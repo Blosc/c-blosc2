@@ -17,13 +17,13 @@ extern "C" {
 #endif
 
 /* Version numbers */
-#define BLOSC_VERSION_MAJOR    1    /* for major interface/format changes  */
-#define BLOSC_VERSION_MINOR    7    /* for minor interface/format changes  */
-#define BLOSC_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
+#define BLOSC_VERSION_MAJOR    2    /* for major interface/format changes  */
+#define BLOSC_VERSION_MINOR    0    /* for minor interface/format changes  */
+#define BLOSC_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC_VERSION_STRING   "1.7.1.dev"  /* string version.  Sync with above! */
+#define BLOSC_VERSION_STRING   "2.0.0a1"  /* string version.  Sync with above! */
 #define BLOSC_VERSION_REVISION "$Rev$"   /* revision version */
-#define BLOSC_VERSION_DATE     "$Date:: 2015-07-05 #$"    /* date version */
+#define BLOSC_VERSION_DATE     "$Date:: 2015-07-30 #$"    /* date version */
 
 #define BLOSCLZ_VERSION_STRING "1.0.5"   /* the internal compressor version */
 
@@ -49,7 +49,7 @@ extern "C" {
 
 /* Codes for shuffling (see blosc_compress) */
 #define BLOSC_NOSHUFFLE   0  /* no shuffle */
-#define BLOSC_SHUFFLE 1      /* byte-wise shuffle */
+#define BLOSC_SHUFFLE     1  /* byte-wise shuffle */
 #define BLOSC_BITSHUFFLE  2  /* bit-wise shuffle */
 
 /* Codes for internal flags (see blosc_cbuffer_metainfo) */
@@ -99,7 +99,6 @@ extern "C" {
 #define BLOSC_LZ4HC_VERSION_FORMAT    1  /* LZ4HC and LZ4 share the same format */
 #define BLOSC_SNAPPY_VERSION_FORMAT   1
 #define BLOSC_ZLIB_VERSION_FORMAT     1
-
 
 /**
   Initialize the Blosc library environment.
@@ -373,6 +372,74 @@ BLOSC_EXPORT void blosc_cbuffer_versions(const void *cbuffer, int *version,
   This function should always succeed.
   */
 BLOSC_EXPORT char *blosc_cbuffer_complib(const void *cbuffer);
+
+
+/*********************************************************************
+
+  Super-chunk related structures and functions.
+
+*********************************************************************/
+
+typedef struct {
+  /* struct blosc_context* parent_context; */
+  uint8_t version;
+  uint8_t flags1;
+  uint8_t flags2;
+  uint8_t flags3;
+  uint16_t compressor;  /* the default compressor */
+  uint16_t clevel;      /* the compression level and other compress params */
+  uint16_t filters;	/* the (sequence of) filters.  3-bit per filter. */
+  uint16_t filt_info;	/* info for filters */
+  uint32_t chunksize;   /* size of each chunk.  0 if not a fixed chunk. */
+  int64_t nchunks;      /* number of chunks in super-chunk */
+  int64_t nbytes;       /* data + metadata (uncompressed) */
+  int64_t cbytes;       /* data + metadata (compressed) */
+  int8_t* metadata;     /* pointer to metadata */
+  int8_t* userdata;     /* pointer to user-defined data */
+  void* data;           /* pointer to data pointers */
+} schunk_header;
+
+typedef struct {
+  uint16_t compressor;  /* the default compressor */
+  uint16_t clevel;      /* the compression level and other compress params */
+  uint16_t filters;	/* the (sequence of) filters.  3-bit per filter. */
+  uint16_t filt_info;	/* info for filters */
+} schunk_params;
+
+/* Create a new super-chunk. */
+BLOSC_EXPORT schunk_header* blosc2_new_schunk(schunk_params params);
+
+/* Free all memory from a super-chunk. */
+BLOSC_EXPORT int blosc2_destroy_schunk(schunk_header* sc_header);
+
+/* Create a new super-chunk. */
+BLOSC_EXPORT schunk_header* blosc2_new_schunk(schunk_params params);
+
+/* Append an existing `chunk` to a super-chunk. */
+BLOSC_EXPORT int blosc2_append_chunk(schunk_header* sc_header, void* chunk);
+
+/* Append a `src` data buffer to a super-chunk.
+
+ `typesize` is the number of bytes of the underlying data type and
+ `nbytes` is the size of the `src` buffer.
+
+ This returns the number of chunk in super-chunk.  If some problem is
+ detected, this number will be negative.
+ */
+BLOSC_EXPORT int blosc2_append_buffer(schunk_header* sc_header,
+				      size_t typesize,
+				      size_t nbytes, void* src);
+
+/* Decompress and return the `nchunk` chunk of a super-chunk.
+
+ If the chunk is uncompressed successfully, it is put in the
+ `**dest` pointer.
+
+ The size of the decompressed chunk is returned.  If some problem is
+ detected, a negative code is returned instead.
+ */
+BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header,
+					 int nchunk, void **dest);
 
 
 
