@@ -37,10 +37,8 @@
 
 int main(){
   static float data[SIZE];
-  static float data_out1[SIZE];
-  static float data_out2[SIZE];
-  void* chunk1 = data_out1;
-  void* chunk2 = data_out2;
+  void* chunk1 = malloc(SIZE*4);
+  void* chunk2 = malloc(SIZE*4);
   float* data_dest;
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize, csize;

@@ -150,14 +150,11 @@ int blosc2_destroy_schunk(schunk_header* sc_header) {
   if (sc_header->data != NULL) {
     for (i = 0; i < sc_header->nchunks; i++) {
       data_pointers = sc_header->data;
-      printf("freeing chunk %d\n", i);
       if (data_pointers[i] != NULL)
 	free(data_pointers[i]);
     }
-    printf("freeing header_data");
     free(sc_header->data);
   }
-  printf("freeing header");
   free(sc_header);
   return 0;
 }
