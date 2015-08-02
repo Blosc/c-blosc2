@@ -1,29 +1,30 @@
 /*
-    Copyright (C) 2015  Francesc Alted
-    http://blosc.org
-    License: MIT (see LICENSE.txt)
+  Copyright (C) 2015  Francesc Alted
+  http://blosc.org
+  License: MIT (see LICENSE.txt)
 
-    Example program demonstrating use of the Blosc filter from C code.
+  Example program demonstrating use of the Blosc filter from C code.
 
-    To compile this program:
+  To compile this program:
 
-    gcc simple_schunk.c -o schunk -lblosc -lpthread
+  gcc simple_schunk.c -o schunk -lblosc -lpthread
 
-    or, if you don't have the blosc library installed:
+  or, if you don't have the blosc library installed:
 
-    gcc -O3 -mavx2 simple_schunk.c ../blosc/*.c -I../blosc -o schunk -lpthread
+  gcc -O3 -mavx2 simple_schunk.c ../blosc/*.c -I../blosc -o schunk -lpthread
 
-    Using MSVC on Windows:
+  Using MSVC on Windows:
 
-    cl /arch:SSE2 /Ox /Feschunk.exe /Iblosc examples\simple_schunk.c blosc\blosc.c blosc\blosclz.c blosc\shuffle.c blosc\shuffle-sse2.c blosc\shuffle-generic.c blosc\bitshuffle-generic.c blosc\bitshuffle-sse2.c
+  cl /arch:SSE2 /Ox /Feschunk.exe /Iblosc examples\simple_schunk.c blosc\blosc.c blosc\blosclz.c blosc\shuffle.c blosc\shuffle-sse2.c blosc\shuffle-generic.c blosc\bitshuffle-generic.c blosc\bitshuffle-sse2.c
 
-    To run:
+  To run:
 
-    $ ./schunk
-    Blosc version info: 1.4.2.dev ($Date:: 2014-07-08 #$)
-    Compression: 4000000 -> 158494 (25.2x)
-    Decompression succesful!
-    Succesful roundtrip!
+  $ ./schunk
+  Blosc version info: 2.0.0a1 ($Date:: 2015-07-30 #$)
+  Compression: 4000000 -> 158788 (25.2x)
+  destsize: 4000000
+  Decompression succesful!
+  Succesful roundtrip!
 
 */
 
@@ -37,10 +38,9 @@
 
 int main(){
   static float data[SIZE];
-  void* chunk1 = malloc(SIZE*4);
-  void* chunk2 = malloc(SIZE*4);
   float* data_dest;
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
+  void* chunk = malloc(isize);
   int dsize, csize;
   schunk_params sc_params;
   schunk_header* sc_header;
@@ -57,8 +57,7 @@ int main(){
   blosc_init();
 
   /* Compress with clevel=5 and shuffle active  */
-  csize = blosc_compress(5, BLOSC_SHUFFLE, sizeof(float), isize, data, chunk1, osize);
-  csize = blosc_compress(5, BLOSC_SHUFFLE, sizeof(float), isize, data, chunk2, osize);
+  csize = blosc_compress(5, BLOSC_SHUFFLE, sizeof(float), isize, data, chunk, osize);
   if (csize == 0) {
     printf("Buffer is uncompressible.  Giving up.\n");
     return 1;
@@ -70,7 +69,6 @@ int main(){
 
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1.*isize) / csize);
 
-
   /* Create a super-chunk container */
   sc_params.filters = BLOSC_SHUFFLE;
   sc_params.compressor = BLOSC_BLOSCLZ;
@@ -78,26 +76,21 @@ int main(){
   sc_header = blosc2_new_schunk(sc_params);
 
   /* Append a couple of chunks there */
-  nchunks = blosc2_append_chunk(sc_header, chunk1);
+  nchunks = blosc2_append_chunk(sc_header, chunk);
   assert(nchunks == 1);
-  nchunks = blosc2_append_chunk(sc_header, chunk2);
+
+  /* Now append another chunk coming from the initial buffer */
+  nchunks = blosc2_append_buffer(sc_header, sizeof(float), isize, data);
   assert(nchunks == 2);
-  printf("Hola!\n");
 
   /* Retrieve and decompress the second chunk (0-based count) */
-  dsize = blosc2_decompress_chunk(sc_header, 0, &data_dest);
+  dsize = blosc2_decompress_chunk(sc_header, 1, &data_dest);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
   }
 
   printf("Decompression succesful!\n");
-
-  /* Destroy the super-chunk */
-  blosc2_destroy_schunk(sc_header);
-
-  /* Destroy the Blosc environment */
-  blosc_destroy();
 
   for(i=0;i<SIZE;i++){
     if(data[i] != data_dest[i]) {
@@ -107,6 +100,14 @@ int main(){
   }
 
   printf("Succesful roundtrip!\n");
+
+  /* Free resources */
   free(data_dest);
+  /* Destroy the super-chunk */
+  blosc2_destroy_schunk(sc_header);
+
+  /* Destroy the Blosc environment */
+  blosc_destroy();
+
   return 0;
 }

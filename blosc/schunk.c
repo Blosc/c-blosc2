@@ -50,9 +50,7 @@ schunk_header* blosc2_new_schunk(schunk_params params) {
   sc_header->filters = params.filters;
   sc_header->compressor = params.compressor;
   sc_header->clevel = params.clevel;
-  printf("Abans de posar el data...\n");
   sc_header->data = malloc(0);
-  printf("Despres de posar el data...\n");
   /* The rest of the structure will remain zeroed */
 
   return sc_header;
@@ -66,7 +64,6 @@ int blosc2_append_chunk(schunk_header* sc_header, void* chunk) {
   /* The chunksize starts in byte 12 */
   int32_t nbytes = *(int32_t*)(chunk + 4);
   int32_t chunksize = *(int32_t*)(chunk + 12);
-  printf("chunksize: %d, %d, %lu\n", chunksize, nbytes, sizeof(void*));
 
   /* Get rid of possibly unused space in chunk */
   /* chunk = realloc(chunk, chunksize); */
@@ -74,8 +71,6 @@ int blosc2_append_chunk(schunk_header* sc_header, void* chunk) {
 
   /* Make space for appending a new chunk and do it */
   sc_header->data = realloc(sc_header->data, (nchunks + 1) * sizeof(void*));
-  printf("data reallocated... %p\n", sc_header->data);
-  printf("chunk address: %p, %lld\n", chunk, nchunks);
   i64_data = sc_header->data;
   i64_data[nchunks] = chunk;
   sc_header->nchunks = nchunks + 1;
@@ -111,7 +106,6 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk,
   int chunksize;
   int32_t destsize;
 
-  printf("nchunk: %d, %lld\n", nchunk, nchunks);
   if (nchunk >= nchunks) {
     return -10;
   }
@@ -119,7 +113,6 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk,
   /* Grab the address of the chunk */
   data_pointers = sc_header->data;
   src = data_pointers[nchunk];
-  printf("Hola2! %p\n", src);
   /* Create a buffer for destination */
   destsize = *(int32_t*)(src + 4);
   printf("destsize: %d\n", destsize);
@@ -150,8 +143,9 @@ int blosc2_destroy_schunk(schunk_header* sc_header) {
   if (sc_header->data != NULL) {
     for (i = 0; i < sc_header->nchunks; i++) {
       data_pointers = sc_header->data;
-      if (data_pointers[i] != NULL)
+      if (data_pointers[i] != NULL) {
 	free(data_pointers[i]);
+      }
     }
     free(sc_header->data);
   }
