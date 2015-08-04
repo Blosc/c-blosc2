@@ -396,24 +396,21 @@ typedef struct {
   int64_t cbytes;       /* data + metadata (compressed) */
   int8_t* metadata;     /* pointer to metadata */
   int8_t* userdata;     /* pointer to user-defined data */
-  void** data;           /* pointer to data pointers */
+  void** data;          /* pointer to data pointers */
 } schunk_header;
 
 typedef struct {
-  uint16_t compressor;  /* the default compressor */
-  uint16_t clevel;      /* the compression level and other compress params */
-  uint16_t filters;	/* the (sequence of) filters.  3-bit per filter. */
-  uint16_t filt_info;	/* info for filters */
+  uint8_t compressor;   /* the default compressor */
+  uint8_t clevel;       /* the compression level and other compress params */
+  uint8_t filters[5];   /* the (sequence of) filters (max: 5) */
+  uint16_t filt_info;   /* info for filters */
 } schunk_params;
 
 /* Create a new super-chunk. */
-BLOSC_EXPORT schunk_header* blosc2_new_schunk(schunk_params params);
+BLOSC_EXPORT schunk_header* blosc2_new_schunk(schunk_params* params);
 
 /* Free all memory from a super-chunk. */
 BLOSC_EXPORT int blosc2_destroy_schunk(schunk_header* sc_header);
-
-/* Create a new super-chunk. */
-BLOSC_EXPORT schunk_header* blosc2_new_schunk(schunk_params params);
 
 /* Append an existing `chunk` to a super-chunk. */
 BLOSC_EXPORT int blosc2_append_chunk(schunk_header* sc_header, void* chunk,

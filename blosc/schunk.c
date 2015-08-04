@@ -42,14 +42,28 @@
 #endif
 
 
+uint16_t encode_filters(schunk_params* params) {
+  int i;
+  int16_t enc_filters = 0;
+
+  /* Encode the 5 filters (3-bit encoded) in 15-bit */
+  for (i=0; i<5; i++) {
+    enc_filters += params->filters[i] << (i * 3);
+  }
+  /* printf("encoded filters: %d \n", enc_filters); */
+  return enc_filters;
+}
+
+
 /* Create a new super-chunk */
-schunk_header* blosc2_new_schunk(schunk_params params) {
+schunk_header* blosc2_new_schunk(schunk_params* params) {
   schunk_header* sc_header = calloc(1, sizeof(schunk_header));
 
   sc_header->version = 0x0;  	/* pre-first version */
-  sc_header->filters = params.filters;
-  sc_header->compressor = params.compressor;
-  sc_header->clevel = params.clevel;
+  sc_header->filters = encode_filters(params);
+  sc_header->filt_info = params->filt_info;
+  sc_header->compressor = params->compressor;
+  sc_header->clevel = params->clevel;
   sc_header->data = malloc(0);
   /* The rest of the structure will remain zeroed */
 
@@ -94,7 +108,7 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
     return chunksize;
   }
 
-  /* Append the chunk (no copy is required) */
+  /* Append the chunk (no copy required here) */
   return blosc2_append_chunk(sc_header, chunk, 0);
 }
 
@@ -115,7 +129,6 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk,
   src = sc_header->data[nchunk];
   /* Create a buffer for destination */
   destsize = *(int32_t*)(src + 4);
-  printf("destsize: %d\n", destsize);
   *dest = malloc(destsize);
 
   /* And decompress it */

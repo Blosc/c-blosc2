@@ -43,7 +43,7 @@ int main(){
   float* data_dest;
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize, csize;
-  schunk_params sc_params;
+  schunk_params* sc_params = calloc(1, sizeof(sc_params));
   schunk_header* sc_header;
   int i, nchunks;
 
@@ -71,9 +71,9 @@ int main(){
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1.*isize) / csize);
 
   /* Create a super-chunk container */
-  sc_params.filters = BLOSC_SHUFFLE;
-  sc_params.compressor = BLOSC_BLOSCLZ;
-  sc_params.clevel = 5;
+  sc_params->filters[0] = BLOSC_SHUFFLE;
+  sc_params->compressor = BLOSC_BLOSCLZ;
+  sc_params->clevel = 5;
   sc_header = blosc2_new_schunk(sc_params);
 
   /* Append a couple of chunks there */
@@ -109,9 +109,9 @@ int main(){
 
   /* Free resources */
   free(data_dest);
+  free(sc_params);
   /* Destroy the super-chunk */
   blosc2_destroy_schunk(sc_header);
-
   /* Destroy the Blosc environment */
   blosc_destroy();
 
