@@ -38,9 +38,10 @@
 
 int main(){
   static float data[SIZE];
+  static float data2[SIZE];
+  void* chunk = data2;
   float* data_dest;
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
-  void* chunk = malloc(isize);
   int dsize, csize;
   schunk_params sc_params;
   schunk_header* sc_header;
@@ -76,7 +77,7 @@ int main(){
   sc_header = blosc2_new_schunk(sc_params);
 
   /* Append a couple of chunks there */
-  nchunks = blosc2_append_chunk(sc_header, chunk);
+  nchunks = blosc2_append_chunk(sc_header, chunk, 1);
   assert(nchunks == 1);
 
   /* Now append another chunk coming from the initial buffer */

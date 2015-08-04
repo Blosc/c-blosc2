@@ -58,16 +58,19 @@ schunk_header* blosc2_new_schunk(schunk_params params) {
 
 
 /* Append an existing chunk to a super-chunk. */
-int blosc2_append_chunk(schunk_header* sc_header, void* chunk) {
+int blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy) {
   int64_t nchunks = sc_header->nchunks;
   int64_t** i64_data;
   /* The chunksize starts in byte 12 */
-  int32_t nbytes = *(int32_t*)(chunk + 4);
-  int32_t chunksize = *(int32_t*)(chunk + 12);
+  int32_t cbytes = *(int32_t*)(chunk + 12);
+  void* chunk_copy;
 
-  /* Get rid of possibly unused space in chunk */
-  /* chunk = realloc(chunk, chunksize); */
-  /* printf("chunk reallocated...\n"); */
+  /* By copying the chunk we will always be able to free it later on */
+  if (copy) {
+    chunk_copy = malloc(cbytes);
+    memcpy(chunk_copy, chunk, cbytes);
+    chunk = chunk_copy;
+  }
 
   /* Make space for appending a new chunk and do it */
   sc_header->data = realloc(sc_header->data, (nchunks + 1) * sizeof(void*));
@@ -93,7 +96,8 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
     return chunksize;
   }
 
-  return blosc2_append_chunk(sc_header, chunk);
+  /* Append the chunk (no copy is required) */
+  return blosc2_append_chunk(sc_header, chunk, 0);
 }
 
 

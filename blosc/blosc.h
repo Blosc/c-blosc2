@@ -416,7 +416,8 @@ BLOSC_EXPORT int blosc2_destroy_schunk(schunk_header* sc_header);
 BLOSC_EXPORT schunk_header* blosc2_new_schunk(schunk_params params);
 
 /* Append an existing `chunk` to a super-chunk. */
-BLOSC_EXPORT int blosc2_append_chunk(schunk_header* sc_header, void* chunk);
+BLOSC_EXPORT int blosc2_append_chunk(schunk_header* sc_header, void* chunk,
+                                     int copy);
 
 /* Append a `src` data buffer to a super-chunk.
 
