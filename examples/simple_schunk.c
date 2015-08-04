@@ -84,8 +84,13 @@ int main(){
   nchunks = blosc2_append_buffer(sc_header, sizeof(float), isize, data);
   assert(nchunks == 2);
 
-  /* Retrieve and decompress the second chunk (0-based count) */
+  /* Retrieve and decompress the chunks (0-based count) */
   dsize = blosc2_decompress_chunk(sc_header, 1, &data_dest);
+  if (dsize < 0) {
+    printf("Decompression error.  Error code: %d\n", dsize);
+    return dsize;
+  }
+  dsize = blosc2_decompress_chunk(sc_header, 0, &data_dest);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;

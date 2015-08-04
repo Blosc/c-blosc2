@@ -60,7 +60,6 @@ schunk_header* blosc2_new_schunk(schunk_params params) {
 /* Append an existing chunk to a super-chunk. */
 int blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy) {
   int64_t nchunks = sc_header->nchunks;
-  int64_t** i64_data;
   /* The chunksize starts in byte 12 */
   int32_t cbytes = *(int32_t*)(chunk + 12);
   void* chunk_copy;
@@ -74,8 +73,7 @@ int blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy) {
 
   /* Make space for appending a new chunk and do it */
   sc_header->data = realloc(sc_header->data, (nchunks + 1) * sizeof(void*));
-  i64_data = sc_header->data;
-  i64_data[nchunks] = chunk;
+  sc_header->data[nchunks] = chunk;
   sc_header->nchunks = nchunks + 1;
 
   return nchunks + 1;
@@ -105,7 +103,6 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
 int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk,
 			    void **dest) {
   int64_t nchunks = sc_header->nchunks;
-  int64_t** data_pointers;
   void* src;
   int chunksize;
   int32_t destsize;
@@ -115,8 +112,7 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk,
   }
 
   /* Grab the address of the chunk */
-  data_pointers = sc_header->data;
-  src = data_pointers[nchunk];
+  src = sc_header->data[nchunk];
   /* Create a buffer for destination */
   destsize = *(int32_t*)(src + 4);
   printf("destsize: %d\n", destsize);
@@ -138,7 +134,6 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk,
 /* Free all memory from a super-chunk. */
 int blosc2_destroy_schunk(schunk_header* sc_header) {
   int i;
-  int64_t** data_pointers;
 
   if (sc_header->metadata != NULL)
     free(sc_header->metadata);
@@ -146,9 +141,8 @@ int blosc2_destroy_schunk(schunk_header* sc_header) {
     free(sc_header->userdata);
   if (sc_header->data != NULL) {
     for (i = 0; i < sc_header->nchunks; i++) {
-      data_pointers = sc_header->data;
-      if (data_pointers[i] != NULL) {
-	free(data_pointers[i]);
+      if (sc_header->data[i] != NULL) {
+	free(sc_header->data[i]);
       }
     }
     free(sc_header->data);

@@ -396,7 +396,7 @@ typedef struct {
   int64_t cbytes;       /* data + metadata (compressed) */
   int8_t* metadata;     /* pointer to metadata */
   int8_t* userdata;     /* pointer to user-defined data */
-  void* data;           /* pointer to data pointers */
+  void** data;           /* pointer to data pointers */
 } schunk_header;
 
 typedef struct {
