@@ -47,10 +47,14 @@ extern "C" {
 /* The maximum number of threads (for some static arrays) */
 #define BLOSC_MAX_THREADS 256
 
-/* Codes for shuffling (see blosc_compress) */
+/* Codes for filters (see blosc_compress) */
 #define BLOSC_NOSHUFFLE   0  /* no shuffle */
 #define BLOSC_SHUFFLE     1  /* byte-wise shuffle */
 #define BLOSC_BITSHUFFLE  2  /* bit-wise shuffle */
+#define BLOSC_DELTA       3  /* delta filter */
+
+/* Maximum number of simultaneous filters */
+#define BLOSC_MAX_FILTERS 5
 
 /* Codes for internal flags (see blosc_cbuffer_metainfo) */
 #define BLOSC_DOSHUFFLE    0x1	/* byte-wise shuffle */
@@ -402,7 +406,7 @@ typedef struct {
 typedef struct {
   uint8_t compressor;   /* the default compressor */
   uint8_t clevel;       /* the compression level and other compress params */
-  uint8_t filters[5];   /* the (sequence of) filters (max: 5) */
+  uint8_t filters[BLOSC_MAX_FILTERS];   /* the (sequence of) filters */
   uint16_t filt_info;   /* info for filters */
 } schunk_params;
 

@@ -42,16 +42,30 @@
 #endif
 
 
+/* Encode filters in a 16 bit int type */
 uint16_t encode_filters(schunk_params* params) {
   int i;
   int16_t enc_filters = 0;
 
-  /* Encode the 5 filters (3-bit encoded) in 15-bit */
-  for (i=0; i<5; i++) {
+  /* Encode the BLOSC_MAX_FILTERS filters (3-bit encoded) in 16 bit */
+  for (i=0; i<BLOSC_MAX_FILTERS; i++) {
     enc_filters += params->filters[i] << (i * 3);
   }
-  /* printf("encoded filters: %d \n", enc_filters); */
   return enc_filters;
+}
+
+
+/* Decode filters.  The returned array must be freed after use.  */
+uint8_t* decode_filters(uint16_t enc_filters) {
+  int i;
+  uint8_t* filters = malloc(BLOSC_MAX_FILTERS);
+
+  /* Decode the BLOSC_MAX_FILTERS filters (3-bit encoded) in 16 bit */
+  for (i=0; i<BLOSC_MAX_FILTERS; i++) {
+    filters[i] = enc_filters & 0b11;
+    enc_filters >>= 3;
+  }
+  return filters;
 }
 
 
@@ -59,7 +73,7 @@ uint16_t encode_filters(schunk_params* params) {
 schunk_header* blosc2_new_schunk(schunk_params* params) {
   schunk_header* sc_header = calloc(1, sizeof(schunk_header));
 
-  sc_header->version = 0x0;  	/* pre-first version */
+  sc_header->version = 0x0;     /* pre-first version */
   sc_header->filters = encode_filters(params);
   sc_header->filt_info = params->filt_info;
   sc_header->compressor = params->compressor;
@@ -94,18 +108,83 @@ int blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy) {
 }
 
 
+int delta_encoder(schunk_header* sc_header, size_t nbytes,
+		  uint8_t* src, uint8_t* dest) {
+  size_t i;
+  int cbytes;
+  uint8_t* dref = malloc(nbytes);
+  void* ref = sc_header->data[0];
+
+  /* Get the reference chunk */
+  cbytes = blosc_decompress(ref, dref, nbytes);
+  if (cbytes < 0) {
+    return cbytes;
+  }
+
+  for (i=0; i<nbytes; i++) {
+    dest[i] = src[i] - dref[i];
+  }
+  free(dref);
+
+  return nbytes;
+}
+
+
+int delta_decoder(schunk_header* sc_header, size_t nbytes, uint8_t* src) {
+  size_t i;
+  int nbytes2;
+  uint8_t* dref = malloc(nbytes);
+  void *ref = sc_header->data[0];
+
+  /* Get the reference chunk */
+  nbytes2 = blosc_decompress(ref, dref, nbytes);
+  if (nbytes2 < 0) {
+    return -10;
+  }
+
+  for (i=0; i<nbytes; i++) {
+    src[i] += dref[i];
+  }
+  free(dref);
+
+  return nbytes;
+}
+
+
 /* Append a data buffer to a super-chunk. */
 int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
-			 size_t nbytes, void* src) {
-  int chunksize;
+                         size_t nbytes, void* src) {
+  int cbytes;
   void* chunk = malloc(nbytes);
+  void* dest;
+  int ret;
+  uint16_t enc_filters = sc_header->filters;
+  uint8_t* filters = decode_filters(enc_filters);
+
+  /* Apply filters prior to compress */
+  if (filters[0] == BLOSC_DELTA) {
+    if (sc_header->nchunks > 0) {
+      dest = malloc(nbytes);
+      ret = delta_encoder(sc_header, nbytes, src, dest);
+      if (ret < 0) {
+	return ret;
+      }
+      src = dest;
+    }
+    enc_filters = enc_filters >> 3;
+  }
 
   /* Compress the src buffer using super-chunk defaults */
-  chunksize = blosc_compress(sc_header->clevel, sc_header->filters,
-			     typesize, nbytes, src, chunk, nbytes);
-  if (chunksize < 0) {
+  cbytes = blosc_compress(sc_header->clevel, enc_filters,
+                          typesize, nbytes, src, chunk, nbytes);
+  printf("Compression: %d -> %d (%.1fx)\n", nbytes, cbytes, (1.*nbytes) / cbytes);
+
+  if (filters[0] == BLOSC_DELTA && sc_header->nchunks > 0) {
+    free(dest);
+  }
+  if (cbytes < 0) {
     free(chunk);
-    return chunksize;
+    return cbytes;
   }
 
   /* Append the chunk (no copy required here) */
@@ -115,11 +194,13 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
 
 /* Decompress and return a chunk that is part of a super-chunk. */
 int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk,
-			    void **dest) {
+                            void **dest) {
   int64_t nchunks = sc_header->nchunks;
   void* src;
   int chunksize;
-  int32_t destsize;
+  int32_t nbytes;
+  uint16_t enc_filters = sc_header->filters;
+  uint8_t* filters = decode_filters(enc_filters);
 
   if (nchunk >= nchunks) {
     return -10;
@@ -128,16 +209,21 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk,
   /* Grab the address of the chunk */
   src = sc_header->data[nchunk];
   /* Create a buffer for destination */
-  destsize = *(int32_t*)(src + 4);
-  *dest = malloc(destsize);
+  nbytes = *(int32_t*)(src + 4);
+  *dest = malloc(nbytes);
 
   /* And decompress it */
-  chunksize = blosc_decompress(src, *dest, destsize);
+  chunksize = blosc_decompress(src, *dest, nbytes);
   if (chunksize < 0) {
     return chunksize;
   }
-  if (chunksize != destsize) {
+  if (chunksize != nbytes) {
     return -11;
+  }
+
+  /* Apply filters after de-compress */
+  if (filters[0] == BLOSC_DELTA && sc_header->nchunks > 0) {
+    delta_decoder(sc_header, nbytes, *dest);
   }
 
   return chunksize;
@@ -155,7 +241,7 @@ int blosc2_destroy_schunk(schunk_header* sc_header) {
   if (sc_header->data != NULL) {
     for (i = 0; i < sc_header->nchunks; i++) {
       if (sc_header->data[i] != NULL) {
-	free(sc_header->data[i]);
+        free(sc_header->data[i]);
       }
     }
     free(sc_header->data);
