@@ -79,32 +79,11 @@ schunk_header* blosc2_new_schunk(schunk_params* params) {
   sc_header->compressor = params->compressor;
   sc_header->clevel = params->clevel;
   sc_header->data = malloc(0);
+  sc_header->nbytes = 0;
+  sc_header->cbytes = sizeof(*sc_header);
   /* The rest of the structure will remain zeroed */
 
   return sc_header;
-}
-
-
-/* Append an existing chunk to a super-chunk. */
-int blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy) {
-  int64_t nchunks = sc_header->nchunks;
-  /* The chunksize starts in byte 12 */
-  int32_t cbytes = *(int32_t*)(chunk + 12);
-  void* chunk_copy;
-
-  /* By copying the chunk we will always be able to free it later on */
-  if (copy) {
-    chunk_copy = malloc(cbytes);
-    memcpy(chunk_copy, chunk, cbytes);
-    chunk = chunk_copy;
-  }
-
-  /* Make space for appending a new chunk and do it */
-  sc_header->data = realloc(sc_header->data, (nchunks + 1) * sizeof(void*));
-  sc_header->data[nchunks] = chunk;
-  sc_header->nchunks = nchunks + 1;
-
-  return nchunks + 1;
 }
 
 
@@ -151,6 +130,34 @@ int delta_decoder(schunk_header* sc_header, size_t nbytes, uint8_t* src) {
 }
 
 
+/* Append an existing chunk to a super-chunk. */
+int blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy) {
+  int64_t nchunks = sc_header->nchunks;
+  /* The uncompressed and compressed sizes start at byte 4 and 12 */
+  int32_t nbytes = *(int32_t*)(chunk + 4);
+  int32_t cbytes = *(int32_t*)(chunk + 12);
+  void* chunk_copy;
+
+  /* By copying the chunk we will always be able to free it later on */
+  if (copy) {
+    chunk_copy = malloc(cbytes);
+    memcpy(chunk_copy, chunk, cbytes);
+    chunk = chunk_copy;
+  }
+
+  /* Make space for appending a new chunk and do it */
+  sc_header->data = realloc(sc_header->data, (nchunks + 1) * sizeof(void*));
+  sc_header->data[nchunks] = chunk;
+  sc_header->nchunks = nchunks + 1;
+  sc_header->nbytes += nbytes;
+  sc_header->cbytes += cbytes;
+  printf("Compression chunk #%lld: %d -> %d (%.1fx)\n",
+         nchunks, nbytes, cbytes, (1.*nbytes) / cbytes);
+
+  return nchunks + 1;
+}
+
+
 /* Append a data buffer to a super-chunk. */
 int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
                          size_t nbytes, void* src) {
@@ -177,7 +184,6 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
   /* Compress the src buffer using super-chunk defaults */
   cbytes = blosc_compress(sc_header->clevel, enc_filters,
                           typesize, nbytes, src, chunk, nbytes);
-  printf("Compression: %d -> %d (%.1fx)\n", nbytes, cbytes, (1.*nbytes) / cbytes);
 
   if (filters[0] == BLOSC_DELTA && sc_header->nchunks > 0) {
     free(dest);

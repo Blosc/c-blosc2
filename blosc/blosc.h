@@ -397,7 +397,7 @@ typedef struct {
   uint32_t chunksize;   /* size of each chunk.  0 if not a fixed chunk. */
   int64_t nchunks;      /* number of chunks in super-chunk */
   int64_t nbytes;       /* data + metadata (uncompressed) */
-  int64_t cbytes;       /* data + metadata (compressed) */
+  int64_t cbytes;       /* data + metadata + header (compressed) */
   int8_t* metadata;     /* pointer to metadata */
   int8_t* userdata;     /* pointer to user-defined data */
   void** data;          /* pointer to data pointers */

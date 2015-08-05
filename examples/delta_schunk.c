@@ -41,6 +41,7 @@ int main(){
   int32_t* data_dest;
   int isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
   int dsize, csize;
+  int32_t nbytes, cbytes;
   schunk_params* sc_params = calloc(1, sizeof(sc_params));
   schunk_header* sc_header;
   int i, nchunks;
@@ -70,8 +71,14 @@ int main(){
   nchunks = blosc2_append_buffer(sc_header, sizeof(int32_t), isize, data);
   assert(nchunks == 2);
 
+  /* Gather some info */
+  nbytes = sc_header->nbytes;
+  cbytes = sc_header->cbytes;
+  printf("Compression super-chunk: %d -> %d (%.1fx)\n",
+         nbytes, cbytes, (1.*nbytes) / cbytes);
+
   /* Retrieve and decompress the chunks (0-based count) */
-  dsize = blosc2_decompress_chunk(sc_header, 1, &data_dest);
+  dsize = blosc2_decompress_chunk(sc_header, 1, (void**)&data_dest);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
