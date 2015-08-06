@@ -32,7 +32,7 @@
 #include <assert.h>
 #include "blosc.h"
 
-#define SIZE 100*100*100
+#define SIZE 500*100*100
 #define SHAPE {100,100,100}
 #define CHUNKSHAPE {1,100,100}
 
