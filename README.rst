@@ -4,15 +4,17 @@
 
 :Author: Francesc Alted
 :Contact: francesc@blosc.org
+:Author: Valentin Haenel
+:Contact: valentin@blosc.org
 :URL: http://www.blosc.org
 :Travis CI: |travis|
 :Appveyor: |appveyor|
 
-.. |travis| image:: https://travis-ci.org/Blosc/c-blosc.svg?branch=master
-        :target: https://travis-ci.org/Blosc/c-blosc
+.. |travis| image:: https://travis-ci.org/Blosc/c-blosc2.svg?branch=master
+        :target: https://travis-ci.org/Blosc/c-blosc2
 
 .. |appveyor| image:: https://ci.appveyor.com/api/projects/status/gccmb03j8ghbj0ig/branch/master?svg=true
-        :target: https://ci.appveyor.com/project/FrancescAlted/c-blosc/branch/master
+        :target: https://ci.appveyor.com/project/FrancescAlted/c-blosc2/branch/master
 
 
 What is it?
@@ -25,33 +27,23 @@ a memcpy() OS call.  Blosc is the first compressor (that I'm aware of)
 that is meant not only to reduce the size of large datasets on-disk or
 in-memory, but also to accelerate memory-bound computations.
 
-It uses the blocking technique (as described in [2]_) to reduce
-activity on the memory bus as much as possible. In short, this
-technique works by dividing datasets in blocks that are small enough
-to fit in caches of modern processors and perform compression /
-decompression there.  It also leverages, if available, SIMD
-instructions (SSE2, AVX2) and multi-threading capabilities of CPUs, in
-order to accelerate the compression / decompression process to a
-maximum.
+C-Blosc2 is the new major version of C-Blosc, with a revamped API and
+support for new filters (including filter pipelining), new compressors,
+but most importantly new data containers that are meant to overcome the
+32-bit limitation of the original C-Blosc.  These new data containers
+will be available in various forms, including in-memory and on-disk
+implementations.
 
-Blosc is actually a metacompressor, that meaning that it can use a
-range of compression libraries for performing the actual
-compression/decompression. Right now, it comes with integrated support
-for BloscLZ (the original one), LZ4, LZ4HC, Snappy and Zlib. Blosc
-comes with full sources for all compressors, so in case it does not
-find the libraries installed in your system, it will compile from the
-included sources and they will be integrated into the Blosc library
-anyway. That means that you can trust in having all supported
-compressors integrated in Blosc in all supported platforms.
-
-You can see some benchmarks about Blosc performance in [3]_
+C-Blosc2 is currently in alpha stage and its development will probably
+take several months.  If you want to collaborate in the this development
+you are welcome.  We are going to need help in supervising and refining
+the API, as well as in the design of the new containers.  Testing for
+other platforms than Intel (specially ARM) will be appreciated as well.
 
 Blosc is distributed using the MIT license, see LICENSES/BLOSC.txt for
 details.
 
 .. [1] http://www.blosc.org
-.. [2] http://blosc.org/docs/StarvingCPUs-CISE-2010.pdf
-.. [3] http://blosc.org/synthetic-benchmarks.html
 
 Meta-compression and other advantages over existing compressors
 ===============================================================
@@ -96,73 +88,6 @@ Other advantages of Blosc are:
 
 When taken together, all these features set Blosc apart from other
 similar solutions.
-
-Compiling your application with a minimalistic Blosc
-====================================================
-
-The minimal Blosc consists of the next files (in `blosc/ directory
-<https://github.com/Blosc/c-blosc/tree/master/blosc>`_)::
-
-    blosc.h and blosc.c        -- the main routines
-    shuffle*.h and shuffle*.c  -- the shuffle code
-    blosclz.h and blosclz.c    -- the blosclz compressor
-
-Just add these files to your project in order to use Blosc.  For
-information on compression and decompression routines, see `blosc.h
-<https://github.com/Blosc/c-blosc/blob/master/blosc/blosc.h>`_.
-
-To compile using GCC (4.9 or higher recommended) on Unix:
-
-.. code-block:: console
-
-   $ gcc -O3 -mavx2 -o myprog myprog.c blosc/*.c -Iblosc -lpthread
-
-Using Windows and MINGW:
-
-.. code-block:: console
-
-   $ gcc -O3 -mavx2 -o myprog myprog.c -Iblosc blosc\*.c
-
-Using Windows and MSVC (2013 or higher recommended):
-
-.. code-block:: console
-
-  $ cl /Ox /Femyprog.exe /Iblosc myprog.c blosc\*.c
-
-In the `examples/ directory
-<https://github.com/Blosc/c-blosc/tree/master/examples>`_ you can find
-more hints on how to link your app with Blosc.
-
-I have not tried to compile this with compilers other than GCC, clang,
-MINGW, Intel ICC or MSVC yet. Please report your experiences with your
-own platforms.
-
-Adding support for other compressors with a minimalistic Blosc
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The official cmake files (see below) for Blosc try hard to include
-support for LZ4, LZ4HC, Snappy, Zlib inside the Blosc library, so
-using them is just a matter of calling the appropriate
-`blosc_set_compressor() API call
-<https://github.com/Blosc/c-blosc/blob/master/blosc/blosc.h>`_.  See
-an `example here
-<https://github.com/Blosc/c-blosc/blob/master/examples/many_compressors.c>`_.
-
-Having said this, it is also easy to use a minimalistic Blosc and just
-add the symbols HAVE_LZ4 (will include both LZ4 and LZ4HC),
-HAVE_SNAPPY and HAVE_ZLIB during compilation as well as the
-appropriate libraries. For example, for compiling with minimalistic
-Blosc but with added Zlib support do:
-
-.. code-block:: console
-
-   $ gcc -O3 -msse2 -o myprog myprog.c blosc/*.c -Iblosc -lpthread -DHAVE_ZLIB -lz
-
-In the `bench/ directory
-<https://github.com/Blosc/c-blosc/tree/master/bench>`_ there a couple
-of Makefile files (one for UNIX and the other for MinGW) with more
-complete building examples, like switching between libraries or
-internal sources for the compressors.
 
 Compiling the Blosc library with CMake
 ======================================
