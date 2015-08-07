@@ -87,8 +87,8 @@ schunk_header* blosc2_new_schunk(schunk_params* params) {
 }
 
 
-int delta_encoder(schunk_header* sc_header, size_t nbytes,
-		  uint8_t* src, uint8_t* dest) {
+int delta_encoder8(schunk_header* sc_header, size_t nbytes,
+		   uint8_t* src, uint8_t* dest) {
   size_t i;
   int cbytes;
   uint8_t* dref = malloc(nbytes);
@@ -109,22 +109,55 @@ int delta_encoder(schunk_header* sc_header, size_t nbytes,
 }
 
 
-int delta_decoder(schunk_header* sc_header, size_t nbytes, uint8_t* src) {
+int delta_encoder32(schunk_header* sc_header, size_t nbytes,
+		    uint8_t* src, uint8_t* dest) {
+  size_t i;
+  int cbytes;
+  uint8_t* dref = malloc(nbytes);
+  uint32_t* ui32dref = (uint32_t*)dref;
+  uint32_t* ui32src = (uint32_t*)src;
+  uint32_t* ui32dest = (uint32_t*)dest;
+
+  /* Get the reference chunk */
+  cbytes = blosc_decompress(sc_header->data[0], dref, nbytes);
+  if (cbytes < 0) {
+    return cbytes;
+  }
+
+  /* Get the delta in chunks of 4 bytes (uint32_t) */
+  for (i=0; i<(nbytes/4); i++) {
+    ui32dest[i] = ui32src[i] - ui32dref[i];
+  }
+  free(dref);
+
+  /* Copy the leftover as-is (i.e. no delta) */
+  for (i=(nbytes/4)*4; i<nbytes; i++) {
+    dest[i] = src[i];
+  }
+
+  return nbytes;
+}
+
+
+int delta_decoder32(schunk_header* sc_header, size_t nbytes, uint8_t* src) {
   size_t i;
   int nbytes2;
   uint8_t* dref = malloc(nbytes);
-  void *ref = sc_header->data[0];
+  uint32_t* ui32dref = (uint32_t*)dref;
+  uint32_t* ui32src = (uint32_t*)src;
 
   /* Get the reference chunk */
-  nbytes2 = blosc_decompress(ref, dref, nbytes);
+  nbytes2 = blosc_decompress(sc_header->data[0], dref, nbytes);
   if (nbytes2 < 0) {
     return -10;
   }
 
-  for (i=0; i<nbytes; i++) {
-    src[i] += dref[i];
+  /* Add the delta */
+  for (i=0; i<(nbytes/4); i++) {
+    ui32src[i] += ui32dref[i];
   }
   free(dref);
+  /* The leftover is a copy of the original already, so we are done */
 
   return nbytes;
 }
@@ -164,7 +197,7 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
   int cbytes;
   void* chunk = malloc(nbytes);
   void* dest;
-  int ret;
+  int ret = nbytes;
   uint16_t enc_filters = sc_header->filters;
   uint8_t* filters = decode_filters(enc_filters);
 
@@ -172,13 +205,16 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
   if (filters[0] == BLOSC_DELTA) {
     if (sc_header->nchunks > 0) {
       dest = malloc(nbytes);
-      ret = delta_encoder(sc_header, nbytes, src, dest);
+      ret = delta_encoder32(sc_header, nbytes, src, dest);
+      /* ret = delta_encoder8(sc_header, nbytes, src, dest); */
+      /* dest = memcpy(dest, src, nbytes); */
       if (ret < 0) {
 	return ret;
       }
       src = dest;
     }
     enc_filters = enc_filters >> 3;
+    /* typesize = 4; */  /* do a test with this and see */
   }
 
   /* Compress the src buffer using super-chunk defaults */
@@ -229,7 +265,7 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk,
 
   /* Apply filters after de-compress */
   if (filters[0] == BLOSC_DELTA && sc_header->nchunks > 0) {
-    delta_decoder(sc_header, nbytes, *dest);
+    delta_decoder32(sc_header, nbytes, *dest);
   }
 
   return chunksize;
