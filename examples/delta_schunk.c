@@ -30,7 +30,7 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include "blosc.h"
+#include "../blosc/blosc.h"
 
 #define SIZE 500*100*100
 #define SHAPE {100,100,100}

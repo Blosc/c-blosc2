@@ -10,6 +10,7 @@
 
 #include <limits.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include "blosc-export.h"
 
 #ifdef __cplusplus

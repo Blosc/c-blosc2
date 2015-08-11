@@ -94,13 +94,21 @@ int delta_encoder8(schunk_header* sc_header, int nbytes,
 		   uint8_t* src, uint8_t* dest) {
   int i;
   int rbytes = *(int *)(sc_header->data[0] + 4);
+  int mbytes;
   uint8_t* dref = (uint8_t *)sc_header->data[0] + BLOSC_MAX_OVERHEAD;
 
-  nbytes = MIN(nbytes, rbytes);
+  mbytes = MIN(nbytes, rbytes);
 
-   /* Encode delta */
-  for (i=0; i<nbytes; i++) {
+  /* Encode delta */
+  for (i=0; i<mbytes; i++) {
     dest[i] = src[i] - dref[i];
+  }
+
+  /* Copy the leftovers */
+  if (nbytes > rbytes) {
+    for (i=rbytes; i<nbytes; i++) {
+      dest[i] = src[i];
+    }
   }
 
   return nbytes;
@@ -108,13 +116,19 @@ int delta_encoder8(schunk_header* sc_header, int nbytes,
 
 
 int delta_decoder8(schunk_header* sc_header, int nbytes, uint8_t* src) {
-   int i;
-   uint8_t* dref = (uint8_t *)sc_header->data[0] + BLOSC_MAX_OVERHEAD;
+  int i;
+  uint8_t* dref = (uint8_t *)sc_header->data[0] + BLOSC_MAX_OVERHEAD;
+  int rbytes = *(int *)(sc_header->data[0] + 4);
+  int mbytes;
 
-   /* Decode delta */
-   for (i=0; i<(nbytes); i++) {
-     src[i] = src[i] + dref[i];
-   }
+  mbytes = MIN(nbytes, rbytes);
+
+  /* Decode delta */
+  for (i=0; i<(mbytes); i++) {
+    src[i] += dref[i];
+  }
+
+  /* The leftovers are in-place already */
 
   return nbytes;
 }
@@ -185,7 +199,8 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
     return cbytes;
   }
 
-  /* free(dest); */   /* investigate why this gives a "pointer not allocated" */
+  /* We don't need dest anymore */
+  free(dest);
 
   /* Append the chunk (no copy required here) */
   return blosc2_append_chunk(sc_header, chunk, 0);
