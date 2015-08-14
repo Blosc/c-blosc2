@@ -37,7 +37,7 @@ if(NOT DEACTIVATE_ZLIB)
 endif(NOT DEACTIVATE_ZLIB)
 
 # library sources
-set(SOURCES blosc.c blosclz.c shuffle-generic.c bitshuffle-generic.c)
+set(SOURCES blosc.c blosclz.c schunk.c shuffle-generic.c bitshuffle-generic.c)
 if(COMPILER_SUPPORT_SSE2)
     message(STATUS "Adding run-time support for SSE2")
     set(SOURCES ${SOURCES} shuffle-sse2.c bitshuffle-sse2.c)

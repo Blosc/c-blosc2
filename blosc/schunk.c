@@ -153,10 +153,13 @@ int blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy) {
   sc_header->data = realloc(sc_header->data, (nchunks + 1) * sizeof(void*));
   sc_header->data[nchunks] = chunk;
   sc_header->nchunks = nchunks + 1;
-  sc_header->nbytes += nbytes;
-  sc_header->cbytes += cbytes;
-  printf("Compression chunk #%lld: %d -> %d (%.1fx)\n",
-         nchunks, nbytes, cbytes, (1.*nbytes) / cbytes);
+  if (nchunks > 0) {
+    /* Avoid counting the reference as it is uncompressed */
+    sc_header->nbytes += nbytes;
+    sc_header->cbytes += cbytes;
+  }
+  /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n", */
+  /*        nchunks, nbytes, cbytes, (1.*nbytes) / cbytes); */
 
   return nchunks + 1;
 }
@@ -172,6 +175,7 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
   uint16_t enc_filters = sc_header->filters;
   uint8_t* filters = decode_filters(enc_filters);
   int clevel = sc_header->clevel;
+  char* compname;
 
   /* Apply filters prior to compress */
   if (filters[0] == BLOSC_DELTA) {
@@ -191,6 +195,8 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
   }
 
   /* Compress the src buffer using super-chunk defaults */
+  blosc_compcode_to_compname(sc_header->compressor, &compname);
+  blosc_set_compressor(compname);
   cbytes = blosc_compress(clevel, enc_filters, typesize, nbytes, src, chunk,
 			  nbytes + BLOSC_MAX_OVERHEAD);
   if (cbytes < 0) {
