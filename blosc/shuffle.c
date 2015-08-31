@@ -270,6 +270,16 @@ get_shuffle_implementation() {
   }
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
+#if defined(SHUFFLE_NEON_ENABLED)
+  shuffle_implementation_t impl_neon;
+  impl_neon.name = "neon";
+  impl_neon.shuffle = (shuffle_func)shuffle_neon;
+  impl_neon.unshuffle = (unshuffle_func)unshuffle_neon;
+  impl_neon.bitshuffle = (bitshuffle_func)bitshuffle_neon;
+  impl_neon.bitunshuffle = (bitunshuffle_func)bitunshuffle_neon;
+  return impl_neon;
+#endif  /* defined(SHUFFLE_NEON_ENABLED) */
+
   /*  Processor doesn't support any of the hardware-accelerated implementations,
       so use the generic implementation. */
   shuffle_implementation_t impl_generic;
