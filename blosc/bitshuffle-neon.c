@@ -23,6 +23,9 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Macro  */
+#define _CHECK_MULT_EIGHT(n) if (n % 8) return;
+
 static void printmem(uint8_t* buf)
 {
   printf("%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,\n",
@@ -35,7 +38,7 @@ static void printmem(uint8_t* buf)
 
 /* Routine optimized for bit-shuffling a buffer for a type size of 1 byte. */
 static void
-bitshuffle1_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytess) {
+bitshuffle1_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
 
   const size_t elem_size = 1;
   uint16x8_t x0;
@@ -46,9 +49,9 @@ bitshuffle1_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytess) 
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  CHECK_MULT_EIGHT(nbytess);
+  _CHECK_MULT_EIGHT(nbytes);
 
-  for (i = 0, k = 0; i < nbytess; i += 16, k++) {
+  for (i = 0, k = 0; i < nbytes; i += 16, k++) {
     /* Load 16-byte groups */
     x0 = vld1q_u8(src + k*16);
     /* Split in 8-bytes grops */
@@ -70,15 +73,15 @@ bitshuffle1_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytess) 
       lo_x = vshr_n_u8(lo_x, 1);
       hi_x = vshr_n_u8(hi_x, 1);
       /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + 2*k + j*nbytess/(8*elem_size), lo, 0);
-      vst1_lane_u8(dest + 2*k+1 + j*nbytess/(8*elem_size), hi, 0);
+      vst1_lane_u8(dest + 2*k + j*nbytes/(8*elem_size), lo, 0);
+      vst1_lane_u8(dest + 2*k+1 + j*nbytes/(8*elem_size), hi, 0);
     }
   }
 }
 
 /* Routine optimized for bit-shuffling a buffer for a type size of 2 bytes. */
 static void
-bitshuffle2_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytess) {
+bitshuffle2_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
 
   const size_t elem_size = 2;
   uint8x16x2_t x0;
@@ -89,9 +92,9 @@ bitshuffle2_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytess) 
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  CHECK_MULT_EIGHT(nbytess);
+  _CHECK_MULT_EIGHT(nbytes);
 
-  for (i = 0, k = 0; i < nbytess; i += 32, k++) {
+  for (i = 0, k = 0; i < nbytes; i += 32, k++) {
     /* Load 32-byte groups */
     x0 = vld2q_u8(src + i);
     /* Split in 8-bytes grops */
@@ -130,17 +133,17 @@ bitshuffle2_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytess) 
       lo_x[1] = vshr_n_u8(lo_x[1], 1);
       hi_x[1] = vshr_n_u8(hi_x[1], 1);
       /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + 2*k + j*nbytess/(8*elem_size), lo[0], 0);
-      vst1_lane_u8(dest + 2*k + j*nbytess/(8*elem_size) + nbytess/2, lo[1], 0);
-      vst1_lane_u8(dest + 2*k+1 + j*nbytess/(8*elem_size), hi[0], 0);
-      vst1_lane_u8(dest + 2*k+1 + j*nbytess/(8*elem_size) + nbytess/2, hi[1], 0);
+      vst1_lane_u8(dest + 2*k + j*nbytes/(8*elem_size), lo[0], 0);
+      vst1_lane_u8(dest + 2*k + j*nbytes/(8*elem_size) + nbytes/2, lo[1], 0);
+      vst1_lane_u8(dest + 2*k+1 + j*nbytes/(8*elem_size), hi[0], 0);
+      vst1_lane_u8(dest + 2*k+1 + j*nbytes/(8*elem_size) + nbytes/2, hi[1], 0);
     }
   }
 }
 
 /* Routine optimized for bit-shuffling a buffer for a type size of 4 bytes. */
 static void
-bitshuffle4_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytess) {
+bitshuffle4_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
 
   const size_t elem_size = 4;
   uint8x16x4_t x0;
@@ -151,7 +154,7 @@ bitshuffle4_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytess) 
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(nbytes);
 
   for (i = 0, k = 0; i < nbytes; i += 64, k++) {
     /* Load 64-byte groups */
@@ -246,7 +249,7 @@ bitshuffle8_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(nbytes);
 
   for (i = 0, k = 0; i < nbytes; i += 64, k++) {
     /* Load and interleave groups of 8 bytes (64 bytes) to the structure r0 */
@@ -343,7 +346,7 @@ bitshuffle16_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) 
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(nbytes);
 
   for (i = 0, k = 0; i < nbytes; i += 128, k++) {
     /* Load and interleave groups of 16 bytes (128 bytes) to the structure r0 */
@@ -506,7 +509,7 @@ bitunshuffle1_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes)
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(nbytes);
 
   for (i = 0, k = 0; i < nbytes; i += 16, k++) {
     for (j = 0; j < 8; j++) {
@@ -548,7 +551,7 @@ bitunshuffle2_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes)
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(nbytes);
 
   for (i = 0, k = 0; i < nbytes; i += 32, k++) {
     for (j = 0; j < 8; j++) {
@@ -609,7 +612,7 @@ bitunshuffle4_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes)
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(nbytes);
 
   for (i = 0, k = 0; i < nbytes; i += 64, k++) {
     for (j = 0; j < 8; j++) {
@@ -703,7 +706,7 @@ bitunshuffle8_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes)
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(nbytes);
 
   for (i = 0, k = 0; i < nbytes; i += 64, k++) {
     for (j = 0; j < 8; j++) {
@@ -795,7 +798,7 @@ bitunshuffle16_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(nbytes);
 
   for (i = 0, k = 0; i < nbytes; i += 128, k++) {
     for (j = 0; j < 8; j++) {
@@ -973,7 +976,7 @@ bitshuffle_neon(const size_t bytesoftype, const size_t blocksize,
   case 16:
     bitshuffle16_neon(_src, _dest, blocksize);
     break;
-  default:   
+  default:
     /* Non-optimized bitshuffle */
     bshuf_trans_bit_elem_scal(_src, _dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
     /* The non-optimized function covers the whole buffer,

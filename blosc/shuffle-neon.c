@@ -307,10 +307,11 @@ unshuffle16_neon(uint8_t* const dest, const uint8_t* const src,
 void
 shuffle_neon(const size_t bytesoftype, const size_t blocksize,
              const uint8_t* const _src, uint8_t* const _dest) {
+  size_t vectorized_chunk_size;
   if(bytesoftype == 2 | bytesoftype == 4) {
-    const size_t vectorized_chunk_size = bytesoftype * 16;
+    vectorized_chunk_size = bytesoftype * 16;
   } else if(bytesoftype == 8 | bytesoftype == 16) {
-    const size_t vectorized_chunk_size = bytesoftype * 8;
+    vectorized_chunk_size = bytesoftype * 8;
   }
   /* If the blocksize is not a multiple of both the typesize and
      the vector size, round the blocksize down to the next value
@@ -343,7 +344,7 @@ shuffle_neon(const size_t bytesoftype, const size_t blocksize,
   case 16:
     shuffle16_sse2(_dest, _src, vectorizable_elements, total_elements);
     break;
-  default:   
+  default:
     /* Non-optimized shuffle */
     shuffle_generic(bytesoftype, blocksize, _src, _dest);
     /* The non-optimized function covers the whole buffer,
@@ -363,10 +364,11 @@ shuffle_neon(const size_t bytesoftype, const size_t blocksize,
 void
 unshuffle_neon(const size_t bytesoftype, const size_t blocksize,
                const uint8_t* const _src, uint8_t* const _dest) {
+  size_t vectorized_chunk_size;
   if(bytesoftype == 2 | bytesoftype == 4) {
-    const size_t vectorized_chunk_size = bytesoftype * 16;
+    vectorized_chunk_size = bytesoftype * 16;
   } else if(bytesoftype == 8 | bytesoftype == 16) {
-    const size_t vectorized_chunk_size = bytesoftype * 8;
+    vectorized_chunk_size = bytesoftype * 8;
   }
   /* If the blocksize is not a multiple of both the typesize and
      the vector size, round the blocksize down to the next value
