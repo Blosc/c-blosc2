@@ -46,6 +46,10 @@ if(COMPILER_SUPPORT_AVX2)
     message(STATUS "Adding run-time support for AVX2")
     set(SOURCES ${SOURCES} shuffle-avx2.c bitshuffle-avx2.c)
 endif(COMPILER_SUPPORT_AVX2)
+if(COMPILER_SUPPORT_NEON)
+    message(STATUS "Adding run-time support for NEON")
+    set(SOURCES ${SOURCES} shuffle-neon.c bitshuffle-neon.c)
+endif(COMPILER_SUPPORT_NEON)
 set(SOURCES ${SOURCES} shuffle.c)
 
 # library install directory
