@@ -44,6 +44,10 @@ static const bool true = 1;
   #include "bitshuffle-sse2.h"
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
+#if defined(SHUFFLE_NEON_ENABLED)
+  #include "shuffle-neon.h"
+  #include "bitshuffle-neon.h"
+#endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
 /*  Define function pointer types for shuffle/unshuffle routines. */
 typedef void(*shuffle_func)(const size_t, const size_t, const uint8_t*, const uint8_t*);
