@@ -333,16 +333,16 @@ shuffle_neon(const size_t bytesoftype, const size_t blocksize,
   switch (bytesoftype)
   {
   case 2:
-    shuffle2_sse2(_dest, _src, vectorizable_elements, total_elements);
+    shuffle2_neon(_dest, _src, vectorizable_elements, total_elements);
     break;
   case 4:
-    shuffle4_sse2(_dest, _src, vectorizable_elements, total_elements);
+    shuffle4_neon(_dest, _src, vectorizable_elements, total_elements);
     break;
   case 8:
-    shuffle8_sse2(_dest, _src, vectorizable_elements, total_elements);
+    shuffle8_neon(_dest, _src, vectorizable_elements, total_elements);
     break;
   case 16:
-    shuffle16_sse2(_dest, _src, vectorizable_elements, total_elements);
+    shuffle16_neon(_dest, _src, vectorizable_elements, total_elements);
     break;
   default:
     /* Non-optimized shuffle */
@@ -391,16 +391,16 @@ unshuffle_neon(const size_t bytesoftype, const size_t blocksize,
   switch (bytesoftype)
   {
   case 2:
-    unshuffle2_sse2(_dest, _src, vectorizable_elements, total_elements);
+    unshuffle2_neon(_dest, _src, vectorizable_elements, total_elements);
     break;
   case 4:
-    unshuffle4_sse2(_dest, _src, vectorizable_elements, total_elements);
+    unshuffle4_neon(_dest, _src, vectorizable_elements, total_elements);
     break;
   case 8:
-    unshuffle8_sse2(_dest, _src, vectorizable_elements, total_elements);
+    unshuffle8_neon(_dest, _src, vectorizable_elements, total_elements);
     break;
   case 16:
-    unshuffle16_sse2(_dest, _src, vectorizable_elements, total_elements);
+    unshuffle16_neon(_dest, _src, vectorizable_elements, total_elements);
     break;
   default:
     /* Non-optimized unshuffle */
