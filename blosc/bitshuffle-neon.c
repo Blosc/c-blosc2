@@ -941,7 +941,7 @@ bitunshuffle16_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes
 /* Shuffle a block.  This can never fail. */
 void
 bitshuffle_neon(const size_t bytesoftype, const size_t blocksize,
-             const uint8_t* const _src, uint8_t* const _dest, void* tmp_buf) {
+             const uint8_t* _src, const uint8_t* _dest, void* tmp_buf) {
   size_t vectorized_chunk_size;
   if(bytesoftype == 1 || bytesoftype == 2 || bytesoftype == 4) {
     vectorized_chunk_size = bytesoftype * 16;
@@ -952,7 +952,7 @@ bitshuffle_neon(const size_t bytesoftype, const size_t blocksize,
   /* If the block size is too small to be vectorized,
      use the generic implementation. */
   if (blocksize < vectorized_chunk_size) {
-    bshuf_trans_bit_elem_scal(_src, _dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
+    bshuf_trans_bit_elem_scal((void*)_src, (void*)_dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
     return;
   }
 
@@ -986,7 +986,7 @@ bitshuffle_neon(const size_t bytesoftype, const size_t blocksize,
 /* Bitunshuffle a block.  This can never fail. */
 void
 bitunshuffle_neon(const size_t bytesoftype, const size_t blocksize,
-               const uint8_t* const _src, uint8_t* const _dest, void* tmp_buf) {
+               const uint8_t* _src, const uint8_t* _dest, void* tmp_buf) {
   size_t vectorized_chunk_size;
   if(bytesoftype == 1 || bytesoftype == 2 || bytesoftype == 4) {
     vectorized_chunk_size = bytesoftype * 16;
@@ -997,7 +997,7 @@ bitunshuffle_neon(const size_t bytesoftype, const size_t blocksize,
   /* If the block size is too small to be vectorized,
      use the generic implementation. */
   if (blocksize < vectorized_chunk_size) {
-    bshuf_untrans_bit_elem_scal(_src, _dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
+    bshuf_untrans_bit_elem_scal((void*)_src, (void*)_dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
     return;
   }
 
