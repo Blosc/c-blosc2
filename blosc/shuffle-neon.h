@@ -1,7 +1,9 @@
 /*********************************************************************
   Blosc - Blocked Shuffling and Compression Library
 
-  Author: Ruben Lucian Marc <ruben.lucian@gmail.com>
+  Author: Francesc Alted <francesc@blosc.org>
+
+  Note: Adapted for NEON by Lucian Marc.
 
   See LICENSES/BLOSC.txt for details about copyright and rights to use.
 **********************************************************************/

@@ -140,7 +140,7 @@ if(COMPILER_SUPPORT_AVX2)
         APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX2_ENABLED)
 endif(COMPILER_SUPPORT_AVX2)
 if(COMPILER_SUPPORT_NEON)
-    set_source_files_properties(shuffle-neon.c PROPERTIES COMPILE_FLAGS -mfpu=neon)
+    set_source_files_properties(shuffle-neon.c bitshuffle-neon.c PROPERTIES COMPILE_FLAGS -mfpu=neon)
     # Define a symbol for the shuffle-dispatch implementation
     # so it knows NEON is supported even though that file is
     # compiled without NEON support (for portability).
