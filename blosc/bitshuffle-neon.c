@@ -945,10 +945,11 @@ bitunshuffle16_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes
 void
 bitshuffle_neon(const size_t bytesoftype, const size_t blocksize,
              const uint8_t* const _src, uint8_t* const _dest, void* tmp_buf) {
+  size_t vectorized_chunk_size;
   if(bytesoftype == 1 || bytesoftype == 2 || bytesoftype == 4) {
-    const size_t vectorized_chunk_size = bytesoftype * 16;
+    vectorized_chunk_size = bytesoftype * 16;
   } else if(bytesoftype == 8 || bytesoftype == 16) {
-    const size_t vectorized_chunk_size = bytesoftype * 8;
+    vectorized_chunk_size = bytesoftype * 8;
   }
 
   /* If the block size is too small to be vectorized,
@@ -989,10 +990,11 @@ bitshuffle_neon(const size_t bytesoftype, const size_t blocksize,
 void
 bitunshuffle_neon(const size_t bytesoftype, const size_t blocksize,
                const uint8_t* const _src, uint8_t* const _dest, void* tmp_buf) {
+  size_t vectorized_chunk_size;
   if(bytesoftype == 1 || bytesoftype == 2 || bytesoftype == 4) {
-    const size_t vectorized_chunk_size = bytesoftype * 16;
+    vectorized_chunk_size = bytesoftype * 16;
   } else if(bytesoftype == 8 || bytesoftype == 16) {
-    const size_t vectorized_chunk_size = bytesoftype * 8;
+    vectorized_chunk_size = bytesoftype * 8;
   }
 
   /* If the block size is too small to be vectorized,
