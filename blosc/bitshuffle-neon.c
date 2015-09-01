@@ -23,9 +23,6 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Macro  */
-#define _CHECK_MULT_EIGHT(n) if (n % 8) return;
-
 static void printmem(uint8_t* buf)
 {
   printf("%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,\n",
