@@ -243,7 +243,6 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
     if (getauxval(AT_HWCAP) & HWCAP_NEON) {
       cpu_features |= BLOSC_HAVE_NEON;
     }
-    printf("cpu_features: %d\n", cpu_features);
     return cpu_features;
   }
 #else   /* No hardware acceleration supported for the target architecture. */

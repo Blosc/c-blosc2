@@ -35,7 +35,7 @@ static void printmem(uint8_t* buf)
 
 /* Routine optimized for bit-shuffling a buffer for a type size of 1 byte. */
 static void
-bitshuffle1_neon(const uint8_t* src, uint8_t* dest, const size_t nbytes) {
+bitshuffle1_neon(void* src, void* dest, const size_t nbytes) {
 
   const size_t elem_size = 1;
   uint16x8_t x0;
@@ -78,7 +78,7 @@ bitshuffle1_neon(const uint8_t* src, uint8_t* dest, const size_t nbytes) {
 
 /* Routine optimized for bit-shuffling a buffer for a type size of 2 bytes. */
 static void
-bitshuffle2_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
+bitshuffle2_neon(void* src, void* dest, const size_t nbytes) {
 
   const size_t elem_size = 2;
   uint8x16x2_t x0;
@@ -140,7 +140,7 @@ bitshuffle2_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
 
 /* Routine optimized for bit-shuffling a buffer for a type size of 4 bytes. */
 static void
-bitshuffle4_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
+bitshuffle4_neon(void* src, void* dest, const size_t nbytes) {
 
   const size_t elem_size = 4;
   uint8x16x4_t x0;
@@ -234,7 +234,7 @@ bitshuffle4_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
 
 /* Routine optimized for bit-shuffling a buffer for a type size of 8 bytes. */
 static void
-bitshuffle8_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
+bitshuffle8_neon(void* src, void* dest, const size_t nbytes) {
 
   const size_t elem_size = 8;
   size_t i, j, k;
@@ -331,7 +331,7 @@ bitshuffle8_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
 
 /* Routine optimized for bit-shuffling a buffer for a type size of 16 bytes. */
 static void
-bitshuffle16_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
+bitshuffle16_neon(void* src, void* dest, const size_t nbytes) {
 
   const size_t elem_size = 16;
   size_t i, j, k;
@@ -496,11 +496,12 @@ bitshuffle16_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) 
 
 /* Routine optimized for bit-unshuffling a buffer for a type size of 1 byte. */
 static void
-bitunshuffle1_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
+bitunshuffle1_neon(void* _src, void* dest, const size_t nbytes) {
 
   const size_t elem_size = 1;
   uint8x8_t lo_x, hi_x, lo, hi;
   size_t i, j, k;
+  uint8_t* src = _src;
 
   const int8_t __attribute__ ((aligned (16))) xr[8] = {0,1,2,3,4,5,6,7};
   uint8x8_t mask_and = vdup_n_u8(0x01);
@@ -538,11 +539,12 @@ bitunshuffle1_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes)
 
 /* Routine optimized for bit-unshuffling a buffer for a type size of 2 byte. */
 static void
-bitunshuffle2_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
+bitunshuffle2_neon(void* _src, void* dest, const size_t nbytes) {
 
   const size_t elem_size = 2;
   size_t i, j, k;
   uint8x8_t lo_x[2], hi_x[2], lo[2], hi[2];
+  uint8_t* src = _src;
 
   const int8_t __attribute__ ((aligned (16))) xr[8] = {0,1,2,3,4,5,6,7};
   uint8x8_t mask_and = vdup_n_u8(0x01);
@@ -599,11 +601,12 @@ bitunshuffle2_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes)
 
 /* Routine optimized for bit-unshuffling a buffer for a type size of 4 byte. */
 static void
-bitunshuffle4_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
+bitunshuffle4_neon(void* _src, void* dest, const size_t nbytes) {
 
   const size_t elem_size = 4;
   size_t i, j, k;
   uint8x8_t lo_x[4], hi_x[4], lo[4], hi[4];
+  uint8_t* src = _src;
 
   const int8_t __attribute__ ((aligned (16))) xr[8] = {0,1,2,3,4,5,6,7};
   uint8x8_t mask_and = vdup_n_u8(0x01);
@@ -692,12 +695,12 @@ bitunshuffle4_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes)
 
 /* Routine optimized for bit-unshuffling a buffer for a type size of 8 byte. */
 static void
-bitunshuffle8_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
+bitunshuffle8_neon(void* _src, void* dest, const size_t nbytes) {
 
   const size_t elem_size = 8;
   size_t i, j, k;
   uint8x8x2_t r0[4], r1[4];
-
+  uint8_t* src = _src;
 
   const int8_t __attribute__ ((aligned (16))) xr[8] = {0,1,2,3,4,5,6,7};
   uint8x8_t mask_and = vdup_n_u8(0x01);
@@ -784,12 +787,12 @@ bitunshuffle8_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes)
 
 /* Routine optimized for bit-unshuffling a buffer for a type size of 16 byte. */
 static void
-bitunshuffle16_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes) {
+bitunshuffle16_neon(void* _src, void* dest, const size_t nbytes) {
 
   const size_t elem_size = 16;
   size_t i, j, k;
   uint8x8x2_t r0[8], r1[8];
-
+  uint8_t* src = _src;
 
   const int8_t __attribute__ ((aligned (16))) xr[8] = {0,1,2,3,4,5,6,7};
   uint8x8_t mask_and = vdup_n_u8(0x01);
@@ -940,8 +943,8 @@ bitunshuffle16_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes
 
 /* Shuffle a block.  This can never fail. */
 int64_t
-bitshuffle_neon(const size_t bytesoftype, const size_t blocksize,
-             const uint8_t* _src, uint8_t* _dest, void* tmp_buf) {
+bitshuffle_neon(void* _src, void* _dest, const size_t blocksize,
+                const size_t bytesoftype, void* tmp_buf) {
   size_t vectorized_chunk_size;
   int64_t count;
   if(bytesoftype == 1 || bytesoftype == 2 || bytesoftype == 4) {
@@ -976,8 +979,6 @@ bitshuffle_neon(const size_t bytesoftype, const size_t blocksize,
     bitshuffle16_neon(_src, _dest, blocksize);
     break;
   default:
-    printf("Bitshuffle default\n");
-    printf("bytesoftype = %d\n", bytesoftype);
     /* Non-optimized bitshuffle */
     count = bshuf_trans_bit_elem_scal((void *)_src, (void *)_dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
     /* The non-optimized function covers the whole buffer,
@@ -988,8 +989,8 @@ bitshuffle_neon(const size_t bytesoftype, const size_t blocksize,
 
 /* Bitunshuffle a block.  This can never fail. */
 int64_t
-bitunshuffle_neon(const size_t bytesoftype, const size_t blocksize,
-               const uint8_t* _src, uint8_t* _dest, void* tmp_buf) {
+bitunshuffle_neon(void* _src, void* _dest, const size_t blocksize,
+                  const size_t bytesoftype, void* tmp_buf) {
   size_t vectorized_chunk_size;
   int64_t count;
   if(bytesoftype == 1 || bytesoftype == 2 || bytesoftype == 4) {
@@ -1025,8 +1026,7 @@ bitunshuffle_neon(const size_t bytesoftype, const size_t blocksize,
     break;
   default:
     /* Non-optimized bitunshuffle */
-    //printf("Bitunshuffle default\n");
-    //count = bshuf_untrans_bit_elem_scal((void*)_src, (void*)_dest, blocksize, bytesoftype, tmp_buf);
+    count = bshuf_untrans_bit_elem_scal((void*)_src, (void*)_dest, blocksize, bytesoftype, tmp_buf);
     /* The non-optimized function covers the whole buffer,
        so we're done processing here. */
     return blocksize;
