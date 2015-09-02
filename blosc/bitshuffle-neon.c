@@ -5,7 +5,7 @@
 
   See LICENSES/BLOSC.txt for details about copyright and rights to use.
 **********************************************************************/
-
+#include <stdio.h>
 
 #include "bitshuffle-generic.h"
 #include "bitshuffle-neon.h"
@@ -939,10 +939,11 @@ bitunshuffle16_neon(const uint8_t* const src, uint8_t* dest, const size_t nbytes
 }
 
 /* Shuffle a block.  This can never fail. */
-void
+int64_t
 bitshuffle_neon(const size_t bytesoftype, const size_t blocksize,
              const uint8_t* _src, uint8_t* _dest, void* tmp_buf) {
   size_t vectorized_chunk_size;
+  int64_t count;
   if(bytesoftype == 1 || bytesoftype == 2 || bytesoftype == 4) {
     vectorized_chunk_size = bytesoftype * 16;
   } else if(bytesoftype == 8 || bytesoftype == 16) {
@@ -952,8 +953,8 @@ bitshuffle_neon(const size_t bytesoftype, const size_t blocksize,
   /* If the block size is too small to be vectorized,
      use the generic implementation. */
   if (blocksize < vectorized_chunk_size) {
-    bshuf_trans_bit_elem_scal((void*)_src, (void*)_dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
-    return;
+    count = bshuf_trans_bit_elem_scal((void*)_src, (void*)_dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
+    return blocksize;
   }
 
   /* Optimized bitshuffle implementations */
@@ -975,19 +976,22 @@ bitshuffle_neon(const size_t bytesoftype, const size_t blocksize,
     bitshuffle16_neon(_src, _dest, blocksize);
     break;
   default:
+    printf("Bitshuffle default\n");
+    printf("bytesoftype = %d\n", bytesoftype);
     /* Non-optimized bitshuffle */
-    bshuf_trans_bit_elem_scal((void *)_src, (void *)_dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
+    count = bshuf_trans_bit_elem_scal((void *)_src, (void *)_dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
     /* The non-optimized function covers the whole buffer,
        so we're done processing here. */
-    return;
+    return blocksize;
   }
 }
 
 /* Bitunshuffle a block.  This can never fail. */
-void
+int64_t
 bitunshuffle_neon(const size_t bytesoftype, const size_t blocksize,
                const uint8_t* _src, uint8_t* _dest, void* tmp_buf) {
   size_t vectorized_chunk_size;
+  int64_t count;
   if(bytesoftype == 1 || bytesoftype == 2 || bytesoftype == 4) {
     vectorized_chunk_size = bytesoftype * 16;
   } else if(bytesoftype == 8 || bytesoftype == 16) {
@@ -997,8 +1001,8 @@ bitunshuffle_neon(const size_t bytesoftype, const size_t blocksize,
   /* If the block size is too small to be vectorized,
      use the generic implementation. */
   if (blocksize < vectorized_chunk_size) {
-    bshuf_untrans_bit_elem_scal((void*)_src, (void*)_dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
-    return;
+    //count = bshuf_untrans_bit_elem_scal((void*)_src, (void*)_dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
+    return blocksize;
   }
 
   /* Optimized bitunshuffle implementations */
@@ -1021,9 +1025,10 @@ bitunshuffle_neon(const size_t bytesoftype, const size_t blocksize,
     break;
   default:
     /* Non-optimized bitunshuffle */
-    bshuf_untrans_bit_elem_scal((void*)_src, (void*)_dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
+    //printf("Bitunshuffle default\n");
+    //count = bshuf_untrans_bit_elem_scal((void*)_src, (void*)_dest, blocksize, bytesoftype, tmp_buf);
     /* The non-optimized function covers the whole buffer,
        so we're done processing here. */
-    return;
+    return blocksize;
   }
 }
