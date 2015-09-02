@@ -235,7 +235,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
 }
 #endif /* HAVE_CPU_FEAT_INTRIN */
 
-#elif defined(SHUFFLE_NEON_ENABLE) /* ARM-NEON */
+#elif defined(SHUFFLE_NEON_ENABLED) /* ARM-NEON */
   #include <sys/auxv.h>
   #include <asm/hwcap.h>
   static blosc_cpu_features blosc_get_cpu_features(void) {
@@ -243,6 +243,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
     if (getauxval(AT_HWCAP) & HWCAP_NEON) {
       cpu_features |= BLOSC_HAVE_NEON;
     }
+    printf("cpu_features: %d\n", cpu_features);
     return cpu_features;
   }
 #else   /* No hardware acceleration supported for the target architecture. */
