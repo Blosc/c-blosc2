@@ -5,7 +5,6 @@
 
   See LICENSES/BLOSC.txt for details about copyright and rights to use.
 **********************************************************************/
-#include <stdio.h>
 
 #include "bitshuffle-generic.h"
 #include "bitshuffle-neon.h"
@@ -16,7 +15,6 @@
 #endif
 
 #include <arm_neon.h>
-
 
 /* The next is useful for debugging purposes */
 #if 0
@@ -35,9 +33,8 @@ static void printmem(uint8_t* buf)
 
 /* Routine optimized for bit-shuffling a buffer for a type size of 1 byte. */
 static void
-bitshuffle1_neon(void* src, void* dest, const size_t nbytes) {
+bitshuffle1_neon(void* src, void* dest, const size_t size, const size_t elem_size) {
 
-  const size_t elem_size = 1;
   uint16x8_t x0;
   size_t i, j, k;
   uint8x8_t lo_x, hi_x, lo, hi;
@@ -46,9 +43,9 @@ bitshuffle1_neon(void* src, void* dest, const size_t nbytes) {
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  _CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(size*elem_size);
 
-  for (i = 0, k = 0; i < nbytes; i += 16, k++) {
+  for (i = 0, k = 0; i < size*elem_size; i += 16, k++) {
     /* Load 16-byte groups */
     x0 = vld1q_u8(src + k*16);
     /* Split in 8-bytes grops */
@@ -70,17 +67,16 @@ bitshuffle1_neon(void* src, void* dest, const size_t nbytes) {
       lo_x = vshr_n_u8(lo_x, 1);
       hi_x = vshr_n_u8(hi_x, 1);
       /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + 2*k + j*nbytes/(8*elem_size), lo, 0);
-      vst1_lane_u8(dest + 2*k+1 + j*nbytes/(8*elem_size), hi, 0);
+      vst1_lane_u8(dest + 2*k + j*size*elem_size/(8*elem_size), lo, 0);
+      vst1_lane_u8(dest + 2*k+1 + j*size*elem_size/(8*elem_size), hi, 0);
     }
   }
 }
 
 /* Routine optimized for bit-shuffling a buffer for a type size of 2 bytes. */
 static void
-bitshuffle2_neon(void* src, void* dest, const size_t nbytes) {
+bitshuffle2_neon(void* src, void* dest, const size_t size, const size_t elem_size) {
 
-  const size_t elem_size = 2;
   uint8x16x2_t x0;
   size_t i, j, k;
   uint8x8_t lo_x[2], hi_x[2], lo[2], hi[2];
@@ -89,9 +85,9 @@ bitshuffle2_neon(void* src, void* dest, const size_t nbytes) {
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  _CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(size*elem_size);
 
-  for (i = 0, k = 0; i < nbytes; i += 32, k++) {
+  for (i = 0, k = 0; i < size*elem_size; i += 32, k++) {
     /* Load 32-byte groups */
     x0 = vld2q_u8(src + i);
     /* Split in 8-bytes grops */
@@ -130,19 +126,18 @@ bitshuffle2_neon(void* src, void* dest, const size_t nbytes) {
       lo_x[1] = vshr_n_u8(lo_x[1], 1);
       hi_x[1] = vshr_n_u8(hi_x[1], 1);
       /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + 2*k + j*nbytes/(8*elem_size), lo[0], 0);
-      vst1_lane_u8(dest + 2*k + j*nbytes/(8*elem_size) + nbytes/2, lo[1], 0);
-      vst1_lane_u8(dest + 2*k+1 + j*nbytes/(8*elem_size), hi[0], 0);
-      vst1_lane_u8(dest + 2*k+1 + j*nbytes/(8*elem_size) + nbytes/2, hi[1], 0);
+      vst1_lane_u8(dest + 2*k + j*size*elem_size/(8*elem_size), lo[0], 0);
+      vst1_lane_u8(dest + 2*k + j*size*elem_size/(8*elem_size) + size*elem_size/2, lo[1], 0);
+      vst1_lane_u8(dest + 2*k+1 + j*size*elem_size/(8*elem_size), hi[0], 0);
+      vst1_lane_u8(dest + 2*k+1 + j*size*elem_size/(8*elem_size) + size*elem_size/2, hi[1], 0);
     }
   }
 }
 
 /* Routine optimized for bit-shuffling a buffer for a type size of 4 bytes. */
 static void
-bitshuffle4_neon(void* src, void* dest, const size_t nbytes) {
+bitshuffle4_neon(void* src, void* dest, const size_t size, const size_t elem_size) {
 
-  const size_t elem_size = 4;
   uint8x16x4_t x0;
   size_t i, j, k;
   uint8x8_t lo_x[4], hi_x[4], lo[4], hi[4];
@@ -151,9 +146,9 @@ bitshuffle4_neon(void* src, void* dest, const size_t nbytes) {
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  _CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(size*elem_size);
 
-  for (i = 0, k = 0; i < nbytes; i += 64, k++) {
+  for (i = 0, k = 0; i < size*elem_size; i += 64, k++) {
     /* Load 64-byte groups */
     x0 = vld4q_u8(src + i);
     /* Split in 8-bytes grops */
@@ -220,23 +215,22 @@ bitshuffle4_neon(void* src, void* dest, const size_t nbytes) {
       lo_x[3] = vshr_n_u8(lo_x[3], 1);
       hi_x[3] = vshr_n_u8(hi_x[3], 1);
       /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + 2*k + j*nbytes/(8*elem_size) + 0*nbytes/4, lo[0], 0);
-      vst1_lane_u8(dest + 2*k + j*nbytes/(8*elem_size) + 1*nbytes/4, lo[1], 0);
-      vst1_lane_u8(dest + 2*k + j*nbytes/(8*elem_size) + 2*nbytes/4, lo[2], 0);
-      vst1_lane_u8(dest + 2*k + j*nbytes/(8*elem_size) + 3*nbytes/4, lo[3], 0);
-      vst1_lane_u8(dest + 2*k+1 + j*nbytes/(8*elem_size) + 0*nbytes/4, hi[0], 0);
-      vst1_lane_u8(dest + 2*k+1 + j*nbytes/(8*elem_size) + 1*nbytes/4, hi[1], 0);
-      vst1_lane_u8(dest + 2*k+1 + j*nbytes/(8*elem_size) + 2*nbytes/4, hi[2], 0);
-      vst1_lane_u8(dest + 2*k+1 + j*nbytes/(8*elem_size) + 3*nbytes/4, hi[3], 0);
+      vst1_lane_u8(dest + 2*k + j*size*elem_size/(8*elem_size) + 0*size*elem_size/4, lo[0], 0);
+      vst1_lane_u8(dest + 2*k + j*size*elem_size/(8*elem_size) + 1*size*elem_size/4, lo[1], 0);
+      vst1_lane_u8(dest + 2*k + j*size*elem_size/(8*elem_size) + 2*size*elem_size/4, lo[2], 0);
+      vst1_lane_u8(dest + 2*k + j*size*elem_size/(8*elem_size) + 3*size*elem_size/4, lo[3], 0);
+      vst1_lane_u8(dest + 2*k+1 + j*size*elem_size/(8*elem_size) + 0*size*elem_size/4, hi[0], 0);
+      vst1_lane_u8(dest + 2*k+1 + j*size*elem_size/(8*elem_size) + 1*size*elem_size/4, hi[1], 0);
+      vst1_lane_u8(dest + 2*k+1 + j*size*elem_size/(8*elem_size) + 2*size*elem_size/4, hi[2], 0);
+      vst1_lane_u8(dest + 2*k+1 + j*size*elem_size/(8*elem_size) + 3*size*elem_size/4, hi[3], 0);
     }
   }
 }
 
 /* Routine optimized for bit-shuffling a buffer for a type size of 8 bytes. */
 static void
-bitshuffle8_neon(void* src, void* dest, const size_t nbytes) {
+bitshuffle8_neon(void* src, void* dest, const size_t size, const size_t elem_size) {
 
-  const size_t elem_size = 8;
   size_t i, j, k;
   uint8x8x2_t r0[4];
   uint16x4x2_t r1[4];
@@ -246,9 +240,9 @@ bitshuffle8_neon(void* src, void* dest, const size_t nbytes) {
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  _CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(size*elem_size);
 
-  for (i = 0, k = 0; i < nbytes; i += 64, k++) {
+  for (i = 0, k = 0; i < size*elem_size; i += 64, k++) {
     /* Load and interleave groups of 8 bytes (64 bytes) to the structure r0 */
     r0[0] = vzip_u8(vld1_u8(src + i + 0*8), vld1_u8(src + i +1*8));
     r0[1] = vzip_u8(vld1_u8(src + i + 2*8), vld1_u8(src + i +3*8));
@@ -317,23 +311,22 @@ bitshuffle8_neon(void* src, void* dest, const size_t nbytes) {
       r2[3].val[0] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[3].val[0]), 1));
       r2[3].val[1] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[3].val[1]), 1));
       /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 0*nbytes/8, r0[0].val[0], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 1*nbytes/8, r0[0].val[1], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 2*nbytes/8, r0[1].val[0], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 3*nbytes/8, r0[1].val[1], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 4*nbytes/8, r0[2].val[0], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 5*nbytes/8, r0[2].val[1], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 6*nbytes/8, r0[3].val[0], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 7*nbytes/8, r0[3].val[1], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 0*size*elem_size/8, r0[0].val[0], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 1*size*elem_size/8, r0[0].val[1], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 2*size*elem_size/8, r0[1].val[0], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 3*size*elem_size/8, r0[1].val[1], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 4*size*elem_size/8, r0[2].val[0], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 5*size*elem_size/8, r0[2].val[1], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 6*size*elem_size/8, r0[3].val[0], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 7*size*elem_size/8, r0[3].val[1], 0);
     }
   }
 }
 
 /* Routine optimized for bit-shuffling a buffer for a type size of 16 bytes. */
 static void
-bitshuffle16_neon(void* src, void* dest, const size_t nbytes) {
+bitshuffle16_neon(void* src, void* dest, const size_t size, const size_t elem_size) {
 
-  const size_t elem_size = 16;
   size_t i, j, k;
   uint8x8x2_t r0[8];
   uint16x4x2_t r1[8];
@@ -343,9 +336,9 @@ bitshuffle16_neon(void* src, void* dest, const size_t nbytes) {
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  _CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(size*elem_size);
 
-  for (i = 0, k = 0; i < nbytes; i += 128, k++) {
+  for (i = 0, k = 0; i < size*elem_size; i += 128, k++) {
     /* Load and interleave groups of 16 bytes (128 bytes) to the structure r0 */
     r0[0] = vzip_u8(vld1_u8(src + i + 0*8), vld1_u8(src + i + 2*8));
     r0[1] = vzip_u8(vld1_u8(src + i + 1*8), vld1_u8(src + i + 3*8));
@@ -474,31 +467,30 @@ bitshuffle16_neon(void* src, void* dest, const size_t nbytes) {
       r2[7].val[0] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[7].val[0]), 1));
       r2[7].val[1] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[7].val[1]), 1));
       /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 0*nbytes/16, r0[0].val[0], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 1*nbytes/16, r0[0].val[1], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 2*nbytes/16, r0[1].val[0], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 3*nbytes/16, r0[1].val[1], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 4*nbytes/16, r0[2].val[0], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 5*nbytes/16, r0[2].val[1], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 6*nbytes/16, r0[3].val[0], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 7*nbytes/16, r0[3].val[1], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 8*nbytes/16, r0[4].val[0], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 9*nbytes/16, r0[4].val[1], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 10*nbytes/16, r0[5].val[0], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 11*nbytes/16, r0[5].val[1], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 12*nbytes/16, r0[6].val[0], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 13*nbytes/16, r0[6].val[1], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 14*nbytes/16, r0[7].val[0], 0);
-      vst1_lane_u8(dest + k + j*nbytes/(8*elem_size) + 15*nbytes/16, r0[7].val[1], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 0*size*elem_size/16, r0[0].val[0], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 1*size*elem_size/16, r0[0].val[1], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 2*size*elem_size/16, r0[1].val[0], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 3*size*elem_size/16, r0[1].val[1], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 4*size*elem_size/16, r0[2].val[0], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 5*size*elem_size/16, r0[2].val[1], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 6*size*elem_size/16, r0[3].val[0], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 7*size*elem_size/16, r0[3].val[1], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 8*size*elem_size/16, r0[4].val[0], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 9*size*elem_size/16, r0[4].val[1], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 10*size*elem_size/16, r0[5].val[0], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 11*size*elem_size/16, r0[5].val[1], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 12*size*elem_size/16, r0[6].val[0], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 13*size*elem_size/16, r0[6].val[1], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 14*size*elem_size/16, r0[7].val[0], 0);
+      vst1_lane_u8(dest + k + j*size*elem_size/(8*elem_size) + 15*size*elem_size/16, r0[7].val[1], 0);
     }
   }
 }
 
 /* Routine optimized for bit-unshuffling a buffer for a type size of 1 byte. */
 static void
-bitunshuffle1_neon(void* _src, void* dest, const size_t nbytes) {
+bitunshuffle1_neon(void* _src, void* dest, const size_t size, const size_t elem_size) {
 
-  const size_t elem_size = 1;
   uint8x8_t lo_x, hi_x, lo, hi;
   size_t i, j, k;
   uint8_t* src = _src;
@@ -507,13 +499,13 @@ bitunshuffle1_neon(void* _src, void* dest, const size_t nbytes) {
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  _CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(size*elem_size);
 
-  for (i = 0, k = 0; i < nbytes; i += 16, k++) {
+  for (i = 0, k = 0; i < size*elem_size; i += 16, k++) {
     for (j = 0; j < 8; j++) {
       /* Load lanes */
-      lo_x[j] = src[2*k+0 + j*nbytes/(8*elem_size)];
-      hi_x[j] = src[2*k+1 + j*nbytes/(8*elem_size)];
+      lo_x[j] = src[2*k+0 + j*size*elem_size/(8*elem_size)];
+      hi_x[j] = src[2*k+1 + j*size*elem_size/(8*elem_size)];
     }
     for (j = 0; j < 8; j++) {
       /* Create mask from the most significant bit of each 8-bit element */
@@ -539,9 +531,8 @@ bitunshuffle1_neon(void* _src, void* dest, const size_t nbytes) {
 
 /* Routine optimized for bit-unshuffling a buffer for a type size of 2 byte. */
 static void
-bitunshuffle2_neon(void* _src, void* dest, const size_t nbytes) {
+bitunshuffle2_neon(void* _src, void* dest, const size_t size, const size_t elem_size) {
 
-  const size_t elem_size = 2;
   size_t i, j, k;
   uint8x8_t lo_x[2], hi_x[2], lo[2], hi[2];
   uint8_t* src = _src;
@@ -550,15 +541,15 @@ bitunshuffle2_neon(void* _src, void* dest, const size_t nbytes) {
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  _CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(size*elem_size);
 
-  for (i = 0, k = 0; i < nbytes; i += 32, k++) {
+  for (i = 0, k = 0; i < size*elem_size; i += 32, k++) {
     for (j = 0; j < 8; j++) {
       /* Load lanes */
-        lo_x[0][j] = src[2*k + j*nbytes/(8*elem_size)];
-        lo_x[1][j] = src[2*k + j*nbytes/(8*elem_size) + nbytes/2];
-        hi_x[0][j] = src[2*k+1 + j*nbytes/(8*elem_size)];
-        hi_x[1][j] = src[2*k+1 + j*nbytes/(8*elem_size) + nbytes/2];
+        lo_x[0][j] = src[2*k + j*size*elem_size/(8*elem_size)];
+        lo_x[1][j] = src[2*k + j*size*elem_size/(8*elem_size) + size*elem_size/2];
+        hi_x[0][j] = src[2*k+1 + j*size*elem_size/(8*elem_size)];
+        hi_x[1][j] = src[2*k+1 + j*size*elem_size/(8*elem_size) + size*elem_size/2];
     }
     for (j = 0; j < 8; j++) {
       /* Create mask from the most significant bit of each 8-bit element */
@@ -601,9 +592,8 @@ bitunshuffle2_neon(void* _src, void* dest, const size_t nbytes) {
 
 /* Routine optimized for bit-unshuffling a buffer for a type size of 4 byte. */
 static void
-bitunshuffle4_neon(void* _src, void* dest, const size_t nbytes) {
+bitunshuffle4_neon(void* _src, void* dest, const size_t size, const size_t elem_size) {
 
-  const size_t elem_size = 4;
   size_t i, j, k;
   uint8x8_t lo_x[4], hi_x[4], lo[4], hi[4];
   uint8_t* src = _src;
@@ -612,19 +602,19 @@ bitunshuffle4_neon(void* _src, void* dest, const size_t nbytes) {
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  _CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(size*elem_size);
 
-  for (i = 0, k = 0; i < nbytes; i += 64, k++) {
+  for (i = 0, k = 0; i < size*elem_size; i += 64, k++) {
     for (j = 0; j < 8; j++) {
       /* Load lanes */
-      lo_x[0][j] = src[2*k + j*nbytes/(8*elem_size)];
-      hi_x[0][j] = src[2*k+1 + j*nbytes/(8*elem_size)];
-      lo_x[1][j] = src[2*k + j*nbytes/(8*elem_size) + nbytes/4];
-      hi_x[1][j] = src[2*k+1 + j*nbytes/(8*elem_size) + nbytes/4];
-      lo_x[2][j] = src[2*k + j*nbytes/(8*elem_size) + nbytes/2];
-      hi_x[2][j] = src[2*k+1 + j*nbytes/(8*elem_size) + nbytes/2];
-      lo_x[3][j] = src[2*k + j*nbytes/(8*elem_size) + 3*nbytes/4];
-      hi_x[3][j] = src[2*k+1 + j*nbytes/(8*elem_size) + 3*nbytes/4];
+      lo_x[0][j] = src[2*k + j*size*elem_size/(8*elem_size)];
+      hi_x[0][j] = src[2*k+1 + j*size*elem_size/(8*elem_size)];
+      lo_x[1][j] = src[2*k + j*size*elem_size/(8*elem_size) + size*elem_size/4];
+      hi_x[1][j] = src[2*k+1 + j*size*elem_size/(8*elem_size) + size*elem_size/4];
+      lo_x[2][j] = src[2*k + j*size*elem_size/(8*elem_size) + size*elem_size/2];
+      hi_x[2][j] = src[2*k+1 + j*size*elem_size/(8*elem_size) + size*elem_size/2];
+      lo_x[3][j] = src[2*k + j*size*elem_size/(8*elem_size) + 3*size*elem_size/4];
+      hi_x[3][j] = src[2*k+1 + j*size*elem_size/(8*elem_size) + 3*size*elem_size/4];
     }
     for (j = 0; j < 8; j++) {
       /* Create mask from the most significant bit of each 8-bit element */
@@ -695,9 +685,8 @@ bitunshuffle4_neon(void* _src, void* dest, const size_t nbytes) {
 
 /* Routine optimized for bit-unshuffling a buffer for a type size of 8 byte. */
 static void
-bitunshuffle8_neon(void* _src, void* dest, const size_t nbytes) {
+bitunshuffle8_neon(void* _src, void* dest, const size_t size, const size_t elem_size) {
 
-  const size_t elem_size = 8;
   size_t i, j, k;
   uint8x8x2_t r0[4], r1[4];
   uint8_t* src = _src;
@@ -706,19 +695,19 @@ bitunshuffle8_neon(void* _src, void* dest, const size_t nbytes) {
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  _CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(size*elem_size);
 
-  for (i = 0, k = 0; i < nbytes; i += 64, k++) {
+  for (i = 0, k = 0; i < size*elem_size; i += 64, k++) {
     for (j = 0; j < 8; j++) {
       /* Load lanes */
-      r0[0].val[0][j] = src[k + j*nbytes/(8*elem_size) + 0*nbytes/8];
-      r0[0].val[1][j] = src[k + j*nbytes/(8*elem_size) + 1*nbytes/8];
-      r0[1].val[0][j] = src[k + j*nbytes/(8*elem_size) + 2*nbytes/8];
-      r0[1].val[1][j] = src[k + j*nbytes/(8*elem_size) + 3*nbytes/8];
-      r0[2].val[0][j] = src[k + j*nbytes/(8*elem_size) + 4*nbytes/8];
-      r0[2].val[1][j] = src[k + j*nbytes/(8*elem_size) + 5*nbytes/8];
-      r0[3].val[0][j] = src[k + j*nbytes/(8*elem_size) + 6*nbytes/8];
-      r0[3].val[1][j] = src[k + j*nbytes/(8*elem_size) + 7*nbytes/8];
+      r0[0].val[0][j] = src[k + j*size*elem_size/(8*elem_size) + 0*size*elem_size/8];
+      r0[0].val[1][j] = src[k + j*size*elem_size/(8*elem_size) + 1*size*elem_size/8];
+      r0[1].val[0][j] = src[k + j*size*elem_size/(8*elem_size) + 2*size*elem_size/8];
+      r0[1].val[1][j] = src[k + j*size*elem_size/(8*elem_size) + 3*size*elem_size/8];
+      r0[2].val[0][j] = src[k + j*size*elem_size/(8*elem_size) + 4*size*elem_size/8];
+      r0[2].val[1][j] = src[k + j*size*elem_size/(8*elem_size) + 5*size*elem_size/8];
+      r0[3].val[0][j] = src[k + j*size*elem_size/(8*elem_size) + 6*size*elem_size/8];
+      r0[3].val[1][j] = src[k + j*size*elem_size/(8*elem_size) + 7*size*elem_size/8];
     }
     for (j = 0; j < 8; j++) {
       /* Create mask from the most significant bit of each 8-bit element */
@@ -787,9 +776,8 @@ bitunshuffle8_neon(void* _src, void* dest, const size_t nbytes) {
 
 /* Routine optimized for bit-unshuffling a buffer for a type size of 16 byte. */
 static void
-bitunshuffle16_neon(void* _src, void* dest, const size_t nbytes) {
+bitunshuffle16_neon(void* _src, void* dest, const size_t size, const size_t elem_size) {
 
-  const size_t elem_size = 16;
   size_t i, j, k;
   uint8x8x2_t r0[8], r1[8];
   uint8_t* src = _src;
@@ -798,27 +786,27 @@ bitunshuffle16_neon(void* _src, void* dest, const size_t nbytes) {
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  _CHECK_MULT_EIGHT(nbytes);
+  _CHECK_MULT_EIGHT(size*elem_size);
 
-  for (i = 0, k = 0; i < nbytes; i += 128, k++) {
+  for (i = 0, k = 0; i < size*elem_size; i += 128, k++) {
     for (j = 0; j < 8; j++) {
       /* Load lanes */
-      r0[0].val[0][j] = src[k + j*nbytes/(8*elem_size) + 0*nbytes/16];
-      r0[0].val[1][j] = src[k + j*nbytes/(8*elem_size) + 1*nbytes/16];
-      r0[1].val[0][j] = src[k + j*nbytes/(8*elem_size) + 2*nbytes/16];
-      r0[1].val[1][j] = src[k + j*nbytes/(8*elem_size) + 3*nbytes/16];
-      r0[2].val[0][j] = src[k + j*nbytes/(8*elem_size) + 4*nbytes/16];
-      r0[2].val[1][j] = src[k + j*nbytes/(8*elem_size) + 5*nbytes/16];
-      r0[3].val[0][j] = src[k + j*nbytes/(8*elem_size) + 6*nbytes/16];
-      r0[3].val[1][j] = src[k + j*nbytes/(8*elem_size) + 7*nbytes/16];
-      r0[4].val[0][j] = src[k + j*nbytes/(8*elem_size) + 8*nbytes/16];
-      r0[4].val[1][j] = src[k + j*nbytes/(8*elem_size) + 9*nbytes/16];
-      r0[5].val[0][j] = src[k + j*nbytes/(8*elem_size) + 10*nbytes/16];
-      r0[5].val[1][j] = src[k + j*nbytes/(8*elem_size) + 11*nbytes/16];
-      r0[6].val[0][j] = src[k + j*nbytes/(8*elem_size) + 12*nbytes/16];
-      r0[6].val[1][j] = src[k + j*nbytes/(8*elem_size) + 13*nbytes/16];
-      r0[7].val[0][j] = src[k + j*nbytes/(8*elem_size) + 14*nbytes/16];
-      r0[7].val[1][j] = src[k + j*nbytes/(8*elem_size) + 15*nbytes/16];
+      r0[0].val[0][j] = src[k + j*size*elem_size/(8*elem_size) + 0*size*elem_size/16];
+      r0[0].val[1][j] = src[k + j*size*elem_size/(8*elem_size) + 1*size*elem_size/16];
+      r0[1].val[0][j] = src[k + j*size*elem_size/(8*elem_size) + 2*size*elem_size/16];
+      r0[1].val[1][j] = src[k + j*size*elem_size/(8*elem_size) + 3*size*elem_size/16];
+      r0[2].val[0][j] = src[k + j*size*elem_size/(8*elem_size) + 4*size*elem_size/16];
+      r0[2].val[1][j] = src[k + j*size*elem_size/(8*elem_size) + 5*size*elem_size/16];
+      r0[3].val[0][j] = src[k + j*size*elem_size/(8*elem_size) + 6*size*elem_size/16];
+      r0[3].val[1][j] = src[k + j*size*elem_size/(8*elem_size) + 7*size*elem_size/16];
+      r0[4].val[0][j] = src[k + j*size*elem_size/(8*elem_size) + 8*size*elem_size/16];
+      r0[4].val[1][j] = src[k + j*size*elem_size/(8*elem_size) + 9*size*elem_size/16];
+      r0[5].val[0][j] = src[k + j*size*elem_size/(8*elem_size) + 10*size*elem_size/16];
+      r0[5].val[1][j] = src[k + j*size*elem_size/(8*elem_size) + 11*size*elem_size/16];
+      r0[6].val[0][j] = src[k + j*size*elem_size/(8*elem_size) + 12*size*elem_size/16];
+      r0[6].val[1][j] = src[k + j*size*elem_size/(8*elem_size) + 13*size*elem_size/16];
+      r0[7].val[0][j] = src[k + j*size*elem_size/(8*elem_size) + 14*size*elem_size/16];
+      r0[7].val[1][j] = src[k + j*size*elem_size/(8*elem_size) + 15*size*elem_size/16];
     }
     for (j = 0; j < 8; j++) {
       /* Create mask from the most significant bit of each 8-bit element */
@@ -943,92 +931,92 @@ bitunshuffle16_neon(void* _src, void* dest, const size_t nbytes) {
 
 /* Shuffle a block.  This can never fail. */
 int64_t
-bitshuffle_neon(void* _src, void* _dest, const size_t blocksize,
-                const size_t bytesoftype, void* tmp_buf) {
+bitshuffle_neon(void* _src, void* _dest, const size_t size,
+                const size_t elem_size, void* tmp_buf) {
   size_t vectorized_chunk_size;
   int64_t count;
-  if(bytesoftype == 1 || bytesoftype == 2 || bytesoftype == 4) {
-    vectorized_chunk_size = bytesoftype * 16;
-  } else if(bytesoftype == 8 || bytesoftype == 16) {
-    vectorized_chunk_size = bytesoftype * 8;
+  if(elem_size == 1 || elem_size == 2 || elem_size == 4) {
+    vectorized_chunk_size = elem_size * 16;
+  } else if(elem_size == 8 || elem_size == 16) {
+    vectorized_chunk_size = elem_size * 8;
   }
 
   /* If the block size is too small to be vectorized,
      use the generic implementation. */
-  if (blocksize < vectorized_chunk_size) {
-    count = bshuf_trans_bit_elem_scal((void*)_src, (void*)_dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
-    return blocksize;
+  if (size*elem_size < vectorized_chunk_size) {
+    count = bshuf_trans_bit_elem_scal((void*)_src, (void*)_dest, size, elem_size, tmp_buf);
+    return count;
   }
 
   /* Optimized bitshuffle implementations */
-  switch (bytesoftype)
+  switch (elem_size)
   {
   case 1:
-    bitshuffle1_neon(_src, _dest, blocksize);
+    bitshuffle1_neon(_src, _dest, size, elem_size);
     break;
   case 2:
-    bitshuffle2_neon(_src, _dest, blocksize);
+    bitshuffle2_neon(_src, _dest, size, elem_size);
     break;
   case 4:
-    bitshuffle4_neon(_src, _dest, blocksize);
+    bitshuffle4_neon(_src, _dest, size, elem_size);
     break;
   case 8:
-    bitshuffle8_neon(_src, _dest, blocksize);
+    bitshuffle8_neon(_src, _dest, size, elem_size);
     break;
   case 16:
-    bitshuffle16_neon(_src, _dest, blocksize);
+    bitshuffle16_neon(_src, _dest, size, elem_size);
     break;
   default:
     /* Non-optimized bitshuffle */
-    count = bshuf_trans_bit_elem_scal((void *)_src, (void *)_dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
+    count = bshuf_trans_bit_elem_scal((void *)_src, (void *)_dest, size, elem_size, tmp_buf);
     /* The non-optimized function covers the whole buffer,
        so we're done processing here. */
-    return blocksize;
+    return count;
   }
 }
 
 /* Bitunshuffle a block.  This can never fail. */
 int64_t
-bitunshuffle_neon(void* _src, void* _dest, const size_t blocksize,
-                  const size_t bytesoftype, void* tmp_buf) {
+bitunshuffle_neon(void* _src, void* _dest, const size_t size,
+                  const size_t elem_size, void* tmp_buf) {
   size_t vectorized_chunk_size;
   int64_t count;
-  if(bytesoftype == 1 || bytesoftype == 2 || bytesoftype == 4) {
-    vectorized_chunk_size = bytesoftype * 16;
-  } else if(bytesoftype == 8 || bytesoftype == 16) {
-    vectorized_chunk_size = bytesoftype * 8;
+  if(size*elem_size == 1 || size*elem_size == 2 || size*elem_size == 4) {
+    vectorized_chunk_size = size*elem_size * 16;
+  } else if(size*elem_size == 8 || size*elem_size == 16) {
+    vectorized_chunk_size = size*elem_size * 8;
   }
 
   /* If the block size is too small to be vectorized,
      use the generic implementation. */
-  if (blocksize < vectorized_chunk_size) {
-    //count = bshuf_untrans_bit_elem_scal((void*)_src, (void*)_dest, blocksize/bytesoftype, bytesoftype, tmp_buf);
-    return blocksize;
+  if (size*elem_size < vectorized_chunk_size) {
+    count = bshuf_untrans_bit_elem_scal((void*)_src, (void*)_dest, size, elem_size, tmp_buf);
+    return count;
   }
 
   /* Optimized bitunshuffle implementations */
-  switch (bytesoftype)
+  switch (elem_size)
   {
   case 1:
-    bitunshuffle1_neon(_src, _dest, blocksize);
+    bitunshuffle1_neon(_src, _dest, size, elem_size);
     break;
   case 2:
-    bitunshuffle2_neon(_src, _dest, blocksize);
+    bitunshuffle2_neon(_src, _dest, size, elem_size);
     break;
   case 4:
-    bitunshuffle4_neon(_src, _dest, blocksize);
+    bitunshuffle4_neon(_src, _dest, size, elem_size);
     break;
   case 8:
-    bitunshuffle8_neon(_src, _dest, blocksize);
+    bitunshuffle8_neon(_src, _dest, size, elem_size);
     break;
   case 16:
-    bitunshuffle16_neon(_src, _dest, blocksize);
+    bitunshuffle16_neon(_src, _dest, size, elem_size);
     break;
   default:
     /* Non-optimized bitunshuffle */
-    count = bshuf_untrans_bit_elem_scal((void*)_src, (void*)_dest, blocksize, bytesoftype, tmp_buf);
+    count = bshuf_untrans_bit_elem_scal((void*)_src, (void*)_dest, size, elem_size, tmp_buf);
     /* The non-optimized function covers the whole buffer,
        so we're done processing here. */
-    return blocksize;
+    return count;
   }
 }
