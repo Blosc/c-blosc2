@@ -137,7 +137,6 @@ bitshuffle2_neon(void* src, void* dest, const size_t size, const size_t elem_siz
 /* Routine optimized for bit-shuffling a buffer for a type size of 4 bytes. */
 static void
 bitshuffle4_neon(void* src, void* dest, const size_t size, const size_t elem_size) {
-
   uint8x16x4_t x0;
   size_t i, j, k;
   uint8x8_t lo_x[4], hi_x[4], lo[4], hi[4];
@@ -147,7 +146,6 @@ bitshuffle4_neon(void* src, void* dest, const size_t size, const size_t elem_siz
   int8x8_t mask_shift = vld1_s8(xr);
 
   _CHECK_MULT_EIGHT(size*elem_size);
-
   for (i = 0, k = 0; i < size*elem_size; i += 64, k++) {
     /* Load 64-byte groups */
     x0 = vld4q_u8(src + i);
@@ -593,7 +591,6 @@ bitunshuffle2_neon(void* _src, void* dest, const size_t size, const size_t elem_
 /* Routine optimized for bit-unshuffling a buffer for a type size of 4 byte. */
 static void
 bitunshuffle4_neon(void* _src, void* dest, const size_t size, const size_t elem_size) {
-
   size_t i, j, k;
   uint8x8_t lo_x[4], hi_x[4], lo[4], hi[4];
   uint8_t* src = _src;
@@ -607,15 +604,16 @@ bitunshuffle4_neon(void* _src, void* dest, const size_t size, const size_t elem_
   for (i = 0, k = 0; i < size*elem_size; i += 64, k++) {
     for (j = 0; j < 8; j++) {
       /* Load lanes */
-      lo_x[0][j] = src[2*k + j*size*elem_size/(8*elem_size)];
-      hi_x[0][j] = src[2*k+1 + j*size*elem_size/(8*elem_size)];
-      lo_x[1][j] = src[2*k + j*size*elem_size/(8*elem_size) + size*elem_size/4];
-      hi_x[1][j] = src[2*k+1 + j*size*elem_size/(8*elem_size) + size*elem_size/4];
-      lo_x[2][j] = src[2*k + j*size*elem_size/(8*elem_size) + size*elem_size/2];
-      hi_x[2][j] = src[2*k+1 + j*size*elem_size/(8*elem_size) + size*elem_size/2];
+      lo_x[0][j] = src[2*k + j*size*elem_size/(8*elem_size) + 0*size*elem_size/4];
+      hi_x[0][j] = src[2*k+1 + j*size*elem_size/(8*elem_size) + 0*size*elem_size/4];
+      lo_x[1][j] = src[2*k + j*size*elem_size/(8*elem_size) + 1*size*elem_size/4];
+      hi_x[1][j] = src[2*k+1 + j*size*elem_size/(8*elem_size) + 1*size*elem_size/4];
+      lo_x[2][j] = src[2*k + j*size*elem_size/(8*elem_size) + 2*size*elem_size/4];
+      hi_x[2][j] = src[2*k+1 + j*size*elem_size/(8*elem_size) + 2*size*elem_size/4];
       lo_x[3][j] = src[2*k + j*size*elem_size/(8*elem_size) + 3*size*elem_size/4];
       hi_x[3][j] = src[2*k+1 + j*size*elem_size/(8*elem_size) + 3*size*elem_size/4];
     }
+
     for (j = 0; j < 8; j++) {
       /* Create mask from the most significant bit of each 8-bit element */
       lo[0] = vand_u8(lo_x[0], mask_and);
