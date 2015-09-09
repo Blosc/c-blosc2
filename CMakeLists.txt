@@ -201,6 +201,24 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL i386 OR
         # Unrecognized compiler. Emit a warning message to let the user know hardware-acceleration won't be available.
         message(WARNING "Unable to determine which ${CMAKE_SYSTEM_PROCESSOR} hardware features are supported by the C compiler (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}).")
     endif()
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l)
+    if(CMAKE_C_COMPILER_ID STREQUAL GNU)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.7 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 4.7)
+            set(COMPILER_SUPPORT_NEON TRUE)
+        else()
+            set(COMPILER_SUPPORT_NEON FALSE)
+        endif()
+    elseif(CMAKE_C_COMPILER_ID STREQUAL Clang)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 3.3 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 3.3)
+            set(COMPILER_SUPPORT_NEON TRUE)
+        else()
+            set(COMPILER_SUPPORT_NEON FALSE)
+        endif()
+    else()
+        set(COMPILER_SUPPORT_NEON FALSE)
+        # Unrecognized compiler. Emit a warning message to let the user know hardware-acceleration won't be available.
+        message(WARNING "Unable to determine which ${CMAKE_SYSTEM_PROCESSOR} hardware features are supported by the C compiler (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}).")
+    endif()
 else()
     # If the target system processor isn't recognized, emit a warning message to alert the user
     # that hardware-acceleration support won't be available but allow configuration to proceed.

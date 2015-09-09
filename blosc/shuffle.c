@@ -44,6 +44,10 @@ static const bool true = 1;
   #include "bitshuffle-sse2.h"
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
+#if defined(SHUFFLE_NEON_ENABLED)
+  #include "shuffle-neon.h"
+  #include "bitshuffle-neon.h"
+#endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
 /*  Define function pointer types for shuffle/unshuffle routines. */
 typedef void(*shuffle_func)(const size_t, const size_t, const uint8_t*, const uint8_t*);
@@ -68,7 +72,8 @@ typedef struct shuffle_implementation {
 typedef enum {
   BLOSC_HAVE_NOTHING = 0,
   BLOSC_HAVE_SSE2 = 1,
-  BLOSC_HAVE_AVX2 = 2
+  BLOSC_HAVE_AVX2 = 2,
+  BLOSC_HAVE_NEON = 4
 } blosc_cpu_features;
 
 /*  Detect hardware and set function pointers to the best shuffle/unshuffle
@@ -228,8 +233,18 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   }
   return result;
 }
-#endif
+#endif /* HAVE_CPU_FEAT_INTRIN */
 
+#elif defined(SHUFFLE_NEON_ENABLED) /* ARM-NEON */
+  #include <sys/auxv.h>
+  #include <asm/hwcap.h>
+  static blosc_cpu_features blosc_get_cpu_features(void) {
+    blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
+    if (getauxval(AT_HWCAP) & HWCAP_NEON) {
+      cpu_features |= BLOSC_HAVE_NEON;
+    }
+    return cpu_features;
+  }
 #else   /* No hardware acceleration supported for the target architecture. */
   #if defined(_MSC_VER)
   #pragma message("Hardware-acceleration detection not implemented for the target architecture. Only the generic shuffle/unshuffle routines will be available.")
@@ -241,7 +256,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   return BLOSC_HAVE_NOTHING;
 }
 
-#endif
+#endif /* defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED) */
 
 static shuffle_implementation_t
 get_shuffle_implementation() {
@@ -269,6 +284,21 @@ get_shuffle_implementation() {
     return impl_sse2;
   }
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
+
+#if defined(SHUFFLE_NEON_ENABLED)
+  if (cpu_features & BLOSC_HAVE_NEON) {
+    shuffle_implementation_t impl_neon;
+    impl_neon.name = "neon";
+    impl_neon.shuffle = (shuffle_func)shuffle_neon;
+    impl_neon.unshuffle = (unshuffle_func)unshuffle_neon;
+/* The NEON implementation for bitshuffle is still buggy, so falling back to the generic implementation for the time being */
+//    impl_neon.bitshuffle = (bitshuffle_func)bitshuffle_neon;
+//    impl_neon.bitunshuffle = (bitunshuffle_func)bitunshuffle_neon;
+    impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_scal;
+    impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_scal;
+    return impl_neon;
+  }
+#endif  /* defined(SHUFFLE_NEON_ENABLED) */
 
   /*  Processor doesn't support any of the hardware-accelerated implementations,
       so use the generic implementation. */

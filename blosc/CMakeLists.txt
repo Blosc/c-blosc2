@@ -46,6 +46,10 @@ if(COMPILER_SUPPORT_AVX2)
     message(STATUS "Adding run-time support for AVX2")
     set(SOURCES ${SOURCES} shuffle-avx2.c bitshuffle-avx2.c)
 endif(COMPILER_SUPPORT_AVX2)
+if(COMPILER_SUPPORT_NEON)
+    message(STATUS "Adding run-time support for NEON")
+    set(SOURCES ${SOURCES} shuffle-neon.c bitshuffle-neon.c)
+endif(COMPILER_SUPPORT_NEON)
 set(SOURCES ${SOURCES} shuffle.c)
 
 # library install directory
@@ -139,6 +143,15 @@ if(COMPILER_SUPPORT_AVX2)
         SOURCE shuffle.c
         APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX2_ENABLED)
 endif(COMPILER_SUPPORT_AVX2)
+if(COMPILER_SUPPORT_NEON)
+    set_source_files_properties(shuffle-neon.c bitshuffle-neon.c PROPERTIES COMPILE_FLAGS "-mfpu=neon -flax-vector-conversions")
+    # Define a symbol for the shuffle-dispatch implementation
+    # so it knows NEON is supported even though that file is
+    # compiled without NEON support (for portability).
+    set_property(
+        SOURCE shuffle.c
+        APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_NEON_ENABLED)
+endif(COMPILER_SUPPORT_NEON)
 
 # When the option has been selected to compile the test suite,
 # compile an additional version of blosc_shared which exports

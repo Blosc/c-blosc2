@@ -373,7 +373,11 @@ int main(int argc, char *argv[]) {
   int size = 2*MB;                      /* Buffer size */
   int elsize = 8;                       /* Datatype size */
   int rshift = 19;                      /* Significant bits */
+#if defined(__arm__)
+  int workingset = 64*MB;              /* The maximum allocated memory */
+#else
   int workingset = 256*MB;              /* The maximum allocated memory */
+#endif
   int nthreads_, size_, elsize_, rshift_, i;
   FILE * output_file = stdout;
   blosc_timestamp_t last, current;
@@ -425,14 +429,14 @@ int main(int argc, char *argv[]) {
   }
   else if (strcmp(bsuite, "test") == 0) {
     single = 1;
-    workingset = 128*MB;
+    workingset /= 2;
   }
   else if (strcmp(bsuite, "suite") == 0) {
     suite = 1;
   }
   else if (strcmp(bsuite, "hardsuite") == 0) {
     hard_suite = 1;
-    workingset = 64*MB;
+    workingset /= 4;
     /* Values here are ending points for loops */
     nthreads = 2;
     size = 8*MB;
@@ -441,7 +445,7 @@ int main(int argc, char *argv[]) {
   }
   else if (strcmp(bsuite, "extremesuite") == 0) {
     extreme_suite = 1;
-    workingset = 32*MB;
+    workingset /= 8;
     niter = 1;
     /* Values here are ending points for loops */
     nthreads = 4;
@@ -451,7 +455,7 @@ int main(int argc, char *argv[]) {
   }
   else if (strcmp(bsuite, "debugsuite") == 0) {
     debug_suite = 1;
-    workingset = 32*MB;
+    workingset /= 8;
     niter = 1;
     /* Warning: values here are starting points for loops.  This is
        useful for debugging. */
