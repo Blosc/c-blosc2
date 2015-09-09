@@ -24,6 +24,7 @@ extern "C" {
 
 
 /*  Macros. */
+#define _CHECK_MULT_EIGHT(n) if (n % 8) return;
 #define CHECK_MULT_EIGHT(n) if (n % 8) return -80;
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 #define MAX(X,Y) ((X) > (Y) ? (X) : (Y))
