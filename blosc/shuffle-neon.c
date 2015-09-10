@@ -47,8 +47,9 @@ shuffle2_neon(uint8_t* const dest, const uint8_t* const src,
     /* Load (and permute) 32 bytes to the structure r0 */
     r0 = vld2q_u8(src + i);
     /* Store the results in the destination vector */
-    vst1q_u8(dest + total_elements*0 + k*16, r0.val[0]);
-    vst1q_u8(dest + total_elements*1 + k*16, r0.val[1]);
+    for(j = 0; j < 2; j++) {
+      vst1q_u8(dest + total_elements*j + k*16, r0.val[j]);
+    }
   }
 }
 
@@ -65,10 +66,9 @@ shuffle4_neon(uint8_t* const dest, const uint8_t* const src,
     /* Load (and permute) 64 bytes to the structure r0 */
     r0 = vld4q_u8(src + i);
     /* Store the results in the destination vector */
-    vst1q_u8(dest + total_elements*0 + k*16, r0.val[0]);
-    vst1q_u8(dest + total_elements*1 + k*16, r0.val[1]);
-    vst1q_u8(dest + total_elements*2 + k*16, r0.val[2]);
-    vst1q_u8(dest + total_elements*3 + k*16, r0.val[3]);
+    for(j = 0; j < 4; j++) {
+      vst1q_u8(dest + total_elements*j + k*16, r0.val[j]);
+    }
   }
 }
 
@@ -76,7 +76,7 @@ shuffle4_neon(uint8_t* const dest, const uint8_t* const src,
 shuffle8_neon(uint8_t* const dest, const uint8_t* const src,
               const size_t vectorizable_elements, const size_t total_elements)
 {
-  size_t i, j, k;
+  size_t i, j, k, l;
   static const size_t bytesoftype = 8;
   uint8x8x2_t r0[4];
   uint16x4x2_t r1[4];
@@ -84,29 +84,27 @@ shuffle8_neon(uint8_t* const dest, const uint8_t* const src,
 
   for(i = 0, k = 0; i < vectorizable_elements*bytesoftype; i += 64, k++) {
     /* Load and interleave groups of 8 bytes (64 bytes) to the structure r0 */
-    r0[0] = vzip_u8(vld1_u8(src + i + 0*8), vld1_u8(src + i +1*8));
-    r0[1] = vzip_u8(vld1_u8(src + i + 2*8), vld1_u8(src + i +3*8));
-    r0[2] = vzip_u8(vld1_u8(src + i + 4*8), vld1_u8(src + i +5*8));
-    r0[3] = vzip_u8(vld1_u8(src + i + 6*8), vld1_u8(src + i +7*8));
+    for(j = 0; j < 4; j++) {
+      r0[j] = vzip_u8(vld1_u8(src + i + (2*j)*8), vld1_u8(src + i +(2*j+1)*8));
+    }
     /* Interleave 16 bytes */
-    r1[0] = vzip_u16(vreinterpret_u16_u8(r0[0].val[0]), vreinterpret_u16_u8(r0[1].val[0]));
-    r1[1] = vzip_u16(vreinterpret_u16_u8(r0[0].val[1]), vreinterpret_u16_u8(r0[1].val[1]));
-    r1[2] = vzip_u16(vreinterpret_u16_u8(r0[2].val[0]), vreinterpret_u16_u8(r0[3].val[0]));
-    r1[3] = vzip_u16(vreinterpret_u16_u8(r0[2].val[1]), vreinterpret_u16_u8(r0[3].val[1]));
+    for(j = 0; j < 2; j++) {
+      for(l = 0; l < 2; l++) {
+        r1[j*2+l] = vzip_u16(vreinterpret_u16_u8(r0[j*2].val[l]), vreinterpret_u16_u8(r0[j*2+1].val[l]));
+      }
+    }
     /* Interleave 32 bytes */
-    r2[0] = vzip_u32(vreinterpret_u32_u16(r1[0].val[0]), vreinterpret_u32_u16(r1[2].val[0]));
-    r2[1] = vzip_u32(vreinterpret_u32_u16(r1[0].val[1]), vreinterpret_u32_u16(r1[2].val[1]));
-    r2[2] = vzip_u32(vreinterpret_u32_u16(r1[1].val[0]), vreinterpret_u32_u16(r1[3].val[0]));
-    r2[3] = vzip_u32(vreinterpret_u32_u16(r1[1].val[1]), vreinterpret_u32_u16(r1[3].val[1]));
+    for(j = 0; j < 2; j++) {
+      for(l = 0; l < 2; l++) {
+        r2[j*2+l] = vzip_u32(vreinterpret_u32_u16(r1[j].val[l]), vreinterpret_u32_u16(r1[j+2].val[l]));
+      }
+    }
     /* Store the results in the destination vector */
-    vst1_u8(dest + k*8 + 0*total_elements, vreinterpret_u8_u32(r2[0].val[0]));
-    vst1_u8(dest + k*8 + 1*total_elements, vreinterpret_u8_u32(r2[0].val[1]));
-    vst1_u8(dest + k*8 + 2*total_elements, vreinterpret_u8_u32(r2[1].val[0]));
-    vst1_u8(dest + k*8 + 3*total_elements, vreinterpret_u8_u32(r2[1].val[1]));
-    vst1_u8(dest + k*8 + 4*total_elements, vreinterpret_u8_u32(r2[2].val[0]));
-    vst1_u8(dest + k*8 + 5*total_elements, vreinterpret_u8_u32(r2[2].val[1]));
-    vst1_u8(dest + k*8 + 6*total_elements, vreinterpret_u8_u32(r2[3].val[0]));
-    vst1_u8(dest + k*8 + 7*total_elements, vreinterpret_u8_u32(r2[3].val[1]));
+    for(j = 0; j < 4; j++) {
+      for(l = 0; l < 2; l++) {
+        vst1_u8(dest + k*8 + (j*2+l)*total_elements, vreinterpret_u8_u32(r2[j].val[l]));
+      }
+    }
   }
 }
 
@@ -114,7 +112,7 @@ shuffle8_neon(uint8_t* const dest, const uint8_t* const src,
 shuffle16_neon(uint8_t* const dest, const uint8_t* const src,
                const size_t vectorizable_elements, const size_t total_elements)
 {
-  size_t i, j, k;
+  size_t i, j, k, l, m;
   static const size_t bytesoftype = 16;
   uint8x8x2_t r0[8];
   uint16x4x2_t r1[8];
@@ -122,49 +120,30 @@ shuffle16_neon(uint8_t* const dest, const uint8_t* const src,
 
   for(i = 0, k = 0; i < vectorizable_elements*bytesoftype; i += 128, k++) {
     /* Load and interleave groups of 16 bytes (128 bytes) to the structure r0 */
-    r0[0] = vzip_u8(vld1_u8(src + i + 0*8), vld1_u8(src + i + 2*8));
-    r0[1] = vzip_u8(vld1_u8(src + i + 1*8), vld1_u8(src + i + 3*8));
-    r0[2] = vzip_u8(vld1_u8(src + i + 4*8), vld1_u8(src + i + 6*8));
-    r0[3] = vzip_u8(vld1_u8(src + i + 5*8), vld1_u8(src + i + 7*8));
-    r0[4] = vzip_u8(vld1_u8(src + i + 8*8), vld1_u8(src + i + 10*8));
-    r0[5] = vzip_u8(vld1_u8(src + i + 9*8), vld1_u8(src + i + 11*8));
-    r0[6] = vzip_u8(vld1_u8(src + i + 12*8), vld1_u8(src + i + 14*8));
-    r0[7] = vzip_u8(vld1_u8(src + i + 13*8), vld1_u8(src + i + 15*8));
+    for(j = 0; j < 8; j++) {;
+    l = (j % 2) ? 1:0;
+      r0[j] = vzip_u8(vld1_u8(src + i + (2*j-l)*8), vld1_u8(src + i +(2*j-l+2)*8));
+    }
     /* Interleave 16 bytes */
-    r1[0] = vzip_u16(vreinterpret_u16_u8(r0[0].val[0]), vreinterpret_u16_u8(r0[2].val[0]));
-    r1[1] = vzip_u16(vreinterpret_u16_u8(r0[0].val[1]), vreinterpret_u16_u8(r0[2].val[1]));
-    r1[2] = vzip_u16(vreinterpret_u16_u8(r0[1].val[0]), vreinterpret_u16_u8(r0[3].val[0]));
-    r1[3] = vzip_u16(vreinterpret_u16_u8(r0[1].val[1]), vreinterpret_u16_u8(r0[3].val[1]));
-    r1[4] = vzip_u16(vreinterpret_u16_u8(r0[4].val[0]), vreinterpret_u16_u8(r0[6].val[0]));
-    r1[5] = vzip_u16(vreinterpret_u16_u8(r0[4].val[1]), vreinterpret_u16_u8(r0[6].val[1]));
-    r1[6] = vzip_u16(vreinterpret_u16_u8(r0[5].val[0]), vreinterpret_u16_u8(r0[7].val[0]));
-    r1[7] = vzip_u16(vreinterpret_u16_u8(r0[5].val[1]), vreinterpret_u16_u8(r0[7].val[1]));
+    for(j = 0; j < 2; j++) {
+      for(l = 0; l < 2; l++) {
+        for(m = 0; m < 2; m++) {
+          r1[j*2+l+4*m] = vzip_u16(vreinterpret_u16_u8(r0[j+4*m].val[l]), vreinterpret_u16_u8(r0[j+2+4*m].val[l]));
+        }
+      }
+    }
     /* Interleave 32 bytes */
-    r2[0] = vzip_u32(vreinterpret_u32_u16(r1[0].val[0]), vreinterpret_u32_u16(r1[4].val[0]));
-    r2[1] = vzip_u32(vreinterpret_u32_u16(r1[0].val[1]), vreinterpret_u32_u16(r1[4].val[1]));
-    r2[2] = vzip_u32(vreinterpret_u32_u16(r1[1].val[0]), vreinterpret_u32_u16(r1[5].val[0]));
-    r2[3] = vzip_u32(vreinterpret_u32_u16(r1[1].val[1]), vreinterpret_u32_u16(r1[5].val[1]));
-    r2[4] = vzip_u32(vreinterpret_u32_u16(r1[2].val[0]), vreinterpret_u32_u16(r1[6].val[0]));
-    r2[5] = vzip_u32(vreinterpret_u32_u16(r1[2].val[1]), vreinterpret_u32_u16(r1[6].val[1]));
-    r2[6] = vzip_u32(vreinterpret_u32_u16(r1[3].val[0]), vreinterpret_u32_u16(r1[7].val[0]));
-    r2[7] = vzip_u32(vreinterpret_u32_u16(r1[3].val[1]), vreinterpret_u32_u16(r1[7].val[1]));
+    for(j = 0; j < 4; j++) {
+      for(l = 0; l < 2; l++) {
+        r2[2*j+l] = vzip_u32(vreinterpret_u32_u16(r1[j].val[l]), vreinterpret_u32_u16(r1[j+4].val[l]));
+      }
+    }
     /* Store the results to the destination vector */
-    vst1_u8(dest + k*8 + 0*total_elements, vreinterpret_u8_u32(r2[0].val[0]));
-    vst1_u8(dest + k*8 + 1*total_elements, vreinterpret_u8_u32(r2[0].val[1]));
-    vst1_u8(dest + k*8 + 2*total_elements, vreinterpret_u8_u32(r2[1].val[0]));
-    vst1_u8(dest + k*8 + 3*total_elements, vreinterpret_u8_u32(r2[1].val[1]));
-    vst1_u8(dest + k*8 + 4*total_elements, vreinterpret_u8_u32(r2[2].val[0]));
-    vst1_u8(dest + k*8 + 5*total_elements, vreinterpret_u8_u32(r2[2].val[1]));
-    vst1_u8(dest + k*8 + 6*total_elements, vreinterpret_u8_u32(r2[3].val[0]));
-    vst1_u8(dest + k*8 + 7*total_elements, vreinterpret_u8_u32(r2[3].val[1]));
-    vst1_u8(dest + k*8 + 8*total_elements, vreinterpret_u8_u32(r2[4].val[0]));
-    vst1_u8(dest + k*8 + 9*total_elements, vreinterpret_u8_u32(r2[4].val[1]));
-    vst1_u8(dest + k*8 + 10*total_elements, vreinterpret_u8_u32(r2[5].val[0]));
-    vst1_u8(dest + k*8 + 11*total_elements, vreinterpret_u8_u32(r2[5].val[1]));
-    vst1_u8(dest + k*8 + 12*total_elements, vreinterpret_u8_u32(r2[6].val[0]));
-    vst1_u8(dest + k*8 + 13*total_elements, vreinterpret_u8_u32(r2[6].val[1]));
-    vst1_u8(dest + k*8 + 14*total_elements, vreinterpret_u8_u32(r2[7].val[0]));
-    vst1_u8(dest + k*8 + 15*total_elements, vreinterpret_u8_u32(r2[7].val[1]));
+    for(j = 0; j < 8; j++) {
+      for(l = 0; l < 2; l++) {
+        vst1_u8(dest + k*8 + (2*j+l)*total_elements, vreinterpret_u8_u32(r2[j].val[l]));
+      }
+    }
   }
 }
 
@@ -179,8 +158,9 @@ unshuffle2_neon(uint8_t* const dest, const uint8_t* const src,
 
   for(i = 0, k = 0; i < vectorizable_elements*bytesoftype; i += 32, k++) {
     /* Load 32 bytes to the structure r0 */
-    r0.val[0] = vld1q_u8(src + total_elements*0 + k*16);
-    r0.val[1] = vld1q_u8(src + total_elements*1 + k*16);
+    for(j = 0; j < 2; j++) {
+      r0.val[j] = vld1q_u8(src + total_elements*j + k*16);
+    }
     /* Store (with permutation) the results in the destination vector */
     vst2q_u8(dest + k*32, r0);
   }
@@ -197,10 +177,9 @@ unshuffle4_neon(uint8_t* const dest, const uint8_t* const src,
 
   for(i = 0, k = 0; i < vectorizable_elements*bytesoftype; i += 64, k++) {
     /* load 64 bytes to the structure r0 */
-    r0.val[0] = vld1q_u8(src + total_elements*0 + k*16);
-    r0.val[1] = vld1q_u8(src + total_elements*1 + k*16);
-    r0.val[2] = vld1q_u8(src + total_elements*2 + k*16);
-    r0.val[3] = vld1q_u8(src + total_elements*3 + k*16);
+    for(j = 0; j < 4; j++) {
+      r0.val[j] = vld1q_u8(src + total_elements*j + k*16);
+    }
     /* Store (with permutation) the results in the destination vector */
     vst4q_u8(dest + k*64, r0);
   }
@@ -210,7 +189,7 @@ unshuffle4_neon(uint8_t* const dest, const uint8_t* const src,
 unshuffle8_neon(uint8_t* const dest, const uint8_t* const src,
                 const size_t vectorizable_elements, const size_t total_elements)
 {
-  size_t i, j, k;
+  size_t i, j, k, l;
   static const size_t bytesoftype = 8;
   uint8x8x2_t r0[4];
   uint16x4x2_t r1[4];
@@ -218,30 +197,27 @@ unshuffle8_neon(uint8_t* const dest, const uint8_t* const src,
 
   for(i = 0, k = 0; i < vectorizable_elements*bytesoftype; i += 64, k++) {
     /* Load and interleave groups of 8 bytes (64 bytes) to the structure r0 */
-    r0[0] = vzip_u8(vld1_u8(src + 0*total_elements + k*8), vld1_u8(src + 1*total_elements + k*8));
-    r0[1] = vzip_u8(vld1_u8(src + 2*total_elements + k*8), vld1_u8(src + 3*total_elements + k*8));
-    r0[2] = vzip_u8(vld1_u8(src + 4*total_elements + k*8), vld1_u8(src + 5*total_elements + k*8));
-    r0[3] = vzip_u8(vld1_u8(src + 6*total_elements + k*8), vld1_u8(src + 7*total_elements + k*8));
+    for(j = 0; j < 4; j++) {
+      r0[j] = vzip_u8(vld1_u8(src + (2*j)*total_elements + k*8), vld1_u8(src + (2*j+1)*total_elements + k*8));
+    }
     /* Interleave 16 bytes */
-    r1[0] = vzip_u16(vreinterpret_u16_u8(r0[0].val[0]), vreinterpret_u16_u8(r0[1].val[0]));
-    r1[1] = vzip_u16(vreinterpret_u16_u8(r0[0].val[1]), vreinterpret_u16_u8(r0[1].val[1]));
-    r1[2] = vzip_u16(vreinterpret_u16_u8(r0[2].val[0]), vreinterpret_u16_u8(r0[3].val[0]));
-    r1[3] = vzip_u16(vreinterpret_u16_u8(r0[2].val[1]), vreinterpret_u16_u8(r0[3].val[1]));
+    for(j = 0; j < 2; j++) {
+      for(l = 0; l < 2; l++) {
+        r1[j*2+l] = vzip_u16(vreinterpret_u16_u8(r0[j*2].val[l]), vreinterpret_u16_u8(r0[j*2+1].val[l]));
+      }
+    }
     /* Interleave 32 bytes */
-    r2[0] = vzip_u32(vreinterpret_u32_u16(r1[0].val[0]), vreinterpret_u32_u16(r1[2].val[0]));
-    r2[1] = vzip_u32(vreinterpret_u32_u16(r1[0].val[1]), vreinterpret_u32_u16(r1[2].val[1]));
-    r2[2] = vzip_u32(vreinterpret_u32_u16(r1[1].val[0]), vreinterpret_u32_u16(r1[3].val[0]));
-    r2[3] = vzip_u32(vreinterpret_u32_u16(r1[1].val[1]), vreinterpret_u32_u16(r1[3].val[1]));
+    for(j = 0; j < 2; j++) {
+      for(l = 0; l < 2; l++) {
+        r2[j*2+l] = vzip_u32(vreinterpret_u32_u16(r1[j].val[l]), vreinterpret_u32_u16(r1[j+2].val[l]));
+      }
+    }
     /* Store the results in the destination vector */
-    vst1_u8(dest + i + 0*8, vreinterpret_u8_u32(r2[0].val[0]));
-    vst1_u8(dest + i + 1*8, vreinterpret_u8_u32(r2[0].val[1]));
-    vst1_u8(dest + i + 2*8, vreinterpret_u8_u32(r2[1].val[0]));
-    vst1_u8(dest + i + 3*8, vreinterpret_u8_u32(r2[1].val[1]));
-    vst1_u8(dest + i + 4*8, vreinterpret_u8_u32(r2[2].val[0]));
-    vst1_u8(dest + i + 5*8, vreinterpret_u8_u32(r2[2].val[1]));
-    vst1_u8(dest + i + 6*8, vreinterpret_u8_u32(r2[3].val[0]));
-    vst1_u8(dest + i + 7*8, vreinterpret_u8_u32(r2[3].val[1]));
-
+    for(j = 0; j < 4; j++) {
+      for(l = 0; l < 2; l++) {
+        vst1_u8(dest + i + (j*2+l)*8, vreinterpret_u8_u32(r2[j].val[l]));
+      }
+    }
   }
 }
 
@@ -249,7 +225,7 @@ unshuffle8_neon(uint8_t* const dest, const uint8_t* const src,
 unshuffle16_neon(uint8_t* const dest, const uint8_t* const src,
                const size_t vectorizable_elements, const size_t total_elements)
 {
-  size_t i, j, k, l;
+  size_t i, j, k, l, m;
   static const size_t bytesoftype = 16;
   uint8x8x2_t r0[8];
   uint16x4x2_t r1[8];
@@ -257,49 +233,31 @@ unshuffle16_neon(uint8_t* const dest, const uint8_t* const src,
 
   for(i = 0, k = 0; i < vectorizable_elements*bytesoftype; i += 128, k++) {
     /* Load and interleave groups of 16 bytes (128 bytes) to the structure r0*/
-    r0[0] = vzip_u8(vld1_u8(src + k*8 + 0*total_elements), vld1_u8(src + k*8 + 1*total_elements));
-    r0[1] = vzip_u8(vld1_u8(src + k*8 + 2*total_elements), vld1_u8(src + k*8 + 3*total_elements));
-    r0[2] = vzip_u8(vld1_u8(src + k*8 + 4*total_elements), vld1_u8(src + k*8 + 5*total_elements));
-    r0[3] = vzip_u8(vld1_u8(src + k*8 + 6*total_elements), vld1_u8(src + k*8 + 7*total_elements));
-    r0[4] = vzip_u8(vld1_u8(src + k*8 + 8*total_elements), vld1_u8(src + k*8 + 9*total_elements));
-    r0[5] = vzip_u8(vld1_u8(src + k*8 + 10*total_elements), vld1_u8(src + k*8 + 11*total_elements));
-    r0[6] = vzip_u8(vld1_u8(src + k*8 + 12*total_elements), vld1_u8(src + k*8 + 13*total_elements));
-    r0[7] = vzip_u8(vld1_u8(src + k*8 + 14*total_elements), vld1_u8(src + k*8 + 15*total_elements));
+    for(j = 0; j < 8; j++) {
+      r0[j] = vzip_u8(vld1_u8(src + (2*j)*total_elements + k*8), vld1_u8(src + (2*j+1)*total_elements + k*8));
+    }
     /* Interleave 16 bytes */
-    r1[0] = vzip_u16(vreinterpret_u16_u8(r0[0].val[0]), vreinterpret_u16_u8(r0[1].val[0]));
-    r1[1] = vzip_u16(vreinterpret_u16_u8(r0[0].val[1]), vreinterpret_u16_u8(r0[1].val[1]));
-    r1[2] = vzip_u16(vreinterpret_u16_u8(r0[2].val[0]), vreinterpret_u16_u8(r0[3].val[0]));
-    r1[3] = vzip_u16(vreinterpret_u16_u8(r0[2].val[1]), vreinterpret_u16_u8(r0[3].val[1]));
-    r1[4] = vzip_u16(vreinterpret_u16_u8(r0[4].val[0]), vreinterpret_u16_u8(r0[5].val[0]));
-    r1[5] = vzip_u16(vreinterpret_u16_u8(r0[4].val[1]), vreinterpret_u16_u8(r0[5].val[1]));
-    r1[6] = vzip_u16(vreinterpret_u16_u8(r0[6].val[0]), vreinterpret_u16_u8(r0[7].val[0]));
-    r1[7] = vzip_u16(vreinterpret_u16_u8(r0[6].val[1]), vreinterpret_u16_u8(r0[7].val[1]));
+    for(j = 0; j < 4; j++) {
+      for(l = 0; l < 2; l++) {
+        r1[2*j+l] = vzip_u16(vreinterpret_u16_u8(r0[2*j].val[l]), vreinterpret_u16_u8(r0[2*j+1].val[l]));
+      }
+    }
     /* Interleave 32 bytes */
-    r2[0] = vzip_u32(vreinterpret_u32_u16(r1[0].val[0]), vreinterpret_u32_u16(r1[2].val[0]));
-    r2[1] = vzip_u32(vreinterpret_u32_u16(r1[0].val[1]), vreinterpret_u32_u16(r1[2].val[1]));
-    r2[2] = vzip_u32(vreinterpret_u32_u16(r1[1].val[0]), vreinterpret_u32_u16(r1[3].val[0]));
-    r2[3] = vzip_u32(vreinterpret_u32_u16(r1[1].val[1]), vreinterpret_u32_u16(r1[3].val[1]));
-    r2[4] = vzip_u32(vreinterpret_u32_u16(r1[4].val[0]), vreinterpret_u32_u16(r1[6].val[0]));
-    r2[5] = vzip_u32(vreinterpret_u32_u16(r1[4].val[1]), vreinterpret_u32_u16(r1[6].val[1]));
-    r2[6] = vzip_u32(vreinterpret_u32_u16(r1[5].val[0]), vreinterpret_u32_u16(r1[7].val[0]));
-    r2[7] = vzip_u32(vreinterpret_u32_u16(r1[5].val[1]), vreinterpret_u32_u16(r1[7].val[1]));
+    for(j = 0; j < 2; j++) {
+      for(l = 0; l < 2; l++) {
+        for(m = 0; m < 2; m++) {
+          r2[j*2+l+4*m] = vzip_u32(vreinterpret_u32_u16(r1[j+4*m].val[l]), vreinterpret_u32_u16(r1[j+2+4*m].val[l]));
+        }
+      }
+    }
     /* Store the results in the destination vector */
-    vst1_u8(dest + i + 0*8, vreinterpret_u8_u32(r2[0].val[0]));
-    vst1_u8(dest + i + 1*8, vreinterpret_u8_u32(r2[4].val[0]));
-    vst1_u8(dest + i + 2*8, vreinterpret_u8_u32(r2[0].val[1]));
-    vst1_u8(dest + i + 3*8, vreinterpret_u8_u32(r2[4].val[1]));
-    vst1_u8(dest + i + 4*8, vreinterpret_u8_u32(r2[1].val[0]));
-    vst1_u8(dest + i + 5*8, vreinterpret_u8_u32(r2[5].val[0]));
-    vst1_u8(dest + i + 6*8, vreinterpret_u8_u32(r2[1].val[1]));
-    vst1_u8(dest + i + 7*8, vreinterpret_u8_u32(r2[5].val[1]));
-    vst1_u8(dest + i + 8*8, vreinterpret_u8_u32(r2[2].val[0]));
-    vst1_u8(dest + i + 9*8, vreinterpret_u8_u32(r2[6].val[0]));
-    vst1_u8(dest + i + 10*8, vreinterpret_u8_u32(r2[2].val[1]));
-    vst1_u8(dest + i + 11*8, vreinterpret_u8_u32(r2[6].val[1]));
-    vst1_u8(dest + i + 12*8, vreinterpret_u8_u32(r2[3].val[0]));
-    vst1_u8(dest + i + 13*8, vreinterpret_u8_u32(r2[7].val[0]));
-    vst1_u8(dest + i + 14*8, vreinterpret_u8_u32(r2[3].val[1]));
-    vst1_u8(dest + i + 15*8, vreinterpret_u8_u32(r2[7].val[1]));
+    for(j = 0; j < 4; j++) {
+      for(l = 0; l < 2; l++) {
+        for(m = 0; m < 2; m++) {
+          vst1_u8(dest + i + (4*j+m+2*l)*8, vreinterpret_u8_u32(r2[j+4*m].val[l]));
+        }
+      }
+    }
   }
 }
 
