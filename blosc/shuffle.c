@@ -50,10 +50,10 @@ static const bool true = 1;
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
 /*  Define function pointer types for shuffle/unshuffle routines. */
-typedef void(*shuffle_func)(const size_t, const size_t, const uint8_t*, const uint8_t*);
-typedef void(*unshuffle_func)(const size_t, const size_t, const uint8_t*, const uint8_t*);
-typedef int64_t(*bitshuffle_func)(void*, void*, const size_t, const size_t, void*);
-typedef int64_t(*bitunshuffle_func)(void*, void*, const size_t, const size_t, void*);
+typedef void(* shuffle_func)(const size_t, const size_t, const uint8_t*, const uint8_t*);
+typedef void(* unshuffle_func)(const size_t, const size_t, const uint8_t*, const uint8_t*);
+typedef int64_t(* bitshuffle_func)(void*, void*, const size_t, const size_t, void*);
+typedef int64_t(* bitunshuffle_func)(void*, void*, const size_t, const size_t, void*);
 
 /* An implementation of shuffle/unshuffle routines. */
 typedef struct shuffle_implementation {
@@ -238,22 +238,22 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
 #elif defined(SHUFFLE_NEON_ENABLED) /* ARM-NEON */
   #include <sys/auxv.h>
   #include <asm/hwcap.h>
-  static blosc_cpu_features blosc_get_cpu_features(void) {
-    blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
-    if (getauxval(AT_HWCAP) & HWCAP_NEON) {
-      cpu_features |= BLOSC_HAVE_NEON;
-    }
-    return cpu_features;
+static blosc_cpu_features blosc_get_cpu_features(void) {
+  blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
+  if (getauxval(AT_HWCAP) & HWCAP_NEON) {
+    cpu_features |= BLOSC_HAVE_NEON;
   }
+  return cpu_features;
+}
 #else   /* No hardware acceleration supported for the target architecture. */
   #if defined(_MSC_VER)
-  #pragma message("Hardware-acceleration detection not implemented for the target architecture. Only the generic shuffle/unshuffle routines will be available.")
+    #pragma message("Hardware-acceleration detection not implemented for the target architecture. Only the generic shuffle/unshuffle routines will be available.")
   #else
-  #warning Hardware-acceleration detection not implemented for the target architecture. Only the generic shuffle/unshuffle routines will be available.
+    #warning Hardware-acceleration detection not implemented for the target architecture. Only the generic shuffle/unshuffle routines will be available.
   #endif
 
 static blosc_cpu_features blosc_get_cpu_features(void) {
-  return BLOSC_HAVE_NOTHING;
+return BLOSC_HAVE_NOTHING;
 }
 
 #endif /* defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED) */
@@ -342,7 +342,7 @@ void init_shuffle_implementation() {
 #if defined(__GNUC__) || defined(__clang__)
   if (__builtin_expect(!implementation_initialized, 0)) {
 #else
-  if (!implementation_initialized) {
+    if (!implementation_initialized) {
 #endif
     /* Initialize the implementation. */
     host_implementation = get_shuffle_implementation();

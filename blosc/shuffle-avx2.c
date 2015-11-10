@@ -44,16 +44,14 @@ static void printymm(__m256i ymm0)
 #if defined(__GNUC__) && !defined(__clang__)
 static inline __m256i
 __attribute__((__always_inline__))
-_mm256_loadu2_m128i(const __m128i* const hiaddr, const __m128i* const loaddr)
-{
+_mm256_loadu2_m128i(const __m128i* const hiaddr, const __m128i* const loaddr) {
   return _mm256_inserti128_si256(
-    _mm256_castsi128_si256(_mm_loadu_si128(loaddr)), _mm_loadu_si128(hiaddr), 1);
+      _mm256_castsi128_si256(_mm_loadu_si128(loaddr)), _mm_loadu_si128(hiaddr), 1);
 }
 
 static inline void
 __attribute__((__always_inline__))
-_mm256_storeu2_m128i(__m128i* const hiaddr, __m128i* const loaddr, const __m256i a)
-{
+_mm256_storeu2_m128i(__m128i* const hiaddr, __m128i* const loaddr, const __m256i a) {
   _mm_storeu_si128(loaddr, _mm256_castsi256_si128(a));
   _mm_storeu_si128(hiaddr, _mm256_extracti128_si256(a, 1));
 }
@@ -62,8 +60,7 @@ _mm256_storeu2_m128i(__m128i* const hiaddr, __m128i* const loaddr, const __m256i
 /* Routine optimized for shuffling a buffer for a type size of 2 bytes. */
 static void
 shuffle2_avx2(uint8_t* const dest, const uint8_t* const src,
-  const size_t vectorizable_elements, const size_t total_elements)
-{
+              const size_t vectorizable_elements, const size_t total_elements) {
   static const size_t bytesoftype = 2;
   size_t j;
   int k;
@@ -74,10 +71,10 @@ shuffle2_avx2(uint8_t* const dest, const uint8_t* const src,
      most to least significant (i.e., their order is reversed when compared to
      loading the mask from an array). */
   const __m256i shmask = _mm256_set_epi8(
-    0x0f, 0x0d, 0x0b, 0x09, 0x07, 0x05, 0x03, 0x01,
-    0x0e, 0x0c, 0x0a, 0x08, 0x06, 0x04, 0x02, 0x00,
-    0x0f, 0x0d, 0x0b, 0x09, 0x07, 0x05, 0x03, 0x01,
-    0x0e, 0x0c, 0x0a, 0x08, 0x06, 0x04, 0x02, 0x00);
+      0x0f, 0x0d, 0x0b, 0x09, 0x07, 0x05, 0x03, 0x01,
+      0x0e, 0x0c, 0x0a, 0x08, 0x06, 0x04, 0x02, 0x00,
+      0x0f, 0x0d, 0x0b, 0x09, 0x07, 0x05, 0x03, 0x01,
+      0x0e, 0x0c, 0x0a, 0x08, 0x06, 0x04, 0x02, 0x00);
 
   for (j = 0; j < vectorizable_elements; j += sizeof(__m256i)) {
     /* Fetch 32 elements (64 bytes) then transpose bytes, words and double words. */
@@ -104,8 +101,7 @@ shuffle2_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for shuffling a buffer for a type size of 4 bytes. */
 static void
 shuffle4_avx2(uint8_t* const dest, const uint8_t* const src,
-  const size_t vectorizable_elements, const size_t total_elements)
-{
+              const size_t vectorizable_elements, const size_t total_elements) {
   static const size_t bytesoftype = 4;
   size_t i;
   int j;
@@ -116,7 +112,7 @@ shuffle4_avx2(uint8_t* const dest, const uint8_t* const src,
      most to least significant (i.e., their order is reversed when compared to
      loading the mask from an array). */
   const __m256i mask = _mm256_set_epi32(
-    0x07, 0x03, 0x06, 0x02, 0x05, 0x01, 0x04, 0x00);
+      0x07, 0x03, 0x06, 0x02, 0x05, 0x01, 0x04, 0x00);
 
   for (i = 0; i < vectorizable_elements; i += sizeof(__m256i)) {
     /* Fetch 32 elements (128 bytes) then transpose bytes and words. */
@@ -130,13 +126,13 @@ shuffle4_avx2(uint8_t* const dest, const uint8_t* const src,
     }
     /* Transpose double words */
     for (j = 0; j < 2; j++) {
-      ymm1[j*2] = _mm256_unpacklo_epi32(ymm0[j*2], ymm0[j*2+1]);
-      ymm1[j*2+1] = _mm256_unpackhi_epi32(ymm0[j*2], ymm0[j*2+1]);
+      ymm1[j * 2] = _mm256_unpacklo_epi32(ymm0[j * 2], ymm0[j * 2 + 1]);
+      ymm1[j * 2 + 1] = _mm256_unpackhi_epi32(ymm0[j * 2], ymm0[j * 2 + 1]);
     }
     /* Transpose quad words */
     for (j = 0; j < 2; j++) {
-      ymm0[j*2] = _mm256_unpacklo_epi64(ymm1[j], ymm1[j+2]);
-      ymm0[j*2+1] = _mm256_unpackhi_epi64(ymm1[j], ymm1[j+2]);
+      ymm0[j * 2] = _mm256_unpacklo_epi64(ymm1[j], ymm1[j + 2]);
+      ymm0[j * 2 + 1] = _mm256_unpackhi_epi64(ymm1[j], ymm1[j + 2]);
     }
     for (j = 0; j < 4; j++) {
       ymm0[j] = _mm256_permutevar8x32_epi32(ymm0[j], mask);
@@ -152,8 +148,7 @@ shuffle4_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for shuffling a buffer for a type size of 8 bytes. */
 static void
 shuffle8_avx2(uint8_t* const dest, const uint8_t* const src,
-  const size_t vectorizable_elements, const size_t total_elements)
-{
+              const size_t vectorizable_elements, const size_t total_elements) {
   static const size_t bytesoftype = 8;
   size_t j;
   int k, l;
@@ -167,22 +162,22 @@ shuffle8_avx2(uint8_t* const dest, const uint8_t* const src,
       ymm1[k] = _mm256_unpacklo_epi8(ymm0[k], ymm1[k]);
     }
     /* Transpose words */
-    for (k = 0, l = 0; k < 4; k++, l +=2) {
-      ymm0[k*2] = _mm256_unpacklo_epi16(ymm1[l], ymm1[l+1]);
-      ymm0[k*2+1] = _mm256_unpackhi_epi16(ymm1[l], ymm1[l+1]);
+    for (k = 0, l = 0; k < 4; k++, l += 2) {
+      ymm0[k * 2] = _mm256_unpacklo_epi16(ymm1[l], ymm1[l + 1]);
+      ymm0[k * 2 + 1] = _mm256_unpackhi_epi16(ymm1[l], ymm1[l + 1]);
     }
     /* Transpose double words */
     for (k = 0, l = 0; k < 4; k++, l++) {
       if (k == 2) l += 2;
-      ymm1[k*2] = _mm256_unpacklo_epi32(ymm0[l], ymm0[l+2]);
-      ymm1[k*2+1] = _mm256_unpackhi_epi32(ymm0[l], ymm0[l+2]);
+      ymm1[k * 2] = _mm256_unpacklo_epi32(ymm0[l], ymm0[l + 2]);
+      ymm1[k * 2 + 1] = _mm256_unpackhi_epi32(ymm0[l], ymm0[l + 2]);
     }
     /* Transpose quad words */
     for (k = 0; k < 4; k++) {
-      ymm0[k*2] = _mm256_unpacklo_epi64(ymm1[k], ymm1[k+4]);
-      ymm0[k*2+1] = _mm256_unpackhi_epi64(ymm1[k], ymm1[k+4]);
+      ymm0[k * 2] = _mm256_unpacklo_epi64(ymm1[k], ymm1[k + 4]);
+      ymm0[k * 2 + 1] = _mm256_unpackhi_epi64(ymm1[k], ymm1[k + 4]);
     }
-    for(k = 0; k < 8; k++) {
+    for (k = 0; k < 8; k++) {
       ymm1[k] = _mm256_permute4x64_epi64(ymm0[k], 0x72);
       ymm0[k] = _mm256_permute4x64_epi64(ymm0[k], 0xD8);
       ymm0[k] = _mm256_unpacklo_epi16(ymm0[k], ymm1[k]);
@@ -198,8 +193,7 @@ shuffle8_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for shuffling a buffer for a type size of 16 bytes. */
 static void
 shuffle16_avx2(uint8_t* const dest, const uint8_t* const src,
-  const size_t vectorizable_elements, const size_t total_elements)
-{
+               const size_t vectorizable_elements, const size_t total_elements) {
   static const size_t bytesoftype = 16;
   size_t j;
   int k, l;
@@ -210,10 +204,10 @@ shuffle16_avx2(uint8_t* const dest, const uint8_t* const src,
      most to least significant (i.e., their order is reversed when compared to
      loading the mask from an array). */
   const __m256i shmask = _mm256_set_epi8(
-    0x0f, 0x07, 0x0e, 0x06, 0x0d, 0x05, 0x0c, 0x04,
-    0x0b, 0x03, 0x0a, 0x02, 0x09, 0x01, 0x08, 0x00,
-    0x0f, 0x07, 0x0e, 0x06, 0x0d, 0x05, 0x0c, 0x04,
-    0x0b, 0x03, 0x0a, 0x02, 0x09, 0x01, 0x08, 0x00);
+      0x0f, 0x07, 0x0e, 0x06, 0x0d, 0x05, 0x0c, 0x04,
+      0x0b, 0x03, 0x0a, 0x02, 0x09, 0x01, 0x08, 0x00,
+      0x0f, 0x07, 0x0e, 0x06, 0x0d, 0x05, 0x0c, 0x04,
+      0x0b, 0x03, 0x0a, 0x02, 0x09, 0x01, 0x08, 0x00);
 
   for (j = 0; j < vectorizable_elements; j += sizeof(__m256i)) {
     /* Fetch 32 elements (512 bytes) into 16 YMM registers. */
@@ -221,26 +215,26 @@ shuffle16_avx2(uint8_t* const dest, const uint8_t* const src,
       ymm0[k] = _mm256_loadu_si256((__m256i*)(src + (j * bytesoftype) + (k * sizeof(__m256i))));
     }
     /* Transpose bytes */
-    for (k = 0, l = 0; k < 8; k++, l +=2) {
-      ymm1[k*2] = _mm256_unpacklo_epi8(ymm0[l], ymm0[l+1]);
-      ymm1[k*2+1] = _mm256_unpackhi_epi8(ymm0[l], ymm0[l+1]);
+    for (k = 0, l = 0; k < 8; k++, l += 2) {
+      ymm1[k * 2] = _mm256_unpacklo_epi8(ymm0[l], ymm0[l + 1]);
+      ymm1[k * 2 + 1] = _mm256_unpackhi_epi8(ymm0[l], ymm0[l + 1]);
     }
     /* Transpose words */
     for (k = 0, l = -2; k < 8; k++, l++) {
-      if ((k%2) == 0) l += 2;
-      ymm0[k*2] = _mm256_unpacklo_epi16(ymm1[l], ymm1[l+2]);
-      ymm0[k*2+1] = _mm256_unpackhi_epi16(ymm1[l], ymm1[l+2]);
+      if ((k % 2) == 0) l += 2;
+      ymm0[k * 2] = _mm256_unpacklo_epi16(ymm1[l], ymm1[l + 2]);
+      ymm0[k * 2 + 1] = _mm256_unpackhi_epi16(ymm1[l], ymm1[l + 2]);
     }
     /* Transpose double words */
     for (k = 0, l = -4; k < 8; k++, l++) {
-      if ((k%4) == 0) l += 4;
-      ymm1[k*2] = _mm256_unpacklo_epi32(ymm0[l], ymm0[l+4]);
-      ymm1[k*2+1] = _mm256_unpackhi_epi32(ymm0[l], ymm0[l+4]);
+      if ((k % 4) == 0) l += 4;
+      ymm1[k * 2] = _mm256_unpacklo_epi32(ymm0[l], ymm0[l + 4]);
+      ymm1[k * 2 + 1] = _mm256_unpackhi_epi32(ymm0[l], ymm0[l + 4]);
     }
     /* Transpose quad words */
     for (k = 0; k < 8; k++) {
-      ymm0[k*2] = _mm256_unpacklo_epi64(ymm1[k], ymm1[k+8]);
-      ymm0[k*2+1] = _mm256_unpackhi_epi64(ymm1[k], ymm1[k+8]);
+      ymm0[k * 2] = _mm256_unpacklo_epi64(ymm1[k], ymm1[k + 8]);
+      ymm0[k * 2 + 1] = _mm256_unpackhi_epi64(ymm1[k], ymm1[k + 8]);
     }
     for (k = 0; k < 16; k++) {
       ymm0[k] = _mm256_permute4x64_epi64(ymm0[k], 0xd8);
@@ -257,8 +251,7 @@ shuffle16_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for shuffling a buffer for a type size larger than 16 bytes. */
 static void
 shuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
-  const size_t vectorizable_elements, const size_t total_elements, const size_t bytesoftype)
-{
+                     const size_t vectorizable_elements, const size_t total_elements, const size_t bytesoftype) {
   size_t j;
   int k, l;
   __m256i ymm0[16], ymm1[16];
@@ -270,10 +263,10 @@ shuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
      most to least significant (i.e., their order is reversed when compared to
      loading the mask from an array). */
   const __m256i shmask = _mm256_set_epi8(
-    0x0f, 0x07, 0x0e, 0x06, 0x0d, 0x05, 0x0c, 0x04,
-    0x0b, 0x03, 0x0a, 0x02, 0x09, 0x01, 0x08, 0x00,
-    0x0f, 0x07, 0x0e, 0x06, 0x0d, 0x05, 0x0c, 0x04,
-    0x0b, 0x03, 0x0a, 0x02, 0x09, 0x01, 0x08, 0x00);
+      0x0f, 0x07, 0x0e, 0x06, 0x0d, 0x05, 0x0c, 0x04,
+      0x0b, 0x03, 0x0a, 0x02, 0x09, 0x01, 0x08, 0x00,
+      0x0f, 0x07, 0x0e, 0x06, 0x0d, 0x05, 0x0c, 0x04,
+      0x0b, 0x03, 0x0a, 0x02, 0x09, 0x01, 0x08, 0x00);
 
   for (j = 0; j < vectorizable_elements; j += sizeof(__m256i)) {
     /* Advance the offset into the type by the vector size (in bytes), unless this is
@@ -282,36 +275,36 @@ shuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
     of remaining bytes in the type will be a multiple of the vector size. */
     size_t offset_into_type;
     for (offset_into_type = 0; offset_into_type < bytesoftype;
-      offset_into_type += (offset_into_type == 0 && vecs_per_el.rem > 0 ? vecs_per_el.rem : sizeof(__m128i))) {
+         offset_into_type += (offset_into_type == 0 && vecs_per_el.rem > 0 ? vecs_per_el.rem : sizeof(__m128i))) {
 
       /* Fetch elements in groups of 512 bytes */
       const uint8_t* const src_with_offset = src + offset_into_type;
       for (k = 0; k < 16; k++) {
         ymm0[k] = _mm256_loadu2_m128i(
-          (__m128i*)(src_with_offset + (j + (2 * k) + 1) * bytesoftype),
-          (__m128i*)(src_with_offset + (j + (2 * k)) * bytesoftype));
+            (__m128i*)(src_with_offset + (j + (2 * k) + 1) * bytesoftype),
+            (__m128i*)(src_with_offset + (j + (2 * k)) * bytesoftype));
       }
       /* Transpose bytes */
-      for (k = 0, l = 0; k < 8; k++, l +=2) {
-        ymm1[k*2] = _mm256_unpacklo_epi8(ymm0[l], ymm0[l+1]);
-        ymm1[k*2+1] = _mm256_unpackhi_epi8(ymm0[l], ymm0[l+1]);
+      for (k = 0, l = 0; k < 8; k++, l += 2) {
+        ymm1[k * 2] = _mm256_unpacklo_epi8(ymm0[l], ymm0[l + 1]);
+        ymm1[k * 2 + 1] = _mm256_unpackhi_epi8(ymm0[l], ymm0[l + 1]);
       }
       /* Transpose words */
       for (k = 0, l = -2; k < 8; k++, l++) {
-        if ((k%2) == 0) l += 2;
-        ymm0[k*2] = _mm256_unpacklo_epi16(ymm1[l], ymm1[l+2]);
-        ymm0[k*2+1] = _mm256_unpackhi_epi16(ymm1[l], ymm1[l+2]);
+        if ((k % 2) == 0) l += 2;
+        ymm0[k * 2] = _mm256_unpacklo_epi16(ymm1[l], ymm1[l + 2]);
+        ymm0[k * 2 + 1] = _mm256_unpackhi_epi16(ymm1[l], ymm1[l + 2]);
       }
       /* Transpose double words */
       for (k = 0, l = -4; k < 8; k++, l++) {
-        if ((k%4) == 0) l += 4;
-        ymm1[k*2] = _mm256_unpacklo_epi32(ymm0[l], ymm0[l+4]);
-        ymm1[k*2+1] = _mm256_unpackhi_epi32(ymm0[l], ymm0[l+4]);
+        if ((k % 4) == 0) l += 4;
+        ymm1[k * 2] = _mm256_unpacklo_epi32(ymm0[l], ymm0[l + 4]);
+        ymm1[k * 2 + 1] = _mm256_unpackhi_epi32(ymm0[l], ymm0[l + 4]);
       }
       /* Transpose quad words */
       for (k = 0; k < 8; k++) {
-        ymm0[k*2] = _mm256_unpacklo_epi64(ymm1[k], ymm1[k+8]);
-        ymm0[k*2+1] = _mm256_unpackhi_epi64(ymm1[k], ymm1[k+8]);
+        ymm0[k * 2] = _mm256_unpacklo_epi64(ymm1[k], ymm1[k + 8]);
+        ymm0[k * 2 + 1] = _mm256_unpackhi_epi64(ymm1[k], ymm1[k + 8]);
       }
       for (k = 0; k < 16; k++) {
         ymm0[k] = _mm256_permute4x64_epi64(ymm0[k], 0xd8);
@@ -329,8 +322,7 @@ shuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for unshuffling a buffer for a type size of 2 bytes. */
 static void
 unshuffle2_avx2(uint8_t* const dest, const uint8_t* const src,
-  const size_t vectorizable_elements, const size_t total_elements)
-{
+                const size_t vectorizable_elements, const size_t total_elements) {
   static const size_t bytesoftype = 2;
   size_t i;
   int j;
@@ -359,8 +351,7 @@ unshuffle2_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for unshuffling a buffer for a type size of 4 bytes. */
 static void
 unshuffle4_avx2(uint8_t* const dest, const uint8_t* const src,
-  const size_t vectorizable_elements, const size_t total_elements)
-{
+                const size_t vectorizable_elements, const size_t total_elements) {
   static const size_t bytesoftype = 4;
   size_t i;
   int j;
@@ -375,16 +366,16 @@ unshuffle4_avx2(uint8_t* const dest, const uint8_t* const src,
     /* Shuffle bytes */
     for (j = 0; j < 2; j++) {
       /* Compute the low 64 bytes */
-      ymm1[j] = _mm256_unpacklo_epi8(ymm0[j*2], ymm0[j*2+1]);
+      ymm1[j] = _mm256_unpacklo_epi8(ymm0[j * 2], ymm0[j * 2 + 1]);
       /* Compute the hi 64 bytes */
-      ymm1[2+j] = _mm256_unpackhi_epi8(ymm0[j*2], ymm0[j*2+1]);
+      ymm1[2 + j] = _mm256_unpackhi_epi8(ymm0[j * 2], ymm0[j * 2 + 1]);
     }
     /* Shuffle 2-byte words */
     for (j = 0; j < 2; j++) {
       /* Compute the low 64 bytes */
-      ymm0[j] = _mm256_unpacklo_epi16(ymm1[j*2], ymm1[j*2+1]);
+      ymm0[j] = _mm256_unpacklo_epi16(ymm1[j * 2], ymm1[j * 2 + 1]);
       /* Compute the hi 64 bytes */
-      ymm0[2+j] = _mm256_unpackhi_epi16(ymm1[j*2], ymm1[j*2+1]);
+      ymm0[2 + j] = _mm256_unpackhi_epi16(ymm1[j * 2], ymm1[j * 2 + 1]);
     }
     ymm1[0] = _mm256_permute2x128_si256(ymm0[0], ymm0[2], 0x20);
     ymm1[1] = _mm256_permute2x128_si256(ymm0[1], ymm0[3], 0x20);
@@ -401,8 +392,7 @@ unshuffle4_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for unshuffling a buffer for a type size of 8 bytes. */
 static void
 unshuffle8_avx2(uint8_t* const dest, const uint8_t* const src,
-  const size_t vectorizable_elements, const size_t total_elements)
-{
+                const size_t vectorizable_elements, const size_t total_elements) {
   static const size_t bytesoftype = 8;
   size_t i;
   int j;
@@ -417,16 +407,16 @@ unshuffle8_avx2(uint8_t* const dest, const uint8_t* const src,
     /* Shuffle bytes */
     for (j = 0; j < 4; j++) {
       /* Compute the low 32 bytes */
-      ymm1[j] = _mm256_unpacklo_epi8(ymm0[j*2], ymm0[j*2+1]);
+      ymm1[j] = _mm256_unpacklo_epi8(ymm0[j * 2], ymm0[j * 2 + 1]);
       /* Compute the hi 32 bytes */
-      ymm1[4+j] = _mm256_unpackhi_epi8(ymm0[j*2], ymm0[j*2+1]);
+      ymm1[4 + j] = _mm256_unpackhi_epi8(ymm0[j * 2], ymm0[j * 2 + 1]);
     }
     /* Shuffle words */
     for (j = 0; j < 4; j++) {
       /* Compute the low 32 bytes */
-      ymm0[j] = _mm256_unpacklo_epi16(ymm1[j*2], ymm1[j*2+1]);
+      ymm0[j] = _mm256_unpacklo_epi16(ymm1[j * 2], ymm1[j * 2 + 1]);
       /* Compute the hi 32 bytes */
-      ymm0[4+j] = _mm256_unpackhi_epi16(ymm1[j*2], ymm1[j*2+1]);
+      ymm0[4 + j] = _mm256_unpackhi_epi16(ymm1[j * 2], ymm1[j * 2 + 1]);
     }
     for (j = 0; j < 8; j++) {
       ymm0[j] = _mm256_permute4x64_epi64(ymm0[j], 0xd8);
@@ -435,9 +425,9 @@ unshuffle8_avx2(uint8_t* const dest, const uint8_t* const src,
     /* Shuffle 4-byte dwords */
     for (j = 0; j < 4; j++) {
       /* Compute the low 32 bytes */
-      ymm1[j] = _mm256_unpacklo_epi32(ymm0[j*2], ymm0[j*2+1]);
+      ymm1[j] = _mm256_unpacklo_epi32(ymm0[j * 2], ymm0[j * 2 + 1]);
       /* Compute the hi 32 bytes */
-      ymm1[4+j] = _mm256_unpackhi_epi32(ymm0[j*2], ymm0[j*2+1]);
+      ymm1[4 + j] = _mm256_unpackhi_epi32(ymm0[j * 2], ymm0[j * 2 + 1]);
     }
 
     /* Store the result vectors in proper order */
@@ -455,8 +445,7 @@ unshuffle8_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for unshuffling a buffer for a type size of 16 bytes. */
 static void
 unshuffle16_avx2(uint8_t* const dest, const uint8_t* const src,
-  const size_t vectorizable_elements, const size_t total_elements)
-{
+                 const size_t vectorizable_elements, const size_t total_elements) {
   static const size_t bytesoftype = 16;
   size_t i;
   int j;
@@ -472,36 +461,36 @@ unshuffle16_avx2(uint8_t* const dest, const uint8_t* const src,
     /* Shuffle bytes */
     for (j = 0; j < 8; j++) {
       /* Compute the low 32 bytes */
-      ymm1[j] = _mm256_unpacklo_epi8(ymm0[j*2], ymm0[j*2+1]);
+      ymm1[j] = _mm256_unpacklo_epi8(ymm0[j * 2], ymm0[j * 2 + 1]);
       /* Compute the hi 32 bytes */
-      ymm1[8+j] = _mm256_unpackhi_epi8(ymm0[j*2], ymm0[j*2+1]);
+      ymm1[8 + j] = _mm256_unpackhi_epi8(ymm0[j * 2], ymm0[j * 2 + 1]);
     }
     /* Shuffle 2-byte words */
     for (j = 0; j < 8; j++) {
       /* Compute the low 32 bytes */
-      ymm0[j] = _mm256_unpacklo_epi16(ymm1[j*2], ymm1[j*2+1]);
+      ymm0[j] = _mm256_unpacklo_epi16(ymm1[j * 2], ymm1[j * 2 + 1]);
       /* Compute the hi 32 bytes */
-      ymm0[8+j] = _mm256_unpackhi_epi16(ymm1[j*2], ymm1[j*2+1]);
+      ymm0[8 + j] = _mm256_unpackhi_epi16(ymm1[j * 2], ymm1[j * 2 + 1]);
     }
     /* Shuffle 4-byte dwords */
     for (j = 0; j < 8; j++) {
       /* Compute the low 32 bytes */
-      ymm1[j] = _mm256_unpacklo_epi32(ymm0[j*2], ymm0[j*2+1]);
+      ymm1[j] = _mm256_unpacklo_epi32(ymm0[j * 2], ymm0[j * 2 + 1]);
       /* Compute the hi 32 bytes */
-      ymm1[8+j] = _mm256_unpackhi_epi32(ymm0[j*2], ymm0[j*2+1]);
+      ymm1[8 + j] = _mm256_unpackhi_epi32(ymm0[j * 2], ymm0[j * 2 + 1]);
     }
 
     /* Shuffle 8-byte qwords */
     for (j = 0; j < 8; j++) {
       /* Compute the low 32 bytes */
-      ymm0[j] = _mm256_unpacklo_epi64(ymm1[j*2], ymm1[j*2+1]);
+      ymm0[j] = _mm256_unpacklo_epi64(ymm1[j * 2], ymm1[j * 2 + 1]);
       /* Compute the hi 32 bytes */
-      ymm0[8+j] = _mm256_unpackhi_epi64(ymm1[j*2], ymm1[j*2+1]);
+      ymm0[8 + j] = _mm256_unpackhi_epi64(ymm1[j * 2], ymm1[j * 2 + 1]);
     }
 
     for (j = 0; j < 8; j++) {
-      ymm1[j] = _mm256_permute2x128_si256(ymm0[j], ymm0[j+8], 0x20);
-      ymm1[j+8] = _mm256_permute2x128_si256(ymm0[j], ymm0[j+8], 0x31);
+      ymm1[j] = _mm256_permute2x128_si256(ymm0[j], ymm0[j + 8], 0x20);
+      ymm1[j + 8] = _mm256_permute2x128_si256(ymm0[j], ymm0[j + 8], 0x31);
     }
 
     /* Store the result vectors in proper order */
@@ -527,8 +516,7 @@ unshuffle16_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for unshuffling a buffer for a type size larger than 16 bytes. */
 static void
 unshuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
-  const size_t vectorizable_elements, const size_t total_elements, const size_t bytesoftype)
-{
+                       const size_t vectorizable_elements, const size_t total_elements, const size_t bytesoftype) {
   size_t i;
   int j;
   __m256i ymm0[16], ymm1[16];
@@ -539,7 +527,7 @@ unshuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
      to optimize cache utilization. */
   size_t offset_into_type;
   for (offset_into_type = 0; offset_into_type < bytesoftype;
-    offset_into_type += (offset_into_type == 0 && vecs_per_el.rem > 0 ? vecs_per_el.rem : sizeof(__m128i))) {
+       offset_into_type += (offset_into_type == 0 && vecs_per_el.rem > 0 ? vecs_per_el.rem : sizeof(__m128i))) {
     for (i = 0; i < vectorizable_elements; i += sizeof(__m256i)) {
       /* Load the first 16 bytes of 32 adjacent elements (512 bytes) into 16 YMM registers */
       const uint8_t* const src_for_ith_element = src + i;
@@ -550,88 +538,88 @@ unshuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
       /* Shuffle bytes */
       for (j = 0; j < 8; j++) {
         /* Compute the low 32 bytes */
-        ymm1[j] = _mm256_unpacklo_epi8(ymm0[j*2], ymm0[j*2+1]);
+        ymm1[j] = _mm256_unpacklo_epi8(ymm0[j * 2], ymm0[j * 2 + 1]);
         /* Compute the hi 32 bytes */
-        ymm1[8+j] = _mm256_unpackhi_epi8(ymm0[j*2], ymm0[j*2+1]);
+        ymm1[8 + j] = _mm256_unpackhi_epi8(ymm0[j * 2], ymm0[j * 2 + 1]);
       }
       /* Shuffle 2-byte words */
       for (j = 0; j < 8; j++) {
         /* Compute the low 32 bytes */
-        ymm0[j] = _mm256_unpacklo_epi16(ymm1[j*2], ymm1[j*2+1]);
+        ymm0[j] = _mm256_unpacklo_epi16(ymm1[j * 2], ymm1[j * 2 + 1]);
         /* Compute the hi 32 bytes */
-        ymm0[8+j] = _mm256_unpackhi_epi16(ymm1[j*2], ymm1[j*2+1]);
+        ymm0[8 + j] = _mm256_unpackhi_epi16(ymm1[j * 2], ymm1[j * 2 + 1]);
       }
       /* Shuffle 4-byte dwords */
       for (j = 0; j < 8; j++) {
         /* Compute the low 32 bytes */
-        ymm1[j] = _mm256_unpacklo_epi32(ymm0[j*2], ymm0[j*2+1]);
+        ymm1[j] = _mm256_unpacklo_epi32(ymm0[j * 2], ymm0[j * 2 + 1]);
         /* Compute the hi 32 bytes */
-        ymm1[8+j] = _mm256_unpackhi_epi32(ymm0[j*2], ymm0[j*2+1]);
+        ymm1[8 + j] = _mm256_unpackhi_epi32(ymm0[j * 2], ymm0[j * 2 + 1]);
       }
 
       /* Shuffle 8-byte qwords */
       for (j = 0; j < 8; j++) {
         /* Compute the low 32 bytes */
-        ymm0[j] = _mm256_unpacklo_epi64(ymm1[j*2], ymm1[j*2+1]);
+        ymm0[j] = _mm256_unpacklo_epi64(ymm1[j * 2], ymm1[j * 2 + 1]);
         /* Compute the hi 32 bytes */
-        ymm0[8+j] = _mm256_unpackhi_epi64(ymm1[j*2], ymm1[j*2+1]);
+        ymm0[8 + j] = _mm256_unpackhi_epi64(ymm1[j * 2], ymm1[j * 2 + 1]);
       }
 
       for (j = 0; j < 8; j++) {
-        ymm1[j] = _mm256_permute2x128_si256(ymm0[j], ymm0[j+8], 0x20);
-        ymm1[j+8] = _mm256_permute2x128_si256(ymm0[j], ymm0[j+8], 0x31);
+        ymm1[j] = _mm256_permute2x128_si256(ymm0[j], ymm0[j + 8], 0x20);
+        ymm1[j + 8] = _mm256_permute2x128_si256(ymm0[j], ymm0[j + 8], 0x31);
       }
 
       /* Store the result vectors in proper order */
       const uint8_t* const dest_with_offset = dest + offset_into_type;
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x01) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x00) * bytesoftype), ymm1[0]);
+          (__m128i*)(dest_with_offset + (i + 0x01) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x00) * bytesoftype), ymm1[0]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x03) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x02) * bytesoftype), ymm1[4]);
+          (__m128i*)(dest_with_offset + (i + 0x03) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x02) * bytesoftype), ymm1[4]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x05) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x04) * bytesoftype), ymm1[2]);
+          (__m128i*)(dest_with_offset + (i + 0x05) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x04) * bytesoftype), ymm1[2]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x07) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x06) * bytesoftype), ymm1[6]);
+          (__m128i*)(dest_with_offset + (i + 0x07) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x06) * bytesoftype), ymm1[6]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x09) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x08) * bytesoftype), ymm1[1]);
+          (__m128i*)(dest_with_offset + (i + 0x09) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x08) * bytesoftype), ymm1[1]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x0b) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x0a) * bytesoftype), ymm1[5]);
+          (__m128i*)(dest_with_offset + (i + 0x0b) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x0a) * bytesoftype), ymm1[5]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x0d) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x0c) * bytesoftype), ymm1[3]);
+          (__m128i*)(dest_with_offset + (i + 0x0d) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x0c) * bytesoftype), ymm1[3]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x0f) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x0e) * bytesoftype), ymm1[7]);
+          (__m128i*)(dest_with_offset + (i + 0x0f) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x0e) * bytesoftype), ymm1[7]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x11) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x10) * bytesoftype), ymm1[8]);
+          (__m128i*)(dest_with_offset + (i + 0x11) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x10) * bytesoftype), ymm1[8]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x13) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x12) * bytesoftype), ymm1[12]);
+          (__m128i*)(dest_with_offset + (i + 0x13) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x12) * bytesoftype), ymm1[12]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x15) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x14) * bytesoftype), ymm1[10]);
+          (__m128i*)(dest_with_offset + (i + 0x15) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x14) * bytesoftype), ymm1[10]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x17) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x16) * bytesoftype), ymm1[14]);
+          (__m128i*)(dest_with_offset + (i + 0x17) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x16) * bytesoftype), ymm1[14]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x19) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x18) * bytesoftype), ymm1[9]);
+          (__m128i*)(dest_with_offset + (i + 0x19) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x18) * bytesoftype), ymm1[9]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x1b) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x1a) * bytesoftype), ymm1[13]);
+          (__m128i*)(dest_with_offset + (i + 0x1b) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x1a) * bytesoftype), ymm1[13]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x1d) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x1c) * bytesoftype), ymm1[11]);
+          (__m128i*)(dest_with_offset + (i + 0x1d) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x1c) * bytesoftype), ymm1[11]);
       _mm256_storeu2_m128i(
-        (__m128i*)(dest_with_offset + (i + 0x1f) * bytesoftype),
-        (__m128i*)(dest_with_offset + (i + 0x1e) * bytesoftype), ymm1[15]);
+          (__m128i*)(dest_with_offset + (i + 0x1f) * bytesoftype),
+          (__m128i*)(dest_with_offset + (i + 0x1e) * bytesoftype), ymm1[15]);
     }
   }
 }
@@ -660,32 +648,31 @@ shuffle_avx2(const size_t bytesoftype, const size_t blocksize,
   const size_t total_elements = blocksize / bytesoftype;
 
   /* Optimized shuffle implementations */
-  switch (bytesoftype)
-  {
-  case 2:
-    shuffle2_avx2(_dest, _src, vectorizable_elements, total_elements);
-    break;
-  case 4:
-    shuffle4_avx2(_dest, _src, vectorizable_elements, total_elements);
-    break;
-  case 8:
-    shuffle8_avx2(_dest, _src, vectorizable_elements, total_elements);
-    break;
-  case 16:
-    shuffle16_avx2(_dest, _src, vectorizable_elements, total_elements);
-    break;
-  default:
-    /* For types larger than 16 bytes, use the AVX2 tiled shuffle. */
-    if (bytesoftype > sizeof(__m128i)) {
-      shuffle16_tiled_avx2(_dest, _src, vectorizable_elements, total_elements, bytesoftype);
-    }
-    else {
-      /* Non-optimized shuffle */
-      shuffle_generic(bytesoftype, blocksize, _src, _dest);
-      /* The non-optimized function covers the whole buffer,
-         so we're done processing here. */
-      return;
-    }
+  switch (bytesoftype) {
+    case 2:
+      shuffle2_avx2(_dest, _src, vectorizable_elements, total_elements);
+      break;
+    case 4:
+      shuffle4_avx2(_dest, _src, vectorizable_elements, total_elements);
+      break;
+    case 8:
+      shuffle8_avx2(_dest, _src, vectorizable_elements, total_elements);
+      break;
+    case 16:
+      shuffle16_avx2(_dest, _src, vectorizable_elements, total_elements);
+      break;
+    default:
+      /* For types larger than 16 bytes, use the AVX2 tiled shuffle. */
+      if (bytesoftype > sizeof(__m128i)) {
+        shuffle16_tiled_avx2(_dest, _src, vectorizable_elements, total_elements, bytesoftype);
+      }
+      else {
+        /* Non-optimized shuffle */
+        shuffle_generic(bytesoftype, blocksize, _src, _dest);
+        /* The non-optimized function covers the whole buffer,
+           so we're done processing here. */
+        return;
+      }
   }
 
   /* If the buffer had any bytes at the end which couldn't be handled
@@ -720,32 +707,31 @@ unshuffle_avx2(const size_t bytesoftype, const size_t blocksize,
   const size_t total_elements = blocksize / bytesoftype;
 
   /* Optimized unshuffle implementations */
-  switch (bytesoftype)
-  {
-  case 2:
-    unshuffle2_avx2(_dest, _src, vectorizable_elements, total_elements);
-    break;
-  case 4:
-    unshuffle4_avx2(_dest, _src, vectorizable_elements, total_elements);
-    break;
-  case 8:
-    unshuffle8_avx2(_dest, _src, vectorizable_elements, total_elements);
-    break;
-  case 16:
-    unshuffle16_avx2(_dest, _src, vectorizable_elements, total_elements);
-    break;
-  default:
-    /* For types larger than 16 bytes, use the AVX2 tiled unshuffle. */
-    if (bytesoftype > sizeof(__m128i)) {
-      unshuffle16_tiled_avx2(_dest, _src, vectorizable_elements, total_elements, bytesoftype);
-    }
-    else {
-      /* Non-optimized unshuffle */
-      unshuffle_generic(bytesoftype, blocksize, _src, _dest);
-      /* The non-optimized function covers the whole buffer,
-         so we're done processing here. */
-      return;
-    }
+  switch (bytesoftype) {
+    case 2:
+      unshuffle2_avx2(_dest, _src, vectorizable_elements, total_elements);
+      break;
+    case 4:
+      unshuffle4_avx2(_dest, _src, vectorizable_elements, total_elements);
+      break;
+    case 8:
+      unshuffle8_avx2(_dest, _src, vectorizable_elements, total_elements);
+      break;
+    case 16:
+      unshuffle16_avx2(_dest, _src, vectorizable_elements, total_elements);
+      break;
+    default:
+      /* For types larger than 16 bytes, use the AVX2 tiled unshuffle. */
+      if (bytesoftype > sizeof(__m128i)) {
+        unshuffle16_tiled_avx2(_dest, _src, vectorizable_elements, total_elements, bytesoftype);
+      }
+      else {
+        /* Non-optimized unshuffle */
+        unshuffle_generic(bytesoftype, blocksize, _src, _dest);
+        /* The non-optimized function covers the whole buffer,
+           so we're done processing here. */
+        return;
+      }
   }
 
   /* If the buffer had any bytes at the end which couldn't be handled

@@ -36,7 +36,7 @@
 #define SHAPE {100,100,100}
 #define CHUNKSHAPE {1,100,100}
 
-int main(){
+int main() {
   static float data[SIZE];
   static float data2[SIZE];
   void* chunk = data2;
@@ -47,12 +47,12 @@ int main(){
   schunk_header* sc_header;
   int i, nchunks;
 
-  for(i=0; i<SIZE; i++){
+  for (i = 0; i < SIZE; i++) {
     data[i] = i;
   }
 
   printf("Blosc version info: %s (%s)\n",
-	 BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+         BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Initialize the Blosc compressor */
   blosc_init();
@@ -68,7 +68,7 @@ int main(){
     return csize;
   }
 
-  printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1.*isize) / csize);
+  printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1. * isize) / csize);
 
   /* Create a super-chunk container */
   sc_params->filters[0] = BLOSC_SHUFFLE;
@@ -98,8 +98,8 @@ int main(){
 
   printf("Decompression succesful!\n");
 
-  for(i=0;i<SIZE;i++){
-    if(data[i] != data_dest[i]) {
+  for (i = 0; i < SIZE; i++) {
+    if (data[i] != data_dest[i]) {
       printf("Decompressed data differs from original!\n");
       return -1;
     }

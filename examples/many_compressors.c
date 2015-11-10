@@ -49,23 +49,23 @@
 #define SHAPE {100,100,100}
 #define CHUNKSHAPE {1,100,100}
 
-int main(){
+int main() {
   static float data[SIZE];
   static float data_out[SIZE];
   static float data_dest[SIZE];
-  int isize = SIZE*sizeof(float), osize = SIZE*sizeof(float);
-  int dsize = SIZE*sizeof(float), csize;
+  int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
+  int dsize = SIZE * sizeof(float), csize;
   int nthreads, pnthreads, i;
   char* compressors[] = {"blosclz", "lz4", "lz4hc", "snappy", "zlib"};
   int ccode, rcode;
 
-  for(i=0; i<SIZE; i++){
+  for (i = 0; i < SIZE; i++) {
     data[i] = i;
   }
 
   /* Register the filter with the library */
   printf("Blosc version info: %s (%s)\n",
-	 BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+         BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Initialize the Blosc compressor */
   blosc_init();
@@ -75,12 +75,12 @@ int main(){
   printf("Using %d threads (previously using %d)\n", nthreads, pnthreads);
 
   /* Tell Blosc to use some number of threads */
-  for (ccode=0; ccode <= 4; ccode++) {
+  for (ccode = 0; ccode <= 4; ccode++) {
 
     rcode = blosc_set_compressor(compressors[ccode]);
     if (rcode < 0) {
       printf("Error setting %s compressor.  It really exists?",
-	     compressors[ccode]);
+             compressors[ccode]);
       return rcode;
     }
     printf("Using %s compressor\n", compressors[ccode]);
@@ -92,22 +92,22 @@ int main(){
       return csize;
     }
 
-    printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1.*isize) / csize);
+    printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1. * isize) / csize);
 
     /* Decompress  */
     dsize = blosc_decompress(data_out, data_dest, dsize);
     if (dsize < 0) {
-        printf("Decompression error.  Error code: %d\n", dsize);
-        return dsize;
+      printf("Decompression error.  Error code: %d\n", dsize);
+      return dsize;
     }
 
     /* After using it, destroy the Blosc environment */
     blosc_destroy();
 
-    for(i=0;i<SIZE;i++){
-      if(data[i] != data_dest[i]) {
-	printf("Decompressed data differs from original!\n");
-	return -1;
+    for (i = 0; i < SIZE; i++) {
+      if (data[i] != data_dest[i]) {
+        printf("Decompressed data differs from original!\n");
+        return -1;
       }
     }
 

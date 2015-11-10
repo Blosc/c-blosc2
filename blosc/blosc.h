@@ -58,8 +58,8 @@ extern "C" {
 #define BLOSC_MAX_FILTERS 5
 
 /* Codes for internal flags (see blosc_cbuffer_metainfo) */
-#define BLOSC_DOSHUFFLE    0x1	/* byte-wise shuffle */
-#define BLOSC_MEMCPYED     0x2	/* plain copy */
+#define BLOSC_DOSHUFFLE    0x1  /* byte-wise shuffle */
+#define BLOSC_MEMCPYED     0x2  /* plain copy */
 #define BLOSC_DOBITSHUFFLE 0x4  /* bit-wise shuffle */
 
 /* Codes for the different compressors shipped with Blosc */
@@ -91,7 +91,7 @@ extern "C" {
 /* The codes for compressor formats shipped with Blosc (code must be < 8) */
 #define BLOSC_BLOSCLZ_FORMAT  BLOSC_BLOSCLZ_LIB
 #define BLOSC_LZ4_FORMAT      BLOSC_LZ4_LIB
-    /* LZ4HC and LZ4 share the same format */
+/* LZ4HC and LZ4 share the same format */
 #define BLOSC_LZ4HC_FORMAT    BLOSC_LZ4_LIB
 #define BLOSC_SNAPPY_FORMAT   BLOSC_SNAPPY_LIB
 #define BLOSC_ZLIB_FORMAT     BLOSC_ZLIB_LIB
@@ -162,8 +162,8 @@ BLOSC_EXPORT void blosc_destroy(void);
   together with the buffer data causing this and compression settings.
   */
 BLOSC_EXPORT int blosc_compress(int clevel, int doshuffle, size_t typesize,
-				size_t nbytes, const void *src, void *dest,
-				size_t destsize);
+                                size_t nbytes, const void* src, void* dest,
+                                size_t destsize);
 
 
 /**
@@ -186,9 +186,9 @@ BLOSC_EXPORT int blosc_compress(int clevel, int doshuffle, size_t typesize,
   together with the buffer data causing this and compression settings.
 */
 BLOSC_EXPORT int blosc_compress_ctx(int clevel, int doshuffle, size_t typesize,
-				    size_t nbytes, const void* src, void* dest,
-				    size_t destsize, const char* compressor,
-				    size_t blocksize, int numinternalthreads);
+                                    size_t nbytes, const void* src, void* dest,
+                                    size_t destsize, const char* compressor,
+                                    size_t blocksize, int numinternalthreads);
 
 /**
   Decompress a block of compressed data in `src`, put the result in
@@ -203,7 +203,7 @@ BLOSC_EXPORT int blosc_compress_ctx(int clevel, int doshuffle, size_t typesize,
   output buffer is not large enough, then 0 (zero) or a negative value
   will be returned instead.
 */
-BLOSC_EXPORT int blosc_decompress(const void *src, void *dest, size_t destsize);
+BLOSC_EXPORT int blosc_decompress(const void* src, void* dest, size_t destsize);
 
 
 /**
@@ -223,8 +223,8 @@ BLOSC_EXPORT int blosc_decompress(const void *src, void *dest, size_t destsize);
   output buffer is not large enough, then 0 (zero) or a negative value
   will be returned instead.
 */
-BLOSC_EXPORT int blosc_decompress_ctx(const void *src, void *dest,
-                                          size_t destsize, int numinternalthreads);
+BLOSC_EXPORT int blosc_decompress_ctx(const void* src, void* dest,
+                                      size_t destsize, int numinternalthreads);
 
 /**
   Get `nitems` (of typesize size) in `src` buffer starting in `start`.
@@ -234,7 +234,7 @@ BLOSC_EXPORT int blosc_decompress_ctx(const void *src, void *dest,
   Returns the number of bytes copied to `dest` or a negative value if
   some error happens.
   */
-BLOSC_EXPORT int blosc_getitem(const void *src, int start, int nitems, void *dest);
+BLOSC_EXPORT int blosc_getitem(const void* src, int start, int nitems, void* dest);
 
 
 /**
@@ -267,7 +267,7 @@ BLOSC_EXPORT int blosc_set_compressor(const char* compname);
   for it in this build, -1 is returned.  Else, the compressor code is
   returned.
  */
-BLOSC_EXPORT int blosc_compcode_to_compname(int compcode, char **compname);
+BLOSC_EXPORT int blosc_compcode_to_compname(int compcode, char** compname);
 
 
 /**
@@ -276,7 +276,7 @@ BLOSC_EXPORT int blosc_compcode_to_compname(int compcode, char **compname);
   If the compressor name is not recognized, or there is not support
   for it in this build, -1 is returned instead.
  */
-BLOSC_EXPORT int blosc_compname_to_compcode(const char *compname);
+BLOSC_EXPORT int blosc_compname_to_compcode(const char* compname);
 
 
 /**
@@ -314,7 +314,7 @@ BLOSC_EXPORT char* blosc_get_version_string(void);
   If the compressor is supported, it returns the code for the library
   (>=0).  If it is not supported, this function returns -1.
   */
-BLOSC_EXPORT int blosc_get_complib_info(char *compname, char **complib, char **version);
+BLOSC_EXPORT int blosc_get_complib_info(char* compname, char** complib, char** version);
 
 
 /**
@@ -337,8 +337,8 @@ BLOSC_EXPORT int blosc_free_resources(void);
 
   This function should always succeed.
   */
-BLOSC_EXPORT void blosc_cbuffer_sizes(const void *cbuffer, size_t *nbytes,
-				      size_t *cbytes, size_t *blocksize);
+BLOSC_EXPORT void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
+                                      size_t* cbytes, size_t* blocksize);
 
 
 /**
@@ -356,8 +356,8 @@ BLOSC_EXPORT void blosc_cbuffer_sizes(const void *cbuffer, size_t *nbytes,
 
   This function should always succeed.
   */
-BLOSC_EXPORT void blosc_cbuffer_metainfo(const void *cbuffer, size_t *typesize,
-					 int *flags);
+BLOSC_EXPORT void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize,
+                                         int* flags);
 
 
 /**
@@ -367,8 +367,8 @@ BLOSC_EXPORT void blosc_cbuffer_metainfo(const void *cbuffer, size_t *typesize,
 
   This function should always succeed.
   */
-BLOSC_EXPORT void blosc_cbuffer_versions(const void *cbuffer, int *version,
-                                             int *versionlz);
+BLOSC_EXPORT void blosc_cbuffer_versions(const void* cbuffer, int* version,
+                                         int* versionlz);
 
 
 /**
@@ -376,7 +376,7 @@ BLOSC_EXPORT void blosc_cbuffer_versions(const void *cbuffer, int *version,
 
   This function should always succeed.
   */
-BLOSC_EXPORT char *blosc_cbuffer_complib(const void *cbuffer);
+BLOSC_EXPORT char* blosc_cbuffer_complib(const void* cbuffer);
 
 
 /*********************************************************************
@@ -391,23 +391,36 @@ typedef struct {
   uint8_t flags1;
   uint8_t flags2;
   uint8_t flags3;
-  uint16_t compressor;  /* the default compressor */
-  uint16_t clevel;      /* the compression level and other compress params */
-  uint16_t filters;	/* the (sequence of) filters.  3-bit per filter. */
-  uint16_t filt_info;	/* info for filters */
-  uint32_t chunksize;   /* size of each chunk.  0 if not a fixed chunk. */
-  int64_t nchunks;      /* number of chunks in super-chunk */
-  int64_t nbytes;       /* data + metadata (uncompressed) */
-  int64_t cbytes;       /* data + metadata + header (compressed) */
-  int8_t* metadata;     /* pointer to metadata */
-  int8_t* userdata;     /* pointer to user-defined data */
+  uint16_t compressor;
+  /* the default compressor */
+  uint16_t clevel;
+  /* the compression level and other compress params */
+  uint16_t filters;
+  /* the (sequence of) filters.  3-bit per filter. */
+  uint16_t filt_info;
+  /* info for filters */
+  uint32_t chunksize;
+  /* size of each chunk.  0 if not a fixed chunk. */
+  int64_t nchunks;
+  /* number of chunks in super-chunk */
+  int64_t nbytes;
+  /* data + metadata (uncompressed) */
+  int64_t cbytes;
+  /* data + metadata + header (compressed) */
+  int8_t* metadata;
+  /* pointer to metadata */
+  int8_t* userdata;
+  /* pointer to user-defined data */
   void** data;          /* pointer to data pointers */
 } schunk_header;
 
 typedef struct {
-  uint8_t compressor;   /* the default compressor */
-  uint8_t clevel;       /* the compression level and other compress params */
-  uint8_t filters[BLOSC_MAX_FILTERS];   /* the (sequence of) filters */
+  uint8_t compressor;
+  /* the default compressor */
+  uint8_t clevel;
+  /* the compression level and other compress params */
+  uint8_t filters[BLOSC_MAX_FILTERS];
+  /* the (sequence of) filters */
   uint16_t filt_info;   /* info for filters */
 } schunk_params;
 
@@ -430,8 +443,8 @@ BLOSC_EXPORT int blosc2_append_chunk(schunk_header* sc_header, void* chunk,
  detected, this number will be negative.
  */
 BLOSC_EXPORT int blosc2_append_buffer(schunk_header* sc_header,
-				      size_t typesize,
-				      size_t nbytes, void* src);
+                                      size_t typesize,
+                                      size_t nbytes, void* src);
 
 /* Decompress and return the `nchunk` chunk of a super-chunk.
 
@@ -442,7 +455,7 @@ BLOSC_EXPORT int blosc2_append_buffer(schunk_header* sc_header,
  detected, a negative code is returned instead.
  */
 BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header,
-					 int nchunk, void **dest);
+                                         int nchunk, void** dest);
 
 
 

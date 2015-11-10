@@ -23,7 +23,7 @@
   #include <windows.h>
   #include <malloc.h>
 
-  /* stdint.h only available in VS2010 (VC++ 16.0) and newer */
+/* stdint.h only available in VS2010 (VC++ 16.0) and newer */
   #if defined(_MSC_VER) && _MSC_VER < 1600
     #include "win32/stdint-windows.h"
   #else
@@ -48,7 +48,7 @@ uint16_t encode_filters(schunk_params* params) {
   int16_t enc_filters = 0;
 
   /* Encode the BLOSC_MAX_FILTERS filters (3-bit encoded) in 16 bit */
-  for (i=0; i<BLOSC_MAX_FILTERS; i++) {
+  for (i = 0; i < BLOSC_MAX_FILTERS; i++) {
     enc_filters += params->filters[i] << (i * 3);
   }
   return enc_filters;
@@ -61,7 +61,7 @@ uint8_t* decode_filters(uint16_t enc_filters) {
   uint8_t* filters = malloc(BLOSC_MAX_FILTERS);
 
   /* Decode the BLOSC_MAX_FILTERS filters (3-bit encoded) in 16 bit */
-  for (i=0; i<BLOSC_MAX_FILTERS; i++) {
+  for (i = 0; i < BLOSC_MAX_FILTERS; i++) {
     filters[i] = enc_filters & 0b11;
     enc_filters >>= 3;
   }
@@ -91,22 +91,22 @@ schunk_header* blosc2_new_schunk(schunk_params* params) {
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 int delta_encoder8(schunk_header* sc_header, int nbytes,
-		   uint8_t* src, uint8_t* dest) {
+                   uint8_t* src, uint8_t* dest) {
   int i;
-  int rbytes = *(int *)(sc_header->data[0] + 4);
+  int rbytes = *(int*)(sc_header->data[0] + 4);
   int mbytes;
-  uint8_t* dref = (uint8_t *)sc_header->data[0] + BLOSC_MAX_OVERHEAD;
+  uint8_t* dref = (uint8_t*)sc_header->data[0] + BLOSC_MAX_OVERHEAD;
 
   mbytes = MIN(nbytes, rbytes);
 
   /* Encode delta */
-  for (i=0; i<mbytes; i++) {
+  for (i = 0; i < mbytes; i++) {
     dest[i] = src[i] - dref[i];
   }
 
   /* Copy the leftovers */
   if (nbytes > rbytes) {
-    for (i=rbytes; i<nbytes; i++) {
+    for (i = rbytes; i < nbytes; i++) {
       dest[i] = src[i];
     }
   }
@@ -117,14 +117,14 @@ int delta_encoder8(schunk_header* sc_header, int nbytes,
 
 int delta_decoder8(schunk_header* sc_header, int nbytes, uint8_t* src) {
   int i;
-  uint8_t* dref = (uint8_t *)sc_header->data[0] + BLOSC_MAX_OVERHEAD;
-  int rbytes = *(int *)(sc_header->data[0] + 4);
+  uint8_t* dref = (uint8_t*)sc_header->data[0] + BLOSC_MAX_OVERHEAD;
+  int rbytes = *(int*)(sc_header->data[0] + 4);
   int mbytes;
 
   mbytes = MIN(nbytes, rbytes);
 
   /* Decode delta */
-  for (i=0; i<(mbytes); i++) {
+  for (i = 0; i < (mbytes); i++) {
     src[i] += dref[i];
   }
 
@@ -183,7 +183,7 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
       ret = delta_encoder8(sc_header, nbytes, src, dest);
       /* dest = memcpy(dest, src, nbytes); */
       if (ret < 0) {
-	return ret;
+        return ret;
       }
       src = dest;
     }
@@ -198,7 +198,7 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
   blosc_compcode_to_compname(sc_header->compressor, &compname);
   blosc_set_compressor(compname);
   cbytes = blosc_compress(clevel, enc_filters, typesize, nbytes, src, chunk,
-			  nbytes + BLOSC_MAX_OVERHEAD);
+                          nbytes + BLOSC_MAX_OVERHEAD);
   if (cbytes < 0) {
     free(chunk);
     free(dest);
@@ -215,7 +215,7 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
 
 /* Decompress and return a chunk that is part of a super-chunk. */
 int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk,
-                            void **dest) {
+                            void** dest) {
   int64_t nchunks = sc_header->nchunks;
   void* src;
   int chunksize;

@@ -36,7 +36,7 @@
 #define SHAPE {100,100,100}
 #define CHUNKSHAPE {1,100,100}
 
-int main(){
+int main() {
   static int32_t data[SIZE];
   int32_t* data_dest;
   int isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
@@ -46,7 +46,7 @@ int main(){
   schunk_header* sc_header;
   int i, nchunks;
 
-  for(i=0; i<SIZE; i++){
+  for (i = 0; i < SIZE; i++) {
     data[i] = i;
   }
 
@@ -75,7 +75,7 @@ int main(){
   nbytes = sc_header->nbytes;
   cbytes = sc_header->cbytes;
   printf("Compression super-chunk: %d -> %d (%.1fx)\n",
-         nbytes, cbytes, (1.*nbytes) / cbytes);
+         nbytes, cbytes, (1. * nbytes) / cbytes);
 
   /* Retrieve and decompress the chunks (0-based count) */
   dsize = blosc2_decompress_chunk(sc_header, 1, (void**)&data_dest);
@@ -86,7 +86,7 @@ int main(){
 
   printf("Decompression succesful!\n");
 
-  for (i=0; i<SIZE; i++){
+  for (i = 0; i < SIZE; i++) {
     if (data[i] != data_dest[i]) {
       printf("Decompressed data differs from original %d, %d, %d!\n", i, data[i], data_dest[i]);
       return -1;
