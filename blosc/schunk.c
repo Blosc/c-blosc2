@@ -71,17 +71,17 @@ uint8_t* decode_filters(uint16_t enc_filters) {
 
 /* Create a new super-chunk */
 schunk_header* blosc2_new_schunk(schunk_params* params) {
-  schunk_header* sc_header = calloc(1, sizeof(schunk_header));
+  static schunk_header sc_header;  /* initialized to zero by default */
 
-  sc_header->version = 0x0;     /* pre-first version */
-  sc_header->filters = encode_filters(params);
-  sc_header->filt_info = params->filt_info;
-  sc_header->compressor = params->compressor;
-  sc_header->clevel = params->clevel;
-  sc_header->cbytes = sizeof(*sc_header);
+  sc_header.version = 0x0;     /* pre-first version */
+  sc_header.filters = encode_filters(params);
+  sc_header.filt_info = params->filt_info;
+  sc_header.compressor = params->compressor;
+  sc_header.clevel = params->clevel;
+  sc_header.cbytes = sizeof(sc_header);
   /* The rest of the structure will remain zeroed */
 
-  return sc_header;
+  return &sc_header;
 }
 
 
@@ -132,7 +132,7 @@ int delta_decoder8(schunk_header* sc_header, int nbytes, uint8_t* src) {
 }
 
 
-/* Append an existing chunk to a super-chunk. */
+/* Append an existing chunk into a super-chunk. */
 int blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy) {
   int64_t nchunks = sc_header->nchunks;
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
