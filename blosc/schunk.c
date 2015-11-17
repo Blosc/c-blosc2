@@ -78,8 +78,6 @@ schunk_header* blosc2_new_schunk(schunk_params* params) {
   sc_header->filt_info = params->filt_info;
   sc_header->compressor = params->compressor;
   sc_header->clevel = params->clevel;
-  sc_header->data = malloc(0);
-  sc_header->nbytes = 0;
   sc_header->cbytes = sizeof(*sc_header);
   /* The rest of the structure will remain zeroed */
 
@@ -144,8 +142,8 @@ int blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy) {
 
   /* By copying the chunk we will always be able to free it later on */
   if (copy) {
-    chunk_copy = malloc(cbytes);
-    memcpy(chunk_copy, chunk, cbytes);
+    chunk_copy = malloc((size_t)cbytes);
+    memcpy(chunk_copy, chunk, (size_t)cbytes);
     chunk = chunk_copy;
   }
 
@@ -171,7 +169,7 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
   int cbytes;
   void* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
   void* dest = malloc(nbytes);
-  int ret = nbytes;
+  int ret;
   uint16_t enc_filters = sc_header->filters;
   uint8_t* filters = decode_filters(enc_filters);
   int clevel = sc_header->clevel;
@@ -180,7 +178,7 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
   /* Apply filters prior to compress */
   if (filters[0] == BLOSC_DELTA) {
     if (sc_header->nchunks > 0) {
-      ret = delta_encoder8(sc_header, nbytes, src, dest);
+      ret = delta_encoder8(sc_header, (int)nbytes, src, dest);
       /* dest = memcpy(dest, src, nbytes); */
       if (ret < 0) {
         return ret;
@@ -231,10 +229,10 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk,
   src = sc_header->data[nchunk];
   /* Create a buffer for destination */
   nbytes = *(int32_t*)(src + 4);
-  *dest = malloc(nbytes);
+  *dest = malloc((size_t)nbytes);
 
   /* And decompress it */
-  chunksize = blosc_decompress(src, *dest, nbytes);
+  chunksize = blosc_decompress(src, *dest, (size_t)nbytes);
   if (chunksize < 0) {
     return chunksize;
   }

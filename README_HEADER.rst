@@ -31,7 +31,7 @@ All entries are little endian.
     :bit 2 (``0x04``):
         Whether the bit-shuffle filter has been applied or not.
     :bit 3 (``0x08``):
-        Reserved
+        If set, the filter (or filters) is defined in the super-chunk.
     :bit 4 (``0x16``):
         Reserved
     :bit 5 (``0x32``):
@@ -52,6 +52,14 @@ All entries are little endian.
         ``snappy``
     :``3``:
         ``zlib``
+    :``4``:
+        Reserved
+    :``5``:
+        Reserved
+    :``6``:
+        Reserved
+    :``7``:
+        The compressor is defined in the super-chunk.
 
 :typesize:
     (``uint8``) Number of bytes for the atomic type.

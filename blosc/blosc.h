@@ -49,7 +49,8 @@ extern "C" {
 #define BLOSC_MAX_THREADS 256
 
 /* Codes for filters (see blosc_compress) */
-#define BLOSC_NOSHUFFLE   0  /* no shuffle */
+#define BLOSC_NOSHUFFLE   0  /* no shuffle (for compatibility with Blosc1) */
+#define BLOSC_NOFILTER    0  /* no filter */
 #define BLOSC_SHUFFLE     1  /* byte-wise shuffle */
 #define BLOSC_BITSHUFFLE  2  /* bit-wise shuffle */
 #define BLOSC_DELTA       3  /* delta filter */
@@ -58,16 +59,19 @@ extern "C" {
 #define BLOSC_MAX_FILTERS 5
 
 /* Codes for internal flags (see blosc_cbuffer_metainfo) */
-#define BLOSC_DOSHUFFLE    0x1  /* byte-wise shuffle */
-#define BLOSC_MEMCPYED     0x2  /* plain copy */
-#define BLOSC_DOBITSHUFFLE 0x4  /* bit-wise shuffle */
+#define BLOSC_DOSHUFFLE     0x1  /* byte-wise shuffle */
+#define BLOSC_MEMCPYED      0x2  /* plain copy */
+#define BLOSC_DOBITSHUFFLE  0x4  /* bit-wise shuffle */
+#define BLOSC_FILTER_SCHUNK 0x8  /* filter defined in super-chunk */
 
 /* Codes for the different compressors shipped with Blosc */
-#define BLOSC_BLOSCLZ   0
-#define BLOSC_LZ4       1
-#define BLOSC_LZ4HC     2
-#define BLOSC_SNAPPY    3
-#define BLOSC_ZLIB      4
+#define BLOSC_BLOSCLZ        0
+#define BLOSC_LZ4            1
+#define BLOSC_LZ4HC          2
+#define BLOSC_SNAPPY         3
+#define BLOSC_ZLIB           4
+#define BLOSC_ZSTD           5
+#define BLOSC_CODEC_SCHUNK   7    /* compressor defined in super-chunk */
 
 /* Names for the different compressors shipped with Blosc */
 #define BLOSC_BLOSCLZ_COMPNAME   "blosclz"
@@ -135,9 +139,10 @@ BLOSC_EXPORT void blosc_destroy(void);
   between 0 (no compression) and 9 (maximum compression).
 
   `doshuffle` specifies whether the shuffle compression preconditioner
-  should be applied or not.  BLOSC_NOSHUFFLE means not applying it,
-  BLOSC_SHUFFLE means applying it at a byte level and BLOSC_BITSHUFFLE
-  at a bit level (slower but may achieve better entropy alignment).
+  should be applied or not.  BLOSC_NOFILTER means not applying filters,
+  BLOSC_SHUFFLE means applying shuffle at a byte level and
+  BLOSC_BITSHUFFLE at a bit level (slower but may achieve better
+  entropy alignment).
 
   `typesize` is the number of bytes for the atomic type in binary
   `src` buffer.  This is mainly useful for the shuffle preconditioner.
@@ -190,6 +195,7 @@ BLOSC_EXPORT int blosc_compress_ctx(int clevel, int doshuffle, size_t typesize,
                                     size_t destsize, const char* compressor,
                                     size_t blocksize, int numinternalthreads);
 
+
 /**
   Decompress a block of compressed data in `src`, put the result in
   `dest` and returns the size of the decompressed block.
@@ -225,6 +231,7 @@ BLOSC_EXPORT int blosc_decompress(const void* src, void* dest, size_t destsize);
 */
 BLOSC_EXPORT int blosc_decompress_ctx(const void* src, void* dest,
                                       size_t destsize, int numinternalthreads);
+
 
 /**
   Get `nitems` (of typesize size) in `src` buffer starting in `start`.
@@ -291,6 +298,7 @@ BLOSC_EXPORT int blosc_compname_to_compcode(const char* compname);
   This function should always succeed.
   */
 BLOSC_EXPORT char* blosc_list_compressors(void);
+
 
 /**
   Return the version of blosc in string format.
