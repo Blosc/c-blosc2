@@ -67,6 +67,5 @@ All entries are little endian.
     (``uint32``) Uncompressed size of the buffer.
 :blocksize:
     (``uint32``) Size of internal blocks.
-:ctbytes:
+:cbytes:
     (``uint32``) Compressed size of the buffer.
-

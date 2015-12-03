@@ -415,11 +415,18 @@ typedef struct {
   /* data + metadata (uncompressed) */
   int64_t cbytes;
   /* data + metadata + header (compressed) */
-  int8_t* metadata;
-  /* pointer to metadata */
-  int8_t* userdata;
+  void* filters_chunk;
+  /* pointer to chunk hosting filter-related data */
+  void* codec_chunk;
+  /* pointer to chunk hosting codec-related data */
+  void* metadata_chunk;
+  /* pointer to schunk metadata */
+  void* userdata_chunk;
   /* pointer to user-defined data */
-  void** data;          /* pointer to data pointers */
+  void** data;
+  /* pointer to chunk data pointers */
+  void* ctx;
+  /* Context for the thread holder.  NULL if not acquired. */
 } schunk_header;
 
 typedef struct {
