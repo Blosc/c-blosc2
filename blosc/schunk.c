@@ -31,7 +31,6 @@
 #else
   #include <stdint.h>
   #include <unistd.h>
-  #include <inttypes.h>
 #endif  /* _WIN32 */
 
 /* If C11 is supported, use it's built-in aligned allocation. */
@@ -120,7 +119,7 @@ schunk_header* blosc2_new_schunk(schunk_params* params) {
 
   sc_header.version = 0x0;     /* pre-first version */
   sc_header.filters = encode_filters(params);
-  sc_header.filt_info = params->filt_info;
+  sc_header.filters_meta = params->filters_meta;
   sc_header.compressor = params->compressor;
   sc_header.clevel = params->clevel;
   sc_header.nbytes = sizeof(sc_header);
@@ -359,10 +358,6 @@ void unpack_copy_chunk(void* packed, int offset, schunk_header* sc_header, void*
     *cbytes_ = cbytes;
     *nbytes_ = nbytes;
   }
-  else {
-    /* No data in chunk */
-    dest_chunk = NULL;
-  }
 }
 
 
@@ -375,7 +370,7 @@ schunk_header* blosc2_unpack_schunk(void* packed) {
   void* data_chunk;
   void* new_chunk;
   int64_t* data;
-  int64_t nchunks, packed_len;
+  int64_t nchunks;
   int32_t chunk_size;
   int i;
 
@@ -393,7 +388,6 @@ schunk_header* blosc2_unpack_schunk(void* packed) {
   /* Finally, fill the data pointers section */
   data = packed + *(int64_t*)(packed + 72);
   nchunks = *(int64_t*)(packed + 24);
-  data_offsets_len = nchunks * (int64_t)sizeof(int64_t);
   sc_header.data = malloc(nchunks * sizeof(void*));
 
   /* And create the actual data chunks */
@@ -413,7 +407,7 @@ schunk_header* blosc2_unpack_schunk(void* packed) {
   sc_header.nbytes = nbytes;
   sc_header.cbytes = cbytes;
 
-  assert (pbytes == packed_len);
+  assert (pbytes == nbytes);
 
   return &sc_header;
 }

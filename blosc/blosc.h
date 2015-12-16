@@ -439,7 +439,7 @@ typedef struct {
   /* the compression level and other compress params */
   uint8_t filters[BLOSC_MAX_FILTERS];
   /* the (sequence of) filters */
-  uint16_t filt_info;   /* info for filters */
+  uint16_t filters_meta;   /* metadata for filters */
 } schunk_params;
 
 /* Create a new super-chunk. */
@@ -475,6 +475,11 @@ BLOSC_EXPORT int blosc2_append_buffer(schunk_header* sc_header,
 BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header,
                                          int nchunk, void** dest);
 
+/* Pack a super-chunk by using the header. */
+BLOSC_EXPORT void* blosc2_pack_schunk(schunk_header* sc_header);
+
+/* Unpack a packed super-chunk */
+BLOSC_EXPORT schunk_header* blosc2_unpack_schunk(void* packed);
 
 
 /*********************************************************************
