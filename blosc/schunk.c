@@ -90,7 +90,7 @@ int delta_decoder8(schunk_header* sc_header, int nbytes, uint8_t* src) {
 /* Encode filters in a 16 bit int type */
 uint16_t encode_filters(schunk_params* params) {
   int i;
-  int16_t enc_filters = 0;
+  uint16_t enc_filters = 0;
 
   /* Encode the BLOSC_MAX_FILTERS filters (3-bit encoded) in 16 bit */
   for (i = 0; i < BLOSC_MAX_FILTERS; i++) {
@@ -107,7 +107,7 @@ uint8_t* decode_filters(uint16_t enc_filters) {
 
   /* Decode the BLOSC_MAX_FILTERS filters (3-bit encoded) in 16 bit */
   for (i = 0; i < BLOSC_MAX_FILTERS; i++) {
-    filters[i] = enc_filters & 0b11;
+    filters[i] = (uint8_t)(enc_filters & 0b11);
     enc_filters >>= 3;
   }
   return filters;
@@ -177,16 +177,8 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
   /* Apply filters prior to compress */
   if (filters[0] == BLOSC_DELTA) {
     enc_filters = enc_filters >> 3;
-    if (sc_header->filters_chunk != NULL) {
-      ret = delta_encoder8(sc_header, (int)nbytes, src, dest);
-      /* dest = memcpy(dest, src, nbytes); */
-      if (ret < 0) {
-        return ret;
-      }
-      src = dest;
-    }
-    else {
-      /* The reference will not be compressed in-memory */
+    if (sc_header->filters_chunk == NULL) {
+      /* The reference will not be compressed in-memory, but we still need a chunk */
       cbytes = blosc_compress(0, 0, typesize, nbytes, src, chunk,
                               nbytes + BLOSC_MAX_OVERHEAD);
       sc_header->filters_chunk = chunk;
@@ -197,6 +189,14 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
       }
       free(dest);
       return 0;
+    }
+    else {
+      ret = delta_encoder8(sc_header, (int)nbytes, src, dest);
+      /* dest = memcpy(dest, src, nbytes); */
+      if (ret < 0) {
+        return ret;
+      }
+      src = dest;
     }
   }
 
@@ -259,7 +259,7 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk, void** dest) {
 /* Compute the final length of a packed super-chunk */
 int64_t blosc2_get_packed_length(schunk_header* sc_header) {
   int i;
-  int64_t length = 96;
+  int64_t length = BLOSC_HEADER_PACKED_LENGTH;
 
   if (sc_header->filters_chunk != NULL)
     length += *(int32_t*)(sc_header->filters_chunk + 12);
@@ -297,20 +297,20 @@ void pack_copy_chunk(void* chunk, void* packed, int offset, int64_t* pbytes) {
 
 /* Create a packed super-chunk */
 void* blosc2_pack_schunk(schunk_header* sc_header) {
-  int i;
-  int64_t pbytes = 96;  /* size of the header */
+  int64_t pbytes = BLOSC_HEADER_PACKED_LENGTH;  /* size of the header */
   void* packed;
   void* data_chunk;
   int64_t* data_pointers;
   size_t data_offsets_len;
   int32_t chunk_size;
   size_t packed_len;
+  int i;
 
   packed_len = (size_t)blosc2_get_packed_length(sc_header);
   packed = malloc(packed_len);
 
   /* Fill the header */
-  memcpy(packed, sc_header, 40); /* Copy until cbytes */
+  memcpy(packed, sc_header, 40);    /* copy until cbytes */
 
   /* Fill the ancillary chunks info */
   pack_copy_chunk(sc_header->filters_chunk, packed, 40, &pbytes);
@@ -329,12 +329,10 @@ void* blosc2_pack_schunk(schunk_header* sc_header) {
   if (sc_header->data != NULL) {
     for (i = 0; i < sc_header->nchunks; i++) {
       data_chunk = sc_header->data[i];
-      if (data_chunk != NULL) {
-        chunk_size = *(int32_t*)(data_chunk + 12);
-        memcpy(packed + pbytes, data_chunk, (size_t)chunk_size);
-        data_pointers[i] = pbytes;
-        pbytes += chunk_size;
-      }
+      chunk_size = *(int32_t*)(data_chunk + 12);
+      memcpy(packed + pbytes, data_chunk, (size_t)chunk_size);
+      data_pointers[i] = pbytes;
+      pbytes += chunk_size;
     }
   }
 
@@ -371,20 +369,20 @@ void unpack_copy_chunk(void* packed, int offset, schunk_header* sc_header, void*
 /* Unpack a packed super-chunk */
 schunk_header* blosc2_unpack_schunk(void* packed) {
   static schunk_header sc_header;  /* initialized to zero by default */
-  int64_t nbytes = 96, cbytes = 96;
-  int i;
-  int64_t pbytes = 96;  /* size of the header */
+  int64_t nbytes = BLOSC_HEADER_PACKED_LENGTH;
+  int64_t cbytes = BLOSC_HEADER_PACKED_LENGTH;
+  int64_t pbytes;
   void* data_chunk;
   void* new_chunk;
   int64_t* data;
-  int64_t data_offsets_len;
-  int32_t chunk_size;
   int64_t nchunks, packed_len;
+  int32_t chunk_size;
+  int i;
 
   /* Fill the header */
   memcpy(&sc_header, packed, 40); /* Copy until cbytes */
   /* Size of the packed schunk */
-  packed_len = *(int64_t*)(packed + 72);
+  pbytes = *(int64_t*)(packed + 72);
 
   /* Fill the ancillary chunks info */
   unpack_copy_chunk(packed, 40, &sc_header, sc_header.filters_chunk, &nbytes, &cbytes);

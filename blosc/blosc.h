@@ -393,6 +393,9 @@ BLOSC_EXPORT char* blosc_cbuffer_complib(const void* cbuffer);
 
 *********************************************************************/
 
+#define BLOSC_HEADER_PACKED_LENGTH 96 /* the length of the header for a packed super-chunk */
+
+
 typedef struct {
   /* struct blosc_context* parent_context; */
   uint8_t version;
@@ -400,31 +403,31 @@ typedef struct {
   uint8_t flags2;
   uint8_t flags3;
   uint16_t compressor;
-  /* the default compressor */
+  /* The default compressor.  Each chunk can override this. */
   uint16_t clevel;
-  /* the compression level and other compress params */
+  /* The compression level and other compress params */
   uint16_t filters;
-  /* the (sequence of) filters.  3-bit per filter. */
-  uint16_t filt_info;
-  /* info for filters */
+  /* The (sequence of) filters.  3-bit per filter. */
+  uint16_t filters_meta;
+  /* Metadata for filters */
   uint32_t chunksize;
-  /* size of each chunk.  0 if not a fixed chunk. */
+  /* Size of each chunk.  0 if not a fixed chunksize. */
   int64_t nchunks;
-  /* number of chunks in super-chunk */
+  /* Number of chunks in super-chunk */
   int64_t nbytes;
-  /* data + metadata (uncompressed) */
+  /* data size + metadata size + header size (uncompressed) */
   int64_t cbytes;
-  /* data + metadata + header (compressed) */
+  /* data size + metadata size + header size (compressed) */
   void* filters_chunk;
-  /* pointer to chunk hosting filter-related data */
+  /* Pointer to chunk hosting filter-related data */
   void* codec_chunk;
-  /* pointer to chunk hosting codec-related data */
+  /* Pointer to chunk hosting codec-related data */
   void* metadata_chunk;
-  /* pointer to schunk metadata */
+  /* Pointer to schunk metadata */
   void* userdata_chunk;
-  /* pointer to user-defined data */
+  /* Pointer to user-defined data */
   void** data;
-  /* pointer to chunk data pointers */
+  /* Pointer to chunk data pointers */
   void* ctx;
   /* Context for the thread holder.  NULL if not acquired. */
 } schunk_header;
