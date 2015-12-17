@@ -148,9 +148,10 @@ int blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy) {
   /* Make space for appending a new chunk and do it */
   sc_header->data = realloc(sc_header->data, (nchunks + 1) * sizeof(void*));
   sc_header->data[nchunks] = chunk;
+  /* Update counters */
   sc_header->nchunks = nchunks + 1;
-  sc_header->nbytes += nbytes;
-  sc_header->cbytes += cbytes;
+  sc_header->nbytes += nbytes + sizeof(void*);
+  sc_header->cbytes += cbytes + sizeof(void*);
   /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n",
           nchunks, nbytes, cbytes, (1.*nbytes) / cbytes); */
 
@@ -185,6 +186,8 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
         free(dest);
         return cbytes;
       }
+      sc_header->nbytes += nbytes;
+      sc_header->cbytes += cbytes;
     }
     ret = delta_encoder8(sc_header, (int)nbytes, src, dest);
     /* dest = memcpy(dest, src, nbytes); */

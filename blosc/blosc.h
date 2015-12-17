@@ -430,6 +430,8 @@ typedef struct {
   /* Pointer to chunk data pointers */
   void* ctx;
   /* Context for the thread holder.  NULL if not acquired. */
+  void* reserved;
+  /* Reserved for the future. */
 } schunk_header;
 
 typedef struct {
