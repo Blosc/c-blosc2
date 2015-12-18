@@ -20,11 +20,10 @@
   To run:
 
   $ ./delta_schunk
-  Blosc version info: 2.0.0a1 ($Date:: 2015-07-30 #$)
-  Compression: 4000000 -> 70841 (56.5x)
-  Compression: 4000000 -> 23467 (170.5x)
-  Decompression succesful!
-  Succesful roundtrip!
+  Blosc version info: 2.0.0a2 ($Date:: 2015-12-17 #$)
+  Compression super-chunk: 60000112 -> 20234528 (3.0x)
+  Decompression successful!
+  Successful roundtrip!
 
 */
 
@@ -93,7 +92,7 @@ int main() {
     }
   }
 
-  printf("Succesful roundtrip!\n");
+  printf("Successful roundtrip!\n");
 
   /* Free resources */
   free(data_dest);
