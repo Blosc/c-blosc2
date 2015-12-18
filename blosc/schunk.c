@@ -167,16 +167,16 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
   void* dest = malloc(nbytes);
   void* filters_chunk;
   int ret;
-  uint16_t enc_filters = sc_header->filters;
-  uint8_t* dec_filters = decode_filters(enc_filters);
+  uint8_t* dec_filters = decode_filters(sc_header->filters);
   int clevel = sc_header->clevel;
   char* compname;
+  int doshuffle;
 
   /* Apply filters prior to compress */
   if (dec_filters[0] == BLOSC_DELTA) {
-    enc_filters = enc_filters >> 3;
+    doshuffle = dec_filters[1];
     if (sc_header->filters_chunk == NULL) {
-      /* The reference will not be compressed in-memory, but we still need a chunk */
+      /* The reference chunk will not be compressed */
       filters_chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
       cbytes = blosc_compress(0, 0, typesize, nbytes, src, filters_chunk,
                               nbytes + BLOSC_MAX_OVERHEAD);
@@ -196,11 +196,14 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
     }
     src = dest;
   }
+  else {
+    doshuffle = dec_filters[0];
+  }
 
   /* Compress the src buffer using super-chunk defaults */
   blosc_compcode_to_compname(sc_header->compressor, &compname);
   blosc_set_compressor(compname);
-  cbytes = blosc_compress(clevel, enc_filters, typesize, nbytes, src, chunk,
+  cbytes = blosc_compress(clevel, doshuffle, typesize, nbytes, src, chunk,
                           nbytes + BLOSC_MAX_OVERHEAD);
   if (cbytes < 0) {
     free(chunk);
@@ -222,8 +225,7 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk, void** dest) {
   void* src;
   int chunksize;
   int32_t nbytes;
-  uint16_t enc_filters = sc_header->filters;
-  uint8_t* filters = decode_filters(enc_filters);
+  uint8_t* filters = decode_filters(sc_header->filters);
 
   if (nchunk >= nchunks) {
     return -10;
