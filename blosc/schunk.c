@@ -16,6 +16,7 @@
   #include "config.h"
 #endif /*  USING_CMAKE */
 #include "blosc.h"
+#include "delta.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <windows.h>
@@ -37,53 +38,6 @@
 #if __STDC_VERSION__ >= 201112L
   #include <stdalign.h>
 #endif
-
-
-#define MAX(x, y) (((x) > (y)) ? (x) : (y))
-#define MIN(x, y) (((x) < (y)) ? (x) : (y))
-
-int delta_encoder8(schunk_header* sc_header, int nbytes,
-                   uint8_t* src, uint8_t* dest) {
-  int i;
-  int rbytes = *(int*)(sc_header->filters_chunk + 4);
-  int mbytes;
-  uint8_t* dref = (uint8_t*)sc_header->filters_chunk + BLOSC_MAX_OVERHEAD;
-
-  mbytes = MIN(nbytes, rbytes);
-
-  /* Encode delta */
-  for (i = 0; i < mbytes; i++) {
-    dest[i] = src[i] - dref[i];
-  }
-
-  /* Copy the leftovers */
-  if (nbytes > rbytes) {
-    for (i = rbytes; i < nbytes; i++) {
-      dest[i] = src[i];
-    }
-  }
-
-  return nbytes;
-}
-
-
-int delta_decoder8(schunk_header* sc_header, int nbytes, uint8_t* src) {
-  int i;
-  uint8_t* dref = (uint8_t*)sc_header->filters_chunk + BLOSC_MAX_OVERHEAD;
-  int rbytes = *(int*)(sc_header->filters_chunk + 4);
-  int mbytes;
-
-  mbytes = MIN(nbytes, rbytes);
-
-  /* Decode delta */
-  for (i = 0; i < (mbytes); i++) {
-    src[i] += dref[i];
-  }
-
-  /* The leftovers are in-place already */
-
-  return nbytes;
-}
 
 
 /* Encode filters in a 16 bit int type */

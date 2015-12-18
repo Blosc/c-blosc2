@@ -84,7 +84,7 @@ int main() {
     return dsize;
   }
 
-  printf("Decompression succesful!\n");
+  printf("Decompression successful!\n");
 
   for (i = 0; i < SIZE; i++) {
     if (data[i] != data_dest[i]) {
