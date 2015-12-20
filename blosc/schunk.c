@@ -252,7 +252,7 @@ void* blosc2_pack_schunk(schunk_header* sc_header) {
   void* packed;
   void* data_chunk;
   int64_t* data_pointers;
-  size_t data_offsets_len;
+  uint64_t data_offsets_len;
   int32_t chunk_cbytes, chunk_nbytes;
   int64_t packed_len;
   int i;
@@ -270,12 +270,9 @@ void* blosc2_pack_schunk(schunk_header* sc_header) {
   pack_copy_chunk(sc_header->userdata_chunk, packed, 64, &cbytes, &nbytes);
 
   /* Finally, setup the data pointers section */
-  data_pointers = packed + cbytes;
-  *(int64_t*)(packed + 72) = cbytes;
-  data_offsets_len = (size_t)nchunks * sizeof(int64_t);
-  cbytes += data_offsets_len;
-  nbytes += data_offsets_len;
-  /* Bytes from 80 to 96 in header are reserved */
+  data_offsets_len = nchunks * sizeof(int64_t);
+  data_pointers = packed + packed_len - data_offsets_len;
+  *(uint64_t*)(packed + 72) = packed_len - data_offsets_len;
 
   /* And fill the actual data chunks */
   if (sc_header->data != NULL) {
@@ -290,6 +287,9 @@ void* blosc2_pack_schunk(schunk_header* sc_header) {
     }
   }
 
+  /* Add the length for the data chunk offsets */
+  cbytes += data_offsets_len;
+  nbytes += data_offsets_len;
   /* printf("nchunks, nbytes, cbytes, packed_len: %d, %d, %d, %d\n", nchunks, nbytes, cbytes, packed_len); */
   assert (cbytes == packed_len);
   *(int64_t*)(packed + 16) = nchunks;

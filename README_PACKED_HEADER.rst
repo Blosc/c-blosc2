@@ -22,7 +22,7 @@ information about the compressed buffer::
     :bytes 48 - 55:  codec chunk
     :bytes 56 - 63:  metadata chunk
     :bytes 64 - 71:  userdata chunk
-    :bytes 72 - 79:  where the data starts are
+    :bytes 72 - 79:  where the data chunk offsets are
     :bytes 80 - 87:  reserved
     :bytes 88 - 95:  reserved
 
