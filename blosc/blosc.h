@@ -466,6 +466,8 @@ BLOSC_EXPORT int blosc2_append_buffer(schunk_header* sc_header,
                                       size_t typesize,
                                       size_t nbytes, void* src);
 
+BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes, void* src);
+
 /* Decompress and return the `nchunk` chunk of a super-chunk.
 
  If the chunk is uncompressed successfully, it is put in the
@@ -474,8 +476,9 @@ BLOSC_EXPORT int blosc2_append_buffer(schunk_header* sc_header,
  The size of the decompressed chunk is returned.  If some problem is
  detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header,
-                                         int nchunk, void** dest);
+BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk, void** dest);
+
+BLOSC_EXPORT int blosc2_packed_decompress_chunk(void* packed, int nchunk, void** dest);
 
 /* Pack a super-chunk by using the header. */
 BLOSC_EXPORT void* blosc2_pack_schunk(schunk_header* sc_header);
