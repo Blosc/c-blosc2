@@ -7,8 +7,8 @@
 
 #include "blosc.h"
 
-int delta_encoder8(schunk_header* sc_header, int nbytes, unsigned char* src, unsigned char* dest);
+int delta_encoder8(void* filters_chunk, int nbytes, unsigned char* src, unsigned char* dest);
 
-int delta_decoder8(schunk_header* sc_header, int nbytes, unsigned char* src);
+int delta_decoder8(void* filters_chunk, int nbytes, unsigned char* src);
 
 #endif //BLOSC_DELTA_H

@@ -14,12 +14,12 @@
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 
-int delta_encoder8(schunk_header* sc_header, int nbytes,
+int delta_encoder8(void* filters_chunk, int nbytes,
                    unsigned char* src, unsigned char* dest) {
   int i;
-  int rbytes = *(int*)(sc_header->filters_chunk + 4);
-  int mbytes;
-  uint8_t* dref = (uint8_t*)sc_header->filters_chunk + BLOSC_MAX_OVERHEAD;
+  int32_t rbytes = *(int32_t*)(filters_chunk + 4);
+  int32_t mbytes;
+  uint8_t* dref = (uint8_t*)filters_chunk + BLOSC_MAX_OVERHEAD;
 
   mbytes = MIN(nbytes, rbytes);
 
@@ -39,16 +39,16 @@ int delta_encoder8(schunk_header* sc_header, int nbytes,
 }
 
 
-int delta_decoder8(schunk_header* sc_header, int nbytes, unsigned char* src) {
+int delta_decoder8(void* filters_chunk, int nbytes, unsigned char* src) {
   int i;
-  unsigned char* dref = (uint8_t*)sc_header->filters_chunk + BLOSC_MAX_OVERHEAD;
-  int rbytes = *(int*)(sc_header->filters_chunk + 4);
-  int mbytes;
+  unsigned char* dref = (uint8_t*)filters_chunk + BLOSC_MAX_OVERHEAD;
+  int32_t rbytes = *(int32_t*)(filters_chunk + 4);
+  int32_t mbytes;
 
   mbytes = MIN(nbytes, rbytes);
 
   /* Decode delta */
-  for (i = 0; i < (mbytes); i++) {
+  for (i = 0; i < mbytes; i++) {
     src[i] += dref[i];
   }
 
