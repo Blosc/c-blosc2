@@ -12,9 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#if defined(USING_CMAKE)
-  #include "config.h"
-#endif /*  USING_CMAKE */
 #include "blosc.h"
 #include "delta.h"
 
@@ -29,9 +26,6 @@
     #include <stdint.h>
   #endif
 
-#else
-  #include <stdint.h>
-  #include <unistd.h>
 #endif  /* _WIN32 */
 
 /* If C11 is supported, use it's built-in aligned allocation. */
