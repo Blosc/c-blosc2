@@ -201,7 +201,7 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk, void** dest) {
   }
 
   /* Apply filters after de-compress */
-  if (filters[0] == BLOSC_DELTA && sc_header->nchunks > 0) {
+  if (filters[0] == BLOSC_DELTA) {
     delta_decoder8(sc_header, nbytes, *dest);
   }
 
