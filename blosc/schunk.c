@@ -203,6 +203,29 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk, void** dest) {
 }
 
 
+/* Free all memory from a super-chunk. */
+int blosc2_destroy_schunk(schunk_header* sc_header) {
+  int i;
+
+  if (sc_header->filters_chunk != NULL)
+    free(sc_header->metadata_chunk);
+  if (sc_header->codec_chunk != NULL)
+    free(sc_header->metadata_chunk);
+  if (sc_header->metadata_chunk != NULL)
+    free(sc_header->metadata_chunk);
+  if (sc_header->userdata_chunk != NULL)
+    free(sc_header->userdata_chunk);
+  if (sc_header->data != NULL) {
+    for (i = 0; i < sc_header->nchunks; i++) {
+      free(sc_header->data[i]);
+    }
+    free(sc_header->data);
+  }
+  free(sc_header);
+  return 0;
+}
+
+
 /* Compute the final length of a packed super-chunk */
 int64_t blosc2_get_packed_length(schunk_header* sc_header) {
   int i;
@@ -375,12 +398,96 @@ schunk_header* blosc2_unpack_schunk(void* packed) {
 }
 
 
-/* Decompress and return a chunk that is part of a *packed* super-chunk. */
-int blosc2_decompress_packed_chunk(void* packed, int nchunk, void** dest) {
+/* Append an existing chunk into a *packed* super-chunk. */
+int blosc2_packed_append_chunk(void* packed, void* chunk) {
   int64_t nchunks = *(int64_t*)(packed + 16);
+  int64_t packed_len = *(int64_t*)(packed + 32);
+  uint64_t data_offsets_len = nchunks * sizeof(int64_t);
+  uint64_t chunk_offset = packed_len - data_offsets_len;
+  *(uint64_t*)(packed + 72) = packed_len - data_offsets_len;
+  int64_t data_offsets = *(int64_t*)(packed + 72);
+  /* The uncompressed and compressed sizes start at byte 4 and 12 */
+  int32_t nbytes = *(int32_t*)(chunk + 4);
+  int32_t cbytes = *(int32_t*)(chunk + 12);
+  /* The current and new data areas */
+  uint64_t* data = packed + packed_len - data_offsets_len;
+  uint64_t* new_data = packed + packed_len + cbytes - data_offsets_len;
+
+  /* Make space for the new chunk and copy it */
+  packed = realloc(packed, packed_len + cbytes + sizeof(int64_t));
+  /* Move the data offsets to the end */
+  memmove(new_data, data, (size_t)data_offsets_len);
+  new_data[nchunks] = chunk_offset;
+  /* Copy the chunk */
+  memcpy(packed + chunk_offset, chunk, (size_t)cbytes);
+  /* Update counters */
+  *(int64_t*)(packed + 16) += 1;
+  *(uint64_t*)(packed + 24) += nbytes + sizeof(uint64_t);
+  *(uint64_t*)(packed + 32) += cbytes + sizeof(uint64_t);
+  *(uint64_t*)(packed + 72) += cbytes;
+  /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n",
+          nchunks, nbytes, cbytes, (1.*nbytes) / cbytes); */
+
+  return nchunks + 1;
+}
+
+
+/* Append a data buffer to a *packed* super-chunk. */
+int blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes, void* src) {
+  int cname = *(int16_t*)(packed + 4);
+  int clevel = *(int16_t*)(packed + 6);
+  void* filters_chunk = packed + *(uint64_t*)(packed + 40);
+  uint8_t* filters = decode_filters(*(uint16_t*)(packed + 8));
+  int cbytes;
+  void* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
+  void* dest = malloc(nbytes);
+  int ret;
+  char* compname;
+  int doshuffle;
+
+  /* Apply filters prior to compress */
+  if (filters[0] == BLOSC_DELTA) {
+    doshuffle = filters[1];
+    if (filters_chunk == NULL) {
+      /* For packed super-buffers, the filters schunk should exist */
+      return -1;
+    }
+    ret = delta_encoder8(filters_chunk, (int)nbytes, src, dest);
+    /* dest = memcpy(dest, src, nbytes); */
+    if (ret < 0) {
+      return ret;
+    }
+    src = dest;
+  }
+  else {
+    doshuffle = filters[0];
+  }
+
+  /* Compress the src buffer using super-chunk defaults */
+  blosc_compcode_to_compname(cname, &compname);
+  blosc_set_compressor(compname);
+  cbytes = blosc_compress(clevel, doshuffle, typesize, nbytes, src, chunk,
+                          nbytes + BLOSC_MAX_OVERHEAD);
+  if (cbytes < 0) {
+    free(chunk);
+    free(dest);
+    return cbytes;
+  }
+
+  /* We don't need dest anymore */
+  free(dest);
+
+  /* Append the chunk (no copy required here) */
+  return blosc2_packed_append_chunk(packed, chunk);
+}
+
+
+/* Decompress and return a chunk that is part of a *packed* super-chunk. */
+int blosc2_packed_decompress_chunk(void* packed, int nchunk, void** dest) {
+  int64_t nchunks = *(int64_t*)(packed + 16);
+  uint8_t* filters = decode_filters(*(uint16_t*)(packed + 8));
   void* filters_chunk = packed + *(uint64_t*)(packed + 40);
   int64_t* data = packed + *(int64_t*)(packed + 72);
-  uint8_t* filters = decode_filters(*(uint16_t*)(packed + 8));
   void* src;
   int chunksize;
   int32_t nbytes;
@@ -410,27 +517,4 @@ int blosc2_decompress_packed_chunk(void* packed, int nchunk, void** dest) {
   }
 
   return chunksize;
-}
-
-
-/* Free all memory from a super-chunk. */
-int blosc2_destroy_schunk(schunk_header* sc_header) {
-  int i;
-
-  if (sc_header->filters_chunk != NULL)
-    free(sc_header->metadata_chunk);
-  if (sc_header->codec_chunk != NULL)
-    free(sc_header->metadata_chunk);
-  if (sc_header->metadata_chunk != NULL)
-    free(sc_header->metadata_chunk);
-  if (sc_header->userdata_chunk != NULL)
-    free(sc_header->userdata_chunk);
-  if (sc_header->data != NULL) {
-    for (i = 0; i < sc_header->nchunks; i++) {
-      free(sc_header->data[i]);
-    }
-    free(sc_header->data);
-  }
-  free(sc_header);
-  return 0;
 }
