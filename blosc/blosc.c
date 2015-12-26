@@ -154,6 +154,7 @@ static int32_t g_compressor = BLOSC_BLOSCLZ;
 static int32_t g_threads = 1;
 static int32_t g_force_blocksize = 0;
 static int32_t g_initlib = 0;
+static void* g_schunk = NULL;   /* the pointer to super-chunk */
 
 
 /* Wrapped function to adjust the number of threads used by blosc */
@@ -917,7 +918,8 @@ static int initialize_context_compression(struct blosc_context* context,
                                           size_t destsize,
                                           int32_t compressor,
                                           int32_t blocksize,
-                                          int32_t numthreads) {
+                                          int32_t numthreads,
+                                          uint8_t g_schunk) {
   /* Set parameters */
   context->compress = 1;
   context->src = (const uint8_t*)src;
@@ -1105,7 +1107,7 @@ int blosc_compress_ctx(int clevel, int doshuffle, size_t typesize,
   context.threads_started = 0;
   error = initialize_context_compression(&context, clevel, doshuffle, typesize, nbytes,
                                          src, dest, destsize, blosc_compname_to_compcode(compressor),
-                                         blocksize, numinternalthreads);
+                                         blocksize, numinternalthreads, NULL);
   if (error < 0) { return error; }
 
   error = write_compression_header(&context, clevel, doshuffle);
@@ -1732,7 +1734,6 @@ void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
   *cbytes = (size_t)sw32_(_src + 12);      /* compressed buffer size */
 }
 
-
 /* Return `typesize` and `flags` from a compressed buffer. */
 void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize,
                             int* flags) {
@@ -1751,7 +1752,6 @@ void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize,
   *typesize = (size_t)_src[3];           /* typesize */
 }
 
-
 /* Return version information from a compressed buffer. */
 void blosc_cbuffer_versions(const void* cbuffer, int* version,
                             int* versionlz) {
@@ -1761,7 +1761,6 @@ void blosc_cbuffer_versions(const void* cbuffer, int* version,
   *version = (int)_src[0];         /* blosc format version */
   *versionlz = (int)_src[1];       /* Lempel-Ziv compressor format version */
 }
-
 
 /* Return the compressor library/format used in a compressed buffer. */
 char* blosc_cbuffer_complib(const void* cbuffer) {
@@ -1775,11 +1774,16 @@ char* blosc_cbuffer_complib(const void* cbuffer) {
   return complib;
 }
 
-
 /* Force the use of a specific blocksize.  If 0, an automatic
    blocksize will be used (the default). */
 void blosc_set_blocksize(size_t size) {
   g_force_blocksize = (int32_t)size;
+}
+
+/* Set pointer to super-chunk.  If NULL, no super-chunk will be
+   reachable (the default). */
+void blosc_set_schunk(void* schunk) {
+  g_schunk = schunk;
 }
 
 void blosc_init(void) {

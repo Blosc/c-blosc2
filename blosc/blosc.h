@@ -500,6 +500,11 @@ BLOSC_EXPORT schunk_header* blosc2_unpack_schunk(void* packed);
   */
 BLOSC_EXPORT void blosc_set_blocksize(size_t blocksize);
 
+/* Set pointer to super-chunk.  If NULL, no super-chunk will be
+   available (the default). */
+BLOSC_EXPORT void blosc_set_schunk(void* schunk);
+
+
 #ifdef __cplusplus
 }
 #endif
