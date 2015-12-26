@@ -74,6 +74,9 @@ schunk_header* blosc2_new_schunk(schunk_params* params) {
   sc_header->cbytes = sizeof(schunk_header);
   /* The rest of the structure will remain zeroed */
 
+  /* Put the super-chunk address in global context */
+  blosc_set_schunk(sc_header);
+
   return sc_header;
 }
 
@@ -174,6 +177,9 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk, void** dest) {
   int chunksize;
   int32_t nbytes;
   uint8_t* filters = decode_filters(sc_header->filters);
+
+  /* Put the super-chunk address in global context */
+  blosc_set_schunk(sc_header);
 
   if (nchunk >= nchunks) {
     return -10;

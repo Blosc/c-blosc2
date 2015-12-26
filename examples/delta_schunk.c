@@ -23,15 +23,13 @@
 #include <assert.h>
 #include "../blosc/blosc.h"
 
-#define SIZE 500*100*100
-#define SHAPE {100,100,100}
-#define CHUNKSHAPE {1,100,100}
+#define SIZE 50 * 1000
 
 int main() {
   static int32_t data[SIZE];
   int32_t* data_dest;
-  int isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
-  int dsize, csize;
+  int isize = SIZE * sizeof(int32_t);
+  int dsize;
   int32_t nbytes, cbytes;
   schunk_params* sc_params = calloc(1, sizeof(sc_params));
   schunk_header* sc_header;

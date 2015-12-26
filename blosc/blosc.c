@@ -18,6 +18,7 @@
 #endif /*  USING_CMAKE */
 #include "blosc.h"
 #include "shuffle.h"
+#include "schunk.h"
 #include "blosclz.h"
 #if defined(HAVE_LZ4)
   #include "lz4.h"
@@ -113,7 +114,10 @@ struct blosc_context {
   /* Start of the buffer past header info */
   int32_t compcode;
   /* Compressor code to use */
-  int clevel;                     /* Compression level (1-9) */
+  int clevel;
+  /* Compression level (1-9) */
+  schunk_header* schunk;
+  /* Super-chunk (if available) */
 
   /* Threading */
   int32_t numthreads;
@@ -524,6 +528,11 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
   char* compname;
   int accel;
   int bscount;
+  uint8_t* filters = decode_filters(context->schunk->filters);
+
+  if (filters[0] == BLOSC_DELTA) {
+    printf("[compr]Delta filter activated!\n");
+  }
 
   if (*(context->header_flags) & BLOSC_DOSHUFFLE) {
     /* Byte shuffling only makes sense if typesize > 1 */
@@ -643,6 +652,11 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize, int32_t lef
   int32_t compcode;
   char* compname;
   int bscount;
+  uint8_t* filters = decode_filters(context->schunk->filters);
+
+  if (filters[0] == BLOSC_DELTA) {
+    printf("[decompr]Delta filter activated!\n");
+  }
 
   if ((*(context->header_flags) & BLOSC_DOSHUFFLE) || \
       (*(context->header_flags) & BLOSC_DOBITSHUFFLE)) {
@@ -919,7 +933,7 @@ static int initialize_context_compression(struct blosc_context* context,
                                           int32_t compressor,
                                           int32_t blocksize,
                                           int32_t numthreads,
-                                          uint8_t g_schunk) {
+                                          schunk_header* schunk) {
   /* Set parameters */
   context->compress = 1;
   context->src = (const uint8_t*)src;
@@ -932,6 +946,7 @@ static int initialize_context_compression(struct blosc_context* context,
   context->numthreads = numthreads;
   context->end_threads = 0;
   context->clevel = clevel;
+  context->schunk = schunk;
 
   /* Check buffer size limits */
   if (sourcesize > BLOSC_MAX_BUFFERSIZE) {
@@ -1131,7 +1146,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
   pthread_mutex_lock(&global_comp_mutex);
 
   error = initialize_context_compression(g_global_context, clevel, doshuffle, typesize, nbytes,
-                                         src, dest, destsize, g_compressor, g_force_blocksize, g_threads);
+                                         src, dest, destsize, g_compressor, g_force_blocksize, g_threads, g_schunk);
   if (error < 0) { return error; }
 
   error = write_compression_header(g_global_context, clevel, doshuffle);

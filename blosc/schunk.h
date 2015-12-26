@@ -6,11 +6,11 @@
   See LICENSES/BLOSC.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#ifndef BLOSC_DELTA_H
-#define BLOSC_DELTA_H
+#ifndef BLOSC_SCHUNK_H
+#define BLOSC_SCHUNK_H
 
-int delta_encoder8(void* filters_chunk, int nbytes, unsigned char* src, unsigned char* dest);
+#include "blosc.h"
 
-int delta_decoder8(void* filters_chunk, int nbytes, unsigned char* src);
+uint8_t* decode_filters(uint16_t enc_filters);
 
-#endif //BLOSC_DELTA_H
+#endif //BLOSC_SCHUNK_H

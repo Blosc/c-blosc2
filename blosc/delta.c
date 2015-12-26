@@ -7,7 +7,7 @@
   See LICENSES/BLOSC.txt for details about copyright and rights to use.
 **********************************************************************/
 
-
+#include "blosc.h"
 #include "delta.h"
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
