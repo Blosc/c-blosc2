@@ -434,11 +434,8 @@ void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes, 
       /* For packed super-buffers, the filters schunk should exist */
       return NULL;
     }
-    ret = delta_encoder8(filters_chunk, 0, (int)nbytes, src, dest);
-    /* dest = memcpy(dest, src, nbytes); */
-    if (ret < 0) {
-      return NULL;
-    }
+    delta_encoder8(filters_chunk, 0, (int)nbytes, src, dest);
+    /* memcpy(dest, src, nbytes); */
     src = dest;
   }
   else {
