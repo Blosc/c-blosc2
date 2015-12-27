@@ -102,6 +102,7 @@ double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current, int nit
 
 #define CHUNKSIZE 5 * 100 * 1000
 #define NCHUNKS 100
+#define NTHREADS 4
 
 
 int main() {
@@ -125,6 +126,8 @@ int main() {
 
   /* Initialize the Blosc compressor */
   blosc_init();
+
+  blosc_set_nthreads(NTHREADS);
 
   /* Create a super-chunk container */
   sc_params.filters[0] = BLOSC_DELTA;
