@@ -533,7 +533,8 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
   uint8_t* filters = decode_filters(context->schunk->filters);
 
   if (filters[0] == BLOSC_DELTA) {
-    delta_encoder8(context->schunk->filters_chunk, offset, blocksize, (unsigned char*)_tmp, tmp2);
+    delta_encoder8(context->schunk->filters_chunk, offset, blocksize,
+		   (unsigned char*)_tmp, tmp2);
     _tmp = tmp2;
   }
 
@@ -735,7 +736,7 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize, int32_t lef
   }
 
   if (filters[0] == BLOSC_DELTA) {
-    delta_decoder8(context->schunk->filters_chunk, offset, blocksize, dest);
+    delta_decoder8(context->schunk->filters_chunk, offset, blocksize, dest + offset);
   }
 
   /* Return the number of uncompressed bytes */
@@ -1470,8 +1471,9 @@ static void* t_blosc(void* ctxt) {
         }
         else {
           /* Regular compression */
-          cbytes = blosc_c(context->parent_context, bsize, leftoverblock, 0, ebsize,
-                           src, nblock_ * blocksize, tmp2, tmp, dest);
+          cbytes = blosc_c(context->parent_context, bsize, leftoverblock, 0,
+                           ebsize, src, nblock_ * blocksize, tmp2, tmp,
+                           dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize);
         }
       }
       else {
@@ -1605,7 +1607,6 @@ static int init_threads(struct blosc_context* context) {
       return (-1);
     }
   }
-
 
   return (0);
 }

@@ -31,7 +31,7 @@ int main() {
   int isize = SIZE * sizeof(int32_t);
   int dsize;
   int32_t nbytes, cbytes;
-  schunk_params* sc_params = calloc(1, sizeof(sc_params));
+  schunk_params* sc_params = calloc(1, sizeof(schunk_params));
   schunk_header* sc_header;
   int i, nchunks;
 
@@ -44,6 +44,7 @@ int main() {
 
   /* Initialize the Blosc compressor */
   blosc_init();
+  blosc_set_nthreads(2);
 
   /* Create a super-chunk container */
   sc_params->filters[0] = BLOSC_DELTA;

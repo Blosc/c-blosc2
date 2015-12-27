@@ -20,17 +20,16 @@ int delta_encoder8(void* filters_chunk, int32_t offset, int32_t nbytes,
   int32_t mbytes;
   uint8_t* dref = (uint8_t*)filters_chunk + BLOSC_MAX_OVERHEAD;
 
-  nbytes += offset;
-  mbytes = MIN(nbytes, rbytes);
+  mbytes = MIN(nbytes, rbytes - offset);
 
   /* Encode delta */
-  for (i = offset; i < mbytes; i++) {
-    dest[i] = src[i] - dref[i];
+  for (i = 0; i < mbytes; i++) {
+    dest[i] = src[i] - dref[i + offset];
   }
 
   /* Copy the leftovers */
-  if (nbytes > rbytes) {
-    for (i = rbytes; i < nbytes; i++) {
+  if (nbytes > (rbytes - offset)) {
+    for (i = (rbytes - offset); i < nbytes; i++) {
       dest[i] = src[i];
     }
   }
@@ -46,12 +45,11 @@ int delta_decoder8(void* filters_chunk, int32_t offset, int32_t nbytes, uint8_t*
   int32_t rbytes = *(int32_t*)(filters_chunk + 4);
   int32_t mbytes;
 
-  nbytes += offset;
-  mbytes = MIN(nbytes, rbytes);
+  mbytes = MIN(nbytes, rbytes - offset);
 
   /* Decode delta */
-  for (i = offset; i < mbytes; i++) {
-    dest[i] += dref[i];
+  for (i = 0; i < mbytes; i++) {
+    dest[i] += dref[i + offset];
   }
 
   /* The leftovers are in-place already */

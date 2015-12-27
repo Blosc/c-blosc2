@@ -100,8 +100,8 @@ int blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy) {
   sc_header->nchunks = nchunks + 1;
   sc_header->nbytes += nbytes + sizeof(void*);
   sc_header->cbytes += cbytes + sizeof(void*);
-  /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n",
-          nchunks, nbytes, cbytes, (1.*nbytes) / cbytes); */
+  /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n", */
+  /*         nchunks, nbytes, cbytes, (1.*nbytes) / cbytes); */
 
   return nchunks + 1;
 }
@@ -112,7 +112,6 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
                          size_t nbytes, void* src) {
   int cbytes;
   void* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
-  void* dest = malloc(nbytes);
   void* filters_chunk;
   uint8_t* dec_filters = decode_filters(sc_header->filters);
   int clevel = sc_header->clevel;
@@ -130,7 +129,6 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
       sc_header->filters_chunk = filters_chunk;
       if (cbytes < 0) {
         free(filters_chunk);
-        free(dest);
         return cbytes;
       }
       sc_header->nbytes += nbytes;
@@ -149,12 +147,8 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
                           nbytes + BLOSC_MAX_OVERHEAD);
   if (cbytes < 0) {
     free(chunk);
-    free(dest);
     return cbytes;
   }
-
-  /* We don't need dest anymore */
-  free(dest);
 
   /* Append the chunk (no copy required here) */
   return blosc2_append_chunk(sc_header, chunk, 0);
@@ -179,7 +173,7 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk, void** dest) {
   nbytes = *(int32_t*)(src + 4);
   *dest = malloc((size_t)nbytes);
 
-  /* Put the super-chunk address in global context */
+  /* Put the super-chunk address in the global context for Blosc1 */
   blosc_set_schunk(sc_header);
   /* And decompress the chunk */
   chunksize = blosc_decompress(src, *dest, (size_t)nbytes);
@@ -304,7 +298,6 @@ void* blosc2_pack_schunk(schunk_header* sc_header) {
   /* Add the length for the data chunk offsets */
   cbytes += data_offsets_len;
   nbytes += data_offsets_len;
-  /* printf("nchunks, nbytes, cbytes, packed_len: %d, %d, %d, %d\n", nchunks, nbytes, cbytes, packed_len); */
   assert (cbytes == packed_len);
   *(int64_t*)(packed + 16) = nchunks;
   *(int64_t*)(packed + 24) = nbytes;
@@ -380,8 +373,6 @@ schunk_header* blosc2_unpack_schunk(void* packed) {
   sc_header->nbytes = nbytes;
   sc_header->cbytes = cbytes;
 
-  /* printf("nbytes: %d, %d\n", *(int64_t*)(packed + 24), nbytes); */
-  /* printf("cbytes: %d, %d\n", *(int64_t*)(packed + 32), cbytes); */
   assert (*(int64_t*)(packed + 24) == nbytes);
   assert (*(int64_t*)(packed + 32) == cbytes);
 
@@ -402,8 +393,6 @@ void* blosc2_packed_append_chunk(void* packed, void* chunk) {
   void* data;
   void* new_data;
 
-  // printf("packed_len, nbytes, cbytes, data_offsets_len: %d, %d, %d, %d, %d\n",
-  //        packed_len, nbytes, cbytes, data_offsets, nchunks);
   /* Make space for the new chunk and copy it */
   packed = realloc(packed, packed_len + cbytes + sizeof(int64_t));
   data = packed + data_offsets;
