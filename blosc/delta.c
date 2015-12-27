@@ -10,21 +10,21 @@
 #include "blosc.h"
 #include "delta.h"
 
-#define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 
-int delta_encoder8(void* filters_chunk, int nbytes,
-                   unsigned char* src, unsigned char* dest) {
+int delta_encoder8(void* filters_chunk, int32_t offset, int32_t nbytes,
+                   uint8_t* src, uint8_t* dest) {
   int i;
   int32_t rbytes = *(int32_t*)(filters_chunk + 4);
   int32_t mbytes;
   uint8_t* dref = (uint8_t*)filters_chunk + BLOSC_MAX_OVERHEAD;
 
+  nbytes += offset;
   mbytes = MIN(nbytes, rbytes);
 
   /* Encode delta */
-  for (i = 0; i < mbytes; i++) {
+  for (i = offset; i < mbytes; i++) {
     dest[i] = src[i] - dref[i];
   }
 
@@ -35,24 +35,27 @@ int delta_encoder8(void* filters_chunk, int nbytes,
     }
   }
 
-  return nbytes;
+  /* This can't never fail */
+  return 0;
 }
 
 
-int delta_decoder8(void* filters_chunk, int nbytes, unsigned char* src) {
+int delta_decoder8(void* filters_chunk, int32_t offset, int32_t nbytes, uint8_t* dest) {
   int i;
-  unsigned char* dref = (uint8_t*)filters_chunk + BLOSC_MAX_OVERHEAD;
+  uint8_t* dref = (uint8_t*)filters_chunk + BLOSC_MAX_OVERHEAD;
   int32_t rbytes = *(int32_t*)(filters_chunk + 4);
   int32_t mbytes;
 
+  nbytes += offset;
   mbytes = MIN(nbytes, rbytes);
 
   /* Decode delta */
-  for (i = 0; i < mbytes; i++) {
-    src[i] += dref[i];
+  for (i = offset; i < mbytes; i++) {
+    dest[i] += dref[i];
   }
 
   /* The leftovers are in-place already */
 
-  return nbytes;
+  /* This can't never fail */
+  return 0;
 }

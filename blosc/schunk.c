@@ -74,9 +74,6 @@ schunk_header* blosc2_new_schunk(schunk_params* params) {
   sc_header->cbytes = sizeof(schunk_header);
   /* The rest of the structure will remain zeroed */
 
-  /* Put the super-chunk address in global context */
-  blosc_set_schunk(sc_header);
-
   return sc_header;
 }
 
@@ -117,7 +114,6 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
   void* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
   void* dest = malloc(nbytes);
   void* filters_chunk;
-  int ret;
   uint8_t* dec_filters = decode_filters(sc_header->filters);
   int clevel = sc_header->clevel;
   char* compname;
@@ -140,12 +136,6 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
       sc_header->nbytes += nbytes;
       sc_header->cbytes += cbytes;
     }
-    ret = delta_encoder8(sc_header->filters_chunk, (int)nbytes, src, dest);
-    /* dest = memcpy(dest, src, nbytes); */
-    if (ret < 0) {
-      return ret;
-    }
-    src = dest;
   }
   else {
     doshuffle = dec_filters[0];
@@ -154,6 +144,7 @@ int blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
   /* Compress the src buffer using super-chunk defaults */
   blosc_compcode_to_compname(sc_header->compressor, &compname);
   blosc_set_compressor(compname);
+  blosc_set_schunk(sc_header);
   cbytes = blosc_compress(clevel, doshuffle, typesize, nbytes, src, chunk,
                           nbytes + BLOSC_MAX_OVERHEAD);
   if (cbytes < 0) {
@@ -178,9 +169,6 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk, void** dest) {
   int32_t nbytes;
   uint8_t* filters = decode_filters(sc_header->filters);
 
-  /* Put the super-chunk address in global context */
-  blosc_set_schunk(sc_header);
-
   if (nchunk >= nchunks) {
     return -10;
   }
@@ -191,18 +179,15 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk, void** dest) {
   nbytes = *(int32_t*)(src + 4);
   *dest = malloc((size_t)nbytes);
 
-  /* And decompress it */
+  /* Put the super-chunk address in global context */
+  blosc_set_schunk(sc_header);
+  /* And decompress the chunk */
   chunksize = blosc_decompress(src, *dest, (size_t)nbytes);
   if (chunksize < 0) {
     return chunksize;
   }
   if (chunksize != nbytes) {
     return -11;
-  }
-
-  /* Apply filters after de-compress */
-  if (filters[0] == BLOSC_DELTA) {
-    delta_decoder8(sc_header->filters_chunk, nbytes, *dest);
   }
 
   return chunksize;
@@ -460,7 +445,7 @@ void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes, 
       /* For packed super-buffers, the filters schunk should exist */
       return NULL;
     }
-    ret = delta_encoder8(filters_chunk, (int)nbytes, src, dest);
+    ret = delta_encoder8(filters_chunk, 0, (int)nbytes, src, dest);
     /* dest = memcpy(dest, src, nbytes); */
     if (ret < 0) {
       return NULL;
@@ -521,7 +506,7 @@ int blosc2_packed_decompress_chunk(void* packed, int nchunk, void** dest) {
 
   /* Apply filters after de-compress */
   if (filters[0] == BLOSC_DELTA) {
-    delta_decoder8(filters_chunk, nbytes, *dest);
+    delta_decoder8(filters_chunk, 0, nbytes, *dest);
   }
 
   return chunksize;
