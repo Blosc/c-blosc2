@@ -22,9 +22,9 @@ extern "C" {
 #define BLOSC_VERSION_MINOR    0    /* for minor interface/format changes  */
 #define BLOSC_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC_VERSION_STRING   "2.0.0a1"  /* string version.  Sync with above! */
+#define BLOSC_VERSION_STRING   "2.0.0a2"  /* string version.  Sync with above! */
 #define BLOSC_VERSION_REVISION "$Rev$"   /* revision version */
-#define BLOSC_VERSION_DATE     "$Date:: 2015-07-30 #$"    /* date version */
+#define BLOSC_VERSION_DATE     "$Date:: 2015-12-17 #$"    /* date version */
 
 #define BLOSCLZ_VERSION_STRING "1.0.5"   /* the internal compressor version */
 
@@ -49,7 +49,8 @@ extern "C" {
 #define BLOSC_MAX_THREADS 256
 
 /* Codes for filters (see blosc_compress) */
-#define BLOSC_NOSHUFFLE   0  /* no shuffle */
+#define BLOSC_NOSHUFFLE   0  /* no shuffle (for compatibility with Blosc1) */
+#define BLOSC_NOFILTER    0  /* no filter */
 #define BLOSC_SHUFFLE     1  /* byte-wise shuffle */
 #define BLOSC_BITSHUFFLE  2  /* bit-wise shuffle */
 #define BLOSC_DELTA       3  /* delta filter */
@@ -58,16 +59,19 @@ extern "C" {
 #define BLOSC_MAX_FILTERS 5
 
 /* Codes for internal flags (see blosc_cbuffer_metainfo) */
-#define BLOSC_DOSHUFFLE    0x1  /* byte-wise shuffle */
-#define BLOSC_MEMCPYED     0x2  /* plain copy */
-#define BLOSC_DOBITSHUFFLE 0x4  /* bit-wise shuffle */
+#define BLOSC_DOSHUFFLE     0x1  /* byte-wise shuffle */
+#define BLOSC_MEMCPYED      0x2  /* plain copy */
+#define BLOSC_DOBITSHUFFLE  0x4  /* bit-wise shuffle */
+#define BLOSC_FILTER_SCHUNK 0x8  /* filter defined in super-chunk */
 
 /* Codes for the different compressors shipped with Blosc */
-#define BLOSC_BLOSCLZ   0
-#define BLOSC_LZ4       1
-#define BLOSC_LZ4HC     2
-#define BLOSC_SNAPPY    3
-#define BLOSC_ZLIB      4
+#define BLOSC_BLOSCLZ        0
+#define BLOSC_LZ4            1
+#define BLOSC_LZ4HC          2
+#define BLOSC_SNAPPY         3
+#define BLOSC_ZLIB           4
+#define BLOSC_ZSTD           5
+#define BLOSC_CODEC_SCHUNK   7    /* compressor defined in super-chunk */
 
 /* Names for the different compressors shipped with Blosc */
 #define BLOSC_BLOSCLZ_COMPNAME   "blosclz"
@@ -135,9 +139,10 @@ BLOSC_EXPORT void blosc_destroy(void);
   between 0 (no compression) and 9 (maximum compression).
 
   `doshuffle` specifies whether the shuffle compression preconditioner
-  should be applied or not.  BLOSC_NOSHUFFLE means not applying it,
-  BLOSC_SHUFFLE means applying it at a byte level and BLOSC_BITSHUFFLE
-  at a bit level (slower but may achieve better entropy alignment).
+  should be applied or not.  BLOSC_NOFILTER means not applying filters,
+  BLOSC_SHUFFLE means applying shuffle at a byte level and
+  BLOSC_BITSHUFFLE at a bit level (slower but may achieve better
+  entropy alignment).
 
   `typesize` is the number of bytes for the atomic type in binary
   `src` buffer.  This is mainly useful for the shuffle preconditioner.
@@ -190,6 +195,7 @@ BLOSC_EXPORT int blosc_compress_ctx(int clevel, int doshuffle, size_t typesize,
                                     size_t destsize, const char* compressor,
                                     size_t blocksize, int numinternalthreads);
 
+
 /**
   Decompress a block of compressed data in `src`, put the result in
   `dest` and returns the size of the decompressed block.
@@ -225,6 +231,7 @@ BLOSC_EXPORT int blosc_decompress(const void* src, void* dest, size_t destsize);
 */
 BLOSC_EXPORT int blosc_decompress_ctx(const void* src, void* dest,
                                       size_t destsize, int numinternalthreads);
+
 
 /**
   Get `nitems` (of typesize size) in `src` buffer starting in `start`.
@@ -291,6 +298,7 @@ BLOSC_EXPORT int blosc_compname_to_compcode(const char* compname);
   This function should always succeed.
   */
 BLOSC_EXPORT char* blosc_list_compressors(void);
+
 
 /**
   Return the version of blosc in string format.
@@ -385,6 +393,9 @@ BLOSC_EXPORT char* blosc_cbuffer_complib(const void* cbuffer);
 
 *********************************************************************/
 
+#define BLOSC_HEADER_PACKED_LENGTH 96 /* the length of the header for a packed super-chunk */
+
+
 typedef struct {
   /* struct blosc_context* parent_context; */
   uint8_t version;
@@ -392,26 +403,35 @@ typedef struct {
   uint8_t flags2;
   uint8_t flags3;
   uint16_t compressor;
-  /* the default compressor */
+  /* The default compressor.  Each chunk can override this. */
   uint16_t clevel;
-  /* the compression level and other compress params */
+  /* The compression level and other compress params */
   uint16_t filters;
-  /* the (sequence of) filters.  3-bit per filter. */
-  uint16_t filt_info;
-  /* info for filters */
+  /* The (sequence of) filters.  3-bit per filter. */
+  uint16_t filters_meta;
+  /* Metadata for filters */
   uint32_t chunksize;
-  /* size of each chunk.  0 if not a fixed chunk. */
+  /* Size of each chunk.  0 if not a fixed chunksize. */
   int64_t nchunks;
-  /* number of chunks in super-chunk */
+  /* Number of chunks in super-chunk */
   int64_t nbytes;
-  /* data + metadata (uncompressed) */
+  /* data size + metadata size + header size (uncompressed) */
   int64_t cbytes;
-  /* data + metadata + header (compressed) */
-  int8_t* metadata;
-  /* pointer to metadata */
-  int8_t* userdata;
-  /* pointer to user-defined data */
-  void** data;          /* pointer to data pointers */
+  /* data size + metadata size + header size (compressed) */
+  void* filters_chunk;
+  /* Pointer to chunk hosting filter-related data */
+  void* codec_chunk;
+  /* Pointer to chunk hosting codec-related data */
+  void* metadata_chunk;
+  /* Pointer to schunk metadata */
+  void* userdata_chunk;
+  /* Pointer to user-defined data */
+  void** data;
+  /* Pointer to chunk data pointers */
+  void* ctx;
+  /* Context for the thread holder.  NULL if not acquired. */
+  void* reserved;
+  /* Reserved for the future. */
 } schunk_header;
 
 typedef struct {
@@ -421,7 +441,7 @@ typedef struct {
   /* the compression level and other compress params */
   uint8_t filters[BLOSC_MAX_FILTERS];
   /* the (sequence of) filters */
-  uint16_t filt_info;   /* info for filters */
+  uint16_t filters_meta;   /* metadata for filters */
 } schunk_params;
 
 /* Create a new super-chunk. */
@@ -446,17 +466,27 @@ BLOSC_EXPORT int blosc2_append_buffer(schunk_header* sc_header,
                                       size_t typesize,
                                       size_t nbytes, void* src);
 
+BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes, void* src);
+
 /* Decompress and return the `nchunk` chunk of a super-chunk.
 
- If the chunk is uncompressed successfully, it is put in the
- `**dest` pointer.
+ If the chunk is uncompressed successfully, it is put in the `*dest`
+ pointer.  `nbytes` is the size of the area pointed by `*dest`.  You
+ must make sure that you have space enough to store the uncompressed
+ data.
 
  The size of the decompressed chunk is returned.  If some problem is
  detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header,
-                                         int nchunk, void** dest);
+BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header, int64_t nchunk, void* dest, int nbytes);
 
+BLOSC_EXPORT int blosc2_packed_decompress_chunk(void* packed, int nchunk, void** dest);
+
+/* Pack a super-chunk by using the header. */
+BLOSC_EXPORT void* blosc2_pack_schunk(schunk_header* sc_header);
+
+/* Unpack a packed super-chunk */
+BLOSC_EXPORT schunk_header* blosc2_unpack_schunk(void* packed);
 
 
 /*********************************************************************
@@ -471,6 +501,11 @@ BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header,
   blocksize will be used (the default).
   */
 BLOSC_EXPORT void blosc_set_blocksize(size_t blocksize);
+
+/* Set pointer to super-chunk.  If NULL, no super-chunk will be
+   available (the default). */
+BLOSC_EXPORT void blosc_set_schunk(schunk_header* schunk);
+
 
 #ifdef __cplusplus
 }
