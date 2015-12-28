@@ -100,8 +100,8 @@ double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current, int nit
 }
 
 
-#define CHUNKSIZE 5 * 10 * 1000
-#define NCHUNKS 10
+#define CHUNKSIZE 5 * 1000 * 1000
+#define NCHUNKS 100
 #define NTHREADS 4
 
 
@@ -118,6 +118,7 @@ int main() {
   float totalsize = isize * NCHUNKS;
 
   data = malloc(CHUNKSIZE * sizeof(int32_t));
+  data_dest = malloc(CHUNKSIZE * sizeof(int32_t));
   for (i = 0; i < CHUNKSIZE; i++) {
     data[i] = i;
   }
@@ -149,13 +150,13 @@ int main() {
   /* Gather some info */
   nbytes = schunk->nbytes;
   cbytes = schunk->cbytes;
-  printf("Compression super-chunk: %lld -> %lld (%.1fx)\n",
-         nbytes, cbytes, (1. * nbytes) / cbytes);
+  printf("Compression super-chunk: %ld -> %ld (%.1fx)\n",
+         (long)nbytes, (long)cbytes, (1. * nbytes) / cbytes);
 
   /* Retrieve and decompress the chunks */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    dsize = blosc2_decompress_chunk(schunk, nchunk, (void**)&data_dest, isize);
+    dsize = blosc2_decompress_chunk(schunk, nchunk, (void*)data_dest, isize);
     if (dsize < 0) {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;

@@ -27,7 +27,7 @@
 
 int main() {
   static int32_t data[SIZE];
-  int32_t* data_dest;
+  static int32_t data_dest[SIZE];
   int isize = SIZE * sizeof(int32_t);
   int dsize;
   int32_t nbytes, cbytes;
@@ -68,7 +68,7 @@ int main() {
          nbytes, cbytes, (1. * nbytes) / cbytes);
 
   /* Retrieve and decompress the chunks (0-based count) */
-  dsize = blosc2_decompress_chunk(sc_header, 1, (void*)&data_dest, isize);
+  dsize = blosc2_decompress_chunk(sc_header, 1, (void*)data_dest, isize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
@@ -86,7 +86,6 @@ int main() {
   printf("Successful roundtrip!\n");
 
   /* Free resources */
-  free(data_dest);
   free(sc_params);
   /* Destroy the super-chunk */
   blosc2_destroy_schunk(sc_header);
