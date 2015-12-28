@@ -11,6 +11,8 @@
 #include "delta.h"
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+
 
 /* Apply the delta filters to src.  This can never fail. */
 void delta_encoder8(uint8_t* filters_chunk, int32_t offset, int32_t nbytes,
@@ -28,8 +30,9 @@ void delta_encoder8(uint8_t* filters_chunk, int32_t offset, int32_t nbytes,
   }
 
   /* Copy the leftovers */
-  if (nbytes > (rbytes - offset)) {
-    for (i = (rbytes - offset); i < nbytes; i++) {
+  if (nbytes > mbytes) {
+    mbytes = MAX(0, mbytes); 	/* negative mbytes are not considered */
+    for (i = mbytes; i < nbytes; i++) {
       dest[i] = src[i];
     }
   }
