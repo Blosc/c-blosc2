@@ -185,6 +185,8 @@ int blosc2_decompress_chunk(schunk_header* sc_header, int64_t nchunk, void* dest
   /* And decompress the chunk */
   chunksize = blosc_decompress(src, dest, (size_t)nbytes);
 
+  free(filters);
+
   return chunksize;
 }
 
