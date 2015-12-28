@@ -28,19 +28,21 @@
 */
 
 #include <stdio.h>
-#include <blosc.h>
+#include "blosc.h"
 
-#define SIZE 100*100*100
-#define SHAPE {100,100,100}
-#define CHUNKSHAPE {1,100,100}
+#define SIZE 1000 * 1000
+#define NTHREADS 1
+
 
 int main() {
   static float data[SIZE];
   static float data_out[SIZE];
   static float data_dest[SIZE];
+  float data_subset[5];
+  float data_subset_ref[5] = {5, 6, 7, 8, 9};
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize = SIZE * sizeof(float), csize;
-  int i;
+  int i, ret;
 
   for (i = 0; i < SIZE; i++) {
     data[i] = i;
@@ -52,6 +54,7 @@ int main() {
 
   /* Initialize the Blosc compressor */
   blosc_init();
+  blosc_set_nthreads(NTHREADS);
 
   /* Compress with clevel=5 and shuffle active  */
   csize = blosc_compress(5, 1, sizeof(float), isize, data, data_out, osize);
@@ -65,6 +68,20 @@ int main() {
   }
 
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1. * isize) / csize);
+
+  ret = blosc_getitem(data_out, 5, 5, data_subset);
+  if (ret < 0) {
+    printf("Error in blosc_getitem().  Giving up.\n");
+    return 1;
+  }
+
+  for (i = 0; i < 5; i++) {
+    if (data_subset[i] != data_subset_ref[i]) {
+      printf("blosc_getitem() fetched data differs from original!\n");
+      return -1;
+    }
+  }
+  printf("Correctly extracted 5 elements from compressed chunk!\n");
 
   /* Decompress  */
   dsize = blosc_decompress(data_out, data_dest, dsize);

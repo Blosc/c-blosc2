@@ -530,12 +530,15 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
   char* compname;
   int accel;
   int bscount;
-  uint8_t* filters = decode_filters(context->schunk->filters);
+  uint8_t* filters;
 
-  if (filters[0] == BLOSC_DELTA) {
-    delta_encoder8(context->schunk->filters_chunk, offset, blocksize,
-		   (unsigned char*)_tmp, tmp2);
-    _tmp = tmp2;
+  if (context->schunk != NULL) {
+    filters = decode_filters(context->schunk->filters);
+    if (filters[0] == BLOSC_DELTA) {
+      delta_encoder8(context->schunk->filters_chunk, offset, blocksize,
+                     (unsigned char*)_tmp, tmp2);
+      _tmp = tmp2;
+    }
   }
 
   if (*(context->header_flags) & BLOSC_DOSHUFFLE) {
@@ -656,7 +659,7 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize, int32_t lef
   int32_t compcode;
   char* compname;
   int bscount;
-  uint8_t* filters = decode_filters(context->schunk->filters);
+  uint8_t* filters;
 
   if ((*(context->header_flags) & BLOSC_DOSHUFFLE) || \
       (*(context->header_flags) & BLOSC_DOBITSHUFFLE)) {
@@ -735,8 +738,11 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize, int32_t lef
       return bscount;
   }
 
-  if (filters[0] == BLOSC_DELTA) {
-    delta_decoder8(context->schunk->filters_chunk, offset, blocksize, dest + offset);
+  if (context->schunk != NULL) {
+    filters = decode_filters(context->schunk->filters);
+    if (filters[0] == BLOSC_DELTA) {
+      delta_decoder8(context->schunk->filters_chunk, offset, blocksize, dest + offset);
+    }
   }
 
   /* Return the number of uncompressed bytes */
@@ -1167,7 +1173,8 @@ int blosc_run_decompression_with_context(struct blosc_context* context,
                                          const void* src,
                                          void* dest,
                                          size_t destsize,
-                                         int numinternalthreads) {
+                                         int numinternalthreads,
+					 schunk_header* schunk) {
   uint8_t version;
   uint8_t versionlz;
   uint32_t ctbytes;
@@ -1180,6 +1187,7 @@ int blosc_run_decompression_with_context(struct blosc_context* context,
   context->num_output_bytes = 0;
   context->numthreads = numinternalthreads;
   context->end_threads = 0;
+  context->schunk = schunk;
 
   /* Read the header block */
   version = context->src[0];                        /* blosc format version */
@@ -1239,7 +1247,7 @@ int blosc_run_decompression_with_context(struct blosc_context* context,
 int blosc_decompress_ctx(const void* src, void* dest, size_t destsize,
                          int numinternalthreads) {
   struct blosc_context context;
-  int result = blosc_run_decompression_with_context(&context, src, dest, destsize, numinternalthreads);
+  int result = blosc_run_decompression_with_context(&context, src, dest, destsize, numinternalthreads, NULL);
   context.threads_started = 0;
 
   if (numinternalthreads > 1) {
@@ -1252,7 +1260,7 @@ int blosc_decompress_ctx(const void* src, void* dest, size_t destsize,
 
 /* The public routine for decompression.  See blosc.h for docstrings. */
 int blosc_decompress(const void* src, void* dest, size_t destsize) {
-  return blosc_run_decompression_with_context(g_global_context, src, dest, destsize, g_threads);
+  return blosc_run_decompression_with_context(g_global_context, src, dest, destsize, g_threads, g_schunk);
 }
 
 
@@ -1350,6 +1358,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
       /* blosc_d only uses typesize and flags */
       context.typesize = typesize;
       context.header_flags = &flags;
+      context.schunk = g_schunk;
 
       /* Regular decompression.  Put results in tmp2. */
       cbytes = blosc_d(&context, bsize, leftoverblock,
