@@ -102,7 +102,7 @@ double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current, int nit
 
 #define CHUNKSIZE 5 * 1000 * 1000
 #define NCHUNKS 100
-#define NTHREADS 4
+#define NTHREADS 2
 
 
 int main() {
@@ -144,8 +144,8 @@ int main() {
   }
   blosc_set_timestamp(&current);
   totaltime = (float)getseconds(last, current);
-  printf("[Compr] Elapsed time:\t %6.3f s.  Processed data: %.3f GB\n",
-         totaltime, totalsize / GB);
+  printf("[Compr] Elapsed time:\t %6.3f s.  Processed data: %.3f GB (%.3f GB/s)\n",
+         totaltime, totalsize / GB, totalsize / (GB * totaltime));
 
   /* Gather some info */
   nbytes = schunk->nbytes;
@@ -166,8 +166,8 @@ int main() {
   blosc_set_timestamp(&current);
   totaltime = (float)getseconds(last, current);
   totalsize = isize * nchunks;
-  printf("[Decompr] Elapsed time:\t %6.3f s.  Processed data: %.3f GB\n",
-         totaltime, totalsize / GB);
+  printf("[Decompr] Elapsed time:\t %6.3f s.  Processed data: %.3f GB (%.3f GB/s)\n",
+         totaltime, totalsize / GB, totalsize / (GB * totaltime));
 
   printf("Decompression successful!\n");
 
