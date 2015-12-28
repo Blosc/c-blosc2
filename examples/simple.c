@@ -15,13 +15,14 @@
 
     Using MSVC on Windows:
 
-    cl /arch:SSE2 /Ox /Fesimple.exe /Iblosc examples\simple.c blosc\blosc.c blosc\blosclz.c blosc\shuffle.c blosc\shuffle-sse2.c blosc\shuffle-generic.c blosc\bitshuffle-generic.c blosc\bitshuffle-sse2.c
+    cl /DSHUFFLE_SSE2_ENABLED /arch:SSE2 /Ox /Fesimple.exe /Iblosc examples\simple.c blosc\blosc.c blosc\blosclz.c blosc\shuffle.c blosc\shuffle-sse2.c blosc\shuffle-generic.c blosc\bitshuffle-generic.c blosc\bitshuffle-sse2.c blosc\schunk.c blosc\delta.c
 
     To run:
 
     $ ./simple
-    Blosc version info: 1.4.2.dev ($Date:: 2014-07-08 #$)
-    Compression: 4000000 -> 158494 (25.2x)
+    Blosc version info: 2.0.0a2 ($Date:: 2015-12-28 #$)
+    Compression: 4000000 -> 158788 (25.2x)
+    Correctly extracted 5 elements from compressed chunk!
     Decompression succesful!
     Succesful roundtrip!
 
