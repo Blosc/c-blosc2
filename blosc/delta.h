@@ -9,8 +9,8 @@
 #ifndef BLOSC_DELTA_H
 #define BLOSC_DELTA_H
 
-void delta_encoder8(void* filters_chunk, int offset, int nbytes, unsigned char* src, unsigned char* dest);
+void delta_encoder8(uint8_t* filters_chunk, int32_t offset, int32_t nbytes, uint8_t* src, uint8_t* dest);
 
-void delta_decoder8(void* filters_chunk, int offset, int nbytes, unsigned char* src);
+void delta_decoder8(uint8_t* filters_chunk, int32_t offset, int32_t nbytes, uint8_t* src);
 
 #endif //BLOSC_DELTA_H
