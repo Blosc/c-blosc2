@@ -418,19 +418,19 @@ typedef struct {
   /* data size + metadata size + header size (uncompressed) */
   int64_t cbytes;
   /* data size + metadata size + header size (compressed) */
-  void* filters_chunk;
+  uint8_t* filters_chunk;
   /* Pointer to chunk hosting filter-related data */
-  void* codec_chunk;
+  uint8_t* codec_chunk;
   /* Pointer to chunk hosting codec-related data */
-  void* metadata_chunk;
+  uint8_t* metadata_chunk;
   /* Pointer to schunk metadata */
-  void* userdata_chunk;
+  uint8_t* userdata_chunk;
   /* Pointer to user-defined data */
-  void** data;
+  uint8_t** data;
   /* Pointer to chunk data pointers */
-  void* ctx;
+  uint8_t* ctx;
   /* Context for the thread holder.  NULL if not acquired. */
-  void* reserved;
+  uint8_t* reserved;
   /* Reserved for the future. */
 } schunk_header;
 
@@ -451,8 +451,7 @@ BLOSC_EXPORT schunk_header* blosc2_new_schunk(schunk_params* params);
 BLOSC_EXPORT int blosc2_destroy_schunk(schunk_header* sc_header);
 
 /* Append an existing `chunk` to a super-chunk. */
-BLOSC_EXPORT int blosc2_append_chunk(schunk_header* sc_header, void* chunk,
-                                     int copy);
+BLOSC_EXPORT size_t blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy);
 
 /* Append a `src` data buffer to a super-chunk.
 
@@ -462,9 +461,9 @@ BLOSC_EXPORT int blosc2_append_chunk(schunk_header* sc_header, void* chunk,
  This returns the number of chunk in super-chunk.  If some problem is
  detected, this number will be negative.
  */
-BLOSC_EXPORT int blosc2_append_buffer(schunk_header* sc_header,
-                                      size_t typesize,
-                                      size_t nbytes, void* src);
+BLOSC_EXPORT size_t blosc2_append_buffer(schunk_header* sc_header,
+                                         size_t typesize,
+                                         size_t nbytes, void* src);
 
 BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes, void* src);
 

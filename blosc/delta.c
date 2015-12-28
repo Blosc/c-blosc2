@@ -13,8 +13,8 @@
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 /* Apply the delta filters to src.  This can never fail. */
-void delta_encoder8(void* filters_chunk, int32_t offset, int32_t nbytes,
-                   uint8_t* src, uint8_t* dest) {
+void delta_encoder8(uint8_t* filters_chunk, int32_t offset, int32_t nbytes,
+                    uint8_t* src, uint8_t* dest) {
   int i;
   int32_t rbytes = *(int32_t*)(filters_chunk + 4);
   int32_t mbytes;
@@ -37,7 +37,7 @@ void delta_encoder8(void* filters_chunk, int32_t offset, int32_t nbytes,
 
 
 /* Undo the delta filter in dest.  This can never fail. */
-void delta_decoder8(void* filters_chunk, int32_t offset, int32_t nbytes, uint8_t* dest) {
+void delta_decoder8(uint8_t* filters_chunk, int32_t offset, int32_t nbytes, uint8_t* dest) {
   int i;
   uint8_t* dref = (uint8_t*)filters_chunk + BLOSC_MAX_OVERHEAD;
   int32_t rbytes = *(int32_t*)(filters_chunk + 4);

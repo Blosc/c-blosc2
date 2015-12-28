@@ -384,7 +384,7 @@ int
 bitshuffle(const size_t bytesoftype, const size_t blocksize,
            const uint8_t* const _src, const uint8_t* _dest,
            const uint8_t* _tmp) {
-  int size = blocksize / bytesoftype;
+  size_t size = blocksize / bytesoftype;
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
@@ -396,7 +396,7 @@ bitshuffle(const size_t bytesoftype, const size_t blocksize,
                                                  bytesoftype, (void*)_tmp);
   else
     memcpy((void*)_dest, (void*)_src, blocksize);
-  return size;
+  return (int)size;
 }
 
 /*  Bit-unshuffle a block by dynamically dispatching to the appropriate
@@ -405,7 +405,7 @@ int
 bitunshuffle(const size_t bytesoftype, const size_t blocksize,
              const uint8_t* const _src, const uint8_t* _dest,
              const uint8_t* _tmp) {
-  int size = blocksize / bytesoftype;
+  size_t size = blocksize / bytesoftype;
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
@@ -417,5 +417,5 @@ bitunshuffle(const size_t bytesoftype, const size_t blocksize,
                                                    bytesoftype, (void*)_tmp);
   else
     memcpy((void*)_dest, (void*)_src, blocksize);
-  return size;
+  return (int)size;
 }
