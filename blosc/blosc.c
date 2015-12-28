@@ -530,15 +530,16 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
   char* compname;
   int accel;
   int bscount;
-  uint8_t* filters;
 
   if (context->schunk != NULL) {
+    uint8_t* filters;
     filters = decode_filters(context->schunk->filters);
     if (filters[0] == BLOSC_DELTA) {
       delta_encoder8(context->schunk->filters_chunk, offset, blocksize,
                      (unsigned char*)_tmp, tmp2);
       _tmp = tmp2;
     }
+    free(filters);
   }
 
   if (*(context->header_flags) & BLOSC_DOSHUFFLE) {
@@ -659,7 +660,6 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize, int32_t lef
   int32_t compcode;
   char* compname;
   int bscount;
-  uint8_t* filters;
 
   if ((*(context->header_flags) & BLOSC_DOSHUFFLE) || \
       (*(context->header_flags) & BLOSC_DOBITSHUFFLE)) {
@@ -739,10 +739,12 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize, int32_t lef
   }
 
   if (context->schunk != NULL) {
+    uint8_t* filters;
     filters = decode_filters(context->schunk->filters);
     if (filters[0] == BLOSC_DELTA) {
       delta_decoder8(context->schunk->filters_chunk, offset, blocksize, dest + offset);
     }
+    free(filters);
   }
 
   /* Return the number of uncompressed bytes */

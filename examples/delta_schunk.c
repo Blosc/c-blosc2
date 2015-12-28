@@ -21,7 +21,7 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include "../blosc/blosc.h"
+#include "blosc.h"
 
 #define SIZE 50 * 1000
 
@@ -68,7 +68,7 @@ int main() {
          nbytes, cbytes, (1. * nbytes) / cbytes);
 
   /* Retrieve and decompress the chunks (0-based count) */
-  dsize = blosc2_decompress_chunk(sc_header, 1, (void**)&data_dest);
+  dsize = blosc2_decompress_chunk(sc_header, 1, (void*)&data_dest, isize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;

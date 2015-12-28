@@ -21,7 +21,7 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include "../blosc/blosc.h"
+#include "blosc.h"
 
 #define SIZE 500*100*100
 
@@ -58,8 +58,8 @@ int main() {
   assert(nchunks == 1);
   nbytes = sc_header->nbytes;
   cbytes = sc_header->cbytes;
-  printf("Compression super-chunk (native) #%d: %lld -> %lld (%.1fx)\n",
-         0, nbytes, cbytes, (1. * nbytes) / cbytes);
+  printf("Compression super-chunk (native) #%d: %ld -> %ld (%.1fx)\n",
+         0, (long)nbytes, (long)cbytes, (1. * nbytes) / cbytes);
 
   /* Pack the super-chunk */
   packed = blosc2_pack_schunk(sc_header);
@@ -71,8 +71,8 @@ int main() {
   assert(*(int64_t*)(packed + 16) == 2);
   nbytes = *(int64_t*)(packed + 24);
   cbytes = *(int64_t*)(packed + 32);
-  printf("Compression super-chunk: %lld -> %lld (%.1fx)\n",
-         nbytes, cbytes, (1. * nbytes) / cbytes);
+  printf("Compression super-chunk: %ld -> %ld (%.1fx)\n",
+         (long)nbytes, (long)cbytes, (1. * nbytes) / cbytes);
 
   /* Retrieve and decompress the chunks (0-based count) */
   dsize = blosc2_packed_decompress_chunk(packed, 1, (void**)&data_dest);

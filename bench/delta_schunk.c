@@ -33,7 +33,7 @@
   #error Unable to detect platform.
 #endif
 
-#include "../blosc/blosc.h"
+#include "blosc.h"
 
 #define KB  1024
 #define MB  (1024*KB)
@@ -100,8 +100,8 @@ double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current, int nit
 }
 
 
-#define CHUNKSIZE 5 * 100 * 1000
-#define NCHUNKS 100
+#define CHUNKSIZE 5 * 10 * 1000
+#define NCHUNKS 10
 #define NTHREADS 4
 
 
@@ -155,7 +155,7 @@ int main() {
   /* Retrieve and decompress the chunks */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    dsize = blosc2_decompress_chunk(schunk, nchunk, (void**)&data_dest);
+    dsize = blosc2_decompress_chunk(schunk, nchunk, (void**)&data_dest, isize);
     if (dsize < 0) {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;

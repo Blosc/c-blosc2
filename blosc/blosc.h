@@ -470,13 +470,15 @@ BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize, si
 
 /* Decompress and return the `nchunk` chunk of a super-chunk.
 
- If the chunk is uncompressed successfully, it is put in the
- `**dest` pointer.
+ If the chunk is uncompressed successfully, it is put in the `*dest`
+ pointer.  `nbytes` is the size of the area pointed by `*dest`.  You
+ must make sure that you have space enough to store the uncompressed
+ data.
 
  The size of the decompressed chunk is returned.  If some problem is
  detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header, int nchunk, void** dest);
+BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header, int64_t nchunk, void* dest, int nbytes);
 
 BLOSC_EXPORT int blosc2_packed_decompress_chunk(void* packed, int nchunk, void** dest);
 
