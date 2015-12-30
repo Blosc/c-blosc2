@@ -262,7 +262,7 @@ void* blosc2_pack_schunk(schunk_header* sc_header) {
   int64_t nchunks = sc_header->nchunks;
   void* packed;
   void* data_chunk;
-  int64_t* data_pointers;
+  uint64_t* data_pointers;
   uint64_t data_offsets_len;
   int32_t chunk_cbytes, chunk_nbytes;
   int64_t packed_len;
