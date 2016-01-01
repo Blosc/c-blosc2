@@ -531,6 +531,7 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
   int accel;
   int bscount;
 
+  /* Check if we have a delta in a super-chunk context */
   if (context->schunk != NULL) {
     uint8_t* filters;
     filters = decode_filters(context->schunk->filters);
@@ -542,14 +543,13 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
     free(filters);
   }
 
+  /* Shuffle filters */
   if (*(context->header_flags) & BLOSC_DOSHUFFLE) {
-    /* Byte shuffling only makes sense if typesize > 1 */
     shuffle(typesize, blocksize, _tmp, tmp);
     _tmp = tmp;
   }
-    /* We don't allow more than 1 filter at the same time (yet) */
   else if (*(context->header_flags) & BLOSC_DOBITSHUFFLE) {
-    bscount = bitshuffle(typesize, blocksize, _tmp, tmp, dest);
+    bscount = bitshuffle(typesize, blocksize, _tmp, tmp, dest); /* dest -> tmp2? */
     if (bscount < 0)
       return bscount;
     _tmp = tmp;

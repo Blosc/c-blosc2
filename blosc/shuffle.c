@@ -76,8 +76,8 @@ typedef enum {
   BLOSC_HAVE_NEON = 4
 } blosc_cpu_features;
 
-/*  Detect hardware and set function pointers to the best shuffle/unshuffle
-    implementations supported by the host processor. */
+/* Detect hardware and set function pointers to the best shuffle/unshuffle
+   implementations supported by the host processor. */
 #if defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED)    /* Intel/i686 */
 
 #ifdef HAVE_CPU_FEAT_INTRIN
@@ -300,8 +300,8 @@ get_shuffle_implementation() {
   }
 #endif  /* defined(SHUFFLE_NEON_ENABLED) */
 
-  /*  Processor doesn't support any of the hardware-accelerated implementations,
-      so use the generic implementation. */
+  /* Processor doesn't support any of the hardware-accelerated implementations,
+     so use the generic implementation. */
   shuffle_implementation_t impl_generic;
   impl_generic.name = "generic";
   impl_generic.shuffle = (shuffle_func)shuffle_generic;
@@ -312,15 +312,15 @@ get_shuffle_implementation() {
 }
 
 
-/*  Flag indicating whether the implementation has been initialized.
-    Zero means it hasn't been initialized, non-zero means it has. */
+/* Flag indicating whether the implementation has been initialized.
+   Zero means it hasn't been initialized, non-zero means it has. */
 static int32_t implementation_initialized;
 
-/*  The dynamically-chosen shuffle/unshuffle implementation.
-    This is only safe to use once `implementation_initialized` is set. */
+/* The dynamically-chosen shuffle/unshuffle implementation.
+   This is only safe to use once `implementation_initialized` is set. */
 static shuffle_implementation_t host_implementation;
 
-/*  Initialize the shuffle implementation, if necessary. */
+/* Initialize the shuffle implementation, if necessary. */
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((always_inline))
 #endif
@@ -347,39 +347,39 @@ void init_shuffle_implementation() {
     /* Initialize the implementation. */
     host_implementation = get_shuffle_implementation();
 
-    /*  Set the flag indicating the implementation has been initialized. */
+    /* Set the flag indicating the implementation has been initialized. */
     implementation_initialized = 1;
   }
 }
 
-/*  Shuffle a block by dynamically dispatching to the appropriate
-    hardware-accelerated routine at run-time. */
+/* Shuffle a block by dynamically dispatching to the appropriate
+   hardware-accelerated routine at run-time. */
 void
 shuffle(const size_t bytesoftype, const size_t blocksize,
         const uint8_t* _src, const uint8_t* _dest) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
-  /*  The implementation is initialized.
-      Dispatch to it's shuffle routine. */
+  /* The implementation is initialized.
+     Dispatch to it's shuffle routine. */
   (host_implementation.shuffle)(bytesoftype, blocksize, _src, _dest);
 }
 
-/*  Unshuffle a block by dynamically dispatching to the appropriate
-    hardware-accelerated routine at run-time. */
+/* Unshuffle a block by dynamically dispatching to the appropriate
+   hardware-accelerated routine at run-time. */
 void
 unshuffle(const size_t bytesoftype, const size_t blocksize,
           const uint8_t* _src, const uint8_t* _dest) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
-  /*  The implementation is initialized.
-      Dispatch to it's unshuffle routine. */
+  /* The implementation is initialized.
+     Dispatch to it's unshuffle routine. */
   (host_implementation.unshuffle)(bytesoftype, blocksize, _src, _dest);
 }
 
-/*  Bit-shuffle a block by dynamically dispatching to the appropriate
-    hardware-accelerated routine at run-time. */
+/* Bit-shuffle a block by dynamically dispatching to the appropriate
+   hardware-accelerated routine at run-time. */
 int
 bitshuffle(const size_t bytesoftype, const size_t blocksize,
            const uint8_t* const _src, const uint8_t* _dest,
@@ -399,8 +399,8 @@ bitshuffle(const size_t bytesoftype, const size_t blocksize,
   return (int)size;
 }
 
-/*  Bit-unshuffle a block by dynamically dispatching to the appropriate
-    hardware-accelerated routine at run-time. */
+/* Bit-unshuffle a block by dynamically dispatching to the appropriate
+   hardware-accelerated routine at run-time. */
 int
 bitunshuffle(const size_t bytesoftype, const size_t blocksize,
              const uint8_t* const _src, const uint8_t* _dest,
