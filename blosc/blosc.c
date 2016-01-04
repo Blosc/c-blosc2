@@ -550,7 +550,7 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
     _tmp = tmp;
   }
   else if (*(context->header_flags) & BLOSC_DOBITSHUFFLE) {
-    bscount = bitshuffle(typesize, blocksize, _tmp, tmp, dest); /* dest -> tmp2? */
+    bscount = bitshuffle(typesize, blocksize, _tmp, tmp, tmp2);
     if (bscount < 0)
       return bscount;
     _tmp = tmp;
