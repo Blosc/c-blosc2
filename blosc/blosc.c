@@ -527,7 +527,7 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
   int32_t ctbytes = 0;              /* number of compressed bytes in block */
   int32_t maxout;
   int32_t typesize = context->typesize;
-  const uint8_t* _tmp = src + offset;
+  const uint8_t* _src = src + offset;
   char* compname;
   int accel;
   int bscount;
@@ -538,22 +538,22 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
     filters = decode_filters(context->schunk->filters);
     if (filters[0] == BLOSC_DELTA) {
       delta_encoder8(context->schunk->filters_chunk, offset, blocksize,
-                     (unsigned char*)_tmp, tmp2);
-      _tmp = tmp2;
+                     (unsigned char*)_src, tmp2);
+      _src = tmp2;
     }
     free(filters);
   }
 
   /* Shuffle filters */
   if (*(context->header_flags) & BLOSC_DOSHUFFLE) {
-    shuffle(typesize, blocksize, _tmp, tmp);
-    _tmp = tmp;
+    shuffle(typesize, blocksize, _src, tmp);
+    _src = tmp;
   }
   else if (*(context->header_flags) & BLOSC_DOBITSHUFFLE) {
-    bscount = bitshuffle(typesize, blocksize, _tmp, tmp, tmp2);
+    bscount = bitshuffle(typesize, blocksize, _src, tmp, tmp2);
     if (bscount < 0)
       return bscount;
-    _tmp = tmp;
+    _src = tmp;
   }
 
   /* Calculate acceleration for different compressors */
@@ -588,28 +588,28 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
       }
     }
     if (context->compcode == BLOSC_BLOSCLZ) {
-      cbytes = blosclz_compress(context->clevel, _tmp + j * neblock, neblock,
+      cbytes = blosclz_compress(context->clevel, _src + j * neblock, neblock,
                                 dest, maxout, accel);
     }
   #if defined(HAVE_LZ4)
     else if (context->compcode == BLOSC_LZ4) {
-      cbytes = lz4_wrap_compress((char*)_tmp + j * neblock, (size_t)neblock,
+      cbytes = lz4_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
                                  (char*)dest, (size_t)maxout, accel);
     }
     else if (context->compcode == BLOSC_LZ4HC) {
-      cbytes = lz4hc_wrap_compress((char*)_tmp + j * neblock, (size_t)neblock,
+      cbytes = lz4hc_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
                                    (char*)dest, (size_t)maxout, context->clevel);
     }
   #endif /*  HAVE_LZ4 */
   #if defined(HAVE_SNAPPY)
     else if (context->compcode == BLOSC_SNAPPY) {
-      cbytes = snappy_wrap_compress((char*)_tmp + j * neblock, (size_t)neblock,
+      cbytes = snappy_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
                                     (char*)dest, (size_t)maxout);
     }
   #endif /*  HAVE_SNAPPY */
   #if defined(HAVE_ZLIB)
     else if (context->compcode == BLOSC_ZLIB) {
-      cbytes = zlib_wrap_compress((char*)_tmp + j * neblock, (size_t)neblock,
+      cbytes = zlib_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
                                   (char*)dest, (size_t)maxout, context->clevel);
     }
   #endif /*  HAVE_ZLIB */
@@ -636,7 +636,7 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
       if ((ntbytes + neblock) > maxbytes) {
         return 0;    /* Non-compressible data */
       }
-      memcpy(dest, _tmp + j * neblock, neblock);
+      memcpy(dest, _src + j * neblock, neblock);
       cbytes = neblock;
     }
     _sw32(dest - 4, cbytes);
@@ -656,7 +656,7 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize, int32_t lef
   int32_t cbytes;                /* number of compressed bytes in split */
   int32_t ctbytes = 0;           /* number of compressed bytes in block */
   int32_t ntbytes = 0;           /* number of uncompressed bytes in block */
-  uint8_t* _tmp = dest + offset;
+  uint8_t* _dest = dest + offset;
   int32_t typesize = context->typesize;
   int32_t compcode;
   char* compname;
@@ -664,7 +664,7 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize, int32_t lef
 
   if ((*(context->header_flags) & BLOSC_DOSHUFFLE) || \
       (*(context->header_flags) & BLOSC_DOBITSHUFFLE)) {
-    _tmp = tmp;
+    _dest = tmp;
   }
 
   compcode = (*(context->header_flags) & 0xe0) >> 5;
@@ -684,29 +684,29 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize, int32_t lef
     ctbytes += (int32_t)sizeof(int32_t);
     /* Uncompress */
     if (cbytes == neblock) {
-      memcpy(_tmp, src, neblock);
+      memcpy(_dest, src, neblock);
       nbytes = neblock;
     }
     else {
       if (compcode == BLOSC_BLOSCLZ_FORMAT) {
-        nbytes = blosclz_decompress(src, cbytes, _tmp, neblock);
+        nbytes = blosclz_decompress(src, cbytes, _dest, neblock);
       }
   #if defined(HAVE_LZ4)
       else if (compcode == BLOSC_LZ4_FORMAT) {
         nbytes = lz4_wrap_decompress((char*)src, (size_t)cbytes,
-                                     (char*)_tmp, (size_t)neblock);
+                                     (char*)_dest, (size_t)neblock);
       }
   #endif /*  HAVE_LZ4 */
   #if defined(HAVE_SNAPPY)
       else if (compcode == BLOSC_SNAPPY_FORMAT) {
         nbytes = snappy_wrap_decompress((char*)src, (size_t)cbytes,
-                                        (char*)_tmp, (size_t)neblock);
+                                        (char*)_dest, (size_t)neblock);
       }
   #endif /*  HAVE_SNAPPY */
   #if defined(HAVE_ZLIB)
       else if (compcode == BLOSC_ZLIB_FORMAT) {
         nbytes = zlib_wrap_decompress((char*)src, (size_t)cbytes,
-                                      (char*)_tmp, (size_t)neblock);
+                                      (char*)_dest, (size_t)neblock);
       }
   #endif /*  HAVE_ZLIB */
       else {
@@ -726,7 +726,7 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize, int32_t lef
     }
     src += cbytes;
     ctbytes += cbytes;
-    _tmp += nbytes;
+    _dest += nbytes;
     ntbytes += nbytes;
   } /* Closes j < nsplits */
 
