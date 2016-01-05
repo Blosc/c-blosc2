@@ -761,8 +761,8 @@ static int serial_blosc(struct blosc_context* context) {
   int32_t ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
   int32_t ntbytes = context->num_output_bytes;
 
-  uint8_t* tmp = my_malloc(context->blocksize);
-  uint8_t* tmp2 = my_malloc(ebsize);
+  uint8_t* tmp = my_malloc(context->blocksize + ebsize);
+  uint8_t* tmp2 = tmp + ebsize;
 
   for (j = 0; j < context->nblocks; j++) {
     if (context->compress && !(*(context->header_flags) & BLOSC_MEMCPYED)) {
@@ -815,9 +815,8 @@ static int serial_blosc(struct blosc_context* context) {
     ntbytes += cbytes;
   }
 
-  // Free temporaries
+  /* Free temporaries */
   my_free(tmp);
-  my_free(tmp2);
 
   return ntbytes;
 }
@@ -1299,8 +1298,8 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   ctbytes = sw32_(_src + 12);               /* compressed buffer size */
 
   ebsize = blocksize + typesize * (int32_t)sizeof(int32_t);
-  tmp = my_malloc(blocksize);               /* tmp for thread 0 */
-  tmp2 = my_malloc(ebsize);                 /* tmp2 for thread 0 */
+  tmp = my_malloc(blocksize + ebsize);      /* tmp for thread 0 */
+  tmp2 = tmp + ebsize;                      /* tmp2 for thread 0 */
 
   version += 0;                             /* shut up compiler warning */
   versionlz += 0;                           /* shut up compiler warning */
@@ -1379,7 +1378,6 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   }
 
   my_free(tmp);
-  my_free(tmp2);
 
   return ntbytes;
 }
@@ -1433,11 +1431,9 @@ static void* t_blosc(void* ctxt) {
 
     if (blocksize > context->tmpblocksize) {
       my_free(context->tmp);
-      my_free(context->tmp2);
-      my_free(context->tmp3);
-      context->tmp = my_malloc(blocksize);
-      context->tmp2 = my_malloc(ebsize);
-      context->tmp3 = my_malloc(blocksize);
+      context->tmp = my_malloc(blocksize + ebsize + blocksize);
+      context->tmp2 = context->tmp + ebsize;
+      context->tmp3 = context->tmp + blocksize;
     }
 
     tmp = context->tmp;
@@ -1561,8 +1557,6 @@ static void* t_blosc(void* ctxt) {
 
   /* Cleanup our working space and context */
   my_free(context->tmp);
-  my_free(context->tmp2);
-  my_free(context->tmp3);
   my_free(context);
 
   return (NULL);
@@ -1608,9 +1602,9 @@ static int init_threads(struct blosc_context* context) {
     thread_context->tid = tid;
 
     ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
-    thread_context->tmp = my_malloc(context->blocksize);
-    thread_context->tmp2 = my_malloc(ebsize);
-    thread_context->tmp3 = my_malloc(context->blocksize);
+    thread_context->tmp = my_malloc(context->blocksize + ebsize + context->blocksize);
+    thread_context->tmp2 = thread_context->tmp + ebsize;
+    thread_context->tmp3 = thread_context->tmp + context->blocksize;
     thread_context->tmpblocksize = context->blocksize;
 
 #if !defined(_WIN32)
