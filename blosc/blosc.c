@@ -1284,6 +1284,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   int stop = start + nitems;
   uint8_t* tmp;
   uint8_t* tmp2;
+  uint8_t* tmp3;
   int32_t ebsize;
 
   _src = (uint8_t*)(src);
@@ -1298,8 +1299,9 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   ctbytes = sw32_(_src + 12);               /* compressed buffer size */
 
   ebsize = blocksize + typesize * (int32_t)sizeof(int32_t);
-  tmp = my_malloc(blocksize + ebsize);      /* tmp for thread 0 */
-  tmp2 = tmp + ebsize;                      /* tmp2 for thread 0 */
+  tmp = my_malloc(blocksize + ebsize + blocksize);
+  tmp2 = tmp + blocksize;
+  tmp3 = tmp + blocksize + ebsize;
 
   version += 0;                             /* shut up compiler warning */
   versionlz += 0;                           /* shut up compiler warning */
@@ -1357,7 +1359,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
     }
     else {
       struct blosc_context context;
-      /* blosc_d only uses typesize and flags */
+      /* blosc_d only uses typesize, flags and schunk info */
       context.typesize = typesize;
       context.header_flags = &flags;
       context.schunk = g_schunk;
@@ -1365,7 +1367,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
       /* Regular decompression.  Put results in tmp2. */
       cbytes = blosc_d(&context, bsize, leftoverblock,
                        (uint8_t*)src + sw32_(bstarts + j * 4),
-                       tmp2, 0, tmp, tmp2);
+                       tmp2, 0, tmp, tmp3);
       if (cbytes < 0) {
         ntbytes = cbytes;
         break;
@@ -1432,8 +1434,8 @@ static void* t_blosc(void* ctxt) {
     if (blocksize > context->tmpblocksize) {
       my_free(context->tmp);
       context->tmp = my_malloc(blocksize + ebsize + blocksize);
-      context->tmp2 = context->tmp + ebsize;
-      context->tmp3 = context->tmp + blocksize;
+      context->tmp2 = context->tmp + blocksize;
+      context->tmp3 = context->tmp + blocksize + ebsize;
     }
 
     tmp = context->tmp;
@@ -1603,8 +1605,8 @@ static int init_threads(struct blosc_context* context) {
 
     ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
     thread_context->tmp = my_malloc(context->blocksize + ebsize + context->blocksize);
-    thread_context->tmp2 = thread_context->tmp + ebsize;
-    thread_context->tmp3 = thread_context->tmp + context->blocksize;
+    thread_context->tmp2 = thread_context->tmp + context->blocksize;
+    thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
     thread_context->tmpblocksize = context->blocksize;
 
 #if !defined(_WIN32)

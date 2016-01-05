@@ -3,7 +3,7 @@
     http://blosc.org
     License: MIT (see LICENSE.txt)
 
-    Example program demonstrating use of the Blosc filter from C code.
+    Example program demonstrating the use of a Blosc from C code.
 
     To compile this program:
 
@@ -21,7 +21,7 @@
 
     $ ./simple
     Blosc version info: 2.0.0a2 ($Date:: 2015-12-17 #$)
-    Compression: 40000000 -> 999393 (40.0x)
+    Compression: 40000000 -> 832774 (48.0x)
     Correctly extracted 5 elements from compressed chunk!
     Decompression succesful!
     Succesful roundtrip!
@@ -58,7 +58,7 @@ int main() {
   blosc_set_nthreads(NTHREADS);
 
   /* Compress with clevel=5 and shuffle active  */
-  csize = blosc_compress(5, BLOSC_SHUFFLE, sizeof(float), isize, data, data_out, osize);
+  csize = blosc_compress(5, BLOSC_BITSHUFFLE, sizeof(float), isize, data, data_out, osize);
   if (csize == 0) {
     printf("Buffer is uncompressible.  Giving up.\n");
     return 1;
