@@ -24,6 +24,8 @@
 #include "blosc.h"
 
 #define SIZE 50 * 1000
+#define NCHUNKS 1000
+
 
 int main() {
   static int32_t data[SIZE];
@@ -33,11 +35,7 @@ int main() {
   int32_t nbytes, cbytes;
   schunk_params* sc_params = calloc(1, sizeof(schunk_params));
   schunk_header* sc_header;
-  int i, nchunks;
-
-  for (i = 0; i < SIZE; i++) {
-    data[i] = i;
-  }
+  int i, nchunk, nchunks;
 
   printf("Blosc version info: %s (%s)\n",
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
@@ -48,18 +46,20 @@ int main() {
 
   /* Create a super-chunk container */
   sc_params->filters[0] = BLOSC_DELTA;
-  sc_params->filters[1] = BLOSC_SHUFFLE;
-  sc_params->compressor = BLOSC_BLOSCLZ;
+  sc_params->filters[1] = BLOSC_BITSHUFFLE;
+  sc_params->compressor = BLOSC_LZ4;
   sc_params->clevel = 5;
   sc_header = blosc2_new_schunk(sc_params);
 
-  /* Append the reference chunks first */
-  nchunks = blosc2_append_buffer(sc_header, sizeof(int32_t), isize, data);
-  assert(nchunks == 1);
+  for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
 
-  /* Now append another chunk (essentially the same as the reference) */
-  nchunks = blosc2_append_buffer(sc_header, sizeof(int32_t), isize, data);
-  assert(nchunks == 2);
+    for (i = 0; i < SIZE; i++) {
+      data[i] = i * nchunk;
+    }
+
+    nchunks = blosc2_append_buffer(sc_header, sizeof(int32_t), isize, data);
+    assert(nchunks == nchunk);
+  }
 
   /* Gather some info */
   nbytes = sc_header->nbytes;
@@ -68,7 +68,7 @@ int main() {
          nbytes, cbytes, (1. * nbytes) / cbytes);
 
   /* Retrieve and decompress the chunks (0-based count) */
-  dsize = blosc2_decompress_chunk(sc_header, 1, (void*)data_dest, isize);
+  dsize = blosc2_decompress_chunk(sc_header, 0, (void*)data_dest, isize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
@@ -77,7 +77,7 @@ int main() {
   printf("Decompression successful!\n");
 
   for (i = 0; i < SIZE; i++) {
-    if (data[i] != data_dest[i]) {
+    if (data_dest[i] != i) {
       printf("Decompressed data differs from original %d, %d, %d!\n", i, data[i], data_dest[i]);
       return -1;
     }

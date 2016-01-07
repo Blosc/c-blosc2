@@ -65,12 +65,11 @@ uint8_t* decode_filters(uint16_t enc_filters) {
 schunk_header* blosc2_new_schunk(schunk_params* params) {
   schunk_header* sc_header = calloc(1, sizeof(schunk_header));
 
-  sc_header->version = 0x0;     /* pre-first version */
+  sc_header->version = 0;     /* pre-first version */
   sc_header->filters = encode_filters(params);
   sc_header->filters_meta = params->filters_meta;
   sc_header->compressor = params->compressor;
   sc_header->clevel = params->clevel;
-  sc_header->nbytes = sizeof(schunk_header);
   sc_header->cbytes = sizeof(schunk_header);
   /* The rest of the structure will remain zeroed */
 
@@ -98,7 +97,7 @@ size_t blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy) {
   sc_header->data[nchunks] = chunk;
   /* Update counters */
   sc_header->nchunks = nchunks + 1;
-  sc_header->nbytes += nbytes + sizeof(void*);
+  sc_header->nbytes += nbytes;
   sc_header->cbytes += cbytes + sizeof(void*);
   /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n", */
   /*         nchunks, nbytes, cbytes, (1.*nbytes) / cbytes); */
@@ -131,7 +130,6 @@ size_t blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
         free(filters_chunk);
         return cbytes;
       }
-      sc_header->nbytes += nbytes;
       sc_header->cbytes += cbytes;
     }
   }
