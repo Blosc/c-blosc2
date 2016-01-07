@@ -106,31 +106,55 @@ size_t blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy) {
 }
 
 
+/* Set a delta reference for the super-chunk */
+int blosc2_set_delta_ref(schunk_header* sc_header, size_t nbytes, void* ref) {
+  int cbytes;
+  void* filters_chunk;
+  uint8_t* dec_filters = decode_filters(sc_header->filters);
+
+  if (dec_filters[0] == BLOSC_DELTA) {
+    if (sc_header->filters_chunk != NULL) {
+      sc_header->cbytes -= *(uint32_t*)(sc_header->filters_chunk + 4);
+      free(sc_header->filters_chunk);
+    }
+  }
+  else {
+    printf("You cannot set a delta reference if delta filter is not set\n");
+    return(-1);
+  }
+  free(dec_filters);
+
+  filters_chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
+  cbytes = blosc_compress(0, 0, 1, nbytes, ref, filters_chunk,
+                          nbytes + BLOSC_MAX_OVERHEAD);
+  if (cbytes < 0) {
+    free(filters_chunk);
+    return cbytes;
+  }
+  sc_header->filters_chunk = filters_chunk;
+  sc_header->cbytes += cbytes;
+  return cbytes;
+}
+
+
 /* Append a data buffer to a super-chunk. */
 size_t blosc2_append_buffer(schunk_header* sc_header, size_t typesize,
                             size_t nbytes, void* src) {
   int cbytes;
   void* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
-  void* filters_chunk;
   uint8_t* dec_filters = decode_filters(sc_header->filters);
   int clevel = sc_header->clevel;
   char* compname;
-  int doshuffle;
+  int doshuffle, ret;
 
   /* Apply filters prior to compress */
   if (dec_filters[0] == BLOSC_DELTA) {
     doshuffle = dec_filters[1];
     if (sc_header->filters_chunk == NULL) {
-      /* The reference chunk will not be compressed */
-      filters_chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
-      cbytes = blosc_compress(0, 0, typesize, nbytes, src, filters_chunk,
-                              nbytes + BLOSC_MAX_OVERHEAD);
-      sc_header->filters_chunk = filters_chunk;
-      if (cbytes < 0) {
-        free(filters_chunk);
-        return cbytes;
+      ret = blosc2_set_delta_ref(sc_header, nbytes, src);
+      if (ret < 0) {
+        return((size_t)ret);
       }
-      sc_header->cbytes += cbytes;
     }
   }
   else {

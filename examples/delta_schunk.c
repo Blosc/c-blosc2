@@ -13,7 +13,7 @@
 
   $ ./delta_schunk
   Blosc version info: 2.0.0a2 ($Date:: 2015-12-17 #$)
-  Compression super-chunk: 60000112 -> 20234528 (3.0x)
+  Compression super-chunk: 200000000 -> 14081961 (14.2x)
   Decompression successful!
   Successful roundtrip!
 

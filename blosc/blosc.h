@@ -447,6 +447,9 @@ typedef struct {
 /* Create a new super-chunk. */
 BLOSC_EXPORT schunk_header* blosc2_new_schunk(schunk_params* params);
 
+/* Set a delta reference for the super-chunk */
+int blosc2_set_delta_ref(schunk_header* sc_header, size_t nbytes, void* ref);
+
 /* Free all memory from a super-chunk. */
 BLOSC_EXPORT int blosc2_destroy_schunk(schunk_header* sc_header);
 
