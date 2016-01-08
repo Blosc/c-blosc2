@@ -7,6 +7,7 @@
   See LICENSES/BLOSC.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#include <string.h>
 #include "blosc.h"
 #include "delta.h"
 
@@ -32,9 +33,7 @@ void delta_encoder8(uint8_t* filters_chunk, int32_t offset, int32_t nbytes,
   /* Copy the leftovers */
   if (nbytes > mbytes) {
     mbytes = MAX(0, mbytes); 	/* negative mbytes are not considered */
-    for (i = mbytes; i < nbytes; i++) {
-      dest[i] = src[i];
-    }
+    memcpy(dest + mbytes, src + mbytes, nbytes - mbytes);
   }
 }
 
