@@ -931,6 +931,11 @@ static int32_t compute_blocksize(struct blosc_context* context,
     blocksize = nbytes;
   }
 
+  /* blocksize *must absolutely* be a multiple of the typesize */
+  if (blocksize > typesize) {
+    blocksize = blocksize / typesize * typesize;
+  }
+
   return blocksize;
 }
 
