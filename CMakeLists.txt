@@ -87,12 +87,16 @@ option(DEACTIVATE_SNAPPY
         "Do not include support for the SNAPPY library." OFF)
 option(DEACTIVATE_ZLIB
         "Do not include support for the ZLIB library." OFF)
+option(DEACTIVATE_ZSTD
+        "Do not include support for the ZSTD library." OFF)
 option(PREFER_EXTERNAL_LZ4
         "Find and use external LZ4 library instead of included sources." OFF)
 option(PREFER_EXTERNAL_SNAPPY
-        "Find and use external Snappy library instead of included sources." ON)
+        "Find and use external SNAPPY library instead of included sources." ON)
 option(PREFER_EXTERNAL_ZLIB
-        "Find and use external zlib library instead of included sources." ON)
+        "Find and use external ZLIB library instead of included sources." ON)
+option(PREFER_EXTERNAL_ZSTD
+        "Find and use external ZSTD library instead of included sources." OFF)
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -134,6 +138,17 @@ if (NOT DEACTIVATE_ZLIB)
     # we will use the included sources for it
     set(HAVE_ZLIB TRUE)
 endif (NOT DEACTIVATE_ZLIB)
+
+if (NOT DEACTIVATE_ZSTD)
+    if (PREFER_EXTERNAL_ZSTD)
+        find_package(ZSTD)
+    else ()
+        message(STATUS "Using ZSTD internal sources.")
+    endif (PREFER_EXTERNAL_ZSTD)
+    # HAVE_LZ4 will be set to true because even if the library is
+    # not found, we will use the included sources for it
+    set(HAVE_ZSTD TRUE)
+endif (NOT DEACTIVATE_ZSTD)
 
 # create the config.h file
 configure_file("blosc/config.h.in" "blosc/config.h")
