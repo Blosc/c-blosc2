@@ -15,6 +15,8 @@
 #       do not include support for the Snappy library
 #   DEACTIVATE_ZLIB: default OFF
 #       do not include support for the Zlib library
+#   DEACTIVATE_ZSTD: default OFF
+#       do not include support for the Zstd library
 #   PREFER_EXTERNAL_LZ4: default OFF
 #       when found, use the installed LZ4 libs instead of included
 #       sources
@@ -23,6 +25,9 @@
 #       sources
 #   PREFER_EXTERNAL_ZLIB: default ON
 #       when found, use the installed zlib libs instead of included
+#       sources
+#   PREFER_EXTERNAL_ZSTD: default OFF
+#       when found, use the installed zstd libs instead of included
 #       sources
 #   TEST_INCLUDE_BENCH_SHUFFLE_1: default ON
 #       add a test that runs the benchmark program passing "shuffle" with 1
@@ -145,7 +150,7 @@ if (NOT DEACTIVATE_ZSTD)
     else ()
         message(STATUS "Using ZSTD internal sources.")
     endif (PREFER_EXTERNAL_ZSTD)
-    # HAVE_LZ4 will be set to true because even if the library is
+    # HAVE_ZSTD will be set to true because even if the library is
     # not found, we will use the included sources for it
     set(HAVE_ZSTD TRUE)
 endif (NOT DEACTIVATE_ZSTD)
