@@ -967,23 +967,31 @@ static int32_t compute_blocksize(struct blosc_context* context,
       blocksize *= 8;
     }
 
-    if (clevel == 0) {
+    /* Choose a different blocksize depending on the compression level */
+    switch (clevel) {
+    case 0:
+      /* Case of plain copy */
       blocksize /= 4;
-    }
-    else if (clevel <= 3) {
+      break;
+    case 1:
+    case 2:
+    case 3:
       blocksize /= 2;
-    }
-    else if (clevel <= 5) {
+      break;
+    case 4:
+    case 5:
       blocksize *= 1;
-    }
-    else if (clevel <= 6) {
+      break;
+    case 6:
       blocksize *= 2;
-    }
-    else if (clevel < 9) {
+      break;
+    case 7:
+    case 8:
       blocksize *= 8;
-    }
-    else {
+      break;
+    case 9:
       blocksize *= 16;
+      break;
     }
   }
 
