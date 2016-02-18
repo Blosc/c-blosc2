@@ -36,6 +36,15 @@ if (NOT DEACTIVATE_ZLIB)
     endif (ZLIB_FOUND)
 endif (NOT DEACTIVATE_ZLIB)
 
+if (NOT DEACTIVATE_ZSTD)
+    if (ZSTD_FOUND)
+        include_directories(${ZSTD_INCLUDE_DIR})
+    else (ZSTD_FOUND)
+        set(ZSTD_LOCAL_DIR ${INTERNAL_LIBS}/zstd-0.5.0)
+        include_directories(${ZSTD_LOCAL_DIR})
+    endif (ZSTD_FOUND)
+endif (NOT DEACTIVATE_ZSTD)
+
 # library sources
 set(SOURCES blosc.c blosclz.c schunk.c delta.c delta.h shuffle-generic.c bitshuffle-generic.c)
 if (COMPILER_SUPPORT_SSE2)
@@ -97,6 +106,15 @@ if (NOT DEACTIVATE_ZLIB)
         set(SOURCES ${SOURCES} ${ZLIB_FILES})
     endif (ZLIB_FOUND)
 endif (NOT DEACTIVATE_ZLIB)
+
+if (NOT DEACTIVATE_ZSTD)
+    if (ZSTD_FOUND)
+        set(LIBS ${LIBS} ${ZSTD_LIBRARY})
+    else (ZSTD_FOUND)
+        file(GLOB ZSTD_FILES ${ZSTD_LOCAL_DIR}/*.c)
+        set(SOURCES ${SOURCES} ${ZSTD_FILES})
+    endif (ZSTD_FOUND)
+endif (NOT DEACTIVATE_ZSTD)
 
 # targets
 add_library(blosc_shared SHARED ${SOURCES})
