@@ -374,7 +374,7 @@ int main(int argc, char* argv[]) {
   int debug_suite = 0;
   int nthreads = 4;                     /* The number of threads */
   int size = 4 * MB;                      /* Buffer size */
-  int elsize = 8;                       /* Datatype size */
+  int elsize = 4;                       /* Datatype size */
   int rshift = 19;                      /* Significant bits */
 #if defined(__arm__)
   int workingset = 64*MB;              /* The maximum allocated memory */
