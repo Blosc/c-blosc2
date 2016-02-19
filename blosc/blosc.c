@@ -934,8 +934,6 @@ static int32_t compute_blocksize(struct blosc_context* context,
     return 1;
   }
 
-  blocksize = nbytes;           /* Start by a whole buffer as blocksize */
-
   if (forced_blocksize) {
     blocksize = forced_blocksize;
     /* Check that forced blocksize is not too small */
@@ -986,6 +984,8 @@ static int32_t compute_blocksize(struct blosc_context* context,
       blocksize *= 2;
       break;
     case 7:
+      blocksize *= 4;
+      break;
     case 8:
       blocksize *= 8;
       break;
