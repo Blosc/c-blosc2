@@ -373,7 +373,7 @@ int main(int argc, char* argv[]) {
   int extreme_suite = 0;
   int debug_suite = 0;
   int nthreads = 4;                     /* The number of threads */
-  int size = 2 * MB;                      /* Buffer size */
+  int size = 4 * MB;                      /* Buffer size */
   int elsize = 8;                       /* Datatype size */
   int rshift = 19;                      /* Significant bits */
 #if defined(__arm__)
