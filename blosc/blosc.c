@@ -805,15 +805,16 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize, int32_t lef
 
 
 /* Serial version for compression/decompression */
-static int serial_blosc(struct blosc_context* context) {
+static int serial_blosc(struct thread_context* thread_context) {
+  struct blosc_context* context = thread_context->parent_context;
   int32_t j, bsize, leftoverblock;
   int32_t cbytes;
 
   int32_t ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
   int32_t ntbytes = context->num_output_bytes;
 
-  uint8_t* tmp = my_malloc(context->blocksize + ebsize);
-  uint8_t* tmp2 = tmp + ebsize;
+  uint8_t* tmp = thread_context->tmp;
+  uint8_t* tmp2 = thread_context->tmp2;
 
   for (j = 0; j < context->nblocks; j++) {
     if (context->compress && !(*(context->header_flags) & BLOSC_MEMCPYED)) {
@@ -866,9 +867,6 @@ static int serial_blosc(struct blosc_context* context) {
     ntbytes += cbytes;
   }
 
-  /* Free temporaries */
-  my_free(tmp);
-
   return ntbytes;
 }
 
@@ -898,19 +896,48 @@ static int parallel_blosc(struct blosc_context* context) {
 }
 
 
+static struct thread_context* create_thread_context(
+                                  struct blosc_context* context, int32_t tid) {
+  struct thread_context* thread_context;
+  int32_t ebsize;
+
+  context->tids[tid] = tid;
+
+  thread_context = (struct thread_context*)my_malloc(sizeof(struct thread_context));
+  thread_context->parent_context = context;
+  thread_context->tid = tid;
+
+  ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
+  thread_context->tmp = my_malloc(context->blocksize + ebsize + context->blocksize);
+  thread_context->tmp2 = thread_context->tmp + context->blocksize;
+  thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
+  thread_context->tmpblocksize = context->blocksize;
+
+  return thread_context;
+}
+
+
 /* Do the compression or decompression of the buffer depending on the
    global params. */
 static int do_job(struct blosc_context* context) {
   int32_t ntbytes;
+  struct thread_context* thread_context;
 
   /* Run the serial version when nthreads is 1 or when the buffers are
-     not much larger than blocksize */
+     not larger than blocksize */
   if (context->nthreads == 1 || (context->sourcesize / context->blocksize) <= 1) {
-    ntbytes = serial_blosc(context);
+    if (context->tids[0] == -1) {
+      printf("Creant buffers de threads! // ");
+      /* The context for this 'thread' has no been initialized yet */
+      thread_context = create_thread_context(context, 0);
+      printf("Context tids[0]: %d", context->tids[0]);
+    }
+    ntbytes = serial_blosc(thread_context);
   }
   else {
     /* Check whether we need to restart threads */
     blosc_set_nthreads_(context);
+    /* and run the job */
     ntbytes = parallel_blosc(context);
   }
 
@@ -1016,6 +1043,8 @@ static int initialize_context_compression(struct blosc_context* context,
                                           int32_t blocksize,
                                           int32_t nthreads,
                                           schunk_header* schunk) {
+  int i;
+
   /* Set parameters */
   context->compress = 1;
   context->src = (const uint8_t*)src;
@@ -1066,6 +1095,47 @@ static int initialize_context_compression(struct blosc_context* context,
   context->nblocks = (context->leftover > 0) ? (context->nblocks + 1) : context->nblocks;
 
   return 1;
+}
+
+static int initialize_context_decompression(struct blosc_context* context,
+					    const void* src,
+					    void* dest,
+					    size_t destsize,
+					    int nthreads,
+					    schunk_header* schunk) {
+
+  int i;
+
+  context->compress = 0;
+  context->src = (const uint8_t*)src;
+  context->dest = (uint8_t*)dest;
+  context->destsize = destsize;
+  context->num_output_bytes = 0;
+  context->nthreads = nthreads;
+  context->end_threads = 0;
+  context->schunk = schunk;
+  for (i = 0; i < BLOSC_MAX_THREADS; i++) {
+    context->tids[i] = -1;
+  }
+
+  context->header_flags = (uint8_t*)(context->src + 2);           /* flags */
+  context->typesize = (int32_t)context->src[3];      /* typesize */
+  context->sourcesize = sw32_(context->src + 4);     /* buffer size */
+  context->blocksize = sw32_(context->src + 8);      /* block size */
+
+  /* Check that we have enough space to decompress */
+  if (context->sourcesize > (int32_t)destsize) {
+    return -1;
+  }
+
+  context->bstarts = (uint8_t*)(context->src + 16);
+  /* Compute some params */
+  /* Total blocks */
+  context->nblocks = context->sourcesize / context->blocksize;
+  context->leftover = context->sourcesize % context->blocksize;
+  context->nblocks = (context->leftover > 0) ? context->nblocks + 1 : context->nblocks;
+
+  return 0;
 }
 
 static int write_compression_header(struct blosc_context* context, int clevel, int doshuffle) {
@@ -1248,42 +1318,6 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
   pthread_mutex_unlock(&global_comp_mutex);
 
   return result;
-}
-
-static int initialize_context_decompression(struct blosc_context* context,
-					    const void* src,
-					    void* dest,
-					    size_t destsize,
-					    int nthreads,
-					    schunk_header* schunk) {
-
-  context->compress = 0;
-  context->src = (const uint8_t*)src;
-  context->dest = (uint8_t*)dest;
-  context->destsize = destsize;
-  context->num_output_bytes = 0;
-  context->nthreads = nthreads;
-  context->end_threads = 0;
-  context->schunk = schunk;
-
-  context->header_flags = (uint8_t*)(context->src + 2);           /* flags */
-  context->typesize = (int32_t)context->src[3];      /* typesize */
-  context->sourcesize = sw32_(context->src + 4);     /* buffer size */
-  context->blocksize = sw32_(context->src + 8);      /* block size */
-
-  /* Check that we have enough space to decompress */
-  if (context->sourcesize > (int32_t)destsize) {
-    return -1;
-  }
-
-  context->bstarts = (uint8_t*)(context->src + 16);
-  /* Compute some params */
-  /* Total blocks */
-  context->nblocks = context->sourcesize / context->blocksize;
-  context->leftover = context->sourcesize % context->blocksize;
-  context->nblocks = (context->leftover > 0) ? context->nblocks + 1 : context->nblocks;
-
-  return 0;
 }
 
 int blosc_run_decompression_with_context(struct blosc_context* context,
@@ -1658,26 +1692,6 @@ static void* t_blosc(void* ctxt) {
   my_free(context);
 
   return (NULL);
-}
-
-static struct thread_context* create_thread_context(
-                                  struct blosc_context* context, int32_t tid) {
-  struct thread_context* thread_context;
-  int32_t ebsize;
-
-  context->tids[tid] = tid;
-
-  thread_context = (struct thread_context*)my_malloc(sizeof(struct thread_context));
-  thread_context->parent_context = context;
-  thread_context->tid = tid;
-
-  ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
-  thread_context->tmp = my_malloc(context->blocksize + ebsize + context->blocksize);
-  thread_context->tmp2 = thread_context->tmp + context->blocksize;
-  thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
-  thread_context->tmpblocksize = context->blocksize;
-
-  return thread_context;
 }
 
 static int init_threads(struct blosc_context* context) {
