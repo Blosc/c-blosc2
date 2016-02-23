@@ -905,6 +905,7 @@ static struct thread_context* create_thread_context(
 
   thread_context = (struct thread_context*)my_malloc(sizeof(struct thread_context));
   thread_context->parent_context = context;
+  context->tids[tid] = tid;
   thread_context->tid = tid;
 
   ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
@@ -926,12 +927,8 @@ static int do_job(struct blosc_context* context) {
   /* Run the serial version when nthreads is 1 or when the buffers are
      not larger than blocksize */
   if (context->nthreads == 1 || (context->sourcesize / context->blocksize) <= 1) {
-    if (context->tids[0] == -1) {
-      printf("Creant buffers de threads! // ");
-      /* The context for this 'thread' has no been initialized yet */
-      thread_context = create_thread_context(context, 0);
-      printf("Context tids[0]: %d", context->tids[0]);
-    }
+    /* The context for this 'thread' has no been initialized yet */
+    thread_context = create_thread_context(context, 0);
     ntbytes = serial_blosc(thread_context);
   }
   else {
@@ -1114,9 +1111,6 @@ static int initialize_context_decompression(struct blosc_context* context,
   context->nthreads = nthreads;
   context->end_threads = 0;
   context->schunk = schunk;
-  for (i = 0; i < BLOSC_MAX_THREADS; i++) {
-    context->tids[i] = -1;
-  }
 
   context->header_flags = (uint8_t*)(context->src + 2);           /* flags */
   context->typesize = (int32_t)context->src[3];      /* typesize */
@@ -1950,6 +1944,7 @@ void blosc_set_schunk(schunk_header* schunk) {
 
 struct blosc_context* create_context(int nthreads) {
   struct blosc_context* context = (struct blosc_context*)my_malloc(sizeof(struct blosc_context));
+
   return context;
 }
 
