@@ -877,9 +877,6 @@ static int serial_blosc(struct blosc_context* context) {
 static int parallel_blosc(struct blosc_context* context) {
   int rc;
 
-  /* Check whether we need to restart threads */
-  blosc_set_nthreads_(context);
-
   /* Set sentinels */
   context->thread_giveup_code = 1;
   context->thread_nblock = -1;
@@ -912,6 +909,8 @@ static int do_job(struct blosc_context* context) {
     ntbytes = serial_blosc(context);
   }
   else {
+    /* Check whether we need to restart threads */
+    blosc_set_nthreads_(context);
     ntbytes = parallel_blosc(context);
   }
 
@@ -1235,8 +1234,10 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
 
   pthread_mutex_lock(&global_comp_mutex);
 
-  error = initialize_context_compression(g_global_context, clevel, doshuffle, typesize, nbytes,
-                                         src, dest, destsize, g_compressor, g_force_blocksize, g_threads, g_schunk);
+  error = initialize_context_compression(
+	      g_global_context, clevel, doshuffle, typesize, nbytes,
+	      src, dest, destsize, g_compressor, g_force_blocksize, g_threads,
+	      g_schunk);
   if (error < 0) { return error; }
 
   error = write_compression_header(g_global_context, clevel, doshuffle);
@@ -1249,16 +1250,12 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
   return result;
 }
 
-int blosc_run_decompression_with_context(struct blosc_context* context,
-                                         const void* src,
-                                         void* dest,
-                                         size_t destsize,
-                                         int numinternalthreads,
-					 schunk_header* schunk) {
-  uint8_t version;
-  uint8_t versionlz;
-  uint32_t ctbytes;
-  int32_t ntbytes;
+static int initialize_context_decompression(struct blosc_context* context,
+					    const void* src,
+					    void* dest,
+					    size_t destsize,
+					    int numinternalthreads,
+					    schunk_header* schunk) {
 
   context->compress = 0;
   context->src = (const uint8_t*)src;
@@ -1269,20 +1266,15 @@ int blosc_run_decompression_with_context(struct blosc_context* context,
   context->end_threads = 0;
   context->schunk = schunk;
 
-  /* Read the header block */
-  version = context->src[0];                        /* blosc format version */
-  versionlz = context->src[1];                      /* blosclz format version */
-
   context->header_flags = (uint8_t*)(context->src + 2);           /* flags */
   context->typesize = (int32_t)context->src[3];      /* typesize */
   context->sourcesize = sw32_(context->src + 4);     /* buffer size */
   context->blocksize = sw32_(context->src + 8);      /* block size */
-  ctbytes = sw32_(context->src + 12);               /* compressed buffer size */
 
-  /* Unused values */
-  version += 0;                             /* shut up compiler warning */
-  versionlz += 0;                           /* shut up compiler warning */
-  ctbytes += 0;                             /* shut up compiler warning */
+  /* Check that we have enough space to decompress */
+  if (context->sourcesize > (int32_t)destsize) {
+    return -1;
+  }
 
   context->bstarts = (uint8_t*)(context->src + 16);
   /* Compute some params */
@@ -1291,10 +1283,34 @@ int blosc_run_decompression_with_context(struct blosc_context* context,
   context->leftover = context->sourcesize % context->blocksize;
   context->nblocks = (context->leftover > 0) ? context->nblocks + 1 : context->nblocks;
 
-  /* Check that we have enough space to decompress */
-  if (context->sourcesize > (int32_t)destsize) {
-    return -1;
-  }
+  return 0;
+}
+
+int blosc_run_decompression_with_context(struct blosc_context* context,
+                                         const void* src,
+                                         void* dest,
+                                         size_t destsize,
+                                         int numinternalthreads,
+					 schunk_header* schunk) {
+  uint8_t version;
+  uint8_t versionlz;
+  uint32_t ctbytes;
+  int32_t ntbytes;
+  int error;
+
+  error = initialize_context_decompression(context, src, dest, destsize,
+					   numinternalthreads, schunk);
+  if (error < 0) { return error; }
+
+  /* Read the header block */
+  version = context->src[0];                        /* blosc format version */
+  versionlz = context->src[1];                      /* blosclz format version */
+  ctbytes = sw32_(context->src + 12);               /* compressed buffer size */
+
+  /* Unused values */
+  version += 0;                             /* shut up compiler warning */
+  versionlz += 0;                           /* shut up compiler warning */
+  ctbytes += 0;                             /* shut up compiler warning */
 
   /* Check whether this buffer is memcpy'ed */
   if (*(context->header_flags) & BLOSC_MEMCPYED) {
@@ -1674,7 +1690,7 @@ static int init_threads(struct blosc_context* context) {
   pthread_attr_setdetachstate(&context->ct_attr, PTHREAD_CREATE_JOINABLE);
 #endif
 
-  /* Finally, create the threads in detached state */
+  /* Finally, create the threads */
   for (tid = 0; tid < context->numthreads; tid++) {
     context->tids[tid] = tid;
 
@@ -1705,13 +1721,14 @@ static int init_threads(struct blosc_context* context) {
 }
 
 int blosc_set_nthreads(int nthreads_new) {
-  int ret = g_threads;
+  int ret = g_threads;  	/* the previous number of threads */
 
-  /* Re-initialize Blosc */
-  blosc_destroy();
-  blosc_init();
-
-  g_threads = nthreads_new;
+  if (nthreads_new != ret){
+    /* Re-initialize Blosc */
+    blosc_destroy();
+    blosc_init();
+    g_threads = nthreads_new;
+  }
 
   return ret;
 }
@@ -1909,9 +1926,14 @@ void blosc_set_schunk(schunk_header* schunk) {
   g_schunk = schunk;
 }
 
+struct blosc_context* create_context(int nthreads) {
+  struct blosc_context* context = (struct blosc_context*)my_malloc(sizeof(struct blosc_context));
+  return context;
+}
+
 void blosc_init(void) {
   pthread_mutex_init(&global_comp_mutex, NULL);
-  g_global_context = (struct blosc_context*)my_malloc(sizeof(struct blosc_context));
+  g_global_context = create_context(g_threads);
   g_global_context->threads_started = 0;
   g_initlib = 1;
 }
