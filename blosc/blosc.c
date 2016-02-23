@@ -1559,11 +1559,13 @@ static void* t_blosc(void* ctxt) {
     src = context->parent_context->src;
     dest = context->parent_context->dest;
 
-    if (blocksize > context->tmpblocksize) {
+    /* Resize the temporaries if needed */
+    if (blocksize != context->tmpblocksize) {
       my_free(context->tmp);
       context->tmp = my_malloc(blocksize + ebsize + blocksize);
       context->tmp2 = context->tmp + blocksize;
       context->tmp3 = context->tmp + blocksize + ebsize;
+      context->tmpblocksize = blocksize;
     }
 
     tmp = context->tmp;
