@@ -124,12 +124,14 @@ struct blosc_context {
   schunk_header* schunk;
   /* Super-chunk (if available) */
 
+  /* Cache for temporaries for serial operation */
+  struct thread_context* serial_context;
+
   /* Threading */
   int32_t nthreads;
   int32_t threads_started;
   int32_t end_threads;
   pthread_t threads[BLOSC_MAX_THREADS];
-  int32_t tids[BLOSC_MAX_THREADS];
   pthread_mutex_t count_mutex;
 #ifdef _POSIX_BARRIERS_MINE
   pthread_barrier_t barr_init;
@@ -901,11 +903,8 @@ static struct thread_context* create_thread_context(
   struct thread_context* thread_context;
   int32_t ebsize;
 
-  context->tids[tid] = tid;
-
   thread_context = (struct thread_context*)my_malloc(sizeof(struct thread_context));
   thread_context->parent_context = context;
-  context->tids[tid] = tid;
   thread_context->tid = tid;
 
   ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
@@ -922,14 +921,16 @@ static struct thread_context* create_thread_context(
    global params. */
 static int do_job(struct blosc_context* context) {
   int32_t ntbytes;
-  struct thread_context* thread_context;
 
   /* Run the serial version when nthreads is 1 or when the buffers are
      not larger than blocksize */
   if (context->nthreads == 1 || (context->sourcesize / context->blocksize) <= 1) {
     /* The context for this 'thread' has no been initialized yet */
-    thread_context = create_thread_context(context, 0);
-    ntbytes = serial_blosc(thread_context);
+    if ((context->serial_context == NULL) ||
+	(context->blocksize != context->serial_context->tmpblocksize)) {
+      context->serial_context = create_thread_context(context, 0);
+    }
+    ntbytes = serial_blosc(context->serial_context);
   }
   else {
     /* Check whether we need to restart threads */
@@ -1944,6 +1945,7 @@ void blosc_set_schunk(schunk_header* schunk) {
 
 struct blosc_context* create_context(int nthreads) {
   struct blosc_context* context = (struct blosc_context*)my_malloc(sizeof(struct blosc_context));
+  context->serial_context = NULL;
 
   return context;
 }
@@ -1958,6 +1960,9 @@ void blosc_init(void) {
 void blosc_destroy(void) {
   g_initlib = 0;
   blosc_release_threadpool(g_global_context);
+  if (g_global_context->serial_context != NULL) {
+    free(g_global_context->serial_context);
+  }
   my_free(g_global_context);
   pthread_mutex_destroy(&global_comp_mutex);
 }
