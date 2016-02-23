@@ -559,10 +559,11 @@ static int get_accel(const struct blosc_context* context) {
 }
 
 /* Shuffle & compress a single block */
-static int blosc_c(const struct blosc_context* context, int32_t blocksize,
+static int blosc_c(const struct thread_context* thread_context, int32_t blocksize,
                    int32_t leftoverblock, int32_t ntbytes, int32_t maxbytes,
                    const uint8_t* src, int offset, uint8_t* dest,
                    uint8_t* tmp, uint8_t* tmp2) {
+  struct blosc_context* context = thread_context->parent_context;
   int32_t j, neblock, nsplits;
   int32_t cbytes;                   /* number of compressed bytes in split */
   int32_t ctbytes = 0;              /* number of compressed bytes in block */
@@ -696,8 +697,9 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
 }
 
 /* Decompress & unshuffle a single block */
-static int blosc_d(struct blosc_context* context, int32_t blocksize, int32_t leftoverblock,
+static int blosc_d(struct thread_context* thread_context, int32_t blocksize, int32_t leftoverblock,
                    const uint8_t* src, uint8_t* dest, int offset, uint8_t* tmp, uint8_t* tmp2) {
+  struct blosc_context* context = thread_context->parent_context;
   int32_t j, neblock, nsplits;
   int32_t nbytes;                /* number of decompressed bytes in split */
   int32_t cbytes;                /* number of compressed bytes in split */
@@ -838,7 +840,7 @@ static int serial_blosc(struct thread_context* thread_context) {
       }
       else {
         /* Regular compression */
-        cbytes = blosc_c(context, bsize, leftoverblock, ntbytes,
+        cbytes = blosc_c(thread_context, bsize, leftoverblock, ntbytes,
                          context->destsize, context->src, j * context->blocksize,
                          context->dest + ntbytes, tmp, tmp2);
         if (cbytes == 0) {
@@ -857,7 +859,7 @@ static int serial_blosc(struct thread_context* thread_context) {
       }
       else {
         /* Regular decompression */
-        cbytes = blosc_d(context, bsize, leftoverblock,
+        cbytes = blosc_d(thread_context, bsize, leftoverblock,
                          context->src + sw32_(context->bstarts + j * 4),
                          context->dest, j * context->blocksize, tmp, tmp2);
       }
@@ -1398,7 +1400,7 @@ int blosc_decompress(const void* src, void* dest, size_t destsize) {
    items out of a compressed chunk.  This does not use threads because
    it would affect negatively to performance. */
 int blosc_getitem(const void* src, int start, int nitems, void* dest) {
-  uint8_t* _src = NULL;               /* current pos for source buffer */
+  uint8_t* _src = NULL;             /* current pos for source buffer */
   uint8_t version, versionlz;       /* versions for compressed header */
   uint8_t flags;                    /* flags for header */
   int32_t ntbytes = 0;              /* the number of uncompressed bytes */
@@ -1425,11 +1427,6 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   nbytes = sw32_(_src + 4);                 /* buffer size */
   blocksize = sw32_(_src + 8);              /* block size */
   ctbytes = sw32_(_src + 12);               /* compressed buffer size */
-
-  ebsize = blocksize + typesize * (int32_t)sizeof(int32_t);
-  tmp = my_malloc(blocksize + ebsize + blocksize);
-  tmp2 = tmp + blocksize;
-  tmp3 = tmp + blocksize + ebsize;
 
   version += 0;                             /* shut up compiler warning */
   versionlz += 0;                           /* shut up compiler warning */
@@ -1489,11 +1486,17 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
       struct blosc_context context;
       /* blosc_d only uses typesize, flags and schunk info */
       context.typesize = typesize;
+      context.blocksize = blocksize;
       context.header_flags = &flags;
       context.schunk = g_schunk;
+      context.serial_context = create_thread_context(&context, 0);
+
+      tmp = context.serial_context->tmp;
+      tmp2 = context.serial_context->tmp2;
+      tmp3 = context.serial_context->tmp3;
 
       /* Regular decompression.  Put results in tmp2. */
-      cbytes = blosc_d(&context, bsize, leftoverblock,
+      cbytes = blosc_d(context.serial_context, bsize, leftoverblock,
                        (uint8_t*)src + sw32_(bstarts + j * 4),
                        tmp2, 0, tmp, tmp3);
       if (cbytes < 0) {
@@ -1503,11 +1506,11 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
       /* Copy to destination */
       memcpy((uint8_t*)dest + ntbytes, tmp2 + startb, bsize2);
       cbytes = bsize2;
+
+      my_free(context.serial_context);
     }
     ntbytes += cbytes;
   }
-
-  my_free(tmp);
 
   return ntbytes;
 }
@@ -1615,7 +1618,7 @@ static void* t_blosc(void* ctxt) {
         }
         else {
           /* Regular compression */
-          cbytes = blosc_c(context->parent_context, bsize, leftoverblock, 0,
+          cbytes = blosc_c(context, bsize, leftoverblock, 0,
                            ebsize, src, nblock_ * blocksize, tmp2, tmp, tmp3);
         }
       }
@@ -1627,7 +1630,7 @@ static void* t_blosc(void* ctxt) {
           cbytes = bsize;
         }
         else {
-          cbytes = blosc_d(context->parent_context, bsize, leftoverblock,
+          cbytes = blosc_d(context, bsize, leftoverblock,
                            src + sw32_(bstarts + nblock_ * 4),
                            dest, nblock_ * blocksize,
                            tmp, tmp2);
