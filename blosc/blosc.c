@@ -131,7 +131,7 @@ struct blosc_context {
   int32_t nthreads;
   int32_t threads_started;
   int32_t end_threads;
-  pthread_t threads[BLOSC_MAX_THREADS];
+  pthread_t *threads;
   pthread_mutex_t count_mutex;
 #ifdef _POSIX_BARRIERS_MINE
   pthread_barrier_t barr_init;
@@ -1722,6 +1722,8 @@ static int init_threads(struct blosc_context* context) {
   pthread_attr_setdetachstate(&context->ct_attr, PTHREAD_CREATE_JOINABLE);
 #endif
 
+  /* Make space for thread handlers */
+  context->threads = (pthread_t*)my_malloc(context->nthreads * sizeof(pthread_t));
   /* Finally, create the threads */
   for (tid = 0; tid < context->nthreads; tid++) {
     /* Create a thread context thread owns context (will destroy when finished) */
@@ -1756,13 +1758,7 @@ int blosc_set_nthreads(int nthreads_new) {
 }
 
 int blosc_set_nthreads_(struct blosc_context* context) {
-  if (context->nthreads > BLOSC_MAX_THREADS) {
-    fprintf(stderr,
-            "Error.  nthreads cannot be larger than BLOSC_MAX_THREADS (%d)",
-            BLOSC_MAX_THREADS);
-    return -1;
-  }
-  else if (context->nthreads <= 0) {
+  if (context->nthreads <= 0) {
     fprintf(stderr, "Error.  nthreads must be a positive integer");
     return -1;
   }
@@ -1950,7 +1946,10 @@ void blosc_set_schunk(schunk_header* schunk) {
 
 struct blosc_context* create_context(int nthreads) {
   struct blosc_context* context = (struct blosc_context*)my_malloc(sizeof(struct blosc_context));
+
+  /* Initialize some struct components */
   context->serial_context = NULL;
+  context->threads = NULL;
 
   return context;
 }
@@ -2013,6 +2012,11 @@ int blosc_release_threadpool(struct blosc_context* context) {
 
   }
 
+  /* Release thread handlers */
+  if (context->threads != NULL) {
+    my_free(context->threads);
+    context->threads = NULL;
+  }
   context->threads_started = 0;
 
   return 0;
