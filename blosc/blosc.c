@@ -2010,13 +2010,10 @@ int blosc_release_threadpool(struct blosc_context* context) {
     pthread_attr_destroy(&context->ct_attr);
   #endif
 
+    /* Release thread handlers */
+    my_free(context->threads);
   }
 
-  /* Release thread handlers */
-  if (context->threads != NULL) {
-    my_free(context->threads);
-    context->threads = NULL;
-  }
   context->threads_started = 0;
 
   return 0;
