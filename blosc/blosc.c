@@ -1660,11 +1660,29 @@ static void* t_blosc(void* ctxt) {
   return (NULL);
 }
 
+static struct thread_context* create_thread_context(
+                                  struct blosc_context* context, int32_t tid) {
+  struct thread_context* thread_context;
+  int32_t ebsize;
+
+  context->tids[tid] = tid;
+
+  thread_context = (struct thread_context*)my_malloc(sizeof(struct thread_context));
+  thread_context->parent_context = context;
+  thread_context->tid = tid;
+
+  ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
+  thread_context->tmp = my_malloc(context->blocksize + ebsize + context->blocksize);
+  thread_context->tmp2 = thread_context->tmp + context->blocksize;
+  thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
+  thread_context->tmpblocksize = context->blocksize;
+
+  return thread_context;
+}
 
 static int init_threads(struct blosc_context* context) {
   int32_t tid;
   int rc2;
-  int32_t ebsize;
   struct thread_context* thread_context;
 
   /* Initialize mutex and condition variable objects */
@@ -1692,18 +1710,8 @@ static int init_threads(struct blosc_context* context) {
 
   /* Finally, create the threads */
   for (tid = 0; tid < context->numthreads; tid++) {
-    context->tids[tid] = tid;
-
     /* Create a thread context thread owns context (will destroy when finished) */
-    thread_context = (struct thread_context*)my_malloc(sizeof(struct thread_context));
-    thread_context->parent_context = context;
-    thread_context->tid = tid;
-
-    ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
-    thread_context->tmp = my_malloc(context->blocksize + ebsize + context->blocksize);
-    thread_context->tmp2 = thread_context->tmp + context->blocksize;
-    thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
-    thread_context->tmpblocksize = context->blocksize;
+    thread_context = create_thread_context(context, tid);
 
 #if !defined(_WIN32)
     rc2 = pthread_create(&context->threads[tid], &context->ct_attr, t_blosc, (void*)thread_context);
