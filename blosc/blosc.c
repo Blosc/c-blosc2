@@ -125,7 +125,7 @@ struct blosc_context {
   /* Super-chunk (if available) */
 
   /* Cache for temporaries for serial operation */
-  struct thread_context* serial_context;
+  struct thread_context* serial_tmps;
 
   /* Threading */
   int32_t nthreads;
@@ -928,14 +928,14 @@ static int do_job(struct blosc_context* context) {
      not larger than blocksize */
   if (context->nthreads == 1 || (context->sourcesize / context->blocksize) <= 1) {
     /* The context for this 'thread' has no been initialized yet */
-    if (context->serial_context == NULL) {
-      context->serial_context = create_thread_context(context, 0);
+    if (context->serial_tmps == NULL) {
+      context->serial_tmps = create_thread_context(context, 0);
     }
-    else if (context->blocksize != context->serial_context->tmpblocksize) {
-      my_free(context->serial_context);
-      context->serial_context = create_thread_context(context, 0);
+    else if (context->blocksize != context->serial_tmps->tmpblocksize) {
+      my_free(context->serial_tmps);
+      context->serial_tmps = create_thread_context(context, 0);
     }
-    ntbytes = serial_blosc(context->serial_context);
+    ntbytes = serial_blosc(context->serial_tmps);
   }
   else {
     /* Check whether we need to restart threads */
@@ -1412,9 +1412,6 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   int32_t j, bsize, bsize2, leftoverblock;
   int32_t cbytes, startb, stopb;
   int stop = start + nitems;
-  uint8_t* tmp;
-  uint8_t* tmp2;
-  uint8_t* tmp3;
   int32_t ebsize;
 
   _src = (uint8_t*)(src);
@@ -1484,19 +1481,21 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
     }
     else {
       struct blosc_context context;
-      /* blosc_d only uses typesize, flags and schunk info */
+      uint8_t* tmp;
+      uint8_t* tmp2;
+      uint8_t* tmp3;
+      /* blosc_d only uses typesize, blocksize, flags and schunk info */
       context.typesize = typesize;
       context.blocksize = blocksize;
       context.header_flags = &flags;
       context.schunk = g_schunk;
-      context.serial_context = create_thread_context(&context, 0);
-
-      tmp = context.serial_context->tmp;
-      tmp2 = context.serial_context->tmp2;
-      tmp3 = context.serial_context->tmp3;
+      context.serial_tmps = create_thread_context(&context, 0);
+      tmp = context.serial_tmps->tmp;
+      tmp2 = context.serial_tmps->tmp2;
+      tmp3 = context.serial_tmps->tmp3;
 
       /* Regular decompression.  Put results in tmp2. */
-      cbytes = blosc_d(context.serial_context, bsize, leftoverblock,
+      cbytes = blosc_d(context.serial_tmps, bsize, leftoverblock,
                        (uint8_t*)src + sw32_(bstarts + j * 4),
                        tmp2, 0, tmp, tmp3);
       if (cbytes < 0) {
@@ -1507,7 +1506,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
       memcpy((uint8_t*)dest + ntbytes, tmp2 + startb, bsize2);
       cbytes = bsize2;
 
-      my_free(context.serial_context);
+      my_free(context.serial_tmps);
     }
     ntbytes += cbytes;
   }
@@ -1951,7 +1950,7 @@ struct blosc_context* create_context(int nthreads) {
   struct blosc_context* context = (struct blosc_context*)my_malloc(sizeof(struct blosc_context));
 
   /* Initialize some struct components */
-  context->serial_context = NULL;
+  context->serial_tmps = NULL;
   context->threads = NULL;
 
   return context;
@@ -1967,8 +1966,8 @@ void blosc_init(void) {
 void blosc_destroy(void) {
   g_initlib = 0;
   blosc_release_threadpool(g_global_context);
-  if (g_global_context->serial_context != NULL) {
-    my_free(g_global_context->serial_context);
+  if (g_global_context->serial_tmps != NULL) {
+    my_free(g_global_context->serial_tmps);
   }
   my_free(g_global_context);
   pthread_mutex_destroy(&global_comp_mutex);
