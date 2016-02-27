@@ -155,7 +155,12 @@ struct thread_context {
   uint8_t* tmp;
   uint8_t* tmp2;
   uint8_t* tmp3;
-  int32_t tmpblocksize; /* Used to keep track of how big the temporary buffers are */
+  int32_t tmpblocksize; /* keep track of how big the temporary buffers are */
+#if defined(HAVE_ZSTD)
+  /* The contexts for ZSTD */
+  ZSTD_CCtx* zstd_cctx;
+  ZSTD_DCtx* zstd_dctx;
+#endif /* HAVE_ZSTD */
 };
 
 /* Global context for non-contextual API */
@@ -374,19 +379,19 @@ int blosc_compcode_to_compname(int compcode, char** compname) {
     code = BLOSC_LZ4;
   else if (compcode == BLOSC_LZ4HC)
     code = BLOSC_LZ4HC;
-#endif /*  HAVE_LZ4 */
+#endif /* HAVE_LZ4 */
 #if defined(HAVE_SNAPPY)
   else if (compcode == BLOSC_SNAPPY)
     code = BLOSC_SNAPPY;
-#endif /*  HAVE_SNAPPY */
+#endif /* HAVE_SNAPPY */
 #if defined(HAVE_ZLIB)
   else if (compcode == BLOSC_ZLIB)
     code = BLOSC_ZLIB;
-#endif /*  HAVE_ZLIB */
+#endif /* HAVE_ZLIB */
 #if defined(HAVE_ZSTD)
   else if (compcode == BLOSC_ZSTD)
     code = BLOSC_ZSTD;
-#endif /*  HAVE_ZSTD */
+#endif /* HAVE_ZSTD */
 
   return code;
 }
@@ -511,11 +516,12 @@ static int zlib_wrap_decompress(const char* input, size_t compressed_length,
 #endif /*  HAVE_ZLIB */
 
 #if defined(HAVE_ZSTD)
-static int zstd_wrap_compress(const char* input, size_t input_length,
+static int zstd_wrap_compress(const struct thread_context* thread_context,
+                              const char* input, size_t input_length,
                               char* output, size_t maxout, int clevel) {
   size_t code;
   clevel = (clevel < 9) ? clevel * 2 - 1 : 21;
-  code = ZSTD_compress(
+  code = ZSTD_compressCCtx(thread_context->zstd_cctx,
       (void*)output, maxout, (void*)input, input_length, clevel);
   if (ZSTD_isError(code) != ZSTD_error_no_error) {
     return 0;
@@ -523,10 +529,11 @@ static int zstd_wrap_compress(const char* input, size_t input_length,
   return (int)code;
 }
 
-static int zstd_wrap_decompress(const char* input, size_t compressed_length,
+static int zstd_wrap_decompress(const struct thread_context* thread_context,
+                                const char* input, size_t compressed_length,
                                 char* output, size_t maxout) {
   size_t code;
-  code = ZSTD_decompress(
+  code = ZSTD_decompressDCtx(thread_context->zstd_dctx,
       (void*)output, maxout, (void*)input, compressed_length);
   if (ZSTD_isError(code) != ZSTD_error_no_error) {
     return 0;
@@ -657,7 +664,8 @@ static int blosc_c(const struct thread_context* thread_context, int32_t blocksiz
   #endif /* HAVE_ZLIB */
   #if defined(HAVE_ZSTD)
     else if (context->compcode == BLOSC_ZSTD) {
-      cbytes = zstd_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
+      cbytes = zstd_wrap_compress(thread_context,
+                                  (char*)_src + j * neblock, (size_t)neblock,
                                   (char*)dest, (size_t)maxout, context->clevel);
     }
   #endif /* HAVE_ZSTD */
@@ -760,7 +768,8 @@ static int blosc_d(struct thread_context* thread_context, int32_t blocksize, int
   #endif /*  HAVE_ZLIB */
   #if defined(HAVE_ZSTD)
       else if (compformat == BLOSC_ZSTD_FORMAT) {
-        nbytes = zstd_wrap_decompress((char*)src, (size_t)cbytes,
+        nbytes = zstd_wrap_decompress(thread_context,
+                                      (char*)src, (size_t)cbytes,
                                       (char*)_dest, (size_t)neblock);
       }
   #endif /*  HAVE_ZSTD */
@@ -915,9 +924,21 @@ static struct thread_context* create_thread_context(
   thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
   thread_context->tmpblocksize = context->blocksize;
 
+  if (context->compcode == BLOSC_ZSTD) {
+    thread_context->zstd_cctx = ZSTD_createCCtx();
+    thread_context->zstd_dctx = ZSTD_createDCtx();
+  }
   return thread_context;
 }
 
+void free_thread_context(struct thread_context* thread_context) {
+  my_free(thread_context->tmp);
+  if (thread_context->parent_context->compcode == BLOSC_ZSTD) {
+    ZSTD_freeCCtx(thread_context->zstd_cctx);
+    ZSTD_freeDCtx(thread_context->zstd_dctx);
+  }
+  my_free(thread_context);
+}
 
 /* Do the compression or decompression of the buffer depending on the
    global params. */
@@ -932,7 +953,7 @@ static int do_job(struct blosc_context* context) {
       context->serial_context = create_thread_context(context, 0);
     }
     else if (context->blocksize != context->serial_context->tmpblocksize) {
-      my_free(context->serial_context);
+      free_thread_context(context->serial_context);
       context->serial_context = create_thread_context(context, 0);
     }
     ntbytes = serial_blosc(context->serial_context);
@@ -1101,11 +1122,11 @@ static int initialize_context_compression(struct blosc_context* context,
 }
 
 static int initialize_context_decompression(struct blosc_context* context,
-					    const void* src,
-					    void* dest,
-					    size_t destsize,
-					    int nthreads,
-					    schunk_header* schunk) {
+                                            const void* src,
+                                            void* dest,
+                                            size_t destsize,
+                                            int nthreads,
+                                            schunk_header* schunk) {
 
   int i;
 
@@ -1305,9 +1326,9 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
   pthread_mutex_lock(&global_comp_mutex);
 
   error = initialize_context_compression(
-	      g_global_context, clevel, doshuffle, typesize, nbytes,
-	      src, dest, destsize, g_compressor, g_force_blocksize, g_nthreads,
-	      g_schunk);
+              g_global_context, clevel, doshuffle, typesize, nbytes,
+              src, dest, destsize, g_compressor, g_force_blocksize, g_nthreads,
+              g_schunk);
   if (error < 0) { return error; }
 
   error = write_compression_header(g_global_context, clevel, doshuffle);
@@ -1325,7 +1346,7 @@ int blosc_run_decompression_with_context(struct blosc_context* context,
                                          void* dest,
                                          size_t destsize,
                                          int nthreads,
-					 schunk_header* schunk) {
+                                         schunk_header* schunk) {
   uint8_t version;
   uint8_t versionlz;
   uint32_t ctbytes;
@@ -1333,7 +1354,7 @@ int blosc_run_decompression_with_context(struct blosc_context* context,
   int error;
 
   error = initialize_context_decompression(context, src, dest, destsize,
-					   nthreads, schunk);
+                                           nthreads, schunk);
   if (error < 0) { return error; }
 
   /* Read the header block */
@@ -1506,7 +1527,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
       memcpy((uint8_t*)dest + ntbytes, tmp2 + startb, bsize2);
       cbytes = bsize2;
 
-      my_free(context.serial_context);
+      free_thread_context(context.serial_context);
     }
     ntbytes += cbytes;
   }
@@ -1690,8 +1711,7 @@ static void* t_blosc(void* ctxt) {
   }
 
   /* Cleanup our working space and context */
-  my_free(context->tmp);
-  my_free(context);
+  free_thread_context(context);
 
   return (NULL);
 }
@@ -1747,7 +1767,7 @@ static int init_threads(struct blosc_context* context) {
 }
 
 int blosc_set_nthreads(int nthreads_new) {
-  int ret = g_nthreads;  	/* the previous number of threads */
+  int ret = g_nthreads;          /* the previous number of threads */
 
   if (nthreads_new != ret){
     /* Re-initialize Blosc */
