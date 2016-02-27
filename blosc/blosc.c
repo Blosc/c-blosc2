@@ -611,7 +611,12 @@ static int blosc_c(const struct thread_context* thread_context, int32_t blocksiz
   /* Compress for each shuffled slice split for this block. */
   /* If typesize is too large, neblock is too small or we are in a
      leftover block, do not split at all. */
-  if ((typesize <= MAX_SPLITS) && (blocksize / typesize) >= MIN_BUFFERSIZE &&
+  if (context->compcode == BLOSC_ZSTD) {
+    /* Zstd requires large buffers */
+    nsplits = 1;
+  }
+  else if ((typesize <= MAX_SPLITS) &&
+	   (blocksize / typesize) >= MIN_BUFFERSIZE &&
       (!leftoverblock)) {
     nsplits = typesize;
   }
@@ -727,7 +732,12 @@ static int blosc_d(struct thread_context* thread_context, int32_t blocksize, int
   compformat = (*(context->header_flags) & 0xe0) >> 5;
 
   /* Compress for each shuffled slice split for this block. */
-  if ((typesize <= MAX_SPLITS) && (blocksize / typesize) >= MIN_BUFFERSIZE &&
+  if (context->compcode == BLOSC_ZSTD) {
+    /* Zstd requires large buffers */
+    nsplits = 1;
+  }
+  else if ((typesize <= MAX_SPLITS) &&
+	   (blocksize / typesize) >= MIN_BUFFERSIZE &&
       (!leftoverblock)) {
     nsplits = typesize;
   }
@@ -1005,11 +1015,11 @@ static int32_t compute_blocksize(struct blosc_context* context,
       blocksize *= 8;
     }
 
-    /* For Zstd, increase the block sizes by a factor of 8 because it
-       is meant for compressing large blocks (it shows a big overhead
-       when compressing small ones). */
+    /* For Zstd, increase the block sizes by a factor of 2 because
+       although it is meant for compressing large blocks it already
+       doesn't split chunks during compression/decompression. */
     if (context->compcode == BLOSC_ZSTD) {
-      blocksize *= 8;
+      blocksize *= 2;
     }
 
     /* Choose a different blocksize depending on the compression level */
