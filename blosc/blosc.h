@@ -45,9 +45,6 @@ extern "C" {
 /* Maximum typesize before considering source buffer as a stream of bytes */
 #define BLOSC_MAX_TYPESIZE 255         /* Cannot be larger than 255 */
 
-/* The maximum number of threads (for some static arrays) */
-#define BLOSC_MAX_THREADS 256
-
 /* Codes for filters (see blosc_compress) */
 #define BLOSC_NOSHUFFLE   0  /* no shuffle (for compatibility with Blosc1) */
 #define BLOSC_NOFILTER    0  /* no filter */
