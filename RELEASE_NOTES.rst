@@ -1,10 +1,18 @@
 ==================================================
- Release notes for c-blosc2 2.0.0a2 (second alpha)
+ Release notes for c-blosc2 2.0.0a3 (third alpha)
 ==================================================
 
 :Author: Francesc Alted
 :Contact: francesc@blosc.org
 :URL: http://www.blosc.org
+
+
+Changes from 2.0.0a1 to 2.0.0a2
+===============================
+
+* The split of blocks only happens for BLOSCLZ and SNAPPY codecs.  All
+  the rest are not splitted at all.  This allows for faster operation
+  for the rest of codecs (most specially zstd).
 
 
 Changes from 2.0.0a1 to 2.0.0a2

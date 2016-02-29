@@ -565,12 +565,26 @@ static int get_accel(const struct blosc_context* context) {
   return 1;
 }
 
+/* Conditions for splitting a block before compressing with a codec */
+static int split_format(int blosc_version_format, int compformat,
+			int typesize, int blocksize, int leftoverblock) {
+  return (((blosc_version_format == 1) ||
+	   ((blosc_version_format > 1) &&
+	    ((compformat == BLOSC_BLOSCLZ_FORMAT) ||
+	     (compformat == BLOSC_SNAPPY_FORMAT))))  &&
+	  (typesize <= MAX_SPLITS) &&
+	  (blocksize / typesize) >= MIN_BUFFERSIZE &&
+	  (!leftoverblock));
+    }
+
 /* Shuffle & compress a single block */
 static int blosc_c(const struct thread_context* thread_context, int32_t blocksize,
                    int32_t leftoverblock, int32_t ntbytes, int32_t maxbytes,
                    const uint8_t* src, int offset, uint8_t* dest,
                    uint8_t* tmp, uint8_t* tmp2) {
   struct blosc_context* context = thread_context->parent_context;
+  int32_t compformat = (*(context->header_flags) & 0xe0) >> 5;
+  uint8_t blosc_version_format = BLOSC_VERSION_FORMAT;
   int32_t j, neblock, nsplits;
   int32_t cbytes;                   /* number of compressed bytes in split */
   int32_t ctbytes = 0;              /* number of compressed bytes in block */
@@ -608,16 +622,9 @@ static int blosc_c(const struct thread_context* thread_context, int32_t blocksiz
   /* Calculate acceleration for different compressors */
   accel = get_accel(context);
 
-  /* Compress for each shuffled slice split for this block. */
-  /* If typesize is too large, neblock is too small or we are in a
-     leftover block, do not split at all. */
-  if (context->compcode == BLOSC_ZSTD) {
-    /* Zstd requires large buffers */
-    nsplits = 1;
-  }
-  else if ((typesize <= MAX_SPLITS) &&
-	   (blocksize / typesize) >= MIN_BUFFERSIZE &&
-      (!leftoverblock)) {
+  /* Compute the number of splits for this block */
+  if (split_format(blosc_version_format, compformat,
+		   typesize, blocksize, leftoverblock)) {
     nsplits = typesize;
   }
   else {
@@ -713,6 +720,8 @@ static int blosc_c(const struct thread_context* thread_context, int32_t blocksiz
 static int blosc_d(struct thread_context* thread_context, int32_t blocksize, int32_t leftoverblock,
                    const uint8_t* src, uint8_t* dest, int offset, uint8_t* tmp, uint8_t* tmp2) {
   struct blosc_context* context = thread_context->parent_context;
+  int32_t compformat = (*(context->header_flags) & 0xe0) >> 5;
+  uint8_t blosc_version_format = context->src[0];
   int32_t j, neblock, nsplits;
   int32_t nbytes;                /* number of decompressed bytes in split */
   int32_t cbytes;                /* number of compressed bytes in split */
@@ -720,7 +729,6 @@ static int blosc_d(struct thread_context* thread_context, int32_t blocksize, int
   int32_t ntbytes = 0;           /* number of uncompressed bytes in block */
   uint8_t* _dest = dest + offset;
   int32_t typesize = context->typesize;
-  int32_t compformat;
   char* compname;
   int bscount;
 
@@ -729,21 +737,15 @@ static int blosc_d(struct thread_context* thread_context, int32_t blocksize, int
     _dest = tmp;
   }
 
-  compformat = (*(context->header_flags) & 0xe0) >> 5;
-
-  /* Compress for each shuffled slice split for this block. */
-  if (context->compcode == BLOSC_ZSTD) {
-    /* Zstd requires large buffers */
-    nsplits = 1;
-  }
-  else if ((typesize <= MAX_SPLITS) &&
-	   (blocksize / typesize) >= MIN_BUFFERSIZE &&
-      (!leftoverblock)) {
+  /* Compute the number of splits for this block */
+  if (split_format(blosc_version_format, compformat,
+		   typesize, blocksize, leftoverblock)) {
     nsplits = typesize;
   }
   else {
     nsplits = 1;
   }
+
   neblock = blocksize / nsplits;
   for (j = 0; j < nsplits; j++) {
     cbytes = sw32_(src);      /* amount of compressed bytes */
@@ -979,6 +981,11 @@ static int do_job(struct blosc_context* context) {
 }
 
 
+/* Whether a codec is meant for High Compression Ratios */
+#define HCR(codec) ( ((codec) == BLOSC_LZ4HC) || \
+		     ((codec) == BLOSC_ZLIB) ||  \
+		     ((codec) == BLOSC_ZSTD) ? 1 : 0 )
+
 static int32_t compute_blocksize(struct blosc_context* context,
                                  int32_t clevel,
                                  int32_t typesize,
@@ -1001,24 +1008,10 @@ static int32_t compute_blocksize(struct blosc_context* context,
   else if (nbytes >= L1) {
     blocksize = L1;
 
-    /* For LZ4HC, increase the block sizes by a factor of 8 because it
-       is meant for compressing large blocks (it shows a big overhead
-       when compressing small ones). */
-    if (context->compcode == BLOSC_LZ4HC) {
-      blocksize *= 8;
-    }
-
-    /* For Zlib, increase the block sizes by a factor of 8 because it
-       is meant for compressing large blocks (it shows a big overhead
-       when compressing small ones). */
-    if (context->compcode == BLOSC_ZLIB) {
-      blocksize *= 8;
-    }
-
-    /* For Zstd, increase the block sizes by a factor of 2 because
+    /* For HCR codecs, increase the block sizes by a factor of 2 because
        although it is meant for compressing large blocks it already
        doesn't split chunks during compression/decompression. */
-    if (context->compcode == BLOSC_ZSTD) {
+    if (HCR(context->compcode)) {
       blocksize *= 2;
     }
 
