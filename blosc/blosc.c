@@ -565,18 +565,6 @@ static int get_accel(const struct blosc_context* context) {
   return 1;
 }
 
-/* Conditions for splitting a block before compressing with a codec */
-static int split_format(int blosc_version_format, int compformat,
-			int typesize, int blocksize, int leftoverblock) {
-  return (((blosc_version_format == 1) ||
-	   ((blosc_version_format > 1) &&
-	    ((compformat == BLOSC_BLOSCLZ_FORMAT) ||
-	     (compformat == BLOSC_SNAPPY_FORMAT))))  &&
-	  (typesize <= MAX_SPLITS) &&
-	  (blocksize / typesize) >= MIN_BUFFERSIZE &&
-	  (!leftoverblock));
-    }
-
 /* Shuffle & compress a single block */
 static int blosc_c(const struct thread_context* thread_context, int32_t blocksize,
                    int32_t leftoverblock, int32_t ntbytes, int32_t maxbytes,
@@ -584,6 +572,7 @@ static int blosc_c(const struct thread_context* thread_context, int32_t blocksiz
                    uint8_t* tmp, uint8_t* tmp2) {
   struct blosc_context* context = thread_context->parent_context;
   int32_t compformat = (*(context->header_flags) & 0xe0) >> 5;
+  int dont_split = (*(context->header_flags) & 0x10) >> 4;
   uint8_t blosc_version_format = BLOSC_VERSION_FORMAT;
   int32_t j, neblock, nsplits;
   int32_t cbytes;                   /* number of compressed bytes in split */
@@ -622,9 +611,8 @@ static int blosc_c(const struct thread_context* thread_context, int32_t blocksiz
   /* Calculate acceleration for different compressors */
   accel = get_accel(context);
 
-  /* Compute the number of splits for this block */
-  if (split_format(blosc_version_format, compformat,
-		   typesize, blocksize, leftoverblock)) {
+  /* The number of splits for this block */
+  if (!dont_split && !leftoverblock) {
     nsplits = typesize;
   }
   else {
@@ -721,6 +709,7 @@ static int blosc_d(struct thread_context* thread_context, int32_t blocksize, int
                    const uint8_t* src, uint8_t* dest, int offset, uint8_t* tmp, uint8_t* tmp2) {
   struct blosc_context* context = thread_context->parent_context;
   int32_t compformat = (*(context->header_flags) & 0xe0) >> 5;
+  int dont_split = (*(context->header_flags) & 0x10) >> 4;
   uint8_t blosc_version_format = context->src[0];
   int32_t j, neblock, nsplits;
   int32_t nbytes;                /* number of decompressed bytes in split */
@@ -737,9 +726,8 @@ static int blosc_d(struct thread_context* thread_context, int32_t blocksize, int
     _dest = tmp;
   }
 
-  /* Compute the number of splits for this block */
-  if (split_format(blosc_version_format, compformat,
-		   typesize, blocksize, leftoverblock)) {
+  /* The number of splits for this block */
+  if (!dont_split && !leftoverblock) {
     nsplits = typesize;
   }
   else {
@@ -1070,7 +1058,6 @@ static int initialize_context_compression(struct blosc_context* context,
                                           int32_t blocksize,
                                           int32_t nthreads,
                                           schunk_header* schunk) {
-  int i;
 
   /* Set parameters */
   context->compress = 1;
@@ -1142,7 +1129,7 @@ static int initialize_context_decompression(struct blosc_context* context,
   context->end_threads = 0;
   context->schunk = schunk;
 
-  context->header_flags = (uint8_t*)(context->src + 2);           /* flags */
+  context->header_flags = (uint8_t*)(context->src + 2); /* flags */
   context->typesize = (int32_t)context->src[3];      /* typesize */
   context->sourcesize = sw32_(context->src + 4);     /* buffer size */
   context->blocksize = sw32_(context->src + 8);      /* block size */
@@ -1162,11 +1149,24 @@ static int initialize_context_decompression(struct blosc_context* context,
   return 0;
 }
 
+/* Conditions for splitting a block before compressing with a codec. */
+static int split_block(int compcode, int typesize, int blocksize) {
+  /* Normally all the compressors designed for speed benefit from a
+     split.  However, in conducted benchmarks LZ4 seems that it runs
+     faster if we don't split, which is quite surprising. */
+  return (((compcode == BLOSC_BLOSCLZ) ||
+	   //(compcode == BLOSC_LZ4) ||
+	   (compcode == BLOSC_SNAPPY)) &&
+	  (typesize <= MAX_SPLITS) &&
+	  (blocksize / typesize) >= MIN_BUFFERSIZE);
+}
+
 static int write_compression_header(struct blosc_context* context, int clevel, int doshuffle) {
   int32_t compformat;
+  int dont_split;
 
   /* Write version header for this block */
-  context->dest[0] = BLOSC_VERSION_FORMAT;              /* blosc format version */
+  context->dest[0] = BLOSC_VERSION_FORMAT;          /* blosc format version */
 
   /* Write compressor format */
   compformat = -1;
@@ -1190,21 +1190,21 @@ static int write_compression_header(struct blosc_context* context, int clevel, i
 #if defined(HAVE_SNAPPY)
     case BLOSC_SNAPPY:
       compformat = BLOSC_SNAPPY_FORMAT;
-      context->dest[1] = BLOSC_SNAPPY_VERSION_FORMAT;    /* snappy format version */
+      context->dest[1] = BLOSC_SNAPPY_VERSION_FORMAT;  /* snappy format version */
       break;
 #endif /*  HAVE_SNAPPY */
 
 #if defined(HAVE_ZLIB)
     case BLOSC_ZLIB:
       compformat = BLOSC_ZLIB_FORMAT;
-      context->dest[1] = BLOSC_ZLIB_VERSION_FORMAT;      /* zlib format version */
+      context->dest[1] = BLOSC_ZLIB_VERSION_FORMAT;  /* zlib format version */
       break;
 #endif /*  HAVE_ZLIB */
 
 #if defined(HAVE_ZSTD)
     case BLOSC_ZSTD:
       compformat = BLOSC_ZSTD_FORMAT;
-      context->dest[1] = BLOSC_ZSTD_VERSION_FORMAT;      /* zstd format version */
+      context->dest[1] = BLOSC_ZSTD_VERSION_FORMAT;  /* zstd format version */
       break;
 #endif /*  HAVE_ZSTD */
 
@@ -1246,7 +1246,11 @@ static int write_compression_header(struct blosc_context* context, int clevel, i
     *(context->header_flags) |= BLOSC_DOBITSHUFFLE;  /* bit 2 set to one in flags */
   }
 
-  *(context->header_flags) |= compformat << 5;      /* compressor format start at bit 5 */
+  dont_split = !split_block(context->compcode, context->typesize,
+			    context->blocksize);
+  *(context->header_flags) |= dont_split << 4;  /* dont_split is in bit 4 */
+
+  *(context->header_flags) |= compformat << 5;  /* compressor format starts at bit 5 */
 
   return 1;
 }
