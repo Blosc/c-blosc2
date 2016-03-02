@@ -28,9 +28,11 @@
 #if defined(HAVE_SNAPPY)
   #include "snappy-c.h"
 #endif /*  HAVE_SNAPPY */
-#if defined(HAVE_ZLIB)
+#if defined(HAVE_MINIZ)
   #include "miniz.c"
-#endif /*  HAVE_ZLIB */
+#elif defined(HAVE_ZLIB)
+  #include "zlib.h"
+#endif /*  HAVE_MINIZ */
 #if defined(HAVE_ZSTD)
   #include "zstd.h"
   #include "error_public.h"

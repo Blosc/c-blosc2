@@ -99,7 +99,7 @@ option(PREFER_EXTERNAL_LZ4
 option(PREFER_EXTERNAL_SNAPPY
         "Find and use external SNAPPY library instead of included sources." ON)
 option(PREFER_EXTERNAL_ZLIB
-        "Find and use external ZLIB library instead of included sources." OFF)
+        "Find and use external ZLIB library instead of included sources." ON)
 option(PREFER_EXTERNAL_ZSTD
         "Find and use external ZSTD library instead of included sources." OFF)
 
@@ -130,15 +130,16 @@ endif (NOT DEACTIVATE_SNAPPY)
 
 if (NOT DEACTIVATE_ZLIB)
     # import the ZLIB_ROOT environment variable to help finding the zlib library
-    # if (PREFER_EXTERNAL_ZLIB)
-    #     set(ZLIB_ROOT $ENV{ZLIB_ROOT})
-    #     find_package(ZLIB)
-    #     if (NOT ZLIB_FOUND)
-    #         message(STATUS "No zlib found.  Using internal sources.")
-    #     endif (NOT ZLIB_FOUND)
-    # else ()
+    if (PREFER_EXTERNAL_ZLIB)
+        set(ZLIB_ROOT $ENV{ZLIB_ROOT})
+        find_package(ZLIB)
+        if (NOT ZLIB_FOUND)
+            message(STATUS "No zlib found.  Using internal sources.")
+        endif (NOT ZLIB_FOUND)
+    else ()
         message(STATUS "Using MINIZ internal sources.")
-    # endif (PREFER_EXTERNAL_ZLIB)
+	set(HAVE_MINIZ TRUE)
+    endif (PREFER_EXTERNAL_ZLIB)
     # HAVE_ZLIB will be set to true because even if the library is not found,
     # we will use the included sources for it
     set(HAVE_ZLIB TRUE)

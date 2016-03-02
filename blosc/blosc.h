@@ -89,7 +89,11 @@ extern "C" {
 #define BLOSC_BLOSCLZ_LIBNAME   "BloscLZ"
 #define BLOSC_LZ4_LIBNAME       "LZ4"
 #define BLOSC_SNAPPY_LIBNAME    "Snappy"
-#define BLOSC_ZLIB_LIBNAME      "Zlib"
+#if defined(HAVE_MINIZ)
+  #define BLOSC_ZLIB_LIBNAME    "Zlib (via miniz)"
+#else
+  #define BLOSC_ZLIB_LIBNAME    "Zlib"
+#endif	/* HAVE_MINIZ */
 #define BLOSC_ZSTD_LIBNAME      "Zstd"
 
 /* The codes for compressor formats shipped with Blosc */

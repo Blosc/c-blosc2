@@ -14,6 +14,10 @@ Changes from 2.0.0a1 to 2.0.0a2
   the rest are not splitted at all.  This allows for faster operation
   for the rest of codecs (most specially zstd).
 
+* The internal zlib 1.2.8 sources have been replaced by the miniz
+  library, which is meant to be fully compatible with Zlib, but much
+  smaller and besides tends to be a bit faster.
+
 
 Changes from 2.0.0a1 to 2.0.0a2
 ===============================
