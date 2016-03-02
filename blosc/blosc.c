@@ -29,7 +29,7 @@
   #include "snappy-c.h"
 #endif /*  HAVE_SNAPPY */
 #if defined(HAVE_ZLIB)
-  #include "zlib.h"
+  #include "miniz.c"
 #endif /*  HAVE_ZLIB */
 #if defined(HAVE_ZSTD)
   #include "zstd.h"
