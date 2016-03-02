@@ -137,7 +137,8 @@ if (NOT DEACTIVATE_ZLIB)
             message(STATUS "No zlib found.  Using internal sources.")
         endif (NOT ZLIB_FOUND)
     else ()
-        message(STATUS "Using zlib internal sources.")
+        message(STATUS "Using MINIZ internal sources.")
+	set(HAVE_MINIZ TRUE)
     endif (PREFER_EXTERNAL_ZLIB)
     # HAVE_ZLIB will be set to true because even if the library is not found,
     # we will use the included sources for it
