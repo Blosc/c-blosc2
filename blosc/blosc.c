@@ -518,11 +518,15 @@ static int zlib_wrap_decompress(const char* input, size_t compressed_length,
 #endif /*  HAVE_ZLIB */
 
 #if defined(HAVE_ZSTD)
-static int zstd_wrap_compress(const struct thread_context* thread_context,
+static int zstd_wrap_compress(struct thread_context* thread_context,
                               const char* input, size_t input_length,
                               char* output, size_t maxout, int clevel) {
   size_t code;
   clevel = (clevel < 9) ? clevel * 2 - 1 : 21;
+  if (thread_context->zstd_cctx == NULL) {
+    thread_context->zstd_cctx = ZSTD_createCCtx();
+  }
+
   code = ZSTD_compressCCtx(thread_context->zstd_cctx,
       (void*)output, maxout, (void*)input, input_length, clevel);
   if (ZSTD_isError(code) != ZSTD_error_no_error) {
@@ -531,10 +535,13 @@ static int zstd_wrap_compress(const struct thread_context* thread_context,
   return (int)code;
 }
 
-static int zstd_wrap_decompress(const struct thread_context* thread_context,
+static int zstd_wrap_decompress(struct thread_context* thread_context,
                                 const char* input, size_t compressed_length,
                                 char* output, size_t maxout) {
   size_t code;
+  if (thread_context->zstd_dctx == NULL) {
+    thread_context->zstd_dctx = ZSTD_createDCtx();
+  }
   code = ZSTD_decompressDCtx(thread_context->zstd_dctx,
       (void*)output, maxout, (void*)input, compressed_length);
   if (ZSTD_isError(code) != ZSTD_error_no_error) {
@@ -568,7 +575,7 @@ static int get_accel(const struct blosc_context* context) {
 }
 
 /* Shuffle & compress a single block */
-static int blosc_c(const struct thread_context* thread_context, int32_t blocksize,
+static int blosc_c(struct thread_context* thread_context, int32_t blocksize,
                    int32_t leftoverblock, int32_t ntbytes, int32_t maxbytes,
                    const uint8_t* src, int offset, uint8_t* dest,
                    uint8_t* tmp, uint8_t* tmp2) {
@@ -925,18 +932,18 @@ static struct thread_context* create_thread_context(
   thread_context->tmp2 = thread_context->tmp + context->blocksize;
   thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
   thread_context->tmpblocksize = context->blocksize;
+  thread_context->zstd_cctx = NULL;
+  thread_context->zstd_dctx = NULL;
 
-  if (context->compcode == BLOSC_ZSTD) {
-    thread_context->zstd_cctx = ZSTD_createCCtx();
-    thread_context->zstd_dctx = ZSTD_createDCtx();
-  }
   return thread_context;
 }
 
 void free_thread_context(struct thread_context* thread_context) {
   my_free(thread_context->tmp);
-  if (thread_context->parent_context->compcode == BLOSC_ZSTD) {
+  if (thread_context->zstd_cctx != NULL) {
     ZSTD_freeCCtx(thread_context->zstd_cctx);
+  }
+  if (thread_context->zstd_dctx != NULL) {
     ZSTD_freeDCtx(thread_context->zstd_dctx);
   }
   my_free(thread_context);
