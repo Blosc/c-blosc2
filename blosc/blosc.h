@@ -122,7 +122,7 @@ extern "C" {
   Blosc to be used simultaneously in a multi-threaded environment, in
   which case you should *exclusively* use the
   blosc_compress_ctx()/blosc_decompress_ctx() pair (see below).
-  */
+*/
 BLOSC_EXPORT void blosc_init(void);
 
 
@@ -132,7 +132,7 @@ BLOSC_EXPORT void blosc_init(void);
   You must call this after to you are done with all the Blosc calls,
   unless you have not used blosc_init() before (see blosc_init()
   above).
-  */
+*/
 BLOSC_EXPORT void blosc_destroy(void);
 
 
@@ -171,7 +171,7 @@ BLOSC_EXPORT void blosc_destroy(void);
   A negative return value means that an internal error happened.  This
   should never happen.  If you see this, please report it back
   together with the buffer data causing this and compression settings.
-  */
+*/
 BLOSC_EXPORT int blosc_compress(int clevel, int doshuffle, size_t typesize,
                                 size_t nbytes, const void* src, void* dest,
                                 size_t destsize);
@@ -246,7 +246,7 @@ BLOSC_EXPORT int blosc_decompress_ctx(const void* src, void* dest,
 
   Returns the number of bytes copied to `dest` or a negative value if
   some error happens.
-  */
+*/
 BLOSC_EXPORT int blosc_getitem(const void* src, int start, int nitems, void* dest);
 
 
@@ -269,7 +269,7 @@ BLOSC_EXPORT int blosc_set_nthreads(int nthreads);
   In case the compressor is not recognized, or there is not support
   for it in this build, it returns a -1.  Else it returns the code for
   the compressor (>=0).
-  */
+*/
 BLOSC_EXPORT int blosc_set_compressor(const char* compname);
 
 
@@ -279,7 +279,7 @@ BLOSC_EXPORT int blosc_set_compressor(const char* compname);
   If the compressor code is not recognized, or there is not support
   for it in this build, -1 is returned.  Else, the compressor code is
   returned.
- */
+*/
 BLOSC_EXPORT int blosc_compcode_to_compname(int compcode, char** compname);
 
 
@@ -288,7 +288,7 @@ BLOSC_EXPORT int blosc_compcode_to_compname(int compcode, char** compname);
 
   If the compressor name is not recognized, or there is not support
   for it in this build, -1 is returned instead.
- */
+*/
 BLOSC_EXPORT int blosc_compname_to_compcode(const char* compname);
 
 
@@ -302,7 +302,7 @@ BLOSC_EXPORT int blosc_compname_to_compcode(const char* compname);
   list.
 
   This function should always succeed.
-  */
+*/
 BLOSC_EXPORT char* blosc_list_compressors(void);
 
 
@@ -327,7 +327,7 @@ BLOSC_EXPORT char* blosc_get_version_string(void);
 
   If the compressor is supported, it returns the code for the library
   (>=0).  If it is not supported, this function returns -1.
-  */
+*/
 BLOSC_EXPORT int blosc_get_complib_info(char* compname, char** complib, char** version);
 
 
@@ -336,7 +336,7 @@ BLOSC_EXPORT int blosc_get_complib_info(char* compname, char** complib, char** v
   when you are not going to use Blosc for a long while.  In case of
   problems releasing the resources, it returns a negative number, else
   it returns 0.
-  */
+*/
 BLOSC_EXPORT int blosc_free_resources(void);
 
 
@@ -350,7 +350,7 @@ BLOSC_EXPORT int blosc_free_resources(void);
   compressed buffer for this call to work.
 
   This function should always succeed.
-  */
+*/
 BLOSC_EXPORT void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
                                       size_t* cbytes, size_t* blocksize);
 
@@ -369,7 +369,7 @@ BLOSC_EXPORT void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
   byte-shuffled or not).
 
   This function should always succeed.
-  */
+*/
 BLOSC_EXPORT void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize,
                                          int* flags);
 
@@ -380,7 +380,7 @@ BLOSC_EXPORT void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize,
   Lempel-Ziv compressor used (`versionlz`).
 
   This function should always succeed.
-  */
+*/
 BLOSC_EXPORT void blosc_cbuffer_versions(const void* cbuffer, int* version,
                                          int* versionlz);
 
@@ -389,8 +389,53 @@ BLOSC_EXPORT void blosc_cbuffer_versions(const void* cbuffer, int* version,
   Return the compressor library/format used in a compressed buffer.
 
   This function should always succeed.
-  */
+*/
 BLOSC_EXPORT char* blosc_cbuffer_complib(const void* cbuffer);
+
+
+/*********************************************************************
+
+  Structures and functions related with contexts.
+
+*********************************************************************/
+
+/**
+  The parameters for creating a context.
+
+  This struct has to be passed to the context creation routine.  In
+  parenthesis it is shown the default value used internally when a 0
+  (zero) in the fields of the strcut is passed to a function.
+*/
+typedef struct {
+  uint8_t nthreads;
+  /* the number of threads to use internally (1) */
+  uint8_t typesize;
+  /* the typesize (8) */
+  uint8_t compcode;
+  /* the compressor code (BLOSC_BLOSCLZ) */
+  uint8_t clevel;
+  /* the compression level (5) */
+  uint8_t filtercode;
+  /* the filter code (BLOSC_SHUFFLE) */
+  int32_t blocksize;
+  /* the requested size of the compressed blocks (automatic) */
+} context_params;
+
+
+typedef struct blosc_context_s blosc_context; /* incomplete type */
+/**
+  Return a context that can be used for compress/decompress functions.
+
+  If this function fails a NULL pointer is returned.
+*/
+BLOSC_EXPORT blosc2_context* blosc2_create_context(context_params* cparams);
+
+/**
+  Free the resources associated with a context.
+
+  This function should always succeed.
+*/
+BLOSC_EXPORT void blosc2_free_context(blosc_context* cparams);
 
 
 /*********************************************************************
