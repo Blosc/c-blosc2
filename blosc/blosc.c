@@ -124,9 +124,8 @@ struct blosc_context_s {
   /* The code of the filter */
   schunk_header* schunk;
   /* Associated super-chunk (if available) */
-
-  /* Cache for temporaries for serial operation */
   struct thread_context* serial_context;
+  /* Cache for temporaries for serial operation */
 
   /* Threading */
   int32_t nthreads;
@@ -2050,12 +2049,14 @@ blosc_context* blosc2_create_context(blosc2_context_params* cparams) {
   blosc_context* context = (blosc_context*)my_malloc(sizeof(blosc_context));
   memset(context, 0, sizeof(blosc_context));
 
-  /* Set default values that are different than 0 (or NULL) */
+  /* Populate the context, with default values for some fields */
   context->typesize = cparams->typesize ? cparams->typesize : 8;
   context->compcode = cparams->compcode ? cparams->compcode : BLOSC_BLOSCLZ;
   context->clevel = cparams->clevel ? cparams->clevel : 5;
   context->filtercode = cparams->filtercode ? cparams->filtercode : BLOSC_SHUFFLE;
   context->nthreads = cparams->nthreads ? cparams->nthreads : 1;
+  context->blocksize = cparams->blocksize ? cparams->blocksize : 0;
+  context->schunk = cparams->schunk ? cparams->schunk : NULL;
 
   return context;
 }
