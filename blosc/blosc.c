@@ -1417,11 +1417,11 @@ int blosc_decompress(const void* src, void* dest, size_t destsize) {
   return blosc_run_decompression_with_context(g_global_context, src, dest, destsize);
 }
 
-
 /* Specific routine optimized for decompression a small number of
    items out of a compressed chunk.  This does not use threads because
    it would affect negatively to performance. */
-int blosc_getitem(const void* src, int start, int nitems, void* dest) {
+int _blosc_getitem(const blosc_context* context, const void* src, int start,
+    int nitems, void* dest) {
   uint8_t* _src = NULL;             /* current pos for source buffer */
   uint8_t version, versionlz;       /* versions for compressed header */
   uint8_t flags;                    /* flags for header */
@@ -1502,23 +1502,12 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
       cbytes = bsize2;
     }
     else {
-      struct blosc_context_s context;
-      uint8_t* tmp;
-      uint8_t* tmp2;
-      uint8_t* tmp3;
-      /* blosc_d only uses typesize, blocksize, flags and schunk info */
-      context.typesize = typesize;
-      context.blocksize = blocksize;
-      context.header_flags = &flags;
-      context.filtercode = get_filtercode(flags);
-      context.schunk = g_schunk;  /* TODO: only works with the global schunk? */
-      context.serial_context = create_thread_context(&context, 0);
-      tmp = context.serial_context->tmp;
-      tmp2 = context.serial_context->tmp2;
-      tmp3 = context.serial_context->tmp3;
+      uint8_t* tmp = context->serial_context->tmp;
+      uint8_t* tmp2 = context->serial_context->tmp2;
+      uint8_t* tmp3 = context->serial_context->tmp3;
 
       /* Regular decompression.  Put results in tmp2. */
-      cbytes = blosc_d(context.serial_context, bsize, leftoverblock,
+      cbytes = blosc_d(context->serial_context, bsize, leftoverblock,
                        (uint8_t*)src + sw32_(bstarts + j * 4),
                        tmp2, 0, tmp, tmp3);
       if (cbytes < 0) {
@@ -1529,12 +1518,29 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
       memcpy((uint8_t*)dest + ntbytes, tmp2 + startb, bsize2);
       cbytes = bsize2;
 
-      free_thread_context(context.serial_context);
+      free_thread_context(context->serial_context);
     }
     ntbytes += cbytes;
   }
 
   return ntbytes;
+}
+
+
+/* Specific routine optimized for decompression a small number of
+   items out of a compressed chunk.  Public non-contextual API. */
+int blosc_getitem(const void* src, int start, int nitems, void* dest) {
+  uint8_t* _src = (uint8_t*)(src);           /* current pos for source buffer */
+  blosc_context context;
+
+  /* Minimally populate the context */
+  context.typesize = (int32_t)_src[3];
+  context.blocksize = sw32_(_src + 8);
+  context.header_flags = _src + 2;
+  context.filtercode = get_filtercode(*(_src +2));
+  context.schunk = g_schunk;
+  context.serial_context = create_thread_context(&context, 0);
+  return _blosc_getitem(&context, src, start, nitems, dest);
 }
 
 
