@@ -92,12 +92,10 @@
 
 
 struct blosc_context_s {
-  int32_t compress;
-  /* 1 if we are doing compression 0 if decompress */
-
   const uint8_t* src;
+  /* The source buffer */
   uint8_t* dest;
-  /* The current pos in the destination buffer */
+  /* The destination buffer */
   uint8_t* header_flags;
   /* Flags for header */
   int32_t sourcesize;
@@ -126,6 +124,8 @@ struct blosc_context_s {
   /* Associated super-chunk (if available) */
   struct thread_context* serial_context;
   /* Cache for temporaries for serial operation */
+  uint8_t compress;
+  /* 1 if we are doing compression 0 if decompress */
 
   /* Threading */
   int32_t nthreads;
@@ -1313,6 +1313,11 @@ int blosc2_compress_ctx(
     size_t destsize) {
   int error, result;
 
+  if (context->compress != 1) {
+    fprintf(stderr, "Context is not meant for compression.  Giving up.\n");
+    return -10;
+  }
+
   error = initialize_context_compression(
     context, nbytes, src, dest, destsize,
     context->clevel, context->filtercode, context->typesize,
@@ -1404,6 +1409,11 @@ int blosc_run_decompression_with_context(
 int blosc2_decompress_ctx(
     blosc_context* context, const void* src, void* dest, size_t destsize) {
   int result;
+
+  if (context->compress != 0) {
+    fprintf(stderr, "Context is not meant for decompression.  Giving up.\n");
+    return -10;
+  }
 
   result = blosc_run_decompression_with_context(context, src, dest, destsize);
 
@@ -2098,19 +2108,35 @@ int blosc_free_resources(void) {
 
 /* Contexts */
 
-blosc_context* blosc2_create_ctx(blosc2_context_params* cparams) {
+/* Create a context for compression */
+blosc_context* blosc2_create_cctx(blosc2_context_cparams* cparams) {
   int error;
   blosc_context* context = (blosc_context*)my_malloc(sizeof(blosc_context));
   memset(context, 0, sizeof(blosc_context));
 
+  context->compress = 1;   /* meant for compression */
   /* Populate the context, using default values for zeroed values */
   context->typesize = cparams->typesize ? cparams->typesize : 8;
   context->compcode = cparams->compcode ? cparams->compcode : BLOSC_BLOSCLZ;
   context->clevel = cparams->clevel ? cparams->clevel : 5;
   context->filtercode = cparams->filtercode ? cparams->filtercode : BLOSC_SHUFFLE;
-  context->nthreads = cparams->nthreads ? cparams->nthreads : 1;
   context->blocksize = cparams->blocksize ? cparams->blocksize : 0;
+  context->nthreads = cparams->nthreads ? cparams->nthreads : 1;
   context->schunk = cparams->schunk ? cparams->schunk : NULL;
+
+  return context;
+}
+
+/* Create a context for decompression */
+blosc_context* blosc2_create_dctx(blosc2_context_dparams* dparams) {
+  int error;
+  blosc_context* context = (blosc_context*)my_malloc(sizeof(blosc_context));
+  memset(context, 0, sizeof(blosc_context));
+
+  context->compress = 0;   /* Meant for decompression */
+  /* Populate the context, using default values for zeroed values */
+  context->nthreads = dparams->nthreads ? dparams->nthreads : 1;
+  context->schunk = dparams->schunk ? dparams->schunk : NULL;
 
   return context;
 }

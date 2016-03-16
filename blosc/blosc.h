@@ -463,42 +463,64 @@ BLOSC_EXPORT schunk_header* blosc2_unpack_schunk(void* packed);
 *********************************************************************/
 
 typedef struct blosc_context_s blosc_context;   /* uncomplete type */
-/**
-  The parameters for creating a context.
 
-  This struct has to be passed to the context creation routine.  In
-  parenthesis it is shown the default value used internally when a 0
+/**
+  The parameters for creating a context for compression purposes.
+
+  In parenthesis it is shown the default value used internally when a 0
   (zero) in the fields of the struct is passed to a function.
 */
 typedef struct {
   uint8_t typesize;
-  /* the type size (8 when compressing) */
+  /* the type size (8) */
   uint8_t compcode;
-  /* the compressor code (BLOSC_BLOSCLZ when compressing) */
+  /* the compressor code (BLOSC_BLOSCLZ) */
   uint8_t clevel;
-  /* the compression level (5 when compressing) */
+  /* the compression level (5) */
   uint8_t filtercode;
-  /* the filter code (BLOSC_SHUFFLE when compressing) */
-  uint8_t nthreads;
-  /* the number of threads to use internally (1) */
+  /* the filter code (BLOSC_SHUFFLE) */
   int32_t blocksize;
   /* the requested size of the compressed blocks (0; meaning automatic) */
+  uint8_t nthreads;
+  /* the number of threads to use internally (1) */
   schunk_header* schunk;
   /* the associated schunk, if any (NULL) */
-} blosc2_context_params;
+} blosc2_context_cparams;
 
 
 /**
-  Create a context for *_ctx() functions.
+  The parameters for creating a context for decompression purposes.
+
+  In parenthesis it is shown the default value used internally when a 0
+  (zero) in the fields of the struct is passed to a function.
+*/
+typedef struct {
+  uint8_t nthreads;
+  /* the number of threads to use internally (1) */
+  schunk_header* schunk;
+  /* the associated schunk, if any (NULL) */
+} blosc2_context_dparams;
+
+
+/**
+  Create a context for *_ctx() compression functions.
 
   A pointer to the new context is returned.  NULL is returned if this fails.
 */
-BLOSC_EXPORT blosc_context* blosc2_create_ctx(blosc2_context_params* cparams);
+BLOSC_EXPORT blosc_context* blosc2_create_cctx(blosc2_context_cparams* cparams);
+
+/**
+  Create a context for *_ctx() decompression functions.
+
+  A pointer to the new context is returned.  NULL is returned if this fails.
+*/
+BLOSC_EXPORT blosc_context* blosc2_create_dctx(blosc2_context_dparams* dparams);
 
 /**
   Free the resources associated with a context.
 
-  This function should always succeed.
+  This function should always succeed and is valid for contexts meant for
+  both compression and decompression.
 */
 BLOSC_EXPORT void blosc2_free_ctx(blosc_context* context);
 
@@ -510,14 +532,15 @@ BLOSC_EXPORT void blosc2_free_ctx(blosc_context* context);
 
   It uses similar parameters than the blosc_compress() function plus:
 
-  `cparams`: a struct with the different compression params.
+  `context`: a struct with the different compression params.
 
-  A negative return value means that an internal error happened.  This
-  should never happen.  If you see this, please report it back
-  together with the buffer data causing this and compression settings.
+  A negative return value means that an internal error happened.  It could
+  happen that context is not meant for compression (which is stated in stderr).
+  Otherwise, please report it back together with the buffer data causing this
+  and compression settings.
 */
 BLOSC_EXPORT int blosc2_compress_ctx(
-  blosc_context* cparams, size_t nbytes, const void* src, void* dest,
+  blosc_context* context, size_t nbytes, const void* src, void* dest,
   size_t destsize);
 
 
@@ -529,15 +552,16 @@ BLOSC_EXPORT int blosc2_compress_ctx(
 
   It uses similar parameters than the blosc_decompress() function plus:
 
-  `cparams`: a struct with the different compression params.
+  `context`: a struct with the different compression params.
 
   Decompression is memory safe and guaranteed not to write the `dest`
   buffer more than what is specified in `destsize`.
 
-  If an error occurs, e.g. the compressed data is corrupted or `destsize` is not
-  large enough, then 0 (zero) or a negative value will be returned instead.
+  If an error occurs, e.g. the compressed data is corrupted, `destsize` is not
+  large enough or context is not meant for decompression, then 0 (zero) or a
+  negative value will be returned instead.
 */
-BLOSC_EXPORT int blosc2_decompress_ctx(blosc_context* cparams, const void* src,
+BLOSC_EXPORT int blosc2_decompress_ctx(blosc_context* context, const void* src,
                                        void* dest, size_t destsize);
 
 /**
