@@ -526,14 +526,14 @@ BLOSC_EXPORT int blosc2_decompress_ctx(
 
   A pointer to the new context is returned.  NULL is returned if this fails.
 */
-BLOSC_EXPORT blosc_context* blosc2_create_context(blosc2_context_params* cparams);
+BLOSC_EXPORT blosc_context* blosc2_create_ctx(blosc2_context_params* cparams);
 
 /**
   Free the resources associated with a context.
 
   This function should always succeed.
 */
-BLOSC_EXPORT void blosc2_free_context(blosc_context* context);
+BLOSC_EXPORT void blosc2_free_ctx(blosc_context* context);
 
 
 /*********************************************************************

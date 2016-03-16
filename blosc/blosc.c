@@ -1530,7 +1530,7 @@ int _blosc_getitem(const blosc_context* context, const void* src, int start,
 /* Specific routine optimized for decompression a small number of
    items out of a compressed chunk.  Public non-contextual API. */
 int blosc_getitem(const void* src, int start, int nitems, void* dest) {
-  uint8_t* _src = (uint8_t*)(src);           /* current pos for source buffer */
+  uint8_t* _src = (uint8_t*)(src);
   blosc_context context;
 
   /* Minimally populate the context */
@@ -1540,6 +1540,8 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   context.filtercode = get_filtercode(*(_src +2));
   context.schunk = g_schunk;
   context.serial_context = create_thread_context(&context, 0);
+
+  /* Call the actual getitem function */
   return _blosc_getitem(&context, src, start, nitems, dest);
 }
 
@@ -2057,7 +2059,7 @@ int blosc_free_resources(void) {
 
 /* Contexts */
 
-blosc_context* blosc2_create_context(blosc2_context_params* cparams) {
+blosc_context* blosc2_create_ctx(blosc2_context_params* cparams) {
   int error;
   blosc_context* context = (blosc_context*)my_malloc(sizeof(blosc_context));
   memset(context, 0, sizeof(blosc_context));
@@ -2074,6 +2076,10 @@ blosc_context* blosc2_create_context(blosc2_context_params* cparams) {
   return context;
 }
 
-void blosc2_free_context(blosc_context* context) {
+void blosc2_free_ctx(blosc_context* context) {
+  blosc_release_threadpool(context);
+  if (context->serial_context != NULL) {
+    my_free(context->serial_context);
+  }
   my_free(context);
 }
