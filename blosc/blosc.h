@@ -408,13 +408,15 @@ typedef struct {
 BLOSC_EXPORT schunk_header* blosc2_new_schunk(schunk_params* params);
 
 /* Set a delta reference for the super-chunk */
-BLOSC_EXPORT int blosc2_set_delta_ref(schunk_header* sc_header, size_t nbytes, void* ref);
+BLOSC_EXPORT int blosc2_set_delta_ref(schunk_header* sc_header, size_t nbytes,
+                                      void* ref);
 
 /* Free all memory from a super-chunk. */
 BLOSC_EXPORT int blosc2_destroy_schunk(schunk_header* sc_header);
 
 /* Append an existing `chunk` to a super-chunk. */
-BLOSC_EXPORT size_t blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy);
+BLOSC_EXPORT size_t blosc2_append_chunk(schunk_header* sc_header, void* chunk,
+                                        int copy);
 
 /* Append a `src` data buffer to a super-chunk.
 
@@ -428,7 +430,8 @@ BLOSC_EXPORT size_t blosc2_append_buffer(schunk_header* sc_header,
                                          size_t typesize,
                                          size_t nbytes, void* src);
 
-BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes, void* src);
+BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize,
+                                               size_t nbytes, void* src);
 
 /* Decompress and return the `nchunk` chunk of a super-chunk.
 
@@ -440,9 +443,11 @@ BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize, si
  The size of the decompressed chunk is returned.  If some problem is
  detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header, int64_t nchunk, void* dest, int nbytes);
+BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header,
+                                         int64_t nchunk, void* dest, int nbytes);
 
-BLOSC_EXPORT int blosc2_packed_decompress_chunk(void* packed, int nchunk, void** dest);
+BLOSC_EXPORT int blosc2_packed_decompress_chunk(void* packed, int nchunk,
+                                                void** dest);
 
 /* Pack a super-chunk by using the header. */
 BLOSC_EXPORT void* blosc2_pack_schunk(schunk_header* sc_header);
@@ -467,13 +472,13 @@ typedef struct blosc_context_s blosc_context;   /* uncomplete type */
 */
 typedef struct {
   uint8_t typesize;
-  /* the type size (8) */
+  /* the type size (8 when compressing) */
   uint8_t compcode;
-  /* the compressor code (BLOSC_BLOSCLZ) */
+  /* the compressor code (BLOSC_BLOSCLZ when compressing) */
   uint8_t clevel;
-  /* the compression level (5) */
+  /* the compression level (5 when compressing) */
   uint8_t filtercode;
-  /* the filter code (BLOSC_SHUFFLE) */
+  /* the filter code (BLOSC_SHUFFLE when compressing) */
   uint8_t nthreads;
   /* the number of threads to use internally (1) */
   int32_t blocksize;
@@ -482,6 +487,20 @@ typedef struct {
   /* the associated schunk, if any (NULL) */
 } blosc2_context_params;
 
+
+/**
+  Create a context for *_ctx() functions.
+
+  A pointer to the new context is returned.  NULL is returned if this fails.
+*/
+BLOSC_EXPORT blosc_context* blosc2_create_ctx(blosc2_context_params* cparams);
+
+/**
+  Free the resources associated with a context.
+
+  This function should always succeed.
+*/
+BLOSC_EXPORT void blosc2_free_ctx(blosc_context* context);
 
 /**
   Context interface to blosc compression. This does not require a call
@@ -518,22 +537,20 @@ BLOSC_EXPORT int blosc2_compress_ctx(
   If an error occurs, e.g. the compressed data is corrupted or `destsize` is not
   large enough, then 0 (zero) or a negative value will be returned instead.
 */
-BLOSC_EXPORT int blosc2_decompress_ctx(
-  blosc_context* cparams, const void* src, void* dest, size_t destsize);
+BLOSC_EXPORT int blosc2_decompress_ctx(blosc_context* cparams, const void* src,
+                                       void* dest, size_t destsize);
 
 /**
-  Create a context for *_ctx() functions.
+  Context interface counterpart for blosc_getitem().
 
-  A pointer to the new context is returned.  NULL is returned if this fails.
+  It uses similar parameters than the blosc_getitem() function plus a
+  `context` parameter.
+
+  Returns the number of bytes copied to `dest` or a negative value if
+  some error happens.
 */
-BLOSC_EXPORT blosc_context* blosc2_create_ctx(blosc2_context_params* cparams);
-
-/**
-  Free the resources associated with a context.
-
-  This function should always succeed.
-*/
-BLOSC_EXPORT void blosc2_free_ctx(blosc_context* context);
+BLOSC_EXPORT int blosc2_getitem_ctx(blosc_context* context, const void* src,
+                                    int start, int nitems, void* dest);
 
 
 /*********************************************************************

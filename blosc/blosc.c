@@ -1502,23 +1502,28 @@ int _blosc_getitem(const blosc_context* context, const void* src, int start,
       cbytes = bsize2;
     }
     else {
-      uint8_t* tmp = context->serial_context->tmp;
-      uint8_t* tmp2 = context->serial_context->tmp2;
-      uint8_t* tmp3 = context->serial_context->tmp3;
+      struct thread_context* scontext = context->serial_context;
+
+      /* Resize the temporaries in serial context if needed */
+      if (blocksize != scontext->tmpblocksize) {
+        my_free(scontext->tmp);
+        scontext->tmp = my_malloc(blocksize + ebsize + blocksize);
+        scontext->tmp2 = scontext->tmp + blocksize;
+        scontext->tmp3 = scontext->tmp + blocksize + ebsize;
+        scontext->tmpblocksize = blocksize;
+      }
 
       /* Regular decompression.  Put results in tmp2. */
       cbytes = blosc_d(context->serial_context, bsize, leftoverblock,
                        (uint8_t*)src + sw32_(bstarts + j * 4),
-                       tmp2, 0, tmp, tmp3);
+                       scontext->tmp2, 0, scontext->tmp, scontext->tmp3);
       if (cbytes < 0) {
         ntbytes = cbytes;
         break;
       }
       /* Copy to destination */
-      memcpy((uint8_t*)dest + ntbytes, tmp2 + startb, bsize2);
+      memcpy((uint8_t*)dest + ntbytes, scontext->tmp2 + startb, bsize2);
       cbytes = bsize2;
-
-      free_thread_context(context->serial_context);
     }
     ntbytes += cbytes;
   }
@@ -1532,6 +1537,7 @@ int _blosc_getitem(const blosc_context* context, const void* src, int start,
 int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   uint8_t* _src = (uint8_t*)(src);
   blosc_context context;
+  int result;
 
   /* Minimally populate the context */
   context.typesize = (int32_t)_src[3];
@@ -1542,7 +1548,39 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   context.serial_context = create_thread_context(&context, 0);
 
   /* Call the actual getitem function */
-  return _blosc_getitem(&context, src, start, nitems, dest);
+  result = _blosc_getitem(&context, src, start, nitems, dest);
+
+  /* Release resources */
+  free_thread_context(context.serial_context);
+  return result;
+}
+
+int blosc2_getitem_ctx(blosc_context* context, const void* src, int start,
+    int nitems, void* dest) {
+  uint8_t* _src = (uint8_t*)(src);
+  int result;
+  uint8_t typesize = context->typesize;
+  uint8_t filtercode = context->filtercode;
+  int32_t blocksize = context->blocksize;
+
+  /* Minimally populate the context */
+  context->typesize = (int32_t)_src[3];
+  context->filtercode = get_filtercode(*(_src +2));
+  context->blocksize = sw32_(_src + 8);
+  context->header_flags = _src + 2;
+  if (context->serial_context == NULL) {
+    context->serial_context = create_thread_context(context, 0);
+  }
+
+  /* Restore original values of context */
+  context->typesize = typesize;
+  context->filtercode = filtercode;
+  context->blocksize = blocksize;
+
+  /* Call the actual getitem function */
+  result = _blosc_getitem(context, src, start, nitems, dest);
+
+  return result;
 }
 
 
@@ -1999,7 +2037,7 @@ void blosc_destroy(void) {
   g_initlib = 0;
   blosc_release_threadpool(g_global_context);
   if (g_global_context->serial_context != NULL) {
-    my_free(g_global_context->serial_context);
+    free_thread_context(g_global_context->serial_context);
   }
   my_free(g_global_context);
   pthread_mutex_destroy(&global_comp_mutex);
@@ -2057,6 +2095,7 @@ int blosc_free_resources(void) {
   return blosc_release_threadpool(g_global_context);
 }
 
+
 /* Contexts */
 
 blosc_context* blosc2_create_ctx(blosc2_context_params* cparams) {
@@ -2064,7 +2103,7 @@ blosc_context* blosc2_create_ctx(blosc2_context_params* cparams) {
   blosc_context* context = (blosc_context*)my_malloc(sizeof(blosc_context));
   memset(context, 0, sizeof(blosc_context));
 
-  /* Populate the context, with default values for some fields */
+  /* Populate the context, using default values for zeroed values */
   context->typesize = cparams->typesize ? cparams->typesize : 8;
   context->compcode = cparams->compcode ? cparams->compcode : BLOSC_BLOSCLZ;
   context->clevel = cparams->clevel ? cparams->clevel : 5;
@@ -2079,7 +2118,7 @@ blosc_context* blosc2_create_ctx(blosc2_context_params* cparams) {
 void blosc2_free_ctx(blosc_context* context) {
   blosc_release_threadpool(context);
   if (context->serial_context != NULL) {
-    my_free(context->serial_context);
+    free_thread_context(context->serial_context);
   }
   my_free(context);
 }
