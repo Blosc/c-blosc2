@@ -1553,7 +1553,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   context.typesize = (int32_t)_src[3];
   context.blocksize = sw32_(_src + 8);
   context.header_flags = _src + 2;
-  context.filtercode = get_filtercode(*(_src +2));
+  context.filtercode = get_filtercode(*(_src + 2));
   context.schunk = g_schunk;
   context.serial_context = create_thread_context(&context, 0);
 
@@ -1569,23 +1569,15 @@ int blosc2_getitem_ctx(blosc_context* context, const void* src, int start,
     int nitems, void* dest) {
   uint8_t* _src = (uint8_t*)(src);
   int result;
-  uint8_t typesize = context->typesize;
-  uint8_t filtercode = context->filtercode;
-  int32_t blocksize = context->blocksize;
 
   /* Minimally populate the context */
   context->typesize = (int32_t)_src[3];
-  context->filtercode = get_filtercode(*(_src +2));
   context->blocksize = sw32_(_src + 8);
   context->header_flags = _src + 2;
+  context->filtercode = get_filtercode(*(_src + 2));
   if (context->serial_context == NULL) {
     context->serial_context = create_thread_context(context, 0);
   }
-
-  /* Restore original values of context */
-  context->typesize = typesize;
-  context->filtercode = filtercode;
-  context->blocksize = blocksize;
 
   /* Call the actual getitem function */
   result = _blosc_getitem(context, src, start, nitems, dest);
@@ -2126,6 +2118,8 @@ blosc_context* blosc2_create_cctx(blosc2_context_cparams* cparams) {
 
   return context;
 }
+
+
 
 /* Create a context for decompression */
 blosc_context* blosc2_create_dctx(blosc2_context_dparams* dparams) {

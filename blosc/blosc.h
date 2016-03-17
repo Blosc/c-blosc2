@@ -479,13 +479,17 @@ typedef struct {
   /* the compression level (5) */
   uint8_t filtercode;
   /* the filter code (BLOSC_SHUFFLE) */
-  int32_t blocksize;
-  /* the requested size of the compressed blocks (0; meaning automatic) */
   uint8_t nthreads;
   /* the number of threads to use internally (1) */
+  int32_t blocksize;
+  /* the requested size of the compressed blocks (0; meaning automatic) */
   schunk_header* schunk;
   /* the associated schunk, if any (NULL) */
 } blosc2_context_cparams;
+
+/* Default struct for compression params meant for user initialization */
+static const blosc2_context_cparams BLOSC_CPARAMS_DEFAULTS = \
+  { 8, BLOSC_BLOSCLZ, 5, BLOSC_SHUFFLE, 1, 0, NULL };
 
 
 /**
@@ -501,6 +505,9 @@ typedef struct {
   /* the associated schunk, if any (NULL) */
 } blosc2_context_dparams;
 
+/* Default struct for compression params meant for user initialization */
+static const blosc2_context_dparams BLOSC_DPARAMS_DEFAULTS = \
+  { 1, NULL };
 
 /**
   Create a context for *_ctx() compression functions.
