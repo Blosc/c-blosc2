@@ -8,7 +8,7 @@ compiler:
   - gcc
   - clang
 
-before_install: ./scripts/travis-before-install.sh
+#before_install: ./scripts/travis-before-install.sh
 
 #install: sudo apt-get install libsnappy-dev zlib1g-dev
 #install: sudo apt-get install liblz4-dev libsnappy-dev zlib1g-dev
