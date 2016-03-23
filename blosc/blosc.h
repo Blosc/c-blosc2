@@ -120,9 +120,9 @@ extern "C" {
 
   You must call this previous to any other Blosc call, unless you want
   Blosc to be used simultaneously in a multi-threaded environment, in
-  which case you should *exclusively* use the
-  blosc_compress_ctx()/blosc_decompress_ctx() pair (see below).
-  */
+  which case you can use the
+  blosc2_compress_ctx()/blosc2_decompress_ctx() pair (see below).
+*/
 BLOSC_EXPORT void blosc_init(void);
 
 
@@ -132,7 +132,7 @@ BLOSC_EXPORT void blosc_init(void);
   You must call this after to you are done with all the Blosc calls,
   unless you have not used blosc_init() before (see blosc_init()
   above).
-  */
+*/
 BLOSC_EXPORT void blosc_destroy(void);
 
 
@@ -171,35 +171,10 @@ BLOSC_EXPORT void blosc_destroy(void);
   A negative return value means that an internal error happened.  This
   should never happen.  If you see this, please report it back
   together with the buffer data causing this and compression settings.
-  */
+*/
 BLOSC_EXPORT int blosc_compress(int clevel, int doshuffle, size_t typesize,
                                 size_t nbytes, const void* src, void* dest,
                                 size_t destsize);
-
-
-/**
-  Context interface to blosc compression. This does not require a call
-  to blosc_init() and can be called from multithreaded applications
-  without the global lock being used, so allowing Blosc be executed
-  simultaneously in those scenarios.
-
-  It uses the same parameters than the blosc_compress() function plus:
-
-  `compressor`: the string representing the type of compressor to use.
-
-  `blocksize`: the requested size of the compressed blocks.  If 0, an
-   automatic blocksize will be used.
-
-  `numinternalthreads`: the number of threads to use internally.
-
-  A negative return value means that an internal error happened.  This
-  should never happen.  If you see this, please report it back
-  together with the buffer data causing this and compression settings.
-*/
-BLOSC_EXPORT int blosc_compress_ctx(int clevel, int doshuffle, size_t typesize,
-                                    size_t nbytes, const void* src, void* dest,
-                                    size_t destsize, const char* compressor,
-                                    size_t blocksize, int numinternalthreads);
 
 
 /**
@@ -219,34 +194,13 @@ BLOSC_EXPORT int blosc_decompress(const void* src, void* dest, size_t destsize);
 
 
 /**
-  Context interface to blosc decompression. This does not require a
-  call to blosc_init() and can be called from multithreaded
-  applications without the global lock being used, so allowing Blosc
-  be executed simultaneously in those scenarios.
-
-  It uses the same parameters than the blosc_decompress() function plus:
-
-  `numinternalthreads`: number of threads to use internally.
-
-  Decompression is memory safe and guaranteed not to write the `dest`
-  buffer more than what is specified in `destsize`.
-
-  If an error occurs, e.g. the compressed data is corrupted or the
-  output buffer is not large enough, then 0 (zero) or a negative value
-  will be returned instead.
-*/
-BLOSC_EXPORT int blosc_decompress_ctx(const void* src, void* dest,
-                                      size_t destsize, int numinternalthreads);
-
-
-/**
   Get `nitems` (of typesize size) in `src` buffer starting in `start`.
   The items are returned in `dest` buffer, which has to have enough
   space for storing all items.
 
   Returns the number of bytes copied to `dest` or a negative value if
   some error happens.
-  */
+*/
 BLOSC_EXPORT int blosc_getitem(const void* src, int start, int nitems, void* dest);
 
 
@@ -269,7 +223,7 @@ BLOSC_EXPORT int blosc_set_nthreads(int nthreads);
   In case the compressor is not recognized, or there is not support
   for it in this build, it returns a -1.  Else it returns the code for
   the compressor (>=0).
-  */
+*/
 BLOSC_EXPORT int blosc_set_compressor(const char* compname);
 
 
@@ -279,7 +233,7 @@ BLOSC_EXPORT int blosc_set_compressor(const char* compname);
   If the compressor code is not recognized, or there is not support
   for it in this build, -1 is returned.  Else, the compressor code is
   returned.
- */
+*/
 BLOSC_EXPORT int blosc_compcode_to_compname(int compcode, char** compname);
 
 
@@ -288,7 +242,7 @@ BLOSC_EXPORT int blosc_compcode_to_compname(int compcode, char** compname);
 
   If the compressor name is not recognized, or there is not support
   for it in this build, -1 is returned instead.
- */
+*/
 BLOSC_EXPORT int blosc_compname_to_compcode(const char* compname);
 
 
@@ -302,7 +256,7 @@ BLOSC_EXPORT int blosc_compname_to_compcode(const char* compname);
   list.
 
   This function should always succeed.
-  */
+*/
 BLOSC_EXPORT char* blosc_list_compressors(void);
 
 
@@ -327,7 +281,7 @@ BLOSC_EXPORT char* blosc_get_version_string(void);
 
   If the compressor is supported, it returns the code for the library
   (>=0).  If it is not supported, this function returns -1.
-  */
+*/
 BLOSC_EXPORT int blosc_get_complib_info(char* compname, char** complib, char** version);
 
 
@@ -336,7 +290,7 @@ BLOSC_EXPORT int blosc_get_complib_info(char* compname, char** complib, char** v
   when you are not going to use Blosc for a long while.  In case of
   problems releasing the resources, it returns a negative number, else
   it returns 0.
-  */
+*/
 BLOSC_EXPORT int blosc_free_resources(void);
 
 
@@ -350,7 +304,7 @@ BLOSC_EXPORT int blosc_free_resources(void);
   compressed buffer for this call to work.
 
   This function should always succeed.
-  */
+*/
 BLOSC_EXPORT void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
                                       size_t* cbytes, size_t* blocksize);
 
@@ -369,7 +323,7 @@ BLOSC_EXPORT void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
   byte-shuffled or not).
 
   This function should always succeed.
-  */
+*/
 BLOSC_EXPORT void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize,
                                          int* flags);
 
@@ -380,7 +334,7 @@ BLOSC_EXPORT void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize,
   Lempel-Ziv compressor used (`versionlz`).
 
   This function should always succeed.
-  */
+*/
 BLOSC_EXPORT void blosc_cbuffer_versions(const void* cbuffer, int* version,
                                          int* versionlz);
 
@@ -389,7 +343,7 @@ BLOSC_EXPORT void blosc_cbuffer_versions(const void* cbuffer, int* version,
   Return the compressor library/format used in a compressed buffer.
 
   This function should always succeed.
-  */
+*/
 BLOSC_EXPORT char* blosc_cbuffer_complib(const void* cbuffer);
 
 
@@ -454,13 +408,15 @@ typedef struct {
 BLOSC_EXPORT schunk_header* blosc2_new_schunk(schunk_params* params);
 
 /* Set a delta reference for the super-chunk */
-BLOSC_EXPORT int blosc2_set_delta_ref(schunk_header* sc_header, size_t nbytes, void* ref);
+BLOSC_EXPORT int blosc2_set_delta_ref(schunk_header* sc_header, size_t nbytes,
+                                      void* ref);
 
 /* Free all memory from a super-chunk. */
 BLOSC_EXPORT int blosc2_destroy_schunk(schunk_header* sc_header);
 
 /* Append an existing `chunk` to a super-chunk. */
-BLOSC_EXPORT size_t blosc2_append_chunk(schunk_header* sc_header, void* chunk, int copy);
+BLOSC_EXPORT size_t blosc2_append_chunk(schunk_header* sc_header, void* chunk,
+                                        int copy);
 
 /* Append a `src` data buffer to a super-chunk.
 
@@ -474,7 +430,8 @@ BLOSC_EXPORT size_t blosc2_append_buffer(schunk_header* sc_header,
                                          size_t typesize,
                                          size_t nbytes, void* src);
 
-BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes, void* src);
+BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize,
+                                               size_t nbytes, void* src);
 
 /* Decompress and return the `nchunk` chunk of a super-chunk.
 
@@ -486,9 +443,11 @@ BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize, si
  The size of the decompressed chunk is returned.  If some problem is
  detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header, int64_t nchunk, void* dest, int nbytes);
+BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header,
+                                         int64_t nchunk, void* dest, int nbytes);
 
-BLOSC_EXPORT int blosc2_packed_decompress_chunk(void* packed, int nchunk, void** dest);
+BLOSC_EXPORT int blosc2_packed_decompress_chunk(void* packed, int nchunk,
+                                                void** dest);
 
 /* Pack a super-chunk by using the header. */
 BLOSC_EXPORT void* blosc2_pack_schunk(schunk_header* sc_header);
@@ -499,10 +458,137 @@ BLOSC_EXPORT schunk_header* blosc2_unpack_schunk(void* packed);
 
 /*********************************************************************
 
-  Low-level functions follows.  Use them only if you are an expert!
+  Structures and functions related with contexts.
 
 *********************************************************************/
 
+typedef struct blosc_context_s blosc_context;   /* uncomplete type */
+
+/**
+  The parameters for creating a context for compression purposes.
+
+  In parenthesis it is shown the default value used internally when a 0
+  (zero) in the fields of the struct is passed to a function.
+*/
+typedef struct {
+  uint8_t typesize;
+  /* the type size (8) */
+  uint8_t compcode;
+  /* the compressor code (BLOSC_BLOSCLZ) */
+  uint8_t clevel;
+  /* the compression level (5) */
+  uint8_t filtercode;
+  /* the filter code (BLOSC_SHUFFLE) */
+  uint8_t nthreads;
+  /* the number of threads to use internally (1) */
+  int32_t blocksize;
+  /* the requested size of the compressed blocks (0; meaning automatic) */
+  schunk_header* schunk;
+  /* the associated schunk, if any (NULL) */
+} blosc2_context_cparams;
+
+/* Default struct for compression params meant for user initialization */
+static const blosc2_context_cparams BLOSC_CPARAMS_DEFAULTS = \
+  { 8, BLOSC_BLOSCLZ, 5, BLOSC_SHUFFLE, 1, 0, NULL };
+
+
+/**
+  The parameters for creating a context for decompression purposes.
+
+  In parenthesis it is shown the default value used internally when a 0
+  (zero) in the fields of the struct is passed to a function.
+*/
+typedef struct {
+  uint8_t nthreads;
+  /* the number of threads to use internally (1) */
+  schunk_header* schunk;
+  /* the associated schunk, if any (NULL) */
+} blosc2_context_dparams;
+
+/* Default struct for compression params meant for user initialization */
+static const blosc2_context_dparams BLOSC_DPARAMS_DEFAULTS = \
+  { 1, NULL };
+
+/**
+  Create a context for *_ctx() compression functions.
+
+  A pointer to the new context is returned.  NULL is returned if this fails.
+*/
+BLOSC_EXPORT blosc_context* blosc2_create_cctx(blosc2_context_cparams* cparams);
+
+/**
+  Create a context for *_ctx() decompression functions.
+
+  A pointer to the new context is returned.  NULL is returned if this fails.
+*/
+BLOSC_EXPORT blosc_context* blosc2_create_dctx(blosc2_context_dparams* dparams);
+
+/**
+  Free the resources associated with a context.
+
+  This function should always succeed and is valid for contexts meant for
+  both compression and decompression.
+*/
+BLOSC_EXPORT void blosc2_free_ctx(blosc_context* context);
+
+/**
+  Context interface to blosc compression. This does not require a call
+  to blosc_init() and can be called from multithreaded applications
+  without the global lock being used, so allowing Blosc be executed
+  simultaneously in those scenarios.
+
+  It uses similar parameters than the blosc_compress() function plus:
+
+  `context`: a struct with the different compression params.
+
+  A negative return value means that an internal error happened.  It could
+  happen that context is not meant for compression (which is stated in stderr).
+  Otherwise, please report it back together with the buffer data causing this
+  and compression settings.
+*/
+BLOSC_EXPORT int blosc2_compress_ctx(
+  blosc_context* context, size_t nbytes, const void* src, void* dest,
+  size_t destsize);
+
+
+/**
+  Context interface to blosc decompression. This does not require a
+  call to blosc_init() and can be called from multithreaded
+  applications without the global lock being used, so allowing Blosc
+  be executed simultaneously in those scenarios.
+
+  It uses similar parameters than the blosc_decompress() function plus:
+
+  `context`: a struct with the different compression params.
+
+  Decompression is memory safe and guaranteed not to write the `dest`
+  buffer more than what is specified in `destsize`.
+
+  If an error occurs, e.g. the compressed data is corrupted, `destsize` is not
+  large enough or context is not meant for decompression, then 0 (zero) or a
+  negative value will be returned instead.
+*/
+BLOSC_EXPORT int blosc2_decompress_ctx(blosc_context* context, const void* src,
+                                       void* dest, size_t destsize);
+
+/**
+  Context interface counterpart for blosc_getitem().
+
+  It uses similar parameters than the blosc_getitem() function plus a
+  `context` parameter.
+
+  Returns the number of bytes copied to `dest` or a negative value if
+  some error happens.
+*/
+BLOSC_EXPORT int blosc2_getitem_ctx(blosc_context* context, const void* src,
+                                    int start, int nitems, void* dest);
+
+
+/*********************************************************************
+
+  Low-level functions follows.  Use them only if you are an expert!
+
+*********************************************************************/
 
 /**
   Force the use of a specific blocksize.  If 0, an automatic
