@@ -7,20 +7,12 @@
 
     To compile this program:
 
-    gcc simple.c -o simple -lblosc -lpthread
-
-    or, if you don't have the blosc library installed:
-
-    gcc -O3 -msse2 simple.c ../blosc/*.c -I../blosc -o simple -lpthread
-
-    Using MSVC on Windows:
-
-    cl /DSHUFFLE_SSE2_ENABLED /arch:SSE2 /Ox /Fesimple.exe /Iblosc examples\simple.c blosc\blosc.c blosc\blosclz.c blosc\shuffle.c blosc\shuffle-sse2.c blosc\shuffle-generic.c blosc\bitshuffle-generic.c blosc\bitshuffle-sse2.c blosc\schunk.c blosc\delta.c
+    $ gcc -O simple.c -o simple -lblosc
 
     To run:
 
     $ ./simple
-    Blosc version info: 2.0.0a2 ($Date:: 2015-12-17 #$)
+    Blosc version info: 2.0.0a2 ($Date:: 2016-01-08 #$)
     Compression: 40000000 -> 832774 (48.0x)
     Correctly extracted 5 elements from compressed chunk!
     Decompression succesful!

@@ -7,21 +7,11 @@
 
     To compile this program:
 
-    gcc many_compressors.c -o many_compressors -lblosc -lpthread
-    
-    or, if you don't have the blosc library installed:
+    $ gcc -O many_compressors.c -o many_compressors -lblosc
 
-    gcc -O3 -msse2 many_compressors.c ../blosc/*.c -I../blosc \
-        -o many_compressors -lpthread \
-        -DHAVE_ZLIB -lz -DHAVE_LZ4 -llz4 -DHAVE_SNAPPY -lsnappy
-
-    Using MSVC on Windows:
-
-    cl /Ox /Femany_compressors.exe /Iblosc many_compressors.c blosc\*.c
-    
     To run:
 
-    ./many_compressors
+    $ ./many_compressors
     Blosc version info: 1.4.2.dev ($Date:: 2014-07-08 #$)
     Using 4 threads (previously using 1)
     Using blosclz compressor
