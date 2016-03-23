@@ -4,8 +4,6 @@
 
 :Author: Francesc Alted
 :Contact: francesc@blosc.org
-:Author: Valentin Haenel
-:Contact: valentin@blosc.org
 :URL: http://www.blosc.org
 :Travis CI: |travis|
 :Appveyor: |appveyor|
