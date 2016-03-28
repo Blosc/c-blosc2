@@ -19,6 +19,16 @@ Changes from 2.0.0a2 to 2.0.0a3
   replaced by blosc2_compress_ctx() and blosc2_decompress_ctx() that
   do accept actual contexts.
 
+* Added support for new Zstd codec (https://github.com/Cyan4973/zstd).
+  This is a new compressor by Yann Collet, the author of LZ4 and
+  LZ4HC.  For details on Zstd, see this nice intro:
+  http://fastcompression.blogspot.com.es/2015/01/zstd-stronger-compression-algorithm.html.
+
+* The blosc2_append_chunk() has been removed.  This is this because an
+  existing chunk may not fulfill the sequence of filters in super
+  header.  It is best that the user will use blosc2_append_buffer()
+  and compress it internally.
+
 * The split of blocks only happens for BLOSCLZ and SNAPPY codecs.  All
   the rest are not split at all.  This allows for faster operation for
   the rest of codecs (most specially zstd).

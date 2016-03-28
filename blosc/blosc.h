@@ -24,15 +24,17 @@ extern "C" {
 
 #define BLOSC_VERSION_STRING   "2.0.0a3"  /* string version.  Sync with above! */
 #define BLOSC_VERSION_REVISION "$Rev$"   /* revision version */
-#define BLOSC_VERSION_DATE     "$Date:: 2016-01-08 #$"    /* date version */
+#define BLOSC_VERSION_DATE     "$Date:: 2016-03-28 #$"    /* date version */
 
 #define BLOSCLZ_VERSION_STRING "1.0.5"   /* the internal compressor version */
 
-/* The *_FORMAT symbols should be just 1-byte long */
-#define BLOSC_VERSION_FORMAT    3   /* Blosc format version, starting at 1
-                                       1 -> Basically per 1.0
-                                       2 -> Blosc 1.x series
-                                       3 -> Blosc 2.x series */
+/* The *_FORMAT symbols below should be just 1-byte long */
+
+#define BLOSC_VERSION_FORMAT    3
+/* Blosc format version, starting at 1
+   1 -> Basically for Blosc pre-1.0
+   2 -> Blosc 1.x series
+   3 -> Blosc 2.x series */
 
 /* Minimum header length */
 #define BLOSC_MIN_HEADER_LENGTH 16
