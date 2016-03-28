@@ -25,7 +25,13 @@ Changes from 2.0.0a2 to 2.0.0a3
 
 * The internal zlib 1.2.8 sources have been replaced by the miniz
   library, which is meant to be fully compatible with Zlib, but much
-  smaller and besides tends to be a bit faster.
+  smaller and besides tends to be a bit faster.  Also, miniz is
+  preferred to an external Zlib.
+
+* The internal snappy sources have been removed.  If snappy library
+  is found, the support for it is still there.
+
+* Internal LZ4 sources upgraded to 1.7.1.
 
 
 Changes from 2.0.0a1 to 2.0.0a2
