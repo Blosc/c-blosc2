@@ -31,6 +31,8 @@ Changes from 2.0.0a2 to 2.0.0a3
 * The internal snappy sources have been removed.  If snappy library
   is found, the support for it is still there.
 
+* Internal LZ4 sources upgraded to 1.7.1.
+
 
 Changes from 2.0.0a1 to 2.0.0a2
 ===============================
