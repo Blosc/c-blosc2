@@ -25,7 +25,8 @@ Changes from 2.0.0a2 to 2.0.0a3
 
 * The internal zlib 1.2.8 sources have been replaced by the miniz
   library, which is meant to be fully compatible with Zlib, but much
-  smaller and besides tends to be a bit faster.
+  smaller and besides tends to be a bit faster.  Also, miniz is
+  preferred to an external Zlib.
 
 
 Changes from 2.0.0a1 to 2.0.0a2
