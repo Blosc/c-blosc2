@@ -7,15 +7,7 @@
 
   To compile this program:
 
-  gcc simple_schunk.c -o schunk -lblosc -lpthread
-
-  or, if you don't have the blosc library installed:
-
-  gcc -O3 -mavx2 simple_schunk.c ../blosc/*.c -I../blosc -o schunk -lpthread
-
-  Using MSVC on Windows:
-
-  cl /arch:SSE2 /Ox /Feschunk.exe /Iblosc examples\simple_schunk.c blosc\blosc.c blosc\blosclz.c blosc\shuffle.c blosc\shuffle-sse2.c blosc\shuffle-generic.c blosc\bitshuffle-generic.c blosc\bitshuffle-sse2.c
+  $ gcc simple_schunk.c -o schunk -lblosc
 
   To run:
 
@@ -32,19 +24,16 @@
 #include <assert.h>
 #include "blosc.h"
 
-#define SIZE 100*100*100
-#define SHAPE {100,100,100}
-#define CHUNKSHAPE {1,100,100}
+#define SIZE 1000*1000
 
 int main() {
   static float data[SIZE];
-  static float data2[SIZE];
-  void* chunk = data2;
-  float* data_dest;
+  static float data_dest[SIZE];
+  void* chunk = data_dest;
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize, csize;
   schunk_params* sc_params = calloc(1, sizeof(sc_params));
-  schunk_header* sc_header;
+  blosc2_sheader* sc_header;
   int i, nchunks;
 
   for (i = 0; i < SIZE; i++) {
@@ -85,12 +74,12 @@ int main() {
   assert(nchunks == 2);
 
   /* Retrieve and decompress the chunks (0-based count) */
-  dsize = blosc2_decompress_chunk(sc_header, 1, &data_dest);
+  dsize = blosc2_decompress_chunk(sc_header, 1, chunk, isize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
   }
-  dsize = blosc2_decompress_chunk(sc_header, 0, &data_dest);
+  dsize = blosc2_decompress_chunk(sc_header, 0, chunk, isize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
@@ -108,7 +97,6 @@ int main() {
   printf("Succesful roundtrip!\n");
 
   /* Free resources */
-  free(data_dest);
   free(sc_params);
   /* Destroy the super-chunk */
   blosc2_destroy_schunk(sc_header);

@@ -353,11 +353,7 @@ BLOSC_EXPORT char* blosc_cbuffer_complib(const void* cbuffer);
 
 *********************************************************************/
 
-#define BLOSC_HEADER_PACKED_LENGTH 96 /* the length of the header for a packed super-chunk */
-
-
 typedef struct {
-  /* struct blosc_context* parent_context; */
   uint8_t version;
   uint8_t flags1;
   uint8_t flags2;
@@ -392,7 +388,8 @@ typedef struct {
   /* Context for the thread holder.  NULL if not acquired. */
   uint8_t* reserved;
   /* Reserved for the future. */
-} schunk_header;
+} blosc2_sheader;
+
 
 typedef struct {
   uint8_t compressor;
@@ -405,18 +402,18 @@ typedef struct {
 } schunk_params;
 
 /* Create a new super-chunk. */
-BLOSC_EXPORT schunk_header* blosc2_new_schunk(schunk_params* params);
+BLOSC_EXPORT blosc2_sheader* blosc2_new_schunk(schunk_params* params);
 
 /* Set a delta reference for the super-chunk */
-BLOSC_EXPORT int blosc2_set_delta_ref(schunk_header* sc_header, size_t nbytes,
-                                      void* ref);
+BLOSC_EXPORT int blosc2_set_delta_ref(blosc2_sheader* sheader,
+    size_t nbytes, void* ref);
 
 /* Free all memory from a super-chunk. */
-BLOSC_EXPORT int blosc2_destroy_schunk(schunk_header* sc_header);
+BLOSC_EXPORT int blosc2_destroy_schunk(blosc2_sheader* sheader);
 
 /* Append an existing `chunk` to a super-chunk. */
-BLOSC_EXPORT size_t blosc2_append_chunk(schunk_header* sc_header, void* chunk,
-                                        int copy);
+BLOSC_EXPORT size_t blosc2_append_chunk(blosc2_sheader* sheader,
+    void* chunk, int copy);
 
 /* Append a `src` data buffer to a super-chunk.
 
@@ -426,9 +423,8 @@ BLOSC_EXPORT size_t blosc2_append_chunk(schunk_header* sc_header, void* chunk,
  This returns the number of chunk in super-chunk.  If some problem is
  detected, this number will be negative.
  */
-BLOSC_EXPORT size_t blosc2_append_buffer(schunk_header* sc_header,
-                                         size_t typesize,
-                                         size_t nbytes, void* src);
+BLOSC_EXPORT size_t blosc2_append_buffer(blosc2_sheader* sheader,
+     size_t typesize, size_t nbytes, void* src);
 
 BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize,
                                                size_t nbytes, void* src);
@@ -443,17 +439,17 @@ BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize,
  The size of the decompressed chunk is returned.  If some problem is
  detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_decompress_chunk(schunk_header* sc_header,
-                                         int64_t nchunk, void* dest, int nbytes);
+BLOSC_EXPORT int blosc2_decompress_chunk(blosc2_sheader* sheader,
+     int64_t nchunk, void* dest, int nbytes);
 
 BLOSC_EXPORT int blosc2_packed_decompress_chunk(void* packed, int nchunk,
-                                                void** dest);
+      void** dest);
 
 /* Pack a super-chunk by using the header. */
-BLOSC_EXPORT void* blosc2_pack_schunk(schunk_header* sc_header);
+BLOSC_EXPORT void* blosc2_pack_schunk(blosc2_sheader* sheader);
 
 /* Unpack a packed super-chunk */
-BLOSC_EXPORT schunk_header* blosc2_unpack_schunk(void* packed);
+BLOSC_EXPORT blosc2_sheader* blosc2_unpack_schunk(void* packed);
 
 
 /*********************************************************************
@@ -483,7 +479,7 @@ typedef struct {
   /* the number of threads to use internally (1) */
   int32_t blocksize;
   /* the requested size of the compressed blocks (0; meaning automatic) */
-  schunk_header* schunk;
+  blosc2_sheader* schunk;
   /* the associated schunk, if any (NULL) */
 } blosc2_context_cparams;
 
@@ -501,7 +497,7 @@ static const blosc2_context_cparams BLOSC_CPARAMS_DEFAULTS = \
 typedef struct {
   uint8_t nthreads;
   /* the number of threads to use internally (1) */
-  schunk_header* schunk;
+  blosc2_sheader* schunk;
   /* the associated schunk, if any (NULL) */
 } blosc2_context_dparams;
 
@@ -598,8 +594,7 @@ BLOSC_EXPORT void blosc_set_blocksize(size_t blocksize);
 
 /* Set pointer to super-chunk.  If NULL, no super-chunk will be
    available (the default). */
-BLOSC_EXPORT void blosc_set_schunk(schunk_header* schunk);
-
+BLOSC_EXPORT void blosc_set_schunk(blosc2_sheader* schunk);
 
 #ifdef __cplusplus
 }

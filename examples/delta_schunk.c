@@ -34,7 +34,7 @@ int main() {
   int dsize;
   int32_t nbytes, cbytes;
   schunk_params* sc_params = calloc(1, sizeof(schunk_params));
-  schunk_header* sc_header;
+  blosc2_sheader* sc_header;
   int i, nchunk, nchunks;
 
   printf("Blosc version info: %s (%s)\n",

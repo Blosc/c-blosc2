@@ -120,7 +120,7 @@ struct blosc_context_s {
   /* Compression level (1-9) */
   uint8_t filtercode;
   /* The code of the filter */
-  schunk_header* schunk;
+  blosc2_sheader* schunk;
   /* Associated super-chunk (if available) */
   struct thread_context* serial_context;
   /* Cache for temporaries for serial operation */
@@ -171,7 +171,7 @@ static int32_t g_compressor = BLOSC_BLOSCLZ;
 static int32_t g_nthreads = 1;
 static int32_t g_force_blocksize = 0;
 static int32_t g_initlib = 0;
-static schunk_header* g_schunk = NULL;   /* the pointer to super-chunk */
+static blosc2_sheader* g_schunk = NULL;   /* the pointer to super-chunk */
 
 
 /* Wrapped function to adjust the number of threads used by blosc */
@@ -1056,7 +1056,7 @@ static int initialize_context_compression(
   blosc_context* context,
   size_t sourcesize, const void* src, void* dest, size_t destsize, int clevel,
   int filtercode, size_t typesize, int32_t compressor, int32_t blocksize,
-  int32_t nthreads, schunk_header* schunk) {
+  int32_t nthreads, blosc2_sheader* schunk) {
 
   /* Set parameters */
   context->compress = 1;
@@ -2013,7 +2013,7 @@ void blosc_set_blocksize(size_t size) {
 
 /* Set pointer to super-chunk.  If NULL, no super-chunk will be
    reachable (the default). */
-void blosc_set_schunk(schunk_header* schunk) {
+void blosc_set_schunk(blosc2_sheader* schunk) {
   g_schunk = schunk;
   g_global_context->schunk = schunk;
 }

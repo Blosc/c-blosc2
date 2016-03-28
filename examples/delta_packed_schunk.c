@@ -33,7 +33,7 @@ int main() {
   int isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
   int dsize, csize;
   int64_t nbytes, cbytes;
-  schunk_header* sc_header;
+  blosc2_sheader* sc_header;
   int i, nchunks;
   void* packed;
 
