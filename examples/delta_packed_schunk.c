@@ -28,12 +28,12 @@
 
 int main() {
   static int32_t data[SIZE];
-  static blosc2_sparams sparams;
+  blosc2_sparams sparams = BLOSC_SPARAMS_DEFAULTS;
   int32_t* data_dest;
   int isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
   int dsize, csize;
   int64_t nbytes, cbytes;
-  blosc2_sheader* sc_header;
+  blosc2_sheader* sheader;
   int i, nchunks;
   void* packed;
 
@@ -47,22 +47,20 @@ int main() {
   blosc_init();
 
   /* Create a super-chunk container */
-  sc_params.filters[0] = BLOSC_DELTA;
-  sc_params.filters[1] = BLOSC_SHUFFLE;
-  sc_params.compressor = BLOSC_BLOSCLZ;
-  sc_params.clevel = 5;
-  sc_header = blosc2_new_schunk(&sc_params);
+  sparams.filters[0] = BLOSC_DELTA;
+  sparams.filters[1] = BLOSC_SHUFFLE;
+  sheader = blosc2_new_schunk(&sparams);
 
   /* Append the reference chunks first */
-  nchunks = blosc2_append_buffer(sc_header, sizeof(int32_t), isize, data);
+  nchunks = blosc2_append_buffer(sheader, sizeof(int32_t), isize, data);
   assert(nchunks == 1);
-  nbytes = sc_header->nbytes;
-  cbytes = sc_header->cbytes;
+  nbytes = sheader->nbytes;
+  cbytes = sheader->cbytes;
   printf("Compression super-chunk (native) #%d: %ld -> %ld (%.1fx)\n",
          0, (long)nbytes, (long)cbytes, (1. * nbytes) / cbytes);
 
   /* Pack the super-chunk */
-  packed = blosc2_pack_schunk(sc_header);
+  packed = blosc2_pack_schunk(sheader);
 
   /* Now append another chunk (essentially the same as the reference) */
   packed = blosc2_packed_append_buffer(packed, sizeof(int32_t), isize, data);
@@ -95,7 +93,7 @@ int main() {
   /* Free resources */
   free(data_dest);
   /* Destroy the super-chunk */
-  blosc2_destroy_schunk(sc_header);
+  blosc2_destroy_schunk(sheader);
   /* Destroy the packed super-chunk */
   free(packed);
   /* Destroy the Blosc environment */

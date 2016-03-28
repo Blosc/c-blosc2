@@ -33,7 +33,7 @@ int main() {
   int isize = SIZE * sizeof(int32_t);
   int dsize;
   int32_t nbytes, cbytes;
-  blosc2_sparams* sparams = calloc(1, sizeof(blosc2_sparams));
+  blosc2_sparams sparams = BLOSC_SPARAMS_DEFAULTS;
   blosc2_sheader* sheader;
   int i, nchunk, nchunks;
 
@@ -45,11 +45,9 @@ int main() {
   blosc_set_nthreads(2);
 
   /* Create a super-chunk container */
-  sparams->filters[0] = BLOSC_DELTA;
-  sparams->filters[1] = BLOSC_BITSHUFFLE;
-  sparams->compressor = BLOSC_LZ4;
-  sparams->clevel = 5;
-  sheader = blosc2_new_schunk(sparams);
+  sparams.filters[0] = BLOSC_DELTA;
+  sparams.filters[1] = BLOSC_BITSHUFFLE;
+  sheader = blosc2_new_schunk(&sparams);
 
   for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
 
@@ -86,7 +84,6 @@ int main() {
   printf("Successful roundtrip!\n");
 
   /* Free resources */
-  free(sparams);
   /* Destroy the super-chunk */
   blosc2_destroy_schunk(sheader);
   /* Destroy the Blosc environment */

@@ -29,10 +29,9 @@
 int main() {
   static float data[SIZE];
   static float data_dest[SIZE];
-  void* chunk = data_dest;
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize, csize;
-  blosc2_sparams* sparams = calloc(1, sizeof(sparams));
+  blosc2_sparams sparams = BLOSC_SPARAMS_DEFAULTS;
   blosc2_sheader* sheader;
   int i, nchunks;
 
@@ -47,7 +46,8 @@ int main() {
   blosc_init();
 
   /* Compress with clevel=5 and shuffle active  */
-  csize = blosc_compress(5, BLOSC_SHUFFLE, sizeof(float), isize, data, chunk, osize);
+  csize = blosc_compress(5, BLOSC_SHUFFLE, sizeof(float),
+    isize, data, data_dest, osize);
   if (csize == 0) {
     printf("Buffer is uncompressible.  Giving up.\n");
     return 1;
@@ -60,13 +60,10 @@ int main() {
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1. * isize) / csize);
 
   /* Create a super-chunk container */
-  sparams->filters[0] = BLOSC_SHUFFLE;
-  sparams->compressor = BLOSC_BLOSCLZ;
-  sparams->clevel = 5;
-  sheader = blosc2_new_schunk(sparams);
+  sheader = blosc2_new_schunk(&sparams);
 
   /* Append a couple of chunks there */
-  nchunks = blosc2_append_chunk(sheader, chunk, 1);
+  nchunks = blosc2_append_chunk(sheader, data_dest, 1);
   assert(nchunks == 1);
 
   /* Now append another chunk coming from the initial buffer */
@@ -74,12 +71,12 @@ int main() {
   assert(nchunks == 2);
 
   /* Retrieve and decompress the chunks (0-based count) */
-  dsize = blosc2_decompress_chunk(sheader, 1, chunk, isize);
+  dsize = blosc2_decompress_chunk(sheader, 1, (void*)data_dest, isize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
   }
-  dsize = blosc2_decompress_chunk(sheader, 0, chunk, isize);
+  dsize = blosc2_decompress_chunk(sheader, 0, (void*)data_dest, isize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
@@ -97,7 +94,6 @@ int main() {
   printf("Succesful roundtrip!\n");
 
   /* Free resources */
-  free(sparams);
   /* Destroy the super-chunk */
   blosc2_destroy_schunk(sheader);
   /* Destroy the Blosc environment */
