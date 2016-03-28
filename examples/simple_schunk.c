@@ -60,23 +60,23 @@ int main() {
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1. * isize) / csize);
 
   /* Create a super-chunk container */
+  sparams.filters[0] = BLOSC_DELTA;
+  sparams.filters[1] = BLOSC_SHUFFLE;
   sheader = blosc2_new_schunk(&sparams);
 
-  /* Append a couple of chunks there */
-  nchunks = blosc2_append_chunk(sheader, data_dest, 1);
+  /* Now append a couple of chunks */
+  nchunks = blosc2_append_buffer(sheader, sizeof(float), isize, data);
   assert(nchunks == 1);
-
-  /* Now append another chunk coming from the initial buffer */
   nchunks = blosc2_append_buffer(sheader, sizeof(float), isize, data);
   assert(nchunks == 2);
 
   /* Retrieve and decompress the chunks (0-based count) */
-  dsize = blosc2_decompress_chunk(sheader, 1, (void*)data_dest, isize);
+  dsize = blosc2_decompress_chunk(sheader, 0, (void*)data_dest, isize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
   }
-  dsize = blosc2_decompress_chunk(sheader, 0, (void*)data_dest, isize);
+  dsize = blosc2_decompress_chunk(sheader, 1, (void*)data_dest, isize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
@@ -86,6 +86,7 @@ int main() {
 
   for (i = 0; i < SIZE; i++) {
     if (data[i] != data_dest[i]) {
+      printf("i, values: %d, %f, %f\n", i, data[i], data_dest[i]);
       printf("Decompressed data differs from original!\n");
       return -1;
     }

@@ -79,20 +79,11 @@ blosc2_sheader* blosc2_new_schunk(blosc2_sparams* sparams) {
 
 
 /* Append an existing chunk into a super-chunk. */
-size_t blosc2_append_chunk(blosc2_sheader* sheader, void* chunk,
-    int copy) {
+size_t append_chunk(blosc2_sheader* sheader, void* chunk) {
   int64_t nchunks = sheader->nchunks;
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
   int32_t nbytes = *(int32_t*)((uint8_t*)chunk + 4);
   int32_t cbytes = *(int32_t*)((uint8_t*)chunk + 12);
-  void* chunk_copy;
-
-  /* By copying the chunk we will always be able to free it later on */
-  if (copy) {
-    chunk_copy = malloc((size_t)cbytes);
-    memcpy(chunk_copy, chunk, (size_t)cbytes);
-    chunk = chunk_copy;
-  }
 
   /* Make space for appending a new chunk and do it */
   sheader->data = realloc(sheader->data, (nchunks + 1) * sizeof(void*));
@@ -176,8 +167,8 @@ size_t blosc2_append_buffer(blosc2_sheader* sheader, size_t typesize,
     return cbytes;
   }
 
-  /* Append the chunk (no copy required here) */
-  return blosc2_append_chunk(sheader, chunk, 0);
+  /* Append the chunk */
+  return append_chunk(sheader, chunk);
 }
 
 
@@ -411,7 +402,7 @@ blosc2_sheader* blosc2_unpack_schunk(void* packed) {
 
 
 /* Append an existing chunk into a *packed* super-chunk. */
-void* blosc2_packed_append_chunk(void* packed, void* chunk) {
+void* packed_append_chunk(void* packed, void* chunk) {
   int64_t nchunks = *(int64_t*)((uint8_t*)packed + 16);
   int64_t packed_len = *(int64_t*)((uint8_t*)packed + 32);
   int64_t data_offsets = *(int64_t*)((uint8_t*)packed + 72);
@@ -489,7 +480,7 @@ void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes, 
   free(filters);
 
   /* Append the chunk and free it */
-  new_packed = blosc2_packed_append_chunk(packed, chunk);
+  new_packed = packed_append_chunk(packed, chunk);
   free(chunk);
 
   return new_packed;

@@ -415,10 +415,6 @@ BLOSC_EXPORT int blosc2_set_delta_ref(blosc2_sheader* sheader,
 /* Free all memory from a super-chunk. */
 BLOSC_EXPORT int blosc2_destroy_schunk(blosc2_sheader* sheader);
 
-/* Append an existing `chunk` to a super-chunk. */
-BLOSC_EXPORT size_t blosc2_append_chunk(blosc2_sheader* sheader,
-    void* chunk, int copy);
-
 /* Append a `src` data buffer to a super-chunk.
 
  `typesize` is the number of bytes of the underlying data type and
