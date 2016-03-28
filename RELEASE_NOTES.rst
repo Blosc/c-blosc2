@@ -28,6 +28,9 @@ Changes from 2.0.0a2 to 2.0.0a3
   smaller and besides tends to be a bit faster.  Also, miniz is
   preferred to an external Zlib.
 
+* The internal snappy sources have been removed.  If snappy library
+  is found, the support for it is still there.
+
 
 Changes from 2.0.0a1 to 2.0.0a2
 ===============================

@@ -20,9 +20,6 @@
 #   PREFER_EXTERNAL_LZ4: default OFF
 #       when found, use the installed LZ4 libs instead of included
 #       sources
-#   PREFER_EXTERNAL_SNAPPY: default ON
-#       when found, use the installed Snappy libs instead of included
-#       sources
 #   PREFER_EXTERNAL_ZLIB: default OFF
 #       when found, use the installed ZLIB libs instead of included
 #       MINIZ sources
@@ -93,8 +90,6 @@ option(DEACTIVATE_ZSTD
         "Do not include support for the ZSTD library." OFF)
 option(PREFER_EXTERNAL_LZ4
         "Find and use external LZ4 library instead of included sources." OFF)
-option(PREFER_EXTERNAL_SNAPPY
-        "Find and use external SNAPPY library instead of included sources." ON)
 option(PREFER_EXTERNAL_ZLIB
         "Find and use external ZLIB library instead of included sources." OFF)
 option(PREFER_EXTERNAL_ZSTD
@@ -115,14 +110,13 @@ if (NOT DEACTIVATE_LZ4)
 endif (NOT DEACTIVATE_LZ4)
 
 if (NOT DEACTIVATE_SNAPPY)
-    if (PREFER_EXTERNAL_SNAPPY)
-        find_package(Snappy)
-    else ()
-        message(STATUS "Using Snappy internal sources.")
-    endif (PREFER_EXTERNAL_SNAPPY)
-    # HAVE_SNAPPY will be set to true because even if the library is not found,
-    # we will use the included sources for it
-    set(HAVE_SNAPPY TRUE)
+    find_package(Snappy)
+    if (SNAPPY_FOUND)
+        message(STATUS "Activating support for SNAPPY.")
+        set(HAVE_SNAPPY TRUE)
+    else (SNAPPY_FOUND)
+        message(STATUS "SNAPPY *not* found.  De-activating support for it.")
+    endif (SNAPPY_FOUND)
 endif (NOT DEACTIVATE_SNAPPY)
 
 if (NOT DEACTIVATE_ZLIB)
@@ -146,6 +140,9 @@ endif (NOT DEACTIVATE_ZLIB)
 if (NOT DEACTIVATE_ZSTD)
     if (PREFER_EXTERNAL_ZSTD)
         find_package(ZSTD)
+        if (NOT ZSTD_FOUND)
+          message(STATUS "No ZSTD library found.  Using internal sources.")
+        endif (NOT ZSTD_FOUND)
     else ()
         message(STATUS "Using ZSTD internal sources.")
     endif (PREFER_EXTERNAL_ZSTD)
