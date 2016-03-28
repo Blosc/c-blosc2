@@ -1,10 +1,16 @@
 ==================================================
- Release notes for c-blosc2 2.0.0a3 (third alpha)
+ Release notes for C-Blosc2 2.0.0a4 (fourth alpha)
 ==================================================
 
 :Author: Francesc Alted
 :Contact: francesc@blosc.org
 :URL: http://www.blosc.org
+
+
+Changes from 2.0.0a3 to 2.0.0a4
+===============================
+
+#XXX version-specific blurb XXX#
 
 
 Changes from 2.0.0a2 to 2.0.0a3

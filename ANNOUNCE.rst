@@ -6,17 +6,8 @@
 What is new?
 ============
 
-This is the third alpha release of Blosc2.  It introduces the concept
-of contexts (for use in multi-threaded apps for example) via the new
-blosc2_create_context() and blosc2_free_context() functions.  The
-contexts can be used with the new blosc2_compress_ctx() and
-blosc2_decompress_ctx().
+#XXX version-specific blurb XXX#
 
-Also important is the support for new Zstd codec
-(https://github.com/Cyan4973/zstd).  This is a new compressor by Yann
-Collet, the author of LZ4 and LZ4HC.  For details on Zstd, see this
-nice intro:
-http://fastcompression.blogspot.com.es/2015/01/zstd-stronger-compression-algorithm.html.
 
 For more info, please see the release notes in:
 
