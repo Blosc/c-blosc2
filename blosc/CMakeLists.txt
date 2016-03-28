@@ -31,7 +31,7 @@ if (NOT DEACTIVATE_ZLIB)
     if (ZLIB_FOUND)
         include_directories(${ZLIB_INCLUDE_DIR})
     else (ZLIB_FOUND)
-	include_directories(${INTERNAL_LIBS}/miniz-1.15)
+        include_directories(${INTERNAL_LIBS}/miniz-1.15)
     endif (ZLIB_FOUND)
 endif (NOT DEACTIVATE_ZLIB)
 
