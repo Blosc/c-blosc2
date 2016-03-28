@@ -28,7 +28,7 @@
 
 int main() {
   static int32_t data[SIZE];
-  static schunk_params sc_params;
+  static blosc2_sparams sparams;
   int32_t* data_dest;
   int isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
   int dsize, csize;

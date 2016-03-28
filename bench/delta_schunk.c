@@ -107,7 +107,7 @@ double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current, int nit
 
 int main() {
   int32_t *data, *data_dest;
-  static schunk_params sc_params;
+  static blosc2_sparams sparams;
   schunk_header* schunk;
   int isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
@@ -131,11 +131,11 @@ int main() {
   blosc_set_nthreads(NTHREADS);
 
   /* Create a super-chunk container */
-  sc_params.filters[0] = BLOSC_DELTA;
-  sc_params.filters[1] = BLOSC_SHUFFLE;
-  sc_params.compressor = BLOSC_BLOSCLZ;
-  sc_params.clevel = 5;
-  schunk = blosc2_new_schunk(&sc_params);
+  sparams.filters[0] = BLOSC_DELTA;
+  sparams.filters[1] = BLOSC_SHUFFLE;
+  sparams.compressor = BLOSC_BLOSCLZ;
+  sparams.clevel = 5;
+  schunk = blosc2_new_schunk(&sparams);
 
   /* Append the reference chunk first */
   blosc_set_timestamp(&last);

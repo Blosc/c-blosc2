@@ -399,10 +399,14 @@ typedef struct {
   uint8_t filters[BLOSC_MAX_FILTERS];
   /* the (sequence of) filters */
   uint16_t filters_meta;   /* metadata for filters */
-} schunk_params;
+} blosc2_sparams;
+
+/* Default struct for schunk params meant for user initialization */
+static const blosc2_sparams BLOSC_SPARAMS_DEFAULTS = \
+  { BLOSC_ZSTD, 5, {BLOSC_DELTA, BLOSC_SHUFFLE, 0, 0, 0}, 0 };
 
 /* Create a new super-chunk. */
-BLOSC_EXPORT blosc2_sheader* blosc2_new_schunk(schunk_params* params);
+BLOSC_EXPORT blosc2_sheader* blosc2_new_schunk(blosc2_sparams* params);
 
 /* Set a delta reference for the super-chunk */
 BLOSC_EXPORT int blosc2_set_delta_ref(blosc2_sheader* sheader,

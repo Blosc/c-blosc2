@@ -18,7 +18,7 @@ int main() {
   int isize = SIZE * sizeof(int32_t);
   int dsize;
   int32_t nbytes, cbytes;
-  schunk_params* sc_params = calloc(1, sizeof(schunk_params));
+  blosc2_sparams* sc_params = calloc(1, sizeof(blosc2_sparams));
   blosc2_sheader* sc_header;
   int i, nchunk, nchunks;
 

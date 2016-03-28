@@ -36,7 +36,7 @@
 
 
 /* Encode filters in a 16 bit int type */
-uint16_t encode_filters(schunk_params* params) {
+uint16_t encode_filters(blosc2_sparams* params) {
   int i;
   uint16_t enc_filters = 0;
 
@@ -63,14 +63,14 @@ uint8_t* decode_filters(uint16_t enc_filters) {
 
 
 /* Create a new super-chunk */
-blosc2_sheader* blosc2_new_schunk(schunk_params* params) {
+blosc2_sheader* blosc2_new_schunk(blosc2_sparams* sparams) {
   blosc2_sheader* sheader = calloc(1, sizeof(blosc2_sheader));
 
   sheader->version = 0;     /* pre-first version */
-  sheader->filters = encode_filters(params);
-  sheader->filters_meta = params->filters_meta;
-  sheader->compressor = params->compressor;
-  sheader->clevel = params->clevel;
+  sheader->filters = encode_filters(sparams);
+  sheader->filters_meta = sparams->filters_meta;
+  sheader->compressor = sparams->compressor;
+  sheader->clevel = sparams->clevel;
   sheader->cbytes = sizeof(blosc2_sheader);
   /* The rest of the structure will remain zeroed */
 

@@ -32,8 +32,8 @@ int main() {
   void* chunk = data_dest;
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize, csize;
-  schunk_params* sc_params = calloc(1, sizeof(sc_params));
-  blosc2_sheader* sc_header;
+  blosc2_sparams* sparams = calloc(1, sizeof(sparams));
+  blosc2_sheader* sheader;
   int i, nchunks;
 
   for (i = 0; i < SIZE; i++) {
@@ -60,26 +60,26 @@ int main() {
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1. * isize) / csize);
 
   /* Create a super-chunk container */
-  sc_params->filters[0] = BLOSC_SHUFFLE;
-  sc_params->compressor = BLOSC_BLOSCLZ;
-  sc_params->clevel = 5;
-  sc_header = blosc2_new_schunk(sc_params);
+  sparams->filters[0] = BLOSC_SHUFFLE;
+  sparams->compressor = BLOSC_BLOSCLZ;
+  sparams->clevel = 5;
+  sheader = blosc2_new_schunk(sparams);
 
   /* Append a couple of chunks there */
-  nchunks = blosc2_append_chunk(sc_header, chunk, 1);
+  nchunks = blosc2_append_chunk(sheader, chunk, 1);
   assert(nchunks == 1);
 
   /* Now append another chunk coming from the initial buffer */
-  nchunks = blosc2_append_buffer(sc_header, sizeof(float), isize, data);
+  nchunks = blosc2_append_buffer(sheader, sizeof(float), isize, data);
   assert(nchunks == 2);
 
   /* Retrieve and decompress the chunks (0-based count) */
-  dsize = blosc2_decompress_chunk(sc_header, 1, chunk, isize);
+  dsize = blosc2_decompress_chunk(sheader, 1, chunk, isize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
   }
-  dsize = blosc2_decompress_chunk(sc_header, 0, chunk, isize);
+  dsize = blosc2_decompress_chunk(sheader, 0, chunk, isize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
@@ -97,9 +97,9 @@ int main() {
   printf("Succesful roundtrip!\n");
 
   /* Free resources */
-  free(sc_params);
+  free(sparams);
   /* Destroy the super-chunk */
-  blosc2_destroy_schunk(sc_header);
+  blosc2_destroy_schunk(sheader);
   /* Destroy the Blosc environment */
   blosc_destroy();
 

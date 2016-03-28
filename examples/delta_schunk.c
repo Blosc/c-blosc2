@@ -33,8 +33,8 @@ int main() {
   int isize = SIZE * sizeof(int32_t);
   int dsize;
   int32_t nbytes, cbytes;
-  schunk_params* sc_params = calloc(1, sizeof(schunk_params));
-  blosc2_sheader* sc_header;
+  blosc2_sparams* sparams = calloc(1, sizeof(blosc2_sparams));
+  blosc2_sheader* sheader;
   int i, nchunk, nchunks;
 
   printf("Blosc version info: %s (%s)\n",
@@ -45,11 +45,11 @@ int main() {
   blosc_set_nthreads(2);
 
   /* Create a super-chunk container */
-  sc_params->filters[0] = BLOSC_DELTA;
-  sc_params->filters[1] = BLOSC_BITSHUFFLE;
-  sc_params->compressor = BLOSC_LZ4;
-  sc_params->clevel = 5;
-  sc_header = blosc2_new_schunk(sc_params);
+  sparams->filters[0] = BLOSC_DELTA;
+  sparams->filters[1] = BLOSC_BITSHUFFLE;
+  sparams->compressor = BLOSC_LZ4;
+  sparams->clevel = 5;
+  sheader = blosc2_new_schunk(sparams);
 
   for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
 
@@ -57,18 +57,18 @@ int main() {
       data[i] = i * nchunk;
     }
 
-    nchunks = blosc2_append_buffer(sc_header, sizeof(int32_t), isize, data);
+    nchunks = blosc2_append_buffer(sheader, sizeof(int32_t), isize, data);
     assert(nchunks == nchunk);
   }
 
   /* Gather some info */
-  nbytes = sc_header->nbytes;
-  cbytes = sc_header->cbytes;
+  nbytes = sheader->nbytes;
+  cbytes = sheader->cbytes;
   printf("Compression super-chunk: %d -> %d (%.1fx)\n",
          nbytes, cbytes, (1. * nbytes) / cbytes);
 
   /* Retrieve and decompress the chunks (0-based count) */
-  dsize = blosc2_decompress_chunk(sc_header, 0, (void*)data_dest, isize);
+  dsize = blosc2_decompress_chunk(sheader, 0, (void*)data_dest, isize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
@@ -86,9 +86,9 @@ int main() {
   printf("Successful roundtrip!\n");
 
   /* Free resources */
-  free(sc_params);
+  free(sparams);
   /* Destroy the super-chunk */
-  blosc2_destroy_schunk(sc_header);
+  blosc2_destroy_schunk(sheader);
   /* Destroy the Blosc environment */
   blosc_destroy();
 
