@@ -718,7 +718,7 @@ static int blosc_d(
   blosc_context* context = thread_context->parent_context;
   int32_t compformat = (*(context->header_flags) & 0xe0) >> 5;
   int dont_split = (*(context->header_flags) & 0x10) >> 4;
-  uint8_t blosc_version_format = context->src[0];
+  uint8_t blosc_version_format = src[0];
   int32_t j, neblock, nsplits;
   int32_t nbytes;                /* number of decompressed bytes in split */
   int32_t cbytes;                /* number of compressed bytes in split */
@@ -1456,6 +1456,8 @@ int _blosc_getitem(const blosc_context* context, const void* src, int start,
   nbytes = sw32_(_src + 4);                 /* buffer size */
   blocksize = sw32_(_src + 8);              /* block size */
   ctbytes = sw32_(_src + 12);               /* compressed buffer size */
+
+  ebsize = blocksize + typesize * (int32_t)sizeof(int32_t);
 
   version += 0;                             /* shut up compiler warning */
   versionlz += 0;                           /* shut up compiler warning */
