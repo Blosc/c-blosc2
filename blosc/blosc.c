@@ -9,6 +9,8 @@
 
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -1338,6 +1340,95 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
                    const void* src, void* dest, size_t destsize) {
   int error;
   int result;
+  char* envvar;
+  blosc_context *cctx;
+  blosc2_context_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+
+  /* Check whether the library should be initialized */
+  if (!g_initlib) blosc_init();
+
+  /* Check for a BLOSC_CLEVEL environment variable */
+  envvar = getenv("BLOSC_CLEVEL");
+  if (envvar != NULL) {
+    long value;
+    value = strtol(envvar, NULL, 10);
+    if ((value != EINVAL) && (value >= 0)) {
+      clevel = (int)value;
+    }
+  }
+
+  /* Check for a BLOSC_SHUFFLE environment variable */
+  envvar = getenv("BLOSC_SHUFFLE");
+  if (envvar != NULL) {
+    if (strcmp(envvar, "NOSHUFFLE") == 0) {
+      doshuffle = BLOSC_NOSHUFFLE;
+    }
+    if (strcmp(envvar, "SHUFFLE") == 0) {
+      doshuffle = BLOSC_SHUFFLE;
+    }
+    if (strcmp(envvar, "BITSHUFFLE") == 0) {
+      doshuffle = BLOSC_BITSHUFFLE;
+    }
+  }
+
+  /* Check for a BLOSC_TYPESIZE environment variable */
+  envvar = getenv("BLOSC_TYPESIZE");
+  if (envvar != NULL) {
+    long value;
+    value = strtol(envvar, NULL, 10);
+    if ((value != EINVAL) && (value > 0)) {
+      typesize = (int)value;
+    }
+  }
+
+  /* Check for a BLOSC_COMPRESSOR environment variable */
+  envvar = getenv("BLOSC_COMPRESSOR");
+  if (envvar != NULL) {
+    result = blosc_set_compressor(envvar);
+    if (result < 0) { return result; }
+  }
+
+  /* Check for a BLOSC_COMPRESSOR environment variable */
+  envvar = getenv("BLOSC_BLOCKSIZE");
+  if (envvar != NULL) {
+    long blocksize;
+    blocksize = strtol(envvar, NULL, 10);
+    if ((blocksize != EINVAL) && (blocksize > 0)) {
+      blosc_set_blocksize((size_t)blocksize);
+    }
+  }
+
+  /* Check for a BLOSC_NTHREADS environment variable */
+  envvar = getenv("BLOSC_NTHREADS");
+  if (envvar != NULL) {
+    long nthreads;
+    nthreads = strtol(envvar, NULL, 10);
+    if ((nthreads != EINVAL) && (nthreads > 0)) {
+      result = blosc_set_nthreads((int)nthreads);
+      if (result < 0) { return result; }
+    }
+  }
+
+  /* Check for a BLOSC_NOLOCK environment variable.  It is important
+     that this should be the last env var so that it can take the
+     previous ones into account */
+  envvar = getenv("BLOSC_NOLOCK");
+  if (envvar != NULL) {
+    char *compname;
+    blosc_compcode_to_compname(g_compressor, &compname);
+    /* Create a context for compression */
+    cparams.typesize = typesize;
+    cparams.compcode = g_compressor;
+    cparams.filtercode = doshuffle;
+    cparams.clevel = clevel;
+    cparams.nthreads = g_nthreads;
+    cctx = blosc2_create_cctx(&cparams);
+    /* Do the actual compression */
+    result = blosc2_compress_ctx(cctx, nbytes, src, dest, destsize);
+    /* Release context resources */
+    blosc2_free_ctx(cctx);
+    return result;
+  }
 
   pthread_mutex_lock(&global_comp_mutex);
 
@@ -1380,18 +1471,8 @@ int blosc_run_decompression_with_context(
 
   /* Check whether this buffer is memcpy'ed */
   if (*(context->header_flags) & BLOSC_MEMCPYED) {
-    if (((context->sourcesize % L1) == 0) || (context->nthreads > 1)) {
-      /* More effective with large buffers that are multiples of the
-       cache size or multi-cores */
-      ntbytes = do_job(context);
-      if (ntbytes < 0) {
-        return -1;
-      }
-    }
-    else {
-      memcpy(dest, (uint8_t*)src + BLOSC_MAX_OVERHEAD, context->sourcesize);
-      ntbytes = context->sourcesize;
-    }
+    memcpy(dest, (uint8_t*)src + BLOSC_MAX_OVERHEAD, context->sourcesize);
+    ntbytes = context->sourcesize;
   }
   else {
     /* Do the actual decompression */
@@ -1423,8 +1504,45 @@ int blosc2_decompress_ctx(
 
 /* The public routine for decompression.  See blosc.h for docstrings. */
 int blosc_decompress(const void* src, void* dest, size_t destsize) {
-  /* TODO: Global lock is missing here!! */
-  return blosc_run_decompression_with_context(g_global_context, src, dest, destsize);
+  int result;
+  char* envvar;
+  long nthreads;
+  blosc_context *dctx;
+  blosc2_context_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+
+  /* Check whether the library should be initialized */
+  if (!g_initlib) blosc_init();
+
+  /* Check for a BLOSC_NTHREADS environment variable */
+  envvar = getenv("BLOSC_NTHREADS");
+  if (envvar != NULL) {
+    nthreads = strtol(envvar, NULL, 10);
+    if ((nthreads != EINVAL) && (nthreads > 0)) {
+      result = blosc_set_nthreads((int)nthreads);
+      if (result < 0) { return result; }
+    }
+  }
+
+  /* Check for a BLOSC_NOLOCK environment variable.  It is important
+     that this should be the last env var so that it can take the
+     previous ones into account */
+  envvar = getenv("BLOSC_NOLOCK");
+  if (envvar != NULL) {
+    dparams.nthreads = g_nthreads;
+    dctx = blosc2_create_dctx(&dparams);
+    result = blosc2_decompress_ctx(dctx, src, dest, destsize);
+    blosc2_free_ctx(dctx);
+    return result;
+  }
+
+  pthread_mutex_lock(&global_comp_mutex);
+
+  result = blosc_run_decompression_with_context(g_global_context, src, dest,
+                                                destsize);
+
+  pthread_mutex_unlock(&global_comp_mutex);
+
+  return result;
 }
 
 /* Specific routine optimized for decompression a small number of
@@ -1818,10 +1936,20 @@ static int init_threads(blosc_context* context) {
   return (0);
 }
 
+int blosc_get_nthreads(void)
+{
+  int ret = g_nthreads;
+
+  return ret;
+}
+
 int blosc_set_nthreads(int nthreads_new) {
   int ret = g_nthreads;          /* the previous number of threads */
 
-  if (nthreads_new != ret){
+  /* Check whether the library should be initialized */
+  if (!g_initlib) blosc_init();
+
+ if (nthreads_new != ret) {
     /* Re-initialize Blosc */
     blosc_destroy();
     blosc_init();
@@ -1850,13 +1978,20 @@ int blosc_set_nthreads_(blosc_context* context) {
   return context->nthreads;
 }
 
+char* blosc_get_compressor(void)
+{
+  char* compname;
+  blosc_compcode_to_compname(g_compressor, &compname);
+
+  return compname;
+}
+
 int blosc_set_compressor(const char* compname) {
   int code = blosc_compname_to_compcode(compname);
 
   g_compressor = code;
 
-  /* Check if should initialize (implementing previous 1.2.3 behaviour,
-     where calling blosc_set_nthreads was enough) */
+  /* Check whether the library should be initialized */
   if (!g_initlib) blosc_init();
 
   return code;
@@ -2007,6 +2142,13 @@ char* blosc_cbuffer_complib(const void* cbuffer) {
   return complib;
 }
 
+/* Get the internal blocksize to be used during compression.  0 means
+   that an automatic blocksize is computed internally. */
+int blosc_get_blocksize(void)
+{
+  return (int)g_force_blocksize;
+}
+
 /* Force the use of a specific blocksize.  If 0, an automatic
    blocksize will be used (the default). */
 void blosc_set_blocksize(size_t size) {
@@ -2031,6 +2173,9 @@ blosc_context* create_context(int nthreads) {
 }
 
 void blosc_init(void) {
+  /* Return if we are already initialized */
+  if (g_initlib) return;
+
   pthread_mutex_init(&global_comp_mutex, NULL);
   g_global_context = create_context(g_nthreads);
   g_global_context->threads_started = 0;
@@ -2038,6 +2183,9 @@ void blosc_init(void) {
 }
 
 void blosc_destroy(void) {
+  /* Return if Blosc is not initialized */
+  if (!g_initlib) return;
+
   g_initlib = 0;
   blosc_release_threadpool(g_global_context);
   if (g_global_context->serial_context != NULL) {
@@ -2096,6 +2244,9 @@ int blosc_release_threadpool(blosc_context* context) {
 }
 
 int blosc_free_resources(void) {
+  /* Return if Blosc is not initialized */
+  if (!g_initlib) return -1;
+
   return blosc_release_threadpool(g_global_context);
 }
 

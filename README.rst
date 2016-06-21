@@ -5,8 +5,13 @@
 :Author: Francesc Alted
 :Contact: francesc@blosc.org
 :URL: http://www.blosc.org
+:Gitter: |gitter|
 :Travis CI: |travis|
 :Appveyor: |appveyor|
+
+.. |gitter| image:: https://badges.gitter.im/Blosc/c-blosc.svg
+        :alt: Join the chat at https://gitter.im/Blosc/c-blosc
+        :target: https://gitter.im/Blosc/c-blosc?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
 
 .. |travis| image:: https://travis-ci.org/Blosc/c-blosc2.svg?branch=master
         :target: https://travis-ci.org/Blosc/c-blosc2
@@ -46,24 +51,24 @@ details.
 Meta-compression and other advantages over existing compressors
 ===============================================================
 
-C-Blosc is not like other compressors: it should rather be called a
+C-Blosc2 is not like other compressors: it should rather be called a
 meta-compressor.  This is so because it can use different compressors
 and filters (programs that generally improve compression ratio).  At
 any rate, it can also be called a compressor because it happens that
 it already comes with several compressor and filters, so it can
 actually work like so.
 
-Currently C-Blosc comes with support of BloscLZ, a compressor heavily
+Currently C-Blosc2 comes with support of BloscLZ, a compressor heavily
 based on FastLZ (http://fastlz.org/), LZ4 and LZ4HC
-(https://github.com/Cyan4973/lz4), Snappy
-(https://github.com/google/snappy) and Zlib (http://www.zlib.net/), as
-well as a highly optimized (it can use SSE2 or AVX2 instructions, if
-available) shuffle and bitshuffle filters (for info on how and why
-shuffling works, see slide 17 of
-http://www.slideshare.net/PyData/blosc-py-data-2014).  However,
+(https://github.com/Cyan4973/lz4), Zstd
+(https://github.com/Cyan4973/zstd) and Zlib (via miniz:
+https://github.com/richgel999/miniz), as well as a highly optimized
+(it can use SSE2 or AVX2 instructions, if available) shuffle and
+bitshuffle filters (for info on how and why shuffling works, see slide
+17 of http://www.slideshare.net/PyData/blosc-py-data-2014).  However,
 different compressors or filters may be added in the future.
 
-C-Blosc is in charge of coordinating the different compressor and
+C-Blosc2 is in charge of coordinating the different compressor and
 filters so that they can leverage the blocking technique (described
 above) as well as multi-threaded execution (if several cores are
 available) automatically. That makes that every compressor and filter
@@ -141,13 +146,13 @@ Once you have compiled your Blosc library, you can easily link your
 apps with it as shown in the `example/ directory
 <https://github.com/Blosc/c-blosc/blob/master/examples>`_.
 
-Adding support for other compressors (LZ4, LZ4HC, Snappy, Zlib) with CMake
+Adding support for other compressors (LZ4, LZ4HC, Zstd, Zlib) with CMake
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The CMake files in Blosc are configured to automatically detect other
-compressors like LZ4, LZ4HC, Snappy or Zlib by default.  So as long as
-the libraries and the header files for these libraries are accessible,
-these will be used by default.  See an `example here
+compressors like LZ4, LZ4HC, Snappy, Zstd or Zlib by default.  So as
+long as the libraries and the header files for these libraries are
+accessible, these will be used by default.  See an `example here
 <https://github.com/Blosc/c-blosc/blob/master/examples/many_compressors.c>`_.
 
 *Note on Zlib*: the library should be easily found on UNIX systems,
@@ -156,7 +161,7 @@ environment variable 'ZLIB_ROOT' to where zlib 'include' and 'lib'
 directories are. Also, make sure that Zlib DDL library is in your
 '\Windows' directory.
 
-However, the full sources for LZ4, LZ4HC, Snappy and Zlib have been
+However, the full sources for LZ4, LZ4HC, Zstd and Zlib have been
 included in Blosc too. So, in general, you should not worry about not
 having (or CMake not finding) the libraries in your system because in
 this case, their sources will be automatically compiled for you. That
@@ -177,6 +182,14 @@ You can also disable support for some compression libraries:
 
   $ cmake -DDEACTIVATE_SNAPPY=ON ..
 
+Supported platforms
+~~~~~~~~~~~~~~~~~~~
+
+Blosc is meant to support all platforms where a C89 compliant C
+compiler can be found.  The ones that are mostly tested are Intel
+(Linux, Mac OSX and Windows) and ARM (Linux), but exotic ones as IBM
+Blue Gene Q embedded "A2" processor are reported to work too.
+
 Mac OSX troubleshooting
 =======================
 
@@ -194,13 +207,6 @@ Wrapper for Python
 Blosc has an official wrapper for Python.  See:
 
 https://github.com/Blosc/python-blosc
-
-Command line interface and serialization format for Blosc
-=========================================================
-
-Blosc can be used from command line by using Bloscpack.  See:
-
-https://github.com/Blosc/bloscpack
 
 Filter for HDF5
 ===============
