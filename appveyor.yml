@@ -10,7 +10,7 @@ version: '{build}'
 
 environment:
   matrix:
-   - GENERATOR: "Visual Studio 12 2013"
+    - GENERATOR: "Visual Studio 12 2013"
       CONFIG: Release
 
     - GENERATOR: "Visual Studio 12 Win64"
