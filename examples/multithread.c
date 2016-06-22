@@ -7,16 +7,21 @@
 
     To compile this program using gcc or clang:
 
-    gcc/clang multithread.c -o multithread -lblosc -lpthread
+    $ gcc/clang multithread.c -o multithread -lblosc -lpthread
 
     or, if you don't have the blosc library installed:
 
-    gcc -O3 -msse2 multithread.c ../blosc/*.c  -I../blosc -o multithread -lpthread
+    $ gcc -O3 -msse2 multithread.c ../blosc/!(*avx2*)*.c  -I../blosc -o multithread -lpthread
+
+    or alternatively:
+
+    $ gcc -O3 -msse2 multithread.c -I../blosc -o multithread -L../build/blosc -lblosc
+    $ export LD_LIBRARY_PATH=../build/blosc
 
     Using MSVC on Windows:
 
-    cl /Ox /Femultithread.exe /Iblosc multithread.c blosc\*.c
-    
+    $ cl /Ox /Femultithread.exe /Iblosc multithread.c blosc\*.c
+
     To run:
 
     $ ./multithread

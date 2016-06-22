@@ -190,6 +190,9 @@ compiler can be found.  The ones that are mostly tested are Intel
 (Linux, Mac OSX and Windows) and ARM (Linux), but exotic ones as IBM
 Blue Gene Q embedded "A2" processor are reported to work too.
 
+For Windows, you will need at least VS2010 SP1 or higher on x86 and
+x64 targets (i.e. ARM is not supported in Windows).
+
 Mac OSX troubleshooting
 =======================
 

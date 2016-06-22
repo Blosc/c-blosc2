@@ -264,8 +264,7 @@ return BLOSC_HAVE_NOTHING;
 
 #endif /* defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED) */
 
-static shuffle_implementation_t
-get_shuffle_implementation() {
+static shuffle_implementation_t get_shuffle_implementation() {
   blosc_cpu_features cpu_features = blosc_get_cpu_features();
 #if defined(SHUFFLE_AVX2_ENABLED)
   if (cpu_features & BLOSC_HAVE_AVX2) {
