@@ -10,19 +10,19 @@ version: '{build}'
 
 environment:
   matrix:
-    - GENERATOR: "Visual Studio 10 2010"
-      CONFIG: Release
-
-    - GENERATOR: "Visual Studio 10 2010 Win64"
-      CONFIG: Release
-
-    - GENERATOR: "Visual Studio 12 2013"
+   - GENERATOR: "Visual Studio 12 2013"
       CONFIG: Release
 
     - GENERATOR: "Visual Studio 12 Win64"
       CONFIG: Release
 
-build_script:
+    - GENERATOR: "Visual Studio 14 2015"
+      CONFIG: Release
+
+    - GENERATOR: "Visual Studio 14 2015 Win64"
+      CONFIG: Release
+
+ build_script:
   - cmake "-G%GENERATOR%" -H. -B_builds
   - cmake --build _builds --config "%CONFIG%"
 
