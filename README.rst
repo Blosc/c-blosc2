@@ -16,7 +16,7 @@
 .. |travis| image:: https://travis-ci.org/Blosc/c-blosc2.svg?branch=master
         :target: https://travis-ci.org/Blosc/c-blosc2
 
-.. |appveyor| image:: https://ci.appveyor.com/api/projects/status/gccmb03j8ghbj0ig/branch/master?svg=true
+.. |appveyor| image:: https://ci.appveyor.com/api/projects/status/3mlyjc1ak0lbkmte/branch/master?svg=true
         :target: https://ci.appveyor.com/project/FrancescAlted/c-blosc2/branch/master
 
 
