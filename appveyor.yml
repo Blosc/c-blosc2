@@ -22,7 +22,7 @@ environment:
     - GENERATOR: "Visual Studio 14 2015 Win64"
       CONFIG: Release
 
- build_script:
+build_script:
   - cmake "-G%GENERATOR%" -H. -B_builds
   - cmake --build _builds --config "%CONFIG%"
 
