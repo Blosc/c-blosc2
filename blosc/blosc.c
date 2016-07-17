@@ -522,7 +522,7 @@ static int zstd_wrap_compress(struct thread_context* thread_context,
                               const char* input, size_t input_length,
                               char* output, size_t maxout, int clevel) {
   size_t code;
-  clevel = (clevel < 9) ? clevel * 2 - 1 : 21;
+  clevel = (clevel < 9) ? clevel * 2 - 1 : 22;
   if (thread_context->zstd_cctx == NULL) {
     thread_context->zstd_cctx = ZSTD_createCCtx();
   }
