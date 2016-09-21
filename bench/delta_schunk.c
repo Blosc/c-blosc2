@@ -23,7 +23,6 @@
   #include <time.h>
   #include <sys/time.h>
 #elif defined(__unix__)
-  #include <unistd.h>
   #if defined(__linux__)
     #include <time.h>
   #else
@@ -33,7 +32,7 @@
   #error Unable to detect platform.
 #endif
 
-#include "blosc.h"
+#include "../blosc/blosc.h"
 
 #define KB  1024
 #define MB  (1024*KB)
@@ -95,7 +94,7 @@ double getseconds(blosc_timestamp_t last, blosc_timestamp_t current) {
 
 /* Given two timeval stamps, return the time per chunk in usec */
 double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current, int niter, size_t nchunks) {
-  double elapsed_usecs = (double)blosc_elapsed_usecs(last, current);
+  double elapsed_usecs = blosc_elapsed_usecs(last, current);
   return elapsed_usecs / (double)(niter * nchunks);
 }
 
@@ -108,7 +107,7 @@ double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current, int nit
 int main() {
   int32_t *data, *data_dest;
   static blosc2_sparams sparams;
-  schunk_header* schunk;
+  blosc2_sheader* schunk;
   int isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   int64_t nbytes, cbytes;

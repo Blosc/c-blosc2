@@ -100,13 +100,15 @@ size_t append_chunk(blosc2_sheader* sheader, void* chunk) {
 
 
 /* Set a delta reference for the super-chunk */
-int blosc2_set_delta_ref(blosc2_sheader* sheader, size_t nbytes,
-    void* ref) {
+int blosc2_set_delta_ref(blosc2_sheader* sheader, size_t typesize, size_t nbytes, void* ref) {
   int cbytes;
   void* filters_chunk;
   uint8_t* dec_filters = decode_filters(sheader->filters);
+  int clevel = sheader->clevel;
+  int doshuffle = 0;
 
   if (dec_filters[0] == BLOSC_DELTA) {
+    doshuffle = dec_filters[1];
     if (sheader->filters_chunk != NULL) {
       sheader->cbytes -= *(uint32_t*)(sheader->filters_chunk + 4);
       free(sheader->filters_chunk);
@@ -119,7 +121,7 @@ int blosc2_set_delta_ref(blosc2_sheader* sheader, size_t nbytes,
   free(dec_filters);
 
   filters_chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
-  cbytes = blosc_compress(0, 0, 1, nbytes, ref, filters_chunk,
+  cbytes = blosc_compress(clevel, doshuffle, typesize, nbytes, ref, filters_chunk,
                           nbytes + BLOSC_MAX_OVERHEAD);
   if (cbytes < 0) {
     free(filters_chunk);
@@ -145,7 +147,7 @@ size_t blosc2_append_buffer(blosc2_sheader* sheader, size_t typesize,
   if (dec_filters[0] == BLOSC_DELTA) {
     doshuffle = dec_filters[1];
     if (sheader->filters_chunk == NULL) {
-      ret = blosc2_set_delta_ref(sheader, nbytes, src);
+      ret = blosc2_set_delta_ref(sheader, typesize, nbytes, src);
       if (ret < 0) {
         return((size_t)ret);
       }
@@ -228,6 +230,10 @@ int blosc2_destroy_schunk(blosc2_sheader* sheader) {
     free(sheader->data);
   }
   free(sheader);
+
+  /* The super-chunk is destroyed, so remove the internal reference to it */
+  blosc_set_schunk(NULL);
+
   return 0;
 }
 
