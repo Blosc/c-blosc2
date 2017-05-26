@@ -428,46 +428,28 @@ typedef struct {
   uint8_t flags1;
   uint8_t flags2;
   uint8_t flags3;
-  uint16_t compressor;
-  /* The default compressor.  Each chunk can override this. */
-  uint16_t clevel;
-  /* The compression level and other compress params */
-  uint16_t filters;
-  /* The (sequence of) filters.  3-bit per filter. */
-  uint16_t filters_meta;
-  /* Metadata for filters */
-  uint32_t chunksize;
-  /* Size of each chunk.  0 if not a fixed chunksize. */
-  int64_t nchunks;
-  /* Number of chunks in super-chunk */
-  int64_t nbytes;
-  /* data size + metadata size + header size (uncompressed) */
-  int64_t cbytes;
-  /* data size + metadata size + header size (compressed) */
-  uint8_t* filters_chunk;
-  /* Pointer to chunk hosting filter-related data */
-  uint8_t* codec_chunk;
-  /* Pointer to chunk hosting codec-related data */
-  uint8_t* metadata_chunk;
-  /* Pointer to schunk metadata */
-  uint8_t* userdata_chunk;
-  /* Pointer to user-defined data */
-  uint8_t** data;
-  /* Pointer to chunk data pointers */
-  uint8_t* ctx;
-  /* Context for the thread holder.  NULL if not acquired. */
-  uint8_t* reserved;
-  /* Reserved for the future. */
+  uint16_t compressor;  /* The default compressor.  Each chunk can override this. */
+  uint16_t clevel;  /* The compression level and other compress params */
+  uint16_t filters;  /* The (sequence of) filters.  3-bit per filter. */
+  uint16_t filters_meta;  /* Metadata for filters */
+  uint32_t chunksize;  /* Size of each chunk.  0 if not a fixed chunksize. */
+  int64_t nchunks;  /* Number of chunks in super-chunk */
+  int64_t nbytes;  /* data size + metadata size + header size (uncompressed) */
+  int64_t cbytes;  /* data size + metadata size + header size (compressed) */
+  uint8_t* filters_chunk;  /* Pointer to chunk hosting filter-related data */
+  uint8_t* codec_chunk;  /* Pointer to chunk hosting codec-related data */
+  uint8_t* metadata_chunk;  /* Pointer to schunk metadata */
+  uint8_t* userdata_chunk;  /* Pointer to user-defined data */
+  uint8_t** data;  /* Pointer to chunk data pointers */
+  uint8_t* ctx;  /* Context for the thread holder.  NULL if not acquired. */
+  uint8_t* reserved;  /* Reserved for the future. */
 } blosc2_sheader;
 
 
 typedef struct {
-  uint8_t compressor;
-  /* the default compressor */
-  uint8_t clevel;
-  /* the compression level and other compress params */
-  uint8_t filters[BLOSC_MAX_FILTERS];
-  /* the (sequence of) filters */
+  uint8_t compressor;  /* the default compressor */
+  uint8_t clevel;  /* the compression level and other compress params */
+  uint8_t filters[BLOSC_MAX_FILTERS];  /* the (sequence of) filters */
   uint16_t filters_meta;   /* metadata for filters */
 } blosc2_sparams;
 
@@ -537,20 +519,13 @@ typedef struct blosc_context_s blosc_context;   /* uncomplete type */
   (zero) in the fields of the struct is passed to a function.
 */
 typedef struct {
-  uint8_t typesize;
-  /* the type size (8) */
-  uint8_t compcode;
-  /* the compressor code (BLOSC_BLOSCLZ) */
-  uint8_t clevel;
-  /* the compression level (5) */
-  uint8_t filtercode;
-  /* the filter code (BLOSC_SHUFFLE) */
-  uint8_t nthreads;
-  /* the number of threads to use internally (1) */
-  int32_t blocksize;
-  /* the requested size of the compressed blocks (0; meaning automatic) */
-  blosc2_sheader* schunk;
-  /* the associated schunk, if any (NULL) */
+  uint8_t typesize;  /* the type size (8) */
+  uint8_t compcode;  /* the compressor code (BLOSC_BLOSCLZ) */
+  uint8_t clevel;  /* the compression level (5) */
+  uint8_t filtercode;  /* the filter code (BLOSC_SHUFFLE) */
+  uint8_t nthreads;  /* the number of threads to use internally (1) */
+  int32_t blocksize;  /* the requested size of the compressed blocks (0; meaning automatic) */
+  blosc2_sheader* schunk;  /* the associated schunk, if any (NULL) */
 } blosc2_context_cparams;
 
 /* Default struct for compression params meant for user initialization */
@@ -565,10 +540,8 @@ static const blosc2_context_cparams BLOSC_CPARAMS_DEFAULTS = \
   (zero) in the fields of the struct is passed to a function.
 */
 typedef struct {
-  uint8_t nthreads;
-  /* the number of threads to use internally (1) */
-  blosc2_sheader* schunk;
-  /* the associated schunk, if any (NULL) */
+  uint8_t nthreads;  /* the number of threads to use internally (1) */
+  blosc2_sheader* schunk;  /* the associated schunk, if any (NULL) */
 } blosc2_context_dparams;
 
 /* Default struct for compression params meant for user initialization */
@@ -662,15 +635,14 @@ BLOSC_EXPORT int blosc_get_blocksize(void);
 
 /**
   Force the use of a specific blocksize.  If 0, an automatic
-  blocksize will be used (the default).
+  blocksize will be used (the default). The blocksize is a critical 
+  parameter with important restrictions in the allowed values,
+  so use this with care.
   */
 BLOSC_EXPORT void blosc_set_blocksize(size_t blocksize);
 
 /* Set pointer to super-chunk.  If NULL, no super-chunk will be
    available (the default).
-
-  The blocksize is a critical parameter with important restrictions in
-  the allowed values, so use this with care.
 */
 BLOSC_EXPORT void blosc_set_schunk(blosc2_sheader* schunk);
 
