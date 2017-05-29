@@ -933,20 +933,24 @@ static struct thread_context* create_thread_context(
   thread_context->tmp2 = thread_context->tmp + context->blocksize;
   thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
   thread_context->tmpblocksize = context->blocksize;
+  #if defined(HAVE_ZSTD)
   thread_context->zstd_cctx = NULL;
   thread_context->zstd_dctx = NULL;
+  #endif
 
   return thread_context;
 }
 
 void free_thread_context(struct thread_context* thread_context) {
   my_free(thread_context->tmp);
+  #if defined(HAVE_ZSTD)
   if (thread_context->zstd_cctx != NULL) {
     ZSTD_freeCCtx(thread_context->zstd_cctx);
   }
   if (thread_context->zstd_dctx != NULL) {
     ZSTD_freeDCtx(thread_context->zstd_dctx);
   }
+  #endif
   my_free(thread_context);
 }
 
