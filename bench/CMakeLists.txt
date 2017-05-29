@@ -1,6 +1,5 @@
-# sources
+# sources for main bench
 set(SOURCES bench.c)
-
 
 # targets
 add_executable(bench ${SOURCES})
@@ -11,6 +10,19 @@ if (UNIX AND NOT APPLE)
     target_link_libraries(bench rt)
 endif (UNIX AND NOT APPLE)
 target_link_libraries(bench blosc_shared)
+
+# sources for delta filter
+set(SOURCES_DELTA delta_schunk.c)
+
+# targets
+add_executable(delta_schunk ${SOURCES_DELTA})
+if (UNIX AND NOT APPLE)
+    # cmake is complaining about LINK_PRIVATE in original PR
+    # and removing it does not seem to hurt, so be it.
+    # target_link_libraries(bench LINK_PRIVATE rt)
+    target_link_libraries(delta_schunk rt)
+endif (UNIX AND NOT APPLE)
+target_link_libraries(delta_schunk blosc_shared)
 
 # have to copy blosc dlls on Windows
 if (MSVC)

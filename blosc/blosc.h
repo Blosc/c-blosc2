@@ -480,7 +480,7 @@ BLOSC_EXPORT blosc2_sheader* blosc2_new_schunk(blosc2_sparams* sparams);
 
 /* Set a delta reference for the super-chunk */
 BLOSC_EXPORT int blosc2_set_delta_ref(blosc2_sheader* sheader,
-    size_t nbytes, void* ref);
+    size_t typesize, size_t nbytes, void* ref);
 
 /* Free all memory from a super-chunk. */
 BLOSC_EXPORT int blosc2_destroy_schunk(blosc2_sheader* sheader);
@@ -663,16 +663,18 @@ BLOSC_EXPORT int blosc_get_blocksize(void);
 /**
   Force the use of a specific blocksize.  If 0, an automatic
   blocksize will be used (the default).
-  */
+*/
 BLOSC_EXPORT void blosc_set_blocksize(size_t blocksize);
 
-/* Set pointer to super-chunk.  If NULL, no super-chunk will be
-   available (the default).
+/**
+  Set pointer to super-chunk.  If NULL, no super-chunk will be
+  available (the default).
 
   The blocksize is a critical parameter with important restrictions in
   the allowed values, so use this with care.
 */
 BLOSC_EXPORT void blosc_set_schunk(blosc2_sheader* schunk);
+
 
 #ifdef __cplusplus
 }
