@@ -996,9 +996,9 @@ static int32_t compute_blocksize(
   else if (nbytes >= L1) {
     blocksize = L1;
 
-    /* For HCR codecs, increase the block sizes by a factor of 2 because
-       although it is meant for compressing large blocks it already
-       doesn't split chunks during compression/decompression. */
+    /* For HCR codecs, increase the block sizes by a factor of 2 because they
+       are meant for compressing large blocks (i.e. they show a big overhead
+       when compressing small ones). */
     if (HCR(context->compcode)) {
       blocksize *= 2;
     }
