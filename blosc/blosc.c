@@ -37,7 +37,7 @@
 #endif /*  HAVE_MINIZ */
 #if defined(HAVE_ZSTD)
   #include "zstd.h"
-  #include "error_public.h"
+  #include "zstd_errors.h"
 #endif /*  HAVE_ZSTD */
 
 #if defined(_WIN32) && !defined(__MINGW32__)
