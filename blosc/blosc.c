@@ -1122,10 +1122,10 @@ static int initialize_context_compression(
 }
 
 /* Get the filter code from header flags */
-static uint8_t get_filtercode(const uint8_t header_flags) {
+static uint8_t get_filtercode(const uint8_t header_flags, const int32_t typesize) {
   uint8_t filtercode = BLOSC_NOFILTER;
 
-  if (header_flags & BLOSC_DOSHUFFLE) {
+  if (header_flags & BLOSC_DOSHUFFLE & (typesize > 1)) {
     filtercode = BLOSC_SHUFFLE;
   } else if (header_flags & BLOSC_DOBITSHUFFLE) {
     filtercode = BLOSC_BITSHUFFLE;
@@ -1149,7 +1149,7 @@ static int initialize_context_decompression(
   context->typesize = (int32_t)context->src[3];      /* typesize */
   context->sourcesize = sw32_(context->src + 4);     /* buffer size */
   context->blocksize = sw32_(context->src + 8);      /* block size */
-  context->filtercode = get_filtercode(*(context->header_flags));
+  context->filtercode = get_filtercode(*(context->header_flags), context->typesize);
 
   /* Check that we have enough space to decompress */
   if (context->sourcesize > (int32_t)destsize) {
@@ -1677,7 +1677,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   context.typesize = (int32_t)_src[3];
   context.blocksize = sw32_(_src + 8);
   context.header_flags = _src + 2;
-  context.filtercode = get_filtercode(*(_src + 2));
+  context.filtercode = get_filtercode(*(_src + 2), context.typesize);
   context.schunk = g_schunk;
   context.serial_context = create_thread_context(&context, 0);
 
@@ -1698,7 +1698,7 @@ int blosc2_getitem_ctx(blosc_context* context, const void* src, int start,
   context->typesize = (int32_t)_src[3];
   context->blocksize = sw32_(_src + 8);
   context->header_flags = _src + 2;
-  context->filtercode = get_filtercode(*(_src + 2));
+  context->filtercode = get_filtercode(*(_src + 2), context->typesize);
   if (context->serial_context == NULL) {
     context->serial_context = create_thread_context(context, 0);
   }
