@@ -193,11 +193,11 @@ if (BUILD_TESTS)
 endif ()
 
 if (BUILD_SHARED)
-    target_link_libraries(blosc_shared ${LIBS})
+    target_link_libraries(blosc_shared PUBLIC ${LIBS})
 endif()
 
 if (BUILD_TESTS)
-    target_link_libraries(blosc_shared_testing ${LIBS})
+    target_link_libraries(blosc_shared_testing PUBLIC ${LIBS})
 endif ()
 
 if (BUILD_STATIC)
@@ -206,7 +206,7 @@ if (BUILD_STATIC)
     if (MSVC)
         set_target_properties(blosc_static PROPERTIES PREFIX lib)
     endif ()
-    target_link_libraries(blosc_static ${LIBS})
+    target_link_libraries(blosc_static PUBLIC ${LIBS})
 endif (BUILD_STATIC)
 
 
