@@ -37,7 +37,7 @@
 #endif /*  HAVE_MINIZ */
 #if defined(HAVE_ZSTD)
   #include "zstd.h"
-  #include "error_public.h"
+  #include "zstd_errors.h"
 #endif /*  HAVE_ZSTD */
 
 #if defined(_WIN32) && !defined(__MINGW32__)
@@ -65,12 +65,6 @@
 #else
   #include <pthread.h>
 #endif
-
-/* If C11 is supported, use it's built-in aligned allocation. */
-#if __STDC_VERSION__ >= 201112L
-  #include <stdalign.h>
-#endif
-
 
 /* Some useful units */
 #define KB 1024
@@ -233,15 +227,9 @@ static uint8_t* my_malloc(size_t size) {
   int res = 0;
 
 /* Do an alignment to 32 bytes because AVX2 is supported */
-#if _ISOC11_SOURCE
-  /* C11 aligned allocation. 'size' must be a multiple of the alignment. */
-  block = aligned_alloc(32, size);
-#elif defined(_WIN32)
+#if defined(_WIN32)
   /* A (void *) cast needed for avoiding a warning with MINGW :-/ */
   block = (void *)_aligned_malloc(size, 32);
-#elif defined __APPLE__
-  /* Mac OS X guarantees 16-byte alignment in small allocs */
-  block = malloc(size);
 #elif _POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600
   /* Platform does have an implementation of posix_memalign */
   res = posix_memalign(&block, 32, size);
@@ -447,10 +435,11 @@ static int lz4hc_wrap_compress(const char* input, size_t input_length,
   int cbytes;
   if (input_length > (size_t)(2 << 30))
     return -1;   /* input larger than 1 GB is not supported */
-  /* clevel for lz4hc goes up to 16, at least in LZ4 1.1.3 */
-  cbytes = LZ4_compressHC2_limitedOutput(input, output, (int)input_length,
-                                         (int)maxout, clevel * 2 - 1);
-  return cbytes;
+  /* clevel for lz4hc goes up to 12, at least in LZ4 1.7.5
+   * but levels larger than 9 does not buy much compression. */
+  cbytes = LZ4_compress_HC(input, output, (int)input_length, (int)maxout,
+                           clevel);
+   return cbytes;
 }
 
 static int lz4_wrap_decompress(const char* input, size_t compressed_length,
@@ -522,7 +511,9 @@ static int zstd_wrap_compress(struct thread_context* thread_context,
                               const char* input, size_t input_length,
                               char* output, size_t maxout, int clevel) {
   size_t code;
-  clevel = (clevel < 9) ? clevel * 2 - 1 : 22;
+  clevel = (clevel < 9) ? clevel * 2 - 1 : ZSTD_maxCLevel();
+  /* Make the level 8 close enough to maxCLevel */
+  if (clevel == 8) clevel = ZSTD_maxCLevel() - 2;
   if (thread_context->zstd_cctx == NULL) {
     thread_context->zstd_cctx = ZSTD_createCCtx();
   }
@@ -1008,9 +999,9 @@ static int32_t compute_blocksize(
   else if (nbytes >= L1) {
     blocksize = L1;
 
-    /* For HCR codecs, increase the block sizes by a factor of 2 because
-       although it is meant for compressing large blocks it already
-       doesn't split chunks during compression/decompression. */
+    /* For HCR codecs, increase the block sizes by a factor of 2 because they
+       are meant for compressing large blocks (i.e. they show a big overhead
+       when compressing small ones). */
     if (HCR(context->compcode)) {
       blocksize *= 2;
     }
@@ -1122,10 +1113,10 @@ static int initialize_context_compression(
 }
 
 /* Get the filter code from header flags */
-static uint8_t get_filtercode(const uint8_t header_flags) {
+static uint8_t get_filtercode(const uint8_t header_flags, const int32_t typesize) {
   uint8_t filtercode = BLOSC_NOFILTER;
 
-  if (header_flags & BLOSC_DOSHUFFLE) {
+  if (header_flags & BLOSC_DOSHUFFLE & (typesize > 1)) {
     filtercode = BLOSC_SHUFFLE;
   } else if (header_flags & BLOSC_DOBITSHUFFLE) {
     filtercode = BLOSC_BITSHUFFLE;
@@ -1149,7 +1140,7 @@ static int initialize_context_decompression(
   context->typesize = (int32_t)context->src[3];      /* typesize */
   context->sourcesize = sw32_(context->src + 4);     /* buffer size */
   context->blocksize = sw32_(context->src + 8);      /* block size */
-  context->filtercode = get_filtercode(*(context->header_flags));
+  context->filtercode = get_filtercode(*(context->header_flags), context->typesize);
 
   /* Check that we have enough space to decompress */
   if (context->sourcesize > (int32_t)destsize) {
@@ -1677,7 +1668,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   context.typesize = (int32_t)_src[3];
   context.blocksize = sw32_(_src + 8);
   context.header_flags = _src + 2;
-  context.filtercode = get_filtercode(*(_src + 2));
+  context.filtercode = get_filtercode(*(_src + 2), context.typesize);
   context.schunk = g_schunk;
   context.serial_context = create_thread_context(&context, 0);
 
@@ -1698,7 +1689,7 @@ int blosc2_getitem_ctx(blosc_context* context, const void* src, int start,
   context->typesize = (int32_t)_src[3];
   context->blocksize = sw32_(_src + 8);
   context->header_flags = _src + 2;
-  context->filtercode = get_filtercode(*(_src + 2));
+  context->filtercode = get_filtercode(*(_src + 2), context->typesize);
   if (context->serial_context == NULL) {
     context->serial_context = create_thread_context(context, 0);
   }

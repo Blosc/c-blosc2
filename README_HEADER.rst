@@ -53,7 +53,7 @@ All entries are little endian.
     :``3``:
         ``zlib``
     :``4``:
-        Reserved
+        ``zstd``
     :``5``:
         Reserved
     :``6``:

@@ -5,6 +5,8 @@
 #
 #   BUILD_STATIC: default ON
 #       build the static version of the Blosc library
+#   BUILD_SHARED: default ON
+#       build the shared library version of the Blosc library
 #   BUILD_TESTS: default ON
 #       build test programs and generates the "test" target
 #   BUILD_BENCHMARKS: default ON
@@ -68,19 +70,21 @@ project(blosc)
 # parse the full version numbers from blosc.h
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/blosc/blosc.h _blosc_h_contents)
 string(REGEX REPLACE ".*#define[ \t]+BLOSC_VERSION_MAJOR[ \t]+([0-9]+).*"
-        "\\1" BLOSC_VERSION_MAJOR ${_blosc_h_contents})
+    "\\1" BLOSC_VERSION_MAJOR ${_blosc_h_contents})
 string(REGEX REPLACE ".*#define[ \t]+BLOSC_VERSION_MINOR[ \t]+([0-9]+).*"
-        "\\1" BLOSC_VERSION_MINOR ${_blosc_h_contents})
+    "\\1" BLOSC_VERSION_MINOR ${_blosc_h_contents})
 string(REGEX REPLACE ".*#define[ \t]+BLOSC_VERSION_RELEASE[ \t]+([0-9]+).*"
-        "\\1" BLOSC_VERSION_PATCH ${_blosc_h_contents})
+    "\\1" BLOSC_VERSION_PATCH ${_blosc_h_contents})
 string(REGEX REPLACE ".*#define[ \t]+BLOSC_VERSION_STRING[ \t]+\"([-0-9A-Za-z.]+)\".*"
-        "\\1" BLOSC_VERSION_STRING ${_blosc_h_contents})
+    "\\1" BLOSC_VERSION_STRING ${_blosc_h_contents})
 
 message("Configuring for Blosc version: " ${BLOSC_VERSION_STRING})
 
 # options
 option(BUILD_STATIC
-        "Build a static version of the blosc library." ON)
+    "Build a static version of the blosc library." ON)
+option(BUILD_SHARED
+    "Build a shared library version of the blosc library." ON)
 option(BUILD_TESTS
     "Build test programs form the blosc compression library" ON)
 option(BUILD_BENCHMARKS
@@ -90,19 +94,19 @@ option(DEACTIVATE_AVX2
 option(DEACTIVATE_LZ4
     "Do not include support for the LZ4 library." OFF)
 option(DEACTIVATE_SNAPPY
-        "Do not include support for the SNAPPY library." OFF)
+    "Do not include support for the SNAPPY library." OFF)
 option(DEACTIVATE_ZLIB
-        "Do not include support for the ZLIB library." OFF)
+    "Do not include support for the ZLIB library." OFF)
 option(DEACTIVATE_ZSTD
-        "Do not include support for the ZSTD library." OFF)
+    "Do not include support for the ZSTD library." OFF)
 option(PREFER_EXTERNAL_LZ4
-        "Find and use external LZ4 library instead of included sources." OFF)
+    "Find and use external LZ4 library instead of included sources." OFF)
 option(PREFER_EXTERNAL_ZLIB
-        "Find and use external ZLIB library instead of included sources." OFF)
+    "Find and use external ZLIB library instead of included sources." OFF)
 option(PREFER_EXTERNAL_ZSTD
-        "Find and use external ZSTD library instead of included sources." OFF)
+    "Find and use external ZSTD library instead of included sources." OFF)
 
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 
 if (NOT DEACTIVATE_LZ4)
@@ -188,6 +192,8 @@ if (CMAKE_SYSTEM_PROCESSOR STREQUAL i386 OR
         CMAKE_SYSTEM_PROCESSOR STREQUAL amd64 OR
         CMAKE_SYSTEM_PROCESSOR STREQUAL AMD64)
     if (CMAKE_C_COMPILER_ID STREQUAL GNU)
+        # We need C99 (GNU99 more exactly)
+        SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
         set(COMPILER_SUPPORT_SSE2 TRUE)
         if (CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.7 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 4.7)
             set(COMPILER_SUPPORT_AVX2 TRUE)
@@ -282,6 +288,22 @@ if (WIN32)
     include_directories("${CMAKE_CURRENT_SOURCE_DIR}/blosc")
 endif (WIN32)
 
+if (NOT DEFINED BLOSC_IS_SUBPROJECT)
+    if ("^${CMAKE_SOURCE_DIR}$" STREQUAL "^${PROJECT_SOURCE_DIR}$")
+        set (BLOSC_IS_SUBPROJECT FALSE)
+    else ()
+        set (BLOSC_IS_SUBPROJECT TRUE)
+        message(STATUS "Detected that BLOSC is used a subproject.")
+   endif ()
+endif ()
+
+if (NOT DEFINED BLOSC_INSTALL)
+    if (BLOSC_IS_SUBPROJECT)
+        set(BLOSC_INSTALL FALSE)
+    else()
+        set(BLOSC_INSTALL TRUE)
+    endif()
+endif()
 
 # subdirectories
 add_subdirectory(blosc)
@@ -297,30 +319,38 @@ endif (BUILD_BENCHMARKS)
 
 
 # uninstall target
-configure_file(
+if (BLOSC_INSTALL)
+    configure_file(
+         "${CMAKE_CURRENT_SOURCE_DIR}/blosc.pc.in"
+         "${CMAKE_CURRENT_BINARY_DIR}/blosc.pc"
+         @ONLY)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/blosc.pc"
+            DESTINATION lib/pkgconfig COMPONENT DEV)
+     configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
         "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
         IMMEDIATE @ONLY)
-
-add_custom_target(uninstall
+    add_custom_target(uninstall
         COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
-
+endif()
 
 # packaging
-include(InstallRequiredSystemLibraries)
+if (NOT BLOSC_IS_SUBPROJECT)
+    include(InstallRequiredSystemLibraries)
 
-set(CPACK_GENERATOR TGZ ZIP)
-set(CPACK_SOURCE_GENERATOR TGZ ZIP)
-set(CPACK_PACKAGE_VERSION_MAJOR ${BLOSC_VERSION_MAJOR})
-set(CPACK_PACKAGE_VERSION_MINOR ${BLOSC_VERSION_MINOR})
-set(CPACK_PACKAGE_VERSION_PATCH ${BLOSC_VERSION_PATCH})
-set(CPACK_PACKAGE_VERSION ${BLOSC_STRING_VERSION})
-set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README.rst")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
-        "A blocking, shuffling and lossless compression library")
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSES/BLOSC.txt")
-set(CPACK_SOURCE_IGNORE_FILES "/build.*;.*~;\\\\.git.*;\\\\.DS_Store")
-set(CPACK_STRIP_FILES TRUE)
-set(CPACK_SOURCE_STRIP_FILES TRUE)
+    set(CPACK_GENERATOR TGZ ZIP)
+    set(CPACK_SOURCE_GENERATOR TGZ ZIP)
+    set(CPACK_PACKAGE_VERSION_MAJOR ${BLOSC_VERSION_MAJOR})
+    set(CPACK_PACKAGE_VERSION_MINOR ${BLOSC_VERSION_MINOR})
+    set(CPACK_PACKAGE_VERSION_PATCH ${BLOSC_VERSION_PATCH})
+    set(CPACK_PACKAGE_VERSION ${BLOSC_STRING_VERSION})
+    set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README.rst")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+            "A blocking, shuffling and lossless compression library")
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSES/BLOSC.txt")
+    set(CPACK_SOURCE_IGNORE_FILES "/build.*;.*~;\\\\.git.*;\\\\.DS_Store")
+    set(CPACK_STRIP_FILES TRUE)
+    set(CPACK_SOURCE_STRIP_FILES TRUE)
 
-include(CPack)
+    include(CPack)
+endif()

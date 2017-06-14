@@ -29,6 +29,9 @@
     Using zlib compressor
     Compression: 4000000 -> 22103 (181.0x)
     Succesful roundtrip!
+    Using zstd compressor
+    Compression: 4000000 -> 11813 (338.6x)
+    Succesful roundtrip!
 
 */
 
@@ -46,7 +49,7 @@ int main() {
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize = SIZE * sizeof(float), csize;
   int nthreads, pnthreads, i;
-  char* compressors[] = {"blosclz", "lz4", "lz4hc", "snappy", "zlib"};
+  char* compressors[] = {"blosclz", "lz4", "lz4hc", "snappy", "zlib", "zstd"};
   int ccode, rcode;
 
   for (i = 0; i < SIZE; i++) {
@@ -65,7 +68,7 @@ int main() {
   printf("Using %d threads (previously using %d)\n", nthreads, pnthreads);
 
   /* Tell Blosc to use some number of threads */
-  for (ccode = 0; ccode <= 4; ccode++) {
+  for (ccode = 0; ccode <= 5; ccode++) {
 
     rcode = blosc_set_compressor(compressors[ccode]);
     if (rcode < 0) {
