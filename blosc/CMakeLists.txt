@@ -193,11 +193,13 @@ if (BUILD_TESTS)
 endif ()
 
 if (BUILD_SHARED)
-    target_link_libraries(blosc_shared PUBLIC ${LIBS})
+    target_link_libraries(blosc_shared ${LIBS})
+    target_include_directories(blosc_shared PUBLIC ${BLOSC_INCLUDE_DIRS})
 endif()
 
 if (BUILD_TESTS)
-    target_link_libraries(blosc_shared_testing PUBLIC ${LIBS})
+    target_link_libraries(blosc_shared_testing ${LIBS})
+    target_include_directories(blosc_shared_testing PUBLIC ${BLOSC_INCLUDE_DIRS})
 endif ()
 
 if (BUILD_STATIC)
@@ -206,7 +208,8 @@ if (BUILD_STATIC)
     if (MSVC)
         set_target_properties(blosc_static PROPERTIES PREFIX lib)
     endif ()
-    target_link_libraries(blosc_static PUBLIC ${LIBS})
+    target_link_libraries(blosc_static ${LIBS})
+    target_include_directories(blosc_static PUBLIC ${BLOSC_INCLUDE_DIRS})
 endif (BUILD_STATIC)
 
 
