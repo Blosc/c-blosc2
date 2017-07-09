@@ -10,7 +10,7 @@
 Changes from 2.0.0a3 to 2.0.0a4
 ===============================
 
-- Internal zstd sources bumbed to 0.7.4.
+- Internal zstd sources bumbed to 1.3.0.
 
 
 Changes from 2.0.0a2 to 2.0.0a3
