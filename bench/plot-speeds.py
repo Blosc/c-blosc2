@@ -29,7 +29,7 @@ def get_values(filename):
             tmp = line.split('-->')[1]
             nthreads, size, elsize, sbits, codec, shuffle = [i for i in tmp.split(', ')]
             nthreads, size, elsize, sbits = map(int, (nthreads, size, elsize, sbits))
-            values["size"] = size * NCHUNKS / MB_
+            values["size"] = size / MB_
             values["elsize"] = elsize
             values["sbits"] = sbits
             values["codec"] = codec
@@ -41,21 +41,21 @@ def get_values(filename):
             #print("-->", nthreads, size, elsize, sbits)
         elif line.startswith('memcpy(write):'):
             tmp = line.split(',')[1]
-            memcpyw = float(tmp.split(' ')[1])
+            memcpyw = float(tmp.split(' ')[1]) / 1024.
             values["memcpyw"].append(memcpyw)
         elif line.startswith('memcpy(read):'):
             tmp = line.split(',')[1]
-            memcpyr = float(tmp.split(' ')[1])
+            memcpyr = float(tmp.split(' ')[1]) / 1024.
             values["memcpyr"].append(memcpyr)
         elif line.startswith('comp(write):'):
             tmp = line.split(',')[1]
-            speedw = float(tmp.split(' ')[1])
+            speedw = float(tmp.split(' ')[1]) / 1024.
             ratio = float(line.split(':')[-1])
             speedsw.append(speedw)
             ratios.append(ratio)
         elif line.startswith('decomp(read):'):
             tmp = line.split(',')[1]
-            speedr = float(tmp.split(' ')[1])
+            speedr = float(tmp.split(' ')[1]) / 1024.
             speedsr.append(speedr)
             if "OK" not in line:
                 print("WARNING!  OK not found in decomp line!")
@@ -66,7 +66,7 @@ def get_values(filename):
 
 def show_plot(plots, yaxis, legends, gtitle, xmax=None, ymax=None):
     xlabel('Compresssion ratio')
-    ylabel('Speed (MB/s)')
+    ylabel('Speed (GB/s)')
     title(gtitle)
     xlim(0, xmax)
     ylim(0, ymax)
@@ -185,7 +185,7 @@ if __name__ == '__main__':
     if options.title:
         plot_title = options.title
     else:
-        plot_title += " (%(size).1f MB, %(elsize)d bytes, %(sbits)d bits), %(codec)s %(shuffle)s" % values
+        plot_title += " (%(size).1f MB, %(elsize)d bytes, %(sbits)d bits), %(codec)s, %(shuffle)s" % values
 
     gtitle = plot_title
 
@@ -214,7 +214,7 @@ if __name__ == '__main__':
         mean = np.mean(values["memcpyr"])
         message = "memcpy (read from memory)"
     plot_ = axhline(mean, linewidth=3, linestyle='-.', color='black')
-    text(4.0, mean+400, message)
+    text(4.0, mean+.5, message)
     plots.append(plot_)
     show_plot(plots, yaxis, legends, gtitle,
               xmax=int(options.xmax) if options.xmax else None,

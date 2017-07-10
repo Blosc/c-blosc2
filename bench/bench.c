@@ -377,7 +377,7 @@ int main(int argc, char* argv[]) {
   int elsize = 4;                       /* Datatype size */
   int rshift = 19;                      /* Significant bits */
 #if defined(__arm__)
-  int workingset = 64*MB;              /* The maximum allocated memory */
+  int workingset = 64 * MB;              /* The maximum allocated memory */
 #else
   int workingset = 256 * MB;              /* The maximum allocated memory */
 #endif
