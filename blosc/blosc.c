@@ -1031,7 +1031,10 @@ static int32_t compute_blocksize(
       blocksize *= 8;
       break;
     case 9:
-      blocksize *= 16;
+      blocksize *= 8;
+      if (HCR(context->compcode)) {
+        blocksize *= 2;
+      }
       break;
     }
   }

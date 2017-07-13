@@ -12,6 +12,9 @@ Changes from 2.0.0a3 to 2.0.0a4
 
 - Internal zstd sources bumbed to 1.3.0.
 
+- New re-parametrization of BloscLZ for improved compression ratio
+  and also more speed (at least on modern Intel/AMD CPUs).  Version
+  for internal BloscLZ codec bumped to 1.0.6.
 
 Changes from 2.0.0a2 to 2.0.0a3
 ===============================
