@@ -1015,22 +1015,21 @@ static int32_t compute_blocksize(
     case 1:
     case 2:
     case 3:
-      blocksize /= 2;
-      break;
     case 4:
-    case 5:
       blocksize *= 1;
       break;
-    case 6:
+    case 5:
       blocksize *= 2;
       break;
-    case 7:
+    case 6:
       blocksize *= 4;
       break;
+    case 7:
     case 8:
       blocksize *= 8;
       break;
     case 9:
+      /* Do not exceed 256 KB for non HCR codecs */
       blocksize *= 8;
       if (HCR(context->compcode)) {
         blocksize *= 2;
