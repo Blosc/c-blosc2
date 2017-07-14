@@ -207,14 +207,17 @@ if __name__ == '__main__':
         legends.append("%d threads" % nt)
 
     # Add memcpy lines
+    # Take the first value found in order to avoid cache effects
     if cspeed:
-        mean = np.mean(values["memcpyw"])
+        # memcpy_speed = np.mean(values["memcpyw"])
+        memcpy_speed = values["memcpyw"][0]
         message = "memcpy (write to memory)"
     else:
-        mean = np.mean(values["memcpyr"])
+        # memcpy_speed = np.mean(values["memcpyr"])
+        memcpy_speed = values["memcpyw"][0]
         message = "memcpy (read from memory)"
-    plot_ = axhline(mean, linewidth=3, linestyle='-.', color='black')
-    text(4.0, mean+.5, message)
+    plot_ = axhline(memcpy_speed, linewidth=3, linestyle='-.', color='black')
+    text(4.0, memcpy_speed + .5, message)
     plots.append(plot_)
     show_plot(plots, yaxis, legends, gtitle,
               xmax=int(options.xmax) if options.xmax else None,
