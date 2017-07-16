@@ -43,7 +43,7 @@ you are welcome.  We would need help in supervising and refining
 the API, as well as in the design of the new containers.  Testing for
 other platforms than Intel (specially ARM) will be appreciated as well.
 
-Blosc is distributed using the BSD license, see `LICENSES/BLOSC.txt`_ for
+Blosc is distributed using the BSD license, see `<LICENSES/BLOSC.txt>`_ for
 details.
 
 Meta-compression and other advantages over existing compressors
