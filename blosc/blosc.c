@@ -975,9 +975,14 @@ static int do_job(blosc_context* context) {
 
 
 /* Whether a codec is meant for High Compression Ratios */
-#define HCR(codec) ( ((codec) == BLOSC_LZ4HC) || \
-		     ((codec) == BLOSC_ZLIB) ||  \
-		     ((codec) == BLOSC_ZSTD) ? 1 : 0 )
+/* Include LZ4 + BITSHUFFLE here, but not BloscLZ + BITSHUFFLE because,
+   for some reason, the latter couple does not work too well */
+#define HCR(codec, filter) ( \
+             (((codec) == BLOSC_LZ4) && \
+              ((filter) == BLOSC_BITSHUFFLE)) || \
+             ((codec) == BLOSC_LZ4HC) || \
+             ((codec) == BLOSC_ZLIB) ||  \
+             ((codec) == BLOSC_ZSTD) ? 1 : 0 )
 
 static int32_t compute_blocksize(
     blosc_context* context, int32_t clevel, int32_t typesize, int32_t nbytes,
@@ -1002,7 +1007,7 @@ static int32_t compute_blocksize(
     /* For HCR codecs, increase the block sizes by a factor of 2 because they
        are meant for compressing large blocks (i.e. they show a big overhead
        when compressing small ones). */
-    if (HCR(context->compcode)) {
+    if (HCR(context->compcode, context->filtercode)) {
       blocksize *= 2;
     }
 
@@ -1031,7 +1036,7 @@ static int32_t compute_blocksize(
     case 9:
       /* Do not exceed 256 KB for non HCR codecs */
       blocksize *= 8;
-      if (HCR(context->compcode)) {
+      if (HCR(context->compcode, context->filtercode)) {
         blocksize *= 2;
       }
       break;
