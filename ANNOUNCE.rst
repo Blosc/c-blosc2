@@ -1,6 +1,6 @@
 ===============================================================
- Announcing c-blosc 1.7.1
- A blocking, shuffling and lossless compression library for C
+ Announcing C-Blosc 2.0.0a3
+ A simplistic, compressed and fast data store library for C
 ===============================================================
 
 What is new?
@@ -8,38 +8,35 @@ What is new?
 
 #XXX version-specific blurb XXX#
 
+
 For more info, please see the release notes in:
 
-https://github.com/Blosc/c-blosc/wiki/Release-notes
+https://github.com/Blosc/c-blosc2/blob/master/RELEASE_NOTES.rst
+
 
 
 What is it?
 ===========
 
-Blosc (http://www.blosc.org) is a high performance meta-compressor
-optimized for binary data.  It has been designed to transmit data to
-the processor cache faster than the traditional, non-compressed,
-direct memory fetch approach via a memcpy() OS call.
+Blosc2 is a high performance data container optimized for binary data.
+It builds on the shoulders of Blosc, the high performance
+meta-compressor (http://www.blosc.org).
 
-Blosc has internal support for different compressors like its internal
-BloscLZ, but also LZ4, LZ4HC, Snappy and Zlib.  This way these can
-automatically leverage the multithreading and pre-filtering
-(shuffling) capabilities that comes with Blosc.
+Blosc2 expands the capabilities of Blosc by providing a higher lever
+container that is able to store many chunks on it (hence the
+super-block name).  Also, it will add more compressors and filters
+(e.g. a new delta filter is here already).
 
 
 Download sources
 ================
 
-Please go to main web site:
+The github repository is over here:
 
-http://www.blosc.org/
+https://github.com/c-blosc2
 
-and proceed from there.  The github repository is over here:
-
-https://github.com/Blosc
-
-Blosc is distributed using the MIT license, see LICENSES/BLOSC.txt for
-details.
+Blosc is distributed using the MIT license, see LICENSES/BLOSC2.txt
+for details.
 
 
 Mailing list
@@ -52,4 +49,3 @@ http://groups.google.es/group/blosc
 
 
 Enjoy Data!
-

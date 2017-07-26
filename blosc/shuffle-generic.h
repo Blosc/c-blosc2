@@ -30,9 +30,8 @@ extern "C" {
   is not a multiple of (type_size * vector_size).
 */
 static void shuffle_generic_inline(const size_t type_size,
-    const size_t vectorizable_blocksize, const size_t blocksize,
-    const uint8_t* const _src, uint8_t* const _dest)
-{
+                                   const size_t vectorizable_blocksize, const size_t blocksize,
+                                   const uint8_t* const _src, uint8_t* const _dest) {
   size_t i, j;
   /* Calculate the number of elements in the block. */
   const size_t neblock_quot = blocksize / type_size;
@@ -43,7 +42,7 @@ static void shuffle_generic_inline(const size_t type_size,
   /* Non-optimized shuffle */
   for (j = 0; j < type_size; j++) {
     for (i = vectorizable_elements; i < (size_t)neblock_quot; i++) {
-      _dest[j*neblock_quot+i] = _src[i*type_size+j];
+      _dest[j * neblock_quot + i] = _src[i * type_size + j];
     }
   }
 
@@ -59,9 +58,8 @@ static void shuffle_generic_inline(const size_t type_size,
   is not a multiple of (type_size * vector_size).
 */
 static void unshuffle_generic_inline(const size_t type_size,
-  const size_t vectorizable_blocksize, const size_t blocksize,
-  const uint8_t* const _src, uint8_t* const _dest)
-{
+                                     const size_t vectorizable_blocksize, const size_t blocksize,
+                                     const uint8_t* const _src, uint8_t* const _dest) {
   size_t i, j;
 
   /* Calculate the number of elements in the block. */
@@ -72,7 +70,7 @@ static void unshuffle_generic_inline(const size_t type_size,
   /* Non-optimized unshuffle */
   for (i = vectorizable_elements; i < (size_t)neblock_quot; i++) {
     for (j = 0; j < type_size; j++) {
-      _dest[i*type_size+j] = _src[j*neblock_quot+i];
+      _dest[i * type_size + j] = _src[j * neblock_quot + i];
     }
   }
 
@@ -84,13 +82,13 @@ static void unshuffle_generic_inline(const size_t type_size,
   Generic (non-hardware-accelerated) shuffle routine.
 */
 BLOSC_NO_EXPORT void shuffle_generic(const size_t bytesoftype, const size_t blocksize,
-                                      const uint8_t* const _src, uint8_t* const _dest);
+                                     const uint8_t* const _src, uint8_t* const _dest);
 
 /**
   Generic (non-hardware-accelerated) unshuffle routine.
 */
 BLOSC_NO_EXPORT void unshuffle_generic(const size_t bytesoftype, const size_t blocksize,
-                                        const uint8_t* const _src, uint8_t* const _dest);
+                                       const uint8_t* const _src, uint8_t* const _dest);
 
 #ifdef __cplusplus
 }

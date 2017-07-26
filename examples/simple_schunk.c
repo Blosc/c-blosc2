@@ -7,15 +7,7 @@
 
   To compile this program:
 
-  gcc simple_schunk.c -o schunk -lblosc -lpthread
-
-  or, if you don't have the blosc library installed:
-
-  gcc -O3 -mavx2 simple_schunk.c ../blosc/*.c -I../blosc -o schunk -lpthread
-
-  Using MSVC on Windows:
-
-  cl /arch:SSE2 /Ox /Feschunk.exe /Iblosc examples\simple_schunk.c blosc\blosc.c blosc\blosclz.c blosc\shuffle.c blosc\shuffle-sse2.c blosc\shuffle-generic.c blosc\bitshuffle-generic.c blosc\bitshuffle-sse2.c
+  $ gcc simple_schunk.c -o schunk -lblosc
 
   To run:
 
@@ -32,33 +24,30 @@
 #include <assert.h>
 #include "blosc.h"
 
-#define SIZE 100*100*100
-#define SHAPE {100,100,100}
-#define CHUNKSHAPE {1,100,100}
+#define SIZE 1000*1000
 
-int main(){
+int main() {
   static float data[SIZE];
-  static float data2[SIZE];
-  void* chunk = data2;
-  float* data_dest;
+  static float data_dest[SIZE];
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize, csize;
-  schunk_params* sc_params = calloc(1, sizeof(sc_params));
-  schunk_header* sc_header;
+  blosc2_sparams sparams = BLOSC_SPARAMS_DEFAULTS;
+  blosc2_sheader* sheader;
   int i, nchunks;
 
-  for(i=0; i<SIZE; i++){
+  for (i = 0; i < SIZE; i++) {
     data[i] = i;
   }
 
   printf("Blosc version info: %s (%s)\n",
-	 BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+         BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Initialize the Blosc compressor */
   blosc_init();
 
   /* Compress with clevel=5 and shuffle active  */
-  csize = blosc_compress(5, BLOSC_SHUFFLE, sizeof(float), isize, data, chunk, osize);
+  csize = blosc_compress(5, BLOSC_SHUFFLE, sizeof(float),
+    isize, data, data_dest, osize);
   if (csize == 0) {
     printf("Buffer is uncompressible.  Giving up.\n");
     return 1;
@@ -68,29 +57,26 @@ int main(){
     return csize;
   }
 
-  printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1.*isize) / csize);
+  printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1. * isize) / csize);
 
   /* Create a super-chunk container */
-  sc_params->filters[0] = BLOSC_SHUFFLE;
-  sc_params->compressor = BLOSC_BLOSCLZ;
-  sc_params->clevel = 5;
-  sc_header = blosc2_new_schunk(sc_params);
+  sparams.filters[0] = BLOSC_DELTA;
+  sparams.filters[1] = BLOSC_SHUFFLE;
+  sheader = blosc2_new_schunk(&sparams);
 
-  /* Append a couple of chunks there */
-  nchunks = blosc2_append_chunk(sc_header, chunk, 1);
+  /* Now append a couple of chunks */
+  nchunks = blosc2_append_buffer(sheader, sizeof(float), isize, data);
   assert(nchunks == 1);
-
-  /* Now append another chunk coming from the initial buffer */
-  nchunks = blosc2_append_buffer(sc_header, sizeof(float), isize, data);
+  nchunks = blosc2_append_buffer(sheader, sizeof(float), isize, data);
   assert(nchunks == 2);
 
   /* Retrieve and decompress the chunks (0-based count) */
-  dsize = blosc2_decompress_chunk(sc_header, 1, &data_dest);
+  dsize = blosc2_decompress_chunk(sheader, 0, (void*)data_dest, isize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
   }
-  dsize = blosc2_decompress_chunk(sc_header, 0, &data_dest);
+  dsize = blosc2_decompress_chunk(sheader, 1, (void*)data_dest, isize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
@@ -98,8 +84,9 @@ int main(){
 
   printf("Decompression succesful!\n");
 
-  for(i=0;i<SIZE;i++){
-    if(data[i] != data_dest[i]) {
+  for (i = 0; i < SIZE; i++) {
+    if (data[i] != data_dest[i]) {
+      printf("i, values: %d, %f, %f\n", i, data[i], data_dest[i]);
       printf("Decompressed data differs from original!\n");
       return -1;
     }
@@ -108,10 +95,8 @@ int main(){
   printf("Succesful roundtrip!\n");
 
   /* Free resources */
-  free(data_dest);
-  free(sc_params);
   /* Destroy the super-chunk */
-  blosc2_destroy_schunk(sc_header);
+  blosc2_destroy_schunk(sheader);
   /* Destroy the Blosc environment */
   blosc_destroy();
 

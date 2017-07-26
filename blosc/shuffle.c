@@ -50,10 +50,10 @@ static const bool true = 1;
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
 /*  Define function pointer types for shuffle/unshuffle routines. */
-typedef void(*shuffle_func)(const size_t, const size_t, const uint8_t*, const uint8_t*);
-typedef void(*unshuffle_func)(const size_t, const size_t, const uint8_t*, const uint8_t*);
-typedef int64_t(*bitshuffle_func)(void*, void*, const size_t, const size_t, void*);
-typedef int64_t(*bitunshuffle_func)(void*, void*, const size_t, const size_t, void*);
+typedef void(* shuffle_func)(const size_t, const size_t, const uint8_t*, const uint8_t*);
+typedef void(* unshuffle_func)(const size_t, const size_t, const uint8_t*, const uint8_t*);
+typedef int64_t(* bitshuffle_func)(void*, void*, const size_t, const size_t, void*);
+typedef int64_t(* bitunshuffle_func)(void*, void*, const size_t, const size_t, void*);
 
 /* An implementation of shuffle/unshuffle routines. */
 typedef struct shuffle_implementation {
@@ -76,11 +76,17 @@ typedef enum {
   BLOSC_HAVE_NEON = 4
 } blosc_cpu_features;
 
-/*  Detect hardware and set function pointers to the best shuffle/unshuffle
-    implementations supported by the host processor. */
+/* Detect hardware and set function pointers to the best shuffle/unshuffle
+   implementations supported by the host processor. */
 #if defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED)    /* Intel/i686 */
 
-#ifdef HAVE_CPU_FEAT_INTRIN
+/*  Disabled the __builtin_cpu_supports() call, as it has issues with
+    new versions of gcc (like 5.3.1 in forthcoming ubuntu/xenial:
+      "undefined symbol: __cpu_model"
+    For a similar report, see:
+    https://lists.fedoraproject.org/archives/list/devel@lists.fedoraproject.org/thread/ZM2L65WIZEEQHHLFERZYD5FAG7QY2OGB/
+*/
+#if defined(HAVE_CPU_FEAT_INTRIN) && 0
 static blosc_cpu_features blosc_get_cpu_features(void) {
   blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
   if (__builtin_cpu_supports("sse2")) {
@@ -238,28 +244,27 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
 #elif defined(SHUFFLE_NEON_ENABLED) /* ARM-NEON */
   #include <sys/auxv.h>
   #include <asm/hwcap.h>
-  static blosc_cpu_features blosc_get_cpu_features(void) {
-    blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
-    if (getauxval(AT_HWCAP) & HWCAP_NEON) {
-      cpu_features |= BLOSC_HAVE_NEON;
-    }
-    return cpu_features;
+static blosc_cpu_features blosc_get_cpu_features(void) {
+  blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
+  if (getauxval(AT_HWCAP) & HWCAP_NEON) {
+    cpu_features |= BLOSC_HAVE_NEON;
   }
+  return cpu_features;
+}
 #else   /* No hardware acceleration supported for the target architecture. */
   #if defined(_MSC_VER)
-  #pragma message("Hardware-acceleration detection not implemented for the target architecture. Only the generic shuffle/unshuffle routines will be available.")
+    #pragma message("Hardware-acceleration detection not implemented for the target architecture. Only the generic shuffle/unshuffle routines will be available.")
   #else
-  #warning Hardware-acceleration detection not implemented for the target architecture. Only the generic shuffle/unshuffle routines will be available.
+    #warning Hardware-acceleration detection not implemented for the target architecture. Only the generic shuffle/unshuffle routines will be available.
   #endif
 
 static blosc_cpu_features blosc_get_cpu_features(void) {
-  return BLOSC_HAVE_NOTHING;
+return BLOSC_HAVE_NOTHING;
 }
 
 #endif /* defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED) */
 
-static shuffle_implementation_t
-get_shuffle_implementation() {
+static shuffle_implementation_t get_shuffle_implementation() {
   blosc_cpu_features cpu_features = blosc_get_cpu_features();
 #if defined(SHUFFLE_AVX2_ENABLED)
   if (cpu_features & BLOSC_HAVE_AVX2) {
@@ -300,8 +305,8 @@ get_shuffle_implementation() {
   }
 #endif  /* defined(SHUFFLE_NEON_ENABLED) */
 
-  /*  Processor doesn't support any of the hardware-accelerated implementations,
-      so use the generic implementation. */
+  /* Processor doesn't support any of the hardware-accelerated implementations,
+     so use the generic implementation. */
   shuffle_implementation_t impl_generic;
   impl_generic.name = "generic";
   impl_generic.shuffle = (shuffle_func)shuffle_generic;
@@ -312,15 +317,15 @@ get_shuffle_implementation() {
 }
 
 
-/*  Flag indicating whether the implementation has been initialized.
-    Zero means it hasn't been initialized, non-zero means it has. */
+/* Flag indicating whether the implementation has been initialized.
+   Zero means it hasn't been initialized, non-zero means it has. */
 static int32_t implementation_initialized;
 
-/*  The dynamically-chosen shuffle/unshuffle implementation.
-    This is only safe to use once `implementation_initialized` is set. */
+/* The dynamically-chosen shuffle/unshuffle implementation.
+   This is only safe to use once `implementation_initialized` is set. */
 static shuffle_implementation_t host_implementation;
 
-/*  Initialize the shuffle implementation, if necessary. */
+/* Initialize the shuffle implementation, if necessary. */
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((always_inline))
 #endif
@@ -342,49 +347,49 @@ void init_shuffle_implementation() {
 #if defined(__GNUC__) || defined(__clang__)
   if (__builtin_expect(!implementation_initialized, 0)) {
 #else
-  if (!implementation_initialized) {
+    if (!implementation_initialized) {
 #endif
     /* Initialize the implementation. */
     host_implementation = get_shuffle_implementation();
 
-    /*  Set the flag indicating the implementation has been initialized. */
+    /* Set the flag indicating the implementation has been initialized. */
     implementation_initialized = 1;
   }
 }
 
-/*  Shuffle a block by dynamically dispatching to the appropriate
-    hardware-accelerated routine at run-time. */
+/* Shuffle a block by dynamically dispatching to the appropriate
+   hardware-accelerated routine at run-time. */
 void
 shuffle(const size_t bytesoftype, const size_t blocksize,
         const uint8_t* _src, const uint8_t* _dest) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
-  /*  The implementation is initialized.
-      Dispatch to it's shuffle routine. */
+  /* The implementation is initialized.
+     Dispatch to it's shuffle routine. */
   (host_implementation.shuffle)(bytesoftype, blocksize, _src, _dest);
 }
 
-/*  Unshuffle a block by dynamically dispatching to the appropriate
-    hardware-accelerated routine at run-time. */
+/* Unshuffle a block by dynamically dispatching to the appropriate
+   hardware-accelerated routine at run-time. */
 void
 unshuffle(const size_t bytesoftype, const size_t blocksize,
           const uint8_t* _src, const uint8_t* _dest) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
-  /*  The implementation is initialized.
-      Dispatch to it's unshuffle routine. */
+  /* The implementation is initialized.
+     Dispatch to it's unshuffle routine. */
   (host_implementation.unshuffle)(bytesoftype, blocksize, _src, _dest);
 }
 
-/*  Bit-shuffle a block by dynamically dispatching to the appropriate
-    hardware-accelerated routine at run-time. */
+/* Bit-shuffle a block by dynamically dispatching to the appropriate
+   hardware-accelerated routine at run-time. */
 int
 bitshuffle(const size_t bytesoftype, const size_t blocksize,
            const uint8_t* const _src, const uint8_t* _dest,
            const uint8_t* _tmp) {
-  int size = blocksize / bytesoftype;
+  size_t size = blocksize / bytesoftype;
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
@@ -396,16 +401,16 @@ bitshuffle(const size_t bytesoftype, const size_t blocksize,
                                                  bytesoftype, (void*)_tmp);
   else
     memcpy((void*)_dest, (void*)_src, blocksize);
-  return size;
+  return (int)size;
 }
 
-/*  Bit-unshuffle a block by dynamically dispatching to the appropriate
-    hardware-accelerated routine at run-time. */
+/* Bit-unshuffle a block by dynamically dispatching to the appropriate
+   hardware-accelerated routine at run-time. */
 int
 bitunshuffle(const size_t bytesoftype, const size_t blocksize,
              const uint8_t* const _src, const uint8_t* _dest,
              const uint8_t* _tmp) {
-  int size = blocksize / bytesoftype;
+  size_t size = blocksize / bytesoftype;
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
@@ -417,5 +422,5 @@ bitunshuffle(const size_t bytesoftype, const size_t blocksize,
                                                    bytesoftype, (void*)_tmp);
   else
     memcpy((void*)_dest, (void*)_src, blocksize);
-  return size;
+  return (int)size;
 }

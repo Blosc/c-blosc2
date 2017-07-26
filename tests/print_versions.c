@@ -8,9 +8,9 @@
 #include "../blosc/blosc.h"
 
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
 
-  char *name = NULL, *version = NULL;
+  char* name = NULL, * version = NULL;
   int ret;
 
   printf("Blosc version: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
@@ -27,6 +27,8 @@ int main(int argc, char *argv[]) {
   if (ret >= 0) printf("  %s: %s\n", name, version);
   ret = blosc_get_complib_info("zlib", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
+  ret = blosc_get_complib_info("zstd", &name, &version);
+  if (ret >= 0) printf("  %s: %s\n", name, version);
 
-  return(0);
+  return (0);
 }

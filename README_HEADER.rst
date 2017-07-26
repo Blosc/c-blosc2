@@ -5,7 +5,7 @@ Blosc (as of Version 1.0.0) has the following 16 byte header that stores
 information about the compressed buffer::
 
     |-0-|-1-|-2-|-3-|-4-|-5-|-6-|-7-|-8-|-9-|-A-|-B-|-C-|-D-|-E-|-F-|
-      ^   ^   ^   ^ |     nbytes    |   blocksize   |    ctbytes    |
+      ^   ^   ^   ^ |     nbytes    |   blocksize   |     cbytes    |
       |   |   |   |
       |   |   |   +--typesize
       |   |   +------flags
@@ -31,14 +31,14 @@ All entries are little endian.
     :bit 2 (``0x04``):
         Whether the bit-shuffle filter has been applied or not.
     :bit 3 (``0x08``):
-        Reserved
-    :bit 4 (``0x16``):
-        Reserved
-    :bit 5 (``0x32``):
+        If set, the filter (or filters) is defined in the super-chunk.
+    :bit 4 (``0x10``):
+        If set, the blocks will not be split in sub-blocks during compression.
+    :bit 5 (``0x20``):
         Part of the enumeration for compressors.
-    :bit 6 (``0x64``):
+    :bit 6 (``0x40``):
         Part of the enumeration for compressors.
-    :bit 7 (``0x64``):
+    :bit 7 (``0x80``):
         Part of the enumeration for compressors.
 
     The last three bits form an enumeration that allows to use alternative
@@ -52,6 +52,14 @@ All entries are little endian.
         ``snappy``
     :``3``:
         ``zlib``
+    :``4``:
+        ``zstd``
+    :``5``:
+        Reserved
+    :``6``:
+        Reserved
+    :``7``:
+        The compressor is defined in the super-chunk.
 
 :typesize:
     (``uint8``) Number of bytes for the atomic type.
@@ -59,6 +67,5 @@ All entries are little endian.
     (``uint32``) Uncompressed size of the buffer.
 :blocksize:
     (``uint32``) Size of internal blocks.
-:ctbytes:
+:cbytes:
     (``uint32``) Compressed size of the buffer.
-

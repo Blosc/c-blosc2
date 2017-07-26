@@ -20,17 +20,16 @@
   #include "../blosc/shuffle-avx2.h"
 #else
   #if defined(_MSC_VER)
-  #pragma message("AVX2 shuffle tests not enabled.")
+    #pragma message("AVX2 shuffle tests not enabled.")
   #else
-  #warning AVX2 shuffle tests not enabled.
+    #warning AVX2 shuffle tests not enabled.
   #endif
 #endif  /* defined(SHUFFLE_AVX2_ENABLED) */
 
 
 /** Roundtrip tests for the AVX2-accelerated shuffle/unshuffle. */
 static int test_shuffle_roundtrip_avx2(size_t type_size, size_t num_elements,
-  size_t buffer_alignment, int test_type)
-{
+                                       size_t buffer_alignment, int test_type) {
 #if defined(SHUFFLE_AVX2_ENABLED)
   size_t buffer_size = type_size * num_elements;
 
@@ -85,8 +84,7 @@ static int test_shuffle_roundtrip_avx2(size_t type_size, size_t num_elements,
 /** Required number of arguments to this test, including the executable name. */
 #define TEST_ARG_COUNT  5
 
-int main(int argc, char **argv)
-{
+int main(int argc, char** argv) {
   /*  argv[1]: sizeof(element type)
       argv[2]: number of elements
       argv[3]: buffer alignment
@@ -94,39 +92,34 @@ int main(int argc, char **argv)
   */
 
   /*  Verify the correct number of command-line args have been specified. */
-  if (TEST_ARG_COUNT != argc)
-  {
+  if (TEST_ARG_COUNT != argc) {
     blosc_test_print_bad_argcount_msg(TEST_ARG_COUNT, argc);
     return EXIT_FAILURE;
   }
 
   /* Parse arguments */
   uint32_t type_size;
-  if (!blosc_test_parse_uint32_t(argv[1], &type_size) || (type_size < 1))
-  {
+  if (!blosc_test_parse_uint32_t(argv[1], &type_size) || (type_size < 1)) {
     blosc_test_print_bad_arg_msg(1);
     return EXIT_FAILURE;
   }
 
   uint32_t num_elements;
-  if (!blosc_test_parse_uint32_t(argv[2], &num_elements) || (num_elements < 1))
-  {
+  if (!blosc_test_parse_uint32_t(argv[2], &num_elements) || (num_elements < 1)) {
     blosc_test_print_bad_arg_msg(2);
     return EXIT_FAILURE;
   }
 
   uint32_t buffer_align_size;
   if (!blosc_test_parse_uint32_t(argv[3], &buffer_align_size)
-    || (buffer_align_size & (buffer_align_size - 1))
-    || (buffer_align_size < sizeof(void*)))
-  {
+      || (buffer_align_size & (buffer_align_size - 1))
+      || (buffer_align_size < sizeof(void*))) {
     blosc_test_print_bad_arg_msg(3);
     return EXIT_FAILURE;
   }
 
   uint32_t test_type;
-  if (!blosc_test_parse_uint32_t(argv[4], &test_type) || (test_type > 2))
-  {
+  if (!blosc_test_parse_uint32_t(argv[4], &test_type) || (test_type > 2)) {
     blosc_test_print_bad_arg_msg(4);
     return EXIT_FAILURE;
   }

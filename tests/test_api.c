@@ -14,16 +14,15 @@
 int tests_run = 0;
 
 /* Global vars */
-void *src, *srccpy, *dest, *dest2;
+void* src, * srccpy, * dest, * dest2;
 size_t nbytes, cbytes;
 int clevel = 3;
 int doshuffle = 1;
 size_t typesize = 4;
-size_t size = 1*MB;
+size_t size = 1 * MB;
 
 
-
-static char *test_cbuffer_sizes() {
+static char* test_cbuffer_sizes() {
   size_t nbytes_, cbytes_, blocksize;
 
   blosc_cbuffer_sizes(dest, &nbytes_, &cbytes_, &blocksize);
@@ -34,7 +33,7 @@ static char *test_cbuffer_sizes() {
   return 0;
 }
 
-static char *test_cbuffer_metainfo() {
+static char* test_cbuffer_metainfo() {
   size_t typesize_;
   int flags;
 
@@ -45,7 +44,7 @@ static char *test_cbuffer_metainfo() {
 }
 
 
-static char *test_cbuffer_versions() {
+static char* test_cbuffer_versions() {
   int version_;
   int versionlz_;
 
@@ -56,27 +55,51 @@ static char *test_cbuffer_versions() {
 }
 
 
-static char *test_cbuffer_complib() {
-  char *complib;
+static char* test_cbuffer_complib() {
+  char* complib;
 
   complib = blosc_cbuffer_complib(dest);
   mu_assert("ERROR: complib incorrect", strcmp(complib, "BloscLZ") == 0);
   return 0;
 }
 
+static char *test_nthreads() {
+  int nthreads;
 
-static char *all_tests() {
+  nthreads = blosc_set_nthreads(4);
+  mu_assert("ERROR: set_nthreads incorrect", nthreads == 1);
+  nthreads = blosc_get_nthreads();
+  mu_assert("ERROR: get_nthreads incorrect", nthreads == 4);
+  return 0;
+}
+
+static char *test_blocksize() {
+  int blocksize;
+
+  blocksize = blosc_get_blocksize();
+  mu_assert("ERROR: get_blocksize incorrect", blocksize == 0);
+
+  blosc_set_blocksize(4096);
+  blocksize = blosc_get_blocksize();
+  mu_assert("ERROR: get_blocksize incorrect", blocksize == 4096);
+  return 0;
+}
+
+
+static char* all_tests() {
   mu_run_test(test_cbuffer_sizes);
   mu_run_test(test_cbuffer_metainfo);
   mu_run_test(test_cbuffer_versions);
   mu_run_test(test_cbuffer_complib);
+  mu_run_test(test_nthreads);
+  mu_run_test(test_blocksize);
   return 0;
 }
 
 #define BUFFER_ALIGN_SIZE   8
 
-int main(int argc, char **argv) {
-  char *result;
+int main(int argc, char** argv) {
+  char* result;
 
   printf("STARTING TESTS for %s", argv[0]);
 

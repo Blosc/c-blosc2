@@ -29,7 +29,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #if defined(_WIN32)
-  /* For QueryPerformanceCounter(), etc. */
+/* For QueryPerformanceCounter(), etc. */
   #include <windows.h>
 #elif defined(__MACH__)
   #include <mach/clock.h>
@@ -59,7 +59,8 @@
 
 
 int nchunks = NCHUNKS;
-int niter = 3;                  /* default number of iterations */
+int niter = 3;
+/* default number of iterations */
 double totalsize = 0.;          /* total compressed/decompressed size */
 
 /* System-specific high-precision timing functions. */
@@ -104,8 +105,8 @@ void blosc_set_timestamp(blosc_timestamp_t* timestamp) {
 
 /* Given two timestamp values, return the difference in microseconds. */
 double blosc_elapsed_usecs(blosc_timestamp_t start_time, blosc_timestamp_t end_time) {
-	return (1e6 * (end_time.tv_sec - start_time.tv_sec))
-		+ (1e-3 * (end_time.tv_nsec - start_time.tv_nsec));
+  return (1e6 * (end_time.tv_sec - start_time.tv_sec))
+      + (1e-3 * (end_time.tv_nsec - start_time.tv_nsec));
 }
 
 #endif
@@ -127,8 +128,8 @@ double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current, int nit
 
 int posix_memalign(void **memptr, size_t alignment, size_t size)
 {
-	*memptr = _aligned_malloc(size, alignment);
-	return 0;
+    *memptr = _aligned_malloc(size, alignment);
+    return 0;
 }
 
 /* Buffers allocated with _aligned_malloc need to be freed with _aligned_free. */
@@ -141,7 +142,7 @@ int posix_memalign(void **memptr, size_t alignment, size_t size)
 int get_value(int i, int rshift) {
   int v;
 
-  v = (i<<26)^(i<<18)^(i<<11)^(i<<3)^i;
+  v = (i << 26) ^ (i << 18) ^ (i << 11) ^ (i << 3) ^ i;
   if (rshift < 32) {
     v &= (1 << rshift) - 1;
   }
@@ -149,15 +150,15 @@ int get_value(int i, int rshift) {
 }
 
 
-void init_buffer(void *src, int size, int rshift) {
+void init_buffer(void* src, int size, int rshift) {
   unsigned int i;
-  int *_src = (int *)src;
+  int* _src = (int*)src;
 
   /* To have reproducible results */
   srand(1);
 
   /* Initialize the original buffer */
-  for (i = 0; i < size/sizeof(int); ++i) {
+  for (i = 0; i < size / sizeof(int); ++i) {
     /* Choose one below */
     /* _src[i] = 0;
      * _src[i] = 0x01010101;
@@ -170,29 +171,29 @@ void init_buffer(void *src, int size, int rshift) {
 }
 
 
-void do_bench(char *compressor, char *shuffle, int nthreads, int size, int elsize,
-              int rshift, FILE * ofile) {
-  void *src, *srccpy;
-  void *dest[NCHUNKS], *dest2;
+void do_bench(char* compressor, char* shuffle, int nthreads, int size, int elsize,
+              int rshift, FILE* ofile) {
+  void* src, * srccpy;
+  void* dest[NCHUNKS], * dest2;
   int nbytes = 0, cbytes = 0;
   int i, j, retcode;
-  unsigned char *orig, *round;
+  unsigned char* orig, * round;
   blosc_timestamp_t last, current;
   double tmemcpy, tshuf, tunshuf;
   int clevel, doshuffle;
 
   if (strcmp(shuffle, "shuffle") == 0) {
-      doshuffle = BLOSC_SHUFFLE;
-    }
+    doshuffle = BLOSC_SHUFFLE;
+  }
   else if (strcmp(shuffle, "bitshuffle") == 0) {
-      doshuffle = BLOSC_BITSHUFFLE;
-    }
+    doshuffle = BLOSC_BITSHUFFLE;
+  }
   else if (strcmp(shuffle, "noshuffle") == 0) {
-      doshuffle = BLOSC_NOSHUFFLE;
-    }
+    doshuffle = BLOSC_NOSHUFFLE;
+  }
 
   blosc_set_nthreads(nthreads);
-  if(blosc_set_compressor(compressor) < 0){
+  if (blosc_set_compressor(compressor) < 0) {
     printf("Compiled w/o support for compressor: '%s', so sorry.\n",
            compressor);
     exit(1);
@@ -200,15 +201,15 @@ void do_bench(char *compressor, char *shuffle, int nthreads, int size, int elsiz
 
   /* Initialize buffers */
   srccpy = malloc(size);
-  retcode = posix_memalign( (void **)(&src), 32, size);
-  retcode = posix_memalign( (void **)(&dest2), 32, size);
+  retcode = posix_memalign((void**)(&src), 32, size);
+  retcode = posix_memalign((void**)(&dest2), 32, size);
 
   /* zero src to initialize byte on it, and not only multiples of 4 */
   memset(src, 0, size);
   init_buffer(src, size, rshift);
   memcpy(srccpy, src, size);
   for (j = 0; j < nchunks; j++) {
-     retcode = posix_memalign( (void **)(&dest[j]), 32, size+BLOSC_MAX_OVERHEAD);
+    retcode = posix_memalign((void**)(&dest[j]), 32, size + BLOSC_MAX_OVERHEAD);
   }
 
   fprintf(ofile, "--> %d, %d, %d, %d, %s, %s\n", nthreads, size, elsize, rshift, compressor, shuffle);
@@ -216,7 +217,7 @@ void do_bench(char *compressor, char *shuffle, int nthreads, int size, int elsiz
   fprintf(ofile, "Blosc version: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
   fprintf(ofile, "Using synthetic data with %d significant bits (out of 32)\n", rshift);
   fprintf(ofile, "Dataset size: %d bytes\tType size: %d bytes\n", size, elsize);
-  fprintf(ofile, "Working set: %.1f MB\t\t", (size*nchunks) / (float)MB);
+  fprintf(ofile, "Working set: %.1f MB\t\t", (size * nchunks) / (float)MB);
   fprintf(ofile, "Number of threads: %d\n", nthreads);
   fprintf(ofile, "********************** Running benchmarks *********************\n");
 
@@ -229,7 +230,7 @@ void do_bench(char *compressor, char *shuffle, int nthreads, int size, int elsiz
   blosc_set_timestamp(&current);
   tmemcpy = get_usec_chunk(last, current, niter, nchunks);
   fprintf(ofile, "memcpy(write):\t\t %6.1f us, %.1f MB/s\n",
-         tmemcpy, (size * 1e6) / (tmemcpy*MB));
+          tmemcpy, (size * 1e6) / (tmemcpy * MB));
 
   blosc_set_timestamp(&last);
   for (i = 0; i < niter; i++) {
@@ -240,9 +241,9 @@ void do_bench(char *compressor, char *shuffle, int nthreads, int size, int elsiz
   blosc_set_timestamp(&current);
   tmemcpy = get_usec_chunk(last, current, niter, nchunks);
   fprintf(ofile, "memcpy(read):\t\t %6.1f us, %.1f MB/s\n",
-         tmemcpy, (size * 1e6) / (tmemcpy*MB));
+          tmemcpy, (size * 1e6) / (tmemcpy * MB));
 
-  for (clevel=0; clevel<10; clevel++) {
+  for (clevel = 0; clevel < 10; clevel++) {
 
     fprintf(ofile, "Compression level: %d\n", clevel);
 
@@ -250,16 +251,16 @@ void do_bench(char *compressor, char *shuffle, int nthreads, int size, int elsiz
     for (i = 0; i < niter; i++) {
       for (j = 0; j < nchunks; j++) {
         cbytes = blosc_compress(clevel, doshuffle, elsize, size, src,
-                                dest[j], size+BLOSC_MAX_OVERHEAD);
+                                dest[j], size + BLOSC_MAX_OVERHEAD);
       }
     }
     blosc_set_timestamp(&current);
     tshuf = get_usec_chunk(last, current, niter, nchunks);
     fprintf(ofile, "comp(write):\t %6.1f us, %.1f MB/s\t  ",
-           tshuf, (size * 1e6) / (tshuf*MB));
+            tshuf, (size * 1e6) / (tshuf * MB));
     fprintf(ofile, "Final bytes: %d  ", cbytes);
     if (cbytes > 0) {
-      fprintf(ofile, "Ratio: %3.2f", size/(float)cbytes);
+      fprintf(ofile, "Ratio: %3.2f", size / (float)cbytes);
     }
     fprintf(ofile, "\n");
 
@@ -285,7 +286,7 @@ void do_bench(char *compressor, char *shuffle, int nthreads, int size, int elsiz
     blosc_set_timestamp(&current);
     tunshuf = get_usec_chunk(last, current, niter, nchunks);
     fprintf(ofile, "decomp(read):\t %6.1f us, %.1f MB/s\t  ",
-           tunshuf, (nbytes * 1e6) / (tunshuf*MB));
+            tunshuf, (nbytes * 1e6) / (tunshuf * MB));
     if (nbytes < 0) {
       fprintf(ofile, "FAILED.  Error code: %d\n", nbytes);
     }
@@ -295,14 +296,13 @@ void do_bench(char *compressor, char *shuffle, int nthreads, int size, int elsiz
        Byte-by-byte comparison is slow, so use 'memcmp' to check whether the
        roundtripped data is correct. If not, fall back to the slow path to
        print diagnostic messages. */
-    orig = (unsigned char *)srccpy;
-    round = (unsigned char *)dest2;
-    if (memcmp(orig, round, size) != 0)
-    {
-      for(i = 0; i<size; ++i){
+    orig = (unsigned char*)srccpy;
+    round = (unsigned char*)dest2;
+    if (memcmp(orig, round, size) != 0) {
+      for (i = 0; i < size; ++i) {
         if (orig[i] != round[i]) {
           fprintf(ofile, "\nError: Original data and round-trip do not match in pos %d\n",
-                 (int)i);
+                  (int)i);
           fprintf(ofile, "Orig--> %x, round-trip--> %x\n", orig[i], round[i]);
           break;
         }
@@ -319,7 +319,9 @@ void do_bench(char *compressor, char *shuffle, int nthreads, int size, int elsiz
      compression levels */
   totalsize += (size * nchunks * niter * 10.);
 
-  aligned_free(src); free(srccpy); aligned_free(dest2);
+  aligned_free(src);
+  free(srccpy);
+  aligned_free(dest2);
   for (i = 0; i < nchunks; i++) {
     aligned_free(dest[i]);
   }
@@ -337,9 +339,8 @@ int get_nchunks(int size_, int ws) {
   return nchunks;
 }
 
-void print_compress_info(void)
-{
-  char *name = NULL, *version = NULL;
+void print_compress_info(void) {
+  char* name = NULL, * version = NULL;
   int ret;
 
   printf("Blosc version: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
@@ -356,11 +357,13 @@ void print_compress_info(void)
   if (ret >= 0) printf("  %s: %s\n", name, version);
   ret = blosc_get_complib_info("zlib", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
+  ret = blosc_get_complib_info("zstd", &name, &version);
+  if (ret >= 0) printf("  %s: %s\n", name, version);
 
 }
 
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   char compressor[32];
   char shuffle[32] = "shuffle";
   char bsuite[32];
@@ -370,26 +373,26 @@ int main(int argc, char *argv[]) {
   int extreme_suite = 0;
   int debug_suite = 0;
   int nthreads = 4;                     /* The number of threads */
-  int size = 2*MB;                      /* Buffer size */
-  int elsize = 8;                       /* Datatype size */
+  int size = 4 * MB;                      /* Buffer size */
+  int elsize = 4;                       /* Datatype size */
   int rshift = 19;                      /* Significant bits */
 #if defined(__arm__)
-  int workingset = 64*MB;              /* The maximum allocated memory */
+  int workingset = 64 * MB;              /* The maximum allocated memory */
 #else
-  int workingset = 256*MB;              /* The maximum allocated memory */
+  int workingset = 256 * MB;              /* The maximum allocated memory */
 #endif
   int nthreads_, size_, elsize_, rshift_, i;
-  FILE * output_file = stdout;
+  FILE* output_file = stdout;
   blosc_timestamp_t last, current;
   float totaltime;
   char usage[256];
 
   print_compress_info();
 
-  strncpy(usage, "Usage: bench [blosclz | lz4 | lz4hc | snappy | zlib] "
-	  "[noshuffle | shuffle | bitshuffle] "
-          "[single | suite | hardsuite | extremesuite | debugsuite] "
-          "[nthreads] [bufsize(bytes)] [typesize] [sbits]", 255);
+  strncpy(usage, "Usage: bench [blosclz | lz4 | lz4hc | snappy | zlib | zstd] "
+      "[noshuffle | shuffle | bitshuffle] "
+      "[single | suite | hardsuite | extremesuite | debugsuite] "
+      "[nthreads] [bufsize(bytes)] [typesize] [sbits]", 255);
 
   if (argc < 2) {
     printf("%s\n", usage);
@@ -402,21 +405,22 @@ int main(int argc, char *argv[]) {
       strcmp(compressor, "lz4") != 0 &&
       strcmp(compressor, "lz4hc") != 0 &&
       strcmp(compressor, "snappy") != 0 &&
-      strcmp(compressor, "zlib") != 0) {
+      strcmp(compressor, "zlib") != 0 &&
+      strcmp(compressor, "zstd") != 0) {
     printf("No such compressor: '%s'\n", compressor);
     printf("%s\n", usage);
     exit(2);
   }
 
   if (argc >= 3) {
-      strcpy(shuffle, argv[2]);
-      if (strcmp(shuffle, "shuffle") != 0 &&
-          strcmp(shuffle, "bitshuffle") != 0 &&
-          strcmp(shuffle, "noshuffle") != 0) {
-	printf("No such shuffler: '%s'\n", shuffle);
-	printf("%s\n", usage);
-	exit(2);
-     }
+    strcpy(shuffle, argv[2]);
+    if (strcmp(shuffle, "shuffle") != 0 &&
+        strcmp(shuffle, "bitshuffle") != 0 &&
+        strcmp(shuffle, "noshuffle") != 0) {
+      printf("No such shuffler: '%s'\n", shuffle);
+      printf("%s\n", usage);
+      exit(2);
+    }
   }
 
   if (argc < 4)
@@ -439,7 +443,7 @@ int main(int argc, char *argv[]) {
     workingset /= 4;
     /* Values here are ending points for loops */
     nthreads = 2;
-    size = 8*MB;
+    size = 8 * MB;
     elsize = 32;
     rshift = 32;
   }
@@ -449,7 +453,7 @@ int main(int argc, char *argv[]) {
     niter = 1;
     /* Values here are ending points for loops */
     nthreads = 4;
-    size = 16*MB;
+    size = 16 * MB;
     elsize = 32;
     rshift = 32;
   }
@@ -460,7 +464,7 @@ int main(int argc, char *argv[]) {
     /* Warning: values here are starting points for loops.  This is
        useful for debugging. */
     nthreads = 1;
-    size = 16*KB;
+    size = 16 * KB;
     elsize = 1;
     rshift = 0;
   }
@@ -497,7 +501,7 @@ int main(int argc, char *argv[]) {
   blosc_init();
 
   if (suite) {
-    for (nthreads_=1; nthreads_ <= nthreads; nthreads_++) {
+    for (nthreads_ = 1; nthreads_ <= nthreads; nthreads_++) {
       do_bench(compressor, shuffle, nthreads_, size, elsize, rshift, output_file);
     }
   }
@@ -509,11 +513,11 @@ int main(int argc, char *argv[]) {
       for (elsize_ = 1; elsize_ <= elsize; elsize_ *= 2) {
         /* The next loop is for getting sizes that are not power of 2 */
         for (i = -elsize_; i <= elsize_; i += elsize_) {
-          for (size_ = 32*KB; size_ <= size; size_ *= 2) {
-            nchunks = get_nchunks(size_+i, workingset);
-    	    niter = 1;
+          for (size_ = 32 * KB; size_ <= size; size_ *= 2) {
+            nchunks = get_nchunks(size_ + i, workingset);
+            niter = 1;
             for (nthreads_ = 1; nthreads_ <= nthreads; nthreads_++) {
-              do_bench(compressor, shuffle, nthreads_, size_+i, elsize_, rshift_, output_file);
+              do_bench(compressor, shuffle, nthreads_, size_ + i, elsize_, rshift_, output_file);
               blosc_set_timestamp(&current);
               totaltime = (float)getseconds(last, current);
               printf("Elapsed time:\t %6.1f s.  Processed data: %.1f GB\n",
@@ -528,11 +532,11 @@ int main(int argc, char *argv[]) {
     for (rshift_ = 0; rshift_ <= rshift; rshift_++) {
       for (elsize_ = 1; elsize_ <= elsize; elsize_++) {
         /* The next loop is for getting sizes that are not power of 2 */
-        for (i = -elsize_*2; i <= elsize_*2; i += elsize_) {
-          for (size_ = 32*KB; size_ <= size; size_ *= 2) {
-            nchunks = get_nchunks(size_+i, workingset);
+        for (i = -elsize_ * 2; i <= elsize_ * 2; i += elsize_) {
+          for (size_ = 32 * KB; size_ <= size; size_ *= 2) {
+            nchunks = get_nchunks(size_ + i, workingset);
             for (nthreads_ = 1; nthreads_ <= nthreads; nthreads_++) {
-              do_bench(compressor, shuffle, nthreads_, size_+i, elsize_, rshift_, output_file);
+              do_bench(compressor, shuffle, nthreads_, size_ + i, elsize_, rshift_, output_file);
               blosc_set_timestamp(&current);
               totaltime = (float)getseconds(last, current);
               printf("Elapsed time:\t %6.1f s.  Processed data: %.1f GB\n",
@@ -547,11 +551,11 @@ int main(int argc, char *argv[]) {
     for (rshift_ = rshift; rshift_ <= 32; rshift_++) {
       for (elsize_ = elsize; elsize_ <= 32; elsize_++) {
         /* The next loop is for getting sizes that are not power of 2 */
-        for (i = -elsize_*2; i <= elsize_*2; i += elsize_) {
-          for (size_ = size; size_ <= 16*MB; size_ *= 2) {
-            nchunks = get_nchunks(size_+i, workingset);
+        for (i = -elsize_ * 2; i <= elsize_ * 2; i += elsize_) {
+          for (size_ = size; size_ <= 16 * MB; size_ *= 2) {
+            nchunks = get_nchunks(size_ + i, workingset);
             for (nthreads_ = nthreads; nthreads_ <= 6; nthreads_++) {
-              do_bench(compressor, shuffle, nthreads_, size_+i, elsize_, rshift_, output_file);
+              do_bench(compressor, shuffle, nthreads_, size_ + i, elsize_, rshift_, output_file);
               blosc_set_timestamp(&current);
               totaltime = (float)getseconds(last, current);
               printf("Elapsed time:\t %6.1f s.  Processed data: %.1f GB\n",
@@ -562,7 +566,7 @@ int main(int argc, char *argv[]) {
       }
     }
   }
-  /* Single mode */
+    /* Single mode */
   else {
     do_bench(compressor, shuffle, nthreads, size, elsize, rshift, output_file);
   }
@@ -572,7 +576,7 @@ int main(int argc, char *argv[]) {
   totaltime = (float)getseconds(last, current);
   printf("\nRound-trip compr/decompr on %.1f GB\n", totalsize / GB);
   printf("Elapsed time:\t %6.1f s, %.1f MB/s\n",
-         totaltime, totalsize*2*1.1/(MB*totaltime));
+         totaltime, totalsize * 2 * 1.1 / (MB * totaltime));
 
   /* Free blosc resources */
   blosc_free_resources();

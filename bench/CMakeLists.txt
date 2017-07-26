@@ -1,42 +1,54 @@
-# sources
+# sources for main bench
 set(SOURCES bench.c)
-
 
 # targets
 add_executable(bench ${SOURCES})
-if(UNIX AND NOT APPLE)
-  # cmake is complaining about LINK_PRIVATE in original PR
-  # and removing it does not seem to hurt, so be it.
-  # target_link_libraries(bench LINK_PRIVATE rt)
-  target_link_libraries(bench rt)
-endif(UNIX AND NOT APPLE)
+if (UNIX AND NOT APPLE)
+    # cmake is complaining about LINK_PRIVATE in original PR
+    # and removing it does not seem to hurt, so be it.
+    # target_link_libraries(bench LINK_PRIVATE rt)
+    target_link_libraries(bench rt)
+endif (UNIX AND NOT APPLE)
 target_link_libraries(bench blosc_shared)
 
+# sources for delta filter
+set(SOURCES_DELTA delta_schunk.c)
+
+# targets
+add_executable(delta_schunk ${SOURCES_DELTA})
+if (UNIX AND NOT APPLE)
+    # cmake is complaining about LINK_PRIVATE in original PR
+    # and removing it does not seem to hurt, so be it.
+    # target_link_libraries(bench LINK_PRIVATE rt)
+    target_link_libraries(delta_schunk rt)
+endif (UNIX AND NOT APPLE)
+target_link_libraries(delta_schunk blosc_shared)
+
 # have to copy blosc dlls on Windows
-if(MSVC)
+if (MSVC)
     add_custom_command(
-        TARGET      bench
-        POST_BUILD
-        COMMAND     ${CMAKE_COMMAND}
-        ARGS        -E copy_if_different
-                    "${PROJECT_BINARY_DIR}/blosc/\$\(Configuration\)/blosc.dll"
-                    "${CMAKE_CURRENT_BINARY_DIR}/\$\(Configuration\)/blosc.dll")
-elseif(MINGW)
+            TARGET bench
+            POST_BUILD
+            COMMAND ${CMAKE_COMMAND}
+            ARGS -E copy_if_different
+            "${PROJECT_BINARY_DIR}/blosc/\$\(Configuration\)/blosc.dll"
+            "${CMAKE_CURRENT_BINARY_DIR}/\$\(Configuration\)/blosc.dll")
+elseif (MINGW)
     add_custom_command(
-        TARGET      bench
-        POST_BUILD
-        COMMAND     ${CMAKE_COMMAND}
-        ARGS        -E copy_if_different
-                    "${PROJECT_BINARY_DIR}/blosc/libblosc.dll"
-                    "${CMAKE_CURRENT_BINARY_DIR}/libblosc.dll")
-endif()
+            TARGET bench
+            POST_BUILD
+            COMMAND ${CMAKE_COMMAND}
+            ARGS -E copy_if_different
+            "${PROJECT_BINARY_DIR}/blosc/libblosc.dll"
+            "${CMAKE_CURRENT_BINARY_DIR}/libblosc.dll")
+endif ()
 
 # tests
-if(BUILD_TESTS)
+if (BUILD_TESTS)
 
     # The commented tests below take too much time to complete
     option(TEST_INCLUDE_BENCH_SHUFFLE_1 "Include bench shuffle (1 thread) in the tests" ON)
-    if(TEST_INCLUDE_BENCH_SHUFFLE_1)
+    if (TEST_INCLUDE_BENCH_SHUFFLE_1)
         set(SHUFFLE_1_OPTS shuffle test 1)
         add_test(test_blosclz_shuffle_1 bench blosclz ${SHUFFLE_1_OPTS})
         if (HAVE_LZ4)
@@ -49,10 +61,13 @@ if(BUILD_TESTS)
         if (HAVE_ZLIB)
             # add_test(test_zlib_shuffle_1 bench zlib ${SHUFFLE_1_OPTS})
         endif (HAVE_ZLIB)
-    endif(TEST_INCLUDE_BENCH_SHUFFLE_1)
+        if (HAVE_ZSTD)
+            # add_test(test_zstd_shuffle_1 bench zstd ${SHUFFLE_1_OPTS})
+        endif (HAVE_ZSTD)
+    endif (TEST_INCLUDE_BENCH_SHUFFLE_1)
 
     option(TEST_INCLUDE_BENCH_SHUFFLE_N "Include bench shuffle (multithread) in the tests" ON)
-    if(TEST_INCLUDE_BENCH_SHUFFLE_N)
+    if (TEST_INCLUDE_BENCH_SHUFFLE_N)
         set(SHUFFLE_N_OPTS shuffle test)
         add_test(test_blosclz_shuffle_n bench blosclz ${SHUFFLE_N_OPTS})
         if (HAVE_LZ4)
@@ -65,10 +80,13 @@ if(BUILD_TESTS)
         if (HAVE_ZLIB)
             add_test(test_zlib_shuffle_n bench zlib ${SHUFFLE_N_OPTS})
         endif (HAVE_ZLIB)
-    endif(TEST_INCLUDE_BENCH_SHUFFLE_N)
+        if (HAVE_ZSTD)
+            add_test(test_zstd_shuffle_n bench zstd ${SHUFFLE_N_OPTS})
+        endif (HAVE_ZSTD)
+    endif (TEST_INCLUDE_BENCH_SHUFFLE_N)
 
     option(TEST_INCLUDE_BENCH_BITSHUFFLE_1 "Include bench bitshuffle (1 thread) in the tests" ON)
-    if(TEST_INCLUDE_BENCH_BITSHUFFLE_1)
+    if (TEST_INCLUDE_BENCH_BITSHUFFLE_1)
         set(BITSHUFFLE_1_OPTS bitshuffle test 1)
         add_test(test_blosclz_bitshuffle_1 bench blosclz ${BITSHUFFLE_1_OPTS})
         if (HAVE_LZ4)
@@ -81,11 +99,14 @@ if(BUILD_TESTS)
         if (HAVE_ZLIB)
             # add_test(test_zlib_bitshuffle_1 bench zlib ${BITSHUFFLE_1_OPTS})
         endif (HAVE_ZLIB)
-    endif(TEST_INCLUDE_BENCH_BITSHUFFLE_1)
+        if (HAVE_ZSTD)
+            # add_test(test_zstd_bitshuffle_1 bench zstd ${BITSHUFFLE_1_OPTS})
+        endif (HAVE_ZSTD)
+    endif (TEST_INCLUDE_BENCH_BITSHUFFLE_1)
 
     option(TEST_INCLUDE_BENCH_BITSHUFFLE_N "Include bench bitshuffle (multithread) in the tests" ON)
-    if(TEST_INCLUDE_BENCH_BITSHUFFLE_N)
-        set(BITSHUFFLE_N_OPTS bitshuffle test 2 2097152 3 19)  # typesize=3
+    if (TEST_INCLUDE_BENCH_BITSHUFFLE_N)
+        set(BITSHUFFLE_N_OPTS bitshuffle test)
         add_test(test_blosclz_bitshuffle_n bench blosclz ${BITSHUFFLE_N_OPTS})
         if (HAVE_LZ4)
             add_test(test_lz4_bitshuffle_n bench lz4 ${BITSHUFFLE_N_OPTS})
@@ -97,15 +118,18 @@ if(BUILD_TESTS)
         if (HAVE_ZLIB)
             # add_test(test_zlib_bitshuffle_n bench zlib ${BITSHUFFLE_N_OPTS})
         endif (HAVE_ZLIB)
-    endif(TEST_INCLUDE_BENCH_BITSHUFFLE_N)
+        if (HAVE_ZSTD)
+            # add_test(test_zstd_bitshuffle_n bench zstd ${BITSHUFFLE_N_OPTS})
+        endif (HAVE_ZSTD)
+    endif (TEST_INCLUDE_BENCH_BITSHUFFLE_N)
 
     option(TEST_INCLUDE_BENCH_SUITE "Include bench suite in the tests" OFF)
-    if(TEST_INCLUDE_BENCH_SUITE)
+    if (TEST_INCLUDE_BENCH_SUITE)
         add_test(test_hardsuite blosc blosclz shuffle suite)
-    endif(TEST_INCLUDE_BENCH_SUITE)
+    endif (TEST_INCLUDE_BENCH_SUITE)
 
     option(TEST_INCLUDE_BENCH_DEBUGSUITE "Include bench debugsuite in the tests" OFF)
-    if(TEST_INCLUDE_BENCH_DEBUGSUITE)
+    if (TEST_INCLUDE_BENCH_DEBUGSUITE)
         add_test(test_debugsuite bench blosclz shuffle debugsuite)
-    endif(TEST_INCLUDE_BENCH_DEBUGSUITE)
-endif(BUILD_TESTS)
+    endif (TEST_INCLUDE_BENCH_DEBUGSUITE)
+endif (BUILD_TESTS)

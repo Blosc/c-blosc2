@@ -33,17 +33,17 @@
 #define CHUNKSHAPE {1,1000,1000}
 
 /* Definition for the compression and decompression blosc routines */
-typedef int (__cdecl *COMPRESS_CTX)(int clevel, int doshuffle, size_t typesize,
-                                        size_t nbytes, const void* src, void* dest,
-                                        size_t destsize, const char* compressor,
-                                        size_t blocksize, int numinternalthreads);
+typedef int (__cdecl* COMPRESS_CTX)(int clevel, int doshuffle, size_t typesize,
+                                    size_t nbytes, const void* src, void* dest,
+                                    size_t destsize, const char* compressor,
+                                    size_t blocksize, int numinternalthreads);
 
-typedef int (__cdecl *DECOMPRESS_CTX)(const void *src, void *dest,
-                                          size_t destsize, int numinternalthreads);
-typedef char* (__cdecl *GET_VERSION_STRING)(void);
+typedef int (__cdecl* DECOMPRESS_CTX)(const void* src, void* dest,
+                                      size_t destsize, int numinternalthreads);
+typedef char* (__cdecl* GET_VERSION_STRING)(void);
 
 
-int main(){
+int main() {
   HINSTANCE BDLL;                       /* Handle to DLL */
   COMPRESS_CTX blosc_compress_ctx;      /* Function pointer for compression */
   DECOMPRESS_CTX blosc_decompress_ctx;  /* Function pointer for decompression */
@@ -52,8 +52,8 @@ int main(){
   static float data[SIZE];
   static float data_out[SIZE];
   static float data_dest[SIZE];
-  int isize = SIZE*sizeof(float), osize = SIZE*sizeof(float);
-  int dsize = SIZE*sizeof(float), csize;
+  int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
+  int dsize = SIZE * sizeof(float), csize;
   int i;
 
   BDLL = LoadLibrary(TEXT("myblosc.dll"));
@@ -83,7 +83,7 @@ int main(){
     goto out;
   }
 
-  for(i=0; i<SIZE; i++){
+  for (i = 0; i < SIZE; i++) {
     data[i] = i;
   }
 
@@ -101,7 +101,7 @@ int main(){
     return csize;
   }
 
-  printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1.*isize) / csize);
+  printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1. * isize) / csize);
 
   /* Decompress  */
   dsize = blosc_decompress_ctx(data_out, data_dest, dsize, 1);
@@ -112,8 +112,8 @@ int main(){
 
   printf("Decompression succesful!\n");
 
-  for(i=0;i<SIZE;i++){
-    if(data[i] != data_dest[i]) {
+  for (i = 0; i < SIZE; i++) {
+    if (data[i] != data_dest[i]) {
       printf("Decompressed data differs from original!\n");
       return -1;
     }
@@ -121,8 +121,8 @@ int main(){
 
   printf("Succesful roundtrip!\n");
   return 0;
-  
-out:
+
+  out:
   FreeLibrary(BDLL);
   return -1;
 }
