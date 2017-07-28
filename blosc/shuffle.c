@@ -296,6 +296,8 @@ static shuffle_implementation_t get_shuffle_implementation() {
     impl_neon.name = "neon";
     impl_neon.shuffle = (shuffle_func)shuffle_neon;
     impl_neon.unshuffle = (unshuffle_func)unshuffle_neon;
+//    impl_neon.shuffle = (shuffle_func)shuffle_generic;
+//    impl_neon.unshuffle = (unshuffle_func)unshuffle_generic;
     impl_neon.bitshuffle = (bitshuffle_func)bitshuffle_neon;
     impl_neon.bitunshuffle = (bitunshuffle_func)bitunshuffle_neon;
 //    impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_scal;
