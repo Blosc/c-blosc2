@@ -82,7 +82,7 @@ int main() {
     return dsize;
   }
 
-  printf("Decompression succesful!\n");
+  printf("Decompression successful!\n");
 
   for (i = 0; i < SIZE; i++) {
     if (data[i] != data_dest[i]) {
@@ -92,7 +92,7 @@ int main() {
     }
   }
 
-  printf("Succesful roundtrip!\n");
+  printf("Successful roundtrip!\n");
 
   /* Free resources */
   /* Destroy the super-chunk */
