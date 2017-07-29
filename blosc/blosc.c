@@ -1053,6 +1053,7 @@ static int do_job(blosc_context* context) {
              (((codec) == BLOSC_LZ4) && \
               ((filter) == BLOSC_BITSHUFFLE)) || \
              ((codec) == BLOSC_LZ4HC) || \
+             ((codec) == BLOSC_LIZARD) || \
              ((codec) == BLOSC_ZLIB) ||  \
              ((codec) == BLOSC_ZSTD) ? 1 : 0 )
 
