@@ -617,7 +617,7 @@ static int get_accel(const blosc_context* context) {
           case 7 :
               return 20;
           case 8 :
-              return 30;
+              return 41;
           case 9 :
               return 41;
       }
