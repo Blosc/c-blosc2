@@ -605,11 +605,13 @@ static int get_accel(const blosc_context* context) {
     /* Lizard currently accepts clevels from 10 to 49 */
       switch (clevel) {
           case 1 :
+              return 10;
           case 2 :
               return 10;
           case 3 :
+              return 10;
           case 4 :
-              return 11;
+              return 10;
           case 5 :
               return 20;
           case 6 :
