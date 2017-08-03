@@ -35,28 +35,26 @@
 #endif
 
 
-/* Encode filters in a 16 bit int type */
-uint16_t encode_filters(blosc2_sparams* params) {
-  int i;
-  uint16_t enc_filters = 0;
+/* Encode filters in a 64 bit int type */
+uint64_t encode_filters(blosc2_sparams* params) {
+  uint64_t enc_filters = 0;
 
-  /* Encode the BLOSC_MAX_FILTERS filters (3-bit encoded) in 16 bit */
-  for (i = 0; i < BLOSC_MAX_FILTERS; i++) {
-    enc_filters += params->filters[i] << (i * 3);
+  /* Encode the BLOSC_MAX_FILTERS filters (8-bit encoded) in 64 bit */
+  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+    enc_filters += (uint64_t)(params->filters[i]) << (i * 8);
   }
   return enc_filters;
 }
 
 
 /* Decode filters.  The returned array must be freed after use.  */
-uint8_t* decode_filters(uint16_t enc_filters) {
-  int i;
+uint8_t* decode_filters(uint64_t enc_filters) {
   uint8_t* filters = malloc(BLOSC_MAX_FILTERS);
 
-  /* Decode the BLOSC_MAX_FILTERS filters (3-bit encoded) in 16 bit */
-  for (i = 0; i < BLOSC_MAX_FILTERS; i++) {
-    filters[i] = (uint8_t)(enc_filters & 0x3);
-    enc_filters >>= 3;
+  /* Decode the BLOSC_MAX_FILTERS filters (8-bit encoded) in 16 bit */
+  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+    filters[i] = (uint8_t)(enc_filters & 0xff);
+    enc_filters >>= 8;
   }
   return filters;
 }
@@ -68,7 +66,9 @@ blosc2_sheader* blosc2_new_schunk(blosc2_sparams* sparams) {
 
   sheader->version = 0;     /* pre-first version */
   sheader->filters = encode_filters(sparams);
-  sheader->filters_meta = sparams->filters_meta;
+  for (int i = 0; i < BLOSC_MAX_FILTER_MSLOTS; i++) {
+    sheader->filters_meta[i] = sparams->filters_meta[i];
+  }
   sheader->compressor = sparams->compressor;
   sheader->clevel = sparams->clevel;
   sheader->cbytes = sizeof(blosc2_sheader);
@@ -100,7 +100,8 @@ size_t append_chunk(blosc2_sheader* sheader, void* chunk) {
 
 
 /* Set a delta reference for the super-chunk */
-int blosc2_set_delta_ref(blosc2_sheader* sheader, size_t typesize, size_t nbytes, void* ref) {
+int blosc2_set_delta_ref(blosc2_sheader* sheader, size_t typesize,
+                         size_t nbytes, void* ref) {
   int cbytes;
   void* filters_chunk;
   uint8_t* dec_filters = decode_filters(sheader->filters);
@@ -121,8 +122,8 @@ int blosc2_set_delta_ref(blosc2_sheader* sheader, size_t typesize, size_t nbytes
   free(dec_filters);
 
   filters_chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
-  cbytes = blosc_compress(clevel, doshuffle, typesize, nbytes, ref, filters_chunk,
-                          nbytes + BLOSC_MAX_OVERHEAD);
+  cbytes = blosc_compress(clevel, doshuffle, typesize, nbytes, ref,
+                          filters_chunk, nbytes + BLOSC_MAX_OVERHEAD);
   if (cbytes < 0) {
     free(filters_chunk);
     return cbytes;
@@ -152,6 +153,9 @@ size_t blosc2_append_buffer(blosc2_sheader* sheader, size_t typesize,
         return((size_t)ret);
       }
     }
+  }
+  else if (dec_filters[0] == BLOSC_TRUNC_PREC) {
+    doshuffle = dec_filters[1];
   }
   else {
     doshuffle = dec_filters[0];
@@ -195,7 +199,8 @@ int blosc2_decompress_chunk(blosc2_sheader* sheader, int64_t nchunk,
   nbytes_ = *(int32_t*)((uint8_t*)src + 4);
 
   if (nbytes < nbytes_) {
-    printf("Buffer size is too small for the decompressed buffer ('%d' bytes, but '%d' are needed)\n", nbytes, nbytes_);
+    printf("Buffer size is too small for the decompressed buffer "
+                   "('%d' bytes, but '%d' are needed)\n", nbytes, nbytes_);
     return -11;
   }
 
@@ -261,7 +266,8 @@ int64_t blosc2_get_packed_length(blosc2_sheader* sheader) {
 }
 
 /* Copy a chunk into a packed super-chunk */
-void pack_copy_chunk(void* chunk, void* packed, int offset, int64_t* cbytes, int64_t* nbytes) {
+void pack_copy_chunk(void* chunk, void* packed, int offset, int64_t* cbytes,
+                     int64_t* nbytes) {
   int32_t cbytes_, nbytes_;
 
   if (chunk != NULL) {
@@ -370,17 +376,22 @@ blosc2_sheader* blosc2_unpack_schunk(void* packed) {
   int i;
 
   /* Fill the header */
-  memcpy(sheader, packed, 40); /* Copy until cbytes */
+  memcpy(sheader, packed, 52); /* Copy until cbytes */
 
   /* Fill the ancillary chunks info */
-  sheader->filters_chunk = unpack_copy_chunk(packed, 40, sheader, &nbytes, &cbytes);
-  sheader->codec_chunk = unpack_copy_chunk(packed, 48, sheader, &nbytes, &cbytes);
-  sheader->metadata_chunk = unpack_copy_chunk(packed, 56, sheader, &nbytes, &cbytes);
-  sheader->userdata_chunk = unpack_copy_chunk(packed, 64, sheader, &nbytes, &cbytes);
+  sheader->filters_chunk = unpack_copy_chunk(
+          packed, 52, sheader, &nbytes, &cbytes);
+  sheader->codec_chunk = unpack_copy_chunk(
+          packed, 52 + 8, sheader, &nbytes, &cbytes);
+  sheader->metadata_chunk = unpack_copy_chunk(
+          packed, 52 + 8 * 2, sheader, &nbytes, &cbytes);
+  sheader->userdata_chunk = unpack_copy_chunk(
+          packed, 52 + 8 * 3, sheader, &nbytes, &cbytes);
 
   /* Finally, fill the data pointers section */
-  data = (int64_t*)((uint8_t*)packed + *(int64_t*)((uint8_t*)packed + 72));
-  nchunks = *(int64_t*)((uint8_t*)packed + 16);
+  data = (int64_t*)(
+          (uint8_t*)packed + *(int64_t*)((uint8_t*)packed + 52 + 8 * 4));
+  nchunks = *(int64_t*)((uint8_t*)packed + 28);
   sheader->data = malloc(nchunks * sizeof(void*));
   nbytes += nchunks * sizeof(int64_t);
   cbytes += nchunks * sizeof(int64_t);
@@ -400,8 +411,8 @@ blosc2_sheader* blosc2_unpack_schunk(void* packed) {
   sheader->nbytes = nbytes;
   sheader->cbytes = cbytes;
 
-  assert(*(int64_t*)((uint8_t*)packed + 24) == nbytes);
-  assert(*(int64_t*)((uint8_t*)packed + 32) == cbytes);
+  assert(*(int64_t*)((uint8_t*)packed + 36) == nbytes);
+  assert(*(int64_t*)((uint8_t*)packed + 44) == cbytes);
 
   return sheader;
 }
@@ -409,9 +420,9 @@ blosc2_sheader* blosc2_unpack_schunk(void* packed) {
 
 /* Append an existing chunk into a *packed* super-chunk. */
 void* packed_append_chunk(void* packed, void* chunk) {
-  int64_t nchunks = *(int64_t*)((uint8_t*)packed + 16);
-  int64_t packed_len = *(int64_t*)((uint8_t*)packed + 32);
-  int64_t data_offsets = *(int64_t*)((uint8_t*)packed + 72);
+  int64_t nchunks = *(int64_t*)((uint8_t*)packed + 28);
+  int64_t packed_len = *(int64_t*)((uint8_t*)packed + 44);
+  int64_t data_offsets = *(int64_t*)((uint8_t*)packed + 52 + 8 * 4);
   uint64_t chunk_offset = packed_len - nchunks * sizeof(int64_t);
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
   int32_t nbytes = *(int32_t*)((uint8_t*)chunk + 4);
@@ -430,10 +441,10 @@ void* packed_append_chunk(void* packed, void* chunk) {
   /* Copy the chunk */
   memcpy((uint8_t*)packed + chunk_offset, chunk, (size_t)cbytes);
   /* Update counters */
-  *(int64_t*)((uint8_t*)packed + 16) += 1;
-  *(uint64_t*)((uint8_t*)packed + 24) += nbytes + sizeof(uint64_t);
-  *(uint64_t*)((uint8_t*)packed + 32) += cbytes + sizeof(uint64_t);
-  *(uint64_t*)((uint8_t*)packed + 72) += cbytes;
+  *(int64_t*)((uint8_t*)packed + 28) += 1;
+  *(uint64_t*)((uint8_t*)packed + 36) += nbytes + sizeof(uint64_t);
+  *(uint64_t*)((uint8_t*)packed + 44) += cbytes + sizeof(uint64_t);
+  *(uint64_t*)((uint8_t*)packed + 52 + 8 * 3) += cbytes;
   /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n",
           nchunks, nbytes, cbytes, (1.*nbytes) / cbytes); */
 
@@ -442,11 +453,12 @@ void* packed_append_chunk(void* packed, void* chunk) {
 
 
 /* Append a data buffer to a *packed* super-chunk. */
-void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes, void* src) {
+void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes,
+                                  void* src) {
   int cname = *(int16_t*)((uint8_t*)packed + 4);
   int clevel = *(int16_t*)((uint8_t*)packed + 6);
-  void* filters_chunk = (uint8_t*)packed + *(uint64_t*)((uint8_t*)packed + 40);
-  uint8_t* filters = decode_filters(*(uint16_t*)((uint8_t*)packed + 8));
+  void* filters_chunk = (uint8_t*)packed + *(uint64_t*)((uint8_t*)packed + 52);
+  uint8_t* filters = decode_filters(*(uint16_t*)((uint8_t*)packed + 12));
   int cbytes;
   void* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
   void* dest = malloc(nbytes);
@@ -462,8 +474,10 @@ void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes, 
       return NULL;
     }
     delta_encoder8(filters_chunk, 0, (int)nbytes, src, dest);
-    /* memcpy(dest, src, nbytes); */
     src = dest;
+  }
+  else if (filters[0] == BLOSC_TRUNC_PREC) {
+    doshuffle = filters[1];
   }
   else {
     doshuffle = filters[0];
@@ -495,10 +509,12 @@ void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes, 
 
 /* Decompress and return a chunk that is part of a *packed* super-chunk. */
 int blosc2_packed_decompress_chunk(void* packed, int nchunk, void** dest) {
-  int64_t nchunks = *(int64_t*)((uint8_t*)packed + 16);
-  uint8_t* filters = decode_filters(*(uint16_t*)((uint8_t*)packed + 8));
-  uint8_t* filters_chunk = (uint8_t*)packed + *(uint64_t*)((uint8_t*)packed + 40);
-  int64_t* data = (int64_t*)((uint8_t*)packed + *(int64_t*)((uint8_t*)packed + 72));
+  int64_t nchunks = *(int64_t*)((uint8_t*)packed + 28);
+  uint8_t* filters = decode_filters(*(uint16_t*)((uint8_t*)packed + 12));
+  uint8_t* filters_chunk = (uint8_t*)(
+          packed + *(uint64_t*)((uint8_t*)packed + 52));
+  int64_t* data = (int64_t*)(
+          (uint8_t*)packed + *(int64_t*)((uint8_t*)packed + 52 + 8 * 4));
   void* src;
   int chunksize;
   int32_t nbytes;
