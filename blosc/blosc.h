@@ -436,23 +436,23 @@ typedef struct {
   uint8_t flags1;
   uint8_t flags2;
   uint8_t flags3;
-  uint16_t compressor;
+  uint16_t compressor;  // starts at 4 bytes
   /* The default compressor.  Each chunk can override this. */
-  uint16_t clevel;
+  uint16_t clevel;  // starts at 6 bytes
   /* The compression level and other compress params */
-  uint32_t chunksize;
+  uint32_t chunksize;   // starts at 8 bytes
   /* Size of each chunk.  0 if not a fixed chunksize. */
-  uint64_t filters;
+  uint64_t filters;  // starts at 12 bytes
   /* The (sequence of) filters.  8-bit per filter. */
   uint16_t filters_meta[BLOSC_MAX_FILTER_MSLOTS];
   /* Metadata for filters. 16-bit per meta-slot. */
-  int64_t nchunks;
+  int64_t nchunks;  // starts at 28 bytes
   /* Number of chunks in super-chunk */
-  int64_t nbytes;
+  int64_t nbytes;  // starts at 36 bytes
   /* data size + metadata size + header size (uncompressed) */
-  int64_t cbytes;
+  int64_t cbytes;  // starts at 44 bytes
   /* data size + metadata size + header size (compressed) */
-  uint8_t* filters_chunk;
+  uint8_t* filters_chunk;  // starts at 52 bytes
   /* Pointer to chunk hosting filter-related data */
   uint8_t* codec_chunk;
   /* Pointer to chunk hosting codec-related data */
