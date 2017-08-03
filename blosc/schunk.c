@@ -35,28 +35,26 @@
 #endif
 
 
-/* Encode filters in a 16 bit int type */
-uint16_t encode_filters(blosc2_sparams* params) {
-  int i;
-  uint16_t enc_filters = 0;
+/* Encode filters in a 64 bit int type */
+uint64_t encode_filters(blosc2_sparams* params) {
+  uint64_t enc_filters = 0;
 
-  /* Encode the BLOSC_MAX_FILTERS filters (4-bit encoded) in 16 bit */
-  for (i = 0; i < BLOSC_MAX_FILTERS; i++) {
-    enc_filters += params->filters[i] << (i * 4);
+  /* Encode the BLOSC_MAX_FILTERS filters (8-bit encoded) in 64 bit */
+  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+    enc_filters += (uint64_t)(params->filters[i]) << (i * 8);
   }
   return enc_filters;
 }
 
 
 /* Decode filters.  The returned array must be freed after use.  */
-uint8_t* decode_filters(uint16_t enc_filters) {
-  int i;
+uint8_t* decode_filters(uint64_t enc_filters) {
   uint8_t* filters = malloc(BLOSC_MAX_FILTERS);
 
-  /* Decode the BLOSC_MAX_FILTERS filters (4-bit encoded) in 16 bit */
-  for (i = 0; i < BLOSC_MAX_FILTERS; i++) {
-    filters[i] = (uint8_t)(enc_filters & 0xf);
-    enc_filters >>= 4;
+  /* Decode the BLOSC_MAX_FILTERS filters (8-bit encoded) in 16 bit */
+  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+    filters[i] = (uint8_t)(enc_filters & 0xff);
+    enc_filters >>= 8;
   }
   return filters;
 }

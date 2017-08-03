@@ -60,7 +60,7 @@ extern "C" {
 #define BLOSC_LAST_FILTER 5  /* sentinel */
 
 /* Maximum number of simultaneous filters */
-#define BLOSC_MAX_FILTERS 4
+#define BLOSC_MAX_FILTERS 8
 
 /* Codes for internal flags (see blosc_cbuffer_metainfo) */
 #define BLOSC_DOSHUFFLE     0x1  /* byte-wise shuffle */
@@ -195,10 +195,10 @@ BLOSC_EXPORT void blosc_destroy(void);
 
   BLOSC_TYPESIZE=(INTEGER): This will overwrite the `typesize`
   parameter before the compression process starts.
-
   BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | SNAPPY | ZLIB]: This will
   call blosc_set_compressor(BLOSC_COMPRESSOR) before the compression
   process starts.
+
 
   BLOSC_NTHREADS=(INTEGER): This will call
   blosc_set_nthreads(BLOSC_NTHREADS) before the compression process
@@ -434,12 +434,12 @@ typedef struct {
   /* The default compressor.  Each chunk can override this. */
   uint16_t clevel;
   /* The compression level and other compress params */
-  uint16_t filters;
-  /* The (sequence of) filters.  4-bit per filter. */
-  uint16_t filters_meta;
-  /* Metadata for filters */
   uint32_t chunksize;
   /* Size of each chunk.  0 if not a fixed chunksize. */
+  uint64_t filters;
+  /* The (sequence of) filters.  8-bit per filter. */
+  uint64_t filters_meta;
+  /* Metadata for filters */
   int64_t nchunks;
   /* Number of chunks in super-chunk */
   int64_t nbytes;
@@ -475,7 +475,7 @@ typedef struct {
 
 /* Default struct for schunk params meant for user initialization */
 static const blosc2_sparams BLOSC_SPARAMS_DEFAULTS = \
-  { BLOSC_ZSTD, 5, {BLOSC_SHUFFLE, 0, 0, 0}, 0 };
+  { BLOSC_ZSTD, 5, {BLOSC_SHUFFLE, 0, 0, 0, 0, 0, 0, 0}, 0 };
 
 /* Create a new super-chunk. */
 BLOSC_EXPORT blosc2_sheader* blosc2_new_schunk(blosc2_sparams* sparams);
