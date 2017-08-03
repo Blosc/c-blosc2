@@ -599,8 +599,8 @@ static int blosc_c(struct thread_context* thread_context, int32_t blocksize,
         fprintf(stderr, "unsupported typesize for TRUNC_PREC filter\n");
         return -6;  // signals
       }
-      truncate_precision(context->schunk->filters_meta, typesize, blocksize,
-                         (unsigned char *)_src, tmp2);
+      truncate_precision(context->schunk->filters_meta[BLOSC_TRUNC_PREC_MSLOT],
+                         typesize, blocksize, (unsigned char *)_src, tmp2);
       _src = tmp2;
     }
     free(filters);

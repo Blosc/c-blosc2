@@ -66,7 +66,9 @@ blosc2_sheader* blosc2_new_schunk(blosc2_sparams* sparams) {
 
   sheader->version = 0;     /* pre-first version */
   sheader->filters = encode_filters(sparams);
-  sheader->filters_meta = sparams->filters_meta;
+  for (int i = 0; i < BLOSC_MAX_FILTER_MSLOTS; i++) {
+    sheader->filters_meta[i] = sparams->filters_meta[i];
+  }
   sheader->compressor = sparams->compressor;
   sheader->clevel = sparams->clevel;
   sheader->cbytes = sizeof(blosc2_sheader);

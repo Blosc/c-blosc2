@@ -137,7 +137,7 @@ int main() {
 
   /* Create a super-chunk container */
   sparams.filters[0] = BLOSC_TRUNC_PREC;
-  sparams.filters_meta = 23;  // treat doubles as floats
+  sparams.filters_meta[BLOSC_TRUNC_PREC_MSLOT] = 23;  // treat doubles as floats
   sparams.filters[1] = BLOSC_SHUFFLE;
   sparams.compressor = BLOSC_LZ4;
   sparams.clevel = 9;

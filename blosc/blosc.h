@@ -62,6 +62,12 @@ extern "C" {
 /* Maximum number of simultaneous filters */
 #define BLOSC_MAX_FILTERS 8
 
+/* The meta slots for the different filters (in case meta is needed) */
+#define BLOSC_TRUNC_PREC_MSLOT 0
+
+/* Maximum number of slots for meta info in filters */
+#define BLOSC_MAX_FILTER_MSLOTS 4
+
 /* Codes for internal flags (see blosc_cbuffer_metainfo) */
 #define BLOSC_DOSHUFFLE     0x1  /* byte-wise shuffle */
 #define BLOSC_MEMCPYED      0x2  /* plain copy */
@@ -438,8 +444,8 @@ typedef struct {
   /* Size of each chunk.  0 if not a fixed chunksize. */
   uint64_t filters;
   /* The (sequence of) filters.  8-bit per filter. */
-  uint64_t filters_meta;
-  /* Metadata for filters */
+  uint16_t filters_meta[BLOSC_MAX_FILTER_MSLOTS];
+  /* Metadata for filters. 16-bit per meta-slot. */
   int64_t nchunks;
   /* Number of chunks in super-chunk */
   int64_t nbytes;
@@ -470,12 +476,12 @@ typedef struct {
   /* the compression level and other compress params */
   uint8_t filters[BLOSC_MAX_FILTERS];
   /* the (sequence of) filters */
-  uint16_t filters_meta;   /* metadata for filters */
+  uint16_t filters_meta[BLOSC_MAX_FILTER_MSLOTS];   /* metadata for filters */
 } blosc2_sparams;
 
 /* Default struct for schunk params meant for user initialization */
 static const blosc2_sparams BLOSC_SPARAMS_DEFAULTS = \
-  { BLOSC_ZSTD, 5, {BLOSC_SHUFFLE, 0, 0, 0, 0, 0, 0, 0}, 0 };
+  { BLOSC_ZSTD, 5, {BLOSC_SHUFFLE, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0} };
 
 /* Create a new super-chunk. */
 BLOSC_EXPORT blosc2_sheader* blosc2_new_schunk(blosc2_sparams* sparams);
