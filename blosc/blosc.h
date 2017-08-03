@@ -56,9 +56,11 @@ extern "C" {
 #define BLOSC_SHUFFLE     1  /* byte-wise shuffle */
 #define BLOSC_BITSHUFFLE  2  /* bit-wise shuffle */
 #define BLOSC_DELTA       3  /* delta filter */
+#define BLOSC_TRUNC_PREC  4  /* truncate precision filter */
+#define BLOSC_LAST_FILTER 5  /* sentinel */
 
 /* Maximum number of simultaneous filters */
-#define BLOSC_MAX_FILTERS 5
+#define BLOSC_MAX_FILTERS 4
 
 /* Codes for internal flags (see blosc_cbuffer_metainfo) */
 #define BLOSC_DOSHUFFLE     0x1  /* byte-wise shuffle */
@@ -433,7 +435,7 @@ typedef struct {
   uint16_t clevel;
   /* The compression level and other compress params */
   uint16_t filters;
-  /* The (sequence of) filters.  3-bit per filter. */
+  /* The (sequence of) filters.  4-bit per filter. */
   uint16_t filters_meta;
   /* Metadata for filters */
   uint32_t chunksize;
@@ -473,7 +475,7 @@ typedef struct {
 
 /* Default struct for schunk params meant for user initialization */
 static const blosc2_sparams BLOSC_SPARAMS_DEFAULTS = \
-  { BLOSC_ZSTD, 5, {BLOSC_SHUFFLE, 0, 0, 0, 0}, 0 };
+  { BLOSC_ZSTD, 5, {BLOSC_SHUFFLE, 0, 0, 0}, 0 };
 
 /* Create a new super-chunk. */
 BLOSC_EXPORT blosc2_sheader* blosc2_new_schunk(blosc2_sparams* sparams);

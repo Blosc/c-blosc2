@@ -7,7 +7,7 @@
 
   To compile this program:
 
-  $ gcc -O3 delta_schunk.c -o delta_schunk -lblosc
+  $ gcc -O3 trunc_prec.c -o trunc_prec -lblosc
 
 */
 
@@ -37,6 +37,10 @@
 #define KB  1024
 #define MB  (1024*KB)
 #define GB  (1024*MB)
+
+#define NCHUNKS 200
+#define CHUNKSIZE 500 * 1000
+#define NTHREADS 4
 
 
 /* System-specific high-precision timing functions. */
@@ -99,13 +103,19 @@ double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current, int nit
 }
 
 
-#define CHUNKSIZE 5 * 1000 * 1000
-#define NCHUNKS 100
-#define NTHREADS 2
+void fill_buffer(double *buffer, int nchunk) {
+  double incx = 10. / (NCHUNKS * CHUNKSIZE);
+
+  for (int i = 0; i < CHUNKSIZE; i++) {
+    double x = incx * (nchunk * CHUNKSIZE + i);
+    buffer[i] = (x - .25) * (x - 4.45) * (x - 8.95);
+    //buffer[i] = x;
+  }
+}
 
 
 int main() {
-  int32_t *data, *data_dest;
+  double *data_buffer;
   static blosc2_sparams sparams;
   blosc2_sheader* schunk;
   int isize = CHUNKSIZE * sizeof(int32_t);
@@ -116,13 +126,9 @@ int main() {
   float totaltime;
   float totalsize = isize * NCHUNKS;
 
-  data = malloc(CHUNKSIZE * sizeof(int32_t));
-  data_dest = malloc(CHUNKSIZE * sizeof(int32_t));
-  for (i = 0; i < CHUNKSIZE; i++) {
-    data[i] = i;
-  }
-
   printf("Blosc version info: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+
+  data_buffer = malloc(CHUNKSIZE * sizeof(double));
 
   /* Initialize the Blosc compressor */
   blosc_init();
@@ -130,16 +136,18 @@ int main() {
   blosc_set_nthreads(NTHREADS);
 
   /* Create a super-chunk container */
-  sparams.filters[0] = BLOSC_DELTA;
+  sparams.filters[0] = BLOSC_TRUNC_PREC;
+  sparams.filters_meta = 23;  // treat doubles as floats
   sparams.filters[1] = BLOSC_SHUFFLE;
-  sparams.compressor = BLOSC_BLOSCLZ;
-  sparams.clevel = 5;
+  sparams.compressor = BLOSC_LZ4;
+  sparams.clevel = 9;
   schunk = blosc2_new_schunk(&sparams);
 
-  /* Append chunks (the first will be taken as reference for delta) */
+  /* Append the chunks */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    nchunks = blosc2_append_buffer(schunk, sizeof(int32_t), isize, data);
+    fill_buffer(data_buffer, nchunk);
+    nchunks = blosc2_append_buffer(schunk, sizeof(double), isize, data_buffer);
   }
   blosc_set_timestamp(&current);
   totaltime = (float)getseconds(last, current);
@@ -155,7 +163,7 @@ int main() {
   /* Retrieve and decompress the chunks */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    dsize = blosc2_decompress_chunk(schunk, nchunk, (void*)data_dest, isize);
+    dsize = blosc2_decompress_chunk(schunk, nchunk, (void*)data_buffer, isize);
     if (dsize < 0) {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;
@@ -168,21 +176,8 @@ int main() {
   printf("[Decompr] Elapsed time:\t %6.3f s.  Processed data: %.3f GB (%.3f GB/s)\n",
          totaltime, totalsize / GB, totalsize / (GB * totaltime));
 
-  printf("Decompression successful!\n");
-
-  for (i = 0; i < CHUNKSIZE; i++) {
-    if (data[i] != data_dest[i]) {
-      printf("Decompressed data differs from original %d, %d, %d!\n",
-             i, data[i], data_dest[i]);
-      return -1;
-    }
-  }
-
-  printf("Successful roundtrip!\n");
-
   /* Free resources */
-  free(data);
-  free(data_dest);
+  free(data_buffer);
   /* Destroy the super-chunk */
   blosc2_destroy_schunk(schunk);
   /* Destroy the Blosc environment */

@@ -22,6 +22,7 @@
 #include "shuffle.h"
 #include "schunk.h"
 #include "delta.h"
+#include "trunc_prec.h"
 #include "blosclz.h"
 #if defined(HAVE_LZ4)
   #include "lz4.h"
@@ -593,6 +594,15 @@ static int blosc_c(struct thread_context* thread_context, int32_t blocksize,
                      (unsigned char*)_src, tmp2);
       _src = tmp2;
     }
+    else if (filters[0] == BLOSC_TRUNC_PREC) {
+      if ((typesize != 4) && (typesize != 8)) {
+        fprintf(stderr, "unsupported typesize for TRUNC_PREC filter\n");
+        return -6;  // signals
+      }
+      truncate_precision(context->schunk->filters_meta, typesize, blocksize,
+                         (unsigned char *)_src, tmp2);
+      _src = tmp2;
+    }
     free(filters);
   }
 
@@ -1093,9 +1103,7 @@ static int initialize_context_compression(
   }
 
   /* Shuffle */
-  if (!((filtercode == BLOSC_NOFILTER) ||
-        (filtercode == BLOSC_SHUFFLE) ||
-        (filtercode == BLOSC_BITSHUFFLE))) {
+  if ((filtercode < 0) || (filtercode >= BLOSC_LAST_FILTER)) {
     fprintf(stderr, "`filtercode` parameter value `%d` not allowed!\n", filtercode);
     return -10;
   }

@@ -40,9 +40,9 @@ uint16_t encode_filters(blosc2_sparams* params) {
   int i;
   uint16_t enc_filters = 0;
 
-  /* Encode the BLOSC_MAX_FILTERS filters (3-bit encoded) in 16 bit */
+  /* Encode the BLOSC_MAX_FILTERS filters (4-bit encoded) in 16 bit */
   for (i = 0; i < BLOSC_MAX_FILTERS; i++) {
-    enc_filters += params->filters[i] << (i * 3);
+    enc_filters += params->filters[i] << (i * 4);
   }
   return enc_filters;
 }
@@ -53,10 +53,10 @@ uint8_t* decode_filters(uint16_t enc_filters) {
   int i;
   uint8_t* filters = malloc(BLOSC_MAX_FILTERS);
 
-  /* Decode the BLOSC_MAX_FILTERS filters (3-bit encoded) in 16 bit */
+  /* Decode the BLOSC_MAX_FILTERS filters (4-bit encoded) in 16 bit */
   for (i = 0; i < BLOSC_MAX_FILTERS; i++) {
-    filters[i] = (uint8_t)(enc_filters & 0x3);
-    enc_filters >>= 3;
+    filters[i] = (uint8_t)(enc_filters & 0xf);
+    enc_filters >>= 4;
   }
   return filters;
 }
@@ -152,6 +152,9 @@ size_t blosc2_append_buffer(blosc2_sheader* sheader, size_t typesize,
         return((size_t)ret);
       }
     }
+  }
+  else if (dec_filters[0] == BLOSC_TRUNC_PREC) {
+    doshuffle = dec_filters[1];
   }
   else {
     doshuffle = dec_filters[0];
@@ -464,6 +467,9 @@ void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes, 
     delta_encoder8(filters_chunk, 0, (int)nbytes, src, dest);
     /* memcpy(dest, src, nbytes); */
     src = dest;
+  }
+  else if (filters[0] == BLOSC_TRUNC_PREC) {
+    doshuffle = filters[1];
   }
   else {
     doshuffle = filters[0];
