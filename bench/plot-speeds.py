@@ -214,7 +214,7 @@ if __name__ == '__main__':
         message = "memcpy (write to memory)"
     else:
         # memcpy_speed = np.mean(values["memcpyr"])
-        memcpy_speed = values["memcpyw"][0]
+        memcpy_speed = values["memcpyr"][0]
         message = "memcpy (read from memory)"
     plot_ = axhline(memcpy_speed, linewidth=3, linestyle='-.', color='black')
     text(4.0, memcpy_speed + .5, message)
