@@ -29,59 +29,65 @@ extern "C" {
 #define BLOSCLZ_VERSION_STRING "1.0.6"   /* the internal compressor version */
 
 /* The *_FORMAT symbols below should be just 1-byte long */
+enum {
+  /* Blosc format version, starting at 1
+     1 -> Basically for Blosc pre-1.0
+     2 -> Blosc 1.x series
+     3 -> Blosc 2.x series */
+  BLOSC_VERSION_FORMAT = 3,
+};
 
-#define BLOSC_VERSION_FORMAT    3
-/* Blosc format version, starting at 1
-   1 -> Basically for Blosc pre-1.0
-   2 -> Blosc 1.x series
-   3 -> Blosc 2.x series */
-
-/* Minimum header length */
-#define BLOSC_MIN_HEADER_LENGTH 16
-
-/* The maximum overhead during compression in bytes.  This equals to
-   BLOSC_MIN_HEADER_LENGTH now, but can be higher in future
-   implementations */
-#define BLOSC_MAX_OVERHEAD BLOSC_MIN_HEADER_LENGTH
-
-/* Maximum source buffer size to be compressed */
-#define BLOSC_MAX_BUFFERSIZE (INT_MAX - BLOSC_MAX_OVERHEAD)
-
-/* Maximum typesize before considering source buffer as a stream of bytes */
-#define BLOSC_MAX_TYPESIZE 255         /* Cannot be larger than 255 */
+enum {
+  /* Minimum header length */
+  BLOSC_MIN_HEADER_LENGTH = 16,
+  /* The maximum overhead during compression in bytes.  This equals to
+     BLOSC_MIN_HEADER_LENGTH now, but can be higher in future
+     implementations */
+  BLOSC_MAX_OVERHEAD = BLOSC_MIN_HEADER_LENGTH,
+  /* Maximum source buffer size to be compressed */
+  BLOSC_MAX_BUFFERSIZE = (INT_MAX - BLOSC_MAX_OVERHEAD),
+  /* Maximum typesize before considering source buffer as a stream of bytes */
+  BLOSC_MAX_TYPESIZE = 255,         /* Cannot be larger than 255 */
+};
 
 /* Codes for filters (see blosc_compress) */
-#define BLOSC_NOSHUFFLE   0  /* no shuffle (for compatibility with Blosc1) */
-#define BLOSC_NOFILTER    0  /* no filter */
-#define BLOSC_SHUFFLE     1  /* byte-wise shuffle */
-#define BLOSC_BITSHUFFLE  2  /* bit-wise shuffle */
-#define BLOSC_DELTA       3  /* delta filter */
-#define BLOSC_TRUNC_PREC  4  /* truncate precision filter */
-#define BLOSC_LAST_FILTER 5  /* sentinel */
+enum {
+  BLOSC_NOSHUFFLE = 0,   /* no shuffle (for compatibility with Blosc1) */
+  BLOSC_NOFILTER = 0,    /* no filter */
+  BLOSC_SHUFFLE = 1,     /* byte-wise shuffle */
+  BLOSC_BITSHUFFLE = 2,  /* bit-wise shuffle */
+  BLOSC_DELTA = 3,       /* delta filter */
+  BLOSC_TRUNC_PREC = 4,  /* truncate precision filter */
+  BLOSC_LAST_FILTER= 5,  /* sentinel */
+};
 
-/* Maximum number of simultaneous filters */
-#define BLOSC_MAX_FILTERS 8
-
-/* The meta slots for the different filters (in case meta is needed) */
-#define BLOSC_TRUNC_PREC_MSLOT 0
-
-/* Maximum number of slots for meta info in filters */
-#define BLOSC_MAX_FILTER_MSLOTS 4
+enum {
+  /* Maximum number of the filter pipeline */
+  BLOSC_MAX_FILTERS = 8,
+  /* The meta slots for the different filters (in case meta is needed) */
+  BLOSC_TRUNC_PREC_MSLOT = 0,
+  /* Maximum number of slots for meta info in filters */
+  BLOSC_MAX_FILTER_MSLOTS = 4,
+};
 
 /* Codes for internal flags (see blosc_cbuffer_metainfo) */
-#define BLOSC_DOSHUFFLE     0x1  /* byte-wise shuffle */
-#define BLOSC_MEMCPYED      0x2  /* plain copy */
-#define BLOSC_DOBITSHUFFLE  0x4  /* bit-wise shuffle */
-#define BLOSC_FILTER_SCHUNK 0x8  /* filter defined in super-chunk */
+enum {
+  BLOSC_DOSHUFFLE = 0x1,     /* byte-wise shuffle */
+  BLOSC_MEMCPYED = 0x2,      /* plain copy */
+  BLOSC_DOBITSHUFFLE = 0x4,  /* bit-wise shuffle */
+  BLOSC_FILTER_SCHUNK= 0x8,  /* filter defined in super-chunk */
+};
 
 /* Codes for the different compressors shipped with Blosc */
-#define BLOSC_BLOSCLZ        0
-#define BLOSC_LZ4            1
-#define BLOSC_LZ4HC          2
-#define BLOSC_SNAPPY         3
-#define BLOSC_ZLIB           4
-#define BLOSC_ZSTD           5
-#define BLOSC_LIZARD         6
+enum {
+  BLOSC_BLOSCLZ = 0,
+  BLOSC_LZ4 = 1,
+  BLOSC_LZ4HC = 2,
+  BLOSC_SNAPPY = 3,
+  BLOSC_ZLIB = 4,
+  BLOSC_ZSTD = 5,
+  BLOSC_LIZARD = 6,
+};
 
 /* Names for the different compressors shipped with Blosc */
 #define BLOSC_BLOSCLZ_COMPNAME   "blosclz"
@@ -93,13 +99,15 @@ extern "C" {
 #define BLOSC_ZSTD_COMPNAME      "zstd"
 
 /* Codes for compression libraries shipped with Blosc (code must be < 8) */
-#define BLOSC_BLOSCLZ_LIB    0
-#define BLOSC_LZ4_LIB        1
-#define BLOSC_SNAPPY_LIB     2
-#define BLOSC_ZLIB_LIB       3
-#define BLOSC_ZSTD_LIB       4
-#define BLOSC_LIZARD_LIB     5
-#define BLOSC_SCHUNK_LIB     7   /* compressor library in super-chunk header */
+enum {
+  BLOSC_BLOSCLZ_LIB = 0,
+  BLOSC_LZ4_LIB = 1,
+  BLOSC_SNAPPY_LIB = 2,
+  BLOSC_ZLIB_LIB = 3,
+  BLOSC_ZSTD_LIB = 4,
+  BLOSC_LIZARD_LIB = 5,
+  BLOSC_SCHUNK_LIB = 7,   /* compressor library in super-chunk header */
+};
 
 /* Names for the different compression libraries shipped with Blosc */
 #define BLOSC_BLOSCLZ_LIBNAME   "BloscLZ"
@@ -114,25 +122,28 @@ extern "C" {
 #define BLOSC_ZSTD_LIBNAME      "Zstd"
 
 /* The codes for compressor formats shipped with Blosc */
-#define BLOSC_BLOSCLZ_FORMAT  BLOSC_BLOSCLZ_LIB
-#define BLOSC_LZ4_FORMAT      BLOSC_LZ4_LIB
-/* LZ4HC and LZ4 share the same format */
-#define BLOSC_LZ4HC_FORMAT    BLOSC_LZ4_LIB
-#define BLOSC_LIZARD_FORMAT   BLOSC_LIZARD_LIB
-#define BLOSC_SNAPPY_FORMAT   BLOSC_SNAPPY_LIB
-#define BLOSC_ZLIB_FORMAT     BLOSC_ZLIB_LIB
-#define BLOSC_ZSTD_FORMAT     BLOSC_ZSTD_LIB
-
+enum {
+  BLOSC_BLOSCLZ_FORMAT = BLOSC_BLOSCLZ_LIB,
+  BLOSC_LZ4_FORMAT = BLOSC_LZ4_LIB,
+  /* LZ4HC and LZ4 share the same format */
+  BLOSC_LZ4HC_FORMAT = BLOSC_LZ4_LIB,
+  BLOSC_LIZARD_FORMAT = BLOSC_LIZARD_LIB,
+  BLOSC_SNAPPY_FORMAT = BLOSC_SNAPPY_LIB,
+  BLOSC_ZLIB_FORMAT = BLOSC_ZLIB_LIB,
+  BLOSC_ZSTD_FORMAT = BLOSC_ZSTD_LIB,
+};
 
 /* The version formats for compressors shipped with Blosc */
 /* All versions here starts at 1 */
-#define BLOSC_BLOSCLZ_VERSION_FORMAT  1
-#define BLOSC_LZ4_VERSION_FORMAT      1
-#define BLOSC_LZ4HC_VERSION_FORMAT    1  /* LZ4HC and LZ4 share the same format */
-#define BLOSC_LIZARD_VERSION_FORMAT   1
-#define BLOSC_SNAPPY_VERSION_FORMAT   1
-#define BLOSC_ZLIB_VERSION_FORMAT     1
-#define BLOSC_ZSTD_VERSION_FORMAT     1
+enum {
+  BLOSC_BLOSCLZ_VERSION_FORMAT = 1,
+  BLOSC_LZ4_VERSION_FORMAT = 1,
+  BLOSC_LZ4HC_VERSION_FORMAT = 1,  /* LZ4HC and LZ4 share the same format */
+  BLOSC_LIZARD_VERSION_FORMAT = 1,
+  BLOSC_SNAPPY_VERSION_FORMAT = 1,
+  BLOSC_ZLIB_VERSION_FORMAT = 1,
+  BLOSC_ZSTD_VERSION_FORMAT = 1,
+};
 
 /**
   Initialize the Blosc library environment.
@@ -367,7 +378,8 @@ BLOSC_EXPORT char* blosc_get_version_string(void);
   If the compressor is supported, it returns the code for the library
   (>=0).  If it is not supported, this function returns -1.
 */
-BLOSC_EXPORT int blosc_get_complib_info(char* compname, char** complib, char** version);
+BLOSC_EXPORT int blosc_get_complib_info(char* compname, char** complib,
+                                        char** version);
 
 
 /**
