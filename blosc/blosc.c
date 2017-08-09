@@ -22,7 +22,7 @@
 #include "shuffle.h"
 #include "schunk.h"
 #include "delta.h"
-#include "trunc_prec.h"
+#include "trunc-prec.h"
 #include "blosclz.h"
 #if defined(HAVE_LZ4)
 #include "lz4.h"
@@ -134,6 +134,8 @@ struct blosc_context_s {
   int32_t end_threads;
   pthread_t *threads;
   pthread_mutex_t count_mutex;
+  pthread_mutex_t delta_mutex;
+  pthread_cond_t delta_cv;
 #ifdef _POSIX_BARRIERS_MINE
   pthread_barrier_t barr_init;
   pthread_barrier_t barr_finish;
@@ -148,6 +150,7 @@ struct blosc_context_s {
   int32_t thread_giveup_code;
   /* error code when give up */
   int32_t thread_nblock;                    /* block counter */
+  int32_t dref_not_init;   /* data ref not initialized */
 };
 
 struct thread_context {
@@ -652,8 +655,8 @@ static int blosc_c(struct thread_context* thread_context, int32_t blocksize,
     uint8_t* filters;
     filters = decode_filters(context->schunk->filters);
     if (filters[0] == BLOSC_DELTA) {
-      delta_encoder8(context->schunk->filters_chunk, offset, blocksize,
-                     (unsigned char*)_src, tmp2);
+      delta_encoder8((uint8_t*)src, offset, blocksize, (unsigned char*)_src,
+                     tmp2);
       _src = tmp2;
     }
     else if (filters[0] == BLOSC_TRUNC_PREC) {
@@ -892,7 +895,18 @@ static int blosc_d(
     uint8_t* filters;
     filters = decode_filters(context->schunk->filters);
     if (filters[0] == BLOSC_DELTA) {
-      delta_decoder8(context->schunk->filters_chunk, offset, blocksize, dest + offset);
+      /* Let the thread in charge of the block 0 to go first */
+      pthread_mutex_lock(&context->delta_mutex);
+      if (context->dref_not_init) {
+        if (offset != 0) {
+          pthread_cond_wait(&context->delta_cv, &context->delta_mutex);
+        } else {
+          context->dref_not_init = 0;
+          pthread_cond_broadcast(&context->delta_cv);
+        }
+      }
+      pthread_mutex_unlock(&context->delta_mutex);
+      delta_decoder8(dest, offset, blocksize, dest + offset);
     }
     free(filters);
   }
@@ -976,6 +990,7 @@ static int parallel_blosc(blosc_context* context) {
   /* Set sentinels */
   context->thread_giveup_code = 1;
   context->thread_nblock = -1;
+  context->dref_not_init = 1;
 
   /* Synchronization point for all threads (wait for initialization) */
   WAIT_INIT(-1, context);
@@ -1986,6 +2001,8 @@ static int init_threads(blosc_context* context) {
 
   /* Initialize mutex and condition variable objects */
   pthread_mutex_init(&context->count_mutex, NULL);
+  pthread_mutex_init(&context->delta_mutex, NULL);
+  pthread_cond_init(&context->delta_cv, NULL);
 
   /* Set context thread sentinels */
   context->thread_giveup_code = 1;
@@ -2015,7 +2032,8 @@ static int init_threads(blosc_context* context) {
     thread_context = create_thread_context(context, tid);
 
 #if !defined(_WIN32)
-    rc2 = pthread_create(&context->threads[tid], &context->ct_attr, t_blosc, (void*)thread_context);
+    rc2 = pthread_create(&context->threads[tid], &context->ct_attr, t_blosc,
+                         (void*)thread_context);
 #else
     rc2 = pthread_create(&context->threads[tid], NULL, t_blosc, (void *)thread_context);
 #endif
@@ -2326,6 +2344,8 @@ int blosc_release_threadpool(blosc_context* context) {
 
     /* Release mutex and condition variable objects */
     pthread_mutex_destroy(&context->count_mutex);
+    pthread_mutex_destroy(&context->delta_mutex);
+    pthread_cond_destroy(&context->delta_cv);
 
     /* Barriers */
   #ifdef _POSIX_BARRIERS_MINE

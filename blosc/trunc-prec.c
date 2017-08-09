@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "blosc.h"
-#include "trunc_prec.h"
+#include "trunc-prec.h"
 
 #define BITS_MANTISSA_FLOAT 23
 #define BITS_MANTISSA_DOUBLE 52

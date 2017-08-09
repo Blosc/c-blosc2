@@ -58,7 +58,7 @@ endif (NOT DEACTIVATE_ZSTD)
 include_directories(${BLOSC_INCLUDE_DIRS})
 
 # library sources
-set(SOURCES blosc.c blosclz.c schunk.c delta.c delta.h shuffle-generic.c bitshuffle-generic.c trunc_prec.c)
+set(SOURCES blosc.c blosclz.c schunk.c delta.c delta.h shuffle-generic.c bitshuffle-generic.c trunc-prec.c)
 if (COMPILER_SUPPORT_SSE2)
     message(STATUS "Adding run-time support for SSE2")
     set(SOURCES ${SOURCES} shuffle-sse2.c bitshuffle-sse2.c)
