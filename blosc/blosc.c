@@ -895,7 +895,7 @@ static int blosc_d(
     uint8_t* filters;
     filters = decode_filters(context->schunk->filters);
     if (filters[0] == BLOSC_DELTA) {
-      /* Let the thread in charge of the block 0 to go first */
+      /* Force the thread in charge of the block 0 to go first */
       pthread_mutex_lock(&context->delta_mutex);
       if (context->dref_not_init) {
         if (offset != 0) {
