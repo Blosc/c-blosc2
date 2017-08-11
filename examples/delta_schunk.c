@@ -108,8 +108,6 @@ int main() {
   printf("Decompression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
-  printf("Decompression successful!\n");
-
   for (i = 0; i < CHUNKSIZE; i++) {
     if (data_dest[i] != i) {
       printf("Decompressed data differs from original %d, %d!\n",
