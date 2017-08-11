@@ -513,7 +513,7 @@ typedef struct {
 
 /* Default struct for schunk params meant for user initialization */
 static const blosc2_sparams BLOSC_SPARAMS_DEFAULTS = \
-  { BLOSC_ZSTD, 5, {BLOSC_SHUFFLE, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0} };
+  { BLOSC_BLOSCLZ, 5, {BLOSC_DOSHUFFLE, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0} };
 
 /* Create a new super-chunk. */
 BLOSC_EXPORT blosc2_sheader* blosc2_new_schunk(blosc2_sparams* sparams);
