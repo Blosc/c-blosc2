@@ -114,6 +114,7 @@ int main() {
     if (data_dest[i] != i) {
       printf("Decompressed data differs from original %d, %d!\n",
              i, data_dest[i]);
+      return -1;
     }
   }
 

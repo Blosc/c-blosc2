@@ -75,7 +75,7 @@ enum {
   BLOSC_DOSHUFFLE = 0x1,     /* byte-wise shuffle */
   BLOSC_MEMCPYED = 0x2,      /* plain copy */
   BLOSC_DOBITSHUFFLE = 0x4,  /* bit-wise shuffle */
-  BLOSC_FILTER_SCHUNK= 0x8,  /* filter defined in super-chunk */
+  BLOSC_DODELTA = 0x8,       /* delta coding */
 };
 
 /* Codes for the different compressors shipped with Blosc */
@@ -177,8 +177,8 @@ BLOSC_EXPORT void blosc_destroy(void);
   `doshuffle` specifies whether the shuffle compression preconditioner
   should be applied or not.  BLOSC_NOFILTER means not applying filters,
   BLOSC_SHUFFLE means applying shuffle at a byte level and
-  BLOSC_BITSHUFFLE at a bit level (slower but may achieve better
-  entropy alignment).
+  BLOSC_BITSHUFFLE at a bit level (slower but *may* achieve better
+  compression).
 
   `typesize` is the number of bytes for the atomic type in binary
   `src` buffer.  This is mainly useful for the shuffle preconditioner.
@@ -216,13 +216,15 @@ BLOSC_EXPORT void blosc_destroy(void);
   overwrite the `doshuffle` parameter before the compression process
   starts.
 
+  BLOSC_DELTA=(1|0): This will call blosc_set_delta() before the
+  compression process starts.
+
   BLOSC_TYPESIZE=(INTEGER): This will overwrite the `typesize`
   parameter before the compression process starts.
 
   BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | LIZARD | SNAPPY | ZLIB]:
   This will call blosc_set_compressor(BLOSC_COMPRESSOR) before the
   compression process starts.
-
 
   BLOSC_NTHREADS=(INTEGER): This will call
   blosc_set_nthreads(BLOSC_NTHREADS) before the compression process
@@ -237,8 +239,8 @@ BLOSC_EXPORT void blosc_destroy(void);
   the hood, with the `compressor`, `blocksize` and
   `numinternalthreads` parameters set to the same as the last calls to
   blosc_set_compressor(), blosc_set_blocksize() and
-  blosc_set_nthreads().  BLOSC_CLEVEL, BLOSC_SHUFFLE, BLOSC_TYPESIZE
-  environment vars will also be honored.
+  blosc_set_nthreads().  BLOSC_CLEVEL, BLOSC_SHUFFLE, BLOSC_DELTA and
+  BLOSC_TYPESIZE environment vars will also be honored.
 */
 BLOSC_EXPORT int blosc_compress(int clevel, int doshuffle, size_t typesize,
                                 size_t nbytes, const void* src, void* dest,
@@ -306,7 +308,7 @@ BLOSC_EXPORT int blosc_set_nthreads(int nthreads);
 
 
 /**
-  Returns the current compressor that is used for compression.
+  Return the current compressor that is used for compression.
   */
 BLOSC_EXPORT char* blosc_get_compressor(void);
 
@@ -321,6 +323,15 @@ BLOSC_EXPORT char* blosc_get_compressor(void);
   the compressor (>=0).
 */
 BLOSC_EXPORT int blosc_set_compressor(const char* compname);
+
+
+/**
+  Select the delta coding filter to be used.  If a value >0 is passed, the
+  delta filter will be active.  If 0, it will be de-activated.
+
+  This call should always succeed.
+*/
+BLOSC_EXPORT void blosc_set_delta(int dodelta);
 
 
 /**
@@ -413,11 +424,13 @@ BLOSC_EXPORT void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
   The `flags` is a set of bits, where the currently used ones are:
     * bit 0: whether the shuffle filter has been applied or not
     * bit 1: whether the internal buffer is a pure memcpy or not
+    * bit 2: whether the bitshuffle filter has been applied or not
+    * bit 3: whether the delta coding filter has been applied or not
 
-  You can use the `BLOSC_DOSHUFFLE`, `BLOSC_DOBITSHUFFLE` and
-  `BLOSC_MEMCPYED` symbols for extracting the interesting bits
-  (e.g. ``flags & BLOSC_DOSHUFFLE`` says whether the buffer is
-  byte-shuffled or not).
+  You can use the `BLOSC_DOSHUFFLE`, `BLOSC_DOBITSHUFFLE`, `BLOSC_DODELTA`
+  and `BLOSC_MEMCPYED` symbols for extracting the interesting bits
+  (e.g. ``flags & BLOSC_DOSHUFFLE`` says whether the buffer is byte-shuffled
+  or not).
 
   This function should always succeed.
 */
@@ -567,11 +580,11 @@ typedef struct {
   uint8_t typesize;
   /* the type size (8) */
   uint8_t compcode;
-  /* the compressor code (BLOSC_BLOSCLZ) */
+  /* the compressor codec */
   uint8_t clevel;
   /* the compression level (5) */
-  uint8_t filtercode;
-  /* the filter code (BLOSC_SHUFFLE) */
+  uint8_t filtercodes;
+  /* the (and-ed) filter codes (BLOSC_DOSHUFFLE) */
   uint8_t nthreads;
   /* the number of threads to use internally (1) */
   int32_t blocksize;
@@ -582,7 +595,7 @@ typedef struct {
 
 /* Default struct for compression params meant for user initialization */
 static const blosc2_context_cparams BLOSC_CPARAMS_DEFAULTS = \
-  { 8, BLOSC_BLOSCLZ, 5, BLOSC_SHUFFLE, 1, 0, NULL };
+  { 8, BLOSC_BLOSCLZ, 5, BLOSC_DOSHUFFLE, 1, 0, NULL };
 
 
 /**

@@ -169,6 +169,30 @@ static char *test_bitshuffle() {
 }
 
 
+/* Check delta conding */
+static char *test_delta() {
+  int cbytes2;
+
+  /* Get a compressed buffer */
+  blosc_set_compressor("blosclz");  /* avoid lz4 here for now (see #168) */
+  blosc_set_delta(0);
+  cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
+                          dest, size + 16);
+  mu_assert("ERROR: cbytes is not 0", cbytes < size);
+
+  /* Activate the BLOSC_DELTA variable */
+  setenv("BLOSC_DELTA", "1", 0);
+  cbytes2 = blosc_compress(clevel, doshuffle, typesize, size, src,
+                           dest, size + 16);
+  mu_assert("ERROR: BLOSC_DELTA=1 does not work correctly",
+            cbytes2 < cbytes / 2);
+
+  /* Reset env var */
+  unsetenv("BLOSC_DELTA");
+  return 0;
+}
+
+
 /* Check typesize */
 static char *test_typesize() {
   int cbytes2;
@@ -197,6 +221,7 @@ static char *all_tests() {
   mu_run_test(test_noshuffle);
   mu_run_test(test_shuffle);
   mu_run_test(test_bitshuffle);
+  mu_run_test(test_delta);
   mu_run_test(test_typesize);
 
   return 0;
