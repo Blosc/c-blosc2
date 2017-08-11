@@ -583,7 +583,7 @@ typedef struct {
   /* the compressor codec */
   uint8_t clevel;
   /* the compression level (5) */
-  uint8_t filtercodes;
+  uint8_t filters;
   /* the (and-ed) filter codes (BLOSC_DOSHUFFLE) */
   uint8_t nthreads;
   /* the number of threads to use internally (1) */

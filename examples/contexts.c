@@ -51,7 +51,7 @@ int main() {
   /* Create a context for compression */
   cparams.typesize = sizeof(float);
   cparams.compcode = BLOSC_BLOSCLZ;
-  cparams.filtercode = BLOSC_SHUFFLE;
+  cparams.filters = BLOSC_SHUFFLE;
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   cctx = blosc2_create_cctx(&cparams);
