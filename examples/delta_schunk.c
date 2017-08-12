@@ -52,9 +52,9 @@ double getseconds(blosc_timestamp_t last, blosc_timestamp_t current) {
 
 
 int main() {
-  static int32_t data[CHUNKSIZE];
-  static int32_t data_dest[CHUNKSIZE];
-  int isize = CHUNKSIZE * sizeof(int32_t);
+  static int64_t data[CHUNKSIZE];
+  static int64_t data_dest[CHUNKSIZE];
+  int isize = CHUNKSIZE * sizeof(int64_t);
   int dsize;
   int32_t nbytes, cbytes;
   blosc2_sparams sparams = BLOSC_SPARAMS_DEFAULTS;
@@ -81,7 +81,7 @@ int main() {
     for (i = 0; i < CHUNKSIZE; i++) {
       data[i] = i * nchunk;
     }
-    nchunks = blosc2_append_buffer(sheader, sizeof(int32_t), isize, data);
+    nchunks = blosc2_append_buffer(sheader, sizeof(int64_t), isize, data);
     assert(nchunks == nchunk);
   }
   /* Gather some info */
@@ -109,8 +109,8 @@ int main() {
          ttotal, nbytes / (ttotal * MB));
 
   for (i = 0; i < CHUNKSIZE; i++) {
-    if (data_dest[i] != i) {
-      printf("Decompressed data differs from original %d, %d!\n",
+    if (data_dest[i] != (uint64_t)i) {
+      printf("Decompressed data differs from original %d, %lld!\n",
              i, data_dest[i]);
       return -1;
     }

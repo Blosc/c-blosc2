@@ -670,8 +670,8 @@ static int blosc_c(struct thread_context* thread_context, int32_t blocksize,
 
   /* Delta filter */
   if (context->filters & BLOSC_DODELTA) {
-    delta_encoder8((uint8_t*)src, offset, blocksize, (unsigned char*)_src,
-                   tmp2);
+    delta_encoder8((uint8_t*)src, offset, blocksize, typesize,
+                   (unsigned char*) _src, tmp2);
     _src = tmp2;
   }
 
@@ -902,12 +902,15 @@ static int blosc_d(
       if (offset != 0) {
         pthread_cond_wait(&context->delta_cv, &context->delta_mutex);
       } else {
+        delta_decoder8(dest, offset, blocksize, typesize, dest + offset);
         context->dref_not_init = 0;
         pthread_cond_broadcast(&context->delta_cv);
       }
     }
     pthread_mutex_unlock(&context->delta_mutex);
-    delta_decoder8(dest, offset, blocksize, dest + offset);
+    if (offset != 0) {
+      delta_decoder8(dest, offset, blocksize, typesize, dest + offset);
+    }
   }
 
   /* Return the number of uncompressed bytes */
@@ -989,7 +992,6 @@ static int parallel_blosc(blosc_context* context) {
   /* Set sentinels */
   context->thread_giveup_code = 1;
   context->thread_nblock = -1;
-  context->dref_not_init = 1;
 
   /* Synchronization point for all threads (wait for initialization) */
   WAIT_INIT(-1, context);
@@ -1047,6 +1049,9 @@ void free_thread_context(struct thread_context* thread_context) {
    global params. */
 static int do_job(blosc_context* context) {
   int32_t ntbytes;
+
+  /* Set sentinels */
+  context->dref_not_init = 1;
 
   /* Run the serial version when nthreads is 1 or when the buffers are
      not larger than blocksize */
