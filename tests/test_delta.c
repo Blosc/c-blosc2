@@ -16,10 +16,10 @@ int tests_run = 0;
 /* Global vars */
 void *src, *srccpy, *dest;
 int nbytes, cbytes;
-int clevel = 9;
+int clevel = 5;
 int doshuffle = 1;
 int typesize;
-size_t size = 48 * 100 * 1000;  /* must be divisible by typesize */
+size_t size = 7 * 13 * 16 * 24 * 1000;  /* must be divisible by typesize */
 
 
 /* Check compressor */
@@ -43,6 +43,13 @@ static char *test_delta() {
         ((uint32_t*)src)[i] = (uint32_t)i;
       }
       break;
+    case 7:
+      for (int i = 0; i < size / typesize; i++) {
+        *(uint32_t*)(src + i * 4) = (uint32_t)i;
+        *(uint16_t*)(src + i * 4 + 2) = (uint16_t)i;
+        *(uint8_t*)(src + i * 4 + 2 + 1) = (uint8_t)i;
+      }
+      break;
     case 8:
       for (int i = 0; i < size / typesize; i++) {
         ((uint64_t*)src)[i] = (uint64_t)i;
@@ -51,7 +58,14 @@ static char *test_delta() {
     case 12:
       for (int i = 0; i < size / typesize; i++) {
         *(uint64_t*)(src + i * 8) = (uint64_t)i;
-        *(uint32_t*)(src + i * 8 + 4) = 0;
+        *(uint32_t*)(src + i * 8 + 4) = 1;
+      }
+      break;
+    case 13:
+      for (int i = 0; i < size / typesize; i++) {
+        *(uint64_t*)(src + i * 8) = (uint64_t)i;
+        *(uint32_t*)(src + i * 8 + 4) = 1;
+        *(uint8_t*)(src + i * 8 + 4 + 1) = 1;
       }
       break;
     case 16:
@@ -63,9 +77,9 @@ static char *test_delta() {
     case 24:
       for (int i = 0; i < size / typesize; i++) {
         *(uint64_t*)(src + i * 8) = (uint64_t)i;
-        *(uint32_t*)(src + i * 8 + 4) = 0;
+        *(uint32_t*)(src + i * 8 + 4) = 1;
         *(uint64_t*)(src + i * 8 + 4 + 8) = (uint64_t)i;
-        *(uint32_t*)(src + i * 8 + 4 + 8 + 4) = 0;
+        *(uint32_t*)(src + i * 8 + 4 + 8 + 4) = 2;
       }
       break;
     default:
@@ -112,9 +126,13 @@ static char *all_tests() {
   mu_run_test(test_delta);
   typesize = 4;
   mu_run_test(test_delta);
+  typesize = 7;
+  mu_run_test(test_delta);
   typesize = 8;
   mu_run_test(test_delta);
   typesize = 12;
+  mu_run_test(test_delta);
+  typesize = 13;
   mu_run_test(test_delta);
   typesize = 16;
   mu_run_test(test_delta);
