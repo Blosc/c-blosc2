@@ -64,7 +64,7 @@ inline void fill_buffer(double *x, int nchunk) {
     }
 }
 
-inline void process_data(double *x, double *y) {
+inline void process_data(const double *x, double *y) {
 
     for (int i = 0; i < CHUNKSIZE; i++) {
         double xi = x[i];
@@ -73,7 +73,8 @@ inline void process_data(double *x, double *y) {
     }
 }
 
-inline void find_root(double *x, double *y, double prev_value) {
+inline void find_root(const double *x, const double *y,
+                      const double prev_value) {
     double pv = prev_value;
     int last_root_idx = -1;
 
@@ -93,7 +94,8 @@ inline void find_root(double *x, double *y, double prev_value) {
 int compute_vectors(void) {
     static double buffer_x[CHUNKSIZE];
     static double buffer_y[CHUNKSIZE];
-    int isize = CHUNKSIZE * sizeof(double), osize = CHUNKSIZE * sizeof(double);
+    const int isize = CHUNKSIZE * sizeof(double);
+    const int osize = CHUNKSIZE * sizeof(double);
     int dsize, csize;
     long nbytes = 0;
     blosc2_sparams sparams;
@@ -197,7 +199,7 @@ int main() {
     /* Initialize the Blosc compressor */
     blosc_init();
 
-    blosc_set_nthreads(2);
+    blosc_set_nthreads(4);
 
     compute_vectors();
 

@@ -54,7 +54,7 @@ double getseconds(blosc_timestamp_t last, blosc_timestamp_t current) {
 int main() {
   static int64_t data[CHUNKSIZE];
   static int64_t data_dest[CHUNKSIZE];
-  int isize = CHUNKSIZE * sizeof(int64_t);
+  const int isize = CHUNKSIZE * sizeof(int64_t);
   int dsize;
   int32_t nbytes, cbytes;
   blosc2_sparams sparams = BLOSC_SPARAMS_DEFAULTS;
@@ -68,12 +68,13 @@ int main() {
 
   /* Initialize the Blosc compressor */
   blosc_init();
-  blosc_set_nthreads(2);
+  blosc_set_nthreads(4);
 
   /* Create a super-chunk container */
   sparams.filters[0] = BLOSC_DELTA;
   sparams.filters[1] = BLOSC_BITSHUFFLE;
   sparams.compressor = BLOSC_LZ4;
+  sparams.clevel = 9;
   sheader = blosc2_new_schunk(&sparams);
 
   blosc_set_timestamp(&last);
@@ -108,6 +109,7 @@ int main() {
   printf("Decompression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
+  /* Check integrity of the first chunk */
   for (i = 0; i < CHUNKSIZE; i++) {
     if (data_dest[i] != (uint64_t)i) {
       printf("Decompressed data differs from original %d, %lld!\n",
@@ -119,9 +121,7 @@ int main() {
   printf("Successful roundtrip!\n");
 
   /* Free resources */
-  /* Destroy the super-chunk */
   blosc2_destroy_schunk(sheader);
-  /* Destroy the Blosc environment */
   blosc_destroy();
 
   return 0;
