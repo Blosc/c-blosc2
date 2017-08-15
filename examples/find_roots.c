@@ -8,11 +8,11 @@
 
   To compile this program:
 
-  $ gcc -O3 find-roots.c -o find-roots -lblosc
+  $ gcc -O3 find_roots.c -o find_roots -lblosc
 
   To run:
 
-  $ ./find-roots
+  $ ./find_roots
   ...
 
 */
