@@ -90,8 +90,8 @@ int main() {
   cbytes = sheader->cbytes;
   blosc_set_timestamp(&current);
   ttotal = (double)getseconds(last, current);
-  printf("Compression ratio: %d -> %d (%.1fx)\n",
-         nbytes, cbytes, (1. * nbytes) / cbytes);
+  printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
+         nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
   printf("Compression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
