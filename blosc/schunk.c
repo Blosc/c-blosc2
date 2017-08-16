@@ -467,7 +467,7 @@ void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes,
 int blosc2_packed_decompress_chunk(void* packed, int nchunk, void** dest) {
   int64_t nchunks = *(int64_t*)((uint8_t*)packed + 28);
   uint8_t* filters_chunk = (uint8_t*)(
-          packed + *(uint64_t*)((uint8_t*)packed + 52));
+          (uint8_t*)packed + *(uint64_t*)((uint8_t*)packed + 52));
   int64_t* data = (int64_t*)(
           (uint8_t*)packed + *(int64_t*)((uint8_t*)packed + 52 + 8 * 4));
   void* src;
