@@ -670,8 +670,8 @@ static int blosc_c(struct thread_context* thread_context, int32_t blocksize,
 
   /* Delta filter */
   if (context->filters & BLOSC_DODELTA) {
-    delta_encoder8((uint8_t*)src, offset, blocksize, typesize,
-                   (unsigned char*) _src, tmp2);
+    delta_encoder((uint8_t*)src, offset, blocksize, typesize,
+                  (unsigned char*) _src, tmp2);
     _src = tmp2;
   }
 
@@ -898,7 +898,7 @@ static int blosc_d(
   if (context->filters & BLOSC_DODELTA) {
     if (context->nthreads == 1) {
       /* Serial mode */
-      delta_decoder8(dest, offset, blocksize, typesize, dest + offset);
+      delta_decoder(dest, offset, blocksize, typesize, dest + offset);
     } else {
       /* Force the thread in charge of the block 0 to go first */
       pthread_mutex_lock(&context->delta_mutex);
@@ -906,14 +906,14 @@ static int blosc_d(
         if (offset != 0) {
           pthread_cond_wait(&context->delta_cv, &context->delta_mutex);
         } else {
-          delta_decoder8(dest, offset, blocksize, typesize, dest + offset);
+          delta_decoder(dest, offset, blocksize, typesize, dest + offset);
           context->dref_not_init = 0;
           pthread_cond_broadcast(&context->delta_cv);
         }
       }
       pthread_mutex_unlock(&context->delta_mutex);
       if (offset != 0) {
-        delta_decoder8(dest, offset, blocksize, typesize, dest + offset);
+        delta_decoder(dest, offset, blocksize, typesize, dest + offset);
       }
     }
   }

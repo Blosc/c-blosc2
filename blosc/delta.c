@@ -13,9 +13,9 @@
 
 
 /* Apply the delta filters to src.  This can never fail. */
-void delta_encoder8(const uint8_t* dref, const int32_t offset,
-                    const int32_t nbytes, const int32_t typesize,
-                    const uint8_t* src, uint8_t* dest) {
+void delta_encoder(const uint8_t* dref, const int32_t offset,
+                   const int32_t nbytes, const int32_t typesize,
+                   const uint8_t* src, uint8_t* dest) {
 
   if (offset == 0) {
     /* This is the reference block, use delta coding in elements */
@@ -49,19 +49,9 @@ void delta_encoder8(const uint8_t* dref, const int32_t offset,
         break;
       default:
         if ((typesize % 8) == 0) {
-          ((uint64_t *)dest)[0] = ((uint64_t *)dref)[0];
-          for (int i = 1; i < nbytes / 8; i++) {
-            ((uint64_t *)dest)[i] = ((uint64_t *)src)[i] -
-                                     ((uint64_t *)dref)[i - 1];
-          }
-          for (int i = nbytes / 8 * 8; i < nbytes; i++) {
-            dest[i] = src[i] - dref[i-1];
-          }
+          delta_encoder(dref, offset, nbytes, 8, src, dest);
         } else {
-          dest[0] = dref[0];
-          for (int i = 1; i < nbytes; i++) {
-            dest[i] = src[i] - dref[i-1];
-          }
+          delta_encoder(dref, offset, nbytes, 1, src, dest);
         }
     }
   } else {
@@ -92,17 +82,9 @@ void delta_encoder8(const uint8_t* dref, const int32_t offset,
         break;
       default:
         if ((typesize % 8) == 0) {
-          for (int i = 0; i < nbytes / 8; i++) {
-            ((uint64_t *) dest)[i] =
-                    ((uint64_t *) src)[i] - ((uint64_t *) dref)[i];
-          }
-          for (int i = nbytes / 8 * 8; i < nbytes; i++) {
-            dest[i] = src[i] - dref[i];
-          }
+          delta_encoder(dref, offset, nbytes, 8, src, dest);
         } else {
-          for (int i = 0; i < nbytes; i++) {
-            dest[i] = src[i] - dref[i];
-          }
+          delta_encoder(dref, offset, nbytes, 1, src, dest);
         }
     }
   }
@@ -110,9 +92,9 @@ void delta_encoder8(const uint8_t* dref, const int32_t offset,
 
 
 /* Undo the delta filter in dest.  This can never fail. */
-void delta_decoder8(const uint8_t* dref, const int32_t offset,
-                    const int32_t nbytes, const int32_t typesize,
-                    uint8_t* dest) {
+void delta_decoder(const uint8_t* dref, const int32_t offset,
+                   const int32_t nbytes, const int32_t typesize,
+                   uint8_t* dest) {
 
   if (offset == 0) {
     /* Decode delta for the reference block */
@@ -139,16 +121,9 @@ void delta_decoder8(const uint8_t* dref, const int32_t offset,
         break;
       default:
         if ((typesize % 8) == 0) {
-          for (int i = 1; i < nbytes / 8; i++) {
-            ((uint64_t *) dest)[i] += ((uint64_t *) dref)[i-1];
-          }
-          for (int i = nbytes / 8 * 8; i < nbytes; i++) {
-            dest[i] += dref[i-1];
-          }
+          delta_decoder(dref, offset, nbytes, 8, dest);
         } else {
-          for (int i = 1; i < nbytes; i++) {
-            dest[i] += dref[i-1];
-          }
+          delta_decoder(dref, offset, nbytes, 1, dest);
         }
     }
   } else {
@@ -176,16 +151,9 @@ void delta_decoder8(const uint8_t* dref, const int32_t offset,
         break;
       default:
         if ((typesize % 8) == 0) {
-          for (int i = 0; i < nbytes / 8; i++) {
-            ((uint64_t *) dest)[i] += ((uint64_t *) dref)[i];
-          }
-          for (int i = nbytes / 8 * 8; i < nbytes; i++) {
-            dest[i] += dref[i];
-          }
+          delta_decoder(dref, offset, nbytes, 8, dest);
         } else {
-          for (int i = 0; i < nbytes; i++) {
-            dest[i] += dref[i];
-          }
+          delta_decoder(dref, offset, nbytes, 1, dest);
         }
     }
   }
