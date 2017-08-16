@@ -136,8 +136,6 @@ struct blosc_context_s {
   int32_t end_threads;
   pthread_t *threads;
   pthread_mutex_t count_mutex;
-  pthread_mutex_t delta_mutex;
-  pthread_cond_t delta_cv;
 #ifdef _POSIX_BARRIERS_MINE
   pthread_barrier_t barr_init;
   pthread_barrier_t barr_finish;
@@ -147,12 +145,14 @@ struct blosc_context_s {
   pthread_cond_t count_threads_cv;
 #endif
 #if !defined(_WIN32)
-  pthread_attr_t ct_attr;            /* creation time attrs for threads */
+  pthread_attr_t ct_attr;      /* creation time attrs for threads */
 #endif
   int32_t thread_giveup_code;
   /* error code when give up */
-  int32_t thread_nblock;                    /* block counter */
-  int32_t dref_not_init;   /* data ref not initialized */
+  int32_t thread_nblock;       /* block counter */
+  int32_t dref_not_init;       /* data ref in delta not initialized */
+  pthread_mutex_t delta_mutex;
+  pthread_cond_t delta_cv;
 };
 
 struct thread_context {
@@ -896,20 +896,25 @@ static int blosc_d(
   }
 
   if (context->filters & BLOSC_DODELTA) {
-    /* Force the thread in charge of the block 0 to go first */
-    pthread_mutex_lock(&context->delta_mutex);
-    if (context->dref_not_init) {
-      if (offset != 0) {
-        pthread_cond_wait(&context->delta_cv, &context->delta_mutex);
-      } else {
-        delta_decoder8(dest, offset, blocksize, typesize, dest + offset);
-        context->dref_not_init = 0;
-        pthread_cond_broadcast(&context->delta_cv);
-      }
-    }
-    pthread_mutex_unlock(&context->delta_mutex);
-    if (offset != 0) {
+    if (context->nthreads == 1) {
+      /* Serial mode */
       delta_decoder8(dest, offset, blocksize, typesize, dest + offset);
+    } else {
+      /* Force the thread in charge of the block 0 to go first */
+      pthread_mutex_lock(&context->delta_mutex);
+      if (context->dref_not_init) {
+        if (offset != 0) {
+          pthread_cond_wait(&context->delta_cv, &context->delta_mutex);
+        } else {
+          delta_decoder8(dest, offset, blocksize, typesize, dest + offset);
+          context->dref_not_init = 0;
+          pthread_cond_broadcast(&context->delta_cv);
+        }
+      }
+      pthread_mutex_unlock(&context->delta_mutex);
+      if (offset != 0) {
+        delta_decoder8(dest, offset, blocksize, typesize, dest + offset);
+      }
     }
   }
 
