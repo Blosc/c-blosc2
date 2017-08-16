@@ -16,6 +16,10 @@ Changes from 2.0.0a3 to 2.0.0a4
   and also more speed (at least on modern Intel/AMD CPUs).  Version
   for internal BloscLZ codec bumped to 1.0.6.
 
+- New delta filter implemented to work inside a chunk.  Previously it was
+  working inside a super-chunk, but the new implementation is both faster and
+  gets better compression ratios (at least for the tested datasets).
+
 Changes from 2.0.0a2 to 2.0.0a3
 ===============================
 
