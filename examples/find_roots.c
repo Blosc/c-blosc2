@@ -107,18 +107,13 @@ int compute_vectors(void) {
 
     /* Create a super-chunk container for input (X values) */
     sparams = BLOSC_SPARAMS_DEFAULTS;
-    sparams.compressor = BLOSC_LZ4;
-    sparams.clevel = 9;
+    sparams.compressor = BLOSC_BLOSCLZ;
+    sparams.clevel = 1;
     sparams.filters[0] = BLOSC_DELTA;
     sparams.filters[1] = BLOSC_SHUFFLE;
     sc_x = blosc2_new_schunk(&sparams);
 
     /* Create a super-chunk container for output (Y values) */
-    sparams = BLOSC_SPARAMS_DEFAULTS;
-    sparams.compressor = BLOSC_LZ4;
-    sparams.clevel = 9;
-    sparams.filters[0] = BLOSC_DELTA;
-    sparams.filters[1] = BLOSC_SHUFFLE;
     sc_y = blosc2_new_schunk(&sparams);
 
     /* Now fill the buffer with even values between 0 and 10 */
