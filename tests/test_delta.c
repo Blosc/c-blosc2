@@ -19,7 +19,7 @@ int nbytes, cbytes;
 int clevel = 5;
 int doshuffle = 1;
 int typesize;
-size_t size = 7 * 13 * 16 * 24 * 1000;  /* must be divisible by typesize */
+size_t size = 7 * 12 * 13 * 16 * 24 * 100;  /* must be divisible by typesize */
 
 
 /* Check compressor */
