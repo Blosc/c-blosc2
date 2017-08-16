@@ -31,7 +31,7 @@ All entries are little endian.
     :bit 2 (``0x04``):
         Whether the bit-shuffle filter has been applied or not.
     :bit 3 (``0x08``):
-        If set, the filter (or filters) is defined in the super-chunk.
+        Whether the delta codec has been applied or not.
     :bit 4 (``0x10``):
         If set, the blocks will not be split in sub-blocks during compression.
     :bit 5 (``0x20``):
@@ -55,7 +55,7 @@ All entries are little endian.
     :``4``:
         ``zstd``
     :``5``:
-        Reserved
+        ``lizard``
     :``6``:
         Reserved
     :``7``:

@@ -8,95 +8,153 @@
 **********************************************************************/
 
 #include <stdio.h>
-#include <string.h>
 #include "blosc.h"
 #include "delta.h"
 
-#define MIN(x, y) (((x) < (y)) ? (x) : (y))
-#define MAX(x, y) (((x) > (y)) ? (x) : (y))
-
 
 /* Apply the delta filters to src.  This can never fail. */
-void delta_encoder8(uint8_t* filters_chunk, int32_t offset, int32_t nbytes,
-                    uint8_t* src, uint8_t* dest) {
-  int i;
-  uint8_t typesize = *(uint8_t*)(filters_chunk + 3);
-  int32_t rbytes = *(int32_t*)(filters_chunk + 4);
-  int32_t mbytes;
-  int32_t cpy_bytes;
-  uint8_t* dref;
-  blosc2_context_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
-  blosc_context *dctx;
+void delta_encoder(const uint8_t* dref, const int32_t offset,
+                   const int32_t nbytes, const int32_t typesize,
+                   const uint8_t* src, uint8_t* dest) {
 
-  mbytes = MIN(nbytes, rbytes - offset);
-  if (mbytes > 0) {
-    /* Fetch mbytes from reference frame */
-    dref = malloc((size_t)mbytes);
-    if ((mbytes % typesize) != 0) {
-      printf("nbytes is not a multiple of typesize (delta_decoder8).  Please report this!\n");
-      return;
+  if (offset == 0) {
+    /* This is the reference block, use delta coding in elements */
+    switch (typesize) {
+      case 1:
+        dest[0] = dref[0];
+        for (int i = 1; i < nbytes; i++) {
+          dest[i] = src[i] - dref[i-1];
+        }
+        break;
+      case 2:
+        ((uint16_t *)dest)[0] = ((uint16_t *)dref)[0];
+        for (int i = 1; i < nbytes / 2; i++) {
+          ((uint16_t *)dest)[i] = ((uint16_t *)src)[i] -
+                                  ((uint16_t *)dref)[i-1];
+        }
+        break;
+      case 4:
+        ((uint32_t *)dest)[0] = ((uint32_t *)dref)[0];
+        for (int i = 1; i < nbytes / 4; i++) {
+          ((uint32_t *)dest)[i] = ((uint32_t *)src)[i] -
+                                  ((uint32_t *)dref)[i-1];
+        }
+        break;
+      case 8:
+        ((uint64_t *)dest)[0] = ((uint64_t *)dref)[0];
+        for (int i = 1; i < nbytes / 8; i++) {
+          ((uint64_t *)dest)[i] = ((uint64_t *)src)[i] -
+                                  ((uint64_t *)dref)[i-1];
+        }
+        break;
+      default:
+        if ((typesize % 8) == 0) {
+          delta_encoder(dref, offset, nbytes, 8, src, dest);
+        } else {
+          delta_encoder(dref, offset, nbytes, 1, src, dest);
+        }
     }
-    /* Create a context for decompressing the interesting part of the reference */
-    dparams.nthreads = 1;  /* we don't want to interfere with existing threads */
-    dctx = blosc2_create_dctx(&dparams);
-    cpy_bytes = blosc2_getitem_ctx(dctx, filters_chunk, offset / typesize, mbytes / typesize, dref);
-    blosc2_free_ctx(dctx);
-    if (cpy_bytes != mbytes) {
-      printf("Error in getting items (delta_decoder8).  Please report this!\n");
-      return;
+  } else {
+    /* Use delta coding wrt reference block */
+    switch (typesize) {
+      case 1:
+        for (int i = 0; i < nbytes; i++) {
+          dest[i] = src[i] - dref[i];
+        }
+        break;
+      case 2:
+        for (int i = 0; i < nbytes / 2; i++) {
+          ((uint16_t *) dest)[i] =
+                  ((uint16_t *) src)[i] - ((uint16_t *) dref)[i];
+        }
+        break;
+      case 4:
+        for (int i = 0; i < nbytes / 4; i++) {
+          ((uint32_t *) dest)[i] =
+                  ((uint32_t *) src)[i] - ((uint32_t *) dref)[i];
+        }
+        break;
+      case 8:
+        for (int i = 0; i < nbytes / 8; i++) {
+          ((uint64_t *) dest)[i] =
+                  ((uint64_t *) src)[i] - ((uint64_t *) dref)[i];
+        }
+        break;
+      default:
+        if ((typesize % 8) == 0) {
+          delta_encoder(dref, offset, nbytes, 8, src, dest);
+        } else {
+          delta_encoder(dref, offset, nbytes, 1, src, dest);
+        }
     }
-
-    /* Encode delta */
-    for (i = 0; i < mbytes; i++) {
-      dest[i] = src[i] - dref[i];
-    }
-    free(dref);
-  }
-
-  /* Copy the leftovers */
-  if (nbytes > mbytes) {
-    mbytes = MAX(0, mbytes); 	/* negative mbytes are not considered */
-    memcpy(dest + mbytes, src + mbytes, nbytes - mbytes);
   }
 }
 
 
 /* Undo the delta filter in dest.  This can never fail. */
-void delta_decoder8(uint8_t* filters_chunk, int32_t offset, int32_t nbytes, uint8_t* dest) {
-  int i;
-  uint8_t typesize = *(uint8_t*)(filters_chunk + 3);
-  int32_t rbytes = *(int32_t*)(filters_chunk + 4);
-  int32_t mbytes;
-  int32_t cpy_bytes;
-  uint8_t* dref;
-  blosc2_context_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
-  blosc_context *dctx;
+void delta_decoder(const uint8_t* dref, const int32_t offset,
+                   const int32_t nbytes, const int32_t typesize,
+                   uint8_t* dest) {
 
-  mbytes = MIN(nbytes, rbytes - offset);
-  if (mbytes > 0) {
-    /* Fetch mbytes from reference frame */
-    dref = malloc((size_t)mbytes);
-    if ((mbytes % typesize) != 0) {
-      printf("nbytes is not a multiple of typesize (delta_decoder8).  Please report this!\n");
-      return;
+  if (offset == 0) {
+    /* Decode delta for the reference block */
+    switch (typesize) {
+      case 1:
+        for (int i = 1; i < nbytes; i++) {
+          dest[i] += dref[i-1];
+        }
+        break;
+      case 2:
+        for (int i = 1; i < nbytes / 2; i++) {
+          ((uint16_t *)dest)[i] += ((uint16_t *)dref)[i-1];
+        }
+        break;
+      case 4:
+        for (int i = 1; i < nbytes / 4; i++) {
+          ((uint32_t *)dest)[i] += ((uint32_t *)dref)[i-1];
+        }
+        break;
+      case 8:
+        for (int i = 1; i < nbytes / 8; i++) {
+          ((uint64_t *)dest)[i] += ((uint64_t *)dref)[i-1];
+        }
+        break;
+      default:
+        if ((typesize % 8) == 0) {
+          delta_decoder(dref, offset, nbytes, 8, dest);
+        } else {
+          delta_decoder(dref, offset, nbytes, 1, dest);
+        }
     }
-    /* Create a context for decompressing the interesting part of the reference */
-    dparams.nthreads = 1;  /* we don't want to interfere with existing threads */
-    dctx = blosc2_create_dctx(&dparams);
-    cpy_bytes = blosc2_getitem_ctx(dctx, filters_chunk, offset / typesize, mbytes / typesize, dref);
-    blosc2_free_ctx(dctx);
-    if (cpy_bytes != mbytes) {
-      printf("Error in getting items (delta_decoder8).  Please report this!\n");
-      return;
+  } else {
+    /* Decode delta for the non-reference blocks */
+    switch (typesize) {
+      case 1:
+        for (int i = 0; i < nbytes; i++) {
+          dest[i] += dref[i];
+        }
+        break;
+      case 2:
+        for (int i = 0; i < nbytes / 2; i++) {
+          ((uint16_t *)dest)[i] += ((uint16_t *)dref)[i];
+        }
+        break;
+      case 4:
+        for (int i = 0; i < nbytes / 4; i++) {
+          ((uint32_t *)dest)[i] += ((uint32_t *)dref)[i];
+        }
+        break;
+      case 8:
+        for (int i = 0; i < nbytes / 8; i++) {
+          ((uint64_t *)dest)[i] += ((uint64_t *)dref)[i];
+        }
+        break;
+      default:
+        if ((typesize % 8) == 0) {
+          delta_decoder(dref, offset, nbytes, 8, dest);
+        } else {
+          delta_decoder(dref, offset, nbytes, 1, dest);
+        }
     }
-
-    /* Decode delta */
-    for (i = 0; i < mbytes; i++) {
-      dest[i] += dref[i];
-    }
-    free(dref);
   }
-
-  /* The leftovers are in-place already */
-
 }
