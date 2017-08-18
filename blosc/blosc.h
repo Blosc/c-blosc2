@@ -463,6 +463,8 @@ BLOSC_EXPORT char* blosc_cbuffer_complib(const void* cbuffer);
 
 *********************************************************************/
 
+typedef struct blosc_context_s blosc_context;   /* uncomplete type */
+
 typedef struct {
   uint8_t version;
   uint8_t flags1;
@@ -474,7 +476,7 @@ typedef struct {
   /* The compression level and other compress params */
   uint32_t chunksize;   // starts at 8 bytes
   /* Size of each chunk.  0 if not a fixed chunksize. */
-  uint64_t filters;  // starts at 12 bytes
+  uint8_t filters[BLOSC_MAX_FILTERS];  // starts at 12 bytes
   /* The (sequence of) filters.  8-bit per filter. */
   uint16_t filters_meta[BLOSC_MAX_FILTER_MSLOTS];
   /* Metadata for filters. 16-bit per meta-slot. */
@@ -496,6 +498,9 @@ typedef struct {
   /* Pointer to chunk data pointers */
   uint8_t* ctx;
   /* Context for the thread holder.  NULL if not acquired. */
+  blosc_context* cctx;
+  blosc_context* dctx;
+  /* Contexts for compression and decompression */
   uint8_t* reserved;
   /* Reserved for the future. */
 } blosc2_sheader;
@@ -509,20 +514,18 @@ typedef struct {
   uint8_t filters[BLOSC_MAX_FILTERS];
   /* the (sequence of) filters */
   uint16_t filters_meta[BLOSC_MAX_FILTER_MSLOTS];   /* metadata for filters */
+  uint8_t nthreads;
+  /* the number of threads to use internally (1) */
 } blosc2_sparams;
 
 /* Default struct for schunk params meant for user initialization */
-static const blosc2_sparams BLOSC_SPARAMS_DEFAULTS = \
-  { BLOSC_BLOSCLZ, 5, {BLOSC_DOSHUFFLE, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0} };
+static const blosc2_sparams BLOSC_SPARAMS_DEFAULTS =
+  { BLOSC_BLOSCLZ, 5, {0, 0, 0, 0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0}, 1 };
 
 /* Create a new super-chunk. */
 BLOSC_EXPORT blosc2_sheader* blosc2_new_schunk(blosc2_sparams* sparams);
 
-/* Set a delta reference for the super-chunk */
-BLOSC_EXPORT int blosc2_set_delta_ref(blosc2_sheader* sheader,
-    size_t typesize, size_t nbytes, void* ref);
-
-/* Free all memory from a super-chunk. */
+/* Release resources from a super-chunk */
 BLOSC_EXPORT int blosc2_destroy_schunk(blosc2_sheader* sheader);
 
 /* Append a `src` data buffer to a super-chunk.
@@ -568,8 +571,6 @@ BLOSC_EXPORT blosc2_sheader* blosc2_unpack_schunk(void* packed);
 
 *********************************************************************/
 
-typedef struct blosc_context_s blosc_context;   /* uncomplete type */
-
 /**
   The parameters for creating a context for compression purposes.
 
@@ -583,19 +584,22 @@ typedef struct {
   /* the compressor codec */
   uint8_t clevel;
   /* the compression level (5) */
-  uint8_t filters;
-  /* the (and-ed) filter codes (BLOSC_DOSHUFFLE) */
   uint8_t nthreads;
   /* the number of threads to use internally (1) */
   int32_t blocksize;
   /* the requested size of the compressed blocks (0; meaning automatic) */
+  uint8_t filters[BLOSC_MAX_FILTERS];
+  /* the (sequence of) filters */
+  uint16_t filters_meta[BLOSC_MAX_FILTER_MSLOTS];
+  /* metadata for filters */
   blosc2_sheader* schunk;
   /* the associated schunk, if any (NULL) */
 } blosc2_context_cparams;
 
 /* Default struct for compression params meant for user initialization */
 static const blosc2_context_cparams BLOSC_CPARAMS_DEFAULTS = \
-  { 8, BLOSC_BLOSCLZ, 5, BLOSC_DOSHUFFLE, 1, 0, NULL };
+  { 8, BLOSC_BLOSCLZ, 5, 1, 0, {0, 0, 0, 0, 0, 0, 0, BLOSC_SHUFFLE},
+    {0, 0, 0, 0}, NULL };
 
 
 /**
@@ -612,8 +616,7 @@ typedef struct {
 } blosc2_context_dparams;
 
 /* Default struct for compression params meant for user initialization */
-static const blosc2_context_dparams BLOSC_DPARAMS_DEFAULTS = \
-  { 1, NULL };
+static const blosc2_context_dparams BLOSC_DPARAMS_DEFAULTS = { 1, NULL };
 
 /**
   Create a context for *_ctx() compression functions.

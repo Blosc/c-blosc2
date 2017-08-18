@@ -119,10 +119,12 @@ struct blosc_context_s {
   /* Compressor code to use */
   int8_t clevel;
   /* Compression level (1-9) */
-  uint8_t filters;
-  /* The filter codes in the filter pipeline */
-  uint8_t delta;
-  /* Delta coding filter */
+  uint8_t filter_flags;
+  /* The filter flags in the filter pipeline */
+  uint8_t filters[BLOSC_MAX_FILTERS];
+  /* the (sequence of) filters */
+  uint16_t* filters_meta[BLOSC_MAX_FILTER_MSLOTS];
+  /* metadata for filters */
   blosc2_sheader* schunk;
   /* Associated super-chunk (if available) */
   struct thread_context* serial_context;
@@ -161,6 +163,7 @@ struct thread_context {
   uint8_t* tmp;
   uint8_t* tmp2;
   uint8_t* tmp3;
+  uint8_t* tmp4;
   int32_t tmpblocksize; /* keep track of how big the temporary buffers are */
 #if defined(HAVE_ZSTD)
   /* The contexts for ZSTD */
@@ -640,51 +643,54 @@ static int blosc_c(struct thread_context* thread_context, int32_t blocksize,
                    const uint8_t* src, int offset, uint8_t* dest,
                    uint8_t* tmp, uint8_t* tmp2) {
   blosc_context* context = thread_context->parent_context;
-  int32_t compformat = (*(context->header_flags) & 0xe0) >> 5;
   int dont_split = (*(context->header_flags) & 0x10) >> 4;
-  uint8_t blosc_version_format = BLOSC_VERSION_FORMAT;
   int32_t j, neblock, nsplits;
   int32_t cbytes;                   /* number of compressed bytes in split */
   int32_t ctbytes = 0;              /* number of compressed bytes in block */
   int32_t maxout;
   int32_t typesize = context->typesize;
+  uint8_t* filters = context->filters;
   const uint8_t* _src = src + offset;
   char* compname;
   int accel;
   int bscount;
+  uint8_t *_tmp = tmp, *_tmp2 = tmp2;
+  uint8_t* tmp4 = thread_context->tmp4;
 
-  /* Check if we have a delta in a super-chunk context */
-  if (context->schunk != NULL) {
-    uint8_t* schunk_filters = decode_filters(context->schunk->filters);
-    if (schunk_filters[0] == BLOSC_TRUNC_PREC) {
-      if ((typesize != 4) && (typesize != 8)) {
-        fprintf(stderr, "unsupported typesize for TRUNC_PREC filter\n");
-        return -6;  // signals
-      }
-      truncate_precision(context->schunk->filters_meta[BLOSC_TRUNC_PREC_MSLOT],
-                         typesize, blocksize, (unsigned char *)_src, tmp2);
-      _src = tmp2;
+  /* Process the filter pipeline */
+  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+
+    switch (filters[i]) {
+      case BLOSC_SHUFFLE:
+        printf("SHUFFLE! %d\n", i);
+        shuffle(typesize, blocksize, _src, _tmp);
+        break;
+      case BLOSC_BITSHUFFLE:
+        printf("BITSHUFFLE!\n");
+        bscount = bitshuffle(typesize, blocksize, _src, _tmp, tmp4);
+        if (bscount < 0)
+          return bscount;
+        break;
+      case BLOSC_DELTA:
+        printf("DELTA!\n");
+        delta_encoder((uint8_t *) src, offset, blocksize, typesize,
+                      (unsigned char *) _src, _tmp);
+        break;
+      case BLOSC_TRUNC_PREC:
+        printf("TRUNC!\n");
+        if ((typesize != 4) && (typesize != 8)) {
+          fprintf(stderr, "unsupported typesize for TRUNC_PREC filter\n");
+          return -6;  // signals
+        }
+        truncate_precision(
+                context->filters_meta[BLOSC_TRUNC_PREC_MSLOT],
+                typesize, blocksize, (unsigned char *) _src, _tmp);
     }
-    free(schunk_filters);
-  }
 
-  /* Delta filter */
-  if (context->filters & BLOSC_DODELTA) {
-    delta_encoder((uint8_t*)src, offset, blocksize, typesize,
-                  (unsigned char*) _src, tmp2);
-    _src = tmp2;
-  }
-
-  /* Shuffle filters */
-  if (context->filters & BLOSC_DOSHUFFLE) {
-    shuffle(typesize, blocksize, _src, tmp);
-    _src = tmp;
-  }
-  if (context->filters & BLOSC_DOBITSHUFFLE) {
-    bscount = bitshuffle(typesize, blocksize, _src, tmp, tmp2);
-    if (bscount < 0)
-      return bscount;
-    _src = tmp;
+    /* Cycle buffers */
+    _src = _tmp;
+    _tmp = _tmp2;
+    _tmp2 = _tmp;
   }
 
   /* Calculate acceleration for different compressors */
@@ -730,7 +736,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t blocksize,
     }
   #endif /* HAVE_LZ4 */
   #if defined(HAVE_LIZARD)
-      else if (context->compcode == BLOSC_LIZARD) {
+    else if (context->compcode == BLOSC_LIZARD) {
       cbytes = lizard_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
                                     (char*)dest, (size_t)maxout, accel);
     }
@@ -766,11 +772,11 @@ static int blosc_c(struct thread_context* thread_context, int32_t blocksize,
       /* Buffer overrun caused by compression (should never happen) */
       return -1;
     }
-    else if (cbytes < 0) {
+    if (cbytes < 0) {
       /* cbytes should never be negative */
       return -2;
     }
-    else if (cbytes == 0 || cbytes == neblock) {
+    if (cbytes == 0 || cbytes == neblock) {
       /* The compressor has been unable to compress data at all. */
       /* Before doing the copy, check that we are not running into a
          buffer overflow. */
@@ -807,8 +813,8 @@ static int blosc_d(
   char* compname;
   int bscount;
 
-  if ((context->filters & BLOSC_DOSHUFFLE) || \
-      (context->filters & BLOSC_DOBITSHUFFLE)) {
+  if ((context->filter_flags & BLOSC_DOSHUFFLE) || \
+      (context->filter_flags & BLOSC_DOBITSHUFFLE)) {
     _dest = tmp;
   }
 
@@ -886,16 +892,16 @@ static int blosc_d(
     ntbytes += nbytes;
   } /* Closes j < nsplits */
 
-  if (context->filters & BLOSC_DOSHUFFLE) {
+  if (context->filter_flags & BLOSC_DOSHUFFLE) {
     unshuffle(typesize, blocksize, tmp, dest + offset);
   }
-  if (context->filters & BLOSC_DOBITSHUFFLE) {
+  if (context->filter_flags & BLOSC_DOBITSHUFFLE) {
     bscount = bitunshuffle(typesize, blocksize, tmp, dest + offset, tmp2);
     if (bscount < 0)
       return bscount;
   }
 
-  if (context->filters & BLOSC_DODELTA) {
+  if (context->filter_flags & BLOSC_DODELTA) {
     if (context->nthreads == 1) {
       /* Serial mode */
       delta_decoder(dest, offset, blocksize, typesize, dest + offset);
@@ -1025,9 +1031,10 @@ static struct thread_context* create_thread_context(
   thread_context->tid = tid;
 
   ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
-  thread_context->tmp = my_malloc(context->blocksize + ebsize + context->blocksize);
+  thread_context->tmp = my_malloc(3 * context->blocksize + ebsize);
   thread_context->tmp2 = thread_context->tmp + context->blocksize;
   thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
+  thread_context->tmp4 = thread_context->tmp + 2 * context->blocksize + ebsize;
   thread_context->tmpblocksize = context->blocksize;
   #if defined(HAVE_ZSTD)
   thread_context->zstd_cctx = NULL;
@@ -1057,6 +1064,7 @@ static int do_job(blosc_context* context) {
 
   /* Set sentinels */
   context->dref_not_init = 1;
+  printf("do_job: %d\n", context->nthreads);
 
   /* Run the serial version when nthreads is 1 or when the buffers are
      not larger than blocksize */
@@ -1072,9 +1080,9 @@ static int do_job(blosc_context* context) {
     ntbytes = serial_blosc(context->serial_context);
   }
   else {
-    /* Check whether we need to restart threads */
+    /* Check whether we need to restart threads... */
     blosc_set_nthreads_(context);
-    /* and run the job */
+    /* ...and run the job */
     ntbytes = parallel_blosc(context);
   }
 
@@ -1088,7 +1096,7 @@ static int do_job(blosc_context* context) {
 int HCR(blosc_context *context) {
   switch (context->compcode) {
     case BLOSC_LZ4 :
-      return (context->filters & BLOSC_DOBITSHUFFLE) ? 1 : 0;
+      return (context->filter_flags & BLOSC_DOBITSHUFFLE) ? 1 : 0;
     case BLOSC_LZ4HC :
       return 1;
     case BLOSC_LIZARD :
@@ -1174,11 +1182,32 @@ static int32_t compute_blocksize(
   return blocksize;
 }
 
+
+uint8_t filters_to_flags(uint8_t* filters) {
+  uint8_t flags = 0;
+
+  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+    switch (filters[i]) {
+      case BLOSC_SHUFFLE:
+        flags |= BLOSC_DOSHUFFLE;
+        break;
+      case BLOSC_BITSHUFFLE:
+        flags |= BLOSC_DOBITSHUFFLE;
+        break;
+      case BLOSC_DELTA:
+        flags |= BLOSC_DODELTA;
+        break;
+    }
+  }
+  return flags;
+}
+
+
 static int initialize_context_compression(
   blosc_context* context,
   size_t sourcesize, const void* src, void* dest, size_t destsize, int clevel,
-  int filters, size_t typesize, int32_t compressor, int32_t blocksize,
-  int32_t nthreads, blosc2_sheader* schunk) {
+  uint8_t *filters, uint16_t *filters_meta, size_t typesize, int32_t compressor,
+  int32_t blocksize, int32_t nthreads, blosc2_sheader* schunk) {
 
   /* Set parameters */
   context->compress = 1;
@@ -1186,13 +1215,15 @@ static int initialize_context_compression(
   context->dest = (uint8_t*)(dest);
   context->num_output_bytes = 0;
   context->destsize = (int32_t)destsize;
-  context->sourcesize = sourcesize;
-  context->typesize = typesize;
+  context->sourcesize = (int32_t)sourcesize;
+  context->typesize = (uint8_t)typesize;
+  context->filter_flags = filters_to_flags(filters);
   context->filters = filters;
-  context->compcode = compressor;
+  context->filters_meta = filters_meta;
+  context->compcode = (uint8_t)compressor;
   context->nthreads = nthreads;
   context->end_threads = 0;
-  context->clevel = clevel;
+  context->clevel = (uint8_t)clevel;
   context->schunk = schunk;
 
   /* Check buffer size limits */
@@ -1207,13 +1238,6 @@ static int initialize_context_compression(
   if (clevel < 0 || clevel > 9) {
     /* If clevel not in 0..9, print an error */
     fprintf(stderr, "`clevel` parameter must be between 0 and 9!\n");
-    return -10;
-  }
-
-  /* Shuffle */
-  if ((filters < 0) || (filters >= (1 << BLOSC_LAST_FILTER))) {
-    fprintf(stderr, "`filters` parameter value `%d` not allowed!\n",
-            filters);
     return -10;
   }
 
@@ -1236,21 +1260,21 @@ static int initialize_context_compression(
   return 1;
 }
 
-/* Get the filter codes from header flags */
-static uint8_t get_filters(const uint8_t header_flags,
-                               const int32_t typesize) {
-  uint8_t filters = BLOSC_NOFILTER;
+/* Get filter flags from header flags */
+static uint8_t get_filter_flags(const uint8_t header_flags,
+                                const int32_t typesize) {
+  uint8_t flags = BLOSC_NOFILTER;
 
   if (header_flags & BLOSC_DOSHUFFLE & (typesize > 1)) {
-    filters |= BLOSC_DOSHUFFLE;
+    flags |= BLOSC_DOSHUFFLE;
   }
   if (header_flags & BLOSC_DOBITSHUFFLE) {
-    filters |= BLOSC_DOBITSHUFFLE;
+    flags |= BLOSC_DOBITSHUFFLE;
   }
   if (header_flags & BLOSC_DODELTA) {
-    filters |= BLOSC_DODELTA;
+    flags |= BLOSC_DODELTA;
   }
-  return filters;
+  return flags;
 }
 
 static int initialize_context_decompression(
@@ -1261,16 +1285,16 @@ static int initialize_context_decompression(
   context->compress = 0;
   context->src = (const uint8_t*)src;
   context->dest = (uint8_t*)dest;
-  context->destsize = destsize;
+  context->destsize = (int32_t)destsize;
   context->num_output_bytes = 0;
   context->end_threads = 0;
 
   context->header_flags = (uint8_t*)(context->src + 2); /* flags */
-  context->typesize = (int32_t)context->src[3];      /* typesize */
+  context->typesize = (uint8_t)context->src[3];      /* typesize */
   context->sourcesize = sw32_(context->src + 4);     /* buffer size */
   context->blocksize = sw32_(context->src + 8);      /* block size */
-  context->filters = get_filters(*(context->header_flags),
-                                         context->typesize);
+  context->filter_flags = get_filter_flags(*(context->header_flags),
+                                           context->typesize);
 
   /* Check that we have enough space to decompress */
   if (context->sourcesize > (int32_t)destsize) {
@@ -1383,17 +1407,17 @@ static int write_compression_header(blosc_context* context) {
     *(context->header_flags) |= BLOSC_MEMCPYED;
   }
 
-  if (context->filters & BLOSC_DOSHUFFLE) {
+  if (context->filter_flags & BLOSC_DOSHUFFLE) {
     /* Byte-shuffle is active */
     *(context->header_flags) |= BLOSC_DOSHUFFLE;
   }
 
-  if (context->filters & BLOSC_DOBITSHUFFLE) {
+  if (context->filter_flags & BLOSC_DOBITSHUFFLE) {
     /* Bit-shuffle is active */
     *(context->header_flags) |= BLOSC_DOBITSHUFFLE;
   }
 
-  if (context->filters & BLOSC_DODELTA) {
+  if (context->filter_flags & BLOSC_DODELTA) {
     /* Delta is active */
     *(context->header_flags) |= BLOSC_DODELTA;
   }
@@ -1461,9 +1485,9 @@ int blosc2_compress_ctx(
 
   error = initialize_context_compression(
     context, nbytes, src, dest, destsize,
-    context->clevel, context->filters, context->typesize,
-    context->compcode, context->blocksize, context->nthreads,
-    context->schunk);
+    context->clevel, context->filters, context->filters_meta,
+    context->typesize, context->compcode, context->blocksize,
+    context->nthreads, context->schunk);
   if (error < 0) { return error; }
 
   error = write_compression_header(context);
@@ -1475,16 +1499,20 @@ int blosc2_compress_ctx(
 }
 
 
-uint8_t build_filters(int doshuffle, int delta) {
-  uint8_t filters = BLOSC_NOFILTER;
+uint64_t build_filters(int doshuffle, int delta) {
+  union {
+    uint64_t compact;
+    uint8_t array[8];
+  } pipeline;
 
+  /* Fill the end part of the filter pipeline */
   if (doshuffle == BLOSC_SHUFFLE)
-    filters |= BLOSC_DOSHUFFLE;
+    pipeline.array[7] = BLOSC_SHUFFLE;
   if (doshuffle == BLOSC_BITSHUFFLE)
-    filters |= BLOSC_DOBITSHUFFLE;
+    pipeline.array[7] = BLOSC_BITSHUFFLE;
   if (delta)
-    filters |= BLOSC_DODELTA;
-  return filters;
+    pipeline.array[6] = BLOSC_DELTA;
+  return pipeline.compact;
 }
 
 
@@ -1580,11 +1608,11 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     char *compname;
     blosc_compcode_to_compname(g_compressor, &compname);
     /* Create a context for compression */
-    cparams.typesize = typesize;
-    cparams.compcode = g_compressor;
-    cparams.filters = build_filters(doshuffle, g_delta);
-    cparams.clevel = clevel;
-    cparams.nthreads = g_nthreads;
+    cparams.typesize = (uint8_t)typesize;
+    cparams.compcode = (uint8_t)g_compressor;
+    cparams.filters = (uint8_t*)build_filters(doshuffle, g_delta);
+    cparams.clevel = (uint8_t)clevel;
+    cparams.nthreads = (uint8_t)g_nthreads;
     cctx = blosc2_create_cctx(&cparams);
     /* Do the actual compression */
     result = blosc2_compress_ctx(cctx, nbytes, src, dest, destsize);
@@ -1597,7 +1625,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
 
   error = initialize_context_compression(
     g_global_context, nbytes, src, dest, destsize, clevel,
-    build_filters(doshuffle, g_delta), typesize,
+    build_filters(doshuffle, g_delta), 0, typesize,
     g_compressor, g_force_blocksize, g_nthreads, g_schunk);
   if (error < 0) { return error; }
 
@@ -1801,9 +1829,10 @@ int _blosc_getitem(const blosc_context* context, const void* src, int start,
       /* Resize the temporaries in serial context if needed */
       if (blocksize != scontext->tmpblocksize) {
         my_free(scontext->tmp);
-        scontext->tmp = my_malloc(blocksize + ebsize + blocksize);
+        scontext->tmp = my_malloc(3 * blocksize + ebsize);
         scontext->tmp2 = scontext->tmp + blocksize;
         scontext->tmp3 = scontext->tmp + blocksize + ebsize;
+        scontext->tmp4 = scontext->tmp + 2 * blocksize + ebsize;
         scontext->tmpblocksize = blocksize;
       }
 
@@ -1834,10 +1863,10 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   int result;
 
   /* Minimally populate the context */
-  context.typesize = (int32_t)_src[3];
+  context.typesize = (uint8_t)_src[3];
   context.blocksize = sw32_(_src + 8);
   context.header_flags = _src + 2;
-  context.filters = get_filters(*(_src + 2), context.typesize);
+  context.filter_flags = get_filter_flags(*(_src + 2), context.typesize);
   context.schunk = g_schunk;
   context.serial_context = create_thread_context(&context, 0);
 
@@ -1855,10 +1884,10 @@ int blosc2_getitem_ctx(blosc_context* context, const void* src, int start,
   int result;
 
   /* Minimally populate the context */
-  context->typesize = (int32_t)_src[3];
+  context->typesize = (uint8_t)_src[3];
   context->blocksize = sw32_(_src + 8);
   context->header_flags = _src + 2;
-  context->filters = get_filters(*(_src + 2), context->typesize);
+  context->filter_flags = get_filter_flags(*(_src + 2), context->typesize);
   if (context->serial_context == NULL) {
     context->serial_context = create_thread_context(context, 0);
   }
@@ -1919,9 +1948,10 @@ static void* t_blosc(void* ctxt) {
     /* Resize the temporaries if needed */
     if (blocksize != context->tmpblocksize) {
       my_free(context->tmp);
-      context->tmp = my_malloc(blocksize + ebsize + blocksize);
+      context->tmp = my_malloc(3 * blocksize + ebsize);
       context->tmp2 = context->tmp + blocksize;
       context->tmp3 = context->tmp + blocksize + ebsize;
+      context->tmp4 = context->tmp + 2 * blocksize + ebsize;
       context->tmpblocksize = blocksize;
     }
 
@@ -2447,7 +2477,7 @@ int blosc_free_resources(void) {
 
 /* Create a context for compression */
 blosc_context* blosc2_create_cctx(blosc2_context_cparams* cparams) {
-  int error;
+
   blosc_context* context = (blosc_context*)my_malloc(sizeof(blosc_context));
   memset(context, 0, sizeof(blosc_context));
 
@@ -2475,7 +2505,6 @@ blosc_context* blosc2_create_cctx(blosc2_context_cparams* cparams) {
 
 /* Create a context for decompression */
 blosc_context* blosc2_create_dctx(blosc2_context_dparams* dparams) {
-  int error;
   blosc_context* context = (blosc_context*)my_malloc(sizeof(blosc_context));
   memset(context, 0, sizeof(blosc_context));
 

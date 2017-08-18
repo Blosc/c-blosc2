@@ -34,43 +34,29 @@
 #endif
 
 
-/* Encode filters in a 64 bit int type */
-uint64_t encode_filters(blosc2_sparams* params) {
-  uint64_t enc_filters = 0;
-
-  /* Encode the BLOSC_MAX_FILTERS filters (8-bit encoded) in 64 bit */
-  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
-    enc_filters += (uint64_t)(params->filters[i]) << (i * 8);
-  }
-  return enc_filters;
-}
-
-
-/* Decode filters.  The returned array must be freed after use.  */
-uint8_t* decode_filters(uint64_t enc_filters) {
-  uint8_t* filters = malloc(BLOSC_MAX_FILTERS);
-
-  /* Decode the BLOSC_MAX_FILTERS filters (8-bit encoded) in 16 bit */
-  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
-    filters[i] = (uint8_t)(enc_filters & 0xff);
-    enc_filters >>= 8;
-  }
-  return filters;
-}
-
-
 /* Create a new super-chunk */
 blosc2_sheader* blosc2_new_schunk(blosc2_sparams* sparams) {
   blosc2_sheader* sheader = calloc(1, sizeof(blosc2_sheader));
 
   sheader->version = 0;     /* pre-first version */
-  sheader->filters = encode_filters(sparams);
-  for (int i = 0; i < BLOSC_MAX_FILTER_MSLOTS; i++) {
-    sheader->filters_meta[i] = sparams->filters_meta[i];
-  }
+  sheader->filters = sparams->filters;
+  sheader->filters_meta = sparams->filters_meta;
   sheader->compressor = sparams->compressor;
   sheader->clevel = sparams->clevel;
   sheader->cbytes = sizeof(blosc2_sheader);
+
+  blosc2_context_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  cparams.compcode = sparams->compressor;
+  cparams.clevel = sparams->clevel;
+  cparams.filters = sparams->filters;
+  cparams.filters_meta = sparams->filters_meta;
+  cparams.schunk = sheader;
+  sheader->cctx = blosc2_create_cctx(&cparams);
+
+  blosc2_context_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  dparams.schunk = sheader;
+  sheader->dctx = blosc2_create_dctx(&dparams);
+
   /* The rest of the structure will remain zeroed */
 
   return sheader;
@@ -103,31 +89,12 @@ size_t blosc2_append_buffer(blosc2_sheader* sheader, size_t typesize,
                             size_t nbytes, void* src) {
   int cbytes;
   void* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
-  uint8_t* dec_filters = decode_filters(sheader->filters);
   int clevel = sheader->clevel;
   char* compname;
-  int doshuffle, dodelta = 0;
 
-  /* Apply filters prior to compress */
-  if (dec_filters[0] == BLOSC_DELTA) {
-    dodelta = 1;
-    doshuffle = dec_filters[1];
-  }
-  else if (dec_filters[0] == BLOSC_TRUNC_PREC) {
-    doshuffle = dec_filters[1];
-  }
-  else {
-    doshuffle = dec_filters[0];
-  }
-  free(dec_filters);
-
-  /* Compress the src buffer using super-chunk defaults */
-  blosc_compcode_to_compname(sheader->compressor, &compname);
-  blosc_set_compressor(compname);
-  blosc_set_schunk(sheader);
-  blosc_set_delta(dodelta);
-  cbytes = blosc_compress(clevel, doshuffle, typesize, nbytes, src, chunk,
-                          nbytes + BLOSC_MAX_OVERHEAD);
+  /* Compress the src buffer using super-chunk context */
+  cbytes = blosc2_compress_ctx(sheader->cctx, nbytes, src, chunk,
+                               nbytes + BLOSC_MAX_OVERHEAD);
   if (cbytes < 0) {
     free(chunk);
     return cbytes;
@@ -145,7 +112,6 @@ int blosc2_decompress_chunk(blosc2_sheader* sheader, int64_t nchunk,
   void* src;
   int chunksize;
   int nbytes_;
-  uint8_t* filters = decode_filters(sheader->filters);
 
   if (nchunk >= nchunks) {
     printf("specified nchunk ('%ld') exceeds the number of chunks "
@@ -168,9 +134,8 @@ int blosc2_decompress_chunk(blosc2_sheader* sheader, int64_t nchunk,
   blosc_set_schunk(sheader);
 
   /* And decompress the chunk */
-  chunksize = blosc_decompress(src, dest, (size_t)nbytes);
-
-  free(filters);
+  //chunksize = blosc_decompress(src, dest, (size_t)nbytes);
+  chunksize = blosc2_decompress_ctx(sheader->dctx, src, dest, (size_t)nbytes);
 
   return chunksize;
 }
@@ -194,6 +159,8 @@ int blosc2_destroy_schunk(blosc2_sheader* sheader) {
     }
     free(sheader->data);
   }
+  blosc2_free_ctx(sheader->cctx);
+  blosc2_free_ctx(sheader->dctx);
   free(sheader);
 
   /* The super-chunk is destroyed, so remove the internal reference to it */
@@ -413,12 +380,13 @@ void* packed_append_chunk(void* packed, void* chunk) {
 
 
 /* Append a data buffer to a *packed* super-chunk. */
+// TODO: Update for the new filter pipeline support
 void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes,
                                   void* src) {
   int cname = *(int16_t*)((uint8_t*)packed + 4);
   int clevel = *(int16_t*)((uint8_t*)packed + 6);
   void* filters_chunk = (uint8_t*)packed + *(uint64_t*)((uint8_t*)packed + 52);
-  uint8_t* filters = decode_filters(*(uint16_t*)((uint8_t*)packed + 12));
+  uint8_t* filters = (uint8_t*)packed + 12;
   int cbytes;
   void* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
   void* dest = malloc(nbytes);
@@ -447,13 +415,10 @@ void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes,
   if (cbytes < 0) {
     free(chunk);
     free(dest);
-    free(filters);
     return NULL;
   }
 
-  /* We don't need dest and filters anymore */
   free(dest);
-  free(filters);
 
   /* Append the chunk and free it */
   new_packed = packed_append_chunk(packed, chunk);
@@ -466,8 +431,6 @@ void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes,
 /* Decompress and return a chunk that is part of a *packed* super-chunk. */
 int blosc2_packed_decompress_chunk(void* packed, int nchunk, void** dest) {
   int64_t nchunks = *(int64_t*)((uint8_t*)packed + 28);
-  uint8_t* filters_chunk = (uint8_t*)(
-          (uint8_t*)packed + *(uint64_t*)((uint8_t*)packed + 52));
   int64_t* data = (int64_t*)(
           (uint8_t*)packed + *(int64_t*)((uint8_t*)packed + 52 + 8 * 4));
   void* src;

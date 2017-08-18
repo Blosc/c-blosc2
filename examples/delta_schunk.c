@@ -29,7 +29,8 @@
 #define GB  (1024*MB)
 
 #define CHUNKSIZE 200 * 1000
-#define NCHUNKS 500
+//#define NCHUNKS 500
+#define NCHUNKS 1
 
 /* The type of timestamp used on this system. */
 #define blosc_timestamp_t struct timespec
@@ -71,8 +72,8 @@ int main() {
   blosc_set_nthreads(4);
 
   /* Create a super-chunk container */
-  sparams.filters[0] = BLOSC_DELTA;
-  sparams.filters[1] = BLOSC_SHUFFLE;
+  //sparams.filters[0] = BLOSC_DELTA;
+  //sparams.filters[1] = BLOSC_SHUFFLE;
   sparams.compressor = BLOSC_BLOSCLZ;
   sparams.clevel = 1;
   sheader = blosc2_new_schunk(&sparams);
