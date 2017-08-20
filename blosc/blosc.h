@@ -62,12 +62,8 @@ enum {
 };
 
 enum {
-  /* Maximum number of the filter pipeline */
   BLOSC_MAX_FILTERS = 8,
-  /* The meta slots for the different filters (in case meta is needed) */
-  BLOSC_TRUNC_PREC_MSLOT = 0,
-  /* Maximum number of slots for meta info in filters */
-  BLOSC_MAX_FILTER_MSLOTS = 4,
+  /* Maximum number of filters in the filter pipeline */
 };
 
 /* Codes for internal flags (see blosc_cbuffer_metainfo) */
@@ -459,11 +455,139 @@ BLOSC_EXPORT char* blosc_cbuffer_complib(const void* cbuffer);
 
 /*********************************************************************
 
-  Super-chunk related structures and functions.
+  Structures and functions related with contexts.
 
 *********************************************************************/
 
-typedef struct blosc_context_s blosc_context;   /* uncomplete type */
+typedef struct blosc2_context_s blosc2_context;   /* uncomplete type */
+
+/**
+  The parameters for creating a context for compression purposes.
+
+  In parenthesis it is shown the default value used internally when a 0
+  (zero) in the fields of the struct is passed to a function.
+*/
+typedef struct {
+    uint8_t compcode;
+    /* the compressor codec */
+    uint8_t clevel;
+    /* the compression level (5) */
+    uint32_t typesize;
+    /* the type size (8) */
+    uint8_t filters[BLOSC_MAX_FILTERS];
+    /* the (sequence of) filters */
+    uint8_t filters_meta[BLOSC_MAX_FILTERS];
+    /* metadata for filters */
+    uint32_t nthreads;
+    /* the number of threads to use internally (1) */
+    int32_t blocksize;
+    /* the requested size of the compressed blocks (0; meaning automatic) */
+    void* schunk;
+    /* the associated schunk, if any (NULL) */
+} blosc2_context_cparams;
+
+/* Default struct for compression params meant for user initialization */
+static const blosc2_context_cparams BLOSC_CPARAMS_DEFAULTS = {
+        BLOSC_BLOSCLZ, 5, 8, {0, 0, 0, 0, 0, 0, 0, BLOSC_SHUFFLE},
+        {0, 0, 0, 0, 0, 0, 0, 0}, 1, 0, NULL };
+
+
+/**
+  The parameters for creating a context for decompression purposes.
+
+  In parenthesis it is shown the default value used internally when a 0
+  (zero) in the fields of the struct is passed to a function.
+*/
+typedef struct {
+    uint8_t nthreads;
+    /* the number of threads to use internally (1) */
+    void* schunk;
+    /* the associated schunk, if any (NULL) */
+} blosc2_context_dparams;
+
+/* Default struct for compression params meant for user initialization */
+static const blosc2_context_dparams BLOSC_DPARAMS_DEFAULTS = { 1, NULL };
+
+/**
+  Create a context for *_ctx() compression functions.
+
+  A pointer to the new context is returned.  NULL is returned if this fails.
+*/
+BLOSC_EXPORT blosc2_context* blosc2_create_cctx(blosc2_context_cparams* cparams);
+
+/**
+  Create a context for *_ctx() decompression functions.
+
+  A pointer to the new context is returned.  NULL is returned if this fails.
+*/
+BLOSC_EXPORT blosc2_context* blosc2_create_dctx(blosc2_context_dparams* dparams);
+
+/**
+  Free the resources associated with a context.
+
+  This function should always succeed and is valid for contexts meant for
+  both compression and decompression.
+*/
+BLOSC_EXPORT void blosc2_free_ctx(blosc2_context* context);
+
+/**
+  Context interface to blosc compression. This does not require a call
+  to blosc_init() and can be called from multithreaded applications
+  without the global lock being used, so allowing Blosc be executed
+  simultaneously in those scenarios.
+
+  It uses similar parameters than the blosc_compress() function plus:
+
+  `context`: a struct with the different compression params.
+
+  A negative return value means that an internal error happened.  It could
+  happen that context is not meant for compression (which is stated in stderr).
+  Otherwise, please report it back together with the buffer data causing this
+  and compression settings.
+*/
+BLOSC_EXPORT int blosc2_compress_ctx(
+        blosc2_context* context, size_t nbytes, const void* src, void* dest,
+        size_t destsize);
+
+
+/**
+  Context interface to blosc decompression. This does not require a
+  call to blosc_init() and can be called from multithreaded
+  applications without the global lock being used, so allowing Blosc
+  be executed simultaneously in those scenarios.
+
+  It uses similar parameters than the blosc_decompress() function plus:
+
+  `context`: a struct with the different compression params.
+
+  Decompression is memory safe and guaranteed not to write the `dest`
+  buffer more than what is specified in `destsize`.
+
+  If an error occurs, e.g. the compressed data is corrupted, `destsize` is not
+  large enough or context is not meant for decompression, then 0 (zero) or a
+  negative value will be returned instead.
+*/
+BLOSC_EXPORT int blosc2_decompress_ctx(blosc2_context* context, const void* src,
+                                       void* dest, size_t destsize);
+
+/**
+  Context interface counterpart for blosc_getitem().
+
+  It uses similar parameters than the blosc_getitem() function plus a
+  `context` parameter.
+
+  Returns the number of bytes copied to `dest` or a negative value if
+  some error happens.
+*/
+BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
+                                    int start, int nitems, void* dest);
+
+
+/*********************************************************************
+
+  Super-chunk related structures and functions.
+
+*********************************************************************/
 
 typedef struct {
   uint8_t version;
@@ -474,12 +598,16 @@ typedef struct {
   /* The default compressor.  Each chunk can override this. */
   uint16_t clevel;  // starts at 6 bytes
   /* The compression level and other compress params */
+  uint32_t typesize;
+  /* the type size */
+  int32_t blocksize;
+  /* the requested size of the compressed blocks (0; meaning automatic) */
   uint32_t chunksize;   // starts at 8 bytes
   /* Size of each chunk.  0 if not a fixed chunksize. */
   uint8_t filters[BLOSC_MAX_FILTERS];  // starts at 12 bytes
   /* The (sequence of) filters.  8-bit per filter. */
-  uint16_t filters_meta[BLOSC_MAX_FILTER_MSLOTS];
-  /* Metadata for filters. 16-bit per meta-slot. */
+  uint8_t filters_meta[BLOSC_MAX_FILTERS];
+  /* Metadata for filters. 8-bit per meta-slot. */
   int64_t nchunks;  // starts at 28 bytes
   /* Number of chunks in super-chunk */
   int64_t nbytes;  // starts at 36 bytes
@@ -498,8 +626,8 @@ typedef struct {
   /* Pointer to chunk data pointers */
   uint8_t* ctx;
   /* Context for the thread holder.  NULL if not acquired. */
-  blosc_context* cctx;
-  blosc_context* dctx;
+  blosc2_context* cctx;
+  blosc2_context* dctx;
   /* Contexts for compression and decompression */
   uint8_t* reserved;
   /* Reserved for the future. */
@@ -513,14 +641,20 @@ typedef struct {
   /* the compression level and other compress params */
   uint8_t filters[BLOSC_MAX_FILTERS];
   /* the (sequence of) filters */
-  uint16_t filters_meta[BLOSC_MAX_FILTER_MSLOTS];   /* metadata for filters */
+  uint8_t filters_meta[BLOSC_MAX_FILTERS];
+  /* metadata for filters */
+  uint32_t typesize;
+  /* the type size (8) */
   uint8_t nthreads;
   /* the number of threads to use internally (1) */
+  int32_t blocksize;
+  /* the requested size of the compressed blocks (0; meaning automatic) */
 } blosc2_sparams;
 
 /* Default struct for schunk params meant for user initialization */
-static const blosc2_sparams BLOSC_SPARAMS_DEFAULTS =
-  { BLOSC_BLOSCLZ, 5, {0, 0, 0, 0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0}, 1 };
+static const blosc2_sparams BLOSC_SPARAMS_DEFAULTS = {
+        BLOSC_BLOSCLZ, 5, {0, 0, 0, 0, 0, 0, 0, BLOSC_SHUFFLE},
+        {0, 0, 0, 0, 0, 0, 0, 0}, 8, 1, 0 };
 
 /* Create a new super-chunk. */
 BLOSC_EXPORT blosc2_sheader* blosc2_new_schunk(blosc2_sparams* sparams);
@@ -537,7 +671,7 @@ BLOSC_EXPORT int blosc2_destroy_schunk(blosc2_sheader* sheader);
  detected, this number will be negative.
  */
 BLOSC_EXPORT size_t blosc2_append_buffer(blosc2_sheader* sheader,
-     size_t typesize, size_t nbytes, void* src);
+                                         size_t nbytes, void* src);
 
 BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize,
                                                size_t nbytes, void* src);
@@ -563,134 +697,6 @@ BLOSC_EXPORT void* blosc2_pack_schunk(blosc2_sheader* sheader);
 
 /* Unpack a packed super-chunk */
 BLOSC_EXPORT blosc2_sheader* blosc2_unpack_schunk(void* packed);
-
-
-/*********************************************************************
-
-  Structures and functions related with contexts.
-
-*********************************************************************/
-
-/**
-  The parameters for creating a context for compression purposes.
-
-  In parenthesis it is shown the default value used internally when a 0
-  (zero) in the fields of the struct is passed to a function.
-*/
-typedef struct {
-  uint8_t typesize;
-  /* the type size (8) */
-  uint8_t compcode;
-  /* the compressor codec */
-  uint8_t clevel;
-  /* the compression level (5) */
-  uint8_t nthreads;
-  /* the number of threads to use internally (1) */
-  int32_t blocksize;
-  /* the requested size of the compressed blocks (0; meaning automatic) */
-  uint8_t filters[BLOSC_MAX_FILTERS];
-  /* the (sequence of) filters */
-  uint16_t filters_meta[BLOSC_MAX_FILTER_MSLOTS];
-  /* metadata for filters */
-  blosc2_sheader* schunk;
-  /* the associated schunk, if any (NULL) */
-} blosc2_context_cparams;
-
-/* Default struct for compression params meant for user initialization */
-static const blosc2_context_cparams BLOSC_CPARAMS_DEFAULTS = \
-  { 8, BLOSC_BLOSCLZ, 5, 1, 0, {0, 0, 0, 0, 0, 0, 0, BLOSC_SHUFFLE},
-    {0, 0, 0, 0}, NULL };
-
-
-/**
-  The parameters for creating a context for decompression purposes.
-
-  In parenthesis it is shown the default value used internally when a 0
-  (zero) in the fields of the struct is passed to a function.
-*/
-typedef struct {
-  uint8_t nthreads;
-  /* the number of threads to use internally (1) */
-  blosc2_sheader* schunk;
-  /* the associated schunk, if any (NULL) */
-} blosc2_context_dparams;
-
-/* Default struct for compression params meant for user initialization */
-static const blosc2_context_dparams BLOSC_DPARAMS_DEFAULTS = { 1, NULL };
-
-/**
-  Create a context for *_ctx() compression functions.
-
-  A pointer to the new context is returned.  NULL is returned if this fails.
-*/
-BLOSC_EXPORT blosc_context* blosc2_create_cctx(blosc2_context_cparams* cparams);
-
-/**
-  Create a context for *_ctx() decompression functions.
-
-  A pointer to the new context is returned.  NULL is returned if this fails.
-*/
-BLOSC_EXPORT blosc_context* blosc2_create_dctx(blosc2_context_dparams* dparams);
-
-/**
-  Free the resources associated with a context.
-
-  This function should always succeed and is valid for contexts meant for
-  both compression and decompression.
-*/
-BLOSC_EXPORT void blosc2_free_ctx(blosc_context* context);
-
-/**
-  Context interface to blosc compression. This does not require a call
-  to blosc_init() and can be called from multithreaded applications
-  without the global lock being used, so allowing Blosc be executed
-  simultaneously in those scenarios.
-
-  It uses similar parameters than the blosc_compress() function plus:
-
-  `context`: a struct with the different compression params.
-
-  A negative return value means that an internal error happened.  It could
-  happen that context is not meant for compression (which is stated in stderr).
-  Otherwise, please report it back together with the buffer data causing this
-  and compression settings.
-*/
-BLOSC_EXPORT int blosc2_compress_ctx(
-  blosc_context* context, size_t nbytes, const void* src, void* dest,
-  size_t destsize);
-
-
-/**
-  Context interface to blosc decompression. This does not require a
-  call to blosc_init() and can be called from multithreaded
-  applications without the global lock being used, so allowing Blosc
-  be executed simultaneously in those scenarios.
-
-  It uses similar parameters than the blosc_decompress() function plus:
-
-  `context`: a struct with the different compression params.
-
-  Decompression is memory safe and guaranteed not to write the `dest`
-  buffer more than what is specified in `destsize`.
-
-  If an error occurs, e.g. the compressed data is corrupted, `destsize` is not
-  large enough or context is not meant for decompression, then 0 (zero) or a
-  negative value will be returned instead.
-*/
-BLOSC_EXPORT int blosc2_decompress_ctx(blosc_context* context, const void* src,
-                                       void* dest, size_t destsize);
-
-/**
-  Context interface counterpart for blosc_getitem().
-
-  It uses similar parameters than the blosc_getitem() function plus a
-  `context` parameter.
-
-  Returns the number of bytes copied to `dest` or a negative value if
-  some error happens.
-*/
-BLOSC_EXPORT int blosc2_getitem_ctx(blosc_context* context, const void* src,
-                                    int start, int nitems, void* dest);
 
 
 /*********************************************************************

@@ -39,21 +39,31 @@ blosc2_sheader* blosc2_new_schunk(blosc2_sparams* sparams) {
   blosc2_sheader* sheader = calloc(1, sizeof(blosc2_sheader));
 
   sheader->version = 0;     /* pre-first version */
-  sheader->filters = sparams->filters;
-  sheader->filters_meta = sparams->filters_meta;
+  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+    sheader->filters[i] = sparams->filters[i];
+    sheader->filters_meta[i] = sparams->filters_meta[i];
+  }
   sheader->compressor = sparams->compressor;
   sheader->clevel = sparams->clevel;
+  sheader->typesize = sparams->typesize;
+  sheader->blocksize = sparams->blocksize;
   sheader->cbytes = sizeof(blosc2_sheader);
 
   blosc2_context_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   cparams.compcode = sparams->compressor;
   cparams.clevel = sparams->clevel;
-  cparams.filters = sparams->filters;
-  cparams.filters_meta = sparams->filters_meta;
+  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+    cparams.filters[i] = sparams->filters[i];
+    cparams.filters_meta[i] = sparams->filters_meta[i];
+  }
+  cparams.typesize = sparams->typesize;
+  cparams.blocksize = sparams->blocksize;
+  cparams.nthreads = sparams->nthreads;
   cparams.schunk = sheader;
   sheader->cctx = blosc2_create_cctx(&cparams);
 
   blosc2_context_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  dparams.nthreads = sparams->nthreads;
   dparams.schunk = sheader;
   sheader->dctx = blosc2_create_dctx(&dparams);
 
@@ -85,8 +95,8 @@ size_t append_chunk(blosc2_sheader* sheader, void* chunk) {
 
 
 /* Append a data buffer to a super-chunk. */
-size_t blosc2_append_buffer(blosc2_sheader* sheader, size_t typesize,
-                            size_t nbytes, void* src) {
+size_t blosc2_append_buffer(blosc2_sheader* sheader, size_t nbytes,
+                            void* src) {
   int cbytes;
   void* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
   int clevel = sheader->clevel;
@@ -97,7 +107,7 @@ size_t blosc2_append_buffer(blosc2_sheader* sheader, size_t typesize,
                                nbytes + BLOSC_MAX_OVERHEAD);
   if (cbytes < 0) {
     free(chunk);
-    return cbytes;
+    return (size_t)cbytes;
   }
 
   /* Append the chunk */

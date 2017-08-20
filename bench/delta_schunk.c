@@ -22,6 +22,8 @@
   #include <mach/mach.h>
   #include <time.h>
   #include <sys/time.h>
+#include <blosc.h>
+
 #elif defined(__unix__)
   #if defined(__linux__)
     #include <time.h>
@@ -106,12 +108,13 @@ double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current, int nit
 
 int main() {
   int32_t *data, *data_dest;
-  static blosc2_sparams sparams;
+  blosc2_sparams sparams = BLOSC_SPARAMS_DEFAULTS;
   blosc2_sheader* schunk;
-  int isize = CHUNKSIZE * sizeof(int32_t);
+  size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   int64_t nbytes, cbytes;
-  int i, nchunk, nchunks;
+  int i, nchunk;
+  size_t nchunks = 0;
   blosc_timestamp_t last, current;
   float totaltime;
   float totalsize = isize * NCHUNKS;
@@ -131,15 +134,16 @@ int main() {
 
   /* Create a super-chunk container */
   sparams.filters[0] = BLOSC_DELTA;
-  sparams.filters[1] = BLOSC_SHUFFLE;
+  //sparams.filters[7] = BLOSC_SHUFFLE;
+  sparams.typesize = sizeof(int32_t);
   sparams.compressor = BLOSC_BLOSCLZ;
-  sparams.clevel = 5;
+  sparams.clevel = 1;
   schunk = blosc2_new_schunk(&sparams);
 
   /* Append chunks (the first will be taken as reference for delta) */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    nchunks = blosc2_append_buffer(schunk, sizeof(int32_t), isize, data);
+    nchunks = blosc2_append_buffer(schunk, isize, data);
   }
   blosc_set_timestamp(&current);
   totaltime = (float)getseconds(last, current);
@@ -155,7 +159,8 @@ int main() {
   /* Retrieve and decompress the chunks */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    dsize = blosc2_decompress_chunk(schunk, nchunk, (void*)data_dest, isize);
+    dsize = blosc2_decompress_chunk(schunk, nchunk, (void*)data_dest,
+                                    (int)isize);
     if (dsize < 0) {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;

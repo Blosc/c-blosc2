@@ -18,12 +18,12 @@ int main() {
   static int32_t data_dest[SIZE];
   int32_t data_subset[5];
   int32_t data_subset_ref[5] = {5, 6, 7, 8, 9};
-  int isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
+  size_t isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
   int dsize = SIZE * sizeof(int32_t), csize;
   int i, ret;
   blosc2_context_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   blosc2_context_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
-  blosc_context *cctx, *dctx;
+  blosc2_context *cctx, *dctx;
 
   /* Initialize dataset */
   for (i = 0; i < SIZE; i++) {
@@ -36,7 +36,7 @@ int main() {
   /* Create a context for compression */
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_BLOSCLZ;
-  cparams.filters = BLOSC_DOSHUFFLE;
+  cparams.filters[7] = BLOSC_DOSHUFFLE;
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   cctx = blosc2_create_cctx(&cparams);
@@ -47,7 +47,7 @@ int main() {
     printf("Buffer is uncompressible.  Giving up.\n");
     return EXIT_FAILURE;
   }
-  else if (csize < 0) {
+  if (csize < 0) {
     printf("Compression error.  Error code: %d\n", csize);
     return EXIT_FAILURE;
   }
@@ -70,7 +70,7 @@ int main() {
   }
 
   /* Decompress  */
-  dsize = blosc2_decompress_ctx(dctx, data_out, data_dest, dsize);
+  dsize = blosc2_decompress_ctx(dctx, data_out, data_dest, (size_t)dsize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return EXIT_FAILURE;
