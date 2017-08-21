@@ -484,13 +484,12 @@ typedef struct {
     /* the requested size of the compressed blocks (0; meaning automatic) */
     void* schunk;
     /* the associated schunk, if any (NULL) */
-} blosc2_context_cparams;
+} blosc2_cparams;
 
 /* Default struct for compression params meant for user initialization */
-static const blosc2_context_cparams BLOSC_CPARAMS_DEFAULTS = {
+static const blosc2_cparams BLOSC_CPARAMS_DEFAULTS = {
         BLOSC_BLOSCLZ, 5, 8, {0, 0, 0, 0, 0, 0, 0, BLOSC_SHUFFLE},
         {0, 0, 0, 0, 0, 0, 0, 0}, 1, 0, NULL };
-
 
 /**
   The parameters for creating a context for decompression purposes.
@@ -503,24 +502,24 @@ typedef struct {
     /* the number of threads to use internally (1) */
     void* schunk;
     /* the associated schunk, if any (NULL) */
-} blosc2_context_dparams;
+} blosc2_dparams;
 
 /* Default struct for compression params meant for user initialization */
-static const blosc2_context_dparams BLOSC_DPARAMS_DEFAULTS = { 1, NULL };
+static const blosc2_dparams BLOSC_DPARAMS_DEFAULTS = { 1, NULL };
 
 /**
   Create a context for *_ctx() compression functions.
 
   A pointer to the new context is returned.  NULL is returned if this fails.
 */
-BLOSC_EXPORT blosc2_context* blosc2_create_cctx(blosc2_context_cparams* cparams);
+BLOSC_EXPORT blosc2_context* blosc2_create_cctx(blosc2_cparams cparams);
 
 /**
   Create a context for *_ctx() decompression functions.
 
   A pointer to the new context is returned.  NULL is returned if this fails.
 */
-BLOSC_EXPORT blosc2_context* blosc2_create_dctx(blosc2_context_dparams* dparams);
+BLOSC_EXPORT blosc2_context* blosc2_create_dctx(blosc2_dparams dparams);
 
 /**
   Free the resources associated with a context.
@@ -594,9 +593,9 @@ typedef struct {
   uint8_t flags1;
   uint8_t flags2;
   uint8_t flags3;
-  uint16_t compressor;  // starts at 4 bytes
+  uint8_t compcode;  // starts at 4 bytes
   /* The default compressor.  Each chunk can override this. */
-  uint16_t clevel;  // starts at 6 bytes
+  uint8_t clevel;  // starts at 6 bytes
   /* The compression level and other compress params */
   uint32_t typesize;
   /* the type size */
@@ -624,43 +623,22 @@ typedef struct {
   /* Pointer to user-defined data */
   uint8_t** data;
   /* Pointer to chunk data pointers */
-  uint8_t* ctx;
+  //uint8_t* ctx;
   /* Context for the thread holder.  NULL if not acquired. */
   blosc2_context* cctx;
   blosc2_context* dctx;
   /* Contexts for compression and decompression */
   uint8_t* reserved;
   /* Reserved for the future. */
-} blosc2_sheader;
+} blosc2_schunk;
 
-
-typedef struct {
-  uint8_t compressor;
-  /* the default compressor */
-  uint8_t clevel;
-  /* the compression level and other compress params */
-  uint8_t filters[BLOSC_MAX_FILTERS];
-  /* the (sequence of) filters */
-  uint8_t filters_meta[BLOSC_MAX_FILTERS];
-  /* metadata for filters */
-  uint32_t typesize;
-  /* the type size (8) */
-  uint8_t nthreads;
-  /* the number of threads to use internally (1) */
-  int32_t blocksize;
-  /* the requested size of the compressed blocks (0; meaning automatic) */
-} blosc2_sparams;
-
-/* Default struct for schunk params meant for user initialization */
-static const blosc2_sparams BLOSC_SPARAMS_DEFAULTS = {
-        BLOSC_BLOSCLZ, 5, {0, 0, 0, 0, 0, 0, 0, BLOSC_SHUFFLE},
-        {0, 0, 0, 0, 0, 0, 0, 0}, 8, 1, 0 };
 
 /* Create a new super-chunk. */
-BLOSC_EXPORT blosc2_sheader* blosc2_new_schunk(blosc2_sparams* sparams);
+BLOSC_EXPORT blosc2_schunk* blosc2_new_schunk(
+        blosc2_cparams cparams, blosc2_dparams dparams);
 
 /* Release resources from a super-chunk */
-BLOSC_EXPORT int blosc2_destroy_schunk(blosc2_sheader* sheader);
+BLOSC_EXPORT int blosc2_destroy_schunk(blosc2_schunk* sheader);
 
 /* Append a `src` data buffer to a super-chunk.
 
@@ -670,7 +648,7 @@ BLOSC_EXPORT int blosc2_destroy_schunk(blosc2_sheader* sheader);
  This returns the number of chunk in super-chunk.  If some problem is
  detected, this number will be negative.
  */
-BLOSC_EXPORT size_t blosc2_append_buffer(blosc2_sheader* sheader,
+BLOSC_EXPORT size_t blosc2_append_buffer(blosc2_schunk* sheader,
                                          size_t nbytes, void* src);
 
 BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize,
@@ -686,17 +664,17 @@ BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize,
  The size of the decompressed chunk is returned.  If some problem is
  detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_decompress_chunk(blosc2_sheader* sheader,
+BLOSC_EXPORT int blosc2_decompress_chunk(blosc2_schunk* sheader,
      int64_t nchunk, void* dest, int nbytes);
 
 BLOSC_EXPORT int blosc2_packed_decompress_chunk(void* packed, int nchunk,
       void** dest);
 
 /* Pack a super-chunk by using the header. */
-BLOSC_EXPORT void* blosc2_pack_schunk(blosc2_sheader* sheader);
+BLOSC_EXPORT void* blosc2_pack_schunk(blosc2_schunk* sheader);
 
 /* Unpack a packed super-chunk */
-BLOSC_EXPORT blosc2_sheader* blosc2_unpack_schunk(void* packed);
+BLOSC_EXPORT blosc2_schunk* blosc2_unpack_schunk(void* packed);
 
 
 /*********************************************************************
@@ -722,7 +700,7 @@ BLOSC_EXPORT void blosc_set_blocksize(size_t blocksize);
   The blocksize is a critical parameter with important restrictions in
   the allowed values, so use this with care.
 */
-BLOSC_EXPORT void blosc_set_schunk(blosc2_sheader* schunk);
+BLOSC_EXPORT void blosc_set_schunk(blosc2_schunk* schunk);
 
 
 #ifdef __cplusplus

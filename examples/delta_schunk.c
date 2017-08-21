@@ -58,8 +58,9 @@ int main() {
   const int isize = CHUNKSIZE * sizeof(int64_t);
   int dsize;
   int32_t nbytes, cbytes;
-  blosc2_sparams sparams = BLOSC_SPARAMS_DEFAULTS;
-  blosc2_sheader* schunk;
+  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_schunk* schunk;
   int i, nchunk, nchunks;
   blosc_timestamp_t last, current;
   double ttotal;
@@ -72,13 +73,13 @@ int main() {
   blosc_set_nthreads(4);
 
   /* Create a super-chunk container */
-  sparams.typesize = 8;
-  sparams.filters[0] = BLOSC_DELTA;
+  cparams.typesize = 8;
+  cparams.filters[0] = BLOSC_DELTA;
   //sparams.filters[7] = BLOSC_SHUFFLE;
-  sparams.compressor = BLOSC_BLOSCLZ;
+  cparams.compcode = BLOSC_BLOSCLZ;
   //sparams.blocksize = 1 <<20;
-  sparams.clevel = 1;
-  schunk = blosc2_new_schunk(&sparams);
+  cparams.clevel = 1;
+  schunk = blosc2_new_schunk(cparams, dparams);
 
   blosc_set_timestamp(&last);
   for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {

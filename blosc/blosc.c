@@ -125,7 +125,7 @@ struct blosc2_context_s {
   /* the (sequence of) filters */
   uint8_t filters_meta[BLOSC_MAX_FILTERS];
   /* metadata for filters */
-  blosc2_sheader* schunk;
+  blosc2_schunk* schunk;
   /* Associated super-chunk (if available) */
   struct thread_context* serial_context;
   /* Cache for temporaries for serial operation */
@@ -181,7 +181,7 @@ static int32_t g_delta = 0;
 static int32_t g_nthreads = 1;
 static int32_t g_force_blocksize = 0;
 static int32_t g_initlib = 0;
-static blosc2_sheader* g_schunk = NULL;   /* the pointer to super-chunk */
+static blosc2_schunk* g_schunk = NULL;   /* the pointer to super-chunk */
 
 
 /* Wrapped function to adjust the number of threads used by blosc */
@@ -1206,7 +1206,7 @@ static int initialize_context_compression(
   blosc2_context* context,
   size_t sourcesize, const void* src, void* dest, size_t destsize, int clevel,
   uint8_t *filters, uint8_t* filters_meta, size_t typesize, int32_t compressor,
-  int32_t blocksize, int32_t nthreads, blosc2_sheader* schunk) {
+  int32_t blocksize, int32_t nthreads, blosc2_schunk* schunk) {
 
   /* Set parameters */
   context->compress = 1;
@@ -1522,7 +1522,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
   int result;
   char* envvar;
   blosc2_context *cctx;
-  blosc2_context_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
 
   /* Check whether the library should be initialized */
   if (!g_initlib) blosc_init();
@@ -1617,7 +1617,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     }
     cparams.clevel = (uint8_t)clevel;
     cparams.nthreads = (uint8_t)g_nthreads;
-    cctx = blosc2_create_cctx(&cparams);
+    cctx = blosc2_create_cctx(cparams);
     /* Do the actual compression */
     result = blosc2_compress_ctx(cctx, nbytes, src, dest, destsize);
     /* Release context resources */
@@ -1707,7 +1707,7 @@ int blosc_decompress(const void* src, void* dest, size_t destsize) {
   char* envvar;
   long nthreads;
   blosc2_context *dctx;
-  blosc2_context_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
 
   /* Check whether the library should be initialized */
   if (!g_initlib) blosc_init();
@@ -1728,7 +1728,7 @@ int blosc_decompress(const void* src, void* dest, size_t destsize) {
   envvar = getenv("BLOSC_NOLOCK");
   if (envvar != NULL) {
     dparams.nthreads = g_nthreads;
-    dctx = blosc2_create_dctx(&dparams);
+    dctx = blosc2_create_dctx(dparams);
     result = blosc2_decompress_ctx(dctx, src, dest, destsize);
     blosc2_free_ctx(dctx);
     return result;
@@ -2384,7 +2384,7 @@ void blosc_set_blocksize(size_t size) {
 
 /* Set pointer to super-chunk.  If NULL, no super-chunk will be
    reachable (the default). */
-void blosc_set_schunk(blosc2_sheader* schunk) {
+void blosc_set_schunk(blosc2_schunk* schunk) {
   g_schunk = schunk;
   g_global_context->schunk = schunk;
 }
@@ -2483,23 +2483,23 @@ int blosc_free_resources(void) {
 /* Contexts */
 
 /* Create a context for compression */
-blosc2_context* blosc2_create_cctx(blosc2_context_cparams* cparams) {
+blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
 
   blosc2_context* context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
   memset(context, 0, sizeof(blosc2_context));
 
   context->compress = 1;   /* meant for compression */
   /* Populate the context, using default values for zeroed values */
-  context->compcode = cparams->compcode;
-  context->clevel = cparams->clevel;
-  context->typesize = cparams->typesize;
+  context->compcode = cparams.compcode;
+  context->clevel = cparams.clevel;
+  context->typesize = cparams.typesize;
   for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
-    context->filters[i] = cparams->filters[i];
-    context->filters_meta[i] = cparams->filters_meta[i];
+    context->filters[i] = cparams.filters[i];
+    context->filters_meta[i] = cparams.filters_meta[i];
   }
-  context->nthreads = cparams->nthreads;
-  context->blocksize = cparams->blocksize;
-  context->schunk = cparams->schunk;
+  context->nthreads = cparams.nthreads;
+  context->blocksize = cparams.blocksize;
+  context->schunk = cparams.schunk;
 
   return context;
 }
@@ -2507,16 +2507,14 @@ blosc2_context* blosc2_create_cctx(blosc2_context_cparams* cparams) {
 
 
 /* Create a context for decompression */
-blosc2_context* blosc2_create_dctx(blosc2_context_dparams* dparams) {
+blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   blosc2_context* context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
   memset(context, 0, sizeof(blosc2_context));
 
   context->compress = 0;   /* Meant for decompression */
   /* Populate the context, using default values for zeroed values */
-  context->nthreads = dparams->nthreads ? dparams->nthreads :
-                      BLOSC_DPARAMS_DEFAULTS.nthreads;
-  context->schunk = dparams->schunk ? dparams->schunk :
-                    BLOSC_DPARAMS_DEFAULTS.schunk;
+  context->nthreads = dparams.nthreads;
+  context->schunk = dparams.schunk;
 
   return context;
 }

@@ -19,8 +19,9 @@ int main() {
   size_t isize = SIZE * sizeof(int32_t);
   int dsize;
   int64_t nbytes, cbytes;
-  blosc2_sparams sparams = BLOSC_SPARAMS_DEFAULTS;
-  blosc2_sheader* sc_header;
+  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_schunk* schunk;
   size_t nchunks;
 
   printf("Blosc version info: %s (%s)\n",
@@ -31,29 +32,29 @@ int main() {
   blosc_set_nthreads(2);
 
   /* Create a super-chunk container */
-  sparams.filters[0] = BLOSC_DELTA;
-  sparams.filters[7] = BLOSC_BITSHUFFLE;
-  sparams.compressor = BLOSC_BLOSCLZ;
-  sparams.clevel = 5;
-  sc_header = blosc2_new_schunk(&sparams);
+  cparams.filters[0] = BLOSC_DELTA;
+  cparams.filters[7] = BLOSC_BITSHUFFLE;
+  cparams.compcode = BLOSC_BLOSCLZ;
+  cparams.clevel = 5;
+  schunk = blosc2_new_schunk(cparams, dparams);
 
   for (int nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
     for (int i = 0; i < SIZE; i++) {
       data[i] = i * nchunk;
     }
-    nchunks = blosc2_append_buffer(sc_header, isize, data);
+    nchunks = blosc2_append_buffer(schunk, isize, data);
     if (nchunks != nchunk) return EXIT_FAILURE;
   }
 
   /* Gather some info */
-  nbytes = sc_header->nbytes;
-  cbytes = sc_header->cbytes;
+  nbytes = schunk->nbytes;
+  cbytes = schunk->cbytes;
   if (cbytes > nbytes) {
     return EXIT_FAILURE;
   }
 
   /* Retrieve and decompress the chunks (0-based count) */
-  dsize = blosc2_decompress_chunk(sc_header, 0, (void*)data_dest, (int)isize);
+  dsize = blosc2_decompress_chunk(schunk, 0, (void*)data_dest, (int)isize);
   if (dsize < 0) {
     return EXIT_FAILURE;
   }
@@ -65,7 +66,7 @@ int main() {
   }
 
   /* Free resources */
-  blosc2_destroy_schunk(sc_header);
+  blosc2_destroy_schunk(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
 

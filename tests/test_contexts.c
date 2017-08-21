@@ -21,8 +21,8 @@ int main() {
   size_t isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
   int dsize = SIZE * sizeof(int32_t), csize;
   int i, ret;
-  blosc2_context_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
-  blosc2_context_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_context *cctx, *dctx;
 
   /* Initialize dataset */
@@ -39,7 +39,7 @@ int main() {
   cparams.filters[7] = BLOSC_DOSHUFFLE;
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
-  cctx = blosc2_create_cctx(&cparams);
+  cctx = blosc2_create_cctx(cparams);
 
   /* Compress with clevel=5 and shuffle active  */
   csize = blosc2_compress_ctx(cctx, isize, data, data_out, osize);
@@ -54,7 +54,7 @@ int main() {
 
   /* Create a context for decompression */
   dparams.nthreads = NTHREADS;
-  dctx = blosc2_create_dctx(&dparams);
+  dctx = blosc2_create_dctx(dparams);
 
   ret = blosc2_getitem_ctx(dctx, data_out, 5, 5, data_subset);
   if (ret < 0) {
