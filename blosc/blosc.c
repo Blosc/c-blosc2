@@ -1055,7 +1055,6 @@ static int do_job(blosc2_context* context) {
 
   /* Set sentinels */
   context->dref_not_init = 1;
-  //printf("do_job: %d\n", context->nthreads);
 
   /* Run the serial version when nthreads is 1 or when the buffers are
      not larger than blocksize */
@@ -1273,9 +1272,7 @@ static uint8_t get_filter_flags(const uint8_t header_flags,
 
 
 static int initialize_context_decompression(
-    blosc2_context* context, const void* src, void* dest, size_t destsize) {
-
-  int i;
+        blosc2_context* context, const void* src, void* dest, size_t destsize) {
 
   context->compress = 0;
   context->src = (const uint8_t*)src;
