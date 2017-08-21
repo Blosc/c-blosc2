@@ -498,7 +498,7 @@ static const blosc2_cparams BLOSC_CPARAMS_DEFAULTS = {
   (zero) in the fields of the struct is passed to a function.
 */
 typedef struct {
-    uint8_t nthreads;
+    int32_t nthreads;
     /* the number of threads to use internally (1) */
     void* schunk;
     /* the associated schunk, if any (NULL) */

@@ -184,7 +184,7 @@ static blosc2_schunk* g_schunk = NULL;   /* the pointer to super-chunk */
 
 
 /* Wrapped function to adjust the number of threads used by blosc */
-int blosc_set_nthreads_(blosc2_context*);
+int blosc_set_nthreads_(blosc2_context* context);
 
 /* Releases the global threadpool */
 int blosc_release_threadpool(blosc2_context* context);
@@ -194,43 +194,45 @@ int blosc_release_threadpool(blosc2_context* context);
 /* Wait until all threads are initialized */
 #ifdef _POSIX_BARRIERS_MINE
 #define WAIT_INIT(RET_VAL, CONTEXT_PTR)  \
-  rc = pthread_barrier_wait(&CONTEXT_PTR->barr_init); \
+  rc = pthread_barrier_wait(&(CONTEXT_PTR)->barr_init); \
   if (rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD) { \
     printf("Could not wait on barrier (init): %d\n", rc); \
     return((RET_VAL));                            \
   }
 #else
 #define WAIT_INIT(RET_VAL, CONTEXT_PTR)   \
-  pthread_mutex_lock(&CONTEXT_PTR->count_threads_mutex); \
-  if (CONTEXT_PTR->count_threads < CONTEXT_PTR->nthreads) { \
-    CONTEXT_PTR->count_threads++;  \
-    pthread_cond_wait(&CONTEXT_PTR->count_threads_cv, &CONTEXT_PTR->count_threads_mutex); \
+  pthread_mutex_lock(&(CONTEXT_PTR)->count_threads_mutex); \
+  if ((CONTEXT_PTR)->count_threads < (CONTEXT_PTR)->nthreads) { \
+    (CONTEXT_PTR)->count_threads++;  \
+    pthread_cond_wait(&(CONTEXT_PTR)->count_threads_cv, \
+                      &(CONTEXT_PTR)->count_threads_mutex); \
   } \
   else { \
-    pthread_cond_broadcast(&CONTEXT_PTR->count_threads_cv); \
+    pthread_cond_broadcast(&(CONTEXT_PTR)->count_threads_cv); \
   } \
-  pthread_mutex_unlock(&CONTEXT_PTR->count_threads_mutex);
+  pthread_mutex_unlock(&(CONTEXT_PTR)->count_threads_mutex);
 #endif
 
 /* Wait for all threads to finish */
 #ifdef _POSIX_BARRIERS_MINE
 #define WAIT_FINISH(RET_VAL, CONTEXT_PTR)   \
-  rc = pthread_barrier_wait(&CONTEXT_PTR->barr_finish); \
+  rc = pthread_barrier_wait(&(CONTEXT_PTR)->barr_finish); \
   if (rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD) { \
     printf("Could not wait on barrier (finish)\n"); \
     return((RET_VAL));                              \
   }
 #else
 #define WAIT_FINISH(RET_VAL, CONTEXT_PTR)                           \
-  pthread_mutex_lock(&CONTEXT_PTR->count_threads_mutex); \
-  if (CONTEXT_PTR->count_threads > 0) { \
-    CONTEXT_PTR->count_threads--; \
-    pthread_cond_wait(&CONTEXT_PTR->count_threads_cv, &CONTEXT_PTR->count_threads_mutex); \
+  pthread_mutex_lock(&(CONTEXT_PTR)->count_threads_mutex); \
+  if ((CONTEXT_PTR)->count_threads > 0) { \
+    (CONTEXT_PTR)->count_threads--; \
+    pthread_cond_wait(&(CONTEXT_PTR)->count_threads_cv, \
+                      &(CONTEXT_PTR)->count_threads_mutex); \
   } \
   else { \
-    pthread_cond_broadcast(&CONTEXT_PTR->count_threads_cv); \
+    pthread_cond_broadcast(&(CONTEXT_PTR)->count_threads_cv); \
   } \
-  pthread_mutex_unlock(&CONTEXT_PTR->count_threads_mutex);
+  pthread_mutex_unlock(&(CONTEXT_PTR)->count_threads_mutex);
 #endif
 
 
@@ -1551,6 +1553,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     context->nthreads, context->schunk);
   if (error < 0) { return error; }
 
+  /* Write the extended header (not compatible with Blosc1) */
   error = write_compression_header(context, 1);
   if (error < 0) { return error; }
 
@@ -1561,7 +1564,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
 
 
 void build_filters(const int doshuffle, const int delta,
-                   const int typesize, uint8_t* filters) {
+                   const size_t typesize, uint8_t* filters) {
 
   /* Fill the end part of the filter pipeline */
   if ((doshuffle == BLOSC_SHUFFLE) && (typesize > 1))
@@ -1623,7 +1626,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     long value;
     value = strtol(envvar, NULL, 10);
     if ((value != EINVAL) && (value > 0)) {
-      typesize = (int)value;
+      typesize = (size_t)value;
     }
   }
 
@@ -1690,6 +1693,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     g_schunk);
   if (error < 0) { return error; }
 
+  /* Write chunk header without extended header (Blosc1 compatibility mode) */
   error = write_compression_header(g_global_context, 0);
   if (error < 0) { return error; }
 
