@@ -1521,8 +1521,6 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
   int error;
   int result;
   char* envvar;
-  blosc2_context *cctx;
-  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
 
   /* Check whether the library should be initialized */
   if (!g_initlib) blosc_init();
@@ -1605,16 +1603,14 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
   envvar = getenv("BLOSC_NOLOCK");
   if (envvar != NULL) {
     char *compname;
-    uint8_t filters[BLOSC_MAX_FILTERS] = {0, 0, 0, 0, 0, 0, 0, 0};
-    build_filters(doshuffle, g_delta, filters);
+    blosc2_context *cctx;
+    blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+
     blosc_compcode_to_compname(g_compressor, &compname);
     /* Create a context for compression */
+    build_filters(doshuffle, g_delta, cparams.filters);
     cparams.typesize = (uint8_t)typesize;
     cparams.compcode = (uint8_t)g_compressor;
-    for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
-      cparams.filters[i] = filters[i];
-      cparams.filters_meta[i] = 0;
-    }
     cparams.clevel = (uint8_t)clevel;
     cparams.nthreads = (uint8_t)g_nthreads;
     cctx = blosc2_create_cctx(cparams);

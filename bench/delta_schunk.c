@@ -135,7 +135,7 @@ int main() {
 
   /* Create a super-chunk container */
   cparams.filters[0] = BLOSC_DELTA;
-  //sparams.filters[7] = BLOSC_SHUFFLE;
+  //cparams.filters[7] = BLOSC_SHUFFLE;
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 1;

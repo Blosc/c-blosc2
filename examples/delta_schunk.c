@@ -75,9 +75,7 @@ int main() {
   /* Create a super-chunk container */
   cparams.typesize = 8;
   cparams.filters[0] = BLOSC_DELTA;
-  //sparams.filters[7] = BLOSC_SHUFFLE;
   cparams.compcode = BLOSC_BLOSCLZ;
-  //sparams.blocksize = 1 <<20;
   cparams.clevel = 1;
   schunk = blosc2_new_schunk(cparams, dparams);
 
