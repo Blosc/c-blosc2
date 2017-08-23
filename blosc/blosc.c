@@ -163,6 +163,7 @@ struct thread_context {
   uint8_t* tmp;
   uint8_t* tmp2;
   uint8_t* tmp3;
+  uint8_t* tmp4;
   int32_t tmpblocksize; /* keep track of how big the temporary buffers are */
 #if defined(HAVE_ZSTD)
   /* The contexts for ZSTD */
@@ -656,7 +657,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t blocksize,
   char* compname;
   int accel;
   int bscount;
-  uint8_t *_tmp = tmp, *_tmp2 = tmp2;
+  uint8_t *_tmp = tmp, *_tmp2 = tmp2, *_tmp3 = thread_context->tmp4;
 
   /* Process the filter pipeline */
   for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
@@ -668,7 +669,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t blocksize,
         break;
       case BLOSC_BITSHUFFLE:
         bscount = bitshuffle((size_t)typesize, (size_t)blocksize,
-                             _src, _tmp, dest);  // treat dest as temporary buf
+                             _src, _tmp, _tmp3);
         if (bscount < 0)
           return bscount;
         _src = _tmp; _tmp = _tmp2; _tmp2 = _tmp;    /* cycle buffers */
@@ -1050,9 +1051,10 @@ static struct thread_context* create_thread_context(
   thread_context->tid = tid;
 
   ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
-  thread_context->tmp = my_malloc(2 * context->blocksize + ebsize);
+  thread_context->tmp = my_malloc(3 * context->blocksize + ebsize);
   thread_context->tmp2 = thread_context->tmp + context->blocksize;
   thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
+  thread_context->tmp4 = thread_context->tmp + 2 * context->blocksize + ebsize;
   thread_context->tmpblocksize = context->blocksize;
   #if defined(HAVE_ZSTD)
   thread_context->zstd_cctx = NULL;
@@ -1905,9 +1907,10 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
       /* Resize the temporaries in serial context if needed */
       if (blocksize != scontext->tmpblocksize) {
         my_free(scontext->tmp);
-        scontext->tmp = my_malloc(2 * blocksize + ebsize);
+        scontext->tmp = my_malloc(3 * blocksize + ebsize);
         scontext->tmp2 = scontext->tmp + blocksize;
         scontext->tmp3 = scontext->tmp + blocksize + ebsize;
+        scontext->tmp4 = scontext->tmp + 2 * blocksize + ebsize;
         scontext->tmpblocksize = blocksize;
       }
 
@@ -2023,9 +2026,10 @@ static void* t_blosc(void* ctxt) {
     /* Resize the temporaries if needed */
     if (blocksize != context->tmpblocksize) {
       my_free(context->tmp);
-      context->tmp = my_malloc(2 * blocksize + ebsize);
+      context->tmp = my_malloc(3 * blocksize + ebsize);
       context->tmp2 = context->tmp + blocksize;
       context->tmp3 = context->tmp + blocksize + ebsize;
+      context->tmp4 = context->tmp + 2 * blocksize + ebsize;
       context->tmpblocksize = blocksize;
     }
 
