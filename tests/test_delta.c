@@ -30,7 +30,7 @@ static char *test_delta() {
   switch (typesize) {
     case 1:
       for (int i = 0; i < size / typesize; i++) {
-        ((uint8_t*)src)[i] = (uint8_t)i;
+        src[i] = (uint8_t)i;
       }
       break;
     case 2:
@@ -84,7 +84,7 @@ static char *test_delta() {
       break;
     default:
       for (int i = 0; i < size / typesize; i++) {
-        ((uint8_t*)src)[i] = (uint8_t)i;
+        src[i] = (uint8_t)i;
       }
   }
   memcpy(srccpy, src, size);

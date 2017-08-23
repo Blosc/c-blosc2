@@ -468,11 +468,11 @@ typedef struct blosc2_context_s blosc2_context;   /* uncomplete type */
   (zero) in the fields of the struct is passed to a function.
 */
 typedef struct {
-    uint8_t compcode;
+    int compcode;
     /* the compressor codec */
-    uint8_t clevel;
+    int clevel;
     /* the compression level (5) */
-    uint32_t typesize;
+    size_t typesize;
     /* the type size (8) */
     uint8_t filters[BLOSC_MAX_FILTERS];
     /* the (sequence of) filters */
@@ -480,7 +480,7 @@ typedef struct {
     /* metadata for filters */
     uint32_t nthreads;
     /* the number of threads to use internally (1) */
-    int32_t blocksize;
+    size_t blocksize;
     /* the requested size of the compressed blocks (0; meaning automatic) */
     void* schunk;
     /* the associated schunk, if any (NULL) */
