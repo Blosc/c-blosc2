@@ -14,7 +14,7 @@
 int tests_run = 0;
 
 /* Global vars */
-void *src, *srccpy, *dest;
+uint8_t *src, *srccpy, *dest;
 int nbytes, cbytes;
 int clevel = 5;
 int doshuffle = 1;
