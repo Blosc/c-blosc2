@@ -809,9 +809,67 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
 }
 
 
+/* Process the filter pipeline (decompression mode) */
+int pipeline_d(blosc2_context* context, const int32_t bsize, uint8_t* dest,
+               const int offset, uint8_t* tmp, uint8_t* tmp2) {
+  uint32_t typesize = context->typesize;
+  uint8_t* filters = context->filters;
+  //uint8_t* filters_meta = context->filters_meta;
+  uint8_t *_src = tmp, *_tmp = tmp2, *_tmp2 = tmp;
+  int bscount;
+  int errcode;
+
+  for (int i = BLOSC_MAX_FILTERS - 1; i >= 0; i--) {
+    switch (filters[i]) {
+      case BLOSC_SHUFFLE:
+        unshuffle(typesize, bsize, _src, dest + offset);
+        _src = dest + offset; _tmp = _tmp2; _tmp2 = _tmp;  /* cycle buffers */
+        break;
+      case BLOSC_BITSHUFFLE:
+        bscount = bitunshuffle(typesize, bsize, _src, dest + offset, _tmp);
+        if (bscount < 0)
+          errcode = bscount;
+        _src = dest + offset; _tmp = _tmp2; _tmp2 = _tmp;  /* cycle buffers */
+        break;
+      case BLOSC_DELTA:
+        if (context->nthreads == 1) {
+          /* Serial mode */
+          delta_decoder(dest, offset, bsize, typesize, dest + offset);
+        } else {
+          /* Force the thread in charge of the block 0 to go first */
+          pthread_mutex_lock(&context->delta_mutex);
+          if (context->dref_not_init) {
+            if (offset != 0) {
+              pthread_cond_wait(&context->delta_cv, &context->delta_mutex);
+            } else {
+              delta_decoder(dest, offset, bsize, typesize, dest + offset);
+              context->dref_not_init = 0;
+              pthread_cond_broadcast(&context->delta_cv);
+            }
+          }
+          pthread_mutex_unlock(&context->delta_mutex);
+          if (offset != 0) {
+            delta_decoder(dest, offset, bsize, typesize, dest + offset);
+          }
+        }
+        _src = dest + offset; _tmp = _tmp2; _tmp2 = _tmp;  /* cycle buffers */
+        break;
+      default:
+        if (filters[i] > 0) {
+          fprintf(stderr, "Filter %d not handled during decompression\n",
+                  filters[i]);
+          errcode = -1;
+        }
+    }
+  }
+
+  return errcode;
+}
+
+
 /* Decompress & unshuffle a single block */
 static int blosc_d(
-    struct thread_context* thread_context, int32_t blocksize,
+    struct thread_context* thread_context, int32_t bsize,
     int32_t leftoverblock, const uint8_t* src, uint8_t* dest, int offset,
     uint8_t* tmp, uint8_t* tmp2) {
   blosc2_context* context = thread_context->parent_context;
@@ -843,7 +901,7 @@ static int blosc_d(
     nsplits = 1;
   }
 
-  neblock = blocksize / nsplits;
+  neblock = bsize / nsplits;
   for (j = 0; j < nsplits; j++) {
     cbytes = sw32_(src);      /* amount of compressed bytes */
     src += sizeof(int32_t);
@@ -909,52 +967,9 @@ static int blosc_d(
     ntbytes += nbytes;
   } /* Closes j < nsplits */
 
-  /* Process the filter pipeline */
-  uint8_t *_src = tmp, *_tmp = tmp2, *_tmp2 = tmp;
-  for (int i = BLOSC_MAX_FILTERS - 1; i >= 0; i--) {
-
-    switch (filters[i]) {
-      case BLOSC_SHUFFLE:
-        unshuffle(typesize, blocksize, _src, dest + offset);
-        _src = dest + offset; _tmp = _tmp2; _tmp2 = _tmp;    /* cycle buffers */
-        break;
-      case BLOSC_BITSHUFFLE:
-        bscount = bitunshuffle(typesize, blocksize, _src, dest + offset, _tmp);
-        if (bscount < 0)
-          return bscount;
-        _src = dest + offset; _tmp = _tmp2; _tmp2 = _tmp;    /* cycle buffers */
-        break;
-      case BLOSC_DELTA:
-        if (context->nthreads == 1) {
-          /* Serial mode */
-          delta_decoder(dest, offset, blocksize, typesize, dest + offset);
-        } else {
-          /* Force the thread in charge of the block 0 to go first */
-          pthread_mutex_lock(&context->delta_mutex);
-          if (context->dref_not_init) {
-            if (offset != 0) {
-              pthread_cond_wait(&context->delta_cv, &context->delta_mutex);
-            } else {
-              delta_decoder(dest, offset, blocksize, typesize, dest + offset);
-              context->dref_not_init = 0;
-              pthread_cond_broadcast(&context->delta_cv);
-            }
-          }
-          pthread_mutex_unlock(&context->delta_mutex);
-          if (offset != 0) {
-            delta_decoder(dest, offset, blocksize, typesize, dest + offset);
-          }
-        }
-        _src = dest + offset; _tmp = _tmp2; _tmp2 = _tmp;    /* cycle buffers */
-        break;
-      default:
-        if (filters[i] > 0) {
-          fprintf(stderr, "Filter %d not handled during decompression\n",
-                  filters[i]);
-          return -1;
-        }
-    }
-  }
+  int errcode = pipeline_d(context, bsize, dest, offset, tmp, tmp2);
+  if (errcode < 0)
+    return errcode;
 
   /* Return the number of uncompressed bytes */
   return ntbytes;
