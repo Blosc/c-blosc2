@@ -18,7 +18,6 @@
 #endif /*  USING_CMAKE */
 #include "blosc.h"
 #include "shuffle.h"
-#include "schunk.h"
 #include "delta.h"
 #include "trunc-prec.h"
 #include "blosclz.h"
@@ -57,9 +56,7 @@
   #include <process.h>
   #define getpid _getpid
 #else
-  #include <stdint.h>
   #include <unistd.h>
-  #include <inttypes.h>
 #endif  /* _WIN32 */
 
 #if defined(_WIN32) && !defined(__GNUC__)
@@ -127,37 +124,37 @@ struct blosc2_context_s {
   /* Associated super-chunk (if available) */
   struct thread_context* serial_context;
   /* Cache for temporaries for serial operation */
-  uint8_t compress;
+  int compress;
   /* 1 if we are doing compression 0 if decompress */
 
   /* Threading */
-  int32_t nthreads;
-  int32_t threads_started;
-  int32_t end_threads;
+  int nthreads;
+  int threads_started;
+  int end_threads;
   pthread_t *threads;
   pthread_mutex_t count_mutex;
 #ifdef _POSIX_BARRIERS_MINE
   pthread_barrier_t barr_init;
   pthread_barrier_t barr_finish;
 #else
-  int32_t count_threads;
+  int count_threads;
   pthread_mutex_t count_threads_mutex;
   pthread_cond_t count_threads_cv;
 #endif
 #if !defined(_WIN32)
   pthread_attr_t ct_attr;      /* creation time attrs for threads */
 #endif
-  int32_t thread_giveup_code;
+  int thread_giveup_code;
   /* error code when give up */
-  int32_t thread_nblock;       /* block counter */
-  int32_t dref_not_init;       /* data ref in delta not initialized */
+  int thread_nblock;       /* block counter */
+  int dref_not_init;       /* data ref in delta not initialized */
   pthread_mutex_t delta_mutex;
   pthread_cond_t delta_cv;
 };
 
 struct thread_context {
   blosc2_context* parent_context;
-  int32_t tid;
+  int tid;
   uint8_t* tmp;
   uint8_t* tmp2;
   uint8_t* tmp3;
@@ -614,24 +611,26 @@ static int get_accel(const blosc2_context* context) {
   else if (context->compcode == BLOSC_LIZARD) {
     /* Lizard currently accepts clevels from 10 to 49 */
       switch (clevel) {
-          case 1 :
-              return 10;
-          case 2 :
-              return 10;
-          case 3 :
-              return 10;
-          case 4 :
-              return 10;
-          case 5 :
-              return 20;
-          case 6 :
-              return 20;
-          case 7 :
-              return 20;
-          case 8 :
-              return 41;
-          case 9 :
-              return 41;
+        case 1 :
+            return 10;
+        case 2 :
+            return 10;
+        case 3 :
+            return 10;
+        case 4 :
+            return 10;
+        case 5 :
+            return 20;
+        case 6 :
+            return 20;
+        case 7 :
+            return 20;
+        case 8 :
+            return 41;
+        case 9 :
+            return 41;
+        default :
+          break;
       }
   }
   return 1;
@@ -1131,10 +1130,12 @@ static int do_job(blosc2_context* context) {
 
 
 /* Whether a codec is meant for High Compression Ratios */
-/* Include LZ4 + BITSHUFFLE here, but not BloscLZ + BITSHUFFLE because,
+/* Includes LZ4 + BITSHUFFLE here, but not BloscLZ + BITSHUFFLE because,
    for some reason, the latter does not work too well */
 int HCR(blosc2_context *context) {
   switch (context->compcode) {
+    case BLOSC_BLOSCLZ :
+      return 0;
     case BLOSC_LZ4 :
       return (context->filter_flags & BLOSC_DOBITSHUFFLE) ? 1 : 0;
     case BLOSC_LZ4HC :
@@ -1145,6 +1146,9 @@ int HCR(blosc2_context *context) {
       return 1;
     case BLOSC_ZSTD :
       return 1;
+    default :
+      fprintf(stderr, "Error in HCR: codec %d not handled\n",
+              context->compcode);
   }
   return 0;
 }
@@ -1179,33 +1183,35 @@ static size_t compute_blocksize(
 
     /* Choose a different blocksize depending on the compression level */
     switch (clevel) {
-    case 0:
-      /* Case of plain copy */
-      blocksize /= 4;
-      break;
-    case 1:
-    case 2:
-    case 3:
-    case 4:
-      blocksize *= 1;
-      break;
-    case 5:
-      blocksize *= 2;
-      break;
-    case 6:
-      blocksize *= 4;
-      break;
-    case 7:
-    case 8:
-      blocksize *= 8;
-      break;
-    case 9:
-      /* Do not exceed 256 KB for non HCR codecs */
-      blocksize *= 8;
-      if (HCR(context)) {
+      case 0:
+        /* Case of plain copy */
+        blocksize /= 4;
+        break;
+      case 1:
+      case 2:
+      case 3:
+      case 4:
+        blocksize *= 1;
+        break;
+      case 5:
         blocksize *= 2;
-      }
-      break;
+        break;
+      case 6:
+        blocksize *= 4;
+        break;
+      case 7:
+      case 8:
+        blocksize *= 8;
+        break;
+      case 9:
+        /* Do not exceed 256 KB for non HCR codecs */
+        blocksize *= 8;
+        if (HCR(context)) {
+          blocksize *= 2;
+        }
+        break;
+      default:
+        break;
     }
   }
 
@@ -1236,6 +1242,8 @@ uint8_t filters_to_flags(const uint8_t* filters) {
         break;
       case BLOSC_DELTA:
         flags |= BLOSC_DODELTA;
+        break;
+      default :
         break;
     }
   }
@@ -1526,7 +1534,7 @@ int blosc_compress_context(blosc2_context* context) {
     if (ntbytes < 0) {
       return -1;
     }
-    else if (ntbytes == 0) {
+    if (ntbytes == 0) {
       /* Last chance for fitting `src` buffer in `dest`.  Update flags
        and do a memcpy later on. */
       *(context->header_flags) |= BLOSC_MEMCPYED;
@@ -1732,24 +1740,11 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
 
 int blosc_run_decompression_with_context(
     blosc2_context* context, const void* src, void* dest, size_t destsize) {
-  uint8_t version;
-  uint8_t versionlz;
-  int32_t ctbytes;
   int32_t ntbytes;
   int error;
 
   error = initialize_context_decompression(context, src, dest, destsize);
   if (error < 0) { return error; }
-
-  /* Read the header block */
-  version = context->src[0];                        /* blosc format version */
-  versionlz = context->src[1];                      /* blosclz format version */
-  ctbytes = sw32_(context->src + 12);               /* compressed buffer size */
-
-  /* Unused values */
-  version += 0;                             /* shut up compiler warning */
-  versionlz += 0;                           /* shut up compiler warning */
-  ctbytes += 0;                             /* shut up compiler warning */
 
   /* Check whether this buffer is memcpy'ed */
   if (*(context->header_flags) & BLOSC_MEMCPYED) {
@@ -1833,13 +1828,12 @@ int blosc_decompress(const void* src, void* dest, size_t destsize) {
 int _blosc_getitem(blosc2_context* context, const void* src, int start,
                    int nitems, void* dest) {
   uint8_t* _src = NULL;             /* current pos for source buffer */
-  uint8_t version, versionlz;       /* versions for compressed header */
   uint8_t flags;                    /* flags for header */
   int32_t ntbytes = 0;              /* the number of uncompressed bytes */
   size_t nblocks;                   /* number of total blocks in buffer */
   size_t leftover;                  /* extra bytes at end of buffer */
   uint8_t* bstarts;                 /* start pointers for each block */
-  size_t typesize, blocksize, nbytes, ctbytes;
+  size_t typesize, blocksize, nbytes;
   size_t bsize, bsize2, leftoverblock;
   int j;
   int startb, stopb;
@@ -1850,19 +1844,12 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
   _src = (uint8_t*)(src);
 
   /* Read the header block */
-  version = _src[0];                        /* blosc format version */
-  versionlz = _src[1];                      /* blosclz format version */
   flags = _src[2];                          /* flags */
   typesize = (int32_t)_src[3];              /* typesize */
   nbytes = (size_t)sw32_(_src + 4);         /* buffer size */
   blocksize = (size_t)sw32_(_src + 8);      /* block size */
-  ctbytes = (size_t)sw32_(_src + 12);       /* compressed buffer size */
 
   ebsize = blocksize + typesize * (size_t)sizeof(int32_t);
-
-  version += 0;                             /* shut up compiler warning */
-  versionlz += 0;                           /* shut up compiler warning */
-  ctbytes += 0;                             /* shut up compiler warning */
 
   if ((context->header_flags[0] & BLOSC_DOSHUFFLE) &&
       (context->header_flags[0] & BLOSC_DOBITSHUFFLE)) {
@@ -1884,7 +1871,6 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
   nblocks = nbytes / blocksize;
   leftover = nbytes % blocksize;
   nblocks = (leftover > 0) ? nblocks + 1 : nblocks;
-  _src += sizeof(int32_t) * nblocks;
 
   /* Check region boundaries */
   if ((start < 0) || (start * typesize > nbytes)) {
@@ -2341,11 +2327,13 @@ char* blosc_list_compressors(void) {
   return ret;
 }
 
+
 char* blosc_get_version_string(void) {
   static char ret[256];
   strcpy(ret, BLOSC_VERSION_STRING);
   return ret;
 }
+
 
 int blosc_get_complib_info(char* compname, char** complib, char** version) {
   int clibcode;
@@ -2412,14 +2400,6 @@ int blosc_get_complib_info(char* compname, char** complib, char** version) {
 void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
                          size_t* cbytes, size_t* blocksize) {
   uint8_t* _src = (uint8_t*)(cbuffer);    /* current pos for source buffer */
-  uint8_t version, versionlz;              /* versions for compressed header */
-
-  /* Read the version info (could be useful in the future) */
-  version = _src[0];                       /* blosc format version */
-  versionlz = _src[1];                     /* blosclz format version */
-
-  version += 0;                            /* shut up compiler warning */
-  versionlz += 0;                          /* shut up compiler warning */
 
   /* Read the interesting values */
   *nbytes = (size_t)sw32_(_src + 4);       /* uncompressed buffer size */
@@ -2427,23 +2407,17 @@ void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
   *cbytes = (size_t)sw32_(_src + 12);      /* compressed buffer size */
 }
 
+
 /* Return `typesize` and `flags` from a compressed buffer. */
 void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize,
                             int* flags) {
   uint8_t* _src = (uint8_t*)(cbuffer);  /* current pos for source buffer */
-  uint8_t version, versionlz;            /* versions for compressed header */
-
-  /* Read the version info (could be useful in the future) */
-  version = _src[0];                     /* blosc format version */
-  versionlz = _src[1];                   /* blosclz format version */
-
-  version += 0;                             /* shut up compiler warning */
-  versionlz += 0;                           /* shut up compiler warning */
 
   /* Read the interesting values */
   *flags = (int)_src[2];                 /* flags */
   *typesize = (size_t)_src[3];           /* typesize */
 }
+
 
 /* Return version information from a compressed buffer. */
 void blosc_cbuffer_versions(const void* cbuffer, int* version,
@@ -2454,6 +2428,7 @@ void blosc_cbuffer_versions(const void* cbuffer, int* version,
   *version = (int)_src[0];         /* blosc format version */
   *versionlz = (int)_src[1];       /* Lempel-Ziv compressor format version */
 }
+
 
 /* Return the compressor library/format used in a compressed buffer. */
 char* blosc_cbuffer_complib(const void* cbuffer) {
@@ -2467,6 +2442,7 @@ char* blosc_cbuffer_complib(const void* cbuffer) {
   return complib;
 }
 
+
 /* Get the internal blocksize to be used during compression.  0 means
    that an automatic blocksize is computed internally. */
 int blosc_get_blocksize(void)
@@ -2474,11 +2450,13 @@ int blosc_get_blocksize(void)
   return (int)g_force_blocksize;
 }
 
+
 /* Force the use of a specific blocksize.  If 0, an automatic
    blocksize will be used (the default). */
 void blosc_set_blocksize(size_t size) {
   g_force_blocksize = (int32_t)size;
 }
+
 
 /* Set pointer to super-chunk.  If NULL, no super-chunk will be
    reachable (the default). */
@@ -2487,25 +2465,21 @@ void blosc_set_schunk(blosc2_schunk* schunk) {
   g_global_context->schunk = schunk;
 }
 
-blosc2_context* create_context(int nthreads) {
-  blosc2_context* context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
-
-  /* Initialize some struct components */
-  context->serial_context = NULL;
-  context->threads = NULL;
-
-  return context;
-}
 
 void blosc_init(void) {
   /* Return if we are already initialized */
   if (g_initlib) return;
 
   pthread_mutex_init(&global_comp_mutex, NULL);
-  g_global_context = create_context(g_nthreads);
+  /* Create a global context */
+  g_global_context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
+  /* Initialize some struct components */
+  g_global_context->serial_context = NULL;
+  g_global_context->threads = NULL;
   g_global_context->threads_started = 0;
   g_initlib = 1;
 }
+
 
 void blosc_destroy(void) {
   /* Return if Blosc is not initialized */
@@ -2520,11 +2494,11 @@ void blosc_destroy(void) {
   pthread_mutex_destroy(&global_comp_mutex);
 }
 
+
 int blosc_release_threadpool(blosc2_context* context) {
   int32_t t;
   void* status;
   int rc;
-  int rc2;
 
   if (context->threads_started > 0) {
     /* Tell all existing threads to finish */
@@ -2535,10 +2509,10 @@ int blosc_release_threadpool(blosc2_context* context) {
 
     /* Join exiting threads */
     for (t = 0; t < context->threads_started; t++) {
-      rc2 = pthread_join(context->threads[t], &status);
-      if (rc2) {
-        fprintf(stderr, "ERROR; return code from pthread_join() is %d\n", rc2);
-        fprintf(stderr, "\tError detail: %s\n", strerror(rc2));
+      rc = pthread_join(context->threads[t], &status);
+      if (rc) {
+        fprintf(stderr, "ERROR; return code from pthread_join() is %d\n", rc);
+        fprintf(stderr, "\tError detail: %s\n", strerror(rc));
       }
     }
 
