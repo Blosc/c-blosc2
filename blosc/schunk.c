@@ -50,13 +50,13 @@ blosc2_schunk* blosc2_new_schunk(blosc2_cparams cparams,
   schunk->blocksize = cparams.blocksize;
   schunk->cbytes = sizeof(blosc2_schunk);
 
+  /* The compression context */
   cparams.schunk = schunk;
   schunk->cctx = blosc2_create_cctx(cparams);
 
+  /* The decompression context */
   dparams.schunk = schunk;
   schunk->dctx = blosc2_create_dctx(dparams);
-
-  /* The rest of the structure will remain zeroed */
 
   return schunk;
 }
@@ -88,8 +88,6 @@ size_t blosc2_append_buffer(blosc2_schunk* schunk, size_t nbytes,
                             void* src) {
   int cbytes;
   void* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
-  int clevel = schunk->clevel;
-  char* compname;
 
   /* Compress the src buffer using super-chunk context */
   cbytes = blosc2_compress_ctx(schunk->cctx, nbytes, src, chunk,
@@ -218,7 +216,7 @@ void* blosc2_pack_schunk(blosc2_schunk* schunk) {
   int64_t nchunks = schunk->nchunks;
   void* packed;
   void* data_chunk;
-  uint64_t* data_pointers;
+  int64_t* data_pointers;
   uint64_t data_offsets_len;
   int32_t chunk_cbytes, chunk_nbytes;
   int64_t packed_len;
@@ -238,7 +236,7 @@ void* blosc2_pack_schunk(blosc2_schunk* schunk) {
 
   /* Finally, setup the data pointers section */
   data_offsets_len = nchunks * sizeof(int64_t);
-  data_pointers = (uint64_t*)((uint8_t*)packed + packed_len - data_offsets_len);
+  data_pointers = (int64_t*)((uint8_t*)packed + packed_len - data_offsets_len);
   *(uint64_t*)((uint8_t*)packed + 72) = packed_len - data_offsets_len;
 
   /* And fill the actual data chunks */

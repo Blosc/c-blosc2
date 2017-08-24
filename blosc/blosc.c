@@ -125,7 +125,7 @@ struct blosc2_context_s {
   struct thread_context* serial_context;
   /* Cache for temporaries for serial operation */
   int compress;
-  /* 1 if we are doing compression 0 if decompress */
+  /* 1 if we are compressing, 0 if decompressing */
 
   /* Threading */
   int nthreads;
@@ -1409,52 +1409,52 @@ static int write_compression_header(blosc2_context* context,
   int dont_split;
 
   /* Write version header for this block */
-  context->dest[0] = BLOSC_VERSION_FORMAT;          /* blosc format version */
+  context->dest[0] = BLOSC_VERSION_FORMAT;
 
   /* Write compressor format */
   compformat = -1;
   switch (context->compcode) {
     case BLOSC_BLOSCLZ:
       compformat = BLOSC_BLOSCLZ_FORMAT;
-      context->dest[1] = BLOSC_BLOSCLZ_VERSION_FORMAT; /* blosclz format version */
+      context->dest[1] = BLOSC_BLOSCLZ_VERSION_FORMAT;
       break;
 
 #if defined(HAVE_LZ4)
     case BLOSC_LZ4:
       compformat = BLOSC_LZ4_FORMAT;
-      context->dest[1] = BLOSC_LZ4_VERSION_FORMAT;  /* lz4 format version */
+      context->dest[1] = BLOSC_LZ4_VERSION_FORMAT;
       break;
     case BLOSC_LZ4HC:
       compformat = BLOSC_LZ4HC_FORMAT;
-      context->dest[1] = BLOSC_LZ4HC_VERSION_FORMAT; /* lz4hc is the same as lz4 */
+      context->dest[1] = BLOSC_LZ4HC_VERSION_FORMAT;
       break;
 #endif /*  HAVE_LZ4 */
 
 #if defined(HAVE_LIZARD)
     case BLOSC_LIZARD:
       compformat = BLOSC_LIZARD_FORMAT;
-      context->dest[1] = BLOSC_LIZARD_VERSION_FORMAT;  /* lizard format version */
+      context->dest[1] = BLOSC_LIZARD_VERSION_FORMAT;
       break;
 #endif /*  HAVE_LIZARD */
 
 #if defined(HAVE_SNAPPY)
     case BLOSC_SNAPPY:
       compformat = BLOSC_SNAPPY_FORMAT;
-      context->dest[1] = BLOSC_SNAPPY_VERSION_FORMAT;  /* snappy format version */
+      context->dest[1] = BLOSC_SNAPPY_VERSION_FORMAT;
       break;
 #endif /*  HAVE_SNAPPY */
 
 #if defined(HAVE_ZLIB)
     case BLOSC_ZLIB:
       compformat = BLOSC_ZLIB_FORMAT;
-      context->dest[1] = BLOSC_ZLIB_VERSION_FORMAT;  /* zlib format version */
+      context->dest[1] = BLOSC_ZLIB_VERSION_FORMAT;
       break;
 #endif /*  HAVE_ZLIB */
 
 #if defined(HAVE_ZSTD)
     case BLOSC_ZSTD:
       compformat = BLOSC_ZSTD_FORMAT;
-      context->dest[1] = BLOSC_ZSTD_VERSION_FORMAT;  /* zstd format version */
+      context->dest[1] = BLOSC_ZSTD_VERSION_FORMAT;
       break;
 #endif /*  HAVE_ZSTD */
 
@@ -2007,7 +2007,7 @@ static void* t_blosc(void* ctxt) {
   int32_t flags;
   size_t nblocks;
   size_t leftover;
-   size_t leftover2;
+  size_t leftover2;
   uint8_t* bstarts;
   const uint8_t* src;
   uint8_t* dest;
@@ -2026,7 +2026,7 @@ static void* t_blosc(void* ctxt) {
 
     /* Get parameters for this thread before entering the main loop */
     blocksize = context->parent_context->blocksize;
-    ebsize = blocksize + context->parent_context->typesize * (int32_t)sizeof(int32_t);
+    ebsize = blocksize + context->parent_context->typesize * sizeof(int32_t);
     compress = context->parent_context->compress;
     flags = *(context->parent_context->header_flags);
     maxbytes = context->parent_context->destsize;
@@ -2078,7 +2078,8 @@ static void* t_blosc(void* ctxt) {
 
     /* Loop over blocks */
     leftoverblock = 0;
-    while ((nblock_ < tblock) && context->parent_context->thread_giveup_code > 0) {
+    while ((nblock_ < tblock) &&
+            (context->parent_context->thread_giveup_code > 0)) {
       bsize = blocksize;
       if (nblock_ == (nblocks - 1) && (leftover > 0)) {
         bsize = leftover;
@@ -2133,13 +2134,13 @@ static void* t_blosc(void* ctxt) {
         _sw32(bstarts + nblock_ * 4, (int32_t)ntdest);
 
         if ((cbytes == 0) || (ntdest + cbytes > maxbytes)) {
-          context->parent_context->thread_giveup_code = 0;  /* uncompressible buffer */
+          context->parent_context->thread_giveup_code = 0;  /* uncompressible buf */
           pthread_mutex_unlock(&context->parent_context->count_mutex);
           break;
         }
         context->parent_context->thread_nblock++;
         nblock_ = (size_t)context->parent_context->thread_nblock;
-        context->parent_context->output_bytes += cbytes;           /* update return bytes counter */
+        context->parent_context->output_bytes += cbytes;
         pthread_mutex_unlock(&context->parent_context->count_mutex);
         /* End of critical section */
 
@@ -2155,7 +2156,8 @@ static void* t_blosc(void* ctxt) {
     } /* closes while (nblock_) */
 
     /* Sum up all the bytes decompressed */
-    if ((!compress || (flags & BLOSC_MEMCPYED)) && context->parent_context->thread_giveup_code > 0) {
+    if ((!compress || (flags & BLOSC_MEMCPYED)) &&
+        (context->parent_context->thread_giveup_code > 0)) {
       /* Update global counter for all threads (decompression only) */
       pthread_mutex_lock(&context->parent_context->count_mutex);
       context->parent_context->output_bytes += ntbytes;
@@ -2204,17 +2206,19 @@ static int init_threads(blosc2_context* context) {
 #endif
 
   /* Make space for thread handlers */
-  context->threads = (pthread_t*)my_malloc(context->nthreads * sizeof(pthread_t));
+  context->threads = (pthread_t*)my_malloc(
+          context->nthreads * sizeof(pthread_t));
   /* Finally, create the threads */
   for (tid = 0; tid < context->nthreads; tid++) {
-    /* Create a thread context thread owns context (will destroy when finished) */
+    /* Create a thread context (will destroy when finished) */
     thread_context = create_thread_context(context, tid);
 
 #if !defined(_WIN32)
     rc2 = pthread_create(&context->threads[tid], &context->ct_attr, t_blosc,
                          (void*)thread_context);
 #else
-    rc2 = pthread_create(&context->threads[tid], NULL, t_blosc, (void *)thread_context);
+    rc2 = pthread_create(&context->threads[tid], NULL, t_blosc,
+                         (void *)thread_context);
 #endif
     if (rc2) {
       fprintf(stderr, "ERROR; return code from pthread_create() is %d\n", rc2);
@@ -2579,6 +2583,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
 
 /* Create a context for decompression */
 blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
+
   blosc2_context* context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
   memset(context, 0, sizeof(blosc2_context));
 

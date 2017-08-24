@@ -8,7 +8,6 @@
 **********************************************************************/
 
 #include <stdio.h>
-#include <string.h>
 #include "blosc.h"
 #include "trunc-prec.h"
 
@@ -45,5 +44,8 @@ void truncate_precision(const uint8_t filter_meta, const size_t typesize,
     case 8:
       truncate_precision64(filter_meta, nbytes / typesize,
                            (int64_t *)src, (int64_t *)dest);
+    default:
+      fprintf(stderr, "Error in trunc-prec filter: Precision for typesize %d "
+              "not handled", (int)typesize);
   }
 }
