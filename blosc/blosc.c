@@ -1526,7 +1526,7 @@ int blosc_compress_context(blosc2_context* context) {
     if (ntbytes < 0) {
       return -1;
     }
-    if ((ntbytes == 0) && (context->sourcesize + BLOSC_MAX_OVERHEAD <= context->destsize)) {
+    else if (ntbytes == 0) {
       /* Last chance for fitting `src` buffer in `dest`.  Update flags
        and do a memcpy later on. */
       *(context->header_flags) |= BLOSC_MEMCPYED;
@@ -1547,8 +1547,9 @@ int blosc_compress_context(blosc2_context* context) {
         return -1;
       }
     }
-    else {
-      memcpy(context->dest + BLOSC_MAX_OVERHEAD, context->src, context->sourcesize);
+    else if (context->sourcesize + BLOSC_MAX_OVERHEAD <= context->destsize) {
+      memcpy(context->dest + BLOSC_MAX_OVERHEAD, context->src,
+             context->sourcesize);
       ntbytes = (int)context->sourcesize + BLOSC_MAX_OVERHEAD;
     }
   }
