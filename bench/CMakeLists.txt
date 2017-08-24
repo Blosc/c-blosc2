@@ -134,11 +134,17 @@ if (BUILD_TESTS)
 
     option(TEST_INCLUDE_BENCH_SUITE "Include bench suite in the tests" OFF)
     if (TEST_INCLUDE_BENCH_SUITE)
-        add_test(test_hardsuite blosc blosclz shuffle suite)
+        add_test(test_hardsuite bench blosclz shuffle suite)
     endif (TEST_INCLUDE_BENCH_SUITE)
 
     option(TEST_INCLUDE_BENCH_DEBUGSUITE "Include bench debugsuite in the tests" OFF)
     if (TEST_INCLUDE_BENCH_DEBUGSUITE)
         add_test(test_debugsuite bench blosclz shuffle debugsuite)
     endif (TEST_INCLUDE_BENCH_DEBUGSUITE)
+
+    option(TEST_INCLUDE_BENCH_DELTA "Include delta bench in the tests" ON)
+    if (TEST_INCLUDE_BENCH_DELTA)
+        add_test(test_bench_delta delta_schunk)
+    endif (TEST_INCLUDE_BENCH_DELTA)
+
 endif (BUILD_TESTS)
