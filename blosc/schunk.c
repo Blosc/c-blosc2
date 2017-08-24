@@ -84,8 +84,7 @@ size_t append_chunk(blosc2_schunk* schunk, void* chunk) {
 
 
 /* Append a data buffer to a super-chunk. */
-size_t blosc2_append_buffer(blosc2_schunk* schunk, size_t nbytes,
-                            void* src) {
+size_t blosc2_append_buffer(blosc2_schunk* schunk, size_t nbytes, void* src) {
   int cbytes;
   void* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
 
@@ -97,14 +96,13 @@ size_t blosc2_append_buffer(blosc2_schunk* schunk, size_t nbytes,
     return (size_t)cbytes;
   }
 
-  /* Append the chunk */
   return append_chunk(schunk, chunk);
 }
 
 
 /* Decompress and return a chunk that is part of a super-chunk. */
 int blosc2_decompress_chunk(blosc2_schunk* schunk, int64_t nchunk,
-    void* dest, int nbytes) {
+                            void* dest, size_t nbytes) {
   int64_t nchunks = schunk->nchunks;
   void* src;
   int chunksize;
@@ -116,23 +114,16 @@ int blosc2_decompress_chunk(blosc2_schunk* schunk, int64_t nchunk,
     return -10;
   }
 
-  /* Grab the address of the chunk */
   src = schunk->data[nchunk];
-  /* Create a buffer for destination */
   nbytes_ = *(int32_t*)((uint8_t*)src + 4);
-
   if (nbytes < nbytes_) {
-    printf("Buffer size is too small for the decompressed buffer "
-                   "('%d' bytes, but '%d' are needed)\n", nbytes, nbytes_);
+    fprintf(stderr, "Buffer size is too small for the decompressed buffer "
+                    "('%ld' bytes, but '%d' are needed)\n",
+            (long)nbytes, nbytes_);
     return -11;
   }
 
-  /* Put the super-chunk address in the global context for Blosc1 */
-  blosc_set_schunk(schunk);
-
-  /* And decompress the chunk */
-  //chunksize = blosc_decompress(src, dest, (size_t)nbytes);
-  chunksize = blosc2_decompress_ctx(schunk->dctx, src, dest, (size_t)nbytes);
+  chunksize = blosc2_decompress_ctx(schunk->dctx, src, dest, nbytes);
 
   return chunksize;
 }
@@ -140,7 +131,6 @@ int blosc2_decompress_chunk(blosc2_schunk* schunk, int64_t nchunk,
 
 /* Free all memory from a super-chunk. */
 int blosc2_destroy_schunk(blosc2_schunk* schunk) {
-  int i;
 
   if (schunk->filters_chunk != NULL)
     free(schunk->filters_chunk);
@@ -151,7 +141,7 @@ int blosc2_destroy_schunk(blosc2_schunk* schunk) {
   if (schunk->userdata_chunk != NULL)
     free(schunk->userdata_chunk);
   if (schunk->data != NULL) {
-    for (i = 0; i < schunk->nchunks; i++) {
+    for (int i = 0; i < schunk->nchunks; i++) {
       free(schunk->data[i]);
     }
     free(schunk->data);
@@ -159,9 +149,6 @@ int blosc2_destroy_schunk(blosc2_schunk* schunk) {
   blosc2_free_ctx(schunk->cctx);
   blosc2_free_ctx(schunk->dctx);
   free(schunk);
-
-  /* The super-chunk is destroyed, so remove the internal reference to it */
-  blosc_set_schunk(NULL);
 
   return 0;
 }
@@ -188,6 +175,7 @@ int64_t blosc2_get_packed_length(blosc2_schunk* schunk) {
   }
   return length;
 }
+
 
 /* Copy a chunk into a packed super-chunk */
 void pack_copy_chunk(void* chunk, void* packed, int offset, int64_t* cbytes,
@@ -426,7 +414,7 @@ void* blosc2_packed_append_buffer(void* packed, size_t typesize, size_t nbytes,
 
 
 /* Decompress and return a chunk that is part of a *packed* super-chunk. */
-int blosc2_packed_decompress_chunk(void* packed, int nchunk, void** dest) {
+int blosc2_packed_decompress_chunk(void* packed, size_t nchunk, void** dest) {
   int64_t nchunks = *(int64_t*)((uint8_t*)packed + 28);
   int64_t* data = (int64_t*)(
           (uint8_t*)packed + *(int64_t*)((uint8_t*)packed + 52 + 8 * 4));

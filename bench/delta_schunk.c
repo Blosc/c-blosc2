@@ -135,7 +135,7 @@ int main() {
 
   /* Create a super-chunk container */
   cparams.filters[0] = BLOSC_DELTA;
-  //cparams.filters[7] = BLOSC_SHUFFLE;
+  //cparams.filters[BLOSC_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 1;
@@ -160,8 +160,7 @@ int main() {
   /* Retrieve and decompress the chunks */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    dsize = blosc2_decompress_chunk(schunk, nchunk, (void*)data_dest,
-                                    (int)isize);
+    dsize = blosc2_decompress_chunk(schunk, nchunk, (void*)data_dest, isize);
     if (dsize < 0) {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;

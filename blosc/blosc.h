@@ -668,9 +668,9 @@ BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize,
  detected, a negative code is returned instead.
  */
 BLOSC_EXPORT int blosc2_decompress_chunk(blosc2_schunk* sheader,
-     int64_t nchunk, void* dest, int nbytes);
+     int64_t nchunk, void* dest, size_t nbytes);
 
-BLOSC_EXPORT int blosc2_packed_decompress_chunk(void* packed, int nchunk,
+BLOSC_EXPORT int blosc2_packed_decompress_chunk(void* packed, size_t nchunk,
       void** dest);
 
 /* Pack a super-chunk by using the header. */

@@ -38,12 +38,12 @@ int main() {
   cparams.clevel = 5;
   schunk = blosc2_new_schunk(cparams, dparams);
 
-  for (int nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
+  for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     for (int i = 0; i < SIZE; i++) {
       data[i] = i * nchunk;
     }
     nchunks = blosc2_append_buffer(schunk, isize, data);
-    if (nchunks != nchunk) return EXIT_FAILURE;
+    if (nchunks != (nchunk + 1)) return EXIT_FAILURE;
   }
 
   /* Gather some info */
@@ -54,14 +54,16 @@ int main() {
   }
 
   /* Retrieve and decompress the chunks (0-based count) */
-  dsize = blosc2_decompress_chunk(schunk, 0, (void*)data_dest, (int)isize);
-  if (dsize < 0) {
-    return EXIT_FAILURE;
-  }
-
-  for (int i = 0; i < SIZE; i++) {
-    if (data_dest[i] != i) {
+  for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    dsize = blosc2_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
+    if (dsize < 0) {
       return EXIT_FAILURE;
+    }
+    for (int i = 0; i < SIZE; i++) {
+      if (data_dest[i] != i  * nchunk) {
+        fprintf(stderr, "First error in: %d, %d, %d", nchunk, i, data_dest[i]);
+        return EXIT_FAILURE;
+      }
     }
   }
 
