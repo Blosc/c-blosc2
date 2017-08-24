@@ -33,7 +33,7 @@ int main() {
 
   /* Create a super-chunk container */
   cparams.filters[0] = BLOSC_DELTA;
-  cparams.filters[7] = BLOSC_BITSHUFFLE;
+  cparams.filters[BLOSC_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 5;
   schunk = blosc2_new_schunk(cparams, dparams);

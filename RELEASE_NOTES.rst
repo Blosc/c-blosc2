@@ -10,15 +10,21 @@
 Changes from 2.0.0a3 to 2.0.0a4
 ===============================
 
-- Internal zstd sources bumbed to 1.3.0.
+- New filter pipeline designed to work inside a chunk.  The pipeline has a
+  current capacity of 5 slots, and is designed to apply different filters
+  sequentially over the same chunk.  For this, a new extended header for the
+  chunk has been put in place (see README_HEADER.rst).
+
+- New delta filter meant to work inside a chunk.  Previously delta was
+  working inside a super-chunk, but the new implementation is both faster and
+  simpler and gets better compression ratios (at least for the tested datasets).
 
 - New re-parametrization of BloscLZ for improved compression ratio
   and also more speed (at least on modern Intel/AMD CPUs).  Version
   for internal BloscLZ codec bumped to 1.0.6.
 
-- New delta filter implemented to work inside a chunk.  Previously it was
-  working inside a super-chunk, but the new implementation is both faster and
-  gets better compression ratios (at least for the tested datasets).
+- Internal zstd sources bumbed to 1.3.0.
+
 
 Changes from 2.0.0a2 to 2.0.0a3
 ===============================

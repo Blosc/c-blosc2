@@ -2,7 +2,7 @@ Blosc Header Format
 ===================
 
 Blosc (as of Version 1.0.0) has the following 16 byte header that stores
-information about the compressed buffer::
+information about the compressed chunk::
 
     |-0-|-1-|-2-|-3-|-4-|-5-|-6-|-7-|-8-|-9-|-A-|-B-|-C-|-D-|-E-|-F-|
       ^   ^   ^   ^ |     nbytes    |   blocksize   |     cbytes    |
@@ -11,6 +11,17 @@ information about the compressed buffer::
       |   |   +------flags
       |   +----------versionlz
       +--------------version
+
+In addition, starting in Blosc 2.0.0, there is an extension of the header
+above that allows to encode the filter pipeline::
+
+  1+|-0-|-1-|-2-|-3-|-4-|-5-|-6-|-7-|-8-|-9-|-A-|-B-|-C-|-D-|-E-|-F-|
+    |   filter codes    | reserved  |   filter meta     | reserved  |
+
+So there is a complete byte for encoding the filter and another one to encode
+possible metadata associated with the filter.  The filter pipeline has 5
+reserved slots for the filters to be applied sequentially to the chunk.  The
+filters are applied sequentially following the slot order.
 
 Datatypes of the Header Entries
 -------------------------------
@@ -40,6 +51,9 @@ All entries are little endian.
         Part of the enumeration for compressors.
     :bit 7 (``0x80``):
         Part of the enumeration for compressors.
+
+    Note:: If both bit 0 and bit 2 are set at once, that means that an
+        extended header (see above) is used.
 
     The last three bits form an enumeration that allows to use alternative
     compressors.

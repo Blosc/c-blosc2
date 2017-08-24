@@ -38,16 +38,19 @@ enum {
 };
 
 enum {
-  /* Minimum header length */
   BLOSC_MIN_HEADER_LENGTH = 16,
+  /* Minimum header length */
+  BLOSC_EXTENDED_HEADER_LENGTH = 32,
+  /* Extended header length (see README_HEADER) */
+  BLOSC_MAX_OVERHEAD = BLOSC_MIN_HEADER_LENGTH,
   /* The maximum overhead during compression in bytes.  This equals to
      BLOSC_MIN_HEADER_LENGTH now, but can be higher in future
      implementations */
-  BLOSC_MAX_OVERHEAD = BLOSC_MIN_HEADER_LENGTH,
-  /* Maximum source buffer size to be compressed */
   BLOSC_MAX_BUFFERSIZE = (INT_MAX - BLOSC_MAX_OVERHEAD),
+  /* Maximum source buffer size to be compressed */
+  BLOSC_MAX_TYPESIZE = 255,
   /* Maximum typesize before considering source buffer as a stream of bytes */
-  BLOSC_MAX_TYPESIZE = 255,         /* Cannot be larger than 255 */
+  /* Cannot be larger than 255 */
 };
 
 /* Codes for filters (see blosc_compress) */
@@ -62,7 +65,7 @@ enum {
 };
 
 enum {
-  BLOSC_MAX_FILTERS = 8,
+  BLOSC_MAX_FILTERS = 5,
   /* Maximum number of filters in the filter pipeline */
 };
 
@@ -468,28 +471,28 @@ typedef struct blosc2_context_s blosc2_context;   /* uncomplete type */
   (zero) in the fields of the struct is passed to a function.
 */
 typedef struct {
-    int compcode;
-    /* the compressor codec */
-    int clevel;
-    /* the compression level (5) */
-    size_t typesize;
-    /* the type size (8) */
-    uint8_t filters[BLOSC_MAX_FILTERS];
-    /* the (sequence of) filters */
-    uint8_t filters_meta[BLOSC_MAX_FILTERS];
-    /* metadata for filters */
-    uint32_t nthreads;
-    /* the number of threads to use internally (1) */
-    size_t blocksize;
-    /* the requested size of the compressed blocks (0; meaning automatic) */
-    void* schunk;
-    /* the associated schunk, if any (NULL) */
+  int compcode;
+  /* the compressor codec */
+  int clevel;
+  /* the compression level (5) */
+  size_t typesize;
+  /* the type size (8) */
+  uint32_t nthreads;
+  /* the number of threads to use internally (1) */
+  size_t blocksize;
+  /* the requested size of the compressed blocks (0; meaning automatic) */
+  void* schunk;
+  /* the associated schunk, if any (NULL) */
+  uint8_t filters[BLOSC_MAX_FILTERS];
+  /* the (sequence of) filters */
+  uint8_t filters_meta[BLOSC_MAX_FILTERS];
+  /* metadata for filters */
 } blosc2_cparams;
 
 /* Default struct for compression params meant for user initialization */
 static const blosc2_cparams BLOSC_CPARAMS_DEFAULTS = {
-        BLOSC_BLOSCLZ, 5, 8, {0, 0, 0, 0, 0, 0, 0, BLOSC_SHUFFLE},
-        {0, 0, 0, 0, 0, 0, 0, 0}, 1, 0, NULL };
+        BLOSC_BLOSCLZ, 5, 8, 1, 0, NULL,
+        {0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0} };
 
 /**
   The parameters for creating a context for decompression purposes.
@@ -498,10 +501,10 @@ static const blosc2_cparams BLOSC_CPARAMS_DEFAULTS = {
   (zero) in the fields of the struct is passed to a function.
 */
 typedef struct {
-    int32_t nthreads;
-    /* the number of threads to use internally (1) */
-    void* schunk;
-    /* the associated schunk, if any (NULL) */
+  int32_t nthreads;
+  /* the number of threads to use internally (1) */
+  void* schunk;
+  /* the associated schunk, if any (NULL) */
 } blosc2_dparams;
 
 /* Default struct for compression params meant for user initialization */

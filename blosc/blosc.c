@@ -106,10 +106,10 @@ struct blosc2_context_s {
   /* Counter for the number of output bytes */
   size_t destsize;
   /* Maximum size for destination buffer */
-  uint8_t* bstarts;
-  /* Start of the buffer past header info */
   size_t typesize;
   /* Type size */
+  uint8_t* bstarts;
+  /* Starts for every block inside the compressed buffer */
   int compcode;
   /* Compressor code to use */
   int clevel;
@@ -1255,11 +1255,11 @@ void flags_to_filters(const uint8_t flags, uint8_t* filters) {
 
   /* Fill the end part of the filter pipeline */
   if (flags & BLOSC_DOSHUFFLE)
-    filters[7] = BLOSC_SHUFFLE;
+    filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   if (flags & BLOSC_BITSHUFFLE)
-    filters[7] = BLOSC_BITSHUFFLE;
+    filters[BLOSC_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   if (flags & BLOSC_DODELTA)
-    filters[6] = BLOSC_DELTA;
+    filters[BLOSC_MAX_FILTERS - 2] = BLOSC_DELTA;
 }
 
 
@@ -1359,20 +1359,20 @@ static int initialize_context_decompression(
   if ((context->header_flags[0] & BLOSC_DOSHUFFLE) &&
       (context->header_flags[0] & BLOSC_DOBITSHUFFLE)) {
     /* Extended header */
-    uint8_t* filters = (uint8_t*)(context->src + 16);
-    uint8_t* filters_meta = (uint8_t*)(context->src + 16 + 8);
+    uint8_t* filters = (uint8_t*)(context->src + BLOSC_MIN_HEADER_LENGTH);
+    uint8_t* filters_meta = filters + 8;
     for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
       context->filters[i] = filters[i];
       context->filters_meta[i] = filters_meta[i];
     }
     context->filter_flags = filters_to_flags(filters);
-    context->bstarts = (uint8_t*)(context->src + 32);
+    context->bstarts = (uint8_t*)(context->src + BLOSC_EXTENDED_HEADER_LENGTH);
   } else {
     /* Blosc-1 header */
     context->filter_flags = get_filter_flags(context->header_flags[0],
                                              context->typesize);
     flags_to_filters(context->header_flags[0], context->filters);
-    context->bstarts = (uint8_t*)(context->src + 16);
+    context->bstarts = (uint8_t*)(context->src + BLOSC_MIN_HEADER_LENGTH);
   }
 
   /* Check that we have enough space to decompress */
@@ -1477,17 +1477,19 @@ static int write_compression_header(blosc2_context* context,
     /* Mark that we are handling an extended header */
     *(context->header_flags) |= (BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE);
     /* Store filter pipeline info at the end of the header */
-    uint8_t *dest_filters = context->dest + 16;       /* filter pipeline */
-    uint8_t *dest_filters_meta = context->dest + 24;  /* filter meta */
+    uint8_t *filters = context->dest + BLOSC_MIN_HEADER_LENGTH;
+    uint8_t *filters_meta = filters + 8;
     for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
-      dest_filters[i] = context->filters[i];
-      dest_filters_meta[i] = context->filters_meta[i];
+      filters[i] = context->filters[i];
+      filters_meta[i] = context->filters_meta[i];
     }
-    context->bstarts = context->dest + 32;    /* starts for every block */
-    context->output_bytes = 32 + sizeof(int32_t) * context->nblocks;
+    context->bstarts = context->dest + BLOSC_EXTENDED_HEADER_LENGTH;
+    context->output_bytes = BLOSC_EXTENDED_HEADER_LENGTH +
+            sizeof(int32_t) * context->nblocks;
   } else {
-    context->bstarts = context->dest + 16;    /* starts for every block */
-    context->output_bytes = 16 + sizeof(int32_t) * context->nblocks;
+    context->bstarts = context->dest + BLOSC_MIN_HEADER_LENGTH;
+    context->output_bytes = BLOSC_MIN_HEADER_LENGTH +
+            sizeof(int32_t) * context->nblocks;
   }
   /* space for header and pointers */
 
@@ -1602,11 +1604,11 @@ void build_filters(const int doshuffle, const int delta,
 
   /* Fill the end part of the filter pipeline */
   if ((doshuffle == BLOSC_SHUFFLE) && (typesize > 1))
-    filters[7] = BLOSC_SHUFFLE;
+    filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   if (doshuffle == BLOSC_BITSHUFFLE)
-    filters[7] = BLOSC_BITSHUFFLE;
+    filters[BLOSC_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   if (delta)
-    filters[6] = BLOSC_DELTA;
+    filters[BLOSC_MAX_FILTERS - 2] = BLOSC_DELTA;
 }
 
 
@@ -1718,18 +1720,23 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
 
   pthread_mutex_lock(&global_comp_mutex);
 
-  uint8_t filters[BLOSC_MAX_FILTERS] = {0, 0, 0, 0, 0, 0, 0, 0};
+  /* Initialize a context compression */
+  uint8_t* filters = calloc(1, BLOSC_MAX_FILTERS);
+  uint8_t* filters_meta = calloc(1, BLOSC_MAX_FILTERS);
   build_filters(doshuffle, g_delta, typesize, filters);
-  uint8_t filters_meta[BLOSC_MAX_FILTERS] = {0, 0, 0, 0, 0, 0, 0, 0};
   error = initialize_context_compression(
     g_global_context, nbytes, src, dest, destsize, clevel, filters,
     filters_meta, typesize, g_compressor, g_force_blocksize, g_nthreads,
     g_schunk);
-  if (error < 0) { return error; }
+  free(filters);
+  free(filters_meta);
+  if (error < 0)
+    return error;
 
   /* Write chunk header without extended header (Blosc1 compatibility mode) */
   error = write_compression_header(g_global_context, 0);
-  if (error < 0) { return error; }
+  if (error < 0)
+    return error;
 
   result = blosc_compress_context(g_global_context);
 
@@ -1854,16 +1861,17 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
   if ((context->header_flags[0] & BLOSC_DOSHUFFLE) &&
       (context->header_flags[0] & BLOSC_DOBITSHUFFLE)) {
     /* Extended header */
-    uint8_t* filters = _src + 16;
-    uint8_t* filters_meta = _src + 24;
+    uint8_t* filters = _src + BLOSC_MIN_HEADER_LENGTH;
+    uint8_t* filters_meta = filters + 8;
     for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
       context->filters[i] = filters[i];
       context->filters_meta[i] = filters_meta[i];
     }
-    _src += 32;
+    _src += BLOSC_EXTENDED_HEADER_LENGTH;
   } else {
+    /* Minimal header */
     flags_to_filters(flags, context->filters);
-    _src += 16;
+    _src += BLOSC_MIN_HEADER_LENGTH;
   }
   bstarts = _src;
   /* Compute some params */
