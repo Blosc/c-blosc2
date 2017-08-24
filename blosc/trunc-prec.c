@@ -8,7 +8,6 @@
 **********************************************************************/
 
 #include <stdio.h>
-#include <string.h>
 #include "blosc.h"
 #include "trunc-prec.h"
 
@@ -16,7 +15,7 @@
 #define BITS_MANTISSA_DOUBLE 52
 
 
-void truncate_precision32(const uint16_t filter_meta, const int nelems,
+void truncate_precision32(const uint8_t filter_meta, const size_t nelems,
                           const int32_t* src, int32_t* dest) {
   int zeroed_bits = BITS_MANTISSA_FLOAT - filter_meta;
   int32_t mask = ~((1 << zeroed_bits) - 1);
@@ -25,18 +24,18 @@ void truncate_precision32(const uint16_t filter_meta, const int nelems,
   }
 }
 
-void truncate_precision64(const uint16_t filter_meta, const int nelems,
+void truncate_precision64(const uint8_t filter_meta, const size_t nelems,
                           const int64_t* src, int64_t* dest) {
   int zeroed_bits = BITS_MANTISSA_DOUBLE - filter_meta;
-  uint64_t mask = ~((1LL << zeroed_bits) - 1LL);
+  uint64_t mask = ~((1ULL << zeroed_bits) - 1ULL);
   for (int i = 0; i < nelems; i++) {
     dest[i] = src[i] & mask;
   }
 }
 
 /* Apply the truncate precision to src.  This can never fail. */
-void truncate_precision(const uint16_t filter_meta, const int32_t typesize,
-                        const int32_t nbytes, const uint8_t* src,
+void truncate_precision(const uint8_t filter_meta, const size_t typesize,
+                        const size_t nbytes, const uint8_t* src,
                         uint8_t* dest) {
   switch (typesize) {
     case 4:
@@ -45,5 +44,8 @@ void truncate_precision(const uint16_t filter_meta, const int32_t typesize,
     case 8:
       truncate_precision64(filter_meta, nbytes / typesize,
                            (int64_t *)src, (int64_t *)dest);
+    default:
+      fprintf(stderr, "Error in trunc-prec filter: Precision for typesize %d "
+              "not handled", (int)typesize);
   }
 }

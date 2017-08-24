@@ -11,6 +11,4 @@
 
 #include "blosc.h"
 
-uint8_t* decode_filters(uint16_t enc_filters);
-
 #endif //BLOSC_SCHUNK_H

@@ -14,12 +14,12 @@
 int tests_run = 0;
 
 /* Global vars */
-void *src, *srccpy, *dest;
+uint8_t *src, *srccpy, *dest;
 int nbytes, cbytes;
 int clevel = 5;
 int doshuffle = 1;
 int typesize;
-size_t size = 7 * 12 * 13 * 16 * 24 * 100;  /* must be divisible by typesize */
+size_t size = 7 * 12 * 13 * 16 * 24 * 10;  /* must be divisible by typesize */
 
 
 /* Check compressor */
@@ -30,7 +30,7 @@ static char *test_delta() {
   switch (typesize) {
     case 1:
       for (int i = 0; i < size / typesize; i++) {
-        ((uint8_t*)src)[i] = (uint8_t)i;
+        src[i] = (uint8_t)i;
       }
       break;
     case 2:
@@ -84,7 +84,7 @@ static char *test_delta() {
       break;
     default:
       for (int i = 0; i < size / typesize; i++) {
-        ((uint8_t*)src)[i] = (uint8_t)i;
+        src[i] = (uint8_t)i;
       }
   }
   memcpy(srccpy, src, size);

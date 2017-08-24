@@ -7,20 +7,22 @@
 
 #include <stdio.h>
 #include "test_common.h"
+#include "../blosc/blosc.h"
 
-#define SIZE 500 * 1000
+#define SIZE (500 * 1000)
 #define NCHUNKS 10
 
 
 int main() {
   static int32_t data[SIZE];
   static int32_t data_dest[SIZE];
-  int isize = SIZE * sizeof(int32_t);
+  size_t isize = SIZE * sizeof(int32_t);
   int dsize;
-  int32_t nbytes, cbytes;
-  blosc2_sparams* sc_params = calloc(1, sizeof(blosc2_sparams));
-  blosc2_sheader* sc_header;
-  int i, nchunk, nchunks;
+  int64_t nbytes, cbytes;
+  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_schunk* schunk;
+  size_t nchunks;
 
   printf("Blosc version info: %s (%s)\n",
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
@@ -30,43 +32,43 @@ int main() {
   blosc_set_nthreads(2);
 
   /* Create a super-chunk container */
-  sc_params->filters[0] = BLOSC_DELTA;
-  sc_params->filters[1] = BLOSC_BITSHUFFLE;
-  sc_params->compressor = BLOSC_BLOSCLZ;
-  sc_params->clevel = 5;
-  sc_header = blosc2_new_schunk(sc_params);
+  cparams.filters[0] = BLOSC_DELTA;
+  cparams.filters[BLOSC_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
+  cparams.compcode = BLOSC_BLOSCLZ;
+  cparams.clevel = 5;
+  schunk = blosc2_new_schunk(cparams, dparams);
 
-  for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
-    for (i = 0; i < SIZE; i++) {
+  for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    for (int i = 0; i < SIZE; i++) {
       data[i] = i * nchunk;
     }
-    nchunks = blosc2_append_buffer(sc_header, sizeof(int32_t), isize, data);
-    if (nchunks != nchunk) return EXIT_FAILURE;
+    nchunks = blosc2_append_buffer(schunk, isize, data);
+    if (nchunks != (nchunk + 1)) return EXIT_FAILURE;
   }
 
   /* Gather some info */
-  nbytes = sc_header->nbytes;
-  cbytes = sc_header->cbytes;
+  nbytes = schunk->nbytes;
+  cbytes = schunk->cbytes;
   if (cbytes > nbytes) {
     return EXIT_FAILURE;
   }
 
   /* Retrieve and decompress the chunks (0-based count) */
-  dsize = blosc2_decompress_chunk(sc_header, 0, (void*)data_dest, isize);
-  if (dsize < 0) {
-    return EXIT_FAILURE;
-  }
-
-  for (i = 0; i < SIZE; i++) {
-    if (data_dest[i] != i) {
+  for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    dsize = blosc2_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
+    if (dsize < 0) {
       return EXIT_FAILURE;
+    }
+    for (int i = 0; i < SIZE; i++) {
+      if (data_dest[i] != i  * nchunk) {
+        fprintf(stderr, "First error in: %d, %d, %d", nchunk, i, data_dest[i]);
+        return EXIT_FAILURE;
+      }
     }
   }
 
   /* Free resources */
-  free(sc_params);
-  /* Destroy the super-chunk */
-  blosc2_destroy_schunk(sc_header);
+  blosc2_destroy_schunk(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
 
