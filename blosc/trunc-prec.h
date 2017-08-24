@@ -10,8 +10,8 @@
 #ifndef BLOSC_TRUNC_PREC_H
 #define BLOSC_TRUNC_PREC_H
 
-void truncate_precision(const uint8_t filters_meta, const size_t typesize,
-                        const size_t nbytes, const uint8_t* src,
+void truncate_precision(uint8_t filters_meta, size_t typesize,
+                        size_t nbytes, const uint8_t* src,
                         uint8_t* dest);
 
 #endif //BLOSC_TRUNC_PREC_H
