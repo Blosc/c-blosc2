@@ -1264,29 +1264,28 @@ void flags_to_filters(const uint8_t flags, uint8_t* filters) {
 
 
 static int initialize_context_compression(
-  blosc2_context* context,
-  size_t sourcesize, const void* src, void* dest, size_t destsize, int clevel,
-  uint8_t const *filters, uint8_t const *filters_meta, size_t typesize,
-  const int32_t compressor, const size_t blocksize, const int32_t nthreads,
-  blosc2_schunk* schunk) {
+  blosc2_context* context, size_t sourcesize, const void* src, void* dest,
+  size_t destsize, int clevel, uint8_t const *filters,
+  uint8_t const *filters_meta, size_t typesize, int compressor,
+  size_t blocksize, int nthreads, blosc2_schunk* schunk) {
 
   /* Set parameters */
   context->compress = 1;
   context->src = (const uint8_t*)src;
   context->dest = (uint8_t*)(dest);
   context->output_bytes = 0;
-  context->destsize = (int32_t)destsize;
-  context->sourcesize = (int32_t)sourcesize;
-  context->typesize = (uint32_t)typesize;
+  context->destsize = destsize;
+  context->sourcesize = sourcesize;
+  context->typesize = typesize;
   context->filter_flags = filters_to_flags(filters);
   for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
     context->filters[i] = filters[i];
     context->filters_meta[i] = filters_meta[i];
   }
-  context->compcode = (uint8_t)compressor;
+  context->compcode = compressor;
   context->nthreads = nthreads;
   context->end_threads = 0;
-  context->clevel = (uint8_t)clevel;
+  context->clevel = clevel;
   context->schunk = schunk;
 
   /* Check buffer size limits */
@@ -1317,8 +1316,8 @@ static int initialize_context_compression(
   /* Compute number of blocks in buffer */
   context->nblocks = context->sourcesize / context->blocksize;
   context->leftover = context->sourcesize % context->blocksize;
-  context->nblocks = (context->leftover > 0) ? \
-   (context->nblocks + 1) : context->nblocks;
+  context->nblocks = (context->leftover > 0) ?
+                     (context->nblocks + 1) : context->nblocks;
 
   return 1;
 }
