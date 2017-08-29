@@ -64,6 +64,10 @@
   #include <unistd.h>
 #endif  /* _WIN32 */
 
+#if defined(_WIN32) && !defined(__GNUC__)
+  #include "win32/pthread.c"
+#endif
+
 /* The maximum number of splits in a block for compression */
 #define MAX_SPLITS 16            /* Cannot be larger than 128 */
 
