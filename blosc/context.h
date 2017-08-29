@@ -9,6 +9,9 @@
 
 #include "blosc.h"
 
+#ifndef CONTEXT_HEADER
+#define CONTEXT_HEADER
+
 #if defined(_WIN32) && !defined(__GNUC__)
   #include "win32/pthread.h"
   #include "win32/pthread.c"
@@ -103,3 +106,6 @@ struct thread_context {
   ZSTD_DCtx* zstd_dctx;
 #endif /* HAVE_ZSTD */
 };
+
+
+#endif  /* CONTEXT_HEADER */
