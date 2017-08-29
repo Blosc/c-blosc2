@@ -13,23 +13,25 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/types.h>
+
 #if defined(USING_CMAKE)
   #include "config.h"
 #endif /*  USING_CMAKE */
+
 #include "blosc.h"
 #include "shuffle.h"
 #include "delta.h"
 #include "trunc-prec.h"
 #include "blosclz.h"
-#include "context.h"
 #include "btune.h"
+
 #if defined(HAVE_LZ4)
-#include "lz4.h"
-#include "lz4hc.h"
+  #include "lz4.h"
+  #include "lz4hc.h"
 #endif /*  HAVE_LZ4 */
 #if defined(HAVE_LIZARD)
-#include "lizard_compress.h"
-#include "lizard_decompress.h"
+  #include "lizard_compress.h"
+  #include "lizard_decompress.h"
 #endif /*  HAVE_LIZARD */
 #if defined(HAVE_SNAPPY)
   #include "snappy-c.h"
@@ -43,6 +45,9 @@
   #include "zstd.h"
   #include "zstd_errors.h"
 #endif /*  HAVE_ZSTD */
+
+#include "context.h"
+
 
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <windows.h>
@@ -60,13 +65,6 @@
 #else
   #include <unistd.h>
 #endif  /* _WIN32 */
-
-#if defined(_WIN32) && !defined(__GNUC__)
-  #include "win32/pthread.h"
-  #include "win32/pthread.c"
-#else
-  #include <pthread.h>
-#endif
 
 /* The maximum number of splits in a block for compression */
 #define MAX_SPLITS 16            /* Cannot be larger than 128 */

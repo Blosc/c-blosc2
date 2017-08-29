@@ -9,17 +9,17 @@
 
 #include "blosc.h"
 
-#if defined(HAVE_ZSTD)
-#include "zstd.h"
-#include "zstd_errors.h"
-#endif /*  HAVE_ZSTD */
-
 #if defined(_WIN32) && !defined(__GNUC__)
-#include "win32/pthread.h"
+  #include "win32/pthread.h"
   #include "win32/pthread.c"
 #else
-#include <pthread.h>
+  #include <pthread.h>
 #endif
+
+#if defined(HAVE_ZSTD)
+  #include "zstd.h"
+  #include "zstd_errors.h"
+#endif /*  HAVE_ZSTD */
 
 
 struct blosc2_context_s {
