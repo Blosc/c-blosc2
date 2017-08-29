@@ -9,8 +9,8 @@
 
 #include "blosc.h"
 
-#ifndef CONTEXT_HEADER
-#define CONTEXT_HEADER
+#ifndef CONTEXT_H
+#define CONTEXT_H
 
 #if defined(_WIN32) && !defined(__GNUC__)
   #include "win32/pthread.h"
@@ -108,4 +108,4 @@ struct thread_context {
 };
 
 
-#endif  /* CONTEXT_HEADER */
+#endif  /* CONTEXT_H */
