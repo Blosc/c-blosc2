@@ -1154,18 +1154,22 @@ int HCR(blosc2_context *context) {
 }
 
 
-static size_t compute_blocksize(
-    blosc2_context* context, int32_t clevel, size_t typesize, size_t nbytes,
-    size_t forced_blocksize) {
+/* Tune some compression parameters based in the context */
+void btune_cparams(blosc2_context* context) {
+  int32_t clevel = context->clevel;
+  size_t typesize = context->typesize;
+  size_t nbytes = context->sourcesize;
+  size_t user_blocksize = context->blocksize;
   size_t blocksize = nbytes;
 
   /* Protection against very small buffers */
-  if (nbytes < (int32_t)typesize) {
-    return 1;
+  if (nbytes < typesize) {
+    context->blocksize = 1;
+    return;
   }
 
-  if (forced_blocksize) {
-    blocksize = forced_blocksize;
+  if (user_blocksize) {
+    blocksize = user_blocksize;
     /* Check that forced blocksize is not too small */
     if (blocksize < MIN_BUFFERSIZE) {
       blocksize = MIN_BUFFERSIZE;
@@ -1225,7 +1229,7 @@ static size_t compute_blocksize(
     blocksize = blocksize / typesize * typesize;
   }
 
-  return blocksize;
+  context->blocksize = blocksize;
 }
 
 
@@ -1309,9 +1313,9 @@ static int initialize_context_compression(
     context->typesize = 1;
   }
 
-  /* Get the blocksize */
-  context->blocksize = compute_blocksize(
-    context, clevel, context->typesize, context->sourcesize, blocksize);
+  /* Finally, tune some compression parameters */
+  context->blocksize = blocksize;
+  btune_cparams(context);
 
   /* Compute number of blocks in buffer */
   context->nblocks = context->sourcesize / context->blocksize;
