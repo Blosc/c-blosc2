@@ -721,4 +721,4 @@ BLOSC_EXPORT void blosc_set_schunk(blosc2_schunk* schunk);
 #endif
 
 
-#endif
+#endif  /* BLOSC_H */

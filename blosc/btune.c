@@ -8,8 +8,6 @@
 **********************************************************************/
 
 #include <stdio.h>
-#include "blosc.h"
-#include "context.h"
 #include "btune.h"
 
 

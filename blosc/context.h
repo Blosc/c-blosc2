@@ -7,10 +7,10 @@
   See LICENSES/BLOSC.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include "blosc.h"
-
 #ifndef CONTEXT_H
 #define CONTEXT_H
+
+#include "blosc.h"
 
 #if defined(_WIN32) && !defined(__GNUC__)
   #include "win32/pthread.h"
@@ -21,7 +21,6 @@
 
 #if defined(HAVE_ZSTD)
   #include "zstd.h"
-  #include "zstd_errors.h"
 #endif /*  HAVE_ZSTD */
 
 

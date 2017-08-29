@@ -7,7 +7,7 @@
   See LICENSES/BLOSC.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include "blosc.h"
+#include "context.h"
 
 /* The size of L1 cache.  32 KB is quite common nowadays. */
 #define L1 (32 * 1024)

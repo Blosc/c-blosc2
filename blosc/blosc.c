@@ -18,7 +18,7 @@
   #include "config.h"
 #endif /*  USING_CMAKE */
 
-#include "blosc.h"
+#include "context.h"
 #include "shuffle.h"
 #include "delta.h"
 #include "trunc-prec.h"
@@ -45,8 +45,6 @@
   #include "zstd.h"
   #include "zstd_errors.h"
 #endif /*  HAVE_ZSTD */
-
-#include "context.h"
 
 
 #if defined(_WIN32) && !defined(__MINGW32__)
