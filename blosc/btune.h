@@ -7,6 +7,9 @@
   See LICENSES/BLOSC.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#ifndef BTUNE_H
+#define BTUNE_H
+
 #include "context.h"
 
 /* The size of L1 cache.  32 KB is quite common nowadays. */
@@ -14,3 +17,6 @@
 
 
 void btune_cparams(blosc2_context* context);
+
+
+#endif  /* BTUNE_H */
