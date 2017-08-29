@@ -28,6 +28,14 @@ extern "C" {
 
 #define BLOSCLZ_VERSION_STRING "1.0.6"   /* the internal compressor version */
 
+/* Have problems using posix barriers when symbol value is 200112L */
+/* This requires more investigation, but will work for the moment */
+#if defined(_POSIX_BARRIERS) && ((_POSIX_BARRIERS - 20012L) >= 0 && _POSIX_BARRIERS != 200112L)
+#define BLOSC_POSIX_BARRIERS_MINE
+#endif
+
+
+
 /* The *_FORMAT symbols below should be just 1-byte long */
 enum {
   /* Blosc format version, starting at 1
@@ -51,6 +59,8 @@ enum {
   BLOSC_MAX_TYPESIZE = 255,
   /* Maximum typesize before considering source buffer as a stream of bytes */
   /* Cannot be larger than 255 */
+  BLOSC_MIN_BUFFERSIZE = 128,       /* Cannot be smaller than 66 */
+  /* Minimum buffer size to be compressed */
 };
 
 /* Codes for filters (see blosc_compress) */

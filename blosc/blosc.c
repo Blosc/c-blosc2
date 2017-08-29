@@ -21,6 +21,8 @@
 #include "delta.h"
 #include "trunc-prec.h"
 #include "blosclz.h"
+#include "context.h"
+#include "btune.h"
 #if defined(HAVE_LZ4)
 #include "lz4.h"
 #include "lz4hc.h"
@@ -66,106 +68,10 @@
   #include <pthread.h>
 #endif
 
-/* Some useful units */
-#define KB 1024
-#define MB (1024*KB)
-
-/* Minimum buffer size to be compressed */
-#define MIN_BUFFERSIZE 128       /* Cannot be smaller than 66 */
-
 /* The maximum number of splits in a block for compression */
 #define MAX_SPLITS 16            /* Cannot be larger than 128 */
 
-/* The size of L1 cache.  32 KB is quite common nowadays. */
-#define L1 (32*KB)
-
-/* Have problems using posix barriers when symbol value is 200112L */
-/* This requires more investigation, but will work for the moment */
-#if defined(_POSIX_BARRIERS) && ((_POSIX_BARRIERS - 20012L) >= 0 && _POSIX_BARRIERS != 200112L)
-#define _POSIX_BARRIERS_MINE
-#endif
 /* Synchronization variables */
-
-
-struct blosc2_context_s {
-  const uint8_t* src;
-  /* The source buffer */
-  uint8_t* dest;
-  /* The destination buffer */
-  uint8_t* header_flags;
-  /* Flags for header */
-  size_t sourcesize;
-  /* Number of bytes in source buffer */
-  size_t nblocks;
-  /* Number of total blocks in buffer */
-  size_t leftover;
-  /* Extra bytes at end of buffer */
-  size_t blocksize;
-  /* Length of the block in bytes */
-  size_t output_bytes;
-  /* Counter for the number of output bytes */
-  size_t destsize;
-  /* Maximum size for destination buffer */
-  size_t typesize;
-  /* Type size */
-  uint8_t* bstarts;
-  /* Starts for every block inside the compressed buffer */
-  int compcode;
-  /* Compressor code to use */
-  int clevel;
-  /* Compression level (1-9) */
-  uint8_t filter_flags;
-  /* The filter flags in the filter pipeline */
-  uint8_t filters[BLOSC_MAX_FILTERS];
-  /* the (sequence of) filters */
-  uint8_t filters_meta[BLOSC_MAX_FILTERS];
-  /* metadata for filters */
-  blosc2_schunk* schunk;
-  /* Associated super-chunk (if available) */
-  struct thread_context* serial_context;
-  /* Cache for temporaries for serial operation */
-  int compress;
-  /* 1 if we are compressing, 0 if decompressing */
-
-  /* Threading */
-  int nthreads;
-  int threads_started;
-  int end_threads;
-  pthread_t *threads;
-  pthread_mutex_t count_mutex;
-#ifdef _POSIX_BARRIERS_MINE
-  pthread_barrier_t barr_init;
-  pthread_barrier_t barr_finish;
-#else
-  int count_threads;
-  pthread_mutex_t count_threads_mutex;
-  pthread_cond_t count_threads_cv;
-#endif
-#if !defined(_WIN32)
-  pthread_attr_t ct_attr;      /* creation time attrs for threads */
-#endif
-  int thread_giveup_code;
-  /* error code when give up */
-  int thread_nblock;       /* block counter */
-  int dref_not_init;       /* data ref in delta not initialized */
-  pthread_mutex_t delta_mutex;
-  pthread_cond_t delta_cv;
-};
-
-struct thread_context {
-  blosc2_context* parent_context;
-  int tid;
-  uint8_t* tmp;
-  uint8_t* tmp2;
-  uint8_t* tmp3;
-  uint8_t* tmp4;
-  size_t tmpblocksize; /* keep track of how big the temporary buffers are */
-#if defined(HAVE_ZSTD)
-  /* The contexts for ZSTD */
-  ZSTD_CCtx* zstd_cctx;
-  ZSTD_DCtx* zstd_dctx;
-#endif /* HAVE_ZSTD */
-};
 
 /* Global context for non-contextual API */
 static blosc2_context* g_global_context;
@@ -210,7 +116,7 @@ int blosc_release_threadpool(blosc2_context* context);
 #endif
 
 /* Wait for all threads to finish */
-#ifdef _POSIX_BARRIERS_MINE
+#ifdef BLOSC_POSIX_BARRIERS_MINE
 #define WAIT_FINISH(RET_VAL, CONTEXT_PTR)   \
   rc = pthread_barrier_wait(&(CONTEXT_PTR)->barr_finish); \
   if (rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD) { \
@@ -983,7 +889,7 @@ static int serial_blosc(struct thread_context* thread_context) {
   uint8_t* tmp2 = thread_context->tmp2;
 
   for (j = 0; j < context->nblocks; j++) {
-    if (context->compress && !(*(context->header_flags) & BLOSC_MEMCPYED)) {
+    if (context->do_compress && !(*(context->header_flags) & BLOSC_MEMCPYED)) {
       _sw32(context->bstarts + j * 4, (int32_t)ntbytes);
     }
     bsize = context->blocksize;
@@ -992,7 +898,7 @@ static int serial_blosc(struct thread_context* thread_context) {
       bsize = context->leftover;
       leftoverblock = 1;
     }
-    if (context->compress) {
+    if (context->do_compress) {
       if (*(context->header_flags) & BLOSC_MEMCPYED) {
         /* We want to memcpy only */
         memcpy(context->dest + BLOSC_MAX_OVERHEAD + j * context->blocksize,
@@ -1129,110 +1035,6 @@ static int do_job(blosc2_context* context) {
 }
 
 
-/* Whether a codec is meant for High Compression Ratios */
-/* Includes LZ4 + BITSHUFFLE here, but not BloscLZ + BITSHUFFLE because,
-   for some reason, the latter does not work too well */
-int HCR(blosc2_context *context) {
-  switch (context->compcode) {
-    case BLOSC_BLOSCLZ :
-      return 0;
-    case BLOSC_LZ4 :
-      return (context->filter_flags & BLOSC_DOBITSHUFFLE) ? 1 : 0;
-    case BLOSC_LZ4HC :
-      return 1;
-    case BLOSC_LIZARD :
-      return 1;
-    case BLOSC_ZLIB :
-      return 1;
-    case BLOSC_ZSTD :
-      return 1;
-    default :
-      fprintf(stderr, "Error in HCR: codec %d not handled\n",
-              context->compcode);
-  }
-  return 0;
-}
-
-
-/* Tune some compression parameters based in the context */
-void btune_cparams(blosc2_context* context) {
-  int32_t clevel = context->clevel;
-  size_t typesize = context->typesize;
-  size_t nbytes = context->sourcesize;
-  size_t user_blocksize = context->blocksize;
-  size_t blocksize = nbytes;
-
-  /* Protection against very small buffers */
-  if (nbytes < typesize) {
-    context->blocksize = 1;
-    return;
-  }
-
-  if (user_blocksize) {
-    blocksize = user_blocksize;
-    /* Check that forced blocksize is not too small */
-    if (blocksize < MIN_BUFFERSIZE) {
-      blocksize = MIN_BUFFERSIZE;
-    }
-  }
-  else if (nbytes >= L1) {
-    blocksize = L1;
-
-    /* For HCR codecs, increase the block sizes by a factor of 2 because they
-       are meant for compressing large blocks (i.e. they show a big overhead
-       when compressing small ones). */
-    if (HCR(context)) {
-      blocksize *= 2;
-    }
-
-    /* Choose a different blocksize depending on the compression level */
-    switch (clevel) {
-      case 0:
-        /* Case of plain copy */
-        blocksize /= 4;
-        break;
-      case 1:
-      case 2:
-      case 3:
-      case 4:
-        blocksize *= 1;
-        break;
-      case 5:
-        blocksize *= 2;
-        break;
-      case 6:
-        blocksize *= 4;
-        break;
-      case 7:
-      case 8:
-        blocksize *= 8;
-        break;
-      case 9:
-        /* Do not exceed 256 KB for non HCR codecs */
-        blocksize *= 8;
-        if (HCR(context)) {
-          blocksize *= 2;
-        }
-        break;
-      default:
-        break;
-    }
-  }
-
-  /* Check that blocksize is not too large */
-  if (blocksize > (int32_t)nbytes) {
-    blocksize = nbytes;
-  }
-
-  /* blocksize *must absolutely* be a multiple of the typesize */
-  if (blocksize > typesize) {
-    blocksize = blocksize / typesize * typesize;
-  }
-
-  context->blocksize = blocksize;
-}
-
-
 uint8_t filters_to_flags(const uint8_t* filters) {
   uint8_t flags = 0;
 
@@ -1274,7 +1076,7 @@ static int initialize_context_compression(
   size_t blocksize, int nthreads, blosc2_schunk* schunk) {
 
   /* Set parameters */
-  context->compress = 1;
+  context->do_compress = 1;
   context->src = (const uint8_t*)src;
   context->dest = (uint8_t*)(dest);
   context->output_bytes = 0;
@@ -1348,7 +1150,7 @@ static uint8_t get_filter_flags(const uint8_t header_flags,
 static int initialize_context_decompression(
         blosc2_context* context, const void* src, void* dest, size_t destsize) {
 
-  context->compress = 0;
+  context->do_compress = 0;
   context->src = (const uint8_t*)src;
   context->dest = (uint8_t*)dest;
   context->destsize = (int32_t)destsize;
@@ -1402,7 +1204,7 @@ static int split_block(int compcode, size_t typesize, size_t blocksize) {
   return (((compcode == BLOSC_BLOSCLZ) ||
            (compcode == BLOSC_SNAPPY)) &&
           (typesize <= MAX_SPLITS) &&
-          (blocksize / typesize) >= MIN_BUFFERSIZE);
+          (blocksize / typesize) >= BLOSC_MIN_BUFFERSIZE);
 }
 
 
@@ -1501,7 +1303,7 @@ static int write_compression_header(blosc2_context* context,
     *(context->header_flags) |= BLOSC_MEMCPYED;
   }
 
-  if (context->sourcesize < MIN_BUFFERSIZE) {
+  if (context->sourcesize < BLOSC_MIN_BUFFERSIZE) {
     /* Buffer is too small.  Try memcpy'ing. */
     *(context->header_flags) |= BLOSC_MEMCPYED;
   }
@@ -1580,7 +1382,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
                         const void* src, void* dest, size_t destsize) {
   int error, result;
 
-  if (context->compress != 1) {
+  if (context->do_compress != 1) {
     fprintf(stderr, "Context is not meant for compression.  Giving up.\n");
     return -10;
   }
@@ -1778,7 +1580,7 @@ int blosc2_decompress_ctx(
     blosc2_context* context, const void* src, void* dest, size_t destsize) {
   int result;
 
-  if (context->compress != 0) {
+  if (context->do_compress != 0) {
     fprintf(stderr, "Context is not meant for decompression.  Giving up.\n");
     return -10;
   }
@@ -2038,7 +1840,7 @@ static void* t_blosc(void* ctxt) {
     /* Get parameters for this thread before entering the main loop */
     blocksize = context->parent_context->blocksize;
     ebsize = blocksize + context->parent_context->typesize * sizeof(int32_t);
-    compress = context->parent_context->compress;
+    compress = context->parent_context->do_compress;
     flags = *(context->parent_context->header_flags);
     maxbytes = context->parent_context->destsize;
     nblocks = context->parent_context->nblocks;
@@ -2201,7 +2003,7 @@ static int init_threads(blosc2_context* context) {
   context->thread_nblock = -1;
 
   /* Barrier initialization */
-#ifdef _POSIX_BARRIERS_MINE
+#ifdef BLOSC_POSIX_BARRIERS_MINE
   pthread_barrier_init(&context->barr_init, NULL, context->nthreads + 1);
   pthread_barrier_init(&context->barr_finish, NULL, context->nthreads + 1);
 #else
@@ -2537,7 +2339,7 @@ int blosc_release_threadpool(blosc2_context* context) {
     pthread_cond_destroy(&context->delta_cv);
 
     /* Barriers */
-  #ifdef _POSIX_BARRIERS_MINE
+  #ifdef BLOSC_POSIX_BARRIERS_MINE
     pthread_barrier_destroy(&context->barr_init);
     pthread_barrier_destroy(&context->barr_finish);
   #else
@@ -2575,7 +2377,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   blosc2_context* context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
   memset(context, 0, sizeof(blosc2_context));
 
-  context->compress = 1;   /* meant for compression */
+  context->do_compress = 1;   /* meant for compression */
   /* Populate the context, using default values for zeroed values */
   context->compcode = cparams.compcode;
   context->clevel = cparams.clevel;
@@ -2598,7 +2400,7 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   blosc2_context* context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
   memset(context, 0, sizeof(blosc2_context));
 
-  context->compress = 0;   /* Meant for decompression */
+  context->do_compress = 0;   /* Meant for decompression */
   /* Populate the context, using default values for zeroed values */
   context->nthreads = dparams.nthreads;
   context->schunk = dparams.schunk;

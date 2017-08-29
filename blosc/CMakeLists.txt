@@ -58,7 +58,8 @@ endif (NOT DEACTIVATE_ZSTD)
 include_directories(${BLOSC_INCLUDE_DIRS})
 
 # library sources
-set(SOURCES blosc.c blosclz.c schunk.c delta.c delta.h shuffle-generic.c bitshuffle-generic.c trunc-prec.c)
+set(SOURCES blosc.c blosclz.c schunk.c btune.c btune.h context.h delta.c delta.h
+        shuffle-generic.c bitshuffle-generic.c trunc-prec.c trunc-prec.h)
 if (COMPILER_SUPPORT_SSE2)
     message(STATUS "Adding run-time support for SSE2")
     set(SOURCES ${SOURCES} shuffle-sse2.c bitshuffle-sse2.c)
@@ -128,7 +129,7 @@ if (NOT DEACTIVATE_ZSTD)
         file(GLOB ZSTD_COMPRESS_FILES ${ZSTD_LOCAL_DIR}/compress/*.c)
         file(GLOB ZSTD_DECOMPRESS_FILES ${ZSTD_LOCAL_DIR}/decompress/*.c)
         set(SOURCES ${SOURCES} ${ZSTD_COMMON_FILES} ${ZSTD_COMPRESS_FILES}
-          ${ZSTD_DECOMPRESS_FILES})
+                ${ZSTD_DECOMPRESS_FILES})
     endif (ZSTD_FOUND)
 endif (NOT DEACTIVATE_ZSTD)
 
