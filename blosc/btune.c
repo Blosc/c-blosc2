@@ -18,6 +18,8 @@ int HCR(blosc2_context *context) {
   switch (context->compcode) {
     case BLOSC_BLOSCLZ :
       return 0;
+    case BLOSC_BLOSCLZ2 :
+      return 0;
     case BLOSC_LZ4 :
       return (context->filter_flags & BLOSC_DOBITSHUFFLE) ? 1 : 0;
     case BLOSC_LZ4HC :

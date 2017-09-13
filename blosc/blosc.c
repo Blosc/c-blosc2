@@ -23,6 +23,7 @@
 #include "delta.h"
 #include "trunc-prec.h"
 #include "blosclz.h"
+#include "blosclz2.h"
 #include "btune.h"
 
 #if defined(HAVE_LZ4)
@@ -229,6 +230,8 @@ static void _sw32(uint8_t* dest, int32_t a) {
 static int compname_to_clibcode(const char* compname) {
   if (strcmp(compname, BLOSC_BLOSCLZ_COMPNAME) == 0)
     return BLOSC_BLOSCLZ_LIB;
+  if (strcmp(compname, BLOSC_BLOSCLZ2_COMPNAME) == 0)
+    return BLOSC_BLOSCLZ2_LIB;
   if (strcmp(compname, BLOSC_LZ4_COMPNAME) == 0)
     return BLOSC_LZ4_LIB;
   if (strcmp(compname, BLOSC_LZ4HC_COMPNAME) == 0)
@@ -247,6 +250,7 @@ static int compname_to_clibcode(const char* compname) {
 /* Return the library name associated with the compressor code */
 static char* clibcode_to_clibname(int clibcode) {
   if (clibcode == BLOSC_BLOSCLZ_LIB) return BLOSC_BLOSCLZ_LIBNAME;
+  if (clibcode == BLOSC_BLOSCLZ2_LIB) return BLOSC_BLOSCLZ2_LIBNAME;
   if (clibcode == BLOSC_LZ4_LIB) return BLOSC_LZ4_LIBNAME;
   if (clibcode == BLOSC_LIZARD_LIB) return BLOSC_LIZARD_LIBNAME;
   if (clibcode == BLOSC_SNAPPY_LIB) return BLOSC_SNAPPY_LIBNAME;
@@ -268,6 +272,8 @@ int blosc_compcode_to_compname(int compcode, char** compname) {
   /* Map the compressor code */
   if (compcode == BLOSC_BLOSCLZ)
     name = BLOSC_BLOSCLZ_COMPNAME;
+  else if (compcode == BLOSC_BLOSCLZ2)
+    name = BLOSC_BLOSCLZ2_COMPNAME;
   else if (compcode == BLOSC_LZ4)
     name = BLOSC_LZ4_COMPNAME;
   else if (compcode == BLOSC_LZ4HC)
@@ -286,6 +292,8 @@ int blosc_compcode_to_compname(int compcode, char** compname) {
   /* Guess if there is support for this code */
   if (compcode == BLOSC_BLOSCLZ)
     code = BLOSC_BLOSCLZ;
+  else if (compcode == BLOSC_BLOSCLZ2)
+    code = BLOSC_BLOSCLZ2;
 #if defined(HAVE_LZ4)
   else if (compcode == BLOSC_LZ4)
     code = BLOSC_LZ4;
@@ -318,6 +326,9 @@ int blosc_compname_to_compcode(const char* compname) {
 
   if (strcmp(compname, BLOSC_BLOSCLZ_COMPNAME) == 0) {
     code = BLOSC_BLOSCLZ;
+  }
+  else if (strcmp(compname, BLOSC_BLOSCLZ2_COMPNAME) == 0) {
+    code = BLOSC_BLOSCLZ2;
   }
 #if defined(HAVE_LZ4)
   else if (strcmp(compname, BLOSC_LZ4_COMPNAME) == 0) {
@@ -494,7 +505,7 @@ static int zstd_wrap_decompress(struct thread_context* thread_context,
 }
 #endif /*  HAVE_ZSTD */
 
-/* Compute acceleration for blosclz */
+/* Compute acceleration for some codecs */
 static int get_accel(const blosc2_context* context) {
   int clevel = context->clevel;
   size_t typesize = context->typesize;
@@ -641,6 +652,11 @@ static int blosc_c(struct thread_context* thread_context, size_t bsize,
     if (context->compcode == BLOSC_BLOSCLZ) {
       cbytes = blosclz_compress(context->clevel, _src + j * neblock,
                                 (int)neblock, dest, (int)maxout, accel);
+    }
+    else if (context->compcode == BLOSC_BLOSCLZ2) {
+      cbytes = blosclz2_compress(_src + j * neblock, (int32_t)neblock,
+                                 dest, (int32_t)maxout,
+                                 thread_context->blosclz2_workdict);
     }
   #if defined(HAVE_LZ4)
     else if (context->compcode == BLOSC_LZ4) {
@@ -817,6 +833,9 @@ static int blosc_d(
       if (compformat == BLOSC_BLOSCLZ_FORMAT) {
         nbytes = blosclz_decompress(src, cbytes, _dest, (int)neblock);
       }
+      else if (compformat == BLOSC_BLOSCLZ2_FORMAT) {
+        nbytes = blosclz2_decompress(src, _dest, (int32_t)neblock);
+      }
   #if defined(HAVE_LZ4)
       else if (compformat == BLOSC_LZ4_FORMAT) {
         nbytes = lz4_wrap_decompress((char*)src, (size_t)cbytes,
@@ -982,6 +1001,7 @@ create_thread_context(blosc2_context* context, int32_t tid) {
   thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
   thread_context->tmp4 = thread_context->tmp + 2 * context->blocksize + ebsize;
   thread_context->tmpblocksize = (size_t)context->blocksize;
+  thread_context->blosclz2_workdict = my_malloc(blosclz2_get_workdict_size());
   #if defined(HAVE_ZSTD)
   thread_context->zstd_cctx = NULL;
   thread_context->zstd_dctx = NULL;
@@ -992,6 +1012,7 @@ create_thread_context(blosc2_context* context, int32_t tid) {
 
 void free_thread_context(struct thread_context* thread_context) {
   my_free(thread_context->tmp);
+  my_free(thread_context->blosclz2_workdict);
   #if defined(HAVE_ZSTD)
   if (thread_context->zstd_cctx != NULL) {
     ZSTD_freeCCtx(thread_context->zstd_cctx);
@@ -1202,6 +1223,7 @@ static int split_block(int compcode, size_t typesize, size_t blocksize) {
      split.  However, in conducted benchmarks LZ4 seems that it runs
      faster if we don't split, which is quite surprising. */
   return (((compcode == BLOSC_BLOSCLZ) ||
+           //(compcode == BLOSC_BLOSCLZ2) ||
            (compcode == BLOSC_SNAPPY)) &&
           (typesize <= MAX_SPLITS) &&
           (blocksize / typesize) >= BLOSC_MIN_BUFFERSIZE);
@@ -1223,7 +1245,10 @@ static int write_compression_header(blosc2_context* context,
       compformat = BLOSC_BLOSCLZ_FORMAT;
       context->dest[1] = BLOSC_BLOSCLZ_VERSION_FORMAT;
       break;
-
+    case BLOSC_BLOSCLZ2:
+      compformat = BLOSC_BLOSCLZ2_FORMAT;
+      context->dest[1] = BLOSC_BLOSCLZ2_VERSION_FORMAT;
+      break;
 #if defined(HAVE_LZ4)
     case BLOSC_LZ4:
       compformat = BLOSC_LZ4_FORMAT;
@@ -2118,6 +2143,8 @@ char* blosc_list_compressors(void) {
   if (compressors_list_done) return ret;
   ret[0] = '\0';
   strcat(ret, BLOSC_BLOSCLZ_COMPNAME);
+  strcat(ret, ",");
+  strcat(ret, BLOSC_BLOSCLZ2_COMPNAME);
 #if defined(HAVE_LZ4)
   strcat(ret, ",");
   strcat(ret, BLOSC_LZ4_COMPNAME);
@@ -2157,12 +2184,7 @@ int blosc_get_complib_info(char* compname, char** complib, char** version) {
   char* clibname;
   char* clibversion = "unknown";
 
-#if (defined(HAVE_LZ4) && defined(LZ4_VERSION_MAJOR)) || \
-  (defined(HAVE_LIZARD) && defined(LIZARD_VERSION_MAJOR)) || \
-  (defined(HAVE_SNAPPY) && defined(SNAPPY_VERSION)) || \
-  (defined(HAVE_ZSTD) && defined(ZSTD_VERSION_MAJOR))
   char sbuffer[256];
-#endif
 
   clibcode = compname_to_clibcode(compname);
   clibname = clibcode_to_clibname(clibcode);
@@ -2170,6 +2192,12 @@ int blosc_get_complib_info(char* compname, char** complib, char** version) {
   /* complib version */
   if (clibcode == BLOSC_BLOSCLZ_LIB) {
     clibversion = BLOSCLZ_VERSION_STRING;
+  }
+  else if (clibcode == BLOSC_BLOSCLZ2_LIB) {
+    sprintf(sbuffer, "%d.%d.%d",
+            BLOSCLZ2_VERSION_MAJOR, BLOSCLZ2_VERSION_MINOR,
+            BLOSCLZ2_VERSION_RELEASE);
+    clibversion = sbuffer;
   }
 #if defined(HAVE_LZ4)
   else if (clibcode == BLOSC_LZ4_LIB) {

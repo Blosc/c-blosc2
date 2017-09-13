@@ -1,5 +1,5 @@
 /*********************************************************************
-  Small benchmark for testing basic capabilities of Blosc.
+ * Small benchmark for testing basic capabilities of Blosc. *
 
   You can select different degrees of 'randomness' in input buffer, as
   well as external datafiles (uncomment the lines after "For data
@@ -351,6 +351,8 @@ void print_compress_info(void) {
   printf("Supported compression libraries:\n");
   ret = blosc_get_complib_info("blosclz", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
+  ret = blosc_get_complib_info("blosclz2", &name, &version);
+  if (ret >= 0) printf("  %s: %s\n", name, version);
   ret = blosc_get_complib_info("lz4", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
   ret = blosc_get_complib_info("lizard", &name, &version);
@@ -391,10 +393,11 @@ int main(int argc, char* argv[]) {
 
   print_compress_info();
 
-  strncpy(usage, "Usage: bench [blosclz | lz4 | lz4hc | lizard | snappy | zlib | zstd] "
-      "[noshuffle | shuffle | bitshuffle] "
-      "[single | suite | hardsuite | extremesuite | debugsuite] "
-      "[nthreads] [bufsize(bytes)] [typesize] [sbits]", 255);
+  strncpy(usage, "Usage: bench "
+    "[blosclz | blosclz2 | lz4 | lz4hc | lizard | snappy | zlib | zstd] "
+    "[noshuffle | shuffle | bitshuffle] "
+    "[single | suite | hardsuite | extremesuite | debugsuite] "
+    "[nthreads] [bufsize(bytes)] [typesize] [sbits]", 255);
 
   if (argc < 2) {
     printf("%s\n", usage);
@@ -404,6 +407,7 @@ int main(int argc, char* argv[]) {
   strcpy(compressor, argv[1]);
 
   if (strcmp(compressor, "blosclz") != 0 &&
+      strcmp(compressor, "blosclz2") != 0 &&
       strcmp(compressor, "lz4") != 0 &&
       strcmp(compressor, "lz4hc") != 0 &&
       strcmp(compressor, "lizard") != 0 &&

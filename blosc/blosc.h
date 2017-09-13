@@ -96,10 +96,12 @@ enum {
   BLOSC_ZLIB = 4,
   BLOSC_ZSTD = 5,
   BLOSC_LIZARD = 6,
+  BLOSC_BLOSCLZ2 = 7,
 };
 
 /* Names for the different compressors shipped with Blosc */
 #define BLOSC_BLOSCLZ_COMPNAME   "blosclz"
+#define BLOSC_BLOSCLZ2_COMPNAME  "blosclz2"
 #define BLOSC_LZ4_COMPNAME       "lz4"
 #define BLOSC_LZ4HC_COMPNAME     "lz4hc"
 #define BLOSC_LIZARD_COMPNAME    "lizard"
@@ -115,11 +117,13 @@ enum {
   BLOSC_ZLIB_LIB = 3,
   BLOSC_ZSTD_LIB = 4,
   BLOSC_LIZARD_LIB = 5,
+  BLOSC_BLOSCLZ2_LIB = 6,
   BLOSC_SCHUNK_LIB = 7,   /* compressor library in super-chunk header */
 };
 
 /* Names for the different compression libraries shipped with Blosc */
 #define BLOSC_BLOSCLZ_LIBNAME   "BloscLZ"
+#define BLOSC_BLOSCLZ2_LIBNAME  "BloscLZ2"
 #define BLOSC_LZ4_LIBNAME       "LZ4"
 #define BLOSC_LIZARD_LIBNAME    "Lizard"
 #define BLOSC_SNAPPY_LIBNAME    "Snappy"
@@ -133,6 +137,7 @@ enum {
 /* The codes for compressor formats shipped with Blosc */
 enum {
   BLOSC_BLOSCLZ_FORMAT = BLOSC_BLOSCLZ_LIB,
+  BLOSC_BLOSCLZ2_FORMAT = BLOSC_BLOSCLZ2_LIB,
   BLOSC_LZ4_FORMAT = BLOSC_LZ4_LIB,
   /* LZ4HC and LZ4 share the same format */
   BLOSC_LZ4HC_FORMAT = BLOSC_LZ4_LIB,
@@ -146,6 +151,7 @@ enum {
 /* All versions here starts at 1 */
 enum {
   BLOSC_BLOSCLZ_VERSION_FORMAT = 1,
+  BLOSC_BLOSCLZ2_VERSION_FORMAT = 1,
   BLOSC_LZ4_VERSION_FORMAT = 1,
   BLOSC_LZ4HC_VERSION_FORMAT = 1,  /* LZ4HC and LZ4 share the same format */
   BLOSC_LIZARD_VERSION_FORMAT = 1,
@@ -231,7 +237,7 @@ BLOSC_EXPORT void blosc_destroy(void);
   BLOSC_TYPESIZE=(INTEGER): This will overwrite the `typesize`
   parameter before the compression process starts.
 
-  BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | LIZARD | SNAPPY | ZLIB]:
+  BLOSC_COMPRESSOR=[BLOSCLZ | BLOSCLZ2 | LZ4 | LZ4HC | LIZARD | SNAPPY | ZLIB]:
   This will call blosc_set_compressor(BLOSC_COMPRESSOR) before the
   compression process starts.
 
@@ -324,8 +330,8 @@ BLOSC_EXPORT char* blosc_get_compressor(void);
 
 /**
   Select the compressor to be used.  The supported ones are "blosclz",
-  "lz4", "lz4hc", "snappy", "zlib" and "ztsd".  If this function is not
-  called, then "blosclz" will be used.
+  "blosclz2", "lz4", "lz4hc", "snappy", "zlib" and "ztsd".  If this function is
+  not called, then "blosclz" will be used.
 
   In case the compressor is not recognized, or there is not support
   for it in this build, it returns a -1.  Else it returns the code for
@@ -364,8 +370,8 @@ BLOSC_EXPORT int blosc_compname_to_compcode(const char* compname);
 
 /**
   Get a list of compressors supported in the current build.  The
-  returned value is a string with a concatenation of "blosclz", "lz4",
-  "lz4hc", "snappy", "zlib" or "zstd "separated by commas, depending
+  returned value is a string with a concatenation of "blosclz", "blosclz2",
+  "lz4", "lz4hc", "snappy", "zlib" or "zstd "separated by commas, depending
   on which ones are present in the build.
 
   This function does not leak, so you should not free() the returned

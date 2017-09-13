@@ -98,6 +98,7 @@ struct thread_context {
   uint8_t* tmp3;
   uint8_t* tmp4;
   size_t tmpblocksize; /* keep track of how big the temporary buffers are */
+  uint8_t* blosclz2_workdict;
 #if defined(HAVE_ZSTD)
   /* The contexts for ZSTD */
   ZSTD_CCtx* zstd_cctx;
