@@ -101,7 +101,7 @@ size_t blosc2_append_buffer(blosc2_schunk* schunk, size_t nbytes, void* src) {
 
 
 /* Decompress and return a chunk that is part of a super-chunk. */
-int blosc2_decompress_chunk(blosc2_schunk* schunk, int64_t nchunk,
+int blosc2_decompress_chunk(blosc2_schunk* schunk, size_t nchunk,
                             void* dest, size_t nbytes) {
   int64_t nchunks = schunk->nchunks;
   void* src;

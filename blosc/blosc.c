@@ -758,6 +758,9 @@ int pipeline_d(blosc2_context* context, const size_t bsize, uint8_t* dest,
         }
         _src = dest + offset; _tmp = _tmp2; _tmp2 = _tmp;  /* cycle buffers */
         break;
+      case BLOSC_TRUNC_PREC:
+        // TRUNC_PREC filter does not need to be undone
+        break;
       default:
         if (filters[i] > 0) {
           fprintf(stderr, "Filter %d not handled during decompression\n",

@@ -1,28 +1,26 @@
 # sources for main bench
 set(SOURCES bench.c)
+# sources for delta filter
+set(SOURCES_DELTA delta_schunk.c)
+# sources for trunc_prec filter
+set(SOURCES_TRUNC_PREC trunc_prec_schunk.c)
 
 # targets
 add_executable(bench ${SOURCES})
+add_executable(delta_schunk ${SOURCES_DELTA})
+add_executable(trunc_prec_schunk ${SOURCES_TRUNC_PREC})
 if (UNIX AND NOT APPLE)
     # cmake is complaining about LINK_PRIVATE in original PR
     # and removing it does not seem to hurt, so be it.
     # target_link_libraries(bench LINK_PRIVATE rt)
     target_link_libraries(bench rt)
+    target_link_libraries(delta_schunk rt)
+    target_link_libraries(trunc_prec_schunk rt)
 endif (UNIX AND NOT APPLE)
 target_link_libraries(bench blosc_shared)
-
-# sources for delta filter
-set(SOURCES_DELTA delta_schunk.c)
-
-# targets
-add_executable(delta_schunk ${SOURCES_DELTA})
-if (UNIX AND NOT APPLE)
-    # cmake is complaining about LINK_PRIVATE in original PR
-    # and removing it does not seem to hurt, so be it.
-    # target_link_libraries(bench LINK_PRIVATE rt)
-    target_link_libraries(delta_schunk rt)
-endif (UNIX AND NOT APPLE)
 target_link_libraries(delta_schunk blosc_shared)
+target_link_libraries(trunc_prec_schunk blosc_shared)
+
 
 # have to copy blosc dlls on Windows
 if (MSVC)
@@ -146,5 +144,10 @@ if (BUILD_TESTS)
     if (TEST_INCLUDE_BENCH_DELTA)
         add_test(test_bench_delta delta_schunk)
     endif (TEST_INCLUDE_BENCH_DELTA)
+
+    option(TEST_INCLUDE_BENCH_TRUNC_PREC "Include trunc bench in the tests" ON)
+    if (TEST_INCLUDE_BENCH_TRUNC_PREC)
+        add_test(test_bench_trunc_prec trunc_prec_schunk)
+    endif (TEST_INCLUDE_BENCH_TRUNC_PREC)
 
 endif (BUILD_TESTS)

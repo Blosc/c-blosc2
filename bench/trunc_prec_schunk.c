@@ -1,13 +1,13 @@
 /*
-  Copyright (C) 2015  Francesc Alted
+  Copyright (C) 2017  Francesc Alted
   http://blosc.org
   License: MIT (see LICENSE.txt)
 
-  Benchmark showing Blosc filter from C code.
+  Benchmark showing Blosc TRUNC_PREC filter from C code.
 
   To compile this program:
 
-  $ gcc -O3 trunc_prec.c -o trunc_prec -lblosc
+  $ gcc -O3 trunc_prec_schunk.c -o trunc_prec_schunk -lblosc
 
 */
 
@@ -21,7 +21,6 @@
   #include <mach/clock.h>
   #include <mach/mach.h>
   #include <time.h>
-  #include <sys/time.h>
 #elif defined(__unix__)
   #if defined(__linux__)
     #include <time.h>
@@ -39,7 +38,7 @@
 #define GB  (1024*MB)
 
 #define NCHUNKS 200
-#define CHUNKSIZE 500 * 1000
+#define CHUNKSIZE (500 * 1000)
 #define NTHREADS 4
 
 
@@ -56,11 +55,13 @@ void blosc_set_timestamp(blosc_timestamp_t* timestamp) {
 }
 
 /* Given two timestamp values, return the difference in microseconds. */
-double blosc_elapsed_usecs(blosc_timestamp_t start_time, blosc_timestamp_t end_time) {
+double blosc_elapsed_usecs(blosc_timestamp_t start_time,
+                           blosc_timestamp_t end_time) {
   LARGE_INTEGER CounterFreq;
   QueryPerformanceFrequency(&CounterFreq);
 
-  return (double)(end_time.QuadPart - start_time.QuadPart) / ((double)CounterFreq.QuadPart / 1e6);
+  return (double)(end_time.QuadPart - start_time.QuadPart) /
+          ((double)CounterFreq.QuadPart / 1e6);
 }
 
 #else
@@ -84,7 +85,8 @@ void blosc_set_timestamp(blosc_timestamp_t* timestamp) {
 }
 
 /* Given two timestamp values, return the difference in microseconds. */
-double blosc_elapsed_usecs(blosc_timestamp_t start_time, blosc_timestamp_t end_time) {
+double blosc_elapsed_usecs(blosc_timestamp_t start_time,
+                           blosc_timestamp_t end_time) {
   return (1e6 * (end_time.tv_sec - start_time.tv_sec))
       + (1e-3 * (end_time.tv_nsec - start_time.tv_nsec));
 }
@@ -97,38 +99,45 @@ double getseconds(blosc_timestamp_t last, blosc_timestamp_t current) {
 }
 
 /* Given two timeval stamps, return the time per chunk in usec */
-double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current, int niter, size_t nchunks) {
+double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current,
+                      int niter, size_t nchunks) {
   double elapsed_usecs = blosc_elapsed_usecs(last, current);
   return elapsed_usecs / (double)(niter * nchunks);
 }
 
 
-void fill_buffer(double *buffer, int nchunk) {
+void fill_buffer(double *buffer, size_t nchunk, int prec) {
   double incx = 10. / (NCHUNKS * CHUNKSIZE);
 
   for (int i = 0; i < CHUNKSIZE; i++) {
     double x = incx * (nchunk * CHUNKSIZE + i);
     buffer[i] = (x - .25) * (x - 4.45) * (x - 8.95);
     //buffer[i] = x;
+    if (prec) {
+      uint64_t mask = ~((1ULL << (52 - prec)) - 1ULL);
+      buffer[i] = (double)((uint64_t)(buffer[i]) & mask);
+    }
   }
 }
 
 
 int main() {
-  double *data_buffer;
-  static blosc2_sparams sparams;
-  blosc2_sheader* schunk;
-  int isize = CHUNKSIZE * sizeof(int32_t);
+  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_schunk* schunk;
+  size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   int64_t nbytes, cbytes;
-  int i, nchunk, nchunks;
+  size_t nchunk, nchunks = 0;
   blosc_timestamp_t last, current;
   float totaltime;
   float totalsize = isize * NCHUNKS;
 
-  printf("Blosc version info: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+  printf("Blosc version info: %s (%s)\n",
+         BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
-  data_buffer = malloc(CHUNKSIZE * sizeof(double));
+  double *data_buffer = malloc(CHUNKSIZE * sizeof(double));
+  double *rec_buffer = malloc(CHUNKSIZE * sizeof(double));
 
   /* Initialize the Blosc compressor */
   blosc_init();
@@ -136,22 +145,25 @@ int main() {
   blosc_set_nthreads(NTHREADS);
 
   /* Create a super-chunk container */
-  sparams.filters[0] = BLOSC_TRUNC_PREC;
-  sparams.filters_meta[BLOSC_TRUNC_PREC_MSLOT] = 23;  // treat doubles as floats
-  sparams.filters[1] = BLOSC_SHUFFLE;
-  sparams.compressor = BLOSC_LZ4;
-  sparams.clevel = 9;
-  schunk = blosc2_new_schunk(&sparams);
+  cparams.filters[0] = BLOSC_TRUNC_PREC;
+  cparams.filters_meta[BLOSC_TRUNC_PREC] = 23;  // treat doubles as floats
+  // For some reason, using BLOSC_SHUFFLE twice makes decompression faster
+  //cparams.filters[1] = BLOSC_SHUFFLE;
+  //cparams.filters[BLOSC_LAST_FILTER - 1] = BLOSC_BITSHUFFLE;
+  //cparams.compcode = BLOSC_LZ4;
+  cparams.clevel = 9;
+  schunk = blosc2_new_schunk(cparams, dparams);
 
   /* Append the chunks */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    fill_buffer(data_buffer, nchunk);
-    nchunks = blosc2_append_buffer(schunk, sizeof(double), isize, data_buffer);
+    fill_buffer(data_buffer, nchunk, 0);
+    nchunks = blosc2_append_buffer(schunk, isize, data_buffer);
   }
   blosc_set_timestamp(&current);
   totaltime = (float)getseconds(last, current);
-  printf("[Compr] Elapsed time:\t %6.3f s.  Processed data: %.3f GB (%.3f GB/s)\n",
+  printf("[Compr] Elapsed time:\t %6.3f s."
+                 "  Processed data: %.3f GB (%.3f GB/s)\n",
          totaltime, totalsize / GB, totalsize / (GB * totaltime));
 
   /* Gather some info */
@@ -163,17 +175,28 @@ int main() {
   /* Retrieve and decompress the chunks */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    dsize = blosc2_decompress_chunk(schunk, nchunk, (void*)data_buffer, isize);
+    dsize = blosc2_decompress_chunk(schunk, nchunk, (void*)rec_buffer, isize);
     if (dsize < 0) {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;
     }
     assert (dsize == isize);
+    // TODO: Make sure that the decompressed buffer is close enough to original
+    // data
+//    fill_buffer(data_buffer, nchunk, cparams.filters_meta[BLOSC_TRUNC_PREC]);
+//    for (int i = 0; i < CHUNKSIZE; i++) {
+//      if (data_buffer[i] != 0) {
+//        printf("%g - %g: %g; ", data_buffer[i], rec_buffer[i],
+//               (data_buffer[i] - rec_buffer[i]));
+//        assert ((data_buffer[i] - rec_buffer[i]) < 10.);
+//      }
+//    }
   }
   blosc_set_timestamp(&current);
   totaltime = (float)getseconds(last, current);
   totalsize = isize * nchunks;
-  printf("[Decompr] Elapsed time:\t %6.3f s.  Processed data: %.3f GB (%.3f GB/s)\n",
+  printf("[Decompr] Elapsed time:\t %6.3f s."
+                 "  Processed data: %.3f GB (%.3f GB/s)\n",
          totaltime, totalsize / GB, totalsize / (GB * totaltime));
 
   /* Free resources */

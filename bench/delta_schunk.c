@@ -21,7 +21,6 @@
   #include <mach/clock.h>
   #include <mach/mach.h>
   #include <time.h>
-  #include <sys/time.h>
 #include <blosc.h>
 
 #elif defined(__unix__)
@@ -33,8 +32,6 @@
 #else
   #error Unable to detect platform.
 #endif
-
-#include "../blosc/blosc.h"
 
 #define KB  1024
 #define MB  (1024*KB)
@@ -101,7 +98,7 @@ double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current, int nit
 }
 
 
-#define CHUNKSIZE 5 * 1000 * 1000
+#define CHUNKSIZE (5 * 1000 * 1000)
 #define NCHUNKS 100
 #define NTHREADS 2
 
@@ -114,7 +111,7 @@ int main() {
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   int64_t nbytes, cbytes;
-  int i, nchunk;
+  size_t nchunk;
   size_t nchunks = 0;
   blosc_timestamp_t last, current;
   float totaltime;
@@ -122,7 +119,7 @@ int main() {
 
   data = malloc(CHUNKSIZE * sizeof(int32_t));
   data_dest = malloc(CHUNKSIZE * sizeof(int32_t));
-  for (i = 0; i < CHUNKSIZE; i++) {
+  for (int i = 0; i < CHUNKSIZE; i++) {
     data[i] = i;
   }
 
@@ -175,7 +172,7 @@ int main() {
 
   printf("Decompression successful!\n");
 
-  for (i = 0; i < CHUNKSIZE; i++) {
+  for (int i = 0; i < CHUNKSIZE; i++) {
     if (data[i] != data_dest[i]) {
       printf("Decompressed data differs from original %d, %d, %d!\n",
              i, data[i], data_dest[i]);

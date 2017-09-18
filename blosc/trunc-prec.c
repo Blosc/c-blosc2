@@ -41,9 +41,11 @@ void truncate_precision(const uint8_t filter_meta, const size_t typesize,
     case 4:
       truncate_precision32(filter_meta, nbytes / typesize,
                            (int32_t *)src, (int32_t *)dest);
+      break;
     case 8:
       truncate_precision64(filter_meta, nbytes / typesize,
                            (int64_t *)src, (int64_t *)dest);
+      break;
     default:
       fprintf(stderr, "Error in trunc-prec filter: Precision for typesize %d "
               "not handled", (int)typesize);
