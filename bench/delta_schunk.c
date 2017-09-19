@@ -12,7 +12,9 @@
 */
 
 #include <stdio.h>
+#include <stdint.h>
 #include <assert.h>
+#include <blosc.h>
 
 #if defined(_WIN32)
 /* For QueryPerformanceCounter(), etc. */
@@ -21,8 +23,6 @@
   #include <mach/clock.h>
   #include <mach/mach.h>
   #include <time.h>
-#include <blosc.h>
-
 #elif defined(__unix__)
   #if defined(__linux__)
     #include <time.h>
@@ -107,7 +107,7 @@ int main() {
   int32_t *data, *data_dest;
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
-  blosc2_schunk* schunk;
+  blosc2_schunk *schunk;
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   int64_t nbytes, cbytes;

@@ -12,8 +12,11 @@
 */
 
 #include <stdio.h>
+#include <stdint.h>
 #include <assert.h>
 #include <math.h>
+#include "blosc.h"
+
 
 #if defined(_WIN32)
 /* For QueryPerformanceCounter(), etc. */
@@ -31,8 +34,6 @@
 #else
   #error Unable to detect platform.
 #endif
-
-#include "../blosc/blosc.h"
 
 #define KB  1024
 #define MB  (1024*KB)
@@ -121,7 +122,7 @@ void fill_buffer(double *buffer, size_t nchunk) {
 int main() {
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
-  blosc2_schunk* schunk;
+  blosc2_schunk *schunk;
   size_t isize = CHUNKSIZE * sizeof(double);
   int dsize;
   int64_t nbytes, cbytes;
