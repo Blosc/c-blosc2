@@ -24,28 +24,28 @@ void delta_encoder(const uint8_t* dref, const size_t offset,
       case 1:
         dest[0] = dref[0];
         for (i = 1; i < nbytes; i++) {
-          dest[i] = src[i] - dref[i-1];
+          dest[i] = src[i] ^ dref[i-1];
         }
         break;
       case 2:
         ((uint16_t *)dest)[0] = ((uint16_t *)dref)[0];
         for (i = 1; i < nbytes / 2; i++) {
-          ((uint16_t *)dest)[i] = ((uint16_t *)src)[i] -
-                                  ((uint16_t *)dref)[i-1];
+          ((uint16_t *)dest)[i] =
+                  ((uint16_t *)src)[i] ^ ((uint16_t *)dref)[i-1];
         }
         break;
       case 4:
         ((uint32_t *)dest)[0] = ((uint32_t *)dref)[0];
         for (i = 1; i < nbytes / 4; i++) {
-          ((uint32_t *)dest)[i] = ((uint32_t *)src)[i] -
-                                  ((uint32_t *)dref)[i-1];
+          ((uint32_t *)dest)[i] =
+                  ((uint32_t *)src)[i] ^ ((uint32_t *)dref)[i-1];
         }
         break;
       case 8:
         ((uint64_t *)dest)[0] = ((uint64_t *)dref)[0];
         for (i = 1; i < nbytes / 8; i++) {
-          ((uint64_t *)dest)[i] = ((uint64_t *)src)[i] -
-                                  ((uint64_t *)dref)[i-1];
+          ((uint64_t *)dest)[i] =
+                  ((uint64_t *)src)[i] ^ ((uint64_t *)dref)[i-1];
         }
         break;
       default:
@@ -60,25 +60,25 @@ void delta_encoder(const uint8_t* dref, const size_t offset,
     switch (typesize) {
       case 1:
         for (i = 0; i < nbytes; i++) {
-          dest[i] = src[i] - dref[i];
+          dest[i] = src[i] ^ dref[i];
         }
         break;
       case 2:
         for (i = 0; i < nbytes / 2; i++) {
           ((uint16_t *) dest)[i] =
-                  ((uint16_t *) src)[i] - ((uint16_t *) dref)[i];
+                  ((uint16_t *) src)[i] ^ ((uint16_t *) dref)[i];
         }
         break;
       case 4:
         for (i = 0; i < nbytes / 4; i++) {
           ((uint32_t *) dest)[i] =
-                  ((uint32_t *) src)[i] - ((uint32_t *) dref)[i];
+                  ((uint32_t *) src)[i] ^ ((uint32_t *) dref)[i];
         }
         break;
       case 8:
         for (i = 0; i < nbytes / 8; i++) {
           ((uint64_t *) dest)[i] =
-                  ((uint64_t *) src)[i] - ((uint64_t *) dref)[i];
+                  ((uint64_t *) src)[i] ^ ((uint64_t *) dref)[i];
         }
         break;
       default:
@@ -102,22 +102,22 @@ void delta_decoder(const uint8_t* dref, const size_t offset,
     switch (typesize) {
       case 1:
         for (i = 1; i < nbytes; i++) {
-          dest[i] += dref[i-1];
+          dest[i] ^= dref[i-1];
         }
         break;
       case 2:
         for (i = 1; i < nbytes / 2; i++) {
-          ((uint16_t *)dest)[i] += ((uint16_t *)dref)[i-1];
+          ((uint16_t *)dest)[i] ^= ((uint16_t *)dref)[i-1];
         }
         break;
       case 4:
         for (i = 1; i < nbytes / 4; i++) {
-          ((uint32_t *)dest)[i] += ((uint32_t *)dref)[i-1];
+          ((uint32_t *)dest)[i] ^= ((uint32_t *)dref)[i-1];
         }
         break;
       case 8:
         for (i = 1; i < nbytes / 8; i++) {
-          ((uint64_t *)dest)[i] += ((uint64_t *)dref)[i-1];
+          ((uint64_t *)dest)[i] ^= ((uint64_t *)dref)[i-1];
         }
         break;
       default:
@@ -132,22 +132,22 @@ void delta_decoder(const uint8_t* dref, const size_t offset,
     switch (typesize) {
       case 1:
         for (i = 0; i < nbytes; i++) {
-          dest[i] += dref[i];
+          dest[i] ^= dref[i];
         }
         break;
       case 2:
         for (i = 0; i < nbytes / 2; i++) {
-          ((uint16_t *)dest)[i] += ((uint16_t *)dref)[i];
+          ((uint16_t *)dest)[i] ^= ((uint16_t *)dref)[i];
         }
         break;
       case 4:
         for (i = 0; i < nbytes / 4; i++) {
-          ((uint32_t *)dest)[i] += ((uint32_t *)dref)[i];
+          ((uint32_t *)dest)[i] ^= ((uint32_t *)dref)[i];
         }
         break;
       case 8:
         for (i = 0; i < nbytes / 8; i++) {
-          ((uint64_t *)dest)[i] += ((uint64_t *)dref)[i];
+          ((uint64_t *)dest)[i] ^= ((uint64_t *)dref)[i];
         }
         break;
       default:

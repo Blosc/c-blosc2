@@ -156,6 +156,7 @@ int main() {
   cparams.clevel = 9;
   //cparams.compcode = BLOSC_ZSTD;
   //cparams.clevel = 7;
+  //cparams.nthreads = 1;
   schunk = blosc2_new_schunk(cparams, dparams);
 
   /* Append the chunks */
@@ -206,8 +207,9 @@ int main() {
     for (int i = 0; i < CHUNKSIZE; i++) {
       if (fabs(data_buffer[i] - rec_buffer[i]) > 1e-5) {
         printf("Value not in tolerance margin: ");
-        printf("%g - %g: %g, %d; ", data_buffer[i], rec_buffer[i],
-               (data_buffer[i] - rec_buffer[i]), i);
+        printf("%g - %g: %g, (nchunk: %d, nelem: %d); ",
+               data_buffer[i], rec_buffer[i],
+               (data_buffer[i] - rec_buffer[i]), (int)nchunk, i);
         return -1;
       }
     }

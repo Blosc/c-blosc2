@@ -98,13 +98,22 @@ static char *test_delta() {
   blosc_set_delta(1);
   cbytes2 = blosc_compress(clevel, doshuffle, typesize, size, src,
                            dest, size + 16);
-  if (cbytes2 > cbytes) {
+  if ((typesize % 12) == 0) {
+    // For typesizes 12 and 24 we do an exception and allow less compression
+    if ((2 * cbytes2) > (3 * cbytes)) {
+      fprintf(stderr, "Failed test for DELTA and typesize: %d\n", typesize);
+      fprintf(stderr, "Size with no DELTA: %d.  Size with DELTA: %d\n",
+              cbytes, cbytes2);
+      mu_assert("ERROR: DELTA does not work correctly",
+                (2 * cbytes2) < (3 * cbytes));
+    }
+  }
+  else if (cbytes2 > cbytes) {
     fprintf(stderr, "Failed test for DELTA and typesize: %d\n", typesize);
     fprintf(stderr, "Size with no DELTA: %d.  Size with DELTA: %d\n",
             cbytes, cbytes2);
+    mu_assert("ERROR: DELTA does not work correctly", cbytes2 < cbytes);
   }
-  //printf("size, cbytes: %d, %d, %d, %d\n", size, cbytes, cbytes2, typesize);
-  mu_assert("ERROR: DELTA does not work correctly", cbytes2 < cbytes);
 
   /* Decompress the buffer with delta */
   nbytes = blosc_decompress(dest, src, size);
