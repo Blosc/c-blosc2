@@ -13,6 +13,7 @@
 
 #include <stdio.h>
 #include <assert.h>
+#include <math.h>
 
 #if defined(_WIN32)
 /* For QueryPerformanceCounter(), etc. */
@@ -106,17 +107,13 @@ double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current,
 }
 
 
-void fill_buffer(double *buffer, size_t nchunk, int prec) {
+void fill_buffer(double *buffer, size_t nchunk) {
   double incx = 10. / (NCHUNKS * CHUNKSIZE);
 
   for (int i = 0; i < CHUNKSIZE; i++) {
     double x = incx * (nchunk * CHUNKSIZE + i);
     buffer[i] = (x - .25) * (x - 4.45) * (x - 8.95);
     //buffer[i] = x;
-    if (prec) {
-      uint64_t mask = ~((1ULL << (52 - prec)) - 1ULL);
-      buffer[i] = (double)((uint64_t)(buffer[i]) & mask);
-    }
   }
 }
 
@@ -125,19 +122,18 @@ int main() {
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
-  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  size_t isize = CHUNKSIZE * sizeof(double);
   int dsize;
   int64_t nbytes, cbytes;
   size_t nchunk, nchunks = 0;
   blosc_timestamp_t last, current;
   float totaltime;
   float totalsize = isize * NCHUNKS;
+  double *data_buffer = malloc(CHUNKSIZE * sizeof(double));
+  double *rec_buffer = malloc(CHUNKSIZE * sizeof(double));
 
   printf("Blosc version info: %s (%s)\n",
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
-
-  double *data_buffer = malloc(CHUNKSIZE * sizeof(double));
-  double *rec_buffer = malloc(CHUNKSIZE * sizeof(double));
 
   /* Initialize the Blosc compressor */
   blosc_init();
@@ -146,18 +142,25 @@ int main() {
 
   /* Create a super-chunk container */
   cparams.filters[0] = BLOSC_TRUNC_PREC;
-  cparams.filters_meta[BLOSC_TRUNC_PREC] = 23;  // treat doubles as floats
-  // For some reason, using BLOSC_SHUFFLE twice makes decompression faster
-  //cparams.filters[1] = BLOSC_SHUFFLE;
+  cparams.filters_meta[0] = 23;  // treat doubles as floats
+  cparams.typesize = sizeof(double);
+  // TODO: DELTA makes this test to fail
+  //cparams.filters[1] = BLOSC_DELTA;
+  // BLOSC_BITSHUFFLE is not compressing better and it quite slower here
   //cparams.filters[BLOSC_LAST_FILTER - 1] = BLOSC_BITSHUFFLE;
+  // Good codec params for this dataset
   //cparams.compcode = BLOSC_LZ4;
+  //cparams.clevel = 9;
+  cparams.compcode = BLOSC_LIZARD;
   cparams.clevel = 9;
+  //cparams.compcode = BLOSC_ZSTD;
+  //cparams.clevel = 7;
   schunk = blosc2_new_schunk(cparams, dparams);
 
   /* Append the chunks */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    fill_buffer(data_buffer, nchunk, 0);
+    fill_buffer(data_buffer, nchunk);
     nchunks = blosc2_append_buffer(schunk, isize, data_buffer);
   }
   blosc_set_timestamp(&current);
@@ -181,16 +184,6 @@ int main() {
       return dsize;
     }
     assert (dsize == isize);
-    // TODO: Make sure that the decompressed buffer is close enough to original
-    // data
-//    fill_buffer(data_buffer, nchunk, cparams.filters_meta[BLOSC_TRUNC_PREC]);
-//    for (int i = 0; i < CHUNKSIZE; i++) {
-//      if (data_buffer[i] != 0) {
-//        printf("%g - %g: %g; ", data_buffer[i], rec_buffer[i],
-//               (data_buffer[i] - rec_buffer[i]));
-//        assert ((data_buffer[i] - rec_buffer[i]) < 10.);
-//      }
-//    }
   }
   blosc_set_timestamp(&current);
   totaltime = (float)getseconds(last, current);
@@ -198,6 +191,27 @@ int main() {
   printf("[Decompr] Elapsed time:\t %6.3f s."
                  "  Processed data: %.3f GB (%.3f GB/s)\n",
          totaltime, totalsize / GB, totalsize / (GB * totaltime));
+
+  /* Check that all the values are in the precision range */
+  blosc_set_timestamp(&last);
+  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    dsize = blosc2_decompress_chunk(schunk, nchunk, (void*)rec_buffer, isize);
+    if (dsize < 0) {
+      printf("Decompression error.  Error code: %d\n", dsize);
+      return dsize;
+    }
+    assert (dsize == isize);
+    fill_buffer(data_buffer, nchunk);
+    for (int i = 0; i < CHUNKSIZE; i++) {
+      if (fabs(data_buffer[i] - rec_buffer[i]) > 1e-5) {
+        printf("Value not in tolerance margin: ");
+        printf("%g - %g: %g, %d; ", data_buffer[i], rec_buffer[i],
+               (data_buffer[i] - rec_buffer[i]), i);
+        return -1;
+      }
+    }
+  }
+  printf("All data did a good roundtrip!\n");
 
   /* Free resources */
   free(data_buffer);
