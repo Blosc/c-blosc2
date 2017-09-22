@@ -218,6 +218,7 @@ int main() {
 
   /* Free resources */
   free(data_buffer);
+  free(rec_buffer);
   /* Destroy the super-chunk */
   blosc2_destroy_schunk(schunk);
   /* Destroy the Blosc environment */

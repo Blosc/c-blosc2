@@ -543,10 +543,19 @@ static int get_accel(const blosc2_context* context) {
 }
 
 
-static int next_filter(const uint8_t* filters, int current_filter) {
-  for (int i = current_filter - 1; i >= 0; i--) {
+int do_nothing(int8_t filter, char cmode) {
+  if (cmode == 'c') {
+    return (filter == BLOSC_NOFILTER);
+  } else {
     // TRUNC_PREC do not have to be applied during decompression
-    if ((filters[i] != BLOSC_NOFILTER) && (filters[i] != BLOSC_TRUNC_PREC)) {
+    return ((filter == BLOSC_NOFILTER) || (filter == BLOSC_TRUNC_PREC));
+  }
+}
+
+
+int next_filter(const uint8_t* filters, int current_filter, char cmode) {
+  for (int i = current_filter - 1; i >= 0; i--) {
+    if (!do_nothing(filters[i], cmode)) {
       return filters[i];
     }
   }
@@ -554,11 +563,10 @@ static int next_filter(const uint8_t* filters, int current_filter) {
 }
 
 
-int last_filter(const uint8_t* filters) {
+int last_filter(const uint8_t* filters, char cmode) {
   int last_index = -1;
   for (int i = BLOSC_MAX_FILTERS - 1; i >= 0; i--) {
-    // TRUNC_PREC do not have to be applied during decompression
-    if ((filters[i] != BLOSC_NOFILTER) && (filters[i] != BLOSC_TRUNC_PREC)) {
+    if (!do_nothing(filters[i], cmode))  {
       last_index = i;
     }
   }
@@ -632,7 +640,7 @@ static int blosc_c(struct thread_context* thread_context, size_t bsize,
   int accel;
   const uint8_t* _src;
   uint8_t *_tmp = tmp, *_tmp2 = tmp2, *_tmp3 = thread_context->tmp4;
-  int last_filter_index = last_filter(context->filters);
+  int last_filter_index = last_filter(context->filters, 'c');
 
   if (last_filter_index >= 0) {
     /* Apply filter pipleline */
@@ -760,7 +768,8 @@ int pipeline_d(blosc2_context* context, const size_t bsize, uint8_t* dest,
 
   for (int i = BLOSC_MAX_FILTERS - 1; i >= 0; i--) {
     // Delta filter requires the whole chunk ready
-    if ((last_filter_index == i) || (next_filter(filters, i) == BLOSC_DELTA)) {
+    if ((last_filter_index == i) ||
+            (next_filter(filters, i, 'd') == BLOSC_DELTA)) {
       _dest = dest + offset;
     }
     switch (filters[i]) {
@@ -839,10 +848,10 @@ static int blosc_d(
   uint8_t* _dest;
   size_t typesize = context->typesize;
   char* compname;
-  int last_filter_index = last_filter(filters);
+  int last_filter_index = last_filter(filters, 'd');
 
   if ((last_filter_index >= 0) &&
-          (next_filter(filters, BLOSC_MAX_FILTERS) != BLOSC_DELTA)) {
+          (next_filter(filters, BLOSC_MAX_FILTERS, 'd') != BLOSC_DELTA)) {
    // We are making use of some filter, so use a temp for destination
    _dest = tmp;
   } else {
