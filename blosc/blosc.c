@@ -543,10 +543,36 @@ static int get_accel(const blosc2_context* context) {
 }
 
 
+static int next_filter(const uint8_t* filters, int current_filter) {
+  for (int i = current_filter - 1; i >= 0; i--) {
+    // TRUNC_PREC do not have to be applied during decompression
+    if ((filters[i] != BLOSC_NOFILTER) && (filters[i] != BLOSC_TRUNC_PREC)) {
+      return filters[i];
+    }
+  }
+  return BLOSC_NOFILTER;
+}
+
+
+int last_filter(const uint8_t* filters) {
+  int last_index = -1;
+  for (int i = BLOSC_MAX_FILTERS - 1; i >= 0; i--) {
+    // TRUNC_PREC do not have to be applied during decompression
+    if ((filters[i] != BLOSC_NOFILTER) && (filters[i] != BLOSC_TRUNC_PREC)) {
+      last_index = i;
+    }
+  }
+  return last_index;
+}
+
+
 uint8_t* pipeline_c(blosc2_context* context, const size_t bsize,
                     const uint8_t* src, const size_t offset,
-                    uint8_t* _tmp, uint8_t* _tmp2, uint8_t* _tmp3) {
+                    uint8_t* dest, uint8_t* tmp, uint8_t* tmp2,
+                    int last_filter_index) {
   uint8_t* _src = (uint8_t*)src + offset;
+  uint8_t* _tmp = tmp;
+  uint8_t* _dest = dest;
   size_t typesize = context->typesize;
   uint8_t* filters = context->filters;
   uint8_t* filters_meta = context->filters_meta;
@@ -556,34 +582,35 @@ uint8_t* pipeline_c(blosc2_context* context, const size_t bsize,
   for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
     switch (filters[i]) {
       case BLOSC_SHUFFLE:
-        shuffle(typesize, (size_t)bsize, _src, _tmp);
-        _src = _tmp; _tmp = _tmp2; _tmp2 = _tmp;    /* cycle buffers */
+        shuffle(typesize, (size_t)bsize, _src, _dest);
         break;
       case BLOSC_BITSHUFFLE:
-        bscount = bitshuffle((size_t)typesize, (size_t)bsize, _src,
-                             _tmp, _tmp3);
+        bscount = bitshuffle(typesize, bsize, _src, _dest, tmp2);
         if (bscount < 0)
           return NULL;
-        _src = _tmp; _tmp = _tmp2; _tmp2 = _tmp;    /* cycle buffers */
         break;
       case BLOSC_DELTA:
-        delta_encoder((uint8_t *) src, offset, bsize, typesize, _src, _tmp);
-        _src = _tmp; _tmp = _tmp2; _tmp2 = _tmp;    /* cycle buffers */
+        delta_encoder(src, offset, bsize, typesize, _src, _dest);
         break;
       case BLOSC_TRUNC_PREC:
         if ((typesize != 4) && (typesize != 8)) {
           fprintf(stderr, "unsupported typesize for TRUNC_PREC filter\n");
           return NULL;
         }
-        truncate_precision(filters_meta[i], typesize, bsize, _src, _tmp);
-        _src = _tmp; _tmp = _tmp2; _tmp2 = _tmp;    /* cycle buffers */
+        truncate_precision(filters_meta[i], typesize, bsize, _src, _dest);
         break;
       default:
-        if (filters[i] > 0) {
+        if (filters[i] != BLOSC_NOFILTER) {
           fprintf(stderr, "Filter %d not handled during compression\n",
                   filters[i]);
           return NULL;
         }
+    }
+    // Cycle buffers when required
+    if (filters[i] != BLOSC_NOFILTER) {
+      _src = _dest;
+      _dest = _tmp;
+      _tmp = _src;
     }
   }
   return _src;
@@ -604,12 +631,19 @@ static int blosc_c(struct thread_context* thread_context, size_t bsize,
   size_t typesize = context->typesize;
   char* compname;
   int accel;
+  const uint8_t* _src;
   uint8_t *_tmp = tmp, *_tmp2 = tmp2, *_tmp3 = thread_context->tmp4;
+  int last_filter_index = last_filter(context->filters);
 
-  /* Apply filter pipleline */
-  uint8_t* _src = pipeline_c(context, bsize, src, offset, _tmp, _tmp2, _tmp3);
-  if (_src == NULL)
-    return -9;  // signals a problem with the filter pipeline
+  if (last_filter_index >= 0) {
+    /* Apply filter pipleline */
+    _src = pipeline_c(context, bsize, src, offset, _tmp, _tmp2, _tmp3,
+                      last_filter_index);
+    if (_src == NULL)
+      return -9;  // signals a problem with the filter pipeline
+  } else {
+    _src = src;
+  }
 
   /* Calculate acceleration for different compressors */
   accel = get_accel(context);
@@ -715,30 +749,35 @@ static int blosc_c(struct thread_context* thread_context, size_t bsize,
 
 /* Process the filter pipeline (decompression mode) */
 int pipeline_d(blosc2_context* context, const size_t bsize, uint8_t* dest,
-               const size_t offset, uint8_t* tmp, uint8_t* tmp2) {
+               const size_t offset, uint8_t* src, uint8_t* tmp,
+               uint8_t* tmp2, int last_filter_index) {
   size_t typesize = context->typesize;
   uint8_t* filters = context->filters;
   //uint8_t* filters_meta = context->filters_meta;
-  uint8_t *_src = tmp, *_tmp = tmp2, *_tmp2 = tmp;
+  uint8_t* _src = src;
+  uint8_t* _dest = tmp;
+  uint8_t* _tmp = tmp2;
   int bscount;
   int errcode = 0;
 
   for (int i = BLOSC_MAX_FILTERS - 1; i >= 0; i--) {
+    // Delta filter requires the whole chunk ready
+    if ((last_filter_index == i) || (next_filter(filters, i) == BLOSC_DELTA)) {
+      _dest = dest + offset;
+    }
     switch (filters[i]) {
       case BLOSC_SHUFFLE:
-        unshuffle(typesize, bsize, _src, dest + offset);
-        _src = dest + offset; _tmp = _tmp2; _tmp2 = _tmp;  /* cycle buffers */
+        unshuffle(typesize, bsize, _src, _dest);
         break;
       case BLOSC_BITSHUFFLE:
-        bscount = bitunshuffle(typesize, bsize, _src, dest + offset, _tmp);
+        bscount = bitunshuffle(typesize, bsize, _src, _dest, _tmp);
         if (bscount < 0)
           errcode = bscount;
-        _src = dest + offset; _tmp = _tmp2; _tmp2 = _tmp;  /* cycle buffers */
         break;
       case BLOSC_DELTA:
         if (context->nthreads == 1) {
           /* Serial mode */
-          delta_decoder(dest, offset, bsize, typesize, dest + offset);
+          delta_decoder(dest, offset, bsize, typesize, _dest);
         } else {
           /* Force the thread in charge of the block 0 to go first */
           pthread_mutex_lock(&context->delta_mutex);
@@ -746,27 +785,35 @@ int pipeline_d(blosc2_context* context, const size_t bsize, uint8_t* dest,
             if (offset != 0) {
               pthread_cond_wait(&context->delta_cv, &context->delta_mutex);
             } else {
-              delta_decoder(dest, offset, bsize, typesize, dest + offset);
+              delta_decoder(dest, offset, bsize, typesize, _dest);
               context->dref_not_init = 0;
               pthread_cond_broadcast(&context->delta_cv);
             }
           }
           pthread_mutex_unlock(&context->delta_mutex);
           if (offset != 0) {
-            delta_decoder(dest, offset, bsize, typesize, dest + offset);
+            delta_decoder(dest, offset, bsize, typesize, _dest);
           }
         }
-        _src = dest + offset; _tmp = _tmp2; _tmp2 = _tmp;  /* cycle buffers */
         break;
       case BLOSC_TRUNC_PREC:
         // TRUNC_PREC filter does not need to be undone
         break;
       default:
-        if (filters[i] > 0) {
+        if (filters[i] != BLOSC_NOFILTER) {
           fprintf(stderr, "Filter %d not handled during decompression\n",
                   filters[i]);
           errcode = -1;
         }
+    }
+    if (last_filter_index == i) {
+      return errcode;
+    }
+    // Cycle buffers when required
+    if ((filters[i] != BLOSC_NOFILTER) && (filters[i] != BLOSC_TRUNC_PREC)) {
+      _src = _dest;
+      _dest = _tmp;
+      _tmp = _src;
     }
   }
 
@@ -780,22 +827,29 @@ static int blosc_d(
     size_t leftoverblock, const uint8_t* src, uint8_t* dest, size_t offset,
     uint8_t* tmp, uint8_t* tmp2) {
   blosc2_context* context = thread_context->parent_context;
+  uint8_t* filters = context->filters;
+  uint8_t *tmp3 = thread_context->tmp4;
   int32_t compformat = (*(context->header_flags) & 0xe0) >> 5;
   int dont_split = (*(context->header_flags) & 0x10) >> 4;
   //uint8_t blosc_version_format = src[0];
-  int32_t j, nsplits;
+  int nsplits;
   size_t neblock;
   int32_t nbytes;                /* number of decompressed bytes in split */
   int32_t cbytes;                /* number of compressed bytes in split */
   size_t ctbytes = 0;           /* number of compressed bytes in block */
   size_t ntbytes = 0;           /* number of uncompressed bytes in block */
-  uint8_t* _dest = dest + offset;
+  uint8_t* _dest;
   size_t typesize = context->typesize;
   char* compname;
+  int last_filter_index = last_filter(filters);
 
-  if ((context->filter_flags & BLOSC_DOSHUFFLE) || \
-      (context->filter_flags & BLOSC_DOBITSHUFFLE)) {
-    _dest = tmp;
+  if ((last_filter_index >= 0) &&
+          (next_filter(filters, BLOSC_MAX_FILTERS) != BLOSC_DELTA)) {
+   // We are making use of some filter, so use a temp for destination
+   _dest = tmp;
+  } else {
+    // If no filters, or only DELTA in pipeline
+   _dest = dest + offset;
   }
 
   /* The number of splits for this block */
@@ -807,7 +861,7 @@ static int blosc_d(
   }
 
   neblock = bsize / nsplits;
-  for (j = 0; j < nsplits; j++) {
+  for (int j = 0; j < nsplits; j++) {
     cbytes = sw32_(src);      /* amount of compressed bytes */
     src += sizeof(int32_t);
     ctbytes += (int32_t)sizeof(int32_t);
@@ -872,9 +926,12 @@ static int blosc_d(
     ntbytes += nbytes;
   } /* Closes j < nsplits */
 
-  int errcode = pipeline_d(context, bsize, dest, offset, tmp, tmp2);
-  if (errcode < 0)
-    return errcode;
+  if (last_filter_index >= 0) {
+    int errcode = pipeline_d(context, bsize, dest, offset, tmp, tmp2, tmp3,
+                             last_filter_index);
+    if (errcode < 0)
+      return errcode;
+  }
 
   /* Return the number of uncompressed bytes */
   return (int)ntbytes;
@@ -1553,6 +1610,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
   return result;
 }
 
+
 int blosc_run_decompression_with_context(
     blosc2_context* context, const void* src, void* dest, size_t destsize) {
   int32_t ntbytes;
@@ -1577,6 +1635,7 @@ int blosc_run_decompression_with_context(
   assert(ntbytes <= (int32_t)destsize);
   return ntbytes;
 }
+
 
 /* The public routine for decompression with context. */
 int blosc2_decompress_ctx(
@@ -1924,8 +1983,7 @@ static void* t_blosc(void* ctxt) {
         else {
           cbytes = blosc_d(context, bsize, leftoverblock,
                            src + sw32_(bstarts + nblock_ * 4),
-                           dest, nblock_ * blocksize,
-                           tmp, tmp2);
+                           dest, nblock_ * blocksize, tmp, tmp2);
         }
       }
 

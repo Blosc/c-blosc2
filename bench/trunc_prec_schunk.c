@@ -139,13 +139,11 @@ int main() {
   /* Initialize the Blosc compressor */
   blosc_init();
 
-  blosc_set_nthreads(NTHREADS);
-
   /* Create a super-chunk container */
   cparams.filters[0] = BLOSC_TRUNC_PREC;
   cparams.filters_meta[0] = 23;  // treat doubles as floats
   cparams.typesize = sizeof(double);
-  // TODO: DELTA makes this test to fail
+  // DELTA makes compression ratio quite worse in this case
   //cparams.filters[1] = BLOSC_DELTA;
   // BLOSC_BITSHUFFLE is not compressing better and it quite slower here
   //cparams.filters[BLOSC_LAST_FILTER - 1] = BLOSC_BITSHUFFLE;
@@ -154,9 +152,11 @@ int main() {
   //cparams.clevel = 9;
   cparams.compcode = BLOSC_LIZARD;
   cparams.clevel = 9;
+  //cparams.compcode = BLOSC_BLOSCLZ;
+  //cparams.clevel = 9;
   //cparams.compcode = BLOSC_ZSTD;
   //cparams.clevel = 7;
-  //cparams.nthreads = 1;
+  cparams.nthreads = NTHREADS;
   schunk = blosc2_new_schunk(cparams, dparams);
 
   /* Append the chunks */
@@ -207,7 +207,7 @@ int main() {
     for (int i = 0; i < CHUNKSIZE; i++) {
       if (fabs(data_buffer[i] - rec_buffer[i]) > 1e-5) {
         printf("Value not in tolerance margin: ");
-        printf("%g - %g: %g, (nchunk: %d, nelem: %d); ",
+        printf("%g - %g: %g, (nchunk: %d, nelem: %d)\n",
                data_buffer[i], rec_buffer[i],
                (data_buffer[i] - rec_buffer[i]), (int)nchunk, i);
         return -1;

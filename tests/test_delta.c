@@ -18,7 +18,7 @@ uint8_t *src, *srccpy, *dest;
 int nbytes, cbytes;
 int clevel = 5;
 int doshuffle = 1;
-int typesize;
+size_t typesize;
 size_t size = 7 * 12 * 13 * 16 * 24 * 10;  /* must be divisible by typesize */
 
 
@@ -47,7 +47,7 @@ static char *test_delta() {
       for (int i = 0; i < size / typesize; i++) {
         *(uint32_t*)(src + i * 4) = (uint32_t)i;
         *(uint16_t*)(src + i * 4 + 2) = (uint16_t)i;
-        *(uint8_t*)(src + i * 4 + 2 + 1) = (uint8_t)i;
+        *(src + i * 4 + 2 + 1) = (uint8_t)i;
       }
       break;
     case 8:
@@ -65,7 +65,7 @@ static char *test_delta() {
       for (int i = 0; i < size / typesize; i++) {
         *(uint64_t*)(src + i * 8) = (uint64_t)i;
         *(uint32_t*)(src + i * 8 + 4) = 1;
-        *(uint8_t*)(src + i * 8 + 4 + 1) = 1;
+        *(src + i * 8 + 4 + 1) = 1;
       }
       break;
     case 16:
@@ -101,7 +101,7 @@ static char *test_delta() {
   if ((typesize % 12) == 0) {
     // For typesizes 12 and 24 we do an exception and allow less compression
     if ((2 * cbytes2) > (3 * cbytes)) {
-      fprintf(stderr, "Failed test for DELTA and typesize: %d\n", typesize);
+      fprintf(stderr, "Failed test for DELTA and typesize: %zu\n", typesize);
       fprintf(stderr, "Size with no DELTA: %d.  Size with DELTA: %d\n",
               cbytes, cbytes2);
       mu_assert("ERROR: DELTA does not work correctly",
@@ -109,7 +109,7 @@ static char *test_delta() {
     }
   }
   else if (cbytes2 > cbytes) {
-    fprintf(stderr, "Failed test for DELTA and typesize: %d\n", typesize);
+    fprintf(stderr, "Failed test for DELTA and typesize: %zu\n", typesize);
     fprintf(stderr, "Size with no DELTA: %d.  Size with DELTA: %d\n",
             cbytes, cbytes2);
     mu_assert("ERROR: DELTA does not work correctly", cbytes2 < cbytes);
@@ -121,7 +121,7 @@ static char *test_delta() {
 
   buf_equal = memcmp(src, srccpy, size);
   if (buf_equal != 0) {
-    fprintf(stderr, "Failed test for DELTA and typesize: %d\n", typesize);
+    fprintf(stderr, "Failed test for DELTA and typesize: %zu\n", typesize);
   }
   mu_assert("ERROR: roundtrip not successful", buf_equal == 0);
 
