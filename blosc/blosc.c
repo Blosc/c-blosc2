@@ -568,8 +568,7 @@ int last_filter(const uint8_t* filters) {
 
 uint8_t* pipeline_c(blosc2_context* context, const size_t bsize,
                     const uint8_t* src, const size_t offset,
-                    uint8_t* dest, uint8_t* tmp, uint8_t* tmp2,
-                    int last_filter_index) {
+                    uint8_t* dest, uint8_t* tmp, uint8_t* tmp2) {
   uint8_t* _src = (uint8_t*)src + offset;
   uint8_t* _tmp = tmp;
   uint8_t* _dest = dest;
@@ -637,8 +636,7 @@ static int blosc_c(struct thread_context* thread_context, size_t bsize,
 
   if (last_filter_index >= 0) {
     /* Apply filter pipleline */
-    _src = pipeline_c(context, bsize, src, offset, _tmp, _tmp2, _tmp3,
-                      last_filter_index);
+    _src = pipeline_c(context, bsize, src, offset, _tmp, _tmp2, _tmp3);
     if (_src == NULL)
       return -9;  // signals a problem with the filter pipeline
   } else {
