@@ -67,5 +67,6 @@ void truncate_precision(const uint8_t prec_bits, const size_t typesize,
     default:
       fprintf(stderr, "Error in trunc-prec filter: Precision for typesize %d "
               "not handled", (int)typesize);
+      assert(0);
   }
 }

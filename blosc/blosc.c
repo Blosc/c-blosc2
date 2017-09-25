@@ -600,10 +600,6 @@ uint8_t* pipeline_c(blosc2_context* context, const size_t bsize,
         delta_encoder(src, offset, bsize, typesize, _src, _dest);
         break;
       case BLOSC_TRUNC_PREC:
-        if ((typesize != 4) && (typesize != 8)) {
-          fprintf(stderr, "unsupported typesize for TRUNC_PREC filter\n");
-          return NULL;
-        }
         truncate_precision(filters_meta[i], typesize, bsize, _src, _dest);
         break;
       default:
