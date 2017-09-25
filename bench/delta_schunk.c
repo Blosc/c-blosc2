@@ -1,7 +1,7 @@
 /*
   Copyright (C) 2015  Francesc Alted
   http://blosc.org
-  License: MIT (see LICENSE.txt)
+  License: BSD (see LICENSE.txt)
 
   Benchmark showing Blosc filter from C code.
 
@@ -128,14 +128,13 @@ int main() {
   /* Initialize the Blosc compressor */
   blosc_init();
 
-  blosc_set_nthreads(NTHREADS);
-
   /* Create a super-chunk container */
   cparams.filters[0] = BLOSC_DELTA;
   //cparams.filters[BLOSC_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 1;
+  cparams.nthreads = NTHREADS;
   schunk = blosc2_new_schunk(cparams, dparams);
 
   /* Append chunks (the first will be taken as reference for delta) */

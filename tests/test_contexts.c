@@ -1,7 +1,7 @@
 /*
   Copyright (C) 2015  Francesc Alted
   http://blosc.org
-  License: MIT (see LICENSE.txt)
+  License: BSD (see LICENSE.txt)
 
 */
 

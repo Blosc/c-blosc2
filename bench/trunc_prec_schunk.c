@@ -1,7 +1,7 @@
 /*
   Copyright (C) 2017  Francesc Alted
   http://blosc.org
-  License: MIT (see LICENSE.txt)
+  License: BSD (see LICENSE.txt)
 
   Benchmark showing Blosc TRUNC_PREC filter from C code.
 

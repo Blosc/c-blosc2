@@ -1,13 +1,12 @@
 /*
   Copyright (C) 2015  Francesc Alted
   http://blosc.org
-  License: MIT (see LICENSE.txt)
+  License: BSD (see LICENSE.txt)
 
 */
 
 #include <stdio.h>
 #include "test_common.h"
-#include "../blosc/blosc.h"
 
 #define SIZE (500 * 1000)
 #define NCHUNKS 100
