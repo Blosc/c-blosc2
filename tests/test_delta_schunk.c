@@ -10,7 +10,8 @@
 #include "../blosc/blosc.h"
 
 #define SIZE (500 * 1000)
-#define NCHUNKS 10
+#define NCHUNKS 100
+#define NTHREADS 4
 
 
 int main() {
@@ -29,13 +30,13 @@ int main() {
 
   /* Initialize the Blosc compressor */
   blosc_init();
-  blosc_set_nthreads(2);
 
   /* Create a super-chunk container */
   cparams.filters[0] = BLOSC_DELTA;
   cparams.filters[BLOSC_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 5;
+  cparams.nthreads = NTHREADS;
   schunk = blosc2_new_schunk(cparams, dparams);
 
   for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
@@ -54,14 +55,15 @@ int main() {
   }
 
   /* Retrieve and decompress the chunks (0-based count) */
-  for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+  for (size_t nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     dsize = blosc2_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     if (dsize < 0) {
       return EXIT_FAILURE;
     }
     for (int i = 0; i < SIZE; i++) {
       if (data_dest[i] != i  * nchunk) {
-        fprintf(stderr, "First error in: %d, %d, %d", nchunk, i, data_dest[i]);
+        fprintf(stderr, "First error in: %zu, %d, %d\n",
+                nchunk, i, data_dest[i]);
         return EXIT_FAILURE;
       }
     }
