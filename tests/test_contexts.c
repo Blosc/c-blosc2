@@ -36,7 +36,7 @@ int main() {
   /* Create a context for compression */
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_BLOSCLZ;
-  cparams.filters[7] = BLOSC_DOSHUFFLE;
+  cparams.filters[BLOSC_MAX_FILTERS - 1] = BLOSC_DOSHUFFLE;
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   cctx = blosc2_create_cctx(cparams);
