@@ -10,7 +10,9 @@
 #   BUILD_TESTS: default ON
 #       build test programs and generates the "test" target
 #   BUILD_BENCHMARKS: default ON
-#       build the benchmark program
+#       build the benchmark programs
+#   BUILD_EXAMPLES: default ON
+#       build the examples programs
 #   DEACTIVATE_AVX2: default OFF
 #       do not attempt to build with AVX2 instructions
 #   DEACTIVATE_LZ4: default OFF
@@ -93,7 +95,9 @@ option(BUILD_SHARED
 option(BUILD_TESTS
     "Build test programs form the blosc compression library" ON)
 option(BUILD_BENCHMARKS
-    "Build benchmark programs form the blosc compression library" ON)
+        "Build benchmark programs form the blosc compression library" ON)
+option(BUILD_EXAMPLES
+        "Build example programs form the blosc compression library" ON)
 option(DEACTIVATE_AVX2
     "Do not attempt to build with AVX2 instructions" OFF)
 option(DEACTIVATE_LZ4
@@ -336,6 +340,10 @@ endif (BUILD_TESTS)
 if (BUILD_BENCHMARKS)
     add_subdirectory(bench)
 endif (BUILD_BENCHMARKS)
+
+if (BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif (BUILD_EXAMPLES)
 
 
 # uninstall target
