@@ -36,9 +36,9 @@ int main() {
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize = SIZE * sizeof(float), csize;
   int i, ret;
-  blosc2_context_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
-  blosc2_context_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
-  blosc_context *cctx, *dctx;
+  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_context *cctx, *dctx;
 
   /* Initialize dataset */
   for (i = 0; i < SIZE; i++) {
@@ -51,12 +51,12 @@ int main() {
   /* Create a context for compression */
   cparams.typesize = sizeof(float);
   cparams.compcode = BLOSC_BLOSCLZ;
-  cparams.filters = BLOSC_SHUFFLE;
+  cparams.filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
-  cctx = blosc2_create_cctx(&cparams);
+  cctx = blosc2_create_cctx(cparams);
 
-  /* Compress with clevel=5 and shuffle active  */
+  /* Do the actual compression */
   csize = blosc2_compress_ctx(cctx, isize, data, data_out, osize);
   if (csize == 0) {
     printf("Buffer is uncompressible.  Giving up.\n");
@@ -71,7 +71,7 @@ int main() {
 
   /* Create a context for decompression */
   dparams.nthreads = NTHREADS;
-  dctx = blosc2_create_dctx(&dparams);
+  dctx = blosc2_create_dctx(dparams);
 
   ret = blosc2_getitem_ctx(dctx, data_out, 5, 5, data_subset);
   if (ret < 0) {
