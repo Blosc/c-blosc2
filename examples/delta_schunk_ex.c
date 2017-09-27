@@ -11,10 +11,11 @@
 
   To run:
 
-  $ ./delta_schunk
-  Blosc version info: 2.0.0a2 ($Date:: 2015-12-17 #$)
-  Compression super-chunk: 200000000 -> 14081961 (14.2x)
-  Decompression successful!
+  $ ./delta_schunk_ex
+  Blosc version info: 2.0.0a4.dev ($Date:: 2016-08-04 #$)
+  Compression ratio: 762.9 MB -> 7.6 MB (100.7x)
+  Compression time: 0.222 s, 3437.4 MB/s
+  Decompression time: 0.162 s, 4714.4 MB/s
   Successful roundtrip!
 
 */
@@ -47,6 +48,7 @@
 
 #define CHUNKSIZE (200 * 1000)
 #define NCHUNKS 500
+#define NTHREADS 4
 
 /* The type of timestamp used on this system. */
 #define blosc_timestamp_t struct timespec
@@ -97,13 +99,13 @@ int main() {
 
   /* Initialize the Blosc compressor */
   blosc_init();
-  blosc_set_nthreads(4);
 
   /* Create a super-chunk container */
   cparams.typesize = 8;
   cparams.filters[0] = BLOSC_DELTA;
   cparams.compcode = BLOSC_BLOSCLZ;
-  cparams.clevel = 1;
+  cparams.clevel = 9;
+  cparams.nthreads = NTHREADS;
   schunk = blosc2_new_schunk(cparams, dparams);
 
   blosc_set_timestamp(&last);
