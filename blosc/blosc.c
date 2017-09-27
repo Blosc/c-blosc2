@@ -1121,8 +1121,9 @@ uint8_t filters_to_flags(const uint8_t* filters) {
 
 
 void flags_to_filters(const uint8_t flags, uint8_t* filters) {
-
-  /* Fill the end part of the filter pipeline */
+  /* Initialize the filter pipeline */
+  memset(filters, 0, BLOSC_MAX_FILTERS);
+  /* Fill the filter pipeline */
   if (flags & BLOSC_DOSHUFFLE)
     filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   if (flags & BLOSC_DOBITSHUFFLE)
