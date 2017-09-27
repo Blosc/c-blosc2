@@ -25,7 +25,7 @@ static int test_shuffle_roundtrip_generic(size_t type_size, size_t num_elements,
   void* unshuffled = blosc_test_malloc(buffer_alignment, buffer_size);
 
   /* Fill the input data buffer with random values. */
-  blosc_test_fill_random(original, buffer_size);
+  blosc_test_fill_seq(original, buffer_size);
 
   /* Generic shuffle, then generic unshuffle. */
   shuffle_generic(type_size, buffer_size, original, shuffled);

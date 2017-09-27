@@ -644,7 +644,7 @@ static int blosc_c(struct thread_context* thread_context, size_t bsize,
     if (_src == NULL)
       return -9;  // signals a problem with the filter pipeline
   } else {
-    _src = src;
+    _src = src + offset;
   }
 
   /* Calculate acceleration for different compressors */
@@ -1125,7 +1125,7 @@ void flags_to_filters(const uint8_t flags, uint8_t* filters) {
   /* Fill the end part of the filter pipeline */
   if (flags & BLOSC_DOSHUFFLE)
     filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
-  if (flags & BLOSC_BITSHUFFLE)
+  if (flags & BLOSC_DOBITSHUFFLE)
     filters[BLOSC_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   if (flags & BLOSC_DODELTA)
     filters[BLOSC_MAX_FILTERS - 2] = BLOSC_DELTA;

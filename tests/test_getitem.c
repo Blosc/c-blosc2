@@ -14,27 +14,40 @@
 
 /** Test the blosc_getitem function. */
 static int test_getitem(size_t type_size, size_t num_elements,
-                        size_t buffer_alignment, int compression_level, int do_shuffle) {
+                        size_t buffer_alignment, int compression_level,
+                        int do_shuffle) {
   size_t buffer_size = type_size * num_elements;
+  int csize, dsize;
 
   /* Allocate memory for the test. */
   void* original = blosc_test_malloc(buffer_alignment, buffer_size);
-  void* intermediate = blosc_test_malloc(buffer_alignment, buffer_size + BLOSC_MAX_OVERHEAD);
+  void* intermediate = blosc_test_malloc(buffer_alignment,
+                                         buffer_size + BLOSC_MAX_OVERHEAD);
   void* result = blosc_test_malloc(buffer_alignment, buffer_size);
 
   /* Fill the input data buffer with random values. */
-  blosc_test_fill_random(original, buffer_size);
+  blosc_test_fill_seq(original, buffer_size);
 
   /* Compress the input data, then use blosc_getitem to extract (decompress)
      a range of elements into a new buffer. */
-  blosc_compress(compression_level, do_shuffle, type_size, buffer_size,
-                 original, intermediate, buffer_size + BLOSC_MAX_OVERHEAD);
-  blosc_getitem(intermediate, 0, num_elements, result);
+  csize = blosc_compress(compression_level, do_shuffle, type_size,
+                          buffer_size, original, intermediate,
+                          buffer_size + BLOSC_MAX_OVERHEAD);
+  if (csize < 0) {
+    printf("Compression error.  Error code: %d\n", csize);
+    return csize;
+  }
+  dsize = blosc_getitem(intermediate, 0, (int)num_elements, result);
+  if (dsize < 0) {
+    printf("getitem error.  Error code: %d\n", dsize);
+    return dsize;
+  }
 
   /* The round-tripped data matches the original data when the
      result of memcmp is 0. */
   int exit_code = memcmp(original, result, buffer_size) ?
                   EXIT_FAILURE : EXIT_SUCCESS;
+  if (exit_code != 0) printf("getitem test fail!\n");
 
   /* Free allocated memory. */
   blosc_test_free(original);
@@ -84,21 +97,24 @@ int main(int argc, char** argv) {
   }
 
   uint32_t compression_level;
-  if (!blosc_test_parse_uint32_t(argv[4], &compression_level) || (compression_level > 9)) {
+  if (!blosc_test_parse_uint32_t(
+          argv[4], &compression_level) || (compression_level > 9)) {
     blosc_test_print_bad_arg_msg(4);
     return EXIT_FAILURE;
   }
 
   uint32_t shuffle_enabled;
   {
-    if (!blosc_test_parse_uint32_t(argv[5], &shuffle_enabled) || (shuffle_enabled > 2)) {
+    if (!blosc_test_parse_uint32_t(
+            argv[5], &shuffle_enabled) || (shuffle_enabled > 2)) {
       blosc_test_print_bad_arg_msg(5);
       return EXIT_FAILURE;
     }
   }
 
   uint32_t blosc_thread_count;
-  if (!blosc_test_parse_uint32_t(argv[6], &blosc_thread_count) || (blosc_thread_count < 1)) {
+  if (!blosc_test_parse_uint32_t(
+          argv[6], &blosc_thread_count) || (blosc_thread_count < 1)) {
     blosc_test_print_bad_arg_msg(6);
     return EXIT_FAILURE;
   }

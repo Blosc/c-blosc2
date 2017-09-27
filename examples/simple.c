@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include "blosc.h"
 
-#define SIZE 10 * 1000 * 1000
+#define SIZE (10 * 1000 * 1000)
 #define NTHREADS 2
 
 
@@ -33,7 +33,7 @@ int main() {
   static float data_dest[SIZE];
   float data_subset[5];
   float data_subset_ref[5] = {5, 6, 7, 8, 9};
-  int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
+  size_t isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize = SIZE * sizeof(float), csize;
   int i, ret;
 
@@ -60,7 +60,8 @@ int main() {
     return csize;
   }
 
-  printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1. * isize) / csize);
+  printf("Compression: %zu -> %d (%.1fx)\n",
+         isize, csize, (1. * isize) / csize);
 
   ret = blosc_getitem(data_out, 5, 5, data_subset);
   if (ret < 0) {
@@ -77,7 +78,7 @@ int main() {
   printf("Correctly extracted 5 elements from compressed chunk!\n");
 
   /* Decompress  */
-  dsize = blosc_decompress(data_out, data_dest, dsize);
+  dsize = blosc_decompress(data_out, data_dest, (size_t)dsize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;

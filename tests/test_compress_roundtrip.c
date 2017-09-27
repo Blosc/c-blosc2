@@ -25,7 +25,7 @@ static int test_compress_roundtrip(size_t type_size, size_t num_elements,
   void* result = blosc_test_malloc(buffer_alignment, buffer_size);
 
   /* Fill the input data buffer with random values. */
-  blosc_test_fill_random(original, buffer_size);
+  blosc_test_fill_seq(original, buffer_size);
 
   /* Compress the input data and store it in an intermediate buffer.
      Decompress the data from the intermediate buffer into a result buffer. */
