@@ -7,7 +7,7 @@
 
   To compile this program:
 
-  $ gcc -O delta_schunk.c -o delta_schunk -lblosc
+  $ gcc -O delta_schunk_ex.c -o delta_schunk_ex -lblosc
 
   To run:
 
@@ -24,13 +24,30 @@
 #include <time.h>
 #include "blosc.h"
 
+#if defined(_WIN32)
+/* For QueryPerformanceCounter(), etc. */
+  #include <windows.h>
+#elif defined(__MACH__)
+  #include <mach/clock.h>
+  #include <mach/mach.h>
+  #include <time.h>
+#elif defined(__unix__)
+  #if defined(__linux__)
+    #include <time.h>
+  #else
+    #include <sys/time.h>
+  #endif
+#else
+  #error Unable to detect platform.
+#endif
+
+
 #define KB  1024.
 #define MB  (1024*KB)
 #define GB  (1024*MB)
 
-#define CHUNKSIZE 200 * 1000
+#define CHUNKSIZE (200 * 1000)
 #define NCHUNKS 500
-//#define NCHUNKS 1
 
 /* The type of timestamp used on this system. */
 #define blosc_timestamp_t struct timespec
@@ -55,13 +72,13 @@ double getseconds(blosc_timestamp_t last, blosc_timestamp_t current) {
 int main() {
   static int64_t data[CHUNKSIZE];
   static int64_t data_dest[CHUNKSIZE];
-  const int isize = CHUNKSIZE * sizeof(int64_t);
-  int dsize;
-  int32_t nbytes, cbytes;
+  const size_t isize = CHUNKSIZE * sizeof(int64_t);
+  int dsize = 0;
+  int64_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
-  int i, nchunk, nchunks;
+  size_t i, nchunk, nchunks;
   blosc_timestamp_t last, current;
   double ttotal;
 
@@ -91,7 +108,7 @@ int main() {
   nbytes = schunk->nbytes;
   cbytes = schunk->cbytes;
   blosc_set_timestamp(&current);
-  ttotal = (double)getseconds(last, current);
+  ttotal = getseconds(last, current);
   printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
          nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
   printf("Compression time: %.3g s, %.1f MB/s\n",
@@ -107,14 +124,14 @@ int main() {
     return dsize;
   }
   blosc_set_timestamp(&current);
-  ttotal = (double)getseconds(last, current);
+  ttotal = getseconds(last, current);
   printf("Decompression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
   /* Check integrity of the first chunk */
   for (i = 0; i < CHUNKSIZE; i++) {
     if (data_dest[i] != (uint64_t)i) {
-      printf("Decompressed data differs from original %d, %jd!\n",
+      printf("Decompressed data differs from original %zd, %zd!\n",
              i, data_dest[i]);
       return -1;
     }
