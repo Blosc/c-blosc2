@@ -78,7 +78,8 @@ int main() {
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
-  size_t i, nchunk, nchunks;
+  int i, nchunk;
+  size_t nchunks;
   blosc_timestamp_t last, current;
   double ttotal;
 
@@ -131,7 +132,7 @@ int main() {
   /* Check integrity of the first chunk */
   for (i = 0; i < CHUNKSIZE; i++) {
     if (data_dest[i] != (uint64_t)i) {
-      printf("Decompressed data differs from original %zd, %zd!\n",
+      printf("Decompressed data differs from original %d, %zd!\n",
              i, data_dest[i]);
       return -1;
     }
