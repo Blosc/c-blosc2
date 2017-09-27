@@ -135,7 +135,7 @@ int compute_vectors(void) {
     /* Create a super-chunk container for input (X values) */
     cparams.typesize = sizeof(double);
     cparams.compcode = BLOSC_BLOSCLZ;
-    cparams.clevel = 0;
+    cparams.clevel = 5;
     cparams.filters[0] = BLOSC_TRUNC_PREC;
     cparams.filters_meta[0] = 23;  // treat doubles as floats
     cparams.nthreads = NTHREADS;
