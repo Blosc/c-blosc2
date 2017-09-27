@@ -1,6 +1,6 @@
 # sources for examples
 #set(SOURCES contexts delta_schunk_ex multithread simple noinit simple_schunk)
-set(SOURCES contexts delta_schunk_ex multithread simple noinit)
+set(SOURCES contexts delta_schunk_ex multithread simple noinit find_roots)
 
 # targets
 foreach(src ${SOURCES})

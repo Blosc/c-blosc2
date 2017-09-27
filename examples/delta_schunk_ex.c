@@ -106,6 +106,7 @@ int main() {
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
+  dparams.nthreads = NTHREADS;
   schunk = blosc2_new_schunk(cparams, dparams);
 
   blosc_set_timestamp(&last);

@@ -18,9 +18,25 @@
 */
 
 #include <stdio.h>
-#include <assert.h>
-#include "blosc.h"
 #include <time.h>
+#include "blosc.h"
+
+#if defined(_WIN32)
+/* For QueryPerformanceCounter(), etc. */
+    #include <windows.h>
+#elif defined(__MACH__)
+    #include <mach/clock.h>
+    #include <mach/mach.h>
+#elif defined(__unix__)
+    #if defined(__linux__)
+        #include <time.h>
+      #else
+        #include <sys/time.h>
+      #endif
+    #else
+      #error Unable to detect platform.
+#endif
+
 
 #define KB  1024.
 #define MB  (1024*KB)
@@ -28,14 +44,25 @@
 
 
 #define NCHUNKS 500
-#define CHUNKSIZE 200*1000  // a chunksize that fits well in modern L3 caches
+#define CHUNKSIZE (200 * 1000)  // fits well in modern L3 caches
+#define NTHREADS 4
 
 /* The type of timestamp used on this system. */
 #define blosc_timestamp_t struct timespec
 
 /* Set a timestamp value to the current time. */
 void blosc_set_timestamp(blosc_timestamp_t* timestamp) {
-    clock_gettime(CLOCK_MONOTONIC, timestamp);
+#ifdef __MACH__ // OS X does not have clock_gettime, use clock_get_time
+  clock_serv_t cclock;
+  mach_timespec_t mts;
+  host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
+  clock_get_time(cclock, &mts);
+  mach_port_deallocate(mach_task_self(), cclock);
+  timestamp->tv_sec = mts.tv_sec;
+  timestamp->tv_nsec = mts.tv_nsec;
+#else
+  clock_gettime(CLOCK_MONOTONIC, timestamp);
+#endif
 }
 
 /* Given two timestamp values, return the difference in microseconds. */
@@ -56,7 +83,7 @@ double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current, int nit
 }
 
 
-inline void fill_buffer(double *x, int nchunk) {
+void fill_buffer(double *x, int nchunk) {
     double incx = 10. / (NCHUNKS * CHUNKSIZE);
 
     for (int i = 0; i < CHUNKSIZE; i++) {
@@ -64,7 +91,7 @@ inline void fill_buffer(double *x, int nchunk) {
     }
 }
 
-inline void process_data(const double *x, double *y) {
+void process_data(const double *x, double *y) {
 
     for (int i = 0; i < CHUNKSIZE; i++) {
         double xi = x[i];
@@ -73,7 +100,7 @@ inline void process_data(const double *x, double *y) {
     }
 }
 
-inline void find_root(const double *x, const double *y,
+void find_root(const double *x, const double *y,
                       const double prev_value) {
     double pv = prev_value;
     int last_root_idx = -1;
@@ -94,38 +121,39 @@ inline void find_root(const double *x, const double *y,
 int compute_vectors(void) {
     static double buffer_x[CHUNKSIZE];
     static double buffer_y[CHUNKSIZE];
-    const int isize = CHUNKSIZE * sizeof(double);
-    const int osize = CHUNKSIZE * sizeof(double);
-    int dsize, csize;
+    const size_t isize = CHUNKSIZE * sizeof(double);
+    int dsize;
     long nbytes = 0;
-    blosc2_sparams sparams;
-    blosc2_sheader *sc_x, *sc_y;
-    int i, j, nchunks;
+    blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+    blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+    blosc2_schunk *sc_x, *sc_y;
+    int nchunk;
     blosc_timestamp_t last, current;
     double ttotal;
     double prev_value;
 
     /* Create a super-chunk container for input (X values) */
-    sparams = BLOSC_SPARAMS_DEFAULTS;
-    sparams.compressor = BLOSC_BLOSCLZ;
-    sparams.clevel = 1;
-    sparams.filters[0] = BLOSC_DELTA;
-    sparams.filters[1] = BLOSC_SHUFFLE;
-    sc_x = blosc2_new_schunk(&sparams);
+    cparams.typesize = sizeof(double);
+    cparams.compcode = BLOSC_BLOSCLZ;
+    cparams.clevel = 0;
+    cparams.filters[0] = BLOSC_TRUNC_PREC;
+    cparams.filters_meta[0] = 23;  // treat doubles as floats
+    cparams.nthreads = NTHREADS;
+    dparams.nthreads = NTHREADS;
+    sc_x = blosc2_new_schunk(cparams, dparams);
 
     /* Create a super-chunk container for output (Y values) */
-    sc_y = blosc2_new_schunk(&sparams);
+    sc_y = blosc2_new_schunk(cparams, dparams);
 
     /* Now fill the buffer with even values between 0 and 10 */
     blosc_set_timestamp(&last);
-    for (i = 0; i < NCHUNKS; i++) {
-        fill_buffer(buffer_x, i);
-        nchunks = blosc2_append_buffer(sc_x, sizeof(double), isize,
-                                       buffer_x);
+    for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+        fill_buffer(buffer_x, nchunk);
+        blosc2_append_buffer(sc_x, isize, buffer_x);
         nbytes += isize;
     }
     blosc_set_timestamp(&current);
-    ttotal = (double) getseconds(last, current);
+    ttotal = getseconds(last, current);
     printf("Creation time for X values: %.3g s, %.1f MB/s\n",
            ttotal, nbytes / (ttotal * MB));
     printf("Compression for X values: %.1f MB -> %.1f MB (%.1fx)\n",
@@ -134,18 +162,17 @@ int compute_vectors(void) {
 
     /* Retrieve the chunks and compute the polynomial in another super-chunk */
     blosc_set_timestamp(&last);
-    for (i = 0; i < NCHUNKS; i++) {
-        dsize = blosc2_decompress_chunk(sc_x, i, (void *) buffer_x, isize);
+    for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+        dsize = blosc2_decompress_chunk(sc_x, nchunk, (void *) buffer_x, isize);
         if (dsize < 0) {
             printf("Decompression error.  Error code: %d\n", dsize);
             return dsize;
         }
         process_data(buffer_x, buffer_y);
-        nchunks = blosc2_append_buffer(sc_y, sizeof(double), isize,
-                                       buffer_y);
+        blosc2_append_buffer(sc_y, isize, buffer_y);
     }
     blosc_set_timestamp(&current);
-    ttotal = (double) getseconds(last, current);
+    ttotal = getseconds(last, current);
     printf("Computing Y polynomial: %.3g s, %.1f MB/s\n",
            ttotal,
            2. * nbytes / (ttotal * MB));    // 2 super-chunks involved
@@ -156,16 +183,14 @@ int compute_vectors(void) {
     /* Find the roots of the polynomial */
     printf("Roots found at: ");
     blosc_set_timestamp(&last);
-    for (i = 0; i < NCHUNKS; i++) {
-        dsize = blosc2_decompress_chunk(sc_y, i, (void *) buffer_y, isize);
-        if (i == 0) {
-            prev_value = buffer_y[0];
-        }
+    prev_value = buffer_y[0];
+    for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+        dsize = blosc2_decompress_chunk(sc_y, nchunk, (void *) buffer_y, isize);
         if (dsize < 0) {
             printf("Decompression error.  Error code: %d\n", dsize);
             return dsize;
         }
-        dsize = blosc2_decompress_chunk(sc_x, i, (void *) buffer_x, isize);
+        dsize = blosc2_decompress_chunk(sc_x, nchunk, (void *) buffer_x, isize);
         if (dsize < 0) {
             printf("Decompression error.  Error code: %d\n", dsize);
             return dsize;
@@ -174,7 +199,7 @@ int compute_vectors(void) {
         prev_value = buffer_y[CHUNKSIZE - 1];
     }
     blosc_set_timestamp(&current);
-    ttotal = (double) getseconds(last, current);
+    ttotal = getseconds(last, current);
     printf("\n");
     printf("Find root time:  %.3g s, %.1f MB/s\n",
            ttotal, 2. * nbytes / (ttotal * MB));    // 2 super-chunks involved
@@ -193,8 +218,6 @@ int main() {
 
     /* Initialize the Blosc compressor */
     blosc_init();
-
-    blosc_set_nthreads(4);
 
     compute_vectors();
 
