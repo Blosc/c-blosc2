@@ -13,11 +13,11 @@
 /* For QueryPerformanceCounter(), etc. */
   #include <windows.h>
 #elif defined(__MACH__)
-#include <mach/clock.h>
-#include <mach/mach.h>
-#include <time.h>
+  #include <mach/clock.h>
+  #include <mach/mach.h>
+  #include <time.h>
 #elif defined(__unix__)
-#if defined(__linux__)
+  #if defined(__linux__)
     #include <time.h>
   #else
     #include <sys/time.h>
@@ -29,7 +29,11 @@
 #include "blosc-export.h"
 
 /* The type of timestamp used on this system. */
-#define blosc_timestamp_t struct timespec
+#if defined(_WIN32)
+  #define blosc_timestamp_t LARGE_INTEGER
+#else
+  #define blosc_timestamp_t struct timespec
+#endif
 
 BLOSC_EXPORT void blosc_set_timestamp(blosc_timestamp_t* timestamp);
 

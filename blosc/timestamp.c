@@ -11,9 +11,6 @@
 /* System-specific high-precision timing functions. */
 #if defined(_WIN32)
 
-/* The type of timestamp used on this system. */
-#define blosc_timestamp_t LARGE_INTEGER
-
 /* Set a timestamp value to the current time. */
 void blosc_set_timestamp(blosc_timestamp_t* timestamp) {
   /* Ignore the return value, assume the call always succeeds. */
@@ -31,9 +28,6 @@ double blosc_elapsed_nsecs(blosc_timestamp_t start_time,
 }
 
 #else
-
-/* The type of timestamp used on this system. */
-#define blosc_timestamp_t struct timespec
 
 /* Set a timestamp value to the current time. */
 void blosc_set_timestamp(blosc_timestamp_t* timestamp) {
