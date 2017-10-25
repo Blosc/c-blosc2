@@ -5,6 +5,7 @@
 
   See LICENSES/BLOSC.txt for details about copyright and rights to use.
 **********************************************************************/
+
 #ifndef BLOSC_H
 #define BLOSC_H
 
@@ -688,6 +689,15 @@ BLOSC_EXPORT void* blosc2_pack_schunk(blosc2_schunk* sheader);
 
 /* Unpack a packed super-chunk */
 BLOSC_EXPORT blosc2_schunk* blosc2_unpack_schunk(void* packed);
+
+
+/*********************************************************************
+
+  Time measurement utilities.  Visit the include below for the public API.
+
+*********************************************************************/
+
+#include "timestamp.h"
 
 
 /*********************************************************************

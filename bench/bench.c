@@ -25,29 +25,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
-#if defined(_WIN32)
-/* For QueryPerformanceCounter(), etc. */
-  #include <windows.h>
-#elif defined(__MACH__)
-  #include <mach/clock.h>
-  #include <mach/mach.h>
-  #include <time.h>
-  #include <sys/time.h>
-#elif defined(__unix__)
-  #include <unistd.h>
-  #if defined(__linux__)
-    #include <time.h>
-  #else
-    #include <sys/time.h>
-  #endif
-#else
-  #error Unable to detect platform.
-#endif
-
-
 #include "../blosc/blosc.h"
 
 #define KB  1024
@@ -55,72 +33,12 @@
 #define GB  (1024*MB)
 
 #define NCHUNKS (32*1024)       /* maximum number of chunks */
-#define MAX_THREADS 16
 
 
 int nchunks = NCHUNKS;
 int niter = 3;
 /* default number of iterations */
 double totalsize = 0.;          /* total compressed/decompressed size */
-
-/* System-specific high-precision timing functions. */
-#if defined(_WIN32)
-
-/* The type of timestamp used on this system. */
-#define blosc_timestamp_t LARGE_INTEGER
-
-/* Set a timestamp value to the current time. */
-void blosc_set_timestamp(blosc_timestamp_t* timestamp) {
-  /* Ignore the return value, assume the call always succeeds. */
-  QueryPerformanceCounter(timestamp);
-}
-
-/* Given two timestamp values, return the difference in microseconds. */
-double blosc_elapsed_usecs(blosc_timestamp_t start_time, blosc_timestamp_t end_time) {
-  LARGE_INTEGER CounterFreq;
-  QueryPerformanceFrequency(&CounterFreq);
-
-  return (double)(end_time.QuadPart - start_time.QuadPart) / ((double)CounterFreq.QuadPart / 1e6);
-}
-
-#else
-
-/* The type of timestamp used on this system. */
-#define blosc_timestamp_t struct timespec
-
-/* Set a timestamp value to the current time. */
-void blosc_set_timestamp(blosc_timestamp_t* timestamp) {
-#ifdef __MACH__ // OS X does not have clock_gettime, use clock_get_time
-  clock_serv_t cclock;
-  mach_timespec_t mts;
-  host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
-  clock_get_time(cclock, &mts);
-  mach_port_deallocate(mach_task_self(), cclock);
-  timestamp->tv_sec = mts.tv_sec;
-  timestamp->tv_nsec = mts.tv_nsec;
-#else
-  clock_gettime(CLOCK_MONOTONIC, timestamp);
-#endif
-}
-
-/* Given two timestamp values, return the difference in microseconds. */
-double blosc_elapsed_usecs(blosc_timestamp_t start_time, blosc_timestamp_t end_time) {
-  return (1e6 * (end_time.tv_sec - start_time.tv_sec))
-      + (1e-3 * (end_time.tv_nsec - start_time.tv_nsec));
-}
-
-#endif
-
-/* Given two timeval stamps, return the difference in seconds */
-double getseconds(blosc_timestamp_t last, blosc_timestamp_t current) {
-  return 1e-6 * blosc_elapsed_usecs(last, current);
-}
-
-/* Given two timeval stamps, return the time per chunk in usec */
-double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current, int niter, size_t nchunks) {
-  double elapsed_usecs = (double)blosc_elapsed_usecs(last, current);
-  return elapsed_usecs / (double)(niter * nchunks);
-}
 
 /* Define posix_memalign for Windows */
 #if defined(_WIN32)
@@ -138,6 +56,14 @@ int posix_memalign(void **memptr, size_t alignment, size_t size)
 /* If not using MSVC, aligned memory can be freed in the usual way. */
 #define aligned_free(memptr) free(memptr)
 #endif  /* defined(_WIN32) && !defined(__MINGW32__) */
+
+/* Given two timeval stamps, return the time per chunk in usec */
+double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current,
+                      int niter, size_t nchunks) {
+  double elapsed_usecs = 1e-3 * blosc_elapsed_nsecs(last, current);
+  return elapsed_usecs / (double)(niter * nchunks);
+}
+
 
 int get_value(int i, int rshift) {
   int v;
@@ -386,7 +312,7 @@ int main(int argc, char* argv[]) {
   int nthreads_, size_, elsize_, rshift_, i;
   FILE* output_file = stdout;
   blosc_timestamp_t last, current;
-  float totaltime;
+  double totaltime;
   char usage[256];
 
   print_compress_info();
@@ -522,7 +448,7 @@ int main(int argc, char* argv[]) {
             for (nthreads_ = 1; nthreads_ <= nthreads; nthreads_++) {
               do_bench(compressor, shuffle, nthreads_, size_ + i, elsize_, rshift_, output_file);
               blosc_set_timestamp(&current);
-              totaltime = (float)getseconds(last, current);
+              totaltime = blosc_elapsed_secs(last, current);
               printf("Elapsed time:\t %6.1f s.  Processed data: %.1f GB\n",
                      totaltime, totalsize / GB);
             }
@@ -541,7 +467,7 @@ int main(int argc, char* argv[]) {
             for (nthreads_ = 1; nthreads_ <= nthreads; nthreads_++) {
               do_bench(compressor, shuffle, nthreads_, size_ + i, elsize_, rshift_, output_file);
               blosc_set_timestamp(&current);
-              totaltime = (float)getseconds(last, current);
+              totaltime = blosc_elapsed_secs(last, current);
               printf("Elapsed time:\t %6.1f s.  Processed data: %.1f GB\n",
                      totaltime, totalsize / GB);
             }
@@ -560,7 +486,7 @@ int main(int argc, char* argv[]) {
             for (nthreads_ = nthreads; nthreads_ <= 6; nthreads_++) {
               do_bench(compressor, shuffle, nthreads_, size_ + i, elsize_, rshift_, output_file);
               blosc_set_timestamp(&current);
-              totaltime = (float)getseconds(last, current);
+              totaltime = blosc_elapsed_secs(last, current);
               printf("Elapsed time:\t %6.1f s.  Processed data: %.1f GB\n",
                      totaltime, totalsize / GB);
             }
@@ -576,7 +502,7 @@ int main(int argc, char* argv[]) {
 
   /* Print out some statistics */
   blosc_set_timestamp(&current);
-  totaltime = (float)getseconds(last, current);
+  totaltime = (float)blosc_elapsed_secs(last, current);
   printf("\nRound-trip compr/decompr on %.1f GB\n", totalsize / GB);
   printf("Elapsed time:\t %6.1f s, %.1f MB/s\n",
          totaltime, totalsize * 2 * 1.1 / (MB * totaltime));
