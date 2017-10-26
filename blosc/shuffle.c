@@ -393,14 +393,16 @@ bitshuffle(const size_t bytesoftype, const size_t blocksize,
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
-  if ((size % 8) == 0)
+  if ((blocksize > bytesoftype) && ((size % 8) == 0)) {
     /* The number of elems is a multiple of 8 which is supported by
        bitshuffle. */
     return (int)(host_implementation.bitshuffle)((void*)_src, (void*)_dest,
                                                  blocksize / bytesoftype,
                                                  bytesoftype, (void*)_tmp);
-  else
+  }
+  else {
     memcpy((void*)_dest, (void*)_src, blocksize);
+  }
   return (int)size;
 }
 
@@ -414,13 +416,14 @@ bitunshuffle(const size_t bytesoftype, const size_t blocksize,
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
-  if ((size % 8) == 0)
+  if ((blocksize > bytesoftype) && ((size % 8) == 0)) {
     /* The number of elems is a multiple of 8 which is supported by
        bitshuffle. */
     return (int)(host_implementation.bitunshuffle)((void*)_src, (void*)_dest,
                                                    blocksize / bytesoftype,
                                                    bytesoftype, (void*)_tmp);
-  else
+  } else {
     memcpy((void*)_dest, (void*)_src, blocksize);
+  }
   return (int)size;
 }
