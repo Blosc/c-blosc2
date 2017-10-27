@@ -385,20 +385,19 @@ unshuffle(const size_t bytesoftype, const size_t blocksize,
 
 /* Bit-shuffle a block by dynamically dispatching to the appropriate
    hardware-accelerated routine at run-time. */
-int
+size_t
 bitshuffle(const size_t bytesoftype, const size_t blocksize,
-           const uint8_t* const _src, const uint8_t* _dest,
-           const uint8_t* _tmp) {
+           const uint8_t *const _src, const uint8_t *_dest,
+           const uint8_t *_tmp) {
   size_t size = blocksize / bytesoftype;
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
-  if ((blocksize > bytesoftype) && ((size % 8) == 0)) {
+  if (size != 0 && ((size % 8) == 0)) {
     /* The number of elems is a multiple of 8 which is supported by
        bitshuffle. */
-    return (int)(host_implementation.bitshuffle)((void*)_src, (void*)_dest,
-                                                 blocksize / bytesoftype,
-                                                 bytesoftype, (void*)_tmp);
+    return (size_t)(host_implementation.bitshuffle)(
+            (void*)_src, (void*)_dest, size, bytesoftype, (void*)_tmp);
   }
   else {
     memcpy((void*)_dest, (void*)_src, blocksize);
@@ -408,20 +407,19 @@ bitshuffle(const size_t bytesoftype, const size_t blocksize,
 
 /* Bit-unshuffle a block by dynamically dispatching to the appropriate
    hardware-accelerated routine at run-time. */
-int
+size_t
 bitunshuffle(const size_t bytesoftype, const size_t blocksize,
-             const uint8_t* const _src, const uint8_t* _dest,
-             const uint8_t* _tmp) {
+             const uint8_t *const _src, const uint8_t *_dest,
+             const uint8_t *_tmp) {
   size_t size = blocksize / bytesoftype;
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
-  if ((blocksize > bytesoftype) && ((size % 8) == 0)) {
+  if (size != 0 && ((size % 8) == 0)) {
     /* The number of elems is a multiple of 8 which is supported by
        bitshuffle. */
-    return (int)(host_implementation.bitunshuffle)((void*)_src, (void*)_dest,
-                                                   blocksize / bytesoftype,
-                                                   bytesoftype, (void*)_tmp);
+    return (size_t)(host_implementation.bitunshuffle)(
+            (void*)_src, (void*)_dest, size, bytesoftype, (void*)_tmp);
   } else {
     memcpy((void*)_dest, (void*)_src, blocksize);
   }

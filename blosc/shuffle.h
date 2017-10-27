@@ -35,10 +35,10 @@ BLOSC_NO_EXPORT void
     shuffle(const size_t bytesoftype, const size_t blocksize,
             const uint8_t* _src, const uint8_t* _dest);
 
-BLOSC_NO_EXPORT int
+BLOSC_NO_EXPORT size_t
     bitshuffle(const size_t bytesoftype, const size_t blocksize,
-               const uint8_t* const _src, const uint8_t* _dest,
-               const uint8_t* _tmp);
+               const uint8_t *const _src, const uint8_t *_dest,
+               const uint8_t *_tmp);
 
 /**
   Primary unshuffle and bitunshuffle routine.
@@ -55,10 +55,10 @@ BLOSC_NO_EXPORT void
               const uint8_t* _src, const uint8_t* _dest);
 
 
-BLOSC_NO_EXPORT int
+BLOSC_NO_EXPORT size_t
     bitunshuffle(const size_t bytesoftype, const size_t blocksize,
-                 const uint8_t* const _src, const uint8_t* _dest,
-                 const uint8_t* _tmp);
+                 const uint8_t *const _src, const uint8_t *_dest,
+                 const uint8_t *_tmp);
 
 #ifdef __cplusplus
 }
