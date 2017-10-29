@@ -467,9 +467,11 @@ static int zstd_wrap_compress(struct thread_context* thread_context,
                               char* output, size_t maxout, int clevel) {
   size_t code;
   blosc2_context* context = thread_context->parent_context;
+
   clevel = (clevel < 9) ? clevel * 2 - 1 : ZSTD_maxCLevel();
   /* Make the level 8 close enough to maxCLevel */
   if (clevel == 8) clevel = ZSTD_maxCLevel() - 2;
+
   if (thread_context->zstd_cctx == NULL) {
     thread_context->zstd_cctx = ZSTD_createCCtx();
   }
@@ -495,11 +497,21 @@ static int zstd_wrap_decompress(struct thread_context* thread_context,
                                 const char* input, size_t compressed_length,
                                 char* output, size_t maxout) {
   size_t code;
+  blosc2_context* context = thread_context->parent_context;
+
   if (thread_context->zstd_dctx == NULL) {
     thread_context->zstd_dctx = ZSTD_createDCtx();
   }
-  code = ZSTD_decompressDCtx(thread_context->zstd_dctx,
-      (void*)output, maxout, (void*)input, compressed_length);
+
+  if (context->use_dict) {
+    assert(context->dict_size > 0);
+    code = ZSTD_decompress_usingDict(
+            thread_context->zstd_dctx, (void*)output, maxout, (void*)input,
+            compressed_length, context->dict_buffer, context->dict_size);
+  } else {
+    code = ZSTD_decompressDCtx(thread_context->zstd_dctx,
+        (void*)output, maxout, (void*)input, compressed_length);
+  }
   if (ZSTD_isError(code) != ZSTD_error_no_error) {
     fprintf(stderr, "Error in ZSTD decompression: '%s'.  Giving up.\n",
             ZDICT_getErrorName(code));
@@ -855,7 +867,6 @@ static int blosc_d(
   uint8_t *tmp3 = thread_context->tmp4;
   int32_t compformat = (*(context->header_flags) & 0xe0) >> 5;
   int dont_split = (*(context->header_flags) & 0x10) >> 4;
-  int dict_training = context->use_dict && context->dict_buffer == NULL;
   //uint8_t blosc_version_format = src[0];
   int nsplits;
   size_t neblock;
@@ -878,7 +889,7 @@ static int blosc_d(
   }
 
   /* The number of splits for this block */
-  if (!dont_split && !leftoverblock && !dict_training) {
+  if (!dont_split && !leftoverblock && !context->use_dict) {
     // We don't want to split when in a training dict state
     nsplits = (int32_t)typesize;
   }
@@ -1259,13 +1270,17 @@ static int initialize_context_decompression(
     }
     context->filter_flags = filters_to_flags(filters);
     context->bstarts = (uint8_t*)(context->src + BLOSC_EXTENDED_HEADER_LENGTH);
-    uint8_t * blosc2_flags = (uint8_t*)(context->src +
-            BLOSC_EXTENDED_HEADER_LENGTH + 0xF);
+    uint8_t* blosc2_flags = (uint8_t*)(context->src +
+            BLOSC_MIN_HEADER_LENGTH + 0xF);
     if (*blosc2_flags & BLOSC2_USEDICT) {
       context->use_dict = 1;
+      // The trained dictionary is after the bstarts block
+      size_t nblocks = context->sourcesize / context->blocksize;
+      context->dict_size = (size_t)sw32_(context->bstarts + nblocks * 4);
+      context->dict_buffer = context->bstarts + (nblocks + 1) * 4;
     }
   } else {
-    /* Blosc-1 header */
+    /* Regular (Blosc1) header */
     context->filter_flags = get_filter_flags(context->header_flags[0],
                                              context->typesize);
     flags_to_filters(context->header_flags[0], context->filters);
@@ -1384,7 +1399,7 @@ static int write_compression_header(blosc2_context* context,
     context->bstarts = context->dest + BLOSC_EXTENDED_HEADER_LENGTH;
     context->output_bytes = BLOSC_EXTENDED_HEADER_LENGTH +
                             sizeof(int32_t) * context->nblocks;
-    uint8_t * blosc2_flags = context->dest + BLOSC_EXTENDED_HEADER_LENGTH + 0xF;
+    uint8_t * blosc2_flags = context->dest + BLOSC_MIN_HEADER_LENGTH + 0xF;
     if (context->use_dict) {
       *blosc2_flags |= BLOSC2_USEDICT;
     }
