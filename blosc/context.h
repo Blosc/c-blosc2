@@ -50,6 +50,12 @@ struct blosc2_context_s {
   /* Compressor code to use */
   int clevel;
   /* Compression level (1-9) */
+  int use_dict;
+  /* Whether to use dicts or not */
+  void* dict_buffer;
+  /* The buffer to keep the trained dictionary */
+  size_t dict_size;
+  /* The size of the trained dictionary */
   uint8_t filter_flags;
   /* The filter flags in the filter pipeline */
   uint8_t filters[BLOSC_MAX_FILTERS];

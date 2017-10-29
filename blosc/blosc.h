@@ -88,6 +88,16 @@ enum {
   BLOSC_DODELTA = 0x8,       /* delta coding */
 };
 
+/* Codes for new internal flags in Blosc2 */
+enum {
+  BLOSC2_USEDICT = 0x1,            /* use dictionaries with codec */
+};
+
+/* Values for different Blosc2 capabilities */
+enum {
+  BLOSC2_MAXDICTSIZE = 128 * 1024, /* maximum size for compression dicts */
+};
+
 /* Codes for the different compressors shipped with Blosc */
 enum {
   BLOSC_BLOSCLZ = 0,
@@ -486,6 +496,8 @@ typedef struct {
   /* the compressor codec */
   int clevel;
   /* the compression level (5) */
+  int use_dict;
+  /* use dicts or not when compressing (only for ZSTD) */
   size_t typesize;
   /* the type size (8) */
   uint32_t nthreads;
@@ -502,7 +514,7 @@ typedef struct {
 
 /* Default struct for compression params meant for user initialization */
 static const blosc2_cparams BLOSC_CPARAMS_DEFAULTS = {
-        BLOSC_BLOSCLZ, 5, 8, 1, 0, NULL,
+        BLOSC_BLOSCLZ, 5, 1, 8, 1, 0, NULL,
         {0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0} };
 
 /**

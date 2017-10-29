@@ -16,7 +16,9 @@ In addition, starting in Blosc 2.0.0, there is an extension of the header
 above that allows to encode the filter pipeline::
 
   1+|-0-|-1-|-2-|-3-|-4-|-5-|-6-|-7-|-8-|-9-|-A-|-B-|-C-|-D-|-E-|-F-|
-    |   filter codes    | reserved  |   filter meta     | reserved  |
+    |   filter codes    | reserved  |   filter meta     | resvd | ^ |
+                                                                  |
+                                                                  +-blosc2_flags
 
 So there is a complete byte for encoding the filter and another one to encode
 possible metadata associated with the filter.  The filter pipeline has 5
@@ -30,8 +32,10 @@ All entries are little endian.
 
 :version:
     (``uint8``) Blosc format version.
+
 :versionlz:
     (``uint8``) Version of the internal compressor used.
+
 :flags and compressor enumeration:
     (``bitfield``) The flags of the buffer
 
@@ -77,9 +81,18 @@ All entries are little endian.
 
 :typesize:
     (``uint8``) Number of bytes for the atomic type.
+
 :nbytes:
     (``uint32``) Uncompressed size of the buffer.
+
 :blocksize:
     (``uint32``) Size of internal blocks.
+
 :cbytes:
     (``uint32``) Compressed size of the buffer.
+
+:blosc2_flags:
+    (``bitfield``) The flags for a Blosc2 buffer.
+
+    :bit 0 (``0x01``):
+        Whether the codec use dictionaries or not.
