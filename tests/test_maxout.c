@@ -15,7 +15,7 @@ int tests_run = 0;
 
 /* Global vars */
 void* src, * srccpy, * dest, * dest2;
-size_t nbytes, cbytes;
+int nbytes, cbytes;
 int clevel = 1;
 int doshuffle = 0;
 size_t typesize = 4;

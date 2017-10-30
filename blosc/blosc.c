@@ -1176,7 +1176,7 @@ static int initialize_context_compression(
   /* Set parameters */
   context->do_compress = 1;
   context->src = (const uint8_t*)src;
-  context->dest = (uint8_t*)(dest);
+  context->dest = (uint8_t*)dest;
   context->output_bytes = 0;
   context->destsize = destsize;
   context->sourcesize = sourcesize;
@@ -1447,25 +1447,7 @@ static int write_compression_header(blosc2_context* context,
 int blosc_compress_context(blosc2_context* context) {
   int ntbytes = 0;
 
-  if (*(context->header_flags) & BLOSC_MEMCPYED) {
-    // Copy the buffer as-is
-    if (context->sourcesize + BLOSC_MAX_OVERHEAD > context->destsize) {
-      /* We are exceeding maximum output size */
-      ntbytes = 0;
-    } else if (((context->sourcesize % L1) == 0) || (context->nthreads > 1)) {
-      /* Copy is more effective with large buffers that are multiples of the
-       cache size or multi-cores */
-      context->output_bytes = BLOSC_MAX_OVERHEAD;
-      ntbytes = do_job(context);
-      if (ntbytes < 0) {
-        return -1;
-      }
-    } else if (context->sourcesize + BLOSC_MAX_OVERHEAD <= context->destsize) {
-      memcpy(context->dest + BLOSC_MAX_OVERHEAD, context->src,
-             context->sourcesize);
-      ntbytes = (int) context->sourcesize + BLOSC_MAX_OVERHEAD;
-    }
-  } else {
+  if (!(*(context->header_flags) & BLOSC_MEMCPYED)) {
     /* Do the actual compression */
     ntbytes = do_job(context);
     if (ntbytes < 0) {
@@ -1478,10 +1460,32 @@ int blosc_compress_context(blosc2_context* context) {
     }
   }
 
+  if (*(context->header_flags) & BLOSC_MEMCPYED) {
+    if (context->sourcesize + BLOSC_MAX_OVERHEAD > context->destsize) {
+      /* We are exceeding maximum output size */
+      ntbytes = 0;
+    }
+    else if (((context->sourcesize % L1) == 0) || (context->nthreads > 1)) {
+      /* More effective with large buffers that are multiples of the
+       cache size or multi-cores */
+      context->output_bytes = BLOSC_MAX_OVERHEAD;
+      ntbytes = do_job(context);
+      if (ntbytes < 0) {
+        return -1;
+      }
+    }
+    else if (context->sourcesize + BLOSC_MAX_OVERHEAD <= context->destsize) {
+    memcpy(context->dest + BLOSC_MAX_OVERHEAD, context->src,
+           context->sourcesize);
+      ntbytes = (int)context->sourcesize + BLOSC_MAX_OVERHEAD;
+    }
+  }
+
   /* Set the number of compressed bytes in header */
   _sw32(context->dest + 12, ntbytes);
 
   assert(ntbytes <= context->destsize);
+
   return ntbytes;
 }
 

@@ -514,7 +514,7 @@ typedef struct {
 
 /* Default struct for compression params meant for user initialization */
 static const blosc2_cparams BLOSC_CPARAMS_DEFAULTS = {
-        BLOSC_BLOSCLZ, 5, 1, 8, 1, 0, NULL,
+        BLOSC_BLOSCLZ, 5, 0, 8, 1, 0, NULL,
         {0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0} };
 
 /**
