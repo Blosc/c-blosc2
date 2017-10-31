@@ -1247,7 +1247,6 @@ static uint8_t get_filter_flags(const uint8_t header_flags,
 
 static int initialize_context_decompression(
         blosc2_context* context, const void* src, void* dest, size_t destsize) {
-
   context->do_compress = 0;
   context->src = (const uint8_t*)src;
   context->dest = (uint8_t*)dest;
@@ -2454,10 +2453,7 @@ void blosc_init(void) {
   pthread_mutex_init(&global_comp_mutex, NULL);
   /* Create a global context */
   g_global_context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
-  /* Initialize some struct components */
-  g_global_context->serial_context = NULL;
-  g_global_context->threads = NULL;
-  g_global_context->threads_started = 0;
+  memset(g_global_context, 0, sizeof(blosc2_context));
   g_initlib = 1;
 }
 
