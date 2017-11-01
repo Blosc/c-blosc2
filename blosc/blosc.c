@@ -1399,6 +1399,7 @@ static int write_compression_header(blosc2_context* context,
     context->output_bytes = BLOSC_EXTENDED_HEADER_LENGTH +
                             sizeof(int32_t) * context->nblocks;
     uint8_t * blosc2_flags = context->dest + BLOSC_MIN_HEADER_LENGTH + 0xF;
+    *blosc2_flags = 0;    // zeroes flags
     if (context->use_dict) {
       *blosc2_flags |= BLOSC2_USEDICT;
     }
@@ -1666,6 +1667,8 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
      previous ones into account */
   envvar = getenv("BLOSC_NOLOCK");
   if (envvar != NULL) {
+    // TODO: here is the only place that returns an extended header from
+    //   a blosc_compress() call.  This should probably be fixed.
     char *compname;
     blosc2_context *cctx;
     blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
@@ -1673,6 +1676,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     blosc_compcode_to_compname(g_compressor, &compname);
     /* Create a context for compression */
     build_filters(doshuffle, g_delta, typesize, cparams.filters);
+    // TODO: cparams can be shared in a multithreaded environment.  do a copy!
     cparams.typesize = (uint8_t)typesize;
     cparams.compcode = (uint8_t)g_compressor;
     cparams.clevel = (uint8_t)clevel;

@@ -12,15 +12,19 @@
 #include <unistd.h>
 #include "test_common.h"
 
+#define BUFFER_ALIGN_SIZE   32
+#define NCHILDREN 4
+#define NTHREADS 4
+
 int tests_run = 0;
 
 /* Global vars */
 void *src, *srccpy, *dest, *dest2;
-size_t nbytes, cbytes;
+int nbytes, cbytes;
 int clevel = 1;
 int doshuffle = 1;
 size_t typesize = 4;
-size_t size = 4 * 1000 * 1000;             /* must be divisible by 4 */
+size_t size = sizeof(int32_t) * 1000 * 1000;
 
 
 /* Check just compressing */
@@ -45,7 +49,7 @@ static char *test_compress_decompress() {
 
   /* Decompress the buffer */
   nbytes = blosc_decompress(dest, dest2, size);
-  mu_assert("ERROR: nbytes incorrect(1)", nbytes == size);
+  mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
   return 0;
 }
@@ -58,13 +62,10 @@ static char *all_tests() {
   return 0;
 }
 
-#define BUFFER_ALIGN_SIZE   32
 
 int main(int argc, char **argv) {
   int32_t *_src;
   char *result;
-  size_t i;
-  int pid, nchildren = 4;
 
   printf("STARTING TESTS for %s\n", argv[0]);
 
@@ -72,12 +73,12 @@ int main(int argc, char **argv) {
   setenv("BLOSC_NOLOCK", "TRUE", 0);
 
   /* Launch several subprocesses */
-  for (i = 1; i <= nchildren; i++) {
-    pid = fork();
+  for (int i = 1; i <= NCHILDREN; i++) {
+    int pid = fork();
   }
 
   blosc_init();
-  blosc_set_nthreads(4);
+  blosc_set_nthreads(NTHREADS);
 
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
@@ -85,7 +86,7 @@ int main(int argc, char **argv) {
   dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, size + 16);
   dest2 = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
   _src = (int32_t *)src;
-  for (i = 0; i < (size / 4); i++) {
+  for (int i = 0; i < (size / sizeof(int32_t)); i++) {
     _src[i] = (int32_t)i;
   }
   memcpy(srccpy, src, size);
