@@ -153,8 +153,8 @@ int compute_vectors(void) {
 
     /* Free resources */
     /* Destroy the super-chunk */
-    blosc2_destroy_schunk(sc_x);
-    blosc2_destroy_schunk(sc_y);
+  blosc2_free_schunk(sc_x);
+  blosc2_free_schunk(sc_y);
     return 0;
 }
 

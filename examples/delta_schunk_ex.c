@@ -109,7 +109,7 @@ int main() {
   printf("Successful roundtrip!\n");
 
   /* Free resources */
-  blosc2_destroy_schunk(schunk);
+  blosc2_free_schunk(schunk);
   blosc_destroy();
 
   return 0;

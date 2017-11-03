@@ -130,7 +130,7 @@ int blosc2_decompress_chunk(blosc2_schunk* schunk, size_t nchunk,
 
 
 /* Free all memory from a super-chunk. */
-int blosc2_destroy_schunk(blosc2_schunk* schunk) {
+int blosc2_free_schunk(blosc2_schunk *schunk) {
 
   if (schunk->filters_chunk != NULL)
     free(schunk->filters_chunk);

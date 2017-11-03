@@ -652,7 +652,7 @@ BLOSC_EXPORT blosc2_schunk* blosc2_new_schunk(
         blosc2_cparams cparams, blosc2_dparams dparams);
 
 /* Release resources from a super-chunk */
-BLOSC_EXPORT int blosc2_destroy_schunk(blosc2_schunk* sheader);
+BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *sheader);
 
 /* Append a `src` data buffer to a super-chunk.
 
