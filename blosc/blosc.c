@@ -690,8 +690,8 @@ static int blosc_c(struct thread_context* thread_context, size_t bsize,
   neblock = bsize / nsplits;
   for (j = 0; j < nsplits; j++) {
     dest += sizeof(int32_t);
-    ntbytes += (int32_t)sizeof(int32_t);
-    ctbytes += (int32_t)sizeof(int32_t);
+    ntbytes += sizeof(int32_t);
+    ctbytes += sizeof(int32_t);
     maxout = neblock;
   #if defined(HAVE_SNAPPY)
     if (context->compcode == BLOSC_SNAPPY) {
@@ -1514,50 +1514,48 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
   /* Write the extended header (not compatible with Blosc1) */
   error = write_compression_header(context, 1);
   if (error < 0) { return error; }
-  size_t data_start = context->output_bytes;
-  void* samples_buffer = context->dest + data_start;
 
   result = blosc_compress_context(context);
 
   if (context->use_dict) {
-    // Build the dictionary out of the filters outcome and compress with it
-    size_t dict_maxsize = BLOSC2_MAXDICTSIZE;
-    size_t dict_actual_size = 0;
-    unsigned nblocks = (unsigned)context->nblocks;
-    void* dict_buffer = malloc(dict_maxsize);
 
-    if (context->compcode == BLOSC_ZSTD) {
-      size_t* samples_sizes = malloc(nblocks * sizeof(void*));
-      // Populate the samples sizes for training the dictionary
-      for (size_t i = 0; i < nblocks; i++) {
-        printf("bstarts i, i*1: %d, %d", context->bstarts[i + 1],
-               context->bstarts[i]);
-        samples_sizes[i] = context->bstarts[i + 1] - context->bstarts[i];
-      }
-
-      dict_actual_size = ZDICT_trainFromBuffer(
-            dict_buffer, dict_maxsize, samples_buffer, samples_sizes, nblocks);
-      if (ZDICT_isError(dict_actual_size) != ZSTD_error_no_error) {
-        fprintf(stderr, "Error in ZDICT_trainFromBuffer(): '%s'."
-                "  Giving up.\n", ZDICT_getErrorName(dict_actual_size));
-      }
-      free(samples_sizes);
-    }
-    else {
+    if (context->compcode != BLOSC_ZSTD) {
       char* compname;
       compname = clibcode_to_clibname(context->compcode);
       fprintf(stderr, "Codec %s does not support dicts.  Giving up.\n",
               compname);
-      free(dict_buffer);
       return -20;
     }
+
+    // Build the dictionary out of the filters outcome and compress with it
+    size_t dict_maxsize = BLOSC2_MAXDICTSIZE;
+    size_t dict_actual_size = 0;
+    unsigned nblocks = (unsigned)context->nblocks - 1;
+    void* dict_buffer = malloc(dict_maxsize);
+    size_t data_start = context->output_bytes;
+    void* samples_buffer = context->dest + data_start;
+    size_t sample_size = 1024;
+    size_t* samples_sizes = malloc(nblocks * sizeof(void*));
+
+    // Populate the samples sizes for training the dictionary
+    for (size_t i = 0; i < nblocks; i++) {
+      samples_sizes[i] = sample_size;
+    }
+
+    dict_actual_size = ZDICT_trainFromBuffer(
+          dict_buffer, dict_maxsize, samples_buffer, samples_sizes, nblocks);
+    if (ZDICT_isError(dict_actual_size) != ZSTD_error_no_error) {
+      fprintf(stderr, "Error in ZDICT_trainFromBuffer(): '%s'."
+              "  Giving up.\n", ZDICT_getErrorName(dict_actual_size));
+    }
+    free(samples_sizes);
 
     assert(dict_actual_size > 0);
     context->dict_buffer = dict_buffer;
     context->dict_size = dict_actual_size;
     /* Write the trained dict at the end of the existing header info */
     _sw32(samples_buffer, (int32_t)dict_actual_size);
-    memcpy(samples_buffer + 4, dict_buffer, dict_actual_size);
+    memcpy(samples_buffer + sizeof(int32_t), dict_buffer, dict_actual_size);
     context->output_bytes = data_start + dict_actual_size;
 
     /* Compress again with dict */
