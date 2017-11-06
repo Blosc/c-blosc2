@@ -177,49 +177,51 @@ static void my_free(void* block) {
 
 
 /* Copy 4 bytes from `*pa` to int32_t, changing endianness if necessary. */
-static int32_t sw32_(const uint8_t* pa) {
+static int32_t sw32_(const void* pa) {
   int32_t idest;
   uint8_t* dest = (uint8_t*)&idest;
+  uint8_t* pa_ = (uint8_t*)pa;
   int i = 1;                    /* for big/little endian detection */
   char* p = (char*)&i;
 
   if (p[0] != 1) {
     /* big endian */
-    dest[0] = pa[3];
-    dest[1] = pa[2];
-    dest[2] = pa[1];
-    dest[3] = pa[0];
+    dest[0] = pa_[3];
+    dest[1] = pa_[2];
+    dest[2] = pa_[1];
+    dest[3] = pa_[0];
   }
   else {
     /* little endian */
-    dest[0] = pa[0];
-    dest[1] = pa[1];
-    dest[2] = pa[2];
-    dest[3] = pa[3];
+    dest[0] = pa_[0];
+    dest[1] = pa_[1];
+    dest[2] = pa_[2];
+    dest[3] = pa_[3];
   }
   return idest;
 }
 
 
 /* Copy 4 bytes from `*pa` to `*dest`, changing endianness if necessary. */
-static void _sw32(uint8_t* dest, int32_t a) {
+static void _sw32(void* dest, int32_t a) {
+  uint8_t* dest_ = (uint8_t*)dest;
   uint8_t* pa = (uint8_t*)&a;
   int i = 1;                    /* for big/little endian detection */
   char* p = (char*)&i;
 
   if (p[0] != 1) {
     /* big endian */
-    dest[0] = pa[3];
-    dest[1] = pa[2];
-    dest[2] = pa[1];
-    dest[3] = pa[0];
+    dest_[0] = pa[3];
+    dest_[1] = pa[2];
+    dest_[2] = pa[1];
+    dest_[3] = pa[0];
   }
   else {
     /* little endian */
-    dest[0] = pa[0];
-    dest[1] = pa[1];
-    dest[2] = pa[2];
-    dest[3] = pa[3];
+    dest_[0] = pa[0];
+    dest_[1] = pa[1];
+    dest_[2] = pa[2];
+    dest_[3] = pa[3];
   }
 }
 
@@ -981,13 +983,14 @@ static int serial_blosc(struct thread_context* thread_context) {
   size_t j, bsize, leftoverblock;
   int32_t cbytes;
   int32_t ntbytes = (int32_t)context->output_bytes;
+  uint32_t* bstarts = context->bstarts;
 
   uint8_t* tmp = thread_context->tmp;
   uint8_t* tmp2 = thread_context->tmp2;
 
   for (j = 0; j < context->nblocks; j++) {
     if (context->do_compress && !(*(context->header_flags) & BLOSC_MEMCPYED)) {
-      _sw32(context->bstarts + j * 4, (int32_t)ntbytes);
+      _sw32(bstarts + j, ntbytes);
     }
     bsize = context->blocksize;
     leftoverblock = 0;
@@ -1025,7 +1028,7 @@ static int serial_blosc(struct thread_context* thread_context) {
       else {
         /* Regular decompression */
         cbytes = blosc_d(thread_context, bsize, leftoverblock,
-                         context->src + sw32_(context->bstarts + j * 4),
+                         context->src + sw32_(bstarts + j),
                          context->dest, j * context->blocksize, tmp, tmp2);
       }
     }
@@ -1268,22 +1271,22 @@ static int initialize_context_decompression(
       context->filters_meta[i] = filters_meta[i];
     }
     context->filter_flags = filters_to_flags(filters);
-    context->bstarts = (uint8_t*)(context->src + BLOSC_EXTENDED_HEADER_LENGTH);
     uint8_t* blosc2_flags = (uint8_t*)(context->src +
             BLOSC_MIN_HEADER_LENGTH + 0xF);
     if (*blosc2_flags & BLOSC2_USEDICT) {
       context->use_dict = 1;
       // The trained dictionary is after the bstarts block
       size_t nblocks = context->sourcesize / context->blocksize;
-      context->dict_size = (size_t)sw32_(context->bstarts + nblocks * 4);
-      context->dict_buffer = context->bstarts + (nblocks + 1) * 4;
+      context->dict_size = (size_t)sw32_(context->bstarts + nblocks);
+      context->dict_buffer = context->bstarts + nblocks + 1;
     }
+    context->bstarts = (uint32_t*)(context->src + BLOSC_EXTENDED_HEADER_LENGTH);
   } else {
     /* Regular (Blosc1) header */
     context->filter_flags = get_filter_flags(context->header_flags[0],
                                              context->typesize);
     flags_to_filters(context->header_flags[0], context->filters);
-    context->bstarts = (uint8_t*)(context->src + BLOSC_MIN_HEADER_LENGTH);
+    context->bstarts = (uint32_t*)(context->src + BLOSC_MIN_HEADER_LENGTH);
   }
 
   /* Check that we have enough space to decompress */
@@ -1395,7 +1398,8 @@ static int write_compression_header(blosc2_context* context,
       filters[i] = context->filters[i];
       filters_meta[i] = context->filters_meta[i];
     }
-    context->bstarts = context->dest + BLOSC_EXTENDED_HEADER_LENGTH;
+    context->bstarts = (uint32_t*)(context->dest +
+            BLOSC_EXTENDED_HEADER_LENGTH);
     context->output_bytes = BLOSC_EXTENDED_HEADER_LENGTH +
                             sizeof(int32_t) * context->nblocks;
     uint8_t * blosc2_flags = context->dest + BLOSC_MIN_HEADER_LENGTH + 0xF;
@@ -1405,7 +1409,7 @@ static int write_compression_header(blosc2_context* context,
     }
   } else {
     // Regular header
-    context->bstarts = context->dest + BLOSC_MIN_HEADER_LENGTH;
+    context->bstarts = (uint32_t*)(context->dest + BLOSC_MIN_HEADER_LENGTH);
     context->output_bytes = BLOSC_MIN_HEADER_LENGTH +
                             sizeof(int32_t) * context->nblocks;
   }
@@ -1526,6 +1530,8 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
       size_t* samples_sizes = malloc(nblocks * sizeof(void*));
       // Populate the samples sizes for training the dictionary
       for (size_t i = 0; i < nblocks; i++) {
+        printf("bstarts i, i*1: %d, %d", context->bstarts[i + 1],
+               context->bstarts[i]);
         samples_sizes[i] = context->bstarts[i + 1] - context->bstarts[i];
       }
 
@@ -1812,7 +1818,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
   int32_t ntbytes = 0;              /* the number of uncompressed bytes */
   size_t nblocks;                   /* number of total blocks in buffer */
   size_t leftover;                  /* extra bytes at end of buffer */
-  uint8_t* bstarts;                 /* start pointers for each block */
+  uint32_t* bstarts;                /* start pointers for each block */
   size_t typesize, blocksize, nbytes;
   size_t bsize, bsize2, leftoverblock;
   int j;
@@ -1824,8 +1830,8 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
   _src = (uint8_t*)(src);
 
   /* Read the header block */
-  flags = _src[2];                          /* flags */
-  typesize = (int32_t)_src[3];              /* typesize */
+  flags = _src[2];                                       /* flags */
+  typesize = (int32_t)_src[3];                           /* typesize */
   nbytes = (size_t)sw32_(_src + 4);         /* buffer size */
   blocksize = (size_t)sw32_(_src + 8);      /* block size */
 
@@ -1840,13 +1846,13 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
       context->filters[i] = filters[i];
       context->filters_meta[i] = filters_meta[i];
     }
-    _src += BLOSC_EXTENDED_HEADER_LENGTH;
+    bstarts = (uint32_t*)(_src + BLOSC_EXTENDED_HEADER_LENGTH);
   } else {
     /* Minimal header */
     flags_to_filters(flags, context->filters);
-    _src += BLOSC_MIN_HEADER_LENGTH;
+    bstarts = (uint32_t*)(_src + BLOSC_MIN_HEADER_LENGTH);
   }
-  bstarts = _src;
+
   /* Compute some params */
   /* Total blocks */
   nblocks = nbytes / blocksize;
@@ -1909,7 +1915,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
 
       /* Regular decompression.  Put results in tmp2. */
       cbytes = blosc_d(context->serial_context, bsize, leftoverblock,
-                       (uint8_t*)src + sw32_(bstarts + j * 4),
+                       (uint8_t*)src + sw32_(bstarts + j),
                        scontext->tmp2, 0, scontext->tmp, scontext->tmp3);
       if (cbytes < 0) {
         ntbytes = cbytes;
@@ -1989,7 +1995,7 @@ static void* t_blosc(void* ctxt) {
   size_t nblocks;
   size_t leftover;
   size_t leftover2;
-  uint8_t* bstarts;
+  uint32_t* bstarts;
   const uint8_t* src;
   uint8_t* dest;
   uint8_t* tmp;
@@ -2088,7 +2094,7 @@ static void* t_blosc(void* ctxt) {
         }
         else {
           cbytes = blosc_d(context, bsize, leftoverblock,
-                           src + sw32_(bstarts + nblock_ * 4),
+                           src + sw32_(bstarts + nblock_),
                            dest, nblock_ * blocksize, tmp, tmp2);
         }
       }
@@ -2111,7 +2117,7 @@ static void* t_blosc(void* ctxt) {
         /* Start critical section */
         pthread_mutex_lock(&context->parent_context->count_mutex);
         ntdest = context->parent_context->output_bytes;
-        _sw32(bstarts + nblock_ * 4, (int32_t)ntdest);
+        _sw32(bstarts + nblock_, (int32_t)ntdest);
 
         if ((cbytes == 0) || (ntdest + cbytes > maxbytes)) {
           context->parent_context->thread_giveup_code = 0;  /* uncompressible buf */

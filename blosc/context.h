@@ -44,7 +44,7 @@ struct blosc2_context_s {
   /* Maximum size for destination buffer */
   size_t typesize;
   /* Type size */
-  uint8_t* bstarts;
+  uint32_t* bstarts;
   /* Starts for every block inside the compressed buffer */
   int compcode;
   /* Compressor code to use */
