@@ -402,7 +402,7 @@ bitshuffle(const size_t bytesoftype, const size_t blocksize,
   else {
     memcpy((void*)_dest, (void*)_src, blocksize);
   }
-  return (int)size;
+  return size;
 }
 
 /* Bit-unshuffle a block by dynamically dispatching to the appropriate
@@ -423,5 +423,5 @@ bitunshuffle(const size_t bytesoftype, const size_t blocksize,
   } else {
     memcpy((void*)_dest, (void*)_src, blocksize);
   }
-  return (int)size;
+  return size;
 }

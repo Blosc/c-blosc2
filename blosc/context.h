@@ -34,9 +34,9 @@ struct blosc2_context_s {
   /* Number of bytes in source buffer */
   size_t nblocks;
   /* Number of total blocks in buffer */
-  size_t leftover;
+  int32_t leftover;
   /* Extra bytes at end of buffer */
-  size_t blocksize;
+  int32_t blocksize;
   /* Length of the block in bytes */
   size_t output_bytes;
   /* Counter for the number of output bytes */

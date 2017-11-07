@@ -603,7 +603,7 @@ int last_filter(const uint8_t* filters, char cmode) {
 }
 
 
-uint8_t* pipeline_c(blosc2_context* context, const size_t bsize,
+uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
                     const uint8_t* src, const size_t offset,
                     uint8_t* dest, uint8_t* tmp, uint8_t* tmp2) {
   uint8_t* _src = (uint8_t*)src + offset;
@@ -612,7 +612,6 @@ uint8_t* pipeline_c(blosc2_context* context, const size_t bsize,
   size_t typesize = context->typesize;
   uint8_t* filters = context->filters;
   uint8_t* filters_meta = context->filters_meta;
-  int bscount;
 
   /* Process the filter pipeline */
   for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
@@ -621,9 +620,7 @@ uint8_t* pipeline_c(blosc2_context* context, const size_t bsize,
         shuffle(typesize, (size_t)bsize, _src, _dest);
         break;
       case BLOSC_BITSHUFFLE:
-        bscount = bitshuffle(typesize, bsize, _src, _dest, tmp2);
-        if (bscount < 0)
-          return NULL;
+        bitshuffle(typesize, (size_t)bsize, _src, _dest, tmp2);
         break;
       case BLOSC_DELTA:
         delta_encoder(src, offset, bsize, typesize, _src, _dest);
@@ -650,17 +647,17 @@ uint8_t* pipeline_c(blosc2_context* context, const size_t bsize,
 
 
 /* Shuffle & compress a single block */
-static int blosc_c(struct thread_context* thread_context, size_t bsize,
-                   size_t leftoverblock, size_t ntbytes, size_t maxbytes,
+static int blosc_c(struct thread_context* thread_context, int32_t bsize,
+                   int32_t leftoverblock, size_t ntbytes, size_t maxbytes,
                    const uint8_t* src, const size_t offset, uint8_t* dest,
                    uint8_t* tmp, uint8_t* tmp2) {
   blosc2_context* context = thread_context->parent_context;
   int dont_split = (*(context->header_flags) & 0x10) >> 4;
   int dict_training = context->use_dict && context->dict_buffer == NULL;
-  size_t j, neblock, nsplits;
+  int32_t j, neblock, nsplits;
   int32_t cbytes;                   /* number of compressed bytes in split */
   int32_t ctbytes = 0;              /* number of compressed bytes in block */
-  size_t maxout;
+  int64_t maxout;
   size_t typesize = context->typesize;
   char* compname;
   int accel;
@@ -682,16 +679,18 @@ static int blosc_c(struct thread_context* thread_context, size_t bsize,
 
   /* The number of splits for this block */
   if (!dont_split && !leftoverblock && !dict_training) {
-    nsplits = typesize;
+    nsplits = (int32_t)typesize;
   }
   else {
     nsplits = 1;
   }
   neblock = bsize / nsplits;
   for (j = 0; j < nsplits; j++) {
-    dest += sizeof(int32_t);
-    ntbytes += sizeof(int32_t);
-    ctbytes += sizeof(int32_t);
+    if (!dict_training) {
+      dest += sizeof(int32_t);
+      ntbytes += sizeof(int32_t);
+      ctbytes += sizeof(int32_t);
+    }
     maxout = neblock;
   #if defined(HAVE_SNAPPY)
     if (context->compcode == BLOSC_SNAPPY) {
@@ -699,13 +698,15 @@ static int blosc_c(struct thread_context* thread_context, size_t bsize,
     }
   #endif /*  HAVE_SNAPPY */
     if (ntbytes + maxout > maxbytes) {
-      maxout = maxbytes - ntbytes;   /* avoid buffer overrun */
+      /* avoid buffer * overrun */
+      maxout = (int64_t)maxbytes - (int64_t)ntbytes;
       if (maxout <= 0) {
         return 0;                  /* non-compressible block */
       }
     }
     if (dict_training) {
       // We are in the build dict state, so don't compress
+      // TODO: copy only a percentage for sampling
       memcpy(dest, _src + j * neblock, neblock);
       cbytes = (int32_t)neblock;
     }
@@ -764,7 +765,7 @@ static int blosc_c(struct thread_context* thread_context, size_t bsize,
       /* cbytes should never be negative */
       return -2;
     }
-    if (cbytes == 0 || cbytes == neblock) {
+    if (!dict_training && (cbytes == 0 || cbytes == neblock)) {
       /* The compressor has been unable to compress data at all. */
       /* Before doing the copy, check that we are not running into a
          buffer overflow. */
@@ -774,7 +775,9 @@ static int blosc_c(struct thread_context* thread_context, size_t bsize,
       memcpy(dest, _src + j * neblock, neblock);
       cbytes = (int32_t)neblock;
     }
-    _sw32(dest - 4, cbytes);
+    if (!dict_training) {
+      _sw32(dest - 4, cbytes);
+    }
     dest += cbytes;
     ntbytes += cbytes;
     ctbytes += cbytes;
@@ -794,7 +797,6 @@ int pipeline_d(blosc2_context* context, const size_t bsize, uint8_t* dest,
   uint8_t* _src = src;
   uint8_t* _dest = tmp;
   uint8_t* _tmp = tmp2;
-  int bscount;
   int errcode = 0;
 
   for (int i = BLOSC_MAX_FILTERS - 1; i >= 0; i--) {
@@ -808,9 +810,7 @@ int pipeline_d(blosc2_context* context, const size_t bsize, uint8_t* dest,
         unshuffle(typesize, bsize, _src, _dest);
         break;
       case BLOSC_BITSHUFFLE:
-        bscount = bitunshuffle(typesize, bsize, _src, _dest, _tmp);
-        if (bscount < 0)
-          errcode = bscount;
+        bitunshuffle(typesize, bsize, _src, _dest, _tmp);
         break;
       case BLOSC_DELTA:
         if (context->nthreads == 1) {
@@ -980,16 +980,17 @@ static int blosc_d(
 /* Serial version for compression/decompression */
 static int serial_blosc(struct thread_context* thread_context) {
   blosc2_context* context = thread_context->parent_context;
-  size_t j, bsize, leftoverblock;
+  int32_t j, bsize, leftoverblock;
   int32_t cbytes;
-  int32_t ntbytes = (int32_t)context->output_bytes;
+  size_t ntbytes = context->output_bytes;
   uint32_t* bstarts = context->bstarts;
-
   uint8_t* tmp = thread_context->tmp;
   uint8_t* tmp2 = thread_context->tmp2;
+  int dict_training = context->use_dict && (context->dict_buffer == NULL);
+  int memcpyed = *(context->header_flags) & BLOSC_MEMCPYED;
 
   for (j = 0; j < context->nblocks; j++) {
-    if (context->do_compress && !(*(context->header_flags) & BLOSC_MEMCPYED)) {
+    if (context->do_compress && !memcpyed && !dict_training) {
       _sw32(bstarts + j, ntbytes);
     }
     bsize = context->blocksize;
@@ -999,7 +1000,7 @@ static int serial_blosc(struct thread_context* thread_context) {
       leftoverblock = 1;
     }
     if (context->do_compress) {
-      if (*(context->header_flags) & BLOSC_MEMCPYED) {
+      if (memcpyed) {
         /* We want to memcpy only */
         memcpy(context->dest + BLOSC_MAX_OVERHEAD + j * context->blocksize,
                context->src + j * context->blocksize,
@@ -1008,7 +1009,7 @@ static int serial_blosc(struct thread_context* thread_context) {
       }
       else {
         /* Regular compression */
-        cbytes = blosc_c(thread_context, bsize, leftoverblock, (size_t)ntbytes,
+        cbytes = blosc_c(thread_context, bsize, leftoverblock, ntbytes,
                          context->destsize, context->src, j * context->blocksize,
                          context->dest + ntbytes, tmp, tmp2);
         if (cbytes == 0) {
@@ -1018,7 +1019,7 @@ static int serial_blosc(struct thread_context* thread_context) {
       }
     }
     else {
-      if (*(context->header_flags) & BLOSC_MEMCPYED) {
+      if (memcpyed) {
         /* We want to memcpy only */
         memcpy(context->dest + j * context->blocksize,
                context->src + BLOSC_MAX_OVERHEAD + j * context->blocksize,
@@ -1032,6 +1033,7 @@ static int serial_blosc(struct thread_context* thread_context) {
                          context->dest, j * context->blocksize, tmp, tmp2);
       }
     }
+
     if (cbytes < 0) {
       ntbytes = cbytes;         /* error in blosc_c or blosc_d */
       break;
@@ -1261,6 +1263,11 @@ static int initialize_context_decompression(
   context->typesize = (uint8_t)context->src[3];
   context->sourcesize = (size_t)sw32_(context->src + 4);
   context->blocksize = (size_t)sw32_(context->src + 8);
+  /* Total blocks */
+  context->nblocks = context->sourcesize / context->blocksize;
+  context->leftover = context->sourcesize % context->blocksize;
+  context->nblocks = (context->leftover > 0) ?
+                     context->nblocks + 1 : context->nblocks;
   if ((context->header_flags[0] & BLOSC_DOSHUFFLE) &&
       (context->header_flags[0] & BLOSC_DOBITSHUFFLE)) {
     /* Extended header */
@@ -1271,16 +1278,14 @@ static int initialize_context_decompression(
       context->filters_meta[i] = filters_meta[i];
     }
     context->filter_flags = filters_to_flags(filters);
-    uint8_t* blosc2_flags = (uint8_t*)(context->src +
-            BLOSC_MIN_HEADER_LENGTH + 0xF);
+    uint8_t* blosc2_flags = (uint8_t*)(context->src + 0x1F);
+    context->bstarts = (uint32_t*)(context->src + BLOSC_EXTENDED_HEADER_LENGTH);
     if (*blosc2_flags & BLOSC2_USEDICT) {
       context->use_dict = 1;
       // The trained dictionary is after the bstarts block
-      size_t nblocks = context->sourcesize / context->blocksize;
-      context->dict_size = (size_t)sw32_(context->bstarts + nblocks);
-      context->dict_buffer = context->bstarts + nblocks + 1;
+      context->dict_size = (size_t)sw32_(context->bstarts + context->nblocks);
+      context->dict_buffer = (void*)(context->bstarts + context->nblocks + 1);
     }
-    context->bstarts = (uint32_t*)(context->src + BLOSC_EXTENDED_HEADER_LENGTH);
   } else {
     /* Regular (Blosc1) header */
     context->filter_flags = get_filter_flags(context->header_flags[0],
@@ -1293,13 +1298,6 @@ static int initialize_context_decompression(
   if (context->sourcesize > (int32_t)destsize) {
     return -1;
   }
-
-  /* Compute some params */
-  /* Total blocks */
-  context->nblocks = context->sourcesize / context->blocksize;
-  context->leftover = context->sourcesize % context->blocksize;
-  context->nblocks = (context->leftover > 0) ?
-                     context->nblocks + 1 : context->nblocks;
 
   return 0;
 }
@@ -1322,6 +1320,7 @@ static int write_compression_header(blosc2_context* context,
                                     int extended_header) {
   int32_t compformat;
   int dont_split;
+  int dict_training = context->use_dict && (context->dict_buffer == NULL);
 
   /* Write version header for this block */
   context->dest[0] = BLOSC_VERSION_FORMAT;
@@ -1398,11 +1397,16 @@ static int write_compression_header(blosc2_context* context,
       filters[i] = context->filters[i];
       filters_meta[i] = context->filters_meta[i];
     }
-    context->bstarts = (uint32_t*)(context->dest +
-            BLOSC_EXTENDED_HEADER_LENGTH);
-    context->output_bytes = BLOSC_EXTENDED_HEADER_LENGTH +
-                            sizeof(int32_t) * context->nblocks;
-    uint8_t * blosc2_flags = context->dest + BLOSC_MIN_HEADER_LENGTH + 0xF;
+    if (dict_training) {
+      context->bstarts = NULL;
+      context->output_bytes = BLOSC_EXTENDED_HEADER_LENGTH;
+    } else {
+      context->bstarts = (uint32_t*)(context->dest +
+              BLOSC_EXTENDED_HEADER_LENGTH);
+      context->output_bytes = BLOSC_EXTENDED_HEADER_LENGTH +
+                              sizeof(int32_t) * context->nblocks;
+    }
+    uint8_t * blosc2_flags = context->dest + 0x1F;
     *blosc2_flags = 0;    // zeroes flags
     if (context->use_dict) {
       *blosc2_flags |= BLOSC2_USEDICT;
@@ -1479,8 +1483,8 @@ int blosc_compress_context(blosc2_context* context) {
       }
     }
     else if (context->sourcesize + BLOSC_MAX_OVERHEAD <= context->destsize) {
-    memcpy(context->dest + BLOSC_MAX_OVERHEAD, context->src,
-           context->sourcesize);
+      memcpy(context->dest + BLOSC_MAX_OVERHEAD, context->src,
+             context->sourcesize);
       ntbytes = (int)context->sourcesize + BLOSC_MAX_OVERHEAD;
     }
   }
@@ -1511,7 +1515,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     context->nthreads, context->schunk);
   if (error < 0) { return error; }
 
-  /* Write the extended header (not compatible with Blosc1) */
+  /* Write the extended header that is meant for hosting the samples */
   error = write_compression_header(context, 1);
   if (error < 0) { return error; }
 
@@ -1529,42 +1533,55 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
 
     // Build the dictionary out of the filters outcome and compress with it
     size_t dict_maxsize = BLOSC2_MAXDICTSIZE;
-    size_t dict_actual_size = 0;
-    unsigned nblocks = (unsigned)context->nblocks - 1;
-    void* dict_buffer = malloc(dict_maxsize);
-    size_t data_start = context->output_bytes;
-    void* samples_buffer = context->dest + data_start;
-    size_t sample_size = 1024;
-    size_t* samples_sizes = malloc(nblocks * sizeof(void*));
+    // Do not make the dict more than 7% larger than uncompressed buffer
+    if (dict_maxsize > nbytes / 16) {
+      dict_maxsize = nbytes / 16;
+    }
+    void* samples_buffer = context->dest + BLOSC_EXTENDED_HEADER_LENGTH;
+    size_t sample_size = 128 * (size_t)(context->clevel);  // TODO: fine-tuning
+    unsigned nblocks = (unsigned)context->nblocks;
 
     // Populate the samples sizes for training the dictionary
-    for (size_t i = 0; i < nblocks; i++) {
+    size_t* samples_sizes = malloc(nblocks * sizeof(void*));
+    for (size_t i = 0; i < nblocks - 1; i++) {
       samples_sizes[i] = sample_size;
     }
+    // Deal with the leftovers
+    if (sample_size > (context->sourcesize % context->blocksize))
+      sample_size = context->sourcesize % context->blocksize;
+    samples_sizes[nblocks - 1] = sample_size;
 
-    dict_actual_size = ZDICT_trainFromBuffer(
+    // Train from samples
+    void* dict_buffer = malloc(dict_maxsize);
+    size_t dict_actual_size = ZDICT_trainFromBuffer(
           dict_buffer, dict_maxsize, samples_buffer, samples_sizes, nblocks);
     if (ZDICT_isError(dict_actual_size) != ZSTD_error_no_error) {
       fprintf(stderr, "Error in ZDICT_trainFromBuffer(): '%s'."
               "  Giving up.\n", ZDICT_getErrorName(dict_actual_size));
     }
+    assert(dict_actual_size > 0);
     free(samples_sizes);
 
-    assert(dict_actual_size > 0);
-    context->dict_buffer = dict_buffer;
+    // Update bytes counter and pointers to bstarts for the new compressed
+    // buffer
+    context->bstarts = (uint32_t*)(context->dest +
+                                   BLOSC_EXTENDED_HEADER_LENGTH);
+    context->output_bytes = BLOSC_EXTENDED_HEADER_LENGTH +
+                            sizeof(int32_t) * context->nblocks;
+    /* Write the size of trained dict at the end of bstarts */
+    _sw32(context->dest + context->output_bytes, (int32_t)dict_actual_size);
+    context->output_bytes += sizeof(uint32_t);
+    /* Write the trained dict afterwards */
+    context->dict_buffer = context->dest + context->output_bytes;
+    memcpy(context->dict_buffer, dict_buffer, dict_actual_size);
+    free(dict_buffer);      // the dictionary is copied in the header now
+    context->output_bytes += dict_actual_size;
     context->dict_size = dict_actual_size;
-    /* Write the trained dict at the end of the existing header info */
-    _sw32(samples_buffer, (int32_t)dict_actual_size);
-    memcpy(samples_buffer + sizeof(int32_t), dict_buffer, dict_actual_size);
-    context->output_bytes = data_start + dict_actual_size;
+    // TODO: use ZSTD_createCDict() in another context entry and see if this
+    // actually accelerates the compression process or not
 
-    /* Compress again with dict */
+    /* Compress with dict */
     result = blosc_compress_context(context);
-
-    // Release dictionary in context (it is copied in the header now)
-    free(dict_buffer);
-    context->dict_buffer = NULL;
-    context->dict_size = 0;
   }
 
   return result;
@@ -1727,7 +1744,9 @@ int blosc_run_decompression_with_context(
   int error;
 
   error = initialize_context_decompression(context, src, dest, destsize);
-  if (error < 0) { return error; }
+  if (error < 0) {
+    return error;
+  }
 
   /* Check whether this buffer is memcpy'ed */
   if (*(context->header_flags) & BLOSC_MEMCPYED) {

@@ -66,6 +66,7 @@ blosc2_schunk* blosc2_new_schunk(blosc2_cparams cparams,
 size_t append_chunk(blosc2_schunk* schunk, void* chunk) {
   int64_t nchunks = schunk->nchunks;
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
+  // TODO: update for extended headers
   int32_t nbytes = *(int32_t*)((uint8_t*)chunk + 4);
   int32_t cbytes = *(int32_t*)((uint8_t*)chunk + 12);
 
@@ -95,6 +96,7 @@ size_t blosc2_append_buffer(blosc2_schunk* schunk, size_t nbytes, void* src) {
     free(chunk);
     return (size_t)cbytes;
   }
+  // TODO: use a realloc to get rid of unused space in chunk
 
   return append_chunk(schunk, chunk);
 }

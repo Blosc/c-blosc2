@@ -48,12 +48,12 @@ enum {
 
 enum {
   BLOSC_MIN_HEADER_LENGTH = 16,
-  /* Minimum header length */
+  /* Minimum header length (Blosc1) */
   BLOSC_EXTENDED_HEADER_LENGTH = 32,
-  /* Extended header length (see README_HEADER) */
-  BLOSC_MAX_OVERHEAD = BLOSC_MIN_HEADER_LENGTH,
+  /* Extended header length (Blosc2, see README_HEADER) */
+  BLOSC_MAX_OVERHEAD = BLOSC_EXTENDED_HEADER_LENGTH,
   /* The maximum overhead during compression in bytes.  This equals to
-     BLOSC_MIN_HEADER_LENGTH now, but can be higher in future
+     BLOSC_EXTENDED_HEADER_LENGTH now, but can be higher in future
      implementations */
   BLOSC_MAX_BUFFERSIZE = (INT_MAX - BLOSC_MAX_OVERHEAD),
   /* Maximum source buffer size to be compressed */

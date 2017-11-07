@@ -92,12 +92,12 @@ static char *test_delta() {
   /* Get a compressed buffer without delta */
   blosc_set_delta(0);
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
-                          dest, size + 16);
+                          dest, size + BLOSC_MAX_OVERHEAD);
 
   /* Activate the delta filter and compress again */
   blosc_set_delta(1);
   cbytes2 = blosc_compress(clevel, doshuffle, typesize, size, src,
-                           dest, size + 16);
+                           dest, size + BLOSC_MAX_OVERHEAD);
   if ((typesize % 12) == 0) {
     // For typesizes 12 and 24 we do an exception and allow less compression
     if ((2 * cbytes2) > (3 * cbytes)) {
