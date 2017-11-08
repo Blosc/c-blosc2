@@ -27,7 +27,7 @@
 
 #define CHUNKSIZE (200 * 1000)
 #define NCHUNKS 10
-#define NTHREADS 1
+#define NTHREADS 4
 
 
 int main() {

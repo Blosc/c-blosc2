@@ -317,6 +317,7 @@ int blosc_compcode_to_compname(int compcode, char** compname) {
   return code;
 }
 
+
 /* Get the compressor code for the compressor name. -1 if it is not available */
 int blosc_compname_to_compcode(const char* compname) {
   int code = -1;  /* -1 means non-existent compressor code */
@@ -366,6 +367,7 @@ static int lz4_wrap_compress(const char* input, size_t input_length,
   return cbytes;
 }
 
+
 static int lz4hc_wrap_compress(const char* input, size_t input_length,
                                char* output, size_t maxout, int clevel) {
   int cbytes;
@@ -378,6 +380,7 @@ static int lz4hc_wrap_compress(const char* input, size_t input_length,
   return cbytes;
 }
 
+
 static int lz4_wrap_decompress(const char* input, size_t compressed_length,
                                char* output, size_t maxout) {
   int cbytes;
@@ -388,6 +391,7 @@ static int lz4_wrap_decompress(const char* input, size_t compressed_length,
   return (int)maxout;
 }
 #endif /* HAVE_LZ4 */
+
 
 #if defined(HAVE_LIZARD)
 static int lizard_wrap_compress(const char* input, size_t input_length,
@@ -435,6 +439,7 @@ static int snappy_wrap_decompress(const char* input, size_t compressed_length,
 }
 #endif /* HAVE_SNAPPY */
 
+
 #if defined(HAVE_ZLIB)
 /* zlib is not very respectful with sharing name space with others.
  Fortunately, its names do not collide with those already in blosc. */
@@ -462,6 +467,7 @@ static int zlib_wrap_decompress(const char* input, size_t compressed_length,
   return (int)ul;
 }
 #endif /*  HAVE_ZLIB */
+
 
 #if defined(HAVE_ZSTD)
 static int zstd_wrap_compress(struct thread_context* thread_context,
@@ -2020,7 +2026,6 @@ static void* t_blosc(void* ctxt) {
   uint8_t* tmp;
   uint8_t* tmp2;
   uint8_t* tmp3;
-  int dict_training = context->use_dict && (context->dict_buffer == NULL);
   int rc;
 
   while (1) {
@@ -2137,7 +2142,12 @@ static void* t_blosc(void* ctxt) {
         /* Start critical section */
         pthread_mutex_lock(&context->count_mutex);
         ntdest = context->output_bytes;
-        _sw32(bstarts + nblock_, (int32_t)ntdest);
+        // Note: do not use a typical local dict_training variable here
+        // because it is probably cached from previous calls if the number of
+        // threads does not change (the usual thing).
+        if (!(context->use_dict && (context->dict_buffer == NULL))) {
+          _sw32(bstarts + nblock_, (int32_t) ntdest);
+        }
 
         if ((cbytes == 0) || (ntdest + cbytes > maxbytes)) {
           context->thread_giveup_code = 0;  /* uncompressible buf */
