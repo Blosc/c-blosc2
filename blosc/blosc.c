@@ -861,8 +861,8 @@ int pipeline_d(blosc2_context* context, const size_t bsize, uint8_t* dest,
 
 /* Decompress & unshuffle a single block */
 static int blosc_d(
-    struct thread_context* thread_context, size_t bsize,
-    size_t leftoverblock, const uint8_t* src, uint8_t* dest, size_t offset,
+    struct thread_context* thread_context, int32_t bsize,
+    int32_t leftoverblock, const uint8_t* src, uint8_t* dest, size_t offset,
     uint8_t* tmp, uint8_t* tmp2) {
   blosc2_context* context = thread_context->parent_context;
   uint8_t* filters = context->filters;
@@ -1995,73 +1995,76 @@ int blosc2_getitem_ctx(blosc2_context* context, const void* src, int start,
 
 /* Decompress & unshuffle several blocks in a single thread */
 static void* t_blosc(void* ctxt) {
-  struct thread_context* context = (struct thread_context*)ctxt;
+  struct thread_context* thcontext = (struct thread_context*)ctxt;
+  blosc2_context* context = thcontext->parent_context;
   int32_t cbytes;
   size_t ntdest;
   size_t tblocks;               /* number of blocks per thread */
   size_t tblock;                /* limit block on a thread */
   size_t nblock_;              /* private copy of nblock */
-  size_t bsize, leftoverblock;
+  int32_t bsize;
+  int32_t leftoverblock;
   /* Parameters for threads */
-  size_t blocksize;
+  int32_t blocksize;
   size_t ebsize;
   int32_t compress;
   size_t maxbytes;
   int32_t ntbytes;
   int32_t flags;
   size_t nblocks;
-  size_t leftover;
-  size_t leftover2;
+  int32_t leftover;
+  int32_t leftover2;
   uint32_t* bstarts;
   const uint8_t* src;
   uint8_t* dest;
   uint8_t* tmp;
   uint8_t* tmp2;
   uint8_t* tmp3;
+  int dict_training = context->use_dict && (context->dict_buffer == NULL);
   int rc;
 
   while (1) {
     /* Synchronization point for all threads (wait for initialization) */
-    WAIT_INIT(NULL, context->parent_context);
+    WAIT_INIT(NULL, context);
 
-    if (context->parent_context->end_threads) {
+    if (context->end_threads) {
       break;
     }
 
     /* Get parameters for this thread before entering the main loop */
-    blocksize = context->parent_context->blocksize;
-    ebsize = blocksize + context->parent_context->typesize * sizeof(int32_t);
-    compress = context->parent_context->do_compress;
-    flags = *(context->parent_context->header_flags);
-    maxbytes = context->parent_context->destsize;
-    nblocks = context->parent_context->nblocks;
-    leftover = context->parent_context->leftover;
-    bstarts = context->parent_context->bstarts;
-    src = context->parent_context->src;
-    dest = context->parent_context->dest;
+    blocksize = context->blocksize;
+    ebsize = blocksize + context->typesize * sizeof(int32_t);
+    compress = context->do_compress;
+    flags = *(context->header_flags);
+    maxbytes = context->destsize;
+    nblocks = context->nblocks;
+    leftover = context->leftover;
+    bstarts = context->bstarts;
+    src = context->src;
+    dest = context->dest;
 
     /* Resize the temporaries if needed */
-    if (blocksize != context->tmpblocksize) {
-      my_free(context->tmp);
-      context->tmp = my_malloc(3 * blocksize + ebsize);
-      context->tmp2 = context->tmp + blocksize;
-      context->tmp3 = context->tmp + blocksize + ebsize;
-      context->tmp4 = context->tmp + 2 * blocksize + ebsize;
-      context->tmpblocksize = blocksize;
+    if (blocksize != thcontext->tmpblocksize) {
+      my_free(thcontext->tmp);
+      thcontext->tmp = my_malloc(3 * blocksize + ebsize);
+      thcontext->tmp2 = thcontext->tmp + blocksize;
+      thcontext->tmp3 = thcontext->tmp + blocksize + ebsize;
+      thcontext->tmp4 = thcontext->tmp + 2 * blocksize + ebsize;
+      thcontext->tmpblocksize = blocksize;
     }
 
-    tmp = context->tmp;
-    tmp2 = context->tmp2;
-    tmp3 = context->tmp3;
+    tmp = thcontext->tmp;
+    tmp2 = thcontext->tmp2;
+    tmp3 = thcontext->tmp3;
 
     ntbytes = 0;                /* only useful for decompression */
 
     if (compress && !(flags & BLOSC_MEMCPYED)) {
       /* Compression always has to follow the block order */
-      pthread_mutex_lock(&context->parent_context->count_mutex);
-      context->parent_context->thread_nblock++;
-      nblock_ = (size_t)context->parent_context->thread_nblock;
-      pthread_mutex_unlock(&context->parent_context->count_mutex);
+      pthread_mutex_lock(&context->count_mutex);
+      context->thread_nblock++;
+      nblock_ = (size_t)context->thread_nblock;
+      pthread_mutex_unlock(&context->count_mutex);
       tblock = nblocks;
     }
     else {
@@ -2069,11 +2072,11 @@ static void* t_blosc(void* ctxt) {
        sequential block order on each thread */
 
       /* Blocks per thread */
-      tblocks = nblocks / context->parent_context->nthreads;
-      leftover2 = nblocks % context->parent_context->nthreads;
+      tblocks = nblocks / context->nthreads;
+      leftover2 = nblocks % context->nthreads;
       tblocks = (leftover2 > 0) ? tblocks + 1 : tblocks;
 
-      nblock_ = context->tid * tblocks;
+      nblock_ = thcontext->tid * tblocks;
       tblock = nblock_ + tblocks;
       if (tblock > nblocks) {
         tblock = nblocks;
@@ -2083,7 +2086,7 @@ static void* t_blosc(void* ctxt) {
     /* Loop over blocks */
     leftoverblock = 0;
     while ((nblock_ < tblock) &&
-            (context->parent_context->thread_giveup_code > 0)) {
+            (context->thread_giveup_code > 0)) {
       bsize = blocksize;
       if (nblock_ == (nblocks - 1) && (leftover > 0)) {
         bsize = leftover;
@@ -2098,7 +2101,7 @@ static void* t_blosc(void* ctxt) {
         }
         else {
           /* Regular compression */
-          cbytes = blosc_c(context, bsize, leftoverblock, 0,
+          cbytes = blosc_c(thcontext, bsize, leftoverblock, 0,
                            ebsize, src, nblock_ * blocksize, tmp2, tmp, tmp3);
         }
       }
@@ -2110,41 +2113,41 @@ static void* t_blosc(void* ctxt) {
           cbytes = (int32_t)bsize;
         }
         else {
-          cbytes = blosc_d(context, bsize, leftoverblock,
+          cbytes = blosc_d(thcontext, bsize, leftoverblock,
                            src + sw32_(bstarts + nblock_),
                            dest, nblock_ * blocksize, tmp, tmp2);
         }
       }
 
       /* Check whether current thread has to giveup */
-      if (context->parent_context->thread_giveup_code <= 0) {
+      if (context->thread_giveup_code <= 0) {
         break;
       }
 
       /* Check results for the compressed/decompressed block */
       if (cbytes < 0) {            /* compr/decompr failure */
         /* Set giveup_code error */
-        pthread_mutex_lock(&context->parent_context->count_mutex);
-        context->parent_context->thread_giveup_code = cbytes;
-        pthread_mutex_unlock(&context->parent_context->count_mutex);
+        pthread_mutex_lock(&context->count_mutex);
+        context->thread_giveup_code = cbytes;
+        pthread_mutex_unlock(&context->count_mutex);
         break;
       }
 
       if (compress && !(flags & BLOSC_MEMCPYED)) {
         /* Start critical section */
-        pthread_mutex_lock(&context->parent_context->count_mutex);
-        ntdest = context->parent_context->output_bytes;
+        pthread_mutex_lock(&context->count_mutex);
+        ntdest = context->output_bytes;
         _sw32(bstarts + nblock_, (int32_t)ntdest);
 
         if ((cbytes == 0) || (ntdest + cbytes > maxbytes)) {
-          context->parent_context->thread_giveup_code = 0;  /* uncompressible buf */
-          pthread_mutex_unlock(&context->parent_context->count_mutex);
+          context->thread_giveup_code = 0;  /* uncompressible buf */
+          pthread_mutex_unlock(&context->count_mutex);
           break;
         }
-        context->parent_context->thread_nblock++;
-        nblock_ = (size_t)context->parent_context->thread_nblock;
-        context->parent_context->output_bytes += cbytes;
-        pthread_mutex_unlock(&context->parent_context->count_mutex);
+        context->thread_nblock++;
+        nblock_ = (size_t)context->thread_nblock;
+        context->output_bytes += cbytes;
+        pthread_mutex_unlock(&context->count_mutex);
         /* End of critical section */
 
         /* Copy the compressed buffer to destination */
@@ -2160,19 +2163,19 @@ static void* t_blosc(void* ctxt) {
 
     /* Sum up all the bytes decompressed */
     if ((!compress || (flags & BLOSC_MEMCPYED)) &&
-        (context->parent_context->thread_giveup_code > 0)) {
+        (context->thread_giveup_code > 0)) {
       /* Update global counter for all threads (decompression only) */
-      pthread_mutex_lock(&context->parent_context->count_mutex);
-      context->parent_context->output_bytes += ntbytes;
-      pthread_mutex_unlock(&context->parent_context->count_mutex);
+      pthread_mutex_lock(&context->count_mutex);
+      context->output_bytes += ntbytes;
+      pthread_mutex_unlock(&context->count_mutex);
     }
 
     /* Meeting point for all threads (wait for finalization) */
-    WAIT_FINISH(NULL, context->parent_context);
+    WAIT_FINISH(NULL, context);
   }
 
   /* Cleanup our working space and context */
-  free_thread_context(context);
+  free_thread_context(thcontext);
 
   return (NULL);
 }
