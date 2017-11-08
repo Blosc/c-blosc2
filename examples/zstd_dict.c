@@ -26,8 +26,11 @@
 #define GB  (1024*MB)
 
 #define CHUNKSIZE (200 * 1000)
-#define NCHUNKS 10
+#define NCHUNKS 100  // TODO: increment to 500 and see a cratio decrease?
 #define NTHREADS 4
+//#define CHUNKSIZE (20 * 1000)
+//#define NCHUNKS 2
+//#define NTHREADS 1
 
 
 int main() {
@@ -57,6 +60,7 @@ int main() {
   cparams.compcode = BLOSC_ZSTD;
   cparams.use_dict = 1;
   cparams.clevel = 1;
+  cparams.blocksize = 1024 * 32;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
   schunk = blosc2_new_schunk(cparams, dparams);
@@ -81,7 +85,7 @@ int main() {
 
   /* Retrieve and decompress the chunks (0-based count) */
   blosc_set_timestamp(&last);
-  for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
+  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk,
                                     (void *)data_dest, isize);
   }
@@ -94,9 +98,9 @@ int main() {
   printf("Decompression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
-  /* Check integrity of the first chunk */
+  /* Check integrity of the last chunk */
   for (i = 0; i < CHUNKSIZE; i++) {
-    if (data_dest[i] != (uint64_t)i) {
+    if (data_dest[i] != (uint64_t)i * nchunk) {
       printf("Decompressed data differs from original %d, %zd!\n",
              i, data_dest[i]);
       return -1;

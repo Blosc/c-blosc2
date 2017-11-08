@@ -30,7 +30,7 @@
 #define GB  (1024*MB)
 
 #define CHUNKSIZE (200 * 1000)
-#define NCHUNKS 500
+#define NCHUNKS 100
 #define NTHREADS 4
 
 

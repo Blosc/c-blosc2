@@ -56,6 +56,10 @@ struct blosc2_context_s {
   /* The buffer to keep the trained dictionary */
   size_t dict_size;
   /* The size of the trained dictionary */
+  void* dict_cdict;
+  /* The dictionary in digested form for compression */
+  void* dict_ddict;
+  /* The dictionary in digested form for decompression */
   uint8_t filter_flags;
   /* The filter flags in the filter pipeline */
   uint8_t filters[BLOSC_MAX_FILTERS];

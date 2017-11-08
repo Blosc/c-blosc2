@@ -485,10 +485,10 @@ static int zstd_wrap_compress(struct thread_context* thread_context,
   }
 
   if (context->use_dict) {
-    assert(context->dict_size > 0);
-    code = ZSTD_compress_usingDict(
+    assert(context->dict_cdict != NULL);
+    code = ZSTD_compress_usingCDict(
             thread_context->zstd_cctx, (void*)output, maxout, (void*)input,
-            input_length, context->dict_buffer, context->dict_size, clevel);
+            input_length, context->dict_cdict);
   } else {
     code = ZSTD_compressCCtx(thread_context->zstd_cctx,
         (void*)output, maxout, (void*)input, input_length, clevel);
@@ -512,10 +512,10 @@ static int zstd_wrap_decompress(struct thread_context* thread_context,
   }
 
   if (context->use_dict) {
-    assert(context->dict_size > 0);
-    code = ZSTD_decompress_usingDict(
+    assert(context->dict_ddict != NULL);
+    code = ZSTD_decompress_usingDDict(
             thread_context->zstd_dctx, (void*)output, maxout, (void*)input,
-            compressed_length, context->dict_buffer, context->dict_size);
+            compressed_length, context->dict_ddict);
   } else {
     code = ZSTD_decompressDCtx(thread_context->zstd_dctx,
         (void*)output, maxout, (void*)input, compressed_length);
@@ -659,7 +659,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
                    uint8_t* tmp, uint8_t* tmp2) {
   blosc2_context* context = thread_context->parent_context;
   int dont_split = (*(context->header_flags) & 0x10) >> 4;
-  int dict_training = context->use_dict && context->dict_buffer == NULL;
+  int dict_training = context->use_dict && context->dict_cdict == NULL;
   int32_t j, neblock, nsplits;
   int32_t cbytes;                   /* number of compressed bytes in split */
   int32_t ctbytes = 0;              /* number of compressed bytes in block */
@@ -992,7 +992,7 @@ static int serial_blosc(struct thread_context* thread_context) {
   uint32_t* bstarts = context->bstarts;
   uint8_t* tmp = thread_context->tmp;
   uint8_t* tmp2 = thread_context->tmp2;
-  int dict_training = context->use_dict && (context->dict_buffer == NULL);
+  int dict_training = context->use_dict && (context->dict_cdict == NULL);
   int memcpyed = *(context->header_flags) & BLOSC_MEMCPYED;
 
   for (j = 0; j < context->nblocks; j++) {
@@ -1288,9 +1288,13 @@ static int initialize_context_decompression(
     context->bstarts = (uint32_t*)(context->src + BLOSC_EXTENDED_HEADER_LENGTH);
     if (*blosc2_flags & BLOSC2_USEDICT) {
       context->use_dict = 1;
-      // The trained dictionary is after the bstarts block
-      context->dict_size = (size_t)sw32_(context->bstarts + context->nblocks);
-      context->dict_buffer = (void*)(context->bstarts + context->nblocks + 1);
+      if (context->dict_ddict == NULL) {
+        // The trained dictionary is after the bstarts block
+        context->dict_size = (size_t)sw32_(context->bstarts + context->nblocks);
+        context->dict_buffer = (void*)(context->bstarts + context->nblocks + 1);
+        context->dict_ddict = ZSTD_createDDict(context->dict_buffer,
+                                               context->dict_size);
+      }
     }
   } else {
     /* Regular (Blosc1) header */
@@ -1326,7 +1330,7 @@ static int write_compression_header(blosc2_context* context,
                                     int extended_header) {
   int32_t compformat;
   int dont_split;
-  int dict_training = context->use_dict && (context->dict_buffer == NULL);
+  int dict_training = context->use_dict && (context->dict_cdict == NULL);
 
   /* Write version header for this block */
   context->dest[0] = BLOSC_VERSION_FORMAT;
@@ -1521,13 +1525,13 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     context->nthreads, context->schunk);
   if (error < 0) { return error; }
 
-  /* Write the extended header that is meant for hosting the samples */
+  /* Write the extended header */
   error = write_compression_header(context, 1);
   if (error < 0) { return error; }
 
   result = blosc_compress_context(context);
 
-  if (context->use_dict) {
+  if (context->use_dict && context->dict_cdict == NULL) {
 
     if (context->compcode != BLOSC_ZSTD) {
       char* compname;
@@ -1580,11 +1584,11 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     /* Write the trained dict afterwards */
     context->dict_buffer = context->dest + context->output_bytes;
     memcpy(context->dict_buffer, dict_buffer, dict_actual_size);
+    context->dict_cdict = ZSTD_createCDict(dict_buffer, dict_actual_size,
+                                           1);  // TODO: use get_accel()
     free(dict_buffer);      // the dictionary is copied in the header now
     context->output_bytes += dict_actual_size;
     context->dict_size = dict_actual_size;
-    // TODO: use ZSTD_createCDict() in another context entry and see if this
-    // actually accelerates the compression process or not
 
     /* Compress with dict */
     result = blosc_compress_context(context);
@@ -2145,7 +2149,7 @@ static void* t_blosc(void* ctxt) {
         // Note: do not use a typical local dict_training variable here
         // because it is probably cached from previous calls if the number of
         // threads does not change (the usual thing).
-        if (!(context->use_dict && (context->dict_buffer == NULL))) {
+        if (!(context->use_dict && (context->dict_cdict == NULL))) {
           _sw32(bstarts + nblock_, (int32_t) ntdest);
         }
 
@@ -2612,6 +2616,12 @@ void blosc2_free_ctx(blosc2_context* context) {
   blosc_release_threadpool(context);
   if (context->serial_context != NULL) {
     free_thread_context(context->serial_context);
+  }
+  if (context->dict_cdict != NULL) {
+    ZSTD_freeCDict(context->dict_cdict);
+  }
+  if (context->dict_ddict != NULL) {
+    ZSTD_freeDDict(context->dict_ddict);
   }
   my_free(context);
 }
