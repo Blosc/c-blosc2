@@ -1548,8 +1548,9 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
       dict_maxsize = nbytes / 32;
     }
     void* samples_buffer = context->dest + BLOSC_EXTENDED_HEADER_LENGTH;
-    size_t sample_size = 256 * (size_t)(context->clevel);  // TODO: fine-tuning
     unsigned nblocks = (unsigned)context->nblocks;
+    // The 1 << 14 below is purely a result of experimentation.  YMMV.
+    size_t sample_size = (1 << 14) * (size_t)(context->clevel) / nblocks;
 
     // Populate the samples sizes for training the dictionary
     size_t* samples_sizes = malloc(nblocks * sizeof(void*));
@@ -1568,6 +1569,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     if (ZDICT_isError(dict_actual_size) != ZSTD_error_no_error) {
       fprintf(stderr, "Error in ZDICT_trainFromBuffer(): '%s'."
               "  Giving up.\n", ZDICT_getErrorName(dict_actual_size));
+      return -20;
     }
     assert(dict_actual_size > 0);
     free(samples_sizes);
