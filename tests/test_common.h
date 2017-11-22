@@ -19,6 +19,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <math.h>
+#include "../blosc/blosc.h"
+
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <time.h>
   #include "win32/stdint-windows.h"
@@ -27,8 +30,6 @@
   #include <unistd.h>
   #include <sys/time.h>
 #endif
-#include <math.h>
-#include "../blosc/blosc.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
   /* MSVC does not have setenv */
