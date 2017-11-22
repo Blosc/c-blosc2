@@ -17,6 +17,7 @@
 #if defined(USING_CMAKE)
   #include "config.h"
 #endif /*  USING_CMAKE */
+#include "blosc.h"
 
 #include "context.h"
 #include "shuffle.h"
@@ -45,7 +46,6 @@
   #include "zstd.h"
   #include "zstd_errors.h"
   #include "zdict.h"
-#include "blosc.h"
 
 #endif /*  HAVE_ZSTD */
 
@@ -1543,12 +1543,12 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
 
     // Build the dictionary out of the filters outcome and compress with it
     size_t dict_maxsize = BLOSC2_MAXDICTSIZE;
-    // Do not make the dict more than 7% larger than uncompressed buffer
-    if (dict_maxsize > nbytes / 16) {
-      dict_maxsize = nbytes / 16;
+    // Do not make the dict more than 5% larger than uncompressed buffer
+    if (dict_maxsize > nbytes / 32) {
+      dict_maxsize = nbytes / 32;
     }
     void* samples_buffer = context->dest + BLOSC_EXTENDED_HEADER_LENGTH;
-    size_t sample_size = 128 * (size_t)(context->clevel);  // TODO: fine-tuning
+    size_t sample_size = 256 * (size_t)(context->clevel);  // TODO: fine-tuning
     unsigned nblocks = (unsigned)context->nblocks;
 
     // Populate the samples sizes for training the dictionary
