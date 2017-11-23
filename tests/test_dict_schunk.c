@@ -140,7 +140,7 @@ static char* test_dict() {
   }
 
   /* Free resources */
-  blosc2_destroy_schunk(schunk);
+  blosc2_free_schunk(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
 
