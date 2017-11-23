@@ -1,10 +1,16 @@
 # sources for examples
 #set(SOURCES contexts delta_schunk_ex multithread simple noinit simple_schunk)
-set(SOURCES contexts delta_schunk_ex multithread simple noinit find_roots)
+set(SOURCES contexts delta_schunk_ex multithread simple noinit find_roots
+        zstd_dict)
 
 # targets
 foreach(src ${SOURCES})
     add_executable(${src} ${src}.c)
+    # Define the BLOSC_TESTING symbol so normally-hidden functions
+    # aren't hidden from the view of the test programs.
+    set_property(
+            TARGET ${src}
+            APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
 endforeach(src)
 
 if (UNIX AND NOT APPLE)

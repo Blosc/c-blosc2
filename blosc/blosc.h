@@ -48,12 +48,12 @@ enum {
 
 enum {
   BLOSC_MIN_HEADER_LENGTH = 16,
-  /* Minimum header length */
+  /* Minimum header length (Blosc1) */
   BLOSC_EXTENDED_HEADER_LENGTH = 32,
-  /* Extended header length (see README_HEADER) */
-  BLOSC_MAX_OVERHEAD = BLOSC_MIN_HEADER_LENGTH,
+  /* Extended header length (Blosc2, see README_HEADER) */
+  BLOSC_MAX_OVERHEAD = BLOSC_EXTENDED_HEADER_LENGTH,
   /* The maximum overhead during compression in bytes.  This equals to
-     BLOSC_MIN_HEADER_LENGTH now, but can be higher in future
+     BLOSC_EXTENDED_HEADER_LENGTH now, but can be higher in future
      implementations */
   BLOSC_MAX_BUFFERSIZE = (INT_MAX - BLOSC_MAX_OVERHEAD),
   /* Maximum source buffer size to be compressed */
@@ -86,6 +86,16 @@ enum {
   BLOSC_MEMCPYED = 0x2,      /* plain copy */
   BLOSC_DOBITSHUFFLE = 0x4,  /* bit-wise shuffle */
   BLOSC_DODELTA = 0x8,       /* delta coding */
+};
+
+/* Codes for new internal flags in Blosc2 */
+enum {
+  BLOSC2_USEDICT = 0x1,            /* use dictionaries with codec */
+};
+
+/* Values for different Blosc2 capabilities */
+enum {
+  BLOSC2_MAXDICTSIZE = 128 * 1024, /* maximum size for compression dicts */
 };
 
 /* Codes for the different compressors shipped with Blosc */
@@ -486,6 +496,8 @@ typedef struct {
   /* the compressor codec */
   int clevel;
   /* the compression level (5) */
+  int use_dict;
+  /* use dicts or not when compressing (only for ZSTD) */
   size_t typesize;
   /* the type size (8) */
   uint32_t nthreads;
@@ -502,7 +514,7 @@ typedef struct {
 
 /* Default struct for compression params meant for user initialization */
 static const blosc2_cparams BLOSC_CPARAMS_DEFAULTS = {
-        BLOSC_BLOSCLZ, 5, 8, 1, 0, NULL,
+        BLOSC_BLOSCLZ, 5, 0, 8, 1, 0, NULL,
         {0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0} };
 
 /**

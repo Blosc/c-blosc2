@@ -1,28 +1,25 @@
 /*
-  Copyright (C) 2015  Francesc Alted
+  Copyright (C) 2017  Francesc Alted
   http://blosc.org
-  License: MIT (see LICENSE.txt)
+  License: BSD (see LICENSE.txt)
 
   Example program demonstrating use of the Blosc filter from C code.
 
   To compile this program:
 
-  $ gcc -O delta_schunk_ex.c -o delta_schunk_ex -lblosc
+  $ gcc -O zstd_dict.c -o zstd_dict -lblosc
 
   To run:
 
-  $ ./delta_schunk_ex
-  Blosc version info: 2.0.0a4.dev ($Date:: 2016-08-04 #$)
-  Compression ratio: 762.9 MB -> 7.6 MB (100.7x)
-  Compression time: 0.222 s, 3437.4 MB/s
-  Decompression time: 0.162 s, 4714.4 MB/s
-  Successful roundtrip!
+  $ ./zstd_dict
+  TODO ...
 
 */
 
 #include <stdio.h>
 #include <assert.h>
 #include <time.h>
+#include <blosc.h>
 #include "blosc.h"
 
 #define KB  1024.
@@ -30,7 +27,7 @@
 #define GB  (1024*MB)
 
 #define CHUNKSIZE (200 * 1000)
-#define NCHUNKS 100
+#define NCHUNKS 500
 #define NTHREADS 4
 
 
@@ -57,20 +54,23 @@ int main() {
 
   /* Create a super-chunk container */
   cparams.typesize = 8;
-  cparams.filters[0] = BLOSC_DELTA;
-  cparams.compcode = BLOSC_BLOSCLZ;
-  cparams.clevel = 9;
+  //cparams.filters[0] = BLOSC_DELTA;
+  cparams.compcode = BLOSC_ZSTD;
+  cparams.use_dict = 1;
+  //cparams.clevel = 7;
+  cparams.blocksize = 1024 * 4;  // a page size
+  //cparams.blocksize = 1024 * 32;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
   schunk = blosc2_new_schunk(cparams, dparams);
 
   blosc_set_timestamp(&last);
-  for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
+  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     for (i = 0; i < CHUNKSIZE; i++) {
-      data[i] = i * (int64_t)nchunk;
+      data[i] = i + (int64_t)nchunk * CHUNKSIZE;
     }
     nchunks = blosc2_append_buffer(schunk, isize, data);
-    assert(nchunks == nchunk);
+    assert(nchunks == nchunk + 1);
   }
   /* Gather some info */
   nbytes = schunk->nbytes;
@@ -84,7 +84,7 @@ int main() {
 
   /* Retrieve and decompress the chunks (0-based count) */
   blosc_set_timestamp(&last);
-  for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
+  for (nchunk = NCHUNKS - 1; nchunk >= 0; nchunk--) {
     dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk,
                                     (void *)data_dest, isize);
   }
@@ -99,8 +99,8 @@ int main() {
 
   /* Check integrity of the first chunk */
   for (i = 0; i < CHUNKSIZE; i++) {
-    if (data_dest[i] != (uint64_t)i) {
-      printf("Decompressed data differs from original %d, %zd!\n",
+    if (data_dest[i] != (int64_t)i) {
+      printf("Decompressed data differs from original %zd, %zd!\n",
              i, data_dest[i]);
       return -1;
     }
@@ -109,7 +109,7 @@ int main() {
   printf("Successful roundtrip!\n");
 
   /* Free resources */
-  blosc2_free_schunk(schunk);
+  blosc2_destroy_schunk(schunk);
   blosc_destroy();
 
   return 0;

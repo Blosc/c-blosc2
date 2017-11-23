@@ -44,15 +44,15 @@
 #include <stdio.h>
 #include <blosc.h>
 
-#define SIZE 1000*1000
+#define SIZE (1000 * 1000)
 
 
 int main() {
   static float data[SIZE];
   static float data_out[SIZE];
   static float data_dest[SIZE];
-  int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
-  int dsize = SIZE * sizeof(float), csize;
+  size_t isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
+  int dsize, csize;
   int nthreads, pnthreads, i;
 
   for (i = 0; i < SIZE; i++) {
@@ -79,10 +79,11 @@ int main() {
       return csize;
     }
 
-    printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1. * isize) / csize);
+    printf("Compression: %zu -> %d (%.1fx)\n", isize, csize, (1. * isize) /
+            csize);
 
     /* Decompress  */
-    dsize = blosc_decompress(data_out, data_dest, dsize);
+    dsize = blosc_decompress(data_out, data_dest, isize);
     if (dsize < 0) {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;

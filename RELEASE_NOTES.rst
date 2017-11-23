@@ -25,6 +25,9 @@ Changes from 2.0.0a3 to 2.0.0a4
 
 - Internal zstd sources bumbed to 1.3.0.
 
+- The BLOSC_MAX_OVERHEAD symbol is always 32 bytes, not 16 as in Blosc1.
+  This is needed in order to allow buffers larger than 32 bits (31 actually :).
+
 
 Changes from 2.0.0a2 to 2.0.0a3
 ===============================

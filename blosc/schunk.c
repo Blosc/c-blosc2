@@ -12,8 +12,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "blosc.h"
+#include "schunk.h"
+#include "context.h"
 
+#include "zstd.h"
+#include "zstd_errors.h"
+#include "zdict.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <windows.h>
@@ -66,6 +70,7 @@ blosc2_schunk* blosc2_new_schunk(blosc2_cparams cparams,
 size_t append_chunk(blosc2_schunk* schunk, void* chunk) {
   int64_t nchunks = schunk->nchunks;
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
+  // TODO: update for extended headers
   int32_t nbytes = *(int32_t*)((uint8_t*)chunk + 4);
   int32_t cbytes = *(int32_t*)((uint8_t*)chunk + 12);
 
@@ -95,6 +100,7 @@ size_t blosc2_append_buffer(blosc2_schunk* schunk, size_t nbytes, void* src) {
     free(chunk);
     return (size_t)cbytes;
   }
+  // TODO: use a realloc to get rid of unused space in chunk
 
   return append_chunk(schunk, chunk);
 }
@@ -104,6 +110,8 @@ size_t blosc2_append_buffer(blosc2_schunk* schunk, size_t nbytes, void* src) {
 int blosc2_decompress_chunk(blosc2_schunk* schunk, size_t nchunk,
                             void* dest, size_t nbytes) {
   int64_t nchunks = schunk->nchunks;
+  blosc2_context* cctx = schunk->cctx;
+  blosc2_context* dctx = schunk->dctx;
   void* src;
   int chunksize;
   int nbytes_;
@@ -112,6 +120,14 @@ int blosc2_decompress_chunk(blosc2_schunk* schunk, size_t nchunk,
     printf("specified nchunk ('%ld') exceeds the number of chunks "
            "('%ld') in super-chunk\n", (long)nchunk, (long)nchunks);
     return -10;
+  }
+
+  if (cctx->use_dict && dctx->dict_ddict == NULL) {
+    // Create the dictionary for decompression
+    // Right now we can only have an schunk if we created it in-memory.
+    // TODO: revisit this when schunks can be loaded from disk.
+    dctx->dict_ddict = ZSTD_createDDict(cctx->dict_buffer, cctx->dict_size);
+    dctx->use_dict = 1;
   }
 
   src = schunk->data[nchunk];

@@ -34,9 +34,9 @@ struct blosc2_context_s {
   /* Number of bytes in source buffer */
   size_t nblocks;
   /* Number of total blocks in buffer */
-  size_t leftover;
+  int32_t leftover;
   /* Extra bytes at end of buffer */
-  size_t blocksize;
+  int32_t blocksize;
   /* Length of the block in bytes */
   size_t output_bytes;
   /* Counter for the number of output bytes */
@@ -44,12 +44,22 @@ struct blosc2_context_s {
   /* Maximum size for destination buffer */
   size_t typesize;
   /* Type size */
-  uint8_t* bstarts;
+  uint32_t* bstarts;
   /* Starts for every block inside the compressed buffer */
   int compcode;
   /* Compressor code to use */
   int clevel;
   /* Compression level (1-9) */
+  int use_dict;
+  /* Whether to use dicts or not */
+  void* dict_buffer;
+  /* The buffer to keep the trained dictionary */
+  size_t dict_size;
+  /* The size of the trained dictionary */
+  void* dict_cdict;
+  /* The dictionary in digested form for compression */
+  void* dict_ddict;
+  /* The dictionary in digested form for decompression */
   uint8_t filter_flags;
   /* The filter flags in the filter pipeline */
   uint8_t filters[BLOSC_MAX_FILTERS];
@@ -97,7 +107,7 @@ struct thread_context {
   uint8_t* tmp2;
   uint8_t* tmp3;
   uint8_t* tmp4;
-  size_t tmpblocksize; /* keep track of how big the temporary buffers are */
+  int32_t tmpblocksize; /* keep track of how big the temporary buffers are */
 #if defined(HAVE_ZSTD)
   /* The contexts for ZSTD */
   ZSTD_CCtx* zstd_cctx;

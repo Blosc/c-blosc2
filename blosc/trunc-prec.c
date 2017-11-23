@@ -46,7 +46,7 @@ void truncate_precision64(const uint8_t prec_bits, const size_t nelems,
 
 /* Apply the truncate precision to src.  This can never fail. */
 void truncate_precision(const uint8_t prec_bits, const size_t typesize,
-                        const size_t nbytes, const uint8_t* src,
+                        const int32_t nbytes, const uint8_t* src,
                         uint8_t* dest) {
   // Make sure that we don't remove all the bits in mantissa so that we
   // don't mess with NaNs or Infinite representation in IEEE 754:
