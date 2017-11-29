@@ -1970,6 +1970,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   int result;
 
   /* Minimally populate the context */
+  memset(&context, 0, sizeof(blosc2_context));
   context.typesize = (uint8_t)_src[3];
   context.blocksize = (size_t)sw32_(_src + 8);
   context.header_flags = _src + 2;
