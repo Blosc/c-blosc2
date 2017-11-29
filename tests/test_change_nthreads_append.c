@@ -47,14 +47,12 @@ int main() {
 
   struct blosc2_context_s * cctx = schunk->cctx;
   blosc_set_timestamp(&last);
-  int j = 0;
   for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
     for (i = 0; i < CHUNKSIZE; i++) {
       data[i] = i * (int64_t)nchunk;
     }
     // Alternate between 1 and NTHREADS
-    cctx->new_nthreads = j % NTHREADS + 1;
-    j++;
+    cctx->new_nthreads = nchunk % NTHREADS + 1;
     nchunks = blosc2_append_buffer(schunk, isize, data);
     mu_assert("ERROR: nchunk is not correct", nchunks == nchunk);
   }
