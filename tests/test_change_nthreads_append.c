@@ -52,12 +52,8 @@ int main() {
     for (i = 0; i < CHUNKSIZE; i++) {
       data[i] = i * (int64_t)nchunk;
     }
-    // Alternate between 2 and NTHREADS
-    if (j % 2 != 0) {
-      cctx->new_nthreads = 2;
-    } else {
-      cctx->new_nthreads = NTHREADS;
-    }
+    // Alternate between 1 and NTHREADS
+    cctx->new_nthreads = j % NTHREADS + 1;
     j++;
     nchunks = blosc2_append_buffer(schunk, isize, data);
     mu_assert("ERROR: nchunk is not correct", nchunks == nchunk);
