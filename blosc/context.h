@@ -77,6 +77,7 @@ struct blosc2_context_s {
 
   /* Threading */
   int nthreads;
+  int new_nthreads;
   int threads_started;
   int end_threads;
   pthread_t *threads;

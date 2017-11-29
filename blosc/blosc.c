@@ -1199,6 +1199,7 @@ static int initialize_context_compression(
   }
   context->compcode = compressor;
   context->nthreads = nthreads;
+  context->new_nthreads = context->nthreads;
   context->end_threads = 0;
   context->clevel = clevel;
   context->schunk = schunk;
@@ -2249,6 +2250,10 @@ static int init_threads(blosc2_context* context) {
     }
   }
 
+  /* We have now started the threads */
+  context->threads_started = context->nthreads;
+  context->new_nthreads = context->nthreads;
+
   return (0);
 }
 
@@ -2280,14 +2285,13 @@ int blosc_set_nthreads_(blosc2_context* context) {
     return -1;
   }
 
-  /* Launch a new pool of threads */
-  if (context->nthreads > 1 && context->nthreads != context->threads_started) {
+  if (context->nthreads > 1 && context->new_nthreads != context->nthreads) {
     blosc_release_threadpool(context);
+    context->nthreads = context->new_nthreads;
+  }
+  if (context->nthreads > 1 && context->threads_started == 0) {
     init_threads(context);
   }
-
-  /* We have now started the threads */
-  context->threads_started = context->nthreads;
 
   return context->nthreads;
 }
@@ -2526,8 +2530,6 @@ int blosc_release_threadpool(blosc2_context* context) {
   if (context->threads_started > 0) {
     /* Tell all existing threads to finish */
     context->end_threads = 1;
-
-    /* Sync threads */
     WAIT_INIT(-1, context);
 
     /* Join exiting threads */
@@ -2538,6 +2540,11 @@ int blosc_release_threadpool(blosc2_context* context) {
         fprintf(stderr, "\tError detail: %s\n", strerror(rc));
       }
     }
+
+    /* Reset flags and counters */
+    context->end_threads = 0;
+    context->threads_started = 0;
+    context->count_threads = 0;
 
     /* Release mutex and condition variable objects */
     pthread_mutex_destroy(&context->count_mutex);
@@ -2562,7 +2569,6 @@ int blosc_release_threadpool(blosc2_context* context) {
     my_free(context->threads);
   }
 
-  context->threads_started = 0;
 
   return 0;
 }
@@ -2593,7 +2599,9 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     context->filters_meta[i] = cparams.filters_meta[i];
   }
   context->nthreads = cparams.nthreads;
+  context->new_nthreads = context->nthreads;
   context->blocksize = cparams.blocksize;
+  context->threads_started = 0;
   context->schunk = cparams.schunk;
 
   return context;
@@ -2608,6 +2616,8 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   memset(context, 0, sizeof(blosc2_context));
   context->do_compress = 0;   /* Meant for decompression */
   context->nthreads = dparams.nthreads;
+  context->new_nthreads = context->nthreads;
+  context->threads_started = 0;
   context->schunk = dparams.schunk;
 
   return context;
