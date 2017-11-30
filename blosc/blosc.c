@@ -88,11 +88,10 @@ static int g_initlib = 0;
 static blosc2_schunk* g_schunk = NULL;   /* the pointer to super-chunk */
 
 
-/* Wrapped function to adjust the number of threads used by blosc */
-int blosc_set_nthreads_(blosc2_context* context);
+// Forward declarations
 
-/* Releases the global threadpool */
-int blosc_release_threadpool(blosc2_context* context);
+int init_threadpool(blosc2_context *context);
+int release_threadpool(blosc2_context *context);
 
 /* Macros for synchronization */
 
@@ -1111,6 +1110,25 @@ void free_thread_context(struct thread_context* thread_context) {
   my_free(thread_context);
 }
 
+
+int check_nthreads(blosc2_context* context) {
+  if (context->nthreads <= 0) {
+    fprintf(stderr, "Error.  nthreads must be a positive integer");
+    return -1;
+  }
+
+  if (context->nthreads > 1 && context->new_nthreads != context->nthreads) {
+    release_threadpool(context);
+    context->nthreads = context->new_nthreads;
+  }
+  if (context->nthreads > 1 && context->threads_started == 0) {
+    init_threadpool(context);
+  }
+
+  return context->nthreads;
+}
+
+
 /* Do the compression or decompression of the buffer depending on the
    global params. */
 static int do_job(blosc2_context* context) {
@@ -1118,6 +1136,9 @@ static int do_job(blosc2_context* context) {
 
   /* Set sentinels */
   context->dref_not_init = 1;
+
+  /* Check whether we need to restart threads */
+  check_nthreads(context);
 
   /* Run the serial version when nthreads is 1 or when the buffers are
      not larger than blocksize */
@@ -1133,9 +1154,6 @@ static int do_job(blosc2_context* context) {
     ntbytes = serial_blosc(context->serial_context);
   }
   else {
-    /* Check whether we need to restart threads... */
-    blosc_set_nthreads_(context);
-    /* ...and run the job */
     ntbytes = parallel_blosc(context);
   }
 
@@ -2217,7 +2235,7 @@ static void* t_blosc(void* ctxt) {
 }
 
 
-static int init_threads(blosc2_context* context) {
+int init_threadpool(blosc2_context *context) {
   int32_t tid;
   int rc2;
   struct thread_context* thread_context;
@@ -2298,22 +2316,6 @@ int blosc_set_nthreads(int nthreads_new) {
   return ret;
 }
 
-int blosc_set_nthreads_(blosc2_context* context) {
-  if (context->nthreads <= 0) {
-    fprintf(stderr, "Error.  nthreads must be a positive integer");
-    return -1;
-  }
-
-  if (context->nthreads > 1 && context->new_nthreads != context->nthreads) {
-    blosc_release_threadpool(context);
-    context->nthreads = context->new_nthreads;
-  }
-  if (context->nthreads > 1 && context->threads_started == 0) {
-    init_threads(context);
-  }
-
-  return context->nthreads;
-}
 
 char* blosc_get_compressor(void)
 {
@@ -2532,7 +2534,7 @@ void blosc_destroy(void) {
   if (!g_initlib) return;
 
   g_initlib = 0;
-  blosc_release_threadpool(g_global_context);
+  release_threadpool(g_global_context);
   if (g_global_context->serial_context != NULL) {
     free_thread_context(g_global_context->serial_context);
   }
@@ -2541,7 +2543,7 @@ void blosc_destroy(void) {
 }
 
 
-int blosc_release_threadpool(blosc2_context* context) {
+int release_threadpool(blosc2_context *context) {
   int32_t t;
   void* status;
   int rc;
@@ -2560,11 +2562,6 @@ int blosc_release_threadpool(blosc2_context* context) {
       }
     }
 
-    /* Reset flags and counters */
-    context->end_threads = 0;
-    context->threads_started = 0;
-    context->count_threads = 0;
-
     /* Release mutex and condition variable objects */
     pthread_mutex_destroy(&context->count_mutex);
     pthread_mutex_destroy(&context->delta_mutex);
@@ -2577,7 +2574,12 @@ int blosc_release_threadpool(blosc2_context* context) {
   #else
     pthread_mutex_destroy(&context->count_threads_mutex);
     pthread_cond_destroy(&context->count_threads_cv);
+    context->count_threads = 0;      /* Reset threads counter */
   #endif
+
+    /* Reset flags and counters */
+    context->end_threads = 0;
+    context->threads_started = 0;
 
     /* Thread attributes */
   #if !defined(_WIN32)
@@ -2596,7 +2598,7 @@ int blosc_free_resources(void) {
   /* Return if Blosc is not initialized */
   if (!g_initlib) return -1;
 
-  return blosc_release_threadpool(g_global_context);
+  return release_threadpool(g_global_context);
 }
 
 
@@ -2644,7 +2646,7 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
 
 
 void blosc2_free_ctx(blosc2_context* context) {
-  blosc_release_threadpool(context);
+  release_threadpool(context);
   if (context->serial_context != NULL) {
     free_thread_context(context->serial_context);
   }
