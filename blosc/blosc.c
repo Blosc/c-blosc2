@@ -1206,8 +1206,11 @@ static int initialize_context_compression(
 
   /* Tune some compression parameters */
   context->blocksize = blocksize;
-  btune_next_cparams(context);
-
+  if (context->btune != NULL) {
+    btune_next_cparams(context);
+  } else {
+    btune_next_blocksize(context);
+  }
 
   /* Check buffer size limits */
   if (sourcesize > BLOSC_MAX_BUFFERSIZE) {
