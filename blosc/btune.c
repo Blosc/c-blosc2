@@ -37,7 +37,7 @@ int HCR(blosc2_context *context) {
 
 
 /* Tune some compression parameters based in the context */
-void btune_cparams(blosc2_context* context) {
+void btune_next_cparams(blosc2_context* context) {
   int32_t clevel = context->clevel;
   size_t typesize = context->typesize;
   size_t nbytes = context->sourcesize;
@@ -112,4 +112,13 @@ void btune_cparams(blosc2_context* context) {
   }
 
   context->blocksize = blocksize;
+}
+
+// Empty functions (will be replaced by actual BTune)
+void btune_update(blosc2_context* context, double ctime) {
+  return;
+}
+
+void btune_free(blosc2_context* context) {
+  return;
 }

@@ -67,6 +67,7 @@
 #    LIB: includes blosc.so
 #    DEV: static includes blosc.a and blosc.h
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
 
 cmake_minimum_required(VERSION 2.8.10)
 IF (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} GREATER 3.4)

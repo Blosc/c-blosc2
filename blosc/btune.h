@@ -16,7 +16,12 @@
 #define L1 (32 * 1024)
 
 
-void btune_cparams(blosc2_context* context);
+BLOSC_EXPORT void btune_init(void * config, blosc2_context* cctx, blosc2_context* dctx);
 
+void btune_next_cparams(blosc2_context* context);
+
+void btune_update(blosc2_context* context, double ctime);
+
+void btune_free(blosc2_context* context);
 
 #endif  /* BTUNE_H */

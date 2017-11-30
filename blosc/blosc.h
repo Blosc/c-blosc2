@@ -530,7 +530,7 @@ typedef struct {
   /* the associated schunk, if any (NULL) */
 } blosc2_dparams;
 
-/* Default struct for compression params meant for user initialization */
+/* Default struct for decompression params meant for user initialization */
 static const blosc2_dparams BLOSC_DPARAMS_DEFAULTS = { 1, NULL };
 
 /**

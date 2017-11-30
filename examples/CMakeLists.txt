@@ -1,11 +1,31 @@
 # sources for examples
 #set(SOURCES contexts delta_schunk_ex multithread simple noinit simple_schunk)
-set(SOURCES contexts delta_schunk_ex multithread simple noinit find_roots
-        zstd_dict)
+set(SOURCES contexts delta_schunk_ex multithread simple noinit find_roots zstd_dict)
+if (EXISTS btune_schunk.c)
+    set(SOURCES ${SOURCES} btune_schunk.c)
+endif()
 
 # targets
 foreach(src ${SOURCES})
     add_executable(${src} ${src}.c)
+    # have to copy blosc dlls on Windows
+    if (MSVC)
+        add_custom_command(
+                TARGET ${src}
+                POST_BUILD
+                COMMAND ${CMAKE_COMMAND}
+                ARGS -E copy_if_different
+                "${PROJECT_BINARY_DIR}/blosc/\$\(Configuration\)/blosc.dll"
+                "${CMAKE_CURRENT_BINARY_DIR}/\$\(Configuration\)/blosc.dll")
+    elseif (MINGW)
+        add_custom_command(
+                TARGET ${src}
+                POST_BUILD
+                COMMAND ${CMAKE_COMMAND}
+                ARGS -E copy_if_different
+                "${PROJECT_BINARY_DIR}/blosc/libblosc.dll"
+                "${CMAKE_CURRENT_BINARY_DIR}/libblosc.dll")
+    endif(MSVC)
     # Define the BLOSC_TESTING symbol so normally-hidden functions
     # aren't hidden from the view of the test programs.
     set_property(
@@ -25,25 +45,6 @@ endif (UNIX AND NOT APPLE)
 foreach(src ${SOURCES})
     target_link_libraries(${src} blosc_shared)
 endforeach(src)
-
-# have to copy blosc dlls on Windows
-if (MSVC)
-    add_custom_command(
-            TARGET contexts
-            POST_BUILD
-            COMMAND ${CMAKE_COMMAND}
-            ARGS -E copy_if_different
-            "${PROJECT_BINARY_DIR}/blosc/\$\(Configuration\)/blosc.dll"
-            "${CMAKE_CURRENT_BINARY_DIR}/\$\(Configuration\)/blosc.dll")
-elseif (MINGW)
-    add_custom_command(
-            TARGET contexts
-            POST_BUILD
-            COMMAND ${CMAKE_COMMAND}
-            ARGS -E copy_if_different
-            "${PROJECT_BINARY_DIR}/blosc/libblosc.dll"
-            "${CMAKE_CURRENT_BINARY_DIR}/libblosc.dll")
-endif (MSVC)
 
 # tests
 if (BUILD_TESTS)

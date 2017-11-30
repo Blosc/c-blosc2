@@ -1,9 +1,9 @@
 /*
   Copyright (C) 2015  Francesc Alted
   http://blosc.org
-  License: MIT (see LICENSE.txt)
+  License: BSD (see LICENSE.txt)
 
-  Example program demonstrating use of the Blosc filter from C code.
+  Example program demonstrating use of the delta filter from C code.
 
   To compile this program:
 
@@ -22,7 +22,6 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include <time.h>
 #include "blosc.h"
 
 #define KB  1024.
@@ -30,7 +29,7 @@
 #define GB  (1024*MB)
 
 #define CHUNKSIZE (200 * 1000)
-#define NCHUNKS 100
+#define NCHUNKS 500
 #define NTHREADS 4
 
 
@@ -110,7 +109,6 @@ int main() {
 
   /* Free resources */
   blosc2_free_schunk(schunk);
-  blosc_destroy();
 
   return 0;
 }

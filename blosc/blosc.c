@@ -1204,6 +1204,11 @@ static int initialize_context_compression(
   context->clevel = clevel;
   context->schunk = schunk;
 
+  /* Tune some compression parameters */
+  context->blocksize = blocksize;
+  btune_next_cparams(context);
+
+
   /* Check buffer size limits */
   if (sourcesize > BLOSC_MAX_BUFFERSIZE) {
     /* If buffer is too large, give up. */
@@ -1224,10 +1229,6 @@ static int initialize_context_compression(
     /* If typesize is too large, treat buffer as an 1-byte stream. */
     context->typesize = 1;
   }
-
-  /* Finally, tune some compression parameters */
-  context->blocksize = blocksize;
-  btune_cparams(context);
 
   /* Compute number of blocks in buffer */
   context->nblocks = context->sourcesize / context->blocksize;
@@ -1465,6 +1466,11 @@ static int write_compression_header(blosc2_context* context,
 
 int blosc_compress_context(blosc2_context* context) {
   int ntbytes = 0;
+  blosc_timestamp_t last, current;
+
+  if (context->btune != NULL) {
+    blosc_set_timestamp(&last);
+  }
 
   if (!(*(context->header_flags) & BLOSC_MEMCPYED)) {
     /* Do the actual compression */
@@ -1502,8 +1508,17 @@ int blosc_compress_context(blosc2_context* context) {
 
   /* Set the number of compressed bytes in header */
   _sw32(context->dest + 12, ntbytes);
+  /* Set the number of bytes in dest buffer (might be useful for btune) */
+  context->destsize = ntbytes;
 
   assert(ntbytes <= context->destsize);
+
+
+  if (context->btune != NULL) {
+    blosc_set_timestamp(&current);
+    double ctime = blosc_elapsed_secs(last, current);
+    btune_update(context, ctime);
+  }
 
   return ntbytes;
 }
@@ -2635,6 +2650,9 @@ void blosc2_free_ctx(blosc2_context* context) {
   }
   if (context->dict_ddict != NULL) {
     ZSTD_freeDDict(context->dict_ddict);
+  }
+  if (context->btune != NULL) {
+    btune_free(context);
   }
   my_free(context);
 }
