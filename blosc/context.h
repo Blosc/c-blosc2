@@ -10,13 +10,20 @@
 #ifndef CONTEXT_H
 #define CONTEXT_H
 
-#include "blosc.h"
-
 #if defined(_WIN32) && !defined(__GNUC__)
   #include "win32/pthread.h"
 #else
   #include <pthread.h>
+  #include <unistd.h>    // _POSIX_BARRIERS should be defined there
 #endif
+
+/* Have problems using posix barriers when symbol value is 200112L */
+/* This requires more investigation, but will work for the moment */
+#if defined(_POSIX_BARRIERS) && ((_POSIX_BARRIERS - 20012L) >= 0 && _POSIX_BARRIERS != 200112L)
+#define BLOSC_POSIX_BARRIERS
+#endif
+
+#include "blosc.h"
 
 #if defined(HAVE_ZSTD)
   #include "zstd.h"
@@ -82,7 +89,7 @@ struct blosc2_context_s {
   int end_threads;
   pthread_t *threads;
   pthread_mutex_t count_mutex;
-#ifdef BLOSC_POSIX_BARRIERS_MINE
+#ifdef BLOSC_POSIX_BARRIERS
   pthread_barrier_t barr_init;
   pthread_barrier_t barr_finish;
 #else

@@ -17,9 +17,8 @@
 #if defined(USING_CMAKE)
   #include "config.h"
 #endif /*  USING_CMAKE */
-#include "blosc.h"
-
 #include "context.h"
+
 #include "shuffle.h"
 #include "delta.h"
 #include "trunc-prec.h"
@@ -96,7 +95,7 @@ int release_threadpool(blosc2_context *context);
 /* Macros for synchronization */
 
 /* Wait until all threads are initialized */
-#ifdef _POSIX_BARRIERS_MINE
+#ifdef BLOSC_POSIX_BARRIERS
 #define WAIT_INIT(RET_VAL, CONTEXT_PTR)  \
   rc = pthread_barrier_wait(&(CONTEXT_PTR)->barr_init); \
   if (rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD) { \
@@ -118,7 +117,7 @@ int release_threadpool(blosc2_context *context);
 #endif
 
 /* Wait for all threads to finish */
-#ifdef BLOSC_POSIX_BARRIERS_MINE
+#ifdef BLOSC_POSIX_BARRIERS
 #define WAIT_FINISH(RET_VAL, CONTEXT_PTR)   \
   rc = pthread_barrier_wait(&(CONTEXT_PTR)->barr_finish); \
   if (rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD) { \
@@ -2250,7 +2249,7 @@ int init_threadpool(blosc2_context *context) {
   context->thread_nblock = -1;
 
   /* Barrier initialization */
-#ifdef BLOSC_POSIX_BARRIERS_MINE
+#ifdef BLOSC_POSIX_BARRIERS
   pthread_barrier_init(&context->barr_init, NULL, context->nthreads + 1);
   pthread_barrier_init(&context->barr_finish, NULL, context->nthreads + 1);
 #else
@@ -2568,7 +2567,7 @@ int release_threadpool(blosc2_context *context) {
     pthread_cond_destroy(&context->delta_cv);
 
     /* Barriers */
-  #ifdef BLOSC_POSIX_BARRIERS_MINE
+  #ifdef BLOSC_POSIX_BARRIERS
     pthread_barrier_destroy(&context->barr_init);
     pthread_barrier_destroy(&context->barr_finish);
   #else
