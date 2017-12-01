@@ -67,8 +67,11 @@ int main() {
          ttotal, nbytes / (ttotal * MB));
 
   /* Retrieve and decompress the chunks (0-based count) */
+  struct blosc2_context_s * dctx = schunk->dctx;
   blosc_set_timestamp(&last);
   for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
+    // Alternate between 1 and NTHREADS
+    dctx->new_nthreads = nchunk % NTHREADS + 1;
     dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk,
                                     (void *)data_dest, isize);
   }

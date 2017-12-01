@@ -1116,17 +1116,18 @@ int check_nthreads(blosc2_context* context) {
     return -1;
   }
 
-  if (context->nthreads > 1 && context->new_nthreads != context->nthreads) {
-    release_threadpool(context);
+  if (context->new_nthreads != context->nthreads) {
+    if (context->nthreads > 1) {
+      release_threadpool(context);
+    }
     context->nthreads = context->new_nthreads;
   }
-  if (context->nthreads > 1 && context->threads_started == 0) {
+  if (context->new_nthreads > 1 && context->threads_started == 0) {
     init_threadpool(context);
   }
 
   return context->nthreads;
 }
-
 
 /* Do the compression or decompression of the buffer depending on the
    global params. */
@@ -1199,7 +1200,7 @@ static int initialize_context_compression(
   blosc2_context* context, size_t sourcesize, const void* src, void* dest,
   size_t destsize, int clevel, uint8_t const *filters,
   uint8_t const *filters_meta, size_t typesize, int compressor,
-  size_t blocksize, int nthreads, blosc2_schunk* schunk) {
+  size_t blocksize, int new_nthreads, int nthreads, blosc2_schunk* schunk) {
 
   /* Set parameters */
   context->do_compress = 1;
@@ -1216,7 +1217,7 @@ static int initialize_context_compression(
   }
   context->compcode = compressor;
   context->nthreads = nthreads;
-  context->new_nthreads = context->nthreads;
+  context->new_nthreads = new_nthreads;
   context->end_threads = 0;
   context->clevel = clevel;
   context->schunk = schunk;
@@ -1558,8 +1559,10 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     context, nbytes, src, dest, destsize,
     context->clevel, context->filters, context->filters_meta,
     context->typesize, context->compcode, context->blocksize,
-    context->nthreads, context->schunk);
-  if (error < 0) { return error; }
+    context->new_nthreads, context->nthreads, context->schunk);
+  if (error < 0) {
+    return error;
+  }
 
   /* Write the extended header */
   error = write_compression_header(context, 1);
@@ -1766,7 +1769,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
   build_filters(doshuffle, g_delta, typesize, filters);
   error = initialize_context_compression(
     g_global_context, nbytes, src, dest, destsize, clevel, filters,
-    filters_meta, typesize, g_compressor, g_force_blocksize, g_nthreads,
+    filters_meta, typesize, g_compressor, g_force_blocksize, g_nthreads, g_nthreads,
     g_schunk);
   free(filters);
   free(filters_meta);
@@ -2305,12 +2308,10 @@ int blosc_set_nthreads(int nthreads_new) {
   if (!g_initlib) blosc_init();
 
  if (nthreads_new != ret) {
-    /* Re-initialize Blosc */
-    blosc_destroy();
-    blosc_init();
-    g_nthreads = nthreads_new;
-    g_global_context->nthreads = nthreads_new;
-  }
+   g_nthreads = nthreads_new;
+   g_global_context->new_nthreads = nthreads_new;
+   check_nthreads(g_global_context);
+ }
 
   return ret;
 }
@@ -2524,6 +2525,8 @@ void blosc_init(void) {
   /* Create a global context */
   g_global_context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
   memset(g_global_context, 0, sizeof(blosc2_context));
+  g_global_context->nthreads = g_nthreads;
+  g_global_context->new_nthreads = g_nthreads;
   g_initlib = 1;
 }
 
