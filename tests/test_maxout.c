@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
   srccpy = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
-  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, size + 16);
+  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, size + BLOSC_MAX_OVERHEAD);
   dest2 = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
   _src = (int32_t*)src;
   for (i = 0; i < (size / 4); i++) {

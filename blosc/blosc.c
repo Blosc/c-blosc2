@@ -1521,8 +1521,7 @@ int blosc_compress_context(blosc2_context* context) {
       }
     }
     else if (context->sourcesize + BLOSC_MAX_OVERHEAD <= context->destsize) {
-      memcpy(context->dest + BLOSC_MAX_OVERHEAD, context->src,
-             context->sourcesize);
+      memcpy(context->dest + BLOSC_MAX_OVERHEAD, context->src, context->sourcesize);
       ntbytes = (int)context->sourcesize + BLOSC_MAX_OVERHEAD;
     }
   }
@@ -2518,7 +2517,7 @@ void blosc_set_schunk(blosc2_schunk* schunk) {
 
 
 void blosc_init(void) {
-  /* Return if we are already initialized */
+  /* Return if Blosc is already initialized */
   if (g_initlib) return;
 
   pthread_mutex_init(&global_comp_mutex, NULL);

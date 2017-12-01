@@ -42,7 +42,7 @@ static char *test_compress_decompress() {
 
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
-                          dest, size + 16);
+                          dest, size + BLOSC_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not correct", cbytes < size);
 
   /* Decompress the buffer */
