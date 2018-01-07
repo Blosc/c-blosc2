@@ -20,6 +20,9 @@
 extern "C" {
 #endif
 
+#define BLOSCLZ_VERSION_STRING "1.1.0"
+
+
 /**
   Compress a block of data in the input buffer and returns the size of
   compressed block. The size of input buffer is specified by
@@ -41,7 +44,7 @@ extern "C" {
 */
 
 int blosclz_compress(const int opt_level, const void* input, int length,
-                     void* output, int maxout, int accel);
+                     void* output, int maxout);
 
 /**
   Decompress a block of compressed data and returns the size of the

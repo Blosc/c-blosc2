@@ -15,6 +15,9 @@
 /* The size of L1 cache.  32 KB is quite common nowadays. */
 #define L1 (32 * 1024)
 
+/* The maximum number of splits in a block for compression */
+#define MAX_SPLITS 16            /* Cannot be larger than 128 */
+
 
 BLOSC_EXPORT void btune_init(void * config, blosc2_context* cctx, blosc2_context* dctx);
 
@@ -25,5 +28,17 @@ void btune_next_cparams(blosc2_context * context);
 void btune_update(blosc2_context * context, double ctime);
 
 void btune_free(blosc2_context * context);
+
+/* Conditions for splitting a block before compressing with a codec. */
+static int split_block(int compcode, size_t typesize, size_t blocksize) {
+  /* Normally all the compressors designed for speed benefit from a
+     split.  However, in conducted benchmarks LZ4 seems that it runs
+     faster if we don't split, which is quite surprising.
+     */
+  return (((compcode == BLOSC_BLOSCLZ) ||
+           (compcode == BLOSC_SNAPPY)) &&
+          (typesize <= MAX_SPLITS) &&
+          (blocksize / typesize) >= BLOSC_MIN_BUFFERSIZE);
+}
 
 #endif  /* BTUNE_H */
