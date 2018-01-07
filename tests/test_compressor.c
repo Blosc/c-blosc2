@@ -185,7 +185,7 @@ static char *test_delta() {
   cbytes2 = blosc_compress(clevel, doshuffle, typesize, size, src,
                            dest, size + 16);
   mu_assert("ERROR: BLOSC_DELTA=1 does not work correctly",
-            cbytes2 < cbytes / 2);
+            cbytes2 < 3 * cbytes / 4);
 
   /* Reset env var */
   unsetenv("BLOSC_DELTA");
