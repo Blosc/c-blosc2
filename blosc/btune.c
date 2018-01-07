@@ -76,17 +76,19 @@ void btune_next_blocksize(blosc2_context* context) {
         blocksize /= 4;
         break;
       case 1:
+        blocksize /= 2;
+        break;
       case 2:
-      case 3:
-      case 4:
         blocksize *= 1;
         break;
-      case 5:
+      case 3:
         blocksize *= 2;
         break;
-      case 6:
+      case 4:
+      case 5:
         blocksize *= 4;
         break;
+      case 6:
       case 7:
       case 8:
         blocksize *= 8;
@@ -101,6 +103,15 @@ void btune_next_blocksize(blosc2_context* context) {
       default:
         break;
     }
+  }
+
+  /* Enlarge the blocksize for splittable codecs */
+  if (clevel > 0 && split_block(context->compcode, typesize, blocksize)) {
+    if (blocksize > (1 << 16)) {
+      /* Do not use a too large buffer (64 KB) for splitting codecs */
+      blocksize = (1 << 16);
+    }
+    blocksize *= typesize;
   }
 
   /* Check that blocksize is not too large */

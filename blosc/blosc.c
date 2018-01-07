@@ -70,9 +70,6 @@
   #include "win32/pthread.c"
 #endif
 
-/* The maximum number of splits in a block for compression */
-#define MAX_SPLITS 16            /* Cannot be larger than 128 */
-
 /* Synchronization variables */
 
 /* Global context for non-contextual API */
@@ -530,18 +527,8 @@ static int zstd_wrap_decompress(struct thread_context* thread_context,
 /* Compute acceleration for blosclz */
 static int get_accel(const blosc2_context* context) {
   int clevel = context->clevel;
-  size_t typesize = context->typesize;
 
-  if (context->compcode == BLOSC_BLOSCLZ) {
-    /* Compute the power of 2. See:
-     * http://www.exploringbinary.com/ten-ways-to-check-if-an-integer-is-a-power-of-two-in-c/
-     */
-    int32_t tspow2 = ((typesize != 0) && !(typesize & (typesize - 1)));
-    if (tspow2 && typesize < 32) {
-      return 32;
-    }
-  }
-  else if (context->compcode == BLOSC_LZ4) {
+  if (context->compcode == BLOSC_LZ4) {
     /* This acceleration setting based on discussions held in:
      * https://groups.google.com/forum/#!topic/lz4c/zosy90P8MQw
      */
@@ -716,7 +703,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     }
     else if (context->compcode == BLOSC_BLOSCLZ) {
       cbytes = blosclz_compress(context->clevel, _src + j * neblock,
-                                (int)neblock, dest, (int)maxout, accel);
+                                (int)neblock, dest, (int)maxout);
     }
   #if defined(HAVE_LZ4)
     else if (context->compcode == BLOSC_LZ4) {
@@ -1333,19 +1320,6 @@ static int initialize_context_decompression(
   }
 
   return 0;
-}
-
-
-/* Conditions for splitting a block before compressing with a codec. */
-static int split_block(int compcode, size_t typesize, size_t blocksize) {
-  /* Normally all the compressors designed for speed benefit from a
-     split.  However, in conducted benchmarks LZ4 seems that it runs
-     faster if we don't split, which is quite surprising.
-     */
-  return (((compcode == BLOSC_BLOSCLZ) ||
-           (compcode == BLOSC_SNAPPY)) &&
-          (typesize <= MAX_SPLITS) &&
-          (blocksize / typesize) >= BLOSC_MIN_BUFFERSIZE);
 }
 
 

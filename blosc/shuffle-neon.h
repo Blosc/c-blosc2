@@ -13,7 +13,7 @@
 #ifndef SHUFFLE_NEON_H
 #define SHUFFLE_NEON_H
 
-#include "shuffle-common.h"
+#include "blosc-common.h"
 
 #ifdef __cplusplus
 extern "C" {
