@@ -14,6 +14,8 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include "fastcopy.h"
+
 #if defined(USING_CMAKE)
   #include "config.h"
 #endif /*  USING_CMAKE */
@@ -698,7 +700,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     if (dict_training) {
       // We are in the build dict state, so don't compress
       // TODO: copy only a percentage for sampling
-      memcpy(dest, _src + j * neblock, neblock);
+      fastcopy(dest, _src + j * neblock, neblock);
       cbytes = (int32_t)neblock;
     }
     else if (context->compcode == BLOSC_BLOSCLZ) {
@@ -763,7 +765,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       if ((ntbytes + neblock) > maxbytes) {
         return 0;    /* Non-compressible data */
       }
-      memcpy(dest, _src + j * neblock, neblock);
+      fastcopy(dest, _src + j * neblock, neblock);
       cbytes = (int32_t)neblock;
     }
     if (!dict_training) {
@@ -897,7 +899,7 @@ static int blosc_d(
     ctbytes += (int32_t)sizeof(int32_t);
     /* Uncompress */
     if (cbytes == neblock) {
-      memcpy(_dest, src, neblock);
+      fastcopy(_dest, src, neblock);
       nbytes = (int32_t)neblock;
     }
     else {
@@ -993,9 +995,9 @@ static int serial_blosc(struct thread_context* thread_context) {
     if (context->do_compress) {
       if (memcpyed) {
         /* We want to memcpy only */
-        memcpy(context->dest + BLOSC_MAX_OVERHEAD + j * context->blocksize,
-               context->src + j * context->blocksize,
-               bsize);
+        fastcopy(context->dest + BLOSC_MAX_OVERHEAD + j * context->blocksize,
+                 context->src + j * context->blocksize,
+                 bsize);
         cbytes = (int32_t)bsize;
       }
       else {
@@ -1012,9 +1014,9 @@ static int serial_blosc(struct thread_context* thread_context) {
     else {
       if (memcpyed) {
         /* We want to memcpy only */
-        memcpy(context->dest + j * context->blocksize,
-               context->src + BLOSC_MAX_OVERHEAD + j * context->blocksize,
-               bsize);
+        fastcopy(context->dest + j * context->blocksize,
+                 context->src + BLOSC_MAX_OVERHEAD + j * context->blocksize,
+                 bsize);
         cbytes = (int32_t)bsize;
       }
       else {
@@ -1495,7 +1497,7 @@ int blosc_compress_context(blosc2_context* context) {
       }
     }
     else if (context->sourcesize + BLOSC_MAX_OVERHEAD <= context->destsize) {
-      memcpy(context->dest + BLOSC_MAX_OVERHEAD, context->src, context->sourcesize);
+      fastcopy(context->dest + BLOSC_MAX_OVERHEAD, context->src, context->sourcesize);
       ntbytes = (int)context->sourcesize + BLOSC_MAX_OVERHEAD;
     }
   }
@@ -1597,7 +1599,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     context->output_bytes += sizeof(uint32_t);
     /* Write the trained dict afterwards */
     context->dict_buffer = context->dest + context->output_bytes;
-    memcpy(context->dict_buffer, dict_buffer, dict_actual_size);
+    fastcopy(context->dict_buffer, dict_buffer, dict_actual_size);
     context->dict_cdict = ZSTD_createCDict(dict_buffer, dict_actual_size,
                                            1);  // TODO: use get_accel()
     free(dict_buffer);      // the dictionary is copied in the header now
@@ -1774,7 +1776,7 @@ int blosc_run_decompression_with_context(
 
   /* Check whether this buffer is memcpy'ed */
   if (*(context->header_flags) & BLOSC_MEMCPYED) {
-    memcpy(dest, (uint8_t*)src + BLOSC_MAX_OVERHEAD, context->sourcesize);
+    fastcopy(dest, (uint8_t*)src + BLOSC_MAX_OVERHEAD, context->sourcesize);
     ntbytes = (int32_t)context->sourcesize;
   }
   else {
@@ -1936,9 +1938,9 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
     /* Do the actual data copy */
     if (flags & BLOSC_MEMCPYED) {
       /* We want to memcpy only */
-      memcpy((uint8_t*)dest + ntbytes,
-             (uint8_t*)src + BLOSC_MAX_OVERHEAD + j * blocksize + startb,
-             bsize2);
+      fastcopy((uint8_t*)dest + ntbytes,
+               (uint8_t*)src + BLOSC_MAX_OVERHEAD + j * blocksize + startb,
+               bsize2);
       cbytes = (int)bsize2;
     }
     else {
@@ -1963,7 +1965,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
         break;
       }
       /* Copy to destination */
-      memcpy((uint8_t*)dest + ntbytes, scontext->tmp2 + startb, bsize2);
+      fastcopy((uint8_t*)dest + ntbytes, scontext->tmp2 + startb, bsize2);
       cbytes = (int)bsize2;
     }
     ntbytes += cbytes;
@@ -2119,8 +2121,8 @@ static void* t_blosc(void* ctxt) {
       if (compress) {
         if (flags & BLOSC_MEMCPYED) {
           /* We want to memcpy only */
-          memcpy(dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize,
-                 src + nblock_ * blocksize, bsize);
+          fastcopy(dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize,
+                   src + nblock_ * blocksize, bsize);
           cbytes = (int32_t)bsize;
         }
         else {
@@ -2132,8 +2134,8 @@ static void* t_blosc(void* ctxt) {
       else {
         if (flags & BLOSC_MEMCPYED) {
           /* We want to memcpy only */
-          memcpy(dest + nblock_ * blocksize,
-                 src + BLOSC_MAX_OVERHEAD + nblock_ * blocksize, bsize);
+          fastcopy(dest + nblock_ * blocksize,
+                   src + BLOSC_MAX_OVERHEAD + nblock_ * blocksize, bsize);
           cbytes = (int32_t)bsize;
         }
         else {
@@ -2180,7 +2182,7 @@ static void* t_blosc(void* ctxt) {
         /* End of critical section */
 
         /* Copy the compressed buffer to destination */
-        memcpy(dest + ntdest, tmp2, cbytes);
+        fastcopy(dest + ntdest, tmp2, cbytes);
       }
       else {
         nblock_++;
