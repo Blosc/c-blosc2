@@ -49,7 +49,7 @@ struct blosc2_context_s {
   /* Counter for the number of output bytes */
   size_t destsize;
   /* Maximum size for destination buffer */
-  size_t typesize;
+  int32_t typesize;
   /* Type size */
   uint32_t* bstarts;
   /* Starts for every block inside the compressed buffer */
