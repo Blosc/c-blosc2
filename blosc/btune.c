@@ -41,10 +41,10 @@ int HCR(blosc2_context *context) {
 /* Tune some compression parameters based in the context */
 void btune_next_blocksize(blosc2_context* context) {
   int32_t clevel = context->clevel;
-  size_t typesize = context->typesize;
+  int32_t typesize = context->typesize;
   size_t nbytes = context->sourcesize;
-  size_t user_blocksize = context->blocksize;
-  size_t blocksize = nbytes;
+  int32_t user_blocksize = context->blocksize;
+  int32_t blocksize = nbytes;
 
   /* Protection against very small buffers */
   if (nbytes < typesize) {
@@ -112,11 +112,15 @@ void btune_next_blocksize(blosc2_context* context) {
       blocksize = (1 << 16);
     }
     blocksize *= typesize;
+    if (blocksize < (1 << 16)) {
+      /* Do not use a too small blocksize (< 64 KB) when typesize is small */
+      blocksize = (1 << 16);
+    }
   }
 
   /* Check that blocksize is not too large */
   if (blocksize > (int32_t)nbytes) {
-    blocksize = nbytes;
+    blocksize = (int32_t)nbytes;
   }
 
   /* blocksize *must absolutely* be a multiple of the typesize */
@@ -128,13 +132,10 @@ void btune_next_blocksize(blosc2_context* context) {
 }
 
 void btune_next_cparams(blosc2_context * context) {
-  return;
 }
 
 void btune_update(blosc2_context * context, double ctime) {
-  return;
 }
 
 void btune_free(blosc2_context * context) {
-  return;
 }

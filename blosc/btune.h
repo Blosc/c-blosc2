@@ -30,7 +30,7 @@ void btune_update(blosc2_context * context, double ctime);
 void btune_free(blosc2_context * context);
 
 /* Conditions for splitting a block before compressing with a codec. */
-static int split_block(int compcode, size_t typesize, size_t blocksize) {
+static int split_block(int compcode, int32_t typesize, int32_t blocksize) {
   /* Normally all the compressors designed for speed benefit from a
      split.  However, in conducted benchmarks LZ4 seems that it runs
      faster if we don't split, which is quite surprising.
