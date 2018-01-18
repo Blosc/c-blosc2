@@ -59,8 +59,8 @@ endif (NOT DEACTIVATE_ZSTD)
 include_directories(${BLOSC_INCLUDE_DIRS})
 
 # library sources
-set(SOURCES blosc.c blosc-common.h blosclz.c memcopy.h schunk.c btune.c btune.h context.h
-        delta.c delta.h shuffle-generic.c bitshuffle-generic.c trunc-prec.c trunc-prec.h
+set(SOURCES blosc.c blosc-common.h blosclz.c fastcopy.c fastcopy.h schunk.c btune.c btune.h
+        context.h delta.c delta.h shuffle-generic.c bitshuffle-generic.c trunc-prec.c trunc-prec.h
         timestamp.c timestamp.h)
 if (COMPILER_SUPPORT_SSE2)
     message(STATUS "Adding run-time support for SSE2")
