@@ -7,46 +7,44 @@
   See LICENSES/BLOSC.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#include <stdbool.h>
 #include <stdio.h>
-#ifndef BTUNE_H
 #include "btune.h"
-#endif
 
 
-/* Whether a codec is meant for High Compression Ratios */
-/* Includes LZ4 + BITSHUFFLE here, but not BloscLZ + BITSHUFFLE because,
+/* Whether a codec is meant for High Compression Ratios
+   Includes LZ4 + BITSHUFFLE here, but not BloscLZ + BITSHUFFLE because,
    for some reason, the latter does not work too well */
-int HCR(blosc2_context *context) {
+static bool is_HCR(blosc2_context * context) {
   switch (context->compcode) {
     case BLOSC_BLOSCLZ :
-      return 0;
+      return false;
     case BLOSC_LZ4 :
-      return (context->filter_flags & BLOSC_DOBITSHUFFLE) ? 1 : 0;
+      return (context->filter_flags & BLOSC_DOBITSHUFFLE) ? true : false;
     case BLOSC_LZ4HC :
-      return 1;
+      return true;
     case BLOSC_LIZARD :
-      return 1;
+      return true;
     case BLOSC_ZLIB :
-      return 1;
+      return true;
     case BLOSC_ZSTD :
-      return 1;
+      return true;
     default :
-      fprintf(stderr, "Error in HCR: codec %d not handled\n",
+      fprintf(stderr, "Error in is_COMP_HCR: codec %d not handled\n",
               context->compcode);
   }
-  return 0;
+  return false;
 }
 
-
-/* Tune some compression parameters based in the context */
-void btune_next_blocksize(blosc2_context* context) {
+// Set the automatic blocksize 0 to its real value
+void btune_next_blocksize(blosc2_context *context) {
   int32_t clevel = context->clevel;
   int32_t typesize = context->typesize;
   size_t nbytes = context->sourcesize;
   int32_t user_blocksize = context->blocksize;
-  int32_t blocksize = nbytes;
+  int32_t blocksize = (int32_t) nbytes;  // TODO: fix the type mismatch
 
-  /* Protection against very small buffers */
+  // Protection against very small buffers
   if (nbytes < typesize) {
     context->blocksize = 1;
     return;
@@ -54,7 +52,7 @@ void btune_next_blocksize(blosc2_context* context) {
 
   if (user_blocksize) {
     blocksize = user_blocksize;
-    /* Check that forced blocksize is not too small */
+    // Check that forced blocksize is not too small
     if (blocksize < BLOSC_MIN_BUFFERSIZE) {
       blocksize = BLOSC_MIN_BUFFERSIZE;
     }
@@ -63,16 +61,16 @@ void btune_next_blocksize(blosc2_context* context) {
     blocksize = L1;
 
     /* For HCR codecs, increase the block sizes by a factor of 2 because they
-       are meant for compressing large blocks (i.e. they show a big overhead
-       when compressing small ones). */
-    if (HCR(context)) {
+        are meant for compressing large blocks (i.e. they show a big overhead
+        when compressing small ones). */
+    if (is_HCR(context)) {
       blocksize *= 2;
     }
 
-    /* Choose a different blocksize depending on the compression level */
+    // Choose a different blocksize depending on the compression level
     switch (clevel) {
       case 0:
-        /* Case of plain copy */
+        // Case of plain copy
         blocksize /= 4;
         break;
       case 1:
@@ -94,9 +92,9 @@ void btune_next_blocksize(blosc2_context* context) {
         blocksize *= 8;
         break;
       case 9:
-        /* Do not exceed 256 KB for non HCR codecs */
+        // Do not exceed 256 KB for non HCR codecs
         blocksize *= 8;
-        if (HCR(context)) {
+        if (is_HCR(context)) {
           blocksize *= 2;
         }
         break;
@@ -120,12 +118,12 @@ void btune_next_blocksize(blosc2_context* context) {
 
   /* Check that blocksize is not too large */
   if (blocksize > (int32_t)nbytes) {
-    blocksize = (int32_t)nbytes;
+    blocksize = (int32_t)nbytes;  //TODO: Fix casting
   }
 
-  /* blocksize *must absolutely* be a multiple of the typesize */
+  // blocksize *must absolutely* be a multiple of the typesize
   if (blocksize > typesize) {
-    blocksize = blocksize / typesize * typesize;
+    blocksize = (int32_t) (blocksize / typesize * typesize);
   }
 
   context->blocksize = blocksize;
