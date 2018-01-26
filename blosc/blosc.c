@@ -1496,7 +1496,7 @@ int blosc_compress_context(blosc2_context* context) {
         return -1;
       }
     }
-    else if (context->sourcesize + BLOSC_MAX_OVERHEAD <= context->destsize) {
+    else {
       fastcopy(context->dest + BLOSC_MAX_OVERHEAD, context->src, context->sourcesize);
       ntbytes = (int)context->sourcesize + BLOSC_MAX_OVERHEAD;
     }
