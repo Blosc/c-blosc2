@@ -491,8 +491,9 @@ static int zstd_wrap_compress(struct thread_context* thread_context,
         (void*)output, maxout, (void*)input, input_length, clevel);
   }
   if (ZSTD_isError(code) != ZSTD_error_no_error) {
-    fprintf(stderr, "Error in ZSTD compression: '%s'.  Giving up.\n",
-            ZDICT_getErrorName(code));
+    // Do not print anything because blosc will just memcpy this buffer
+    // fprintf(stderr, "Error in ZSTD compression: '%s'.  Giving up.\n",
+    //         ZDICT_getErrorName(code));
     return 0;
   }
   return (int)code;
