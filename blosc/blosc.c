@@ -611,7 +611,15 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
   for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
     switch (filters[i]) {
       case BLOSC_SHUFFLE:
-        shuffle(typesize, (size_t)bsize, _src, _dest);
+        for (int j = 0; j < filters_meta[i] + 1; j++) {
+          shuffle(typesize, (size_t) bsize, _src, _dest);
+          // Cycle filters when required
+          if (j < filters_meta[i] + 1) {
+            _src = _dest;
+            _dest = _tmp;
+            _tmp = _src;
+          }
+        }
         break;
       case BLOSC_BITSHUFFLE:
         bitshuffle(typesize, (size_t)bsize, _src, _dest, tmp2);
@@ -787,7 +795,7 @@ int pipeline_d(blosc2_context* context, const size_t bsize, uint8_t* dest,
                uint8_t* tmp2, int last_filter_index) {
   size_t typesize = context->typesize;
   uint8_t* filters = context->filters;
-  //uint8_t* filters_meta = context->filters_meta;
+  uint8_t* filters_meta = context->filters_meta;
   uint8_t* _src = src;
   uint8_t* _dest = tmp;
   uint8_t* _tmp = tmp2;
@@ -801,7 +809,15 @@ int pipeline_d(blosc2_context* context, const size_t bsize, uint8_t* dest,
     }
     switch (filters[i]) {
       case BLOSC_SHUFFLE:
-        unshuffle(typesize, bsize, _src, _dest);
+        for (int j = 0; j < filters_meta[i] + 1; j++) {
+          unshuffle(typesize, bsize, _src, _dest);
+          // Cycle filters when required
+          if (j < filters_meta[i]) {
+            _src = _dest;
+            _dest = _tmp;
+            _tmp = _src;
+          }
+        }
         break;
       case BLOSC_BITSHUFFLE:
         bitunshuffle(typesize, bsize, _src, _dest, _tmp);

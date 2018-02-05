@@ -56,7 +56,8 @@ int main() {
   /* Create a super-chunk container */
   cparams.typesize = 8;
   cparams.filters[0] = BLOSC_SHUFFLE;
-  cparams.compcode = BLOSC_BLOSCLZ;
+  cparams.filters_meta[0] = 2;  // A number larger than 0 will execute additional shuffles
+  cparams.compcode = BLOSC_LZ4;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
@@ -97,9 +98,9 @@ int main() {
 
   /* Check integrity of the first chunk */
   for (i = 0; i < CHUNKSIZE; i++) {
-    if (data_dest[i] != (uint64_t)i) {
-      printf("Decompressed data differs from original %d, %f!\n",
-             i, data_dest[i]);
+    if (data_dest[i] != (float)i) {
+      printf("Decompressed data differs from original %f, %f!\n",
+             (float)i, data_dest[i]);
       return -1;
     }
   }
