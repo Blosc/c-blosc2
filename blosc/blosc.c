@@ -652,7 +652,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   int32_t cbytes;                   /* number of compressed bytes in split */
   int32_t ctbytes = 0;              /* number of compressed bytes in block */
   int64_t maxout;
-  size_t typesize = context->typesize;
+  int32_t typesize = context->typesize;
   char* compname;
   int accel;
   const uint8_t* _src;
@@ -759,17 +759,17 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       /* cbytes should never be negative */
       return -2;
     }
-    if (!dict_training && (cbytes == 0 || cbytes == neblock)) {
-      /* The compressor has been unable to compress data at all. */
-      /* Before doing the copy, check that we are not running into a
-         buffer overflow. */
-      if ((ntbytes + neblock) > maxbytes) {
-        return 0;    /* Non-compressible data */
-      }
-      fastcopy(dest, _src + j * neblock, neblock);
-      cbytes = (int32_t)neblock;
-    }
     if (!dict_training) {
+      if (cbytes == 0 || cbytes == neblock) {
+        /* The compressor has been unable to compress data at all. */
+        /* Before doing the copy, check that we are not running into a
+           buffer overflow. */
+        if ((ntbytes + neblock) > maxbytes) {
+          return 0;    /* Non-compressible data */
+        }
+        fastcopy(dest, _src + j * neblock, neblock);
+        cbytes = (int32_t)neblock;
+      }
       _sw32(dest - 4, cbytes);
     }
     dest += cbytes;

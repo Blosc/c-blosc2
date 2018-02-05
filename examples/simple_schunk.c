@@ -22,72 +22,84 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include "blosc.h"
+#include <blosc.h>
 
-#define SIZE 1000*1000
+#define KB  1024.
+#define MB  (1024*KB)
+#define GB  (1024*MB)
+
+#define CHUNKSIZE (200 * 1000)
+#define NCHUNKS 500
+#define NTHREADS 4
 
 int main() {
-  static float data[SIZE];
-  static float data_dest[SIZE];
-  int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
-  int dsize, csize;
-  blosc2_sparams sparams = BLOSC_SPARAMS_DEFAULTS;
-  blosc2_sheader* sheader;
-  int i, nchunks;
+  static float data[CHUNKSIZE];
+  static float data_dest[CHUNKSIZE];
+  size_t isize = CHUNKSIZE * sizeof(float);
+  int dsize = 0;
+  int64_t nbytes, cbytes;
+  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_schunk* schunk;
+  int i, nchunk;
+  size_t nchunks;
+  blosc_timestamp_t last, current;
+  double ttotal;
 
-  for (i = 0; i < SIZE; i++) {
+  for (i = 0; i < CHUNKSIZE; i++) {
     data[i] = i;
   }
 
   printf("Blosc version info: %s (%s)\n",
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
-  /* Initialize the Blosc compressor */
-  blosc_init();
-
-  /* Compress with clevel=5 and shuffle active  */
-  csize = blosc_compress(5, BLOSC_SHUFFLE, sizeof(float),
-    isize, data, data_dest, osize);
-  if (csize == 0) {
-    printf("Buffer is uncompressible.  Giving up.\n");
-    return 1;
-  }
-  else if (csize < 0) {
-    printf("Compression error.  Error code: %d\n", csize);
-    return csize;
-  }
-
-  printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1. * isize) / csize);
-
   /* Create a super-chunk container */
-  sparams.filters[0] = BLOSC_DELTA;
-  sparams.filters[1] = BLOSC_SHUFFLE;
-  sheader = blosc2_new_schunk(&sparams);
+  cparams.typesize = 8;
+  cparams.filters[0] = BLOSC_SHUFFLE;
+  cparams.compcode = BLOSC_BLOSCLZ;
+  cparams.clevel = 9;
+  cparams.nthreads = NTHREADS;
+  dparams.nthreads = NTHREADS;
+  schunk = blosc2_new_schunk(cparams, dparams);
 
-  /* Now append a couple of chunks */
-  nchunks = blosc2_append_buffer(sheader, sizeof(float), isize, data);
-  assert(nchunks == 1);
-  nchunks = blosc2_append_buffer(sheader, sizeof(float), isize, data);
-  assert(nchunks == 2);
+  blosc_set_timestamp(&last);
+  for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
+    for (i = 0; i < CHUNKSIZE; i++) {
+      data[i] = i * nchunk;
+    }
+    nchunks = blosc2_append_buffer(schunk, isize, data);
+    assert(nchunks == nchunk);
+  }
+  /* Gather some info */
+  nbytes = schunk->nbytes;
+  cbytes = schunk->cbytes;
+  blosc_set_timestamp(&current);
+  ttotal = blosc_elapsed_secs(last, current);
+  printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
+         nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
+  printf("Compression time: %.3g s, %.1f MB/s\n",
+         ttotal, nbytes / (ttotal * MB));
 
   /* Retrieve and decompress the chunks (0-based count) */
-  dsize = blosc2_decompress_chunk(sheader, 0, (void*)data_dest, isize);
+  blosc_set_timestamp(&last);
+  for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
+    dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk,
+                                    (void *)data_dest, isize);
+  }
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
   }
-  dsize = blosc2_decompress_chunk(sheader, 1, (void*)data_dest, isize);
-  if (dsize < 0) {
-    printf("Decompression error.  Error code: %d\n", dsize);
-    return dsize;
-  }
+  blosc_set_timestamp(&current);
+  ttotal = blosc_elapsed_secs(last, current);
+  printf("Decompression time: %.3g s, %.1f MB/s\n",
+         ttotal, nbytes / (ttotal * MB));
 
-  printf("Decompression successful!\n");
-
-  for (i = 0; i < SIZE; i++) {
-    if (data[i] != data_dest[i]) {
-      printf("i, values: %d, %f, %f\n", i, data[i], data_dest[i]);
-      printf("Decompressed data differs from original!\n");
+  /* Check integrity of the first chunk */
+  for (i = 0; i < CHUNKSIZE; i++) {
+    if (data_dest[i] != (uint64_t)i) {
+      printf("Decompressed data differs from original %d, %f!\n",
+             i, data_dest[i]);
       return -1;
     }
   }
@@ -96,9 +108,7 @@ int main() {
 
   /* Free resources */
   /* Destroy the super-chunk */
-  blosc2_destroy_schunk(sheader);
-  /* Destroy the Blosc environment */
-  blosc_destroy();
+  blosc2_free_schunk(schunk);
 
   return 0;
 }
