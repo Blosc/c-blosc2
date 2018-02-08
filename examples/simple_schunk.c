@@ -55,8 +55,8 @@ int main() {
 
   /* Create a super-chunk container */
   cparams.typesize = 8;
-  cparams.filters[0] = BLOSC_SHUFFLE;
-  cparams.filters_meta[0] = 2;  // A number larger than 0 will execute additional shuffles
+  cparams.filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
+  cparams.filters_meta[BLOSC_MAX_FILTERS - 1] = 2;  // A number larger than 0 will execute additional shuffles
   cparams.compcode = BLOSC_LZ4;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
@@ -84,8 +84,7 @@ int main() {
   /* Retrieve and decompress the chunks (0-based count) */
   blosc_set_timestamp(&last);
   for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
-    dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk,
-                                    (void *)data_dest, isize);
+    dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk, (void *)data_dest, isize);
   }
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);

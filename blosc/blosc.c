@@ -47,6 +47,7 @@
   #include "zstd.h"
   #include "zstd_errors.h"
   #include "zdict.h"
+#include "blosc.h"
 
 #endif /*  HAVE_ZSTD */
 
@@ -611,10 +612,10 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
   for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
     switch (filters[i]) {
       case BLOSC_SHUFFLE:
-        for (int j = 0; j < filters_meta[i] + 1; j++) {
+        for (int j = 0; j <= filters_meta[i]; j++) {
           shuffle(typesize, (size_t) bsize, _src, _dest);
           // Cycle filters when required
-          if (j < filters_meta[i] + 1) {
+          if (j < filters_meta[i]) {
             _src = _dest;
             _dest = _tmp;
             _tmp = _src;
@@ -803,19 +804,23 @@ int pipeline_d(blosc2_context* context, const size_t bsize, uint8_t* dest,
 
   for (int i = BLOSC_MAX_FILTERS - 1; i >= 0; i--) {
     // Delta filter requires the whole chunk ready
-    if ((last_filter_index == i) ||
-            (next_filter(filters, i, 'd') == BLOSC_DELTA)) {
+    int last_copy_filter = (last_filter_index == i) || (next_filter(filters, i, 'd') == BLOSC_DELTA);
+    if (last_copy_filter) {
       _dest = dest + offset;
     }
     switch (filters[i]) {
       case BLOSC_SHUFFLE:
-        for (int j = 0; j < filters_meta[i] + 1; j++) {
+        for (int j = 0; j <= filters_meta[i]; j++) {
           unshuffle(typesize, bsize, _src, _dest);
           // Cycle filters when required
           if (j < filters_meta[i]) {
             _src = _dest;
             _dest = _tmp;
             _tmp = _src;
+          }
+          // Check whether we have to copy the intermediate _dest buffer to final destination
+          if (last_copy_filter && (filters_meta[i] % 2) == 1 && j == filters_meta[i]) {
+            memcpy(dest + offset, _dest, bsize);
           }
         }
         break;
