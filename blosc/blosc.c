@@ -820,7 +820,7 @@ int pipeline_d(blosc2_context* context, const size_t bsize, uint8_t* dest,
           }
           // Check whether we have to copy the intermediate _dest buffer to final destination
           if (last_copy_filter && (filters_meta[i] % 2) == 1 && j == filters_meta[i]) {
-            memcpy(dest + offset, _dest, bsize);
+            fastcopy(dest + offset, _dest, bsize);
           }
         }
         break;
