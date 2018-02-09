@@ -47,6 +47,7 @@
   #include "zstd.h"
   #include "zstd_errors.h"
   #include "zdict.h"
+#include "blosc.h"
 
 #endif /*  HAVE_ZSTD */
 
@@ -611,7 +612,15 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
   for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
     switch (filters[i]) {
       case BLOSC_SHUFFLE:
-        shuffle(typesize, (size_t)bsize, _src, _dest);
+        for (int j = 0; j <= filters_meta[i]; j++) {
+          shuffle(typesize, (size_t) bsize, _src, _dest);
+          // Cycle filters when required
+          if (j < filters_meta[i]) {
+            _src = _dest;
+            _dest = _tmp;
+            _tmp = _src;
+          }
+        }
         break;
       case BLOSC_BITSHUFFLE:
         bitshuffle(typesize, (size_t)bsize, _src, _dest, tmp2);
@@ -652,7 +661,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   int32_t cbytes;                   /* number of compressed bytes in split */
   int32_t ctbytes = 0;              /* number of compressed bytes in block */
   int64_t maxout;
-  size_t typesize = context->typesize;
+  int32_t typesize = context->typesize;
   char* compname;
   int accel;
   const uint8_t* _src;
@@ -759,17 +768,17 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       /* cbytes should never be negative */
       return -2;
     }
-    if (!dict_training && (cbytes == 0 || cbytes == neblock)) {
-      /* The compressor has been unable to compress data at all. */
-      /* Before doing the copy, check that we are not running into a
-         buffer overflow. */
-      if ((ntbytes + neblock) > maxbytes) {
-        return 0;    /* Non-compressible data */
-      }
-      fastcopy(dest, _src + j * neblock, neblock);
-      cbytes = (int32_t)neblock;
-    }
     if (!dict_training) {
+      if (cbytes == 0 || cbytes == neblock) {
+        /* The compressor has been unable to compress data at all. */
+        /* Before doing the copy, check that we are not running into a
+           buffer overflow. */
+        if ((ntbytes + neblock) > maxbytes) {
+          return 0;    /* Non-compressible data */
+        }
+        fastcopy(dest, _src + j * neblock, neblock);
+        cbytes = (int32_t)neblock;
+      }
       _sw32(dest - 4, cbytes);
     }
     dest += cbytes;
@@ -787,7 +796,7 @@ int pipeline_d(blosc2_context* context, const size_t bsize, uint8_t* dest,
                uint8_t* tmp2, int last_filter_index) {
   size_t typesize = context->typesize;
   uint8_t* filters = context->filters;
-  //uint8_t* filters_meta = context->filters_meta;
+  uint8_t* filters_meta = context->filters_meta;
   uint8_t* _src = src;
   uint8_t* _dest = tmp;
   uint8_t* _tmp = tmp2;
@@ -795,13 +804,25 @@ int pipeline_d(blosc2_context* context, const size_t bsize, uint8_t* dest,
 
   for (int i = BLOSC_MAX_FILTERS - 1; i >= 0; i--) {
     // Delta filter requires the whole chunk ready
-    if ((last_filter_index == i) ||
-            (next_filter(filters, i, 'd') == BLOSC_DELTA)) {
+    int last_copy_filter = (last_filter_index == i) || (next_filter(filters, i, 'd') == BLOSC_DELTA);
+    if (last_copy_filter) {
       _dest = dest + offset;
     }
     switch (filters[i]) {
       case BLOSC_SHUFFLE:
-        unshuffle(typesize, bsize, _src, _dest);
+        for (int j = 0; j <= filters_meta[i]; j++) {
+          unshuffle(typesize, bsize, _src, _dest);
+          // Cycle filters when required
+          if (j < filters_meta[i]) {
+            _src = _dest;
+            _dest = _tmp;
+            _tmp = _src;
+          }
+          // Check whether we have to copy the intermediate _dest buffer to final destination
+          if (last_copy_filter && (filters_meta[i] % 2) == 1 && j == filters_meta[i]) {
+            fastcopy(dest + offset, _dest, bsize);
+          }
+        }
         break;
       case BLOSC_BITSHUFFLE:
         bitunshuffle(typesize, bsize, _src, _dest, _tmp);

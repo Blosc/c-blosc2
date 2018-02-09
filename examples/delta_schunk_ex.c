@@ -109,6 +109,7 @@ int main() {
 
   /* Free resources */
   blosc2_free_schunk(schunk);
+  blosc_destroy();
 
   return 0;
 }
