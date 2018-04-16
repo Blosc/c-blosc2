@@ -31,13 +31,30 @@ foreach (source ${SOURCES})
         set_property(
                 SOURCE ${source}
                 APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_SSE2_ENABLED)
+    elseif (target STREQUAL test_shuffle_roundtrip_sse2)
+        message("Skipping ${target} on non-SSE2 builds")
+        continue()
     endif (COMPILER_SUPPORT_SSE2)
-    #    if(COMPILER_SUPPORT_AVX2)
-    #        # Define a symbol so tests for AVX2 shuffle/unshuffle will be compiled in.
-    #        set_property(
-    #            SOURCE ${source}
-    #            APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX2_ENABLED)
-    #    endif(COMPILER_SUPPORT_AVX2)
+
+    if(COMPILER_SUPPORT_AVX2)
+        # Define a symbol so tests for AVX2 shuffle/unshuffle will be compiled in.
+        set_property(
+                SOURCE ${source}
+                APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX2_ENABLED)
+    elseif (target STREQUAL test_shuffle_roundtrip_avx2)
+        message("Skipping ${target} on non-AVX2 builds")
+        continue()
+    endif(COMPILER_SUPPORT_AVX2)
+
+    if(COMPILER_SUPPORT_NEON)
+         # Define a symbol so tests for NEON shuffle/unshuffle will be compiled in.
+         set_property(
+                SOURCE ${source}
+                APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_NEON_ENABLED)
+    elseif (target STREQUAL test_shuffle_roundtrip_neon)
+        message("Skipping ${target} on non-NEON builds")
+        continue()
+    endif(COMPILER_SUPPORT_NEON)
 
     add_executable(${target} ${source})
 

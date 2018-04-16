@@ -43,8 +43,6 @@ bitshuffle1_neon(void* src, void* dest, const size_t size, const size_t elem_siz
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  _CHECK_MULT_EIGHT(size * elem_size);
-
   for (i = 0, k = 0; i < size * elem_size; i += 16, k++) {
     /* Load 16-byte groups */
     x0 = vld1q_u8(src + k * 16);
@@ -84,8 +82,6 @@ bitshuffle2_neon(void* src, void* dest, const size_t size, const size_t elem_siz
   const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
-
-  _CHECK_MULT_EIGHT(size * elem_size);
 
   for (i = 0, k = 0; i < size * elem_size; i += 32, k++) {
     /* Load 32-byte groups */
@@ -145,7 +141,6 @@ bitshuffle4_neon(void* src, void* dest, const size_t size, const size_t elem_siz
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  _CHECK_MULT_EIGHT(size * elem_size);
   for (i = 0, k = 0; i < size * elem_size; i += 64, k++) {
     /* Load 64-byte groups */
     x0 = vld4q_u8(src + i);
@@ -237,8 +232,6 @@ bitshuffle8_neon(void* src, void* dest, const size_t size, const size_t elem_siz
   const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
-
-  _CHECK_MULT_EIGHT(size * elem_size);
 
   for (i = 0, k = 0; i < size * elem_size; i += 64, k++) {
     /* Load and interleave groups of 8 bytes (64 bytes) to the structure r0 */
@@ -333,8 +326,6 @@ bitshuffle16_neon(void* src, void* dest, const size_t size, const size_t elem_si
   const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
-
-  _CHECK_MULT_EIGHT(size * elem_size);
 
   for (i = 0, k = 0; i < size * elem_size; i += 128, k++) {
     /* Load and interleave groups of 16 bytes (128 bytes) to the structure r0 */
@@ -497,8 +488,6 @@ bitunshuffle1_neon(void* _src, void* dest, const size_t size, const size_t elem_
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  _CHECK_MULT_EIGHT(size * elem_size);
-
   for (i = 0, k = 0; i < size * elem_size; i += 16, k++) {
     for (j = 0; j < 8; j++) {
       /* Load lanes */
@@ -538,8 +527,6 @@ bitunshuffle2_neon(void* _src, void* dest, const size_t size, const size_t elem_
   const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
-
-  _CHECK_MULT_EIGHT(size * elem_size);
 
   for (i = 0, k = 0; i < size * elem_size; i += 32, k++) {
     for (j = 0; j < 8; j++) {
@@ -598,8 +585,6 @@ bitunshuffle4_neon(void* _src, void* dest, const size_t size, const size_t elem_
   const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
-
-  _CHECK_MULT_EIGHT(size * elem_size);
 
   for (i = 0, k = 0; i < size * elem_size; i += 64, k++) {
     for (j = 0; j < 8; j++) {
@@ -693,8 +678,6 @@ bitunshuffle8_neon(void* _src, void* dest, const size_t size, const size_t elem_
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
 
-  _CHECK_MULT_EIGHT(size * elem_size);
-
   for (i = 0, k = 0; i < size * elem_size; i += 64, k++) {
     for (j = 0; j < 8; j++) {
       /* Load lanes */
@@ -783,8 +766,6 @@ bitunshuffle16_neon(void* _src, void* dest, const size_t size, const size_t elem
   const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
   uint8x8_t mask_and = vdup_n_u8(0x01);
   int8x8_t mask_shift = vld1_s8(xr);
-
-  _CHECK_MULT_EIGHT(size * elem_size);
 
   for (i = 0, k = 0; i < size * elem_size; i += 128, k++) {
     for (j = 0; j < 8; j++) {

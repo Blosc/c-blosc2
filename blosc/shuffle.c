@@ -296,11 +296,12 @@ static shuffle_implementation_t get_shuffle_implementation() {
     impl_neon.name = "neon";
     impl_neon.shuffle = (shuffle_func)shuffle_neon;
     impl_neon.unshuffle = (unshuffle_func)unshuffle_neon;
-/* The NEON implementation for bitshuffle is still buggy, so falling back to the generic implementation for the time being */
-//    impl_neon.bitshuffle = (bitshuffle_func)bitshuffle_neon;
-//    impl_neon.bitunshuffle = (bitunshuffle_func)bitunshuffle_neon;
-    impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_scal;
-    impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_scal;
+//    impl_neon.shuffle = (shuffle_func)shuffle_generic;
+//    impl_neon.unshuffle = (unshuffle_func)unshuffle_generic;
+    impl_neon.bitshuffle = (bitshuffle_func)bitshuffle_neon;
+    impl_neon.bitunshuffle = (bitunshuffle_func)bitunshuffle_neon;
+//    impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_scal;
+//    impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_scal;
     return impl_neon;
   }
 #endif  /* defined(SHUFFLE_NEON_ENABLED) */
