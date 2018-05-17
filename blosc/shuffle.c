@@ -246,9 +246,14 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   #include <asm/hwcap.h>
 static blosc_cpu_features blosc_get_cpu_features(void) {
   blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
+#if defined(__aarch64__)
+  /* aarch64 always has NEON */
+  cpu_features |= BLOSC_HAVE_NEON;
+#else
   if (getauxval(AT_HWCAP) & HWCAP_NEON) {
     cpu_features |= BLOSC_HAVE_NEON;
   }
+#endif
   return cpu_features;
 }
 #else   /* No hardware acceleration supported for the target architecture. */
@@ -296,11 +301,12 @@ static shuffle_implementation_t get_shuffle_implementation() {
     impl_neon.name = "neon";
     impl_neon.shuffle = (shuffle_func)shuffle_neon;
     impl_neon.unshuffle = (unshuffle_func)unshuffle_neon;
-/* The NEON implementation for bitshuffle is still buggy, so falling back to the generic implementation for the time being */
-//    impl_neon.bitshuffle = (bitshuffle_func)bitshuffle_neon;
-//    impl_neon.bitunshuffle = (bitunshuffle_func)bitunshuffle_neon;
-    impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_scal;
-    impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_scal;
+//    impl_neon.shuffle = (shuffle_func)shuffle_generic;
+//    impl_neon.unshuffle = (unshuffle_func)unshuffle_generic;
+    impl_neon.bitshuffle = (bitshuffle_func)bitshuffle_neon;
+    impl_neon.bitunshuffle = (bitunshuffle_func)bitunshuffle_neon;
+//    impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_scal;
+//    impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_scal;
     return impl_neon;
   }
 #endif  /* defined(SHUFFLE_NEON_ENABLED) */
