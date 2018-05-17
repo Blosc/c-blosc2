@@ -246,7 +246,14 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   #include <asm/hwcap.h>
 static blosc_cpu_features blosc_get_cpu_features(void) {
   blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
+#if defined(__aarch64__)
+  /* aarch64 always has NEON */
   cpu_features |= BLOSC_HAVE_NEON;
+#else
+  if (getauxval(AT_HWCAP) & HWCAP_NEON) {
+    cpu_features |= BLOSC_HAVE_NEON;
+  }
+#endif
   return cpu_features;
 }
 #else   /* No hardware acceleration supported for the target architecture. */
