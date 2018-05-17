@@ -10,7 +10,7 @@
 #include "bitshuffle-neon.h"
 
 /* Make sure NEON is available for the compilation target and compiler. */
-#if !defined(__ARM_NEON__)
+#if !defined(__ARM_NEON)
   #error NEON is not supported by the target architecture/platform and/or this compiler.
 #endif
 
