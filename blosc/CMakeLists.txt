@@ -184,7 +184,10 @@ if (COMPILER_SUPPORT_AVX2)
             APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX2_ENABLED)
 endif (COMPILER_SUPPORT_AVX2)
 if (COMPILER_SUPPORT_NEON)
-    set_source_files_properties(shuffle-neon.c bitshuffle-neon.c PROPERTIES COMPILE_FLAGS "-mfpu=neon -flax-vector-conversions")
+    if (CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l)
+        # Only armv7l needs special flags; aarch64 doesn't.
+      set_source_files_properties(shuffle-neon.c bitshuffle-neon.c PROPERTIES COMPILE_FLAGS "-mfpu=neon -flax-vector-conversions")
+    endif()
     # Define a symbol for the shuffle-dispatch implementation
     # so it knows NEON is supported even though that file is
     # compiled without NEON support (for portability).
