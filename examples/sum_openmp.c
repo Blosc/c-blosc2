@@ -7,16 +7,19 @@
 
   To compile this program:
 
-  $ gcc -O3 simple_sum.c -o simple_sum -lblosc
+  $ gcc -fopenmp -O3 sum_openmp.c -o sum_openmp -lblosc
 
   To run:
 
-  $ ./simple_sum
-  Blosc version info: 2.0.0a1 ($Date:: 2015-07-30 #$)
-  Compression: 4000000 -> 158788 (25.2x)
-  destsize: 4000000
-  Decompression succesful!
-  Succesful roundtrip!
+  $ OMP_NUM_THREADS=8 ./sum_openmp
+  Blosc version info: 2.0.0a4.dev ($Date:: 2016-08-04 #$)
+  Sum for uncompressed data: 4999999950000000
+  Sum time for uncompressed data: 0.0289 s, 26441.8 MB/s
+  Compression ratio: 762.9 MB -> 8.4 MB (90.6x)
+  Compression time: 0.46 s, 1659.9 MB/s
+  Sum for *compressed* data: 4999999950000000
+  Sum time for *compressed* data: 0.015 s, 50909.5 MB/s
+
 
 */
 
