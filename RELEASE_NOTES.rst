@@ -1,10 +1,16 @@
 ==================================================
- Release notes for C-Blosc2 2.0.0a5 (fifth alpha)
+ Release notes for C-Blosc2 2.0.0a6 (sixth alpha)
 ==================================================
 
 :Author: Francesc Alted
 :Contact: francesc@blosc.org
 :URL: http://www.blosc.org
+
+
+Changes from 2.0.0a5 to 2.0.0a6
+===============================
+
+#XXX version-specific blurb XXX#
 
 
 Changes from 2.0.0a4 to 2.0.0a5
