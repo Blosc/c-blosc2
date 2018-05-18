@@ -23,9 +23,9 @@ extern "C" {
 #define BLOSC_VERSION_MINOR    0    /* for minor interface/format changes  */
 #define BLOSC_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC_VERSION_STRING   "2.0.0a4.dev"  /* string version.  Sync with above! */
+#define BLOSC_VERSION_STRING   "2.0.0a5.dev"  /* string version.  Sync with above! */
 #define BLOSC_VERSION_REVISION "$Rev$"   /* revision version */
-#define BLOSC_VERSION_DATE     "$Date:: 2016-08-04 #$"    /* date version */
+#define BLOSC_VERSION_DATE     "$Date:: 2018-05-18 #$"    /* date version */
 
 
 /* The *_FORMAT symbols below should be just 1-byte long */

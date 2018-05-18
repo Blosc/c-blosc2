@@ -1,13 +1,20 @@
 ===============================================================
- Announcing C-Blosc 2.0.0a3
+ Announcing C-Blosc 2.0.0a5
  A simplistic, compressed and fast data store library for C
 ===============================================================
 
 What is new?
 ============
 
-#XXX version-specific blurb XXX#
+Support for Zstd dictionaries; this allows for (much) better compression
+ratios when using small blocksizes, while improving compression speed.
+The delta filter is using a XOR instead of a NEG for better numerical
+stability.
 
+Last but not least, ARM support has been greatly enhanced, as ARMv7 and
+ARMv8 (specially AArch64) are supported out of the box.  Support for NEON
+for shuffle and bitshuffle is there (but use the latter with caution, as
+there are implementation flaws still).
 
 For more info, please see the release notes in:
 

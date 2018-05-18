@@ -1,10 +1,30 @@
 ==================================================
- Release notes for C-Blosc2 2.0.0a4 (fourth alpha)
+ Release notes for C-Blosc2 2.0.0a5 (fifth alpha)
 ==================================================
 
 :Author: Francesc Alted
 :Contact: francesc@blosc.org
 :URL: http://www.blosc.org
+
+
+Changes from 2.0.0a4 to 2.0.0a5
+===============================
+
+- Delta filter now implemented as a XOR instead of a NEG for better numerical
+  stability.
+
+- Zstd dictionaries are supported.  This allows for (much) better compression
+  ratios when using small blocksizes, while improving compression speed.
+
+- Performance upgrades in the BloscLZ codec, specially for decompression
+  in ARM architectures.
+
+- Preliminary support for Neon instruction set in ARM CPUs.  Shuffle seems
+  to work well, but still some issues with bitshuffle.
+
+- Internal LZ4 sources bumbed to 1.8.2.
+
+- Internal Zstd sources bumbed to 1.3.4.
 
 
 Changes from 2.0.0a3 to 2.0.0a4

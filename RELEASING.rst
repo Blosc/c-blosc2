@@ -15,6 +15,11 @@ Preliminaries
 
 - Check that *VERSION* symbols in blosc/blosc.h contains the correct info.
 
+- Commit the changes with::
+
+    $ git commit -a -m "Getting ready for release X.Y.Z"
+
+
 Testing
 -------
 
