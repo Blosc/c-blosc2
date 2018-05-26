@@ -25,7 +25,7 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include <blosc.h>
+#include "blosc.h"
 
 #define KB  1024.
 #define MB  (1024*KB)
@@ -43,6 +43,7 @@
 
 int main() {
   static DTYPE udata[N];
+  static DTYPE chunk_buf[CHUNKSIZE];
   static DTYPE chunk[NTHREADS][CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(DTYPE);
   DTYPE sum, compressed_sum;
@@ -70,7 +71,6 @@ int main() {
     sum = 0;
     blosc_set_timestamp(&last);
 #pragma omp parallel for reduction (+:sum)
-#pragma simd
     for (i = 0; i < N; i++) {
       sum += udata[i];
     }
@@ -88,15 +88,13 @@ int main() {
   cparams.clevel = CLEVEL;
   cparams.nthreads = 1;
   dparams.nthreads = 1;
-  schunk = blosc2_new_schunk(cparams, dparams);
   blosc_set_timestamp(&last);
-  for (j = 0; j < NTHREADS; j++) {
-    for (nchunk = 0; nchunk < nchunks_thread; nchunk++) {
-      for (i = 0; i < CHUNKSIZE; i++) {
-        chunk[j][i] = i + (j * nchunks_thread + nchunk) * CHUNKSIZE;
-      }
-      blosc2_append_buffer(schunk, isize, chunk[j]);
+  schunk = blosc2_new_schunk(cparams, dparams);
+  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    for (i = 0; i < CHUNKSIZE; i++) {
+      chunk_buf[i] = i + nchunk * CHUNKSIZE;
     }
+    blosc2_append_buffer(schunk, isize, chunk_buf);
   }
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
@@ -117,7 +115,6 @@ int main() {
       dctx[j] = blosc2_create_dctx(dparams);
       for (nchunk = 0; nchunk < nchunks_thread; nchunk++) {
         blosc2_decompress_ctx(dctx[j], schunk->data[j * nchunks_thread + nchunk], (void*)(chunk[j]), isize);
-        #pragma simd
         for (i = 0; i < CHUNKSIZE; i++) {
           compressed_sum += chunk[j][i];
           //compressed_sum += i + (j * nchunks_thread + nchunk) * CHUNKSIZE;
