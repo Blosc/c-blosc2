@@ -24,6 +24,8 @@
 */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
 #include <assert.h>
 #include "blosc.h"
 
@@ -35,7 +37,6 @@
 #define CHUNKSIZE (4 * 1000)
 #define NCHUNKS (N / CHUNKSIZE)
 #define NITER 5
-#define NTHREADS 8
 #define CLEVEL 9
 #define CODEC BLOSC_BLOSCLZ
 #define DTYPE int64_t
@@ -43,16 +44,13 @@
 
 int main() {
   static DTYPE udata[N];
-  static DTYPE chunk_buf[CHUNKSIZE];
-  static DTYPE chunk[NTHREADS][CHUNKSIZE];
+  DTYPE chunk_buf[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(DTYPE);
   DTYPE sum, compressed_sum;
-  int nchunks_thread = NCHUNKS / NTHREADS;
   int64_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
-  blosc2_context* dctx[NTHREADS];
   int i, j, nchunk;
   blosc_timestamp_t last, current;
   double ttotal, itotal;
@@ -67,6 +65,7 @@ int main() {
 
   // Reduce uncompressed dataset
   ttotal = 1e10;
+  sum = 0;
   for (int n = 0; n < NITER; n++) {
     sum = 0;
     blosc_set_timestamp(&last);
@@ -80,7 +79,7 @@ int main() {
   }
   printf("Sum for uncompressed data: %10.0f\n", (double)sum);
   printf("Sum time for uncompressed data: %.3g s, %.1f MB/s\n",
-         ttotal, (isize * NCHUNKS) / (ttotal * MB));
+         ttotal, (isize * NCHUNKS) / (ttotal * (double)MB));
 
   // Create a super-chunk container for the compressed container
   cparams.typesize = sizeof(DTYPE);
@@ -105,13 +104,31 @@ int main() {
   printf("Compression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
+  int nthreads = 8;
+  char* envvar = getenv("OMP_NUM_THREADS");
+  if (envvar != NULL) {
+    long value;
+    value = strtol(envvar, NULL, 10);
+    if ((value != EINVAL) && (value >= 0)) {
+      nthreads = (int)value;
+    }
+  }
+  // Build buffers and contexts for computations
+  int nchunks_thread = NCHUNKS / nthreads;
+  blosc2_context **dctx = malloc(nthreads * sizeof(void*));
+  DTYPE** chunk = malloc(nthreads * sizeof(void*));
+  for (j = 0; j < nthreads; j++) {
+    chunk[j] = malloc(CHUNKSIZE * sizeof(DTYPE));
+  }
+
   // Reduce uncompressed dataset
   blosc_set_timestamp(&last);
   ttotal = 1e10;
+  compressed_sum = 0;
   for (int n = 0; n < NITER; n++) {
     compressed_sum = 0;
     #pragma omp parallel for private(nchunk) reduction (+:compressed_sum)
-    for (j = 0; j < NTHREADS; j++) {
+    for (j = 0; j < nthreads; j++) {
       dctx[j] = blosc2_create_dctx(dparams);
       for (nchunk = 0; nchunk < nchunks_thread; nchunk++) {
         blosc2_decompress_ctx(dctx[j], schunk->data[j * nchunks_thread + nchunk], (void*)(chunk[j]), isize);
