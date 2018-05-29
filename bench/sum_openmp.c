@@ -115,6 +115,7 @@ int main() {
   }
   // Build buffers and contexts for computations
   int nchunks_thread = NCHUNKS / nthreads;
+  int remaining_chunks = NCHUNKS - nchunks_thread * nthreads;
   blosc2_context **dctx = malloc(nthreads * sizeof(void*));
   DTYPE** chunk = malloc(nthreads * sizeof(void*));
   for (j = 0; j < nthreads; j++) {
@@ -136,6 +137,13 @@ int main() {
           compressed_sum += chunk[j][i];
           //compressed_sum += i + (j * nchunks_thread + nchunk) * CHUNKSIZE;
         }
+      }
+    }
+    for (nchunk = NCHUNKS - remaining_chunks; nchunk < NCHUNKS; nchunk++) {
+      blosc2_decompress_ctx(dctx[0], schunk->data[nchunk], (void*)(chunk[0]), isize);
+      for (i = 0; i < CHUNKSIZE; i++) {
+        compressed_sum += chunk[0][i];
+        //compressed_sum += i + nchunk * CHUNKSIZE;
       }
     }
     blosc_set_timestamp(&current);
