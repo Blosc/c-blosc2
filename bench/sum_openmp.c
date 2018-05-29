@@ -91,7 +91,7 @@ int main() {
   schunk = blosc2_new_schunk(cparams, dparams);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     for (i = 0; i < CHUNKSIZE; i++) {
-      chunk_buf[i] = i + nchunk * CHUNKSIZE;
+      chunk_buf[i] = udata[i + nchunk * CHUNKSIZE];
     }
     blosc2_append_buffer(schunk, isize, chunk_buf);
   }
