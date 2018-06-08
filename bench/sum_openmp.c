@@ -11,7 +11,7 @@
 
   To run:
 
-  $ OMP_NUM_THREADS=8 ./sum_openmp
+  $ OMP_PROC_BIND=spread OMP_NUM_THREADS=8 ./sum_openmp
   Blosc version info: 2.0.0a4.dev ($Date:: 2016-08-04 #$)
   Sum for uncompressed data: 4999999950000000
   Sum time for uncompressed data: 0.0289 s, 26441.8 MB/s
@@ -20,11 +20,12 @@
   Sum for *compressed* data: 4999999950000000
   Sum time for *compressed* data: 0.015 s, 50909.5 MB/s
 
-
 */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <sys/stat.h>
 #include <errno.h>
 #include <assert.h>
 #include "blosc.h"
@@ -36,10 +37,19 @@
 #define N (100 * 1000 * 1000)
 #define CHUNKSIZE (4 * 1000)
 #define NCHUNKS (N / CHUNKSIZE)
+#define NTHREADS 8
 #define NITER 5
-#define CLEVEL 9
-#define CODEC BLOSC_BLOSCLZ
+#define SYNTHETIC false
+
+#if SYNTHETIC == true
 #define DTYPE int64_t
+#define CLEVEL 5
+#define CODEC BLOSC_BLOSCLZ
+#else
+#define DTYPE float
+#define CLEVEL 9
+#define CODEC BLOSC_LZ4HC
+#endif
 
 
 int main() {
@@ -58,9 +68,39 @@ int main() {
   printf("Blosc version info: %s (%s)\n",
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
-  // Fill the uncompressed dataset
-  for (i = 0; i < N; i++) {
-    udata[i] = i;
+  // Fill the buffer for a chunk
+  if (SYNTHETIC) {
+    for (j = 0; j < CHUNKSIZE; j++) {
+      chunk_buf[j] = j;
+    }
+  }
+  else {
+    struct stat info;
+    const char *filegrid = "rainfall-grid-150x150.bin";
+    if (stat(filegrid, &info) != 0) {
+      printf("Grid file %s not found!", filegrid);
+      exit(1);
+    }
+    char *cdata = malloc(info.st_size);
+
+    FILE *f = fopen(filegrid, "rb");
+    size_t blocks_read = fread(cdata, info.st_size, 1, f);
+    assert(blocks_read == 1);
+    fclose(f);
+
+    int dsize = blosc_getitem(cdata, 0, CHUNKSIZE, chunk_buf);
+    if (dsize < 0) {
+      printf("blosc_getitem() error.  Error code: %d\n.  Probaly reading too much data?", dsize);
+      exit(1);
+    }
+    free(cdata);
+  }
+
+  // Fill the uncompressed dataset with data chunks
+  for (i = 0; i < N / CHUNKSIZE; i++) {
+    for (j = 0; j < CHUNKSIZE; j++) {
+      udata[i * CHUNKSIZE + j] = chunk_buf[j];
+    }
   }
 
   // Reduce uncompressed dataset
@@ -104,7 +144,7 @@ int main() {
   printf("Compression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
-  int nthreads = 8;
+  int nthreads = NTHREADS;
   char* envvar = getenv("OMP_NUM_THREADS");
   if (envvar != NULL) {
     long value;
@@ -153,8 +193,11 @@ int main() {
   printf("Sum for *compressed* data: %10.0f\n", (double)compressed_sum);
   printf("Sum time for *compressed* data: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
-  assert(sum == compressed_sum);
-
+  //printf("sum, csum: %f, %f\n", sum, compressed_sum);
+  if (SYNTHETIC) {
+    // for simple precision this is extremely difficult to fulfill
+    assert(sum == compressed_sum);
+  }
   /* Free resources */
   blosc2_free_schunk(schunk);
 
