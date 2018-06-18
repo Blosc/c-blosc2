@@ -1,7 +1,7 @@
 /*
     Copyright (C) 2014  Francesc Alted
     http://blosc.org
-    License: MIT (see LICENSE.txt)
+    License: BSD 3-Clause (see LICENSE.txt)
 
     Example program demonstrating the use of a Blosc from C code.
 

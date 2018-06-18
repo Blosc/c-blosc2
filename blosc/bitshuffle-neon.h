@@ -5,7 +5,7 @@
 
   Note: Adapted for NEON by Lucian Marc.
 
-  See LICENSES/BLOSC.txt for details about copyright and rights to use.
+  See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
 /* NEON-accelerated bitshuffle/bitunshuffle routines. */

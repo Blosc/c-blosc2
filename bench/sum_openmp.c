@@ -1,7 +1,7 @@
 /*
   Copyright (C) 2018  Francesc Alted
   http://blosc.org
-  License: BSD 3-clause (see LICENSES/BLOSC2.txt)
+  License: BSD 3-Clause (see LICENSE.txt)
 
   Example program showing how to operate with compressed buffers.
 

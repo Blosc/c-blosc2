@@ -4,7 +4,7 @@
   Author: Francesc Alted <francesc@blosc.org>
   Creation date: 2018-01-03
 
-  See LICENSES/BLOSC.txt for details about copyright and rights to use.
+  See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
 /*********************************************************************
