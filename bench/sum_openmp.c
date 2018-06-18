@@ -1,24 +1,40 @@
 /*
   Copyright (C) 2018  Francesc Alted
   http://blosc.org
-  License: MIT (see LICENSE.txt)
+  License: BSD 3-clause (see LICENSES/BLOSC2.txt)
 
   Example program showing how to operate with compressed buffers.
 
-  To compile this program:
+  To compile this program for synthetic data (default):
 
   $ gcc -fopenmp -O3 sum_openmp.c -o sum_openmp -lblosc
 
   To run:
 
-  $ OMP_PROC_BIND=spread OMP_NUM_THREADS=8 ./sum_openmp
-  Blosc version info: 2.0.0a4.dev ($Date:: 2016-08-04 #$)
-  Sum for uncompressed data: 4999999950000000
-  Sum time for uncompressed data: 0.0289 s, 26441.8 MB/s
-  Compression ratio: 762.9 MB -> 8.4 MB (90.6x)
-  Compression time: 0.46 s, 1659.9 MB/s
-  Sum for *compressed* data: 4999999950000000
-  Sum time for *compressed* data: 0.015 s, 50909.5 MB/s
+  $ OMP_PROC_BIND=spread OMP_NUM_THREADS=4 ./sum_openmp
+  Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
+  Sum for uncompressed data: 199950000000
+  Sum time for uncompressed data: 0.0296 s, 25752.4 MB/s
+  Compression ratio: 762.9 MB -> 14.2 MB (53.9x)
+  Compression time: 0.741 s, 1029.3 MB/s
+  Sum for *compressed* data: 199950000000
+  Sum time for *compressed* data: 0.0313 s, 24339.2 MB/s
+
+  To use real (rainfall) data:
+
+  $ gcc-8 -DRAINFALL -fopenmp -Ofast sum_openmp.c -o sum_openmp
+
+  And running it:
+
+  $ OMP_PROC_BIND=spread OMP_NUM_THREADS=4 ./sum_openmp
+  Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
+  Sum for uncompressed data:   29851430
+  Sum time for uncompressed data: 0.0144 s, 26461.0 MB/s
+  Compression ratio: 381.5 MB -> 80.3 MB (4.7x)
+  Compression time: 0.378 s, 1010.4 MB/s
+  Sum for *compressed* data:   29952800
+  Sum time for *compressed* data: 0.0513 s, 7432.2 MB/s
+
 
 */
 
@@ -39,16 +55,20 @@
 #define NCHUNKS (N / CHUNKSIZE)
 #define NTHREADS 8
 #define NITER 5
+#ifdef RAINFALL
 #define SYNTHETIC false
+#else
+#define SYNTHETIC true
+#endif
 
 #if SYNTHETIC == true
 #define DTYPE int64_t
-#define CLEVEL 5
+#define CLEVEL 9
 #define CODEC BLOSC_BLOSCLZ
 #else
 #define DTYPE float
 #define CLEVEL 9
-#define CODEC BLOSC_LZ4HC
+#define CODEC BLOSC_LZ4
 #endif
 
 
@@ -195,7 +215,7 @@ int main() {
          ttotal, nbytes / (ttotal * MB));
   //printf("sum, csum: %f, %f\n", sum, compressed_sum);
   if (SYNTHETIC) {
-    // for simple precision this is extremely difficult to fulfill
+    // for simple precision this is difficult to fulfill
     assert(sum == compressed_sum);
   }
   /* Free resources */
