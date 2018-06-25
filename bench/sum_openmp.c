@@ -68,7 +68,7 @@
 #else
 #define DTYPE float
 #define CLEVEL 9
-#define CODEC BLOSC_LZ4
+#define CODEC BLOSC_LZ4HC
 #endif
 
 
@@ -192,7 +192,8 @@ int main() {
     for (j = 0; j < nthreads; j++) {
       dctx[j] = blosc2_create_dctx(dparams);
       for (nchunk = 0; nchunk < nchunks_thread; nchunk++) {
-        blosc2_decompress_ctx(dctx[j], schunk->data[j * nchunks_thread + nchunk], (void*)(chunk[j]), isize);
+        blosc2_decompress_ctx(dctx[j], schunk->data[j * nchunks_thread + nchunk],
+                              (void*)(chunk[j]), isize);
         for (i = 0; i < CHUNKSIZE; i++) {
           compressed_sum += chunk[j][i];
           //compressed_sum += i + (j * nchunks_thread + nchunk) * CHUNKSIZE;
@@ -215,7 +216,7 @@ int main() {
          ttotal, nbytes / (ttotal * MB));
   //printf("sum, csum: %f, %f\n", sum, compressed_sum);
   if (SYNTHETIC) {
-    // for simple precision this is difficult to fulfill
+    // difficult to fulfill for single precision
     assert(sum == compressed_sum);
   }
   /* Free resources */
