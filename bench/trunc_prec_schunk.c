@@ -76,7 +76,7 @@ int main() {
   //cparams.compcode = BLOSC_ZSTD;
   //cparams.clevel = 7;
   cparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams);
+  schunk = blosc2_make_schunk(cparams, dparams);
 
   /* Append the chunks */
   blosc_set_timestamp(&last);
@@ -139,7 +139,7 @@ int main() {
   free(data_buffer);
   free(rec_buffer);
   /* Destroy the super-chunk */
-  blosc2_free_schunk(schunk);
+  blosc2_destroy_schunk(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
 

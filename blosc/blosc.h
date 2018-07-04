@@ -618,22 +618,18 @@ typedef struct {
   /* the type size */
   int32_t blocksize;
   /* the requested size of the compressed blocks (0; meaning automatic) */
-  uint32_t chunksize;   // starts at 8 bytes
+  uint32_t chunksize;
   /* Size of each chunk.  0 if not a fixed chunksize. */
-  uint8_t filters[BLOSC_MAX_FILTERS];  // starts at 12 bytes
+  uint8_t filters[BLOSC_MAX_FILTERS];
   /* The (sequence of) filters.  8-bit per filter. */
   uint8_t filters_meta[BLOSC_MAX_FILTERS];
   /* Metadata for filters. 8-bit per meta-slot. */
-  int64_t nchunks;  // starts at 28 bytes
+  int64_t nchunks;
   /* Number of chunks in super-chunk */
-  int64_t nbytes;  // starts at 36 bytes
+  int64_t nbytes;
   /* data size + metadata size + header size (uncompressed) */
-  int64_t cbytes;  // starts at 44 bytes
+  int64_t cbytes;
   /* data size + metadata size + header size (compressed) */
-  uint8_t* filters_chunk;  // starts at 52 bytes
-  /* Pointer to chunk hosting filter-related data */
-  uint8_t* codec_chunk;
-  /* Pointer to chunk hosting codec-related data */
   uint8_t* metadata_chunk;
   /* Pointer to schunk metadata */
   uint8_t* userdata_chunk;
@@ -651,11 +647,11 @@ typedef struct {
 
 
 /* Create a new super-chunk. */
-BLOSC_EXPORT blosc2_schunk* blosc2_new_schunk(
+BLOSC_EXPORT blosc2_schunk* blosc2_make_schunk(
         blosc2_cparams cparams, blosc2_dparams dparams);
 
 /* Release resources from a super-chunk */
-BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *sheader);
+BLOSC_EXPORT int blosc2_destroy_schunk(blosc2_schunk *sheader);
 
 /* Append a `src` data buffer to a super-chunk.
 
@@ -668,8 +664,8 @@ BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *sheader);
 BLOSC_EXPORT size_t blosc2_append_buffer(blosc2_schunk* sheader,
                                          size_t nbytes, void* src);
 
-BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize,
-                                               size_t nbytes, void* src);
+BLOSC_EXPORT void* blosc2_frame_append_buffer(void *packed, size_t typesize,
+                                              size_t nbytes, void *src);
 
 /* Decompress and return the `nchunk` chunk of a super-chunk.
 
@@ -684,11 +680,11 @@ BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize,
 BLOSC_EXPORT int blosc2_decompress_chunk(blosc2_schunk* sheader,
      size_t nchunk, void* dest, size_t nbytes);
 
-BLOSC_EXPORT int blosc2_packed_decompress_chunk(void* packed, size_t nchunk,
-      void** dest);
+BLOSC_EXPORT int blosc2_frame_decompress_chunk(void *packed, size_t nchunk,
+                                               void **dest);
 
 /* Pack a super-chunk by using the header. */
-BLOSC_EXPORT void* blosc2_pack_schunk(blosc2_schunk* sheader);
+BLOSC_EXPORT void* blosc2_make_frame(blosc2_schunk *sheader);
 
 /* Unpack a packed super-chunk */
 BLOSC_EXPORT blosc2_schunk* blosc2_unpack_schunk(void* packed);

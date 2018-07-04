@@ -61,7 +61,7 @@ int main() {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams);
+  schunk = blosc2_make_schunk(cparams, dparams);
 
   blosc_set_timestamp(&last);
   for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
@@ -108,7 +108,7 @@ int main() {
 
   /* Free resources */
   /* Destroy the super-chunk */
-  blosc2_free_schunk(schunk);
+  blosc2_destroy_schunk(schunk);
 
   return 0;
 }

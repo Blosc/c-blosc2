@@ -51,17 +51,17 @@ int main() {
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Create a super-chunk container */
-  schunk = blosc2_new_schunk(
+  schunk = blosc2_make_schunk(
           (blosc2_cparams) {
-           .typesize = sizeof(int32_t),
-           .filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE,
-           .compcode = BLOSC_LZ4,
-           .clevel = 9,
-           .nthreads = NTHREADS,
-                   },
+                  .typesize = sizeof(int32_t),
+                  .filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE,
+                  .compcode = BLOSC_LZ4,
+                  .clevel = 9,
+                  .nthreads = NTHREADS,
+          },
           (blosc2_dparams) {
-           .nthreads = NTHREADS,
-                   });
+                  .nthreads = NTHREADS,
+          });
 
   blosc_set_timestamp(&last);
   for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
@@ -107,7 +107,7 @@ int main() {
 
   /* Free resources */
   /* Destroy the super-chunk */
-  blosc2_free_schunk(schunk);
+  blosc2_destroy_schunk(schunk);
 
   return 0;
 }

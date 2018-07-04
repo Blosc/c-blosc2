@@ -62,7 +62,7 @@ int main() {
   //cparams.blocksize = 1024 * 32;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams);
+  schunk = blosc2_make_schunk(cparams, dparams);
 
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
@@ -109,7 +109,7 @@ int main() {
   printf("Successful roundtrip!\n");
 
   /* Free resources */
-  blosc2_free_schunk(schunk);
+  blosc2_destroy_schunk(schunk);
   blosc_destroy();
 
   return 0;
