@@ -474,7 +474,7 @@ BLOSC_EXPORT char* blosc_cbuffer_complib(const void* cbuffer);
 
 *********************************************************************/
 
-typedef struct blosc2_context_s blosc2_context;   /* uncomplete type */
+typedef struct blosc2_context_s blosc2_context;   /* opaque type */
 
 /**
   The parameters for creating a context for compression purposes.
@@ -491,7 +491,7 @@ typedef struct {
   /* use dicts or not when compressing (only for ZSTD) */
   size_t typesize;
   /* the type size (8) */
-  uint32_t nthreads;
+  int16_t nthreads;
   /* the number of threads to use internally (1) */
   size_t blocksize;
   /* the requested size of the compressed blocks (0; meaning automatic) */
@@ -515,7 +515,7 @@ static const blosc2_cparams BLOSC_CPARAMS_DEFAULTS = {
   (zero) in the fields of the struct is passed to a function.
 */
 typedef struct {
-  int32_t nthreads;
+  int16_t nthreads;
   /* the number of threads to use internally (1) */
   void* schunk;
   /* the associated schunk, if any (NULL) */
@@ -647,11 +647,11 @@ typedef struct {
 
 
 /* Create a new super-chunk. */
-BLOSC_EXPORT blosc2_schunk* blosc2_make_schunk(
+BLOSC_EXPORT blosc2_schunk* blosc2_new_schunk(
         blosc2_cparams cparams, blosc2_dparams dparams);
 
 /* Release resources from a super-chunk */
-BLOSC_EXPORT int blosc2_destroy_schunk(blosc2_schunk *sheader);
+BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *schunk);
 
 /* Append a `src` data buffer to a super-chunk.
 
@@ -661,7 +661,7 @@ BLOSC_EXPORT int blosc2_destroy_schunk(blosc2_schunk *sheader);
  This returns the number of chunk in super-chunk.  If some problem is
  detected, this number will be negative.
  */
-BLOSC_EXPORT size_t blosc2_append_buffer(blosc2_schunk* sheader,
+BLOSC_EXPORT size_t blosc2_append_buffer(blosc2_schunk* schunk,
                                          size_t nbytes, void* src);
 
 BLOSC_EXPORT void* blosc2_frame_append_buffer(void *packed, size_t typesize,
@@ -677,17 +677,21 @@ BLOSC_EXPORT void* blosc2_frame_append_buffer(void *packed, size_t typesize,
  The size of the decompressed chunk is returned.  If some problem is
  detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_decompress_chunk(blosc2_schunk* sheader,
-     size_t nchunk, void* dest, size_t nbytes);
+BLOSC_EXPORT int blosc2_decompress_chunk(blosc2_schunk* schunk,
+                                         size_t nchunk, void* dest, size_t nbytes);
 
-BLOSC_EXPORT int blosc2_frame_decompress_chunk(void *packed, size_t nchunk,
-                                               void **dest);
 
-/* Pack a super-chunk by using the header. */
-BLOSC_EXPORT void* blosc2_make_frame(blosc2_schunk *sheader);
+/*********************************************************************
 
-/* Unpack a packed super-chunk */
-BLOSC_EXPORT blosc2_schunk* blosc2_unpack_schunk(void* packed);
+  Frame related structures and functions.
+
+*********************************************************************/
+
+/* Create a frame from a super-chunk. */
+BLOSC_EXPORT void* blosc2_new_frame(blosc2_schunk *schunk);
+
+/* Get a super-chunk from a frame */
+BLOSC_EXPORT blosc2_schunk* blosc2_unpack_schunk(void* frame);
 
 
 /*********************************************************************

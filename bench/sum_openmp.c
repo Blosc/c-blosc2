@@ -148,7 +148,7 @@ int main() {
   cparams.nthreads = 1;
   dparams.nthreads = 1;
   blosc_set_timestamp(&last);
-  schunk = blosc2_make_schunk(cparams, dparams);
+  schunk = blosc2_new_schunk(cparams, dparams);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     for (i = 0; i < CHUNKSIZE; i++) {
       chunk_buf[i] = udata[i + nchunk * CHUNKSIZE];
@@ -220,7 +220,7 @@ int main() {
     assert(sum == compressed_sum);
   }
   /* Free resources */
-  blosc2_destroy_schunk(schunk);
+  blosc2_free_schunk(schunk);
 
   return 0;
 }

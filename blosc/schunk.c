@@ -39,8 +39,8 @@
 
 
 /* Create a new super-chunk */
-blosc2_schunk* blosc2_make_schunk(blosc2_cparams cparams,
-                                  blosc2_dparams dparams) {
+blosc2_schunk* blosc2_new_schunk(blosc2_cparams cparams,
+                                 blosc2_dparams dparams) {
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
 
   schunk->version = 0;     /* pre-first version */
@@ -52,7 +52,6 @@ blosc2_schunk* blosc2_make_schunk(blosc2_cparams cparams,
   schunk->clevel = cparams.clevel;
   schunk->typesize = cparams.typesize;
   schunk->blocksize = cparams.blocksize;
-  schunk->cbytes = sizeof(blosc2_schunk);
 
   /* The compression context */
   cparams.schunk = schunk;
@@ -80,7 +79,7 @@ size_t append_chunk(blosc2_schunk* schunk, void* chunk) {
   /* Update counters */
   schunk->nchunks = nchunks + 1;
   schunk->nbytes += nbytes;
-  schunk->cbytes += cbytes + sizeof(void*);
+  schunk->cbytes += cbytes;
   /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n", */
   /*         nchunks, nbytes, cbytes, (1.*nbytes) / cbytes); */
 
@@ -146,7 +145,7 @@ int blosc2_decompress_chunk(blosc2_schunk* schunk, size_t nchunk,
 
 
 /* Free all memory from a super-chunk. */
-int blosc2_destroy_schunk(blosc2_schunk *schunk) {
+int blosc2_free_schunk(blosc2_schunk *schunk) {
 
   if (schunk->metadata_chunk != NULL)
     free(schunk->metadata_chunk);

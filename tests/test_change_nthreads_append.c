@@ -43,7 +43,7 @@ int main() {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_make_schunk(cparams, dparams);
+  schunk = blosc2_new_schunk(cparams, dparams);
 
   struct blosc2_context_s * cctx = schunk->cctx;
   blosc_set_timestamp(&last);
@@ -96,7 +96,7 @@ int main() {
   printf("Successful roundtrip!\n");
 
 /* Free resources */
-  blosc2_destroy_schunk(schunk);
+  blosc2_free_schunk(schunk);
 
   return 0;
 }

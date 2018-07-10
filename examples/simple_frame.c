@@ -51,7 +51,7 @@ int main() {
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Create a super-chunk container */
-  schunk = blosc2_make_schunk(
+  schunk = blosc2_new_schunk(
           (blosc2_cparams) {
                   .typesize = sizeof(int32_t),
                   .filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE,
@@ -81,6 +81,8 @@ int main() {
   printf("Compression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
+  void* frame = blosc2_new_frame(schunk);
+
   /* Retrieve and decompress the chunks (0-based count) */
   blosc_set_timestamp(&last);
   for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
@@ -106,8 +108,8 @@ int main() {
   printf("Successful roundtrip!\n");
 
   /* Free resources */
-  /* Destroy the super-chunk */
-  blosc2_destroy_schunk(schunk);
+  blosc2_free_schunk(schunk);
+  free(frame);
 
   return 0;
 }

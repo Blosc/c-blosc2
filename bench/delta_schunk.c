@@ -57,7 +57,7 @@ int main() {
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 1;
   cparams.nthreads = NTHREADS;
-  schunk = blosc2_make_schunk(cparams, dparams);
+  schunk = blosc2_new_schunk(cparams, dparams);
 
   /* Append chunks (the first will be taken as reference for delta) */
   blosc_set_timestamp(&last);
@@ -107,7 +107,7 @@ int main() {
   free(data);
   free(data_dest);
   /* Destroy the super-chunk */
-  blosc2_destroy_schunk(schunk);
+  blosc2_free_schunk(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
 

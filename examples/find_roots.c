@@ -87,10 +87,10 @@ int compute_vectors(void) {
     cparams.filters_meta[0] = 23;  // treat doubles as floats
     cparams.nthreads = NTHREADS;
     dparams.nthreads = NTHREADS;
-    sc_x = blosc2_make_schunk(cparams, dparams);
+    sc_x = blosc2_new_schunk(cparams, dparams);
 
     /* Create a super-chunk container for output (Y values) */
-    sc_y = blosc2_make_schunk(cparams, dparams);
+    sc_y = blosc2_new_schunk(cparams, dparams);
 
     /* Now fill the buffer with even values between 0 and 10 */
     blosc_set_timestamp(&last);
@@ -153,8 +153,8 @@ int compute_vectors(void) {
 
     /* Free resources */
     /* Destroy the super-chunk */
-    blosc2_destroy_schunk(sc_x);
-    blosc2_destroy_schunk(sc_y);
+    blosc2_free_schunk(sc_x);
+    blosc2_free_schunk(sc_y);
     return 0;
 }
 
