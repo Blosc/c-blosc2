@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "schunk.h"
+#include "blosc.h"
 #include "context.h"
 
 #include "zstd.h"

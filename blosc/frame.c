@@ -11,8 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "schunk.h"
-#include "frame.h"
+#include "blosc.h"
 #include "context.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
