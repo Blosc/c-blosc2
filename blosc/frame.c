@@ -70,7 +70,7 @@ void* swap_bytes(const void *pa, int size) {
       case 1:
         break;
       default:
-        sprintf(stderr, "Unhandled size: %d\n", size);
+        fprintf(stderr, "Unhandled size: %d\n", size);
     }
   }
   return pa_;
@@ -89,7 +89,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   *h2p = 0xa0 + 6;  // str with 6 elements
   h2p += 1;
   assert(h2p - h2 < HEADER2_MAXSIZE);
-  strncpy(h2p, "blf", 3);
+  strncpy((char*)h2p, "blf", 3);
   h2p += 6;
 
   // Header size
@@ -216,7 +216,7 @@ void* blosc2_new_frame(blosc2_schunk *schunk) {
     }
   }
   else {
-    sprintf(stderr, "Offsets for 32-bit platforms not implemented yet");
+    fprintf(stderr, "Offsets for 32-bit platforms not implemented yet");
     return NULL;
   }
   printf("Offsets compressed from %ld to %d bytes\n", off_nbytes, off_cbytes);
