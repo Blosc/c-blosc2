@@ -34,7 +34,7 @@
 
 
 // Inplace conversion to big/little-endian (it is symmetric).  Sizes supported: 1, 2, 4, 8 bytes.
-void* swap_bytes(const void *pa, int size) {
+void* swap_inplace(void *pa, int size) {
   uint8_t* pa_ = (uint8_t*)pa;
   int64_t dest;
   uint8_t* pa2_ = (uint8_t*)&dest;
@@ -77,7 +77,6 @@ void* swap_bytes(const void *pa, int size) {
 }
 
 
-
 #define FRAME_VERSION 0
 #define HEADER2_MAXSIZE 64
 
@@ -89,7 +88,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   *h2p = 0xa0 + 6;  // str with 6 elements
   h2p += 1;
   assert(h2p - h2 < HEADER2_MAXSIZE);
-  strncpy((char*)h2p, "blf", 3);
+  strncpy((char*)h2p, "b2fram", 6);
   h2p += 6;
 
   // Header size
@@ -131,7 +130,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   *h2p = 0xd3;  // int64
   h2p += 1;
   int64_t nbytes = schunk->nbytes;
-  memcpy(h2p, swap_bytes(&nbytes, 8), 8);
+  memcpy(h2p, swap_inplace(&nbytes, 8), 8);
   h2p += 8;
   assert(h2p - h2 < HEADER2_MAXSIZE);
 
@@ -139,7 +138,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   *h2p = 0xd3;  // int64
   h2p += 1;
   int64_t cbytes = schunk->cbytes;
-  memcpy(h2p, swap_bytes(&cbytes, 8), 8);
+  memcpy(h2p, swap_inplace(&cbytes, 8), 8);
   h2p += 8;
   assert(h2p - h2 < HEADER2_MAXSIZE);
 
@@ -147,7 +146,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   *h2p = 0xd2;  // int32
   h2p += 1;
   int32_t typesize = schunk->typesize;
-  memcpy(h2p, swap_bytes(&typesize, 4), 4);
+  memcpy(h2p, swap_inplace(&typesize, 4), 4);
   h2p += 4;
   assert(h2p - h2 < HEADER2_MAXSIZE);
 
@@ -155,7 +154,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   *h2p = 0xd2;  // int32
   h2p += 1;
   int32_t chunksize = schunk->chunksize;
-  memcpy(h2p, swap_bytes(&chunksize, 4), 4);
+  memcpy(h2p, swap_inplace(&chunksize, 4), 4);
   h2p += 4;
   assert(h2p - h2 < HEADER2_MAXSIZE);
 
@@ -163,7 +162,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   *h2p = 0xd1;  // int16
   h2p += 1;
   int16_t nthreads = schunk->dctx->nthreads;
-  memcpy(h2p, swap_bytes(&nthreads, 2), 2);
+  memcpy(h2p, swap_inplace(&nthreads, 2), 2);
   h2p += 2;
   assert(h2p - h2 < HEADER2_MAXSIZE);
 
@@ -174,7 +173,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
 
   // Finally, set the length now that we know it
   int32_t hsize = (int32_t)(h2p - h2);
-  memcpy(h2sizep, swap_bytes(&hsize, 4), 4);
+  memcpy(h2sizep, swap_inplace(&hsize, 4), 4);
 
   return h2;
 }
@@ -184,61 +183,59 @@ void* new_header2_frame(blosc2_schunk *schunk) {
 void* blosc2_new_frame(blosc2_schunk *schunk) {
   int64_t nchunks = schunk->nchunks;
   int64_t cbytes = schunk->cbytes;
-  int32_t off_cbytes = 0;
+  uint64_t coffset = 0;
   uint32_t h2len;
   size_t frame_len;
-  void* frame;
 
   void* h2 = new_header2_frame(schunk);
   memcpy(&h2len, h2 + 8, 4);
-  swap_bytes(&h2len, 4);
+  swap_inplace(&h2len, 4);
   printf("header len: %d\n", h2len);
   frame_len = h2len + cbytes;
 
-  // Get the offsets chunk
+  // Build the offsets chunk
+  int32_t off_cbytes = 0;
   size_t off_nbytes = nchunks * 8;
   void* off_chunk = malloc(off_nbytes + BLOSC_MAX_OVERHEAD);
-  if (sizeof(void*) == 8) {
-    uint64_t* data_tmp = malloc(off_nbytes);
-    for (int i = 0; i < nchunks; i++) {
-      data_tmp[i] = schunk->data[i] - schunk->data[0];
-    }
-    blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
-    blosc2_context* cctx = blosc2_create_cctx(cparams);
-    off_cbytes = blosc2_compress_ctx(cctx, off_nbytes, data_tmp, off_chunk,
-                                     off_nbytes + BLOSC_MAX_OVERHEAD);
-    free(data_tmp);
-    blosc2_free_ctx(cctx);
-    if (off_cbytes < 0) {
-      free(off_chunk);
-      free(h2);
-      return NULL;
-    }
-  }
-  else {
-    fprintf(stderr, "Offsets for 32-bit platforms not implemented yet");
-    return NULL;
-  }
-  printf("Offsets compressed from %ld to %d bytes\n", off_nbytes, off_cbytes);
-  frame_len += off_cbytes;
-  printf("Total frame length: %ld\n", frame_len);
-
-  // Create the frame and populate the metadata
-  frame = malloc(frame_len);
-  memcpy(frame, h2, h2len);
-  free(h2);
-  memcpy(frame + h2len + cbytes, off_chunk, off_cbytes);
-  free(off_chunk);
-
-  // And fill the actual data chunks
-  uint64_t offset = h2len;
+  uint64_t* data_tmp = malloc(off_nbytes);
   for (int i = 0; i < nchunks; i++) {
     void* data_chunk = schunk->data[i];
     int32_t chunk_cbytes = *(int32_t*)((uint8_t*)data_chunk + 12);
-    memcpy((uint8_t*)frame + offset, data_chunk, (size_t)chunk_cbytes);
-    offset += chunk_cbytes;
+    data_tmp[i] = coffset;
+    coffset += chunk_cbytes;
   }
-  assert (offset == h2len + cbytes);
+  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  blosc2_context* cctx = blosc2_create_cctx(cparams);
+  off_cbytes = blosc2_compress_ctx(cctx, off_nbytes, data_tmp, off_chunk,
+                                   off_nbytes + BLOSC_MAX_OVERHEAD);
+  free(data_tmp);
+  blosc2_free_ctx(cctx);
+  if (off_cbytes < 0) {
+    free(off_chunk);
+    free(h2);
+    return NULL;
+  }
+  assert (coffset == cbytes);
+  frame_len += off_cbytes;
+  printf("Total frame length: %ld\n", frame_len);
+
+  // Create the frame and put the header at the beginning
+  void* frame = malloc(frame_len);
+  memcpy(frame, h2, h2len);
+  free(h2);
+  // Copy the offsets at the end of the frame
+  memcpy(frame + h2len + cbytes, off_chunk, off_cbytes);
+  free(off_chunk);
+  printf("Offsets compressed from %ld to %d bytes\n", off_nbytes, off_cbytes);
+
+  // Fill the actual data chunks
+  coffset = 0;
+  for (int i = 0; i < nchunks; i++) {
+    void* data_chunk = schunk->data[i];
+    int32_t chunk_cbytes = *(int32_t*)((uint8_t*)data_chunk + 12);
+    memcpy((uint8_t*)frame + h2len + coffset, data_chunk, (size_t)chunk_cbytes);
+    coffset += chunk_cbytes;
+  }
 
   return frame;
 }
