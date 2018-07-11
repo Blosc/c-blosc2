@@ -78,24 +78,37 @@ void* swap_inplace(void *pa, int size) {
 
 
 #define FRAME_VERSION 0
+#define FRAME_LEN 16
+#define FRAME_CHUNKSIZE 53
 #define HEADER2_MAXSIZE 64
+#define HEADER2_LEN 11
 
 void* new_header2_frame(blosc2_schunk *schunk) {
   uint8_t* h2 = calloc(HEADER2_MAXSIZE, 1);
   uint8_t* h2p = h2;
 
+  // The msgpack header will start as a fix array
+  *h2p = 0x90 + 10;  // array with 10 elements
+  h2p += 1;
+
   // Magic number
-  *h2p = 0xa0 + 6;  // str with 6 elements
+  *h2p = 0xa0 + 8;  // str with 8 elements
   h2p += 1;
   assert(h2p - h2 < HEADER2_MAXSIZE);
-  strncpy((char*)h2p, "b2fram", 6);
-  h2p += 6;
+  strncpy((char*)h2p, "b2frame", strlen("b2frame"));
+  h2p += 8;
 
   // Header size
   *h2p = 0xd2;  // int32
   h2p += 1;
   int32_t* h2sizep = (int32_t*)h2p;
   h2p += 4;
+  assert(h2p - h2 < HEADER2_MAXSIZE);
+
+  // Total frame size
+  *h2p = 0xcf;  // uint64
+  h2p += 1;
+  h2p += 8;
   assert(h2p - h2 < HEADER2_MAXSIZE);
 
   // Flags
@@ -188,7 +201,7 @@ void* blosc2_new_frame(blosc2_schunk *schunk) {
   size_t frame_len;
 
   void* h2 = new_header2_frame(schunk);
-  memcpy(&h2len, h2 + 8, 4);
+  memcpy(&h2len, h2 + HEADER2_LEN, 4);
   swap_inplace(&h2len, 4);
   printf("header len: %d\n", h2len);
   frame_len = h2len + cbytes;
@@ -229,15 +242,38 @@ void* blosc2_new_frame(blosc2_schunk *schunk) {
   printf("Offsets compressed from %ld to %d bytes\n", off_nbytes, off_cbytes);
 
   // Fill the actual data chunks
+  int32_t chunksize = 0;
   coffset = 0;
   for (int i = 0; i < nchunks; i++) {
     void* data_chunk = schunk->data[i];
     int32_t chunk_cbytes = *(int32_t*)((uint8_t*)data_chunk + 12);
     memcpy((uint8_t*)frame + h2len + coffset, data_chunk, (size_t)chunk_cbytes);
     coffset += chunk_cbytes;
+    int32_t chunksize_ = *(int32_t*)((uint8_t*)data_chunk + 8);
+    if (i == 0) {
+      chunksize = chunksize_;
+    }
+    else if (chunksize != chunksize_) {
+      // Variable size  TODO: update flags for this (or do not use them at all)
+      chunksize = 0;
+    }
   }
 
+  // Finally, set the length and the chunksize now that we know them
+  uint64_t tbytes = frame_len;
+  memcpy(frame + FRAME_LEN, swap_inplace(&tbytes, 8), 8);
+  memcpy(frame + FRAME_CHUNKSIZE, swap_inplace(&chunksize, 4), 4);
+
   return frame;
+}
+
+
+// Get the frame length
+uint64_t blosc2_frame_len(const void *frame) {
+  uint64_t frame_len;
+  memcpy(&frame_len, frame + FRAME_LEN, 8);
+  swap_inplace(&frame_len, 8);
+  return frame_len;
 }
 
 
