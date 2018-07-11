@@ -81,7 +81,12 @@ int main() {
   printf("Compression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
+  // Get a frame from the super-chunk
   void* frame = blosc2_new_frame(schunk);
+
+  // Write the frame out to a file
+  uint64_t frame_len = blosc2_frame_tofile(frame, "simple_frame.b2frame");
+  printf("Frame output to simple_frame.b2frame with %lld bytes\n", frame_len);
 
   /* Retrieve and decompress the chunks (0-based count) */
   blosc_set_timestamp(&last);
