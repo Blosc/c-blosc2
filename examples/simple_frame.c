@@ -81,12 +81,15 @@ int main() {
   printf("Compression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
-  // Get a frame from the super-chunk
-  void* frame = blosc2_new_frame(schunk);
-
+  // Get an in-memory frame from the super-chunk
+  void* frame = blosc2_new_frame(schunk, NULL);
   // Write the frame out to a file
   uint64_t frame_len = blosc2_frame_tofile(frame, "simple_frame.b2frame");
   printf("Frame output to simple_frame.b2frame with %lld bytes\n", frame_len);
+
+  // Alternatively, you can create the frame directly on disk (both have to be equal)
+  blosc2_new_frame(schunk, "simple_frame2.b2frame");
+  printf("Same frame output to simple_frame2.b2frame with no intermediate buffers\n");
 
   /* Retrieve and decompress the chunks (0-based count) */
   blosc_set_timestamp(&last);

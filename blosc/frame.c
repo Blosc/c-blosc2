@@ -192,62 +192,34 @@ void* new_header2_frame(blosc2_schunk *schunk) {
 }
 
 
-/* Create a frame out of a super-chunk */
-void* blosc2_new_frame(blosc2_schunk *schunk) {
+/* Create a frame out of a super-chunk.
+
+ If `fname` is NULL, create the frame in-memory.
+ */
+void* blosc2_new_frame(blosc2_schunk *schunk, char *fname) {
   int64_t nchunks = schunk->nchunks;
   int64_t cbytes = schunk->cbytes;
-  uint64_t coffset = 0;
   uint32_t h2len;
-  size_t frame_len;
+  uint64_t frame_len;
+  void *frame = NULL;
+  FILE* fp = NULL;
 
   void* h2 = new_header2_frame(schunk);
   memcpy(&h2len, h2 + HEADER2_LEN, 4);
   swap_inplace(&h2len, 4);
   printf("header len: %d\n", h2len);
-  frame_len = h2len + cbytes;
 
   // Build the offsets chunk
+  int32_t chunksize = 0;
   int32_t off_cbytes = 0;
   size_t off_nbytes = nchunks * 8;
+  uint64_t coffset = 0;
   void* off_chunk = malloc(off_nbytes + BLOSC_MAX_OVERHEAD);
   uint64_t* data_tmp = malloc(off_nbytes);
   for (int i = 0; i < nchunks; i++) {
     void* data_chunk = schunk->data[i];
     int32_t chunk_cbytes = *(int32_t*)((uint8_t*)data_chunk + 12);
     data_tmp[i] = coffset;
-    coffset += chunk_cbytes;
-  }
-  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
-  blosc2_context* cctx = blosc2_create_cctx(cparams);
-  off_cbytes = blosc2_compress_ctx(cctx, off_nbytes, data_tmp, off_chunk,
-                                   off_nbytes + BLOSC_MAX_OVERHEAD);
-  free(data_tmp);
-  blosc2_free_ctx(cctx);
-  if (off_cbytes < 0) {
-    free(off_chunk);
-    free(h2);
-    return NULL;
-  }
-  assert (coffset == cbytes);
-  frame_len += off_cbytes;
-  printf("Total frame length: %ld\n", frame_len);
-
-  // Create the frame and put the header at the beginning
-  void* frame = malloc(frame_len);
-  memcpy(frame, h2, h2len);
-  free(h2);
-  // Copy the offsets at the end of the frame
-  memcpy(frame + h2len + cbytes, off_chunk, off_cbytes);
-  free(off_chunk);
-  printf("Offsets compressed from %ld to %d bytes\n", off_nbytes, off_cbytes);
-
-  // Fill the actual data chunks
-  int32_t chunksize = 0;
-  coffset = 0;
-  for (int i = 0; i < nchunks; i++) {
-    void* data_chunk = schunk->data[i];
-    int32_t chunk_cbytes = *(int32_t*)((uint8_t*)data_chunk + 12);
-    memcpy((uint8_t*)frame + h2len + coffset, data_chunk, (size_t)chunk_cbytes);
     coffset += chunk_cbytes;
     int32_t chunksize_ = *(int32_t*)((uint8_t*)data_chunk + 8);
     if (i == 0) {
@@ -258,12 +230,68 @@ void* blosc2_new_frame(blosc2_schunk *schunk) {
       chunksize = 0;
     }
   }
+  assert (coffset == cbytes);
 
-  // Finally, set the length and the chunksize now that we know them
+  // Compress the chunk of offsets
+  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  blosc2_context* cctx = blosc2_create_cctx(cparams);
+  off_cbytes = blosc2_compress_ctx(cctx, off_nbytes, data_tmp, off_chunk,
+                                   off_nbytes + BLOSC_MAX_OVERHEAD);
+  blosc2_free_ctx(cctx);
+  free(data_tmp);
+  if (off_cbytes < 0) {
+    free(off_chunk);
+    free(h2);
+    return NULL;
+  }
+
+  // Now that we know them, fill the chunksize and frame length in header2
+  memcpy(h2 + FRAME_CHUNKSIZE, swap_inplace(&chunksize, 4), 4);
+  frame_len = h2len + cbytes + off_cbytes;
+  printf("Total frame length: %lld\n", frame_len);
   uint64_t tbytes = frame_len;
-  memcpy(frame + FRAME_LEN, swap_inplace(&tbytes, 8), 8);
-  memcpy(frame + FRAME_CHUNKSIZE, swap_inplace(&chunksize, 4), 4);
+  memcpy(h2 + FRAME_LEN, swap_inplace(&tbytes, 8), 8);
 
+  // Create the frame and put the header at the beginning
+  if (fname == NULL) {
+    frame = malloc(frame_len);
+    memcpy(frame, h2, h2len);
+  }
+  else {
+    fp = fopen(fname, "w");
+    fwrite(h2, h2len, 1, fp);
+  }
+  free(h2);
+
+  // Fill the frame with the actual data chunks
+  coffset = 0;
+  for (int i = 0; i < nchunks; i++) {
+    void* data_chunk = schunk->data[i];
+    int32_t chunk_cbytes = *(int32_t*)((uint8_t*)data_chunk + 12);
+    if (fname == NULL) {
+      memcpy((uint8_t *)frame + h2len + coffset, data_chunk, (size_t) chunk_cbytes);
+    } else {
+      fwrite(data_chunk, (size_t)chunk_cbytes, 1, fp);
+    }
+    coffset += chunk_cbytes;
+  }
+  assert (coffset == cbytes);
+
+  // Copy the offsets chunk at the end of the frame
+  if (fname == NULL) {
+    memcpy(frame + h2len + cbytes, off_chunk, off_cbytes);
+  }
+  else {
+    fwrite(off_chunk, (size_t)off_cbytes, 1, fp);
+  }
+  free(off_chunk);
+  printf("Offsets compressed from %ld to %d bytes\n", off_nbytes, off_cbytes);
+
+  if (fname != NULL) {
+    fclose(fp);
+  }
+
+  // Return the in-memory frame or NULL for disk-based frames
   return frame;
 }
 
@@ -277,7 +305,7 @@ uint64_t blosc2_frame_len(const void *frame) {
 }
 
 
-/* Write the frame out to a file. */
+/* Write an in-memory frame out to a file. */
 uint64_t blosc2_frame_tofile(void* frame, char* fname) {
   uint64_t frame_len = blosc2_frame_len(frame);
   FILE* fp = fopen(fname, "w");

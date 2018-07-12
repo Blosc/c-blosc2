@@ -687,13 +687,17 @@ BLOSC_EXPORT int blosc2_decompress_chunk(blosc2_schunk* schunk,
 
 *********************************************************************/
 
-/* Create a frame from a super-chunk. */
-BLOSC_EXPORT void* blosc2_new_frame(blosc2_schunk *schunk);
+/* Create a frame from a super-chunk.
 
-/* Get the frame length. */
+ If `fname` is NULL, a frame is created in memory; else it is created
+ on disk.
+ */
+BLOSC_EXPORT void* blosc2_new_frame(blosc2_schunk *schunk, char* fname);
+
+/* Get an in-memory frame length. */
 BLOSC_EXPORT uint64_t blosc2_frame_len(const void *frame);
 
-/* Write the frame out to a file. */
+/* Write an in-memory frame out to a file. */
 BLOSC_EXPORT uint64_t blosc2_frame_tofile(void* frame, char* fname);
 
 /* Get a super-chunk from a frame. */
