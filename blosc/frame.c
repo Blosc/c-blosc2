@@ -78,10 +78,17 @@ void* swap_inplace(void *pa, int size) {
 
 
 #define FRAME_VERSION 0
-#define FRAME_LEN 16
-#define FRAME_CHUNKSIZE 53
 #define HEADER2_MAXSIZE 64
+
+#define FRAME_LEN 16
+#define FRAME_FILTERS 26
+#define FRAME_COMPCODE 27
+#define FRAME_NBYTES 30
+#define FRAME_CBYTES 39
+#define FRAME_TYPESIZE 48
+#define FRAME_CHUNKSIZE 53
 #define HEADER2_LEN 11
+
 
 void* new_header2_frame(blosc2_schunk *schunk) {
   uint8_t* h2 = calloc(HEADER2_MAXSIZE, 1);
@@ -221,7 +228,7 @@ void* blosc2_new_frame(blosc2_schunk *schunk, char *fname) {
     int32_t chunk_cbytes = *(int32_t*)((uint8_t*)data_chunk + 12);
     data_tmp[i] = coffset;
     coffset += chunk_cbytes;
-    int32_t chunksize_ = *(int32_t*)((uint8_t*)data_chunk + 8);
+    int32_t chunksize_ = *(int32_t*)((uint8_t*)data_chunk + 4);
     if (i == 0) {
       chunksize = chunksize_;
     }
@@ -242,6 +249,7 @@ void* blosc2_new_frame(blosc2_schunk *schunk, char *fname) {
   if (off_cbytes < 0) {
     free(off_chunk);
     free(h2);
+    // TODO: how to signal the error when fname == NULL ?
     return NULL;
   }
 
@@ -316,45 +324,114 @@ uint64_t blosc2_frame_tofile(void* frame, char* fname) {
 
 
 /* Get a super-chunk out of a frame */
-blosc2_schunk* blosc2_frame_to_schunk(void* frame) {
+blosc2_schunk* blosc2_schunk_from_frame(void* frame) {
+  uint8_t* framep = frame;
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
-  int64_t nbytes = sizeof(blosc2_schunk);
-  int64_t cbytes = sizeof(blosc2_schunk);
   uint8_t* data_chunk;
-  void* new_chunk;
-  int64_t* data;
-  int64_t nchunks;
-  int32_t chunk_size;
-  int i;
 
-  /* Fill the header */
-  memcpy(schunk, frame, 52); /* Copy until cbytes */
+  // Fetch some internal lengths
+  uint32_t h2_len;
+  memcpy(&h2_len, framep + HEADER2_LEN, 4);
+  swap_inplace(&h2_len, 4);
 
-  /* Finally, fill the data pointers section */
-  data = (int64_t*)(
-          (uint8_t*)frame + *(int64_t*)((uint8_t*)frame + 52 + 8 * 4));
-  nchunks = *(int64_t*)((uint8_t*)frame + 28);
-  schunk->data = malloc(nchunks * sizeof(void*));
-  nbytes += nchunks * sizeof(int64_t);
-  cbytes += nchunks * sizeof(int64_t);
+  uint64_t frame_len;
+  memcpy(&frame_len, framep + FRAME_LEN, 8);
+  swap_inplace(&frame_len, 8);
 
-  /* And create the actual data chunks */
-  if (data != NULL) {
-    for (i = 0; i < nchunks; i++) {
-      data_chunk = (uint8_t*)frame + data[i];
-      chunk_size = *(int32_t*)(data_chunk + 12);
-      new_chunk = malloc((size_t)chunk_size);
-      memcpy(new_chunk, data_chunk, (size_t)chunk_size);
-      schunk->data[i] = new_chunk;
-      cbytes += chunk_size;
-      nbytes += *(int32_t*)(data_chunk + 4);
-    }
-  }
+  int64_t nbytes;
+  memcpy(&nbytes, framep + FRAME_NBYTES, 8);
+  swap_inplace(&nbytes, 8);
   schunk->nbytes = nbytes;
+
+  int64_t cbytes;
+  memcpy(&cbytes, framep + FRAME_CBYTES, 8);
+  swap_inplace(&cbytes, 8);
   schunk->cbytes = cbytes;
 
-  assert(*(int64_t*)((uint8_t*)frame + 36) == nbytes);
-  assert(*(int64_t*)((uint8_t*)frame + 44) == cbytes);
+  int32_t typesize;
+  memcpy(&typesize, framep + FRAME_TYPESIZE, 4);
+  swap_inplace(&typesize, 4);
+  schunk->typesize = typesize;
+
+  int32_t chunksize;
+  memcpy(&chunksize, framep + FRAME_CHUNKSIZE, 4);
+  swap_inplace(&chunksize, 4);
+  schunk->cbytes = cbytes;
+
+  int32_t nchunks = (int32_t)(nbytes / chunksize);
+  if (nchunks * chunksize < nbytes) {
+    nchunks += 1;
+  }
+  schunk->nchunks = nchunks;
+
+  // Fill the different values in struct
+  // Codec
+  uint8_t compcode = framep[FRAME_COMPCODE];
+  schunk->compcode = (uint8_t)(compcode & 0xf);
+  schunk->clevel = (uint8_t)((compcode & 0xf0) >> 4);
+
+  // Filter.  We don't pay attention to the split flag which is set automatically when compressing.
+  uint8_t filters = framep[FRAME_FILTERS];
+  schunk->filters[BLOSC_MAX_FILTERS - 1] = (filters & 0xc) >> 2;  // filters are in bits 2 and 3
+
+  // TODO: complete other flags
+
+  // Fill the data pointers section
+  // Decompress the chunk of offsets
+  void* coffsets = framep + h2_len + cbytes;
+  int64_t* offsets = (int64_t*)calloc(nchunks * 8, 1);
+  blosc2_dparams off_dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_context* dctx = blosc2_create_dctx(off_dparams);
+  int32_t off_nbytes = blosc2_decompress_ctx(dctx, coffsets, offsets, nchunks * 8);
+  blosc2_free_ctx(dctx);
+  if (off_nbytes < 0) {
+    free(offsets);
+    return NULL;
+  }
+
+  // And create the actual data chunks (and, while doing this,
+  // get a guess of the blocksize used in this frame)
+  schunk->data = malloc(nchunks * sizeof(void*));
+  int64_t acc_nbytes = 0;
+  int64_t acc_cbytes = 0;
+  int32_t blocksize = 0;
+  for (int i = 0; i < nchunks; i++) {
+    data_chunk = framep + h2_len + offsets[i];
+    int32_t csize = *(int32_t*)(data_chunk + 12);
+    void* new_chunk = malloc((size_t)csize);
+    memcpy(new_chunk, data_chunk, (size_t)csize);
+    schunk->data[i] = new_chunk;
+    acc_nbytes += *(int32_t*)(data_chunk + 4);
+    acc_cbytes += csize;
+    int32_t blocksize_ = *(int32_t*)(data_chunk + 8);
+    if (i == 0) {
+      blocksize = blocksize_;
+    }
+    else if (blocksize != blocksize_) {
+      // Blocksize varies
+      blocksize = 0;
+    }
+  }
+  schunk->blocksize = blocksize;
+  assert(acc_nbytes == nbytes);
+  assert(acc_cbytes == cbytes);
+
+  // Compression and decompression contexts
+  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+    cparams.filters[i] = schunk->filters[i];
+    cparams.filters_meta[i] = schunk->filters_meta[i];
+  }
+  cparams.compcode = schunk->compcode;
+  cparams.clevel = schunk->clevel;
+  cparams.typesize = schunk->typesize;
+  cparams.blocksize = schunk->blocksize;
+  schunk->cctx = blosc2_create_cctx(cparams);
+
+  /* The decompression context */
+  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  dparams.schunk = schunk;
+  schunk->dctx = blosc2_create_dctx(dparams);
 
   return schunk;
 }

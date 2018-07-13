@@ -85,10 +85,10 @@ int main() {
   blosc_set_timestamp(&last);
   for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
     dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk, (void *)data_dest, isize);
-  }
-  if (dsize < 0) {
-    printf("Decompression error.  Error code: %d\n", dsize);
-    return dsize;
+    if (dsize < 0) {
+      printf("Decompression error.  Error code: %d\n", dsize);
+      return dsize;
+    }
   }
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
@@ -104,7 +104,7 @@ int main() {
     }
   }
 
-  printf("Successful roundtrip!\n");
+  printf("Successful roundtrip data <-> schunk !\n");
 
   /* Free resources */
   /* Destroy the super-chunk */

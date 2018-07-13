@@ -34,8 +34,8 @@
 int main() {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
+  static int32_t data_dest2[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
-  int dsize = 0;
   int64_t nbytes, cbytes;
   blosc2_schunk* schunk;
   int i, nchunk;
@@ -91,32 +91,42 @@ int main() {
   blosc2_new_frame(schunk, "simple_frame2.b2frame");
   printf("Same frame output to simple_frame2.b2frame with no intermediate buffers\n");
 
-  /* Retrieve and decompress the chunks (0-based count) */
+  // Get a new schunk from a frame
+  blosc2_schunk* schunk2 = blosc2_schunk_from_frame(frame);
+
+  /* Retrieve and decompress the chunks from the 2 frames */
   blosc_set_timestamp(&last);
-  for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
-    dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk, (void *)data_dest, isize);
-  }
-  if (dsize < 0) {
-    printf("Decompression error.  Error code: %d\n", dsize);
-    return dsize;
+  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    int32_t dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk, (void *)data_dest, isize);
+    if (dsize < 0) {
+      printf("Decompression error in schunk.  Error code: %d\n", dsize);
+      return dsize;
+    }
+    int32_t dsize2 = blosc2_decompress_chunk(schunk2, (size_t)nchunk, (void *)data_dest2, isize);
+    if (dsize2 < 0) {
+      printf("Decompression error in schunk2.  Error code: %d\n", dsize2);
+      return dsize2;
+    }
+    assert(dsize == dsize2);
   }
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Decompression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
-  /* Check integrity of the first chunk */
+  /* Check integrity of the last chunk */
   for (i = 0; i < CHUNKSIZE; i++) {
-    if (data_dest[i] != i) {
-      printf("Decompressed data differs from original %d, %d!\n", i, data_dest[i]);
+    if (data_dest[i] != data_dest2[i]) {
+      printf("Decompressed data differs from original %d, %d!\n", data_dest[i], data_dest2[i]);
       return -1;
     }
   }
 
-  printf("Successful roundtrip!\n");
+  printf("Successful roundtrip schunk <-> frame !\n");
 
   /* Free resources */
   blosc2_free_schunk(schunk);
+  blosc2_free_schunk(schunk2);
   free(frame);
 
   return 0;

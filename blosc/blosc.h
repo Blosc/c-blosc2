@@ -610,9 +610,9 @@ typedef struct {
   uint8_t flags1;
   uint8_t flags2;
   uint8_t flags3;
-  uint8_t compcode;  // starts at 4 bytes
+  uint8_t compcode;
   /* The default compressor.  Each chunk can override this. */
-  uint8_t clevel;  // starts at 6 bytes
+  uint8_t clevel;
   /* The compression level and other compress params */
   uint32_t typesize;
   /* the type size */
@@ -701,7 +701,7 @@ BLOSC_EXPORT uint64_t blosc2_frame_len(const void *frame);
 BLOSC_EXPORT uint64_t blosc2_frame_tofile(void* frame, char* fname);
 
 /* Get a super-chunk from a frame. */
-BLOSC_EXPORT blosc2_schunk* blosc2_unpack_schunk(void* frame);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(void* frame);
 
 
 /*********************************************************************
