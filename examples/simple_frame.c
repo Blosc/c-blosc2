@@ -14,9 +14,12 @@
   $ ./simple_frame
   Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
   Compression ratio: 381.5 MB -> 9.5 MB (40.2x)
-  Compression time: 0.689 s, 553.3 MB/s
-  Decompression time: 0.244 s, 1562.1 MB/s
-  Successful roundtrip!
+  Compression time: 0.613 s, 622.7 MB/s
+  Frame output to simple_frame.b2frame with 9940344 bytes
+  Same frame output to simple_frame2.b2frame with no intermediate buffers
+  Decompression time: 0.713 s, 535.3 MB/s
+  Successful roundtrip schunk <-> frame !
+
  */
 
 #include <stdio.h>

@@ -214,7 +214,6 @@ void* blosc2_new_frame(blosc2_schunk *schunk, char *fname) {
   void* h2 = new_header2_frame(schunk);
   memcpy(&h2len, h2 + HEADER2_LEN, 4);
   swap_inplace(&h2len, 4);
-  printf("header len: %d\n", h2len);
 
   // Build the offsets chunk
   int32_t chunksize = 0;
@@ -256,7 +255,6 @@ void* blosc2_new_frame(blosc2_schunk *schunk, char *fname) {
   // Now that we know them, fill the chunksize and frame length in header2
   memcpy(h2 + FRAME_CHUNKSIZE, swap_inplace(&chunksize, 4), 4);
   frame_len = h2len + cbytes + off_cbytes;
-  printf("Total frame length: %lld\n", frame_len);
   uint64_t tbytes = frame_len;
   memcpy(h2 + FRAME_LEN, swap_inplace(&tbytes, 8), 8);
 
@@ -293,7 +291,6 @@ void* blosc2_new_frame(blosc2_schunk *schunk, char *fname) {
     fwrite(off_chunk, (size_t)off_cbytes, 1, fp);
   }
   free(off_chunk);
-  printf("Offsets compressed from %ld to %d bytes\n", off_nbytes, off_cbytes);
 
   if (fname != NULL) {
     fclose(fp);
@@ -464,8 +461,6 @@ void* blosc2_frame_append_chunk(void* frame, void* chunk) {
   *(uint64_t*)((uint8_t*)frame + 36) += nbytes + sizeof(uint64_t);
   *(uint64_t*)((uint8_t*)frame + 44) += cbytes + sizeof(uint64_t);
   *(uint64_t*)((uint8_t*)frame + 52 + 8 * 3) += cbytes;
-  /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n",
-          nchunks, nbytes, cbytes, (1.*nbytes) / cbytes); */
 
   return frame;
 }
