@@ -321,16 +321,21 @@ uint64_t blosc2_frame_tofile(void* frame, char* fname) {
 
 
 /* Get a super-chunk out of a frame */
-blosc2_schunk* blosc2_schunk_from_frame(void* frame) {
-  uint8_t* framep = frame;
+blosc2_schunk* schunk_from_frame(int32_t header_len, void *header, char* fname) {
+  uint8_t* framep;
+  FILE* fp = NULL;
+  if (header != NULL) {
+    framep = header;
+  }
+  else {
+    void *header_ = malloc(header_len);
+    fp = fopen(fname, "r");
+    fread(header_, header_len, 1, fp);
+    framep = header_;
+  }
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
-  uint8_t* data_chunk;
 
   // Fetch some internal lengths
-  uint32_t h2_len;
-  memcpy(&h2_len, framep + HEADER2_LEN, 4);
-  swap_inplace(&h2_len, 4);
-
   uint64_t frame_len;
   memcpy(&frame_len, framep + FRAME_LEN, 8);
   swap_inplace(&frame_len, 8);
@@ -373,9 +378,23 @@ blosc2_schunk* blosc2_schunk_from_frame(void* frame) {
 
   // TODO: complete other flags
 
+  if (header == NULL) {
+    free(framep);   // we are done with the header
+  }
+
   // Fill the data pointers section
   // Decompress the chunk of offsets
-  void* coffsets = framep + h2_len + cbytes;
+  void* coffsets;
+  if (header != NULL) {
+    coffsets = framep + header_len + cbytes;
+  }
+  else {
+    int32_t off_cbytes = (int32_t)(frame_len - header_len - cbytes);
+    coffsets = malloc((size_t)off_cbytes);
+    fseek(fp, cbytes, SEEK_CUR);
+    fread(coffsets, (size_t)off_cbytes, 1, fp);
+  }
+  int32_t off_cbytes = *(int32_t*)(coffsets + 12);
   int64_t* offsets = (int64_t*)calloc(nchunks * 8, 1);
   blosc2_dparams off_dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_context* dctx = blosc2_create_dctx(off_dparams);
@@ -385,6 +404,9 @@ blosc2_schunk* blosc2_schunk_from_frame(void* frame) {
     free(offsets);
     return NULL;
   }
+  if (header == NULL) {
+    free(coffsets);
+  }
 
   // And create the actual data chunks (and, while doing this,
   // get a guess of the blocksize used in this frame)
@@ -392,9 +414,28 @@ blosc2_schunk* blosc2_schunk_from_frame(void* frame) {
   int64_t acc_nbytes = 0;
   int64_t acc_cbytes = 0;
   int32_t blocksize = 0;
+  int32_t csize = 0;
+  uint8_t* data_chunk = NULL;
+  int32_t prev_alloc = BLOSC_MIN_HEADER_LENGTH;
+  if (header == NULL) {
+    data_chunk = malloc((size_t)prev_alloc);
+  }
   for (int i = 0; i < nchunks; i++) {
-    data_chunk = framep + h2_len + offsets[i];
-    int32_t csize = *(int32_t*)(data_chunk + 12);
+    if (header != NULL) {
+      data_chunk = framep + header_len + offsets[i];
+      csize = *(int32_t*)(data_chunk + 12);
+    }
+    else {
+      fseek(fp, header_len + offsets[i], SEEK_SET);
+      fread(data_chunk, BLOSC_MIN_HEADER_LENGTH, 1, fp);
+      csize = *(int32_t*)(data_chunk + 12);  // TODO: use memcpy for unaligned access
+      if (csize > prev_alloc) {
+        data_chunk = realloc(data_chunk, (size_t) csize);
+        prev_alloc = csize;
+      }
+      fseek(fp, header_len + offsets[i], SEEK_SET);
+      fread(data_chunk, (size_t)csize, 1, fp);
+    }
     void* new_chunk = malloc((size_t)csize);
     memcpy(new_chunk, data_chunk, (size_t)csize);
     schunk->data[i] = new_chunk;
@@ -410,8 +451,14 @@ blosc2_schunk* blosc2_schunk_from_frame(void* frame) {
     }
   }
   schunk->blocksize = blocksize;
+
+  if (header == NULL) {
+    free(data_chunk);
+    fclose(fp);
+  }
   assert(acc_nbytes == nbytes);
   assert(acc_cbytes == cbytes);
+  assert(frame_len == header_len + cbytes + off_cbytes);
 
   // Compression and decompression contexts
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
@@ -425,12 +472,41 @@ blosc2_schunk* blosc2_schunk_from_frame(void* frame) {
   cparams.blocksize = schunk->blocksize;
   schunk->cctx = blosc2_create_cctx(cparams);
 
-  /* The decompression context */
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   dparams.schunk = schunk;
   schunk->dctx = blosc2_create_dctx(dparams);
 
   return schunk;
+}
+
+
+/* Get a super-chunk out of an in-memory frame */
+blosc2_schunk* blosc2_schunk_from_frame(void* frame) {
+  uint8_t* framep = frame;
+
+  uint32_t header_len;
+  memcpy(&header_len, framep + HEADER2_LEN, 4);
+  swap_inplace(&header_len, 4);
+
+  return schunk_from_frame(header_len, frame, NULL);
+}
+
+
+/* Get a super-chunk out of an in-memory frame */
+blosc2_schunk* blosc2_schunk_from_fileframe(char* fname) {
+  void* header = malloc(HEADER2_MAXSIZE);
+  FILE* fp = fopen(fname, "r");
+  fread(header, HEADER2_MAXSIZE, 1, fp);
+  fclose(fp);
+  uint8_t* framep = header;
+
+  uint32_t header_len;
+  memcpy(&header_len, framep + HEADER2_LEN, 4);
+  swap_inplace(&header_len, 4);
+
+  free(header);
+
+  return schunk_from_frame(header_len, NULL, fname);
 }
 
 

@@ -700,8 +700,11 @@ BLOSC_EXPORT uint64_t blosc2_frame_len(const void *frame);
 /* Write an in-memory frame out to a file. */
 BLOSC_EXPORT uint64_t blosc2_frame_tofile(void* frame, char* fname);
 
-/* Get a super-chunk from a frame. */
+/* Get a super-chunk from an in memory frame. */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(void* frame);
+
+/* Get a super-chunk from a file frame. */
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_fileframe(char* fname);
 
 
 /*********************************************************************
