@@ -664,9 +664,6 @@ BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *schunk);
 BLOSC_EXPORT size_t blosc2_append_buffer(blosc2_schunk* schunk,
                                          size_t nbytes, void* src);
 
-BLOSC_EXPORT void* blosc2_frame_append_buffer(void *packed, size_t typesize,
-                                              size_t nbytes, void *src);
-
 /* Decompress and return the `nchunk` chunk of a super-chunk.
 
  If the chunk is uncompressed successfully, it is put in the `*dest`
@@ -687,15 +684,23 @@ BLOSC_EXPORT int blosc2_decompress_chunk(blosc2_schunk* schunk,
 
 *********************************************************************/
 
+typedef struct {
+  char* fname;  // the name of the file; if NULL, this is in-memory
+  void *sdata;  // the in-memory serialized data
+  int64_t len;  // the current length of the frame in bytes
+  int64_t maxlen;  // the maximum length of the frame; if 0, there is no maximum
+} blosc2_frame;
+
+
 /* Create a frame from a super-chunk.
 
- If `fname` is NULL, a frame is created in memory; else it is created
+ If `frame->fname` is NULL, a frame is created in memory; else it is created
  on disk.
  */
-BLOSC_EXPORT void* blosc2_new_frame(blosc2_schunk *schunk, char* fname);
+BLOSC_EXPORT int64_t blosc2_new_frame(blosc2_schunk *schunk, blosc2_frame *frame);
 
-/* Get an in-memory frame length. */
-BLOSC_EXPORT uint64_t blosc2_frame_len(const void *frame);
+/* Free all memory from a frame. */
+BLOSC_EXPORT int blosc2_free_frame(blosc2_frame *frame);
 
 /* Write an in-memory frame out to a file. */
 BLOSC_EXPORT uint64_t blosc2_frame_tofile(void* frame, char* fname);
@@ -705,7 +710,6 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(void* frame);
 
 /* Get a super-chunk from a file frame. */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_fileframe(char* fname);
-
 
 /*********************************************************************
 

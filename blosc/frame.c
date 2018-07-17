@@ -199,16 +199,11 @@ void* new_header2_frame(blosc2_schunk *schunk) {
 }
 
 
-/* Create a frame out of a super-chunk.
-
- If `fname` is NULL, create the frame in-memory.
- */
-void* blosc2_new_frame(blosc2_schunk *schunk, char *fname) {
+/* Create a frame out of a super-chunk. */
+int64_t blosc2_new_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int64_t nchunks = schunk->nchunks;
   int64_t cbytes = schunk->cbytes;
   uint32_t h2len;
-  uint64_t frame_len;
-  void *frame = NULL;
   FILE* fp = NULL;
 
   void* h2 = new_header2_frame(schunk);
@@ -248,23 +243,22 @@ void* blosc2_new_frame(blosc2_schunk *schunk, char *fname) {
   if (off_cbytes < 0) {
     free(off_chunk);
     free(h2);
-    // TODO: how to signal the error when fname == NULL ?
-    return NULL;
+    return -1;
   }
 
   // Now that we know them, fill the chunksize and frame length in header2
   memcpy(h2 + FRAME_CHUNKSIZE, swap_inplace(&chunksize, 4), 4);
-  frame_len = h2len + cbytes + off_cbytes;
-  uint64_t tbytes = frame_len;
+  frame->len = h2len + cbytes + off_cbytes;
+  uint64_t tbytes = frame->len;
   memcpy(h2 + FRAME_LEN, swap_inplace(&tbytes, 8), 8);
 
   // Create the frame and put the header at the beginning
-  if (fname == NULL) {
-    frame = malloc(frame_len);
-    memcpy(frame, h2, h2len);
+  if (frame->fname == NULL) {
+    frame->sdata = malloc(frame->len);
+    memcpy(frame->sdata, h2, h2len);
   }
   else {
-    fp = fopen(fname, "w");
+    fp = fopen(frame->fname, "w");
     fwrite(h2, h2len, 1, fp);
   }
   free(h2);
@@ -274,8 +268,8 @@ void* blosc2_new_frame(blosc2_schunk *schunk, char *fname) {
   for (int i = 0; i < nchunks; i++) {
     void* data_chunk = schunk->data[i];
     int32_t chunk_cbytes = *(int32_t*)((uint8_t*)data_chunk + 12);
-    if (fname == NULL) {
-      memcpy((uint8_t *)frame + h2len + coffset, data_chunk, (size_t) chunk_cbytes);
+    if (frame->fname == NULL) {
+      memcpy((uint8_t *)frame->sdata + h2len + coffset, data_chunk, (size_t) chunk_cbytes);
     } else {
       fwrite(data_chunk, (size_t)chunk_cbytes, 1, fp);
     }
@@ -284,24 +278,23 @@ void* blosc2_new_frame(blosc2_schunk *schunk, char *fname) {
   assert (coffset == cbytes);
 
   // Copy the offsets chunk at the end of the frame
-  if (fname == NULL) {
-    memcpy(frame + h2len + cbytes, off_chunk, off_cbytes);
+  if (frame->fname == NULL) {
+    memcpy(frame->sdata + h2len + cbytes, off_chunk, off_cbytes);
   }
   else {
     fwrite(off_chunk, (size_t)off_cbytes, 1, fp);
   }
   free(off_chunk);
 
-  if (fname != NULL) {
+  if (frame->fname != NULL) {
     fclose(fp);
   }
 
-  // Return the in-memory frame or NULL for disk-based frames
-  return frame;
+  return frame->len;
 }
 
 
-/* Get the frame length. */
+/* Get the frame length. */  // TODO: to be removed
 uint64_t blosc2_frame_len(const void *frame) {
   uint64_t frame_len;
   memcpy(&frame_len, frame + FRAME_LEN, 8);
@@ -619,4 +612,14 @@ int blosc2_frame_decompress_chunk(void *frame, size_t nchunk, void **dest) {
   }
 
   return chunksize;
+}
+
+
+/* Free all memory from a frame. */
+int blosc2_free_frame(blosc2_frame *frame) {
+
+  if (frame->sdata != NULL) {
+    free(frame->sdata);
+  }
+  return 0;
 }

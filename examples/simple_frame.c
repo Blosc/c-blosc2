@@ -87,15 +87,22 @@ int main() {
 
   // super-chunk -> frame
   blosc_set_timestamp(&last);
-  void* frame = blosc2_new_frame(schunk, NULL);
+  blosc2_frame* frame1 = &(blosc2_frame) {
+    .sdata = NULL,
+    .fname = NULL,
+    .len = 0,
+    .maxlen = 0,
+  };
+  int64_t frame_len = blosc2_new_frame(schunk, frame1);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for schunk -> frame: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
-  //printf("Frame length: %lld bytes\n", frame_len);
-  // frame -> fileframe
+  printf("Frame length in memory: %lld bytes\n", frame_len);
+  // frame1 -> fileframe
   blosc_set_timestamp(&last);
-  uint64_t frame_len = blosc2_frame_tofile(frame, "simple_frame.b2frame");
+  frame_len = blosc2_frame_tofile(frame1->sdata, "simple_frame.b2frame");
+  printf("Frame length on disk: %lld bytes\n", frame_len);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for frame -> fileframe (simple_frame.b2frame): %.3g s, %.1f MB/s\n",
@@ -103,11 +110,17 @@ int main() {
 
   // super-chunk -> fileframe (no intermediate frame buffer)
   blosc_set_timestamp(&last);
-  blosc2_new_frame(schunk, "simple_frame2.b2frame");
+  blosc2_frame* frame2 = &(blosc2_frame) {
+          .sdata = NULL,
+          .fname = "simple_frame2.b2frame",
+          .len = 0,
+          .maxlen = 0,
+  };
+  blosc2_new_frame(schunk, frame2);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Time for schunk -> fileframe (simple_frame2.b2frame): %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+  printf("Time for schunk -> fileframe (%s): %.3g s, %.1f MB/s\n",
+         frame2->fname, ttotal, nbytes / (ttotal * MB));
 
   // fileframe -> schunk (no intermediate frame buffer)
   blosc_set_timestamp(&last);
@@ -140,7 +153,7 @@ int main() {
   /* Free resources */
   blosc2_free_schunk(schunk);
   blosc2_free_schunk(schunk2);
-  free(frame);
+  blosc2_free_frame(frame1);
 
   return 0;
 }
