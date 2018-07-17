@@ -101,7 +101,7 @@ int main() {
   printf("Frame length in memory: %lld bytes\n", frame_len);
   // frame1 -> fileframe
   blosc_set_timestamp(&last);
-  frame_len = blosc2_frame_tofile(frame1->sdata, "simple_frame.b2frame");
+  frame_len = blosc2_frame_tofile(frame1, "simple_frame.b2frame");
   printf("Frame length on disk: %lld bytes\n", frame_len);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);

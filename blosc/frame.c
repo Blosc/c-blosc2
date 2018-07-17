@@ -294,22 +294,13 @@ int64_t blosc2_new_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 }
 
 
-/* Get the frame length. */  // TODO: to be removed
-uint64_t blosc2_frame_len(const void *frame) {
-  uint64_t frame_len;
-  memcpy(&frame_len, frame + FRAME_LEN, 8);
-  swap_inplace(&frame_len, 8);
-  return frame_len;
-}
-
-
 /* Write an in-memory frame out to a file. */
-uint64_t blosc2_frame_tofile(void* frame, char* fname) {
-  uint64_t frame_len = blosc2_frame_len(frame);
+int64_t blosc2_frame_tofile(blosc2_frame* frame, char* fname) {
+  assert(frame->fname == NULL);  // make sure that we are using an in-memory frame
   FILE* fp = fopen(fname, "w");
-  fwrite(frame, frame_len, 1, fp);
+  fwrite(frame, frame->len, 1, fp);
   fclose(fp);
-  return frame_len;
+  return frame->len;
 }
 
 
