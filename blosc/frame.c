@@ -200,7 +200,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
 
 
 /* Create a frame out of a super-chunk. */
-int64_t blosc2_new_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
+int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int64_t nchunks = schunk->nchunks;
   int64_t cbytes = schunk->cbytes;
   uint32_t h2len;
@@ -295,7 +295,7 @@ int64_t blosc2_new_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
 
 /* Write an in-memory frame out to a file. */
-int64_t blosc2_frame_tofile(blosc2_frame* frame, char* fname) {
+int64_t blosc2_frame_to_file(blosc2_frame *frame, char *fname) {
   assert(frame->fname == NULL);  // make sure that we are using an in-memory frame
   FILE* fp = fopen(fname, "w");
   fwrite(frame->sdata, frame->len, 1, fp);
@@ -305,7 +305,7 @@ int64_t blosc2_frame_tofile(blosc2_frame* frame, char* fname) {
 
 
 /* Initialize a frame out of a file */
-blosc2_frame* blosc2_frame_fromfile(char* fname) {
+blosc2_frame* blosc2_frame_from_file(char *fname) {
   blosc2_frame* frame = calloc(1, sizeof(blosc2_frame));
   char* fname_cpy = malloc(strlen(fname) + 1);
   frame->fname = strcpy(fname_cpy, fname);

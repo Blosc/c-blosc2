@@ -697,18 +697,18 @@ typedef struct {
  If `frame->fname` is NULL, a frame is created in memory; else it is created
  on disk.
  */
-BLOSC_EXPORT int64_t blosc2_new_frame(blosc2_schunk *schunk, blosc2_frame *frame);
+BLOSC_EXPORT int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame);
 
 /* Free all memory from a frame. */
 BLOSC_EXPORT int blosc2_free_frame(blosc2_frame *frame);
 
 /* Write an in-memory frame out to a file. */
-BLOSC_EXPORT int64_t blosc2_frame_tofile(blosc2_frame* frame, char* fname);
+BLOSC_EXPORT int64_t blosc2_frame_to_file(blosc2_frame *frame, char *fname);
 
 /* Initialize a frame out of a file */
-BLOSC_EXPORT blosc2_frame* blosc2_frame_fromfile(char* fname);
+BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(char *fname);
 
-/* Get a super-chunk from an in memory frame. */
+/* Create a super-chunk from a frame. */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame);
 
 
