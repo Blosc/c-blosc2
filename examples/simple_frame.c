@@ -14,12 +14,15 @@
   $ ./simple_frame
   Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
   Compression ratio: 381.5 MB -> 9.5 MB (40.2x)
-  Compression time: 0.122 s, 3133.7 MB/s
-  Time for schunk -> frame: 0.00644 s, 59242.6 MB/s
-  Time for frame -> fileframe (simple_frame.b2frame): 0.00918 s, 41556.5 MB/s
-  Time for schunk -> fileframe (simple_frame2.b2frame): 0.00888 s, 42962.7 MB/s
-  fileframe -> schunk time: 0.00939 s, 40608.1 MB/s
-  Successful roundtrip schunk <-> frame !
+  Compression time: 0.674 s, 566.3 MB/s
+  Time for schunk -> frame: 0.00569 s, 67002.9 MB/s
+  Frame length in memory: 9940344 bytes
+  Frame length on disk: 9940344 bytes
+  Time for frame -> fileframe (simple_frame.b2frame): 0.00685 s, 55726.3 MB/s
+  Time for fileframe (simple_frame.b2frame) -> frame : 0.000133 s, 2857622.4 MB/s
+  Time for frame -> schunk: 0.00621 s, 61384.1 MB/s
+  Time for fileframe -> schunk: 0.00804 s, 47425.2 MB/s
+  Successful roundtrip schunk <-> frame <-> fileframe !
 
  */
 
@@ -38,6 +41,7 @@
 int main() {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
+  static int32_t data_dest1[CHUNKSIZE];
   static int32_t data_dest2[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int64_t nbytes, cbytes;
@@ -85,7 +89,9 @@ int main() {
   printf("Compression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
-  // super-chunk -> frame
+  // Start different conversions between schunks, frames and fileframes
+
+  // super-chunk -> frame1 (in-memory)
   blosc_set_timestamp(&last);
   blosc2_frame* frame1 = &(blosc2_frame) {
     .sdata = NULL,
@@ -99,7 +105,8 @@ int main() {
   printf("Time for schunk -> frame: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
   printf("Frame length in memory: %lld bytes\n", frame_len);
-  // frame1 -> fileframe
+
+  // frame1 (in-memory) -> fileframe (on-disk)
   blosc_set_timestamp(&last);
   frame_len = blosc2_frame_tofile(frame1, "simple_frame.b2frame");
   printf("Frame length on disk: %lld bytes\n", frame_len);
@@ -108,35 +115,51 @@ int main() {
   printf("Time for frame -> fileframe (simple_frame.b2frame): %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
-  // super-chunk -> fileframe (no intermediate frame buffer)
+  // fileframe (file) -> frame2 (on-disk frame)
   blosc_set_timestamp(&last);
-  blosc2_frame* frame2 = &(blosc2_frame) {
-          .sdata = NULL,
-          .fname = "simple_frame2.b2frame",
-          .len = 0,
-          .maxlen = 0,
-  };
-  blosc2_new_frame(schunk, frame2);
+  blosc2_frame* frame2 = blosc2_frame_fromfile("simple_frame.b2frame");
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Time for schunk -> fileframe (%s): %.3g s, %.1f MB/s\n",
+  printf("Time for fileframe (%s) -> frame : %.3g s, %.1f MB/s\n",
          frame2->fname, ttotal, nbytes / (ttotal * MB));
 
-  // fileframe -> schunk (no intermediate frame buffer)
+  // frame1 (in-memory) -> schunk
   blosc_set_timestamp(&last);
-  blosc2_schunk* schunk2 = blosc2_schunk_from_fileframe("simple_frame2.b2frame");
+  blosc2_schunk* schunk1 = blosc2_schunk_from_frame(frame1);
+  if (schunk1 == NULL) {
+    printf("Bad conversion frame -> schunk!\n");
+    return -1;
+  }
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("fileframe -> schunk time: %.3g s, %.1f MB/s\n",
+  printf("Time for frame -> schunk: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
-  /* Retrieve and decompress the chunks from the 2 frames */
+  // frame2 (on-disk) -> schunk
+  blosc_set_timestamp(&last);
+  blosc2_schunk* schunk2 = blosc2_schunk_from_frame(frame2);
+  if (schunk2 == NULL) {
+    printf("Bad conversion frame -> schunk!\n");
+    return -1;
+  }
+  blosc_set_timestamp(&current);
+  ttotal = blosc_elapsed_secs(last, current);
+  printf("Time for fileframe -> schunk: %.3g s, %.1f MB/s\n",
+         ttotal, nbytes / (ttotal * MB));
+
+  /* Retrieve and decompress the chunks from the 3 frames and compare values */
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     int32_t dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk, (void *)data_dest, isize);
     if (dsize < 0) {
       printf("Decompression error in schunk.  Error code: %d\n", dsize);
       return dsize;
     }
+    int32_t dsize1 = blosc2_decompress_chunk(schunk1, (size_t)nchunk, (void *)data_dest1, isize);
+    if (dsize1 < 0) {
+      printf("Decompression error in schunk1.  Error code: %d\n", dsize1);
+      return dsize1;
+    }
+    assert(dsize == dsize1);
     int32_t dsize2 = blosc2_decompress_chunk(schunk2, (size_t)nchunk, (void *)data_dest2, isize);
     if (dsize2 < 0) {
       printf("Decompression error in schunk2.  Error code: %d\n", dsize2);
@@ -145,15 +168,18 @@ int main() {
     assert(dsize == dsize2);
     /* Check integrity of the last chunk */
     for (i = 0; i < CHUNKSIZE; i++) {
+      assert (data_dest[i] == data_dest1[i]);
       assert (data_dest[i] == data_dest2[i]);
     }
   }
-  printf("Successful roundtrip schunk <-> frame !\n");
+  printf("Successful roundtrip schunk <-> frame <-> fileframe !\n");
 
   /* Free resources */
   blosc2_free_schunk(schunk);
+  blosc2_free_schunk(schunk1);
   blosc2_free_schunk(schunk2);
   blosc2_free_frame(frame1);
+  blosc2_free_frame(frame2);
 
   return 0;
 }

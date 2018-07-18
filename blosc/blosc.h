@@ -705,11 +705,12 @@ BLOSC_EXPORT int blosc2_free_frame(blosc2_frame *frame);
 /* Write an in-memory frame out to a file. */
 BLOSC_EXPORT int64_t blosc2_frame_tofile(blosc2_frame* frame, char* fname);
 
-/* Get a super-chunk from an in memory frame. */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(void* frame);
+/* Initialize a frame out of a file */
+BLOSC_EXPORT blosc2_frame* blosc2_frame_fromfile(char* fname);
 
-/* Get a super-chunk from a file frame. */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_fileframe(char* fname);
+/* Get a super-chunk from an in memory frame. */
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame);
+
 
 /*********************************************************************
 
