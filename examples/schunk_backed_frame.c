@@ -32,6 +32,7 @@
 #define NCHUNKS 100
 #define NTHREADS 4
 
+
 int main() {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
@@ -40,7 +41,7 @@ int main() {
   int64_t nbytes, cbytes;
   blosc2_schunk* schunk;
   int i, nchunk;
-  size_t nchunks;
+  int nchunks;
   blosc_timestamp_t last, current;
   double ttotal;
 
@@ -75,7 +76,7 @@ int main() {
     for (i = 0; i < CHUNKSIZE; i++) {
       data[i] = i * nchunk;
     }
-    nchunks = blosc2_schunk_append_buffer(schunk, isize, data);
+    nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     assert(nchunks == nchunk);
   }
   /* Gather some info */

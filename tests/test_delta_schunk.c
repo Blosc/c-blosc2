@@ -42,7 +42,7 @@ int main() {
     for (int i = 0; i < SIZE; i++) {
       data[i] = i * nchunk;
     }
-    nchunks = blosc2_schunk_append_buffer(schunk, isize, data);
+    nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     if (nchunks != (nchunk + 1)) return EXIT_FAILURE;
   }
 

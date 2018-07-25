@@ -633,7 +633,7 @@ typedef struct {
   /* The (sequence of) filters.  8-bit per filter. */
   uint8_t filters_meta[BLOSC_MAX_FILTERS];
   /* Metadata for filters. 8-bit per meta-slot. */
-  int64_t nchunks;
+  int32_t nchunks;
   /* Number of chunks in super-chunk */
   int64_t nbytes;
   /* data size + metadata size + header size (uncompressed) */
@@ -671,8 +671,7 @@ BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *schunk);
  This returns the number of chunk in super-chunk.  If some problem is
  detected, this number will be negative.
  */
-BLOSC_EXPORT int blosc2_schunk_append_buffer(blosc2_schunk *schunk,
-                                             size_t nbytes, void *src);
+BLOSC_EXPORT int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, size_t nbytes);
 
 /* Decompress and return the `nchunk` chunk of a super-chunk.
 

@@ -153,7 +153,7 @@ int main() {
     for (i = 0; i < CHUNKSIZE; i++) {
       chunk_buf[i] = udata[i + nchunk * CHUNKSIZE];
     }
-    blosc2_schunk_append_buffer(schunk, isize, chunk_buf);
+    blosc2_schunk_append_buffer(schunk, chunk_buf, isize);
   }
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);

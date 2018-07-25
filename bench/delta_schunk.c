@@ -62,7 +62,7 @@ int main() {
   /* Append chunks (the first will be taken as reference for delta) */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    nchunks = blosc2_schunk_append_buffer(schunk, isize, data);
+    nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
   }
   blosc_set_timestamp(&current);
   totaltime = blosc_elapsed_secs(last, current);

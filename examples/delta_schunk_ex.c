@@ -68,7 +68,7 @@ int main() {
     for (i = 0; i < CHUNKSIZE; i++) {
       data[i] = i * (int64_t)nchunk;
     }
-    nchunks = blosc2_schunk_append_buffer(schunk, isize, data);
+    nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     assert(nchunks == nchunk);
   }
   /* Gather some info */

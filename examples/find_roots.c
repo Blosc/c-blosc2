@@ -30,7 +30,7 @@
 #define NTHREADS 4
 
 
-void fill_buffer(double *x, size_t nchunk) {
+void fill_buffer(double *x, int nchunk) {
     double incx = 10. / (NCHUNKS * CHUNKSIZE);
 
     for (int i = 0; i < CHUNKSIZE; i++) {
@@ -74,7 +74,7 @@ int compute_vectors(void) {
     blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
     blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
     blosc2_schunk *sc_x, *sc_y;
-    size_t nchunk;
+    int nchunk;
     blosc_timestamp_t last, current;
     double ttotal;
     double prev_value;
@@ -96,7 +96,7 @@ int compute_vectors(void) {
     blosc_set_timestamp(&last);
     for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
         fill_buffer(buffer_x, nchunk);
-        blosc2_schunk_append_buffer(sc_x, isize, buffer_x);
+        blosc2_schunk_append_buffer(sc_x, buffer_x, isize);
         nbytes += isize;
     }
     blosc_set_timestamp(&current);
@@ -110,13 +110,13 @@ int compute_vectors(void) {
     /* Retrieve the chunks and compute the polynomial in another super-chunk */
     blosc_set_timestamp(&last);
     for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-        dsize = blosc2_schunk_decompress_chunk(sc_x, nchunk, (void *) buffer_x, isize);
+        dsize = blosc2_schunk_decompress_chunk(sc_x, nchunk, buffer_x, isize);
         if (dsize < 0) {
             printf("Decompression error.  Error code: %d\n", dsize);
             return dsize;
         }
         process_data(buffer_x, buffer_y);
-        blosc2_schunk_append_buffer(sc_y, isize, buffer_y);
+        blosc2_schunk_append_buffer(sc_y, buffer_y, isize);
     }
     blosc_set_timestamp(&current);
     ttotal = blosc_elapsed_secs(last, current);

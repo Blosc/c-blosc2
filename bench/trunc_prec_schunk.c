@@ -82,7 +82,7 @@ int main() {
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     fill_buffer(data_buffer, nchunk);
-    nchunks = blosc2_schunk_append_buffer(schunk, isize, data_buffer);
+    nchunks = blosc2_schunk_append_buffer(schunk, data_buffer, isize);
   }
   blosc_set_timestamp(&current);
   totaltime = blosc_elapsed_secs(last, current);

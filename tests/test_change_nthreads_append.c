@@ -53,7 +53,7 @@ int main() {
     }
     // Alternate between 1 and NTHREADS
     cctx->new_nthreads = nchunk % NTHREADS + 1;
-    nchunks = blosc2_schunk_append_buffer(schunk, isize, data);
+    nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: nchunk is not correct", nchunks == nchunk);
   }
   /* Gather some info */

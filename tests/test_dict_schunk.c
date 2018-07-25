@@ -52,7 +52,7 @@ static char* test_dict() {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
-    nchunks = blosc2_schunk_append_buffer(schunk, isize, data);
+    nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: incorrect nchunks value", nchunks == (nchunk + 1));
   }
   blosc_set_timestamp(&current);
