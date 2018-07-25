@@ -606,6 +606,15 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 *********************************************************************/
 
 typedef struct {
+  char* fname;     // the name of the file; if NULL, this is in-memory
+  void *sdata;     // the in-memory serialized data
+  int64_t len;     // the current length of the frame in bytes
+  int64_t maxlen;  // the maximum length of the frame; if 0, there is no maximum
+  void* schunk;
+} blosc2_frame;
+
+
+typedef struct {
   uint8_t version;
   uint8_t flags1;
   uint8_t flags2;
@@ -636,6 +645,8 @@ typedef struct {
   /* Pointer to user-defined data */
   uint8_t** data;
   /* Pointer to chunk data pointers */
+  blosc2_frame* frame;
+  /* Pointer to frame to used as store for chunks */
   //uint8_t* ctx;
   /* Context for the thread holder.  NULL if not acquired. */
   blosc2_context* cctx;
@@ -645,10 +656,9 @@ typedef struct {
   /* Reserved for the future. */
 } blosc2_schunk;
 
-
 /* Create a new super-chunk. */
-BLOSC_EXPORT blosc2_schunk* blosc2_new_schunk(
-        blosc2_cparams cparams, blosc2_dparams dparams);
+BLOSC_EXPORT blosc2_schunk *
+blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams, blosc2_frame *frame);
 
 /* Release resources from a super-chunk */
 BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *schunk);
@@ -661,8 +671,8 @@ BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *schunk);
  This returns the number of chunk in super-chunk.  If some problem is
  detected, this number will be negative.
  */
-BLOSC_EXPORT size_t blosc2_append_buffer(blosc2_schunk* schunk,
-                                         size_t nbytes, void* src);
+BLOSC_EXPORT int blosc2_schunk_append_buffer(blosc2_schunk *schunk,
+                                             size_t nbytes, void *src);
 
 /* Decompress and return the `nchunk` chunk of a super-chunk.
 
@@ -674,8 +684,8 @@ BLOSC_EXPORT size_t blosc2_append_buffer(blosc2_schunk* schunk,
  The size of the decompressed chunk is returned.  If some problem is
  detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_decompress_chunk(blosc2_schunk* schunk,
-                                         size_t nchunk, void* dest, size_t nbytes);
+BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk,
+                                                int nchunk, void *dest, size_t nbytes);
 
 
 /*********************************************************************
@@ -683,14 +693,6 @@ BLOSC_EXPORT int blosc2_decompress_chunk(blosc2_schunk* schunk,
   Frame related structures and functions.
 
 *********************************************************************/
-
-typedef struct {
-  char* fname;  // the name of the file; if NULL, this is in-memory
-  void *sdata;  // the in-memory serialized data
-  int64_t len;  // the current length of the frame in bytes
-  int64_t maxlen;  // the maximum length of the frame; if 0, there is no maximum
-} blosc2_frame;
-
 
 /* Create a frame from a super-chunk.
 
@@ -710,6 +712,16 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(char *fname);
 
 /* Create a super-chunk from a frame. */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame);
+
+/* Append an existing chunk into a frame. */
+BLOSC_EXPORT void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk);
+
+/* Return a compressed chunk that is part of a frame. */
+BLOSC_EXPORT void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk);
+
+/* Decompress and return a chunk that is part of a frame. */
+BLOSC_EXPORT int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk,
+                                               void *dest, size_t nbytes);
 
 
 /*********************************************************************

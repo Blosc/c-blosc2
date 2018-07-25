@@ -87,16 +87,16 @@ int compute_vectors(void) {
     cparams.filters_meta[0] = 23;  // treat doubles as floats
     cparams.nthreads = NTHREADS;
     dparams.nthreads = NTHREADS;
-    sc_x = blosc2_new_schunk(cparams, dparams);
+    sc_x = blosc2_new_schunk(cparams, dparams, NULL);
 
     /* Create a super-chunk container for output (Y values) */
-    sc_y = blosc2_new_schunk(cparams, dparams);
+    sc_y = blosc2_new_schunk(cparams, dparams, NULL);
 
     /* Now fill the buffer with even values between 0 and 10 */
     blosc_set_timestamp(&last);
     for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
         fill_buffer(buffer_x, nchunk);
-        blosc2_append_buffer(sc_x, isize, buffer_x);
+        blosc2_schunk_append_buffer(sc_x, isize, buffer_x);
         nbytes += isize;
     }
     blosc_set_timestamp(&current);
@@ -110,13 +110,13 @@ int compute_vectors(void) {
     /* Retrieve the chunks and compute the polynomial in another super-chunk */
     blosc_set_timestamp(&last);
     for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-        dsize = blosc2_decompress_chunk(sc_x, nchunk, (void *) buffer_x, isize);
+        dsize = blosc2_schunk_decompress_chunk(sc_x, nchunk, (void *) buffer_x, isize);
         if (dsize < 0) {
             printf("Decompression error.  Error code: %d\n", dsize);
             return dsize;
         }
         process_data(buffer_x, buffer_y);
-        blosc2_append_buffer(sc_y, isize, buffer_y);
+        blosc2_schunk_append_buffer(sc_y, isize, buffer_y);
     }
     blosc_set_timestamp(&current);
     ttotal = blosc_elapsed_secs(last, current);
@@ -132,12 +132,12 @@ int compute_vectors(void) {
     blosc_set_timestamp(&last);
     prev_value = buffer_y[0];
     for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-        dsize = blosc2_decompress_chunk(sc_y, nchunk, (void *) buffer_y, isize);
+        dsize = blosc2_schunk_decompress_chunk(sc_y, nchunk, (void *) buffer_y, isize);
         if (dsize < 0) {
             printf("Decompression error.  Error code: %d\n", dsize);
             return dsize;
         }
-        dsize = blosc2_decompress_chunk(sc_x, nchunk, (void *) buffer_x, isize);
+        dsize = blosc2_schunk_decompress_chunk(sc_x, nchunk, (void *) buffer_x, isize);
         if (dsize < 0) {
             printf("Decompression error.  Error code: %d\n", dsize);
             return dsize;

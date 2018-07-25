@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2015  Francesc Alted
+  Copyright (C) 2018  Francesc Alted
   http://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 
@@ -7,18 +7,18 @@
 
   To compile this program:
 
-  $ gcc simple_schunk.c -o simple_schunk -lblosc
+  $ gcc schunk_backed_frame.c -o schunk_backed_frame -lblosc
 
   To run:
 
-  $ ./simple_schunk
+  $ ./schunk_backed_frame
   Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
-  Compression ratio: 381.5 MB -> 18.8 MB (20.3x)
-  Compression time: 0.818 s, 466.3 MB/s
-  Decompression time: 0.326 s, 1169.5 MB/s
-  Successful roundtrip data <-> schunk !
+  Compression ratio: 381.5 MB -> 9.5 MB (40.2x)
+  Compression time: 0.619 s, 616.3 MB/s
+  Decompression time: 0.247 s, 1541.4 MB/s
+  Successful roundtrip data <-> schunk (frame based) !
 
-*/
+ */
 
 #include <stdio.h>
 #include <assert.h>
@@ -28,18 +28,16 @@
 #define MB  (1024*KB)
 #define GB  (1024*MB)
 
-#define CHUNKSIZE (200 * 1000)
-#define NCHUNKS 500
+#define CHUNKSIZE (1000 * 1000)
+#define NCHUNKS 100
 #define NTHREADS 4
 
 int main() {
-  static float data[CHUNKSIZE];
-  static float data_dest[CHUNKSIZE];
-  size_t isize = CHUNKSIZE * sizeof(float);
+  static int32_t data[CHUNKSIZE];
+  static int32_t data_dest[CHUNKSIZE];
+  size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize = 0;
   int64_t nbytes, cbytes;
-  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
   int i, nchunk;
   size_t nchunks;
@@ -53,15 +51,24 @@ int main() {
   printf("Blosc version info: %s (%s)\n",
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
+  // Create a simple in-memory frame
+  blosc2_frame* frame = &(blosc2_frame) {
+          .sdata = NULL,
+          .fname = NULL,
+          .len = 0,
+          .maxlen = 0,
+  };
+
   /* Create a super-chunk container */
-  cparams.typesize = sizeof(float);
-  cparams.filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
-  //cparams.filters_meta[BLOSC_MAX_FILTERS - 1] = 2;  // A number larger than 0 will execute additional shuffles
-  cparams.compcode = BLOSC_LZ4;
-  cparams.clevel = 9;
-  cparams.nthreads = NTHREADS;
-  dparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams, NULL);
+  schunk = blosc2_new_schunk((blosc2_cparams) {
+          .typesize = sizeof(int32_t),
+          .filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE,
+          .compcode = BLOSC_LZ4,
+          .clevel = 9,
+          .nthreads = NTHREADS,
+  }, (blosc2_dparams) {
+          .nthreads = NTHREADS,
+  }, frame);
 
   blosc_set_timestamp(&last);
   for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
@@ -83,7 +90,7 @@ int main() {
 
   /* Retrieve and decompress the chunks (0-based count) */
   blosc_set_timestamp(&last);
-  for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
+  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, data_dest, isize);
     if (dsize < 0) {
       printf("Decompression error.  Error code: %d\n", dsize);
@@ -99,13 +106,13 @@ int main() {
   blosc2_schunk_decompress_chunk(schunk, 0, data_dest, isize);
   for (i = 0; i < CHUNKSIZE; i++) {
     if (data_dest[i] != (float)i) {
-      printf("Decompressed data differs from original %f, %f!\n",
-             (float)i, data_dest[i]);
+      printf("Decompressed data differs from original %d, %d!\n",
+             i, data_dest[i]);
       return -1;
     }
   }
 
-  printf("Successful roundtrip data <-> schunk !\n");
+  printf("Successful roundtrip data <-> schunk (frame based) !\n");
 
   /* Free resources */
   /* Destroy the super-chunk */

@@ -39,8 +39,8 @@
 
 
 /* Create a new super-chunk */
-blosc2_schunk* blosc2_new_schunk(blosc2_cparams cparams,
-                                 blosc2_dparams dparams) {
+blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
+                                 blosc2_frame* frame) {
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
 
   schunk->version = 0;     /* pre-first version */
@@ -61,6 +61,16 @@ blosc2_schunk* blosc2_new_schunk(blosc2_cparams cparams,
   dparams.schunk = schunk;
   schunk->dctx = blosc2_create_dctx(dparams);
 
+  if (frame != NULL && frame->len == 0) {
+    // Initialize frame (basically encode the header)
+    int64_t frame_len = blosc2_schunk_to_frame(schunk, frame);
+    if (frame_len < 0) {
+      fprintf(stderr, "Error during the conversion of schunk to frame\n");
+    }
+    frame->schunk = schunk;
+    schunk->frame = frame;
+  }
+
   return schunk;
 }
 
@@ -73,22 +83,27 @@ size_t append_chunk(blosc2_schunk* schunk, void* chunk) {
   int32_t nbytes = *(int32_t*)((uint8_t*)chunk + 4);
   int32_t cbytes = *(int32_t*)((uint8_t*)chunk + 12);
 
-  /* Make space for appending a new chunk and do it */
-  schunk->data = realloc(schunk->data, (nchunks + 1) * sizeof(void*));
-  schunk->data[nchunks] = chunk;
+  if (schunk->frame == NULL) {
+    /* Make space for appending a new chunk and do it */
+    schunk->data = realloc(schunk->data, (nchunks + 1) * sizeof(void *));
+    schunk->data[nchunks] = chunk;
+  }
+  else {
+    blosc2_frame_append_chunk(schunk->frame, chunk);
+    free(chunk);  // for a frame, we don't need the chunk anymore
+  }
   /* Update counters */
   schunk->nchunks = nchunks + 1;
   schunk->nbytes += nbytes;
   schunk->cbytes += cbytes;
   /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n", */
   /*         nchunks, nbytes, cbytes, (1.*nbytes) / cbytes); */
-
-  return (size_t)nchunks + 1;
+  return schunk->nchunks;
 }
 
 
 /* Append a data buffer to a super-chunk. */
-size_t blosc2_append_buffer(blosc2_schunk* schunk, size_t nbytes, void* src) {
+int blosc2_schunk_append_buffer(blosc2_schunk *schunk, size_t nbytes, void *src) {
   int cbytes;
   void* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
 
@@ -101,26 +116,23 @@ size_t blosc2_append_buffer(blosc2_schunk* schunk, size_t nbytes, void* src) {
   }
   // TODO: use a realloc to get rid of unused space in chunk
 
-  return append_chunk(schunk, chunk);
+  size_t nchunks = append_chunk(schunk, chunk);
+  return nchunks;
 }
 
 
 /* Decompress and return a chunk that is part of a super-chunk. */
-int blosc2_decompress_chunk(blosc2_schunk* schunk, size_t nchunk,
-                            void* dest, size_t nbytes) {
-  int64_t nchunks = schunk->nchunks;
-  blosc2_context* cctx = schunk->cctx;
-  blosc2_context* dctx = schunk->dctx;
-  void* src;
-  int chunksize;
-  int nbytes_;
+int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
+                                   void *dest, size_t nbytes) {
 
-  if (nchunk >= nchunks) {
+  if (nchunk >= schunk->nchunks) {
     printf("specified nchunk ('%ld') exceeds the number of chunks "
-           "('%ld') in super-chunk\n", (long)nchunk, (long)nchunks);
+           "('%ld') in super-chunk\n", (long)nchunk, (long)schunk->nchunks);
     return -10;
   }
 
+  blosc2_context* cctx = schunk->cctx;
+  blosc2_context* dctx = schunk->dctx;
   if (cctx->use_dict && dctx->dict_ddict == NULL) {
     // Create the dictionary for decompression
     // Right now we can only have an schunk if we created it in-memory.
@@ -129,16 +141,24 @@ int blosc2_decompress_chunk(blosc2_schunk* schunk, size_t nchunk,
     dctx->use_dict = 1;
   }
 
-  src = schunk->data[nchunk];
-  nbytes_ = *(int32_t*)((uint8_t*)src + 4);
+  void* src;
+  if (schunk->frame == NULL) {
+    src = schunk->data[nchunk];
+  } else {
+    src = blosc2_frame_get_chunk(schunk->frame, nchunk);
+  }
+  int nbytes_ = *(int32_t *) ((uint8_t *) src + 4);
   if (nbytes < nbytes_) {
     fprintf(stderr, "Buffer size is too small for the decompressed buffer "
                     "('%ld' bytes, but '%d' are needed)\n",
-            (long)nbytes, nbytes_);
+            (long) nbytes, nbytes_);
     return -11;
   }
 
-  chunksize = blosc2_decompress_ctx(schunk->dctx, src, dest, nbytes);
+  int chunksize = blosc2_decompress_ctx(schunk->dctx, src, dest, nbytes);
+  if (chunksize < 0 || chunksize != nbytes_) {
+    fprintf(stderr, "Error in decompressing chunk");
+  }
 
   return chunksize;
 }

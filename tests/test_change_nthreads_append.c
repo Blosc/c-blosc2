@@ -43,7 +43,7 @@ int main() {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams);
+  schunk = blosc2_new_schunk(cparams, dparams, NULL);
 
   struct blosc2_context_s * cctx = schunk->cctx;
   blosc_set_timestamp(&last);
@@ -53,7 +53,7 @@ int main() {
     }
     // Alternate between 1 and NTHREADS
     cctx->new_nthreads = nchunk % NTHREADS + 1;
-    nchunks = blosc2_append_buffer(schunk, isize, data);
+    nchunks = blosc2_schunk_append_buffer(schunk, isize, data);
     mu_assert("ERROR: nchunk is not correct", nchunks == nchunk);
   }
   /* Gather some info */
@@ -72,8 +72,8 @@ int main() {
   for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
     // Alternate between 1 and NTHREADS
     dctx->new_nthreads = nchunk % NTHREADS + 1;
-    dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk,
-                                    (void *)data_dest, isize);
+    dsize = blosc2_schunk_decompress_chunk(schunk, (size_t) nchunk,
+                                           (void *) data_dest, isize);
   }
   if (dsize < 0) {
     printf("Decompression error. Error code: %d\n", dsize);

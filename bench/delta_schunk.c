@@ -33,7 +33,7 @@ int main() {
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   int64_t nbytes, cbytes;
-  size_t nchunk;
+  int nchunk;
   size_t nchunks = 0;
   blosc_timestamp_t last, current;
   double totaltime;
@@ -57,12 +57,12 @@ int main() {
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 1;
   cparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams);
+  schunk = blosc2_new_schunk(cparams, dparams, NULL);
 
   /* Append chunks (the first will be taken as reference for delta) */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    nchunks = blosc2_append_buffer(schunk, isize, data);
+    nchunks = blosc2_schunk_append_buffer(schunk, isize, data);
   }
   blosc_set_timestamp(&current);
   totaltime = blosc_elapsed_secs(last, current);
@@ -78,7 +78,7 @@ int main() {
   /* Retrieve and decompress the chunks */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    dsize = blosc2_decompress_chunk(schunk, nchunk, (void*)data_dest, isize);
+    dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, data_dest, isize);
     if (dsize < 0) {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;

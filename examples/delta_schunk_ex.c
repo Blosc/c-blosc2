@@ -61,14 +61,14 @@ int main() {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams);
+  schunk = blosc2_new_schunk(cparams, dparams, NULL);
 
   blosc_set_timestamp(&last);
   for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
     for (i = 0; i < CHUNKSIZE; i++) {
       data[i] = i * (int64_t)nchunk;
     }
-    nchunks = blosc2_append_buffer(schunk, isize, data);
+    nchunks = blosc2_schunk_append_buffer(schunk, isize, data);
     assert(nchunks == nchunk);
   }
   /* Gather some info */
@@ -84,8 +84,8 @@ int main() {
   /* Retrieve and decompress the chunks (0-based count) */
   blosc_set_timestamp(&last);
   for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
-    dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk,
-                                    (void *)data_dest, isize);
+    dsize = blosc2_schunk_decompress_chunk(schunk, (size_t) nchunk,
+                                           (void *) data_dest, isize);
   }
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);

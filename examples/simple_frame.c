@@ -38,6 +38,7 @@
 #define NCHUNKS 100
 #define NTHREADS 4
 
+
 int main() {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
@@ -59,24 +60,22 @@ int main() {
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Create a super-chunk container */
-  schunk = blosc2_new_schunk(
-          (blosc2_cparams) {
-                  .typesize = sizeof(int32_t),
-                  .filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE,
-                  .compcode = BLOSC_LZ4,
-                  .clevel = 9,
-                  .nthreads = NTHREADS,
-          },
-          (blosc2_dparams) {
-                  .nthreads = NTHREADS,
-          });
+  schunk = blosc2_new_schunk((blosc2_cparams) {
+          .typesize = sizeof(int32_t),
+          .filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE,
+          .compcode = BLOSC_LZ4,
+          .clevel = 9,
+          .nthreads = NTHREADS,
+  }, (blosc2_dparams) {
+          .nthreads = NTHREADS,
+  }, NULL);
 
   blosc_set_timestamp(&last);
   for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
     for (i = 0; i < CHUNKSIZE; i++) {
       data[i] = i * nchunk;
     }
-    nchunks = blosc2_append_buffer(schunk, isize, data);
+    nchunks = blosc2_schunk_append_buffer(schunk, isize, data);
     assert(nchunks == nchunk);
   }
   /* Gather some info */
@@ -149,18 +148,18 @@ int main() {
 
   /* Retrieve and decompress the chunks from the 3 frames and compare values */
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    int32_t dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk, (void *)data_dest, isize);
+    int32_t dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, data_dest, isize);
     if (dsize < 0) {
       printf("Decompression error in schunk.  Error code: %d\n", dsize);
       return dsize;
     }
-    int32_t dsize1 = blosc2_decompress_chunk(schunk1, (size_t)nchunk, (void *)data_dest1, isize);
+    int32_t dsize1 = blosc2_frame_decompress_chunk(frame1, nchunk, data_dest1, isize);
     if (dsize1 < 0) {
-      printf("Decompression error in schunk1.  Error code: %d\n", dsize1);
+      printf("Decompression error in frame1.  Error code: %d\n", dsize1);
       return dsize1;
     }
     assert(dsize == dsize1);
-    int32_t dsize2 = blosc2_decompress_chunk(schunk2, (size_t)nchunk, (void *)data_dest2, isize);
+    int32_t dsize2 = blosc2_schunk_decompress_chunk(schunk2, nchunk, data_dest2, isize);
     if (dsize2 < 0) {
       printf("Decompression error in schunk2.  Error code: %d\n", dsize2);
       return dsize2;
