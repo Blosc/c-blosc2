@@ -61,15 +61,18 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
   dparams.schunk = schunk;
   schunk->dctx = blosc2_create_dctx(dparams);
 
-  if (frame != NULL && frame->len == 0) {
-    // Initialize frame (basically encode the header)
-    int64_t frame_len = blosc2_schunk_to_frame(schunk, frame);
-    if (frame_len < 0) {
-      fprintf(stderr, "Error during the conversion of schunk to frame\n");
-    }
+  if (frame != NULL) {
     frame->schunk = schunk;
-    schunk->frame = frame;
+    if (frame->len == 0) {
+      // Initialize frame (basically encode the header)
+      // TODO: take into account other possibilities than an in-memory frame
+      int64_t frame_len = blosc2_schunk_to_frame(schunk, frame);
+      if (frame_len < 0) {
+        fprintf(stderr, "Error during the conversion of schunk to frame\n");
+      }
+    }
   }
+  schunk->frame = frame;
 
   return schunk;
 }
@@ -124,12 +127,6 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, size_t nbytes)
 int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
                                    void *dest, size_t nbytes) {
 
-  if (nchunk >= schunk->nchunks) {
-    printf("specified nchunk ('%ld') exceeds the number of chunks "
-           "('%ld') in super-chunk\n", (long)nchunk, (long)schunk->nchunks);
-    return -10;
-  }
-
   blosc2_context* cctx = schunk->cctx;
   blosc2_context* dctx = schunk->dctx;
   if (cctx->use_dict && dctx->dict_ddict == NULL) {
@@ -142,15 +139,22 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
 
   void* src;
   if (schunk->frame == NULL) {
+    if (nchunk >= schunk->nchunks) {
+      fprintf(stderr, "nchunk ('%d') exceeds the number of chunks "
+                      "('%d') in super-chunk\n", nchunk, schunk->nchunks);
+      return -10;
+    }
     src = schunk->data[nchunk];
   } else {
     src = blosc2_frame_get_chunk(schunk->frame, nchunk);
+    if (src == NULL) {
+      return -10;
+    }
   }
   int nbytes_ = *(int32_t *) ((uint8_t *) src + 4);
   if (nbytes < nbytes_) {
     fprintf(stderr, "Buffer size is too small for the decompressed buffer "
-                    "('%ld' bytes, but '%d' are needed)\n",
-            (long) nbytes, nbytes_);
+                    "('%d' bytes, but '%d' are needed)\n", nbytes, nbytes_);
     return -11;
   }
 

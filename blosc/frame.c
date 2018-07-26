@@ -411,7 +411,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
   }
   schunk->nchunks = nchunks;
 
-  // Fill the different values in struct
+  // Fill in the different values in struct
   // Codec
   uint8_t compcode = framep[FRAME_COMPCODE];
   schunk->compcode = (uint8_t)(compcode & 0xf);
@@ -658,8 +658,19 @@ void* blosc2_frame_append_buffer(void *frame, size_t typesize, size_t nbytes, vo
 /* Decompress and return a chunk that is part of a frame. */
 void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk) {
   uint8_t* framep = frame->sdata;
+  void* header = NULL;
+  FILE* fp = NULL;
+  void* chunk;
 
   assert(frame->len > 0);
+
+  if (frame->sdata == NULL) {
+    header = malloc(HEADER2_MAXSIZE);
+    fp = fopen(frame->fname, "r");
+    fread(header, HEADER2_MAXSIZE, 1, fp);
+    framep = header;
+    fclose(fp);
+  }
 
   // Fetch some internal lengths
   int32_t header_len;
@@ -682,20 +693,22 @@ void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk) {
   memcpy(&chunksize, framep + FRAME_CHUNKSIZE, 4);
   swap_inplace(&chunksize, 4);
 
-  int32_t nchunks = 0;
-  if (nbytes > 0) {
-    nchunks = (int32_t) (nbytes / chunksize);
-    if (nchunks * chunksize < nbytes) {
-      nchunks += 1;
-    }
+  if (frame->sdata == NULL) {
+    free(header);
+  }
+
+  int32_t nchunks = (int32_t) (nbytes / chunksize);
+  if (nchunks * chunksize < nbytes) {
+    nchunks += 1;
   }
 
   if (nchunk >= nchunks) {
-    fprintf(stderr, "nchunk is beyond the number of chunks in frame");
+    fprintf(stderr, "nchunk ('%d') exceeds the number of chunks "
+                    "('%d') in frame\n", nchunk, nchunks);
     return NULL;
   }
 
-  // Get the current offsets
+  // Get the offset to the chunk
   int32_t off_nbytes = nchunks * 8;
   int64_t* offsets = (int64_t*)calloc((size_t)off_nbytes, 1);
   int32_t off_cbytes = get_offsets(frame, frame_len, header_len, cbytes, nchunks, offsets);
@@ -703,10 +716,29 @@ void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk) {
     fprintf(stderr, "Cannot get the offsets for the frame\n");
     return NULL;
   }
-
   int64_t offset = offsets[nchunk];
-  void* chunk = framep + header_len + offset;
   free(offsets);
+
+  if (frame->sdata == NULL) {
+    fp = fopen(frame->fname, "r");
+    fseek(fp, header_len + offset + 12, SEEK_SET);
+    int32_t chunk_cbytes;
+    long rbytes = fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
+    if (rbytes != sizeof(chunk_cbytes)) {
+      fprintf(stderr, "Cannot read the cbytes for chunk of the fileframe.\n");
+      return NULL;
+    }
+    chunk = malloc((size_t)chunk_cbytes);
+    fseek(fp, header_len + offset, SEEK_SET);
+    rbytes = fread(chunk, 1, (size_t)chunk_cbytes, fp);
+    if (rbytes != chunk_cbytes) {
+      fprintf(stderr, "Cannot read the chunk out of the fileframe.\n");
+      return NULL;
+    }
+    fclose(fp);
+  } else {
+    chunk = framep + header_len + offset;
+  }
 
   return chunk;
 }
