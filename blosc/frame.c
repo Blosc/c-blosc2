@@ -205,7 +205,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int64_t cbytes = schunk->cbytes;
   FILE* fp = NULL;
 
-  void* h2 = new_header2_frame(schunk);
+  uint8_t* h2 = new_header2_frame(schunk);
   uint32_t h2len;
   memcpy(&h2len, h2 + HEADER2_LEN, 4);
   swap_inplace(&h2len, 4);
@@ -327,7 +327,7 @@ blosc2_frame* blosc2_frame_from_file(char *fname) {
 int32_t get_offsets(blosc2_frame* frame, int64_t frame_len, int32_t header_len,
                   int64_t cbytes, int32_t nchunks, void* offsets) {
   uint8_t* framep = frame->sdata;
-  void *coffsets;
+  uint8_t* coffsets;
 
   if (frame->sdata != NULL) {
     coffsets = framep + header_len + cbytes;
@@ -348,7 +348,7 @@ int32_t get_offsets(blosc2_frame* frame, int64_t frame_len, int32_t header_len,
   int32_t off_cbytes = *(int32_t *) (coffsets + 12);
   blosc2_dparams off_dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_context *dctx = blosc2_create_dctx(off_dparams);
-  int32_t off_nbytes = blosc2_decompress_ctx(dctx, coffsets, offsets, nchunks * 8);
+  int32_t off_nbytes = blosc2_decompress_ctx(dctx, coffsets, offsets, (size_t)nchunks * 8);
   blosc2_free_ctx(dctx);
   if (off_nbytes < 0) {
     free(offsets);

@@ -607,7 +607,7 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 
 typedef struct {
   char* fname;     // the name of the file; if NULL, this is in-memory
-  void *sdata;     // the in-memory serialized data
+  uint8_t* sdata;  // the in-memory serialized data
   int64_t len;     // the current length of the frame in (compressed) bytes
   int64_t maxlen;  // the maximum length of the frame; if 0, there is no maximum
   void* schunk;    // pointer to schunk (if it exists)

@@ -87,7 +87,7 @@ int main() {
 /* Check integrity of the first chunk */
   for (i = 0; i < CHUNKSIZE; i++) {
     if (data_dest[i] != (uint64_t)i) {
-      printf("Decompressed data differs from original %d, %zd!\n",
+      printf("Decompressed data differs from original %d, %lld!\n",
              i, data_dest[i]);
       return -1;
     }
