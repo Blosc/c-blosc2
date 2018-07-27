@@ -258,7 +258,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
     memcpy(frame->sdata, h2, h2len);
   }
   else {
-    fp = fopen(frame->fname, "w");
+    fp = fopen(frame->fname, "wb");
     fwrite(h2, h2len, 1, fp);
   }
   free(h2);
@@ -294,7 +294,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 /* Write an in-memory frame out to a file. */
 int64_t blosc2_frame_to_file(blosc2_frame *frame, char *fname) {
   assert(frame->fname == NULL);  // make sure that we are using an in-memory frame
-  FILE* fp = fopen(fname, "w");
+  FILE* fp = fopen(fname, "wb");
   fwrite(frame->sdata, frame->len, 1, fp);
   fclose(fp);
   return frame->len;
@@ -308,7 +308,7 @@ blosc2_frame* blosc2_frame_from_file(char *fname) {
   frame->fname = strcpy(fname_cpy, fname);
 
   uint8_t* header = malloc(HEADER2_MAXSIZE);
-  FILE* fp = fopen(fname, "r");
+  FILE* fp = fopen(fname, "rb");
   fread(header, HEADER2_MAXSIZE, 1, fp);
   fclose(fp);
 
@@ -332,9 +332,9 @@ int32_t get_offsets(blosc2_frame* frame, int64_t frame_len, int32_t header_len,
   if (frame->sdata != NULL) {
     coffsets = framep + header_len + cbytes;
   } else {
-    FILE* fp = fopen(frame->fname, "r");
     int32_t off_cbytes = (int32_t) (frame_len - header_len - cbytes);
     coffsets = malloc((size_t) off_cbytes);
+    FILE* fp = fopen(frame->fname, "rb");
     fseek(fp, header_len + cbytes, SEEK_SET);
     long rbytes = fread(coffsets, 1, (size_t) off_cbytes, fp);
     if (rbytes != off_cbytes) {
@@ -371,7 +371,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
 
   if (frame->sdata == NULL) {
     header = malloc(HEADER2_MAXSIZE);
-    fp = fopen(frame->fname, "r");
+    fp = fopen(frame->fname, "rb");
     fread(header, HEADER2_MAXSIZE, 1, fp);
     framep = header;
     fclose(fp);
@@ -443,7 +443,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
   int32_t prev_alloc = BLOSC_MIN_HEADER_LENGTH;
   if (frame->sdata == NULL) {
     data_chunk = malloc((size_t)prev_alloc);
-    fp = fopen(frame->fname, "r");
+    fp = fopen(frame->fname, "rb");
   }
   for (int i = 0; i < nchunks; i++) {
     if (frame->sdata != NULL) {
@@ -517,7 +517,7 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
 
   if (frame->sdata == NULL) {
     header = malloc(HEADER2_MAXSIZE);
-    fp = fopen(frame->fname, "r");
+    fp = fopen(frame->fname, "rb");
     fread(header, HEADER2_MAXSIZE, 1, fp);
     framep = header;
     fclose(fp);
@@ -597,7 +597,7 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
     memcpy(framep + header_len + new_cbytes, off_chunk, (size_t) new_off_cbytes);
   } else {
     // fileframe
-    fp = fopen(frame->fname, "r+");
+    fp = fopen(frame->fname, "rb+");
     fseek(fp, header_len + cbytes, SEEK_SET);
     wbytes = fwrite(chunk, (size_t)cbytes_chunk, 1, fp);  // the new chunk
     if (wbytes != 1) {
@@ -631,7 +631,7 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
 
   if (frame->sdata == NULL) {
     // Write updated counters down to file
-    fp = fopen(frame->fname, "r+");
+    fp = fopen(frame->fname, "rb+");
     fwrite(header, (size_t)header_len, 1, fp);
     fclose(fp);
     free(header);
@@ -703,7 +703,7 @@ void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk) {
 
   if (frame->sdata == NULL) {
     header = malloc(HEADER2_MAXSIZE);
-    fp = fopen(frame->fname, "r");
+    fp = fopen(frame->fname, "rb");
     fread(header, HEADER2_MAXSIZE, 1, fp);
     framep = header;
     fclose(fp);
@@ -761,7 +761,7 @@ void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk) {
   free(offsets);
 
   if (frame->sdata == NULL) {
-    fp = fopen(frame->fname, "r");
+    fp = fopen(frame->fname, "rb");
     fseek(fp, header_len + offset + 12, SEEK_SET);
     int32_t chunk_cbytes;
     long rbytes = fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
