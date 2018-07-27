@@ -1,0 +1,141 @@
+/*
+  Copyright (C) 2018  Francesc Alted
+  http://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
+
+  Example program demonstrating use of the Blosc filter from C code.
+
+  To compile this program:
+
+  $ gcc frame_backed_schunk.c -o frame_backed_schunk -lblosc
+
+  To run:
+
+  $ ./frame_backed_schunk
+  Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
+  Compression ratio: 381.5 MB -> 9.4 MB (40.5x)
+  Time for append data to a schunk backed by an in-memory frame: 0.67 s, 569.2 MB/s
+  Compression ratio: 381.5 MB -> 9.4 MB (40.5x)
+  Time for append data to a schunk backed by a fileframe: 0.648 s, 588.4 MB/s
+  Successful roundtrip data <-> schunk (frame-backed) !
+
+ */
+
+#include <stdio.h>
+#include <assert.h>
+#include <blosc.h>
+
+#define KB  1024.
+#define MB  (1024*KB)
+#define GB  (1024*MB)
+
+#define CHUNKSIZE (1000 * 1000)
+#define NCHUNKS 100
+#define NTHREADS 4
+
+
+int main() {
+  static int32_t data[CHUNKSIZE];
+  static int32_t data_dest1[CHUNKSIZE];
+  static int32_t data_dest2[CHUNKSIZE];
+  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int64_t nbytes, cbytes;
+  int i, nchunk;
+  int nchunks;
+  blosc_timestamp_t last, current;
+  double ttotal;
+
+  printf("Blosc version info: %s (%s)\n",
+         BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+
+  // Compression and decompression parameters
+  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  cparams.typesize = sizeof(int32_t);
+  cparams.compcode = BLOSC_LZ4;
+  cparams.clevel = 9;
+  cparams.nthreads = NTHREADS;
+  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  dparams.nthreads = NTHREADS;
+
+  /* Create a super-chunk backed by an in-memory frame */
+  blosc2_frame* frame1 = &(blosc2_frame) {
+          .sdata = NULL,
+          .fname = NULL,
+          .len = 0,
+          .maxlen = 0,
+  };
+  blosc2_schunk* schunk1 = blosc2_new_schunk(cparams, dparams, frame1);
+
+  blosc_set_timestamp(&last);
+  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    for (i = 0; i < CHUNKSIZE; i++) {
+      data[i] = i * nchunk;
+    }
+    nchunks = blosc2_schunk_append_buffer(schunk1, data, isize);
+    assert(nchunks == nchunk + 1);
+  }
+  /* Gather some info */
+  nbytes = schunk1->nbytes;
+  cbytes = schunk1->cbytes;
+  blosc_set_timestamp(&current);
+  ttotal = blosc_elapsed_secs(last, current);
+  printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
+         nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
+  printf("Time for append data to a schunk backed by an in-memory frame: %.3g s, %.1f MB/s\n",
+         ttotal, nbytes / (ttotal * MB));
+
+  /* Create a super-chunk backed by a fileframe */
+  blosc2_frame* frame2 = &(blosc2_frame) {
+          .sdata = NULL,
+          .fname = "frame_backed_schunk.b2frame",
+          .len = 0,
+          .maxlen = 0,
+  };
+  blosc2_schunk* schunk2 = blosc2_new_schunk(cparams, dparams, frame2);
+
+  blosc_set_timestamp(&last);
+  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    for (i = 0; i < CHUNKSIZE; i++) {
+      data[i] = i * nchunk;
+    }
+    nchunks = blosc2_schunk_append_buffer(schunk2, data, isize);
+    assert(nchunks == nchunk + 1);
+  }
+  /* Gather some info */
+  nbytes = schunk2->nbytes;
+  cbytes = schunk2->cbytes;
+  blosc_set_timestamp(&current);
+  ttotal = blosc_elapsed_secs(last, current);
+  printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
+         nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
+  printf("Time for append data to a schunk backed by a fileframe: %.3g s, %.1f MB/s\n",
+         ttotal, nbytes / (ttotal * MB));
+
+  /* Retrieve and decompress the chunks from the super-chunks and compare values */
+  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    int32_t dsize1 = blosc2_schunk_decompress_chunk(schunk1, nchunk, data_dest1, isize);
+    if (dsize1 < 0) {
+      printf("Decompression error in schunk1.  Error code: %d\n", dsize1);
+      return dsize1;
+    }
+    int32_t dsize2 = blosc2_schunk_decompress_chunk(schunk2, nchunk, data_dest2, isize);
+    if (dsize2 < 0) {
+      printf("Decompression error in schunk2.  Error code: %d\n", dsize2);
+      return dsize2;
+    }
+    assert(dsize1 == dsize2);
+    /* Check integrity of the last chunk */
+    for (i = 0; i < CHUNKSIZE; i++) {
+      assert (data_dest1[i] == i * nchunk);
+      assert (data_dest2[i] == i * nchunk);
+    }
+  }
+
+  printf("Successful roundtrip data <-> schunk (frame-backed) !\n");
+
+  /* Free resources */
+  blosc2_free_schunk(schunk1);
+  blosc2_free_schunk(schunk2);
+
+  return 0;
+}

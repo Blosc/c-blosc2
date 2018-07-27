@@ -1,6 +1,6 @@
 # sources for examples
 set(SOURCES contexts delta_schunk_ex multithread simple simple_schunk simple_frame
-        schunk_backed_frame noinit find_roots zstd_dict)
+        frame_backed_schunk noinit find_roots zstd_dict)
 if (EXISTS btune_schunk.c)
     set(SOURCES ${SOURCES} btune_schunk.c)
 endif()

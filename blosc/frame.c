@@ -283,12 +283,9 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   }
   else {
     fwrite(off_chunk, (size_t)off_cbytes, 1, fp);
-  }
-  free(off_chunk);
-
-  if (frame->fname != NULL) {
     fclose(fp);
   }
+  free(off_chunk);
 
   return frame->len;
 }
@@ -341,7 +338,8 @@ int32_t get_offsets(blosc2_frame* frame, int64_t frame_len, int32_t header_len,
     fseek(fp, header_len + cbytes, SEEK_SET);
     long rbytes = fread(coffsets, 1, (size_t) off_cbytes, fp);
     if (rbytes != off_cbytes) {
-      fprintf(stderr, "Cannot read the offsets out of the fileframe.  Giving up.\n");
+      fprintf(stderr, "Cannot read the offsets out of the fileframe.\n");
+      fclose(fp);
       return -1;
     };
     fclose(fp);
@@ -511,8 +509,19 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
 /* Append an existing chunk into a frame. */
 void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
   uint8_t* framep = frame->sdata;
+  void* header = NULL;
+  FILE* fp = NULL;
+  size_t wbytes;
 
   assert(frame->len > 0);
+
+  if (frame->sdata == NULL) {
+    header = malloc(HEADER2_MAXSIZE);
+    fp = fopen(frame->fname, "r");
+    fread(header, HEADER2_MAXSIZE, 1, fp);
+    framep = header;
+    fclose(fp);
+  }
 
   // Fetch some internal lengths
   int32_t header_len;
@@ -537,6 +546,7 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
 
   int32_t nchunks = 0;
   if (nbytes > 0) {
+    // We can compute the chunks only when the frame has actual data
     nchunks = (int32_t) (nbytes / chunksize);
     if (nchunks * chunksize < nbytes) {
       nchunks += 1;
@@ -551,10 +561,9 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
 
   // Get the current offsets and add one more
   int32_t off_nbytes = (nchunks + 1) * 8;
-  int64_t* offsets = (int64_t*)calloc(off_nbytes, 1);
+  int64_t* offsets = malloc((size_t)off_nbytes);
   int32_t off_cbytes = get_offsets(frame, frame_len, header_len, cbytes, nchunks, offsets);
   if (off_cbytes < 0) {
-    fprintf(stderr, "Cannot get the offsets for the frame\n");
     return NULL;
   }
   // Add the new offset
@@ -563,9 +572,9 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
   // Re-compress the offsets again
   blosc2_context* cctx = blosc2_create_cctx(BLOSC_CPARAMS_DEFAULTS);
   cctx->typesize = 8;
-  void* off_chunk = malloc(off_nbytes + BLOSC_MAX_OVERHEAD);
+  void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, (size_t)off_nbytes, offsets,
-          off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
+          off_chunk, (size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
   free(offsets);
   if (new_off_cbytes < 0) {
@@ -575,13 +584,34 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
 
   int64_t new_frame_len = header_len + new_cbytes + new_off_cbytes;
 
-  /* Make space for the new chunk and copy it */
-  framep = realloc(framep, (size_t)new_frame_len);
-  frame->sdata = framep;
-  /* Copy the chunk */
-  memcpy(framep + header_len + cbytes, chunk, (size_t)cbytes_chunk);
-  /* Copy the offsets */
-  memcpy(framep + header_len + new_cbytes, off_chunk, (size_t)new_off_cbytes);
+  if (frame->sdata != NULL) {
+    /* Make space for the new chunk and copy it */
+    frame->sdata = framep = realloc(framep, (size_t) new_frame_len);
+    if (framep == NULL) {
+      fprintf(stderr, "cannot realloc space for the frame.");
+      return NULL;
+    }
+    /* Copy the chunk */
+    memcpy(framep + header_len + cbytes, chunk, (size_t) cbytes_chunk);
+    /* Copy the offsets */
+    memcpy(framep + header_len + new_cbytes, off_chunk, (size_t) new_off_cbytes);
+  } else {
+    // fileframe
+    fp = fopen(frame->fname, "r+");
+    fseek(fp, header_len + cbytes, SEEK_SET);
+    wbytes = fwrite(chunk, (size_t)cbytes_chunk, 1, fp);  // the new chunk
+    if (wbytes != 1) {
+      fprintf(stderr, "cannot write the full chunk to fileframe.");
+      return NULL;
+    }
+    wbytes = fwrite(off_chunk, (size_t)new_off_cbytes, 1, fp);  // the new offsets
+    if (wbytes != 1) {
+      fprintf(stderr, "cannot write the offsets to fileframe.");
+      return NULL;
+    }
+    fclose(fp);
+  }
+
   /* Update counters */
   frame->len = new_frame_len;
   memcpy(framep + FRAME_LEN, &new_frame_len, 8);
@@ -590,15 +620,22 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
   swap_inplace(framep + FRAME_NBYTES, 8);
   memcpy(framep + FRAME_CBYTES, &new_cbytes, 8);
   swap_inplace(framep + FRAME_CBYTES, 8);
-
   // Set the chunksize
   if (nbytes == 0) {
     chunksize = nbytes_chunk;
   } else if (chunksize != nbytes_chunk) {
-    chunksize = 0;
+    chunksize = 0;   // varlen
   }
   memcpy(framep + FRAME_CHUNKSIZE, &chunksize, 4);
   swap_inplace(framep + FRAME_CHUNKSIZE, 4);
+
+  if (frame->sdata == NULL) {
+    // Write updated counters down to file
+    fp = fopen(frame->fname, "r+");
+    fwrite(header, (size_t)header_len, 1, fp);
+    fclose(fp);
+    free(header);
+  }
 
   // Free resources
   free(off_chunk);
@@ -697,9 +734,13 @@ void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk) {
     free(header);
   }
 
-  int32_t nchunks = (int32_t) (nbytes / chunksize);
-  if (nchunks * chunksize < nbytes) {
-    nchunks += 1;
+  int32_t nchunks = 0;
+  if (nbytes > 0) {
+    // We can compute the chunks only when the frame has actual data
+    nchunks = (int32_t) (nbytes / chunksize);
+    if (nchunks * chunksize < nbytes) {
+      nchunks += 1;
+    }
   }
 
   if (nchunk >= nchunks) {
@@ -710,7 +751,7 @@ void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk) {
 
   // Get the offset to the chunk
   int32_t off_nbytes = nchunks * 8;
-  int64_t* offsets = (int64_t*)calloc((size_t)off_nbytes, 1);
+  int64_t* offsets = malloc((size_t)off_nbytes);
   int32_t off_cbytes = get_offsets(frame, frame_len, header_len, cbytes, nchunks, offsets);
   if (off_cbytes < 0) {
     fprintf(stderr, "Cannot get the offsets for the frame\n");

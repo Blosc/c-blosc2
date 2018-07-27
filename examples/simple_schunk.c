@@ -28,14 +28,14 @@
 #define MB  (1024*KB)
 #define GB  (1024*MB)
 
-#define CHUNKSIZE (200 * 1000)
-#define NCHUNKS 500
+#define CHUNKSIZE (1000 * 1000)
+#define NCHUNKS 100
 #define NTHREADS 4
 
 int main() {
-  static float data[CHUNKSIZE];
-  static float data_dest[CHUNKSIZE];
-  size_t isize = CHUNKSIZE * sizeof(float);
+  static int32_t data[CHUNKSIZE];
+  static int32_t data_dest[CHUNKSIZE];
+  size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize = 0;
   int64_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
@@ -46,15 +46,11 @@ int main() {
   blosc_timestamp_t last, current;
   double ttotal;
 
-  for (i = 0; i < CHUNKSIZE; i++) {
-    data[i] = i;
-  }
-
   printf("Blosc version info: %s (%s)\n",
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Create a super-chunk container */
-  cparams.typesize = sizeof(float);
+  cparams.typesize = sizeof(int32_t);
   cparams.filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   //cparams.filters_meta[BLOSC_MAX_FILTERS - 1] = 2;  // A number larger than 0 will execute additional shuffles
   cparams.compcode = BLOSC_LZ4;
@@ -64,12 +60,12 @@ int main() {
   schunk = blosc2_new_schunk(cparams, dparams, NULL);
 
   blosc_set_timestamp(&last);
-  for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
+  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     for (i = 0; i < CHUNKSIZE; i++) {
       data[i] = i * nchunk;
     }
     nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
-    assert(nchunks == nchunk);
+    assert(nchunks == nchunk + 1);
   }
   /* Gather some info */
   nbytes = schunk->nbytes;
@@ -95,12 +91,12 @@ int main() {
   printf("Decompression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
-  /* Check integrity of the first chunk */
-  blosc2_schunk_decompress_chunk(schunk, 0, data_dest, isize);
+  /* Check integrity of the second chunk */
+  blosc2_schunk_decompress_chunk(schunk, 1, data_dest, isize);
   for (i = 0; i < CHUNKSIZE; i++) {
-    if (data_dest[i] != (float)i) {
-      printf("Decompressed data differs from original %f, %f!\n",
-             (float)i, data_dest[i]);
+    if (data_dest[i] != i) {
+      printf("Decompressed data differs from original %d, %d!\n",
+             i, data_dest[i]);
       return -1;
     }
   }

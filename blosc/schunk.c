@@ -65,7 +65,6 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
     frame->schunk = schunk;
     if (frame->len == 0) {
       // Initialize frame (basically encode the header)
-      // TODO: take into account other possibilities than an in-memory frame
       int64_t frame_len = blosc2_schunk_to_frame(schunk, frame);
       if (frame_len < 0) {
         fprintf(stderr, "Error during the conversion of schunk to frame\n");
@@ -154,7 +153,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
   int nbytes_ = *(int32_t *) ((uint8_t *) src + 4);
   if (nbytes < nbytes_) {
     fprintf(stderr, "Buffer size is too small for the decompressed buffer "
-                    "('%d' bytes, but '%d' are needed)\n", nbytes, nbytes_);
+                    "('%ld' bytes, but '%d' are needed)\n", nbytes, nbytes_);
     return -11;
   }
 
@@ -179,6 +178,9 @@ int blosc2_free_schunk(blosc2_schunk *schunk) {
       free(schunk->data[i]);
     }
     free(schunk->data);
+  }
+  if ((schunk->frame != NULL) && (schunk->frame->sdata != NULL)) {
+    free(schunk->frame->sdata);
   }
   blosc2_free_ctx(schunk->cctx);
   blosc2_free_ctx(schunk->dctx);

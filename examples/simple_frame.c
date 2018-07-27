@@ -51,10 +51,6 @@ int main() {
   blosc_timestamp_t last, current;
   double ttotal;
 
-  for (i = 0; i < CHUNKSIZE; i++) {
-    data[i] = i;
-  }
-
   printf("Blosc version info: %s (%s)\n",
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
@@ -69,12 +65,12 @@ int main() {
   blosc2_schunk* schunk = blosc2_new_schunk(cparams, dparams, NULL);
 
   blosc_set_timestamp(&last);
-  for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {
+  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     for (i = 0; i < CHUNKSIZE; i++) {
       data[i] = i * nchunk;
     }
     nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
-    assert(nchunks == nchunk);
+    assert(nchunks == nchunk + 1);
   }
   /* Gather some info */
   nbytes = schunk->nbytes;
@@ -145,7 +141,7 @@ int main() {
   printf("Time for fileframe -> schunk: %.3g s, %.3g MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
-  /* Retrieve and decompress the chunks from the 3 frames and compare values */
+  /* Retrieve and decompress the chunks from the super-chunks and compare values */
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     int32_t dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, data_dest, isize);
     if (dsize < 0) {
@@ -166,8 +162,9 @@ int main() {
     assert(dsize == dsize2);
     /* Check integrity of the last chunk */
     for (i = 0; i < CHUNKSIZE; i++) {
-      assert (data_dest[i] == data_dest1[i]);
-      assert (data_dest[i] == data_dest2[i]);
+      assert (data_dest[i] == i * nchunk);
+      assert (data_dest1[i] == i * nchunk);
+      assert (data_dest2[i] == i * nchunk);
     }
   }
   printf("Successful roundtrip schunk <-> frame <-> fileframe !\n");
