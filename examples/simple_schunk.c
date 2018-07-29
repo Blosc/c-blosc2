@@ -13,9 +13,9 @@
 
   $ ./simple_schunk
   Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
-  Compression ratio: 381.5 MB -> 18.8 MB (20.3x)
-  Compression time: 0.818 s, 466.3 MB/s
-  Decompression time: 0.326 s, 1169.5 MB/s
+  Compression ratio: 381.5 MB -> 9.4 MB (40.5x)
+  Compression time: 0.128 s, 2986.5 MB/s
+  Decompression time: 0.063 s, 6053.7 MB/s
   Successful roundtrip data <-> schunk !
 
 */

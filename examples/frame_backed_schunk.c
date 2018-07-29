@@ -14,9 +14,9 @@
   $ ./frame_backed_schunk
   Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
   Compression ratio: 381.5 MB -> 9.4 MB (40.5x)
-  Time for append data to a schunk backed by an in-memory frame: 0.67 s, 569.2 MB/s
+  Time for append data to a schunk backed by an in-memory frame: 0.135 s, 2821.6 MB/s
   Compression ratio: 381.5 MB -> 9.4 MB (40.5x)
-  Time for append data to a schunk backed by a fileframe: 0.648 s, 588.4 MB/s
+  Time for append data to a schunk backed by a fileframe: 0.135 s, 2833.9 MB/s
   Successful roundtrip data <-> schunk (frame-backed) !
 
  */
