@@ -506,8 +506,8 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
 }
 
 
-uint8_t* frame_get_meta(blosc2_frame* frame, int32_t* header_len, size_t* frame_len,
-                        size_t* nbytes, size_t* cbytes, int32_t* chunksize, int32_t* nchunks) {
+int frame_get_meta(blosc2_frame* frame, int32_t* header_len, size_t* frame_len,
+                   size_t* nbytes, size_t* cbytes, int32_t* chunksize, int32_t* nchunks) {
   uint8_t* framep = frame->sdata;
   void* header = NULL;
 
@@ -545,7 +545,62 @@ uint8_t* frame_get_meta(blosc2_frame* frame, int32_t* header_len, size_t* frame_
     }
   }
 
-  return framep;
+  if (frame->sdata == NULL) {
+    free(header);
+  }
+  return 0;
+}
+
+
+int frame_update_meta(blosc2_frame* frame, size_t new_frame_len, size_t new_nbytes,
+                      size_t new_cbytes, int32_t new_chunksize) {
+  uint8_t* framep = frame->sdata;
+  void* header = NULL;
+
+  assert(frame->len > 0);
+
+  if (frame->sdata == NULL) {
+    header = malloc(HEADER2_MAXSIZE);
+    FILE* fp = fopen(frame->fname, "rb");
+    fread(header, HEADER2_MAXSIZE, 1, fp);
+    framep = header;
+    fclose(fp);
+  }
+
+  int32_t header_len;
+  memcpy(&header_len, framep + HEADER2_LEN, sizeof(header_len));
+  swap_inplace(&header_len, sizeof(header_len));
+
+  int32_t chunksize;
+  memcpy(&chunksize, framep + FRAME_CHUNKSIZE, sizeof(chunksize));
+  swap_inplace(&chunksize, sizeof(chunksize));
+
+  /* Update counters */
+  frame->len = new_frame_len;
+  memcpy(header + FRAME_LEN, &new_frame_len, 8);
+  swap_inplace(header + FRAME_LEN, 8);
+  memcpy(header + FRAME_NBYTES, &new_nbytes, 8);
+  swap_inplace(header + FRAME_NBYTES, 8);
+  memcpy(header + FRAME_CBYTES, &new_cbytes, 8);
+  swap_inplace(header + FRAME_CBYTES, 8);
+  // Set the chunksize
+  if (new_nbytes == 0) {
+    new_chunksize = chunksize;
+  } else if (new_chunksize != chunksize) {
+    new_chunksize = 0;   // varlen
+  }
+  memcpy(header + FRAME_CHUNKSIZE, &new_chunksize, 4);
+  swap_inplace(header + FRAME_CHUNKSIZE, 4);
+
+  if (frame->sdata == NULL) {
+    // Write updated counters down to file
+    FILE* fp = fopen(frame->fname, "rb+");
+    fwrite(header, (size_t)header_len, 1, fp);
+    fclose(fp);
+    free(header);
+  }
+
+  return 0;
 }
 
 
@@ -557,8 +612,11 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
   size_t cbytes;
   int32_t chunksize;
   int32_t nchunks;
-  uint8_t* header = frame_get_meta(frame, &header_len, &frame_len, &nbytes, &cbytes,
-          &chunksize, &nchunks);
+  int ret = frame_get_meta(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks);
+  if (ret < 0) {
+    fprintf(stderr, "unable to get meta info from frame");
+    return NULL;
+  }
 
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
   int32_t nbytes_chunk = *(int32_t*)((uint8_t*)chunk + 4);
@@ -624,27 +682,10 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
 
   /* Update counters */
   frame->len = new_frame_len;
-  memcpy(header + FRAME_LEN, &new_frame_len, 8);
-  swap_inplace(header + FRAME_LEN, 8);
-  memcpy(header + FRAME_NBYTES, &new_nbytes, 8);
-  swap_inplace(header + FRAME_NBYTES, 8);
-  memcpy(header + FRAME_CBYTES, &new_cbytes, 8);
-  swap_inplace(header + FRAME_CBYTES, 8);
-  // Set the chunksize
-  if (nbytes == 0) {
-    chunksize = nbytes_chunk;
-  } else if (chunksize != nbytes_chunk) {
-    chunksize = 0;   // varlen
-  }
-  memcpy(header + FRAME_CHUNKSIZE, &chunksize, 4);
-  swap_inplace(header + FRAME_CHUNKSIZE, 4);
-
-  if (frame->sdata == NULL) {
-    // Write updated counters down to file
-    fp = fopen(frame->fname, "rb+");
-    fwrite(header, (size_t)header_len, 1, fp);
-    fclose(fp);
-    free(header);
+  ret = frame_update_meta(frame, new_frame_len, new_nbytes, new_cbytes, nbytes_chunk);
+  if (ret < 0) {
+    fprintf(stderr, "unable to update meta info from frame");
+    return NULL;
   }
 
   return frame;
