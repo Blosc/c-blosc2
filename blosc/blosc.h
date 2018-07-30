@@ -483,17 +483,17 @@ typedef struct blosc2_context_s blosc2_context;   /* opaque type */
   (zero) in the fields of the struct is passed to a function.
 */
 typedef struct {
-  int compcode;
+  uint8_t compcode;
   /* the compressor codec */
-  int clevel;
+  uint8_t clevel;
   /* the compression level (5) */
   int use_dict;
   /* use dicts or not when compressing (only for ZSTD) */
-  size_t typesize;
+  int32_t typesize;
   /* the type size (8) */
   int16_t nthreads;
   /* the number of threads to use internally (1) */
-  size_t blocksize;
+  int32_t blocksize;
   /* the requested size of the compressed blocks (0; meaning automatic) */
   void* schunk;
   /* the associated schunk, if any (NULL) */
@@ -608,8 +608,8 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 typedef struct {
   char* fname;     // the name of the file; if NULL, this is in-memory
   uint8_t* sdata;  // the in-memory serialized data
-  int64_t len;     // the current length of the frame in (compressed) bytes
-  int64_t maxlen;  // the maximum length of the frame; if 0, there is no maximum
+  size_t len;      // the current length of the frame in (compressed) bytes
+  size_t maxlen;   // the maximum length of the frame; if 0, there is no maximum
   void* schunk;    // pointer to schunk (if it exists)
 } blosc2_frame;
 
@@ -631,7 +631,7 @@ typedef struct {
   /* The default compressor.  Each chunk can override this. */
   uint8_t clevel;
   /* The compression level and other compress params */
-  uint32_t typesize;
+  int32_t typesize;
   /* the type size */
   int32_t blocksize;
   /* the requested size of the compressed blocks (0; meaning automatic) */
@@ -643,9 +643,9 @@ typedef struct {
   /* Metadata for filters. 8-bit per meta-slot. */
   int32_t nchunks;
   /* Number of chunks in super-chunk */
-  int64_t nbytes;
+  size_t nbytes;
   /* data size + metadata size + header size (uncompressed) */
-  int64_t cbytes;
+  size_t cbytes;
   /* data size + metadata size + header size (compressed) */
   uint8_t* metadata_chunk;
   /* Pointer to schunk metadata */

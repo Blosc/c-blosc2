@@ -79,7 +79,7 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
 
 /* Append an existing chunk into a super-chunk. */
 int append_chunk(blosc2_schunk* schunk, void* chunk) {
-  int64_t nchunks = schunk->nchunks;
+  int32_t nchunks = schunk->nchunks;
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
   // TODO: update for extended headers
   int32_t nbytes = *(int32_t*)((uint8_t*)chunk + 4);
