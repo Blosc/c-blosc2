@@ -548,6 +548,7 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, size_t* frame_len,
   if (frame->sdata == NULL) {
     free(header);
   }
+
   return 0;
 }
 
@@ -694,52 +695,16 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
 
 /* Decompress and return a chunk that is part of a frame. */
 void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk) {
-  uint8_t* framep = frame->sdata;
-  void* header = NULL;
-  FILE* fp = NULL;
-
-  assert(frame->len > 0);
-
-  if (frame->sdata == NULL) {
-    header = malloc(HEADER2_MAXSIZE);
-    fp = fopen(frame->fname, "rb");
-    fread(header, HEADER2_MAXSIZE, 1, fp);
-    framep = header;
-    fclose(fp);
-  }
-
-  // Fetch some internal lengths
   int32_t header_len;
-  memcpy(&header_len, framep + HEADER2_LEN, sizeof(header_len));
-  swap_inplace(&header_len, sizeof(header_len));
-
   size_t frame_len;
-  memcpy(&frame_len, framep + FRAME_LEN, 8);
-  swap_inplace(&frame_len, 8);
-
   size_t nbytes;
-  memcpy(&nbytes, framep + FRAME_NBYTES, 8);
-  swap_inplace(&nbytes, 8);
-
   size_t cbytes;
-  memcpy(&cbytes, framep + FRAME_CBYTES, 8);
-  swap_inplace(&cbytes, 8);
-
   int32_t chunksize;
-  memcpy(&chunksize, framep + FRAME_CHUNKSIZE, 4);
-  swap_inplace(&chunksize, 4);
-
-  if (frame->sdata == NULL) {
-    free(header);
-  }
-
-  int32_t nchunks = 0;
-  if (nbytes > 0) {
-    // We can compute the chunks only when the frame has actual data
-    nchunks = (int32_t) (nbytes / chunksize);
-    if (nchunks * chunksize < nbytes) {
-      nchunks += 1;
-    }
+  int32_t nchunks;
+  int ret = frame_get_meta(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks);
+  if (ret < 0) {
+    fprintf(stderr, "unable to get meta info from frame");
+    return NULL;
   }
 
   if (nchunk >= nchunks) {
@@ -761,7 +726,7 @@ void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk) {
 
   void* chunk;
   if (frame->sdata == NULL) {
-    fp = fopen(frame->fname, "rb");
+    FILE* fp = fopen(frame->fname, "rb");
     fseek(fp, header_len + offset + 12, SEEK_SET);
     int32_t chunk_cbytes;
     long rbytes = fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
@@ -778,7 +743,7 @@ void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk) {
     }
     fclose(fp);
   } else {
-    chunk = framep + header_len + offset;
+    chunk = frame->sdata + header_len + offset;
   }
 
   return chunk;
