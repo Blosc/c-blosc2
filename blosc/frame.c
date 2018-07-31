@@ -325,7 +325,7 @@ blosc2_frame* blosc2_frame_from_file(char *fname) {
 
 // Get the data pointers section
 int32_t get_offsets(blosc2_frame* frame, size_t frame_len, int32_t header_len,
-                  size_t cbytes, int32_t nchunks, void* offsets) {
+                    size_t cbytes, int32_t nchunks, void* offsets) {
   uint8_t* framep = frame->sdata;
   uint8_t* coffsets;
 
@@ -400,6 +400,8 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, size_t* frame_len,
     if (*nchunks * *chunksize < *nbytes) {
       *nchunks += 1;
     }
+  } else {
+    *nchunks = 0;
   }
 
   memcpy(typesize, framep + FRAME_TYPESIZE, sizeof(*typesize));
@@ -425,7 +427,7 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, size_t* frame_len,
 int frame_update_meta(blosc2_frame* frame, size_t new_frame_len, size_t new_nbytes,
                       size_t new_cbytes, int32_t new_chunksize) {
   uint8_t* framep = frame->sdata;
-  void* header = NULL;
+  void* header = frame->sdata;
 
   assert(frame->len > 0);
 
@@ -441,6 +443,10 @@ int frame_update_meta(blosc2_frame* frame, size_t new_frame_len, size_t new_nbyt
   memcpy(&header_len, framep + HEADER2_LEN, sizeof(header_len));
   swap_inplace(&header_len, sizeof(header_len));
 
+  size_t nbytes;
+  memcpy(&nbytes, framep + FRAME_NBYTES, sizeof(nbytes));
+  swap_inplace(&nbytes, sizeof(nbytes));
+
   int32_t chunksize;
   memcpy(&chunksize, framep + FRAME_CHUNKSIZE, sizeof(chunksize));
   swap_inplace(&chunksize, sizeof(chunksize));
@@ -454,9 +460,7 @@ int frame_update_meta(blosc2_frame* frame, size_t new_frame_len, size_t new_nbyt
   memcpy(header + FRAME_CBYTES, &new_cbytes, sizeof(new_cbytes));
   swap_inplace(header + FRAME_CBYTES, sizeof(new_cbytes));
   // Set the chunksize
-  if (new_nbytes == 0) {
-    new_chunksize = chunksize;
-  } else if (new_chunksize != chunksize) {
+  if ((nbytes > 0) && (new_chunksize != chunksize)) {
     new_chunksize = 0;   // varlen
   }
   memcpy(header + FRAME_CHUNKSIZE, &new_chunksize, sizeof(new_chunksize));
@@ -706,7 +710,7 @@ void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk) {
   int64_t* offsets = malloc((size_t)off_nbytes);
   int32_t off_cbytes = get_offsets(frame, frame_len, header_len, cbytes, nchunks, offsets);
   if (off_cbytes < 0) {
-    fprintf(stderr, "Cannot get the offsets for the frame\n");
+    fprintf(stderr, "Cannot get the offset for chunk %d for the frame\n", nchunk);
     return NULL;
   }
   int64_t offset = offsets[nchunk];
