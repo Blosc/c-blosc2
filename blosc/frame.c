@@ -608,9 +608,9 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
   }
 
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
-  int32_t nbytes_chunk = sw32_(chunk + 4);
+  int32_t nbytes_chunk = sw32_((uint8_t*)chunk + 4);
   int64_t new_nbytes = nbytes + nbytes_chunk;
-  int32_t cbytes_chunk = sw32_(chunk + 12);
+  int32_t cbytes_chunk = sw32_((uint8_t*)chunk + 12);
   int64_t new_cbytes = cbytes + cbytes_chunk;
 
   if ((nchunks > 0) && (nbytes_chunk != chunksize)) {
