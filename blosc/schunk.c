@@ -78,12 +78,12 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
 
 
 /* Append an existing chunk into a super-chunk. */
-int append_chunk(blosc2_schunk* schunk, void* chunk) {
+int append_chunk(blosc2_schunk* schunk, uint8_t* chunk) {
   int32_t nchunks = schunk->nchunks;
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
   // TODO: update for extended headers
-  int32_t nbytes = *(int32_t*)((uint8_t*)chunk + 4);
-  int32_t cbytes = *(int32_t*)((uint8_t*)chunk + 12);
+  int32_t nbytes = sw32_(chunk + 4);
+  int32_t cbytes = sw32_(chunk + 12);
 
   if ((schunk->nchunks > 0) && (nbytes != schunk->chunksize)) {
     fprintf(stderr, "appending chunks with a different chunksize than schunk is not allowed yet: "
@@ -113,7 +113,7 @@ int append_chunk(blosc2_schunk* schunk, void* chunk) {
 
 /* Append a data buffer to a super-chunk. */
 int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, size_t nbytes) {
-  void* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
+  uint8_t* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
 
   /* Compress the src buffer using super-chunk context */
   int cbytes = blosc2_compress_ctx(schunk->cctx, nbytes, src, chunk,
@@ -143,7 +143,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
     dctx->use_dict = 1;
   }
 
-  void* src;
+  uint8_t* src;
   if (schunk->frame == NULL) {
     if (nchunk >= schunk->nchunks) {
       fprintf(stderr, "nchunk ('%d') exceeds the number of chunks "
@@ -157,7 +157,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
       return -10;
     }
   }
-  int nbytes_ = *(int32_t *) ((uint8_t *) src + 4);
+  int nbytes_ = sw32_(src + 4);
   if (nbytes < nbytes_) {
     fprintf(stderr, "Buffer size is too small for the decompressed buffer "
                     "('%ld' bytes, but '%d' are needed)\n", nbytes, nbytes_);
