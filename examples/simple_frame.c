@@ -167,7 +167,7 @@ int main() {
       return dsize2;
     }
     assert(dsize == dsize2);
-    /* Check integrity of the last chunk */
+    /* Check integrity of this chunk */
     for (i = 0; i < CHUNKSIZE; i++) {
       assert (data_dest[i] == i * nchunk);
       assert (data_dest1[i] == i * nchunk);

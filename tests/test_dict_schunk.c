@@ -17,7 +17,7 @@
 
 /* Global vars */
 int tests_run = 0;
-size_t blocksize;
+int blocksize;
 int use_dict;
 
 static char* test_dict() {
@@ -25,11 +25,11 @@ static char* test_dict() {
   static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
-  int64_t nbytes, cbytes;
+  size_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
-  size_t nchunks;
+  int32_t nchunks;
   blosc_timestamp_t last, current;
   double cttotal, dttotal;
 
@@ -60,7 +60,7 @@ static char* test_dict() {
 
   /* Retrieve and decompress the chunks */
   blosc_set_timestamp(&last);
-  for (size_t nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+  for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     mu_assert("ERROR: Decompression error.", dsize > 0);
   }
@@ -75,7 +75,7 @@ static char* test_dict() {
   float dspeed = nbytes / ((float)dttotal * MB);
   if (tests_run == 0) printf("\n");
   if (blocksize > 0) {
-    printf("[blocksize: %zd KB] ", blocksize / 1024);
+    printf("[blocksize: %d KB] ", blocksize / 1024);
   } else {
     printf("[blocksize: automatic] ");
   }
@@ -130,7 +130,7 @@ static char* test_dict() {
   }
 
   // Check that the chunks have been decompressed correctly
-  for (size_t nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+  for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
     for (int i = 0; i < CHUNKSIZE; i++) {

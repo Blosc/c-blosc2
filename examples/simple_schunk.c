@@ -37,7 +37,7 @@ int main() {
   static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize = 0;
-  int64_t nbytes, cbytes;
+  size_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
@@ -91,7 +91,7 @@ int main() {
   printf("Decompression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
-  /* Check integrity of the second chunk */
+  /* Check integrity of the second chunk (made of non-zeros) */
   blosc2_schunk_decompress_chunk(schunk, 1, data_dest, isize);
   for (i = 0; i < CHUNKSIZE; i++) {
     if (data_dest[i] != i) {
