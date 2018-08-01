@@ -427,7 +427,7 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, size_t* frame_len,
 int frame_update_meta(blosc2_frame* frame, size_t new_frame_len, size_t new_nbytes,
                       size_t new_cbytes, int32_t new_chunksize) {
   uint8_t* framep = frame->sdata;
-  void* header = frame->sdata;
+  uint8_t* header = frame->sdata;
 
   assert(frame->len > 0);
 
@@ -544,7 +544,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
       fseek(fp, header_len + offsets[i], SEEK_SET);
       fread(data_chunk, (size_t)csize, 1, fp);
     }
-    void* new_chunk = malloc((size_t)csize);
+    uint8_t* new_chunk = malloc((size_t)csize);
     memcpy(new_chunk, data_chunk, (size_t)csize);
     schunk->data[i] = new_chunk;
     acc_nbytes += *(int32_t*)(data_chunk + 4);
