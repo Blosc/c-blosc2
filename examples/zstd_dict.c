@@ -36,13 +36,13 @@ int main() {
   static int64_t data_dest[CHUNKSIZE];
   const size_t isize = CHUNKSIZE * sizeof(int64_t);
   int dsize = 0;
-  int64_t nbytes, cbytes;
+  size_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
   int i;
-  int nchunk;
-  size_t nchunks;
+  int32_t nchunk;
+  int32_t nchunks;
   blosc_timestamp_t last, current;
   double ttotal;
 
@@ -62,14 +62,14 @@ int main() {
   //cparams.blocksize = 1024 * 32;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams);
+  schunk = blosc2_new_schunk(cparams, dparams, NULL);
 
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     for (i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + (int64_t)nchunk * CHUNKSIZE;
     }
-    nchunks = blosc2_append_buffer(schunk, isize, data);
+    nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     assert(nchunks == nchunk + 1);
   }
   /* Gather some info */
@@ -85,8 +85,7 @@ int main() {
   /* Retrieve and decompress the chunks (0-based count) */
   blosc_set_timestamp(&last);
   for (nchunk = NCHUNKS - 1; nchunk >= 0; nchunk--) {
-    dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk,
-                                    (void *)data_dest, isize);
+    dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, data_dest, isize);
   }
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
@@ -100,7 +99,7 @@ int main() {
   /* Check integrity of the first chunk */
   for (i = 0; i < CHUNKSIZE; i++) {
     if (data_dest[i] != (int64_t)i) {
-      printf("Decompressed data differs from original %zd, %zd!\n",
+      printf("Decompressed data differs from original %d, %lld!\n",
              i, data_dest[i]);
       return -1;
     }

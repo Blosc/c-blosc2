@@ -174,56 +174,6 @@ static void my_free(void* block) {
 }
 
 
-/* Copy 4 bytes from `*pa` to int32_t, changing endianness if necessary. */
-static int32_t sw32_(const void* pa) {
-  int32_t idest;
-  uint8_t* dest = (uint8_t*)&idest;
-  uint8_t* pa_ = (uint8_t*)pa;
-  int i = 1;                    /* for big/little endian detection */
-  char* p = (char*)&i;
-
-  if (p[0] != 1) {
-    /* big endian */
-    dest[0] = pa_[3];
-    dest[1] = pa_[2];
-    dest[2] = pa_[1];
-    dest[3] = pa_[0];
-  }
-  else {
-    /* little endian */
-    dest[0] = pa_[0];
-    dest[1] = pa_[1];
-    dest[2] = pa_[2];
-    dest[3] = pa_[3];
-  }
-  return idest;
-}
-
-
-/* Copy 4 bytes from `*pa` to `*dest`, changing endianness if necessary. */
-static void _sw32(void* dest, int32_t a) {
-  uint8_t* dest_ = (uint8_t*)dest;
-  uint8_t* pa = (uint8_t*)&a;
-  int i = 1;                    /* for big/little endian detection */
-  char* p = (char*)&i;
-
-  if (p[0] != 1) {
-    /* big endian */
-    dest_[0] = pa[3];
-    dest_[1] = pa[2];
-    dest_[2] = pa[1];
-    dest_[3] = pa[0];
-  }
-  else {
-    /* little endian */
-    dest_[0] = pa[0];
-    dest_[1] = pa[1];
-    dest_[2] = pa[2];
-    dest_[3] = pa[3];
-  }
-}
-
-
 /*
  * Conversion routines between compressor and compression libraries
  */

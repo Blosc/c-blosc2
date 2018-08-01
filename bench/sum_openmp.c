@@ -148,12 +148,12 @@ int main() {
   cparams.nthreads = 1;
   dparams.nthreads = 1;
   blosc_set_timestamp(&last);
-  schunk = blosc2_new_schunk(cparams, dparams);
+  schunk = blosc2_new_schunk(cparams, dparams, NULL);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     for (i = 0; i < CHUNKSIZE; i++) {
       chunk_buf[i] = udata[i + nchunk * CHUNKSIZE];
     }
-    blosc2_append_buffer(schunk, isize, chunk_buf);
+    blosc2_schunk_append_buffer(schunk, chunk_buf, isize);
   }
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);

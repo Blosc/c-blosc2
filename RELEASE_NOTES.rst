@@ -74,7 +74,7 @@ Changes from 2.0.0a2 to 2.0.0a3
 
 * The blosc2_append_chunk() has been removed.  This is this because an
   existing chunk may not fulfill the sequence of filters in super
-  header.  It is best that the user will use blosc2_append_buffer()
+  header.  It is best that the user will use blosc2_schunk_append_buffer()
   and compress it internally.
 
 * The split of blocks only happens for BLOSCLZ and SNAPPY codecs.  All

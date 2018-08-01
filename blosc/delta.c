@@ -13,8 +13,7 @@
 
 
 /* Apply the delta filters to src.  This can never fail. */
-void delta_encoder(const uint8_t* dref, const size_t offset,
-                   const int32_t nbytes, const size_t typesize,
+void delta_encoder(const uint8_t* dref, size_t offset, int32_t nbytes, size_t typesize,
                    const uint8_t* src, uint8_t* dest) {
   uint32_t i;
 
@@ -93,8 +92,8 @@ void delta_encoder(const uint8_t* dref, const size_t offset,
 
 
 /* Undo the delta filter in dest.  This can never fail. */
-void delta_decoder(const uint8_t* dref, const size_t offset,
-                   const size_t nbytes, const size_t typesize, uint8_t* dest) {
+void delta_decoder(const uint8_t* dref, size_t offset, size_t nbytes,
+                   size_t typesize, uint8_t* dest) {
   size_t i;
 
   if (offset == 0) {

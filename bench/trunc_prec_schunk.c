@@ -27,7 +27,7 @@
 #define NTHREADS 4
 
 
-void fill_buffer(double *buffer, size_t nchunk) {
+void fill_buffer(double *buffer, int nchunk) {
   double incx = 10. / (NCHUNKS * CHUNKSIZE);
 
   for (int i = 0; i < CHUNKSIZE; i++) {
@@ -45,7 +45,7 @@ int main() {
   size_t isize = CHUNKSIZE * sizeof(double);
   int dsize;
   int64_t nbytes, cbytes;
-  size_t nchunk, nchunks = 0;
+  int nchunk, nchunks = 0;
   blosc_timestamp_t last, current;
   double totaltime;
   float totalsize = isize * NCHUNKS;
@@ -76,13 +76,13 @@ int main() {
   //cparams.compcode = BLOSC_ZSTD;
   //cparams.clevel = 7;
   cparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams);
+  schunk = blosc2_new_schunk(cparams, dparams, NULL);
 
   /* Append the chunks */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     fill_buffer(data_buffer, nchunk);
-    nchunks = blosc2_append_buffer(schunk, isize, data_buffer);
+    nchunks = blosc2_schunk_append_buffer(schunk, data_buffer, isize);
   }
   blosc_set_timestamp(&current);
   totaltime = blosc_elapsed_secs(last, current);
@@ -99,7 +99,7 @@ int main() {
   /* Retrieve and decompress the chunks */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    dsize = blosc2_decompress_chunk(schunk, nchunk, (void*)rec_buffer, isize);
+    dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, rec_buffer, isize);
     if (dsize < 0) {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;
@@ -116,7 +116,7 @@ int main() {
   /* Check that all the values are in the precision range */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    dsize = blosc2_decompress_chunk(schunk, nchunk, (void*)rec_buffer, isize);
+    dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) rec_buffer, isize);
     if (dsize < 0) {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;
@@ -128,7 +128,7 @@ int main() {
         printf("Value not in tolerance margin: ");
         printf("%g - %g: %g, (nchunk: %d, nelem: %d)\n",
                data_buffer[i], rec_buffer[i],
-               (data_buffer[i] - rec_buffer[i]), (int)nchunk, i);
+               (data_buffer[i] - rec_buffer[i]), nchunk, i);
         return -1;
       }
     }

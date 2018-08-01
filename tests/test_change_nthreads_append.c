@@ -11,22 +11,24 @@
 
 #define CHUNKSIZE (200 * 1000)
 #define NCHUNKS 500
-//#define NCHUNKS 5
 #define NTHREADS 4
 
 
-int main() {
+/* Global vars */
+int tests_run = 0;
+
+static char* all_tests() {
   static int64_t data[CHUNKSIZE];
   static int64_t data_dest[CHUNKSIZE];
   const size_t isize = CHUNKSIZE * sizeof(int64_t);
   int dsize = 0;
-  int64_t nbytes, cbytes;
+  size_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
-  int i;
-  int nchunk;
-  size_t nchunks;
+  int32_t i;
+  int32_t nchunk;
+  int32_t nchunks;
   blosc_timestamp_t last, current;
   double ttotal;
 
@@ -43,7 +45,7 @@ int main() {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams);
+  schunk = blosc2_new_schunk(cparams, dparams, NULL);
 
   struct blosc2_context_s * cctx = schunk->cctx;
   blosc_set_timestamp(&last);
@@ -53,7 +55,7 @@ int main() {
     }
     // Alternate between 1 and NTHREADS
     cctx->new_nthreads = nchunk % NTHREADS + 1;
-    nchunks = blosc2_append_buffer(schunk, isize, data);
+    nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: nchunk is not correct", nchunks == nchunk);
   }
   /* Gather some info */
@@ -72,31 +74,46 @@ int main() {
   for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
     // Alternate between 1 and NTHREADS
     dctx->new_nthreads = nchunk % NTHREADS + 1;
-    dsize = blosc2_decompress_chunk(schunk, (size_t)nchunk,
-                                    (void *)data_dest, isize);
+    dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, data_dest, isize);
   }
-  if (dsize < 0) {
-    printf("Decompression error. Error code: %d\n", dsize);
-    return dsize;
-  }
+  mu_assert("ERROR: chunk decompression error", dsize > 0);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Decompression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
-/* Check integrity of the first chunk */
+  /* Check integrity of the first chunk */
   for (i = 0; i < CHUNKSIZE; i++) {
-    if (data_dest[i] != (uint64_t)i) {
-      printf("Decompressed data differs from original %d, %zd!\n",
-             i, data_dest[i]);
-      return -1;
-    }
+    mu_assert("ERROR: decompressed data differs from original", data_dest[i] == (uint64_t)i);
   }
 
   printf("Successful roundtrip!\n");
 
-/* Free resources */
+  /* Free resources */
   blosc2_free_schunk(schunk);
 
   return 0;
+}
+
+
+int main(int argc, char **argv) {
+  char *result;
+
+  printf("STARTING TESTS for %s", argv[0]);
+
+  blosc_init();
+
+  /* Run all the suite */
+  result = all_tests();
+  if (result != EXIT_SUCCESS) {
+    printf(" (%s)\n", result);
+  }
+  else {
+    printf(" ALL TESTS PASSED");
+  }
+  printf("\tTests run: %d\n", tests_run);
+
+  blosc_destroy();
+
+  return result != EXIT_SUCCESS;
 }

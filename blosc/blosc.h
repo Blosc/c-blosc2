@@ -474,7 +474,7 @@ BLOSC_EXPORT char* blosc_cbuffer_complib(const void* cbuffer);
 
 *********************************************************************/
 
-typedef struct blosc2_context_s blosc2_context;   /* uncomplete type */
+typedef struct blosc2_context_s blosc2_context;   /* opaque type */
 
 /**
   The parameters for creating a context for compression purposes.
@@ -483,17 +483,17 @@ typedef struct blosc2_context_s blosc2_context;   /* uncomplete type */
   (zero) in the fields of the struct is passed to a function.
 */
 typedef struct {
-  int compcode;
+  uint8_t compcode;
   /* the compressor codec */
-  int clevel;
+  uint8_t clevel;
   /* the compression level (5) */
   int use_dict;
   /* use dicts or not when compressing (only for ZSTD) */
-  size_t typesize;
+  int32_t typesize;
   /* the type size (8) */
-  uint32_t nthreads;
+  int16_t nthreads;
   /* the number of threads to use internally (1) */
-  size_t blocksize;
+  int32_t blocksize;
   /* the requested size of the compressed blocks (0; meaning automatic) */
   void* schunk;
   /* the associated schunk, if any (NULL) */
@@ -515,7 +515,7 @@ static const blosc2_cparams BLOSC_CPARAMS_DEFAULTS = {
   (zero) in the fields of the struct is passed to a function.
 */
 typedef struct {
-  int32_t nthreads;
+  int16_t nthreads;
   /* the number of threads to use internally (1) */
   void* schunk;
   /* the associated schunk, if any (NULL) */
@@ -606,40 +606,55 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 *********************************************************************/
 
 typedef struct {
+  char* fname;     // the name of the file; if NULL, this is in-memory
+  uint8_t* sdata;  // the in-memory serialized data
+  int64_t len;     // the current length of the frame in (compressed) bytes
+  int64_t maxlen;  // the maximum length of the frame; if 0, there is no maximum
+  void* schunk;    // pointer to schunk (if it exists)
+} blosc2_frame;
+
+/* Empty in-memory frame */
+static const blosc2_frame BLOSC_EMPTY_FRAME = {
+  .sdata = NULL,
+  .fname = NULL,
+  .len = 0,
+  .maxlen = 0,
+  .schunk = NULL,
+};
+
+typedef struct {
   uint8_t version;
   uint8_t flags1;
   uint8_t flags2;
   uint8_t flags3;
-  uint8_t compcode;  // starts at 4 bytes
+  uint8_t compcode;
   /* The default compressor.  Each chunk can override this. */
-  uint8_t clevel;  // starts at 6 bytes
+  uint8_t clevel;
   /* The compression level and other compress params */
-  uint32_t typesize;
+  int32_t typesize;
   /* the type size */
   int32_t blocksize;
   /* the requested size of the compressed blocks (0; meaning automatic) */
-  uint32_t chunksize;   // starts at 8 bytes
+  int32_t chunksize;
   /* Size of each chunk.  0 if not a fixed chunksize. */
-  uint8_t filters[BLOSC_MAX_FILTERS];  // starts at 12 bytes
+  uint8_t filters[BLOSC_MAX_FILTERS];
   /* The (sequence of) filters.  8-bit per filter. */
   uint8_t filters_meta[BLOSC_MAX_FILTERS];
   /* Metadata for filters. 8-bit per meta-slot. */
-  int64_t nchunks;  // starts at 28 bytes
+  int32_t nchunks;
   /* Number of chunks in super-chunk */
-  int64_t nbytes;  // starts at 36 bytes
+  int64_t nbytes;
   /* data size + metadata size + header size (uncompressed) */
-  int64_t cbytes;  // starts at 44 bytes
+  int64_t cbytes;
   /* data size + metadata size + header size (compressed) */
-  uint8_t* filters_chunk;  // starts at 52 bytes
-  /* Pointer to chunk hosting filter-related data */
-  uint8_t* codec_chunk;
-  /* Pointer to chunk hosting codec-related data */
   uint8_t* metadata_chunk;
   /* Pointer to schunk metadata */
   uint8_t* userdata_chunk;
   /* Pointer to user-defined data */
   uint8_t** data;
   /* Pointer to chunk data pointers */
+  blosc2_frame* frame;
+  /* Pointer to frame to used as store for chunks */
   //uint8_t* ctx;
   /* Context for the thread holder.  NULL if not acquired. */
   blosc2_context* cctx;
@@ -649,13 +664,12 @@ typedef struct {
   /* Reserved for the future. */
 } blosc2_schunk;
 
-
 /* Create a new super-chunk. */
-BLOSC_EXPORT blosc2_schunk* blosc2_new_schunk(
-        blosc2_cparams cparams, blosc2_dparams dparams);
+BLOSC_EXPORT blosc2_schunk *
+blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams, blosc2_frame *frame);
 
 /* Release resources from a super-chunk */
-BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *sheader);
+BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *schunk);
 
 /* Append a `src` data buffer to a super-chunk.
 
@@ -665,11 +679,7 @@ BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *sheader);
  This returns the number of chunk in super-chunk.  If some problem is
  detected, this number will be negative.
  */
-BLOSC_EXPORT size_t blosc2_append_buffer(blosc2_schunk* sheader,
-                                         size_t nbytes, void* src);
-
-BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize,
-                                               size_t nbytes, void* src);
+BLOSC_EXPORT int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, size_t nbytes);
 
 /* Decompress and return the `nchunk` chunk of a super-chunk.
 
@@ -681,17 +691,44 @@ BLOSC_EXPORT void* blosc2_packed_append_buffer(void* packed, size_t typesize,
  The size of the decompressed chunk is returned.  If some problem is
  detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_decompress_chunk(blosc2_schunk* sheader,
-     size_t nchunk, void* dest, size_t nbytes);
+BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk,
+                                                int nchunk, void *dest, size_t nbytes);
 
-BLOSC_EXPORT int blosc2_packed_decompress_chunk(void* packed, size_t nchunk,
-      void** dest);
 
-/* Pack a super-chunk by using the header. */
-BLOSC_EXPORT void* blosc2_pack_schunk(blosc2_schunk* sheader);
+/*********************************************************************
 
-/* Unpack a packed super-chunk */
-BLOSC_EXPORT blosc2_schunk* blosc2_unpack_schunk(void* packed);
+  Frame related structures and functions.
+
+*********************************************************************/
+
+/* Create a frame from a super-chunk.
+
+ If `frame->fname` is NULL, a frame is created in memory; else it is created
+ on disk.
+ */
+BLOSC_EXPORT int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame);
+
+/* Free all memory from a frame. */
+BLOSC_EXPORT int blosc2_free_frame(blosc2_frame *frame);
+
+/* Write an in-memory frame out to a file. */
+BLOSC_EXPORT int64_t blosc2_frame_to_file(blosc2_frame *frame, char *fname);
+
+/* Initialize a frame out of a file */
+BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(char *fname);
+
+/* Create a super-chunk from a frame. */
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame);
+
+/* Append an existing chunk into a frame. */
+BLOSC_EXPORT void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk);
+
+/* Return a compressed chunk that is part of a frame. */
+BLOSC_EXPORT void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk);
+
+/* Decompress and return a chunk that is part of a frame. */
+BLOSC_EXPORT int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk,
+                                               void *dest, size_t nbytes);
 
 
 /*********************************************************************
@@ -727,6 +764,62 @@ BLOSC_EXPORT void blosc_set_blocksize(size_t blocksize);
   the allowed values, so use this with care.
 */
 BLOSC_EXPORT void blosc_set_schunk(blosc2_schunk* schunk);
+
+
+/*********************************************************************
+
+  Utility functions meant to be used internally.  // TODO put them in their own header
+
+*********************************************************************/
+
+/* Copy 4 bytes from `*pa` to int32_t, changing endianness if necessary. */
+static int32_t sw32_(const void* pa) {
+  int32_t idest;
+  uint8_t* dest = (uint8_t*)&idest;
+  uint8_t* pa_ = (uint8_t*)pa;
+  int i = 1;                    /* for big/little endian detection */
+  char* p = (char*)&i;
+
+  if (p[0] != 1) {
+    /* big endian */
+    dest[0] = pa_[3];
+    dest[1] = pa_[2];
+    dest[2] = pa_[1];
+    dest[3] = pa_[0];
+  }
+  else {
+    /* little endian */
+    dest[0] = pa_[0];
+    dest[1] = pa_[1];
+    dest[2] = pa_[2];
+    dest[3] = pa_[3];
+  }
+  return idest;
+}
+
+
+/* Copy 4 bytes from `*pa` to `*dest`, changing endianness if necessary. */
+static void _sw32(void* dest, int32_t a) {
+  uint8_t* dest_ = (uint8_t*)dest;
+  uint8_t* pa = (uint8_t*)&a;
+  int i = 1;                    /* for big/little endian detection */
+  char* p = (char*)&i;
+
+  if (p[0] != 1) {
+    /* big endian */
+    dest_[0] = pa[3];
+    dest_[1] = pa[2];
+    dest_[2] = pa[1];
+    dest_[3] = pa[0];
+  }
+  else {
+    /* little endian */
+    dest_[0] = pa[0];
+    dest_[1] = pa[1];
+    dest_[2] = pa[2];
+    dest_[3] = pa[3];
+  }
+}
 
 
 #ifdef __cplusplus
