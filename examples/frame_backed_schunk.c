@@ -39,7 +39,7 @@ int main() {
   static int32_t data_dest1[CHUNKSIZE];
   static int32_t data_dest2[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
-  size_t nbytes, cbytes;
+  int64_t nbytes, cbytes;
   int i, nchunk;
   int nchunks;
   blosc_timestamp_t last, current;

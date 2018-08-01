@@ -608,8 +608,8 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 typedef struct {
   char* fname;     // the name of the file; if NULL, this is in-memory
   uint8_t* sdata;  // the in-memory serialized data
-  size_t len;      // the current length of the frame in (compressed) bytes
-  size_t maxlen;   // the maximum length of the frame; if 0, there is no maximum
+  int64_t len;     // the current length of the frame in (compressed) bytes
+  int64_t maxlen;  // the maximum length of the frame; if 0, there is no maximum
   void* schunk;    // pointer to schunk (if it exists)
 } blosc2_frame;
 
@@ -643,9 +643,9 @@ typedef struct {
   /* Metadata for filters. 8-bit per meta-slot. */
   int32_t nchunks;
   /* Number of chunks in super-chunk */
-  size_t nbytes;
+  int64_t nbytes;
   /* data size + metadata size + header size (uncompressed) */
-  size_t cbytes;
+  int64_t cbytes;
   /* data size + metadata size + header size (compressed) */
   uint8_t* metadata_chunk;
   /* Pointer to schunk metadata */

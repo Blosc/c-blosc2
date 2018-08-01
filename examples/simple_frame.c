@@ -46,7 +46,7 @@ int main() {
   static int32_t data_dest2[CHUNKSIZE];
   static int32_t data_dest3[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
-  size_t nbytes, cbytes;
+  int64_t nbytes, cbytes;
   int i, nchunk;
   int nchunks;
   blosc_timestamp_t last, current;
@@ -119,7 +119,7 @@ int main() {
   // The next creates a frame-backed schunk
   // blosc2_schunk* schunk1 = blosc2_new_schunk(cparams, dparams, &frame1);
   if (schunk1 == NULL) {
-    printf("Bad conversion frame -> schunk!\n");
+    printf("Bad conversion frame1 -> schunk1!\n");
     return -1;
   }
   blosc_set_timestamp(&current);
@@ -134,7 +134,7 @@ int main() {
   // The next creates a frame-backed schunk
   blosc2_schunk* schunk2 = blosc2_new_schunk(cparams, dparams, frame2);
   if (schunk2 == NULL) {
-    printf("Bad conversion frame -> schunk!\n");
+    printf("Bad conversion frame2 -> schunk2!\n");
     return -1;
   }
   blosc_set_timestamp(&current);

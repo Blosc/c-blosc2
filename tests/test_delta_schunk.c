@@ -18,7 +18,7 @@ int main() {
   static int32_t data_dest[SIZE];
   size_t isize = SIZE * sizeof(int32_t);
   int dsize;
-  size_t nbytes, cbytes;
+  int64_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;

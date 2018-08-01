@@ -149,7 +149,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   // Uncompressed size
   *h2p = 0xd3;  // int64
   h2p += 1;
-  size_t nbytes = schunk->nbytes;
+  int64_t nbytes = schunk->nbytes;
   memcpy(h2p, swap_inplace(&nbytes, 8), 8);
   h2p += 8;
   assert(h2p - h2 < HEADER2_MAXSIZE);
@@ -157,7 +157,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   // Compressed size
   *h2p = 0xd3;  // int64
   h2p += 1;
-  size_t cbytes = schunk->cbytes;
+  int64_t cbytes = schunk->cbytes;
   memcpy(h2p, swap_inplace(&cbytes, 8), 8);
   h2p += 8;
   assert(h2p - h2 < HEADER2_MAXSIZE);
@@ -202,7 +202,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
 /* Create a frame out of a super-chunk. */
 int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int32_t nchunks = schunk->nchunks;
-  size_t cbytes = schunk->cbytes;
+  int64_t cbytes = schunk->cbytes;
   FILE* fp = NULL;
 
   uint8_t* h2 = new_header2_frame(schunk);
@@ -249,12 +249,12 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   // Now that we know them, fill the chunksize and frame length in header2
   memcpy(h2 + FRAME_CHUNKSIZE, swap_inplace(&chunksize, 4), 4);
   frame->len = h2len + cbytes + off_cbytes;
-  size_t tbytes = frame->len;
-  memcpy(h2 + FRAME_LEN, swap_inplace(&tbytes, 8), 8);
+  int64_t tbytes = frame->len;
+  memcpy(h2 + FRAME_LEN, swap_inplace(&tbytes, sizeof(tbytes)), sizeof(tbytes));
 
   // Create the frame and put the header at the beginning
   if (frame->fname == NULL) {
-    frame->sdata = malloc(frame->len);
+    frame->sdata = malloc((size_t)frame->len);
     memcpy(frame->sdata, h2, h2len);
   }
   else {
@@ -269,7 +269,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
     uint8_t* data_chunk = schunk->data[i];
     int32_t chunk_cbytes = sw32_(data_chunk + 12);
     if (frame->fname == NULL) {
-      memcpy(frame->sdata + h2len + coffset, data_chunk, (size_t) chunk_cbytes);
+      memcpy(frame->sdata + h2len + coffset, data_chunk, (size_t)chunk_cbytes);
     } else {
       fwrite(data_chunk, (size_t)chunk_cbytes, 1, fp);
     }
@@ -287,7 +287,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   }
   free(off_chunk);
 
-  return (int64_t)(frame->len);
+  return frame->len;
 }
 
 
@@ -295,9 +295,9 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 int64_t blosc2_frame_to_file(blosc2_frame *frame, char *fname) {
   assert(frame->fname == NULL);  // make sure that we are using an in-memory frame
   FILE* fp = fopen(fname, "wb");
-  fwrite(frame->sdata, frame->len, 1, fp);
+  fwrite(frame->sdata, (size_t)frame->len, 1, fp);
   fclose(fp);
-  return (int64_t)frame->len;
+  return frame->len;
 }
 
 
@@ -312,9 +312,9 @@ blosc2_frame* blosc2_frame_from_file(char *fname) {
   fread(header, HEADER2_MAXSIZE, 1, fp);
   fclose(fp);
 
-  size_t frame_len;
-  memcpy(&frame_len, header + FRAME_LEN, 8);
-  swap_inplace(&frame_len, 8);
+  int64_t frame_len;
+  memcpy(&frame_len, header + FRAME_LEN, sizeof(frame_len));
+  swap_inplace(&frame_len, sizeof(frame_len));
   frame->len = frame_len;
 
   free(header);
@@ -324,19 +324,19 @@ blosc2_frame* blosc2_frame_from_file(char *fname) {
 
 
 // Get the data pointers section
-int32_t get_offsets(blosc2_frame* frame, size_t frame_len, int32_t header_len,
-                    size_t cbytes, int32_t nchunks, void* offsets) {
+int32_t get_offsets(blosc2_frame* frame, int64_t frame_len, int32_t header_len,
+                    int64_t cbytes, int32_t nchunks, void* offsets) {
   uint8_t* framep = frame->sdata;
   uint8_t* coffsets;
 
   if (frame->sdata != NULL) {
     coffsets = framep + header_len + cbytes;
   } else {
-    int32_t off_cbytes = (int32_t) (frame_len - header_len - cbytes);
-    coffsets = malloc((size_t) off_cbytes);
+    int32_t off_cbytes = (int32_t)(frame_len - header_len - cbytes);
+    coffsets = malloc((size_t)off_cbytes);
     FILE* fp = fopen(frame->fname, "rb");
     fseek(fp, header_len + cbytes, SEEK_SET);
-    long rbytes = fread(coffsets, 1, (size_t) off_cbytes, fp);
+    long rbytes = fread(coffsets, 1, (size_t)off_cbytes, fp);
     if (rbytes != off_cbytes) {
       fprintf(stderr, "Cannot read the offsets out of the fileframe.\n");
       fclose(fp);
@@ -362,8 +362,8 @@ int32_t get_offsets(blosc2_frame* frame, size_t frame_len, int32_t header_len,
 }
 
 
-int frame_get_meta(blosc2_frame* frame, int32_t* header_len, size_t* frame_len,
-                   size_t* nbytes, size_t* cbytes, uint32_t* chunksize, int32_t* nchunks,
+int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
+                   int64_t* nbytes, int64_t* cbytes, uint32_t* chunksize, int32_t* nchunks,
                    int32_t* typesize, uint8_t* compcode, uint8_t* filters) {
   uint8_t* framep = frame->sdata;
   uint8_t* header = NULL;
@@ -424,8 +424,8 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, size_t* frame_len,
 }
 
 
-int frame_update_meta(blosc2_frame* frame, size_t new_frame_len, size_t new_nbytes,
-                      size_t new_cbytes, int32_t new_chunksize) {
+int frame_update_meta(blosc2_frame* frame, int64_t new_frame_len, int64_t new_nbytes,
+                      int64_t new_cbytes, int32_t new_chunksize) {
   uint8_t* framep = frame->sdata;
   uint8_t* header = frame->sdata;
 
@@ -443,7 +443,7 @@ int frame_update_meta(blosc2_frame* frame, size_t new_frame_len, size_t new_nbyt
   memcpy(&header_len, framep + HEADER2_LEN, sizeof(header_len));
   swap_inplace(&header_len, sizeof(header_len));
 
-  size_t nbytes;
+  int64_t nbytes;
   memcpy(&nbytes, framep + FRAME_NBYTES, sizeof(nbytes));
   swap_inplace(&nbytes, sizeof(nbytes));
 
@@ -481,9 +481,9 @@ int frame_update_meta(blosc2_frame* frame, size_t new_frame_len, size_t new_nbyt
 /* Get a super-chunk out of a frame */
 blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
   int32_t header_len;
-  size_t frame_len;
-  size_t nbytes;
-  size_t cbytes;
+  int64_t frame_len;
+  int64_t nbytes;
+  int64_t cbytes;
   uint32_t chunksize;
   int32_t nchunks;
   int32_t typesize;
@@ -538,7 +538,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
       fread(data_chunk, BLOSC_MIN_HEADER_LENGTH, 1, fp);
       csize = sw32_(data_chunk + 12);
       if (csize > prev_alloc) {
-        data_chunk = realloc(data_chunk, (size_t) csize);
+        data_chunk = realloc(data_chunk, (size_t)csize);
         prev_alloc = csize;
       }
       fseek(fp, header_len + offsets[i], SEEK_SET);
@@ -592,9 +592,9 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
 /* Append an existing chunk into a frame. */
 void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
   int32_t header_len;
-  size_t frame_len;
-  size_t nbytes;
-  size_t cbytes;
+  int64_t frame_len;
+  int64_t nbytes;
+  int64_t cbytes;
   uint32_t chunksize;
   int32_t nchunks;
   int32_t typesize;
@@ -609,9 +609,9 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
 
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
   int32_t nbytes_chunk = sw32_(chunk + 4);
-  size_t new_nbytes = nbytes + nbytes_chunk;
+  int64_t new_nbytes = nbytes + nbytes_chunk;
   int32_t cbytes_chunk = sw32_(chunk + 12);
-  size_t new_cbytes = cbytes + cbytes_chunk;
+  int64_t new_cbytes = cbytes + cbytes_chunk;
 
   if ((nchunks > 0) && (nbytes_chunk != chunksize)) {
     fprintf(stderr, "appending chunks with a different chunksize than frame is not allowed yet"
@@ -621,7 +621,7 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
 
   // Get the current offsets and add one more
   int32_t off_nbytes = (nchunks + 1) * 8;
-  size_t* offsets = malloc((size_t)off_nbytes);
+  int64_t* offsets = malloc((size_t)off_nbytes);
   int32_t off_cbytes = get_offsets(frame, frame_len, header_len, cbytes, nchunks, offsets);
   if (off_cbytes < 0) {
     return NULL;
@@ -642,21 +642,21 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
     return NULL;
   }
 
-  size_t new_frame_len = header_len + new_cbytes + new_off_cbytes;
+  int64_t new_frame_len = header_len + new_cbytes + new_off_cbytes;
 
   FILE* fp = NULL;
   if (frame->sdata != NULL) {
     uint8_t* framep = frame->sdata;
     /* Make space for the new chunk and copy it */
-    frame->sdata = framep = realloc(framep, new_frame_len);
+    frame->sdata = framep = realloc(framep, (size_t)new_frame_len);
     if (framep == NULL) {
       fprintf(stderr, "cannot realloc space for the frame.");
       return NULL;
     }
     /* Copy the chunk */
-    memcpy(framep + header_len + cbytes, chunk, (size_t) cbytes_chunk);
+    memcpy(framep + header_len + cbytes, chunk, (size_t)cbytes_chunk);
     /* Copy the offsets */
-    memcpy(framep + header_len + new_cbytes, off_chunk, (size_t) new_off_cbytes);
+    memcpy(framep + header_len + new_cbytes, off_chunk, (size_t)new_off_cbytes);
   } else {
     // fileframe
     fp = fopen(frame->fname, "rb+");
@@ -690,9 +690,9 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
 /* Decompress and return a chunk that is part of a frame. */
 void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk) {
   int32_t header_len;
-  size_t frame_len;
-  size_t nbytes;
-  size_t cbytes;
+  int64_t frame_len;
+  int64_t nbytes;
+  int64_t cbytes;
   uint32_t chunksize;
   int32_t nchunks;
   int32_t typesize;
@@ -761,7 +761,7 @@ int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, s
   }
 
   /* And decompress it */
-  int32_t chunksize = blosc_decompress(src, dest, (size_t)nbytes);
+  int32_t chunksize = blosc_decompress(src, dest, nbytes);
   return (int)chunksize;
 }
 
