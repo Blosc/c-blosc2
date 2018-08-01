@@ -85,6 +85,12 @@ int append_chunk(blosc2_schunk* schunk, void* chunk) {
   int32_t nbytes = *(int32_t*)((uint8_t*)chunk + 4);
   int32_t cbytes = *(int32_t*)((uint8_t*)chunk + 12);
 
+  if ((schunk->nchunks > 0) && (nbytes != schunk->chunksize)) {
+    fprintf(stderr, "appending chunks with a different chunksize than schunk is not allowed yet: "
+                    "%d != %d", nbytes, schunk->chunksize);
+    return -1;
+  }
+
   if (schunk->frame == NULL) {
     /* Make space for appending a new chunk and do it */
     schunk->data = realloc(schunk->data, (nchunks + 1) * sizeof(void *));
@@ -98,6 +104,7 @@ int append_chunk(blosc2_schunk* schunk, void* chunk) {
   schunk->nchunks = nchunks + 1;
   schunk->nbytes += nbytes;
   schunk->cbytes += cbytes;
+  schunk->chunksize = nbytes;
   /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n", */
   /*         nchunks, nbytes, cbytes, (1.*nbytes) / cbytes); */
   return schunk->nchunks;

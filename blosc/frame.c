@@ -613,6 +613,12 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
   int32_t cbytes_chunk = *(int32_t*)((uint8_t*)chunk + 12);
   size_t new_cbytes = cbytes + cbytes_chunk;
 
+  if ((nchunks > 0) && (nbytes_chunk != chunksize)) {
+    fprintf(stderr, "appending chunks with a different chunksize than frame is not allowed yet"
+                    "%d != %d", nbytes_chunk, chunksize);
+    return NULL;
+  }
+
   // Get the current offsets and add one more
   int32_t off_nbytes = (nchunks + 1) * 8;
   size_t* offsets = malloc((size_t)off_nbytes);
