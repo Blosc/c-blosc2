@@ -69,7 +69,7 @@
 
 if (NOT WIN32)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
-endif(WIN32)
+endif(NOT WIN32)
 
 cmake_minimum_required(VERSION 2.8.10)
 IF (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} GREATER 3.4)

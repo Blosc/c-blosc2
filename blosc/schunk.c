@@ -85,13 +85,25 @@ int append_chunk(blosc2_schunk* schunk, uint8_t* chunk) {
   int32_t nbytes = sw32_(chunk + 4);
   int32_t cbytes = sw32_(chunk + 12);
 
-  if ((schunk->nchunks > 0) && (nbytes != schunk->chunksize)) {
-    fprintf(stderr, "appending chunks with a different chunksize than schunk is not allowed yet: "
-                    "%d != %d", nbytes, schunk->chunksize);
+  if ((schunk->nchunks > 0) && (nbytes > schunk->chunksize)) {
+    fprintf(stderr, "appending chunks with a larger chunksize than schunk is not allowed yet: "
+                    "%d > %d", nbytes, schunk->chunksize);
     return -1;
   }
-
   if (schunk->frame == NULL) {
+    // Check that we are not appending a small chunk after another small chunk
+    if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
+      uint8_t* last_chunk = schunk->data[nchunks - 1];
+      int32_t last_nbytes = sw32_(last_chunk + 4);
+      if ((last_nbytes < schunk->chunksize) && (nbytes < schunk->chunksize)) {
+        fprintf(stderr,
+                "appending two consecutive chunks with a chunksize smaller than the schunk chunksize"
+                "is not allowed yet: "
+                "%d != %d", nbytes, schunk->chunksize);
+        return -1;
+      }
+    }
+
     /* Make space for appending a new chunk and do it */
     schunk->data = realloc(schunk->data, (nchunks + 1) * sizeof(void *));
     schunk->data[nchunks] = chunk;
@@ -144,31 +156,32 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
   }
 
   uint8_t* src;
+  int chunksize;
   if (schunk->frame == NULL) {
     if (nchunk >= schunk->nchunks) {
       fprintf(stderr, "nchunk ('%d') exceeds the number of chunks "
                       "('%d') in super-chunk\n", nchunk, schunk->nchunks);
-      return -10;
+      return -11;
     }
     src = schunk->data[nchunk];
+    int nbytes_ = sw32_(src + 4);
+    if (nbytes < nbytes_) {
+      fprintf(stderr, "Buffer size is too small for the decompressed buffer "
+                      "('%ld' bytes, but '%d' are needed)\n", nbytes, nbytes_);
+      return -11;
+    }
+
+    chunksize = blosc2_decompress_ctx(schunk->dctx, src, dest, nbytes);
+    if (chunksize < 0 || chunksize != nbytes_) {
+      fprintf(stderr, "Error in decompressing chunk");
+      return -11;
+    }
   } else {
-    src = blosc2_frame_get_chunk(schunk->frame, nchunk);
-    if (src == NULL) {
+    chunksize = blosc2_frame_decompress_chunk(schunk->frame, nchunk, dest, nbytes);
+    if (chunksize < 0) {
       return -10;
     }
   }
-  int nbytes_ = sw32_(src + 4);
-  if (nbytes < nbytes_) {
-    fprintf(stderr, "Buffer size is too small for the decompressed buffer "
-                    "('%ld' bytes, but '%d' are needed)\n", nbytes, nbytes_);
-    return -11;
-  }
-
-  int chunksize = blosc2_decompress_ctx(schunk->dctx, src, dest, nbytes);
-  if (chunksize < 0 || chunksize != nbytes_) {
-    fprintf(stderr, "Error in decompressing chunk");
-  }
-
   return chunksize;
 }
 

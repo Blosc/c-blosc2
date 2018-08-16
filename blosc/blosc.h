@@ -723,9 +723,6 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame);
 /* Append an existing chunk into a frame. */
 BLOSC_EXPORT void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk);
 
-/* Return a compressed chunk that is part of a frame. */
-BLOSC_EXPORT void* blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk);
-
 /* Decompress and return a chunk that is part of a frame. */
 BLOSC_EXPORT int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk,
                                                void *dest, size_t nbytes);
