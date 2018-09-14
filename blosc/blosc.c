@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/types.h>
+#include <assert.h>
 
 #include "fastcopy.h"
 
