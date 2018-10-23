@@ -62,16 +62,21 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
   schunk->dctx = blosc2_create_dctx(dparams);
 
   if (frame != NULL) {
-    frame->schunk = schunk;
-    if (frame->len == 0) {
+    blosc2_frame *mframe = malloc(sizeof(blosc2_frame));
+    memcpy(mframe, frame, sizeof(blosc2_frame));
+    mframe->schunk = schunk;
+    if (mframe->len == 0) {
       // Initialize frame (basically encode the header)
-      int64_t frame_len = blosc2_schunk_to_frame(schunk, frame);
+      int64_t frame_len = blosc2_schunk_to_frame(schunk, mframe);
       if (frame_len < 0) {
         fprintf(stderr, "Error during the conversion of schunk to frame\n");
       }
     }
+    schunk->frame = mframe;
   }
-  schunk->frame = frame;
+  else {
+    schunk->frame = NULL;
+  }
 
   return schunk;
 }
@@ -193,19 +198,18 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
 /* Free all memory from a super-chunk. */
 int blosc2_free_schunk(blosc2_schunk *schunk) {
 
-  if (schunk->metadata_chunk != NULL)
-    free(schunk->metadata_chunk);
-  if (schunk->userdata_chunk != NULL)
-    free(schunk->userdata_chunk);
+  free(schunk->metadata_chunk);
+  free(schunk->userdata_chunk);
   if (schunk->data != NULL) {
     for (int i = 0; i < schunk->nchunks; i++) {
       free(schunk->data[i]);
     }
-    free(schunk->data);
   }
-  if ((schunk->frame != NULL) && (schunk->frame->sdata != NULL)) {
+  free(schunk->data);
+  if (schunk->frame != NULL) {
     free(schunk->frame->sdata);
   }
+  free(schunk->frame);
   blosc2_free_ctx(schunk->cctx);
   blosc2_free_ctx(schunk->dctx);
   free(schunk);
