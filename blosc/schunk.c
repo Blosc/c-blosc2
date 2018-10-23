@@ -116,7 +116,11 @@ int append_chunk(blosc2_schunk* schunk, uint8_t* chunk) {
   schunk->nchunks = nchunks + 1;
   schunk->nbytes += nbytes;
   schunk->cbytes += cbytes;
-  schunk->chunksize = nbytes;
+  // FIXME: this should be updated when/if super-chunks support chunks with different sizes
+  if (nchunks == 0) {
+    schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
+  }
+
   /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n", */
   /*         nchunks, nbytes, cbytes, (1.*nbytes) / cbytes); */
   return schunk->nchunks;
