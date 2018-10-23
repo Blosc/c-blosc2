@@ -666,7 +666,7 @@ typedef struct {
 
 /* Create a new super-chunk. */
 BLOSC_EXPORT blosc2_schunk *
-blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams, blosc2_frame *frame);
+blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams, const blosc2_frame *frame);
 
 /* Release resources from a super-chunk */
 BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *schunk);

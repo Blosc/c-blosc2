@@ -40,7 +40,7 @@
 
 /* Create a new super-chunk */
 blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
-                                 blosc2_frame* frame) {
+                                 const blosc2_frame* frame) {
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
 
   schunk->version = 0;     /* pre-first version */
