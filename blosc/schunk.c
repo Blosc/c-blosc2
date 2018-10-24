@@ -194,6 +194,31 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
   return chunksize;
 }
 
+/* Return a compressed chunk that is part of a super-chunk in the `chunk` parameter.
+ * If the super-chunk is backed by a frame that is disk-based, a buffer is allocated for the
+ * (compressed) chunk, and hence a free is needed.  You can check if the chunk requires a free
+ * with the `needs_free` parameter.
+ * If the chunk does not need a free, it means that a pointer to the location in the super-chunk
+ * (or the backing in-memory frame) is returned in the `chunk` parameter.
+ *
+ * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
+ * is returned instead.
+*/
+int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, void **chunk, bool *needs_free) {
+  if (schunk->frame != NULL) {
+    return blosc2_frame_get_chunk(schunk->frame, nchunk, chunk, needs_free);
+  }
+
+  if (nchunk >= schunk->nchunks) {
+    fprintf(stderr, "nchunk ('%d') exceeds the number of chunks "
+                    "('%d') in schunk\n", nchunk, schunk->nchunks);
+    return -2;
+  }
+  *chunk = schunk->data[nchunk];
+  *needs_free = false;
+  return sw32_(*chunk + 12);
+}
+
 
 /* Free all memory from a super-chunk. */
 int blosc2_free_schunk(blosc2_schunk *schunk) {

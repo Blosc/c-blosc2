@@ -101,16 +101,16 @@ int main() {
   printf("Frame length on disk: %lld bytes\n", frame_len);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Time for frame -> fileframe (simple_frame.b2frame): %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+  printf("Time for frame -> fileframe (simple_frame.b2frame): %.3g s, %.1f GB/s\n",
+         ttotal, nbytes / (ttotal * GB));
 
   // fileframe (file) -> frame2 (on-disk frame)
   blosc_set_timestamp(&last);
   blosc2_frame* frame2 = blosc2_frame_from_file("simple_frame.b2frame");
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Time for fileframe (%s) -> frame : %.3g s, %.3g MB/s\n",
-         frame2->fname, ttotal, nbytes / (ttotal * MB));
+  printf("Time for fileframe (%s) -> frame : %.3g s, %.1f GB/s\n",
+         frame2->fname, ttotal, nbytes / (ttotal * GB));
 
   // frame1 (in-memory) -> schunk
   blosc_set_timestamp(&last);
@@ -124,8 +124,8 @@ int main() {
   }
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Time for frame -> schunk: %.3g s, %.3g MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+  printf("Time for frame -> schunk: %.3g s, %.1f GB/s\n",
+         ttotal, nbytes / (ttotal * GB));
 
   // frame2 (on-disk) -> schunk
   blosc_set_timestamp(&last);
@@ -139,8 +139,8 @@ int main() {
   }
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Time for fileframe -> schunk: %.3g s, %.3g MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+  printf("Time for fileframe -> schunk: %.3g s, %.1f GB/s\n",
+         ttotal, nbytes / (ttotal * GB));
 
   /* Retrieve and decompress the chunks from the super-chunks and compare values */
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {

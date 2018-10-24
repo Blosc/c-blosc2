@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdbool.h>
 #include "blosc.h"
 #include "context.h"
 
@@ -125,7 +126,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
 
   // General flags
   *h2p = 0x4 + FRAME_VERSION;  // frame + version
-  *h2p += 0x20;  // fixed size + 64 bit offsets
+  *h2p += 0x20;  // 64 bit offsets
   h2p += 1;
   assert(h2p - h2 < HEADER2_MAXSIZE);
 
@@ -589,10 +590,17 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
 }
 
 
-/* Return a chunk that is part of a frame.
- * If the frame is disk-based, a buffer is allocated for the (compressed) chunk (hence a free is needed).
- * If not, just a pointer to the location in frame is returned. */
-void* frame_get_chunk(blosc2_frame *frame, int nchunk) {
+/* Return a compressed chunk that is part of a frame in the `chunk` parameter.
+ * If the frame is disk-based, a buffer is allocated for the (compressed) chunk,
+ * and hence a free is needed.  You can check if the chunk requires a free with the `needs_free`
+ * parameter.
+ * If the chunk does not need a free, it means that a pointer to the location in frame is returned
+ * in the `chunk` parameter.
+ *
+ * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
+ * is returned instead.
+*/
+int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, void **chunk, bool *needs_free) {
   int32_t header_len;
   int64_t frame_len;
   int64_t nbytes;
@@ -602,17 +610,20 @@ void* frame_get_chunk(blosc2_frame *frame, int nchunk) {
   int32_t typesize;
   uint8_t compcode;
   uint8_t filters;
+
+  *chunk = NULL;
+  *needs_free = false;
   int ret = frame_get_meta(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
                            &typesize, &compcode, &filters);
   if (ret < 0) {
     fprintf(stderr, "unable to get meta info from frame");
-    return NULL;
+    return -1;
   }
 
   if (nchunk >= nchunks) {
     fprintf(stderr, "nchunk ('%d') exceeds the number of chunks "
                     "('%d') in frame\n", nchunk, nchunks);
-    return NULL;
+    return -2;
   }
 
   // Get the offset to the chunk
@@ -621,35 +632,36 @@ void* frame_get_chunk(blosc2_frame *frame, int nchunk) {
   int32_t off_cbytes = get_offsets(frame, frame_len, header_len, cbytes, nchunks, offsets);
   if (off_cbytes < 0) {
     fprintf(stderr, "Cannot get the offset for chunk %d for the frame\n", nchunk);
-    return NULL;
+    return -3;
   }
   int64_t offset = offsets[nchunk];
   free(offsets);
 
-  void* chunk;
+  int32_t chunk_cbytes;
   if (frame->sdata == NULL) {
     FILE* fp = fopen(frame->fname, "rb");
     fseek(fp, header_len + offset + 12, SEEK_SET);
-    int32_t chunk_cbytes;
     long rbytes = fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
     if (rbytes != sizeof(chunk_cbytes)) {
       fprintf(stderr, "Cannot read the cbytes for chunk in the fileframe.\n");
-      return NULL;
+      return -4;
     }
-    chunk_cbytes = sw32_(&chunk_cbytes);  // deal with endianness
-    chunk = malloc((size_t)chunk_cbytes);
+    chunk_cbytes = sw32_(&chunk_cbytes);
+    *chunk = malloc((size_t)chunk_cbytes);
     fseek(fp, header_len + offset, SEEK_SET);
-    rbytes = fread(chunk, 1, (size_t)chunk_cbytes, fp);
+    rbytes = fread(*chunk, 1, (size_t)chunk_cbytes, fp);
     if (rbytes != chunk_cbytes) {
       fprintf(stderr, "Cannot read the chunk out of the fileframe.\n");
-      return NULL;
+      return -5;
     }
     fclose(fp);
+    *needs_free = true;
   } else {
-    chunk = frame->sdata + header_len + offset;
+    *chunk = frame->sdata + header_len + offset;
+    chunk_cbytes = sw32_(*chunk + 12);
   }
 
-  return chunk;
+  return chunk_cbytes;
 }
 
 
@@ -685,9 +697,11 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
 
   // Check that we are not appending a small chunk after another small chunk
   if ((nchunks > 0) && (nbytes_chunk < chunksize)) {
-    uint8_t* last_chunk = frame_get_chunk(frame, nchunks - 1);
+    uint8_t* last_chunk;
+    bool needs_free;
+    int retcode = blosc2_frame_get_chunk(frame, nchunks - 1, (void**)&last_chunk, &needs_free);
     int32_t last_nbytes = sw32_(last_chunk + 4);
-    if (frame->sdata == NULL) {
+    if (needs_free) {
       free(last_chunk);
     }
     if ((last_nbytes < chunksize) && (nbytes < chunksize)) {
@@ -768,7 +782,9 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
 
 /* Decompress and return a chunk that is part of a frame. */
 int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, size_t nbytes) {
-  uint8_t* src = frame_get_chunk(frame, nchunk);
+  uint8_t* src;
+  bool needs_free;
+  int retcode = blosc2_frame_get_chunk(frame, nchunk, (void**)&src, &needs_free);
 
   /* Create a buffer for destination */
   int32_t nbytes_ = sw32_(src + 4);
@@ -780,7 +796,7 @@ int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, s
   /* And decompress it */
   int32_t chunksize = blosc_decompress(src, dest, nbytes);
 
-  if (frame->sdata == NULL) {
+  if (needs_free) {
     free(src);
   }
   return (int)chunksize;

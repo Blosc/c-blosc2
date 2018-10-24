@@ -12,6 +12,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include "blosc-export.h"
 
 #ifdef __cplusplus
@@ -614,7 +615,7 @@ typedef struct {
 } blosc2_frame;
 
 /* Empty in-memory frame */
-static const blosc2_frame BLOSC_EMPTY_FRAME = {
+static blosc2_frame BLOSC_EMPTY_FRAME = {
   .sdata = NULL,
   .fname = NULL,
   .len = 0,
@@ -691,9 +692,19 @@ BLOSC_EXPORT int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, s
  The size of the decompressed chunk is returned.  If some problem is
  detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk,
-                                                int nchunk, void *dest, size_t nbytes);
+BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk, void *dest, size_t nbytes);
 
+/* Return a compressed chunk that is part of a super-chunk in the `chunk` parameter.
+ * If the super-chunk is backed by a frame that is disk-based, a buffer is allocated for the
+ * (compressed) chunk, and hence a free is needed.  You can check if the chunk requires a free
+ * with the `needs_free` parameter.
+ * If the chunk does not need a free, it means that a pointer to the location in the super-chunk
+ * (or the backing in-memory frame) is returned in the `chunk` parameter.
+ *
+ * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
+ * is returned instead.
+*/
+BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, void **chunk, bool *needs_free);
 
 /*********************************************************************
 
@@ -722,6 +733,18 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame);
 
 /* Append an existing chunk into a frame. */
 BLOSC_EXPORT void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk);
+
+/* Return a compressed chunk that is part of a frame in the `chunk` parameter.
+ * If the frame is disk-based, a buffer is allocated for the (compressed) chunk,
+ * and hence a free is needed.  You can check if the chunk requires a free with the `needs_free`
+ * parameter.
+ * If the chunk does not need a free, it means that a pointer to the location in frame is returned
+ * in the `chunk` parameter.
+ *
+ * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
+ * is returned instead.
+*/
+BLOSC_EXPORT int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, void **chunk, bool *needs_free);
 
 /* Decompress and return a chunk that is part of a frame. */
 BLOSC_EXPORT int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk,
