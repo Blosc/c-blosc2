@@ -68,7 +68,7 @@
 #else
 #define DTYPE float
 #define CLEVEL 9
-#define CODEC BLOSC_LZ4HC
+#define CODEC BLOSC_LZ4
 #endif
 
 
