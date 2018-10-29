@@ -204,7 +204,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
  * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
  * is returned instead.
 */
-int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, void **chunk, bool *needs_free) {
+int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, bool *needs_free) {
   if (schunk->frame != NULL) {
     return blosc2_frame_get_chunk(schunk->frame, nchunk, chunk, needs_free);
   }

@@ -600,7 +600,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
  * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
  * is returned instead.
 */
-int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, void **chunk, bool *needs_free) {
+int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free) {
   int32_t header_len;
   int64_t frame_len;
   int64_t nbytes;
@@ -699,7 +699,7 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
   if ((nchunks > 0) && (nbytes_chunk < chunksize)) {
     uint8_t* last_chunk;
     bool needs_free;
-    int retcode = blosc2_frame_get_chunk(frame, nchunks - 1, (void**)&last_chunk, &needs_free);
+    int retcode = blosc2_frame_get_chunk(frame, nchunks - 1, &last_chunk, &needs_free);
     int32_t last_nbytes = sw32_(last_chunk + 4);
     if (needs_free) {
       free(last_chunk);
@@ -784,7 +784,7 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
 int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, size_t nbytes) {
   uint8_t* src;
   bool needs_free;
-  int retcode = blosc2_frame_get_chunk(frame, nchunk, (void**)&src, &needs_free);
+  int retcode = blosc2_frame_get_chunk(frame, nchunk, &src, &needs_free);
 
   /* Create a buffer for destination */
   int32_t nbytes_ = sw32_(src + 4);

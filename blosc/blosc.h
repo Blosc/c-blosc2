@@ -704,7 +704,8 @@ BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchun
  * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
  * is returned instead.
 */
-BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, void **chunk, bool *needs_free);
+BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk,
+                                         bool *needs_free);
 
 /*********************************************************************
 
@@ -744,7 +745,8 @@ BLOSC_EXPORT void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk);
  * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
  * is returned instead.
 */
-BLOSC_EXPORT int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, void **chunk, bool *needs_free);
+BLOSC_EXPORT int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk,
+                                        bool *needs_free);
 
 /* Decompress and return a chunk that is part of a frame. */
 BLOSC_EXPORT int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk,
