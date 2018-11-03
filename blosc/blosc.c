@@ -395,7 +395,7 @@ static int snappy_wrap_decompress(const char* input, size_t compressed_length,
 static int zlib_wrap_compress(const char* input, size_t input_length,
                               char* output, size_t maxout, int clevel) {
   int status;
-  uLongf cl = maxout;
+  uLongf cl = (uLongf)maxout;
   status = compress2(
       (Bytef*)output, &cl, (Bytef*)input, (uLong)input_length, clevel);
   if (status != Z_OK) {
@@ -407,7 +407,7 @@ static int zlib_wrap_compress(const char* input, size_t input_length,
 static int zlib_wrap_decompress(const char* input, size_t compressed_length,
                                 char* output, size_t maxout) {
   int status;
-  uLongf ul = maxout;
+  uLongf ul = (uLongf)maxout;
   status = uncompress(
       (Bytef*)output, &ul, (Bytef*)input, (uLong)compressed_length);
   if (status != Z_OK) {
@@ -771,7 +771,7 @@ int pipeline_d(blosc2_context* context, const size_t bsize, uint8_t* dest,
           }
           // Check whether we have to copy the intermediate _dest buffer to final destination
           if (last_copy_filter && (filters_meta[i] % 2) == 1 && j == filters_meta[i]) {
-            fastcopy(dest + offset, _dest, bsize);
+            fastcopy(dest + offset, _dest, (unsigned int)bsize);
           }
         }
         break;
@@ -872,7 +872,7 @@ static int blosc_d(
     ctbytes += (int32_t)sizeof(int32_t);
     /* Uncompress */
     if (cbytes == neblock) {
-      fastcopy(_dest, src, neblock);
+      fastcopy(_dest, src, (unsigned int)neblock);
       nbytes = (int32_t)neblock;
     }
     else {
@@ -948,7 +948,7 @@ static int serial_blosc(struct thread_context* thread_context) {
   blosc2_context* context = thread_context->parent_context;
   int32_t j, bsize, leftoverblock;
   int32_t cbytes;
-  size_t ntbytes = context->output_bytes;
+  int32_t ntbytes = (int32_t)context->output_bytes;
   uint32_t* bstarts = context->bstarts;
   uint8_t* tmp = thread_context->tmp;
   uint8_t* tmp2 = thread_context->tmp2;
@@ -1013,7 +1013,6 @@ static int serial_blosc(struct thread_context* thread_context) {
 
 /* Threaded version for compression/decompression */
 static int parallel_blosc(blosc2_context* context) {
-  int rc;
 
   /* Set sentinels */
   context->thread_giveup_code = 1;
@@ -1171,7 +1170,7 @@ static int initialize_context_compression(
   context->output_bytes = 0;
   context->destsize = destsize;
   context->sourcesize = sourcesize;
-  context->typesize = typesize;
+  context->typesize = (int32_t)typesize;
   context->filter_flags = filters_to_flags(filters);
   for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
     context->filters[i] = filters[i];
@@ -1185,7 +1184,7 @@ static int initialize_context_compression(
   context->schunk = schunk;
 
   /* Tune some compression parameters */
-  context->blocksize = blocksize;
+  context->blocksize = (int32_t)blocksize;
   if (context->btune != NULL) {
     btune_next_cparams(context);
   } else {
@@ -1470,7 +1469,7 @@ int blosc_compress_context(blosc2_context* context) {
       }
     }
     else {
-      fastcopy(context->dest + BLOSC_MAX_OVERHEAD, context->src, context->sourcesize);
+      fastcopy(context->dest + BLOSC_MAX_OVERHEAD, context->src, (unsigned int)context->sourcesize);
       ntbytes = (int)context->sourcesize + BLOSC_MAX_OVERHEAD;
     }
   }
@@ -1572,7 +1571,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     context->output_bytes += sizeof(uint32_t);
     /* Write the trained dict afterwards */
     context->dict_buffer = context->dest + context->output_bytes;
-    fastcopy(context->dict_buffer, dict_buffer, dict_actual_size);
+    fastcopy(context->dict_buffer, dict_buffer, (unsigned int)dict_actual_size);
     context->dict_cdict = ZSTD_createCDict(dict_buffer, dict_actual_size,
                                            1);  // TODO: use get_accel()
     free(dict_buffer);      // the dictionary is copied in the header now
@@ -1749,7 +1748,7 @@ int blosc_run_decompression_with_context(
 
   /* Check whether this buffer is memcpy'ed */
   if (*(context->header_flags) & BLOSC_MEMCPYED) {
-    fastcopy(dest, (uint8_t*)src + BLOSC_MAX_OVERHEAD, context->sourcesize);
+    fastcopy(dest, (uint8_t*)src + BLOSC_MAX_OVERHEAD, (unsigned int)context->sourcesize);
     ntbytes = (int32_t)context->sourcesize;
   }
   else {
@@ -1913,7 +1912,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
       /* We want to memcpy only */
       fastcopy((uint8_t*)dest + ntbytes,
                (uint8_t*)src + BLOSC_MAX_OVERHEAD + j * blocksize + startb,
-               bsize2);
+               (unsigned int)bsize2);
       cbytes = (int)bsize2;
     }
     else {
@@ -1926,11 +1925,11 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
         scontext->tmp2 = scontext->tmp + blocksize;
         scontext->tmp3 = scontext->tmp + blocksize + ebsize;
         scontext->tmp4 = scontext->tmp + 2 * blocksize + ebsize;
-        scontext->tmpblocksize = blocksize;
+        scontext->tmpblocksize = (int32_t)blocksize;
       }
 
       /* Regular decompression.  Put results in tmp2. */
-      cbytes = blosc_d(context->serial_context, bsize, leftoverblock,
+      cbytes = blosc_d(context->serial_context, (int32_t)bsize, (int32_t)leftoverblock,
                        (uint8_t*)src + sw32_(bstarts + j),
                        scontext->tmp2, 0, scontext->tmp, scontext->tmp3);
       if (cbytes < 0) {
@@ -1938,7 +1937,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
         break;
       }
       /* Copy to destination */
-      fastcopy((uint8_t*)dest + ntbytes, scontext->tmp2 + startb, bsize2);
+      fastcopy((uint8_t*)dest + ntbytes, scontext->tmp2 + startb, (unsigned int)bsize2);
       cbytes = (int)bsize2;
     }
     ntbytes += cbytes;
@@ -2020,7 +2019,6 @@ static void* t_blosc(void* ctxt) {
   uint8_t* tmp;
   uint8_t* tmp2;
   uint8_t* tmp3;
-  int rc;
 
   while (1) {
     /* Synchronization point for all threads (wait for initialization) */
@@ -2390,8 +2388,13 @@ int blosc_get_complib_info(char* compname, char** complib, char** version) {
   }
 #endif /* HAVE_ZSTD */
 
+#ifdef _MSC_VER
+  *complib = _strdup(clibname);
+  *version = _strdup(clibversion);
+#else
   *complib = strdup(clibname);
   *version = strdup(clibversion);
+#endif
   return clibcode;
 }
 

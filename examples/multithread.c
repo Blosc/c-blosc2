@@ -56,7 +56,7 @@ int main() {
   int nthreads, pnthreads, i;
 
   for (i = 0; i < SIZE; i++) {
-    data[i] = i;
+    data[i] = (float)i;
   }
 
   /* Register the filter with the library */

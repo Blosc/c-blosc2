@@ -26,6 +26,8 @@
     #include <stdint.h>
   #endif
 
+  #define fseek _fseeki64
+
 #endif  /* _WIN32 */
 
 /* If C11 is supported, use it's built-in aligned allocation. */
@@ -337,7 +339,7 @@ int32_t get_offsets(blosc2_frame* frame, int64_t frame_len, int32_t header_len,
     coffsets = malloc((size_t)off_cbytes);
     FILE* fp = fopen(frame->fname, "rb");
     fseek(fp, header_len + cbytes, SEEK_SET);
-    long rbytes = fread(coffsets, 1, (size_t)off_cbytes, fp);
+    long rbytes = (long)fread(coffsets, 1, (size_t)off_cbytes, fp);
     if (rbytes != off_cbytes) {
       fprintf(stderr, "Cannot read the offsets out of the fileframe.\n");
       fclose(fp);
@@ -641,7 +643,7 @@ int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, boo
   if (frame->sdata == NULL) {
     FILE* fp = fopen(frame->fname, "rb");
     fseek(fp, header_len + offset + 12, SEEK_SET);
-    long rbytes = fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
+    long rbytes = (long)fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
     if (rbytes != sizeof(chunk_cbytes)) {
       fprintf(stderr, "Cannot read the cbytes for chunk in the fileframe.\n");
       return -4;
@@ -649,7 +651,7 @@ int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, boo
     chunk_cbytes = sw32_(&chunk_cbytes);
     *chunk = malloc((size_t)chunk_cbytes);
     fseek(fp, header_len + offset, SEEK_SET);
-    rbytes = fread(*chunk, 1, (size_t)chunk_cbytes, fp);
+    rbytes = (long)fread(*chunk, 1, (size_t)chunk_cbytes, fp);
     if (rbytes != chunk_cbytes) {
       fprintf(stderr, "Cannot read the chunk out of the fileframe.\n");
       return -5;
@@ -671,13 +673,15 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
   int64_t frame_len;
   int64_t nbytes;
   int64_t cbytes;
-  uint32_t chunksize;
+  uint32_t ichunksize;
+  int32_t chunksize;
   int32_t nchunks;
   int32_t typesize;
   uint8_t compcode;
   uint8_t filters;
-  int ret = frame_get_meta(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+  int ret = frame_get_meta(frame, &header_len, &frame_len, &nbytes, &cbytes, &ichunksize, &nchunks,
                            &typesize, &compcode, &filters);
+  chunksize = (int32_t)ichunksize;
   if (ret < 0) {
     fprintf(stderr, "unable to get meta info from frame");
     return NULL;

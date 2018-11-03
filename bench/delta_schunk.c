@@ -37,7 +37,7 @@ int main() {
   size_t nchunks = 0;
   blosc_timestamp_t last, current;
   double totaltime;
-  float totalsize = isize * NCHUNKS;
+  float totalsize = (float)(isize * NCHUNKS);
 
   data = malloc(CHUNKSIZE * sizeof(int32_t));
   data_dest = malloc(CHUNKSIZE * sizeof(int32_t));
@@ -87,7 +87,7 @@ int main() {
   }
   blosc_set_timestamp(&current);
   totaltime = blosc_elapsed_secs(last, current);
-  totalsize = isize * nchunks;
+  totalsize = (float)(isize * nchunks);
   printf("[Decompr] Elapsed time:\t %6.3f s.  Processed data: %.3f GB (%.3f GB/s)\n",
          totaltime, totalsize / GB, totalsize / (GB * totaltime));
 

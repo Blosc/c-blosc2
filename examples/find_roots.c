@@ -97,7 +97,7 @@ int compute_vectors(void) {
     for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
         fill_buffer(buffer_x, nchunk);
         blosc2_schunk_append_buffer(sc_x, buffer_x, isize);
-        nbytes += isize;
+        nbytes += (long)isize;
     }
     blosc_set_timestamp(&current);
     ttotal = blosc_elapsed_secs(last, current);
