@@ -1013,7 +1013,9 @@ static int serial_blosc(struct thread_context* thread_context) {
 
 /* Threaded version for compression/decompression */
 static int parallel_blosc(blosc2_context* context) {
-
+#ifdef BLOSC_POSIX_BARRIERS
+  int rc;
+#endif
   /* Set sentinels */
   context->thread_giveup_code = 1;
   context->thread_nblock = -1;
@@ -2019,6 +2021,9 @@ static void* t_blosc(void* ctxt) {
   uint8_t* tmp;
   uint8_t* tmp2;
   uint8_t* tmp3;
+#ifdef BLOSC_POSIX_BARRIERS
+  int rc;
+#endif
 
   while (1) {
     /* Synchronization point for all threads (wait for initialization) */
