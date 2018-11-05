@@ -1226,7 +1226,7 @@ static int initialize_context_compression(
 
 /* Get filter flags from header flags */
 static uint8_t get_filter_flags(const uint8_t header_flags,
-                                const size_t typesize) {
+                                const int32_t typesize) {
   uint8_t flags = 0;
 
   if ((header_flags & BLOSC_DOSHUFFLE) && (typesize > 1)) {
@@ -1833,26 +1833,25 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
   uint8_t* _src = NULL;             /* current pos for source buffer */
   uint8_t flags;                    /* flags for header */
   int32_t ntbytes = 0;              /* the number of uncompressed bytes */
-  size_t nblocks;                   /* number of total blocks in buffer */
-  size_t leftover;                  /* extra bytes at end of buffer */
+  int32_t nblocks;                   /* number of total blocks in buffer */
+  int32_t leftover;                  /* extra bytes at end of buffer */
   uint32_t* bstarts;                /* start pointers for each block */
-  size_t typesize, blocksize, nbytes;
-  size_t bsize, bsize2, leftoverblock;
+  int32_t typesize, blocksize, nbytes;
+  int32_t bsize, bsize2, ebsize, leftoverblock;
+  int32_t cbytes;
+  int32_t startb, stopb;
+  int32_t stop = start + nitems;
   int j;
-  int startb, stopb;
-  int cbytes;
-  int stop = start + nitems;
-  size_t ebsize;
 
   _src = (uint8_t*)(src);
 
   /* Read the header block */
-  flags = _src[2];                                       /* flags */
-  typesize = (int32_t)_src[3];                           /* typesize */
-  nbytes = (size_t)sw32_(_src + 4);         /* buffer size */
-  blocksize = (size_t)sw32_(_src + 8);      /* block size */
+  flags = _src[2];                  /* flags */
+  typesize = (int32_t)_src[3];      /* typesize */
+  nbytes = sw32_(_src + 4);         /* buffer size */
+  blocksize = sw32_(_src + 8);      /* block size */
 
-  ebsize = blocksize + typesize * (size_t)sizeof(int32_t);
+  ebsize = blocksize + typesize * (int32_t)sizeof(int32_t);
 
   if ((context->header_flags[0] & BLOSC_DOSHUFFLE) &&
       (context->header_flags[0] & BLOSC_DOBITSHUFFLE)) {
@@ -1907,7 +1906,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
     if (stopb > (int)blocksize) {
       stopb = (int)blocksize;
     }
-    bsize2 = (size_t)(stopb - startb);
+    bsize2 = stopb - startb;
 
     /* Do the actual data copy */
     if (flags & BLOSC_MEMCPYED) {
@@ -1923,7 +1922,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
       /* Resize the temporaries in serial context if needed */
       if (blocksize != scontext->tmpblocksize) {
         my_free(scontext->tmp);
-        scontext->tmp = my_malloc(3 * blocksize + ebsize);
+        scontext->tmp = my_malloc(3 * (size_t)(blocksize + ebsize));
         scontext->tmp2 = scontext->tmp + blocksize;
         scontext->tmp3 = scontext->tmp + blocksize + ebsize;
         scontext->tmp4 = scontext->tmp + 2 * blocksize + ebsize;
@@ -1959,7 +1958,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   /* Minimally populate the context */
   memset(&context, 0, sizeof(blosc2_context));
   context.typesize = (uint8_t)_src[3];
-  context.blocksize = (size_t)sw32_(_src + 8);
+  context.blocksize = sw32_(_src + 8);
   context.header_flags = _src + 2;
   context.filter_flags = get_filter_flags(*(_src + 2), context.typesize);
   context.schunk = g_schunk;
@@ -1980,7 +1979,7 @@ int blosc2_getitem_ctx(blosc2_context* context, const void* src, int start,
 
   /* Minimally populate the context */
   context->typesize = (uint8_t)_src[3];
-  context->blocksize = (size_t)sw32_(_src + 8);
+  context->blocksize = sw32_(_src + 8);
   context->header_flags = _src + 2;
   context->filter_flags = get_filter_flags(*(_src + 2), context->typesize);
   if (context->serial_context == NULL) {
@@ -2098,7 +2097,7 @@ static void* t_blosc(void* ctxt) {
         if (flags & BLOSC_MEMCPYED) {
           /* We want to memcpy only */
           fastcopy(dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize,
-                   src + nblock_ * blocksize, bsize);
+                   src + nblock_ * blocksize, (unsigned int)bsize);
           cbytes = (int32_t)bsize;
         }
         else {
@@ -2111,7 +2110,7 @@ static void* t_blosc(void* ctxt) {
         if (flags & BLOSC_MEMCPYED) {
           /* We want to memcpy only */
           fastcopy(dest + nblock_ * blocksize,
-                   src + BLOSC_MAX_OVERHEAD + nblock_ * blocksize, bsize);
+                   src + BLOSC_MAX_OVERHEAD + nblock_ * blocksize, (unsigned int)bsize);
           cbytes = (int32_t)bsize;
         }
         else {
@@ -2158,7 +2157,7 @@ static void* t_blosc(void* ctxt) {
         /* End of critical section */
 
         /* Copy the compressed buffer to destination */
-        fastcopy(dest + ntdest, tmp2, cbytes);
+        fastcopy(dest + ntdest, tmp2, (unsigned int)cbytes);
       }
       else {
         nblock_++;

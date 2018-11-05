@@ -13,10 +13,9 @@
 
 
 /* Apply the delta filters to src.  This can never fail. */
-void delta_encoder(const uint8_t* dref, size_t offset, int32_t inbytes, size_t typesize,
+void delta_encoder(const uint8_t* dref, size_t offset, int32_t nbytes, size_t typesize,
                    const uint8_t* src, uint8_t* dest) {
-  uint32_t i;
-  uint32_t nbytes = (uint32_t)inbytes;
+  int32_t i;
   if (offset == 0) {
     /* This is the reference block, use delta coding in elements */
     switch (typesize) {
