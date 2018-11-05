@@ -42,7 +42,7 @@ int main() {
 
   /* Initialize dataset */
   for (i = 0; i < SIZE; i++) {
-    data[i] = i;
+    data[i] = (float)i;
   }
 
   printf("Blosc version info: %s (%s)\n",

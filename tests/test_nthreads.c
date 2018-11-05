@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
   int32_t *_src;
   char *result;
   size_t i;
-  int pid, nchildren = 4;
+  int nchildren = 4;
 
   printf("STARTING TESTS for %s", argv[0]);
 

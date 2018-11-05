@@ -103,7 +103,7 @@ static void blosc_test_fill_seq(void* const ptr, const size_t size) {
   size_t k;
   uint8_t* const byte_ptr = (uint8_t*)ptr;
   for (k = 0; k < size; k++) {
-    byte_ptr[k] = k;
+    byte_ptr[k] = (uint8_t)k;
   }
 }
 

@@ -176,7 +176,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
     int nbytes_ = sw32_(src + 4);
     if (nbytes < nbytes_) {
       fprintf(stderr, "Buffer size is too small for the decompressed buffer "
-                      "('%ld' bytes, but '%d' are needed)\n", nbytes, nbytes_);
+                      "('%zd' bytes, but '%d' are needed)\n", nbytes, nbytes_);
       return -11;
     }
 

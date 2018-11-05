@@ -8,6 +8,10 @@
 
 #include "bitshuffle-generic.h"
 
+#ifdef _MSC_VER
+#pragma warning (push)
+#pragma warning (disable: 4146)
+#endif
 
 /* Transpose bytes within elements, starting partway through input. */
 int64_t bshuf_trans_byte_elem_remainder(const void* in, void* out, const size_t size,
@@ -77,7 +81,7 @@ int64_t bshuf_trans_bit_byte_remainder(const void* in, void* out, const size_t s
             TRANS_BIT_8X8_BE(x, t);
         }
         for (kk = 0; kk < 8; kk ++) {
-            out_b[bit_row_offset + kk * bit_row_skip + ii] = x;
+            out_b[bit_row_offset + kk * bit_row_skip + ii] = (uint8_t)x;
             x = x >> 8;
         }
     }
@@ -196,7 +200,7 @@ int64_t bshuf_shuffle_bit_eightelem_scal(const void* in, void* out, \
             }
             for (kk = 0; kk < 8; kk++) {
                 out_index = ii + jj / 8 + elem_offset + kk * elem_skip;
-                *((uint8_t*) &out_b[out_index]) = x;
+                *((uint8_t*) &out_b[out_index]) = (uint8_t)x;
                 x = x >> 8;
             }
         }
@@ -219,3 +223,7 @@ int64_t bshuf_untrans_bit_elem_scal(const void* in, void* out, const size_t size
 
     return count;
 }
+
+#ifdef _MSC_VER
+#pragma warning (pop)
+#endif
