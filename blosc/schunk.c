@@ -229,12 +229,11 @@ int blosc2_free_schunk(blosc2_schunk *schunk) {
     for (int i = 0; i < schunk->nchunks; i++) {
       free(schunk->data[i]);
     }
+    free(schunk->data);
   }
-  free(schunk->data);
   if (schunk->frame != NULL) {
-    free(schunk->frame->sdata);
+    blosc2_free_frame(schunk->frame);
   }
-  free(schunk->frame);
   blosc2_free_ctx(schunk->cctx);
   blosc2_free_ctx(schunk->dctx);
   free(schunk);

@@ -463,9 +463,10 @@ int frame_update_meta(blosc2_frame* frame, int64_t new_frame_len, int64_t new_nb
   memcpy(header + FRAME_CBYTES, &new_cbytes, sizeof(new_cbytes));
   swap_inplace(header + FRAME_CBYTES, sizeof(new_cbytes));
   // Set the chunksize
-  if ((nbytes > 0) && (new_chunksize != chunksize)) {
-    new_chunksize = 0;   // varlen
-  }
+//  if ((nbytes > 0) && (new_chunksize != chunksize)) {
+//    TODO: look into the variable size flag for this condition
+//    new_chunksize = 0;   // varlen
+//  }
   memcpy(header + FRAME_CHUNKSIZE, &new_chunksize, sizeof(new_chunksize));
   swap_inplace(header + FRAME_CHUNKSIZE, sizeof(new_chunksize));
 
@@ -821,8 +822,19 @@ int blosc2_free_frame(blosc2_frame *frame) {
   if (frame->sdata != NULL) {
     free(frame->sdata);
   }
-  if (frame->fname != NULL) {
-    free(frame->fname);
+  if (frame->nclients > 0) {
+    for (int i = 0; i < frame->nclients; i++) {
+      free(frame->attrs[i]->namespace);
+      free(frame->attrs[i]->sattrs);
+      free(frame->attrs[i]);
+    }
   }
+
+  // TODO: make a constructor for frames so that we can handle the contents of the struct
+//  if (frame->fname != NULL) {
+//    free(frame->fname);
+//  }
+  free(frame);
+
   return 0;
 }

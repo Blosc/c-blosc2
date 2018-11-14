@@ -606,12 +606,23 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 
 *********************************************************************/
 
+#define BLOSC2_MAX_FRAME_CLIENTS (16)
+
+struct blosc2_schunk_s;    // forward declaration
+
+typedef struct blosc2_frame_attrs_s {
+    char* namespace;  // namespace for blosc client (e.g. caterva)
+    uint8_t* sattrs;  // serialized (msgpack preferably) map with the client attributes
+} blosc2_frame_attrs;
+
 typedef struct {
   char* fname;     // the name of the file; if NULL, this is in-memory
   uint8_t* sdata;  // the in-memory serialized data
   int64_t len;     // the current length of the frame in (compressed) bytes
   int64_t maxlen;  // the maximum length of the frame; if 0, there is no maximum
-  void* schunk;    // pointer to schunk (if it exists)
+  struct blosc2_schunk_s *schunk;    // pointer to schunk (if it exists)
+  int8_t nclients;  // the number of clients adding an entry in attributes
+  struct blosc2_frame_attrs_s *attrs[BLOSC2_MAX_FRAME_CLIENTS];
 } blosc2_frame;
 
 /* Empty in-memory frame */
@@ -621,9 +632,10 @@ static blosc2_frame BLOSC_EMPTY_FRAME = {
   .len = 0,
   .maxlen = 0,
   .schunk = NULL,
+  .nclients = 0,
 };
 
-typedef struct {
+typedef struct blosc2_schunk_s {
   uint8_t version;
   uint8_t flags1;
   uint8_t flags2;
@@ -655,7 +667,7 @@ typedef struct {
   uint8_t** data;
   /* Pointer to chunk data pointers */
   blosc2_frame* frame;
-  /* Pointer to frame to used as store for chunks */
+  /* Pointer to frame used as store for chunks */
   //uint8_t* ctx;
   /* Context for the thread holder.  NULL if not acquired. */
   blosc2_context* cctx;
