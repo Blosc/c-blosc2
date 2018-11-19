@@ -66,7 +66,7 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
     memcpy(mframe, frame, sizeof(blosc2_frame));
     mframe->schunk = schunk;
     if (mframe->len == 0) {
-      // Initialize frame (basically encode the header)
+      // Initialize frame (basically, encode the header)
       int64_t frame_len = blosc2_schunk_to_frame(schunk, mframe);
       if (frame_len < 0) {
         fprintf(stderr, "Error during the conversion of schunk to frame\n");

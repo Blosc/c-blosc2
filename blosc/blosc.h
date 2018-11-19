@@ -613,6 +613,7 @@ struct blosc2_schunk_s;    // forward declaration
 typedef struct blosc2_frame_attrs_s {
     char* namespace;  // namespace for blosc client (e.g. caterva)
     uint8_t* sattrs;  // serialized (msgpack preferably) map with the client attributes
+    int32_t sattrs_len;
 } blosc2_frame_attrs;
 
 typedef struct {

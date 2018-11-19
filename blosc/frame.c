@@ -190,13 +190,37 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   assert(h2p - h2 < HEADER2_MAXSIZE);
 
   // Optional meta-blocks
-  *h2p = 0x80 + 0;  // map with N keys
-  h2p += 1;
-  assert(h2p - h2 < HEADER2_MAXSIZE);
+  int nclients = (schunk->frame == NULL)? 0 : schunk->frame->nclients;
+  if (nclients == 0) {
+      *h2p = 0x80 + 0;  // map with N keys
+      h2p += 1;
+      assert(h2p - h2 < HEADER2_MAXSIZE);
+  }
+  else {
+      blosc2_frame_attrs *attrs = schunk->frame->attrs;
+      *h2p = (uint8_t)0x80 + (uint8_t)nclients;  // map with N keys
+      h2p += 1;
+      for (int nclient = 0; nclient < nclients; nclient++) {
+        // Store the namespace
+        uint8_t nslen = (uint8_t)strlen(attrs->namespace);
+        *h2p = (uint8_t)0xa0 + nslen;  // str
+        h2p += 1;
+        memcpy(h2p, attrs->namespace, nslen);
+        // Store the serialized attrs for this namespace
+        *h2p++ = (uint8_t)0xc6;  // bin 32
+        memcpy(h2p, &(attrs->sattrs_len), 4);
+        h2p += 5;
+        memcpy(h2p, attrs->sattrs, attrs->sattrs_len);
+        h2p += attrs->sattrs_len;
+        assert(h2p - h2 < HEADER2_MAXSIZE);
+      }
+  }
 
   // Finally, set the length now that we know it
   int32_t hsize = (int32_t)(h2p - h2);
   memcpy(h2sizep, swap_inplace(&hsize, 4), 4);
+
+  h2 = realloc(h2, (size_t)hsize);
 
   return h2;
 }
