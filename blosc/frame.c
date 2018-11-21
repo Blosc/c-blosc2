@@ -37,13 +37,14 @@
 
 
 // Inplace conversion to big/little-endian (it is symmetric).  Sizes supported: 1, 2, 4, 8 bytes.
-void* swap_inplace(void *pa, int size) {
+void* swap_endian(void *pa, int size) {
   uint8_t* pa_ = (uint8_t*)pa;
-  int64_t dest;
+  static uint64_t dest;
   uint8_t* pa2_ = (uint8_t*)&dest;
   int i = 1;                    /* for big/little endian detection */
   char* p = (char*)&i;
 
+  dest = 0;
   if (p[0] == 1) {
     /* little endian */
     switch (size) {
@@ -56,27 +57,25 @@ void* swap_inplace(void *pa, int size) {
         pa2_[5] = pa_[2];
         pa2_[6] = pa_[1];
         pa2_[7] = pa_[0];
-        memcpy(pa_, pa2_, 8);
         break;
       case 4:
         pa2_[0] = pa_[3];
         pa2_[1] = pa_[2];
         pa2_[2] = pa_[1];
         pa2_[3] = pa_[0];
-        memcpy(pa_, pa2_, 4);
         break;
       case 2:
         pa2_[0] = pa_[1];
         pa2_[1] = pa_[0];
-        memcpy(pa_, pa2_, 2);
         break;
       case 1:
+        pa2_[0] = pa_[1];
         break;
       default:
         fprintf(stderr, "Unhandled size: %d\n", size);
     }
   }
-  return pa_;
+  return (void*)pa2_;
 }
 
 
@@ -98,7 +97,7 @@ void* swap_inplace(void *pa, int size) {
 //#define FRAME_ATTRS (HEADER2_MINLEN)  // 64
 
 
-void* new_header2_frame(blosc2_schunk *schunk) {
+void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   uint8_t* h2 = calloc(HEADER2_MINLEN, 1);
   uint8_t* h2p = h2;
 
@@ -155,7 +154,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   *h2p = 0xd3;  // int64
   h2p += 1;
   int64_t nbytes = schunk->nbytes;
-  memcpy(h2p, swap_inplace(&nbytes, 8), 8);
+  memcpy(h2p, swap_endian(&nbytes, 8), 8);
   h2p += 8;
   assert(h2p - h2 < HEADER2_MINLEN);
 
@@ -163,7 +162,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   *h2p = 0xd3;  // int64
   h2p += 1;
   int64_t cbytes = schunk->cbytes;
-  memcpy(h2p, swap_inplace(&cbytes, 8), 8);
+  memcpy(h2p, swap_endian(&cbytes, 8), 8);
   h2p += 8;
   assert(h2p - h2 < HEADER2_MINLEN);
 
@@ -171,7 +170,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   *h2p = 0xd2;  // int32
   h2p += 1;
   int32_t typesize = schunk->typesize;
-  memcpy(h2p, swap_inplace(&typesize, 4), 4);
+  memcpy(h2p, swap_endian(&typesize, 4), 4);
   h2p += 4;
   assert(h2p - h2 < HEADER2_MINLEN);
 
@@ -179,7 +178,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   *h2p = 0xd2;  // int32
   h2p += 1;
   int32_t chunksize = schunk->chunksize;
-  memcpy(h2p, swap_inplace(&chunksize, 4), 4);
+  memcpy(h2p, swap_endian(&chunksize, 4), 4);
   h2p += 4;
   assert(h2p - h2 < HEADER2_MINLEN);
 
@@ -187,7 +186,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   *h2p = 0xd1;  // int16
   h2p += 1;
   int16_t nthreads = schunk->cctx->nthreads;
-  memcpy(h2p, swap_inplace(&nthreads, 2), 2);
+  memcpy(h2p, swap_endian(&nthreads, 2), 2);
   h2p += 2;
   assert(h2p - h2 < HEADER2_MINLEN);
 
@@ -195,7 +194,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   *h2p = 0xd1;  // int16
   h2p += 1;
   nthreads = schunk->dctx->nthreads;
-  memcpy(h2p, swap_inplace(&nthreads, 2), 2);
+  memcpy(h2p, swap_endian(&nthreads, 2), 2);
   h2p += 2;
   assert(h2p - h2 == HEADER2_MINLEN - 1);
 
@@ -204,16 +203,17 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   h2 = realloc(h2, HEADER2_MINLEN + 1 + 2);
   h2p = h2 + hsize;
 
-  // Offsets for optional namespaces of attributes
-  int16_t nclients = (schunk->frame == NULL)? (int16_t)0 : schunk->frame->nclients;
+  // Map of offsets for optional namespaces of attributes
+  int16_t nclients = (frame == NULL)? (int16_t)0 : frame->nclients;
   *h2p = 0xde;  // map 16 with N keys
   h2p += 1;
-  memcpy(h2p, &nclients, sizeof(nclients));
+  memcpy(h2p, swap_endian(&nclients, sizeof(nclients)), sizeof(nclients));
   h2p += sizeof(nclients);
   int32_t current_header_len = (int32_t)(h2p - h2);
   int32_t *offtooff = malloc(nclients * sizeof(int32_t));
   for (int nclient = 0; nclient < nclients; nclient++) {
-    blosc2_frame_attrs *attrs = schunk->frame->attrs[nclient];
+    assert(frame != NULL);
+    blosc2_frame_attrs *attrs = frame->attrs[nclient];
     uint8_t nslen = (uint8_t) strlen(attrs->namespace);
     h2 = realloc(h2, (size_t)current_header_len + 1 + nslen + 1 + 4);
     h2p = h2 + current_header_len;
@@ -240,22 +240,23 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   // Now, store the values in an array
   *h2p = 0xdc;  // array 16 with N elements
   h2p += 1;
-  memcpy(h2p, &nclients, sizeof(nclients));
+  memcpy(h2p, swap_endian(&nclients, sizeof(nclients)), sizeof(nclients));
   h2p += sizeof(nclients);
   current_header_len = (int32_t)(h2p - h2);
   for (int nclient = 0; nclient < nclients; nclient++) {
-    blosc2_frame_attrs *attrs = schunk->frame->attrs[nclient];
+    assert(frame != NULL);
+    blosc2_frame_attrs *attrs = frame->attrs[nclient];
     h2 = realloc(h2, (size_t)current_header_len + 1 + 4 + attrs->sattrs_len);
     h2p = h2 + current_header_len;
     // Store the serialized attrs for this namespace
     *h2p = 0xc6;  // bin 32
     h2p += 1;
-    memcpy(h2p, &(attrs->sattrs_len), 4);
+    memcpy(h2p, swap_endian(&(attrs->sattrs_len), 4), 4);
     h2p += 4;
     memcpy(h2p, attrs->sattrs, attrs->sattrs_len);
     h2p += attrs->sattrs_len;
     // Update the offset now that we know it
-    memcpy(h2 + offtooff[nclient], &current_header_len, 4);
+    memcpy(h2 + offtooff[nclient], swap_endian(&current_header_len, 4), 4);
     current_header_len += 1 + 4 + attrs->sattrs_len;
   }
   free(offtooff);
@@ -263,7 +264,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   // Set the length of the whole header now that we know it
   hsize = (int32_t)(h2p - h2);
   assert(hsize == current_header_len);  // sanity check
-  memcpy(h2 + HEADER2_LEN, swap_inplace(&hsize, 4), 4);
+  memcpy(h2 + HEADER2_LEN, swap_endian(&hsize, 4), 4);
 
   return h2;
 }
@@ -275,10 +276,9 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int64_t cbytes = schunk->cbytes;
   FILE* fp = NULL;
 
-  uint8_t* h2 = new_header2_frame(schunk);
+  uint8_t* h2 = new_header2_frame(schunk, frame);
   uint32_t h2len;
-  memcpy(&h2len, h2 + HEADER2_LEN, 4);
-  swap_inplace(&h2len, 4);
+  memcpy(&h2len, swap_endian(h2 + HEADER2_LEN, 4), 4);
 
   // Build the offsets chunk
   int32_t chunksize = 0;
@@ -317,10 +317,10 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   }
 
   // Now that we know them, fill the chunksize and frame length in header2
-  memcpy(h2 + FRAME_CHUNKSIZE, swap_inplace(&chunksize, 4), 4);
+  memcpy(h2 + FRAME_CHUNKSIZE, swap_endian(&chunksize, 4), 4);
   frame->len = h2len + cbytes + off_cbytes;
   int64_t tbytes = frame->len;
-  memcpy(h2 + FRAME_LEN, swap_inplace(&tbytes, sizeof(tbytes)), sizeof(tbytes));
+  memcpy(h2 + FRAME_LEN, swap_endian(&tbytes, sizeof(tbytes)), sizeof(tbytes));
 
   // Create the frame and put the header at the beginning
   if (frame->fname == NULL) {
@@ -383,8 +383,7 @@ blosc2_frame* blosc2_frame_from_file(char *fname) {
   fclose(fp);
 
   int64_t frame_len;
-  memcpy(&frame_len, header + FRAME_LEN, sizeof(frame_len));
-  swap_inplace(&frame_len, sizeof(frame_len));
+  memcpy(&frame_len, swap_endian(header + FRAME_LEN, sizeof(frame_len)), sizeof(frame_len));
   frame->len = frame_len;
 
   free(header);
@@ -449,20 +448,15 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
   }
 
   // Fetch some internal lengths
-  memcpy(header_len, framep + HEADER2_LEN, sizeof(*header_len));
-  swap_inplace(header_len, sizeof(*header_len));
+  memcpy(header_len, swap_endian(framep + HEADER2_LEN, sizeof(*header_len)), sizeof(*header_len));
 
-  memcpy(frame_len, framep + FRAME_LEN, sizeof(*frame_len));
-  swap_inplace(frame_len, sizeof(*frame_len));
+  memcpy(frame_len, swap_endian(framep + FRAME_LEN, sizeof(*frame_len)), sizeof(*frame_len));
 
-  memcpy(nbytes, framep + FRAME_NBYTES, sizeof(*nbytes));
-  swap_inplace(nbytes, sizeof(*nbytes));
+  memcpy(nbytes, swap_endian(framep + FRAME_NBYTES, sizeof(*nbytes)), sizeof(*nbytes));
 
-  memcpy(cbytes, framep + FRAME_CBYTES, sizeof(*cbytes));
-  swap_inplace(cbytes, sizeof(*cbytes));
+  memcpy(cbytes, swap_endian(framep + FRAME_CBYTES, sizeof(*cbytes)), sizeof(*cbytes));
 
-  memcpy(chunksize, framep + FRAME_CHUNKSIZE, sizeof(*chunksize));
-  swap_inplace(chunksize, sizeof(*chunksize));
+  memcpy(chunksize, swap_endian(framep + FRAME_CHUNKSIZE, sizeof(*chunksize)), sizeof(*chunksize));
 
   if (*nbytes > 0) {
     // We can compute the chunks only when the frame has actual data
@@ -474,8 +468,7 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
     *nchunks = 0;
   }
 
-  memcpy(typesize, framep + FRAME_TYPESIZE, sizeof(*typesize));
-  swap_inplace(typesize, sizeof(*typesize));
+  memcpy(typesize, swap_endian(framep + FRAME_TYPESIZE, sizeof(*typesize)), sizeof(*typesize));
 
   // Codec and compression level
   *compcode = framep[FRAME_COMPCODE];
@@ -510,32 +503,25 @@ int frame_update_meta(blosc2_frame* frame, int64_t new_frame_len, int64_t new_nb
   }
 
   int32_t header_len;
-  memcpy(&header_len, framep + HEADER2_LEN, sizeof(header_len));
-  swap_inplace(&header_len, sizeof(header_len));
+  memcpy(&header_len, swap_endian(framep + HEADER2_LEN, sizeof(header_len)), sizeof(header_len));
 
   int64_t nbytes;
-  memcpy(&nbytes, framep + FRAME_NBYTES, sizeof(nbytes));
-  swap_inplace(&nbytes, sizeof(nbytes));
+  memcpy(&nbytes, swap_endian(framep + FRAME_NBYTES, sizeof(nbytes)), sizeof(nbytes));
 
   int32_t chunksize;
-  memcpy(&chunksize, framep + FRAME_CHUNKSIZE, sizeof(chunksize));
-  swap_inplace(&chunksize, sizeof(chunksize));
+  memcpy(&chunksize, swap_endian(framep + FRAME_CHUNKSIZE, sizeof(chunksize)), sizeof(chunksize));
 
   /* Update counters */
   frame->len = new_frame_len;
-  memcpy(header + FRAME_LEN, &new_frame_len, sizeof(new_frame_len));
-  swap_inplace(header + FRAME_LEN, sizeof(new_frame_len));
-  memcpy(header + FRAME_NBYTES, &new_nbytes, sizeof(new_nbytes));
-  swap_inplace(header + FRAME_NBYTES, sizeof(new_nbytes));
-  memcpy(header + FRAME_CBYTES, &new_cbytes, sizeof(new_cbytes));
-  swap_inplace(header + FRAME_CBYTES, sizeof(new_cbytes));
+  memcpy(header + FRAME_LEN, swap_endian(&new_frame_len, sizeof(new_frame_len)), sizeof(new_frame_len));
+  memcpy(header + FRAME_NBYTES, swap_endian(&new_nbytes, sizeof(new_nbytes)), sizeof(new_nbytes));
+  memcpy(header + FRAME_CBYTES, swap_endian(&new_cbytes, sizeof(new_cbytes)), sizeof(new_cbytes));
   // Set the chunksize
 //  if ((nbytes > 0) && (new_chunksize != chunksize)) {
 //    TODO: look into the variable size flag for this condition
 //    new_chunksize = 0;   // varlen
 //  }
-  memcpy(header + FRAME_CHUNKSIZE, &new_chunksize, sizeof(new_chunksize));
-  swap_inplace(header + FRAME_CHUNKSIZE, sizeof(new_chunksize));
+  memcpy(header + FRAME_CHUNKSIZE, swap_endian(&new_chunksize, sizeof(new_chunksize)), sizeof(new_chunksize));
 
   if (frame->sdata == NULL) {
     // Write updated counters down to file
