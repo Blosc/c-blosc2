@@ -103,7 +103,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   uint8_t* h2p = h2;
 
   // The msgpack header will start as a fix array
-  *h2p = 0x90 + 11;  // array with 11 elements
+  *h2p = 0x90 + 12;  // array with 12 elements
   h2p += 1;
 
   // Magic number
@@ -199,33 +199,70 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   h2p += 2;
   assert(h2p - h2 == HEADER2_MINLEN - 1);
 
-  // Optional namespaces for attributes
-  int nclients = (schunk->frame == NULL)? 0 : schunk->frame->nclients;
-  *h2p = (uint8_t)0x80 + (uint8_t)nclients;  // map with N keys
+  // Make space for an (empty) map
+  int32_t hsize = (int32_t)(h2p - h2);
+  h2 = realloc(h2, HEADER2_MINLEN + 1 + 2);
+  h2p = h2 + hsize;
+
+  // Offsets for optional namespaces of attributes
+  int16_t nclients = (schunk->frame == NULL)? (int16_t)0 : schunk->frame->nclients;
+  *h2p = 0xde;  // map 16 with N keys
   h2p += 1;
+  memcpy(h2p, &nclients, sizeof(nclients));
+  h2p += sizeof(nclients);
   int32_t current_header_len = (int32_t)(h2p - h2);
+  int32_t *offtooff = malloc(nclients * sizeof(int32_t));
   for (int nclient = 0; nclient < nclients; nclient++) {
     blosc2_frame_attrs *attrs = schunk->frame->attrs[nclient];
     uint8_t nslen = (uint8_t) strlen(attrs->namespace);
-    current_header_len += 1 + nslen + 1 + 4 + attrs->sattrs_len;
-    h2 = realloc(h2, (size_t)current_header_len);
+    h2 = realloc(h2, (size_t)current_header_len + 1 + nslen + 1 + 4);
+    h2p = h2 + current_header_len;
     // Store the namespace
-    *h2p = (uint8_t) 0xa0 + nslen;  // str
+    *h2p = (uint8_t)0xa0 + nslen;  // str
     h2p += 1;
     memcpy(h2p, attrs->namespace, nslen);
     h2p += nslen;
+    // Space for storing the offset for the value of this namespace
+    *h2p = 0xd2;  // int 32
+    h2p += 1;
+    offtooff[nclient] = (int32_t)(h2p - h2);
+    h2p += 4;
+    current_header_len += 1 + nslen + 1 + 4;
+  }
+  hsize = (int32_t)(h2p - h2);
+  assert(hsize == current_header_len);  // sanity check
+
+  // Make space for an (empty) array
+  hsize = (int32_t)(h2p - h2);
+  h2 = realloc(h2, HEADER2_MINLEN + 1 + 2);
+  h2p = h2 + hsize;
+
+  // Now, store the values in an array
+  *h2p = 0xdc;  // array 16 with N elements
+  h2p += 1;
+  memcpy(h2p, &nclients, sizeof(nclients));
+  h2p += sizeof(nclients);
+  current_header_len = (int32_t)(h2p - h2);
+  for (int nclient = 0; nclient < nclients; nclient++) {
+    blosc2_frame_attrs *attrs = schunk->frame->attrs[nclient];
+    h2 = realloc(h2, (size_t)current_header_len + 1 + 4 + attrs->sattrs_len);
+    h2p = h2 + current_header_len;
     // Store the serialized attrs for this namespace
-    *h2p = (uint8_t) 0xc6;  // bin 32
+    *h2p = 0xc6;  // bin 32
     h2p += 1;
     memcpy(h2p, &(attrs->sattrs_len), 4);
     h2p += 4;
     memcpy(h2p, attrs->sattrs, attrs->sattrs_len);
     h2p += attrs->sattrs_len;
+    // Update the offset now that we know it
+    memcpy(h2 + offtooff[nclient], &current_header_len, 4);
+    current_header_len += 1 + 4 + attrs->sattrs_len;
   }
+  free(offtooff);
 
   // Set the length of the whole header now that we know it
-  int32_t hsize = (int32_t)(h2p - h2);
-  assert(hsize == current_header_len);
+  hsize = (int32_t)(h2p - h2);
+  assert(hsize == current_header_len);  // sanity check
   memcpy(h2 + HEADER2_LEN, swap_inplace(&hsize, 4), 4);
 
   return h2;

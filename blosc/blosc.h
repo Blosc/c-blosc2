@@ -622,7 +622,7 @@ typedef struct {
   int64_t len;     // the current length of the frame in (compressed) bytes
   int64_t maxlen;  // the maximum length of the frame; if 0, there is no maximum
   struct blosc2_schunk_s *schunk;    // pointer to schunk (if it exists)
-  int8_t nclients;  // the number of clients adding an entry in attributes
+  int16_t nclients;  // the number of clients adding an entry in attributes
   struct blosc2_frame_attrs_s *attrs[BLOSC2_MAX_FRAME_CLIENTS];
 } blosc2_frame;
 
