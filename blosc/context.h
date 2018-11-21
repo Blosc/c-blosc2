@@ -83,8 +83,8 @@ struct blosc2_context_s {
   /* Entry point for BTune persistence between runs */
 
   /* Threading */
-  int nthreads;
-  int new_nthreads;
+  int16_t nthreads;
+  int16_t new_nthreads;
   int threads_started;
   int end_threads;
   pthread_t *threads;

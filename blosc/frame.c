@@ -92,9 +92,10 @@ void* swap_inplace(void *pa, int size) {
 #define FRAME_CBYTES (FRAME_NBYTES + 8 + 1)  // 39
 #define FRAME_TYPESIZE (FRAME_CBYTES + 8 + 1) // 48
 #define FRAME_CHUNKSIZE (FRAME_TYPESIZE + 4 + 1)  // 53
-#define FRAME_NTHREADS (FRAME_CHUNKSIZE + 4 + 1)  // 58
-#define HEADER2_MINLEN (FRAME_NTHREADS + 2 + 1)  // 61 <- minimum length
-//#define FRAME_ATTRS (HEADER2_MINLEN)  // 61
+#define FRAME_NTHREADS_C (FRAME_CHUNKSIZE + 4 + 1)  // 58
+#define FRAME_NTHREADS_D (FRAME_NTHREADS_C + 2 + 1)  // 61
+#define HEADER2_MINLEN (FRAME_NTHREADS_D + 2 + 1)  // 64 <- minimum length
+//#define FRAME_ATTRS (HEADER2_MINLEN)  // 64
 
 
 void* new_header2_frame(blosc2_schunk *schunk) {
@@ -102,7 +103,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   uint8_t* h2p = h2;
 
   // The msgpack header will start as a fix array
-  *h2p = 0x90 + 10;  // array with 10 elements
+  *h2p = 0x90 + 11;  // array with 11 elements
   h2p += 1;
 
   // Magic number
@@ -182,10 +183,18 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   h2p += 4;
   assert(h2p - h2 < HEADER2_MINLEN);
 
-  // Number of threads
+  // Number of threads for compression
   *h2p = 0xd1;  // int16
   h2p += 1;
-  int16_t nthreads = (int16_t)schunk->dctx->nthreads;
+  int16_t nthreads = schunk->cctx->nthreads;
+  memcpy(h2p, swap_inplace(&nthreads, 2), 2);
+  h2p += 2;
+  assert(h2p - h2 < HEADER2_MINLEN);
+
+  // Number of threads for decompression
+  *h2p = 0xd1;  // int16
+  h2p += 1;
+  nthreads = schunk->dctx->nthreads;
   memcpy(h2p, swap_inplace(&nthreads, 2), 2);
   h2p += 2;
   assert(h2p - h2 == HEADER2_MINLEN - 1);
