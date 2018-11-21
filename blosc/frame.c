@@ -81,20 +81,24 @@ void* swap_inplace(void *pa, int size) {
 
 
 #define FRAME_VERSION 0
-#define HEADER2_MAXSIZE 64
 
-#define FRAME_LEN 16
-#define FRAME_FILTERS 26
-#define FRAME_COMPCODE 27
-#define FRAME_NBYTES 30
-#define FRAME_CBYTES 39
-#define FRAME_TYPESIZE 48
-#define FRAME_CHUNKSIZE 53
-#define HEADER2_LEN 11
+#define HEADER2_MAGIC 2
+#define HEADER2_LEN (HEADER2_MAGIC + 8 + 1)  // 11
+#define FRAME_LEN (HEADER2_LEN + 4 + 1)  // 16
+#define FRAME_FLAGS (FRAME_LEN + 8 + 1)  // 25
+#define FRAME_FILTERS (FRAME_FLAGS + 1)  // 26
+#define FRAME_COMPCODE (FRAME_FLAGS + 2)  // 27
+#define FRAME_NBYTES (FRAME_FLAGS + 4 + 1)  // 30
+#define FRAME_CBYTES (FRAME_NBYTES + 8 + 1)  // 39
+#define FRAME_TYPESIZE (FRAME_CBYTES + 8 + 1) // 48
+#define FRAME_CHUNKSIZE (FRAME_TYPESIZE + 4 + 1)  // 53
+#define FRAME_NTHREADS (FRAME_CHUNKSIZE + 4 + 1)  // 58
+#define HEADER2_MINLEN (FRAME_NTHREADS + 2 + 1)  // 61 <- minimum length
+//#define FRAME_ATTRS (HEADER2_MINLEN)  // 61
 
 
 void* new_header2_frame(blosc2_schunk *schunk) {
-  uint8_t* h2 = calloc(HEADER2_MAXSIZE, 1);
+  uint8_t* h2 = calloc(HEADER2_MINLEN, 1);
   uint8_t* h2p = h2;
 
   // The msgpack header will start as a fix array
@@ -104,50 +108,47 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   // Magic number
   *h2p = 0xa0 + 8;  // str with 8 elements
   h2p += 1;
-  assert(h2p - h2 < HEADER2_MAXSIZE);
+  assert(h2p - h2 < HEADER2_MINLEN);
   strncpy((char*)h2p, "b2frame", strlen("b2frame"));
   h2p += 8;
 
   // Header size
   *h2p = 0xd2;  // int32
-  h2p += 1;
-  int32_t* h2sizep = (int32_t*)h2p;
-  h2p += 4;
-  assert(h2p - h2 < HEADER2_MAXSIZE);
+  h2p += 1 + 4;
+  assert(h2p - h2 < HEADER2_MINLEN);
 
   // Total frame size
   *h2p = 0xcf;  // uint64
-  h2p += 1;
-  h2p += 8;
-  assert(h2p - h2 < HEADER2_MAXSIZE);
+  h2p += 1 + 8;
+  assert(h2p - h2 < HEADER2_MINLEN);
 
   // Flags
   *h2p = 0xa0 + 4;  // str with 4 elements
   h2p += 1;
-  assert(h2p - h2 < HEADER2_MAXSIZE);
+  assert(h2p - h2 < HEADER2_MINLEN);
 
   // General flags
   *h2p = 0x4 + FRAME_VERSION;  // frame + version
   *h2p += 0x20;  // 64 bit offsets
   h2p += 1;
-  assert(h2p - h2 < HEADER2_MAXSIZE);
+  assert(h2p - h2 < HEADER2_MINLEN);
 
   // Filter flags
   *h2p = 0x6;  // shuffle + split_blocks
   *h2p += 0;  // same as typesize
   h2p += 1;
-  assert(h2p - h2 < HEADER2_MAXSIZE);
+  assert(h2p - h2 < HEADER2_MINLEN);
 
   // Codec flags
   *h2p = schunk->compcode;
   *h2p += (schunk->clevel) << 4u;  // clevel
   h2p += 1;
-  assert(h2p - h2 < HEADER2_MAXSIZE);
+  assert(h2p - h2 < HEADER2_MINLEN);
 
   // Reserved flags
   *h2p = 0;
   h2p += 1;
-  assert(h2p - h2 < HEADER2_MAXSIZE);
+  assert(h2p - h2 < HEADER2_MINLEN);
 
   // Uncompressed size
   *h2p = 0xd3;  // int64
@@ -155,7 +156,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   int64_t nbytes = schunk->nbytes;
   memcpy(h2p, swap_inplace(&nbytes, 8), 8);
   h2p += 8;
-  assert(h2p - h2 < HEADER2_MAXSIZE);
+  assert(h2p - h2 < HEADER2_MINLEN);
 
   // Compressed size
   *h2p = 0xd3;  // int64
@@ -163,7 +164,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   int64_t cbytes = schunk->cbytes;
   memcpy(h2p, swap_inplace(&cbytes, 8), 8);
   h2p += 8;
-  assert(h2p - h2 < HEADER2_MAXSIZE);
+  assert(h2p - h2 < HEADER2_MINLEN);
 
   // Type size
   *h2p = 0xd2;  // int32
@@ -171,7 +172,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   int32_t typesize = schunk->typesize;
   memcpy(h2p, swap_inplace(&typesize, 4), 4);
   h2p += 4;
-  assert(h2p - h2 < HEADER2_MAXSIZE);
+  assert(h2p - h2 < HEADER2_MINLEN);
 
   // Chunk size
   *h2p = 0xd2;  // int32
@@ -179,7 +180,7 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   int32_t chunksize = schunk->chunksize;
   memcpy(h2p, swap_inplace(&chunksize, 4), 4);
   h2p += 4;
-  assert(h2p - h2 < HEADER2_MAXSIZE);
+  assert(h2p - h2 < HEADER2_MINLEN);
 
   // Number of threads
   *h2p = 0xd1;  // int16
@@ -187,40 +188,36 @@ void* new_header2_frame(blosc2_schunk *schunk) {
   int16_t nthreads = (int16_t)schunk->dctx->nthreads;
   memcpy(h2p, swap_inplace(&nthreads, 2), 2);
   h2p += 2;
-  assert(h2p - h2 < HEADER2_MAXSIZE);
+  assert(h2p - h2 == HEADER2_MINLEN - 1);
 
-  // Optional meta-blocks
+  // Optional namespaces for attributes
   int nclients = (schunk->frame == NULL)? 0 : schunk->frame->nclients;
-  if (nclients == 0) {
-      *h2p = 0x80 + 0;  // map with N keys
-      h2p += 1;
-      assert(h2p - h2 < HEADER2_MAXSIZE);
-  }
-  else {
-      blosc2_frame_attrs *attrs = schunk->frame->attrs;
-      *h2p = (uint8_t)0x80 + (uint8_t)nclients;  // map with N keys
-      h2p += 1;
-      for (int nclient = 0; nclient < nclients; nclient++) {
-        // Store the namespace
-        uint8_t nslen = (uint8_t)strlen(attrs->namespace);
-        *h2p = (uint8_t)0xa0 + nslen;  // str
-        h2p += 1;
-        memcpy(h2p, attrs->namespace, nslen);
-        // Store the serialized attrs for this namespace
-        *h2p++ = (uint8_t)0xc6;  // bin 32
-        memcpy(h2p, &(attrs->sattrs_len), 4);
-        h2p += 5;
-        memcpy(h2p, attrs->sattrs, attrs->sattrs_len);
-        h2p += attrs->sattrs_len;
-        assert(h2p - h2 < HEADER2_MAXSIZE);
-      }
+  *h2p = (uint8_t)0x80 + (uint8_t)nclients;  // map with N keys
+  h2p += 1;
+  int32_t current_header_len = (int32_t)(h2p - h2);
+  for (int nclient = 0; nclient < nclients; nclient++) {
+    blosc2_frame_attrs *attrs = schunk->frame->attrs[nclient];
+    uint8_t nslen = (uint8_t) strlen(attrs->namespace);
+    current_header_len += 1 + nslen + 1 + 4 + attrs->sattrs_len;
+    h2 = realloc(h2, (size_t)current_header_len);
+    // Store the namespace
+    *h2p = (uint8_t) 0xa0 + nslen;  // str
+    h2p += 1;
+    memcpy(h2p, attrs->namespace, nslen);
+    h2p += nslen;
+    // Store the serialized attrs for this namespace
+    *h2p = (uint8_t) 0xc6;  // bin 32
+    h2p += 1;
+    memcpy(h2p, &(attrs->sattrs_len), 4);
+    h2p += 4;
+    memcpy(h2p, attrs->sattrs, attrs->sattrs_len);
+    h2p += attrs->sattrs_len;
   }
 
-  // Finally, set the length now that we know it
+  // Set the length of the whole header now that we know it
   int32_t hsize = (int32_t)(h2p - h2);
-  memcpy(h2sizep, swap_inplace(&hsize, 4), 4);
-
-  h2 = realloc(h2, (size_t)hsize);
+  assert(hsize == current_header_len);
+  memcpy(h2 + HEADER2_LEN, swap_inplace(&hsize, 4), 4);
 
   return h2;
 }
@@ -257,7 +254,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
       chunksize = 0;
     }
   }
-  assert (coffset == cbytes);
+  assert ((int64_t)coffset == cbytes);
 
   // Compress the chunk of offsets
   uint8_t* off_chunk = malloc(off_nbytes + BLOSC_MAX_OVERHEAD);
@@ -302,7 +299,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
     }
     coffset += chunk_cbytes;
   }
-  assert (coffset == cbytes);
+  assert ((int64_t)coffset == cbytes);
 
   // Copy the offsets chunk at the end of the frame
   if (frame->fname == NULL) {
@@ -334,9 +331,9 @@ blosc2_frame* blosc2_frame_from_file(char *fname) {
   char* fname_cpy = malloc(strlen(fname) + 1);
   frame->fname = strcpy(fname_cpy, fname);
 
-  uint8_t* header = malloc(HEADER2_MAXSIZE);
+  uint8_t* header = malloc(HEADER2_MINLEN);
   FILE* fp = fopen(fname, "rb");
-  fread(header, HEADER2_MAXSIZE, 1, fp);
+  fread(header, HEADER2_MINLEN, 1, fp);
   fclose(fp);
 
   int64_t frame_len;
@@ -398,9 +395,9 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
   assert(frame->len > 0);
 
   if (frame->sdata == NULL) {
-    header = malloc(HEADER2_MAXSIZE);
+    header = malloc(HEADER2_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
-    fread(header, HEADER2_MAXSIZE, 1, fp);
+    fread(header, HEADER2_MINLEN, 1, fp);
     framep = header;
     fclose(fp);
   }
@@ -459,9 +456,9 @@ int frame_update_meta(blosc2_frame* frame, int64_t new_frame_len, int64_t new_nb
   assert(frame->len > 0);
 
   if (frame->sdata == NULL) {
-    header = malloc(HEADER2_MAXSIZE);
+    header = malloc(HEADER2_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
-    fread(header, HEADER2_MAXSIZE, 1, fp);
+    fread(header, HEADER2_MINLEN, 1, fp);
     framep = header;
     fclose(fp);
   }
@@ -825,7 +822,7 @@ int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, s
 
   /* Create a buffer for destination */
   int32_t nbytes_ = sw32_(src + 4);
-  if (nbytes_ > nbytes) {
+  if (nbytes_ > (int32_t)nbytes) {
     fprintf(stderr, "Not enough space for decompressing in dest");
     return -1;
   }
