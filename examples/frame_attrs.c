@@ -95,6 +95,26 @@ int main() {
     printf("Time for frame -> fileframe (simple_frame.b2frame): %.3g s, %.1f GB/s\n",
            ttotal, nbytes / (ttotal * GB));
 
+    // fileframe (file) -> frame2 (on-disk frame)
+    blosc_set_timestamp(&last);
+    blosc2_frame* frame2 = blosc2_frame_from_file("frame_attrs.b2frame");
+    blosc_set_timestamp(&current);
+    ttotal = blosc_elapsed_secs(last, current);
+    printf("Time for fileframe (%s) -> frame : %.3g s, %.1f GB/s\n",
+           frame2->fname, ttotal, nbytes / (ttotal * GB));
+
+    // frame2 (on-disk) -> schunk
+    blosc_set_timestamp(&last);
+    blosc2_schunk* schunk2 = blosc2_new_schunk(cparams, dparams, frame2);
+    if (schunk2 == NULL) {
+        printf("Bad conversion frame2 -> schunk2!\n");
+        return -1;
+    }
+    blosc_set_timestamp(&current);
+    ttotal = blosc_elapsed_secs(last, current);
+    printf("Time for fileframe -> schunk: %.3g s, %.1f GB/s\n",
+           ttotal, nbytes / (ttotal * GB));
+
     /* Free resources */
     blosc2_free_schunk(schunk);
 

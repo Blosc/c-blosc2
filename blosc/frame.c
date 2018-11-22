@@ -93,8 +93,10 @@ void* swap_endian(void *pa, int size) {
 #define FRAME_CHUNKSIZE (FRAME_TYPESIZE + 4 + 1)  // 53
 #define FRAME_NTHREADS_C (FRAME_CHUNKSIZE + 4 + 1)  // 58
 #define FRAME_NTHREADS_D (FRAME_NTHREADS_C + 2 + 1)  // 61
-#define HEADER2_MINLEN (FRAME_NTHREADS_D + 2 + 1)  // 64 <- minimum length
-//#define FRAME_ATTRS (HEADER2_MINLEN)  // 64
+#define FRAME_HAVE_ATTRS (FRAME_NTHREADS_D + 2)  // 63
+#define HEADER2_MINLEN (FRAME_HAVE_ATTRS + 1)  // 64 <- minimum length
+#define FRAME_ATTRS (HEADER2_MINLEN)  // 64
+#define FRAME_IDX_SIZE (FRAME_ATTRS + 1 + 1)  // 66
 
 
 void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
@@ -196,15 +198,28 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   nthreads = schunk->dctx->nthreads;
   memcpy(h2p, swap_endian(&nthreads, 2), 2);
   h2p += 2;
-  assert(h2p - h2 == HEADER2_MINLEN - 1);
+  assert(h2p - h2 < HEADER2_MINLEN);
 
-  // Make space for an (empty) map
+  // Boolean for attributes existence
+  int16_t nclients = (frame == NULL)? (int16_t)0 : frame->nclients;
+  *h2p = (nclients > 0)? (uint8_t)0xc3 : (uint8_t)0xc2;  // bool for FRAME_HAVE_ATTRS
+  h2p += 1;
+  assert(h2p - h2 == HEADER2_MINLEN);
+
+  // Make space for the header of attrs (array marker, size, map of offsets)
   int32_t hsize = (int32_t)(h2p - h2);
-  h2 = realloc(h2, HEADER2_MINLEN + 1 + 2);
+  h2 = realloc(h2, HEADER2_MINLEN + 1 + 1 + 2 + 1 + 2);
   h2p = h2 + hsize;
 
-  // Map of offsets for optional namespaces of attributes
-  int16_t nclients = (frame == NULL)? (int16_t)0 : frame->nclients;
+  // The msgpack header for the attrs (array_marker, size, map of offsets, list of values)
+  *h2p = 0x90 + 3;  // array with 3 elements
+  h2p += 1;
+
+  // Size for the map of offsets, including this uint16 size (to be filled out later on)
+  *h2p = 0xcd;  // uint16
+  h2p += 1 + 2;
+
+    // Map of offsets for optional namespaces of attributes
   *h2p = 0xde;  // map 16 with N keys
   h2p += 1;
   memcpy(h2p, swap_endian(&nclients, sizeof(nclients)), sizeof(nclients));
@@ -229,12 +244,17 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
     h2p += 4;
     current_header_len += 1 + nslen + 1 + 4;
   }
-  hsize = (int32_t)(h2p - h2);
-  assert(hsize == current_header_len);  // sanity check
+  int32_t hsize2 = (int32_t)(h2p - h2);
+  assert(hsize2 == current_header_len);  // sanity check
+
+  // Map size + int16 size
+  assert((hsize2 - hsize) < (1 << 16));
+  uint16_t map_size = (uint16_t) (hsize2 - hsize);
+  memcpy(h2 + FRAME_IDX_SIZE, swap_endian(&map_size, 2), 2);
 
   // Make space for an (empty) array
   hsize = (int32_t)(h2p - h2);
-  h2 = realloc(h2, HEADER2_MINLEN + 1 + 2);
+  h2 = realloc(h2, FRAME_IDX_SIZE + 2 + 1 + 2);
   h2p = h2 + hsize;
 
   // Now, store the values in an array
@@ -380,13 +400,30 @@ blosc2_frame* blosc2_frame_from_file(char *fname) {
   uint8_t* header = malloc(HEADER2_MINLEN);
   FILE* fp = fopen(fname, "rb");
   fread(header, HEADER2_MINLEN, 1, fp);
-  fclose(fp);
 
   int64_t frame_len;
   memcpy(&frame_len, swap_endian(header + FRAME_LEN, sizeof(frame_len)), sizeof(frame_len));
   frame->len = frame_len;
 
+  bool have_attrs = (header[FRAME_HAVE_ATTRS] == 0xc3) ? true : false;
+
   free(header);
+
+  if (have_attrs) {
+    // Now, read the attrs for every client
+    uint16_t idx_size;
+    fseek(fp, FRAME_IDX_SIZE, SEEK_SET);
+    fread(&idx_size, sizeof(uint16_t), 1, fp);
+    memcpy(&idx_size, swap_endian(&idx_size, 2), 2);
+    // Read the index of namespaces for attributes
+    uint8_t* attrs_idx = malloc(idx_size);
+    fseek(fp, FRAME_IDX_SIZE + 2, SEEK_SET);
+    fread(attrs_idx, idx_size, 1, fp);
+    assert(attrs_idx[0] == 0xde);   // sanity check
+    free(attrs_idx);
+  }
+
+  fclose(fp);
 
   return frame;
 }
