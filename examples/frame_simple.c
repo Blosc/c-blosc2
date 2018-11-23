@@ -181,7 +181,8 @@ int main() {
   blosc2_free_schunk(schunk);
   blosc2_free_schunk(schunk1);
   blosc2_free_schunk(schunk2);
-  blosc2_free_frame(frame2);
+  // TODO: When freeing the schunk, the associated frame is freed automatically.  Is this desirable?
+  // blosc2_free_frame(frame2);
 
   return 0;
 }

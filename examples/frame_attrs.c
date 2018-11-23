@@ -130,22 +130,24 @@ int main() {
            ttotal, nbytes / (ttotal * GB));
 
     // Check that the attributes had a good roundtrip
-    if (frame2->nclients != 1) {
+    if (schunk2->frame->nclients != 1) {
         printf("nclients not retrieved correctly!\n");
         return -1;
     }
-    if (strncmp(frame2->attrs[0]->namespace, "myattrs_namespace", 32) != 0) {
+    if (strncmp(schunk2->frame->attrs[0]->namespace, "myattrs_namespace", 32) != 0) {
         printf("namespace not retrieved correctly!\n");
         return -1;
     }
-    if (strncmp((char*)frame2->attrs[0]->sattrs, "myattrs_value", 32) != 0) {
+    if (strncmp((char*)schunk2->frame->attrs[0]->sattrs, "myattrs_value", 32) != 0) {
         printf("serialized value for namespace not retrieved correctly!\n");
         return -1;
     }
 
     /* Free resources */
-    blosc2_free_frame(frame2);
     blosc2_free_schunk(schunk);
+    blosc2_free_schunk(schunk2);
+    // TODO: When freeing the schunk, the associated frame is freed automatically.  Is this desirable?
+    //blosc2_free_frame(frame2);
 
     return 0;
 }

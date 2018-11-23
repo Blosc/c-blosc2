@@ -974,6 +974,7 @@ int blosc2_free_frame(blosc2_frame *frame) {
       free(frame->attrs[i]->sattrs);
       free(frame->attrs[i]);
     }
+    frame->nclients = 0;
   }
 
   // TODO: make a constructor for frames so that we can handle the contents of the struct
