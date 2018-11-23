@@ -73,12 +73,8 @@ int main() {
     blosc2_frame frame1 = BLOSC_EMPTY_FRAME;
 
     // Add some attrs
-    blosc2_frame_attrs *attrs = malloc(sizeof(blosc2_frame_attrs));
-    attrs->namespace = strdup("myattrs_namespace");
-    attrs->sattrs = (uint8_t*)strdup("myattrs_value");
-    attrs->sattrs_len = (int32_t)strlen((char*)attrs->sattrs);
-    frame1.attrs[0] = attrs;
-    frame1.nclients++;
+    blosc2_frame_add_attr(&frame1, "myattrs_namespace", (uint8_t*)"myattrs_value",
+                          (uint32_t)strlen("myattrs_value"));
     int64_t frame_len = blosc2_schunk_to_frame(schunk, &frame1);
     blosc_set_timestamp(&current);
     ttotal = blosc_elapsed_secs(last, current);

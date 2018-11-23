@@ -765,6 +765,8 @@ BLOSC_EXPORT int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t
 BLOSC_EXPORT int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk,
                                                void *dest, size_t nbytes);
 
+BLOSC_EXPORT int blosc2_frame_add_attr(blosc2_frame* frame, char* namespace, uint8_t* sattrs,
+                                       uint32_t sattrs_len);
 
 /*********************************************************************
 
