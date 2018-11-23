@@ -204,22 +204,23 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int16_t nclients = (frame == NULL)? (int16_t)0 : frame->nclients;
   *h2p = (nclients > 0)? (uint8_t)0xc3 : (uint8_t)0xc2;  // bool for FRAME_HAVE_ATTRS
   h2p += 1;
-  assert(h2p - h2 == HEADER2_MINLEN);
+
+  int32_t hsize = (int32_t)(h2p - h2);
+  assert(hsize == HEADER2_MINLEN);
 
   // Make space for the header of attrs (array marker, size, map of offsets)
-  int32_t hsize = (int32_t)(h2p - h2);
-  h2 = realloc(h2, HEADER2_MINLEN + 1 + 1 + 2 + 1 + 2);
+  h2 = realloc(h2, (size_t)hsize + 1 + 1 + 2 + 1 + 2);
   h2p = h2 + hsize;
 
   // The msgpack header for the attrs (array_marker, size, map of offsets, list of values)
   *h2p = 0x90 + 3;  // array with 3 elements
   h2p += 1;
 
-  // Size for the map of offsets, including this uint16 size (to be filled out later on)
+  // Size for the map (index) of offsets, including this uint16 size (to be filled out later on)
   *h2p = 0xcd;  // uint16
   h2p += 1 + 2;
 
-    // Map of offsets for optional namespaces of attributes
+    // Map (index) of offsets for optional namespaces of attributes
   *h2p = 0xde;  // map 16 with N keys
   h2p += 1;
   memcpy(h2p, swap_endian(&nclients, sizeof(nclients)), sizeof(nclients));
@@ -233,6 +234,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
     h2 = realloc(h2, (size_t)current_header_len + 1 + nslen + 1 + 4);
     h2p = h2 + current_header_len;
     // Store the namespace
+    assert(nslen < (1 << 5));  // namespace strings cannot be longer than 32 bytes
     *h2p = (uint8_t)0xa0 + nslen;  // str
     h2p += 1;
     memcpy(h2p, attrs->namespace, nslen);
@@ -254,7 +256,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
   // Make space for an (empty) array
   hsize = (int32_t)(h2p - h2);
-  h2 = realloc(h2, FRAME_IDX_SIZE + 2 + 1 + 2);
+  h2 = realloc(h2, (size_t)hsize + 2 + 1 + 2);
   h2p = h2 + hsize;
 
   // Now, store the values in an array
@@ -409,20 +411,74 @@ blosc2_frame* blosc2_frame_from_file(char *fname) {
 
   free(header);
 
-  if (have_attrs) {
-    // Now, read the attrs for every client
-    uint16_t idx_size;
-    fseek(fp, FRAME_IDX_SIZE, SEEK_SET);
-    fread(&idx_size, sizeof(uint16_t), 1, fp);
-    memcpy(&idx_size, swap_endian(&idx_size, 2), 2);
-    // Read the index of namespaces for attributes
-    uint8_t* attrs_idx = malloc(idx_size);
-    fseek(fp, FRAME_IDX_SIZE + 2, SEEK_SET);
-    fread(attrs_idx, idx_size, 1, fp);
-    assert(attrs_idx[0] == 0xde);   // sanity check
-    free(attrs_idx);
+  if (!have_attrs) {
+    goto out;
   }
 
+  // Get the size for the index of attributes
+  uint16_t idx_size;
+  fseek(fp, FRAME_IDX_SIZE, SEEK_SET);
+  fread(&idx_size, sizeof(uint16_t), 1, fp);
+  memcpy(&idx_size, swap_endian(&idx_size, 2), 2);
+
+  // Read the index of namespaces for attributes
+  uint8_t* attrs_idx = malloc(idx_size);
+  fseek(fp, FRAME_IDX_SIZE + 2, SEEK_SET);
+  fread(attrs_idx, idx_size, 1, fp);
+  assert(attrs_idx[0] == 0xde);   // sanity check
+  uint8_t* idxp = attrs_idx + 1;
+  uint16_t nclients;
+  memcpy(&nclients, swap_endian(idxp, sizeof(uint16_t)), sizeof(uint16_t));
+  idxp += 2;
+  frame->nclients = nclients;
+  assert(nclients == 1);   // sanity check
+
+  // Populate the namespace and serialized value for each client
+  for (int nclient = 0; nclient < nclients; nclient++) {
+    assert((*idxp & 0xe0) == 0xa0);   // sanity check
+    blosc2_frame_attrs* attrs = calloc(sizeof(blosc2_frame_attrs), 1);
+    frame->attrs[nclient] = attrs;
+
+    // Populate the namespace string
+    int8_t nslen = *idxp & (uint8_t)0x1f;
+    idxp += 1;
+    char* ns = malloc((size_t)nslen + 1);
+    memcpy(ns, idxp, nslen);
+    ns[nslen] = '\0';
+    idxp += nslen;
+    attrs->namespace = ns;
+
+    // Populate the serialized value for this name space
+    // Get the offset
+    assert((*idxp & 0xff) == 0xd2);   // sanity check
+    idxp += 1;
+    int32_t offset;
+    memcpy(&offset, swap_endian(idxp, 4), 4);
+    idxp += 4;
+
+    // Go to offset and see if we have the correct marker
+    uint8_t sattrs_marker;
+    fseek(fp, offset, SEEK_SET);
+    fread(&sattrs_marker, 1, 1, fp);
+    assert(sattrs_marker == 0xc6);
+
+    // Read the size of the value
+    int32_t sattrs_len;
+    fseek(fp, offset + 1, SEEK_SET);
+    fread(&sattrs_len, 4, 1, fp);
+    memcpy(&sattrs_len, swap_endian(&sattrs_len, 4), 4);
+    attrs->sattrs_len = sattrs_len;
+
+    // Finally, read the value
+    char* sattrs = malloc((size_t)sattrs_len);
+    fseek(fp, offset + 1 + 4, SEEK_SET);
+    fread(sattrs, (size_t)sattrs_len, 1, fp);
+    attrs->sattrs = (uint8_t*)sattrs;
+  }
+
+  free(attrs_idx);
+
+out:
   fclose(fp);
 
   return frame;

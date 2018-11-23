@@ -103,6 +103,20 @@ int main() {
     printf("Time for fileframe (%s) -> frame : %.3g s, %.1f GB/s\n",
            frame2->fname, ttotal, nbytes / (ttotal * GB));
 
+    // Check that the attributes had a good roundtrip
+    if (frame2->nclients != 1) {
+        printf("nclients not retrieved correctly!\n");
+        return -1;
+    }
+    if (strncmp(frame2->attrs[0]->namespace, "myattrs_namespace", 32) != 0) {
+        printf("namespace not retrieved correctly!\n");
+        return -1;
+    }
+    if (strncmp((char*)frame2->attrs[0]->sattrs, "myattrs_value", 32) != 0) {
+        printf("serialized value for namespace not retrieved correctly!\n");
+        return -1;
+    }
+
     // frame2 (on-disk) -> schunk
     blosc_set_timestamp(&last);
     blosc2_schunk* schunk2 = blosc2_new_schunk(cparams, dparams, frame2);
@@ -115,7 +129,22 @@ int main() {
     printf("Time for fileframe -> schunk: %.3g s, %.1f GB/s\n",
            ttotal, nbytes / (ttotal * GB));
 
+    // Check that the attributes had a good roundtrip
+    if (frame2->nclients != 1) {
+        printf("nclients not retrieved correctly!\n");
+        return -1;
+    }
+    if (strncmp(frame2->attrs[0]->namespace, "myattrs_namespace", 32) != 0) {
+        printf("namespace not retrieved correctly!\n");
+        return -1;
+    }
+    if (strncmp((char*)frame2->attrs[0]->sattrs, "myattrs_value", 32) != 0) {
+        printf("serialized value for namespace not retrieved correctly!\n");
+        return -1;
+    }
+
     /* Free resources */
+    blosc2_free_frame(frame2);
     blosc2_free_schunk(schunk);
 
     return 0;
