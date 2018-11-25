@@ -104,14 +104,17 @@ int main() {
         printf("nclients not retrieved correctly!\n");
         return -1;
     }
-    if (strncmp(frame2->attrs[0]->namespace, "myattrs_namespace", 32) != 0) {
-        printf("namespace not retrieved correctly!\n");
+    uint8_t* sattrs;
+    uint32_t sattrs_len;
+    if (blosc2_frame_get_attrs(frame2, "myattrs_namespace", &sattrs, &sattrs_len) < 0) {
+        printf("namespace not found");
         return -1;
     }
-    if (strncmp((char*)frame2->attrs[0]->sattrs, "myattrs_value", 32) != 0) {
+    if (memcmp(sattrs, "myattrs_value", sattrs_len) != 0) {
         printf("serialized value for namespace not retrieved correctly!\n");
         return -1;
     }
+    free(sattrs);
 
     // frame2 (on-disk) -> schunk
     blosc_set_timestamp(&last);
@@ -130,14 +133,15 @@ int main() {
         printf("nclients not retrieved correctly!\n");
         return -1;
     }
-    if (strncmp(schunk2->frame->attrs[0]->namespace, "myattrs_namespace", 32) != 0) {
-        printf("namespace not retrieved correctly!\n");
+    if (blosc2_frame_get_attrs(schunk2->frame, "myattrs_namespace", &sattrs, &sattrs_len) < 0) {
+        printf("namespace not found");
         return -1;
     }
-    if (strncmp((char*)schunk2->frame->attrs[0]->sattrs, "myattrs_value", 32) != 0) {
+    if (memcmp(sattrs, "myattrs_value", sattrs_len) != 0) {
         printf("serialized value for namespace not retrieved correctly!\n");
         return -1;
     }
+    free(sattrs);
 
     /* Free resources */
     blosc2_free_schunk(schunk);

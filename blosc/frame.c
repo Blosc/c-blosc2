@@ -484,7 +484,6 @@ out:
   return frame;
 }
 
-
 // Get the data pointers section
 int32_t get_offsets(blosc2_frame* frame, int64_t frame_len, int32_t header_len,
                     int64_t cbytes, int32_t nchunks, void* offsets) {
@@ -962,7 +961,7 @@ int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, s
 }
 
 
-/* Add serialized attrs into a new namespace of a frame */
+/* Add serialized attrs into a new namespace */
 int blosc2_frame_add_attr(blosc2_frame* frame, char* namespace, uint8_t* sattrs, uint32_t sattrs_len) {
   blosc2_frame_attrs *attrs = malloc(sizeof(blosc2_frame_attrs));
   attrs->namespace = strdup(namespace);
@@ -973,6 +972,20 @@ int blosc2_frame_add_attr(blosc2_frame* frame, char* namespace, uint8_t* sattrs,
   frame->attrs[frame->nclients] = attrs;
   frame->nclients += 1;
   return 0;
+}
+
+
+/* Get the serialized attributes out of a namespace */
+int blosc2_frame_get_attrs(blosc2_frame* frame,  char* namespace, uint8_t** sattrs, uint32_t* sattrs_len) {
+    for (int nclient = 0; nclient < frame->nclients; nclient++) {
+        if (strcmp(namespace, frame->attrs[nclient]->namespace) == 0) {
+            *sattrs_len = (uint32_t)frame->attrs[nclient]->sattrs_len;
+            *sattrs = malloc((size_t)*sattrs_len);
+            memcpy(*sattrs, frame->attrs[nclient]->sattrs, (size_t)*sattrs_len);
+            return 0;  // Found
+        }
+    }
+    return -1;  // Not found
 }
 
 

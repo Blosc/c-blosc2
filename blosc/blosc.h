@@ -768,6 +768,10 @@ BLOSC_EXPORT int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk,
 BLOSC_EXPORT int blosc2_frame_add_attr(blosc2_frame* frame, char* namespace, uint8_t* sattrs,
                                        uint32_t sattrs_len);
 
+/* Get the serialized attributes out of a namespace */
+BLOSC_EXPORT int blosc2_frame_get_attrs(blosc2_frame* frame,  char* namespace, uint8_t** sattrs,
+                                        uint32_t* sattrs_len);
+
 /*********************************************************************
 
   Time measurement utilities.  Visit the include below for the public API.
