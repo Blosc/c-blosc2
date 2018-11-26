@@ -606,7 +606,8 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 
 *********************************************************************/
 
-#define BLOSC2_MAX_FRAME_CLIENTS (16)
+#define BLOSC2_MAX_FRAME_CLIENTS 16
+#define BLOSC2_NAMESPACE_MAXLEN 30
 
 struct blosc2_schunk_s;    // forward declaration
 
@@ -765,12 +766,12 @@ BLOSC_EXPORT int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t
 BLOSC_EXPORT int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk,
                                                void *dest, size_t nbytes);
 
-BLOSC_EXPORT int blosc2_frame_add_attr(blosc2_frame* frame, char* namespace, uint8_t* sattrs,
-                                       uint32_t sattrs_len);
+BLOSC_EXPORT int blosc2_frame_add_namespace(blosc2_frame *frame, char *namespace, uint8_t *sattrs,
+                                            uint32_t sattrs_len);
 
 /* Get the serialized attributes out of a namespace */
-BLOSC_EXPORT int blosc2_frame_get_attrs(blosc2_frame* frame,  char* namespace, uint8_t** sattrs,
-                                        uint32_t* sattrs_len);
+BLOSC_EXPORT int blosc2_frame_get_namespace(blosc2_frame *frame, char *namespace, uint8_t **sattrs,
+                                            uint32_t *sattrs_len);
 
 /*********************************************************************
 

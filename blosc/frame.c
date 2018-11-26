@@ -962,8 +962,12 @@ int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, s
 
 
 /* Add serialized attrs into a new namespace */
-int blosc2_frame_add_attr(blosc2_frame* frame, char* namespace, uint8_t* sattrs, uint32_t sattrs_len) {
+int blosc2_frame_add_namespace(blosc2_frame *frame, char *namespace, uint8_t *sattrs,
+                               uint32_t sattrs_len) {
   blosc2_frame_attrs *attrs = malloc(sizeof(blosc2_frame_attrs));
+  if (strlen(namespace) > BLOSC2_NAMESPACE_MAXLEN) {
+      return -1;
+  }
   attrs->namespace = strdup(namespace);
   uint8_t* sattrs_buf = malloc((size_t)sattrs_len);
   memcpy(sattrs_buf, sattrs, sattrs_len);
@@ -976,7 +980,8 @@ int blosc2_frame_add_attr(blosc2_frame* frame, char* namespace, uint8_t* sattrs,
 
 
 /* Get the serialized attributes out of a namespace */
-int blosc2_frame_get_attrs(blosc2_frame* frame,  char* namespace, uint8_t** sattrs, uint32_t* sattrs_len) {
+int blosc2_frame_get_namespace(blosc2_frame *frame, char *namespace, uint8_t **sattrs,
+                               uint32_t *sattrs_len) {
     for (int nclient = 0; nclient < frame->nclients; nclient++) {
         if (strcmp(namespace, frame->attrs[nclient]->namespace) == 0) {
             *sattrs_len = (uint32_t)frame->attrs[nclient]->sattrs_len;

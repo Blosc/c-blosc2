@@ -73,8 +73,8 @@ int main() {
     blosc2_frame frame1 = BLOSC_EMPTY_FRAME;
 
     // Add some attrs
-    blosc2_frame_add_attr(&frame1, "myattrs_namespace", (uint8_t*)"myattrs_value",
-                          (uint32_t)strlen("myattrs_value"));
+    blosc2_frame_add_namespace(&frame1, "myattrs_namespace", (uint8_t *) "myattrs_value",
+                               (uint32_t) strlen("myattrs_value"));
     int64_t frame_len = blosc2_schunk_to_frame(schunk, &frame1);
     blosc_set_timestamp(&current);
     ttotal = blosc_elapsed_secs(last, current);
@@ -106,7 +106,7 @@ int main() {
     }
     uint8_t* sattrs;
     uint32_t sattrs_len;
-    if (blosc2_frame_get_attrs(frame2, "myattrs_namespace", &sattrs, &sattrs_len) < 0) {
+    if (blosc2_frame_get_namespace(frame2, "myattrs_namespace", &sattrs, &sattrs_len) < 0) {
         printf("namespace not found");
         return -1;
     }
@@ -133,7 +133,7 @@ int main() {
         printf("nclients not retrieved correctly!\n");
         return -1;
     }
-    if (blosc2_frame_get_attrs(schunk2->frame, "myattrs_namespace", &sattrs, &sattrs_len) < 0) {
+    if (blosc2_frame_get_namespace(schunk2->frame, "myattrs_namespace", &sattrs, &sattrs_len) < 0) {
         printf("namespace not found");
         return -1;
     }
