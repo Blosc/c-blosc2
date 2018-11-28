@@ -226,9 +226,9 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   h2p += sizeof(nnspaces);
   int32_t current_header_len = (int32_t)(h2p - h2);
   int32_t *offtooff = malloc(nnspaces * sizeof(int32_t));
-  for (int nclient = 0; nclient < nnspaces; nclient++) {
+  for (int nnspace = 0; nnspace < nnspaces; nnspace++) {
     assert(frame != NULL);
-    blosc2_frame_nspace *nspace = frame->nspaces[nclient];
+    blosc2_frame_nspace *nspace = frame->nspaces[nnspace];
     uint8_t nslen = (uint8_t) strlen(nspace->name);
     h2 = realloc(h2, (size_t)current_header_len + 1 + nslen + 1 + 4);
     h2p = h2 + current_header_len;
@@ -241,7 +241,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
     // Space for storing the offset for the value of this namespace
     *h2p = 0xd2;  // int 32
     h2p += 1;
-    offtooff[nclient] = (int32_t)(h2p - h2);
+    offtooff[nnspace] = (int32_t)(h2p - h2);
     h2p += 4;
     current_header_len += 1 + nslen + 1 + 4;
   }
@@ -264,9 +264,9 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   swap_store(h2p, &nnspaces, sizeof(nnspaces));
   h2p += sizeof(nnspaces);
   current_header_len = (int32_t)(h2p - h2);
-  for (int nclient = 0; nclient < nnspaces; nclient++) {
+  for (int nnspace = 0; nnspace < nnspaces; nnspace++) {
     assert(frame != NULL);
-    blosc2_frame_nspace *nspace = frame->nspaces[nclient];
+    blosc2_frame_nspace *nspace = frame->nspaces[nnspace];
     h2 = realloc(h2, (size_t)current_header_len + 1 + 4 + nspace->content_len);
     h2p = h2 + current_header_len;
     // Store the serialized contents for this namespace
@@ -277,7 +277,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
     memcpy(h2p, nspace->content, nspace->content_len);  // buffer, no need to swap
     h2p += nspace->content_len;
     // Update the offset now that we know it
-    swap_store(h2 + offtooff[nclient], &current_header_len, sizeof(current_header_len));
+    swap_store(h2 + offtooff[nnspace], &current_header_len, sizeof(current_header_len));
     current_header_len += 1 + 4 + nspace->content_len;
   }
   free(offtooff);
@@ -432,10 +432,10 @@ blosc2_frame* blosc2_frame_from_file(char *fname) {
   frame->nnspaces = nnspaces;
 
   // Populate the namespace and serialized value for each client
-  for (int nclient = 0; nclient < nnspaces; nclient++) {
+  for (int nnspace = 0; nnspace < nnspaces; nnspace++) {
     assert((*idxp & 0xe0) == 0xa0);   // sanity check
     blosc2_frame_nspace* nspace = calloc(sizeof(blosc2_frame_nspace), 1);
-    frame->nspaces[nclient] = nspace;
+    frame->nspaces[nnspace] = nspace;
 
     // Populate the namespace string
     int8_t nslen = *idxp & (uint8_t)0x1f;
@@ -946,46 +946,92 @@ int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, s
 }
 
 
-/* Add content into a new namespace */
-int blosc2_frame_add_namespace(blosc2_frame *frame, char *name, uint8_t *content,
-                               uint32_t content_len) {
-  if (strlen(name) > BLOSC2_NAMESPACE_NAME_MAXLEN) {
-    fprintf(stderr, "namespaces cannot be larger than %d chars\n", BLOSC2_NAMESPACE_NAME_MAXLEN);
-    return -1;
-  }
+/* Find whether the frame has a namespace or not.
+ *
+ * If successful, return the index of the namespace.  Else, return a negative value.
+ * */
+int blosc2_frame_has_namespace(blosc2_frame *frame, char *name) {
+    if (strlen(name) > BLOSC2_NAMESPACE_NAME_MAXLEN) {
+        fprintf(stderr, "namespaces cannot be larger than %d chars\n", BLOSC2_NAMESPACE_NAME_MAXLEN);
+        return -1;
+    }
 
-  if (blosc2_frame_get_namespace(frame, name, &content, &content_len) == 0) {
-    free(content);
-    fprintf(stderr, "namespace \"%s\" already exists\n", name);
-    return -2;
-  }
-
-  // Add the namespace
-  blosc2_frame_nspace *nspace = malloc(sizeof(blosc2_frame_nspace));
-  nspace->name = strdup(name);
-  uint8_t* content_buf = malloc((size_t)content_len);
-  memcpy(content_buf, content, content_len);
-  nspace->content = content_buf;
-  nspace->content_len = content_len;
-  frame->nspaces[frame->nnspaces] = nspace;
-  frame->nnspaces += 1;
-
-  return 0;
-}
-
-
-/* Get the content out of a namespace */
-int blosc2_frame_get_namespace(blosc2_frame *frame, char *name, uint8_t **content,
-                               uint32_t *content_len) {
-    for (int nclient = 0; nclient < frame->nnspaces; nclient++) {
-        if (strcmp(name, frame->nspaces[nclient]->name) == 0) {
-            *content_len = (uint32_t)frame->nspaces[nclient]->content_len;
-            *content = malloc((size_t)*content_len);
-            memcpy(*content, frame->nspaces[nclient]->content, (size_t)*content_len);
-            return 0;  // Found
+    for (int nnspace = 0; nnspace < frame->nnspaces; nnspace++) {
+        if (strcmp(name, frame->nspaces[nnspace]->name) == 0) {
+            return nnspace;  // Found
         }
     }
     return -1;  // Not found
+}
+
+
+/* Add content into a new namespace.
+ *
+ * If successful, return the index of the new namespace.  Else, return a negative value.
+ * */
+int blosc2_frame_add_namespace(blosc2_frame *frame, char *name, uint8_t *content,
+                               uint32_t content_len) {
+    int nnspace = blosc2_frame_has_namespace(frame, name);
+    if (nnspace >= 0) {
+        fprintf(stderr, "namespace \"%s\" already exists\n", name);
+        return -2;
+    }
+
+    // Add the namespace
+    blosc2_frame_nspace *nspace = malloc(sizeof(blosc2_frame_nspace));
+    nspace->name = strdup(name);
+    uint8_t* content_buf = malloc((size_t)content_len);
+    memcpy(content_buf, content, content_len);
+    nspace->content = content_buf;
+    nspace->content_len = content_len;
+    frame->nspaces[frame->nnspaces] = nspace;
+    frame->nnspaces += 1;
+
+    return frame->nnspaces - 1;
+}
+
+
+/* Update the content of an existing namespace.
+ *
+ * If successful, return the index of the new namespace.  Else, return a negative value.
+ * */
+int blosc2_frame_update_namespace(blosc2_frame *frame, char *name, uint8_t *content,
+                                  uint32_t content_len) {
+    int nnspace = blosc2_frame_has_namespace(frame, name);
+    if (nnspace < 0) {
+        fprintf(stderr, "namespace \"%s\" not found\n", name);
+        return nnspace;
+    }
+
+    blosc2_frame_nspace *nspace = frame->nspaces[nnspace];
+    if (content_len > (uint32_t)nspace->content_len) {
+        fprintf(stderr, "`content_len` cannot exceed the existing size of %d bytes", nspace->content_len);
+        return nnspace;
+    }
+
+    // Update the contents of the namespace
+    memcpy(nspace->content, content, content_len);
+    return nnspace;
+}
+
+
+/* Get the content out of a namespace.
+ *
+ * The `**content` receives a malloc'ed copy of the content.  The user is responsible of freeing it.
+ *
+ * If successful, return the index of the new namespace.  Else, return a negative value.
+ * */
+int blosc2_frame_get_namespace(blosc2_frame *frame, char *name, uint8_t **content,
+                               uint32_t *content_len) {
+    int nnspace = blosc2_frame_has_namespace(frame, name);
+    if (nnspace < 0) {
+        fprintf(stderr, "namespace \"%s\" not found\n", name);
+        return nnspace;
+    }
+    *content_len = (uint32_t)frame->nspaces[nnspace]->content_len;
+    *content = malloc((size_t)*content_len);
+    memcpy(*content, frame->nspaces[nnspace]->content, (size_t)*content_len);
+    return nnspace;
 }
 
 

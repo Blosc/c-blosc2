@@ -750,9 +750,11 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame);
 BLOSC_EXPORT void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk);
 
 /* Return a compressed chunk that is part of a frame in the `chunk` parameter.
+ *
  * If the frame is disk-based, a buffer is allocated for the (compressed) chunk,
  * and hence a free is needed.  You can check if the chunk requires a free with the `needs_free`
  * parameter.
+ *
  * If the chunk does not need a free, it means that a pointer to the location in frame is returned
  * in the `chunk` parameter.
  *
@@ -766,12 +768,33 @@ BLOSC_EXPORT int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t
 BLOSC_EXPORT int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk,
                                                void *dest, size_t nbytes);
 
-/* Add content into a new namespace */
+/* Find whether the frame has a namespace or not.
+ *
+ * If successful, return the index of the namespace.  Else, return a negative value.
+ * */
+BLOSC_EXPORT int blosc2_frame_has_namespace(blosc2_frame *frame, char *name);
+
+/* Add content into a new namespace.
+ *
+ * If successful, return the index of the new namespace.  Else, return a negative value.
+ * */
 BLOSC_EXPORT int blosc2_frame_add_namespace(blosc2_frame *frame, char *name, uint8_t *content,
                                             uint32_t content_len);
 
-/* Get the content out of a namespace */
-BLOSC_EXPORT int blosc2_frame_get_namespace(blosc2_frame *frame, char *namespace, uint8_t **content,
+/* Update the content of an existing namespace.
+ *
+ * If successful, return the index of the new namespace.  Else, return a negative value.
+ * */
+BLOSC_EXPORT int blosc2_frame_update_namespace(blosc2_frame *frame, char *name, uint8_t *content,
+                                               uint32_t content_len);
+
+/* Get the content out of a namespace.
+ *
+ * The `**content` receives a malloc'ed copy of the content.  The user is responsible of freeing it.
+ *
+ * If successful, return the index of the new namespace.  Else, return a negative value.
+ * */
+BLOSC_EXPORT int blosc2_frame_get_namespace(blosc2_frame *frame, char *name, uint8_t **content,
                                             uint32_t *content_len);
 
 /*********************************************************************
