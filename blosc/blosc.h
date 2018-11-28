@@ -606,16 +606,16 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 
 *********************************************************************/
 
-#define BLOSC2_MAX_FRAME_CLIENTS 16
-#define BLOSC2_NAMESPACE_MAXLEN 30
+#define BLOSC2_MAX_NAMESPACES 16
+#define BLOSC2_NAMESPACE_NAME_MAXLEN 31
 
 struct blosc2_schunk_s;    // forward declaration
 
-typedef struct blosc2_frame_attrs_s {
-    char* namespace;  // namespace for blosc client (e.g. caterva)
-    uint8_t* sattrs;  // serialized (msgpack preferably) map with the client attributes
-    int32_t sattrs_len;
-} blosc2_frame_attrs;
+typedef struct blosc2_frame_nspaces_s {
+    char* name;  // namespace for blosc client (e.g. caterva)
+    uint8_t* content;  // serialized (msgpack preferably) content of the namespace
+    int32_t content_len;
+} blosc2_frame_nspace;
 
 typedef struct {
   char* fname;     // the name of the file; if NULL, this is in-memory
@@ -623,8 +623,8 @@ typedef struct {
   int64_t len;     // the current length of the frame in (compressed) bytes
   int64_t maxlen;  // the maximum length of the frame; if 0, there is no maximum
   struct blosc2_schunk_s *schunk;    // pointer to schunk (if it exists)
-  struct blosc2_frame_attrs_s *attrs[BLOSC2_MAX_FRAME_CLIENTS];
-  int16_t nclients;  // the number of clients adding an entry in attributes
+  struct blosc2_frame_nspaces_s *nspaces[BLOSC2_MAX_NAMESPACES];
+  int16_t nnspaces;  // the number of namespaces in the frame
 } blosc2_frame;
 
 /* Empty in-memory frame */
@@ -634,7 +634,7 @@ static blosc2_frame BLOSC_EMPTY_FRAME = {
   .len = 0,
   .maxlen = 0,
   .schunk = NULL,
-  .nclients = 0,
+  .nnspaces = 0,
 };
 
 typedef struct blosc2_schunk_s {
@@ -766,12 +766,13 @@ BLOSC_EXPORT int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t
 BLOSC_EXPORT int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk,
                                                void *dest, size_t nbytes);
 
-BLOSC_EXPORT int blosc2_frame_add_namespace(blosc2_frame *frame, char *namespace, uint8_t *sattrs,
-                                            uint32_t sattrs_len);
+/* Add content into a new namespace */
+BLOSC_EXPORT int blosc2_frame_add_namespace(blosc2_frame *frame, char *name, uint8_t *content,
+                                            uint32_t content_len);
 
-/* Get the serialized attributes out of a namespace */
-BLOSC_EXPORT int blosc2_frame_get_namespace(blosc2_frame *frame, char *namespace, uint8_t **sattrs,
-                                            uint32_t *sattrs_len);
+/* Get the content out of a namespace */
+BLOSC_EXPORT int blosc2_frame_get_namespace(blosc2_frame *frame, char *namespace, uint8_t **content,
+                                            uint32_t *content_len);
 
 /*********************************************************************
 

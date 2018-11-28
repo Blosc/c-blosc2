@@ -200,9 +200,9 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   h2p += 2;
   assert(h2p - h2 < HEADER2_MINLEN);
 
-  // Boolean for attributes existence
-  int16_t nclients = (frame == NULL)? (int16_t)0 : frame->nclients;
-  *h2p = (nclients > 0)? (uint8_t)0xc3 : (uint8_t)0xc2;  // bool for FRAME_HAVE_ATTRS
+  // Boolean for checking the existence of namespaces
+  int16_t nnspaces = (frame == NULL)? (int16_t)0 : frame->nnspaces;
+  *h2p = (nnspaces > 0)? (uint8_t)0xc3 : (uint8_t)0xc2;  // bool for FRAME_HAVE_ATTRS
   h2p += 1;
 
   int32_t hsize = (int32_t)(h2p - h2);
@@ -220,24 +220,24 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   *h2p = 0xcd;  // uint16
   h2p += 1 + 2;
 
-    // Map (index) of offsets for optional namespaces of attributes
+  // Map (index) of offsets for optional namespaces
   *h2p = 0xde;  // map 16 with N keys
   h2p += 1;
-  memcpy(h2p, swap_endian(&nclients, sizeof(nclients)), sizeof(nclients));
-  h2p += sizeof(nclients);
+  memcpy(h2p, swap_endian(&nnspaces, sizeof(nnspaces)), sizeof(nnspaces));
+  h2p += sizeof(nnspaces);
   int32_t current_header_len = (int32_t)(h2p - h2);
-  int32_t *offtooff = malloc(nclients * sizeof(int32_t));
-  for (int nclient = 0; nclient < nclients; nclient++) {
+  int32_t *offtooff = malloc(nnspaces * sizeof(int32_t));
+  for (int nclient = 0; nclient < nnspaces; nclient++) {
     assert(frame != NULL);
-    blosc2_frame_attrs *attrs = frame->attrs[nclient];
-    uint8_t nslen = (uint8_t) strlen(attrs->namespace);
+    blosc2_frame_nspace *attrs = frame->nspaces[nclient];
+    uint8_t nslen = (uint8_t) strlen(attrs->name);
     h2 = realloc(h2, (size_t)current_header_len + 1 + nslen + 1 + 4);
     h2p = h2 + current_header_len;
     // Store the namespace
     assert(nslen < (1 << 5));  // namespace strings cannot be longer than 32 bytes
     *h2p = (uint8_t)0xa0 + nslen;  // str
     h2p += 1;
-    memcpy(h2p, attrs->namespace, nslen);
+    memcpy(h2p, attrs->name, nslen);
     h2p += nslen;
     // Space for storing the offset for the value of this namespace
     *h2p = 0xd2;  // int 32
@@ -262,24 +262,24 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   // Now, store the values in an array
   *h2p = 0xdc;  // array 16 with N elements
   h2p += 1;
-  memcpy(h2p, swap_endian(&nclients, sizeof(nclients)), sizeof(nclients));
-  h2p += sizeof(nclients);
+  memcpy(h2p, swap_endian(&nnspaces, sizeof(nnspaces)), sizeof(nnspaces));
+  h2p += sizeof(nnspaces);
   current_header_len = (int32_t)(h2p - h2);
-  for (int nclient = 0; nclient < nclients; nclient++) {
+  for (int nclient = 0; nclient < nnspaces; nclient++) {
     assert(frame != NULL);
-    blosc2_frame_attrs *attrs = frame->attrs[nclient];
-    h2 = realloc(h2, (size_t)current_header_len + 1 + 4 + attrs->sattrs_len);
+    blosc2_frame_nspace *attrs = frame->nspaces[nclient];
+    h2 = realloc(h2, (size_t)current_header_len + 1 + 4 + attrs->content_len);
     h2p = h2 + current_header_len;
     // Store the serialized attrs for this namespace
     *h2p = 0xc6;  // bin 32
     h2p += 1;
-    memcpy(h2p, swap_endian(&(attrs->sattrs_len), 4), 4);
+    memcpy(h2p, swap_endian(&(attrs->content_len), 4), 4);
     h2p += 4;
-    memcpy(h2p, attrs->sattrs, attrs->sattrs_len);
-    h2p += attrs->sattrs_len;
+    memcpy(h2p, attrs->content, attrs->content_len);
+    h2p += attrs->content_len;
     // Update the offset now that we know it
     memcpy(h2 + offtooff[nclient], swap_endian(&current_header_len, 4), 4);
-    current_header_len += 1 + 4 + attrs->sattrs_len;
+    current_header_len += 1 + 4 + attrs->content_len;
   }
   free(offtooff);
 
@@ -415,29 +415,29 @@ blosc2_frame* blosc2_frame_from_file(char *fname) {
     goto out;
   }
 
-  // Get the size for the index of attributes
+  // Get the size for the index of namespaces
   uint16_t idx_size;
   fseek(fp, FRAME_IDX_SIZE, SEEK_SET);
   fread(&idx_size, sizeof(uint16_t), 1, fp);
   memcpy(&idx_size, swap_endian(&idx_size, 2), 2);
 
-  // Read the index of namespaces for attributes
+  // Read the index of namespaces for namespaces
   uint8_t* attrs_idx = malloc(idx_size);
   fseek(fp, FRAME_IDX_SIZE + 2, SEEK_SET);
   fread(attrs_idx, idx_size, 1, fp);
   assert(attrs_idx[0] == 0xde);   // sanity check
   uint8_t* idxp = attrs_idx + 1;
-  uint16_t nclients;
-  memcpy(&nclients, swap_endian(idxp, sizeof(uint16_t)), sizeof(uint16_t));
+  uint16_t nnspaces;
+  memcpy(&nnspaces, swap_endian(idxp, sizeof(uint16_t)), sizeof(uint16_t));
   idxp += 2;
-  frame->nclients = nclients;
-  assert(nclients == 1);   // sanity check
+  frame->nnspaces = nnspaces;
+  assert(nnspaces == 1);   // sanity check
 
   // Populate the namespace and serialized value for each client
-  for (int nclient = 0; nclient < nclients; nclient++) {
+  for (int nclient = 0; nclient < nnspaces; nclient++) {
     assert((*idxp & 0xe0) == 0xa0);   // sanity check
-    blosc2_frame_attrs* attrs = calloc(sizeof(blosc2_frame_attrs), 1);
-    frame->attrs[nclient] = attrs;
+    blosc2_frame_nspace* attrs = calloc(sizeof(blosc2_frame_nspace), 1);
+    frame->nspaces[nclient] = attrs;
 
     // Populate the namespace string
     int8_t nslen = *idxp & (uint8_t)0x1f;
@@ -446,7 +446,7 @@ blosc2_frame* blosc2_frame_from_file(char *fname) {
     memcpy(ns, idxp, nslen);
     ns[nslen] = '\0';
     idxp += nslen;
-    attrs->namespace = ns;
+    attrs->name = ns;
 
     // Populate the serialized value for this name space
     // Get the offset
@@ -457,23 +457,23 @@ blosc2_frame* blosc2_frame_from_file(char *fname) {
     idxp += 4;
 
     // Go to offset and see if we have the correct marker
-    uint8_t sattrs_marker;
+    uint8_t content_marker;
     fseek(fp, offset, SEEK_SET);
-    fread(&sattrs_marker, 1, 1, fp);
-    assert(sattrs_marker == 0xc6);
+    fread(&content_marker, 1, 1, fp);
+    assert(content_marker == 0xc6);
 
-    // Read the size of the value
-    int32_t sattrs_len;
+    // Read the size of the content
+    int32_t content_len;
     fseek(fp, offset + 1, SEEK_SET);
-    fread(&sattrs_len, 4, 1, fp);
-    memcpy(&sattrs_len, swap_endian(&sattrs_len, 4), 4);
-    attrs->sattrs_len = sattrs_len;
+    fread(&content_len, 4, 1, fp);
+    memcpy(&content_len, swap_endian(&content_len, 4), 4);
+    attrs->content_len = content_len;
 
-    // Finally, read the value
-    char* sattrs = malloc((size_t)sattrs_len);
+    // Finally, read the content
+    char* content = malloc((size_t)content_len);
     fseek(fp, offset + 1 + 4, SEEK_SET);
-    fread(sattrs, (size_t)sattrs_len, 1, fp);
-    attrs->sattrs = (uint8_t*)sattrs;
+    fread(content, (size_t)content_len, 1, fp);
+    attrs->content = (uint8_t*)content;
   }
 
   free(attrs_idx);
@@ -961,32 +961,42 @@ int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, s
 }
 
 
-/* Add serialized attrs into a new namespace */
-int blosc2_frame_add_namespace(blosc2_frame *frame, char *namespace, uint8_t *sattrs,
-                               uint32_t sattrs_len) {
-  blosc2_frame_attrs *attrs = malloc(sizeof(blosc2_frame_attrs));
-  if (strlen(namespace) > BLOSC2_NAMESPACE_MAXLEN) {
-      return -1;
+/* Add content into a new namespace */
+int blosc2_frame_add_namespace(blosc2_frame *frame, char *name, uint8_t *content,
+                               uint32_t content_len) {
+  if (strlen(name) > BLOSC2_NAMESPACE_NAME_MAXLEN) {
+    fprintf(stderr, "namespaces cannot be larger than %d chars\n", BLOSC2_NAMESPACE_NAME_MAXLEN);
+    return -1;
   }
-  attrs->namespace = strdup(namespace);
-  uint8_t* sattrs_buf = malloc((size_t)sattrs_len);
-  memcpy(sattrs_buf, sattrs, sattrs_len);
-  attrs->sattrs = sattrs_buf;
-  attrs->sattrs_len = sattrs_len;
-  frame->attrs[frame->nclients] = attrs;
-  frame->nclients += 1;
+
+  if (blosc2_frame_get_namespace(frame, name, &content, &content_len) < 0) {
+    free(content);
+    fprintf(stderr, "namespace \"%s\" already exists\n", name);
+    return -2;
+  }
+
+  // Add the namespace
+  blosc2_frame_nspace *attrs = malloc(sizeof(blosc2_frame_nspace));
+  attrs->name = strdup(name);
+  uint8_t* content_buf = malloc((size_t)content_len);
+  memcpy(content_buf, content, content_len);
+  attrs->content = content_buf;
+  attrs->content_len = content_len;
+  frame->nspaces[frame->nnspaces] = attrs;
+  frame->nnspaces += 1;
+
   return 0;
 }
 
 
-/* Get the serialized attributes out of a namespace */
-int blosc2_frame_get_namespace(blosc2_frame *frame, char *namespace, uint8_t **sattrs,
-                               uint32_t *sattrs_len) {
-    for (int nclient = 0; nclient < frame->nclients; nclient++) {
-        if (strcmp(namespace, frame->attrs[nclient]->namespace) == 0) {
-            *sattrs_len = (uint32_t)frame->attrs[nclient]->sattrs_len;
-            *sattrs = malloc((size_t)*sattrs_len);
-            memcpy(*sattrs, frame->attrs[nclient]->sattrs, (size_t)*sattrs_len);
+/* Get the content out of a namespace */
+int blosc2_frame_get_namespace(blosc2_frame *frame, char *name, uint8_t **content,
+                               uint32_t *content_len) {
+    for (int nclient = 0; nclient < frame->nnspaces; nclient++) {
+        if (strcmp(name, frame->nspaces[nclient]->name) == 0) {
+            *content_len = (uint32_t)frame->nspaces[nclient]->content_len;
+            *content = malloc((size_t)*content_len);
+            memcpy(*content, frame->nspaces[nclient]->content, (size_t)*content_len);
             return 0;  // Found
         }
     }
@@ -1000,13 +1010,13 @@ int blosc2_free_frame(blosc2_frame *frame) {
   if (frame->sdata != NULL) {
     free(frame->sdata);
   }
-  if (frame->nclients > 0) {
-    for (int i = 0; i < frame->nclients; i++) {
-      free(frame->attrs[i]->namespace);
-      free(frame->attrs[i]->sattrs);
-      free(frame->attrs[i]);
+  if (frame->nnspaces > 0) {
+    for (int i = 0; i < frame->nnspaces; i++) {
+      free(frame->nspaces[i]->name);
+      free(frame->nspaces[i]->content);
+      free(frame->nspaces[i]);
     }
-    frame->nclients = 0;
+    frame->nnspaces = 0;
   }
 
   // TODO: make a constructor for frames so that we can handle the contents of the struct
