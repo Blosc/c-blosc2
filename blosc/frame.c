@@ -94,7 +94,7 @@ void swap_store(void *dest, const void *pa, int size) {
 #define FRAME_NTHREADS_D (FRAME_NTHREADS_C + 2 + 1)  // 61
 #define FRAME_HAS_NSPACES (FRAME_NTHREADS_D + 2)  // 63
 #define HEADER2_MINLEN (FRAME_HAS_NSPACES + 1)  // 64 <- minimum length
-#define FRAME_NAMESPACES (HEADER2_MINLEN)  // 64
+#define FRAME_NAMESPACES (FRAME_HAS_NSPACES + 1)  // 64
 #define FRAME_IDX_SIZE (FRAME_NAMESPACES + 1 + 1)  // 66
 
 
@@ -203,11 +203,10 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int16_t nnspaces = (frame == NULL)? (int16_t)0 : frame->nnspaces;
   *h2p = (nnspaces > 0)? (uint8_t)0xc3 : (uint8_t)0xc2;  // bool for FRAME_HAS_NAMESPACES
   h2p += 1;
-
-  int32_t hsize = (int32_t)(h2p - h2);
-  assert(hsize == HEADER2_MINLEN);
+  assert(h2p - h2 == HEADER2_MINLEN);
 
   // Make space for the header of namespaces (array marker, size, map of offsets)
+  int32_t hsize = HEADER2_MINLEN;
   h2 = realloc(h2, (size_t)hsize + 1 + 1 + 2 + 1 + 2);
   h2p = h2 + hsize;
 
@@ -603,7 +602,7 @@ int frame_update_meta(blosc2_frame* frame, int64_t new_frame_len, int64_t new_nb
   if (frame->sdata == NULL) {
     // Write updated counters down to file
     FILE* fp = fopen(frame->fname, "rb+");
-    fwrite(header, (size_t)header_len, 1, fp);
+      fwrite(header, HEADER2_MINLEN, 1, fp);
     fclose(fp);
     free(header);
   }
@@ -973,7 +972,7 @@ int blosc2_frame_add_namespace(blosc2_frame *frame, char *name, uint8_t *content
                                uint32_t content_len) {
     int nnspace = blosc2_frame_has_namespace(frame, name);
     if (nnspace >= 0) {
-        fprintf(stderr, "namespace \"%s\" already exists\n", name);
+        fprintf(stderr, "namespace \"%s\" already exists", name);
         return -2;
     }
 
@@ -986,6 +985,15 @@ int blosc2_frame_add_namespace(blosc2_frame *frame, char *name, uint8_t *content
     nspace->content_len = content_len;
     frame->nspaces[frame->nnspaces] = nspace;
     frame->nnspaces += 1;
+
+    // TODO: should we always dump the complete super-chunk?
+    if (frame->fname != NULL) {
+        int64_t len = blosc2_schunk_to_frame(frame->schunk, frame);
+        if (len < 0) {
+            fprintf(stderr, "problems storing frame on-disk");
+            return -3;
+        }
+    }
 
     return frame->nnspaces - 1;
 }
