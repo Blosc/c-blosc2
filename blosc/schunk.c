@@ -40,7 +40,7 @@
 
 /* Create a new super-chunk */
 blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
-                                 const blosc2_frame* frame) {
+                                 blosc2_frame* frame) {
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
 
   schunk->version = 0;     /* pre-first version */
@@ -61,21 +61,16 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
   dparams.schunk = schunk;
   schunk->dctx = blosc2_create_dctx(dparams);
 
+  schunk->frame = frame;
   if (frame != NULL) {
-    blosc2_frame *mframe = malloc(sizeof(blosc2_frame));
-    memcpy(mframe, frame, sizeof(blosc2_frame));
-    mframe->schunk = schunk;
-    if (mframe->len == 0) {
+    frame->schunk = schunk;
+    if (frame->len == 0) {
       // Initialize frame (basically, encode the header)
-      int64_t frame_len = blosc2_schunk_to_frame(schunk, mframe);
+      int64_t frame_len = blosc2_schunk_to_frame(schunk, frame);
       if (frame_len < 0) {
         fprintf(stderr, "Error during the conversion of schunk to frame\n");
       }
     }
-    schunk->frame = mframe;
-  }
-  else {
-    schunk->frame = NULL;
   }
 
   return schunk;
@@ -230,9 +225,6 @@ int blosc2_free_schunk(blosc2_schunk *schunk) {
       free(schunk->data[i]);
     }
     free(schunk->data);
-  }
-  if (schunk->frame != NULL) {
-    blosc2_free_frame(schunk->frame);
   }
   blosc2_free_ctx(schunk->cctx);
   blosc2_free_ctx(schunk->dctx);

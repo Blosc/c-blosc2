@@ -986,15 +986,6 @@ int blosc2_frame_add_namespace(blosc2_frame *frame, char *name, uint8_t *content
     frame->nspaces[frame->nnspaces] = nspace;
     frame->nnspaces += 1;
 
-    // TODO: should we always dump the complete super-chunk?
-    if (frame->fname != NULL) {
-        int64_t len = blosc2_schunk_to_frame(frame->schunk, frame);
-        if (len < 0) {
-            fprintf(stderr, "problems storing frame on-disk");
-            return -3;
-        }
-    }
-
     return frame->nnspaces - 1;
 }
 
