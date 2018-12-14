@@ -90,6 +90,17 @@ int append_chunk(blosc2_schunk* schunk, uint8_t* chunk) {
                     "%d > %d", nbytes, schunk->chunksize);
     return -1;
   }
+
+  /* Update counters */
+  schunk->nchunks = nchunks + 1;
+  schunk->nbytes += nbytes;
+  schunk->cbytes += cbytes;
+  // FIXME: this should be updated when/if super-chunks support chunks with different sizes
+  if (nchunks == 0) {
+    schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
+  }
+
+  // Update frame
   if (schunk->frame == NULL) {
     // Check that we are not appending a small chunk after another small chunk
     if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
@@ -111,14 +122,6 @@ int append_chunk(blosc2_schunk* schunk, uint8_t* chunk) {
   else {
     blosc2_frame_append_chunk(schunk->frame, chunk);
     free(chunk);  // for a frame, we don't need the chunk anymore
-  }
-  /* Update counters */
-  schunk->nchunks = nchunks + 1;
-  schunk->nbytes += nbytes;
-  schunk->cbytes += cbytes;
-  // FIXME: this should be updated when/if super-chunks support chunks with different sizes
-  if (nchunks == 0) {
-    schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
   }
 
   /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n", */

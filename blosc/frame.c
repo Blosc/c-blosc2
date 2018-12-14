@@ -120,6 +120,9 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
   // Total frame size
   *h2p = 0xcf;  // uint64
+  // Fill it with frame->len which is known *after* the creation of the frame (e.g. when updating the header)
+  int64_t flen = frame->len;
+  swap_store(h2 + FRAME_LEN, &flen, sizeof(flen));
   h2p += 1 + 8;
   assert(h2p - h2 < HEADER2_MINLEN);
 
@@ -383,11 +386,11 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
 /* Write an in-memory frame out to a file. */
 int64_t blosc2_frame_to_file(blosc2_frame *frame, char *fname) {
-  assert(frame->fname == NULL);  // make sure that we are using an in-memory frame
-  FILE* fp = fopen(fname, "wb");
-  fwrite(frame->sdata, (size_t)frame->len, 1, fp);
-  fclose(fp);
-  return frame->len;
+    assert(frame->fname == NULL);  // make sure that we are using an in-memory frame
+    FILE* fp = fopen(fname, "wb");
+    fwrite(frame->sdata, (size_t)frame->len, 1, fp);
+    fclose(fp);
+    return frame->len;
 }
 
 
@@ -566,9 +569,7 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
 }
 
 
-int frame_update_meta(blosc2_frame* frame, int64_t new_frame_len, int64_t new_nbytes,
-                      int64_t new_cbytes, int32_t new_chunksize) {
-  uint8_t* framep = frame->sdata;
+int frame_update_meta(blosc2_frame* frame) {
   uint8_t* header = frame->sdata;
 
   assert(frame->len > 0);
@@ -577,37 +578,32 @@ int frame_update_meta(blosc2_frame* frame, int64_t new_frame_len, int64_t new_nb
     header = malloc(HEADER2_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
     fread(header, HEADER2_MINLEN, 1, fp);
-    framep = header;
     fclose(fp);
   }
+  uint32_t prev_h2len;
+  swap_store(&prev_h2len, header + HEADER2_LEN, sizeof(prev_h2len));
 
-  int32_t header_len;
-  swap_store(&header_len, framep + HEADER2_LEN, sizeof(header_len));
-  int64_t nbytes;
-  swap_store(&nbytes, framep + FRAME_NBYTES, sizeof(nbytes));
-  int32_t chunksize;
-  swap_store(&chunksize, framep + FRAME_CHUNKSIZE, sizeof(chunksize));
-  /* Update counters */
-  frame->len = new_frame_len;
-  swap_store(header + FRAME_LEN, &new_frame_len, sizeof(new_frame_len));
-  swap_store(header + FRAME_NBYTES, &new_nbytes, sizeof(new_nbytes));
-  swap_store(header + FRAME_CBYTES, &new_cbytes, sizeof(new_cbytes));
-  // Set the chunksize
-//  if ((nbytes > 0) && (new_chunksize != chunksize)) {
-//    TODO: look into the variable size flag for this condition
-//    new_chunksize = 0;   // varlen
-//  }
-  swap_store(header + FRAME_CHUNKSIZE, &new_chunksize, sizeof(new_chunksize));
+  // Build a new header
+  uint8_t* h2 = new_header2_frame(frame->schunk, frame);
+  uint32_t h2len;
+  swap_store(&h2len, h2 + HEADER2_LEN, sizeof(h2len));
+
+  assert(prev_h2len == h2len);  // sanity check: the new header size should equal the previous one
 
   if (frame->sdata == NULL) {
-    // Write updated counters down to file
+    // Write updated header down to file
     FILE* fp = fopen(frame->fname, "rb+");
-      fwrite(header, HEADER2_MINLEN, 1, fp);
+    fwrite(h2, h2len, 1, fp);
     fclose(fp);
     free(header);
   }
+  else {
+    memcpy(frame->sdata, h2, h2len);
+  }
+  free(h2);
 
   return 0;
+
 }
 
 
@@ -905,9 +901,9 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
   }
   free(off_chunk);
 
-  /* Update counters */
+  /* Update header and other metainfo (namespaces) in frame */
   frame->len = new_frame_len;
-  ret = frame_update_meta(frame, new_frame_len, new_nbytes, new_cbytes, nbytes_chunk);
+  ret = frame_update_meta(frame);
   if (ret < 0) {
     fprintf(stderr, "unable to update meta info from frame");
     return NULL;
