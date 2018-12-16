@@ -395,7 +395,7 @@ int64_t blosc2_frame_to_file(blosc2_frame *frame, char *fname) {
 
 
 /* Initialize a frame out of a file */
-blosc2_frame* blosc2_frame_from_file(char *fname) {
+blosc2_frame* blosc2_frame_from_file(const char *fname) {
   blosc2_frame* frame = calloc(1, sizeof(blosc2_frame));
   char* fname_cpy = malloc(strlen(fname) + 1);
   frame->fname = strcpy(fname_cpy, fname);
@@ -713,6 +713,8 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   dparams.schunk = schunk;
   schunk->dctx = blosc2_create_dctx(dparams);
+
+  schunk->frame = frame;
 
   return schunk;
 }

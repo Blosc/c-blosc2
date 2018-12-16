@@ -741,7 +741,7 @@ BLOSC_EXPORT int blosc2_free_frame(blosc2_frame *frame);
 BLOSC_EXPORT int64_t blosc2_frame_to_file(blosc2_frame *frame, char *fname);
 
 /* Initialize a frame out of a file */
-BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(char *fname);
+BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(const char *fname);
 
 /* Create a super-chunk from a frame. */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame);
