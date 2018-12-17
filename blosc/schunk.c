@@ -38,6 +38,42 @@
 #endif
 
 
+/* Get the cparams associated with a super-chunk */
+int blosc2_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
+  *cparams = calloc(sizeof(blosc2_cparams), 1);
+  (*cparams)->schunk = schunk;
+  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+    (*cparams)->filters[i] = schunk->filters[i];
+    (*cparams)->filters_meta[i] = schunk->filters_meta[i];
+  }
+  (*cparams)->compcode = schunk->compcode;
+  (*cparams)->clevel = schunk->clevel;
+  (*cparams)->typesize = schunk->typesize;
+  (*cparams)->blocksize = schunk->blocksize;
+  if (schunk->cctx == NULL) {
+    (*cparams)->nthreads = BLOSC_CPARAMS_DEFAULTS.nthreads;
+  }
+  else {
+    (*cparams)->nthreads = schunk->cctx->nthreads;
+  }
+  return 0;
+}
+
+
+/* Get the dparams associated with a super-chunk */
+int blosc2_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams) {
+  *dparams = calloc(sizeof(blosc2_dparams), 1);
+  (*dparams)->schunk = schunk;
+  if (schunk->dctx == NULL) {
+    (*dparams)->nthreads = BLOSC_DPARAMS_DEFAULTS.nthreads;
+  }
+  else {
+    (*dparams)->nthreads = schunk->dctx->nthreads;
+  }
+  return 0;
+}
+
+
 /* Create a new super-chunk */
 blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
                                  blosc2_frame* frame) {

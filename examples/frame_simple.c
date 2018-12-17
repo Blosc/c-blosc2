@@ -115,9 +115,9 @@ int main() {
   // frame1 (in-memory) -> schunk
   blosc_set_timestamp(&last);
   // The next creates an schunk made of sparse chunks
-  blosc2_schunk* schunk1 = blosc2_schunk_from_frame(&frame1);
+  blosc2_schunk* schunk1 = blosc2_schunk_from_frame(&frame1, true);
   // The next creates a frame-backed schunk
-  // blosc2_schunk* schunk1 = blosc2_new_schunk(cparams, dparams, &frame1);
+  // blosc2_schunk* schunk1 = blosc2_schunk_from_frame(&frame1, false);
   if (schunk1 == NULL) {
     printf("Bad conversion frame1 -> schunk1!\n");
     return -1;
@@ -130,9 +130,9 @@ int main() {
   // frame2 (on-disk) -> schunk
   blosc_set_timestamp(&last);
   // The next creates an schunk made of sparse chunks
-  // blosc2_schunk* schunk2 = blosc2_schunk_from_frame(frame2);
+  // blosc2_schunk* schunk2 = blosc2_schunk_from_frame(frame2, true);
   // The next creates a frame-backed schunk
-  blosc2_schunk* schunk2 = blosc2_new_schunk(cparams, dparams, frame2);
+  blosc2_schunk* schunk2 = blosc2_schunk_from_frame(frame2, false);
   if (schunk2 == NULL) {
     printf("Bad conversion frame2 -> schunk2!\n");
     return -1;

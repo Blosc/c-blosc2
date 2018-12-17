@@ -608,7 +608,7 @@ int frame_update_meta(blosc2_frame* frame) {
 
 
 /* Get a super-chunk out of a frame */
-blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
+blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
   int32_t header_len;
   int64_t frame_len;
   int64_t nbytes;
@@ -626,6 +626,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
   }
 
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
+  schunk->frame = frame;
   schunk->nbytes = nbytes;
   schunk->cbytes = cbytes;
   schunk->typesize = typesize;
@@ -643,7 +644,22 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
     return NULL;
   }
 
-  // And create the actual data chunks (and, while doing this,
+  // Compression and decompression contexts
+  blosc2_cparams *cparams;
+  blosc2_get_cparams(schunk, &cparams);
+  schunk->cctx = blosc2_create_cctx(*cparams);
+  free(cparams);
+  blosc2_dparams *dparams;
+  blosc2_get_dparams(schunk, &dparams);
+  schunk->dctx = blosc2_create_dctx(*dparams);
+  free(dparams);
+
+  if (!sparse) {
+    // We are done, so leave here
+    return schunk;
+  }
+
+  // We want the sparse schunk, so create the actual data chunks (and, while doing this,
   // get a guess at the blocksize used in this frame)
   schunk->data = malloc(nchunks * sizeof(void*));
   int64_t acc_nbytes = 0;
@@ -697,24 +713,6 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame) {
   assert(acc_nbytes == nbytes);
   assert(acc_cbytes == cbytes);
   assert(frame_len == header_len + cbytes + off_cbytes);
-
-  // Compression and decompression contexts
-  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
-  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
-    cparams.filters[i] = schunk->filters[i];
-    cparams.filters_meta[i] = schunk->filters_meta[i];
-  }
-  cparams.compcode = schunk->compcode;
-  cparams.clevel = schunk->clevel;
-  cparams.typesize = schunk->typesize;
-  cparams.blocksize = schunk->blocksize;
-  schunk->cctx = blosc2_create_cctx(cparams);
-
-  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
-  dparams.schunk = schunk;
-  schunk->dctx = blosc2_create_dctx(dparams);
-
-  schunk->frame = frame;
 
   return schunk;
 }
