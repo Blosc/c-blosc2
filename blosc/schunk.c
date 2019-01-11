@@ -38,9 +38,45 @@
 #endif
 
 
+/* Get the cparams associated with a super-chunk */
+int blosc2_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
+  *cparams = calloc(sizeof(blosc2_cparams), 1);
+  (*cparams)->schunk = schunk;
+  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+    (*cparams)->filters[i] = schunk->filters[i];
+    (*cparams)->filters_meta[i] = schunk->filters_meta[i];
+  }
+  (*cparams)->compcode = schunk->compcode;
+  (*cparams)->clevel = schunk->clevel;
+  (*cparams)->typesize = schunk->typesize;
+  (*cparams)->blocksize = schunk->blocksize;
+  if (schunk->cctx == NULL) {
+    (*cparams)->nthreads = BLOSC_CPARAMS_DEFAULTS.nthreads;
+  }
+  else {
+    (*cparams)->nthreads = schunk->cctx->nthreads;
+  }
+  return 0;
+}
+
+
+/* Get the dparams associated with a super-chunk */
+int blosc2_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams) {
+  *dparams = calloc(sizeof(blosc2_dparams), 1);
+  (*dparams)->schunk = schunk;
+  if (schunk->dctx == NULL) {
+    (*dparams)->nthreads = BLOSC_DPARAMS_DEFAULTS.nthreads;
+  }
+  else {
+    (*dparams)->nthreads = schunk->dctx->nthreads;
+  }
+  return 0;
+}
+
+
 /* Create a new super-chunk */
 blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
-                                 const blosc2_frame* frame) {
+                                 blosc2_frame* frame) {
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
 
   schunk->version = 0;     /* pre-first version */
@@ -61,21 +97,16 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
   dparams.schunk = schunk;
   schunk->dctx = blosc2_create_dctx(dparams);
 
+  schunk->frame = frame;
   if (frame != NULL) {
-    blosc2_frame *mframe = malloc(sizeof(blosc2_frame));
-    memcpy(mframe, frame, sizeof(blosc2_frame));
-    mframe->schunk = schunk;
-    if (mframe->len == 0) {
+    frame->schunk = schunk;
+    if (frame->len == 0) {
       // Initialize frame (basically, encode the header)
-      int64_t frame_len = blosc2_schunk_to_frame(schunk, mframe);
+      int64_t frame_len = blosc2_schunk_to_frame(schunk, frame);
       if (frame_len < 0) {
         fprintf(stderr, "Error during the conversion of schunk to frame\n");
       }
     }
-    schunk->frame = mframe;
-  }
-  else {
-    schunk->frame = NULL;
   }
 
   return schunk;
@@ -95,6 +126,17 @@ int append_chunk(blosc2_schunk* schunk, uint8_t* chunk) {
                     "%d > %d", nbytes, schunk->chunksize);
     return -1;
   }
+
+  /* Update counters */
+  schunk->nchunks = nchunks + 1;
+  schunk->nbytes += nbytes;
+  schunk->cbytes += cbytes;
+  // FIXME: this should be updated when/if super-chunks support chunks with different sizes
+  if (nchunks == 0) {
+    schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
+  }
+
+  // Update frame
   if (schunk->frame == NULL) {
     // Check that we are not appending a small chunk after another small chunk
     if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
@@ -116,14 +158,6 @@ int append_chunk(blosc2_schunk* schunk, uint8_t* chunk) {
   else {
     blosc2_frame_append_chunk(schunk->frame, chunk);
     free(chunk);  // for a frame, we don't need the chunk anymore
-  }
-  /* Update counters */
-  schunk->nchunks = nchunks + 1;
-  schunk->nbytes += nbytes;
-  schunk->cbytes += cbytes;
-  // FIXME: this should be updated when/if super-chunks support chunks with different sizes
-  if (nchunks == 0) {
-    schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
   }
 
   /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n", */
@@ -230,9 +264,6 @@ int blosc2_free_schunk(blosc2_schunk *schunk) {
       free(schunk->data[i]);
     }
     free(schunk->data);
-  }
-  if (schunk->frame != NULL) {
-    blosc2_free_frame(schunk->frame);
   }
   blosc2_free_ctx(schunk->cctx);
   blosc2_free_ctx(schunk->dctx);

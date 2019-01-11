@@ -681,7 +681,7 @@ typedef struct blosc2_schunk_s {
 
 /* Create a new super-chunk. */
 BLOSC_EXPORT blosc2_schunk *
-blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams, const blosc2_frame *frame);
+blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams, blosc2_frame *frame);
 
 /* Release resources from a super-chunk */
 BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *schunk);
@@ -717,9 +717,26 @@ BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchun
  *
  * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
  * is returned instead.
-*/
+ */
 BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk,
                                          bool *needs_free);
+
+/* Return the `cparams` associated to a super-chunk.
+ *
+ * A new struct is allocated, and the user should free it after use.
+ *
+ * Return 0 if success.  Else a negative code is returned.
+ */
+BLOSC_EXPORT int blosc2_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams);
+
+/* Return the `dparams` struct associated to a super-chunk.
+ *
+ * A new struct is allocated, and the user should free it after use.
+ *
+ * Return 0 if success.  Else a negative code is returned.
+ */
+BLOSC_EXPORT int blosc2_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams);
+
 
 /*********************************************************************
 
@@ -741,10 +758,13 @@ BLOSC_EXPORT int blosc2_free_frame(blosc2_frame *frame);
 BLOSC_EXPORT int64_t blosc2_frame_to_file(blosc2_frame *frame, char *fname);
 
 /* Initialize a frame out of a file */
-BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(char *fname);
+BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(const char *fname);
 
-/* Create a super-chunk from a frame. */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame);
+/* Create a super-chunk from a frame.
+ *
+ * If `sparse` is true, a new sparse, in-memory schunk is created.  Else, a frame-backed one
+ * is created (i.e. no copies are made). */
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse);
 
 /* Append an existing chunk into a frame. */
 BLOSC_EXPORT void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk);

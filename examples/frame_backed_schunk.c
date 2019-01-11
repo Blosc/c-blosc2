@@ -57,7 +57,7 @@ int main() {
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
 
-  /* Create a super-chunk backed by an in-memory frame */
+  /* Create a new super-chunk backed by an in-memory frame */
   blosc2_frame* frame1 = &(blosc2_frame) {
           .sdata = NULL,
           .fname = NULL,
@@ -84,7 +84,7 @@ int main() {
   printf("Time for append data to a schunk backed by an in-memory frame: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
 
-  /* Create a super-chunk backed by a fileframe */
+  /* Create a new super-chunk backed by a fileframe */
   blosc2_frame* frame2 = &(blosc2_frame) {
           .sdata = NULL,
           .fname = "frame_backed_schunk.b2frame",
