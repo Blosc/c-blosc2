@@ -113,6 +113,8 @@ option(DEACTIVATE_ZLIB
     "Do not include support for the ZLIB library." OFF)
 option(DEACTIVATE_ZSTD
     "Do not include support for the ZSTD library." OFF)
+option(DEACTIVATE_IPP
+    "Do not include support for the Intel IPP library." OFF)
 option(PREFER_EXTERNAL_LZ4
         "Find and use external LZ4 library instead of included sources." OFF)
 option(PREFER_EXTERNAL_LIZARD
@@ -188,6 +190,12 @@ if (NOT DEACTIVATE_ZSTD)
     # not found, we will use the included sources for it
     set(HAVE_ZSTD TRUE)
 endif (NOT DEACTIVATE_ZSTD)
+
+if (NOT DEACTIVATE_IPP)
+    find_package(IPP)
+	message(STATUS "Using IPP accelerated compression.")
+    set(HAVE_IPP TRUE)
+endif (NOT DEACTIVATE_IPP)
 
 # create the config.h file
 configure_file("blosc/config.h.in" "blosc/config.h")
