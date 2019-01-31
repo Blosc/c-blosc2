@@ -7,6 +7,7 @@
 #cmakedefine HAVE_ZLIB @HAVE_ZLIB@
 #cmakedefine HAVE_MINIZ @HAVE_MINIZ@
 #cmakedefine HAVE_ZSTD @HAVE_ZSTD@
+#cmakedefine HAVE_IPP @HAVE_IPP@
 #cmakedefine BLOSC_DLL_EXPORT @DLL_EXPORT@
 
 

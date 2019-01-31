@@ -136,6 +136,10 @@ if (NOT DEACTIVATE_ZSTD)
     endif (ZSTD_FOUND)
 endif (NOT DEACTIVATE_ZSTD)
 
+if (NOT DEACTIVATE_IPP)
+    set(LIBS ${LIBS} "${IPP_LIBRARIES}")
+endif (NOT DEACTIVATE_IPP)
+
 # targets
 if (BUILD_SHARED)
     add_library(blosc_shared SHARED ${SOURCES})
