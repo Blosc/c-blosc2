@@ -34,10 +34,6 @@
 
 #include "config.h"
 
-#ifdef HAVE_IPP
-#include <ipps.h>
-#include <ippdc.h>
-#endif
 
 /*-************************************
 *  Tuning parameters
@@ -1619,22 +1615,9 @@ int LZ4_decompress_safe_partial(const char* source, char* dest, int compressedSi
 LZ4_FORCE_O2_GCC_PPC64LE
 int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
 {
-#ifdef HAVE_IPP
-  int inlen, outlen;
-  IppStatus status;
-  inlen = originalSize + originalSize;
-  outlen = originalSize;
-
-  /* Decoding stops when the end of the destination buffer is reached. */
-  status = ippsDecodeLZ4Dict_8u((const Ipp8u*)source, &inlen, (Ipp8u*)dest, 0, &outlen, NULL, 64 KB);
-  //status = ippsDecodeLZ4_8u((const Ipp8u*)source, inlen, (Ipp8u*)dest, &outlen);
-  /* Simulate original function return status */
-  return (status == ippStsNoErr) ? inlen : -inlen;
-#else
   return LZ4_decompress_generic(source, dest, 0, originalSize,
                                   endOnOutputSize, full, 0, withPrefix64k,
                                   (BYTE*)dest - 64 KB, NULL, 0);
-#endif
 }
 
 /*===== Instantiate a few more decoding cases, used more than once. =====*/

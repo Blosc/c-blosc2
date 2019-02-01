@@ -31,6 +31,10 @@
 #if defined(HAVE_LZ4)
   #include "lz4.h"
   #include "lz4hc.h"
+  #ifdef HAVE_IPP
+    #include <ipps.h>
+    #include <ippdc.h>
+  #endif
 #endif /*  HAVE_LZ4 */
 #if defined(HAVE_LIZARD)
   #include "lizard_compress.h"
@@ -311,8 +315,27 @@ int blosc_compname_to_compcode(const char* compname) {
 static int lz4_wrap_compress(const char* input, size_t input_length,
                              char* output, size_t maxout, int accel) {
   int cbytes;
-  cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout,
-                             accel);
+#ifdef HAVE_IPP
+  int outlen = (int)maxout;
+  int inlen = (int)input_length;
+  IppStatus status;
+  int hash_size = 0;
+  Ipp8u *hash_table = NULL;
+  status = ippsEncodeLZ4HashTableGetSize_8u(&hash_size);
+  if (status != ippStsNoErr) {
+    return -1;
+  }
+  hash_table = ippsMalloc_8u(hash_size);
+  status = ippsEncodeLZ4HashTableInit_8u(hash_table, inlen);
+  if (status != ippStsNoErr) {
+    return -1;
+  }
+  status = ippsEncodeLZ4_8u((const Ipp8u*)input, inlen, (Ipp8u*)output, &outlen, hash_table);
+  ippsFree(hash_table);
+  cbytes = (status == ippStsNoErr) ? outlen : -outlen;
+#else
+  cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
+#endif
   return cbytes;
 }
 
@@ -333,7 +356,16 @@ static int lz4hc_wrap_compress(const char* input, size_t input_length,
 static int lz4_wrap_decompress(const char* input, size_t compressed_length,
                                char* output, size_t maxout) {
   int cbytes;
+#ifdef HAVE_IPP
+  int outlen;
+  int inlen = (int)compressed_length;
+  IppStatus status;
+  //status = ippsDecodeLZ4_8u((const Ipp8u*)input, inlen, (Ipp8u*)output, &outlen);
+  status = ippsDecodeLZ4Dict_8u((const Ipp8u*)input, &inlen, (Ipp8u*)output, 0, &outlen, NULL, 1 << 16);
+  cbytes = (status == ippStsNoErr) ? inlen : -inlen;
+#else
   cbytes = LZ4_decompress_fast(input, output, (int)maxout);
+#endif
   if (cbytes != compressed_length) {
     return 0;
   }
