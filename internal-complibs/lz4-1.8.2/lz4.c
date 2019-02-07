@@ -32,8 +32,6 @@
     - LZ4 source repository : https://github.com/lz4/lz4
 */
 
-#include "config.h"
-
 
 /*-************************************
 *  Tuning parameters
@@ -1615,7 +1613,7 @@ int LZ4_decompress_safe_partial(const char* source, char* dest, int compressedSi
 LZ4_FORCE_O2_GCC_PPC64LE
 int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
 {
-  return LZ4_decompress_generic(source, dest, 0, originalSize,
+    return LZ4_decompress_generic(source, dest, 0, originalSize,
                                   endOnOutputSize, full, 0, withPrefix64k,
                                   (BYTE*)dest - 64 KB, NULL, 0);
 }
