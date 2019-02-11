@@ -63,10 +63,3 @@ Outreaching
   
 * Other outreaching activities would be to produce videos of the kind 'Blosc in 10 minutes', but not sure if this would be interesting for potential Blosc users (probably short tutorials in docs would be better suited).
 
-
-Appendix: Naming things
------------------------
-
-Naming is one of the most time-consuming tasks, but critical for communicating effectively.  Here it is a preliminary list of names that I am not comfortable with: 
-
-* We are currently calling `filters` to a data transformation function that essentially produces the same amount of data, but with bytes shuffled or transformed in different ways.  Perhaps `transformers` would be a better name?
