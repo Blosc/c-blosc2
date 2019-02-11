@@ -8,7 +8,7 @@
 :Gitter: |gitter|
 :Travis CI: |travis|
 :Appveyor: |appveyor|
-:Powered by NumFOCUS: |numfocus|
+:NumFOCUS: |numfocus|
 
 .. |gitter| image:: https://badges.gitter.im/Blosc/c-blosc.svg
         :alt: Join the chat at https://gitter.im/Blosc/c-blosc
