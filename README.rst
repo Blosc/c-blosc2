@@ -8,6 +8,7 @@
 :Gitter: |gitter|
 :Travis CI: |travis|
 :Appveyor: |appveyor|
+:Powered by NumFOCUS: |numfocus|
 
 .. |gitter| image:: https://badges.gitter.im/Blosc/c-blosc.svg
         :alt: Join the chat at https://gitter.im/Blosc/c-blosc
@@ -19,10 +20,12 @@
 .. |appveyor| image:: https://ci.appveyor.com/api/projects/status/3mlyjc1ak0lbkmte/branch/master?svg=true
         :target: https://ci.appveyor.com/project/FrancescAlted/c-blosc2/branch/master
 
+.. |numfocus| image:: https://img.shields.io/badge/powered%20by-NumFOCUS-orange.svg?style=flat&colorA=E1523D&colorB=007D8A
+        :target: https://numfocus.org
+
 What is it?
 ===========
 
-`Powered by NumFOCUS <https://img.shields.io/badge/powered%20by-NumFOCUS-orange.svg?style=flat&colorA=E1523D&colorB=007D8A>`_
 
 `Blosc <http://blosc.org/pages/blosc-in-depth/>`_ is a high performance compressor optimized for binary data.
 It has been designed to transmit data to the processor cache faster
