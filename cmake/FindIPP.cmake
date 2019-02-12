@@ -41,7 +41,7 @@ elseif(APPLE)
     set(IPP_LIBS libipps.a libippdc.a libippcore.a)
 else() # Linux
     set(IPP_SEARCH_LIB libippcore.a)
-    set(IPP_LIBS libipps.a libippdc.a libippcore.a)
+    set(IPP_LIBS libippvm.a libipps.a libippdc.a libippcore.a)
 endif()
 
 
