@@ -357,11 +357,11 @@ static int lz4_wrap_decompress(const char* input, size_t compressed_length,
                                char* output, size_t maxout) {
   int cbytes;
 #ifdef HAVE_IPP
-  int outlen;
+  int outlen = (int)maxout;
   int inlen = (int)compressed_length;
   IppStatus status;
-  //status = ippsDecodeLZ4_8u((const Ipp8u*)input, inlen, (Ipp8u*)output, &outlen);
-  status = ippsDecodeLZ4Dict_8u((const Ipp8u*)input, &inlen, (Ipp8u*)output, 0, &outlen, NULL, 1 << 16);
+  status = ippsDecodeLZ4_8u((const Ipp8u*)input, inlen, (Ipp8u*)output, &outlen);
+  //status = ippsDecodeLZ4Dict_8u((const Ipp8u*)input, &inlen, (Ipp8u*)output, 0, &outlen, NULL, 1 << 16);
   cbytes = (status == ippStsNoErr) ? inlen : -inlen;
 #else
   cbytes = LZ4_decompress_fast(input, output, (int)maxout);
