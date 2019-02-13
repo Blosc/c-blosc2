@@ -692,8 +692,12 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     }
   #if defined(HAVE_LZ4)
     else if (context->compcode == BLOSC_LZ4) {
+      void *hash_table = NULL;
+    #ifdef HAVE_IPP
+      hash_table = thread_context->lz4_hash_table;
+    #endif
       cbytes = lz4_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
-                                 (char*)dest, (size_t)maxout, accel, thread_context->lz4_hash_table);
+                                 (char*)dest, (size_t)maxout, accel, hash_table);
     }
     else if (context->compcode == BLOSC_LZ4HC) {
       cbytes = lz4hc_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
