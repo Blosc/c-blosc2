@@ -121,6 +121,9 @@ struct thread_context {
   ZSTD_CCtx* zstd_cctx;
   ZSTD_DCtx* zstd_dctx;
 #endif /* HAVE_ZSTD */
+#ifdef HAVE_IPP
+  void *lz4_hash_table;
+#endif
 };
 
 
