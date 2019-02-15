@@ -193,8 +193,13 @@ endif (NOT DEACTIVATE_ZSTD)
 
 if (NOT DEACTIVATE_IPP)
     find_package(IPP)
-	message(STATUS "Using IPP accelerated compression.")
-    set(HAVE_IPP TRUE)
+    if (IPP_FOUND)
+	    message(STATUS "Using IPP accelerated compression.")
+        set(HAVE_IPP TRUE)
+    else ()
+        message(STATUS "Not using IPP accelerated compression.")
+        set(HAVE_IPP FALSE)
+    endif (IPP_FOUND)
 endif (NOT DEACTIVATE_IPP)
 
 # create the config.h file
