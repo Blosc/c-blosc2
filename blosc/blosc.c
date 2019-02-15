@@ -31,6 +31,10 @@
 #if defined(HAVE_LZ4)
   #include "lz4.h"
   #include "lz4hc.h"
+  #ifdef HAVE_IPP
+    #include <ipps.h>
+    #include <ippdc.h>
+  #endif
 #endif /*  HAVE_LZ4 */
 #if defined(HAVE_LIZARD)
   #include "lizard_compress.h"
@@ -309,10 +313,19 @@ int blosc_compname_to_compcode(const char* compname) {
 
 #if defined(HAVE_LZ4)
 static int lz4_wrap_compress(const char* input, size_t input_length,
-                             char* output, size_t maxout, int accel) {
+                             char* output, size_t maxout, int accel, void* hash_table) {
   int cbytes;
-  cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout,
-                             accel);
+#ifdef HAVE_IPP
+  if (hash_table == NULL) {
+    return -1;  // the hash table should always be initialized
+  }
+  int outlen = (int)maxout;
+  int inlen = (int)input_length;
+  IppStatus status = ippsEncodeLZ4_8u((const Ipp8u*)input, inlen, (Ipp8u*)output, &outlen, hash_table);
+  cbytes = (status == ippStsNoErr) ? outlen : -outlen;
+#else
+  cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
+#endif
   return cbytes;
 }
 
@@ -333,7 +346,16 @@ static int lz4hc_wrap_compress(const char* input, size_t input_length,
 static int lz4_wrap_decompress(const char* input, size_t compressed_length,
                                char* output, size_t maxout) {
   int cbytes;
+#ifdef HAVE_IPP
+  int outlen = (int)maxout;
+  int inlen = (int)compressed_length;
+  IppStatus status;
+  status = ippsDecodeLZ4_8u((const Ipp8u*)input, inlen, (Ipp8u*)output, &outlen);
+  //status = ippsDecodeLZ4Dict_8u((const Ipp8u*)input, &inlen, (Ipp8u*)output, 0, &outlen, NULL, 1 << 16);
+  cbytes = (status == ippStsNoErr) ? inlen : -inlen;
+#else
   cbytes = LZ4_decompress_fast(input, output, (int)maxout);
+#endif
   if (cbytes != compressed_length) {
     return 0;
   }
@@ -670,8 +692,12 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     }
   #if defined(HAVE_LZ4)
     else if (context->compcode == BLOSC_LZ4) {
+      void *hash_table = NULL;
+    #ifdef HAVE_IPP
+      hash_table = thread_context->lz4_hash_table;
+    #endif
       cbytes = lz4_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
-                                 (char*)dest, (size_t)maxout, accel);
+                                 (char*)dest, (size_t)maxout, accel, hash_table);
     }
     else if (context->compcode == BLOSC_LZ4HC) {
       cbytes = lz4hc_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
@@ -1056,19 +1082,43 @@ create_thread_context(blosc2_context* context, int32_t tid) {
   thread_context->zstd_dctx = NULL;
   #endif
 
+  /* Create the hash table for LZ4 in case we are using IPP */
+#ifdef HAVE_IPP
+  IppStatus status;
+  int inlen = thread_context->tmpblocksize > 0 ? thread_context->tmpblocksize : 1 << 16;
+  int hash_size = 0;
+  Ipp8u *hash_table = NULL;
+  status = ippsEncodeLZ4HashTableGetSize_8u(&hash_size);
+  if (status != ippStsNoErr) {
+    fprintf(stderr, "Error in ippsEncodeLZ4HashTableGetSize_8u");
+  }
+  hash_table = ippsMalloc_8u(hash_size);
+  status = ippsEncodeLZ4HashTableInit_8u(hash_table, inlen);
+  if (status != ippStsNoErr) {
+    fprintf(stderr, "Error in ippsEncodeLZ4HashTableInit_8u");
+  }
+  thread_context->lz4_hash_table = hash_table;
+#endif
+
   return thread_context;
 }
 
 void free_thread_context(struct thread_context* thread_context) {
   my_free(thread_context->tmp);
-  #if defined(HAVE_ZSTD)
+#if defined(HAVE_ZSTD)
   if (thread_context->zstd_cctx != NULL) {
     ZSTD_freeCCtx(thread_context->zstd_cctx);
   }
   if (thread_context->zstd_dctx != NULL) {
     ZSTD_freeDCtx(thread_context->zstd_dctx);
   }
-  #endif
+#endif
+#ifdef HAVE_IPP
+  if (thread_context->lz4_hash_table != NULL) {
+    ippsFree(thread_context->lz4_hash_table);
+  }
+#endif
+
   my_free(thread_context);
 }
 
@@ -2616,5 +2666,6 @@ void blosc2_free_ctx(blosc2_context* context) {
   if (context->btune != NULL) {
     btune_free(context);
   }
+
   my_free(context);
 }
