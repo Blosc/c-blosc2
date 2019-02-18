@@ -73,12 +73,12 @@ int main() {
     blosc2_frame frame1 = BLOSC_EMPTY_FRAME;
 
     // Add some namespaces
-    blosc2_frame_add_namespace(&frame1, "my_namespace1", (uint8_t *) "my_content1",
-                               (uint32_t) strlen("my_content1"));
-    blosc2_frame_add_namespace(&frame1, "my_namespace2", (uint8_t *) "my_content1",
-                               (uint32_t) strlen("my_content1"));
-    blosc2_frame_update_namespace(&frame1, "my_namespace2", (uint8_t *) "my_content2",
-                               (uint32_t) strlen("my_content2"));
+  blosc2_frame_add_metalayer(&frame1, "my_namespace1", (uint8_t *) "my_content1",
+                             (uint32_t) strlen("my_content1"));
+  blosc2_frame_add_metalayer(&frame1, "my_namespace2", (uint8_t *) "my_content1",
+                             (uint32_t) strlen("my_content1"));
+  blosc2_frame_update_metalayer(&frame1, "my_namespace2", (uint8_t *) "my_content2",
+                                (uint32_t) strlen("my_content2"));
     int64_t frame_len = blosc2_schunk_to_frame(schunk, &frame1);
     blosc_set_timestamp(&current);
     ttotal = blosc_elapsed_secs(last, current);
@@ -104,13 +104,13 @@ int main() {
            frame2->fname, ttotal, nbytes / (ttotal * GB));
 
     // Check that the attributes had a good roundtrip
-    if (frame2->nnspaces != 2) {
+    if (frame2->nmetalayers != 2) {
         printf("nclients not retrieved correctly!\n");
         return -1;
     }
     uint8_t* content;
     uint32_t content_len;
-    if (blosc2_frame_get_namespace(frame2, "my_namespace1", &content, &content_len) < 0) {
+    if (blosc2_frame_get_metalayer(frame2, "my_namespace1", &content, &content_len) < 0) {
         printf("namespace not found");
         return -1;
     }
@@ -133,11 +133,11 @@ int main() {
            ttotal, nbytes / (ttotal * GB));
 
     // Check that the attributes had a good roundtrip
-    if (schunk2->frame->nnspaces != 2) {
+    if (schunk2->frame->nmetalayers != 2) {
         printf("namespace not retrieved correctly!\n");
         return -1;
     }
-    if (blosc2_frame_get_namespace(schunk2->frame, "my_namespace2", &content, &content_len) < 0) {
+    if (blosc2_frame_get_metalayer(schunk2->frame, "my_namespace2", &content, &content_len) < 0) {
         printf("namespace not found");
         return -1;
     }

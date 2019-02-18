@@ -203,7 +203,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   assert(h2p - h2 < HEADER2_MINLEN);
 
   // Boolean for checking the existence of namespaces
-  int16_t nnspaces = (frame == NULL)? (int16_t)0 : frame->nnspaces;
+  int16_t nnspaces = (frame == NULL)? (int16_t)0 : frame->nmetalayers;
   *h2p = (nnspaces > 0)? (uint8_t)0xc3 : (uint8_t)0xc2;  // bool for FRAME_HAS_NAMESPACES
   h2p += 1;
   assert(h2p - h2 == HEADER2_MINLEN);
@@ -230,7 +230,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int32_t *offtooff = malloc(nnspaces * sizeof(int32_t));
   for (int nnspace = 0; nnspace < nnspaces; nnspace++) {
     assert(frame != NULL);
-    blosc2_frame_nspace *nspace = frame->nspaces[nnspace];
+    blosc2_frame_metalayer *nspace = frame->metalayers[nnspace];
     uint8_t nslen = (uint8_t) strlen(nspace->name);
     h2 = realloc(h2, (size_t)current_header_len + 1 + nslen + 1 + 4);
     h2p = h2 + current_header_len;
@@ -268,7 +268,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   current_header_len = (int32_t)(h2p - h2);
   for (int nnspace = 0; nnspace < nnspaces; nnspace++) {
     assert(frame != NULL);
-    blosc2_frame_nspace *nspace = frame->nspaces[nnspace];
+    blosc2_frame_metalayer *nspace = frame->metalayers[nnspace];
     h2 = realloc(h2, (size_t)current_header_len + 1 + 4 + nspace->content_len);
     h2p = h2 + current_header_len;
     // Store the serialized contents for this namespace
@@ -431,13 +431,13 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   uint16_t nnspaces;
   swap_store(&nnspaces, idxp, sizeof(uint16_t));
   idxp += 2;
-  frame->nnspaces = nnspaces;
+  frame->nmetalayers = nnspaces;
 
   // Populate the namespace and serialized value for each client
   for (int nnspace = 0; nnspace < nnspaces; nnspace++) {
     assert((*idxp & 0xe0) == 0xa0);   // sanity check
-    blosc2_frame_nspace* nspace = calloc(sizeof(blosc2_frame_nspace), 1);
-    frame->nspaces[nnspace] = nspace;
+    blosc2_frame_metalayer* nspace = calloc(sizeof(blosc2_frame_metalayer), 1);
+    frame->metalayers[nnspace] = nspace;
 
     // Populate the namespace string
     int8_t nslen = *idxp & (uint8_t)0x1f;
@@ -945,14 +945,14 @@ int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, s
  *
  * If successful, return the index of the namespace.  Else, return a negative value.
  * */
-int blosc2_frame_has_namespace(blosc2_frame *frame, char *name) {
-    if (strlen(name) > BLOSC2_NAMESPACE_NAME_MAXLEN) {
-        fprintf(stderr, "namespaces cannot be larger than %d chars\n", BLOSC2_NAMESPACE_NAME_MAXLEN);
+int blosc2_frame_has_metalayer(blosc2_frame *frame, char *name) {
+    if (strlen(name) > BLOSC2_METALAYER_NAME_MAXLEN) {
+        fprintf(stderr, "namespaces cannot be larger than %d chars\n", BLOSC2_METALAYER_NAME_MAXLEN);
         return -1;
     }
 
-    for (int nnspace = 0; nnspace < frame->nnspaces; nnspace++) {
-        if (strcmp(name, frame->nspaces[nnspace]->name) == 0) {
+    for (int nnspace = 0; nnspace < frame->nmetalayers; nnspace++) {
+        if (strcmp(name, frame->metalayers[nnspace]->name) == 0) {
             return nnspace;  // Found
         }
     }
@@ -964,25 +964,25 @@ int blosc2_frame_has_namespace(blosc2_frame *frame, char *name) {
  *
  * If successful, return the index of the new namespace.  Else, return a negative value.
  * */
-int blosc2_frame_add_namespace(blosc2_frame *frame, char *name, uint8_t *content,
+int blosc2_frame_add_metalayer(blosc2_frame *frame, char *name, uint8_t *content,
                                uint32_t content_len) {
-    int nnspace = blosc2_frame_has_namespace(frame, name);
+    int nnspace = blosc2_frame_has_metalayer(frame, name);
     if (nnspace >= 0) {
         fprintf(stderr, "namespace \"%s\" already exists", name);
         return -2;
     }
 
     // Add the namespace
-    blosc2_frame_nspace *nspace = malloc(sizeof(blosc2_frame_nspace));
+    blosc2_frame_metalayer *nspace = malloc(sizeof(blosc2_frame_metalayer));
     nspace->name = strdup(name);
     uint8_t* content_buf = malloc((size_t)content_len);
     memcpy(content_buf, content, content_len);
     nspace->content = content_buf;
     nspace->content_len = content_len;
-    frame->nspaces[frame->nnspaces] = nspace;
-    frame->nnspaces += 1;
+    frame->metalayers[frame->nmetalayers] = nspace;
+    frame->nmetalayers += 1;
 
-    return frame->nnspaces - 1;
+    return frame->nmetalayers - 1;
 }
 
 
@@ -990,15 +990,15 @@ int blosc2_frame_add_namespace(blosc2_frame *frame, char *name, uint8_t *content
  *
  * If successful, return the index of the new namespace.  Else, return a negative value.
  * */
-int blosc2_frame_update_namespace(blosc2_frame *frame, char *name, uint8_t *content,
+int blosc2_frame_update_metalayer(blosc2_frame *frame, char *name, uint8_t *content,
                                   uint32_t content_len) {
-    int nnspace = blosc2_frame_has_namespace(frame, name);
+    int nnspace = blosc2_frame_has_metalayer(frame, name);
     if (nnspace < 0) {
         fprintf(stderr, "namespace \"%s\" not found\n", name);
         return nnspace;
     }
 
-    blosc2_frame_nspace *nspace = frame->nspaces[nnspace];
+    blosc2_frame_metalayer *nspace = frame->metalayers[nnspace];
     if (content_len > (uint32_t)nspace->content_len) {
         fprintf(stderr, "`content_len` cannot exceed the existing size of %d bytes", nspace->content_len);
         return nnspace;
@@ -1016,16 +1016,16 @@ int blosc2_frame_update_namespace(blosc2_frame *frame, char *name, uint8_t *cont
  *
  * If successful, return the index of the new namespace.  Else, return a negative value.
  * */
-int blosc2_frame_get_namespace(blosc2_frame *frame, char *name, uint8_t **content,
+int blosc2_frame_get_metalayer(blosc2_frame *frame, char *name, uint8_t **content,
                                uint32_t *content_len) {
-    int nnspace = blosc2_frame_has_namespace(frame, name);
+    int nnspace = blosc2_frame_has_metalayer(frame, name);
     if (nnspace < 0) {
         fprintf(stderr, "namespace \"%s\" not found\n", name);
         return nnspace;
     }
-    *content_len = (uint32_t)frame->nspaces[nnspace]->content_len;
+    *content_len = (uint32_t)frame->metalayers[nnspace]->content_len;
     *content = malloc((size_t)*content_len);
-    memcpy(*content, frame->nspaces[nnspace]->content, (size_t)*content_len);
+    memcpy(*content, frame->metalayers[nnspace]->content, (size_t)*content_len);
     return nnspace;
 }
 
@@ -1036,13 +1036,13 @@ int blosc2_free_frame(blosc2_frame *frame) {
   if (frame->sdata != NULL) {
     free(frame->sdata);
   }
-  if (frame->nnspaces > 0) {
-    for (int i = 0; i < frame->nnspaces; i++) {
-      free(frame->nspaces[i]->name);
-      free(frame->nspaces[i]->content);
-      free(frame->nspaces[i]);
+  if (frame->nmetalayers > 0) {
+    for (int i = 0; i < frame->nmetalayers; i++) {
+      free(frame->metalayers[i]->name);
+      free(frame->metalayers[i]->content);
+      free(frame->metalayers[i]);
     }
-    frame->nnspaces = 0;
+    frame->nmetalayers = 0;
   }
 
   // TODO: make a constructor for frames so that we can handle the contents of the struct
