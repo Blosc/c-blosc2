@@ -1,6 +1,6 @@
 # sources for examples
 set(SOURCES contexts delta_schunk_ex multithread simple simple_schunk frame_simple
-        frame_backed_schunk frame_namespaces compress_file noinit find_roots zstd_dict)
+        frame_backed_schunk frame_metalayers compress_file noinit find_roots zstd_dict)
 if (EXISTS btune_schunk.c)
     set(SOURCES ${SOURCES} btune_schunk.c)
 endif()
@@ -52,7 +52,7 @@ if (BUILD_TESTS)
     if (TEST_INCLUDE_EXAMPLES)
         foreach(src ${SOURCES})
             if(src STREQUAL compress_file)
-                add_test(test_example_${src} ${src} ${src} ${src}.b2frame)
+                add_test(test_example_${src} ${src} "${PROJECT_BINARY_DIR}/CMakeCache.txt" CMakeCache.b2frame)
             else()
                 add_test(test_example_${src} ${src})
             endif(src STREQUAL compress_file)
