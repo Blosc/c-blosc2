@@ -7,11 +7,11 @@
 
   To compile this program:
 
-  $ gcc frame_namespaces.c -o frame_namespaces -lblosc
+  $ gcc frame_metalayers.c -o frame_metalayers -lblosc
 
   To run:
 
-  $ ./frame_namespaces
+  $ ./frame_metalayers
 
  */
 
@@ -72,12 +72,12 @@ int main() {
     blosc_set_timestamp(&last);
     blosc2_frame frame1 = BLOSC_EMPTY_FRAME;
 
-    // Add some namespaces
-  blosc2_frame_add_metalayer(&frame1, "my_namespace1", (uint8_t *) "my_content1",
+    // Add some metalayers
+  blosc2_frame_add_metalayer(&frame1, "my_metalayer1", (uint8_t *) "my_content1",
                              (uint32_t) strlen("my_content1"));
-  blosc2_frame_add_metalayer(&frame1, "my_namespace2", (uint8_t *) "my_content1",
+  blosc2_frame_add_metalayer(&frame1, "my_metalayer2", (uint8_t *) "my_content1",
                              (uint32_t) strlen("my_content1"));
-  blosc2_frame_update_metalayer(&frame1, "my_namespace2", (uint8_t *) "my_content2",
+  blosc2_frame_update_metalayer(&frame1, "my_metalayer2", (uint8_t *) "my_content2",
                                 (uint32_t) strlen("my_content2"));
     int64_t frame_len = blosc2_schunk_to_frame(schunk, &frame1);
     blosc_set_timestamp(&current);
@@ -88,7 +88,7 @@ int main() {
 
     // frame1 (in-memory) -> fileframe (on-disk)
     blosc_set_timestamp(&last);
-    frame_len = blosc2_frame_to_file(&frame1, "frame_namespaces.b2frame");
+    frame_len = blosc2_frame_to_file(&frame1, "frame_metalayers.b2frame");
     printf("Frame length on disk: %lld bytes\n", frame_len);
     blosc_set_timestamp(&current);
     ttotal = blosc_elapsed_secs(last, current);
@@ -97,7 +97,7 @@ int main() {
 
     // fileframe (file) -> frame2 (on-disk frame)
     blosc_set_timestamp(&last);
-    blosc2_frame* frame2 = blosc2_frame_from_file("frame_namespaces.b2frame");
+    blosc2_frame* frame2 = blosc2_frame_from_file("frame_metalayers.b2frame");
     blosc_set_timestamp(&current);
     ttotal = blosc_elapsed_secs(last, current);
     printf("Time for fileframe (%s) -> frame : %.3g s, %.1f GB/s\n",
@@ -110,12 +110,12 @@ int main() {
     }
     uint8_t* content;
     uint32_t content_len;
-    if (blosc2_frame_get_metalayer(frame2, "my_namespace1", &content, &content_len) < 0) {
-        printf("namespace not found");
+    if (blosc2_frame_get_metalayer(frame2, "my_metalayer1", &content, &content_len) < 0) {
+        printf("metalayer not found");
         return -1;
     }
     if (memcmp(content, "my_content1", content_len) != 0) {
-        printf("serialized content for namespace not retrieved correctly!\n");
+        printf("serialized content for metalayer not retrieved correctly!\n");
         return -1;
     }
     free(content);
@@ -134,15 +134,15 @@ int main() {
 
     // Check that the attributes had a good roundtrip
     if (schunk2->frame->nmetalayers != 2) {
-        printf("namespace not retrieved correctly!\n");
+        printf("metalayer not retrieved correctly!\n");
         return -1;
     }
-    if (blosc2_frame_get_metalayer(schunk2->frame, "my_namespace2", &content, &content_len) < 0) {
-        printf("namespace not found");
+    if (blosc2_frame_get_metalayer(schunk2->frame, "my_metalayer2", &content, &content_len) < 0) {
+        printf("metalayer not found");
         return -1;
     }
     if (memcmp(content, "my_content2", content_len) != 0) {
-        printf("serialized content for namespace not retrieved correctly!\n");
+        printf("serialized content for metalayer not retrieved correctly!\n");
         return -1;
     }
     free(content);
