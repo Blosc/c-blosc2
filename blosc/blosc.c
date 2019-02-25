@@ -321,8 +321,18 @@ static int lz4_wrap_compress(const char* input, size_t input_length,
   }
   int outlen = (int)maxout;
   int inlen = (int)input_length;
-  IppStatus status = ippsEncodeLZ4_8u((const Ipp8u*)input, inlen, (Ipp8u*)output, &outlen, hash_table);
-  cbytes = (status == ippStsNoErr) ? outlen : -outlen;
+  if (inlen < outlen) {
+    // We need this protection here because not even the ippsEncodeLZ4Safe_8u() avoids
+    // writing beyond the output limits.  I should report this to Intel.
+    // IppStatus status = ippsEncodeLZ4Safe_8u((const Ipp8u*)input, inlen,
+    //                                         (Ipp8u*)output, &outlen, (Ipp8u*)hash_table);
+    IppStatus status = ippsEncodeLZ4_8u((const Ipp8u *) input, inlen,
+                                        (Ipp8u *) output, &outlen, (Ipp8u *) hash_table);
+    cbytes = (status == ippStsNoErr) ? outlen : -outlen;
+  }
+  else {
+    cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
+  }
 #else
   cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
 #endif
@@ -694,7 +704,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     else if (context->compcode == BLOSC_LZ4) {
       void *hash_table = NULL;
     #ifdef HAVE_IPP
-      hash_table = thread_context->lz4_hash_table;
+      hash_table = (void*)thread_context->lz4_hash_table;
     #endif
       cbytes = lz4_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
                                  (char*)dest, (size_t)maxout, accel, hash_table);
@@ -1087,15 +1097,16 @@ create_thread_context(blosc2_context* context, int32_t tid) {
   IppStatus status;
   int inlen = thread_context->tmpblocksize > 0 ? thread_context->tmpblocksize : 1 << 16;
   int hash_size = 0;
-  Ipp8u *hash_table = NULL;
   status = ippsEncodeLZ4HashTableGetSize_8u(&hash_size);
   if (status != ippStsNoErr) {
     fprintf(stderr, "Error in ippsEncodeLZ4HashTableGetSize_8u");
+    return NULL;
   }
-  hash_table = ippsMalloc_8u(hash_size);
+  Ipp8u *hash_table = ippsMalloc_8u(hash_size);
   status = ippsEncodeLZ4HashTableInit_8u(hash_table, inlen);
   if (status != ippStsNoErr) {
     fprintf(stderr, "Error in ippsEncodeLZ4HashTableInit_8u");
+    return NULL;
   }
   thread_context->lz4_hash_table = hash_table;
 #endif

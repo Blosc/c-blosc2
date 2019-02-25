@@ -29,6 +29,9 @@
   #include "zstd.h"
 #endif /*  HAVE_ZSTD */
 
+#ifdef HAVE_IPP
+  #include <ipps.h>
+#endif /* HAVE_IPP */
 
 struct blosc2_context_s {
   const uint8_t* src;
@@ -122,7 +125,7 @@ struct thread_context {
   ZSTD_DCtx* zstd_dctx;
 #endif /* HAVE_ZSTD */
 #ifdef HAVE_IPP
-  void *lz4_hash_table;
+  Ipp8u* lz4_hash_table;
 #endif
 };
 

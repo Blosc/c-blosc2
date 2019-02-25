@@ -22,6 +22,7 @@ find_path(IPP_ROOT_DIR
         /opt/intel/compilers_and_libraries/mac/ipp
         "C:/IntelSWTools/compilers_and_libraries/windows/ipp/"
         "C:/Program Files (x86)/IntelSWTools/compilers_and_libraries/windows/ipp"
+        $ENV{HOME}/intel/ipp
         $ENV{HOME}/miniconda3
         $ENV{USERPROFILE}/miniconda3/Library
         "C:/Miniconda37-x64/Library" # Making AppVeyor happy
@@ -40,8 +41,8 @@ elseif(APPLE)
     set(IPP_SEARCH_LIB libippcore.a)
     set(IPP_LIBS libipps.a libippdc.a libippcore.a)
 else() # Linux
-    set(IPP_SEARCH_LIB libippcore.a)
-    set(IPP_LIBS libippvm.a libipps.a libippdc.a libippcore.a)
+    set(IPP_SEARCH_LIB libippcore.so)
+    set(IPP_LIBS ipps ippdc ippcore)
 endif()
 
 
