@@ -13,6 +13,7 @@
 #include <string.h>
 #include <assert.h>
 #include "blosc.h"
+#include "blosc-private.h"
 #include "context.h"
 
 #include "zstd.h"

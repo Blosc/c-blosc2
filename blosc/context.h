@@ -40,21 +40,21 @@ struct blosc2_context_s {
   /* The destination buffer */
   uint8_t* header_flags;
   /* Flags for header */
-  size_t sourcesize;
+  int32_t sourcesize;
   /* Number of bytes in source buffer */
-  size_t nblocks;
+  int32_t nblocks;
   /* Number of total blocks in buffer */
   int32_t leftover;
   /* Extra bytes at end of buffer */
   int32_t blocksize;
   /* Length of the block in bytes */
-  size_t output_bytes;
+  int32_t output_bytes;
   /* Counter for the number of output bytes */
-  size_t destsize;
+  int32_t destsize;
   /* Maximum size for destination buffer */
   int32_t typesize;
   /* Type size */
-  uint32_t* bstarts;
+  int32_t* bstarts;
   /* Starts for every block inside the compressed buffer */
   int compcode;
   /* Compressor code to use */
@@ -86,8 +86,8 @@ struct blosc2_context_s {
   /* Entry point for BTune persistence between runs */
 
   /* Threading */
-  int16_t nthreads;
-  int16_t new_nthreads;
+  int nthreads;
+  int new_nthreads;
   int threads_started;
   int end_threads;
   pthread_t *threads;

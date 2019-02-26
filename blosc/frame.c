@@ -13,6 +13,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include "blosc.h"
+#include "blosc-private.h"
 #include "context.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
@@ -99,6 +100,7 @@ void swap_store(void *dest, const void *pa, int size) {
 
 
 void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
+  assert(frame != NULL);
   uint8_t* h2 = calloc(HEADER2_MINLEN, 1);
   uint8_t* h2p = h2;
 
@@ -189,7 +191,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   // Number of threads for compression
   *h2p = 0xd1;  // int16
   h2p += 1;
-  int16_t nthreads = schunk->cctx->nthreads;
+  int16_t nthreads = (int16_t)schunk->cctx->nthreads;
   swap_store(h2p, &nthreads, sizeof(nthreads));
   h2p += 2;
   assert(h2p - h2 < HEADER2_MINLEN);
@@ -197,13 +199,13 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   // Number of threads for decompression
   *h2p = 0xd1;  // int16
   h2p += 1;
-  nthreads = schunk->dctx->nthreads;
+  nthreads = (int16_t)schunk->dctx->nthreads;
   swap_store(h2p, &nthreads, sizeof(nthreads));
   h2p += 2;
   assert(h2p - h2 < HEADER2_MINLEN);
 
   // Boolean for checking the existence of namespaces
-  int16_t nnspaces = (frame == NULL)? (int16_t)0 : frame->nmetalayers;
+  int16_t nnspaces = frame->nmetalayers;
   *h2p = (nnspaces > 0)? (uint8_t)0xc3 : (uint8_t)0xc2;  // bool for FRAME_HAS_NAMESPACES
   h2p += 1;
   assert(h2p - h2 == HEADER2_MINLEN);

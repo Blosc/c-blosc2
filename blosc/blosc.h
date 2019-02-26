@@ -597,7 +597,7 @@ static const blosc2_cparams BLOSC_CPARAMS_DEFAULTS = {
   (zero) in the fields of the struct is passed to a function.
  */
 typedef struct {
-  int16_t nthreads;
+  int nthreads;
   //!< The number of threads to use internally (1).
   void* schunk;
   //!< The associated schunk, if any (NULL).
@@ -1081,62 +1081,6 @@ BLOSC_EXPORT void blosc_set_blocksize(size_t blocksize);
  * available (the default).
  */
 BLOSC_EXPORT void blosc_set_schunk(blosc2_schunk* schunk);
-
-
-/*********************************************************************
-
-  Utility functions meant to be used internally.  // TODO put them in their own header
-
-*********************************************************************/
-
-/* Copy 4 bytes from @p *pa to int32_t, changing endianness if necessary. */
-static int32_t sw32_(const void* pa) {
-  int32_t idest;
-  uint8_t* dest = (uint8_t*)&idest;
-  uint8_t* pa_ = (uint8_t*)pa;
-  int i = 1;                    /* for big/little endian detection */
-  char* p = (char*)&i;
-
-  if (p[0] != 1) {
-    /* big endian */
-    dest[0] = pa_[3];
-    dest[1] = pa_[2];
-    dest[2] = pa_[1];
-    dest[3] = pa_[0];
-  }
-  else {
-    /* little endian */
-    dest[0] = pa_[0];
-    dest[1] = pa_[1];
-    dest[2] = pa_[2];
-    dest[3] = pa_[3];
-  }
-  return idest;
-}
-
-
-/* Copy 4 bytes from @p *pa to @p *dest, changing endianness if necessary. */
-static void _sw32(void* dest, int32_t a) {
-  uint8_t* dest_ = (uint8_t*)dest;
-  uint8_t* pa = (uint8_t*)&a;
-  int i = 1;                    /* for big/little endian detection */
-  char* p = (char*)&i;
-
-  if (p[0] != 1) {
-    /* big endian */
-    dest_[0] = pa[3];
-    dest_[1] = pa[2];
-    dest_[2] = pa[1];
-    dest_[3] = pa[0];
-  }
-  else {
-    /* little endian */
-    dest_[0] = pa[0];
-    dest_[1] = pa[1];
-    dest_[2] = pa[2];
-    dest_[3] = pa[3];
-  }
-}
 
 
 #ifdef __cplusplus

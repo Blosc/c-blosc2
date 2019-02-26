@@ -37,9 +37,9 @@ static void printmem(uint8_t* buf)
 /* Routine optimized for shuffling a buffer for a type size of 2 bytes. */
 static void
 shuffle2_neon(uint8_t* const dest, const uint8_t* const src,
-              const size_t vectorizable_elements, const size_t total_elements) {
-  size_t i, j, k;
-  static const size_t bytesoftype = 2;
+              const int32_t vectorizable_elements, const int32_t total_elements) {
+  int32_t i, j, k;
+  static const int32_t bytesoftype = 2;
   uint8x16x2_t r0;
 
   for (i = 0, k = 0; i < vectorizable_elements * bytesoftype; i += 32, k++) {
@@ -55,9 +55,9 @@ shuffle2_neon(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for shuffling a buffer for a type size of 4 bytes. */
 static void
 shuffle4_neon(uint8_t* const dest, const uint8_t* const src,
-              const size_t vectorizable_elements, const size_t total_elements) {
-  size_t i, j, k;
-  static const size_t bytesoftype = 4;
+              const int32_t vectorizable_elements, const int32_t total_elements) {
+  int32_t i, j, k;
+  static const int32_t bytesoftype = 4;
   uint8x16x4_t r0;
 
   for (i = 0, k = 0; i < vectorizable_elements * bytesoftype; i += 64, k++) {
@@ -74,12 +74,12 @@ shuffle4_neon(uint8_t* const dest, const uint8_t* const src,
 shuffle8_neon(uint8_t
 * const dest,
 const uint8_t* const src,
-const size_t vectorizable_elements,
-const size_t total_elements
+const int32_t vectorizable_elements,
+const int32_t total_elements
 )
 {
-size_t i, j, k, l;
-static const size_t bytesoftype = 8;
+int32_t i, j, k, l;
+static const int32_t bytesoftype = 8;
 uint8x8x2_t r0[4];
 uint16x4x2_t r1[4];
 uint32x2x2_t r2[4];
@@ -140,12 +140,12 @@ vreinterpret_u8_u32(r2[j]
 shuffle16_neon(uint8_t
 * const dest,
 const uint8_t* const src,
-const size_t vectorizable_elements,
-const size_t total_elements
+const int32_t vectorizable_elements,
+const int32_t total_elements
 )
 {
-size_t i, j, k, l, m;
-static const size_t bytesoftype = 16;
+int32_t i, j, k, l, m;
+static const int32_t bytesoftype = 16;
 uint8x8x2_t r0[8];
 uint16x4x2_t r1[8];
 uint32x2x2_t r2[8];
@@ -212,12 +212,12 @@ static void
     unshuffle2_neon(uint8_t * const
 dest,
 const uint8_t* const src,
-const size_t vectorizable_elements,
-const size_t total_elements
+const int32_t vectorizable_elements,
+const int32_t total_elements
 )
 {
-size_t i, j, k;
-static const size_t bytesoftype = 2;
+int32_t i, j, k;
+static const int32_t bytesoftype = 2;
 uint8x16x2_t r0;
 
 for(
@@ -245,12 +245,12 @@ static void
     unshuffle4_neon(uint8_t * const
 dest,
 const uint8_t* const src,
-const size_t vectorizable_elements,
-const size_t total_elements
+const int32_t vectorizable_elements,
+const int32_t total_elements
 )
 {
-size_t i, j, k;
-static const size_t bytesoftype = 4;
+int32_t i, j, k;
+static const int32_t bytesoftype = 4;
 uint8x16x4_t r0;
 
 for(
@@ -277,12 +277,12 @@ vst4q_u8(dest
 unshuffle8_neon(uint8_t
 * const dest,
 const uint8_t* const src,
-const size_t vectorizable_elements,
-const size_t total_elements
+const int32_t vectorizable_elements,
+const int32_t total_elements
 )
 {
-size_t i, j, k, l;
-static const size_t bytesoftype = 8;
+int32_t i, j, k, l;
+static const int32_t bytesoftype = 8;
 uint8x8x2_t r0[4];
 uint16x4x2_t r1[4];
 uint32x2x2_t r2[4];
@@ -343,12 +343,12 @@ vreinterpret_u8_u32(r2[j]
 unshuffle16_neon(uint8_t
 * const dest,
 const uint8_t* const src,
-const size_t vectorizable_elements,
-const size_t total_elements
+const int32_t vectorizable_elements,
+const int32_t total_elements
 )
 {
-size_t i, j, k, l, m;
-static const size_t bytesoftype = 16;
+int32_t i, j, k, l, m;
+static const int32_t bytesoftype = 16;
 uint8x8x2_t r0[8];
 uint16x4x2_t r1[8];
 uint32x2x2_t r2[8];
@@ -415,9 +415,9 @@ vreinterpret_u8_u32(r2[j + 4 * m]
 
 /* Shuffle a block.  This can never fail. */
 void
-shuffle_neon(const size_t bytesoftype, const size_t blocksize,
-             const uint8_t* const _src, uint8_t* const _dest) {
-  size_t vectorized_chunk_size;
+shuffle_neon(const int32_t bytesoftype, const int32_t blocksize,
+             const uint8_t* const _src, uint8_t *_dest) {
+  int32_t vectorized_chunk_size;
   if (bytesoftype == 2 | bytesoftype == 4) {
     vectorized_chunk_size = bytesoftype * 16;
   } else if (bytesoftype == 8 | bytesoftype == 16) {
@@ -428,9 +428,9 @@ shuffle_neon(const size_t bytesoftype, const size_t blocksize,
      which is a multiple of both. The vectorized shuffle can be
      used for that portion of the data, and the naive implementation
      can be used for the remaining portion. */
-  const size_t vectorizable_bytes = blocksize - (blocksize % vectorized_chunk_size);
-  const size_t vectorizable_elements = vectorizable_bytes / bytesoftype;
-  const size_t total_elements = blocksize / bytesoftype;
+  const int32_t vectorizable_bytes = blocksize - (blocksize % vectorized_chunk_size);
+  const int32_t vectorizable_elements = vectorizable_bytes / bytesoftype;
+  const int32_t total_elements = blocksize / bytesoftype;
 
   /* If the block size is too small to be vectorized,
      use the generic implementation. */
@@ -471,9 +471,9 @@ shuffle_neon(const size_t bytesoftype, const size_t blocksize,
 
 /* Unshuffle a block.  This can never fail. */
 void
-unshuffle_neon(const size_t bytesoftype, const size_t blocksize,
-               const uint8_t* const _src, uint8_t* const _dest) {
-  size_t vectorized_chunk_size;
+unshuffle_neon(const int32_t bytesoftype, const int32_t blocksize,
+               const uint8_t* const _src, uint8_t *_dest) {
+  int32_t vectorized_chunk_size;
   if (bytesoftype == 2 | bytesoftype == 4) {
     vectorized_chunk_size = bytesoftype * 16;
   } else if (bytesoftype == 8 | bytesoftype == 16) {
@@ -484,9 +484,9 @@ unshuffle_neon(const size_t bytesoftype, const size_t blocksize,
      which is a multiple of both. The vectorized unshuffle can be
      used for that portion of the data, and the naive implementation
      can be used for the remaining portion. */
-  const size_t vectorizable_bytes = blocksize - (blocksize % vectorized_chunk_size);
-  const size_t vectorizable_elements = vectorizable_bytes / bytesoftype;
-  const size_t total_elements = blocksize / bytesoftype;
+  const int32_t vectorizable_bytes = blocksize - (blocksize % vectorized_chunk_size);
+  const int32_t vectorizable_elements = vectorizable_bytes / bytesoftype;
+  const int32_t total_elements = blocksize / bytesoftype;
 
 
   /* If the block size is too small to be vectorized,

@@ -22,14 +22,14 @@ extern "C" {
 /**
   NEON-accelerated shuffle routine.
 */
-BLOSC_NO_EXPORT void shuffle_neon(const size_t bytesoftype, const size_t blocksize,
+BLOSC_NO_EXPORT void shuffle_neon(const int32_t bytesoftype, const int32_t blocksize,
                                   const uint8_t* const _src, uint8_t* const _dest);
 
 /**
   NEON-accelerated unshuffle routine.
 */
 BLOSC_NO_EXPORT void unshuffle_neon(const size_t bytesoftype, const size_t blocksize,
-                                    const uint8_t* const _src, uint8_t* const _dest);
+                                    const uint8_t *_src, uint8_t *_dest);
 
 #ifdef __cplusplus
 }

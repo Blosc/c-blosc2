@@ -60,9 +60,9 @@ _mm256_storeu2_m128i(__m128i* const hiaddr, __m128i* const loaddr, const __m256i
 /* Routine optimized for shuffling a buffer for a type size of 2 bytes. */
 static void
 shuffle2_avx2(uint8_t* const dest, const uint8_t* const src,
-              const size_t vectorizable_elements, const size_t total_elements) {
-  static const size_t bytesoftype = 2;
-  size_t j;
+              const int32_t vectorizable_elements, const int32_t total_elements) {
+  static const int32_t bytesoftype = 2;
+  int32_t j;
   int k;
   __m256i ymm0[2], ymm1[2];
 
@@ -101,9 +101,9 @@ shuffle2_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for shuffling a buffer for a type size of 4 bytes. */
 static void
 shuffle4_avx2(uint8_t* const dest, const uint8_t* const src,
-              const size_t vectorizable_elements, const size_t total_elements) {
-  static const size_t bytesoftype = 4;
-  size_t i;
+              const int32_t vectorizable_elements, const int32_t total_elements) {
+  static const int32_t bytesoftype = 4;
+  int32_t i;
   int j;
   __m256i ymm0[4], ymm1[4];
 
@@ -148,9 +148,9 @@ shuffle4_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for shuffling a buffer for a type size of 8 bytes. */
 static void
 shuffle8_avx2(uint8_t* const dest, const uint8_t* const src,
-              const size_t vectorizable_elements, const size_t total_elements) {
-  static const size_t bytesoftype = 8;
-  size_t j;
+              const int32_t vectorizable_elements, const int32_t total_elements) {
+  static const int32_t bytesoftype = 8;
+  int32_t j;
   int k, l;
   __m256i ymm0[8], ymm1[8];
 
@@ -193,9 +193,9 @@ shuffle8_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for shuffling a buffer for a type size of 16 bytes. */
 static void
 shuffle16_avx2(uint8_t* const dest, const uint8_t* const src,
-               const size_t vectorizable_elements, const size_t total_elements) {
-  static const size_t bytesoftype = 16;
-  size_t j;
+               const int32_t vectorizable_elements, const int32_t total_elements) {
+  static const int32_t bytesoftype = 16;
+  int32_t j;
   int k, l;
   __m256i ymm0[16], ymm1[16];
 
@@ -251,8 +251,8 @@ shuffle16_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for shuffling a buffer for a type size larger than 16 bytes. */
 static void
 shuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
-                     const size_t vectorizable_elements, const size_t total_elements, const size_t bytesoftype) {
-  size_t j;
+                     const int32_t vectorizable_elements, const int32_t total_elements, const int32_t bytesoftype) {
+  int32_t j;
   int k, l;
   __m256i ymm0[16], ymm1[16];
 
@@ -273,7 +273,7 @@ shuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
     the initial iteration and the type size is not a multiple of the vector size.
     In that case, only advance by the number of bytes necessary so that the number
     of remaining bytes in the type will be a multiple of the vector size. */
-    size_t offset_into_type;
+    int32_t offset_into_type;
     for (offset_into_type = 0; offset_into_type < bytesoftype;
          offset_into_type += (offset_into_type == 0 && vecs_per_el.rem > 0 ? vecs_per_el.rem : sizeof(__m128i))) {
 
@@ -322,9 +322,9 @@ shuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for unshuffling a buffer for a type size of 2 bytes. */
 static void
 unshuffle2_avx2(uint8_t* const dest, const uint8_t* const src,
-                const size_t vectorizable_elements, const size_t total_elements) {
-  static const size_t bytesoftype = 2;
-  size_t i;
+                const int32_t vectorizable_elements, const int32_t total_elements) {
+  static const int32_t bytesoftype = 2;
+  int32_t i;
   int j;
   __m256i ymm0[2], ymm1[2];
 
@@ -351,9 +351,9 @@ unshuffle2_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for unshuffling a buffer for a type size of 4 bytes. */
 static void
 unshuffle4_avx2(uint8_t* const dest, const uint8_t* const src,
-                const size_t vectorizable_elements, const size_t total_elements) {
-  static const size_t bytesoftype = 4;
-  size_t i;
+                const int32_t vectorizable_elements, const int32_t total_elements) {
+  static const int32_t bytesoftype = 4;
+  int32_t i;
   int j;
   __m256i ymm0[4], ymm1[4];
 
@@ -392,9 +392,9 @@ unshuffle4_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for unshuffling a buffer for a type size of 8 bytes. */
 static void
 unshuffle8_avx2(uint8_t* const dest, const uint8_t* const src,
-                const size_t vectorizable_elements, const size_t total_elements) {
-  static const size_t bytesoftype = 8;
-  size_t i;
+                const int32_t vectorizable_elements, const int32_t total_elements) {
+  static const int32_t bytesoftype = 8;
+  int32_t i;
   int j;
   __m256i ymm0[8], ymm1[8];
 
@@ -445,9 +445,9 @@ unshuffle8_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for unshuffling a buffer for a type size of 16 bytes. */
 static void
 unshuffle16_avx2(uint8_t* const dest, const uint8_t* const src,
-                 const size_t vectorizable_elements, const size_t total_elements) {
-  static const size_t bytesoftype = 16;
-  size_t i;
+                 const int32_t vectorizable_elements, const int32_t total_elements) {
+  static const int32_t bytesoftype = 16;
+  int32_t i;
   int j;
   __m256i ymm0[16], ymm1[16];
 
@@ -516,8 +516,8 @@ unshuffle16_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for unshuffling a buffer for a type size larger than 16 bytes. */
 static void
 unshuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
-                       const size_t vectorizable_elements, const size_t total_elements, const size_t bytesoftype) {
-  size_t i;
+                       const int32_t vectorizable_elements, const int32_t total_elements, const int32_t bytesoftype) {
+  int32_t i;
   int j;
   __m256i ymm0[16], ymm1[16];
 
@@ -525,7 +525,7 @@ unshuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
 
   /* The unshuffle loops are inverted (compared to shuffle_tiled16_avx2)
      to optimize cache utilization. */
-  size_t offset_into_type;
+  int32_t offset_into_type;
   for (offset_into_type = 0; offset_into_type < bytesoftype;
        offset_into_type += (offset_into_type == 0 && vecs_per_el.rem > 0 ? vecs_per_el.rem : sizeof(__m128i))) {
     for (i = 0; i < vectorizable_elements; i += sizeof(__m256i)) {
@@ -626,9 +626,9 @@ unshuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
 
 /* Shuffle a block.  This can never fail. */
 void
-shuffle_avx2(const size_t bytesoftype, const size_t blocksize,
+shuffle_avx2(const int32_t bytesoftype, const int32_t blocksize,
              const uint8_t* const _src, uint8_t* const _dest) {
-  const size_t vectorized_chunk_size = bytesoftype * sizeof(__m256i);
+  const int32_t vectorized_chunk_size = bytesoftype * sizeof(__m256i);
 
   /* If the block size is too small to be vectorized,
      use the generic implementation. */
@@ -642,10 +642,10 @@ shuffle_avx2(const size_t bytesoftype, const size_t blocksize,
      which is a multiple of both. The vectorized shuffle can be
      used for that portion of the data, and the naive implementation
      can be used for the remaining portion. */
-  const size_t vectorizable_bytes = blocksize - (blocksize % vectorized_chunk_size);
+  const int32_t vectorizable_bytes = blocksize - (blocksize % vectorized_chunk_size);
 
-  const size_t vectorizable_elements = vectorizable_bytes / bytesoftype;
-  const size_t total_elements = blocksize / bytesoftype;
+  const int32_t vectorizable_elements = vectorizable_bytes / bytesoftype;
+  const int32_t total_elements = blocksize / bytesoftype;
 
   /* Optimized shuffle implementations */
   switch (bytesoftype) {
@@ -663,7 +663,7 @@ shuffle_avx2(const size_t bytesoftype, const size_t blocksize,
       break;
     default:
       /* For types larger than 16 bytes, use the AVX2 tiled shuffle. */
-      if (bytesoftype > sizeof(__m128i)) {
+      if (bytesoftype > (int32_t)sizeof(__m128i)) {
         shuffle16_tiled_avx2(_dest, _src, vectorizable_elements, total_elements, bytesoftype);
       }
       else {
@@ -685,9 +685,9 @@ shuffle_avx2(const size_t bytesoftype, const size_t blocksize,
 
 /* Unshuffle a block.  This can never fail. */
 void
-unshuffle_avx2(const size_t bytesoftype, const size_t blocksize,
-               const uint8_t* const _src, uint8_t* const _dest) {
-  const size_t vectorized_chunk_size = bytesoftype * sizeof(__m256i);
+unshuffle_avx2(const int32_t bytesoftype, const int32_t blocksize,
+               const uint8_t *_src, uint8_t *_dest) {
+  const int32_t vectorized_chunk_size = bytesoftype * sizeof(__m256i);
 
   /* If the block size is too small to be vectorized,
      use the generic implementation. */
@@ -701,10 +701,10 @@ unshuffle_avx2(const size_t bytesoftype, const size_t blocksize,
      which is a multiple of both. The vectorized unshuffle can be
      used for that portion of the data, and the naive implementation
      can be used for the remaining portion. */
-  const size_t vectorizable_bytes = blocksize - (blocksize % vectorized_chunk_size);
+  const int32_t vectorizable_bytes = blocksize - (blocksize % vectorized_chunk_size);
 
-  const size_t vectorizable_elements = vectorizable_bytes / bytesoftype;
-  const size_t total_elements = blocksize / bytesoftype;
+  const int32_t vectorizable_elements = vectorizable_bytes / bytesoftype;
+  const int32_t total_elements = blocksize / bytesoftype;
 
   /* Optimized unshuffle implementations */
   switch (bytesoftype) {
@@ -722,7 +722,7 @@ unshuffle_avx2(const size_t bytesoftype, const size_t blocksize,
       break;
     default:
       /* For types larger than 16 bytes, use the AVX2 tiled unshuffle. */
-      if (bytesoftype > sizeof(__m128i)) {
+      if (bytesoftype > (int32_t)sizeof(__m128i)) {
         unshuffle16_tiled_avx2(_dest, _src, vectorizable_elements, total_elements, bytesoftype);
       }
       else {

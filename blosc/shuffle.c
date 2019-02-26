@@ -13,17 +13,7 @@
 #include "bitshuffle-generic.h"
 #include <stdio.h>
 #include <string.h>
-
-/* Visual Studio < 2013 does not have stdbool.h so here it is a replacement: */
-#if defined __STDC__ && defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L
-/* have a C99 compiler */
-typedef _Bool bool;
-#else
-/* do not have a C99 compiler */
-typedef unsigned char bool;
-#endif
-static const bool false = 0;
-static const bool true = 1;
+#include <stdbool.h>
 
 
 #if !defined(__clang__) && defined(__GNUC__) && defined(__GNUC_MINOR__) && \
@@ -50,10 +40,10 @@ static const bool true = 1;
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
 /*  Define function pointer types for shuffle/unshuffle routines. */
-typedef void(* shuffle_func)(const size_t, const size_t, const uint8_t*, const uint8_t*);
-typedef void(* unshuffle_func)(const size_t, const size_t, const uint8_t*, const uint8_t*);
-typedef int64_t(* bitshuffle_func)(void*, void*, const size_t, const size_t, void*);
-typedef int64_t(* bitunshuffle_func)(void*, void*, const size_t, const size_t, void*);
+typedef void(* shuffle_func)(const int32_t, const int32_t, const uint8_t*, const uint8_t*);
+typedef void(* unshuffle_func)(const int32_t, const int32_t, const uint8_t*, const uint8_t*);
+typedef int32_t(* bitshuffle_func)(void*, void*, const int32_t, const int32_t, void*);
+typedef int32_t(* bitunshuffle_func)(void*, void*, const int32_t, const int32_t, void*);
 
 /* An implementation of shuffle/unshuffle routines. */
 typedef struct shuffle_implementation {
@@ -366,7 +356,7 @@ void init_shuffle_implementation() {
 /* Shuffle a block by dynamically dispatching to the appropriate
    hardware-accelerated routine at run-time. */
 void
-shuffle(const size_t bytesoftype, const size_t blocksize,
+shuffle(const int32_t bytesoftype, const int32_t blocksize,
         const uint8_t* _src, const uint8_t* _dest) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
@@ -379,7 +369,7 @@ shuffle(const size_t bytesoftype, const size_t blocksize,
 /* Unshuffle a block by dynamically dispatching to the appropriate
    hardware-accelerated routine at run-time. */
 void
-unshuffle(const size_t bytesoftype, const size_t blocksize,
+unshuffle(const int32_t bytesoftype, const int32_t blocksize,
           const uint8_t* _src, const uint8_t* _dest) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
@@ -391,18 +381,18 @@ unshuffle(const size_t bytesoftype, const size_t blocksize,
 
 /* Bit-shuffle a block by dynamically dispatching to the appropriate
    hardware-accelerated routine at run-time. */
-size_t
-bitshuffle(const size_t bytesoftype, const size_t blocksize,
-           const uint8_t *const _src, const uint8_t *_dest,
+int32_t
+bitshuffle(const int32_t bytesoftype, const int32_t blocksize,
+           const uint8_t *_src, const uint8_t *_dest,
            const uint8_t *_tmp) {
-  size_t size = blocksize / bytesoftype;
+  int32_t size = blocksize / bytesoftype;
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
   if (size != 0 && ((size % 8) == 0)) {
     /* The number of elems is a multiple of 8 which is supported by
        bitshuffle. */
-    return (size_t)(host_implementation.bitshuffle)(
+    return (int32_t)(host_implementation.bitshuffle)(
             (void*)_src, (void*)_dest, size, bytesoftype, (void*)_tmp);
   }
   else {
@@ -413,18 +403,18 @@ bitshuffle(const size_t bytesoftype, const size_t blocksize,
 
 /* Bit-unshuffle a block by dynamically dispatching to the appropriate
    hardware-accelerated routine at run-time. */
-size_t
-bitunshuffle(const size_t bytesoftype, const size_t blocksize,
-             const uint8_t *const _src, const uint8_t *_dest,
+int32_t
+bitunshuffle(const int32_t bytesoftype, const int32_t blocksize,
+             const uint8_t *_src, const uint8_t *_dest,
              const uint8_t *_tmp) {
-  size_t size = blocksize / bytesoftype;
+  int32_t size = blocksize / bytesoftype;
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
   if (size != 0 && ((size % 8) == 0)) {
     /* The number of elems is a multiple of 8 which is supported by
        bitshuffle. */
-    return (size_t)(host_implementation.bitunshuffle)(
+    return (int32_t)(host_implementation.bitunshuffle)(
             (void*)_src, (void*)_dest, size, bytesoftype, (void*)_tmp);
   } else {
     memcpy((void*)_dest, (void*)_src, blocksize);

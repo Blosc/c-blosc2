@@ -29,19 +29,19 @@ extern "C" {
   implementations to process any remaining elements in a block which
   is not a multiple of (type_size * vector_size).
 */
-static void shuffle_generic_inline(const size_t type_size,
-                                   const size_t vectorizable_blocksize, const size_t blocksize,
-                                   const uint8_t* const _src, uint8_t* const _dest) {
-  size_t i, j;
+static void shuffle_generic_inline(const int32_t type_size,
+                                   const int32_t vectorizable_blocksize, const int32_t blocksize,
+                                   const uint8_t *_src, uint8_t *_dest) {
+  int32_t i, j;
   /* Calculate the number of elements in the block. */
-  const size_t neblock_quot = blocksize / type_size;
-  const size_t neblock_rem = blocksize % type_size;
-  const size_t vectorizable_elements = vectorizable_blocksize / type_size;
+  const int32_t neblock_quot = blocksize / type_size;
+  const int32_t neblock_rem = blocksize % type_size;
+  const int32_t vectorizable_elements = vectorizable_blocksize / type_size;
 
 
   /* Non-optimized shuffle */
   for (j = 0; j < type_size; j++) {
-    for (i = vectorizable_elements; i < (size_t)neblock_quot; i++) {
+    for (i = vectorizable_elements; i < (int32_t)neblock_quot; i++) {
       _dest[j * neblock_quot + i] = _src[i * type_size + j];
     }
   }
@@ -57,18 +57,18 @@ static void shuffle_generic_inline(const size_t type_size,
   implementations to process any remaining elements in a block which
   is not a multiple of (type_size * vector_size).
 */
-static void unshuffle_generic_inline(const size_t type_size,
-                                     const size_t vectorizable_blocksize, const size_t blocksize,
-                                     const uint8_t* const _src, uint8_t* const _dest) {
-  size_t i, j;
+static void unshuffle_generic_inline(const int32_t type_size,
+                                     const int32_t vectorizable_blocksize, const int32_t blocksize,
+                                     const uint8_t *_src, uint8_t *_dest) {
+  int32_t i, j;
 
   /* Calculate the number of elements in the block. */
-  const size_t neblock_quot = blocksize / type_size;
-  const size_t neblock_rem = blocksize % type_size;
-  const size_t vectorizable_elements = vectorizable_blocksize / type_size;
+  const int32_t neblock_quot = blocksize / type_size;
+  const int32_t neblock_rem = blocksize % type_size;
+  const int32_t vectorizable_elements = vectorizable_blocksize / type_size;
 
   /* Non-optimized unshuffle */
-  for (i = vectorizable_elements; i < (size_t)neblock_quot; i++) {
+  for (i = vectorizable_elements; i < (int32_t)neblock_quot; i++) {
     for (j = 0; j < type_size; j++) {
       _dest[i * type_size + j] = _src[j * neblock_quot + i];
     }
@@ -81,14 +81,14 @@ static void unshuffle_generic_inline(const size_t type_size,
 /**
   Generic (non-hardware-accelerated) shuffle routine.
 */
-BLOSC_NO_EXPORT void shuffle_generic(const size_t bytesoftype, const size_t blocksize,
-                                     const uint8_t* const _src, uint8_t* const _dest);
+BLOSC_NO_EXPORT void shuffle_generic(int32_t bytesoftype, int32_t blocksize,
+                                     const uint8_t *_src, uint8_t *_dest);
 
 /**
   Generic (non-hardware-accelerated) unshuffle routine.
 */
-BLOSC_NO_EXPORT void unshuffle_generic(const size_t bytesoftype, const size_t blocksize,
-                                       const uint8_t* const _src, uint8_t* const _dest);
+BLOSC_NO_EXPORT void unshuffle_generic(int32_t bytesoftype, int32_t blocksize,
+                                       const uint8_t *_src, uint8_t *_dest);
 
 #ifdef __cplusplus
 }

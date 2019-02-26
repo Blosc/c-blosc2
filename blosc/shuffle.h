@@ -32,12 +32,12 @@ extern "C" {
   platform and future-proof.
 */
 BLOSC_NO_EXPORT void
-    shuffle(const size_t bytesoftype, const size_t blocksize,
+    shuffle(int32_t bytesoftype, int32_t blocksize,
             const uint8_t* _src, const uint8_t* _dest);
 
-BLOSC_NO_EXPORT size_t
-    bitshuffle(const size_t bytesoftype, const size_t blocksize,
-               const uint8_t *const _src, const uint8_t *_dest,
+BLOSC_NO_EXPORT int32_t
+    bitshuffle(int32_t bytesoftype, int32_t blocksize,
+               const uint8_t *_src, const uint8_t *_dest,
                const uint8_t *_tmp);
 
 /**
@@ -51,13 +51,13 @@ BLOSC_NO_EXPORT size_t
   platform and future-proof.
 */
 BLOSC_NO_EXPORT void
-    unshuffle(const size_t bytesoftype, const size_t blocksize,
+    unshuffle(int32_t bytesoftype, int32_t blocksize,
               const uint8_t* _src, const uint8_t* _dest);
 
 
-BLOSC_NO_EXPORT size_t
-    bitunshuffle(const size_t bytesoftype, const size_t blocksize,
-                 const uint8_t *const _src, const uint8_t *_dest,
+BLOSC_NO_EXPORT int32_t
+    bitunshuffle(int32_t bytesoftype, int32_t blocksize,
+                 const uint8_t *_src, const uint8_t *_dest,
                  const uint8_t *_tmp);
 
 #ifdef __cplusplus

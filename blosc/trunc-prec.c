@@ -16,7 +16,7 @@
 #define BITS_MANTISSA_DOUBLE 52
 
 
-void truncate_precision32(uint8_t prec_bits, size_t nelems,
+void truncate_precision32(uint8_t prec_bits, int32_t nelems,
                           const int32_t* src, int32_t* dest) {
   if (prec_bits > BITS_MANTISSA_FLOAT) {
     fprintf(stderr, "The precision cannot be larger than %d bits for floats",
@@ -30,7 +30,7 @@ void truncate_precision32(uint8_t prec_bits, size_t nelems,
   }
 }
 
-void truncate_precision64(uint8_t prec_bits, size_t nelems,
+void truncate_precision64(uint8_t prec_bits, int32_t nelems,
                           const int64_t* src, int64_t* dest) {
   if (prec_bits > BITS_MANTISSA_DOUBLE) {
     fprintf(stderr, "The precision cannot be larger than %d bits for doubles",
@@ -45,7 +45,7 @@ void truncate_precision64(uint8_t prec_bits, size_t nelems,
 }
 
 /* Apply the truncate precision to src.  This can never fail. */
-void truncate_precision(uint8_t prec_bits, size_t typesize, int32_t nbytes,
+void truncate_precision(uint8_t prec_bits, int32_t typesize, int32_t nbytes,
                         const uint8_t* src, uint8_t* dest) {
   // Make sure that we don't remove all the bits in mantissa so that we
   // don't mess with NaNs or Infinite representation in IEEE 754:
