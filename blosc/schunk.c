@@ -55,7 +55,7 @@ int blosc2_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
     (*cparams)->nthreads = BLOSC_CPARAMS_DEFAULTS.nthreads;
   }
   else {
-    (*cparams)->nthreads = schunk->cctx->nthreads;
+    (*cparams)->nthreads = (int16_t)schunk->cctx->nthreads;
   }
   return 0;
 }
@@ -209,7 +209,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
     }
     src = schunk->data[nchunk];
     int nbytes_ = sw32_(src + 4);
-    if (nbytes < nbytes_) {
+    if (nbytes < (size_t)nbytes_) {
       fprintf(stderr, "Buffer size is too small for the decompressed buffer "
                       "('%zd' bytes, but '%d' are needed)\n", nbytes, nbytes_);
       return -11;

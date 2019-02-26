@@ -81,13 +81,13 @@ static void unshuffle_generic_inline(const int32_t type_size,
 /**
   Generic (non-hardware-accelerated) shuffle routine.
 */
-BLOSC_NO_EXPORT void shuffle_generic(int32_t bytesoftype, int32_t blocksize,
+BLOSC_NO_EXPORT void shuffle_generic(const int32_t bytesoftype, const int32_t blocksize,
                                      const uint8_t *_src, uint8_t *_dest);
 
 /**
   Generic (non-hardware-accelerated) unshuffle routine.
 */
-BLOSC_NO_EXPORT void unshuffle_generic(int32_t bytesoftype, int32_t blocksize,
+BLOSC_NO_EXPORT void unshuffle_generic(const int32_t bytesoftype, const int32_t blocksize,
                                        const uint8_t *_src, uint8_t *_dest);
 
 #ifdef __cplusplus

@@ -40,9 +40,9 @@ static bool is_HCR(blosc2_context * context) {
 void btune_next_blocksize(blosc2_context *context) {
   int32_t clevel = context->clevel;
   int32_t typesize = context->typesize;
-  size_t nbytes = context->sourcesize;
+  int32_t nbytes = context->sourcesize;
   int32_t user_blocksize = context->blocksize;
-  int32_t blocksize = (int32_t) nbytes;  // TODO: fix the type mismatch
+  int32_t blocksize = nbytes;
 
   // Protection against very small buffers
   if (nbytes < typesize) {
@@ -117,13 +117,13 @@ void btune_next_blocksize(blosc2_context *context) {
   }
 
   /* Check that blocksize is not too large */
-  if (blocksize > (int32_t)nbytes) {
-    blocksize = (int32_t)nbytes;  //TODO: Fix casting
+  if (blocksize > nbytes) {
+    blocksize = nbytes;
   }
 
   // blocksize *must absolutely* be a multiple of the typesize
   if (blocksize > typesize) {
-    blocksize = (int32_t) (blocksize / typesize * typesize);
+    blocksize = blocksize / typesize * typesize;
   }
 
   context->blocksize = blocksize;

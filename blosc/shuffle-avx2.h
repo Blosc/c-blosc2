@@ -20,13 +20,13 @@ extern "C" {
 /**
   AVX2-accelerated shuffle routine.
 */
-BLOSC_NO_EXPORT void shuffle_avx2(int32_t bytesoftype, int32_t blocksize,
+BLOSC_NO_EXPORT void shuffle_avx2(const int32_t bytesoftype, const int32_t blocksize,
                                   const uint8_t *_src, uint8_t *_dest);
 
 /**
   AVX2-accelerated unshuffle routine.
 */
-BLOSC_NO_EXPORT void unshuffle_avx2(int32_t bytesoftype, int32_t blocksize,
+BLOSC_NO_EXPORT void unshuffle_avx2(const int32_t bytesoftype, const int32_t blocksize,
                                     const uint8_t *_src, uint8_t *_dest);
 
 #ifdef __cplusplus
