@@ -257,6 +257,7 @@ shuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
   __m256i ymm0[16], ymm1[16];
 
   const lldiv_t vecs_per_el = lldiv(bytesoftype, sizeof(__m128i));
+  const int32_t vecs_rem = (int32_t)vecs_per_el.rem;
 
   /* Create the shuffle mask.
      NOTE: The XMM/YMM 'set' intrinsics require the arguments to be ordered from
@@ -275,7 +276,7 @@ shuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
     of remaining bytes in the type will be a multiple of the vector size. */
     int32_t offset_into_type;
     for (offset_into_type = 0; offset_into_type < bytesoftype;
-         offset_into_type += (offset_into_type == 0 && vecs_per_el.rem > 0 ? vecs_per_el.rem : sizeof(__m128i))) {
+         offset_into_type += (offset_into_type == 0 && vecs_rem > 0 ? vecs_rem : (int32_t)sizeof(__m128i))) {
 
       /* Fetch elements in groups of 512 bytes */
       const uint8_t* const src_with_offset = src + offset_into_type;
@@ -515,19 +516,20 @@ unshuffle16_avx2(uint8_t* const dest, const uint8_t* const src,
 
 /* Routine optimized for unshuffling a buffer for a type size larger than 16 bytes. */
 static void
-unshuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
+unshuffle16_tiled_avx2(const uint8_t *dest, const uint8_t* const src,
                        const int32_t vectorizable_elements, const int32_t total_elements, const int32_t bytesoftype) {
   int32_t i;
   int j;
   __m256i ymm0[16], ymm1[16];
 
   const lldiv_t vecs_per_el = lldiv(bytesoftype, sizeof(__m128i));
+  const int32_t vecs_rem = (int32_t)vecs_per_el.rem;
 
   /* The unshuffle loops are inverted (compared to shuffle_tiled16_avx2)
      to optimize cache utilization. */
   int32_t offset_into_type;
   for (offset_into_type = 0; offset_into_type < bytesoftype;
-       offset_into_type += (offset_into_type == 0 && vecs_per_el.rem > 0 ? vecs_per_el.rem : sizeof(__m128i))) {
+       offset_into_type += (offset_into_type == 0 && vecs_rem > 0 ? vecs_rem : (int32_t)sizeof(__m128i))) {
     for (i = 0; i < vectorizable_elements; i += sizeof(__m256i)) {
       /* Load the first 16 bytes of 32 adjacent elements (512 bytes) into 16 YMM registers */
       const uint8_t* const src_for_ith_element = src + i;
@@ -627,7 +629,7 @@ unshuffle16_tiled_avx2(uint8_t* const dest, const uint8_t* const src,
 /* Shuffle a block.  This can never fail. */
 void
 shuffle_avx2(const int32_t bytesoftype, const int32_t blocksize,
-             const uint8_t* const _src, uint8_t* const _dest) {
+             const uint8_t *_src, uint8_t *_dest) {
   const int32_t vectorized_chunk_size = bytesoftype * sizeof(__m256i);
 
   /* If the block size is too small to be vectorized,
