@@ -44,7 +44,7 @@ int main() {
   blosc2_schunk* schunk;
   int i;
   int nchunk;
-  size_t nchunks;
+  int nchunks;
   blosc_timestamp_t last, current;
   double ttotal;
 
@@ -84,7 +84,7 @@ int main() {
   /* Retrieve and decompress the chunks (0-based count) */
   blosc_set_timestamp(&last);
   for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
-    dsize = blosc2_schunk_decompress_chunk(schunk, (size_t) nchunk,
+    dsize = blosc2_schunk_decompress_chunk(schunk, nchunk,
                                            (void *) data_dest, isize);
   }
   if (dsize < 0) {
@@ -98,9 +98,9 @@ int main() {
 
   /* Check integrity of the first chunk */
   for (i = 0; i < CHUNKSIZE; i++) {
-    if (data_dest[i] != (uint64_t)i) {
-      printf("Decompressed data differs from original %d, %lld!\n",
-             i, data_dest[i]);
+    if (data_dest[i] != i) {
+      printf("Decompressed data differs from original %d, %ld!\n",
+             i, (long)data_dest[i]);
       return -1;
     }
   }

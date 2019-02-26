@@ -404,7 +404,8 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
 
   uint8_t* header = malloc(HEADER2_MINLEN);
   FILE* fp = fopen(fname, "rb");
-  fread(header, HEADER2_MINLEN, 1, fp);
+  size_t rbytes = fread(header, HEADER2_MINLEN, 1, fp);
+  assert(rbytes == HEADER2_MINLEN);
 
   int64_t frame_len;
   swap_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
@@ -421,13 +422,16 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   // Get the size for the index of namespaces
   uint16_t idx_size;
   fseek(fp, FRAME_IDX_SIZE, SEEK_SET);
-  fread(&idx_size, sizeof(uint16_t), 1, fp);
+  rbytes = fread(&idx_size, sizeof(uint16_t), 1, fp);
+  assert(rbytes == sizeof(uint16_t));
+
   swap_store(&idx_size, &idx_size, sizeof(idx_size));
 
   // Read the index of namespaces for namespaces
   uint8_t* nspaces_idx = malloc(idx_size);
   fseek(fp, FRAME_IDX_SIZE + 2, SEEK_SET);
-  fread(nspaces_idx, idx_size, 1, fp);
+  rbytes = fread(nspaces_idx, idx_size, 1, fp);
+  assert(rbytes == idx_size);
   assert(nspaces_idx[0] == 0xde);   // sanity check
   uint8_t* idxp = nspaces_idx + 1;
   uint16_t nnspaces;
@@ -461,20 +465,23 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
     // Go to offset and see if we have the correct marker
     uint8_t content_marker;
     fseek(fp, offset, SEEK_SET);
-    fread(&content_marker, 1, 1, fp);
+    rbytes = fread(&content_marker, 1, 1, fp);
+    assert(rbytes == 1);
     assert(content_marker == 0xc6);
 
     // Read the size of the content
     int32_t content_len;
     fseek(fp, offset + 1, SEEK_SET);
-    fread(&content_len, 4, 1, fp);
+    rbytes = fread(&content_len, 4, 1, fp);
+    assert(rbytes == 4);
     swap_store(&content_len, &content_len, sizeof(content_len));
     nspace->content_len = content_len;
 
     // Finally, read the content
     char* content = malloc((size_t)content_len);
     fseek(fp, offset + 1 + 4, SEEK_SET);
-    fread(content, (size_t)content_len, 1, fp);
+    rbytes = fread(content, (size_t)content_len, 1, fp);
+    assert(rbytes == (size_t)content_len);
     nspace->content = (uint8_t*)content;
   }
 
@@ -536,7 +543,8 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
   if (frame->sdata == NULL) {
     header = malloc(HEADER2_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
-    fread(header, HEADER2_MINLEN, 1, fp);
+    size_t rbytes = fread(header, HEADER2_MINLEN, 1, fp);
+    assert(rbytes == HEADER2_MINLEN);
     framep = header;
     fclose(fp);
   }
@@ -579,7 +587,8 @@ int frame_update_meta(blosc2_frame* frame) {
   if (frame->sdata == NULL) {
     header = malloc(HEADER2_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
-    fread(header, HEADER2_MINLEN, 1, fp);
+    size_t rbytes = fread(header, HEADER2_MINLEN, 1, fp);
+    assert(rbytes == HEADER2_MINLEN);
     fclose(fp);
   }
   uint32_t prev_h2len;
@@ -682,14 +691,16 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
     }
     else {
       fseek(fp, header_len + offsets[i], SEEK_SET);
-      fread(data_chunk, BLOSC_MIN_HEADER_LENGTH, 1, fp);
+      size_t rbytes = fread(data_chunk, BLOSC_MIN_HEADER_LENGTH, 1, fp);
+      assert(rbytes == BLOSC_MIN_HEADER_LENGTH);
       csize = sw32_(data_chunk + 12);
       if (csize > prev_alloc) {
         data_chunk = realloc(data_chunk, (size_t)csize);
         prev_alloc = csize;
       }
       fseek(fp, header_len + offsets[i], SEEK_SET);
-      fread(data_chunk, (size_t)csize, 1, fp);
+      rbytes = fread(data_chunk, (size_t)csize, 1, fp);
+      assert(rbytes == (size_t)csize);
     }
     uint8_t* new_chunk = malloc((size_t)csize);
     memcpy(new_chunk, data_chunk, (size_t)csize);
@@ -771,7 +782,7 @@ int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, boo
   if (frame->sdata == NULL) {
     FILE* fp = fopen(frame->fname, "rb");
     fseek(fp, header_len + offset + 12, SEEK_SET);
-    long rbytes = (long)fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
+    size_t rbytes = fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
     if (rbytes != sizeof(chunk_cbytes)) {
       fprintf(stderr, "Cannot read the cbytes for chunk in the fileframe.\n");
       return -4;
@@ -779,8 +790,8 @@ int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, boo
     chunk_cbytes = sw32_(&chunk_cbytes);
     *chunk = malloc((size_t)chunk_cbytes);
     fseek(fp, header_len + offset, SEEK_SET);
-    rbytes = (long)fread(*chunk, 1, (size_t)chunk_cbytes, fp);
-    if (rbytes != chunk_cbytes) {
+    rbytes = fread(*chunk, 1, (size_t)chunk_cbytes, fp);
+    if (rbytes != (size_t)chunk_cbytes) {
       fprintf(stderr, "Cannot read the chunk out of the fileframe.\n");
       return -5;
     }
