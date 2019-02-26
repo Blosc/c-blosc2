@@ -28,18 +28,18 @@
 
 
 /** Roundtrip tests for the SSE2-accelerated shuffle/unshuffle. */
-static int test_shuffle_roundtrip_sse2(size_t type_size, size_t num_elements,
+static int test_shuffle_roundtrip_sse2(int32_t type_size, int32_t num_elements,
                                        size_t buffer_alignment, int test_type) {
 #if defined(SHUFFLE_SSE2_ENABLED)
-  size_t buffer_size = type_size * num_elements;
+  int32_t buffer_size = type_size * num_elements;
 
   /* Allocate memory for the test. */
-  void* original = blosc_test_malloc(buffer_alignment, buffer_size);
-  void* shuffled = blosc_test_malloc(buffer_alignment, buffer_size);
-  void* unshuffled = blosc_test_malloc(buffer_alignment, buffer_size);
+  void* original = blosc_test_malloc(buffer_alignment, (size_t)buffer_size);
+  void* shuffled = blosc_test_malloc(buffer_alignment, (size_t)buffer_size);
+  void* unshuffled = blosc_test_malloc(buffer_alignment, (size_t)buffer_size);
 
   /* Fill the input data buffer with random values. */
-  blosc_test_fill_seq(original, buffer_size);
+  blosc_test_fill_seq(original, (size_t)buffer_size);
 
   /* Shuffle/unshuffle, selecting the implementations based on the test type. */
   switch (test_type) {
@@ -65,7 +65,7 @@ static int test_shuffle_roundtrip_sse2(size_t type_size, size_t num_elements,
 
   /* The round-tripped data matches the original data when the
      result of memcmp is 0. */
-  int exit_code = memcmp(original, unshuffled, buffer_size) ?
+  int exit_code = memcmp(original, unshuffled, (size_t)buffer_size) ?
                   EXIT_FAILURE : EXIT_SUCCESS;
 
   /* Free allocated memory. */
