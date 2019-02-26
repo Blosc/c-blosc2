@@ -987,7 +987,9 @@ int blosc2_frame_add_metalayer(blosc2_frame *frame, char *name, uint8_t *content
 
     // Add the namespace
     blosc2_frame_metalayer *nspace = malloc(sizeof(blosc2_frame_metalayer));
-    nspace->name = strndup(name, strlen(name));
+    char* name_ = malloc(strlen(name));
+    strncpy(name_, name, strlen(name));
+    nspace->name = name;
     uint8_t* content_buf = malloc((size_t)content_len);
     memcpy(content_buf, content, content_len);
     nspace->content = content_buf;
