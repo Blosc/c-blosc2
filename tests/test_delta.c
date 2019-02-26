@@ -18,8 +18,8 @@ uint8_t *src, *srccpy, *dest;
 int nbytes, cbytes;
 int clevel = 5;
 int doshuffle = 1;
-size_t typesize;
-size_t size = 7 * 12 * 13 * 16 * 24 * 10;  /* must be divisible by typesize */
+int typesize;
+int size = 7 * 12 * 13 * 16 * 24 * 10;  /* must be divisible by typesize */
 
 
 /* Check compressor */
@@ -91,17 +91,17 @@ static char *test_delta() {
 
   /* Get a compressed buffer without delta */
   blosc_set_delta(0);
-  cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
-                          dest, size + BLOSC_MAX_OVERHEAD);
+  cbytes = blosc_compress(clevel, doshuffle, (size_t)typesize, (size_t)size, src,
+                          dest, (size_t)size + BLOSC_MAX_OVERHEAD);
 
   /* Activate the delta filter and compress again */
   blosc_set_delta(1);
-  cbytes2 = blosc_compress(clevel, doshuffle, typesize, size, src,
-                           dest, size + BLOSC_MAX_OVERHEAD);
+  cbytes2 = blosc_compress(clevel, doshuffle, (size_t)typesize, (size_t)size, src,
+                           dest, (size_t)size + BLOSC_MAX_OVERHEAD);
   if ((typesize % 12) == 0) {
     // For typesizes 12 and 24 we do an exception and allow less compression
     if ((2 * cbytes2) > (3 * cbytes)) {
-      fprintf(stderr, "Failed test for DELTA and typesize: %zu\n", typesize);
+      fprintf(stderr, "Failed test for DELTA and typesize: %d\n", typesize);
       fprintf(stderr, "Size with no DELTA: %d.  Size with DELTA: %d\n",
               cbytes, cbytes2);
       mu_assert("ERROR: DELTA does not work correctly",
@@ -109,19 +109,19 @@ static char *test_delta() {
     }
   }
   else if (cbytes2 > cbytes) {
-    fprintf(stderr, "Failed test for DELTA and typesize: %zu\n", typesize);
+    fprintf(stderr, "Failed test for DELTA and typesize: %d\n", typesize);
     fprintf(stderr, "Size with no DELTA: %d.  Size with DELTA: %d\n",
             cbytes, cbytes2);
     mu_assert("ERROR: DELTA does not work correctly", cbytes2 < cbytes);
   }
 
   /* Decompress the buffer with delta */
-  nbytes = blosc_decompress(dest, src, size);
+  nbytes = blosc_decompress(dest, src, (size_t)size);
   mu_assert("ERROR: nbytes incorrect", nbytes == size);
 
-  buf_equal = memcmp(src, srccpy, size);
+  buf_equal = memcmp(src, srccpy, (size_t)size);
   if (buf_equal != 0) {
-    fprintf(stderr, "Failed test for DELTA and typesize: %zu\n", typesize);
+    fprintf(stderr, "Failed test for DELTA and typesize: %d\n", typesize);
   }
   mu_assert("ERROR: roundtrip not successful", buf_equal == 0);
 
@@ -156,15 +156,17 @@ static char *all_tests() {
 int main(int argc, char **argv) {
   char *result;
 
-  printf("STARTING TESTS for %s", argv[0]);
-
+  if (argc > 0) {
+    printf("STARTING TESTS for %s", argv[0]);
+  }
+  
   blosc_init();
   blosc_set_compressor("blosclz");
 
   /* Initialize buffers */
-  src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
-  srccpy = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
-  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, size + 16);
+  src = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t)size);
+  srccpy = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t)size);
+  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t)size + 16);
 
   /* Run all the suite */
   result = all_tests();
