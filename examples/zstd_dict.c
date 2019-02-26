@@ -36,7 +36,7 @@ int main() {
   static int64_t data_dest[CHUNKSIZE];
   const size_t isize = CHUNKSIZE * sizeof(int64_t);
   int dsize = 0;
-  size_t nbytes, cbytes;
+  int64_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
@@ -99,8 +99,8 @@ int main() {
   /* Check integrity of the first chunk */
   for (i = 0; i < CHUNKSIZE; i++) {
     if (data_dest[i] != (int64_t)i) {
-      printf("Decompressed data differs from original %d, %lld!\n",
-             i, data_dest[i]);
+      printf("Decompressed data differs from original %d, %ld!\n",
+             i, (long)data_dest[i]);
       return -1;
     }
   }
