@@ -12,6 +12,7 @@
 /* Test for using blosc without blosc_init() and blosc_destroy() */
 
 #include <unistd.h>
+#include <assert.h>
 #include "test_common.h"
 
 int tests_run = 0;
@@ -31,7 +32,7 @@ static char *test_compress() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + 16);
-  mu_assert("ERROR: cbytes is not correct", cbytes < size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   return 0;
 }
@@ -43,11 +44,11 @@ static char *test_compress_decompress() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: cbytes is not correct", cbytes < size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   /* Decompress the buffer */
   nbytes = blosc_decompress(dest, dest2, size);
-  mu_assert("ERROR: nbytes incorrect(1)", nbytes == size);
+  mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
   return 0;
 }
@@ -65,14 +66,17 @@ static char *all_tests() {
 int main(int argc, char **argv) {
   int32_t *_src;
   char *result;
-  size_t i;
+  int i;
   int pid, nchildren = 4;
 
-  printf("STARTING TESTS for %s\n", argv[0]);
+  if (argc > 0) {
+    printf("STARTING TESTS for %s", argv[0]);
+  }
 
   /* Launch several subprocesses */
   for (i = 1; i <= nchildren; i++) {
     pid = fork();
+    assert(pid >= 0);
   }
 
   blosc_set_nthreads(4);
@@ -83,7 +87,7 @@ int main(int argc, char **argv) {
   dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, size + 16);
   dest2 = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
   _src = (int32_t *)src;
-  for (i=0; i < (size/4); i++) {
+  for (i=0; i < (int)(size/4); i++) {
     _src[i] = (int32_t)i;
   }
   memcpy(srccpy, src, size);

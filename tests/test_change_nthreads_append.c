@@ -59,8 +59,8 @@ static char* all_tests() {
     mu_assert("ERROR: nchunk is not correct", nchunks == nchunk);
   }
   /* Gather some info */
-  nbytes = schunk->nbytes;
-  cbytes = schunk->cbytes;
+  nbytes = (size_t)schunk->nbytes;
+  cbytes = (size_t)schunk->cbytes;
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
@@ -84,7 +84,7 @@ static char* all_tests() {
 
   /* Check integrity of the first chunk */
   for (i = 0; i < CHUNKSIZE; i++) {
-    mu_assert("ERROR: decompressed data differs from original", data_dest[i] == (uint64_t)i);
+    mu_assert("ERROR: decompressed data differs from original", data_dest[i] == (int64_t)i);
   }
 
   printf("Successful roundtrip!\n");
@@ -99,7 +99,9 @@ static char* all_tests() {
 int main(int argc, char **argv) {
   char *result;
 
-  printf("STARTING TESTS for %s", argv[0]);
+  if (argc > 0) {
+    printf("STARTING TESTS for %s", argv[0]);
+  }
 
   blosc_init();
 

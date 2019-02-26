@@ -34,7 +34,7 @@ static char *test_compress() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + 16);
-  mu_assert("ERROR: cbytes is not correct", cbytes < size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   nthreads = blosc_get_nthreads();
   mu_assert("ERROR: get_nthreads (compress, after) incorrect", nthreads == 3);
@@ -53,14 +53,14 @@ static char *test_compress_decompress() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size+16);
-  mu_assert("ERROR: cbytes is not correct", cbytes < size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   nthreads = blosc_get_nthreads();
   mu_assert("ERROR: get_nthreads incorrect", nthreads == 3);
 
   /* Decompress the buffer */
   nbytes = blosc_decompress(dest, dest2, size);
-  mu_assert("ERROR: nbytes incorrect(1)", nbytes == size);
+  mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
   nthreads = blosc_get_nthreads();
   mu_assert("ERROR: get_nthreads incorrect", nthreads == 3);
@@ -82,10 +82,10 @@ int main(int argc, char **argv) {
   int32_t *_src;
   char *result;
   size_t i;
-  int nchildren = 4;
 
-  printf("STARTING TESTS for %s", argv[0]);
-
+  if (argc > 0) {
+    printf("STARTING TESTS for %s", argv[0]);
+  }
   /* Activate the BLOSC_NTHREADS variable */
   setenv("BLOSC_NTHREADS", "3", 1);
 

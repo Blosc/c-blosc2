@@ -37,7 +37,7 @@ static char *test_compressor() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + 16);
-  mu_assert("ERROR: cbytes is not correct", cbytes < size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   compressor = blosc_get_compressor();
   mu_assert("ERROR: get_compressor (compress, after) incorrect",
@@ -63,7 +63,7 @@ static char *test_compress_decompress() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + 16);
-  mu_assert("ERROR: cbytes is not correct", cbytes < size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   compressor = blosc_get_compressor();
   mu_assert("ERROR: get_compressor incorrect",
@@ -71,7 +71,7 @@ static char *test_compress_decompress() {
 
   /* Decompress the buffer */
   nbytes = blosc_decompress(dest, dest2, size);
-  mu_assert("ERROR: nbytes incorrect(1)", nbytes == size);
+  mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
   compressor = blosc_get_compressor();
   mu_assert("ERROR: get_compressor incorrect",
@@ -90,7 +90,7 @@ static char *test_clevel() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + 16);
-  mu_assert("ERROR: cbytes is not correct", cbytes < size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   /* Activate the BLOSC_CLEVEL variable */
   setenv("BLOSC_CLEVEL", "9", 0);
@@ -110,7 +110,7 @@ static char *test_noshuffle() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + 16);
-  mu_assert("ERROR: cbytes is not correct", cbytes < size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   /* Activate the BLOSC_SHUFFLE variable */
   setenv("BLOSC_SHUFFLE", "NOSHUFFLE", 0);
@@ -132,7 +132,7 @@ static char *test_shuffle() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + 16);
-  mu_assert("ERROR: cbytes is not 0", cbytes < size);
+  mu_assert("ERROR: cbytes is not 0", cbytes < (int)size);
 
   /* Activate the BLOSC_SHUFFLE variable */
   setenv("BLOSC_SHUFFLE", "SHUFFLE", 0);
@@ -154,7 +154,7 @@ static char *test_bitshuffle() {
   blosc_set_compressor("blosclz");  /* avoid lz4 here for now (see #168) */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + 16);
-  mu_assert("ERROR: cbytes is not 0", cbytes < size);
+  mu_assert("ERROR: cbytes is not 0", cbytes < (int)size);
 
   /* Activate the BLOSC_BITSHUFFLE variable */
   setenv("BLOSC_SHUFFLE", "BITSHUFFLE", 0);
@@ -178,7 +178,7 @@ static char *test_delta() {
   blosc_set_delta(0);
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + 16);
-  mu_assert("ERROR: cbytes is not 0", cbytes < size);
+  mu_assert("ERROR: cbytes is not 0", cbytes < (int)size);
 
   /* Activate the BLOSC_DELTA variable */
   setenv("BLOSC_DELTA", "1", 0);
@@ -200,7 +200,7 @@ static char *test_typesize() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + 16);
-  mu_assert("ERROR: cbytes is not correct", cbytes < size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   /* Activate the BLOSC_TYPESIZE variable */
   setenv("BLOSC_TYPESIZE", "9", 0);
@@ -234,7 +234,9 @@ int main(int argc, char **argv) {
   char *result;
   size_t i;
 
-  printf("STARTING TESTS for %s", argv[0]);
+  if (argc > 0) {
+    printf("STARTING TESTS for %s", argv[0]);
+  }
 
   blosc_init();
   blosc_set_compressor("blosclz");

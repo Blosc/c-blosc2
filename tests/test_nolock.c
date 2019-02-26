@@ -10,6 +10,7 @@
 **********************************************************************/
 
 #include <unistd.h>
+#include <assert.h>
 #include "test_common.h"
 
 #define BUFFER_ALIGN_SIZE   32
@@ -33,7 +34,7 @@ static char *test_compress() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + 16);
-  mu_assert("ERROR: cbytes is not correct", cbytes < size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   return 0;
 }
@@ -45,7 +46,7 @@ static char *test_compress_decompress() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + 16);
-  mu_assert("ERROR: cbytes is not correct", cbytes < size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   /* Decompress the buffer */
   nbytes = blosc_decompress(dest, dest2, size);
@@ -67,7 +68,9 @@ int main(int argc, char **argv) {
   int32_t *_src;
   char *result;
 
-  printf("STARTING TESTS for %s\n", argv[0]);
+  if (argc > 0) {
+    printf("STARTING TESTS for %s", argv[0]);
+  }
 
   /* Activate the BLOSC_NOLOCK variable */
   setenv("BLOSC_NOLOCK", "TRUE", 0);
@@ -75,6 +78,7 @@ int main(int argc, char **argv) {
   /* Launch several subprocesses */
   for (int i = 1; i <= NCHILDREN; i++) {
     int pid = fork();
+    assert(pid >= 0);
   }
 
   blosc_init();
@@ -86,7 +90,7 @@ int main(int argc, char **argv) {
   dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, size + 16);
   dest2 = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
   _src = (int32_t *)src;
-  for (int i = 0; i < (size / sizeof(int32_t)); i++) {
+  for (int i = 0; i < (int)(size / sizeof(int32_t)); i++) {
     _src[i] = (int32_t)i;
   }
   memcpy(srccpy, src, size);

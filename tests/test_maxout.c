@@ -52,11 +52,11 @@ static char* test_maxout_equal() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src, dest,
                           size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: cbytes is not correct", cbytes == size + BLOSC_MAX_OVERHEAD);
+  mu_assert("ERROR: cbytes is not correct", cbytes == (int)size + BLOSC_MAX_OVERHEAD);
 
   /* Decompress the buffer */
   nbytes = blosc_decompress(dest, dest2, size);
-  mu_assert("ERROR: nbytes incorrect(1)", nbytes == size);
+  mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
   return 0;
 }
@@ -68,11 +68,11 @@ static char* test_maxout_equal_memcpy() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(0, doshuffle, typesize, size, src, dest,
                           size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: cbytes is not correct", cbytes == size + BLOSC_MAX_OVERHEAD);
+  mu_assert("ERROR: cbytes is not correct", cbytes == (int)size + BLOSC_MAX_OVERHEAD);
 
   /* Decompress the buffer */
   nbytes = blosc_decompress(dest, dest2, size);
-  mu_assert("ERROR: nbytes incorrect(1)", nbytes == size);
+  mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
   return 0;
 }
@@ -83,11 +83,11 @@ static char* test_maxout_great() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src, dest,
                           size + BLOSC_MAX_OVERHEAD + 1);
-  mu_assert("ERROR: cbytes is not correct", cbytes == size + BLOSC_MAX_OVERHEAD);
+  mu_assert("ERROR: cbytes is not correct", cbytes == (int)size + BLOSC_MAX_OVERHEAD);
 
   /* Decompress the buffer */
   nbytes = blosc_decompress(dest, dest2, size);
-  mu_assert("ERROR: nbytes incorrect(1)", nbytes == size);
+  mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
   return 0;
 }
@@ -98,11 +98,11 @@ static char* test_maxout_great_memcpy() {
   /* Get a compressed buffer */
   cbytes = blosc_compress(0, doshuffle, typesize, size, src, dest,
                           size + BLOSC_MAX_OVERHEAD + 1);
-  mu_assert("ERROR: cbytes is not correct", cbytes == size + BLOSC_MAX_OVERHEAD);
+  mu_assert("ERROR: cbytes is not correct", cbytes == (int)size + BLOSC_MAX_OVERHEAD);
 
   /* Decompress the buffer */
   nbytes = blosc_decompress(dest, dest2, size);
-  mu_assert("ERROR: nbytes incorrect(1)", nbytes == size);
+  mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
   return 0;
 }
@@ -126,7 +126,9 @@ int main(int argc, char** argv) {
   char* result;
   size_t i;
 
-  printf("STARTING TESTS for %s", argv[0]);
+  if (argc > 0) {
+    printf("STARTING TESTS for %s", argv[0]);
+  }
 
   blosc_init();
   blosc_set_nthreads(1);

@@ -186,7 +186,9 @@ static char *all_tests() {
 int main(int argc, char **argv) {
   char *result;
 
-  printf("STARTING TESTS for %s", argv[0]);
+  if (argc > 0) {
+    printf("STARTING TESTS for %s", argv[0]);
+  }
 
   blosc_init();
 
