@@ -2,8 +2,8 @@
  Blosc: A blocking, shuffling and lossless compression library
 ===============================================================
 
-:Author: Francesc Alted
-:Contact: francesc@blosc.org
+:Author: Blosc Development Team
+:Contact: blosc@blosc.org
 :URL: http://www.blosc.org
 :Gitter: |gitter|
 :Travis CI: |travis|
@@ -43,9 +43,8 @@ implementations.
 
 C-Blosc2 is currently in alpha stage and its development will probably
 take several months.  If you want to collaborate in the this development
-you are welcome.  We would need help in supervising and refining
-the API, as well as in the design of the new containers.  Testing for
-other platforms than Intel (specially ARM) will be appreciated as well.
+you are welcome.  We need help in the different areas listed at the 
+`<ROADMAP.md>`_; also, be sure to read our `<DEVELOPING-GUIDE.rst>`_.
 
 Blosc is distributed using the BSD license, see `<LICENSES/BLOSC2.txt>`_ for
 details.
@@ -60,7 +59,7 @@ any rate, it can also be called a compressor because it happens that
 it already comes with several compressor and filters, so it can
 actually work like so.
 
-Another important aspect of C-Blosc2, is that it is meant to host blocks of data
+Another important aspect of C-Blosc2 is that it is meant to host blocks of data
 in smaller containers.  These containers are called *chunks* in C-Blosc2
 jargon (they are basically `Blosc1 containers <https://github.com/Blosc/c-blosc>`_).
 For achieving maximum speed, these chunks are meant to fit in the
@@ -91,8 +90,8 @@ available) automatically. That makes that every compressor and filter
 will work at very high speeds, even if it was not initially designed
 for doing blocking or multi-threading.
 
-C-Blosc2 can be used as a regular compressed data container, although it should
-shine when used in streamed processes that do computations with the chunks
+C-Blosc2 can be used as a regular compressed data container, although it
+shines when it is used in streamed processes that do computations with the chunks
 fitting in CPU caches.  These streamed process can be anything, but e.g. C-Blosc2
 working as a RDD (Resilient Distributed Dataset) inside
 `Spark <https://spark.apache.org/docs/latest/rdd-programming-guide.html#overview>`_
@@ -143,7 +142,7 @@ header files, will be installed into the specified
 CMAKE_INSTALL_PREFIX.
 
 Once you have compiled your Blosc library, you can easily link your
-apps with it as shown in the `example/ directory
+apps with it as shown in the `examples/ directory
 <https://github.com/Blosc/c-blosc2/blob/master/examples>`_.
 
 Handling support for codecs (LZ4, LZ4HC, Zstd, Zlib)
