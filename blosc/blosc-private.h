@@ -46,7 +46,7 @@ static int32_t sw32_(const void* pa) {
 }
 
 
-/* Copy 4 bytes from @p *pa to @p *dest, changing endianness if necessary. */
+/* Copy 4 bytes from int32_t to @p *dest, changing endianness if necessary. */
 static void _sw32(void* dest, int32_t a) {
   uint8_t* dest_ = (uint8_t*)dest;
   uint8_t* pa = (uint8_t*)&a;

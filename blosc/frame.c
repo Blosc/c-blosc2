@@ -404,7 +404,7 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
 
   uint8_t* header = malloc(HEADER2_MINLEN);
   FILE* fp = fopen(fname, "rb");
-  size_t rbytes = fread(header, HEADER2_MINLEN, 1, fp);
+  size_t rbytes = fread(header, 1, HEADER2_MINLEN, fp);
   assert(rbytes == HEADER2_MINLEN);
 
   int64_t frame_len;
@@ -422,7 +422,7 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   // Get the size for the index of namespaces
   uint16_t idx_size;
   fseek(fp, FRAME_IDX_SIZE, SEEK_SET);
-  rbytes = fread(&idx_size, sizeof(uint16_t), 1, fp);
+  rbytes = fread(&idx_size, 1, sizeof(uint16_t), fp);
   assert(rbytes == sizeof(uint16_t));
 
   swap_store(&idx_size, &idx_size, sizeof(idx_size));
@@ -430,7 +430,7 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   // Read the index of namespaces for namespaces
   uint8_t* nspaces_idx = malloc(idx_size);
   fseek(fp, FRAME_IDX_SIZE + 2, SEEK_SET);
-  rbytes = fread(nspaces_idx, idx_size, 1, fp);
+  rbytes = fread(nspaces_idx, 1, idx_size, fp);
   assert(rbytes == idx_size);
   assert(nspaces_idx[0] == 0xde);   // sanity check
   uint8_t* idxp = nspaces_idx + 1;
@@ -472,7 +472,7 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
     // Read the size of the content
     int32_t content_len;
     fseek(fp, offset + 1, SEEK_SET);
-    rbytes = fread(&content_len, 4, 1, fp);
+    rbytes = fread(&content_len, 1, 4, fp);
     assert(rbytes == 4);
     swap_store(&content_len, &content_len, sizeof(content_len));
     nspace->content_len = content_len;
@@ -480,7 +480,7 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
     // Finally, read the content
     char* content = malloc((size_t)content_len);
     fseek(fp, offset + 1 + 4, SEEK_SET);
-    rbytes = fread(content, (size_t)content_len, 1, fp);
+    rbytes = fread(content, 1, (size_t)content_len, fp);
     assert(rbytes == (size_t)content_len);
     nspace->content = (uint8_t*)content;
   }
@@ -543,7 +543,7 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
   if (frame->sdata == NULL) {
     header = malloc(HEADER2_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
-    size_t rbytes = fread(header, HEADER2_MINLEN, 1, fp);
+    size_t rbytes = fread(header, 1, HEADER2_MINLEN, fp);
     assert(rbytes == HEADER2_MINLEN);
     framep = header;
     fclose(fp);
@@ -587,7 +587,7 @@ int frame_update_meta(blosc2_frame* frame) {
   if (frame->sdata == NULL) {
     header = malloc(HEADER2_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
-    size_t rbytes = fread(header, HEADER2_MINLEN, 1, fp);
+    size_t rbytes = fread(header, 1, HEADER2_MINLEN, fp);
     assert(rbytes == HEADER2_MINLEN);
     fclose(fp);
   }
@@ -691,7 +691,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
     }
     else {
       fseek(fp, header_len + offsets[i], SEEK_SET);
-      size_t rbytes = fread(data_chunk, BLOSC_MIN_HEADER_LENGTH, 1, fp);
+      size_t rbytes = fread(data_chunk, 1, BLOSC_MIN_HEADER_LENGTH, fp);
       assert(rbytes == BLOSC_MIN_HEADER_LENGTH);
       csize = sw32_(data_chunk + 12);
       if (csize > prev_alloc) {
@@ -699,7 +699,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
         prev_alloc = csize;
       }
       fseek(fp, header_len + offsets[i], SEEK_SET);
-      rbytes = fread(data_chunk, (size_t)csize, 1, fp);
+      rbytes = fread(data_chunk, 1, (size_t)csize, fp);
       assert(rbytes == (size_t)csize);
     }
     uint8_t* new_chunk = malloc((size_t)csize);
@@ -826,7 +826,6 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
 
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
   int32_t nbytes_chunk = sw32_((uint8_t*)chunk + 4);
-  int64_t new_nbytes = nbytes + nbytes_chunk;
   int32_t cbytes_chunk = sw32_((uint8_t*)chunk + 12);
   int64_t new_cbytes = cbytes + cbytes_chunk;
 
