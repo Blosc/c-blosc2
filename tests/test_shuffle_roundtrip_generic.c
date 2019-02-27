@@ -28,8 +28,8 @@ static int test_shuffle_roundtrip_generic(size_t type_size, size_t num_elements,
   blosc_test_fill_seq(original, buffer_size);
 
   /* Generic shuffle, then generic unshuffle. */
-  shuffle_generic(type_size, buffer_size, original, shuffled);
-  unshuffle_generic(type_size, buffer_size, shuffled, unshuffled);
+  shuffle_generic((int32_t)type_size, (int32_t)buffer_size, original, shuffled);
+  unshuffle_generic((int32_t)type_size, (int32_t)buffer_size, shuffled, unshuffled);
 
   /* The round-tripped data matches the original data when the
      result of memcmp is 0. */

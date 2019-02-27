@@ -1636,7 +1636,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     context->dict_cdict = ZSTD_createCDict(dict_buffer, dict_actual_size,
                                            1);  // TODO: use get_accel()
     free(dict_buffer);      // the dictionary is copied in the header now
-    context->output_bytes += dict_actual_size;
+    context->output_bytes += (int32_t)dict_actual_size;
     context->dict_size = dict_actual_size;
 
     /* Compress with dict */
