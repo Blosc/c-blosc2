@@ -51,7 +51,7 @@ static void printymm(__m256i ymm0)
 
 
 /* Transpose bits within bytes. */
-int64_t bshuf_trans_bit_byte_avx2(void* in, void* out, const size_t size,
+int32_t bshuf_trans_bit_byte_avx2(void* in, void* out, const size_t size,
                                   const size_t elem_size) {
 
   char* in_b = (char*)in;
@@ -60,7 +60,7 @@ int64_t bshuf_trans_bit_byte_avx2(void* in, void* out, const size_t size,
 
   size_t nbyte = elem_size * size;
 
-  int64_t count;
+  int32_t count;
 
   __m256i ymm;
   int32_t bt;
@@ -82,18 +82,18 @@ int64_t bshuf_trans_bit_byte_avx2(void* in, void* out, const size_t size,
 
 
 /* Transpose bits within elements. */
-int64_t bshuf_trans_bit_elem_avx2(void* in, void* out, const size_t size,
-                                  const size_t elem_size, void* tmp_buf) {
+int32_t bshuf_trans_bit_elem_avx2(void* in, void* out, const int32_t size,
+                                  const int32_t elem_size, void* tmp_buf) {
 
-  int64_t count;
+  int32_t count;
 
   CHECK_MULT_EIGHT(size);
 
-  count = bshuf_trans_byte_elem_sse2(in, out, size, elem_size, tmp_buf);
+  count = bshuf_trans_byte_elem_sse2(in, out, (size_t)size, (size_t)elem_size, tmp_buf);
   CHECK_ERR(count);
-  count = bshuf_trans_bit_byte_avx2(out, tmp_buf, size, elem_size);
+  count = bshuf_trans_bit_byte_avx2(out, tmp_buf, (size_t)size, (size_t)elem_size);
   CHECK_ERR(count);
-  count = bshuf_trans_bitrow_eight(tmp_buf, out, size, elem_size);
+  count = bshuf_trans_bitrow_eight(tmp_buf, out, (size_t)size, (size_t)elem_size);
 
   return count;
 }
@@ -101,7 +101,7 @@ int64_t bshuf_trans_bit_elem_avx2(void* in, void* out, const size_t size,
 
 /* For data organized into a row for each bit (8 * elem_size rows), transpose
  * the bytes. */
-int64_t bshuf_trans_byte_bitrow_avx2(void* in, void* out, const size_t size,
+int32_t bshuf_trans_byte_bitrow_avx2(void* in, void* out, const size_t size,
                                      const size_t elem_size) {
 
   char* in_b = (char*)in;
@@ -196,7 +196,7 @@ int64_t bshuf_trans_byte_bitrow_avx2(void* in, void* out, const size_t size,
 
 
 /* Shuffle bits within the bytes of eight element blocks. */
-int64_t bshuf_shuffle_bit_eightelem_avx2(void* in, void* out, const size_t size,
+int32_t bshuf_shuffle_bit_eightelem_avx2(void* in, void* out, const size_t size,
                                          const size_t elem_size) {
 
   CHECK_MULT_EIGHT(size);
@@ -228,21 +228,21 @@ int64_t bshuf_shuffle_bit_eightelem_avx2(void* in, void* out, const size_t size,
       }
     }
   }
-  return size * elem_size;
+  return (int32_t)(size * elem_size);
 }
 
 
 /* Untranspose bits within elements. */
-int64_t bshuf_untrans_bit_elem_avx2(void* in, void* out, const size_t size,
-                                    const size_t elem_size, void* tmp_buf) {
+int32_t bshuf_untrans_bit_elem_avx2(void* in, void* out, const int32_t size,
+                                    const int32_t elem_size, void* tmp_buf) {
 
-  int64_t count;
+  int32_t count;
 
   CHECK_MULT_EIGHT(size);
 
-  count = bshuf_trans_byte_bitrow_avx2(in, tmp_buf, size, elem_size);
+  count = bshuf_trans_byte_bitrow_avx2(in, tmp_buf, (size_t)size, (size_t)elem_size);
   CHECK_ERR(count);
-  count = bshuf_shuffle_bit_eightelem_avx2(tmp_buf, out, size, elem_size);
+  count = bshuf_shuffle_bit_eightelem_avx2(tmp_buf, out, (size_t)size, (size_t)elem_size);
 
   return count;
 }

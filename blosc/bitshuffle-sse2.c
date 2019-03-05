@@ -45,7 +45,7 @@ static void printxmm(__m128i xmm0)
 /* ---- Worker code that requires SSE2. Intel Petium 4 (2000) and later. ---- */
 
 /* Transpose bytes within elements for 16 bit elements. */
-int64_t bshuf_trans_byte_elem_SSE_16(void* in, void* out, const size_t size) {
+int32_t bshuf_trans_byte_elem_SSE_16(void* in, void* out, const size_t size) {
 
   char* in_b = (char*)in;
   char* out_b = (char*)out;
@@ -77,7 +77,7 @@ int64_t bshuf_trans_byte_elem_SSE_16(void* in, void* out, const size_t size) {
 
 
 /* Transpose bytes within elements for 32 bit elements. */
-int64_t bshuf_trans_byte_elem_SSE_32(void* in, void* out, const size_t size) {
+int32_t bshuf_trans_byte_elem_SSE_32(void* in, void* out, const size_t size) {
 
   char* in_b = (char*)in;
   char* out_b = (char*)out;
@@ -121,7 +121,7 @@ int64_t bshuf_trans_byte_elem_SSE_32(void* in, void* out, const size_t size) {
 
 
 /* Transpose bytes within elements for 64 bit elements. */
-int64_t bshuf_trans_byte_elem_SSE_64(void* in, void* out, const size_t size) {
+int32_t bshuf_trans_byte_elem_SSE_64(void* in, void* out, const size_t size) {
 
   char* in_b = (char*)in;
   char* out_b = (char*)out;
@@ -190,22 +190,22 @@ int64_t bshuf_trans_byte_elem_SSE_64(void* in, void* out, const size_t size) {
 
 
 /* Memory copy with bshuf call signature. */
-int64_t bshuf_copy(void* in, void* out, const size_t size,
+int32_t bshuf_copy(void* in, void* out, const size_t size,
                    const size_t elem_size) {
 
   char* in_b = (char*)in;
   char* out_b = (char*)out;
 
   memcpy(out_b, in_b, size * elem_size);
-  return size * elem_size;
+  return (int32_t)(size * elem_size);
 }
 
 
 /* Transpose bytes within elements using best SSE algorithm available. */
-int64_t bshuf_trans_byte_elem_sse2(void* in, void* out, const size_t size,
+int32_t bshuf_trans_byte_elem_sse2(void* in, void* out, const size_t size,
                                    const size_t elem_size, void* tmp_buf) {
 
-  int64_t count;
+  int32_t count;
 
   /*  Trivial cases: power of 2 bytes. */
   switch (elem_size) {
@@ -236,7 +236,7 @@ int64_t bshuf_trans_byte_elem_sse2(void* in, void* out, const size_t size,
 
     if ((elem_size % 8) == 0) {
       nchunk_elem = elem_size / 8;
-      TRANS_ELEM_TYPE(in, out, size, nchunk_elem, int64_t);
+      TRANS_ELEM_TYPE(in, out, size, nchunk_elem, int32_t);
       count = bshuf_trans_byte_elem_SSE_64(out, tmp_buf,
                                            size * nchunk_elem);
       bshuf_trans_elem(tmp_buf, out, 8, nchunk_elem, size);
@@ -261,13 +261,13 @@ int64_t bshuf_trans_byte_elem_sse2(void* in, void* out, const size_t size,
 
 
 /* Transpose bits within bytes. */
-int64_t bshuf_trans_bit_byte_sse2(void* in, void* out, const size_t size,
+int32_t bshuf_trans_bit_byte_sse2(void* in, void* out, const size_t size,
                                   const size_t elem_size) {
 
   char* in_b = (char*)in;
   char* out_b = (char*)out;
   uint16_t* out_ui16;
-  int64_t count;
+  int32_t count;
   size_t nbyte = elem_size * size;
   __m128i xmm;
   int32_t bt;
@@ -291,18 +291,18 @@ int64_t bshuf_trans_bit_byte_sse2(void* in, void* out, const size_t size,
 
 
 /* Transpose bits within elements. */
-int64_t bshuf_trans_bit_elem_sse2(void* in, void* out, const size_t size,
-                                  const size_t elem_size, void* tmp_buf) {
+int32_t bshuf_trans_bit_elem_sse2(void* in, void* out, const int32_t size,
+                                  const int32_t elem_size, void* tmp_buf) {
 
-  int64_t count;
+  int32_t count;
 
   CHECK_MULT_EIGHT(size);
 
-  count = bshuf_trans_byte_elem_sse2(in, out, size, elem_size, tmp_buf);
+  count = bshuf_trans_byte_elem_sse2(in, out, (size_t)size, (size_t)elem_size, tmp_buf);
   CHECK_ERR(count);
-  count = bshuf_trans_bit_byte_sse2(out, tmp_buf, size, elem_size);
+  count = bshuf_trans_bit_byte_sse2(out, tmp_buf, (size_t)size, (size_t)elem_size);
   CHECK_ERR(count);
-  count = bshuf_trans_bitrow_eight(tmp_buf, out, size, elem_size);
+  count = bshuf_trans_bitrow_eight(tmp_buf, out, (size_t)size, (size_t)elem_size);
 
   return count;
 }
@@ -310,7 +310,7 @@ int64_t bshuf_trans_bit_elem_sse2(void* in, void* out, const size_t size,
 
 /* For data organized into a row for each bit (8 * elem_size rows), transpose
  * the bytes. */
-int64_t bshuf_trans_byte_bitrow_sse2(void* in, void* out, const size_t size,
+int32_t bshuf_trans_byte_bitrow_sse2(void* in, void* out, const size_t size,
                                      const size_t elem_size) {
 
   char* in_b = (char*)in;
@@ -410,12 +410,12 @@ int64_t bshuf_trans_byte_bitrow_sse2(void* in, void* out, const size_t size,
       out_b[jj * nrows + ii + 7] = in_b[(ii + 7) * nbyte_row + jj];
     }
   }
-  return size * elem_size;
+  return (int32_t)(size * elem_size);
 }
 
 
 /* Shuffle bits within the bytes of eight element blocks. */
-int64_t bshuf_shuffle_bit_eightelem_sse2(void* in, void* out, const size_t size,
+int32_t bshuf_shuffle_bit_eightelem_sse2(void* in, void* out, const size_t size,
                                          const size_t elem_size) {
   /*  With a bit of care, this could be written such that such that it is */
   /*  in_buf = out_buf safe. */
@@ -447,21 +447,21 @@ int64_t bshuf_shuffle_bit_eightelem_sse2(void* in, void* out, const size_t size,
       }
     }
   }
-  return size * elem_size;
+  return (int32_t)(size * elem_size);
 }
 
 
 /* Untranspose bits within elements. */
-int64_t bshuf_untrans_bit_elem_sse2(void* in, void* out, const size_t size,
-                                    const size_t elem_size, void* tmp_buf) {
+int32_t bshuf_untrans_bit_elem_sse2(void* in, void* out, const int32_t size,
+                                    const int32_t elem_size, void* tmp_buf) {
 
-  int64_t count;
+  int32_t count;
 
   CHECK_MULT_EIGHT(size);
 
-  count = bshuf_trans_byte_bitrow_sse2(in, tmp_buf, size, elem_size);
+  count = bshuf_trans_byte_bitrow_sse2(in, tmp_buf, (size_t)size, (size_t)elem_size);
   CHECK_ERR(count);
-  count = bshuf_shuffle_bit_eightelem_sse2(tmp_buf, out, size, elem_size);
+  count = bshuf_shuffle_bit_eightelem_sse2(tmp_buf, out, (size_t)size, (size_t)elem_size);
 
   return count;
 }
