@@ -112,7 +112,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   *h2p = 0xa0 + 8;  // str with 8 elements
   h2p += 1;
   assert(h2p - h2 < HEADER2_MINLEN);
-  strncpy((char*)h2p, "b2frame", strlen("b2frame"));
+  strcpy((char*)h2p, "b2frame");
   h2p += 8;
 
   // Header size
@@ -986,8 +986,8 @@ int blosc2_frame_add_metalayer(blosc2_frame *frame, char *name, uint8_t *content
 
     // Add the namespace
     blosc2_frame_metalayer *nspace = malloc(sizeof(blosc2_frame_metalayer));
-    char* name_ = malloc(strlen(name));
-    strncpy(name_, name, strlen(name));
+    char* name_ = malloc(strlen(name) + 1);
+    strcpy(name_, name);
     nspace->name = name;
     uint8_t* content_buf = malloc((size_t)content_len);
     memcpy(content_buf, content, content_len);

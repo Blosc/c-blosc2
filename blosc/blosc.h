@@ -26,6 +26,10 @@
 extern "C" {
 #endif
 
+// For shutting up stupid compiler warning about some 'unused' variables
+#define UNUSED_VAR __attribute__ ((unused))
+
+
 /* Version numbers */
 #define BLOSC_VERSION_MAJOR    2    /* for major interface/format changes  */
 #define BLOSC_VERSION_MINOR    0    /* for minor interface/format changes  */
@@ -729,7 +733,7 @@ typedef struct {
 /**
  * @brief Empty in-memory frame
  */
-static blosc2_frame BLOSC_EMPTY_FRAME = {
+UNUSED_VAR static blosc2_frame BLOSC_EMPTY_FRAME = {
   .sdata = NULL,
   .fname = NULL,
   .len = 0,

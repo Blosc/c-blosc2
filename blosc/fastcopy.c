@@ -196,24 +196,45 @@ static inline unsigned char *chunk_memcpy(unsigned char *out, const unsigned cha
     case 7:
       out = copy_8_bytes(out, from);
       from += sz;
+      #if defined(__GNUC__) && !defined(__clang__)
+      __attribute__ ((fallthrough));  // Shut-up -Wimplicit-fallthrough warning in GCC
+      #endif
     case 6:
       out = copy_8_bytes(out, from);
       from += sz;
+      #if defined(__GNUC__) && !defined(__clang__)
+      __attribute__ ((fallthrough));
+      #endif
     case 5:
       out = copy_8_bytes(out, from);
       from += sz;
+      #if defined(__GNUC__) && !defined(__clang__)
+      __attribute__ ((fallthrough));
+      #endif
     case 4:
       out = copy_8_bytes(out, from);
       from += sz;
+      #if defined(__GNUC__) && !defined(__clang__)
+      __attribute__ ((fallthrough));
+      #endif
     case 3:
       out = copy_8_bytes(out, from);
       from += sz;
+      #if defined(__GNUC__) && !defined(__clang__)
+      __attribute__ ((fallthrough));
+      #endif
     case 2:
       out = copy_8_bytes(out, from);
       from += sz;
+      #if defined(__GNUC__) && !defined(__clang__)
+      __attribute__ ((fallthrough));
+      #endif
     case 1:
       out = copy_8_bytes(out, from);
       from += sz;
+      #if defined(__GNUC__) && !defined(__clang__)
+      __attribute__ ((fallthrough));
+      #endif
     default:
       break;
   }
