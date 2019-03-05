@@ -185,7 +185,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
       extended control register XCR0 to see if the CPU features are enabled. */
   bool xmm_state_enabled = false;
   bool ymm_state_enabled = false;
-  bool zmm_state_enabled = false;
+  //bool zmm_state_enabled = false;  // commented this out for avoiding an 'unused variable' warning
 
 #if defined(_XCR_XFEATURE_ENABLED_MASK)
   if (xsave_available && xsave_enabled_by_os && (
@@ -200,7 +200,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
 
     /*  Require support for both the upper 256-bits of zmm0-zmm15 to be
         restored as well as all of zmm16-zmm31 and the opmask registers. */
-    zmm_state_enabled = (xcr0_contents & 0x70) == 0x70;
+    //zmm_state_enabled = (xcr0_contents & 0x70) == 0x70;
   }
 #endif /* defined(_XCR_XFEATURE_ENABLED_MASK) */
 
@@ -217,7 +217,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   printf("XSAVE enabled: %s\n", xsave_enabled_by_os ? "True" : "False");
   printf("XMM state enabled: %s\n", xmm_state_enabled ? "True" : "False");
   printf("YMM state enabled: %s\n", ymm_state_enabled ? "True" : "False");
-  printf("ZMM state enabled: %s\n", zmm_state_enabled ? "True" : "False");
+  //printf("ZMM state enabled: %s\n", zmm_state_enabled ? "True" : "False");
 #endif /* defined(BLOSC_DUMP_CPU_INFO) */
 
   /* Using the gathered CPU information, determine which implementation to use. */
