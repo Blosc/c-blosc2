@@ -21,13 +21,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "blosc-export.h"
+#include "blosc-common.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-// For shutting up stupid compiler warning about some 'unused' variables
-#define UNUSED_VAR __attribute__ ((unused))
 
 
 /* Version numbers */
@@ -733,7 +731,7 @@ typedef struct {
 /**
  * @brief Empty in-memory frame
  */
-UNUSED_VAR static blosc2_frame BLOSC_EMPTY_FRAME = {
+BLOSC_UNUSED_VAR static blosc2_frame BLOSC_EMPTY_FRAME = {
   .sdata = NULL,
   .fname = NULL,
   .len = 0,

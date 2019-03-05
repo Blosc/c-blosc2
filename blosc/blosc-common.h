@@ -12,6 +12,12 @@
 #include "blosc-export.h"
 #include <string.h>
 
+// For shutting up stupid compiler warning about some 'unused' variables in GCC
+#ifdef __GNUC__
+#define BLOSC_UNUSED_VAR __attribute__ ((unused))
+#endif
+#define BLOSC_UNUSED_PARAM(x) ((void)(x))
+
 /* Import standard integer type definitions */
 #if defined(_WIN32) && !defined(__MINGW32__)
 
