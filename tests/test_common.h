@@ -53,11 +53,13 @@ extern int tests_run;
   Memory functions.
 */
 
+#define UNUSED(x) ((void)(x))
+
 /** Allocates a block of memory with the specified size and alignment.
     The allocated memory is 'cleaned' before returning to avoid
     accidental re-use of data within or between tests.
  */
-static void* blosc_test_malloc(const size_t alignment, const size_t size) {
+inline static void* blosc_test_malloc(const size_t alignment, const size_t size) {
   const int32_t clean_value = 0x99;
   void* block = NULL;
   int32_t res = 0;
@@ -73,6 +75,7 @@ static void* blosc_test_malloc(const size_t alignment, const size_t size) {
   res = posix_memalign(&block, alignment, size);
 #elif defined(__APPLE__)
   /* Mac OS X guarantees 16-byte alignment in small allocs */
+  UNUSED(alignment);
   block = malloc(size);
 #else
   #error Cannot determine how to allocate aligned memory on the target platform.
@@ -90,7 +93,7 @@ static void* blosc_test_malloc(const size_t alignment, const size_t size) {
 }
 
 /** Frees memory allocated by blosc_test_malloc. */
-static void blosc_test_free(void* ptr) {
+inline static void blosc_test_free(void* ptr) {
 #if defined(_WIN32)
   _aligned_free(ptr);
 #else
@@ -99,7 +102,7 @@ static void blosc_test_free(void* ptr) {
 }
 
 /** Fills a buffer with sequential values. */
-static void blosc_test_fill_seq(void* const ptr, const size_t size) {
+inline static void blosc_test_fill_seq(void* const ptr, const size_t size) {
   size_t k;
   uint8_t* const byte_ptr = (uint8_t*)ptr;
   for (k = 0; k < size; k++) {
@@ -108,11 +111,11 @@ static void blosc_test_fill_seq(void* const ptr, const size_t size) {
 }
 
 /** Fills a buffer with random values. */
-static void blosc_test_fill_random(void* const ptr, const size_t size) {
+inline static void blosc_test_fill_random(void* const ptr, const size_t size) {
   size_t k;
   uint8_t* const byte_ptr = (uint8_t*)ptr;
   for (k = 0; k < size; k++) {
-    byte_ptr[k] = rand();
+    byte_ptr[k] = (uint8_t)rand();
   }
 }
 
@@ -121,9 +124,9 @@ static void blosc_test_fill_random(void* const ptr, const size_t size) {
 */
 
 /** Parse a `int32_t` value from a string, checking for overflow. */
-static bool blosc_test_parse_uint32_t(const char* const str, uint32_t* value) {
+inline static bool blosc_test_parse_uint32_t(const char* const str, uint32_t* value) {
   char* str_end;
-  int32_t signed_value = strtol(str, &str_end, 10);
+  long signed_value = strtol(str, &str_end, 10);
   if (signed_value < 0 || *str_end) {
     return false;
   }
@@ -139,7 +142,7 @@ static bool blosc_test_parse_uint32_t(const char* const str, uint32_t* value) {
 
 /** Print an error message when a test program has been invoked
     with an invalid number of arguments. */
-static void blosc_test_print_bad_argcount_msg(
+inline static void blosc_test_print_bad_argcount_msg(
     const int32_t num_expected_args, const int32_t num_actual_args) {
   fprintf(stderr, "Invalid number of arguments specified.\nExpected %d arguments but was given %d.",
           num_expected_args, num_actual_args);
@@ -147,7 +150,7 @@ static void blosc_test_print_bad_argcount_msg(
 
 /** Print an error message when a test program has been invoked
     with an invalid argument value. */
-static void blosc_test_print_bad_arg_msg(const int32_t arg_index) {
+inline static void blosc_test_print_bad_arg_msg(const int32_t arg_index) {
   fprintf(stderr, "Invalid value specified for argument at index %d.\n", arg_index);
 }
 

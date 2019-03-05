@@ -129,11 +129,16 @@ void btune_next_blocksize(blosc2_context *context) {
   context->blocksize = blocksize;
 }
 
+#define UNUSED(x) ((void)(x))
 void btune_next_cparams(blosc2_context * context) {
+    UNUSED(context);
 }
 
 void btune_update(blosc2_context * context, double ctime) {
+    UNUSED(context);
+    UNUSED(ctime);
 }
 
 void btune_free(blosc2_context * context) {
+    UNUSED(context);
 }

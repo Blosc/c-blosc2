@@ -64,13 +64,9 @@ static char *all_tests() {
 }
 
 
-int main(int argc, char **argv) {
+int main() {
   int32_t *_src;
   char *result;
-
-  if (argc > 0) {
-    printf("STARTING TESTS for %s", argv[0]);
-  }
 
   /* Activate the BLOSC_NOLOCK variable */
   setenv("BLOSC_NOLOCK", "TRUE", 0);

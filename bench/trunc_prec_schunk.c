@@ -104,7 +104,7 @@ int main() {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;
     }
-    assert (dsize == isize);
+    assert (dsize == (int)isize);
   }
   blosc_set_timestamp(&current);
   totaltime = blosc_elapsed_secs(last, current);
@@ -121,7 +121,7 @@ int main() {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;
     }
-    assert (dsize == isize);
+    assert (dsize == (int)isize);
     fill_buffer(data_buffer, nchunk);
     for (int i = 0; i < CHUNKSIZE; i++) {
       if (fabs(data_buffer[i] - rec_buffer[i]) > 1e-5) {

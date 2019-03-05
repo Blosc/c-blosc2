@@ -34,7 +34,7 @@ int main() {
   int dsize;
   int64_t nbytes, cbytes;
   int nchunk;
-  size_t nchunks = 0;
+  int nchunks = 0;
   blosc_timestamp_t last, current;
   double totaltime;
   float totalsize = (float)(isize * NCHUNKS);
@@ -83,7 +83,7 @@ int main() {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;
     }
-    assert (dsize == isize);
+    assert (dsize == (int)isize);
   }
   blosc_set_timestamp(&current);
   totaltime = blosc_elapsed_secs(last, current);

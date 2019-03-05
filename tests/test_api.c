@@ -15,11 +15,11 @@ int tests_run = 0;
 
 /* Global vars */
 void* src, * srccpy, * dest, * dest2;
-size_t nbytes, cbytes;
+int nbytes, cbytes;
 int clevel = 3;
 int doshuffle = 1;
-size_t typesize = 4;
-size_t size = 1 * MB;
+int typesize = 4;
+int size = 1 * MB;
 
 
 static char* test_cbuffer_sizes() {
@@ -27,8 +27,8 @@ static char* test_cbuffer_sizes() {
 
   blosc_cbuffer_sizes(dest, &nbytes_, &cbytes_, &blocksize);
   mu_assert("ERROR: nbytes incorrect(1)", nbytes == size);
-  mu_assert("ERROR: nbytes incorrect(2)", nbytes_ == nbytes);
-  mu_assert("ERROR: cbytes incorrect", cbytes == cbytes_);
+  mu_assert("ERROR: nbytes incorrect(2)", nbytes_ == (size_t)nbytes);
+  mu_assert("ERROR: cbytes incorrect", cbytes_ == (size_t)cbytes_);
   mu_assert("ERROR: blocksize incorrect", blocksize >= 128);
   return 0;
 }
@@ -38,7 +38,7 @@ static char* test_cbuffer_metainfo() {
   int flags;
 
   blosc_cbuffer_metainfo(dest, &typesize_, &flags);
-  mu_assert("ERROR: typesize incorrect", typesize_ == typesize);
+  mu_assert("ERROR: typesize incorrect", typesize_ == (size_t)typesize);
   mu_assert("ERROR: shuffle incorrect", (flags & BLOSC_DOSHUFFLE) == doshuffle);
   return 0;
 }
@@ -98,10 +98,8 @@ static char* all_tests() {
 
 #define BUFFER_ALIGN_SIZE   8
 
-int main(int argc, char** argv) {
+int main() {
   char* result;
-
-  printf("STARTING TESTS for %s", argv[0]);
 
   blosc_init();
   blosc_set_nthreads(1);

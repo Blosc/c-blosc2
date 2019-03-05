@@ -16,7 +16,7 @@
     * get_run() and get_match() familiy of functions
     * fast_copy() and safe_copy() functions
     * Support for SSE2/AVX2 copy instructions for these routines
-**********************************************************************/
+*************g*********************************************************/
 
 #include <assert.h>
 #include "blosc-common.h"
@@ -242,6 +242,7 @@ static inline unsigned char *chunk_memcpy(unsigned char *out, const unsigned cha
   return out;
 }
 
+#if (defined(__SSE2__) && defined(__AVX2__))
 /* 16-byte version of chunk_memcpy() */
 static inline unsigned char *chunk_memcpy_16(unsigned char *out, const unsigned char *from, unsigned len) {
   unsigned sz = 16;
@@ -265,97 +266,101 @@ static inline unsigned char *chunk_memcpy_16(unsigned char *out, const unsigned 
 
   return out;
 }
+#endif
 
-/* 32-byte version of chunk_memcpy() */
-static inline unsigned char *chunk_memcpy_32(unsigned char *out, const unsigned char *from, unsigned len) {
-  unsigned sz = 32;
-  unsigned rem = len % sz;
-  unsigned ilen;
 
-  assert(len >= sz);
+// NOTE: chunk_memcpy_32() and chunk_memcpy_32_unrolled() are not used, so commenting them
 
-  /* Copy a few bytes to make sure the loop below has a multiple of SZ bytes to be copied. */
-  copy_32_bytes(out, from);
-
-  len /= sz;
-  out += rem;
-  from += rem;
-
-  for (ilen = 0; ilen < len; ilen++) {
-    copy_32_bytes(out, from);
-    out += sz;
-    from += sz;
-  }
-
-  return out;
-}
-
-/* 32-byte *unrolled* version of chunk_memcpy() */
-static inline unsigned char *chunk_memcpy_32_unrolled(unsigned char *out, const unsigned char *from, unsigned len) {
-  unsigned sz = 32;
-  unsigned rem = len % sz;
-  unsigned by8;
-
-  assert(len >= sz);
-
-  /* Copy a few bytes to make sure the loop below has a multiple of SZ bytes to be copied. */
-  copy_32_bytes(out, from);
-
-  len /= sz;
-  out += rem;
-  from += rem;
-
-  by8 = len % 8;
-  len -= by8;
-  switch (by8) {
-    case 7:
-      out = copy_32_bytes(out, from);
-      from += sz;
-    case 6:
-      out = copy_32_bytes(out, from);
-      from += sz;
-    case 5:
-      out = copy_32_bytes(out, from);
-      from += sz;
-    case 4:
-      out = copy_32_bytes(out, from);
-      from += sz;
-    case 3:
-      out = copy_32_bytes(out, from);
-      from += sz;
-    case 2:
-      out = copy_32_bytes(out, from);
-      from += sz;
-    case 1:
-      out = copy_32_bytes(out, from);
-      from += sz;
-    default:
-      break;
-  }
-
-  while (len) {
-    out = copy_32_bytes(out, from);
-    from += sz;
-    out = copy_32_bytes(out, from);
-    from += sz;
-    out = copy_32_bytes(out, from);
-    from += sz;
-    out = copy_32_bytes(out, from);
-    from += sz;
-    out = copy_32_bytes(out, from);
-    from += sz;
-    out = copy_32_bytes(out, from);
-    from += sz;
-    out = copy_32_bytes(out, from);
-    from += sz;
-    out = copy_32_bytes(out, from);
-    from += sz;
-
-    len -= 8;
-  }
-
-  return out;
-}
+///* 32-byte version of chunk_memcpy() */
+//static inline unsigned char *chunk_memcpy_32(unsigned char *out, const unsigned char *from, unsigned len) {
+//  unsigned sz = 32;
+//  unsigned rem = len % sz;
+//  unsigned ilen;
+//
+//  assert(len >= sz);
+//
+//  /* Copy a few bytes to make sure the loop below has a multiple of SZ bytes to be copied. */
+//  copy_32_bytes(out, from);
+//
+//  len /= sz;
+//  out += rem;
+//  from += rem;
+//
+//  for (ilen = 0; ilen < len; ilen++) {
+//    copy_32_bytes(out, from);
+//    out += sz;
+//    from += sz;
+//  }
+//
+//  return out;
+//}
+//
+///* 32-byte *unrolled* version of chunk_memcpy() */
+//static inline unsigned char *chunk_memcpy_32_unrolled(unsigned char *out, const unsigned char *from, unsigned len) {
+//  unsigned sz = 32;
+//  unsigned rem = len % sz;
+//  unsigned by8;
+//
+//  assert(len >= sz);
+//
+//  /* Copy a few bytes to make sure the loop below has a multiple of SZ bytes to be copied. */
+//  copy_32_bytes(out, from);
+//
+//  len /= sz;
+//  out += rem;
+//  from += rem;
+//
+//  by8 = len % 8;
+//  len -= by8;
+//  switch (by8) {
+//    case 7:
+//      out = copy_32_bytes(out, from);
+//      from += sz;
+//    case 6:
+//      out = copy_32_bytes(out, from);
+//      from += sz;
+//    case 5:
+//      out = copy_32_bytes(out, from);
+//      from += sz;
+//    case 4:
+//      out = copy_32_bytes(out, from);
+//      from += sz;
+//    case 3:
+//      out = copy_32_bytes(out, from);
+//      from += sz;
+//    case 2:
+//      out = copy_32_bytes(out, from);
+//      from += sz;
+//    case 1:
+//      out = copy_32_bytes(out, from);
+//      from += sz;
+//    default:
+//      break;
+//  }
+//
+//  while (len) {
+//    out = copy_32_bytes(out, from);
+//    from += sz;
+//    out = copy_32_bytes(out, from);
+//    from += sz;
+//    out = copy_32_bytes(out, from);
+//    from += sz;
+//    out = copy_32_bytes(out, from);
+//    from += sz;
+//    out = copy_32_bytes(out, from);
+//    from += sz;
+//    out = copy_32_bytes(out, from);
+//    from += sz;
+//    out = copy_32_bytes(out, from);
+//    from += sz;
+//    out = copy_32_bytes(out, from);
+//    from += sz;
+//
+//    len -= 8;
+//  }
+//
+//  return out;
+//}
 
 
 /* SSE2/AVX2 *unaligned* version of chunk_memcpy() */
@@ -397,58 +402,60 @@ static inline unsigned char *chunk_memcpy_unaligned(unsigned char *out, const un
 #endif // __SSE2__ || __AVX2__
 
 
-#if defined(__SSE2__) || defined(__AVX2__)
-/* SSE2/AVX2 *aligned* version of chunk_memcpy() */
-static inline unsigned char *chunk_memcpy_aligned(unsigned char *out, const unsigned char *from, unsigned len) {
-#if defined(__AVX2__)
-  unsigned sz = sizeof(__m256i);
-  __m256i chunk;
-#elif defined(__SSE2__)
-  unsigned sz = sizeof(__m128i);
-  __m128i chunk;
-#endif
-  unsigned bytes_to_align = sz - (unsigned)(((uintptr_t)(const void *)(from)) % sz);
-  unsigned corrected_len = len - bytes_to_align;
-  unsigned rem = corrected_len % sz;
-  unsigned ilen;
+// NOTE: chunk_memcpy_aligned() is not used, so commenting it
 
-  assert(len >= sz);
-
-  /* Copy a few bytes to make sure the loop below has aligned access. */
-#if defined(__AVX2__)
-  chunk = _mm256_loadu_si256((__m256i *) from);
-  _mm256_storeu_si256((__m256i *) out, chunk);
-#elif defined(__SSE2__)
-  chunk = _mm_loadu_si128((__m128i *) from);
-  _mm_storeu_si128((__m128i *) out, chunk);
-#endif
-  out += bytes_to_align;
-  from += bytes_to_align;
-
-  len = corrected_len / sz;
-  for (ilen = 0; ilen < len; ilen++) {
-#if defined(__AVX2__)
-    chunk = _mm256_load_si256((__m256i *) from);  /* *aligned* load */
-    _mm256_storeu_si256((__m256i *) out, chunk);
-#elif defined(__SSE2__)
-    chunk = _mm_load_si128((__m128i *) from);  /* *aligned* load */
-    _mm_storeu_si128((__m128i *) out, chunk);
-#endif
-    out += sz;
-    from += sz;
-  }
-
-  /* Copy remaining bytes */
-  if (rem < 8) {
-    out = copy_bytes(out, from, rem);
-  }
-  else {
-    out = chunk_memcpy(out, from, rem);
-  }
-
-  return out;
-}
-#endif // __AVX2__ || __SSE2__
+//#if defined(__SSE2__) || defined(__AVX2__)
+///* SSE2/AVX2 *aligned* version of chunk_memcpy() */
+//static inline unsigned char *chunk_memcpy_aligned(unsigned char *out, const unsigned char *from, unsigned len) {
+//#if defined(__AVX2__)
+//  unsigned sz = sizeof(__m256i);
+//  __m256i chunk;
+//#elif defined(__SSE2__)
+//  unsigned sz = sizeof(__m128i);
+//  __m128i chunk;
+//#endif
+//  unsigned bytes_to_align = sz - (unsigned)(((uintptr_t)(const void *)(from)) % sz);
+//  unsigned corrected_len = len - bytes_to_align;
+//  unsigned rem = corrected_len % sz;
+//  unsigned ilen;
+//
+//  assert(len >= sz);
+//
+//  /* Copy a few bytes to make sure the loop below has aligned access. */
+//#if defined(__AVX2__)
+//  chunk = _mm256_loadu_si256((__m256i *) from);
+//  _mm256_storeu_si256((__m256i *) out, chunk);
+//#elif defined(__SSE2__)
+//  chunk = _mm_loadu_si128((__m128i *) from);
+//  _mm_storeu_si128((__m128i *) out, chunk);
+//#endif
+//  out += bytes_to_align;
+//  from += bytes_to_align;
+//
+//  len = corrected_len / sz;
+//  for (ilen = 0; ilen < len; ilen++) {
+//#if defined(__AVX2__)
+//    chunk = _mm256_load_si256((__m256i *) from);  /* *aligned* load */
+//    _mm256_storeu_si256((__m256i *) out, chunk);
+//#elif defined(__SSE2__)
+//    chunk = _mm_load_si128((__m128i *) from);  /* *aligned* load */
+//    _mm_storeu_si128((__m128i *) out, chunk);
+//#endif
+//    out += sz;
+//    from += sz;
+//  }
+//
+//  /* Copy remaining bytes */
+//  if (rem < 8) {
+//    out = copy_bytes(out, from, rem);
+//  }
+//  else {
+//    out = chunk_memcpy(out, from, rem);
+//  }
+//
+//  return out;
+//}
+//#endif // __AVX2__ || __SSE2__
 
 
 /* Byte by byte semantics: copy LEN bytes from FROM and write them to OUT. Return OUT + LEN. */

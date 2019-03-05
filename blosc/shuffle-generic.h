@@ -29,7 +29,7 @@ extern "C" {
   implementations to process any remaining elements in a block which
   is not a multiple of (type_size * vector_size).
 */
-static void shuffle_generic_inline(const int32_t type_size,
+inline static void shuffle_generic_inline(const int32_t type_size,
                                    const int32_t vectorizable_blocksize, const int32_t blocksize,
                                    const uint8_t *_src, uint8_t *_dest) {
   int32_t i, j;
@@ -57,7 +57,7 @@ static void shuffle_generic_inline(const int32_t type_size,
   implementations to process any remaining elements in a block which
   is not a multiple of (type_size * vector_size).
 */
-static void unshuffle_generic_inline(const int32_t type_size,
+inline static void unshuffle_generic_inline(const int32_t type_size,
                                      const int32_t vectorizable_blocksize, const int32_t blocksize,
                                      const uint8_t *_src, uint8_t *_dest) {
   int32_t i, j;

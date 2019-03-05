@@ -22,9 +22,9 @@
 
 /*
  * Check for bound when decompressing.
- * It is a good idea to define this while developing.
+ * It is a good idea to define this for safety by default.
  */
-#undef BLOSCLZ_SAFE
+#define BLOSCLZ_SAFE
 
 /*
  * Give hints to the compiler for branch prediction optimization.
@@ -78,7 +78,7 @@
 #define IP_BOUNDARY 2
 
 
-
+#if !(defined(__SSE2__) || defined(__AVX2__))
 static inline uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
   int64_t value, value2;
@@ -105,6 +105,7 @@ static inline uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8
   while ((ip < ip_bound) && (*ref++ == x)) ip++;
   return ip;
 }
+#endif
 
 #ifdef __SSE2__
 static inline uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {

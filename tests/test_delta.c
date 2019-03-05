@@ -153,13 +153,9 @@ static char *all_tests() {
 
 #define BUFFER_ALIGN_SIZE   32
 
-int main(int argc, char **argv) {
+int main() {
   char *result;
 
-  if (argc > 0) {
-    printf("STARTING TESTS for %s", argv[0]);
-  }
-  
   blosc_init();
   blosc_set_compressor("blosclz");
 
