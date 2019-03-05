@@ -42,8 +42,10 @@
 /*  Define function pointer types for shuffle/unshuffle routines. */
 typedef void(* shuffle_func)(const int32_t, const int32_t, const uint8_t*, const uint8_t*);
 typedef void(* unshuffle_func)(const int32_t, const int32_t, const uint8_t*, const uint8_t*);
-typedef int32_t(* bitshuffle_func)(void*, void*, const int32_t, const int32_t, void*);
-typedef int32_t(* bitunshuffle_func)(void*, void*, const int32_t, const int32_t, void*);
+// For bitshuffle, everything is done in terms of size_t and int64_t (return value)
+// and although this is not strictly necessary for Blosc, it does not hurt either
+typedef int64_t(* bitshuffle_func)(void*, void*, const size_t, const size_t, void*);
+typedef int64_t(* bitunshuffle_func)(void*, void*, const size_t, const size_t, void*);
 
 /* An implementation of shuffle/unshuffle routines. */
 typedef struct shuffle_implementation {
