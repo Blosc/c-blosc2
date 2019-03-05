@@ -67,11 +67,11 @@ int64_t bshuf_trans_bit_byte_avx2(void* in, void* out, const size_t size,
   size_t ii, kk;
 
   for (ii = 0; ii + 31 < nbyte; ii += 32) {
-    ymm = _mm256_loadu_si256((__m256i*)&in_b[ii]);
+    ymm = _mm256_loadu_si256((__m256i * ) & in_b[ii]);
     for (kk = 0; kk < 8; kk++) {
       bt = _mm256_movemask_epi8(ymm);
       ymm = _mm256_slli_epi16(ymm, 1);
-      out_i32 = (int32_t*)&out_b[((7 - kk) * nbyte + ii) / 8];
+      out_i32 = (int32_t * ) & out_b[((7 - kk) * nbyte + ii) / 8];
       *out_i32 = bt;
     }
   }
@@ -125,7 +125,7 @@ int64_t bshuf_trans_byte_bitrow_avx2(void* in, void* out, const size_t size,
       for (hh = 0; hh < 4; hh++) {
 
         for (kk = 0; kk < 8; kk++) {
-          ymm_0[kk] = _mm256_loadu_si256((__m256i*)&in_b[
+          ymm_0[kk] = _mm256_loadu_si256((__m256i * ) & in_b[
               (ii * 8 + hh * 8 + kk) * nbyte_row + jj]);
         }
 
@@ -175,13 +175,13 @@ int64_t bshuf_trans_byte_bitrow_avx2(void* in, void* out, const size_t size,
         ymm_0[2] = _mm256_permute2x128_si256(ymm_1[0], ymm_1[1], 49);
         ymm_0[3] = _mm256_permute2x128_si256(ymm_1[2], ymm_1[3], 49);
 
-        _mm256_storeu_si256((__m256i*)&out_b[
+        _mm256_storeu_si256((__m256i * ) & out_b[
             (jj + mm * 2 + 0 * 16) * nrows + ii * 8], ymm_0[0]);
-        _mm256_storeu_si256((__m256i*)&out_b[
+        _mm256_storeu_si256((__m256i * ) & out_b[
             (jj + mm * 2 + 0 * 16 + 1) * nrows + ii * 8], ymm_0[1]);
-        _mm256_storeu_si256((__m256i*)&out_b[
+        _mm256_storeu_si256((__m256i * ) & out_b[
             (jj + mm * 2 + 1 * 16) * nrows + ii * 8], ymm_0[2]);
-        _mm256_storeu_si256((__m256i*)&out_b[
+        _mm256_storeu_si256((__m256i * ) & out_b[
             (jj + mm * 2 + 1 * 16 + 1) * nrows + ii * 8], ymm_0[3]);
       }
     }
@@ -218,12 +218,12 @@ int64_t bshuf_shuffle_bit_eightelem_avx2(void* in, void* out, const size_t size,
     for (jj = 0; jj + 31 < 8 * elem_size; jj += 32) {
       for (ii = 0; ii + 8 * elem_size - 1 < nbyte;
            ii += 8 * elem_size) {
-        ymm = _mm256_loadu_si256((__m256i*)&in_b[ii + jj]);
+        ymm = _mm256_loadu_si256((__m256i * ) & in_b[ii + jj]);
         for (kk = 0; kk < 8; kk++) {
           bt = _mm256_movemask_epi8(ymm);
           ymm = _mm256_slli_epi16(ymm, 1);
           ind = (ii + jj / 8 + (7 - kk) * elem_size);
-          *(int32_t*)&out_b[ind] = bt;
+          *(int32_t * ) & out_b[ind] = bt;
         }
       }
     }

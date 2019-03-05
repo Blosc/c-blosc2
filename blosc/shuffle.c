@@ -183,9 +183,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
       extended control register XCR0 to see if the CPU features are enabled. */
   bool xmm_state_enabled = false;
   bool ymm_state_enabled = false;
-#if defined(BLOSC_DUMP_CPU_INFO)  // just to avoid the unused variable warning
   bool zmm_state_enabled = false;
-#endif
 
 #if defined(_XCR_XFEATURE_ENABLED_MASK)
   if (xsave_available && xsave_enabled_by_os && (
@@ -200,9 +198,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
 
     /*  Require support for both the upper 256-bits of zmm0-zmm15 to be
         restored as well as all of zmm16-zmm31 and the opmask registers. */
-#if defined(BLOSC_DUMP_CPU_INFO)
     zmm_state_enabled = (xcr0_contents & 0x70) == 0x70;
-#endif
   }
 #endif /* defined(_XCR_XFEATURE_ENABLED_MASK) */
 
