@@ -15,7 +15,11 @@
 // For shutting up stupid compiler warning about some 'unused' variables in GCC
 #ifdef __GNUC__
 #define BLOSC_UNUSED_VAR __attribute__ ((unused))
-#endif
+#else
+#define BLOSC_UNUSED_VAR
+#endif  // __GNUC__
+
+// For shutting up compiler warning about unused parameters
 #define BLOSC_UNUSED_PARAM(x) ((void)(x))
 
 /* Import standard integer type definitions */
