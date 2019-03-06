@@ -281,7 +281,7 @@ int64_t bshuf_trans_bit_byte_sse2(void* in, void* out, const size_t size,
       bt = _mm_movemask_epi8(xmm);
       xmm = _mm_slli_epi16(xmm, 1);
       out_ui16 = (uint16_t*)&out_b[((7 - kk) * nbyte + ii) / 8];
-      *out_ui16 = bt;
+      *out_ui16 = (uint16_t)bt;
     }
   }
   count = bshuf_trans_bit_byte_remainder(in, out, size, elem_size,
@@ -442,7 +442,7 @@ int64_t bshuf_shuffle_bit_eightelem_sse2(void* in, void* out, const size_t size,
           bt = _mm_movemask_epi8(xmm);
           xmm = _mm_slli_epi16(xmm, 1);
           ind = (ii + jj / 8 + (7 - kk) * elem_size);
-          out_ui16[ind / 2] = bt;
+          out_ui16[ind / 2] = (uint16_t)bt;
         }
       }
     }

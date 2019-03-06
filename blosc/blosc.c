@@ -17,6 +17,7 @@
 
 #include "blosc.h"
 #include "blosc-private.h"
+#include "blosc-common.h"
 
 #include "fastcopy.h"
 
@@ -335,6 +336,7 @@ static int lz4_wrap_compress(const char* input, size_t input_length,
     cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
   }
 #else
+  BLOSC_UNUSED_PARAM(hash_table);
   cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
 #endif
   return cbytes;

@@ -250,8 +250,8 @@ int blosclz_compress(const int opt_level, const void* input, int length,
      Curiously enough, values >= 14 does not always
      get maximum compression, even with large blocksizes. */
   int8_t hash_log_[10] = {-1, 15, 15, 15, 15, 15, 15, 15, 15, 15};
-  uint8_t hash_log = hash_log_[opt_level];
-  uint16_t hash_size = 1 << hash_log;
+  int8_t hash_log = hash_log_[opt_level];
+  uint16_t hash_size = (uint16_t)(1 << hash_log);
   uint16_t* htab;
   uint8_t* op_limit;
 
@@ -349,7 +349,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     /* if we have copied something, adjust the copy count */
     if (copy)
       /* copy is biased, '0' means 1 byte copy */
-      *(op - copy - 1) = copy - 1;
+      *(op - copy - 1) = (uint8_t)(copy - 1);
     else
       /* back, to overwrite the copy count */
       op--;
@@ -367,15 +367,15 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     /* encode the match */
     if (distance < MAX_DISTANCE) {
       if (len < 7) {
-        *op++ = (len << 5) + (distance >> 8);
-        *op++ = (distance & 255);
+        *op++ = (uint8_t)((len << 5) + (distance >> 8));
+        *op++ = (uint8_t)((distance & 255));
       }
       else {
         *op++ = (uint8_t)((7 << 5) + (distance >> 8));
         for (len -= 7; len >= 255; len -= 255)
           *op++ = 255;
-        *op++ = len;
-        *op++ = (distance & 255);
+        *op++ = (uint8_t)len;
+        *op++ = (uint8_t)((distance & 255));
       }
     }
     else {
@@ -385,17 +385,17 @@ int blosclz_compress(const int opt_level, const void* input, int length,
         *op++ = (uint8_t)((len << 5) + 31);
         *op++ = 255;
         *op++ = (uint8_t)(distance >> 8);
-        *op++ = distance & 255;
+        *op++ = (uint8_t)(distance & 255);
       }
       else {
         distance -= MAX_DISTANCE;
         *op++ = (7 << 5) + 31;
         for (len -= 7; len >= 255; len -= 255)
           *op++ = 255;
-        *op++ = len;
+        *op++ = (uint8_t)len;
         *op++ = 255;
         *op++ = (uint8_t)(distance >> 8);
-        *op++ = distance & 255;
+        *op++ = (uint8_t)(distance & 255);
       }
     }
 
@@ -423,7 +423,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
 
   /* if we have copied something, adjust the copy length */
   if (copy)
-    *(op - copy - 1) = copy - 1;
+    *(op - copy - 1) = (uint8_t)(copy - 1);
   else
     op--;
 
