@@ -214,7 +214,8 @@ shuffle16_tiled_sse2(uint8_t* const dest, const uint8_t* const src,
     of remaining bytes in the type will be a multiple of the vector size. */
     int32_t offset_into_type;
     for (offset_into_type = 0; offset_into_type < bytesoftype;
-         offset_into_type += (offset_into_type == 0 && vecs_per_el_rem > 0 ? vecs_per_el_rem : sizeof(__m128i))) {
+         offset_into_type += (offset_into_type == 0 &&
+                              vecs_per_el_rem > 0 ? vecs_per_el_rem : (int32_t)sizeof(__m128i))) {
 
       /* Fetch elements in groups of 256 bytes */
       const uint8_t* const src_with_offset = src + offset_into_type;
@@ -442,7 +443,8 @@ unshuffle16_tiled_sse2(uint8_t* const dest, const uint8_t* const orig,
      to optimize cache utilization. */
   int32_t offset_into_type;
   for (offset_into_type = 0; offset_into_type < bytesoftype;
-       offset_into_type += (offset_into_type == 0 && vecs_per_el_rem > 0 ? vecs_per_el_rem : sizeof(__m128i))) {
+       offset_into_type += (offset_into_type == 0 &&
+           vecs_per_el_rem > 0 ? vecs_per_el_rem : (int32_t)sizeof(__m128i))) {
     for (i = 0; i < vectorizable_elements; i += sizeof(__m128i)) {
       /* Load the first 128 bytes in 16 XMM registers */
       const uint8_t* const src_for_ith_element = orig + i;
