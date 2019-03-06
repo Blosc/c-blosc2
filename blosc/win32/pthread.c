@@ -40,6 +40,8 @@
 #include <limits.h>
 
 
+#define PTHREAD_UNUSED_PARAM(x) ((void)(x))
+
 void die(const char *err, ...)
 {
 	printf("%s", err);
@@ -54,8 +56,9 @@ static unsigned __stdcall win32_start_routine(void *arg)
 }
 
 int pthread_create(pthread_t *thread, const void *unused,
-		   void *(*start_routine)(void*), void *arg)
+		           void *(*start_routine)(void*), void *arg)
 {
+	PTHREAD_UNUSED_PARAM(unused);
 	thread->arg = arg;
 	thread->start_routine = start_routine;
 	thread->handle = (HANDLE)
@@ -84,6 +87,7 @@ int win32_pthread_join(pthread_t *thread, void **value_ptr)
 
 int pthread_cond_init(pthread_cond_t *cond, const void *unused)
 {
+	PTHREAD_UNUSED_PARAM(unused);
 	cond->waiters = 0;
 	cond->was_broadcast = 0;
 	InitializeCriticalSection(&cond->waiters_lock);

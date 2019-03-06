@@ -59,9 +59,9 @@ int posix_memalign(void **memptr, size_t alignment, size_t size)
 
 /* Given two timeval stamps, return the time per chunk in usec */
 double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current,
-                      int niter, int nchunks) {
+                      int niter_, int nchunks) {
   double elapsed_usecs = 1e-3 * blosc_elapsed_nsecs(last, current);
-  return elapsed_usecs / (double)(niter * nchunks);
+  return elapsed_usecs / (double)(niter_ * nchunks);
 }
 
 
@@ -267,12 +267,12 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
 
 /* Compute a sensible value for nchunks */
 int get_nchunks(int size_, int ws) {
-  int nchunks;
+  int nchunks_;
 
-  nchunks = ws / size_;
-  if (nchunks > NCHUNKS) nchunks = NCHUNKS;
-  if (nchunks < 1) nchunks = 1;
-  return nchunks;
+  nchunks_ = ws / size_;
+  if (nchunks_ > NCHUNKS) nchunks_ = NCHUNKS;
+  if (nchunks_ < 1) nchunks_ = 1;
+  return nchunks_;
 }
 
 void print_compress_info(void) {
