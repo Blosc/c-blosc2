@@ -175,6 +175,11 @@ static inline unsigned char *copy_bytes(unsigned char *out, const unsigned char 
   return out;
 }
 
+// Define a symbol for avoiding fall-through warnings emitted by gcc >= 7.0
+#if ((defined(__GNUC__) && BLOSC_GCC_VERSION >= 700) && !defined(__clang__))
+#define AVOID_FALLTHROUGH_WARNING
+#endif
+
 /* Byte by byte semantics: copy LEN bytes from FROM and write them to OUT. Return OUT + LEN. */
 static inline unsigned char *chunk_memcpy(unsigned char *out, const unsigned char *from, unsigned len) {
   unsigned sz = sizeof(uint64_t);
@@ -196,43 +201,43 @@ static inline unsigned char *chunk_memcpy(unsigned char *out, const unsigned cha
     case 7:
       out = copy_8_bytes(out, from);
       from += sz;
-      #if defined(__GNUC__) && !defined(__clang__)
+      #ifdef AVOID_FALLTHROUGH_WARNING
       __attribute__ ((fallthrough));  // Shut-up -Wimplicit-fallthrough warning in GCC
       #endif
     case 6:
       out = copy_8_bytes(out, from);
       from += sz;
-      #if defined(__GNUC__) && !defined(__clang__)
+      #ifdef AVOID_FALLTHROUGH_WARNING
       __attribute__ ((fallthrough));
       #endif
     case 5:
       out = copy_8_bytes(out, from);
       from += sz;
-      #if defined(__GNUC__) && !defined(__clang__)
+      #ifdef AVOID_FALLTHROUGH_WARNING
       __attribute__ ((fallthrough));
       #endif
     case 4:
       out = copy_8_bytes(out, from);
       from += sz;
-      #if defined(__GNUC__) && !defined(__clang__)
+      #ifdef AVOID_FALLTHROUGH_WARNING
       __attribute__ ((fallthrough));
       #endif
     case 3:
       out = copy_8_bytes(out, from);
       from += sz;
-      #if defined(__GNUC__) && !defined(__clang__)
+      #ifdef AVOID_FALLTHROUGH_WARNING
       __attribute__ ((fallthrough));
       #endif
     case 2:
       out = copy_8_bytes(out, from);
       from += sz;
-      #if defined(__GNUC__) && !defined(__clang__)
+      #ifdef AVOID_FALLTHROUGH_WARNING
       __attribute__ ((fallthrough));
       #endif
     case 1:
       out = copy_8_bytes(out, from);
       from += sz;
-      #if defined(__GNUC__) && !defined(__clang__)
+      #ifdef AVOID_FALLTHROUGH_WARNING
       __attribute__ ((fallthrough));
       #endif
     default:

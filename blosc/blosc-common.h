@@ -14,6 +14,7 @@
 
 // For shutting up stupid compiler warning about some 'unused' variables in GCC
 #ifdef __GNUC__
+#define BLOSC_GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
 #define BLOSC_UNUSED_VAR __attribute__ ((unused))
 #else
 #define BLOSC_UNUSED_VAR
