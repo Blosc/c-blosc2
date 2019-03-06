@@ -1,5 +1,5 @@
 # sources for main bench
-set(SOURCES bench.c)
+set(SOURCES b2bench.c)
 # sources for delta filter
 set(SOURCES_DELTA delta_schunk.c)
 # sources for trunc_prec filter

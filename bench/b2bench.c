@@ -59,7 +59,7 @@ int posix_memalign(void **memptr, size_t alignment, size_t size)
 
 /* Given two timeval stamps, return the time per chunk in usec */
 double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current,
-                      int niter, size_t nchunks) {
+                      int niter, int nchunks) {
   double elapsed_usecs = 1e-3 * blosc_elapsed_nsecs(last, current);
   return elapsed_usecs / (double)(niter * nchunks);
 }
@@ -76,7 +76,7 @@ int get_value(int i, int rshift) {
 }
 
 
-void init_buffer(void* src, int size, int rshift) {
+void init_buffer(void* src, size_t size, int rshift) {
   unsigned int i;
   int* _src = (int*)src;
 
@@ -97,16 +97,17 @@ void init_buffer(void* src, int size, int rshift) {
 }
 
 
-void do_bench(char* compressor, char* shuffle, int nthreads, int size, int elsize,
+void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsize,
               int rshift, FILE* ofile) {
-  void* src, * srccpy;
-  void* dest[NCHUNKS], * dest2;
+  size_t size = (size_t)size_;
+  void* src, *srccpy;
+  void* dest[NCHUNKS], *dest2;
   int nbytes = 0, cbytes = 0;
   int i, j, retcode;
   unsigned char* orig, * round;
   blosc_timestamp_t last, current;
   double tmemcpy, tshuf, tunshuf;
-  int clevel, doshuffle;
+  int clevel, doshuffle = BLOSC_NOFILTER;
 
   if (strcmp(shuffle, "shuffle") == 0) {
     doshuffle = BLOSC_SHUFFLE;
@@ -127,22 +128,31 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size, int elsiz
 
   /* Initialize buffers */
   srccpy = malloc(size);
-  retcode = posix_memalign((void**)(&src), 32, size);
-  retcode = posix_memalign((void**)(&dest2), 32, size);
+  retcode = posix_memalign(&src, 32, size);
+  if (retcode != 0) {
+    printf("Error in allocating memory!");
+  }
+  retcode = posix_memalign(&dest2, 32, size);
+  if (retcode != 0) {
+    printf("Error in allocating memory!");
+  }
 
   /* zero src to initialize byte on it, and not only multiples of 4 */
   memset(src, 0, size);
   init_buffer(src, size, rshift);
   memcpy(srccpy, src, size);
   for (j = 0; j < nchunks; j++) {
-    retcode = posix_memalign((void**)(&dest[j]), 32, size + BLOSC_MAX_OVERHEAD);
+    retcode = posix_memalign(&dest[j], 32, size + BLOSC_MAX_OVERHEAD);
+    if (retcode != 0) {
+      printf("Error in allocating memory!");
+    }
   }
 
-  fprintf(ofile, "--> %d, %d, %d, %d, %s, %s\n", nthreads, size, elsize, rshift, compressor, shuffle);
+  fprintf(ofile, "--> %d, %d, %d, %d, %s, %s\n", nthreads, (int)size, elsize, rshift, compressor, shuffle);
   fprintf(ofile, "********************** Run info ******************************\n");
   fprintf(ofile, "Blosc version: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
   fprintf(ofile, "Using synthetic data with %d significant bits (out of 32)\n", rshift);
-  fprintf(ofile, "Dataset size: %d bytes\tType size: %d bytes\n", size, elsize);
+  fprintf(ofile, "Dataset size: %d bytes\tType size: %d bytes\n", (int)size, elsize);
   fprintf(ofile, "Working set: %.1f MB\t\t", (size * nchunks) / (float)MB);
   fprintf(ofile, "Number of threads: %d\n", nthreads);
   fprintf(ofile, "********************** Running benchmarks *********************\n");
@@ -176,7 +186,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size, int elsiz
     blosc_set_timestamp(&last);
     for (i = 0; i < niter; i++) {
       for (j = 0; j < nchunks; j++) {
-        cbytes = blosc_compress(clevel, doshuffle, elsize, size, src,
+        cbytes = blosc_compress(clevel, doshuffle, (size_t)elsize, size, src,
                                 dest[j], size + BLOSC_MAX_OVERHEAD);
       }
     }
@@ -202,7 +212,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size, int elsiz
       for (j = 0; j < nchunks; j++) {
         if (cbytes == 0) {
           memcpy(dest2, dest[j], size);
-          nbytes = size;
+          nbytes = (int)size;
         }
         else {
           nbytes = blosc_decompress(dest[j], dest2, size);
@@ -225,18 +235,19 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size, int elsiz
     orig = (unsigned char*)srccpy;
     round = (unsigned char*)dest2;
     if (memcmp(orig, round, size) != 0) {
-      for (i = 0; i < size; ++i) {
+      for (i = 0; i < (int)size; ++i) {
         if (orig[i] != round[i]) {
-          fprintf(ofile, "\nError: Original data and round-trip do not match in pos %d\n",
-                  (int)i);
+          fprintf(ofile, "\nError: Original data and round-trip do not match in pos %d\n", i);
           fprintf(ofile, "Orig--> %x, round-trip--> %x\n", orig[i], round[i]);
           break;
         }
       }
     }
-    else { i = size; }
+    else {
+      i = (int)size;
+    }
 
-    if (i == size) fprintf(ofile, "OK\n");
+    if (i == (int)size) fprintf(ofile, "OK\n");
 
   } /* End clevel loop */
 
@@ -251,7 +262,6 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size, int elsiz
   for (i = 0; i < nchunks; i++) {
     aligned_free(dest[i]);
   }
-
 }
 
 
@@ -407,16 +417,16 @@ int main(int argc, char* argv[]) {
   printf("Running suite: %s\n", bsuite);
 
   if (argc >= 5) {
-    nthreads = atoi(argv[4]);
+    nthreads = (int)strtol(argv[4], NULL, 10);
   }
   if (argc >= 6) {
-    size = atoi(argv[5]);
+    size = (int)strtol(argv[5], NULL, 10);
   }
   if (argc >= 7) {
-    elsize = atoi(argv[6]);
+    elsize = (int)strtol(argv[6], NULL, 10);
   }
   if (argc >= 8) {
-    rshift = atoi(argv[7]);
+    rshift = (int)strtol(argv[7], NULL, 10);
   }
 
   if ((argc >= 9) || !(single || suite || hard_suite || extreme_suite)) {
