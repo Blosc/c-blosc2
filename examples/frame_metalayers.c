@@ -77,7 +77,7 @@ int main() {
     blosc2_frame_add_metalayer(frame1, "my_metalayer1", (uint8_t *) "my_content1",
                                (uint32_t) strlen("my_content1"));
     blosc2_frame_add_metalayer(frame1, "my_metalayer2", (uint8_t *) "my_content1",
-                             (uint32_t) strlen("my_content1"));
+                               (uint32_t) strlen("my_content1"));
     blosc2_frame_update_metalayer(frame1, "my_metalayer2", (uint8_t *) "my_content2",
                                   (uint32_t) strlen("my_content2"));
     int64_t frame_len = blosc2_schunk_to_frame(schunk, frame1);

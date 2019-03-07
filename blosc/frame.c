@@ -1001,7 +1001,7 @@ int blosc2_frame_add_metalayer(blosc2_frame *frame, char *name, uint8_t *content
     blosc2_frame_metalayer *nspace = malloc(sizeof(blosc2_frame_metalayer));
     char* name_ = malloc(strlen(name) + 1);
     strcpy(name_, name);
-    nspace->name = name;
+    nspace->name = name_;
     uint8_t* content_buf = malloc((size_t)content_len);
     memcpy(content_buf, content, content_len);
     nspace->content = content_buf;
