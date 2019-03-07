@@ -36,7 +36,7 @@ find_path(IPP_INCLUDE_DIR
 
 if(WIN32)
     set(IPP_SEARCH_LIB ippcore.lib)
-    set(IPP_LIBS ippcore.lib ippdc.lib)
+    set(IPP_LIBS ippcore.lib ipps.lib ippdc.lib)
 elseif(APPLE)
     set(IPP_SEARCH_LIB libippcore.a)
     set(IPP_LIBS libipps.a libippdc.a libippcore.a)
