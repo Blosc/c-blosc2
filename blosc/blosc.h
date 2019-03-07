@@ -729,18 +729,6 @@ typedef struct {
 } blosc2_frame;
 
 /**
- * @brief Empty in-memory frame
- */
-BLOSC_UNUSED_VAR static blosc2_frame BLOSC_EMPTY_FRAME = {
-  .sdata = NULL,
-  .fname = NULL,
-  .len = 0,
-  .maxlen = 0,
-  .schunk = NULL,
-  .nmetalayers = 0,
-};
-
-/**
  * @brief This struct is the standard container for Blosc 2 compressed data.
  *
  * This sctruct is basically a container for Blosc 1 chunks of compressed data,
@@ -894,6 +882,15 @@ BLOSC_EXPORT int blosc2_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dpar
   Frame related structures and functions.
 
 *********************************************************************/
+
+/**
+ * @brief Create a new frame.
+ *
+ * @param fname The filename of the frame.  If not persistent, pass NULL.
+ *
+ * @return The new frame.
+ */
+BLOSC_EXPORT blosc2_frame* blosc2_new_frame(char* fname);
 
 /**
  * @brief Create a frame from a super-chunk.

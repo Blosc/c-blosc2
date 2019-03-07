@@ -71,16 +71,16 @@ int main() {
 
     // super-chunk -> frame1 (in-memory)
     blosc_set_timestamp(&last);
-    blosc2_frame frame1 = BLOSC_EMPTY_FRAME;
+    blosc2_frame* frame1 = blosc2_new_frame(NULL);
 
     // Add some metalayers
-  blosc2_frame_add_metalayer(&frame1, "my_metalayer1", (uint8_t *) "my_content1",
+    blosc2_frame_add_metalayer(frame1, "my_metalayer1", (uint8_t *) "my_content1",
+                               (uint32_t) strlen("my_content1"));
+    blosc2_frame_add_metalayer(frame1, "my_metalayer2", (uint8_t *) "my_content1",
                              (uint32_t) strlen("my_content1"));
-  blosc2_frame_add_metalayer(&frame1, "my_metalayer2", (uint8_t *) "my_content1",
-                             (uint32_t) strlen("my_content1"));
-  blosc2_frame_update_metalayer(&frame1, "my_metalayer2", (uint8_t *) "my_content2",
-                                (uint32_t) strlen("my_content2"));
-    int64_t frame_len = blosc2_schunk_to_frame(schunk, &frame1);
+    blosc2_frame_update_metalayer(frame1, "my_metalayer2", (uint8_t *) "my_content2",
+                                  (uint32_t) strlen("my_content2"));
+    int64_t frame_len = blosc2_schunk_to_frame(schunk, frame1);
     blosc_set_timestamp(&current);
     ttotal = blosc_elapsed_secs(last, current);
     printf("Time for schunk -> frame: %.3g s, %.1f GB/s\n",
@@ -89,7 +89,7 @@ int main() {
 
     // frame1 (in-memory) -> fileframe (on-disk)
     blosc_set_timestamp(&last);
-    frame_len = blosc2_frame_to_file(&frame1, "frame_metalayers.b2frame");
+    frame_len = blosc2_frame_to_file(frame1, "frame_metalayers.b2frame");
     printf("Frame length on disk: %ld bytes\n", (long)frame_len);
     blosc_set_timestamp(&current);
     ttotal = blosc_elapsed_secs(last, current);
@@ -151,6 +151,7 @@ int main() {
     /* Free resources */
     blosc2_free_schunk(schunk);
     blosc2_free_schunk(schunk2);
+    blosc2_free_frame(frame1);
     blosc2_free_frame(frame2);
 
     return 0;

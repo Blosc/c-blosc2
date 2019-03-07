@@ -99,6 +99,19 @@ void swap_store(void *dest, const void *pa, int size) {
 #define FRAME_IDX_SIZE (FRAME_NAMESPACES + 1 + 1)  // 66
 
 
+/* Create a new (empty) frame */
+blosc2_frame* blosc2_new_frame(char* fname) {
+  blosc2_frame* new_frame = malloc(sizeof(blosc2_frame));
+  memset(new_frame, 0, sizeof(blosc2_frame));
+  if (fname != NULL) {
+    char* new_fname = malloc(strlen(fname) + 1);  // + 1 for the trailing NULL
+    new_frame->fname = strcpy(new_fname, fname);
+  }
+
+  return new_frame;
+}
+
+
 void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   assert(frame != NULL);
   uint8_t* h2 = calloc(HEADER2_MINLEN, 1);
@@ -1059,10 +1072,9 @@ int blosc2_free_frame(blosc2_frame *frame) {
     frame->nmetalayers = 0;
   }
 
-  // TODO: make a constructor for frames so that we can handle the contents of the struct
-//  if (frame->fname != NULL) {
-//    free(frame->fname);
-//  }
+  if (frame->fname != NULL) {
+    free(frame->fname);
+  }
   free(frame);
 
   return 0;

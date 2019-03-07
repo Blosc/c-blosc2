@@ -87,8 +87,8 @@ int main() {
 
   // super-chunk -> frame1 (in-memory)
   blosc_set_timestamp(&last);
-  blosc2_frame frame1 = BLOSC_EMPTY_FRAME;
-  int64_t frame_len = blosc2_schunk_to_frame(schunk, &frame1);
+  blosc2_frame* frame1 = blosc2_new_frame(NULL);
+  int64_t frame_len = blosc2_schunk_to_frame(schunk, frame1);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for schunk -> frame: %.3g s, %.1f MB/s\n",
@@ -97,7 +97,7 @@ int main() {
 
   // frame1 (in-memory) -> fileframe (on-disk)
   blosc_set_timestamp(&last);
-  frame_len = blosc2_frame_to_file(&frame1, "frame_simple.b2frame");
+  frame_len = blosc2_frame_to_file(frame1, "frame_simple.b2frame");
   printf("Frame length on disk: %ld bytes\n", (long)frame_len);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
@@ -115,9 +115,9 @@ int main() {
   // frame1 (in-memory) -> schunk
   blosc_set_timestamp(&last);
   // The next creates an schunk made of sparse chunks
-  blosc2_schunk* schunk1 = blosc2_schunk_from_frame(&frame1, true);
+  blosc2_schunk* schunk1 = blosc2_schunk_from_frame(frame1, true);
   // The next creates a frame-backed schunk
-  // blosc2_schunk* schunk1 = blosc2_schunk_from_frame(&frame1, false);
+  // blosc2_schunk* schunk1 = blosc2_schunk_from_frame(frame1, false);
   if (schunk1 == NULL) {
     printf("Bad conversion frame1 -> schunk1!\n");
     return -1;
@@ -149,7 +149,7 @@ int main() {
       printf("Decompression error in schunk1.  Error code: %d\n", dsize);
       return dsize;
     }
-    int32_t dsize1 = blosc2_frame_decompress_chunk(&frame1, nchunk, data_dest1, isize);
+    int32_t dsize1 = blosc2_frame_decompress_chunk(frame1, nchunk, data_dest1, isize);
     if (dsize1 < 0) {
       printf("Decompression error in frame1.  Error code: %d\n", dsize1);
       return dsize1;
@@ -181,6 +181,7 @@ int main() {
   blosc2_free_schunk(schunk);
   blosc2_free_schunk(schunk1);
   blosc2_free_schunk(schunk2);
+  blosc2_free_frame(frame1);
   blosc2_free_frame(frame2);
 
   return 0;

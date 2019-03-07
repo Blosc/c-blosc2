@@ -56,12 +56,7 @@ int main(int argc, char* argv[]) {
   dparams.nthreads = NTHREADS;
 
   /* Create a super-chunk backed by an in-memory frame */
-  blosc2_frame* frame1 = &(blosc2_frame) {
-          .sdata = NULL,
-          .fname = argv[2],
-          .len = 0,
-          .maxlen = 0,
-  };
+  blosc2_frame* frame1 = blosc2_new_frame(argv[2]);
   blosc2_schunk* schunk = blosc2_new_schunk(cparams, dparams, frame1);
 
   // Compress the file
@@ -90,6 +85,7 @@ int main(int argc, char* argv[]) {
 
   /* Free resources */
   blosc2_free_schunk(schunk);
+  blosc2_free_frame(frame1);
 
   return 0;
 }
