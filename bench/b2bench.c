@@ -59,9 +59,9 @@ int posix_memalign(void **memptr, size_t alignment, size_t size)
 
 /* Given two timeval stamps, return the time per chunk in usec */
 double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current,
-                      int niter_, int nchunks) {
+                      int niter_, int nchunks_) {
   double elapsed_usecs = 1e-3 * blosc_elapsed_nsecs(last, current);
-  return elapsed_usecs / (double)(niter_ * nchunks);
+  return elapsed_usecs / (double)(niter_ * nchunks_);
 }
 
 

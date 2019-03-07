@@ -86,7 +86,7 @@ static inline unsigned char *copy_16_bytes(unsigned char *out, const unsigned ch
   __m128i chunk;
   chunk = _mm_loadu_si128((__m128i*)from);
   _mm_storeu_si128((__m128i*)out, chunk);
-  from += 16; out += 16;
+  out += 16;
 #elif !defined(BLOSC_STRICT_ALIGN)
   *(uint64_t*)out = *(uint64_t*)from;
    from += 8; out += 8;
@@ -114,21 +114,21 @@ static inline unsigned char *copy_32_bytes(unsigned char *out, const unsigned ch
   from += 16; out += 16;
   chunk = _mm_loadu_si128((__m128i*)from);
   _mm_storeu_si128((__m128i*)out, chunk);
-  from += 16; out += 16;
+  out += 16;
 #elif !defined(BLOSC_STRICT_ALIGN)
   *(uint64_t*)out = *(uint64_t*)from;
-   from += 8; out += 8;
-   *(uint64_t*)out = *(uint64_t*)from;
-   from += 8; out += 8;
-   *(uint64_t*)out = *(uint64_t*)from;
-   from += 8; out += 8;
-   *(uint64_t*)out = *(uint64_t*)from;
-   from += 8; out += 8;
+  from += 8; out += 8;
+  *(uint64_t*)out = *(uint64_t*)from;
+  from += 8; out += 8;
+  *(uint64_t*)out = *(uint64_t*)from;
+  from += 8; out += 8;
+  *(uint64_t*)out = *(uint64_t*)from;
+  from += 8; out += 8;
 #else
-   int i;
-   for (i = 0; i < 32; i++) {
-     *out++ = *from++;
-   }
+  int i;
+  for (i = 0; i < 32; i++) {
+    *out++ = *from++;
+  }
 #endif
   return out;
 }
@@ -511,8 +511,9 @@ unsigned char *fastcopy(unsigned char *out, const unsigned char *from, unsigned 
   }
   return chunk_memcpy_unaligned(out, from, len);
 #endif  // !__AVX2__
-#endif  // __SSE2__
+#else
   return chunk_memcpy(out, from, len);
+#endif  // __SSE2__
 }
 
 
