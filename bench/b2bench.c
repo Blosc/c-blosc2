@@ -137,7 +137,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
     printf("Error in allocating memory!");
   }
 
-  /* zero src to initialize byte on it, and not only multiples of 4 */
+  /* zero src to initialize all bytes on it, and not only multiples of 4 */
   memset(src, 0, size);
   init_buffer(src, size, rshift);
   memcpy(srccpy, src, size);
@@ -147,6 +147,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
       printf("Error in allocating memory!");
     }
   }
+  memset(dest2, 0, size);  // just to avoid some GCC compiler warnings
 
   fprintf(ofile, "--> %d, %d, %d, %d, %s, %s\n", nthreads, (int)size, elsize, rshift, compressor, shuffle);
   fprintf(ofile, "********************** Run info ******************************\n");
