@@ -1599,7 +1599,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     void* samples_buffer = context->dest + BLOSC_EXTENDED_HEADER_LENGTH;
     unsigned nblocks = (unsigned)context->nblocks;
     // The 1 << 14 below is purely a result of experimentation.  YMMV.
-    size_t sample_size = (1 << 14) * (context->clevel) / nblocks;
+    size_t sample_size = (1 << 15) * (context->clevel) / nblocks;
 
     // Populate the samples sizes for training the dictionary
     size_t* samples_sizes = malloc(nblocks * sizeof(void*));
