@@ -55,6 +55,7 @@
 #if defined(HAVE_ZSTD)
   #include "zstd.h"
   #include "zstd_errors.h"
+  // #include "cover.h"  // for experimenting with fast cover training for building dicts
   #include "zdict.h"
 #endif /*  HAVE_ZSTD */
 
@@ -1593,28 +1594,33 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     // Build the dictionary out of the filters outcome and compress with it
     size_t dict_maxsize = BLOSC2_MAXDICTSIZE;
     // Do not make the dict more than 5% larger than uncompressed buffer
-    if (dict_maxsize > nbytes / 32) {
-      dict_maxsize = nbytes / 32;
+    if (dict_maxsize > nbytes / 20) {
+      dict_maxsize = nbytes / 20;
     }
     void* samples_buffer = context->dest + BLOSC_EXTENDED_HEADER_LENGTH;
-    unsigned nblocks = (unsigned)context->nblocks;
-    // The 1 << 14 below is purely a result of experimentation.  YMMV.
-    size_t sample_size = (1 << 15) * (context->clevel) / nblocks;
+    unsigned nblocks = 8;  // the minimum that accepts zstd as of 1.4.0
+    unsigned sample_fraction = 1;  // 1 allows to use most of the chunk for training
+    size_t sample_size = context->sourcesize / nblocks / sample_fraction;
 
     // Populate the samples sizes for training the dictionary
     size_t* samples_sizes = malloc(nblocks * sizeof(void*));
-    for (size_t i = 0; i < nblocks - 1; i++) {
+    for (size_t i = 0; i < nblocks; i++) {
       samples_sizes[i] = sample_size;
     }
-    // Deal with the leftovers
-    if (sample_size > (size_t)(context->sourcesize % context->blocksize))
-      sample_size = (size_t)context->sourcesize % context->blocksize;
-    samples_sizes[nblocks - 1] = sample_size;
 
     // Train from samples
     void* dict_buffer = malloc(dict_maxsize);
-    size_t dict_actual_size = ZDICT_trainFromBuffer(
-          dict_buffer, dict_maxsize, samples_buffer, samples_sizes, nblocks);
+    size_t dict_actual_size = ZDICT_trainFromBuffer(dict_buffer, dict_maxsize, samples_buffer, samples_sizes, nblocks);
+
+    // TODO: experiment with parameters of low-level fast cover algorithm
+    // Note that this API is still unstable.  See: https://github.com/facebook/zstd/issues/1599
+    // ZDICT_fastCover_params_t fast_cover_params;
+    // memset(&fast_cover_params, 0, sizeof(fast_cover_params));
+    // fast_cover_params.d = nblocks;
+    // fast_cover_params.steps = 4;
+    // fast_cover_params.zParams.compressionLevel = context->clevel;
+    //size_t dict_actual_size = ZDICT_optimizeTrainFromBuffer_fastCover(dict_buffer, dict_maxsize, samples_buffer, samples_sizes, nblocks, &fast_cover_params);
+
     if (ZDICT_isError(dict_actual_size) != ZSTD_error_no_error) {
       fprintf(stderr, "Error in ZDICT_trainFromBuffer(): '%s'."
               "  Giving up.\n", ZDICT_getErrorName(dict_actual_size));
