@@ -595,6 +595,25 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
   uint8_t* filters = context->filters;
   uint8_t* filters_meta = context->filters_meta;
 
+  /* Prefilter function */
+  if (context->prefilter != NULL) {
+    // Create new prefilter parameters for this block
+    prefilter_params pparams;
+    pparams.out = dest;
+    pparams.out_size = (size_t)bsize;
+    pparams.ninputs = context->pparams->ninputs;
+    int ninputs = context->pparams->ninputs;
+    for (int i = 0; i < ninputs; i++) {
+      pparams.typesizes[i] = context->pparams->typesizes[i];
+      int32_t offset_i = (offset / typesize) * pparams.typesizes[i];
+      pparams.inputs[i] = context->pparams->inputs[i] + offset_i;
+    }
+    if (context->prefilter(&pparams) != 0) {
+      fprintf(stderr, "Execution of prefilter function failed\n");
+      return NULL;
+    };
+  }
+
   /* Process the filter pipeline */
   for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
     switch (filters[i]) {
@@ -620,8 +639,7 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
         break;
       default:
         if (filters[i] != BLOSC_NOFILTER) {
-          fprintf(stderr, "Filter %d not handled during compression\n",
-                  filters[i]);
+          fprintf(stderr, "Filter %d not handled during compression\n", filters[i]);
           return NULL;
         }
     }
@@ -2649,6 +2667,12 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   context->threads_started = 0;
   context->schunk = cparams.schunk;
 
+  if (cparams.prefilter != NULL) {
+    context->prefilter = cparams.prefilter;
+    context->pparams = (prefilter_params*)malloc(sizeof(prefilter_params));
+    memcpy(context->pparams, cparams.pparams, sizeof(prefilter_params));
+  }
+
   return context;
 }
 
@@ -2682,6 +2706,9 @@ void blosc2_free_ctx(blosc2_context* context) {
   }
   if (context->btune != NULL) {
     btune_free(context);
+  }
+  if (context->prefilter != NULL) {
+    my_free(context->pparams);
   }
 
   my_free(context);

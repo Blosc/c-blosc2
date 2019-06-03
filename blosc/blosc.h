@@ -558,6 +558,29 @@ BLOSC_EXPORT char* blosc_cbuffer_complib(const void* cbuffer);
 
 typedef struct blosc2_context_s blosc2_context;   /* opaque type */
 
+#define BLOSC2_PREFILTER_INPUTS_MAX (128)
+
+/**
+ * @brief The parameters for a prefilter function.
+ *
+ * There can be many inputs and a single output.
+ * The number of elements of each input and the output should be the same.
+ */
+typedef struct {
+  void *out;
+  size_t out_size;
+  int ninputs;
+  int32_t typesizes[BLOSC2_PREFILTER_INPUTS_MAX];
+  uint8_t* inputs[BLOSC2_PREFILTER_INPUTS_MAX];
+} prefilter_params;
+
+/**
+ * @brief The type of the prefilter function.
+ *
+ * If the function call is successful, the return value should be 0; else, a negative value.
+ */
+typedef int (*prefilter_fn)(prefilter_params* params);
+
 /**
  * @brief The parameters for creating a context for compression purposes.
  *
@@ -583,6 +606,10 @@ typedef struct {
   //!< The (sequence of) filters.
   uint8_t filters_meta[BLOSC_MAX_FILTERS];
   //!< The metadata for filters.
+  prefilter_fn prefilter;
+  //!< The prefilter function.
+  prefilter_params *pparams;
+  //!< The prefilter parameters.
 } blosc2_cparams;
 
 /**
@@ -590,7 +617,8 @@ typedef struct {
  */
 static const blosc2_cparams BLOSC_CPARAMS_DEFAULTS = {
         BLOSC_BLOSCLZ, 5, 0, 8, 1, 0, NULL,
-        {0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0} };
+        {0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0},
+        NULL, NULL };
 
 /**
   @brief The parameters for creating a context for decompression purposes.
