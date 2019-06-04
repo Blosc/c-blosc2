@@ -572,9 +572,9 @@ typedef struct {
   int ninputs;
   uint8_t* inputs[BLOSC2_PREFILTER_INPUTS_MAX];
   int32_t input_typesizes[BLOSC2_PREFILTER_INPUTS_MAX];
-  uint8_t *out;  // no need to fill
-  size_t out_size;  // no need to fill
-  int32_t out_typesize;  // no need to fill
+  uint8_t *out;  // automatically filled
+  size_t out_size;  // automatically filled
+  int32_t out_typesize;  // automatically filled
 } prefilter_params;
 
 /**

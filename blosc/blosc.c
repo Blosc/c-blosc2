@@ -613,7 +613,7 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
       fprintf(stderr, "Execution of prefilter function failed\n");
       return NULL;
     };
-    // Cycle filters
+    // Cycle buffers
     _src = _dest;
     _dest = _tmp;
     _tmp = _src;
