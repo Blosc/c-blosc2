@@ -5,15 +5,36 @@
 
 */
 
-#include <stdio.h>
 #include "test_common.h"
+
+int tests_run = 0;
 
 #define SIZE 500 * 1000
 #define NTHREADS 2
 
-int prefilter_example(prefilter_params* pparams) {
+// Global vars
+blosc2_cparams cparams;
+blosc2_dparams dparams;
+blosc2_context *cctx, *dctx;
+static int32_t data[SIZE];
+static int32_t data2[SIZE];
+static int32_t data_out[SIZE];
+static int32_t data_dest[SIZE];
+size_t isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
+int dsize = SIZE * sizeof(int32_t), csize;
+
+
+int prefilter_func(prefilter_params *pparams) {
+  int nelems = pparams->out_size / pparams->out_typesize;
   if (pparams->ninputs == 1) {
-    memcpy(pparams->out, pparams->inputs[0], pparams->out_size);
+    for (int i = 0; i < nelems; i++) {
+      ((int32_t*)(pparams->out))[i] = ((int32_t*)(pparams->inputs[0]))[i];
+    }
+  }
+  else if (pparams->ninputs == 2) {
+    for (int i = 0; i < nelems; i++) {
+      ((int32_t *) (pparams->out))[i] = ((int32_t *)(pparams->inputs[0]))[i] + ((int32_t *) (pparams->inputs[1]))[i];
+    }
   }
   else {
     return 1;
@@ -21,89 +42,111 @@ int prefilter_example(prefilter_params* pparams) {
   return 0;
 }
 
-int main() {
-  static int32_t data[SIZE];
-  static int32_t data_out[SIZE];
-  static int32_t data_dest[SIZE];
-  int32_t data_subset[5];
-  int32_t data_subset_ref[5] = {5, 6, 7, 8, 9};
-  size_t isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
-  int dsize = SIZE * sizeof(int32_t), csize;
-  int i, ret;
-  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
-  blosc2_context *cctx, *dctx;
 
-  /* Initialize dataset */
-  for (i = 0; i < SIZE; i++) {
-    data[i] = i;
+static char *test_prefilter1() {
+  // Set some prefilter parameters and function
+  cparams.prefilter = (prefilter_fn)prefilter_func;
+  prefilter_params pparams;
+  pparams.ninputs = 1;
+  pparams.inputs[0] = (uint8_t*)data;
+  pparams.input_typesizes[0] = cparams.typesize;
+  cparams.pparams = &pparams;
+  cctx = blosc2_create_cctx(cparams);
+
+  csize = blosc2_compress_ctx(cctx, isize, data, data_out, osize);
+  mu_assert("Buffer is uncompressible", csize != 0);
+  mu_assert("Compression error", csize > 0);
+
+  /* Create a context for decompression */
+  dparams = BLOSC_DPARAMS_DEFAULTS;
+  dparams.nthreads = NTHREADS;
+  dctx = blosc2_create_dctx(dparams);
+
+  /* Decompress  */
+  dsize = blosc2_decompress_ctx(dctx, data_out, data_dest, (size_t)dsize);
+  mu_assert("Decompression error", dsize > 0);
+
+  for (int i = 0; i < SIZE; i++) {
+    mu_assert("Decompressed data differs from original!", data[i] == data_dest[i]);
   }
 
-  printf("Blosc version info: %s (%s)\n",
-         BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+  return 0;
+}
+
+
+static char *test_prefilter2() {
+  // Set some prefilter parameters and function
+  cparams.prefilter = (prefilter_fn)prefilter_func;
+  prefilter_params pparams;
+  pparams.ninputs = 2;
+  pparams.inputs[0] = (uint8_t*)data;
+  pparams.inputs[1] = (uint8_t*)data2;
+  pparams.input_typesizes[0] = cparams.typesize;
+  pparams.input_typesizes[1] = cparams.typesize;
+  cparams.pparams = &pparams;
+  cctx = blosc2_create_cctx(cparams);
+
+  csize = blosc2_compress_ctx(cctx, isize, data, data_out, osize);
+  mu_assert("Buffer is uncompressible", csize != 0);
+  mu_assert("Compression error", csize > 0);
+
+  /* Create a context for decompression */
+  dparams = BLOSC_DPARAMS_DEFAULTS;
+  dparams.nthreads = NTHREADS;
+  dctx = blosc2_create_dctx(dparams);
+
+  /* Decompress  */
+  dsize = blosc2_decompress_ctx(dctx, data_out, data_dest, (size_t)dsize);
+  mu_assert("Decompression error", dsize > 0);
+
+  for (int i = 0; i < SIZE; i++) {
+    if ((data[i] + data2[i]) != data_dest[i]) {
+      printf("Error en pos '%d': (%d + %d) != %d\n", i, data[i], data2[i], data_dest[i]);
+    }
+    mu_assert("Decompressed data differs from original!", (data[i] + data2[i]) == data_dest[i]);
+  }
+
+  return 0;
+}
+
+
+static char *all_tests() {
+  mu_run_test(test_prefilter1);
+  mu_run_test(test_prefilter2);
+
+  return 0;
+}
+
+
+int main() {
+  /* Initialize inputs */
+  for (int i = 0; i < SIZE; i++) {
+    data[i] = i;
+    data2[i] = i * 2;
+  }
 
   /* Create a context for compression */
+  cparams = BLOSC_CPARAMS_DEFAULTS;
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
 
-  // Set some prefilter parameters and function
-  cparams.prefilter = (prefilter_fn)prefilter_example;
-  prefilter_params pparams;
-  pparams.ninputs = 1;
-  pparams.inputs[0] = (uint8_t*)data;
-  pparams.typesizes[0] = cparams.typesize;
-  cparams.pparams = &pparams;
-
-  cctx = blosc2_create_cctx(cparams);
-
-  /* Compress with clevel=5 and shuffle active  */
-  csize = blosc2_compress_ctx(cctx, isize, data, data_out, osize);
-  if (csize == 0) {
-    printf("Buffer is uncompressible.  Giving up.\n");
-    return EXIT_FAILURE;
+  /* Run all the suite */
+  char* result = all_tests();
+  if (result != 0) {
+    printf(" (%s)\n", result);
   }
-  if (csize < 0) {
-    printf("Compression error.  Error code: %d\n", csize);
-    return EXIT_FAILURE;
+  else {
+    printf(" ALL TESTS PASSED");
   }
+  printf("\tTests run: %d\n", tests_run);
 
-  /* Create a context for decompression */
-  dparams.nthreads = NTHREADS;
-  dctx = blosc2_create_dctx(dparams);
-
-  ret = blosc2_getitem_ctx(dctx, data_out, 5, 5, data_subset);
-  if (ret < 0) {
-    printf("Error in blosc2_getitem_ctx().  Giving up.\n");
-    return EXIT_FAILURE;
-  }
-
-  for (i = 0; i < 5; i++) {
-    if (data_subset[i] != data_subset_ref[i]) {
-      printf("blosc2_getitem_ctx() fetched data differs from original!\n");
-      return EXIT_FAILURE;
-    }
-  }
-
-  /* Decompress  */
-  dsize = blosc2_decompress_ctx(dctx, data_out, data_dest, (size_t)dsize);
-  if (dsize < 0) {
-    printf("Decompression error.  Error code: %d\n", dsize);
-    return EXIT_FAILURE;
-  }
-
-  for (i = 0; i < SIZE; i++) {
-    if (data[i] != data_dest[i]) {
-      printf("Decompressed data differs from original!\n");
-      return EXIT_FAILURE;
-    }
-  }
 
   /* Free resources */
   blosc2_free_ctx(cctx);
   blosc2_free_ctx(dctx);
 
-  return EXIT_SUCCESS;
+  return result != 0;
 }

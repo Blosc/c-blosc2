@@ -601,17 +601,22 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
     prefilter_params pparams;
     pparams.out = dest;
     pparams.out_size = (size_t)bsize;
+    pparams.out_typesize = typesize;
     pparams.ninputs = context->pparams->ninputs;
     int ninputs = context->pparams->ninputs;
     for (int i = 0; i < ninputs; i++) {
-      pparams.typesizes[i] = context->pparams->typesizes[i];
-      int32_t offset_i = (offset / typesize) * pparams.typesizes[i];
+      pparams.input_typesizes[i] = context->pparams->input_typesizes[i];
+      int32_t offset_i = (offset / typesize) * pparams.input_typesizes[i];
       pparams.inputs[i] = context->pparams->inputs[i] + offset_i;
     }
     if (context->prefilter(&pparams) != 0) {
       fprintf(stderr, "Execution of prefilter function failed\n");
       return NULL;
     };
+    // Cycle filters
+    _src = _dest;
+    _dest = _tmp;
+    _tmp = _src;
   }
 
   /* Process the filter pipeline */

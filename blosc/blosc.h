@@ -565,13 +565,16 @@ typedef struct blosc2_context_s blosc2_context;   /* opaque type */
  *
  * There can be many inputs and a single output.
  * The number of elements of each input and the output should be the same.
+ * The user only needs to fill the `ninputs` , `inputs` and `input_typesizes`;
+ * The other fields will be filled by the library itself.
  */
 typedef struct {
-  void *out;
-  size_t out_size;
   int ninputs;
-  int32_t typesizes[BLOSC2_PREFILTER_INPUTS_MAX];
   uint8_t* inputs[BLOSC2_PREFILTER_INPUTS_MAX];
+  int32_t input_typesizes[BLOSC2_PREFILTER_INPUTS_MAX];
+  uint8_t *out;  // no need to fill
+  size_t out_size;  // no need to fill
+  int32_t out_typesize;  // no need to fill
 } prefilter_params;
 
 /**
