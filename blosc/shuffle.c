@@ -37,7 +37,13 @@
 #if defined(SHUFFLE_NEON_ENABLED)
   #include "shuffle-neon.h"
   #include "bitshuffle-neon.h"
-#endif  /* defined(SHUFFLE_SSE2_ENABLED) */
+#endif  /* defined(SHUFFLE_NEON_ENABLED) */
+
+#if defined(SHUFFLE_ALTIVEC_ENABLED)
+  #include "shuffle-altivec.h"
+  #include "bitshuffle-altivec.h"
+#endif  /* defined(SHUFFLE_ALTIVEC_ENABLED) */
+
 
 /*  Define function pointer types for shuffle/unshuffle routines. */
 typedef void(* shuffle_func)(const int32_t, const int32_t, const uint8_t*, const uint8_t*);
@@ -65,7 +71,8 @@ typedef enum {
   BLOSC_HAVE_NOTHING = 0,
   BLOSC_HAVE_SSE2 = 1,
   BLOSC_HAVE_AVX2 = 2,
-  BLOSC_HAVE_NEON = 4
+  BLOSC_HAVE_NEON = 4,
+  BLOSC_HAVE_ALTIVEC = 8
 } blosc_cpu_features;
 
 /* Detect hardware and set function pointers to the best shuffle/unshuffle
@@ -248,6 +255,12 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
 #endif
   return cpu_features;
 }
+#elif defined(SHUFFLE_ALTIVEC_ENABLED) /* POWER9-ALTIVEC preliminary test*/
+static blosc_cpu_features blosc_get_cpu_features(void) {
+  blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
+  cpu_features |= BLOSC_HAVE_ALTIVEC;
+  return cpu_features;
+}
 #else   /* No hardware acceleration supported for the target architecture. */
   #if defined(_MSC_VER)
     #pragma message("Hardware-acceleration detection not implemented for the target architecture. Only the generic shuffle/unshuffle routines will be available.")
@@ -302,6 +315,18 @@ static shuffle_implementation_t get_shuffle_implementation() {
     return impl_neon;
   }
 #endif  /* defined(SHUFFLE_NEON_ENABLED) */
+
+  #if defined(SHUFFLE_ALTIVEC_ENABLED)
+  if (cpu_features & BLOSC_HAVE_ALTIVEC) {
+    shuffle_implementation_t impl_altivec;
+    impl_altivec.name = "altivec";
+    impl_altivec.shuffle = (shuffle_func)shuffle_altivec;
+    impl_altivec.unshuffle = (unshuffle_func)unshuffle_altivec;
+    impl_altivec.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_altivec;
+    impl_altivec.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_altivec;
+    return impl_altivec;
+  }
+#endif  /* defined(SHUFFLE_ALTIVEC_ENABLED) */
 
   /* Processor doesn't support any of the hardware-accelerated implementations,
      so use the generic implementation. */
