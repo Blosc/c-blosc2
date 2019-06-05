@@ -76,9 +76,9 @@ struct blosc2_context_s {
   /* the (sequence of) filters */
   uint8_t filters_meta[BLOSC_MAX_FILTERS];
   /* the metainfo for filters */
-  prefilter_fn prefilter;
+  blosc2_prefilter_fn prefilter;
   /* prefilter function */
-  prefilter_params *pparams;
+  blosc2_prefilter_params *pparams;
   /* prefilter params */
 
   /* metadata for filters */

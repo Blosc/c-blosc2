@@ -598,7 +598,7 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
   /* Prefilter function */
   if (context->prefilter != NULL) {
     // Create new prefilter parameters for this block
-    prefilter_params pparams;
+    blosc2_prefilter_params pparams;
     pparams.out = dest;
     pparams.out_size = (size_t)bsize;
     pparams.out_typesize = typesize;
@@ -2674,8 +2674,8 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
 
   if (cparams.prefilter != NULL) {
     context->prefilter = cparams.prefilter;
-    context->pparams = (prefilter_params*)malloc(sizeof(prefilter_params));
-    memcpy(context->pparams, cparams.pparams, sizeof(prefilter_params));
+    context->pparams = (blosc2_prefilter_params*)malloc(sizeof(blosc2_prefilter_params));
+    memcpy(context->pparams, cparams.pparams, sizeof(blosc2_prefilter_params));
   }
 
   return context;

@@ -24,7 +24,7 @@ size_t isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
 int dsize = SIZE * sizeof(int32_t), csize;
 
 
-int prefilter_func(prefilter_params *pparams) {
+int prefilter_func(blosc2_prefilter_params *pparams) {
   int nelems = pparams->out_size / pparams->out_typesize;
   if (pparams->ninputs == 1) {
     for (int i = 0; i < nelems; i++) {
@@ -45,8 +45,8 @@ int prefilter_func(prefilter_params *pparams) {
 
 static char *test_prefilter1() {
   // Set some prefilter parameters and function
-  cparams.prefilter = (prefilter_fn)prefilter_func;
-  prefilter_params pparams;
+  cparams.prefilter = (blosc2_prefilter_fn)prefilter_func;
+  blosc2_prefilter_params pparams;
   pparams.ninputs = 1;
   pparams.inputs[0] = (uint8_t*)data;
   pparams.input_typesizes[0] = cparams.typesize;
@@ -76,8 +76,8 @@ static char *test_prefilter1() {
 
 static char *test_prefilter2() {
   // Set some prefilter parameters and function
-  cparams.prefilter = (prefilter_fn)prefilter_func;
-  prefilter_params pparams;
+  cparams.prefilter = (blosc2_prefilter_fn)prefilter_func;
+  blosc2_prefilter_params pparams;
   pparams.ninputs = 2;
   pparams.inputs[0] = (uint8_t*)data;
   pparams.inputs[1] = (uint8_t*)data2;

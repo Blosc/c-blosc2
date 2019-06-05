@@ -565,24 +565,25 @@ typedef struct blosc2_context_s blosc2_context;   /* opaque type */
  *
  * There can be many inputs and a single output.
  * The number of elements of each input and the output should be the same.
- * The user only needs to fill the `ninputs` , `inputs` and `input_typesizes`;
+ * Strictly, the user only needs to fill the `ninputs` , `inputs` and `input_typesizes`.
  * The other fields will be filled by the library itself.
  */
 typedef struct {
-  int ninputs;
-  uint8_t* inputs[BLOSC2_PREFILTER_INPUTS_MAX];
-  int32_t input_typesizes[BLOSC2_PREFILTER_INPUTS_MAX];
+  int ninputs;  // number of data inputs
+  uint8_t* inputs[BLOSC2_PREFILTER_INPUTS_MAX];  // the data inputs
+  int32_t input_typesizes[BLOSC2_PREFILTER_INPUTS_MAX];  // the typesizes for data inputs
+  void *user_data;  // user-provided info.  Optional
   uint8_t *out;  // automatically filled
   size_t out_size;  // automatically filled
   int32_t out_typesize;  // automatically filled
-} prefilter_params;
+} blosc2_prefilter_params;
 
 /**
  * @brief The type of the prefilter function.
  *
  * If the function call is successful, the return value should be 0; else, a negative value.
  */
-typedef int (*prefilter_fn)(prefilter_params* params);
+typedef int (*blosc2_prefilter_fn)(blosc2_prefilter_params* params);
 
 /**
  * @brief The parameters for creating a context for compression purposes.
@@ -609,9 +610,9 @@ typedef struct {
   //!< The (sequence of) filters.
   uint8_t filters_meta[BLOSC_MAX_FILTERS];
   //!< The metadata for filters.
-  prefilter_fn prefilter;
+  blosc2_prefilter_fn prefilter;
   //!< The prefilter function.
-  prefilter_params *pparams;
+  blosc2_prefilter_params *pparams;
   //!< The prefilter parameters.
 } blosc2_cparams;
 
