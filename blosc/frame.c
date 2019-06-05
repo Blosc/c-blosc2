@@ -680,6 +680,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
 
   if (!sparse) {
     // We are done, so leave here
+    // TODO: should we copy the frame in-memory?  schunk-> mem, frame -> disk?
     return schunk;
   }
 
@@ -730,6 +731,8 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
     }
   }
   schunk->blocksize = blocksize;
+  // We are not attached to a frame anymore, so get rid of this
+  schunk->frame = NULL;
 
   free(offsets);
   if (frame->sdata == NULL) {
