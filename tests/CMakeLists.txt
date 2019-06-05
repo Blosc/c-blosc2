@@ -56,6 +56,16 @@ foreach (source ${SOURCES})
         continue()
     endif(COMPILER_SUPPORT_NEON)
 
+    if(COMPILER_SUPPORT_ALTIVEC)
+         # Define a symbol so tests for NEON shuffle/unshuffle will be compiled in.
+         set_property(
+                SOURCE ${source}
+                APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_ALTIVEC_ENABLED)
+    elseif (target STREQUAL test_shuffle_roundtrip_altivec)
+        message("Skipping ${target} on non-ALTIVEC builds")
+        continue()
+    endif(COMPILER_SUPPORT_ALTIVEC)
+
     add_executable(${target} ${source})
 
     # Define the BLOSC_TESTING symbol so normally-hidden functions
