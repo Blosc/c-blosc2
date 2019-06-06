@@ -603,6 +603,8 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
     pparams.out_size = (size_t)bsize;
     pparams.out_typesize = typesize;
     pparams.ninputs = context->pparams->ninputs;
+    pparams.user_data = malloc(context->pparams->user_data_size);
+    memcpy(pparams.user_data, context->pparams->user_data, context->pparams->user_data_size);
     int ninputs = context->pparams->ninputs;
     for (int i = 0; i < ninputs; i++) {
       pparams.input_typesizes[i] = context->pparams->input_typesizes[i];
@@ -2713,6 +2715,9 @@ void blosc2_free_ctx(blosc2_context* context) {
     btune_free(context);
   }
   if (context->prefilter != NULL) {
+    if (context->pparams->user_data != NULL) {
+      my_free(context->pparams->user_data);
+    }
     my_free(context->pparams);
   }
 

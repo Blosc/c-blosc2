@@ -572,7 +572,8 @@ typedef struct {
   int ninputs;  // number of data inputs
   uint8_t* inputs[BLOSC2_PREFILTER_INPUTS_MAX];  // the data inputs
   int32_t input_typesizes[BLOSC2_PREFILTER_INPUTS_MAX];  // the typesizes for data inputs
-  void *user_data;  // user-provided info.  Optional
+  void *user_data;  // user-provided info (optional)
+  size_t user_data_size;  // size for user-provided info (optional)
   uint8_t *out;  // automatically filled
   size_t out_size;  // automatically filled
   int32_t out_typesize;  // automatically filled
@@ -831,6 +832,17 @@ blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams, blosc2_frame *
  * @return 0 if succeeds.
  */
 BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *schunk);
+
+/**
+ * @brief Append an existing @p chunk o a super-chunk.
+ *
+ * @param schunk The super-chunk where the chunk will be appended.
+ * @param chunk The chunk to append.
+ *
+ * @return The number of chunks in super-chunk. If some problem is
+ * detected, this number will be negative.
+ */
+BLOSC_EXPORT int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk);
 
 /**
  * @brief Append a @p src data buffer to a super-chunk.
