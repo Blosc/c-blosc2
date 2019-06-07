@@ -603,8 +603,12 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
     pparams.out_size = (size_t)bsize;
     pparams.out_typesize = typesize;
     pparams.ninputs = context->pparams->ninputs;
-    pparams.user_data = malloc(context->pparams->user_data_size);
-    memcpy(pparams.user_data, context->pparams->user_data, context->pparams->user_data_size);
+    if (context->pparams->user_data != NULL && context->pparams->user_data_size != 0) {
+      // Provide the user with a copy of the user_data per thread
+      // TODO: do we really need a copy, or just a pointer would be enough?
+      pparams.user_data = malloc(context->pparams->user_data_size);
+      memcpy(pparams.user_data, context->pparams->user_data, context->pparams->user_data_size);
+    }
     int ninputs = context->pparams->ninputs;
     for (int i = 0; i < ninputs; i++) {
       pparams.input_typesizes[i] = context->pparams->input_typesizes[i];
@@ -2683,6 +2687,9 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     context->prefilter = cparams.prefilter;
     context->pparams = (blosc2_prefilter_params*)malloc(sizeof(blosc2_prefilter_params));
     memcpy(context->pparams, cparams.pparams, sizeof(blosc2_prefilter_params));
+    // Do not expect the user to always pass user_data
+    context->pparams->user_data = NULL;
+    context->pparams->user_data_size = 0;
   }
 
   return context;

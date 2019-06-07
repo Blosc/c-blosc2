@@ -10,7 +10,7 @@
 int tests_run = 0;
 
 #define SIZE 500 * 1000
-#define NTHREADS 2
+#define NTHREADS 1
 
 // Global vars
 blosc2_cparams cparams;
@@ -70,6 +70,10 @@ static char *test_prefilter1() {
     mu_assert("Decompressed data differs from original!", data[i] == data_dest[i]);
   }
 
+  /* Free resources */
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+
   return 0;
 }
 
@@ -105,6 +109,10 @@ static char *test_prefilter2() {
     }
     mu_assert("Decompressed data differs from original!", (data[i] + data2[i]) == data_dest[i]);
   }
+
+  /* Free resources */
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
 
   return 0;
 }
@@ -142,11 +150,6 @@ int main() {
     printf(" ALL TESTS PASSED");
   }
   printf("\tTests run: %d\n", tests_run);
-
-
-  /* Free resources */
-  blosc2_free_ctx(cctx);
-  blosc2_free_ctx(dctx);
 
   return result != 0;
 }
