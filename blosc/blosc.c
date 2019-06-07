@@ -1364,13 +1364,14 @@ static int initialize_context_decompression(
     context->bstarts = (int32_t*)(context->src + BLOSC_EXTENDED_HEADER_LENGTH);
     if (*blosc2_flags & BLOSC2_USEDICT) {
       context->use_dict = 1;
-      if (context->dict_ddict == NULL) {
-        // The trained dictionary is after the bstarts block
-        context->dict_size = (size_t)sw32_(context->bstarts + context->nblocks);
-        context->dict_buffer = (void*)(context->bstarts + context->nblocks + 1);
-        context->dict_ddict = ZSTD_createDDict(context->dict_buffer,
-                                               context->dict_size);
+      if (context->dict_ddict != NULL) {
+          // Free the existing dictionary (probably from another chunk)
+          ZSTD_freeDDict(context->dict_ddict);
       }
+      // The trained dictionary is after the bstarts block
+      context->dict_size = (size_t)sw32_(context->bstarts + context->nblocks);
+      context->dict_buffer = (void*)(context->bstarts + context->nblocks + 1);
+      context->dict_ddict = ZSTD_createDDict(context->dict_buffer, context->dict_size);
     }
   } else {
     /* Regular (Blosc1) header */
@@ -1666,14 +1667,18 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     /* Write the trained dict afterwards */
     context->dict_buffer = context->dest + context->output_bytes;
     fastcopy(context->dict_buffer, dict_buffer, (unsigned int)dict_actual_size);
-    context->dict_cdict = ZSTD_createCDict(dict_buffer, dict_actual_size,
-                                           1);  // TODO: use get_accel()
+    context->dict_cdict = ZSTD_createCDict(dict_buffer, dict_actual_size, 1);  // TODO: use get_accel()
     free(dict_buffer);      // the dictionary is copied in the header now
     context->output_bytes += (int32_t)dict_actual_size;
     context->dict_size = dict_actual_size;
 
     /* Compress with dict */
     result = blosc_compress_context(context);
+
+    // Invalidate the dictionary for compressing other chunks using the same context
+    context->dict_buffer = NULL;
+    ZSTD_freeCDict(context->dict_cdict);
+    context->dict_cdict = NULL;
   }
 
   return result;

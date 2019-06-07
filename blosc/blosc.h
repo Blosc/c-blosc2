@@ -683,9 +683,11 @@ BLOSC_EXPORT void blosc2_free_ctx(blosc2_context* context);
  * @param dest The buffer where the compressed data will be put.
  * @param destsize The size in bytes of the @p dest buffer.
  *
- * @return The number of bytes compressed. A negative return value means
- * that an internal error happened. It could happen that context is
- * not meant for compression (which is stated in stderr).
+ * @return The number of bytes compressed.
+ * If @p src buffer cannot be compressed into @p destsize, the return
+ * value is zero and you should discard the contents of the @p dest
+ * buffer.  A negative return value means that an internal error happened.
+ * It could happen that context is not meant for compression (which is stated in stderr).
  * Otherwise, please report it back together with the buffer data causing this
  * and compression settings.
  */
@@ -837,7 +839,8 @@ BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *schunk);
  * @brief Append an existing @p chunk o a super-chunk.
  *
  * @param schunk The super-chunk where the chunk will be appended.
- * @param chunk The chunk to append.
+ * @param chunk The @p chunk to append.  An internal copy is made, so @p chunk can be reused or
+ * freed if desired.
  *
  * @return The number of chunks in super-chunk. If some problem is
  * detected, this number will be negative.
