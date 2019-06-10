@@ -603,14 +603,7 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
     pparams.out_size = (size_t)bsize;
     pparams.out_typesize = typesize;
     pparams.ninputs = context->pparams->ninputs;
-    if (context->pparams->user_data != NULL && context->pparams->user_data_size != 0) {
-      // Provide the user with a copy of the user_data per thread
-      // TODO: do we really need a copy, or just a pointer would be enough?
-      // Followup: apparently a copy does not fix the tinyexpr evaluator in parallel
-      //pparams.user_data = malloc(context->pparams->user_data_size);
-      //memcpy(pparams.user_data, context->pparams->user_data, context->pparams->user_data_size);
-      pparams.user_data = context->pparams->user_data;
-    }
+    pparams.user_data = context->pparams->user_data;
     int ninputs = context->pparams->ninputs;
     for (int i = 0; i < ninputs; i++) {
       pparams.input_typesizes[i] = context->pparams->input_typesizes[i];
@@ -2728,10 +2721,6 @@ void blosc2_free_ctx(blosc2_context* context) {
     btune_free(context);
   }
   if (context->prefilter != NULL) {
-    if (context->pparams->user_data != NULL) {
-      // TODO: check if we should copy user_data internally, and free it here if necessary...
-      //my_free(context->pparams->user_data);
-    }
     my_free(context->pparams);
   }
 

@@ -573,7 +573,6 @@ typedef struct {
   uint8_t* inputs[BLOSC2_PREFILTER_INPUTS_MAX];  // the data inputs
   int32_t input_typesizes[BLOSC2_PREFILTER_INPUTS_MAX];  // the typesizes for data inputs
   void *user_data;  // user-provided info (optional)
-  size_t user_data_size;  // size for user-provided info (optional)
   uint8_t *out;  // automatically filled
   size_t out_size;  // automatically filled
   int32_t out_typesize;  // automatically filled
