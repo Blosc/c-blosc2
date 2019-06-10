@@ -95,4 +95,4 @@ All entries are little endian.
     (``bitfield``) The flags for a Blosc2 buffer.
 
     :bit 0 (``0x01``):
-        Whether the codec use dictionaries or not.
+        Whether the codec uses dictionaries or not.

@@ -686,7 +686,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   uint8_t *_tmp = tmp, *_tmp2 = tmp2, *_tmp3 = thread_context->tmp4;
   int last_filter_index = last_filter(context->filters, 'c');
 
-  if (last_filter_index >= 0) {
+  if (last_filter_index >= 0 || context->prefilter != NULL) {
     /* Apply filter pipleline */
     _src = pipeline_c(context, bsize, src, offset, _tmp, _tmp2, _tmp3);
     if (_src == NULL)
@@ -1497,14 +1497,16 @@ static int write_compression_header(blosc2_context* context,
                             sizeof(int32_t) * context->nblocks;
   }
 
-  if (context->clevel == 0) {
-    /* Compression level 0 means buffer to be memcpy'ed */
-    *(context->header_flags) |= BLOSC_MEMCPYED;
-  }
+  if (context->prefilter == NULL) {
+    if (context->clevel == 0) {
+      /* Compression level 0 means buffer to be memcpy'ed */
+      *(context->header_flags) |= BLOSC_MEMCPYED;
+    }
 
-  if (context->sourcesize < BLOSC_MIN_BUFFERSIZE) {
-    /* Buffer is too small.  Try memcpy'ing. */
-    *(context->header_flags) |= BLOSC_MEMCPYED;
+    if (context->sourcesize < BLOSC_MIN_BUFFERSIZE) {
+      /* Buffer is too small.  Try memcpy'ing. */
+      *(context->header_flags) |= BLOSC_MEMCPYED;
+    }
   }
 
   if (context->filter_flags & BLOSC_DOSHUFFLE) {
