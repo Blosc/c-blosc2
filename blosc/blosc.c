@@ -2729,7 +2729,8 @@ void blosc2_free_ctx(blosc2_context* context) {
   }
   if (context->prefilter != NULL) {
     if (context->pparams->user_data != NULL) {
-      my_free(context->pparams->user_data);
+      // TODO: check if we should copy user_data internally, and free it here if necessary...
+      //my_free(context->pparams->user_data);
     }
     my_free(context->pparams);
   }
