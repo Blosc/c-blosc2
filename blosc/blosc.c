@@ -1505,16 +1505,7 @@ static int write_compression_header(blosc2_context* context,
                             sizeof(int32_t) * context->nblocks;
   }
 
-  if (context->prefilter != NULL) {
-    if (context->clevel == 0 && context->nthreads > 1) {
-      // Prefilters cannot be evaluated in parallel because clevel == 0 in parallel mode only
-      // supports sequential copies of the original buffer.  Fixing this would require too much
-      // effort, and would break the fact that chunks fit in a sizeof(src) + BLOSC_MAX_OVERHEAD.
-      // Forcing serial mode...
-      context->new_nthreads = 1;
-    }
-  }
-  else {
+  if (context->prefilter == NULL) {
     if (context->clevel == 0) {
       /* Compression level 0 means buffer to be memcpy'ed */
       *(context->header_flags) |= BLOSC_MEMCPYED;
@@ -1596,7 +1587,8 @@ int blosc_compress_context(blosc2_context* context) {
   _sw32(context->dest + 12, ntbytes);
 
   // If the size is equal to destsize, that means that a regular copy has been done (e.g. prefilter)
-  if (ntbytes == context->destsize) {
+  // TODO: context->clevel == 0 should be better?
+  if (context->clevel == 0) {
     *(context->header_flags) |= BLOSC_MEMCPYED;
   }
   /* Set the number of bytes in dest buffer (might be useful for btune) */
@@ -2231,6 +2223,10 @@ static void* t_blosc(void* ctxt) {
         }
         else {
           /* Regular compression */
+          if (context->clevel == 0) {
+            // We can copy straight to destination, as we know where we can write
+            tmp2 = dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize;
+          }
           cbytes = blosc_c(thcontext, bsize, leftoverblock, 0,
                            ebsize, src, nblock_ * blocksize, tmp2, tmp, tmp3);
         }
@@ -2270,7 +2266,7 @@ static void* t_blosc(void* ctxt) {
         // Note: do not use a typical local dict_training variable here
         // because it is probably cached from previous calls if the number of
         // threads does not change (the usual thing).
-        if (!(context->use_dict && context->dict_cdict == NULL)) {
+        if (!(context->use_dict && context->dict_cdict == NULL) && context->clevel != 0) {
           _sw32(bstarts + nblock_, (int32_t) ntdest);
         }
 
@@ -2286,7 +2282,10 @@ static void* t_blosc(void* ctxt) {
         /* End of critical section */
 
         /* Copy the compressed buffer to destination */
-        fastcopy(dest + ntdest, tmp2, (unsigned int)cbytes);
+        if (context->clevel != 0) {
+          // We can avoid the copy when clevel == 0 (already copied)
+          fastcopy(dest + ntdest, tmp2, (unsigned int) cbytes);
+        }
       }
       else {
         nblock_++;
