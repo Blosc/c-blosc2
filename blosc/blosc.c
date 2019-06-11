@@ -599,7 +599,7 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
   if (context->prefilter != NULL) {
     // Create new prefilter parameters for this block
     blosc2_prefilter_params pparams;
-    pparams.out = dest;
+    pparams.out = _dest;
     pparams.out_size = (size_t)bsize;
     pparams.out_typesize = typesize;
     pparams.ninputs = context->pparams->ninputs;
@@ -614,6 +614,11 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
       fprintf(stderr, "Execution of prefilter function failed\n");
       return NULL;
     };
+
+    if (context->clevel == 0) {
+      // No more filters are required
+      return _dest;
+    }
     // Cycle buffers
     _src = _dest;
     _dest = _tmp;
@@ -682,8 +687,14 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   if (last_filter_index >= 0 || context->prefilter != NULL) {
     /* Apply filter pipleline */
     _src = pipeline_c(context, bsize, src, offset, _tmp, _tmp2, _tmp3);
-    if (_src == NULL)
+    if (_src == NULL) {
       return -9;  // signals a problem with the filter pipeline
+    }
+    if (context->clevel == 0 && context->prefilter != NULL) {
+      // We have finished, as we only need the prefilter
+      fastcopy(dest, _src, bsize);
+      return bsize;
+    }
   } else {
     _src = src + offset;
   }
@@ -1020,7 +1031,7 @@ static int serial_blosc(struct thread_context* thread_context) {
   int memcpyed = *(context->header_flags) & BLOSC_MEMCPYED;
 
   for (j = 0; j < context->nblocks; j++) {
-    if (context->do_compress && !memcpyed && !dict_training) {
+    if (context->do_compress && !memcpyed && !dict_training && context->clevel != 0) {
       _sw32(bstarts + j, ntbytes);
     }
     bsize = context->blocksize;
@@ -1470,7 +1481,7 @@ static int write_compression_header(blosc2_context* context,
       filters[i] = context->filters[i];
       filters_meta[i] = context->filters_meta[i];
     }
-    if (dict_training) {
+    if (dict_training || context->clevel == 0) {
       context->bstarts = NULL;
       context->output_bytes = BLOSC_EXTENDED_HEADER_LENGTH;
     } else {
@@ -1560,6 +1571,7 @@ int blosc_compress_context(blosc2_context* context) {
       }
     }
     else {
+      // TODO: context->src is not defined when using prefilters.  Think about a workaround.
       fastcopy(context->dest + BLOSC_MAX_OVERHEAD, context->src, (unsigned int)context->sourcesize);
       ntbytes = (int)context->sourcesize + BLOSC_MAX_OVERHEAD;
     }
@@ -1567,6 +1579,11 @@ int blosc_compress_context(blosc2_context* context) {
 
   /* Set the number of compressed bytes in header */
   _sw32(context->dest + 12, ntbytes);
+
+  // If the size is equal to destsize, that means that a regular copy has been done (e.g. prefilter)
+  if (ntbytes == context->destsize) {
+    *(context->header_flags) |= BLOSC_MEMCPYED;
+  }
   /* Set the number of bytes in dest buffer (might be useful for btune) */
   context->destsize = ntbytes;
 
