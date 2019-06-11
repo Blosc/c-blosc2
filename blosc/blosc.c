@@ -1571,7 +1571,9 @@ int blosc_compress_context(blosc2_context* context) {
       }
     }
     else {
-      // TODO: context->src is not defined when using prefilters.  Think about a workaround.
+      if (context->src == NULL) {
+        return -10;  // cannot compress the output from prefilter (context->src == NULL)
+      }
       fastcopy(context->dest + BLOSC_MAX_OVERHEAD, context->src, (unsigned int)context->sourcesize);
       ntbytes = (int)context->sourcesize + BLOSC_MAX_OVERHEAD;
     }
