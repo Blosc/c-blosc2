@@ -74,6 +74,10 @@ if (COMPILER_SUPPORT_NEON)
     message(STATUS "Adding run-time support for NEON")
     set(SOURCES ${SOURCES} shuffle-neon.c bitshuffle-neon.c)
 endif (COMPILER_SUPPORT_NEON)
+if (COMPILER_SUPPORT_ALTIVEC)
+    message(STATUS "Adding run-time support for ALTIVEC")
+    set(SOURCES ${SOURCES} shuffle-altivec.c bitshuffle-altivec.c)
+endif (COMPILER_SUPPORT_ALTIVEC)
 set(SOURCES ${SOURCES} shuffle.c)
 
 # library install directory
@@ -200,6 +204,16 @@ if (COMPILER_SUPPORT_NEON)
             SOURCE shuffle.c
             APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_NEON_ENABLED)
 endif (COMPILER_SUPPORT_NEON)
+if (COMPILER_SUPPORT_ALTIVEC)
+    set_source_files_properties(shuffle-altivec.c bitshuffle-altivec.c PROPERTIES COMPILE_FLAGS -DNO_WARN_X86_INTRINSICS)
+
+    # Define a symbol for the shuffle-dispatch implementation
+    # so it knows ALTIVEC is supported even though that file is
+    # compiled without ALTIVEC support (for portability).
+    set_property(
+            SOURCE shuffle.c
+            APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_ALTIVEC_ENABLED)
+endif (COMPILER_SUPPORT_ALTIVEC)
 
 # When the option has been selected to compile the test suite,
 # compile an additional version of blosc_shared which exports
