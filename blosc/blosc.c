@@ -685,15 +685,19 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   int last_filter_index = last_filter(context->filters, 'c');
 
   if (last_filter_index >= 0 || context->prefilter != NULL) {
-    /* Apply filter pipleline */
+    /* Apply the filter pipeline just for the prefilter */
+    if (context->clevel == 0 && context->prefilter != NULL) {
+      // We have finished, as we only need the prefilter output
+      _src = pipeline_c(context, bsize, src, offset, dest, _tmp2, _tmp3);
+      if (_src == NULL) {
+        return -9;  // signals a problem with the filter pipeline
+      }
+      return bsize;
+    }
+    /* Apply regular filter pipeline */
     _src = pipeline_c(context, bsize, src, offset, _tmp, _tmp2, _tmp3);
     if (_src == NULL) {
       return -9;  // signals a problem with the filter pipeline
-    }
-    if (context->clevel == 0 && context->prefilter != NULL) {
-      // We have finished, as we only need the prefilter
-      fastcopy(dest, _src, bsize);
-      return bsize;
     }
   } else {
     _src = src + offset;
@@ -1501,7 +1505,16 @@ static int write_compression_header(blosc2_context* context,
                             sizeof(int32_t) * context->nblocks;
   }
 
-  if (context->prefilter == NULL) {
+  if (context->prefilter != NULL) {
+    if (context->clevel == 0 && context->nthreads > 1) {
+      // Prefilters cannot be evaluated in parallel because clevel == 0 in parallel mode only
+      // supports sequential copies of the original buffer.  Fixing this would require too much
+      // effort, and would break the fact that chunks fit in a sizeof(src) + BLOSC_MAX_OVERHEAD.
+      // Forcing serial mode...
+      context->new_nthreads = 1;
+    }
+  }
+  else {
     if (context->clevel == 0) {
       /* Compression level 0 means buffer to be memcpy'ed */
       *(context->header_flags) |= BLOSC_MEMCPYED;
@@ -1590,7 +1603,6 @@ int blosc_compress_context(blosc2_context* context) {
   context->destsize = ntbytes;
 
   assert(ntbytes <= context->destsize);
-
 
   if (context->btune != NULL) {
     blosc_set_timestamp(&current);
@@ -2258,7 +2270,7 @@ static void* t_blosc(void* ctxt) {
         // Note: do not use a typical local dict_training variable here
         // because it is probably cached from previous calls if the number of
         // threads does not change (the usual thing).
-        if (!(context->use_dict && (context->dict_cdict == NULL))) {
+        if (!(context->use_dict && context->dict_cdict == NULL)) {
           _sw32(bstarts + nblock_, (int32_t) ntdest);
         }
 
@@ -2285,8 +2297,7 @@ static void* t_blosc(void* ctxt) {
     } /* closes while (nblock_) */
 
     /* Sum up all the bytes decompressed */
-    if ((!compress || (flags & BLOSC_MEMCPYED)) &&
-        (context->thread_giveup_code > 0)) {
+    if ((!compress || (flags & BLOSC_MEMCPYED)) && (context->thread_giveup_code > 0)) {
       /* Update global counter for all threads (decompression only) */
       pthread_mutex_lock(&context->count_mutex);
       context->output_bytes += ntbytes;

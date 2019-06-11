@@ -15,6 +15,7 @@
 #include "blosc.h"
 #include "blosc-private.h"
 #include "context.h"
+#include "fastcopy.h"
 
 #include "zstd.h"
 #include "zstd_errors.h"
@@ -153,7 +154,7 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk) {
 
     // Make a copy of the chunk
     uint8_t* chunk_copy = malloc(cbytes);
-    memcpy(chunk_copy, chunk, cbytes);
+    fastcopy(chunk_copy, chunk, cbytes);
 
     /* Make space for appending the copy of the chunk and do it */
     schunk->data = realloc(schunk->data, (nchunks + 1) * sizeof(void *));
