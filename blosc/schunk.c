@@ -116,7 +116,7 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
 
 
 /* Append an existing chunk into a super-chunk. */
-int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk) {
+int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy) {
   int32_t nchunks = schunk->nchunks;
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
   int32_t nbytes = sw32_(chunk + 4);
@@ -152,13 +152,16 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk) {
       }
     }
 
-    // Make a copy of the chunk
-    uint8_t* chunk_copy = malloc(cbytes);
-    fastcopy(chunk_copy, chunk, cbytes);
+    if (copy) {
+        // Make a copy of the chunk
+        uint8_t *chunk_copy = malloc(cbytes);
+        fastcopy(chunk_copy, chunk, cbytes);
+        chunk = chunk_copy;
+    }
 
     /* Make space for appending the copy of the chunk and do it */
     schunk->data = realloc(schunk->data, (nchunks + 1) * sizeof(void *));
-    schunk->data[nchunks] = chunk_copy;
+    schunk->data[nchunks] = chunk;
   }
   else {
     blosc2_frame_append_chunk(schunk->frame, chunk);
@@ -182,7 +185,8 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, size_t nbytes)
     return cbytes;
   }
 
-  int nchunks = blosc2_schunk_append_chunk(schunk, chunk);
+  // Append the chunk with a copy for getting rid of the unnecessary space (nbytes - cbytes)
+  int nchunks = blosc2_schunk_append_chunk(schunk, chunk, true);
 
   free(chunk);  // the chunk has been copied, so we don't need it anymore
   return nchunks;

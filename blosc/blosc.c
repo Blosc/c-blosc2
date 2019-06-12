@@ -598,7 +598,7 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
   /* Prefilter function */
   if (context->prefilter != NULL) {
     // Create new prefilter parameters for this block
-    blosc2_prefilter_params pparams;
+    blosc2_prefilter_params pparams = {0};
     pparams.out = _dest;
     pparams.out_size = (size_t)bsize;
     pparams.out_typesize = typesize;
