@@ -15,6 +15,7 @@
 #include "blosc.h"
 #include "blosc-private.h"
 #include "context.h"
+#include "fastcopy.h"
 
 #include "zstd.h"
 #include "zstd_errors.h"
@@ -115,10 +116,9 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
 
 
 /* Append an existing chunk into a super-chunk. */
-int append_chunk(blosc2_schunk* schunk, uint8_t* chunk) {
+int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk) {
   int32_t nchunks = schunk->nchunks;
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
-  // TODO: update for extended headers
   int32_t nbytes = sw32_(chunk + 4);
   int32_t cbytes = sw32_(chunk + 12);
 
@@ -137,7 +137,7 @@ int append_chunk(blosc2_schunk* schunk, uint8_t* chunk) {
     schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
   }
 
-  // Update frame
+  // Update super-chunk or frame
   if (schunk->frame == NULL) {
     // Check that we are not appending a small chunk after another small chunk
     if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
@@ -152,13 +152,16 @@ int append_chunk(blosc2_schunk* schunk, uint8_t* chunk) {
       }
     }
 
-    /* Make space for appending a new chunk and do it */
+    // Make a copy of the chunk
+    uint8_t* chunk_copy = malloc(cbytes);
+    fastcopy(chunk_copy, chunk, cbytes);
+
+    /* Make space for appending the copy of the chunk and do it */
     schunk->data = realloc(schunk->data, (nchunks + 1) * sizeof(void *));
-    schunk->data[nchunks] = chunk;
+    schunk->data[nchunks] = chunk_copy;
   }
   else {
     blosc2_frame_append_chunk(schunk->frame, chunk);
-    free(chunk);  // for a frame, we don't need the chunk anymore
   }
 
   /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n", */
@@ -178,9 +181,10 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, size_t nbytes)
     free(chunk);
     return cbytes;
   }
-  // TODO: use a realloc to get rid of unused space in chunk
 
-  int nchunks = append_chunk(schunk, chunk);
+  int nchunks = blosc2_schunk_append_chunk(schunk, chunk);
+
+  free(chunk);  // the chunk has been copied, so we don't need it anymore
   return nchunks;
 }
 
@@ -188,16 +192,6 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, size_t nbytes)
 /* Decompress and return a chunk that is part of a super-chunk. */
 int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
                                    void *dest, size_t nbytes) {
-
-  blosc2_context* cctx = schunk->cctx;
-  blosc2_context* dctx = schunk->dctx;
-  if (cctx->use_dict && dctx->dict_ddict == NULL) {
-    // Create the dictionary for decompression
-    // Right now we can only have an schunk if we created it in-memory.
-    // TODO: revisit this when schunks can be loaded from disk.
-    dctx->dict_ddict = ZSTD_createDDict(cctx->dict_buffer, cctx->dict_size);
-    dctx->use_dict = 1;
-  }
 
   uint8_t* src;
   int chunksize;

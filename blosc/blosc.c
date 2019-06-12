@@ -595,6 +595,36 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
   uint8_t* filters = context->filters;
   uint8_t* filters_meta = context->filters_meta;
 
+  /* Prefilter function */
+  if (context->prefilter != NULL) {
+    // Create new prefilter parameters for this block
+    blosc2_prefilter_params pparams;
+    pparams.out = _dest;
+    pparams.out_size = (size_t)bsize;
+    pparams.out_typesize = typesize;
+    pparams.ninputs = context->pparams->ninputs;
+    pparams.user_data = context->pparams->user_data;
+    int ninputs = context->pparams->ninputs;
+    for (int i = 0; i < ninputs; i++) {
+      pparams.input_typesizes[i] = context->pparams->input_typesizes[i];
+      int32_t offset_i = (offset / typesize) * pparams.input_typesizes[i];
+      pparams.inputs[i] = context->pparams->inputs[i] + offset_i;
+    }
+    if (context->prefilter(&pparams) != 0) {
+      fprintf(stderr, "Execution of prefilter function failed\n");
+      return NULL;
+    };
+
+    if (context->clevel == 0) {
+      // No more filters are required
+      return _dest;
+    }
+    // Cycle buffers
+    _src = _dest;
+    _dest = _tmp;
+    _tmp = _src;
+  }
+
   /* Process the filter pipeline */
   for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
     switch (filters[i]) {
@@ -620,8 +650,7 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
         break;
       default:
         if (filters[i] != BLOSC_NOFILTER) {
-          fprintf(stderr, "Filter %d not handled during compression\n",
-                  filters[i]);
+          fprintf(stderr, "Filter %d not handled during compression\n", filters[i]);
           return NULL;
         }
     }
@@ -655,11 +684,21 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   uint8_t *_tmp = tmp, *_tmp2 = tmp2, *_tmp3 = thread_context->tmp4;
   int last_filter_index = last_filter(context->filters, 'c');
 
-  if (last_filter_index >= 0) {
-    /* Apply filter pipleline */
+  if (last_filter_index >= 0 || context->prefilter != NULL) {
+    /* Apply the filter pipeline just for the prefilter */
+    if (context->clevel == 0 && context->prefilter != NULL) {
+      // We have finished, as we only need the prefilter output
+      _src = pipeline_c(context, bsize, src, offset, dest, _tmp2, _tmp3);
+      if (_src == NULL) {
+        return -9;  // signals a problem with the filter pipeline
+      }
+      return bsize;
+    }
+    /* Apply regular filter pipeline */
     _src = pipeline_c(context, bsize, src, offset, _tmp, _tmp2, _tmp3);
-    if (_src == NULL)
+    if (_src == NULL) {
       return -9;  // signals a problem with the filter pipeline
+    }
   } else {
     _src = src + offset;
   }
@@ -996,7 +1035,7 @@ static int serial_blosc(struct thread_context* thread_context) {
   int memcpyed = *(context->header_flags) & BLOSC_MEMCPYED;
 
   for (j = 0; j < context->nblocks; j++) {
-    if (context->do_compress && !memcpyed && !dict_training) {
+    if (context->do_compress && !memcpyed && !dict_training && context->clevel != 0) {
       _sw32(bstarts + j, ntbytes);
     }
     bsize = context->blocksize;
@@ -1339,13 +1378,14 @@ static int initialize_context_decompression(
     context->bstarts = (int32_t*)(context->src + BLOSC_EXTENDED_HEADER_LENGTH);
     if (*blosc2_flags & BLOSC2_USEDICT) {
       context->use_dict = 1;
-      if (context->dict_ddict == NULL) {
-        // The trained dictionary is after the bstarts block
-        context->dict_size = (size_t)sw32_(context->bstarts + context->nblocks);
-        context->dict_buffer = (void*)(context->bstarts + context->nblocks + 1);
-        context->dict_ddict = ZSTD_createDDict(context->dict_buffer,
-                                               context->dict_size);
+      if (context->dict_ddict != NULL) {
+          // Free the existing dictionary (probably from another chunk)
+          ZSTD_freeDDict(context->dict_ddict);
       }
+      // The trained dictionary is after the bstarts block
+      context->dict_size = (size_t)sw32_(context->bstarts + context->nblocks);
+      context->dict_buffer = (void*)(context->bstarts + context->nblocks + 1);
+      context->dict_ddict = ZSTD_createDDict(context->dict_buffer, context->dict_size);
     }
   } else {
     /* Regular (Blosc1) header */
@@ -1445,7 +1485,7 @@ static int write_compression_header(blosc2_context* context,
       filters[i] = context->filters[i];
       filters_meta[i] = context->filters_meta[i];
     }
-    if (dict_training) {
+    if (dict_training || context->clevel == 0) {
       context->bstarts = NULL;
       context->output_bytes = BLOSC_EXTENDED_HEADER_LENGTH;
     } else {
@@ -1465,14 +1505,16 @@ static int write_compression_header(blosc2_context* context,
                             sizeof(int32_t) * context->nblocks;
   }
 
-  if (context->clevel == 0) {
-    /* Compression level 0 means buffer to be memcpy'ed */
-    *(context->header_flags) |= BLOSC_MEMCPYED;
-  }
+  if (context->prefilter == NULL) {
+    if (context->clevel == 0) {
+      /* Compression level 0 means buffer to be memcpy'ed */
+      *(context->header_flags) |= BLOSC_MEMCPYED;
+    }
 
-  if (context->sourcesize < BLOSC_MIN_BUFFERSIZE) {
-    /* Buffer is too small.  Try memcpy'ing. */
-    *(context->header_flags) |= BLOSC_MEMCPYED;
+    if (context->sourcesize < BLOSC_MIN_BUFFERSIZE) {
+      /* Buffer is too small.  Try memcpy'ing. */
+      *(context->header_flags) |= BLOSC_MEMCPYED;
+    }
   }
 
   if (context->filter_flags & BLOSC_DOSHUFFLE) {
@@ -1533,6 +1575,9 @@ int blosc_compress_context(blosc2_context* context) {
       }
     }
     else {
+      if (context->src == NULL) {
+        return -10;  // cannot compress the output from prefilter (context->src == NULL)
+      }
       fastcopy(context->dest + BLOSC_MAX_OVERHEAD, context->src, (unsigned int)context->sourcesize);
       ntbytes = (int)context->sourcesize + BLOSC_MAX_OVERHEAD;
     }
@@ -1540,11 +1585,16 @@ int blosc_compress_context(blosc2_context* context) {
 
   /* Set the number of compressed bytes in header */
   _sw32(context->dest + 12, ntbytes);
+
+  // If the size is equal to destsize, that means that a regular copy has been done (e.g. prefilter)
+  // TODO: context->clevel == 0 should be better?
+  if (context->clevel == 0) {
+    *(context->header_flags) |= BLOSC_MEMCPYED;
+  }
   /* Set the number of bytes in dest buffer (might be useful for btune) */
   context->destsize = ntbytes;
 
   assert(ntbytes <= context->destsize);
-
 
   if (context->btune != NULL) {
     blosc_set_timestamp(&current);
@@ -1641,14 +1691,18 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     /* Write the trained dict afterwards */
     context->dict_buffer = context->dest + context->output_bytes;
     fastcopy(context->dict_buffer, dict_buffer, (unsigned int)dict_actual_size);
-    context->dict_cdict = ZSTD_createCDict(dict_buffer, dict_actual_size,
-                                           1);  // TODO: use get_accel()
+    context->dict_cdict = ZSTD_createCDict(dict_buffer, dict_actual_size, 1);  // TODO: use get_accel()
     free(dict_buffer);      // the dictionary is copied in the header now
     context->output_bytes += (int32_t)dict_actual_size;
     context->dict_size = dict_actual_size;
 
     /* Compress with dict */
     result = blosc_compress_context(context);
+
+    // Invalidate the dictionary for compressing other chunks using the same context
+    context->dict_buffer = NULL;
+    ZSTD_freeCDict(context->dict_cdict);
+    context->dict_cdict = NULL;
   }
 
   return result;
@@ -2169,6 +2223,10 @@ static void* t_blosc(void* ctxt) {
         }
         else {
           /* Regular compression */
+          if (context->clevel == 0) {
+            // We can copy straight to destination, as we know where we can write
+            tmp2 = dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize;
+          }
           cbytes = blosc_c(thcontext, bsize, leftoverblock, 0,
                            ebsize, src, nblock_ * blocksize, tmp2, tmp, tmp3);
         }
@@ -2208,7 +2266,7 @@ static void* t_blosc(void* ctxt) {
         // Note: do not use a typical local dict_training variable here
         // because it is probably cached from previous calls if the number of
         // threads does not change (the usual thing).
-        if (!(context->use_dict && (context->dict_cdict == NULL))) {
+        if (!(context->use_dict && context->dict_cdict == NULL) && context->clevel != 0) {
           _sw32(bstarts + nblock_, (int32_t) ntdest);
         }
 
@@ -2224,7 +2282,10 @@ static void* t_blosc(void* ctxt) {
         /* End of critical section */
 
         /* Copy the compressed buffer to destination */
-        fastcopy(dest + ntdest, tmp2, (unsigned int)cbytes);
+        if (context->clevel != 0) {
+          // We can avoid the copy when clevel == 0 (already copied)
+          fastcopy(dest + ntdest, tmp2, (unsigned int) cbytes);
+        }
       }
       else {
         nblock_++;
@@ -2235,8 +2296,7 @@ static void* t_blosc(void* ctxt) {
     } /* closes while (nblock_) */
 
     /* Sum up all the bytes decompressed */
-    if ((!compress || (flags & BLOSC_MEMCPYED)) &&
-        (context->thread_giveup_code > 0)) {
+    if ((!compress || (flags & BLOSC_MEMCPYED)) && (context->thread_giveup_code > 0)) {
       /* Update global counter for all threads (decompression only) */
       pthread_mutex_lock(&context->count_mutex);
       context->output_bytes += ntbytes;
@@ -2649,6 +2709,12 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   context->threads_started = 0;
   context->schunk = cparams.schunk;
 
+  if (cparams.prefilter != NULL) {
+    context->prefilter = cparams.prefilter;
+    context->pparams = (blosc2_prefilter_params*)malloc(sizeof(blosc2_prefilter_params));
+    memcpy(context->pparams, cparams.pparams, sizeof(blosc2_prefilter_params));
+  }
+
   return context;
 }
 
@@ -2682,6 +2748,9 @@ void blosc2_free_ctx(blosc2_context* context) {
   }
   if (context->btune != NULL) {
     btune_free(context);
+  }
+  if (context->prefilter != NULL) {
+    my_free(context->pparams);
   }
 
   my_free(context);

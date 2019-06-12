@@ -12,7 +12,7 @@
 #include "test_common.h"
 
 #define CHUNKSIZE (200 * 1000)
-#define NCHUNKS 100
+#define NCHUNKS 20
 #define NTHREADS 4
 
 /* Global vars */
@@ -109,23 +109,23 @@ static char* test_dict() {
     switch (blocksize) {
       case 1 * KB:
         mu_assert("ERROR: Dict does not reach expected compression ratio",
-                  15 * cbytes < nbytes);
+                  10 * cbytes < nbytes);
         break;
       case 4 * KB:
         mu_assert("ERROR: Dict does not reach expected compression ratio",
-                  40 * cbytes < nbytes);
+                  20 * cbytes < nbytes);
         break;
       case 32 * KB:
         mu_assert("ERROR: Dict does not reach expected compression ratio",
-                  70 * cbytes < nbytes);
+                  150 * cbytes < nbytes);
         break;
       case 256 * KB:
         mu_assert("ERROR: Dict does not reach expected compression ratio",
-                  210 * cbytes < nbytes);
+                  300 * cbytes < nbytes);
         break;
       default:
         mu_assert("ERROR: Dict does not reach expected compression ratio",
-                  120 * cbytes < nbytes);
+                  300 * cbytes < nbytes);
     }
   }
 

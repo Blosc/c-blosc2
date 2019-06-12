@@ -558,6 +558,33 @@ BLOSC_EXPORT char* blosc_cbuffer_complib(const void* cbuffer);
 
 typedef struct blosc2_context_s blosc2_context;   /* opaque type */
 
+#define BLOSC2_PREFILTER_INPUTS_MAX (128)
+
+/**
+ * @brief The parameters for a prefilter function.
+ *
+ * There can be many inputs and a single output.
+ * The number of elements of each input and the output should be the same.
+ * Strictly, the user only needs to fill the `ninputs` , `inputs` and `input_typesizes`.
+ * The other fields will be filled by the library itself.
+ */
+typedef struct {
+  int ninputs;  // number of data inputs
+  uint8_t* inputs[BLOSC2_PREFILTER_INPUTS_MAX];  // the data inputs
+  int32_t input_typesizes[BLOSC2_PREFILTER_INPUTS_MAX];  // the typesizes for data inputs
+  void *user_data;  // user-provided info (optional)
+  uint8_t *out;  // automatically filled
+  size_t out_size;  // automatically filled
+  int32_t out_typesize;  // automatically filled
+} blosc2_prefilter_params;
+
+/**
+ * @brief The type of the prefilter function.
+ *
+ * If the function call is successful, the return value should be 0; else, a negative value.
+ */
+typedef int (*blosc2_prefilter_fn)(blosc2_prefilter_params* params);
+
 /**
  * @brief The parameters for creating a context for compression purposes.
  *
@@ -583,6 +610,10 @@ typedef struct {
   //!< The (sequence of) filters.
   uint8_t filters_meta[BLOSC_MAX_FILTERS];
   //!< The metadata for filters.
+  blosc2_prefilter_fn prefilter;
+  //!< The prefilter function.
+  blosc2_prefilter_params *pparams;
+  //!< The prefilter parameters.
 } blosc2_cparams;
 
 /**
@@ -590,7 +621,8 @@ typedef struct {
  */
 static const blosc2_cparams BLOSC_CPARAMS_DEFAULTS = {
         BLOSC_BLOSCLZ, 5, 0, 8, 1, 0, NULL,
-        {0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0} };
+        {0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0},
+        NULL, NULL };
 
 /**
   @brief The parameters for creating a context for decompression purposes.
@@ -650,9 +682,11 @@ BLOSC_EXPORT void blosc2_free_ctx(blosc2_context* context);
  * @param dest The buffer where the compressed data will be put.
  * @param destsize The size in bytes of the @p dest buffer.
  *
- * @return The number of bytes compressed. A negative return value means
- * that an internal error happened. It could happen that context is
- * not meant for compression (which is stated in stderr).
+ * @return The number of bytes compressed.
+ * If @p src buffer cannot be compressed into @p destsize, the return
+ * value is zero and you should discard the contents of the @p dest
+ * buffer.  A negative return value means that an internal error happened.
+ * It could happen that context is not meant for compression (which is stated in stderr).
  * Otherwise, please report it back together with the buffer data causing this
  * and compression settings.
  */
@@ -799,6 +833,18 @@ blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams, blosc2_frame *
  * @return 0 if succeeds.
  */
 BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *schunk);
+
+/**
+ * @brief Append an existing @p chunk o a super-chunk.
+ *
+ * @param schunk The super-chunk where the chunk will be appended.
+ * @param chunk The @p chunk to append.  An internal copy is made, so @p chunk can be reused or
+ * freed if desired.
+ *
+ * @return The number of chunks in super-chunk. If some problem is
+ * detected, this number will be negative.
+ */
+BLOSC_EXPORT int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk);
 
 /**
  * @brief Append a @p src data buffer to a super-chunk.
