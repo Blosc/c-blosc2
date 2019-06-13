@@ -2711,7 +2711,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
 
   if (cparams.prefilter != NULL) {
     context->prefilter = cparams.prefilter;
-    context->pparams = (blosc2_prefilter_params*)malloc(sizeof(blosc2_prefilter_params));
+    context->pparams = (blosc2_prefilter_params*)my_malloc(sizeof(blosc2_prefilter_params));
     memcpy(context->pparams, cparams.pparams, sizeof(blosc2_prefilter_params));
   }
 
