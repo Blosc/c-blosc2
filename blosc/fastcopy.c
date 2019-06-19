@@ -176,7 +176,8 @@ static inline unsigned char *copy_bytes(unsigned char *out, const unsigned char 
 }
 
 // Define a symbol for avoiding fall-through warnings emitted by gcc >= 7.0
-#if ((defined(__GNUC__) && BLOSC_GCC_VERSION >= 700) && !defined(__clang__))
+#if ((defined(__GNUC__) && BLOSC_GCC_VERSION >= 700) && !defined(__clang__) && \
+     !defined(__ICC) && !defined(__ICL))
 #define AVOID_FALLTHROUGH_WARNING
 #endif
 

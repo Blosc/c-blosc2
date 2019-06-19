@@ -14,12 +14,11 @@
   #include "win32/pthread.h"
 #else
   #include <pthread.h>
-  #include <unistd.h>    // _POSIX_BARRIERS should be defined there
 #endif
 
 /* Have problems using posix barriers when symbol value is 200112L */
 /* This requires more investigation, but will work for the moment */
-#if defined(_POSIX_BARRIERS) && ((_POSIX_BARRIERS - 20012L) >= 0 && _POSIX_BARRIERS != 200112L)
+#if defined(_POSIX_BARRIERS) && (_POSIX_BARRIERS >= 200112L)
 #define BLOSC_POSIX_BARRIERS
 #endif
 
