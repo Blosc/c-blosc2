@@ -158,6 +158,10 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
         fastcopy(chunk_copy, chunk, cbytes);
         chunk = chunk_copy;
     }
+    else if (cbytes < nbytes) {
+      // We still want to do a shrink of the chunk
+      chunk = realloc(chunk, cbytes);
+    }
 
     /* Make space for appending the copy of the chunk and do it */
     schunk->data = realloc(schunk->data, (nchunks + 1) * sizeof(void *));
