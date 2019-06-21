@@ -527,9 +527,54 @@ unsigned char* safecopy(unsigned char *out, const unsigned char *from, unsigned 
 #else
   unsigned sz = sizeof(uint64_t);
 #endif
+  if (len == 0) {
+    return out;
+  }
   if (out - sz < from) {
-    for (; len; --len) {
-      *out++ = *from++;
+    int overlap = out - from;
+    if ((overlap > 1) && (len % overlap == 0)) {
+      switch (overlap) {
+        case 2:
+          for (; len; len -= 2) {
+            out = copy_2_bytes(out, from);
+          }
+          break;
+        case 4:
+          for (; len; len -= 4) {
+            out = copy_4_bytes(out, from);
+          }
+          break;
+        case 8:
+          for (; len; len -= 8) {
+            out = copy_8_bytes(out, from);
+          }
+          break;
+#if defined(__AVX2__)
+        case 32:
+          for (; len; len -= 32) {
+            out = copy_32_bytes(out, from);
+          }
+          break;
+#endif
+#if defined(__SSE2__)
+        case 16:
+          for (; len; len -= 16) {
+            out = copy_16_bytes(out, from);
+          }
+          break;
+#endif
+        default:
+          //printf("len0: %d, %ld, %d | ", len, out - from, sz);
+          for (; len; --len) {
+            *out++ = *from++;
+          }
+      }
+    }
+    else {
+      //printf("len1: %d, %ld, %d | ", len, out - from, sz);
+      for (; len; --len) {
+        *out++ = *from++;
+      }
     }
     return out;
   }
