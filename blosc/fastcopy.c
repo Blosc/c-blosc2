@@ -531,47 +531,52 @@ unsigned char* safecopy(unsigned char *out, const unsigned char *from, unsigned 
     return out;
   }
   if (out - sz < from) {
+    unsigned char* out2 = out;
     int overlap = out - from;
-    if ((overlap > 1) && (len % overlap == 0)) {
+    if ((overlap > 1) && (len > overlap)) {
       switch (overlap) {
         case 2:
-          for (; len; len -= 2) {
-            out = copy_2_bytes(out, from);
+          for (; len > 2; len -= 2) {
+            out2 = copy_2_bytes(out2, from);
           }
           break;
         case 4:
-          for (; len; len -= 4) {
-            out = copy_4_bytes(out, from);
+          for (; len > 4; len -= 4) {
+            out2 = copy_4_bytes(out2, from);
           }
           break;
         case 8:
-          for (; len; len -= 8) {
-            out = copy_8_bytes(out, from);
+          for (; len > 8; len -= 8) {
+            out2 = copy_8_bytes(out2, from);
           }
           break;
 #if defined(__AVX2__)
         case 32:
-          for (; len; len -= 32) {
-            out = copy_32_bytes(out, from);
+          for (; len > 32; len -= 32) {
+            out2 = copy_32_bytes(out2, from);
           }
           break;
 #endif
 #if defined(__SSE2__)
         case 16:
-          for (; len; len -= 16) {
-            out = copy_16_bytes(out, from);
+          for (; len > 16; len -= 16) {
+            out2 = copy_16_bytes(out2, from);
           }
           break;
 #endif
         default:
-          //printf("len0: %d, %ld, %d | ", len, out - from, sz);
           for (; len; --len) {
-            *out++ = *from++;
+            *out2++ = *from++;
           }
+      }
+      // Leftovers come ...
+      from += (out2 - out);
+      out = out2;
+      for (; len; --len) {
+        *out++ = *from++;
       }
     }
     else {
-      //printf("len1: %d, %ld, %d | ", len, out - from, sz);
       for (; len; --len) {
         *out++ = *from++;
       }
