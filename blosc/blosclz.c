@@ -54,12 +54,13 @@
   #define BLOSCLZ_READU16(p) *((const uint16_t*)(p))
 #endif
 
+#define HASH_LOG (15)
 
 /* Simple, but pretty effective hash function for 3-byte sequence */
-#define HASH_FUNCTION(v, p, l) {                     \
-  v = BLOSCLZ_READU16(p);                            \
-  v ^= BLOSCLZ_READU16(p + 1) ^ ( v >> (16 - l));    \
-  v &= (1 << l) - 1;                                 \
+#define HASH_FUNCTION(v, p) {                               \
+  v = BLOSCLZ_READU16(p);                                   \
+  v ^= BLOSCLZ_READU16(p + 1) ^ ( v >> (16 - HASH_LOG));    \
+  v &= (1 << HASH_LOG) - 1;                                 \
 }
 
 #define LITERAL(ip, op, op_limit, anchor, copy) {        \
@@ -242,17 +243,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   uint8_t* ip_limit = ip + length - 12;
   uint8_t* op = (uint8_t*)output;
 
-  /* Hash table depends on the opt level.  Hash_log cannot be larger than 15. */
-  /* The parametrization below is made from playing with the bench suite, like:
-     $ bench/bench blosclz single 4
-     $ bench/bench blosclz single 4 4194280 12 25
-     and taking the minimum times on a i5-3380M @ 2.90GHz.
-     Curiously enough, values >= 14 does not always
-     get maximum compression, even with large blocksizes. */
-  int8_t hash_log_[10] = {-1, 15, 15, 15, 15, 15, 15, 15, 15, 15};
-  int8_t hash_log = hash_log_[opt_level];
-  uint16_t hash_size = (uint16_t)(1 << hash_log);
-  uint16_t* htab;
+  uint16_t htab[(uint16_t)1 << (uint16_t)HASH_LOG] = {0};
   uint8_t* op_limit;
 
   int32_t hval;
@@ -269,8 +260,6 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   if (BLOSCLZ_UNEXPECT_CONDITIONAL(maxout < 66 || length < 4)) {
     return 0;
   }
-
-  htab = (uint16_t*)calloc(hash_size, sizeof(uint16_t));
 
   /* we start with literal copy */
   copy = 2;
@@ -294,7 +283,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     }
 
     /* find potential match */
-    HASH_FUNCTION(hval, ip, hash_log);
+    HASH_FUNCTION(hval, ip);
     ref = ibase + htab[hval];
 
     /* calculate distance to the match */
@@ -400,9 +389,9 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     }
 
     /* update the hash at match boundary */
-    HASH_FUNCTION(hval, ip, hash_log);
+    HASH_FUNCTION(hval, ip);
     htab[hval] = (uint16_t)(ip++ - ibase);
-    HASH_FUNCTION(hval, ip, hash_log);
+    HASH_FUNCTION(hval, ip);
     htab[hval] = (uint16_t)(ip++ - ibase);
 
     /* assuming literal copy */
@@ -430,11 +419,9 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   /* marker for blosclz */
   *(uint8_t*)output |= (1 << 5);
 
-  free(htab);
   return (int)(op - (uint8_t*)output);
 
   out:
-  free(htab);
   return 0;
 
 }
