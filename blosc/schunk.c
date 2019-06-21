@@ -15,7 +15,6 @@
 #include "blosc.h"
 #include "blosc-private.h"
 #include "context.h"
-#include "fastcopy.h"
 
 #include "zstd.h"
 #include "zstd_errors.h"
@@ -155,7 +154,7 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
     if (copy) {
         // Make a copy of the chunk
         uint8_t *chunk_copy = malloc(cbytes);
-        fastcopy(chunk_copy, chunk, cbytes);
+        memcpy(chunk_copy, chunk, cbytes);
         chunk = chunk_copy;
     }
     else if (cbytes < nbytes) {
@@ -189,10 +188,9 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, size_t nbytes)
     return cbytes;
   }
 
-  // Append the chunk with a copy for getting rid of the unnecessary space (nbytes - cbytes)
-  int nchunks = blosc2_schunk_append_chunk(schunk, chunk, true);
+  // We don't need a copy of the chunk, as it will be shrinked if necessary
+  int nchunks = blosc2_schunk_append_chunk(schunk, chunk, false);
 
-  free(chunk);  // the chunk has been copied, so we don't need it anymore
   return nchunks;
 }
 
