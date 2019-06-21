@@ -164,10 +164,14 @@ if (COMPILER_SUPPORT_SSE2)
     if (MSVC)
         # MSVC targets SSE2 by default on 64-bit configurations, but not 32-bit configurations.
         if (${CMAKE_SIZEOF_VOID_P} EQUAL 4)
-            set_source_files_properties(shuffle-sse2.c bitshuffle-sse2.c PROPERTIES COMPILE_FLAGS "/arch:SSE2")
+            set_source_files_properties(
+                    shuffle-sse2.c bitshuffle-sse2.c blosclz.c fastcopy.c
+                    PROPERTIES COMPILE_FLAGS "/arch:SSE2")
         endif (${CMAKE_SIZEOF_VOID_P} EQUAL 4)
     else (MSVC)
-        set_source_files_properties(shuffle-sse2.c bitshuffle-sse2.c PROPERTIES COMPILE_FLAGS -msse2)
+        set_source_files_properties(
+                shuffle-sse2.c bitshuffle-sse2.c blosclz.c fastcopy.c
+                PROPERTIES COMPILE_FLAGS -msse2)
     endif (MSVC)
 
     # Define a symbol for the shuffle-dispatch implementation
@@ -179,9 +183,13 @@ if (COMPILER_SUPPORT_SSE2)
 endif (COMPILER_SUPPORT_SSE2)
 if (COMPILER_SUPPORT_AVX2)
     if (MSVC)
-        set_source_files_properties(shuffle-avx2.c bitshuffle-avx2.c PROPERTIES COMPILE_FLAGS "/arch:AVX2")
+        set_source_files_properties(
+                shuffle-avx2.c bitshuffle-avx2.c blosclz.c fastcopy.c
+                PROPERTIES COMPILE_FLAGS "/arch:AVX2")
     else (MSVC)
-        set_source_files_properties(shuffle-avx2.c bitshuffle-avx2.c PROPERTIES COMPILE_FLAGS -mavx2)
+        set_source_files_properties(
+                shuffle-avx2.c bitshuffle-avx2.c blosclz.c fastcopy.c
+                PROPERTIES COMPILE_FLAGS -mavx2)
     endif (MSVC)
 
     # Define a symbol for the shuffle-dispatch implementation
