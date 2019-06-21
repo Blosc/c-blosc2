@@ -79,7 +79,6 @@
 #define IP_BOUNDARY 2
 
 
-#if !(defined(__SSE2__) || defined(__AVX2__))
 static inline uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
   int64_t value, value2;
@@ -106,7 +105,6 @@ static inline uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8
   while ((ip < ip_bound) && (*ref++ == x)) ip++;
   return ip;
 }
-#endif
 
 #ifdef __SSE2__
 static inline uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
@@ -300,11 +298,13 @@ int blosclz_compress(const int opt_level, const void* input, int length,
       LITERAL(ip, op, op_limit, anchor, copy);
     }
 
-    /* far, needs at least 5-byte match */
-    if (opt_level >= 5 && distance >= MAX_DISTANCE) {
-      if (*ip++ != *ref++ || *ip++ != *ref++) LITERAL(ip, op, op_limit, anchor, copy);
-      len += 2;
-    }
+    // During my experiments, this looks like it hurts compression ratio quite a bit in some cases (bitshuffle)
+    // Commenting this out until more serious experiments would be done
+    // /* far, needs at least 5-byte match */
+    // if (opt_level >= 5 && distance >= MAX_DISTANCE) {
+    //   if (*ip++ != *ref++ || *ip++ != *ref++) LITERAL(ip, op, op_limit, anchor, copy);
+    //   len += 2;
+    // }
 
     match:
 
