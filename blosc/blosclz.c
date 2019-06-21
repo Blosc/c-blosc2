@@ -337,10 +337,10 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     }
     else {
 #if defined(__AVX2__)
-      /* Experiments show that the SSE2 version is a bit faster, even on AVX2 processors */
-      ip = get_match_16(ip, ip_bound + IP_BOUNDARY, ref);
+      /* Experiments show that the scalar version is a bit faster, even on SSE2/AVX2 processors */
+      ip = get_match(ip, ip_bound + IP_BOUNDARY, ref);
 #elif defined(__SSE2__)
-      ip = get_match_16(ip, ip_bound + IP_BOUNDARY, ref);
+      ip = get_match(ip, ip_bound + IP_BOUNDARY, ref);
 #else
       ip = get_match(ip, ip_bound + IP_BOUNDARY, ref);
 #endif
