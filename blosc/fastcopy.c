@@ -527,63 +527,52 @@ unsigned char* safecopy(unsigned char *out, const unsigned char *from, unsigned 
 #else
   unsigned sz = sizeof(uint64_t);
 #endif
-  if (len == 0) {
-    return out;
-  }
-  if (out - sz < from) {
-    unsigned char* out2 = out;
-    int overlap = out - from;
-    if ((overlap > 1) && (len > overlap)) {
-      switch (overlap) {
-        case 2:
-          for (; len > 2; len -= 2) {
-            out2 = copy_2_bytes(out2, from);
-          }
-          break;
-        case 4:
-          for (; len > 4; len -= 4) {
-            out2 = copy_4_bytes(out2, from);
-          }
-          break;
-        case 8:
-          for (; len > 8; len -= 8) {
-            out2 = copy_8_bytes(out2, from);
-          }
-          break;
-#if defined(__AVX2__)
-        case 32:
-          for (; len > 32; len -= 32) {
-            out2 = copy_32_bytes(out2, from);
-          }
-          break;
-#endif
-#if defined(__SSE2__)
-        case 16:
-          for (; len > 16; len -= 16) {
-            out2 = copy_16_bytes(out2, from);
-          }
-          break;
-#endif
-        default:
-          for (; len; --len) {
-            *out2++ = *from++;
-          }
-      }
-      // Leftovers come ...
-      from += (out2 - out);
-      out = out2;
-      for (; len; --len) {
-        *out++ = *from++;
-      }
-    }
-    else {
-      for (; len; --len) {
-        *out++ = *from++;
-      }
-    }
-    return out;
-  }
-  else {
+
+  // If out and from are away more than the size of the copy, then a fastcopy is safe
+  if (out - from >= sz) {
     return fastcopy(out, from, len);
   }
+
+  // Otherwise we absolutely need a safecopy
+  unsigned overlap_dist = out - from;
+  switch (overlap_dist) {
+    case 2:
+      for (; len >= 2; len -= 2) {
+        out = copy_2_bytes(out, from);
+      }
+      break;
+    case 4:
+      for (; len > 4; len -= 4) {
+        out = copy_4_bytes(out, from);
+      }
+      break;
+    case 8:
+      for (; len > 8; len -= 8) {
+        out = copy_8_bytes(out, from);
+      }
+      break;
+#if defined(__SSE2__)
+    case 16:
+      for (; len > 16; len -= 16) {
+        out = copy_16_bytes(out, from);
+      }
+      break;
+#endif
+#if defined(__AVX2__)
+    case 32:
+      for (; len > 32; len -= 32) {
+        out = copy_32_bytes(out, from);
+      }
+      break;
+#endif
+    default:
+      for (; len >= overlap_dist; len -= overlap_dist) {
+        out = fastcopy(out, from, overlap_dist);
+      }
+  }
+
+  // Copy the leftovers (a fastcopy is safe here)
+  out = fastcopy(out, from, len);
+
+  return out;
 }

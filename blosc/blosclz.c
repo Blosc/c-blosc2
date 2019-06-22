@@ -485,16 +485,8 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         /* copy from reference */
         ref--;
         len += 3;
-        if ((op < ref) || ((op > ref) && len <= (op - ref))) {
-          memcpy(op, ref, len);
-          op += len;
-        }
-        else {
-          // Oops, there is an overlap, but for some reason, memmove cannot handle this
-          //memmove(op, ref, (unsigned) len);
-          //op += len;
-          op = safecopy(op, ref, (unsigned) len);
-        }
+        // We absolutely need a safecopy here
+        op = safecopy(op, ref, (unsigned) len);
       }
     }
     else {
