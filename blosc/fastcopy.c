@@ -518,8 +518,8 @@ unsigned char *fastcopy(unsigned char *out, const unsigned char *from, unsigned 
 }
 
 
-/* Same as fastcopy() but without overwriting origin or destination when they overlap */
-unsigned char* safecopy(unsigned char *out, const unsigned char *from, unsigned len) {
+/* Copy a run */
+unsigned char* copyrun(unsigned char *out, const unsigned char *from, unsigned len) {
 #if defined(__AVX2__)
   unsigned sz = sizeof(__m256i);
 #elif defined(__SSE2__)
@@ -534,7 +534,7 @@ unsigned char* safecopy(unsigned char *out, const unsigned char *from, unsigned 
     return fastcopy(out, from, len);
   }
 
-  // Otherwise we absolutely need a safecopy
+  // Otherwise we need to be more careful so as not to overwrite destination
   switch (overlap_dist) {
     case 2:
       for (; len >= 2; len -= 2) {

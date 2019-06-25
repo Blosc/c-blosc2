@@ -14,6 +14,6 @@
 unsigned char *fastcopy(unsigned char *out, const unsigned char *from, unsigned len);
 
 /* Same as fastcopy() but without overwriting origin or destination when they overlap */
-unsigned char* safecopy(unsigned char *out, const unsigned char *from, unsigned len);
+unsigned char* copyrun(unsigned char *out, const unsigned char *from, unsigned len);
 
 #endif //BLOSC_FASTCOPY_H
