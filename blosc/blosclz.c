@@ -57,10 +57,10 @@
 #define HASH_LOG (15)
 
 /* Simple, but pretty effective hash function for 3-byte sequence */
-#define HASH_FUNCTION(v, p) {                               \
-  v = BLOSCLZ_READU16(p);                                   \
-  v ^= BLOSCLZ_READU16(p + 1) ^ ( v >> (16 - HASH_LOG));    \
-  v &= (1 << HASH_LOG) - 1;                                 \
+#define HASH_FUNCTION(v, p, h) {                         \
+  v = BLOSCLZ_READU16(p);                                \
+  v ^= BLOSCLZ_READU16(p + 1) ^ ( v >> (16 - h));        \
+  v &= (1 << h) - 1;                                     \
 }
 
 #define LITERAL(ip, op, op_limit, anchor, copy) {        \
@@ -241,7 +241,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   uint8_t* ip_limit = ip + length - 12;
   uint8_t* op = (uint8_t*)output;
 
-  uint16_t htab[(uint16_t)1 << (uint16_t)HASH_LOG] = {0};
+  uint16_t htab[(uint16_t)1 << (uint16_t)HASH_LOG];
   uint8_t* op_limit;
 
   int32_t hval;
@@ -253,6 +253,10 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     maxlength = (int32_t)maxout;
   }
   op_limit = op + maxlength;
+  //uint16_t hashlog_[10] = {11, 13, 13, 13, 13, 14, 14, 14, 14, 15};
+  uint16_t hashlog_[10] = {12, 13, 14, 14, 14, 14, 14, 14, 14, 15};
+  uint16_t hashlog = hashlog_[opt_level];
+  memset(htab, 0, ((uint16_t)1U << hashlog) * 2);
 
   /* output buffer cannot be less than 66 bytes or we can get into trouble */
   if (BLOSCLZ_UNEXPECT_CONDITIONAL(maxout < 66 || length < 4)) {
@@ -281,7 +285,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     }
 
     /* find potential match */
-    HASH_FUNCTION(hval, ip);
+    HASH_FUNCTION(hval, ip, hashlog);
     ref = ibase + htab[hval];
 
     /* calculate distance to the match */
@@ -389,9 +393,9 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     }
 
     /* update the hash at match boundary */
-    HASH_FUNCTION(hval, ip);
+    HASH_FUNCTION(hval, ip, hashlog);
     htab[hval] = (uint16_t)(ip++ - ibase);
-    HASH_FUNCTION(hval, ip);
+    HASH_FUNCTION(hval, ip, hashlog);
     htab[hval] = (uint16_t)(ip++ - ibase);
 
     /* assuming literal copy */
