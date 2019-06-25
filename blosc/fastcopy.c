@@ -529,12 +529,12 @@ unsigned char* safecopy(unsigned char *out, const unsigned char *from, unsigned 
 #endif
 
   // If out and from are away more than the size of the copy, then a fastcopy is safe
-  if (out - from >= sz) {
+  unsigned overlap_dist = out - from;
+  if (overlap_dist > sz) {
     return fastcopy(out, from, len);
   }
 
   // Otherwise we absolutely need a safecopy
-  unsigned overlap_dist = out - from;
   switch (overlap_dist) {
     case 2:
       for (; len >= 2; len -= 2) {
@@ -542,32 +542,32 @@ unsigned char* safecopy(unsigned char *out, const unsigned char *from, unsigned 
       }
       break;
     case 4:
-      for (; len > 4; len -= 4) {
+      for (; len >= 4; len -= 4) {
         out = copy_4_bytes(out, from);
       }
       break;
     case 8:
-      for (; len > 8; len -= 8) {
+      for (; len >= 8; len -= 8) {
         out = copy_8_bytes(out, from);
       }
       break;
 #if defined(__SSE2__)
     case 16:
-      for (; len > 16; len -= 16) {
+      for (; len >= 16; len -= 16) {
         out = copy_16_bytes(out, from);
       }
       break;
 #endif
 #if defined(__AVX2__)
     case 32:
-      for (; len > 32; len -= 32) {
+      for (; len >= 32; len -= 32) {
         out = copy_32_bytes(out, from);
       }
       break;
 #endif
     default:
-      for (; len >= overlap_dist; len -= overlap_dist) {
-        out = fastcopy(out, from, overlap_dist);
+      for (; len > 0; len--) {
+        *out++ = *from++;
       }
   }
 
