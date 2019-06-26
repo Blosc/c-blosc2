@@ -253,8 +253,8 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     maxlength = (int32_t)maxout;
   }
   op_limit = op + maxlength;
-  //uint16_t hashlog_[10] = {11, 13, 13, 13, 13, 14, 14, 14, 14, 15};
-  uint16_t hashlog_[10] = {12, 13, 14, 14, 14, 14, 14, 14, 14, 14};
+  uint16_t hashlog_[10] = {-1, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
+                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};  // max HASH_LOG
   uint16_t hashlog = hashlog_[opt_level];
   memset(htab, 0, ((uint16_t)1U << hashlog) * 2);
 
