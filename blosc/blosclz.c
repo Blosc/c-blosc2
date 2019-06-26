@@ -54,7 +54,7 @@
   #define BLOSCLZ_READU16(p) *((const uint16_t*)(p))
 #endif
 
-#define HASH_LOG (15)
+#define HASH_LOG (14)
 
 /* Simple, but pretty effective hash function for 3-byte sequence */
 #define HASH_FUNCTION(v, p, h) {                         \
@@ -254,7 +254,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   }
   op_limit = op + maxlength;
   //uint16_t hashlog_[10] = {11, 13, 13, 13, 13, 14, 14, 14, 14, 15};
-  uint16_t hashlog_[10] = {12, 13, 14, 14, 14, 14, 14, 14, 14, 15};
+  uint16_t hashlog_[10] = {12, 13, 14, 14, 14, 14, 14, 14, 14, 14};
   uint16_t hashlog = hashlog_[opt_level];
   memset(htab, 0, ((uint16_t)1U << hashlog) * 2);
 
@@ -279,7 +279,6 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     /* check for a run */
     if (ip[0] == ip[-1] && BLOSCLZ_READU16(ip - 1) == BLOSCLZ_READU16(ip + 1)) {
       distance = 1;
-      ip += 3;
       ref = anchor - 1 + 3;
       goto match;
     }
@@ -301,14 +300,6 @@ int blosclz_compress(const int opt_level, const void* input, int length,
         *ref++ != *ip++ || *ref++ != *ip++ || *ref++ != *ip++) {
       LITERAL(ip, op, op_limit, anchor, copy);
     }
-
-    // During my experiments, this looks like it hurts compression ratio quite a bit in some cases (bitshuffle)
-    // Commenting this out until more serious experiments would be done
-    // /* far, needs at least 5-byte match */
-    // if (opt_level >= 5 && distance >= MAX_DISTANCE) {
-    //   if (*ip++ != *ref++ || *ip++ != *ref++) LITERAL(ip, op, op_limit, anchor, copy);
-    //   len += 2;
-    // }
 
     match:
 
