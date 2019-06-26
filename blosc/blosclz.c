@@ -166,7 +166,7 @@ static inline uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const ui
 uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
 #if !defined(BLOSC_STRICT_ALIGN)
   while (ip < (ip_bound - sizeof(int64_t))) {
-    if (((int64_t*)ref)[0] != ((int64_t*)ip)[0]) {
+    if (*(int64_t*)ref != *(int64_t*)ip) {
       /* Find the byte that starts to differ */
       while (*ref++ == *ip++) {}
       return ip;
@@ -291,8 +291,8 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     distance = (int32_t)(anchor - ref);
 
     /* update hash table if necessary */
-    /* not exactly sure why 0x1F works best, but experiments apparently say so */
-    if ((distance & 0x1F) == 0)
+    /* not exactly sure why masking the distance works best, but this is what the experiments say */
+    if ((distance & (MAX_COPY - 1)) == 0)
       htab[hval] = (uint16_t)(anchor - ibase);
 
     /* is this a match? check the first 3 bytes */
