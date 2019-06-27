@@ -20,6 +20,8 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
+
 #define BLOSCLZ_VERSION_STRING "1.1.0"
 
 
@@ -44,7 +46,7 @@ extern "C" {
 */
 
 int blosclz_compress(const int opt_level, const void* input, int length,
-                     void* output, int maxout);
+                     void* output, int maxout, bool shuffle);
 
 /**
   Decompress a block of compressed data and returns the size of the

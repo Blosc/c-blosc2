@@ -143,9 +143,9 @@ static char *all_tests() {
   mu_run_test(test_delta);
   typesize = 13;
   mu_run_test(test_delta);
-  typesize = 16;
+  typesize = 15;
   mu_run_test(test_delta);
-  typesize = 24;
+  typesize = 16;
   mu_run_test(test_delta);
 
   return 0;

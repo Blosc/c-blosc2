@@ -50,18 +50,27 @@
 
 #ifdef BLOSC_STRICT_ALIGN
   #define BLOSCLZ_READU16(p) ((p)[0] | (p)[1]<<8)
+  #define BLOSCLZ_READU32(p) ((p)[0] | (p)[1]<<8 | (p)[2]<<16 | (p)[3]<<24)
 #else
   #define BLOSCLZ_READU16(p) *((const uint16_t*)(p))
+  #define BLOSCLZ_READU32(p) *((const uint32_t*)(p))
 #endif
 
 #define HASH_LOG (14)
 
 /* Simple, but pretty effective hash function for 3-byte sequence */
+// This is the original hash function used in fastlz
+//#define HASH_FUNCTION(v, p, h) {                         \
+//  v = BLOSCLZ_READU16(p);                                \
+//  v ^= BLOSCLZ_READU16(p + 1) ^ ( v >> (16 - h));        \
+//  v &= (1 << h) - 1;                                     \
+//}
+
+// This is used in LZ4 and seems to work pretty well here too
 #define HASH_FUNCTION(v, p, h) {                         \
-  v = BLOSCLZ_READU16(p);                                \
-  v ^= BLOSCLZ_READU16(p + 1) ^ ( v >> (16 - h));        \
-  v &= (1 << h) - 1;                                     \
+  v = ((BLOSCLZ_READU32(p) * 2654435761U) >> (32 - h));  \
 }
+
 
 #define LITERAL(ip, op, op_limit, anchor, copy) {        \
   if (BLOSCLZ_UNEXPECT_CONDITIONAL(op + 2 > op_limit))   \
@@ -79,7 +88,7 @@
 #define IP_BOUNDARY 2
 
 
-static inline uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
   int64_t value, value2;
   /* Broadcast the value for every byte in a 64-bit register */
@@ -107,7 +116,7 @@ static inline uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8
 }
 
 #ifdef __SSE2__
-static inline uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+static uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
   __m128i value, value2, cmp;
 
@@ -135,7 +144,7 @@ static inline uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const ui
 
 
 #ifdef __AVX2__
-static inline uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
   __m256i value, value2, cmp;
 
@@ -163,7 +172,7 @@ static inline uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const ui
 
 
 /* Find the byte that starts to differ */
-uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+static uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
 #if !defined(BLOSC_STRICT_ALIGN)
   while (ip < (ip_bound - sizeof(int64_t))) {
     if (*(int64_t*)ref != *(int64_t*)ip) {
@@ -184,7 +193,7 @@ uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
 
 
 #if defined(__SSE2__)
-uint8_t *get_match_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+static uint8_t *get_match_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   __m128i value, value2, cmp;
 
   while (ip < (ip_bound - sizeof(__m128i))) {
@@ -209,7 +218,7 @@ uint8_t *get_match_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) 
 
 
 #if defined(__AVX2__)
-uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   __m256i value, value2, cmp;
 
   while (ip < (ip_bound - sizeof(__m256i))) {
@@ -234,16 +243,14 @@ uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) 
 
 
 int blosclz_compress(const int opt_level, const void* input, int length,
-                     void* output, int maxout) {
+                     void* output, int maxout, bool shuffle) {
   uint8_t* ip = (uint8_t*)input;
   uint8_t* ibase = (uint8_t*)input;
   uint8_t* ip_bound = ip + length - IP_BOUNDARY;
   uint8_t* ip_limit = ip + length - 12;
   uint8_t* op = (uint8_t*)output;
-
-  uint16_t htab[(uint16_t)1 << (uint16_t)HASH_LOG];
   uint8_t* op_limit;
-
+  uint32_t htab[1U << (uint8_t)HASH_LOG];
   int32_t hval;
   uint8_t copy;
 
@@ -253,10 +260,10 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     maxlength = (int32_t)maxout;
   }
   op_limit = op + maxlength;
-  uint16_t hashlog_[10] = {-1, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
+  uint8_t hashlog_[10] = {-1, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
                            HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};  // max HASH_LOG
-  uint16_t hashlog = hashlog_[opt_level];
-  memset(htab, 0, ((uint16_t)1U << hashlog) * 2);
+  uint8_t hashlog = hashlog_[opt_level];
+  memset(htab, 0, ((uint8_t)1U << hashlog) * sizeof(uint32_t));
 
   /* output buffer cannot be less than 66 bytes or we can get into trouble */
   if (BLOSCLZ_UNEXPECT_CONDITIONAL(maxout < 66 || length < 4)) {
@@ -274,7 +281,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     const uint8_t* ref;
     int32_t distance;
     int32_t len = 3;         /* minimum match length */
-    uint8_t* anchor = ip;  /* comparison starting-point */
+    uint8_t* anchor = ip;    /* comparison starting-point */
 
     /* check for a run */
     if (ip[0] == ip[-1] && BLOSCLZ_READU16(ip - 1) == BLOSCLZ_READU16(ip + 1)) {
@@ -292,8 +299,9 @@ int blosclz_compress(const int opt_level, const void* input, int length,
 
     /* update hash table if necessary */
     /* not exactly sure why masking the distance works best, but this is what the experiments say */
-    if ((distance & (MAX_COPY - 1)) == 0)
-      htab[hval] = (uint16_t)(anchor - ibase);
+    if (!shuffle || (distance & (MAX_COPY - 1)) == 0) {
+      htab[hval] = (uint32_t) (anchor - ibase);
+    }
 
     /* is this a match? check the first 3 bytes */
     if (distance == 0 || (distance >= MAX_FARDISTANCE) ||
@@ -384,11 +392,11 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     }
 
     /* update the hash at match boundary */
-    HASH_FUNCTION(hval, ip, hashlog);
-    htab[hval] = (uint16_t)(ip++ - ibase);
-    HASH_FUNCTION(hval, ip, hashlog);
-    htab[hval] = (uint16_t)(ip++ - ibase);
-
+    if (ip < ip_limit) {
+      HASH_FUNCTION(hval, ip, hashlog);
+      htab[hval] = (uint32_t)(ip - ibase);
+    }
+    ip += 2;
     /* assuming literal copy */
     *op++ = MAX_COPY - 1;
   }
