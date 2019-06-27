@@ -162,7 +162,7 @@ int main() {
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t)size);
   srccpy = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t)size);
-  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t)size + 16);
+  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t)size + BLOSC_MAX_OVERHEAD);
 
   /* Run all the suite */
   result = all_tests();
