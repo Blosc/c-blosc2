@@ -22,7 +22,7 @@ extern "C" {
 
 #include <stdbool.h>
 
-#define BLOSCLZ_VERSION_STRING "1.1.0"
+#define BLOSCLZ_VERSION_STRING "2.0.0"
 
 
 /**
