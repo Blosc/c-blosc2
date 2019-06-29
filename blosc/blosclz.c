@@ -399,7 +399,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     }
 
     /* is this a match? check the first 4 bytes */
-    if (*(int32_t*)ref == *(int32_t*)ip) {
+    if (BLOSCLZ_READU32(ref) == BLOSCLZ_READU32(ip)) {
       len = 4;
       ref += 4;
     }
