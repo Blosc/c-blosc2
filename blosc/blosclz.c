@@ -388,15 +388,24 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     /* calculate distance to the match */
     distance = (int32_t)(anchor - ref);
 
+    if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
+	LITERAL(ip, op, op_limit, anchor, copy);
+    }
+
     /* update hash table if necessary */
     /* not exactly sure why masking the distance works best, but this is what the experiments say */
     if (!shuffle || (distance & (MAX_COPY - 1)) == 0) {
       htab[hval] = (uint32_t) (anchor - ibase);
     }
 
-    /* is this a match? check the first 3 bytes */
-    if (distance == 0 || (distance >= MAX_FARDISTANCE) ||
-        *ref++ != *ip++ || *ref++ != *ip++ || *ref++ != *ip++) {
+    /* is this a match? check the first 4 bytes */
+    if (*(int32_t*)ref == *(int32_t*)ip) {
+      len = 4;
+      ref += 4;
+    }
+    /* check just the first 3 bytes */
+    else if (*ref++ != *ip++ || *ref++ != *ip++ || *ref++ != *ip++) {
+      /* no luck, copy as a literal */
       LITERAL(ip, op, op_limit, anchor, copy);
     }
 
