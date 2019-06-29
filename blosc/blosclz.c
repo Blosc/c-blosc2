@@ -101,7 +101,7 @@ static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref
     value2 = ((int64_t*)ref)[0];
 #endif
     if (value != value2) {
-      /* Find the byte that starts to differ */
+      /* Return the byte that starts to differ */
       while (*ref++ == x) ip++;
       return ip;
     }
@@ -129,7 +129,7 @@ static uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *
     value2 = ((int64_t*)ref)[0];
 #endif
     if (value != value2) {
-      /* Find the byte that starts to differ */
+      /* Return the byte that starts to differ */
       while (*ref++ == x) ip++;
       return ip;
     }
@@ -146,7 +146,7 @@ static uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *
     value2 = _mm_loadu_si128((__m128i *)ref);
     cmp = _mm_cmpeq_epi32(value, value2);
     if (_mm_movemask_epi8(cmp) != 0xFFFF) {
-      /* Find the byte that starts to differ */
+      /* Return the byte that starts to differ */
       while (*ref++ == x) ip++;
       return ip;
     }
@@ -176,7 +176,7 @@ static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *
     value2 = ((int64_t*)ref)[0];
 #endif
     if (value != value2) {
-      /* Find the byte that starts to differ */
+      /* Return the byte that starts to differ */
       while (*ref++ == x) ip++;
       return ip;
     }
@@ -192,7 +192,7 @@ static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *
     value2 = _mm_loadu_si128((__m128i *) ref);
     cmp = _mm_cmpeq_epi32(value, value2);
     if (_mm_movemask_epi8(cmp) != 0xFFFF) {
-      /* Find the byte that starts to differ */
+      /* Return the byte that starts to differ */
       while (*ref++ == x) ip++;
       return ip;
     } else {
@@ -207,7 +207,7 @@ static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *
     value2 = _mm256_loadu_si256((__m256i *)ref);
     cmp = _mm256_cmpeq_epi64(value, value2);
     if (_mm256_movemask_epi8(cmp) != 0xFFFFFFFF) {
-      /* Find the byte that starts to differ */
+      /* Return the byte that starts to differ */
       while (*ref++ == x) ip++;
       return ip;
     }
@@ -223,12 +223,12 @@ static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *
 #endif
 
 
-/* Find the byte that starts to differ */
+/* Return the byte that starts to differ */
 static uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
 #if !defined(BLOSC_STRICT_ALIGN)
   while (ip < (ip_bound - sizeof(int64_t))) {
     if (*(int64_t*)ref != *(int64_t*)ip) {
-      /* Find the byte that starts to differ */
+      /* Return the byte that starts to differ */
       while (*ref++ == *ip++) {}
       return ip;
     }
@@ -250,7 +250,7 @@ static uint8_t *get_match_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
 
   if (ip < (ip_bound - sizeof(int64_t))) {
     if (*(int64_t *) ref != *(int64_t *) ip) {
-      /* Find the byte that starts to differ */
+      /* Return the byte that starts to differ */
       while (*ref++ == *ip++) {}
       return ip;
     } else {
@@ -263,9 +263,8 @@ static uint8_t *get_match_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
     value2 = _mm_loadu_si128((__m128i *) ref);
     cmp = _mm_cmpeq_epi32(value, value2);
     if (_mm_movemask_epi8(cmp) != 0xFFFF) {
-      /* Find the byte that starts to differ */
-      while (*ref++ == *ip++) {}
-      return ip;
+      /* Return the byte that starts to differ */
+      return get_match(ip, ip_bound, ref);
     }
     else {
       ip += sizeof(__m128i);
@@ -284,7 +283,7 @@ static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
 
   if (ip < (ip_bound - sizeof(int64_t))) {
     if (*(int64_t *) ref != *(int64_t *) ip) {
-      /* Find the byte that starts to differ */
+      /* Return the byte that starts to differ */
       while (*ref++ == *ip++) {}
       return ip;
     } else {
@@ -298,9 +297,8 @@ static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
     value2 = _mm_loadu_si128((__m128i *) ref);
     cmp = _mm_cmpeq_epi32(value, value2);
     if (_mm_movemask_epi8(cmp) != 0xFFFF) {
-      /* Find the byte that starts to differ */
-      while (*ref++ == *ip++) {}
-      return ip;
+      /* Return the byte that starts to differ */
+      return get_match_16(ip, ip_bound, ref);
     }
     else {
       ip += sizeof(__m128i);
@@ -313,7 +311,7 @@ static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
     value2 = _mm256_loadu_si256((__m256i *)ref);
     cmp = _mm256_cmpeq_epi64(value, value2);
     if (_mm256_movemask_epi8(cmp) != 0xFFFFFFFF) {
-      /* Find the byte that starts to differ */
+      /* Return the byte that starts to differ */
       while (*ref++ == *ip++) {}
       return ip;
     }
@@ -323,8 +321,6 @@ static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
     }
   }
   /* Look into the remainder */
-  // return get_match_16(ip, ip_bound, ref);
-  // The next looks faster
   while ((ip < ip_bound) && (*ref++ == *ip++)) {}
   return ip;
 }
