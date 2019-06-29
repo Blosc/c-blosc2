@@ -56,7 +56,7 @@
   #define BLOSCLZ_READU32(p) *((const uint32_t*)(p))
 #endif
 
-#define HASH_LOG (14)
+#define HASH_LOG (13)
 
 /* Simple, but pretty effective hash function for 3-byte sequence */
 // This is the original hash function used in fastlz
