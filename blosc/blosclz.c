@@ -348,13 +348,11 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   uint8_t hashlog_[10] = {-1, HASH_LOG - 3, HASH_LOG - 2, HASH_LOG -1 , HASH_LOG - 1,
                            HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[opt_level];
-  // Looks like bitshuffle is not suffering a lot when reducing the hash_log
-  // TODO: to discrimate whether we are using a bitshuffle or not
-  // and do more experiments.
-//  if (!shuffle) {
-//      hashlog -= 4;
-//  }
-  memset(htab, 0, ((uint8_t)1U << hashlog) * sizeof(uint32_t));
+
+  // Initialize the hash table to 0s
+  for (int i = 0; i < (1U << hashlog); i++) {
+    htab[i] = 0;
+  }
 
   /* output buffer cannot be less than 66 bytes or we can get into trouble */
   if (BLOSCLZ_UNEXPECT_CONDITIONAL(maxout < 66 || length < 4)) {
