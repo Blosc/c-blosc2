@@ -56,7 +56,7 @@
   #define BLOSCLZ_READU32(p) *((const uint32_t*)(p))
 #endif
 
-#define HASH_LOG (13)
+#define HASH_LOG (14)
 
 /* Simple, but pretty effective hash function for 3-byte sequence */
 // This is the original hash function used in fastlz
@@ -345,8 +345,8 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     maxlength = (int32_t)maxout;
   }
   op_limit = op + maxlength;
-  uint8_t hashlog_[10] = {-1, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
-                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};  // max HASH_LOG
+  uint8_t hashlog_[10] = {-1, HASH_LOG - 3, HASH_LOG - 2, HASH_LOG -1 , HASH_LOG - 1,
+                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[opt_level];
   // Looks like bitshuffle is not suffering a lot when reducing the hash_log
   // TODO: to discrimate whether we are using a bitshuffle or not
