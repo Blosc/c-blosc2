@@ -196,6 +196,16 @@ static uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *r
 static uint8_t *get_match_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   __m128i value, value2, cmp;
 
+  if (ip < (ip_bound - sizeof(int64_t))) {
+    if (*(int64_t *) ref != *(int64_t *) ip) {
+      /* Find the byte that starts to differ */
+      while (*ref++ == *ip++) {}
+      return ip;
+    } else {
+      ip += sizeof(int64_t);
+      ref += sizeof(int64_t);
+    }
+  }
   while (ip < (ip_bound - sizeof(__m128i))) {
     value = _mm_loadu_si128((__m128i *) ip);
     value2 = _mm_loadu_si128((__m128i *) ref);
@@ -219,9 +229,34 @@ static uint8_t *get_match_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
 
 #if defined(__AVX2__)
 static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
-  __m256i value, value2, cmp;
 
+  if (ip < (ip_bound - sizeof(int64_t))) {
+    if (*(int64_t *) ref != *(int64_t *) ip) {
+      /* Find the byte that starts to differ */
+      while (*ref++ == *ip++) {}
+      return ip;
+    } else {
+      ip += sizeof(int64_t);
+      ref += sizeof(int64_t);
+    }
+  }
+  if (ip < (ip_bound - sizeof(__m128i))) {
+    __m128i value, value2, cmp;
+    value = _mm_loadu_si128((__m128i *) ip);
+    value2 = _mm_loadu_si128((__m128i *) ref);
+    cmp = _mm_cmpeq_epi32(value, value2);
+    if (_mm_movemask_epi8(cmp) != 0xFFFF) {
+      /* Find the byte that starts to differ */
+      while (*ref++ == *ip++) {}
+      return ip;
+    }
+    else {
+      ip += sizeof(__m128i);
+      ref += sizeof(__m128i);
+    }
+  }
   while (ip < (ip_bound - sizeof(__m256i))) {
+    __m256i value, value2, cmp;
     value = _mm256_loadu_si256((__m256i *) ip);
     value2 = _mm256_loadu_si256((__m256i *)ref);
     cmp = _mm256_cmpeq_epi64(value, value2);
@@ -236,6 +271,8 @@ static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
     }
   }
   /* Look into the remainder */
+  // return get_match_16(ip, ip_bound, ref);
+  // The next looks faster
   while ((ip < ip_bound) && (*ref++ == *ip++)) {}
   return ip;
 }
@@ -335,10 +372,9 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     }
     else {
 #if defined(__AVX2__)
-      /* Experiments show that the scalar version is a bit faster, even on SSE2/AVX2 processors */
-      ip = get_match(ip, ip_bound + IP_BOUNDARY, ref);
+      ip = get_match_32(ip, ip_bound + IP_BOUNDARY, ref);
 #elif defined(__SSE2__)
-      ip = get_match(ip, ip_bound + IP_BOUNDARY, ref);
+      ip = get_match_16(ip, ip_bound + IP_BOUNDARY, ref);
 #else
       ip = get_match(ip, ip_bound + IP_BOUNDARY, ref);
 #endif

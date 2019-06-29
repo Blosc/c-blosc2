@@ -13,10 +13,9 @@
   See also: https://github.com/Dead2/zlib-ng/blob/develop/zlib.h
 
   New implementations by Francesc Alted:
-    * get_run() and get_match() familiy of functions
-    * fast_copy() and safe_copy() functions
+    * fast_copy() and copyrun() functions
     * Support for SSE2/AVX2 copy instructions for these routines
-*************g*********************************************************/
+**********************************************************************/
 
 #include <assert.h>
 #include "blosc-common.h"
