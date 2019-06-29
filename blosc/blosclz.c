@@ -118,12 +118,31 @@ static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref
 #ifdef __SSE2__
 static uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
-  __m128i value, value2, cmp;
 
-  /* Broadcast the value for every byte in a 128-bit register */
-  memset(&value, x, sizeof(__m128i));
+  if (ip < (ip_bound - sizeof(int64_t))) {
+    int64_t value, value2;
+    /* Broadcast the value for every byte in a 64-bit register */
+    memset(&value, x, 8);
+#if defined(BLOSC_STRICT_ALIGN)
+    memcpy(&value2, ref, 8);
+#else
+    value2 = ((int64_t*)ref)[0];
+#endif
+    if (value != value2) {
+      /* Find the byte that starts to differ */
+      while (*ref++ == x) ip++;
+      return ip;
+    }
+    else {
+      ip += 8;
+      ref += 8;
+    }
+  }
   /* safe because the outer check against ip limit */
   while (ip < (ip_bound - sizeof(__m128i))) {
+    __m128i value, value2, cmp;
+    /* Broadcast the value for every byte in a 128-bit register */
+    memset(&value, x, sizeof(__m128i));
     value2 = _mm_loadu_si128((__m128i *)ref);
     cmp = _mm_cmpeq_epi32(value, value2);
     if (_mm_movemask_epi8(cmp) != 0xFFFF) {
@@ -146,12 +165,45 @@ static uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *
 #ifdef __AVX2__
 static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
-  __m256i value, value2, cmp;
-
-  /* Broadcast the value for every byte in a 256-bit register */
-  memset(&value, x, sizeof(__m256i));
   /* safe because the outer check against ip limit */
+  if (ip < (ip_bound - sizeof(int64_t))) {
+    int64_t value, value2;
+    /* Broadcast the value for every byte in a 64-bit register */
+    memset(&value, x, 8);
+#if defined(BLOSC_STRICT_ALIGN)
+    memcpy(&value2, ref, 8);
+#else
+    value2 = ((int64_t*)ref)[0];
+#endif
+    if (value != value2) {
+      /* Find the byte that starts to differ */
+      while (*ref++ == x) ip++;
+      return ip;
+    }
+    else {
+      ip += 8;
+      ref += 8;
+    }
+  }
+  if (ip < (ip_bound - sizeof(__m128i))) {
+    __m128i value, value2, cmp;
+    /* Broadcast the value for every byte in a 128-bit register */
+    memset(&value, x, sizeof(__m128i));
+    value2 = _mm_loadu_si128((__m128i *) ref);
+    cmp = _mm_cmpeq_epi32(value, value2);
+    if (_mm_movemask_epi8(cmp) != 0xFFFF) {
+      /* Find the byte that starts to differ */
+      while (*ref++ == x) ip++;
+      return ip;
+    } else {
+      ip += sizeof(__m128i);
+      ref += sizeof(__m128i);
+    }
+  }
   while (ip < (ip_bound - (sizeof(__m256i)))) {
+    __m256i value, value2, cmp;
+    /* Broadcast the value for every byte in a 256-bit register */
+    memset(&value, x, sizeof(__m256i));
     value2 = _mm256_loadu_si256((__m256i *)ref);
     cmp = _mm256_cmpeq_epi64(value, value2);
     if (_mm256_movemask_epi8(cmp) != 0xFFFFFFFF) {
