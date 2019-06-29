@@ -13,7 +13,7 @@
   See also: https://github.com/Dead2/zlib-ng/blob/develop/zlib.h
 
   New implementations by Francesc Alted:
-    * fast_copy() and copyrun() functions
+    * fast_copy() and copy_run() functions
     * Support for SSE2/AVX2 copy instructions for these routines
 **********************************************************************/
 
@@ -518,7 +518,7 @@ unsigned char *fastcopy(unsigned char *out, const unsigned char *from, unsigned 
 
 
 /* Copy a run */
-unsigned char* copyrun(unsigned char *out, const unsigned char *from, unsigned len) {
+unsigned char* copy_run(unsigned char *out, const unsigned char *from, unsigned len) {
 #if defined(__AVX2__)
   unsigned sz = sizeof(__m256i);
 #elif defined(__SSE2__)

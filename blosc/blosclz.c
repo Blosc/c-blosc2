@@ -530,8 +530,8 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         /* copy from reference */
         ref--;
         len += 3;
-        // We absolutely need a copyrun here
-        op = copyrun(op, ref, (unsigned) len);
+        // We absolutely need a copy_run here
+        op = copy_run(op, ref, (unsigned) len);
       }
     }
     else {
