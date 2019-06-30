@@ -350,8 +350,8 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   }
   op_limit = op + maxlength;
 
-  uint8_t hashlog_[10] = {-1, HASH_LOG - 3, HASH_LOG - 2, HASH_LOG -1 , HASH_LOG - 1,
-                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
+  uint8_t hashlog_[10] = {-1, HASH_LOG - 5, HASH_LOG - 4, HASH_LOG - 3 , HASH_LOG - 2,
+                           HASH_LOG - 1, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[opt_level];
   // Initialize the hash table to 0s
   for (int i = 0; i < (1U << hashlog); i++) {
