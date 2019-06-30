@@ -338,7 +338,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   uint8_t* ip_limit = ip + length - 12;
   uint8_t* op = (uint8_t*)output;
   uint8_t* op_limit;
-  uint32_t htab[1U << (uint8_t)HASH_LOG];
+  uint16_t htab[1U << (uint8_t)HASH_LOG];
   int32_t hval;
   uint8_t copy;
   uint32_t nmax_copies = 0;
@@ -401,7 +401,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     /* update hash table if necessary */
     /* not exactly sure why masking the distance works best, but this is what the experiments say */
     if (!shuffle || (distance & (MAX_COPY - 1)) == 0) {
-      htab[hval] = (uint32_t) (anchor - ibase);
+      htab[hval] = (uint16_t) (anchor - ibase);
     }
 
     /* is this a match? check the first 4 bytes */
@@ -499,7 +499,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     /* update the hash at match boundary */
     if (ip < ip_limit) {
       HASH_FUNCTION(hval, ip, hashlog);
-      htab[hval] = (uint32_t)(ip - ibase);
+      htab[hval] = (uint16_t)(ip - ibase);
     }
     ip += 2;
     /* assuming literal copy */
