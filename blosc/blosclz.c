@@ -350,7 +350,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   }
   op_limit = op + maxlength;
 
-  uint8_t hashlog_[10] = {-1, HASH_LOG - 5, HASH_LOG - 4, HASH_LOG - 3 , HASH_LOG - 2,
+  uint8_t hashlog_[10] = {-1, HASH_LOG - 4, HASH_LOG - 4, HASH_LOG - 3 , HASH_LOG - 2,
                            HASH_LOG - 1, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[opt_level];
   // Initialize the hash table to 0s
@@ -359,7 +359,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   }
 
   // The maximum amount of consecutive MAX_COPY copies before giving up
-  uint8_t max_nmax_copies_[10] = {-1, 8, 16, 24, 32, 32, 32, 32, 32, 64};
+  uint8_t max_nmax_copies_[10] = {-1, 8, 8, 16, 16, 32, 32, 32, 32, 64};
   uint8_t max_nmax_copies = max_nmax_copies_[opt_level];
 
   /* output buffer cannot be less than 66 bytes or we can get into trouble */
