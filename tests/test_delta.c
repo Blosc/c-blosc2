@@ -16,7 +16,7 @@ int tests_run = 0;
 /* Global vars */
 uint8_t *src, *srccpy, *dest;
 int nbytes, cbytes;
-int clevel = 5;
+int clevel = 1;
 int doshuffle = 1;
 int typesize;
 int size = 7 * 12 * 13 * 16 * 24 * 10;  /* must be divisible by typesize */

@@ -343,7 +343,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   uint8_t copy;
   uint32_t nmax_copies = 0;
 
-  double maxlength_[10] = {-1, .1, .3, .5, .6, .8, .9, .95, 1.0, 1.0};
+  double maxlength_[10] = {-1, .1, .2, .3, .4, .6, .9, .95, 1.0, 1.0};
   int32_t maxlength = (int32_t)(length * maxlength_[opt_level]);
   if (maxlength > (int32_t)maxout) {
     maxlength = (int32_t)maxout;
@@ -353,13 +353,14 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   uint8_t hashlog_[10] = {-1, HASH_LOG - 4, HASH_LOG - 4, HASH_LOG - 3 , HASH_LOG - 2,
                            HASH_LOG - 1, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[opt_level];
-  // Initialize the hash table to 0s
+  // Initialize the hash table to distances of 0
   for (int i = 0; i < (1U << hashlog); i++) {
     htab[i] = 0;
   }
 
   // The maximum amount of consecutive MAX_COPY copies before giving up
-  uint8_t max_nmax_copies_[10] = {-1, 8, 8, 16, 16, 32, 32, 32, 32, 64};
+  // 0 means something very close to RLE
+  uint8_t max_nmax_copies_[10] = {-1, 0, 8, 8, 16, 32, 32, 32, 32, 64};
   uint8_t max_nmax_copies = max_nmax_copies_[opt_level];
 
   /* output buffer cannot be less than 66 bytes or we can get into trouble */
@@ -394,14 +395,14 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     /* calculate distance to the match */
     distance = (int32_t)(anchor - ref);
 
-    if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
-      LITERAL(ip, op, op_limit, anchor, copy);
-    }
-
     /* update hash table if necessary */
     /* not exactly sure why masking the distance works best, but this is what the experiments say */
     if (!shuffle || (distance & (MAX_COPY - 1)) == 0) {
       htab[hval] = (uint16_t) (anchor - ibase);
+    }
+
+    if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
+      LITERAL(ip, op, op_limit, anchor, copy);
     }
 
     /* is this a match? check the first 4 bytes */
