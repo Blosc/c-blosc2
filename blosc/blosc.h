@@ -574,7 +574,7 @@ typedef struct {
   int32_t input_typesizes[BLOSC2_PREFILTER_INPUTS_MAX];  // the typesizes for data inputs
   void *user_data;  // user-provided info (optional)
   uint8_t *out;  // automatically filled
-  size_t out_size;  // automatically filled
+  int32_t out_size;  // automatically filled
   int32_t out_typesize;  // automatically filled
 } blosc2_prefilter_params;
 
