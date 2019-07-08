@@ -540,14 +540,62 @@ unsigned char* copy_match(unsigned char *out, const unsigned char *from, unsigne
         out = copy_32_bytes(out, from);
       }
       break;
+    // Just unroll in the range 16 to 32, as other cases are better covered by copy_match_16
+    case 30:
+      for (; len >= 30; len -= 30) {
+        out = copy_16_bytes(out, from);
+        out = copy_8_bytes(out, from + 16);
+        out = copy_4_bytes(out, from + 24);
+        out = copy_2_bytes(out, from + 28);
+      }
+      break;
+    case 28:
+      for (; len >= 28; len -= 28) {
+        out = copy_16_bytes(out, from);
+        out = copy_8_bytes(out, from + 16);
+        out = copy_4_bytes(out, from + 24);
+      }
+      break;
+    case 26:
+      for (; len >= 26; len -= 26) {
+        out = copy_16_bytes(out, from);
+        out = copy_8_bytes(out, from + 16);
+        out = copy_2_bytes(out, from + 24);
+      }
+      break;
+    case 24:
+      for (; len >= 24; len -= 24) {
+        out = copy_16_bytes(out, from);
+        out = copy_8_bytes(out, from + 16);
+      }
+      break;
+    case 22:
+      for (; len >= 22; len -= 22) {
+        out = copy_16_bytes(out, from);
+        out = copy_4_bytes(out, from + 16);
+        out = copy_2_bytes(out, from + 20);
+      }
+      break;
+    case 20:
+      for (; len >= 20; len -= 20) {
+        out = copy_16_bytes(out, from);
+        out = copy_4_bytes(out, from + 16);
+      }
+      break;
+    case 18:
+      for (; len >= 18; len -= 18) {
+        out = copy_16_bytes(out, from);
+        out = copy_2_bytes(out, from + 16);
+      }
+      break;
     case 16:
       for (; len >= 16; len -= 16) {
         out = copy_16_bytes(out, from);
       }
       break;
-    case 2:
-      for (; len >= 2; len -= 2) {
-        out = copy_2_bytes(out, from);
+    case 8:
+      for (; len >= 8; len -= 8) {
+        out = copy_8_bytes(out, from);
       }
       break;
     case 4:
@@ -555,9 +603,9 @@ unsigned char* copy_match(unsigned char *out, const unsigned char *from, unsigne
         out = copy_4_bytes(out, from);
       }
       break;
-    case 8:
-      for (; len >= 8; len -= 8) {
-        out = copy_8_bytes(out, from);
+    case 2:
+      for (; len >= 2; len -= 2) {
+        out = copy_2_bytes(out, from);
       }
       break;
     default:
