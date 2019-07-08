@@ -518,7 +518,7 @@ unsigned char *fastcopy(unsigned char *out, const unsigned char *from, unsigned 
 
 
 /* Copy a run */
-unsigned char* copy_run(unsigned char *out, const unsigned char *from, unsigned len) {
+unsigned char* copy_match(unsigned char *out, const unsigned char *from, unsigned len) {
 #if defined(__AVX2__)
   unsigned sz = sizeof(__m256i);
 #elif defined(__SSE2__)
@@ -535,6 +535,16 @@ unsigned char* copy_run(unsigned char *out, const unsigned char *from, unsigned 
 
   // Otherwise we need to be more careful so as not to overwrite destination
   switch (overlap_dist) {
+    case 32:
+      for (; len >= 32; len -= 32) {
+        out = copy_32_bytes(out, from);
+      }
+      break;
+    case 16:
+      for (; len >= 16; len -= 16) {
+        out = copy_16_bytes(out, from);
+      }
+      break;
     case 2:
       for (; len >= 2; len -= 2) {
         out = copy_2_bytes(out, from);
@@ -550,28 +560,16 @@ unsigned char* copy_run(unsigned char *out, const unsigned char *from, unsigned 
         out = copy_8_bytes(out, from);
       }
       break;
-#if defined(__SSE2__)
-    case 16:
-      for (; len >= 16; len -= 16) {
-        out = copy_16_bytes(out, from);
-      }
-      break;
-#endif
-#if defined(__AVX2__)
-    case 32:
-      for (; len >= 32; len -= 32) {
-        out = copy_32_bytes(out, from);
-      }
-      break;
-#endif
     default:
       for (; len > 0; len--) {
         *out++ = *from++;
       }
   }
 
-  // Copy the leftovers (a fastcopy is safe here)
-  out = fastcopy(out, from, len);
+  // Copy the leftovers
+  for (; len > 0; len--) {
+    *out++ = *from++;
+  }
 
   return out;
 }
