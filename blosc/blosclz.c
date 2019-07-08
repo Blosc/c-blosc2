@@ -538,6 +538,55 @@ int blosclz_compress(const int opt_level, const void* input, int length,
 
 }
 
+// This is not faster on a combination of compilers (clagn, gcc, icc) or machines, but
+// it is kept here for future reference
+// See https://habr.com/en/company/yandex/blog/457612/
+#ifdef __SSSE3__
+static unsigned char* copy_block_16(unsigned char * op, const unsigned char *match, int32_t len)
+{
+  unsigned offset = op - match;
+  while (len >= 16) {
+
+    static const uint8_t __attribute__((__aligned__(16))) masks[] =
+        {
+                0,  1,  2,  1,  4,  1,  4,  2,  8,  7,  6,  5,  4,  3,  2,  1, /* offset = 0, not used as mask, but for shift amount instea
+d */
+                0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, /* offset = 1 */
+                0,  1,  0,  1,  0,  1,  0,  1,  0,  1,  0,  1,  0,  1,  0,  1,
+                0,  1,  2,  0,  1,  2,  0,  1,  2,  0,  1,  2,  0,  1,  2,  0,
+                0,  1,  2,  3,  0,  1,  2,  3,  0,  1,  2,  3,  0,  1,  2,  3,
+                0,  1,  2,  3,  4,  0,  1,  2,  3,  4,  0,  1,  2,  3,  4,  0,
+                0,  1,  2,  3,  4,  5,  0,  1,  2,  3,  4,  5,  0,  1,  2,  3,
+                0,  1,  2,  3,  4,  5,  6,  0,  1,  2,  3,  4,  5,  6,  0,  1,
+                0,  1,  2,  3,  4,  5,  6,  7,  0,  1,  2,  3,  4,  5,  6,  7,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  0,  1,  2,  3,  4,  5,  6,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  0,  1,  2,  3,  4,  5,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,  0,  1,  2,  3,  4,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11,  0,  1,  2,  3,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12,  0,  1,  2,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13,  0,  1,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,  0,
+            };
+
+    _mm_storeu_si128((__m128i *)(op),
+        _mm_shuffle_epi8(
+            _mm_loadu_si128((const __m128i *)(match)),
+            _mm_load_si128((const __m128i *)(masks) + offset)));
+
+    match += masks[offset];
+
+    op += 16;
+    len -= 16;
+  }
+  // Deal with remainders
+  for (; len > 0; len--) {
+    *op++ = *match++;
+  }
+  return op;
+}
+#endif
+
+
 int blosclz_decompress(const void* input, int length, void* output, int maxout) {
   const uint8_t* ip = (const uint8_t*)input;
   const uint8_t* ip_limit = ip + length;
@@ -597,8 +646,17 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         /* copy from reference */
         ref--;
         len += 3;
+#ifdef __SSSE3__XXX  // Remove trailing XXX this for experimenting (see below too)
+        if (op - ref < 16) {
+          op = copy_block_16(op, ref, len);
+        }
+        else {
+#endif
         // We absolutely need a copy_run here
         op = copy_run(op, ref, (unsigned) len);
+#ifdef __SSSE3__XXX   // Remove traling XXX this for experimenting
+        }
+#endif
       }
     }
     else {
