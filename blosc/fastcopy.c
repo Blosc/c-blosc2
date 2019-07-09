@@ -528,7 +528,7 @@ unsigned char* copy_match(unsigned char *out, const unsigned char *from, unsigne
 #endif
 
   // If out and from are away more than the size of the copy, then a fastcopy is safe
-  unsigned overlap_dist = out - from;
+  unsigned overlap_dist = (unsigned) (out - from);
   if (overlap_dist > sz) {
     return fastcopy(out, from, len);
   }
