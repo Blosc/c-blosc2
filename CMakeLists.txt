@@ -108,7 +108,7 @@ option(DEACTIVATE_LZ4
 option(DEACTIVATE_LIZARD
         "Do not include support for the LIZARD library." OFF)
 option(DEACTIVATE_SNAPPY
-    "Do not include support for the SNAPPY library." OFF)
+    "Do not include support for the SNAPPY library." ON)
 option(DEACTIVATE_ZLIB
     "Do not include support for the ZLIB library." OFF)
 option(DEACTIVATE_ZSTD
@@ -288,7 +288,7 @@ elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l OR
     endif ()
 elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL ppc64le)
     if (CMAKE_C_COMPILER_ID STREQUAL GNU AND CMAKE_C_COMPILER_VERSION VERSION_GREATER 8)
-		set(COMPILER_SUPPORT_ALTIVEC TRUE)    
+		set(COMPILER_SUPPORT_ALTIVEC TRUE)
     else ()
         set(COMPILER_SUPPORT_ALTIVEC FALSE)
     endif ()
