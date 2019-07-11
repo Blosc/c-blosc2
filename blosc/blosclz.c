@@ -540,12 +540,22 @@ int blosclz_compress(const int opt_level, const void* input, int length,
 
 // See https://habr.com/en/company/yandex/blog/457612/
 #ifdef __AVX2__
+
+#if defined(_MSC_VER)
+#define ALIGNED_(x) __declspec(align(x))
+#else
+#if defined(__GNUC__)
+#define ALIGNED_(x) __attribute__ ((aligned(x)))
+#endif
+#endif
+#define ALIGNED_TYPE_(t, x) t ALIGNED_(x)
+
 static unsigned char* copy_match_16(unsigned char *op, const unsigned char *match, int32_t len)
 {
   unsigned offset = op - match;
   while (len >= 16) {
 
-    static const uint8_t __attribute__((__aligned__(16))) masks[] =
+    static const ALIGNED_TYPE_(uint8_t, 16) masks[] =
       {
                 0,  1,  2,  1,  4,  1,  4,  2,  8,  7,  6,  5,  4,  3,  2,  1, // offset = 0, not used as mask, but for shift
                 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // offset = 1
