@@ -539,7 +539,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
 }
 
 // See https://habr.com/en/company/yandex/blog/457612/
-#ifdef __SSSE3__
+#ifdef __AVX2__
 static unsigned char* copy_match_16(unsigned char *op, const unsigned char *match, int32_t len)
 {
   unsigned offset = op - match;
@@ -643,7 +643,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         /* copy from reference */
         ref--;
         len += 3;
-#ifdef __SSSE3__
+#ifdef __AVX2__
         if (op - ref <= 16) {
           // This is not faster on a combination of compilers (clang, gcc, icc) or machines, but
           // it is not slower either.  Let's activate here for experimentation.
@@ -653,7 +653,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
 #endif
           // We absolutely need a copy_match here
           op = copy_match(op, ref, (unsigned) len);
-#ifdef __SSSE3__
+#ifdef __AVX2__
         }
 #endif
       }
