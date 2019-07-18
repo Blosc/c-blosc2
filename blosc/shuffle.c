@@ -316,7 +316,7 @@ static shuffle_implementation_t get_shuffle_implementation() {
   }
 #endif  /* defined(SHUFFLE_NEON_ENABLED) */
 
-  #if defined(SHUFFLE_ALTIVEC_ENABLED)
+#if defined(SHUFFLE_ALTIVEC_ENABLED)
   if (cpu_features & BLOSC_HAVE_ALTIVEC) {
     shuffle_implementation_t impl_altivec;
     impl_altivec.name = "altivec";
