@@ -59,12 +59,12 @@
 #define HASH_LOG (14)
 
 /* Simple, but pretty effective hash function for 3-byte sequence */
-// This is the original hash function used in fastlz
-//#define HASH_FUNCTION(v, p, h) {                         \
-//  v = BLOSCLZ_READU16(p);                                \
-//  v ^= BLOSCLZ_READU16(p + 1) ^ ( v >> (16 - h));        \
-//  v &= (1 << h) - 1;                                     \
-//}
+/* This is the original hash function used in fastlz */
+#define _HASH_FUNCTION(v, p, h) {                         \
+  v = BLOSCLZ_READU16(p);                                \
+  v ^= BLOSCLZ_READU16(p + 1) ^ ( v >> (16 - h));        \
+  v &= (1 << h) - 1;                                     \
+}
 
 // This is used in LZ4 and seems to work pretty well here too
 #define HASH_FUNCTION(v, p, h) {                         \
@@ -91,34 +91,67 @@
 #define IP_BOUNDARY 2
 
 
-static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
-  uint8_t x = ip[-1];
-  int64_t value, value2;
-  /* Broadcast the value for every byte in a 64-bit register */
-  memset(&value, x, 8);
-  /* safe because the outer check against ip limit */
-  while (ip < (ip_bound - sizeof(int64_t))) {
+#if defined(__AVX2__)
+static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+    uint8_t x = ip[-1];
+    /* safe because the outer check against ip limit */
+    if (ip < (ip_bound - sizeof(int64_t))) {
+        int64_t value, value2;
+        /* Broadcast the value for every byte in a 64-bit register */
+        memset(&value, x, 8);
 #if defined(BLOSC_STRICT_ALIGN)
-    memcpy(&value2, ref, 8);
+        memcpy(&value2, ref, 8);
 #else
-    value2 = ((int64_t*)ref)[0];
+        value2 = ((int64_t*)ref)[0];
 #endif
-    if (value != value2) {
-      /* Return the byte that starts to differ */
-      while (*ref++ == x) ip++;
-      return ip;
+        if (value != value2) {
+            /* Return the byte that starts to differ */
+            while (*ref++ == x) ip++;
+            return ip;
+        }
+        else {
+            ip += 8;
+            ref += 8;
+        }
     }
-    else {
-      ip += 8;
-      ref += 8;
+    if (ip < (ip_bound - sizeof(__m128i))) {
+        __m128i value, value2, cmp;
+        /* Broadcast the value for every byte in a 128-bit register */
+        memset(&value, x, sizeof(__m128i));
+        value2 = _mm_loadu_si128((__m128i *) ref);
+        cmp = _mm_cmpeq_epi32(value, value2);
+        if (_mm_movemask_epi8(cmp) != 0xFFFF) {
+            /* Return the byte that starts to differ */
+            while (*ref++ == x) ip++;
+            return ip;
+        } else {
+            ip += sizeof(__m128i);
+            ref += sizeof(__m128i);
+        }
     }
-  }
-  /* Look into the remainder */
-  while ((ip < ip_bound) && (*ref++ == x)) ip++;
-  return ip;
+    while (ip < (ip_bound - (sizeof(__m256i)))) {
+        __m256i value, value2, cmp;
+        /* Broadcast the value for every byte in a 256-bit register */
+        memset(&value, x, sizeof(__m256i));
+        value2 = _mm256_loadu_si256((__m256i *)ref);
+        cmp = _mm256_cmpeq_epi64(value, value2);
+        if ((unsigned)_mm256_movemask_epi8(cmp) != 0xFFFFFFFF) {
+            /* Return the byte that starts to differ */
+            while (*ref++ == x) ip++;
+            return ip;
+        }
+        else {
+            ip += sizeof(__m256i);
+            ref += sizeof(__m256i);
+        }
+    }
+    /* Look into the remainder */
+    while ((ip < ip_bound) && (*ref++ == x)) ip++;
+    return ip;
 }
 
-#ifdef __SSE2__
+#elif defined(__SSE2__)
+
 static uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
 
@@ -162,17 +195,15 @@ static uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *
   while ((ip < ip_bound) && (*ref++ == x)) ip++;
   return ip;
 }
-#endif
 
-
-#ifdef __AVX2__
-static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+#else
+static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
+  int64_t value, value2;
+  /* Broadcast the value for every byte in a 64-bit register */
+  memset(&value, x, 8);
   /* safe because the outer check against ip limit */
-  if (ip < (ip_bound - sizeof(int64_t))) {
-    int64_t value, value2;
-    /* Broadcast the value for every byte in a 64-bit register */
-    memset(&value, x, 8);
+  while (ip < (ip_bound - sizeof(int64_t))) {
 #if defined(BLOSC_STRICT_ALIGN)
     memcpy(&value2, ref, 8);
 #else
@@ -186,37 +217,6 @@ static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *
     else {
       ip += 8;
       ref += 8;
-    }
-  }
-  if (ip < (ip_bound - sizeof(__m128i))) {
-    __m128i value, value2, cmp;
-    /* Broadcast the value for every byte in a 128-bit register */
-    memset(&value, x, sizeof(__m128i));
-    value2 = _mm_loadu_si128((__m128i *) ref);
-    cmp = _mm_cmpeq_epi32(value, value2);
-    if (_mm_movemask_epi8(cmp) != 0xFFFF) {
-      /* Return the byte that starts to differ */
-      while (*ref++ == x) ip++;
-      return ip;
-    } else {
-      ip += sizeof(__m128i);
-      ref += sizeof(__m128i);
-    }
-  }
-  while (ip < (ip_bound - (sizeof(__m256i)))) {
-    __m256i value, value2, cmp;
-    /* Broadcast the value for every byte in a 256-bit register */
-    memset(&value, x, sizeof(__m256i));
-    value2 = _mm256_loadu_si256((__m256i *)ref);
-    cmp = _mm256_cmpeq_epi64(value, value2);
-    if (_mm256_movemask_epi8(cmp) != 0xFFFFFFFF) {
-      /* Return the byte that starts to differ */
-      while (*ref++ == x) ip++;
-      return ip;
-    }
-    else {
-      ip += sizeof(__m256i);
-      ref += sizeof(__m256i);
     }
   }
   /* Look into the remainder */
@@ -313,7 +313,7 @@ static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
     value = _mm256_loadu_si256((__m256i *) ip);
     value2 = _mm256_loadu_si256((__m256i *)ref);
     cmp = _mm256_cmpeq_epi64(value, value2);
-    if (_mm256_movemask_epi8(cmp) != 0xFFFFFFFF) {
+    if ((unsigned)_mm256_movemask_epi8(cmp) != 0xFFFFFFFF) {
       /* Return the byte that starts to differ */
       while (*ref++ == *ip++) {}
       return ip;
