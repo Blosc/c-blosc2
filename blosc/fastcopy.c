@@ -527,6 +527,14 @@ unsigned char* copy_match(unsigned char *out, const unsigned char *from, unsigne
   unsigned sz = sizeof(uint64_t);
 #endif
 
+#if ((defined(__GNUC__) && BLOSC_GCC_VERSION < 800) && !defined(__clang__) && !defined(__ICC) && !defined(__ICL))
+  // GCC < 8 in fully optimization mode seems to have problems with the code further below so stop here
+  for (; len > 0; len--) {
+    *out++ = *from++;
+  }
+  return out;
+#endif
+
   // If out and from are away more than the size of the copy, then a fastcopy is safe
   unsigned overlap_dist = (unsigned) (out - from);
   if (overlap_dist > sz) {
@@ -540,7 +548,6 @@ unsigned char* copy_match(unsigned char *out, const unsigned char *from, unsigne
         out = copy_32_bytes(out, from);
       }
       break;
-    // Just unroll in the range 16 to 32, as other cases are better covered by copy_match_16
     case 30:
       for (; len >= 30; len -= 30) {
         out = copy_16_bytes(out, from);
