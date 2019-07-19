@@ -105,7 +105,7 @@ static inline unsigned char *copy_32_bytes(unsigned char *out, const unsigned ch
   __m256i chunk;
   chunk = _mm256_loadu_si256((__m256i*)from);
   _mm256_storeu_si256((__m256i*)out, chunk);
-  from += 32; out += 32;
+  out += 32;
 #elif defined(__SSE2__)
   __m128i chunk;
   chunk = _mm_loadu_si128((__m128i*)from);
@@ -132,14 +132,15 @@ static inline unsigned char *copy_32_bytes(unsigned char *out, const unsigned ch
   return out;
 }
 
-#if defined(__AVX2__)
-static inline unsigned char *copy_32_bytes_aligned(unsigned char *out, const unsigned char *from) {
-  __m256i chunk;
-  chunk = _mm256_load_si256((__m256i*)from);
-  _mm256_storeu_si256((__m256i*)out, chunk);
-  return out + 32;
-}
-#endif  // __AVX2__
+// This is never used, so comment it out
+//#if defined(__AVX2__)
+//static inline unsigned char *copy_32_bytes_aligned(unsigned char *out, const unsigned char *from) {
+//  __m256i chunk;
+//  chunk = _mm256_load_si256((__m256i*)from);
+//  _mm256_storeu_si256((__m256i*)out, chunk);
+//  return out + 32;
+//}
+//#endif  // __AVX2__
 
 /* Copy LEN bytes (7 or fewer) from FROM into OUT. Return OUT + LEN. */
 static inline unsigned char *copy_bytes(unsigned char *out, const unsigned char *from, unsigned len) {
