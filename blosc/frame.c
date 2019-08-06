@@ -340,18 +340,24 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   }
   assert ((int64_t)coffset == cbytes);
 
-  // Compress the chunk of offsets
-  uint8_t* off_chunk = malloc(off_nbytes + BLOSC_MAX_OVERHEAD);
-  blosc2_context* cctx = blosc2_create_cctx(BLOSC_CPARAMS_DEFAULTS);
-  cctx->typesize = 8;
-  off_cbytes = blosc2_compress_ctx(cctx, off_nbytes, data_tmp, off_chunk,
-                                   off_nbytes + BLOSC_MAX_OVERHEAD);
-  blosc2_free_ctx(cctx);
-  free(data_tmp);
-  if (off_cbytes < 0) {
-    free(off_chunk);
-    free(h2);
-    return -1;
+  uint8_t *off_chunk = NULL;
+  if (nchunks > 0) {
+    // Compress the chunk of offsets
+    off_chunk = malloc(off_nbytes + BLOSC_MAX_OVERHEAD);
+    blosc2_context *cctx = blosc2_create_cctx(BLOSC_CPARAMS_DEFAULTS);
+    cctx->typesize = 8;
+    off_cbytes = blosc2_compress_ctx(cctx, off_nbytes, data_tmp, off_chunk,
+                                     off_nbytes + BLOSC_MAX_OVERHEAD);
+    blosc2_free_ctx(cctx);
+    free(data_tmp);
+    if (off_cbytes < 0) {
+      free(off_chunk);
+      free(h2);
+      return -1;
+    }
+  }
+  else {
+    off_cbytes = 0;
   }
 
   // Now that we know them, fill the chunksize and frame length in header2
@@ -660,14 +666,6 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
   schunk->compcode = (uint8_t)(compcode & 0xfu);
   schunk->filters[BLOSC_MAX_FILTERS - 1] = (uint8_t)((filters & 0xcu) >> 2u);  // filters are in bits 2 and 3
 
-  // Get the offsets
-  int64_t* offsets = (int64_t*)calloc((size_t)nchunks * 8, 1);
-  int32_t off_cbytes = get_offsets(frame, frame_len, header_len, cbytes, nchunks, offsets);
-  if (off_cbytes < 0) {
-    fprintf(stderr, "Cannot get the offsets for the frame\n");
-    return NULL;
-  }
-
   // Compression and decompression contexts
   blosc2_cparams *cparams;
   blosc2_get_cparams(schunk, &cparams);
@@ -678,10 +676,22 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
   schunk->dctx = blosc2_create_dctx(*dparams);
   free(dparams);
 
-  if (!sparse) {
+  if (!sparse || nchunks == 0) {
     // We are done, so leave here
-    // TODO: should we copy the frame in-memory?  schunk-> mem, frame -> disk?
+    // Make explicit that the frame has a super-chunk attached
+    frame->schunk = schunk;
     return schunk;
+  }
+
+  // We are not attached to a frame anymore
+  schunk->frame = NULL;
+
+  // Get the offsets
+  int64_t *offsets = (int64_t *) calloc((size_t) nchunks * 8, 1);
+  int32_t off_cbytes = get_offsets(frame, frame_len, header_len, cbytes, nchunks, offsets);
+  if (off_cbytes < 0) {
+    fprintf(stderr, "Cannot get the offsets for the frame\n");
+    return NULL;
   }
 
   // We want the sparse schunk, so create the actual data chunks (and, while doing this,
@@ -731,8 +741,6 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
     }
   }
   schunk->blocksize = blocksize;
-  // We are not attached to a frame anymore, so get rid of this
-  schunk->frame = NULL;
 
   free(offsets);
   if (frame->sdata == NULL) {
@@ -876,9 +884,11 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
   // Get the current offsets and add one more
   int32_t off_nbytes = (nchunks + 1) * 8;
   int64_t* offsets = malloc((size_t)off_nbytes);
-  int32_t off_cbytes = get_offsets(frame, frame_len, header_len, cbytes, nchunks, offsets);
-  if (off_cbytes < 0) {
-    return NULL;
+  if (nchunks > 0) {
+    int32_t off_cbytes = get_offsets(frame, frame_len, header_len, cbytes, nchunks, offsets);
+    if (off_cbytes < 0) {
+      return NULL;
+    }
   }
   // Add the new offset
   offsets[nchunks] = cbytes;

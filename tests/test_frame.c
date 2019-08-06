@@ -9,6 +9,7 @@
 */
 
 #include <stdio.h>
+#include <stdbool.h>
 #include "test_common.h"
 
 #define CHUNKSIZE (200 * 1000)
@@ -17,6 +18,7 @@
 /* Global vars */
 int tests_run = 0;
 int nchunks;
+bool free_new;
 char *fname;
 
 
@@ -42,6 +44,18 @@ static char* test_frame() {
   blosc2_frame* frame = blosc2_new_frame(fname);
   schunk = blosc2_new_schunk(cparams, dparams, frame);
 
+  if (free_new) {
+    if (fname != NULL) {
+      blosc2_free_schunk(schunk);
+      blosc2_free_frame(frame);
+      frame = blosc2_frame_from_file(fname);
+      schunk = blosc2_schunk_from_frame(frame, false);
+    } else {
+      blosc2_free_schunk(schunk);
+      schunk = blosc2_schunk_from_frame(frame, false);
+    }
+  }
+
   // Feed it with data
   int nchunks_ = 0;
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
@@ -52,6 +66,18 @@ static char* test_frame() {
     mu_assert("ERROR: bad append in frame", nchunk >= 0);
   }
   mu_assert("ERROR: wrong number of append chunks", nchunks_ == nchunks);
+
+  if (free_new) {
+    if (fname != NULL) {
+      blosc2_free_schunk(schunk);
+      blosc2_free_frame(frame);
+      frame = blosc2_frame_from_file(fname);
+      schunk = blosc2_schunk_from_frame(frame, false);
+    } else {
+      blosc2_free_schunk(schunk);
+      schunk = blosc2_schunk_from_frame(frame, false);
+    }
+  }
 
   /* Gather some info */
   nbytes = schunk->nbytes;
@@ -82,26 +108,62 @@ static char* test_frame() {
 static char *all_tests() {
   nchunks = 0;
   fname = NULL;
+  free_new = false;
+  mu_run_test(test_frame);
+
+  nchunks = 0;
+  fname = "test_frame_nc.b2frame";
+  free_new = false;
+  mu_run_test(test_frame);
+
+  nchunks = 0;
+  fname = NULL;
+  free_new = true;
   mu_run_test(test_frame);
 
   nchunks = 0;
   fname = "test_frame_nc0.b2frame";
+  free_new = true;
   mu_run_test(test_frame);
 
   nchunks = 1;
   fname = NULL;
+  free_new = false;
   mu_run_test(test_frame);
 
   nchunks = 1;
   fname = "test_frame_nc1.b2frame";
+  free_new = false;
+  mu_run_test(test_frame);
+
+  nchunks = 1;
+  fname = NULL;
+  free_new = true;
+  mu_run_test(test_frame);
+
+  nchunks = 1;
+  fname = "test_frame_nc1.b2frame";
+  free_new = true;
   mu_run_test(test_frame);
 
   nchunks = 10;
   fname = NULL;
+  free_new = false;
   mu_run_test(test_frame);
 
   nchunks = 10;
   fname = "test_frame_nc10.b2frame";
+  free_new = false;
+  mu_run_test(test_frame);
+
+  nchunks = 10;
+  fname = NULL;
+  free_new = true;
+  mu_run_test(test_frame);
+
+  nchunks = 10;
+  fname = "test_frame_nc10.b2frame";
+  free_new = true;
   mu_run_test(test_frame);
 
   return EXIT_SUCCESS;
