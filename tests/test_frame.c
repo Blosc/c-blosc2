@@ -17,6 +17,7 @@
 /* Global vars */
 int tests_run = 0;
 int nchunks;
+char *fname;
 
 
 static char* test_frame() {
@@ -38,17 +39,19 @@ static char* test_frame() {
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_frame* frame = blosc2_new_frame(NULL);
+  blosc2_frame* frame = blosc2_new_frame(fname);
   schunk = blosc2_new_schunk(cparams, dparams, frame);
 
   // Feed it with data
+  int nchunks_ = 0;
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
-    nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
+    nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append in frame", nchunk >= 0);
   }
+  mu_assert("ERROR: wrong number of append chunks", nchunks_ == nchunks);
 
   /* Gather some info */
   nbytes = schunk->nbytes;
@@ -75,14 +78,30 @@ static char* test_frame() {
   return EXIT_SUCCESS;
 }
 
+
 static char *all_tests() {
   nchunks = 0;
+  fname = NULL;
+  mu_run_test(test_frame);
+
+  nchunks = 0;
+  fname = "test_frame_nc0.b2frame";
   mu_run_test(test_frame);
 
   nchunks = 1;
+  fname = NULL;
+  mu_run_test(test_frame);
+
+  nchunks = 1;
+  fname = "test_frame_nc1.b2frame";
   mu_run_test(test_frame);
 
   nchunks = 10;
+  fname = NULL;
+  mu_run_test(test_frame);
+
+  nchunks = 10;
+  fname = "test_frame_nc10.b2frame";
   mu_run_test(test_frame);
 
   return EXIT_SUCCESS;
