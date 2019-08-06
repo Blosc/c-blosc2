@@ -266,7 +266,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   assert(hsize2 == current_header_len);  // sanity check
 
   // Map size + int16 size
-  assert((hsize2 - hsize) < (1 << 16));
+  assert((hsize2 - hsize) < (1U << 16));
   uint16_t map_size = (uint16_t) (hsize2 - hsize);
   swap_store(h2 + FRAME_IDX_SIZE, &map_size, sizeof(map_size));
 
@@ -676,10 +676,13 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
   schunk->dctx = blosc2_create_dctx(*dparams);
   free(dparams);
 
-  if (!sparse || nchunks == 0) {
-    // We are done, so leave here
+  if (!sparse) {
     // Make explicit that the frame has a super-chunk attached
     frame->schunk = schunk;
+  }
+
+  if (!sparse || nchunks == 0) {
+    // We are done, so leave here
     return schunk;
   }
 
@@ -1088,6 +1091,12 @@ int blosc2_free_frame(blosc2_frame *frame) {
   if (frame->fname != NULL) {
     free(frame->fname);
   }
+
+  if (frame->schunk->frame != NULL) {
+    // Remove the back reference to frame
+    frame->schunk->frame = NULL;
+  }
+
   free(frame);
 
   return 0;

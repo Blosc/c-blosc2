@@ -14,11 +14,14 @@
 
 #define CHUNKSIZE (200 * 1000)
 #define NTHREADS (2)
+#define MIN_FRAME_LEN (74)  // the minimum frame lenght as of now
 
 /* Global vars */
+int nchunks_[] = {0, 1, 2, 10};
 int tests_run = 0;
 int nchunks;
 bool free_new;
+bool sparse_schunk;
 char *fname;
 
 
@@ -44,38 +47,52 @@ static char* test_frame() {
   blosc2_frame* frame = blosc2_new_frame(fname);
   schunk = blosc2_new_schunk(cparams, dparams, frame);
 
-  if (free_new) {
-    if (fname != NULL) {
-      blosc2_free_schunk(schunk);
-      blosc2_free_frame(frame);
-      frame = blosc2_frame_from_file(fname);
-      schunk = blosc2_schunk_from_frame(frame, false);
-    } else {
-      blosc2_free_schunk(schunk);
-      schunk = blosc2_schunk_from_frame(frame, false);
+  if (sparse_schunk) {
+    // When using sparse super-chunks, these are not backed by a frame anymore, so
+    // it should be possible to get rid of it
+    blosc2_free_frame(frame);
+  }
+  else {
+    if (free_new) {
+      if (fname != NULL) {
+        blosc2_free_schunk(schunk);
+        blosc2_free_frame(frame);
+        frame = blosc2_frame_from_file(fname);
+        schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
+      } else {
+        blosc2_free_schunk(schunk);
+        schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
+      }
     }
   }
 
   // Feed it with data
-  int nchunks_ = 0;
+  int _nchunks = 0;
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
-    nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
+    _nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append in frame", nchunk >= 0);
   }
-  mu_assert("ERROR: wrong number of append chunks", nchunks_ == nchunks);
+  mu_assert("ERROR: wrong number of append chunks", _nchunks == nchunks);
 
-  if (free_new) {
-    if (fname != NULL) {
-      blosc2_free_schunk(schunk);
-      blosc2_free_frame(frame);
-      frame = blosc2_frame_from_file(fname);
-      schunk = blosc2_schunk_from_frame(frame, false);
-    } else {
-      blosc2_free_schunk(schunk);
-      schunk = blosc2_schunk_from_frame(frame, false);
+  if (!sparse_schunk) {
+    mu_assert("ERROR: frame->len must be larger or equal than schunk->cbytes",
+              frame->len >= schunk->cbytes + MIN_FRAME_LEN);
+  }
+
+  if (!sparse_schunk) {
+    if (free_new) {
+      if (fname != NULL) {
+        blosc2_free_schunk(schunk);
+        blosc2_free_frame(frame);
+        frame = blosc2_frame_from_file(fname);
+        schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
+      } else {
+        blosc2_free_schunk(schunk);
+        schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
+      }
     }
   }
 
@@ -97,7 +114,9 @@ static char* test_frame() {
 
   /* Free resources */
   blosc2_free_schunk(schunk);
-  blosc2_free_frame(frame);
+  if (!sparse_schunk) {
+    blosc2_free_frame(frame);
+  }
   /* Destroy the Blosc environment */
   blosc_destroy();
 
@@ -106,65 +125,23 @@ static char* test_frame() {
 
 
 static char *all_tests() {
-  nchunks = 0;
-  fname = NULL;
-  free_new = false;
-  mu_run_test(test_frame);
 
-  nchunks = 0;
-  fname = "test_frame_nc.b2frame";
-  free_new = false;
-  mu_run_test(test_frame);
-
-  nchunks = 0;
-  fname = NULL;
-  free_new = true;
-  mu_run_test(test_frame);
-
-  nchunks = 0;
-  fname = "test_frame_nc0.b2frame";
-  free_new = true;
-  mu_run_test(test_frame);
-
-  nchunks = 1;
-  fname = NULL;
-  free_new = false;
-  mu_run_test(test_frame);
-
-  nchunks = 1;
-  fname = "test_frame_nc1.b2frame";
-  free_new = false;
-  mu_run_test(test_frame);
-
-  nchunks = 1;
-  fname = NULL;
-  free_new = true;
-  mu_run_test(test_frame);
-
-  nchunks = 1;
-  fname = "test_frame_nc1.b2frame";
-  free_new = true;
-  mu_run_test(test_frame);
-
-  nchunks = 10;
-  fname = NULL;
-  free_new = false;
-  mu_run_test(test_frame);
-
-  nchunks = 10;
-  fname = "test_frame_nc10.b2frame";
-  free_new = false;
-  mu_run_test(test_frame);
-
-  nchunks = 10;
-  fname = NULL;
-  free_new = true;
-  mu_run_test(test_frame);
-
-  nchunks = 10;
-  fname = "test_frame_nc10.b2frame";
-  free_new = true;
-  mu_run_test(test_frame);
+  // Iterate over all different parameters
+  char buf[256];
+  for (int i = 0; i < 4; i++) {
+    nchunks = nchunks_[i];
+    for (int ifree_new = 0; ifree_new < 2; ifree_new++) {
+      for (int isparse_schunk = 0; isparse_schunk < 2; isparse_schunk++) {
+        free_new = (bool) ifree_new;
+        sparse_schunk = (bool) isparse_schunk;
+        fname = NULL;
+        mu_run_test(test_frame);
+        snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
+        fname = buf;
+        mu_run_test(test_frame);
+      }
+    }
+  }
 
   return EXIT_SUCCESS;
 }
