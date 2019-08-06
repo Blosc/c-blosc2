@@ -15,6 +15,7 @@
 #include "blosc.h"
 #include "blosc-private.h"
 #include "context.h"
+#include "frame.h"
 
 #include "zstd.h"
 #include "zstd_errors.h"
@@ -100,7 +101,6 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
 
   schunk->frame = frame;
   if (frame != NULL) {
-    frame->schunk = schunk;
     if (frame->len == 0) {
       // Initialize frame (basically, encode the header)
       int64_t frame_len = blosc2_schunk_to_frame(schunk, frame);
@@ -167,7 +167,7 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
     schunk->data[nchunks] = chunk;
   }
   else {
-    blosc2_frame_append_chunk(schunk->frame, chunk);
+    frame_append_chunk(schunk->frame, chunk, schunk);
   }
 
   /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n", */

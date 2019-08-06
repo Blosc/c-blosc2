@@ -1411,6 +1411,14 @@ static int write_compression_header(blosc2_context* context,
   int dont_split;
   int dict_training = context->use_dict && (context->dict_cdict == NULL);
 
+  // Set the whole header to zeros so that the reserved values are zeroed
+  if (extended_header) {
+    memset(context->dest, 0, BLOSC_EXTENDED_HEADER_LENGTH);
+  }
+  else {
+    memset(context->dest, 0, BLOSC_MIN_HEADER_LENGTH);
+  }
+
   /* Write version header for this block */
   context->dest[0] = BLOSC_VERSION_FORMAT;
 

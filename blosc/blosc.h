@@ -757,7 +757,6 @@ typedef struct {
   uint8_t* sdata;  //!< The in-memory serialized data
   int64_t len;     //!< The current length of the frame in (compressed) bytes
   int64_t maxlen;  //!< The maximum length of the frame; if 0, there is no maximum
-  struct blosc2_schunk *schunk;    //!< The pointer to super-chunk (if it exists).
   struct blosc2_frame_metalayer *metalayers[BLOSC2_MAX_METALAYERS]; //!< The array of metalayers.
   int16_t nmetalayers;  //!< The number of metalayers in the frame
 } blosc2_frame;
@@ -992,16 +991,6 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(const char *fname);
  * @return The super-chunk corresponding to the frame.
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse);
-
-/**
- * @brief Append an existing chunk into a frame.
- *
- * @param frame The frame to which data will be appended.
- * @param chunk The chunk of compressed data to append.
- *
- * @return The frame pointer. If an error occurs NULL will be returned.
- */
-BLOSC_EXPORT void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk);
 
 /**
  * @brief Return a compressed chunk that is part of a frame in the @p chunk parameter.

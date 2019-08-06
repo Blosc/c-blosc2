@@ -349,7 +349,6 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
     off_cbytes = blosc2_compress_ctx(cctx, off_nbytes, data_tmp, off_chunk,
                                      off_nbytes + BLOSC_MAX_OVERHEAD);
     blosc2_free_ctx(cctx);
-    free(data_tmp);
     if (off_cbytes < 0) {
       free(off_chunk);
       free(h2);
@@ -359,6 +358,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   else {
     off_cbytes = 0;
   }
+  free(data_tmp);
 
   // Now that we know them, fill the chunksize and frame length in header2
   swap_store(h2 + FRAME_CHUNKSIZE, &chunksize, sizeof(chunksize));
@@ -598,7 +598,7 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
 }
 
 
-int frame_update_meta(blosc2_frame* frame) {
+int frame_update_meta(blosc2_frame* frame, blosc2_schunk* schunk) {
   uint8_t* header = frame->sdata;
 
   assert(frame->len > 0);
@@ -614,7 +614,7 @@ int frame_update_meta(blosc2_frame* frame) {
   swap_store(&prev_h2len, header + HEADER2_LEN, sizeof(prev_h2len));
 
   // Build a new header
-  uint8_t* h2 = new_header2_frame(frame->schunk, frame);
+  uint8_t* h2 = new_header2_frame(schunk, frame);
   uint32_t h2len;
   swap_store(&h2len, h2 + HEADER2_LEN, sizeof(h2len));
 
@@ -675,11 +675,6 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
   blosc2_get_dparams(schunk, &dparams);
   schunk->dctx = blosc2_create_dctx(*dparams);
   free(dparams);
-
-  if (!sparse) {
-    // Make explicit that the frame has a super-chunk attached
-    frame->schunk = schunk;
-  }
 
   if (!sparse || nchunks == 0) {
     // We are done, so leave here
@@ -834,7 +829,7 @@ int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, boo
 
 
 /* Append an existing chunk into a frame. */
-void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
+void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk) {
   int32_t header_len;
   int64_t frame_len;
   int64_t nbytes;
@@ -940,11 +935,12 @@ void* blosc2_frame_append_chunk(blosc2_frame* frame, void* chunk) {
     }
     fclose(fp);
   }
+  free(chunk);
   free(off_chunk);
 
   /* Update header and other metainfo (namespaces) in frame */
   frame->len = new_frame_len;
-  ret = frame_update_meta(frame);
+  ret = frame_update_meta(frame, schunk);
   if (ret < 0) {
     fprintf(stderr, "unable to update meta info from frame");
     return NULL;
@@ -1090,11 +1086,6 @@ int blosc2_free_frame(blosc2_frame *frame) {
 
   if (frame->fname != NULL) {
     free(frame->fname);
-  }
-
-  if (frame->schunk->frame != NULL) {
-    // Remove the back reference to frame
-    frame->schunk->frame = NULL;
   }
 
   free(frame);

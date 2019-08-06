@@ -14,7 +14,7 @@
 
 #define CHUNKSIZE (200 * 1000)
 #define NTHREADS (2)
-#define MIN_FRAME_LEN (74)  // the minimum frame lenght as of now
+#define MIN_FRAME_LEN (74)  // the minimum frame length as of now
 
 /* Global vars */
 int nchunks_[] = {0, 1, 2, 10};
@@ -47,12 +47,7 @@ static char* test_frame() {
   blosc2_frame* frame = blosc2_new_frame(fname);
   schunk = blosc2_new_schunk(cparams, dparams, frame);
 
-  if (sparse_schunk) {
-    // When using sparse super-chunks, these are not backed by a frame anymore, so
-    // it should be possible to get rid of it
-    blosc2_free_frame(frame);
-  }
-  else {
+  if (!sparse_schunk) {
     if (free_new) {
       if (fname != NULL) {
         blosc2_free_schunk(schunk);
@@ -114,9 +109,7 @@ static char* test_frame() {
 
   /* Free resources */
   blosc2_free_schunk(schunk);
-  if (!sparse_schunk) {
-    blosc2_free_frame(frame);
-  }
+  blosc2_free_frame(frame);
   /* Destroy the Blosc environment */
   blosc_destroy();
 
@@ -128,7 +121,7 @@ static char *all_tests() {
 
   // Iterate over all different parameters
   char buf[256];
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < (int)sizeof(nchunks_) / (int)sizeof(int); i++) {
     nchunks = nchunks_[i];
     for (int ifree_new = 0; ifree_new < 2; ifree_new++) {
       for (int isparse_schunk = 0; isparse_schunk < 2; isparse_schunk++) {
