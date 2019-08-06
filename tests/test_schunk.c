@@ -19,7 +19,7 @@ int tests_run = 0;
 int nchunks;
 
 
-static char* test_frame() {
+static char* test_schunk() {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -32,14 +32,13 @@ static char* test_frame() {
   /* Initialize the Blosc compressor */
   blosc_init();
 
-  /* Create a frame container */
+  /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_frame* frame = blosc2_new_frame(NULL);
-  schunk = blosc2_new_schunk(cparams, dparams, frame);
+  schunk = blosc2_new_schunk(cparams, dparams, NULL);
 
   // Feed it with data
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
@@ -68,7 +67,6 @@ static char* test_frame() {
 
   /* Free resources */
   blosc2_free_schunk(schunk);
-  blosc2_free_frame(frame);
   /* Destroy the Blosc environment */
   blosc_destroy();
 
@@ -77,13 +75,13 @@ static char* test_frame() {
 
 static char *all_tests() {
   nchunks = 0;
-  mu_run_test(test_frame);
+  mu_run_test(test_schunk);
 
   nchunks = 1;
-  mu_run_test(test_frame);
+  mu_run_test(test_schunk);
 
   nchunks = 10;
-  mu_run_test(test_frame);
+  mu_run_test(test_schunk);
 
   return EXIT_SUCCESS;
 }
