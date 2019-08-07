@@ -13,6 +13,10 @@
 #include "test_common.h"
 #include "frame.h"
 
+#ifdef WINDOWS
+#define snprintf _snprintf
+#endif
+
 #define CHUNKSIZE (200 * 1000)
 #define NTHREADS (2)
 
