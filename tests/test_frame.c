@@ -13,7 +13,7 @@
 #include "test_common.h"
 #include "frame.h"
 
-#ifdef WINDOWS
+#if defined(_WIN32)
 #define snprintf _snprintf
 #endif
 
