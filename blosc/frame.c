@@ -95,14 +95,14 @@ blosc2_frame* blosc2_new_frame(char* fname) {
 
 void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   assert(frame != NULL);
-  uint8_t* h2 = calloc(HEADER2_MINLEN, 1);
+  uint8_t* h2 = calloc(FRAME_HEADER2_MINLEN, 1);
   uint8_t* h2p = h2;
 
-  int16_t nnspaces = frame->nmetalayers;
-  bool has_nspaces = nnspaces > 0;
+  int16_t nmetalayers = frame->nmetalayers;
+  bool has_metalayers = nmetalayers > 0;
 
   // The msgpack header will start as a fix array
-  if (has_nspaces) {
+  if (has_metalayers) {
     *h2p = 0x90 + 12;  // array with 12 elements
   }
   else {
@@ -113,14 +113,14 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   // Magic number
   *h2p = 0xa0 + 8;  // str with 8 elements
   h2p += 1;
-  assert(h2p - h2 < HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
   strcpy((char*)h2p, "b2frame");
   h2p += 8;
 
   // Header size
   *h2p = 0xd2;  // int32
   h2p += 1 + 4;
-  assert(h2p - h2 < HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Total frame size
   *h2p = 0xcf;  // uint64
@@ -128,35 +128,35 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int64_t flen = frame->len;
   swap_store(h2 + FRAME_LEN, &flen, sizeof(flen));
   h2p += 1 + 8;
-  assert(h2p - h2 < HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Flags
   *h2p = 0xa0 + 4;  // str with 4 elements
   h2p += 1;
-  assert(h2p - h2 < HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // General flags
   *h2p = 0x4 + FRAME_VERSION;  // frame + version
   *h2p += 0x20;  // 64 bit offsets
   h2p += 1;
-  assert(h2p - h2 < HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Filter flags
   *h2p = 0x6;  // shuffle + split_blocks
   *h2p += 0;  // same as typesize
   h2p += 1;
-  assert(h2p - h2 < HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Codec flags
   *h2p = schunk->compcode;
   *h2p += (schunk->clevel) << 4u;  // clevel
   h2p += 1;
-  assert(h2p - h2 < HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Reserved flags
   *h2p = 0;
   h2p += 1;
-  assert(h2p - h2 < HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Uncompressed size
   *h2p = 0xd3;  // int64
@@ -164,7 +164,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int64_t nbytes = schunk->nbytes;
   swap_store(h2p, &nbytes, sizeof(nbytes));
   h2p += 8;
-  assert(h2p - h2 < HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Compressed size
   *h2p = 0xd3;  // int64
@@ -172,7 +172,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int64_t cbytes = schunk->cbytes;
   swap_store(h2p, &cbytes, sizeof(cbytes));
   h2p += 8;
-  assert(h2p - h2 < HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Type size
   *h2p = 0xd2;  // int32
@@ -180,7 +180,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int32_t typesize = schunk->typesize;
   swap_store(h2p, &typesize, sizeof(typesize));
   h2p += 4;
-  assert(h2p - h2 < HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Chunk size
   *h2p = 0xd2;  // int32
@@ -188,7 +188,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int32_t chunksize = schunk->chunksize;
   swap_store(h2p, &chunksize, sizeof(chunksize));
   h2p += 4;
-  assert(h2p - h2 < HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Number of threads for compression
   *h2p = 0xd1;  // int16
@@ -196,7 +196,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int16_t nthreads = (int16_t)schunk->cctx->nthreads;
   swap_store(h2p, &nthreads, sizeof(nthreads));
   h2p += 2;
-  assert(h2p - h2 < HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Number of threads for decompression
   *h2p = 0xd1;  // int16
@@ -204,23 +204,23 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   nthreads = (int16_t)schunk->dctx->nthreads;
   swap_store(h2p, &nthreads, sizeof(nthreads));
   h2p += 2;
-  assert(h2p - h2 < HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
-  // Boolean for checking the existence of namespaces
-  *h2p = (nnspaces > 0) ? (uint8_t)0xc3 : (uint8_t)0xc2;  // bool for FRAME_HAS_NAMESPACES
+  // Boolean for checking the existence of metalayers
+  *h2p = (nmetalayers > 0) ? (uint8_t)0xc3 : (uint8_t)0xc2;  // bool for FRAME_HAS_metalayerS
   h2p += 1;
-  assert(h2p - h2 == HEADER2_MINLEN);
+  assert(h2p - h2 == FRAME_HEADER2_MINLEN);
 
-  int32_t hsize = HEADER2_MINLEN;
-  if (nnspaces == 0) {
+  int32_t hsize = FRAME_HEADER2_MINLEN;
+  if (nmetalayers == 0) {
     goto out;
   }
 
-  // Make space for the header of namespaces (array marker, size, map of offsets)
+  // Make space for the header of metalayers (array marker, size, map of offsets)
   h2 = realloc(h2, (size_t)hsize + 1 + 1 + 2 + 1 + 2);
   h2p = h2 + hsize;
 
-  // The msgpack header for the namespaces (array_marker, size, map of offsets, list of values)
+  // The msgpack header for the metalayers (array_marker, size, map of offsets, list of values)
   *h2p = 0x90 + 3;  // array with 3 elements
   h2p += 1;
 
@@ -228,29 +228,29 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   *h2p = 0xcd;  // uint16
   h2p += 1 + 2;
 
-  // Map (index) of offsets for optional namespaces
+  // Map (index) of offsets for optional metalayers
   *h2p = 0xde;  // map 16 with N keys
   h2p += 1;
-  swap_store(h2p, &nnspaces, sizeof(nnspaces));
-  h2p += sizeof(nnspaces);
+  swap_store(h2p, &nmetalayers, sizeof(nmetalayers));
+  h2p += sizeof(nmetalayers);
   int32_t current_header_len = (int32_t)(h2p - h2);
-  int32_t *offtooff = malloc(nnspaces * sizeof(int32_t));
-  for (int nnspace = 0; nnspace < nnspaces; nnspace++) {
+  int32_t *offtooff = malloc(nmetalayers * sizeof(int32_t));
+  for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
     assert(frame != NULL);
-    blosc2_frame_metalayer *nspace = frame->metalayers[nnspace];
-    uint8_t nslen = (uint8_t) strlen(nspace->name);
+    blosc2_frame_metalayer *metalayer = frame->metalayers[nmetalayer];
+    uint8_t nslen = (uint8_t) strlen(metalayer->name);
     h2 = realloc(h2, (size_t)current_header_len + 1 + nslen + 1 + 4);
     h2p = h2 + current_header_len;
-    // Store the namespace
-    assert(nslen < (1 << 5));  // namespace strings cannot be longer than 32 bytes
+    // Store the metalayer
+    assert(nslen < (1U << 5U));  // metalayer strings cannot be longer than 32 bytes
     *h2p = (uint8_t)0xa0 + nslen;  // str
     h2p += 1;
-    memcpy(h2p, nspace->name, nslen);
+    memcpy(h2p, metalayer->name, nslen);
     h2p += nslen;
-    // Space for storing the offset for the value of this namespace
+    // Space for storing the offset for the value of this metalayer
     *h2p = 0xd2;  // int 32
     h2p += 1;
-    offtooff[nnspace] = (int32_t)(h2p - h2);
+    offtooff[nmetalayer] = (int32_t)(h2p - h2);
     h2p += 4;
     current_header_len += 1 + nslen + 1 + 4;
   }
@@ -258,7 +258,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   assert(hsize2 == current_header_len);  // sanity check
 
   // Map size + int16 size
-  assert((hsize2 - hsize) < (1U << 16));
+  assert((hsize2 - hsize) < (1U << 16U));
   uint16_t map_size = (uint16_t) (hsize2 - hsize);
   swap_store(h2 + FRAME_IDX_SIZE, &map_size, sizeof(map_size));
 
@@ -270,24 +270,24 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   // Now, store the values in an array
   *h2p = 0xdc;  // array 16 with N elements
   h2p += 1;
-  swap_store(h2p, &nnspaces, sizeof(nnspaces));
-  h2p += sizeof(nnspaces);
+  swap_store(h2p, &nmetalayers, sizeof(nmetalayers));
+  h2p += sizeof(nmetalayers);
   current_header_len = (int32_t)(h2p - h2);
-  for (int nnspace = 0; nnspace < nnspaces; nnspace++) {
+  for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
     assert(frame != NULL);
-    blosc2_frame_metalayer *nspace = frame->metalayers[nnspace];
-    h2 = realloc(h2, (size_t)current_header_len + 1 + 4 + nspace->content_len);
+    blosc2_frame_metalayer *metalayer = frame->metalayers[nmetalayer];
+    h2 = realloc(h2, (size_t)current_header_len + 1 + 4 + metalayer->content_len);
     h2p = h2 + current_header_len;
-    // Store the serialized contents for this namespace
+    // Store the serialized contents for this metalayer
     *h2p = 0xc6;  // bin 32
     h2p += 1;
-    swap_store(h2p, &(nspace->content_len), sizeof(nspace->content_len));
+    swap_store(h2p, &(metalayer->content_len), sizeof(metalayer->content_len));
     h2p += 4;
-    memcpy(h2p, nspace->content, nspace->content_len);  // buffer, no need to swap
-    h2p += nspace->content_len;
+    memcpy(h2p, metalayer->content, metalayer->content_len);  // buffer, no need to swap
+    h2p += metalayer->content_len;
     // Update the offset now that we know it
-    swap_store(h2 + offtooff[nnspace], &current_header_len, sizeof(current_header_len));
-    current_header_len += 1 + 4 + nspace->content_len;
+    swap_store(h2 + offtooff[nmetalayer], &current_header_len, sizeof(current_header_len));
+    current_header_len += 1 + 4 + metalayer->content_len;
   }
   free(offtooff);
   assert(hsize == current_header_len);  // sanity check
@@ -295,7 +295,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   out:
   // Set the length of the whole header now that we know it
   hsize = (int32_t)(h2p - h2);
-  swap_store(h2 + HEADER2_LEN, &hsize, sizeof(hsize));
+  swap_store(h2 + FRAME_HEADER2_LEN, &hsize, sizeof(hsize));
 
   return h2;
 }
@@ -309,7 +309,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
   uint8_t* h2 = new_header2_frame(schunk, frame);
   uint32_t h2len;
-  swap_store(&h2len, h2 + HEADER2_LEN, sizeof(h2len));
+  swap_store(&h2len, h2 + FRAME_HEADER2_LEN, sizeof(h2len));
 
   // Build the offsets chunk
   int32_t chunksize = 0;
@@ -414,24 +414,24 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   char* fname_cpy = malloc(strlen(fname) + 1);
   frame->fname = strcpy(fname_cpy, fname);
 
-  uint8_t* header = malloc(HEADER2_MINLEN);
+  uint8_t* header = malloc(FRAME_HEADER2_MINLEN);
   FILE* fp = fopen(fname, "rb");
-  size_t rbytes = fread(header, 1, HEADER2_MINLEN, fp);
-  assert(rbytes == HEADER2_MINLEN);
+  size_t rbytes = fread(header, 1, FRAME_HEADER2_MINLEN, fp);
+  assert(rbytes == FRAME_HEADER2_MINLEN);
 
   int64_t frame_len;
   swap_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
   frame->len = frame_len;
 
-  bool has_nspaces = (header[FRAME_HAS_NSPACES] == 0xc3) ? true : false;
+  bool has_metalayers = (header[FRAME_HAS_METALAYERS] == 0xc3) ? true : false;
 
   free(header);
 
-  if (!has_nspaces) {
+  if (!has_metalayers) {
     goto out;
   }
 
-  // Get the size for the index of namespaces
+  // Get the size for the index of metalayers
   uint16_t idx_size;
   fseek(fp, FRAME_IDX_SIZE, SEEK_SET);
   rbytes = fread(&idx_size, 1, sizeof(uint16_t), fp);
@@ -439,34 +439,34 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
 
   swap_store(&idx_size, &idx_size, sizeof(idx_size));
 
-  // Read the index of namespaces for namespaces
-  uint8_t* nspaces_idx = malloc(idx_size);
+  // Read the index of metalayers for metalayers
+  uint8_t* metalayers_idx = malloc(idx_size);
   fseek(fp, FRAME_IDX_SIZE + 2, SEEK_SET);
-  rbytes = fread(nspaces_idx, 1, idx_size, fp);
+  rbytes = fread(metalayers_idx, 1, idx_size, fp);
   assert(rbytes == idx_size);
-  assert(nspaces_idx[0] == 0xde);   // sanity check
-  uint8_t* idxp = nspaces_idx + 1;
-  uint16_t nnspaces;
-  swap_store(&nnspaces, idxp, sizeof(uint16_t));
+  assert(metalayers_idx[0] == 0xde);   // sanity check
+  uint8_t* idxp = metalayers_idx + 1;
+  uint16_t nmetalayers;
+  swap_store(&nmetalayers, idxp, sizeof(uint16_t));
   idxp += 2;
-  frame->nmetalayers = nnspaces;
+  frame->nmetalayers = nmetalayers;
 
-  // Populate the namespace and serialized value for each client
-  for (int nnspace = 0; nnspace < nnspaces; nnspace++) {
+  // Populate the metalayer and serialized value for each client
+  for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
     assert((*idxp & 0xe0) == 0xa0);   // sanity check
-    blosc2_frame_metalayer* nspace = calloc(sizeof(blosc2_frame_metalayer), 1);
-    frame->metalayers[nnspace] = nspace;
+    blosc2_frame_metalayer* metalayer = calloc(sizeof(blosc2_frame_metalayer), 1);
+    frame->metalayers[nmetalayer] = metalayer;
 
-    // Populate the namespace string
+    // Populate the metalayer string
     int8_t nslen = *idxp & (uint8_t)0x1f;
     idxp += 1;
     char* ns = malloc((size_t)nslen + 1);
     memcpy(ns, idxp, nslen);
     ns[nslen] = '\0';
     idxp += nslen;
-    nspace->name = ns;
+    metalayer->name = ns;
 
-    // Populate the serialized value for this name space
+    // Populate the serialized value for this metalayer
     // Get the offset
     assert((*idxp & 0xff) == 0xd2);   // sanity check
     idxp += 1;
@@ -487,17 +487,17 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
     rbytes = fread(&content_len, 1, 4, fp);
     assert(rbytes == 4);
     swap_store(&content_len, &content_len, sizeof(content_len));
-    nspace->content_len = content_len;
+    metalayer->content_len = content_len;
 
     // Finally, read the content
     char* content = malloc((size_t)content_len);
     fseek(fp, offset + 1 + 4, SEEK_SET);
     rbytes = fread(content, 1, (size_t)content_len, fp);
     assert(rbytes == (size_t)content_len);
-    nspace->content = (uint8_t*)content;
+    metalayer->content = (uint8_t*)content;
   }
 
-  free(nspaces_idx);
+  free(metalayers_idx);
 
 out:
   fclose(fp);
@@ -553,16 +553,16 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
   assert(frame->len > 0);
 
   if (frame->sdata == NULL) {
-    header = malloc(HEADER2_MINLEN);
+    header = malloc(FRAME_HEADER2_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
-    size_t rbytes = fread(header, 1, HEADER2_MINLEN, fp);
-    assert(rbytes == HEADER2_MINLEN);
+    size_t rbytes = fread(header, 1, FRAME_HEADER2_MINLEN, fp);
+    assert(rbytes == FRAME_HEADER2_MINLEN);
     framep = header;
     fclose(fp);
   }
 
   // Fetch some internal lengths
-  swap_store(header_len, framep + HEADER2_LEN, sizeof(*header_len));
+  swap_store(header_len, framep + FRAME_HEADER2_LEN, sizeof(*header_len));
   swap_store(frame_len, framep + FRAME_LEN, sizeof(*frame_len));
   swap_store(nbytes, framep + FRAME_NBYTES, sizeof(*nbytes));
   swap_store(cbytes, framep + FRAME_CBYTES, sizeof(*cbytes));
@@ -597,19 +597,19 @@ int frame_update_meta(blosc2_frame* frame, blosc2_schunk* schunk) {
   assert(frame->len > 0);
 
   if (frame->sdata == NULL) {
-    header = malloc(HEADER2_MINLEN);
+    header = malloc(FRAME_HEADER2_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
-    size_t rbytes = fread(header, 1, HEADER2_MINLEN, fp);
-    assert(rbytes == HEADER2_MINLEN);
+    size_t rbytes = fread(header, 1, FRAME_HEADER2_MINLEN, fp);
+    assert(rbytes == FRAME_HEADER2_MINLEN);
     fclose(fp);
   }
   uint32_t prev_h2len;
-  swap_store(&prev_h2len, header + HEADER2_LEN, sizeof(prev_h2len));
+  swap_store(&prev_h2len, header + FRAME_HEADER2_LEN, sizeof(prev_h2len));
 
   // Build a new header
   uint8_t* h2 = new_header2_frame(schunk, frame);
   uint32_t h2len;
-  swap_store(&h2len, h2 + HEADER2_LEN, sizeof(h2len));
+  swap_store(&h2len, h2 + FRAME_HEADER2_LEN, sizeof(h2len));
 
   assert(prev_h2len == h2len);  // sanity check: the new header size should equal the previous one
 
@@ -931,7 +931,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   free(chunk);
   free(off_chunk);
 
-  /* Update header and other metainfo (namespaces) in frame */
+  /* Update header and other metainfo (metalayers) in frame */
   frame->len = new_frame_len;
   ret = frame_update_meta(frame, schunk);
   if (ret < 0) {
@@ -971,94 +971,94 @@ int frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, size_t n
 }
 
 
-/* Find whether the frame has a namespace or not.
+/* Find whether the frame has a metalayer or not.
  *
- * If successful, return the index of the namespace.  Else, return a negative value.
+ * If successful, return the index of the metalayer.  Else, return a negative value.
  * */
 int blosc2_frame_has_metalayer(blosc2_frame *frame, char *name) {
     if (strlen(name) > BLOSC2_METALAYER_NAME_MAXLEN) {
-        fprintf(stderr, "namespaces cannot be larger than %d chars\n", BLOSC2_METALAYER_NAME_MAXLEN);
+        fprintf(stderr, "metalayers cannot be larger than %d chars\n", BLOSC2_METALAYER_NAME_MAXLEN);
         return -1;
     }
 
-    for (int nnspace = 0; nnspace < frame->nmetalayers; nnspace++) {
-        if (strcmp(name, frame->metalayers[nnspace]->name) == 0) {
-            return nnspace;  // Found
+    for (int nmetalayer = 0; nmetalayer < frame->nmetalayers; nmetalayer++) {
+        if (strcmp(name, frame->metalayers[nmetalayer]->name) == 0) {
+            return nmetalayer;  // Found
         }
     }
     return -1;  // Not found
 }
 
 
-/* Add content into a new namespace.
+/* Add content into a new metalayer.
  *
- * If successful, return the index of the new namespace.  Else, return a negative value.
+ * If successful, return the index of the new metalayer.  Else, return a negative value.
  * */
 int blosc2_frame_add_metalayer(blosc2_frame *frame, char *name, uint8_t *content,
                                uint32_t content_len) {
-    int nnspace = blosc2_frame_has_metalayer(frame, name);
-    if (nnspace >= 0) {
-        fprintf(stderr, "namespace \"%s\" already exists", name);
+    int nmetalayer = blosc2_frame_has_metalayer(frame, name);
+    if (nmetalayer >= 0) {
+        fprintf(stderr, "metalayer \"%s\" already exists", name);
         return -2;
     }
 
-    // Add the namespace
-    blosc2_frame_metalayer *nspace = malloc(sizeof(blosc2_frame_metalayer));
+    // Add the metalayer
+    blosc2_frame_metalayer *metalayer = malloc(sizeof(blosc2_frame_metalayer));
     char* name_ = malloc(strlen(name) + 1);
     strcpy(name_, name);
-    nspace->name = name_;
+    metalayer->name = name_;
     uint8_t* content_buf = malloc((size_t)content_len);
     memcpy(content_buf, content, content_len);
-    nspace->content = content_buf;
-    nspace->content_len = content_len;
-    frame->metalayers[frame->nmetalayers] = nspace;
+    metalayer->content = content_buf;
+    metalayer->content_len = content_len;
+    frame->metalayers[frame->nmetalayers] = metalayer;
     frame->nmetalayers += 1;
 
     return frame->nmetalayers - 1;
 }
 
 
-/* Update the content of an existing namespace.
+/* Update the content of an existing metalayer.
  *
- * If successful, return the index of the new namespace.  Else, return a negative value.
+ * If successful, return the index of the new metalayer.  Else, return a negative value.
  * */
 int blosc2_frame_update_metalayer(blosc2_frame *frame, char *name, uint8_t *content,
                                   uint32_t content_len) {
-    int nnspace = blosc2_frame_has_metalayer(frame, name);
-    if (nnspace < 0) {
-        fprintf(stderr, "namespace \"%s\" not found\n", name);
-        return nnspace;
+    int nmetalayer = blosc2_frame_has_metalayer(frame, name);
+    if (nmetalayer < 0) {
+        fprintf(stderr, "metalayer \"%s\" not found\n", name);
+        return nmetalayer;
     }
 
-    blosc2_frame_metalayer *nspace = frame->metalayers[nnspace];
-    if (content_len > (uint32_t)nspace->content_len) {
-        fprintf(stderr, "`content_len` cannot exceed the existing size of %d bytes", nspace->content_len);
-        return nnspace;
+    blosc2_frame_metalayer *metalayer = frame->metalayers[nmetalayer];
+    if (content_len > (uint32_t)metalayer->content_len) {
+        fprintf(stderr, "`content_len` cannot exceed the existing size of %d bytes", metalayer->content_len);
+        return nmetalayer;
     }
 
-    // Update the contents of the namespace
-    memcpy(nspace->content, content, content_len);
-    return nnspace;
+    // Update the contents of the metalayer
+    memcpy(metalayer->content, content, content_len);
+    return nmetalayer;
 }
 
 
-/* Get the content out of a namespace.
+/* Get the content out of a metalayer.
  *
  * The `**content` receives a malloc'ed copy of the content.  The user is responsible of freeing it.
  *
- * If successful, return the index of the new namespace.  Else, return a negative value.
+ * If successful, return the index of the new metalayer.  Else, return a negative value.
  * */
 int blosc2_frame_get_metalayer(blosc2_frame *frame, char *name, uint8_t **content,
                                uint32_t *content_len) {
-    int nnspace = blosc2_frame_has_metalayer(frame, name);
-    if (nnspace < 0) {
-        fprintf(stderr, "namespace \"%s\" not found\n", name);
-        return nnspace;
+    int nmetalayer = blosc2_frame_has_metalayer(frame, name);
+    if (nmetalayer < 0) {
+        fprintf(stderr, "metalayer \"%s\" not found\n", name);
+        return nmetalayer;
     }
-    *content_len = (uint32_t)frame->metalayers[nnspace]->content_len;
+    *content_len = (uint32_t)frame->metalayers[nmetalayer]->content_len;
     *content = malloc((size_t)*content_len);
-    memcpy(*content, frame->metalayers[nnspace]->content, (size_t)*content_len);
-    return nnspace;
+    memcpy(*content, frame->metalayers[nmetalayer]->content, (size_t)*content_len);
+    return nmetalayer;
 }
 
 
