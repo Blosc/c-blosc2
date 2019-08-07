@@ -221,7 +221,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
       return -11;
     }
   } else {
-    chunksize = blosc2_frame_decompress_chunk(schunk->frame, nchunk, dest, nbytes);
+    chunksize = frame_decompress_chunk(schunk->frame, nchunk, dest, nbytes);
     if (chunksize < 0) {
       return -10;
     }
@@ -241,7 +241,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
 */
 int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, bool *needs_free) {
   if (schunk->frame != NULL) {
-    return blosc2_frame_get_chunk(schunk->frame, nchunk, chunk, needs_free);
+    return frame_get_chunk(schunk->frame, nchunk, chunk, needs_free);
   }
 
   if (nchunk >= schunk->nchunks) {

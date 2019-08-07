@@ -763,7 +763,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
  * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
  * is returned instead.
 */
-int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free) {
+int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free) {
   int32_t header_len;
   int64_t frame_len;
   int64_t nbytes;
@@ -861,7 +861,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   if ((nchunks > 0) && (nbytes_chunk < chunksize)) {
     uint8_t* last_chunk;
     bool needs_free;
-    int retcode = blosc2_frame_get_chunk(frame, nchunks - 1, &last_chunk, &needs_free);
+    int retcode = frame_get_chunk(frame, nchunks - 1, &last_chunk, &needs_free);
     if (retcode < 0) {
       fprintf(stderr,
               "cannot get the last chunk (in position %d)", nchunks - 1);
@@ -951,10 +951,10 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
 
 
 /* Decompress and return a chunk that is part of a frame. */
-int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, size_t nbytes) {
+int frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, size_t nbytes) {
   uint8_t* src;
   bool needs_free;
-  int retcode = blosc2_frame_get_chunk(frame, nchunk, &src, &needs_free);
+  int retcode = frame_get_chunk(frame, nchunk, &src, &needs_free);
   if (retcode < 0) {
     fprintf(stderr,
             "cannot get the chunk in position %d", nchunk);

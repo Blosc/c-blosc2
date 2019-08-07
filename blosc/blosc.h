@@ -993,41 +993,6 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(const char *fname);
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse);
 
 /**
- * @brief Return a compressed chunk that is part of a frame in the @p chunk parameter.
- *
- * If the frame is disk-based, a buffer is allocated for the (compressed) chunk,
- * and hence a free is needed. You can check if the chunk requires a free with the @p needs_free
- * parameter.
- * If the chunk does not need a free, it means that a pointer to the location in frame is returned
- * in the @p chunk parameter.
- *
- * @param frame The frame from which the chunk will be retrieved.
- * @param nchunk The chunk to be extracted (0 indexed).
- * @param chunk The pointer where the chunk pointer will be put.
- * @param needs_free The pointer to a boolean indicating whether the user is in charge
- * of freeing the chunk or not.
- *
- * @return The size of the (compressed) chunk. If some problem is detected, a negative code
- * is returned instead.
-*/
-BLOSC_EXPORT int blosc2_frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk,
-                                        bool *needs_free);
-
-/**
- * @brief Decompress and return a chunk that is part of a frame.
- *
- * @param frame The frame from which the chunk will be decompressed.
- * @param nchunk The chunk to be decompressed (0 indexed).
- * @param dest The buffer where decompressed data will be put.
- * @param nbytes The size of the @p dest buffer.
- *
- * @return The size of the decompressed chunk. If some problem is
- * detected, a negative code is returned instead.
- */
-BLOSC_EXPORT int blosc2_frame_decompress_chunk(blosc2_frame *frame, int nchunk,
-                                               void *dest, size_t nbytes);
-
-/**
  * @brief Find whether the frame has a metalayer or not.
  *
  * @param frame The frame from which the metalayer will be checked.
