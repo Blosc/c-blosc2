@@ -17,7 +17,7 @@
 
 #include "blosc2.h"
 #include "blosc-private.h"
-#include "blosc-common.h"
+#include "blosc2-common.h"
 
 #include "fastcopy.h"
 

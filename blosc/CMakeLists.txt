@@ -59,7 +59,7 @@ endif (NOT DEACTIVATE_ZSTD)
 include_directories(${BLOSC_INCLUDE_DIRS})
 
 # library sources
-set(SOURCES blosc2.c blosc-common.h blosclz.c fastcopy.c fastcopy.h schunk.c frame.c btune.c btune.h
+set(SOURCES blosc2.c blosc2-common.h blosclz.c fastcopy.c fastcopy.h schunk.c frame.c btune.c btune.h
         context.h delta.c delta.h shuffle-generic.c bitshuffle-generic.c trunc-prec.c trunc-prec.h
         timestamp.c)
 if (COMPILER_SUPPORT_SSE2)
@@ -267,7 +267,7 @@ endif (BUILD_STATIC)
 
 # install
 if (BLOSC_INSTALL)
-    install(FILES blosc2.h blosc-export.h DESTINATION include COMPONENT DEV)
+    install(FILES blosc2.h blosc2-export.h blosc2-common.h DESTINATION include COMPONENT DEV)
     if(BUILD_SHARED)
         install(TARGETS blosc_shared LIBRARY DESTINATION ${lib_dir} ARCHIVE DESTINATION ${lib_dir} RUNTIME DESTINATION bin COMPONENT LIB)
     endif(BUILD_SHARED)

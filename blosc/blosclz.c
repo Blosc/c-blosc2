@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include "blosclz.h"
 #include "fastcopy.h"
-#include "blosc-common.h"
+#include "blosc2-common.h"
 
 
 /*

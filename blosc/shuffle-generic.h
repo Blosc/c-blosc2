@@ -15,7 +15,7 @@
 #ifndef SHUFFLE_GENERIC_H
 #define SHUFFLE_GENERIC_H
 
-#include "blosc-common.h"
+#include "blosc2-common.h"
 #include <stdlib.h>
 
 #ifdef __cplusplus

@@ -11,7 +11,7 @@
 #ifndef SHUFFLE_SSE2_H
 #define SHUFFLE_SSE2_H
 
-#include "blosc-common.h"
+#include "blosc2-common.h"
 
 #ifdef __cplusplus
 extern "C" {

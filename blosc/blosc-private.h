@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#include "blosc-common.h"
+#include "blosc2-common.h"
 
 /*********************************************************************
 

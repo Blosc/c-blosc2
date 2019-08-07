@@ -11,7 +11,7 @@
 #ifndef SHUFFLE_ALTIVEC_H
 #define SHUFFLE_ALTIVEC_H
 
-#include "blosc-common.h"
+#include "blosc2-common.h"
 
 #ifdef __cplusplus
 extern "C" {

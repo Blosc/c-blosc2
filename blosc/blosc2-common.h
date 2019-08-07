@@ -9,7 +9,7 @@
 #ifndef SHUFFLE_COMMON_H
 #define SHUFFLE_COMMON_H
 
-#include "blosc-export.h"
+#include "blosc2-export.h"
 #include <string.h>
 
 // For shutting up stupid compiler warning about some 'unused' variables in GCC

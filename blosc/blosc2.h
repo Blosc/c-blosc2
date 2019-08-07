@@ -20,8 +20,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "blosc-export.h"
-#include "blosc-common.h"
+#include "blosc2-export.h"
+#include "blosc2-common.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -11,7 +11,7 @@
 #ifndef BITSHUFFLE_AVX2_H
 #define BITSHUFFLE_AVX2_H
 
-#include "blosc-common.h"
+#include "blosc2-common.h"
 
 #ifdef __cplusplus
 extern "C" {
