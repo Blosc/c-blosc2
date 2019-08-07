@@ -1050,7 +1050,46 @@ BLOSC_EXPORT int blosc2_frame_get_metalayer(blosc2_frame *frame, char *name, uin
 
 *********************************************************************/
 
-#include "timestamp.h"
+#if defined(_WIN32)
+/* For QueryPerformanceCounter(), etc. */
+  #include <windows.h>
+#elif defined(__MACH__)
+#include <mach/clock.h>
+#include <mach/mach.h>
+#include <time.h>
+#elif defined(__unix__)
+#if defined(__linux__)
+    #include <time.h>
+  #else
+    #include <sys/time.h>
+  #endif
+#else
+  #error Unable to detect platform.
+#endif
+
+/* The type of timestamp used on this system. */
+#if defined(_WIN32)
+#define blosc_timestamp_t LARGE_INTEGER
+#else
+#define blosc_timestamp_t struct timespec
+#endif
+
+/*
+ * Set a timestamp.
+ */
+BLOSC_EXPORT void blosc_set_timestamp(blosc_timestamp_t* timestamp);
+
+/*
+ * Return the nanoseconds between 2 timestamps.
+ */
+BLOSC_EXPORT double blosc_elapsed_nsecs(blosc_timestamp_t start_time,
+                                        blosc_timestamp_t end_time);
+
+/*
+ * Return the seconds between 2 timestamps.
+ */
+BLOSC_EXPORT double blosc_elapsed_secs(blosc_timestamp_t start_time,
+                                       blosc_timestamp_t end_time);
 
 
 /*********************************************************************
