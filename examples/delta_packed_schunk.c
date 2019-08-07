@@ -21,7 +21,7 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include "blosc.h"
+#include "blosc2.h"
 
 #define SIZE 500*100*100
 

@@ -15,7 +15,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include <math.h>
-#include "blosc.h"
+#include "blosc2.h"
 
 
 #define KB  1024

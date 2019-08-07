@@ -64,8 +64,8 @@
 #
 # Components:
 #
-#    LIB: includes blosc.so
-#    DEV: static includes blosc.a and blosc.h
+#    LIB: includes blosc2.so
+#    DEV: static includes blosc2.a and blosc2.h
 
 if (NOT WIN32)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
@@ -78,7 +78,7 @@ ENDIF(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} GREATER 3.4)
 project(blosc)
 
 # parse the full version numbers from blosc.h
-file(READ ${CMAKE_CURRENT_SOURCE_DIR}/blosc/blosc.h _blosc_h_contents)
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/blosc/blosc2.h _blosc_h_contents)
 string(REGEX REPLACE ".*#define[ \t]+BLOSC_VERSION_MAJOR[ \t]+([0-9]+).*"
     "\\1" BLOSC_VERSION_MAJOR ${_blosc_h_contents})
 string(REGEX REPLACE ".*#define[ \t]+BLOSC_VERSION_MINOR[ \t]+([0-9]+).*"

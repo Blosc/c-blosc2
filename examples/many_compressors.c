@@ -36,7 +36,7 @@
 */
 
 #include <stdio.h>
-#include <blosc.h>
+#include <blosc2.h>
 
 #define SIZE 100*100*100
 #define SHAPE {100,100,100}

@@ -22,7 +22,7 @@
 #define BLOSC_POSIX_BARRIERS
 #endif
 
-#include "blosc.h"
+#include "blosc2.h"
 
 #if defined(HAVE_ZSTD)
   #include "zstd.h"

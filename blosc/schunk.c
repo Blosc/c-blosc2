@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "blosc.h"
+#include "blosc2.h"
 #include "blosc-private.h"
 #include "context.h"
 #include "frame.h"

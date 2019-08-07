@@ -15,7 +15,7 @@
 #include <sys/types.h>
 #include <assert.h>
 
-#include "blosc.h"
+#include "blosc2.h"
 #include "blosc-private.h"
 #include "blosc-common.h"
 

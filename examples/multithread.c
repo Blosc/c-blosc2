@@ -42,7 +42,7 @@
 */
 
 #include <stdio.h>
-#include <blosc.h>
+#include <blosc2.h>
 
 #define SIZE (1000 * 1000)
 

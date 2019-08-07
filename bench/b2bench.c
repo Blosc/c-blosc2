@@ -26,7 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
-#include "../blosc/blosc.h"
+#include "blosc2.h"
 
 #define KB  1024
 #define MB  (1024*KB)

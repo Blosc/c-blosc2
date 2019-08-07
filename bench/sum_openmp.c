@@ -44,7 +44,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <assert.h>
-#include "blosc.h"
+#include "blosc2.h"
 
 #define KB  1024.
 #define MB  (1024*KB)
