@@ -56,6 +56,25 @@ static char* test_schunk() {
     mu_assert("ERROR: bad compression ratio in frame", nbytes > 10 * cbytes);
   }
 
+  // Exercise the metadata retrieval machinery (i.e. no decompression is happening below)
+  bool needs_free;
+  uint8_t* chunk;
+  size_t nbytes_, cbytes_, blocksize;
+  nbytes = 0;
+  cbytes = 0;
+  for (int nchunk = 0; nchunk < nchunks; nchunk++) {
+    dsize = blosc2_schunk_get_chunk(schunk, nchunk, &chunk, &needs_free);
+    mu_assert("ERROR: chunk cannot be retrieved correctly.", dsize >= 0);
+    blosc_cbuffer_sizes(chunk, &nbytes_, &cbytes_, &blocksize);
+    nbytes += nbytes_;
+    cbytes += cbytes_;
+    if (needs_free) {
+      free(chunk);
+    }
+  }
+  mu_assert("ERROR: nbytes is not correct", nbytes == schunk->nbytes);
+  mu_assert("ERROR: cbytes is not correct", cbytes == schunk->cbytes);
+
   // Check that the chunks have been decompressed correctly
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
