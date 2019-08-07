@@ -4,6 +4,7 @@ file(GLOB SOURCES test_*.c)
 
 # flags
 link_directories(${PROJECT_BINARY_DIR}/blosc)
+include_directories(${PROJECT_SOURCE_DIR}/blosc)
 
 # targets and tests
 foreach (source ${SOURCES})

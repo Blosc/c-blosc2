@@ -11,10 +11,10 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include "test_common.h"
+#include "frame.h"
 
 #define CHUNKSIZE (200 * 1000)
 #define NTHREADS (2)
-#define MIN_FRAME_LEN (74)  // the minimum frame length as of now
 
 /* Global vars */
 int nchunks_[] = {0, 1, 2, 10};
@@ -74,7 +74,7 @@ static char* test_frame() {
 
   if (!sparse_schunk) {
     mu_assert("ERROR: frame->len must be larger or equal than schunk->cbytes",
-              frame->len >= schunk->cbytes + MIN_FRAME_LEN);
+              frame->len >= schunk->cbytes + HEADER2_MINLEN);
   }
 
   if (!sparse_schunk) {

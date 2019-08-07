@@ -41,7 +41,7 @@
 
 
 /* Get the cparams associated with a super-chunk */
-int blosc2_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
+int blosc2_schunk_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
   *cparams = calloc(sizeof(blosc2_cparams), 1);
   (*cparams)->schunk = schunk;
   for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
@@ -63,7 +63,7 @@ int blosc2_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
 
 
 /* Get the dparams associated with a super-chunk */
-int blosc2_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams) {
+int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams) {
   *dparams = calloc(sizeof(blosc2_dparams), 1);
   (*dparams)->schunk = schunk;
   if (schunk->dctx == NULL) {

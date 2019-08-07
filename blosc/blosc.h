@@ -908,7 +908,7 @@ BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint
  *
  * @return 0 if succeeds. Else a negative code is returned.
  */
-BLOSC_EXPORT int blosc2_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams);
+BLOSC_EXPORT int blosc2_schunk_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams);
 
 /**
  * @brief Return the @p dparams struct associated to a super-chunk.
@@ -920,7 +920,7 @@ BLOSC_EXPORT int blosc2_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cpar
  *
  * @return 0 if succeeds. Else a negative code is returned.
  */
-BLOSC_EXPORT int blosc2_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams);
+BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams);
 
 
 /*********************************************************************

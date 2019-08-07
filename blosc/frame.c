@@ -15,6 +15,7 @@
 #include "blosc.h"
 #include "blosc-private.h"
 #include "context.h"
+#include "frame.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
 #include <windows.h>
@@ -79,26 +80,6 @@ void swap_store(void *dest, const void *pa, int size) {
 }
 
 
-#define FRAME_VERSION 0
-
-#define HEADER2_MAGIC 2
-#define HEADER2_LEN (HEADER2_MAGIC + 8 + 1)  // 11
-#define FRAME_LEN (HEADER2_LEN + 4 + 1)  // 16
-#define FRAME_FLAGS (FRAME_LEN + 8 + 1)  // 25
-#define FRAME_FILTERS (FRAME_FLAGS + 1)  // 26
-#define FRAME_COMPCODE (FRAME_FLAGS + 2)  // 27
-#define FRAME_NBYTES (FRAME_FLAGS + 4 + 1)  // 30
-#define FRAME_CBYTES (FRAME_NBYTES + 8 + 1)  // 39
-#define FRAME_TYPESIZE (FRAME_CBYTES + 8 + 1) // 48
-#define FRAME_CHUNKSIZE (FRAME_TYPESIZE + 4 + 1)  // 53
-#define FRAME_NTHREADS_C (FRAME_CHUNKSIZE + 4 + 1)  // 58
-#define FRAME_NTHREADS_D (FRAME_NTHREADS_C + 2 + 1)  // 61
-#define FRAME_HAS_NSPACES (FRAME_NTHREADS_D + 2)  // 63
-#define HEADER2_MINLEN (FRAME_HAS_NSPACES + 1)  // 64 <- minimum length
-#define FRAME_NAMESPACES (FRAME_HAS_NSPACES + 1)  // 64
-#define FRAME_IDX_SIZE (FRAME_NAMESPACES + 1 + 1)  // 66
-
-
 /* Create a new (empty) frame */
 blosc2_frame* blosc2_new_frame(char* fname) {
   blosc2_frame* new_frame = malloc(sizeof(blosc2_frame));
@@ -117,8 +98,16 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   uint8_t* h2 = calloc(HEADER2_MINLEN, 1);
   uint8_t* h2p = h2;
 
+  int16_t nnspaces = frame->nmetalayers;
+  bool has_nspaces = nnspaces > 0;
+
   // The msgpack header will start as a fix array
-  *h2p = 0x90 + 12;  // array with 12 elements
+  if (has_nspaces) {
+    *h2p = 0x90 + 12;  // array with 12 elements
+  }
+  else {
+    *h2p = 0x90 + 11;  // no metalayers, so just 11 elements
+  }
   h2p += 1;
 
   // Magic number
@@ -218,13 +207,16 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   assert(h2p - h2 < HEADER2_MINLEN);
 
   // Boolean for checking the existence of namespaces
-  int16_t nnspaces = frame->nmetalayers;
-  *h2p = (nnspaces > 0)? (uint8_t)0xc3 : (uint8_t)0xc2;  // bool for FRAME_HAS_NAMESPACES
+  *h2p = (nnspaces > 0) ? (uint8_t)0xc3 : (uint8_t)0xc2;  // bool for FRAME_HAS_NAMESPACES
   h2p += 1;
   assert(h2p - h2 == HEADER2_MINLEN);
 
-  // Make space for the header of namespaces (array marker, size, map of offsets)
   int32_t hsize = HEADER2_MINLEN;
+  if (nnspaces == 0) {
+    goto out;
+  }
+
+  // Make space for the header of namespaces (array marker, size, map of offsets)
   h2 = realloc(h2, (size_t)hsize + 1 + 1 + 2 + 1 + 2);
   h2p = h2 + hsize;
 
@@ -298,10 +290,11 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
     current_header_len += 1 + 4 + nspace->content_len;
   }
   free(offtooff);
+  assert(hsize == current_header_len);  // sanity check
 
+  out:
   // Set the length of the whole header now that we know it
   hsize = (int32_t)(h2p - h2);
-  assert(hsize == current_header_len);  // sanity check
   swap_store(h2 + HEADER2_LEN, &hsize, sizeof(hsize));
 
   return h2;
@@ -668,11 +661,11 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
 
   // Compression and decompression contexts
   blosc2_cparams *cparams;
-  blosc2_get_cparams(schunk, &cparams);
+  blosc2_schunk_get_cparams(schunk, &cparams);
   schunk->cctx = blosc2_create_cctx(*cparams);
   free(cparams);
   blosc2_dparams *dparams;
-  blosc2_get_dparams(schunk, &dparams);
+  blosc2_schunk_get_dparams(schunk, &dparams);
   schunk->dctx = blosc2_create_dctx(*dparams);
   free(dparams);
 
