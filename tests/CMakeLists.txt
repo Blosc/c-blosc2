@@ -1,5 +1,4 @@
 # sources
-#aux_source_directory(. SOURCES)
 file(GLOB SOURCES test_*.c)
 
 # flags
