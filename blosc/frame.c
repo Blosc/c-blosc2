@@ -290,11 +290,11 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
     current_header_len += 1 + 4 + metalayer->content_len;
   }
   free(offtooff);
+  hsize = (int32_t)(h2p - h2);
   assert(hsize == current_header_len);  // sanity check
 
   out:
   // Set the length of the whole header now that we know it
-  hsize = (int32_t)(h2p - h2);
   swap_store(h2 + FRAME_HEADER2_LEN, &hsize, sizeof(hsize));
 
   return h2;
