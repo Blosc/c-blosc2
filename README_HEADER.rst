@@ -16,14 +16,15 @@ In addition, starting in Blosc 2.0.0, there is an extension of the header
 above that allows to encode the filter pipeline::
 
   1+|-0-|-1-|-2-|-3-|-4-|-5-|-6-|-7-|-8-|-9-|-A-|-B-|-C-|-D-|-E-|-F-|
-    |   filter codes    | reserved  |   filter meta     | resvd | ^ |
-                                                                  |
-                                                                  +-blosc2_flags
+    |     filter codes      |   ^   |     filter meta       | ^ | ^ |
+                                |                             |   |
+                                +-reserved                    |   +-blosc2_flags
+                                                              +-reserved
 
 So there is a complete byte for encoding the filter and another one to encode
-possible metadata associated with the filter.  The filter pipeline has 5
+possible metadata associated with the filter.  The filter pipeline has 6
 reserved slots for the filters to be applied sequentially to the chunk.  The
-filters are applied sequentially following the slot order.
+filters are applied sequentially following the slot number in increasing order.
 
 Datatypes of the Header Entries
 -------------------------------
