@@ -7,16 +7,16 @@
 
   To compile this program:
 
-  $ gcc frame_backed_schunk.c -o frame_backed_schunk -lblosc2
+  $ gcc -O frame_backed_schunk.c -o frame_backed_schunk -lblosc2
 
   To run:
 
   $ ./frame_backed_schunk
   Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
-  Compression ratio: 381.5 MB -> 9.4 MB (40.5x)
-  Time for append data to a schunk backed by an in-memory frame: 0.135 s, 2821.6 MB/s
-  Compression ratio: 381.5 MB -> 9.4 MB (40.5x)
-  Time for append data to a schunk backed by a fileframe: 0.135 s, 2833.9 MB/s
+  Compression ratio: 381.5 MB -> 12.2 MB (31.2x)
+  Time for append data to a schunk backed by an in-memory frame: 0.0892 s, 4278.1 MB/s
+  Compression ratio: 381.5 MB -> 12.2 MB (31.2x)
+  Time for append data to a schunk backed by a fileframe: 0.107 s, 3556.3 MB/s
   Successful roundtrip data <-> schunk (frame-backed) !
 
  */
