@@ -7,7 +7,7 @@
 
   To compile this program:
 
-  gcc delta_packed_schunk.c -o delta_packed_schunk -lblosc
+  gcc delta_packed_schunk.c -o delta_packed_schunk -lblosc2
 
   To run:
 

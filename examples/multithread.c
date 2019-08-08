@@ -7,7 +7,7 @@
 
     To compile this program using gcc or clang:
 
-    $ gcc/clang multithread.c -o multithread -lblosc -lpthread
+    $ gcc/clang multithread.c -o multithread -lblosc2 -lpthread
 
     or, if you don't have the blosc library installed:
 
@@ -15,7 +15,7 @@
 
     or alternatively:
 
-    $ gcc -O3 -msse2 multithread.c -I../blosc -o multithread -L../build/blosc -lblosc
+    $ gcc -O3 -msse2 multithread.c -I../blosc -o multithread -L../build/blosc -lblosc2
     $ export LD_LIBRARY_PATH=../build/blosc
 
     Using MSVC on Windows:

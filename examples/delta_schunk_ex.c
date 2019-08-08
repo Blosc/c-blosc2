@@ -7,7 +7,7 @@
 
   To compile this program:
 
-  $ gcc -O delta_schunk_ex.c -o delta_schunk_ex -lblosc
+  $ gcc -O delta_schunk_ex.c -o delta_schunk_ex -lblosc2
 
   To run:
 

@@ -7,7 +7,7 @@
 
   To compile this program:
 
-  $ gcc -O3 trunc_prec_schunk.c -o trunc_prec_schunk -lblosc
+  $ gcc -O3 trunc_prec_schunk.c -o trunc_prec_schunk -lblosc2
 
 */
 

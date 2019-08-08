@@ -7,7 +7,7 @@
 
   To compile this program:
 
-  $ gcc frame_backed_schunk.c -o frame_backed_schunk -lblosc
+  $ gcc frame_backed_schunk.c -o frame_backed_schunk -lblosc2
 
   To run:
 

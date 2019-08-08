@@ -7,7 +7,7 @@
 
   To compile this program:
 
-  $ gcc -O zstd_dict.c -o zstd_dict -lblosc
+  $ gcc -O zstd_dict.c -o zstd_dict -lblosc2
 
   To run:
 

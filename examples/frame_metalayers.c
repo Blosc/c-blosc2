@@ -7,7 +7,7 @@
 
   To compile this program:
 
-  $ gcc frame_metalayers.c -o frame_metalayers -lblosc
+  $ gcc frame_metalayers.c -o frame_metalayers -lblosc2
 
   To run:
 

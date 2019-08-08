@@ -7,7 +7,7 @@
 
   To compile this program:
 
-  $ gcc simple_schunk.c -o simple_schunk -lblosc
+  $ gcc simple_schunk.c -o simple_schunk -lblosc2
 
   To run:
 

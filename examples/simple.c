@@ -7,7 +7,7 @@
 
     To compile this program:
 
-    $ gcc -O simple.c -o simple -lblosc
+    $ gcc -O simple.c -o simple -lblosc2
 
     To run:
 

@@ -7,7 +7,7 @@
 
   To compile this program:
 
-  $ gcc frame_simple.c -o frame_simple -lblosc
+  $ gcc frame_simple.c -o frame_simple -lblosc2
 
   To run:
 

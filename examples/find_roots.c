@@ -8,7 +8,7 @@
 
   To compile this program:
 
-  $ gcc -O3 find_roots.c -o find_roots -lblosc
+  $ gcc -O3 find_roots.c -o find_roots -lblosc2
 
   To run:
 

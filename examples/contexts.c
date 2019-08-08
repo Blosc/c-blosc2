@@ -7,7 +7,7 @@
 
     To compile this program:
 
-    $ gcc -O contexts.c -o contexts -lblosc
+    $ gcc -O contexts.c -o contexts -lblosc2
 
     To run:
 

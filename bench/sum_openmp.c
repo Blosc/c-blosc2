@@ -7,34 +7,33 @@
 
   To compile this program for synthetic data (default):
 
-  $ gcc -fopenmp -O3 sum_openmp.c -o sum_openmp -lblosc
+  $ gcc -fopenmp -O3 sum_openmp.c -o sum_openmp -lblosc2
 
   To run:
 
-  $ OMP_PROC_BIND=spread OMP_NUM_THREADS=4 ./sum_openmp
+  $ OMP_PROC_BIND=spread OMP_NUM_THREADS=8 ./sum_openmp
   Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
   Sum for uncompressed data: 199950000000
-  Sum time for uncompressed data: 0.0296 s, 25752.4 MB/s
-  Compression ratio: 762.9 MB -> 14.2 MB (53.9x)
-  Compression time: 0.741 s, 1029.3 MB/s
+  Sum time for uncompressed data: 0.0288 s, 26459.3 MB/s
+  Compression ratio: 762.9 MB -> 14.0 MB (54.6x)
+  Compression time: 0.288 s, 2653.5 MB/s
   Sum for *compressed* data: 199950000000
-  Sum time for *compressed* data: 0.0313 s, 24339.2 MB/s
+  Sum time for *compressed* data: 0.0188 s, 40653.7 MB/s
 
   To use real (rainfall) data:
 
-  $ gcc-8 -DRAINFALL -fopenmp -Ofast sum_openmp.c -o sum_openmp
+  $ gcc -DRAINFALL -fopenmp -Ofast sum_openmp.c -o sum_openmp
 
   And running it:
 
-  $ OMP_PROC_BIND=spread OMP_NUM_THREADS=4 ./sum_openmp
+  $ OMP_PROC_BIND=spread OMP_NUM_THREADS=8 ./sum_openmp
   Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
-  Sum for uncompressed data:   29851430
-  Sum time for uncompressed data: 0.0144 s, 26461.0 MB/s
-  Compression ratio: 381.5 MB -> 80.3 MB (4.7x)
-  Compression time: 0.378 s, 1010.4 MB/s
-  Sum for *compressed* data:   29952800
-  Sum time for *compressed* data: 0.0513 s, 7432.2 MB/s
-
+  Sum for uncompressed data:   29741012
+  Sum time for uncompressed data: 0.0149 s, 25627.4 MB/s
+  Compression ratio: 381.5 MB -> 71.3 MB (5.3x)
+  Compression time: 1.53 s, 249.1 MB/s
+  Sum for *compressed* data:   29741012
+  Sum time for *compressed* data: 0.0247 s, 15467.5 MB/s
 
 */
 
@@ -63,12 +62,12 @@
 
 #if SYNTHETIC == true
 #define DTYPE int64_t
-#define CLEVEL 9
+#define CLEVEL 3
 #define CODEC BLOSC_BLOSCLZ
 #else
 #define DTYPE float
-#define CLEVEL 9
-#define CODEC BLOSC_LZ4
+#define CLEVEL 1
+#define CODEC BLOSC_LZ4HC
 #endif
 
 
