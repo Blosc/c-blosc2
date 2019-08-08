@@ -104,7 +104,7 @@ void btune_next_blocksize(blosc2_context *context) {
   }
 
   /* Now the blocksize for splittable codecs */
-  if (clevel > 0 && split_block(context->compcode, typesize, blocksize)) {
+  if (clevel > 0 && split_block(context->compcode, typesize, blocksize, true)) {
     blocksize = L1;
      switch (clevel) {
       case 1:

@@ -1406,7 +1406,7 @@ static int initialize_context_decompression(
 
 
 static int write_compression_header(blosc2_context* context,
-                                    int extended_header) {
+                                    bool extended_header) {
   int32_t compformat;
   int dont_split;
   int dict_training = context->use_dict && (context->dict_cdict == NULL);
@@ -1542,7 +1542,7 @@ static int write_compression_header(blosc2_context* context,
   }
 
   dont_split = !split_block(context->compcode, context->typesize,
-                            context->blocksize);
+                            context->blocksize, extended_header);
   *(context->header_flags) |= dont_split << 4;  /* dont_split is in bit 4 */
   *(context->header_flags) |= compformat << 5;  /* codec starts at bit 5 */
 
@@ -1635,7 +1635,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
   }
 
   /* Write the extended header */
-  error = write_compression_header(context, 1);
+  error = write_compression_header(context, true);
   if (error < 0) { return error; }
 
   result = blosc_compress_context(context);
@@ -1856,7 +1856,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     return error;
 
   /* Write chunk header without extended header (Blosc1 compatibility mode) */
-  error = write_compression_header(g_global_context, 0);
+  error = write_compression_header(g_global_context, false);
   if (error < 0)
     return error;
 
