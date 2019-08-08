@@ -324,18 +324,11 @@ static int lz4_wrap_compress(const char* input, size_t input_length,
   }
   int outlen = (int)maxout;
   int inlen = (int)input_length;
-  if (inlen < outlen) {
-    // We need this protection here because not even the ippsEncodeLZ4Safe_8u() avoids
-    // writing beyond the output limits.  I should report this to Intel.
-    // IppStatus status = ippsEncodeLZ4Safe_8u((const Ipp8u*)input, inlen,
-    //                                         (Ipp8u*)output, &outlen, (Ipp8u*)hash_table);
-    IppStatus status = ippsEncodeLZ4_8u((const Ipp8u *) input, inlen,
-                                        (Ipp8u *) output, &outlen, (Ipp8u *) hash_table);
-    cbytes = (status == ippStsNoErr) ? outlen : -outlen;
-  }
-  else {
-    cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
-  }
+  // I have not found any function that uses `accel` like in `LZ4_compress_fast`, but
+  // the IPP LZ4Safe call does a pretty good job on compressing well, so let's use it
+  IppStatus status = ippsEncodeLZ4Safe_8u((const Ipp8u*)input, &inlen,
+                                           (Ipp8u*)output, &outlen, (Ipp8u*)hash_table);
+  cbytes = (status == ippStsNoErr) ? outlen : -outlen;
 #else
   BLOSC_UNUSED_PARAM(hash_table);
   cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);

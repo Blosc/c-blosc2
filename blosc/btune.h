@@ -37,8 +37,8 @@ static int split_block(int compcode, int32_t typesize, int32_t blocksize, bool e
      */
   return (
     ((compcode == BLOSC_BLOSCLZ) ||
+     (compcode == BLOSC_LZ4) ||  // IPP's LZ4 works pretty well when splitting
      // for forward compatibility with Blosc1 (http://blosc.org/posts/new-forward-compat-policy/)
-     (!extended_header && compcode == BLOSC_LZ4) ||
      (!extended_header && compcode == BLOSC_LZ4HC) ||
      (!extended_header && compcode == BLOSC_ZLIB) ||
      (compcode == BLOSC_SNAPPY)) &&
