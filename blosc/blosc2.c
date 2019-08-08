@@ -368,7 +368,7 @@ static int lz4_wrap_decompress(const char* input, size_t compressed_length,
   //status = ippsDecodeLZ4Dict_8u((const Ipp8u*)input, &inlen, (Ipp8u*)output, 0, &outlen, NULL, 1 << 16);
   cbytes = (status == ippStsNoErr) ? inlen : -inlen;
 #else
-  cbytes = LZ4_decompress_fast(input, output, (int)maxout);
+  cbytes = LZ4_decompress_safe(input, output, compressed_length, (int)maxout);
 #endif
   if (cbytes != (int)compressed_length) {
     return 0;
