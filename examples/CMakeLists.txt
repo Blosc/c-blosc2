@@ -15,16 +15,16 @@ foreach(src ${SOURCES})
                 POST_BUILD
                 COMMAND ${CMAKE_COMMAND}
                 ARGS -E copy_if_different
-                "${PROJECT_BINARY_DIR}/blosc/\$\(Configuration\)/blosc.dll"
-                "${CMAKE_CURRENT_BINARY_DIR}/\$\(Configuration\)/blosc.dll")
+                "${PROJECT_BINARY_DIR}/blosc/\$\(Configuration\)/blosc2.dll"
+                "${CMAKE_CURRENT_BINARY_DIR}/\$\(Configuration\)/blosc2.dll")
     elseif (MINGW)
         add_custom_command(
                 TARGET ${src}
                 POST_BUILD
                 COMMAND ${CMAKE_COMMAND}
                 ARGS -E copy_if_different
-                "${PROJECT_BINARY_DIR}/blosc/libblosc.dll"
-                "${CMAKE_CURRENT_BINARY_DIR}/libblosc.dll")
+                "${PROJECT_BINARY_DIR}/blosc/libblosc2.dll"
+                "${CMAKE_CURRENT_BINARY_DIR}/libblosc2.dll")
     endif(MSVC)
     # Define the BLOSC_TESTING symbol so normally-hidden functions
     # aren't hidden from the view of the test programs.
