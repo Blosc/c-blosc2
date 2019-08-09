@@ -1570,6 +1570,9 @@ int blosc_compress_context(blosc2_context* context) {
   }
 
   if (*(context->header_flags) & BLOSC_MEMCPYED) {
+    if (context->src == NULL) {
+      return -10;  // cannot compress the output from prefilter (context->src == NULL)
+    }
     if (context->sourcesize + BLOSC_MAX_OVERHEAD > context->destsize) {
       /* We are exceeding maximum output size */
       ntbytes = 0;
@@ -1584,9 +1587,6 @@ int blosc_compress_context(blosc2_context* context) {
       }
     }
     else {
-      if (context->src == NULL) {
-        return -10;  // cannot compress the output from prefilter (context->src == NULL)
-      }
       fastcopy(context->dest + BLOSC_MAX_OVERHEAD, context->src, (unsigned int)context->sourcesize);
       ntbytes = (int)context->sourcesize + BLOSC_MAX_OVERHEAD;
     }
@@ -1642,7 +1642,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
 
   cbytes = blosc_compress_context(context);
   if (cbytes < 0) {
-    return error;
+    return cbytes;
   }
 
   if (context->use_dict && context->dict_cdict == NULL) {
