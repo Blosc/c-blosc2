@@ -146,14 +146,14 @@ endif (HAVE_IPP)
 
 # targets
 if (BUILD_SHARED)
-    add_library(blosc_shared SHARED ${SOURCES})
-    set_target_properties(blosc_shared PROPERTIES OUTPUT_NAME blosc2)
-    set_target_properties(blosc_shared PROPERTIES
+    add_library(blosc2_shared SHARED ${SOURCES})
+    set_target_properties(blosc2_shared PROPERTIES OUTPUT_NAME blosc2)
+    set_target_properties(blosc2_shared PROPERTIES
             VERSION ${version_string}
             SOVERSION 2  # Change this when an ABI change happens
             )
     set_property(
-            TARGET blosc_shared
+            TARGET blosc2_shared
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_SHARED_LIBRARY)
 endif()
 
@@ -224,7 +224,7 @@ if (COMPILER_SUPPORT_ALTIVEC)
 endif (COMPILER_SUPPORT_ALTIVEC)
 
 # When the option has been selected to compile the test suite,
-# compile an additional version of blosc_shared which exports
+# compile an additional version of blosc2_shared which exports
 # some normally-hidden symbols (to facilitate unit testing).
 if (BUILD_TESTS)
     add_library(blosc_shared_testing SHARED ${SOURCES})
@@ -236,7 +236,7 @@ if (BUILD_TESTS)
             TARGET blosc_shared_testing
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
     # TEMP : CMake doesn't automatically add -lpthread here like it does
-    # for the blosc_shared target. Force it for now.
+    # for the blosc2_shared target. Force it for now.
     if (UNIX)
         set_property(
                 TARGET blosc_shared_testing
@@ -245,8 +245,8 @@ if (BUILD_TESTS)
 endif ()
 
 if (BUILD_SHARED)
-    target_link_libraries(blosc_shared ${LIBS})
-    target_include_directories(blosc_shared PUBLIC ${BLOSC_INCLUDE_DIRS})
+    target_link_libraries(blosc2_shared ${LIBS})
+    target_include_directories(blosc2_shared PUBLIC ${BLOSC_INCLUDE_DIRS})
 endif()
 
 if (BUILD_TESTS)
@@ -255,13 +255,13 @@ if (BUILD_TESTS)
 endif ()
 
 if (BUILD_STATIC)
-    add_library(blosc_static STATIC ${SOURCES})
-    set_target_properties(blosc_static PROPERTIES OUTPUT_NAME blosc2)
+    add_library(blosc2_static STATIC ${SOURCES})
+    set_target_properties(blosc2_static PROPERTIES OUTPUT_NAME blosc2)
     if (MSVC)
-        set_target_properties(blosc_static PROPERTIES PREFIX lib)
+        set_target_properties(blosc2_static PROPERTIES PREFIX lib)
     endif ()
-    target_link_libraries(blosc_static ${LIBS})
-    target_include_directories(blosc_static PUBLIC ${BLOSC_INCLUDE_DIRS})
+    target_link_libraries(blosc2_static ${LIBS})
+    target_include_directories(blosc2_static PUBLIC ${BLOSC_INCLUDE_DIRS})
 endif (BUILD_STATIC)
 
 
@@ -269,9 +269,9 @@ endif (BUILD_STATIC)
 if (BLOSC_INSTALL)
     install(FILES blosc2.h blosc2-export.h blosc2-common.h DESTINATION include COMPONENT DEV)
     if(BUILD_SHARED)
-        install(TARGETS blosc_shared LIBRARY DESTINATION ${lib_dir} ARCHIVE DESTINATION ${lib_dir} RUNTIME DESTINATION bin COMPONENT LIB)
+        install(TARGETS blosc2_shared LIBRARY DESTINATION ${lib_dir} ARCHIVE DESTINATION ${lib_dir} RUNTIME DESTINATION bin COMPONENT LIB)
     endif(BUILD_SHARED)
     if (BUILD_STATIC)
-        install(TARGETS blosc_static LIBRARY DESTINATION ${lib_dir} ARCHIVE DESTINATION ${lib_dir} RUNTIME DESTINATION bin COMPONENT DEV)
+        install(TARGETS blosc2_static LIBRARY DESTINATION ${lib_dir} ARCHIVE DESTINATION ${lib_dir} RUNTIME DESTINATION bin COMPONENT DEV)
     endif (BUILD_STATIC)
 endif(BLOSC_INSTALL)

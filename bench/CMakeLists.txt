@@ -21,10 +21,10 @@ if (UNIX AND NOT APPLE)
     target_link_libraries(trunc_prec_schunk rt)
     target_link_libraries(sum_openmp rt)
 endif (UNIX AND NOT APPLE)
-target_link_libraries(${BENCH_EXE} blosc_shared)
-target_link_libraries(delta_schunk blosc_shared)
-target_link_libraries(trunc_prec_schunk blosc_shared)
-target_link_libraries(sum_openmp blosc_shared)
+target_link_libraries(${BENCH_EXE} blosc2_shared)
+target_link_libraries(delta_schunk blosc2_shared)
+target_link_libraries(trunc_prec_schunk blosc2_shared)
+target_link_libraries(sum_openmp blosc2_shared)
 
 
 # have to copy blosc dlls on Windows
