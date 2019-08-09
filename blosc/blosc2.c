@@ -328,7 +328,13 @@ static int lz4_wrap_compress(const char* input, size_t input_length,
   // the IPP LZ4Safe call does a pretty good job on compressing well, so let's use it
   IppStatus status = ippsEncodeLZ4Safe_8u((const Ipp8u*)input, &inlen,
                                            (Ipp8u*)output, &outlen, (Ipp8u*)hash_table);
-  cbytes = (status == ippStsNoErr) ? outlen : -outlen;
+  if (status == ippStsDstSizeLessExpected) {
+    return 0;  // we cannot compress in required outlen
+  }
+  else if (status != ippStsNoErr) {
+    return -1;  // an unexpected error happened
+  }
+  cbytes = outlen;
 #else
   BLOSC_UNUSED_PARAM(hash_table);
   cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
@@ -1611,7 +1617,7 @@ int blosc_compress_context(blosc2_context* context) {
 /* The public routine for compression with context. */
 int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
                         const void* src, void* dest, size_t destsize) {
-  int error, result;
+  int error, cbytes;
 
   if (context->do_compress != 1) {
     fprintf(stderr, "Context is not meant for compression.  Giving up.\n");
@@ -1629,9 +1635,14 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
 
   /* Write the extended header */
   error = write_compression_header(context, true);
-  if (error < 0) { return error; }
+  if (error < 0) {
+    return error;
+  }
 
-  result = blosc_compress_context(context);
+  cbytes = blosc_compress_context(context);
+  if (cbytes < 0) {
+    return error;
+  }
 
   if (context->use_dict && context->dict_cdict == NULL) {
 
@@ -1699,7 +1710,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     context->dict_size = dict_actual_size;
 
     /* Compress with dict */
-    result = blosc_compress_context(context);
+    cbytes = blosc_compress_context(context);
 
     // Invalidate the dictionary for compressing other chunks using the same context
     context->dict_buffer = NULL;
@@ -1707,7 +1718,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     context->dict_cdict = NULL;
   }
 
-  return result;
+  return cbytes;
 }
 
 
