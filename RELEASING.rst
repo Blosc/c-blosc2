@@ -1,10 +1,10 @@
-================
-Releasing Blosc
-================
+=================
+Releasing Blosc2
+=================
 
 :Author: Francesc Alted
 :Contact: francesc@blosc.org
-:Date: 2014-01-15
+:Date: 2019-08-09
 
 
 Preliminaries

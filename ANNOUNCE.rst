@@ -1,25 +1,32 @@
 ===============================================================
- Announcing C-Blosc 2.0.0a5
- A simplistic, compressed and fast data store library for C
+ Announcing C-Blosc 2.0.0-beta.1
+ A simple, compressed and fast data store library for C
 ===============================================================
 
 What is new?
 ============
 
-Support for Zstd dictionaries; this allows for (much) better compression
-ratios when using small blocksizes, while improving compression speed.
-The delta filter is using a XOR instead of a NEG for better numerical
-stability.
+This is the first beta version, so the API has been declared frozen from
+now on.  To avoid name collisions with existing C-Blosc 1.x deployments,
+the library is officially called `blosc2` and the main header is `blosc2.h`.
+Also, this version offers a frame object so that data can be stored
+sequentially both in-memory and on-disk.  Last but not least, blosc2 supports
+the optimized implementations of LZ4 in Intel's IPP for improved compression
+ratios and speed.
 
-Last but not least, ARM support has been greatly enhanced, as ARMv7 and
-ARMv8 (specially AArch64) are supported out of the box.  Support for NEON
-for shuffle and bitshuffle is there (but use the latter with caution, as
-there are implementation flaws still).
+In principle, C-Blosc2 should be backward compatible with C-Blosc, so you
+can start using it right away and slowly begin to use its new functionality,
+like the new filters, prefilters, super-chunks and frames.  See docs in:
+https://blosc2.readthedocs.io
+
+**IMPORTANT**: Please note that, even if the API has been declared frozen,
+that does not mean that Blosc2 is ready for production yet: internal structures
+can change, formats can change and most importantly, bugs can be normal at this
+stage.  So *do not assume* that your blosc2 data can be read with future versions.
 
 For more info, please see the release notes in:
 
-https://github.com/Blosc/c-blosc2/blob/master/RELEASE_NOTES.rst
-
+https://github.com/Blosc/c-blosc2/blob/master/RELEASE_NOTES.md
 
 
 What is it?
@@ -31,8 +38,8 @@ meta-compressor (http://www.blosc.org).
 
 Blosc2 expands the capabilities of Blosc by providing a higher lever
 container that is able to store many chunks on it (hence the
-super-block name).  Also, it will add more compressors and filters
-(e.g. a new delta filter is here already).
+super-block name).  It supports storing data on both memory and disk
+ using the same API.  Also, it adds more compressors and filters.
 
 
 Download sources
@@ -56,3 +63,4 @@ http://groups.google.es/group/blosc
 
 
 Enjoy Data!
+- The Blosc develop team

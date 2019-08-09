@@ -1,16 +1,37 @@
 ==================================================
- Release notes for C-Blosc2 2.0.0a6 (sixth alpha)
+ Release notes for C-Blosc2 2.0.0-beta.1 (first beta)
 ==================================================
 
-:Author: Francesc Alted
-:Contact: francesc@blosc.org
-:URL: http://www.blosc.org
 
+Changes from 2.0.0a5 to 2.0.0-beta.1
+====================================
 
-Changes from 2.0.0a5 to 2.0.0a6
-===============================
+* The library is called now `blosc2` and not `blosc` anymore.  This is necessary
+  so as to prevent collisions with existing `blosc` deployments.
 
-#XXX version-specific blurb XXX#
+* The `make install` now install all the necessary requirements out-of-the-box.
+
+* Use Intel IPP's LZ4Safe when compressing/decompressing: this provides better
+  compression ratios and speed (in some cases).  It is activated automatically
+  if Intel IPP is found in the system, but you can always disable it with:
+  `cmake -DDEACTIVATE_IPP=ON`
+
+* BREAKING CHANGE: the next API have been made private:
+  + blosc2_frame_append_chunk -> frame_append_chunk
+  + blosc2_frame_get_chunk -> frame_get_chunk
+  + blosc2_frame_decompress_chunk -> frame_decompress_chunk
+
+  Now the appending and retrieval of data in frames should always be made via the frame-backed super-chunk API. The idea is to deduplicate the I/O primitives as much as possible, and the super-chunks are the logical way for doing this.
+
+* BREAKING CHANGE: the next APIs have been renamed:
+  + blosc2_get_cparams - > blosc2_schunk_get_cparams
+  + blosc2_get_dparams - > blosc2_schunk_get_dparams
+
+* Internal BloscLZ sources bumped to 2.0.0.
+
+* Internal LZ4 sources bumped to 1.9.1.
+
+* Internal Zstd sources bumped to 1.4.0.
 
 
 Changes from 2.0.0a4 to 2.0.0a5
