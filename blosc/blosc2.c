@@ -337,6 +337,7 @@ static int lz4_wrap_compress(const char* input, size_t input_length,
   cbytes = outlen;
 #else
   BLOSC_UNUSED_PARAM(hash_table);
+  accel = 1;  // deactivate acceleration to match IPP behaviour
   cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
 #endif
   return cbytes;
