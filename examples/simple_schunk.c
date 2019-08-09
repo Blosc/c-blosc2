@@ -7,7 +7,7 @@
 
   To compile this program:
 
-  $ gcc simple_schunk.c -o simple_schunk -lblosc
+  $ gcc simple_schunk.c -o simple_schunk -lblosc2
 
   To run:
 
@@ -22,7 +22,7 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include <blosc.h>
+#include <blosc2.h>
 
 #define KB  1024.
 #define MB  (1024*KB)

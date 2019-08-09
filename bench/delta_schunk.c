@@ -7,14 +7,14 @@
 
   To compile this program:
 
-  $ gcc -O3 delta_schunk.c -o delta_schunk -lblosc
+  $ gcc -O3 delta_schunk.c -o delta_schunk -lblosc2
 
 */
 
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
-#include <blosc.h>
+#include <blosc2.h>
 
 #define KB  1024
 #define MB  (1024*KB)

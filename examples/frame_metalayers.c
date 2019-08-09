@@ -7,18 +7,27 @@
 
   To compile this program:
 
-  $ gcc frame_metalayers.c -o frame_metalayers -lblosc
+  $ gcc -O frame_metalayers.c -o frame_metalayers -lblosc2
 
   To run:
 
   $ ./frame_metalayers
+  Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
+  Compression ratio: 3.8 MB -> 0.0 MB (234.4x)
+  Compression time: 0.00218 s, 1747.2 MB/s
+  Time for schunk -> frame: 1.19e-05 s, 313.5 GB/s
+  Frame length in memory: 17247 bytes
+  Frame length on disk: 17247 bytes
+  Time for frame -> fileframe (simple_frame.b2frame): 0.000144 s, 25.9 GB/s
+  Time for fileframe (frame_metalayers.b2frame) -> frame : 4.08e-05 s, 91.3 GB/s
+  Time for fileframe -> schunk: 4.29e-07 s, 8683.7 GB/s
 
  */
 
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include <blosc.h>
+#include <blosc2.h>
 
 #define KB  1024.
 #define MB  (1024*KB)

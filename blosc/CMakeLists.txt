@@ -59,9 +59,9 @@ endif (NOT DEACTIVATE_ZSTD)
 include_directories(${BLOSC_INCLUDE_DIRS})
 
 # library sources
-set(SOURCES blosc.c blosc-common.h blosclz.c fastcopy.c fastcopy.h schunk.c frame.c btune.c btune.h
+set(SOURCES blosc2.c blosc2-common.h blosclz.c fastcopy.c fastcopy.h schunk.c frame.c btune.c btune.h
         context.h delta.c delta.h shuffle-generic.c bitshuffle-generic.c trunc-prec.c trunc-prec.h
-        timestamp.c timestamp.h)
+        timestamp.c)
 if (COMPILER_SUPPORT_SSE2)
     message(STATUS "Adding run-time support for SSE2")
     set(SOURCES ${SOURCES} shuffle-sse2.c bitshuffle-sse2.c)
@@ -147,7 +147,7 @@ endif (HAVE_IPP)
 # targets
 if (BUILD_SHARED)
     add_library(blosc_shared SHARED ${SOURCES})
-    set_target_properties(blosc_shared PROPERTIES OUTPUT_NAME blosc)
+    set_target_properties(blosc_shared PROPERTIES OUTPUT_NAME blosc2)
     set_target_properties(blosc_shared PROPERTIES
             VERSION ${version_string}
             SOVERSION 2  # Change this when an ABI change happens
@@ -256,7 +256,7 @@ endif ()
 
 if (BUILD_STATIC)
     add_library(blosc_static STATIC ${SOURCES})
-    set_target_properties(blosc_static PROPERTIES OUTPUT_NAME blosc)
+    set_target_properties(blosc_static PROPERTIES OUTPUT_NAME blosc2)
     if (MSVC)
         set_target_properties(blosc_static PROPERTIES PREFIX lib)
     endif ()
@@ -267,11 +267,11 @@ endif (BUILD_STATIC)
 
 # install
 if (BLOSC_INSTALL)
-    install(FILES blosc.h blosc-export.h DESTINATION include COMPONENT DEV)
+    install(FILES blosc2.h blosc2-export.h blosc2-common.h DESTINATION include COMPONENT DEV)
     if(BUILD_SHARED)
-        install(TARGETS blosc_shared DESTINATION ${lib_dir} COMPONENT LIB)
+        install(TARGETS blosc_shared LIBRARY DESTINATION ${lib_dir} ARCHIVE DESTINATION ${lib_dir} RUNTIME DESTINATION bin COMPONENT LIB)
     endif(BUILD_SHARED)
     if (BUILD_STATIC)
-        install(TARGETS blosc_static DESTINATION ${lib_dir} COMPONENT DEV)
+        install(TARGETS blosc_static LIBRARY DESTINATION ${lib_dir} ARCHIVE DESTINATION ${lib_dir} RUNTIME DESTINATION bin COMPONENT DEV)
     endif (BUILD_STATIC)
 endif(BLOSC_INSTALL)

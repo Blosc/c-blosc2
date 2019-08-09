@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "../blosc/blosc.h"
+#include "blosc2.h"
 
 
 int main(int argc, char* argv[]) {

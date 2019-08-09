@@ -7,11 +7,11 @@
 
   To compile this program:
 
-  $ gcc compress_file.c -o compress_file -lblosc
+  $ gcc compress_file.c -o compress_file -lblosc2
 
   To run:
 
-  $ ./compress_file $ examples/compress_file /usr/lib/libsqlite3.dylib libsqlite3.b2frame
+  $ ./compress_file /usr/lib/libsqlite3.dylib libsqlite3.b2frame
   Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
   Compression ratio: 5.1 MB -> 3.6 MB (1.4x)
   Compression time: 0.0185 s, 275.2 MB/s
@@ -20,7 +20,7 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include <blosc.h>
+#include <blosc2.h>
 
 #define KB  1024.
 #define MB  (1024*KB)

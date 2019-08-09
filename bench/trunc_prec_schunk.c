@@ -7,7 +7,7 @@
 
   To compile this program:
 
-  $ gcc -O3 trunc_prec_schunk.c -o trunc_prec_schunk -lblosc
+  $ gcc -O3 trunc_prec_schunk.c -o trunc_prec_schunk -lblosc2
 
 */
 
@@ -15,7 +15,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include <math.h>
-#include "blosc.h"
+#include "blosc2.h"
 
 
 #define KB  1024

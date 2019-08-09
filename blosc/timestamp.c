@@ -6,7 +6,7 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include "timestamp.h"
+#include "blosc2.h"
 
 /* System-specific high-precision timing functions. */
 #if defined(_WIN32)

@@ -7,7 +7,7 @@
 
     To compile this program:
 
-    $ gcc -O contexts.c -o contexts -lblosc
+    $ gcc -O contexts.c -o contexts -lblosc2
 
     To run:
 
@@ -21,7 +21,7 @@
 */
 
 #include <stdio.h>
-#include "blosc.h"
+#include "blosc2.h"
 
 #define SIZE 10 * 1000 * 1000
 #define NTHREADS 2

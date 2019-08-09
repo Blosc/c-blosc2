@@ -25,7 +25,7 @@
 */
 
 #include <stdio.h>
-#include <blosc.h>
+#include <blosc2.h>
 #include <windows.h>
 
 #define SIZE 100*1000*1000

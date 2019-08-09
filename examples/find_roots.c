@@ -8,17 +8,23 @@
 
   To compile this program:
 
-  $ gcc -O3 find_roots.c -o find_roots -lblosc
+  $ gcc -O3 find_roots.c -o find_roots -lblosc2
 
   To run:
 
   $ ./find_roots
-  ...
+  Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
+  Creation time for X values: 0.178 s, 4274.5 MB/s
+  Compression for X values: 762.9 MB -> 27.3 MB (28.0x)
+  Computing Y polynomial: 0.342 s, 4463.3 MB/s
+  Compression for Y values: 762.9 MB -> 54.0 MB (14.1x)
+  Roots found at: 1.350000023841858, 4.450000286102295, 8.500000953674316,
+  Find root time:  0.401 s, 3806.8 MB/s
 
 */
 
 #include <stdio.h>
-#include "blosc.h"
+#include "blosc2.h"
 
 #define KB  1024.
 #define MB  (1024*KB)
@@ -81,7 +87,7 @@ int compute_vectors(void) {
 
     /* Create a super-chunk container for input (X values) */
     cparams.typesize = sizeof(double);
-    cparams.compcode = BLOSC_BLOSCLZ;
+    cparams.compcode = BLOSC_LZ4;
     cparams.clevel = 5;
     cparams.filters[0] = BLOSC_TRUNC_PREC;
     cparams.filters_meta[0] = 23;  // treat doubles as floats

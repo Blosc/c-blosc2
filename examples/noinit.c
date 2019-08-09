@@ -12,7 +12,7 @@
 
     or, if you don't have the blosc library installed yet:
 
-    $ gcc -O3 -msse2 noinit.c -I../blosc -o noinit -L../build/blosc -lblosc
+    $ gcc -O3 -msse2 noinit.c -I../blosc -o noinit -L../build/blosc -lblosc2
     $ export LD_LIBRARY_PATH=../build/blosc
 
     Using MSVC on Windows:
@@ -30,7 +30,7 @@
 */
 
 #include <stdio.h>
-#include <blosc.h>
+#include <blosc2.h>
 
 #define SIZE 100*100*100
 

@@ -15,9 +15,9 @@
 #include <sys/types.h>
 #include <assert.h>
 
-#include "blosc.h"
+#include "blosc2.h"
 #include "blosc-private.h"
-#include "blosc-common.h"
+#include "blosc2-common.h"
 
 #include "fastcopy.h"
 
@@ -324,18 +324,11 @@ static int lz4_wrap_compress(const char* input, size_t input_length,
   }
   int outlen = (int)maxout;
   int inlen = (int)input_length;
-  if (inlen < outlen) {
-    // We need this protection here because not even the ippsEncodeLZ4Safe_8u() avoids
-    // writing beyond the output limits.  I should report this to Intel.
-    // IppStatus status = ippsEncodeLZ4Safe_8u((const Ipp8u*)input, inlen,
-    //                                         (Ipp8u*)output, &outlen, (Ipp8u*)hash_table);
-    IppStatus status = ippsEncodeLZ4_8u((const Ipp8u *) input, inlen,
-                                        (Ipp8u *) output, &outlen, (Ipp8u *) hash_table);
-    cbytes = (status == ippStsNoErr) ? outlen : -outlen;
-  }
-  else {
-    cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
-  }
+  // I have not found any function that uses `accel` like in `LZ4_compress_fast`, but
+  // the IPP LZ4Safe call does a pretty good job on compressing well, so let's use it
+  IppStatus status = ippsEncodeLZ4Safe_8u((const Ipp8u*)input, &inlen,
+                                           (Ipp8u*)output, &outlen, (Ipp8u*)hash_table);
+  cbytes = (status == ippStsNoErr) ? outlen : -outlen;
 #else
   BLOSC_UNUSED_PARAM(hash_table);
   cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
@@ -359,18 +352,18 @@ static int lz4hc_wrap_compress(const char* input, size_t input_length,
 
 static int lz4_wrap_decompress(const char* input, size_t compressed_length,
                                char* output, size_t maxout) {
-  int cbytes;
+  int nbytes;
 #ifdef HAVE_IPP
   int outlen = (int)maxout;
   int inlen = (int)compressed_length;
   IppStatus status;
   status = ippsDecodeLZ4_8u((const Ipp8u*)input, inlen, (Ipp8u*)output, &outlen);
   //status = ippsDecodeLZ4Dict_8u((const Ipp8u*)input, &inlen, (Ipp8u*)output, 0, &outlen, NULL, 1 << 16);
-  cbytes = (status == ippStsNoErr) ? inlen : -inlen;
+  nbytes = (status == ippStsNoErr) ? outlen : -outlen;
 #else
-  cbytes = LZ4_decompress_fast(input, output, (int)maxout);
+  nbytes = LZ4_decompress_safe(input, output, (int)compressed_length, (int)maxout);
 #endif
-  if (cbytes != (int)compressed_length) {
+  if (nbytes != (int)maxout) {
     return 0;
   }
   return (int)maxout;
@@ -1406,10 +1399,18 @@ static int initialize_context_decompression(
 
 
 static int write_compression_header(blosc2_context* context,
-                                    int extended_header) {
+                                    bool extended_header) {
   int32_t compformat;
   int dont_split;
   int dict_training = context->use_dict && (context->dict_cdict == NULL);
+
+  // Set the whole header to zeros so that the reserved values are zeroed
+  if (extended_header) {
+    memset(context->dest, 0, BLOSC_EXTENDED_HEADER_LENGTH);
+  }
+  else {
+    memset(context->dest, 0, BLOSC_MIN_HEADER_LENGTH);
+  }
 
   /* Write version header for this block */
   context->dest[0] = BLOSC_VERSION_FORMAT;
@@ -1534,7 +1535,7 @@ static int write_compression_header(blosc2_context* context,
   }
 
   dont_split = !split_block(context->compcode, context->typesize,
-                            context->blocksize);
+                            context->blocksize, extended_header);
   *(context->header_flags) |= dont_split << 4;  /* dont_split is in bit 4 */
   *(context->header_flags) |= compformat << 5;  /* codec starts at bit 5 */
 
@@ -1627,7 +1628,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
   }
 
   /* Write the extended header */
-  error = write_compression_header(context, 1);
+  error = write_compression_header(context, true);
   if (error < 0) { return error; }
 
   result = blosc_compress_context(context);
@@ -1848,7 +1849,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     return error;
 
   /* Write chunk header without extended header (Blosc1 compatibility mode) */
-  error = write_compression_header(g_global_context, 0);
+  error = write_compression_header(g_global_context, false);
   if (error < 0)
     return error;
 

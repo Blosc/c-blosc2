@@ -18,7 +18,7 @@
 **********************************************************************/
 
 #include <assert.h>
-#include "blosc-common.h"
+#include "blosc2-common.h"
 
 
 static inline unsigned char *copy_1_bytes(unsigned char *out, const unsigned char *from) {

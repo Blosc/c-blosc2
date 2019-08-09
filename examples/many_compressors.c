@@ -7,36 +7,33 @@
 
     To compile this program:
 
-    $ gcc -O many_compressors.c -o many_compressors -lblosc
+    $ gcc -O many_compressors.c -o many_compressors -lblosc2
 
     To run:
 
     $ ./many_compressors
-    Blosc version info: 1.4.2.dev ($Date:: 2014-07-08 #$)
+    Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
     Using 4 threads (previously using 1)
     Using blosclz compressor
-    Compression: 4000000 -> 158494 (25.2x)
+    Compression: 4000000 -> 57577 (69.5x)
     Succesful roundtrip!
     Using lz4 compressor
-    Compression: 4000000 -> 234238 (17.1x)
+    Compression: 4000000 -> 97276 (41.1x)
     Succesful roundtrip!
     Using lz4hc compressor
     Compression: 4000000 -> 38314 (104.4x)
     Succesful roundtrip!
-    Using snappy compressor
-    Compression: 4000000 -> 311617 (12.8x)
-    Succesful roundtrip!
     Using zlib compressor
-    Compression: 4000000 -> 22103 (181.0x)
+    Compression: 4000000 -> 21486 (186.2x)
     Succesful roundtrip!
     Using zstd compressor
-    Compression: 4000000 -> 11813 (338.6x)
+    Compression: 4000000 -> 10692 (374.1x)
     Succesful roundtrip!
 
-*/
+ */
 
 #include <stdio.h>
-#include <blosc.h>
+#include <blosc2.h>
 
 #define SIZE 100*100*100
 #define SHAPE {100,100,100}
@@ -49,7 +46,7 @@ int main() {
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize = SIZE * sizeof(float), csize;
   int nthreads, pnthreads, i;
-  char* compressors[] = {"blosclz", "lz4", "lz4hc", "snappy", "zlib", "zstd"};
+  char* compressors[] = {"blosclz", "lz4", "lz4hc", "zlib", "zstd"};
   int ccode, rcode;
 
   for (i = 0; i < SIZE; i++) {
@@ -68,7 +65,7 @@ int main() {
   printf("Using %d threads (previously using %d)\n", nthreads, pnthreads);
 
   /* Tell Blosc to use some number of threads */
-  for (ccode = 0; ccode <= 5; ccode++) {
+  for (ccode = 0; ccode < 5; ccode++) {
 
     rcode = blosc_set_compressor(compressors[ccode]);
     if (rcode < 0) {

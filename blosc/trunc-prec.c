@@ -8,7 +8,7 @@
 **********************************************************************/
 
 #include <stdio.h>
-#include "blosc.h"
+#include "blosc2.h"
 #include "assert.h"
 #include "trunc-prec.h"
 

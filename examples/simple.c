@@ -7,7 +7,7 @@
 
     To compile this program:
 
-    $ gcc -O simple.c -o simple -lblosc
+    $ gcc -O simple.c -o simple -lblosc2
 
     To run:
 
@@ -21,7 +21,7 @@
 */
 
 #include <stdio.h>
-#include "blosc.h"
+#include "blosc2.h"
 
 #define SIZE (10 * 1000 * 1000)
 #define NTHREADS 2

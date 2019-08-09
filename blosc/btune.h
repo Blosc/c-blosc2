@@ -30,15 +30,20 @@ void btune_update(blosc2_context * context, double ctime);
 void btune_free(blosc2_context * context);
 
 /* Conditions for splitting a block before compressing with a codec. */
-static int split_block(int compcode, int32_t typesize, int32_t blocksize) {
+static int split_block(int compcode, int32_t typesize, int32_t blocksize, bool extended_header) {
   /* Normally all the compressors designed for speed benefit from a
      split.  However, in conducted benchmarks LZ4 seems that it runs
      faster if we don't split, which is quite surprising.
      */
-  return (((compcode == BLOSC_BLOSCLZ) ||
-           (compcode == BLOSC_SNAPPY)) &&
-          (typesize <= MAX_SPLITS) &&
-          (blocksize / typesize) >= BLOSC_MIN_BUFFERSIZE);
+  return (
+    ((compcode == BLOSC_BLOSCLZ) ||
+     (compcode == BLOSC_LZ4) ||  // IPP's LZ4 works pretty well when splitting
+     // for forward compatibility with Blosc1 (http://blosc.org/posts/new-forward-compat-policy/)
+     (!extended_header && compcode == BLOSC_LZ4HC) ||
+     (!extended_header && compcode == BLOSC_ZLIB) ||
+     (compcode == BLOSC_SNAPPY)) &&
+     (typesize <= MAX_SPLITS) &&
+     (blocksize / typesize) >= BLOSC_MIN_BUFFERSIZE);
 }
 
 #endif  /* BTUNE_H */

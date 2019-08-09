@@ -7,7 +7,7 @@
 
   To compile this program:
 
-  $ gcc frame_simple.c -o frame_simple -lblosc
+  $ gcc frame_simple.c -o frame_simple -lblosc2
 
   To run:
 
@@ -28,13 +28,13 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include <blosc.h>
+#include <blosc2.h>
 
 #define KB  1024.
 #define MB  (1024*KB)
 #define GB  (1024*MB)
 
-#define CHUNKSIZE (1000 * 1000)
+#define CHUNKSIZE (200 * 1000)
 #define NCHUNKS 100
 #define NTHREADS 4
 
@@ -42,9 +42,7 @@
 int main() {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
-  static int32_t data_dest1[CHUNKSIZE];
   static int32_t data_dest2[CHUNKSIZE];
-  static int32_t data_dest3[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int64_t nbytes, cbytes;
   int i, nchunk;
@@ -149,30 +147,16 @@ int main() {
       printf("Decompression error in schunk1.  Error code: %d\n", dsize);
       return dsize;
     }
-    int32_t dsize1 = blosc2_frame_decompress_chunk(frame1, nchunk, data_dest1, isize);
-    if (dsize1 < 0) {
-      printf("Decompression error in frame1.  Error code: %d\n", dsize1);
-      return dsize1;
-    }
-    assert(dsize == dsize1);
     int32_t dsize2 = blosc2_schunk_decompress_chunk(schunk2, nchunk, data_dest2, isize);
     if (dsize2 < 0) {
       printf("Decompression error in schunk2.  Error code: %d\n", dsize2);
       return dsize2;
     }
     assert(dsize == dsize2);
-    int32_t dsize3 = blosc2_frame_decompress_chunk(frame2, nchunk, data_dest3, isize);
-    if (dsize3 < 0) {
-      printf("Decompression error in frame2.  Error code: %d\n", dsize2);
-      return dsize2;
-    }
-    assert(dsize == dsize2);
     /* Check integrity of this chunk */
     for (i = 0; i < CHUNKSIZE; i++) {
       assert (data_dest[i] == i * nchunk);
-      assert (data_dest1[i] == i * nchunk);
       assert (data_dest2[i] == i * nchunk);
-      assert (data_dest3[i] == i * nchunk);
     }
   }
   printf("Successful roundtrip schunk <-> frame <-> fileframe !\n");

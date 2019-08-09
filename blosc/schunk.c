@@ -12,9 +12,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "blosc.h"
+#include "blosc2.h"
 #include "blosc-private.h"
 #include "context.h"
+#include "frame.h"
 
 #include "zstd.h"
 #include "zstd_errors.h"
@@ -40,7 +41,7 @@
 
 
 /* Get the cparams associated with a super-chunk */
-int blosc2_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
+int blosc2_schunk_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
   *cparams = calloc(sizeof(blosc2_cparams), 1);
   (*cparams)->schunk = schunk;
   for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
@@ -62,7 +63,7 @@ int blosc2_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
 
 
 /* Get the dparams associated with a super-chunk */
-int blosc2_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams) {
+int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams) {
   *dparams = calloc(sizeof(blosc2_dparams), 1);
   (*dparams)->schunk = schunk;
   if (schunk->dctx == NULL) {
@@ -100,7 +101,6 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
 
   schunk->frame = frame;
   if (frame != NULL) {
-    frame->schunk = schunk;
     if (frame->len == 0) {
       // Initialize frame (basically, encode the header)
       int64_t frame_len = blosc2_schunk_to_frame(schunk, frame);
@@ -167,7 +167,7 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
     schunk->data[nchunks] = chunk;
   }
   else {
-    blosc2_frame_append_chunk(schunk->frame, chunk);
+    frame_append_chunk(schunk->frame, chunk, schunk);
   }
 
   /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n", */
@@ -221,7 +221,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
       return -11;
     }
   } else {
-    chunksize = blosc2_frame_decompress_chunk(schunk->frame, nchunk, dest, nbytes);
+    chunksize = frame_decompress_chunk(schunk->frame, nchunk, dest, nbytes);
     if (chunksize < 0) {
       return -10;
     }
@@ -241,7 +241,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
 */
 int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, bool *needs_free) {
   if (schunk->frame != NULL) {
-    return blosc2_frame_get_chunk(schunk->frame, nchunk, chunk, needs_free);
+    return frame_get_chunk(schunk->frame, nchunk, chunk, needs_free);
   }
 
   if (nchunk >= schunk->nchunks) {
