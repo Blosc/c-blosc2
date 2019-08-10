@@ -108,27 +108,29 @@ void btune_next_blocksize(blosc2_context *context) {
   if (clevel > 0 && split_block(context->compcode, typesize, blocksize, true)) {
     blocksize = L1;
     switch (clevel) {
-     case 1:
-     case 2:
-       blocksize *= 1;
-       break;
-     case 3:
-     case 4:
-       blocksize *= 2;
-       break;
-     case 5:
-     case 6:
-     case 7:
-       blocksize *= 4;
-       break;
-     case 8:
-     case 9:
-       // Do not exceed 256 KB, never ;-)
-       blocksize *= 8;
-       break;
-     default:
-       break;
-    }
+      case 1:
+        blocksize /= 2;
+        break;
+      case 2:
+      case 3:
+        blocksize *= 1;
+        break;
+      case 4:
+      case 5:
+        blocksize *= 2;
+        break;
+      case 6:
+      case 7:
+        blocksize *= 4;
+        break;
+      case 8:
+      case 9:
+        // Do not exceed 256 KB, never ;-)
+        blocksize *= 8;
+        break;
+      default:
+        break;
+     }
   }
 
   /* Check that blocksize is not too large */
