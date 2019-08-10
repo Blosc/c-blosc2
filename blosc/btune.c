@@ -43,6 +43,7 @@ void btune_next_blocksize(blosc2_context *context) {
   int32_t nbytes = context->sourcesize;
   int32_t user_blocksize = context->blocksize;
   int32_t blocksize = nbytes;
+  int nthreads = context->nthreads;
 
   // Protection against very small buffers
   if (nbytes < typesize) {
@@ -106,27 +107,32 @@ void btune_next_blocksize(blosc2_context *context) {
   /* Now the blocksize for splittable codecs */
   if (clevel > 0 && split_block(context->compcode, typesize, blocksize, true)) {
     blocksize = L1;
-     switch (clevel) {
-      case 1:
-      case 2:
-        blocksize *= 1;
-        break;
-      case 3:
-      case 4:
-        blocksize *= 2;
-        break;
-      case 5:
-      case 6:
-      case 7:
-        blocksize *= 4;
-        break;
-      case 8:
-      case 9:
-        // Do not exceed 256 KB, never ;-)
-        blocksize *= 8;
-        break;
-      default:
-        break;
+    switch (clevel) {
+     case 1:
+     case 2:
+       blocksize *= 1;
+       break;
+     case 3:
+     case 4:
+       blocksize *= 2;
+       break;
+     case 5:
+     case 6:
+     case 7:
+       blocksize *= 4;
+       break;
+     case 8:
+     case 9:
+       // Do not exceed 256 KB, never ;-)
+       blocksize *= 8;
+       break;
+     default:
+       break;
+    }
+
+    // Try to not exceed the L1 for small clevels
+    if ((clevel < 4) && (blocksize * nthreads >= L1)) {
+      blocksize = L1 / nthreads;
     }
 
   }
