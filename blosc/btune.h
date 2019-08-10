@@ -14,6 +14,8 @@
 
 /* The size of L1 cache.  32 KB is quite common nowadays. */
 #define L1 (32 * 1024)
+/* The size of L2 cache.  256 KB is quite common nowadays. */
+#define L2 (256 * 1024)
 
 /* The maximum number of splits in a block for compression */
 #define MAX_SPLITS 16            /* Cannot be larger than 128 */

@@ -130,9 +130,9 @@ void btune_next_blocksize(blosc2_context *context) {
        break;
     }
 
-    // Try to not exceed the L1 for small clevels
-    if ((clevel < 4) && (blocksize * nthreads >= L1)) {
-      blocksize = L1 / nthreads;
+    // Try to not exceed the L2 for small clevels
+    if ((clevel < 4) && (blocksize * nthreads >= L2)) {
+      blocksize = L2 / nthreads;
     }
 
   }
