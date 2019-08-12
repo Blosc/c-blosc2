@@ -33,7 +33,7 @@ C-Blosc2 is the new major version of C-Blosc, with a revamped API and support fo
 
 C-Blosc2 tries to be backward compatible with both the C-Blosc1 API and format.  Furthermore, if you just use the C-Blosc1 API you are guaranteed to generate compressed data containers that can be read with a Blosc1 library, but getting the benefit of better performance, like for example leveraging the accelerated versions of codecs present in Intel's IPP (LZ4 now and maybe others later on).
 
-C-Blosc2 is currently in beta stage, so not ready to be used in production yet.  Having said this, the beta stage means that the API has been declared frozen, so there is guarantee that your programs will continue to work with future versions of the library. If you want to collaborate in this development you are welcome.  We need help in the different areas listed at the `<ROADMAP.md>`_; also, be sure to read our `<DEVELOPING-GUIDE.rst>`_.  Blosc is distributed using the BSD license, see `<LICENSE.txt>`_ for details.
+C-Blosc2 is currently in beta stage, so not ready to be used in production yet.  Having said this, the beta stage means that the API has been declared frozen, so there is guarantee that your programs will continue to work with future versions of the library. If you want to collaborate in this development you are welcome.  We need help in the different areas listed at the `ROADMAP <https://github.com/Blosc/c-blosc2/ROADMAP.md>`_; also, be sure to read our `DEVELOPING-GUIDE <https://github.com/Blosc/c-blosc2/DEVELOPING-GUIDE.rst>`_.  Blosc is distributed using the `BSD license <https://github.com/Blosc/c-blosc2/LICENSE.txt>`_.
 
 Meta-compression and other advantages over existing compressors
 ===============================================================
