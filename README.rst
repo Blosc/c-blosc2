@@ -26,13 +26,14 @@
 What is it?
 ===========
 
-
 `Blosc <http://blosc.org/pages/blosc-in-depth/>`_ is a high performance compressor optimized for binary data.  It has been designed to transmit data to the processor cache faster than the traditional, non-compressed, direct memory fetch approach via a memcpy() OS call.  Blosc is the first compressor (that I'm aware of) that is meant not only to reduce the size of large datasets on-disk or
 in-memory, but also to accelerate memory-bound computations.
 
-C-Blosc2 is the new major version of C-Blosc, with a revamped API and support for new filters (including filter pipelining), new compressors, but most importantly new data containers that are meant to overcome the 32-bit limitation of the original C-Blosc.  These new data containers will be available in various forms, including in-memory and on-disk implementations.
+C-Blosc2 is the new major version of C-Blosc, with a revamped API and support for new filters (including filter pipelining), new compressors, but most importantly new data containers that are meant to overcome the 32-bit limitation of the original C-Blosc.  These new data containers will be available in various forms, including in-memory and on-disk implementations (frames).  Finally, the frames can be annotated with metainfo (metalayers) that is provided by the user.
 
-C-Blosc2 is currently in beta stage, so not ready to be used in production yet.  If you want to collaborate in this development you are welcome.  We need help in the different areas listed at the `<ROADMAP.md>`_; also, be sure to read our `<DEVELOPING-GUIDE.rst>`_.  Blosc is distributed using the BSD license, see `<LICENSE.txt>`_ for details.
+C-Blosc2 tries to be backward compatible with both the C-Blosc1 API and format.  Furthermore, if you just use the C-Blosc1 API you are guaranteed to generate compressed data containers that can be read with a Blosc1 library, but getting the benefit of better performance, like for example leveraging the accelerated versions of codecs present in Intel's IPP (LZ4 now and maybe others later on).
+
+C-Blosc2 is currently in beta stage, so not ready to be used in production yet.  Having said this, the beta stage means that the API has been declared frozen, so there is guarantee that your programs will continue to work with future versions of the library. If you want to collaborate in this development you are welcome.  We need help in the different areas listed at the `<ROADMAP.md>`_; also, be sure to read our `<DEVELOPING-GUIDE.rst>`_.  Blosc is distributed using the BSD license, see `<LICENSE.txt>`_ for details.
 
 Meta-compression and other advantages over existing compressors
 ===============================================================
