@@ -1370,7 +1370,11 @@ static int initialize_context_decompression(
     /* Extended header */
     uint8_t* filters = (uint8_t*)(context->src + BLOSC_MIN_HEADER_LENGTH);
     uint8_t* filters_meta = filters + 8;
-    for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+    int header_version = context->src[0];
+    // The number of filters depends on the version of the header
+    // (we need to read less because filters where not initialized to zero in blosc2 alpha series)
+    int max_filters = (header_version == BLOSC2_ALPHA_VERSION_FORMAT) ? 5 : BLOSC_MAX_FILTERS;
+    for (int i = 0; i < max_filters; i++) {
       context->filters[i] = filters[i];
       context->filters_meta[i] = filters_meta[i];
     }
@@ -1420,7 +1424,7 @@ static int write_compression_header(blosc2_context* context,
   }
 
   /* Write version header for this block */
-  context->dest[0] = BLOSC_VERSION_FORMAT;
+  context->dest[0] = BLOSC_VERSION_FORMAT_LATEST;
 
   /* Write compressor format */
   compformat = -1;

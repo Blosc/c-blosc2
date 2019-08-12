@@ -38,13 +38,19 @@ extern "C" {
 #define BLOSC_VERSION_DATE     "$Date:: 2019-08-09 #$"    /* date version */
 
 
-/* The *_FORMAT symbols below should be just 1-byte long */
+/* The VERSION_FORMAT symbols below should be just 1-byte long */
 enum {
   /* Blosc format version, starting at 1
-     1 -> Basically for Blosc pre-1.0
+     1 -> Blosc pre-1.0
      2 -> Blosc 1.x series
-     3 -> Blosc 2.x series */
-  BLOSC_VERSION_FORMAT = 3,
+     3 -> Blosc 2-alpha.x series
+     4 -> Blosc 2.x series
+     */
+  BLOSC_PRE1_VERSION_FORMAT = 1,
+  BLOSC1_VERSION_FORMAT = 2,
+  BLOSC2_ALPHA_VERSION_FORMAT = 3,
+  BLOSC2_BETA_VERSION_FORMAT = 4,
+  BLOSC_VERSION_FORMAT_LATEST = BLOSC2_BETA_VERSION_FORMAT,
 };
 
 enum {

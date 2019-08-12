@@ -49,7 +49,7 @@ static char* test_cbuffer_versions() {
   int versionlz_;
 
   blosc_cbuffer_versions(dest, &version_, &versionlz_);
-  mu_assert("ERROR: version incorrect", version_ == BLOSC_VERSION_FORMAT);
+  mu_assert("ERROR: version incorrect", version_ == BLOSC_VERSION_FORMAT_LATEST);
   mu_assert("ERROR: versionlz incorrect", versionlz_ == BLOSC_BLOSCLZ_VERSION_FORMAT);
   return 0;
 }
