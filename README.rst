@@ -32,8 +32,7 @@ in-memory, but also to accelerate memory-bound computations.
 
 C-Blosc2 is the new major version of C-Blosc, with a revamped API and support for new filters (including filter pipelining), new compressors, but most importantly new data containers that are meant to overcome the 32-bit limitation of the original C-Blosc.  These new data containers will be available in various forms, including in-memory and on-disk implementations.
 
-C-Blosc2 is currently in beta stage, so not ready to be used in production yet.  If you want to collaborate in this development you are welcome.  We need help in the different areas listed at the `<ROADMAP.md>`_; also, be sure to read our `<DEVELOPING-GUIDE.rst>`_.
-  Blosc is distributed using the BSD license, see `<LICENSE.txt>`_ for details.
+C-Blosc2 is currently in beta stage, so not ready to be used in production yet.  If you want to collaborate in this development you are welcome.  We need help in the different areas listed at the `<ROADMAP.md>`_; also, be sure to read our `<DEVELOPING-GUIDE.rst>`_.  Blosc is distributed using the BSD license, see `<LICENSE.txt>`_ for details.
 
 Meta-compression and other advantages over existing compressors
 ===============================================================
