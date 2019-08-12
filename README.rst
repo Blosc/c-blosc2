@@ -2,7 +2,7 @@
  Blosc: A blocking, shuffling and lossless compression library
 ===============================================================
 
-:Author: Blosc Development Team
+:Author: The Blosc Development Team
 :Contact: blosc@blosc.org
 :URL: http://www.blosc.org
 :Gitter: |gitter|
@@ -43,7 +43,7 @@ implementations.
 
 C-Blosc2 is currently in alpha stage and its development will probably
 take several months.  If you want to collaborate in the this development
-you are welcome.  We need help in the different areas listed at the 
+you are welcome.  We need help in the different areas listed at the
 `<ROADMAP.md>`_; also, be sure to read our `<DEVELOPING-GUIDE.rst>`_.
 
 Blosc is distributed using the BSD license, see `<LICENSES/BLOSC2.txt>`_ for
@@ -100,7 +100,7 @@ is the thing that should be taken as a model for that.
 Compiling the C-Blosc2 library with CMake
 =========================================
 
-Blosc can be built, tested and installed using 
+Blosc can be built, tested and installed using
 `CMake <http://www.cmake.org>`_.  The following procedure
 describes a typical CMake build.
 

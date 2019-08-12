@@ -63,4 +63,4 @@ http://groups.google.es/group/blosc
 
 
 Enjoy Data!
-- The Blosc develop team
+- The Blosc Development Team
