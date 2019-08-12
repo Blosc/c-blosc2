@@ -52,7 +52,7 @@ int main() {
 
   /* Create a super-chunk container */
   cparams.filters[0] = BLOSC_DELTA;
-  //cparams.filters[BLOSC_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
+  //cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 1;

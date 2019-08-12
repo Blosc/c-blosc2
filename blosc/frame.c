@@ -657,7 +657,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
   schunk->nchunks = nchunks;
   schunk->clevel = (uint8_t)((compcode & 0xf0u) >> 4u);
   schunk->compcode = (uint8_t)(compcode & 0xfu);
-  schunk->filters[BLOSC_MAX_FILTERS - 1] = (uint8_t)((filters & 0xcu) >> 2u);  // filters are in bits 2 and 3
+  schunk->filters[BLOSC2_MAX_FILTERS - 1] = (uint8_t)((filters & 0xcu) >> 2u);  // filters are in bits 2 and 3
 
   // Compression and decompression contexts
   blosc2_cparams *cparams;

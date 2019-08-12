@@ -90,7 +90,7 @@ enum {
 };
 
 enum {
-  BLOSC_MAX_FILTERS = 6,
+  BLOSC2_MAX_FILTERS = 6,
   //!< Maximum number of filters in the filter pipeline
 };
 
@@ -612,9 +612,9 @@ typedef struct {
   //!< The requested size of the compressed blocks (0; meaning automatic).
   void* schunk;
   //!< The associated schunk, if any (NULL).
-  uint8_t filters[BLOSC_MAX_FILTERS];
+  uint8_t filters[BLOSC2_MAX_FILTERS];
   //!< The (sequence of) filters.
-  uint8_t filters_meta[BLOSC_MAX_FILTERS];
+  uint8_t filters_meta[BLOSC2_MAX_FILTERS];
   //!< The metadata for filters.
   blosc2_prefilter_fn prefilter;
   //!< The prefilter function.
@@ -790,9 +790,9 @@ typedef struct blosc2_schunk {
   //!< The requested size of the compressed blocks (0; meaning automatic).
   int32_t chunksize;
   //!< Size of each chunk. 0 if not a fixed chunksize.
-  uint8_t filters[BLOSC_MAX_FILTERS];
+  uint8_t filters[BLOSC2_MAX_FILTERS];
   //!< The (sequence of) filters.  8-bit per filter.
-  uint8_t filters_meta[BLOSC_MAX_FILTERS];
+  uint8_t filters_meta[BLOSC2_MAX_FILTERS];
   //!< Metadata for filters. 8-bit per meta-slot.
   int32_t nchunks;
   //!< Number of chunks in super-chunk.

@@ -44,7 +44,7 @@
 int blosc2_schunk_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
   *cparams = calloc(sizeof(blosc2_cparams), 1);
   (*cparams)->schunk = schunk;
-  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     (*cparams)->filters[i] = schunk->filters[i];
     (*cparams)->filters_meta[i] = schunk->filters_meta[i];
   }
@@ -82,7 +82,7 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
 
   schunk->version = 0;     /* pre-first version */
-  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     schunk->filters[i] = cparams.filters[i];
     schunk->filters_meta[i] = cparams.filters_meta[i];
   }

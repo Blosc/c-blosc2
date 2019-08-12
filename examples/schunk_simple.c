@@ -7,21 +7,20 @@
 
   To compile this program:
 
-  $ gcc simple_schunk.c -o simple_schunk -lblosc2
+  $ gcc schunk_simple.c -o schunk_simple -lblosc2
 
   To run:
 
-  $ ./simple_schunk
-  Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
-  Compression ratio: 381.5 MB -> 9.4 MB (40.5x)
-  Compression time: 0.128 s, 2986.5 MB/s
-  Decompression time: 0.063 s, 6053.7 MB/s
+  $ ./schunk_simple
+  Blosc version info: 2.0.0-beta.1 ($Date:: 2019-08-09 #$)
+  Compression ratio: 381.5 MB -> 12.2 MB (31.2x)
+  Compression time: 0.119 s, 3192.9 MB/s
+  Decompression time: 0.035 s, 10888.3 MB/s
   Successful roundtrip data <-> schunk !
 
 */
 
 #include <stdio.h>
-#include <assert.h>
 #include <blosc2.h>
 
 #define KB  1024.
@@ -42,7 +41,6 @@ int main() {
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
   int i, nchunk;
-  int nchunks;
   blosc_timestamp_t last, current;
   double ttotal;
 
@@ -51,8 +49,7 @@ int main() {
 
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
-  cparams.filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
-  //cparams.filters_meta[BLOSC_MAX_FILTERS - 1] = 2;  // A number larger than 0 will execute additional shuffles
+  cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   cparams.compcode = BLOSC_LZ4;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
@@ -64,8 +61,11 @@ int main() {
     for (i = 0; i < CHUNKSIZE; i++) {
       data[i] = i * nchunk;
     }
-    nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
-    assert(nchunks == nchunk + 1);
+    int nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
+    if (nchunks != nchunk + 1) {
+        printf("Unexpected nchunks!");
+        return -1;
+    }
   }
   /* Gather some info */
   nbytes = schunk->nbytes;

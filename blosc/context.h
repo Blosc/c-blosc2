@@ -71,9 +71,9 @@ struct blosc2_context_s {
   /* The dictionary in digested form for decompression */
   uint8_t filter_flags;
   /* The filter flags in the filter pipeline */
-  uint8_t filters[BLOSC_MAX_FILTERS];
+  uint8_t filters[BLOSC2_MAX_FILTERS];
   /* the (sequence of) filters */
-  uint8_t filters_meta[BLOSC_MAX_FILTERS];
+  uint8_t filters_meta[BLOSC2_MAX_FILTERS];
   /* the metainfo for filters */
   blosc2_prefilter_fn prefilter;
   /* prefilter function */

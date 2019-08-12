@@ -576,7 +576,7 @@ int next_filter(const uint8_t* filters, int current_filter, char cmode) {
 
 int last_filter(const uint8_t* filters, char cmode) {
   int last_index = -1;
-  for (int i = BLOSC_MAX_FILTERS - 1; i >= 0; i--) {
+  for (int i = BLOSC2_MAX_FILTERS - 1; i >= 0; i--) {
     if (!do_nothing(filters[i], cmode))  {
       last_index = i;
     }
@@ -626,7 +626,7 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
   }
 
   /* Process the filter pipeline */
-  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     switch (filters[i]) {
       case BLOSC_SHUFFLE:
         for (int j = 0; j <= filters_meta[i]; j++) {
@@ -833,7 +833,7 @@ int pipeline_d(blosc2_context* context, const int32_t bsize, uint8_t* dest,
   uint8_t* _tmp = tmp2;
   int errcode = 0;
 
-  for (int i = BLOSC_MAX_FILTERS - 1; i >= 0; i--) {
+  for (int i = BLOSC2_MAX_FILTERS - 1; i >= 0; i--) {
     // Delta filter requires the whole chunk ready
     int last_copy_filter = (last_filter_index == i) || (next_filter(filters, i, 'd') == BLOSC_DELTA);
     if (last_copy_filter) {
@@ -928,7 +928,7 @@ static int blosc_d(
   int last_filter_index = last_filter(filters, 'd');
 
   if ((last_filter_index >= 0) &&
-          (next_filter(filters, BLOSC_MAX_FILTERS, 'd') != BLOSC_DELTA)) {
+          (next_filter(filters, BLOSC2_MAX_FILTERS, 'd') != BLOSC_DELTA)) {
    // We are making use of some filter, so use a temp for destination
    _dest = tmp;
   } else {
@@ -1232,7 +1232,7 @@ static int do_job(blosc2_context* context) {
 uint8_t filters_to_flags(const uint8_t* filters) {
   uint8_t flags = 0;
 
-  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     switch (filters[i]) {
       case BLOSC_SHUFFLE:
         flags |= BLOSC_DOSHUFFLE;
@@ -1253,14 +1253,14 @@ uint8_t filters_to_flags(const uint8_t* filters) {
 
 void flags_to_filters(const uint8_t flags, uint8_t* filters) {
   /* Initialize the filter pipeline */
-  memset(filters, 0, BLOSC_MAX_FILTERS);
+  memset(filters, 0, BLOSC2_MAX_FILTERS);
   /* Fill the filter pipeline */
   if (flags & BLOSC_DOSHUFFLE)
-    filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
+    filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   if (flags & BLOSC_DOBITSHUFFLE)
-    filters[BLOSC_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
+    filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   if (flags & BLOSC_DODELTA)
-    filters[BLOSC_MAX_FILTERS - 2] = BLOSC_DELTA;
+    filters[BLOSC2_MAX_FILTERS - 2] = BLOSC_DELTA;
 }
 
 
@@ -1279,7 +1279,7 @@ static int initialize_context_compression(
   context->sourcesize = sourcesize;
   context->typesize = (int32_t)typesize;
   context->filter_flags = filters_to_flags(filters);
-  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     context->filters[i] = filters[i];
     context->filters_meta[i] = filters_meta[i];
   }
@@ -1373,7 +1373,7 @@ static int initialize_context_decompression(
     int header_version = context->src[0];
     // The number of filters depends on the version of the header
     // (we need to read less because filters where not initialized to zero in blosc2 alpha series)
-    int max_filters = (header_version == BLOSC2_ALPHA_VERSION_FORMAT) ? 5 : BLOSC_MAX_FILTERS;
+    int max_filters = (header_version == BLOSC2_ALPHA_VERSION_FORMAT) ? 5 : BLOSC2_MAX_FILTERS;
     for (int i = 0; i < max_filters; i++) {
       context->filters[i] = filters[i];
       context->filters_meta[i] = filters_meta[i];
@@ -1494,7 +1494,7 @@ static int write_compression_header(blosc2_context* context,
     /* Store filter pipeline info at the end of the header */
     uint8_t *filters = context->dest + BLOSC_MIN_HEADER_LENGTH;
     uint8_t *filters_meta = filters + 8;
-    for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+    for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
       filters[i] = context->filters[i];
       filters_meta[i] = context->filters_meta[i];
     }
@@ -1732,11 +1732,11 @@ void build_filters(const int doshuffle, const int delta,
 
   /* Fill the end part of the filter pipeline */
   if ((doshuffle == BLOSC_SHUFFLE) && (typesize > 1))
-    filters[BLOSC_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
+    filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   if (doshuffle == BLOSC_BITSHUFFLE)
-    filters[BLOSC_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
+    filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   if (delta)
-    filters[BLOSC_MAX_FILTERS - 2] = BLOSC_DELTA;
+    filters[BLOSC2_MAX_FILTERS - 2] = BLOSC_DELTA;
 }
 
 
@@ -1852,8 +1852,8 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
   pthread_mutex_lock(&global_comp_mutex);
 
   /* Initialize a context compression */
-  uint8_t* filters = calloc(1, BLOSC_MAX_FILTERS);
-  uint8_t* filters_meta = calloc(1, BLOSC_MAX_FILTERS);
+  uint8_t* filters = calloc(1, BLOSC2_MAX_FILTERS);
+  uint8_t* filters_meta = calloc(1, BLOSC2_MAX_FILTERS);
   build_filters(doshuffle, g_delta, typesize, filters);
   error = initialize_context_compression(
     g_global_context, (int32_t)nbytes, src, dest, (int32_t)destsize, clevel, filters,
@@ -1997,7 +1997,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
     /* Extended header */
     uint8_t* filters = _src + BLOSC_MIN_HEADER_LENGTH;
     uint8_t* filters_meta = filters + 8;
-    for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+    for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
       context->filters[i] = filters[i];
       context->filters_meta[i] = filters_meta[i];
     }
@@ -2717,7 +2717,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   context->clevel = cparams.clevel;
   context->use_dict = cparams.use_dict;
   context->typesize = cparams.typesize;
-  for (int i = 0; i < BLOSC_MAX_FILTERS; i++) {
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     context->filters[i] = cparams.filters[i];
     context->filters_meta[i] = cparams.filters_meta[i];
   }

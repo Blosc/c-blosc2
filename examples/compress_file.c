@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   cparams.typesize = 1;
   cparams.compcode = BLOSC_LZ4;
-  //cparams.filters[BLOSC_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
+  //cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
