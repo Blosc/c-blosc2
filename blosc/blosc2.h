@@ -770,10 +770,9 @@ typedef struct {
 /**
  * @brief This struct is the standard container for Blosc 2 compressed data.
  *
- * This sctruct is basically a container for Blosc 1 chunks of compressed data,
- * it allows to overcome the 32-bit limitation in Blosc 1. Additionally can
- * store user defined metadata and can be used together with a frame to store
- * the compressed chunks contiguously.
+ * This struct is essentially a container for Blosc 1 chunks of compressed data,
+ * and it allows to overcome the 32-bit limitation in Blosc 1. It can be used
+ * together with a frame to store the compressed chunks contiguously.
  */
 typedef struct blosc2_schunk {
   uint8_t version;
@@ -950,7 +949,7 @@ BLOSC_EXPORT blosc2_frame* blosc2_new_frame(char* fname);
  * @param schunk The super-chunk from where the frame will be created.
  * @param frame The pointer where the frame will be returned
  *
- * If @p frame->fname is NULL, a frame is created in memory; else it is created
+ * If frame->fname is NULL, a frame is created in memory; else it is created
  * on disk.
  *
  * @return The size in bytes of the frame. If an error occurs it returns a negative value.
@@ -1051,9 +1050,7 @@ BLOSC_EXPORT int blosc2_frame_get_metalayer(blosc2_frame *frame, char *name, uin
                                             uint32_t *content_len);
 
 /*********************************************************************
-
-  Time measurement utilities.  Visit the include below for the public API.
-
+  Time measurement utilities.
 *********************************************************************/
 
 #if defined(_WIN32)
