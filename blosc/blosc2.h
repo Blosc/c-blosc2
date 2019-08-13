@@ -129,6 +129,7 @@ enum {
   BLOSC_ZLIB = 4,
   BLOSC_ZSTD = 5,
   BLOSC_LIZARD = 6,
+  BLOSC_MAX_CODECS = 7,  //!< maximum number of reserved codecs
 };
 
 
