@@ -631,7 +631,7 @@ int frame_update_meta(blosc2_frame* frame, blosc2_schunk* schunk) {
 
 
 /* Get a super-chunk out of a frame */
-blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
+blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
   int32_t header_len;
   int64_t frame_len;
   int64_t nbytes;
@@ -669,7 +669,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse) {
   schunk->dctx = blosc2_create_dctx(*dparams);
   free(dparams);
 
-  if (!sparse || nchunks == 0) {
+  if (!copy || nchunks == 0) {
     // We are done, so leave here
     return schunk;
   }

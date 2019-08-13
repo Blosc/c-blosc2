@@ -991,12 +991,12 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(const char *fname);
  * @brief Create a super-chunk from a frame.
  *
  * @param frame The frame from which the super-chunk will be created.
- * @param sparse If true, a new sparse, in-memory super-chunk is created.
+ * @param copy If true, a new, sparse in-memory super-chunk is created.
  * Else, a frame-backed one is created (i.e. no copies are made)
  *
  * @return The super-chunk corresponding to the frame.
  */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool sparse);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy);
 
 /**
  * @brief Find whether the frame has a metalayer or not.
