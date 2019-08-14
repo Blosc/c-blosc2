@@ -55,6 +55,10 @@ Actions to be done
   
 * Wrappers for other languages: Python and Java are the most obvious candidates, but others like R or Julia would be nice to have.  Still not sure if these should be produced and maintained by the Blosc development team, or leave them for third-party players that would be interested.
 
+* It would be nice to use [LGTM](https://lgtm.com), a CI-friendly analyzer for security.
+
+* Adding support for [buildkite](https://buildkite.com) as another CI would be handy.
+
 
 Outreaching
 -----------
