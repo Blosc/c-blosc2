@@ -15,7 +15,7 @@ Throughout this document we are going to use the next conventions:
 Existing features
 -----------------
 
-Right now (August 2019), the next features are already implemented (although they may require some refactoring or most tests):
+Right now (August 2019), the next features are already implemented (although they may require some refactoring or more tests):
 
 * 64-bit containers.  The first-class container in C-Blosc2 is the `super-chunk` or, for brevity, `schunk`, that is made by smaller containers which are essentially C-Blosc1 32-bit containers.  The super-chunk can be backed or not by another container which is called a `frame` (see later).
 
@@ -23,7 +23,7 @@ Right now (August 2019), the next features are already implemented (although the
   
   - `delta`: the stored blocks inside a chunk are diff'ed with respect to first block in the chunk.  The idea is that, in some situations, the diff will have more zeros than the original data, leading to better compression.
   
-  - `trun_prec`: it zeroes the least significant bits of the matissa of float32 and float64 types.  When combined with the `shuffle` or `bitshuffle` filter, this leads to more contiguous zeros, which are compressed better.
+  - `trun_prec`: it zeroes the least significant bits of the mantissa of float32 and float64 types.  When combined with the `shuffle` or `bitshuffle` filter, this leads to more contiguous zeros, which are compressed better.
   
 * A filter pipeline: the different filters can be pipelined so that the output of one can the input for the other.  A possible example is a `delta` followed by `shuffle`, or as described above, `trunc_prec` followed by `bitshuffle`.
 
@@ -49,7 +49,7 @@ Actions to be done
 
 * Documentation: utterly important for attracting new users and making the life easier for existing ones.  Important points to have in mind here:
 
-  - Quality of API docstrings: is the mission of the functions or data structures clearly and succintly explained? Are all the parameters explained?  Is the return value explained?  What are the possible errors that can be returned?
+  - Quality of API docstrings: is the mission of the functions or data structures clearly and succinctly explained? Are all the parameters explained?  Is the return value explained?  What are the possible errors that can be returned?
   
   - Tutorials/book: besides the API docstrings, more documentation materials should be provided, like tutorials or a book about Blosc (or at least, the beginnings of it).  Due to its adoption in GitHub and Jupyter notebooks, one of the most extended and useful markup systems is MarkDown, so this should also be the first candidate to use here.
   
@@ -57,8 +57,7 @@ Actions to be done
 
 * It would be nice to use [LGTM](https://lgtm.com), a CI-friendly analyzer for security.
 
-* Adding support for [buildkite](https://buildkite.com) as another CI would be handy.
-
+* Add support for `buildkite <https://buildkite.com>`_ as another CI would be handy because it allows to use on-premise machines, potentially speeding-up the time to do the builds, but also to setup pipelines with more complex dependencies and analyzers.
 
 Outreaching
 -----------
