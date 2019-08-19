@@ -142,7 +142,30 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Filter flags
-  *h2p = 0x0;  // default is memcpy
+  // Get the filters that are supported right in the filters flag.
+  // TODO: support the pipeline in full generality.
+  uint8_t filter_flags = 0;
+  int nfilters = 0;
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
+    switch (schunk->filters[i]) {
+      case BLOSC_NOFILTER:
+        break;
+      case BLOSC_SHUFFLE:
+      case BLOSC_BITSHUFFLE:
+      case BLOSC_DELTA:
+        filter_flags = schunk->filters[i];
+        nfilters++;
+        break;
+      default:
+        fprintf(stderr, "Error in frame: filter not yet supported: %d\n", schunk->filters[i]);
+        return NULL;
+    }
+  }
+  if (nfilters > 1) {
+    fprintf(stderr, "Error in frame: serialization of filter pipeline not implemented yet\n");
+    return NULL;
+  }
+  *h2p = filter_flags << 2u;  // filter_flags start at bit 2
   h2p += 1;
   assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
@@ -452,12 +475,12 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
 
   // Populate the metalayer and serialized value for each client
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
-    assert((*idxp & 0xe0) == 0xa0);   // sanity check
+    assert((*idxp & 0xe0u) == 0xa0u);   // sanity check
     blosc2_frame_metalayer* metalayer = calloc(sizeof(blosc2_frame_metalayer), 1);
     frame->metalayers[nmetalayer] = metalayer;
 
     // Populate the metalayer string
-    int8_t nslen = *idxp & (uint8_t)0x1f;
+    int8_t nslen = *idxp & (uint8_t)0x1fu;
     idxp += 1;
     char* ns = malloc((size_t)nslen + 1);
     memcpy(ns, idxp, nslen);
@@ -467,7 +490,7 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
 
     // Populate the serialized value for this metalayer
     // Get the offset
-    assert((*idxp & 0xff) == 0xd2);   // sanity check
+    assert((*idxp & 0xffu) == 0xd2u);   // sanity check
     idxp += 1;
     int32_t offset;
     swap_store(&offset, idxp, sizeof(offset));
@@ -522,7 +545,7 @@ int32_t get_offsets(blosc2_frame* frame, int64_t frame_len, int32_t header_len,
       fprintf(stderr, "Cannot read the offsets out of the fileframe.\n");
       fclose(fp);
       return -1;
-    };
+    }
     fclose(fp);
   }
 
@@ -568,8 +591,10 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
   swap_store(chunksize, framep + FRAME_CHUNKSIZE, sizeof(*chunksize));
   swap_store(typesize, framep + FRAME_TYPESIZE, sizeof(*typesize));
   *compcode = framep[FRAME_COMPCODE];
-  // Filters: we don't pay attention to the split flag, which is set automatically when compressing.
   *filters = framep[FRAME_FILTERS];
+  // Filters are in bits 2 and 3.
+  // We don't pay attention to the split flag, which is set automatically when compressing
+  *filters = (*filters & 0xcu) >> 2u;
   // TODO: complete other flags
 
   if (*nbytes > 0) {
@@ -656,7 +681,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
   schunk->nchunks = nchunks;
   schunk->clevel = (uint8_t)((compcode & 0xf0u) >> 4u);
   schunk->compcode = (uint8_t)(compcode & 0xfu);
-  schunk->filters[BLOSC2_MAX_FILTERS - 1] = (uint8_t)((filters & 0xcu) >> 2u);  // filters are in bits 2 and 3
+  schunk->filters[BLOSC2_MAX_FILTERS - 1] = filters;
 
   // Compression and decompression contexts
   blosc2_cparams *cparams;
