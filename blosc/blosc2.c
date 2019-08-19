@@ -1373,7 +1373,7 @@ static int initialize_context_decompression(
     int header_version = context->src[0];
     // The number of filters depends on the version of the header
     // (we need to read less because filters where not initialized to zero in blosc2 alpha series)
-    int max_filters = (header_version == BLOSC2_ALPHA_VERSION_FORMAT) ? 5 : BLOSC2_MAX_FILTERS;
+    int max_filters = (header_version == BLOSC2_VERSION_FORMAT_ALPHA) ? 5 : BLOSC2_MAX_FILTERS;
     for (int i = 0; i < max_filters; i++) {
       context->filters[i] = filters[i];
       context->filters_meta[i] = filters_meta[i];
@@ -1424,7 +1424,7 @@ static int write_compression_header(blosc2_context* context,
   }
 
   /* Write version header for this block */
-  context->dest[0] = BLOSC_VERSION_FORMAT_LATEST;
+  context->dest[0] = BLOSC_VERSION_FORMAT;
 
   /* Write compressor format */
   compformat = -1;

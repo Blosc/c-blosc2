@@ -136,14 +136,13 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // General flags
-  *h2p = 0x4 + FRAME_VERSION;  // frame + version
-  *h2p += 0x20;  // 64 bit offsets
+  *h2p = 0x4 + BLOSC2_VERSION_FRAME_FORMAT;  // frame + version
+  *h2p += 0x20;  // 64-bit offsets
   h2p += 1;
   assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Filter flags
-  *h2p = 0x6;  // shuffle + split_blocks
-  *h2p += 0;  // same as typesize
+  *h2p = 0x0;  // default is memcpy
   h2p += 1;
   assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
@@ -207,7 +206,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Boolean for checking the existence of metalayers
-  *h2p = (nmetalayers > 0) ? (uint8_t)0xc3 : (uint8_t)0xc2;  // bool for FRAME_HAS_metalayerS
+  *h2p = (nmetalayers > 0) ? (uint8_t)0xc3 : (uint8_t)0xc2;  // bool for FRAME_HAS_METALAYERS
   h2p += 1;
   assert(h2p - h2 == FRAME_HEADER2_MINLEN);
 
@@ -220,7 +219,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   h2 = realloc(h2, (size_t)hsize + 1 + 1 + 2 + 1 + 2);
   h2p = h2 + hsize;
 
-  // The msgpack header for the metalayers (array_marker, size, map of offsets, list of values)
+  // The msgpack header for the metalayers (array_marker, size, map of offsets, list of metalayers)
   *h2p = 0x90 + 3;  // array with 3 elements
   h2p += 1;
 
@@ -238,21 +237,21 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
     assert(frame != NULL);
     blosc2_frame_metalayer *metalayer = frame->metalayers[nmetalayer];
-    uint8_t nslen = (uint8_t) strlen(metalayer->name);
-    h2 = realloc(h2, (size_t)current_header_len + 1 + nslen + 1 + 4);
+    uint8_t namelen = (uint8_t) strlen(metalayer->name);
+    h2 = realloc(h2, (size_t)current_header_len + 1 + namelen + 1 + 4);
     h2p = h2 + current_header_len;
     // Store the metalayer
-    assert(nslen < (1U << 5U));  // metalayer strings cannot be longer than 32 bytes
-    *h2p = (uint8_t)0xa0 + nslen;  // str
+    assert(namelen < (1U << 5U));  // metalayer strings cannot be longer than 32 bytes
+    *h2p = (uint8_t)0xa0 + namelen;  // str
     h2p += 1;
-    memcpy(h2p, metalayer->name, nslen);
-    h2p += nslen;
+    memcpy(h2p, metalayer->name, namelen);
+    h2p += namelen;
     // Space for storing the offset for the value of this metalayer
-    *h2p = 0xd2;  // int 32
+    *h2p = 0xd2;  // int32
     h2p += 1;
     offtooff[nmetalayer] = (int32_t)(h2p - h2);
     h2p += 4;
-    current_header_len += 1 + nslen + 1 + 4;
+    current_header_len += 1 + namelen + 1 + 4;
   }
   int32_t hsize2 = (int32_t)(h2p - h2);
   assert(hsize2 == current_header_len);  // sanity check
@@ -279,7 +278,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
     h2 = realloc(h2, (size_t)current_header_len + 1 + 4 + metalayer->content_len);
     h2p = h2 + current_header_len;
     // Store the serialized contents for this metalayer
-    *h2p = 0xc6;  // bin 32
+    *h2p = 0xc6;  // bin32
     h2p += 1;
     swap_store(h2p, &(metalayer->content_len), sizeof(metalayer->content_len));
     h2p += 4;

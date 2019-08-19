@@ -12,7 +12,6 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#define FRAME_VERSION 0
 #define FRAME_HEADER2_MAGIC 2
 #define FRAME_HEADER2_LEN (FRAME_HEADER2_MAGIC + 8 + 1)  // 11
 #define FRAME_LEN (FRAME_HEADER2_LEN + 4 + 1)  // 16

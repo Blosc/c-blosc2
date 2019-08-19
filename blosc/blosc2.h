@@ -44,13 +44,23 @@ enum {
      1 -> Blosc pre-1.0
      2 -> Blosc 1.x series
      3 -> Blosc 2-alpha.x series
-     4 -> Blosc 2.x series
+     4 -> Blosc 2.x beta.1 series
      */
-  BLOSC_PRE1_VERSION_FORMAT = 1,
+  BLOSC_VERSION_FORMAT_PRE1 = 1,
   BLOSC1_VERSION_FORMAT = 2,
-  BLOSC2_ALPHA_VERSION_FORMAT = 3,
-  BLOSC2_BETA_VERSION_FORMAT = 4,
-  BLOSC_VERSION_FORMAT_LATEST = BLOSC2_BETA_VERSION_FORMAT,
+  BLOSC2_VERSION_FORMAT_ALPHA = 3,
+  BLOSC2_VERSION_FORMAT_BETA1 = 4,
+  BLOSC_VERSION_FORMAT = BLOSC2_VERSION_FORMAT_BETA1,
+};
+
+
+/* The FRAME_FORMAT_VERSION symbols below should be just 2-bit long */
+enum {
+  /* Blosc format version, starting at 0
+     0 -> First version (introduced in beta.1)
+     */
+  BLOSC2_VERSION_FRAME_FORMAT_BETA1 = 0,  // for beta.1 and before
+  BLOSC2_VERSION_FRAME_FORMAT = BLOSC2_VERSION_FRAME_FORMAT_BETA1,
 };
 
 enum {
