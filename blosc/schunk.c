@@ -258,8 +258,6 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, 
 /* Free all memory from a super-chunk. */
 int blosc2_free_schunk(blosc2_schunk *schunk) {
 
-  free(schunk->metadata_chunk);
-  free(schunk->userdata_chunk);
   if (schunk->data != NULL) {
     for (int i = 0; i < schunk->nchunks; i++) {
       free(schunk->data[i]);

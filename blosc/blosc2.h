@@ -812,10 +812,6 @@ typedef struct blosc2_schunk {
   //!< The data size + metadata size + header size (uncompressed).
   int64_t cbytes;
   //!< The data size + metadata size + header size (compressed).
-  uint8_t* metadata_chunk;
-  //!< Pointer to schunk metadata.
-  uint8_t* userdata_chunk;
-  //!< Pointer to user-defined data.
   uint8_t** data;
   //!< Pointer to chunk data pointers.
   blosc2_frame* frame;
