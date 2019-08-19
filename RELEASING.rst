@@ -62,6 +62,8 @@ Tagging
 
     $ git push --tags
 
+- Add the release notes for this tag in the releases tab of github project at:
+  https://github.com/Blosc/c-blosc2/releases.
 
 Announcing
 ----------
@@ -83,6 +85,9 @@ Post-release actions
 
   #XXX version-specific blurb XXX#
 
+- Commit the changes:
+
+  $ git commit -a -m"Post X.Y.Z release actions done"
 
 That's all folks!
 
