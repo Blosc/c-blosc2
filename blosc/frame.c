@@ -79,6 +79,43 @@ void swap_store(void *dest, const void *pa, int size) {
     free(pa2_);
 }
 
+// Get the number of filters in pipeline
+int get_nfilters(const uint8_t* filters) {
+  int nfilters = 0;
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
+    if (filters[i] != BLOSC_NOFILTER) {
+      nfilters++;
+    }
+  }
+  return nfilters;
+}
+
+// Get a metalayer for the filter pipeline
+int filters_to_metalayer(const uint8_t* filters, const uint8_t* filters_meta, void** metalayer) {
+  int nfilters = get_nfilters(filters);
+  int metalayer_len = 1 + 1 + 1 + nfilters * 2;
+  *metalayer = calloc(metalayer_len, 1);
+  uint8_t* mp = *metalayer;
+  *mp = 0x90 + 2;  // array with 2 elements
+  mp += 1;
+  // Create and fill up the filters and associated metainfo in the pipeline
+  uint8_t* mp_filters = mp;
+  uint8_t* mp_meta = mp + nfilters;
+  *mp_filters = 0x90 + nfilters;  // array with nfilter elements
+  mp_filters += 1;
+  *mp_meta = 0x90 + nfilters;  // array with nfilter elements
+  mp_meta += 1;
+  int nfilter = 0;
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
+    if (filters[i] != BLOSC_NOFILTER) {
+        mp_filters[nfilter] = filters[i];
+        mp_meta[nfilter] = filters_meta[i];
+        nfilter++;
+    }
+  }
+  return metalayer_len;
+}
+
 
 /* Create a new (empty) frame */
 blosc2_frame* blosc2_new_frame(char* fname) {
@@ -93,21 +130,12 @@ blosc2_frame* blosc2_new_frame(char* fname) {
 }
 
 
-void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
+void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update) {
   assert(frame != NULL);
   uint8_t* h2 = calloc(FRAME_HEADER2_MINLEN, 1);
   uint8_t* h2p = h2;
 
-  int16_t nmetalayers = frame->nmetalayers;
-  bool has_metalayers = nmetalayers > 0;
-
-  // The msgpack header will start as a fix array
-  if (has_metalayers) {
-    *h2p = 0x90 + 12;  // array with 12 elements
-  }
-  else {
-    *h2p = 0x90 + 11;  // no metalayers, so just 11 elements
-  }
+  // Make space for the first array
   h2p += 1;
 
   // Magic number
@@ -142,23 +170,20 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
   // Filter flags
-  // Get the filters that are supported right in the filters flag.
-  // TODO: support the pipeline in full generality.
-  bool need_metafilters = false;
-  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
-    switch (schunk->filters[i]) {
-      case BLOSC_NOFILTER:
-      case BLOSC_SHUFFLE:
-      case BLOSC_BITSHUFFLE:
-      case BLOSC_DELTA:
-        break;
-      default:
-        need_metafilters = true;
-    }
-  }
+  int nfilters = get_nfilters(schunk->filters);
+  bool need_metafilters = nfilters > 1;
   if (need_metafilters) {
-    fprintf(stderr, "Error in frame: serialization of filter pipeline not implemented yet\n");
-    return NULL;
+    if (!update) {
+      // Build a new metalayer for filters just if we are not updating the frame; otherwise it is already there
+      void *metafilters = NULL;
+      int metafilters_len = filters_to_metalayer(schunk->filters, schunk->filters_meta,
+                                                 &metafilters);
+      int res = blosc2_frame_add_metalayer(frame, "_filter_pipeline", metafilters, metafilters_len);
+      if (res < 0) {
+        fprintf(stderr, "Error: problems adding the filter pipeline as a metalayer\n");
+        return NULL;
+      }
+    }
   }
   else {
     // Filter pipeline described here
@@ -227,8 +252,13 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   h2p += 2;
   assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
-  // Boolean for checking the existence of metalayers
-  *h2p = (nmetalayers > 0) ? (uint8_t)0xc3 : (uint8_t)0xc2;  // bool for FRAME_HAS_METALAYERS
+  // Now, deal with metalayers
+  int16_t nmetalayers = frame->nmetalayers;
+  bool has_metalayers = nmetalayers > 0;
+  // The msgpack header will start as a fix array of 11 or 12 elements
+  *h2 = has_metalayers ? *h2 = 0x90 + 12 : 0x90 + 11;
+  // The boolean for FRAME_HAS_METALAYERS seems a bit redundant, but let's be explicit
+  *h2p = has_metalayers ? (uint8_t)0xc3 : (uint8_t)0xc2;
   h2p += 1;
   assert(h2p - h2 == FRAME_HEADER2_MINLEN);
 
@@ -328,7 +358,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int64_t cbytes = schunk->cbytes;
   FILE* fp = NULL;
 
-  uint8_t* h2 = new_header2_frame(schunk, frame);
+  uint8_t* h2 = new_header2_frame(schunk, frame, false);
   uint32_t h2len;
   swap_store(&h2len, h2 + FRAME_HEADER2_LEN, sizeof(h2len));
 
@@ -565,10 +595,30 @@ int32_t get_offsets(blosc2_frame* frame, int64_t frame_len, int32_t header_len,
 }
 
 
+// Get the filter pipeline from the associated metalayer
+int filters_from_metalayer(blosc2_frame* frame, char* mlname,
+                           uint8_t* filters, uint8_t* filters_meta) {
+  uint8_t* metalayer;
+  uint32_t metalayer_len;
+  int rc = blosc2_frame_get_metalayer(frame, mlname, &metalayer, &metalayer_len);
+  if (rc < 0) {
+    return rc;
+  }
+  uint8_t nfilters = metalayer[1] & 0xFu;  // a fix array has the length in the first 4 bits
+  if (nfilters > BLOSC2_MAX_FILTERS) {
+    fprintf(stderr, "Error: number of filters in metalayer is too large\n");
+    return -1;
+  }
+  memcpy(filters, metalayer + 2, nfilters);
+  memcpy(filters_meta, metalayer + 2 + nfilters, nfilters);
+  return nfilters;
+}
+
+
 int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
                    int64_t* nbytes, int64_t* cbytes, int32_t* chunksize, int32_t* nchunks,
                    int32_t* typesize, uint8_t* compcode, uint8_t* clevel,
-                   uint8_t* filters, uint8_t* meta_filters) {
+                   uint8_t* filters, uint8_t* filters_meta) {
   uint8_t* framep = frame->sdata;
   uint8_t* header = NULL;
 
@@ -608,7 +658,10 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
       filter_flags = (filter_flags & FRAME_FILTER_PIPE_DESCRIPTION) >> FRAME_FILTERS_PIPE_START_BIT;
       flags_to_filters(filter_flags, filters);
     } else {
-      // TODO: read the complete filter pipeline from metalayer
+      int rc = filters_from_metalayer(frame, "_filter_pipeline", filters, filters_meta);
+      if (rc < 0) {
+        return rc;
+      }
     }
   }
 
@@ -646,7 +699,7 @@ int frame_update_meta(blosc2_frame* frame, blosc2_schunk* schunk) {
   swap_store(&prev_h2len, header + FRAME_HEADER2_LEN, sizeof(prev_h2len));
 
   // Build a new header
-  uint8_t* h2 = new_header2_frame(schunk, frame);
+  uint8_t* h2 = new_header2_frame(schunk, frame, true);
   uint32_t h2len;
   swap_store(&h2len, h2 + FRAME_HEADER2_LEN, sizeof(h2len));
 

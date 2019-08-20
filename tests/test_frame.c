@@ -26,6 +26,7 @@ int tests_run = 0;
 int nchunks;
 bool free_new;
 bool sparse_schunk;
+bool filter_pipeline;
 char *fname;
 
 
@@ -37,6 +38,10 @@ static char* test_frame() {
   int64_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  if (filter_pipeline) {
+    cparams.filters[BLOSC2_MAX_FILTERS - 2] = BLOSC_DELTA;
+    cparams.filters_meta[BLOSC2_MAX_FILTERS - 2] = 0;
+  }
   blosc2_schunk* schunk;
 
   /* Initialize the Blosc compressor */
@@ -129,13 +134,16 @@ static char *all_tests() {
     nchunks = nchunks_[i];
     for (int ifree_new = 0; ifree_new < 2; ifree_new++) {
       for (int isparse_schunk = 0; isparse_schunk < 2; isparse_schunk++) {
-        free_new = (bool) ifree_new;
-        sparse_schunk = (bool) isparse_schunk;
-        fname = NULL;
-        mu_run_test(test_frame);
-        snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
-        fname = buf;
-        mu_run_test(test_frame);
+        for (int ifilter_pipeline = 0; ifilter_pipeline < 2; ifilter_pipeline++) {
+          free_new = (bool) ifree_new;
+          sparse_schunk = (bool) isparse_schunk;
+          filter_pipeline = (bool) ifilter_pipeline;
+          fname = NULL;
+          mu_run_test(test_frame);
+          snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
+          fname = buf;
+          mu_run_test(test_frame);
+        }
       }
     }
   }
