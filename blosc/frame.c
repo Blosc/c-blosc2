@@ -165,7 +165,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
     fprintf(stderr, "Error in frame: serialization of filter pipeline not implemented yet\n");
     return NULL;
   }
-  *h2p = filter_flags << 2u;  // filter_flags start at bit 2
+  *h2p = 0b10u | (filter_flags << 3u);  // filter pipeline described here and filter flags start at bit 3
   h2p += 1;
   assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
@@ -568,7 +568,8 @@ int32_t get_offsets(blosc2_frame* frame, int64_t frame_len, int32_t header_len,
 
 int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
                    int64_t* nbytes, int64_t* cbytes, int32_t* chunksize, int32_t* nchunks,
-                   int32_t* typesize, uint8_t* compcode, uint8_t* filters) {
+                   int32_t* typesize, uint8_t* compcode, uint8_t* clevel,
+                   uint8_t* filters, uint8_t* meta_filters) {
   uint8_t* framep = frame->sdata;
   uint8_t* header = NULL;
 
@@ -589,13 +590,29 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
   swap_store(nbytes, framep + FRAME_NBYTES, sizeof(*nbytes));
   swap_store(cbytes, framep + FRAME_CBYTES, sizeof(*cbytes));
   swap_store(chunksize, framep + FRAME_CHUNKSIZE, sizeof(*chunksize));
-  swap_store(typesize, framep + FRAME_TYPESIZE, sizeof(*typesize));
-  *compcode = framep[FRAME_COMPCODE];
-  *filters = framep[FRAME_FILTERS];
-  // Filters are in bits 2 and 3.
-  // We don't pay attention to the split flag, which is set automatically when compressing
-  *filters = (*filters & 0xcu) >> 2u;
-  // TODO: complete other flags
+  if (typesize != NULL) {
+    swap_store(typesize, framep + FRAME_TYPESIZE, sizeof(*typesize));
+  }
+
+  // Codecs and filters
+  uint8_t frame_codecs = framep[FRAME_CODECS];
+  if (clevel != NULL) {
+    *clevel = (frame_codecs & 0b11110000u) >> 4u;
+  }
+  if (compcode != NULL) {
+    *compcode = frame_codecs & 0b1111u;
+  }
+
+  uint8_t filter_flags = framep[FRAME_FILTERS];
+  if (filters != NULL) {
+    if (filter_flags & 0b10u) {
+      // Filters are in bits 3 to 6
+      filter_flags = (filter_flags & 0b1111000u) >> 3u;
+      flags_to_filters(filter_flags, filters);
+    } else {
+      // TODO: read the complete filter pipeline from metalayer
+    }
+  }
 
   if (*nbytes > 0) {
     // We can compute the chunks only when the frame has actual data
@@ -658,30 +675,19 @@ int frame_update_meta(blosc2_frame* frame, blosc2_schunk* schunk) {
 blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
   int32_t header_len;
   int64_t frame_len;
-  int64_t nbytes;
-  int64_t cbytes;
-  int32_t chunksize;
-  int32_t nchunks;
-  int32_t typesize;
-  uint8_t compcode;
-  uint8_t filters;
-  int ret = frame_get_meta(frame, &header_len, &frame_len, &nbytes, &cbytes,
-                           &chunksize, &nchunks, &typesize, &compcode, &filters);
+
+  blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
+  schunk->frame = frame;
+  int ret = frame_get_meta(frame, &header_len, &frame_len, &schunk->nbytes, &schunk->cbytes,
+                           &schunk->chunksize, &schunk->nchunks, &schunk->typesize,
+                           &schunk->compcode, &schunk->clevel, schunk->filters, schunk->filters_meta);
   if (ret < 0) {
     fprintf(stderr, "unable to get meta info from frame");
     return NULL;
   }
-
-  blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
-  schunk->frame = frame;
-  schunk->nbytes = nbytes;
-  schunk->cbytes = cbytes;
-  schunk->typesize = typesize;
-  schunk->chunksize = chunksize;
-  schunk->nchunks = nchunks;
-  schunk->clevel = (uint8_t)((compcode & 0xf0u) >> 4u);
-  schunk->compcode = (uint8_t)(compcode & 0xfu);
-  schunk->filters[BLOSC2_MAX_FILTERS - 1] = filters;
+  int32_t nchunks = schunk->nchunks;
+  int64_t nbytes = schunk->nbytes;
+  int64_t cbytes = schunk->cbytes;
 
   // Compression and decompression contexts
   blosc2_cparams *cparams;
@@ -787,14 +793,11 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
   int64_t cbytes;
   int32_t chunksize;
   int32_t nchunks;
-  int32_t typesize;
-  uint8_t compcode;
-  uint8_t filters;
 
   *chunk = NULL;
   *needs_free = false;
   int ret = frame_get_meta(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
-                           &typesize, &compcode, &filters);
+                           NULL, NULL, NULL, NULL, NULL);
   if (ret < 0) {
     fprintf(stderr, "unable to get meta info from frame");
     return -1;
@@ -853,11 +856,8 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   int64_t cbytes;
   int32_t chunksize;
   int32_t nchunks;
-  int32_t typesize;
-  uint8_t compcode;
-  uint8_t filters;
   int ret = frame_get_meta(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
-                           &typesize, &compcode, &filters);
+                           NULL, NULL, NULL, NULL, NULL);
   if (ret < 0) {
     fprintf(stderr, "unable to get meta info from frame");
     return NULL;

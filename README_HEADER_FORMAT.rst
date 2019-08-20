@@ -49,7 +49,7 @@ All entries are little endian.
     :bit 3 (``0x08``):
         Whether the delta codec has been applied or not.
     :bit 4 (``0x10``):
-        If set, the blocks will not be split in sub-blocks during compression.
+        If set, the blocks are *not* split in sub-blocks.
     :bit 5 (``0x20``):
         Part of the enumeration for compressors.
     :bit 6 (``0x40``):

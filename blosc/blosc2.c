@@ -1229,41 +1229,6 @@ static int do_job(blosc2_context* context) {
 }
 
 
-uint8_t filters_to_flags(const uint8_t* filters) {
-  uint8_t flags = 0;
-
-  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
-    switch (filters[i]) {
-      case BLOSC_SHUFFLE:
-        flags |= BLOSC_DOSHUFFLE;
-        break;
-      case BLOSC_BITSHUFFLE:
-        flags |= BLOSC_DOBITSHUFFLE;
-        break;
-      case BLOSC_DELTA:
-        flags |= BLOSC_DODELTA;
-        break;
-      default :
-        break;
-    }
-  }
-  return flags;
-}
-
-
-void flags_to_filters(const uint8_t flags, uint8_t* filters) {
-  /* Initialize the filter pipeline */
-  memset(filters, 0, BLOSC2_MAX_FILTERS);
-  /* Fill the filter pipeline */
-  if (flags & BLOSC_DOSHUFFLE)
-    filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
-  if (flags & BLOSC_DOBITSHUFFLE)
-    filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
-  if (flags & BLOSC_DODELTA)
-    filters[BLOSC2_MAX_FILTERS - 2] = BLOSC_DELTA;
-}
-
-
 static int initialize_context_compression(
   blosc2_context* context, int32_t sourcesize, const void* src, void* dest,
   int32_t destsize, int clevel, uint8_t const *filters,

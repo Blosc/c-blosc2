@@ -96,20 +96,21 @@ Description for different fields
 :filter_flags:
     (``uint8``) Filter flags that are the defaults for all the chunks in storage.
 
-    :``0``:
-        Data is memcpy'ed
-    :``1``:
-        Blocks are splitted
-    :``2`` and ``3``: Enumerated for filters
-        :``0``:
-            No shuffle
-        :``1``:
-            Shuffle
-        :``2``:
-            Bitshuffle
-        :``3``:
-            Reserved
-    :``4`` to ``7``:
+    :bit 0:
+        If set, blocks are *not* split in sub-blocks.
+    :bit 1:
+        Filter pipeline is described in bits 3 to 6; else in `_filter_pipeline` system metalayer.
+    :bit 2:
+        Reserved
+    :bit 3:
+        Whether the shuffle filter has been applied or not.
+    :bit 4:
+        Whether the internal buffer is a pure memcpy or not.
+    :bit 5:
+        Whether the bitshuffle filter has been applied or not.
+    :bit 6:
+        Whether the delta codec has been applied or not.
+    :bit 7:
         Reserved
 
 :codec_flags:
