@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
+// Constants for metadata placement in header
 #define FRAME_HEADER2_MAGIC 2
 #define FRAME_HEADER2_LEN (FRAME_HEADER2_MAGIC + 8 + 1)  // 11
 #define FRAME_LEN (FRAME_HEADER2_LEN + 4 + 1)  // 16
@@ -28,6 +29,11 @@
 #define FRAME_HEADER2_MINLEN (FRAME_HAS_METALAYERS + 1)  // 64 <- minimum length
 #define FRAME_NAMESPACES (FRAME_HAS_METALAYERS + 1)  // 64
 #define FRAME_IDX_SIZE (FRAME_NAMESPACES + 1 + 1)  // 66
+
+// Other constants
+#define FRAME_FILTERS_PIPE_START_BIT (3u)
+#define FRAME_FILTERS_PIPE_DESCRIBED_HERE (0b10u)
+#define FRAME_FILTER_PIPE_DESCRIPTION (0b1111000u)
 
 
 void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk);

@@ -144,28 +144,27 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   // Filter flags
   // Get the filters that are supported right in the filters flag.
   // TODO: support the pipeline in full generality.
-  uint8_t filter_flags = 0;
-  int nfilters = 0;
+  bool need_metafilters = false;
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     switch (schunk->filters[i]) {
       case BLOSC_NOFILTER:
-        break;
       case BLOSC_SHUFFLE:
       case BLOSC_BITSHUFFLE:
       case BLOSC_DELTA:
-        filter_flags = schunk->filters[i];
-        nfilters++;
         break;
       default:
-        fprintf(stderr, "Error in frame: filter not yet supported: %d\n", schunk->filters[i]);
-        return NULL;
+        need_metafilters = true;
     }
   }
-  if (nfilters > 1) {
+  if (need_metafilters) {
     fprintf(stderr, "Error in frame: serialization of filter pipeline not implemented yet\n");
     return NULL;
   }
-  *h2p = 0b10u | (filter_flags << 3u);  // filter pipeline described here and filter flags start at bit 3
+  else {
+    // Filter pipeline described here
+    uint8_t filter_flags = filters_to_flags(schunk->filters);
+    *h2p = FRAME_FILTERS_PIPE_DESCRIBED_HERE | (filter_flags << FRAME_FILTERS_PIPE_START_BIT);
+  }
   h2p += 1;
   assert(h2p - h2 < FRAME_HEADER2_MINLEN);
 
@@ -597,7 +596,7 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
   // Codecs and filters
   uint8_t frame_codecs = framep[FRAME_CODECS];
   if (clevel != NULL) {
-    *clevel = (frame_codecs & 0b11110000u) >> 4u;
+    *clevel = frame_codecs >> 4u;
   }
   if (compcode != NULL) {
     *compcode = frame_codecs & 0b1111u;
@@ -605,9 +604,8 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
 
   uint8_t filter_flags = framep[FRAME_FILTERS];
   if (filters != NULL) {
-    if (filter_flags & 0b10u) {
-      // Filters are in bits 3 to 6
-      filter_flags = (filter_flags & 0b1111000u) >> 3u;
+    if (filter_flags & FRAME_FILTERS_PIPE_DESCRIBED_HERE) {
+      filter_flags = (filter_flags & FRAME_FILTER_PIPE_DESCRIPTION) >> FRAME_FILTERS_PIPE_START_BIT;
       flags_to_filters(filter_flags, filters);
     } else {
       // TODO: read the complete filter pipeline from metalayer
