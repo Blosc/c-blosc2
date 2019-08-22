@@ -778,7 +778,7 @@ struct blosc2_schunk;
 typedef struct blosc2_frame_metalayer {
     char* name;  //!< The metalayer identifier for Blosc client (e.g. caterva).
     uint8_t* content;  //!< The serialized (msgpack preferably) content of the metalayer.
-    int32_t content_len; //!< The lenght in bytes of the content.
+    int32_t content_len; //!< The length in bytes of the content.
 } blosc2_frame_metalayer;
 
 typedef struct {
@@ -788,6 +788,8 @@ typedef struct {
   int64_t maxlen;  //!< The maximum length of the frame; if 0, there is no maximum
   struct blosc2_frame_metalayer *metalayers[BLOSC2_MAX_METALAYERS]; //!< The array of metalayers.
   int16_t nmetalayers;  //!< The number of metalayers in the frame
+  uint8_t* usermeta;  //<! The user-defined metadata.
+  int32_t usermeta_len;  //<! The (compressed) length of the user-defined metadata.
 } blosc2_frame;
 
 /**
@@ -1015,6 +1017,22 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(const char *fname);
  * @return The super-chunk corresponding to the frame.
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy);
+
+/**
+ * @brief Update content into a usermeta chunk.
+ *
+ * @param frame The frame to which add the usermeta chunk.
+ * @param content The content of the usermeta chunk.
+ * @param content_len The length of the content.
+ * @param cparams The parameters for compressing the usermeta chunk.
+ *
+ * @note The previous content, if any, will be overwritten by the new content.
+ * The user is responsible to keep the new content in sync with any previous content.
+ *
+ * @return If successful, return 1. Else, a negative value.
+ */
+BLOSC_EXPORT int blosc2_frame_update_usermeta(blosc2_frame *frame, uint8_t *content,
+                                              uint32_t content_len, blosc2_cparams cparams);
 
 /**
  * @brief Find whether the frame has a metalayer or not.
