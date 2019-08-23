@@ -311,7 +311,7 @@ int blosc2_schunk_update_usermeta(blosc2_schunk *schunk, uint8_t *content, int32
   memcpy(schunk->usermeta, usermeta_chunk, usermeta_cbytes);
   free(usermeta_chunk);
   schunk->usermeta_len = usermeta_cbytes;
-  return 0;
+  return usermeta_cbytes;
 }
 
 /* Retrieve the usermeta chunk */

@@ -402,7 +402,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
       chunksize = chunksize_;
     }
     else if (chunksize != chunksize_) {
-      // Variable size  TODO: update flags for this (or do not use them at all)
+      // Variable size  // TODO: update flags for this (or do not use them at all)
       chunksize = 0;
     }
   }
@@ -430,7 +430,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
   // Now that we know them, fill the chunksize and frame length in header2
   swap_store(h2 + FRAME_CHUNKSIZE, &chunksize, sizeof(chunksize));
-  frame->len = h2len + cbytes + off_cbytes;
+  frame->len = h2len + cbytes + off_cbytes + schunk->usermeta_len;
   int64_t tbytes = frame->len;
   swap_store(h2 + FRAME_LEN, &tbytes, sizeof(tbytes));
 
@@ -469,13 +469,23 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   }
   free(off_chunk);
 
+  // Now, add the usermeta (if any)
+  int rc = frame_update_usermeta(frame, schunk);
+  if (rc < 0) {
+    return rc;
+  }
+
   return frame->len;
 }
 
 
 /* Write an in-memory frame out to a file. */
 int64_t blosc2_frame_to_file(blosc2_frame *frame, char *fname) {
-    assert(frame->fname == NULL);  // make sure that we are using an in-memory frame
+    // make sure that we are using an in-memory frame
+    if (frame->fname != NULL) {
+      fprintf(stderr, "Error: the original frame must be in-memory");
+      return -1;
+    }
     FILE* fp = fopen(fname, "wb");
     fwrite(frame->sdata, (size_t)frame->len, 1, fp);
     fclose(fp);
@@ -492,16 +502,16 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   uint8_t* header = malloc(FRAME_HEADER2_MINLEN);
   FILE* fp = fopen(fname, "rb");
   size_t rbytes = fread(header, 1, FRAME_HEADER2_MINLEN, fp);
-  assert(rbytes == FRAME_HEADER2_MINLEN);
+  if (rbytes != FRAME_HEADER2_MINLEN) {
+    fprintf(stderr, "Error: cannot read from file '%s'\n", fname);
+    return NULL;
+  }
 
   int64_t frame_len;
   swap_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
   frame->len = frame_len;
 
   bool has_metalayers = ((header[0] & 0xFu) == FRAME_HEADER_NFIELDS_METALAYER) ? true : false;
-  bool has_usermeta = (header[FRAME_HAS_USERMETA]) ? true : false;
-  // TODO: read usermeta too...
-
   free(header);
 
   if (!has_metalayers) {
@@ -588,6 +598,11 @@ int64_t get_usermeta_offset(blosc2_frame *frame, int32_t header_len, int64_t cby
   uint8_t* framep = frame->sdata;
   uint8_t* coffsets;
 
+  if (frame->len == header_len + cbytes) {
+    // No data chunks yet
+    return header_len + cbytes;
+  }
+
   if (frame->sdata != NULL) {
     coffsets = framep + header_len + cbytes;
   } else {
@@ -623,14 +638,13 @@ int get_offsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, int32_t
   if (frame->sdata != NULL) {
     coffsets = framep + header_len + cbytes;
   } else {
-    // Get the size of the data offsets and read them
-    int64_t usermeta_offset = get_usermeta_offset(frame, header_len, cbytes);
-    int32_t off_cbytes = (int32_t)(usermeta_offset - header_len - cbytes);
+    size_t usermeta_offset = get_usermeta_offset(frame, header_len, cbytes);
+    size_t off_cbytes = usermeta_offset - (header_len + cbytes);
     FILE* fp = fopen(frame->fname, "rb");
-    coffsets = malloc((size_t)off_cbytes);
+    coffsets = malloc(off_cbytes);
     fseek(fp, header_len + cbytes, SEEK_SET);
-    size_t rbytes = fread(coffsets, 1, (size_t)off_cbytes, fp);
-    if (rbytes != (size_t)off_cbytes) {
+    size_t rbytes = fread(coffsets, 1, off_cbytes, fp);
+    if (rbytes != off_cbytes) {
       fprintf(stderr, "Error: cannot read the offsets out of the fileframe.\n");
       fclose(fp);
       return -1;
@@ -779,14 +793,14 @@ int frame_update_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
   }
   free(h2);
 
-  return 0;
+  return 1;
 }
 
 
 int frame_update_usermeta(blosc2_frame* frame, blosc2_schunk* schunk) {
   assert(frame->len > 0);
   if (schunk->usermeta_len == 0) {
-    return 0;
+    return 1;
   }
 
   int32_t header_len;
@@ -818,9 +832,65 @@ int frame_update_usermeta(blosc2_frame* frame, blosc2_schunk* schunk) {
     }
     memcpy(frame->sdata + usermeta_offset, schunk->usermeta, schunk->usermeta_len);
   }
-  return 0;
+  return 1;
 }
 
+
+/* Get the (compressed) usermeta chunk out of a frame */
+int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
+  int32_t header_len;
+  int64_t frame_len;
+  int64_t nbytes;
+  int64_t cbytes;
+  int32_t chunksize;
+  int32_t nchunks;
+  int ret = frame_get_meta(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+                           NULL, NULL, NULL, NULL, NULL);
+  if (ret < 0) {
+    fprintf(stderr, "unable to get meta info from frame");
+    return -1;
+  }
+  int64_t usermeta_offset = get_usermeta_offset(frame, header_len, cbytes);
+  if (usermeta_offset == frame->len) {
+    *usermeta = NULL;
+    return 0;
+  }
+
+  // Get the size of usermeta
+  uint8_t* framep = frame->sdata;
+  uint8_t* usermeta_header;
+  if (frame->sdata != NULL) {
+    usermeta_header = framep + usermeta_offset;
+  } else {
+    size_t bytes_to_read = BLOSC_MIN_HEADER_LENGTH;
+    usermeta_header = malloc(bytes_to_read);
+    FILE* fp = fopen(frame->fname, "rb");
+    fseek(fp, usermeta_offset, SEEK_SET);
+    size_t rbytes = fread(usermeta_header, 1, bytes_to_read, fp);
+    if (rbytes != bytes_to_read) {
+      fprintf(stderr, "Cannot access the offsets out of the fileframe.\n");
+      fclose(fp);
+      return -1;
+    }
+    fclose(fp);
+  }
+
+  // Read the actual usermeta chunk
+  int32_t usermeta_len = sw32_(usermeta_header + 12);
+  *usermeta = malloc(usermeta_len);
+  if (frame->sdata != NULL) {
+    memcpy(*usermeta, framep + usermeta_offset, usermeta_len);
+  }
+  else {
+    FILE* fp = fopen(frame->fname, "rb+");
+    fseek(fp, usermeta_offset, SEEK_SET);
+    fread(*usermeta, usermeta_len, 1, fp);
+    fclose(fp);
+    free(usermeta_header);
+  }
+
+  return usermeta_len;
+}
 
 /* Get a super-chunk out of a frame */
 blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
@@ -851,8 +921,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
   free(dparams);
 
   if (!copy || nchunks == 0) {
-    // We are done, so leave here
-    return schunk;
+    goto out;
   }
 
   // We are not attached to a frame anymore
@@ -921,6 +990,18 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
   }
   assert(acc_nbytes == nbytes);
   assert(acc_cbytes == cbytes);
+
+  uint8_t* usermeta;
+  int32_t usermeta_len;
+  out:
+  // Get the usermeta chunk
+  usermeta_len = frame_get_usermeta(frame, &usermeta);
+  if (usermeta_len < 0) {
+    fprintf(stderr, "Error: cannot access the usermeta chunk");
+    return NULL;
+  }
+  schunk->usermeta = usermeta;
+  schunk->usermeta_len = usermeta_len;
 
   return schunk;
 }

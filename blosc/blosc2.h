@@ -958,7 +958,8 @@ BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams
  * @note The previous content, if any, will be overwritten by the new content.
  * The user is responsible to keep the new content in sync with any previous content.
  *
- * @return If successful, return 1. Else, a negative value.
+ * @return If successful, return the number of compressed bytes that takes the content.
+ * Else, a negative value.
  */
 BLOSC_EXPORT int blosc2_schunk_update_usermeta(blosc2_schunk *schunk, uint8_t *content,
                                                int32_t content_len, blosc2_cparams cparams);
@@ -985,7 +986,7 @@ BLOSC_EXPORT int blosc2_schunk_get_usermeta(blosc2_schunk* schunk, uint8_t** con
  *
  * @return If successful, return 1. Else, a negative value.
  */
-int blosc2_schunk_flush(blosc2_schunk* schunk);
+BLOSC_EXPORT int blosc2_schunk_flush(blosc2_schunk* schunk);
 
 
 /*********************************************************************
@@ -1033,7 +1034,8 @@ BLOSC_EXPORT int blosc2_free_frame(blosc2_frame *frame);
  * @param frame The frame to be written into a file.
  * @param fname The name of the file.
  *
- * @return The size of the frame.
+ * @return The size of the frame.  If negative, an error happened (including
+ * that the original frame is not in-memory).
  */
 BLOSC_EXPORT int64_t blosc2_frame_to_file(blosc2_frame *frame, char *fname);
 
