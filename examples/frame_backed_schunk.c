@@ -49,12 +49,12 @@ int main() {
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   // Compression and decompression parameters
-  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_LZ4;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
-  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
 
   /* Create a new super-chunk backed by an in-memory frame */

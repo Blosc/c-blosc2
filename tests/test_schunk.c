@@ -25,8 +25,8 @@ static char* test_schunk() {
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   int64_t nbytes, cbytes;
-  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
 
   /* Initialize the Blosc compressor */
@@ -49,6 +49,9 @@ static char* test_schunk() {
     mu_assert("ERROR: bad append in frame", nchunk >= 0);
   }
 
+  // Attach some user metadata into it
+  blosc2_schunk_update_usermeta(schunk, (uint8_t*)"testing the usermeta", 16, BLOSC2_CPARAMS_DEFAULTS);
+
   /* Gather some info */
   nbytes = schunk->nbytes;
   cbytes = schunk->cbytes;
@@ -56,7 +59,7 @@ static char* test_schunk() {
     mu_assert("ERROR: bad compression ratio in frame", nbytes > 10 * cbytes);
   }
 
-  // Exercise the metadata retrieval machinery (i.e. no decompression is happening below)
+  // Exercise the metadata retrieval machinery
   bool needs_free;
   uint8_t* chunk;
   size_t nbytes_, cbytes_, blocksize;
@@ -83,6 +86,13 @@ static char* test_schunk() {
       mu_assert("ERROR: bad roundtrip",data_dest[i] == i + nchunk * CHUNKSIZE);
     }
   }
+
+  // Check the user metadata
+  uint8_t* content2;
+  int32_t content_len = blosc2_schunk_get_usermeta(schunk, &content2);
+  mu_assert("ERROR: bad usermeta", strcmp((char*)content2, "testing the usermeta"));
+  mu_assert("ERROR: bad usermeta_len", content_len == 16);
+  free(content2);
 
   /* Free resources */
   blosc2_free_schunk(schunk);

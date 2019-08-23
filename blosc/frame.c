@@ -143,9 +143,6 @@ int blosc2_free_frame(blosc2_frame *frame) {
     }
     frame->nmetalayers = 0;
   }
-  if (frame->usermeta_len > 0) {
-    free(frame->usermeta);
-  }
 
   if (frame->fname != NULL) {
     free(frame->fname);
@@ -285,7 +282,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
   *h2 = 0x90;
   *h2 += (nmetalayers > 0) ? FRAME_HEADER_NFIELDS_METALAYER : FRAME_HEADER_NFIELDS_NOMETALAYER;
   // The boolean for FRAME_HAS_USERMETA
-  *h2p = (frame->usermeta_len > 0) ? (uint8_t)0xc3 : (uint8_t)0xc2;
+  *h2p = (schunk->usermeta_len > 0) ? (uint8_t)0xc3 : (uint8_t)0xc2;
   h2p += 1;
   assert(h2p - h2 == FRAME_HEADER2_MINLEN);
 
@@ -415,7 +412,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   if (nchunks > 0) {
     // Compress the chunk of offsets
     off_chunk = malloc(off_nbytes + BLOSC_MAX_OVERHEAD);
-    blosc2_context *cctx = blosc2_create_cctx(BLOSC_CPARAMS_DEFAULTS);
+    blosc2_context *cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
     cctx->typesize = 8;
     off_cbytes = blosc2_compress_ctx(cctx, off_nbytes, data_tmp, off_chunk,
                                      off_nbytes + BLOSC_MAX_OVERHEAD);
@@ -641,7 +638,7 @@ int get_offsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, int32_t
     fclose(fp);
   }
 
-  blosc2_dparams off_dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_context *dctx = blosc2_create_dctx(off_dparams);
   int32_t off_nbytes = blosc2_decompress_ctx(dctx, coffsets, offsets, (size_t)nchunks * 8);
   blosc2_free_ctx(dctx);
@@ -786,9 +783,9 @@ int frame_update_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
 }
 
 
-int frame_update_usermeta(blosc2_frame* frame) {
+int frame_update_usermeta(blosc2_frame* frame, blosc2_schunk* schunk) {
   assert(frame->len > 0);
-  if (frame->usermeta_len == 0) {
+  if (schunk->usermeta_len == 0) {
     return 0;
   }
 
@@ -810,16 +807,16 @@ int frame_update_usermeta(blosc2_frame* frame) {
   if (frame->sdata == NULL) {
     FILE* fp = fopen(frame->fname, "rb+");
     fseek(fp, usermeta_offset, SEEK_SET);
-    fwrite(frame->usermeta, frame->usermeta_len, 1, fp);
+    fwrite(schunk->usermeta, schunk->usermeta_len, 1, fp);
     fclose(fp);
   }
   else {
-    frame->sdata = realloc(frame->sdata, usermeta_offset + frame->usermeta_len);
+    frame->sdata = realloc(frame->sdata, usermeta_offset + schunk->usermeta_len);
     if (frame->sdata == NULL) {
       fprintf(stderr, "Error: cannot realloc space for the frame.");
       return -1;
     }
-    memcpy(frame->sdata + usermeta_offset, frame->usermeta, frame->usermeta_len);
+    memcpy(frame->sdata + usermeta_offset, schunk->usermeta, schunk->usermeta_len);
   }
   return 0;
 }
@@ -1063,7 +1060,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   offsets[nchunks] = cbytes;
 
   // Re-compress the offsets again
-  blosc2_context* cctx = blosc2_create_cctx(BLOSC_CPARAMS_DEFAULTS);
+  blosc2_context* cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
   cctx->typesize = 8;
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, (size_t)off_nbytes, offsets,
@@ -1237,35 +1234,4 @@ int blosc2_frame_get_metalayer(blosc2_frame *frame, char *name, uint8_t **conten
     *content = malloc((size_t)*content_len);
     memcpy(*content, frame->metalayers[nmetalayer]->content, (size_t)*content_len);
     return nmetalayer;
-}
-
-
-/* Update the content of the usermeta chunk. */
-int blosc2_frame_update_usermeta(blosc2_frame *frame, uint8_t *content, uint32_t content_len,
-                                 blosc2_cparams cparams) {
-  if (content_len > 2u << 31u) {
-    fprintf(stderr, "Error: content_len cannot exceed 2 GB");
-    return -1;
-  }
-
-  // Compress the usermeta chunk
-  void* usermeta_chunk = malloc(content_len + BLOSC_MAX_OVERHEAD);
-  blosc2_context *cctx = blosc2_create_cctx(cparams);
-  int usermeta_cbytes = blosc2_compress_ctx(cctx, content_len, content, usermeta_chunk,
-                                            content_len + BLOSC_MAX_OVERHEAD);
-  blosc2_free_ctx(cctx);
-  if (usermeta_cbytes < 0) {
-    free(usermeta_chunk);
-    return -1;
-  }
-
-  // Update the contents of the usermeta chunk
-  if (frame->usermeta_len > 0) {
-    free(frame->usermeta);
-  }
-  frame->usermeta = malloc(usermeta_cbytes);
-  memcpy(frame->usermeta, usermeta_chunk, usermeta_cbytes);
-  free(usermeta_chunk);
-  frame->usermeta_len = usermeta_cbytes;
-  return 0;
 }

@@ -53,7 +53,7 @@ int blosc2_schunk_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
   (*cparams)->typesize = schunk->typesize;
   (*cparams)->blocksize = schunk->blocksize;
   if (schunk->cctx == NULL) {
-    (*cparams)->nthreads = BLOSC_CPARAMS_DEFAULTS.nthreads;
+    (*cparams)->nthreads = BLOSC2_CPARAMS_DEFAULTS.nthreads;
   }
   else {
     (*cparams)->nthreads = (int16_t)schunk->cctx->nthreads;
@@ -67,7 +67,7 @@ int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams) {
   *dparams = calloc(sizeof(blosc2_dparams), 1);
   (*dparams)->schunk = schunk;
   if (schunk->dctx == NULL) {
-    (*dparams)->nthreads = BLOSC_DPARAMS_DEFAULTS.nthreads;
+    (*dparams)->nthreads = BLOSC2_DPARAMS_DEFAULTS.nthreads;
   }
   else {
     (*dparams)->nthreads = schunk->dctx->nthreads;
@@ -111,6 +111,35 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
   }
 
   return schunk;
+}
+
+
+/* Free all memory from a super-chunk. */
+int blosc2_free_schunk(blosc2_schunk *schunk) {
+
+  if (schunk->data != NULL) {
+    for (int i = 0; i < schunk->nchunks; i++) {
+      free(schunk->data[i]);
+    }
+    free(schunk->data);
+  }
+  blosc2_free_ctx(schunk->cctx);
+  blosc2_free_ctx(schunk->dctx);
+  if (schunk->usermeta_len > 0) {
+    free(schunk->usermeta);
+  }
+  free(schunk);
+
+  return 0;
+}
+
+/* Flush the contents of a schunk into a possible backing frame. */
+int blosc2_schunk_flush(blosc2_schunk* schunk) {
+  int rc = 0;
+  if (schunk->frame != NULL) {
+    rc = frame_update_usermeta(schunk->frame, schunk);
+  }
+  return rc;
 }
 
 
@@ -255,18 +284,46 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, 
 }
 
 
-/* Free all memory from a super-chunk. */
-int blosc2_free_schunk(blosc2_schunk *schunk) {
-
-  if (schunk->data != NULL) {
-    for (int i = 0; i < schunk->nchunks; i++) {
-      free(schunk->data[i]);
-    }
-    free(schunk->data);
+/* Update the content of the usermeta chunk. */
+int blosc2_schunk_update_usermeta(blosc2_schunk *schunk, uint8_t *content, int32_t content_len,
+                                  blosc2_cparams cparams) {
+  if (content_len > (1u << 31u)) {
+    fprintf(stderr, "Error: content_len cannot exceed 2 GB");
+    return -1;
   }
-  blosc2_free_ctx(schunk->cctx);
-  blosc2_free_ctx(schunk->dctx);
-  free(schunk);
 
+  // Compress the usermeta chunk
+  void* usermeta_chunk = malloc(content_len + BLOSC_MAX_OVERHEAD);
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  int usermeta_cbytes = blosc2_compress_ctx(cctx, content_len, content, usermeta_chunk,
+                                            content_len + BLOSC_MAX_OVERHEAD);
+  blosc2_free_ctx(cctx);
+  if (usermeta_cbytes < 0) {
+    free(usermeta_chunk);
+    return -1;
+  }
+
+  // Update the contents of the usermeta chunk
+  if (schunk->usermeta_len > 0) {
+    free(schunk->usermeta);
+  }
+  schunk->usermeta = malloc(usermeta_cbytes);
+  memcpy(schunk->usermeta, usermeta_chunk, usermeta_cbytes);
+  free(usermeta_chunk);
+  schunk->usermeta_len = usermeta_cbytes;
   return 0;
+}
+
+/* Retrieve the usermeta chunk */
+int32_t blosc2_schunk_get_usermeta(blosc2_schunk* schunk, uint8_t** content) {
+  size_t nbytes, cbytes, blocksize;
+  blosc_cbuffer_sizes(schunk->usermeta, &nbytes, &cbytes, &blocksize);
+  *content = malloc(nbytes);
+  blosc2_context *dctx = blosc2_create_dctx(BLOSC2_DPARAMS_DEFAULTS);
+  int usermeta_nbytes = blosc2_decompress_ctx(dctx, schunk->usermeta, *content, nbytes);
+  blosc2_free_ctx(dctx);
+  if (usermeta_nbytes < 0) {
+    return -1;
+  }
+  return nbytes;
 }

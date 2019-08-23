@@ -46,13 +46,13 @@ int main(int argc, char* argv[]) {
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Create a super-chunk container */
-  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = 1;
   cparams.compcode = BLOSC_LZ4;
   //cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
-  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
 
   /* Create a super-chunk backed by an in-memory frame */

@@ -36,8 +36,8 @@ static char* test_frame() {
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   int64_t nbytes, cbytes;
-  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   if (filter_pipeline) {
     cparams.filters[BLOSC2_MAX_FILTERS - 2] = BLOSC_DELTA;
     cparams.filters_meta[BLOSC2_MAX_FILTERS - 2] = 0;

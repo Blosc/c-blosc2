@@ -641,7 +641,7 @@ typedef struct {
 /**
  * @brief Default struct for compression params meant for user initialization.
  */
-static const blosc2_cparams BLOSC_CPARAMS_DEFAULTS = {
+static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
         BLOSC_BLOSCLZ, 5, 0, 8, 1, 0, NULL,
         {0, 0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0, 0},
         NULL, NULL };
@@ -662,7 +662,7 @@ typedef struct {
 /**
  * @brief Default struct for decompression params meant for user initialization.
  */
-static const blosc2_dparams BLOSC_DPARAMS_DEFAULTS = { 1, NULL };
+static const blosc2_dparams BLOSC2_DPARAMS_DEFAULTS = {1, NULL };
 
 /**
  * @brief Create a context for @a *_ctx() compression functions.
@@ -773,7 +773,7 @@ struct blosc2_schunk;
 /**
  * @brief This struct is meant to store metadata information inside
  * a #blosc2_frame, allowing to specify, for example, how to interpret
- * the contents compressed in the frame.
+ * the contents included in the frame.
  */
 typedef struct blosc2_frame_metalayer {
     char* name;  //!< The metalayer identifier for Blosc client (e.g. caterva).
@@ -788,22 +788,17 @@ typedef struct {
   int64_t maxlen;  //!< The maximum length of the frame; if 0, there is no maximum
   struct blosc2_frame_metalayer *metalayers[BLOSC2_MAX_METALAYERS]; //!< The array of metalayers.
   int16_t nmetalayers;  //!< The number of metalayers in the frame
-  uint8_t* usermeta;  //<! The user-defined metadata.
-  int32_t usermeta_len;  //<! The (compressed) length of the user-defined metadata.
 } blosc2_frame;
 
 /**
  * @brief This struct is the standard container for Blosc 2 compressed data.
  *
- * This struct is essentially a container for Blosc 1 chunks of compressed data,
- * and it allows to overcome the 32-bit limitation in Blosc 1. It can be used
- * together with a frame to store the compressed chunks contiguously.
+ * This is essentially a container for Blosc 1 chunks of compressed data,
+ * and it allows to overcome the 32-bit limitation in Blosc 1. Optionally,
+ * a #blosc2_frame can be attached so as to store the compressed chunks contiguously.
  */
 typedef struct blosc2_schunk {
   uint8_t version;
-  uint8_t flags1;
-  uint8_t flags2;
-  uint8_t flags3;
   uint8_t compcode;
   //!< The default compressor. Each chunk can override this.
   uint8_t clevel;
@@ -834,6 +829,10 @@ typedef struct blosc2_schunk {
   //!< Context for compression
   blosc2_context* dctx;
   //!< Context for decompression.
+  uint8_t* usermeta;
+  //<! The user-defined metadata.
+  int32_t usermeta_len;
+  //<! The (compressed) length of the user-defined metadata.
   uint8_t* reserved;
   //!< Reserved for the future.
 } blosc2_schunk;
@@ -948,6 +947,46 @@ BLOSC_EXPORT int blosc2_schunk_get_cparams(blosc2_schunk *schunk, blosc2_cparams
  */
 BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams);
 
+/**
+ * @brief Update content into a usermeta chunk.
+ *
+ * @param schunk The super-chunk to which add the usermeta chunk.
+ * @param content The content of the usermeta chunk.
+ * @param content_len The length of the content.
+ * @param cparams The parameters for compressing the usermeta chunk.
+ *
+ * @note The previous content, if any, will be overwritten by the new content.
+ * The user is responsible to keep the new content in sync with any previous content.
+ *
+ * @return If successful, return 1. Else, a negative value.
+ */
+BLOSC_EXPORT int blosc2_schunk_update_usermeta(blosc2_schunk *schunk, uint8_t *content,
+                                               int32_t content_len, blosc2_cparams cparams);
+
+/* @brief Retrieve the usermeta chunk in a decompressed form.
+ *
+ * @param schunk The super-chunk to which add the usermeta chunk.
+ * @param content The content of the usermeta chunk (output).
+ *
+ * @note The user is responsible to free the @p content buffer.
+ *
+ * @return If successful, return the size of the (decompressed) chunk.
+ * Else, a negative value.
+ */
+BLOSC_EXPORT int blosc2_schunk_get_usermeta(blosc2_schunk* schunk, uint8_t** content);
+
+/* @brief Flush the contents of a schunk into an attached frame.
+ *
+ * @param schunk The super-chunk with an attached frame.  If there is not any
+ * attached frame, this does nothing.
+ *
+ * @note: for the time being this only applies to metadata, as data is always
+ * updated automatically into the attached frame (if any).
+ *
+ * @return If successful, return 1. Else, a negative value.
+ */
+int blosc2_schunk_flush(blosc2_schunk* schunk);
+
 
 /*********************************************************************
 
@@ -989,7 +1028,7 @@ BLOSC_EXPORT int blosc2_free_frame(blosc2_frame *frame);
 /**
  * @brief Write an in-memory frame out to a file.
  *
- * The frame used must be an in-memory frame, frame->fname == NULL.
+ * The frame used must be an in-memory frame, i.e. frame->fname == NULL.
  *
  * @param frame The frame to be written into a file.
  * @param fname The name of the file.
@@ -1017,22 +1056,6 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(const char *fname);
  * @return The super-chunk corresponding to the frame.
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy);
-
-/**
- * @brief Update content into a usermeta chunk.
- *
- * @param frame The frame to which add the usermeta chunk.
- * @param content The content of the usermeta chunk.
- * @param content_len The length of the content.
- * @param cparams The parameters for compressing the usermeta chunk.
- *
- * @note The previous content, if any, will be overwritten by the new content.
- * The user is responsible to keep the new content in sync with any previous content.
- *
- * @return If successful, return 1. Else, a negative value.
- */
-BLOSC_EXPORT int blosc2_frame_update_usermeta(blosc2_frame *frame, uint8_t *content,
-                                              uint32_t content_len, blosc2_cparams cparams);
 
 /**
  * @brief Find whether the frame has a metalayer or not.
