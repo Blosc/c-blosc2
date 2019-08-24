@@ -950,6 +950,8 @@ BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams
 /**
  * @brief Update content into a usermeta chunk.
  *
+ * If the @p schunk has an attached frame, the later will be updated accordingly too.
+ *
  * @param schunk The super-chunk to which add the usermeta chunk.
  * @param content The content of the usermeta chunk.
  * @param content_len The length of the content.
@@ -975,18 +977,6 @@ BLOSC_EXPORT int blosc2_schunk_update_usermeta(blosc2_schunk *schunk, uint8_t *c
  * Else, a negative value.
  */
 BLOSC_EXPORT int blosc2_schunk_get_usermeta(blosc2_schunk* schunk, uint8_t** content);
-
-/* @brief Flush the contents of a schunk into an attached frame.
- *
- * @param schunk The super-chunk with an attached frame.  If there is not any
- * attached frame, this does nothing.
- *
- * @note: for the time being this only applies to metadata, as data is always
- * updated automatically into the attached frame (if any).
- *
- * @return If successful, return 1. Else, a negative value.
- */
-BLOSC_EXPORT int blosc2_schunk_flush(blosc2_schunk* schunk);
 
 
 /*********************************************************************

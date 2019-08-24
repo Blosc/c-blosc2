@@ -133,16 +133,6 @@ int blosc2_free_schunk(blosc2_schunk *schunk) {
   return 0;
 }
 
-/* Flush the contents of a schunk into a possible backing frame. */
-int blosc2_schunk_flush(blosc2_schunk* schunk) {
-  int rc = 0;
-  if (schunk->frame != NULL) {
-    rc = frame_update_usermeta(schunk->frame, schunk);
-  }
-  return rc;
-}
-
-
 /* Append an existing chunk into a super-chunk. */
 int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy) {
   int32_t nchunks = schunk->nchunks;
@@ -311,6 +301,14 @@ int blosc2_schunk_update_usermeta(blosc2_schunk *schunk, uint8_t *content, int32
   memcpy(schunk->usermeta, usermeta_chunk, usermeta_cbytes);
   free(usermeta_chunk);
   schunk->usermeta_len = usermeta_cbytes;
+
+  if (schunk->frame != NULL) {
+    int rc = frame_update_usermeta(schunk->frame, schunk);
+    if (rc < 0) {
+      return rc;
+    }
+  }
+
   return usermeta_cbytes;
 }
 
