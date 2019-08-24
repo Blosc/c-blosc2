@@ -3,10 +3,13 @@
 ==================================================
 
 
-Changes from 2.0.0a5 to 2.0.0-beta.1
-====================================
+Changes from 2.0.0-beta.1 to 2.0.0-beta.2
+========================================
 
-#XXX version-specific blurb XXX#
+* A new `usermeta` chunk in `schunk` allows to store arbitrary meta-information
+  that is up to the user.  If the `schunk` has an attached `frame`, the later
+  will be updated accordingly too.  See docstrings of new
+  `blosc2_schunk_update_usermeta()` function for more info.
 
 
 Changes from 2.0.0a5 to 2.0.0-beta.1
