@@ -998,14 +998,14 @@ BLOSC_EXPORT blosc2_frame* blosc2_new_frame(char* fname);
  * @brief Create a frame from a super-chunk.
  *
  * @param schunk The super-chunk from where the frame will be created.
- * @param frame The pointer where the frame will be returned
+ * @param frame The pointer for the frame that will be populated.
  *
  * If frame->fname is NULL, a frame is created in memory; else it is created
  * on disk.
  *
  * @return The size in bytes of the frame. If an error occurs it returns a negative value.
  */
-BLOSC_EXPORT int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame);
+BLOSC_EXPORT int64_t blosc2_schunk_to_frame(blosc2_schunk* schunk, blosc2_frame* frame);
 
 /**
  * @brief Free all memory from a frame.
