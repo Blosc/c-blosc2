@@ -815,9 +815,12 @@ int frame_update_usermeta(blosc2_frame* frame, blosc2_schunk* schunk) {
     fprintf(stderr, "unable to get meta info from frame");
     return -1;
   }
+
   int64_t usermeta_offset = get_usermeta_offset(frame, header_len, cbytes);
 
-  // Now, update the metauser chunk
+  // Update the metauser chunk.  As there is no internal offsets to the usermeta chunk,
+  // and it is always at the end of the frame, we can just write (or overwrite the chunk)
+  // at the end of the frame.
   if (frame->sdata == NULL) {
     FILE* fp = fopen(frame->fname, "rb+");
     fseek(fp, usermeta_offset, SEEK_SET);
