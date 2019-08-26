@@ -636,10 +636,10 @@ int get_offsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, int32_t
   if (frame->sdata != NULL) {
     coffsets = framep + header_len + cbytes;
   } else {
-    size_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
-    size_t off_cbytes = trailer_offset - (header_len + cbytes);
+    int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
+    int64_t off_cbytes = trailer_offset - (header_len + cbytes);
     FILE* fp = fopen(frame->fname, "rb");
-    coffsets = malloc(off_cbytes);
+    coffsets = malloc((size_t)off_cbytes);
     fseek(fp, header_len + cbytes, SEEK_SET);
     size_t rbytes = fread(coffsets, 1, off_cbytes, fp);
     if (rbytes != off_cbytes) {
@@ -852,7 +852,7 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
   // and it is always at the end of the frame, we can just write (or overwrite) it
   // at the end of the frame.
   if (frame->sdata != NULL) {
-    frame->sdata = realloc(frame->sdata, trailer_offset + trailer_len);
+    frame->sdata = realloc(frame->sdata, (size_t)(trailer_offset + trailer_len));
     if (frame->sdata == NULL) {
       fprintf(stderr, "Error: cannot realloc space for the frame.");
       return -1;
@@ -1125,8 +1125,8 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     return NULL;
   }
 
-  size_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
-  size_t trailer_len = frame->len - trailer_offset;
+  int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
+  int64_t trailer_len = frame->len - trailer_offset;
 
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
   int32_t nbytes_chunk = sw32_((uint8_t*)chunk + 4);

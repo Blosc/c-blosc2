@@ -31,12 +31,12 @@
 #define FRAME_IDX_SIZE (FRAME_NAMESPACES + 1 + 1)  // 66
 
 // Other constants
-#define FRAME_FILTERS_PIPE_START_BIT (3u)
-#define FRAME_FILTERS_PIPE_DESCRIBED_HERE (0b10u)
-#define FRAME_FILTER_PIPE_DESCRIPTION (0b1111000u)
+#define FRAME_FILTERS_PIPE_START_BIT (3U)
+#define FRAME_FILTERS_PIPE_DESCRIBED_HERE (2U)  // 0b10
+#define FRAME_FILTER_PIPE_DESCRIPTION (120U)  // 0b1111000
 #define FRAME_HEADER_NFIELDS_NOMETALAYER (11)
 #define FRAME_HEADER_NFIELDS_METALAYER (12)
-#define FRAME_TRAILER_VERSION (0u)  // can be up to 127
+#define FRAME_TRAILER_VERSION (0U)  // can be up to 127
 #define FRAME_TRAILER_USERMETA_LEN_OFFSET (3)  // offset to usermeta length
 #define FRAME_TRAILER_USERMETA_OFFSET (7)  // offset to usermeta chunk
 #define FRAME_TRAILER_MIN_LENGTH (30)  // minimum length for the trailer (msgpack overhead)
