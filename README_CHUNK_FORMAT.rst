@@ -1,5 +1,5 @@
-Blosc Header Format
-===================
+Blosc Chunk Format
+==================
 
 Blosc (as of Version 1.0.0) has the following 16 byte header that stores
 information about the compressed chunk::

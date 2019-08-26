@@ -1796,7 +1796,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     //   a blosc_compress() call.  This should probably be fixed.
     char *compname;
     blosc2_context *cctx;
-    blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
 
     blosc_compcode_to_compname(g_compressor, &compname);
     /* Create a context for compression */
@@ -1892,7 +1892,7 @@ int blosc_decompress(const void* src, void* dest, size_t destsize) {
   char* envvar;
   long nthreads;
   blosc2_context *dctx;
-  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
 
   /* Check whether the library should be initialized */
   if (!g_initlib) blosc_init();

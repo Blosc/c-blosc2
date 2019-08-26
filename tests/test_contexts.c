@@ -21,8 +21,8 @@ int main() {
   size_t isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
   int dsize = SIZE * sizeof(int32_t), csize;
   int i, ret;
-  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_context *cctx, *dctx;
 
   /* Initialize dataset */

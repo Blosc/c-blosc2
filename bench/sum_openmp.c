@@ -77,8 +77,8 @@ int main() {
   size_t isize = CHUNKSIZE * sizeof(DTYPE);
   DTYPE sum, compressed_sum;
   int64_t nbytes, cbytes;
-  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
   int i, j, nchunk;
   blosc_timestamp_t last, current;

@@ -39,8 +39,8 @@ void fill_buffer(double *buffer, int nchunk) {
 
 
 int main() {
-  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk *schunk;
   size_t isize = CHUNKSIZE * sizeof(double);
   int dsize;

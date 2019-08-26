@@ -54,15 +54,16 @@ int main() {
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Create a super-chunk container */
-  blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_LZ4;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
-  blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
   blosc2_schunk* schunk = blosc2_new_schunk(cparams, dparams, NULL);
 
+  // Add some data
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     for (i = 0; i < CHUNKSIZE; i++) {
@@ -71,6 +72,14 @@ int main() {
     nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     assert(nchunks == nchunk + 1);
   }
+
+  // Add some usermeta data
+  int umlen = blosc2_schunk_update_usermeta(schunk, (uint8_t*)"This is a usermeta content...",32,
+                                            BLOSC2_CPARAMS_DEFAULTS);
+  if (umlen < 0) {
+    printf("Cannot write usermeta chunk");
+  }
+
   /* Gather some info */
   nbytes = schunk->nbytes;
   cbytes = schunk->cbytes;
@@ -80,6 +89,10 @@ int main() {
          nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
   printf("Compression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
+  uint8_t* usermeta;
+  int content_len = blosc2_schunk_get_usermeta(schunk, &usermeta);
+  printf("Usermeta in schunk: '%s' with length: %d\n", usermeta, content_len);
+  free(usermeta);
 
   // Start different conversions between schunks, frames and fileframes
 
@@ -96,6 +109,9 @@ int main() {
   // frame1 (in-memory) -> fileframe (on-disk)
   blosc_set_timestamp(&last);
   frame_len = blosc2_frame_to_file(frame1, "frame_simple.b2frame");
+  if (frame_len < 0) {
+    return frame_len;
+  }
   printf("Frame length on disk: %ld bytes\n", (long)frame_len);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
@@ -112,7 +128,7 @@ int main() {
 
   // frame1 (in-memory) -> schunk
   blosc_set_timestamp(&last);
-  // The next creates an schunk made of sparse chunks
+  // The next creates a schunk made of sparse chunks
   blosc2_schunk* schunk1 = blosc2_schunk_from_frame(frame1, true);
   // The next creates a frame-backed schunk
   // blosc2_schunk* schunk1 = blosc2_schunk_from_frame(frame1, false);
@@ -160,6 +176,13 @@ int main() {
     }
   }
   printf("Successful roundtrip schunk <-> frame <-> fileframe !\n");
+
+  content_len = blosc2_schunk_get_usermeta(schunk1, &usermeta);
+  printf("Usermeta in schunk1: '%s' with length: %d\n", usermeta, content_len);
+  free(usermeta);
+  content_len = blosc2_schunk_get_usermeta(schunk2, &usermeta);
+  printf("Usermeta in schunk2: '%s' with length: %d\n", usermeta, content_len);
+  free(usermeta);
 
   /* Free resources */
   blosc2_free_schunk(schunk);

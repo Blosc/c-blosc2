@@ -59,7 +59,7 @@ static char *test_prefilter1() {
   mu_assert("Compression error", csize > 0);
 
   /* Create a context for decompression */
-  dparams = BLOSC_DPARAMS_DEFAULTS;
+  dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
   dctx = blosc2_create_dctx(dparams);
 
@@ -97,7 +97,7 @@ static char *test_prefilter2() {
   mu_assert("Compression error", csize > 0);
 
   /* Create a context for decompression */
-  dparams = BLOSC_DPARAMS_DEFAULTS;
+  dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
   dctx = blosc2_create_dctx(dparams);
 
@@ -136,7 +136,7 @@ int main() {
   }
 
   /* Create a context for compression */
-  cparams = BLOSC_CPARAMS_DEFAULTS;
+  cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;

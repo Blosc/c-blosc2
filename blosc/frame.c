@@ -125,8 +125,32 @@ blosc2_frame* blosc2_new_frame(char* fname) {
     char* new_fname = malloc(strlen(fname) + 1);  // + 1 for the trailing NULL
     new_frame->fname = strcpy(new_fname, fname);
   }
-
   return new_frame;
+}
+
+
+/* Free all memory from a frame. */
+int blosc2_free_frame(blosc2_frame *frame) {
+
+  if (frame->sdata != NULL) {
+    free(frame->sdata);
+  }
+  if (frame->nmetalayers > 0) {
+    for (int i = 0; i < frame->nmetalayers; i++) {
+      free(frame->metalayers[i]->name);
+      free(frame->metalayers[i]->content);
+      free(frame->metalayers[i]);
+    }
+    frame->nmetalayers = 0;
+  }
+
+  if (frame->fname != NULL) {
+    free(frame->fname);
+  }
+
+  free(frame);
+
+  return 0;
 }
 
 
@@ -254,11 +278,11 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
 
   // Now, deal with metalayers
   int16_t nmetalayers = frame->nmetalayers;
-  bool has_metalayers = nmetalayers > 0;
-  // The msgpack header will start as a fix array of 11 or 12 elements
-  *h2 = has_metalayers ? *h2 = 0x90 + 12 : 0x90 + 11;
-  // The boolean for FRAME_HAS_METALAYERS seems a bit redundant, but let's be explicit
-  *h2p = has_metalayers ? (uint8_t)0xc3 : (uint8_t)0xc2;
+  // The msgpack header will start as a fix array of 11 or 12 elements (if it has metalayers)
+  *h2 = 0x90;
+  *h2 += (nmetalayers > 0) ? FRAME_HEADER_NFIELDS_METALAYER : FRAME_HEADER_NFIELDS_NOMETALAYER;
+  // The boolean for FRAME_HAS_USERMETA
+  *h2p = (schunk->usermeta_len > 0) ? (uint8_t)0xc3 : (uint8_t)0xc2;
   h2p += 1;
   assert(h2p - h2 == FRAME_HEADER2_MINLEN);
 
@@ -378,7 +402,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
       chunksize = chunksize_;
     }
     else if (chunksize != chunksize_) {
-      // Variable size  TODO: update flags for this (or do not use them at all)
+      // Variable size  // TODO: update flags for this (or do not use them at all)
       chunksize = 0;
     }
   }
@@ -388,7 +412,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   if (nchunks > 0) {
     // Compress the chunk of offsets
     off_chunk = malloc(off_nbytes + BLOSC_MAX_OVERHEAD);
-    blosc2_context *cctx = blosc2_create_cctx(BLOSC_CPARAMS_DEFAULTS);
+    blosc2_context *cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
     cctx->typesize = 8;
     off_cbytes = blosc2_compress_ctx(cctx, off_nbytes, data_tmp, off_chunk,
                                      off_nbytes + BLOSC_MAX_OVERHEAD);
@@ -406,7 +430,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
   // Now that we know them, fill the chunksize and frame length in header2
   swap_store(h2 + FRAME_CHUNKSIZE, &chunksize, sizeof(chunksize));
-  frame->len = h2len + cbytes + off_cbytes;
+  frame->len = h2len + cbytes + off_cbytes + FRAME_TRAILER_MIN_LENGTH + schunk->usermeta_len;
   int64_t tbytes = frame->len;
   swap_store(h2 + FRAME_LEN, &tbytes, sizeof(tbytes));
 
@@ -445,13 +469,22 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   }
   free(off_chunk);
 
+  int rc = frame_update_trailer(frame, schunk);
+  if (rc < 0) {
+    return rc;
+  }
+
   return frame->len;
 }
 
 
 /* Write an in-memory frame out to a file. */
 int64_t blosc2_frame_to_file(blosc2_frame *frame, char *fname) {
-    assert(frame->fname == NULL);  // make sure that we are using an in-memory frame
+    // make sure that we are using an in-memory frame
+    if (frame->fname != NULL) {
+      fprintf(stderr, "Error: the original frame must be in-memory");
+      return -1;
+    }
     FILE* fp = fopen(fname, "wb");
     fwrite(frame->sdata, (size_t)frame->len, 1, fp);
     fclose(fp);
@@ -468,14 +501,16 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   uint8_t* header = malloc(FRAME_HEADER2_MINLEN);
   FILE* fp = fopen(fname, "rb");
   size_t rbytes = fread(header, 1, FRAME_HEADER2_MINLEN, fp);
-  assert(rbytes == FRAME_HEADER2_MINLEN);
+  if (rbytes != FRAME_HEADER2_MINLEN) {
+    fprintf(stderr, "Error: cannot read from file '%s'\n", fname);
+    return NULL;
+  }
 
   int64_t frame_len;
   swap_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
   frame->len = frame_len;
 
-  bool has_metalayers = (header[FRAME_HAS_METALAYERS] == 0xc3) ? true : false;
-
+  bool has_metalayers = ((header[0] & 0xFu) == FRAME_HEADER_NFIELDS_METALAYER) ? true : false;
   free(header);
 
   if (!has_metalayers) {
@@ -502,7 +537,7 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   idxp += 2;
   frame->nmetalayers = nmetalayers;
 
-  // Populate the metalayer and serialized value for each client
+  // Populate the metalayers and its serialized values
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
     assert((*idxp & 0xe0u) == 0xa0u);   // sanity check
     blosc2_frame_metalayer* metalayer = calloc(sizeof(blosc2_frame_metalayer), 1);
@@ -556,22 +591,26 @@ out:
   return frame;
 }
 
-// Get the data pointers section
-int32_t get_offsets(blosc2_frame* frame, int64_t frame_len, int32_t header_len,
-                    int64_t cbytes, int32_t nchunks, void* offsets) {
-  uint8_t* framep = frame->sdata;
+
+// Get the offset to the usermeta chunk
+int64_t get_trailer_offset(blosc2_frame *frame, int32_t header_len, int64_t cbytes) {
   uint8_t* coffsets;
 
+  if (cbytes == 0) {
+    // No data chunks yet
+    return header_len;
+  }
+
   if (frame->sdata != NULL) {
-    coffsets = framep + header_len + cbytes;
+    coffsets = frame->sdata + header_len + cbytes;
   } else {
-    int32_t off_cbytes = (int32_t)(frame_len - header_len - cbytes);
-    coffsets = malloc((size_t)off_cbytes);
+    size_t bytes_to_read = BLOSC_MIN_HEADER_LENGTH;
+    coffsets = malloc(bytes_to_read);
     FILE* fp = fopen(frame->fname, "rb");
     fseek(fp, header_len + cbytes, SEEK_SET);
-    size_t rbytes = fread(coffsets, 1, (size_t)off_cbytes, fp);
-    if (rbytes != (size_t)off_cbytes) {
-      fprintf(stderr, "Cannot read the offsets out of the fileframe.\n");
+    size_t rbytes = fread(coffsets, 1, bytes_to_read, fp);
+    if (rbytes != bytes_to_read) {
+      fprintf(stderr, "Cannot access the offsets out of the fileframe.\n");
       fclose(fp);
       return -1;
     }
@@ -579,7 +618,39 @@ int32_t get_offsets(blosc2_frame* frame, int64_t frame_len, int32_t header_len,
   }
 
   int32_t off_cbytes = sw32_(coffsets + 12);
-  blosc2_dparams off_dparams = BLOSC_DPARAMS_DEFAULTS;
+
+  if (frame->sdata == NULL) {
+    free(coffsets);
+  }
+
+  // Now we know all the necessary offsets to reach the trailer section
+  return header_len + cbytes + off_cbytes;
+}
+
+
+// Get the data pointers section
+int get_offsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, int32_t nchunks, void *offsets) {
+  uint8_t* framep = frame->sdata;
+  uint8_t* coffsets;
+
+  if (frame->sdata != NULL) {
+    coffsets = framep + header_len + cbytes;
+  } else {
+    int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
+    int64_t off_cbytes = trailer_offset - (header_len + cbytes);
+    FILE* fp = fopen(frame->fname, "rb");
+    coffsets = malloc((size_t)off_cbytes);
+    fseek(fp, header_len + cbytes, SEEK_SET);
+    size_t rbytes = fread(coffsets, 1, (size_t)off_cbytes, fp);
+    if (rbytes != (size_t)off_cbytes) {
+      fprintf(stderr, "Error: cannot read the offsets out of the fileframe.\n");
+      fclose(fp);
+      return -1;
+    }
+    fclose(fp);
+  }
+
+  blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_context *dctx = blosc2_create_dctx(off_dparams);
   int32_t off_nbytes = blosc2_decompress_ctx(dctx, coffsets, offsets, (size_t)nchunks * 8);
   blosc2_free_ctx(dctx);
@@ -591,7 +662,7 @@ int32_t get_offsets(blosc2_frame* frame, int64_t frame_len, int32_t header_len,
     free(coffsets);
   }
 
-  return off_cbytes;
+  return 1;
 }
 
 
@@ -649,7 +720,7 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
     *clevel = frame_codecs >> 4u;
   }
   if (compcode != NULL) {
-    *compcode = frame_codecs & 0b1111u;
+    *compcode = frame_codecs & 0xFu;
   }
 
   uint8_t filter_flags = framep[FRAME_FILTERS];
@@ -682,8 +753,8 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
   return 0;
 }
 
-
-int frame_update_meta(blosc2_frame* frame, blosc2_schunk* schunk) {
+// TODO: we should not need the schunk for updating metalayers
+int frame_update_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
   uint8_t* header = frame->sdata;
 
   assert(frame->len > 0);
@@ -703,7 +774,10 @@ int frame_update_meta(blosc2_frame* frame, blosc2_schunk* schunk) {
   uint32_t h2len;
   swap_store(&h2len, h2 + FRAME_HEADER2_LEN, sizeof(h2len));
 
-  assert(prev_h2len == h2len);  // sanity check: the new header size should equal the previous one
+  if (prev_h2len != h2len) {
+    fprintf(stderr, "Error: the new header size should be equal the existing one");
+    return -1;
+  }
 
   if (frame->sdata == NULL) {
     // Write updated header down to file
@@ -717,10 +791,142 @@ int frame_update_meta(blosc2_frame* frame, blosc2_schunk* schunk) {
   }
   free(h2);
 
-  return 0;
-
+  return 1;
 }
 
+
+int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
+  if (frame->len == 0) {
+    fprintf(stderr, "Error: the trailer cannot be updated on empty frames");
+  }
+
+  // Create the trailer in msgpack (see the frame format document)
+  uint32_t trailer_len = FRAME_TRAILER_MIN_LENGTH + schunk->usermeta_len;
+  uint8_t* trailer = calloc((size_t)trailer_len, 1);
+  uint8_t* ptrailer = trailer;
+  *ptrailer = 0x09 + 4;  // fixarray with 4 elements
+  ptrailer += 1;
+  // Trailer format version
+  *ptrailer = FRAME_TRAILER_VERSION;
+  ptrailer += 1;
+  // usermeta
+  *ptrailer = 0xc6;     // bin32
+  ptrailer += 1;
+  swap_store(ptrailer, &(schunk->usermeta_len), 4);
+  ptrailer += 4;
+  memcpy(ptrailer, schunk->usermeta, schunk->usermeta_len);
+  ptrailer += schunk->usermeta_len;
+  // Trailer length
+  *ptrailer = 0xce;  // uint32
+  ptrailer += 1;
+  swap_store(ptrailer, &(trailer_len), sizeof(uint32_t));
+  ptrailer += sizeof(uint32_t);
+  // Up to 16 bytes for frame fingerprint (using XXH3 included in https://github.com/Cyan4973/xxHash)
+  // Maybe someone would need 256-bit in the future, but for the time being 128-bit seems like a good tradeoff
+  *ptrailer = 0xd8;  // fixext 16
+  ptrailer += 1;
+  *ptrailer = 0;  // fingerprint type: 0 -> no fp; 1 -> 32-bit; 2 -> 64-bit; 3 -> 128-bit
+  ptrailer += 1;
+  // Uncomment this when we compute an actual fingerprint
+  // memcpy(ptrailer, xxh3_fingerprint, sizeof(xxh3_fingerprint));
+  ptrailer += 16;
+  // Sanity check
+  assert(ptrailer - trailer == trailer_len);
+
+  int32_t header_len;
+  int64_t frame_len;
+  int64_t nbytes;
+  int64_t cbytes;
+  int32_t chunksize;
+  int32_t nchunks;
+  int ret = frame_get_meta(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+                           NULL, NULL, NULL, NULL, NULL);
+  if (ret < 0) {
+    fprintf(stderr, "unable to get meta info from frame");
+    return -1;
+  }
+
+  int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
+
+  // Update the trailer.  As there are no internal offsets to the trailer section,
+  // and it is always at the end of the frame, we can just write (or overwrite) it
+  // at the end of the frame.
+  if (frame->sdata != NULL) {
+    frame->sdata = realloc(frame->sdata, (size_t)(trailer_offset + trailer_len));
+    if (frame->sdata == NULL) {
+      fprintf(stderr, "Error: cannot realloc space for the frame.");
+      return -1;
+    }
+    memcpy(frame->sdata + trailer_offset, trailer, trailer_len);
+  }
+  else {
+    FILE* fp = fopen(frame->fname, "rb+");
+    fseek(fp, trailer_offset, SEEK_SET);
+    fwrite(trailer, trailer_len, 1, fp);
+    fclose(fp);
+  }
+  free(trailer);
+  return 1;
+}
+
+
+/* Get the (compressed) usermeta chunk out of a frame */
+int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
+  int32_t header_len;
+  int64_t frame_len;
+  int64_t nbytes;
+  int64_t cbytes;
+  int32_t chunksize;
+  int32_t nchunks;
+  int ret = frame_get_meta(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+                           NULL, NULL, NULL, NULL, NULL);
+  if (ret < 0) {
+    fprintf(stderr, "unable to get meta info from frame");
+    return -1;
+  }
+  int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
+
+  // Get the size of usermeta (inside the trailer)
+  int32_t usermeta_len_network;
+  if (frame->sdata != NULL) {
+    memcpy(&usermeta_len_network, frame->sdata + trailer_offset + FRAME_TRAILER_USERMETA_LEN_OFFSET, sizeof(int32_t));
+  } else {
+    FILE* fp = fopen(frame->fname, "rb");
+    fseek(fp, trailer_offset + FRAME_TRAILER_USERMETA_LEN_OFFSET, SEEK_SET);
+    size_t rbytes = fread(&usermeta_len_network, 1, sizeof(int32_t), fp);
+    if (rbytes != sizeof(int32_t)) {
+      fprintf(stderr, "Cannot access the usermeta_len out of the fileframe.\n");
+      fclose(fp);
+      return -1;
+    }
+    fclose(fp);
+  }
+  int32_t usermeta_len;
+  swap_store(&usermeta_len, &usermeta_len_network, sizeof(int32_t));
+
+  if (usermeta_len == 0) {
+    *usermeta = NULL;
+    return 0;
+  }
+
+  *usermeta = malloc(usermeta_len);
+  if (frame->sdata != NULL) {
+    memcpy(*usermeta, frame->sdata + trailer_offset + FRAME_TRAILER_USERMETA_OFFSET, usermeta_len);
+  }
+  else {
+    FILE* fp = fopen(frame->fname, "rb+");
+    fseek(fp, trailer_offset + FRAME_TRAILER_USERMETA_OFFSET, SEEK_SET);
+    size_t rbytes = fread(*usermeta, 1, usermeta_len, fp);
+    if (rbytes != (size_t)usermeta_len) {
+      fprintf(stderr, "Error: cannot read the complete usermeta chunk in frame. %ld != %ld \n",
+              (long)rbytes, (long)usermeta_len);
+      return -1;
+    }
+    fclose(fp);
+  }
+
+  return usermeta_len;
+}
 
 /* Get a super-chunk out of a frame */
 blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
@@ -751,8 +957,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
   free(dparams);
 
   if (!copy || nchunks == 0) {
-    // We are done, so leave here
-    return schunk;
+    goto out;
   }
 
   // We are not attached to a frame anymore
@@ -760,9 +965,9 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
 
   // Get the offsets
   int64_t *offsets = (int64_t *) calloc((size_t) nchunks * 8, 1);
-  int32_t off_cbytes = get_offsets(frame, frame_len, header_len, cbytes, nchunks, offsets);
-  if (off_cbytes < 0) {
-    fprintf(stderr, "Cannot get the offsets for the frame\n");
+  int rc = get_offsets(frame, header_len, cbytes, nchunks, offsets);
+  if (rc < 0) {
+    fprintf(stderr, "Error: cannot get the offsets for the frame\n");
     return NULL;
   }
 
@@ -821,7 +1026,18 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
   }
   assert(acc_nbytes == nbytes);
   assert(acc_cbytes == cbytes);
-  assert(frame_len == header_len + cbytes + off_cbytes);
+
+  uint8_t* usermeta;
+  int32_t usermeta_len;
+  out:
+  // Get the usermeta chunk
+  usermeta_len = frame_get_usermeta(frame, &usermeta);
+  if (usermeta_len < 0) {
+    fprintf(stderr, "Error: cannot access the usermeta chunk");
+    return NULL;
+  }
+  schunk->usermeta = usermeta;
+  schunk->usermeta_len = usermeta_len;
 
   return schunk;
 }
@@ -863,9 +1079,9 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
   // Get the offset to the chunk
   int32_t off_nbytes = nchunks * 8;
   int64_t* offsets = malloc((size_t)off_nbytes);
-  int32_t off_cbytes = get_offsets(frame, frame_len, header_len, cbytes, nchunks, offsets);
-  if (off_cbytes < 0) {
-    fprintf(stderr, "Cannot get the offset for chunk %d for the frame\n", nchunk);
+  int rc = get_offsets(frame, header_len, cbytes, nchunks, offsets);
+  if (rc < 0) {
+    fprintf(stderr, "Error: cannot get the offset for chunk %d for the frame\n", nchunk);
     return -3;
   }
   int64_t offset = offsets[nchunk];
@@ -914,6 +1130,9 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     return NULL;
   }
 
+  int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
+  int64_t trailer_len = frame->len - trailer_offset;
+
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
   int32_t nbytes_chunk = sw32_((uint8_t*)chunk + 4);
   int32_t cbytes_chunk = sw32_((uint8_t*)chunk + 12);
@@ -951,8 +1170,9 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   int32_t off_nbytes = (nchunks + 1) * 8;
   int64_t* offsets = malloc((size_t)off_nbytes);
   if (nchunks > 0) {
-    int32_t off_cbytes = get_offsets(frame, frame_len, header_len, cbytes, nchunks, offsets);
-    if (off_cbytes < 0) {
+    int rc = get_offsets(frame, header_len, cbytes, nchunks, offsets);
+    if (rc < 0) {
+      fprintf(stderr, "Error: cannot get the offset for chunk %d for the frame\n", nchunks);
       return NULL;
     }
   }
@@ -960,7 +1180,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   offsets[nchunks] = cbytes;
 
   // Re-compress the offsets again
-  blosc2_context* cctx = blosc2_create_cctx(BLOSC_CPARAMS_DEFAULTS);
+  blosc2_context* cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
   cctx->typesize = 8;
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, (size_t)off_nbytes, offsets,
@@ -972,7 +1192,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     return NULL;
   }
 
-  int64_t new_frame_len = header_len + new_cbytes + new_off_cbytes;
+  int64_t new_frame_len = header_len + new_cbytes + new_off_cbytes + trailer_len;
 
   FILE* fp = NULL;
   if (frame->sdata != NULL) {
@@ -1006,11 +1226,15 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   free(chunk);
   free(off_chunk);
 
-  /* Update header and other metainfo (metalayers) in frame */
   frame->len = new_frame_len;
-  ret = frame_update_meta(frame, schunk);
+  ret = frame_update_metalayers(frame, schunk);
   if (ret < 0) {
-    fprintf(stderr, "unable to update meta info from frame");
+    fprintf(stderr, "Error: unable to update meta info from frame");
+    return NULL;
+  }
+
+  int rc = frame_update_trailer(frame, schunk);
+  if (rc < 0) {
     return NULL;
   }
 
@@ -1049,7 +1273,7 @@ int frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, size_t n
 /* Find whether the frame has a metalayer or not.
  *
  * If successful, return the index of the metalayer.  Else, return a negative value.
- * */
+ */
 int blosc2_frame_has_metalayer(blosc2_frame *frame, char *name) {
     if (strlen(name) > BLOSC2_METALAYER_NAME_MAXLEN) {
         fprintf(stderr, "metalayers cannot be larger than %d chars\n", BLOSC2_METALAYER_NAME_MAXLEN);
@@ -1068,7 +1292,7 @@ int blosc2_frame_has_metalayer(blosc2_frame *frame, char *name) {
 /* Add content into a new metalayer.
  *
  * If successful, return the index of the new metalayer.  Else, return a negative value.
- * */
+ */
 int blosc2_frame_add_metalayer(blosc2_frame *frame, char *name, uint8_t *content,
                                uint32_t content_len) {
     int nmetalayer = blosc2_frame_has_metalayer(frame, name);
@@ -1096,24 +1320,24 @@ int blosc2_frame_add_metalayer(blosc2_frame *frame, char *name, uint8_t *content
 /* Update the content of an existing metalayer.
  *
  * If successful, return the index of the new metalayer.  Else, return a negative value.
- * */
+ */
 int blosc2_frame_update_metalayer(blosc2_frame *frame, char *name, uint8_t *content,
                                   uint32_t content_len) {
-    int nmetalayer = blosc2_frame_has_metalayer(frame, name);
-    if (nmetalayer < 0) {
-        fprintf(stderr, "metalayer \"%s\" not found\n", name);
-        return nmetalayer;
-    }
-
-    blosc2_frame_metalayer *metalayer = frame->metalayers[nmetalayer];
-    if (content_len > (uint32_t)metalayer->content_len) {
-        fprintf(stderr, "`content_len` cannot exceed the existing size of %d bytes", metalayer->content_len);
-        return nmetalayer;
-    }
-
-    // Update the contents of the metalayer
-    memcpy(metalayer->content, content, content_len);
+  int nmetalayer = blosc2_frame_has_metalayer(frame, name);
+  if (nmetalayer < 0) {
+    fprintf(stderr, "metalayer \"%s\" not found\n", name);
     return nmetalayer;
+  }
+
+  blosc2_frame_metalayer *metalayer = frame->metalayers[nmetalayer];
+  if (content_len > (uint32_t)metalayer->content_len) {
+    fprintf(stderr, "`content_len` cannot exceed the existing size of %d bytes", metalayer->content_len);
+    return nmetalayer;
+  }
+
+  // Update the contents of the metalayer
+  memcpy(metalayer->content, content, content_len);
+  return nmetalayer;
 }
 
 
@@ -1122,7 +1346,7 @@ int blosc2_frame_update_metalayer(blosc2_frame *frame, char *name, uint8_t *cont
  * The `**content` receives a malloc'ed copy of the content.  The user is responsible of freeing it.
  *
  * If successful, return the index of the new metalayer.  Else, return a negative value.
- * */
+ */
 int blosc2_frame_get_metalayer(blosc2_frame *frame, char *name, uint8_t **content,
                                uint32_t *content_len) {
     int nmetalayer = blosc2_frame_has_metalayer(frame, name);
@@ -1134,29 +1358,4 @@ int blosc2_frame_get_metalayer(blosc2_frame *frame, char *name, uint8_t **conten
     *content = malloc((size_t)*content_len);
     memcpy(*content, frame->metalayers[nmetalayer]->content, (size_t)*content_len);
     return nmetalayer;
-}
-
-
-/* Free all memory from a frame. */
-int blosc2_free_frame(blosc2_frame *frame) {
-
-  if (frame->sdata != NULL) {
-    free(frame->sdata);
-  }
-  if (frame->nmetalayers > 0) {
-    for (int i = 0; i < frame->nmetalayers; i++) {
-      free(frame->metalayers[i]->name);
-      free(frame->metalayers[i]->content);
-      free(frame->metalayers[i]);
-    }
-    frame->nmetalayers = 0;
-  }
-
-  if (frame->fname != NULL) {
-    free(frame->fname);
-  }
-
-  free(frame);
-
-  return 0;
 }

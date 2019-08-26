@@ -77,8 +77,8 @@ int compute_vectors(void) {
     const size_t isize = CHUNKSIZE * sizeof(double);
     int dsize;
     long nbytes = 0;
-    blosc2_cparams cparams = BLOSC_CPARAMS_DEFAULTS;
-    blosc2_dparams dparams = BLOSC_DPARAMS_DEFAULTS;
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_schunk *sc_x, *sc_y;
     int nchunk;
     blosc_timestamp_t last, current;

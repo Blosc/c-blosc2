@@ -1,7 +1,20 @@
 Blosc2 Frame Format
 ===================
 
-Blosc (as of version 2.0.0) has a framing format that allows to store different data chunks sequentially, either in-memory or on-disk.  The header of a frame is encoded via  `msgpack <https://msgpack.org>`_ and it follows the next format::
+Blosc (as of version 2.0.0) has a frame format that allows to store different data chunks sequentially, either in-memory or on-disk.
+
+The frame is composed by a header, a chunks section and a trailer, which are variable-length and stored sequentially::
+
+    +---------+--------+---------+
+    |  header | chunks | trailer |
+    +---------+--------+---------+
+
+These are described below.
+
+The header section
+------------------
+
+The header of a frame is encoded via  `msgpack <https://msgpack.org>`_ and it follows the next format::
 
     |-0-|-1-|-2-|-3-|-4-|-5-|-6-|-7-|-8-|-9-|-A-|-B-|-C-|-D-|-E-|-F-|-10|-11|-12|-13|-14|-15|-16|-17|
     | 9X| aX| "b2frame\0"                   | d2| header_size   | cf| frame_size                    |
@@ -13,7 +26,7 @@ Blosc (as of version 2.0.0) has a framing format that allows to store different 
       |   |       |                           +--[msgpack] int32
       |   |       +---magic number, currently "b2frame"
       |   +------[msgpack] str with 8 elements
-      +---[msgpack] fixed array with X=0xB (11, no metalayers) or X=0xC (12) elements
+      +---[msgpack] fixarray with X=0xB (11, no metalayers) or X=0xC (12) elements
 
     |-18|-19|-1A|-1B|-1C|-1D|-1E|-1F|-20|-21|-22|-23|-24|-25|-26|-27|-28|-29|-2A|-2B|-2C|-2D|-2E|
     | a4|_f0|_f1|_f2|_f3| d3| uncompressed_size             | d3| compressed_size               |
@@ -39,25 +52,23 @@ Blosc (as of version 2.0.0) has a framing format that allows to store different 
       |                   +------[msgpack] int32
       +---[msgpack] int32
 
-  In addition, a frame can be completed with meta-information about the stored data; these data blocks are called metalayers and it is up to the user to store whatever data they want there, with the only (strong) suggestion that they have to be in the msgpack format.  Here it is the format for the case that there exist some metalayers::
+In addition, a frame can be completed with meta-information about the stored data; these data blocks are called metalayers and it is up to the user to store whatever data they want there, with the only (strong) suggestion that they have to be in the msgpack format.  Here it is the format for the case that there exist some metalayers::
 
-    |-40|-41|-42|-43|-44|-----------------------
-    | 93| cd| idx   | de| map_of_metalayers
-    |---|---------------|-----------------------
-      ^   ^    ^      ^
-      |   |    |      |
-      |   |    |      +--[msgpack] map 16 with N keys
-      |   |    +--size of the map (index) of offsets
-      |   +--[msgpack] uint16
-      +-- [msgpack] array with 3 elements
-
+  |-40|-41|-42|-43|-44|-----------------------
+  | 93| cd| idx   | de| map_of_metalayers
+  |---|---------------|-----------------------
+    ^   ^    ^      ^
+    |   |    |      |
+    |   |    |      +--[msgpack] map 16 with N keys
+    |   |    +--size of the map (index) of offsets
+    |   +--[msgpack] uint16
+    +-- [msgpack] fixarray with 3 elements
 
 :map of metalayers:
     This is a *msgpack-formattted* map for the different metalayers.  The keys will be a string (0xa0 + namelen) for the names of the metalayers, followed by an int32 (0xd2) for the *offset* of the value of this metalayer.  The actual value will be encoded as a bin32 (0xc6) value later in frame.
 
-
-Description for different fields
---------------------------------
+Description for different fields in header
+__________________________________________
 
 :header_size:
     (``int32``) Size of the header of the frame (including metalayers).
@@ -151,3 +162,52 @@ Description for different fields
 
 :tdecomp:
     (``int16``) Number of threads for decompression.  If 0, same than `dctx`.
+
+
+The chunks section
+------------------
+
+Here there is the actual data chunks stored sequentially::
+
+    +========+========+========+===========+
+    | chunk0 | chunk1 |   ...  | chunk idx |
+    +========+========+========+===========+
+
+The different chunks are described in the `chunk format <README_CHUNK_FORMAT.rst>`_ document.  The `chunk idx` is an index for the different chunks in this section.  It is made by the 64-bit offsets to the different chunks and compressed into a new chunk, following the regular Blosc chunk format.
+
+
+The trailer section
+-------------------
+
+Here it is data that can change in size, mainly the `metauser` chunk::
+
+    |-0-|-1-|-2-|-3-|-4-|-5-|-6-|====================|---|---------------|---|---|=================|
+    | 9X| aX| c6| usermeta_len  |   usermeta_chunk   | ce| trailer_len   | d8|fpt| fingerprint     |
+    |---|---|---|---------------|====================|---|---------------|---|---|=================|
+      ^   ^   ^       ^                                ^       ^           ^   ^
+      |   |   |       |                                |       |           |   +-- fingerprint type
+      |   |   |       |                                |       |           +--[msgpack] fixext 16
+      |   |   |       |                                |       +-- trailer length (network endian)
+      |   |   |       |                                +--[msgpack] uint32 for trailer length
+      |   |   |       +--[msgpack] usermeta length (network endian)
+      |   |   +---[msgpack] bin32 for usermeta
+      |   +------[msgpack] int8 for trailer version
+      +---[msgpack] fixarray with X=4 elements
+
+Description for different fields in trailer
+___________________________________________
+
+:usermeta_len:
+    (``int32``) The length of the usermeta chunk.
+
+:usermeta_chunk:
+    (``varlen``) The usermeta chunk (a Blosc chunk).
+
+:trailer_len:
+    (``uint32``) Size of the trailer of the frame (including usermeta chunk).
+
+:fpt:
+    (``int8``) Fingerprint type:  0 -> no fp; 1 -> 32-bit; 2 -> 64-bit; 3 -> 128-bit
+
+:fingerprint:
+    (``uint128``) Fix storage space for the fingerprint, padded to the left.
