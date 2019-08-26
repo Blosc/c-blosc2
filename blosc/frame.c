@@ -641,8 +641,8 @@ int get_offsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, int32_t
     FILE* fp = fopen(frame->fname, "rb");
     coffsets = malloc((size_t)off_cbytes);
     fseek(fp, header_len + cbytes, SEEK_SET);
-    int64_t rbytes = fread(coffsets, 1, off_cbytes, fp);
-    if (rbytes != off_cbytes) {
+    size_t rbytes = fread(coffsets, 1, (size_t)off_cbytes, fp);
+    if (rbytes != (size_t)off_cbytes) {
       fprintf(stderr, "Error: cannot read the offsets out of the fileframe.\n");
       fclose(fp);
       return -1;
