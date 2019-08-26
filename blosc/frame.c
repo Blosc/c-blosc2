@@ -916,7 +916,11 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
   else {
     FILE* fp = fopen(frame->fname, "rb+");
     fseek(fp, trailer_offset + FRAME_TRAILER_USERMETA_OFFSET, SEEK_SET);
-    fread(*usermeta, usermeta_len, 1, fp);
+    size_t rbytes = fread(*usermeta, usermeta_len, 1, fp);
+    if (rbytes != (size_t)usermeta_len) {
+      fprintf(stderr, "Error: cannot read the complete usermeta in frame");
+      return -1;
+    }
     fclose(fp);
   }
 
