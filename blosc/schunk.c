@@ -303,7 +303,7 @@ int blosc2_schunk_update_usermeta(blosc2_schunk *schunk, uint8_t *content, int32
   schunk->usermeta_len = usermeta_cbytes;
 
   if (schunk->frame != NULL) {
-    int rc = frame_update_usermeta(schunk->frame, schunk);
+    int rc = frame_update_trailer(schunk->frame, schunk);
     if (rc < 0) {
       return rc;
     }

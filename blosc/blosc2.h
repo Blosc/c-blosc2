@@ -952,7 +952,7 @@ BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams
  *
  * If the @p schunk has an attached frame, the later will be updated accordingly too.
  *
- * @param schunk The super-chunk to which add the usermeta chunk.
+ * @param schunk The super-chunk to which one should add the usermeta chunk.
  * @param content The content of the usermeta chunk.
  * @param content_len The length of the content.
  * @param cparams The parameters for compressing the usermeta chunk.

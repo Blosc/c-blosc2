@@ -36,11 +36,15 @@
 #define FRAME_FILTER_PIPE_DESCRIPTION (0b1111000u)
 #define FRAME_HEADER_NFIELDS_NOMETALAYER (11)
 #define FRAME_HEADER_NFIELDS_METALAYER (12)
+#define FRAME_TRAILER_VERSION (0u)  // can be up to 127
+#define FRAME_TRAILER_USERMETA_LEN_OFFSET (3)  // offset to usermeta length
+#define FRAME_TRAILER_USERMETA_OFFSET (7)  // offset to usermeta chunk
+#define FRAME_TRAILER_MIN_LENGTH (30)  // minimum length for the trailer (msgpack overhead)
 
 
 void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk);
 int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free);
 int frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, size_t nbytes);
-int frame_update_usermeta(blosc2_frame* frame, blosc2_schunk* schunk);
+int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk);
 
 #endif //BLOSC_FRAME_H
