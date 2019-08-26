@@ -641,7 +641,7 @@ int get_offsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, int32_t
     FILE* fp = fopen(frame->fname, "rb");
     coffsets = malloc((size_t)off_cbytes);
     fseek(fp, header_len + cbytes, SEEK_SET);
-    size_t rbytes = fread(coffsets, 1, off_cbytes, fp);
+    int64_t rbytes = fread(coffsets, 1, off_cbytes, fp);
     if (rbytes != off_cbytes) {
       fprintf(stderr, "Error: cannot read the offsets out of the fileframe.\n");
       fclose(fp);
@@ -720,7 +720,7 @@ int frame_get_meta(blosc2_frame* frame, int32_t* header_len, int64_t* frame_len,
     *clevel = frame_codecs >> 4u;
   }
   if (compcode != NULL) {
-    *compcode = frame_codecs & 0b1111u;
+    *compcode = frame_codecs & 0xFu;
   }
 
   uint8_t filter_flags = framep[FRAME_FILTERS];
