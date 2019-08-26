@@ -27,6 +27,7 @@ int nchunks;
 bool free_new;
 bool sparse_schunk;
 bool filter_pipeline;
+bool usermeta;
 char *fname;
 
 
@@ -55,6 +56,17 @@ static char* test_frame() {
   dparams.nthreads = NTHREADS;
   blosc2_frame* frame = blosc2_new_frame(fname);
   schunk = blosc2_new_schunk(cparams, dparams, frame);
+  char* content = "This is a pretty long string with a good number of chars";
+  char* content2 = "This is a pretty long string with a good number of chars; longer than content";
+  char* content3 = "This is a short string, and shorter than content";
+  uint8_t* content_;
+  size_t content_len = strlen(content);
+  size_t content_len2 = strlen(content2);
+  size_t content_len3 = strlen(content3);
+
+  if (usermeta) {
+    blosc2_schunk_update_usermeta(schunk, (uint8_t*)content, content_len, BLOSC2_CPARAMS_DEFAULTS);
+  }
 
   if (!sparse_schunk) {
     if (free_new) {
@@ -68,6 +80,14 @@ static char* test_frame() {
         schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
       }
     }
+  }
+
+  if (usermeta) {
+    int content_len_ = blosc2_schunk_get_usermeta(schunk, &content_);
+    mu_assert("ERROR: bad usermeta length in frame", content_len_ == content_len);
+    mu_assert("ERROR: bad usermeta data in frame", strncmp((char*)content_, content, content_len) == 0);
+    free(content_);
+    blosc2_schunk_update_usermeta(schunk, (uint8_t*)content2, content_len2, BLOSC2_CPARAMS_DEFAULTS);
   }
 
   // Feed it with data
@@ -84,6 +104,14 @@ static char* test_frame() {
   if (!sparse_schunk) {
     mu_assert("ERROR: frame->len must be larger or equal than schunk->cbytes",
               frame->len >= schunk->cbytes + FRAME_HEADER2_MINLEN);
+  }
+
+  if (usermeta) {
+    int content_len_ = blosc2_schunk_get_usermeta(schunk, &content_);
+    mu_assert("ERROR: bad usermeta length in frame", content_len_ == content_len2);
+    mu_assert("ERROR: bad usermeta data in frame", strncmp((char*)content_, content2, content_len2) == 0);
+    free(content_);
+    blosc2_schunk_update_usermeta(schunk, (uint8_t*)content3, content_len3, BLOSC2_CPARAMS_DEFAULTS);
   }
 
   if (!sparse_schunk) {
@@ -116,6 +144,13 @@ static char* test_frame() {
     }
   }
 
+  if (usermeta) {
+    int content_len_ = blosc2_schunk_get_usermeta(schunk, &content_);
+    mu_assert("ERROR: bad usermeta length in frame", content_len_ == content_len3);
+    mu_assert("ERROR: bad usermeta data in frame", strncmp((char*)content_, content3, content_len3) == 0);
+    free(content_);
+  }
+
   /* Free resources */
   blosc2_free_schunk(schunk);
   blosc2_free_frame(frame);
@@ -135,14 +170,17 @@ static char *all_tests() {
     for (int ifree_new = 0; ifree_new < 2; ifree_new++) {
       for (int isparse_schunk = 0; isparse_schunk < 2; isparse_schunk++) {
         for (int ifilter_pipeline = 0; ifilter_pipeline < 2; ifilter_pipeline++) {
-          free_new = (bool) ifree_new;
-          sparse_schunk = (bool) isparse_schunk;
-          filter_pipeline = (bool) ifilter_pipeline;
-          fname = NULL;
-          mu_run_test(test_frame);
-          snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
-          fname = buf;
-          mu_run_test(test_frame);
+          for (int iusermeta = 0; iusermeta < 2; iusermeta++) {
+            free_new = (bool) ifree_new;
+            sparse_schunk = (bool) isparse_schunk;
+            filter_pipeline = (bool) ifilter_pipeline;
+            usermeta = (bool) iusermeta;
+            fname = NULL;
+            mu_run_test(test_frame);
+            snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
+            fname = buf;
+            mu_run_test(test_frame);
+          }
         }
       }
     }
