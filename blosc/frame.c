@@ -194,7 +194,8 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
       // Build a new metalayer for filters just if we are not updating the frame; otherwise it is already there
       void *metafilters = NULL;
       int metafilters_len = filters_to_metalayer(schunk->filters, schunk->filters_meta, &metafilters);
-      int res = blosc2_schunk_add_metalayer(schunk, FRAME_FILTER_PIPELINE_NAME, metafilters, metafilters_len);
+      int res = blosc2_add_metalayer(schunk, FRAME_FILTER_PIPELINE_NAME, metafilters,
+                                     metafilters_len);
       if (res < 0) {
         fprintf(stderr, "Error: problems adding the filter pipeline as a metalayer\n");
         return NULL;
@@ -756,11 +757,11 @@ int filters_from_metalayer(blosc2_schunk* schunk, char* mlname,
                            uint8_t* filters, uint8_t* filters_meta) {
   uint8_t* metalayer;
   uint32_t metalayer_len;
-  int nmetalayer = blosc2_schunk_has_metalayer(schunk, mlname);
+  int nmetalayer = blosc2_has_metalayer(schunk, mlname);
   if (nmetalayer < 0) {
     return 0;
   }
-  int rc = blosc2_schunk_get_metalayer(schunk, mlname, &metalayer, &metalayer_len);
+  int rc = blosc2_get_metalayer(schunk, mlname, &metalayer, &metalayer_len);
   if (rc < 0) {
     return rc;
   }

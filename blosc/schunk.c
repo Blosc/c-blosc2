@@ -290,7 +290,7 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, 
  *
  * If successful, return the index of the metalayer.  Else, return a negative value.
  */
-int blosc2_schunk_has_metalayer(blosc2_schunk *schunk, char *name) {
+int blosc2_has_metalayer(blosc2_schunk *schunk, char *name) {
   if (strlen(name) > BLOSC2_METALAYER_NAME_MAXLEN) {
     fprintf(stderr, "metalayers cannot be larger than %d chars\n", BLOSC2_METALAYER_NAME_MAXLEN);
     return -1;
@@ -309,8 +309,8 @@ int blosc2_schunk_has_metalayer(blosc2_schunk *schunk, char *name) {
  *
  * If successful, return the index of the new metalayer.  Else, return a negative value.
  */
-int blosc2_schunk_add_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content, uint32_t content_len) {
-  int nmetalayer = blosc2_schunk_has_metalayer(schunk, name);
+int blosc2_add_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content, uint32_t content_len) {
+  int nmetalayer = blosc2_has_metalayer(schunk, name);
   if (nmetalayer >= 0) {
     fprintf(stderr, "metalayer \"%s\" already exists", name);
     return -2;
@@ -356,8 +356,8 @@ int blosc2_metalayer_flush(blosc2_schunk* schunk) {
  *
  * If successful, return the index of the new metalayer.  Else, return a negative value.
  */
-int blosc2_schunk_update_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content, uint32_t content_len) {
-  int nmetalayer = blosc2_schunk_has_metalayer(schunk, name);
+int blosc2_update_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content, uint32_t content_len) {
+  int nmetalayer = blosc2_has_metalayer(schunk, name);
   if (nmetalayer < 0) {
     fprintf(stderr, "metalayer \"%s\" not found\n", name);
     return nmetalayer;
@@ -391,9 +391,9 @@ int blosc2_schunk_update_metalayer(blosc2_schunk *schunk, char *name, uint8_t *c
  *
  * If successful, return the index of the new metalayer.  Else, return a negative value.
  */
-int blosc2_schunk_get_metalayer(blosc2_schunk *schunk, char *name, uint8_t **content,
-                                uint32_t *content_len) {
-  int nmetalayer = blosc2_schunk_has_metalayer(schunk, name);
+int blosc2_get_metalayer(blosc2_schunk *schunk, char *name, uint8_t **content,
+                         uint32_t *content_len) {
+  int nmetalayer = blosc2_has_metalayer(schunk, name);
   if (nmetalayer < 0) {
     fprintf(stderr, "metalayer \"%s\" not found\n", name);
     return nmetalayer;

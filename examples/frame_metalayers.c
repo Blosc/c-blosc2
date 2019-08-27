@@ -62,10 +62,10 @@ int main() {
   blosc2_schunk* schunk = blosc2_new_schunk(cparams, dparams, frame1);
 
   // Add some metalayers (one must add metalayers prior to actual data)
-  blosc2_schunk_add_metalayer(schunk, "my_metalayer1", (uint8_t *) "my_content1",
-                              (uint32_t) strlen("my_content1"));
-  blosc2_schunk_add_metalayer(schunk, "my_metalayer2", (uint8_t *) "my_content1",
-                              (uint32_t) strlen("my_content1"));
+  blosc2_add_metalayer(schunk, "my_metalayer1", (uint8_t *) "my_content1",
+                       (uint32_t) strlen("my_content1"));
+  blosc2_add_metalayer(schunk, "my_metalayer2", (uint8_t *) "my_content1",
+                       (uint32_t) strlen("my_content1"));
   blosc2_metalayer_flush(schunk);
 
   blosc_set_timestamp(&last);
@@ -89,8 +89,8 @@ int main() {
   blosc_set_timestamp(&last);
 
   // Update a metalayer (this is fine as long as the new content does not exceed the size of the previous one)
-  blosc2_schunk_update_metalayer(schunk, "my_metalayer2", (uint8_t *) "my_content2",
-                                 (uint32_t) strlen("my_content2"));
+  blosc2_update_metalayer(schunk, "my_metalayer2", (uint8_t *) "my_content2",
+                          (uint32_t) strlen("my_content2"));
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for schunk -> frame: %.3g s, %.1f GB/s\n",
@@ -126,7 +126,7 @@ int main() {
   }
   uint8_t* content;
   uint32_t content_len;
-  if (blosc2_schunk_get_metalayer(schunk2, "my_metalayer1", &content, &content_len) < 0) {
+  if (blosc2_get_metalayer(schunk2, "my_metalayer1", &content, &content_len) < 0) {
       printf("metalayer not found");
       return -1;
   }

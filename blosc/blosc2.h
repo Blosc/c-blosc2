@@ -1050,6 +1050,10 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(const char *fname);
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy);
 
+/*********************************************************************
+  Functions related with metalayers.
+*********************************************************************/
+
 /**
  * @brief Find whether the schunk has a metalayer or not.
  *
@@ -1058,7 +1062,7 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool c
  *
  * @return If successful, return the index of the metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_schunk_has_metalayer(blosc2_schunk *schunk, char *name);
+BLOSC_EXPORT int blosc2_has_metalayer(blosc2_schunk *schunk, char *name);
 
 /**
  * @brief Add content into a new metalayer.
@@ -1073,8 +1077,8 @@ BLOSC_EXPORT int blosc2_schunk_has_metalayer(blosc2_schunk *schunk, char *name);
  *
  * @return If successful, the index of the new metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_schunk_add_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content,
-                                             uint32_t content_len);
+BLOSC_EXPORT int blosc2_add_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content,
+                                      uint32_t content_len);
 
 /**
  * @brief Update the content of an existing metalayer.
@@ -1084,13 +1088,13 @@ BLOSC_EXPORT int blosc2_schunk_add_metalayer(blosc2_schunk *schunk, char *name, 
  * @param content The new content of the metalayer.
  * @param content_len The length of the content.
  *
- * @note Contrarily to #blosc2_schunk_add_metalayer the updates to metalayers
+ * @note Contrarily to #blosc2_add_metalayer the updates to metalayers
  * are automatically serialized into a possible attached frame.
  *
  * @return If successful, the index of the metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_schunk_update_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content,
-                                                uint32_t content_len);
+BLOSC_EXPORT int blosc2_update_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content,
+                                         uint32_t content_len);
 
 /**
  * @brief Get the content out of a metalayer.
@@ -1105,9 +1109,8 @@ BLOSC_EXPORT int blosc2_schunk_update_metalayer(blosc2_schunk *schunk, char *nam
  *
  * @return If successful, the index of the new metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_schunk_get_metalayer(blosc2_schunk *schunk, char *name, uint8_t **content,
-                                             uint32_t *content_len);
-
+BLOSC_EXPORT int blosc2_get_metalayer(blosc2_schunk *schunk, char *name, uint8_t **content,
+                                      uint32_t *content_len);
 
 /**
  * @brief Flush metalayers content into a possible attached frame.
