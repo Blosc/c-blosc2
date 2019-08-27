@@ -92,7 +92,9 @@ int get_nfilters(const uint8_t* filters) {
 
 // Get a metalayer for the filter pipeline
 int filters_to_metalayer(const uint8_t* filters, const uint8_t* filters_meta, void** metalayer) {
-  int nfilters = get_nfilters(filters);
+  // int nfilters = get_nfilters(filters);
+  // Store the whole pipeline (can be useful for btune)
+  int nfilters = BLOSC2_MAX_FILTERS;
   int metalayer_len = 1 + 1 + 1 + nfilters * 2;
   *metalayer = calloc(metalayer_len, 1);
   uint8_t* mp = *metalayer;
@@ -107,11 +109,9 @@ int filters_to_metalayer(const uint8_t* filters, const uint8_t* filters_meta, vo
   mp_meta += 1;
   int nfilter = 0;
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
-    if (filters[i] != BLOSC_NOFILTER) {
-        mp_filters[nfilter] = filters[i];
-        mp_meta[nfilter] = filters_meta[i];
-        nfilter++;
-    }
+    mp_filters[nfilter] = filters[i];
+    mp_meta[nfilter] = filters_meta[i];
+    nfilter++;
   }
   return metalayer_len;
 }
@@ -200,8 +200,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
     if (!update) {
       // Build a new metalayer for filters just if we are not updating the frame; otherwise it is already there
       void *metafilters = NULL;
-      int metafilters_len = filters_to_metalayer(schunk->filters, schunk->filters_meta,
-                                                 &metafilters);
+      int metafilters_len = filters_to_metalayer(schunk->filters, schunk->filters_meta, &metafilters);
       int res = blosc2_frame_add_metalayer(frame, "_filter_pipeline", metafilters, metafilters_len);
       if (res < 0) {
         fprintf(stderr, "Error: problems adding the filter pipeline as a metalayer\n");
@@ -212,7 +211,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
   else {
     // Filter pipeline described here
     uint8_t filter_flags = filters_to_flags(schunk->filters);
-    *h2p = FRAME_FILTERS_PIPE_DESCRIBED_HERE | (filter_flags << FRAME_FILTERS_PIPE_START_BIT);
+    *h2p = FRAME_FILTERS_PIPE_DESCRIBED_HERE | (uint8_t)(filter_flags << FRAME_FILTERS_PIPE_START_BIT);
   }
   h2p += 1;
   assert(h2p - h2 < FRAME_HEADER2_MINLEN);
