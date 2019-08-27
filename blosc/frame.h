@@ -41,10 +41,12 @@
 #define FRAME_TRAILER_USERMETA_OFFSET (7)  // offset to usermeta chunk
 #define FRAME_TRAILER_MIN_LENGTH (30)  // minimum length for the trailer (msgpack overhead)
 
+#define FRAME_FILTER_PIPELINE_NAME "_filter_pipeline"
 
 void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk);
 int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free);
 int frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, size_t nbytes);
+int frame_update_metalayers(blosc2_frame* frame, blosc2_schunk* schunk, bool new);
 int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk);
 
 #endif //BLOSC_FRAME_H
