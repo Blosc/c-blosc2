@@ -776,7 +776,7 @@ int filters_from_metalayer(blosc2_schunk* schunk, char* mlname,
 }
 
 
-int frame_update_metalayers(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
+int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
   uint8_t* header = frame->sdata;
 
   assert(frame->len > 0);
@@ -1196,9 +1196,9 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   int64_t cbytes;
   int32_t chunksize;
   int32_t nchunks;
-  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+  int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL);
-  if (ret < 0) {
+  if (rc < 0) {
     fprintf(stderr, "unable to get meta info from frame");
     return NULL;
   }
@@ -1300,14 +1300,12 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   free(off_chunk);
 
   frame->len = new_frame_len;
-  // TODO: replace by a new update_frame_len()
-  ret = frame_update_metalayers(frame, schunk, false);
-  if (ret < 0) {
-    fprintf(stderr, "Error: unable to update meta info from frame");
+  rc = frame_update_header(frame, schunk, false);
+  if (rc < 0) {
     return NULL;
   }
 
-  int rc = frame_update_trailer(frame, schunk);
+  rc = frame_update_trailer(frame, schunk);
   if (rc < 0) {
     return NULL;
   }

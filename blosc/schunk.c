@@ -338,7 +338,7 @@ int blosc2_metalayer_flush(blosc2_schunk* schunk) {
   if (schunk->frame == NULL) {
     return rc;
   }
-  rc = frame_update_metalayers(schunk->frame, schunk, true);
+  rc = frame_update_header(schunk->frame, schunk, true);
   if (rc < 0) {
     fprintf(stderr, "Error: unable to update metalayers into frame\n");
     return -1;
@@ -374,7 +374,7 @@ int blosc2_update_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content,
 
   // Update the metalayers in frame (as size has not changed, we don't need to update the trailer)
   if (schunk->frame != NULL) {
-    int rc = frame_update_metalayers(schunk->frame, schunk, false);
+    int rc = frame_update_header(schunk->frame, schunk, false);
     if (rc < 0) {
       fprintf(stderr, "Error: unable to update meta info from frame");
       return -1;

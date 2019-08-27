@@ -132,9 +132,6 @@ static char* test_frame() {
   nbytes = schunk->nbytes;
   cbytes = schunk->cbytes;
   if (nchunks > 0) {
-    if (nbytes <= 10 * cbytes) {
-      printf("Error!");
-    }
     mu_assert("ERROR: bad compression ratio in frame", nbytes > 10 * cbytes);
   }
 
