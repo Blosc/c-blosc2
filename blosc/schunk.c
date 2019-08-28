@@ -471,5 +471,5 @@ int32_t blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content) {
   if (usermeta_nbytes < 0) {
     return -1;
   }
-  return nbytes;
+  return (int32_t)nbytes;
 }
