@@ -66,7 +66,6 @@ int main() {
                        (uint32_t) strlen("my_content1"));
   blosc2_add_metalayer(schunk, "my_metalayer2", (uint8_t *) "my_content1",
                        (uint32_t) strlen("my_content1"));
-  blosc2_metalayer_flush(schunk);
 
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {

@@ -768,7 +768,6 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 #define BLOSC2_MAX_METALAYERS 16
 #define BLOSC2_METALAYER_NAME_MAXLEN 31
 
-// TODO: make this opaque
 typedef struct {
   char* fname;     //!< The name of the file; if NULL, this is in-memory
   uint8_t* sdata;  //!< The in-memory serialized data
@@ -782,8 +781,8 @@ typedef struct {
  * the contents included in the schunk.
  */
 typedef struct blosc2_metalayer {
-  char* name;  //!< The metalayer identifier for Blosc client (e.g. caterva).
-  uint8_t* content;  //!< The serialized (msgpack preferably) content of the metalayer.
+  char* name;          //!< The metalayer identifier for Blosc client (e.g. Caterva).
+  uint8_t* content;    //!< The serialized (msgpack preferably) content of the metalayer.
   int32_t content_len; //!< The length in bytes of the content.
 } blosc2_metalayer;
 
@@ -1072,9 +1071,6 @@ BLOSC_EXPORT int blosc2_has_metalayer(blosc2_schunk *schunk, char *name);
  * @param content The content of the metalayer.
  * @param content_len The length of the content.
  *
- * @note The contents are not serialized into a possible attached frame.
- * You need to call #blosc2_metalayer_flush so as to do this.
- *
  * @return If successful, the index of the new metalayer. Else, return a negative value.
  */
 BLOSC_EXPORT int blosc2_add_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content,
@@ -1111,15 +1107,6 @@ BLOSC_EXPORT int blosc2_update_metalayer(blosc2_schunk *schunk, char *name, uint
  */
 BLOSC_EXPORT int blosc2_get_metalayer(blosc2_schunk *schunk, char *name, uint8_t **content,
                                       uint32_t *content_len);
-
-/**
- * @brief Flush metalayers content into a possible attached frame.
- *
- * @param schunk The super-chunk to which the flush should be applied.
- *
- * @return If successful, a 1 is returned. Else, return a negative value.
- */
-BLOSC_EXPORT int blosc2_metalayer_flush(blosc2_schunk* schunk);
 
 
 /*********************************************************************

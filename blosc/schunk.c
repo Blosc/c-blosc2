@@ -305,6 +305,37 @@ int blosc2_has_metalayer(blosc2_schunk *schunk, char *name) {
 }
 
 
+/**
+ * @brief Flush metalayers content into a possible attached frame.
+ *
+ * @param schunk The super-chunk to which the flush should be applied.
+ *
+ * @return If successful, a 1 is returned. Else, return a negative value.
+ */
+// Initially, this was a public function, but as it is really meant to be used only
+// in the schunk_add_metalayer(), I decided to convert it into private and call it
+// implicitly instead of requiring the user to do so.  The only drawback is that
+// each add operation requires a complete frame re-build, but as users should need
+// very few metalayers, this overhead should be negligible in practice.
+int metalayer_flush(blosc2_schunk* schunk) {
+  int rc = 1;
+  if (schunk->frame == NULL) {
+    return rc;
+  }
+  rc = frame_update_header(schunk->frame, schunk, true);
+  if (rc < 0) {
+    fprintf(stderr, "Error: unable to update metalayers into frame\n");
+    return -1;
+  }
+  rc = frame_update_trailer(schunk->frame, schunk);
+  if (rc < 0) {
+    fprintf(stderr, "Error: unable to update trailer into frame\n");
+    return -2;
+  }
+  return rc;
+}
+
+
 /* Add content into a new metalayer.
  *
  * If successful, return the index of the new metalayer.  Else, return a negative value.
@@ -328,27 +359,12 @@ int blosc2_add_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content, ui
   schunk->metalayers[schunk->nmetalayers] = metalayer;
   schunk->nmetalayers += 1;
 
-  return schunk->nmetalayers - 1;
-}
-
-
-/* Flush metalayers into a possible attached frame */
-int blosc2_metalayer_flush(blosc2_schunk* schunk) {
-  int rc = 1;
-  if (schunk->frame == NULL) {
-    return rc;
-  }
-  rc = frame_update_header(schunk->frame, schunk, true);
+  int rc = metalayer_flush(schunk);
   if (rc < 0) {
-    fprintf(stderr, "Error: unable to update metalayers into frame\n");
     return -1;
   }
-  rc = frame_update_trailer(schunk->frame, schunk);
-  if (rc < 0) {
-    fprintf(stderr, "Error: unable to update trailer into frame\n");
-    return -2;
-  }
-  return rc;
+
+  return schunk->nmetalayers - 1;
 }
 
 
