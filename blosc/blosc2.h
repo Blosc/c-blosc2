@@ -573,9 +573,7 @@ BLOSC_EXPORT char* blosc_cbuffer_complib(const void* cbuffer);
 
 
 /*********************************************************************
-
   Structures and functions related with contexts.
-
 *********************************************************************/
 
 typedef struct blosc2_context_s blosc2_context;   /* opaque type */
@@ -760,9 +758,7 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 
 
 /*********************************************************************
-
   Super-chunk related structures and functions.
-
 *********************************************************************/
 
 #define BLOSC2_MAX_METALAYERS 16
@@ -947,6 +943,11 @@ BLOSC_EXPORT int blosc2_schunk_get_cparams(blosc2_schunk *schunk, blosc2_cparams
  */
 BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams);
 
+
+/*********************************************************************
+  Usermeta functions.
+*********************************************************************/
+
 /**
  * @brief Update content into a usermeta chunk.
  *
@@ -963,8 +964,8 @@ BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams
  * @return If successful, return the number of compressed bytes that takes the content.
  * Else, a negative value.
  */
-BLOSC_EXPORT int blosc2_schunk_update_usermeta(blosc2_schunk *schunk, uint8_t *content,
-                                               int32_t content_len, blosc2_cparams cparams);
+BLOSC_EXPORT int blosc2_update_usermeta(blosc2_schunk *schunk, uint8_t *content,
+                                        int32_t content_len, blosc2_cparams cparams);
 
 /* @brief Retrieve the usermeta chunk in a decompressed form.
  *
@@ -976,13 +977,11 @@ BLOSC_EXPORT int blosc2_schunk_update_usermeta(blosc2_schunk *schunk, uint8_t *c
  * @return If successful, return the size of the (decompressed) chunk.
  * Else, a negative value.
  */
-BLOSC_EXPORT int blosc2_schunk_get_usermeta(blosc2_schunk* schunk, uint8_t** content);
+BLOSC_EXPORT int blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content);
 
 
 /*********************************************************************
-
   Frame related structures and functions.
-
 *********************************************************************/
 
 /**
@@ -1048,6 +1047,7 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(const char *fname);
  * @return The super-chunk corresponding to the frame.
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy);
+
 
 /*********************************************************************
   Functions related with metalayers.
@@ -1156,9 +1156,7 @@ BLOSC_EXPORT double blosc_elapsed_secs(blosc_timestamp_t start_time,
 
 
 /*********************************************************************
-
   Low-level functions follows.  Use them only if you are an expert!
-
 *********************************************************************/
 
 /**

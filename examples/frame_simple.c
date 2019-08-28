@@ -74,8 +74,8 @@ int main() {
   }
 
   // Add some usermeta data
-  int umlen = blosc2_schunk_update_usermeta(schunk, (uint8_t*)"This is a usermeta content...",32,
-                                            BLOSC2_CPARAMS_DEFAULTS);
+  int umlen = blosc2_update_usermeta(schunk, (uint8_t *) "This is a usermeta content...", 32,
+                                     BLOSC2_CPARAMS_DEFAULTS);
   if (umlen < 0) {
     printf("Cannot write usermeta chunk");
   }
@@ -90,7 +90,7 @@ int main() {
   printf("Compression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
   uint8_t* usermeta;
-  int content_len = blosc2_schunk_get_usermeta(schunk, &usermeta);
+  int content_len = blosc2_get_usermeta(schunk, &usermeta);
   printf("Usermeta in schunk: '%s' with length: %d\n", usermeta, content_len);
   free(usermeta);
 
@@ -177,10 +177,10 @@ int main() {
   }
   printf("Successful roundtrip schunk <-> frame <-> fileframe !\n");
 
-  content_len = blosc2_schunk_get_usermeta(schunk1, &usermeta);
+  content_len = blosc2_get_usermeta(schunk1, &usermeta);
   printf("Usermeta in schunk1: '%s' with length: %d\n", usermeta, content_len);
   free(usermeta);
-  content_len = blosc2_schunk_get_usermeta(schunk2, &usermeta);
+  content_len = blosc2_get_usermeta(schunk2, &usermeta);
   printf("Usermeta in schunk2: '%s' with length: %d\n", usermeta, content_len);
   free(usermeta);
 
