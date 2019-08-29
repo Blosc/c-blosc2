@@ -40,6 +40,10 @@ static char* test_schunk() {
   dparams.nthreads = NTHREADS;
   schunk = blosc2_new_schunk(cparams, dparams, NULL);
 
+  // Add a couple of metalayers
+  blosc2_add_metalayer(schunk, "metalayer1", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
+  blosc2_add_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
+
   // Feed it with data
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
     for (int i = 0; i < CHUNKSIZE; i++) {
@@ -49,8 +53,9 @@ static char* test_schunk() {
     mu_assert("ERROR: bad append in frame", nchunk >= 0);
   }
 
+  blosc2_update_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer2", sizeof("my metalayer2"));
   // Attach some user metadata into it
-  blosc2_schunk_update_usermeta(schunk, (uint8_t*)"testing the usermeta", 16, BLOSC2_CPARAMS_DEFAULTS);
+  blosc2_update_usermeta(schunk, (uint8_t *) "testing the usermeta", 16, BLOSC2_CPARAMS_DEFAULTS);
 
   /* Gather some info */
   nbytes = schunk->nbytes;
@@ -87,11 +92,21 @@ static char* test_schunk() {
     }
   }
 
-  // Check the user metadata
+  // metalayers
+  uint8_t* content;
+  uint32_t content_len;
+  blosc2_get_metalayer(schunk, "metalayer1", &content, &content_len);
+  mu_assert("ERROR: bad metalayer content", strncmp((char*)content, "my metalayer1", content_len) == 0);
+  free(content);
+  blosc2_get_metalayer(schunk, "metalayer2", &content, &content_len);
+  mu_assert("ERROR: bad metalayer content", strncmp((char*)content, "my metalayer2", content_len) == 0);
+  free(content);
+
+  // Check the usermeta
   uint8_t* content2;
-  int32_t content_len = blosc2_schunk_get_usermeta(schunk, &content2);
-  mu_assert("ERROR: bad usermeta", strcmp((char*)content2, "testing the usermeta"));
-  mu_assert("ERROR: bad usermeta_len", content_len == 16);
+  int32_t content2_len = blosc2_get_usermeta(schunk, &content2);
+  mu_assert("ERROR: bad usermeta", strncmp((char*)content2, "testing the usermeta", 16) == 0);
+  mu_assert("ERROR: bad usermeta_len", content2_len == 16);
   free(content2);
 
   /* Free resources */

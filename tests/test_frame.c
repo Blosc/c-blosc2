@@ -27,6 +27,7 @@ int nchunks;
 bool free_new;
 bool sparse_schunk;
 bool filter_pipeline;
+bool metalayers;
 bool usermeta;
 char *fname;
 
@@ -64,8 +65,13 @@ static char* test_frame() {
   size_t content_len2 = strlen(content2);
   size_t content_len3 = strlen(content3);
 
+  if (metalayers) {
+    blosc2_add_metalayer(schunk, "metalayer1", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
+    blosc2_add_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
+  }
+
   if (usermeta) {
-    blosc2_schunk_update_usermeta(schunk, (uint8_t*)content, content_len, BLOSC2_CPARAMS_DEFAULTS);
+    blosc2_update_usermeta(schunk, (uint8_t *) content, content_len, BLOSC2_CPARAMS_DEFAULTS);
   }
 
   if (!sparse_schunk) {
@@ -82,12 +88,23 @@ static char* test_frame() {
     }
   }
 
+  if (metalayers) {
+    uint8_t* _content;
+    uint32_t _content_len;
+    blosc2_get_metalayer(schunk, "metalayer1", &_content, &_content_len);
+    mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
+    free(_content);
+    blosc2_get_metalayer(schunk, "metalayer2", &_content, &_content_len);
+    mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
+    free(_content);
+  }
+
   if (usermeta) {
-    int content_len_ = blosc2_schunk_get_usermeta(schunk, &content_);
+    int content_len_ = blosc2_get_usermeta(schunk, &content_);
     mu_assert("ERROR: bad usermeta length in frame", content_len_ == content_len);
     mu_assert("ERROR: bad usermeta data in frame", strncmp((char*)content_, content, content_len) == 0);
     free(content_);
-    blosc2_schunk_update_usermeta(schunk, (uint8_t*)content2, content_len2, BLOSC2_CPARAMS_DEFAULTS);
+    blosc2_update_usermeta(schunk, (uint8_t *) content2, content_len2, BLOSC2_CPARAMS_DEFAULTS);
   }
 
   // Feed it with data
@@ -106,12 +123,24 @@ static char* test_frame() {
               frame->len >= schunk->cbytes + FRAME_HEADER2_MINLEN);
   }
 
+  if (metalayers) {
+    uint8_t* _content;
+    uint32_t _content_len;
+    blosc2_get_metalayer(schunk, "metalayer1", &_content, &_content_len);
+    mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
+    free(_content);
+    blosc2_get_metalayer(schunk, "metalayer2", &_content, &_content_len);
+    mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
+    free(_content);
+    blosc2_update_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer2", sizeof("my metalayer2"));
+  }
+
   if (usermeta) {
-    int content_len_ = blosc2_schunk_get_usermeta(schunk, &content_);
+    int content_len_ = blosc2_get_usermeta(schunk, &content_);
     mu_assert("ERROR: bad usermeta length in frame", content_len_ == content_len2);
     mu_assert("ERROR: bad usermeta data in frame", strncmp((char*)content_, content2, content_len2) == 0);
     free(content_);
-    blosc2_schunk_update_usermeta(schunk, (uint8_t*)content3, content_len3, BLOSC2_CPARAMS_DEFAULTS);
+    blosc2_update_usermeta(schunk, (uint8_t *) content3, content_len3, BLOSC2_CPARAMS_DEFAULTS);
   }
 
   if (!sparse_schunk) {
@@ -144,8 +173,19 @@ static char* test_frame() {
     }
   }
 
+  if (metalayers) {
+    uint8_t* _content;
+    uint32_t _content_len;
+    blosc2_get_metalayer(schunk, "metalayer1", &_content, &_content_len);
+    mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
+    free(_content);
+    blosc2_get_metalayer(schunk, "metalayer2", &_content, &_content_len);
+    mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer2", _content_len) == 0);
+    free(_content);
+  }
+
   if (usermeta) {
-    int content_len_ = blosc2_schunk_get_usermeta(schunk, &content_);
+    int content_len_ = blosc2_get_usermeta(schunk, &content_);
     mu_assert("ERROR: bad usermeta length in frame", content_len_ == content_len3);
     mu_assert("ERROR: bad usermeta data in frame", strncmp((char*)content_, content3, content_len3) == 0);
     free(content_);
@@ -170,16 +210,19 @@ static char *all_tests() {
     for (int ifree_new = 0; ifree_new < 2; ifree_new++) {
       for (int isparse_schunk = 0; isparse_schunk < 2; isparse_schunk++) {
         for (int ifilter_pipeline = 0; ifilter_pipeline < 2; ifilter_pipeline++) {
-          for (int iusermeta = 0; iusermeta < 2; iusermeta++) {
-            free_new = (bool) ifree_new;
-            sparse_schunk = (bool) isparse_schunk;
-            filter_pipeline = (bool) ifilter_pipeline;
-            usermeta = (bool) iusermeta;
-            fname = NULL;
-            mu_run_test(test_frame);
-            snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
-            fname = buf;
-            mu_run_test(test_frame);
+          for (int imetalayers = 0; imetalayers < 2; imetalayers++) {
+            for (int iusermeta = 0; iusermeta < 2; iusermeta++) {
+              free_new = (bool) ifree_new;
+              sparse_schunk = (bool) isparse_schunk;
+              filter_pipeline = (bool) ifilter_pipeline;
+              metalayers = (bool) imetalayers;
+              usermeta = (bool) iusermeta;
+              fname = NULL;
+              mu_run_test(test_frame);
+              snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
+              fname = buf;
+              mu_run_test(test_frame);
+            }
           }
         }
       }

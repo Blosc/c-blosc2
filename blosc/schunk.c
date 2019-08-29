@@ -11,15 +11,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include "blosc2.h"
 #include "blosc-private.h"
 #include "context.h"
 #include "frame.h"
-
 #include "zstd.h"
-#include "zstd_errors.h"
-#include "zdict.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <windows.h>
@@ -117,6 +113,12 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
 /* Free all memory from a super-chunk. */
 int blosc2_free_schunk(blosc2_schunk *schunk) {
 
+  // Update the metalayers and trailer in a possible attached frame
+//  int rc = blosc2_metalayer_flush(schunk);
+//  if (rc < 0) {
+//    return -3;
+//  }
+
   if (schunk->data != NULL) {
     for (int i = 0; i < schunk->nchunks; i++) {
       free(schunk->data[i]);
@@ -125,6 +127,16 @@ int blosc2_free_schunk(blosc2_schunk *schunk) {
   }
   blosc2_free_ctx(schunk->cctx);
   blosc2_free_ctx(schunk->dctx);
+
+  if (schunk->nmetalayers > 0) {
+    for (int i = 0; i < schunk->nmetalayers; i++) {
+      free(schunk->metalayers[i]->name);
+      free(schunk->metalayers[i]->content);
+      free(schunk->metalayers[i]);
+    }
+    schunk->nmetalayers = 0;
+  }
+
   if (schunk->usermeta_len > 0) {
     free(schunk->usermeta);
   }
@@ -274,9 +286,144 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, 
 }
 
 
+/* Find whether the schunk has a metalayer or not.
+ *
+ * If successful, return the index of the metalayer.  Else, return a negative value.
+ */
+int blosc2_has_metalayer(blosc2_schunk *schunk, char *name) {
+  if (strlen(name) > BLOSC2_METALAYER_NAME_MAXLEN) {
+    fprintf(stderr, "metalayers cannot be larger than %d chars\n", BLOSC2_METALAYER_NAME_MAXLEN);
+    return -1;
+  }
+
+  for (int nmetalayer = 0; nmetalayer < schunk->nmetalayers; nmetalayer++) {
+    if (strcmp(name, schunk->metalayers[nmetalayer]->name) == 0) {
+      return nmetalayer;  // Found
+    }
+  }
+  return -1;  // Not found
+}
+
+
+/**
+ * @brief Flush metalayers content into a possible attached frame.
+ *
+ * @param schunk The super-chunk to which the flush should be applied.
+ *
+ * @return If successful, a 1 is returned. Else, return a negative value.
+ */
+// Initially, this was a public function, but as it is really meant to be used only
+// in the schunk_add_metalayer(), I decided to convert it into private and call it
+// implicitly instead of requiring the user to do so.  The only drawback is that
+// each add operation requires a complete frame re-build, but as users should need
+// very few metalayers, this overhead should be negligible in practice.
+int metalayer_flush(blosc2_schunk* schunk) {
+  int rc = 1;
+  if (schunk->frame == NULL) {
+    return rc;
+  }
+  rc = frame_update_header(schunk->frame, schunk, true);
+  if (rc < 0) {
+    fprintf(stderr, "Error: unable to update metalayers into frame\n");
+    return -1;
+  }
+  rc = frame_update_trailer(schunk->frame, schunk);
+  if (rc < 0) {
+    fprintf(stderr, "Error: unable to update trailer into frame\n");
+    return -2;
+  }
+  return rc;
+}
+
+
+/* Add content into a new metalayer.
+ *
+ * If successful, return the index of the new metalayer.  Else, return a negative value.
+ */
+int blosc2_add_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content, uint32_t content_len) {
+  int nmetalayer = blosc2_has_metalayer(schunk, name);
+  if (nmetalayer >= 0) {
+    fprintf(stderr, "metalayer \"%s\" already exists", name);
+    return -2;
+  }
+
+  // Add the metalayer
+  blosc2_metalayer *metalayer = malloc(sizeof(blosc2_metalayer));
+  char* name_ = malloc(strlen(name) + 1);
+  strcpy(name_, name);
+  metalayer->name = name_;
+  uint8_t* content_buf = malloc((size_t)content_len);
+  memcpy(content_buf, content, content_len);
+  metalayer->content = content_buf;
+  metalayer->content_len = content_len;
+  schunk->metalayers[schunk->nmetalayers] = metalayer;
+  schunk->nmetalayers += 1;
+
+  int rc = metalayer_flush(schunk);
+  if (rc < 0) {
+    return -1;
+  }
+
+  return schunk->nmetalayers - 1;
+}
+
+
+/* Update the content of an existing metalayer.
+ *
+ * If successful, return the index of the new metalayer.  Else, return a negative value.
+ */
+int blosc2_update_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content, uint32_t content_len) {
+  int nmetalayer = blosc2_has_metalayer(schunk, name);
+  if (nmetalayer < 0) {
+    fprintf(stderr, "metalayer \"%s\" not found\n", name);
+    return nmetalayer;
+  }
+
+  blosc2_metalayer *metalayer = schunk->metalayers[nmetalayer];
+  if (content_len > (uint32_t)metalayer->content_len) {
+    fprintf(stderr, "`content_len` cannot exceed the existing size of %d bytes", metalayer->content_len);
+    return nmetalayer;
+  }
+
+  // Update the contents of the metalayer
+  memcpy(metalayer->content, content, content_len);
+
+  // Update the metalayers in frame (as size has not changed, we don't need to update the trailer)
+  if (schunk->frame != NULL) {
+    int rc = frame_update_header(schunk->frame, schunk, false);
+    if (rc < 0) {
+      fprintf(stderr, "Error: unable to update meta info from frame");
+      return -1;
+    }
+  }
+
+  return nmetalayer;
+}
+
+
+/* Get the content out of a metalayer.
+ *
+ * The `**content` receives a malloc'ed copy of the content.  The user is responsible of freeing it.
+ *
+ * If successful, return the index of the new metalayer.  Else, return a negative value.
+ */
+int blosc2_get_metalayer(blosc2_schunk *schunk, char *name, uint8_t **content,
+                         uint32_t *content_len) {
+  int nmetalayer = blosc2_has_metalayer(schunk, name);
+  if (nmetalayer < 0) {
+    fprintf(stderr, "metalayer \"%s\" not found\n", name);
+    return nmetalayer;
+  }
+  *content_len = (uint32_t)schunk->metalayers[nmetalayer]->content_len;
+  *content = malloc((size_t)*content_len);
+  memcpy(*content, schunk->metalayers[nmetalayer]->content, (size_t)*content_len);
+  return nmetalayer;
+}
+
+
 /* Update the content of the usermeta chunk. */
-int blosc2_schunk_update_usermeta(blosc2_schunk *schunk, uint8_t *content, int32_t content_len,
-                                  blosc2_cparams cparams) {
+int blosc2_update_usermeta(blosc2_schunk *schunk, uint8_t *content, int32_t content_len,
+                           blosc2_cparams cparams) {
   if (content_len > (1u << 31u)) {
     fprintf(stderr, "Error: content_len cannot exceed 2 GB");
     return -1;
@@ -312,8 +459,9 @@ int blosc2_schunk_update_usermeta(blosc2_schunk *schunk, uint8_t *content, int32
   return usermeta_cbytes;
 }
 
+
 /* Retrieve the usermeta chunk */
-int32_t blosc2_schunk_get_usermeta(blosc2_schunk* schunk, uint8_t** content) {
+int32_t blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content) {
   size_t nbytes, cbytes, blocksize;
   blosc_cbuffer_sizes(schunk->usermeta, &nbytes, &cbytes, &blocksize);
   *content = malloc(nbytes);
@@ -323,5 +471,5 @@ int32_t blosc2_schunk_get_usermeta(blosc2_schunk* schunk, uint8_t** content) {
   if (usermeta_nbytes < 0) {
     return -1;
   }
-  return nbytes;
+  return (int32_t)nbytes;
 }
