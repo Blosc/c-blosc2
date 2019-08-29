@@ -29,7 +29,7 @@ What is it?
 `Blosc <http://blosc.org/pages/blosc-in-depth/>`_ is a high performance compressor optimized for binary data.  It has been designed to transmit data to the processor cache faster than the traditional, non-compressed, direct memory fetch approach via a memcpy() OS call.  Blosc is the first compressor (that I'm aware of) that is meant not only to reduce the size of large datasets on-disk or
 in-memory, but also to accelerate memory-bound computations.
 
-C-Blosc2 is the new major version of C-Blosc, with a revamped API and support for new filters (including filter pipelining), new compressors, but most importantly new data containers that are meant to overcome the 32-bit limitation of the original C-Blosc.  These new data containers will be available in various forms, including in-memory and on-disk implementations (frames).  Finally, the frames can be annotated with metainfo (metalayers) that is provided by the user.
+C-Blosc2 is the new major version of C-Blosc, with a revamped API and support for new filters (including filter pipelining), new compressors, but most importantly new data containers that are meant to overcome the 32-bit limitation of the original C-Blosc.  These new data containers will be available in various forms, including in-memory and on-disk implementations (frames).  Finally, the frames can be annotated with metainfo (metalayers, usermeta) that is provided by the user.
 
 C-Blosc2 tries to be backward compatible with both the C-Blosc1 API and format.  Furthermore, if you just use the C-Blosc1 API you are guaranteed to generate compressed data containers that can be read with a Blosc1 library, but getting the benefit of better performance, like for example leveraging the accelerated versions of codecs present in Intel's IPP (LZ4 now and maybe others later on).
 
@@ -40,9 +40,6 @@ Meta-compression and other advantages over existing compressors
 
 C-Blosc2 is not like other compressors: it should rather be called a meta-compressor.  This is so because it can use different compressors and filters (programs that generally improve compression ratio).  At any rate, it can also be called a compressor because it happens that it already comes with several compressor and filters, so it can actually work like so.
 
-Another important aspect of C-Blosc2 is that it is meant to host blocks of data in smaller containers.  These containers are called *chunks* in C-Blosc2 jargon (they are basically `Blosc1 containers <https://github.com/Blosc/c-blosc>`_). For achieving maximum speed, these chunks are meant to fit in the LLC (Last Level Cache) of modern CPUs.  In practice, this means that in order to leverage C-Blosc2 containers effectively, the user should ask for C-Blosc2 to uncompress the chunks, consume them before they hit
-main memory and then proceed with the new chunk (as in any streaming operation).  We call this process *Streamed Compressed Computing* and it effectively avoids uncompressed data to travel to RAM, saving precious time in modern architectures where RAM access is very expensive compared with CPU speeds (most specially when those cores are working cooperatively to solve some computational task).
-
 Currently C-Blosc2 comes with support of BloscLZ, a compressor heavily based on FastLZ (http://fastlz.org/), LZ4 and LZ4HC
 (https://github.com/Cyan4973/lz4), Zstd (https://github.com/facebook/zstd), Lizard (https://github.com/inikep/lizard) and Zlib (via miniz: https://github.com/richgel999/miniz), as well as a highly optimized (it can use SSE2, AVX2, NEON or ALTIVEC instructions, if available) shuffle and bitshuffle filters (for info on how shuffling works, see slide 17 of http://www.slideshare.net/PyData/blosc-py-data-2014).  However, different compressors or filters may be added in the future.
 
@@ -50,6 +47,8 @@ C-Blosc2 is in charge of coordinating the different compressor and filters so th
 above) as well as multi-threaded execution (if several cores are available) automatically. That makes that every compressor and filter
 will work at very high speeds, even if it was not initially designed for doing blocking or multi-threading.
 
+Another important aspect of C-Blosc2 is that it is meant to host blocks of data in smaller containers.  These containers are called *chunks* in C-Blosc2 jargon (they are basically `Blosc1 containers <https://github.com/Blosc/c-blosc>`_). For achieving maximum speed, these chunks are meant to fit in the LLC (Last Level Cache) of modern CPUs.  In practice, this means that in order to leverage C-Blosc2 containers effectively, the user should ask for C-Blosc2 to uncompress the chunks, consume them before they hit
+main memory and then proceed with the new chunk (as in any streaming operation).  We call this process *Streamed Compressed Computing* and it effectively avoids uncompressed data to travel to RAM, saving precious time in modern architectures where RAM access is very expensive compared with CPU speeds (most specially when those cores are working cooperatively to solve some computational task).
 
 Compiling the C-Blosc2 library with CMake
 =========================================
@@ -110,8 +109,7 @@ You can also disable support for some compression libraries:
 Supported platforms
 ~~~~~~~~~~~~~~~~~~~
 
-C-Blosc2 is meant to support all platforms where a C99 compliant C compiler can be found.  The ones that are mostly tested are Intel
-(Linux, Mac OSX and Windows) and ARM (Linux), but exotic ones as IBM Blue Gene Q embedded "A2" processor are reported to work too.
+C-Blosc2 is meant to support all platforms where a C99 compliant C compiler can be found.  The ones that are mostly tested are Intel (Linux, Mac OSX and Windows) and ARM (Linux), but exotic ones as IBM Blue Gene Q embedded "A2" processor are reported to work too.
 
 For Windows, you will need at least VS2015 or higher on x86 and x64 targets (i.e. ARM is not supported on Windows).
 

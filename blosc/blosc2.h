@@ -945,6 +945,66 @@ BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams
 
 
 /*********************************************************************
+  Functions related with metalayers.
+*********************************************************************/
+
+/**
+ * @brief Find whether the schunk has a metalayer or not.
+ *
+ * @param schunk The super-chunk from which the metalayer will be checked.
+ * @param name The name of the metalayer to be checked.
+ *
+ * @return If successful, return the index of the metalayer. Else, return a negative value.
+ */
+BLOSC_EXPORT int blosc2_has_metalayer(blosc2_schunk *schunk, char *name);
+
+/**
+ * @brief Add content into a new metalayer.
+ *
+ * @param schunk The super-chunk to which the metalayer should be added.
+ * @param name The name of the metalayer.
+ * @param content The content of the metalayer.
+ * @param content_len The length of the content.
+ *
+ * @return If successful, the index of the new metalayer. Else, return a negative value.
+ */
+BLOSC_EXPORT int blosc2_add_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content,
+                                      uint32_t content_len);
+
+/**
+ * @brief Update the content of an existing metalayer.
+ *
+ * @param schunk The frame containing the metalayer.
+ * @param name The name of the metalayer to be updated.
+ * @param content The new content of the metalayer.
+ * @param content_len The length of the content.
+ *
+ * @note Contrarily to #blosc2_add_metalayer the updates to metalayers
+ * are automatically serialized into a possible attached frame.
+ *
+ * @return If successful, the index of the metalayer. Else, return a negative value.
+ */
+BLOSC_EXPORT int blosc2_update_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content,
+                                         uint32_t content_len);
+
+/**
+ * @brief Get the content out of a metalayer.
+ *
+ * @param schunk The frame containing the metalayer.
+ * @param name The name of the metalayer.
+ * @param content The pointer where the content will be put.
+ * @param content_len The length of the content.
+ *
+ * @warning The @p **content receives a malloc'ed copy of the content.
+ * The user is responsible of freeing it.
+ *
+ * @return If successful, the index of the new metalayer. Else, return a negative value.
+ */
+BLOSC_EXPORT int blosc2_get_metalayer(blosc2_schunk *schunk, char *name, uint8_t **content,
+                                      uint32_t *content_len);
+
+
+/*********************************************************************
   Usermeta functions.
 *********************************************************************/
 
@@ -1047,66 +1107,6 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(const char *fname);
  * @return The super-chunk corresponding to the frame.
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy);
-
-
-/*********************************************************************
-  Functions related with metalayers.
-*********************************************************************/
-
-/**
- * @brief Find whether the schunk has a metalayer or not.
- *
- * @param schunk The super-chunk from which the metalayer will be checked.
- * @param name The name of the metalayer to be checked.
- *
- * @return If successful, return the index of the metalayer. Else, return a negative value.
- */
-BLOSC_EXPORT int blosc2_has_metalayer(blosc2_schunk *schunk, char *name);
-
-/**
- * @brief Add content into a new metalayer.
- *
- * @param schunk The super-chunk to which the metalayer should be added.
- * @param name The name of the metalayer.
- * @param content The content of the metalayer.
- * @param content_len The length of the content.
- *
- * @return If successful, the index of the new metalayer. Else, return a negative value.
- */
-BLOSC_EXPORT int blosc2_add_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content,
-                                      uint32_t content_len);
-
-/**
- * @brief Update the content of an existing metalayer.
- *
- * @param schunk The frame containing the metalayer.
- * @param name The name of the metalayer to be updated.
- * @param content The new content of the metalayer.
- * @param content_len The length of the content.
- *
- * @note Contrarily to #blosc2_add_metalayer the updates to metalayers
- * are automatically serialized into a possible attached frame.
- *
- * @return If successful, the index of the metalayer. Else, return a negative value.
- */
-BLOSC_EXPORT int blosc2_update_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content,
-                                         uint32_t content_len);
-
-/**
- * @brief Get the content out of a metalayer.
- *
- * @param schunk The frame containing the metalayer.
- * @param name The name of the metalayer.
- * @param content The pointer where the content will be put.
- * @param content_len The length of the content.
- *
- * @warning The @p **content receives a malloc'ed copy of the content.
- * The user is responsible of freeing it.
- *
- * @return If successful, the index of the new metalayer. Else, return a negative value.
- */
-BLOSC_EXPORT int blosc2_get_metalayer(blosc2_schunk *schunk, char *name, uint8_t **content,
-                                      uint32_t *content_len);
 
 
 /*********************************************************************

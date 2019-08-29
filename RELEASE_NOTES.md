@@ -8,8 +8,31 @@ Changes from 2.0.0-beta.1 to 2.0.0-beta.2
 
 * A new `usermeta` chunk in `schunk` allows to store arbitrary meta-information
   that is up to the user.  If the `schunk` has an attached `frame`, the later
-  will be updated accordingly too.  See docstrings of new
-  `blosc2_update_usermeta()` function for more info.
+  will be updated accordingly too.  For more info, see PR #74 and docstrings of
+  new `blosc2_update_usermeta()` and `blosc2_get_usermeta()` functions.
+
+* Metalayers must now be attached to super-chunks, not frames.  The reason is
+  that frames are increasingly treated as a storage specifier (in-memory or disk
+  now, but can be other means in the future), whereas the actual API for I/O
+  (including metainfo) goes into super-chunks.  See PR #75.
+
+* New frame format documented in
+  [README_FRAME_FORMAT.rst](README_FRAME_FORMAT.rst). Remember that the frame
+  format is not written in stone yet, so some changes may be introduced before
+  getting out of beta.
+
+* BREAKING CHANGE: the next APIs have been renamed:
+  + blosc2_frame_has_metalayer -> blosc2_has_metalayer
+  + blosc2_frame_add_metalayer -> blosc2_add_metalayer
+  + blosc2_frame_update_metalayer -> blosc2_update_metalayer
+  + blosc2_frame_metalayer -> blosc2_get_metalayer
+
+  Although the API was declared stable in beta.1, the fact that metalayers are
+  attached now to super-chunks directly, made this change completely necessary.
+
+* BREAKING CHANGE: the next symbols have been renamed:
+  + BLOSC_CPARAMS_DEFAULTS -> BLOSC2_CPARAMS_DEFAULTS
+  + BLOSC_DPARAMS_DEFAULTS -> BLOSC2_DPARAMS_DEFAULTS
 
 
 Changes from 2.0.0a5 to 2.0.0-beta.1
