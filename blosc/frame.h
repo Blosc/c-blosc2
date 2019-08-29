@@ -13,9 +13,9 @@
 #include <stdint.h>
 
 // Constants for metadata placement in header
-#define FRAME_HEADER2_MAGIC 2
-#define FRAME_HEADER2_LEN (FRAME_HEADER2_MAGIC + 8 + 1)  // 11
-#define FRAME_LEN (FRAME_HEADER2_LEN + 4 + 1)  // 16
+#define FRAME_HEADER_MAGIC 2
+#define FRAME_HEADER_LEN (FRAME_HEADER_MAGIC + 8 + 1)  // 11
+#define FRAME_LEN (FRAME_HEADER_LEN + 4 + 1)  // 16
 #define FRAME_FLAGS (FRAME_LEN + 8 + 1)  // 25
 #define FRAME_FILTERS (FRAME_FLAGS + 1)  // 26
 #define FRAME_CODECS (FRAME_FLAGS + 2)  // 27
@@ -26,9 +26,9 @@
 #define FRAME_NTHREADS_C (FRAME_CHUNKSIZE + 4 + 1)  // 58
 #define FRAME_NTHREADS_D (FRAME_NTHREADS_C + 2 + 1)  // 61
 #define FRAME_HAS_USERMETA (FRAME_NTHREADS_D + 2)  // 63
-#define FRAME_HEADER2_MINLEN (FRAME_HAS_USERMETA + 1)  // 64 <- minimum length
-#define FRAME_NAMESPACES (FRAME_HAS_USERMETA + 1)  // 64
-#define FRAME_IDX_SIZE (FRAME_NAMESPACES + 1 + 1)  // 66
+#define FRAME_HEADER_MINLEN (FRAME_HAS_USERMETA + 1)  // 64 <- minimum length
+#define FRAME_METALAYERS (FRAME_HAS_USERMETA + 1)  // 64
+#define FRAME_IDX_SIZE (FRAME_METALAYERS + 1 + 1)  // 66
 
 // Other constants
 #define FRAME_FILTERS_PIPE_START_BIT (3U)

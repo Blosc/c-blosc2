@@ -44,7 +44,7 @@ The header of a frame is encoded via  `msgpack <https://msgpack.org>`_ and it fo
     | d2| type_size     | d2| chunk_size    | d1| tcomp | d1|tdecomp| cX|
     |---|---------------|---|---------------|---|-------|---|-------|---|
       ^                   ^                   ^     ^     ^     ^     ^
-      |                   |                   |     |     |     |     +--[msgpack] bool for has_metalayers
+      |                   |                   |     |     |     |     +--[msgpack] bool for has_usermeta
       |                   |                   |     |     |     +--number of threads for decompression
       |                   |                   |     |     +-- [msgpack] int16
       |                   |                   |     +--number of threads for compression

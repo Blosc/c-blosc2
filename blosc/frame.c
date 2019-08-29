@@ -146,9 +146,9 @@ int blosc2_free_frame(blosc2_frame *frame) {
 }
 
 
-void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update) {
+void* new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update) {
   assert(frame != NULL);
-  uint8_t* h2 = calloc(FRAME_HEADER2_MINLEN, 1);
+  uint8_t* h2 = calloc(FRAME_HEADER_MINLEN, 1);
   uint8_t* h2p = h2;
 
   // Make space for the first array
@@ -157,14 +157,14 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
   // Magic number
   *h2p = 0xa0 + 8;  // str with 8 elements
   h2p += 1;
-  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER_MINLEN);
   strcpy((char*)h2p, "b2frame");
   h2p += 8;
 
   // Header size
   *h2p = 0xd2;  // int32
   h2p += 1 + 4;
-  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER_MINLEN);
 
   // Total frame size
   *h2p = 0xcf;  // uint64
@@ -172,18 +172,18 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
   int64_t flen = frame->len;
   swap_store(h2 + FRAME_LEN, &flen, sizeof(flen));
   h2p += 1 + 8;
-  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER_MINLEN);
 
   // Flags
   *h2p = 0xa0 + 4;  // str with 4 elements
   h2p += 1;
-  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER_MINLEN);
 
   // General flags
   *h2p = 0x4 + BLOSC2_VERSION_FRAME_FORMAT;  // frame + version
   *h2p += 0x20;  // 64-bit offsets
   h2p += 1;
-  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER_MINLEN);
 
   // Filter flags
   int nfilters = get_nfilters(schunk->filters);
@@ -208,18 +208,18 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
     *h2p = FRAME_FILTERS_PIPE_DESCRIBED_HERE | (uint8_t)(filter_flags << FRAME_FILTERS_PIPE_START_BIT);
   }
   h2p += 1;
-  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER_MINLEN);
 
   // Codec flags
   *h2p = schunk->compcode;
   *h2p += (schunk->clevel) << 4u;  // clevel
   h2p += 1;
-  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER_MINLEN);
 
   // Reserved flags
   *h2p = 0;
   h2p += 1;
-  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER_MINLEN);
 
   // Uncompressed size
   *h2p = 0xd3;  // int64
@@ -227,7 +227,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
   int64_t nbytes = schunk->nbytes;
   swap_store(h2p, &nbytes, sizeof(nbytes));
   h2p += 8;
-  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER_MINLEN);
 
   // Compressed size
   *h2p = 0xd3;  // int64
@@ -235,7 +235,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
   int64_t cbytes = schunk->cbytes;
   swap_store(h2p, &cbytes, sizeof(cbytes));
   h2p += 8;
-  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER_MINLEN);
 
   // Type size
   *h2p = 0xd2;  // int32
@@ -243,7 +243,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
   int32_t typesize = schunk->typesize;
   swap_store(h2p, &typesize, sizeof(typesize));
   h2p += 4;
-  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER_MINLEN);
 
   // Chunk size
   *h2p = 0xd2;  // int32
@@ -251,7 +251,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
   int32_t chunksize = schunk->chunksize;
   swap_store(h2p, &chunksize, sizeof(chunksize));
   h2p += 4;
-  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER_MINLEN);
 
   // Number of threads for compression
   *h2p = 0xd1;  // int16
@@ -259,7 +259,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
   int16_t nthreads = (int16_t)schunk->cctx->nthreads;
   swap_store(h2p, &nthreads, sizeof(nthreads));
   h2p += 2;
-  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER_MINLEN);
 
   // Number of threads for decompression
   *h2p = 0xd1;  // int16
@@ -267,7 +267,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
   nthreads = (int16_t)schunk->dctx->nthreads;
   swap_store(h2p, &nthreads, sizeof(nthreads));
   h2p += 2;
-  assert(h2p - h2 < FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 < FRAME_HEADER_MINLEN);
 
   // Now, deal with metalayers
   int16_t nmetalayers = schunk->nmetalayers;
@@ -277,9 +277,9 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
   // The boolean for FRAME_HAS_USERMETA
   *h2p = (schunk->usermeta_len > 0) ? (uint8_t)0xc3 : (uint8_t)0xc2;
   h2p += 1;
-  assert(h2p - h2 == FRAME_HEADER2_MINLEN);
+  assert(h2p - h2 == FRAME_HEADER_MINLEN);
 
-  int32_t hsize = FRAME_HEADER2_MINLEN;
+  int32_t hsize = FRAME_HEADER_MINLEN;
   if (nmetalayers == 0) {
     goto out;
   }
@@ -363,7 +363,7 @@ void* new_header2_frame(blosc2_schunk *schunk, blosc2_frame *frame, bool update)
 
   out:
   // Set the length of the whole header now that we know it
-  swap_store(h2 + FRAME_HEADER2_LEN, &hsize, sizeof(hsize));
+  swap_store(h2 + FRAME_HEADER_LEN, &hsize, sizeof(hsize));
 
   return h2;
 }
@@ -378,16 +378,16 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
   assert(frame->len > 0);
 
   if (frame->sdata == NULL) {
-    header = malloc(FRAME_HEADER2_MINLEN);
+    header = malloc(FRAME_HEADER_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
-    size_t rbytes = fread(header, 1, FRAME_HEADER2_MINLEN, fp);
-    assert(rbytes == FRAME_HEADER2_MINLEN);
+    size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
+    assert(rbytes == FRAME_HEADER_MINLEN);
     framep = header;
     fclose(fp);
   }
 
   // Fetch some internal lengths
-  swap_store(header_len, framep + FRAME_HEADER2_LEN, sizeof(*header_len));
+  swap_store(header_len, framep + FRAME_HEADER_LEN, sizeof(*header_len));
   swap_store(frame_len, framep + FRAME_LEN, sizeof(*frame_len));
   swap_store(nbytes, framep + FRAME_NBYTES, sizeof(*nbytes));
   swap_store(cbytes, framep + FRAME_CBYTES, sizeof(*cbytes));
@@ -580,9 +580,9 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int64_t cbytes = schunk->cbytes;
   FILE* fp = NULL;
 
-  uint8_t* h2 = new_header2_frame(schunk, frame, false);
+  uint8_t* h2 = new_header_frame(schunk, frame, false);
   uint32_t h2len;
-  swap_store(&h2len, h2 + FRAME_HEADER2_LEN, sizeof(h2len));
+  swap_store(&h2len, h2 + FRAME_HEADER_LEN, sizeof(h2len));
 
   // Build the offsets chunk
   int32_t chunksize = 0;
@@ -626,7 +626,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   }
   free(data_tmp);
 
-  // Now that we know them, fill the chunksize and frame length in header2
+  // Now that we know them, fill the chunksize and frame length in header
   swap_store(h2 + FRAME_CHUNKSIZE, &chunksize, sizeof(chunksize));
   frame->len = h2len + cbytes + off_cbytes + FRAME_TRAILER_MIN_LENGTH + schunk->usermeta_len;
   int64_t tbytes = frame->len;
@@ -696,10 +696,10 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   char* fname_cpy = malloc(strlen(fname) + 1);
   frame->fname = strcpy(fname_cpy, fname);
 
-  uint8_t* header = malloc(FRAME_HEADER2_MINLEN);
+  uint8_t* header = malloc(FRAME_HEADER_MINLEN);
   FILE* fp = fopen(fname, "rb");
-  size_t rbytes = fread(header, 1, FRAME_HEADER2_MINLEN, fp);
-  if (rbytes != FRAME_HEADER2_MINLEN) {
+  size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
+  if (rbytes != FRAME_HEADER_MINLEN) {
     fprintf(stderr, "Error: cannot read from file '%s'\n", fname);
     return NULL;
   }
@@ -787,19 +787,19 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
   }
 
   if (frame->sdata == NULL) {
-    header = malloc(FRAME_HEADER2_MINLEN);
+    header = malloc(FRAME_HEADER_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
-    size_t rbytes = fread(header, 1, FRAME_HEADER2_MINLEN, fp);
-    assert(rbytes == FRAME_HEADER2_MINLEN);
+    size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
+    assert(rbytes == FRAME_HEADER_MINLEN);
     fclose(fp);
   }
   uint32_t prev_h2len;
-  swap_store(&prev_h2len, header + FRAME_HEADER2_LEN, sizeof(prev_h2len));
+  swap_store(&prev_h2len, header + FRAME_HEADER_LEN, sizeof(prev_h2len));
 
   // Build a new header
-  uint8_t* h2 = new_header2_frame(schunk, frame, true);
+  uint8_t* h2 = new_header_frame(schunk, frame, true);
   uint32_t h2len;
-  swap_store(&h2len, h2 + FRAME_HEADER2_LEN, sizeof(h2len));
+  swap_store(&h2len, h2 + FRAME_HEADER_LEN, sizeof(h2len));
 
   // The frame length is outdated when adding a new metalayer, so update it
   if (new) {

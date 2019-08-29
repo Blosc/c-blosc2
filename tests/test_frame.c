@@ -120,7 +120,7 @@ static char* test_frame() {
 
   if (!sparse_schunk) {
     mu_assert("ERROR: frame->len must be larger or equal than schunk->cbytes",
-              frame->len >= schunk->cbytes + FRAME_HEADER2_MINLEN);
+              frame->len >= schunk->cbytes + FRAME_HEADER_MINLEN);
   }
 
   if (metalayers) {
