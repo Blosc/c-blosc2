@@ -114,7 +114,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   uint8_t* h2 = calloc(FRAME_HEADER_MINLEN, 1);
   uint8_t* h2p = h2;
 
-  // Make space for the first array
+  // The msgpack header starts here
+  *h2p = 0x90;  // fixarray...
+  *h2p += 12;   // ...with 12 elements
   h2p += 1;
 
   // Magic number
@@ -240,13 +242,6 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
   // Now, deal with metalayers
   int16_t nmetalayers = schunk->nmetalayers;
-  // The msgpack header will start as a fix array of 11 or 12 elements (if it has metalayers)
-  *h2 = 0x90;
-  *h2 += (nmetalayers > 0) ? FRAME_HEADER_NFIELDS_METALAYER : FRAME_HEADER_NFIELDS_NOMETALAYER;
-
-  if (nmetalayers == 0) {
-    goto out;
-  }
 
   // Make space for the header of metalayers (array marker, size, map of offsets)
   h2 = realloc(h2, (size_t)hsize + 1 + 1 + 2 + 1 + 2);
@@ -325,7 +320,6 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   hsize = (int32_t)(h2p - h2);
   assert(hsize == current_header_len);  // sanity check
 
-  out:
   // Set the length of the whole header now that we know it
   swap_store(h2 + FRAME_HEADER_LEN, &hsize, sizeof(hsize));
 
@@ -864,11 +858,6 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
     fclose(fp);
   }
 
-  bool has_metalayers = ((header[0] & 0xFu) == FRAME_HEADER_NFIELDS_METALAYER) ? true : false;
-  if (!has_metalayers) {
-    goto out;
-  }
-
   // Get the size for the index of metalayers
   uint16_t idx_size;
   swap_store(&idx_size, header + FRAME_IDX_SIZE, sizeof(idx_size));
@@ -920,7 +909,6 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
     metalayer->content = (uint8_t*)content;
   }
 
-  out:
   if (frame->sdata == NULL) {
     free(header);
   }

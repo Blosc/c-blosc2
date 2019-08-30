@@ -26,7 +26,7 @@ The header of a frame is encoded via  `msgpack <https://msgpack.org>`_ and it fo
       |   |       |                           +--[msgpack] int32
       |   |       +---magic number, currently "b2frame"
       |   +------[msgpack] str with 8 elements
-      +---[msgpack] fixarray with X=0xB (11, no metalayers) or X=0xC (12) elements
+      +---[msgpack] fixarray with X=0xC (12) elements
 
     |-18|-19|-1A|-1B|-1C|-1D|-1E|-1F|-20|-21|-22|-23|-24|-25|-26|-27|-28|-29|-2A|-2B|-2C|-2D|-2E|
     | a4|_f0|_f1|_f2|_f3| d3| uncompressed_size             | d3| compressed_size               |
@@ -52,7 +52,7 @@ The header of a frame is encoded via  `msgpack <https://msgpack.org>`_ and it fo
       |                   +------[msgpack] int32
       +---[msgpack] int32
 
-The it follows the info about the filter pipeline.  There is place for a pipeline that is 8 slots deep, and there is a reserved byte per every filter code and a possible associated meta-info::
+Then it follows the info about the filter pipeline.  There is place for a pipeline that is 8 slots deep, and there is a reserved byte per every filter code and another byte for a possible associated meta-info::
 
     |-40|-41|-42|-43|-44|-45|-46|-47|-48|-49|-4A|-4B|-4C|-4D|-4E|-4F|-50|-51|
     | d2| X | filter_codes                  | filter_meta                   |

@@ -32,8 +32,6 @@
 
 // Other constants
 #define FRAME_FILTER_PIPELINE_MAX (8)  // the maximum number of filters that can be stored in header
-#define FRAME_HEADER_NFIELDS_NOMETALAYER (11)
-#define FRAME_HEADER_NFIELDS_METALAYER (12)
 #define FRAME_TRAILER_VERSION (0U)  // can be up to 127
 #define FRAME_TRAILER_USERMETA_LEN_OFFSET (3)  // offset to usermeta length
 #define FRAME_TRAILER_USERMETA_OFFSET (7)  // offset to usermeta chunk
