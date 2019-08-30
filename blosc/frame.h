@@ -17,7 +17,6 @@
 #define FRAME_HEADER_LEN (FRAME_HEADER_MAGIC + 8 + 1)  // 11
 #define FRAME_LEN (FRAME_HEADER_LEN + 4 + 1)  // 16
 #define FRAME_FLAGS (FRAME_LEN + 8 + 1)  // 25
-#define FRAME_FILTERS (FRAME_FLAGS + 1)  // 26
 #define FRAME_CODECS (FRAME_FLAGS + 2)  // 27
 #define FRAME_NBYTES (FRAME_FLAGS + 4 + 1)  // 30
 #define FRAME_CBYTES (FRAME_NBYTES + 8 + 1)  // 39
@@ -26,22 +25,18 @@
 #define FRAME_NTHREADS_C (FRAME_CHUNKSIZE + 4 + 1)  // 58
 #define FRAME_NTHREADS_D (FRAME_NTHREADS_C + 2 + 1)  // 61
 #define FRAME_HAS_USERMETA (FRAME_NTHREADS_D + 2)  // 63
-#define FRAME_HEADER_MINLEN (FRAME_HAS_USERMETA + 1)  // 64 <- minimum length
-#define FRAME_METALAYERS (FRAME_HAS_USERMETA + 1)  // 64
-#define FRAME_IDX_SIZE (FRAME_METALAYERS + 1 + 1)  // 66
+#define FRAME_FILTER_PIPELINE (FRAME_HAS_USERMETA + 1 + 1) // 65
+#define FRAME_HEADER_MINLEN (FRAME_FILTER_PIPELINE + 1 + 16)  // 82 <- minimum length
+#define FRAME_METALAYERS (FRAME_HEADER_MINLEN)  // 82
+#define FRAME_IDX_SIZE (FRAME_METALAYERS + 1 + 1)  // 84
 
 // Other constants
-#define FRAME_FILTERS_PIPE_START_BIT (3U)
-#define FRAME_FILTERS_PIPE_DESCRIBED_HERE (2U)  // 0b10
-#define FRAME_FILTER_PIPE_DESCRIPTION (120U)  // 0b1111000
-#define FRAME_HEADER_NFIELDS_NOMETALAYER (11)
-#define FRAME_HEADER_NFIELDS_METALAYER (12)
+#define FRAME_FILTER_PIPELINE_MAX (8)  // the maximum number of filters that can be stored in header
 #define FRAME_TRAILER_VERSION (0U)  // can be up to 127
 #define FRAME_TRAILER_USERMETA_LEN_OFFSET (3)  // offset to usermeta length
 #define FRAME_TRAILER_USERMETA_OFFSET (7)  // offset to usermeta chunk
-#define FRAME_TRAILER_MIN_LENGTH (30)  // minimum length for the trailer (msgpack overhead)
-
-#define FRAME_FILTER_PIPELINE_NAME "_filter_pipeline"
+#define FRAME_TRAILER_MINLEN (30)  // minimum length for the trailer (msgpack overhead)
+#define FRAME_TRAILER_LEN_OFFSET (22)  // offset to trailer length (counting from the end)
 
 void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk);
 int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free);

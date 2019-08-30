@@ -26,7 +26,7 @@ The header of a frame is encoded via  `msgpack <https://msgpack.org>`_ and it fo
       |   |       |                           +--[msgpack] int32
       |   |       +---magic number, currently "b2frame"
       |   +------[msgpack] str with 8 elements
-      +---[msgpack] fixarray with X=0xB (11, no metalayers) or X=0xC (12) elements
+      +---[msgpack] fixarray with X=0xD (13) elements
 
     |-18|-19|-1A|-1B|-1C|-1D|-1E|-1F|-20|-21|-22|-23|-24|-25|-26|-27|-28|-29|-2A|-2B|-2C|-2D|-2E|
     | a4|_f0|_f1|_f2|_f3| d3| uncompressed_size             | d3| compressed_size               |
@@ -36,7 +36,7 @@ The header of a frame is encoded via  `msgpack <https://msgpack.org>`_ and it fo
       |   |   |   |   |   +--[msgpack] int64
       |   |   |   |   +-- reserved flags
       |   |   |   +--codec_flags (see below)
-      |   |   +---filter_flags (see below)
+      |   |   +---reserved flags
       |   +------general_flags (see below)
       +---[msgpack] str with 4 elements (flags)
 
@@ -52,9 +52,19 @@ The header of a frame is encoded via  `msgpack <https://msgpack.org>`_ and it fo
       |                   +------[msgpack] int32
       +---[msgpack] int32
 
+Then it follows the info about the filter pipeline.  There is place for a pipeline that is 8 slots deep, and there is a reserved byte per every filter code and another byte for a possible associated meta-info::
+
+    |-40|-41|-42|-43|-44|-45|-46|-47|-48|-49|-4A|-4B|-4C|-4D|-4E|-4F|-50|-51|
+    | d2| X | filter_codes                  | filter_meta                   |
+    |---|---|-------------------------------|-------------------------------|
+      ^   ^
+      |   |
+      |   +--number of filters
+      +--[msgpack] fixext 16
+
 In addition, a frame can be completed with meta-information about the stored data; these data blocks are called metalayers and it is up to the user to store whatever data they want there, with the only (strong) suggestion that they have to be in the msgpack format.  Here it is the format for the case that there exist some metalayers::
 
-  |-40|-41|-42|-43|-44|-----------------------
+  |-52|-53|-54|-55|-56|-----------------------
   | 93| cd| idx   | de| map_of_metalayers
   |---|---------------|-----------------------
     ^   ^    ^      ^
@@ -79,17 +89,8 @@ __________________________________________
 :general_flags:
     (``uint8``) General flags.
 
-    :``0`` and ``1``:
+    :``0`` to ``3``:
         Format version
-    :``2`` and ``3``: Enumerated
-        :``0``:
-            Reserved (regular chunk?)
-        :``1``:
-            Reserved (extended chunk?)
-        :``2``:
-            Frame
-        :``3``:
-            Reserved (extended frame?)
     :``4`` and ``5``: Enumerated for chunk offsets.
         :``0``:
             16-bit
@@ -102,7 +103,7 @@ __________________________________________
     :``6``:
         Chunks of fixed length (0) or variable length (1)
     :``7``:
-        Reserved.
+        Reserved
 
 :filter_flags:
     (``uint8``) Filter flags that are the defaults for all the chunks in storage.
