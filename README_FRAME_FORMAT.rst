@@ -89,17 +89,8 @@ __________________________________________
 :general_flags:
     (``uint8``) General flags.
 
-    :``0`` and ``1``:
+    :``0`` to ``3``:
         Format version
-    :``2`` and ``3``: Enumerated
-        :``0``:
-            Reserved (regular chunk?)
-        :``1``:
-            Reserved (extended chunk?)
-        :``2``:
-            Frame
-        :``3``:
-            Reserved (extended frame?)
     :``4`` and ``5``: Enumerated for chunk offsets.
         :``0``:
             16-bit
@@ -112,7 +103,7 @@ __________________________________________
     :``6``:
         Chunks of fixed length (0) or variable length (1)
     :``7``:
-        Reserved.
+        Reserved
 
 :filter_flags:
     (``uint8``) Filter flags that are the defaults for all the chunks in storage.

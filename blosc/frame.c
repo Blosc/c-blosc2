@@ -143,7 +143,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   assert(h2p - h2 < FRAME_HEADER_MINLEN);
 
   // General flags
-  *h2p = 0x4 + BLOSC2_VERSION_FRAME_FORMAT;  // frame + version
+  *h2p = BLOSC2_VERSION_FRAME_FORMAT;  // version
   *h2p += 0x20;  // 64-bit offsets
   h2p += 1;
   assert(h2p - h2 < FRAME_HEADER_MINLEN);

@@ -54,13 +54,18 @@ enum {
 };
 
 
-/* The FRAME_FORMAT_VERSION symbols below should be just 2-bit long */
+/* The FRAME_FORMAT_VERSION symbols below should be just 4-bit long */
 enum {
-  /* Blosc format version, starting at 0
-     0 -> First version (introduced in beta.1)
-     */
-  BLOSC2_VERSION_FRAME_FORMAT_BETA1 = 0,  // for beta.1 and before
-  BLOSC2_VERSION_FRAME_FORMAT = BLOSC2_VERSION_FRAME_FORMAT_BETA1,
+  /* Blosc format version
+   *  4 -> First version (introduced in beta.1)
+   *  1 -> Second version (introduced in beta.2)
+   *
+   *  *Important note*: version 4 should be avoided because it was used
+   *  for beta.1 and before, and it won't be supported anymore.
+   */
+  BLOSC2_VERSION_FRAME_FORMAT_BETA1 = 4,  // for beta.1 and before
+  BLOSC2_VERSION_FRAME_FORMAT_BETA2 = 1,  // for beta.2 and after
+  BLOSC2_VERSION_FRAME_FORMAT = BLOSC2_VERSION_FRAME_FORMAT_BETA2,
 };
 
 enum {

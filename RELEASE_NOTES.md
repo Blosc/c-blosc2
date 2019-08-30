@@ -12,14 +12,19 @@ Changes from 2.0.0-beta.1 to 2.0.0-beta.2
   new `blosc2_update_usermeta()` and `blosc2_get_usermeta()` functions.
 
 * Metalayers must now be attached to super-chunks, not frames.  The reason is
-  that frames are increasingly treated as a storage specifier (in-memory or disk
-  now, but can be other means in the future), whereas the actual API for I/O
-  (including metainfo) goes into super-chunks.  See PR #75.
+  that frames are increasingly treated as a storage specifier (in-memory or
+  disk now, but can be other means in the future), whereas the actual API for
+  I/O (including metainfo) goes into super-chunks.  See PR #75.
 
 * New frame format documented in
   [README_FRAME_FORMAT.rst](README_FRAME_FORMAT.rst). Remember that the frame
   format is not written in stone yet, so some changes may be introduced before
   getting out of beta.
+
+* BREAKING CHANGE: the format for frames has changed and
+  BLOSC2_VERSION_FRAME_FORMAT is now set to 1.  There is no attempt to support
+  previous formats, but there will probably be backward compatibility support
+  starting from version 1 on.
 
 * BREAKING CHANGE: the next APIs have been renamed:
   + blosc2_frame_has_metalayer -> blosc2_has_metalayer
