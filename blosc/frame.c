@@ -401,39 +401,14 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
   return 0;
 }
 
-// Get the offset to the usermeta chunk
-int64_t get_trailer_offset(blosc2_frame *frame, int32_t header_len, int64_t cbytes) {
-  uint8_t* coffsets;
 
+int64_t get_trailer_offset(blosc2_frame *frame, int32_t header_len, int64_t cbytes) {
   if (cbytes == 0) {
     // No data chunks yet
     return header_len;
   }
 
-  if (frame->sdata != NULL) {
-    coffsets = frame->sdata + header_len + cbytes;
-  } else {
-    size_t bytes_to_read = BLOSC_MIN_HEADER_LENGTH;
-    coffsets = malloc(bytes_to_read);
-    FILE* fp = fopen(frame->fname, "rb");
-    fseek(fp, header_len + cbytes, SEEK_SET);
-    size_t rbytes = fread(coffsets, 1, bytes_to_read, fp);
-    if (rbytes != bytes_to_read) {
-      fprintf(stderr, "Error: cannot access the offsets out of the fileframe\n");
-      fclose(fp);
-      return -1;
-    }
-    fclose(fp);
-  }
-
-  int32_t off_cbytes = sw32_(coffsets + 12);
-
-  if (frame->sdata == NULL) {
-    free(coffsets);
-  }
-
-  // Now we know all the necessary offsets to reach the trailer section
-  return header_len + cbytes + off_cbytes;
+  return frame->len - frame->trailer_len;
 }
 
 
@@ -465,7 +440,7 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
   }
 
   // Create the trailer in msgpack (see the frame format document)
-  uint32_t trailer_len = FRAME_TRAILER_MIN_LENGTH + schunk->usermeta_len;
+  uint32_t trailer_len = FRAME_TRAILER_MINLEN + schunk->usermeta_len;
   uint8_t* trailer = calloc((size_t)trailer_len, 1);
   uint8_t* ptrailer = trailer;
   *ptrailer = 0x09 + 4;  // fixarray with 4 elements
@@ -540,6 +515,7 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
     return rc;
   }
   frame->len = trailer_offset + trailer_len;
+  frame->trailer_len = trailer_len;
 
   return 1;
 }
@@ -599,7 +575,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
   // Now that we know them, fill the chunksize and frame length in header
   swap_store(h2 + FRAME_CHUNKSIZE, &chunksize, sizeof(chunksize));
-  frame->len = h2len + cbytes + off_cbytes + FRAME_TRAILER_MIN_LENGTH + schunk->usermeta_len;
+  frame->len = h2len + cbytes + off_cbytes + FRAME_TRAILER_MINLEN + schunk->usermeta_len;
   int64_t tbytes = frame->len;
   swap_store(h2 + FRAME_LEN, &tbytes, sizeof(tbytes));
 
@@ -667,6 +643,7 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   char* fname_cpy = malloc(strlen(fname) + 1);
   frame->fname = strcpy(fname_cpy, fname);
 
+  // Get the length of the frame
   uint8_t* header = malloc(FRAME_HEADER_MINLEN);
   FILE* fp = fopen(fname, "rb");
   size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
@@ -674,12 +651,27 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
     fprintf(stderr, "Error: cannot read from file '%s'\n", fname);
     return NULL;
   }
-
   int64_t frame_len;
   swap_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
   frame->len = frame_len;
-  fclose(fp);
   free(header);
+
+  // Now, the trailer length
+  uint8_t* trailer = malloc(FRAME_TRAILER_MINLEN);
+  fseek(fp, frame_len - FRAME_TRAILER_MINLEN, SEEK_SET);
+  rbytes = fread(trailer, 1, FRAME_TRAILER_MINLEN, fp);
+  if (rbytes != FRAME_TRAILER_MINLEN) {
+    fprintf(stderr, "Error: cannot read from file '%s'\n", fname);
+    return NULL;
+  }
+  int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
+  assert(trailer[trailer_offset - 1] == 0xce);
+  uint32_t trailer_len;
+  swap_store(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
+  frame->trailer_len = trailer_len;
+  free(trailer);
+
+  fclose(fp);
 
   return frame;
 }

@@ -37,7 +37,8 @@
 #define FRAME_TRAILER_VERSION (0U)  // can be up to 127
 #define FRAME_TRAILER_USERMETA_LEN_OFFSET (3)  // offset to usermeta length
 #define FRAME_TRAILER_USERMETA_OFFSET (7)  // offset to usermeta chunk
-#define FRAME_TRAILER_MIN_LENGTH (30)  // minimum length for the trailer (msgpack overhead)
+#define FRAME_TRAILER_MINLEN (30)  // minimum length for the trailer (msgpack overhead)
+#define FRAME_TRAILER_LEN_OFFSET (22)  // offset to trailer length (counting from the end)
 
 void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk);
 int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free);

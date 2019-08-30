@@ -769,6 +769,7 @@ typedef struct {
   uint8_t* sdata;  //!< The in-memory serialized data
   int64_t len;     //!< The current length of the frame in (compressed) bytes
   int64_t maxlen;  //!< The maximum length of the frame; if 0, there is no maximum
+  uint32_t trailer_len;  //!< The current length of the trailer in (compressed) bytes
 } blosc2_frame;
 
 /**
