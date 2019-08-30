@@ -26,7 +26,7 @@ The header of a frame is encoded via  `msgpack <https://msgpack.org>`_ and it fo
       |   |       |                           +--[msgpack] int32
       |   |       +---magic number, currently "b2frame"
       |   +------[msgpack] str with 8 elements
-      +---[msgpack] fixarray with X=0xC (12) elements
+      +---[msgpack] fixarray with X=0xD (13) elements
 
     |-18|-19|-1A|-1B|-1C|-1D|-1E|-1F|-20|-21|-22|-23|-24|-25|-26|-27|-28|-29|-2A|-2B|-2C|-2D|-2E|
     | a4|_f0|_f1|_f2|_f3| d3| uncompressed_size             | d3| compressed_size               |

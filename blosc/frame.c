@@ -116,7 +116,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
   // The msgpack header starts here
   *h2p = 0x90;  // fixarray...
-  *h2p += 12;   // ...with 12 elements
+  *h2p += 13;   // ...with 13 elements
   h2p += 1;
 
   // Magic number
