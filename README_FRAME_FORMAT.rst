@@ -36,7 +36,7 @@ The header of a frame is encoded via  `msgpack <https://msgpack.org>`_ and it fo
       |   |   |   |   |   +--[msgpack] int64
       |   |   |   |   +-- reserved flags
       |   |   |   +--codec_flags (see below)
-      |   |   +---filter_flags (see below)
+      |   |   +---reserved flags
       |   +------general_flags (see below)
       +---[msgpack] str with 4 elements (flags)
 
@@ -52,9 +52,19 @@ The header of a frame is encoded via  `msgpack <https://msgpack.org>`_ and it fo
       |                   +------[msgpack] int32
       +---[msgpack] int32
 
+The it follows the info about the filter pipeline.  There is place for a pipeline that is 8 slots deep, and there is a reserved byte per every filter code and a possible associated meta-info::
+
+    |-40|-41|-42|-43|-44|-45|-46|-47|-48|-49|-4A|-4B|-4C|-4D|-4E|-4F|-50|-51|
+    | d2| X | filter_codes                  | filter_meta                   |
+    |---|---|-------------------------------|-------------------------------|
+      ^   ^
+      |   |
+      |   +--number of filters
+      +--[msgpack] fixext 16
+
 In addition, a frame can be completed with meta-information about the stored data; these data blocks are called metalayers and it is up to the user to store whatever data they want there, with the only (strong) suggestion that they have to be in the msgpack format.  Here it is the format for the case that there exist some metalayers::
 
-  |-40|-41|-42|-43|-44|-----------------------
+  |-52|-53|-54|-55|-56|-----------------------
   | 93| cd| idx   | de| map_of_metalayers
   |---|---------------|-----------------------
     ^   ^    ^      ^
