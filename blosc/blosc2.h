@@ -33,7 +33,7 @@ extern "C" {
 #define BLOSC_VERSION_MINOR    0    /* for minor interface/format changes  */
 #define BLOSC_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC_VERSION_STRING   "2.0.0-beta.2"  /* string version.  Sync with above! */
+#define BLOSC_VERSION_STRING   "2.0.0-beta.3.dev"  /* string version.  Sync with above! */
 #define BLOSC_VERSION_REVISION "$Rev$"   /* revision version */
 #define BLOSC_VERSION_DATE     "$Date:: 2019-08-30 #$"    /* date version */
 
