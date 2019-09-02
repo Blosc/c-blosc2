@@ -6,7 +6,12 @@
 Changes from 2.0.0-beta.2 to 2.0.0-beta.3
 =========================================
 
-  #XXX version-specific blurb XXX#
+* Quick release to fix that beta.2 was tagged on top of a branch, not master.
+
+* The msgpack trailer now properly starts with `0x90 + 4` value, not plain
+  wrong `0x09 + 4`.
+
+* Trailer version bumped to 1.
 
 
 Changes from 2.0.0-beta.1 to 2.0.0-beta.2
