@@ -1,12 +1,12 @@
 ===============================================================
- Announcing C-Blosc 2.0.0-beta.2
+ Announcing C-Blosc2 2.0.0-beta.3
  A simple, compressed and fast data store library for C
 ===============================================================
 
 What is new?
 ============
 
-This is the second beta version, and the frame format has been much improved and [documented (yay!)](https://github.com/Blosc/c-blosc2/blob/master/README_FRAME_FORMAT.rst).  Also, the metalayer-related functions are now updating the super-chunk instead of the frame.
+This is the third beta version, a quick release to fix the fact that the previous one was made on a branch different than master.  Also, this includes minor fixes in the trailer section of the frame; hence, the trailer version has been bumped to 1.
 
 In principle, C-Blosc2 should be backward compatible with C-Blosc, so you can start using it right away and slowly begin to use its new functionality, like the new filters, prefilters, super-chunks and frames.  See docs in:
 https://blosc2.readthedocs.io
