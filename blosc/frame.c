@@ -437,7 +437,7 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
   uint32_t trailer_len = FRAME_TRAILER_MINLEN + schunk->usermeta_len;
   uint8_t* trailer = calloc((size_t)trailer_len, 1);
   uint8_t* ptrailer = trailer;
-  *ptrailer = 0x09 + 4;  // fixarray with 4 elements
+  *ptrailer = 0x90 + 4;  // fixarray with 4 elements
   ptrailer += 1;
   // Trailer format version
   *ptrailer = FRAME_TRAILER_VERSION;

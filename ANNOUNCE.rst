@@ -1,14 +1,12 @@
 ===============================================================
- Announcing C-Blosc 2.0.0-beta.1
+ Announcing C-Blosc 2.0.0-beta.2
  A simple, compressed and fast data store library for C
 ===============================================================
 
 What is new?
 ============
 
-This is the first beta version, so the API has been declared frozen from now on.  To avoid name collisions with existing C-Blosc 1.x deployments, the library is officially called `blosc2` and the main header is `blosc2.h`.
-
-Also, this version offers a frame object so that data can be stored sequentially both in-memory and on-disk.  Last but not least, blosc2 supports the optimized implementations of LZ4 in Intel's IPP for improved compression ratios and speed.
+This is the second beta version, and the frame format has been much improved and [documented (yay!)](https://github.com/Blosc/c-blosc2/blob/master/README_FRAME_FORMAT.rst).  Also, the metalayer-related functions are now updating the super-chunk instead of the frame.
 
 In principle, C-Blosc2 should be backward compatible with C-Blosc, so you can start using it right away and slowly begin to use its new functionality, like the new filters, prefilters, super-chunks and frames.  See docs in:
 https://blosc2.readthedocs.io

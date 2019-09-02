@@ -43,10 +43,11 @@ Update documentation
 Go the the `blosc-doc <https://github.com/Blosc/blosc-doc>`_ git repo and update the `README.rst`
 and `blosc2.h` and do a commit::
 
-  $ cp ../c-blosc2/README.rst src/c-blosc2_files/README.rst
+  $ cp ../c-blosc2/README.rst src/c-blosc2_files
+  $ cp ../c-blosc2/README_FRAME_FORMAT.rst src/c-blosc2_files
   $ cp ../c-blosc2/blosc/blosc2.h src/c-blosc2_files
   $ git commit -a -m"Updated documentation for release X.Y.Z"
-  $ pit push
+  $ git push
 
 After pushing, a new documentation will be rendered at: https://blosc-doc.readthedocs.io/en/latest/
 Check that it contains the updated docs.
