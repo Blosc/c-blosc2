@@ -99,6 +99,10 @@ int blosc2_free_frame(blosc2_frame *frame) {
     free(frame->sdata);
   }
 
+  if (frame->chunk_offsets != NULL) {
+    free(frame->chunk_offsets);
+  }
+
   if (frame->fname != NULL) {
     free(frame->fname);
   }
@@ -671,11 +675,14 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
 }
 
 
-// Get the data pointers section
-int get_offsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, int32_t nchunks, void *offsets) {
-  uint8_t* framep = frame->sdata;
-  uint8_t* coffsets;
+// Get the compressed data offsets
+uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes) {
+  if (frame->chunk_offsets != NULL) {
+    return frame->chunk_offsets;
+  }
 
+  uint8_t* coffsets;
+  uint8_t* framep = frame->sdata;
   if (frame->sdata != NULL) {
     coffsets = framep + header_len + cbytes;
   } else {
@@ -688,24 +695,15 @@ int get_offsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, int32_t
     if (rbytes != (size_t)off_cbytes) {
       fprintf(stderr, "Error: cannot read the offsets out of the fileframe.\n");
       fclose(fp);
-      return -1;
+      return NULL;
     }
     fclose(fp);
+
+    // Only store the compressed chunk when reading from disk, otherwise it is in memory already
+    frame->chunk_offsets = coffsets;
   }
 
-  blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
-  blosc2_context *dctx = blosc2_create_dctx(off_dparams);
-  int32_t off_nbytes = blosc2_decompress_ctx(dctx, coffsets, offsets, (size_t)nchunks * 8);
-  blosc2_free_ctx(dctx);
-  if (off_nbytes < 0) {
-    free(offsets);
-    return -1;
-  }
-  if (frame->sdata == NULL) {
-    free(coffsets);
-  }
-
-  return 1;
+  return coffsets;
 }
 
 
@@ -951,11 +949,22 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
   // We are not attached to a frame anymore
   schunk->frame = NULL;
 
-  // Get the offsets
-  int64_t *offsets = (int64_t *) calloc((size_t) nchunks * 8, 1);
-  int rc = get_offsets(frame, header_len, cbytes, nchunks, offsets);
-  if (rc < 0) {
+  // Get the compressed offsets
+  uint8_t* coffsets = get_coffsets(frame, header_len, cbytes);
+  if (coffsets == NULL) {
     fprintf(stderr, "Error: cannot get the offsets for the frame\n");
+    return NULL;
+  }
+
+  // Decompress offsets
+  blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context *dctx = blosc2_create_dctx(off_dparams);
+  int64_t* offsets = (int64_t *) malloc((size_t) nchunks * 8);
+  int32_t off_nbytes = blosc2_decompress_ctx(dctx, coffsets, offsets, (size_t)nchunks * 8);
+  blosc2_free_ctx(dctx);
+  if (off_nbytes < 0) {
+    free(offsets);
+    fprintf(stderr, "Error: cannot decompress the offsets chunk");
     return NULL;
   }
 
@@ -1007,17 +1016,19 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
   }
   schunk->blocksize = blocksize;
 
-  free(offsets);
   if (frame->sdata == NULL) {
     free(data_chunk);
     fclose(fp);
   }
+  free(offsets);
+
   assert(acc_nbytes == nbytes);
   assert(acc_cbytes == cbytes);
 
   uint8_t* usermeta;
   int32_t usermeta_len;
 
+  int rc;
   out:
   rc = frame_get_metalayers(frame, schunk);
   if (rc < 0) {
@@ -1070,16 +1081,20 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
     return -2;
   }
 
-  // Get the offset to the chunk
-  int32_t off_nbytes = nchunks * 8;
-  int64_t* offsets = malloc((size_t)off_nbytes);
-  int rc = get_offsets(frame, header_len, cbytes, nchunks, offsets);
-  if (rc < 0) {
+  // Get the offset to chunk
+  uint8_t* coffsets = get_coffsets(frame, header_len, cbytes);
+  if (coffsets == NULL) {
     fprintf(stderr, "Error: cannot get the offset for chunk %d for the frame\n", nchunk);
     return -3;
   }
-  int64_t offset = offsets[nchunk];
-  free(offsets);
+  int64_t offset;
+  int rc = blosc_getitem(coffsets, nchunk, 1, &offset);
+  if (rc < 0) {
+    size_t nbytes_, cbytes_, blocksize_;
+    blosc_cbuffer_sizes(coffsets, &nbytes_, &cbytes_, &blocksize_);
+    fprintf(stderr, "Error: problems retrieving a chunk offset");
+    return -4;
+  }
 
   int32_t chunk_cbytes;
   if (frame->sdata == NULL) {
@@ -1088,7 +1103,7 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
     size_t rbytes = fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
     if (rbytes != sizeof(chunk_cbytes)) {
       fprintf(stderr, "Cannot read the cbytes for chunk in the fileframe.\n");
-      return -4;
+      return -5;
     }
     chunk_cbytes = sw32_(&chunk_cbytes);
     *chunk = malloc((size_t)chunk_cbytes);
@@ -1096,7 +1111,7 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
     rbytes = fread(*chunk, 1, (size_t)chunk_cbytes, fp);
     if (rbytes != (size_t)chunk_cbytes) {
       fprintf(stderr, "Cannot read the chunk out of the fileframe.\n");
-      return -5;
+      return -6;
     }
     fclose(fp);
     *needs_free = true;
@@ -1160,16 +1175,28 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
       return NULL;
     }
   }
+
   // Get the current offsets and add one more
   int32_t off_nbytes = (nchunks + 1) * 8;
-  int64_t* offsets = malloc((size_t)off_nbytes);
+  int64_t* offsets = (int64_t *) malloc((size_t)off_nbytes);
   if (nchunks > 0) {
-    rc = get_offsets(frame, header_len, cbytes, nchunks, offsets);
-    if (rc < 0) {
-      fprintf(stderr, "Error: cannot get the offset for chunk %d for the frame\n", nchunks);
+    uint8_t *coffsets = get_coffsets(frame, header_len, cbytes);
+    if (coffsets == NULL) {
+      fprintf(stderr, "Error: cannot get the offsets for the frame\n");
+      return NULL;
+    }
+    // Decompress offsets
+    blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
+    blosc2_context *dctx = blosc2_create_dctx(off_dparams);
+    int32_t prev_nbytes = blosc2_decompress_ctx(dctx, coffsets, offsets, (size_t) nchunks * 8);
+    blosc2_free_ctx(dctx);
+    if (prev_nbytes < 0) {
+      free(offsets);
+      fprintf(stderr, "Error: cannot decompress the offsets chunk");
       return NULL;
     }
   }
+
   // Add the new offset
   offsets[nchunks] = cbytes;
 
@@ -1216,6 +1243,10 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
       return NULL;
     }
     fclose(fp);
+    // Invalidate the cache for chunk offsets
+    if (frame->chunk_offsets != NULL) {
+      frame->chunk_offsets = NULL;
+    }
   }
   free(chunk);
   free(off_chunk);
