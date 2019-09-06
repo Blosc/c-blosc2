@@ -1384,6 +1384,7 @@ static int initialize_context_decompression(
     uint8_t* blosc2_flags = (uint8_t*)(context->src + 0x1F);
     context->bstarts = (int32_t*)(context->src + BLOSC_EXTENDED_HEADER_LENGTH);
     if (*blosc2_flags & BLOSC2_USEDICT) {
+#if defined(HAVE_ZSTD)
       context->use_dict = 1;
       if (context->dict_ddict != NULL) {
           // Free the existing dictionary (probably from another chunk)
@@ -1393,6 +1394,7 @@ static int initialize_context_decompression(
       context->dict_size = (size_t)sw32_(context->bstarts + context->nblocks);
       context->dict_buffer = (void*)(context->bstarts + context->nblocks + 1);
       context->dict_ddict = ZSTD_createDDict(context->dict_buffer, context->dict_size);
+#endif   // HAVE_ZSTD
     }
   } else {
     /* Regular (Blosc1) header */
@@ -1661,6 +1663,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
       return -20;
     }
 
+#ifdef HAVE_ZSTD
     // Build the dictionary out of the filters outcome and compress with it
     size_t dict_maxsize = BLOSC2_MAXDICTSIZE;
     // Do not make the dict more than 5% larger than uncompressed buffer
@@ -1723,6 +1726,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     context->dict_buffer = NULL;
     ZSTD_freeCDict(context->dict_cdict);
     context->dict_cdict = NULL;
+#endif  // HAVE_ZSTD
   }
 
   return cbytes;
@@ -2761,10 +2765,14 @@ void blosc2_free_ctx(blosc2_context* context) {
     free_thread_context(context->serial_context);
   }
   if (context->dict_cdict != NULL) {
+#ifdef HAVE_ZSTD
     ZSTD_freeCDict(context->dict_cdict);
+#endif
   }
   if (context->dict_ddict != NULL) {
+#ifdef HAVE_ZSTD
     ZSTD_freeDDict(context->dict_ddict);
+#endif
   }
   if (context->btune != NULL) {
     btune_free(context);
