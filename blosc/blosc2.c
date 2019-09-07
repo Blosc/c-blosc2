@@ -147,6 +147,19 @@ int release_threadpool(blosc2_context *context);
 #endif
 
 
+/* global variable to change threading backend from Blosc-managed to caller-managed */
+static blosc_threads_callback threads_callback = 0;
+static void *threads_callback_data = 0;
+
+/* non-threadsafe function should be called before any other Blosc function in
+   order to change how threads are managed */
+void blosc_set_threads_callback(blosc_threads_callback callback, void *callback_data)
+{
+  threads_callback = callback;
+  threads_callback_data = callback_data;
+}
+
+
 /* A function for aligned malloc that is portable */
 static uint8_t* my_malloc(size_t size) {
   void* block = NULL;
@@ -1090,6 +1103,7 @@ static int serial_blosc(struct thread_context* thread_context) {
   return ntbytes;
 }
 
+static void t_blosc_do_job(void *ctxt);
 
 /* Threaded version for compression/decompression */
 static int parallel_blosc(blosc2_context* context) {
@@ -1100,11 +1114,17 @@ static int parallel_blosc(blosc2_context* context) {
   context->thread_giveup_code = 1;
   context->thread_nblock = -1;
 
-  /* Synchronization point for all threads (wait for initialization) */
-  WAIT_INIT(-1, context);
+  if (threads_callback) {
+    threads_callback(threads_callback_data, t_blosc_do_job,
+                     context->nthreads, sizeof(void*), (void*) context->thread_contexts);
+  }
+  else {
+    /* Synchronization point for all threads (wait for initialization) */
+    WAIT_INIT(-1, context);
 
-  /* Synchronization point for all threads (wait for finalization) */
-  WAIT_FINISH(-1, context);
+    /* Synchronization point for all threads (wait for finalization) */
+    WAIT_FINISH(-1, context);
+  }
 
   if (context->thread_giveup_code <= 0) {
     /* Compression/decompression gave up.  Return error code. */
@@ -2370,35 +2390,44 @@ int init_threadpool(blosc2_context *context) {
   context->count_threads = 0;      /* Reset threads counter */
 #endif
 
-#if !defined(_WIN32)
-  /* Initialize and set thread detached attribute */
-  pthread_attr_init(&context->ct_attr);
-  pthread_attr_setdetachstate(&context->ct_attr, PTHREAD_CREATE_JOINABLE);
-#endif
+  if (threads_callback) {
+      /* Create thread contexts to store data for callback threads */
+    context->thread_contexts = (struct thread_context **)my_malloc(
+            context->nthreads * sizeof(struct thread_context *));
+    for (tid = 0; tid < context->nthreads; tid++)
+      context->thread_contexts[tid] = create_thread_context(context, tid);
+  }
+  else {
+    #if !defined(_WIN32)
+      /* Initialize and set thread detached attribute */
+      pthread_attr_init(&context->ct_attr);
+      pthread_attr_setdetachstate(&context->ct_attr, PTHREAD_CREATE_JOINABLE);
+    #endif
 
-  /* Make space for thread handlers */
-  context->threads = (pthread_t*)my_malloc(
-          context->nthreads * sizeof(pthread_t));
-  /* Finally, create the threads */
-  for (tid = 0; tid < context->nthreads; tid++) {
-    /* Create a thread context (will destroy when finished) */
-    thread_context = create_thread_context(context, tid);
+    /* Make space for thread handlers */
+    context->threads = (pthread_t*)my_malloc(
+            context->nthreads * sizeof(pthread_t));
+    /* Finally, create the threads */
+    for (tid = 0; tid < context->nthreads; tid++) {
+      /* Create a thread context (will destroy when finished) */
+      struct thread_context *thread_context = create_thread_context(context, tid);
 
-#if !defined(_WIN32)
-    rc2 = pthread_create(&context->threads[tid], &context->ct_attr, t_blosc,
-                         (void*)thread_context);
-#else
-    rc2 = pthread_create(&context->threads[tid], NULL, t_blosc,
-                         (void *)thread_context);
-#endif
-    if (rc2) {
-      fprintf(stderr, "ERROR; return code from pthread_create() is %d\n", rc2);
-      fprintf(stderr, "\tError detail: %s\n", strerror(rc2));
-      return (-1);
+      #if !defined(_WIN32)
+        rc2 = pthread_create(&context->threads[tid], &context->ct_attr, t_blosc,
+                            (void*)thread_context);
+      #else
+        rc2 = pthread_create(&context->threads[tid], NULL, t_blosc,
+                            (void *)thread_context);
+      #endif
+      if (rc2) {
+        fprintf(stderr, "ERROR; return code from pthread_create() is %d\n", rc2);
+        fprintf(stderr, "\tError detail: %s\n", strerror(rc2));
+        return (-1);
+      }
     }
   }
 
-  /* We have now started the threads */
+  /* We have now started/initialized the threads */
   context->threads_started = context->nthreads;
   context->new_nthreads = context->nthreads;
 
@@ -2665,17 +2694,33 @@ int release_threadpool(blosc2_context *context) {
   int rc;
 
   if (context->threads_started > 0) {
-    /* Tell all existing threads to finish */
-    context->end_threads = 1;
-    WAIT_INIT(-1, context);
+    if (threads_callback) {
+      /* free context data for user-managed threads */
+      for (t=0; t<context->threads_started; t++)
+        free_thread_context(context->thread_contexts[t]);
+      my_free(context->thread_contexts);
+    }
+    else {
+      /* Tell all existing threads to finish */
+      context->end_threads = 1;
+      WAIT_INIT(-1, context);
 
-    /* Join exiting threads */
-    for (t = 0; t < context->threads_started; t++) {
-      rc = pthread_join(context->threads[t], &status);
-      if (rc) {
-        fprintf(stderr, "ERROR; return code from pthread_join() is %d\n", rc);
-        fprintf(stderr, "\tError detail: %s\n", strerror(rc));
+      /* Join exiting threads */
+      for (t = 0; t < context->threads_started; t++) {
+        rc = pthread_join(context->threads[t], &status);
+        if (rc) {
+          fprintf(stderr, "ERROR; return code from pthread_join() is %d\n", rc);
+          fprintf(stderr, "\tError detail: %s\n", strerror(rc));
+        }
       }
+
+      /* Thread attributes */
+      #if !defined(_WIN32)
+        pthread_attr_destroy(&context->ct_attr);
+      #endif
+
+      /* Release thread handlers */
+      my_free(context->threads);
     }
 
     /* Release mutex and condition variable objects */
@@ -2696,14 +2741,6 @@ int release_threadpool(blosc2_context *context) {
     /* Reset flags and counters */
     context->end_threads = 0;
     context->threads_started = 0;
-
-    /* Thread attributes */
-  #if !defined(_WIN32)
-    pthread_attr_destroy(&context->ct_attr);
-  #endif
-
-    /* Release thread handlers */
-    my_free(context->threads);
   }
 
 

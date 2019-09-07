@@ -96,6 +96,7 @@ struct blosc2_context_s {
   int threads_started;
   int end_threads;
   pthread_t *threads;
+  struct thread_context **thread_contexts; /* only for user-managed threads */
   pthread_mutex_t count_mutex;
 #ifdef BLOSC_POSIX_BARRIERS
   pthread_barrier_t barr_init;
