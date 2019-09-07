@@ -380,8 +380,9 @@ BLOSC_EXPORT int blosc_getitem(const void* src, int start, int nitems, void* des
 
 /**
   Pointer to a callback function that executes `dojob(jobdata + i*jobdata_elsize)` for `i = 0 to numjobs-1`,
-  possibly in parallel threads (but not returning until all `dojob` calls have returned.   This allows the
+  possibly in parallel threads (but not returning until all `dojob` calls have returned).   This allows the
   caller to provide a custom threading backend as an alternative to the default Blosc-managed threads.
+  `callback_data` is passed through from `blosc_set_threads_callback`.
  */
 typedef void (*blosc_threads_callback)(void *callback_data, void (*dojob)(void *), int numjobs, size_t jobdata_elsize, void *jobdata);
 
