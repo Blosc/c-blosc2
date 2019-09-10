@@ -99,8 +99,8 @@ int blosc2_free_frame(blosc2_frame *frame) {
     free(frame->sdata);
   }
 
-  if (frame->chunk_offsets != NULL) {
-    free(frame->chunk_offsets);
+  if (frame->coffsets != NULL) {
+    free(frame->coffsets);
   }
 
   if (frame->fname != NULL) {
@@ -677,31 +677,28 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
 
 // Get the compressed data offsets
 uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes) {
-  if (frame->chunk_offsets != NULL) {
-    return frame->chunk_offsets;
+  if (frame->coffsets != NULL) {
+    return frame->coffsets;
   }
 
-  uint8_t* coffsets;
-  uint8_t* framep = frame->sdata;
   if (frame->sdata != NULL) {
-    coffsets = framep + header_len + cbytes;
-  } else {
-    int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
-    int64_t off_cbytes = trailer_offset - (header_len + cbytes);
-    FILE* fp = fopen(frame->fname, "rb");
-    coffsets = malloc((size_t)off_cbytes);
-    fseek(fp, header_len + cbytes, SEEK_SET);
-    size_t rbytes = fread(coffsets, 1, (size_t)off_cbytes, fp);
-    if (rbytes != (size_t)off_cbytes) {
-      fprintf(stderr, "Error: cannot read the offsets out of the fileframe.\n");
-      fclose(fp);
-      return NULL;
-    }
-    fclose(fp);
-
-    // Only store the compressed chunk when reading from disk, otherwise it is in memory already
-    frame->chunk_offsets = coffsets;
+    // For in-memory frames, the coffset is just one pointer away
+    return frame->sdata + header_len + cbytes;
   }
+
+  int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
+  int64_t off_cbytes = trailer_offset - (header_len + cbytes);
+  FILE* fp = fopen(frame->fname, "rb");
+  uint8_t* coffsets = malloc((size_t)off_cbytes);
+  fseek(fp, header_len + cbytes, SEEK_SET);
+  size_t rbytes = fread(coffsets, 1, (size_t)off_cbytes, fp);
+  if (rbytes != (size_t)off_cbytes) {
+    fprintf(stderr, "Error: cannot read the offsets out of the fileframe.\n");
+    fclose(fp);
+    return NULL;
+  }
+  fclose(fp);
+  frame->coffsets = coffsets;
 
   return coffsets;
 }
@@ -1244,8 +1241,8 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     }
     fclose(fp);
     // Invalidate the cache for chunk offsets
-    if (frame->chunk_offsets != NULL) {
-      frame->chunk_offsets = NULL;
+    if (frame->coffsets != NULL) {
+      frame->coffsets = NULL;
     }
   }
   free(chunk);
