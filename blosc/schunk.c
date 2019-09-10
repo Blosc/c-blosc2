@@ -194,7 +194,11 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
     }
 
     /* Make space for appending the copy of the chunk and do it */
-    schunk->data = realloc(schunk->data, (nchunks + 1) * sizeof(void *));
+    if ((nchunks + 1) * sizeof(void *) > schunk->data_len) {
+      // Extend the data pointer by one memory page (4k)
+      schunk->data_len += 4096;  // must be a multiple of sizeof(void*)
+      schunk->data = realloc(schunk->data, schunk->data_len);
+    }
     schunk->data[nchunks] = chunk;
   }
   else {
