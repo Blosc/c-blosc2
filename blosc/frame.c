@@ -81,7 +81,7 @@ void swap_store(void *dest, const void *pa, int size) {
 
 
 /* Create a new (empty) frame */
-blosc2_frame* blosc2_new_frame(char* fname) {
+blosc2_frame* blosc2_new_frame(const char* fname) {
   blosc2_frame* new_frame = malloc(sizeof(blosc2_frame));
   memset(new_frame, 0, sizeof(blosc2_frame));
   if (fname != NULL) {
@@ -618,7 +618,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
 
 /* Write an in-memory frame out to a file. */
-int64_t blosc2_frame_to_file(blosc2_frame *frame, char *fname) {
+int64_t blosc2_frame_to_file(blosc2_frame *frame, const char *fname) {
     // make sure that we are using an in-memory frame
     if (frame->fname != NULL) {
       fprintf(stderr, "Error: the original frame must be in-memory");

@@ -24,7 +24,7 @@ size_t size = 8 * 1000 * 1000;  /* must be divisible by typesize */
 
 /* Check compressor */
 static char *test_compressor() {
-  char* compressor;
+  const char* compressor;
 
   /* Before any blosc_compress() the compressor must be blosclz */
   compressor = blosc_get_compressor();
@@ -51,7 +51,7 @@ static char *test_compressor() {
 
 /* Check compressing + decompressing */
 static char *test_compress_decompress() {
-  char* compressor;
+  const char* compressor;
 
   /* Activate the BLOSC_COMPRESSOR variable */
   setenv("BLOSC_COMPRESSOR", "lz4", 0);

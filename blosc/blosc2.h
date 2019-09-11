@@ -403,7 +403,7 @@ BLOSC_EXPORT int blosc_set_nthreads(int nthreads);
  *
  * @return The string identifying the compressor being used.
  */
-BLOSC_EXPORT char* blosc_get_compressor(void);
+BLOSC_EXPORT const char* blosc_get_compressor(void);
 
 
 /**
@@ -440,7 +440,7 @@ BLOSC_EXPORT void blosc_set_delta(int dodelta);
  * @return The compressor code. If the compressor code is not recognized,
  * or there is not support for it in this build, -1 is returned.
  */
-BLOSC_EXPORT int blosc_compcode_to_compname(int compcode, char** compname);
+BLOSC_EXPORT int blosc_compcode_to_compname(int compcode, const char** compname);
 
 
 /**
@@ -465,7 +465,7 @@ BLOSC_EXPORT int blosc_compname_to_compcode(const char* compname);
  *
  * This function should always succeed.
  */
-BLOSC_EXPORT char* blosc_list_compressors(void);
+BLOSC_EXPORT const char* blosc_list_compressors(void);
 
 
 /**
@@ -474,7 +474,7 @@ BLOSC_EXPORT char* blosc_list_compressors(void);
  * @return The string with the current Blosc version.
  * Useful for dynamic libraries.
  */
-BLOSC_EXPORT char* blosc_get_version_string(void);
+BLOSC_EXPORT const char* blosc_get_version_string(void);
 
 
 /**
@@ -492,7 +492,7 @@ BLOSC_EXPORT char* blosc_get_version_string(void);
  * @return The code for the compression library (>=0). If it is not supported,
  * this function returns -1.
  */
-BLOSC_EXPORT int blosc_get_complib_info(char* compname, char** complib,
+BLOSC_EXPORT int blosc_get_complib_info(const char* compname, char** complib,
                                         char** version);
 
 
@@ -574,7 +574,7 @@ BLOSC_EXPORT void blosc_cbuffer_versions(const void* cbuffer, int* version,
  *
  * This function should always succeed.
  */
-BLOSC_EXPORT char* blosc_cbuffer_complib(const void* cbuffer);
+BLOSC_EXPORT const char* blosc_cbuffer_complib(const void* cbuffer);
 
 
 /*********************************************************************
@@ -962,7 +962,7 @@ BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams
  *
  * @return If successful, return the index of the metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_has_metalayer(blosc2_schunk *schunk, char *name);
+BLOSC_EXPORT int blosc2_has_metalayer(blosc2_schunk *schunk, const char *name);
 
 /**
  * @brief Add content into a new metalayer.
@@ -974,7 +974,7 @@ BLOSC_EXPORT int blosc2_has_metalayer(blosc2_schunk *schunk, char *name);
  *
  * @return If successful, the index of the new metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_add_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content,
+BLOSC_EXPORT int blosc2_add_metalayer(blosc2_schunk *schunk, const char *name, uint8_t *content,
                                       uint32_t content_len);
 
 /**
@@ -990,7 +990,7 @@ BLOSC_EXPORT int blosc2_add_metalayer(blosc2_schunk *schunk, char *name, uint8_t
  *
  * @return If successful, the index of the metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_update_metalayer(blosc2_schunk *schunk, char *name, uint8_t *content,
+BLOSC_EXPORT int blosc2_update_metalayer(blosc2_schunk *schunk, const char *name, uint8_t *content,
                                          uint32_t content_len);
 
 /**
@@ -1006,7 +1006,7 @@ BLOSC_EXPORT int blosc2_update_metalayer(blosc2_schunk *schunk, char *name, uint
  *
  * @return If successful, the index of the new metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_get_metalayer(blosc2_schunk *schunk, char *name, uint8_t **content,
+BLOSC_EXPORT int blosc2_get_metalayer(blosc2_schunk *schunk, const char *name, uint8_t **content,
                                       uint32_t *content_len);
 
 
@@ -1057,7 +1057,7 @@ BLOSC_EXPORT int blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content);
  *
  * @return The new frame.
  */
-BLOSC_EXPORT blosc2_frame* blosc2_new_frame(char* fname);
+BLOSC_EXPORT blosc2_frame* blosc2_new_frame(const char* fname);
 
 /**
  * @brief Create a frame from a super-chunk.
@@ -1092,7 +1092,7 @@ BLOSC_EXPORT int blosc2_free_frame(blosc2_frame *frame);
  * @return The size of the frame.  If negative, an error happened (including
  * that the original frame is not in-memory).
  */
-BLOSC_EXPORT int64_t blosc2_frame_to_file(blosc2_frame *frame, char *fname);
+BLOSC_EXPORT int64_t blosc2_frame_to_file(blosc2_frame *frame, const char *fname);
 
 /**
  * @brief Initialize a frame out of a file.
