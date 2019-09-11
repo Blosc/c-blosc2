@@ -1116,7 +1116,7 @@ static int parallel_blosc(blosc2_context* context) {
 
   if (threads_callback) {
     threads_callback(threads_callback_data, t_blosc_do_job,
-                     context->nthreads, sizeof(void*), (void*) context->thread_contexts);
+                     context->nthreads, sizeof(struct thread_context), (void*) context->thread_contexts);
   }
   else {
     /* Synchronization point for all threads (wait for initialization) */
@@ -1135,13 +1135,11 @@ static int parallel_blosc(blosc2_context* context) {
   return (int)context->output_bytes;
 }
 
-
-static struct thread_context*
-create_thread_context(blosc2_context* context, int32_t tid) {
-  struct thread_context* thread_context;
+/* initialize a thread_context that has already been allocated */
+static void init_thread_context(struct thread_context* thread_context, blosc2_context* context, int32_t tid)
+{
   int32_t ebsize;
 
-  thread_context = (struct thread_context*)my_malloc(sizeof(struct thread_context));
   thread_context->parent_context = context;
   thread_context->tid = tid;
 
@@ -1174,11 +1172,18 @@ create_thread_context(blosc2_context* context, int32_t tid) {
   }
   thread_context->lz4_hash_table = hash_table;
 #endif
+}
 
+static struct thread_context*
+create_thread_context(blosc2_context* context, int32_t tid) {
+  struct thread_context* thread_context;
+  thread_context = (struct thread_context*)my_malloc(sizeof(struct thread_context));
+  init_thread_context(thread_context, context, tid);
   return thread_context;
 }
 
-void free_thread_context(struct thread_context* thread_context) {
+/* free members of thread_context, but not thread_context itself */
+static void _free_thread_context(struct thread_context* thread_context) {
   my_free(thread_context->tmp);
 #if defined(HAVE_ZSTD)
   if (thread_context->zstd_cctx != NULL) {
@@ -1193,7 +1198,10 @@ void free_thread_context(struct thread_context* thread_context) {
     ippsFree(thread_context->lz4_hash_table);
   }
 #endif
+}
 
+void free_thread_context(struct thread_context* thread_context) {
+  _free_thread_context(thread_context);
   my_free(thread_context);
 }
 
@@ -2392,10 +2400,10 @@ int init_threadpool(blosc2_context *context) {
 
   if (threads_callback) {
       /* Create thread contexts to store data for callback threads */
-    context->thread_contexts = (struct thread_context **)my_malloc(
-            context->nthreads * sizeof(struct thread_context *));
+    context->thread_contexts = (struct thread_context *)my_malloc(
+            context->nthreads * sizeof(struct thread_context));
     for (tid = 0; tid < context->nthreads; tid++)
-      context->thread_contexts[tid] = create_thread_context(context, tid);
+      init_thread_context(context->thread_contexts + tid, context, tid);
   }
   else {
     #if !defined(_WIN32)
@@ -2697,7 +2705,7 @@ int release_threadpool(blosc2_context *context) {
     if (threads_callback) {
       /* free context data for user-managed threads */
       for (t=0; t<context->threads_started; t++)
-        free_thread_context(context->thread_contexts[t]);
+        _free_thread_context(context->thread_contexts + t);
       my_free(context->thread_contexts);
     }
     else {
