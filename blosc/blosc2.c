@@ -1183,7 +1183,7 @@ create_thread_context(blosc2_context* context, int32_t tid) {
 }
 
 /* free members of thread_context, but not thread_context itself */
-static void _free_thread_context(struct thread_context* thread_context) {
+static void destroy_thread_context(struct thread_context* thread_context) {
   my_free(thread_context->tmp);
 #if defined(HAVE_ZSTD)
   if (thread_context->zstd_cctx != NULL) {
@@ -1201,7 +1201,7 @@ static void _free_thread_context(struct thread_context* thread_context) {
 }
 
 void free_thread_context(struct thread_context* thread_context) {
-  _free_thread_context(thread_context);
+  destroy_thread_context(thread_context);
   my_free(thread_context);
 }
 
@@ -2705,7 +2705,7 @@ int release_threadpool(blosc2_context *context) {
     if (threads_callback) {
       /* free context data for user-managed threads */
       for (t=0; t<context->threads_started; t++)
-        _free_thread_context(context->thread_contexts + t);
+        destroy_thread_context(context->thread_contexts + t);
       my_free(context->thread_contexts);
     }
     else {
