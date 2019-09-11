@@ -1162,13 +1162,11 @@ static void init_thread_context(struct thread_context* thread_context, blosc2_co
   status = ippsEncodeLZ4HashTableGetSize_8u(&hash_size);
   if (status != ippStsNoErr) {
     fprintf(stderr, "Error in ippsEncodeLZ4HashTableGetSize_8u");
-    return NULL;
   }
   Ipp8u *hash_table = ippsMalloc_8u(hash_size);
   status = ippsEncodeLZ4HashTableInit_8u(hash_table, inlen);
   if (status != ippStsNoErr) {
     fprintf(stderr, "Error in ippsEncodeLZ4HashTableInit_8u");
-    return NULL;
   }
   thread_context->lz4_hash_table = hash_table;
 #endif
