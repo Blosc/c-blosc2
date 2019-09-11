@@ -49,8 +49,8 @@ static char* test_schunk() {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
-    nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
-    mu_assert("ERROR: bad append in frame", nchunk >= 0);
+    int nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
+    mu_assert("ERROR: bad append in frame", nchunks_ > 0);
   }
 
   blosc2_update_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer2", sizeof("my metalayer2"));
