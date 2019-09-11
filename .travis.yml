@@ -10,6 +10,12 @@ compiler:
   - gcc
   - clang
 
+# whether to test threads using callback backend
+env:
+  matrix:
+    - BLOSC_TEST_CALLBACK=yes
+    - BLOSC_TEST_CALLBACK=no
+
 before_install: ./scripts/travis-before-install.sh
 
 before_script:

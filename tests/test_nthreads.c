@@ -86,6 +86,7 @@ int main() {
   /* Activate the BLOSC_NTHREADS variable */
   setenv("BLOSC_NTHREADS", "3", 1);
 
+  install_blosc_callback_test(); /* optionally install callback test */
   blosc_init();
   blosc_set_nthreads(1);
 

@@ -154,4 +154,22 @@ inline static void blosc_test_print_bad_arg_msg(const int32_t arg_index) {
   fprintf(stderr, "Invalid value specified for argument at index %d.\n", arg_index);
 }
 
+/* dummy callback backend for testing purposes */
+/* serial "threads" backend */
+static void dummy_threads_callback(void *callback_data, void (*dojob)(void *), int numjobs, size_t jobdata_elsize, void *jobdata)
+{
+  int i;
+  (void) callback_data; /* unused */
+  for (i = 0; i < numjobs; ++i)
+    dojob(((char *) jobdata) + ((unsigned) i)*jobdata_elsize);
+}
+/* install the callback if environment variable BLOSC_TEST_CALLBACK="yes" */
+static void install_blosc_callback_test(void)
+{
+  char *callback_env;
+  callback_env = getenv("BLOSC_TEST_CALLBACK");
+  if (callback_env && !strcmp(callback_env, "yes"))
+    blosc_set_threads_callback(dummy_threads_callback, NULL);
+}
+
 #endif  /* !defined(BLOSC_TEST_COMMON_H) */

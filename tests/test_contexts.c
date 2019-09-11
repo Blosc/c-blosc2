@@ -33,6 +33,8 @@ int main() {
   printf("Blosc version info: %s (%s)\n",
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
+  install_blosc_callback_test(); /* optionally install callback test */
+
   /* Create a context for compression */
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_BLOSCLZ;

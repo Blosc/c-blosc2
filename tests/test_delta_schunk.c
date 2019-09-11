@@ -28,6 +28,7 @@ int main() {
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Initialize the Blosc compressor */
+  install_blosc_callback_test(); /* optionally install callback test */
   blosc_init();
 
   /* Create a super-chunk container */

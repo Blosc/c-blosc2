@@ -135,6 +135,8 @@ int main() {
     data2[i] = i * 2;
   }
 
+  install_blosc_callback_test(); /* optionally install callback test */
+
   /* Create a context for compression */
   cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = sizeof(int32_t);
