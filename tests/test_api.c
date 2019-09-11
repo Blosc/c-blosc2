@@ -101,6 +101,7 @@ static char* all_tests() {
 int main() {
   char* result;
 
+  install_blosc_callback_test(); /* optionally install callback test */
   blosc_init();
   blosc_set_nthreads(1);
 

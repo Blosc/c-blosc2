@@ -103,6 +103,7 @@ int main(int argc, char **argv) {
     printf("STARTING TESTS for %s", argv[0]);
   }
 
+  install_blosc_callback_test(); /* optionally install callback test */
   blosc_init();
 
   /* Run all the suite */

@@ -108,6 +108,7 @@ int main(int argc, char** argv) {
   }
 
   /* Initialize blosc before running tests. */
+  install_blosc_callback_test(); /* optionally install callback test */
   blosc_init();
   blosc_set_nthreads(blosc_thread_count);
 
