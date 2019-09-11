@@ -838,8 +838,6 @@ typedef struct blosc2_schunk {
   //<! The user-defined metadata.
   int32_t usermeta_len;
   //<! The (compressed) length of the user-defined metadata.
-  uint8_t* reserved;
-  //!< Reserved for the future.
 } blosc2_schunk;
 
 /**
