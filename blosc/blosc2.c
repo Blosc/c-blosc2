@@ -1528,6 +1528,9 @@ static int write_compression_header(blosc2_context* context,
       filters[i] = context->filters[i];
       filters_meta[i] = context->filters_meta[i];
     }
+    uint8_t* blosc2_flags = context->dest + 0x1F;
+    *blosc2_flags = 0;    // zeroes flags
+    *blosc2_flags |= is_little_endian() ? 0 : BLOSC2_BIGENDIAN;  // endianness
     if (dict_training || context->clevel == 0) {
       context->bstarts = NULL;
       context->output_bytes = BLOSC_EXTENDED_HEADER_LENGTH;
@@ -1536,8 +1539,6 @@ static int write_compression_header(blosc2_context* context,
       context->output_bytes = BLOSC_EXTENDED_HEADER_LENGTH +
                               sizeof(int32_t) * context->nblocks;
     }
-    uint8_t * blosc2_flags = context->dest + 0x1F;
-    *blosc2_flags = 0;    // zeroes flags
     if (context->use_dict) {
       *blosc2_flags |= BLOSC2_USEDICT;
     }

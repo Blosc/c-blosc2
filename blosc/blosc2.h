@@ -123,7 +123,8 @@ enum {
  * @brief Codes for new internal flags in Blosc2
  */
 enum {
-  BLOSC2_USEDICT = 0x1,            //!< use dictionaries with codec
+  BLOSC2_USEDICT = 0x1,          //!< use dictionaries with codec
+  BLOSC2_BIGENDIAN = 0x2,        //!< data is in big-endian ordering
 };
 
 /**
