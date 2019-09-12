@@ -42,11 +42,9 @@
 void swap_store(void *dest, const void *pa, int size) {
     uint8_t* pa_ = (uint8_t*)pa;
     uint8_t* pa2_ = malloc((size_t)size);
-    int i = 1;                    /* for big/little endian detection */
-    char* p = (char*)&i;
 
-    if (p[0] == 1) {
-        /* little endian */
+    bool little_endian = is_little_endian();
+    if (little_endian) {
         switch (size) {
             case 8:
                 pa2_[0] = pa_[7];
