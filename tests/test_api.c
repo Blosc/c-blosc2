@@ -56,7 +56,7 @@ static char* test_cbuffer_versions() {
 
 
 static char* test_cbuffer_complib() {
-  char* complib;
+  const char* complib;
 
   complib = blosc_cbuffer_complib(dest);
   mu_assert("ERROR: complib incorrect", strcmp(complib, "BloscLZ") == 0);
