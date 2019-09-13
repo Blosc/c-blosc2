@@ -58,12 +58,7 @@ int main() {
   dparams.nthreads = NTHREADS;
 
   /* Create a new super-chunk backed by an in-memory frame */
-  blosc2_frame* frame1 = &(blosc2_frame) {
-          .sdata = NULL,
-          .fname = NULL,
-          .len = 0,
-          .maxlen = 0,
-  };
+  blosc2_frame* frame1 = &(blosc2_frame) {.fname = NULL};
   blosc2_schunk* schunk1 = blosc2_new_schunk(cparams, dparams, frame1);
 
   blosc_set_timestamp(&last);
@@ -85,12 +80,7 @@ int main() {
          ttotal, nbytes / (ttotal * MB));
 
   /* Create a new super-chunk backed by a fileframe */
-  blosc2_frame* frame2 = &(blosc2_frame) {
-          .sdata = NULL,
-          .fname = "frame_backed_schunk.b2frame",
-          .len = 0,
-          .maxlen = 0,
-  };
+  blosc2_frame* frame2 = &(blosc2_frame) {.fname = "frame_backed_schunk.b2frame"};
   blosc2_schunk* schunk2 = blosc2_new_schunk(cparams, dparams, frame2);
 
   blosc_set_timestamp(&last);
