@@ -6,6 +6,22 @@
 Changes from 2.0.0-beta.3 to 2.0.0-beta.4
 =========================================
 
+* New pluggable threading backend.  Instead of having Blosc use its own
+  thread pool, you can instead call
+  `blosc_set_threads_callback(threads_callback, callback_data)` to install
+  your own threading backend.  This gives Blosc the possibility to use the
+  same threading mechanism as one you are using in the rest of your program
+  (e.g. OpenMP or Intel TBB), sharing the same threads, rather than starting
+  its own threads that compete with yours for the CPU cores. See #PR 81.
+  Thanks to Steven G. Johnson.
+
+* The endianness of the platform that is writing the data in chunks is stored
+  now in the headers of the chunks.  This info is not used yet, but this
+  should allow a good hint for implementing format compatibility among
+  platforms with different endianness in other layers.  See PR #84. 
+
+* Fixed a nasty bug that prevented frames to go more than 2 GB in size.
+
 * Added a cache for on-disk offsets.  This accelerates the reading of slices
   from disk quite a lot (up to 50% with my benchmarks).
 

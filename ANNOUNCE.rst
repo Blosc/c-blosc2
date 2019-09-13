@@ -1,16 +1,17 @@
 ===============================================================
- Announcing C-Blosc2 2.0.0-beta.3
+ Announcing C-Blosc2 2.0.0-beta.4
  A simple, compressed and fast data store library for C
 ===============================================================
 
 What is new?
 ============
 
-This is the third beta version, a quick release to fix the fact that the previous one was made on a branch different than master.  Also, this includes minor fixes in the trailer section of the frame; hence, the trailer version has been bumped to 1.
+This is the fourth beta version, adding an important fix for making 64-bit containers to actually work.  Also, a new pluggable threading backend has been added, allowing better interaction with the threading mechanism that you are using in the rest of your program
+  (e.g. OpenMP or Intel TBB).  Finally, a cache has been added for on-disk offsets.  This accelerates the reading of slices from disk quite a lot (up to 50% with my benchmarks).
 
 In principle, C-Blosc2 should be backward compatible with C-Blosc, so you can start using it right away and slowly begin to use its new functionality, like the new filters, prefilters, super-chunks and frames.  See docs in: https://blosc-doc.readthedocs.io
 
-**IMPORTANT**: Please note that, even if the API has been declared frozen, that does not mean that Blosc2 is ready for production yet: internal structures can change, formats can change and most importantly, bugs can be normal at this stage.  So *do not assume* that your blosc2 data can be read with future versions.
+**IMPORTANT**: Please note that, even if the API has been declared frozen, that does *not* mean that Blosc2 is ready for production yet: internal structures can change, formats can change and most importantly, bugs can be normal at this stage.  So *do not assume* that your blosc2 data can be read with future versions.
 
 For more info, please see the release notes in:
 
