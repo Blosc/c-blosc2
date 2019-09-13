@@ -1,6 +1,12 @@
 ======================================================
- Release notes for C-Blosc2 2.0.0-beta.4 (fourth beta)
+ Release notes for C-Blosc2 2.0.0-beta.5 (fifth beta)
 ======================================================
+
+
+Changes from 2.0.0-beta.4 to 2.0.0-beta.5
+=========================================
+
+#XXX version-specific blurb XXX#
 
 
 Changes from 2.0.0-beta.3 to 2.0.0-beta.4
