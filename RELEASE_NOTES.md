@@ -9,6 +9,7 @@ Changes from 2.0.0-beta.3 to 2.0.0-beta.4
 * Added a cache for on-disk offsets.  This accelerates the reading of slices
   from disk quite a lot (up to 50% with my benchmarks).
 
+* Zstd codec upgraded from 1.4.0 to 1.4.3.
 
 Changes from 2.0.0-beta.2 to 2.0.0-beta.3
 =========================================
