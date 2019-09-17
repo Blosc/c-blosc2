@@ -33,7 +33,7 @@ Download sources
 
 The github repository is over here:
 
-https://github.com/c-blosc2
+https://github.com/Blosc/c-blosc2
 
 Blosc is distributed using the BSD license, see LICENSES/BLOSC2.txt
 for details.
