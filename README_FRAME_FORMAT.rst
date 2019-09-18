@@ -180,7 +180,7 @@ The different chunks are described in the `chunk format <README_CHUNK_FORMAT.rst
 The trailer section
 -------------------
 
-Here it is data that can change in size, mainly the `metauser` chunk::
+Here it is data that can change in size, mainly the `usermeta` chunk::
 
     |-0-|-1-|-2-|-3-|-4-|-5-|-6-|====================|---|---------------|---|---|=================|
     | 9X| aX| c6| usermeta_len  |   usermeta_chunk   | ce| trailer_len   | d8|fpt| fingerprint     |
