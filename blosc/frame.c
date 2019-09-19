@@ -621,15 +621,15 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
 /* Write an in-memory frame out to a file. */
 int64_t blosc2_frame_to_file(blosc2_frame *frame, const char *fname) {
-    // make sure that we are using an in-memory frame
-    if (frame->fname != NULL) {
-      fprintf(stderr, "Error: the original frame must be in-memory");
-      return -1;
-    }
-    FILE* fp = fopen(fname, "wb");
-    fwrite(frame->sdata, (size_t)frame->len, 1, fp);
-    fclose(fp);
-    return frame->len;
+  // make sure that we are using an in-memory frame
+  if (frame->fname != NULL) {
+    fprintf(stderr, "Error: the original frame must be in-memory");
+    return -1;
+  }
+  FILE* fp = fopen(fname, "wb");
+  fwrite(frame->sdata, (size_t)frame->len, 1, fp);
+  fclose(fp);
+  return frame->len;
 }
 
 
@@ -668,6 +668,37 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   free(trailer);
 
   fclose(fp);
+
+  return frame;
+}
+
+
+/* Initialize a frame out of a serialized frame */
+blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy) {
+  blosc2_frame* frame = calloc(1, sizeof(blosc2_frame));
+
+  // Get the length of the frame
+  const uint8_t* header = sframe;
+  int64_t frame_len;
+  swap_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
+  assert(frame_len == len);   // sanity check
+  frame->len = frame_len;
+
+  // Now, the trailer length
+  const uint8_t* trailer = sframe + frame_len - FRAME_TRAILER_MINLEN;
+  int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
+  assert(trailer[trailer_offset - 1] == 0xce);
+  uint32_t trailer_len;
+  swap_store(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
+  frame->trailer_len = trailer_len;
+
+  if (copy) {
+    frame->sdata = malloc(len);
+    memcpy(frame->sdata, sframe, len);
+  }
+  else {
+    frame->sdata = sframe;
+  }
 
   return frame;
 }

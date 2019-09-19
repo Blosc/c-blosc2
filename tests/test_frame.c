@@ -29,6 +29,7 @@ bool sparse_schunk;
 bool filter_pipeline;
 bool metalayers;
 bool usermeta;
+bool check_sframe;
 char *fname;
 
 
@@ -83,6 +84,13 @@ static char* test_frame() {
         schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
       } else {
         blosc2_free_schunk(schunk);
+        if (check_sframe) {
+          int64_t len = frame->len;
+          uint8_t *sframe = malloc(len);
+          memcpy(sframe, frame->sdata, frame->len);
+          blosc2_free_frame(frame);
+          frame = blosc2_frame_from_sframe(sframe, len, false);
+        }
         schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
       }
     }
@@ -152,6 +160,14 @@ static char* test_frame() {
         schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
       } else {
         blosc2_free_schunk(schunk);
+        if (check_sframe) {
+          int64_t len = frame->len;
+          uint8_t *sframe = malloc(len);
+          memcpy(sframe, frame->sdata, frame->len);
+          blosc2_free_frame(frame);
+          frame = blosc2_frame_from_sframe(sframe, len, true);
+          free(sframe);
+        }
         schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
       }
     }
@@ -212,16 +228,18 @@ static char *all_tests() {
         for (int ifilter_pipeline = 0; ifilter_pipeline < 2; ifilter_pipeline++) {
           for (int imetalayers = 0; imetalayers < 2; imetalayers++) {
             for (int iusermeta = 0; iusermeta < 2; iusermeta++) {
-              free_new = (bool) ifree_new;
-              sparse_schunk = (bool) isparse_schunk;
-              filter_pipeline = (bool) ifilter_pipeline;
-              metalayers = (bool) imetalayers;
-              usermeta = (bool) iusermeta;
-              fname = NULL;
-              mu_run_test(test_frame);
-              snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
-              fname = buf;
-              mu_run_test(test_frame);
+              for (int icheck_sframe = 0; icheck_sframe < 2; icheck_sframe++) {
+                check_sframe = (bool) icheck_sframe;
+                sparse_schunk = (bool) isparse_schunk;
+                filter_pipeline = (bool) ifilter_pipeline;
+                metalayers = (bool) imetalayers;
+                usermeta = (bool) iusermeta;
+                fname = NULL;
+                mu_run_test(test_frame);
+                snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
+                fname = buf;
+                mu_run_test(test_frame);
+              }
             }
           }
         }

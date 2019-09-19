@@ -112,13 +112,6 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
 
 /* Free all memory from a super-chunk. */
 int blosc2_free_schunk(blosc2_schunk *schunk) {
-
-  // Update the metalayers and trailer in a possible attached frame
-//  int rc = blosc2_metalayer_flush(schunk);
-//  if (rc < 0) {
-//    return -3;
-//  }
-
   if (schunk->data != NULL) {
     for (int i = 0; i < schunk->nchunks; i++) {
       free(schunk->data[i]);
@@ -144,6 +137,7 @@ int blosc2_free_schunk(blosc2_schunk *schunk) {
 
   return 0;
 }
+
 
 /* Append an existing chunk into a super-chunk. */
 int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy) {

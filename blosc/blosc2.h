@@ -1123,6 +1123,17 @@ BLOSC_EXPORT int64_t blosc2_frame_to_file(blosc2_frame *frame, const char *fname
 BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(const char *fname);
 
 /**
+ * @brief Initialize a frame out of a serialized frame.
+ *
+ * @param buffer The buffer for the serialized frame.
+ * @param len The length of buffer for the serialized frame.
+ * @param copy Whether the serialized frame should be copied internally or not.
+ *
+ * @return The frame created from the serialized frame.
+ */
+BLOSC_EXPORT blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy);
+
+/**
  * @brief Create a super-chunk from a frame.
  *
  * @param frame The frame from which the super-chunk will be created.
