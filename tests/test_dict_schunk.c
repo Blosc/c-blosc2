@@ -121,11 +121,11 @@ static char* test_dict() {
         break;
       case 256 * KB:
         mu_assert("ERROR: Dict does not reach expected compression ratio",
-                  300 * cbytes < nbytes);
+                  260 * cbytes < nbytes);
         break;
       default:
         mu_assert("ERROR: Dict does not reach expected compression ratio",
-                  300 * cbytes < nbytes);
+                  260 * cbytes < nbytes);
     }
   }
 
