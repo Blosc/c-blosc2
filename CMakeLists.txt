@@ -68,7 +68,7 @@
 #    DEV: static includes blosc2.a and blosc2.h
 
 if (NOT WIN32)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
 endif(NOT WIN32)
 
 cmake_minimum_required(VERSION 2.8.10)
