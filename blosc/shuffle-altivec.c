@@ -2,6 +2,7 @@
   Blosc - Blocked Shuffling and Compression Library
 
   Author: Francesc Alted <francesc@blosc.org>
+  *       Jerome Kieffer <jerome.kieffer@esrf.fr>
 
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
@@ -15,61 +16,145 @@
 #endif
 
 #include <emmintrin.h>
-
-
-/* The next is useful for debugging purposes */
-#if 0
+#include <altivec.h>
 #include <stdio.h>
-#include <string.h>
 
-static void printxmm(__m128i xmm0)
+
+//Store a vector to an unaligned location in memory
+static void vec_st_unaligned(__vector uint8_t v, int32_t position,  __vector uint8_t * dst)
 {
-  uint8_t buf[16];
-
-  ((__m128i *)buf)[0] = xmm0;
-  printf("%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x\n",
-          buf[0], buf[1], buf[2], buf[3],
-          buf[4], buf[5], buf[6], buf[7],
-          buf[8], buf[9], buf[10], buf[11],
-          buf[12], buf[13], buf[14], buf[15]);
+    //Load the surrounding area
+    __vector uint8_t low = vec_ld( position, dst);
+    __vector uint8_t high = vec_ld( position+16, dst);
+    //Prepare the constants that we need
+    uint8_t offset = ((size_t)dst) % 16;
+    __vector uint8_t permute_lo, permute_hi;
+    for (uint8_t i=0; i<16; i++)
+    {
+        if (i<offset){
+            permute_lo[i] = i;
+            permute_hi[i] = 32 + i - offset;
+        }
+        else{
+            permute_lo[i] = 16 + i - offset;
+            permute_hi[i] = i;
+        }
+    }
+    //Insert our data into the low and high vectors
+    low = vec_perm( low, v, permute_lo );
+    high = vec_perm( high, v, permute_hi );
+    //Store the two aligned result vectors
+    vec_st( low, position, dst);
+    vec_st( high, position+16, dst);
 }
-#endif
+/* Missaligned storage helper function which su
+ * 
+ * param:
+ *     data: the (misaligned) vector to store
+ *     position: index in dst where to store
+ *     dst: the pointer of where to store
+ *     previous: the remaining vector of the last write
+ *     shuffle_lo: the vector for shuffling the lower part
+ *     shuffle_hi: the vector for shuffling the higher part
+ * 
+ * return: The remainder to be still written in next vector filled with zeros
+ */
+static inline __vector uint8_t helper_misaligned_store(__vector uint8_t data, 
+                                                       int32_t position,  
+                                                       uint8_t * dst,
+                                                       __vector uint8_t previous,
+                                                       __vector uint8_t shuffle_lo,
+                                                       __vector uint8_t shuffle_hi)
+{  
+    static const __vector uint8_t zero = (const __vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0,
+                                                                   0, 0, 0, 0, 0, 0, 0, 0};
+    __vector uint8_t low, high;
+    //Insert our data into the low and high vectors
+    low = vec_perm( previous, data, shuffle_lo );
+    high = vec_perm( zero, data, shuffle_hi );
+    //Store the two aligned result vectors
+    vec_st( low, position, dst);
+    // Return the next "previous" vector
+    return high;
+}                                                 
 
+/* Calculate the permutation vector for storing data in the lower part
+ * 
+ * param: offset, the position
+ */
+static inline __vector uint8_t gen_permute_low(int32_t offset)
+{
+    __vector uint8_t permute;
+    for (uint8_t i=0; i<16; i++)
+    {
+       if (i<offset) permute[i] = i;
+       else permute[i] = 16 + i - offset;
+    }
+    return permute;
+} 
+
+/* Calculate the permutation vector for storing data in the upper part
+ * 
+ * param: offset, the position
+ */
+static inline __vector uint8_t gen_permute_high(int32_t offset)
+{
+    __vector uint8_t permute;
+    for (int32_t i=0; i<16; i++)
+    {
+       if (i<offset) permute[i] = 32 + i - offset;
+       else permute[i] = i;
+    }
+    return permute;
+} 
 
 /* Routine optimized for shuffling a buffer for a type size of 2 bytes. */
 static void
 shuffle2_altivec(uint8_t* const dest, const uint8_t* const src,
-                 const int32_t vectorizable_elements, const int32_t total_elements) {
-  static const int32_t bytesoftype = 2;
+                 const int32_t vectorizable_elements, const int32_t total_elements) 
+{
+  static const __vector uint8_t even = (const __vector uint8_t) {0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
+                                                                 0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e};
+  static const __vector uint8_t odd = (const __vector uint8_t) {0x01, 0x03, 0x05, 0x07, 0x09, 0x0b, 0x0d, 0x0f,
+                                                                0x11, 0x13, 0x15, 0x17, 0x19, 0x1b, 0x1d, 0x1f};
+  const int32_t offset = total_elements%16;
+  static __vector uint8_t permute_lo, permute_hi;
+  const int32_t bytesoftype = 2;
   int32_t j;
-  int k;
-  uint8_t* dest_for_jth_element;
-  __m128i xmm0[2], xmm1[2];
-
-  for (j = 0; j < vectorizable_elements; j += sizeof(__m128i)) {
-    /* Fetch 16 elements (32 bytes) then transpose bytes, words and double words. */
-    for (k = 0; k < 2; k++) {
-      xmm0[k] = _mm_loadu_si128((__m128i*)(src + (j * bytesoftype) + (k * sizeof(__m128i))));
-      xmm0[k] = _mm_shufflelo_epi16(xmm0[k], 0xd8);
-      xmm0[k] = _mm_shufflehi_epi16(xmm0[k], 0xd8);
-      xmm0[k] = _mm_shuffle_epi32(xmm0[k], 0xd8);
-      xmm1[k] = _mm_shuffle_epi32(xmm0[k], 0x4e);
-      xmm0[k] = _mm_unpacklo_epi8(xmm0[k], xmm1[k]);
-      xmm0[k] = _mm_shuffle_epi32(xmm0[k], 0xd8);
-      xmm1[k] = _mm_shuffle_epi32(xmm0[k], 0x4e);
-      xmm0[k] = _mm_unpacklo_epi16(xmm0[k], xmm1[k]);
-      xmm0[k] = _mm_shuffle_epi32(xmm0[k], 0xd8);
-    }
-    /* Transpose quad words */
-    for (k = 0; k < 1; k++) {
-      xmm1[k * 2] = _mm_unpacklo_epi64(xmm0[k], xmm0[k + 1]);
-      xmm1[k * 2 + 1] = _mm_unpackhi_epi64(xmm0[k], xmm0[k + 1]);
-    }
+  __vector uint8_t inp0, inp1, out0, out1, low;
+  uint8_t* const dest1 = &dest[total_elements];
+  
+  //printf("vectorizable_elements: %d total_elements: %d dst: %d dst1: %d delta: %d offset: %d\n", vectorizable_elements, total_elements, dest, dest1, dest1-dest, offset);
+  
+  if (offset)
+  {
+     // Initialize the two permutation vectors
+     permute_lo = gen_permute_low(offset);
+     permute_hi = gen_permute_high(offset);
+     low = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  }
+  for (j = 0; j < vectorizable_elements; j += 16) 
+  {
+    /* Fetch 16 elements (32 bytes) */
+    inp0 = vec_ld(bytesoftype*j, src);
+    inp1 = vec_ld(bytesoftype*j+16, src);
+    /* Transpose vectors */
+    out0 = vec_perm(inp0, inp1, even);
+    out1 = vec_perm(inp0, inp1, odd);
     /* Store the result vectors */
-    dest_for_jth_element = dest + j;
-    for (k = 0; k < 2; k++) {
-      _mm_storeu_si128((__m128i*)(dest_for_jth_element + (k * total_elements)), xmm1[k]);
+    vec_st(out0, j, dest);
+    if (offset)
+    {// misaligned store
+        low = helper_misaligned_store(out1, j, dest1, low, permute_lo, permute_hi);
     }
+    else
+    {// aligned store
+        vec_st(out1, j, dest1);
+    }
+  }
+  if (offset)
+  {
+      vec_st(low, j, dest1);
   }
 }
 
@@ -78,38 +163,95 @@ static void
 shuffle4_altivec(uint8_t* const dest, const uint8_t* const src,
                  const int32_t vectorizable_elements, const int32_t total_elements) {
   static const int32_t bytesoftype = 4;
-  int32_t i;
-  int j;
-  uint8_t* dest_for_ith_element;
-  __m128i xmm0[4], xmm1[4];
-
-  for (i = 0; i < vectorizable_elements; i += sizeof(__m128i)) {
-    /* Fetch 16 elements (64 bytes) then transpose bytes and words. */
-    for (j = 0; j < 4; j++) {
-      xmm0[j] = _mm_loadu_si128((__m128i*)(src + (i * bytesoftype) + (j * sizeof(__m128i))));
-      xmm1[j] = _mm_shuffle_epi32(xmm0[j], 0xd8);
-      xmm0[j] = _mm_shuffle_epi32(xmm0[j], 0x8d);
-      xmm0[j] = _mm_unpacklo_epi8(xmm1[j], xmm0[j]);
-      xmm1[j] = _mm_shuffle_epi32(xmm0[j], 0x04e);
-      xmm0[j] = _mm_unpacklo_epi16(xmm0[j], xmm1[j]);
-    }
-    /* Transpose double words */
-    for (j = 0; j < 2; j++) {
-      xmm1[j * 2] = _mm_unpacklo_epi32(xmm0[j * 2], xmm0[j * 2 + 1]);
-      xmm1[j * 2 + 1] = _mm_unpackhi_epi32(xmm0[j * 2], xmm0[j * 2 + 1]);
-    }
-    /* Transpose quad words */
-    for (j = 0; j < 2; j++) {
-      xmm0[j * 2] = _mm_unpacklo_epi64(xmm1[j], xmm1[j + 2]);
-      xmm0[j * 2 + 1] = _mm_unpackhi_epi64(xmm1[j], xmm1[j + 2]);
-    }
+  static const __vector uint8_t even = (const __vector uint8_t) {0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
+                                                                 0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e};
+  static const __vector uint8_t odd = (const __vector uint8_t) {0x01, 0x03, 0x05, 0x07, 0x09, 0x0b, 0x0d, 0x0f,
+                                                                0x11, 0x13, 0x15, 0x17, 0x19, 0x1b, 0x1d, 0x1f};
+  int32_t j;
+  const uint8_t offset1 = total_elements%16;
+  const uint8_t offset2 = (2*total_elements)%16;
+  const uint8_t offset3 = (3*total_elements)%16;
+  __vector uint8_t inp0, inp1, inp2, inp3, 
+                   tmp0, tmp1, tmp2, tmp3,
+                   out0, out1, out2, out3,
+                   low1, low2, low3,
+                   permute_lo1, permute_hi1,
+                   permute_lo2, permute_hi2,
+                   permute_lo3, permute_hi3;
+  uint8_t* const dest1 = &dest[total_elements];
+  uint8_t* const dest2 = &dest[2*total_elements];
+  uint8_t* const dest3 = &dest[3*total_elements];
+  
+  //printf("vectorizable_elements: %d total_elements: %d dst: %d dst1: %d delta: %d offset: %d\n", vectorizable_elements, total_elements, dest, dest1, dest1-dest, offset);
+  
+  if (offset1)
+  {
+     // Initialize the two permutation vectors
+     permute_lo1 = gen_permute_low(offset1);
+     permute_hi1 = gen_permute_high(offset1);
+     low1 = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  }
+  if (offset2)
+  {
+     // Initialize the two permutation vectors
+     permute_lo2 = gen_permute_low(offset2);
+     permute_hi2 = gen_permute_high(offset2);
+     low2 = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  }
+  if (offset3)
+  {
+     // Initialize the two permutation vectors
+     permute_lo3 = gen_permute_low(offset3);
+     permute_hi3 = gen_permute_high(offset3);
+     low3 = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  }
+  
+  for (j = 0; j < vectorizable_elements; j += 16) 
+  {
+    /* Fetch 16 elements (64 bytes) */
+    inp0 = vec_ld(bytesoftype*j, src);
+    inp1 = vec_ld(bytesoftype*j+16, src);
+    inp2 = vec_ld(bytesoftype*j+32, src);
+    inp3 = vec_ld(bytesoftype*j+48, src);
+    /* Transpose vectors */
+    tmp0 = vec_perm(inp0, inp1, even);
+    tmp1 = vec_perm(inp0, inp1, odd);
+    tmp2 = vec_perm(inp2, inp3, even);
+    tmp3 = vec_perm(inp2, inp3, odd);
+    out0 = vec_perm(tmp0, tmp2, even); //index0
+    out1 = vec_perm(tmp1, inp3, even); //index1
+    out2 = vec_perm(tmp0, tmp2, odd);  //index2
+    out3 = vec_perm(tmp1, inp3, odd);  //index3
     /* Store the result vectors */
-    dest_for_ith_element = dest + i;
-    for (j = 0; j < 4; j++) {
-      _mm_storeu_si128((__m128i*)(dest_for_ith_element + (j * total_elements)), xmm0[j]);
-    }
+    vec_st(out0, j, dest);
+    if (offset1)
+        low1 = helper_misaligned_store(out1, j, dest1, low1, permute_lo1, permute_hi1);
+    else
+        vec_st(out1, j, dest1);
+    if (offset2)
+        low2 = helper_misaligned_store(out2, j, dest2, low2, permute_lo2, permute_hi2);
+    else
+        vec_st(out2, j, dest2);
+    if (offset3)
+        low3 = helper_misaligned_store(out3, j, dest3, low3, permute_lo3, permute_hi3);
+    else
+        vec_st(out3, j, dest3);
+        
+  }
+  if (offset1)
+  {
+      vec_st(low1, j, dest1);
+  }
+  if (offset2)
+  {
+      vec_st(low2, j, dest2);
+  }
+  if (offset3)
+  {
+      vec_st(low3, j, dest3);
   }
 }
+
 
 /* Routine optimized for shuffling a buffer for a type size of 8 bytes. */
 static void
@@ -505,8 +647,12 @@ unshuffle16_tiled_altivec(uint8_t* const dest, const uint8_t* const orig,
 /* Shuffle a block.  This can never fail. */
 void
 shuffle_altivec(const int32_t bytesoftype, const int32_t blocksize,
-                const uint8_t *_src, uint8_t *_dest) {
-  const int32_t vectorized_chunk_size = bytesoftype * sizeof(__m128i);
+                const uint8_t *_src, uint8_t *_dest) 
+{  
+	int32_t vectorized_chunk_size;
+    vectorized_chunk_size = bytesoftype * 16;
+
+
   /* If the blocksize is not a multiple of both the typesize and
      the vector size, round the blocksize down to the next value
      which is a multiple of both. The vectorized shuffle can be
@@ -578,6 +724,17 @@ unshuffle_altivec(const int32_t bytesoftype, const int32_t blocksize,
     unshuffle_generic(bytesoftype, blocksize, _src, _dest);
     return;
   }
+
+  /* Warning in case of unaligned buffers*/
+  if (((size_t)_dest) % 16)
+  {
+       printf("shuffle2_altivec: Unaligned destination !\n");
+  }
+  if (((size_t)_src) % 16) 
+  {
+      printf("shuffle2_altivec: Unaligned source !\n");
+  }
+
 
   /* Optimized unshuffle implementations */
   switch (bytesoftype) {
