@@ -20,34 +20,34 @@
 #include <stdio.h>
 
 
-//Store a vector to an unaligned location in memory
-static void vec_st_unaligned(__vector uint8_t v, int32_t position,  __vector uint8_t * dst)
-{
-    //Load the surrounding area
-    __vector uint8_t low = vec_ld( position, dst);
-    __vector uint8_t high = vec_ld( position+16, dst);
-    //Prepare the constants that we need
-    uint8_t offset = ((size_t)dst) % 16;
-    __vector uint8_t permute_lo, permute_hi;
-    for (uint8_t i=0; i<16; i++)
-    {
-        if (i<offset){
-            permute_lo[i] = i;
-            permute_hi[i] = 32 + i - offset;
-        }
-        else{
-            permute_lo[i] = 16 + i - offset;
-            permute_hi[i] = i;
-        }
-    }
-    //Insert our data into the low and high vectors
-    low = vec_perm( low, v, permute_lo );
-    high = vec_perm( high, v, permute_hi );
-    //Store the two aligned result vectors
-    vec_st( low, position, dst);
-    vec_st( high, position+16, dst);
+// Store a vector to an unaligned location in memory ... not optimal nor thread-safe
+static void vec_st_unaligned(__vector uint8_t v, int32_t position,  __vector uint8_t * dst){
+  // Load the surrounding area
+  __vector uint8_t low = vec_ld(position, dst);
+  __vector uint8_t high = vec_ld(position + 16, dst);
+  // Prepare the constants that we need
+  uint8_t offset = ((size_t)dst) % 16;
+  __vector uint8_t permute_lo, permute_hi;
+  for (uint8_t i = 0; i < 16; i++){
+      if (i<offset){
+          permute_lo[i] = i;
+          permute_hi[i] = 32 + i - offset;
+      }
+      else{
+          permute_lo[i] = 16 + i - offset;
+          permute_hi[i] = i;
+      }
+  }
+  // Insert our data into the low and high vectors
+  low = vec_perm(low, v, permute_lo);
+  high = vec_perm(high, v, permute_hi);
+  // Store the two aligned result vectors
+  vec_st(low, position, dst);
+  vec_st(high, position+16, dst);
 }
-/* Missaligned storage helper function which su
+
+
+/* Missaligned storage helper function with better performances
  * 
  * param:
  *     data: the (misaligned) vector to store
@@ -64,62 +64,62 @@ static inline __vector uint8_t helper_misaligned_store(__vector uint8_t data,
                                                        uint8_t * dst,
                                                        __vector uint8_t previous,
                                                        __vector uint8_t shuffle_lo,
-                                                       __vector uint8_t shuffle_hi)
-{  
-    static const __vector uint8_t zero = (const __vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0,
-                                                                   0, 0, 0, 0, 0, 0, 0, 0};
-    __vector uint8_t low, high;
-    //Insert our data into the low and high vectors
-    low = vec_perm( previous, data, shuffle_lo );
-    high = vec_perm( zero, data, shuffle_hi );
-    //Store the two aligned result vectors
-    vec_st( low, position, dst);
-    // Return the next "previous" vector
-    return high;
+                                                       __vector uint8_t shuffle_hi){  
+                                                         
+  static const __vector uint8_t zero = (const __vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0,
+                                                                 0, 0, 0, 0, 0, 0, 0, 0};
+  __vector uint8_t low, high;
+  // Insert our data into the low and high vectors
+  low = vec_perm(previous, data, shuffle_lo);
+  high = vec_perm(zero, data, shuffle_hi);
+  // Store only the lower part
+  vec_st(low, position, dst);
+  // and return the higher part which is the next "previous" vector
+  return high;
 }                                                 
 
 /* Calculate the permutation vector for storing data in the lower part
  * 
  * param: offset, the position
  */
-static inline __vector uint8_t gen_permute_low(int32_t offset)
-{
-    __vector uint8_t permute;
-    for (uint8_t i=0; i<16; i++)
-    {
-       if (i<offset) permute[i] = i;
-       else permute[i] = 16 + i - offset;
-    }
-    return permute;
+static inline __vector uint8_t gen_permute_low(int32_t offset){
+  __vector uint8_t permute;
+  for (uint8_t i = 0; i < 16; i++){
+    if (i < offset) 
+      permute[i] = i;
+    else 
+      permute[i] = 16 + i - offset;
+  }
+  return permute;
 } 
 
 /* Calculate the permutation vector for storing data in the upper part
  * 
  * param: offset, the position
  */
-static inline __vector uint8_t gen_permute_high(int32_t offset)
-{
-    __vector uint8_t permute;
-    for (int32_t i=0; i<16; i++)
-    {
-       if (i<offset) permute[i] = 32 + i - offset;
-       else permute[i] = i;
-    }
-    return permute;
+static inline __vector uint8_t gen_permute_high(int32_t offset){
+  __vector uint8_t permute;
+  for (int32_t i = 0; i < 16; i++)
+  {
+    if (i < offset) 
+      permute[i] = 32 + i - offset;
+    else 
+      permute[i] = i;
+  }
+  return permute;
 } 
 
 /* Routine optimized for shuffling a buffer for a type size of 2 bytes. */
 static void
 shuffle2_altivec(uint8_t* const dest, const uint8_t* const src,
-                 const int32_t vectorizable_elements, const int32_t total_elements) 
-{
+                 const int32_t vectorizable_elements, const int32_t total_elements){
   static const __vector uint8_t even = (const __vector uint8_t) {0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
                                                                  0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e};
   static const __vector uint8_t odd = (const __vector uint8_t) {0x01, 0x03, 0x05, 0x07, 0x09, 0x0b, 0x0d, 0x0f,
                                                                 0x11, 0x13, 0x15, 0x17, 0x19, 0x1b, 0x1d, 0x1f};
-  const int32_t offset = total_elements%16;
-  static __vector uint8_t permute_lo, permute_hi;
   const int32_t bytesoftype = 2;
+  const int32_t offset = total_elements % 16;
+  static __vector uint8_t permute_lo, permute_hi;
   int32_t j;
   __vector uint8_t inp0, inp1, out0, out1, low;
   uint8_t* const dest1 = &dest[total_elements];
@@ -133,8 +133,7 @@ shuffle2_altivec(uint8_t* const dest, const uint8_t* const src,
      permute_hi = gen_permute_high(offset);
      low = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   }
-  for (j = 0; j < vectorizable_elements; j += 16) 
-  {
+  for (j = 0; j < vectorizable_elements; j += 16){
     /* Fetch 16 elements (32 bytes) */
     inp0 = vec_ld(bytesoftype*j, src);
     inp1 = vec_ld(bytesoftype*j+16, src);
@@ -144,33 +143,28 @@ shuffle2_altivec(uint8_t* const dest, const uint8_t* const src,
     /* Store the result vectors */
     vec_st(out0, j, dest);
     if (offset)
-    {// misaligned store
-        low = helper_misaligned_store(out1, j, dest1, low, permute_lo, permute_hi);
-    }
+      low = helper_misaligned_store(out1, j, dest1, low, permute_lo, permute_hi);
     else
-    {// aligned store
-        vec_st(out1, j, dest1);
-    }
+      vec_st(out1, j, dest1);
   }
+  // Store the reminder 
   if (offset)
-  {
       vec_st(low, j, dest1);
-  }
 }
 
 /* Routine optimized for shuffling a buffer for a type size of 4 bytes. */
 static void
 shuffle4_altivec(uint8_t* const dest, const uint8_t* const src,
-                 const int32_t vectorizable_elements, const int32_t total_elements) {
+                 const int32_t vectorizable_elements, const int32_t total_elements){
   static const int32_t bytesoftype = 4;
   static const __vector uint8_t even = (const __vector uint8_t) {0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
                                                                  0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e};
   static const __vector uint8_t odd = (const __vector uint8_t) {0x01, 0x03, 0x05, 0x07, 0x09, 0x0b, 0x0d, 0x0f,
                                                                 0x11, 0x13, 0x15, 0x17, 0x19, 0x1b, 0x1d, 0x1f};
   int32_t j;
-  const uint8_t offset1 = total_elements%16;
-  const uint8_t offset2 = (2*total_elements)%16;
-  const uint8_t offset3 = (3*total_elements)%16;
+  const uint8_t offset1 = total_elements % 16;
+  const uint8_t offset2 = (2 * total_elements) % 16;
+  const uint8_t offset3 = (3 * total_elements) % 16;
   __vector uint8_t inp0, inp1, inp2, inp3, 
                    tmp0, tmp1, tmp2, tmp3,
                    out0, out1, out2, out3,
@@ -179,77 +173,68 @@ shuffle4_altivec(uint8_t* const dest, const uint8_t* const src,
                    permute_lo2, permute_hi2,
                    permute_lo3, permute_hi3;
   uint8_t* const dest1 = &dest[total_elements];
-  uint8_t* const dest2 = &dest[2*total_elements];
-  uint8_t* const dest3 = &dest[3*total_elements];
+  uint8_t* const dest2 = &dest[2 * total_elements];
+  uint8_t* const dest3 = &dest[3 * total_elements];
   
-  //printf("vectorizable_elements: %d total_elements: %d dst: %d dst1: %d delta: %d offset: %d\n", vectorizable_elements, total_elements, dest, dest1, dest1-dest, offset);
+  //printf("vectorizable_elements: %d total_elements: %d dst: %d offset1: %d offset2: %d offset3: %d\n", vectorizable_elements, total_elements, dest, offset1, offset2, offset3);
   
-  if (offset1)
-  {
-     // Initialize the two permutation vectors
-     permute_lo1 = gen_permute_low(offset1);
-     permute_hi1 = gen_permute_high(offset1);
-     low1 = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  if (offset1){ 
+    // Initialize the two permutation vectors
+    permute_lo1 = gen_permute_low(offset1);
+    permute_hi1 = gen_permute_high(offset1);
+    low1 = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   }
-  if (offset2)
-  {
-     // Initialize the two permutation vectors
-     permute_lo2 = gen_permute_low(offset2);
-     permute_hi2 = gen_permute_high(offset2);
-     low2 = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  if (offset2){
+    // Initialize the two permutation vectors
+    permute_lo2 = gen_permute_low(offset2);
+    permute_hi2 = gen_permute_high(offset2);
+    low2 = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   }
-  if (offset3)
-  {
-     // Initialize the two permutation vectors
-     permute_lo3 = gen_permute_low(offset3);
-     permute_hi3 = gen_permute_high(offset3);
-     low3 = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  if (offset3){
+    // Initialize the two permutation vectors
+    permute_lo3 = gen_permute_low(offset3);
+    permute_hi3 = gen_permute_high(offset3);
+    low3 = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   }
   
   for (j = 0; j < vectorizable_elements; j += 16) 
   {
-    /* Fetch 16 elements (64 bytes) */
-    inp0 = vec_ld(bytesoftype*j, src);
-    inp1 = vec_ld(bytesoftype*j+16, src);
-    inp2 = vec_ld(bytesoftype*j+32, src);
-    inp3 = vec_ld(bytesoftype*j+48, src);
+    /* Fetch 16 elements (64 bytes, 4 vectors) */
+    inp0 = vec_ld(bytesoftype * j, src);
+    inp1 = vec_ld(bytesoftype * j + 16, src);
+    inp2 = vec_ld(bytesoftype * j + 32, src);
+    inp3 = vec_ld(bytesoftype * j + 48, src);
     /* Transpose vectors */
     tmp0 = vec_perm(inp0, inp1, even);
     tmp1 = vec_perm(inp0, inp1, odd);
     tmp2 = vec_perm(inp2, inp3, even);
     tmp3 = vec_perm(inp2, inp3, odd);
-    out0 = vec_perm(tmp0, tmp2, even); //index0
-    out1 = vec_perm(tmp1, inp3, even); //index1
-    out2 = vec_perm(tmp0, tmp2, odd);  //index2
-    out3 = vec_perm(tmp1, inp3, odd);  //index3
+    out0 = vec_perm(tmp0, tmp2, even); // index0
+    out1 = vec_perm(tmp1, tmp3, even); // index1
+    out2 = vec_perm(tmp0, tmp2, odd);  // index2
+    out3 = vec_perm(tmp1, tmp3, odd);  // index3
     /* Store the result vectors */
     vec_st(out0, j, dest);
     if (offset1)
-        low1 = helper_misaligned_store(out1, j, dest1, low1, permute_lo1, permute_hi1);
+      low1 = helper_misaligned_store(out1, j, dest1, low1, permute_lo1, permute_hi1);
     else
-        vec_st(out1, j, dest1);
+      vec_st(out1, j, dest1);
     if (offset2)
-        low2 = helper_misaligned_store(out2, j, dest2, low2, permute_lo2, permute_hi2);
+      low2 = helper_misaligned_store(out2, j, dest2, low2, permute_lo2, permute_hi2);
     else
-        vec_st(out2, j, dest2);
+      vec_st(out2, j, dest2);
     if (offset3)
-        low3 = helper_misaligned_store(out3, j, dest3, low3, permute_lo3, permute_hi3);
+      low3 = helper_misaligned_store(out3, j, dest3, low3, permute_lo3, permute_hi3);
     else
-        vec_st(out3, j, dest3);
+      vec_st(out3, j, dest3);
         
   }
   if (offset1)
-  {
-      vec_st(low1, j, dest1);
-  }
+    vec_st(low1, j, dest1);
   if (offset2)
-  {
-      vec_st(low2, j, dest2);
-  }
+    vec_st(low2, j, dest2);
   if (offset3)
-  {
-      vec_st(low3, j, dest3);
-  }
+    vec_st(low3, j, dest3);
 }
 
 
