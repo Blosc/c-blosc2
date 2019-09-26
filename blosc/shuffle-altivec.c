@@ -43,7 +43,7 @@ static void vec_st_unaligned(__vector uint8_t v, int32_t position,  __vector uin
   high = vec_perm(high, v, permute_hi);
   // Store the two aligned result vectors
   vec_st(low, position, dst);
-  vec_st(high, position+16, dst);
+  vec_st(high, position + 16, dst);
 }
 
 
@@ -66,8 +66,7 @@ static inline __vector uint8_t helper_misaligned_store(__vector uint8_t data,
                                                        __vector uint8_t shuffle_lo,
                                                        __vector uint8_t shuffle_hi){  
                                                          
-  static const __vector uint8_t zero = (const __vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0,
-                                                                 0, 0, 0, 0, 0, 0, 0, 0};
+  const __vector uint8_t zero = vec_splat_u8(0);
   __vector uint8_t low, high;
   // Insert our data into the low and high vectors
   low = vec_perm(previous, data, shuffle_lo);
@@ -131,12 +130,12 @@ shuffle2_altivec(uint8_t* const dest, const uint8_t* const src,
      // Initialize the two permutation vectors
      permute_lo = gen_permute_low(offset);
      permute_hi = gen_permute_high(offset);
-     low = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+     low = vec_splat_u8(0);
   }
   for (j = 0; j < vectorizable_elements; j += 16){
     /* Fetch 16 elements (32 bytes) */
-    inp0 = vec_ld(bytesoftype*j, src);
-    inp1 = vec_ld(bytesoftype*j+16, src);
+    inp0 = vec_ld(bytesoftype * j, src);
+    inp1 = vec_ld(bytesoftype * j + 16, src);
     /* Transpose vectors */
     out0 = vec_perm(inp0, inp1, even);
     out1 = vec_perm(inp0, inp1, odd);
@@ -161,80 +160,58 @@ shuffle4_altivec(uint8_t* const dest, const uint8_t* const src,
                                                                  0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e};
   static const __vector uint8_t odd = (const __vector uint8_t) {0x01, 0x03, 0x05, 0x07, 0x09, 0x0b, 0x0d, 0x0f,
                                                                 0x11, 0x13, 0x15, 0x17, 0x19, 0x1b, 0x1d, 0x1f};
-  int32_t j;
-  const uint8_t offset1 = total_elements % 16;
-  const uint8_t offset2 = (2 * total_elements) % 16;
-  const uint8_t offset3 = (3 * total_elements) % 16;
-  __vector uint8_t inp0, inp1, inp2, inp3, 
-                   tmp0, tmp1, tmp2, tmp3,
-                   out0, out1, out2, out3,
-                   low1, low2, low3,
-                   permute_lo1, permute_hi1,
-                   permute_lo2, permute_hi2,
-                   permute_lo3, permute_hi3;
-  uint8_t* const dest1 = &dest[total_elements];
-  uint8_t* const dest2 = &dest[2 * total_elements];
-  uint8_t* const dest3 = &dest[3 * total_elements];
+  int32_t i, j, k;
+  uint8_t offset[4];
+  uint8_t* desti[4];
+  __vector uint8_t inp[4], out[4], perm_lo[4], perm_hi[4], low[4];
   
-  //printf("vectorizable_elements: %d total_elements: %d dst: %d offset1: %d offset2: %d offset3: %d\n", vectorizable_elements, total_elements, dest, offset1, offset2, offset3);
-  
-  if (offset1){ 
-    // Initialize the two permutation vectors
-    permute_lo1 = gen_permute_low(offset1);
-    permute_hi1 = gen_permute_high(offset1);
-    low1 = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  // Initialize the offset, destinations and permutations
+  for (i = 0; i < 4; i++){
+    offset[i] = (i*total_elements) % 16;
+    desti[i] = &dest[i * total_elements];
+    if (offset[i]){
+      perm_lo[i] = gen_permute_low(offset[i]);
+      perm_hi[i] = gen_permute_high(offset[i]);
+      low[i] = vec_splat_u8(0);
+    } 
   }
-  if (offset2){
-    // Initialize the two permutation vectors
-    permute_lo2 = gen_permute_low(offset2);
-    permute_hi2 = gen_permute_high(offset2);
-    low2 = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  }
-  if (offset3){
-    // Initialize the two permutation vectors
-    permute_lo3 = gen_permute_low(offset3);
-    permute_hi3 = gen_permute_high(offset3);
-    low3 = (__vector uint8_t) {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  }
+  printf("vectorizable_elements: %d total_elements: %d dst: %d offset1: %d offset2: %d offset3: %d\n", vectorizable_elements, total_elements, dest, offset[1], offset[2], offset[3]);
   
   for (j = 0; j < vectorizable_elements; j += 16) 
   {
     /* Fetch 16 elements (64 bytes, 4 vectors) */
-    inp0 = vec_ld(bytesoftype * j, src);
-    inp1 = vec_ld(bytesoftype * j + 16, src);
-    inp2 = vec_ld(bytesoftype * j + 32, src);
-    inp3 = vec_ld(bytesoftype * j + 48, src);
-    /* Transpose vectors */
-    tmp0 = vec_perm(inp0, inp1, even);
-    tmp1 = vec_perm(inp0, inp1, odd);
-    tmp2 = vec_perm(inp2, inp3, even);
-    tmp3 = vec_perm(inp2, inp3, odd);
-    out0 = vec_perm(tmp0, tmp2, even); // index0
-    out1 = vec_perm(tmp1, tmp3, even); // index1
-    out2 = vec_perm(tmp0, tmp2, odd);  // index2
-    out3 = vec_perm(tmp1, tmp3, odd);  // index3
+    for (i = 0; i < 4; i++){
+      inp[i] = vec_ld((bytesoftype * j) + (i * 16), src);
+    }
+    
+    /* Transpose vectors 0-1*/
+    for (i = 0; i < 4; i += 2){
+      out[i  ] = vec_perm(inp[i], inp[i+1], even);
+      out[i+1] = vec_perm(inp[i], inp[i+1], odd);
+    }
+    /* Transpose vectors 0-2*/
+    inp[0] = vec_perm(out[0], out[2], even);
+    inp[1] = vec_perm(out[1], out[3], even);
+    inp[2] = vec_perm(out[0], out[2], odd);
+    inp[3] = vec_perm(out[1], out[3], odd);
+    
     /* Store the result vectors */
-    vec_st(out0, j, dest);
-    if (offset1)
-      low1 = helper_misaligned_store(out1, j, dest1, low1, permute_lo1, permute_hi1);
-    else
-      vec_st(out1, j, dest1);
-    if (offset2)
-      low2 = helper_misaligned_store(out2, j, dest2, low2, permute_lo2, permute_hi2);
-    else
-      vec_st(out2, j, dest2);
-    if (offset3)
-      low3 = helper_misaligned_store(out3, j, dest3, low3, permute_lo3, permute_hi3);
-    else
-      vec_st(out3, j, dest3);
-        
+    for (i = 0; i < 4; i ++){
+      if (offset[i])
+        low[i] = helper_misaligned_store(inp[i], j, desti[i], low[i], perm_lo[i], perm_hi[i]);
+      else
+        vec_st(inp[i], j, desti[i]);
+    }        
   }
-  if (offset1)
-    vec_st(low1, j, dest1);
-  if (offset2)
-    vec_st(low2, j, dest2);
-  if (offset3)
-    vec_st(low3, j, dest3);
+  /* Store the remainder */
+  for (i = 0; i < 4; i++){
+    if (offset[i]){
+      __vector uint8_t mask;
+      for (k = 0; k < 16; k++)
+        mask[k] = (k<offset[i])?0:0xFF;
+      vec_st(vec_sel(low[i], vec_ld(j, desti[i]), mask), j, desti[i]);   
+    }
+  }
 }
 
 
@@ -243,38 +220,72 @@ static void
 shuffle8_altivec(uint8_t* const dest, const uint8_t* const src,
                  const int32_t vectorizable_elements, const int32_t total_elements) {
   static const int32_t bytesoftype = 8;
-  int32_t j;
-  int k, l;
-  uint8_t* dest_for_jth_element;
-  __m128i xmm0[8], xmm1[8];
+  static const __vector uint8_t even = (const __vector uint8_t) {0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
+                                                                 0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e};
+  static const __vector uint8_t odd = (const __vector uint8_t) {0x01, 0x03, 0x05, 0x07, 0x09, 0x0b, 0x0d, 0x0f,
+                                                                0x11, 0x13, 0x15, 0x17, 0x19, 0x1b, 0x1d, 0x1f};
+  int32_t i, j, k;
+  uint8_t offset[8];
+  uint8_t* desti[8];
+  __vector uint8_t inp[8], out[8], perm_lo[8], perm_hi[8], low[8];
+  
+  // Initialize the offset, destinations and permutations
+  for (i = 0; i < 8; i++){
+    offset[i] = (i*total_elements) %16;
+    desti[i] = &dest[i*total_elements];
+    if (offset[i]){
+      perm_lo[i] = gen_permute_low(offset[i]);
+      perm_hi[i] = gen_permute_high(offset[i]);
+      low[i] = vec_splat_u8(0);
+    } 
+  }
+  printf("vectorizable_elements: %d total_elements: %d dst: %d offset1: %d offset2: %d offset3: %d\n", vectorizable_elements, total_elements, dest, offset[1], offset[2], offset[3]);
+  
+  for (j = 0; j < vectorizable_elements; j += 16) 
+  {
+    /* Fetch 16 elements (128 bytes, 8 vectors) */
+    for (i = 0; i < 8; i++){
+      inp[i] = vec_ld((bytesoftype * j) + (i * 16), src);
+    }
+    
+    /* Transpose vectors 0-1*/
+    for (i = 0; i < 8; i += 2){
+      out[i] = vec_perm(inp[i], inp[i+1], even);
+      out[i+1] = vec_perm(inp[i], inp[i+1], odd);
+    }
+    /* Transpose vectors 0-2*/
+    for (i = 0; i < 8; i += 4){
+      inp[i] = vec_perm(out[i], out[i+2], even);
+      inp[i+1] = vec_perm(out[i+1], out[i+3], even);
+      inp[i+2] = vec_perm(out[i], out[i+2], odd);
+      inp[i+3] = vec_perm(out[i+1], out[i+3], odd);
+    }
 
-  for (j = 0; j < vectorizable_elements; j += sizeof(__m128i)) {
-    /* Fetch 16 elements (128 bytes) then transpose bytes. */
-    for (k = 0; k < 8; k++) {
-      xmm0[k] = _mm_loadu_si128((__m128i*)(src + (j * bytesoftype) + (k * sizeof(__m128i))));
-      xmm1[k] = _mm_shuffle_epi32(xmm0[k], 0x4e);
-      xmm1[k] = _mm_unpacklo_epi8(xmm0[k], xmm1[k]);
-    }
-    /* Transpose words */
-    for (k = 0, l = 0; k < 4; k++, l += 2) {
-      xmm0[k * 2] = _mm_unpacklo_epi16(xmm1[l], xmm1[l + 1]);
-      xmm0[k * 2 + 1] = _mm_unpackhi_epi16(xmm1[l], xmm1[l + 1]);
-    }
-    /* Transpose double words */
-    for (k = 0, l = 0; k < 4; k++, l++) {
-      if (k == 2) l += 2;
-      xmm1[k * 2] = _mm_unpacklo_epi32(xmm0[l], xmm0[l + 2]);
-      xmm1[k * 2 + 1] = _mm_unpackhi_epi32(xmm0[l], xmm0[l + 2]);
-    }
-    /* Transpose quad words */
-    for (k = 0; k < 4; k++) {
-      xmm0[k * 2] = _mm_unpacklo_epi64(xmm1[k], xmm1[k + 4]);
-      xmm0[k * 2 + 1] = _mm_unpackhi_epi64(xmm1[k], xmm1[k + 4]);
-    }
+    /* Transpose vectors 0-4*/
+    out[0] = vec_perm(inp[0], inp[4], even);
+    out[1] = vec_perm(inp[1], inp[5], even);
+    out[2] = vec_perm(inp[2], inp[6], even);
+    out[3] = vec_perm(inp[3], inp[7], even);
+    out[4] = vec_perm(inp[0], inp[4], odd);
+    out[5] = vec_perm(inp[1], inp[5], odd);
+    out[6] = vec_perm(inp[2], inp[6], odd);
+    out[7] = vec_perm(inp[3], inp[7], odd);
+
     /* Store the result vectors */
-    dest_for_jth_element = dest + j;
-    for (k = 0; k < 8; k++) {
-      _mm_storeu_si128((__m128i*)(dest_for_jth_element + (k * total_elements)), xmm0[k]);
+    for (i = 0; i < 8; i ++){
+      if (offset[i])
+        low[i] = helper_misaligned_store(out[i], j, desti[i], low[i], perm_lo[i], perm_hi[i]);
+      else
+        vec_st(out[i], j, desti[i]);
+    }
+  }
+  /* Store the remainder */
+  for (i = 0; i < 8; i++){
+    if (offset[i]){
+      __vector uint8_t mask;
+      for (k = 0; k < 16; k++)
+        mask[k] = (k<offset[i])?0:0xFF;
+      vec_st(vec_sel(low[i], vec_ld(j, desti[i]), mask), j, desti[i]);   
     }
   }
 }
