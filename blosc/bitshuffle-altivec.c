@@ -225,7 +225,7 @@ int64_t bshuf_trans_byte_elem_SSE_64(void* in, void* out, const size_t size) {
     for (j=0; j<bytesoftype; j++)
       vec_st_generic(xmm0[j], ii + j*size, out_b);
   }
-  return bshuf_trans_byte_elem_remainder(in, out, size, 8,
+  return bshuf_trans_byte_elem_remainder(in, out, size, bytesoftype,
                                          size - size % 16);
 }
 
