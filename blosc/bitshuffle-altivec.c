@@ -5,7 +5,8 @@
  * Website: http://www.github.com/kiyo-masui/bitshuffle
  * Created: 2014
  *
- * Note: Adapted for c-blosc by Francesc Alted.
+ * Note: Adapted for c-blosc by Francesc Alted
+ *       Altivec/VSX version by Jerome Kieffer.
  *
  * See LICENSES/BITSHUFFLE.txt file for details about copyright and
  * rights to use.
@@ -19,170 +20,210 @@
 #if !defined(__ALTIVEC__)
   #error ALTIVEC is not supported by the target architecture/platform and/or this compiler.
 #endif
+#include <altivec.h>
 
 #include <emmintrin.h>
+#include <stdio.h>
 
 /* The next is useful for debugging purposes */
-#if 0
+#if 1
 #include <stdio.h>
 #include <string.h>
 
-
-static void printxmm(__m128i xmm0)
-{
-  uint8_t buf[32];
-
-  ((__m128i *)buf)[0] = xmm0;
-  printf("%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x\n",
-          buf[0], buf[1], buf[2], buf[3],
-          buf[4], buf[5], buf[6], buf[7],
-          buf[8], buf[9], buf[10], buf[11],
-          buf[12], buf[13], buf[14], buf[15]);
+static void helper_print(__vector uint8_t v, char* txt){
+  printf("%s %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",txt,
+  v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15]); 
 }
 #endif
 
+//mind to use  vec_bperm(a, epi8_hi) for bitshuffling
 
-/* ---- Worker code that requires ALTIVEC. IBM Power G5 and and later. ---- */
+// Store a vector to an unaligned location in memory ... may be sub-optimal
+static void vec_st_generic(__vector uint8_t vector, int32_t position,  uint8_t * dst){
+  const int32_t offset = ((size_t)dst + position) & 0xF; // check alignment on 16 bytes
+  if (offset){ // Actually unaligned store
+    vec_vsx_st(vector, position, dst);
+  }
+  else{ // Aligned store, the usual way
+    vec_st(vector, position, dst);
+  }
+}
+
+
+// Load a vector from any location in memory ... may be sub-optimal
+static __vector uint8_t vec_ld_generic(int32_t position,  const uint8_t* const src){
+  const int32_t offset = ((size_t)src + position) & 0xF; // check alignment on 16 bytes
+  __vector uint8_t vector;
+  if (offset){ // Actually unaligned load
+    vector = vec_vsx_ld(position, src);
+  }
+  else{ // Aligned load, the usual way
+    vector = vec_ld(position, src);
+  }
+  return vector;
+}
+// Unpack and interleave 8-bit integers from the low half of xmm0 and xmm1, and return the results. 
+static __vector uint8_t unpacklo_epi8(__vector uint8_t xmm0, __vector uint8_t xmm1){
+  static const __vector uint8_t epi8_low = (const __vector uint8_t) {0x00, 0x10, 0x01, 0x11, 0x02, 0x12, 0x03, 0x13, 
+                                                                     0x04, 0x14, 0x05, 0x15, 0x06, 0x16, 0x07, 0x17};
+  return vec_perm(xmm0, xmm1, epi8_low);
+}
+// Unpack and interleave 8-bit integers from the high half of xmm0 and xmm1, and return the results. 
+static __vector uint8_t unpackhi_epi8(__vector uint8_t xmm0, __vector uint8_t xmm1){
+  static const __vector uint8_t epi8_hi = (const __vector uint8_t) {0x08, 0x18, 0x09, 0x19, 0x0a, 0x1a, 0x0b, 0x1b, 
+                                                                     0x0c, 0x1c, 0x0d, 0x1d, 0x0e, 0x1e, 0x0f, 0x1f};
+  return vec_perm(xmm0, xmm1, epi8_hi);
+}
+
+// Unpack and interleave 32-bit integers from the low half of xmm0 and xmm1, and return the results. 
+static __vector uint8_t unpacklo_epi32(__vector uint8_t xmm0, __vector uint8_t xmm1){
+  static const __vector uint8_t epi32_low = (const __vector uint8_t) {0x00, 0x01, 0x02, 0x03, 0x10, 0x11, 0x12, 0x13,
+                                                                      0x04, 0x05, 0x06, 0x07, 0x14, 0x15, 0x16, 0x17};
+  return vec_perm(xmm0, xmm1, epi32_low);
+}
+// Unpack and interleave 32-bit integers from the high half of xmm0 and xmm1, and return the results. 
+static __vector uint8_t unpackhi_epi32(__vector uint8_t xmm0, __vector uint8_t xmm1){
+  static const __vector uint8_t epi32_hi = (const __vector uint8_t) {0x08, 0x09, 0x0a, 0x0b, 0x18, 0x19, 0x1a, 0x1b, 
+                                                                     0x0c, 0x0d, 0x0e, 0x0f, 0x1c, 0x1d, 0x1e, 0x1f};
+  return vec_perm(xmm0, xmm1, epi32_hi);
+}
+
+// Unpack and interleave 64-bit integers from the low half of xmm0 and xmm1, and return the results. 
+static __vector uint8_t unpacklo_epi64(__vector uint8_t xmm0, __vector uint8_t xmm1){
+  static const __vector uint8_t epi64_low = (const __vector uint8_t) {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 
+                                                                     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17};
+  return vec_perm(xmm0, xmm1, epi64_low);
+}
+// Unpack and interleave 64-bit integers from the high half of xmm0 and xmm1, and return the results. 
+static __vector uint8_t unpackhi_epi64(__vector uint8_t xmm0, __vector uint8_t xmm1){
+  static const __vector uint8_t epi64_hi = (const __vector uint8_t) {0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 
+                                                                     0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f};
+  return vec_perm(xmm0, xmm1, epi64_hi);
+}
+
 
 /* Transpose bytes within elements for 16 bit elements. */
 int64_t bshuf_trans_byte_elem_SSE_16(void* in, void* out, const size_t size) {
-
+  static const uint8_t bytesoftype = 2;
   char* in_b = (char*)in;
   char* out_b = (char*)out;
-  __m128i a0, b0, a1, b1;
-  size_t ii;
-
+  __vector uint8_t xmm0[2], xmm1[2];
+  size_t ii, j;
+  
   for (ii = 0; ii + 15 < size; ii += 16) {
-    a0 = _mm_loadu_si128((__m128i*)&in_b[2 * ii + 0 * 16]);
-    b0 = _mm_loadu_si128((__m128i*)&in_b[2 * ii + 1 * 16]);
+    for (j=0; j<bytesoftype; j++)
+      xmm0[j] = vec_ld_generic(2*ii + 16*j, in_b);
+    
+    xmm1[0] = unpacklo_epi8(xmm0[0], xmm0[1]);
+    xmm1[1] = unpackhi_epi8(xmm0[0], xmm0[1]);
 
-    a1 = _mm_unpacklo_epi8(a0, b0);
-    b1 = _mm_unpackhi_epi8(a0, b0);
+    xmm0[0] = unpacklo_epi8(xmm1[0], xmm1[1]);
+    xmm0[1] = unpackhi_epi8(xmm1[0], xmm1[1]);
 
-    a0 = _mm_unpacklo_epi8(a1, b1);
-    b0 = _mm_unpackhi_epi8(a1, b1);
+    xmm1[0] = unpacklo_epi8(xmm0[0], xmm0[1]);
+    xmm1[1] = unpackhi_epi8(xmm0[0], xmm0[1]);
 
-    a1 = _mm_unpacklo_epi8(a0, b0);
-    b1 = _mm_unpackhi_epi8(a0, b0);
+    xmm0[0] = unpacklo_epi8(xmm1[0], xmm1[1]);
+    xmm0[1] = unpackhi_epi8(xmm1[0], xmm1[1]);
 
-    a0 = _mm_unpacklo_epi8(a1, b1);
-    b0 = _mm_unpackhi_epi8(a1, b1);
-
-    _mm_storeu_si128((__m128i*)&out_b[0 * size + ii], a0);
-    _mm_storeu_si128((__m128i*)&out_b[1 * size + ii], b0);
+    for (j=0; j<bytesoftype; j++)
+      vec_st_generic(xmm0[j], ii + j*size, out_b);
   }
-  return bshuf_trans_byte_elem_remainder(in, out, size, 2,
+  return bshuf_trans_byte_elem_remainder(in, out, size, bytesoftype,
                                          size - size % 16);
 }
 
 
 /* Transpose bytes within elements for 32 bit elements. */
 int64_t bshuf_trans_byte_elem_SSE_32(void* in, void* out, const size_t size) {
-
+  static const uint8_t bytesoftype = 4;
   char* in_b = (char*)in;
   char* out_b = (char*)out;
-  __m128i a0, b0, c0, d0, a1, b1, c1, d1;
-  size_t ii;
+  __vector uint8_t xmm0[4], xmm1[4];
+  size_t ii, j;
 
   for (ii = 0; ii + 15 < size; ii += 16) {
-    a0 = _mm_loadu_si128((__m128i*)&in_b[4 * ii + 0 * 16]);
-    b0 = _mm_loadu_si128((__m128i*)&in_b[4 * ii + 1 * 16]);
-    c0 = _mm_loadu_si128((__m128i*)&in_b[4 * ii + 2 * 16]);
-    d0 = _mm_loadu_si128((__m128i*)&in_b[4 * ii + 3 * 16]);
+    for (j=0; j<bytesoftype; j++)
+      xmm0[j] = vec_ld_generic(bytesoftype * ii + 16*j, in_b);
 
-    a1 = _mm_unpacklo_epi8(a0, b0);
-    b1 = _mm_unpackhi_epi8(a0, b0);
-    c1 = _mm_unpacklo_epi8(c0, d0);
-    d1 = _mm_unpackhi_epi8(c0, d0);
+    xmm1[0] = unpacklo_epi8(xmm0[0], xmm0[1]);
+    xmm1[1] = unpackhi_epi8(xmm0[0], xmm0[1]);
+    xmm1[2] = unpacklo_epi8(xmm0[2], xmm0[3]);
+    xmm1[3] = unpackhi_epi8(xmm0[2], xmm0[3]);
 
-    a0 = _mm_unpacklo_epi8(a1, b1);
-    b0 = _mm_unpackhi_epi8(a1, b1);
-    c0 = _mm_unpacklo_epi8(c1, d1);
-    d0 = _mm_unpackhi_epi8(c1, d1);
+    xmm0[0] = unpacklo_epi8(xmm1[0], xmm1[1]);
+    xmm0[1] = unpackhi_epi8(xmm1[0], xmm1[1]);
+    xmm0[2] = unpacklo_epi8(xmm1[2], xmm1[3]);
+    xmm0[3] = unpackhi_epi8(xmm1[2], xmm1[3]);
 
-    a1 = _mm_unpacklo_epi8(a0, b0);
-    b1 = _mm_unpackhi_epi8(a0, b0);
-    c1 = _mm_unpacklo_epi8(c0, d0);
-    d1 = _mm_unpackhi_epi8(c0, d0);
+    xmm1[0] = unpacklo_epi8(xmm0[0], xmm0[1]);
+    xmm1[1] = unpackhi_epi8(xmm0[0], xmm0[1]);
+    xmm1[2] = unpacklo_epi8(xmm0[2], xmm0[3]);
+    xmm1[3] = unpackhi_epi8(xmm0[2], xmm0[3]);
 
-    a0 = _mm_unpacklo_epi64(a1, c1);
-    b0 = _mm_unpackhi_epi64(a1, c1);
-    c0 = _mm_unpacklo_epi64(b1, d1);
-    d0 = _mm_unpackhi_epi64(b1, d1);
+    xmm0[0] = unpacklo_epi64(xmm1[0], xmm1[2]);
+    xmm0[1] = unpackhi_epi64(xmm1[0], xmm1[2]);
+    xmm0[2] = unpacklo_epi64(xmm1[1], xmm1[3]);
+    xmm0[3] = unpackhi_epi64(xmm1[1], xmm1[3]);
 
-    _mm_storeu_si128((__m128i*)&out_b[0 * size + ii], a0);
-    _mm_storeu_si128((__m128i*)&out_b[1 * size + ii], b0);
-    _mm_storeu_si128((__m128i*)&out_b[2 * size + ii], c0);
-    _mm_storeu_si128((__m128i*)&out_b[3 * size + ii], d0);
+    for (j=0; j<bytesoftype; j++)
+      vec_st_generic(xmm0[j], ii + j*size, out_b);
   }
-  return bshuf_trans_byte_elem_remainder(in, out, size, 4,
+  return bshuf_trans_byte_elem_remainder(in, out, size, bytesoftype,
                                          size - size % 16);
 }
 
 
 /* Transpose bytes within elements for 64 bit elements. */
 int64_t bshuf_trans_byte_elem_SSE_64(void* in, void* out, const size_t size) {
-
+  static const uint8_t bytesoftype = 8;
   char* in_b = (char*)in;
   char* out_b = (char*)out;
-  __m128i a0, b0, c0, d0, e0, f0, g0, h0;
-  __m128i a1, b1, c1, d1, e1, f1, g1, h1;
-  size_t ii;
+  __vector uint8_t xmm0[8], xmm1[8];
+  size_t ii, j;
 
   for (ii = 0; ii + 15 < size; ii += 16) {
-    a0 = _mm_loadu_si128((__m128i*)&in_b[8 * ii + 0 * 16]);
-    b0 = _mm_loadu_si128((__m128i*)&in_b[8 * ii + 1 * 16]);
-    c0 = _mm_loadu_si128((__m128i*)&in_b[8 * ii + 2 * 16]);
-    d0 = _mm_loadu_si128((__m128i*)&in_b[8 * ii + 3 * 16]);
-    e0 = _mm_loadu_si128((__m128i*)&in_b[8 * ii + 4 * 16]);
-    f0 = _mm_loadu_si128((__m128i*)&in_b[8 * ii + 5 * 16]);
-    g0 = _mm_loadu_si128((__m128i*)&in_b[8 * ii + 6 * 16]);
-    h0 = _mm_loadu_si128((__m128i*)&in_b[8 * ii + 7 * 16]);
+    for (j=0; j<bytesoftype; j++)
+      xmm0[j] = vec_ld_generic(bytesoftype * ii + 16*j, in_b);
 
-    a1 = _mm_unpacklo_epi8(a0, b0);
-    b1 = _mm_unpackhi_epi8(a0, b0);
-    c1 = _mm_unpacklo_epi8(c0, d0);
-    d1 = _mm_unpackhi_epi8(c0, d0);
-    e1 = _mm_unpacklo_epi8(e0, f0);
-    f1 = _mm_unpackhi_epi8(e0, f0);
-    g1 = _mm_unpacklo_epi8(g0, h0);
-    h1 = _mm_unpackhi_epi8(g0, h0);
+    xmm1[0] = unpacklo_epi8(xmm0[0], xmm0[1]);
+    xmm1[1] = unpackhi_epi8(xmm0[0], xmm0[1]);
+    xmm1[2] = unpacklo_epi8(xmm0[2], xmm0[3]);
+    xmm1[3] = unpackhi_epi8(xmm0[2], xmm0[3]);
+    xmm1[4] = unpacklo_epi8(xmm0[4], xmm0[5]);
+    xmm1[5] = unpackhi_epi8(xmm0[4], xmm0[5]);
+    xmm1[6] = unpacklo_epi8(xmm0[6], xmm0[7]);
+    xmm1[7] = unpackhi_epi8(xmm0[6], xmm0[7]);
 
-    a0 = _mm_unpacklo_epi8(a1, b1);
-    b0 = _mm_unpackhi_epi8(a1, b1);
-    c0 = _mm_unpacklo_epi8(c1, d1);
-    d0 = _mm_unpackhi_epi8(c1, d1);
-    e0 = _mm_unpacklo_epi8(e1, f1);
-    f0 = _mm_unpackhi_epi8(e1, f1);
-    g0 = _mm_unpacklo_epi8(g1, h1);
-    h0 = _mm_unpackhi_epi8(g1, h1);
+    xmm0[0] = unpacklo_epi8(xmm1[0], xmm1[1]);
+    xmm0[1] = unpackhi_epi8(xmm1[0], xmm1[1]);
+    xmm0[2] = unpacklo_epi8(xmm1[2], xmm1[3]);
+    xmm0[3] = unpackhi_epi8(xmm1[2], xmm1[3]);
+    xmm0[4] = unpacklo_epi8(xmm1[4], xmm1[5]);
+    xmm0[5] = unpackhi_epi8(xmm1[4], xmm1[5]);
+    xmm0[6] = unpacklo_epi8(xmm1[6], xmm1[7]);
+    xmm0[7] = unpackhi_epi8(xmm1[6], xmm1[7]);
 
-    a1 = _mm_unpacklo_epi32(a0, c0);
-    b1 = _mm_unpackhi_epi32(a0, c0);
-    c1 = _mm_unpacklo_epi32(b0, d0);
-    d1 = _mm_unpackhi_epi32(b0, d0);
-    e1 = _mm_unpacklo_epi32(e0, g0);
-    f1 = _mm_unpackhi_epi32(e0, g0);
-    g1 = _mm_unpacklo_epi32(f0, h0);
-    h1 = _mm_unpackhi_epi32(f0, h0);
+    xmm1[0] = unpacklo_epi32(xmm0[0], xmm0[2]);
+    xmm1[1] = unpackhi_epi32(xmm0[0], xmm0[2]);
+    xmm1[2] = unpacklo_epi32(xmm0[1], xmm0[3]);
+    xmm1[3] = unpackhi_epi32(xmm0[1], xmm0[3]);
+    xmm1[4] = unpacklo_epi32(xmm0[4], xmm0[6]);
+    xmm1[5] = unpackhi_epi32(xmm0[4], xmm0[6]);
+    xmm1[6] = unpacklo_epi32(xmm0[5], xmm0[7]);
+    xmm1[7] = unpackhi_epi32(xmm0[5], xmm0[7]);
 
-    a0 = _mm_unpacklo_epi64(a1, e1);
-    b0 = _mm_unpackhi_epi64(a1, e1);
-    c0 = _mm_unpacklo_epi64(b1, f1);
-    d0 = _mm_unpackhi_epi64(b1, f1);
-    e0 = _mm_unpacklo_epi64(c1, g1);
-    f0 = _mm_unpackhi_epi64(c1, g1);
-    g0 = _mm_unpacklo_epi64(d1, h1);
-    h0 = _mm_unpackhi_epi64(d1, h1);
+    xmm0[0] = unpacklo_epi64(xmm1[0], xmm1[4]);
+    xmm0[1] = unpackhi_epi64(xmm1[0], xmm1[4]);
+    xmm0[2] = unpacklo_epi64(xmm1[1], xmm1[5]);
+    xmm0[3] = unpackhi_epi64(xmm1[1], xmm1[5]);
+    xmm0[4] = unpacklo_epi64(xmm1[2], xmm1[6]);
+    xmm0[5] = unpackhi_epi64(xmm1[2], xmm1[6]);
+    xmm0[6] = unpacklo_epi64(xmm1[3], xmm1[7]);
+    xmm0[7] = unpackhi_epi64(xmm1[3], xmm1[7]);
 
-    _mm_storeu_si128((__m128i*)&out_b[0 * size + ii], a0);
-    _mm_storeu_si128((__m128i*)&out_b[1 * size + ii], b0);
-    _mm_storeu_si128((__m128i*)&out_b[2 * size + ii], c0);
-    _mm_storeu_si128((__m128i*)&out_b[3 * size + ii], d0);
-    _mm_storeu_si128((__m128i*)&out_b[4 * size + ii], e0);
-    _mm_storeu_si128((__m128i*)&out_b[5 * size + ii], f0);
-    _mm_storeu_si128((__m128i*)&out_b[6 * size + ii], g0);
-    _mm_storeu_si128((__m128i*)&out_b[7 * size + ii], h0);
+    for (j=0; j<bytesoftype; j++)
+      vec_st_generic(xmm0[j], ii + j*size, out_b);
   }
   return bshuf_trans_byte_elem_remainder(in, out, size, 8,
                                          size - size % 16);
