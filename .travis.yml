@@ -4,6 +4,8 @@ language: c
 
 os:
 - linux
+- linux-ppc64le
+- linux-arm64
 # - osx   # TODO: still problems with AVX2 support
 
 compiler:
