@@ -36,32 +36,16 @@ static void helper_print(__vector uint8_t v, char* txt){
 }
 #endif
 
+
+static inline __vector uint8_t gen_save_mask(size_t offset){
+  __vector uint8_t mask;
+  size_t k;
+  for (k = 0; k < 16; k++)
+    mask[k] = (k<offset)?0:0xFF;
+  return mask;
+}
 //mind to use  vec_bperm(a, epi8_hi) for bitshuffling
 
-// Store a vector to an unaligned location in memory ... may be sub-optimal
-static void vec_st_generic(__vector uint8_t vector, int32_t position,  uint8_t * dst){
-  const int32_t offset = ((size_t)dst + position) & 0xF; // check alignment on 16 bytes
-  if (offset){ // Actually unaligned store
-    vec_vsx_st(vector, position, dst);
-  }
-  else{ // Aligned store, the usual way
-    vec_st(vector, position, dst);
-  }
-}
-
-
-// Load a vector from any location in memory ... may be sub-optimal
-static __vector uint8_t vec_ld_generic(int32_t position,  const uint8_t* const src){
-  const int32_t offset = ((size_t)src + position) & 0xF; // check alignment on 16 bytes
-  __vector uint8_t vector;
-  if (offset){ // Actually unaligned load
-    vector = vec_vsx_ld(position, src);
-  }
-  else{ // Aligned load, the usual way
-    vector = vec_ld(position, src);
-  }
-  return vector;
-}
 // Unpack and interleave 8-bit integers from the low half of xmm0 and xmm1, and return the results. 
 static __vector uint8_t unpacklo_epi8(__vector uint8_t xmm0, __vector uint8_t xmm1){
   static const __vector uint8_t epi8_low = (const __vector uint8_t) {0x00, 0x10, 0x01, 0x11, 0x02, 0x12, 0x03, 0x13, 
@@ -101,18 +85,67 @@ static __vector uint8_t unpackhi_epi64(__vector uint8_t xmm0, __vector uint8_t x
   return vec_perm(xmm0, xmm1, epi64_hi);
 }
 
+// Build and return a bit-permutation mask
+static __vector uint8_t make_bitperm_mask(int type_size, int bit) {
+  __vector uint8_t result;
+  int i;
+  if (type_size == 1) {
+    // data_type is 8 bits long
+    for (i=0; i<16; i++)
+      result[i] = 8 * (15-i) + (7-bit);
+  }
+  else if (type_size == 2) {
+    // data_type is 16 bits long
+    for (i=0; i<8; i++) {
+      result[i] = 16 * i + 2 * bit;
+      result[i+8] = 16 * i + 2 * bit + 1;
+    }
+  }
+  return result;
+}
+
+/* Routine optimized for bit-shuffling a buffer for a type size of 1 byte: 
+ * non coalesced as the vector write was slower. Loop unrolling neither helps */
+int64_t bitshuffle1_altivec(void* src, void* dest, const size_t size,  const size_t elem_size) {
+  // Nota elem_size==1 and size%8==0 !
+  const uint8_t* b_src = (const uint8_t*) src;
+  uint8_t* b_dest = (uint8_t*) dest;
+  __vector uint8_t masks[8], data;
+  size_t i, j;
+  const size_t nbyte = elem_size * size;
+  int64_t count;
+  
+  //Generate all 8 needed masks
+  for (i=0; i<8; i++){
+    masks[i] = make_bitperm_mask(1, i);
+  }
+
+  for (j=0; j+15<size; j+=16) {
+    data = vec_xl(j, b_src);
+    for (i=0; i<8; i++) {
+      __vector uint16_t tmp;
+      uint16_t* out_ui16;
+      tmp = (__vector uint16_t) vec_bperm(data, masks[i]);
+      out_ui16 = (uint16_t*)&b_dest[(j + i*size) >> 3];
+      *out_ui16 = tmp[4];
+    }
+  }
+  count = bshuf_trans_bit_byte_remainder(src, dest, size, elem_size,
+                                         nbyte - nbyte % 16);
+  return count;
+}  
 
 /* Transpose bytes within elements for 16 bit elements. */
 int64_t bshuf_trans_byte_elem_SSE_16(void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 2;
-  char* in_b = (char*)in;
-  char* out_b = (char*)out;
+  const uint8_t* in_b = (const uint8_t*)in;
+  uint8_t* out_b = (uint8_t*)out;
   __vector uint8_t xmm0[2], xmm1[2];
   size_t ii, j;
   
   for (ii = 0; ii + 15 < size; ii += 16) {
     for (j=0; j<bytesoftype; j++)
-      xmm0[j] = vec_ld_generic(2*ii + 16*j, in_b);
+      xmm0[j] = vec_xl(bytesoftype*ii + 16*j, in_b);
     
     xmm1[0] = unpacklo_epi8(xmm0[0], xmm0[1]);
     xmm1[1] = unpackhi_epi8(xmm0[0], xmm0[1]);
@@ -127,7 +160,7 @@ int64_t bshuf_trans_byte_elem_SSE_16(void* in, void* out, const size_t size) {
     xmm0[1] = unpackhi_epi8(xmm1[0], xmm1[1]);
 
     for (j=0; j<bytesoftype; j++)
-      vec_st_generic(xmm0[j], ii + j*size, out_b);
+      vec_xst(xmm0[j], ii + j*size, out_b);
   }
   return bshuf_trans_byte_elem_remainder(in, out, size, bytesoftype,
                                          size - size % 16);
@@ -137,14 +170,14 @@ int64_t bshuf_trans_byte_elem_SSE_16(void* in, void* out, const size_t size) {
 /* Transpose bytes within elements for 32 bit elements. */
 int64_t bshuf_trans_byte_elem_SSE_32(void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 4;
-  char* in_b = (char*)in;
-  char* out_b = (char*)out;
+  const uint8_t* in_b = (const uint8_t*)in;
+  uint8_t* out_b = (uint8_t*)out;
   __vector uint8_t xmm0[4], xmm1[4];
   size_t ii, j;
 
   for (ii = 0; ii + 15 < size; ii += 16) {
     for (j=0; j<bytesoftype; j++)
-      xmm0[j] = vec_ld_generic(bytesoftype * ii + 16*j, in_b);
+      xmm0[j] = vec_xl(bytesoftype * ii + 16*j, in_b);
 
     xmm1[0] = unpacklo_epi8(xmm0[0], xmm0[1]);
     xmm1[1] = unpackhi_epi8(xmm0[0], xmm0[1]);
@@ -167,7 +200,7 @@ int64_t bshuf_trans_byte_elem_SSE_32(void* in, void* out, const size_t size) {
     xmm0[3] = unpackhi_epi64(xmm1[1], xmm1[3]);
 
     for (j=0; j<bytesoftype; j++)
-      vec_st_generic(xmm0[j], ii + j*size, out_b);
+      vec_xst(xmm0[j], ii + j*size, out_b);
   }
   return bshuf_trans_byte_elem_remainder(in, out, size, bytesoftype,
                                          size - size % 16);
@@ -177,14 +210,14 @@ int64_t bshuf_trans_byte_elem_SSE_32(void* in, void* out, const size_t size) {
 /* Transpose bytes within elements for 64 bit elements. */
 int64_t bshuf_trans_byte_elem_SSE_64(void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 8;
-  char* in_b = (char*)in;
-  char* out_b = (char*)out;
+  const uint8_t* in_b = (const uint8_t*)in;
+  uint8_t* out_b = (uint8_t*)out;
   __vector uint8_t xmm0[8], xmm1[8];
   size_t ii, j;
 
   for (ii = 0; ii + 15 < size; ii += 16) {
     for (j=0; j<bytesoftype; j++)
-      xmm0[j] = vec_ld_generic(bytesoftype * ii + 16*j, in_b);
+      xmm0[j] = vec_xl(bytesoftype * ii + 16*j, in_b);
 
     xmm1[0] = unpacklo_epi8(xmm0[0], xmm0[1]);
     xmm1[1] = unpackhi_epi8(xmm0[0], xmm0[1]);
@@ -223,7 +256,7 @@ int64_t bshuf_trans_byte_elem_SSE_64(void* in, void* out, const size_t size) {
     xmm0[7] = unpackhi_epi64(xmm1[3], xmm1[7]);
 
     for (j=0; j<bytesoftype; j++)
-      vec_st_generic(xmm0[j], ii + j*size, out_b);
+      vec_xst(xmm0[j], ii + j*size, out_b);
   }
   return bshuf_trans_byte_elem_remainder(in, out, size, bytesoftype,
                                          size - size % 16);
@@ -305,20 +338,34 @@ int64_t bshuf_trans_byte_elem_altivec(void* in, void* out, const size_t size,
 int64_t bshuf_trans_bit_byte_altivec(void* in, void* out, const size_t size,
                                      const size_t elem_size) {
 
-  char* in_b = (char*)in;
-  char* out_b = (char*)out;
+  uint8_t* in_b = (char*)in;
+  uint8_t* out_b = (char*)out;
   uint16_t* out_ui16;
   int64_t count;
   size_t nbyte = elem_size * size;
   __m128i xmm;
+  __vector uint8_t data, masks[8];
   int32_t bt;
   size_t ii, kk;
 
   CHECK_MULT_EIGHT(nbyte);
+   
+  //Generate all 8 needed masks
+  for (kk=0; kk<8; kk++){
+    masks[kk] = make_bitperm_mask(1, kk);
+  }
 
   for (ii = 0; ii + 15 < nbyte; ii += 16) {
+    //data = vec_xl(ii, in_b);
+    
     xmm = _mm_loadu_si128((__m128i*)&in_b[ii]);
     for (kk = 0; kk < 8; kk++) {
+      //__vector uint16_t tmp;
+      //uint16_t* out_ui16;
+      //tmp = (__vector uint16_t) vec_bperm(data, masks[kk]);
+      //out_ui16 = (uint16_t*)&out_b[(ii + (7-kk)*nbyte) >> 3];
+      //*out_ui16 = tmp[4];
+      
       bt = _mm_movemask_epi8(xmm);
       xmm = _mm_slli_epi16(xmm, 1);
       out_ui16 = (uint16_t*)&out_b[((7 - kk) * nbyte + ii) / 8];
@@ -341,6 +388,7 @@ int64_t bshuf_trans_bit_elem_altivec(void* in, void* out, const size_t size,
 
   count = bshuf_trans_byte_elem_altivec(in, out, size, elem_size, tmp_buf);
   CHECK_ERR(count);
+  //bshuf_trans_bit_byte_altivec / bitshuffle1_altivec
   count = bshuf_trans_bit_byte_altivec(out, tmp_buf, size, elem_size);
   CHECK_ERR(count);
   count = bshuf_trans_bitrow_eight(tmp_buf, out, size, elem_size);
@@ -460,17 +508,22 @@ int64_t bshuf_shuffle_bit_eightelem_altivec(void* in, void* out, const size_t si
                                             const size_t elem_size) {
   /*  With a bit of care, this could be written such that such that it is */
   /*  in_buf = out_buf safe. */
-  char* in_b = (char*)in;
+  const uint8_t* in_b = (const uint8_t*)in;
+  uint8_t* out_b = (uint8_t*)out;
   uint16_t* out_ui16 = (uint16_t*)out;
-
   size_t nbyte = elem_size * size;
-
+  __vector uint8_t masks[8], data;
   __m128i xmm;
   int32_t bt;
   size_t ii, jj, kk;
   size_t ind;
 
   CHECK_MULT_EIGHT(size);
+
+  //Generate all 8 needed masks
+  for (kk=0; kk<8; kk++){
+    masks[kk] = make_bitperm_mask(1, kk);
+  }
 
   if (elem_size % 2) {
     bshuf_shuffle_bit_eightelem_scal(in, out, size, elem_size);
@@ -479,7 +532,14 @@ int64_t bshuf_shuffle_bit_eightelem_altivec(void* in, void* out, const size_t si
          ii += 8 * elem_size) {
       for (jj = 0; jj + 15 < 8 * elem_size; jj += 16) {
         xmm = _mm_loadu_si128((__m128i*)&in_b[ii + jj]);
+        //data = vec_xl(ii + jj, in_b);
         for (kk = 0; kk < 8; kk++) {
+          //__vector uint16_t tmp;
+          //uint16_t* out_ui16;
+          //tmp = (__vector uint16_t) vec_bperm(data, masks[kk]);
+          //out_ui16 = (uint16_t*)&out_b[(ii + jj / 8 + (7 - kk) * elem_size)];
+          //*out_ui16 = tmp[4];
+
           bt = _mm_movemask_epi8(xmm);
           xmm = _mm_slli_epi16(xmm, 1);
           ind = (ii + jj / 8 + (7 - kk) * elem_size);
