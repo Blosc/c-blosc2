@@ -338,14 +338,11 @@ int64_t bshuf_trans_byte_elem_altivec(void* in, void* out, const size_t size,
 int64_t bshuf_trans_bit_byte_altivec(void* in, void* out, const size_t size,
                                      const size_t elem_size) {
 
-  uint8_t* in_b = (char*)in;
-  uint8_t* out_b = (char*)out;
-  uint16_t* out_ui16;
+  const uint8_t* in_b = (const uint8_t*)in;
+  uint8_t* out_b = (uint8_t*)out;
   int64_t count;
   size_t nbyte = elem_size * size;
-  __m128i xmm;
   __vector uint8_t data, masks[8];
-  int32_t bt;
   size_t ii, kk;
 
   CHECK_MULT_EIGHT(nbyte);
@@ -356,20 +353,13 @@ int64_t bshuf_trans_bit_byte_altivec(void* in, void* out, const size_t size,
   }
 
   for (ii = 0; ii + 15 < nbyte; ii += 16) {
-    //data = vec_xl(ii, in_b);
-    
-    xmm = _mm_loadu_si128((__m128i*)&in_b[ii]);
+    data = vec_xl(ii, in_b);
     for (kk = 0; kk < 8; kk++) {
-      //__vector uint16_t tmp;
-      //uint16_t* out_ui16;
-      //tmp = (__vector uint16_t) vec_bperm(data, masks[kk]);
-      //out_ui16 = (uint16_t*)&out_b[(ii + (7-kk)*nbyte) >> 3];
-      //*out_ui16 = tmp[4];
-      
-      bt = _mm_movemask_epi8(xmm);
-      xmm = _mm_slli_epi16(xmm, 1);
-      out_ui16 = (uint16_t*)&out_b[((7 - kk) * nbyte + ii) / 8];
-      *out_ui16 = (uint16_t)bt;
+      __vector uint16_t tmp;
+      uint16_t* oui16;
+      tmp = (__vector uint16_t) vec_bperm(data, masks[kk]);
+      oui16 = (uint16_t*)&out_b[(ii + kk*nbyte) >> 3];
+      *oui16 = tmp[4];
     }
   }
   count = bshuf_trans_bit_byte_remainder(in, out, size, elem_size,
@@ -510,11 +500,8 @@ int64_t bshuf_shuffle_bit_eightelem_altivec(void* in, void* out, const size_t si
   /*  in_buf = out_buf safe. */
   const uint8_t* in_b = (const uint8_t*)in;
   uint8_t* out_b = (uint8_t*)out;
-  uint16_t* out_ui16 = (uint16_t*)out;
   size_t nbyte = elem_size * size;
   __vector uint8_t masks[8], data;
-  __m128i xmm;
-  int32_t bt;
   size_t ii, jj, kk;
   size_t ind;
 
@@ -531,19 +518,13 @@ int64_t bshuf_shuffle_bit_eightelem_altivec(void* in, void* out, const size_t si
     for (ii = 0; ii + 8 * elem_size - 1 < nbyte;
          ii += 8 * elem_size) {
       for (jj = 0; jj + 15 < 8 * elem_size; jj += 16) {
-        xmm = _mm_loadu_si128((__m128i*)&in_b[ii + jj]);
-        //data = vec_xl(ii + jj, in_b);
+        data = vec_xl(ii + jj, in_b);
         for (kk = 0; kk < 8; kk++) {
-          //__vector uint16_t tmp;
-          //uint16_t* out_ui16;
-          //tmp = (__vector uint16_t) vec_bperm(data, masks[kk]);
-          //out_ui16 = (uint16_t*)&out_b[(ii + jj / 8 + (7 - kk) * elem_size)];
-          //*out_ui16 = tmp[4];
-
-          bt = _mm_movemask_epi8(xmm);
-          xmm = _mm_slli_epi16(xmm, 1);
-          ind = (ii + jj / 8 + (7 - kk) * elem_size);
-          out_ui16[ind / 2] = (uint16_t)bt;
+          __vector uint16_t tmp;
+          uint16_t* oui16;
+          tmp = (__vector uint16_t) vec_bperm(data, masks[kk]);
+          oui16 = (uint16_t*)&out_b[ii + (jj>>3) + kk * elem_size];
+          *oui16 = tmp[4];
         }
       }
     }
