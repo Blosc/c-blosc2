@@ -134,9 +134,6 @@ int blosc2_free_schunk(blosc2_schunk *schunk) {
     free(schunk->usermeta);
   }
 
-  if (schunk->frame != NULL) {
-      blosc2_free_frame(schunk->frame);
-  }
   free(schunk);
 
   return 0;
