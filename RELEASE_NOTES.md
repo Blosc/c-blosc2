@@ -9,6 +9,8 @@ Changes from 2.0.0-beta.4 to 2.0.0-beta.5
 * New blosc2_frame_from_sframe() function for getting a `blosc2_frame`
   out of an in-memory serialized frame.
 
+* Zstd codec updated to 1.4.4.
+
 
 Changes from 2.0.0-beta.3 to 2.0.0-beta.4
 =========================================
