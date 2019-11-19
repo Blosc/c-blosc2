@@ -105,6 +105,16 @@ You can also disable support for some compression libraries:
 .. code-block:: console
 
   $ cmake -DDEACTIVATE_SNAPPY=ON ..
+  
+Support for the LZ4 optimized version in Intel IPP
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+C-Blosc2 comes with support for a highly optimized version of the LZ4 codec present in Intel IPP.  The cmake machinery in C-Blosc2 can auto-discover IPP in your system.  Here it is a way to easily install Intel IPP in Ubuntu machines:: 
+
+   wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
+   apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
+   sudo sh -c 'echo deb https://apt.repos.intel.com/ipp all main > /etc/apt/sources.list.d/intel-ipp.list'
+   sudo apt-get update && sudo apt-get install intel-ipp-64bit-2019.X  # replace .X by the latest version!
 
 Supported platforms
 ~~~~~~~~~~~~~~~~~~~
