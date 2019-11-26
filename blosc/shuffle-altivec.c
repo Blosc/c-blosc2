@@ -2,6 +2,7 @@
   Blosc - Blocked Shuffling and Compression Library
 
   Author: Francesc Alted <francesc@blosc.org>
+  *       Jerome Kieffer <jerome.kieffer@esrf.fr>
 
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
@@ -14,141 +15,77 @@
   #error ALTIVEC is not supported by the target architecture/platform and/or this compiler.
 #endif
 
-#include <emmintrin.h>
-
-
-/* The next is useful for debugging purposes */
-#if 0
-#include <stdio.h>
-#include <string.h>
-
-static void printxmm(__m128i xmm0)
-{
-  uint8_t buf[16];
-
-  ((__m128i *)buf)[0] = xmm0;
-  printf("%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x\n",
-          buf[0], buf[1], buf[2], buf[3],
-          buf[4], buf[5], buf[6], buf[7],
-          buf[8], buf[9], buf[10], buf[11],
-          buf[12], buf[13], buf[14], buf[15]);
-}
-#endif
-
+#include <altivec.h>
+#include "transpose-altivec.h"
 
 /* Routine optimized for shuffling a buffer for a type size of 2 bytes. */
 static void
 shuffle2_altivec(uint8_t* const dest, const uint8_t* const src,
-                 const int32_t vectorizable_elements, const int32_t total_elements) {
+                 const int32_t vectorizable_elements, const int32_t total_elements){
   static const int32_t bytesoftype = 2;
-  int32_t j;
-  int k;
-  uint8_t* dest_for_jth_element;
-  __m128i xmm0[2], xmm1[2];
+  uint32_t i, j;
+  __vector uint8_t xmm0[2];
 
-  for (j = 0; j < vectorizable_elements; j += sizeof(__m128i)) {
-    /* Fetch 16 elements (32 bytes) then transpose bytes, words and double words. */
-    for (k = 0; k < 2; k++) {
-      xmm0[k] = _mm_loadu_si128((__m128i*)(src + (j * bytesoftype) + (k * sizeof(__m128i))));
-      xmm0[k] = _mm_shufflelo_epi16(xmm0[k], 0xd8);
-      xmm0[k] = _mm_shufflehi_epi16(xmm0[k], 0xd8);
-      xmm0[k] = _mm_shuffle_epi32(xmm0[k], 0xd8);
-      xmm1[k] = _mm_shuffle_epi32(xmm0[k], 0x4e);
-      xmm0[k] = _mm_unpacklo_epi8(xmm0[k], xmm1[k]);
-      xmm0[k] = _mm_shuffle_epi32(xmm0[k], 0xd8);
-      xmm1[k] = _mm_shuffle_epi32(xmm0[k], 0x4e);
-      xmm0[k] = _mm_unpacklo_epi16(xmm0[k], xmm1[k]);
-      xmm0[k] = _mm_shuffle_epi32(xmm0[k], 0xd8);
-    }
-    /* Transpose quad words */
-    for (k = 0; k < 1; k++) {
-      xmm1[k * 2] = _mm_unpacklo_epi64(xmm0[k], xmm0[k + 1]);
-      xmm1[k * 2 + 1] = _mm_unpackhi_epi64(xmm0[k], xmm0[k + 1]);
-    }
+  for (j = 0; j < vectorizable_elements; j += 16){
+    /* Fetch 16 elements (32 bytes) */
+    for (i = 0; i < bytesoftype; i++)
+      xmm0[i] = vec_xl(bytesoftype * j + 16 * i, src);
+    
+    /* Transpose vectors */
+    transpose2x16(xmm0);
+
     /* Store the result vectors */
-    dest_for_jth_element = dest + j;
-    for (k = 0; k < 2; k++) {
-      _mm_storeu_si128((__m128i*)(dest_for_jth_element + (k * total_elements)), xmm1[k]);
-    }
+    for (i = 0; i < bytesoftype; i++)
+        vec_xst(xmm0[i], j + i * total_elements, dest);
   }
 }
 
 /* Routine optimized for shuffling a buffer for a type size of 4 bytes. */
 static void
 shuffle4_altivec(uint8_t* const dest, const uint8_t* const src,
-                 const int32_t vectorizable_elements, const int32_t total_elements) {
+                 const int32_t vectorizable_elements, const int32_t total_elements){
   static const int32_t bytesoftype = 4;
-  int32_t i;
-  int j;
-  uint8_t* dest_for_ith_element;
-  __m128i xmm0[4], xmm1[4];
+  int32_t i, j;
+  __vector uint8_t xmm0[4];
 
-  for (i = 0; i < vectorizable_elements; i += sizeof(__m128i)) {
-    /* Fetch 16 elements (64 bytes) then transpose bytes and words. */
-    for (j = 0; j < 4; j++) {
-      xmm0[j] = _mm_loadu_si128((__m128i*)(src + (i * bytesoftype) + (j * sizeof(__m128i))));
-      xmm1[j] = _mm_shuffle_epi32(xmm0[j], 0xd8);
-      xmm0[j] = _mm_shuffle_epi32(xmm0[j], 0x8d);
-      xmm0[j] = _mm_unpacklo_epi8(xmm1[j], xmm0[j]);
-      xmm1[j] = _mm_shuffle_epi32(xmm0[j], 0x04e);
-      xmm0[j] = _mm_unpacklo_epi16(xmm0[j], xmm1[j]);
-    }
-    /* Transpose double words */
-    for (j = 0; j < 2; j++) {
-      xmm1[j * 2] = _mm_unpacklo_epi32(xmm0[j * 2], xmm0[j * 2 + 1]);
-      xmm1[j * 2 + 1] = _mm_unpackhi_epi32(xmm0[j * 2], xmm0[j * 2 + 1]);
-    }
-    /* Transpose quad words */
-    for (j = 0; j < 2; j++) {
-      xmm0[j * 2] = _mm_unpacklo_epi64(xmm1[j], xmm1[j + 2]);
-      xmm0[j * 2 + 1] = _mm_unpackhi_epi64(xmm1[j], xmm1[j + 2]);
-    }
+  for (j = 0; j < vectorizable_elements; j += 16) 
+  {
+    /* Fetch 16 elements (64 bytes, 4 vectors) */
+    for (i = 0; i < bytesoftype; i++)
+      xmm0[i] = vec_xl(bytesoftype * j + 16 * i, src);
+
+
+    /* Transpose vectors */
+    transpose4x16(xmm0);
+    
     /* Store the result vectors */
-    dest_for_ith_element = dest + i;
-    for (j = 0; j < 4; j++) {
-      _mm_storeu_si128((__m128i*)(dest_for_ith_element + (j * total_elements)), xmm0[j]);
-    }
+    for (i = 0; i < bytesoftype; i ++){
+        vec_xst(xmm0[i], j + i*total_elements, dest);
+    }        
   }
 }
+
 
 /* Routine optimized for shuffling a buffer for a type size of 8 bytes. */
 static void
 shuffle8_altivec(uint8_t* const dest, const uint8_t* const src,
                  const int32_t vectorizable_elements, const int32_t total_elements) {
-  static const int32_t bytesoftype = 8;
-  int32_t j;
-  int k, l;
-  uint8_t* dest_for_jth_element;
-  __m128i xmm0[8], xmm1[8];
+  static const uint8_t bytesoftype = 8;
+  int32_t i, j, k;
+  __vector uint8_t xmm0[8];
 
-  for (j = 0; j < vectorizable_elements; j += sizeof(__m128i)) {
-    /* Fetch 16 elements (128 bytes) then transpose bytes. */
-    for (k = 0; k < 8; k++) {
-      xmm0[k] = _mm_loadu_si128((__m128i*)(src + (j * bytesoftype) + (k * sizeof(__m128i))));
-      xmm1[k] = _mm_shuffle_epi32(xmm0[k], 0x4e);
-      xmm1[k] = _mm_unpacklo_epi8(xmm0[k], xmm1[k]);
-    }
-    /* Transpose words */
-    for (k = 0, l = 0; k < 4; k++, l += 2) {
-      xmm0[k * 2] = _mm_unpacklo_epi16(xmm1[l], xmm1[l + 1]);
-      xmm0[k * 2 + 1] = _mm_unpackhi_epi16(xmm1[l], xmm1[l + 1]);
-    }
-    /* Transpose double words */
-    for (k = 0, l = 0; k < 4; k++, l++) {
-      if (k == 2) l += 2;
-      xmm1[k * 2] = _mm_unpacklo_epi32(xmm0[l], xmm0[l + 2]);
-      xmm1[k * 2 + 1] = _mm_unpackhi_epi32(xmm0[l], xmm0[l + 2]);
-    }
-    /* Transpose quad words */
-    for (k = 0; k < 4; k++) {
-      xmm0[k * 2] = _mm_unpacklo_epi64(xmm1[k], xmm1[k + 4]);
-      xmm0[k * 2 + 1] = _mm_unpackhi_epi64(xmm1[k], xmm1[k + 4]);
-    }
+  for (j = 0; j < vectorizable_elements; j += 16) 
+  {
+    /* Fetch 16 elements (128 bytes, 8 vectors) */
+    for (i = 0; i < bytesoftype; i++)
+      xmm0[i] = vec_xl(bytesoftype * j + 16 * i, src);
+
+    /* Transpose vectors */
+    transpose8x16(xmm0);
+
     /* Store the result vectors */
-    dest_for_jth_element = dest + j;
-    for (k = 0; k < 8; k++) {
-      _mm_storeu_si128((__m128i*)(dest_for_jth_element + (k * total_elements)), xmm0[k]);
-    }
+    for (i = 0; i < bytesoftype; i++)
+      vec_xst(xmm0[i], j + i*total_elements, dest);
   }
 }
 
@@ -157,57 +94,35 @@ static void
 shuffle16_altivec(uint8_t* const dest, const uint8_t* const src,
                   const int32_t vectorizable_elements, const int32_t total_elements) {
   static const int32_t bytesoftype = 16;
-  int32_t j;
-  int k, l;
-  uint8_t* dest_for_jth_element;
-  __m128i xmm0[16], xmm1[16];
+  int32_t i, j;
+  __vector uint8_t xmm0[16];
 
-  for (j = 0; j < vectorizable_elements; j += sizeof(__m128i)) {
-    /* Fetch 16 elements (256 bytes). */
-    for (k = 0; k < 16; k++) {
-      xmm0[k] = _mm_loadu_si128((__m128i*)(src + (j * bytesoftype) + (k * sizeof(__m128i))));
-    }
-    /* Transpose bytes */
-    for (k = 0, l = 0; k < 8; k++, l += 2) {
-      xmm1[k * 2] = _mm_unpacklo_epi8(xmm0[l], xmm0[l + 1]);
-      xmm1[k * 2 + 1] = _mm_unpackhi_epi8(xmm0[l], xmm0[l + 1]);
-    }
-    /* Transpose words */
-    for (k = 0, l = -2; k < 8; k++, l++) {
-      if ((k % 2) == 0) l += 2;
-      xmm0[k * 2] = _mm_unpacklo_epi16(xmm1[l], xmm1[l + 2]);
-      xmm0[k * 2 + 1] = _mm_unpackhi_epi16(xmm1[l], xmm1[l + 2]);
-    }
-    /* Transpose double words */
-    for (k = 0, l = -4; k < 8; k++, l++) {
-      if ((k % 4) == 0) l += 4;
-      xmm1[k * 2] = _mm_unpacklo_epi32(xmm0[l], xmm0[l + 4]);
-      xmm1[k * 2 + 1] = _mm_unpackhi_epi32(xmm0[l], xmm0[l + 4]);
-    }
-    /* Transpose quad words */
-    for (k = 0; k < 8; k++) {
-      xmm0[k * 2] = _mm_unpacklo_epi64(xmm1[k], xmm1[k + 8]);
-      xmm0[k * 2 + 1] = _mm_unpackhi_epi64(xmm1[k], xmm1[k + 8]);
-    }
+  for (j = 0; j < vectorizable_elements; j += 16) 
+  {
+    /* Fetch 16 elements (256 bytes, 16 vectors) */
+    for (i = 0; i < bytesoftype; i++)
+      xmm0[i] = vec_xl(bytesoftype * j + 16 * i, src);
+    
+    // Do the job !
+    transpose16x16(xmm0);
+
     /* Store the result vectors */
-    dest_for_jth_element = dest + j;
-    for (k = 0; k < 16; k++) {
-      _mm_storeu_si128((__m128i*)(dest_for_jth_element + (k * total_elements)), xmm0[k]);
-    }
+    for (i = 0; i < bytesoftype; i ++)
+      vec_xst(xmm0[i], j + i * total_elements, dest);
   }
 }
+
 
 /* Routine optimized for shuffling a buffer for a type size larger than 16 bytes. */
 static void
 shuffle16_tiled_altivec(uint8_t* const dest, const uint8_t* const src,
                         const int32_t vectorizable_elements, const int32_t total_elements, const int32_t bytesoftype) {
-  int32_t j;
-  const int32_t vecs_per_el_rem = bytesoftype % sizeof(__m128i);
-  int k, l;
+  int32_t j, k, l;
+  const int32_t vecs_per_el_rem = bytesoftype & 0xF;
   uint8_t* dest_for_jth_element;
-  __m128i xmm0[16], xmm1[16];
+  __vector uint8_t xmm[16];
 
-  for (j = 0; j < vectorizable_elements; j += sizeof(__m128i)) {
+  for (j = 0; j < vectorizable_elements; j += 16) {
     /* Advance the offset into the type by the vector size (in bytes), unless this is
     the initial iteration and the type size is not a multiple of the vector size.
     In that case, only advance by the number of bytes necessary so that the number
@@ -215,67 +130,43 @@ shuffle16_tiled_altivec(uint8_t* const dest, const uint8_t* const src,
     int32_t offset_into_type;
     for (offset_into_type = 0; offset_into_type < bytesoftype;
          offset_into_type += (offset_into_type == 0 &&
-                              vecs_per_el_rem > 0 ? vecs_per_el_rem : (int32_t)sizeof(__m128i))) {
+                              vecs_per_el_rem > 0 ? vecs_per_el_rem : 16)) {
 
       /* Fetch elements in groups of 256 bytes */
       const uint8_t* const src_with_offset = src + offset_into_type;
-      for (k = 0; k < 16; k++) {
-        xmm0[k] = _mm_loadu_si128((__m128i*)(src_with_offset + (j + k) * bytesoftype));
-      }
-      /* Transpose bytes */
-      for (k = 0, l = 0; k < 8; k++, l += 2) {
-        xmm1[k * 2] = _mm_unpacklo_epi8(xmm0[l], xmm0[l + 1]);
-        xmm1[k * 2 + 1] = _mm_unpackhi_epi8(xmm0[l], xmm0[l + 1]);
-      }
-      /* Transpose words */
-      for (k = 0, l = -2; k < 8; k++, l++) {
-        if ((k % 2) == 0) l += 2;
-        xmm0[k * 2] = _mm_unpacklo_epi16(xmm1[l], xmm1[l + 2]);
-        xmm0[k * 2 + 1] = _mm_unpackhi_epi16(xmm1[l], xmm1[l + 2]);
-      }
-      /* Transpose double words */
-      for (k = 0, l = -4; k < 8; k++, l++) {
-        if ((k % 4) == 0) l += 4;
-        xmm1[k * 2] = _mm_unpacklo_epi32(xmm0[l], xmm0[l + 4]);
-        xmm1[k * 2 + 1] = _mm_unpackhi_epi32(xmm0[l], xmm0[l + 4]);
-      }
-      /* Transpose quad words */
-      for (k = 0; k < 8; k++) {
-        xmm0[k * 2] = _mm_unpacklo_epi64(xmm1[k], xmm1[k + 8]);
-        xmm0[k * 2 + 1] = _mm_unpackhi_epi64(xmm1[k], xmm1[k + 8]);
-      }
+      for (k = 0; k < 16; k++)
+        xmm[k] = vec_xl((j + k) * bytesoftype, src_with_offset);
+      // Do the Job!
+      transpose16x16(xmm);
       /* Store the result vectors */
-      dest_for_jth_element = dest + j;
       for (k = 0; k < 16; k++) {
-        _mm_storeu_si128((__m128i*)(dest_for_jth_element + (total_elements * (offset_into_type + k))), xmm0[k]);
+        vec_xst(xmm[k], j + total_elements * (offset_into_type + k), dest);
       }
     }
   }
 }
-
 /* Routine optimized for unshuffling a buffer for a type size of 2 bytes. */
 static void
 unshuffle2_altivec(uint8_t* const dest, const uint8_t* const src,
                    const int32_t vectorizable_elements, const int32_t total_elements) {
   static const int32_t bytesoftype = 2;
-  int32_t i;
-  int j;
-  __m128i xmm0[2], xmm1[2];
+  uint32_t i, j;
+  __vector uint8_t xmm0[2], xmm1[2];
 
-  for (i = 0; i < vectorizable_elements; i += sizeof(__m128i)) {
-    /* Load 16 elements (32 bytes) into 2 XMM registers. */
-    const uint8_t* const src_for_ith_element = src + i;
-    for (j = 0; j < 2; j++) {
-      xmm0[j] = _mm_loadu_si128((__m128i*)(src_for_ith_element + (j * total_elements)));
-    }
+  for (j = 0; j < vectorizable_elements; j += 16) {
+    /* Load 16 elements (32 bytes) into 2 vectors registers. */
+    for (i = 0; i < bytesoftype; i++)
+      xmm0[i] = vec_xl(j + i * total_elements, src);
+
     /* Shuffle bytes */
-    /* Compute the low 32 bytes */
-    xmm1[0] = _mm_unpacklo_epi8(xmm0[0], xmm0[1]);
-    /* Compute the hi 32 bytes */
-    xmm1[1] = _mm_unpackhi_epi8(xmm0[0], xmm0[1]);
-    /* Store the result vectors in proper order */
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (0 * sizeof(__m128i))), xmm1[0]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (1 * sizeof(__m128i))), xmm1[1]);
+    /* Note the shuffling is different from intel's SSE2 */
+    xmm1[0] = vec_vmrghb (xmm0[0], xmm0[1]);
+    xmm1[1] = vec_vmrglb (xmm0[0], xmm0[1]);
+    
+
+    /* Store the result vectors*/
+    for (i = 0; i < bytesoftype; i++)
+      vec_xst(xmm1[i], bytesoftype * j + 16 * i, dest);
   }
 }
 
@@ -284,35 +175,31 @@ static void
 unshuffle4_altivec(uint8_t* const dest, const uint8_t* const src,
                 const int32_t vectorizable_elements, const int32_t total_elements) {
   static const int32_t bytesoftype = 4;
-  int32_t i;
-  int j;
-  __m128i xmm0[4], xmm1[4];
+  uint32_t i, j;
+  __vector uint8_t xmm0[4], xmm1[4];
 
-  for (i = 0; i < vectorizable_elements; i += sizeof(__m128i)) {
-    /* Load 16 elements (64 bytes) into 4 XMM registers. */
-    const uint8_t* const src_for_ith_element = src + i;
-    for (j = 0; j < 4; j++) {
-      xmm0[j] = _mm_loadu_si128((__m128i*)(src_for_ith_element + (j * total_elements)));
-    }
+  for (j = 0; j < vectorizable_elements; j += 16) {
+    /* Load 16 elements (64 bytes) into 4 vectors registers. */
+    for (i = 0; i < bytesoftype; i++)
+        xmm0[i] = vec_xl(j + i * total_elements, src);
+
     /* Shuffle bytes */
-    for (j = 0; j < 2; j++) {
-      /* Compute the low 32 bytes */
-      xmm1[j] = _mm_unpacklo_epi8(xmm0[j * 2], xmm0[j * 2 + 1]);
-      /* Compute the hi 32 bytes */
-      xmm1[2 + j] = _mm_unpackhi_epi8(xmm0[j * 2], xmm0[j * 2 + 1]);
+    for (i = 0; i < 2; i++) {
+      xmm1[i  ] = vec_vmrghb(xmm0[i * 2], xmm0[i * 2 + 1]);
+      xmm1[i+2] = vec_vmrglb(xmm0[i * 2], xmm0[i * 2 + 1]);
     }
     /* Shuffle 2-byte words */
-    for (j = 0; j < 2; j++) {
+    for (i = 0; i < 2; i++) {
       /* Compute the low 32 bytes */
-      xmm0[j] = _mm_unpacklo_epi16(xmm1[j * 2], xmm1[j * 2 + 1]);
+      xmm0[i] = (__vector uint8_t) vec_vmrghh((__vector uint16_t)xmm1[i * 2], (__vector uint16_t) xmm1[i * 2 + 1]);
       /* Compute the hi 32 bytes */
-      xmm0[2 + j] = _mm_unpackhi_epi16(xmm1[j * 2], xmm1[j * 2 + 1]);
+      xmm0[i+2] = (__vector uint8_t) vec_vmrglh((__vector uint16_t)xmm1[i * 2], (__vector uint16_t)xmm1[i * 2 + 1]);
     }
     /* Store the result vectors in proper order */
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (0 * sizeof(__m128i))), xmm0[0]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (1 * sizeof(__m128i))), xmm0[2]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (2 * sizeof(__m128i))), xmm0[1]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (3 * sizeof(__m128i))), xmm0[3]);
+    vec_xst(xmm0[0], bytesoftype * j, dest);
+    vec_xst(xmm0[2], bytesoftype * j + 16, dest);
+    vec_xst(xmm0[1], bytesoftype * j + 32, dest);
+    vec_xst(xmm0[3], bytesoftype * j + 48, dest);
   }
 }
 
@@ -320,184 +207,99 @@ unshuffle4_altivec(uint8_t* const dest, const uint8_t* const src,
 static void
 unshuffle8_altivec(uint8_t* const dest, const uint8_t* const src,
                    const int32_t vectorizable_elements, const int32_t total_elements) {
-  static const int32_t bytesoftype = 8;
-  int32_t i;
-  int j;
-  __m128i xmm0[8], xmm1[8];
+  static const uint8_t bytesoftype = 8;
+  uint32_t i, j;
+  __vector uint8_t xmm0[8], xmm1[8];
+  
+  // Initialize permutations for writing
+  
 
-  for (i = 0; i < vectorizable_elements; i += sizeof(__m128i)) {
-    /* Load 16 elements (128 bytes) into 8 XMM registers. */
-    const uint8_t* const src_for_ith_element = src + i;
-    for (j = 0; j < 8; j++) {
-      xmm0[j] = _mm_loadu_si128((__m128i*)(src_for_ith_element + (j * total_elements)));
-    }
+  for (j = 0; j < vectorizable_elements; j += 16) {
+    /* Load 16 elements (64 bytes) into 4 vectors registers. */
+    for (i = 0; i < bytesoftype; i++)
+        xmm0[i] = vec_xl(j + i * total_elements, src);
+
     /* Shuffle bytes */
-    for (j = 0; j < 4; j++) {
-      /* Compute the low 32 bytes */
-      xmm1[j] = _mm_unpacklo_epi8(xmm0[j * 2], xmm0[j * 2 + 1]);
-      /* Compute the hi 32 bytes */
-      xmm1[4 + j] = _mm_unpackhi_epi8(xmm0[j * 2], xmm0[j * 2 + 1]);
+    for (i = 0; i < 4; i++) {
+      xmm1[i] = vec_vmrghb(xmm0[i * 2], xmm0[i * 2 + 1]);
+      xmm1[4 + i] = vec_vmrglb(xmm0[i * 2], xmm0[i * 2 + 1]);
     }
     /* Shuffle 2-byte words */
-    for (j = 0; j < 4; j++) {
-      /* Compute the low 32 bytes */
-      xmm0[j] = _mm_unpacklo_epi16(xmm1[j * 2], xmm1[j * 2 + 1]);
-      /* Compute the hi 32 bytes */
-      xmm0[4 + j] = _mm_unpackhi_epi16(xmm1[j * 2], xmm1[j * 2 + 1]);
+    for (i = 0; i < 4; i++) {
+      xmm0[i] = (__vector uint8_t)vec_vmrghh((__vector uint16_t)xmm1[i * 2], (__vector uint16_t)xmm1[i * 2 + 1]);
+      xmm0[4 + i] = (__vector uint8_t)vec_vmrglh((__vector uint16_t)xmm1[i * 2], (__vector uint16_t)xmm1[i * 2 + 1]);
     }
     /* Shuffle 4-byte dwords */
-    for (j = 0; j < 4; j++) {
-      /* Compute the low 32 bytes */
-      xmm1[j] = _mm_unpacklo_epi32(xmm0[j * 2], xmm0[j * 2 + 1]);
-      /* Compute the hi 32 bytes */
-      xmm1[4 + j] = _mm_unpackhi_epi32(xmm0[j * 2], xmm0[j * 2 + 1]);
+    for (i = 0; i < 4; i++) {
+      xmm1[i] = (__vector uint8_t)vec_vmrghw((__vector uint32_t)xmm0[i * 2], (__vector uint32_t)xmm0[i * 2 + 1]);
+      xmm1[4 + i] = (__vector uint8_t)vec_vmrglw((__vector uint32_t)xmm0[i * 2], (__vector uint32_t)xmm0[i * 2 + 1]);
     }
     /* Store the result vectors in proper order */
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (0 * sizeof(__m128i))), xmm1[0]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (1 * sizeof(__m128i))), xmm1[4]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (2 * sizeof(__m128i))), xmm1[2]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (3 * sizeof(__m128i))), xmm1[6]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (4 * sizeof(__m128i))), xmm1[1]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (5 * sizeof(__m128i))), xmm1[5]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (6 * sizeof(__m128i))), xmm1[3]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (7 * sizeof(__m128i))), xmm1[7]);
+      vec_xst(xmm1[0], bytesoftype * j, dest);      
+      vec_xst(xmm1[4], bytesoftype * j + 16, dest);
+      vec_xst(xmm1[2], bytesoftype * j + 32, dest);
+      vec_xst(xmm1[6], bytesoftype * j + 48, dest);
+      vec_xst(xmm1[1], bytesoftype * j + 64, dest);
+      vec_xst(xmm1[5], bytesoftype * j + 80, dest);
+      vec_xst(xmm1[3], bytesoftype * j + 96, dest);
+      vec_xst(xmm1[7], bytesoftype * j + 112, dest);    
+     
   }
 }
+
 
 /* Routine optimized for unshuffling a buffer for a type size of 16 bytes. */
 static void
 unshuffle16_altivec(uint8_t* const dest, const uint8_t* const src,
                     const int32_t vectorizable_elements, const int32_t total_elements) {
   static const int32_t bytesoftype = 16;
-  int32_t i;
-  int j;
-  __m128i xmm1[16], xmm2[16];
+  uint32_t i, j;
+  __vector uint8_t xmm0[16]; 
 
-  for (i = 0; i < vectorizable_elements; i += sizeof(__m128i)) {
-    /* Load 16 elements (256 bytes) into 16 XMM registers. */
-    const uint8_t* const src_for_ith_element = src + i;
-    for (j = 0; j < 16; j++) {
-      xmm1[j] = _mm_loadu_si128((__m128i*)(src_for_ith_element + (j * total_elements)));
-    }
-    /* Shuffle bytes */
-    for (j = 0; j < 8; j++) {
-      /* Compute the low 32 bytes */
-      xmm2[j] = _mm_unpacklo_epi8(xmm1[j * 2], xmm1[j * 2 + 1]);
-      /* Compute the hi 32 bytes */
-      xmm2[8 + j] = _mm_unpackhi_epi8(xmm1[j * 2], xmm1[j * 2 + 1]);
-    }
-    /* Shuffle 2-byte words */
-    for (j = 0; j < 8; j++) {
-      /* Compute the low 32 bytes */
-      xmm1[j] = _mm_unpacklo_epi16(xmm2[j * 2], xmm2[j * 2 + 1]);
-      /* Compute the hi 32 bytes */
-      xmm1[8 + j] = _mm_unpackhi_epi16(xmm2[j * 2], xmm2[j * 2 + 1]);
-    }
-    /* Shuffle 4-byte dwords */
-    for (j = 0; j < 8; j++) {
-      /* Compute the low 32 bytes */
-      xmm2[j] = _mm_unpacklo_epi32(xmm1[j * 2], xmm1[j * 2 + 1]);
-      /* Compute the hi 32 bytes */
-      xmm2[8 + j] = _mm_unpackhi_epi32(xmm1[j * 2], xmm1[j * 2 + 1]);
-    }
-    /* Shuffle 8-byte qwords */
-    for (j = 0; j < 8; j++) {
-      /* Compute the low 32 bytes */
-      xmm1[j] = _mm_unpacklo_epi64(xmm2[j * 2], xmm2[j * 2 + 1]);
-      /* Compute the hi 32 bytes */
-      xmm1[8 + j] = _mm_unpackhi_epi64(xmm2[j * 2], xmm2[j * 2 + 1]);
-    }
-
-    /* Store the result vectors in proper order */
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (0 * sizeof(__m128i))), xmm1[0]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (1 * sizeof(__m128i))), xmm1[8]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (2 * sizeof(__m128i))), xmm1[4]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (3 * sizeof(__m128i))), xmm1[12]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (4 * sizeof(__m128i))), xmm1[2]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (5 * sizeof(__m128i))), xmm1[10]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (6 * sizeof(__m128i))), xmm1[6]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (7 * sizeof(__m128i))), xmm1[14]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (8 * sizeof(__m128i))), xmm1[1]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (9 * sizeof(__m128i))), xmm1[9]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (10 * sizeof(__m128i))), xmm1[5]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (11 * sizeof(__m128i))), xmm1[13]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (12 * sizeof(__m128i))), xmm1[3]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (13 * sizeof(__m128i))), xmm1[11]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (14 * sizeof(__m128i))), xmm1[7]);
-    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (15 * sizeof(__m128i))), xmm1[15]);
+  for (j = 0; j < vectorizable_elements; j += 16) {
+    /* Load 16 elements (64 bytes) into 4 vectors registers. */
+    for (i = 0; i < bytesoftype; i++)
+        xmm0[i] = vec_xl(j + i * total_elements, src);
+    
+    // Do the Job!
+    transpose16x16(xmm0);
+    
+    /* Store the result vectors*/
+    for (i = 0; i < 16; i++)
+      vec_st(xmm0[i], bytesoftype * (i+j), dest); 
   }
 }
+
 
 /* Routine optimized for unshuffling a buffer for a type size larger than 16 bytes. */
 static void
 unshuffle16_tiled_altivec(uint8_t* const dest, const uint8_t* const orig,
                           const int32_t vectorizable_elements, const int32_t total_elements, const int32_t bytesoftype) {
-  int32_t i;
-  const int32_t vecs_per_el_rem = bytesoftype % sizeof(__m128i);
-
-  int j;
-  uint8_t* dest_with_offset;
-  __m128i xmm1[16], xmm2[16];
-
-  /* The unshuffle loops are inverted (compared to shuffle_tiled16_altivec)
-     to optimize cache utilization. */
-  int32_t offset_into_type;
+  int32_t i, j, offset_into_type;
+  const int32_t vecs_per_el_rem = bytesoftype &  0xF;
+  __vector uint8_t xmm[16];
+  
+  
+  /* Advance the offset into the type by the vector size (in bytes), unless this is
+    the initial iteration and the type size is not a multiple of the vector size.
+    In that case, only advance by the number of bytes necessary so that the number
+    of remaining bytes in the type will be a multiple of the vector size. */
+    
   for (offset_into_type = 0; offset_into_type < bytesoftype;
        offset_into_type += (offset_into_type == 0 &&
-           vecs_per_el_rem > 0 ? vecs_per_el_rem : (int32_t)sizeof(__m128i))) {
-    for (i = 0; i < vectorizable_elements; i += sizeof(__m128i)) {
+           vecs_per_el_rem > 0 ? vecs_per_el_rem : 16)) {
+    for (i = 0; i < vectorizable_elements; i += 16) {
       /* Load the first 128 bytes in 16 XMM registers */
       const uint8_t* const src_for_ith_element = orig + i;
-      for (j = 0; j < 16; j++) {
-        xmm1[j] = _mm_loadu_si128((__m128i*)(src_for_ith_element + (total_elements * (offset_into_type + j))));
-      }
-      /* Shuffle bytes */
-      for (j = 0; j < 8; j++) {
-        /* Compute the low 32 bytes */
-        xmm2[j] = _mm_unpacklo_epi8(xmm1[j * 2], xmm1[j * 2 + 1]);
-        /* Compute the hi 32 bytes */
-        xmm2[8 + j] = _mm_unpackhi_epi8(xmm1[j * 2], xmm1[j * 2 + 1]);
-      }
-      /* Shuffle 2-byte words */
-      for (j = 0; j < 8; j++) {
-        /* Compute the low 32 bytes */
-        xmm1[j] = _mm_unpacklo_epi16(xmm2[j * 2], xmm2[j * 2 + 1]);
-        /* Compute the hi 32 bytes */
-        xmm1[8 + j] = _mm_unpackhi_epi16(xmm2[j * 2], xmm2[j * 2 + 1]);
-      }
-      /* Shuffle 4-byte dwords */
-      for (j = 0; j < 8; j++) {
-        /* Compute the low 32 bytes */
-        xmm2[j] = _mm_unpacklo_epi32(xmm1[j * 2], xmm1[j * 2 + 1]);
-        /* Compute the hi 32 bytes */
-        xmm2[8 + j] = _mm_unpackhi_epi32(xmm1[j * 2], xmm1[j * 2 + 1]);
-      }
-      /* Shuffle 8-byte qwords */
-      for (j = 0; j < 8; j++) {
-        /* Compute the low 32 bytes */
-        xmm1[j] = _mm_unpacklo_epi64(xmm2[j * 2], xmm2[j * 2 + 1]);
-        /* Compute the hi 32 bytes */
-        xmm1[8 + j] = _mm_unpackhi_epi64(xmm2[j * 2], xmm2[j * 2 + 1]);
-      }
+      for (j = 0; j < 16; j++)
+        xmm[j] = vec_xl(total_elements * (offset_into_type + j) + i, orig);
 
+      // Do the Job !
+      transpose16x16(xmm);
+      
       /* Store the result vectors in proper order */
-      dest_with_offset = dest + offset_into_type;
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 0) * bytesoftype), xmm1[0]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 1) * bytesoftype), xmm1[8]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 2) * bytesoftype), xmm1[4]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 3) * bytesoftype), xmm1[12]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 4) * bytesoftype), xmm1[2]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 5) * bytesoftype), xmm1[10]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 6) * bytesoftype), xmm1[6]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 7) * bytesoftype), xmm1[14]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 8) * bytesoftype), xmm1[1]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 9) * bytesoftype), xmm1[9]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 10) * bytesoftype), xmm1[5]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 11) * bytesoftype), xmm1[13]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 12) * bytesoftype), xmm1[3]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 13) * bytesoftype), xmm1[11]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 14) * bytesoftype), xmm1[7]);
-      _mm_storeu_si128((__m128i*)(dest_with_offset + (i + 15) * bytesoftype), xmm1[15]);
+      for (j = 0; j < 16; j++)
+        vec_xst(xmm[j], (i + j) * bytesoftype + offset_into_type, dest);
     }
   }
 }
@@ -505,8 +307,12 @@ unshuffle16_tiled_altivec(uint8_t* const dest, const uint8_t* const orig,
 /* Shuffle a block.  This can never fail. */
 void
 shuffle_altivec(const int32_t bytesoftype, const int32_t blocksize,
-                const uint8_t *_src, uint8_t *_dest) {
-  const int32_t vectorized_chunk_size = bytesoftype * sizeof(__m128i);
+                const uint8_t *_src, uint8_t *_dest) 
+{  
+	int32_t vectorized_chunk_size;
+    vectorized_chunk_size = bytesoftype * 16;
+
+
   /* If the blocksize is not a multiple of both the typesize and
      the vector size, round the blocksize down to the next value
      which is a multiple of both. The vectorized shuffle can be
@@ -538,7 +344,7 @@ shuffle_altivec(const int32_t bytesoftype, const int32_t blocksize,
       shuffle16_altivec(_dest, _src, vectorizable_elements, total_elements);
       break;
     default:
-      if (bytesoftype > (int32_t)sizeof(__m128i)) {
+      if (bytesoftype > 16) {
         shuffle16_tiled_altivec(_dest, _src, vectorizable_elements, total_elements, bytesoftype);
       }
       else {
@@ -562,7 +368,7 @@ shuffle_altivec(const int32_t bytesoftype, const int32_t blocksize,
 void
 unshuffle_altivec(const int32_t bytesoftype, const int32_t blocksize,
                   const uint8_t *_src, uint8_t *_dest) {
-  const int32_t vectorized_chunk_size = bytesoftype * sizeof(__m128i);
+  const int32_t vectorized_chunk_size = bytesoftype * 16;
   /* If the blocksize is not a multiple of both the typesize and
      the vector size, round the blocksize down to the next value
      which is a multiple of both. The vectorized unshuffle can be
@@ -594,7 +400,7 @@ unshuffle_altivec(const int32_t bytesoftype, const int32_t blocksize,
       unshuffle16_altivec(_dest, _src, vectorizable_elements, total_elements);
       break;
     default:
-      if (bytesoftype > (int32_t)sizeof(__m128i)) {
+      if (bytesoftype > 16) {
         unshuffle16_tiled_altivec(_dest, _src, vectorizable_elements, total_elements, bytesoftype);
       }
       else {
