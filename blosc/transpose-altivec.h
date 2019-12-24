@@ -63,7 +63,7 @@ static void transpose8x16(__vector uint8_t *xmm0) {
   }
   /* Transpose vectors 0-2*/
   for (int i = 0; i < 8; i += 4){
-    for (k = 0; k < 2; k++){
+    for (int k = 0; k < 2; k++){
       xmm0[i+k] = vec_perm(xmm1[i+k], xmm1[i+k+2], even);
       xmm0[i+k+2] = vec_perm(xmm1[i+k], xmm1[i+k+2], odd);
     }
