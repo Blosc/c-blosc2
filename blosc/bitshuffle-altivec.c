@@ -260,22 +260,21 @@ int64_t bshuf_trans_byte_elem_16(void* in, void* out, const size_t size) {
 
 
 /* Transpose bytes within elements for 32 bit elements. */
-int64_t bshuf_trans_byte_elem_SSE_32(void* in, void* out, const size_t size) {
+int64_t bshuf_trans_byte_elem_32(void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 4;
   const uint8_t* in_b = (const uint8_t*)in;
   uint8_t* out_b = (uint8_t*)out;
   __vector uint8_t xmm0[4], xmm1[4];
-  size_t ii, j;
 
-  for (ii = 0; ii + 15 < size; ii += 16) {
-    for (j=0; j<bytesoftype; j++)
-      xmm0[j] = vec_xl(bytesoftype * ii + 16*j, in_b);
+  for (int i = 0; i + 15 < size; i += 16) {
+    for (int j = 0; j < bytesoftype; j++)
+      xmm0[j] = vec_xl(bytesoftype * i + 16 * j, in_b);
 
     /* Transpose vectors */
     transpose4x16(xmm0);
 
-    for (j=0; j<bytesoftype; j++)
-      vec_xst(xmm0[j], ii + j*size, out_b);
+    for (int j = 0; j < bytesoftype; j++)
+      vec_xst(xmm0[j], i + j * size, out_b);
   }
   return bshuf_trans_byte_elem_remainder(in, out, size, bytesoftype,
                                          size - size % 16);
@@ -283,55 +282,21 @@ int64_t bshuf_trans_byte_elem_SSE_32(void* in, void* out, const size_t size) {
 
 
 /* Transpose bytes within elements for 64 bit elements. */
-int64_t bshuf_trans_byte_elem_SSE_64(void* in, void* out, const size_t size) {
+int64_t bshuf_trans_byte_elem_64(void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 8;
   const uint8_t* in_b = (const uint8_t*)in;
   uint8_t* out_b = (uint8_t*)out;
   __vector uint8_t xmm0[8], xmm1[8];
-  size_t ii, j;
 
-  for (ii = 0; ii + 15 < size; ii += 16) {
-    for (j=0; j<bytesoftype; j++)
-      xmm0[j] = vec_xl(bytesoftype * ii + 16*j, in_b);
+  for (int i = 0; i + 15 < size; i += 16) {
+    for (int j = 0; j < bytesoftype; j++)
+      xmm0[j] = vec_xl(bytesoftype * i + 16 * j, in_b);
 
-    xmm1[0] = unpacklo_epi8(xmm0[0], xmm0[1]);
-    xmm1[1] = unpackhi_epi8(xmm0[0], xmm0[1]);
-    xmm1[2] = unpacklo_epi8(xmm0[2], xmm0[3]);
-    xmm1[3] = unpackhi_epi8(xmm0[2], xmm0[3]);
-    xmm1[4] = unpacklo_epi8(xmm0[4], xmm0[5]);
-    xmm1[5] = unpackhi_epi8(xmm0[4], xmm0[5]);
-    xmm1[6] = unpacklo_epi8(xmm0[6], xmm0[7]);
-    xmm1[7] = unpackhi_epi8(xmm0[6], xmm0[7]);
+    /* Transpose vectors */
+    transpose8x16(xmm0);
 
-    xmm0[0] = unpacklo_epi8(xmm1[0], xmm1[1]);
-    xmm0[1] = unpackhi_epi8(xmm1[0], xmm1[1]);
-    xmm0[2] = unpacklo_epi8(xmm1[2], xmm1[3]);
-    xmm0[3] = unpackhi_epi8(xmm1[2], xmm1[3]);
-    xmm0[4] = unpacklo_epi8(xmm1[4], xmm1[5]);
-    xmm0[5] = unpackhi_epi8(xmm1[4], xmm1[5]);
-    xmm0[6] = unpacklo_epi8(xmm1[6], xmm1[7]);
-    xmm0[7] = unpackhi_epi8(xmm1[6], xmm1[7]);
-
-    xmm1[0] = unpacklo_epi32(xmm0[0], xmm0[2]);
-    xmm1[1] = unpackhi_epi32(xmm0[0], xmm0[2]);
-    xmm1[2] = unpacklo_epi32(xmm0[1], xmm0[3]);
-    xmm1[3] = unpackhi_epi32(xmm0[1], xmm0[3]);
-    xmm1[4] = unpacklo_epi32(xmm0[4], xmm0[6]);
-    xmm1[5] = unpackhi_epi32(xmm0[4], xmm0[6]);
-    xmm1[6] = unpacklo_epi32(xmm0[5], xmm0[7]);
-    xmm1[7] = unpackhi_epi32(xmm0[5], xmm0[7]);
-
-    xmm0[0] = unpacklo_epi64(xmm1[0], xmm1[4]);
-    xmm0[1] = unpackhi_epi64(xmm1[0], xmm1[4]);
-    xmm0[2] = unpacklo_epi64(xmm1[1], xmm1[5]);
-    xmm0[3] = unpackhi_epi64(xmm1[1], xmm1[5]);
-    xmm0[4] = unpacklo_epi64(xmm1[2], xmm1[6]);
-    xmm0[5] = unpackhi_epi64(xmm1[2], xmm1[6]);
-    xmm0[6] = unpacklo_epi64(xmm1[3], xmm1[7]);
-    xmm0[7] = unpackhi_epi64(xmm1[3], xmm1[7]);
-
-    for (j=0; j<bytesoftype; j++)
-      vec_xst(xmm0[j], ii + j*size, out_b);
+    for (int j =0; j < bytesoftype; j++)
+      vec_xst(xmm0[j], i + j * size, out_b);
   }
   return bshuf_trans_byte_elem_remainder(in, out, size, bytesoftype,
                                          size - size % 16);
@@ -365,10 +330,10 @@ int64_t bshuf_trans_byte_elem_altivec(void* in, void* out, const size_t size,
       count = bshuf_trans_byte_elem_16(in, out, size);
       return count;
     case 4:
-      count = bshuf_trans_byte_elem_SSE_32(in, out, size);
+      count = bshuf_trans_byte_elem_32(in, out, size);
       return count;
     case 8:
-      count = bshuf_trans_byte_elem_SSE_64(in, out, size);
+      count = bshuf_trans_byte_elem_64(in, out, size);
       return count;
   }
 
@@ -386,13 +351,13 @@ int64_t bshuf_trans_byte_elem_altivec(void* in, void* out, const size_t size,
     if ((elem_size % 8) == 0) {
       nchunk_elem = elem_size / 8;
       TRANS_ELEM_TYPE(in, out, size, nchunk_elem, int64_t);
-      count = bshuf_trans_byte_elem_SSE_64(out, tmp_buf,
+      count = bshuf_trans_byte_elem_64(out, tmp_buf,
                                            size * nchunk_elem);
       bshuf_trans_elem(tmp_buf, out, 8, nchunk_elem, size);
     } else if ((elem_size % 4) == 0) {
       nchunk_elem = elem_size / 4;
       TRANS_ELEM_TYPE(in, out, size, nchunk_elem, int32_t);
-      count = bshuf_trans_byte_elem_SSE_32(out, tmp_buf,
+      count = bshuf_trans_byte_elem_32(out, tmp_buf,
                                            size * nchunk_elem);
       bshuf_trans_elem(tmp_buf, out, 4, nchunk_elem, size);
     } else {
