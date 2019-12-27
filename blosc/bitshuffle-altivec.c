@@ -264,17 +264,17 @@ int64_t bshuf_trans_byte_elem_32(void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 4;
   const uint8_t* in_b = (const uint8_t*)in;
   uint8_t* out_b = (uint8_t*)out;
-  __vector uint8_t xmm0[4], xmm1[4];
+  __vector uint8_t xmm0[4];
 
   for (int i = 0; i + 15 < size; i += 16) {
     for (int j = 0; j < bytesoftype; j++)
-      xmm0[j] = vec_xl(bytesoftype * i + 16 * j, in_b);
+      xmm0[j] = vec_xl(bytesoftype * i + 16 * j, (const uint8_t*)in);
 
     /* Transpose vectors */
     transpose4x16(xmm0);
 
     for (int j = 0; j < bytesoftype; j++)
-      vec_xst(xmm0[j], i + j * size, out_b);
+      vec_xst(xmm0[j], i + j * size, (uint8_t*)out);
   }
   return bshuf_trans_byte_elem_remainder(in, out, size, bytesoftype,
                                          size - size % 16);
@@ -284,19 +284,37 @@ int64_t bshuf_trans_byte_elem_32(void* in, void* out, const size_t size) {
 /* Transpose bytes within elements for 64 bit elements. */
 int64_t bshuf_trans_byte_elem_64(void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 8;
-  const uint8_t* in_b = (const uint8_t*)in;
-  uint8_t* out_b = (uint8_t*)out;
-  __vector uint8_t xmm0[8], xmm1[8];
+  __vector uint8_t xmm0[8];
 
   for (int i = 0; i + 15 < size; i += 16) {
     for (int j = 0; j < bytesoftype; j++)
-      xmm0[j] = vec_xl(bytesoftype * i + 16 * j, in_b);
+      xmm0[j] = vec_xl(bytesoftype * i + 16 * j, (const uint8_t*)in);
 
     /* Transpose vectors */
     transpose8x16(xmm0);
 
-    for (int j =0; j < bytesoftype; j++)
-      vec_xst(xmm0[j], i + j * size, out_b);
+    for (int j = 0; j < bytesoftype; j++)
+      vec_xst(xmm0[j], i + j * size, (uint8_t*)out);
+  }
+  return bshuf_trans_byte_elem_remainder(in, out, size, bytesoftype,
+                                         size - size % 16);
+}
+
+
+/* Transpose bytes within elements for 128 bit elements. */
+int64_t bshuf_trans_byte_elem_128(void* in, void* out, const size_t size) {
+  static const uint8_t bytesoftype = 16;
+  __vector uint8_t xmm0[16];
+
+  for (int i = 0; i + 15 < size; i += 16) {
+    for (int j = 0; j < bytesoftype; j++)
+      xmm0[j] = vec_xl(bytesoftype * i + 16 * j, (const uint8_t*)in);
+
+    /* Transpose vectors */
+    transpose16x16(xmm0);
+
+    for (int j = 0; j < bytesoftype; j++)
+      vec_xst(xmm0[j], i + j * size, (uint8_t*)out);
   }
   return bshuf_trans_byte_elem_remainder(in, out, size, bytesoftype,
                                          size - size % 16);
@@ -335,6 +353,9 @@ int64_t bshuf_trans_byte_elem_altivec(void* in, void* out, const size_t size,
     case 8:
       count = bshuf_trans_byte_elem_64(in, out, size);
       return count;
+    case 16:
+      count = bshuf_trans_byte_elem_128(in, out, size);
+      return count;
   }
 
   /*  Worst case: odd number of bytes. Turns out that this is faster for */
@@ -348,12 +369,18 @@ int64_t bshuf_trans_byte_elem_altivec(void* in, void* out, const size_t size,
   {
     size_t nchunk_elem;
 
-    if ((elem_size % 8) == 0) {
-      nchunk_elem = elem_size / 8;
-      TRANS_ELEM_TYPE(in, out, size, nchunk_elem, int64_t);
-      count = bshuf_trans_byte_elem_64(out, tmp_buf,
-                                           size * nchunk_elem);
-      bshuf_trans_elem(tmp_buf, out, 8, nchunk_elem, size);
+    if ((elem_size % 16) == 0) {
+      nchunk_elem = elem_size / 16;
+      TRANS_ELEM_TYPE(in, out, size, nchunk_elem, __vector uint8_t);
+      count = bshuf_trans_byte_elem_128(out, tmp_buf,
+                                        size * nchunk_elem);
+      bshuf_trans_elem(tmp_buf, out, 16, nchunk_elem, size);
+    } else if ((elem_size % 8) == 0) {
+        nchunk_elem = elem_size / 8;
+        TRANS_ELEM_TYPE(in, out, size, nchunk_elem, int64_t);
+        count = bshuf_trans_byte_elem_64(out, tmp_buf,
+                                         size * nchunk_elem);
+        bshuf_trans_elem(tmp_buf, out, 8, nchunk_elem, size);
     } else if ((elem_size % 4) == 0) {
       nchunk_elem = elem_size / 4;
       TRANS_ELEM_TYPE(in, out, size, nchunk_elem, int32_t);
