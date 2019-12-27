@@ -32,7 +32,7 @@
 
 static void helper_print(__vector uint8_t v, char* txt){
   printf("%s %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",txt,
-  v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15]); 
+  v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15]);
 }
 #endif
 
@@ -45,54 +45,54 @@ static inline __vector uint8_t gen_save_mask(size_t offset){
   return mask;
 }
 
-// Unpack and interleave 8-bit integers from the low half of xmm0 and xmm1, and return the results. 
+// Unpack and interleave 8-bit integers from the low half of xmm0 and xmm1, and return the results.
 static __vector uint8_t unpacklo_epi8(__vector uint8_t xmm0, __vector uint8_t xmm1){
-  static const __vector uint8_t epi8_low = (const __vector uint8_t) {0x00, 0x10, 0x01, 0x11, 0x02, 0x12, 0x03, 0x13, 
+  static const __vector uint8_t epi8_low = (const __vector uint8_t) {0x00, 0x10, 0x01, 0x11, 0x02, 0x12, 0x03, 0x13,
                                                                      0x04, 0x14, 0x05, 0x15, 0x06, 0x16, 0x07, 0x17};
   return vec_perm(xmm0, xmm1, epi8_low);
 }
-// Unpack and interleave 8-bit integers from the high half of xmm0 and xmm1, and return the results. 
+// Unpack and interleave 8-bit integers from the high half of xmm0 and xmm1, and return the results.
 static __vector uint8_t unpackhi_epi8(__vector uint8_t xmm0, __vector uint8_t xmm1){
-  static const __vector uint8_t epi8_hi = (const __vector uint8_t) {0x08, 0x18, 0x09, 0x19, 0x0a, 0x1a, 0x0b, 0x1b, 
-                                                                     0x0c, 0x1c, 0x0d, 0x1d, 0x0e, 0x1e, 0x0f, 0x1f};
+  static const __vector uint8_t epi8_hi = (const __vector uint8_t) {0x08, 0x18, 0x09, 0x19, 0x0a, 0x1a, 0x0b, 0x1b,
+                                                                    0x0c, 0x1c, 0x0d, 0x1d, 0x0e, 0x1e, 0x0f, 0x1f};
   return vec_perm(xmm0, xmm1, epi8_hi);
 }
 
-// Unpack and interleave 16-bit integers from the low half of xmm0 and xmm1, and return the results. 
+// Unpack and interleave 16-bit integers from the low half of xmm0 and xmm1, and return the results.
 static __vector uint8_t unpacklo_epi16(__vector uint8_t xmm0, __vector uint8_t xmm1){
   static const __vector uint8_t epi16_low = (const __vector uint8_t) {0x00, 0x01, 0x10, 0x11, 0x02, 0x03, 0x12, 0x13,
                                                                       0x04, 0x05, 0x14, 0x15, 0x06, 0x07, 0x16, 0x17};
   return vec_perm(xmm0, xmm1, epi16_low);
 }
-// Unpack and interleave 16-bit integers from the high half of xmm0 and xmm1, and return the results. 
+// Unpack and interleave 16-bit integers from the high half of xmm0 and xmm1, and return the results.
 static __vector uint8_t unpackhi_epi16(__vector uint8_t xmm0, __vector uint8_t xmm1){
-  static const __vector uint8_t epi16_hi = (const __vector uint8_t) {0x08, 0x09, 0x18, 0x19, 0x0a, 0x0b, 0x1a, 0x1b, 
+  static const __vector uint8_t epi16_hi = (const __vector uint8_t) {0x08, 0x09, 0x18, 0x19, 0x0a, 0x0b, 0x1a, 0x1b,
                                                                      0x0c, 0x0d, 0x1c, 0x1d, 0x0e, 0x0f, 0x1e, 0x1f};
   return vec_perm(xmm0, xmm1, epi16_hi);
 }
 
-// Unpack and interleave 32-bit integers from the low half of xmm0 and xmm1, and return the results. 
+// Unpack and interleave 32-bit integers from the low half of xmm0 and xmm1, and return the results.
 static __vector uint8_t unpacklo_epi32(__vector uint8_t xmm0, __vector uint8_t xmm1){
   static const __vector uint8_t epi32_low = (const __vector uint8_t) {0x00, 0x01, 0x02, 0x03, 0x10, 0x11, 0x12, 0x13,
                                                                       0x04, 0x05, 0x06, 0x07, 0x14, 0x15, 0x16, 0x17};
   return vec_perm(xmm0, xmm1, epi32_low);
 }
-// Unpack and interleave 32-bit integers from the high half of xmm0 and xmm1, and return the results. 
+// Unpack and interleave 32-bit integers from the high half of xmm0 and xmm1, and return the results.
 static __vector uint8_t unpackhi_epi32(__vector uint8_t xmm0, __vector uint8_t xmm1){
-  static const __vector uint8_t epi32_hi = (const __vector uint8_t) {0x08, 0x09, 0x0a, 0x0b, 0x18, 0x19, 0x1a, 0x1b, 
+  static const __vector uint8_t epi32_hi = (const __vector uint8_t) {0x08, 0x09, 0x0a, 0x0b, 0x18, 0x19, 0x1a, 0x1b,
                                                                      0x0c, 0x0d, 0x0e, 0x0f, 0x1c, 0x1d, 0x1e, 0x1f};
   return vec_perm(xmm0, xmm1, epi32_hi);
 }
 
-// Unpack and interleave 64-bit integers from the low half of xmm0 and xmm1, and return the results. 
+// Unpack and interleave 64-bit integers from the low half of xmm0 and xmm1, and return the results.
 static __vector uint8_t unpacklo_epi64(__vector uint8_t xmm0, __vector uint8_t xmm1){
-  static const __vector uint8_t epi64_low = (const __vector uint8_t) {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 
-                                                                     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17};
+  static const __vector uint8_t epi64_low = (const __vector uint8_t) {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                                                                      0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17};
   return vec_perm(xmm0, xmm1, epi64_low);
 }
-// Unpack and interleave 64-bit integers from the high half of xmm0 and xmm1, and return the results. 
+// Unpack and interleave 64-bit integers from the high half of xmm0 and xmm1, and return the results.
 static __vector uint8_t unpackhi_epi64(__vector uint8_t xmm0, __vector uint8_t xmm1){
-  static const __vector uint8_t epi64_hi = (const __vector uint8_t) {0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 
+  static const __vector uint8_t epi64_hi = (const __vector uint8_t) {0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
                                                                      0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f};
   return vec_perm(xmm0, xmm1, epi64_hi);
 }
@@ -116,13 +116,13 @@ static __vector uint8_t make_bitperm_mask(int type_size, int bit) {
   return result;
 }
 
-/* Routine optimized for bit-unshuffling a buffer for a type size of 1 byte. 
- * 
- * Strategy: Read 8 vectors of 128bits, hence 128 elements, 
+/* Routine optimized for bit-unshuffling a buffer for a type size of 1 byte.
+ *
+ * Strategy: Read 8 vectors of 128bits, hence 128 elements,
  *           Transpose byte-wise, 2 neighboring elements (x8) remain in each vector : 24 operations
  *           Transpose bit-wise within a vector: 8x8 bitwise-transposition: 64 operations
  *           Saving is perform by shorts (2 bytes at a time)
- * Total cost: 8 vector read, 88 transpositions, 64 writes, 
+ * Total cost: 8 vector read, 88 transpositions, 64 writes,
  *             14 mask vectors, 16 work-vectors
  * */
 void
@@ -140,9 +140,9 @@ bitunshuffle1_altivec(void* _src, void* dest, const size_t size, const size_t el
   static const __vector uint8_t hi01 = (const __vector uint8_t) {0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f, 0x12, 0x13, 0x16, 0x17, 0x1a, 0x1b, 0x1e, 0x1f};
   static const __vector uint8_t lo02 = (const __vector uint8_t) {0x00, 0x01, 0x08, 0x09, 0x10, 0x11, 0x18, 0x19, 0x02, 0x03, 0x0a, 0x0b, 0x12, 0x13, 0x1a, 0x1b};
   static const __vector uint8_t hi02 = (const __vector uint8_t) {0x04, 0x05, 0x0c, 0x0d, 0x14, 0x15, 0x1c, 0x1d, 0x06, 0x07, 0x0e, 0x0f, 0x16, 0x17, 0x1e, 0x1f};
-  
+
   //static const __vector uint8_t msk0 = (const __vector uint8_t) {0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x01, 0x11, 0x21, 0x31, 0x41, 0x51, 0x61, 0x71};
-  
+
   for (kk = 0; kk < 8; kk++){
     __vector uint8_t msk;
     for (ii = 0; ii < 8; ii++){
@@ -161,10 +161,10 @@ bitunshuffle1_altivec(void* _src, void* dest, const size_t size, const size_t el
         xmm0[kk] = vec_xl((ii +kk) * nbyte_row + jj, in_b);
         //helper_print(xmm0[kk], "vector read");
       }
-      
+
       // transpositions 0-1
       xmm1[0] = vec_perm(xmm0[0], xmm0[1], lo01);
-      xmm1[1] = vec_perm(xmm0[0], xmm0[1], hi01);    
+      xmm1[1] = vec_perm(xmm0[0], xmm0[1], hi01);
       xmm1[2] = vec_perm(xmm0[2], xmm0[3], lo01);
       xmm1[3] = vec_perm(xmm0[2], xmm0[3], hi01);
       xmm1[4] = vec_perm(xmm0[4], xmm0[5], lo01);
@@ -189,7 +189,7 @@ bitunshuffle1_altivec(void* _src, void* dest, const size_t size, const size_t el
       xmm1[6] = unpackhi_epi64(xmm0[2], xmm0[6]);
       xmm1[5] = unpacklo_epi64(xmm0[3], xmm0[7]);
       xmm1[7] = unpackhi_epi64(xmm0[3], xmm0[7]);
-      
+
 
       //At this stage each vector xmm1 contains the data from 16 adjacent bytes
       for (int ll=0; ll<8; ll++){
@@ -207,7 +207,7 @@ bitunshuffle1_altivec(void* _src, void* dest, const size_t size, const size_t el
   }
 }
 
-/* Routine optimized for bit-shuffling a buffer for a type size of 1 byte: 
+/* Routine optimized for bit-shuffling a buffer for a type size of 1 byte:
  * non coalesced as the vector write was slower. Loop unrolling neither helps */
 int64_t bitshuffle1_altivec(void* src, void* dest, const size_t size,  const size_t elem_size) {
   // Nota elem_size==1 and size%8==0 !
@@ -217,8 +217,8 @@ int64_t bitshuffle1_altivec(void* src, void* dest, const size_t size,  const siz
   size_t i, j;
   const size_t nbyte = elem_size * size;
   int64_t count;
-  
-  //Generate all 8 needed masks
+
+  // Generate all 8 needed masks
   for (i=0; i<8; i++){
     masks[i] = make_bitperm_mask(1, i);
   }
@@ -236,31 +236,36 @@ int64_t bitshuffle1_altivec(void* src, void* dest, const size_t size,  const siz
   count = bshuf_trans_bit_byte_remainder(src, dest, size, elem_size,
                                          nbyte - nbyte % 16);
   return count;
-}  
+}
 
 /* Transpose bytes within elements for 16 bit elements. */
-int64_t bshuf_trans_byte_elem_SSE_16(void* in, void* out, const size_t size) {
+int64_t bshuf_trans_byte_elem_16(void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 2;
   const uint8_t* in_b = (const uint8_t*)in;
   uint8_t* out_b = (uint8_t*)out;
   __vector uint8_t xmm0[2], xmm1[2];
   size_t ii, j;
-  
+
+  static const __vector uint8_t epi8_low = (const __vector uint8_t) {0x00, 0x10, 0x01, 0x11, 0x02, 0x12, 0x03, 0x13,
+      0x04, 0x14, 0x05, 0x15, 0x06, 0x16, 0x07, 0x17};
+  static const __vector uint8_t epi8_hi = (const __vector uint8_t) {0x08, 0x18, 0x09, 0x19, 0x0a, 0x1a, 0x0b, 0x1b,
+      0x0c, 0x1c, 0x0d, 0x1d, 0x0e, 0x1e, 0x0f, 0x1f};
+
   for (ii = 0; ii + 15 < size; ii += 16) {
     for (j=0; j<bytesoftype; j++)
       xmm0[j] = vec_xl(bytesoftype*ii + 16*j, in_b);
-    
-    xmm1[0] = unpacklo_epi8(xmm0[0], xmm0[1]);
-    xmm1[1] = unpackhi_epi8(xmm0[0], xmm0[1]);
 
-    xmm0[0] = unpacklo_epi8(xmm1[0], xmm1[1]);
-    xmm0[1] = unpackhi_epi8(xmm1[0], xmm1[1]);
+    xmm1[0] = vec_perm(xmm0[0], xmm0[1], epi8_low);
+    xmm1[1] = vec_perm(xmm0[0], xmm0[1], epi8_hi);
 
-    xmm1[0] = unpacklo_epi8(xmm0[0], xmm0[1]);
-    xmm1[1] = unpackhi_epi8(xmm0[0], xmm0[1]);
+    xmm0[0] = vec_perm(xmm1[0], xmm1[1], epi8_low);
+    xmm0[1] = vec_perm(xmm1[0], xmm1[1], epi8_hi);
 
-    xmm0[0] = unpacklo_epi8(xmm1[0], xmm1[1]);
-    xmm0[1] = unpackhi_epi8(xmm1[0], xmm1[1]);
+    xmm1[0] = vec_perm(xmm0[0], xmm0[1], epi8_low);
+    xmm1[1] = vec_perm(xmm0[0], xmm0[1], epi8_hi);
+
+    xmm0[0] = vec_perm(xmm1[0], xmm1[1], epi8_low);
+    xmm0[1] = vec_perm(xmm1[0], xmm1[1], epi8_hi);
 
     for (j=0; j<bytesoftype; j++)
       vec_xst(xmm0[j], ii + j*size, out_b);
@@ -390,7 +395,7 @@ int64_t bshuf_trans_byte_elem_altivec(void* in, void* out, const size_t size,
       count = bshuf_copy(in, out, size, elem_size);
       return count;
     case 2:
-      count = bshuf_trans_byte_elem_SSE_16(in, out, size);
+      count = bshuf_trans_byte_elem_16(in, out, size);
       return count;
     case 4:
       count = bshuf_trans_byte_elem_SSE_32(in, out, size);
@@ -427,8 +432,7 @@ int64_t bshuf_trans_byte_elem_altivec(void* in, void* out, const size_t size,
       /*  Not used since scalar algorithm is faster. */
       nchunk_elem = elem_size / 2;
       TRANS_ELEM_TYPE(in, out, size, nchunk_elem, int16_t);
-      count = bshuf_trans_byte_elem_SSE_16(out, tmp_buf,
-                                           size * nchunk_elem);
+      count = bshuf_trans_byte_elem_16(out, tmp_buf, size * nchunk_elem);
       bshuf_trans_elem(tmp_buf, out, 2, nchunk_elem, size);
     }
 
@@ -449,7 +453,7 @@ int64_t bshuf_trans_bit_byte_altivec(void* in, void* out, const size_t size,
   size_t ii, kk;
 
   CHECK_MULT_EIGHT(nbyte);
-   
+
   //Generate all 8 needed masks
   for (kk=0; kk<8; kk++){
     masks[kk] = make_bitperm_mask(1, kk);
@@ -481,7 +485,7 @@ int64_t bshuf_trans_bit_elem_altivec(void* in, void* out, const size_t size,
 
   count = bshuf_trans_byte_elem_altivec(in, out, size, elem_size, tmp_buf);
   CHECK_ERR(count);
-  //bshuf_trans_bit_byte_altivec / bitshuffle1_altivec
+  // bshuf_trans_bit_byte_altivec / bitshuffle1_altivec
   count = bshuf_trans_bit_byte_altivec(out, tmp_buf, size, elem_size);
   CHECK_ERR(count);
   count = bshuf_trans_bitrow_eight(tmp_buf, out, size, elem_size);
