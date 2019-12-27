@@ -271,25 +271,8 @@ int64_t bshuf_trans_byte_elem_SSE_32(void* in, void* out, const size_t size) {
     for (j=0; j<bytesoftype; j++)
       xmm0[j] = vec_xl(bytesoftype * ii + 16*j, in_b);
 
-    xmm1[0] = unpacklo_epi8(xmm0[0], xmm0[1]);
-    xmm1[1] = unpackhi_epi8(xmm0[0], xmm0[1]);
-    xmm1[2] = unpacklo_epi8(xmm0[2], xmm0[3]);
-    xmm1[3] = unpackhi_epi8(xmm0[2], xmm0[3]);
-
-    xmm0[0] = unpacklo_epi8(xmm1[0], xmm1[1]);
-    xmm0[1] = unpackhi_epi8(xmm1[0], xmm1[1]);
-    xmm0[2] = unpacklo_epi8(xmm1[2], xmm1[3]);
-    xmm0[3] = unpackhi_epi8(xmm1[2], xmm1[3]);
-
-    xmm1[0] = unpacklo_epi8(xmm0[0], xmm0[1]);
-    xmm1[1] = unpackhi_epi8(xmm0[0], xmm0[1]);
-    xmm1[2] = unpacklo_epi8(xmm0[2], xmm0[3]);
-    xmm1[3] = unpackhi_epi8(xmm0[2], xmm0[3]);
-
-    xmm0[0] = unpacklo_epi64(xmm1[0], xmm1[2]);
-    xmm0[1] = unpackhi_epi64(xmm1[0], xmm1[2]);
-    xmm0[2] = unpacklo_epi64(xmm1[1], xmm1[3]);
-    xmm0[3] = unpackhi_epi64(xmm1[1], xmm1[3]);
+    /* Transpose vectors */
+    transpose4x16(xmm0);
 
     for (j=0; j<bytesoftype; j++)
       vec_xst(xmm0[j], ii + j*size, out_b);
