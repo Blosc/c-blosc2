@@ -46,45 +46,6 @@ static inline __vector uint8_t gen_save_mask(size_t offset){
   return mask;
 }
 
-// Unpack and interleave 8-bit integers from the low half of xmm0 and xmm1, and return the results.
-static __vector uint8_t unpacklo_epi8(__vector uint8_t xmm0, __vector uint8_t xmm1){
-  static const __vector uint8_t epi8_low = (const __vector uint8_t) {0x00, 0x10, 0x01, 0x11, 0x02, 0x12, 0x03, 0x13,
-                                                                     0x04, 0x14, 0x05, 0x15, 0x06, 0x16, 0x07, 0x17};
-  return vec_perm(xmm0, xmm1, epi8_low);
-}
-// Unpack and interleave 8-bit integers from the high half of xmm0 and xmm1, and return the results.
-static __vector uint8_t unpackhi_epi8(__vector uint8_t xmm0, __vector uint8_t xmm1){
-  static const __vector uint8_t epi8_hi = (const __vector uint8_t) {0x08, 0x18, 0x09, 0x19, 0x0a, 0x1a, 0x0b, 0x1b,
-                                                                    0x0c, 0x1c, 0x0d, 0x1d, 0x0e, 0x1e, 0x0f, 0x1f};
-  return vec_perm(xmm0, xmm1, epi8_hi);
-}
-
-// Unpack and interleave 16-bit integers from the low half of xmm0 and xmm1, and return the results.
-static __vector uint8_t unpacklo_epi16(__vector uint8_t xmm0, __vector uint8_t xmm1){
-  static const __vector uint8_t epi16_low = (const __vector uint8_t) {0x00, 0x01, 0x10, 0x11, 0x02, 0x03, 0x12, 0x13,
-                                                                      0x04, 0x05, 0x14, 0x15, 0x06, 0x07, 0x16, 0x17};
-  return vec_perm(xmm0, xmm1, epi16_low);
-}
-// Unpack and interleave 16-bit integers from the high half of xmm0 and xmm1, and return the results.
-static __vector uint8_t unpackhi_epi16(__vector uint8_t xmm0, __vector uint8_t xmm1){
-  static const __vector uint8_t epi16_hi = (const __vector uint8_t) {0x08, 0x09, 0x18, 0x19, 0x0a, 0x0b, 0x1a, 0x1b,
-                                                                     0x0c, 0x0d, 0x1c, 0x1d, 0x0e, 0x0f, 0x1e, 0x1f};
-  return vec_perm(xmm0, xmm1, epi16_hi);
-}
-
-// Unpack and interleave 32-bit integers from the low half of xmm0 and xmm1, and return the results.
-static __vector uint8_t unpacklo_epi32(__vector uint8_t xmm0, __vector uint8_t xmm1){
-  static const __vector uint8_t epi32_low = (const __vector uint8_t) {0x00, 0x01, 0x02, 0x03, 0x10, 0x11, 0x12, 0x13,
-                                                                      0x04, 0x05, 0x06, 0x07, 0x14, 0x15, 0x16, 0x17};
-  return vec_perm(xmm0, xmm1, epi32_low);
-}
-// Unpack and interleave 32-bit integers from the high half of xmm0 and xmm1, and return the results.
-static __vector uint8_t unpackhi_epi32(__vector uint8_t xmm0, __vector uint8_t xmm1){
-  static const __vector uint8_t epi32_hi = (const __vector uint8_t) {0x08, 0x09, 0x0a, 0x0b, 0x18, 0x19, 0x1a, 0x1b,
-                                                                     0x0c, 0x0d, 0x0e, 0x0f, 0x1c, 0x1d, 0x1e, 0x1f};
-  return vec_perm(xmm0, xmm1, epi32_hi);
-}
-
 // Unpack and interleave 64-bit integers from the low half of xmm0 and xmm1, and return the results.
 static __vector uint8_t unpacklo_epi64(__vector uint8_t xmm0, __vector uint8_t xmm1){
   static const __vector uint8_t epi64_low = (const __vector uint8_t) {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
@@ -452,11 +413,34 @@ int64_t bshuf_trans_bit_elem_altivec(void* in, void* out, const size_t size,
   return count;
 }
 
-
 /* For data organized into a row for each bit (8 * elem_size rows), transpose
  * the bytes. */
 int64_t bshuf_trans_byte_bitrow_altivec(void* in, void* out, const size_t size,
                                         const size_t elem_size) {
+  static const __vector uint8_t epi8_low = (const __vector uint8_t) {
+    0x00, 0x10, 0x01, 0x11, 0x02, 0x12, 0x03, 0x13,
+    0x04, 0x14, 0x05, 0x15, 0x06, 0x16, 0x07, 0x17};
+  static const __vector uint8_t epi8_hi = (const __vector uint8_t) {
+    0x08, 0x18, 0x09, 0x19, 0x0a, 0x1a, 0x0b, 0x1b,
+    0x0c, 0x1c, 0x0d, 0x1d, 0x0e, 0x1e, 0x0f, 0x1f};
+  static const __vector uint8_t epi16_low = (const __vector uint8_t) {
+    0x00, 0x01, 0x10, 0x11, 0x02, 0x03, 0x12, 0x13,
+    0x04, 0x05, 0x14, 0x15, 0x06, 0x07, 0x16, 0x17};
+  static const __vector uint8_t epi16_hi = (const __vector uint8_t) {
+    0x08, 0x09, 0x18, 0x19, 0x0a, 0x0b, 0x1a, 0x1b,
+    0x0c, 0x0d, 0x1c, 0x1d, 0x0e, 0x0f, 0x1e, 0x1f};
+  static const __vector uint8_t epi32_low = (const __vector uint8_t) {
+    0x00, 0x01, 0x02, 0x03, 0x10, 0x11, 0x12, 0x13,
+    0x04, 0x05, 0x06, 0x07, 0x14, 0x15, 0x16, 0x17};
+  static const __vector uint8_t epi32_hi = (const __vector uint8_t) {
+    0x08, 0x09, 0x0a, 0x0b, 0x18, 0x19, 0x1a, 0x1b,
+    0x0c, 0x0d, 0x0e, 0x0f, 0x1c, 0x1d, 0x1e, 0x1f};
+  static const __vector uint8_t epi64_low = (const __vector uint8_t) {
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17};
+  static const __vector uint8_t epi64_hi = (const __vector uint8_t) {
+    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f};
 
   const uint8_t* in_b = (const uint8_t*)in;
   uint8_t* out_b = (uint8_t*)out;
@@ -464,63 +448,53 @@ int64_t bshuf_trans_byte_bitrow_altivec(void* in, void* out, const size_t size,
   size_t nbyte_row = size / 8;
   size_t ii, jj;
 
-  __vector uint8_t a0, b0, c0, d0, e0, f0, g0, h0;
-  __vector uint8_t a1, b1, c1, d1, e1, f1, g1, h1;
-  __m128* as, * bs, * cs, * ds, * es, * fs, * gs, * hs;
+  __vector uint8_t xmm0[8], xmm1[8];
+  // __vector uint8_t xmm2[16], xmm3;
+  __m128 *as, *bs, *cs, *ds, *es, *fs, *gs, *hs;
 
   CHECK_MULT_EIGHT(size);
 
-  for (ii = 0; ii + 7 < nrows; ii += 8) {
-    for (jj = 0; jj + 15 < nbyte_row; jj += 16) {
-      a0 = vec_xl((ii + 0) * nbyte_row + jj,in_b);
-      b0 = vec_xl((ii + 1) * nbyte_row + jj,in_b);
-      c0 = vec_xl((ii + 2) * nbyte_row + jj,in_b);
-      d0 = vec_xl((ii + 3) * nbyte_row + jj,in_b);
-      e0 = vec_xl((ii + 4) * nbyte_row + jj,in_b);
-      f0 = vec_xl((ii + 5) * nbyte_row + jj,in_b);
-      g0 = vec_xl((ii + 6) * nbyte_row + jj,in_b);
-      h0 = vec_xl((ii + 7) * nbyte_row + jj,in_b);
+  for (jj = 0; jj + 15 < nbyte_row; jj += 16) {
+    for (ii = 0; ii + 7 < nrows; ii += 8) {
+      for (int k = 0; k < 8; k++) {
+        xmm0[k] = vec_xl((ii + k) * nbyte_row + jj, in_b);
+      }
 
-      a1 = unpacklo_epi8(a0, b0);
-      b1 = unpacklo_epi8(c0, d0);
-      c1 = unpacklo_epi8(e0, f0);
-      d1 = unpacklo_epi8(g0, h0);
-      e1 = unpackhi_epi8(a0, b0);
-      f1 = unpackhi_epi8(c0, d0);
-      g1 = unpackhi_epi8(e0, f0);
-      h1 = unpackhi_epi8(g0, h0);
+      for (int k = 0; k < 4; k++) {
+        xmm1[k] = vec_perm(xmm0[k * 2], xmm0[k * 2 + 1], epi8_low);
+        xmm1[k + 4] = vec_perm(xmm0[k * 2], xmm0[k * 2 + 1], epi8_hi);
+      }
 
+      xmm0[0] = vec_perm(xmm1[0], xmm1[1], epi16_low);
+      xmm0[1] = vec_perm(xmm1[2], xmm1[3], epi16_low);
+      xmm0[2] = vec_perm(xmm1[0], xmm1[1], epi16_hi);
+      xmm0[3] = vec_perm(xmm1[2], xmm1[3], epi16_hi);
+      xmm0[4] = vec_perm(xmm1[4], xmm1[5], epi16_low);
+      xmm0[5] = vec_perm(xmm1[6], xmm1[7], epi16_low);
+      xmm0[6] = vec_perm(xmm1[4], xmm1[5], epi16_hi);
+      xmm0[7] = vec_perm(xmm1[6], xmm1[7], epi16_hi);
 
-      a0 = unpacklo_epi16(a1, b1);
-      b0 = unpacklo_epi16(c1, d1);
-      c0 = unpackhi_epi16(a1, b1);
-      d0 = unpackhi_epi16(c1, d1);
-      e0 = unpacklo_epi16(e1, f1);
-      f0 = unpacklo_epi16(g1, h1);
-      g0 = unpackhi_epi16(e1, f1);
-      h0 = unpackhi_epi16(g1, h1);
-
-
-      a1 = unpacklo_epi32(a0, b0);
-      b1 = unpackhi_epi32(a0, b0);
-      c1 = unpacklo_epi32(c0, d0);
-      d1 = unpackhi_epi32(c0, d0);
-      e1 = unpacklo_epi32(e0, f0);
-      f1 = unpackhi_epi32(e0, f0);
-      g1 = unpacklo_epi32(g0, h0);
-      h1 = unpackhi_epi32(g0, h0);
+      xmm1[0] = vec_perm(xmm0[0], xmm0[1], epi32_low);
+      xmm1[1] = vec_perm(xmm0[0], xmm0[1], epi32_hi);
+      xmm1[2] = vec_perm(xmm0[2], xmm0[3], epi32_low);
+      xmm1[3] = vec_perm(xmm0[2], xmm0[3], epi32_hi);
+      xmm1[4] = vec_perm(xmm0[4], xmm0[5], epi32_low);
+      xmm1[5] = vec_perm(xmm0[4], xmm0[5], epi32_hi);
+      xmm1[6] = vec_perm(xmm0[6], xmm0[7], epi32_low);
+      xmm1[7] = vec_perm(xmm0[6], xmm0[7], epi32_hi);
 
       /*  We don't have a storeh instruction for integers, so interpret */
       /*  as a float. Have a storel (_mm_storel_epi64). */
-      as = (__m128*)&a1;
-      bs = (__m128*)&b1;
-      cs = (__m128*)&c1;
-      ds = (__m128*)&d1;
-      es = (__m128*)&e1;
-      fs = (__m128*)&f1;
-      gs = (__m128*)&g1;
-      hs = (__m128*)&h1;
+      as = (__m128*)&xmm1[0];
+      bs = (__m128*)&xmm1[1];
+      cs = (__m128*)&xmm1[2];
+      ds = (__m128*)&xmm1[3];
+      es = (__m128*)&xmm1[4];
+      fs = (__m128*)&xmm1[5];
+      gs = (__m128*)&xmm1[6];
+      hs = (__m128*)&xmm1[7];
 
+      // printf("ii, jj: %d, %d\n", ii, jj);
       _mm_storel_pi((__m64*)&out_b[(jj + 0) * nrows + ii], *as);
       _mm_storel_pi((__m64*)&out_b[(jj + 2) * nrows + ii], *bs);
       _mm_storel_pi((__m64*)&out_b[(jj + 4) * nrows + ii], *cs);
@@ -538,18 +512,47 @@ int64_t bshuf_trans_byte_bitrow_altivec(void* in, void* out, const size_t size,
       _mm_storeh_pi((__m64*)&out_b[(jj + 11) * nrows + ii], *fs);
       _mm_storeh_pi((__m64*)&out_b[(jj + 13) * nrows + ii], *gs);
       _mm_storeh_pi((__m64*)&out_b[(jj + 15) * nrows + ii], *hs);
-    }
-    for (jj = nbyte_row - nbyte_row % 16; jj < nbyte_row; jj++) {
-      out_b[jj * nrows + ii + 0] = in_b[(ii + 0) * nbyte_row + jj];
-      out_b[jj * nrows + ii + 1] = in_b[(ii + 1) * nbyte_row + jj];
-      out_b[jj * nrows + ii + 2] = in_b[(ii + 2) * nbyte_row + jj];
-      out_b[jj * nrows + ii + 3] = in_b[(ii + 3) * nbyte_row + jj];
-      out_b[jj * nrows + ii + 4] = in_b[(ii + 4) * nbyte_row + jj];
-      out_b[jj * nrows + ii + 5] = in_b[(ii + 5) * nbyte_row + jj];
-      out_b[jj * nrows + ii + 6] = in_b[(ii + 6) * nbyte_row + jj];
-      out_b[jj * nrows + ii + 7] = in_b[(ii + 7) * nbyte_row + jj];
+#if 0
+      for (int k = 0; k < 8; k += 1) {
+        xmm3 = vec_xl((jj + k * 2) * nrows + ii, out_b);
+        helper_print(xmm3, "0->");
+      }
+#endif
+
+      // Attempt to make the above copy to memory work with just VSX built-in
+      // functions.  Unfortunately this does not work (yet).
+//      if ((ii % 16) == 0) {
+//         for (int k = 0; k < 8; k++) {
+//           xmm2[k * 2] = vec_perm(xmm1[k], xmm1[k], epi64_low);
+//           xmm2[k * 2 + 1] = vec_perm(xmm1[k], xmm1[k], epi64_hi);
+//         }
+//      }
+//      else {
+//        for (int k = 0; k < 8; k++) {
+//          kk = ii / 16 * 16;
+//          // printf("ii, jj, kk: %d, %d, %d\n", ii, jj, kk);
+//
+//          xmm3 = vec_perm(xmm2[k * 2], xmm1[k], epi64_low);
+//          vec_xst(xmm3, (jj + k * 2) * nrows + kk, (uint8_t *)out);
+//          // helper_print(xmm3, "0->");
+//          xmm3 = vec_perm(xmm2[k * 2 + 1], xmm1[k], epi64_hi);
+//          vec_xst(xmm3, (jj + k * 2 + 1) * nrows + kk, (uint8_t *)out);
+//          // helper_print(xmm3, "1->");
+//        }
+//      }
+
     }
   }
+
+  // Copy the remainder
+  for (jj = nbyte_row - nbyte_row % 16; jj < nbyte_row; jj++) {
+    for (ii = 0; ii + 7 < nrows; ii += 8) {
+      for (int k = 0; k < 8; k++) {
+        out_b[jj * nrows + ii + k] = in_b[(ii + k) * nbyte_row + jj];
+      }
+    }
+  }
+
   return size * elem_size;
 }
 
