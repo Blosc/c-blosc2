@@ -409,7 +409,6 @@ int64_t bshuf_trans_bit_elem_altivec(void* in, void* out, const size_t size,
   count = bshuf_trans_bit_byte_altivec(out, tmp_buf, size, elem_size);
   CHECK_ERR(count);
   count = bshuf_trans_bitrow_eight(tmp_buf, out, size, elem_size);
-
   return count;
 }
 
@@ -446,111 +445,114 @@ int64_t bshuf_trans_byte_bitrow_altivec(void* in, void* out, const size_t size,
   uint8_t* out_b = (uint8_t*)out;
   size_t nrows = 8 * elem_size;
   size_t nbyte_row = size / 8;
-  size_t ii, jj;
-
-  __vector uint8_t xmm0[8], xmm1[8];
-  // __vector uint8_t xmm2[16], xmm3;
-  __m128 *as, *bs, *cs, *ds, *es, *fs, *gs, *hs;
+  __vector uint8_t xmm0[16], xmm1[16];
 
   CHECK_MULT_EIGHT(size);
 
-  for (jj = 0; jj + 15 < nbyte_row; jj += 16) {
-    for (ii = 0; ii + 7 < nrows; ii += 8) {
-      for (int k = 0; k < 8; k++) {
+  int nvectors = (elem_size == 1) ? 8 : 16;
+  for (int ii = 0; ii < nrows; ii += nvectors) {
+    for (int jj = 0; jj  < nbyte_row; jj += 16) {  // vectors of 16 elements
+
+      if (elem_size == 1) {
+        for (int k = 0; k < 8; k++) {
+          xmm0[k] = vec_xl((ii + k) * nbyte_row + jj, in_b);
+        }
+
+        xmm1[0] = vec_perm(xmm0[0], xmm0[1], epi8_low);
+        xmm1[1] = vec_perm(xmm0[2], xmm0[3], epi8_low);
+        xmm1[2] = vec_perm(xmm0[4], xmm0[5], epi8_low);
+        xmm1[3] = vec_perm(xmm0[6], xmm0[7], epi8_low);
+        xmm1[4] = vec_perm(xmm0[0], xmm0[1], epi8_hi);
+        xmm1[5] = vec_perm(xmm0[2], xmm0[3], epi8_hi);
+        xmm1[6] = vec_perm(xmm0[4], xmm0[5], epi8_hi);
+        xmm1[7] = vec_perm(xmm0[6], xmm0[7], epi8_hi);
+
+        xmm0[0] = vec_perm(xmm1[0], xmm1[1], epi16_low);
+        xmm0[1] = vec_perm(xmm1[2], xmm1[3], epi16_low);
+        xmm0[2] = vec_perm(xmm1[0], xmm1[1], epi16_hi);
+        xmm0[3] = vec_perm(xmm1[2], xmm1[3], epi16_hi);
+        xmm0[4] = vec_perm(xmm1[4], xmm1[5], epi16_low);
+        xmm0[5] = vec_perm(xmm1[6], xmm1[7], epi16_low);
+        xmm0[6] = vec_perm(xmm1[4], xmm1[5], epi16_hi);
+        xmm0[7] = vec_perm(xmm1[6], xmm1[7], epi16_hi);
+
+        xmm1[0] = vec_perm(xmm0[0], xmm0[1], epi32_low);
+        xmm1[1] = vec_perm(xmm0[0], xmm0[1], epi32_hi);
+        xmm1[2] = vec_perm(xmm0[2], xmm0[3], epi32_low);
+        xmm1[3] = vec_perm(xmm0[2], xmm0[3], epi32_hi);
+        xmm1[4] = vec_perm(xmm0[4], xmm0[5], epi32_low);
+        xmm1[5] = vec_perm(xmm0[4], xmm0[5], epi32_hi);
+        xmm1[6] = vec_perm(xmm0[6], xmm0[7], epi32_low);
+        xmm1[7] = vec_perm(xmm0[6], xmm0[7], epi32_hi);
+
+        for (int k = 0; k < 8; k++) {
+          vec_xst(xmm1[k], (jj + k * 2) * nrows + ii, out_b);
+        }
+
+        continue;
+      }
+
+      for (int k = 0; k < 16; k++) {
         xmm0[k] = vec_xl((ii + k) * nbyte_row + jj, in_b);
       }
 
-      for (int k = 0; k < 4; k++) {
-        xmm1[k] = vec_perm(xmm0[k * 2], xmm0[k * 2 + 1], epi8_low);
-        xmm1[k + 4] = vec_perm(xmm0[k * 2], xmm0[k * 2 + 1], epi8_hi);
+      for (int k = 0; k < 16; k += 8) {
+        xmm1[k + 0] = vec_perm(xmm0[k + 0], xmm0[k + 1], epi8_low);
+        xmm1[k + 1] = vec_perm(xmm0[k + 2], xmm0[k + 3], epi8_low);
+        xmm1[k + 2] = vec_perm(xmm0[k + 4], xmm0[k + 5], epi8_low);
+        xmm1[k + 3] = vec_perm(xmm0[k + 6], xmm0[k + 7], epi8_low);
+        xmm1[k + 4] = vec_perm(xmm0[k + 0], xmm0[k + 1], epi8_hi);
+        xmm1[k + 5] = vec_perm(xmm0[k + 2], xmm0[k + 3], epi8_hi);
+        xmm1[k + 6] = vec_perm(xmm0[k + 4], xmm0[k + 5], epi8_hi);
+        xmm1[k + 7] = vec_perm(xmm0[k + 6], xmm0[k + 7], epi8_hi);
       }
 
-      xmm0[0] = vec_perm(xmm1[0], xmm1[1], epi16_low);
-      xmm0[1] = vec_perm(xmm1[2], xmm1[3], epi16_low);
-      xmm0[2] = vec_perm(xmm1[0], xmm1[1], epi16_hi);
-      xmm0[3] = vec_perm(xmm1[2], xmm1[3], epi16_hi);
-      xmm0[4] = vec_perm(xmm1[4], xmm1[5], epi16_low);
-      xmm0[5] = vec_perm(xmm1[6], xmm1[7], epi16_low);
-      xmm0[6] = vec_perm(xmm1[4], xmm1[5], epi16_hi);
-      xmm0[7] = vec_perm(xmm1[6], xmm1[7], epi16_hi);
-
-      xmm1[0] = vec_perm(xmm0[0], xmm0[1], epi32_low);
-      xmm1[1] = vec_perm(xmm0[0], xmm0[1], epi32_hi);
-      xmm1[2] = vec_perm(xmm0[2], xmm0[3], epi32_low);
-      xmm1[3] = vec_perm(xmm0[2], xmm0[3], epi32_hi);
-      xmm1[4] = vec_perm(xmm0[4], xmm0[5], epi32_low);
-      xmm1[5] = vec_perm(xmm0[4], xmm0[5], epi32_hi);
-      xmm1[6] = vec_perm(xmm0[6], xmm0[7], epi32_low);
-      xmm1[7] = vec_perm(xmm0[6], xmm0[7], epi32_hi);
-
-      /*  We don't have a storeh instruction for integers, so interpret */
-      /*  as a float. Have a storel (_mm_storel_epi64). */
-      as = (__m128*)&xmm1[0];
-      bs = (__m128*)&xmm1[1];
-      cs = (__m128*)&xmm1[2];
-      ds = (__m128*)&xmm1[3];
-      es = (__m128*)&xmm1[4];
-      fs = (__m128*)&xmm1[5];
-      gs = (__m128*)&xmm1[6];
-      hs = (__m128*)&xmm1[7];
-
-      // printf("ii, jj: %d, %d\n", ii, jj);
-      _mm_storel_pi((__m64*)&out_b[(jj + 0) * nrows + ii], *as);
-      _mm_storel_pi((__m64*)&out_b[(jj + 2) * nrows + ii], *bs);
-      _mm_storel_pi((__m64*)&out_b[(jj + 4) * nrows + ii], *cs);
-      _mm_storel_pi((__m64*)&out_b[(jj + 6) * nrows + ii], *ds);
-      _mm_storel_pi((__m64*)&out_b[(jj + 8) * nrows + ii], *es);
-      _mm_storel_pi((__m64*)&out_b[(jj + 10) * nrows + ii], *fs);
-      _mm_storel_pi((__m64*)&out_b[(jj + 12) * nrows + ii], *gs);
-      _mm_storel_pi((__m64*)&out_b[(jj + 14) * nrows + ii], *hs);
-
-      _mm_storeh_pi((__m64*)&out_b[(jj + 1) * nrows + ii], *as);
-      _mm_storeh_pi((__m64*)&out_b[(jj + 3) * nrows + ii], *bs);
-      _mm_storeh_pi((__m64*)&out_b[(jj + 5) * nrows + ii], *cs);
-      _mm_storeh_pi((__m64*)&out_b[(jj + 7) * nrows + ii], *ds);
-      _mm_storeh_pi((__m64*)&out_b[(jj + 9) * nrows + ii], *es);
-      _mm_storeh_pi((__m64*)&out_b[(jj + 11) * nrows + ii], *fs);
-      _mm_storeh_pi((__m64*)&out_b[(jj + 13) * nrows + ii], *gs);
-      _mm_storeh_pi((__m64*)&out_b[(jj + 15) * nrows + ii], *hs);
-#if 0
-      for (int k = 0; k < 8; k += 1) {
-        xmm3 = vec_xl((jj + k * 2) * nrows + ii, out_b);
-        helper_print(xmm3, "0->");
+      for (int k = 0; k < 16; k += 8) {
+        xmm0[k + 0] = vec_perm(xmm1[k + 0], xmm1[k + 1], epi16_low);
+        xmm0[k + 1] = vec_perm(xmm1[k + 2], xmm1[k + 3], epi16_low);
+        xmm0[k + 2] = vec_perm(xmm1[k + 0], xmm1[k + 1], epi16_hi);
+        xmm0[k + 3] = vec_perm(xmm1[k + 2], xmm1[k + 3], epi16_hi);
+        xmm0[k + 4] = vec_perm(xmm1[k + 4], xmm1[k + 5], epi16_low);
+        xmm0[k + 5] = vec_perm(xmm1[k + 6], xmm1[k + 7], epi16_low);
+        xmm0[k + 6] = vec_perm(xmm1[k + 4], xmm1[k + 5], epi16_hi);
+        xmm0[k + 7] = vec_perm(xmm1[k + 6], xmm1[k + 7], epi16_hi);
       }
-#endif
 
-      // Attempt to make the above copy to memory work with just VSX built-in
-      // functions.  Unfortunately this does not work (yet).
-//      if ((ii % 16) == 0) {
-//         for (int k = 0; k < 8; k++) {
-//           xmm2[k * 2] = vec_perm(xmm1[k], xmm1[k], epi64_low);
-//           xmm2[k * 2 + 1] = vec_perm(xmm1[k], xmm1[k], epi64_hi);
-//         }
-//      }
-//      else {
-//        for (int k = 0; k < 8; k++) {
-//          kk = ii / 16 * 16;
-//          // printf("ii, jj, kk: %d, %d, %d\n", ii, jj, kk);
-//
-//          xmm3 = vec_perm(xmm2[k * 2], xmm1[k], epi64_low);
-//          vec_xst(xmm3, (jj + k * 2) * nrows + kk, (uint8_t *)out);
-//          // helper_print(xmm3, "0->");
-//          xmm3 = vec_perm(xmm2[k * 2 + 1], xmm1[k], epi64_hi);
-//          vec_xst(xmm3, (jj + k * 2 + 1) * nrows + kk, (uint8_t *)out);
-//          // helper_print(xmm3, "1->");
-//        }
-//      }
+      for (int k = 0; k < 16; k += 8) {
+        xmm1[k + 0] = vec_perm(xmm0[k + 0], xmm0[k + 1], epi32_low);
+        xmm1[k + 1] = vec_perm(xmm0[k + 0], xmm0[k + 1], epi32_hi);
+        xmm1[k + 2] = vec_perm(xmm0[k + 2], xmm0[k + 3], epi32_low);
+        xmm1[k + 3] = vec_perm(xmm0[k + 2], xmm0[k + 3], epi32_hi);
+        xmm1[k + 4] = vec_perm(xmm0[k + 4], xmm0[k + 5], epi32_low);
+        xmm1[k + 5] = vec_perm(xmm0[k + 4], xmm0[k + 5], epi32_hi);
+        xmm1[k + 6] = vec_perm(xmm0[k + 6], xmm0[k + 7], epi32_low);
+        xmm1[k + 7] = vec_perm(xmm0[k + 6], xmm0[k + 7], epi32_hi);
+      }
+
+      for (int k = 0; k < 8; k += 4) {
+        xmm0[k * 2 + 0] = vec_perm(xmm1[k + 0], xmm1[k + 8], epi64_low);
+        xmm0[k * 2 + 1] = vec_perm(xmm1[k + 0], xmm1[k + 8], epi64_hi);
+        xmm0[k * 2 + 2] = vec_perm(xmm1[k + 1], xmm1[k + 9], epi64_low);
+        xmm0[k * 2 + 3] = vec_perm(xmm1[k + 1], xmm1[k + 9], epi64_hi);
+        xmm0[k * 2 + 4] = vec_perm(xmm1[k + 2], xmm1[k + 10], epi64_low);
+        xmm0[k * 2 + 5] = vec_perm(xmm1[k + 2], xmm1[k + 10], epi64_hi);
+        xmm0[k * 2 + 6] = vec_perm(xmm1[k + 3], xmm1[k + 11], epi64_low);
+        xmm0[k * 2 + 7] = vec_perm(xmm1[k + 3], xmm1[k + 11], epi64_hi);
+      }
+
+      for (int k = 0; k < 16; k++) {
+        vec_xst(xmm0[k], (jj + k) * nrows + ii, out_b);
+      }
 
     }
-  }
 
-  // Copy the remainder
-  for (jj = nbyte_row - nbyte_row % 16; jj < nbyte_row; jj++) {
-    for (ii = 0; ii + 7 < nrows; ii += 8) {
-      for (int k = 0; k < 8; k++) {
+    // Copy the remainder
+    for (int jj = nbyte_row - nbyte_row % 16; jj < nbyte_row; jj++) {
+      for (int k = 0; k < nvectors; k++) {
         out_b[jj * nrows + ii + k] = in_b[(ii + k) * nbyte_row + jj];
       }
     }
+
   }
 
   return size * elem_size;
