@@ -449,7 +449,8 @@ int64_t bshuf_trans_byte_bitrow_altivec(void* in, void* out, const size_t size,
 
   CHECK_MULT_EIGHT(size);
 
-  if ((elem_size > 8) && (elem_size % 2)) {
+  // The optimized algorithms can only deal with even values or 1 for elem_size
+  if ((elem_size > 1) && (elem_size % 2)) {
     return bshuf_trans_byte_bitrow_scal(in, out, size, elem_size);
   }
 
