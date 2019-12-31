@@ -449,6 +449,10 @@ int64_t bshuf_trans_byte_bitrow_altivec(void* in, void* out, const size_t size,
 
   CHECK_MULT_EIGHT(size);
 
+  if ((elem_size > 8) && (elem_size % 2)) {
+    return bshuf_trans_byte_bitrow_scal(in, out, size, elem_size);
+  }
+
   int nvectors = (elem_size == 1) ? 8 : 16;
   for (int ii = 0; ii < nrows; ii += nvectors) {
     for (int jj = 0; jj  < nbyte_row; jj += 16) {  // vectors of 16 elements

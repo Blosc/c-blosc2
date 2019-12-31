@@ -105,6 +105,9 @@ BLOSC_NO_EXPORT int64_t
 bshuf_shuffle_bit_eightelem_scal(const void* in, void* out,
                                  const size_t size, const size_t elem_size);
 
+BLOSC_NO_EXPORT int64_t
+bshuf_trans_byte_bitrow_scal(const void* in, void* out, const size_t size,
+                             const size_t elem_size);
 
 /* Bitshuffle the data.
  *
