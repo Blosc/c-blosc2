@@ -23,9 +23,6 @@
 #include <altivec.h>
 #include "transpose-altivec.h"
 
-#include <emmintrin.h>
-#include <stdio.h>
-
 /* The next is useful for debugging purposes */
 #if 1
 #include <stdio.h>
