@@ -30,7 +30,7 @@ shuffle2_altivec(uint8_t* const dest, const uint8_t* const src,
     /* Fetch 16 elements (32 bytes) */
     for (i = 0; i < bytesoftype; i++)
       xmm0[i] = vec_xl(bytesoftype * j + 16 * i, src);
-    
+
     /* Transpose vectors */
     transpose2x16(xmm0);
 
@@ -48,7 +48,7 @@ shuffle4_altivec(uint8_t* const dest, const uint8_t* const src,
   int32_t i, j;
   __vector uint8_t xmm0[4];
 
-  for (j = 0; j < vectorizable_elements; j += 16) 
+  for (j = 0; j < vectorizable_elements; j += 16)
   {
     /* Fetch 16 elements (64 bytes, 4 vectors) */
     for (i = 0; i < bytesoftype; i++)
@@ -57,11 +57,11 @@ shuffle4_altivec(uint8_t* const dest, const uint8_t* const src,
 
     /* Transpose vectors */
     transpose4x16(xmm0);
-    
+
     /* Store the result vectors */
     for (i = 0; i < bytesoftype; i ++){
         vec_xst(xmm0[i], j + i*total_elements, dest);
-    }        
+    }
   }
 }
 
@@ -71,10 +71,10 @@ static void
 shuffle8_altivec(uint8_t* const dest, const uint8_t* const src,
                  const int32_t vectorizable_elements, const int32_t total_elements) {
   static const uint8_t bytesoftype = 8;
-  int32_t i, j, k;
+  int32_t i, j;
   __vector uint8_t xmm0[8];
 
-  for (j = 0; j < vectorizable_elements; j += 16) 
+  for (j = 0; j < vectorizable_elements; j += 16)
   {
     /* Fetch 16 elements (128 bytes, 8 vectors) */
     for (i = 0; i < bytesoftype; i++)
@@ -97,12 +97,12 @@ shuffle16_altivec(uint8_t* const dest, const uint8_t* const src,
   int32_t i, j;
   __vector uint8_t xmm0[16];
 
-  for (j = 0; j < vectorizable_elements; j += 16) 
+  for (j = 0; j < vectorizable_elements; j += 16)
   {
     /* Fetch 16 elements (256 bytes, 16 vectors) */
     for (i = 0; i < bytesoftype; i++)
       xmm0[i] = vec_xl(bytesoftype * j + 16 * i, src);
-    
+
     // Do the job !
     transpose16x16(xmm0);
 
@@ -117,9 +117,8 @@ shuffle16_altivec(uint8_t* const dest, const uint8_t* const src,
 static void
 shuffle16_tiled_altivec(uint8_t* const dest, const uint8_t* const src,
                         const int32_t vectorizable_elements, const int32_t total_elements, const int32_t bytesoftype) {
-  int32_t j, k, l;
+  int32_t j, k;
   const int32_t vecs_per_el_rem = bytesoftype & 0xF;
-  uint8_t* dest_for_jth_element;
   __vector uint8_t xmm[16];
 
   for (j = 0; j < vectorizable_elements; j += 16) {
@@ -160,9 +159,9 @@ unshuffle2_altivec(uint8_t* const dest, const uint8_t* const src,
 
     /* Shuffle bytes */
     /* Note the shuffling is different from intel's SSE2 */
-    xmm1[0] = vec_vmrghb (xmm0[0], xmm0[1]);
-    xmm1[1] = vec_vmrglb (xmm0[0], xmm0[1]);
-    
+    xmm1[0] = vec_vmrghb(xmm0[0], xmm0[1]);
+    xmm1[1] = vec_vmrglb(xmm0[0], xmm0[1]);
+
 
     /* Store the result vectors*/
     for (i = 0; i < bytesoftype; i++)
@@ -210,9 +209,9 @@ unshuffle8_altivec(uint8_t* const dest, const uint8_t* const src,
   static const uint8_t bytesoftype = 8;
   uint32_t i, j;
   __vector uint8_t xmm0[8], xmm1[8];
-  
+
   // Initialize permutations for writing
-  
+
 
   for (j = 0; j < vectorizable_elements; j += 16) {
     /* Load 16 elements (64 bytes) into 4 vectors registers. */
@@ -235,15 +234,15 @@ unshuffle8_altivec(uint8_t* const dest, const uint8_t* const src,
       xmm1[4 + i] = (__vector uint8_t)vec_vmrglw((__vector uint32_t)xmm0[i * 2], (__vector uint32_t)xmm0[i * 2 + 1]);
     }
     /* Store the result vectors in proper order */
-      vec_xst(xmm1[0], bytesoftype * j, dest);      
+      vec_xst(xmm1[0], bytesoftype * j, dest);
       vec_xst(xmm1[4], bytesoftype * j + 16, dest);
       vec_xst(xmm1[2], bytesoftype * j + 32, dest);
       vec_xst(xmm1[6], bytesoftype * j + 48, dest);
       vec_xst(xmm1[1], bytesoftype * j + 64, dest);
       vec_xst(xmm1[5], bytesoftype * j + 80, dest);
       vec_xst(xmm1[3], bytesoftype * j + 96, dest);
-      vec_xst(xmm1[7], bytesoftype * j + 112, dest);    
-     
+      vec_xst(xmm1[7], bytesoftype * j + 112, dest);
+
   }
 }
 
@@ -254,19 +253,19 @@ unshuffle16_altivec(uint8_t* const dest, const uint8_t* const src,
                     const int32_t vectorizable_elements, const int32_t total_elements) {
   static const int32_t bytesoftype = 16;
   uint32_t i, j;
-  __vector uint8_t xmm0[16]; 
+  __vector uint8_t xmm0[16];
 
   for (j = 0; j < vectorizable_elements; j += 16) {
     /* Load 16 elements (64 bytes) into 4 vectors registers. */
     for (i = 0; i < bytesoftype; i++)
         xmm0[i] = vec_xl(j + i * total_elements, src);
-    
+
     // Do the Job!
     transpose16x16(xmm0);
-    
+
     /* Store the result vectors*/
     for (i = 0; i < 16; i++)
-      vec_st(xmm0[i], bytesoftype * (i+j), dest); 
+      vec_st(xmm0[i], bytesoftype * (i+j), dest);
   }
 }
 
@@ -278,25 +277,24 @@ unshuffle16_tiled_altivec(uint8_t* const dest, const uint8_t* const orig,
   int32_t i, j, offset_into_type;
   const int32_t vecs_per_el_rem = bytesoftype &  0xF;
   __vector uint8_t xmm[16];
-  
-  
+
+
   /* Advance the offset into the type by the vector size (in bytes), unless this is
     the initial iteration and the type size is not a multiple of the vector size.
     In that case, only advance by the number of bytes necessary so that the number
     of remaining bytes in the type will be a multiple of the vector size. */
-    
+
   for (offset_into_type = 0; offset_into_type < bytesoftype;
        offset_into_type += (offset_into_type == 0 &&
            vecs_per_el_rem > 0 ? vecs_per_el_rem : 16)) {
     for (i = 0; i < vectorizable_elements; i += 16) {
       /* Load the first 128 bytes in 16 XMM registers */
-      const uint8_t* const src_for_ith_element = orig + i;
       for (j = 0; j < 16; j++)
         xmm[j] = vec_xl(total_elements * (offset_into_type + j) + i, orig);
 
       // Do the Job !
       transpose16x16(xmm);
-      
+
       /* Store the result vectors in proper order */
       for (j = 0; j < 16; j++)
         vec_xst(xmm[j], (i + j) * bytesoftype + offset_into_type, dest);
@@ -307,8 +305,8 @@ unshuffle16_tiled_altivec(uint8_t* const dest, const uint8_t* const orig,
 /* Shuffle a block.  This can never fail. */
 void
 shuffle_altivec(const int32_t bytesoftype, const int32_t blocksize,
-                const uint8_t *_src, uint8_t *_dest) 
-{  
+                const uint8_t *_src, uint8_t *_dest)
+{
 	int32_t vectorized_chunk_size;
     vectorized_chunk_size = bytesoftype * 16;
 
