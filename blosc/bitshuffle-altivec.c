@@ -152,7 +152,7 @@ bitunshuffle1_altivec(void* _src, void* dest, const size_t size, const size_t el
       xmm1[5] = vec_perm(xmm0[3], xmm1[7], epi64_low);
       xmm1[7] = vec_perm(xmm0[3], xmm1[7], epi64_hi);
 
-      //At this stage each vector xmm1 contains the data from 16 adjacent bytes
+      // At this stage each vector xmm1 contains the data from 16 adjacent bytes
       for (int ll=0; ll<8; ll++){
         __vector uint8_t xmm = xmm1[ll];
         //helper_print(xmm, "vector transposed");
@@ -205,7 +205,7 @@ int64_t bshuf_trans_byte_elem_16(void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 2;
   __vector uint8_t xmm0[2];
 
-  for (int i = 0; i + 15 < size; i += 16) {
+  for (size_t i = 0; i + 15 < size; i += 16) {
     for (int j = 0; j < bytesoftype; j++)
       xmm0[j] = vec_xl(bytesoftype * i + 16 * j, (const uint8_t*)in);
 
@@ -225,7 +225,7 @@ int64_t bshuf_trans_byte_elem_32(void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 4;
   __vector uint8_t xmm0[4];
 
-  for (int i = 0; i + 15 < size; i += 16) {
+  for (size_t i = 0; i + 15 < size; i += 16) {
     for (int j = 0; j < bytesoftype; j++)
       xmm0[j] = vec_xl(bytesoftype * i + 16 * j, (const uint8_t*)in);
 
@@ -245,7 +245,7 @@ int64_t bshuf_trans_byte_elem_64(void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 8;
   __vector uint8_t xmm0[8];
 
-  for (int i = 0; i + 15 < size; i += 16) {
+  for (size_t i = 0; i + 15 < size; i += 16) {
     for (int j = 0; j < bytesoftype; j++)
       xmm0[j] = vec_xl(bytesoftype * i + 16 * j, (const uint8_t*)in);
 
@@ -265,7 +265,7 @@ int64_t bshuf_trans_byte_elem_128(void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 16;
   __vector uint8_t xmm0[16];
 
-  for (int i = 0; i + 15 < size; i += 16) {
+  for (size_t i = 0; i + 15 < size; i += 16) {
     for (int j = 0; j < bytesoftype; j++)
       xmm0[j] = vec_xl(bytesoftype * i + 16 * j, (const uint8_t*)in);
 
@@ -453,8 +453,8 @@ int64_t bshuf_trans_byte_bitrow_altivec(void* in, void* out, const size_t size,
   }
 
   int nvectors = (elem_size == 1) ? 8 : 16;
-  for (int ii = 0; ii + (nvectors - 1) < nrows; ii += nvectors) {
-    for (int jj = 0; jj + 15 < nbyte_row; jj += 16) {  // vectors of 16 elements
+  for (size_t ii = 0; ii + (nvectors - 1) < nrows; ii += nvectors) {
+    for (size_t jj = 0; jj + 15 < nbyte_row; jj += 16) {  // vectors of 16 elements
 
       if (elem_size == 1) {
         for (int k = 0; k < 8; k++) {
@@ -550,7 +550,7 @@ int64_t bshuf_trans_byte_bitrow_altivec(void* in, void* out, const size_t size,
     }
 
     // Copy the remainder
-    for (int jj = nbyte_row - nbyte_row % 16; jj < nbyte_row; jj++) {
+    for (size_t jj = nbyte_row - nbyte_row % 16; jj < nbyte_row; jj++) {
       for (int k = 0; k < nvectors; k++) {
         out_b[jj * nrows + ii + k] = in_b[(ii + k) * nbyte_row + jj];
       }
@@ -575,7 +575,7 @@ int64_t bshuf_shuffle_bit_eightelem_altivec(void* in, void* out, const size_t si
   CHECK_MULT_EIGHT(size);
 
   // Generate all 8 needed masks
-  for (kk=0; kk<8; kk++){
+  for (size_t kk=0; kk<8; kk++){
     masks[kk] = make_bitperm_mask(1, kk);
   }
 
