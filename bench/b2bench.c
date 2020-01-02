@@ -288,17 +288,22 @@ void print_compress_info(void) {
   printf("Supported compression libraries:\n");
   ret = blosc_get_complib_info("blosclz", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
+  free(name); free(version);
   ret = blosc_get_complib_info("lz4", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
+  free(name); free(version);
   ret = blosc_get_complib_info("lizard", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
+  free(name); free(version);
   ret = blosc_get_complib_info("snappy", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
+  free(name); free(version);
   ret = blosc_get_complib_info("zlib", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
+  free(name); free(version);
   ret = blosc_get_complib_info("zstd", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
-
+  free(name); free(version);
 }
 
 
