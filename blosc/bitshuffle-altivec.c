@@ -24,7 +24,7 @@
 #include "transpose-altivec.h"
 
 /* The next is useful for debugging purposes */
-#if 1
+#if 0
 #include <stdio.h>
 #include <string.h>
 
@@ -223,8 +223,6 @@ int64_t bshuf_trans_byte_elem_16(void* in, void* out, const size_t size) {
 /* Transpose bytes within elements for 32 bit elements. */
 int64_t bshuf_trans_byte_elem_32(void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 4;
-  const uint8_t* in_b = (const uint8_t*)in;
-  uint8_t* out_b = (uint8_t*)out;
   __vector uint8_t xmm0[4];
 
   for (int i = 0; i + 15 < size; i += 16) {
@@ -573,12 +571,10 @@ int64_t bshuf_shuffle_bit_eightelem_altivec(void* in, void* out, const size_t si
   uint8_t* out_b = (uint8_t*)out;
   size_t nbyte = elem_size * size;
   __vector uint8_t masks[8], data;
-  size_t ii, jj, kk;
-  size_t ind;
 
   CHECK_MULT_EIGHT(size);
 
-  //Generate all 8 needed masks
+  // Generate all 8 needed masks
   for (kk=0; kk<8; kk++){
     masks[kk] = make_bitperm_mask(1, kk);
   }
@@ -586,11 +582,11 @@ int64_t bshuf_shuffle_bit_eightelem_altivec(void* in, void* out, const size_t si
   if (elem_size % 2) {
     bshuf_shuffle_bit_eightelem_scal(in, out, size, elem_size);
   } else {
-    for (ii = 0; ii + 8 * elem_size - 1 < nbyte;
+    for (size_t ii = 0; ii + 8 * elem_size - 1 < nbyte;
          ii += 8 * elem_size) {
-      for (jj = 0; jj + 15 < 8 * elem_size; jj += 16) {
+      for (size_t jj = 0; jj + 15 < 8 * elem_size; jj += 16) {
         data = vec_xl(ii + jj, in_b);
-        for (kk = 0; kk < 8; kk++) {
+        for (size_t kk = 0; kk < 8; kk++) {
           __vector uint16_t tmp;
           uint16_t* oui16;
           tmp = (__vector uint16_t) vec_bperm(data, masks[kk]);
