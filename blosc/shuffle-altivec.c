@@ -116,7 +116,8 @@ shuffle16_altivec(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for shuffling a buffer for a type size larger than 16 bytes. */
 static void
 shuffle16_tiled_altivec(uint8_t* const dest, const uint8_t* const src,
-                        const int32_t vectorizable_elements, const int32_t total_elements, const int32_t bytesoftype) {
+                        const int32_t vectorizable_elements, const int32_t total_elements,
+                        const int32_t bytesoftype) {
   int32_t j, k;
   const int32_t vecs_per_el_rem = bytesoftype & 0xF;
   __vector uint8_t xmm[16];
@@ -162,7 +163,6 @@ unshuffle2_altivec(uint8_t* const dest, const uint8_t* const src,
     xmm1[0] = vec_vmrghb(xmm0[0], xmm0[1]);
     xmm1[1] = vec_vmrglb(xmm0[0], xmm0[1]);
 
-
     /* Store the result vectors*/
     for (i = 0; i < bytesoftype; i++)
       vec_xst(xmm1[i], bytesoftype * j + 16 * i, dest);
@@ -172,7 +172,7 @@ unshuffle2_altivec(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for unshuffling a buffer for a type size of 4 bytes. */
 static void
 unshuffle4_altivec(uint8_t* const dest, const uint8_t* const src,
-                const int32_t vectorizable_elements, const int32_t total_elements) {
+                   const int32_t vectorizable_elements, const int32_t total_elements) {
   static const int32_t bytesoftype = 4;
   uint32_t i, j;
   __vector uint8_t xmm0[4], xmm1[4];
@@ -190,9 +190,11 @@ unshuffle4_altivec(uint8_t* const dest, const uint8_t* const src,
     /* Shuffle 2-byte words */
     for (i = 0; i < 2; i++) {
       /* Compute the low 32 bytes */
-      xmm0[i] = (__vector uint8_t) vec_vmrghh((__vector uint16_t)xmm1[i * 2], (__vector uint16_t) xmm1[i * 2 + 1]);
+      xmm0[i] = (__vector uint8_t) vec_vmrghh((__vector uint16_t)xmm1[i * 2],
+                                              (__vector uint16_t) xmm1[i * 2 + 1]);
       /* Compute the hi 32 bytes */
-      xmm0[i+2] = (__vector uint8_t) vec_vmrglh((__vector uint16_t)xmm1[i * 2], (__vector uint16_t)xmm1[i * 2 + 1]);
+      xmm0[i+2] = (__vector uint8_t) vec_vmrglh((__vector uint16_t)xmm1[i * 2],
+                                                (__vector uint16_t)xmm1[i * 2 + 1]);
     }
     /* Store the result vectors in proper order */
     vec_xst(xmm0[0], bytesoftype * j, dest);
@@ -222,13 +224,17 @@ unshuffle8_altivec(uint8_t* const dest, const uint8_t* const src,
     }
     /* Shuffle 2-byte words */
     for (i = 0; i < 4; i++) {
-      xmm0[i] = (__vector uint8_t)vec_vmrghh((__vector uint16_t)xmm1[i * 2], (__vector uint16_t)xmm1[i * 2 + 1]);
-      xmm0[4 + i] = (__vector uint8_t)vec_vmrglh((__vector uint16_t)xmm1[i * 2], (__vector uint16_t)xmm1[i * 2 + 1]);
+      xmm0[i] = (__vector uint8_t)vec_vmrghh((__vector uint16_t)xmm1[i * 2],
+                                             (__vector uint16_t)xmm1[i * 2 + 1]);
+      xmm0[4 + i] = (__vector uint8_t)vec_vmrglh((__vector uint16_t)xmm1[i * 2],
+                                                 (__vector uint16_t)xmm1[i * 2 + 1]);
     }
     /* Shuffle 4-byte dwords */
     for (i = 0; i < 4; i++) {
-      xmm1[i] = (__vector uint8_t)vec_vmrghw((__vector uint32_t)xmm0[i * 2], (__vector uint32_t)xmm0[i * 2 + 1]);
-      xmm1[4 + i] = (__vector uint8_t)vec_vmrglw((__vector uint32_t)xmm0[i * 2], (__vector uint32_t)xmm0[i * 2 + 1]);
+      xmm1[i] = (__vector uint8_t)vec_vmrghw((__vector uint32_t)xmm0[i * 2],
+                                             (__vector uint32_t)xmm0[i * 2 + 1]);
+      xmm1[4 + i] = (__vector uint8_t)vec_vmrglw((__vector uint32_t)xmm0[i * 2],
+                                                 (__vector uint32_t)xmm0[i * 2 + 1]);
     }
     /* Store the result vectors in proper order */
     vec_xst(xmm1[0], bytesoftype * j, dest);
@@ -269,7 +275,8 @@ unshuffle16_altivec(uint8_t* const dest, const uint8_t* const src,
 /* Routine optimized for unshuffling a buffer for a type size larger than 16 bytes. */
 static void
 unshuffle16_tiled_altivec(uint8_t* const dest, const uint8_t* const orig,
-                          const int32_t vectorizable_elements, const int32_t total_elements, const int32_t bytesoftype) {
+                          const int32_t vectorizable_elements, const int32_t total_elements,
+                          const int32_t bytesoftype) {
   int32_t i, j, offset_into_type;
   const int32_t vecs_per_el_rem = bytesoftype &  0xF;
   __vector uint8_t xmm[16];
