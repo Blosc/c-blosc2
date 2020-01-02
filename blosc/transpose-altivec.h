@@ -1,16 +1,15 @@
 /*********************************************************************
   Blosc - Blocked Shuffling and Compression Library
 
-  Author: Francesc Alted <francesc@blosc.org>
-  *       Jerome Kieffer <jerome.kieffer@esrf.fr>
+ * Author: Jerome Kieffer <jerome.kieffer@esrf.fr>
+           Francesc Alted <francesc@blosc.org>
+ * Created: 2019
 
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
 #ifndef BLOSC_TRANSPOSE_ALTIVEC_H
 #define BLOSC_TRANSPOSE_ALTIVEC_H
-
-#include "blosc2-common.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,15 +35,17 @@ static void transpose2x16(__vector uint8_t *xmm0) {
   }
 }
 
-/* Transpose inplace 4 vectors of 16 bytes in src into dst. */
+
+/* Transpose inplace 4 vectors of 16 bytes in src into dst.
+ * Total cost: 8 calls to vec_perm. */
 static void transpose4x16(__vector uint8_t *xmm0) {
   __vector uint8_t xmm1[4];
-  /* Transpose vectors 0-1*/
-  for (int i = 0; i < 4; i += 2){
-    xmm1[i  ] = vec_perm(xmm0[i], xmm0[i+1], even);
-    xmm1[i+1] = vec_perm(xmm0[i], xmm0[i+1], odd);
-  }
 
+  /* Transpose vectors 0-1*/
+  xmm1[0] = vec_perm(xmm0[0], xmm0[1], even);
+  xmm1[1] = vec_perm(xmm0[0], xmm0[1], odd);
+  xmm1[2] = vec_perm(xmm0[2], xmm0[3], even);
+  xmm1[3] = vec_perm(xmm0[2], xmm0[3], odd);
   /* Transpose vectors 0-2*/
   xmm0[0] = vec_perm(xmm1[0], xmm1[2], even);
   xmm0[1] = vec_perm(xmm1[1], xmm1[3], even);
@@ -52,7 +53,9 @@ static void transpose4x16(__vector uint8_t *xmm0) {
   xmm0[3] = vec_perm(xmm1[1], xmm1[3], odd);
 }
 
-/* Transpose inplace 8 vectors of 16 bytes in src into dst. */
+
+/* Transpose inplace 8 vectors of 16 bytes in src into dst.
+ * Total cost: 24 calls to vec_perm. */
 static void transpose8x16(__vector uint8_t *xmm0) {
   __vector uint8_t xmm1[8];
 
@@ -79,7 +82,9 @@ static void transpose8x16(__vector uint8_t *xmm0) {
   }
 }
 
-/* Transpose inplace 16 vectors of 16 bytes in src into dst. */
+
+/* Transpose inplace 16 vectors of 16 bytes in src into dst.
+ * Total cost: 64 calls to vec_perm. */
 static void transpose16x16(__vector uint8_t * xmm0){
   __vector uint8_t xmm1[16];
   /* Transpose vectors 0-1*/
