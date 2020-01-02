@@ -211,13 +211,10 @@ unshuffle8_altivec(uint8_t* const dest, const uint8_t* const src,
   __vector uint8_t xmm0[8], xmm1[8];
 
   // Initialize permutations for writing
-
-
   for (j = 0; j < vectorizable_elements; j += 16) {
     /* Load 16 elements (64 bytes) into 4 vectors registers. */
     for (i = 0; i < bytesoftype; i++)
         xmm0[i] = vec_xl(j + i * total_elements, src);
-
     /* Shuffle bytes */
     for (i = 0; i < 4; i++) {
       xmm1[i] = vec_vmrghb(xmm0[i * 2], xmm0[i * 2 + 1]);
@@ -234,15 +231,14 @@ unshuffle8_altivec(uint8_t* const dest, const uint8_t* const src,
       xmm1[4 + i] = (__vector uint8_t)vec_vmrglw((__vector uint32_t)xmm0[i * 2], (__vector uint32_t)xmm0[i * 2 + 1]);
     }
     /* Store the result vectors in proper order */
-      vec_xst(xmm1[0], bytesoftype * j, dest);
-      vec_xst(xmm1[4], bytesoftype * j + 16, dest);
-      vec_xst(xmm1[2], bytesoftype * j + 32, dest);
-      vec_xst(xmm1[6], bytesoftype * j + 48, dest);
-      vec_xst(xmm1[1], bytesoftype * j + 64, dest);
-      vec_xst(xmm1[5], bytesoftype * j + 80, dest);
-      vec_xst(xmm1[3], bytesoftype * j + 96, dest);
-      vec_xst(xmm1[7], bytesoftype * j + 112, dest);
-
+    vec_xst(xmm1[0], bytesoftype * j, dest);
+    vec_xst(xmm1[4], bytesoftype * j + 16, dest);
+    vec_xst(xmm1[2], bytesoftype * j + 32, dest);
+    vec_xst(xmm1[6], bytesoftype * j + 48, dest);
+    vec_xst(xmm1[1], bytesoftype * j + 64, dest);
+    vec_xst(xmm1[5], bytesoftype * j + 80, dest);
+    vec_xst(xmm1[3], bytesoftype * j + 96, dest);
+    vec_xst(xmm1[7], bytesoftype * j + 112, dest);
   }
 }
 

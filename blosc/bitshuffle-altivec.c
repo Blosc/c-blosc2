@@ -47,15 +47,14 @@ static inline __vector uint8_t gen_save_mask(size_t offset){
 // Build and return a bit-permutation mask
 static __vector uint8_t make_bitperm_mask(int type_size, int bit) {
   __vector uint8_t result;
-  int i;
   if (type_size == 1) {
     // data_type is 8 bits long
-    for (i=0; i<16; i++)
-      result[i] = 8 * (15-i) + (7-bit);
+    for (int i = 0; i < 16; i++)
+      result[i] = 8 * (15 - i) + (7 - bit);
   }
   else if (type_size == 2) {
     // data_type is 16 bits long
-    for (i=0; i<8; i++) {
+    for (int i = 0; i < 8; i++) {
       result[i] = 16 * i + 2 * bit;
       result[i+8] = 16 * i + 2 * bit + 1;
     }
@@ -83,7 +82,7 @@ bitunshuffle1_altivec(void* _src, void* dest, const size_t size, const size_t el
 
   // working vectors
   __vector uint8_t xmm0[8], xmm1[8], masks[8];
-  // Masks vectors
+  // Vector masks
   static const __vector uint8_t lo01 = (const __vector uint8_t) {
     0x00, 0x01, 0x04, 0x05, 0x08, 0x09, 0x0c, 0x0d,
     0x10, 0x11, 0x14, 0x15, 0x18, 0x19, 0x1c, 0x1d};
@@ -103,8 +102,6 @@ bitunshuffle1_altivec(void* _src, void* dest, const size_t size, const size_t el
     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
     0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f};
 
-  //static const __vector uint8_t msk0 = (const __vector uint8_t) {0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x01, 0x11, 0x21, 0x31, 0x41, 0x51, 0x61, 0x71};
-
   for (kk = 0; kk < 8; kk++){
     __vector uint8_t msk;
     for (ii = 0; ii < 8; ii++){
@@ -114,11 +111,12 @@ bitunshuffle1_altivec(void* _src, void* dest, const size_t size, const size_t el
     //helper_print(msk, "Mask");
     masks[kk] = msk;
   }
-  vp = 0;
-  //TODO: CHECK_MULT_EIGHT(size);
+
   // read the data
+  vp = 0;
   for (ii = 0; ii + 7 < nrows; ii += 8) {
     for (jj = 0; jj + 15 < nbyte_row; jj += 16) {
+
       for (kk = 0; kk < 8; kk++){
         xmm0[kk] = vec_xl((ii +kk) * nbyte_row + jj, in_b);
         //helper_print(xmm0[kk], "vector read");
@@ -153,10 +151,10 @@ bitunshuffle1_altivec(void* _src, void* dest, const size_t size, const size_t el
       xmm1[7] = vec_perm(xmm0[3], xmm1[7], epi64_hi);
 
       // At this stage each vector xmm1 contains the data from 16 adjacent bytes
-      for (int ll=0; ll<8; ll++){
+      for (int ll = 0; ll < 8; ll++){
         __vector uint8_t xmm = xmm1[ll];
         //helper_print(xmm, "vector transposed");
-        for (kk=0; kk<8; kk++) {
+        for (kk = 0; kk < 8; kk++) {
            __vector uint16_t tmp;
            tmp = (__vector uint16_t) vec_bperm(xmm, masks[kk]);
            //printf("%d %d\n", vp, tmp[4]);
@@ -172,7 +170,7 @@ bitunshuffle1_altivec(void* _src, void* dest, const size_t size, const size_t el
 /* Routine optimized for bit-shuffling a buffer for a type size of 1 byte:
  * non coalesced as the vector write was slower. Loop unrolling neither helps */
 int64_t bitshuffle1_altivec(void* src, void* dest, const size_t size,  const size_t elem_size) {
-  // Nota elem_size==1 and size%8==0 !
+  // Nota elem_size==1 and size % 8 == 0 !
   const uint8_t* b_src = (const uint8_t*) src;
   uint8_t* b_dest = (uint8_t*) dest;
   __vector uint8_t masks[8], data;
@@ -181,13 +179,13 @@ int64_t bitshuffle1_altivec(void* src, void* dest, const size_t size,  const siz
   int64_t count;
 
   // Generate all 8 needed masks
-  for (i=0; i<8; i++){
+  for (i = 0; i < 8; i++){
     masks[i] = make_bitperm_mask(1, i);
   }
 
-  for (j=0; j+15<size; j+=16) {
+  for (j = 0; j+15 < size; j += 16) {
     data = vec_xl(j, b_src);
-    for (i=0; i<8; i++) {
+    for (i = 0; i < 8; i++) {
       __vector uint16_t tmp;
       uint16_t* out_ui16;
       tmp = (__vector uint16_t) vec_bperm(data, masks[i]);
@@ -372,8 +370,8 @@ int64_t bshuf_trans_bit_byte_altivec(void* in, void* out, const size_t size,
 
   CHECK_MULT_EIGHT(nbyte);
 
-  //Generate all 8 needed masks
-  for (kk=0; kk<8; kk++){
+  // Generate all 8 needed masks
+  for (kk = 0; kk < 8; kk++){
     masks[kk] = make_bitperm_mask(1, kk);
   }
 
@@ -575,7 +573,7 @@ int64_t bshuf_shuffle_bit_eightelem_altivec(void* in, void* out, const size_t si
   CHECK_MULT_EIGHT(size);
 
   // Generate all 8 needed masks
-  for (size_t kk=0; kk<8; kk++){
+  for (int kk = 0; kk < 8; kk++){
     masks[kk] = make_bitperm_mask(1, kk);
   }
 
