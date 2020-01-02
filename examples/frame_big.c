@@ -51,7 +51,7 @@ int main() {
   dparams.nthreads = NTHREADS;
 
   /* Create a new super-chunk backed by a fileframe */
-  blosc2_frame* frame = &(blosc2_frame) {.fname = "frame_big.b2frame"};
+  blosc2_frame* frame = blosc2_new_frame("frame_big.b2frame");
   blosc2_schunk* schunk = blosc2_new_schunk(cparams, dparams, frame);
 
   blosc_set_timestamp(&last);
@@ -89,6 +89,7 @@ int main() {
 
   /* Free resources */
   blosc2_free_schunk(schunk);
+  blosc2_free_frame(frame);
 
   return 0;
 }
