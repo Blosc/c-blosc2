@@ -287,11 +287,11 @@ elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l OR
         message(WARNING "Unable to determine which ${CMAKE_SYSTEM_PROCESSOR} hardware features are supported by the C compiler (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}).")
     endif ()
 elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL ppc64le)
-	if (CMAKE_C_COMPILER_ID STREQUAL GNU)
-		set(COMPILER_SUPPORT_ALTIVEC TRUE)
-	else ()
-		set(COMPILER_SUPPORT_ALTIVEC FALSE)
-	endif ()
+    if (CMAKE_C_COMPILER_ID STREQUAL GNU AND CMAKE_C_COMPILER_VERSION VERSION_GREATER 6)
+        set(COMPILER_SUPPORT_ALTIVEC TRUE)
+    else ()
+        set(COMPILER_SUPPORT_ALTIVEC FALSE)
+    endif ()
 else ()
     # If the target system processor isn't recognized, emit a warning message to alert the user
     # that hardware-acceleration support won't be available but allow configuration to proceed.
