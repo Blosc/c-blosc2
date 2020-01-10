@@ -167,37 +167,6 @@ bitunshuffle1_altivec(void* _src, void* dest, const size_t size, const size_t el
 }
 
 
-/* Routine optimized for bit-shuffling a buffer for a type size of 1 byte:
- * non coalesced as the vector write was slower. Loop unrolling neither helps */
-int64_t bitshuffle1_altivec(void* src, void* dest, const size_t size,  const size_t elem_size) {
-  // Nota elem_size==1 and size % 8 == 0 !
-  const uint8_t* b_src = (const uint8_t*) src;
-  uint8_t* b_dest = (uint8_t*) dest;
-  __vector uint8_t masks[8], data;
-  size_t i, j;
-  const size_t nbyte = elem_size * size;
-  int64_t count;
-
-  // Generate all 8 needed masks
-  for (i = 0; i < 8; i++){
-    masks[i] = make_bitperm_mask(1, i);
-  }
-
-  for (j = 0; j+15 < size; j += 16) {
-    data = vec_xl(j, b_src);
-    for (i = 0; i < 8; i++) {
-      __vector uint16_t tmp;
-      uint16_t* out_ui16;
-      tmp = (__vector uint16_t) vec_bperm(data, masks[i]);
-      out_ui16 = (uint16_t*)&b_dest[(j + i*size) >> 3];
-      *out_ui16 = tmp[4];
-    }
-  }
-  count = bshuf_trans_bit_byte_remainder(src, dest, size, elem_size,
-                                         nbyte - nbyte % 16);
-  return count;
-}
-
 /* Transpose bytes within elements for 16 bit elements. */
 int64_t bshuf_trans_byte_elem_16(void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 2;
