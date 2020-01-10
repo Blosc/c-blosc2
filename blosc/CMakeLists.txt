@@ -213,7 +213,7 @@ if (COMPILER_SUPPORT_NEON)
             APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_NEON_ENABLED)
 endif (COMPILER_SUPPORT_NEON)
 if (COMPILER_SUPPORT_ALTIVEC)
-    set_source_files_properties(shuffle-altivec.c bitshuffle-altivec.c PROPERTIES COMPILE_FLAGS -DNO_WARN_X86_INTRINSICS)
+    set_source_files_properties(shuffle-altivec.c bitshuffle-altivec.c PROPERTIES COMPILE_FLAGS "-maltivec")
 
     # Define a symbol for the shuffle-dispatch implementation
     # so it knows ALTIVEC is supported even though that file is
