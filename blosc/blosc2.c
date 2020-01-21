@@ -597,6 +597,9 @@ int last_filter(const uint8_t* filters, char cmode) {
   return last_index;
 }
 
+// Forward declaration
+int _blosc_getitem(blosc2_context* context, const void* src, int start,
+                   int nitems, void* dest);
 
 uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
                     const uint8_t* src, const int32_t offset,
@@ -618,10 +621,17 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
     pparams.ninputs = context->pparams->ninputs;
     pparams.user_data = context->pparams->user_data;
     int ninputs = context->pparams->ninputs;
+    bool compressed_inputs = context->pparams->compressed_inputs;
     for (int i = 0; i < ninputs; i++) {
       pparams.input_typesizes[i] = context->pparams->input_typesizes[i];
       int32_t offset_i = (offset / typesize) * pparams.input_typesizes[i];
-      pparams.inputs[i] = context->pparams->inputs[i] + offset_i;
+      if (compressed_inputs) {
+          _blosc_getitem(context, context->pparams->inputs[i], offset / typesize, bsize / typesize, tmp);
+          pparams.inputs[i] = tmp;
+      }
+      else {
+          pparams.inputs[i] = context->pparams->inputs[i] + offset_i;
+      }
     }
     if (context->prefilter(&pparams) != 0) {
       fprintf(stderr, "Execution of prefilter function failed\n");
