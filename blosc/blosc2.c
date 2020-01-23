@@ -626,7 +626,7 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
       pparams.input_typesizes[i] = context->pparams->input_typesizes[i];
       int32_t offset_i = (offset / typesize) * pparams.input_typesizes[i];
       if (compressed_inputs) {
-          _blosc_getitem(context, context->pparams->inputs[i], offset / typesize, bsize / typesize, tmp);
+          blosc_getitem(context->pparams->inputs[i], offset / typesize, bsize / typesize, tmp);
           pparams.inputs[i] = tmp;
       }
       else {
