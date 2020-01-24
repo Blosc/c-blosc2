@@ -57,8 +57,10 @@ void btune_next_blocksize(blosc2_context *context) {
     if (blocksize < BLOSC_MIN_BUFFERSIZE) {
       blocksize = BLOSC_MIN_BUFFERSIZE;
     }
+    goto last;
   }
-  else if (nbytes >= L1) {
+
+  if (nbytes >= L1) {
     blocksize = L1;
 
     /* For HCR codecs, increase the block sizes by a factor of 2 because they
@@ -133,6 +135,7 @@ void btune_next_blocksize(blosc2_context *context) {
      }
   }
 
+last:
   /* Check that blocksize is not too large */
   if (blocksize > nbytes) {
     blocksize = nbytes;
