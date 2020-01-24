@@ -35,7 +35,7 @@ Right now (August 2019), the next features are already implemented (although the
 
 * Frames: allow to store super-chunks contiguously, either on-disk or in-memory.  When a super-chunk is backed by a frame, instead of storing all the chunks sparsely in-memory, they are serialized inside the frame container.  The frame can be stored on-disk too, meaning that persistence of super-chunks is supported.
 
-* Meta-layers: optionally, the user can add meta-data for different uses and in different layers.  For example, one may think on providing a meta-layer for [NumPy](http://www.numpy.org) so that most of the meta-data for it is stored in a meta-layer; then, one can place another meta-layer on top of the latter can add more high-level info (e.g. geo-spatial, meteorological...), if desired. 
+* Meta-layers: optionally, the user can add meta-data for different uses and in different layers.  For example, one may think on providing a meta-layer for [NumPy](http://www.numpy.org) so that most of the meta-data for it is stored in a meta-layer; then, one can place another meta-layer on top of the latter for adding more high-level info if desired (e.g. geo-spatial, meteorological...).
 
 * Nice markup for documentation: we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  Thanks to Alberto Sabater for contributing the support for this.
 
@@ -53,6 +53,8 @@ Actions to be done
   
   - Tutorials/book: besides the API docstrings, more documentation materials should be provided, like tutorials or a book about Blosc (or at least, the beginnings of it).  Due to its adoption in GitHub and Jupyter notebooks, one of the most extended and useful markup systems is MarkDown, so this should also be the first candidate to use here.
   
+* Plugin capabilities for allowing users to add more filters and codecs.  There should also be a plugin register capability so that the info about the new filters and codecs can be persistent and propagated to different machines.
+
 * Wrappers for other languages: Python and Java are the most obvious candidates, but others like R or Julia would be nice to have.  Still not sure if these should be produced and maintained by the Blosc development team, or leave them for third-party players that would be interested.
 
 * It would be nice to use [LGTM](https://lgtm.com), a CI-friendly analyzer for security.
