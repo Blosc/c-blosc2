@@ -1,0 +1,82 @@
+/*
+  Copyright (C) 2020 Blosc Development Team
+  http://blosc.org
+  License: BSD (see LICENSE.txt)
+
+  Creation date: 2020-01-28
+
+  See LICENSE.txt for details about copyright and rights to use.
+*/
+
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+
+#include "test_common.h"
+
+int tests_run = 0;
+
+
+static char* test_getitem() {
+  blosc_set_nthreads(1);
+
+  size_t type_size = 131;
+  size_t num_elements = 1;
+  size_t buffer_alignment = 32;
+
+  blosc_set_compressor("blosclz");
+  blosc_set_delta(1);
+
+  size_t buffer_size = type_size * num_elements;
+
+  /* Allocate memory for the test. */
+  void* original = malloc(buffer_size);
+  void* intermediate = malloc(buffer_size + BLOSC_MAX_OVERHEAD);
+  void* items = malloc(buffer_size);
+  void* result = malloc(buffer_size);
+
+  /* The test data */
+  memset(original, 0, buffer_size);
+  ((char*)original)[128] = 1;
+
+  /* Compress the input data and store it in an intermediate buffer.
+     Decompress the data from the intermediate buffer into a result buffer. */
+  blosc_compress(1, 0, type_size, buffer_size,
+		 original, intermediate, buffer_size + BLOSC_MAX_OVERHEAD);
+    
+  unsigned start_item = 0;
+  unsigned num_items = 1;
+  blosc_decompress(intermediate, result, buffer_size);
+  assert(memcmp(original, result, buffer_size) == 0);
+  mu_assert("ERROR: decompression with delta filter fails", memcmp(original, result, buffer_size) == 0);
+
+  /* Now that we see the round-trip passed, check the getitem */
+  int get_result = blosc_getitem(intermediate, start_item, num_items, items);
+  mu_assert("ERROR: the number of items in getitem is not correct", get_result == (num_items * type_size));
+  mu_assert("ERROR: getitem with delta filter fails", memcmp(original, items, get_result) == 0);
+  
+  /* Free allocated memory. */
+  free(original);
+  free(intermediate);
+  free(items);
+  free(result);
+  return EXIT_SUCCESS;
+}
+
+static char *all_tests() {
+  mu_run_test(test_getitem);
+  return EXIT_SUCCESS;
+}
+
+int main() {
+  char *result;
+  blosc_init();
+
+  result = all_tests();
+  
+  blosc_destroy();
+
+  return result != EXIT_SUCCESS;
+}

@@ -2134,6 +2134,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   context.header_flags = _src + 2;
   context.filter_flags = get_filter_flags(*(_src + 2), context.typesize);
   context.schunk = g_schunk;
+  context.nthreads = 1;  // force a serial decompression; fixes #95
   context.serial_context = create_thread_context(&context, 0);
 
   /* Call the actual getitem function */
