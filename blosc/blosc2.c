@@ -623,13 +623,13 @@ uint8_t* pipeline_c(blosc2_context* context, const int32_t bsize,
     int ninputs = context->pparams->ninputs;
     bool compressed_inputs = context->pparams->compressed_inputs;
     int nitems = bsize / typesize;
-    int start = bsize / typesize;
+    int start = offset / typesize;
     for (int i = 0; i < ninputs; i++) {
       pparams.input_typesizes[i] = context->pparams->input_typesizes[i];
       int32_t offset_i = (offset / typesize) * pparams.input_typesizes[i];
       if (compressed_inputs) {
-          int ritems = blosc_getitem(context->pparams->inputs[i], start, nitems, tmp);
-          if (ritems < nitems) {
+          int rbytes = blosc_getitem(context->pparams->inputs[i], start, nitems, tmp);
+          if (rbytes != bsize) {
             fprintf(stderr, "Read from inputs failed inside pipeline\n");
             return NULL;
           }
