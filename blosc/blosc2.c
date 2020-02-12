@@ -607,7 +607,7 @@ static int blosc_d(
 
 uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
                     const uint8_t* src, const int32_t offset,
-                    uint8_t* dest, uint8_t* tmp, uint8_t* tmp2, uint8_t* tmp3) {
+                    uint8_t* dest, uint8_t* tmp, uint8_t* tmp2) {
   blosc2_context* context = thread_context->parent_context;
   uint8_t* _src = (uint8_t*)src + offset;
   uint8_t* _tmp = tmp;
@@ -639,9 +639,10 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
           int32_t *bstarts = (int32_t*)(input_chunk + BLOSC_EXTENDED_HEADER_LENGTH);
           int32_t nblock = offset / input_blocksize;
           int32_t leftoverblock = (input_blocksize == bsize) ? 0 : 1;
+          // We can use dest as a temporary here
           rbytes = blosc_d(thread_context, bsize, leftoverblock,
                            input_chunk + sw32_(bstarts + nblock),
-                           tmp, 0, tmp3, tmp2);
+                           tmp, 0, dest, tmp2);
         }
         else {
           int32_t offset_i = offset / pparams.input_typesizes[i];
@@ -732,21 +733,20 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   const uint8_t* _src;
   uint8_t *_tmp = tmp, *_tmp2 = tmp2;
   uint8_t *_tmp3 = thread_context->tmp4;
-  uint8_t *_tmp4 = thread_context->tmp5;
   int last_filter_index = last_filter(context->filters, 'c');
 
   if (last_filter_index >= 0 || context->prefilter != NULL) {
     /* Apply the filter pipeline just for the prefilter */
     if (context->clevel == 0 && context->prefilter != NULL) {
       // We have finished, as we only need the prefilter output
-      _src = pipeline_c(thread_context, bsize, src, offset, dest, _tmp2, _tmp3, _tmp4);
+      _src = pipeline_c(thread_context, bsize, src, offset, dest, _tmp2, _tmp3);
       if (_src == NULL) {
         return -9;  // signals a problem with the filter pipeline
       }
       return bsize;
     }
     /* Apply regular filter pipeline */
-    _src = pipeline_c(thread_context, bsize, src, offset, _tmp, _tmp2, _tmp3, _tmp4);
+    _src = pipeline_c(thread_context, bsize, src, offset, _tmp, _tmp2, _tmp3);
     if (_src == NULL) {
       return -9;  // signals a problem with the filter pipeline
     }
@@ -1182,11 +1182,10 @@ static void init_thread_context(struct thread_context* thread_context, blosc2_co
   thread_context->tid = tid;
 
   ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
-  thread_context->tmp = my_malloc((size_t)4 * context->blocksize + ebsize);
+  thread_context->tmp = my_malloc((size_t)3 * context->blocksize + ebsize);
   thread_context->tmp2 = thread_context->tmp + context->blocksize;
   thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
   thread_context->tmp4 = thread_context->tmp + 2 * context->blocksize + ebsize;
-  thread_context->tmp5 = thread_context->tmp + 3 * context->blocksize + ebsize;
   thread_context->tmpblocksize = context->blocksize;
   #if defined(HAVE_ZSTD)
   thread_context->zstd_cctx = NULL;
@@ -2133,11 +2132,10 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
       /* Resize the temporaries in serial context if needed */
       if (blocksize != scontext->tmpblocksize) {
         my_free(scontext->tmp);
-        scontext->tmp = my_malloc(4 * (size_t)(blocksize + ebsize));
+        scontext->tmp = my_malloc(3 * (size_t)(blocksize + ebsize));
         scontext->tmp2 = scontext->tmp + blocksize;
         scontext->tmp3 = scontext->tmp + blocksize + ebsize;
         scontext->tmp4 = scontext->tmp + 2 * blocksize + ebsize;
-        scontext->tmp5 = scontext->tmp + 3 * blocksize + ebsize;
         scontext->tmpblocksize = (int32_t)blocksize;
       }
 
@@ -2248,11 +2246,10 @@ static void t_blosc_do_job(void *ctxt)
   /* Resize the temporaries if needed */
   if (blocksize != thcontext->tmpblocksize) {
     my_free(thcontext->tmp);
-    thcontext->tmp = my_malloc((size_t)4 * blocksize + ebsize);
+    thcontext->tmp = my_malloc((size_t)3 * blocksize + ebsize);
     thcontext->tmp2 = thcontext->tmp + blocksize;
     thcontext->tmp3 = thcontext->tmp + blocksize + ebsize;
     thcontext->tmp4 = thcontext->tmp + 2 * blocksize + ebsize;
-    thcontext->tmp5 = thcontext->tmp + 3 * blocksize + ebsize;
     thcontext->tmpblocksize = blocksize;
   }
 
