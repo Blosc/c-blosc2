@@ -1910,10 +1910,15 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
 }
 
 
-int blosc_run_decompression_with_context(
-    blosc2_context* context, const void* src, void* dest, size_t destsize) {
+int blosc_run_decompression_with_context(blosc2_context* context, const void* src, void* dest, size_t destsize) {
   int32_t ntbytes;
   int error;
+
+  uint8_t version = ((uint8_t*)src)[0];                        /* blosc format version */
+  if (version > BLOSC_VERSION_FORMAT) {
+    /* Version from future */
+    return -1;
+  }
 
   error = initialize_context_decompression(context, src, dest, destsize);
   if (error < 0) {
@@ -2126,6 +2131,12 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   uint8_t* _src = (uint8_t*)(src);
   blosc2_context context;
   int result;
+
+  uint8_t version = ((uint8_t*)src)[0];                        /* blosc format version */
+  if (version > BLOSC_VERSION_FORMAT) {
+    /* Version from future */
+    return -1;
+  }
 
   /* Minimally populate the context */
   memset(&context, 0, sizeof(blosc2_context));
@@ -2602,6 +2613,12 @@ int blosc_get_complib_info(const char* compname, char** complib, char** version)
 void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
                          size_t* cbytes, size_t* blocksize) {
   uint8_t* _src = (uint8_t*)(cbuffer);    /* current pos for source buffer */
+  uint8_t version = _src[0];                        /* blosc format version */
+  if (version > BLOSC_VERSION_FORMAT) {
+    /* Version from future */
+    *nbytes = *blocksize = *cbytes = 0;
+    return;
+  }
 
   /* Read the interesting values */
   *nbytes = (size_t)sw32_(_src + 4);       /* uncompressed buffer size */
@@ -2611,9 +2628,14 @@ void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
 
 
 /* Return `typesize` and `flags` from a compressed buffer. */
-void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize,
-                            int* flags) {
+void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize, int* flags) {
   uint8_t* _src = (uint8_t*)(cbuffer);  /* current pos for source buffer */
+  uint8_t version = _src[0];                        /* blosc format version */
+  if (version > BLOSC_VERSION_FORMAT) {
+    /* Version from future */
+    *flags = *typesize = 0;
+    return;
+  }
 
   /* Read the interesting values */
   *flags = (int)_src[2];                 /* flags */
