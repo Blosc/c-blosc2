@@ -869,7 +869,7 @@ int pipeline_d(blosc2_context* context, const int32_t bsize, uint8_t* dest,
         }
         break;
       case BLOSC_BITSHUFFLE:
-        bitunshuffle(typesize, bsize, _src, _dest, _tmp);
+        bitunshuffle(typesize, bsize, _src, _dest, _tmp, context->src[0]);
         break;
       case BLOSC_DELTA:
         if (context->nthreads == 1) {
@@ -2129,6 +2129,8 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
 
   /* Minimally populate the context */
   memset(&context, 0, sizeof(blosc2_context));
+  context.src = src;
+  context.dest = dest;
   context.typesize = (uint8_t)_src[3];
   context.blocksize = sw32_(_src + 8);
   context.header_flags = _src + 2;

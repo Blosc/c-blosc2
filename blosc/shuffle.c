@@ -406,45 +406,73 @@ unshuffle(const int32_t bytesoftype, const int32_t blocksize,
   (host_implementation.unshuffle)(bytesoftype, blocksize, _src, _dest);
 }
 
-/* Bit-shuffle a block by dynamically dispatching to the appropriate
-   hardware-accelerated routine at run-time. */
+/*  Bit-shuffle a block by dynamically dispatching to the appropriate
+    hardware-accelerated routine at run-time. */
 int32_t
 bitshuffle(const int32_t bytesoftype, const int32_t blocksize,
            const uint8_t *_src, const uint8_t *_dest,
            const uint8_t *_tmp) {
-  int32_t size = blocksize / bytesoftype;
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
+  size_t size = blocksize / bytesoftype;
+  /* bitshuffle only supports a number of elements that is a multiple of 8. */
+  size -= size % 8;
+  int res = (host_implementation.bitshuffle)((void *) _src, (void *) _dest,
+                                             size, bytesoftype, (void *) _tmp);
+  if (res < 0) {
+    // Some error in bitshuffle (should not happen)
+    printf(stderr, "the impossible happened: the bitshuffle filter failed!");
+    return res;
+  }
 
-  if (size != 0 && ((size % 8) == 0)) {
-    /* The number of elems is a multiple of 8 which is supported by
-       bitshuffle. */
-    return (int32_t)(host_implementation.bitshuffle)(
-            (void*)_src, (void*)_dest, size, bytesoftype, (void*)_tmp);
-  }
-  else {
-    memcpy((void*)_dest, (void*)_src, blocksize);
-  }
+  // Copy the remainder
+  // printf("blocksize, size, bytesoftype: %d, %d, %d\n", blocksize, size, bytesoftype);
+  size_t remainder = blocksize - size * bytesoftype;
+  //printf("remainder (compr): %d\n", remainder);
+  memcpy((void *)(_dest + size * bytesoftype),
+         (void *)(_src + size * bytesoftype), remainder);
+
   return size;
 }
 
-/* Bit-unshuffle a block by dynamically dispatching to the appropriate
-   hardware-accelerated routine at run-time. */
-int32_t
-bitunshuffle(const int32_t bytesoftype, const int32_t blocksize,
-             const uint8_t *_src, const uint8_t *_dest,
-             const uint8_t *_tmp) {
-  int32_t size = blocksize / bytesoftype;
+/*  Bit-unshuffle a block by dynamically dispatching to the appropriate
+    hardware-accelerated routine at run-time. */
+int32_t bitunshuffle(const int32_t bytesoftype, const int32_t blocksize,
+                     const uint8_t *_src, const uint8_t *_dest,
+                     const uint8_t *_tmp, const uint8_t format_version) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
+  size_t size = blocksize / bytesoftype;
 
-  if (size != 0 && ((size % 8) == 0)) {
-    /* The number of elems is a multiple of 8 which is supported by
-       bitshuffle. */
-    return (int32_t)(host_implementation.bitunshuffle)(
-            (void*)_src, (void*)_dest, size, bytesoftype, (void*)_tmp);
-  } else {
-    memcpy((void*)_dest, (void*)_src, blocksize);
+  if (format_version == 2) {
+    /* Starting from version 3, blosc_internal_bitshuffle() works differently */
+    if ((size % 8) == 0) {
+      /* The number of elems is a multiple of 8 which is supported by
+         bitshuffle. */
+      return (int) (host_implementation.bitunshuffle)((void *) _src, (void *) _dest,
+                                                      blocksize / bytesoftype,
+                                                      bytesoftype, (void *) _tmp);
+    }
+    else {
+      memcpy((void *) _dest, (void *) _src, blocksize);
+    }
   }
+  else {
+    /* bitshuffle only supports a number of bytes that is a multiple of 8. */
+    size -= size % 8;
+    int res = (host_implementation.bitunshuffle)((void *) _src, (void *) _dest,
+                                                 size, bytesoftype, (void *) _tmp);
+    if (res < 0) {
+      printf(stderr, "the impossible happened: the bitunshuffle filter failed!");
+      return res;
+    }
+
+    // Copy the remainder
+    size_t remainder = blocksize - size * bytesoftype;
+    // printf("remainder: %d\n", remainder);
+    memcpy((void *) (_dest + size * bytesoftype),
+           (void *) (_src + size * bytesoftype), remainder);
+  }
+
   return size;
 }
