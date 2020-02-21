@@ -50,7 +50,7 @@
 #define GB  (1024*MB)
 
 #define N (100 * 1000 * 1000)
-#define CHUNKSIZE (4 * 1000)
+#define CHUNKSIZE (16 * 1000)
 #define NCHUNKS (N / CHUNKSIZE)
 #define NTHREADS 8
 #define NITER 5
