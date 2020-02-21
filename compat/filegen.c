@@ -10,7 +10,7 @@
 **********************************************************************/
 
 #include <stdio.h>
-#include <blosc.h>
+#include <blosc2.h>
 #include <string.h>
 
 #if defined(_WIN32) && !defined(__MINGW32__)
