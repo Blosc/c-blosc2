@@ -101,9 +101,12 @@ int main(int argc, char *argv[]) {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;
     }
-
     printf("Decompression succesful!\n");
-    dsize -= dsize % 8;  // do not check unaligned data (blosc-1.17.1-bitshuffle8-nomemcpy.cdata)
+
+    char *isbitshuf =  strstr(argv[2], "-bitshuffle");
+    if ((isbitshuf != NULL) && (dsize % 8) != 0) {
+      dsize -= dsize % 8;   // do not check unaligned data (e.g. blosc-1.17.1-bitshuffle8-nomemcpy.cdata)
+    }
     exit_code = memcmp(data, data_dest, dsize) ? EXIT_FAILURE : EXIT_SUCCESS;
 
     if (exit_code == EXIT_SUCCESS) {

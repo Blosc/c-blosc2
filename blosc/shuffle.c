@@ -417,20 +417,19 @@ bitshuffle(const int32_t bytesoftype, const int32_t blocksize,
   size_t size = blocksize / bytesoftype;
   /* bitshuffle only supports a number of elements that is a multiple of 8. */
   size -= size % 8;
-  int res = (host_implementation.bitshuffle)((void *) _src, (void *) _dest,
+  int ret = (host_implementation.bitshuffle)((void *) _src, (void *) _dest,
                                              size, bytesoftype, (void *) _tmp);
-  if (res < 0) {
+  if (ret < 0) {
     // Some error in bitshuffle (should not happen)
     printf(stderr, "the impossible happened: the bitshuffle filter failed!");
-    return res;
+    return ret;
   }
 
-  // Copy the remainder
-  size_t remainder = blocksize - size * bytesoftype;
-  memcpy((void *)(_dest + size * bytesoftype),
-         (void *)(_src + size * bytesoftype), remainder);
+  // Copy the leftovers
+  size_t offset = size * bytesoftype;
+  memcpy((void *) (_dest + offset), (void *) (_src + offset), blocksize - offset);
 
-  return size;
+  return blocksize;
 }
 
 /*  Bit-unshuffle a block by dynamically dispatching to the appropriate
@@ -447,9 +446,17 @@ int32_t bitunshuffle(const int32_t bytesoftype, const int32_t blocksize,
     if ((size % 8) == 0) {
       /* The number of elems is a multiple of 8 which is supported by
          bitshuffle. */
-      return (int) (host_implementation.bitunshuffle)((void *) _src, (void *) _dest,
-                                                      blocksize / bytesoftype,
-                                                      bytesoftype, (void *) _tmp);
+      int ret = (host_implementation.bitunshuffle)((void *) _src, (void *) _dest,
+                                                   blocksize / bytesoftype,
+                                                   bytesoftype, (void *) _tmp);
+      if (ret < 0) {
+        // Some error in bitshuffle (should not happen)
+        printf(stderr, "the impossible happened: the bitunshuffle filter failed!");
+        return ret;
+      }
+      /* Copy the leftovers (we do so starting from c-blosc 1.18 on) */
+      size_t offset = size * bytesoftype;
+      memcpy((void *) (_dest + offset), (void *) (_src + offset), blocksize - offset);
     }
     else {
       memcpy((void *) _dest, (void *) _src, blocksize);
@@ -458,18 +465,17 @@ int32_t bitunshuffle(const int32_t bytesoftype, const int32_t blocksize,
   else {
     /* bitshuffle only supports a number of bytes that is a multiple of 8. */
     size -= size % 8;
-    int res = (host_implementation.bitunshuffle)((void *) _src, (void *) _dest,
+    int ret = (host_implementation.bitunshuffle)((void *) _src, (void *) _dest,
                                                  size, bytesoftype, (void *) _tmp);
-    if (res < 0) {
+    if (ret < 0) {
       printf(stderr, "the impossible happened: the bitunshuffle filter failed!");
-      return res;
+      return ret;
     }
 
-    // Copy the remainder
-    size_t remainder = blocksize - size * bytesoftype;
-    memcpy((void *) (_dest + size * bytesoftype),
-           (void *) (_src + size * bytesoftype), remainder);
+    /* Copy the leftovers */
+    size_t offset = size * bytesoftype;
+    memcpy((void *) (_dest + offset), (void *) (_src + offset), blocksize - offset);
   }
 
-  return size;
+  return blocksize;
 }
