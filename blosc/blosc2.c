@@ -2106,16 +2106,22 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
         scontext->tmpblocksize = (int32_t)blocksize;
       }
 
-      /* Regular decompression.  Put results in tmp2. */
+      /* Regular decompression */
+      // If the block is aligned and the worst case fits in destination,
+      // let's avoid a copy
+      bool safe_nblock = ((startb == 0) && (ntbytes + blocksize <= (nitems * typesize)));
+      uint8_t *tmp = safe_nblock ? dest + ntbytes : scontext->tmp2;
       cbytes = blosc_d(context->serial_context, bsize, leftoverblock,
                        (uint8_t*)src + sw32_(bstarts + j),
-                       scontext->tmp2, 0, scontext->tmp, scontext->tmp3);
+                       tmp, 0, scontext->tmp, scontext->tmp3);
       if (cbytes < 0) {
         ntbytes = cbytes;
         break;
       }
-      /* Copy to destination */
-      fastcopy((uint8_t*)dest + ntbytes, scontext->tmp2 + startb, (unsigned int)bsize2);
+      /* Copy to destination if necessary */
+      if (!safe_nblock) {
+        fastcopy((uint8_t *)dest + ntbytes, tmp + startb, (unsigned int)bsize2);
+      }
       cbytes = (int)bsize2;
     }
     ntbytes += cbytes;
