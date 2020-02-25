@@ -636,7 +636,7 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
         int rbytes;
         // Check if inputs and output are aligned for a faster decompression
         // TODO: re-check this when input_itemsize != out_itemsize
-        if (input_blocksize == bsize) {
+        if (0 && input_blocksize == bsize) {
           int32_t nblock = offset / bsize;
           if (is_memcpyed) {
             fastcopy(dest, input_chunk + BLOSC_MAX_OVERHEAD + nblock * input_blocksize, bsize);
@@ -654,13 +654,13 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
         else {
           int32_t offset_i = offset / pparams.input_typesizes[i];
           int32_t nitems_i = bsize / pparams.input_typesizes[i];
-          rbytes = blosc_getitem(input_chunk, offset_i, nitems_i, tmp);
+          pparams.inputs[i] = malloc(bsize);
+          rbytes = blosc_getitem(input_chunk, offset_i, nitems_i, pparams.inputs[i]);
         }
         if (rbytes != bsize) {
           fprintf(stderr, "Read from inputs failed inside pipeline\n");
           return NULL;
         }
-        pparams.inputs[i] = tmp;
       }
       else {
         int32_t offset_i = (offset / typesize) * pparams.input_typesizes[i];
@@ -671,6 +671,10 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
       fprintf(stderr, "Execution of prefilter function failed\n");
       return NULL;
     };
+
+    for (int i = 0; i < ninputs; ++i) {
+      free(pparams.inputs[i]);
+    }
 
     if (context->clevel == 0 || disable_filters) {
       // No more filters are required
@@ -866,7 +870,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
            buffer overflow. */
         if ((ntbytes + neblock) > maxbytes) {
           if (context->prefilter != NULL) {
-            context->src = pipeline_c(context, bsize, src, offset, _tmp, _tmp2, _tmp3, true);
+            context->src = pipeline_c(thread_context, bsize, src, offset, _tmp, _tmp2, _tmp3, true);
           }
           return 0;    /* Non-compressible data */
         }
