@@ -607,7 +607,7 @@ static int blosc_d(
 
 uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
                     const uint8_t* src, const int32_t offset,
-                    uint8_t* dest, uint8_t* tmp, uint8_t* tmp2) {
+                    uint8_t* dest, uint8_t* tmp, uint8_t* tmp2, bool disable_filters) {
   blosc2_context* context = thread_context->parent_context;
   uint8_t* _src = (uint8_t*)src + offset;
   uint8_t* _tmp = tmp;
@@ -672,7 +672,7 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
       return NULL;
     };
 
-    if (context->clevel == 0) {
+    if (context->clevel == 0 || disable_filters) {
       // No more filters are required
       return _dest;
     }
@@ -746,14 +746,16 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     /* Apply the filter pipeline just for the prefilter */
     if (context->clevel == 0 && context->prefilter != NULL) {
       // We have finished, as we only need the prefilter output
-      _src = pipeline_c(thread_context, bsize, src, offset, dest, _tmp2, _tmp3);
+      _src = pipeline_c(thread_context, bsize, src, offset, dest, _tmp2, _tmp3, false);
+
       if (_src == NULL) {
         return -9;  // signals a problem with the filter pipeline
       }
       return bsize;
     }
     /* Apply regular filter pipeline */
-    _src = pipeline_c(thread_context, bsize, src, offset, _tmp, _tmp2, _tmp3);
+    _src = pipeline_c(thread_context, bsize, src, offset, _tmp, _tmp2, _tmp3, false);
+
     if (_src == NULL) {
       return -9;  // signals a problem with the filter pipeline
     }
@@ -863,6 +865,9 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
         /* Before doing the copy, check that we are not running into a
            buffer overflow. */
         if ((ntbytes + neblock) > maxbytes) {
+          if (context->prefilter != NULL) {
+            context->src = pipeline_c(context, bsize, src, offset, _tmp, _tmp2, _tmp3, true);
+          }
           return 0;    /* Non-compressible data */
         }
         fastcopy(dest, _src + j * neblock, (unsigned int)neblock);
