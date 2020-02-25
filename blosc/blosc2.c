@@ -672,8 +672,10 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
       return NULL;
     };
 
-    for (int i = 0; i < ninputs; ++i) {
-      free(pparams.inputs[i]);
+    if (compressed_inputs) {
+      for (int i = 0; i < ninputs; ++i) {
+        free(pparams.inputs[i]);
+      }
     }
 
     if (context->clevel == 0 || disable_filters) {
