@@ -620,6 +620,7 @@ typedef struct {
   uint8_t *out;  // automatically filled
   int32_t out_size;  // automatically filled
   int32_t out_typesize;  // automatically filled
+  int32_t out_offset; // automatically filled
 } blosc2_prefilter_params;
 
 /**

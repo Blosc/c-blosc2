@@ -27,13 +27,16 @@ int dsize = SIZE * sizeof(int32_t), csize;
 int prefilter_func(blosc2_prefilter_params *pparams) {
   int nelems = pparams->out_size / pparams->out_typesize;
   if (pparams->ninputs == 1) {
+    int32_t *input0 = ((int32_t *)(pparams->inputs[0] + pparams->out_offset));
     for (int i = 0; i < nelems; i++) {
-      ((int32_t*)(pparams->out))[i] = ((int32_t*)(pparams->inputs[0]))[i];
+      ((int32_t*)(pparams->out))[i] = input0[i];
     }
   }
   else if (pparams->ninputs == 2) {
+    int32_t *input0 = ((int32_t *)(pparams->inputs[0] + pparams->out_offset));
+    int32_t *input1 = ((int32_t *)(pparams->inputs[1] + pparams->out_offset));
     for (int i = 0; i < nelems; i++) {
-      ((int32_t *) (pparams->out))[i] = ((int32_t *)(pparams->inputs[0]))[i] + ((int32_t *) (pparams->inputs[1]))[i];
+      ((int32_t *) (pparams->out))[i] = input0[i] + input1[i];
     }
   }
   else {

@@ -618,64 +618,17 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
 
   /* Prefilter function */
   if (context->prefilter != NULL) {
-    // Create new prefilter parameters for this block
-    blosc2_prefilter_params pparams = {0};
+    // Create new prefilter parameters for this block (must be private for each thread)
+    blosc2_prefilter_params pparams;
+    memcpy(&pparams, context->pparams, sizeof(pparams));
     pparams.out = _dest;
     pparams.out_size = (size_t)bsize;
     pparams.out_typesize = typesize;
-    pparams.ninputs = context->pparams->ninputs;
-    pparams.user_data = context->pparams->user_data;
-    int ninputs = context->pparams->ninputs;
-    bool compressed_inputs = context->pparams->compressed_inputs;
-    for (int i = 0; i < ninputs; i++) {
-      pparams.input_typesizes[i] = context->pparams->input_typesizes[i];
-      uint8_t* input_chunk = context->pparams->inputs[i];
-      if (compressed_inputs) {
-        int32_t input_blocksize = sw32_(input_chunk + 8);
-        bool is_memcpyed = input_chunk[2] & BLOSC_MEMCPYED;
-        int rbytes;
-        // Check if inputs and output are aligned for a faster decompression
-        // TODO: re-check this when input_itemsize != out_itemsize
-        if (0 && input_blocksize == bsize) {
-          int32_t nblock = offset / bsize;
-          if (is_memcpyed) {
-            fastcopy(dest, input_chunk + BLOSC_MAX_OVERHEAD + nblock * input_blocksize, bsize);
-            rbytes = bsize;
-          }
-          else {
-            // We can use dest as a temporary here
-            int32_t *bstarts = (int32_t*)(input_chunk + BLOSC_EXTENDED_HEADER_LENGTH);
-            int32_t leftoverblock = (input_blocksize == bsize) ? 0 : 1;
-            rbytes = blosc_d(thread_context, bsize, leftoverblock,
-                             input_chunk + sw32_(bstarts + nblock), tmp, 0,
-                             dest, tmp2);
-          }
-        }
-        else {
-          int32_t offset_i = offset / pparams.input_typesizes[i];
-          int32_t nitems_i = bsize / pparams.input_typesizes[i];
-          pparams.inputs[i] = malloc(bsize);
-          rbytes = blosc_getitem(input_chunk, offset_i, nitems_i, pparams.inputs[i]);
-        }
-        if (rbytes != bsize) {
-          fprintf(stderr, "Read from inputs failed inside pipeline\n");
-          return NULL;
-        }
-      }
-      else {
-        int32_t offset_i = (offset / typesize) * pparams.input_typesizes[i];
-        pparams.inputs[i] = context->pparams->inputs[i] + offset_i;
-      }
-    }
+    pparams.out_offset = offset;
+
     if (context->prefilter(&pparams) != 0) {
       fprintf(stderr, "Execution of prefilter function failed\n");
       return NULL;
-    };
-
-    if (compressed_inputs) {
-      for (int i = 0; i < ninputs; ++i) {
-        free(pparams.inputs[i]);
-      }
     }
 
     if (context->clevel == 0 || disable_filters) {
