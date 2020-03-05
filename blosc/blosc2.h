@@ -601,8 +601,6 @@ BLOSC_EXPORT const char* blosc_cbuffer_complib(const void* cbuffer);
 
 typedef struct blosc2_context_s blosc2_context;   /* opaque type */
 
-#define BLOSC2_PREFILTER_INPUTS_MAX (128)
-
 /**
  * @brief The parameters for a prefilter function.
  *
