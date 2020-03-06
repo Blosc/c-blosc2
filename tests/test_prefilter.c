@@ -58,7 +58,7 @@ static char *test_prefilter1() {
   cparams.prefilter = (blosc2_prefilter_fn)prefilter_func;
   // We need to zero the contents of the pparams.  TODO: make a constructor for ppparams.
   blosc2_prefilter_params pparams = {0};
-  test_pparams tpparams = {};
+  test_pparams tpparams = {0};
   tpparams.ninputs = 1;
   tpparams.inputs[0] = (uint8_t*)data;
   tpparams.input_typesizes[0] = cparams.typesize;
@@ -96,7 +96,7 @@ static char *test_prefilter2() {
   cparams.prefilter = (blosc2_prefilter_fn)prefilter_func;
   // We need to zero the contents of the pparams.  TODO: make a constructor for ppparams.
   blosc2_prefilter_params pparams = {0};
-  test_pparams tpparams = {};
+  test_pparams tpparams = {0};
   tpparams.ninputs = 2;
   tpparams.inputs[0] = (uint8_t*)data;
   tpparams.inputs[1] = (uint8_t*)data2;
