@@ -604,17 +604,17 @@ typedef struct blosc2_context_s blosc2_context;   /* opaque type */
 /**
  * @brief The parameters for a prefilter function.
  *
- * There can be many inputs and a single output.
- * The number of elements of each input and the output should be the same.
- * Strictly, the user only needs to fill the `ninputs` , `inputs` and `input_typesizes`.
- * The other fields will be filled by the library itself.
  */
 typedef struct {
   void *user_data;  // user-provided info (optional)
-  uint8_t *out;  // automatically filled
-  int32_t out_size;  // automatically filled
-  int32_t out_typesize;  // automatically filled
-  int32_t out_offset; // automatically filled
+  uint8_t *out;  // the output buffer
+  int32_t out_size;  // the output size (in bytes)
+  int32_t out_typesize;  // the output typesize
+  int32_t out_offset; // offset to reach the start of the output buffer
+  int32_t tid;  // thread id
+  uint8_t *ttmp;  // a temporary that is able to hold several blocks for the output and is private for each thread
+  int32_t ttmp_nbytes;  // the size of the temporary in bytes
+  blosc2_context *ctx;  // the decompression context
 } blosc2_prefilter_params;
 
 /**

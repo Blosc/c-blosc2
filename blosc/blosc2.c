@@ -625,6 +625,10 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
     pparams.out_size = (size_t)bsize;
     pparams.out_typesize = typesize;
     pparams.out_offset = offset;
+    pparams.tid = thread_context->tid;
+    pparams.ttmp = thread_context->tmp;
+    pparams.ttmp_nbytes = thread_context->tmp_nbytes;
+    pparams.ctx = context;
 
     if (context->prefilter(&pparams) != 0) {
       fprintf(stderr, "Execution of prefilter function failed\n");
@@ -1153,11 +1157,12 @@ static void init_thread_context(struct thread_context* thread_context, blosc2_co
   thread_context->tid = tid;
 
   ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
-  thread_context->tmp = my_malloc((size_t)3 * context->blocksize + ebsize);
+  thread_context->tmp_nbytes = (size_t)3 * context->blocksize + ebsize;
+  thread_context->tmp = my_malloc(thread_context->tmp_nbytes);
   thread_context->tmp2 = thread_context->tmp + context->blocksize;
   thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
   thread_context->tmp4 = thread_context->tmp + 2 * context->blocksize + ebsize;
-  thread_context->tmpblocksize = context->blocksize;
+  thread_context->tmp_blocksize = context->blocksize;
   #if defined(HAVE_ZSTD)
   thread_context->zstd_cctx = NULL;
   thread_context->zstd_dctx = NULL;
@@ -1166,7 +1171,7 @@ static void init_thread_context(struct thread_context* thread_context, blosc2_co
   /* Create the hash table for LZ4 in case we are using IPP */
 #ifdef HAVE_IPP
   IppStatus status;
-  int inlen = thread_context->tmpblocksize > 0 ? thread_context->tmpblocksize : 1 << 16;
+  int inlen = thread_context->tmp_blocksize > 0 ? thread_context->tmp_blocksize : 1 << 16;
   int hash_size = 0;
   status = ippsEncodeLZ4HashTableGetSize_8u(&hash_size);
   if (status != ippStsNoErr) {
@@ -1250,7 +1255,7 @@ static int do_job(blosc2_context* context) {
     if (context->serial_context == NULL) {
       context->serial_context = create_thread_context(context, 0);
     }
-    else if (context->blocksize != context->serial_context->tmpblocksize) {
+    else if (context->blocksize != context->serial_context->tmp_blocksize) {
       free_thread_context(context->serial_context);
       context->serial_context = create_thread_context(context, 0);
     }
@@ -2101,13 +2106,14 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
       struct thread_context* scontext = context->serial_context;
 
       /* Resize the temporaries in serial context if needed */
-      if (blocksize != scontext->tmpblocksize) {
+      if (blocksize != scontext->tmp_blocksize) {
         my_free(scontext->tmp);
-        scontext->tmp = my_malloc(3 * (size_t)(blocksize + ebsize));
+        scontext->tmp_nbytes = (size_t)3 * context->blocksize + ebsize;
+        scontext->tmp = my_malloc(scontext->tmp_nbytes);
         scontext->tmp2 = scontext->tmp + blocksize;
         scontext->tmp3 = scontext->tmp + blocksize + ebsize;
         scontext->tmp4 = scontext->tmp + 2 * blocksize + ebsize;
-        scontext->tmpblocksize = (int32_t)blocksize;
+        scontext->tmp_blocksize = (int32_t)blocksize;
       }
 
       /* Regular decompression.  Put results in tmp2. */
@@ -2215,13 +2221,14 @@ static void t_blosc_do_job(void *ctxt)
   dest = context->dest;
 
   /* Resize the temporaries if needed */
-  if (blocksize != thcontext->tmpblocksize) {
+  if (blocksize != thcontext->tmp_blocksize) {
     my_free(thcontext->tmp);
-    thcontext->tmp = my_malloc((size_t)3 * blocksize + ebsize);
+    thcontext->tmp_nbytes = (size_t)3 * context->blocksize + ebsize;
+    thcontext->tmp = my_malloc(thcontext->tmp_nbytes);
     thcontext->tmp2 = thcontext->tmp + blocksize;
     thcontext->tmp3 = thcontext->tmp + blocksize + ebsize;
     thcontext->tmp4 = thcontext->tmp + 2 * blocksize + ebsize;
-    thcontext->tmpblocksize = blocksize;
+    thcontext->tmp_blocksize = blocksize;
   }
 
   tmp = thcontext->tmp;
