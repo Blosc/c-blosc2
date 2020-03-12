@@ -1111,6 +1111,7 @@ static int serial_blosc(struct thread_context* thread_context) {
 }
 
 static void t_blosc_do_job(void *ctxt);
+static void t_blosc_do_job_2(void *ctxt);
 
 /* Threaded version for compression/decompression */
 static int parallel_blosc(blosc2_context* context) {
