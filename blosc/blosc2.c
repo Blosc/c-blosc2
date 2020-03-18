@@ -2110,7 +2110,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
       // If the block is aligned and the worst case fits in destination,
       // let's avoid a copy
       bool safe_nblock = ((startb == 0) && (ntbytes + blocksize <= (nitems * typesize)));
-      uint8_t *tmp = safe_nblock ? dest + ntbytes : scontext->tmp2;
+      uint8_t *tmp = safe_nblock ? (uint8_t*)dest + ntbytes : scontext->tmp2;
       cbytes = blosc_d(context->serial_context, bsize, leftoverblock,
                        (uint8_t*)src + sw32_(bstarts + j),
                        tmp, 0, scontext->tmp, scontext->tmp3);
