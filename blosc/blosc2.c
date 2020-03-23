@@ -2197,10 +2197,10 @@ int blosc2_getitem_ctx(blosc2_context* context, const void* src, int start,
 }
 
 /* execute single compression/decompression job for a single thread_context */
-static void t_blosc_do_job(void *ctxt) {
+static void t_blosc_do_job(void* ctxt) {
 
-  struct thread_context *thcontext = (struct thread_context *) ctxt;
-  blosc2_context *context = thcontext->parent_context;
+  struct thread_context* thcontext = (struct thread_context*) ctxt;
+  blosc2_context* context = thcontext->parent_context;
   int32_t cbytes;
   int32_t ntdest;
   int32_t tblocks;               /* number of blocks per thread */
@@ -2218,12 +2218,12 @@ static void t_blosc_do_job(void *ctxt) {
   int32_t nblocks;
   int32_t leftover;
   int32_t leftover2;
-  int32_t *bstarts;
-  const uint8_t *src;
-  uint8_t *dest;
-  uint8_t *tmp;
-  uint8_t *tmp2;
-  uint8_t *tmp3;
+  int32_t* bstarts;
+  const uint8_t* src;
+  uint8_t* dest;
+  uint8_t* tmp;
+  uint8_t* tmp2;
+  uint8_t* tmp3;
 
   /* Get parameters for this thread before entering the main loop */
   blocksize = context->blocksize;
@@ -2240,7 +2240,7 @@ static void t_blosc_do_job(void *ctxt) {
   /* Resize the temporaries if needed */
   if (blocksize != thcontext->tmpblocksize) {
     my_free(thcontext->tmp);
-    thcontext->tmp = my_malloc((size_t) 3 * blocksize + ebsize);
+    thcontext->tmp = my_malloc((size_t)3 * blocksize + ebsize);
     thcontext->tmp2 = thcontext->tmp + blocksize;
     thcontext->tmp3 = thcontext->tmp + blocksize + ebsize;
     thcontext->tmp4 = thcontext->tmp + 2 * blocksize + ebsize;
@@ -2253,143 +2253,47 @@ static void t_blosc_do_job(void *ctxt) {
 
   ntbytes = 0;                /* only useful for decompression */
 
-  /* Compression always has to follow the block order */
+  /*  Get the next block in the queue */
   pthread_mutex_lock(&context->count_mutex);
   context->thread_nblock++;
   nblock_ = context->thread_nblock;
   pthread_mutex_unlock(&context->count_mutex);
   tblock = nblocks;
 
-    if (context->block_maskout_nitems != 0) {
-      /* Loop over blocks */
-      leftoverblock = 0;
-      while ((nblock_ < tblock) &&
-             (context->thread_giveup_code > 0)) {
-        bsize = blocksize;
-        if (nblock_ == (nblocks - 1) && (leftover > 0)) {
-          bsize = leftover;
-          leftoverblock = 1;
-        }
-
-        pthread_mutex_lock(&context->count_mutex);
-        while ((context->block_maskout[nblock_]) && (nblock_ < nblocks)) {
-          context->thread_nblock++;
-          nblock_ = context->thread_nblock;
-          ntbytes += bsize;
-        }
-        pthread_mutex_unlock(&context->count_mutex);
-
-        if (nblock_ >= nblocks) {
-          break;
-        }
-        if (!context->block_maskout[nblock_]) {
-          //        printf("soy el thread %d, y voy a hacer el block %d \n", tid, nblock_);
-          if (flags & BLOSC_MEMCPYED) {
-            /* We want to memcpy only */
-            fastcopy(dest + nblock_ * blocksize,
-                src + BLOSC_MAX_OVERHEAD + nblock_ * blocksize, (unsigned int) bsize);
-            cbytes = (int32_t) bsize;
-          } else {
-            cbytes = blosc_d(thcontext, bsize, leftoverblock,
-                src + sw32_(bstarts + nblock_),
-                  dest, nblock_ * blocksize, tmp, tmp2);
-          }
-
-          /* Check whether current thread has to giveup */
-          if (context->thread_giveup_code <= 0) {
-            break;
-          }
-
-          /* Check results for the compressed/decompressed block */
-          if (cbytes < 0) {            /* compr/decompr failure */
-            /* Set giveup_code error */
-            pthread_mutex_lock(&context->count_mutex);
-            context->thread_giveup_code = cbytes;
-            pthread_mutex_unlock(&context->count_mutex);
-            break;
-          }
-        }
-
-        pthread_mutex_lock(&context->count_mutex);
-        context->thread_nblock++;
-        nblock_ = context->thread_nblock;
-        pthread_mutex_unlock(&context->count_mutex);
-        /* Update counter for this thread */
-        ntbytes += cbytes;
-
-      } /* closes while (nblock_) */
-
-      /* Sum up all the bytes decompressed */
-      if ((!compress || (flags & BLOSC_MEMCPYED)) && (context->thread_giveup_code > 0)) {
-        /* Update global counter for all threads (decompression only) */
-        pthread_mutex_lock(&context->count_mutex);
-        context->output_bytes += ntbytes;
-        pthread_mutex_unlock(&context->count_mutex);
-      }
-    } else {
-      if (compress && !(flags & BLOSC_MEMCPYED)) {
-        /* Compression always has to follow the block order */
-        pthread_mutex_lock(&context->count_mutex);
-        context->thread_nblock++;
-        nblock_ = context->thread_nblock;
-        pthread_mutex_unlock(&context->count_mutex);
-        tblock = nblocks;
-      } else {
-        /* Decompression can happen using any order.  We choose
-        sequential block order on each thread */
-
-        /* Blocks per thread */
-        tblocks = nblocks / context->nthreads;
-        leftover2 = nblocks % context->nthreads;
-        tblocks = (leftover2 > 0) ? tblocks + 1 : tblocks;
-
-        nblock_ = thcontext->tid * tblocks;
-        tblock = nblock_ + tblocks;
-        if (tblock > nblocks) {
-          tblock = nblocks;
-        }
+  if (context->block_maskout_nitems != 0) {
+    /* Loop over blocks */
+    leftoverblock = 0;
+    while ((nblock_ < tblock) && (context->thread_giveup_code > 0)) {
+      bsize = blocksize;
+      if (nblock_ == (nblocks - 1) && (leftover > 0)) {
+        bsize = leftover;
+        leftoverblock = 1;
       }
 
-      /* Loop over blocks */
-      leftoverblock = 0;
-      while ((nblock_ < tblock) &&
-             (context->thread_giveup_code > 0)) {
-        bsize = blocksize;
-        if (nblock_ == (nblocks - 1) && (leftover > 0)) {
-          bsize = leftover;
-          leftoverblock = 1;
-        }
-        if (compress) {
-          if (flags & BLOSC_MEMCPYED) {
-            /* We want to memcpy only */
-            fastcopy(dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize,
-                src + nblock_ * blocksize, (unsigned int)bsize);
-            cbytes = (int32_t)bsize;
-          } else {
-            /* Regular compression */
-            if (context->clevel == 0) {
-              // We can copy straight to destination, as we know where we can write
-              tmp2 = dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize;
-            }
-            cbytes = blosc_c(thcontext, bsize, leftoverblock, 0,
-                ebsize, src, nblock_ * blocksize, tmp2, tmp, tmp3);
-          }
-        }
-        else {
-          if (flags & BLOSC_MEMCPYED) {
-            /* We want to memcpy only */
-            fastcopy(dest + nblock_ * blocksize,
-                src + BLOSC_MAX_OVERHEAD + nblock_ * blocksize, (unsigned int)bsize);
-            cbytes = (int32_t)bsize;
-          }
-          else {
-            cbytes = blosc_d(thcontext, bsize, leftoverblock,
-                src + sw32_(bstarts + nblock_),
-                dest, nblock_ * blocksize, tmp, tmp2);
-          }
+      pthread_mutex_lock(&context->count_mutex);
+      while ((context->block_maskout[nblock_]) && (nblock_ < nblocks)) {
+        context->thread_nblock++;
+        nblock_ = context->thread_nblock;
+        ntbytes += bsize;
+      }
+      pthread_mutex_unlock(&context->count_mutex);
+
+      if (nblock_ >= nblocks) {
+        break;
+      }
+      if (!context->block_maskout[nblock_]) {
+        if (flags & BLOSC_MEMCPYED) {
+          /* We want to memcpy only */
+          fastcopy(dest + nblock_ * blocksize,
+                  src + BLOSC_MAX_OVERHEAD + nblock_ * blocksize, (unsigned int) bsize);
+          cbytes = (int32_t) bsize;
+        } else {
+          cbytes = blosc_d(thcontext, bsize, leftoverblock,
+                      src + sw32_(bstarts + nblock_),
+                           dest, nblock_ * blocksize, tmp, tmp2);
         }
 
-        /* Check whether current thread has to giveup */
+        /* Check whether the current thread has to giveup */
         if (context->thread_giveup_code <= 0) {
           break;
         }
@@ -2402,51 +2306,145 @@ static void t_blosc_do_job(void *ctxt) {
           pthread_mutex_unlock(&context->count_mutex);
           break;
         }
+      }
 
-        if (compress && !(flags & BLOSC_MEMCPYED)) {
-          /* Start critical section */
-          pthread_mutex_lock(&context->count_mutex);
-          ntdest = context->output_bytes;
-          // Note: do not use a typical local dict_training variable here
-          // because it is probably cached from previous calls if the number of
-          // threads does not change (the usual thing).
-          if (!(context->use_dict && context->dict_cdict == NULL) && context->clevel != 0) {
-            _sw32(bstarts + nblock_, (int32_t) ntdest);
-          }
+      pthread_mutex_lock(&context->count_mutex);
+      context->thread_nblock++;
+      nblock_ = context->thread_nblock;
+      pthread_mutex_unlock(&context->count_mutex);
+      /* Update counter for this thread */
+      ntbytes += cbytes;
 
-          if ((cbytes == 0) || (ntdest + cbytes > maxbytes)) {
-            context->thread_giveup_code = 0;  /* uncompressible buf */
-            pthread_mutex_unlock(&context->count_mutex);
-            break;
-          }
-          context->thread_nblock++;
-          nblock_ = context->thread_nblock;
-          context->output_bytes += cbytes;
-          pthread_mutex_unlock(&context->count_mutex);
-          /* End of critical section */
+    } /* closes while (nblock_) */
 
-          /* Copy the compressed buffer to destination */
-          if (context->clevel != 0) {
-            // We can avoid the copy when clevel == 0 (already copied)
-            fastcopy(dest + ntdest, tmp2, (unsigned int) cbytes);
-          }
-        }
-        else {
-          nblock_++;
-          /* Update counter for this thread */
-          ntbytes += cbytes;
-        }
+    /* Sum up all the bytes decompressed */
+    if ((!compress || (flags & BLOSC_MEMCPYED)) && (context->thread_giveup_code > 0)) {
+      /* Update global counter for all threads (decompression only) */
+      pthread_mutex_lock(&context->count_mutex);
+      context->output_bytes += ntbytes;
+      pthread_mutex_unlock(&context->count_mutex);
+    }
+  } else {
+    if (compress && !(flags & BLOSC_MEMCPYED)) {
+      /* Compression always has to follow the block order */
+      pthread_mutex_lock(&context->count_mutex);
+      context->thread_nblock++;
+      nblock_ = context->thread_nblock;
+      pthread_mutex_unlock(&context->count_mutex);
+      tblock = nblocks;
+    } else {
+      /* Decompression can happen using any order.  We choose
+      sequential block order on each thread */
 
-      } /* closes while (nblock_) */
+      /* Blocks per thread */
+      tblocks = nblocks / context->nthreads;
+      leftover2 = nblocks % context->nthreads;
+      tblocks = (leftover2 > 0) ? tblocks + 1 : tblocks;
 
-      /* Sum up all the bytes decompressed */
-      if ((!compress || (flags & BLOSC_MEMCPYED)) && (context->thread_giveup_code > 0)) {
-        /* Update global counter for all threads (decompression only) */
-        pthread_mutex_lock(&context->count_mutex);
-        context->output_bytes += ntbytes;
-        pthread_mutex_unlock(&context->count_mutex);
+      nblock_ = thcontext->tid * tblocks;
+      tblock = nblock_ + tblocks;
+      if (tblock > nblocks) {
+        tblock = nblocks;
       }
     }
+
+    /* Loop over blocks */
+    leftoverblock = 0;
+    while ((nblock_ < tblock) &&
+           (context->thread_giveup_code > 0)) {
+      bsize = blocksize;
+      if (nblock_ == (nblocks - 1) && (leftover > 0)) {
+        bsize = leftover;
+        leftoverblock = 1;
+      }
+      if (compress) {
+        if (flags & BLOSC_MEMCPYED) {
+          /* We want to memcpy only */
+          fastcopy(dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize,
+                  src + nblock_ * blocksize, (unsigned int)bsize);
+          cbytes = (int32_t)bsize;
+        } else {
+          /* Regular compression */
+          if (context->clevel == 0) {
+            // We can copy straight to destination, as we know where we can write
+            tmp2 = dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize;
+          }
+          cbytes = blosc_c(thcontext, bsize, leftoverblock, 0,
+                           ebsize, src, nblock_ * blocksize, tmp2, tmp, tmp3);
+        }
+      }
+      else {
+        if (flags & BLOSC_MEMCPYED) {
+          /* We want to memcpy only */
+          fastcopy(dest + nblock_ * blocksize,
+                  src + BLOSC_MAX_OVERHEAD + nblock_ * blocksize, (unsigned int)bsize);
+          cbytes = (int32_t)bsize;
+        }
+        else {
+          cbytes = blosc_d(thcontext, bsize, leftoverblock,
+                      src + sw32_(bstarts + nblock_),
+                           dest, nblock_ * blocksize, tmp, tmp2);
+        }
+      }
+
+      /* Check whether current thread has to giveup */
+      if (context->thread_giveup_code <= 0) {
+        break;
+      }
+
+      /* Check results for the compressed/decompressed block */
+      if (cbytes < 0) {            /* compr/decompr failure */
+        /* Set giveup_code error */
+        pthread_mutex_lock(&context->count_mutex);
+        context->thread_giveup_code = cbytes;
+        pthread_mutex_unlock(&context->count_mutex);
+        break;
+      }
+
+      if (compress && !(flags & BLOSC_MEMCPYED)) {
+        /* Start critical section */
+        pthread_mutex_lock(&context->count_mutex);
+        ntdest = context->output_bytes;
+        // Note: do not use a typical local dict_training variable here
+        // because it is probably cached from previous calls if the number of
+        // threads does not change (the usual thing).
+        if (!(context->use_dict && context->dict_cdict == NULL) && context->clevel != 0) {
+          _sw32(bstarts + nblock_, (int32_t) ntdest);
+        }
+
+        if ((cbytes == 0) || (ntdest + cbytes > maxbytes)) {
+          context->thread_giveup_code = 0;  /* uncompressible buf */
+          pthread_mutex_unlock(&context->count_mutex);
+          break;
+        }
+        context->thread_nblock++;
+        nblock_ = context->thread_nblock;
+        context->output_bytes += cbytes;
+        pthread_mutex_unlock(&context->count_mutex);
+        /* End of critical section */
+
+        /* Copy the compressed buffer to destination */
+        if (context->clevel != 0) {
+          // We can avoid the copy when clevel == 0 (already copied)
+          fastcopy(dest + ntdest, tmp2, (unsigned int) cbytes);
+        }
+      }
+      else {
+        nblock_++;
+        /* Update counter for this thread */
+        ntbytes += cbytes;
+      }
+
+    } /* closes while (nblock_) */
+
+    /* Sum up all the bytes decompressed */
+    if ((!compress || (flags & BLOSC_MEMCPYED)) && (context->thread_giveup_code > 0)) {
+      /* Update global counter for all threads (decompression only) */
+      pthread_mutex_lock(&context->count_mutex);
+      context->output_bytes += ntbytes;
+      pthread_mutex_unlock(&context->count_mutex);
+    }
+  }
 }
 
 
