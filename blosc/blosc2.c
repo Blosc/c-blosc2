@@ -597,13 +597,6 @@ int last_filter(const uint8_t* filters, char cmode) {
   return last_index;
 }
 
-// Forward declarations
-int _blosc_getitem(blosc2_context* context, const void* src, int start,
-                   int nitems, void* dest);
-static int blosc_d(
-    struct thread_context* thread_context, int32_t bsize,
-    int32_t leftoverblock, const uint8_t* src, uint8_t* dest, int32_t offset,
-    uint8_t* tmp, uint8_t* tmp2);
 
 uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
                     const uint8_t* src, const int32_t offset,
