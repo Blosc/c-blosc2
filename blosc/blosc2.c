@@ -2253,29 +2253,12 @@ static void t_blosc_do_job(void *ctxt)
 
   ntbytes = 0;                /* only useful for decompression */
 
-  if (compress && !(flags & BLOSC_MEMCPYED)) {
-    /* Compression always has to follow the block order */
-    pthread_mutex_lock(&context->count_mutex);
-    context->thread_nblock++;
-    nblock_ = context->thread_nblock;
-    pthread_mutex_unlock(&context->count_mutex);
-    tblock = nblocks;
-  }
-  else {
-    /* Decompression can happen using any order.  We choose
-      sequential block order on each thread */
-
-    /* Blocks per thread */
-    tblocks = nblocks / context->nthreads;
-    leftover2 = nblocks % context->nthreads;
-    tblocks = (leftover2 > 0) ? tblocks + 1 : tblocks;
-
-    nblock_ = thcontext->tid * tblocks;
-    tblock = nblock_ + tblocks;
-    if (tblock > nblocks) {
-      tblock = nblocks;
-    }
-  }
+  /* Get the next block to be decompressed */
+  pthread_mutex_lock(&context->count_mutex);
+  context->thread_nblock++;
+  nblock_ = context->thread_nblock;
+  pthread_mutex_unlock(&context->count_mutex);
+  tblock = nblocks;
 
   /* Loop over blocks */
   leftoverblock = 0;
@@ -2354,26 +2337,20 @@ static void t_blosc_do_job(void *ctxt)
       /* End of critical section */
 
       /* Copy the compressed buffer to destination */
-      if (context->clevel != 0) {
-        // We can avoid the copy when clevel == 0 (already copied)
-        fastcopy(dest + ntdest, tmp2, (unsigned int) cbytes);
-      }
+      fastcopy(dest + ntdest, tmp2, (unsigned int) cbytes);
     }
     else {
-      nblock_++;
-      /* Update counter for this thread */
-      ntbytes += cbytes;
+      pthread_mutex_lock(&context->count_mutex);
+      do {
+        context->thread_nblock++;
+        nblock_ = context->thread_nblock;
+        context->output_bytes += bsize;
+      } while (context->block_maskout && context->block_maskout[nblock_]);
+      pthread_mutex_unlock(&context->count_mutex);
     }
 
   } /* closes while (nblock_) */
 
-  /* Sum up all the bytes decompressed */
-  if ((!compress || (flags & BLOSC_MEMCPYED)) && (context->thread_giveup_code > 0)) {
-    /* Update global counter for all threads (decompression only) */
-    pthread_mutex_lock(&context->count_mutex);
-    context->output_bytes += ntbytes;
-    pthread_mutex_unlock(&context->count_mutex);
-  }
 }
 
 /* Decompress & unshuffle several blocks in a single thread */
