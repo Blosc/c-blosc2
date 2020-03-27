@@ -2218,10 +2218,8 @@ static void t_blosc_do_job(void *ctxt)
   /* Parameters for threads */
   int32_t blocksize;
   int32_t ebsize;
-  int32_t compress;
+  bool compress = context->do_compress != 0;
   int32_t maxbytes;
-  int32_t ntbytes;
-  int32_t flags;
   int32_t nblocks;
   int32_t leftover;
   int32_t leftover2;
@@ -2235,8 +2233,6 @@ static void t_blosc_do_job(void *ctxt)
   /* Get parameters for this thread before entering the main loop */
   blocksize = context->blocksize;
   ebsize = blocksize + context->typesize * sizeof(int32_t);
-  compress = context->do_compress;
-  flags = *(context->header_flags);
   maxbytes = context->destsize;
   nblocks = context->nblocks;
   leftover = context->leftover;
@@ -2259,26 +2255,39 @@ static void t_blosc_do_job(void *ctxt)
   tmp2 = thcontext->tmp2;
   tmp3 = thcontext->tmp3;
 
-  ntbytes = 0;                /* only useful for decompression */
-
-  /* Get the next block to be decompressed */
-  pthread_mutex_lock(&context->count_mutex);
-  context->thread_nblock++;
-  nblock_ = context->thread_nblock;
-  pthread_mutex_unlock(&context->count_mutex);
-  tblock = nblocks;
+  // Determine whether we can do a static distribution of workload among different threads
+  bool memcpyed = *(context->header_flags) & (unsigned)BLOSC_MEMCPYED;
+  bool static_schedule = (!compress || memcpyed) && context->block_maskout == NULL;
+  if (static_schedule) {
+      /* Blocks per thread */
+      tblocks = nblocks / context->nthreads;
+      leftover2 = nblocks % context->nthreads;
+      tblocks = (leftover2 > 0) ? tblocks + 1 : tblocks;
+      nblock_ = thcontext->tid * tblocks;
+      tblock = nblock_ + tblocks;
+      if (tblock > nblocks) {
+          tblock = nblocks;
+      }
+  }
+  else {
+    // Use dynamic schedule via a queue.  Get the next block.
+    pthread_mutex_lock(&context->count_mutex);
+    context->thread_nblock++;
+    nblock_ = context->thread_nblock;
+    pthread_mutex_unlock(&context->count_mutex);
+    tblock = nblocks;
+  }
 
   /* Loop over blocks */
   leftoverblock = 0;
-  while ((nblock_ < tblock) &&
-          (context->thread_giveup_code > 0)) {
+  while ((nblock_ < tblock) && (context->thread_giveup_code > 0)) {
     bsize = blocksize;
     if (nblock_ == (nblocks - 1) && (leftover > 0)) {
       bsize = leftover;
       leftoverblock = 1;
     }
     if (compress) {
-      if (flags & BLOSC_MEMCPYED) {
+      if (memcpyed) {
         /* We want to memcpy only */
         fastcopy(dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize,
                   src + nblock_ * blocksize, (unsigned int)bsize);
@@ -2295,7 +2304,7 @@ static void t_blosc_do_job(void *ctxt)
       }
     }
     else {
-      if (flags & BLOSC_MEMCPYED) {
+      if (memcpyed) {
         /* We want to memcpy only */
         fastcopy(dest + nblock_ * blocksize,
                   src + BLOSC_MAX_OVERHEAD + nblock_ * blocksize, (unsigned int)bsize);
@@ -2322,7 +2331,7 @@ static void t_blosc_do_job(void *ctxt)
       break;
     }
 
-    if (compress && !(flags & BLOSC_MEMCPYED)) {
+    if (compress && !memcpyed) {
       /* Start critical section */
       pthread_mutex_lock(&context->count_mutex);
       ntdest = context->output_bytes;
@@ -2347,6 +2356,9 @@ static void t_blosc_do_job(void *ctxt)
       /* Copy the compressed buffer to destination */
       fastcopy(dest + ntdest, tmp2, (unsigned int) cbytes);
     }
+    else if (static_schedule) {
+      nblock_++;
+    }
     else {
       pthread_mutex_lock(&context->count_mutex);
       do {
@@ -2358,6 +2370,10 @@ static void t_blosc_do_job(void *ctxt)
     }
 
   } /* closes while (nblock_) */
+
+  if (static_schedule) {
+    context->output_bytes = context->sourcesize;
+  }
 
 }
 
