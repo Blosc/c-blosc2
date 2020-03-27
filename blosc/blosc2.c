@@ -943,7 +943,7 @@ static int blosc_d(
   int32_t ntbytes = 0;           /* number of uncompressed bytes in block */
   uint8_t* _dest;
   int32_t typesize = context->typesize;
-  int32_t nblock = offset / bsize;
+  int32_t nblock = offset / context->blocksize;
   const char* compname;
 
   if (context->block_maskout != NULL && context->block_maskout[nblock]) {
@@ -1407,11 +1407,13 @@ static int initialize_context_decompression(
   context->leftover = context->sourcesize % context->blocksize;
   context->nblocks = (context->leftover > 0) ?
                       context->nblocks + 1 : context->nblocks;
+
   if (context->block_maskout != NULL && context->block_maskout_nitems != context->nblocks) {
-    fprintf(stderr, "The number of items in block_maskout must match the number"
-                    " of blocks in chunk (%d)", context->nblocks);
+    fprintf(stderr, "The number of items in block_maskout (%d) must match the number"
+                    " of blocks in chunk (%d)", context->block_maskout_nitems, context->nblocks);
     return -2;
   }
+
   if ((context->header_flags[0] & BLOSC_DOSHUFFLE) &&
       (context->header_flags[0] & BLOSC_DOBITSHUFFLE)) {
     /* Extended header */
@@ -1974,6 +1976,13 @@ int blosc2_decompress_ctx(
 
   result = blosc_run_decompression_with_context(context, src, dest, destsize);
 
+  // Reset a possible block_maskout
+  if (context->block_maskout != NULL) {
+    free(context->block_maskout);
+    context->block_maskout = NULL;
+  }
+  context->block_maskout_nitems = 0;
+
   return result;
 }
 
@@ -2364,8 +2373,15 @@ static void t_blosc_do_job(void *ctxt)
       do {
         context->thread_nblock++;
         nblock_ = context->thread_nblock;
-        context->output_bytes += bsize;
-      } while (context->block_maskout && context->block_maskout[nblock_]);
+        if (nblock_ == (nblocks - 1) && (leftover > 0)) {
+          context->output_bytes += leftover;
+        }
+        else {
+          context->output_bytes += cbytes;
+        }
+      } while (nblock_ < tblock &&
+               context->block_maskout &&
+               context->block_maskout[nblock_]);
       pthread_mutex_unlock(&context->count_mutex);
     }
 
@@ -2847,8 +2863,8 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   context->nthreads = dparams.nthreads;
   context->new_nthreads = context->nthreads;
   context->threads_started = 0;
-  context->block_maskout = dparams.block_maskout;
-  context->block_maskout_nitems = dparams.block_maskout_nitems;
+  context->block_maskout = NULL;
+  context->block_maskout_nitems = 0;
   context->schunk = dparams.schunk;
 
   return context;
@@ -2877,12 +2893,26 @@ void blosc2_free_ctx(blosc2_context* context) {
     my_free(context->pparams);
   }
 
+  if (context->block_maskout != NULL) {
+    free(context->block_maskout);
+  }
+
   my_free(context);
 }
 
 
 /* Set a maskout in decompression context */
-void blosc2_set_maskout(blosc2_context *dctx, bool *block_maskout, int nblocks) {
-  dctx->block_maskout = block_maskout;
-  dctx->block_maskout_nitems = nblocks;
+int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks) {
+
+  if (ctx->block_maskout != NULL) {
+    // Get rid of a possible mask here
+    free(ctx->block_maskout);
+  }
+
+  bool *maskout_ = malloc(nblocks);
+  memcpy(maskout_, maskout, nblocks);
+  ctx->block_maskout = maskout_;
+  ctx->block_maskout_nitems = nblocks;
+
+  return 0;
 }

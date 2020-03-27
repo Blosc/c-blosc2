@@ -672,10 +672,6 @@ static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
 typedef struct {
   int nthreads;
   //!< The number of threads to use internally (1).
-  bool* block_maskout;
-  //!< The blocks that are not meant to be decompressed. If NULL (default), all blocks in a chunk should be read.
-  int block_maskout_nitems;
-  //!< The number of items in block_maskout array (must match the number of blocks in chunk if block_maskout != NULL).
   void* schunk;
   //!< The associated schunk, if any (NULL).
 } blosc2_dparams;
@@ -683,7 +679,7 @@ typedef struct {
 /**
  * @brief Default struct for decompression params meant for user initialization.
  */
-static const blosc2_dparams BLOSC2_DPARAMS_DEFAULTS = {1, NULL, 0, NULL };
+static const blosc2_dparams BLOSC2_DPARAMS_DEFAULTS = {1, NULL};
 
 /**
  * @brief Create a context for @a *_ctx() compression functions.
@@ -716,16 +712,23 @@ BLOSC_EXPORT void blosc2_free_ctx(blosc2_context* context);
 /**
  * @brief Set a maskout so as to avoid decompressing specified blocks.
  *
- * @param dctx The decompression context to update.
+ * @param ctx The decompression context to update.
  *
- * @param block_maskout The boolean mask for avoiding decompression in block.
+ * @param maskout The boolean mask for the blocks where decompression
+ * is to be avoided.
+ *
+ * @remark The maskout is valid for contexts *only* meant for decompressing
+ * a chunk via #blosc2_decompress_ctx.  Once a call to #blosc2_decompress_ctx
+ * is done, this mask is reset so that next call to #blosc2_decompress_ctx
+ * will decompress the whole chunk.
  *
  * @param nblocks The number of blocks in maskout above.
  *
- * This function should always succeed and is valid for contexts only meant
- * for decompression.
+ * @return If success, a 0 values is returned.  An error is signaled with a
+ * negative int.
+ *
  */
-BLOSC_EXPORT void blosc2_set_maskout(blosc2_context *dctx, bool *block_maskout, int nblocks);
+BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks);
 
 /**
  * @brief Context interface to Blosc compression. This does not require a call
@@ -769,9 +772,15 @@ BLOSC_EXPORT int blosc2_compress_ctx(
  * buffer more than what is specified in @p destsize.
  *
  * @remark In case you want to keep under control the number of bytes read from
- * source, you can call #blosc_cbuffer_sizes first to check whether the
- * @p nbytes (i.e. the number of bytes to be read from @p src buffer by this
- * function) in the compressed buffer is ok with you.
+ * source, you can call #blosc_cbuffer_sizes first to check the @p nbytes
+ * (i.e. the number of bytes to be read from @p src buffer by this function)
+ * in the compressed buffer.
+ *
+ * @remark If #blosc2_set_maskout is called prior to this function, its
+ * @p block_maskout parameter will be honored for just *one single* time;
+ * i.e. after this #blosc2_decompress_ctx is called, the maskout in context
+ * will be automatically reset to NULL, so all blocks will be decompressed next
+ * time.
  *
  * @return The number of bytes decompressed. If an error occurs,
  * e.g. the compressed data is corrupted, @p destsize is not large enough
