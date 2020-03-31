@@ -19,8 +19,8 @@ int nbytes, cbytes;
 int nthreads = 1;
 int clevel = 1;
 int doshuffle = 1;
-const int size = 1000 * 1000;
-const int typesize = 8;
+#define size (1000 * 1000)
+#define typesize 8
 const int bytesize = size * typesize;
 const int blocksize = 32 * 1024;
 bool *maskout;
