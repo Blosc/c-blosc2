@@ -2370,18 +2370,9 @@ static void t_blosc_do_job(void *ctxt)
     }
     else {
       pthread_mutex_lock(&context->count_mutex);
-      do {
-        context->thread_nblock++;
-        nblock_ = context->thread_nblock;
-        if (nblock_ == (nblocks - 1) && (leftover > 0)) {
-          context->output_bytes += leftover;
-        }
-        else {
-          context->output_bytes += cbytes;
-        }
-      } while (nblock_ < tblock &&
-               context->block_maskout &&
-               context->block_maskout[nblock_]);
+      context->thread_nblock++;
+      nblock_ = context->thread_nblock;
+      context->output_bytes += cbytes;
       pthread_mutex_unlock(&context->count_mutex);
     }
 

@@ -777,15 +777,14 @@ BLOSC_EXPORT int blosc2_compress_ctx(
  * in the compressed buffer.
  *
  * @remark If #blosc2_set_maskout is called prior to this function, its
- * @p block_maskout parameter will be honored for just *one single* time;
- * i.e. after this #blosc2_decompress_ctx is called, the maskout in context
- * will be automatically reset to NULL, so all blocks will be decompressed next
- * time.
+ * @p block_maskout parameter will be honored for just *one single* shot;
+ * i.e. the maskout in context will be automatically reset to NULL, so
+ * mask will be used next time (unless #blosc2_set_maskout is called again).
  *
- * @return The number of bytes decompressed. If an error occurs,
- * e.g. the compressed data is corrupted, @p destsize is not large enough
- * or context is not meant for decompression, then 0 (zero) or a
- * negative value will be returned instead.
+ * @return The number of bytes decompressed (i.e. the maskout blocks are not
+ * counted). If an error occurs, e.g. the compressed data is corrupted,
+ * @p destsize is not large enough or context is not meant for decompression,
+ * then 0 (zero) or a negative value will be returned instead.
  */
 BLOSC_EXPORT int blosc2_decompress_ctx(blosc2_context* context, const void* src,
                                        void* dest, size_t destsize);
