@@ -1313,6 +1313,10 @@ int frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, size_t n
 
   /* And decompress it */
   int32_t chunksize = blosc_decompress(src, dest, nbytes);
+  if (chunksize < 0 || chunksize != nbytes_) {
+    fprintf(stderr, "Error in decompressing chunk");
+    return -11;
+  }
 
   if (needs_free) {
     free(src);
