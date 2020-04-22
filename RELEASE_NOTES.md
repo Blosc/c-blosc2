@@ -15,6 +15,11 @@ Changes from 2.0.0-beta.4 to 2.0.0.beta5
   chunk. This should be always called before blosc2_decompress_ctx() and
   its effect is reset to the default (decompress all blocks) after that.
 
+* New ALTIVEC optimizations for Power architecture.  These include support
+  for both shuffle and bitshuffle filters.  For details, see
+  https://github.com/Blosc/c-blosc2/pull/98.  Thanks to Jerome Kieffer
+  and ESRF for making this happen.
+
 * New blosc2_frame_from_sframe() function for getting a `blosc2_frame`
   out of an in-memory serialized frame.
 

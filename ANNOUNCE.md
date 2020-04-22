@@ -7,6 +7,8 @@ This is the fifth beta version, adding pre-filtering functionality and masked de
 
 Also, with masked decompression, it is possible to do partial chunk decompressions.  By calling the `blosc2_set_maskout()` prior to `blosc2_decompress_ctx()` has the effect to select the set of blocks to decompress in a chunk. This will be useful for more efficient slicing operation in Caterva.
 
+Last, but not least, C-Blosc2 gained support for ALTIVEC optimzations on Power architecture. These include support for both shuffle and bitshuffle filters.  For details, see  https://github.com/Blosc/c-blosc2/pull/98.  Thanks to Jerome Kieffer and ESRF for making this happen.
+
 In principle, C-Blosc2 should be backward compatible with C-Blosc, so you can start using it right away and slowly begin to use its new functionality, like the new filters, prefilters, super-chunks and frames.  See docs in: https://blosc-doc.readthedocs.io
 
 **IMPORTANT**: Please note that, even if the API has been declared frozen, that does *not* mean that Blosc2 is ready for production yet: internal structures can change, formats can change and most importantly, bugs can be normal at this stage.  So *do not assume* that your blosc2 data can be read with future versions.

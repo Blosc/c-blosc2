@@ -48,7 +48,7 @@ Another important aspect of C-Blosc2 is that it splits large datasets in smaller
 Multidimensional containers
 ===========================
 
-As said, C-Blosc2 adds a powerful mechanism for adding different metalayers on top of its containers.  `Caterva <https://github.com/Blosc/Caterva>`_ is a sibling library that adds such a metalayer specifying not only the dimensionality of a dataset, but also the dimensionality of the chunks inside the dataset.  In addition, Caterva adds machinery for retrieving arbitrary multi-dimensional slices (aka hyper-slices) out of the multi-dimensional containers in the most efficient way.  Hence, Caterva brings the convenience of multi-dimensional containers to your application very easily.  For more info, check out the `Caterva documentation<https://caterva.readthedocs.io>`_.
+As said, C-Blosc2 adds a powerful mechanism for adding different metalayers on top of its containers.  `Caterva <https://github.com/Blosc/Caterva>`_ is a sibling library that adds such a metalayer specifying not only the dimensionality of a dataset, but also the dimensionality of the chunks inside the dataset.  In addition, Caterva adds machinery for retrieving arbitrary multi-dimensional slices (aka hyper-slices) out of the multi-dimensional containers in the most efficient way.  Hence, Caterva brings the convenience of multi-dimensional containers to your application very easily.  For more info, check out the `Caterva documentation <https://caterva.readthedocs.io>`_.
 
 Compiling the C-Blosc2 library with CMake
 =========================================
