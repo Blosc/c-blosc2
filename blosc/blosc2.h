@@ -779,7 +779,7 @@ BLOSC_EXPORT int blosc2_compress_ctx(
  * @remark If #blosc2_set_maskout is called prior to this function, its
  * @p block_maskout parameter will be honored for just *one single* shot;
  * i.e. the maskout in context will be automatically reset to NULL, so
- * mask will be used next time (unless #blosc2_set_maskout is called again).
+ * mask won't be used next time (unless #blosc2_set_maskout is called again).
  *
  * @return The number of bytes decompressed (i.e. the maskout blocks are not
  * counted). If an error occurs, e.g. the compressed data is corrupted,

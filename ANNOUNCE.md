@@ -1,5 +1,5 @@
 # Announcing C-Blosc2 2.0.0.beta.5
- A simple, compressed and fast data store library for C; and persistent too.
+A simple, compressed, fast and persistent data store library for C.
 
 ## What is new?
 

@@ -1,5 +1,5 @@
 ===============================================================
- Blosc: A blocking, shuffling and lossless compression library
+ C-Blosc2: A simple, compressed, fast and persistent data store library for C
 ===============================================================
 
 :Author: The Blosc Development Team
