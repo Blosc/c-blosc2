@@ -5,6 +5,9 @@ file(GLOB SOURCES test_*.c)
 link_directories(${PROJECT_BINARY_DIR}/blosc)
 include_directories(${PROJECT_SOURCE_DIR}/blosc)
 
+# Check SIMD features for the local CPU
+find_package(SIMD)
+
 # targets and tests
 foreach (source ${SOURCES})
     get_filename_component(target ${source} NAME_WE)
@@ -26,25 +29,25 @@ foreach (source ${SOURCES})
     endif()
 
     # Enable support for testing accelerated shuffles
-    if (COMPILER_SUPPORT_SSE2)
-        # Define a symbol so tests for SSE2 shuffle/unshuffle will be compiled in.
+    if (COMPILER_SUPPORT_SSE2 AND SSE2_FOUND)
+        # Define a symbol so tests for SSE2 shuffle/unshuffle will be compiled in *and* there is support in the CPU for it.
         set_property(
                 SOURCE ${source}
                 APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_SSE2_ENABLED)
     elseif (target STREQUAL test_shuffle_roundtrip_sse2)
         message("Skipping ${target} on non-SSE2 builds")
         continue()
-    endif (COMPILER_SUPPORT_SSE2)
+    endif (COMPILER_SUPPORT_SSE2 AND SSE2_FOUND)
 
-    if(COMPILER_SUPPORT_AVX2)
-        # Define a symbol so tests for AVX2 shuffle/unshuffle will be compiled in.
+    if (COMPILER_SUPPORT_AVX2 AND AVX2_FOUND)
+        # Define a symbol so tests for AVX2 shuffle/unshuffle will be compiled in *and* there is support in the CPU for it.
         set_property(
                 SOURCE ${source}
                 APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX2_ENABLED)
     elseif (target STREQUAL test_shuffle_roundtrip_avx2)
         message("Skipping ${target} on non-AVX2 builds")
         continue()
-    endif(COMPILER_SUPPORT_AVX2)
+    endif(COMPILER_SUPPORT_AVX2 AND AVX2_FOUND)
 
     if(COMPILER_SUPPORT_NEON)
          # Define a symbol so tests for NEON shuffle/unshuffle will be compiled in.
