@@ -17,7 +17,7 @@
 .. |travis| image:: https://travis-ci.org/Blosc/c-blosc2.svg?branch=master
         :target: https://travis-ci.org/Blosc/c-blosc2
 
-.. |appveyor| image:: https://ci.appveyor.com/api/projects/status/3mlyjc1ak0lbkmte/branch/master?svg=true
+.. |appveyor| image:: https://ci.appveyor.com/api/projects/status/qiaxywqrouj6nkug/branch/master?svg=true
         :target: https://ci.appveyor.com/project/FrancescAlted/c-blosc2/branch/master
 
 .. |numfocus| image:: https://img.shields.io/badge/powered%20by-NumFOCUS-orange.svg?style=flat&colorA=E1523D&colorB=007D8A
