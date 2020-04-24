@@ -144,6 +144,10 @@ if (HAVE_IPP)
     set(LIBS ${LIBS} "${IPP_LIBRARIES}")
 endif (HAVE_IPP)
 
+if (UNIX AND NOT APPLE)
+    set(LIBS ${LIBS} "rt")
+endif (UNIX AND NOT APPLE)
+
 # targets
 if (BUILD_SHARED)
     add_library(blosc2_shared SHARED ${SOURCES})
