@@ -298,8 +298,8 @@ else ()
     message(WARNING "Unrecognized system processor ${CMAKE_SYSTEM_PROCESSOR}. Cannot determine which hardware features (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}) supports, so hardware-accelerated implementations will not be available.")
 endif ()
 
-# disable AVX2 if specified
-if(DEACTIVATE_AVX2)
+# disable AVX2 if specified or if SSE is deactivated
+if(DEACTIVATE_AVX2 OR DEACTIVATE_SSE2)
     set(COMPILER_SUPPORT_AVX2 FALSE)
 endif()
 
