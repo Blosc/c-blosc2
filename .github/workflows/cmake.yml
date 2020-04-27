@@ -15,9 +15,7 @@ jobs:
           Ubuntu GCC External ZLIB,
           Ubuntu GCC External ZSTD,
           Ubuntu Clang,
-          Ubuntu Clang No SSE2,
           Ubuntu Clang No AVX2,
-          Ubuntu Clang No AVX2 No SSE2,
           Ubuntu Clang No LZ4,
           Ubuntu Clang No LIZARD,
           Ubuntu Clang No SNAPPY,
@@ -69,20 +67,10 @@ jobs:
             os: ubuntu-latest
             compiler: clang
 
-          - name: Ubuntu Clang No SSE2
-            os: ubuntu-latest
-            compiler: clang
-            cmake-args: -DDEACTIVATE_SSE2=ON
-
           - name: Ubuntu Clang No AVX2
             os: ubuntu-latest
             compiler: clang
             cmake-args: -DDEACTIVATE_AVX2=ON
-
-          - name: Ubuntu Clang No AVX2 No SSE2
-            os: ubuntu-latest
-            compiler: clang
-            cmake-args: -DDEACTIVATE_AVX2=ON -DDEACTIVATE_SSE2=ON
 
           - name: Ubuntu Clang No LZ4
             os: ubuntu-latest
