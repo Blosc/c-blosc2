@@ -22,7 +22,8 @@
 
 #define CHUNKSIZE (5 * 1000 * 1000)
 #define NCHUNKS 100
-#define NTHREADS 2
+// Setting NTHREADS > 1 increases the likelihood of a crash.  See #112.
+#define NTHREADS 1
 
 
 int main() {
