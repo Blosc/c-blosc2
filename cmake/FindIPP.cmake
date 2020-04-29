@@ -53,7 +53,7 @@ find_path(IPP_LIB_SEARCHPATH
         ${IPP_ROOT_DIR}/lib
 )
 
-foreach (LIB ${IPP_LIBS})
+foreach(LIB ${IPP_LIBS})
     find_library(${LIB}_PATH ${LIB} PATHS ${IPP_LIB_SEARCHPATH})
     if(${LIB}_PATH)
         set(IPP_LIBRARIES ${IPP_LIBRARIES} ${${LIB}_PATH})
@@ -64,11 +64,11 @@ foreach (LIB ${IPP_LIBS})
     endif()
 endforeach()
 
-if (IPP_FOUND AND NOT IPP_NOTFOUND)
+if(IPP_FOUND AND NOT IPP_NOTFOUND)
     set(IPP_INCLUDE_DIRS ${IPP_INCLUDE_DIR})
     include_directories(${IPP_INCLUDE_DIRS})
     message(STATUS "Found IPP libraries in: ${IPP_LIBRARIES}")
-else ()
+else()
     message(STATUS "No IPP libraries found.")
     set(IPP_FOUND FALSE)
-endif ()
+endif()

@@ -67,14 +67,14 @@
 #    LIB: includes blosc2.so
 #    DEV: static includes blosc2.a and blosc2.h
 
-if (NOT WIN32)
+if(NOT WIN32)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
-endif(NOT WIN32)
+endif()
 
 cmake_minimum_required(VERSION 2.8.10)
-IF (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} GREATER 3.4)
+if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} GREATER 3.4)
   cmake_policy(SET CMP0063 NEW)
-ENDIF(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} GREATER 3.4)
+endif()
 project(blosc)
 
 # parse the full version numbers from blosc.h
@@ -98,15 +98,15 @@ option(BUILD_SHARED
 option(BUILD_TESTS
     "Build test programs form the blosc compression library" ON)
 option(BUILD_BENCHMARKS
-        "Build benchmark programs form the blosc compression library" ON)
+    "Build benchmark programs form the blosc compression library" ON)
 option(BUILD_EXAMPLES
-        "Build example programs form the blosc compression library" ON)
+    "Build example programs form the blosc compression library" ON)
 option(DEACTIVATE_AVX2
     "Do not attempt to build with AVX2 instructions" OFF)
 option(DEACTIVATE_LZ4
-        "Do not include support for the LZ4 library." OFF)
+    "Do not include support for the LZ4 library." OFF)
 option(DEACTIVATE_LIZARD
-        "Do not include support for the LIZARD library." OFF)
+    "Do not include support for the LIZARD library." OFF)
 option(DEACTIVATE_SNAPPY
     "Do not include support for the SNAPPY library." ON)
 option(DEACTIVATE_ZLIB
@@ -116,9 +116,9 @@ option(DEACTIVATE_ZSTD
 option(DEACTIVATE_IPP
     "Do not include support for the Intel IPP library." OFF)
 option(PREFER_EXTERNAL_LZ4
-        "Find and use external LZ4 library instead of included sources." OFF)
+    "Find and use external LZ4 library instead of included sources." OFF)
 option(PREFER_EXTERNAL_LIZARD
-        "Find and use external LIZARD library instead of included sources." OFF)
+    "Find and use external LIZARD library instead of included sources." OFF)
 option(PREFER_EXTERNAL_ZLIB
     "Find and use external ZLIB library instead of included sources." OFF)
 option(PREFER_EXTERNAL_ZSTD
@@ -127,80 +127,80 @@ option(PREFER_EXTERNAL_ZSTD
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 
-if (NOT DEACTIVATE_LZ4)
-    if (PREFER_EXTERNAL_LZ4)
+if(NOT DEACTIVATE_LZ4)
+    if(PREFER_EXTERNAL_LZ4)
         find_package(LZ4)
-    else ()
+    else()
         message(STATUS "Using LZ4 internal sources.")
-    endif (PREFER_EXTERNAL_LZ4)
+    endif()
     # HAVE_LZ4 will be set to true because even if the library is
     # not found, we will use the included sources for it
     set(HAVE_LZ4 TRUE)
-endif (NOT DEACTIVATE_LZ4)
+endif()
 
-if (NOT DEACTIVATE_LIZARD)
-    if (PREFER_EXTERNAL_LIZARD)
+if(NOT DEACTIVATE_LIZARD)
+    if(PREFER_EXTERNAL_LIZARD)
         find_package(LIZARD)
-    else ()
+    else()
         message(STATUS "Using LIZARD internal sources.")
-    endif (PREFER_EXTERNAL_LIZARD)
+    endif()
     # HAVE_LIZARD will be set to true because even if the library is
     # not found, we will use the included sources for it
     set(HAVE_LIZARD TRUE)
-endif (NOT DEACTIVATE_LIZARD)
+endif()
 
-if (NOT DEACTIVATE_SNAPPY)
+if(NOT DEACTIVATE_SNAPPY)
     find_package(Snappy)
-    if (SNAPPY_FOUND)
+    if(SNAPPY_FOUND)
         message(STATUS "Activating support for SNAPPY.")
         set(HAVE_SNAPPY TRUE)
-    else (SNAPPY_FOUND)
+    else()
         message(STATUS "SNAPPY *not* found.  De-activating support for it.")
-    endif (SNAPPY_FOUND)
-endif (NOT DEACTIVATE_SNAPPY)
+    endif()
+endif()
 
-if (NOT DEACTIVATE_ZLIB)
+if(NOT DEACTIVATE_ZLIB)
     # import the ZLIB_ROOT environment variable to help finding the zlib library
-    if (PREFER_EXTERNAL_ZLIB)
+    if(PREFER_EXTERNAL_ZLIB)
         set(ZLIB_ROOT $ENV{ZLIB_ROOT})
         find_package(ZLIB)
-        if (NOT ZLIB_FOUND)
+        if(NOT ZLIB_FOUND)
             message(STATUS "No ZLIB found.  Using MINIZ internal sources.")
             set(HAVE_MINIZ TRUE)
-        endif (NOT ZLIB_FOUND)
-    else ()
+        endif()
+    else()
         message(STATUS "Using MINIZ internal sources for ZLIB support.")
         set(HAVE_MINIZ TRUE)
-    endif (PREFER_EXTERNAL_ZLIB)
+    endif()
     # HAVE_ZLIB will be set to true because even if the library is not found,
     # we will use the included sources for it
     set(HAVE_ZLIB TRUE)
-endif (NOT DEACTIVATE_ZLIB)
+endif()
 
-if (NOT DEACTIVATE_ZSTD)
-    if (PREFER_EXTERNAL_ZSTD)
+if(NOT DEACTIVATE_ZSTD)
+    if(PREFER_EXTERNAL_ZSTD)
         find_package(ZSTD)
-        if (NOT ZSTD_FOUND)
+        if(NOT ZSTD_FOUND)
           message(STATUS "No ZSTD library found.  Using internal sources.")
-        endif (NOT ZSTD_FOUND)
-    else ()
+        endif()
+    else()
         message(STATUS "Using ZSTD internal sources.")
-    endif (PREFER_EXTERNAL_ZSTD)
+    endif()
     # HAVE_ZSTD will be set to true because even if the library is
     # not found, we will use the included sources for it
     set(HAVE_ZSTD TRUE)
-endif (NOT DEACTIVATE_ZSTD)
+endif()
 
-if (NOT DEACTIVATE_IPP)
+if(NOT DEACTIVATE_IPP)
     find_package(IPP)
-    if (IPP_FOUND)
-	    message(STATUS "Using IPP accelerated compression.")
+    if(IPP_FOUND)
+        message(STATUS "Using IPP accelerated compression.")
         set(HAVE_IPP TRUE)
-    else ()
+    else()
         message(STATUS "Not using IPP accelerated compression.")
         set(HAVE_IPP FALSE)
-    endif (IPP_FOUND)
-endif (NOT DEACTIVATE_IPP)
+    endif()
+endif()
 
 # create the config.h file
 configure_file("blosc/config.h.in" "blosc/config.h")
@@ -210,7 +210,7 @@ include_directories("${PROJECT_BINARY_DIR}/blosc/")
 
 # If the build type is not set, default to Release.
 set(BLOSC_DEFAULT_BUILD_TYPE Release)
-if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     message(STATUS "No build type specified. Defaulting to '${BLOSC_DEFAULT_BUILD_TYPE}'.")
     set(CMAKE_BUILD_TYPE ${BLOSC_DEFAULT_BUILD_TYPE} CACHE STRING
             "Choose the type of build." FORCE)
@@ -218,7 +218,7 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     # Set the possible values of build type for cmake-gui
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
             "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
-endif ()
+endif()
 
 # Based on the target system's processor and the compiler being used,
 # set build variables indicating which hardware features can be targeted
@@ -226,77 +226,77 @@ endif ()
 # by this (the host) system, because we want to be able to support compiling
 # for newer hardware on older machines as well as cross-compilation.
 message(STATUS "Building for system processor ${CMAKE_SYSTEM_PROCESSOR}")
-if (CMAKE_SYSTEM_PROCESSOR STREQUAL i386 OR
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL i386 OR
         CMAKE_SYSTEM_PROCESSOR STREQUAL i686 OR
         CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64 OR
         CMAKE_SYSTEM_PROCESSOR STREQUAL amd64 OR
         CMAKE_SYSTEM_PROCESSOR STREQUAL AMD64)
-    if (CMAKE_C_COMPILER_ID STREQUAL GNU)
+    if(CMAKE_C_COMPILER_ID STREQUAL GNU)
         # We need C99 (GNU99 more exactly)
         SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
         set(COMPILER_SUPPORT_SSE2 TRUE)
-        if (CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.7 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 4.7)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.7 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 4.7)
             set(COMPILER_SUPPORT_AVX2 TRUE)
-        else ()
+        else()
             set(COMPILER_SUPPORT_AVX2 FALSE)
-        endif ()
-    elseif (CMAKE_C_COMPILER_ID STREQUAL Clang)
+        endif()
+    elseif(CMAKE_C_COMPILER_ID STREQUAL Clang)
         set(COMPILER_SUPPORT_SSE2 TRUE)
-        if (CMAKE_C_COMPILER_VERSION VERSION_GREATER 3.2 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 3.2)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 3.2 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 3.2)
             set(COMPILER_SUPPORT_AVX2 TRUE)
-        else ()
+        else()
             set(COMPILER_SUPPORT_AVX2 FALSE)
-        endif ()
-    elseif (CMAKE_C_COMPILER_ID STREQUAL Intel)
+        endif()
+    elseif(CMAKE_C_COMPILER_ID STREQUAL Intel)
         set(COMPILER_SUPPORT_SSE2 TRUE)
-        if (CMAKE_C_COMPILER_VERSION VERSION_GREATER 14.0 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 14.0)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 14.0 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 14.0)
             set(COMPILER_SUPPORT_AVX2 TRUE)
-        else ()
+        else()
             set(COMPILER_SUPPORT_AVX2 FALSE)
-        endif ()
-    elseif (MSVC)
+        endif()
+    elseif(MSVC)
         set(COMPILER_SUPPORT_SSE2 TRUE)
-        if (CMAKE_C_COMPILER_VERSION VERSION_GREATER 18.00.30501 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 18.00.30501)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 18.00.30501 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 18.00.30501)
             set(COMPILER_SUPPORT_AVX2 TRUE)
-        else ()
+        else()
             set(COMPILER_SUPPORT_AVX2 FALSE)
-        endif ()
-    else ()
+        endif()
+    else()
         set(COMPILER_SUPPORT_SSE2 FALSE)
         set(COMPILER_SUPPORT_AVX2 FALSE)
         # Unrecognized compiler. Emit a warning message to let the user know hardware-acceleration won't be available.
         message(WARNING "Unable to determine which ${CMAKE_SYSTEM_PROCESSOR} hardware features are supported by the C compiler (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}).")
-    endif ()
-elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l OR
+    endif()
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l OR
         CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64)
-    if (CMAKE_C_COMPILER_ID STREQUAL GNU)
-        if (CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.7 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 4.7)
+    if(CMAKE_C_COMPILER_ID STREQUAL GNU)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.7 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 4.7)
             set(COMPILER_SUPPORT_NEON TRUE)
-        else ()
+        else()
             set(COMPILER_SUPPORT_NEON FALSE)
-        endif ()
-    elseif (CMAKE_C_COMPILER_ID STREQUAL Clang)
-        if (CMAKE_C_COMPILER_VERSION VERSION_GREATER 3.3 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 3.3)
+        endif()
+    elseif(CMAKE_C_COMPILER_ID STREQUAL Clang)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 3.3 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 3.3)
             set(COMPILER_SUPPORT_NEON TRUE)
-        else ()
+        else()
             set(COMPILER_SUPPORT_NEON FALSE)
-        endif ()
-    else ()
+        endif()
+    else()
         set(COMPILER_SUPPORT_NEON FALSE)
         # Unrecognized compiler. Emit a warning message to let the user know hardware-acceleration won't be available.
         message(WARNING "Unable to determine which ${CMAKE_SYSTEM_PROCESSOR} hardware features are supported by the C compiler (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}).")
-    endif ()
-elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL ppc64le)
-    if (CMAKE_C_COMPILER_ID STREQUAL GNU AND CMAKE_C_COMPILER_VERSION VERSION_GREATER 8)
-		set(COMPILER_SUPPORT_ALTIVEC TRUE)
-    else ()
+    endif()
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL ppc64le)
+    if(CMAKE_C_COMPILER_ID STREQUAL GNU AND CMAKE_C_COMPILER_VERSION VERSION_GREATER 8)
+        set(COMPILER_SUPPORT_ALTIVEC TRUE)
+    else()
         set(COMPILER_SUPPORT_ALTIVEC FALSE)
-    endif ()
-else ()
+    endif()
+else()
     # If the target system processor isn't recognized, emit a warning message to alert the user
     # that hardware-acceleration support won't be available but allow configuration to proceed.
     message(WARNING "Unrecognized system processor ${CMAKE_SYSTEM_PROCESSOR}. Cannot determine which hardware features (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}) supports, so hardware-accelerated implementations will not be available.")
-endif ()
+endif()
 
 # disable AVX2 if specified
 if(DEACTIVATE_AVX2)
@@ -309,45 +309,45 @@ endif()
 
 # Set the "-msse2" build flag only if the CMAKE_C_FLAGS is not already set.
 # Probably "-msse2" should be appended to CMAKE_C_FLAGS_RELEASE.
-if (CMAKE_C_COMPILER_ID STREQUAL GNU OR CMAKE_C_COMPILER_ID STREQUAL Clang OR CMAKE_C_COMPILER_ID STREQUAL Intel)
-    if (NOT CMAKE_C_FLAGS AND COMPILER_SUPPORT_SSE2)
+if(CMAKE_C_COMPILER_ID STREQUAL GNU OR CMAKE_C_COMPILER_ID STREQUAL Clang OR CMAKE_C_COMPILER_ID STREQUAL Intel)
+    if(NOT CMAKE_C_FLAGS AND COMPILER_SUPPORT_SSE2)
         set(CMAKE_C_FLAGS -msse2 CACHE STRING "C flags." FORCE)
-    endif (NOT CMAKE_C_FLAGS AND COMPILER_SUPPORT_SSE2)
-endif (CMAKE_C_COMPILER_ID STREQUAL GNU OR CMAKE_C_COMPILER_ID STREQUAL Clang OR CMAKE_C_COMPILER_ID STREQUAL Intel)
+    endif()
+endif()
 
-if (CMAKE_C_COMPILER_ID STREQUAL Intel OR CMAKE_C_COMPILER_ID STREQUAL Clang OR HAIKU)
+if(CMAKE_C_COMPILER_ID STREQUAL Intel OR CMAKE_C_COMPILER_ID STREQUAL Clang OR HAIKU)
     # We need to tell Intel and Clang compilers about what level of POSIX they support
     SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_XOPEN_SOURCE=600")
-endif(CMAKE_C_COMPILER_ID STREQUAL Intel OR CMAKE_C_COMPILER_ID STREQUAL Clang OR HAIKU)
+endif()
 
-if (MSVC)
-    if (NOT CMAKE_C_FLAGS)
+if(MSVC)
+    if(NOT CMAKE_C_FLAGS)
         set(CMAKE_C_FLAGS "/Ox" CACHE STRING "C flags." FORCE)
-    endif (NOT CMAKE_C_FLAGS)
+    endif()
 
     # Turn off misguided "secure CRT" warnings in MSVC.
     # Microsoft wants people to use the MS-specific <function>_s
     # versions of certain C functions but this is difficult to do
     # in platform-independent code.
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-endif (MSVC)
+endif()
 
-if (WIN32)
+if(WIN32)
     # For some supporting headers
     include_directories("${CMAKE_CURRENT_SOURCE_DIR}/blosc")
-endif (WIN32)
+endif()
 
-if (NOT DEFINED BLOSC_IS_SUBPROJECT)
-    if ("^${CMAKE_SOURCE_DIR}$" STREQUAL "^${PROJECT_SOURCE_DIR}$")
+if(NOT DEFINED BLOSC_IS_SUBPROJECT)
+    if("^${CMAKE_SOURCE_DIR}$" STREQUAL "^${PROJECT_SOURCE_DIR}$")
         set (BLOSC_IS_SUBPROJECT FALSE)
-    else ()
+    else()
         set (BLOSC_IS_SUBPROJECT TRUE)
         message(STATUS "Detected that BLOSC is used a subproject.")
-   endif ()
-endif ()
+   endif()
+endif()
 
-if (NOT DEFINED BLOSC_INSTALL)
-    if (BLOSC_IS_SUBPROJECT)
+if(NOT DEFINED BLOSC_INSTALL)
+    if(BLOSC_IS_SUBPROJECT)
         set(BLOSC_INSTALL FALSE)
     else()
         set(BLOSC_INSTALL TRUE)
@@ -357,23 +357,23 @@ endif()
 # subdirectories
 add_subdirectory(blosc)
 
-if (BUILD_TESTS)
+if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
     add_subdirectory(compat)
-endif (BUILD_TESTS)
+endif()
 
-if (BUILD_BENCHMARKS)
+if(BUILD_BENCHMARKS)
     add_subdirectory(bench)
-endif (BUILD_BENCHMARKS)
+endif()
 
-if (BUILD_EXAMPLES)
+if(BUILD_EXAMPLES)
     add_subdirectory(examples)
-endif (BUILD_EXAMPLES)
+endif()
 
 
 # uninstall target
-if (BLOSC_INSTALL)
+if(BLOSC_INSTALL)
     configure_file(
          "${CMAKE_CURRENT_SOURCE_DIR}/blosc.pc.in"
          "${CMAKE_CURRENT_BINARY_DIR}/blosc.pc"
@@ -389,7 +389,7 @@ if (BLOSC_INSTALL)
 endif()
 
 # packaging
-if (NOT BLOSC_IS_SUBPROJECT)
+if(NOT BLOSC_IS_SUBPROJECT)
     include(InstallRequiredSystemLibraries)
 
     set(CPACK_GENERATOR TGZ ZIP)
