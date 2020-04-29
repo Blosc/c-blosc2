@@ -13,7 +13,10 @@ jobs:
           Ubuntu GCC External LZ4,
           Ubuntu GCC External LIZARD,
           Ubuntu GCC External ZLIB,
-          Ubuntu GCC External ZSTD,
+          # Not too recent Zstd libs (< 1.4.4) in distros perform pretty bad on compression
+          # ratios when using dictionaries, making some tests not passing.
+          # Commenting this out for the time being.
+          # Ubuntu GCC External ZSTD,
           Ubuntu Clang,
           Ubuntu Clang No AVX2,
           Ubuntu Clang No LZ4,
