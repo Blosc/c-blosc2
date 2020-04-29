@@ -1,7 +1,13 @@
 # sources for examples
-set(SOURCES contexts delta_schunk_ex multithread simple schunk_simple frame_simple frame_big
-        frame_backed_schunk frame_metalayers compress_file noinit find_roots zstd_dict)
-if (EXISTS btune_schunk.c)
+set(SOURCES contexts delta_schunk_ex multithread simple frame_metalayers noinit find_roots)
+if(NOT DEACTIVATE_LZ4)
+    set(SOURCES ${SOURCES} schunk_simple frame_simple frame_big frame_backed_schunk compress_file)
+endif()
+if(NOT DEACTIVATE_ZSTD)
+    set(SOURCES ${SOURCES} zstd_dict)
+endif()
+
+if(EXISTS btune_schunk.c)
     set(SOURCES ${SOURCES} btune_schunk.c)
 endif()
 
@@ -9,7 +15,7 @@ endif()
 foreach(src ${SOURCES})
     add_executable(${src} ${src}.c)
     # have to copy blosc dlls on Windows
-    if (MSVC)
+    if(MSVC)
         add_custom_command(
                 TARGET ${src}
                 POST_BUILD
@@ -17,7 +23,7 @@ foreach(src ${SOURCES})
                 ARGS -E copy_if_different
                 "${PROJECT_BINARY_DIR}/blosc/\$\(Configuration\)/blosc2.dll"
                 "${CMAKE_CURRENT_BINARY_DIR}/\$\(Configuration\)/blosc2.dll")
-    elseif (MINGW)
+    elseif(MINGW)
         add_custom_command(
                 TARGET ${src}
                 POST_BUILD
@@ -33,23 +39,23 @@ foreach(src ${SOURCES})
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
 endforeach()
 
-if (UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE)
     # cmake is complaining about LINK_PRIVATE in original PR
     # and removing it does not seem to hurt, so be it.
     # target_link_libraries(bench LINK_PRIVATE rt)
     foreach(src ${SOURCES})
         target_link_libraries(${src} rt)
     endforeach()
-endif ()
+endif()
 
 foreach(src ${SOURCES})
     target_link_libraries(${src} blosc2_shared)
 endforeach()
 
 # tests
-if (BUILD_TESTS)
+if(BUILD_TESTS)
     option(TEST_INCLUDE_EXAMPLES "Include examples in the tests" ON)
-    if (TEST_INCLUDE_EXAMPLES)
+    if(TEST_INCLUDE_EXAMPLES)
         foreach(src ${SOURCES})
             if(src STREQUAL compress_file)
                 add_test(test_example_${src} ${src} "${PROJECT_BINARY_DIR}/CMakeCache.txt" CMakeCache.b2frame)
@@ -58,4 +64,4 @@ if (BUILD_TESTS)
             endif()
         endforeach()
     endif()
-endif ()
+endif()
