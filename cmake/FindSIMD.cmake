@@ -41,18 +41,18 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
 
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
    # TODO.  For now supposing SSE2 is safe enough
-   set(SSE2_FOUND   true  CACHE BOOL "SSE2 available on host")
-   set(AVX2_FOUND   false CACHE BOOL "AVX2 available on host")
+   set(SSE2_FOUND true  CACHE BOOL "SSE2 available on host")
+   set(AVX2_FOUND false CACHE BOOL "AVX2 available on host")
 else()
-   set(SSE2_FOUND   true  CACHE BOOL "SSE2 available on host")
+   set(SSE2_FOUND true  CACHE BOOL "SSE2 available on host")
    set(AVX2_FOUND false CACHE BOOL "AVX2 available on host")
 endif()
 
 if(NOT SSE2_FOUND)
-      message(STATUS "Could not find hardware support for SSE2 on this machine.")
+   message(STATUS "Could not find hardware support for SSE2 on this machine.")
 endif()
 if(NOT AVX2_FOUND)
-      message(STATUS "Could not find hardware support for AVX2 on this machine.")
+   message(STATUS "Could not find hardware support for AVX2 on this machine.")
 endif()
 
 mark_as_advanced(SSE2_FOUND AVX2_FOUND)
