@@ -30,7 +30,7 @@
   #include <sys/time.h>
 #endif
 
-#if defined(_WIN32) && !defined(__MINGW32__)
+#if defined(_WIN32)
   /* MSVC does not have setenv */
   #define setenv(name, value, overwrite) do {_putenv_s(name, value);} while(0)
 #endif

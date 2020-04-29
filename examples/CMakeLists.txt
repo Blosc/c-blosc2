@@ -1,6 +1,12 @@
 # sources for examples
-set(SOURCES contexts delta_schunk_ex multithread simple schunk_simple frame_simple frame_big
-        frame_backed_schunk frame_metalayers compress_file noinit find_roots zstd_dict)
+set(SOURCES contexts delta_schunk_ex multithread simple frame_metalayers noinit find_roots)
+if (NOT DEACTIVATE_LZ4)
+    set(SOURCES ${SOURCES} schunk_simple frame_simple frame_big frame_backed_schunk compress_file)
+endif ()
+if (NOT DEACTIVATE_ZSTD)
+    set(SOURCES ${SOURCES} zstd_dict)
+endif ()
+
 if (EXISTS btune_schunk.c)
     set(SOURCES ${SOURCES} btune_schunk.c)
 endif()

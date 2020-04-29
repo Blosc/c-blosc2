@@ -15,7 +15,6 @@
 #include "blosc-private.h"
 #include "context.h"
 #include "frame.h"
-#include "zstd.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <windows.h>
