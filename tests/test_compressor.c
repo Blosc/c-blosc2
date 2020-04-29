@@ -220,7 +220,9 @@ static char *all_tests() {
   mu_run_test(test_clevel);
   mu_run_test(test_noshuffle);
   mu_run_test(test_shuffle);
+#if defined(HAVE_ZSTD)
   mu_run_test(test_bitshuffle);
+#endif
   mu_run_test(test_delta);
   mu_run_test(test_typesize);
 

@@ -67,14 +67,17 @@ int main() {
   // BLOSC_BITSHUFFLE is not compressing better and it quite slower here
   //cparams.filters[BLOSC_LAST_FILTER - 1] = BLOSC_BITSHUFFLE;
   // Good codec params for this dataset
-  //cparams.compcode = BLOSC_LZ4;
-  //cparams.clevel = 9;
+#if defined(HAVE_LZ4)
+  cparams.compcode = BLOSC_LZ4;
+#elif defined(HAVE_LIZARD)
   cparams.compcode = BLOSC_LIZARD;
+#elif defined(BLOSC_ZSTD)
+  cparams.compcode = BLOSC_ZSTD;
+#else
+  cparams.compcode = BLOSC_BLOSCLZ;
+#endif
   cparams.clevel = 9;
-  //cparams.compcode = BLOSC_BLOSCLZ;
-  //cparams.clevel = 9;
-  //cparams.compcode = BLOSC_ZSTD;
-  //cparams.clevel = 7;
+
   cparams.nthreads = NTHREADS;
   schunk = blosc2_new_schunk(cparams, dparams, NULL);
 

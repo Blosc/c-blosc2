@@ -9,12 +9,12 @@ include_directories(${PROJECT_SOURCE_DIR}/blosc)
 find_package(SIMD)
 
 # targets and tests
-foreach (source ${SOURCES})
+foreach(source ${SOURCES})
     get_filename_component(target ${source} NAME_WE)
 
     # test_nolock and test_noinit will be enabled only for Unix
     if(WIN32)
-        if (target STREQUAL test_nolock OR
+        if(target STREQUAL test_nolock OR
             target STREQUAL test_noinit OR
             target STREQUAL test_compressor)
             message("Skipping ${target} on Windows systems")
@@ -22,52 +22,58 @@ foreach (source ${SOURCES})
         endif()
     endif()
 
-    # test_compressor will be enabled only when LZ4 support is in
-    if(target STREQUAL test_compressor AND DEACTIVATE_LZ4)
+    # Disable targets that use lz4 compressor when lz4 is deactivated
+    if((target STREQUAL test_compressor) OR
+       (target STREQUAL test_bitshuffle_leftovers) AND DEACTIVATE_LZ4)
         message("Skipping ${target} on non-LZ4 builds")
+        continue()
+    endif()
+    # Disable targets that use zstd compressor when zstd is deactivated
+    if((target STREQUAL test_dict_schunk) AND DEACTIVATE_ZSTD)
+        message("Skipping ${target} on non-ZSTD builds")
         continue()
     endif()
 
     # Enable support for testing accelerated shuffles
-    if (COMPILER_SUPPORT_SSE2 AND SSE2_FOUND)
+    if(COMPILER_SUPPORT_SSE2 AND SSE2_FOUND)
         # Define a symbol so tests for SSE2 shuffle/unshuffle will be compiled in *and* there is support in the CPU for it.
         set_property(
                 SOURCE ${source}
                 APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_SSE2_ENABLED)
-    elseif (target STREQUAL test_shuffle_roundtrip_sse2)
+    elseif(target STREQUAL test_shuffle_roundtrip_sse2)
         message("Skipping ${target} on non-SSE2 builds")
         continue()
-    endif (COMPILER_SUPPORT_SSE2 AND SSE2_FOUND)
+    endif()
 
-    if (COMPILER_SUPPORT_AVX2 AND AVX2_FOUND)
+    if(COMPILER_SUPPORT_AVX2 AND AVX2_FOUND)
         # Define a symbol so tests for AVX2 shuffle/unshuffle will be compiled in *and* there is support in the CPU for it.
         set_property(
                 SOURCE ${source}
                 APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX2_ENABLED)
-    elseif (target STREQUAL test_shuffle_roundtrip_avx2)
+    elseif(target STREQUAL test_shuffle_roundtrip_avx2)
         message("Skipping ${target} on non-AVX2 builds")
         continue()
-    endif(COMPILER_SUPPORT_AVX2 AND AVX2_FOUND)
+    endif()
 
     if(COMPILER_SUPPORT_NEON)
          # Define a symbol so tests for NEON shuffle/unshuffle will be compiled in.
          set_property(
                 SOURCE ${source}
                 APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_NEON_ENABLED)
-    elseif (target STREQUAL test_shuffle_roundtrip_neon)
+    elseif(target STREQUAL test_shuffle_roundtrip_neon)
         message("Skipping ${target} on non-NEON builds")
         continue()
-    endif(COMPILER_SUPPORT_NEON)
+    endif()
 
     if(COMPILER_SUPPORT_ALTIVEC)
          # Define a symbol so tests for NEON shuffle/unshuffle will be compiled in.
          set_property(
                 SOURCE ${source}
                 APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_ALTIVEC_ENABLED)
-    elseif (target STREQUAL test_shuffle_roundtrip_altivec)
+    elseif(target STREQUAL test_shuffle_roundtrip_altivec)
         message("Skipping ${target} on non-ALTIVEC builds")
         continue()
-    endif(COMPILER_SUPPORT_ALTIVEC)
+    endif()
 
     add_executable(${target} ${source})
 
@@ -78,7 +84,7 @@ foreach (source ${SOURCES})
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
 
     # have to copy dlls for Visual Studio
-    if (MSVC)
+    if(MSVC)
         add_custom_command(
                 TARGET ${target}
                 POST_BUILD
@@ -86,7 +92,7 @@ foreach (source ${SOURCES})
                 ARGS -E copy_if_different
                 "${PROJECT_BINARY_DIR}/blosc/\$\(Configuration\)/blosc_testing.dll"
                 "${CMAKE_CURRENT_BINARY_DIR}/\$\(Configuration\)/blosc_testing.dll")
-    elseif (MINGW)
+    elseif(MINGW)
         add_custom_command(
                 TARGET ${target}
                 POST_BUILD
@@ -94,7 +100,7 @@ foreach (source ${SOURCES})
                 ARGS -E copy_if_different
                 "${PROJECT_BINARY_DIR}/blosc/libblosc_testing.dll"
                 "${CMAKE_CURRENT_BINARY_DIR}/libblosc_testing.dll")
-    endif ()
+    endif()
 
     target_link_libraries(${target} blosc_testing)
     add_dependencies(${target} blosc_shared_testing)
@@ -105,7 +111,7 @@ foreach (source ${SOURCES})
     get_filename_component(source_extension ${source} EXT)
     string(REGEX REPLACE "${source_extension}$" ".csv"
             test_params_file ${source})
-    if (EXISTS "${test_params_file}")
+    if(EXISTS "${test_params_file}")
         # Read the file contents into a CMake list
         file(READ "${test_params_file}" test_params_contents)
 
@@ -118,15 +124,15 @@ foreach (source ${SOURCES})
         # If there's not at least one (accounting for the CSV header line),
         # that's probably not correct so emit an error and stop configuring.
         list(LENGTH test_params_contents test_params_count)
-        if ("${test_params_count}" LESS 2)
+        if("${test_params_count}" LESS 2)
             message(ERROR "Invalid test parameters file: ${test_params_file}")
-        endif ()
+        endif()
 
         # Remove the header line.
         list(REMOVE_AT test_params_contents 0)
 
         # Add a test for each parameter set in the file.
-        foreach (test_params_raw ${test_params_contents})
+        foreach(test_params_raw ${test_params_contents})
             string(REGEX REPLACE "," " " test_params "${test_params_raw}")
 
             # Create the test name.
@@ -137,8 +143,8 @@ foreach (source ${SOURCES})
 
             separate_arguments(test_params)
             add_test(${test_name} ${target} ${test_params})
-        endforeach ()
-    else ()
+        endforeach()
+    else()
         add_test(${target} ${target})
-    endif ()
-endforeach (source)
+    endif()
+endforeach()

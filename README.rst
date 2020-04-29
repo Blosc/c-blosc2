@@ -6,16 +6,15 @@
 :Contact: blosc@blosc.org
 :URL: http://www.blosc.org
 :Gitter: |gitter|
-:Travis CI: |travis|
-:Appveyor: |appveyor|
+:Actions: |actions|
 :NumFOCUS: |numfocus|
 
 .. |gitter| image:: https://badges.gitter.im/Blosc/c-blosc.svg
         :alt: Join the chat at https://gitter.im/Blosc/c-blosc
         :target: https://gitter.im/Blosc/c-blosc?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
 
-.. |travis| image:: https://travis-ci.org/Blosc/c-blosc2.svg?branch=master
-        :target: https://travis-ci.org/Blosc/c-blosc2
+.. |actions| image:: https://github.com/Blosc/c-blosc2/workflows/CI%20CMake/badge.svg
+        :target: https://github.com/Blosc/c-blosc2/actions?query=workflow%3A%22CI+CMake%22
 
 .. |appveyor| image:: https://ci.appveyor.com/api/projects/status/qiaxywqrouj6nkug/branch/master?svg=true
         :target: https://ci.appveyor.com/project/FrancescAlted/c-blosc2/branch/master
