@@ -210,10 +210,14 @@ if(COMPILER_SUPPORT_AVX2)
             APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX2_ENABLED)
 endif()
 if(COMPILER_SUPPORT_NEON)
-    set_source_files_properties(shuffle-neon.c bitshuffle-neon.c PROPERTIES COMPILE_FLAGS "-flax-vector-conversions")
+    set_source_files_properties(
+            shuffle-neon.c bitshuffle-neon.c
+            PROPERTIES COMPILE_FLAGS "-flax-vector-conversions")
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l)
         # Only armv7l needs special -mfpu=neon flag; aarch64 doesn't.
-      set_source_files_properties(shuffle-neon.c bitshuffle-neon.c PROPERTIES COMPILE_FLAGS "-mfpu=neon")
+      set_source_files_properties(
+            shuffle-neon.c bitshuffle-neon.c
+            PROPERTIES COMPILE_FLAGS "-mfpu=neon")
     endif()
     # Define a symbol for the shuffle-dispatch implementation
     # so it knows NEON is supported even though that file is
@@ -223,7 +227,8 @@ if(COMPILER_SUPPORT_NEON)
             APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_NEON_ENABLED)
 endif()
 if(COMPILER_SUPPORT_ALTIVEC)
-    set_source_files_properties(shuffle-altivec.c bitshuffle-altivec.c PROPERTIES COMPILE_FLAGS -DNO_WARN_X86_INTRINSICS)
+    set_source_files_properties(shuffle-altivec.c bitshuffle-altivec.c
+            PROPERTIES COMPILE_FLAGS -DNO_WARN_X86_INTRINSICS)
 
     # Define a symbol for the shuffle-dispatch implementation
     # so it knows ALTIVEC is supported even though that file is
@@ -279,9 +284,15 @@ endif()
 if(BLOSC_INSTALL)
     install(FILES blosc2.h blosc2-export.h blosc2-common.h DESTINATION include COMPONENT DEV)
     if(BUILD_SHARED)
-        install(TARGETS blosc2_shared LIBRARY DESTINATION ${lib_dir} ARCHIVE DESTINATION ${lib_dir} RUNTIME DESTINATION bin COMPONENT LIB)
+        install(TARGETS blosc2_shared
+                LIBRARY DESTINATION ${lib_dir}
+                ARCHIVE DESTINATION ${lib_dir}
+                RUNTIME DESTINATION bin COMPONENT LIB)
     endif()
     if(BUILD_STATIC)
-        install(TARGETS blosc2_static LIBRARY DESTINATION ${lib_dir} ARCHIVE DESTINATION ${lib_dir} RUNTIME DESTINATION bin COMPONENT DEV)
+        install(TARGETS blosc2_static
+                LIBRARY DESTINATION ${lib_dir}
+                ARCHIVE DESTINATION ${lib_dir}
+                RUNTIME DESTINATION bin COMPONENT DEV)
     endif()
 endif()

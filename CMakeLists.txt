@@ -98,15 +98,15 @@ option(BUILD_SHARED
 option(BUILD_TESTS
     "Build test programs form the blosc compression library" ON)
 option(BUILD_BENCHMARKS
-        "Build benchmark programs form the blosc compression library" ON)
+    "Build benchmark programs form the blosc compression library" ON)
 option(BUILD_EXAMPLES
-        "Build example programs form the blosc compression library" ON)
+    "Build example programs form the blosc compression library" ON)
 option(DEACTIVATE_AVX2
     "Do not attempt to build with AVX2 instructions" OFF)
 option(DEACTIVATE_LZ4
-        "Do not include support for the LZ4 library." OFF)
+    "Do not include support for the LZ4 library." OFF)
 option(DEACTIVATE_LIZARD
-        "Do not include support for the LIZARD library." OFF)
+    "Do not include support for the LIZARD library." OFF)
 option(DEACTIVATE_SNAPPY
     "Do not include support for the SNAPPY library." ON)
 option(DEACTIVATE_ZLIB
@@ -116,9 +116,9 @@ option(DEACTIVATE_ZSTD
 option(DEACTIVATE_IPP
     "Do not include support for the Intel IPP library." OFF)
 option(PREFER_EXTERNAL_LZ4
-        "Find and use external LZ4 library instead of included sources." OFF)
+    "Find and use external LZ4 library instead of included sources." OFF)
 option(PREFER_EXTERNAL_LIZARD
-        "Find and use external LIZARD library instead of included sources." OFF)
+    "Find and use external LIZARD library instead of included sources." OFF)
 option(PREFER_EXTERNAL_ZLIB
     "Find and use external ZLIB library instead of included sources." OFF)
 option(PREFER_EXTERNAL_ZSTD
@@ -194,7 +194,7 @@ endif()
 if(NOT DEACTIVATE_IPP)
     find_package(IPP)
     if(IPP_FOUND)
-	    message(STATUS "Using IPP accelerated compression.")
+        message(STATUS "Using IPP accelerated compression.")
         set(HAVE_IPP TRUE)
     else()
         message(STATUS "Not using IPP accelerated compression.")
@@ -288,7 +288,7 @@ elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l OR
     endif()
 elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL ppc64le)
     if(CMAKE_C_COMPILER_ID STREQUAL GNU AND CMAKE_C_COMPILER_VERSION VERSION_GREATER 8)
-		set(COMPILER_SUPPORT_ALTIVEC TRUE)
+        set(COMPILER_SUPPORT_ALTIVEC TRUE)
     else()
         set(COMPILER_SUPPORT_ALTIVEC FALSE)
     endif()
