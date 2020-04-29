@@ -60,11 +60,11 @@ jobs:
             packages: zlib1g-dev
             cmake-args: -DPREFER_EXTERNAL_ZLIB=ON
 
-          - name: Ubuntu GCC External ZSTD
-            os: ubuntu-latest
-            compiler: gcc
-            packages: zstd libzstd-dev
-            cmake-args: -DPREFER_EXTERNAL_ZSTD=ON
+            # - name: Ubuntu GCC External ZSTD
+            #   os: ubuntu-latest
+            #   compiler: gcc
+            #   packages: zstd libzstd-dev
+            #   cmake-args: -DPREFER_EXTERNAL_ZSTD=ON
 
           - name: Ubuntu Clang
             os: ubuntu-latest
