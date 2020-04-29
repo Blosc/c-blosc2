@@ -25,13 +25,13 @@ foreach(src ${SOURCES})
                 ARGS -E copy_if_different
                 "${PROJECT_BINARY_DIR}/blosc/libblosc2.dll"
                 "${CMAKE_CURRENT_BINARY_DIR}/libblosc2.dll")
-    endif(MSVC)
+    endif()
     # Define the BLOSC_TESTING symbol so normally-hidden functions
     # aren't hidden from the view of the test programs.
     set_property(
             TARGET ${src}
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
-endforeach(src)
+endforeach()
 
 if (UNIX AND NOT APPLE)
     # cmake is complaining about LINK_PRIVATE in original PR
@@ -39,12 +39,12 @@ if (UNIX AND NOT APPLE)
     # target_link_libraries(bench LINK_PRIVATE rt)
     foreach(src ${SOURCES})
         target_link_libraries(${src} rt)
-    endforeach(src)
-endif (UNIX AND NOT APPLE)
+    endforeach()
+endif ()
 
 foreach(src ${SOURCES})
     target_link_libraries(${src} blosc2_shared)
-endforeach(src)
+endforeach()
 
 # tests
 if (BUILD_TESTS)
@@ -55,7 +55,7 @@ if (BUILD_TESTS)
                 add_test(test_example_${src} ${src} "${PROJECT_BINARY_DIR}/CMakeCache.txt" CMakeCache.b2frame)
             else()
                 add_test(test_example_${src} ${src})
-            endif(src STREQUAL compress_file)
-        endforeach(src)
+            endif()
+        endforeach()
     endif()
-endif (BUILD_TESTS)
+endif ()

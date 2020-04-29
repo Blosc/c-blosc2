@@ -69,12 +69,12 @@
 
 if (NOT WIN32)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
-endif(NOT WIN32)
+endif()
 
 cmake_minimum_required(VERSION 2.8.10)
 IF (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} GREATER 3.4)
   cmake_policy(SET CMP0063 NEW)
-ENDIF(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} GREATER 3.4)
+ENDIF()
 project(blosc)
 
 # parse the full version numbers from blosc.h
@@ -132,32 +132,32 @@ if (NOT DEACTIVATE_LZ4)
         find_package(LZ4)
     else ()
         message(STATUS "Using LZ4 internal sources.")
-    endif (PREFER_EXTERNAL_LZ4)
+    endif ()
     # HAVE_LZ4 will be set to true because even if the library is
     # not found, we will use the included sources for it
     set(HAVE_LZ4 TRUE)
-endif (NOT DEACTIVATE_LZ4)
+endif ()
 
 if (NOT DEACTIVATE_LIZARD)
     if (PREFER_EXTERNAL_LIZARD)
         find_package(LIZARD)
     else ()
         message(STATUS "Using LIZARD internal sources.")
-    endif (PREFER_EXTERNAL_LIZARD)
+    endif ()
     # HAVE_LIZARD will be set to true because even if the library is
     # not found, we will use the included sources for it
     set(HAVE_LIZARD TRUE)
-endif (NOT DEACTIVATE_LIZARD)
+endif ()
 
 if (NOT DEACTIVATE_SNAPPY)
     find_package(Snappy)
     if (SNAPPY_FOUND)
         message(STATUS "Activating support for SNAPPY.")
         set(HAVE_SNAPPY TRUE)
-    else (SNAPPY_FOUND)
+    else ()
         message(STATUS "SNAPPY *not* found.  De-activating support for it.")
-    endif (SNAPPY_FOUND)
-endif (NOT DEACTIVATE_SNAPPY)
+    endif ()
+endif ()
 
 if (NOT DEACTIVATE_ZLIB)
     # import the ZLIB_ROOT environment variable to help finding the zlib library
@@ -167,29 +167,29 @@ if (NOT DEACTIVATE_ZLIB)
         if (NOT ZLIB_FOUND)
             message(STATUS "No ZLIB found.  Using MINIZ internal sources.")
             set(HAVE_MINIZ TRUE)
-        endif (NOT ZLIB_FOUND)
+        endif ()
     else ()
         message(STATUS "Using MINIZ internal sources for ZLIB support.")
         set(HAVE_MINIZ TRUE)
-    endif (PREFER_EXTERNAL_ZLIB)
+    endif ()
     # HAVE_ZLIB will be set to true because even if the library is not found,
     # we will use the included sources for it
     set(HAVE_ZLIB TRUE)
-endif (NOT DEACTIVATE_ZLIB)
+endif ()
 
 if (NOT DEACTIVATE_ZSTD)
     if (PREFER_EXTERNAL_ZSTD)
         find_package(ZSTD)
         if (NOT ZSTD_FOUND)
           message(STATUS "No ZSTD library found.  Using internal sources.")
-        endif (NOT ZSTD_FOUND)
+        endif ()
     else ()
         message(STATUS "Using ZSTD internal sources.")
-    endif (PREFER_EXTERNAL_ZSTD)
+    endif ()
     # HAVE_ZSTD will be set to true because even if the library is
     # not found, we will use the included sources for it
     set(HAVE_ZSTD TRUE)
-endif (NOT DEACTIVATE_ZSTD)
+endif ()
 
 if (NOT DEACTIVATE_IPP)
     find_package(IPP)
@@ -199,8 +199,8 @@ if (NOT DEACTIVATE_IPP)
     else ()
         message(STATUS "Not using IPP accelerated compression.")
         set(HAVE_IPP FALSE)
-    endif (IPP_FOUND)
-endif (NOT DEACTIVATE_IPP)
+    endif ()
+endif ()
 
 # create the config.h file
 configure_file("blosc/config.h.in" "blosc/config.h")
@@ -312,30 +312,30 @@ endif()
 if (CMAKE_C_COMPILER_ID STREQUAL GNU OR CMAKE_C_COMPILER_ID STREQUAL Clang OR CMAKE_C_COMPILER_ID STREQUAL Intel)
     if (NOT CMAKE_C_FLAGS AND COMPILER_SUPPORT_SSE2)
         set(CMAKE_C_FLAGS -msse2 CACHE STRING "C flags." FORCE)
-    endif (NOT CMAKE_C_FLAGS AND COMPILER_SUPPORT_SSE2)
-endif (CMAKE_C_COMPILER_ID STREQUAL GNU OR CMAKE_C_COMPILER_ID STREQUAL Clang OR CMAKE_C_COMPILER_ID STREQUAL Intel)
+    endif ()
+endif ()
 
 if (CMAKE_C_COMPILER_ID STREQUAL Intel OR CMAKE_C_COMPILER_ID STREQUAL Clang OR HAIKU)
     # We need to tell Intel and Clang compilers about what level of POSIX they support
     SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_XOPEN_SOURCE=600")
-endif(CMAKE_C_COMPILER_ID STREQUAL Intel OR CMAKE_C_COMPILER_ID STREQUAL Clang OR HAIKU)
+endif()
 
 if (MSVC)
     if (NOT CMAKE_C_FLAGS)
         set(CMAKE_C_FLAGS "/Ox" CACHE STRING "C flags." FORCE)
-    endif (NOT CMAKE_C_FLAGS)
+    endif ()
 
     # Turn off misguided "secure CRT" warnings in MSVC.
     # Microsoft wants people to use the MS-specific <function>_s
     # versions of certain C functions but this is difficult to do
     # in platform-independent code.
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-endif (MSVC)
+endif ()
 
 if (WIN32)
     # For some supporting headers
     include_directories("${CMAKE_CURRENT_SOURCE_DIR}/blosc")
-endif (WIN32)
+endif ()
 
 if (NOT DEFINED BLOSC_IS_SUBPROJECT)
     if ("^${CMAKE_SOURCE_DIR}$" STREQUAL "^${PROJECT_SOURCE_DIR}$")

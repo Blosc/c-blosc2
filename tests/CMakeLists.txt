@@ -37,7 +37,7 @@ foreach (source ${SOURCES})
     elseif (target STREQUAL test_shuffle_roundtrip_sse2)
         message("Skipping ${target} on non-SSE2 builds")
         continue()
-    endif (COMPILER_SUPPORT_SSE2 AND SSE2_FOUND)
+    endif ()
 
     if (COMPILER_SUPPORT_AVX2 AND AVX2_FOUND)
         # Define a symbol so tests for AVX2 shuffle/unshuffle will be compiled in *and* there is support in the CPU for it.
@@ -47,7 +47,7 @@ foreach (source ${SOURCES})
     elseif (target STREQUAL test_shuffle_roundtrip_avx2)
         message("Skipping ${target} on non-AVX2 builds")
         continue()
-    endif(COMPILER_SUPPORT_AVX2 AND AVX2_FOUND)
+    endif()
 
     if(COMPILER_SUPPORT_NEON)
          # Define a symbol so tests for NEON shuffle/unshuffle will be compiled in.
@@ -57,7 +57,7 @@ foreach (source ${SOURCES})
     elseif (target STREQUAL test_shuffle_roundtrip_neon)
         message("Skipping ${target} on non-NEON builds")
         continue()
-    endif(COMPILER_SUPPORT_NEON)
+    endif()
 
     if(COMPILER_SUPPORT_ALTIVEC)
          # Define a symbol so tests for NEON shuffle/unshuffle will be compiled in.
@@ -67,7 +67,7 @@ foreach (source ${SOURCES})
     elseif (target STREQUAL test_shuffle_roundtrip_altivec)
         message("Skipping ${target} on non-ALTIVEC builds")
         continue()
-    endif(COMPILER_SUPPORT_ALTIVEC)
+    endif()
 
     add_executable(${target} ${source})
 
@@ -141,4 +141,4 @@ foreach (source ${SOURCES})
     else ()
         add_test(${target} ${target})
     endif ()
-endforeach (source)
+endforeach ()
