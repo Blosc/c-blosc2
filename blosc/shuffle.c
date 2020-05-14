@@ -420,7 +420,7 @@ bitshuffle(const int32_t bytesoftype, const int32_t blocksize,
   size_t size = blocksize / bytesoftype;
   /* bitshuffle only supports a number of elements that is a multiple of 8. */
   size -= size % 8;
-  int ret = (host_implementation.bitshuffle)((void *) _src, (void *) _dest,
+  int ret = (int) (host_implementation.bitshuffle)((void *) _src, (void *) _dest,
                                              size, bytesoftype, (void *) _tmp);
   if (ret < 0) {
     // Some error in bitshuffle (should not happen)
@@ -449,7 +449,7 @@ int32_t bitunshuffle(const int32_t bytesoftype, const int32_t blocksize,
     if ((size % 8) == 0) {
       /* The number of elems is a multiple of 8 which is supported by
          bitshuffle. */
-      int ret = (host_implementation.bitunshuffle)((void *) _src, (void *) _dest,
+      int ret = (int) (host_implementation.bitunshuffle)((void *) _src, (void *) _dest,
                                                    blocksize / bytesoftype,
                                                    bytesoftype, (void *) _tmp);
       if (ret < 0) {
@@ -468,7 +468,7 @@ int32_t bitunshuffle(const int32_t bytesoftype, const int32_t blocksize,
   else {
     /* bitshuffle only supports a number of bytes that is a multiple of 8. */
     size -= size % 8;
-    int ret = (host_implementation.bitunshuffle)((void *) _src, (void *) _dest,
+    int ret = (int) (host_implementation.bitunshuffle)((void *) _src, (void *) _dest,
                                                  size, bytesoftype, (void *) _tmp);
     if (ret < 0) {
       fprintf(stderr, "the impossible happened: the bitunshuffle filter failed!");

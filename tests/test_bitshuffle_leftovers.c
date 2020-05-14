@@ -107,7 +107,7 @@ int main() {
   }
   /* leftovers */
   for (int i = size / sizeof(int32_t) * sizeof(int32_t); i < size; i++) {
-    ((uint8_t*)data)[i] = i;
+    ((uint8_t*)data)[i] = (uint8_t) i;
   }
 
   blosc_init();

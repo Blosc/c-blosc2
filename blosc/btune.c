@@ -43,7 +43,6 @@ void btune_next_blocksize(blosc2_context *context) {
   int32_t nbytes = context->sourcesize;
   int32_t user_blocksize = context->blocksize;
   int32_t blocksize = nbytes;
-  int nthreads = context->nthreads;
 
   // Protection against very small buffers
   if (nbytes < typesize) {
