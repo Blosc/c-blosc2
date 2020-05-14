@@ -341,6 +341,7 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
     header = malloc(FRAME_HEADER_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
     size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
+    (void) rbytes;
     assert(rbytes == FRAME_HEADER_MINLEN);
     framep = header;
     fclose(fp);
@@ -747,6 +748,7 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
     header = malloc(FRAME_HEADER_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
     size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
+    (void) rbytes;
     assert(rbytes == FRAME_HEADER_MINLEN);
     fclose(fp);
   }
@@ -956,6 +958,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
   }
   int32_t nchunks = schunk->nchunks;
   int64_t nbytes = schunk->nbytes;
+  (void) nbytes;
   int64_t cbytes = schunk->cbytes;
 
   // Compression and decompression contexts

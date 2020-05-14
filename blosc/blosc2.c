@@ -2416,7 +2416,6 @@ static void* t_blosc(void* ctxt) {
 int init_threadpool(blosc2_context *context) {
   int32_t tid;
   int rc2;
-  struct thread_context* thread_context;
 
   /* Initialize mutex and condition variable objects */
   pthread_mutex_init(&context->count_mutex, NULL);
@@ -2659,7 +2658,8 @@ void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize, int* flags) {
   uint8_t version = _src[0];                        /* blosc format version */
   if (version > BLOSC_VERSION_FORMAT) {
     /* Version from future */
-    *flags = *typesize = 0;
+    *flags = 0;
+    *typesize = 0;
     return;
   }
 
