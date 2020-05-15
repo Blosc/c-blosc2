@@ -34,6 +34,7 @@
 
 
 int main(int argc, char *argv[]) {
+  BLOSC_UNUSED_PARAM(argc);
   static int32_t data[SIZE];
   static int32_t data_out[SIZE];
   static int32_t data_dest[SIZE];
@@ -114,7 +115,7 @@ int main(int argc, char *argv[]) {
     }
     else {
       printf("Decompressed data differs from original!\n");
-      for (int i = 0; i < dsize; i++) {
+      for (i = 0; i < dsize; i++) {
         if (((uint8_t*)data)[i] != ((uint8_t*)data_dest)[i]) {
           printf("values start to differ in pos: %d\n", i);
           break;

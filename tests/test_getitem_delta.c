@@ -24,7 +24,6 @@ static char* test_getitem() {
 
   size_t type_size = 131;
   size_t num_elements = 1;
-  size_t buffer_alignment = 32;
 
   blosc_set_compressor("blosclz");
   blosc_set_delta(1);
