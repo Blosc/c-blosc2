@@ -421,7 +421,7 @@ int blosc2_get_metalayer(blosc2_schunk *schunk, const char *name, uint8_t **cont
 /* Update the content of the usermeta chunk. */
 int blosc2_update_usermeta(blosc2_schunk *schunk, uint8_t *content, int32_t content_len,
                            blosc2_cparams cparams) {
-  if (content_len > (1u << 31u)) {
+  if ((uint32_t) content_len > (1u << 31u)) {
     fprintf(stderr, "Error: content_len cannot exceed 2 GB");
     return -1;
   }

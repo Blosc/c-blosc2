@@ -102,7 +102,7 @@ int main() {
   int result;
 
   /* Initialize data */
-  for (int i = 0; i < size / sizeof(int32_t); i++) {
+  for (int i = 0; i < (int) (size / sizeof(int32_t)); i++) {
     ((uint32_t*)data)[i] = i;
   }
   /* leftovers */

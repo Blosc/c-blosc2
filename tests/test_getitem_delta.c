@@ -53,7 +53,7 @@ static char* test_getitem() {
 
   /* Now that we see the round-trip passed, check the getitem */
   int get_result = blosc_getitem(intermediate, start_item, num_items, items);
-  mu_assert("ERROR: the number of items in getitem is not correct", get_result == (num_items * type_size));
+  mu_assert("ERROR: the number of items in getitem is not correct", (uint32_t) get_result == (num_items * type_size));
   mu_assert("ERROR: getitem with delta filter fails", memcmp(original, items, get_result) == 0);
   
   /* Free allocated memory. */

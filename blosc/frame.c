@@ -287,7 +287,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   assert(hsize2 == current_header_len);  // sanity check
 
   // Map size + int16 size
-  assert((hsize2 - hsize) < (1U << 16U));
+  assert((uint32_t) (hsize2 - hsize) < (1U << 16U));
   uint16_t map_size = (uint16_t) (hsize2 - hsize);
   swap_store(h2 + FRAME_IDX_SIZE, &map_size, sizeof(map_size));
 
@@ -876,7 +876,7 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
     header = malloc(header_len);
     FILE* fp = fopen(frame->fname, "rb");
     size_t rbytes = fread(header, 1, header_len, fp);
-    if (rbytes != header_len) {
+    if (rbytes != (size_t) header_len) {
       fprintf(stderr, "Cannot access the header out of the fileframe.\n");
       fclose(fp);
       return -2;
