@@ -19,7 +19,7 @@
 int tests_run = 0;
 
 
-static char* test_getitem() {
+static char* test_getitem(void) {
   blosc_set_nthreads(1);
 
   size_t type_size = 131;
@@ -64,12 +64,12 @@ static char* test_getitem() {
   return EXIT_SUCCESS;
 }
 
-static char *all_tests() {
+static char *all_tests(void) {
   mu_run_test(test_getitem);
   return EXIT_SUCCESS;
 }
 
-int main() {
+int main(void) {
   char *result;
   blosc_init();
 

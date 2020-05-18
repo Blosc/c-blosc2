@@ -12,7 +12,7 @@
 #define NTHREADS 2
 
 
-int main() {
+int main(void) {
   static int32_t data[SIZE];
   static int32_t data_out[SIZE];
   static int32_t data_dest[SIZE];

@@ -29,7 +29,7 @@ int nblocks;
 
 
 // Check decompression without mask
-static char *test_nomask() {
+static char *test_nomask(void) {
   blosc2_context *dctx = blosc2_create_dctx(BLOSC2_DPARAMS_DEFAULTS);
   nbytes = blosc2_decompress_ctx(dctx, dest, dest2, bytesize);
   mu_assert("ERROR: nbytes is not correct", nbytes == bytesize);
@@ -45,7 +45,7 @@ static char *test_nomask() {
 
 
 // Check decompression with mask
-static char *test_mask() {
+static char *test_mask(void) {
   blosc2_context *dctx = blosc2_create_dctx(BLOSC2_DPARAMS_DEFAULTS);
 
   memset(dest2, 0, bytesize);
@@ -64,7 +64,7 @@ static char *test_mask() {
 
 
 // Check decompression with mask, and no mask aftewards
-static char *test_mask_nomask() {
+static char *test_mask_nomask(void) {
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = nthreads;
   blosc2_context *dctx = blosc2_create_dctx(dparams);
@@ -95,7 +95,7 @@ static char *test_mask_nomask() {
 
 
 // Check decompression with mask, no mask, and then a different mask at last
-static char *test_mask_nomask_mask() {
+static char *test_mask_nomask_mask(void) {
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = nthreads;
   blosc2_context *dctx = blosc2_create_dctx(dparams);
@@ -136,7 +136,7 @@ static char *test_mask_nomask_mask() {
 }
 
 
-static char *all_tests() {
+static char *all_tests(void) {
   nthreads = 1;
   mu_run_test(test_nomask);
   nthreads = 2;
@@ -159,7 +159,7 @@ static char *all_tests() {
 
 #define BUFFER_ALIGN_SIZE   32
 
-int main() {
+int main(void) {
   char *result;
 
   nblocks = bytesize / blocksize;

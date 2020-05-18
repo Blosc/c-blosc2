@@ -33,7 +33,7 @@ bool check_sframe;
 char *fname;
 
 
-static char* test_frame() {
+static char* test_frame(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -217,7 +217,7 @@ static char* test_frame() {
 }
 
 
-static char *all_tests() {
+static char *all_tests(void) {
 
   // Iterate over all different parameters
   char buf[256];
@@ -251,7 +251,7 @@ static char *all_tests() {
 }
 
 
-int main() {
+int main(void) {
   char *result;
 
   blosc_init();

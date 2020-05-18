@@ -26,7 +26,7 @@
 #define SIZE 500*100*100
 
 
-int main() {
+int main(void) {
   static int32_t data[SIZE];
   blosc2_sparams sparams = BLOSC_SPARAMS_DEFAULTS;
   int32_t* data_dest;

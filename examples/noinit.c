@@ -34,7 +34,7 @@
 
 #define SIZE 100*100*100
 
-int main(){
+int main(void){
   static float data[SIZE];
   static float data_out[SIZE];
   static float data_dest[SIZE];

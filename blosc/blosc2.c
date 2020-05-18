@@ -330,6 +330,7 @@ int blosc_compname_to_compcode(const char* compname) {
 #if defined(HAVE_LZ4)
 static int lz4_wrap_compress(const char* input, size_t input_length,
                              char* output, size_t maxout, int accel, void* hash_table) {
+  BLOSC_UNUSED_PARAM(accel);
   int cbytes;
 #ifdef HAVE_IPP
   if (hash_table == NULL) {

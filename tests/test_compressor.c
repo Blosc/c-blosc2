@@ -23,7 +23,7 @@ size_t size = 8 * 1000 * 1000;  /* must be divisible by typesize */
 
 
 /* Check compressor */
-static char *test_compressor() {
+static char *test_compressor(void) {
   const char* compressor;
 
   /* Before any blosc_compress() the compressor must be blosclz */
@@ -50,7 +50,7 @@ static char *test_compressor() {
 
 
 /* Check compressing + decompressing */
-static char *test_compress_decompress() {
+static char *test_compress_decompress(void) {
   const char* compressor;
 
   /* Activate the BLOSC_COMPRESSOR variable */
@@ -84,7 +84,7 @@ static char *test_compress_decompress() {
 
 
 /* Check compression level */
-static char *test_clevel() {
+static char *test_clevel(void) {
   int cbytes2;
 
   /* Get a compressed buffer */
@@ -104,7 +104,7 @@ static char *test_clevel() {
 }
 
 /* Check noshuffle */
-static char *test_noshuffle() {
+static char *test_noshuffle(void) {
   int cbytes2;
 
   /* Get a compressed buffer */
@@ -126,7 +126,7 @@ static char *test_noshuffle() {
 
 
 /* Check regular shuffle */
-static char *test_shuffle() {
+static char *test_shuffle(void) {
   int cbytes2;
 
   /* Get a compressed buffer */
@@ -147,7 +147,7 @@ static char *test_shuffle() {
 }
 
 /* Check bitshuffle */
-static char *test_bitshuffle() {
+static char *test_bitshuffle(void) {
   int cbytes2;
 
   /* Get a compressed buffer */
@@ -170,7 +170,7 @@ static char *test_bitshuffle() {
 
 
 /* Check delta conding */
-static char *test_delta() {
+static char *test_delta(void) {
   int cbytes2;
 
   /* Get a compressed buffer */
@@ -194,7 +194,7 @@ static char *test_delta() {
 
 
 /* Check typesize */
-static char *test_typesize() {
+static char *test_typesize(void) {
   int cbytes2;
 
   /* Get a compressed buffer */
@@ -214,7 +214,7 @@ static char *test_typesize() {
 }
 
 
-static char *all_tests() {
+static char *all_tests(void) {
   mu_run_test(test_compressor);
   mu_run_test(test_compress_decompress);
   mu_run_test(test_clevel);
@@ -231,7 +231,7 @@ static char *all_tests() {
 
 #define BUFFER_ALIGN_SIZE   32
 
-int main() {
+int main(void) {
   int64_t *_src;
   char *result;
   size_t i;

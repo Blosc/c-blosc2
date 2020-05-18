@@ -90,7 +90,7 @@ static int test_roundtrip_bitshuffle4(int size, void *data, void *data_out, void
   return exit_code;
 }
 
-int main() {
+int main(void) {
   /* `size` below is chosen so that it is not divisible by 8
    * (not supported by bitshuffle) and in addition, it is not
    * divisible by 8 (typesize) again.

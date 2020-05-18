@@ -19,7 +19,7 @@ int tests_run = 0;
 int nchunks;
 
 
-static char* test_schunk() {
+static char* test_schunk(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -117,7 +117,7 @@ static char* test_schunk() {
   return EXIT_SUCCESS;
 }
 
-static char *all_tests() {
+static char *all_tests(void) {
   nchunks = 0;
   mu_run_test(test_schunk);
 
@@ -131,7 +131,7 @@ static char *all_tests() {
 }
 
 
-int main() {
+int main(void) {
   char *result;
 
   install_blosc_callback_test(); /* optionally install callback test */

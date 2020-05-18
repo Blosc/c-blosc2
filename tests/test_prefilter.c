@@ -53,7 +53,7 @@ int prefilter_func(blosc2_prefilter_params *pparams) {
 }
 
 
-static char *test_prefilter1() {
+static char *test_prefilter1(void) {
   // Set some prefilter parameters and function
   cparams.prefilter = (blosc2_prefilter_fn)prefilter_func;
   // We need to zero the contents of the pparams.  TODO: make a constructor for ppparams.
@@ -91,7 +91,7 @@ static char *test_prefilter1() {
 }
 
 
-static char *test_prefilter2() {
+static char *test_prefilter2(void) {
   // Set some prefilter parameters and function
   cparams.prefilter = (blosc2_prefilter_fn)prefilter_func;
   // We need to zero the contents of the pparams.  TODO: make a constructor for ppparams.
@@ -134,7 +134,7 @@ static char *test_prefilter2() {
 }
 
 
-static char *all_tests() {
+static char *all_tests(void) {
   mu_run_test(test_prefilter1);
   mu_run_test(test_prefilter2);
 
@@ -142,7 +142,7 @@ static char *all_tests() {
 }
 
 
-int main() {
+int main(void) {
   /* Initialize inputs */
   for (int i = 0; i < SIZE; i++) {
     data[i] = i;

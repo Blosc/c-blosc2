@@ -22,7 +22,7 @@ int typesize = 4;
 int size = 1 * MB;
 
 
-static char* test_cbuffer_sizes() {
+static char* test_cbuffer_sizes(void) {
   size_t nbytes_, cbytes_, blocksize;
 
   blosc_cbuffer_sizes(dest, &nbytes_, &cbytes_, &blocksize);
@@ -33,7 +33,7 @@ static char* test_cbuffer_sizes() {
   return 0;
 }
 
-static char* test_cbuffer_metainfo() {
+static char* test_cbuffer_metainfo(void) {
   size_t typesize_;
   int flags;
 
@@ -44,7 +44,7 @@ static char* test_cbuffer_metainfo() {
 }
 
 
-static char* test_cbuffer_versions() {
+static char* test_cbuffer_versions(void) {
   int version_;
   int versionlz_;
 
@@ -55,7 +55,7 @@ static char* test_cbuffer_versions() {
 }
 
 
-static char* test_cbuffer_complib() {
+static char* test_cbuffer_complib(void) {
   const char* complib;
 
   complib = blosc_cbuffer_complib(dest);
@@ -63,7 +63,7 @@ static char* test_cbuffer_complib() {
   return 0;
 }
 
-static char *test_nthreads() {
+static char *test_nthreads(void) {
   int nthreads;
 
   nthreads = blosc_set_nthreads(4);
@@ -73,7 +73,7 @@ static char *test_nthreads() {
   return 0;
 }
 
-static char *test_blocksize() {
+static char *test_blocksize(void) {
   int blocksize;
 
   blocksize = blosc_get_blocksize();
@@ -86,7 +86,7 @@ static char *test_blocksize() {
 }
 
 
-static char* all_tests() {
+static char* all_tests(void) {
   mu_run_test(test_cbuffer_sizes);
   mu_run_test(test_cbuffer_metainfo);
   mu_run_test(test_cbuffer_versions);
@@ -98,7 +98,7 @@ static char* all_tests() {
 
 #define BUFFER_ALIGN_SIZE   8
 
-int main() {
+int main(void) {
   char* result;
 
   install_blosc_callback_test(); /* optionally install callback test */

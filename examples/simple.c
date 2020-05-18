@@ -27,7 +27,7 @@
 #define NTHREADS 2
 
 
-int main() {
+int main(void) {
   static float data[SIZE];
   static float data_out[SIZE];
   static float data_dest[SIZE];

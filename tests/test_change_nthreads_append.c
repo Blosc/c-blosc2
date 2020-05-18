@@ -17,7 +17,7 @@
 /* Global vars */
 int tests_run = 0;
 
-static char* all_tests() {
+static char* all_tests(void) {
   static int64_t data[CHUNKSIZE];
   static int64_t data_dest[CHUNKSIZE];
   const size_t isize = CHUNKSIZE * sizeof(int64_t);

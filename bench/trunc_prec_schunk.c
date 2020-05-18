@@ -38,7 +38,7 @@ void fill_buffer(double *buffer, int nchunk) {
 }
 
 
-int main() {
+int main(void) {
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk *schunk;

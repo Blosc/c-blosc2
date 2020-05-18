@@ -277,7 +277,7 @@ return BLOSC_HAVE_NOTHING;
 
 #endif /* defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED) */
 
-static shuffle_implementation_t get_shuffle_implementation() {
+static shuffle_implementation_t get_shuffle_implementation(void) {
   blosc_cpu_features cpu_features = blosc_get_cpu_features();
 #if defined(SHUFFLE_AVX2_ENABLED)
   if (cpu_features & BLOSC_HAVE_AVX2) {
@@ -361,7 +361,7 @@ __forceinline
 #else
 inline
 #endif
-void init_shuffle_implementation() {
+void init_shuffle_implementation(void) {
   /* Initialization could (in rare cases) take place concurrently on
      multiple threads, but it shouldn't matter because the
      initialization should return the same result on each thread (so
