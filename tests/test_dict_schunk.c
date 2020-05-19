@@ -109,7 +109,7 @@ static char* test_dict(void) {
     switch (blocksize) {
       case 1 * KB:
         mu_assert("ERROR: Dict does not reach expected compression ratio",
-                  10 * cbytes < nbytes);
+                  8 * cbytes < nbytes);
         break;
       case 4 * KB:
         mu_assert("ERROR: Dict does not reach expected compression ratio",
