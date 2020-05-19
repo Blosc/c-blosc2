@@ -26,7 +26,7 @@
 #define NTHREADS 1
 
 
-int main() {
+int main(void) {
   int32_t *data, *data_dest;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;

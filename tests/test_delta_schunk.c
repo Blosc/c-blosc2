@@ -13,7 +13,7 @@
 #define NTHREADS 4
 
 
-int main() {
+int main(void) {
   static int32_t data[SIZE];
   static int32_t data_dest[SIZE];
   size_t isize = SIZE * sizeof(int32_t);

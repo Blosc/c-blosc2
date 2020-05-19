@@ -27,7 +27,7 @@ size_t size = 4 * 1000 * 1000;             /* must be divisible by 4 */
 
 
 /* Check just compressing */
-static char *test_compress() {
+static char *test_compress(void) {
 
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
@@ -39,7 +39,7 @@ static char *test_compress() {
 
 
 /* Check compressing + decompressing */
-static char *test_compress_decompress() {
+static char *test_compress_decompress(void) {
 
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
@@ -54,7 +54,7 @@ static char *test_compress_decompress() {
 }
 
 
-static char *all_tests() {
+static char *all_tests(void) {
   mu_run_test(test_compress);
   mu_run_test(test_compress_decompress);
 
@@ -63,7 +63,7 @@ static char *all_tests() {
 
 #define BUFFER_ALIGN_SIZE   32
 
-int main() {
+int main(void) {
   int32_t *_src;
   char *result;
   int i;

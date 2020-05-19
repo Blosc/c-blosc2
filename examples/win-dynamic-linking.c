@@ -43,7 +43,7 @@ typedef int (__cdecl* DECOMPRESS_CTX)(const void* src, void* dest,
 typedef char* (__cdecl* GET_VERSION_STRING)(void);
 
 
-int main() {
+int main(void) {
   HINSTANCE BDLL;                       /* Handle to DLL */
   COMPRESS_CTX blosc_compress_ctx;      /* Function pointer for compression */
   DECOMPRESS_CTX blosc_decompress_ctx;  /* Function pointer for decompression */

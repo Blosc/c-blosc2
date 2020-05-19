@@ -23,7 +23,7 @@ int size = 7 * 12 * 13 * 16 * 24 * 10;  /* must be divisible by typesize */
 
 
 /* Check compressor */
-static char *test_delta() {
+static char *test_delta(void) {
   int cbytes2;
   int buf_equal;
 
@@ -128,7 +128,7 @@ static char *test_delta() {
   return 0;
 }
 
-static char *all_tests() {
+static char *all_tests(void) {
   typesize = 1;
   mu_run_test(test_delta);
   typesize = 2;
@@ -153,7 +153,7 @@ static char *all_tests() {
 
 #define BUFFER_ALIGN_SIZE   32
 
-int main() {
+int main(void) {
   char *result;
 
   blosc_init();

@@ -23,7 +23,7 @@ size_t size = 4 * 1000 * 1000;             /* must be divisible by 4 */
 
 
 /* Check just compressing */
-static char *test_compress() {
+static char *test_compress(void) {
   int nthreads;
 
   /* Before any blosc_compress() or blosc_decompress() the number of
@@ -44,7 +44,7 @@ static char *test_compress() {
 
 
 /* Check compressing + decompressing */
-static char *test_compress_decompress() {
+static char *test_compress_decompress(void) {
   int nthreads;
 
   nthreads = blosc_get_nthreads();
@@ -69,7 +69,7 @@ static char *test_compress_decompress() {
 }
 
 
-static char *all_tests() {
+static char *all_tests(void) {
   mu_run_test(test_compress);
   mu_run_test(test_compress_decompress);
 
@@ -78,7 +78,7 @@ static char *all_tests() {
 
 #define BUFFER_ALIGN_SIZE   32
 
-int main() {
+int main(void) {
   int32_t *_src;
   char *result;
   size_t i;

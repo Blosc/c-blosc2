@@ -287,7 +287,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   assert(hsize2 == current_header_len);  // sanity check
 
   // Map size + int16 size
-  assert((hsize2 - hsize) < (1U << 16U));
+  assert((uint32_t) (hsize2 - hsize) < (1U << 16U));
   uint16_t map_size = (uint16_t) (hsize2 - hsize);
   swap_store(h2 + FRAME_IDX_SIZE, &map_size, sizeof(map_size));
 
@@ -341,6 +341,7 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
     header = malloc(FRAME_HEADER_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
     size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
+    (void) rbytes;
     assert(rbytes == FRAME_HEADER_MINLEN);
     framep = header;
     fclose(fp);
@@ -747,6 +748,7 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
     header = malloc(FRAME_HEADER_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
     size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
+    (void) rbytes;
     assert(rbytes == FRAME_HEADER_MINLEN);
     fclose(fp);
   }
@@ -874,7 +876,7 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
     header = malloc(header_len);
     FILE* fp = fopen(frame->fname, "rb");
     size_t rbytes = fread(header, 1, header_len, fp);
-    if (rbytes != header_len) {
+    if (rbytes != (size_t) header_len) {
       fprintf(stderr, "Cannot access the header out of the fileframe.\n");
       fclose(fp);
       return -2;
@@ -956,6 +958,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
   }
   int32_t nchunks = schunk->nchunks;
   int64_t nbytes = schunk->nbytes;
+  (void) nbytes;
   int64_t cbytes = schunk->cbytes;
 
   // Compression and decompression contexts

@@ -38,7 +38,7 @@
 #define NTHREADS 4
 
 
-int main() {
+int main(void) {
   static int32_t data[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int64_t nbytes, cbytes;

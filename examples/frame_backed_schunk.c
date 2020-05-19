@@ -34,7 +34,7 @@
 #define NTHREADS 4
 
 
-int main() {
+int main(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest1[CHUNKSIZE];
   static int32_t data_dest2[CHUNKSIZE];

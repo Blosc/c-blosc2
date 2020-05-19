@@ -34,6 +34,7 @@
 
 
 int main(int argc, char *argv[]) {
+  BLOSC_UNUSED_PARAM(argc);
   static int32_t data[SIZE];
   static int32_t data_out[SIZE];
   static int32_t data_dest[SIZE];
@@ -78,7 +79,7 @@ int main(int argc, char *argv[]) {
 
     /* Write data_out to argv[3] */
     f = fopen(argv[3], "wb+");
-    if (fwrite(data_out, 1, (size_t) csize, f) == csize) {
+    if (fwrite(data_out, 1, (size_t) csize, f) == (uint32_t) csize) {
       printf("Wrote %s\n", argv[3]);
     } else {
       printf("Write failed");
@@ -89,7 +90,7 @@ int main(int argc, char *argv[]) {
     fseek(f, 0, SEEK_END);
     fsize = ftell(f);
     fseek(f, 0, SEEK_SET);
-    if (fread(data_out, 1, (size_t) fsize, f) == fsize) {
+    if (fread(data_out, 1, (size_t) fsize, f) == (uint32_t) fsize) {
       printf("Checking %s\n", argv[2]);
     } else {
       printf("Read failed");
@@ -114,7 +115,7 @@ int main(int argc, char *argv[]) {
     }
     else {
       printf("Decompressed data differs from original!\n");
-      for (int i = 0; i < dsize; i++) {
+      for (i = 0; i < dsize; i++) {
         if (((uint8_t*)data)[i] != ((uint8_t*)data_dest)[i]) {
           printf("values start to differ in pos: %d\n", i);
           break;

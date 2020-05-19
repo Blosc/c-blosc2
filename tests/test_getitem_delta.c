@@ -19,12 +19,11 @@
 int tests_run = 0;
 
 
-static char* test_getitem() {
+static char* test_getitem(void) {
   blosc_set_nthreads(1);
 
   size_t type_size = 131;
   size_t num_elements = 1;
-  size_t buffer_alignment = 32;
 
   blosc_set_compressor("blosclz");
   blosc_set_delta(1);
@@ -54,7 +53,7 @@ static char* test_getitem() {
 
   /* Now that we see the round-trip passed, check the getitem */
   int get_result = blosc_getitem(intermediate, start_item, num_items, items);
-  mu_assert("ERROR: the number of items in getitem is not correct", get_result == (num_items * type_size));
+  mu_assert("ERROR: the number of items in getitem is not correct", (uint32_t) get_result == (num_items * type_size));
   mu_assert("ERROR: getitem with delta filter fails", memcmp(original, items, get_result) == 0);
   
   /* Free allocated memory. */
@@ -65,12 +64,12 @@ static char* test_getitem() {
   return EXIT_SUCCESS;
 }
 
-static char *all_tests() {
+static char *all_tests(void) {
   mu_run_test(test_getitem);
   return EXIT_SUCCESS;
 }
 
-int main() {
+int main(void) {
   char *result;
   blosc_init();
 

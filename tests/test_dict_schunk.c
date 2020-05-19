@@ -20,7 +20,7 @@ int tests_run = 0;
 int blocksize;
 int use_dict;
 
-static char* test_dict() {
+static char* test_dict(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -109,7 +109,7 @@ static char* test_dict() {
     switch (blocksize) {
       case 1 * KB:
         mu_assert("ERROR: Dict does not reach expected compression ratio",
-                  10 * cbytes < nbytes);
+                  8 * cbytes < nbytes);
         break;
       case 4 * KB:
         mu_assert("ERROR: Dict does not reach expected compression ratio",
@@ -148,7 +148,7 @@ static char* test_dict() {
 }
 
 
-static char *all_tests() {
+static char *all_tests(void) {
   blocksize = 1 * KB;    // really tiny
   use_dict = 0;
   mu_run_test(test_dict);
@@ -183,7 +183,7 @@ static char *all_tests() {
 }
 
 
-int main() {
+int main(void) {
   char *result;
 
   blosc_init();

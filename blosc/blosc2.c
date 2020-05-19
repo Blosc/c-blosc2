@@ -330,6 +330,7 @@ int blosc_compname_to_compcode(const char* compname) {
 #if defined(HAVE_LZ4)
 static int lz4_wrap_compress(const char* input, size_t input_length,
                              char* output, size_t maxout, int accel, void* hash_table) {
+  BLOSC_UNUSED_PARAM(accel);
   int cbytes;
 #ifdef HAVE_IPP
   if (hash_table == NULL) {
@@ -2416,7 +2417,6 @@ static void* t_blosc(void* ctxt) {
 int init_threadpool(blosc2_context *context) {
   int32_t tid;
   int rc2;
-  struct thread_context* thread_context;
 
   /* Initialize mutex and condition variable objects */
   pthread_mutex_init(&context->count_mutex, NULL);
@@ -2659,7 +2659,8 @@ void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize, int* flags) {
   uint8_t version = _src[0];                        /* blosc format version */
   if (version > BLOSC_VERSION_FORMAT) {
     /* Version from future */
-    *flags = *typesize = 0;
+    *flags = 0;
+    *typesize = 0;
     return;
   }
 

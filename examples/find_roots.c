@@ -165,7 +165,7 @@ int compute_vectors(void) {
 }
 
 
-int main() {
+int main(void) {
     printf("Blosc version info: %s (%s)\n",
            BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 

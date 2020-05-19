@@ -29,7 +29,7 @@ size_t size = sizeof(int32_t) * 1000 * 1000;
 
 
 /* Check just compressing */
-static char *test_compress() {
+static char *test_compress(void) {
 
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
@@ -41,7 +41,7 @@ static char *test_compress() {
 
 
 /* Check compressing + decompressing */
-static char *test_compress_decompress() {
+static char *test_compress_decompress(void) {
 
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
@@ -56,7 +56,7 @@ static char *test_compress_decompress() {
 }
 
 
-static char *all_tests() {
+static char *all_tests(void) {
   mu_run_test(test_compress);
   mu_run_test(test_compress_decompress);
 
@@ -64,7 +64,7 @@ static char *all_tests() {
 }
 
 
-int main() {
+int main(void) {
   int32_t *_src;
   char *result;
 

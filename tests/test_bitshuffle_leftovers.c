@@ -90,7 +90,7 @@ static int test_roundtrip_bitshuffle4(int size, void *data, void *data_out, void
   return exit_code;
 }
 
-int main() {
+int main(void) {
   /* `size` below is chosen so that it is not divisible by 8
    * (not supported by bitshuffle) and in addition, it is not
    * divisible by 8 (typesize) again.
@@ -102,12 +102,12 @@ int main() {
   int result;
 
   /* Initialize data */
-  for (int i = 0; i < size / sizeof(int32_t); i++) {
+  for (int i = 0; i < (int) (size / sizeof(int32_t)); i++) {
     ((uint32_t*)data)[i] = i;
   }
   /* leftovers */
   for (int i = size / sizeof(int32_t) * sizeof(int32_t); i < size; i++) {
-    ((uint8_t*)data)[i] = i;
+    ((uint8_t*)data)[i] = (uint8_t) i;
   }
 
   blosc_init();

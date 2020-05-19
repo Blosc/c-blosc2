@@ -71,7 +71,7 @@
 #endif
 
 
-int main() {
+int main(void) {
   static DTYPE udata[N];
   DTYPE chunk_buf[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(DTYPE);
