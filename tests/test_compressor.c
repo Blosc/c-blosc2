@@ -151,7 +151,10 @@ static char *test_bitshuffle(void) {
   int cbytes2;
 
   /* Get a compressed buffer */
-  blosc_set_compressor("zstd");  /* avoid lz4 here for now (see #168) */
+  if (blosc_set_compressor("zstd") == -1) {
+    /* If zstd is not here, just skip the test */
+    return 0;
+  };
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + BLOSC_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not 0", cbytes < (int)size);
@@ -220,9 +223,7 @@ static char *all_tests(void) {
   mu_run_test(test_clevel);
   mu_run_test(test_noshuffle);
   mu_run_test(test_shuffle);
-#if defined(HAVE_ZSTD)
   mu_run_test(test_bitshuffle);
-#endif
   mu_run_test(test_delta);
   mu_run_test(test_typesize);
 
