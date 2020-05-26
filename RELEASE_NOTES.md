@@ -5,7 +5,7 @@
 Changes from 2.0.0-beta.5 to 2.0.0.beta6
 ========================================
 
-#XXX version-specific blurb XXX#
+* Internal Zstd sources updated to 1.4.5.
 
 
 Changes from 2.0.0-beta.4 to 2.0.0.beta5
