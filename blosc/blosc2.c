@@ -1341,12 +1341,27 @@ static int initialize_context_compression(
     btune_next_blocksize(context);
   }
 
+  char* envvar = getenv("BLOSC_WARN");
+  int warnlvl = 0;
+  if (envvar != NULL) {
+    warnlvl = strtol(envvar, NULL, 10);
+  }
+
   /* Check buffer size limits */
   if (sourcesize > BLOSC_MAX_BUFFERSIZE) {
-    /* If buffer is too large, give up. */
-    fprintf(stderr, "Input buffer size cannot exceed %d bytes\n",
-            BLOSC_MAX_BUFFERSIZE);
+    if (warnlvl > 0) {
+      fprintf(stderr, "Input buffer size cannot exceed %d bytes\n",
+              BLOSC_MAX_BUFFERSIZE);
+    }
     return -1;
+  }
+
+  if (destsize < BLOSC_MAX_OVERHEAD) {
+    if (warnlvl > 0) {
+      fprintf(stderr, "Output buffer size should be larger than %d bytes\n",
+              BLOSC_MAX_OVERHEAD);
+    }
+    return -2;
   }
 
   /* Compression level */
@@ -1687,7 +1702,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     context->clevel, context->filters, context->filters_meta,
     context->typesize, context->compcode, context->blocksize,
     context->new_nthreads, context->nthreads, context->schunk);
-  if (error < 0) {
+  if (error <= 0) {
     return error;
   }
 
@@ -1899,6 +1914,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     cctx = blosc2_create_cctx(cparams);
     /* Do the actual compression */
     result = blosc2_compress_ctx(cctx, nbytes, src, dest, destsize);
+    printf("Hola!\n");
     /* Release context resources */
     blosc2_free_ctx(cctx);
     return result;
@@ -1914,10 +1930,11 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     g_global_context, (int32_t)nbytes, src, dest, (int32_t)destsize, clevel, filters,
     filters_meta, (int32_t)typesize, g_compressor, g_force_blocksize, g_nthreads, g_nthreads,
     g_schunk);
+  if (error <= 0) {
+    return error;
+  }
   free(filters);
   free(filters_meta);
-  if (error < 0)
-    return error;
 
   /* Write chunk header without extended header (Blosc1 compatibility mode) */
   error = write_compression_header(g_global_context, false);
