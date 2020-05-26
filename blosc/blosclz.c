@@ -82,8 +82,8 @@
     copy = 0;                                            \
     *op++ = MAX_COPY-1;                                  \
     nmax_copies++;                                       \
-    if (nmax_copies > max_nmax_copies)                   \
-      goto out;                                          \
+    if ((max_nmax_copies < 255) && (nmax_copies > max_nmax_copies))                   \
+      goto leftover;                                          \
   }                                                      \
   continue;                                              \
 }
@@ -359,8 +359,8 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   }
 
   // The maximum amount of consecutive MAX_COPY copies before giving up
-  // 0 means something very close to RLE
-  uint8_t max_nmax_copies_[10] = {255, 0, 8, 8, 16, 32, 32, 32, 32, 64};  // 255 never used
+  // 0 means something very close to RLE; 255 means no giveup
+  uint8_t max_nmax_copies_[10] = {255, 8, 8, 16, 16, 32, 32, 32, 32, 64};
   uint8_t max_nmax_copies = max_nmax_copies_[opt_level];
 
   /* output buffer cannot be less than 66 bytes or we can get into trouble */
@@ -510,6 +510,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     nmax_copies = 0;
   }
 
+  leftover:
   /* left-over as literal copy */
   ip_bound++;
   while (ip <= ip_bound) {

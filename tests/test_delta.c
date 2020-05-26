@@ -98,8 +98,8 @@ static char *test_delta(void) {
   blosc_set_delta(1);
   cbytes2 = blosc_compress(clevel, doshuffle, (size_t)typesize, (size_t)size, src,
                            dest, (size_t)size + BLOSC_MAX_OVERHEAD);
-  if ((typesize % 12) == 0) {
-    // For typesizes 12 and 24 we do an exception and allow less compression
+  if ((typesize == 12) || (typesize == 15) || (typesize == 24)) {
+    // For typesizes 12, 15 and 24 we make an exception and allow less compression
     if ((2 * cbytes2) > (3 * cbytes)) {
       fprintf(stderr, "Failed test for DELTA and typesize: %d\n", typesize);
       fprintf(stderr, "Size with no DELTA: %d.  Size with DELTA: %d\n",
