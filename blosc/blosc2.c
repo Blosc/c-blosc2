@@ -1364,6 +1364,14 @@ static int initialize_context_compression(
     return 0;
   }
 
+  if (destsize < BLOSC_MAX_OVERHEAD) {
+    if (warnlvl > 0) {
+      fprintf(stderr, "Output buffer size should be larger than %d bytes\n",
+              BLOSC_MAX_OVERHEAD);
+    }
+    return -2;
+  }
+
   /* Compression level */
   if (clevel < 0 || clevel > 9) {
     /* If clevel not in 0..9, print an error */
