@@ -1353,7 +1353,7 @@ static int initialize_context_compression(
       fprintf(stderr, "Input buffer size cannot exceed %d bytes\n",
               BLOSC_MAX_BUFFERSIZE);
     }
-    return -1;
+    return 0;
   }
 
   if (destsize < BLOSC_MAX_OVERHEAD) {
@@ -1361,7 +1361,7 @@ static int initialize_context_compression(
       fprintf(stderr, "Output buffer size should be larger than %d bytes\n",
               BLOSC_MAX_OVERHEAD);
     }
-    return -2;
+    return 0;
   }
 
   /* Compression level */
@@ -1931,6 +1931,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     filters_meta, (int32_t)typesize, g_compressor, g_force_blocksize, g_nthreads, g_nthreads,
     g_schunk);
   if (error <= 0) {
+    pthread_mutex_unlock(&global_comp_mutex);
     return error;
   }
   free(filters);
@@ -1938,8 +1939,10 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
 
   /* Write chunk header without extended header (Blosc1 compatibility mode) */
   error = write_compression_header(g_global_context, false);
-  if (error < 0)
+  if (error < 0) {
+    pthread_mutex_unlock(&global_comp_mutex);
     return error;
+  }
 
   result = blosc_compress_context(g_global_context);
 

@@ -28,8 +28,7 @@ static char* test_input_too_large(void) {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, BLOSC_MAX_BUFFERSIZE + 1, src,
                           dest, size + BLOSC_MAX_OVERHEAD - 1);
-  printf("cbytes: %d\n", cbytes);
-  mu_assert("ERROR: cbytes is not < 0", cbytes < 0);
+  mu_assert("ERROR: cbytes is not == 0", cbytes == 0);
 
   return 0;
 }
