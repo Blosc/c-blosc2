@@ -82,8 +82,6 @@
     copy = 0;                                            \
     *op++ = MAX_COPY-1;                                  \
     nmax_copies++;                                       \
-    if ((max_nmax_copies < 255) && (nmax_copies > max_nmax_copies))                   \
-      goto leftover;                                          \
   }                                                      \
   continue;                                              \
 }
@@ -386,6 +384,10 @@ int blosclz_compress(const int opt_level, const void* input, int length,
       distance = 1;
       ref = anchor - 1 + 3;
       goto match;
+    }
+    else if ((max_nmax_copies < 255) && (nmax_copies > max_nmax_copies)) {
+      // too many literal copies already: just look for runs from now on
+      LITERAL(ip, op, op_limit, anchor, copy)
     }
 
     /* find potential match */
