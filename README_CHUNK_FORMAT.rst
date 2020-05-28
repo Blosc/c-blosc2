@@ -57,7 +57,7 @@ All entries are little endian.
     :bit 7 (``0x80``):
         Part of the enumeration for compressors.
 
-    Note:: If both bit 0 and bit 2 are set at once, that means that an
+    Note:: If both bit 0 and bit 2 are both set, that means that an
         extended header (see above) is used.
 
     The last three bits form an enumeration that allows to use alternative
