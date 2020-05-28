@@ -35,7 +35,7 @@ All entries are little endian.
     (``uint8``) Blosc format version.
 
 :versionlz:
-    (``uint8``) Version of the internal compressor used.
+    (``uint8``) Version of the *format* of the internal compressor used (normally always 1).
 
 :flags and compressor enumeration:
     (``bitfield``) The flags of the buffer
