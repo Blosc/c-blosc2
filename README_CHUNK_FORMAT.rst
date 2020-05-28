@@ -97,3 +97,8 @@ All entries are little endian.
 
     :bit 0 (``0x01``):
         Whether the codec uses dictionaries or not.
+    :bit 1 (``0x02``):
+        Whether the header is extended with +32 bytes coming right after this byte. 
+    :bit 2 (``0x04``):
+        Whether the codec is stored in a byte previous to this compressed buffer or it is in the global `flags` for chunk. 
+        
