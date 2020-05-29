@@ -55,7 +55,7 @@
   #define BLOSCLZ_READU32(p) *((const uint32_t*)(p))
 #endif
 
-#define HASH_LOG (14)
+#define HASH_LOG (12)
 
 /* Simple, but pretty effective hash function for 3-byte sequence */
 /* This is the original hash function used in fastlz
@@ -341,15 +341,15 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   uint8_t copy;
   uint32_t nmax_copies = 0;
 
-  double maxlength_[10] = {-1, .1, .2, .3, .4, .6, .9, .95, 1.0, 1.0};
+  double maxlength_[10] = {-1, .1, .2, .4, .5, .7, .9, .95, 1.0, 1.0};
   int32_t maxlength = (int32_t)(length * maxlength_[opt_level]);
   if (maxlength > (int32_t)maxout) {
     maxlength = (int32_t)maxout;
   }
   op_limit = op + maxlength;
 
-  uint8_t hashlog_[10] = {0, HASH_LOG - 4, HASH_LOG - 4, HASH_LOG - 3 , HASH_LOG - 2,
-                           HASH_LOG - 1, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
+  uint8_t hashlog_[10] = {0, HASH_LOG - 1, HASH_LOG - 1, HASH_LOG - 1, HASH_LOG,
+                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[opt_level];
   // Initialize the hash table to distances of 0
   for (unsigned i = 0; i < (1U << hashlog); i++) {
@@ -379,17 +379,6 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     uint32_t len = 3;         /* minimum match length */
     uint8_t* anchor = ip;    /* comparison starting-point */
 
-    /* check for a run */
-    if (ip[0] == ip[-1] && BLOSCLZ_READU16(ip - 1) == BLOSCLZ_READU16(ip + 1)) {
-      distance = 1;
-      ref = anchor - 1 + 3;
-      goto match;
-    }
-    else if ((max_nmax_copies < 255) && (nmax_copies > max_nmax_copies)) {
-      // too many literal copies already: just look for runs from now on
-      LITERAL(ip, op, op_limit, anchor, copy)
-    }
-
     /* find potential match */
     HASH_FUNCTION(hval, ip, hashlog)
     ref = ibase + htab[hval];
@@ -397,11 +386,8 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     /* calculate distance to the match */
     distance = (int32_t)(anchor - ref);
 
-    /* update hash table if necessary */
-    /* not exactly sure why masking the distance works best, but this is what the experiments say */
-    if (!shuffle || (distance & (MAX_COPY - 1)) == 0) {
-      htab[hval] = (uint16_t) (anchor - ibase);
-    }
+    /* update hash table */
+    htab[hval] = (uint16_t) (anchor - ibase);
 
     if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
       LITERAL(ip, op, op_limit, anchor, copy)
