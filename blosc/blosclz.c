@@ -319,7 +319,7 @@ static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
 
 
 int blosclz_compress(const int opt_level, const void* input, int length,
-                     void* output, int maxout, bool shuffle) {
+                     void* output, int maxout) {
   uint8_t* ip = (uint8_t*)input;
   uint8_t* ibase = (uint8_t*)input;
   uint8_t* ip_bound = ip + length - IP_BOUNDARY;
@@ -477,7 +477,6 @@ int blosclz_compress(const int opt_level, const void* input, int length,
 
   }
 
-  leftover:
   /* left-over as literal copy */
   ip_bound++;
   while (ip <= ip_bound) {

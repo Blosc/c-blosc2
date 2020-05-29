@@ -758,8 +758,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     }
     else if (context->compcode == BLOSC_BLOSCLZ) {
       cbytes = blosclz_compress(context->clevel, _src + j * neblock,
-                                (int)neblock, dest, (int)maxout,
-                                context->filter_flags & BLOSC_DOSHUFFLE);
+                                (int)neblock, dest, (int)maxout);
     }
   #if defined(HAVE_LZ4)
     else if (context->compcode == BLOSC_LZ4) {
