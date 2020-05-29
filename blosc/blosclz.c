@@ -55,16 +55,7 @@
   #define BLOSCLZ_READU32(p) *((const uint32_t*)(p))
 #endif
 
-#define HASH_LOG (12)
-
-/* Simple, but pretty effective hash function for 3-byte sequence */
-/* This is the original hash function used in fastlz
- * #define _HASH_FUNCTION(v, p, h) {                      \
- * v = BLOSCLZ_READU16(p);                                \
- * v ^= BLOSCLZ_READU16(p + 1) ^ ( v >> (16 - h));        \
- * v &= (1 << h) - 1;                                     \
- *}
- */
+#define HASH_LOG (11)
 
 // This is used in LZ4 and seems to work pretty well here too
 #define HASH_FUNCTION(v, p, h) {                          \
@@ -335,7 +326,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   uint8_t* ip_limit = ip + length - 12;
   uint8_t* op = (uint8_t*)output;
   uint8_t* op_limit;
-  uint16_t htab[1U << (uint8_t)HASH_LOG];
+  uint32_t htab[1U << (uint8_t)HASH_LOG];
   int32_t hval;
   uint8_t copy;
 
@@ -346,7 +337,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   }
   op_limit = op + maxlength;
 
-  uint8_t hashlog_[10] = {0, HASH_LOG - 1, HASH_LOG - 1, HASH_LOG - 1, HASH_LOG,
+  uint8_t hashlog_[10] = {0, HASH_LOG -1, HASH_LOG, HASH_LOG, HASH_LOG,
                            HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[opt_level];
   // Initialize the hash table to distances of 0
@@ -380,7 +371,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     distance = (int32_t)(anchor - ref);
 
     /* update hash table */
-    htab[hval] = (uint16_t) (anchor - ibase);
+    htab[hval] = (uint32_t) (anchor - ibase);
 
     if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
       LITERAL(ip, op, op_limit, anchor, copy)
@@ -478,7 +469,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     /* update the hash at match boundary */
     if (ip < ip_limit) {
       HASH_FUNCTION(hval, ip, hashlog)
-      htab[hval] = (uint16_t)(ip - ibase);
+      htab[hval] = (uint32_t) (ip - ibase);
     }
     ip += 2;
     /* assuming literal copy */

@@ -107,29 +107,28 @@ void btune_next_blocksize(blosc2_context *context) {
 
   /* Now the blocksize for splittable codecs */
   if (clevel > 0 && split_block(context->compcode, typesize, blocksize, true)) {
-    if (context->compcode == BLOSC_BLOSCLZ) {
-      // BloscLZ requires never exceeding 64KB blocksize (hash table is 16-bit)
-      switch (clevel) {
-        case 1:
-          blocksize = 16 * 1024;
-          break;
-        case 2:
-        case 3:
-          blocksize = 16 * 1024;
-          break;
-        case 4:
-        case 5:
-        case 6:
-          blocksize = 32 * 1024;
-          break;
-        case 7:
-        case 8:
-        case 9:
-          blocksize = 64 * 1024;
-          break;
-        default:
-          break;
-      }
+    // For performance reasons, do not exceed L2 (256KB) cache
+    switch (clevel) {
+      case 1:
+        blocksize = 16 * 1024;
+        break;
+      case 2:
+      case 3:
+        blocksize = 32 * 1024;
+        break;
+      case 4:
+      case 5:
+        blocksize = 64 * 1024;
+        break;
+      case 6:
+      case 7:
+        blocksize = 128 * 1024;
+        break;
+      case 8:
+      case 9:
+      default:
+        blocksize = 256 * 1024;
+        break;
     }
     // Multiply by typesize so as to get proper split sizes
     blocksize *= typesize;
