@@ -81,7 +81,6 @@
   if (BLOSCLZ_UNEXPECT_CONDITIONAL(copy == MAX_COPY)) {  \
     copy = 0;                                            \
     *op++ = MAX_COPY-1;                                  \
-    nmax_copies++;                                       \
   }                                                      \
   continue;                                              \
 }
@@ -339,7 +338,6 @@ int blosclz_compress(const int opt_level, const void* input, int length,
   uint16_t htab[1U << (uint8_t)HASH_LOG];
   int32_t hval;
   uint8_t copy;
-  uint32_t nmax_copies = 0;
 
   double maxlength_[10] = {-1, .1, .2, .4, .5, .7, .9, .95, 1.0, 1.0};
   int32_t maxlength = (int32_t)(length * maxlength_[opt_level]);
@@ -356,13 +354,8 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     htab[i] = 0;
   }
 
-  // The maximum amount of consecutive MAX_COPY copies before giving up
-  // 0 means something very close to RLE; 255 means no giveup
-  uint8_t max_nmax_copies_[10] = {255, 8, 8, 16, 16, 32, 32, 32, 32, 64};
-  uint8_t max_nmax_copies = max_nmax_copies_[opt_level];
-
-  /* output buffer cannot be less than 66 bytes or we can get into trouble */
-  if (BLOSCLZ_UNEXPECT_CONDITIONAL(maxout < 66 || length < 4)) {
+  /* input and output buffer cannot be less than 16 and 66 bytes or we can get into trouble */
+  if (length < 16 || maxout < 66) {
     return 0;
   }
 
@@ -447,9 +440,6 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     ip -= 3;
     len = (int32_t)(ip - anchor);
 
-    /* check that we have space enough to encode the match for all the cases */
-    if (BLOSCLZ_UNEXPECT_CONDITIONAL(op + (len / 255) + 6 > op_limit)) goto out;
-
     /* encode the match */
     if (distance < MAX_DISTANCE) {
       if (len < 7) {
@@ -494,8 +484,6 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     /* assuming literal copy */
     *op++ = MAX_COPY - 1;
 
-    // reset the number of max copies
-    nmax_copies = 0;
   }
 
   leftover:
