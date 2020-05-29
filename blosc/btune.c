@@ -111,15 +111,17 @@ void btune_next_blocksize(blosc2_context *context) {
       // BloscLZ requires never exceeding 64KB blocksize (hash table is 16-bit)
       switch (clevel) {
         case 1:
+          blocksize = 16 * 1024;
+          break;
         case 2:
         case 3:
           blocksize = 16 * 1024;
           break;
         case 4:
         case 5:
+        case 6:
           blocksize = 32 * 1024;
           break;
-        case 6:
         case 7:
         case 8:
         case 9:
