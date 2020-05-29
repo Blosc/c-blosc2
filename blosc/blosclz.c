@@ -72,8 +72,8 @@
   if (BLOSCLZ_UNEXPECT_CONDITIONAL(copy == MAX_COPY)) {  \
     copy = 0;                                            \
     *op++ = MAX_COPY-1;                                  \
+    ncopies++;                                           \
   }                                                      \
-  continue;                                              \
 }
 
 #define IP_BOUNDARY 2
@@ -318,28 +318,46 @@ static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
 #endif
 
 
-int blosclz_compress(const int opt_level, const void* input, int length,
+int blosclz_compress(const int clevel, const void* input, int length,
                      void* output, int maxout) {
-  uint8_t* ip = (uint8_t*)input;
   uint8_t* ibase = (uint8_t*)input;
-  uint8_t* ip_bound = ip + length - IP_BOUNDARY;
-  uint8_t* ip_limit = ip + length - 12;
+  uint8_t* ip = ibase;
+  uint8_t* icycle = ibase;
+  uint8_t* ip_bound = ibase + length - IP_BOUNDARY;
+  uint8_t* ip_limit = ibase + length - 12;
   uint8_t* op = (uint8_t*)output;
   uint8_t* op_limit;
   uint32_t htab[1U << (uint8_t)HASH_LOG];
   int32_t hval;
   uint8_t copy;
+  int ncopies = 0;
+  int skip_cycle = 0;
+  double copy_ratio;
 
   double maxlength_[10] = {-1, .1, .2, .4, .5, .7, .9, .95, 1.0, 1.0};
-  int32_t maxlength = (int32_t)(length * maxlength_[opt_level]);
+  int32_t maxlength = (int32_t)(length * maxlength_[clevel]);
   if (maxlength > (int32_t)maxout) {
     maxlength = (int32_t)maxout;
   }
-  op_limit = op + maxlength;
+  if (clevel <= 5) {
+    // The truncation mode is faster, albeit less accurate than skip mode,
+    // but that is fine for low compression methods
+    op_limit = op + maxlength;
+  }
+  else {
+    op_limit = op + (int32_t) maxout;
+  }
+
+  // The maximum amount of cycles to skip match lookups
+  int max_skip_cycles_[10] = {255, 64, 64, 32, 32, 32, 16, 8, 8, 1};
+  int max_skip_cycles = max_skip_cycles_[clevel];
+  // The maximum raw copied bytes ratio before skipping a number of cycles
+  double maxcopy_ratio_[10] = {-1, .2, .2, .4, .5, .7, .8, .9, .95, 1.};
+  double maxcopy_ratio = maxcopy_ratio_[clevel];
 
   uint8_t hashlog_[10] = {0, HASH_LOG -1, HASH_LOG, HASH_LOG, HASH_LOG,
                            HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
-  uint8_t hashlog = hashlog_[opt_level];
+  uint8_t hashlog = hashlog_[clevel];
   // Initialize the hash table to distances of 0
   for (unsigned i = 0; i < (1U << hashlog); i++) {
     htab[i] = 0;
@@ -363,6 +381,27 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     uint32_t len = 3;         /* minimum match length */
     uint8_t* anchor = ip;    /* comparison starting-point */
 
+    if (clevel > 5) {
+      // Enter the skip cycling mode
+      if (skip_cycle) {
+        LITERAL(ip, op, op_limit, anchor, copy);
+        if (ncopies > 0) {
+          skip_cycle--;
+          icycle = ip;
+        }
+        continue;
+      }
+      if (ip > icycle) {
+        copy_ratio = (double) (ncopies * MAX_COPY) / (double) (ip - icycle);
+        if (copy_ratio > maxcopy_ratio) {
+          skip_cycle = max_skip_cycles;
+          ncopies = 0;
+          icycle = ip;
+          continue;
+        }
+      }
+    }
+
     /* find potential match */
     HASH_FUNCTION(hval, ip, hashlog)
     ref = ibase + htab[hval];
@@ -375,6 +414,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
 
     if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
       LITERAL(ip, op, op_limit, anchor, copy)
+      continue;
     }
 
     /* is this a match? check the first 4 bytes */
@@ -386,6 +426,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     else if (*ref++ != *ip++ || *ref++ != *ip++ || *ref++ != *ip) {
       /* no luck, copy as a literal */
       LITERAL(ip, op, op_limit, anchor, copy)
+      continue;
     }
 
     /* last matched byte */
