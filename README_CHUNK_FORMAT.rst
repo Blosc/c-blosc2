@@ -35,7 +35,7 @@ All entries are little endian.
     (``uint8``) Blosc format version.
 
 :versionlz:
-    (``uint8``) Version of the internal compressor used.
+    (``uint8``) Version of the *format* of the internal compressor used (normally always 1).
 
 :flags and compressor enumeration:
     (``bitfield``) The flags of the buffer
@@ -57,7 +57,7 @@ All entries are little endian.
     :bit 7 (``0x80``):
         Part of the enumeration for compressors.
 
-    Note:: If both bit 0 and bit 2 are set at once, that means that an
+    Note:: If both bit 0 and bit 2 are both set, that means that an
         extended header (see above) is used.
 
     The last three bits form an enumeration that allows to use alternative
@@ -97,3 +97,8 @@ All entries are little endian.
 
     :bit 0 (``0x01``):
         Whether the codec uses dictionaries or not.
+    :bit 1 (``0x02``):
+        Whether the header is extended with +32 bytes coming right after this byte. 
+    :bit 2 (``0x04``):
+        Whether the codec is stored in a byte previous to this compressed buffer or it is in the global `flags` for chunk. 
+        
