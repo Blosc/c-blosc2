@@ -388,8 +388,6 @@ int blosclz_compress(const int opt_level, const void* input, int length,
       LITERAL(ip, op, op_limit, anchor, copy)
     }
 
-    match:
-
     /* last matched byte */
     ip = anchor + len;
 
