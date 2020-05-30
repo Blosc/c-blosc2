@@ -72,12 +72,11 @@
   if (BLOSCLZ_UNEXPECT_CONDITIONAL(copy == MAX_COPY)) {  \
     copy = 0;                                            \
     *op++ = MAX_COPY-1;                                  \
-    ncopies++;                                           \
   }                                                      \
 }
 
 #define IP_BOUNDARY 2
-
+#define BYTES_IN_CYCLE 512
 
 #if defined(__AVX2__)
 static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
@@ -326,34 +325,28 @@ int blosclz_compress(const int clevel, const void* input, int length,
   uint8_t* ip_bound = ibase + length - IP_BOUNDARY;
   uint8_t* ip_limit = ibase + length - 12;
   uint8_t* op = (uint8_t*)output;
+  uint8_t* ocycle = op;
   uint8_t* op_limit;
   uint32_t htab[1U << (uint8_t)HASH_LOG];
   int32_t hval;
   uint8_t copy;
-  int ncopies = 0;
-  int skip_cycle = 0;
-  double copy_ratio;
+  long skip_cycle = 0;
+  double cratio;
 
-  double maxlength_[10] = {-1, .1, .2, .4, .5, .7, .9, .95, 1.0, 1.0};
+  // Use _early giveup_ for clevel < 5 and then switch to _entropy probing_
+  double maxlength_[10] = {-1, .1, .15, .2, .3, 1., 1., 1., 1., 1.};
   int32_t maxlength = (int32_t)(length * maxlength_[clevel]);
   if (maxlength > (int32_t)maxout) {
     maxlength = (int32_t)maxout;
   }
-  if (clevel <= 5) {
-    // The truncation mode is faster, albeit less accurate than skip mode,
-    // but that is fine for low compression methods
-    op_limit = op + maxlength;
-  }
-  else {
-    op_limit = op + (int32_t) maxout;
-  }
+  op_limit = op + maxlength;
 
-  // The maximum amount of cycles to skip match lookups
-  int max_skip_cycles_[10] = {255, 64, 64, 32, 32, 32, 16, 8, 8, 1};
-  int max_skip_cycles = max_skip_cycles_[clevel];
-  // The maximum raw copied bytes ratio before skipping a number of cycles
-  double maxcopy_ratio_[10] = {-1, .2, .2, .4, .5, .7, .8, .9, .95, 1.};
-  double maxcopy_ratio = maxcopy_ratio_[clevel];
+  // The maximum amount of cycles to skip match lookups (_entropy probing_)
+  long max_skip_cycles_[10] = {255, 0, 0, 0, 0, 4, 3, 2, 1, 0};
+  long max_skip_cycles = max_skip_cycles_[clevel];
+  // The minimum compression ratio before skipping a number of cycles
+  double min_cratio_[10] = {-1, 0., 0., 0., 0., 5., 4., 3., 2., 1.};
+  double min_cratio = min_cratio_[clevel];
 
   uint8_t hashlog_[10] = {0, HASH_LOG -1, HASH_LOG, HASH_LOG, HASH_LOG,
                            HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
@@ -381,22 +374,25 @@ int blosclz_compress(const int clevel, const void* input, int length,
     uint32_t len = 3;         /* minimum match length */
     uint8_t* anchor = ip;    /* comparison starting-point */
 
-    if (clevel > 5) {
-      // Enter the skip cycling mode
+    if (max_skip_cycles) {
+      // Enter the entropy probing mode
       if (skip_cycle) {
         LITERAL(ip, op, op_limit, anchor, copy);
-        if (ncopies > 0) {
+        // Start a new cycle every 256 bytes
+        if ((ip - icycle) >= BYTES_IN_CYCLE) {
           skip_cycle--;
           icycle = ip;
+          ocycle = op;
         }
         continue;
       }
-      if (ip > icycle) {
-        copy_ratio = (double) (ncopies * MAX_COPY) / (double) (ip - icycle);
-        if (copy_ratio > maxcopy_ratio) {
+      // Check whether we are doing well with compression ratios
+      if ((op - ocycle) >= BYTES_IN_CYCLE) {
+        cratio = (double) (ip - icycle) / (double) (op - ocycle);
+        if (cratio < min_cratio) {
           skip_cycle = max_skip_cycles;
-          ncopies = 0;
           icycle = ip;
+          ocycle = op;
           continue;
         }
       }
