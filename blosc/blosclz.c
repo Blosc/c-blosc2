@@ -377,6 +377,16 @@ int blosclz_compress(const int clevel, const void* input, int length,
     if (max_skip_cycles) {
       // Enter the entropy probing mode
       if (skip_cycle) {
+        // Just check for runs larger than 4-byte when in entropy probing mode
+        // Not sure if that would help in general, but it does not hurt either
+        if (BLOSCLZ_READU32(ip - 1) == BLOSCLZ_READU32(ip)) {
+          // Way to trigger this: `b2bench blosclz shuffle single 6 1048576 19 19`
+          //printf("m");
+          distance = 1;
+          ref = anchor - 1 + 4;
+          len = 4;
+          goto match;
+        }
         LITERAL(ip, op, op_limit, anchor, copy);
         // Start a new cycle every 256 bytes
         if ((ip - icycle) >= BYTES_IN_CYCLE) {
@@ -425,6 +435,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
       continue;
     }
 
+    match:
     /* last matched byte */
     ip = anchor + len;
 
