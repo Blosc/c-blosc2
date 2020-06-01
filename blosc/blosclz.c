@@ -334,7 +334,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
   double cratio;
 
   // Use _early giveup_ for clevel < 5 and then switch to _entropy probing_
-  double maxlength_[10] = {-1, .1, .15, .2, .3, 1., 1., 1., 1., 1.};
+  double maxlength_[10] = {-1, .1, .15, .2, 1., 1., 1., 1., 1., 1.};
   int32_t maxlength = (int32_t)(length * maxlength_[clevel]);
   if (maxlength > (int32_t)maxout) {
     maxlength = (int32_t)maxout;
@@ -342,10 +342,10 @@ int blosclz_compress(const int clevel, const void* input, int length,
   op_limit = op + maxlength;
 
   // The maximum amount of cycles to skip match lookups (_entropy probing_)
-  long max_skip_cycles_[10] = {255, 0, 0, 0, 0, 4, 3, 2, 1, 0};
+  long max_skip_cycles_[10] = {255, 0, 0, 0, 6, 4, 2, 2, 1, 0};
   long max_skip_cycles = max_skip_cycles_[clevel];
   // The minimum compression ratio before skipping a number of cycles
-  double min_cratio_[10] = {-1, 0., 0., 0., 0., 5., 4., 3., 2., 1.};
+  double min_cratio_[10] = {-1, 0., 0., 0., 6., 5., 4., 3., 2., 1.};
   double min_cratio = min_cratio_[clevel];
 
   uint8_t hashlog_[10] = {0, HASH_LOG -1, HASH_LOG, HASH_LOG, HASH_LOG,

@@ -110,20 +110,18 @@ void btune_next_blocksize(blosc2_context *context) {
     // For performance reasons, do not exceed L2 (256KB) cache
     switch (clevel) {
       case 1:
+      case 2:
         blocksize = 16 * 1024;
         break;
-      case 2:
       case 3:
         blocksize = 32 * 1024;
         break;
       case 4:
       case 5:
-        blocksize = 64 * 1024;
-        break;
       case 6:
-      case 7:
         blocksize = 128 * 1024;
         break;
+      case 7:
       case 8:
       case 9:
       default:
