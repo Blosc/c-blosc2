@@ -376,12 +376,12 @@ int blosclz_compress(const int clevel, const void* input, int length,
     uint32_t len = 4;         /* minimum match length */
     uint8_t* anchor = ip;    /* comparison starting-point */
 
-    if (max_skip_cycles) {
+    if (BLOSCLZ_EXPECT_CONDITIONAL(max_skip_cycles)) {
       // Enter the entropy probing mode
       if (skip_cycle) {
         LITERAL(ip, op, op_limit, anchor, copy)
         // Start a new cycle every 256 bytes
-        if ((ip - icycle) >= BYTES_IN_CYCLE) {
+        if (BLOSCLZ_UNEXPECT_CONDITIONAL(ip - icycle) >= BYTES_IN_CYCLE) {
           skip_cycle--;
           icycle = ip;
           ocycle = op;
@@ -389,7 +389,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
         continue;
       }
       // Check whether we are doing well with compression ratios
-      if ((op - ocycle) >= BYTES_IN_CYCLE) {
+      if (BLOSCLZ_UNEXPECT_CONDITIONAL((op - ocycle) >= BYTES_IN_CYCLE)) {
         cratio = (double) (ip - icycle) / (double) (op - ocycle);
         if (cratio < min_cratio) {
           skip_cycle = max_skip_cycles;
@@ -416,7 +416,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
     }
 
     /* is this a match? check the first 4 bytes */
-    if (BLOSCLZ_READU32(ref) == BLOSCLZ_READU32(ip)) {
+    if (BLOSCLZ_UNEXPECT_CONDITIONAL(BLOSCLZ_READU32(ref) == BLOSCLZ_READU32(ip))) {
       ref += 4;
     }
     else {
@@ -431,7 +431,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
     /* distance is biased */
     distance--;
 
-    if (!distance) {
+    if (BLOSCLZ_UNEXPECT_CONDITIONAL(!distance)) {
       /* zero distance means a run */
 #if defined(__AVX2__)
       ip = get_run_32(ip, ip_bound, ref);
@@ -502,7 +502,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
     }
 
     /* update the hash at match boundary */
-    if (ip < ip_limit) {
+    if (BLOSCLZ_UNEXPECT_CONDITIONAL(ip < ip_limit)) {
       HASH_FUNCTION(hval, ip, hashlog)
       htab[hval] = (uint32_t) (ip - ibase);
     }
@@ -514,11 +514,11 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
   /* left-over as literal copy */
   ip_bound++;
-  while (ip <= ip_bound) {
+  while (BLOSCLZ_UNEXPECT_CONDITIONAL(ip <= ip_bound)) {
     if (BLOSCLZ_UNEXPECT_CONDITIONAL(op + 2 > op_limit)) goto out;
     *op++ = *ip++;
     copy++;
-    if (copy == MAX_COPY) {
+    if (BLOSCLZ_UNEXPECT_CONDITIONAL(copy == MAX_COPY)) {
       copy = 0;
       *op++ = MAX_COPY - 1;
     }
