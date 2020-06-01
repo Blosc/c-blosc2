@@ -379,7 +379,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
     if (max_skip_cycles) {
       // Enter the entropy probing mode
       if (skip_cycle) {
-        LITERAL(ip, op, op_limit, anchor, copy);
+        LITERAL(ip, op, op_limit, anchor, copy)
         // Start a new cycle every 256 bytes
         if ((ip - icycle) >= BYTES_IN_CYCLE) {
           skip_cycle--;
