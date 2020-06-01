@@ -1297,36 +1297,6 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
 
 
 /* Decompress and return a chunk that is part of a frame. */
-int frame_decompress_chunk(blosc2_frame *frame, int nchunk, void *dest, size_t nbytes) {
-  uint8_t* src;
-  bool needs_free;
-  int retcode = frame_get_chunk(frame, nchunk, &src, &needs_free);
-  if (retcode < 0) {
-    fprintf(stderr,
-            "cannot get the chunk in position %d", nchunk);
-    return -1;
-  }
-
-  /* Create a buffer for destination */
-  int32_t nbytes_ = sw32_(src + 4);
-  if (nbytes_ > (int32_t)nbytes) {
-    fprintf(stderr, "Not enough space for decompressing in dest");
-    return -1;
-  }
-
-  /* And decompress it */
-  int32_t chunksize = blosc_decompress(src, dest, nbytes);
-  if (chunksize < 0 || chunksize != nbytes_) {
-    fprintf(stderr, "Error in decompressing chunk");
-    return -11;
-  }
-
-  if (needs_free) {
-    free(src);
-  }
-  return (int)chunksize;
-}
-
 int frame_decompress_ctx_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk, void *dest, size_t nbytes) {
   uint8_t* src;
   bool needs_free;
