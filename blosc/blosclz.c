@@ -420,8 +420,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
       len = 4;
       ref += 4;
     }
-    /* check just the first 3 bytes */
-    else if (*ref++ != *ip++ || *ref++ != *ip++ || *ref++ != *ip) {
+    else {
       /* no luck, copy as a literal */
       LITERAL(ip, op, op_limit, anchor, copy)
       continue;
