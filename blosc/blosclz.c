@@ -373,7 +373,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
   while (BLOSCLZ_EXPECT_CONDITIONAL(ip < ip_limit)) {
     const uint8_t* ref;
     uint32_t distance;
-    uint32_t len = 3;         /* minimum match length */
+    uint32_t len = 4;         /* minimum match length */
     uint8_t* anchor = ip;    /* comparison starting-point */
 
     if (max_skip_cycles) {
@@ -417,7 +417,6 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
     /* is this a match? check the first 4 bytes */
     if (BLOSCLZ_READU32(ref) == BLOSCLZ_READU32(ip)) {
-      len = 4;
       ref += 4;
     }
     else {
