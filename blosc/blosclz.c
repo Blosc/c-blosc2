@@ -628,10 +628,12 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
       ref -= code;
 
       /* match from 16-bit distance */
-      if (BLOSCLZ_UNEXPECT_CONDITIONAL(code == 255)) if (BLOSCLZ_EXPECT_CONDITIONAL(ofs == (31U << 8U))) {
-        ofs = (*ip++) << 8U;
-        ofs += *ip++;
-        ref = op - ofs - MAX_DISTANCE;
+      if (BLOSCLZ_UNEXPECT_CONDITIONAL(code == 255)) {
+        if (BLOSCLZ_EXPECT_CONDITIONAL(ofs == (31U << 8U))) {
+          ofs = (*ip++) << 8U;
+          ofs += *ip++;
+          ref = op - ofs - MAX_DISTANCE;
+        }
       }
 
 #ifdef BLOSCLZ_SAFE
@@ -691,11 +693,11 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
       // in performance.
       op = fastcopy(op, ip, (unsigned) ctrl); ip += ctrl;
 
-      loop = (int32_t)BLOSCLZ_EXPECT_CONDITIONAL(ip < ip_limit);
-      if (loop)
+      loop = (int32_t)(ip < ip_limit);
+      if (BLOSCLZ_EXPECT_CONDITIONAL(loop))
         ctrl = *ip++;
     }
-  } while (BLOSCLZ_EXPECT_CONDITIONAL(loop));
+  } while (loop);
 
   return (int)(op - (uint8_t*)output);
 }
