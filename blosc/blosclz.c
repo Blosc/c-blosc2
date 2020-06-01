@@ -344,10 +344,10 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
   // The maximum amount of cycles to skip match lookups
   // A 0 means just _early giveup_ whereas > 0 use _entropy sensing_ too
-  long max_skip_cycles_[10] = {255, 0, 0, 0, 3, 3, 2, 1, 1, 0};
+  long max_skip_cycles_[10] = {255, 0, 0, 0, 3, 3, 3, 1, 1, 0};
   long max_skip_cycles = max_skip_cycles_[clevel];
   // The minimum compression ratio before skipping a number of cycles
-  double min_cratio_[10] = {-1, 0., 0., 0., 5., 5., 4., 3., 2., 1.};
+  double min_cratio_[10] = {-1, 0., 0., 0., 5., 5., 5., 4., 3., 1.};
   double min_cratio = min_cratio_[clevel];
 
   uint8_t hashlog_[10] = {0, HASH_LOG - 1, HASH_LOG - 1, HASH_LOG, HASH_LOG,
