@@ -249,7 +249,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
       return -11;
     }
   } else {
-    chunksize = frame_decompress_ctx_chunk(schunk->dctx, schunk->frame, nchunk, dest, nbytes);
+    chunksize = frame_decompress_chunk(schunk->dctx, schunk->frame, nchunk, dest, nbytes);
     if (chunksize < 0) {
       return -10;
     }

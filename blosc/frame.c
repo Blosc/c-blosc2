@@ -1297,7 +1297,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
 
 
 /* Decompress and return a chunk that is part of a frame. */
-int frame_decompress_ctx_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk, void *dest, size_t nbytes) {
+int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk, void *dest, size_t nbytes) {
   uint8_t* src;
   bool needs_free;
   int retcode = frame_get_chunk(frame, nchunk, &src, &needs_free);
