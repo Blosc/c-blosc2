@@ -73,11 +73,10 @@
     copy = 0;                                            \
     *op++ = MAX_COPY-1;                                  \
   }                                                      \
-  continue;                                              \
 }
 
 #define IP_BOUNDARY 2
-
+#define BYTES_IN_CYCLE 512
 
 #if defined(__AVX2__)
 static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
@@ -318,28 +317,42 @@ static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
 #endif
 
 
-int blosclz_compress(const int opt_level, const void* input, int length,
+int blosclz_compress(const int clevel, const void* input, int length,
                      void* output, int maxout) {
-  uint8_t* ip = (uint8_t*)input;
   uint8_t* ibase = (uint8_t*)input;
-  uint8_t* ip_bound = ip + length - IP_BOUNDARY;
-  uint8_t* ip_limit = ip + length - 12;
+  uint8_t* ip = ibase;
+  uint8_t* icycle = ibase;
+  uint8_t* ip_bound = ibase + length - IP_BOUNDARY;
+  uint8_t* ip_limit = ibase + length - 12;
   uint8_t* op = (uint8_t*)output;
+  uint8_t* ocycle = op;
   uint8_t* op_limit;
   uint32_t htab[1U << (uint8_t)HASH_LOG];
   int32_t hval;
   uint8_t copy;
+  long skip_cycle = 0;
+  double cratio;
 
-  double maxlength_[10] = {-1, .1, .2, .4, .5, .7, .9, .95, 1.0, 1.0};
-  int32_t maxlength = (int32_t)(length * maxlength_[opt_level]);
+  // Minimum cratios before issuing and _early giveup_
+  // Remind that blosclz is not meant for cratios <= 2 (too costly to decompress)
+  double maxlength_[10] = {-1, .1, .15, .2, .4, .4, .4, .4, .45, .5};
+  int32_t maxlength = (int32_t)(length * maxlength_[clevel]);
   if (maxlength > (int32_t)maxout) {
     maxlength = (int32_t)maxout;
   }
   op_limit = op + maxlength;
 
-  uint8_t hashlog_[10] = {0, HASH_LOG -1, HASH_LOG, HASH_LOG, HASH_LOG,
+  // The maximum amount of cycles to skip match lookups
+  // A 0 means just _early giveup_ whereas > 0 use _entropy sensing_ too
+  long max_skip_cycles_[10] = {255, 0, 0, 0, 3, 3, 2, 1, 1, 0};
+  long max_skip_cycles = max_skip_cycles_[clevel];
+  // The minimum compression ratio before skipping a number of cycles
+  double min_cratio_[10] = {-1, 0., 0., 0., 5., 5., 4., 3., 2., 1.};
+  double min_cratio = min_cratio_[clevel];
+
+  uint8_t hashlog_[10] = {0, HASH_LOG - 1, HASH_LOG - 1, HASH_LOG, HASH_LOG,
                            HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
-  uint8_t hashlog = hashlog_[opt_level];
+  uint8_t hashlog = hashlog_[clevel];
   // Initialize the hash table to distances of 0
   for (unsigned i = 0; i < (1U << hashlog); i++) {
     htab[i] = 0;
@@ -363,6 +376,30 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     uint32_t len = 3;         /* minimum match length */
     uint8_t* anchor = ip;    /* comparison starting-point */
 
+    if (max_skip_cycles) {
+      // Enter the entropy probing mode
+      if (skip_cycle) {
+        LITERAL(ip, op, op_limit, anchor, copy);
+        // Start a new cycle every 256 bytes
+        if ((ip - icycle) >= BYTES_IN_CYCLE) {
+          skip_cycle--;
+          icycle = ip;
+          ocycle = op;
+        }
+        continue;
+      }
+      // Check whether we are doing well with compression ratios
+      if ((op - ocycle) >= BYTES_IN_CYCLE) {
+        cratio = (double) (ip - icycle) / (double) (op - ocycle);
+        if (cratio < min_cratio) {
+          skip_cycle = max_skip_cycles;
+          icycle = ip;
+          ocycle = op;
+          continue;
+        }
+      }
+    }
+
     /* find potential match */
     HASH_FUNCTION(hval, ip, hashlog)
     ref = ibase + htab[hval];
@@ -375,6 +412,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
 
     if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
       LITERAL(ip, op, op_limit, anchor, copy)
+      continue;
     }
 
     /* is this a match? check the first 4 bytes */
@@ -386,6 +424,7 @@ int blosclz_compress(const int opt_level, const void* input, int length,
     else if (*ref++ != *ip++ || *ref++ != *ip++ || *ref++ != *ip) {
       /* no luck, copy as a literal */
       LITERAL(ip, op, op_limit, anchor, copy)
+      continue;
     }
 
     /* last matched byte */
