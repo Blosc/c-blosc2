@@ -335,7 +335,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
   // Minimum cratios before issuing and _early giveup_
   // Remind that blosclz is not meant for cratios <= 2 (too costly to decompress)
-  double maxlength_[10] = {-1, .1, .15, .2, .4, .4, .4, .4, .45, .5};
+  double maxlength_[10] = {-1, .07, .1, .2, .3, .4, .4, .4, .45, .5};
   int32_t maxlength = (int32_t)(length * maxlength_[clevel]);
   if (maxlength > (int32_t)maxout) {
     maxlength = (int32_t)maxout;
@@ -350,7 +350,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
   double min_cratio_[10] = {-1, 0., 0., 0., 5., 5., 5., 4., 3., 1.};
   double min_cratio = min_cratio_[clevel];
 
-  uint8_t hashlog_[10] = {0, HASH_LOG - 1, HASH_LOG - 1, HASH_LOG, HASH_LOG,
+  uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
                            HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[clevel];
   // Initialize the hash table to distances of 0
