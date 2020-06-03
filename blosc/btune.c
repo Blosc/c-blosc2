@@ -107,19 +107,17 @@ void btune_next_blocksize(blosc2_context *context) {
 
   /* Now the blocksize for splittable codecs */
   if (clevel > 0 && split_block(context->compcode, typesize, blocksize, true)) {
-    // For performance reasons, do not exceed 128 KB (in + out must fit in L2 cache)
+    // For performance reasons, do not exceed 256 KB (in must fit in L2 cache)
     switch (clevel) {
       case 1:
-      case 2:
         blocksize = 8 * 1024;
         break;
+      case 2:
       case 3:
-      case 4:
-        blocksize = 32 * 1024;
+        blocksize = 16 * 1024;
         break;
+      case 4:
       case 5:
-//        blocksize = 128 * 1024;
-//        break;
       case 6:
       case 7:
       case 8:

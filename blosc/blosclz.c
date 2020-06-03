@@ -336,7 +336,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
   // Minimum cratios before issuing and _early giveup_
   // Remind that blosclz is not meant for cratios <= 2 (too costly to decompress)
-  double maxlength_[10] = {-1, .07, .1, .2, .5, .5, .5, .5, .5, .6};
+  double maxlength_[10] = {-1, .07, .1, .2, .4, .5, .5, .5, .5, .6};
   int32_t maxlength = (int32_t)(length * maxlength_[clevel]);
   if (maxlength > (int32_t)maxout) {
     maxlength = (int32_t)maxout;
