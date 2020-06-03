@@ -504,15 +504,12 @@ int blosclz_compress(const int clevel, const void* input, int length,
     }
 
     /* update the hash at match boundary */
-    if (BLOSCLZ_UNEXPECT_CONDITIONAL(ip + 1 < ip_limit)) {
-      seq = BLOSCLZ_READU32(ip);
-      HASH_FUNCTION(hval, seq, hashlog)
-      htab[hval] = (uint32_t) (ip - ibase);
-      seq >>= 8U;
-      HASH_FUNCTION(hval, seq, hashlog)
-      htab[hval] = (uint32_t) (ip + 1 - ibase);
-    }
-    ip += 2;
+    seq = BLOSCLZ_READU32(ip);
+    HASH_FUNCTION(hval, seq, hashlog)
+    htab[hval] = (uint32_t) (ip++ - ibase);
+    seq >>= 8U;
+    HASH_FUNCTION(hval, seq, hashlog)
+    htab[hval] = (uint32_t) (ip++ - ibase);
     /* assuming literal copy */
     *op++ = MAX_COPY - 1;
 
