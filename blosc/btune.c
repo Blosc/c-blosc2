@@ -114,13 +114,13 @@ void btune_next_blocksize(blosc2_context *context) {
         blocksize = 8 * 1024;
         break;
       case 3:
-        blocksize = 64 * 1024;
-        break;
       case 4:
-      case 5:
-      case 6:
-        blocksize = 128 * 1024;
+        blocksize = 32 * 1024;
         break;
+      case 5:
+//        blocksize = 128 * 1024;
+//        break;
+      case 6:
       case 7:
       case 8:
       case 9:
