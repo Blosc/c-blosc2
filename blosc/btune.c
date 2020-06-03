@@ -110,28 +110,30 @@ void btune_next_blocksize(blosc2_context *context) {
     // For performance reasons, do not exceed 128 KB (in + out must fit in L2 cache)
     switch (clevel) {
       case 1:
+      case 2:
         blocksize = 8 * 1024;
         break;
-      case 2:
-        blocksize = 16 * 1024;
-        break;
       case 3:
-        blocksize = 32 * 1024;
+        blocksize = 64 * 1024;
         break;
       case 4:
       case 5:
       case 6:
-        blocksize = 64 * 1024;
+        blocksize = 128 * 1024;
         break;
       case 7:
       case 8:
       case 9:
       default:
-        blocksize = 128 * 1024;
+        blocksize = 256 * 1024;
         break;
     }
     // Multiply by typesize so as to get proper split sizes
     blocksize *= typesize;
+    // But do not exceed 1 MB per thread (having this capacity in L3 is normal in modern CPUs)
+    if (blocksize > 1024 * 1024) {
+      blocksize = 1024 * 1024;
+    }
   }
 
   last:
