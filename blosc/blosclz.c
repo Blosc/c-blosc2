@@ -58,8 +58,8 @@
 #define HASH_LOG (11)
 
 // This is used in LZ4 and seems to work pretty well here too
-#define HASH_FUNCTION(v, p, h) {                          \
-  v = ((BLOSCLZ_READU32(p) * 2654435761U) >> (32U - h));  \
+#define HASH_FUNCTION(v, s, h) {                          \
+  v = (s * 2654435761U) >> (32U - h);  \
 }
 
 
@@ -328,7 +328,8 @@ int blosclz_compress(const int clevel, const void* input, int length,
   uint8_t* ocycle = op;
   uint8_t* op_limit;
   uint32_t htab[1U << (uint8_t)HASH_LOG];
-  int32_t hval;
+  uint32_t hval;
+  uint32_t seq;
   uint8_t copy;
   long skip_cycle = 0;
   double cratio;
@@ -401,7 +402,8 @@ int blosclz_compress(const int clevel, const void* input, int length,
     }
 
     /* find potential match */
-    HASH_FUNCTION(hval, ip, hashlog)
+    seq = BLOSCLZ_READU32(ip);
+    HASH_FUNCTION(hval, seq, hashlog)
     ref = ibase + htab[hval];
 
     /* calculate distance to the match */
@@ -502,9 +504,13 @@ int blosclz_compress(const int clevel, const void* input, int length,
     }
 
     /* update the hash at match boundary */
-    if (BLOSCLZ_UNEXPECT_CONDITIONAL(ip < ip_limit)) {
-      HASH_FUNCTION(hval, ip, hashlog)
+    if (BLOSCLZ_UNEXPECT_CONDITIONAL(ip + 1 < ip_limit)) {
+      seq = BLOSCLZ_READU32(ip);
+      HASH_FUNCTION(hval, seq, hashlog)
       htab[hval] = (uint32_t) (ip - ibase);
+      seq >>= 8U;
+      HASH_FUNCTION(hval, seq, hashlog)
+      htab[hval] = (uint32_t) (ip + 1 - ibase);
     }
     ip += 2;
     /* assuming literal copy */
