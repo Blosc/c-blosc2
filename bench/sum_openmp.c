@@ -67,7 +67,7 @@
 #else
 #define DTYPE float
 #define CLEVEL 1
-#define CODEC BLOSC_LZ4HC
+#define CODEC BLOSC_LZ4
 #endif
 
 
@@ -83,6 +83,7 @@ int main(void) {
   int i, j, nchunk;
   blosc_timestamp_t last, current;
   double ttotal, itotal;
+  char* envvar = NULL;
 
   printf("Blosc version info: %s (%s)\n",
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
@@ -141,9 +142,25 @@ int main(void) {
          ttotal, (isize * NCHUNKS) / (ttotal * (double)MB));
 
   // Create a super-chunk container for the compressed container
+  long codec = CODEC;
+  envvar = getenv("SUM_COMPRESSOR");
+  if (envvar != NULL) {
+    codec = blosc_compname_to_compcode(envvar);
+    if (codec < 0) {
+      printf("Unknown compresssor: %s\n", envvar);
+      return 1;
+    }
+  }
+  cparams.compcode = codec;
+
+  long clevel = CLEVEL;
+  envvar = getenv("SUM_CLEVEL");
+  if (envvar != NULL) {
+    clevel = strtol(envvar, NULL, 10);
+  }
+  cparams.clevel = clevel;
+
   cparams.typesize = sizeof(DTYPE);
-  cparams.compcode = CODEC;
-  cparams.clevel = CLEVEL;
   cparams.nthreads = 1;
   dparams.nthreads = 1;
   blosc_set_timestamp(&last);
@@ -164,7 +181,7 @@ int main(void) {
          ttotal, nbytes / (ttotal * MB));
 
   int nthreads = NTHREADS;
-  char* envvar = getenv("OMP_NUM_THREADS");
+  envvar = getenv("OMP_NUM_THREADS");
   if (envvar != NULL) {
     long value;
     value = strtol(envvar, NULL, 10);
