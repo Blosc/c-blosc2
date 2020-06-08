@@ -346,8 +346,10 @@ int blosclz_compress(const int clevel, const void* input, int length,
   }
 
   /* we start with literal copy */
-  copy = 2;
+  copy = 4;
   *op++ = MAX_COPY - 1;
+  *op++ = *ip++;
+  *op++ = *ip++;
   *op++ = *ip++;
   *op++ = *ip++;
 
@@ -355,7 +357,6 @@ int blosclz_compress(const int clevel, const void* input, int length,
   while (BLOSCLZ_EXPECT_CONDITIONAL(ip < ip_limit)) {
     const uint8_t* ref;
     uint32_t distance;
-    uint32_t len = 4;         /* minimum match length */
     uint8_t* anchor = ip;    /* comparison starting-point */
 
     /* find potential match */
@@ -385,7 +386,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
     }
 
     /* last matched byte */
-    ip = anchor + len;
+    ip = anchor + 4;
 
     /* distance is biased */
     distance--;
@@ -426,7 +427,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
     /* When we get back by 4 we obtain quite different compression properties.
      * It looks like 4 is more useful for binary data (compress better and faster). */
     ip -= 4;
-    len = (int32_t)(ip - anchor);
+    long len = ip - anchor;
 
     /* encode the match */
     if (distance < MAX_DISTANCE) {
