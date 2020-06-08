@@ -70,7 +70,6 @@
 }
 
 #define IP_BOUNDARY 2
-#define BYTES_IN_CYCLE 512
 
 #if defined(__AVX2__)
 static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
@@ -315,35 +314,23 @@ int blosclz_compress(const int clevel, const void* input, int length,
                      void* output, int maxout) {
   uint8_t* ibase = (uint8_t*)input;
   uint8_t* ip = ibase;
-  uint8_t* icycle = ibase;
   uint8_t* ip_bound = ibase + length - IP_BOUNDARY;
   uint8_t* ip_limit = ibase + length - 12;
   uint8_t* op = (uint8_t*)output;
-  uint8_t* ocycle = op;
   uint8_t* op_limit;
   uint32_t htab[1U << (uint8_t)HASH_LOG];
   uint32_t hval;
   uint32_t seq;
   uint8_t copy;
-  long skip_cycle = 0;
-  double cratio;
 
   // Minimum cratios before issuing and _early giveup_
   // Remind that blosclz is not meant for cratios <= 2 (too costly to decompress)
-  double maxlength_[10] = {-1, .07, .1, .2, .4, .5, .5, .5, .5, .6};
+  double maxlength_[10] = {-1, .07, .1, .15, .25, .45, .5, .5, .5, .5};
   int32_t maxlength = (int32_t)(length * maxlength_[clevel]);
   if (maxlength > (int32_t)maxout) {
     maxlength = (int32_t)maxout;
   }
   op_limit = op + maxlength;
-
-  // The maximum amount of cycles to skip match lookups
-  // A 0 means just _early giveup_ whereas > 0 use _entropy sensing_ too
-  long max_skip_cycles_[10] = {255, 0, 0, 0, 3, 2, 2, 1, 1, 0};
-  long max_skip_cycles = max_skip_cycles_[clevel];
-  // The minimum compression ratio before skipping a number of cycles
-  double min_cratio_[10] = {-1, 0., 0., 0., 5., 4., 4., 3., 2., 1.};
-  double min_cratio = min_cratio_[clevel];
 
   uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
                            HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
@@ -359,8 +346,10 @@ int blosclz_compress(const int clevel, const void* input, int length,
   }
 
   /* we start with literal copy */
-  copy = 2;
+  copy = 4;
   *op++ = MAX_COPY - 1;
+  *op++ = *ip++;
+  *op++ = *ip++;
   *op++ = *ip++;
   *op++ = *ip++;
 
@@ -368,32 +357,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
   while (BLOSCLZ_EXPECT_CONDITIONAL(ip < ip_limit)) {
     const uint8_t* ref;
     uint32_t distance;
-    uint32_t len = 4;         /* minimum match length */
     uint8_t* anchor = ip;    /* comparison starting-point */
-
-    if (BLOSCLZ_EXPECT_CONDITIONAL(max_skip_cycles)) {
-      // Enter the entropy probing mode
-      if (skip_cycle) {
-        LITERAL(ip, op, op_limit, anchor, copy)
-        // Start a new cycle every 256 bytes
-        if (BLOSCLZ_UNEXPECT_CONDITIONAL(ip - icycle) >= BYTES_IN_CYCLE) {
-          skip_cycle--;
-          icycle = ip;
-          ocycle = op;
-        }
-        continue;
-      }
-      // Check whether we are doing well with compression ratios
-      if (BLOSCLZ_UNEXPECT_CONDITIONAL((op - ocycle) >= BYTES_IN_CYCLE)) {
-        cratio = (double) (ip - icycle) / (double) (op - ocycle);
-        if (cratio < min_cratio) {
-          skip_cycle = max_skip_cycles;
-          icycle = ip;
-          ocycle = op;
-          continue;
-        }
-      }
-    }
 
     /* find potential match */
     seq = BLOSCLZ_READU32(ip);
@@ -422,7 +386,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
     }
 
     /* last matched byte */
-    ip = anchor + len;
+    ip = anchor + 4;
 
     /* distance is biased */
     distance--;
@@ -459,8 +423,11 @@ int blosclz_compress(const int clevel, const void* input, int length,
     copy = 0;
 
     /* length is biased, '1' means a match of 3 bytes */
-    ip -= 3;
-    len = (int32_t)(ip - anchor);
+    /* ip -= 3; */
+    /* When we get back by 4 we obtain quite different compression properties.
+     * It looks like 4 is more useful for binary data (compress better and faster). */
+    ip -= 4;
+    long len = ip - anchor;
 
     /* encode the match */
     if (distance < MAX_DISTANCE) {
