@@ -119,8 +119,12 @@ void btune_next_blocksize(blosc2_context *context) {
       case 4:
       case 5:
       case 6:
+        blocksize = 64 * 1024;
+        break;
       case 7:
       case 8:
+        blocksize = 128 * 1024;
+        break;
       case 9:
       default:
         blocksize = 256 * 1024;
@@ -132,9 +136,9 @@ void btune_next_blocksize(blosc2_context *context) {
     if (blocksize > 1024 * 1024) {
       blocksize = 1024 * 1024;
     }
-    if (blocksize < 64 * 1024) {
-      /* Do not use a too small blocksize (< 64 KB) when typesize is small */
-      blocksize = 64 * 1024;
+    if (blocksize < 32 * 1024) {
+      /* Do not use a too small blocksize (< 32 KB) when typesize is small */
+      blocksize = 32 * 1024;
     }
   }
 
