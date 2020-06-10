@@ -52,10 +52,6 @@ void btune_next_blocksize(blosc2_context *context) {
 
   if (user_blocksize) {
     blocksize = user_blocksize;
-    // Check that forced blocksize is not too small
-    if (blocksize < BLOSC_MIN_BUFFERSIZE) {
-      blocksize = BLOSC_MIN_BUFFERSIZE;
-    }
     goto last;
   }
 
