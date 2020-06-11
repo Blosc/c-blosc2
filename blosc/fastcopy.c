@@ -493,7 +493,7 @@ static inline unsigned char *chunk_memcpy_unaligned(unsigned char *out, const un
 
 
 /* Byte by byte semantics: copy LEN bytes from FROM and write them to OUT. Return OUT + LEN. */
-unsigned char *fastcopy(unsigned char *out, const unsigned char *from, unsigned len) {
+static inline unsigned char *fastcopy(unsigned char *out, const unsigned char *from, unsigned len) {
   switch (len) {
     case 32:
       return copy_32_bytes(out, from);
