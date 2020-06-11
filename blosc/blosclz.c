@@ -423,10 +423,12 @@ int blosclz_compress(const int clevel, const void* input, int length,
     copy = 0;
 
     /* length is biased, '1' means a match of 3 bytes */
-    /* ip -= 3; */
+    ip -= 3;
     /* When we get back by 4 we obtain quite different compression properties.
-     * It looks like 4 is more useful for binary data (compress better and faster). */
-    ip -= 4;
+     * It looks like 4 is more useful in combination with bitshuffle and small typesizes
+     * (compress better and faster in e.g. `b2bench blosclz bitshuffle single 6 6291456 1 19`).
+     * Worth experimenting with this in the future. */
+    /* ip -= 4; */
     long len = ip - anchor;
 
     /* encode the match */
