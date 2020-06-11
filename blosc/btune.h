@@ -36,7 +36,8 @@ static int split_block(int compcode, int32_t typesize, int32_t blocksize, bool e
   // Normally all the compressors designed for speed benefit from a split.
   return (
     ((compcode == BLOSC_BLOSCLZ) ||
-     (compcode == BLOSC_LZ4) ||  // IPP's LZ4 works pretty well when splitting
+     // Non-IPP LZ4 seems to prefer not to split, specially on floating point
+     // (compcode == BLOSC_LZ4) ||
      // For forward compatibility with Blosc1 (http://blosc.org/posts/new-forward-compat-policy/)
      (!extended_header && compcode == BLOSC_LZ4HC) ||
      (!extended_header && compcode == BLOSC_ZLIB) ||
