@@ -559,6 +559,15 @@ static unsigned char* copy_match_16(unsigned char *op, const unsigned char *matc
 }
 #endif
 
+// LZ4 wildCopy which can reach excellent copy bandwidth (even if insecure)
+static inline void wild_copy(uint8_t *out, const uint8_t* from, uint8_t* end) {
+  uint8_t* d = out;
+  const uint8_t* s = from;
+  uint8_t* const e = end;
+
+  do { memcpy(d,s,8); d+=8; s+=8; } while (d<e);
+}
+
 
 int blosclz_decompress(const void* input, int length, void* output, int maxout) {
   const uint8_t* ip = (const uint8_t*)input;
@@ -640,8 +649,16 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         }
         else {
 #endif
-          // We absolutely need a copy_match here
-          op = copy_match(op, ref, (unsigned) len);
+          uint8_t* endcpy = op + len;
+          if ((op - ref < 8) || (op_limit - endcpy < 8)) {
+            // We absolutely need a copy_match here
+            op = copy_match(op, ref, (unsigned) len);
+          }
+          else {
+            wild_copy(op, ref, endcpy);
+            op = endcpy;
+          }
+
 #ifdef __AVX2__
         }
 #endif
