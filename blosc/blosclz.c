@@ -423,12 +423,11 @@ int blosclz_compress(const int clevel, const void* input, int length,
     copy = 0;
 
     /* length is biased, '1' means a match of 3 bytes */
-    ip -= 3;
     /* When we get back by 4 we obtain quite different compression properties.
      * It looks like 4 is more useful in combination with bitshuffle and small typesizes
      * (compress better and faster in e.g. `b2bench blosclz bitshuffle single 6 6291456 1 19`).
-     * Worth experimenting with this in the future. */
-    /* ip -= 4; */
+     * Worth experimenting with this in the future.  For the time being, use 3 for high clevels. */
+    ip -= clevel > 8 ? 3 : 4;
     long len = ip - anchor;
 
     /* encode the match */
@@ -569,7 +568,6 @@ static inline void wild_copy(uint8_t *out, const uint8_t* from, uint8_t* end) {
 
   do { memcpy(d,s,8); d+=8; s+=8; } while (d<e);
 }
-
 
 int blosclz_decompress(const void* input, int length, void* output, int maxout) {
   const uint8_t* ip = (const uint8_t*)input;
