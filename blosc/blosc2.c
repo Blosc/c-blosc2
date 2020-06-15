@@ -1429,6 +1429,12 @@ static int initialize_context_decompression(
   context->nblocks = (context->leftover > 0) ?
                       context->nblocks + 1 : context->nblocks;
 
+  // Some checks for malformed headers
+  if (context->blocksize <= 0 || context->blocksize > destsize ||
+      context->typesize <= 0 || context->typesize > BLOSC_MAX_TYPESIZE) {
+    return -1;
+  }
+
   if (context->block_maskout != NULL && context->block_maskout_nitems != context->nblocks) {
     fprintf(stderr, "The number of items in block_maskout (%d) must match the number"
                     " of blocks in chunk (%d)", context->block_maskout_nitems, context->nblocks);
@@ -1956,7 +1962,8 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
 }
 
 
-int blosc_run_decompression_with_context(blosc2_context* context, const void* src, void* dest, size_t destsize) {
+int blosc_run_decompression_with_context(blosc2_context* context, const void* src, void* dest,
+                                         size_t destsize) {
   int32_t ntbytes;
   int error;
 
@@ -1973,8 +1980,12 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
 
   /* Check whether this buffer is memcpy'ed */
   if (*(context->header_flags) & BLOSC_MEMCPYED) {
-    memcpy(dest, (uint8_t*)src + BLOSC_MAX_OVERHEAD, (unsigned int)context->sourcesize);
+    // Check that we have space enough in destination to copy
     ntbytes = (int32_t)context->sourcesize;
+    if (destsize < (size_t)ntbytes) {
+      return -1;
+    }
+    memcpy(dest, (uint8_t*)src + BLOSC_MAX_OVERHEAD, (unsigned int)ntbytes);
   }
   else {
     /* Do the actual decompression */
@@ -2097,6 +2108,11 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
     /* Minimal header */
     flags_to_filters(flags, context->filters);
     bstarts = (int32_t*)(_src + BLOSC_MIN_HEADER_LENGTH);
+  }
+
+  // Some checks for malformed buffers
+  if (blocksize <= 0 || blocksize > nbytes || typesize <= 0 || typesize > BLOSC_MAX_TYPESIZE) {
+    return -1;
   }
 
   /* Compute some params */

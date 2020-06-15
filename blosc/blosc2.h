@@ -85,8 +85,8 @@ enum {
    * Cannot be larger than 255
    */
   BLOSC_MIN_BUFFERSIZE = 128,
-  /** Minimum buffer size to be compressed
-   * Cannot be smaller than 66
+  /** Minimum buffer size to be compressed.
+   *  Cannot be smaller than 66.
    */
 };
 
@@ -613,7 +613,7 @@ typedef struct {
   int32_t out_offset; // offset to reach the start of the output buffer
   int32_t tid;  // thread id
   uint8_t *ttmp;  // a temporary that is able to hold several blocks for the output and is private for each thread
-  int32_t ttmp_nbytes;  // the size of the temporary in bytes
+  size_t ttmp_nbytes;  // the size of the temporary in bytes
   blosc2_context *ctx;  // the decompression context
 } blosc2_prefilter_params;
 
