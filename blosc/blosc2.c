@@ -1934,12 +1934,12 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     g_global_context, (int32_t)nbytes, src, dest, (int32_t)destsize, clevel, filters,
     filters_meta, (int32_t)typesize, g_compressor, g_force_blocksize, g_nthreads, g_nthreads,
     g_schunk);
+  free(filters);
+  free(filters_meta);
   if (error <= 0) {
     pthread_mutex_unlock(&global_comp_mutex);
     return error;
   }
-  free(filters);
-  free(filters_meta);
 
   /* Write chunk header without extended header (Blosc1 compatibility mode) */
   error = write_compression_header(g_global_context, false);
