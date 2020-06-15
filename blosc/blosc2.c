@@ -1919,7 +1919,6 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     cctx = blosc2_create_cctx(cparams);
     /* Do the actual compression */
     result = blosc2_compress_ctx(cctx, nbytes, src, dest, destsize);
-    printf("Hola!\n");
     /* Release context resources */
     blosc2_free_ctx(cctx);
     return result;
