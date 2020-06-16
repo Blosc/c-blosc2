@@ -113,10 +113,10 @@ jobs:
             compiler: cl
             cmake-args: -A x64
 
-          - name: Windows GCC
-            os: windows-latest
-            compiler: gcc
-            cmake-args: -G Ninja
+            # - name: Windows GCC
+            # os: windows-latest
+            # compiler: gcc
+            # cmake-args: -G Ninja
 
           - name: macOS Clang
             os: macOS-latest
