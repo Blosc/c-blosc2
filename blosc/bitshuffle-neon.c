@@ -951,6 +951,8 @@ bitshuffle_neon(void* _src, void* _dest, const size_t size,
          so we're done processing here. */
       return count;
   }
+
+  return (int64_t)size * (int64_t)elem_size;
 }
 
 /* Bitunshuffle a block.  This can never fail. */
@@ -996,4 +998,6 @@ bitunshuffle_neon(void* _src, void* _dest, const size_t size,
          so we're done processing here. */
       return count;
   }
+  
+  return (int64_t)size * (int64_t)elem_size;
 }
