@@ -1090,10 +1090,14 @@ static int serial_blosc(struct thread_context* thread_context) {
     }
     else {
       if (memcpyed) {
-        /* We want to memcpy only */
+        // Check that sizes in header are compatible, otherwise there is a header corruption
+        int32_t csize = sw32_(context->src + 12);   /* compressed buffer size */
+        if (context->sourcesize + BLOSC_MAX_OVERHEAD != csize) {
+          return -1;
+        }
         memcpy(context->dest + j * context->blocksize,
-                 context->src + BLOSC_MAX_OVERHEAD + j * context->blocksize,
-                 (unsigned int)bsize);
+               context->src + BLOSC_MAX_OVERHEAD + j * context->blocksize,
+               (unsigned int)bsize);
         cbytes = (int32_t)bsize;
       }
       else {
@@ -1980,8 +1984,13 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
 
   /* Check whether this buffer is memcpy'ed */
   if (*(context->header_flags) & BLOSC_MEMCPYED) {
-    // Check that we have space enough in destination to copy
-    ntbytes = (int32_t)context->sourcesize;
+    // Check that sizes in header are compatible, otherwise there is a header corruption
+    ntbytes = context->sourcesize;
+    int32_t cbytes = sw32_((int8_t*)src + 12);   /* compressed buffer size */
+    if (ntbytes + BLOSC_MAX_OVERHEAD != cbytes) {
+      return -1;
+    }
+    // Check that we have enough space in destination for the copy operation
     if (destsize < (size_t)ntbytes) {
       return -1;
     }
@@ -2091,6 +2100,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
   typesize = (int32_t)_src[3];      /* typesize */
   nbytes = sw32_(_src + 4);         /* buffer size */
   blocksize = sw32_(_src + 8);      /* block size */
+  cbytes = sw32_(_src + 12);    /* compressed buffer size */
 
   ebsize = blocksize + typesize * (int32_t)sizeof(int32_t);
 
@@ -2156,10 +2166,13 @@ int _blosc_getitem(blosc2_context* context, const void* src, int start,
 
     /* Do the actual data copy */
     if (flags & BLOSC_MEMCPYED) {
-      /* We want to memcpy only */
+      // Check that sizes in header are compatible, otherwise there is a header corruption
+      if (nbytes + BLOSC_MAX_OVERHEAD != cbytes) {
+         return -1;
+      }
       memcpy((uint8_t*)dest + ntbytes,
-               (uint8_t*)src + BLOSC_MAX_OVERHEAD + j * blocksize + startb,
-               (unsigned int)bsize2);
+             (uint8_t*)src + BLOSC_MAX_OVERHEAD + j * blocksize + startb,
+             (unsigned int)bsize2);
       cbytes = (int)bsize2;
     }
     else {
