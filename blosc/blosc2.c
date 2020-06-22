@@ -1683,7 +1683,6 @@ int blosc_compress_context(blosc2_context* context) {
   _sw32(context->dest + 12, ntbytes);
 
   // If the size is equal to destsize, that means that a regular copy has been done (e.g. prefilter)
-  // TODO: context->clevel == 0 should be better?
   if (context->clevel == 0) {
     *(context->header_flags) |= BLOSC_MEMCPYED;
   }
@@ -2353,15 +2352,11 @@ static void t_blosc_do_job(void *ctxt)
       if (memcpyed) {
         /* We want to memcpy only */
         memcpy(dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize,
-                  src + nblock_ * blocksize, (unsigned int)bsize);
+               src + nblock_ * blocksize, (unsigned int)bsize);
         cbytes = (int32_t)bsize;
       }
       else {
         /* Regular compression */
-        if (context->clevel == 0) {
-          // We can copy straight to destination, as we know where we can write
-          tmp2 = dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize;
-        }
         cbytes = blosc_c(thcontext, bsize, leftoverblock, 0,
                           ebsize, src, nblock_ * blocksize, tmp2, tmp, tmp3);
       }
@@ -2370,7 +2365,7 @@ static void t_blosc_do_job(void *ctxt)
       if (memcpyed) {
         /* We want to memcpy only */
         memcpy(dest + nblock_ * blocksize,
-                  src + BLOSC_MAX_OVERHEAD + nblock_ * blocksize, (unsigned int)bsize);
+               src + BLOSC_MAX_OVERHEAD + nblock_ * blocksize, (unsigned int)bsize);
         cbytes = (int32_t)bsize;
       }
       else {
@@ -2434,6 +2429,9 @@ static void t_blosc_do_job(void *ctxt)
 
   if (static_schedule) {
     context->output_bytes = context->sourcesize;
+    if (compress) {
+      context->output_bytes += BLOSC_MAX_OVERHEAD;
+    }
   }
 
 }
