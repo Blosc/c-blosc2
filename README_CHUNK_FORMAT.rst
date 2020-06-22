@@ -84,13 +84,13 @@ All entries are little endian.
     (``uint8``) Number of bytes for the atomic type.
 
 :nbytes:
-    (``uint32``) Uncompressed size of the buffer.
+    (``uint32``) Uncompressed size of the buffer (this header is not included).
 
 :blocksize:
     (``uint32``) Size of internal blocks.
 
 :cbytes:
-    (``uint32``) Compressed size of the buffer.
+    (``uint32``) Compressed size of the buffer (including this header).
 
 :blosc2_flags:
     (``bitfield``) The flags for a Blosc2 buffer.
