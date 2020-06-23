@@ -354,7 +354,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
   /* main loop */
   while (BLOSCLZ_EXPECT_CONDITIONAL(ip < ip_limit)) {
     const uint8_t* ref;
-    uint32_t distance;
+    unsigned distance;
     uint8_t* anchor = ip;    /* comparison starting-point */
 
     /* find potential match */
@@ -363,7 +363,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
     ref = ibase + htab[hval];
 
     /* calculate distance to the match */
-    distance = (int32_t)(anchor - ref);
+    distance = anchor - ref;
 
     /* update hash table */
     htab[hval] = (uint32_t) (anchor - ibase);
@@ -409,6 +409,28 @@ int blosclz_compress(const int clevel, const void* input, int length,
 #endif
     }
 
+    /* length is biased, '1' means a match of 3 bytes */
+    /* When we get back by 4 we obtain quite different compression properties.
+     * It looks like 4 is more useful in combination with bitshuffle and small typesizes
+     * (compress better and faster in e.g. `b2bench blosclz bitshuffle single 6 6291456 1 19`).
+     * Worth experimenting with this in the future.  For the time being, use 3 for high clevels. */
+    // ip -= clevel > 8 ? 3 : 4;
+    // Fallback to always 4 because it provides more consistent results on bitshuffle and small typesizes
+    ip -= 4;
+
+    unsigned len = (int)(ip - anchor);
+    // Encoding short lengths is expensive during decompression
+    unsigned minlen_[10] = {0, 15, 13, 11, 10, 9, 8, 7, 6, 4};
+    unsigned minlen = minlen_[clevel];
+    // If match is close, let's reduce the minimum length to encode it
+    if (distance < MAX_DISTANCE) {
+      minlen -= 1;
+    }
+    if (len < minlen) {
+      LITERAL(ip, op, op_limit, anchor, copy)
+      continue;
+    }
+
     /* if we have copied something, adjust the copy count */
     if (copy)
       /* copy is biased, '0' means 1 byte copy */
@@ -416,17 +438,8 @@ int blosclz_compress(const int clevel, const void* input, int length,
     else
       /* back, to overwrite the copy count */
       op--;
-
     /* reset literal counter */
     copy = 0;
-
-    /* length is biased, '1' means a match of 3 bytes */
-    /* When we get back by 4 we obtain quite different compression properties.
-     * It looks like 4 is more useful in combination with bitshuffle and small typesizes
-     * (compress better and faster in e.g. `b2bench blosclz bitshuffle single 6 6291456 1 19`).
-     * Worth experimenting with this in the future.  For the time being, use 3 for high clevels. */
-    ip -= clevel > 8 ? 3 : 4;
-    long len = ip - anchor;
 
     /* encode the match */
     if (distance < MAX_DISTANCE) {
