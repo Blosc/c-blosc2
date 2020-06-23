@@ -330,8 +330,11 @@ int blosclz_compress(const int clevel, const void* input, int length,
   }
   op_limit = op + maxlength;
 
+  // Minimum lengths for encoding
+  unsigned minlen_[10] = {0, 12, 12, 11, 10, 9, 8, 7, 6, 4};
+
   uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
-                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
+                          HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[clevel];
   // Initialize the hash table to distances of 0
   for (unsigned i = 0; i < (1U << hashlog); i++) {
@@ -419,13 +422,9 @@ int blosclz_compress(const int clevel, const void* input, int length,
     ip -= 4;
 
     unsigned len = (int)(ip - anchor);
-    // Encoding short lengths is expensive during decompression
-    unsigned minlen_[10] = {0, 15, 13, 11, 10, 9, 8, 7, 6, 4};
-    unsigned minlen = minlen_[clevel];
     // If match is close, let's reduce the minimum length to encode it
-    if (distance < MAX_DISTANCE) {
-      minlen -= 1;
-    }
+    unsigned minlen = (distance < MAX_DISTANCE) ? minlen_[clevel] - 1 : minlen_[clevel];
+    // Encoding short lengths is expensive during decompression
     if (len < minlen) {
       LITERAL(ip, op, op_limit, anchor, copy)
       continue;
