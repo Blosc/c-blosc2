@@ -58,30 +58,6 @@
 }
 
 
-#define LITERAL(ip, op, op_limit, anchor, copy) {        \
-  if (BLOSCLZ_UNEXPECT_CONDITIONAL(op + 2 > op_limit))   \
-    goto out;                                            \
-  *op++ = *anchor++;                                     \
-  ip = anchor;                                           \
-  copy++;                                                \
-  if (BLOSCLZ_UNEXPECT_CONDITIONAL(copy == MAX_COPY)) {  \
-    copy = 0;                                            \
-    *op++ = MAX_COPY-1;                                  \
-  }                                                      \
-}
-
-#define LITERAL2(ip, oc, oc_limit, anchor, copy) {       \
-  if (BLOSCLZ_UNEXPECT_CONDITIONAL(oc + 2 > oc_limit))   \
-    goto out;                                            \
-  oc++; anchor++;                                        \
-  ip = anchor;                                           \
-  copy++;                                                \
-  if (BLOSCLZ_UNEXPECT_CONDITIONAL(copy == MAX_COPY)) {  \
-    copy = 0;                                            \
-    oc++;                                                \
-  }                                                      \
-}
-
 #if defined(__AVX2__)
 static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
     uint8_t x = ip[-1];
@@ -187,8 +163,7 @@ static uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *
   return ip;
 }
 
-#endif
-
+#else
 
 static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
@@ -216,6 +191,8 @@ static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref
   while ((ip < ip_bound) && (*ref++ == x)) ip++;
   return ip;
 }
+
+#endif
 
 
 /* Return the byte that starts to differ */
@@ -346,13 +323,35 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 }
 
 
+#define LITERAL(ip, op, op_limit, anchor, copy) {        \
+  if (BLOSCLZ_UNEXPECT_CONDITIONAL(op + 2 > op_limit))   \
+    goto out;                                            \
+  *op++ = *anchor++;                                     \
+  ip = anchor;                                           \
+  copy++;                                                \
+  if (BLOSCLZ_UNEXPECT_CONDITIONAL(copy == MAX_COPY)) {  \
+    copy = 0;                                            \
+    *op++ = MAX_COPY-1;                                  \
+  }                                                      \
+}
+
+#define LITERAL2(ip, oc, anchor, copy) {                 \
+  oc++; anchor++;                                        \
+  ip = anchor;                                           \
+  copy++;                                                \
+  if (BLOSCLZ_UNEXPECT_CONDITIONAL(copy == MAX_COPY)) {  \
+    copy = 0;                                            \
+    oc++;                                                \
+  }                                                      \
+}
+
+
 // Get the compressed size of a buffer.  Useful for testing compression ratios for high clevels.
-static int get_csize(uint8_t* ibase, int length, int maxout, bool force_3b_shift) {
+static int get_csize(uint8_t* ibase, int length, int maxlen, bool force_3b_shift) {
   uint8_t* ip = ibase;
   int32_t oc = 0;
-  int32_t oc_limit = maxout;
-  uint8_t* ip_bound = ibase + length - 1;
-  uint8_t* ip_limit = ibase + length - 12;
+  uint8_t* ip_bound = ibase + maxlen - 1;
+  uint8_t* ip_limit = ibase + maxlen - 12;
   uint32_t htab[1U << (uint8_t)HASH_LOG];
   uint32_t hval;
   uint32_t seq;
@@ -369,6 +368,13 @@ static int get_csize(uint8_t* ibase, int length, int maxout, bool force_3b_shift
 
   /* main loop */
   while (BLOSCLZ_EXPECT_CONDITIONAL(ip < ip_limit)) {
+    // An attempt to check entropy at the end of the buffer
+//    int midway = maxlen / 2;
+//    if (ip - ibase < midway) {
+//      ip = ibase + length - midway;
+//      ip_bound = ibase + maxlen - 1;
+//      ip_limit = ibase + length - 12;
+//    }
     const uint8_t* ref;
     unsigned distance;
     uint8_t* anchor = ip;    /* comparison starting-point */
@@ -385,7 +391,7 @@ static int get_csize(uint8_t* ibase, int length, int maxout, bool force_3b_shift
     htab[hval] = (uint32_t) (anchor - ibase);
 
     if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
-      LITERAL2(ip, oc, oc_limit, anchor, copy)
+      LITERAL2(ip, oc, anchor, copy)
       continue;
     }
 
@@ -395,7 +401,7 @@ static int get_csize(uint8_t* ibase, int length, int maxout, bool force_3b_shift
     }
     else {
       /* no luck, copy as a literal */
-      LITERAL2(ip, oc, oc_limit, anchor, copy)
+      LITERAL2(ip, oc, anchor, copy)
       continue;
     }
 
@@ -414,7 +420,7 @@ static int get_csize(uint8_t* ibase, int length, int maxout, bool force_3b_shift
     unsigned minlen = (distance < MAX_DISTANCE) ? 3 : 4;
     // Encoding short lengths is expensive during decompression
     if (len < minlen) {
-      LITERAL2(ip, oc, oc_limit, anchor, copy)
+      LITERAL2(ip, oc, anchor, copy)
       continue;
     }
 
@@ -456,10 +462,6 @@ static int get_csize(uint8_t* ibase, int length, int maxout, bool force_3b_shift
     oc--;
 
   return (int)oc;
-
-  out:
-  return 0;
-
 }
 
 int blosclz_compress(const int clevel, const void* input, int length,
@@ -507,11 +509,12 @@ int blosclz_compress(const int clevel, const void* input, int length,
   // Fallback to always 4 because it provides more consistent results on bitshuffle and small typesizes
   int ipshift = 4;
   if (clevel == 9) {
-    // test cratios for an output buffer whicj, for speed, is a small fraction of the original input
-    int maxout_ = (int)(length * .1);
-    int csize_3b = get_csize(ibase, length, maxout_, true);
-    int csize_4b = get_csize(ibase, length, maxout_, false);
-    // printf("3, 4: %d, %d / ", csize_3b, csize_4b);
+    // test cratios for an output buffer which, for speed, is a small fraction of the original input
+    //int maxlen_ = (int)(length * .15);
+    int maxlen_ = 1U << 15U;  // 32 KB
+    int csize_3b = get_csize(ibase, length, maxlen_, true);
+    int csize_4b = get_csize(ibase, length, maxlen_, false);
+    //printf("3, 4: %d, %d, %d / ", csize_3b, csize_4b, maxlen_);
     ipshift = (csize_3b < csize_4b) ? 3 : 4;
   }
 
