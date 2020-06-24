@@ -1628,7 +1628,7 @@ static int write_compression_header(blosc2_context* context,
     *(context->header_flags) |= BLOSC_DODELTA;
   }
 
-  dont_split = !split_block(context->compcode, context->typesize,
+  dont_split = !split_block(context, context->typesize,
                             context->blocksize, extended_header);
   *(context->header_flags) |= dont_split << 4;  /* dont_split is in bit 4 */
   *(context->header_flags) |= compformat << 5;  /* codec starts at bit 5 */

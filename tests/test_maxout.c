@@ -38,8 +38,7 @@ static char* test_input_too_large(void) {
 static char* test_maxout_less(void) {
 
   /* Get a compressed buffer */
-  cbytes = blosc_compress(clevel, doshuffle, typesize, size, src, dest,
-                          size + BLOSC_MAX_OVERHEAD - 1);
+  cbytes = blosc_compress(clevel, doshuffle, typesize, size, src, dest, size);
   mu_assert("ERROR: cbytes is not 0", cbytes == 0);
 
   return 0;
@@ -64,7 +63,7 @@ static char* test_maxout_equal(void) {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src, dest,
                           size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: cbytes is not correct", cbytes == (int)size + BLOSC_MAX_OVERHEAD);
+  mu_assert("ERROR: cbytes is not correct", cbytes <= (int)size + BLOSC_MAX_OVERHEAD);
 
   /* Decompress the buffer */
   nbytes = blosc_decompress(dest, dest2, size);
@@ -95,7 +94,7 @@ static char* test_maxout_great(void) {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src, dest,
                           size + BLOSC_MAX_OVERHEAD + 1);
-  mu_assert("ERROR: cbytes is not correct", cbytes == (int)size + BLOSC_MAX_OVERHEAD);
+  mu_assert("ERROR: cbytes is not correct", cbytes <= (int)size + BLOSC_MAX_OVERHEAD);
 
   /* Decompress the buffer */
   nbytes = blosc_decompress(dest, dest2, size);

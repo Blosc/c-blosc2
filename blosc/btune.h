@@ -32,12 +32,15 @@ void btune_update(blosc2_context * context, double ctime);
 void btune_free(blosc2_context * context);
 
 /* Conditions for splitting a block before compressing with a codec. */
-static int split_block(int compcode, int32_t typesize, int32_t blocksize, bool extended_header) {
+static int split_block(blosc2_context* context, int32_t typesize,
+                       int32_t blocksize, bool extended_header) {
   // Normally all the compressors designed for speed benefit from a split.
+  int compcode = context->compcode;
+  bool shuffle = context->filter_flags & BLOSC_DOSHUFFLE;
   return (
-    ((compcode == BLOSC_BLOSCLZ) ||
-     // Non-IPP LZ4 seems to prefer not to split, specially on floating point
-     // (compcode == BLOSC_LZ4) ||
+    // fast codecs like lz4 and blosclz prefer to split with shuffle
+    ((compcode == BLOSC_BLOSCLZ && shuffle) ||
+     (compcode == BLOSC_LZ4  && shuffle) ||
      // For forward compatibility with Blosc1 (http://blosc.org/posts/new-forward-compat-policy/)
      (!extended_header && compcode == BLOSC_LZ4HC) ||
      (!extended_header && compcode == BLOSC_ZLIB) ||
