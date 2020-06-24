@@ -572,7 +572,8 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
     unsigned len = (int)(ip - anchor);
     // If match is close, let's reduce the minimum length to encode it
-    unsigned minlen = (distance < MAX_DISTANCE) ? minlen_[clevel] - 1 : minlen_[clevel];
+    //unsigned minlen = (distance < MAX_DISTANCE) ? minlen_[clevel] - 1 : minlen_[clevel];
+    unsigned minlen = minlen_[clevel];
     // Encoding short lengths is expensive during decompression
     if (len < minlen) {
       LITERAL(ip, op, op_limit, anchor, copy)
