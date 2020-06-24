@@ -14,6 +14,7 @@
 
 
 #include <stdio.h>
+#include <stdbool.h>
 #include "blosclz.h"
 #include "fastcopy.h"
 #include "blosc2-common.h"
@@ -49,7 +50,7 @@
   #define BLOSCLZ_READU32(p) *((const uint32_t*)(p))
 #endif
 
-#define HASH_LOG (12)
+#define HASH_LOG (12U)
 
 // This is used in LZ4 and seems to work pretty well here too
 #define HASH_FUNCTION(v, s, h) {                          \
@@ -66,6 +67,18 @@
   if (BLOSCLZ_UNEXPECT_CONDITIONAL(copy == MAX_COPY)) {  \
     copy = 0;                                            \
     *op++ = MAX_COPY-1;                                  \
+  }                                                      \
+}
+
+#define LITERAL2(ip, oc, oc_limit, anchor, copy) {       \
+  if (BLOSCLZ_UNEXPECT_CONDITIONAL(oc + 2 > oc_limit))   \
+    goto out;                                            \
+  oc++; anchor++;                                        \
+  ip = anchor;                                           \
+  copy++;                                                \
+  if (BLOSCLZ_UNEXPECT_CONDITIONAL(copy == MAX_COPY)) {  \
+    copy = 0;                                            \
+    oc++;                                                \
   }                                                      \
 }
 
@@ -174,7 +187,9 @@ static uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *
   return ip;
 }
 
-#else
+#endif
+
+
 static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
   int64_t value, value2;
@@ -201,7 +216,6 @@ static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref
   while ((ip < ip_bound) && (*ref++ == x)) ip++;
   return ip;
 }
-#endif
 
 
 /* Return the byte that starts to differ */
@@ -308,6 +322,146 @@ static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
 #endif
 
 
+static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* ref, bool run) {
+  if (BLOSCLZ_UNEXPECT_CONDITIONAL(run)) {
+#if defined(__AVX2__)
+    ip = get_run_32(ip, ip_bound, ref);
+#elif defined(__SSE2__)
+    ip = get_run_16(ip, ip_bound, ref);
+#else
+    ip = get_run(ip, ip_bound, ref);
+#endif
+  }
+  else {
+#if defined(__AVX2__)
+    ip = get_match_32(ip, ip_bound, ref);
+#elif defined(__SSE2__)
+    ip = get_match_16(ip, ip_bound, ref);
+#else
+    ip = get_match(ip, ip_bound, ref);
+#endif
+  }
+
+  return ip;
+}
+
+
+// Get the compressed size of a buffer.  Useful for testing compression ratios for high clevels.
+int get_csize(uint8_t* ibase, int length, int maxout, bool force_3b_match) {
+  uint8_t* ip = ibase;
+  int32_t oc = 0;
+  int32_t oc_limit = maxout;
+  uint8_t* ip_bound = ibase + length - 1;
+  uint8_t* ip_limit = ibase + length - 12;
+  uint32_t htab[1U << (uint8_t)HASH_LOG];
+  uint32_t hval;
+  uint32_t seq;
+  uint8_t copy;
+
+  // Initialize the hash table to distances of 0
+  for (unsigned i = 0; i < (1U << HASH_LOG); i++) {
+    htab[i] = 0;
+  }
+
+  /* we start with literal copy */
+  copy = 4;
+  oc += 5;
+
+  /* main loop */
+  while (BLOSCLZ_EXPECT_CONDITIONAL(ip < ip_limit)) {
+    const uint8_t* ref;
+    unsigned distance;
+    uint8_t* anchor = ip;    /* comparison starting-point */
+
+    /* find potential match */
+    seq = BLOSCLZ_READU32(ip);
+    HASH_FUNCTION(hval, seq, HASH_LOG)
+    ref = ibase + htab[hval];
+
+    /* calculate distance to the match */
+    distance = anchor - ref;
+
+    /* update hash table */
+    htab[hval] = (uint32_t) (anchor - ibase);
+
+    if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
+      LITERAL2(ip, oc, oc_limit, anchor, copy)
+      continue;
+    }
+
+    /* is this a match? check the first 4 bytes */
+    if (BLOSCLZ_UNEXPECT_CONDITIONAL(BLOSCLZ_READU32(ref) == BLOSCLZ_READU32(ip))) {
+      ref += 4;
+    }
+    else {
+      /* no luck, copy as a literal */
+      LITERAL2(ip, oc, oc_limit, anchor, copy)
+      continue;
+    }
+
+    /* last matched byte */
+    ip = anchor + 4;
+
+    /* distance is biased */
+    distance--;
+
+    /* get runs or matches; zero distance means a run */
+    ip = get_run_or_match(ip, ip_bound, ref, !distance);
+
+    ip -= force_3b_match ? 3 : 4;
+    unsigned len = (int)(ip - anchor);
+    // If match is close, let's reduce the minimum length to encode it
+    unsigned minlen = (distance < MAX_DISTANCE) ? 3 : 4;
+    // Encoding short lengths is expensive during decompression
+    if (len < minlen) {
+      LITERAL2(ip, oc, oc_limit, anchor, copy)
+      continue;
+    }
+
+    /* if we have'nt copied anything, adjust the output counter */
+    if (!copy)
+      oc--;
+    /* reset literal counter */
+    copy = 0;
+
+    /* encode the match */
+    if (distance < MAX_DISTANCE) {
+      if (len >= 7) {
+        oc += ((len - 7) / 255) + 1;
+      }
+      oc += 2;
+    }
+    else {
+      /* far away, but not yet in the another galaxy... */
+      if (len >= 7) {
+        oc += ((len - 7) / 255) + 1;
+      }
+      oc += 4;
+    }
+
+    /* update the hash at match boundary */
+    seq = BLOSCLZ_READU32(ip);
+    HASH_FUNCTION(hval, seq, HASH_LOG)
+    htab[hval] = (uint32_t) (ip++ - ibase);
+    seq >>= 8U;
+    HASH_FUNCTION(hval, seq, HASH_LOG)
+    htab[hval] = (uint32_t) (ip++ - ibase);
+    /* assuming literal copy */
+    oc++;
+
+  }
+
+  /* if we have copied something, adjust the copy length */
+  if (!copy)
+    oc--;
+
+  return (int)oc;
+
+  out:
+  return 0;
+
+}
+
 int blosclz_compress(const int clevel, const void* input, int length,
                      void* output, int maxout) {
   uint8_t* ibase = (uint8_t*)input;
@@ -344,6 +498,21 @@ int blosclz_compress(const int clevel, const void* input, int length,
   /* input and output buffer cannot be less than 16 and 66 bytes or we can get into trouble */
   if (length < 16 || maxout < 66) {
     return 0;
+  }
+
+  /* When we get back by 4 in a match, we obtain quite different compression properties.
+   * It looks like 4 is more useful in combination with bitshuffle and small typesizes
+   * (compress better and faster in e.g. `b2bench blosclz bitshuffle single 6 6291456 1 19`).
+   */
+  // Fallback to always 4 because it provides more consistent results on bitshuffle and small typesizes
+  int ipshift = 4;
+  if (clevel == 9) {
+    // test cratios for an output buffer whicj, for speed, is a small fraction of the original input
+    int maxout_ = (int)(length * .1);
+    int csize_3b = get_csize(ibase, length, maxout_, true);
+    int csize_4b = get_csize(ibase, length, maxout_, false);
+    // printf("3, 4: %d, %d / ", csize_3b, csize_4b);
+    ipshift = (csize_3b < csize_4b) ? 3 : 4;
   }
 
   /* we start with literal copy */
@@ -392,34 +561,11 @@ int blosclz_compress(const int clevel, const void* input, int length,
     /* distance is biased */
     distance--;
 
-    if (BLOSCLZ_UNEXPECT_CONDITIONAL(!distance)) {
-      /* zero distance means a run */
-#if defined(__AVX2__)
-      ip = get_run_32(ip, ip_bound, ref);
-#elif defined(__SSE2__)
-      ip = get_run_16(ip, ip_bound, ref);
-#else
-      ip = get_run(ip, ip_bound, ref);
-#endif
-    }
-    else {
-#if defined(__AVX2__)
-      ip = get_match_32(ip, ip_bound, ref);
-#elif defined(__SSE2__)
-      ip = get_match_16(ip, ip_bound, ref);
-#else
-      ip = get_match(ip, ip_bound, ref);
-#endif
-    }
+    /* get runs or matches; zero distance means a run */
+    ip = get_run_or_match(ip, ip_bound, ref, !distance);
 
     /* length is biased, '1' means a match of 3 bytes */
-    /* When we get back by 4 we obtain quite different compression properties.
-     * It looks like 4 is more useful in combination with bitshuffle and small typesizes
-     * (compress better and faster in e.g. `b2bench blosclz bitshuffle single 6 6291456 1 19`).
-     * Worth experimenting with this in the future.  For the time being, use 3 for high clevels. */
-    // ip -= clevel > 8 ? 3 : 4;
-    // Fallback to always 4 because it provides more consistent results on bitshuffle and small typesizes
-    ip -= 4;
+    ip -= ipshift;
 
     unsigned len = (int)(ip - anchor);
     // If match is close, let's reduce the minimum length to encode it
