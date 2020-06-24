@@ -347,7 +347,7 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 
 
 // Get the compressed size of a buffer.  Useful for testing compression ratios for high clevels.
-static int get_csize(uint8_t* ibase, int length, int maxlen, bool force_3b_shift) {
+static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
   uint8_t* ip = ibase;
   int32_t oc = 0;
   uint8_t* ip_bound = ibase + maxlen - 1;
@@ -368,13 +368,6 @@ static int get_csize(uint8_t* ibase, int length, int maxlen, bool force_3b_shift
 
   /* main loop */
   while (BLOSCLZ_EXPECT_CONDITIONAL(ip < ip_limit)) {
-    // An attempt to check entropy at the end of the buffer
-//    int midway = maxlen / 2;
-//    if (ip - ibase < midway) {
-//      ip = ibase + length - midway;
-//      ip_bound = ibase + maxlen - 1;
-//      ip_limit = ibase + length - 12;
-//    }
     const uint8_t* ref;
     unsigned distance;
     uint8_t* anchor = ip;    /* comparison starting-point */
@@ -464,6 +457,7 @@ static int get_csize(uint8_t* ibase, int length, int maxlen, bool force_3b_shift
   return (int)oc;
 }
 
+
 int blosclz_compress(const int clevel, const void* input, int length,
                      void* output, int maxout) {
   uint8_t* ibase = (uint8_t*)input;
@@ -477,14 +471,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
   uint32_t seq;
   uint8_t copy;
 
-  // Minimum cratios before issuing and _early giveup_
-  // Remind that blosclz is not meant for cratios <= 2 (too costly to decompress)
-  double maxlength_[10] = {-1, .07, .1, .15, .25, .45, .5, .5, .5, .5};
-  int32_t maxlength = (int32_t)(length * maxlength_[clevel]);
-  if (maxlength > (int32_t)maxout) {
-    maxlength = (int32_t)maxout;
-  }
-  op_limit = op + maxlength;
+  op_limit = op + maxout;
 
   // Minimum lengths for encoding
   unsigned minlen_[10] = {0, 12, 12, 11, 10, 9, 8, 7, 6, 4};
@@ -502,20 +489,51 @@ int blosclz_compress(const int clevel, const void* input, int length,
     return 0;
   }
 
-  /* When we get back by 4 in a match, we obtain quite different compression properties.
+  /* When we go back in a match (shift), we obtain quite different compression properties.
    * It looks like 4 is more useful in combination with bitshuffle and small typesizes
    * (compress better and faster in e.g. `b2bench blosclz bitshuffle single 6 6291456 1 19`).
+   * Fallback to 4 because it provides more consistent results on small itemsizes.
+   *
+   * In this block we also check cratios for the beginning of the buffers and
+   * eventually discard those that are small (take too long to decompress).
+   * This process is called _entropy probing_.
    */
-  // Fallback to always 4 because it provides more consistent results on bitshuffle and small typesizes
   int ipshift = 4;
-  if (clevel == 9) {
-    // test cratios for an output buffer which, for speed, is a small fraction of the original input
-    //int maxlen_ = (int)(length * .15);
-    int maxlen_ = 1U << 15U;  // 32 KB
-    int csize_3b = get_csize(ibase, length, maxlen_, true);
-    int csize_4b = get_csize(ibase, length, maxlen_, false);
-    //printf("3, 4: %d, %d, %d / ", csize_3b, csize_4b, maxlen_);
-    ipshift = (csize_3b < csize_4b) ? 3 : 4;
+  int maxlen;  // maximum length for entropy probing
+  int csize_3b;
+  int csize_4b;
+  double cratio = 0;
+  switch (clevel) {
+    case 1:
+    case 2:
+    case 3:
+      maxlen = 2 * 1024;
+      csize_4b = get_csize(ibase, maxlen, false);
+      cratio = (double)maxlen / csize_4b;
+      break;
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+    case 8:
+      maxlen = 16 * 1024;
+      csize_4b = get_csize(ibase, maxlen, false);
+      cratio = (double)maxlen / csize_4b;
+      break;
+    case 9:
+      // case 9 is special.  we need to asses the optimal shift
+      maxlen = 16 * 1024;
+      csize_3b = get_csize(ibase, maxlen, true);
+      csize_4b = get_csize(ibase, maxlen, false);
+      ipshift = (csize_3b < csize_4b) ? 3 : 4;
+      cratio = (csize_3b < csize_4b) ? (maxlen / csize_3b) : (maxlen / csize_4b);
+      break;
+    default:
+      break;
+  }
+  // compression ratios less than 2x are too expensive for a fast codec like this one
+  if (cratio < 2) {
+    goto out;
   }
 
   /* we start with literal copy */
@@ -572,12 +590,10 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
     unsigned len = (int)(ip - anchor);
     // If match is close, let's reduce the minimum length to encode it
-    //unsigned minlen = (distance < MAX_DISTANCE) ? minlen_[clevel] - 1 : minlen_[clevel];
     unsigned minlen = (distance < MAX_DISTANCE) ? minlen_[clevel] - 1 : minlen_[clevel];
     if (clevel == 9) {
       minlen = ipshift;
     }
-    //unsigned minlen = minlen_[clevel];
     // Encoding short lengths is expensive during decompression
     if (len < minlen) {
       LITERAL(ip, op, op_limit, anchor, copy)
