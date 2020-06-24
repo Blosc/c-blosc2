@@ -347,7 +347,7 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 
 
 // Get the compressed size of a buffer.  Useful for testing compression ratios for high clevels.
-static int get_csize(uint8_t* ibase, int length, int maxout, bool force_3b_match) {
+static int get_csize(uint8_t* ibase, int length, int maxout, bool force_3b_shift) {
   uint8_t* ip = ibase;
   int32_t oc = 0;
   int32_t oc_limit = maxout;
@@ -408,7 +408,7 @@ static int get_csize(uint8_t* ibase, int length, int maxout, bool force_3b_match
     /* get runs or matches; zero distance means a run */
     ip = get_run_or_match(ip, ip_bound, ref, !distance);
 
-    ip -= force_3b_match ? 3 : 4;
+    ip -= force_3b_shift ? 3 : 4;
     unsigned len = (int)(ip - anchor);
     // If match is close, let's reduce the minimum length to encode it
     unsigned minlen = (distance < MAX_DISTANCE) ? 3 : 4;
