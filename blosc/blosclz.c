@@ -474,7 +474,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
   op_limit = op + maxout;
 
   // Minimum lengths for encoding
-  unsigned minlen_[10] = {0, 12, 12, 11, 10, 9, 8, 7, 6, 4};
+  unsigned minlen_[10] = {0, 12, 12, 11, 10, 9, 8, 7, 6, 5};
 
   uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
@@ -590,12 +590,13 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
     unsigned len = (int)(ip - anchor);
     // If match is close, let's reduce the minimum length to encode it
-    unsigned minlen = (distance < MAX_DISTANCE) ? minlen_[clevel] - 1 : minlen_[clevel];
-    if (clevel == 9) {
-      minlen = ipshift;
-    }
+    unsigned minlen = (clevel == 9) ? ipshift : minlen_[clevel];
+
     // Encoding short lengths is expensive during decompression
-    if (len < minlen) {
+    // Encode only for reasonable lengths (extensive experiments done)
+    if ((len < minlen) ||
+        (len <= 8 && distance > MAX_DISTANCE) ||
+        (len <= 5 && distance <= MAX_DISTANCE)) {
       LITERAL(ip, op, op_limit, anchor, copy)
       continue;
     }
@@ -760,14 +761,13 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
   ctrl = (*ip++) & 31U;
 
   while (1) {
-    uint8_t* ref = op;
-    int32_t len = ctrl >> 5U;
-    int32_t ofs = (ctrl & 31U) << 8U;
-
     if (ctrl >= 32) {
+      // match
+      int32_t len = (ctrl >> 5U) - 1 ;
+      int32_t ofs = (ctrl & 31U) << 8U;
       uint8_t code;
-      len--;
-      ref -= ofs;
+      const uint8_t* ref = op - ofs;
+
       if (len == 7 - 1) {
         do {
           if (BLOSCLZ_UNEXPECT_CONDITIONAL(ip + 1 >= ip_limit)) {
@@ -844,6 +844,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
       }
     }
     else {
+      // literal
       ctrl++;
       if (BLOSCLZ_UNEXPECT_CONDITIONAL(op + ctrl > op_limit)) {
         return 0;
