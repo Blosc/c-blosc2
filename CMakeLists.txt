@@ -9,6 +9,8 @@
 #       build the shared library version of the Blosc library
 #   BUILD_TESTS: default ON
 #       build test programs and generates the "test" target
+#   BUILD_FUZZERS: default ON
+#       build fuzz programs and generates "fuzz" targets
 #   BUILD_BENCHMARKS: default ON
 #       build the benchmark programs
 #   BUILD_EXAMPLES: default ON
@@ -97,6 +99,8 @@ option(BUILD_SHARED
     "Build a shared library version of the blosc library." ON)
 option(BUILD_TESTS
     "Build test programs form the blosc compression library" ON)
+option(BUILD_FUZZERS
+    "Build fuzzer programs from the blosc compression library" ON)
 option(BUILD_BENCHMARKS
     "Build benchmark programs form the blosc compression library" ON)
 option(BUILD_EXAMPLES
@@ -361,6 +365,11 @@ if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
     add_subdirectory(compat)
+endif()
+
+if(BUILD_FUZZERS)
+    enable_testing()
+    add_subdirectory(tests/fuzz)
 endif()
 
 if(BUILD_BENCHMARKS)
