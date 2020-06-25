@@ -507,7 +507,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
     case 1:
     case 2:
     case 3:
-      maxlen = 2 * 1024;
+      maxlen = length / 8;
       csize_4b = get_csize(ibase, maxlen, false);
       cratio = (double)maxlen / csize_4b;
       break;
@@ -516,13 +516,13 @@ int blosclz_compress(const int clevel, const void* input, int length,
     case 6:
     case 7:
     case 8:
-      maxlen = 16 * 1024;
+      maxlen = length / 8;
       csize_4b = get_csize(ibase, maxlen, false);
       cratio = (double)maxlen / csize_4b;
       break;
     case 9:
       // case 9 is special.  we need to asses the optimal shift
-      maxlen = 16 * 1024;
+      maxlen = length / 8;
       csize_3b = get_csize(ibase, maxlen, true);
       csize_4b = get_csize(ibase, maxlen, false);
       ipshift = (csize_3b < csize_4b) ? 3 : 4;
@@ -594,9 +594,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
     // Encoding short lengths is expensive during decompression
     // Encode only for reasonable lengths (extensive experiments done)
-    if ((len < minlen) ||
-        (len <= 8 && distance > MAX_DISTANCE) ||
-        (len <= 5 && distance <= MAX_DISTANCE)) {
+    if (len < minlen || (len <= 5 && distance >= MAX_DISTANCE)) {
       LITERAL(ip, op, op_limit, anchor, copy)
       continue;
     }
