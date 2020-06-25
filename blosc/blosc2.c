@@ -1432,17 +1432,18 @@ static int initialize_context_decompression(
   context->typesize = (uint8_t)context->src[3];
   context->sourcesize = sw32_(context->src + 4);
   context->blocksize = sw32_(context->src + 8);
-  /* Total blocks */
-  context->nblocks = context->sourcesize / context->blocksize;
-  context->leftover = context->sourcesize % context->blocksize;
-  context->nblocks = (context->leftover > 0) ?
-                      context->nblocks + 1 : context->nblocks;
 
   // Some checks for malformed headers
   if (context->blocksize <= 0 || context->blocksize > destsize ||
       context->typesize <= 0 || context->typesize > BLOSC_MAX_TYPESIZE) {
     return -1;
   }
+
+  /* Total blocks */
+  context->nblocks = context->sourcesize / context->blocksize;
+  context->leftover = context->sourcesize % context->blocksize;
+  context->nblocks = (context->leftover > 0) ?
+                      context->nblocks + 1 : context->nblocks;
 
   if (context->block_maskout != NULL && context->block_maskout_nitems != context->nblocks) {
     fprintf(stderr, "The number of items in block_maskout (%d) must match the number"
