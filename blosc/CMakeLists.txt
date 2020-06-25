@@ -105,6 +105,7 @@ if(NOT DEACTIVATE_LZ4)
     else()
         file(GLOB LZ4_FILES ${LZ4_LOCAL_DIR}/*.c)
         set(SOURCES ${SOURCES} ${LZ4_FILES})
+        source_group("LZ4" FILES ${LZ4_FILES})
     endif()
 endif()
 
@@ -120,6 +121,7 @@ if(NOT DEACTIVATE_LIZARD)
             file(GLOB LIZARD_FILES ${LIZARD_LOCAL_DIR}/*.c)
         endif()
         set(SOURCES ${SOURCES} ${LIZARD_FILES})
+        source_group("Lizard" FILES ${LIZARD_FILES})
     endif()
 endif()
 
@@ -141,8 +143,10 @@ if(NOT DEACTIVATE_ZSTD)
         file(GLOB ZSTD_COMPRESS_FILES ${ZSTD_LOCAL_DIR}/compress/*.c)
         file(GLOB ZSTD_DECOMPRESS_FILES ${ZSTD_LOCAL_DIR}/decompress/*.c)
         file(GLOB ZSTD_DICT_FILES ${ZSTD_LOCAL_DIR}/dictBuilder/*.c)
-        set(SOURCES ${SOURCES} ${ZSTD_COMMON_FILES} ${ZSTD_COMPRESS_FILES}
-                ${ZSTD_DECOMPRESS_FILES} ${ZSTD_DICT_FILES})
+        set(ZSTD_FILES ${ZSTD_COMMON_FILES} ${ZSTD_COMPRESS_FILES}
+            ${ZSTD_DECOMPRESS_FILES} ${ZSTD_DICT_FILES})
+        set(SOURCES ${SOURCES} ${ZSTD_FILES})
+        source_group("Zstd" FILES ${ZSTD_FILES})
     endif()
 endif()
 
