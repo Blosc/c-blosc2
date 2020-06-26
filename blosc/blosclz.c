@@ -781,6 +781,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         }
       }
       code = *ip++;
+      len += 3;
       ref -= code;
 
       /* match from 16-bit distance */
@@ -795,7 +796,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         }
       }
 
-      if (BLOSCLZ_UNEXPECT_CONDITIONAL(op + len + 3 > op_limit)) {
+      if (BLOSCLZ_UNEXPECT_CONDITIONAL(op + len > op_limit)) {
         return 0;
       }
 
@@ -808,16 +809,18 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
       else
         break;
 
-      if (ref == op) {
+      ref--;
+      if (ref == op - 1) {
         /* optimized copy for a run */
-        uint8_t b = ref[-1];
-        memset(op, b, len + 3);
-        op += len + 3;
+        memset(op, *ref, len);
+        op += len;
+      }
+      else if ((op - ref >= 8) && (op_limit - op - len >= 8)) {
+        wild_copy(op, ref, op + len);
+        op += len;
       }
       else {
         /* copy from reference */
-        ref--;
-        len += 3;
 #ifdef __AVX2__
         if (op - ref <= 16) {
           // This is not faster on a combination of compilers (clang, gcc, icc) or machines, but
@@ -826,16 +829,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         }
         else {
 #endif
-          uint8_t* endcpy = op + len;
-          if ((op - ref < 8) || (op_limit - endcpy < 8)) {
-            // We absolutely need a copy_match here
-            op = copy_match(op, ref, (unsigned) len);
-          }
-          else {
-            wild_copy(op, ref, endcpy);
-            op = endcpy;
-          }
-
+        op = copy_match(op, ref, (unsigned) len);
 #ifdef __AVX2__
         }
 #endif
