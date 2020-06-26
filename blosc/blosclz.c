@@ -24,11 +24,11 @@
  * Give hints to the compiler for branch prediction optimization.
  */
 #if defined(__GNUC__) && (__GNUC__ > 2)
-#define BLOSCLZ_EXPECT_CONDITIONAL(c)    (__builtin_expect((c), 1))
-#define BLOSCLZ_UNEXPECT_CONDITIONAL(c)  (__builtin_expect((c), 0))
+#define BLOSCLZ_LIKELY(c)    (__builtin_expect((c), 1))
+#define BLOSCLZ_UNLIKELY(c)  (__builtin_expect((c), 0))
 #else
-#define BLOSCLZ_EXPECT_CONDITIONAL(c)    (c)
-#define BLOSCLZ_UNEXPECT_CONDITIONAL(c)  (c)
+#define BLOSCLZ_LIKELY(c)    (c)
+#define BLOSCLZ_UNLIKELY(c)  (c)
 #endif
 
 /*
@@ -300,7 +300,7 @@ static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
 
 
 static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* ref, bool run) {
-  if (BLOSCLZ_UNEXPECT_CONDITIONAL(run)) {
+  if (BLOSCLZ_UNLIKELY(run)) {
 #if defined(__AVX2__)
     ip = get_run_32(ip, ip_bound, ref);
 #elif defined(__SSE2__)
@@ -324,12 +324,12 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 
 
 #define LITERAL(ip, op, op_limit, anchor, copy) {        \
-  if (BLOSCLZ_UNEXPECT_CONDITIONAL(op + 2 > op_limit))   \
+  if (BLOSCLZ_UNLIKELY(op + 2 > op_limit))   \
     goto out;                                            \
   *op++ = *anchor++;                                     \
   ip = anchor;                                           \
   copy++;                                                \
-  if (BLOSCLZ_UNEXPECT_CONDITIONAL(copy == MAX_COPY)) {  \
+  if (BLOSCLZ_UNLIKELY(copy == MAX_COPY)) {  \
     copy = 0;                                            \
     *op++ = MAX_COPY-1;                                  \
   }                                                      \
@@ -339,7 +339,7 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
   oc++; anchor++;                                        \
   ip = anchor;                                           \
   copy++;                                                \
-  if (BLOSCLZ_UNEXPECT_CONDITIONAL(copy == MAX_COPY)) {  \
+  if (BLOSCLZ_UNLIKELY(copy == MAX_COPY)) {  \
     copy = 0;                                            \
     oc++;                                                \
   }                                                      \
@@ -367,7 +367,7 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
   oc += 5;
 
   /* main loop */
-  while (BLOSCLZ_EXPECT_CONDITIONAL(ip < ip_limit)) {
+  while (BLOSCLZ_LIKELY(ip < ip_limit)) {
     const uint8_t* ref;
     unsigned distance;
     uint8_t* anchor = ip;    /* comparison starting-point */
@@ -389,7 +389,7 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
     }
 
     /* is this a match? check the first 4 bytes */
-    if (BLOSCLZ_UNEXPECT_CONDITIONAL(BLOSCLZ_READU32(ref) == BLOSCLZ_READU32(ip))) {
+    if (BLOSCLZ_UNLIKELY(BLOSCLZ_READU32(ref) == BLOSCLZ_READU32(ip))) {
       ref += 4;
     }
     else {
@@ -545,7 +545,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
   *op++ = *ip++;
 
   /* main loop */
-  while (BLOSCLZ_EXPECT_CONDITIONAL(ip < ip_limit)) {
+  while (BLOSCLZ_LIKELY(ip < ip_limit)) {
     const uint8_t* ref;
     unsigned distance;
     uint8_t* anchor = ip;    /* comparison starting-point */
@@ -567,7 +567,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
     }
 
     /* is this a match? check the first 4 bytes */
-    if (BLOSCLZ_UNEXPECT_CONDITIONAL(BLOSCLZ_READU32(ref) == BLOSCLZ_READU32(ip))) {
+    if (BLOSCLZ_UNLIKELY(BLOSCLZ_READU32(ref) == BLOSCLZ_READU32(ip))) {
       ref += 4;
     }
     else {
@@ -657,11 +657,11 @@ int blosclz_compress(const int clevel, const void* input, int length,
   }
 
   /* left-over as literal copy */
-  while (BLOSCLZ_UNEXPECT_CONDITIONAL(ip <= ip_bound)) {
-    if (BLOSCLZ_UNEXPECT_CONDITIONAL(op + 2 > op_limit)) goto out;
+  while (BLOSCLZ_UNLIKELY(ip <= ip_bound)) {
+    if (BLOSCLZ_UNLIKELY(op + 2 > op_limit)) goto out;
     *op++ = *ip++;
     copy++;
-    if (BLOSCLZ_UNEXPECT_CONDITIONAL(copy == MAX_COPY)) {
+    if (BLOSCLZ_UNLIKELY(copy == MAX_COPY)) {
       copy = 0;
       *op++ = MAX_COPY - 1;
     }
@@ -753,7 +753,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
   uint8_t* op = (uint8_t*)output;
   uint32_t ctrl;
   uint8_t* op_limit = op + maxout;
-  if (BLOSCLZ_UNEXPECT_CONDITIONAL(length == 0)) {
+  if (BLOSCLZ_UNLIKELY(length == 0)) {
     return 0;
   }
   ctrl = (*ip++) & 31U;
@@ -768,7 +768,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
 
       if (len == 7 - 1) {
         do {
-          if (BLOSCLZ_UNEXPECT_CONDITIONAL(ip + 1 >= ip_limit)) {
+          if (BLOSCLZ_UNLIKELY(ip + 1 >= ip_limit)) {
             return 0;
           }
           code = *ip++;
@@ -776,7 +776,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         } while (code == 255);
       }
       else {
-        if (BLOSCLZ_UNEXPECT_CONDITIONAL(ip + 1 >= ip_limit)) {
+        if (BLOSCLZ_UNLIKELY(ip + 1 >= ip_limit)) {
           return 0;
         }
       }
@@ -785,9 +785,9 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
       ref -= code;
 
       /* match from 16-bit distance */
-      if (BLOSCLZ_UNEXPECT_CONDITIONAL(code == 255)) {
-        if (BLOSCLZ_EXPECT_CONDITIONAL(ofs == (31U << 8U))) {
-          if (BLOSCLZ_UNEXPECT_CONDITIONAL(ip + 1 >= ip_limit)) {
+      if (BLOSCLZ_UNLIKELY(code == 255)) {
+        if (ofs == (31U << 8U)) {
+          if (ip + 1 >= ip_limit) {
             return 0;
           }
           ofs = (*ip++) << 8U;
@@ -796,18 +796,16 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         }
       }
 
-      if (BLOSCLZ_UNEXPECT_CONDITIONAL(op + len > op_limit)) {
+      if (BLOSCLZ_UNLIKELY(op + len > op_limit)) {
         return 0;
       }
 
-      if (BLOSCLZ_UNEXPECT_CONDITIONAL(ref - 1 < (uint8_t*)output)) {
+      if (BLOSCLZ_UNLIKELY(ref - 1 < (uint8_t*)output)) {
         return 0;
       }
 
-      if (BLOSCLZ_EXPECT_CONDITIONAL(ip < ip_limit))
-        ctrl = *ip++;
-      else
-        break;
+      if (BLOSCLZ_UNLIKELY(ip >= ip_limit)) break;
+      ctrl = *ip++;
 
       ref--;
       if (ref == op - 1) {
@@ -815,12 +813,13 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         memset(op, *ref, len);
         op += len;
       }
-      else if ((op - ref >= 8) && (op_limit - op - len >= 8)) {
+      else if ((op - ref >= 8) && (op_limit - op >= len + 8)) {
+        // copy with an overlap not larger than 8
         wild_copy(op, ref, op + len);
         op += len;
       }
       else {
-        /* copy from reference */
+        // general copy with any overlap
 #ifdef __AVX2__
         if (op - ref <= 16) {
           // This is not faster on a combination of compilers (clang, gcc, icc) or machines, but
@@ -829,7 +828,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         }
         else {
 #endif
-        op = copy_match(op, ref, (unsigned) len);
+          op = copy_match(op, ref, (unsigned) len);
 #ifdef __AVX2__
         }
 #endif
@@ -838,10 +837,10 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
     else {
       // literal
       ctrl++;
-      if (BLOSCLZ_UNEXPECT_CONDITIONAL(op + ctrl > op_limit)) {
+      if (BLOSCLZ_UNLIKELY(op + ctrl > op_limit)) {
         return 0;
       }
-      if (BLOSCLZ_UNEXPECT_CONDITIONAL(ip + ctrl > ip_limit)) {
+      if (BLOSCLZ_UNLIKELY(ip + ctrl > ip_limit)) {
         return 0;
       }
 
@@ -852,7 +851,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
       // And starting on CLANG/LLVM 10 and GCC 9, memcpy is generally faster.
       // op = fastcopy(op, ip, (unsigned) ctrl); ip += ctrl;
 
-      if (BLOSCLZ_UNEXPECT_CONDITIONAL(ip >= ip_limit)) break;
+      if (BLOSCLZ_UNLIKELY(ip >= ip_limit)) break;
       ctrl = *ip++;
     }
   }
