@@ -1419,8 +1419,8 @@ static uint8_t get_filter_flags(const uint8_t header_flags,
 }
 
 
-static int initialize_context_decompression(
-        blosc2_context* context, const void* src, void* dest, size_t destsize) {
+static int initialize_context_decompression(blosc2_context* context, const void* src,
+                                            void* dest, int32_t destsize) {
   context->do_compress = 0;
   context->src = (const uint8_t*)src;
   context->dest = (uint8_t*)dest;
@@ -1982,7 +1982,7 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
     return -1;
   }
 
-  error = initialize_context_decompression(context, src, dest, destsize);
+  error = initialize_context_decompression(context, src, dest, (int32_t)destsize);
   if (error < 0) {
     return error;
   }
