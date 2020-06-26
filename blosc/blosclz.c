@@ -526,7 +526,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
       csize_3b = get_csize(ibase, maxlen, true);
       csize_4b = get_csize(ibase, maxlen, false);
       ipshift = (csize_3b < csize_4b) ? 3 : 4;
-      cratio = (csize_3b < csize_4b) ? (maxlen / csize_3b) : (maxlen / csize_4b);
+      cratio = (csize_3b < csize_4b) ? ((double)maxlen / csize_3b) : ((double)maxlen / csize_4b);
       break;
     default:
       break;
