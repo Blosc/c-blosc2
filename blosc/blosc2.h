@@ -543,6 +543,22 @@ BLOSC_EXPORT int blosc_free_resources(void);
 BLOSC_EXPORT void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
                                       size_t* cbytes, size_t* blocksize);
 
+/**
+ * @brief Checks that the compressed buffer starting at @cbuffer of length @cbytes may
+ * contain valid blosc compressed data, and that it is safe to call
+ * blosc_decompress/blosc_decompress_ctx/blosc_getitem.
+ * On success, returns 0 and sets @nbytes to the size of the uncompressed data.
+ * This does not guarantee that the decompression function won't return an error,
+ * but does guarantee that it is safe to attempt decompression.
+ *
+ * @param cbuffer The buffer of compressed data.
+ * @param cbytes The number of compressed bytes.
+ * @param nbytes The pointer where the number of uncompressed bytes will be put.
+ *
+ * @return On failure, returns -1.
+ */
+BLOSC_EXPORT int blosc_cbuffer_validate(const void* cbuffer, size_t cbytes,
+                                         size_t* nbytes);
 
 /**
  * @brief Get information about a compressed buffer, namely the type size
