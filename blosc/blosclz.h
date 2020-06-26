@@ -20,7 +20,7 @@
 extern "C" {
 #endif
 
-#define BLOSCLZ_VERSION_STRING "2.2.0"
+#define BLOSCLZ_VERSION_STRING "2.3.0"
 
 
 /**
