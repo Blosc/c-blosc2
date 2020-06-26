@@ -532,7 +532,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
       break;
   }
   // compression ratios less than 2x are too expensive for a fast codec like this one
-  if (cratio < 2) {
+  if ((clevel < 9 && cratio < 2) || (clevel == 9 && cratio < 1.2)) {
     goto out;
   }
 
