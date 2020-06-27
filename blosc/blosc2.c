@@ -1475,8 +1475,11 @@ static int initialize_context_decompression(blosc2_context* context, const void*
           ZSTD_freeDDict(context->dict_ddict);
       }
       // The trained dictionary is after the bstarts block
-      context->dict_size = (size_t)sw32_(context->bstarts + context->nblocks);
       context->dict_buffer = (void*)(context->bstarts + context->nblocks + 1);
+      context->dict_size = (size_t)sw32_(context->bstarts + context->nblocks);
+      if (context->dict_size > BLOSC2_MAXDICTSIZE) {
+        return -1;
+      }
       context->dict_ddict = ZSTD_createDDict(context->dict_buffer, context->dict_size);
 #endif   // HAVE_ZSTD
     }
