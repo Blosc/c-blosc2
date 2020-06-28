@@ -10,7 +10,7 @@
 int tests_run = 0;
 
 #define SIZE 500 * 1000
-#define NTHREADS 1
+#define NTHREADS 2
 
 typedef struct {
     int ninputs;
@@ -26,8 +26,10 @@ static int32_t data[SIZE];
 static int32_t data2[SIZE];
 static int32_t data_out[SIZE];
 static int32_t data_dest[SIZE];
-size_t isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t) + BLOSC_MAX_OVERHEAD;
-int dsize = SIZE * sizeof(int32_t), csize;
+size_t isize = SIZE * sizeof(int32_t);
+size_t osize = SIZE * sizeof(int32_t) + BLOSC_MAX_OVERHEAD;
+int dsize = SIZE * sizeof(int32_t);
+int csize;
 
 
 int prefilter_func(blosc2_prefilter_params *pparams) {
@@ -70,8 +72,6 @@ static char *test_prefilter1(void) {
   mu_assert("Compression error", csize > 0);
 
   /* Create a context for decompression */
-  dparams = BLOSC2_DPARAMS_DEFAULTS;
-  dparams.nthreads = NTHREADS;
   dctx = blosc2_create_dctx(dparams);
 
   /* Decompress  */
@@ -110,8 +110,6 @@ static char *test_prefilter2(void) {
   mu_assert("Compression error", csize > 0);
 
   /* Create a context for decompression */
-  dparams = BLOSC2_DPARAMS_DEFAULTS;
-  dparams.nthreads = NTHREADS;
   dctx = blosc2_create_dctx(dparams);
 
   /* Decompress  */
@@ -134,17 +132,26 @@ static char *test_prefilter2(void) {
 
 
 static char *all_tests(void) {
+  // Check with an assortment of clevels and nthreads
   cparams.clevel = 0;
+  cparams.nthreads = 1;
+  dparams.nthreads = NTHREADS;
   mu_run_test(test_prefilter1);
   cparams.clevel = 1;
+  cparams.nthreads = 1;
   mu_run_test(test_prefilter1);
   cparams.clevel = 7;
+  cparams.nthreads = NTHREADS;
   mu_run_test(test_prefilter1);
   cparams.clevel = 0;
+  cparams.nthreads = NTHREADS;
+  dparams.nthreads = 1;
   mu_run_test(test_prefilter2);
   cparams.clevel = 5;
+  cparams.nthreads = 1;
   mu_run_test(test_prefilter2);
   cparams.clevel = 9;
+  cparams.nthreads = NTHREADS;
   mu_run_test(test_prefilter2);
 
   return 0;
@@ -165,7 +172,7 @@ int main(void) {
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
-  cparams.nthreads = NTHREADS;
+  dparams = BLOSC2_DPARAMS_DEFAULTS;
 
   /* Run all the suite */
   char* result = all_tests();
