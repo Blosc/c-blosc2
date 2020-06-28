@@ -2369,10 +2369,21 @@ static void t_blosc_do_job(void *ctxt)
     }
     if (compress) {
       if (memcpyed) {
-        /* We want to memcpy only */
-        memcpy(dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize,
-               src + nblock_ * blocksize, (unsigned int)bsize);
-        cbytes = (int32_t)bsize;
+        if (!context->prefilter) {
+          /* We want to memcpy only */
+          memcpy(dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize,
+                 src + nblock_ * blocksize, (unsigned int) bsize);
+          cbytes = (int32_t) bsize;
+        }
+        else {
+          /* Only the prefilter has to be executed, and this is done in blosc_c().
+           * However, no further actions are needed, so we can put the result
+           * directly in dest. */
+          cbytes = blosc_c(thcontext, bsize, leftoverblock, 0,
+                           ebsize, src, nblock_ * blocksize,
+                           dest + BLOSC_MAX_OVERHEAD + nblock_ * blocksize,
+                           tmp, tmp3);
+        }
       }
       else {
         /* Regular compression */
