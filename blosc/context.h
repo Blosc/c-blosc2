@@ -37,7 +37,7 @@ struct blosc2_context_s {
   /* The source buffer */
   uint8_t* dest;
   /* The destination buffer */
-  uint8_t* header_flags;
+  uint8_t header_flags;
   /* Flags for header */
   int32_t sourcesize;
   /* Number of bytes in source buffer */
