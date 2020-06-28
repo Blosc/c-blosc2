@@ -476,6 +476,9 @@ int blosclz_compress(const int clevel, const void* input, int length,
   // Minimum lengths for encoding
   unsigned minlen_[10] = {0, 12, 12, 11, 10, 9, 8, 7, 6, 5};
 
+  // Minimum compression ratios for initiate encoding
+  double cratio_[10] = {0, 2, 2, 2, 2, 1.8, 1.6, 1.4, 1.2, 1.1};
+
   uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[clevel];
@@ -531,8 +534,8 @@ int blosclz_compress(const int clevel, const void* input, int length,
     default:
       break;
   }
-  // compression ratios less than 2x are too expensive for a fast codec like this one
-  if ((clevel < 9 && cratio < 2) || (clevel == 9 && cratio < 1.2)) {
+  // discard probes with small compression ratios (too expensive)
+  if (cratio < cratio_ [clevel]) {
     goto out;
   }
 
