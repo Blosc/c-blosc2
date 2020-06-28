@@ -1069,7 +1069,7 @@ static int serial_blosc(struct thread_context* thread_context) {
       leftoverblock = 1;
     }
     if (context->do_compress) {
-      if (memcpyed) {
+      if (memcpyed && !context->prefilter) {
         /* We want to memcpy only */
         memcpy(context->dest + BLOSC_MAX_OVERHEAD + j * context->blocksize,
                  context->src + j * context->blocksize,
@@ -1986,7 +1986,6 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
     /* Version from future */
     return -1;
   }
-  bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
 
   error = initialize_context_decompression(context, src, dest, (int32_t)destsize);
   if (error < 0) {
@@ -1994,6 +1993,7 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
   }
 
   /* Check whether this buffer is memcpy'ed */
+  bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
   if (memcpyed) {
     // Check that sizes in header are compatible, otherwise there is a header corruption
     ntbytes = context->sourcesize;
