@@ -163,6 +163,7 @@ static void dummy_threads_callback(void *callback_data, void (*dojob)(void *), i
   for (i = 0; i < numjobs; ++i)
     dojob(((char *) jobdata) + ((unsigned) i)*jobdata_elsize);
 }
+
 /* install the callback if environment variable BLOSC_TEST_CALLBACK="yes" */
 inline static void install_blosc_callback_test(void)
 {
