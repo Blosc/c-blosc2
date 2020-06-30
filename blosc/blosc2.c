@@ -974,6 +974,12 @@ static int blosc_d(
     cbytes = sw32_(src);      /* amount of compressed bytes */
     src += sizeof(int32_t);
     ctbytes += (int32_t)sizeof(int32_t);
+
+    if (cbytes < 0 || ctbytes < 0) {
+      /* cbytes and ctbytes should never be negative */
+      return -2;
+    }
+
     /* Uncompress */
     if (cbytes == neblock) {
       memcpy(_dest, src, (unsigned int)neblock);
