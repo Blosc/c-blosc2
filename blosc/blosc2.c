@@ -678,30 +678,29 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
 }
 
 
-static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
-  uint8_t x = ip[-1];
+// Optimized version for detecting runs.  It compares 8 bytes values wherever possible.
+static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound) {
+  uint8_t x = *ip;
   int64_t value, value2;
   /* Broadcast the value for every byte in a 64-bit register */
   memset(&value, x, 8);
-  /* safe because the outer check against ip limit */
-  while (ip < (ip_bound - sizeof(int64_t))) {
+  while (ip < (ip_bound - 8)) {
 #if defined(BLOSC_STRICT_ALIGN)
     memcpy(&value2, ref, 8);
 #else
-    value2 = ((int64_t*)ref)[0];
+    value2 = *(int64_t*)ip;
 #endif
     if (value != value2) {
       /* Return the byte that starts to differ */
-      while (*ref++ == x) ip++;
+      while (*ip == x) ip++;
       return ip;
     }
     else {
       ip += 8;
-      ref += 8;
     }
   }
   /* Look into the remainder */
-  while ((ip < ip_bound) && (*ref++ == x)) ip++;
+  while ((ip < ip_bound) && (*ip == x)) ip++;
   return ip;
 }
 
@@ -768,14 +767,14 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       ctbytes += sizeof(int32_t);
     }
 
-    // First see if we have a run here
+    // See if we have a run here
     uint8_t* ip = (uint8_t*)_src + j * neblock;
-    ip = get_run(ip + 1, _src + (j + 1) * neblock, ip);
-    if (ip == _src + (j + 1) * neblock) {
+    uint8_t* ipbound = (uint8_t*)_src + (j + 1) * neblock;
+    ip = get_run(ip, ipbound);
+    if (ip == ipbound) {
       // A run.  Encode the repeated byte as a negative length in the length of the split.
       int32_t value = _src[j * neblock];
       _sw32(dest - 4, -value);
-      //printf("c%d,", value);
       continue;
     }
 
@@ -1019,15 +1018,14 @@ static int blosc_d(
 
     /* Uncompress */
     if (cbytes <= 0) {
+      // A run
       if (cbytes < -255) {
         // Runs can only encode a byte
         return -2;
       }
-      // A run
       uint8_t value = -cbytes;
-      //printf("d%d,", value);
       memset(_dest, value, (unsigned int)neblock);
-      nbytes = (int32_t)neblock;
+      nbytes = neblock;
       cbytes = 0;  // everything is encoded in the cbytes token
     }
     else if (cbytes == neblock) {

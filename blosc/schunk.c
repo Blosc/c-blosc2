@@ -196,7 +196,10 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
     schunk->data[nchunks] = chunk;
   }
   else {
-    frame_append_chunk(schunk->frame, chunk, schunk);
+    if (frame_append_chunk(schunk->frame, chunk, schunk) == NULL) {
+      fprintf(stderr, "Problems appending a chunk");
+      return -1;
+    }
   }
 
   /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n", */
