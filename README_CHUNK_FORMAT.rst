@@ -138,3 +138,5 @@ Finally, it comes the actual list of compressed blocks / splits data streams.  I
     +========+========+========+========+========+========+========+
 
 [**Only for C-Blosc2**] The `csize` can be signed.  Positive values mean regular compressed sizes (the only ones supported by C-Blosc1).  Negative values mean splits that are made of a sequence of the same byte value; such value is encoded as the lowest significant byte of the `int32_t csize`.  For example, a csize of 10000 means that the compressed split stream that follows is 10000 bytes long.  On its hand, a csize of -32 means that the whole block/split is made of bytes with a value of 32.
+
+*Note*: all the integers are stored in little endian.
