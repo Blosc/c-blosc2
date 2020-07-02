@@ -1846,10 +1846,8 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     assert(dict_actual_size > 0);
     free(samples_sizes);
 
-    // Update bytes counter and pointers to bstarts for the new compressed
-    // buffer
-    context->bstarts = (int32_t*)(context->dest +
-                                   BLOSC_EXTENDED_HEADER_LENGTH);
+    // Update bytes counter and pointers to bstarts for the new compressed buffer
+    context->bstarts = (int32_t*)(context->dest + BLOSC_EXTENDED_HEADER_LENGTH);
     context->output_bytes = BLOSC_EXTENDED_HEADER_LENGTH +
                             sizeof(int32_t) * context->nblocks;
     /* Write the size of trained dict at the end of bstarts */
