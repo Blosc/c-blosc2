@@ -678,6 +678,34 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
 }
 
 
+static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+  uint8_t x = ip[-1];
+  int64_t value, value2;
+  /* Broadcast the value for every byte in a 64-bit register */
+  memset(&value, x, 8);
+  /* safe because the outer check against ip limit */
+  while (ip < (ip_bound - sizeof(int64_t))) {
+#if defined(BLOSC_STRICT_ALIGN)
+    memcpy(&value2, ref, 8);
+#else
+    value2 = ((int64_t*)ref)[0];
+#endif
+    if (value != value2) {
+      /* Return the byte that starts to differ */
+      while (*ref++ == x) ip++;
+      return ip;
+    }
+    else {
+      ip += 8;
+      ref += 8;
+    }
+  }
+  /* Look into the remainder */
+  while ((ip < ip_bound) && (*ref++ == x)) ip++;
+  return ip;
+}
+
+
 /* Shuffle & compress a single block */
 static int blosc_c(struct thread_context* thread_context, int32_t bsize,
                    int32_t leftoverblock, int32_t ntbytes, int32_t maxbytes,
@@ -720,6 +748,8 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     _src = src + offset;
   }
 
+  assert(context->clevel > 0);
+
   /* Calculate acceleration for different compressors */
   accel = get_accel(context);
 
@@ -737,6 +767,18 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       ntbytes += sizeof(int32_t);
       ctbytes += sizeof(int32_t);
     }
+
+    // First see if we have a run here
+    uint8_t* ip = (uint8_t*)_src + j * neblock;
+    ip = get_run(ip + 1, _src + (j + 1) * neblock, ip);
+    if (ip == _src + (j + 1) * neblock) {
+      // A run.  Encode the repeated byte as a negative length in the length of the split.
+      int32_t value = _src[j * neblock];
+      _sw32(dest - 4, -value);
+      //printf("c%d,", value);
+      continue;
+    }
+
     maxout = neblock;
   #if defined(HAVE_SNAPPY)
     if (context->compcode == BLOSC_SNAPPY) {
@@ -833,6 +875,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     ctbytes += cbytes;
   }  /* Closes j < nsplits */
 
+  //printf("c%d", ctbytes);
   return ctbytes;
 }
 
@@ -974,13 +1017,20 @@ static int blosc_d(
     src += sizeof(int32_t);
     ctbytes += (int32_t)sizeof(int32_t);
 
-    if (cbytes < 0 || ctbytes < 0) {
-      /* cbytes and ctbytes should never be negative */
-      return -2;
-    }
-
     /* Uncompress */
-    if (cbytes == neblock) {
+    if (cbytes <= 0) {
+      if (cbytes < -255) {
+        // Runs can only encode a byte
+        return -2;
+      }
+      // A run
+      uint8_t value = -cbytes;
+      //printf("d%d,", value);
+      memset(_dest, value, (unsigned int)neblock);
+      nbytes = (int32_t)neblock;
+      cbytes = 0;  // everything is encoded in the cbytes token
+    }
+    else if (cbytes == neblock) {
       memcpy(_dest, src, (unsigned int)neblock);
       nbytes = (int32_t)neblock;
     }
