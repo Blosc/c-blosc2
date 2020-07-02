@@ -53,8 +53,8 @@
 #define HASH_LOG (12U)
 
 // This is used in LZ4 and seems to work pretty well here too
-#define HASH_FUNCTION(v, s, h) {                          \
-  v = (s * 2654435761U) >> (32U - h);  \
+#define HASH_FUNCTION(v, s, h) {      \
+  v = (s * 2654435761U) >> (32U - h); \
 }
 
 
@@ -323,26 +323,74 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 }
 
 
-#define LITERAL(ip, op, op_limit, anchor, copy) {        \
-  if (BLOSCLZ_UNLIKELY(op + 2 > op_limit))   \
-    goto out;                                            \
-  *op++ = *anchor++;                                     \
-  ip = anchor;                                           \
-  copy++;                                                \
-  if (BLOSCLZ_UNLIKELY(copy == MAX_COPY)) {  \
-    copy = 0;                                            \
-    *op++ = MAX_COPY-1;                                  \
-  }                                                      \
+#define LITERAL(ip, op, op_limit, anchor, copy) {       \
+  if (BLOSCLZ_UNLIKELY(op + 2 > op_limit))              \
+    goto out;                                           \
+  *op++ = *anchor++;                                    \
+  ip = anchor;                                          \
+  copy++;                                               \
+  if (BLOSCLZ_UNLIKELY(copy == MAX_COPY)) {             \
+    copy = 0;                                           \
+    *op++ = MAX_COPY-1;                                 \
+  }                                                     \
 }
 
-#define LITERAL2(ip, oc, anchor, copy) {                 \
-  oc++; anchor++;                                        \
-  ip = anchor;                                           \
-  copy++;                                                \
-  if (BLOSCLZ_UNLIKELY(copy == MAX_COPY)) {  \
-    copy = 0;                                            \
-    oc++;                                                \
-  }                                                      \
+#define LITERAL2(ip, oc, anchor, copy) {                \
+  oc++; anchor++;                                       \
+  ip = anchor;                                          \
+  copy++;                                               \
+  if (BLOSCLZ_UNLIKELY(copy == MAX_COPY)) {             \
+    copy = 0;                                           \
+    oc++;                                               \
+  }                                                     \
+}
+
+#define DISTANCE_SHORT(op, op_limit, len, distance) {   \
+  if (BLOSCLZ_UNLIKELY(op + 2 > op_limit))              \
+    goto out;                                           \
+  *op++ = (uint8_t)((len << 5U) + (distance >> 8U));    \
+  *op++ = (uint8_t)((distance & 255U));                 \
+}
+
+#define DISTANCE_LONG(op, op_limit, len, distance) {    \
+  if (BLOSCLZ_UNLIKELY(op + 1 > op_limit))              \
+    goto out;                                           \
+  *op++ = (uint8_t)((7U << 5U) + (distance >> 8U));     \
+  for (len -= 7; len >= 255; len -= 255) {              \
+    if (BLOSCLZ_UNLIKELY(op + 1 > op_limit))            \
+      goto out;                                         \
+    *op++ = 255;                                        \
+  }                                                     \
+  if (BLOSCLZ_UNLIKELY(op + 2 > op_limit))              \
+    goto out;                                           \
+  *op++ = (uint8_t)len;                                 \
+  *op++ = (uint8_t)((distance & 255U));                 \
+}
+
+#define DISTANCE_SHORT_FAR(op, op_limit, len, distance) {   \
+  if (BLOSCLZ_UNLIKELY(op + 4 > op_limit))                  \
+    goto out;                                               \
+  *op++ = (uint8_t)((len << 5U) + 31);                      \
+  *op++ = 255;                                              \
+  *op++ = (uint8_t)(distance >> 8U);                        \
+  *op++ = (uint8_t)(distance & 255U);                       \
+}
+
+#define DISTANCE_LONG_FAR(op, op_limit, len, distance) {    \
+  if (BLOSCLZ_UNLIKELY(op + 1 > op_limit))                  \
+    goto out;                                               \
+  *op++ = (7U << 5U) + 31;                                  \
+  for (len -= 7; len >= 255; len -= 255) {                  \
+    if (BLOSCLZ_UNLIKELY(op + 1 > op_limit))                \
+      goto out;                                             \
+    *op++ = 255;                                            \
+  }                                                         \
+  if (BLOSCLZ_UNLIKELY(op + 4 > op_limit))                  \
+    goto out;                                               \
+  *op++ = (uint8_t)len;                                     \
+  *op++ = 255;                                              \
+  *op++ = (uint8_t)(distance >> 8U);                        \
+  *op++ = (uint8_t)(distance & 255U);                       \
 }
 
 
@@ -572,8 +620,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
     /* is this a match? check the first 4 bytes */
     if (BLOSCLZ_UNLIKELY(BLOSCLZ_READU32(ref) == BLOSCLZ_READU32(ip))) {
       ref += 4;
-    }
-    else {
+    } else {
       /* no luck, copy as a literal */
       LITERAL(ip, op, op_limit, anchor, copy)
       continue;
@@ -615,35 +662,17 @@ int blosclz_compress(const int clevel, const void* input, int length,
     /* encode the match */
     if (distance < MAX_DISTANCE) {
       if (len < 7) {
-        *op++ = (uint8_t)((len << 5U) + (distance >> 8U));
-        *op++ = (uint8_t)((distance & 255U));
+        DISTANCE_SHORT(op, op_limit, len, distance)
+      } else {
+        DISTANCE_LONG(op, op_limit, len, distance)
       }
-      else {
-        *op++ = (uint8_t)((7U << 5U) + (distance >> 8U));
-        for (len -= 7; len >= 255; len -= 255)
-          *op++ = 255;
-        *op++ = (uint8_t)len;
-        *op++ = (uint8_t)((distance & 255U));
-      }
-    }
-    else {
+    } else {
       /* far away, but not yet in the another galaxy... */
+      distance -= MAX_DISTANCE;
       if (len < 7) {
-        distance -= MAX_DISTANCE;
-        *op++ = (uint8_t)((len << 5U) + 31);
-        *op++ = 255;
-        *op++ = (uint8_t)(distance >> 8U);
-        *op++ = (uint8_t)(distance & 255U);
-      }
-      else {
-        distance -= MAX_DISTANCE;
-        *op++ = (7U << 5U) + 31;
-        for (len -= 7; len >= 255; len -= 255)
-          *op++ = 255;
-        *op++ = (uint8_t)len;
-        *op++ = 255;
-        *op++ = (uint8_t)(distance >> 8U);
-        *op++ = (uint8_t)(distance & 255U);
+        DISTANCE_SHORT_FAR(op, op_limit, len, distance)
+      } else {
+        DISTANCE_LONG_FAR(op, op_limit, len, distance)
       }
     }
 
@@ -655,8 +684,10 @@ int blosclz_compress(const int clevel, const void* input, int length,
     HASH_FUNCTION(hval, seq, hashlog)
     htab[hval] = (uint32_t) (ip++ - ibase);
     /* assuming literal copy */
-    *op++ = MAX_COPY - 1;
 
+    if (BLOSCLZ_UNLIKELY(op + 1 > op_limit))
+      goto out;
+    *op++ = MAX_COPY - 1;
   }
 
   /* left-over as literal copy */
@@ -683,7 +714,6 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
   out:
   return 0;
-
 }
 
 // See https://habr.com/en/company/yandex/blog/457612/
