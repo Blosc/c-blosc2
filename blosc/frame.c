@@ -1146,6 +1146,7 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
     *needs_free = true;
   } else {
     *chunk = frame->sdata + header_len + offset;
+    int32_t chunk_nbytes = sw32_(*chunk + 4);
     chunk_cbytes = sw32_(*chunk + 12);
   }
 
@@ -1236,6 +1237,13 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, (size_t)off_nbytes, offsets,
           off_chunk, (size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
+  int64_t offset;
+  int rc2 = blosc_getitem(off_chunk, nchunks, 1, &offset);
+  // Safety check.  This is cheap and can save time while debugging.
+  if (rc2 != 8 || offset != offsets[nchunks]) {
+    fprintf(stderr, "Chunk offset has not being compressed correctly!\n");
+    return NULL;
+  }
   free(offsets);
   if (new_off_cbytes < 0) {
     free(off_chunk);
