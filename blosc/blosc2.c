@@ -679,7 +679,7 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
 
 
 // Optimized version for detecting runs.  It compares 8 bytes values wherever possible.
-static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound) {
+static bool get_run(const uint8_t* ip, const uint8_t* ip_bound) {
   uint8_t x = *ip;
   int64_t value, value2;
   /* Broadcast the value for every byte in a 64-bit register */
@@ -691,9 +691,8 @@ static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound) {
     value2 = *(int64_t*)ip;
 #endif
     if (value != value2) {
-      /* Return the byte that starts to differ */
-      while (*ip == x) ip++;
-      return ip;
+      // Values differ.  We don't have a run.
+      return false;
     }
     else {
       ip += 8;
@@ -701,7 +700,7 @@ static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound) {
   }
   /* Look into the remainder */
   while ((ip < ip_bound) && (*ip == x)) ip++;
-  return ip;
+  return ip == ip_bound ? true : false;
 }
 
 
@@ -768,10 +767,9 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     }
 
     // See if we have a run here
-    uint8_t* ip = (uint8_t*)_src + j * neblock;
-    uint8_t* ipbound = (uint8_t*)_src + (j + 1) * neblock;
-    ip = get_run(ip, ipbound);
-    if (ip == ipbound) {
+    const uint8_t* ip = (uint8_t*)_src + j * neblock;
+    const uint8_t* ipbound = (uint8_t*)_src + (j + 1) * neblock;
+    if (get_run(ip, ipbound)) {
       // A run.  Encode the repeated byte as a negative length in the length of the split.
       int32_t value = _src[j * neblock];
       _sw32(dest - 4, -value);
