@@ -38,9 +38,10 @@ static int split_block(blosc2_context* context, int32_t typesize,
   int compcode = context->compcode;
   bool shuffle = context->filter_flags & BLOSC_DOSHUFFLE;
   return (
-    // fast codecs like lz4 and blosclz prefer to split with shuffle
+    // fast codecs like blosclz prefer to split with shuffle
     ((compcode == BLOSC_BLOSCLZ && shuffle) ||
-     (compcode == BLOSC_LZ4  && shuffle) ||
+     // Generally, LZ4 without IPP works better without splitting blocks
+     //(compcode == BLOSC_LZ4  && shuffle) ||
      // For forward compatibility with Blosc1 (http://blosc.org/posts/new-forward-compat-policy/)
      (!extended_header && compcode == BLOSC_LZ4HC) ||
      (!extended_header && compcode == BLOSC_ZLIB) ||
