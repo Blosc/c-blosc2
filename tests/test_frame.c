@@ -231,6 +231,7 @@ static char *all_tests(void) {
               for (int icheck_sframe = 0; icheck_sframe < 2; icheck_sframe++) {
                 check_sframe = (bool) icheck_sframe;
                 sparse_schunk = (bool) isparse_schunk;
+                free_new = (bool) ifree_new;
                 filter_pipeline = (bool) ifilter_pipeline;
                 metalayers = (bool) imetalayers;
                 usermeta = (bool) iusermeta;
