@@ -345,14 +345,14 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
   }                                                     \
 }
 
-#define DISTANCE_SHORT(op, op_limit, len, distance) {   \
+#define MATCH_SHORT(op, op_limit, len, distance) {      \
   if (BLOSCLZ_UNLIKELY(op + 2 > op_limit))              \
     goto out;                                           \
   *op++ = (uint8_t)((len << 5U) + (distance >> 8U));    \
   *op++ = (uint8_t)((distance & 255U));                 \
 }
 
-#define DISTANCE_LONG(op, op_limit, len, distance) {    \
+#define MATCH_LONG(op, op_limit, len, distance) {       \
   if (BLOSCLZ_UNLIKELY(op + 1 > op_limit))              \
     goto out;                                           \
   *op++ = (uint8_t)((7U << 5U) + (distance >> 8U));     \
@@ -367,7 +367,7 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
   *op++ = (uint8_t)((distance & 255U));                 \
 }
 
-#define DISTANCE_SHORT_FAR(op, op_limit, len, distance) {   \
+#define MATCH_SHORT_FAR(op, op_limit, len, distance) {      \
   if (BLOSCLZ_UNLIKELY(op + 4 > op_limit))                  \
     goto out;                                               \
   *op++ = (uint8_t)((len << 5U) + 31);                      \
@@ -376,7 +376,7 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
   *op++ = (uint8_t)(distance & 255U);                       \
 }
 
-#define DISTANCE_LONG_FAR(op, op_limit, len, distance) {    \
+#define MATCH_LONG_FAR(op, op_limit, len, distance) {       \
   if (BLOSCLZ_UNLIKELY(op + 1 > op_limit))                  \
     goto out;                                               \
   *op++ = (7U << 5U) + 31;                                  \
@@ -662,17 +662,17 @@ int blosclz_compress(const int clevel, const void* input, int length,
     /* encode the match */
     if (distance < MAX_DISTANCE) {
       if (len < 7) {
-        DISTANCE_SHORT(op, op_limit, len, distance)
+        MATCH_SHORT(op, op_limit, len, distance)
       } else {
-        DISTANCE_LONG(op, op_limit, len, distance)
+        MATCH_LONG(op, op_limit, len, distance)
       }
     } else {
       /* far away, but not yet in the another galaxy... */
       distance -= MAX_DISTANCE;
       if (len < 7) {
-        DISTANCE_SHORT_FAR(op, op_limit, len, distance)
+        MATCH_SHORT_FAR(op, op_limit, len, distance)
       } else {
-        DISTANCE_LONG_FAR(op, op_limit, len, distance)
+        MATCH_LONG_FAR(op, op_limit, len, distance)
       }
     }
 
