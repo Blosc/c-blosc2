@@ -712,7 +712,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   blosc2_context* context = thread_context->parent_context;
   int dont_split = (context->header_flags & 0x10) >> 4;
   int dict_training = context->use_dict && context->dict_cdict == NULL;
-  int32_t j, neblock, nsplits;
+  int32_t j, neblock, nstreams;
   int32_t cbytes;                   /* number of compressed bytes in split */
   int32_t ctbytes = 0;              /* number of compressed bytes in block */
   int64_t maxout;
@@ -751,15 +751,15 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   /* Calculate acceleration for different compressors */
   accel = get_accel(context);
 
-  /* The number of splits for this block */
+  /* The number of compressed data streams for this block */
   if (!dont_split && !leftoverblock && !dict_training) {
-    nsplits = (int32_t)typesize;
+    nstreams = (int32_t)typesize;
   }
   else {
-    nsplits = 1;
+    nstreams = 1;
   }
-  neblock = bsize / nsplits;
-  for (j = 0; j < nsplits; j++) {
+  neblock = bsize / nstreams;
+  for (j = 0; j < nstreams; j++) {
     if (!dict_training) {
       dest += sizeof(int32_t);
       ntbytes += sizeof(int32_t);
@@ -870,7 +870,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     dest += cbytes;
     ntbytes += cbytes;
     ctbytes += cbytes;
-  }  /* Closes j < nsplits */
+  }  /* Closes j < nstreams */
 
   //printf("c%d", ctbytes);
   return ctbytes;
@@ -972,7 +972,7 @@ static int blosc_d(
   int32_t compformat = (context->header_flags & 0xe0) >> 5;
   int dont_split = (context->header_flags & 0x10) >> 4;
   //uint8_t blosc_version_format = src[0];
-  int nsplits;
+  int nstreams;
   int32_t neblock;
   int32_t nbytes;                /* number of decompressed bytes in split */
   int32_t cbytes;                /* number of compressed bytes in split */
@@ -999,17 +999,17 @@ static int blosc_d(
    _dest = dest + offset;
   }
 
-  /* The number of splits for this block */
+  /* The number of compressed data streams for this block */
   if (!dont_split && !leftoverblock && !context->use_dict) {
     // We don't want to split when in a training dict state
-    nsplits = (int32_t)typesize;
+    nstreams = (int32_t)typesize;
   }
   else {
-    nsplits = 1;
+    nstreams = 1;
   }
 
-  neblock = bsize / nsplits;
-  for (int j = 0; j < nsplits; j++) {
+  neblock = bsize / nstreams;
+  for (int j = 0; j < nstreams; j++) {
     cbytes = sw32_(src);      /* amount of compressed bytes */
     src += sizeof(int32_t);
     ctbytes += (int32_t)sizeof(int32_t);
@@ -1084,7 +1084,7 @@ static int blosc_d(
     ctbytes += cbytes;
     _dest += nbytes;
     ntbytes += nbytes;
-  } /* Closes j < nsplits */
+  } /* Closes j < nstreams */
 
   if (last_filter_index >= 0) {
     int errcode = pipeline_d(context, bsize, dest, offset, tmp, tmp2, tmp3,
