@@ -50,7 +50,7 @@ for encoding blocks with a filter pipeline::
     :bit 3 (``0x08``):
         Whether the delta codec has been applied or not.
     :bit 4 (``0x10``):
-        If set, blocks are *not* split among multiple data streams.
+        If set, blocks are *not* split into multiple compressed data streams.
     :bit 5 (``0x20``):
         Part of the enumeration for compressors.
     :bit 6 (``0x40``):

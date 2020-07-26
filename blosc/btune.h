@@ -17,8 +17,8 @@
 /* The size of L2 cache.  256 KB is quite common nowadays. */
 #define L2 (256 * 1024)
 
-/* The maximum number of splits in a block for compression */
-#define MAX_SPLITS 16            /* Cannot be larger than 128 */
+/* The maximum number of compressed data streams in a block for compression */
+#define MAX_STREAMS 16 /* Cannot be larger than 128 */
 
 
 BLOSC_EXPORT void btune_init(void * config, blosc2_context* cctx, blosc2_context* dctx);
@@ -46,7 +46,7 @@ static int split_block(blosc2_context* context, int32_t typesize,
      (!extended_header && compcode == BLOSC_LZ4HC) ||
      (!extended_header && compcode == BLOSC_ZLIB) ||
      (compcode == BLOSC_SNAPPY)) &&
-     (typesize <= MAX_SPLITS) &&
+     (typesize <= MAX_STREAMS) &&
      (blocksize / typesize) >= BLOSC_MIN_BUFFERSIZE);
 }
 
