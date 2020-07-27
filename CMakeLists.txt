@@ -100,7 +100,7 @@ option(BUILD_SHARED
 option(BUILD_TESTS
     "Build test programs form the blosc compression library" ON)
 option(BUILD_FUZZERS
-    "Build fuzzer programs from the blosc compression library" ON)
+    "Build fuzzer programs from the blosc compression library" ${BUILD_STATIC})
 option(BUILD_BENCHMARKS
     "Build benchmark programs form the blosc compression library" ON)
 option(BUILD_EXAMPLES
@@ -368,6 +368,9 @@ if(BUILD_TESTS)
 endif()
 
 if(BUILD_FUZZERS)
+    if(NOT BUILD_STATIC)
+        message(FATAL_ERROR "BUILD_FUZZERS requires BUILD_STATIC to be enabled.")
+    endif()
     enable_testing()
     add_subdirectory(tests/fuzz)
 endif()
