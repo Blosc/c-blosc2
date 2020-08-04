@@ -151,14 +151,14 @@ int main(void) {
       return 1;
     }
   }
-  cparams.compcode = codec;
+  cparams.compcode = (uint8_t)codec;
 
   long clevel = CLEVEL;
   envvar = getenv("SUM_CLEVEL");
   if (envvar != NULL) {
     clevel = strtol(envvar, NULL, 10);
   }
-  cparams.clevel = clevel;
+  cparams.clevel = (uint8_t)clevel;
 
   cparams.typesize = sizeof(DTYPE);
   cparams.nthreads = 1;
@@ -208,7 +208,7 @@ int main(void) {
     for (j = 0; j < nthreads; j++) {
       dctx[j] = blosc2_create_dctx(dparams);
       for (nchunk = 0; nchunk < nchunks_thread; nchunk++) {
-        blosc2_decompress_ctx(dctx[j], schunk->data[j * nchunks_thread + nchunk],
+        blosc2_decompress_ctx(dctx[j], schunk->data[j * nchunks_thread + nchunk], INT32_MAX, 
                               (void*)(chunk[j]), isize);
         for (i = 0; i < CHUNKSIZE; i++) {
           compressed_sum += chunk[j][i];
@@ -217,7 +217,7 @@ int main(void) {
       }
     }
     for (nchunk = NCHUNKS - remaining_chunks; nchunk < NCHUNKS; nchunk++) {
-      blosc2_decompress_ctx(dctx[0], schunk->data[nchunk], (void*)(chunk[0]), isize);
+      blosc2_decompress_ctx(dctx[0], schunk->data[nchunk], INT32_MAX, (void*)(chunk[0]), isize);
       for (i = 0; i < CHUNKSIZE; i++) {
         compressed_sum += chunk[0][i];
         //compressed_sum += i + nchunk * CHUNKSIZE;

@@ -779,6 +779,7 @@ BLOSC_EXPORT int blosc2_compress_ctx(
  *
  * @param context The blosc2_context struct with the different compression params.
  * @param src The buffer of compressed data.
+ * @param srcsize The length of buffer of compressed data.
  * @param dest The buffer where the decompressed data will be put.
  * @param destsize The size in bytes of the @p dest buffer.
  *
@@ -803,19 +804,19 @@ BLOSC_EXPORT int blosc2_compress_ctx(
  * then 0 (zero) or a negative value will be returned instead.
  */
 BLOSC_EXPORT int blosc2_decompress_ctx(blosc2_context* context, const void* src,
-                                       void* dest, size_t destsize);
+                                       size_t srcsize, void* dest, size_t destsize);
 
 /**
  * @brief Context interface counterpart for #blosc_getitem.
  *
  * It uses similar parameters than the blosc_getitem() function plus a
- * @p context parameter.
+ * @p context parameter and @srcsize compressed buffer length parameter.
  *
  * @return The number of bytes copied to @p dest or a negative value if
  * some error happens.
  */
 BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
-                                    int start, int nitems, void* dest);
+                                    size_t srcsize, int start, int nitems, void* dest);
 
 
 /*********************************************************************

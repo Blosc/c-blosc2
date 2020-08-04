@@ -58,7 +58,7 @@ int main(void) {
   dparams.nthreads = NTHREADS;
   dctx = blosc2_create_dctx(dparams);
 
-  ret = blosc2_getitem_ctx(dctx, data_out, 5, 5, data_subset);
+  ret = blosc2_getitem_ctx(dctx, data_out, csize, 5, 5, data_subset);
   if (ret < 0) {
     printf("Error in blosc2_getitem_ctx().  Giving up.\n");
     return EXIT_FAILURE;
@@ -72,7 +72,7 @@ int main(void) {
   }
 
   /* Decompress  */
-  dsize = blosc2_decompress_ctx(dctx, data_out, data_dest, (size_t)dsize);
+  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, (size_t)dsize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return EXIT_FAILURE;

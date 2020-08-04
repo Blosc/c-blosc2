@@ -75,7 +75,7 @@ static char *test_prefilter1(void) {
   dctx = blosc2_create_dctx(dparams);
 
   /* Decompress  */
-  dsize = blosc2_decompress_ctx(dctx, data_out, data_dest, (size_t)dsize);
+  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, (size_t)dsize);
   mu_assert("Decompression error", dsize > 0);
 
   for (int i = 0; i < SIZE; i++) {
@@ -113,7 +113,7 @@ static char *test_prefilter2(void) {
   dctx = blosc2_create_dctx(dparams);
 
   /* Decompress  */
-  dsize = blosc2_decompress_ctx(dctx, data_out, data_dest, (size_t)dsize);
+  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, (size_t)dsize);
   mu_assert("Decompression error", dsize > 0);
 
   for (int i = 0; i < SIZE; i++) {
