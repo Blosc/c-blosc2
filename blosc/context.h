@@ -48,6 +48,8 @@ struct blosc2_context_s {
   int32_t blocksize;
   /* Length of the block in bytes */
   int32_t output_bytes;
+  /* Counter for the number of input bytes */
+  int32_t srcsize;
   /* Counter for the number of output bytes */
   int32_t destsize;
   /* Maximum size for destination buffer */

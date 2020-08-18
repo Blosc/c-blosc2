@@ -31,7 +31,7 @@ int nblocks;
 // Check decompression without mask
 static char *test_nomask(void) {
   blosc2_context *dctx = blosc2_create_dctx(BLOSC2_DPARAMS_DEFAULTS);
-  nbytes = blosc2_decompress_ctx(dctx, dest, dest2, bytesize);
+  nbytes = blosc2_decompress_ctx(dctx, dest, cbytes, dest2, bytesize);
   mu_assert("ERROR: nbytes is not correct", nbytes == bytesize);
 
   int64_t* _src = src;
@@ -50,7 +50,7 @@ static char *test_mask(void) {
 
   memset(dest2, 0, bytesize);
   mu_assert("ERROR: setting maskout", blosc2_set_maskout(dctx, maskout, nblocks) == 0);
-  nbytes = blosc2_decompress_ctx(dctx, dest, dest2, bytesize);
+  nbytes = blosc2_decompress_ctx(dctx, dest, cbytes, dest2, bytesize);
   mu_assert("ERROR: nbytes is not correct", nbytes == bytesize);
 
   int64_t* _src = srcmasked;
@@ -71,7 +71,7 @@ static char *test_mask_nomask(void) {
 
   memset(dest2, 0, bytesize);
   mu_assert("ERROR: setting maskout", blosc2_set_maskout(dctx, maskout, nblocks) == 0);
-  nbytes = blosc2_decompress_ctx(dctx, dest, dest2, bytesize);
+  nbytes = blosc2_decompress_ctx(dctx, dest, cbytes, dest2, bytesize);
   mu_assert("ERROR: nbytes is not correct w/ mask", nbytes == bytesize);
 
   int64_t* _src = srcmasked;  // masked source
@@ -81,7 +81,7 @@ static char *test_mask_nomask(void) {
   }
 
   memset(dest2, 0, bytesize);
-  nbytes = blosc2_decompress_ctx(dctx, dest, dest2, bytesize);
+  nbytes = blosc2_decompress_ctx(dctx, dest, cbytes, dest2, bytesize);
   mu_assert("ERROR: nbytes is not correct w/out mask", nbytes == bytesize);
 
   _src = src;   // original source
@@ -102,7 +102,7 @@ static char *test_mask_nomask_mask(void) {
 
   memset(dest2, 0, bytesize);
   mu_assert("ERROR: setting maskout", blosc2_set_maskout(dctx, maskout, nblocks) == 0);
-  nbytes = blosc2_decompress_ctx(dctx, dest, dest2, bytesize);
+  nbytes = blosc2_decompress_ctx(dctx, dest, cbytes, dest2, bytesize);
   mu_assert("ERROR: nbytes is not correct w/ mask", nbytes == bytesize);
 
   int64_t* _src = srcmasked;  // masked source
@@ -112,7 +112,7 @@ static char *test_mask_nomask_mask(void) {
   }
 
   memset(dest2, 0, bytesize);
-  nbytes = blosc2_decompress_ctx(dctx, dest, dest2, bytesize);
+  nbytes = blosc2_decompress_ctx(dctx, dest, cbytes, dest2, bytesize);
   mu_assert("ERROR: nbytes is not correct w/out mask", nbytes == bytesize);
 
   _src = src;   // original source
@@ -123,7 +123,7 @@ static char *test_mask_nomask_mask(void) {
 
   memset(dest2, 0, bytesize);
   mu_assert("ERROR: setting maskout", blosc2_set_maskout(dctx, maskout2, nblocks) == 0);
-  nbytes = blosc2_decompress_ctx(dctx, dest, dest2, bytesize);
+  nbytes = blosc2_decompress_ctx(dctx, dest, cbytes, dest2, bytesize);
   mu_assert("ERROR: nbytes is not correct w/out mask", nbytes == bytesize);
 
   _src = srcmasked2;  // masked source

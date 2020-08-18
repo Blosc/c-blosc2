@@ -245,8 +245,8 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
                       "('%zd' bytes, but '%d' are needed)\n", nbytes, nbytes_);
       return -11;
     }
-
-    chunksize = blosc2_decompress_ctx(schunk->dctx, src, dest, nbytes);
+    int cbytes = sw32_(src + 12);
+    chunksize = blosc2_decompress_ctx(schunk->dctx, src, cbytes, dest, nbytes);
     if (chunksize < 0 || chunksize != nbytes_) {
       fprintf(stderr, "Error in decompressing chunk");
       return -11;
@@ -466,7 +466,7 @@ int32_t blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content) {
   blosc_cbuffer_sizes(schunk->usermeta, &nbytes, &cbytes, &blocksize);
   *content = malloc(nbytes);
   blosc2_context *dctx = blosc2_create_dctx(BLOSC2_DPARAMS_DEFAULTS);
-  int usermeta_nbytes = blosc2_decompress_ctx(dctx, schunk->usermeta, *content, nbytes);
+  int usermeta_nbytes = blosc2_decompress_ctx(dctx, schunk->usermeta, schunk->usermeta_len, *content, nbytes);
   blosc2_free_ctx(dctx);
   if (usermeta_nbytes < 0) {
     return -1;
