@@ -24,17 +24,15 @@ extern "C" {
 
 // Return true if platform is little endian; else false
 static bool is_little_endian(void) {
-  bool little;
-  int i = 1;
+  const static int i = 1;
   char* p = (char*)&i;
 
   if (p[0] == 1) {
-    little = true;
+    return true;
   }
   else {
-    little = false;
+    return false;
   }
-  return little;
 }
 
 /* Copy 4 bytes from @p *pa to int32_t, changing endianness if necessary. */
@@ -45,16 +43,23 @@ static inline int32_t sw32_(const void* pa) {
 
   bool little_endian = is_little_endian();
   if (little_endian) {
-    dest[0] = pa_[0];
-    dest[1] = pa_[1];
-    dest[2] = pa_[2];
-    dest[3] = pa_[3];
+    // dest[0] = pa_[0];
+    // dest[1] = pa_[1];
+    // dest[2] = pa_[2];
+    // dest[3] = pa_[3];
+    idest = *(int32_t *)pa;
   }
   else {
+#if defined (__GNUC__)
+    return __builtin_bswap32(*(unsigned int *)pa);
+#elif defined (_MSC_VER) /* Visual Studio */
+    return _byteswap_ulong(*(unsigned int *)pa);
+#else
     dest[0] = pa_[3];
     dest[1] = pa_[2];
     dest[2] = pa_[1];
     dest[3] = pa_[0];
+#endif
   }
   return idest;
 }
@@ -66,16 +71,23 @@ static inline void _sw32(void* dest, int32_t a) {
 
   bool little_endian = is_little_endian();
   if (little_endian) {
-    dest_[0] = pa[0];
-    dest_[1] = pa[1];
-    dest_[2] = pa[2];
-    dest_[3] = pa[3];
+    // dest_[0] = pa[0];
+    // dest_[1] = pa[1];
+    // dest_[2] = pa[2];
+    // dest_[3] = pa[3];
+    *(int32_t *)dest_ = a;
   }
   else {
+#if defined (__GNUC__)
+    *(int32_t *)dest_ = __builtin_bswap32(*(unsigned int *)pa);
+#elif defined (_MSC_VER) /* Visual Studio */
+    *(int32_t *)dest_ = _byteswap_ulong(*(unsigned int *)pa);
+#else
     dest_[0] = pa[3];
     dest_[1] = pa[2];
     dest_[2] = pa[1];
     dest_[3] = pa[0];
+#endif
   }
 }
 
