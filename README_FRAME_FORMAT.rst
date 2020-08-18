@@ -1,20 +1,23 @@
 Blosc2 Frame Format
 ===================
 
-Blosc (as of version 2.0.0) has a frame format that allows to store different data chunks sequentially, either in-memory or on-disk.
+Blosc (as of version 2.0.0) has a frame format that allows for the storage of different Blosc data chunks sequentially,
+either in-memory or on-disk.
 
-The frame is composed by a header, a chunks section and a trailer, which are variable-length and stored sequentially::
+The frame is composed of a header, a chunks section, and a trailer::
 
     +---------+--------+---------+
     |  header | chunks | trailer |
     +---------+--------+---------+
 
-These are described below.
+Each of the three parts of the frame are variable length; with the header and trailer both stored using the
+`msgpack <https://msgpack.org>`_ format.
 
-The header section
+Header
 ------------------
 
-The header of a frame is encoded via  `msgpack <https://msgpack.org>`_ and it follows the next format::
+The header contains information needed to decompress the Blosc chunks contained in the frame. It is encoded using
+`msgpack <https://msgpack.org>`_ and the format is as follows::
 
     |-0-|-1-|-2-|-3-|-4-|-5-|-6-|-7-|-8-|-9-|-A-|-B-|-C-|-D-|-E-|-F-|-10|-11|-12|-13|-14|-15|-16|-17|
     | 9X| aX| "b2frame\0"                   | d2| header_size   | cf| frame_size                    |
@@ -52,7 +55,10 @@ The header of a frame is encoded via  `msgpack <https://msgpack.org>`_ and it fo
       |                   +------[msgpack] int32
       +---[msgpack] int32
 
-Then it follows the info about the filter pipeline.  There is place for a pipeline that is 8 slots deep, and there is a reserved byte per every filter code and another byte for a possible associated meta-info::
+The filter pipeline is stored next in the header. It contains 8 slots, one for each filter that can be applied. For
+each slot there is a byte used to store the filter code in `filter_codes` and an associated byte used to store any
+possible filter meta-info in `filter_meta`::
+
 
     |-40|-41|-42|-43|-44|-45|-46|-47|-48|-49|-4A|-4B|-4C|-4D|-4E|-4F|-50|-51|
     | d2| X | filter_codes                  | filter_meta                   |
@@ -62,23 +68,19 @@ Then it follows the info about the filter pipeline.  There is place for a pipeli
       |   +--number of filters
       +--[msgpack] fixext 16
 
-In addition, a frame can be completed with meta-information about the stored data; these data blocks are called metalayers and it is up to the user to store whatever data they want there, with the only (strong) suggestion that they have to be in the msgpack format.  Here it is the format for the case that there exist some metalayers::
+At the end of the header *metalayers* are stored which contain meta-information about the chunked data stored in the
+frame. It is up to the user to store whatever data they want with the only (strong) suggestion that they be stored
+using the msgpack format. Here is the format for the *metalayers*::
 
   |-52|-53|-54|-55|-56|-----------------------
   | 93| cd| idx   | de| map_of_metalayers
   |---|---------------|-----------------------
     ^   ^    ^      ^
     |   |    |      |
-    |   |    |      +--[msgpack] map 16 with N keys
-    |   |    +--size of the map (index) of offsets
+    |   |    |      +--[msgpack] map of name/offset pairs
+    |   |    +--size of the map
     |   +--[msgpack] uint16
     +-- [msgpack] fixarray with 3 elements
-
-:map of metalayers:
-    This is a *msgpack-formattted* map for the different metalayers.  The keys will be a string (0xa0 + namelen) for the names of the metalayers, followed by an int32 (0xd2) for the *offset* of the value of this metalayer.  The actual value will be encoded as a bin32 (0xc6) value later in frame.
-
-Description for different fields in header
-__________________________________________
 
 :header_size:
     (``int32``) Size of the header of the frame (including metalayers).
@@ -103,26 +105,6 @@ __________________________________________
     :``6``:
         Chunks of fixed length (0) or variable length (1)
     :``7``:
-        Reserved
-
-:filter_flags:
-    (``uint8``) Filter flags that are the defaults for all the chunks in storage.
-
-    :bit 0:
-        If set, blocks are *not* split in sub-blocks.
-    :bit 1:
-        Filter pipeline is described in bits 3 to 6; else in `_filter_pipeline` system metalayer.
-    :bit 2:
-        Reserved
-    :bit 3:
-        Whether the shuffle filter has been applied or not.
-    :bit 4:
-        Whether the internal buffer is a pure memcpy or not.
-    :bit 5:
-        Whether the bitshuffle filter has been applied or not.
-    :bit 6:
-        Whether the delta codec has been applied or not.
-    :bit 7:
         Reserved
 
 :codec_flags:
@@ -164,23 +146,33 @@ __________________________________________
 :tdecomp:
     (``int16``) Number of threads for decompression.  If 0, same than `dctx`.
 
+:map of metalayers:
+    This is a *msgpack-formattted* map for the different metalayers.  The keys will be a string (0xa0 + namelen) for
+    the names of the metalayers, followed by an int32 (0xd2) for the *offset* of the value of this metalayer.  The
+    actual value will be encoded as a bin32 (0xc6) value later in frame.
 
-The chunks section
-------------------
+Chunks
+------
 
-Here there is the actual data chunks stored sequentially::
+The chunks section is composed of one or more Blosc data chunks followed by an index chunk::
 
-    +========+========+========+===========+
-    | chunk0 | chunk1 |   ...  | chunk idx |
-    +========+========+========+===========+
+    +========+========+========+========+===========+
+    | chunk0 | chunk1 |   ...  | chunkN | chunk idx |
+    +========+========+========+========+===========+
 
-The different chunks are described in the `chunk format <README_CHUNK_FORMAT.rst>`_ document.  The `chunk idx` is an index for the different chunks in this section.  It is made by the 64-bit offsets to the different chunks and compressed into a new chunk, following the regular Blosc chunk format.
+Each chunk is stored sequentially and follows the format described in the
+`chunk format <README_CHUNK_FORMAT.rst>`_ document.
+
+The `chunk idx` is a Blosc chunk containing the indexes to each chunk in this section.  The data in the
+chunk is a list of 64-bit offsets to each chunk. The index chunk follows the regular Blosc chunk format and
+can be compressed.
 
 
-The trailer section
--------------------
+Trailer
+-------
 
-Here it is data that can change in size, mainly the `usermeta` chunk::
+The trailer for the frame is encoded via `msgpack <https://msgpack.org>`_ and contains a user meta data chunk and
+a fingerprint.::
 
     |-0-|-1-|-2-|-3-|-4-|-5-|-6-|====================|---|---------------|---|---|=================|
     | 9X| aX| c6| usermeta_len  |   usermeta_chunk   | ce| trailer_len   | d8|fpt| fingerprint     |
@@ -195,8 +187,8 @@ Here it is data that can change in size, mainly the `usermeta` chunk::
       |   +------[msgpack] int8 for trailer version
       +---[msgpack] fixarray with X=4 elements
 
-Description for different fields in trailer
-___________________________________________
+The *usermeta* chunk which stores the user meta data can change in size during the lifetime of the frame.
+This is an important feature and the reason why the *usermeta* is stored in the trailer and not in the header.
 
 :usermeta_len:
     (``int32``) The length of the usermeta chunk.
