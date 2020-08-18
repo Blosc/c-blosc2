@@ -5,6 +5,11 @@
 Changes from 2.0.0-beta.5 to 2.0.0.beta6
 ========================================
 
+* [API change] `blosc2_decompress_ctx()` gets a new `srcsize`
+ parameter to ensure that it does not read past the end
+ of the provided buffer.  See #144.  Thanks to Nathan Moinvaziri
+ (@nmoinvaz).
+
 * Internal Zstd sources updated to 1.4.5.
 
 
