@@ -38,15 +38,9 @@ static bool is_little_endian(void) {
 /* Copy 4 bytes from @p *pa to int32_t, changing endianness if necessary. */
 static inline int32_t sw32_(const void* pa) {
   int32_t idest;
-  uint8_t* dest = (uint8_t*)&idest;
-  uint8_t* pa_ = (uint8_t*)pa;
 
   bool little_endian = is_little_endian();
   if (little_endian) {
-    // dest[0] = pa_[0];
-    // dest[1] = pa_[1];
-    // dest[2] = pa_[2];
-    // dest[3] = pa_[3];
     idest = *(int32_t *)pa;
   }
   else {
@@ -71,10 +65,6 @@ static inline void _sw32(void* dest, int32_t a) {
 
   bool little_endian = is_little_endian();
   if (little_endian) {
-    // dest_[0] = pa[0];
-    // dest_[1] = pa[1];
-    // dest_[2] = pa[2];
-    // dest_[3] = pa[3];
     *(int32_t *)dest_ = a;
   }
   else {
