@@ -1583,12 +1583,12 @@ static int initialize_context_decompression(blosc2_context* context, const void*
       return -1;
     }
     context->dict_size = (size_t)sw32_(bstarts_end);
-    if (src_end < (uint8_t *)(bstarts_end + 1) + context->dict_size) {
-      /* Not enough input to read entire dictionary */
+    if (context->dict_size <= 0 || context->dict_size > BLOSC2_MAXDICTSIZE) {
+      /* Dictionary size is smaller than minimum or larger than maximum allowed */
       return -1;
     }
-    if (context->dict_size > BLOSC2_MAXDICTSIZE) {
-      /* Dictionary is larger than maximum size allowed */
+    if (src_end < (uint8_t *)(bstarts_end + 1) + context->dict_size) {
+      /* Not enough input to read entire dictionary */
       return -1;
     }
     context->dict_buffer = (void*)(bstarts_end + 1);
