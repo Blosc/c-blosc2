@@ -1373,7 +1373,7 @@ static void flags_to_filters(const uint8_t flags, uint8_t* filters) {
 
 
 static int initialize_context_compression(
-  blosc2_context* context, int32_t sourcesize, const void* src, void* dest,
+  blosc2_context* context, const void* src, size_t srcsize, void* dest,
   int32_t destsize, int clevel, uint8_t const *filters,
   uint8_t const *filters_meta, int32_t typesize, int compressor,
   int32_t blocksize, int new_nthreads, int nthreads, blosc2_schunk* schunk) {
@@ -1381,10 +1381,11 @@ static int initialize_context_compression(
   /* Set parameters */
   context->do_compress = 1;
   context->src = (const uint8_t*)src;
+  context->srcsize = srcsize;
   context->dest = (uint8_t*)dest;
   context->output_bytes = 0;
   context->destsize = destsize;
-  context->sourcesize = sourcesize;
+  context->sourcesize = srcsize;
   context->typesize = (int32_t)typesize;
   context->filter_flags = filters_to_flags(filters);
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
@@ -1413,7 +1414,7 @@ static int initialize_context_compression(
   }
 
   /* Check buffer size limits */
-  if (sourcesize > BLOSC_MAX_BUFFERSIZE) {
+  if (srcsize > BLOSC_MAX_BUFFERSIZE) {
     if (warnlvl > 0) {
       fprintf(stderr, "Input buffer size cannot exceed %d bytes\n",
               BLOSC_MAX_BUFFERSIZE);
@@ -1823,7 +1824,7 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, size_t srcsize
   }
 
   error = initialize_context_compression(
-    context, (int32_t)srcsize, src, dest, (int32_t)destsize,
+    context, src, (int32_t)srcsize, dest, (int32_t)destsize,
     context->clevel, context->filters, context->filters_meta,
     context->typesize, context->compcode, context->blocksize,
     context->new_nthreads, context->nthreads, context->schunk);
@@ -2048,7 +2049,7 @@ int blosc2_compress(int clevel, int doshuffle, size_t typesize,
   uint8_t* filters_meta = calloc(1, BLOSC2_MAX_FILTERS);
   build_filters(doshuffle, g_delta, typesize, filters);
   error = initialize_context_compression(
-    g_global_context, (int32_t)srcsize, src, dest, (int32_t)destsize, clevel, filters,
+    g_global_context, src, (int32_t)srcsize, dest, (int32_t)destsize, clevel, filters,
     filters_meta, (int32_t)typesize, g_compressor, g_force_blocksize, g_nthreads, g_nthreads,
     g_schunk);
   free(filters);
@@ -2526,7 +2527,7 @@ static void t_blosc_do_job(void *ctxt)
         /* We want to memcpy only */
         if (srcsize < BLOSC_MAX_OVERHEAD + (nblock_ * blocksize) + bsize) {
           /* Not enough input to copy data */
-          
+
           cbytes = -1;
         } else {
           memcpy(dest + nblock_ * blocksize,
