@@ -30,11 +30,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   output = malloc(cbytes);
   if (output != NULL) {
-    blosc2_context *dctx;
-    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-    dctx = blosc2_create_dctx(dparams);
-    blosc2_decompress_ctx(dctx, data, size, output, cbytes);
-    blosc2_free_ctx(dctx);
+    blosc2_decompress(data, size, output, cbytes);
     free(output);
   }
   return 0;
