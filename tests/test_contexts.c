@@ -44,7 +44,7 @@ int main(void) {
   cctx = blosc2_create_cctx(cparams);
 
   /* Compress with clevel=5 and shuffle active  */
-  csize = blosc2_compress_ctx(cctx, isize, data, data_out, osize);
+  csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
   if (csize == 0) {
     printf("Buffer is uncompressible.  Giving up.\n");
     return EXIT_FAILURE;

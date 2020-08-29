@@ -753,8 +753,8 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * simultaneously in those scenarios.
  *
  * @param context A blosc2_context struct with the different compression params.
- * @param nbytes The number of bytes to be compressed from the @p src buffer.
  * @param src The buffer containing the data to be compressed.
+ * @param srcsize The number of bytes to be compressed from the @p src buffer.
  * @param dest The buffer where the compressed data will be put.
  * @param destsize The size in bytes of the @p dest buffer.
  *
@@ -767,7 +767,7 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * and compression settings.
  */
 BLOSC_EXPORT int blosc2_compress_ctx(
-        blosc2_context* context, size_t nbytes, const void* src, void* dest,
+        blosc2_context* context, const void* src, size_t srcsize, void* dest,
         size_t destsize);
 
 

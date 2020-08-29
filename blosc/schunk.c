@@ -213,7 +213,7 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, size_t nbytes)
   uint8_t* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
 
   /* Compress the src buffer using super-chunk context */
-  int cbytes = blosc2_compress_ctx(schunk->cctx, nbytes, src, chunk,
+  int cbytes = blosc2_compress_ctx(schunk->cctx, src, nbytes, chunk,
                                    nbytes + BLOSC_MAX_OVERHEAD);
   if (cbytes < 0) {
     free(chunk);
@@ -432,7 +432,7 @@ int blosc2_update_usermeta(blosc2_schunk *schunk, uint8_t *content, int32_t cont
   // Compress the usermeta chunk
   void* usermeta_chunk = malloc(content_len + BLOSC_MAX_OVERHEAD);
   blosc2_context *cctx = blosc2_create_cctx(cparams);
-  int usermeta_cbytes = blosc2_compress_ctx(cctx, content_len, content, usermeta_chunk,
+  int usermeta_cbytes = blosc2_compress_ctx(cctx, content, content_len, usermeta_chunk,
                                             content_len + BLOSC_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
   if (usermeta_cbytes < 0) {

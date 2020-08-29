@@ -1813,8 +1813,8 @@ int blosc_compress_context(blosc2_context* context) {
 
 
 /* The public routine for compression with context. */
-int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
-                        const void* src, void* dest, size_t destsize) {
+int blosc2_compress_ctx(blosc2_context* context, const void* src, size_t srcsize,
+                        void* dest, size_t destsize) {
   int error, cbytes;
 
   if (context->do_compress != 1) {
@@ -1823,7 +1823,7 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
   }
 
   error = initialize_context_compression(
-    context, (int32_t)nbytes, src, dest, (int32_t)destsize,
+    context, (int32_t)srcsize, src, dest, (int32_t)destsize,
     context->clevel, context->filters, context->filters_meta,
     context->typesize, context->compcode, context->blocksize,
     context->new_nthreads, context->nthreads, context->schunk);
@@ -1856,8 +1856,8 @@ int blosc2_compress_ctx(blosc2_context* context, size_t nbytes,
     // Build the dictionary out of the filters outcome and compress with it
     size_t dict_maxsize = BLOSC2_MAXDICTSIZE;
     // Do not make the dict more than 5% larger than uncompressed buffer
-    if (dict_maxsize > nbytes / 20) {
-      dict_maxsize = nbytes / 20;
+    if (dict_maxsize > srcsize / 20) {
+      dict_maxsize = srcsize / 20;
     }
     void* samples_buffer = context->dest + BLOSC_EXTENDED_HEADER_LENGTH;
     unsigned nblocks = 8;  // the minimum that accepts zstd as of 1.4.0
@@ -2036,7 +2036,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     cparams.nthreads = (uint8_t)g_nthreads;
     cctx = blosc2_create_cctx(cparams);
     /* Do the actual compression */
-    result = blosc2_compress_ctx(cctx, nbytes, src, dest, destsize);
+    result = blosc2_compress_ctx(cctx, src, nbytes, dest, destsize);
     /* Release context resources */
     blosc2_free_ctx(cctx);
     return result;

@@ -556,7 +556,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
     off_chunk = malloc(off_nbytes + BLOSC_MAX_OVERHEAD);
     blosc2_context *cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
     cctx->typesize = 8;
-    off_cbytes = blosc2_compress_ctx(cctx, off_nbytes, data_tmp, off_chunk,
+    off_cbytes = blosc2_compress_ctx(cctx, data_tmp, off_nbytes, off_chunk,
                                      off_nbytes + BLOSC_MAX_OVERHEAD);
     blosc2_free_ctx(cctx);
     if (off_cbytes < 0) {
@@ -1240,7 +1240,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   blosc2_context* cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
   cctx->typesize = 8;
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
-  int32_t new_off_cbytes = blosc2_compress_ctx(cctx, (size_t)off_nbytes, offsets,
+  int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, (size_t)off_nbytes,
           off_chunk, (size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
   int64_t offset;

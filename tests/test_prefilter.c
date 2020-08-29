@@ -68,7 +68,7 @@ static char *test_prefilter1(void) {
   cparams.pparams = &pparams;
   cctx = blosc2_create_cctx(cparams);
 
-  csize = blosc2_compress_ctx(cctx, isize, data, data_out, osize);
+  csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
   mu_assert("Compression error", csize > 0);
 
   /* Create a context for decompression */
@@ -105,7 +105,7 @@ static char *test_prefilter2(void) {
   cparams.pparams = &pparams;
   cctx = blosc2_create_cctx(cparams);
 
-  csize = blosc2_compress_ctx(cctx, isize, data, data_out, osize);
+  csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
   mu_assert("Buffer is uncompressible", csize != 0);
   mu_assert("Compression error", csize > 0);
 
