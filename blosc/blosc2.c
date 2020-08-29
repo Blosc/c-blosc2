@@ -1812,7 +1812,7 @@ int blosc_compress_context(blosc2_context* context) {
 }
 
 
-/* The public routine for compression with context. */
+/* The public secure routine for compression with context. */
 int blosc2_compress_ctx(blosc2_context* context, const void* src, size_t srcsize,
                         void* dest, size_t destsize) {
   int error, cbytes;
@@ -1932,10 +1932,9 @@ void build_filters(const int doshuffle, const int delta,
     filters[BLOSC2_MAX_FILTERS - 2] = BLOSC_DELTA;
 }
 
-
-/* The public routine for compression.  See blosc.h for docstrings. */
-int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
-                   const void* src, void* dest, size_t destsize) {
+/* The public secure routine for compression. */
+int blosc2_compress(int clevel, int doshuffle, size_t typesize,
+                    const void* src, size_t srcsize, void* dest, size_t destsize) {
   int error;
   int result;
   char* envvar;
@@ -2036,7 +2035,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
     cparams.nthreads = (uint8_t)g_nthreads;
     cctx = blosc2_create_cctx(cparams);
     /* Do the actual compression */
-    result = blosc2_compress_ctx(cctx, src, nbytes, dest, destsize);
+    result = blosc2_compress_ctx(cctx, src, srcsize, dest, destsize);
     /* Release context resources */
     blosc2_free_ctx(cctx);
     return result;
@@ -2049,7 +2048,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
   uint8_t* filters_meta = calloc(1, BLOSC2_MAX_FILTERS);
   build_filters(doshuffle, g_delta, typesize, filters);
   error = initialize_context_compression(
-    g_global_context, (int32_t)nbytes, src, dest, (int32_t)destsize, clevel, filters,
+    g_global_context, (int32_t)srcsize, src, dest, (int32_t)destsize, clevel, filters,
     filters_meta, (int32_t)typesize, g_compressor, g_force_blocksize, g_nthreads, g_nthreads,
     g_schunk);
   free(filters);
@@ -2071,6 +2070,13 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
   pthread_mutex_unlock(&global_comp_mutex);
 
   return result;
+}
+
+
+/* The public routine for compression. */
+int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
+                   const void* src, void* dest, size_t destsize) {
+  return blosc2_compress(clevel, doshuffle, typesize, src, nbytes, dest, destsize);
 }
 
 
@@ -2124,7 +2130,7 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
 }
 
 
-/* The public routine for decompression with context. */
+/* The public secure routine for decompression with context. */
 int blosc2_decompress_ctx(blosc2_context* context, const void* src, size_t srcsize,
                           void* dest, size_t destsize) {
   int result;
@@ -2147,8 +2153,8 @@ int blosc2_decompress_ctx(blosc2_context* context, const void* src, size_t srcsi
 }
 
 
-/* The public routine for decompression.  See blosc.h for docstrings. */
-int blosc_decompress(const void* src, void* dest, size_t destsize) {
+/* The public secure routine for decompression. */
+int blosc2_decompress(const void* src, size_t srcsize, void* dest, size_t destsize) {
   int result;
   char* envvar;
   long nthreads;
@@ -2175,7 +2181,7 @@ int blosc_decompress(const void* src, void* dest, size_t destsize) {
   if (envvar != NULL) {
     dparams.nthreads = g_nthreads;
     dctx = blosc2_create_dctx(dparams);
-    result = blosc2_decompress_ctx(dctx, src, INT32_MAX, dest, destsize);
+    result = blosc2_decompress_ctx(dctx, src, srcsize, dest, destsize);
     blosc2_free_ctx(dctx);
     return result;
   }
@@ -2189,6 +2195,13 @@ int blosc_decompress(const void* src, void* dest, size_t destsize) {
 
   return result;
 }
+
+
+/* The public routine for decompression. */
+int blosc_decompress(const void* src, void* dest, size_t destsize) {
+  return blosc2_decompress(src, INT32_MAX, dest, destsize);
+}
+
 
 /* Specific routine optimized for decompression a small number of
    items out of a compressed chunk.  This does not use threads because

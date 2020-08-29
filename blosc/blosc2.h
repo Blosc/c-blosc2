@@ -271,48 +271,9 @@ BLOSC_EXPORT void blosc_destroy(void);
  * buffer. A negative return value means that an internal error happened. This
  * should never happen. If you see this, please report it back
  * together with the buffer data causing this and compression settings.
-*/
-/*
- * Environment variables
- * _____________________
  *
- * *blosc_compress()* honors different environment variables to control
- * internal parameters without the need of doing that programatically.
- * Here are the ones supported:
- *
- * **BLOSC_CLEVEL=(INTEGER)**: This will overwrite the @p clevel parameter
- * before the compression process starts.
- *
- * **BLOSC_SHUFFLE=[NOSHUFFLE | SHUFFLE | BITSHUFFLE]**: This will
- * overwrite the *doshuffle* parameter before the compression process
- * starts.
- *
- * **BLOSC_DELTA=(1|0)**: This will call *blosc_set_delta()^* before the
- * compression process starts.
- *
- * **BLOSC_TYPESIZE=(INTEGER)**: This will overwrite the *typesize*
- * parameter before the compression process starts.
- *
- * **BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | LIZARD | SNAPPY | ZLIB]**:
- * This will call *blosc_set_compressor(BLOSC_COMPRESSOR)* before the
- * compression process starts.
- *
- * **BLOSC_NTHREADS=(INTEGER)**: This will call
- * *blosc_set_nthreads(BLOSC_NTHREADS)* before the compression process
- * starts.
- *
- * **BLOSC_BLOCKSIZE=(INTEGER)**: This will call
- * *blosc_set_blocksize(BLOSC_BLOCKSIZE)* before the compression process
- * starts.  *NOTE:* The blocksize is a critical parameter with
- * important restrictions in the allowed values, so use this with care.
- *
- * **BLOSC_NOLOCK=(ANY VALUE)**: This will call *blosc2_compress_ctx()* under
- * the hood, with the *compressor*, *blocksize* and
- * *numinternalthreads* parameters set to the same as the last calls to
- * *blosc_set_compressor*, *blosc_set_blocksize* and
- * *blosc_set_nthreads*. *BLOSC_CLEVEL*, *BLOSC_SHUFFLE*, *BLOSC_DELTA* and
- * *BLOSC_TYPESIZE* environment vars will also be honored.
- *
+ * This function supports all the configuration based environment variables
+ * available in blosc2_compress.
  */
 BLOSC_EXPORT int blosc_compress(int clevel, int doshuffle, size_t typesize,
                                 size_t nbytes, const void* src, void* dest,
@@ -341,23 +302,9 @@ BLOSC_EXPORT int blosc_compress(int clevel, int doshuffle, size_t typesize,
  * If an error occurs, e.g. the compressed data is corrupted or the
  * output buffer is not large enough, then 0 (zero) or a negative value
  * will be returned instead.
-*/
-/*
- * Environment variables
- * _____________________
  *
- * *blosc_decompress* honors different environment variables to control
- * internal parameters without the need of doing that programatically.
- * Here are the ones supported:
- *
- * **BLOSC_NTHREADS=(INTEGER)**: This will call
- * *blosc_set_nthreads(BLOSC_NTHREADS)* before the proper decompression
- * process starts.
- *
- * **BLOSC_NOLOCK=(ANY VALUE)**: This will call *blosc2_decompress_ctx*
- * under the hood, with the *numinternalthreads* parameter set to the
- * same value as the last call to *blosc_set_nthreads*.
- *
+ * This function supports all the configuration based environment variables
+ * available in blosc2_decompress.
  */
 BLOSC_EXPORT int blosc_decompress(const void* src, void* dest, size_t destsize);
 
@@ -745,6 +692,133 @@ BLOSC_EXPORT void blosc2_free_ctx(blosc2_context* context);
  *
  */
 BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks);
+/**
+ * @brief Compress a block of data in the @p src buffer and returns the size of
+ * compressed block.
+ *
+ * @remark Compression is memory safe and guaranteed not to write @p dest
+ * more than what is specified in @p destsize.
+ * There is not a minimum for @p src buffer size @p nbytes.
+ *
+ * @warning The @p src buffer and the @p dest buffer can not overlap.
+ *
+ * @param clevel The desired compression level and must be a number
+ * between 0 (no compression) and 9 (maximum compression).
+ * @param doshuffle Specifies whether the shuffle compression preconditioner
+ * should be applied or not. @a BLOSC_NOFILTER means not applying filters,
+ * @a BLOSC_SHUFFLE means applying shuffle at a byte level and
+ * @a BLOSC_BITSHUFFLE at a bit level (slower but *may* achieve better
+ * compression).
+ * @param typesize Is the number of bytes for the atomic type in binary
+ * @p src buffer.  This is mainly useful for the shuffle preconditioner.
+ * For implementation reasons, only a 1 < typesize < 256 will allow the
+ * shuffle filter to work.  When typesize is not in this range, shuffle
+ * will be silently disabled.
+ * @param src The buffer containing the data to compress.
+ * @param srcsize The number of bytes to compress in the @p src buffer.
+ * @param dest The buffer where the compressed data will be put,
+ * must have at least the size of @p destsize.
+ * @param destsize The size of the dest buffer. Blosc
+ * guarantees that if you set @p destsize to, at least,
+ * (@p nbytes + @a BLOSC_MAX_OVERHEAD), the compression will always succeed.
+ *
+ * @return The number of bytes compressed.
+ * If @p src buffer cannot be compressed into @p destsize, the return
+ * value is zero and you should discard the contents of the @p dest
+ * buffer. A negative return value means that an internal error happened. This
+ * should never happen. If you see this, please report it back
+ * together with the buffer data causing this and compression settings.
+*/
+/*
+ * Environment variables
+ * _____________________
+ *
+ * *blosc_compress()* honors different environment variables to control
+ * internal parameters without the need of doing that programatically.
+ * Here are the ones supported:
+ *
+ * **BLOSC_CLEVEL=(INTEGER)**: This will overwrite the @p clevel parameter
+ * before the compression process starts.
+ *
+ * **BLOSC_SHUFFLE=[NOSHUFFLE | SHUFFLE | BITSHUFFLE]**: This will
+ * overwrite the *doshuffle* parameter before the compression process
+ * starts.
+ *
+ * **BLOSC_DELTA=(1|0)**: This will call *blosc_set_delta()^* before the
+ * compression process starts.
+ *
+ * **BLOSC_TYPESIZE=(INTEGER)**: This will overwrite the *typesize*
+ * parameter before the compression process starts.
+ *
+ * **BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | LIZARD | SNAPPY | ZLIB]**:
+ * This will call *blosc_set_compressor(BLOSC_COMPRESSOR)* before the
+ * compression process starts.
+ *
+ * **BLOSC_NTHREADS=(INTEGER)**: This will call
+ * *blosc_set_nthreads(BLOSC_NTHREADS)* before the compression process
+ * starts.
+ *
+ * **BLOSC_BLOCKSIZE=(INTEGER)**: This will call
+ * *blosc_set_blocksize(BLOSC_BLOCKSIZE)* before the compression process
+ * starts.  *NOTE:* The blocksize is a critical parameter with
+ * important restrictions in the allowed values, so use this with care.
+ *
+ * **BLOSC_NOLOCK=(ANY VALUE)**: This will call *blosc2_compress_ctx()* under
+ * the hood, with the *compressor*, *blocksize* and
+ * *numinternalthreads* parameters set to the same as the last calls to
+ * *blosc_set_compressor*, *blosc_set_blocksize* and
+ * *blosc_set_nthreads*. *BLOSC_CLEVEL*, *BLOSC_SHUFFLE*, *BLOSC_DELTA* and
+ * *BLOSC_TYPESIZE* environment vars will also be honored.
+ *
+ */
+BLOSC_EXPORT int blosc2_compress(int clevel, int doshuffle, size_t typesize,
+                                 const void* src, size_t srcsize, void* dest,
+                                 size_t destsize);
+
+
+/**
+ * @brief Decompress a block of compressed data in @p src, put the result in
+ * @p dest and returns the size of the decompressed block.
+ *
+ * @warning The @p src buffer and the @p dest buffer can not overlap.
+ *
+ * @remark Decompression is memory safe and guaranteed not to write the @p dest
+ * buffer more than what is specified in @p destsize.
+ *
+ * @remark In case you want to keep under control the number of bytes read from
+ * source, you can call #blosc_cbuffer_sizes first to check whether the
+ * @p nbytes (i.e. the number of bytes to be read from @p src buffer by this
+ * function) in the compressed buffer is ok with you.
+ *
+ * @param src The buffer to be decompressed.
+ * @param srcsize The size of the buffer to be decompressed.
+ * @param dest The buffer where the decompressed data will be put.
+ * @param destsize The size of the @p dest buffer.
+ *
+ * @return The number of bytes decompressed.
+ * If an error occurs, e.g. the compressed data is corrupted or the
+ * output buffer is not large enough, then 0 (zero) or a negative value
+ * will be returned instead.
+*/
+/*
+ * Environment variables
+ * _____________________
+ *
+ * *blosc_decompress* honors different environment variables to control
+ * internal parameters without the need of doing that programatically.
+ * Here are the ones supported:
+ *
+ * **BLOSC_NTHREADS=(INTEGER)**: This will call
+ * *blosc_set_nthreads(BLOSC_NTHREADS)* before the proper decompression
+ * process starts.
+ *
+ * **BLOSC_NOLOCK=(ANY VALUE)**: This will call *blosc2_decompress_ctx*
+ * under the hood, with the *numinternalthreads* parameter set to the
+ * same value as the last call to *blosc_set_nthreads*.
+ *
+ */
+BLOSC_EXPORT int blosc2_decompress(const void* src, size_t srcsize,
+                                   void* dest, size_t destsize);
 
 /**
  * @brief Context interface to Blosc compression. This does not require a call
