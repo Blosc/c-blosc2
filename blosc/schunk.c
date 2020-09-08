@@ -209,7 +209,7 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
 
 
 /* Append a data buffer to a super-chunk. */
-int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, size_t nbytes) {
+int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes) {
   uint8_t* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
 
   /* Compress the src buffer using super-chunk context */
@@ -228,7 +228,7 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, size_t nbytes)
 
 /* Decompress and return a chunk that is part of a super-chunk. */
 int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
-                                   void *dest, size_t nbytes) {
+                                   void *dest, int32_t nbytes) {
 
   uint8_t* src;
   int chunksize;
@@ -240,9 +240,9 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
     }
     src = schunk->data[nchunk];
     int nbytes_ = sw32_(src + 4);
-    if (nbytes < (size_t)nbytes_) {
+    if (nbytes < nbytes_) {
       fprintf(stderr, "Buffer size is too small for the decompressed buffer "
-                      "('%zd' bytes, but '%d' are needed)\n", nbytes, nbytes_);
+                      "('%d' bytes, but '%d' are needed)\n", nbytes, nbytes_);
       return -11;
     }
     int cbytes = sw32_(src + 12);
@@ -466,7 +466,7 @@ int32_t blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content) {
   blosc_cbuffer_sizes(schunk->usermeta, &nbytes, &cbytes, &blocksize);
   *content = malloc(nbytes);
   blosc2_context *dctx = blosc2_create_dctx(BLOSC2_DPARAMS_DEFAULTS);
-  int usermeta_nbytes = blosc2_decompress_ctx(dctx, schunk->usermeta, schunk->usermeta_len, *content, nbytes);
+  int usermeta_nbytes = blosc2_decompress_ctx(dctx, schunk->usermeta, schunk->usermeta_len, *content, (int32_t)nbytes);
   blosc2_free_ctx(dctx);
   if (usermeta_nbytes < 0) {
     return -1;

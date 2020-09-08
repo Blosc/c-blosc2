@@ -964,7 +964,7 @@ int pipeline_d(blosc2_context* context, const int32_t bsize, uint8_t* dest,
 /* Decompress & unshuffle a single block */
 static int blosc_d(
     struct thread_context* thread_context, int32_t bsize,
-    int32_t leftoverblock, const uint8_t* src, size_t srcsize, uint8_t* dest,
+    int32_t leftoverblock, const uint8_t* src, int32_t srcsize, uint8_t* dest,
     int32_t offset, uint8_t* tmp, uint8_t* tmp2) {
   blosc2_context* context = thread_context->parent_context;
   uint8_t* filters = context->filters;
@@ -1373,7 +1373,7 @@ static void flags_to_filters(const uint8_t flags, uint8_t* filters) {
 
 
 static int initialize_context_compression(
-  blosc2_context* context, const void* src, size_t srcsize, void* dest,
+  blosc2_context* context, const void* src, int32_t srcsize, void* dest,
   int32_t destsize, int clevel, uint8_t const *filters,
   uint8_t const *filters_meta, int32_t typesize, int compressor,
   int32_t blocksize, int new_nthreads, int nthreads, blosc2_schunk* schunk) {
@@ -1814,8 +1814,8 @@ int blosc_compress_context(blosc2_context* context) {
 
 
 /* The public secure routine for compression with context. */
-int blosc2_compress_ctx(blosc2_context* context, const void* src, size_t srcsize,
-                        void* dest, size_t destsize) {
+int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsize,
+                        void* dest, int32_t destsize) {
   int error, cbytes;
 
   if (context->do_compress != 1) {
@@ -1934,8 +1934,8 @@ void build_filters(const int doshuffle, const int delta,
 }
 
 /* The public secure routine for compression. */
-int blosc2_compress(int clevel, int doshuffle, size_t typesize,
-                    const void* src, size_t srcsize, void* dest, size_t destsize) {
+int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
+                    const void* src, int32_t srcsize, void* dest, int32_t destsize) {
   int error;
   int result;
   char* envvar;
@@ -2077,12 +2077,12 @@ int blosc2_compress(int clevel, int doshuffle, size_t typesize,
 /* The public routine for compression. */
 int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
                    const void* src, void* dest, size_t destsize) {
-  return blosc2_compress(clevel, doshuffle, typesize, src, nbytes, dest, destsize);
+  return blosc2_compress(clevel, doshuffle, (int32_t)typesize, src, (int32_t)nbytes, dest, (int32_t)destsize);
 }
 
 
-int blosc_run_decompression_with_context(blosc2_context* context, const void* src, size_t srcsize,
-                                         void* dest, size_t destsize) {
+int blosc_run_decompression_with_context(blosc2_context* context, const void* src, int32_t srcsize,
+                                         void* dest, int32_t destsize) {
   int32_t ntbytes;
   uint8_t* _src = (uint8_t*)src;
   uint8_t version;
@@ -2132,8 +2132,8 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
 
 
 /* The public secure routine for decompression with context. */
-int blosc2_decompress_ctx(blosc2_context* context, const void* src, size_t srcsize,
-                          void* dest, size_t destsize) {
+int blosc2_decompress_ctx(blosc2_context* context, const void* src, int32_t srcsize,
+                          void* dest, int32_t destsize) {
   int result;
 
   if (context->do_compress != 0) {
@@ -2155,7 +2155,7 @@ int blosc2_decompress_ctx(blosc2_context* context, const void* src, size_t srcsi
 
 
 /* The public secure routine for decompression. */
-int blosc2_decompress(const void* src, size_t srcsize, void* dest, size_t destsize) {
+int blosc2_decompress(const void* src, int32_t srcsize, void* dest, int32_t destsize) {
   int result;
   char* envvar;
   long nthreads;
@@ -2200,14 +2200,14 @@ int blosc2_decompress(const void* src, size_t srcsize, void* dest, size_t destsi
 
 /* The public routine for decompression. */
 int blosc_decompress(const void* src, void* dest, size_t destsize) {
-  return blosc2_decompress(src, INT32_MAX, dest, destsize);
+  return blosc2_decompress(src, INT32_MAX, dest, (int32_t)destsize);
 }
 
 
 /* Specific routine optimized for decompression a small number of
    items out of a compressed chunk.  This does not use threads because
    it would affect negatively to performance. */
-int _blosc_getitem(blosc2_context* context, const void* src, size_t srcsize,
+int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
                    int start, int nitems, void* dest) {
   uint8_t* _src = NULL;             /* current pos for source buffer */
   uint8_t flags;                    /* flags for header */
@@ -2393,7 +2393,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   return result;
 }
 
-int blosc2_getitem_ctx(blosc2_context* context, const void* src, size_t srcsize,
+int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize,
     int start, int nitems, void* dest) {
   uint8_t* _src = (uint8_t*)(src);
   int result;

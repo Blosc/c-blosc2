@@ -771,9 +771,9 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * *BLOSC_TYPESIZE* environment vars will also be honored.
  *
  */
-BLOSC_EXPORT int blosc2_compress(int clevel, int doshuffle, size_t typesize,
-                                 const void* src, size_t srcsize, void* dest,
-                                 size_t destsize);
+BLOSC_EXPORT int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
+                                 const void* src, int32_t srcsize, void* dest,
+                                 int32_t destsize);
 
 
 /**
@@ -817,8 +817,8 @@ BLOSC_EXPORT int blosc2_compress(int clevel, int doshuffle, size_t typesize,
  * same value as the last call to *blosc_set_nthreads*.
  *
  */
-BLOSC_EXPORT int blosc2_decompress(const void* src, size_t srcsize,
-                                   void* dest, size_t destsize);
+BLOSC_EXPORT int blosc2_decompress(const void* src, int32_t srcsize,
+                                   void* dest, int32_t destsize);
 
 /**
  * @brief Context interface to Blosc compression. This does not require a call
@@ -841,8 +841,8 @@ BLOSC_EXPORT int blosc2_decompress(const void* src, size_t srcsize,
  * and compression settings.
  */
 BLOSC_EXPORT int blosc2_compress_ctx(
-        blosc2_context* context, const void* src, size_t srcsize, void* dest,
-        size_t destsize);
+        blosc2_context* context, const void* src, int32_t srcsize, void* dest,
+        int32_t destsize);
 
 
 /**
@@ -878,7 +878,7 @@ BLOSC_EXPORT int blosc2_compress_ctx(
  * then 0 (zero) or a negative value will be returned instead.
  */
 BLOSC_EXPORT int blosc2_decompress_ctx(blosc2_context* context, const void* src,
-                                       size_t srcsize, void* dest, size_t destsize);
+                                       int32_t srcsize, void* dest, int32_t destsize);
 
 /**
  * @brief Context interface counterpart for #blosc_getitem.
@@ -890,7 +890,7 @@ BLOSC_EXPORT int blosc2_decompress_ctx(blosc2_context* context, const void* src,
  * some error happens.
  */
 BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
-                                    size_t srcsize, int start, int nitems, void* dest);
+                                    int32_t srcsize, int start, int nitems, void* dest);
 
 
 /*********************************************************************
@@ -1015,7 +1015,7 @@ BLOSC_EXPORT int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chun
  * @return The number of chunks in super-chunk. If some problem is
  * detected, this number will be negative.
  */
-BLOSC_EXPORT int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, size_t nbytes);
+BLOSC_EXPORT int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes);
 
 /**
  * @brief Decompress and return the @p nchunk chunk of a super-chunk.
@@ -1034,7 +1034,7 @@ BLOSC_EXPORT int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, s
  * @return The size of the decompressed chunk. If some problem is
  * detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk, void *dest, size_t nbytes);
+BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk, void *dest, int32_t nbytes);
 
 /**
  * @brief Return a compressed chunk that is part of a super-chunk in the @p chunk parameter.

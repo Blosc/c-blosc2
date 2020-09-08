@@ -532,7 +532,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int32_t chunksize = 0;
   int32_t off_cbytes = 0;
   uint64_t coffset = 0;
-  size_t off_nbytes = (size_t)nchunks * 8;
+  int32_t off_nbytes = nchunks * 8;
   uint64_t* data_tmp = malloc(off_nbytes);
   for (int i = 0; i < nchunks; i++) {
     uint8_t* data_chunk = schunk->data[i];
@@ -706,7 +706,7 @@ blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy) 
 
 
 // Get the compressed data offsets
-uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, int64_t *off_cbytes) {
+uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, int32_t *off_cbytes) {
   if (frame->coffsets != NULL) {
     return frame->coffsets;
   }
@@ -714,12 +714,12 @@ uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, i
   if (frame->sdata != NULL) {
     // For in-memory frames, the coffset is just one pointer away
     if (off_cbytes != NULL)
-      *off_cbytes = cbytes;
+      *off_cbytes = (int32_t)cbytes;
     return frame->sdata + header_len + cbytes;
   }
 
   int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
-  int64_t coffsets_cbytes = trailer_offset - (header_len + cbytes);
+  int32_t coffsets_cbytes = (int32_t)(trailer_offset - (header_len + cbytes));
   if (off_cbytes != NULL)
     *off_cbytes = coffsets_cbytes;
   FILE* fp = fopen(frame->fname, "rb");
@@ -983,7 +983,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
   schunk->frame = NULL;
 
   // Get the compressed offsets
-  int64_t coffsets_cbytes = 0;
+  int32_t coffsets_cbytes = 0;
   uint8_t* coffsets = get_coffsets(frame, header_len, cbytes, &coffsets_cbytes);
   if (coffsets == NULL) {
     fprintf(stderr, "Error: cannot get the offsets for the frame\n");
@@ -993,8 +993,8 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
   // Decompress offsets
   blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_context *dctx = blosc2_create_dctx(off_dparams);
-  int64_t* offsets = (int64_t *) malloc((size_t) nchunks * 8);
-  int32_t off_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes, offsets, (size_t)nchunks * 8);
+  int64_t* offsets = (int64_t *) malloc((size_t)nchunks * 8);
+  int32_t off_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes, offsets, nchunks * 8);
   blosc2_free_ctx(dctx);
   if (off_nbytes < 0) {
     free(offsets);
@@ -1215,7 +1215,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   int32_t off_nbytes = (nchunks + 1) * 8;
   int64_t* offsets = (int64_t *) malloc((size_t)off_nbytes);
   if (nchunks > 0) {
-    int64_t coffsets_cbytes = 0;
+    int32_t coffsets_cbytes = 0;
     uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, &coffsets_cbytes);
     if (coffsets == NULL) {
       fprintf(stderr, "Error: cannot get the offsets for the frame\n");
@@ -1224,7 +1224,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     // Decompress offsets
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
-    int32_t prev_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes, offsets, (size_t) nchunks * 8);
+    int32_t prev_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes, offsets, nchunks * 8);
     blosc2_free_ctx(dctx);
     if (prev_nbytes < 0) {
       free(offsets);
@@ -1240,8 +1240,8 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   blosc2_context* cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
   cctx->typesize = 8;
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
-  int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, (size_t)off_nbytes,
-          off_chunk, (size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
+  int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
+          off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
   int64_t offset;
   int rc2 = blosc_getitem(off_chunk, nchunks, 1, &offset);
@@ -1311,7 +1311,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
 
 
 /* Decompress and return a chunk that is part of a frame. */
-int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk, void *dest, size_t nbytes) {
+int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk, void *dest, int32_t nbytes) {
   uint8_t* src;
   bool needs_free;
   int chunk_cbytes = frame_get_chunk(frame, nchunk, &src, &needs_free);

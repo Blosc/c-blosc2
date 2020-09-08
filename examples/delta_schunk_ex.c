@@ -36,7 +36,7 @@
 int main(void) {
   static int64_t data[CHUNKSIZE];
   static int64_t data_dest[CHUNKSIZE];
-  const size_t isize = CHUNKSIZE * sizeof(int64_t);
+  const int32_t isize = CHUNKSIZE * sizeof(int64_t);
   int dsize = 0;
   int64_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
