@@ -185,7 +185,7 @@ int main(void) {
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.blocksize = blocksize;
   blosc2_context *cctx = blosc2_create_cctx(cparams);
-  cbytes = blosc2_compress_ctx(cctx, bytesize, src, dest, bytesize + BLOSC_MAX_OVERHEAD);
+  cbytes = blosc2_compress_ctx(cctx, src, bytesize, dest, bytesize + BLOSC_MAX_OVERHEAD);
 
   // Build a mask
   for (int i=0; i < nblocks; i++) {

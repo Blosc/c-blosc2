@@ -30,7 +30,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   output = malloc(cbytes);
   if (output != NULL) {
-    blosc_decompress(data, output, cbytes);
+    blosc2_decompress(data, size, output, cbytes);
     free(output);
   }
   return 0;

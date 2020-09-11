@@ -32,7 +32,7 @@
 
 int main(int argc, char* argv[]) {
   static int32_t data[CHUNKSIZE];
-  size_t isize;
+  int32_t isize;
   int64_t nbytes, cbytes;
   blosc_timestamp_t last, current;
   double ttotal;
