@@ -1824,7 +1824,7 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
   }
 
   error = initialize_context_compression(
-    context, src, (int32_t)srcsize, dest, (int32_t)destsize,
+    context, src, srcsize, dest, destsize,
     context->clevel, context->filters, context->filters_meta,
     context->typesize, context->compcode, context->blocksize,
     context->new_nthreads, context->nthreads, context->schunk);
@@ -2049,7 +2049,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   uint8_t* filters_meta = calloc(1, BLOSC2_MAX_FILTERS);
   build_filters(doshuffle, g_delta, typesize, filters);
   error = initialize_context_compression(
-    g_global_context, src, (int32_t)srcsize, dest, (int32_t)destsize, clevel, filters,
+    g_global_context, src, srcsize, dest, destsize, clevel, filters,
     filters_meta, (int32_t)typesize, g_compressor, g_force_blocksize, g_nthreads, g_nthreads,
     g_schunk);
   free(filters);
@@ -2098,7 +2098,7 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
     return -1;
   }
 
-  error = initialize_context_decompression(context, src, (int32_t)srcsize, dest, (int32_t)destsize);
+  error = initialize_context_decompression(context, src, srcsize, dest, destsize);
   if (error < 0) {
     return error;
   }
