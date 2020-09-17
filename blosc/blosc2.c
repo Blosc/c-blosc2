@@ -964,8 +964,8 @@ int pipeline_d(blosc2_context* context, const int32_t bsize, uint8_t* dest,
 /* Decompress & unshuffle a single block */
 static int blosc_d(
     struct thread_context* thread_context, int32_t bsize,
-    int32_t leftoverblock, const uint8_t* src, int32_t srcsize, uint8_t* dest,
-    int32_t offset, uint8_t* tmp, uint8_t* tmp2) {
+    int32_t leftoverblock, const uint8_t* src, int32_t srcsize, int32_t src_offset,
+    uint8_t* dest, int32_t dest_offset, uint8_t* tmp, uint8_t* tmp2) {
   blosc2_context* context = thread_context->parent_context;
   uint8_t* filters = context->filters;
   uint8_t *tmp3 = thread_context->tmp4;
@@ -981,13 +981,20 @@ static int blosc_d(
   int32_t ntbytes = 0;           /* number of uncompressed bytes in block */
   uint8_t* _dest;
   int32_t typesize = context->typesize;
-  int32_t nblock = offset / context->blocksize;
+  int32_t nblock = dest_offset / context->blocksize;
   const char* compname;
 
   if (context->block_maskout != NULL && context->block_maskout[nblock]) {
     // Do not decompress, but act as if we successfully decompressed everything
     return bsize;
   }
+
+  if (src_offset <= 0 || src_offset >= srcsize) {
+    /* Invalid block src offset encountered */
+    return -1;
+  }
+
+  src += src_offset;
 
   int last_filter_index = last_filter(filters, 'd');
 
@@ -997,7 +1004,7 @@ static int blosc_d(
    _dest = tmp;
   } else {
     // If no filters, or only DELTA in pipeline
-   _dest = dest + offset;
+   _dest = dest + dest_offset;
   }
 
   /* The number of compressed data streams for this block */
@@ -1011,13 +1018,13 @@ static int blosc_d(
 
   neblock = bsize / nstreams;
   for (int j = 0; j < nstreams; j++) {
-    if (src + sizeof(int32_t) >= src_end) {
+    if (src + sizeof(int32_t) > src_end) {
       /* Not enough input to read compressed size */
       return -1;
     }
     cbytes = sw32_(src);      /* amount of compressed bytes */
     src += sizeof(int32_t);
-    if (src + cbytes >= src_end) {
+    if (src + cbytes > src_end) {
       /* Not enough input to read compressed size */
       return -1;
     }
@@ -1096,7 +1103,7 @@ static int blosc_d(
   } /* Closes j < nstreams */
 
   if (last_filter_index >= 0) {
-    int errcode = pipeline_d(context, bsize, dest, offset, tmp, tmp2, tmp3,
+    int errcode = pipeline_d(context, bsize, dest, dest_offset, tmp, tmp2, tmp3,
                              last_filter_index);
     if (errcode < 0)
       return errcode;
@@ -1167,7 +1174,7 @@ static int serial_blosc(struct thread_context* thread_context) {
       else {
         /* Regular decompression */
         cbytes = blosc_d(thread_context, bsize, leftoverblock,
-                         context->src + sw32_(bstarts + j), context->srcsize,
+                         context->src, context->srcsize, sw32_(bstarts + j),
                          context->dest, j * context->blocksize, tmp, tmp2);
       }
     }
@@ -2341,7 +2348,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
       bool get_single_block = ((startb == 0) && (bsize == nitems * typesize));
       uint8_t* tmp2 = get_single_block ? dest : scontext->tmp2;
       cbytes = blosc_d(context->serial_context, bsize, leftoverblock,
-                       (uint8_t*)src + sw32_(bstarts + j), srcsize,
+                       src, srcsize, sw32_(bstarts + j),
                        tmp2, 0, scontext->tmp, scontext->tmp3);
       if (cbytes < 0) {
         ntbytes = cbytes;
@@ -2541,7 +2548,7 @@ static void t_blosc_do_job(void *ctxt)
           cbytes = -1;
         } else {
           cbytes = blosc_d(thcontext, bsize, leftoverblock,
-                            src + sw32_(bstarts + nblock_), srcsize,
+                            src, srcsize, sw32_(bstarts + nblock_),
                             dest, nblock_ * blocksize, tmp, tmp2);
         }
       }
