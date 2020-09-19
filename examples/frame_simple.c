@@ -74,10 +74,11 @@ int main(void) {
   }
 
   // Add some usermeta data
-  int umlen = blosc2_update_usermeta(schunk, (uint8_t *) "This is a usermeta content...", 32,
+  int umlen = blosc2_update_usermeta(schunk, (uint8_t *) "This is a usermeta content.....", 32,
                                      BLOSC2_CPARAMS_DEFAULTS);
   if (umlen < 0) {
     printf("Cannot write usermeta chunk");
+    return -1;
   }
 
   /* Gather some info */
