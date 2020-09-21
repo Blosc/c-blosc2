@@ -19,7 +19,7 @@ int tests_run = 0;
 int nchunks;
 
 
-static char* test_rewrite_offsets(void) {
+static char* test_reorder_offsets(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -75,10 +75,10 @@ static char* test_rewrite_offsets(void) {
 
 static char *all_tests(void) {
   nchunks = 5;
-  mu_run_test(test_rewrite_offsets);
+  mu_run_test(test_reorder_offsets);
 
   nchunks = 13;
-  mu_run_test(test_rewrite_offsets);
+  mu_run_test(test_reorder_offsets);
 
   return EXIT_SUCCESS;
 }
