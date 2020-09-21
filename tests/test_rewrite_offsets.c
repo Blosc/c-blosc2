@@ -48,11 +48,11 @@ static char* test_rewrite_offsets(void) {
     mu_assert("ERROR: bad append in frame", nchunks_ > 0);
   }
 
-  int *indexes = malloc(sizeof(int) * nchunks);
+  int *offsets_order = malloc(sizeof(int) * nchunks);
   for (int i = 0; i < nchunks; ++i) {
-    indexes[i] = (i + 3) % nchunks;
+    offsets_order[i] = (i + 3) % nchunks;
   }
-  int err = blosc2_schunk_rewrite_offsets(schunk, indexes);
+  int err = blosc2_schunk_reorder_offsets(schunk, offsets_order);
   mu_assert("ERROR: can not rewrite offsets", err >= 0);
 
   // Check that the chunks have been decompressed correctly
@@ -60,12 +60,12 @@ static char* test_rewrite_offsets(void) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
     for (int i = 0; i < CHUNKSIZE; i++) {
-      mu_assert("ERROR: bad roundtrip",data_dest[i] == i + (indexes[nchunk]) * CHUNKSIZE);
+      mu_assert("ERROR: bad roundtrip",data_dest[i] == i + (offsets_order[nchunk]) * CHUNKSIZE);
     }
   }
 
   /* Free resources */
-  free(indexes);
+  free(offsets_order);
   blosc2_free_schunk(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();

@@ -305,13 +305,13 @@ int blosc2_has_metalayer(blosc2_schunk *schunk, const char *name) {
 }
 
 /* Rewrite the offsets of an existing super-chunk. */
-int blosc2_schunk_rewrite_offsets(blosc2_schunk *schunk, int *indexes) {
+int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order) {
   uint8_t **offsets = schunk->data;
 
-  // Check that the indexes are correct
+  // Check that the index order are correct
   bool *index_check = (bool *) calloc(schunk->nchunks, sizeof(bool));
   for (int i = 0; i < schunk->nchunks; ++i) {
-    int index = indexes[i];
+    int index = offsets_order[i];
     if (index >= schunk->nchunks) {
       fprintf(stderr, "Error: index is bigger than the number of chunks\n");
       return -1;
@@ -330,7 +330,7 @@ int blosc2_schunk_rewrite_offsets(blosc2_schunk *schunk, int *indexes) {
   memcpy(offsets_copy, offsets, schunk->data_len);
 
   for (int i = 0; i < schunk->nchunks; ++i) {
-    offsets[i] = offsets_copy[indexes[i]];
+    offsets[i] = offsets_copy[offsets_order[i]];
   }
   free(offsets_copy);
 
