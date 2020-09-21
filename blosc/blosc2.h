@@ -1081,6 +1081,15 @@ BLOSC_EXPORT int blosc2_schunk_get_cparams(blosc2_schunk *schunk, blosc2_cparams
  */
 BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams);
 
+/**
+ * @brief Rewrite the offsets of an existing super-chunk.
+ *
+ * @param schunk The super-chunk from where rewrite the offsets.
+ * @param indexes The new positions for the offsets.
+ *
+ * @return 0 if suceeds. Else a negative code is returned.
+ */
+BLOSC_EXPORT int blosc2_schunk_rewrite_offsets(blosc2_schunk *schunk, int *indexes);
 
 /*********************************************************************
   Functions related with metalayers.
