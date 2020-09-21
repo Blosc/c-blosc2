@@ -1085,7 +1085,7 @@ BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams
  * @brief Reorder the offsets of an existing super-chunk.
  *
  * @param schunk The super-chunk from where rewrite the offsets.
- * @param offsets_order The new offsets_order for the offsets.
+ * @param offsets_order The new order for the offsets.
  *
  * @return 0 if suceeds. Else a negative code is returned.
  */
