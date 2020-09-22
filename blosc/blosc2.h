@@ -1009,8 +1009,8 @@ BLOSC_EXPORT int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chun
  * @brief Insert an existing @p chunk in a specified position on a super-chunk.
  *
  * @param schunk The super-chunk where the chunk will be appended.
- * @param nchunk The position where the chunk will be appended.
- * @param chunk The @p chunk to append.  An internal copy is made, so @p chunk can be reused or
+ * @param nchunk The position where the chunk will be inserted.
+ * @param chunk The @p chunk to insert.  An internal copy is made, so @p chunk can be reused or
  * freed if desired.
  * @param copy Whether the chunk should be copied internally or can be used as-is.
  *
