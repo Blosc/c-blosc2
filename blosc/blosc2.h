@@ -1006,7 +1006,7 @@ BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *schunk);
 BLOSC_EXPORT int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy);
 
 /**
- * @brief Insert an existing @p chunk in a specified position on a super-chunk.
+ * @brief Insert a chunk at a specific position in a super-chunk.
  *
  * @param schunk The super-chunk where the chunk will be appended.
  * @param nchunk The position where the chunk will be inserted.
