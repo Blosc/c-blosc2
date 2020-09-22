@@ -47,23 +47,37 @@ static char* test_insert_schunk(void) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
     int nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
-    mu_assert("ERROR: bad append in frame", nchunks_ > 0);
+    mu_assert("ERROR: bad append", nchunks_ > 0);
   }
 
   // Insert chunk in specified position
   for (int i = 0; i < CHUNKSIZE; ++i) {
     data[i] = 0;
   }
-
-  int _nchunks = blosc2_schunk_insert_chunk(schunk, pos, data, true);
+  int32_t datasize = sizeof(int32_t) * CHUNKSIZE;
+  int32_t chunksize = sizeof(int32_t) * CHUNKSIZE + BLOSC_MAX_OVERHEAD;
+  uint8_t *chunk = malloc(chunksize);
+  int csize = blosc2_compress_ctx(schunk->cctx, data, datasize, chunk, chunksize);
+  mu_assert("ERROR: chunk cannot be compressed", csize >= 0);
+  int _nchunks = blosc2_schunk_insert_chunk(schunk, pos, chunk, true);
+  mu_assert("ERROR: chunk cannot be inserted correctly", _nchunks > 0);
 
   // Check that the chunks have been decompressed correctly
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
-    dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
-    mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
-    for (int i = 0; i < CHUNKSIZE; i++) {
-      mu_assert("ERROR: bad roundtrip",data_dest[i] == i + nchunk * CHUNKSIZE);
+    if (nchunk < pos) {
+      dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
+    } else {
+      dsize = blosc2_schunk_decompress_chunk(schunk, nchunk + 1, (void *) data_dest, isize);
     }
+    mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
+    for (int i = 0; i < CHUNKSIZE; i++) {
+      mu_assert("ERROR: bad roundtrip", data_dest[i] == i + nchunk * CHUNKSIZE);
+    }
+  }
+  dsize = blosc2_schunk_decompress_chunk(schunk, pos, (void *) data_dest, isize);
+  mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
+  for (int i = 0; i < CHUNKSIZE; i++) {
+    mu_assert("ERROR: bad roundtrip", data_dest[i] == 0);
   }
 
   /* Free resources */
@@ -78,6 +92,14 @@ static char *all_tests(void) {
 
   nchunks = 10;
   pos = 4;
+  mu_run_test(test_insert_schunk);
+
+  nchunks = 5;
+  pos = 0;
+  mu_run_test(test_insert_schunk);
+
+  nchunks = 33;
+  pos = 33;
   mu_run_test(test_insert_schunk);
 
   return EXIT_SUCCESS;
