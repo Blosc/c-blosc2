@@ -1,9 +1,9 @@
 /*
-  Copyright (C) 2019  Francesc Alted
+  Copyright (C) 2020- The Blosc Development Team <blosc@blosc.org>
   http://blosc.org
   License: BSD (see LICENSE.txt)
 
-  Creation date: 2019-08-06
+  Creation date: 2020-09-22
 
   See LICENSE.txt for details about copyright and rights to use.
 */
