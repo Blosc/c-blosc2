@@ -32,6 +32,8 @@ int nblocks;
 static char *test_nomask(void) {
   blosc2_context *dctx = blosc2_create_dctx(BLOSC2_DPARAMS_DEFAULTS);
   nbytes = blosc2_decompress_ctx(dctx, dest, cbytes, dest2, bytesize);
+  blosc2_free_ctx(dctx);
+
   mu_assert("ERROR: nbytes is not correct", nbytes == bytesize);
 
   int64_t* _src = src;
@@ -39,7 +41,6 @@ static char *test_nomask(void) {
   for (int i = 0; i < size; i++) {
       mu_assert("ERROR: wrong values in dest", _dst[i] == _src[i]);
   }
-
   return 0;
 }
 
@@ -51,6 +52,7 @@ static char *test_mask(void) {
   memset(dest2, 0, bytesize);
   mu_assert("ERROR: setting maskout", blosc2_set_maskout(dctx, maskout, nblocks) == 0);
   nbytes = blosc2_decompress_ctx(dctx, dest, cbytes, dest2, bytesize);
+  blosc2_free_ctx(dctx);
   mu_assert("ERROR: nbytes is not correct", nbytes == bytesize);
 
   int64_t* _src = srcmasked;
@@ -58,7 +60,6 @@ static char *test_mask(void) {
   for (int i = 0; i < size; i++) {
     mu_assert("ERROR: wrong values in dest", _dst[i] == _src[i]);
   }
-
   return 0;
 }
 
@@ -89,7 +90,7 @@ static char *test_mask_nomask(void) {
   for (int i = 0; i < size; i++) {
     mu_assert("ERROR: wrong values in dest", _dst[i] == _src[i]);
   }
-
+  blosc2_free_ctx(dctx);
   return 0;
 }
 
@@ -131,7 +132,7 @@ static char *test_mask_nomask_mask(void) {
   for (int i = 0; i < size; i++) {
     mu_assert("ERROR: wrong values in dest", _dst[i] == _src[i]);
   }
-
+  blosc2_free_ctx(dctx);
   return 0;
 }
 
@@ -186,6 +187,7 @@ int main(void) {
   cparams.blocksize = blocksize;
   blosc2_context *cctx = blosc2_create_cctx(cparams);
   cbytes = blosc2_compress_ctx(cctx, src, bytesize, dest, bytesize + BLOSC_MAX_OVERHEAD);
+  blosc2_free_ctx(cctx);
 
   // Build a mask
   for (int i=0; i < nblocks; i++) {
