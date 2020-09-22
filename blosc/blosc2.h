@@ -1006,6 +1006,20 @@ BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *schunk);
 BLOSC_EXPORT int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy);
 
 /**
+ * @brief Insert an existing @p chunk in a specified position on a super-chunk.
+ *
+ * @param schunk The super-chunk where the chunk will be appended.
+ * @param nchunk The position where the chunk will be appended.
+ * @param chunk The @p chunk to append.  An internal copy is made, so @p chunk can be reused or
+ * freed if desired.
+ * @param copy Whether the chunk should be copied internally or can be used as-is.
+ *
+ * @return The number of chunks in super-chunk. If some problem is
+ * detected, this number will be negative.
+ */
+BLOSC_EXPORT int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy);
+
+/**
  * @brief Append a @p src data buffer to a super-chunk.
  *
  * @param schunk The super-chunk where data will be appended.
