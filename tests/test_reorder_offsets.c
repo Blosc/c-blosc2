@@ -19,7 +19,7 @@ int tests_run = 0;
 int nchunks;
 
 
-static char* test_reorder_chunks(void) {
+static char* test_reorder_offsets(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -48,11 +48,11 @@ static char* test_reorder_chunks(void) {
     mu_assert("ERROR: bad append in frame", nchunks_ > 0);
   }
 
-  int *chunks_order = malloc(sizeof(int) * nchunks);
+  int *offsets_order = malloc(sizeof(int) * nchunks);
   for (int i = 0; i < nchunks; ++i) {
-    chunks_order[i] = (i + 3) % nchunks;
+    offsets_order[i] = (i + 3) % nchunks;
   }
-  int err = blosc2_schunk_reorder_chunks(schunk, chunks_order);
+  int err = blosc2_schunk_reorder_offsets(schunk, offsets_order);
   mu_assert("ERROR: can not reorder chunks", err >= 0);
 
   // Check that the chunks have been decompressed correctly
@@ -60,12 +60,12 @@ static char* test_reorder_chunks(void) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
     for (int i = 0; i < CHUNKSIZE; i++) {
-      mu_assert("ERROR: bad roundtrip",data_dest[i] == i + (chunks_order[nchunk]) * CHUNKSIZE);
+      mu_assert("ERROR: bad roundtrip",data_dest[i] == i + (offsets_order[nchunk]) * CHUNKSIZE);
     }
   }
 
   /* Free resources */
-  free(chunks_order);
+  free(offsets_order);
   blosc2_free_schunk(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
@@ -75,10 +75,10 @@ static char* test_reorder_chunks(void) {
 
 static char *all_tests(void) {
   nchunks = 5;
-  mu_run_test(test_reorder_chunks);
+  mu_run_test(test_reorder_offsets);
 
   nchunks = 13;
-  mu_run_test(test_reorder_chunks);
+  mu_run_test(test_reorder_offsets);
 
   return EXIT_SUCCESS;
 }

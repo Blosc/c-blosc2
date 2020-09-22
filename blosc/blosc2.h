@@ -1082,14 +1082,14 @@ BLOSC_EXPORT int blosc2_schunk_get_cparams(blosc2_schunk *schunk, blosc2_cparams
 BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams);
 
 /**
- * @brief Reorder the chunks of an existing super-chunk.
+ * @brief Reorder the chunk offsets of an existing super-chunk.
  *
- * @param schunk The super-chunk whose chunks are to be reordered.
- * @param chunks_order The new order of the chunks.
+ * @param schunk The super-chunk whose chunk offsets are to be reordered.
+ * @param offsets_order The new order of the chunk offsets.
  *
  * @return 0 if suceeds. Else a negative code is returned.
  */
-BLOSC_EXPORT int blosc2_schunk_reorder_chunks(blosc2_schunk *schunk, int *chunks_order);
+BLOSC_EXPORT int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order);
 
 
 /*********************************************************************
