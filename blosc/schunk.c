@@ -208,6 +208,72 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
 }
 
 
+int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy) {
+  int32_t nchunks = schunk->nchunks;
+
+  /* The uncompressed and compressed sizes start at byte 4 and 12 */
+  int32_t nbytes = sw32_(chunk + 4);
+  int32_t cbytes = sw32_(chunk + 12);
+
+  if ((schunk->nchunks > 0) && (nbytes > schunk->chunksize)) {
+    fprintf(stderr, "appending chunks with a larger chunksize than schunk is not allowed yet: "
+                    "%d > %d", nbytes, schunk->chunksize);
+    return -1;
+  }
+
+  // Update super-chunk or frame
+  if (schunk->frame == NULL) {
+    uint8_t *chunk_old;
+    bool needs_free;
+    blosc2_schunk_get_chunk(schunk, nchunk, &chunk_old, &needs_free);
+    int32_t nbytes_old = sw32_(chunk_old + 4);
+    int32_t cbytes_old = sw32_(chunk_old + 12);
+
+    /* Update counters */
+    schunk->nbytes += nbytes;
+    schunk->nbytes -= nbytes_old;
+    schunk->cbytes += cbytes;
+    schunk->cbytes += cbytes_old;
+    if (nchunks == 0) {
+      schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
+    }
+
+    // Check that we are not appending a small chunk after another small chunk
+    if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize) && (nchunk == nchunks - 1)) {
+      uint8_t* last_chunk = schunk->data[nchunks - 1];
+      int32_t last_nbytes = sw32_(last_chunk + 4);
+      if ((last_nbytes < schunk->chunksize) && (nbytes < schunk->chunksize)) {
+        fprintf(stderr,
+                "appending two consecutive chunks with a chunksize smaller than the schunk chunksize"
+                "is not allowed yet: %d != %d", nbytes, schunk->chunksize);
+        return -1;
+      }
+    }
+
+    if (copy) {
+      // Make a copy of the chunk
+      uint8_t *chunk_copy = malloc(cbytes);
+      memcpy(chunk_copy, chunk, cbytes);
+      chunk = chunk_copy;
+    }
+    else if (cbytes < nbytes) {
+      // We still want to do a shrink of the chunk
+      chunk = realloc(chunk, cbytes);
+    }
+
+    // Free old chunk and add reference to new chunk
+    free(schunk->data[nchunk]);
+    schunk->data[nchunk] = chunk;
+  }
+  else {
+    fprintf(stderr, "Updating chunks in a frame is not allowed yet");
+    return -1;
+  }
+
+  return schunk->nchunks;
+}
+
+
 /* Append a data buffer to a super-chunk. */
 int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes) {
   uint8_t* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
