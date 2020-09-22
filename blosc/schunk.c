@@ -373,6 +373,39 @@ int blosc2_has_metalayer(blosc2_schunk *schunk, const char *name) {
   return -1;  // Not found
 }
 
+/* Reorder the chunk offsets of an existing super-chunk. */
+int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order) {
+  uint8_t **offsets = schunk->data;
+
+  // Check that the offsets order are correct
+  bool *index_check = (bool *) calloc(schunk->nchunks, sizeof(bool));
+  for (int i = 0; i < schunk->nchunks; ++i) {
+    int index = offsets_order[i];
+    if (index >= schunk->nchunks) {
+      fprintf(stderr, "Error: index is bigger than the number of chunks\n");
+      return -1;
+    }
+    if (index_check[index] == false) {
+      index_check[index] = true;
+    } else {
+      fprintf(stderr, "Error: index is yet used\n");
+      return -1;
+    }
+  }
+  free(index_check);
+
+  // Make a copy of the chunk offsets and reorder it
+  uint8_t **offsets_copy = malloc(schunk->data_len);
+  memcpy(offsets_copy, offsets, schunk->data_len);
+
+  for (int i = 0; i < schunk->nchunks; ++i) {
+    offsets[i] = offsets_copy[offsets_order[i]];
+  }
+  free(offsets_copy);
+
+  return 0;
+}
+
 
 /**
  * @brief Flush metalayers content into a possible attached frame.
