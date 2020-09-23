@@ -18,6 +18,7 @@
 int tests_run = 0;
 int nchunks;
 int pos;
+bool copy;
 
 
 static char* test_insert_schunk(void) {
@@ -59,8 +60,11 @@ static char* test_insert_schunk(void) {
   uint8_t *chunk = malloc(chunksize);
   int csize = blosc2_compress_ctx(schunk->cctx, data, datasize, chunk, chunksize);
   mu_assert("ERROR: chunk cannot be compressed", csize >= 0);
-  int _nchunks = blosc2_schunk_insert_chunk(schunk, pos, chunk, true);
+  int _nchunks = blosc2_schunk_insert_chunk(schunk, pos, chunk, copy);
   mu_assert("ERROR: chunk cannot be inserted correctly", _nchunks > 0);
+  if (copy) {
+    free(chunk);
+  }
 
   // Check that the chunks have been decompressed correctly
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
@@ -92,14 +96,22 @@ static char *all_tests(void) {
 
   nchunks = 10;
   pos = 4;
+  copy = true;
   mu_run_test(test_insert_schunk);
 
   nchunks = 5;
   pos = 0;
+  copy = true;
   mu_run_test(test_insert_schunk);
 
   nchunks = 33;
   pos = 33;
+  copy = true;
+  mu_run_test(test_insert_schunk);
+
+  nchunks = 12;
+  pos = 5;
+  copy = false;
   mu_run_test(test_insert_schunk);
 
   return EXIT_SUCCESS;
