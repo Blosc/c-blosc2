@@ -1007,11 +1007,11 @@ BLOSC_EXPORT int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chun
 
 
 /**
-  * @brief Insert a chunk at a specific position in a super-chunk.
+  * @brief Update a chunk at a specific position in a super-chunk.
   *
   * @param schunk The super-chunk where the chunk will be updated.
   * @param nchunk The position where the chunk will be updated.
-  * @param chunk The new @p chunk.  An internal copy is made, so @p chunk can be reused or
+  * @param chunk The new @p chunk. If an internal copy is made, so @p chunk can be reused or
   * freed if desired.
   * @param copy Whether the chunk should be copied internally or can be used as-is.
   *

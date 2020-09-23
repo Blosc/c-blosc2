@@ -1,12 +1,12 @@
 /*
-   Copyright (C) 2019  Francesc Alted
-   http://blosc.org
-   License: BSD (see LICENSE.txt)
+  Copyright (C) 2020- The Blosc Development Team <blosc@blosc.org>
+  http://blosc.org
+  License: BSD (see LICENSE.txt)
 
-   Creation date: 2019-08-06
+  Creation date: 2020-09-23
 
-   See LICENSE.txt for details about copyright and rights to use.
- */
+  See LICENSE.txt for details about copyright and rights to use.
+*/
 
 #include <stdio.h>
 #include "test_common.h"
