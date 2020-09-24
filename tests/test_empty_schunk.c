@@ -24,7 +24,6 @@ static char* test_schunk(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
-  int dsize;
   int64_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
@@ -45,29 +44,35 @@ static char* test_schunk(void) {
   blosc2_add_metalayer(schunk, "metalayer1", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
   blosc2_add_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
 
-  uint8_t *chunk;
+  uint8_t *chunk_aux;
   bool needs_free;
-  cbytes = blosc2_schunk_get_chunk(schunk, nchunks / 2, &chunk, &needs_free);
+  cbytes = blosc2_schunk_get_chunk(schunk, nchunks / 2, &chunk_aux, &needs_free);
   mu_assert("ERROR: chunk cannot be retrieved correctly.\n", cbytes == 0);
-
+  if (needs_free) {
+    free(chunk_aux);
+  }
   int32_t datasize = sizeof(int32_t) * CHUNKSIZE;
   int32_t chunksize = sizeof(int32_t) * CHUNKSIZE + BLOSC_MAX_OVERHEAD;
 
   // Feed it with data
+  uint8_t *chunk;
+  int csize;
+  int nchunks_;
+
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
 
     chunk = malloc(chunksize);
-    int csize = blosc2_compress_ctx(schunk->cctx, data, datasize, chunk, chunksize);
+    csize = blosc2_compress_ctx(schunk->cctx, data, datasize, chunk, chunksize);
     mu_assert("ERROR: chunk cannot be compressed", csize >= 0);
-
-    int nchunks_ = blosc2_schunk_update_chunk(schunk, nchunk, chunk, copy);
+    nchunks_ = blosc2_schunk_update_chunk(schunk, nchunk, chunk, copy);
     mu_assert("ERROR: bad append in schunk", nchunks_ == nchunks);
-    if (!copy) {
-      chunk = malloc(chunksize);
-    }
+
+    chunk = malloc(chunksize);
+    csize = blosc2_compress_ctx(schunk->cctx, data, datasize, chunk, chunksize);
+    mu_assert("ERROR: chunk cannot be compressed", csize >= 0);
     nchunks_ = blosc2_schunk_update_chunk(schunk, nchunk, chunk, copy);
 
     mu_assert("ERROR: bad append in schunk", nchunks_ == nchunks);
