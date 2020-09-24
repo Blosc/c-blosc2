@@ -207,6 +207,75 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   return schunk->nchunks;
 }
 
+/* Insert an existing @p chunk in a specified position on a super-chunk */
+int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy) {
+  int32_t nchunks = schunk->nchunks;
+  /* The uncompressed and compressed sizes start at byte 4 and 12 */
+  int32_t nbytes = sw32_(chunk + 4);
+  int32_t cbytes = sw32_(chunk + 12);
+
+  if ((schunk->nchunks > 0) && (nbytes > schunk->chunksize)) {
+    fprintf(stderr, "appending chunks with a larger chunksize than schunk is not allowed yet: "
+                    "%d > %d", nbytes, schunk->chunksize);
+    return -1;
+  }
+
+  /* Update counters */
+  schunk->nchunks = nchunks + 1;
+  schunk->nbytes += nbytes;
+  schunk->cbytes += cbytes;
+  // FIXME: this should be updated when/if super-chunks support chunks with different sizes
+  if (nchunks == 0) {
+    schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
+  }
+
+  // Update super-chunk or frame
+  if (schunk->frame == NULL) {
+    // Check that we are not appending a small chunk after another small chunk
+    if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
+      uint8_t* last_chunk = schunk->data[nchunks - 1];
+      int32_t last_nbytes = sw32_(last_chunk + 4);
+      if ((last_nbytes < schunk->chunksize) && (nbytes < schunk->chunksize)) {
+        fprintf(stderr,
+                "appending two consecutive chunks with a chunksize smaller than the schunk chunksize"
+                "is not allowed yet: "
+                "%d != %d", nbytes, schunk->chunksize);
+        return -1;
+      }
+    }
+
+    if (copy) {
+      // Make a copy of the chunk
+      uint8_t *chunk_copy = malloc(cbytes);
+      memcpy(chunk_copy, chunk, cbytes);
+      chunk = chunk_copy;
+    }
+    else if (cbytes < nbytes) {
+      // We still want to do a shrink of the chunk
+      chunk = realloc(chunk, cbytes);
+    }
+
+    // Make space for appending the copy of the chunk and do it
+    if ((nchunks + 1) * sizeof(void *) > schunk->data_len) {
+      // Extend the data pointer by one memory page (4k)
+      schunk->data_len += 4096;  // must be a multiple of sizeof(void*)
+      schunk->data = realloc(schunk->data, schunk->data_len);
+    }
+
+    // Reorder the offsets and insert the new chunk
+    for (int i = nchunks; i > nchunk; --i) {
+      schunk->data[i] = schunk->data[i-1];
+    }
+    schunk->data[nchunk] = chunk;
+  }
+
+  else {
+    fprintf(stderr, "Not allowed yet");
+    return -1;
+  }
+  return schunk->nchunks;
+}
+
 
 int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy) {
   int32_t nchunks = schunk->nchunks;
