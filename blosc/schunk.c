@@ -191,11 +191,11 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   int32_t cbytes = sw32_(chunk + 12);
 
   if (schunk->chunksize == -1) {
-    schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
+    schunk->chunksize = nbytes;  // The super-chunk is initialized now
   }
 
   if (nbytes > schunk->chunksize) {
-    fprintf(stderr, "appending chunks with a larger chunksize than schunk is not allowed yet: "
+    fprintf(stderr, "Appending chunks that have different lengths in the same schunk is not supported yet: "
                     "%d > %d", nbytes, schunk->chunksize);
     return -1;
   }
@@ -259,11 +259,11 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   int32_t cbytes = sw32_(chunk + 12);
 
   if (schunk->chunksize == -1) {
-    schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
+    schunk->chunksize = nbytes;  // The super-chunk is initialized now
   }
 
   if (nbytes > schunk->chunksize) {
-    fprintf(stderr, "inserting chunks with a larger chunksize than schunk is not allowed yet: "
+    fprintf(stderr, "Inserting chunks that have different lengths in the same schunk is not supported yet: "
                     "%d > %d", nbytes, schunk->chunksize);
     return -1;
   }
@@ -329,11 +329,11 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   int32_t cbytes = sw32_(chunk + 12);
 
   if (schunk->chunksize == -1) {
-    schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
+    schunk->chunksize = nbytes;  // The super-chunk is initialized now
   }
 
   if ((schunk->chunksize != 0) && (nbytes > schunk->chunksize)) {
-    fprintf(stderr, "updating chunks with a larger chunksize than schunk is not allowed yet: "
+    fprintf(stderr, "Inserting chunks that have different lengths in the same schunk is not supported yet: "
                     "%d > %d", nbytes, schunk->chunksize);
     return -1;
   }
