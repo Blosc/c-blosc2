@@ -85,6 +85,7 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
   schunk->clevel = cparams.clevel;
   schunk->typesize = cparams.typesize;
   schunk->blocksize = cparams.blocksize;
+  schunk->chunksize = -1;
 
   /* The compression context */
   cparams.schunk = schunk;
@@ -141,12 +142,12 @@ blosc2_schunk *blosc2_empty_schunk(blosc2_cparams cparams, blosc2_dparams dparam
 
   // Init offsets
   schunk->nchunks = nchunks;
-  schunk->chunksize = 0;
+  schunk->chunksize = -1;
   schunk->nbytes = 0;
   schunk->cbytes = 0;
 
-  schunk->data_len += 4096 * nchunks;  // must be a multiple of sizeof(void*)
-  schunk->data = calloc(nchunks, 4096);
+  schunk->data_len += sizeof(void *) * nchunks;  // must be a multiple of sizeof(void*)
+  schunk->data = calloc(nchunks, sizeof(void *));
 
   return schunk;
 }
@@ -189,7 +190,11 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   int32_t nbytes = sw32_(chunk + 4);
   int32_t cbytes = sw32_(chunk + 12);
 
-  if ((schunk->nchunks > 0) && (nbytes > schunk->chunksize)) {
+  if (schunk->chunksize == -1) {
+    schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
+  }
+
+  if (nbytes > schunk->chunksize) {
     fprintf(stderr, "appending chunks with a larger chunksize than schunk is not allowed yet: "
                     "%d > %d", nbytes, schunk->chunksize);
     return -1;
@@ -199,10 +204,6 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   schunk->nchunks = nchunks + 1;
   schunk->nbytes += nbytes;
   schunk->cbytes += cbytes;
-  // FIXME: this should be updated when/if super-chunks support chunks with different sizes
-  if (schunk->chunksize == 0) {
-    schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
-  }
 
   // Update super-chunk or frame
   if (schunk->frame == NULL) {
@@ -257,8 +258,12 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   int32_t nbytes = sw32_(chunk + 4);
   int32_t cbytes = sw32_(chunk + 12);
 
-  if ((schunk->nchunks > 0) && (nbytes > schunk->chunksize)) {
-    fprintf(stderr, "appending chunks with a larger chunksize than schunk is not allowed yet: "
+  if (schunk->chunksize == -1) {
+    schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
+  }
+
+  if (nbytes > schunk->chunksize) {
+    fprintf(stderr, "inserting chunks with a larger chunksize than schunk is not allowed yet: "
                     "%d > %d", nbytes, schunk->chunksize);
     return -1;
   }
@@ -267,10 +272,6 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   schunk->nchunks = nchunks + 1;
   schunk->nbytes += nbytes;
   schunk->cbytes += cbytes;
-  // FIXME: this should be updated when/if super-chunks support chunks with different sizes
-  if (schunk->chunksize == 0) {
-    schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
-  }
 
   // Update super-chunk or frame
   if (schunk->frame == NULL) {
@@ -327,11 +328,16 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   int32_t nbytes = sw32_(chunk + 4);
   int32_t cbytes = sw32_(chunk + 12);
 
-  if ((schunk->nchunks > 0) && (schunk->chunksize != 0) && (nbytes > schunk->chunksize)) {
-    fprintf(stderr, "appending chunks with a larger chunksize than schunk is not allowed yet: "
+  if (schunk->chunksize == -1) {
+    schunk->chunksize = nbytes;  // Only update chunksize when it is the first chunk
+  }
+
+  if ((schunk->chunksize != 0) && (nbytes > schunk->chunksize)) {
+    fprintf(stderr, "updating chunks with a larger chunksize than schunk is not allowed yet: "
                     "%d > %d", nbytes, schunk->chunksize);
     return -1;
   }
+
 
   // Update super-chunk or frame
   if (schunk->frame == NULL) {

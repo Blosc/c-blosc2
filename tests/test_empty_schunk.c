@@ -54,6 +54,11 @@ static char* test_schunk(void) {
   int32_t datasize = sizeof(int32_t) * CHUNKSIZE;
   int32_t chunksize = sizeof(int32_t) * CHUNKSIZE + BLOSC_MAX_OVERHEAD;
 
+  chunk_aux = malloc(chunksize);
+  nbytes = blosc2_schunk_decompress_chunk(schunk, nchunks / 2, &chunk_aux, chunksize);
+  mu_assert("ERROR: chunk cannot be retrieved correctly.\n", nbytes == 0);
+  free(chunk_aux);
+
   // Feed it with data
   uint8_t *chunk;
   int csize;
