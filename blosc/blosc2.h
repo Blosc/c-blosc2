@@ -978,10 +978,23 @@ typedef struct blosc2_schunk {
  * @param dparams The decompression parameters.
  * @param frame The frame to be used. NULL if not needed.
  *
- * @return The new super-chunk
+ * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk *
 blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams, blosc2_frame *frame);
+
+/**
+ * @brief Create a non-initialized super-chunk.
+ *
+ * @param cparams The compression parameters.
+ * @param dparams The decompression parameters.
+ * @param nchunks The number of non-initialized chunks in the super-chunk.
+ * @param frame If not NULL, the super-chunk will be backed by this frame object.
+ *
+ * @return The new super-chunk.
+ */
+BLOSC_EXPORT blosc2_schunk *
+blosc2_empty_schunk(blosc2_cparams cparams, blosc2_dparams dparams, int nchunks, blosc2_frame *frame);
 
 /**
  * @brief Release resources from a super-chunk.
@@ -1060,7 +1073,7 @@ BLOSC_EXPORT int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, i
  * @warning You must make sure that you have space enough to store the
  * uncompressed data.
  *
- * @return The size of the decompressed chunk. If some problem is
+ * @return The size of the decompressed chunk or 0 if it is non-initialized. If some problem is
  * detected, a negative code is returned instead.
  */
 BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk, void *dest, int32_t nbytes);
@@ -1080,8 +1093,8 @@ BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchun
  * If the chunk does not need a free, it means that a pointer to the location in the super-chunk
  * (or the backing in-memory frame) is returned in the @p chunk parameter.
  *
- * @return The size of the (compressed) chunk. If some problem is detected, a negative code
- * is returned instead.
+ * @return The size of the (compressed) chunk or 0 if it is non-initialized. If some problem is
+ * detected, a negative code is returned instead.
  */
 BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk,
                                          bool *needs_free);

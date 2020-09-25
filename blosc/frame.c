@@ -529,7 +529,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   swap_store(&h2len, h2 + FRAME_HEADER_LEN, sizeof(h2len));
 
   // Build the offsets chunk
-  int32_t chunksize = 0;
+  int32_t chunksize = -1;
   int32_t off_cbytes = 0;
   uint64_t coffset = 0;
   int32_t off_nbytes = nchunks * 8;
