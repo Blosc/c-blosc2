@@ -173,7 +173,7 @@ data stream is stored with the size of the stream `int32 csize` preceeding the b
     | csize | cdata |
     +=======+=======+
 
-If bit 4 of the `flags` header field is *not* set, each block is stored in a single data stream::
+If bit 4 of the `flags` header field is set, each block is stored in a single data stream::
 
     +=========+
     | stream0 |
@@ -181,7 +181,7 @@ If bit 4 of the `flags` header field is *not* set, each block is stored in a sin
     | block0  |
     +=========+
 
-If bit 4 of the `flags` header is set, each block can be stored using multiple data streams::
+If bit 4 of the `flags` header is *not* set, each block can be stored using multiple data streams::
 
     +=========+=========+=========+=========+
     | stream0 | stream1 |    ...  | streamN |
