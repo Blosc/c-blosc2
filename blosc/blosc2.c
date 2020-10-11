@@ -970,7 +970,6 @@ static int blosc_d(
   uint8_t* filters = context->filters;
   uint8_t *tmp3 = thread_context->tmp4;
   int32_t compformat = (context->header_flags & 0xe0) >> 5;
-  uint8_t *src_end = (uint8_t *)src + srcsize;
   int dont_split = (context->header_flags & 0x10) >> 4;
   //uint8_t blosc_version_format = src[0];
   int nstreams;
@@ -995,6 +994,7 @@ static int blosc_d(
   }
 
   src += src_offset;
+  srcsize -= src_offset;
 
   int last_filter_index = last_filter(filters, 'd');
 
@@ -1018,14 +1018,16 @@ static int blosc_d(
 
   neblock = bsize / nstreams;
   for (int j = 0; j < nstreams; j++) {
-    if (src + sizeof(int32_t) > src_end) {
+    srcsize -= sizeof(int32_t);
+    if (srcsize < 0) {
       /* Not enough input to read compressed size */
       return -1;
     }
     cbytes = sw32_(src);      /* amount of compressed bytes */
     src += sizeof(int32_t);
-    if (src + cbytes > src_end) {
-      /* Not enough input to read compressed size */
+    srcsize -= cbytes;
+    if (srcsize < 0) {
+      /* Not enough input to read compressed bytes */
       return -1;
     }
     ctbytes += (int32_t)sizeof(int32_t);
