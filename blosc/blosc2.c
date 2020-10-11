@@ -1500,6 +1500,8 @@ static int initialize_context_decompression(blosc2_context* context, const void*
                                             void* dest, int32_t destsize) {
   uint8_t blosc2_flags = 0;
   int32_t cbytes;
+  int32_t bstarts_offset;
+  int32_t bstarts_end;
 
   context->do_compress = 0;
   context->src = (const uint8_t*)src;
@@ -1524,6 +1526,10 @@ static int initialize_context_decompression(blosc2_context* context, const void*
   if (context->blocksize <= 0 || context->blocksize > destsize ||
       context->typesize <= 0 || context->typesize > BLOSC_MAX_TYPESIZE ||
       cbytes > srcsize) {
+    return -1;
+  }
+  /* Check that we have enough space to decompress */
+  if (context->sourcesize > (int32_t)destsize) {
     return -1;
   }
 
@@ -1557,24 +1563,20 @@ static int initialize_context_decompression(blosc2_context* context, const void*
       context->filters_meta[i] = filters_meta[i];
     }
     context->filter_flags = filters_to_flags(filters);
-    context->bstarts = (int32_t*)(context->src + BLOSC_EXTENDED_HEADER_LENGTH);
-
+    bstarts_offset = BLOSC_EXTENDED_HEADER_LENGTH;
     blosc2_flags = context->src[0x1F];
   } else {
     /* Regular (Blosc1) header */
     context->filter_flags = get_filter_flags(context->header_flags,
                                              context->typesize);
     flags_to_filters(context->header_flags, context->filters);
-    context->bstarts = (int32_t*)(context->src + BLOSC_MIN_HEADER_LENGTH);
+    bstarts_offset = BLOSC_MIN_HEADER_LENGTH;
   }
 
-  /* Check that we have enough space to decompress */
-  if (context->sourcesize > (int32_t)destsize) {
-    return -1;
-  }
-  const uint8_t *src_end = (context->src + context->srcsize);
-  const int32_t *bstarts_end = (int32_t *)(context->bstarts + context->nblocks);
-  if (src_end < (uint8_t *)bstarts_end) {
+  context->bstarts = (int32_t*)(context->src + bstarts_offset);
+  bstarts_end = bstarts_offset + (context->nblocks * sizeof(int32_t));
+  srcsize -= bstarts_end;
+  if (srcsize < 0) {
     /* Not enough input to read entire `bstarts` section */
     return -1;
   }
@@ -1587,21 +1589,23 @@ static int initialize_context_decompression(blosc2_context* context, const void*
       // Free the existing dictionary (probably from another chunk)
       ZSTD_freeDDict(context->dict_ddict);
     }
+    srcsize -= sizeof(int32_t);
     // The trained dictionary is after the bstarts block
-    if (src_end < (uint8_t *)(bstarts_end + 1)) {
+    if (srcsize < 0) {
       /* Not enough input to size of dictionary */
       return -1;
     }
-    context->dict_size = (size_t)sw32_(bstarts_end);
+    context->dict_size = (size_t)sw32_(context->src + bstarts_end);
     if (context->dict_size <= 0 || context->dict_size > BLOSC2_MAXDICTSIZE) {
       /* Dictionary size is smaller than minimum or larger than maximum allowed */
       return -1;
     }
-    if (src_end < (uint8_t *)(bstarts_end + 1) + context->dict_size) {
+    srcsize -= context->dict_size;
+    if (srcsize < 0) {
       /* Not enough input to read entire dictionary */
       return -1;
     }
-    context->dict_buffer = (void*)(bstarts_end + 1);
+    context->dict_buffer = (void*)(context->src + bstarts_end + sizeof(int32_t));
     context->dict_ddict = ZSTD_createDDict(context->dict_buffer, context->dict_size);
 #endif   // HAVE_ZSTD
   }
