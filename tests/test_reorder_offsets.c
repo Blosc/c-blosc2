@@ -21,7 +21,7 @@ int nchunks;
 
 static char* test_reorder_offsets(void) {
   static int32_t data[CHUNKSIZE];
-  static int32_t data_dest[CHUNKSIZE];
+  int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -37,7 +37,8 @@ static char* test_reorder_offsets(void) {
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams, NULL);
+  blosc2_frame *frame = blosc2_new_frame(NULL);
+  schunk = blosc2_new_schunk(cparams, dparams, frame);
 
   // Feed it with data
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {

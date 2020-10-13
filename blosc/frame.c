@@ -1344,3 +1344,124 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk
   }
   return (int)chunksize;
 }
+
+int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk* schunk) {
+  // Get header info
+  int32_t header_len;
+  int64_t frame_len;
+  int64_t nbytes;
+  int64_t cbytes;
+  int32_t chunksize;
+  int32_t nchunks;
+  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+                            NULL, NULL, NULL, NULL, NULL);
+
+  // Check that the offsets order are correct
+  bool *index_check = (bool *) calloc(nchunks, sizeof(bool));
+  for (int i = 0; i < nchunks; ++i) {
+    int index = offsets_order[i];
+    if (index >= nchunks) {
+      fprintf(stderr, "Error: index is bigger than the number of chunks\n");
+      return -1;
+    }
+    if (index_check[index] == false) {
+      index_check[index] = true;
+    } else {
+      fprintf(stderr, "Error: index is yet used\n");
+      return -1;
+    }
+  }
+  free(index_check);
+
+  // Get the current offsets and add one more
+  int32_t off_nbytes = nchunks * 8;
+  int64_t* offsets = (int64_t *) malloc((size_t)off_nbytes);
+
+  int32_t coffsets_cbytes = 0;
+  uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, &coffsets_cbytes);
+  if (coffsets == NULL) {
+    fprintf(stderr, "Error: cannot get the offsets for the frame\n");
+    return -1;
+  }
+
+  int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
+  int64_t trailer_len = frame->len - trailer_offset;
+
+  // Decompress offsets
+  blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context *dctx = blosc2_create_dctx(off_dparams);
+  int32_t prev_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes, offsets, nchunks * 8);
+  blosc2_free_ctx(dctx);
+  if (prev_nbytes < 0) {
+    free(offsets);
+    fprintf(stderr, "Error: cannot decompress the offsets chunk");
+    return -1;
+  }
+
+
+  // Make a copy of the chunk offsets and reorder it
+  uint8_t *offsets_copy = malloc(prev_nbytes);
+  memcpy(offsets_copy, offsets, prev_nbytes);
+
+  for (int i = 0; i < nchunks; ++i) {
+    offsets[i] = offsets_copy[offsets_order[i]];
+  }
+  free(offsets_copy);
+
+  // Re-compress the offsets again
+  blosc2_context* cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
+  cctx->typesize = 8;
+  void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
+  int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
+                                               off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
+  blosc2_free_ctx(cctx);
+
+  if (new_off_cbytes < 0) {
+    free(off_chunk);
+    return -1;
+  }
+
+  int64_t new_frame_len = header_len + cbytes + new_off_cbytes + trailer_len;
+
+  FILE* fp = NULL;
+  if (frame->sdata != NULL) {
+    uint8_t* framep = frame->sdata;
+    /* Make space for the new chunk and copy it */
+    frame->sdata = framep = realloc(framep, (size_t)new_frame_len);
+    if (framep == NULL) {
+      fprintf(stderr, "cannot realloc space for the frame.");
+      return -1;
+    }
+    /* Copy the offsets */
+    memcpy(framep + header_len + cbytes, off_chunk, (size_t)new_off_cbytes);
+  } else {
+    // fileframe
+    fp = fopen(frame->fname, "rb+");
+    fseek(fp, header_len + cbytes, SEEK_SET);
+    size_t wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
+    if (wbytes != (size_t)new_off_cbytes) {
+      fprintf(stderr, "cannot write the offsets to fileframe.");
+      return -1;
+    }
+    fclose(fp);
+    // Invalidate the cache for chunk offsets
+    if (frame->coffsets != NULL) {
+      free(frame->coffsets);
+      frame->coffsets = NULL;
+    }
+  }
+  free(off_chunk);
+
+  frame->len = new_frame_len;
+  int rc = frame_update_header(frame, schunk, false);
+  if (rc < 0) {
+    return -1;
+  }
+
+  rc = frame_update_trailer(frame, schunk);
+  if (rc < 0) {
+    return -1;
+  }
+
+  return 0;
+}
