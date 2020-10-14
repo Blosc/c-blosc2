@@ -1402,7 +1402,7 @@ int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk
     free(off_chunk);
     return -1;
   }
-
+  free(offsets);
   int64_t new_frame_len = header_len + cbytes + new_off_cbytes + trailer_len;
 
   FILE* fp = NULL;

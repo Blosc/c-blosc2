@@ -75,6 +75,9 @@ static char* test_reorder_offsets(void) {
   /* Free resources */
   free(offsets_order);
   blosc2_free_schunk(schunk);
+  if (serialized == true) {
+    blosc2_free_frame(frame);
+  }
   /* Destroy the Blosc environment */
   blosc_destroy();
 
@@ -82,6 +85,7 @@ static char* test_reorder_offsets(void) {
 }
 
 static char *all_tests(void) {
+  /*
   nchunks = 5;
   serialized = false;
   filename = NULL;
@@ -106,7 +110,7 @@ static char *all_tests(void) {
   serialized = true;
   filename = "test_reorder_offsets.b2frame";
   mu_run_test(test_reorder_offsets);
-
+*/
   nchunks = 13;
   serialized = true;
   filename = "test_reorder_offsets.b2frame";

@@ -526,7 +526,8 @@ int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order) {
       return -1;
     }
   }
-
+  free(index_check);
+  
   if (schunk->frame != NULL) {
     return frame_reorder_offsets(schunk->frame, offsets_order, schunk);
   }
