@@ -17,6 +17,8 @@
 /* Global vars */
 int tests_run = 0;
 int nchunks;
+bool serialized;
+char* filename;
 
 
 static char* test_reorder_offsets(void) {
@@ -37,7 +39,12 @@ static char* test_reorder_offsets(void) {
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_frame *frame = blosc2_new_frame(NULL);
+  blosc2_frame *frame;
+  if (serialized == true) {
+    frame = blosc2_new_frame(filename);
+  } else {
+    frame = NULL;
+  }
   schunk = blosc2_new_schunk(cparams, dparams, frame);
 
   // Feed it with data
@@ -76,9 +83,33 @@ static char* test_reorder_offsets(void) {
 
 static char *all_tests(void) {
   nchunks = 5;
+  serialized = false;
+  filename = NULL;
   mu_run_test(test_reorder_offsets);
 
   nchunks = 13;
+  serialized = false;
+  filename = NULL;
+  mu_run_test(test_reorder_offsets);
+
+  nchunks = 44;
+  serialized = true;
+  filename = NULL;
+  mu_run_test(test_reorder_offsets);
+
+  nchunks = 13;
+  serialized = true;
+  filename = NULL;
+  mu_run_test(test_reorder_offsets);
+
+  nchunks = 23;
+  serialized = true;
+  filename = "reorder_offsets.blosc";
+  mu_run_test(test_reorder_offsets);
+
+  nchunks = 13;
+  serialized = true;
+  filename = "reorder_offsets.blosc";
   mu_run_test(test_reorder_offsets);
 
   return EXIT_SUCCESS;

@@ -1398,9 +1398,8 @@ int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk
     return -1;
   }
 
-
   // Make a copy of the chunk offsets and reorder it
-  uint8_t *offsets_copy = malloc(prev_nbytes);
+  int64_t *offsets_copy = malloc(prev_nbytes);
   memcpy(offsets_copy, offsets, prev_nbytes);
 
   for (int i = 0; i < nchunks; ++i) {
