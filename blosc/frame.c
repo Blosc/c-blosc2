@@ -1356,23 +1356,6 @@ int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL, NULL);
 
-  // Check that the offsets order are correct
-  bool *index_check = (bool *) calloc(nchunks, sizeof(bool));
-  for (int i = 0; i < nchunks; ++i) {
-    int index = offsets_order[i];
-    if (index >= nchunks) {
-      fprintf(stderr, "Error: index is bigger than the number of chunks\n");
-      return -1;
-    }
-    if (index_check[index] == false) {
-      index_check[index] = true;
-    } else {
-      fprintf(stderr, "Error: index is yet used\n");
-      return -1;
-    }
-  }
-  free(index_check);
-
   // Get the current offsets and add one more
   int32_t off_nbytes = nchunks * 8;
   int64_t* offsets = (int64_t *) malloc((size_t)off_nbytes);

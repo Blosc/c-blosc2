@@ -22,7 +22,7 @@ char* filename;
 
 
 static char* test_reorder_offsets(void) {
-  static int32_t data[CHUNKSIZE];
+  int32_t data[CHUNKSIZE];
   int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
@@ -104,12 +104,12 @@ static char *all_tests(void) {
 
   nchunks = 23;
   serialized = true;
-  filename = "reorder_offsets.blosc";
+  filename = "test_reorder_offsets.b2frame";
   mu_run_test(test_reorder_offsets);
 
   nchunks = 13;
   serialized = true;
-  filename = "reorder_offsets.blosc";
+  filename = "test_reorder_offsets.b2frame";
   mu_run_test(test_reorder_offsets);
 
   return EXIT_SUCCESS;
