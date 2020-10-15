@@ -106,6 +106,7 @@ static char *all_tests(void) {
   filename = NULL;
   mu_run_test(test_reorder_offsets);
 
+  /*
   nchunks = 23;
   serialized = true;
   filename = "test_reorder_offsets.b2frame";
@@ -115,7 +116,7 @@ static char *all_tests(void) {
   serialized = true;
   filename = "test_reorder_offsets2.b2frame";
   mu_run_test(test_reorder_offsets);
-
+*/
   return EXIT_SUCCESS;
 }
 
