@@ -120,8 +120,8 @@ static char *all_tests(void) {
 #define BUFFER_ALIGN_SIZE   32
 
 int main(void) {
-  data = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t) CHUNKSIZE);
-  data_dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t)CHUNKSIZE);
+  data = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int32_t));
+  data_dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int32_t));
 
   install_blosc_callback_test(); /* optionally install callback test */
   blosc_init();
