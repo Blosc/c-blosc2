@@ -164,4 +164,4 @@ jobs:
     - name: Run test cases
       run: |
         cd ${{ matrix.build-dir || '.' }}
-        ctest -C Release --output-on-failure --max-width 120
+        ctest -C Release --output-on-failure --max-width 120 -R offsets

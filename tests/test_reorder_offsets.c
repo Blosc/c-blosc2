@@ -60,9 +60,9 @@ static char* test_reorder_offsets(void) {
   for (int i = 0; i < nchunks; ++i) {
     offsets_order[i] = (i + 3) % nchunks;
   }
-  /*int err = blosc2_schunk_reorder_offsets(schunk, offsets_order);
+  int err = blosc2_schunk_reorder_offsets(schunk, offsets_order);
   mu_assert("ERROR: can not reorder chunks", err >= 0);
-
+  /*
   // Check that the chunks have been decompressed correctly
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
