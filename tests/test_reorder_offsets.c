@@ -20,10 +20,10 @@ int nchunks;
 bool serialized;
 char* filename;
 
+int32_t *data;
+int32_t *data_dest;
 
 static char* test_reorder_offsets(void) {
-  static int32_t data[CHUNKSIZE];
-  static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -117,15 +117,17 @@ static char *all_tests(void) {
   return EXIT_SUCCESS;
 }
 
+#define BUFFER_ALIGN_SIZE   32
 
 int main(void) {
-  char *result;
+  data = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t) CHUNKSIZE);
+  data_dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t)CHUNKSIZE);
 
   install_blosc_callback_test(); /* optionally install callback test */
   blosc_init();
 
   /* Run all the suite */
-  result = all_tests();
+  char *result = all_tests();
   if (result != EXIT_SUCCESS) {
     printf(" (%s)\n", result);
   }
@@ -133,6 +135,9 @@ int main(void) {
     printf(" ALL TESTS PASSED");
   }
   printf("\tTests run: %d\n", tests_run);
+
+  blosc_test_free(data);
+  blosc_test_free(data_dest);
 
   blosc_destroy();
 
