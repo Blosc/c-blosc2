@@ -22,8 +22,8 @@ char* filename;
 
 
 static char* test_reorder_offsets(void) {
-  int32_t data[CHUNKSIZE];
-  int32_t data_dest[CHUNKSIZE];
+  static int32_t data[CHUNKSIZE];
+  static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -62,7 +62,7 @@ static char* test_reorder_offsets(void) {
   }
   int err = blosc2_schunk_reorder_offsets(schunk, offsets_order);
   mu_assert("ERROR: can not reorder chunks", err >= 0);
-  /*
+
   // Check that the chunks have been decompressed correctly
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
@@ -71,7 +71,7 @@ static char* test_reorder_offsets(void) {
       mu_assert("ERROR: bad roundtrip",data_dest[i] == i + (offsets_order[nchunk]) * CHUNKSIZE);
     }
   }
-*/
+
   /* Free resources */
   free(offsets_order);
   blosc2_free_schunk(schunk);
@@ -103,7 +103,6 @@ static char *all_tests(void) {
   serialized = true;
   filename = NULL;
   mu_run_test(test_reorder_offsets);
-
 
   nchunks = 23;
   serialized = true;
