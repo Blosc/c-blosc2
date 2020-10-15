@@ -75,9 +75,7 @@ static char* test_reorder_offsets(void) {
   /* Free resources */
   free(offsets_order);
   blosc2_free_schunk(schunk);
-  if (serialized == true) {
-    blosc2_free_frame(frame);
-  }
+
   /* Destroy the Blosc environment */
   blosc_destroy();
 
