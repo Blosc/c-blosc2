@@ -17,11 +17,13 @@
 /* Global vars */
 int tests_run = 0;
 int nchunks;
+bool serialized;
+char* filename;
 
+int32_t *data;
+int32_t *data_dest;
 
 static char* test_reorder_offsets(void) {
-  static int32_t data[CHUNKSIZE];
-  static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -37,7 +39,13 @@ static char* test_reorder_offsets(void) {
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams, NULL);
+  blosc2_frame *frame;
+  if (serialized == true) {
+    frame = blosc2_new_frame(filename);
+  } else {
+    frame = NULL;
+  }
+  schunk = blosc2_new_schunk(cparams, dparams, frame);
 
   // Feed it with data
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
@@ -67,6 +75,7 @@ static char* test_reorder_offsets(void) {
   /* Free resources */
   free(offsets_order);
   blosc2_free_schunk(schunk);
+
   /* Destroy the Blosc environment */
   blosc_destroy();
 
@@ -74,24 +83,51 @@ static char* test_reorder_offsets(void) {
 }
 
 static char *all_tests(void) {
+
   nchunks = 5;
+  serialized = false;
+  filename = NULL;
   mu_run_test(test_reorder_offsets);
 
   nchunks = 13;
+  serialized = false;
+  filename = NULL;
+  mu_run_test(test_reorder_offsets);
+
+  nchunks = 44;
+  serialized = true;
+  filename = NULL;
+  mu_run_test(test_reorder_offsets);
+
+  nchunks = 13;
+  serialized = true;
+  filename = NULL;
+  mu_run_test(test_reorder_offsets);
+
+  nchunks = 23;
+  serialized = true;
+  filename = "test_reorder_offsets.b2frame";
+  mu_run_test(test_reorder_offsets);
+
+  nchunks = 13;
+  serialized = true;
+  filename = "test_reorder_offsets2.b2frame";
   mu_run_test(test_reorder_offsets);
 
   return EXIT_SUCCESS;
 }
 
+#define BUFFER_ALIGN_SIZE   32
 
 int main(void) {
-  char *result;
+  data = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int32_t));
+  data_dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int32_t));
 
   install_blosc_callback_test(); /* optionally install callback test */
   blosc_init();
 
   /* Run all the suite */
-  result = all_tests();
+  char *result = all_tests();
   if (result != EXIT_SUCCESS) {
     printf(" (%s)\n", result);
   }
@@ -99,6 +135,9 @@ int main(void) {
     printf(" ALL TESTS PASSED");
   }
   printf("\tTests run: %d\n", tests_run);
+
+  blosc_test_free(data);
+  blosc_test_free(data_dest);
 
   blosc_destroy();
 

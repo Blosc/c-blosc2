@@ -511,8 +511,6 @@ int blosc2_has_metalayer(blosc2_schunk *schunk, const char *name) {
 
 /* Reorder the chunk offsets of an existing super-chunk. */
 int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order) {
-  uint8_t **offsets = schunk->data;
-
   // Check that the offsets order are correct
   bool *index_check = (bool *) calloc(schunk->nchunks, sizeof(bool));
   for (int i = 0; i < schunk->nchunks; ++i) {
@@ -529,6 +527,11 @@ int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order) {
     }
   }
   free(index_check);
+  
+  if (schunk->frame != NULL) {
+    return frame_reorder_offsets(schunk->frame, offsets_order, schunk);
+  }
+  uint8_t **offsets = schunk->data;
 
   // Make a copy of the chunk offsets and reorder it
   uint8_t **offsets_copy = malloc(schunk->data_len);
