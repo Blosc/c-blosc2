@@ -45,6 +45,8 @@ Right now (August 2019), the next features are already implemented (although the
 Actions to be done
 ------------------
 
+* Sparse storage support for super-chunks.  This means that each chunk will be stored in a separate file, and the metadata will be stored on its own files too.  This would be the counterpart of in-memory super-chunk, and will allow for more efficient updates than in frames.
+
 * Plugin capabilities for allowing users to add more filters and codecs.  There should also be a plugin register capability so that the info about the new filters and codecs can be persistent and propagated to different machines.
 
 * Checksums: the frame can benefit from having a checksum per every chunk/index/metalayer.  This will provide more safety towards frames that are damaged for whatever reason.  Also, this would provide better feedback when trying to determine the parts of the frame that are corrupted.  Candidates for checksums can be the xxhash32 or xxhash64, depending on the gaols (to be decided).
