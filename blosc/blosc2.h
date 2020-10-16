@@ -906,8 +906,10 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
  * the contents included in the schunk.
  */
 typedef struct {
-    bool sparse;  //!< Whether the chunks are sparse or sequential (frame)
-    char* path;   //!< The path for storage; if NULL, that means in-memory
+    bool sparse;
+    //!< Whether the chunks are sparse or sequential (frame).
+    char* path;
+    //!< The path for persistent storage. If NULL, that means in-memory.
 } blosc2_storage;
 
 /**

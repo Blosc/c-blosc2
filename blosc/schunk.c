@@ -102,6 +102,10 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
 
   schunk->frame = frame;
   if (frame != NULL) {
+    schunk->storage->sparse = false;
+    if (frame->fname != NULL) {
+      schunk->storage->path = frame->fname;
+    }
     if (frame->len == 0) {
       // Initialize frame (basically, encode the header)
       int64_t frame_len = blosc2_schunk_to_frame(schunk, frame);
@@ -126,7 +130,11 @@ blosc2_schunk *blosc2_empty_schunk(blosc2_cparams cparams, blosc2_dparams dparam
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
 
   if (storage->sparse == false) {
-    fprintf(stderr, "Creating empty frames is not allowed yet\n");
+    fprintf(stderr, "Creating empty frames is not supported yet\n");
+    return NULL;
+  }
+  else if (storage->path != NULL) {
+    fprintf(stderr, "Creating empty schunks on-disk is not supported yet\n");
     return NULL;
   }
   schunk->frame = NULL;
