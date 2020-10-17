@@ -706,7 +706,7 @@ static bool get_run(const uint8_t* ip, const uint8_t* ip_bound) {
 
 /* Shuffle & compress a single block */
 static int blosc_c(struct thread_context* thread_context, int32_t bsize,
-                   int32_t leftoverblock, int32_t ntbytes, int32_t maxbytes,
+                   int32_t leftoverblock, int32_t ntbytes, int32_t destsize,
                    const uint8_t* src, const int32_t offset, uint8_t* dest,
                    uint8_t* tmp, uint8_t* tmp2) {
   blosc2_context* context = thread_context->parent_context;
@@ -772,6 +772,10 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     if (get_run(ip, ipbound)) {
       // A run.  Encode the repeated byte as a negative length in the length of the split.
       int32_t value = _src[j * neblock];
+      if (ntbytes > destsize) {
+        /* Not enough space to write out compressed block size */
+        return -1;
+      }
       _sw32(dest - 4, -value);
       continue;
     }
@@ -782,9 +786,9 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       maxout = (int32_t)snappy_max_compressed_length((size_t)neblock);
     }
   #endif /*  HAVE_SNAPPY */
-    if (ntbytes + maxout > maxbytes) {
+    if (ntbytes + maxout > destsize) {
       /* avoid buffer * overrun */
-      maxout = (int64_t)maxbytes - (int64_t)ntbytes;
+      maxout = (int64_t)destsize - (int64_t)ntbytes;
       if (maxout <= 0) {
         return 0;                  /* non-compressible block */
       }
@@ -859,7 +863,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
         /* The compressor has been unable to compress data at all. */
         /* Before doing the copy, check that we are not running into a
            buffer overflow. */
-        if ((ntbytes + neblock) > maxbytes) {
+        if ((ntbytes + neblock) > destsize) {
           return 0;    /* Non-compressible data */
         }
         memcpy(dest, _src + j * neblock, (unsigned int)neblock);
