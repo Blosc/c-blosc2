@@ -1018,18 +1018,20 @@ static int blosc_d(
 
   neblock = bsize / nstreams;
   for (int j = 0; j < nstreams; j++) {
-    srcsize -= sizeof(int32_t);
-    if (srcsize < 0) {
+    if (srcsize < sizeof(int32_t)) {
       /* Not enough input to read compressed size */
       return -1;
     }
+    srcsize -= sizeof(int32_t);
     cbytes = sw32_(src);      /* amount of compressed bytes */
-    src += sizeof(int32_t);
-    srcsize -= cbytes;
-    if (srcsize < 0) {
-      /* Not enough input to read compressed bytes */
-      return -1;
+    if (cbytes > 0) {
+      if (srcsize < cbytes) {
+        /* Not enough input to read compressed bytes */
+        return -1;
+      }
+      srcsize -= cbytes;
     }
+    src += sizeof(int32_t);
     ctbytes += (int32_t)sizeof(int32_t);
 
     /* Uncompress */
@@ -1575,11 +1577,11 @@ static int initialize_context_decompression(blosc2_context* context, const void*
 
   context->bstarts = (int32_t*)(context->src + bstarts_offset);
   bstarts_end = bstarts_offset + (context->nblocks * sizeof(int32_t));
-  srcsize -= bstarts_end;
-  if (srcsize < 0) {
+  if (srcsize < bstarts_end) {
     /* Not enough input to read entire `bstarts` section */
     return -1;
   }
+  srcsize -= bstarts_end;
 
   /* Read optional dictionary if flag set */
   if (blosc2_flags & BLOSC2_USEDICT) {
@@ -1589,22 +1591,22 @@ static int initialize_context_decompression(blosc2_context* context, const void*
       // Free the existing dictionary (probably from another chunk)
       ZSTD_freeDDict(context->dict_ddict);
     }
-    srcsize -= sizeof(int32_t);
     // The trained dictionary is after the bstarts block
-    if (srcsize < 0) {
+    if (srcsize < sizeof(int32_t)) {
       /* Not enough input to size of dictionary */
       return -1;
     }
+    srcsize -= sizeof(int32_t);
     context->dict_size = (size_t)sw32_(context->src + bstarts_end);
     if (context->dict_size <= 0 || context->dict_size > BLOSC2_MAXDICTSIZE) {
       /* Dictionary size is smaller than minimum or larger than maximum allowed */
       return -1;
     }
-    srcsize -= context->dict_size;
-    if (srcsize < 0) {
+    if (srcsize < (int32_t)context->dict_size) {
       /* Not enough input to read entire dictionary */
       return -1;
     }
+    srcsize -= context->dict_size;
     context->dict_buffer = (void*)(context->src + bstarts_end + sizeof(int32_t));
     context->dict_ddict = ZSTD_createDDict(context->dict_buffer, context->dict_size);
 #endif   // HAVE_ZSTD
@@ -1868,7 +1870,7 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
 
 #ifdef HAVE_ZSTD
     // Build the dictionary out of the filters outcome and compress with it
-    size_t dict_maxsize = BLOSC2_MAXDICTSIZE;
+    int32_t dict_maxsize = BLOSC2_MAXDICTSIZE;
     // Do not make the dict more than 5% larger than uncompressed buffer
     if (dict_maxsize > srcsize / 20) {
       dict_maxsize = srcsize / 20;
@@ -2126,7 +2128,7 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
       return -1;
     }
     // Check that we have enough space in destination for the copy operation
-    if (destsize < (size_t)ntbytes) {
+    if (destsize < ntbytes) {
       return -1;
     }
     memcpy(dest, _src + BLOSC_MAX_OVERHEAD, (unsigned int)ntbytes);
@@ -2549,7 +2551,7 @@ static void t_blosc_do_job(void *ctxt)
         }
       }
       else {
-        if (srcsize < BLOSC_MAX_OVERHEAD + (sizeof(int32_t) * nblocks)) {
+        if (srcsize < (int32_t)(BLOSC_MAX_OVERHEAD + (sizeof(int32_t) * nblocks))) {
           /* Not enough input to read all `bstarts` */
           cbytes = -1;
         } else {
