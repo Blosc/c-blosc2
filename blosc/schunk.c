@@ -95,8 +95,17 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
   dparams.schunk = schunk;
   schunk->dctx = blosc2_create_dctx(dparams);
 
+  // Storage info.  We use defaults here because we don't want to break
+  // the existing `blosc2_new_schunk()` API.
+  schunk->storage = (blosc2_storage*)malloc(sizeof(blosc2_storage));
+  memcpy(schunk->storage, &BLOSC2_STORAGE_DEFAULTS, sizeof(blosc2_storage));
+
   schunk->frame = frame;
   if (frame != NULL) {
+    schunk->storage->sparse = false;
+    if (frame->fname != NULL) {
+      schunk->storage->path = frame->fname;
+    }
     if (frame->len == 0) {
       // Initialize frame (basically, encode the header)
       int64_t frame_len = blosc2_schunk_to_frame(schunk, frame);
@@ -112,13 +121,23 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
 
 /* Create an empty super-chunk */
 blosc2_schunk *blosc2_empty_schunk(blosc2_cparams cparams, blosc2_dparams dparams, int nchunks,
-                                 blosc2_frame* frame) {
-  if (frame != NULL) {
-    fprintf(stderr, "Creating empty frames is not allowwed yet\n");
-    return NULL;
+                                   blosc2_storage* storage) {
+  if (storage == NULL) {
+    storage = (blosc2_storage*)malloc(sizeof(blosc2_storage));
+    memcpy(storage, &BLOSC2_STORAGE_DEFAULTS, sizeof(blosc2_storage));
   }
 
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
+
+  if (storage->sparse == false) {
+    fprintf(stderr, "Creating empty frames is not supported yet\n");
+    return NULL;
+  }
+  else if (storage->path != NULL) {
+    fprintf(stderr, "Creating empty schunks on-disk is not supported yet\n");
+    return NULL;
+  }
+  schunk->frame = NULL;
 
   schunk->version = 0;     // pre-first version
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
@@ -137,8 +156,6 @@ blosc2_schunk *blosc2_empty_schunk(blosc2_cparams cparams, blosc2_dparams dparam
   // The decompression context
   dparams.schunk = schunk;
   schunk->dctx = blosc2_create_dctx(dparams);
-
-  schunk->frame = frame;
 
   // Init offsets
   schunk->nchunks = nchunks;
@@ -171,6 +188,10 @@ int blosc2_free_schunk(blosc2_schunk *schunk) {
       free(schunk->metalayers[i]);
     }
     schunk->nmetalayers = 0;
+  }
+
+  if (schunk->storage != NULL) {
+    free(schunk->storage);
   }
 
   if (schunk->usermeta_len > 0) {

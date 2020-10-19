@@ -900,6 +900,23 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 #define BLOSC2_MAX_METALAYERS 16
 #define BLOSC2_METALAYER_NAME_MAXLEN 31
 
+/**
+ * @brief This struct is meant for holding storage parameters for a
+ * for a blosc2 container, allowing to specify, for example, how to interpret
+ * the contents included in the schunk.
+ */
+typedef struct {
+    bool sparse;
+    //!< Whether the chunks are sparse or sequential (frame).
+    char* path;
+    //!< The path for persistent storage. If NULL, that means in-memory.
+} blosc2_storage;
+
+/**
+ * @brief Default struct for #blosc2_storage meant for user initialization.
+ */
+static const blosc2_storage BLOSC2_STORAGE_DEFAULTS = {true, NULL};
+
 typedef struct {
   char* fname;             //!< The name of the file; if NULL, this is in-memory
   uint8_t* sdata;          //!< The in-memory serialized data
@@ -953,6 +970,8 @@ typedef struct blosc2_schunk {
   //!< Pointer to chunk data pointers buffer.
   size_t data_len;
   //!< Length of the chunk data pointers buffer.
+  blosc2_storage* storage;
+  //!< Pointer to storage info.
   blosc2_frame* frame;
   //!< Pointer to frame used as store for chunks.
   //!<uint8_t* ctx;
@@ -994,7 +1013,8 @@ blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams, blosc2_frame *
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk *
-blosc2_empty_schunk(blosc2_cparams cparams, blosc2_dparams dparams, int nchunks, blosc2_frame *frame);
+blosc2_empty_schunk(blosc2_cparams cparams, blosc2_dparams dparams, int nchunks,
+                    blosc2_storage *storage);
 
 /**
  * @brief Release resources from a super-chunk.

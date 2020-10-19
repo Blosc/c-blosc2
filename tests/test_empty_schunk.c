@@ -44,20 +44,9 @@ static char* test_schunk(void) {
   blosc2_add_metalayer(schunk, "metalayer1", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
   blosc2_add_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
 
-  uint8_t *chunk_aux;
   bool needs_free;
-  cbytes = blosc2_schunk_get_chunk(schunk, nchunks / 2, &chunk_aux, &needs_free);
-  mu_assert("ERROR: chunk cannot be retrieved correctly.\n", cbytes == 0);
-  if (needs_free) {
-    free(chunk_aux);
-  }
   int32_t datasize = sizeof(int32_t) * CHUNKSIZE;
   int32_t chunksize = sizeof(int32_t) * CHUNKSIZE + BLOSC_MAX_OVERHEAD;
-
-  chunk_aux = malloc(chunksize);
-  nbytes = blosc2_schunk_decompress_chunk(schunk, nchunks / 2, &chunk_aux, chunksize);
-  mu_assert("ERROR: chunk cannot be retrieved correctly.\n", nbytes == 0);
-  free(chunk_aux);
 
   // Feed it with data
   uint8_t *chunk;
@@ -150,6 +139,10 @@ static char* test_schunk(void) {
 }
 
 static char *all_tests(void) {
+  nchunks = 0;
+  copy = true;
+  mu_run_test(test_schunk);
+
   nchunks = 6;
   copy = true;
   mu_run_test(test_schunk);
