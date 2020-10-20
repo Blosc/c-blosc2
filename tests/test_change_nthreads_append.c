@@ -45,7 +45,8 @@ static char* all_tests(void) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams, NULL);
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
+  schunk = blosc2_schunk_new(storage);
 
   struct blosc2_context_s * cctx = schunk->cctx;
   blosc_set_timestamp(&last);
@@ -90,7 +91,7 @@ static char* all_tests(void) {
   printf("Successful roundtrip!\n");
 
   /* Free resources */
-  blosc2_free_schunk(schunk);
+  blosc2_schunk_free(schunk);
 
   return 0;
 }

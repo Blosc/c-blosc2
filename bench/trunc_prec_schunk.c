@@ -142,7 +142,7 @@ int main(void) {
   free(data_buffer);
   free(rec_buffer);
   /* Destroy the super-chunk */
-  blosc2_free_schunk(schunk);
+  blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
 

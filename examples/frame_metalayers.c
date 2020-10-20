@@ -58,7 +58,8 @@ int main(void) {
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
-  blosc2_schunk* schunk = blosc2_new_schunk(cparams, dparams, &(blosc2_storage){.sequential=true});
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams, .sequential=true};
+  blosc2_schunk* schunk = blosc2_schunk_new(storage);
   blosc2_frame* frame1 = schunk->frame;
 
   // Add some metalayers (one must add metalayers prior to actual data)
@@ -107,8 +108,11 @@ int main(void) {
 
   // fileframe (file) -> schunk2 (schunk based on a on-disk frame)
   blosc_set_timestamp(&last);
-  blosc2_frame* frame2 = blosc2_frame_from_file("frame_metalayers.b2frame");
-  blosc2_schunk* schunk2 = blosc2_schunk_from_frame(frame2, false);
+  //blosc2_frame* frame2 = blosc2_frame_from_file("frame_metalayers.b2frame");
+  //blosc2_schunk* schunk2 = blosc2_schunk_from_frame(frame2, false);
+  blosc2_storage storage2 = {.cparams=&cparams, .dparams=&dparams, .sequential=true,
+                             .path="frame_metalayers.b2frame"};
+  blosc2_schunk* schunk2 = blosc2_schunk_open(storage2);
   if (schunk2 == NULL) {
     printf("Cannot get the schunk from frame2");
     return -1;
@@ -116,7 +120,7 @@ int main(void) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for fileframe (%s) -> schunk : %.3g s, %.1f GB/s\n",
-         frame2->fname, ttotal, nbytes / (ttotal * GB));
+         schunk2->storage->path, ttotal, nbytes / (ttotal * GB));
 
   // Check that the metalayers had a good roundtrip
   if (schunk2->nmetalayers != 2) {
@@ -136,10 +140,9 @@ int main(void) {
   free(content);
 
   /* Free resources */
-  blosc2_free_schunk(schunk);
-  blosc2_free_schunk(schunk2);
+  blosc2_schunk_free(schunk);
+  blosc2_schunk_free(schunk2);
   blosc2_free_frame(frame1);
-  blosc2_free_frame(frame2);
 
   return 0;
 }

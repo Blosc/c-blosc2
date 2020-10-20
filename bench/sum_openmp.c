@@ -236,7 +236,7 @@ int main(void) {
     assert(sum == compressed_sum);
   }
   /* Free resources */
-  blosc2_free_schunk(schunk);
+  blosc2_schunk_free(schunk);
 
   return 0;
 }

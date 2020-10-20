@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
          ttotal, nbytes / (ttotal * MB));
 
   /* Free resources */
-  blosc2_free_schunk(schunk);
+  blosc2_schunk_free(schunk);
 
   return 0;
 }

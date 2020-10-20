@@ -95,6 +95,11 @@ blosc2_dparams* get_dparams(const blosc2_storage storage, blosc2_dparams default
 blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
   schunk->storage = (blosc2_storage*)malloc(sizeof(blosc2_storage));
+  if (storage.path != NULL) {
+    size_t pathlen = strlen(storage.path);
+    schunk->storage->path = malloc(pathlen);
+    strcpy(schunk->storage->path, storage.path);
+  }
   memcpy(schunk->storage, &storage, sizeof(blosc2_storage));
   blosc2_cparams* cparams = get_cparams(storage, BLOSC2_CPARAMS_DEFAULTS);
   schunk->storage->cparams = (blosc2_cparams*)malloc(sizeof(blosc2_cparams));
