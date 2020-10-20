@@ -34,11 +34,11 @@ static char* test_schunk(void) {
 
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
-  cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams, NULL);
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
+  schunk = blosc2_schunk_new(storage);
 
   // Add a couple of metalayers
   blosc2_add_metalayer(schunk, "metalayer1", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
@@ -110,7 +110,7 @@ static char* test_schunk(void) {
   free(content2);
 
   /* Free resources */
-  blosc2_free_schunk(schunk);
+  blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
 

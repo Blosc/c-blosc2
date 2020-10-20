@@ -202,6 +202,30 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
 }
 
 
+/* Open an existing super-chunk that is on-disk (no copy is made). */
+blosc2_schunk* blosc2_schunk_open(const blosc2_storage storage) {
+  if (!storage.sequential) {
+    fprintf(stderr, "Opening sparse data is not supported yet\n");
+    return NULL;
+  }
+  if (storage.path == NULL) {
+    fprintf(stderr, "You need to supply a storage.path\n");
+    return NULL;
+  }
+  blosc2_frame* frame = blosc2_frame_from_file(storage.path);
+  blosc2_schunk* schunk = blosc2_schunk_from_frame(frame, false);
+  return schunk;
+}
+
+
+/* Create a super-chunk out of a serialized frame (no copy is made). */
+blosc2_schunk* blosc2_schunk_from_memframe(uint8_t *memframe, int64_t len) {
+  blosc2_frame* frame = blosc2_frame_from_sframe(memframe, len, false);
+  blosc2_schunk* schunk = blosc2_schunk_from_frame(frame, false);
+  return schunk;
+}
+
+
 /* Append an existing chunk into a super-chunk. */
 int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy) {
   int32_t nchunks = schunk->nchunks;

@@ -31,6 +31,7 @@ bool metalayers;
 bool usermeta;
 bool check_sframe;
 char *fname;
+char buf[256];
 
 
 static char* test_frame(void) {
@@ -52,13 +53,11 @@ static char* test_frame(void) {
 
   /* Create a frame container */
   cparams.typesize = sizeof(int32_t);
-  cparams.compcode = BLOSC_BLOSCLZ;
-  cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.sequential=true, .path=fname, .cparams=&cparams, .dparams=&dparams};
-  schunk = blosc2_schunk_new(&storage);
-  blosc2_frame* frame = schunk->frame;
+  schunk = blosc2_schunk_new(storage);
+  mu_assert("blosc2_schunk_new() failed", schunk != NULL);
   char* content = "This is a pretty long string with a good number of chars";
   char* content2 = "This is a pretty long string with a good number of chars; longer than content";
   char* content3 = "This is a short string, and shorter than content";
@@ -80,17 +79,17 @@ static char* test_frame(void) {
     if (free_new) {
       if (fname != NULL) {
         blosc2_schunk_free(schunk);
-        frame = blosc2_frame_from_file(fname);
-        schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
+        blosc2_storage storage2 = {.sequential=true, .path=fname};
+        schunk = blosc2_schunk_open(storage2);
+        mu_assert("blosc2_schunk_open() failed", schunk != NULL);
       } else {
+        blosc2_frame* frame = schunk->frame;
+        int64_t len = frame->len;
+        uint8_t *sframe = malloc(len);
+        memcpy(sframe, frame->sdata, frame->len);
         blosc2_schunk_free(schunk);
-        if (check_sframe) {
-          int64_t len = frame->len;
-          uint8_t *sframe = malloc(len);
-          memcpy(sframe, frame->sdata, frame->len);
-          frame = blosc2_frame_from_sframe(sframe, len, false);
-        }
-        schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
+        schunk = blosc2_schunk_from_memframe(sframe, len);
+        mu_assert("blosc2_schunk_from_memframe() failed", schunk != NULL);
       }
     }
   }
@@ -100,10 +99,14 @@ static char* test_frame(void) {
     uint32_t _content_len;
     blosc2_get_metalayer(schunk, "metalayer1", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
-    free(_content);
+    if (_content != NULL) {
+      free(_content);
+    }
     blosc2_get_metalayer(schunk, "metalayer2", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
-    free(_content);
+    if (_content != NULL) {
+      free(_content);
+    }
   }
 
   if (usermeta) {
@@ -126,6 +129,7 @@ static char* test_frame(void) {
   mu_assert("ERROR: wrong number of append chunks", _nchunks == nchunks);
 
   if (!sparse_schunk) {
+    blosc2_frame* frame = schunk->frame;
     mu_assert("ERROR: frame->len must be larger or equal than schunk->cbytes",
               frame->len >= schunk->cbytes + FRAME_HEADER_MINLEN);
   }
@@ -135,10 +139,14 @@ static char* test_frame(void) {
     uint32_t _content_len;
     blosc2_get_metalayer(schunk, "metalayer1", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
-    free(_content);
+    if (_content != NULL) {
+      free(_content);
+    }
     blosc2_get_metalayer(schunk, "metalayer2", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
-    free(_content);
+    if (_content != NULL) {
+      free(_content);
+    }
     blosc2_update_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer2", sizeof("my metalayer2"));
   }
 
@@ -154,18 +162,15 @@ static char* test_frame(void) {
     if (free_new) {
       if (fname != NULL) {
         blosc2_schunk_free(schunk);
-        frame = blosc2_frame_from_file(fname);
-        schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
+        blosc2_storage storage2 = {.sequential=true, .path=fname};
+        schunk = blosc2_schunk_open(storage2);
       } else {
+        blosc2_frame* frame = schunk->frame;
+        int64_t len = frame->len;
+        uint8_t *sframe = malloc(len);
+        memcpy(sframe, frame->sdata, frame->len);
         blosc2_schunk_free(schunk);
-        if (check_sframe) {
-          int64_t len = frame->len;
-          uint8_t *sframe = malloc(len);
-          memcpy(sframe, frame->sdata, frame->len);
-          frame = blosc2_frame_from_sframe(sframe, len, true);
-          free(sframe);
-        }
-        schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
+        schunk = blosc2_schunk_from_memframe(sframe, len);
       }
     }
   }
@@ -191,10 +196,14 @@ static char* test_frame(void) {
     uint32_t _content_len;
     blosc2_get_metalayer(schunk, "metalayer1", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
-    free(_content);
+    if (_content != NULL) {
+      free(_content);
+    }
     blosc2_get_metalayer(schunk, "metalayer2", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer2", _content_len) == 0);
-    free(_content);
+    if (_content != NULL) {
+      free(_content);
+    }
   }
 
   if (usermeta) {
@@ -216,7 +225,6 @@ static char* test_frame(void) {
 static char *all_tests(void) {
 
   // Iterate over all different parameters
-  char buf[256];
   for (int i = 0; i < (int)sizeof(nchunks_) / (int)sizeof(int); i++) {
     nchunks = nchunks_[i];
     for (int ifree_new = 0; ifree_new < 2; ifree_new++) {
@@ -224,19 +232,16 @@ static char *all_tests(void) {
         for (int ifilter_pipeline = 0; ifilter_pipeline < 2; ifilter_pipeline++) {
           for (int imetalayers = 0; imetalayers < 2; imetalayers++) {
             for (int iusermeta = 0; iusermeta < 2; iusermeta++) {
-              for (int icheck_sframe = 0; icheck_sframe < 2; icheck_sframe++) {
-                check_sframe = (bool) icheck_sframe;
-                sparse_schunk = (bool) isparse_schunk;
-                free_new = (bool) ifree_new;
-                filter_pipeline = (bool) ifilter_pipeline;
-                metalayers = (bool) imetalayers;
-                usermeta = (bool) iusermeta;
-                fname = NULL;
-                mu_run_test(test_frame);
-                snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
-                fname = buf;
-                mu_run_test(test_frame);
-              }
+              sparse_schunk = (bool) isparse_schunk;
+              free_new = (bool) ifree_new;
+              filter_pipeline = (bool) ifilter_pipeline;
+              metalayers = (bool) imetalayers;
+              usermeta = (bool) iusermeta;
+              fname = NULL;
+              mu_run_test(test_frame);
+              snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
+              fname = buf;
+              mu_run_test(test_frame);
             }
           }
         }

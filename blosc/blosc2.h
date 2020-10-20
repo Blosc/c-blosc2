@@ -1018,15 +1018,24 @@ BLOSC_EXPORT blosc2_schunk *
 blosc2_schunk_empty(int nchunks, const blosc2_storage storage);
 
 /**
- * @brief Open an existing super-chunk, either on-disk or in-memory.
+ * @brief Open an existing super-chunk that is on-disk (no copy is made).
  *
  * @param storage The storage properties of the source.
- * @param sframe An in-memory serial frame buffer.
  *
- * @return The handle to the super-chunk.
+ * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk *
-blosc2_schunk_open(const blosc2_storage *storage);
+blosc2_schunk_open(const blosc2_storage storage);
+
+/**
+ * @brief Create a super-chunk out of a serialized frame (no copy is made).
+ *
+ * @param memframe The buffer of the serialized frame.
+ * @param len The length of buffer of the serialized frame (in bytes).
+ *
+ * @return The new super-chunk.
+ */
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_memframe(uint8_t *memframe, int64_t len);
 
 /**
  * @brief Release resources from a super-chunk.
