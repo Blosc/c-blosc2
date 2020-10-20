@@ -19,7 +19,6 @@
  */
 
 #include <stdio.h>
-#include <assert.h>
 #include <blosc2.h>
 
 #define KB  1024.
@@ -48,7 +47,7 @@ int main(int argc, char* argv[]) {
   /* Create a super-chunk container */
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = 1;
-  cparams.compcode = BLOSC_LZ4;
+  cparams.compcode = BLOSC_BLOSCLZ;
   //cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
@@ -56,8 +55,8 @@ int main(int argc, char* argv[]) {
   dparams.nthreads = NTHREADS;
 
   /* Create a super-chunk backed by an in-memory frame */
-  blosc2_frame* frame1 = blosc2_new_frame(argv[2]);
-  blosc2_schunk* schunk = blosc2_new_schunk(cparams, dparams, frame1);
+  blosc2_storage storage = {.sequential=true, .path=argv[2]};
+  blosc2_schunk* schunk = blosc2_new_schunk(cparams, dparams, &storage);
 
   // Compress the file
   blosc_set_timestamp(&last);
@@ -85,7 +84,6 @@ int main(int argc, char* argv[]) {
 
   /* Free resources */
   blosc2_free_schunk(schunk);
-  blosc2_free_frame(frame1);
 
   return 0;
 }

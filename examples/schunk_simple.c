@@ -35,7 +35,7 @@ int main(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
-  int dsize = 0;
+  int dsize;
   int64_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
@@ -48,12 +48,12 @@ int main(void) {
 
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
-  cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
-  cparams.compcode = BLOSC_LZ4;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams, NULL);
+  blosc2_storage storage = BLOSC2_STORAGE_DEFAULTS;
+  storage.cparams = &cparams;
+  schunk = blosc2_schunk_new(&storage);
 
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
@@ -104,7 +104,7 @@ int main(void) {
 
   /* Free resources */
   /* Destroy the super-chunk */
-  blosc2_free_schunk(schunk);
+  blosc2_schunk_free(schunk);
 
   return 0;
 }

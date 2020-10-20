@@ -70,49 +70,74 @@ int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams) {
   return 0;
 }
 
+blosc2_cparams* get_cparams(const blosc2_storage* storage, blosc2_cparams defaults) {
+  blosc2_cparams *cparams = malloc(sizeof(blosc2_cparams));
+  if (storage->cparams != NULL) {
+    memcpy(cparams, storage->cparams, sizeof(blosc2_cparams));
+  } else {
+    memcpy(cparams, &defaults, sizeof(blosc2_cparams));
+  }
+  return cparams;
+}
+
+blosc2_dparams* get_dparams(const blosc2_storage* storage, blosc2_dparams defaults) {
+  blosc2_dparams* dparams = malloc(sizeof(blosc2_dparams));
+  if (storage->dparams != NULL) {
+    memcpy(dparams, storage->dparams, sizeof(blosc2_dparams));
+  }
+  else {
+    memcpy(dparams, &defaults, sizeof(blosc2_dparams));
+  }
+  return dparams;
+}
 
 /* Create a new super-chunk */
-blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
-                                 blosc2_frame* frame) {
+blosc2_schunk *blosc2_schunk_new(const blosc2_storage* storage) {
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
+  if (storage == NULL) {
+    storage = (blosc2_storage*)&BLOSC2_STORAGE_DEFAULTS;
+  }
+  schunk->storage = (blosc2_storage*)malloc(sizeof(blosc2_storage));
+  memcpy(schunk->storage, storage, sizeof(blosc2_storage));
+  blosc2_cparams* cparams = get_cparams(storage, BLOSC2_CPARAMS_DEFAULTS);
+  schunk->storage->cparams = (blosc2_cparams*)malloc(sizeof(blosc2_cparams));
+  memcpy(schunk->storage->cparams, cparams, sizeof(blosc2_cparams));
+  blosc2_dparams* dparams = get_dparams(storage, BLOSC2_DPARAMS_DEFAULTS);
+  schunk->storage->dparams = (blosc2_dparams*)malloc(sizeof(blosc2_dparams));
+  memcpy(schunk->storage->dparams, dparams, sizeof(blosc2_dparams));
 
   schunk->version = 0;     /* pre-first version */
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
-    schunk->filters[i] = cparams.filters[i];
-    schunk->filters_meta[i] = cparams.filters_meta[i];
+    schunk->filters[i] = cparams->filters[i];
+    schunk->filters_meta[i] = cparams->filters_meta[i];
   }
-  schunk->compcode = cparams.compcode;
-  schunk->clevel = cparams.clevel;
-  schunk->typesize = cparams.typesize;
-  schunk->blocksize = cparams.blocksize;
+  schunk->compcode = cparams->compcode;
+  schunk->clevel = cparams->clevel;
+  schunk->typesize = cparams->typesize;
+  schunk->blocksize = cparams->blocksize;
   schunk->chunksize = -1;
 
   /* The compression context */
-  cparams.schunk = schunk;
-  schunk->cctx = blosc2_create_cctx(cparams);
+  cparams->schunk = schunk;
+  schunk->cctx = blosc2_create_cctx(*cparams);
 
   /* The decompression context */
-  dparams.schunk = schunk;
-  schunk->dctx = blosc2_create_dctx(dparams);
+  dparams->schunk = schunk;
+  schunk->dctx = blosc2_create_dctx(*dparams);
 
-  // Storage info.  We use defaults here because we don't want to break
-  // the existing `blosc2_new_schunk()` API.
-  schunk->storage = (blosc2_storage*)malloc(sizeof(blosc2_storage));
-  memcpy(schunk->storage, &BLOSC2_STORAGE_DEFAULTS, sizeof(blosc2_storage));
-
-  schunk->frame = frame;
-  if (frame != NULL) {
-    schunk->storage->sparse = false;
-    if (frame->fname != NULL) {
-      schunk->storage->path = frame->fname;
+  if (storage->sequential) {
+    // We want a frame as storage
+    blosc2_frame* frame = blosc2_new_frame(storage->path);
+    // Initialize frame (basically, encode the header)
+    int64_t frame_len = blosc2_schunk_to_frame(schunk, frame);
+    if (frame_len < 0) {
+      fprintf(stderr, "Error during the conversion of schunk to frame\n");
     }
-    if (frame->len == 0) {
-      // Initialize frame (basically, encode the header)
-      int64_t frame_len = blosc2_schunk_to_frame(schunk, frame);
-      if (frame_len < 0) {
-        fprintf(stderr, "Error during the conversion of schunk to frame\n");
-      }
-    }
+    schunk->frame = frame;
+  }
+  else if (storage->path != NULL) {
+    fprintf(stderr, "Creating empty schunks on-disk is not supported yet\n");
+    return NULL;
   }
 
   return schunk;
@@ -120,42 +145,12 @@ blosc2_schunk *blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams,
 
 
 /* Create an empty super-chunk */
-blosc2_schunk *blosc2_empty_schunk(blosc2_cparams cparams, blosc2_dparams dparams, int nchunks,
-                                   blosc2_storage* storage) {
-  if (storage == NULL) {
-    storage = (blosc2_storage*)malloc(sizeof(blosc2_storage));
-    memcpy(storage, &BLOSC2_STORAGE_DEFAULTS, sizeof(blosc2_storage));
-  }
-
-  blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
-
-  if (storage->sparse == false) {
+blosc2_schunk *blosc2_schunk_empty(int nchunks, const blosc2_storage* storage) {
+  blosc2_schunk* schunk = blosc2_schunk_new(storage);
+  if (storage->sequential == true) {
     fprintf(stderr, "Creating empty frames is not supported yet\n");
     return NULL;
   }
-  else if (storage->path != NULL) {
-    fprintf(stderr, "Creating empty schunks on-disk is not supported yet\n");
-    return NULL;
-  }
-  schunk->frame = NULL;
-
-  schunk->version = 0;     // pre-first version
-  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
-    schunk->filters[i] = cparams.filters[i];
-    schunk->filters_meta[i] = cparams.filters_meta[i];
-  }
-  schunk->compcode = cparams.compcode;
-  schunk->clevel = cparams.clevel;
-  schunk->typesize = cparams.typesize;
-  schunk->blocksize = cparams.blocksize;
-
-  // The compression context
-  cparams.schunk = schunk;
-  schunk->cctx = blosc2_create_cctx(cparams);
-
-  // The decompression context
-  dparams.schunk = schunk;
-  schunk->dctx = blosc2_create_dctx(dparams);
 
   // Init offsets
   schunk->nchunks = nchunks;
@@ -171,7 +166,7 @@ blosc2_schunk *blosc2_empty_schunk(blosc2_cparams cparams, blosc2_dparams dparam
 
 
 /* Free all memory from a super-chunk. */
-int blosc2_free_schunk(blosc2_schunk *schunk) {
+int blosc2_schunk_free(blosc2_schunk *schunk) {
   if (schunk->data != NULL) {
     for (int i = 0; i < schunk->nchunks; i++) {
       free(schunk->data[i]);
@@ -191,7 +186,13 @@ int blosc2_free_schunk(blosc2_schunk *schunk) {
   }
 
   if (schunk->storage != NULL) {
+    free(schunk->storage->cparams);
+    free(schunk->storage->dparams);
     free(schunk->storage);
+  }
+
+  if (schunk->frame != NULL) {
+    blosc2_free_frame(schunk->frame);
   }
 
   if (schunk->usermeta_len > 0) {

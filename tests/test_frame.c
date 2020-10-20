@@ -56,8 +56,9 @@ static char* test_frame(void) {
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_frame* frame = blosc2_new_frame(fname);
-  schunk = blosc2_new_schunk(cparams, dparams, frame);
+  blosc2_storage storage = {.sequential=true, .path=fname, .cparams=&cparams, .dparams=&dparams};
+  schunk = blosc2_schunk_new(&storage);
+  blosc2_frame* frame = schunk->frame;
   char* content = "This is a pretty long string with a good number of chars";
   char* content2 = "This is a pretty long string with a good number of chars; longer than content";
   char* content3 = "This is a short string, and shorter than content";
@@ -78,17 +79,15 @@ static char* test_frame(void) {
   if (!sparse_schunk) {
     if (free_new) {
       if (fname != NULL) {
-        blosc2_free_schunk(schunk);
-        blosc2_free_frame(frame);
+        blosc2_schunk_free(schunk);
         frame = blosc2_frame_from_file(fname);
         schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
       } else {
-        blosc2_free_schunk(schunk);
+        blosc2_schunk_free(schunk);
         if (check_sframe) {
           int64_t len = frame->len;
           uint8_t *sframe = malloc(len);
           memcpy(sframe, frame->sdata, frame->len);
-          blosc2_free_frame(frame);
           frame = blosc2_frame_from_sframe(sframe, len, false);
         }
         schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
@@ -154,17 +153,15 @@ static char* test_frame(void) {
   if (!sparse_schunk) {
     if (free_new) {
       if (fname != NULL) {
-        blosc2_free_schunk(schunk);
-        blosc2_free_frame(frame);
+        blosc2_schunk_free(schunk);
         frame = blosc2_frame_from_file(fname);
         schunk = blosc2_schunk_from_frame(frame, sparse_schunk);
       } else {
-        blosc2_free_schunk(schunk);
+        blosc2_schunk_free(schunk);
         if (check_sframe) {
           int64_t len = frame->len;
           uint8_t *sframe = malloc(len);
           memcpy(sframe, frame->sdata, frame->len);
-          blosc2_free_frame(frame);
           frame = blosc2_frame_from_sframe(sframe, len, true);
           free(sframe);
         }
@@ -208,8 +205,7 @@ static char* test_frame(void) {
   }
 
   /* Free resources */
-  blosc2_free_schunk(schunk);
-  blosc2_free_frame(frame);
+  blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
 

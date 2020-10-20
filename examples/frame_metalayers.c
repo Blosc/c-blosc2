@@ -58,8 +58,8 @@ int main(void) {
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
-  blosc2_frame* frame1 = blosc2_new_frame(NULL);
-  blosc2_schunk* schunk = blosc2_new_schunk(cparams, dparams, frame1);
+  blosc2_schunk* schunk = blosc2_new_schunk(cparams, dparams, &(blosc2_storage){.sequential=true});
+  blosc2_frame* frame1 = schunk->frame;
 
   // Add some metalayers (one must add metalayers prior to actual data)
   blosc2_add_metalayer(schunk, "my_metalayer1", (uint8_t *) "my_content1",

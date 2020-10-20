@@ -906,16 +906,22 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
  * the contents included in the schunk.
  */
 typedef struct {
-    bool sparse;
-    //!< Whether the chunks are sparse or sequential (frame).
+    bool sequential;
+    //!< Whether the chunks are sequential (frame) or sequential.
     char* path;
     //!< The path for persistent storage. If NULL, that means in-memory.
+    blosc2_cparams* cparams;
+    //!< The compression params when creating a schunk.
+    //!< If NULL, sensible defaults are used depending on the context.
+    blosc2_dparams* dparams;
+    //!< The decompression params when creating a schunk.
+    //!< If NULL, sensible defaults are used depending on the context.
 } blosc2_storage;
 
 /**
  * @brief Default struct for #blosc2_storage meant for user initialization.
  */
-static const blosc2_storage BLOSC2_STORAGE_DEFAULTS = {true, NULL};
+static const blosc2_storage BLOSC2_STORAGE_DEFAULTS = {false, NULL, NULL, NULL};
 
 typedef struct {
   char* fname;             //!< The name of the file; if NULL, this is in-memory
@@ -993,28 +999,34 @@ typedef struct blosc2_schunk {
 /**
  * @brief Create a new super-chunk.
  *
- * @param cparams The compression parameters.
- * @param dparams The decompression parameters.
- * @param frame The frame to be used. NULL if not needed.
+ * @param storage The storage properties.
  *
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk *
-blosc2_new_schunk(blosc2_cparams cparams, blosc2_dparams dparams, blosc2_frame *frame);
+blosc2_schunk_new(const blosc2_storage* storage);
 
 /**
  * @brief Create a non-initialized super-chunk.
  *
- * @param cparams The compression parameters.
- * @param dparams The decompression parameters.
  * @param nchunks The number of non-initialized chunks in the super-chunk.
- * @param frame If not NULL, the super-chunk will be backed by this frame object.
+ * @param storage The storage properties.
  *
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk *
-blosc2_empty_schunk(blosc2_cparams cparams, blosc2_dparams dparams, int nchunks,
-                    blosc2_storage *storage);
+blosc2_schunk_empty(int nchunks, const blosc2_storage *storage);
+
+/**
+ * @brief Open an existing super-chunk, either on-disk or in-memory.
+ *
+ * @param storage The storage properties of the source.
+ * @param sframe An in-memory serial frame buffer.
+ *
+ * @return The handle to the super-chunk.
+ */
+BLOSC_EXPORT blosc2_schunk *
+blosc2_schunk_open(const blosc2_storage *storage);
 
 /**
  * @brief Release resources from a super-chunk.
@@ -1023,7 +1035,7 @@ blosc2_empty_schunk(blosc2_cparams cparams, blosc2_dparams dparams, int nchunks,
  *
  * @return 0 if succeeds.
  */
-BLOSC_EXPORT int blosc2_free_schunk(blosc2_schunk *schunk);
+BLOSC_EXPORT int blosc2_schunk_free(blosc2_schunk *schunk);
 
 /**
  * @brief Append an existing @p chunk o a super-chunk.
@@ -1322,7 +1334,7 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len
  * @brief Create a super-chunk from a frame.
  *
  * @param frame The frame from which the super-chunk will be created.
- * @param copy If true, a new, sparse in-memory super-chunk is created.
+ * @param copy If true, a new, sequential in-memory super-chunk is created.
  * Else, a frame-backed one is created (i.e. no copies are made)
  *
  * @return The super-chunk corresponding to the frame.

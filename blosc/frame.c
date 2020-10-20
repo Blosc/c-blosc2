@@ -1002,7 +1002,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
     return NULL;
   }
 
-  // We want the sparse schunk, so create the actual data chunks (and, while doing this,
+  // We want the sequential schunk, so create the actual data chunks (and, while doing this,
   // get a guess at the blocksize used in this frame)
   schunk->data = malloc(nchunks * sizeof(void*));
   int64_t acc_nbytes = 0;

@@ -39,13 +39,13 @@ static char* test_reorder_offsets(void) {
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_frame *frame;
-  if (serialized == true) {
-    frame = blosc2_new_frame(filename);
-  } else {
-    frame = NULL;
+  blosc2_storage storage = BLOSC2_STORAGE_DEFAULTS;
+  if (serialized) {
+    // Only frame serialization is supported right now
+    storage.sequential = true;
+    storage.path = filename;
   }
-  schunk = blosc2_new_schunk(cparams, dparams, frame);
+  schunk = blosc2_new_schunk(cparams, dparams, &storage);
 
   // Feed it with data
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
