@@ -1004,7 +1004,7 @@ typedef struct blosc2_schunk {
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk *
-blosc2_schunk_new(const blosc2_storage* storage);
+blosc2_schunk_new(const blosc2_storage storage);
 
 /**
  * @brief Create a non-initialized super-chunk.
@@ -1015,7 +1015,7 @@ blosc2_schunk_new(const blosc2_storage* storage);
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk *
-blosc2_schunk_empty(int nchunks, const blosc2_storage *storage);
+blosc2_schunk_empty(int nchunks, const blosc2_storage storage);
 
 /**
  * @brief Open an existing super-chunk, either on-disk or in-memory.

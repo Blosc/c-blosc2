@@ -52,7 +52,7 @@ int main(void) {
   /* Create a new super-chunk backed by a fileframe */
   blosc2_storage storage = {.sequential=true, .path="frame_big.b2frame",
                             .cparams=&cparams, .dparams=&dparams};
-  blosc2_schunk* schunk = blosc2_schunk_new(&storage);
+  blosc2_schunk* schunk = blosc2_schunk_new(storage);
 
   blosc_set_timestamp(&last);
   for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
