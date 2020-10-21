@@ -39,8 +39,8 @@
 
 
 int main(void) {
-  int32_t* data = malloc(CHUNKSIZE);
   size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t* data = malloc(isize);
   int64_t nbytes, cbytes;
   int i, nchunk;
   int nchunks;
