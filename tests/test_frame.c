@@ -85,8 +85,8 @@ static char* test_frame(void) {
       } else {
         blosc2_frame* frame = schunk->frame;
         int64_t len = frame->len;
-        uint8_t *sframe = malloc(len);
-        memcpy(sframe, frame->sdata, frame->len);
+        uint8_t* sframe = malloc((size_t)len);
+        memcpy(sframe, frame->sdata, (size_t)frame->len);
         blosc2_schunk_free(schunk);
         schunk = blosc2_schunk_from_memframe(sframe, len);
         mu_assert("blosc2_schunk_from_memframe() failed", schunk != NULL);
@@ -167,8 +167,8 @@ static char* test_frame(void) {
       } else {
         blosc2_frame* frame = schunk->frame;
         int64_t len = frame->len;
-        uint8_t *sframe = malloc(len);
-        memcpy(sframe, frame->sdata, frame->len);
+        uint8_t *sframe = malloc((size_t)len);
+        memcpy(sframe, frame->sdata, (size_t)frame->len);
         blosc2_schunk_free(schunk);
         schunk = blosc2_schunk_from_memframe(sframe, len);
       }

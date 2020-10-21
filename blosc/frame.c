@@ -694,8 +694,8 @@ blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy) 
   frame->trailer_len = trailer_len;
 
   if (copy) {
-    frame->sdata = malloc(len);
-    memcpy(frame->sdata, sframe, len);
+    frame->sdata = malloc((size_t)len);
+    memcpy(frame->sdata, sframe, (size_t)len);
   }
   else {
     frame->sdata = sframe;
