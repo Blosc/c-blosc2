@@ -39,8 +39,6 @@ void fill_buffer(double *buffer, int nchunk) {
 
 
 int main(void) {
-  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk *schunk;
   size_t isize = CHUNKSIZE * sizeof(double);
   int dsize;
@@ -59,6 +57,7 @@ int main(void) {
   blosc_init();
 
   /* Create a super-chunk container */
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.filters[0] = BLOSC_TRUNC_PREC;
   cparams.filters_meta[0] = 23;  // treat doubles as floats
   cparams.typesize = sizeof(double);
@@ -67,19 +66,11 @@ int main(void) {
   // BLOSC_BITSHUFFLE is not compressing better and it quite slower here
   //cparams.filters[BLOSC_LAST_FILTER - 1] = BLOSC_BITSHUFFLE;
   // Good codec params for this dataset
-#if defined(HAVE_LZ4)
-  cparams.compcode = BLOSC_LZ4;
-#elif defined(HAVE_LIZARD)
-  cparams.compcode = BLOSC_LIZARD;
-#elif defined(BLOSC_ZSTD)
-  cparams.compcode = BLOSC_ZSTD;
-#else
   cparams.compcode = BLOSC_BLOSCLZ;
-#endif
   cparams.clevel = 9;
-
   cparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams, NULL);
+  blosc2_storage storage = {.cparams=&cparams, .sequential=true};
+  schunk = blosc2_schunk_new(storage);
 
   /* Append the chunks */
   blosc_set_timestamp(&last);
@@ -142,7 +133,7 @@ int main(void) {
   free(data_buffer);
   free(rec_buffer);
   /* Destroy the super-chunk */
-  blosc2_free_schunk(schunk);
+  blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
 

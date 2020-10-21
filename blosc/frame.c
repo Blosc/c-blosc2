@@ -694,8 +694,8 @@ blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy) 
   frame->trailer_len = trailer_len;
 
   if (copy) {
-    frame->sdata = malloc(len);
-    memcpy(frame->sdata, sframe, len);
+    frame->sdata = malloc((size_t)len);
+    memcpy(frame->sdata, sframe, (size_t)len);
   }
   else {
     frame->sdata = sframe;
@@ -1002,7 +1002,7 @@ blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
     return NULL;
   }
 
-  // We want the sparse schunk, so create the actual data chunks (and, while doing this,
+  // We want the sequential schunk, so create the actual data chunks (and, while doing this,
   // get a guess at the blocksize used in this frame)
   schunk->data = malloc(nchunks * sizeof(void*));
   int64_t acc_nbytes = 0;

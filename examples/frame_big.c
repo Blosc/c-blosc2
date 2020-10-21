@@ -44,15 +44,15 @@ int main(void) {
   // Compression and decompression parameters
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = sizeof(int32_t);
-  cparams.compcode = BLOSC_LZ4;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
 
   /* Create a new super-chunk backed by a fileframe */
-  blosc2_frame* frame = blosc2_new_frame("frame_big.b2frame");
-  blosc2_schunk* schunk = blosc2_new_schunk(cparams, dparams, frame);
+  blosc2_storage storage = {.sequential=true, .path="frame_big.b2frame",
+                            .cparams=&cparams, .dparams=&dparams};
+  blosc2_schunk* schunk = blosc2_schunk_new(storage);
 
   blosc_set_timestamp(&last);
   for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
@@ -88,8 +88,7 @@ int main(void) {
   printf("Successful roundtrip data <-> schunk (frame-backed) !\n");
 
   /* Free resources */
-  blosc2_free_schunk(schunk);
-  blosc2_free_frame(frame);
+  blosc2_schunk_free(schunk);
 
   return 0;
 }

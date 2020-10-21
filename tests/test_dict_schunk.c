@@ -44,7 +44,8 @@ static char* test_dict(void) {
   cparams.nthreads = NTHREADS;
   cparams.blocksize = blocksize;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams, NULL);
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
+  schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
   blosc_set_timestamp(&last);
@@ -140,7 +141,7 @@ static char* test_dict(void) {
   }
 
   /* Free resources */
-  blosc2_free_schunk(schunk);
+  blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
 

@@ -35,17 +35,10 @@ static char* test_reorder_offsets(void) {
 
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
-  cparams.compcode = BLOSC_BLOSCLZ;
-  cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_frame *frame;
-  if (serialized == true) {
-    frame = blosc2_new_frame(filename);
-  } else {
-    frame = NULL;
-  }
-  schunk = blosc2_new_schunk(cparams, dparams, frame);
+  blosc2_storage storage = {.sequential=true, .path=filename, .cparams=&cparams, .dparams=&dparams};
+  schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
@@ -74,7 +67,7 @@ static char* test_reorder_offsets(void) {
 
   /* Free resources */
   free(offsets_order);
-  blosc2_free_schunk(schunk);
+  blosc2_schunk_free(schunk);
 
   /* Destroy the Blosc environment */
   blosc_destroy();

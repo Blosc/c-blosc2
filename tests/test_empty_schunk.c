@@ -34,11 +34,10 @@ static char* test_schunk(void) {
 
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
-  cparams.compcode = BLOSC_BLOSCLZ;
-  cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_empty_schunk(cparams, dparams, nchunks, NULL);
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
+  schunk = blosc2_schunk_empty(nchunks, storage);
 
   // Add a couple of metalayers
   blosc2_add_metalayer(schunk, "metalayer1", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
@@ -118,10 +117,14 @@ static char* test_schunk(void) {
   uint32_t content_len;
   blosc2_get_metalayer(schunk, "metalayer1", &content, &content_len);
   mu_assert("ERROR: bad metalayer content", strncmp((char*)content, "my metalayer1", content_len) == 0);
-  free(content);
+  if (content != NULL) {
+    free(content);
+  }
   blosc2_get_metalayer(schunk, "metalayer2", &content, &content_len);
   mu_assert("ERROR: bad metalayer content", strncmp((char*)content, "my metalayer2", content_len) == 0);
-  free(content);
+  if (content != NULL) {
+    free(content);
+  }
 
   // Check the usermeta
   uint8_t* content2;
@@ -131,7 +134,7 @@ static char* test_schunk(void) {
   free(content2);
 
   /* Free resources */
-  blosc2_free_schunk(schunk);
+  blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
 

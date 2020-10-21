@@ -77,8 +77,6 @@ int main(void) {
   size_t isize = CHUNKSIZE * sizeof(DTYPE);
   DTYPE sum, compressed_sum;
   int64_t nbytes, cbytes;
-  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
   int i, j, nchunk;
   blosc_timestamp_t last, current;
@@ -139,7 +137,7 @@ int main(void) {
   }
   printf("Sum for uncompressed data: %10.0f\n", (double)sum);
   printf("Sum time for uncompressed data: %.3g s, %.1f MB/s\n",
-         ttotal, (isize * NCHUNKS) / (ttotal * (double)MB));
+         ttotal, (double)(isize * NCHUNKS) / (double)(ttotal * MB));
 
   // Create a super-chunk container for the compressed container
   long codec = CODEC;
@@ -151,6 +149,7 @@ int main(void) {
       return 1;
     }
   }
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.compcode = (uint8_t)codec;
 
   long clevel = CLEVEL;
@@ -162,9 +161,11 @@ int main(void) {
 
   cparams.typesize = sizeof(DTYPE);
   cparams.nthreads = 1;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = 1;
   blosc_set_timestamp(&last);
-  schunk = blosc2_new_schunk(cparams, dparams, NULL);
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
+  schunk = blosc2_schunk_new(storage);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     for (i = 0; i < CHUNKSIZE; i++) {
       chunk_buf[i] = udata[i + nchunk * CHUNKSIZE];
@@ -236,7 +237,7 @@ int main(void) {
     assert(sum == compressed_sum);
   }
   /* Free resources */
-  blosc2_free_schunk(schunk);
+  blosc2_schunk_free(schunk);
 
   return 0;
 }

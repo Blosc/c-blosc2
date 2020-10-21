@@ -61,7 +61,8 @@ int main(void) {
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
-  blosc2_schunk* schunk = blosc2_new_schunk(cparams, dparams, NULL);
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_schunk* schunk = blosc2_schunk_new(storage);
 
   // Add some data
   blosc_set_timestamp(&last);
@@ -129,7 +130,7 @@ int main(void) {
 
   // frame1 (in-memory) -> schunk
   blosc_set_timestamp(&last);
-  // The next creates a schunk made of sparse chunks
+  // The next creates a schunk made of sequential chunks
   blosc2_schunk* schunk1 = blosc2_schunk_from_frame(frame1, true);
   // The next creates a frame-backed schunk
   // blosc2_schunk* schunk1 = blosc2_schunk_from_frame(frame1, false);
@@ -144,7 +145,7 @@ int main(void) {
 
   // frame2 (on-disk) -> schunk
   blosc_set_timestamp(&last);
-  // The next creates an schunk made of sparse chunks
+  // The next creates an schunk made of sequential chunks
   // blosc2_schunk* schunk2 = blosc2_schunk_from_frame(frame2, true);
   // The next creates a frame-backed schunk
   blosc2_schunk* schunk2 = blosc2_schunk_from_frame(frame2, false);
@@ -186,11 +187,11 @@ int main(void) {
   free(usermeta);
 
   /* Free resources */
-  blosc2_free_schunk(schunk);
-  blosc2_free_schunk(schunk1);
-  blosc2_free_schunk(schunk2);
+  blosc2_schunk_free(schunk);
+  blosc2_schunk_free(schunk1);
+  blosc2_schunk_free(schunk2);
   blosc2_free_frame(frame1);
-  blosc2_free_frame(frame2);
+  //blosc2_free_frame(frame2);
 
   return 0;
 }
