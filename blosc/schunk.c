@@ -136,7 +136,7 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
     schunk->frame = frame;
   }
   else if (storage.path != NULL) {
-    fprintf(stderr, "Creating empty schunks on-disk is not supported yet\n");
+    fprintf(stderr, "Creating empty sparse schunks on-disk is not supported yet\n");
     return NULL;
   }
 
@@ -168,7 +168,7 @@ blosc2_schunk *blosc2_schunk_empty(int nchunks, const blosc2_storage storage) {
 /* Open an existing super-chunk that is on-disk (no copy is made). */
 blosc2_schunk* blosc2_schunk_open(const blosc2_storage storage) {
   if (!storage.sequential) {
-    fprintf(stderr, "Opening sparse data is not supported yet\n");
+    fprintf(stderr, "Opening sparse super-chunks on-disk is not supported yet\n");
     return NULL;
   }
   if (storage.path == NULL) {
@@ -285,6 +285,10 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
 
   // Update super-chunk or frame
   if (schunk->frame == NULL) {
+    if (schunk->storage->path != NULL) {
+      printf("The persistent sparse storage is not supported yet");
+      return -1;
+    }
     // Check that we are not appending a small chunk after another small chunk
     if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
       uint8_t* last_chunk = schunk->data[nchunks - 1];
