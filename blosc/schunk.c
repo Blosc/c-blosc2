@@ -102,11 +102,9 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
     strcpy(schunk->storage->path, storage.path);
   }
   blosc2_cparams* cparams = get_cparams(storage, BLOSC2_CPARAMS_DEFAULTS);
-  schunk->storage->cparams = (blosc2_cparams*)malloc(sizeof(blosc2_cparams));
-  memcpy(schunk->storage->cparams, cparams, sizeof(blosc2_cparams));
+  schunk->storage->cparams = cparams;
   blosc2_dparams* dparams = get_dparams(storage, BLOSC2_DPARAMS_DEFAULTS);
-  schunk->storage->dparams = (blosc2_dparams*)malloc(sizeof(blosc2_dparams));
-  memcpy(schunk->storage->dparams, dparams, sizeof(blosc2_dparams));
+  schunk->storage->dparams = dparams;
 
   schunk->version = 0;     /* pre-first version */
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
@@ -194,22 +192,19 @@ blosc2_schunk* blosc2_schunk_open(const blosc2_storage storage) {
     schunk->storage->path = malloc(pathlen + 1);
     strcpy(schunk->storage->path, storage.path);
   }
-  // New cparams and dparams using opened storage as defaults
-  cparams = get_cparams(storage, *cparams);
-  schunk->storage->cparams = (blosc2_cparams*)malloc(sizeof(blosc2_cparams));
-  memcpy(schunk->storage->cparams, cparams, sizeof(blosc2_cparams));
-  dparams = get_dparams(storage, *dparams);
-  schunk->storage->dparams = (blosc2_dparams*)malloc(sizeof(blosc2_dparams));
-  memcpy(schunk->storage->dparams, dparams, sizeof(blosc2_dparams));
+  // New cparams2 and dparams2 using opened storage as defaults
+  blosc2_cparams* cparams2 = get_cparams(storage, *cparams);
+  schunk->storage->cparams = cparams2;
+  blosc2_dparams* dparams2 = get_dparams(storage, *dparams);
+  schunk->storage->dparams = dparams2;
+  free(cparams);
+  free(dparams);
 
   // Update the existing cparams/dparams with the new defaults
   blosc2_free_ctx(schunk->cctx);
   blosc2_free_ctx(schunk->dctx);
-  schunk->cctx = blosc2_create_cctx(*cparams);
-  schunk->dctx = blosc2_create_dctx(*dparams);
-
-  free(cparams);
-  free(dparams);
+  schunk->cctx = blosc2_create_cctx(*cparams2);
+  schunk->dctx = blosc2_create_dctx(*dparams2);
 
   return schunk;
 }
