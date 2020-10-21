@@ -191,7 +191,7 @@ blosc2_schunk* blosc2_schunk_open(const blosc2_storage storage) {
   memcpy(schunk->storage, &storage, sizeof(blosc2_storage));
   if (storage.path != NULL) {
     size_t pathlen = strlen(storage.path);
-    schunk->storage->path = malloc(pathlen);
+    schunk->storage->path = malloc(pathlen + 1);
     strcpy(schunk->storage->path, storage.path);
   }
   // New cparams and dparams using opened storage as defaults
