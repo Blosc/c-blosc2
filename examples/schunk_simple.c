@@ -51,9 +51,8 @@ int main(void) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = BLOSC2_STORAGE_DEFAULTS;
-  storage.cparams = &cparams;
-  schunk = blosc2_schunk_new(&storage);
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
+  schunk = blosc2_schunk_new(storage);
 
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {

@@ -55,15 +55,21 @@ int main(int argc, char* argv[]) {
   dparams.nthreads = NTHREADS;
 
   /* Create a super-chunk backed by an in-memory frame */
-  blosc2_storage storage = {.sequential=true, .path=argv[2]};
-  blosc2_schunk* schunk = blosc2_new_schunk(cparams, dparams, &storage);
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
+                            .sequential=true, .path=argv[2]};
+  blosc2_schunk* schunk = blosc2_schunk_new(storage);
 
   // Compress the file
   blosc_set_timestamp(&last);
   FILE* finput = fopen(argv[1], "rb");
+  if (finput == NULL) {
+    printf("Input file cannot be open.");
+    exit(1);
+  }
   while ((isize = fread(data, 1, CHUNKSIZE, finput)) == CHUNKSIZE) {
     if (blosc2_schunk_append_buffer(schunk, data, isize) < 0) {
       fprintf(stderr, "Error in appending data to destination file");
+      return -1;
     }
   }
   if (blosc2_schunk_append_buffer(schunk, data, isize) < 0) {

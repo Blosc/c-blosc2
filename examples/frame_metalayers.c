@@ -53,7 +53,7 @@ int main(void) {
   /* Create a super-chunk container */
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = sizeof(int32_t);
-  cparams.compcode = BLOSC_LZ4;
+  //cparams.compcode = BLOSC_LZ4;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
@@ -71,7 +71,7 @@ int main(void) {
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
       for (i = 0; i < CHUNKSIZE; i++) {
-          data[i] = i * nchunk;
+          data[i] = i * nchunk + i;
       }
       nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
       assert(nchunks == nchunk + 1);
@@ -81,7 +81,7 @@ int main(void) {
   cbytes = schunk->cbytes;
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
+  printf("Compression ratio: %.2f MB -> %.2f MB (%.1fx)\n",
          nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
   printf("Compression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
@@ -93,8 +93,7 @@ int main(void) {
                           (uint32_t) strlen("my_content2"));
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Time for schunk -> frame: %.3g s, %.1f GB/s\n",
-         ttotal, nbytes / (ttotal * GB));
+  printf("Time for update metalayer in header: %.2g s\n", ttotal);
   printf("Frame length in memory: %ld bytes\n", (long)frame1->len);
 
   // frame1 (in-memory) -> fileframe (on-disk)
@@ -142,7 +141,6 @@ int main(void) {
   /* Free resources */
   blosc2_schunk_free(schunk);
   blosc2_schunk_free(schunk2);
-  blosc2_free_frame(frame1);
 
   return 0;
 }

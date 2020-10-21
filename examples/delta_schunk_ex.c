@@ -39,8 +39,6 @@ int main(void) {
   const int32_t isize = CHUNKSIZE * sizeof(int64_t);
   int dsize = 0;
   int64_t nbytes, cbytes;
-  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
   int i;
   int nchunk;
@@ -55,13 +53,14 @@ int main(void) {
   blosc_init();
 
   /* Create a super-chunk container */
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = 8;
   cparams.filters[0] = BLOSC_DELTA;
-  cparams.compcode = BLOSC_BLOSCLZ;
-  cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
-  schunk = blosc2_new_schunk(cparams, dparams, NULL);
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
+  schunk = blosc2_schunk_new(storage);
 
   blosc_set_timestamp(&last);
   for (nchunk = 1; nchunk <= NCHUNKS; nchunk++) {

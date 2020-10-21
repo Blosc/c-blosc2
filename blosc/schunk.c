@@ -95,12 +95,12 @@ blosc2_dparams* get_dparams(const blosc2_storage storage, blosc2_dparams default
 blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
   schunk->storage = (blosc2_storage*)malloc(sizeof(blosc2_storage));
+  memcpy(schunk->storage, &storage, sizeof(blosc2_storage));
   if (storage.path != NULL) {
     size_t pathlen = strlen(storage.path);
     schunk->storage->path = malloc(pathlen);
     strcpy(schunk->storage->path, storage.path);
   }
-  memcpy(schunk->storage, &storage, sizeof(blosc2_storage));
   blosc2_cparams* cparams = get_cparams(storage, BLOSC2_CPARAMS_DEFAULTS);
   schunk->storage->cparams = (blosc2_cparams*)malloc(sizeof(blosc2_cparams));
   memcpy(schunk->storage->cparams, cparams, sizeof(blosc2_cparams));
@@ -167,6 +167,54 @@ blosc2_schunk *blosc2_schunk_empty(int nchunks, const blosc2_storage storage) {
 }
 
 
+/* Open an existing super-chunk that is on-disk (no copy is made). */
+blosc2_schunk* blosc2_schunk_open(const blosc2_storage storage) {
+  if (!storage.sequential) {
+    fprintf(stderr, "Opening sparse data is not supported yet\n");
+    return NULL;
+  }
+  if (storage.path == NULL) {
+    fprintf(stderr, "You need to supply a storage.path\n");
+    return NULL;
+  }
+
+  // We only support frames yet
+  blosc2_frame* frame = blosc2_frame_from_file(storage.path);
+  blosc2_schunk* schunk = blosc2_schunk_from_frame(frame, false);
+  blosc2_cparams *cparams;
+  blosc2_schunk_get_cparams(schunk, &cparams);
+  blosc2_dparams *dparams;
+  blosc2_schunk_get_dparams(schunk, &dparams);
+
+  // Create storage instance and attach it to schunk
+  schunk->storage = (blosc2_storage*)calloc(1, sizeof(blosc2_storage));
+  memcpy(schunk->storage, &storage, sizeof(blosc2_storage));
+  if (storage.path != NULL) {
+    size_t pathlen = strlen(storage.path);
+    schunk->storage->path = malloc(pathlen);
+    strcpy(schunk->storage->path, storage.path);
+  }
+  // New cparams and dparams using opened storage as defaults
+  cparams = get_cparams(storage, *cparams);
+  schunk->storage->cparams = (blosc2_cparams*)malloc(sizeof(blosc2_cparams));
+  memcpy(schunk->storage->cparams, cparams, sizeof(blosc2_cparams));
+  dparams = get_dparams(storage, *dparams);
+  schunk->storage->dparams = (blosc2_dparams*)malloc(sizeof(blosc2_dparams));
+  memcpy(schunk->storage->dparams, dparams, sizeof(blosc2_dparams));
+
+  // Update the existing cparams/dparams with the new defaults
+  blosc2_free_ctx(schunk->cctx);
+  blosc2_free_ctx(schunk->dctx);
+  schunk->cctx = blosc2_create_cctx(*cparams);
+  schunk->dctx = blosc2_create_dctx(*dparams);
+
+  free(cparams);
+  free(dparams);
+
+  return schunk;
+}
+
+
 /* Free all memory from a super-chunk. */
 int blosc2_schunk_free(blosc2_schunk *schunk) {
   if (schunk->data != NULL) {
@@ -188,6 +236,9 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
   }
 
   if (schunk->storage != NULL) {
+    if (schunk->storage->path != NULL) {
+      free(schunk->storage->path);
+    }
     free(schunk->storage->cparams);
     free(schunk->storage->dparams);
     free(schunk->storage);
@@ -204,22 +255,6 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
   free(schunk);
 
   return 0;
-}
-
-
-/* Open an existing super-chunk that is on-disk (no copy is made). */
-blosc2_schunk* blosc2_schunk_open(const blosc2_storage storage) {
-  if (!storage.sequential) {
-    fprintf(stderr, "Opening sparse data is not supported yet\n");
-    return NULL;
-  }
-  if (storage.path == NULL) {
-    fprintf(stderr, "You need to supply a storage.path\n");
-    return NULL;
-  }
-  blosc2_frame* frame = blosc2_frame_from_file(storage.path);
-  blosc2_schunk* schunk = blosc2_schunk_from_frame(frame, false);
-  return schunk;
 }
 
 
