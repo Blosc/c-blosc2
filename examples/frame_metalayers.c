@@ -39,7 +39,7 @@
 
 
 int main(void) {
-  static int32_t data[CHUNKSIZE];
+  int32_t* data = malloc(CHUNKSIZE);
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int64_t nbytes, cbytes;
   int i, nchunk;
@@ -141,6 +141,7 @@ int main(void) {
   /* Free resources */
   blosc2_schunk_free(schunk);
   blosc2_schunk_free(schunk2);
+  free(data);
 
   return 0;
 }
