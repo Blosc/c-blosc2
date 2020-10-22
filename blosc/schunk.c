@@ -91,22 +91,35 @@ blosc2_dparams* get_dparams(const blosc2_storage storage, blosc2_dparams default
   return dparams;
 }
 
+blosc2_storage* get_new_storage(const blosc2_storage* storage, const blosc2_cparams* cdefaults,
+                                const blosc2_dparams* ddefaults) {
+  blosc2_storage* new_storage = (blosc2_storage*)calloc(1, sizeof(blosc2_storage));
+  memcpy(new_storage, &storage, sizeof(blosc2_storage));
+  if (storage->path != NULL) {
+    size_t pathlen = strlen(storage->path);
+    new_storage->path = malloc(pathlen + 1);
+    strcpy(new_storage->path, storage->path);
+  }
+  else {
+    new_storage->path = NULL;
+  }
+  blosc2_cparams* cparams = get_cparams(*storage, *cdefaults);
+  new_storage->cparams = cparams;
+  blosc2_dparams* dparams = get_dparams(*storage, *ddefaults);
+  new_storage->dparams = dparams;
+  return new_storage;
+}
+
 /* Create a new super-chunk */
 blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
-  schunk->storage = (blosc2_storage*)malloc(sizeof(blosc2_storage));
-  memcpy(schunk->storage, &storage, sizeof(blosc2_storage));
-  if (storage.path != NULL) {
-    size_t pathlen = strlen(storage.path);
-    schunk->storage->path = malloc(pathlen + 1);
-    strcpy(schunk->storage->path, storage.path);
-  }
-  blosc2_cparams* cparams = get_cparams(storage, BLOSC2_CPARAMS_DEFAULTS);
-  schunk->storage->cparams = cparams;
-  blosc2_dparams* dparams = get_dparams(storage, BLOSC2_DPARAMS_DEFAULTS);
-  schunk->storage->dparams = dparams;
-
   schunk->version = 0;     /* pre-first version */
+
+  // Get the storage with proper defaults
+  schunk->storage = get_new_storage(&storage, &BLOSC2_CPARAMS_DEFAULTS, &BLOSC2_DPARAMS_DEFAULTS);
+  blosc2_cparams* cparams = schunk->storage->cparams;
+  blosc2_dparams* dparams = schunk->storage->dparams;
+
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     schunk->filters[i] = cparams->filters[i];
     schunk->filters_meta[i] = cparams->filters_meta[i];
@@ -179,32 +192,23 @@ blosc2_schunk* blosc2_schunk_open(const blosc2_storage storage) {
   // We only support frames yet
   blosc2_frame* frame = blosc2_frame_from_file(storage.path);
   blosc2_schunk* schunk = blosc2_schunk_from_frame(frame, false);
-  blosc2_cparams *cparams;
-  blosc2_schunk_get_cparams(schunk, &cparams);
-  blosc2_dparams *dparams;
-  blosc2_schunk_get_dparams(schunk, &dparams);
 
-  // Create storage instance and attach it to schunk
-  schunk->storage = (blosc2_storage*)calloc(1, sizeof(blosc2_storage));
-  memcpy(schunk->storage, &storage, sizeof(blosc2_storage));
-  if (storage.path != NULL) {
-    size_t pathlen = strlen(storage.path);
-    schunk->storage->path = malloc(pathlen + 1);
-    strcpy(schunk->storage->path, storage.path);
-  }
-  // New cparams2 and dparams2 using opened storage as defaults
-  blosc2_cparams* cparams2 = get_cparams(storage, *cparams);
-  schunk->storage->cparams = cparams2;
-  blosc2_dparams* dparams2 = get_dparams(storage, *dparams);
-  schunk->storage->dparams = dparams2;
-  free(cparams);
-  free(dparams);
+  // Get the storage with proper defaults
+  blosc2_cparams *store_cparams;
+  blosc2_schunk_get_cparams(schunk, &store_cparams);
+  blosc2_dparams *store_dparams;
+  blosc2_schunk_get_dparams(schunk, &store_dparams);
+  schunk->storage = get_new_storage(&storage, store_cparams, store_dparams);
+  free(store_cparams);
+  free(store_dparams);
+  blosc2_cparams* cparams = schunk->storage->cparams;
+  blosc2_dparams* dparams = schunk->storage->dparams;
 
   // Update the existing cparams/dparams with the new defaults
   blosc2_free_ctx(schunk->cctx);
   blosc2_free_ctx(schunk->dctx);
-  schunk->cctx = blosc2_create_cctx(*cparams2);
-  schunk->dctx = blosc2_create_dctx(*dparams2);
+  schunk->cctx = blosc2_create_cctx(*cparams);
+  schunk->dctx = blosc2_create_dctx(*dparams);
 
   return schunk;
 }
