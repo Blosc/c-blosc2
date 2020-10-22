@@ -117,10 +117,16 @@ void update_schunk_properties(struct blosc2_schunk* schunk) {
   schunk->chunksize = -1;
 
   /* The compression context */
+  if (schunk->cctx != NULL) {
+    blosc2_free_ctx(schunk->cctx);
+  }
   cparams->schunk = schunk;
   schunk->cctx = blosc2_create_cctx(*cparams);
 
   /* The decompression context */
+  if (schunk->dctx != NULL) {
+    blosc2_free_ctx(schunk->dctx);
+  }
   dparams->schunk = schunk;
   schunk->dctx = blosc2_create_dctx(*dparams);
 }
