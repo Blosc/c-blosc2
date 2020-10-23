@@ -100,24 +100,24 @@ int main(void) {
 
   // super-chunk -> frame1 (in-memory)
   blosc_set_timestamp(&last);
-  blosc2_frame* frame1 = blosc2_new_frame(NULL);
-  int64_t frame_len = blosc2_schunk_to_frame(schunk, frame1);
+  blosc2_frame* frame1 = blosc2_frame_new(NULL);
+  int64_t frame_len = blosc2_frame_from_schunk(schunk, frame1);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for schunk -> frame: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
   printf("Frame length in memory: %ld bytes\n", (long)frame_len);
 
-  // super-chunk -> memframe (in-memory, sequential)
+  // super-chunk -> sframe (in-memory, sequential)
   blosc_set_timestamp(&last);
-  uint8_t* memframe;
-  int64_t memframe_len = blosc2_schunk_to_memframe(schunk, &memframe);
+  uint8_t* sframe;
+  int64_t sframe_len = blosc2_schunk_to_sframe(schunk, &sframe);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Time for schunk -> memframe: %.3g s, %.1f MB/s\n",
-         ttotal, memframe_len / (ttotal * MB));
-  printf("Memframe length in memory: %ld bytes\n", (long)memframe_len);
-  free(memframe);
+  printf("Time for schunk -> sframe: %.3g s, %.1f MB/s\n",
+         ttotal, sframe_len / (ttotal * MB));
+  printf("sframe length in memory: %ld bytes\n", (long)sframe_len);
+  free(sframe);
 
   // frame1 (in-memory) -> fileframe (on-disk)
   blosc_set_timestamp(&last);
@@ -142,9 +142,9 @@ int main(void) {
   // frame1 (in-memory) -> schunk
   blosc_set_timestamp(&last);
   // The next creates a schunk made of sequential chunks
-  blosc2_schunk* schunk1 = blosc2_schunk_from_frame(frame1, true);
+  blosc2_schunk* schunk1 = blosc2_frame_to_schunk(frame1, true);
   // The next creates a frame-backed schunk
-  // blosc2_schunk* schunk1 = blosc2_schunk_from_frame(frame1, false);
+  // blosc2_schunk* schunk1 = blosc2_frame_to_schunk(frame1, false);
   if (schunk1 == NULL) {
     printf("Bad conversion frame1 -> schunk1!\n");
     return -1;
@@ -157,9 +157,9 @@ int main(void) {
   // frame2 (on-disk) -> schunk
   blosc_set_timestamp(&last);
   // The next creates an schunk made of sequential chunks
-  // blosc2_schunk* schunk2 = blosc2_schunk_from_frame(frame2, true);
+  // blosc2_schunk* schunk2 = blosc2_frame_to_schunk(frame2, true);
   // The next creates a frame-backed schunk
-  blosc2_schunk* schunk2 = blosc2_schunk_from_frame(frame2, false);
+  blosc2_schunk* schunk2 = blosc2_frame_to_schunk(frame2, false);
   if (schunk2 == NULL) {
     printf("Bad conversion frame2 -> schunk2!\n");
     return -1;
@@ -201,8 +201,8 @@ int main(void) {
   blosc2_schunk_free(schunk);
   blosc2_schunk_free(schunk1);
   blosc2_schunk_free(schunk2);
-  blosc2_free_frame(frame1);
-  //blosc2_free_frame(frame2);
+  blosc2_frame_free(frame1);
+  //blosc2_frame_free(frame2);
 
   return 0;
 }

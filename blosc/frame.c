@@ -79,7 +79,7 @@ void swap_store(void *dest, const void *pa, int size) {
 
 
 /* Create a new (empty) frame */
-blosc2_frame* blosc2_new_frame(const char* fname) {
+blosc2_frame* blosc2_frame_new(const char* fname) {
   blosc2_frame* new_frame = calloc(1, sizeof(blosc2_frame));
   if (fname != NULL) {
     char* new_fname = malloc(strlen(fname) + 1);  // + 1 for the trailing NULL
@@ -90,7 +90,7 @@ blosc2_frame* blosc2_new_frame(const char* fname) {
 
 
 /* Free memory from a frame. */
-int blosc2_free_frame(blosc2_frame *frame) {
+int blosc2_frame_free(blosc2_frame *frame) {
 
   if (frame->sdata != NULL) {
     free(frame->sdata);
@@ -518,7 +518,7 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
 
 
 /* Create a frame out of a super-chunk. */
-int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
+int64_t blosc2_frame_from_schunk(blosc2_schunk *schunk, blosc2_frame *frame) {
   int32_t nchunks = schunk->nchunks;
   int64_t cbytes = schunk->cbytes;
   FILE* fp = NULL;
@@ -620,7 +620,7 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
 
 /* Create an in-memory frame out of a super-chunk */
-int64_t blosc2_schunk_to_memframe(blosc2_schunk* schunk, uint8_t** memframe) {
+int64_t blosc2_schunk_to_sframe(blosc2_schunk* schunk, uint8_t** sframe) {
   blosc2_frame* frame = NULL;
   uint8_t* sdata = NULL;
   int64_t sdata_len = 0;
@@ -631,19 +631,19 @@ int64_t blosc2_schunk_to_memframe(blosc2_schunk* schunk, uint8_t** memframe) {
     sdata_len = schunk->frame->len;
   }
   else {
-    frame = blosc2_new_frame(NULL);
-    sdata_len = blosc2_schunk_to_frame(schunk, frame);
+    frame = blosc2_frame_new(NULL);
+    sdata_len = blosc2_frame_from_schunk(schunk, frame);
     if (sdata_len < 0) {
       fprintf(stderr, "Error during the conversion of schunk to frame\n");
       return sdata_len;
     }
     sdata = frame->sdata;
   }
-  // Get a copy of the internal memframe
-  *memframe = malloc((size_t)sdata_len);
-  memcpy(*memframe, sdata, sdata_len);
+  // Get a copy of the internal sframe
+  *sframe = malloc((size_t)sdata_len);
+  memcpy(*sframe, sdata, sdata_len);
   if (frame != NULL) {
-    blosc2_free_frame(frame);
+    blosc2_frame_free(frame);
   }
   return sdata_len;
 }
@@ -976,7 +976,7 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
 
 
 /* Get a super-chunk out of a frame */
-blosc2_schunk* blosc2_schunk_from_frame(blosc2_frame* frame, bool copy) {
+blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
   int32_t header_len;
   int64_t frame_len;
 

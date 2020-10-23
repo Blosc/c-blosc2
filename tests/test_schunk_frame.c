@@ -20,7 +20,7 @@ int nchunks;
 int sequential = false;
 
 
-static char* test_schunk_memframe(void) {
+static char* test_schunk_sframe(void) {
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int32_t *data = malloc(isize);
   int32_t *data_dest = malloc(isize);
@@ -44,14 +44,14 @@ static char* test_schunk_memframe(void) {
   }
 
   // Get a memory frame out of the schunk
-  uint8_t* memframe;
-  int64_t len = blosc2_schunk_to_memframe(schunk, &memframe);
-  mu_assert("Error in getting a memframe", len > 0);
+  uint8_t* sframe;
+  int64_t len = blosc2_schunk_to_sframe(schunk, &sframe);
+  mu_assert("Error in getting a sframe", len > 0);
 
   // Free completely schunk
   blosc2_schunk_free(schunk);
-  // ...and another schunk backed by the memframe
-  schunk = blosc2_schunk_open_memframe(memframe, len);
+  // ...and another schunk backed by the sframe
+  schunk = blosc2_schunk_open_sframe(sframe, len);
 
   // Check that the chunks have been decompressed correctly
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
@@ -75,19 +75,19 @@ static char* test_schunk_memframe(void) {
 static char *all_tests(void) {
   nchunks = 0;
   sequential = true;
-  mu_run_test(test_schunk_memframe);
+  mu_run_test(test_schunk_sframe);
 
   nchunks = 0;
   sequential = false;
-  mu_run_test(test_schunk_memframe);
+  mu_run_test(test_schunk_sframe);
 
   nchunks = 1;
   sequential = false;
-  mu_run_test(test_schunk_memframe);
+  mu_run_test(test_schunk_sframe);
 
   nchunks = 10;
   sequential = true;
-  mu_run_test(test_schunk_memframe);
+  mu_run_test(test_schunk_sframe);
 
   return EXIT_SUCCESS;
 }
