@@ -70,43 +70,42 @@ int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams) {
   return 0;
 }
 
-blosc2_cparams* get_cparams(const blosc2_storage storage, blosc2_cparams defaults) {
-  blosc2_cparams *cparams = malloc(sizeof(blosc2_cparams));
-  if (storage.cparams != NULL) {
-    memcpy(cparams, storage.cparams, sizeof(blosc2_cparams));
-  } else {
-    memcpy(cparams, &defaults, sizeof(blosc2_cparams));
-  }
-  return cparams;
-}
-
-blosc2_dparams* get_dparams(const blosc2_storage storage, blosc2_dparams defaults) {
-  blosc2_dparams* dparams = malloc(sizeof(blosc2_dparams));
-  if (storage.dparams != NULL) {
-    memcpy(dparams, storage.dparams, sizeof(blosc2_dparams));
+blosc2_storage* get_new_storage(const blosc2_storage* storage, const blosc2_cparams* cdefaults,
+                                const blosc2_dparams* ddefaults) {
+  blosc2_storage* new_storage = (blosc2_storage*)calloc(1, sizeof(blosc2_storage));
+  memcpy(new_storage, &storage, sizeof(blosc2_storage));
+  if (storage->path != NULL) {
+    size_t pathlen = strlen(storage->path);
+    new_storage->path = malloc(pathlen + 1);
+    strcpy(new_storage->path, storage->path);
   }
   else {
-    memcpy(dparams, &defaults, sizeof(blosc2_dparams));
+    new_storage->path = NULL;
   }
-  return dparams;
+  // cparams
+  blosc2_cparams* cparams = malloc(sizeof(blosc2_cparams));
+  if (storage->cparams != NULL) {
+    memcpy(cparams, storage->cparams, sizeof(blosc2_cparams));
+  } else {
+    memcpy(cparams, cdefaults, sizeof(blosc2_cparams));
+  }
+  new_storage->cparams = cparams;
+  // dparams
+  blosc2_dparams* dparams = malloc(sizeof(blosc2_dparams));
+  if (storage->dparams != NULL) {
+    memcpy(dparams, storage->dparams, sizeof(blosc2_dparams));
+  }
+  else {
+    memcpy(dparams, ddefaults, sizeof(blosc2_dparams));
+  }
+  new_storage->dparams = dparams;
+  return new_storage;
 }
 
-/* Create a new super-chunk */
-blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
-  blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
-  schunk->storage = (blosc2_storage*)malloc(sizeof(blosc2_storage));
-  memcpy(schunk->storage, &storage, sizeof(blosc2_storage));
-  if (storage.path != NULL) {
-    size_t pathlen = strlen(storage.path);
-    schunk->storage->path = malloc(pathlen + 1);
-    strcpy(schunk->storage->path, storage.path);
-  }
-  blosc2_cparams* cparams = get_cparams(storage, BLOSC2_CPARAMS_DEFAULTS);
-  schunk->storage->cparams = cparams;
-  blosc2_dparams* dparams = get_dparams(storage, BLOSC2_DPARAMS_DEFAULTS);
-  schunk->storage->dparams = dparams;
+void update_schunk_properties(struct blosc2_schunk* schunk) {
+  blosc2_cparams* cparams = schunk->storage->cparams;
+  blosc2_dparams* dparams = schunk->storage->dparams;
 
-  schunk->version = 0;     /* pre-first version */
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     schunk->filters[i] = cparams->filters[i];
     schunk->filters_meta[i] = cparams->filters_meta[i];
@@ -118,18 +117,35 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
   schunk->chunksize = -1;
 
   /* The compression context */
+  if (schunk->cctx != NULL) {
+    blosc2_free_ctx(schunk->cctx);
+  }
   cparams->schunk = schunk;
   schunk->cctx = blosc2_create_cctx(*cparams);
 
   /* The decompression context */
+  if (schunk->dctx != NULL) {
+    blosc2_free_ctx(schunk->dctx);
+  }
   dparams->schunk = schunk;
   schunk->dctx = blosc2_create_dctx(*dparams);
+}
+
+/* Create a new super-chunk */
+blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
+  blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
+  schunk->version = 0;     /* pre-first version */
+
+  // Get the storage with proper defaults
+  schunk->storage = get_new_storage(&storage, &BLOSC2_CPARAMS_DEFAULTS, &BLOSC2_DPARAMS_DEFAULTS);
+  // ...and update internal properties
+  update_schunk_properties(schunk);
 
   if (storage.sequential) {
     // We want a frame as storage
-    blosc2_frame* frame = blosc2_new_frame(storage.path);
+    blosc2_frame* frame = blosc2_frame_new(storage.path);
     // Initialize frame (basically, encode the header)
-    int64_t frame_len = blosc2_schunk_to_frame(schunk, frame);
+    int64_t frame_len = blosc2_frame_from_schunk(schunk, frame);
     if (frame_len < 0) {
       fprintf(stderr, "Error during the conversion of schunk to frame\n");
     }
@@ -178,33 +194,18 @@ blosc2_schunk* blosc2_schunk_open(const blosc2_storage storage) {
 
   // We only support frames yet
   blosc2_frame* frame = blosc2_frame_from_file(storage.path);
-  blosc2_schunk* schunk = blosc2_schunk_from_frame(frame, false);
-  blosc2_cparams *cparams;
-  blosc2_schunk_get_cparams(schunk, &cparams);
-  blosc2_dparams *dparams;
-  blosc2_schunk_get_dparams(schunk, &dparams);
+  blosc2_schunk* schunk = blosc2_frame_to_schunk(frame, false);
 
-  // Create storage instance and attach it to schunk
-  schunk->storage = (blosc2_storage*)calloc(1, sizeof(blosc2_storage));
-  memcpy(schunk->storage, &storage, sizeof(blosc2_storage));
-  if (storage.path != NULL) {
-    size_t pathlen = strlen(storage.path);
-    schunk->storage->path = malloc(pathlen + 1);
-    strcpy(schunk->storage->path, storage.path);
-  }
-  // New cparams2 and dparams2 using opened storage as defaults
-  blosc2_cparams* cparams2 = get_cparams(storage, *cparams);
-  schunk->storage->cparams = cparams2;
-  blosc2_dparams* dparams2 = get_dparams(storage, *dparams);
-  schunk->storage->dparams = dparams2;
-  free(cparams);
-  free(dparams);
-
+  // Get the storage with proper defaults
+  blosc2_cparams *store_cparams;
+  blosc2_schunk_get_cparams(schunk, &store_cparams);
+  blosc2_dparams *store_dparams;
+  blosc2_schunk_get_dparams(schunk, &store_dparams);
+  schunk->storage = get_new_storage(&storage, store_cparams, store_dparams);
+  free(store_cparams);
+  free(store_dparams);
   // Update the existing cparams/dparams with the new defaults
-  blosc2_free_ctx(schunk->cctx);
-  blosc2_free_ctx(schunk->dctx);
-  schunk->cctx = blosc2_create_cctx(*cparams2);
-  schunk->dctx = blosc2_create_dctx(*dparams2);
+  update_schunk_properties(schunk);
 
   return schunk;
 }
@@ -240,7 +241,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
   }
 
   if (schunk->frame != NULL) {
-    blosc2_free_frame(schunk->frame);
+    blosc2_frame_free(schunk->frame);
   }
 
   if (schunk->usermeta_len > 0) {
@@ -254,9 +255,9 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
 
 
 /* Create a super-chunk out of a serialized frame (no copy is made). */
-blosc2_schunk* blosc2_schunk_from_memframe(uint8_t *memframe, int64_t len) {
-  blosc2_frame* frame = blosc2_frame_from_sframe(memframe, len, false);
-  blosc2_schunk* schunk = blosc2_schunk_from_frame(frame, false);
+blosc2_schunk* blosc2_schunk_open_sframe(uint8_t *sframe, int64_t len) {
+  blosc2_frame* frame = blosc2_frame_from_sframe(sframe, len, false);
+  blosc2_schunk* schunk = blosc2_frame_to_schunk(frame, false);
   return schunk;
 }
 

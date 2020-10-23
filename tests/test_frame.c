@@ -35,9 +35,9 @@ char buf[256];
 
 
 static char* test_frame(void) {
-  static int32_t data[CHUNKSIZE];
-  static int32_t data_dest[CHUNKSIZE];
-  int32_t isize = CHUNKSIZE * sizeof(int32_t);
+  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t *data = malloc(isize);
+  int32_t *data_dest = malloc(isize);
   int dsize;
   int64_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -83,13 +83,12 @@ static char* test_frame(void) {
         schunk = blosc2_schunk_open(storage2);
         mu_assert("blosc2_schunk_open() failed", schunk != NULL);
       } else {
-        blosc2_frame* frame = schunk->frame;
-        int64_t len = frame->len;
-        uint8_t* sframe = malloc((size_t)len);
-        memcpy(sframe, frame->sdata, (size_t)frame->len);
+        // Dump the schunk to a sframe and regenerate it from there
+        uint8_t* sframe;
+        int64_t sframe_len = blosc2_schunk_to_sframe(schunk, &sframe);
         blosc2_schunk_free(schunk);
-        schunk = blosc2_schunk_from_memframe(sframe, len);
-        mu_assert("blosc2_schunk_from_memframe() failed", schunk != NULL);
+        schunk = blosc2_schunk_open_sframe(sframe, sframe_len);
+        mu_assert("blosc2_schunk_open_sframe() failed", schunk != NULL);
       }
     }
   }
@@ -165,12 +164,13 @@ static char* test_frame(void) {
         blosc2_storage storage2 = {.sequential=true, .path=fname};
         schunk = blosc2_schunk_open(storage2);
       } else {
-        blosc2_frame* frame = schunk->frame;
-        int64_t len = frame->len;
-        uint8_t *sframe = malloc((size_t)len);
-        memcpy(sframe, frame->sdata, (size_t)frame->len);
+        // Dump the schunk to a sframe and regenerate it from there
+        uint8_t* sframe;
+        int64_t sframe_len = blosc2_schunk_to_sframe(schunk, &sframe);
         blosc2_schunk_free(schunk);
-        schunk = blosc2_schunk_from_memframe(sframe, len);
+        schunk = blosc2_schunk_open_sframe(sframe, sframe_len);
+        mu_assert("blosc2_schunk_open_sframe() failed", schunk != NULL);
+
       }
     }
   }
@@ -214,7 +214,10 @@ static char* test_frame(void) {
   }
 
   /* Free resources */
+  free(data);
+  free(data_dest);
   blosc2_schunk_free(schunk);
+
   /* Destroy the Blosc environment */
   blosc_destroy();
 
