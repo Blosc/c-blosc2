@@ -1,7 +1,7 @@
 /*********************************************************************
   Blosc - Blocked Shuffling and Compression Library
 
-  Author: Francesc Alted <francesc@blosc.org>
+  Author: The Blosc Developers <blosc@blosc.org>
 
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
@@ -10,7 +10,7 @@
  * @brief Blosc header file.
  *
  * This file contains Blosc public API and the structures needed to use it.
- * @author Francesc Alted <francesc@blosc.org>
+ * @author The Blosc Developers <blosc@blosc.org>
  */
 
 #ifndef BLOSC_H

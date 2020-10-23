@@ -2,7 +2,7 @@
 Releasing Blosc2
 =================
 
-:Author: Francesc Alted
+:Author: The Blosc Developers
 :Contact: francesc@blosc.org
 :Date: 2019-08-09
 

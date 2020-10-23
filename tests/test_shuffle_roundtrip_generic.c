@@ -4,7 +4,7 @@
   Roundtrip tests
 
   Creation date: 2010-06-07
-  Author: Francesc Alted <francesc@blosc.org>
+  Author: The Blosc Developers <blosc@blosc.org>
 
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/

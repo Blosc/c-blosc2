@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2019  Francesc Alted
+  Copyright (C) 2020 The Blosc Developers
   http://blosc.org
   License: BSD (see LICENSE.txt)
 

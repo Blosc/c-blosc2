@@ -12,7 +12,7 @@
   I'm collecting speeds for different machines, so the output of your
   benchmarks and your processor specifications are welcome!
 
-  Author: Francesc Alted <francesc@blosc.org>
+  Author: The Blosc Developers <blosc@blosc.org>
 
   Note: Compiling this with VS2008 does not work well with cmake.  Here
   it is a way to compile the benchmark (with added support for LZ4):

@@ -6,7 +6,7 @@
   Probably related: https://github.com/Blosc/c-blosc/issues/240
 
   Creation date: 2020-02-18
-  Author: Francesc Alted <francesc@blosc.org>
+  Author: The Blosc Developers <blosc@blosc.org>
 
   See LICENSES/BLOSC.txt for details about copyright and rights to use.
  **********************************************************************/

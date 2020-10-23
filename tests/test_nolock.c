@@ -4,7 +4,7 @@
   Unit tests for BLOSC_NOLOCK environment variable in Blosc.
 
   Creation date: 2016-04-25
-  Author: Francesc Alted <francesc@blosc.org>
+  Author: The Blosc Developers <blosc@blosc.org>
 
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/

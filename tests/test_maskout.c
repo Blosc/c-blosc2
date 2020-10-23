@@ -4,7 +4,7 @@
   Unit tests for BLOSC_COMPRESSOR environment variable in Blosc.
 
   Creation date: 2020-03-27
-  Author: Francesc Alted <francesc@blosc.org>
+  Author: The Blosc Developers <blosc@blosc.org>
 
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/

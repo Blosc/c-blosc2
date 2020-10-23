@@ -1,7 +1,7 @@
 """Script for plotting the results of the 'suite' benchmark.
 Invoke without parameters for usage hints.
 
-:Author: Francesc Alted
+:Author: The Blosc Developers
 :Date: 2010-06-01
 """
 from __future__ import print_function

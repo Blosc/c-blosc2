@@ -1,7 +1,7 @@
 /*********************************************************************
   Blosc - Blocked Shuffling and Compression Library
 
-  Author: Francesc Alted <francesc@blosc.org>
+  Author: The Blosc Developers <blosc@blosc.org>
   *       Jerome Kieffer <jerome.kieffer@esrf.fr>
 
   See LICENSE.txt for details about copyright and rights to use.
