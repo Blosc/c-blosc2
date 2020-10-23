@@ -255,7 +255,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
 
 
 /* Create a super-chunk out of a serialized frame (no copy is made). */
-blosc2_schunk* blosc2_schunk_from_memframe(uint8_t *memframe, int64_t len) {
+blosc2_schunk* blosc2_schunk_open_memframe(uint8_t *memframe, int64_t len) {
   blosc2_frame* frame = blosc2_frame_from_sframe(memframe, len, false);
   blosc2_schunk* schunk = blosc2_schunk_from_frame(frame, false);
   return schunk;

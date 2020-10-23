@@ -108,6 +108,17 @@ int main(void) {
          ttotal, nbytes / (ttotal * MB));
   printf("Frame length in memory: %ld bytes\n", (long)frame_len);
 
+  // super-chunk -> memframe (in-memory, sequential)
+  blosc_set_timestamp(&last);
+  uint8_t* memframe;
+  int64_t memframe_len = blosc2_schunk_to_memframe(schunk, &memframe);
+  blosc_set_timestamp(&current);
+  ttotal = blosc_elapsed_secs(last, current);
+  printf("Time for schunk -> memframe: %.3g s, %.1f MB/s\n",
+         ttotal, memframe_len / (ttotal * MB));
+  printf("Memframe length in memory: %ld bytes\n", (long)memframe_len);
+  free(memframe);
+
   // frame1 (in-memory) -> fileframe (on-disk)
   blosc_set_timestamp(&last);
   frame_len = blosc2_frame_to_file(frame1, "frame_simple.b2frame");

@@ -1002,6 +1002,9 @@ typedef struct blosc2_schunk {
  * @param storage The storage properties.
  *
  * @return The new super-chunk.
+ *
+ * @note In case that storage.path is not NULL, the data is stored
+ * on-disk.  If the data file(s) exist, they are *overwritten*.
  */
 BLOSC_EXPORT blosc2_schunk *
 blosc2_schunk_new(const blosc2_storage storage);
@@ -1013,6 +1016,9 @@ blosc2_schunk_new(const blosc2_storage storage);
  * @param storage The storage properties.
  *
  * @return The new super-chunk.
+ *
+ * @note In case that storage.path is not NULL, the data is stored
+ * on-disk.  If the data file(s) exist, they are *overwritten*.
  */
 BLOSC_EXPORT blosc2_schunk *
 blosc2_schunk_empty(int nchunks, const blosc2_storage storage);
@@ -1023,26 +1029,53 @@ blosc2_schunk_empty(int nchunks, const blosc2_storage storage);
  * @param storage The storage properties of the source.
  *
  * @return The new super-chunk.
+ *
+ * @note The storage.path must be not NULL and it should exist on-disk.
+ * New data or metadata can be appended or updated.
  */
-BLOSC_EXPORT blosc2_schunk *
-blosc2_schunk_open(const blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk*
+blosc2_schunk_open(blosc2_storage storage);
 
 /**
- * @brief Create a super-chunk out of a serialized frame (no copy is made).
+ * @brief Create a super-chunk out of an in-memory frame (no copy is made).
  *
  * @param memframe The buffer of the serialized frame.
+ *
  * @param len The length of buffer of the serialized frame (in bytes).
  *
  * @return The new super-chunk.
+ *
+ * @note The memframe passed will be owned by the super-chunk and will be
+ * automatically freed when blosc2_schunk_free() is called.  If the user
+ * frees it after the opening, bad things will happen.  Don't do that.
  */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_memframe(uint8_t *memframe, int64_t len);
+BLOSC_EXPORT blosc2_schunk*
+blosc2_schunk_open_memframe(uint8_t *memframe, int64_t len);
+
+/**
+ * @brief Create an in-memory frame out of a super-chunk.
+ *
+ * @param schunk The super-chunk where the chunk to be serialized.
+ *
+ * @param memframe A pointer where the schunk will be serialized.
+ *
+ * @return The length of the memframe.  If <= 0 this indicate an error.
+ *
+ * @note A freshly allocated memframe is returned, so you can use it
+ * independently of what you do with the super-chunk later on.
+ */
+BLOSC_EXPORT int64_t blosc2_schunk_to_memframe(blosc2_schunk* schunk, uint8_t** memframe);
 
 /**
  * @brief Release resources from a super-chunk.
  *
  * @param schunk The super-chunk to be freed.
  *
- * @return 0 if succeeds.
+ * @return 0 if success.
+ *
+ * @note All the memory resources attached to the super-frame are freed.
+ * If the super-chunk is on-disk, the data continues there for a later
+ * re-opening.
  */
 BLOSC_EXPORT int blosc2_schunk_free(blosc2_schunk *schunk);
 
@@ -1272,7 +1305,9 @@ BLOSC_EXPORT int blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content);
 
 
 /*********************************************************************
-  Frame related structures and functions.
+  Frame related functions.
+  These are rather low-level and blosc2_schunk interface is recommended
+  instead.
 *********************************************************************/
 
 /**

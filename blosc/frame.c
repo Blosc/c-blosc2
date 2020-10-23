@@ -80,8 +80,7 @@ void swap_store(void *dest, const void *pa, int size) {
 
 /* Create a new (empty) frame */
 blosc2_frame* blosc2_new_frame(const char* fname) {
-  blosc2_frame* new_frame = malloc(sizeof(blosc2_frame));
-  memset(new_frame, 0, sizeof(blosc2_frame));
+  blosc2_frame* new_frame = calloc(1, sizeof(blosc2_frame));
   if (fname != NULL) {
     char* new_fname = malloc(strlen(fname) + 1);  // + 1 for the trailing NULL
     new_frame->fname = strcpy(new_fname, fname);
@@ -90,7 +89,7 @@ blosc2_frame* blosc2_new_frame(const char* fname) {
 }
 
 
-/* Free all memory from a frame. */
+/* Free memory from a frame. */
 int blosc2_free_frame(blosc2_frame *frame) {
 
   if (frame->sdata != NULL) {
@@ -617,6 +616,36 @@ int64_t blosc2_schunk_to_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   }
 
   return frame->len;
+}
+
+
+/* Create an in-memory frame out of a super-chunk */
+int64_t blosc2_schunk_to_memframe(blosc2_schunk* schunk, uint8_t** memframe) {
+  blosc2_frame* frame = NULL;
+  uint8_t* sdata = NULL;
+  int64_t sdata_len = 0;
+  //if ((schunk->storage->sequential == true) && (schunk->storage->path == NULL)) {
+  // TODO: the above is the canonical way to check, but that does not work (??)
+  if (schunk->frame != NULL && schunk->frame->sdata != NULL) {
+    sdata = schunk->frame->sdata;
+    sdata_len = schunk->frame->len;
+  }
+  else {
+    frame = blosc2_new_frame(NULL);
+    sdata_len = blosc2_schunk_to_frame(schunk, frame);
+    if (sdata_len < 0) {
+      fprintf(stderr, "Error during the conversion of schunk to frame\n");
+      return sdata_len;
+    }
+    sdata = frame->sdata;
+  }
+  // Get a copy of the internal memframe
+  *memframe = malloc((size_t)sdata_len);
+  memcpy(*memframe, sdata, sdata_len);
+  if (frame != NULL) {
+    blosc2_free_frame(frame);
+  }
+  return sdata_len;
 }
 
 
