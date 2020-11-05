@@ -1,0 +1,60 @@
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+#include <blosc2.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+  const char *compressors[] = { "blosclz", "lz4", "lz4hc", "snappy", "zlib", "zstd" };
+  int32_t i = 0, dsize = 0, filter = BLOSC_BITSHUFFLE;
+  int32_t nchunk = 0;
+
+  blosc_init();
+  blosc_set_nthreads(1);
+
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  dparams.nthreads = 1;
+
+  /* Create a super-chunk backed by an in-memory frame */
+  blosc2_frame* frame = blosc2_frame_from_sframe((uint8_t *)data, size, 1);
+  if (frame == NULL) {
+    blosc_destroy();
+    return 0;
+  }
+  blosc2_schunk* schunk = blosc2_schunk_open_sframe(frame, size);
+  if (schunk == NULL) {
+    blosc2_frame_free(frame);
+    blosc_destroy();
+    return 0;
+  }
+
+  /* Decompress data */
+  uint8_t *uncompressed_data = (uint8_t *)malloc(schunk->nbytes+1);
+  if (uncompressed_data != NULL) {
+    for (i = 0, nchunk = 0; nchunk < schunk->nchunks-1; nchunk++) {
+      dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, uncompressed_data + i, schunk->chunksize);
+      if (dsize < 0) {
+        printf("Decompression error.  Error code: %d\n", dsize);
+        break;
+      }
+      i += dsize;
+    }
+
+    free(uncompressed_data);
+  }
+
+  /* Free resources */
+  blosc2_schunk_free(schunk);
+  blosc2_frame_free(frame);
+
+  blosc_destroy();
+  return 0;
+}
+
+#ifdef __cplusplus
+}
+#endif

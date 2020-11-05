@@ -437,7 +437,7 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
 
   // Create the trailer in msgpack (see the frame format document)
   uint32_t trailer_len = FRAME_TRAILER_MINLEN + schunk->usermeta_len;
-  uint8_t* trailer = calloc((size_t)trailer_len, 1);
+  uint8_t* trailer = (uint8_t*)calloc((size_t)trailer_len, 1);
   uint8_t* ptrailer = trailer;
   *ptrailer = 0x90 + 4;  // fixarray with 4 elements
   ptrailer += 1;
@@ -449,7 +449,8 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
   ptrailer += 1;
   swap_store(ptrailer, &(schunk->usermeta_len), 4);
   ptrailer += 4;
-  memcpy(ptrailer, schunk->usermeta, schunk->usermeta_len);
+  if (schunk->usermeta_len > 0)
+    memcpy(ptrailer, schunk->usermeta, schunk->usermeta_len);
   ptrailer += schunk->usermeta_len;
   // Trailer length
   *ptrailer = 0xce;  // uint32
