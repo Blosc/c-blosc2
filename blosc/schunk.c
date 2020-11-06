@@ -152,8 +152,26 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
     schunk->frame = frame;
   }
   else if (storage.path != NULL) {
-    fprintf(stderr, "Creating empty sparse schunks on-disk is not supported yet\n");
-    return NULL;
+
+      //Create header file
+      int64_t header_len = blosc2_sparse_new_header(schunk);
+
+      //Create empty chunks text file
+      char filename[sizeof(storage.path)+10];
+      strcpy(filename,storage.path);
+      strcat(filename,"chunks.txt");
+
+      FILE *fpc = fopen(filename,"w");
+      fclose(fpc);
+
+      //Create trailer file
+      int rc = sparse_new_trailer(schunk);
+      if (rc < 0) {
+          return rc;
+      }
+      //fprintf(stderr, "Creating empty sparse schunks on-disk is not supported yet\n");
+
+      return NULL;
   }
 
   return schunk;

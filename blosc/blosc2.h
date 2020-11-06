@@ -1405,6 +1405,12 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_new(const char* fname);
  */
 BLOSC_EXPORT int64_t blosc2_frame_from_schunk(blosc2_schunk* schunk, blosc2_frame* frame);
 
+
+
+BLOSC_EXPORT int64_t blosc2_sparse_new_header(blosc2_schunk* schunk);
+
+
+
 /**
  * @brief Free all memory from a frame.
  *

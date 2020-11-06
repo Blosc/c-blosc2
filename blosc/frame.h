@@ -50,4 +50,8 @@ int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk
 int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new);
 int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk);
 
+
+int sparse_new_trailer(blosc2_schunk* schunk);
+
+
 #endif //BLOSC_FRAME_H
