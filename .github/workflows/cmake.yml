@@ -7,32 +7,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        name: [
-          Ubuntu GCC,
-          Ubuntu GCC OSB,
-          Ubuntu GCC External LZ4,
-          Ubuntu GCC External LIZARD,
-          Ubuntu GCC External ZLIB,
-          # Not too recent Zstd libs (< 1.4.4) in distros perform pretty bad on compression
-          # ratios when using dictionaries, making some tests not passing.
-          # Commenting this out for the time being.
-          # Ubuntu GCC External ZSTD,
-          Ubuntu Clang,
-          Ubuntu Clang No AVX2,
-          Ubuntu Clang No LZ4,
-          Ubuntu Clang No LIZARD,
-          Ubuntu Clang No SNAPPY,
-          Ubuntu Clang No ZLIB,
-          Ubuntu Clang No ZSTD,
-          Windows MSVC Win32,
-          Windows MSVC Win64,
-          # Windows GCC started to fail with commit 39e4c3c which was just a printf removal.
-          # Looks like this is a problem with this platform in upstream CI.
-          # Commenting this out for now.
-          # Windows GCC,
-          macOS Clang,
-          macOS GCC
-        ]
         include:
           - name: Ubuntu GCC
             os: ubuntu-latest
@@ -63,6 +37,9 @@ jobs:
             packages: zlib1g-dev
             cmake-args: -DPREFER_EXTERNAL_ZLIB=ON
 
+            # Not too recent Zstd libs (< 1.4.4) in distros perform pretty bad on compression
+            # ratios when using dictionaries, making some tests not passing.
+            # Commenting this out for the time being.
             # - name: Ubuntu GCC External ZSTD
             #   os: ubuntu-latest
             #   compiler: gcc
@@ -113,6 +90,9 @@ jobs:
             compiler: cl
             cmake-args: -A x64
 
+            # Windows GCC started to fail with commit 39e4c3c which was just a printf removal.
+            # Looks like this is a problem with this platform in upstream CI.
+            # Commenting this out for now.
             # - name: Windows GCC
             # os: windows-latest
             # compiler: gcc
