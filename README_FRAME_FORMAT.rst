@@ -92,9 +92,10 @@ using the msgpack format. Here is the format for the *metalayers*::
     (``uint8``) General flags.
 
     :``0`` to ``3``:
-        Format version
+        Format version.
     :``4`` and ``5``:
         Enumerated for chunk offsets.
+        
         :``0``:
             16-bit
         :``1``:
