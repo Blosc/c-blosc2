@@ -112,7 +112,9 @@ using the msgpack format. Here is the format for the *metalayers*::
 :codec_flags:
     (``uint8``) Compressor enumeration (defaults for all the chunks in storage).
 
-    :``0`` to ``3``: Enumerated for codecs (up to 16)
+    :``0`` to ``3``:
+        Enumerated for codecs (up to 16).
+        
         :``0``:
             ``blosclz``
         :``1``:
