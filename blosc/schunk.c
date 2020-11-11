@@ -305,6 +305,7 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   // Update super-chunk or frame
   if (schunk->frame == NULL) {
     if (schunk->storage->path != NULL) {
+
       printf("The persistent sparse storage is not supported yet");
       return -1;
     }
