@@ -60,9 +60,11 @@ static char* test_frame(void) {
     // Only BLOSCLZ is doing that.
     cparams.compcode = BLOSC_BLOSCLZ;
   }
+#if defined(HAVE_LZ4)
   else {
     cparams.compcode = BLOSC_LZ4;
   }
+#endif
   if (multithread) {
     cparams.nthreads = NTHREADS;
     dparams.nthreads = NTHREADS;
