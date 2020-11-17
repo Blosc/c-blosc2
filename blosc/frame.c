@@ -1111,15 +1111,28 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
 }
 
 
+struct csize_idx {
+    int32_t val;
+    int32_t idx;
+};
+
+// Helper function for qsorting block offsets
+int sort_offset(const void* a, const void* b) {
+  int32_t a_ = ((struct csize_idx*)a)->val;
+  int32_t b_ = ((struct csize_idx*)b)->val;
+  return a_ - b_;
+}
+
+
 /* Return a compressed chunk that is part of a frame in the `chunk` parameter.
- * If the frame is disk-based, a buffer is allocated for the (compressed) chunk,
+ * If the frame is disk-based, a buffer is allocated for the (lazy) chunk,
  * and hence a free is needed.  You can check if the chunk requires a free with the `needs_free`
  * parameter.
- * If the chunk does not need a free, it means that a pointer to the location in frame is returned
- * in the `chunk` parameter.
+ * If the chunk does not need a free, it means that the frame is in memory and that just a
+ * pointer to the location of the chunk in memory is returned.
  *
- * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
- * is returned instead.
+ * The size of the (compressed, potentially lazy) chunk is returned.  If some problem is detected,
+ * a negative code is returned instead.
 */
 int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free) {
   int32_t header_len;
@@ -1153,38 +1166,84 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
   int64_t offset;
   int rc = blosc_getitem(coffsets, nchunk, 1, &offset);
   if (rc < 0) {
-    size_t nbytes_, cbytes_, blocksize_;
-    blosc_cbuffer_sizes(coffsets, &nbytes_, &cbytes_, &blocksize_);
     fprintf(stderr, "Error: problems retrieving a chunk offset");
     return -4;
   }
 
-  int32_t chunk_cbytes;
+  size_t lazychunk_cbytes = 0;
   if (frame->sdata == NULL) {
+    // TODO: make this portable across different endianness
+    // Get info for building a lazy chunk
+    size_t chunk_nbytes;
+    size_t chunk_cbytes;
+    size_t chunk_blocksize;
+    uint8_t header[BLOSC_MIN_HEADER_LENGTH];
     FILE* fp = fopen(frame->fname, "rb");
-    fseek(fp, header_len + offset + 12, SEEK_SET);
-    size_t rbytes = fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
-    if (rbytes != sizeof(chunk_cbytes)) {
-      fprintf(stderr, "Cannot read the cbytes for chunk in the fileframe.\n");
+    fseek(fp, header_len + offset, SEEK_SET);
+    size_t rbytes = fread(header, 1, BLOSC_MIN_HEADER_LENGTH, fp);
+    if (rbytes != BLOSC_MIN_HEADER_LENGTH) {
+      fprintf(stderr, "Cannot read the header for chunk in the fileframe.\n");
       return -5;
     }
-    chunk_cbytes = sw32_(&chunk_cbytes);
-    *chunk = malloc((size_t)chunk_cbytes);
+    blosc_cbuffer_sizes(header, &chunk_nbytes, &chunk_cbytes, &chunk_blocksize);
+    size_t nblocks = chunk_nbytes / chunk_blocksize;
+    size_t leftover_block = chunk_nbytes % chunk_blocksize;
+    nblocks = leftover_block ? nblocks + 1 : nblocks;
+    // Allocate space for lazy chunk (cbytes + trailer)
+    size_t trailer_len = sizeof(int32_t) + sizeof(int64_t) + nblocks * sizeof(int32_t);
+    lazychunk_cbytes = chunk_cbytes + trailer_len;
+    *chunk = malloc(lazychunk_cbytes);
+    *needs_free = true;
+    // Read just the full header and bstarts section too (lazy partial length)
     fseek(fp, header_len + offset, SEEK_SET);
-    rbytes = fread(*chunk, 1, (size_t)chunk_cbytes, fp);
-    if (rbytes != (size_t)chunk_cbytes) {
-      fprintf(stderr, "Cannot read the chunk out of the fileframe.\n");
+    size_t lazy_partial_len = BLOSC_EXTENDED_HEADER_LENGTH + nblocks * sizeof(int32_t);
+    rbytes = fread(*chunk, 1, lazy_partial_len, fp);
+    fclose(fp);
+    if (rbytes != lazy_partial_len) {
+      fprintf(stderr, "Cannot read the (lazy) chunk out of the fileframe.\n");
       return -6;
     }
-    fclose(fp);
-    *needs_free = true;
+
+    // Mark chunk as lazy
+    uint8_t* blosc2_flags = *chunk + 0x1F;
+    *blosc2_flags |= 0x08U;
+
+    // Add the trailer (currently, nchunk + offset + block_csizes)
+    *(int32_t*)(*chunk + chunk_cbytes) = nchunk;
+    *(int64_t*)(*chunk + chunk_cbytes + sizeof(int32_t)) = header_len + offset;
+
+    // For computing block_csizes we just need to sort the bstarts (they can be out
+    // of order because of multi-threading).
+    int32_t* block_csizes = malloc(nblocks * sizeof(int32_t));
+    memcpy(block_csizes, *chunk + BLOSC_EXTENDED_HEADER_LENGTH, nblocks * sizeof(int32_t));
+    // Helper structure to keep track of original indexes
+    struct csize_idx* csize_idx = malloc(nblocks * sizeof(struct csize_idx));
+    for (int n = 0; n < nblocks; n++) {
+      csize_idx[n].val = block_csizes[n];
+      csize_idx[n].idx = n;
+    }
+    qsort(csize_idx, nblocks, sizeof(struct csize_idx), &sort_offset);
+    // Compute the actual csizes
+    int idx;
+    for (int n = 0; n < nblocks - 1; n++) {
+      idx = csize_idx[n].idx;
+      block_csizes[idx] = csize_idx[n + 1].val - csize_idx[n].val;
+    }
+    idx = csize_idx[nblocks - 1].idx;
+    block_csizes[idx] = chunk_cbytes - csize_idx[nblocks - 1].val;
+
+    // Copy the csizes at the end of the trailer
+    void* trailer_csizes = *chunk + lazychunk_cbytes - nblocks * sizeof(int32_t);
+    memcpy(trailer_csizes, block_csizes, nblocks * sizeof(int32_t));
+    free(block_csizes);
+    free(csize_idx);
   } else {
+    // The chunk is in memory and just one pointer away
     *chunk = frame->sdata + header_len + offset;
-    int32_t chunk_nbytes = sw32_(*chunk + 4);
-    chunk_cbytes = sw32_(*chunk + 12);
+    lazychunk_cbytes = sw32_(*chunk + 4);
   }
 
-  return chunk_cbytes;
+  return (int)lazychunk_cbytes;
 }
 
 

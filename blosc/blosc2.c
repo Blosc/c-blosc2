@@ -997,6 +997,37 @@ static int blosc_d(
     return -1;
   }
 
+  bool is_lazy = context->blosc2_flags & 0x08u;
+  if (is_lazy) {
+    // The chunk is on disk, so just lazily load the block
+    if (context->schunk == NULL) {
+      fprintf(stderr, "Lazy chunk needs an associated super-chunk");
+      return -11;
+    }
+    if (context->schunk->frame == NULL) {
+      fprintf(stderr, "Lazy chunk needs an associated frame");
+      return -12;
+    }
+    char *fname = context->schunk->frame->fname;
+    // Get the offset and csize of the nblock
+    int32_t *block_offsets = (int32_t *)(src + BLOSC_EXTENDED_HEADER_LENGTH);
+    int32_t block_offset = block_offsets[nblock];
+    int32_t *block_csizes = (int32_t *)(src + srcsize - context->nblocks * sizeof(int32_t));
+    int32_t block_csize = block_csizes[nblock];
+    // The offset of the actual chunk is in the trailer
+    int32_t non_lazy_chunklen = *(int32_t*)(src + 12);
+    int64_t chunk_offset = *(int64_t*)(src + non_lazy_chunklen + sizeof(int32_t));
+    // The the lazy block
+    FILE* fp = fopen(fname, "rb");
+    fseek(fp, (long)(chunk_offset + block_offset), SEEK_SET);
+    size_t rbytes = fread((void*)(src + block_offset), 1, block_csize, fp);
+    fclose(fp);
+    if (rbytes != block_csize) {
+      fprintf(stderr, "Cannot read the (lazy) block out of the fileframe.\n");
+      return -13;
+    }
+  }
+
   src += src_offset;
   srcsize -= src_offset;
 
@@ -1504,7 +1535,6 @@ static uint8_t get_filter_flags(const uint8_t header_flags,
 
 static int initialize_context_decompression(blosc2_context* context, const void* src, int32_t srcsize,
                                             void* dest, int32_t destsize) {
-  uint8_t blosc2_flags = 0;
   int32_t cbytes;
   int32_t bstarts_offset;
   int32_t bstarts_end;
@@ -1569,8 +1599,8 @@ static int initialize_context_decompression(blosc2_context* context, const void*
       context->filters_meta[i] = filters_meta[i];
     }
     context->filter_flags = filters_to_flags(filters);
+    context->blosc2_flags = context->src[0x1F];
     bstarts_offset = BLOSC_EXTENDED_HEADER_LENGTH;
-    blosc2_flags = context->src[0x1F];
   } else {
     /* Regular (Blosc1) header */
     context->filter_flags = get_filter_flags(context->header_flags,
@@ -1588,7 +1618,7 @@ static int initialize_context_decompression(blosc2_context* context, const void*
   srcsize -= bstarts_end;
 
   /* Read optional dictionary if flag set */
-  if (blosc2_flags & BLOSC2_USEDICT) {
+  if (context->blosc2_flags & BLOSC2_USEDICT) {
 #if defined(HAVE_ZSTD)
     context->use_dict = 1;
     if (context->dict_ddict != NULL) {
@@ -2123,6 +2153,7 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
   }
 
   /* Check whether this buffer is memcpy'ed */
+  // TODO: what to do with lazy chunks?  Probably it is better to disable this optimization.
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
   if (memcpyed) {
     // Check that sizes in header are compatible, otherwise there is a header corruption
