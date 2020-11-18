@@ -1092,6 +1092,11 @@ BLOSC_EXPORT int blosc2_schunk_free(blosc2_schunk *schunk);
 BLOSC_EXPORT int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy);
 
 
+
+BLOSC_EXPORT int schunk_sparse_append_chunk(blosc2_schunk *schunk, uint8_t *chunk);
+
+
+
 /**
   * @brief Update a chunk at a specific position in a super-chunk.
   *

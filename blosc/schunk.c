@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
+#include <sys/stat.h>
 #include "blosc2.h"
 #include "blosc-private.h"
 #include "context.h"
@@ -148,28 +150,33 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
     int64_t frame_len = blosc2_frame_from_schunk(schunk, frame);
     if (frame_len < 0) {
       fprintf(stderr, "Error during the conversion of schunk to frame\n");
+      return NULL;
     }
     schunk->frame = frame;
   }
   else if (storage.path != NULL) {
+      //Create directory
+      if (mkdir(storage.path,777) == -1) {
+          fprintf(stderr, "Error during the creation of the directory, maybe it already exists\n");
+          return NULL;
+      }
 
       //Create header file
       int64_t header_len = blosc2_sparse_new_header(schunk);
 
       //Create empty chunks text file
-      char filename[sizeof(storage.path)+10];
-      strcpy(filename,storage.path);
+      char *filename = malloc(sizeof(uint8_t) * (strlen(schunk->storage->path)) + 10 +1);
+      strcpy(filename, schunk->storage->path);
       strcat(filename,"chunks.txt");
-
-      FILE *fpc = fopen(filename,"w");
-      fclose(fpc);
+      FILE *fpcs = fopen(filename,"w");
+      free(filename);
+      fclose(fpcs);
 
       //Create trailer file
       int rc = sparse_new_trailer(schunk);
       if (rc < 0) {
           return rc;
       }
-      //fprintf(stderr, "Creating empty sparse schunks on-disk is not supported yet\n");
 
       return NULL;
   }
@@ -305,9 +312,7 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   // Update super-chunk or frame
   if (schunk->frame == NULL) {
     if (schunk->storage->path != NULL) {
-
-      printf("The persistent sparse storage is not supported yet");
-      return -1;
+        return schunk_sparse_append_chunk(chunk,schunk);
     }
     // Check that we are not appending a small chunk after another small chunk
     if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
