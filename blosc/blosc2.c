@@ -2272,6 +2272,11 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
   int32_t stop = start + nitems;
   int j;
 
+  if (nitems == 0) {
+    // We have nothing to do
+    return 0;
+  }
+
   if (srcsize < BLOSC_MIN_HEADER_LENGTH) {
     /* Not enough input to parse Blosc1 header */
     return -1;
@@ -2288,6 +2293,11 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
 
   ebsize = blocksize + typesize * (int32_t)sizeof(int32_t);
 
+  /* Total blocks */
+  nblocks = nbytes / blocksize;
+  leftover = nbytes % blocksize;
+  nblocks = (leftover > 0) ? nblocks + 1 : nblocks;
+
   if ((context->header_flags & BLOSC_DOSHUFFLE) &&
       (context->header_flags & BLOSC_DOBITSHUFFLE)) {
     /* Extended header */
@@ -2302,6 +2312,9 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
       context->filters_meta[i] = filters_meta[i];
     }
     bstarts = (int32_t*)(_src + BLOSC_EXTENDED_HEADER_LENGTH);
+    // The next is needed for lazy chunks
+    context->nblocks = nblocks;
+    context->blosc2_flags = _src[0x1F];
   } else {
     /* Minimal header */
     flags_to_filters(flags, context->filters);
@@ -2312,12 +2325,6 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
   if (blocksize <= 0 || blocksize > nbytes || typesize <= 0 || typesize > BLOSC_MAX_TYPESIZE) {
     return -1;
   }
-
-  /* Compute some params */
-  /* Total blocks */
-  nblocks = nbytes / blocksize;
-  leftover = nbytes % blocksize;
-  nblocks = (leftover > 0) ? nblocks + 1 : nblocks;
 
   /* Check region boundaries */
   if ((start < 0) || (start * typesize > nbytes)) {
@@ -2434,6 +2441,15 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   context.schunk = g_schunk;
   context.nthreads = 1;  // force a serial decompression; fixes #95
   context.serial_context = create_thread_context(&context, 0);
+  if ((context.header_flags & BLOSC_DOSHUFFLE) &&
+      (context.header_flags & BLOSC_DOBITSHUFFLE)) {
+    // Support for lazy chunks exists only for Blosc2, and needs the context.
+    context.blosc2_flags = _src[0x1F];
+    if (context.blosc2_flags & 0x08) {
+      fprintf(stderr, "blosc_getitem does not support lazy chunks.  Use blosc2_getitem_ctx instead.");
+      return -2;
+    }
+  }
 
   /* Call the actual getitem function */
   result = _blosc_getitem(&context, src, INT32_MAX, start, nitems, dest);
@@ -2449,7 +2465,7 @@ int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize
   int result;
 
   /* Minimally populate the context */
-  context->typesize = (uint8_t)_src[3];
+  context->typesize = _src[3];
   context->blocksize = sw32_(_src + 8);
   context->header_flags = *(_src + 2);
   context->filter_flags = get_filter_flags(*(_src + 2), context->typesize);
