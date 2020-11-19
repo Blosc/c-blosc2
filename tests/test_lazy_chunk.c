@@ -12,6 +12,8 @@
 #include "test_common.h"
 
 #define CHUNKSIZE (200 * 1000)
+#define BLOCKSIZE (20 * 1000)
+#define NBLOCKS (CHUNKSIZE / BLOCKSIZE)
 #define NTHREADS (2)
 
 /* Global vars */
@@ -36,14 +38,17 @@ static char* test_lazy_chunk(void) {
   cparams.typesize = sizeof(int32_t);
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
+  cparams.blocksize = BLOCKSIZE * cparams.typesize;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.sequential=true, .path="test_lazy_chunk.b2frame", .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
-    for (int i = 0; i < CHUNKSIZE; i++) {
-      data[i] = i + nchunk * CHUNKSIZE;
+    for (int i = 0; i < NBLOCKS; i++) {
+      for (int j = 0; j < BLOCKSIZE; j++) {
+        data[j + i * BLOCKSIZE] = j + i * BLOCKSIZE + nchunk * CHUNKSIZE;
+      }
     }
     int nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append in frame", nchunks_ > 0);
@@ -56,29 +61,35 @@ static char* test_lazy_chunk(void) {
     mu_assert("ERROR: bad compression ratio in frame", nbytes > 10 * cbytes);
   }
 
+  // Check that blosc2_getitem_ctx works correctly with lazy chunks
+  bool needs_free;
+  uint8_t* lazy_chunk;
+  for (int nchunk = 0; nchunk < nchunks; nchunk++) {
+    for (int i = 0; i < NBLOCKS - 1; i++) {
+      memset(data_dest, 0, CHUNKSIZE * sizeof(int32_t));
+      cbytes  = blosc2_schunk_get_chunk(schunk, nchunk, &lazy_chunk, &needs_free);
+      dsize = blosc2_getitem_ctx(schunk->dctx, lazy_chunk, cbytes, i * BLOCKSIZE, BLOCKSIZE * 2, data_dest);
+      mu_assert("ERROR: blosc2_getitem_ctx does not work correctly.", dsize >= 0);
+      for (int j = 0; j < BLOCKSIZE * 2; j++) {
+        mu_assert("ERROR: bad roundtrip (getitem)",
+                  data_dest[j] == j + i * BLOCKSIZE + nchunk * CHUNKSIZE);
+      }
+      if (needs_free) {
+        free(lazy_chunk);
+      }
+    }
+  }
+
   // Check that lazy chunks can be decompressed correctly
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
     memset(data_dest, 0, CHUNKSIZE * sizeof(int32_t));
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
-    for (int i = 0; i < CHUNKSIZE; i++) {
-      mu_assert("ERROR: bad roundtrip",data_dest[i] == i + nchunk * CHUNKSIZE);
-    }
-  }
-
-  // Check that blosc2_getitem_ctx works correctly with lazy chunks
-  bool needs_free;
-  uint8_t* lazy_chunk;
-  for (int nchunk = 0; nchunk < nchunks; nchunk++) {
-    memset(data_dest, 0, CHUNKSIZE * sizeof(int32_t));
-    cbytes  = blosc2_schunk_get_chunk(schunk, nchunk, &lazy_chunk, &needs_free);
-    dsize = blosc2_getitem_ctx(schunk->dctx, lazy_chunk, cbytes, nchunk, nchunk * 100, data_dest);
-    mu_assert("ERROR: blosc2_getitem_ctx does not work correctly.", dsize >= 0);
-    for (int i = nchunk; i < nchunk * 100; i++) {
-      mu_assert("ERROR: bad roundtrip",data_dest[i - nchunk] == i + nchunk * CHUNKSIZE);
-    }
-    if (needs_free) {
-      free(lazy_chunk);
+    for (int i = 0; i < NBLOCKS; i++) {
+      for (int j = 0; j < BLOCKSIZE; j++) {
+        mu_assert("ERROR: bad roundtrip (decompress)",
+                  data_dest[j + i * BLOCKSIZE] == j + i * BLOCKSIZE + nchunk * CHUNKSIZE);
+      }
     }
   }
 

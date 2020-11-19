@@ -969,7 +969,7 @@ int pipeline_d(blosc2_context* context, const int32_t bsize, uint8_t* dest,
 static int blosc_d(
     struct thread_context* thread_context, int32_t bsize,
     int32_t leftoverblock, const uint8_t* src, int32_t srcsize, int32_t src_offset,
-    uint8_t* dest, int32_t dest_offset, uint8_t* tmp, uint8_t* tmp2) {
+    int32_t nblock, uint8_t* dest, int32_t dest_offset, uint8_t* tmp, uint8_t* tmp2) {
   blosc2_context* context = thread_context->parent_context;
   uint8_t* filters = context->filters;
   uint8_t *tmp3 = thread_context->tmp4;
@@ -984,7 +984,6 @@ static int blosc_d(
   int32_t ntbytes = 0;           /* number of uncompressed bytes in block */
   uint8_t* _dest;
   int32_t typesize = context->typesize;
-  int32_t nblock = dest_offset / context->blocksize;
   const char* compname;
 
   if (context->block_maskout != NULL && context->block_maskout[nblock]) {
@@ -1009,9 +1008,7 @@ static int blosc_d(
       return -12;
     }
     char *fname = context->schunk->frame->fname;
-    // Get the offset and csize of the nblock
-    int32_t *block_offsets = (int32_t *)(src + BLOSC_EXTENDED_HEADER_LENGTH);
-    int32_t block_offset = block_offsets[nblock];
+    // Get the csize of the nblock
     int32_t *block_csizes = (int32_t *)(src + srcsize - context->nblocks * sizeof(int32_t));
     int32_t block_csize = block_csizes[nblock];
     // The offset of the actual chunk is in the trailer
@@ -1019,8 +1016,9 @@ static int blosc_d(
     int64_t chunk_offset = *(int64_t*)(src + non_lazy_chunklen + sizeof(int32_t));
     // The the lazy block
     FILE* fp = fopen(fname, "rb");
-    fseek(fp, (long)(chunk_offset + block_offset), SEEK_SET);
-    size_t rbytes = fread((void*)(src + block_offset), 1, block_csize, fp);
+    // The offset of the block is src_offset
+    fseek(fp, (long)(chunk_offset + src_offset), SEEK_SET);
+    size_t rbytes = fread((void*)(src + src_offset), 1, block_csize, fp);
     fclose(fp);
     if (rbytes != block_csize) {
       fprintf(stderr, "Cannot read the (lazy) block out of the fileframe.\n");
@@ -1213,7 +1211,7 @@ static int serial_blosc(struct thread_context* thread_context) {
       else {
         /* Regular decompression */
         cbytes = blosc_d(thread_context, bsize, leftoverblock,
-                         context->src, context->srcsize, sw32_(bstarts + j),
+                         context->src, context->srcsize, sw32_(bstarts + j), j,
                          context->dest, j * context->blocksize, tmp, tmp2);
       }
     }
@@ -2398,7 +2396,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
       bool get_single_block = ((startb == 0) && (bsize == nitems * typesize));
       uint8_t* tmp2 = get_single_block ? dest : scontext->tmp2;
       cbytes = blosc_d(context->serial_context, bsize, leftoverblock,
-                       src, srcsize, sw32_(bstarts + j),
+                       src, srcsize, sw32_(bstarts + j), j,
                        tmp2, 0, scontext->tmp, scontext->tmp3);
       if (cbytes < 0) {
         ntbytes = cbytes;
@@ -2607,7 +2605,7 @@ static void t_blosc_do_job(void *ctxt)
           cbytes = -1;
         } else {
           cbytes = blosc_d(thcontext, bsize, leftoverblock,
-                            src, srcsize, sw32_(bstarts + nblock_),
+                            src, srcsize, sw32_(bstarts + nblock_), nblock_,
                             dest, nblock_ * blocksize, tmp, tmp2);
         }
       }
