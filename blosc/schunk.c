@@ -574,6 +574,38 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, 
 }
 
 
+/* Return a compressed chunk that is part of a super-chunk in the `chunk` parameter.
+ * If the super-chunk is backed by a frame that is disk-based, a buffer is allocated for the
+ * (compressed) chunk, and hence a free is needed.  You can check if the chunk requires a free
+ * with the `needs_free` parameter.
+ * If the chunk does not need a free, it means that a pointer to the location in the super-chunk
+ * (or the backing in-memory frame) is returned in the `chunk` parameter.
+ *
+ * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
+ * is returned instead.
+*/
+int blosc2_schunk_get_chunk_lazy(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, bool *needs_free) {
+  if (schunk->frame != NULL) {
+    return frame_get_chunk_lazy(schunk->frame, nchunk, chunk, needs_free);
+  }
+
+  if (nchunk >= schunk->nchunks) {
+    fprintf(stderr, "nchunk ('%d') exceeds the number of chunks "
+                    "('%d') in schunk\n", nchunk, schunk->nchunks);
+    return -2;
+  }
+
+  *chunk = schunk->data[nchunk];
+  if (*chunk == 0) {
+    *needs_free = 0;
+    return 0;
+  }
+
+  *needs_free = false;
+  return sw32_(*chunk + 12);
+}
+
+
 /* Find whether the schunk has a metalayer or not.
  *
  * If successful, return the index of the metalayer.  Else, return a negative value.

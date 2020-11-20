@@ -1014,7 +1014,7 @@ static int blosc_d(
     // The offset of the actual chunk is in the trailer
     int32_t non_lazy_chunklen = *(int32_t*)(src + 12);
     int64_t chunk_offset = *(int64_t*)(src + non_lazy_chunklen + sizeof(int32_t));
-    // The the lazy block
+    // Read the lazy block on disk
     FILE* fp = fopen(fname, "rb");
     // The offset of the block is src_offset
     fseek(fp, (long)(chunk_offset + src_offset), SEEK_SET);

@@ -1007,7 +1007,7 @@ typedef struct blosc2_schunk {
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk *
-blosc2_schunk_new(const blosc2_storage storage);
+blosc2_schunk_new(blosc2_storage storage);
 
 /**
  * @brief Create a non-initialized super-chunk.
@@ -1021,7 +1021,7 @@ blosc2_schunk_new(const blosc2_storage storage);
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk *
-blosc2_schunk_empty(int nchunks, const blosc2_storage storage);
+blosc2_schunk_empty(int nchunks, blosc2_storage storage);
 
 /**
  * @brief Open an existing super-chunk that is on-disk (no copy is made).
@@ -1161,8 +1161,8 @@ BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchun
  * responsibility to free the chunk returned or not.
  *
  * @warning If the super-chunk is backed by a frame that is disk-based, a buffer is allocated for the
- * (compressed) chunk, and hence a free is needed. You can check if the chunk requires a free
- * with the @p needs_free parameter.
+ * (compressed) chunk, and hence a free is needed.
+ * You can check if the chunk requires a free with the @p needs_free parameter.
  * If the chunk does not need a free, it means that a pointer to the location in the super-chunk
  * (or the backing in-memory frame) is returned in the @p chunk parameter.
  *
@@ -1171,6 +1171,33 @@ BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchun
  */
 BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk,
                                          bool *needs_free);
+
+/**
+ * @brief Return a (lazy) compressed chunk that is part of a super-chunk in the @p chunk parameter.
+ *
+ * @param schunk The super-chunk from where to extract a chunk.
+ * @param nchunk The chunk to be extracted (0 indexed).
+ * @param chunk The pointer to the (lazy) chunk of compressed data.
+ * @param needs_free The pointer to a boolean indicating if it is the user's
+ * responsibility to free the chunk returned or not.
+ *
+ * @note For disk-based frames, a lazy chunk is always returned.
+ *
+ * @warning Currently, a lazy chunk can only be used by #blosc2_decompress_ctx and #blosc2_getitem_ctx.
+ *
+ * @warning If the super-chunk is backed by a frame that is disk-based, a buffer is allocated for the
+ * (compressed) chunk, and hence a free is needed.
+ * You can check if the chunk requires a free with the @p needs_free parameter.
+ * If the chunk does not need a free, it means that a pointer to the location in the super-chunk
+ * (or the backing in-memory frame) is returned in the @p chunk parameter.  In this case the returned
+ * chunk is not lazy.
+ *
+ * @return The size of the (compressed) chunk or 0 if it is non-initialized. If some problem is
+ * detected, a negative code is returned instead.  Note that a lazy chunk is somewhat larger than
+ * a regular chunk because of the trailer section (for details see `README_CHUNK_FORMAT.rst`).
+ */
+BLOSC_EXPORT int blosc2_schunk_get_chunk_lazy(blosc2_schunk *schunk, int nchunk, uint8_t **chunk,
+                                              bool *needs_free);
 
 /**
  * @brief Return the @p cparams associated to a super-chunk.

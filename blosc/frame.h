@@ -42,6 +42,7 @@
 
 void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk);
 int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free);
+int frame_get_chunk_lazy(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free);
 int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk,
                            void *dest, int32_t nbytes);
 

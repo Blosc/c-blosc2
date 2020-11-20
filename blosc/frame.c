@@ -1124,15 +1124,34 @@ int sort_offset(const void* a, const void* b) {
 }
 
 
+int64_t get_coffset(blosc2_frame* frame, int32_t header_len, int64_t cbytes, int32_t nchunk) {
+  // Get the offset to nchunk
+  int64_t offset;
+  uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, NULL);
+  if (coffsets == NULL) {
+    fprintf(stderr, "Error: cannot get the offset for chunk %d for the frame\n", nchunk);
+    return -3;
+  }
+
+  int rc = blosc_getitem(coffsets, nchunk, 1, &offset);
+  if (rc < 0) {
+    size_t nbytes_, cbytes_, blocksize_;
+    blosc_cbuffer_sizes(coffsets, &nbytes_, &cbytes_, &blocksize_);
+    fprintf(stderr, "Error: problems retrieving a chunk offset");
+    return -4;
+  }
+  return offset;
+}
+
 /* Return a compressed chunk that is part of a frame in the `chunk` parameter.
- * If the frame is disk-based, a buffer is allocated for the (lazy) chunk,
+ * If the frame is disk-based, a buffer is allocated for the (compressed) chunk,
  * and hence a free is needed.  You can check if the chunk requires a free with the `needs_free`
  * parameter.
- * If the chunk does not need a free, it means that the frame is in memory and that just a
- * pointer to the location of the chunk in memory is returned.
+ * If the chunk does not need a free, it means that a pointer to the location in frame is returned
+ * in the `chunk` parameter.
  *
- * The size of the (compressed, potentially lazy) chunk is returned.  If some problem is detected,
- * a negative code is returned instead.
+ * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
+ * is returned instead.
 */
 int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free) {
   int32_t header_len;
@@ -1157,18 +1176,73 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
     return -2;
   }
 
-  // Get the offset to chunk
-  uint8_t* coffsets = get_coffsets(frame, header_len, cbytes, NULL);
-  if (coffsets == NULL) {
-    fprintf(stderr, "Error: cannot get the offset for chunk %d for the frame\n", nchunk);
-    return -3;
+  // Get the offset to nchunk
+  int64_t offset = get_coffset(frame, header_len, cbytes, nchunk);
+
+  int32_t chunk_cbytes;
+  if (frame->sdata == NULL) {
+    FILE* fp = fopen(frame->fname, "rb");
+    fseek(fp, header_len + offset + 12, SEEK_SET);
+    size_t rbytes = fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
+    if (rbytes != sizeof(chunk_cbytes)) {
+      fprintf(stderr, "Cannot read the cbytes for chunk in the fileframe.\n");
+      return -5;
+    }
+    chunk_cbytes = sw32_(&chunk_cbytes);
+    *chunk = malloc((size_t)chunk_cbytes);
+    fseek(fp, header_len + offset, SEEK_SET);
+    rbytes = fread(*chunk, 1, (size_t)chunk_cbytes, fp);
+    if (rbytes != (size_t)chunk_cbytes) {
+      fprintf(stderr, "Cannot read the chunk out of the fileframe.\n");
+      return -6;
+    }
+    fclose(fp);
+    *needs_free = true;
+  } else {
+    // The chunk is in memory and just one pointer away
+    *chunk = frame->sdata + header_len + offset;
+    chunk_cbytes = sw32_(*chunk + 12);
   }
-  int64_t offset;
-  int rc = blosc_getitem(coffsets, nchunk, 1, &offset);
-  if (rc < 0) {
-    fprintf(stderr, "Error: problems retrieving a chunk offset");
-    return -4;
+
+  return chunk_cbytes;
+}
+
+
+/* Return a compressed chunk that is part of a frame in the `chunk` parameter.
+ * If the frame is disk-based, a buffer is allocated for the (lazy) chunk,
+ * and hence a free is needed.  You can check if the chunk requires a free with the `needs_free`
+ * parameter.
+ * If the chunk does not need a free, it means that the frame is in memory and that just a
+ * pointer to the location of the chunk in memory is returned.
+ *
+ * The size of the (compressed, potentially lazy) chunk is returned.  If some problem is detected,
+ * a negative code is returned instead.
+*/
+int frame_get_chunk_lazy(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free) {
+  int32_t header_len;
+  int64_t frame_len;
+  int64_t nbytes;
+  int64_t cbytes;
+  int32_t chunksize;
+  int32_t nchunks;
+
+  *chunk = NULL;
+  *needs_free = false;
+  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+                            NULL, NULL, NULL, NULL, NULL);
+  if (ret < 0) {
+    fprintf(stderr, "unable to get meta info from frame");
+    return -1;
   }
+
+  if (nchunk >= nchunks) {
+    fprintf(stderr, "nchunk ('%d') exceeds the number of chunks "
+                    "('%d') in frame\n", nchunk, nchunks);
+    return -2;
+  }
+
+  // Get the offset to nchunk
+  int64_t offset = get_coffset(frame, header_len, cbytes, nchunk);
 
   size_t lazychunk_cbytes = 0;
   if (frame->sdata == NULL) {
@@ -1345,6 +1419,13 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   }
 
   int64_t new_frame_len = header_len + new_cbytes + new_off_cbytes + trailer_len;
+
+  // If the chunk is lazy, convert it into a regular chunk
+  uint8_t* chunk_ = chunk;
+  if (chunk_[0x1F] & 0x08U) {
+    void* destchunk = malloc(nbytes_chunk);
+    blosc2_decompress_ctx(cctx, chunk, cbytes_chunk, destchunk, nbytes_chunk);
+  }
 
   FILE* fp = NULL;
   if (frame->sdata != NULL) {
