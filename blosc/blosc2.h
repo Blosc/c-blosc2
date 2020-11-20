@@ -214,6 +214,25 @@ enum {
   BLOSC_ZSTD_VERSION_FORMAT = 1,
 };
 
+
+/**
+ * @brief Offsets for fields in Blosc2 chunk header
+ */
+enum {
+    BLOSC2_CHUNK_VERSION = 0x0,       //!< the version for the chunk format
+    BLOSC2_CHUNK_VERSIONLZ = 0x1,     //!< the version for the format of internal codec
+    BLOSC2_CHUNK_FLAGS = 0x2,         //!< flags and codec info
+    BLOSC2_CHUNK_TYPESIZE = 0x3,      //!< (uint8) the number of bytes of the atomic type
+    BLOSC2_CHUNK_NBYTES = 0x4,        //!< (int32) uncompressed size of the buffer (this header is not included)
+    BLOSC2_CHUNK_BLOCKSIZE = 0x8,     //!< (int32) size of internal blocks
+    BLOSC2_CHUNK_CBYTES = 0xc,        //!< (int32) compressed size of the buffer (including this header)
+    BLOSC2_CHUNK_FILTER_CODES = 0x10, //!< the codecs for the filter pipeline (1 byte per code)
+    BLOSC2_CHUNK_FILTER_META = 0x18,  //!< meta info for the filter pipeline (1 byte per code)
+    BLOSC2_CHUNK_BLOSC2_FLAGS = 0x1F, //!< flags specific for Blosc2 functionality
+};
+
+
+
 /**
  * @brief Initialize the Blosc library environment.
  *

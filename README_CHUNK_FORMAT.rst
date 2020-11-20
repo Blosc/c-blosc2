@@ -87,13 +87,13 @@ for encoding blocks with a filter pipeline::
     (``uint8``) Number of bytes for the atomic type.
 
 :nbytes:
-    (``uint32``) Uncompressed size of the buffer (this header is not included).
+    (``int32``) Uncompressed size of the buffer (this header is not included).
 
 :blocksize:
-    (``uint32``) Size of internal blocks.
+    (``int32``) Size of internal blocks.
 
 :cbytes:
-    (``uint32``) Compressed size of the buffer (including this header).
+    (``int32``) Compressed size of the buffer (including this header).
 
 :filter_codes:
     (``uint8``) Filter code.

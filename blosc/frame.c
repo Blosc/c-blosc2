@@ -535,10 +535,10 @@ int64_t blosc2_frame_from_schunk(blosc2_schunk *schunk, blosc2_frame *frame) {
   uint64_t* data_tmp = malloc(off_nbytes);
   for (int i = 0; i < nchunks; i++) {
     uint8_t* data_chunk = schunk->data[i];
-    int32_t chunk_cbytes = sw32_(data_chunk + 12);
+    int32_t chunk_cbytes = sw32_(data_chunk + BLOSC2_CHUNK_CBYTES);
     data_tmp[i] = coffset;
     coffset += chunk_cbytes;
-    int32_t chunksize_ = sw32_(data_chunk + 4);
+    int32_t chunksize_ = sw32_(data_chunk + BLOSC2_CHUNK_NBYTES);
     if (i == 0) {
       chunksize = chunksize_;
     }
@@ -590,7 +590,7 @@ int64_t blosc2_frame_from_schunk(blosc2_schunk *schunk, blosc2_frame *frame) {
   coffset = 0;
   for (int i = 0; i < nchunks; i++) {
     uint8_t* data_chunk = schunk->data[i];
-    int32_t chunk_cbytes = sw32_(data_chunk + 12);
+    int32_t chunk_cbytes = sw32_(data_chunk + BLOSC2_CHUNK_CBYTES);
     if (frame->fname == NULL) {
       memcpy(frame->sdata + h2len + coffset, data_chunk, (size_t)chunk_cbytes);
     } else {
@@ -937,7 +937,7 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
     schunk->metalayers[nmetalayer] = metalayer;
 
     // Populate the metalayer string
-    int8_t nslen = *idxp & (uint8_t)0x1fu;
+    int8_t nslen = *idxp & (uint8_t)0x1F;
     idxp += 1;
     char* ns = malloc((size_t)nslen + 1);
     memcpy(ns, idxp, nslen);
@@ -1048,13 +1048,13 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
   for (int i = 0; i < nchunks; i++) {
     if (frame->sdata != NULL) {
       data_chunk = frame->sdata + header_len + offsets[i];
-      csize = sw32_(data_chunk + 12);
+      csize = sw32_(data_chunk + BLOSC2_CHUNK_CBYTES);
     }
     else {
       fseek(fp, header_len + offsets[i], SEEK_SET);
       size_t rbytes = fread(data_chunk, 1, BLOSC_MIN_HEADER_LENGTH, fp);
       assert(rbytes == BLOSC_MIN_HEADER_LENGTH);
-      csize = sw32_(data_chunk + 12);
+      csize = sw32_(data_chunk + BLOSC2_CHUNK_CBYTES);
       if (csize > prev_alloc) {
         data_chunk = realloc(data_chunk, (size_t)csize);
         prev_alloc = csize;
@@ -1066,9 +1066,9 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
     uint8_t* new_chunk = malloc((size_t)csize);
     memcpy(new_chunk, data_chunk, (size_t)csize);
     schunk->data[i] = new_chunk;
-    acc_nbytes += sw32_(data_chunk + 4);
+    acc_nbytes += sw32_(data_chunk + BLOSC2_CHUNK_NBYTES);
     acc_cbytes += csize;
-    int32_t blocksize_ = sw32_(data_chunk + 8);
+    int32_t blocksize_ = sw32_(data_chunk + BLOSC2_CHUNK_BLOCKSIZE);
     if (i == 0) {
       blocksize = blocksize_;
     }
@@ -1182,7 +1182,7 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
   int32_t chunk_cbytes;
   if (frame->sdata == NULL) {
     FILE* fp = fopen(frame->fname, "rb");
-    fseek(fp, header_len + offset + 12, SEEK_SET);
+    fseek(fp, header_len + offset + BLOSC2_CHUNK_CBYTES, SEEK_SET);
     size_t rbytes = fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
     if (rbytes != sizeof(chunk_cbytes)) {
       fprintf(stderr, "Cannot read the cbytes for chunk in the fileframe.\n");
@@ -1201,7 +1201,7 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
   } else {
     // The chunk is in memory and just one pointer away
     *chunk = frame->sdata + header_len + offset;
-    chunk_cbytes = sw32_(*chunk + 12);
+    chunk_cbytes = sw32_(*chunk + BLOSC2_CHUNK_CBYTES);
   }
 
   return chunk_cbytes;
@@ -1279,7 +1279,7 @@ int frame_get_chunk_lazy(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool 
     }
 
     // Mark chunk as lazy
-    uint8_t* blosc2_flags = *chunk + 0x1F;
+    uint8_t* blosc2_flags = *chunk + BLOSC2_CHUNK_BLOSC2_FLAGS;
     *blosc2_flags |= 0x08U;
 
     // Add the trailer (currently, nchunk + offset + block_csizes)
@@ -1314,7 +1314,7 @@ int frame_get_chunk_lazy(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool 
   } else {
     // The chunk is in memory and just one pointer away
     *chunk = frame->sdata + header_len + offset;
-    lazychunk_cbytes = sw32_(*chunk + 4);
+    lazychunk_cbytes = sw32_(*chunk + BLOSC2_CHUNK_CBYTES);
   }
 
   return (int)lazychunk_cbytes;
@@ -1340,8 +1340,8 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   int64_t trailer_len = frame->len - trailer_offset;
 
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
-  int32_t nbytes_chunk = sw32_((uint8_t*)chunk + 4);
-  int32_t cbytes_chunk = sw32_((uint8_t*)chunk + 12);
+  int32_t nbytes_chunk = sw32_((uint8_t*)chunk + BLOSC2_CHUNK_NBYTES);
+  int32_t cbytes_chunk = sw32_((uint8_t*)chunk + BLOSC2_CHUNK_CBYTES);
   int64_t new_cbytes = cbytes + cbytes_chunk;
 
   if ((nchunks > 0) && (nbytes_chunk > chunksize)) {
@@ -1360,7 +1360,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
               "cannot get the last chunk (in position %d)", nchunks - 1);
       return NULL;
     }
-    int32_t last_nbytes = sw32_(last_chunk + 4);
+    int32_t last_nbytes = sw32_(last_chunk + BLOSC2_CHUNK_NBYTES);
     if (needs_free) {
       free(last_chunk);
     }
@@ -1488,7 +1488,7 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk
   }
 
   /* Create a buffer for destination */
-  int32_t nbytes_ = sw32_(src + 4);
+  int32_t nbytes_ = sw32_(src + BLOSC2_CHUNK_NBYTES);
   if (nbytes_ > (int32_t)nbytes) {
     fprintf(stderr, "Not enough space for decompressing in dest");
     return -1;

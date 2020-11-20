@@ -916,7 +916,7 @@ int pipeline_d(blosc2_context* context, const int32_t bsize, uint8_t* dest,
         }
         break;
       case BLOSC_BITSHUFFLE:
-        bitunshuffle(typesize, bsize, _src, _dest, _tmp, context->src[0]);
+        bitunshuffle(typesize, bsize, _src, _dest, _tmp, context->src[BLOSC2_CHUNK_VERSION]);
         break;
       case BLOSC_DELTA:
         if (context->nthreads == 1) {
@@ -975,7 +975,7 @@ static int blosc_d(
   uint8_t *tmp3 = thread_context->tmp4;
   int32_t compformat = (context->header_flags & 0xe0) >> 5;
   int dont_split = (context->header_flags & 0x10) >> 4;
-  //uint8_t blosc_version_format = src[0];
+  //uint8_t blosc_version_format = src[BLOSC2_CHUNK_VERSION];
   int nstreams;
   int32_t neblock;
   int32_t nbytes;                /* number of decompressed bytes in split */
@@ -1012,7 +1012,7 @@ static int blosc_d(
     int32_t *block_csizes = (int32_t *)(src + srcsize - context->nblocks * sizeof(int32_t));
     int32_t block_csize = block_csizes[nblock];
     // The offset of the actual chunk is in the trailer
-    int32_t non_lazy_chunklen = *(int32_t*)(src + 12);
+    int32_t non_lazy_chunklen = *(int32_t*)(src + BLOSC2_CHUNK_CBYTES);
     int64_t chunk_offset = *(int64_t*)(src + non_lazy_chunklen + sizeof(int32_t));
     // Read the lazy block on disk
     FILE* fp = fopen(fname, "rb");
@@ -1195,7 +1195,7 @@ static int serial_blosc(struct thread_context* thread_context) {
     else {
       if (memcpyed) {
         // Check that sizes in header are compatible, otherwise there is a header corruption
-        int32_t csize = sw32_(context->src + 12);   /* compressed buffer size */
+        int32_t csize = sw32_(context->src + BLOSC2_CHUNK_CBYTES);   /* compressed buffer size */
         if (context->sourcesize + BLOSC_MAX_OVERHEAD != csize) {
           return -1;
         }
@@ -1550,11 +1550,11 @@ static int initialize_context_decompression(blosc2_context* context, const void*
     return -1;
   }
 
-  context->header_flags = context->src[2];
-  context->typesize = context->src[3];
-  context->sourcesize = sw32_(context->src + 4);
-  context->blocksize = sw32_(context->src + 8);
-  cbytes = sw32_(context->src + 12);
+  context->header_flags = context->src[BLOSC2_CHUNK_FLAGS];
+  context->typesize = context->src[BLOSC2_CHUNK_TYPESIZE];
+  context->sourcesize = sw32_(context->src + BLOSC2_CHUNK_NBYTES);
+  context->blocksize = sw32_(context->src + BLOSC2_CHUNK_BLOCKSIZE);
+  cbytes = sw32_(context->src + BLOSC2_CHUNK_CBYTES);
 
   // Some checks for malformed headers
   if (context->blocksize <= 0 || context->blocksize > destsize ||
@@ -1588,7 +1588,7 @@ static int initialize_context_decompression(blosc2_context* context, const void*
     }
     uint8_t* filters = (uint8_t*)(context->src + BLOSC_MIN_HEADER_LENGTH);
     uint8_t* filters_meta = filters + 8;
-    uint8_t header_version = context->src[0];
+    uint8_t header_version = context->src[BLOSC2_CHUNK_VERSION];
     // The number of filters depends on the version of the header
     // (we need to read less because filters where not initialized to zero in blosc2 alpha series)
     int max_filters = (header_version == BLOSC2_VERSION_FORMAT_ALPHA) ? 5 : BLOSC2_MAX_FILTERS;
@@ -1597,7 +1597,7 @@ static int initialize_context_decompression(blosc2_context* context, const void*
       context->filters_meta[i] = filters_meta[i];
     }
     context->filter_flags = filters_to_flags(filters);
-    context->blosc2_flags = context->src[0x1F];
+    context->blosc2_flags = context->src[BLOSC2_CHUNK_BLOSC2_FLAGS];
     bstarts_offset = BLOSC_EXTENDED_HEADER_LENGTH;
   } else {
     /* Regular (Blosc1) header */
@@ -1664,52 +1664,52 @@ static int write_compression_header(blosc2_context* context,
   }
 
   /* Write version header for this block */
-  context->dest[0] = BLOSC_VERSION_FORMAT;
+  context->dest[BLOSC2_CHUNK_VERSION] = BLOSC_VERSION_FORMAT;
 
   /* Write compressor format */
   compformat = -1;
   switch (context->compcode) {
     case BLOSC_BLOSCLZ:
       compformat = BLOSC_BLOSCLZ_FORMAT;
-      context->dest[1] = BLOSC_BLOSCLZ_VERSION_FORMAT;
+      context->dest[BLOSC2_CHUNK_VERSIONLZ] = BLOSC_BLOSCLZ_VERSION_FORMAT;
       break;
 
 #if defined(HAVE_LZ4)
     case BLOSC_LZ4:
       compformat = BLOSC_LZ4_FORMAT;
-      context->dest[1] = BLOSC_LZ4_VERSION_FORMAT;
+      context->dest[BLOSC2_CHUNK_VERSIONLZ] = BLOSC_LZ4_VERSION_FORMAT;
       break;
     case BLOSC_LZ4HC:
       compformat = BLOSC_LZ4HC_FORMAT;
-      context->dest[1] = BLOSC_LZ4HC_VERSION_FORMAT;
+      context->dest[BLOSC2_CHUNK_VERSIONLZ] = BLOSC_LZ4HC_VERSION_FORMAT;
       break;
 #endif /*  HAVE_LZ4 */
 
 #if defined(HAVE_LIZARD)
     case BLOSC_LIZARD:
       compformat = BLOSC_LIZARD_FORMAT;
-      context->dest[1] = BLOSC_LIZARD_VERSION_FORMAT;
+      context->dest[BLOSC2_CHUNK_VERSIONLZ] = BLOSC_LIZARD_VERSION_FORMAT;
       break;
 #endif /*  HAVE_LIZARD */
 
 #if defined(HAVE_SNAPPY)
     case BLOSC_SNAPPY:
       compformat = BLOSC_SNAPPY_FORMAT;
-      context->dest[1] = BLOSC_SNAPPY_VERSION_FORMAT;
+      context->dest[BLOSC2_CHUNK_VERSIONLZ] = BLOSC_SNAPPY_VERSION_FORMAT;
       break;
 #endif /*  HAVE_SNAPPY */
 
 #if defined(HAVE_ZLIB)
     case BLOSC_ZLIB:
       compformat = BLOSC_ZLIB_FORMAT;
-      context->dest[1] = BLOSC_ZLIB_VERSION_FORMAT;
+      context->dest[BLOSC2_CHUNK_VERSIONLZ] = BLOSC_ZLIB_VERSION_FORMAT;
       break;
 #endif /*  HAVE_ZLIB */
 
 #if defined(HAVE_ZSTD)
     case BLOSC_ZSTD:
       compformat = BLOSC_ZSTD_FORMAT;
-      context->dest[1] = BLOSC_ZSTD_VERSION_FORMAT;
+      context->dest[BLOSC2_CHUNK_VERSIONLZ] = BLOSC_ZSTD_VERSION_FORMAT;
       break;
 #endif /*  HAVE_ZSTD */
 
@@ -1734,10 +1734,10 @@ static int write_compression_header(blosc2_context* context,
   }
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
 
-  context->dest[2] = 0;                               /* zeroes flags */
-  context->dest[3] = (uint8_t)context->typesize;
-  _sw32(context->dest + 4, (int32_t)context->sourcesize);
-  _sw32(context->dest + 8, (int32_t)context->blocksize);
+  context->dest[BLOSC2_CHUNK_FLAGS] = 0;                               /* zeroes flags */
+  context->dest[BLOSC2_CHUNK_TYPESIZE] = (uint8_t)context->typesize;
+  _sw32(context->dest + BLOSC2_CHUNK_NBYTES, (int32_t)context->sourcesize);
+  _sw32(context->dest + BLOSC2_CHUNK_BLOCKSIZE, (int32_t)context->blocksize);
   if (extended_header) {
     /* Mark that we are handling an extended header */
     context->header_flags |= (BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE);
@@ -1748,7 +1748,7 @@ static int write_compression_header(blosc2_context* context,
       filters[i] = context->filters[i];
       filters_meta[i] = context->filters_meta[i];
     }
-    uint8_t* blosc2_flags = context->dest + 0x1F;
+    uint8_t* blosc2_flags = context->dest + BLOSC2_CHUNK_BLOSC2_FLAGS;
     *blosc2_flags = 0;    // zeroes flags
     *blosc2_flags |= is_little_endian() ? 0 : BLOSC2_BIGENDIAN;  // endianness
     if (dict_training || memcpyed) {
@@ -1798,7 +1798,7 @@ static int write_compression_header(blosc2_context* context,
   }
 
   // store header flags in dest
-  context->dest[2] = context->header_flags;
+  context->dest[BLOSC2_CHUNK_FLAGS] = context->header_flags;
 
   return 1;
 }
@@ -1836,14 +1836,14 @@ int blosc_compress_context(blosc2_context* context) {
         return -1;
       }
       // Success!  update the memcpy bit in header
-      context->dest[2] = context->header_flags;
+      context->dest[BLOSC2_CHUNK_FLAGS] = context->header_flags;
       // and clear the memcpy bit in context (for next reuse)
       context->header_flags &= ~(uint8_t)BLOSC_MEMCPYED;
     }
   }
 
   /* Set the number of compressed bytes in header */
-  _sw32(context->dest + 12, ntbytes);
+  _sw32(context->dest + BLOSC2_CHUNK_CBYTES, ntbytes);
 
   /* Set the number of bytes in dest buffer (might be useful for btune) */
   context->destsize = ntbytes;
@@ -2139,7 +2139,7 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
     /* Invalid argument */
     return -1;
   }
-  version = _src[0];                        /* blosc format version */
+  version = _src[BLOSC2_CHUNK_VERSION];                        /* blosc format version */
   if (version > BLOSC_VERSION_FORMAT) {
     /* Version from future */
     return -1;
@@ -2156,7 +2156,7 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
   if (memcpyed) {
     // Check that sizes in header are compatible, otherwise there is a header corruption
     ntbytes = context->sourcesize;
-    int32_t cbytes = sw32_(_src + 12);   /* compressed buffer size */
+    int32_t cbytes = sw32_(_src + BLOSC2_CHUNK_CBYTES);   /* compressed buffer size */
     if (ntbytes + BLOSC_MAX_OVERHEAD != cbytes) {
       return -1;
     }
@@ -2282,12 +2282,12 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
   _src = (uint8_t*)(src);
 
   /* Read the header block */
-  flags = _src[2];                  /* flags */
+  flags = _src[BLOSC2_CHUNK_FLAGS];                  /* flags */
   bool memcpyed = flags & (uint8_t)BLOSC_MEMCPYED;
-  typesize = (int32_t)_src[3];      /* typesize */
-  nbytes = sw32_(_src + 4);         /* buffer size */
-  blocksize = sw32_(_src + 8);      /* block size */
-  cbytes = sw32_(_src + 12);    /* compressed buffer size */
+  typesize = (int32_t)_src[BLOSC2_CHUNK_TYPESIZE];      /* typesize */
+  nbytes = sw32_(_src + BLOSC2_CHUNK_NBYTES);         /* buffer size */
+  blocksize = sw32_(_src + BLOSC2_CHUNK_BLOCKSIZE);      /* block size */
+  cbytes = sw32_(_src + BLOSC2_CHUNK_CBYTES);    /* compressed buffer size */
 
   ebsize = blocksize + typesize * (int32_t)sizeof(int32_t);
 
@@ -2312,7 +2312,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
     bstarts = (int32_t*)(_src + BLOSC_EXTENDED_HEADER_LENGTH);
     // The next is needed for lazy chunks
     context->nblocks = nblocks;
-    context->blosc2_flags = _src[0x1F];
+    context->blosc2_flags = _src[BLOSC2_CHUNK_BLOSC2_FLAGS];
   } else {
     /* Minimal header */
     flags_to_filters(flags, context->filters);
@@ -2422,7 +2422,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   blosc2_context context;
   int result;
 
-  uint8_t version = _src[0];                        /* blosc format version */
+  uint8_t version = _src[BLOSC2_CHUNK_VERSION];                        /* blosc format version */
   if (version > BLOSC_VERSION_FORMAT) {
     /* Version from future */
     return -1;
@@ -2432,8 +2432,8 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   memset(&context, 0, sizeof(blosc2_context));
   context.src = src;
   context.dest = dest;
-  context.typesize = (uint8_t)_src[3];
-  context.blocksize = sw32_(_src + 8);
+  context.typesize = (uint8_t)_src[BLOSC2_CHUNK_TYPESIZE];
+  context.blocksize = sw32_(_src + BLOSC2_CHUNK_BLOCKSIZE);
   context.header_flags = *(_src + 2);
   context.filter_flags = get_filter_flags(context.header_flags, context.typesize);
   context.schunk = g_schunk;
@@ -2442,7 +2442,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   if ((context.header_flags & BLOSC_DOSHUFFLE) &&
       (context.header_flags & BLOSC_DOBITSHUFFLE)) {
     // Support for lazy chunks exists only for Blosc2, and needs the context.
-    context.blosc2_flags = _src[0x1F];
+    context.blosc2_flags = _src[BLOSC2_CHUNK_BLOSC2_FLAGS];
     if (context.blosc2_flags & 0x08) {
       fprintf(stderr, "blosc_getitem does not support lazy chunks.  Use blosc2_getitem_ctx instead.");
       return -2;
@@ -2463,8 +2463,8 @@ int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize
   int result;
 
   /* Minimally populate the context */
-  context->typesize = _src[3];
-  context->blocksize = sw32_(_src + 8);
+  context->typesize = _src[BLOSC2_CHUNK_TYPESIZE];
+  context->blocksize = sw32_(_src + BLOSC2_CHUNK_BLOCKSIZE);
   context->header_flags = *(_src + 2);
   context->filter_flags = get_filter_flags(*(_src + 2), context->typesize);
   if (context->serial_context == NULL) {
@@ -2926,7 +2926,7 @@ int blosc_get_complib_info(const char* compname, char** complib, char** version)
 void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
                          size_t* cbytes, size_t* blocksize) {
   uint8_t* _src = (uint8_t*)(cbuffer);    /* current pos for source buffer */
-  uint8_t version = _src[0];                        /* blosc format version */
+  uint8_t version = _src[BLOSC2_CHUNK_VERSION];     /* blosc format version */
   if (version > BLOSC_VERSION_FORMAT) {
     /* Version from future */
     *nbytes = *blocksize = *cbytes = 0;
@@ -2934,9 +2934,9 @@ void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
   }
 
   /* Read the interesting values */
-  *nbytes = (size_t)sw32_(_src + 4);       /* uncompressed buffer size */
-  *blocksize = (size_t)sw32_(_src + 8);    /* block size */
-  *cbytes = (size_t)sw32_(_src + 12);      /* compressed buffer size */
+  *nbytes = (size_t)sw32_(_src + BLOSC2_CHUNK_NBYTES);       /* uncompressed buffer size */
+  *blocksize = (size_t)sw32_(_src + BLOSC2_CHUNK_BLOCKSIZE);    /* block size */
+  *cbytes = (size_t)sw32_(_src + BLOSC2_CHUNK_CBYTES);      /* compressed buffer size */
 }
 
 int blosc_cbuffer_validate(const void* cbuffer, size_t cbytes, size_t* nbytes) {
@@ -2962,7 +2962,7 @@ int blosc_cbuffer_validate(const void* cbuffer, size_t cbytes, size_t* nbytes) {
 /* Return `typesize` and `flags` from a compressed buffer. */
 void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize, int* flags) {
   uint8_t* _src = (uint8_t*)(cbuffer);  /* current pos for source buffer */
-  uint8_t version = _src[0];                        /* blosc format version */
+  uint8_t version = _src[BLOSC2_CHUNK_VERSION];                        /* blosc format version */
   if (version > BLOSC_VERSION_FORMAT) {
     /* Version from future */
     *flags = 0;
@@ -2971,8 +2971,8 @@ void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize, int* flags) {
   }
 
   /* Read the interesting values */
-  *flags = (int)_src[2];                 /* flags */
-  *typesize = (size_t)_src[3];           /* typesize */
+  *flags = (int)_src[BLOSC2_CHUNK_FLAGS];                 /* flags */
+  *typesize = (size_t)_src[BLOSC2_CHUNK_TYPESIZE];           /* typesize */
 }
 
 
@@ -2982,8 +2982,8 @@ void blosc_cbuffer_versions(const void* cbuffer, int* version,
   uint8_t* _src = (uint8_t*)(cbuffer);  /* current pos for source buffer */
 
   /* Read the version info */
-  *version = (int)_src[0];         /* blosc format version */
-  *versionlz = (int)_src[1];       /* Lempel-Ziv compressor format version */
+  *version = (int)_src[BLOSC2_CHUNK_VERSION];         /* blosc format version */
+  *versionlz = (int)_src[BLOSC2_CHUNK_VERSIONLZ];       /* Lempel-Ziv compressor format version */
 }
 
 
@@ -2994,7 +2994,7 @@ const char* blosc_cbuffer_complib(const void* cbuffer) {
   const char* complib;
 
   /* Read the compressor format/library info */
-  clibcode = (_src[2] & 0xe0) >> 5;
+  clibcode = (_src[BLOSC2_CHUNK_FLAGS] & 0xe0) >> 5;
   complib = clibcode_to_clibname(clibcode);
   return complib;
 }
