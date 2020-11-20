@@ -1420,13 +1420,6 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
 
   int64_t new_frame_len = header_len + new_cbytes + new_off_cbytes + trailer_len;
 
-  // If the chunk is lazy, convert it into a regular chunk
-  uint8_t* chunk_ = chunk;
-  if (chunk_[0x1F] & 0x08U) {
-    void* destchunk = malloc(nbytes_chunk);
-    blosc2_decompress_ctx(cctx, chunk, cbytes_chunk, destchunk, nbytes_chunk);
-  }
-
   FILE* fp = NULL;
   if (frame->sdata != NULL) {
     uint8_t* framep = frame->sdata;
