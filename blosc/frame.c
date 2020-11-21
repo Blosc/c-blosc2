@@ -1414,14 +1414,16 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
           off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
-  int64_t offset;
-  int rc2 = blosc_getitem(off_chunk, nchunks, 1, &offset);
-  // Safety check.  This is cheap and can save time while debugging.
-  // TODO: maybe it is time to deactivate this?
-  if (rc2 != 8 || offset != cbytes) {
-    fprintf(stderr, "Chunk offset has not being compressed correctly!\n");
-    return NULL;
-  }
+
+//  // You may want to uncomment this code block for debugging
+//  int64_t offset;
+//  int rc2 = blosc_getitem(off_chunk, nchunks, 1, &offset);
+//  // Safety check.  This is cheap and can save time while debugging.
+//  if (rc2 != 8 || offset != cbytes) {
+//    fprintf(stderr, "Chunk offset has not being compressed correctly!\n");
+//    return NULL;
+//  }
+
   free(offsets);
   if (new_off_cbytes < 0) {
     free(off_chunk);
