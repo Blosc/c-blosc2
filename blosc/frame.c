@@ -1292,7 +1292,7 @@ int frame_get_chunk_lazy(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool 
     if (memcpyed) {
       // When memcpyed the blocksizes are trivial to compute
       for (int i = 0; i < (int)nblocks; i++) {
-        block_csizes[i] = chunk_blocksize;
+        block_csizes[i] = (int)chunk_blocksize;
       }
     }
     else {
@@ -1313,7 +1313,7 @@ int frame_get_chunk_lazy(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool 
         block_csizes[idx] = csize_idx[n + 1].val - csize_idx[n].val;
       }
       idx = csize_idx[nblocks - 1].idx;
-      block_csizes[idx] = chunk_cbytes - csize_idx[nblocks - 1].val;
+      block_csizes[idx] = (int)chunk_cbytes - csize_idx[nblocks - 1].val;
       free(csize_idx);
     }
     // Copy the csizes at the end of the trailer
