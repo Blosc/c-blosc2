@@ -2327,20 +2327,20 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
     }
 
     /* Compute start & stop for each block */
-    startb = start * (int)typesize - j * (int)blocksize;
-    stopb = stop * (int)typesize - j * (int)blocksize;
-    // TODO: check whether this makes the tests to pass
-//    if (stopb <= 0) {
-//      break;
-//    }
-    if ((startb >= (int)blocksize) || (stopb <= 0)) {
+    startb = start * typesize - j * blocksize;
+    stopb = stop * typesize - j * blocksize;
+    if (stopb <= 0) {
+      // We can exit as soon as this block is beyond stop
+      break;
+    }
+    if (startb >= blocksize) {
       continue;
     }
     if (startb < 0) {
       startb = 0;
     }
-    if (stopb > (int)blocksize) {
-      stopb = (int)blocksize;
+    if (stopb > blocksize) {
+      stopb = blocksize;
     }
     bsize2 = stopb - startb;
 
