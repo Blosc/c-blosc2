@@ -641,7 +641,7 @@ int64_t blosc2_schunk_to_sframe(blosc2_schunk* schunk, uint8_t** sframe) {
   }
   // Get a copy of the internal sframe
   *sframe = malloc((size_t)sdata_len);
-  memcpy(*sframe, sdata, sdata_len);
+  memcpy(*sframe, sdata, (size_t)sdata_len);
   if (frame != NULL) {
     blosc2_frame_free(frame);
   }
@@ -1291,7 +1291,7 @@ int frame_get_chunk_lazy(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool 
     int memcpyed = *(*chunk + BLOSC2_CHUNK_FLAGS) & (uint8_t)BLOSC_MEMCPYED;
     if (memcpyed) {
       // When memcpyed the blocksizes are trivial to compute
-      for (int i = 0; i < nblocks; i++) {
+      for (int i = 0; i < (int)nblocks; i++) {
         block_csizes[i] = chunk_blocksize;
       }
     }
@@ -1301,14 +1301,14 @@ int frame_get_chunk_lazy(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool 
       memcpy(block_csizes, *chunk + BLOSC_EXTENDED_HEADER_LENGTH, nblocks * sizeof(int32_t));
       // Helper structure to keep track of original indexes
       struct csize_idx *csize_idx = malloc(nblocks * sizeof(struct csize_idx));
-      for (int n = 0; n < nblocks; n++) {
+      for (int n = 0; n < (int)nblocks; n++) {
         csize_idx[n].val = block_csizes[n];
         csize_idx[n].idx = n;
       }
       qsort(csize_idx, nblocks, sizeof(struct csize_idx), &sort_offset);
       // Compute the actual csizes
       int idx;
-      for (int n = 0; n < nblocks - 1; n++) {
+      for (int n = 0; n < (int)nblocks - 1; n++) {
         idx = csize_idx[n].idx;
         block_csizes[idx] = csize_idx[n + 1].val - csize_idx[n].val;
       }
