@@ -973,8 +973,8 @@ static int blosc_d(
   blosc2_context* context = thread_context->parent_context;
   uint8_t* filters = context->filters;
   uint8_t *tmp3 = thread_context->tmp4;
-  int32_t compformat = (context->header_flags & 0xe0) >> 5;
-  int dont_split = (context->header_flags & 0x10) >> 4;
+  int32_t compformat = (context->header_flags & (uint8_t)0xe0) >> 5u;
+  int dont_split = (context->header_flags & (uint8_t)0x10) >> 4u;
   //uint8_t blosc_version_format = src[BLOSC2_CHUNK_VERSION];
   int nstreams;
   int32_t neblock;
@@ -989,11 +989,6 @@ static int blosc_d(
   if (context->block_maskout != NULL && context->block_maskout[nblock]) {
     // Do not decompress, but act as if we successfully decompressed everything
     return bsize;
-  }
-
-  if (src_offset <= 0 || src_offset >= srcsize) {
-    /* Invalid block src offset encountered */
-    return -1;
   }
 
   bool is_lazy = context->blosc2_flags & 0x08u;
@@ -1024,6 +1019,20 @@ static int blosc_d(
       fprintf(stderr, "Cannot read the (lazy) block out of the fileframe.\n");
       return -13;
     }
+  }
+
+  // If the chunk is memcpyed, we just have to copy the block to dest and return
+  int memcpyed = src[BLOSC2_CHUNK_FLAGS] & (uint8_t)BLOSC_MEMCPYED;
+  if (memcpyed) {
+    int32_t chunk_nbytes = *(int32_t*)(src + BLOSC2_CHUNK_NBYTES);
+    int bsize_ = leftoverblock ? chunk_nbytes % context->blocksize : bsize;
+    memcpy(dest + dest_offset, src + BLOSC_MAX_OVERHEAD + nblock * context->blocksize, bsize_);
+    return bsize_;
+  }
+
+  if (src_offset <= 0 || src_offset >= srcsize) {
+    /* Invalid block src offset encountered */
+    return -1;
   }
 
   src += src_offset;
@@ -1193,27 +1202,12 @@ static int serial_blosc(struct thread_context* thread_context) {
       }
     }
     else {
-      if (memcpyed) {
-        // Check that sizes in header are compatible, otherwise there is a header corruption
-        int32_t csize = sw32_(context->src + BLOSC2_CHUNK_CBYTES);   /* compressed buffer size */
-        if (context->sourcesize + BLOSC_MAX_OVERHEAD != csize) {
-          return -1;
-        }
-        if (context->srcsize < BLOSC_MAX_OVERHEAD + (j * context->blocksize) + bsize) {
-          /* Not enough input to copy block */
-          return -1;
-        }
-        memcpy(context->dest + j * context->blocksize,
-               context->src + BLOSC_MAX_OVERHEAD + j * context->blocksize,
-               (unsigned int)bsize);
-        cbytes = (int32_t)bsize;
-      }
-      else {
-        /* Regular decompression */
-        cbytes = blosc_d(thread_context, bsize, leftoverblock,
-                         context->src, context->srcsize, sw32_(bstarts + j), j,
-                         context->dest, j * context->blocksize, tmp, tmp2);
-      }
+      /* Regular decompression */
+      // If memcpyed we don't have a bstarts section (because it is not needed)
+      int32_t src_offset = memcpyed ? BLOSC_MAX_OVERHEAD + j * context->blocksize : sw32_(bstarts + j);
+      cbytes = blosc_d(thread_context, bsize, leftoverblock,
+                       context->src, context->srcsize, src_offset, j,
+                       context->dest, j * context->blocksize, tmp, tmp2);
     }
 
     if (cbytes < 0) {
@@ -2150,28 +2144,10 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
     return error;
   }
 
-  /* Check whether this buffer is memcpy'ed */
-  // TODO: what to do with lazy chunks?  Probably it is better to disable this optimization.
-  bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
-  if (memcpyed) {
-    // Check that sizes in header are compatible, otherwise there is a header corruption
-    ntbytes = context->sourcesize;
-    int32_t cbytes = sw32_(_src + BLOSC2_CHUNK_CBYTES);   /* compressed buffer size */
-    if (ntbytes + BLOSC_MAX_OVERHEAD != cbytes) {
-      return -1;
-    }
-    // Check that we have enough space in destination for the copy operation
-    if (destsize < ntbytes) {
-      return -1;
-    }
-    memcpy(dest, _src + BLOSC_MAX_OVERHEAD, (unsigned int)ntbytes);
-  }
-  else {
-    /* Do the actual decompression */
-    ntbytes = do_job(context);
-    if (ntbytes < 0) {
-      return -1;
-    }
+  /* Do the actual decompression */
+  ntbytes = do_job(context);
+  if (ntbytes < 0) {
+    return -1;
   }
 
   assert(ntbytes <= (int32_t)destsize);
@@ -2296,6 +2272,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
   leftover = nbytes % blocksize;
   nblocks = (leftover > 0) ? nblocks + 1 : nblocks;
 
+  int32_t header_overhead = BLOSC_MIN_HEADER_LENGTH;
   if ((context->header_flags & BLOSC_DOSHUFFLE) &&
       (context->header_flags & BLOSC_DOBITSHUFFLE)) {
     /* Extended header */
@@ -2303,6 +2280,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
       /* Not enough input to parse Blosc2 header */
       return -1;
     }
+    header_overhead = BLOSC_EXTENDED_HEADER_LENGTH;
     uint8_t* filters = _src + BLOSC_MIN_HEADER_LENGTH;
     uint8_t* filters_meta = filters + 8;
     for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
@@ -2351,6 +2329,10 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
     /* Compute start & stop for each block */
     startb = start * (int)typesize - j * (int)blocksize;
     stopb = stop * (int)typesize - j * (int)blocksize;
+    // TODO: check whether this makes the tests to pass
+//    if (stopb <= 0) {
+//      break;
+//    }
     if ((startb >= (int)blocksize) || (stopb <= 0)) {
       continue;
     }
@@ -2363,51 +2345,37 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
     bsize2 = stopb - startb;
 
     /* Do the actual data copy */
-    if (memcpyed) {
-      // Check that sizes in header are compatible, otherwise there is a header corruption
-      if (nbytes + BLOSC_MAX_OVERHEAD != cbytes) {
-         return -1;
-      }
-      if (srcsize < BLOSC_MAX_OVERHEAD + j * blocksize + startb + bsize2) {
-        /* Not enough input to copy data */
-        return -1;
-      }
-      memcpy((uint8_t*)dest + ntbytes,
-             (uint8_t*)src + BLOSC_MAX_OVERHEAD + j * blocksize + startb,
-             (unsigned int)bsize2);
-      cbytes = (int)bsize2;
-    }
-    else {
-      struct thread_context* scontext = context->serial_context;
+    struct thread_context* scontext = context->serial_context;
 
-      /* Resize the temporaries in serial context if needed */
-      if (blocksize != scontext->tmp_blocksize) {
-        my_free(scontext->tmp);
-        scontext->tmp_nbytes = (size_t)3 * context->blocksize + ebsize;
-        scontext->tmp = my_malloc(scontext->tmp_nbytes);
-        scontext->tmp2 = scontext->tmp + blocksize;
-        scontext->tmp3 = scontext->tmp + blocksize + ebsize;
-        scontext->tmp4 = scontext->tmp + 2 * blocksize + ebsize;
-        scontext->tmp_blocksize = (int32_t)blocksize;
-      }
-
-      // Regular decompression.  Put results in tmp2.
-      // If the block is aligned and the worst case fits in destination, let's avoid a copy
-      bool get_single_block = ((startb == 0) && (bsize == nitems * typesize));
-      uint8_t* tmp2 = get_single_block ? dest : scontext->tmp2;
-      cbytes = blosc_d(context->serial_context, bsize, leftoverblock,
-                       src, srcsize, sw32_(bstarts + j), j,
-                       tmp2, 0, scontext->tmp, scontext->tmp3);
-      if (cbytes < 0) {
-        ntbytes = cbytes;
-        break;
-      }
-      if (!get_single_block) {
-        /* Copy to destination */
-        memcpy((uint8_t *) dest + ntbytes, tmp2 + startb, (unsigned int) bsize2);
-      }
-      cbytes = (int)bsize2;
+    /* Resize the temporaries in serial context if needed */
+    if (blocksize != scontext->tmp_blocksize) {
+      my_free(scontext->tmp);
+      scontext->tmp_nbytes = (size_t)3 * context->blocksize + ebsize;
+      scontext->tmp = my_malloc(scontext->tmp_nbytes);
+      scontext->tmp2 = scontext->tmp + blocksize;
+      scontext->tmp3 = scontext->tmp + blocksize + ebsize;
+      scontext->tmp4 = scontext->tmp + 2 * blocksize + ebsize;
+      scontext->tmp_blocksize = (int32_t)blocksize;
     }
+
+    // Regular decompression.  Put results in tmp2.
+    // If the block is aligned and the worst case fits in destination, let's avoid a copy
+    bool get_single_block = ((startb == 0) && (bsize == nitems * typesize));
+    uint8_t* tmp2 = get_single_block ? dest : scontext->tmp2;
+    // If memcpyed we don't have a bstarts section (because it is not needed)
+    int32_t src_offset = memcpyed ? header_overhead + j * bsize : sw32_(bstarts + j);
+    cbytes = blosc_d(context->serial_context, bsize, leftoverblock,
+                     src, srcsize, src_offset, j,
+                     tmp2, 0, scontext->tmp, scontext->tmp3);
+    if (cbytes < 0) {
+      ntbytes = cbytes;
+      break;
+    }
+    if (!get_single_block) {
+      /* Copy to destination */
+      memcpy((uint8_t *) dest + ntbytes, tmp2 + startb, (unsigned int) bsize2);
+    }
+    cbytes = (int)bsize2;
     ntbytes += cbytes;
   }
 
@@ -2587,27 +2555,17 @@ static void t_blosc_do_job(void *ctxt)
       }
     }
     else {
-      if (memcpyed) {
-        /* We want to memcpy only */
-        if (srcsize < BLOSC_MAX_OVERHEAD + (nblock_ * blocksize) + bsize) {
-          /* Not enough input to copy data */
-
-          cbytes = -1;
-        } else {
-          memcpy(dest + nblock_ * blocksize,
-                  src + BLOSC_MAX_OVERHEAD + nblock_ * blocksize, (unsigned int)bsize);
-          cbytes = (int32_t)bsize;
-        }
+      /* Regular decompression */
+      if (srcsize < (int32_t)(BLOSC_MAX_OVERHEAD + (sizeof(int32_t) * nblocks))) {
+        /* Not enough input to read all `bstarts` */
+        cbytes = -1;
       }
       else {
-        if (srcsize < (int32_t)(BLOSC_MAX_OVERHEAD + (sizeof(int32_t) * nblocks))) {
-          /* Not enough input to read all `bstarts` */
-          cbytes = -1;
-        } else {
-          cbytes = blosc_d(thcontext, bsize, leftoverblock,
-                            src, srcsize, sw32_(bstarts + nblock_), nblock_,
-                            dest, nblock_ * blocksize, tmp, tmp2);
-        }
+        // If memcpyed we don't have a bstarts section (because it is not needed)
+        int32_t src_offset = memcpyed ? BLOSC_MAX_OVERHEAD + nblock_ * blocksize : sw32_(bstarts + nblock_);
+        cbytes = blosc_d(thcontext, bsize, leftoverblock,
+                          src, srcsize, src_offset, nblock_,
+                          dest, nblock_ * blocksize, tmp, tmp2);
       }
     }
 

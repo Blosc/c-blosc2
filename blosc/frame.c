@@ -1286,31 +1286,40 @@ int frame_get_chunk_lazy(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool 
     *(int32_t*)(*chunk + chunk_cbytes) = nchunk;
     *(int64_t*)(*chunk + chunk_cbytes + sizeof(int32_t)) = header_len + offset;
 
-    // For computing block_csizes we just need to sort the bstarts (they can be out
-    // of order because of multi-threading).
     int32_t* block_csizes = malloc(nblocks * sizeof(int32_t));
-    memcpy(block_csizes, *chunk + BLOSC_EXTENDED_HEADER_LENGTH, nblocks * sizeof(int32_t));
-    // Helper structure to keep track of original indexes
-    struct csize_idx* csize_idx = malloc(nblocks * sizeof(struct csize_idx));
-    for (int n = 0; n < nblocks; n++) {
-      csize_idx[n].val = block_csizes[n];
-      csize_idx[n].idx = n;
-    }
-    qsort(csize_idx, nblocks, sizeof(struct csize_idx), &sort_offset);
-    // Compute the actual csizes
-    int idx;
-    for (int n = 0; n < nblocks - 1; n++) {
-      idx = csize_idx[n].idx;
-      block_csizes[idx] = csize_idx[n + 1].val - csize_idx[n].val;
-    }
-    idx = csize_idx[nblocks - 1].idx;
-    block_csizes[idx] = chunk_cbytes - csize_idx[nblocks - 1].val;
 
+    int memcpyed = *(*chunk + BLOSC2_CHUNK_FLAGS) & (uint8_t)BLOSC_MEMCPYED;
+    if (memcpyed) {
+      // When memcpyed the blocksizes are trivial to compute
+      for (int i = 0; i < nblocks; i++) {
+        block_csizes[i] = chunk_blocksize;
+      }
+    }
+    else {
+      // In regular, compressed chunks, we need to sort the bstarts (they can be out
+      // of order because of multi-threading), and get a reverse index too.
+      memcpy(block_csizes, *chunk + BLOSC_EXTENDED_HEADER_LENGTH, nblocks * sizeof(int32_t));
+      // Helper structure to keep track of original indexes
+      struct csize_idx *csize_idx = malloc(nblocks * sizeof(struct csize_idx));
+      for (int n = 0; n < nblocks; n++) {
+        csize_idx[n].val = block_csizes[n];
+        csize_idx[n].idx = n;
+      }
+      qsort(csize_idx, nblocks, sizeof(struct csize_idx), &sort_offset);
+      // Compute the actual csizes
+      int idx;
+      for (int n = 0; n < nblocks - 1; n++) {
+        idx = csize_idx[n].idx;
+        block_csizes[idx] = csize_idx[n + 1].val - csize_idx[n].val;
+      }
+      idx = csize_idx[nblocks - 1].idx;
+      block_csizes[idx] = chunk_cbytes - csize_idx[nblocks - 1].val;
+      free(csize_idx);
+    }
     // Copy the csizes at the end of the trailer
-    void* trailer_csizes = *chunk + lazychunk_cbytes - nblocks * sizeof(int32_t);
+    void *trailer_csizes = *chunk + lazychunk_cbytes - nblocks * sizeof(int32_t);
     memcpy(trailer_csizes, block_csizes, nblocks * sizeof(int32_t));
     free(block_csizes);
-    free(csize_idx);
   } else {
     // The chunk is in memory and just one pointer away
     *chunk = frame->sdata + header_len + offset;
@@ -1408,7 +1417,8 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   int64_t offset;
   int rc2 = blosc_getitem(off_chunk, nchunks, 1, &offset);
   // Safety check.  This is cheap and can save time while debugging.
-  if (rc2 != 8 || offset != offsets[nchunks]) {
+  // TODO: maybe it is time to deactivate this?
+  if (rc2 != 8 || offset != cbytes) {
     fprintf(stderr, "Chunk offset has not being compressed correctly!\n");
     return NULL;
   }

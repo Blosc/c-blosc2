@@ -232,8 +232,8 @@ static char* test_frame(void) {
   }
 
   /* Free resources */
-  free(data);
   free(data_dest);
+  free(data);
   blosc2_schunk_free(schunk);
 
   /* Destroy the Blosc environment */

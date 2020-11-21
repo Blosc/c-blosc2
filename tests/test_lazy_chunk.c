@@ -14,11 +14,12 @@
 #define CHUNKSIZE (200 * 1000)
 #define BLOCKSIZE (20 * 1000)
 #define NBLOCKS (CHUNKSIZE / BLOCKSIZE)
-#define NTHREADS (2)
 
 /* Global vars */
 int tests_run = 0;
 int nchunks;
+int clevel;
+int nthreads;
 
 
 static char* test_lazy_chunk(void) {
@@ -36,10 +37,10 @@ static char* test_lazy_chunk(void) {
 
   /* Create a super-chunk container, backed by a frame */
   cparams.typesize = sizeof(int32_t);
-  cparams.clevel = 5;
-  cparams.nthreads = NTHREADS;
+  cparams.clevel = clevel;
+  cparams.nthreads = nthreads;
   cparams.blocksize = BLOCKSIZE * cparams.typesize;
-  dparams.nthreads = NTHREADS;
+  dparams.nthreads = nthreads;
   blosc2_storage storage = {.sequential=true, .path="test_lazy_chunk.b2frame", .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
 
@@ -57,7 +58,7 @@ static char* test_lazy_chunk(void) {
   /* Gather some info */
   nbytes = schunk->nbytes;
   cbytes = schunk->cbytes;
-  if (nchunks > 0) {
+  if (nchunks > 0 && clevel > 0) {
     mu_assert("ERROR: bad compression ratio in frame", nbytes > 10 * cbytes);
   }
 
@@ -65,18 +66,18 @@ static char* test_lazy_chunk(void) {
   bool needs_free;
   uint8_t* lazy_chunk;
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
+    cbytes  = blosc2_schunk_get_chunk_lazy(schunk, nchunk, &lazy_chunk, &needs_free);
     for (int i = 0; i < NBLOCKS - 1; i++) {
       memset(data_dest, 0, isize);
-      cbytes  = blosc2_schunk_get_chunk_lazy(schunk, nchunk, &lazy_chunk, &needs_free);
       dsize = blosc2_getitem_ctx(schunk->dctx, lazy_chunk, cbytes, i * BLOCKSIZE, BLOCKSIZE * 2, data_dest);
       mu_assert("ERROR: blosc2_getitem_ctx does not work correctly.", dsize >= 0);
       for (int j = 0; j < BLOCKSIZE * 2; j++) {
-        mu_assert("ERROR: bad roundtrip (getitem)",
+        mu_assert("ERROR: bad roundtrip (blosc2_getitem_ctx)",
                   data_dest[j] == j + i * BLOCKSIZE + nchunk * CHUNKSIZE);
       }
-      if (needs_free) {
-        free(lazy_chunk);
-      }
+    }
+    if (needs_free) {
+      free(lazy_chunk);
     }
   }
 
@@ -88,7 +89,7 @@ static char* test_lazy_chunk(void) {
     mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
     for (int i = 0; i < NBLOCKS; i++) {
       for (int j = 0; j < BLOCKSIZE; j++) {
-        mu_assert("ERROR: bad roundtrip (decompress)",
+        mu_assert("ERROR: bad roundtrip (blosc2_decompress_ctx)",
                   data_dest[j + i * BLOCKSIZE] == j + i * BLOCKSIZE + nchunk * CHUNKSIZE);
       }
     }
@@ -104,12 +105,33 @@ static char* test_lazy_chunk(void) {
 
 static char *all_tests(void) {
   nchunks = 0;
+  clevel = 5;
+  nthreads = 1;
   mu_run_test(test_lazy_chunk);
 
   nchunks = 1;
+  clevel = 5;
+  nthreads = 2;
   mu_run_test(test_lazy_chunk);
 
   nchunks = 10;
+  clevel = 5;
+  nthreads = 1;
+  mu_run_test(test_lazy_chunk);
+
+  nchunks = 10;
+  clevel = 5;
+  nthreads = 2;
+  mu_run_test(test_lazy_chunk);
+
+  nchunks = 10;
+  clevel = 0;
+  nthreads = 1;
+  mu_run_test(test_lazy_chunk);
+
+  nchunks = 10;
+  clevel = 0;
+  nthreads = 2;
   mu_run_test(test_lazy_chunk);
 
   return EXIT_SUCCESS;
