@@ -111,7 +111,9 @@ int blosc2_frame_free(blosc2_frame *frame) {
 
 
 void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
-  assert(frame != NULL);
+  if (frame == NULL) {
+    return NULL;
+  }
   uint8_t* h2 = calloc(FRAME_HEADER_MINLEN, 1);
   uint8_t* h2p = h2;
 
@@ -123,14 +125,18 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   // Magic number
   *h2p = 0xa0 + 8;  // str with 8 elements
   h2p += 1;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
   strcpy((char*)h2p, "b2frame");
   h2p += 8;
 
   // Header size
   *h2p = 0xd2;  // int32
   h2p += 1 + 4;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   // Total frame size
   *h2p = 0xcf;  // uint64
@@ -138,33 +144,45 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int64_t flen = frame->len;
   swap_store(h2 + FRAME_LEN, &flen, sizeof(flen));
   h2p += 1 + 8;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   // Flags
   *h2p = 0xa0 + 4;  // str with 4 elements
   h2p += 1;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   // General flags
   *h2p = BLOSC2_VERSION_FRAME_FORMAT;  // version
   *h2p += 0x20;  // 64-bit offsets
   h2p += 1;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   // Reserved flags
   h2p += 1;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   // Codec flags
   *h2p = schunk->compcode;
   *h2p += (schunk->clevel) << 4u;  // clevel
   h2p += 1;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   // Reserved flags
   *h2p = 0;
   h2p += 1;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   // Uncompressed size
   *h2p = 0xd3;  // int64
@@ -172,7 +190,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int64_t nbytes = schunk->nbytes;
   swap_store(h2p, &nbytes, sizeof(nbytes));
   h2p += 8;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   // Compressed size
   *h2p = 0xd3;  // int64
@@ -180,7 +200,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int64_t cbytes = schunk->cbytes;
   swap_store(h2p, &cbytes, sizeof(cbytes));
   h2p += 8;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   // Type size
   *h2p = 0xd2;  // int32
@@ -188,7 +210,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int32_t typesize = schunk->typesize;
   swap_store(h2p, &typesize, sizeof(typesize));
   h2p += 4;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   // Chunk size
   *h2p = 0xd2;  // int32
@@ -196,7 +220,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int32_t chunksize = schunk->chunksize;
   swap_store(h2p, &chunksize, sizeof(chunksize));
   h2p += 4;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   // Number of threads for compression
   *h2p = 0xd1;  // int16
@@ -204,7 +230,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int16_t nthreads = (int16_t)schunk->cctx->nthreads;
   swap_store(h2p, &nthreads, sizeof(nthreads));
   h2p += 2;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   // Number of threads for decompression
   *h2p = 0xd1;  // int16
@@ -212,17 +240,23 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   nthreads = (int16_t)schunk->dctx->nthreads;
   swap_store(h2p, &nthreads, sizeof(nthreads));
   h2p += 2;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   // The boolean for FRAME_HAS_USERMETA
   *h2p = (schunk->usermeta_len > 0) ? (uint8_t)0xc3 : (uint8_t)0xc2;
   h2p += 1;
-  assert(h2p - h2 < FRAME_HEADER_MINLEN);
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   // The space for FRAME_FILTER_PIPELINE
   *h2p = 0xd8;  //  fixext 16
   h2p += 1;
-  assert(BLOSC2_MAX_FILTERS <= FRAME_FILTER_PIPELINE_MAX);
+  if (BLOSC2_MAX_FILTERS > FRAME_FILTER_PIPELINE_MAX) {
+    return NULL;
+  }
   // Store the filter pipeline in header
   uint8_t* mp_filters = h2 + FRAME_FILTER_PIPELINE + 1;
   uint8_t* mp_meta = h2 + FRAME_FILTER_PIPELINE + 1 + FRAME_FILTER_PIPELINE_MAX;
@@ -237,7 +271,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   *h2p = (uint8_t)nfilters;
   h2p += 1;
   h2p += 16;
-  assert(h2p - h2 == FRAME_HEADER_MINLEN);
+  if (h2p - h2 != FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
 
   int32_t hsize = FRAME_HEADER_MINLEN;
 
@@ -264,13 +300,17 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int32_t current_header_len = (int32_t)(h2p - h2);
   int32_t *offtooff = malloc(nmetalayers * sizeof(int32_t));
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
-    assert(frame != NULL);
+    if (frame == NULL) {
+      return NULL;
+    }
     blosc2_metalayer *metalayer = schunk->metalayers[nmetalayer];
     uint8_t namelen = (uint8_t) strlen(metalayer->name);
     h2 = realloc(h2, (size_t)current_header_len + 1 + namelen + 1 + 4);
     h2p = h2 + current_header_len;
     // Store the metalayer
-    assert(namelen < (1U << 5U));  // metalayer strings cannot be longer than 32 bytes
+    if (namelen >= (1U << 5U)) {  // metalayer strings cannot be longer than 32 bytes
+      return NULL;
+    }
     *h2p = (uint8_t)0xa0 + namelen;  // str
     h2p += 1;
     memcpy(h2p, metalayer->name, namelen);
@@ -283,10 +323,14 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
     current_header_len += 1 + namelen + 1 + 4;
   }
   int32_t hsize2 = (int32_t)(h2p - h2);
-  assert(hsize2 == current_header_len);  // sanity check
+  if (hsize2 != current_header_len) {  // sanity check
+    return NULL;
+  }
 
   // Map size + int16 size
-  assert((uint32_t) (hsize2 - hsize) < (1U << 16U));
+  if ((uint32_t) (hsize2 - hsize) >= (1U << 16U)) {
+    return NULL;
+  }
   uint16_t map_size = (uint16_t) (hsize2 - hsize);
   swap_store(h2 + FRAME_IDX_SIZE, &map_size, sizeof(map_size));
 
@@ -302,7 +346,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   h2p += sizeof(nmetalayers);
   current_header_len = (int32_t)(h2p - h2);
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
-    assert(frame != NULL);
+    if (frame == NULL) {
+      return NULL;
+    }
     blosc2_metalayer *metalayer = schunk->metalayers[nmetalayer];
     h2 = realloc(h2, (size_t)current_header_len + 1 + 4 + metalayer->content_len);
     h2p = h2 + current_header_len;
@@ -319,7 +365,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   }
   free(offtooff);
   hsize = (int32_t)(h2p - h2);
-  assert(hsize == current_header_len);  // sanity check
+  if (hsize != current_header_len) {  // sanity check
+    return NULL;
+  }
 
   // Set the length of the whole header now that we know it
   swap_store(h2 + FRAME_HEADER_LEN, &hsize, sizeof(hsize));
@@ -334,16 +382,23 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
   uint8_t* framep = frame->sdata;
   uint8_t* header = NULL;
 
-  assert(frame->len > 0);
+  if (frame->len <= 0) {
+    return -1;
+  }
 
   if (frame->sdata == NULL) {
+    size_t rbytes = 0;
     header = malloc(FRAME_HEADER_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
-    size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
+    if (fp != NULL) {
+      rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
+      fclose(fp);
+    }
     (void) rbytes;
-    assert(rbytes == FRAME_HEADER_MINLEN);
+    if (rbytes != FRAME_HEADER_MINLEN) {
+      return -1;
+    }
     framep = header;
-    fclose(fp);
   }
 
   // Fetch some internal lengths
@@ -467,7 +522,9 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
   // memcpy(ptrailer, xxh3_fingerprint, sizeof(xxh3_fingerprint));
   ptrailer += 16;
   // Sanity check
-  assert(ptrailer - trailer == trailer_len);
+  if (ptrailer - trailer != trailer_len) {
+    return -1;
+  }
 
   int32_t header_len;
   int64_t frame_len;
@@ -525,6 +582,9 @@ int64_t blosc2_frame_from_schunk(blosc2_schunk *schunk, blosc2_frame *frame) {
   FILE* fp = NULL;
 
   uint8_t* h2 = new_header_frame(schunk, frame);
+  if (h2 == NULL) {
+    return -1;
+  }
   uint32_t h2len;
   swap_store(&h2len, h2 + FRAME_HEADER_LEN, sizeof(h2len));
 
@@ -548,7 +608,9 @@ int64_t blosc2_frame_from_schunk(blosc2_schunk *schunk, blosc2_frame *frame) {
       chunksize = 0;
     }
   }
-  assert ((int64_t)coffset == cbytes);
+  if ((int64_t)coffset != cbytes) {
+    return -1;
+  }
 
   uint8_t *off_chunk = NULL;
   if (nchunks > 0) {
@@ -599,7 +661,9 @@ int64_t blosc2_frame_from_schunk(blosc2_schunk *schunk, blosc2_frame *frame) {
     }
     coffset += chunk_cbytes;
   }
-  assert ((int64_t)coffset == cbytes);
+  if ((int64_t)coffset != cbytes) {
+    return -1;
+  }
 
   // Copy the offsets chunk at the end of the frame
   if (frame->fname == NULL) {
@@ -676,6 +740,7 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
   if (rbytes != FRAME_HEADER_MINLEN) {
     fprintf(stderr, "Error: cannot read from file '%s'\n", fname);
+    fclose(fp);
     return NULL;
   }
   int64_t frame_len;
@@ -687,18 +752,21 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   uint8_t* trailer = malloc(FRAME_TRAILER_MINLEN);
   fseek(fp, frame_len - FRAME_TRAILER_MINLEN, SEEK_SET);
   rbytes = fread(trailer, 1, FRAME_TRAILER_MINLEN, fp);
+  fclose(fp);
   if (rbytes != FRAME_TRAILER_MINLEN) {
     fprintf(stderr, "Error: cannot read from file '%s'\n", fname);
+    free(trailer);
     return NULL;
   }
   int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
-  assert(trailer[trailer_offset - 1] == 0xce);
+  if (trailer[trailer_offset - 1] != 0xce) {
+    free(trailer);
+    return NULL;
+  }
   uint32_t trailer_len;
   swap_store(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
   frame->trailer_len = trailer_len;
   free(trailer);
-
-  fclose(fp);
 
   return frame;
 }
@@ -712,13 +780,17 @@ blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy) 
   const uint8_t* header = sframe;
   int64_t frame_len;
   swap_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
-  assert(frame_len == len);   // sanity check
+  if (frame_len != len) {   // sanity check
+    return NULL;
+  }
   frame->len = frame_len;
 
   // Now, the trailer length
   const uint8_t* trailer = sframe + frame_len - FRAME_TRAILER_MINLEN;
   int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
-  assert(trailer[trailer_offset - 1] == 0xce);
+  if (trailer[trailer_offset - 1] != 0xce) {
+    return NULL;
+  }
   uint32_t trailer_len;
   swap_store(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
   frame->trailer_len = trailer_len;
@@ -771,7 +843,9 @@ uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, i
 int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
   uint8_t* header = frame->sdata;
 
-  assert(frame->len > 0);
+  if (frame->len <= 0) {
+    return -1;
+  }
 
   if (new && schunk->cbytes > 0) {
     fprintf(stderr, "Error: new metalayers cannot be added after actual data has been appended\n");
@@ -779,12 +853,18 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
   }
 
   if (frame->sdata == NULL) {
+    size_t rbytes = 0;
     header = malloc(FRAME_HEADER_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
-    size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
+    if (fp != NULL) {
+      rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
+      fclose(fp);
+    }
     (void) rbytes;
-    assert(rbytes == FRAME_HEADER_MINLEN);
-    fclose(fp);
+    if (rbytes != FRAME_HEADER_MINLEN) {
+      free(header);
+      return -1;
+    }
   }
   uint32_t prev_h2len;
   swap_store(&prev_h2len, header + FRAME_HEADER_LEN, sizeof(prev_h2len));
@@ -809,8 +889,10 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
   if (frame->sdata == NULL) {
     // Write updated header down to file
     FILE* fp = fopen(frame->fname, "rb+");
-    fwrite(h2, h2len, 1, fp);
-    fclose(fp);
+    if (fp != NULL) {
+      fwrite(h2, h2len, 1, fp);
+      fclose(fp);
+    }
     free(header);
   }
   else {
@@ -907,15 +989,18 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
   if (frame->sdata != NULL) {
     header = frame->sdata;
   } else {
+    size_t rbytes = 0;
     header = malloc(header_len);
     FILE* fp = fopen(frame->fname, "rb");
-    size_t rbytes = fread(header, 1, header_len, fp);
+    if (fp != NULL) {
+      rbytes = fread(header, 1, header_len, fp);
+      fclose(fp);
+    }
     if (rbytes != (size_t) header_len) {
       fprintf(stderr, "Cannot access the header out of the fileframe.\n");
-      fclose(fp);
+      free(header);
       return -2;
     }
-    fclose(fp);
   }
 
   // Get the size for the index of metalayers
@@ -924,7 +1009,9 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
 
   // Get the actual index of metalayers
   uint8_t* metalayers_idx = header + FRAME_IDX_SIZE + 2;
-  assert(metalayers_idx[0] == 0xde);   // sanity check
+  if (metalayers_idx[0] != 0xde) {   // sanity check
+    return -1;
+  }
   uint8_t* idxp = metalayers_idx + 1;
   uint16_t nmetalayers;
   swap_store(&nmetalayers, idxp, sizeof(uint16_t));
@@ -933,7 +1020,9 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
 
   // Populate the metalayers and its serialized values
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
-    assert((*idxp & 0xe0u) == 0xa0u);   // sanity check
+    if ((*idxp & 0xe0u) != 0xa0u) {   // sanity check
+      return -1;
+    }
     blosc2_metalayer* metalayer = calloc(sizeof(blosc2_metalayer), 1);
     schunk->metalayers[nmetalayer] = metalayer;
 
@@ -948,7 +1037,9 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
 
     // Populate the serialized value for this metalayer
     // Get the offset
-    assert((*idxp & 0xffu) == 0xd2u);   // sanity check
+    if ((*idxp & 0xffu) != 0xd2u) {   // sanity check
+      return -1;
+    }
     idxp += 1;
     int32_t offset;
     swap_store(&offset, idxp, sizeof(offset));
@@ -956,7 +1047,9 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
 
     // Go to offset and see if we have the correct marker
     uint8_t* content_marker = header + offset;
-    assert(*content_marker == 0xc6);
+    if (*content_marker != 0xc6) {
+      return -1;
+    }
 
     // Read the size of the content
     int32_t content_len;
@@ -1054,7 +1147,10 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
     else {
       fseek(fp, header_len + offsets[i], SEEK_SET);
       size_t rbytes = fread(data_chunk, 1, BLOSC_MIN_HEADER_LENGTH, fp);
-      assert(rbytes == BLOSC_MIN_HEADER_LENGTH);
+      if (rbytes != BLOSC_MIN_HEADER_LENGTH) {
+        fclose(fp);
+        return NULL;
+      }
       csize = sw32_(data_chunk + 12);
       if (csize > prev_alloc) {
         data_chunk = realloc(data_chunk, (size_t)csize);
@@ -1062,7 +1158,10 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
       }
       fseek(fp, header_len + offsets[i], SEEK_SET);
       rbytes = fread(data_chunk, 1, (size_t)csize, fp);
-      assert(rbytes == (size_t)csize);
+      if (rbytes != (size_t)csize) {
+        fclose(fp);
+        return NULL;
+      }
     }
     uint8_t* new_chunk = malloc((size_t)csize);
     memcpy(new_chunk, data_chunk, (size_t)csize);
@@ -1086,8 +1185,9 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
   }
   free(offsets);
 
-  assert(acc_nbytes == nbytes);
-  assert(acc_cbytes == cbytes);
+  if (acc_nbytes != nbytes || acc_cbytes != cbytes) {
+    return NULL;
+  }
 
   uint8_t* usermeta;
   int32_t usermeta_len;
