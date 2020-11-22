@@ -27,7 +27,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   }
 
   /* Decompress data */
-  uint8_t *uncompressed_data = (uint8_t *)malloc(schunk->nbytes+1);
+  uint8_t *uncompressed_data = (uint8_t *)malloc((size_t)schunk->nbytes+1);
   if (uncompressed_data != NULL) {
     for (i = 0, nchunk = 0; nchunk < schunk->nchunks-1; nchunk++) {
       dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, uncompressed_data + i, schunk->chunksize);
@@ -41,6 +41,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     free(uncompressed_data);
   }
 
+  blosc2_schunk_free(schunk);
   blosc_destroy();
   return 0;
 }
