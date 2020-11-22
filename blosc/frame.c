@@ -774,8 +774,6 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
 
 /* Initialize a frame out of a serialized frame */
 blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy) {
-  blosc2_frame* frame = calloc(1, sizeof(blosc2_frame));
-
   // Get the length of the frame
   const uint8_t* header = sframe;
   int64_t frame_len;
@@ -783,12 +781,15 @@ blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy) 
   if (frame_len != len) {   // sanity check
     return NULL;
   }
+
+  blosc2_frame* frame = calloc(1, sizeof(blosc2_frame));
   frame->len = frame_len;
 
   // Now, the trailer length
   const uint8_t* trailer = sframe + frame_len - FRAME_TRAILER_MINLEN;
   int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
   if (trailer[trailer_offset - 1] != 0xce) {
+    free(frame);
     return NULL;
   }
   uint32_t trailer_len;
