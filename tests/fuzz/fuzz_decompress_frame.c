@@ -20,14 +20,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   dparams.nthreads = 1;
 
   /* Create a super-chunk backed by an in-memory frame */
-  blosc2_frame* frame = blosc2_frame_from_sframe((uint8_t *)data, size, 1);
-  if (frame == NULL) {
-    blosc_destroy();
-    return 0;
-  }
-  blosc2_schunk* schunk = blosc2_schunk_open_sframe(frame, size);
+  blosc2_schunk* schunk = blosc2_schunk_open_sframe((uint8_t *)data, size);
   if (schunk == NULL) {
-    blosc2_frame_free(frame);
     blosc_destroy();
     return 0;
   }
@@ -49,7 +43,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   /* Free resources */
   blosc2_schunk_free(schunk);
-  blosc2_frame_free(frame);
 
   blosc_destroy();
   return 0;
