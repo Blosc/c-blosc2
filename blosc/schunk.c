@@ -257,6 +257,9 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
 /* Create a super-chunk out of a serialized frame (no copy is made). */
 blosc2_schunk* blosc2_schunk_open_sframe(uint8_t *sframe, int64_t len) {
   blosc2_frame* frame = blosc2_frame_from_sframe(sframe, len, false);
+  if (frame == NULL) {
+    return NULL;
+  }
   blosc2_schunk* schunk = blosc2_frame_to_schunk(frame, false);
   return schunk;
 }
@@ -610,7 +613,7 @@ int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order) {
     }
   }
   free(index_check);
-  
+
   if (schunk->frame != NULL) {
     return frame_reorder_offsets(schunk->frame, offsets_order, schunk);
   }
