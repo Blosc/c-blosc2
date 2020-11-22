@@ -41,9 +41,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     free(uncompressed_data);
   }
 
-  /* Free resources */
-  blosc2_schunk_free(schunk);
-
   blosc_destroy();
   return 0;
 }
