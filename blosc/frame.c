@@ -706,7 +706,7 @@ int64_t blosc2_schunk_to_sframe(blosc2_schunk* schunk, uint8_t** sframe) {
   }
   // Get a copy of the internal sframe
   *sframe = malloc((size_t)sdata_len);
-  memcpy(*sframe, sdata, sdata_len);
+  memcpy(*sframe, sdata, (size_t)sdata_len);
   if (frame != NULL) {
     blosc2_frame_free(frame);
   }
@@ -1167,7 +1167,6 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
 
   // We want the sequential schunk, so create the actual data chunks (and, while doing this,
   // get a guess at the blocksize used in this frame)
-  schunk->data = malloc(nchunks * sizeof(void*));
   int64_t acc_nbytes = 0;
   int64_t acc_cbytes = 0;
   int32_t blocksize = 0;
@@ -1178,7 +1177,12 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
   if (frame->sdata == NULL) {
     data_chunk = malloc((size_t)prev_alloc);
     fp = fopen(frame->fname, "rb");
+    if (fp == NULL) {
+      free(offsets);
+      return NULL;
+    }
   }
+  schunk->data = malloc(nchunks * sizeof(void*));
   for (int i = 0; i < nchunks; i++) {
     if (frame->sdata != NULL) {
       data_chunk = frame->sdata + header_len + offsets[i];
@@ -1189,6 +1193,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
       size_t rbytes = fread(data_chunk, 1, BLOSC_MIN_HEADER_LENGTH, fp);
       if (rbytes != BLOSC_MIN_HEADER_LENGTH) {
         fclose(fp);
+        free(offsets);
         return NULL;
       }
       csize = sw32_(data_chunk + 12);
@@ -1200,6 +1205,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
       rbytes = fread(data_chunk, 1, (size_t)csize, fp);
       if (rbytes != (size_t)csize) {
         fclose(fp);
+        free(offsets);
         return NULL;
       }
     }
