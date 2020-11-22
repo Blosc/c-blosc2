@@ -730,12 +730,8 @@ int64_t blosc2_frame_to_file(blosc2_frame *frame, const char *fname) {
 
 /* Initialize a frame out of a file */
 blosc2_frame* blosc2_frame_from_file(const char *fname) {
-  blosc2_frame* frame = calloc(1, sizeof(blosc2_frame));
-  char* fname_cpy = malloc(strlen(fname) + 1);
-  frame->fname = strcpy(fname_cpy, fname);
-
   // Get the length of the frame
-  uint8_t* header = malloc(FRAME_HEADER_MINLEN);
+  uint8_t header[FRAME_HEADER_MINLEN];
   FILE* fp = fopen(fname, "rb");
   size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
   if (rbytes != FRAME_HEADER_MINLEN) {
@@ -745,8 +741,11 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   }
   int64_t frame_len;
   swap_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
+
+  blosc2_frame* frame = calloc(1, sizeof(blosc2_frame));
+  char* fname_cpy = malloc(strlen(fname) + 1);
+  frame->fname = strcpy(fname_cpy, fname);
   frame->len = frame_len;
-  free(header);
 
   // Now, the trailer length
   uint8_t* trailer = malloc(FRAME_TRAILER_MINLEN);
