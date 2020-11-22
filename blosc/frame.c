@@ -777,6 +777,9 @@ blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy) 
   // Get the length of the frame
   const uint8_t* header = sframe;
   int64_t frame_len;
+  if (len < FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
   swap_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
   if (frame_len != len) {   // sanity check
     return NULL;
