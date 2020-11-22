@@ -380,7 +380,7 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
                     int64_t *cbytes, int32_t *chunksize, int32_t *nchunks, int32_t *typesize,
                     uint8_t *compcode, uint8_t *clevel, uint8_t *filters, uint8_t *filters_meta) {
   uint8_t* framep = frame->sdata;
-  uint8_t* header = NULL;
+  uint8_t header[FRAME_HEADER_MINLEN];
 
   if (frame->len <= 0) {
     return -1;
@@ -388,7 +388,6 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
 
   if (frame->sdata == NULL) {
     size_t rbytes = 0;
-    header = malloc(FRAME_HEADER_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
     if (fp != NULL) {
       rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
@@ -443,10 +442,6 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
     }
   } else {
     *nchunks = 0;
-  }
-
-  if (frame->sdata == NULL) {
-    free(header);
   }
 
   return 0;
@@ -732,6 +727,8 @@ int64_t blosc2_frame_to_file(blosc2_frame *frame, const char *fname) {
 blosc2_frame* blosc2_frame_from_file(const char *fname) {
   // Get the length of the frame
   uint8_t header[FRAME_HEADER_MINLEN];
+  uint8_t trailer[FRAME_TRAILER_MINLEN];
+
   FILE* fp = fopen(fname, "rb");
   size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
   if (rbytes != FRAME_HEADER_MINLEN) {
@@ -748,24 +745,20 @@ blosc2_frame* blosc2_frame_from_file(const char *fname) {
   frame->len = frame_len;
 
   // Now, the trailer length
-  uint8_t* trailer = malloc(FRAME_TRAILER_MINLEN);
   fseek(fp, frame_len - FRAME_TRAILER_MINLEN, SEEK_SET);
   rbytes = fread(trailer, 1, FRAME_TRAILER_MINLEN, fp);
   fclose(fp);
   if (rbytes != FRAME_TRAILER_MINLEN) {
     fprintf(stderr, "Error: cannot read from file '%s'\n", fname);
-    free(trailer);
     return NULL;
   }
   int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
   if (trailer[trailer_offset - 1] != 0xce) {
-    free(trailer);
     return NULL;
   }
   uint32_t trailer_len;
   swap_store(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
   frame->trailer_len = trailer_len;
-  free(trailer);
 
   return frame;
 }
@@ -844,7 +837,8 @@ uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, i
 
 
 int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
-  uint8_t* header = frame->sdata;
+  uint8_t* framep = frame->sdata;
+  uint8_t header[FRAME_HEADER_MINLEN];
 
   if (frame->len <= 0) {
     return -1;
@@ -857,7 +851,6 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
 
   if (frame->sdata == NULL) {
     size_t rbytes = 0;
-    header = malloc(FRAME_HEADER_MINLEN);
     FILE* fp = fopen(frame->fname, "rb");
     if (fp != NULL) {
       rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
@@ -865,12 +858,12 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
     }
     (void) rbytes;
     if (rbytes != FRAME_HEADER_MINLEN) {
-      free(header);
       return -1;
     }
+    framep = header;
   }
   uint32_t prev_h2len;
-  swap_store(&prev_h2len, header + FRAME_HEADER_LEN, sizeof(prev_h2len));
+  swap_store(&prev_h2len, framep + FRAME_HEADER_LEN, sizeof(prev_h2len));
 
   // Build a new header
   uint8_t* h2 = new_header_frame(schunk, frame);
@@ -896,7 +889,6 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
       fwrite(h2, h2len, 1, fp);
       fclose(fp);
     }
-    free(header);
   }
   else {
     if (new) {
