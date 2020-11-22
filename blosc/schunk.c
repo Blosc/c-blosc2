@@ -261,6 +261,10 @@ blosc2_schunk* blosc2_schunk_open_sframe(uint8_t *sframe, int64_t len) {
     return NULL;
   }
   blosc2_schunk* schunk = blosc2_frame_to_schunk(frame, false);
+  if (schunk == NULL) {
+    /* Use free instead of blosc2_frame_free since no copy */
+    free(frame);
+  }
   return schunk;
 }
 

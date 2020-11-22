@@ -1121,6 +1121,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
                             &schunk->compcode, &schunk->clevel, schunk->filters, schunk->filters_meta);
   if (ret < 0) {
     fprintf(stderr, "unable to get meta info from frame");
+    free(schunk);
     return NULL;
   }
   int32_t nchunks = schunk->nchunks;
@@ -1149,6 +1150,9 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
   int32_t coffsets_cbytes = 0;
   uint8_t* coffsets = get_coffsets(frame, header_len, cbytes, &coffsets_cbytes);
   if (coffsets == NULL) {
+    blosc2_free_ctx(schunk->cctx);
+    blosc2_free_ctx(schunk->dctx);
+    free(schunk);
     fprintf(stderr, "Error: cannot get the offsets for the frame\n");
     return NULL;
   }
@@ -1161,6 +1165,9 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
   blosc2_free_ctx(dctx);
   if (off_nbytes < 0) {
     free(offsets);
+    blosc2_free_ctx(schunk->cctx);
+    blosc2_free_ctx(schunk->dctx);
+    free(schunk);
     fprintf(stderr, "Error: cannot decompress the offsets chunk");
     return NULL;
   }
@@ -1179,6 +1186,9 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
     fp = fopen(frame->fname, "rb");
     if (fp == NULL) {
       free(offsets);
+      blosc2_free_ctx(schunk->cctx);
+      blosc2_free_ctx(schunk->dctx);
+      free(schunk);
       return NULL;
     }
   }
@@ -1194,6 +1204,9 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
       if (rbytes != BLOSC_MIN_HEADER_LENGTH) {
         fclose(fp);
         free(offsets);
+        blosc2_free_ctx(schunk->cctx);
+        blosc2_free_ctx(schunk->dctx);
+        free(schunk);
         return NULL;
       }
       csize = sw32_(data_chunk + 12);
@@ -1206,6 +1219,9 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
       if (rbytes != (size_t)csize) {
         fclose(fp);
         free(offsets);
+        blosc2_free_ctx(schunk->cctx);
+        blosc2_free_ctx(schunk->dctx);
+        free(schunk);
         return NULL;
       }
     }
@@ -1232,6 +1248,9 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
   free(offsets);
 
   if (acc_nbytes != nbytes || acc_cbytes != cbytes) {
+    blosc2_free_ctx(schunk->cctx);
+    blosc2_free_ctx(schunk->dctx);
+    free(schunk);
     return NULL;
   }
 
@@ -1242,12 +1261,18 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
   out:
   rc = frame_get_metalayers(frame, schunk);
   if (rc < 0) {
+    blosc2_free_ctx(schunk->cctx);
+    blosc2_free_ctx(schunk->dctx);
+    free(schunk);
     fprintf(stderr, "Error: cannot access the metalayers");
     return NULL;
   }
 
   usermeta_len = frame_get_usermeta(frame, &usermeta);
   if (usermeta_len < 0) {
+    blosc2_free_ctx(schunk->cctx);
+    blosc2_free_ctx(schunk->dctx);
+    free(schunk);
     fprintf(stderr, "Error: cannot access the usermeta chunk");
     return NULL;
   }
