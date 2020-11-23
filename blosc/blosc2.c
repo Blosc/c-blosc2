@@ -1025,7 +1025,15 @@ static int blosc_d(
   int memcpyed = src[BLOSC2_CHUNK_FLAGS] & (uint8_t)BLOSC_MEMCPYED;
   if (memcpyed) {
     int32_t chunk_nbytes = *(int32_t*)(src + BLOSC2_CHUNK_NBYTES);
+    int32_t chunk_cbytes = *(int32_t*)(src + BLOSC2_CHUNK_CBYTES);
+    if (chunk_nbytes + BLOSC_MAX_OVERHEAD != chunk_cbytes) {
+      return -1;
+    }
     int bsize_ = leftoverblock ? chunk_nbytes % context->blocksize : bsize;
+    if (chunk_cbytes < BLOSC_MAX_OVERHEAD + (nblock * context->blocksize) + bsize_) {
+      /* Not enough input to copy block */
+      return -1;
+    }
     memcpy(dest + dest_offset, src + BLOSC_MAX_OVERHEAD + nblock * context->blocksize, bsize_);
     return bsize_;
   }
