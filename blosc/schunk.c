@@ -580,9 +580,9 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, 
  * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
  * is returned instead.
 */
-int blosc2_schunk_get_chunk_lazy(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, bool *needs_free) {
+int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, bool *needs_free) {
   if (schunk->frame != NULL) {
-    return frame_get_chunk_lazy(schunk->frame, nchunk, chunk, needs_free);
+    return frame_get_lazychunk(schunk->frame, nchunk, chunk, needs_free);
   }
 
   if (nchunk >= schunk->nchunks) {

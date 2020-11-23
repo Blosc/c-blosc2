@@ -1215,8 +1215,8 @@ BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint
  * detected, a negative code is returned instead.  Note that a lazy chunk is somewhat larger than
  * a regular chunk because of the trailer section (for details see `README_CHUNK_FORMAT.rst`).
  */
-BLOSC_EXPORT int blosc2_schunk_get_chunk_lazy(blosc2_schunk *schunk, int nchunk, uint8_t **chunk,
-                                              bool *needs_free);
+BLOSC_EXPORT int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk,
+                                             bool *needs_free);
 
 /**
  * @brief Return the @p cparams associated to a super-chunk.

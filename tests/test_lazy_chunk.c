@@ -66,7 +66,7 @@ static char* test_lazy_chunk(void) {
   bool needs_free;
   uint8_t* lazy_chunk;
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
-    cbytes  = blosc2_schunk_get_chunk_lazy(schunk, nchunk, &lazy_chunk, &needs_free);
+    cbytes  = blosc2_schunk_get_lazychunk(schunk, nchunk, &lazy_chunk, &needs_free);
     for (int i = 0; i < NBLOCKS - 1; i++) {
       memset(data_dest, 0, isize);
       dsize = blosc2_getitem_ctx(schunk->dctx, lazy_chunk, cbytes, i * BLOCKSIZE, BLOCKSIZE * 2, data_dest);
@@ -84,7 +84,7 @@ static char* test_lazy_chunk(void) {
   // Check that lazy chunks can be decompressed correctly
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
     memset(data_dest, 0, isize);
-    cbytes = blosc2_schunk_get_chunk_lazy(schunk, nchunk, &lazy_chunk, &needs_free);
+    cbytes = blosc2_schunk_get_lazychunk(schunk, nchunk, &lazy_chunk, &needs_free);
     dsize = blosc2_decompress_ctx(schunk->dctx, lazy_chunk, cbytes, data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
     for (int i = 0; i < NBLOCKS; i++) {
