@@ -27,7 +27,7 @@ static char* test_lazy_chunk(void) {
   static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
-  int64_t nbytes, cbytes;
+  int cbytes;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
@@ -56,10 +56,8 @@ static char* test_lazy_chunk(void) {
   }
 
   /* Gather some info */
-  nbytes = schunk->nbytes;
-  cbytes = schunk->cbytes;
   if (nchunks > 0 && clevel > 0) {
-    mu_assert("ERROR: bad compression ratio in frame", nbytes > 10 * cbytes);
+    mu_assert("ERROR: bad compression ratio in frame", schunk->nbytes > 10 * schunk->cbytes);
   }
 
   // Check that blosc2_getitem_ctx works correctly with lazy chunks
@@ -111,6 +109,11 @@ static char *all_tests(void) {
 
   nchunks = 1;
   clevel = 5;
+  nthreads = 2;
+  mu_run_test(test_lazy_chunk);
+
+  nchunks = 1;
+  clevel = 0;
   nthreads = 2;
   mu_run_test(test_lazy_chunk);
 

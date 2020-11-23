@@ -1005,12 +1005,13 @@ static int blosc_d(
       return -12;
     }
     char *fname = context->schunk->frame->fname;
-    // Get the csize of the nblock
-    int32_t *block_csizes = (int32_t *)(src + srcsize - context->nblocks * sizeof(int32_t));
-    int32_t block_csize = block_csizes[nblock];
+    int32_t trailer_len = sizeof(int32_t) + sizeof(int64_t) + context->nblocks * sizeof(int32_t);
+    int32_t non_lazy_chunklen = srcsize - trailer_len;
     // The offset of the actual chunk is in the trailer
-    int32_t non_lazy_chunklen = *(int32_t*)(src + BLOSC2_CHUNK_CBYTES);
     int64_t chunk_offset = *(int64_t*)(src + non_lazy_chunklen + sizeof(int32_t));
+    // Get the csize of the nblock
+    int32_t *block_csizes = (int32_t *)(src + non_lazy_chunklen + sizeof(int32_t) + sizeof(int64_t));
+    int32_t block_csize = block_csizes[nblock];
     // Read the lazy block on disk
     FILE* fp = fopen(fname, "rb");
     // The offset of the block is src_offset
