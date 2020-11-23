@@ -1363,7 +1363,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   if ((nchunks > 0) && (nbytes_chunk < chunksize)) {
     uint8_t* last_chunk;
     bool needs_free;
-    int retcode = frame_get_chunk(frame, nchunks - 1, &last_chunk, &needs_free);
+    int retcode = frame_get_chunk_lazy(frame, nchunks - 1, &last_chunk, &needs_free);
     if (retcode < 0) {
       fprintf(stderr,
               "cannot get the last chunk (in position %d)", nchunks - 1);
@@ -1488,7 +1488,8 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
 int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk, void *dest, int32_t nbytes) {
   uint8_t* src;
   bool needs_free;
-  int chunk_cbytes = frame_get_chunk(frame, nchunk, &src, &needs_free);
+  // Use a lazychunk here in order to do a potential parallel read.
+  int chunk_cbytes = frame_get_chunk_lazy(frame, nchunk, &src, &needs_free);
   if (chunk_cbytes < 0) {
     fprintf(stderr,
             "cannot get the chunk in position %d", nchunk);
