@@ -69,6 +69,8 @@
     #include <stdint.h>
   #endif
 
+  #define fseek _fseeki64
+
   #include <process.h>
   #define getpid _getpid
 #else
@@ -1012,7 +1014,7 @@ static int blosc_d(
     // Read the lazy block on disk
     FILE* fp = fopen(fname, "rb");
     // The offset of the block is src_offset
-    fseek(fp, (long)(chunk_offset + src_offset), SEEK_SET);
+    fseek(fp, chunk_offset + src_offset, SEEK_SET);
     size_t rbytes = fread((void*)(src + src_offset), 1, block_csize, fp);
     fclose(fp);
     if (rbytes != block_csize) {
