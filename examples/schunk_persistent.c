@@ -51,7 +51,7 @@ int main(void) {
     cparams.clevel = 9;
     cparams.nthreads = NTHREADS;
     dparams.nthreads = NTHREADS;
-    blosc2_storage storage = {false,"/home/",.cparams=&cparams, .dparams=&dparams};
+    blosc2_storage storage = {false,"/home/martaiborra/catacumba/",.cparams=&cparams, .dparams=&dparams};
     schunk = blosc2_schunk_new(storage);
 
     blosc_set_timestamp(&last);

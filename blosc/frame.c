@@ -111,7 +111,6 @@ int blosc2_frame_free(blosc2_frame *frame) {
 
 
 void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
-  assert(frame != NULL);
   uint8_t* h2 = calloc(FRAME_HEADER_MINLEN, 1);
   uint8_t* h2p = h2;
 
@@ -135,7 +134,14 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   // Total frame size
   *h2p = 0xcf;  // uint64
   // Fill it with frame->len which is known *after* the creation of the frame (e.g. when updating the header)
-  int64_t flen = frame->len;
+  int64_t flen;
+  if (frame != NULL){
+    flen = frame->len;
+  }else{
+      // pschunk framesize = 0
+      flen = 0;
+  }
+
   swap_store(h2 + FRAME_LEN, &flen, sizeof(flen));
   h2p += 1 + 8;
   assert(h2p - h2 < FRAME_HEADER_MINLEN);
@@ -264,7 +270,6 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   int32_t current_header_len = (int32_t)(h2p - h2);
   int32_t *offtooff = malloc(nmetalayers * sizeof(int32_t));
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
-    assert(frame != NULL);
     blosc2_metalayer *metalayer = schunk->metalayers[nmetalayer];
     uint8_t namelen = (uint8_t) strlen(metalayer->name);
     h2 = realloc(h2, (size_t)current_header_len + 1 + namelen + 1 + 4);
@@ -302,7 +307,6 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   h2p += sizeof(nmetalayers);
   current_header_len = (int32_t)(h2p - h2);
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
-    assert(frame != NULL);
     blosc2_metalayer *metalayer = schunk->metalayers[nmetalayer];
     h2 = realloc(h2, (size_t)current_header_len + 1 + 4 + metalayer->content_len);
     h2p = h2 + current_header_len;
@@ -431,8 +435,9 @@ int update_frame_len(blosc2_frame* frame, int64_t len) {
 
 
 int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
-  if (frame->len == 0) {
+  if (frame != NULL && frame->len == 0) {
     fprintf(stderr, "Error: the trailer cannot be updated on empty frames");
+    return -1;
   }
 
   // Create the trailer in msgpack (see the frame format document)
@@ -468,6 +473,22 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
   // Sanity check
   assert(ptrailer - trailer == trailer_len);
 
+  if (frame == NULL){
+      // Persistent - schunk
+      uint8_t *trailername = malloc(sizeof(uint8_t) * (strlen(schunk->storage->path) + 7 +1));
+      strcpy(trailername, schunk->storage->path);
+      strcat(trailername,"trailer");
+      FILE *fpt = fopen(trailername,"wb");
+      size_t wbytes = fwrite(trailer, 1, trailer_len, fpt);
+      if (wbytes != trailer_len) {
+          fprintf(stderr, "cannot write the trailer file.");
+          return -1;
+      }
+      fclose(fpt);
+      free(trailername);
+      free(trailer);
+      return 1;
+  }
   int32_t header_len;
   int64_t frame_len;
   int64_t nbytes;
