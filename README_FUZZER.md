@@ -1,7 +1,7 @@
 How to look into fuzzer issues
 ==============================
 
-* Look into the output of the test case at: https://oss-fuzz.com/testcases?showall=1 (Nathan, I am not sure how to look into a specific testcase coming from the logs in CI; could you chime in and put the procedure here ?).  Use the blosc.oss.fuzz@gmail.com account so as to access it.
+* Look into the output of the test case in the logs in CI (look for something like `Test unit written to ./crash-85283a6341337b0ede4bf3b9b2657dcce83ee0b4\nBase64: AiACDQEAAAAPAAAAFAAAABMAbZ0=\n".`).  Use the blosc.oss.fuzz@gmail.com account so as to access it.
 
 * This output always gives the base64 of the data that reproduced it (e.g. AiACDQEAAAAPAAAAFAAAABMAbZ0=).  This can be converted to hex and saved to a file.
 
