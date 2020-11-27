@@ -1,0 +1,1 @@
+/usr/bin/cc  -std=gnu99 -std=gnu99 -g  -rdynamic CMakeFiles/test_noinit.dir/test_noinit.c.o  -o test_noinit   -L/home/martaiborra/c-blosc2/cmake-build-debug/blosc  -Wl,-rpath,/home/martaiborra/c-blosc2/cmake-build-debug/blosc -lblosc_testing 

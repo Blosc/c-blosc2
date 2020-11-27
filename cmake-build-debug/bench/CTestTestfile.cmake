@@ -1,0 +1,38 @@
+# CMake generated Testfile for 
+# Source directory: /home/martaiborra/c-blosc2/bench
+# Build directory: /home/martaiborra/c-blosc2/cmake-build-debug/bench
+# 
+# This file includes the relevant testing commands required for 
+# testing this directory and lists subdirectories to be tested as well.
+add_test(test_blosclz_shuffle_1 "b2bench" "blosclz" "shuffle" "test" "1")
+set_tests_properties(test_blosclz_shuffle_1 PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;60;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_lz4_shuffle_1 "b2bench" "lz4" "shuffle" "test" "1")
+set_tests_properties(test_lz4_shuffle_1 PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;62;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_lizard_shuffle_1 "b2bench" "lizard" "shuffle" "test" "1")
+set_tests_properties(test_lizard_shuffle_1 PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;66;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_blosclz_shuffle_n "b2bench" "blosclz" "shuffle" "test")
+set_tests_properties(test_blosclz_shuffle_n PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;82;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_lz4_shuffle_n "b2bench" "lz4" "shuffle" "test")
+set_tests_properties(test_lz4_shuffle_n PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;84;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_lz4hc_shuffle_n "b2bench" "lz4hc" "shuffle" "test")
+set_tests_properties(test_lz4hc_shuffle_n PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;85;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_lizard_shuffle_n "b2bench" "lizard" "shuffle" "test")
+set_tests_properties(test_lizard_shuffle_n PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;88;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_zlib_shuffle_n "b2bench" "zlib" "shuffle" "test")
+set_tests_properties(test_zlib_shuffle_n PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;94;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_zstd_shuffle_n "b2bench" "zstd" "shuffle" "test")
+set_tests_properties(test_zstd_shuffle_n PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;97;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_blosclz_bitshuffle_1 "b2bench" "blosclz" "bitshuffle" "test" "1")
+set_tests_properties(test_blosclz_bitshuffle_1 PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;104;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_lz4_bitshuffle_1 "b2bench" "lz4" "bitshuffle" "test" "1")
+set_tests_properties(test_lz4_bitshuffle_1 PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;106;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_blosclz_bitshuffle_n "b2bench" "blosclz" "bitshuffle" "test")
+set_tests_properties(test_blosclz_bitshuffle_n PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;123;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_lz4_bitshuffle_n "b2bench" "lz4" "bitshuffle" "test")
+set_tests_properties(test_lz4_bitshuffle_n PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;125;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_lizard_bitshuffle_n "b2bench" "lizard" "bitshuffle" "test")
+set_tests_properties(test_lizard_bitshuffle_n PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;129;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_bench_delta "delta_schunk")
+set_tests_properties(test_bench_delta PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;154;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")
+add_test(test_bench_trunc_prec "trunc_prec_schunk")
+set_tests_properties(test_bench_trunc_prec PROPERTIES  _BACKTRACE_TRIPLES "/home/martaiborra/c-blosc2/bench/CMakeLists.txt;159;add_test;/home/martaiborra/c-blosc2/bench/CMakeLists.txt;0;")

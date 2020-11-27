@@ -1,0 +1,1 @@
+/usr/bin/cc  -std=gnu99 -std=gnu99 -g  -rdynamic CMakeFiles/fuzz_compress_frame.dir/fuzz_compress_frame.c.o CMakeFiles/fuzz_compress_frame.dir/standalone.c.o  -o compress_frame_fuzzer   -L/home/martaiborra/c-blosc2/cmake-build-debug/blosc  -Wl,-rpath,/home/martaiborra/c-blosc2/cmake-build-debug/blosc ../../blosc/libblosc2.a -lpthread -lrt 

@@ -1,0 +1,1 @@
+/usr/bin/cc  -std=gnu99 -std=gnu99 -g  -rdynamic CMakeFiles/test_change_nthreads_append.dir/test_change_nthreads_append.c.o  -o test_change_nthreads_append   -L/home/martaiborra/c-blosc2/cmake-build-debug/blosc  -Wl,-rpath,/home/martaiborra/c-blosc2/cmake-build-debug/blosc -lblosc_testing 

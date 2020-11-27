@@ -1,0 +1,1 @@
+/usr/bin/cc  -std=gnu99 -std=gnu99 -g  -rdynamic CMakeFiles/zstd_dict.dir/zstd_dict.c.o  -o zstd_dict  -Wl,-rpath,/home/martaiborra/c-blosc2/cmake-build-debug/blosc -lrt ../blosc/libblosc2.so.2.0.0 -lpthread -lrt 

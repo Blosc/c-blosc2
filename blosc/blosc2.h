@@ -214,6 +214,25 @@ enum {
   BLOSC_ZSTD_VERSION_FORMAT = 1,
 };
 
+
+/**
+ * @brief Offsets for fields in Blosc2 chunk header
+ */
+enum {
+    BLOSC2_CHUNK_VERSION = 0x0,       //!< the version for the chunk format
+    BLOSC2_CHUNK_VERSIONLZ = 0x1,     //!< the version for the format of internal codec
+    BLOSC2_CHUNK_FLAGS = 0x2,         //!< flags and codec info
+    BLOSC2_CHUNK_TYPESIZE = 0x3,      //!< (uint8) the number of bytes of the atomic type
+    BLOSC2_CHUNK_NBYTES = 0x4,        //!< (int32) uncompressed size of the buffer (this header is not included)
+    BLOSC2_CHUNK_BLOCKSIZE = 0x8,     //!< (int32) size of internal blocks
+    BLOSC2_CHUNK_CBYTES = 0xc,        //!< (int32) compressed size of the buffer (including this header)
+    BLOSC2_CHUNK_FILTER_CODES = 0x10, //!< the codecs for the filter pipeline (1 byte per code)
+    BLOSC2_CHUNK_FILTER_META = 0x18,  //!< meta info for the filter pipeline (1 byte per code)
+    BLOSC2_CHUNK_BLOSC2_FLAGS = 0x1F, //!< flags specific for Blosc2 functionality
+};
+
+
+
 /**
  * @brief Initialize the Blosc library environment.
  *
@@ -1007,7 +1026,7 @@ typedef struct blosc2_schunk {
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk *
-blosc2_schunk_new(const blosc2_storage storage);
+blosc2_schunk_new(blosc2_storage storage);
 
 /**
  * @brief Create a non-initialized super-chunk.
@@ -1021,7 +1040,7 @@ blosc2_schunk_new(const blosc2_storage storage);
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk *
-blosc2_schunk_empty(int nchunks, const blosc2_storage storage);
+blosc2_schunk_empty(int nchunks, blosc2_storage storage);
 
 /**
  * @brief Open an existing super-chunk that is on-disk (no copy is made).
@@ -1166,8 +1185,8 @@ BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchun
  * responsibility to free the chunk returned or not.
  *
  * @warning If the super-chunk is backed by a frame that is disk-based, a buffer is allocated for the
- * (compressed) chunk, and hence a free is needed. You can check if the chunk requires a free
- * with the @p needs_free parameter.
+ * (compressed) chunk, and hence a free is needed.
+ * You can check if the chunk requires a free with the @p needs_free parameter.
  * If the chunk does not need a free, it means that a pointer to the location in the super-chunk
  * (or the backing in-memory frame) is returned in the @p chunk parameter.
  *
@@ -1176,6 +1195,33 @@ BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchun
  */
 BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk,
                                          bool *needs_free);
+
+/**
+ * @brief Return a (lazy) compressed chunk that is part of a super-chunk in the @p chunk parameter.
+ *
+ * @param schunk The super-chunk from where to extract a chunk.
+ * @param nchunk The chunk to be extracted (0 indexed).
+ * @param chunk The pointer to the (lazy) chunk of compressed data.
+ * @param needs_free The pointer to a boolean indicating if it is the user's
+ * responsibility to free the chunk returned or not.
+ *
+ * @note For disk-based frames, a lazy chunk is always returned.
+ *
+ * @warning Currently, a lazy chunk can only be used by #blosc2_decompress_ctx and #blosc2_getitem_ctx.
+ *
+ * @warning If the super-chunk is backed by a frame that is disk-based, a buffer is allocated for the
+ * (compressed) chunk, and hence a free is needed.
+ * You can check if the chunk requires a free with the @p needs_free parameter.
+ * If the chunk does not need a free, it means that a pointer to the location in the super-chunk
+ * (or the backing in-memory frame) is returned in the @p chunk parameter.  In this case the returned
+ * chunk is not lazy.
+ *
+ * @return The size of the (compressed) chunk or 0 if it is non-initialized. If some problem is
+ * detected, a negative code is returned instead.  Note that a lazy chunk is somewhat larger than
+ * a regular chunk because of the trailer section (for details see `README_CHUNK_FORMAT.rst`).
+ */
+BLOSC_EXPORT int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk,
+                                             bool *needs_free);
 
 /**
  * @brief Return the @p cparams associated to a super-chunk.

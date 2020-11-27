@@ -284,7 +284,14 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
 /* Create a super-chunk out of a serialized frame (no copy is made). */
 blosc2_schunk* blosc2_schunk_open_sframe(uint8_t *sframe, int64_t len) {
   blosc2_frame* frame = blosc2_frame_from_sframe(sframe, len, false);
+  if (frame == NULL) {
+    return NULL;
+  }
   blosc2_schunk* schunk = blosc2_frame_to_schunk(frame, false);
+  if (schunk == NULL) {
+    /* Use free instead of blosc2_frame_free since no copy */
+    free(frame);
+  }
   return schunk;
 }
 
@@ -292,9 +299,8 @@ blosc2_schunk* blosc2_schunk_open_sframe(uint8_t *sframe, int64_t len) {
 /* Append an existing chunk into a super-chunk. */
 int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy) {
   int32_t nchunks = schunk->nchunks;
-  /* The uncompressed and compressed sizes start at byte 4 and 12 */
-  int32_t nbytes = sw32_(chunk + 4);
-  int32_t cbytes = sw32_(chunk + 12);
+  int32_t nbytes = sw32_(chunk + BLOSC2_CHUNK_NBYTES);
+  int32_t cbytes = sw32_(chunk + BLOSC2_CHUNK_CBYTES);
 
     if (schunk->chunksize == -1) {
     schunk->chunksize = nbytes;  // The super-chunk is initialized now
@@ -320,7 +326,7 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
     // Check that we are not appending a small chunk after another small chunk
     if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
       uint8_t* last_chunk = schunk->data[nchunks - 1];
-      int32_t last_nbytes = sw32_(last_chunk + 4);
+      int32_t last_nbytes = sw32_(last_chunk + BLOSC2_CHUNK_NBYTES);
       if ((last_nbytes < schunk->chunksize) && (nbytes < schunk->chunksize)) {
         fprintf(stderr,
                 "appending two consecutive chunks with a chunksize smaller than the schunk chunksize"
@@ -361,12 +367,12 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   return schunk->nchunks;
 }
 
+
 /* Insert an existing @p chunk in a specified position on a super-chunk */
 int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy) {
   int32_t nchunks = schunk->nchunks;
-  /* The uncompressed and compressed sizes start at byte 4 and 12 */
-  int32_t nbytes = sw32_(chunk + 4);
-  int32_t cbytes = sw32_(chunk + 12);
+  int32_t nbytes = sw32_(chunk + BLOSC2_CHUNK_NBYTES);
+  int32_t cbytes = sw32_(chunk + BLOSC2_CHUNK_CBYTES);
 
   if (schunk->chunksize == -1) {
     schunk->chunksize = nbytes;  // The super-chunk is initialized now
@@ -388,7 +394,7 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     // Check that we are not appending a small chunk after another small chunk
     if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
       uint8_t* last_chunk = schunk->data[nchunks - 1];
-      int32_t last_nbytes = sw32_(last_chunk + 4);
+      int32_t last_nbytes = sw32_(last_chunk + BLOSC2_CHUNK_NBYTES);
       if ((last_nbytes < schunk->chunksize) && (nbytes < schunk->chunksize)) {
         fprintf(stderr,
                 "appending two consecutive chunks with a chunksize smaller than the schunk chunksize"
@@ -433,10 +439,8 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
 
 int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy) {
   int32_t nchunks = schunk->nchunks;
-
-  /* The uncompressed and compressed sizes start at byte 4 and 12 */
-  int32_t nbytes = sw32_(chunk + 4);
-  int32_t cbytes = sw32_(chunk + 12);
+  int32_t nbytes = sw32_(chunk + BLOSC2_CHUNK_NBYTES);
+  int32_t cbytes = sw32_(chunk + BLOSC2_CHUNK_CBYTES);
 
   if (schunk->chunksize == -1) {
     schunk->chunksize = nbytes;  // The super-chunk is initialized now
@@ -448,7 +452,6 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     return -1;
   }
 
-
   // Update super-chunk or frame
   if (schunk->frame == NULL) {
     uint8_t *chunk_old = schunk->data[nchunk];
@@ -459,8 +462,8 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
       nbytes_old = 0;
       cbytes_old = 0;
     } else {
-      nbytes_old = sw32_(chunk_old + 4);
-      cbytes_old = sw32_(chunk_old + 12);
+      nbytes_old = sw32_(chunk_old + BLOSC2_CHUNK_NBYTES);
+      cbytes_old = sw32_(chunk_old + BLOSC2_CHUNK_CBYTES);
     }
 
     /* Update counters */
@@ -476,7 +479,7 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
       if (last_chunk == 0) {
         last_nbytes = 0;
       } else {
-        last_nbytes = sw32_(last_chunk + 4);
+        last_nbytes = sw32_(last_chunk + BLOSC2_CHUNK_NBYTES);
       }
       if ((last_nbytes < schunk->chunksize) && (nbytes < schunk->chunksize)) {
         fprintf(stderr,
@@ -554,13 +557,13 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
       return 0;
     }
 
-    int nbytes_ = sw32_(src + 4);
+    int nbytes_ = sw32_(src + BLOSC2_CHUNK_NBYTES);
     if (nbytes < nbytes_) {
       fprintf(stderr, "Buffer size is too small for the decompressed buffer "
                       "('%d' bytes, but '%d' are needed)\n", nbytes, nbytes_);
       return -11;
     }
-    int cbytes = sw32_(src + 12);
+    int cbytes = sw32_(src + BLOSC2_CHUNK_CBYTES);
     chunksize = blosc2_decompress_ctx(schunk->dctx, src, cbytes, dest, nbytes);
     if (chunksize < 0 || chunksize != nbytes_) {
       fprintf(stderr, "Error in decompressing chunk");
@@ -606,7 +609,39 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, 
   }
 
   *needs_free = false;
-  return sw32_(*chunk + 12);
+  return sw32_(*chunk + BLOSC2_CHUNK_CBYTES);
+}
+
+
+/* Return a compressed chunk that is part of a super-chunk in the `chunk` parameter.
+ * If the super-chunk is backed by a frame that is disk-based, a buffer is allocated for the
+ * (compressed) chunk, and hence a free is needed.  You can check if the chunk requires a free
+ * with the `needs_free` parameter.
+ * If the chunk does not need a free, it means that a pointer to the location in the super-chunk
+ * (or the backing in-memory frame) is returned in the `chunk` parameter.
+ *
+ * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
+ * is returned instead.
+*/
+int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, bool *needs_free) {
+  if (schunk->frame != NULL) {
+    return frame_get_lazychunk(schunk->frame, nchunk, chunk, needs_free);
+  }
+
+  if (nchunk >= schunk->nchunks) {
+    fprintf(stderr, "nchunk ('%d') exceeds the number of chunks "
+                    "('%d') in schunk\n", nchunk, schunk->nchunks);
+    return -2;
+  }
+
+  *chunk = schunk->data[nchunk];
+  if (*chunk == 0) {
+    *needs_free = 0;
+    return 0;
+  }
+
+  *needs_free = false;
+  return sw32_(*chunk + BLOSC2_CHUNK_CBYTES);
 }
 
 
@@ -646,7 +681,7 @@ int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order) {
     }
   }
   free(index_check);
-  
+
   if (schunk->frame != NULL) {
     return frame_reorder_offsets(schunk->frame, offsets_order, schunk);
   }

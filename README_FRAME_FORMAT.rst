@@ -13,6 +13,9 @@ The frame is composed of a header, a chunks section, and a trailer::
 Each of the three parts of the frame are variable length; with the header and trailer both stored using the
 `msgpack <https://msgpack.org>`_ format.
 
+*Note:*  All integer types are stored in little endian.
+
+
 Header
 ------------------
 
@@ -168,8 +171,8 @@ Each chunk is stored sequentially and follows the format described in the
 `chunk format <README_CHUNK_FORMAT.rst>`_ document.
 
 The `chunk idx` is a Blosc chunk containing the indexes to each chunk in this section.  The data in the
-chunk is a list of 64-bit offsets to each chunk. The index chunk follows the regular Blosc chunk format and
-can be compressed.
+chunk is a list of (16-bit, 32-bit or 64-bit, see above) offsets to each chunk. The index chunk follows
+the regular Blosc chunk format and can be compressed.
 
 
 Trailer

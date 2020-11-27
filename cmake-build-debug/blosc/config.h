@@ -1,0 +1,14 @@
+#ifndef _CONFIGURATION_HEADER_GUARD_H_
+#define _CONFIGURATION_HEADER_GUARD_H_
+
+#define HAVE_LZ4 TRUE
+#define HAVE_LIZARD TRUE
+/* #undef HAVE_SNAPPY */
+#define HAVE_ZLIB TRUE
+#define HAVE_MINIZ TRUE
+#define HAVE_ZSTD TRUE
+/* #undef HAVE_IPP */
+/* #undef BLOSC_DLL_EXPORT */
+
+
+#endif
