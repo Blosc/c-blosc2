@@ -169,9 +169,8 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
       }
 
       //Create empty chunks text file
-      uint8_t *filename = malloc(sizeof(uint8_t) * (strlen(schunk->storage->path) + 10 +1));
-      strcpy(filename, schunk->storage->path);
-      strcat(filename,"chunks.txt");
+      char *filename = malloc(sizeof(char) * (strlen(schunk->storage->path) + 10 +1));
+      sprintf(filename, "%schunks.txt", schunk->storage->path);
       FILE *fpcs = fopen(filename,"w");
       free(filename);
       fclose(fpcs);
@@ -541,13 +540,15 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
                       "('%d') in super-chunk\n", nchunk, schunk->nchunks);
       return -11;
     }
-    src = schunk->data[nchunk];
-    if (schunk->storage->path != NULL && !schunk->storage->sequential) {
-        bool needs_free;
-        uint8_t * chunk = (uint8_t *)dest;
-        pschunk_get_chunk(schunk, nchunk, &chunk, &needs_free);
-        src = chunk;
 
+    if (schunk->storage->path != NULL && !schunk->storage->sequential) {
+      bool needs_free;
+      uint8_t * chunk = (uint8_t *)dest;
+      pschunk_get_chunk(schunk, nchunk, &chunk, &needs_free);
+      src = chunk;
+    }
+    else {
+      src = schunk->data[nchunk];
     }
     if (src == 0) {
       return 0;

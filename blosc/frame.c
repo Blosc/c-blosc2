@@ -475,13 +475,14 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
 
   if (frame == NULL){
       // Persistent - schunk
-      uint8_t *trailername = malloc(sizeof(uint8_t) * (strlen(schunk->storage->path) + 7 +1));
-      strcpy(trailername, schunk->storage->path);
-      strcat(trailername,"trailer");
+      char *trailername = malloc(sizeof(char) * (strlen(schunk->storage->path) + 7 +1));
+      sprintf(trailername, "%strailer", schunk->storage->path);
+
       FILE *fpt = fopen(trailername,"wb");
       size_t wbytes = fwrite(trailer, 1, trailer_len, fpt);
       if (wbytes != trailer_len) {
           fprintf(stderr, "cannot write the trailer file.");
+          fclose(fpt);
           return -1;
       }
       fclose(fpt);
@@ -521,7 +522,8 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
     size_t wbytes = fwrite(trailer, 1, trailer_len, fp);
     if (wbytes != (size_t)trailer_len) {
       fprintf(stderr, "Error: cannot write the trailer length in trailer");
-      return -2;
+        fclose(fp);
+        return -2;
     }
     fclose(fp);
   }
