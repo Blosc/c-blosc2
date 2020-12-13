@@ -26,12 +26,14 @@
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/edit_cache.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/package_source.dir
+/home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/package.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_frame.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_schunk_frame.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_change_nthreads_append.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_lazychunk.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_shuffle_roundtrip_avx2.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_delta_schunk.dir
+/home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_eframe.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_delta.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_contexts.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_insert_chunk.dir
@@ -46,6 +48,8 @@
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_shuffle_roundtrip_generic.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_update_chunk.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_api.dir
+/home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_nolock.dir
+/home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_getitem_delta.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_getitem.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_dict_schunk.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_shuffle_roundtrip_sse2.dir
@@ -54,9 +58,6 @@
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_maxout.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_compressor.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_schunk.dir
-/home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_getitem_delta.dir
-/home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/test_nolock.dir
-/home/martaiborra/c-blosc2/cmake-build-debug/tests/CMakeFiles/package.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/compat/CMakeFiles/install/strip.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/compat/CMakeFiles/install/local.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/compat/CMakeFiles/edit_cache.dir
@@ -97,11 +98,11 @@
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/install/local.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/test.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/package_source.dir
-/home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/pschunk_test1.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/contexts.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/package.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/delta_schunk_ex.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/simple.dir
+/home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/eframe_simple.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/multithread.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/frame_big.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/rebuild_cache.dir
@@ -112,7 +113,6 @@
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/list_install_components.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/schunk_simple.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/frame_simple.dir
-/home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/schunk_persistent.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/install.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/zstd_dict.dir
 /home/martaiborra/c-blosc2/cmake-build-debug/examples/CMakeFiles/frame_backed_schunk.dir

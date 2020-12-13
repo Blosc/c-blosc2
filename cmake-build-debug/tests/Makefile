@@ -122,6 +122,17 @@ package_source/fast: package_source
 
 .PHONY : package_source/fast
 
+# Special rule for the target package
+package: preinstall
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Run CPack packaging tool..."
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && /usr/bin/cpack --config ./CPackConfig.cmake
+.PHONY : package
+
+# Special rule for the target package
+package/fast: package
+
+.PHONY : package/fast
+
 # Special rule for the target install
 install: preinstall
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Install the project..."
@@ -145,17 +156,6 @@ install/strip/fast: preinstall/fast
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing the project stripped..."
 	/usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
 .PHONY : install/strip/fast
-
-# Special rule for the target package
-package: preinstall
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Run CPack packaging tool..."
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && /usr/bin/cpack --config ./CPackConfig.cmake
-.PHONY : package
-
-# Special rule for the target package
-package/fast: package
-
-.PHONY : package/fast
 
 # The main all target
 all: cmake_check_build_system
@@ -278,6 +278,21 @@ test_delta_schunk: tests/CMakeFiles/test_delta_schunk.dir/rule
 test_delta_schunk/fast:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_delta_schunk.dir/build.make tests/CMakeFiles/test_delta_schunk.dir/build
 .PHONY : test_delta_schunk/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_eframe.dir/rule:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_eframe.dir/rule
+.PHONY : tests/CMakeFiles/test_eframe.dir/rule
+
+# Convenience name for target.
+test_eframe: tests/CMakeFiles/test_eframe.dir/rule
+
+.PHONY : test_eframe
+
+# fast build rule for target.
+test_eframe/fast:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_eframe.dir/build.make tests/CMakeFiles/test_eframe.dir/build
+.PHONY : test_eframe/fast
 
 # Convenience name for target.
 tests/CMakeFiles/test_delta.dir/rule:
@@ -460,6 +475,36 @@ test_api/fast:
 .PHONY : test_api/fast
 
 # Convenience name for target.
+tests/CMakeFiles/test_nolock.dir/rule:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_nolock.dir/rule
+.PHONY : tests/CMakeFiles/test_nolock.dir/rule
+
+# Convenience name for target.
+test_nolock: tests/CMakeFiles/test_nolock.dir/rule
+
+.PHONY : test_nolock
+
+# fast build rule for target.
+test_nolock/fast:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_nolock.dir/build.make tests/CMakeFiles/test_nolock.dir/build
+.PHONY : test_nolock/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_getitem_delta.dir/rule:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_getitem_delta.dir/rule
+.PHONY : tests/CMakeFiles/test_getitem_delta.dir/rule
+
+# Convenience name for target.
+test_getitem_delta: tests/CMakeFiles/test_getitem_delta.dir/rule
+
+.PHONY : test_getitem_delta
+
+# fast build rule for target.
+test_getitem_delta/fast:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_getitem_delta.dir/build.make tests/CMakeFiles/test_getitem_delta.dir/build
+.PHONY : test_getitem_delta/fast
+
+# Convenience name for target.
 tests/CMakeFiles/test_getitem.dir/rule:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_getitem.dir/rule
 .PHONY : tests/CMakeFiles/test_getitem.dir/rule
@@ -578,36 +623,6 @@ test_schunk: tests/CMakeFiles/test_schunk.dir/rule
 test_schunk/fast:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_schunk.dir/build.make tests/CMakeFiles/test_schunk.dir/build
 .PHONY : test_schunk/fast
-
-# Convenience name for target.
-tests/CMakeFiles/test_getitem_delta.dir/rule:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_getitem_delta.dir/rule
-.PHONY : tests/CMakeFiles/test_getitem_delta.dir/rule
-
-# Convenience name for target.
-test_getitem_delta: tests/CMakeFiles/test_getitem_delta.dir/rule
-
-.PHONY : test_getitem_delta
-
-# fast build rule for target.
-test_getitem_delta/fast:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_getitem_delta.dir/build.make tests/CMakeFiles/test_getitem_delta.dir/build
-.PHONY : test_getitem_delta/fast
-
-# Convenience name for target.
-tests/CMakeFiles/test_nolock.dir/rule:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_nolock.dir/rule
-.PHONY : tests/CMakeFiles/test_nolock.dir/rule
-
-# Convenience name for target.
-test_nolock: tests/CMakeFiles/test_nolock.dir/rule
-
-.PHONY : test_nolock
-
-# fast build rule for target.
-test_nolock/fast:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_nolock.dir/build.make tests/CMakeFiles/test_nolock.dir/build
-.PHONY : test_nolock/fast
 
 test_api.o: test_api.c.o
 
@@ -851,6 +866,33 @@ test_dict_schunk.s: test_dict_schunk.c.s
 test_dict_schunk.c.s:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_dict_schunk.dir/build.make tests/CMakeFiles/test_dict_schunk.dir/test_dict_schunk.c.s
 .PHONY : test_dict_schunk.c.s
+
+test_eframe.o: test_eframe.c.o
+
+.PHONY : test_eframe.o
+
+# target to build an object file
+test_eframe.c.o:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_eframe.dir/build.make tests/CMakeFiles/test_eframe.dir/test_eframe.c.o
+.PHONY : test_eframe.c.o
+
+test_eframe.i: test_eframe.c.i
+
+.PHONY : test_eframe.i
+
+# target to preprocess a source file
+test_eframe.c.i:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_eframe.dir/build.make tests/CMakeFiles/test_eframe.dir/test_eframe.c.i
+.PHONY : test_eframe.c.i
+
+test_eframe.s: test_eframe.c.s
+
+.PHONY : test_eframe.s
+
+# target to generate assembly for a file
+test_eframe.c.s:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_eframe.dir/build.make tests/CMakeFiles/test_eframe.dir/test_eframe.c.s
+.PHONY : test_eframe.c.s
 
 test_empty_schunk.o: test_empty_schunk.c.o
 
@@ -1377,12 +1419,14 @@ help:
 	@echo "... edit_cache"
 	@echo "... test"
 	@echo "... package_source"
+	@echo "... package"
 	@echo "... test_frame"
 	@echo "... test_schunk_frame"
 	@echo "... test_change_nthreads_append"
 	@echo "... test_lazychunk"
 	@echo "... test_shuffle_roundtrip_avx2"
 	@echo "... test_delta_schunk"
+	@echo "... test_eframe"
 	@echo "... test_delta"
 	@echo "... test_contexts"
 	@echo "... test_insert_chunk"
@@ -1397,6 +1441,8 @@ help:
 	@echo "... test_shuffle_roundtrip_generic"
 	@echo "... test_update_chunk"
 	@echo "... test_api"
+	@echo "... test_nolock"
+	@echo "... test_getitem_delta"
 	@echo "... test_getitem"
 	@echo "... test_dict_schunk"
 	@echo "... test_shuffle_roundtrip_sse2"
@@ -1405,9 +1451,6 @@ help:
 	@echo "... test_maxout"
 	@echo "... test_compressor"
 	@echo "... test_schunk"
-	@echo "... test_getitem_delta"
-	@echo "... test_nolock"
-	@echo "... package"
 	@echo "... test_api.o"
 	@echo "... test_api.i"
 	@echo "... test_api.s"
@@ -1435,6 +1478,9 @@ help:
 	@echo "... test_dict_schunk.o"
 	@echo "... test_dict_schunk.i"
 	@echo "... test_dict_schunk.s"
+	@echo "... test_eframe.o"
+	@echo "... test_eframe.i"
+	@echo "... test_eframe.s"
 	@echo "... test_empty_schunk.o"
 	@echo "... test_empty_schunk.i"
 	@echo "... test_empty_schunk.s"

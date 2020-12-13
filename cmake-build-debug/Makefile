@@ -320,6 +320,19 @@ test_delta_schunk/fast:
 .PHONY : test_delta_schunk/fast
 
 #=============================================================================
+# Target rules for targets named test_eframe
+
+# Build rule for target.
+test_eframe: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 test_eframe
+.PHONY : test_eframe
+
+# fast build rule for target.
+test_eframe/fast:
+	$(MAKE) -f tests/CMakeFiles/test_eframe.dir/build.make tests/CMakeFiles/test_eframe.dir/build
+.PHONY : test_eframe/fast
+
+#=============================================================================
 # Target rules for targets named test_delta
 
 # Build rule for target.
@@ -476,6 +489,32 @@ test_api/fast:
 .PHONY : test_api/fast
 
 #=============================================================================
+# Target rules for targets named test_nolock
+
+# Build rule for target.
+test_nolock: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 test_nolock
+.PHONY : test_nolock
+
+# fast build rule for target.
+test_nolock/fast:
+	$(MAKE) -f tests/CMakeFiles/test_nolock.dir/build.make tests/CMakeFiles/test_nolock.dir/build
+.PHONY : test_nolock/fast
+
+#=============================================================================
+# Target rules for targets named test_getitem_delta
+
+# Build rule for target.
+test_getitem_delta: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 test_getitem_delta
+.PHONY : test_getitem_delta
+
+# fast build rule for target.
+test_getitem_delta/fast:
+	$(MAKE) -f tests/CMakeFiles/test_getitem_delta.dir/build.make tests/CMakeFiles/test_getitem_delta.dir/build
+.PHONY : test_getitem_delta/fast
+
+#=============================================================================
 # Target rules for targets named test_getitem
 
 # Build rule for target.
@@ -578,32 +617,6 @@ test_schunk: cmake_check_build_system
 test_schunk/fast:
 	$(MAKE) -f tests/CMakeFiles/test_schunk.dir/build.make tests/CMakeFiles/test_schunk.dir/build
 .PHONY : test_schunk/fast
-
-#=============================================================================
-# Target rules for targets named test_getitem_delta
-
-# Build rule for target.
-test_getitem_delta: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 test_getitem_delta
-.PHONY : test_getitem_delta
-
-# fast build rule for target.
-test_getitem_delta/fast:
-	$(MAKE) -f tests/CMakeFiles/test_getitem_delta.dir/build.make tests/CMakeFiles/test_getitem_delta.dir/build
-.PHONY : test_getitem_delta/fast
-
-#=============================================================================
-# Target rules for targets named test_nolock
-
-# Build rule for target.
-test_nolock: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 test_nolock
-.PHONY : test_nolock
-
-# fast build rule for target.
-test_nolock/fast:
-	$(MAKE) -f tests/CMakeFiles/test_nolock.dir/build.make tests/CMakeFiles/test_nolock.dir/build
-.PHONY : test_nolock/fast
 
 #=============================================================================
 # Target rules for targets named filegen
@@ -723,19 +736,6 @@ b2bench/fast:
 .PHONY : b2bench/fast
 
 #=============================================================================
-# Target rules for targets named pschunk_test1
-
-# Build rule for target.
-pschunk_test1: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 pschunk_test1
-.PHONY : pschunk_test1
-
-# fast build rule for target.
-pschunk_test1/fast:
-	$(MAKE) -f examples/CMakeFiles/pschunk_test1.dir/build.make examples/CMakeFiles/pschunk_test1.dir/build
-.PHONY : pschunk_test1/fast
-
-#=============================================================================
 # Target rules for targets named contexts
 
 # Build rule for target.
@@ -773,6 +773,19 @@ simple: cmake_check_build_system
 simple/fast:
 	$(MAKE) -f examples/CMakeFiles/simple.dir/build.make examples/CMakeFiles/simple.dir/build
 .PHONY : simple/fast
+
+#=============================================================================
+# Target rules for targets named eframe_simple
+
+# Build rule for target.
+eframe_simple: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 eframe_simple
+.PHONY : eframe_simple
+
+# fast build rule for target.
+eframe_simple/fast:
+	$(MAKE) -f examples/CMakeFiles/eframe_simple.dir/build.make examples/CMakeFiles/eframe_simple.dir/build
+.PHONY : eframe_simple/fast
 
 #=============================================================================
 # Target rules for targets named multithread
@@ -866,19 +879,6 @@ frame_simple/fast:
 .PHONY : frame_simple/fast
 
 #=============================================================================
-# Target rules for targets named schunk_persistent
-
-# Build rule for target.
-schunk_persistent: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 schunk_persistent
-.PHONY : schunk_persistent
-
-# fast build rule for target.
-schunk_persistent/fast:
-	$(MAKE) -f examples/CMakeFiles/schunk_persistent.dir/build.make examples/CMakeFiles/schunk_persistent.dir/build
-.PHONY : schunk_persistent/fast
-
-#=============================================================================
 # Target rules for targets named zstd_dict
 
 # Build rule for target.
@@ -942,6 +942,7 @@ help:
 	@echo "... test_lazychunk"
 	@echo "... test_shuffle_roundtrip_avx2"
 	@echo "... test_delta_schunk"
+	@echo "... test_eframe"
 	@echo "... test_delta"
 	@echo "... test_contexts"
 	@echo "... test_insert_chunk"
@@ -954,6 +955,8 @@ help:
 	@echo "... test_shuffle_roundtrip_generic"
 	@echo "... test_update_chunk"
 	@echo "... test_api"
+	@echo "... test_nolock"
+	@echo "... test_getitem_delta"
 	@echo "... test_getitem"
 	@echo "... test_dict_schunk"
 	@echo "... test_shuffle_roundtrip_sse2"
@@ -962,8 +965,6 @@ help:
 	@echo "... test_maxout"
 	@echo "... test_compressor"
 	@echo "... test_schunk"
-	@echo "... test_getitem_delta"
-	@echo "... test_nolock"
 	@echo "... filegen"
 	@echo "... fuzz_decompress_frame"
 	@echo "... fuzz_decompress_chunk"
@@ -973,10 +974,10 @@ help:
 	@echo "... trunc_prec_schunk"
 	@echo "... delta_schunk"
 	@echo "... b2bench"
-	@echo "... pschunk_test1"
 	@echo "... contexts"
 	@echo "... delta_schunk_ex"
 	@echo "... simple"
+	@echo "... eframe_simple"
 	@echo "... multithread"
 	@echo "... frame_big"
 	@echo "... frame_metalayers"
@@ -984,7 +985,6 @@ help:
 	@echo "... find_roots"
 	@echo "... schunk_simple"
 	@echo "... frame_simple"
-	@echo "... schunk_persistent"
 	@echo "... zstd_dict"
 	@echo "... frame_backed_schunk"
 	@echo "... compress_file"

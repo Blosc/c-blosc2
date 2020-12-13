@@ -72,6 +72,8 @@ zstd.h
 ipps.h
 -
 
+/home/martaiborra/c-blosc2/blosc/eframe.h
+
 /home/martaiborra/c-blosc2/blosc/frame.c
 stdio.h
 -
@@ -91,6 +93,8 @@ context.h
 /home/martaiborra/c-blosc2/blosc/context.h
 frame.h
 /home/martaiborra/c-blosc2/blosc/frame.h
+eframe.h
+/home/martaiborra/c-blosc2/blosc/eframe.h
 windows.h
 -
 malloc.h
@@ -108,14 +112,14 @@ stdio.h
 stdint.h
 -
 
-/home/martaiborra/c-blosc2/blosc/pschunk.c
+/home/martaiborra/c-blosc2/blosc/schunk.c
 stdio.h
 -
 stdlib.h
 -
 string.h
 -
-assert.h
+sys/stat.h
 -
 blosc2.h
 /home/martaiborra/c-blosc2/blosc/blosc2.h
@@ -125,8 +129,8 @@ context.h
 /home/martaiborra/c-blosc2/blosc/context.h
 frame.h
 /home/martaiborra/c-blosc2/blosc/frame.h
-pschunk.h
-/home/martaiborra/c-blosc2/blosc/pschunk.h
+eframe.h
+/home/martaiborra/c-blosc2/blosc/eframe.h
 windows.h
 -
 malloc.h
@@ -137,8 +141,6 @@ stdint.h
 -
 stdalign.h
 -
-
-/home/martaiborra/c-blosc2/blosc/pschunk.h
 
 /home/martaiborra/c-blosc2/blosc/win32/pthread.h
 windows.h

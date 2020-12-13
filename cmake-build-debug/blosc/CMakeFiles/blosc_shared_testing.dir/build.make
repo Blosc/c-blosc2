@@ -200,18 +200,18 @@ blosc/CMakeFiles/blosc_shared_testing.dir/timestamp.c.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/blosc_shared_testing.dir/timestamp.c.s"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/martaiborra/c-blosc2/blosc/timestamp.c -o CMakeFiles/blosc_shared_testing.dir/timestamp.c.s
 
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o: blosc/CMakeFiles/blosc_shared_testing.dir/flags.make
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o: ../blosc/pschunk.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Building C object blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o"
-	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc_shared_testing.dir/pschunk.c.o   -c /home/martaiborra/c-blosc2/blosc/pschunk.c
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: blosc/CMakeFiles/blosc_shared_testing.dir/flags.make
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../blosc/eframe.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Building C object blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o"
+	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc_shared_testing.dir/eframe.c.o   -c /home/martaiborra/c-blosc2/blosc/eframe.c
 
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/blosc_shared_testing.dir/pschunk.c.i"
-	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/martaiborra/c-blosc2/blosc/pschunk.c > CMakeFiles/blosc_shared_testing.dir/pschunk.c.i
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/blosc_shared_testing.dir/eframe.c.i"
+	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/martaiborra/c-blosc2/blosc/eframe.c > CMakeFiles/blosc_shared_testing.dir/eframe.c.i
 
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/blosc_shared_testing.dir/pschunk.c.s"
-	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/martaiborra/c-blosc2/blosc/pschunk.c -o CMakeFiles/blosc_shared_testing.dir/pschunk.c.s
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/blosc_shared_testing.dir/eframe.c.s"
+	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/martaiborra/c-blosc2/blosc/eframe.c -o CMakeFiles/blosc_shared_testing.dir/eframe.c.s
 
 blosc/CMakeFiles/blosc_shared_testing.dir/shuffle-sse2.c.o: blosc/CMakeFiles/blosc_shared_testing.dir/flags.make
 blosc/CMakeFiles/blosc_shared_testing.dir/shuffle-sse2.c.o: ../blosc/shuffle-sse2.c
@@ -733,7 +733,7 @@ blosc_shared_testing_OBJECTS = \
 "CMakeFiles/blosc_shared_testing.dir/bitshuffle-generic.c.o" \
 "CMakeFiles/blosc_shared_testing.dir/trunc-prec.c.o" \
 "CMakeFiles/blosc_shared_testing.dir/timestamp.c.o" \
-"CMakeFiles/blosc_shared_testing.dir/pschunk.c.o" \
+"CMakeFiles/blosc_shared_testing.dir/eframe.c.o" \
 "CMakeFiles/blosc_shared_testing.dir/shuffle-sse2.c.o" \
 "CMakeFiles/blosc_shared_testing.dir/bitshuffle-sse2.c.o" \
 "CMakeFiles/blosc_shared_testing.dir/shuffle-avx2.c.o" \
@@ -788,7 +788,7 @@ blosc/libblosc_testing.so: blosc/CMakeFiles/blosc_shared_testing.dir/shuffle-gen
 blosc/libblosc_testing.so: blosc/CMakeFiles/blosc_shared_testing.dir/bitshuffle-generic.c.o
 blosc/libblosc_testing.so: blosc/CMakeFiles/blosc_shared_testing.dir/trunc-prec.c.o
 blosc/libblosc_testing.so: blosc/CMakeFiles/blosc_shared_testing.dir/timestamp.c.o
-blosc/libblosc_testing.so: blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o
+blosc/libblosc_testing.so: blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o
 blosc/libblosc_testing.so: blosc/CMakeFiles/blosc_shared_testing.dir/shuffle-sse2.c.o
 blosc/libblosc_testing.so: blosc/CMakeFiles/blosc_shared_testing.dir/bitshuffle-sse2.c.o
 blosc/libblosc_testing.so: blosc/CMakeFiles/blosc_shared_testing.dir/shuffle-avx2.c.o

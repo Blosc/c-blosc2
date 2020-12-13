@@ -1587,6 +1587,39 @@ delta.c.s:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_shared.dir/build.make blosc/CMakeFiles/blosc2_shared.dir/delta.c.s
 .PHONY : delta.c.s
 
+eframe.o: eframe.c.o
+
+.PHONY : eframe.o
+
+# target to build an object file
+eframe.c.o:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_static.dir/build.make blosc/CMakeFiles/blosc2_static.dir/eframe.c.o
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc_shared_testing.dir/build.make blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_shared.dir/build.make blosc/CMakeFiles/blosc2_shared.dir/eframe.c.o
+.PHONY : eframe.c.o
+
+eframe.i: eframe.c.i
+
+.PHONY : eframe.i
+
+# target to preprocess a source file
+eframe.c.i:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_static.dir/build.make blosc/CMakeFiles/blosc2_static.dir/eframe.c.i
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc_shared_testing.dir/build.make blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.i
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_shared.dir/build.make blosc/CMakeFiles/blosc2_shared.dir/eframe.c.i
+.PHONY : eframe.c.i
+
+eframe.s: eframe.c.s
+
+.PHONY : eframe.s
+
+# target to generate assembly for a file
+eframe.c.s:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_static.dir/build.make blosc/CMakeFiles/blosc2_static.dir/eframe.c.s
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc_shared_testing.dir/build.make blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.s
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_shared.dir/build.make blosc/CMakeFiles/blosc2_shared.dir/eframe.c.s
+.PHONY : eframe.c.s
+
 fastcopy.o: fastcopy.c.o
 
 .PHONY : fastcopy.o
@@ -1652,39 +1685,6 @@ frame.c.s:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc_shared_testing.dir/build.make blosc/CMakeFiles/blosc_shared_testing.dir/frame.c.s
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_shared.dir/build.make blosc/CMakeFiles/blosc2_shared.dir/frame.c.s
 .PHONY : frame.c.s
-
-pschunk.o: pschunk.c.o
-
-.PHONY : pschunk.o
-
-# target to build an object file
-pschunk.c.o:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_static.dir/build.make blosc/CMakeFiles/blosc2_static.dir/pschunk.c.o
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc_shared_testing.dir/build.make blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_shared.dir/build.make blosc/CMakeFiles/blosc2_shared.dir/pschunk.c.o
-.PHONY : pschunk.c.o
-
-pschunk.i: pschunk.c.i
-
-.PHONY : pschunk.i
-
-# target to preprocess a source file
-pschunk.c.i:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_static.dir/build.make blosc/CMakeFiles/blosc2_static.dir/pschunk.c.i
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc_shared_testing.dir/build.make blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.i
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_shared.dir/build.make blosc/CMakeFiles/blosc2_shared.dir/pschunk.c.i
-.PHONY : pschunk.c.i
-
-pschunk.s: pschunk.c.s
-
-.PHONY : pschunk.s
-
-# target to generate assembly for a file
-pschunk.c.s:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_static.dir/build.make blosc/CMakeFiles/blosc2_static.dir/pschunk.c.s
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc_shared_testing.dir/build.make blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.s
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_shared.dir/build.make blosc/CMakeFiles/blosc2_shared.dir/pschunk.c.s
-.PHONY : pschunk.c.s
 
 schunk.o: schunk.c.o
 
@@ -2058,15 +2058,15 @@ help:
 	@echo "... delta.o"
 	@echo "... delta.i"
 	@echo "... delta.s"
+	@echo "... eframe.o"
+	@echo "... eframe.i"
+	@echo "... eframe.s"
 	@echo "... fastcopy.o"
 	@echo "... fastcopy.i"
 	@echo "... fastcopy.s"
 	@echo "... frame.o"
 	@echo "... frame.i"
 	@echo "... frame.s"
-	@echo "... pschunk.o"
-	@echo "... pschunk.i"
-	@echo "... pschunk.s"
 	@echo "... schunk.o"
 	@echo "... schunk.i"
 	@echo "... schunk.s"

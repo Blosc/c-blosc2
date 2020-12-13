@@ -151,10 +151,10 @@ compat/clean: compat/CMakeFiles/filegen.dir/clean
 # Directory level rules for directory examples
 
 # Recursive "all" directory target.
-examples/all: examples/CMakeFiles/pschunk_test1.dir/all
 examples/all: examples/CMakeFiles/contexts.dir/all
 examples/all: examples/CMakeFiles/delta_schunk_ex.dir/all
 examples/all: examples/CMakeFiles/simple.dir/all
+examples/all: examples/CMakeFiles/eframe_simple.dir/all
 examples/all: examples/CMakeFiles/multithread.dir/all
 examples/all: examples/CMakeFiles/frame_big.dir/all
 examples/all: examples/CMakeFiles/frame_metalayers.dir/all
@@ -162,7 +162,6 @@ examples/all: examples/CMakeFiles/noinit.dir/all
 examples/all: examples/CMakeFiles/find_roots.dir/all
 examples/all: examples/CMakeFiles/schunk_simple.dir/all
 examples/all: examples/CMakeFiles/frame_simple.dir/all
-examples/all: examples/CMakeFiles/schunk_persistent.dir/all
 examples/all: examples/CMakeFiles/zstd_dict.dir/all
 examples/all: examples/CMakeFiles/frame_backed_schunk.dir/all
 examples/all: examples/CMakeFiles/compress_file.dir/all
@@ -175,10 +174,10 @@ examples/preinstall:
 .PHONY : examples/preinstall
 
 # Recursive "clean" directory target.
-examples/clean: examples/CMakeFiles/pschunk_test1.dir/clean
 examples/clean: examples/CMakeFiles/contexts.dir/clean
 examples/clean: examples/CMakeFiles/delta_schunk_ex.dir/clean
 examples/clean: examples/CMakeFiles/simple.dir/clean
+examples/clean: examples/CMakeFiles/eframe_simple.dir/clean
 examples/clean: examples/CMakeFiles/multithread.dir/clean
 examples/clean: examples/CMakeFiles/frame_big.dir/clean
 examples/clean: examples/CMakeFiles/frame_metalayers.dir/clean
@@ -186,7 +185,6 @@ examples/clean: examples/CMakeFiles/noinit.dir/clean
 examples/clean: examples/CMakeFiles/find_roots.dir/clean
 examples/clean: examples/CMakeFiles/schunk_simple.dir/clean
 examples/clean: examples/CMakeFiles/frame_simple.dir/clean
-examples/clean: examples/CMakeFiles/schunk_persistent.dir/clean
 examples/clean: examples/CMakeFiles/zstd_dict.dir/clean
 examples/clean: examples/CMakeFiles/frame_backed_schunk.dir/clean
 examples/clean: examples/CMakeFiles/compress_file.dir/clean
@@ -203,6 +201,7 @@ tests/all: tests/CMakeFiles/test_change_nthreads_append.dir/all
 tests/all: tests/CMakeFiles/test_lazychunk.dir/all
 tests/all: tests/CMakeFiles/test_shuffle_roundtrip_avx2.dir/all
 tests/all: tests/CMakeFiles/test_delta_schunk.dir/all
+tests/all: tests/CMakeFiles/test_eframe.dir/all
 tests/all: tests/CMakeFiles/test_delta.dir/all
 tests/all: tests/CMakeFiles/test_contexts.dir/all
 tests/all: tests/CMakeFiles/test_insert_chunk.dir/all
@@ -215,6 +214,8 @@ tests/all: tests/CMakeFiles/test_prefilter.dir/all
 tests/all: tests/CMakeFiles/test_shuffle_roundtrip_generic.dir/all
 tests/all: tests/CMakeFiles/test_update_chunk.dir/all
 tests/all: tests/CMakeFiles/test_api.dir/all
+tests/all: tests/CMakeFiles/test_nolock.dir/all
+tests/all: tests/CMakeFiles/test_getitem_delta.dir/all
 tests/all: tests/CMakeFiles/test_getitem.dir/all
 tests/all: tests/CMakeFiles/test_dict_schunk.dir/all
 tests/all: tests/CMakeFiles/test_shuffle_roundtrip_sse2.dir/all
@@ -223,8 +224,6 @@ tests/all: tests/CMakeFiles/test_reorder_offsets.dir/all
 tests/all: tests/CMakeFiles/test_maxout.dir/all
 tests/all: tests/CMakeFiles/test_compressor.dir/all
 tests/all: tests/CMakeFiles/test_schunk.dir/all
-tests/all: tests/CMakeFiles/test_getitem_delta.dir/all
-tests/all: tests/CMakeFiles/test_nolock.dir/all
 
 .PHONY : tests/all
 
@@ -240,6 +239,7 @@ tests/clean: tests/CMakeFiles/test_change_nthreads_append.dir/clean
 tests/clean: tests/CMakeFiles/test_lazychunk.dir/clean
 tests/clean: tests/CMakeFiles/test_shuffle_roundtrip_avx2.dir/clean
 tests/clean: tests/CMakeFiles/test_delta_schunk.dir/clean
+tests/clean: tests/CMakeFiles/test_eframe.dir/clean
 tests/clean: tests/CMakeFiles/test_delta.dir/clean
 tests/clean: tests/CMakeFiles/test_contexts.dir/clean
 tests/clean: tests/CMakeFiles/test_insert_chunk.dir/clean
@@ -252,6 +252,8 @@ tests/clean: tests/CMakeFiles/test_prefilter.dir/clean
 tests/clean: tests/CMakeFiles/test_shuffle_roundtrip_generic.dir/clean
 tests/clean: tests/CMakeFiles/test_update_chunk.dir/clean
 tests/clean: tests/CMakeFiles/test_api.dir/clean
+tests/clean: tests/CMakeFiles/test_nolock.dir/clean
+tests/clean: tests/CMakeFiles/test_getitem_delta.dir/clean
 tests/clean: tests/CMakeFiles/test_getitem.dir/clean
 tests/clean: tests/CMakeFiles/test_dict_schunk.dir/clean
 tests/clean: tests/CMakeFiles/test_shuffle_roundtrip_sse2.dir/clean
@@ -260,8 +262,6 @@ tests/clean: tests/CMakeFiles/test_reorder_offsets.dir/clean
 tests/clean: tests/CMakeFiles/test_maxout.dir/clean
 tests/clean: tests/CMakeFiles/test_compressor.dir/clean
 tests/clean: tests/CMakeFiles/test_schunk.dir/clean
-tests/clean: tests/CMakeFiles/test_getitem_delta.dir/clean
-tests/clean: tests/CMakeFiles/test_nolock.dir/clean
 
 .PHONY : tests/clean
 
@@ -458,12 +458,12 @@ tests/CMakeFiles/test_schunk_frame.dir/clean:
 tests/CMakeFiles/test_change_nthreads_append.dir/all: blosc/CMakeFiles/blosc_shared_testing.dir/all
 	$(MAKE) -f tests/CMakeFiles/test_change_nthreads_append.dir/build.make tests/CMakeFiles/test_change_nthreads_append.dir/depend
 	$(MAKE) -f tests/CMakeFiles/test_change_nthreads_append.dir/build.make tests/CMakeFiles/test_change_nthreads_append.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=79 "Built target test_change_nthreads_append"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num= "Built target test_change_nthreads_append"
 .PHONY : tests/CMakeFiles/test_change_nthreads_append.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_change_nthreads_append.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 20
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 19
 	$(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_change_nthreads_append.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_change_nthreads_append.dir/rule
@@ -539,7 +539,7 @@ tests/CMakeFiles/test_shuffle_roundtrip_avx2.dir/clean:
 tests/CMakeFiles/test_delta_schunk.dir/all: blosc/CMakeFiles/blosc_shared_testing.dir/all
 	$(MAKE) -f tests/CMakeFiles/test_delta_schunk.dir/build.make tests/CMakeFiles/test_delta_schunk.dir/depend
 	$(MAKE) -f tests/CMakeFiles/test_delta_schunk.dir/build.make tests/CMakeFiles/test_delta_schunk.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=83 "Built target test_delta_schunk"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=82 "Built target test_delta_schunk"
 .PHONY : tests/CMakeFiles/test_delta_schunk.dir/all
 
 # Build rule for subdir invocation for target.
@@ -560,18 +560,45 @@ tests/CMakeFiles/test_delta_schunk.dir/clean:
 .PHONY : tests/CMakeFiles/test_delta_schunk.dir/clean
 
 #=============================================================================
+# Target rules for target tests/CMakeFiles/test_eframe.dir
+
+# All Build rule for target.
+tests/CMakeFiles/test_eframe.dir/all: blosc/CMakeFiles/blosc_shared_testing.dir/all
+	$(MAKE) -f tests/CMakeFiles/test_eframe.dir/build.make tests/CMakeFiles/test_eframe.dir/depend
+	$(MAKE) -f tests/CMakeFiles/test_eframe.dir/build.make tests/CMakeFiles/test_eframe.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=84 "Built target test_eframe"
+.PHONY : tests/CMakeFiles/test_eframe.dir/all
+
+# Build rule for subdir invocation for target.
+tests/CMakeFiles/test_eframe.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 20
+	$(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_eframe.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
+.PHONY : tests/CMakeFiles/test_eframe.dir/rule
+
+# Convenience name for target.
+test_eframe: tests/CMakeFiles/test_eframe.dir/rule
+
+.PHONY : test_eframe
+
+# clean rule for target.
+tests/CMakeFiles/test_eframe.dir/clean:
+	$(MAKE) -f tests/CMakeFiles/test_eframe.dir/build.make tests/CMakeFiles/test_eframe.dir/clean
+.PHONY : tests/CMakeFiles/test_eframe.dir/clean
+
+#=============================================================================
 # Target rules for target tests/CMakeFiles/test_delta.dir
 
 # All Build rule for target.
 tests/CMakeFiles/test_delta.dir/all: blosc/CMakeFiles/blosc_shared_testing.dir/all
 	$(MAKE) -f tests/CMakeFiles/test_delta.dir/build.make tests/CMakeFiles/test_delta.dir/depend
 	$(MAKE) -f tests/CMakeFiles/test_delta.dir/build.make tests/CMakeFiles/test_delta.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=82 "Built target test_delta"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num= "Built target test_delta"
 .PHONY : tests/CMakeFiles/test_delta.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_delta.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 20
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 19
 	$(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_delta.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_delta.dir/rule
@@ -593,12 +620,12 @@ tests/CMakeFiles/test_delta.dir/clean:
 tests/CMakeFiles/test_contexts.dir/all: blosc/CMakeFiles/blosc_shared_testing.dir/all
 	$(MAKE) -f tests/CMakeFiles/test_contexts.dir/build.make tests/CMakeFiles/test_contexts.dir/depend
 	$(MAKE) -f tests/CMakeFiles/test_contexts.dir/build.make tests/CMakeFiles/test_contexts.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num= "Built target test_contexts"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=81 "Built target test_contexts"
 .PHONY : tests/CMakeFiles/test_contexts.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_contexts.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 19
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 20
 	$(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_contexts.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_contexts.dir/rule
@@ -647,7 +674,7 @@ tests/CMakeFiles/test_insert_chunk.dir/clean:
 tests/CMakeFiles/test_compress_roundtrip.dir/all: blosc/CMakeFiles/blosc_shared_testing.dir/all
 	$(MAKE) -f tests/CMakeFiles/test_compress_roundtrip.dir/build.make tests/CMakeFiles/test_compress_roundtrip.dir/depend
 	$(MAKE) -f tests/CMakeFiles/test_compress_roundtrip.dir/build.make tests/CMakeFiles/test_compress_roundtrip.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=80 "Built target test_compress_roundtrip"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=79 "Built target test_compress_roundtrip"
 .PHONY : tests/CMakeFiles/test_compress_roundtrip.dir/all
 
 # Build rule for subdir invocation for target.
@@ -674,12 +701,12 @@ tests/CMakeFiles/test_compress_roundtrip.dir/clean:
 tests/CMakeFiles/test_bitshuffle_leftovers.dir/all: blosc/CMakeFiles/blosc_shared_testing.dir/all
 	$(MAKE) -f tests/CMakeFiles/test_bitshuffle_leftovers.dir/build.make tests/CMakeFiles/test_bitshuffle_leftovers.dir/depend
 	$(MAKE) -f tests/CMakeFiles/test_bitshuffle_leftovers.dir/build.make tests/CMakeFiles/test_bitshuffle_leftovers.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num= "Built target test_bitshuffle_leftovers"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=78 "Built target test_bitshuffle_leftovers"
 .PHONY : tests/CMakeFiles/test_bitshuffle_leftovers.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_bitshuffle_leftovers.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 19
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 20
 	$(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_bitshuffle_leftovers.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_bitshuffle_leftovers.dir/rule
@@ -863,7 +890,7 @@ tests/CMakeFiles/test_update_chunk.dir/clean:
 tests/CMakeFiles/test_api.dir/all: blosc/CMakeFiles/blosc_shared_testing.dir/all
 	$(MAKE) -f tests/CMakeFiles/test_api.dir/build.make tests/CMakeFiles/test_api.dir/depend
 	$(MAKE) -f tests/CMakeFiles/test_api.dir/build.make tests/CMakeFiles/test_api.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=78 "Built target test_api"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=77 "Built target test_api"
 .PHONY : tests/CMakeFiles/test_api.dir/all
 
 # Build rule for subdir invocation for target.
@@ -882,6 +909,60 @@ test_api: tests/CMakeFiles/test_api.dir/rule
 tests/CMakeFiles/test_api.dir/clean:
 	$(MAKE) -f tests/CMakeFiles/test_api.dir/build.make tests/CMakeFiles/test_api.dir/clean
 .PHONY : tests/CMakeFiles/test_api.dir/clean
+
+#=============================================================================
+# Target rules for target tests/CMakeFiles/test_nolock.dir
+
+# All Build rule for target.
+tests/CMakeFiles/test_nolock.dir/all: blosc/CMakeFiles/blosc_shared_testing.dir/all
+	$(MAKE) -f tests/CMakeFiles/test_nolock.dir/build.make tests/CMakeFiles/test_nolock.dir/depend
+	$(MAKE) -f tests/CMakeFiles/test_nolock.dir/build.make tests/CMakeFiles/test_nolock.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=91 "Built target test_nolock"
+.PHONY : tests/CMakeFiles/test_nolock.dir/all
+
+# Build rule for subdir invocation for target.
+tests/CMakeFiles/test_nolock.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 20
+	$(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_nolock.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
+.PHONY : tests/CMakeFiles/test_nolock.dir/rule
+
+# Convenience name for target.
+test_nolock: tests/CMakeFiles/test_nolock.dir/rule
+
+.PHONY : test_nolock
+
+# clean rule for target.
+tests/CMakeFiles/test_nolock.dir/clean:
+	$(MAKE) -f tests/CMakeFiles/test_nolock.dir/build.make tests/CMakeFiles/test_nolock.dir/clean
+.PHONY : tests/CMakeFiles/test_nolock.dir/clean
+
+#=============================================================================
+# Target rules for target tests/CMakeFiles/test_getitem_delta.dir
+
+# All Build rule for target.
+tests/CMakeFiles/test_getitem_delta.dir/all: blosc/CMakeFiles/blosc_shared_testing.dir/all
+	$(MAKE) -f tests/CMakeFiles/test_getitem_delta.dir/build.make tests/CMakeFiles/test_getitem_delta.dir/depend
+	$(MAKE) -f tests/CMakeFiles/test_getitem_delta.dir/build.make tests/CMakeFiles/test_getitem_delta.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=87 "Built target test_getitem_delta"
+.PHONY : tests/CMakeFiles/test_getitem_delta.dir/all
+
+# Build rule for subdir invocation for target.
+tests/CMakeFiles/test_getitem_delta.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 20
+	$(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_getitem_delta.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
+.PHONY : tests/CMakeFiles/test_getitem_delta.dir/rule
+
+# Convenience name for target.
+test_getitem_delta: tests/CMakeFiles/test_getitem_delta.dir/rule
+
+.PHONY : test_getitem_delta
+
+# clean rule for target.
+tests/CMakeFiles/test_getitem_delta.dir/clean:
+	$(MAKE) -f tests/CMakeFiles/test_getitem_delta.dir/build.make tests/CMakeFiles/test_getitem_delta.dir/clean
+.PHONY : tests/CMakeFiles/test_getitem_delta.dir/clean
 
 #=============================================================================
 # Target rules for target tests/CMakeFiles/test_getitem.dir
@@ -917,7 +998,7 @@ tests/CMakeFiles/test_getitem.dir/clean:
 tests/CMakeFiles/test_dict_schunk.dir/all: blosc/CMakeFiles/blosc_shared_testing.dir/all
 	$(MAKE) -f tests/CMakeFiles/test_dict_schunk.dir/build.make tests/CMakeFiles/test_dict_schunk.dir/depend
 	$(MAKE) -f tests/CMakeFiles/test_dict_schunk.dir/build.make tests/CMakeFiles/test_dict_schunk.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=84 "Built target test_dict_schunk"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=83 "Built target test_dict_schunk"
 .PHONY : tests/CMakeFiles/test_dict_schunk.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1052,7 +1133,7 @@ tests/CMakeFiles/test_maxout.dir/clean:
 tests/CMakeFiles/test_compressor.dir/all: blosc/CMakeFiles/blosc_shared_testing.dir/all
 	$(MAKE) -f tests/CMakeFiles/test_compressor.dir/build.make tests/CMakeFiles/test_compressor.dir/depend
 	$(MAKE) -f tests/CMakeFiles/test_compressor.dir/build.make tests/CMakeFiles/test_compressor.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=81 "Built target test_compressor"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=80 "Built target test_compressor"
 .PHONY : tests/CMakeFiles/test_compressor.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1100,67 +1181,13 @@ tests/CMakeFiles/test_schunk.dir/clean:
 .PHONY : tests/CMakeFiles/test_schunk.dir/clean
 
 #=============================================================================
-# Target rules for target tests/CMakeFiles/test_getitem_delta.dir
-
-# All Build rule for target.
-tests/CMakeFiles/test_getitem_delta.dir/all: blosc/CMakeFiles/blosc_shared_testing.dir/all
-	$(MAKE) -f tests/CMakeFiles/test_getitem_delta.dir/build.make tests/CMakeFiles/test_getitem_delta.dir/depend
-	$(MAKE) -f tests/CMakeFiles/test_getitem_delta.dir/build.make tests/CMakeFiles/test_getitem_delta.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=87 "Built target test_getitem_delta"
-.PHONY : tests/CMakeFiles/test_getitem_delta.dir/all
-
-# Build rule for subdir invocation for target.
-tests/CMakeFiles/test_getitem_delta.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 20
-	$(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_getitem_delta.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
-.PHONY : tests/CMakeFiles/test_getitem_delta.dir/rule
-
-# Convenience name for target.
-test_getitem_delta: tests/CMakeFiles/test_getitem_delta.dir/rule
-
-.PHONY : test_getitem_delta
-
-# clean rule for target.
-tests/CMakeFiles/test_getitem_delta.dir/clean:
-	$(MAKE) -f tests/CMakeFiles/test_getitem_delta.dir/build.make tests/CMakeFiles/test_getitem_delta.dir/clean
-.PHONY : tests/CMakeFiles/test_getitem_delta.dir/clean
-
-#=============================================================================
-# Target rules for target tests/CMakeFiles/test_nolock.dir
-
-# All Build rule for target.
-tests/CMakeFiles/test_nolock.dir/all: blosc/CMakeFiles/blosc_shared_testing.dir/all
-	$(MAKE) -f tests/CMakeFiles/test_nolock.dir/build.make tests/CMakeFiles/test_nolock.dir/depend
-	$(MAKE) -f tests/CMakeFiles/test_nolock.dir/build.make tests/CMakeFiles/test_nolock.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=91 "Built target test_nolock"
-.PHONY : tests/CMakeFiles/test_nolock.dir/all
-
-# Build rule for subdir invocation for target.
-tests/CMakeFiles/test_nolock.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 20
-	$(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_nolock.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
-.PHONY : tests/CMakeFiles/test_nolock.dir/rule
-
-# Convenience name for target.
-test_nolock: tests/CMakeFiles/test_nolock.dir/rule
-
-.PHONY : test_nolock
-
-# clean rule for target.
-tests/CMakeFiles/test_nolock.dir/clean:
-	$(MAKE) -f tests/CMakeFiles/test_nolock.dir/build.make tests/CMakeFiles/test_nolock.dir/clean
-.PHONY : tests/CMakeFiles/test_nolock.dir/clean
-
-#=============================================================================
 # Target rules for target compat/CMakeFiles/filegen.dir
 
 # All Build rule for target.
 compat/CMakeFiles/filegen.dir/all: blosc/CMakeFiles/blosc2_shared.dir/all
 	$(MAKE) -f compat/CMakeFiles/filegen.dir/build.make compat/CMakeFiles/filegen.dir/depend
 	$(MAKE) -f compat/CMakeFiles/filegen.dir/build.make compat/CMakeFiles/filegen.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=63 "Built target filegen"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=64 "Built target filegen"
 .PHONY : compat/CMakeFiles/filegen.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1187,7 +1214,7 @@ compat/CMakeFiles/filegen.dir/clean:
 tests/fuzz/CMakeFiles/fuzz_decompress_frame.dir/all: blosc/CMakeFiles/blosc2_static.dir/all
 	$(MAKE) -f tests/fuzz/CMakeFiles/fuzz_decompress_frame.dir/build.make tests/fuzz/CMakeFiles/fuzz_decompress_frame.dir/depend
 	$(MAKE) -f tests/fuzz/CMakeFiles/fuzz_decompress_frame.dir/build.make tests/fuzz/CMakeFiles/fuzz_decompress_frame.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=71 "Built target fuzz_decompress_frame"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=72 "Built target fuzz_decompress_frame"
 .PHONY : tests/fuzz/CMakeFiles/fuzz_decompress_frame.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1214,7 +1241,7 @@ tests/fuzz/CMakeFiles/fuzz_decompress_frame.dir/clean:
 tests/fuzz/CMakeFiles/fuzz_decompress_chunk.dir/all: blosc/CMakeFiles/blosc2_static.dir/all
 	$(MAKE) -f tests/fuzz/CMakeFiles/fuzz_decompress_chunk.dir/build.make tests/fuzz/CMakeFiles/fuzz_decompress_chunk.dir/depend
 	$(MAKE) -f tests/fuzz/CMakeFiles/fuzz_decompress_chunk.dir/build.make tests/fuzz/CMakeFiles/fuzz_decompress_chunk.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=70 "Built target fuzz_decompress_chunk"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=71 "Built target fuzz_decompress_chunk"
 .PHONY : tests/fuzz/CMakeFiles/fuzz_decompress_chunk.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1241,7 +1268,7 @@ tests/fuzz/CMakeFiles/fuzz_decompress_chunk.dir/clean:
 tests/fuzz/CMakeFiles/fuzz_compress_frame.dir/all: blosc/CMakeFiles/blosc2_static.dir/all
 	$(MAKE) -f tests/fuzz/CMakeFiles/fuzz_compress_frame.dir/build.make tests/fuzz/CMakeFiles/fuzz_compress_frame.dir/depend
 	$(MAKE) -f tests/fuzz/CMakeFiles/fuzz_compress_frame.dir/build.make tests/fuzz/CMakeFiles/fuzz_compress_frame.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=69 "Built target fuzz_compress_frame"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=70 "Built target fuzz_compress_frame"
 .PHONY : tests/fuzz/CMakeFiles/fuzz_compress_frame.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1268,7 +1295,7 @@ tests/fuzz/CMakeFiles/fuzz_compress_frame.dir/clean:
 tests/fuzz/CMakeFiles/fuzz_compress_chunk.dir/all: blosc/CMakeFiles/blosc2_static.dir/all
 	$(MAKE) -f tests/fuzz/CMakeFiles/fuzz_compress_chunk.dir/build.make tests/fuzz/CMakeFiles/fuzz_compress_chunk.dir/depend
 	$(MAKE) -f tests/fuzz/CMakeFiles/fuzz_compress_chunk.dir/build.make tests/fuzz/CMakeFiles/fuzz_compress_chunk.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=68 "Built target fuzz_compress_chunk"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=69 "Built target fuzz_compress_chunk"
 .PHONY : tests/fuzz/CMakeFiles/fuzz_compress_chunk.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1295,7 +1322,7 @@ tests/fuzz/CMakeFiles/fuzz_compress_chunk.dir/clean:
 bench/CMakeFiles/sum_openmp.dir/all: blosc/CMakeFiles/blosc2_shared.dir/all
 	$(MAKE) -f bench/CMakeFiles/sum_openmp.dir/build.make bench/CMakeFiles/sum_openmp.dir/depend
 	$(MAKE) -f bench/CMakeFiles/sum_openmp.dir/build.make bench/CMakeFiles/sum_openmp.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=77 "Built target sum_openmp"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=76 "Built target sum_openmp"
 .PHONY : bench/CMakeFiles/sum_openmp.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1397,33 +1424,6 @@ bench/CMakeFiles/b2bench.dir/clean:
 .PHONY : bench/CMakeFiles/b2bench.dir/clean
 
 #=============================================================================
-# Target rules for target examples/CMakeFiles/pschunk_test1.dir
-
-# All Build rule for target.
-examples/CMakeFiles/pschunk_test1.dir/all: blosc/CMakeFiles/blosc2_shared.dir/all
-	$(MAKE) -f examples/CMakeFiles/pschunk_test1.dir/build.make examples/CMakeFiles/pschunk_test1.dir/depend
-	$(MAKE) -f examples/CMakeFiles/pschunk_test1.dir/build.make examples/CMakeFiles/pschunk_test1.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=74 "Built target pschunk_test1"
-.PHONY : examples/CMakeFiles/pschunk_test1.dir/all
-
-# Build rule for subdir invocation for target.
-examples/CMakeFiles/pschunk_test1.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 21
-	$(MAKE) -f CMakeFiles/Makefile2 examples/CMakeFiles/pschunk_test1.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
-.PHONY : examples/CMakeFiles/pschunk_test1.dir/rule
-
-# Convenience name for target.
-pschunk_test1: examples/CMakeFiles/pschunk_test1.dir/rule
-
-.PHONY : pschunk_test1
-
-# clean rule for target.
-examples/CMakeFiles/pschunk_test1.dir/clean:
-	$(MAKE) -f examples/CMakeFiles/pschunk_test1.dir/build.make examples/CMakeFiles/pschunk_test1.dir/clean
-.PHONY : examples/CMakeFiles/pschunk_test1.dir/clean
-
-#=============================================================================
 # Target rules for target examples/CMakeFiles/contexts.dir
 
 # All Build rule for target.
@@ -1484,12 +1484,12 @@ examples/CMakeFiles/delta_schunk_ex.dir/clean:
 examples/CMakeFiles/simple.dir/all: blosc/CMakeFiles/blosc2_shared.dir/all
 	$(MAKE) -f examples/CMakeFiles/simple.dir/build.make examples/CMakeFiles/simple.dir/depend
 	$(MAKE) -f examples/CMakeFiles/simple.dir/build.make examples/CMakeFiles/simple.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=76 "Built target simple"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num= "Built target simple"
 .PHONY : examples/CMakeFiles/simple.dir/all
 
 # Build rule for subdir invocation for target.
 examples/CMakeFiles/simple.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 21
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 20
 	$(MAKE) -f CMakeFiles/Makefile2 examples/CMakeFiles/simple.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
 .PHONY : examples/CMakeFiles/simple.dir/rule
@@ -1505,13 +1505,40 @@ examples/CMakeFiles/simple.dir/clean:
 .PHONY : examples/CMakeFiles/simple.dir/clean
 
 #=============================================================================
+# Target rules for target examples/CMakeFiles/eframe_simple.dir
+
+# All Build rule for target.
+examples/CMakeFiles/eframe_simple.dir/all: blosc/CMakeFiles/blosc2_shared.dir/all
+	$(MAKE) -f examples/CMakeFiles/eframe_simple.dir/build.make examples/CMakeFiles/eframe_simple.dir/depend
+	$(MAKE) -f examples/CMakeFiles/eframe_simple.dir/build.make examples/CMakeFiles/eframe_simple.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=63 "Built target eframe_simple"
+.PHONY : examples/CMakeFiles/eframe_simple.dir/all
+
+# Build rule for subdir invocation for target.
+examples/CMakeFiles/eframe_simple.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 21
+	$(MAKE) -f CMakeFiles/Makefile2 examples/CMakeFiles/eframe_simple.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
+.PHONY : examples/CMakeFiles/eframe_simple.dir/rule
+
+# Convenience name for target.
+eframe_simple: examples/CMakeFiles/eframe_simple.dir/rule
+
+.PHONY : eframe_simple
+
+# clean rule for target.
+examples/CMakeFiles/eframe_simple.dir/clean:
+	$(MAKE) -f examples/CMakeFiles/eframe_simple.dir/build.make examples/CMakeFiles/eframe_simple.dir/clean
+.PHONY : examples/CMakeFiles/eframe_simple.dir/clean
+
+#=============================================================================
 # Target rules for target examples/CMakeFiles/multithread.dir
 
 # All Build rule for target.
 examples/CMakeFiles/multithread.dir/all: blosc/CMakeFiles/blosc2_shared.dir/all
 	$(MAKE) -f examples/CMakeFiles/multithread.dir/build.make examples/CMakeFiles/multithread.dir/depend
 	$(MAKE) -f examples/CMakeFiles/multithread.dir/build.make examples/CMakeFiles/multithread.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=72 "Built target multithread"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=73 "Built target multithread"
 .PHONY : examples/CMakeFiles/multithread.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1538,12 +1565,12 @@ examples/CMakeFiles/multithread.dir/clean:
 examples/CMakeFiles/frame_big.dir/all: blosc/CMakeFiles/blosc2_shared.dir/all
 	$(MAKE) -f examples/CMakeFiles/frame_big.dir/build.make examples/CMakeFiles/frame_big.dir/depend
 	$(MAKE) -f examples/CMakeFiles/frame_big.dir/build.make examples/CMakeFiles/frame_big.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num= "Built target frame_big"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=66 "Built target frame_big"
 .PHONY : examples/CMakeFiles/frame_big.dir/all
 
 # Build rule for subdir invocation for target.
 examples/CMakeFiles/frame_big.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 20
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 21
 	$(MAKE) -f CMakeFiles/Makefile2 examples/CMakeFiles/frame_big.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
 .PHONY : examples/CMakeFiles/frame_big.dir/rule
@@ -1565,7 +1592,7 @@ examples/CMakeFiles/frame_big.dir/clean:
 examples/CMakeFiles/frame_metalayers.dir/all: blosc/CMakeFiles/blosc2_shared.dir/all
 	$(MAKE) -f examples/CMakeFiles/frame_metalayers.dir/build.make examples/CMakeFiles/frame_metalayers.dir/depend
 	$(MAKE) -f examples/CMakeFiles/frame_metalayers.dir/build.make examples/CMakeFiles/frame_metalayers.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=66 "Built target frame_metalayers"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=67 "Built target frame_metalayers"
 .PHONY : examples/CMakeFiles/frame_metalayers.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1592,7 +1619,7 @@ examples/CMakeFiles/frame_metalayers.dir/clean:
 examples/CMakeFiles/noinit.dir/all: blosc/CMakeFiles/blosc2_shared.dir/all
 	$(MAKE) -f examples/CMakeFiles/noinit.dir/build.make examples/CMakeFiles/noinit.dir/depend
 	$(MAKE) -f examples/CMakeFiles/noinit.dir/build.make examples/CMakeFiles/noinit.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=73 "Built target noinit"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=74 "Built target noinit"
 .PHONY : examples/CMakeFiles/noinit.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1619,7 +1646,7 @@ examples/CMakeFiles/noinit.dir/clean:
 examples/CMakeFiles/find_roots.dir/all: blosc/CMakeFiles/blosc2_shared.dir/all
 	$(MAKE) -f examples/CMakeFiles/find_roots.dir/build.make examples/CMakeFiles/find_roots.dir/depend
 	$(MAKE) -f examples/CMakeFiles/find_roots.dir/build.make examples/CMakeFiles/find_roots.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=64 "Built target find_roots"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=65 "Built target find_roots"
 .PHONY : examples/CMakeFiles/find_roots.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1646,12 +1673,12 @@ examples/CMakeFiles/find_roots.dir/clean:
 examples/CMakeFiles/schunk_simple.dir/all: blosc/CMakeFiles/blosc2_shared.dir/all
 	$(MAKE) -f examples/CMakeFiles/schunk_simple.dir/build.make examples/CMakeFiles/schunk_simple.dir/depend
 	$(MAKE) -f examples/CMakeFiles/schunk_simple.dir/build.make examples/CMakeFiles/schunk_simple.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num= "Built target schunk_simple"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=75 "Built target schunk_simple"
 .PHONY : examples/CMakeFiles/schunk_simple.dir/all
 
 # Build rule for subdir invocation for target.
 examples/CMakeFiles/schunk_simple.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 20
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 21
 	$(MAKE) -f CMakeFiles/Makefile2 examples/CMakeFiles/schunk_simple.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
 .PHONY : examples/CMakeFiles/schunk_simple.dir/rule
@@ -1673,7 +1700,7 @@ examples/CMakeFiles/schunk_simple.dir/clean:
 examples/CMakeFiles/frame_simple.dir/all: blosc/CMakeFiles/blosc2_shared.dir/all
 	$(MAKE) -f examples/CMakeFiles/frame_simple.dir/build.make examples/CMakeFiles/frame_simple.dir/depend
 	$(MAKE) -f examples/CMakeFiles/frame_simple.dir/build.make examples/CMakeFiles/frame_simple.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=67 "Built target frame_simple"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=68 "Built target frame_simple"
 .PHONY : examples/CMakeFiles/frame_simple.dir/all
 
 # Build rule for subdir invocation for target.
@@ -1692,33 +1719,6 @@ frame_simple: examples/CMakeFiles/frame_simple.dir/rule
 examples/CMakeFiles/frame_simple.dir/clean:
 	$(MAKE) -f examples/CMakeFiles/frame_simple.dir/build.make examples/CMakeFiles/frame_simple.dir/clean
 .PHONY : examples/CMakeFiles/frame_simple.dir/clean
-
-#=============================================================================
-# Target rules for target examples/CMakeFiles/schunk_persistent.dir
-
-# All Build rule for target.
-examples/CMakeFiles/schunk_persistent.dir/all: blosc/CMakeFiles/blosc2_shared.dir/all
-	$(MAKE) -f examples/CMakeFiles/schunk_persistent.dir/build.make examples/CMakeFiles/schunk_persistent.dir/depend
-	$(MAKE) -f examples/CMakeFiles/schunk_persistent.dir/build.make examples/CMakeFiles/schunk_persistent.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=75 "Built target schunk_persistent"
-.PHONY : examples/CMakeFiles/schunk_persistent.dir/all
-
-# Build rule for subdir invocation for target.
-examples/CMakeFiles/schunk_persistent.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 21
-	$(MAKE) -f CMakeFiles/Makefile2 examples/CMakeFiles/schunk_persistent.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
-.PHONY : examples/CMakeFiles/schunk_persistent.dir/rule
-
-# Convenience name for target.
-schunk_persistent: examples/CMakeFiles/schunk_persistent.dir/rule
-
-.PHONY : schunk_persistent
-
-# clean rule for target.
-examples/CMakeFiles/schunk_persistent.dir/clean:
-	$(MAKE) -f examples/CMakeFiles/schunk_persistent.dir/build.make examples/CMakeFiles/schunk_persistent.dir/clean
-.PHONY : examples/CMakeFiles/schunk_persistent.dir/clean
 
 #=============================================================================
 # Target rules for target examples/CMakeFiles/zstd_dict.dir
@@ -1754,12 +1754,12 @@ examples/CMakeFiles/zstd_dict.dir/clean:
 examples/CMakeFiles/frame_backed_schunk.dir/all: blosc/CMakeFiles/blosc2_shared.dir/all
 	$(MAKE) -f examples/CMakeFiles/frame_backed_schunk.dir/build.make examples/CMakeFiles/frame_backed_schunk.dir/depend
 	$(MAKE) -f examples/CMakeFiles/frame_backed_schunk.dir/build.make examples/CMakeFiles/frame_backed_schunk.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=65 "Built target frame_backed_schunk"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num= "Built target frame_backed_schunk"
 .PHONY : examples/CMakeFiles/frame_backed_schunk.dir/all
 
 # Build rule for subdir invocation for target.
 examples/CMakeFiles/frame_backed_schunk.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 21
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 20
 	$(MAKE) -f CMakeFiles/Makefile2 examples/CMakeFiles/frame_backed_schunk.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles 0
 .PHONY : examples/CMakeFiles/frame_backed_schunk.dir/rule

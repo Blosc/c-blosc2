@@ -11,13 +11,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <dirent.h>
 #include <sys/stat.h>
 #include "blosc2.h"
 #include "blosc-private.h"
 #include "context.h"
 #include "frame.h"
-#include "pschunk.h"
+#include "eframe.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <windows.h>
@@ -144,7 +143,14 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
   // ...and update internal properties
   update_schunk_properties(schunk);
 
-  if (storage.sequential) {
+  if (!storage.sequential && storage.path != NULL){
+    //Create directory
+    if (mkdir(storage.path,0777) == -1) {
+      fprintf(stderr, "Error during the creation of the directory, maybe it already exists\n");
+      return NULL;
+    }
+  }
+  if (storage.sequential || (!storage.sequential && storage.path != NULL)){
     // We want a frame as storage
     blosc2_frame* frame = blosc2_frame_new(storage.path);
     // Initialize frame (basically, encode the header)
@@ -154,33 +160,6 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
       return NULL;
     }
     schunk->frame = frame;
-  }
-  else if (storage.path != NULL) {
-      //Create directory
-      if (mkdir(storage.path,0777) == -1) {
-          fprintf(stderr, "Error during the creation of the directory, maybe it already exists\n");
-          return NULL;
-      }
-      //Create header file
-      int header_len = pschunk_update_header(schunk);
-      if (header_len < 0){
-          fprintf(stderr, "Error during the creation of the persistent header\n");
-          return NULL;
-      }
-
-      //Create empty chunks text file
-      char *filename = malloc(sizeof(char) * (strlen(schunk->storage->path) + 10 +1));
-      sprintf(filename, "%schunks.txt", schunk->storage->path);
-      FILE *fpcs = fopen(filename,"w");
-      free(filename);
-      fclose(fpcs);
-
-      //Create trailer file
-      int rc = pschunk_new_trailer(schunk);
-      if (rc < 0) {
-          fprintf(stderr, "Error during the creation of the persistent trailer\n");
-          return NULL;
-      }
   }
 
   return schunk;
@@ -302,7 +281,7 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   int32_t nbytes = sw32_(chunk + BLOSC2_CHUNK_NBYTES);
   int32_t cbytes = sw32_(chunk + BLOSC2_CHUNK_CBYTES);
 
-    if (schunk->chunksize == -1) {
+  if (schunk->chunksize == -1) {
     schunk->chunksize = nbytes;  // The super-chunk is initialized now
   }
   if (nbytes > schunk->chunksize) {
@@ -317,12 +296,6 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   schunk->cbytes += cbytes;
   // Update super-chunk or frame
   if (schunk->frame == NULL) {
-    if (schunk->storage->path != NULL) {
-        if (pschunk_append_chunk(schunk, chunk) == NULL) {
-            fprintf(stderr, "Problems appending a chunk");
-            return -1;
-        }
-    }
     // Check that we are not appending a small chunk after another small chunk
     if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
       uint8_t* last_chunk = schunk->data[nchunks - 1];
@@ -330,7 +303,7 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
       if ((last_nbytes < schunk->chunksize) && (nbytes < schunk->chunksize)) {
         fprintf(stderr,
                 "appending two consecutive chunks with a chunksize smaller than the schunk chunksize"
-                "is not allowed yet: "
+                " is not allowed yet: "
                 "%d != %d", nbytes, schunk->chunksize);
         return -1;
       }
@@ -525,7 +498,6 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes
     free(chunk);
     return cbytes;
   }
-
   // We don't need a copy of the chunk, as it will be shrinked if necessary
   int nchunks = blosc2_schunk_append_chunk(schunk, chunk, false);
 
@@ -535,7 +507,6 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes
 /* Decompress and return a chunk that is part of a super-chunk. */
 int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
                                    void *dest, int32_t nbytes) {
-  uint8_t* src;
   int chunksize;
   if (schunk->frame == NULL) {
     if (nchunk >= schunk->nchunks) {
@@ -543,16 +514,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
                       "('%d') in super-chunk\n", nchunk, schunk->nchunks);
       return -11;
     }
-
-    if (schunk->storage->path != NULL && !schunk->storage->sequential) {
-      bool needs_free;
-      uint8_t * chunk = (uint8_t *)dest;
-      pschunk_get_chunk(schunk, nchunk, &chunk, &needs_free);
-      src = chunk;
-    }
-    else {
-      src = schunk->data[nchunk];
-    }
+    uint8_t* src = schunk->data[nchunk];
     if (src == 0) {
       return 0;
     }
@@ -589,12 +551,12 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
  * is returned instead.
 */
 int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, bool *needs_free) {
-    if (!schunk->storage->sequential && schunk->storage->path != NULL){
-    return pschunk_get_chunk(schunk, nchunk, chunk, needs_free);
-    }
-    if (schunk->frame != NULL) {
+  if (!schunk->storage->sequential && schunk->storage->path != NULL){
+    return eframe_get_chunk(schunk->frame, nchunk, chunk, needs_free);
+  }
+  if (schunk->frame != NULL) {
     return frame_get_chunk(schunk->frame, nchunk, chunk, needs_free);
-    }
+  }
 
   if (nchunk >= schunk->nchunks) {
     fprintf(stderr, "nchunk ('%d') exceeds the number of chunks "

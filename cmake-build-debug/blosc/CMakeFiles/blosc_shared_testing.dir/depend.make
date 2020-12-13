@@ -537,6 +537,18 @@ blosc/CMakeFiles/blosc_shared_testing.dir/delta.c.o: ../blosc/delta.c
 blosc/CMakeFiles/blosc_shared_testing.dir/delta.c.o: ../blosc/delta.h
 blosc/CMakeFiles/blosc_shared_testing.dir/delta.c.o: ../blosc/win32/stdint-windows.h
 
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../internal-complibs/zstd-1.4.5/zstd.h
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../blosc/blosc-private.h
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../blosc/blosc2-common.h
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../blosc/blosc2-export.h
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../blosc/blosc2.h
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../blosc/context.h
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../blosc/eframe.c
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../blosc/eframe.h
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../blosc/frame.h
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../blosc/win32/pthread.h
+blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../blosc/win32/stdint-windows.h
+
 blosc/CMakeFiles/blosc_shared_testing.dir/fastcopy.c.o: ../blosc/blosc2-common.h
 blosc/CMakeFiles/blosc_shared_testing.dir/fastcopy.c.o: ../blosc/blosc2-export.h
 blosc/CMakeFiles/blosc_shared_testing.dir/fastcopy.c.o: ../blosc/fastcopy.c
@@ -548,22 +560,11 @@ blosc/CMakeFiles/blosc_shared_testing.dir/frame.c.o: ../blosc/blosc2-common.h
 blosc/CMakeFiles/blosc_shared_testing.dir/frame.c.o: ../blosc/blosc2-export.h
 blosc/CMakeFiles/blosc_shared_testing.dir/frame.c.o: ../blosc/blosc2.h
 blosc/CMakeFiles/blosc_shared_testing.dir/frame.c.o: ../blosc/context.h
+blosc/CMakeFiles/blosc_shared_testing.dir/frame.c.o: ../blosc/eframe.h
 blosc/CMakeFiles/blosc_shared_testing.dir/frame.c.o: ../blosc/frame.c
 blosc/CMakeFiles/blosc_shared_testing.dir/frame.c.o: ../blosc/frame.h
 blosc/CMakeFiles/blosc_shared_testing.dir/frame.c.o: ../blosc/win32/pthread.h
 blosc/CMakeFiles/blosc_shared_testing.dir/frame.c.o: ../blosc/win32/stdint-windows.h
-
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o: ../internal-complibs/zstd-1.4.5/zstd.h
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o: ../blosc/blosc-private.h
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o: ../blosc/blosc2-common.h
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o: ../blosc/blosc2-export.h
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o: ../blosc/blosc2.h
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o: ../blosc/context.h
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o: ../blosc/frame.h
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o: ../blosc/pschunk.c
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o: ../blosc/pschunk.h
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o: ../blosc/win32/pthread.h
-blosc/CMakeFiles/blosc_shared_testing.dir/pschunk.c.o: ../blosc/win32/stdint-windows.h
 
 blosc/CMakeFiles/blosc_shared_testing.dir/schunk.c.o: ../internal-complibs/zstd-1.4.5/zstd.h
 blosc/CMakeFiles/blosc_shared_testing.dir/schunk.c.o: ../blosc/blosc-private.h
@@ -571,8 +572,8 @@ blosc/CMakeFiles/blosc_shared_testing.dir/schunk.c.o: ../blosc/blosc2-common.h
 blosc/CMakeFiles/blosc_shared_testing.dir/schunk.c.o: ../blosc/blosc2-export.h
 blosc/CMakeFiles/blosc_shared_testing.dir/schunk.c.o: ../blosc/blosc2.h
 blosc/CMakeFiles/blosc_shared_testing.dir/schunk.c.o: ../blosc/context.h
+blosc/CMakeFiles/blosc_shared_testing.dir/schunk.c.o: ../blosc/eframe.h
 blosc/CMakeFiles/blosc_shared_testing.dir/schunk.c.o: ../blosc/frame.h
-blosc/CMakeFiles/blosc_shared_testing.dir/schunk.c.o: ../blosc/pschunk.h
 blosc/CMakeFiles/blosc_shared_testing.dir/schunk.c.o: ../blosc/schunk.c
 blosc/CMakeFiles/blosc_shared_testing.dir/schunk.c.o: ../blosc/win32/pthread.h
 blosc/CMakeFiles/blosc_shared_testing.dir/schunk.c.o: ../blosc/win32/stdint-windows.h

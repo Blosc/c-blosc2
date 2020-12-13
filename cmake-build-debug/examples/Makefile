@@ -190,21 +190,6 @@ depend:
 .PHONY : depend
 
 # Convenience name for target.
-examples/CMakeFiles/pschunk_test1.dir/rule:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 examples/CMakeFiles/pschunk_test1.dir/rule
-.PHONY : examples/CMakeFiles/pschunk_test1.dir/rule
-
-# Convenience name for target.
-pschunk_test1: examples/CMakeFiles/pschunk_test1.dir/rule
-
-.PHONY : pschunk_test1
-
-# fast build rule for target.
-pschunk_test1/fast:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/pschunk_test1.dir/build.make examples/CMakeFiles/pschunk_test1.dir/build
-.PHONY : pschunk_test1/fast
-
-# Convenience name for target.
 examples/CMakeFiles/contexts.dir/rule:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 examples/CMakeFiles/contexts.dir/rule
 .PHONY : examples/CMakeFiles/contexts.dir/rule
@@ -248,6 +233,21 @@ simple: examples/CMakeFiles/simple.dir/rule
 simple/fast:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/simple.dir/build.make examples/CMakeFiles/simple.dir/build
 .PHONY : simple/fast
+
+# Convenience name for target.
+examples/CMakeFiles/eframe_simple.dir/rule:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 examples/CMakeFiles/eframe_simple.dir/rule
+.PHONY : examples/CMakeFiles/eframe_simple.dir/rule
+
+# Convenience name for target.
+eframe_simple: examples/CMakeFiles/eframe_simple.dir/rule
+
+.PHONY : eframe_simple
+
+# fast build rule for target.
+eframe_simple/fast:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/eframe_simple.dir/build.make examples/CMakeFiles/eframe_simple.dir/build
+.PHONY : eframe_simple/fast
 
 # Convenience name for target.
 examples/CMakeFiles/multithread.dir/rule:
@@ -353,21 +353,6 @@ frame_simple: examples/CMakeFiles/frame_simple.dir/rule
 frame_simple/fast:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/frame_simple.dir/build.make examples/CMakeFiles/frame_simple.dir/build
 .PHONY : frame_simple/fast
-
-# Convenience name for target.
-examples/CMakeFiles/schunk_persistent.dir/rule:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 examples/CMakeFiles/schunk_persistent.dir/rule
-.PHONY : examples/CMakeFiles/schunk_persistent.dir/rule
-
-# Convenience name for target.
-schunk_persistent: examples/CMakeFiles/schunk_persistent.dir/rule
-
-.PHONY : schunk_persistent
-
-# fast build rule for target.
-schunk_persistent/fast:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/schunk_persistent.dir/build.make examples/CMakeFiles/schunk_persistent.dir/build
-.PHONY : schunk_persistent/fast
 
 # Convenience name for target.
 examples/CMakeFiles/zstd_dict.dir/rule:
@@ -494,6 +479,33 @@ delta_schunk_ex.s: delta_schunk_ex.c.s
 delta_schunk_ex.c.s:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/delta_schunk_ex.dir/build.make examples/CMakeFiles/delta_schunk_ex.dir/delta_schunk_ex.c.s
 .PHONY : delta_schunk_ex.c.s
+
+eframe_simple.o: eframe_simple.c.o
+
+.PHONY : eframe_simple.o
+
+# target to build an object file
+eframe_simple.c.o:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/eframe_simple.dir/build.make examples/CMakeFiles/eframe_simple.dir/eframe_simple.c.o
+.PHONY : eframe_simple.c.o
+
+eframe_simple.i: eframe_simple.c.i
+
+.PHONY : eframe_simple.i
+
+# target to preprocess a source file
+eframe_simple.c.i:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/eframe_simple.dir/build.make examples/CMakeFiles/eframe_simple.dir/eframe_simple.c.i
+.PHONY : eframe_simple.c.i
+
+eframe_simple.s: eframe_simple.c.s
+
+.PHONY : eframe_simple.s
+
+# target to generate assembly for a file
+eframe_simple.c.s:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/eframe_simple.dir/build.make examples/CMakeFiles/eframe_simple.dir/eframe_simple.c.s
+.PHONY : eframe_simple.c.s
 
 find_roots.o: find_roots.c.o
 
@@ -684,60 +696,6 @@ noinit.c.s:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/noinit.dir/build.make examples/CMakeFiles/noinit.dir/noinit.c.s
 .PHONY : noinit.c.s
 
-pschunk_test1.o: pschunk_test1.c.o
-
-.PHONY : pschunk_test1.o
-
-# target to build an object file
-pschunk_test1.c.o:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/pschunk_test1.dir/build.make examples/CMakeFiles/pschunk_test1.dir/pschunk_test1.c.o
-.PHONY : pschunk_test1.c.o
-
-pschunk_test1.i: pschunk_test1.c.i
-
-.PHONY : pschunk_test1.i
-
-# target to preprocess a source file
-pschunk_test1.c.i:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/pschunk_test1.dir/build.make examples/CMakeFiles/pschunk_test1.dir/pschunk_test1.c.i
-.PHONY : pschunk_test1.c.i
-
-pschunk_test1.s: pschunk_test1.c.s
-
-.PHONY : pschunk_test1.s
-
-# target to generate assembly for a file
-pschunk_test1.c.s:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/pschunk_test1.dir/build.make examples/CMakeFiles/pschunk_test1.dir/pschunk_test1.c.s
-.PHONY : pschunk_test1.c.s
-
-schunk_persistent.o: schunk_persistent.c.o
-
-.PHONY : schunk_persistent.o
-
-# target to build an object file
-schunk_persistent.c.o:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/schunk_persistent.dir/build.make examples/CMakeFiles/schunk_persistent.dir/schunk_persistent.c.o
-.PHONY : schunk_persistent.c.o
-
-schunk_persistent.i: schunk_persistent.c.i
-
-.PHONY : schunk_persistent.i
-
-# target to preprocess a source file
-schunk_persistent.c.i:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/schunk_persistent.dir/build.make examples/CMakeFiles/schunk_persistent.dir/schunk_persistent.c.i
-.PHONY : schunk_persistent.c.i
-
-schunk_persistent.s: schunk_persistent.c.s
-
-.PHONY : schunk_persistent.s
-
-# target to generate assembly for a file
-schunk_persistent.c.s:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f examples/CMakeFiles/schunk_persistent.dir/build.make examples/CMakeFiles/schunk_persistent.dir/schunk_persistent.c.s
-.PHONY : schunk_persistent.c.s
-
 schunk_simple.o: schunk_simple.c.o
 
 .PHONY : schunk_simple.o
@@ -829,11 +787,11 @@ help:
 	@echo "... install/local"
 	@echo "... test"
 	@echo "... package_source"
-	@echo "... pschunk_test1"
 	@echo "... contexts"
 	@echo "... package"
 	@echo "... delta_schunk_ex"
 	@echo "... simple"
+	@echo "... eframe_simple"
 	@echo "... multithread"
 	@echo "... frame_big"
 	@echo "... rebuild_cache"
@@ -844,7 +802,6 @@ help:
 	@echo "... list_install_components"
 	@echo "... schunk_simple"
 	@echo "... frame_simple"
-	@echo "... schunk_persistent"
 	@echo "... install"
 	@echo "... zstd_dict"
 	@echo "... frame_backed_schunk"
@@ -858,6 +815,9 @@ help:
 	@echo "... delta_schunk_ex.o"
 	@echo "... delta_schunk_ex.i"
 	@echo "... delta_schunk_ex.s"
+	@echo "... eframe_simple.o"
+	@echo "... eframe_simple.i"
+	@echo "... eframe_simple.s"
 	@echo "... find_roots.o"
 	@echo "... find_roots.i"
 	@echo "... find_roots.s"
@@ -879,12 +839,6 @@ help:
 	@echo "... noinit.o"
 	@echo "... noinit.i"
 	@echo "... noinit.s"
-	@echo "... pschunk_test1.o"
-	@echo "... pschunk_test1.i"
-	@echo "... pschunk_test1.s"
-	@echo "... schunk_persistent.o"
-	@echo "... schunk_persistent.i"
-	@echo "... schunk_persistent.s"
 	@echo "... schunk_simple.o"
 	@echo "... schunk_simple.i"
 	@echo "... schunk_simple.s"

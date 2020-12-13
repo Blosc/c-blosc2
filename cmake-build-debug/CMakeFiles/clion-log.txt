@@ -1,11 +1,4 @@
 /usr/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" /home/martaiborra/c-blosc2
--- The C compiler identification is GNU 9.3.0
--- Check for working C compiler: /usr/bin/cc
--- Check for working C compiler: /usr/bin/cc -- works
--- Detecting C compiler ABI info
--- Detecting C compiler ABI info - done
--- Detecting C compile features
--- Detecting C compile features - done
 Configuring for Blosc version: 2.0.0.beta.6.dev
 -- Using LZ4 internal sources.
 -- Using LIZARD internal sources.
@@ -14,15 +7,6 @@ Configuring for Blosc version: 2.0.0.beta.6.dev
 -- Building for system processor x86_64
 -- Adding run-time support for SSE2
 -- Adding run-time support for AVX2
--- Looking for pthread.h
--- Looking for pthread.h - found
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
--- Looking for pthread_create in pthreads
--- Looking for pthread_create in pthreads - not found
--- Looking for pthread_create in pthread
--- Looking for pthread_create in pthread - found
--- Found Threads: TRUE  
 Skipping test_shuffle_roundtrip_altivec on non-ALTIVEC builds
 Skipping test_shuffle_roundtrip_neon on non-NEON builds
 -- Configuring done
