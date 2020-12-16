@@ -438,6 +438,9 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
     // We can compute the number of chunks only when the frame has actual data
     *nchunks = (int32_t) (*nbytes / *chunksize);
     if (*nbytes % *chunksize > 0) {
+      if (*nchunks == INT32_MAX) {
+        return -1;
+      }
       *nchunks += 1;
     }
   } else {
