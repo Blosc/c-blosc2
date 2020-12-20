@@ -2278,6 +2278,11 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
 
   ebsize = blocksize + typesize * (int32_t)sizeof(int32_t);
 
+  if (blocksize <= 0) {
+    /* Invalid block size */
+    return -1;
+  }
+
   /* Total blocks */
   nblocks = nbytes / blocksize;
   leftover = nbytes % blocksize;
