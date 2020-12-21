@@ -688,7 +688,7 @@ static bool get_run(const uint8_t* ip, const uint8_t* ip_bound) {
   memset(&value, x, 8);
   while (ip < (ip_bound - 8)) {
 #if defined(BLOSC_STRICT_ALIGN)
-    memcpy(&value2, ref, 8);
+    memcpy(&value2, ip, 8);
 #else
     value2 = *(int64_t*)ip;
 #endif
@@ -2277,6 +2277,11 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
   cbytes = sw32_(_src + BLOSC2_CHUNK_CBYTES);    /* compressed buffer size */
 
   ebsize = blocksize + typesize * (int32_t)sizeof(int32_t);
+
+  if (blocksize <= 0) {
+    /* Invalid block size */
+    return -1;
+  }
 
   /* Total blocks */
   nblocks = nbytes / blocksize;

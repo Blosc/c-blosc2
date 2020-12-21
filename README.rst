@@ -113,7 +113,7 @@ You can also disable support for some compression libraries:
 Supported platforms
 ~~~~~~~~~~~~~~~~~~~
 
-C-Blosc2 is meant to support all platforms where a C99 compliant C compiler can be found.  The ones that are mostly tested are Intel (Linux, Mac OSX and Windows) and ARM (Linux), but exotic ones as IBM Blue Gene Q embedded "A2" processor are reported to work too.
+C-Blosc2 is meant to support all platforms where a C99 compliant C compiler can be found.  The ones that are mostly tested are Intel (Linux, Mac OSX and Windows), ARM (Linux, Mac), and PowerPC (Linux) but exotic ones as IBM Blue Gene Q embedded "A2" processor are reported to work too.  More on ARM support in `README_ARM.rst`.
 
 For Windows, you will need at least VS2015 or higher on x86 and x64 targets (i.e. ARM is not supported on Windows).
 
@@ -122,6 +122,13 @@ For Mac OSX, make sure that you have installed the command line developer tools.
 .. code-block:: console
 
   $ xcode-select --install
+
+For Mac OSX on arm64 architecture, you need to compile like this:
+
+.. code-block:: console
+
+  $ CC="clang -arch arm64" cmake ..
+
 
 Support for the LZ4 optimized version in Intel IPP
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

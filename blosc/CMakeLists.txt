@@ -61,14 +61,16 @@ include_directories(${BLOSC_INCLUDE_DIRS})
 # library sources
 set(SOURCES blosc2.c blosc2-common.h blosclz.c fastcopy.c fastcopy.h schunk.c frame.c btune.c btune.h
         context.h delta.c delta.h shuffle-generic.c bitshuffle-generic.c trunc-prec.c trunc-prec.h
-        timestamp.c eframe.c)
-if(COMPILER_SUPPORT_SSE2)
-    message(STATUS "Adding run-time support for SSE2")
-    set(SOURCES ${SOURCES} shuffle-sse2.c bitshuffle-sse2.c)
-endif()
-if(COMPILER_SUPPORT_AVX2)
-    message(STATUS "Adding run-time support for AVX2")
-    set(SOURCES ${SOURCES} shuffle-avx2.c bitshuffle-avx2.c)
+        timestamp.c)
+if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
+    if(COMPILER_SUPPORT_SSE2)
+        message(STATUS "Adding run-time support for SSE2")
+        set(SOURCES ${SOURCES} shuffle-sse2.c bitshuffle-sse2.c)
+    endif()
+    if(COMPILER_SUPPORT_AVX2)
+        message(STATUS "Adding run-time support for AVX2")
+        set(SOURCES ${SOURCES} shuffle-avx2.c bitshuffle-avx2.c)
+    endif()
 endif()
 if(COMPILER_SUPPORT_NEON)
     message(STATUS "Adding run-time support for NEON")
@@ -160,7 +162,7 @@ endif()
 
 # targets
 if(BUILD_SHARED)
-    add_library(blosc2_shared SHARED ${SOURCES} eframe.c eframe.h)
+    add_library(blosc2_shared SHARED ${SOURCES})
     set_target_properties(blosc2_shared PROPERTIES OUTPUT_NAME blosc2)
     set_target_properties(blosc2_shared PROPERTIES
             VERSION ${version_string}

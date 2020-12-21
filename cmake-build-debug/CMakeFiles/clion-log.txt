@@ -5,23 +5,11 @@ Configuring for Blosc version: 2.0.0.beta.6.dev
 -- Using MINIZ internal sources for ZLIB support.
 -- Using ZSTD internal sources.
 -- Building for system processor x86_64
--- Adding run-time support for SSE2
--- Adding run-time support for AVX2
-Skipping test_shuffle_roundtrip_altivec on non-ALTIVEC builds
-Skipping test_shuffle_roundtrip_neon on non-NEON builds
--- Configuring done
-CMake Warning (dev) at blosc/CMakeLists.txt:277 (add_library):
-  Policy CMP0063 is not set: Honor visibility properties for all target
-  types.  Run "cmake --help-policy CMP0063" for policy details.  Use the
-  cmake_policy command to set the policy and suppress this warning.
+CMake Error at blosc/CMakeLists.txt:73:
+  Parse error.  Expected a command name, got unquoted argument with text
+  "=======".
 
-  Target "blosc2_static" of type "STATIC_LIBRARY" has the following
-  visibility properties set for C:
 
-    C_VISIBILITY_PRESET
-
-  For compatibility CMake is not honoring them for this target.
-This warning is for project developers.  Use -Wno-dev to suppress it.
-
--- Generating done
--- Build files have been written to: /home/martaiborra/c-blosc2/cmake-build-debug
+-- Configuring incomplete, errors occurred!
+See also "/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles/CMakeOutput.log".
+See also "/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles/CMakeError.log".

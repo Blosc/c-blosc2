@@ -224,6 +224,17 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
             "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
+# Workaround for Darwin with new Apple Silicon (arm64)
+# For now, it is necessary to compile the beast with:
+# CC="clang -arch arm64" cmake ..
+if (CMAKE_C_COMPILER_ARG1)
+    string(FIND ${CMAKE_C_COMPILER_ARG1} "arm64" IS_APPLE_SILICON)
+    if (IS_APPLE_SILICON)
+        message(STATUS "Detected Apple arm64 arch")
+        set(CMAKE_SYSTEM_PROCESSOR "arm64")
+    endif()
+endif()
+
 # Based on the target system's processor and the compiler being used,
 # set build variables indicating which hardware features can be targeted
 # by the compiler. Note we DO NOT check which hardware features are supported
@@ -272,7 +283,8 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL i386 OR
         message(WARNING "Unable to determine which ${CMAKE_SYSTEM_PROCESSOR} hardware features are supported by the C compiler (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}).")
     endif()
 elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l OR
-        CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64)
+        CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64 OR
+        CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
     if(CMAKE_C_COMPILER_ID STREQUAL GNU)
         if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.7 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 4.7)
             set(COMPILER_SUPPORT_NEON TRUE)

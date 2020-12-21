@@ -244,8 +244,10 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
 #endif /* HAVE_CPU_FEAT_INTRIN */
 
 #elif defined(SHUFFLE_NEON_ENABLED) /* ARM-NEON */
-  #include <sys/auxv.h>
-  #include <asm/hwcap.h>
+  #if !defined(__arm64)
+      #include <sys/auxv.h>
+      #include <asm/hwcap.h>
+  #endif
 static blosc_cpu_features blosc_get_cpu_features(void) {
   blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
 #if defined(__aarch64__)
