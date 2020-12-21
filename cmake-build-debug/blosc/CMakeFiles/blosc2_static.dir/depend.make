@@ -537,16 +537,12 @@ blosc/CMakeFiles/blosc2_static.dir/delta.c.o: ../blosc/delta.c
 blosc/CMakeFiles/blosc2_static.dir/delta.c.o: ../blosc/delta.h
 blosc/CMakeFiles/blosc2_static.dir/delta.c.o: ../blosc/win32/stdint-windows.h
 
-blosc/CMakeFiles/blosc2_static.dir/eframe.c.o: ../internal-complibs/zstd-1.4.5/zstd.h
-blosc/CMakeFiles/blosc2_static.dir/eframe.c.o: ../blosc/blosc-private.h
 blosc/CMakeFiles/blosc2_static.dir/eframe.c.o: ../blosc/blosc2-common.h
 blosc/CMakeFiles/blosc2_static.dir/eframe.c.o: ../blosc/blosc2-export.h
 blosc/CMakeFiles/blosc2_static.dir/eframe.c.o: ../blosc/blosc2.h
-blosc/CMakeFiles/blosc2_static.dir/eframe.c.o: ../blosc/context.h
 blosc/CMakeFiles/blosc2_static.dir/eframe.c.o: ../blosc/eframe.c
 blosc/CMakeFiles/blosc2_static.dir/eframe.c.o: ../blosc/eframe.h
 blosc/CMakeFiles/blosc2_static.dir/eframe.c.o: ../blosc/frame.h
-blosc/CMakeFiles/blosc2_static.dir/eframe.c.o: ../blosc/win32/pthread.h
 blosc/CMakeFiles/blosc2_static.dir/eframe.c.o: ../blosc/win32/stdint-windows.h
 
 blosc/CMakeFiles/blosc2_static.dir/fastcopy.c.o: ../blosc/blosc2-common.h

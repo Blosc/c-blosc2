@@ -2,9 +2,7 @@
   Copyright (C) 2020 The Blosc Developers
   http://blosc.org
   License: BSD (see LICENSE.txt)
-
   Creation date: 2019-08-06
-
   See LICENSE.txt for details about copyright and rights to use.
 */
 

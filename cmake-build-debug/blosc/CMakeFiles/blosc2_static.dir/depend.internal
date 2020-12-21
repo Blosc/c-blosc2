@@ -538,16 +538,12 @@ blosc/CMakeFiles/blosc2_static.dir/delta.c.o
  /home/martaiborra/c-blosc2/blosc/delta.h
  /home/martaiborra/c-blosc2/blosc/win32/stdint-windows.h
 blosc/CMakeFiles/blosc2_static.dir/eframe.c.o
- ../internal-complibs/zstd-1.4.5/zstd.h
- /home/martaiborra/c-blosc2/blosc/blosc-private.h
  /home/martaiborra/c-blosc2/blosc/blosc2-common.h
  /home/martaiborra/c-blosc2/blosc/blosc2-export.h
  /home/martaiborra/c-blosc2/blosc/blosc2.h
- /home/martaiborra/c-blosc2/blosc/context.h
  /home/martaiborra/c-blosc2/blosc/eframe.c
  /home/martaiborra/c-blosc2/blosc/eframe.h
  /home/martaiborra/c-blosc2/blosc/frame.h
- /home/martaiborra/c-blosc2/blosc/win32/pthread.h
  /home/martaiborra/c-blosc2/blosc/win32/stdint-windows.h
 blosc/CMakeFiles/blosc2_static.dir/fastcopy.c.o
  /home/martaiborra/c-blosc2/blosc/blosc2-common.h

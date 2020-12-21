@@ -149,10 +149,21 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
       fprintf(stderr, "Error during the creation of the directory, maybe it already exists\n");
       return NULL;
     }
-  }
-  if (storage.sequential || (!storage.sequential && storage.path != NULL)){
     // We want a frame as storage
     blosc2_frame* frame = blosc2_frame_new(storage.path);
+    frame->eframe = true;
+    // Initialize frame (basically, encode the header)
+    int64_t frame_len = blosc2_frame_from_schunk(schunk, frame);
+    if (frame_len < 0) {
+      fprintf(stderr, "Error during the conversion of schunk to frame\n");
+      return NULL;
+    }
+    schunk->frame = frame;
+  }
+  if (storage.sequential){
+    // We want a frame as storage
+    blosc2_frame* frame = blosc2_frame_new(storage.path);
+    frame->eframe = false;
     // Initialize frame (basically, encode the header)
     int64_t frame_len = blosc2_frame_from_schunk(schunk, frame);
     if (frame_len < 0) {
@@ -189,10 +200,6 @@ blosc2_schunk *blosc2_schunk_empty(int nchunks, const blosc2_storage storage) {
 
 /* Open an existing super-chunk that is on-disk (no copy is made). */
 blosc2_schunk* blosc2_schunk_open(const blosc2_storage storage) {
-  if (!storage.sequential) {
-    fprintf(stderr, "Opening sparse super-chunks on-disk is not supported yet\n");
-    return NULL;
-  }
   if (storage.path == NULL) {
     fprintf(stderr, "You need to supply a storage.path\n");
     return NULL;
