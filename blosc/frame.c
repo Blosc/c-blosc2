@@ -72,7 +72,7 @@ void swap_store(void *dest, const void *pa, int size) {
                 pa2_[0] = pa_[1];
                 break;
             default:
-                fprintf(stderr, "Unhandled size: %d\n", size);
+              BLOSC_TRACE_ERROR("Unhandled size: %d.", size);
         }
     }
     memcpy(dest, pa2_, size);
@@ -434,7 +434,7 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
   if (filters != NULL && filters_meta != NULL) {
     uint8_t nfilters = framep[FRAME_FILTER_PIPELINE];
     if (nfilters > BLOSC2_MAX_FILTERS) {
-      fprintf(stderr, "Error: the number of filters in frame header are too large for Blosc2");
+      BLOSC_TRACE_ERROR("The number of filters in frame header are too large for Blosc2.");
       return -1;
     }
     uint8_t *filters_ = framep + FRAME_FILTER_PIPELINE + 1;
@@ -494,7 +494,7 @@ int update_frame_len(blosc2_frame* frame, int64_t len) {
     swap_store(&swap_len, &len, sizeof(int64_t));
     size_t wbytes = fwrite(&swap_len, 1, sizeof(int64_t), fp);
     if (wbytes != sizeof(int64_t)) {
-      fprintf(stderr, "Error: cannot write the frame length in header");
+      BLOSC_TRACE_ERROR("Cannot write the frame length in header.");
       return -1;
     }
     fclose(fp);
@@ -505,8 +505,7 @@ int update_frame_len(blosc2_frame* frame, int64_t len) {
 
 int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
   if (frame != NULL && frame->len == 0) {
-    fprintf(stderr, "Error: the trailer cannot be updated on empty frames");
-    return -1;
+    BLOSC_TRACE_ERROR("The trailer cannot be updated on empty frames.");
   }
 
   // Create the trailer in msgpack (see the frame format document)
@@ -553,7 +552,7 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL, NULL);
   if (ret < 0) {
-    fprintf(stderr, "unable to get meta info from frame");
+    BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return -1;
   }
 
@@ -565,7 +564,7 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
   if (frame->sdata != NULL) {
     frame->sdata = realloc(frame->sdata, (size_t)(trailer_offset + trailer_len));
     if (frame->sdata == NULL) {
-      fprintf(stderr, "Error: cannot realloc space for the frame.");
+      BLOSC_TRACE_ERROR("Cannot realloc space for the frame.");
       return -1;
     }
     memcpy(frame->sdata + trailer_offset, trailer, trailer_len);
@@ -584,9 +583,9 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
     fseek(fp, trailer_offset, SEEK_SET);
     size_t wbytes = fwrite(trailer, 1, trailer_len, fp);
     if (wbytes != (size_t)trailer_len) {
-      fprintf(stderr, "Error: cannot write the trailer length in trailer");
-        fclose(fp);
-        return -2;
+      BLOSC_TRACE_ERROR("Cannot write the trailer length in trailer.");
+      fclose(fp);
+      return -2;
     }
     fclose(fp);
   }
@@ -748,7 +747,7 @@ int64_t blosc2_schunk_to_sframe(blosc2_schunk* schunk, uint8_t** sframe) {
     frame = blosc2_frame_new(NULL);
     sdata_len = blosc2_frame_from_schunk(schunk, frame);
     if (sdata_len < 0) {
-      fprintf(stderr, "Error during the conversion of schunk to frame\n");
+      BLOSC_TRACE_ERROR("Error during the conversion of schunk to frame.");
       return sdata_len;
     }
     sdata = frame->sdata;
@@ -767,7 +766,7 @@ int64_t blosc2_schunk_to_sframe(blosc2_schunk* schunk, uint8_t** sframe) {
 int64_t blosc2_frame_to_file(blosc2_frame *frame, const char *urlpath) {
   // make sure that we are using an in-memory frame
   if (frame->urlpath != NULL) {
-    fprintf(stderr, "Error: the original frame must be in-memory");
+    BLOSC_TRACE_ERROR("The original frame must be in-memory.");
     return -1;
   }
   FILE* fp = fopen(urlpath, "wb");
@@ -799,7 +798,7 @@ blosc2_frame* blosc2_frame_from_file(const char *urlpath) {
   }
   size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
   if (rbytes != FRAME_HEADER_MINLEN) {
-    fprintf(stderr, "Error: cannot read from file '%s'\n", urlpath);
+    BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
     fclose(fp);
     return NULL;
   }
@@ -817,7 +816,7 @@ blosc2_frame* blosc2_frame_from_file(const char *urlpath) {
   rbytes = fread(trailer, 1, FRAME_TRAILER_MINLEN, fp);
   fclose(fp);
   if (rbytes != FRAME_TRAILER_MINLEN) {
-    fprintf(stderr, "Error: cannot read from file '%s'\n", urlpath);
+    BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
     return NULL;
   }
   int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
@@ -906,7 +905,7 @@ uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, i
   }
   size_t rbytes = fread(coffsets, 1, (size_t)coffsets_cbytes, fp);
   if (rbytes != (size_t)coffsets_cbytes) {
-    fprintf(stderr, "Error: cannot read the offsets out of the fileframe.\n");
+    BLOSC_TRACE_ERROR("Cannot read the offsets out of the fileframe.");
     fclose(fp);
     return NULL;
   }
@@ -926,7 +925,8 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
   }
 
   if (new && schunk->cbytes > 0) {
-    fprintf(stderr, "Error: new metalayers cannot be added after actual data has been appended\n");
+    BLOSC_TRACE_ERROR("New metalayers cannot be added after actual data "
+                      "has been appended.");
     return -1;
   }
 
@@ -968,7 +968,7 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
   }
 
   if (!new && prev_h2len != h2len) {
-    fprintf(stderr, "Error: the new metalayer sizes should be equal the existing ones");
+    BLOSC_TRACE_ERROR("The new metalayer sizes should be equal the existing ones.");
     return -2;
   }
 
@@ -1012,12 +1012,12 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL, NULL);
   if (ret < 0) {
-    fprintf(stderr, "Unable to get the header info from frame");
+    BLOSC_TRACE_ERROR("Unable to get the header info from frame.");
     return -1;
   }
   int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
   if (trailer_offset < 0) {
-    fprintf(stderr, "Unable to get the trailer offset from frame");
+    BLOSC_TRACE_ERROR("Unable to get the trailer offset from frame.");
     return -1;
   }
 
@@ -1040,7 +1040,7 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
     fseek(fp, trailer_offset + FRAME_TRAILER_USERMETA_LEN_OFFSET, SEEK_SET);
     size_t rbytes = fread(&usermeta_len_network, 1, sizeof(int32_t), fp);
     if (rbytes != sizeof(int32_t)) {
-      fprintf(stderr, "Cannot access the usermeta_len out of the fileframe.\n");
+      BLOSC_TRACE_ERROR("Cannot access the usermeta_len out of the fileframe.");
       fclose(fp);
       return -1;
     }
@@ -1072,7 +1072,7 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
     fseek(fp, trailer_offset + FRAME_TRAILER_USERMETA_OFFSET, SEEK_SET);
     size_t rbytes = fread(*usermeta, 1, usermeta_len, fp);
     if (rbytes != (size_t)usermeta_len) {
-      fprintf(stderr, "Error: cannot read the complete usermeta chunk in frame. %ld != %ld \n",
+      BLOSC_TRACE_ERROR("Cannot read the complete usermeta chunk in frame. %ld != %ld.",
               (long)rbytes, (long)usermeta_len);
       return -1;
     }
@@ -1094,7 +1094,7 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL, NULL);
   if (ret < 0) {
-    fprintf(stderr, "Unable to get the header info from frame");
+    BLOSC_TRACE_ERROR("Unable to get the header info from frame.");
     return -1;
   }
 
@@ -1120,7 +1120,7 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
       fclose(fp);
     }
     if (rbytes != (size_t) header_len) {
-      fprintf(stderr, "Cannot access the header out of the fileframe.\n");
+      BLOSC_TRACE_ERROR("Cannot access the header out of the fileframe.");
       free(header);
       return -2;
     }
@@ -1239,7 +1239,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
                             &schunk->chunksize, &schunk->nchunks, &schunk->typesize,
                             &schunk->compcode, &schunk->clevel, schunk->filters, schunk->filters_meta);
   if (ret < 0) {
-    fprintf(stderr, "unable to get meta info from frame");
+    BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     free(schunk);
     return NULL;
   }
@@ -1272,7 +1272,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
     blosc2_free_ctx(schunk->cctx);
     blosc2_free_ctx(schunk->dctx);
     free(schunk);
-    fprintf(stderr, "Error: cannot get the offsets for the frame\n");
+    BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
     return NULL;
   }
 
@@ -1287,7 +1287,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
     blosc2_free_ctx(schunk->cctx);
     blosc2_free_ctx(schunk->dctx);
     free(schunk);
-    fprintf(stderr, "Error: cannot decompress the offsets chunk");
+    BLOSC_TRACE_ERROR("Cannot decompress the offsets chunk.");
     return NULL;
   }
 
@@ -1401,7 +1401,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
     blosc2_free_ctx(schunk->cctx);
     blosc2_free_ctx(schunk->dctx);
     free(schunk);
-    fprintf(stderr, "Error: cannot access the metalayers");
+    BLOSC_TRACE_ERROR("Cannot access the metalayers.");
     return NULL;
   }
 
@@ -1410,7 +1410,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
     blosc2_free_ctx(schunk->cctx);
     blosc2_free_ctx(schunk->dctx);
     free(schunk);
-    fprintf(stderr, "Error: cannot access the usermeta chunk");
+    BLOSC_TRACE_ERROR("Cannot access the usermeta chunk.");
     return NULL;
   }
   schunk->usermeta = usermeta;
@@ -1438,7 +1438,7 @@ int64_t get_coffset(blosc2_frame* frame, int32_t header_len, int64_t cbytes, int
   int64_t offset;
   uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, NULL);
   if (coffsets == NULL) {
-    fprintf(stderr, "Error: cannot get the offset for chunk %d for the frame\n", nchunk);
+  BLOSC_TRACE_ERROR("Cannot get the offset for chunk %d for the frame.", nchunk);
     return -3;
   }
 
@@ -1446,7 +1446,7 @@ int64_t get_coffset(blosc2_frame* frame, int32_t header_len, int64_t cbytes, int
   if (rc < 0) {
     size_t nbytes_, cbytes_, blocksize_;
     blosc_cbuffer_sizes(coffsets, &nbytes_, &cbytes_, &blocksize_);
-    fprintf(stderr, "Error: problems retrieving a chunk offset");
+    BLOSC_TRACE_ERROR("Problems retrieving a chunk offset.");
     return -4;
   }
   return offset;
@@ -1475,13 +1475,13 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL, NULL);
   if (ret < 0) {
-    fprintf(stderr, "unable to get meta info from frame");
+    BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return -1;
   }
 
   if (nchunk >= nchunks) {
-    fprintf(stderr, "nchunk ('%d') exceeds the number of chunks "
-                    "('%d') in frame\n", nchunk, nchunks);
+    BLOSC_TRACE_ERROR("nchunk ('%d') exceeds the number of chunks "
+                    "('%d') in frame.", nchunk, nchunks);
     return -2;
   }
 
@@ -1505,7 +1505,7 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
     fseek(fp, header_len + offset + BLOSC2_CHUNK_CBYTES, SEEK_SET);
     size_t rbytes = fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
     if (rbytes != sizeof(chunk_cbytes)) {
-      fprintf(stderr, "Cannot read the cbytes for chunk in the fileframe.\n");
+      BLOSC_TRACE_ERROR("Cannot read the cbytes for chunk in the fileframe.");
       return -5;
     }
     chunk_cbytes = sw32_(&chunk_cbytes);
@@ -1513,7 +1513,7 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
     fseek(fp, header_len + offset, SEEK_SET);
     rbytes = fread(*chunk, 1, (size_t)chunk_cbytes, fp);
     if (rbytes != (size_t)chunk_cbytes) {
-      fprintf(stderr, "Cannot read the chunk out of the fileframe.\n");
+      BLOSC_TRACE_ERROR("Cannot read the chunk out of the fileframe.");
       return -6;
     }
     fclose(fp);
@@ -1551,13 +1551,13 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL, NULL);
   if (ret < 0) {
-    fprintf(stderr, "unable to get meta info from frame");
+    BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return -1;
   }
 
   if (nchunk >= nchunks) {
-    fprintf(stderr, "nchunk ('%d') exceeds the number of chunks "
-                    "('%d') in frame\n", nchunk, nchunks);
+    BLOSC_TRACE_ERROR("nchunk ('%d') exceeds the number of chunks "
+                      "('%d') in frame.", nchunk, nchunks);
     return -2;
   }
 
@@ -1586,7 +1586,7 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
     }
     size_t rbytes = fread(header, 1, BLOSC_MIN_HEADER_LENGTH, fp);
     if (rbytes != BLOSC_MIN_HEADER_LENGTH) {
-      fprintf(stderr, "Cannot read the header for chunk in the fileframe.\n");
+      BLOSC_TRACE_ERROR("Cannot read the header for chunk in the fileframe.");
       return -5;
     }
     blosc_cbuffer_sizes(header, &chunk_nbytes, &chunk_cbytes, &chunk_blocksize);
@@ -1609,7 +1609,7 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
     rbytes = fread(*chunk, 1, lazy_partial_len, fp);
     fclose(fp);
     if (rbytes != lazy_partial_len) {
-      fprintf(stderr, "Cannot read the (lazy) chunk out of the fileframe.\n");
+      BLOSC_TRACE_ERROR("Cannot read the (lazy) chunk out of the fileframe.");
       return -6;
     }
 
@@ -1676,7 +1676,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
                            NULL, NULL, NULL, NULL, NULL);
   if (rc < 0) {
-    fprintf(stderr, "unable to get meta info from frame");
+    BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return NULL;
   }
   int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
@@ -1688,8 +1688,8 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   int64_t new_cbytes = cbytes + cbytes_chunk;
 
   if ((nchunks > 0) && (nbytes_chunk > chunksize)) {
-    fprintf(stderr, "appending chunks with a larger chunksize than frame is not allowed yet"
-                    "%d != %d", nbytes_chunk, chunksize);
+    BLOSC_TRACE_ERROR("Appending chunks with a larger chunksize than frame is "
+                      "not allowed yet %d != %d.", nbytes_chunk, chunksize);
     return NULL;
   }
 
@@ -1699,8 +1699,8 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     bool needs_free;
     int retcode = frame_get_lazychunk(frame, nchunks - 1, &last_chunk, &needs_free);
     if (retcode < 0) {
-      fprintf(stderr,
-              "cannot get the last chunk (in position %d)", nchunks - 1);
+      BLOSC_TRACE_ERROR("Cannot get the last chunk (in position %d).",
+                        nchunks - 1);
       return NULL;
     }
     int32_t last_nbytes = sw32_(last_chunk + BLOSC2_CHUNK_NBYTES);
@@ -1708,10 +1708,9 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
       free(last_chunk);
     }
     if ((last_nbytes < chunksize) && (nbytes < chunksize)) {
-      fprintf(stderr,
-              "appending two consecutive chunks with a chunksize smaller than the frame chunksize"
-              "is not allowed yet: "
-              "%d != %d", nbytes_chunk, chunksize);
+      BLOSC_TRACE_ERROR("Appending two consecutive chunks with a chunksize smaller "
+                        "than the frame chunksize is not allowed yet: %d != %d.",
+                        nbytes_chunk, chunksize);
       return NULL;
     }
   }
@@ -1723,7 +1722,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     int32_t coffsets_cbytes = 0;
     uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, &coffsets_cbytes);
     if (coffsets == NULL) {
-      fprintf(stderr, "Error: cannot get the offsets for the frame\n");
+      BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
       return NULL;
     }
     // Decompress offsets
@@ -1733,7 +1732,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     blosc2_free_ctx(dctx);
     if (prev_nbytes < 0) {
       free(offsets);
-      fprintf(stderr, "Error: cannot decompress the offsets chunk");
+      BLOSC_TRACE_ERROR("Cannot decompress the offsets chunk.");
       return NULL;
     }
   }
@@ -1780,7 +1779,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     /* Make space for the new chunk and copy it */
     frame->sdata = framep = realloc(framep, (size_t)new_frame_len);
     if (framep == NULL) {
-      fprintf(stderr, "cannot realloc space for the frame.");
+      BLOSC_TRACE_ERROR("Cannot realloc space for the frame.");
       return NULL;
     }
     /* Copy the chunk */
@@ -1815,12 +1814,12 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     fseek(fp, header_len + cbytes, SEEK_SET);
     size_t wbytes = fwrite(chunk, 1, (size_t)cbytes_chunk, fp);  // the new chunk
     if (wbytes != (size_t)cbytes_chunk) {
-      fprintf(stderr, "cannot write the full chunk to fileframe.");
+      BLOSC_TRACE_ERROR("Cannot write the full chunk to fileframe.");
       return NULL;
     }
     wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
     if (wbytes != (size_t)new_off_cbytes) {
-      fprintf(stderr, "cannot write the offsets to fileframe.");
+      BLOSC_TRACE_ERROR("Cannot write the offsets to fileframe.");
       return NULL;
     }
     fclose(fp);
@@ -1861,8 +1860,7 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk
     chunk_cbytes = frame_get_lazychunk(frame, nchunk, &src, &needs_free);
   }
   if (chunk_cbytes < 0) {
-    fprintf(stderr,
-            "cannot get the chunk in position %d", nchunk);
+    BLOSC_TRACE_ERROR("Cannot get the chunk in position %d.", nchunk);
     return -1;
   }
 
@@ -1874,13 +1872,13 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk
   /* Create a buffer for destination */
   int32_t nbytes_ = sw32_(src + BLOSC2_CHUNK_NBYTES);
   if (nbytes_ > (int32_t)nbytes) {
-    fprintf(stderr, "Not enough space for decompressing in dest");
+    BLOSC_TRACE_ERROR("Not enough space for decompressing in dest.");
     return -1;
   }
   /* And decompress it */
   int32_t chunksize = blosc2_decompress_ctx(dctx, src, chunk_cbytes, dest, nbytes);
   if (chunksize < 0 || chunksize != nbytes_) {
-    fprintf(stderr, "Error in decompressing chunk");
+    BLOSC_TRACE_ERROR("Error in decompressing chunk.");
     return -11;
   }
 
@@ -1908,7 +1906,7 @@ int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk
   int32_t coffsets_cbytes = 0;
   uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, &coffsets_cbytes);
   if (coffsets == NULL) {
-    fprintf(stderr, "Error: cannot get the offsets for the frame\n");
+    BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
     return -1;
   }
 
@@ -1922,7 +1920,7 @@ int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk
   blosc2_free_ctx(dctx);
   if (prev_nbytes < 0) {
     free(offsets);
-    fprintf(stderr, "Error: cannot decompress the offsets chunk");
+    BLOSC_TRACE_ERROR("Cannot decompress the offsets chunk.");
     return -1;
   }
 
@@ -1956,7 +1954,7 @@ int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk
     /* Make space for the new chunk and copy it */
     frame->sdata = framep = realloc(framep, (size_t)new_frame_len);
     if (framep == NULL) {
-      fprintf(stderr, "cannot realloc space for the frame.");
+      BLOSC_TRACE_ERROR("Cannot realloc space for the frame.");
       return -1;
     }
     /* Copy the offsets */
@@ -1967,7 +1965,7 @@ int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk
     fseek(fp, header_len + cbytes, SEEK_SET);
     size_t wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
     if (wbytes != (size_t)new_off_cbytes) {
-      fprintf(stderr, "cannot write the offsets to fileframe.");
+      BLOSC_TRACE_ERROR("Cannot write the offsets to fileframe.");
       return -1;
     }
     fclose(fp);

@@ -108,7 +108,7 @@ int release_threadpool(blosc2_context *context);
 #define WAIT_INIT(RET_VAL, CONTEXT_PTR)  \
   rc = pthread_barrier_wait(&(CONTEXT_PTR)->barr_init); \
   if (rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD) { \
-    printf("Could not wait on barrier (init): %d\n", rc); \
+    BLOSC_TRACE_ERROR("Could not wait on barrier (init): %d", rc); \
     return((RET_VAL));                            \
   }
 #else
@@ -130,7 +130,7 @@ int release_threadpool(blosc2_context *context);
 #define WAIT_FINISH(RET_VAL, CONTEXT_PTR)   \
   rc = pthread_barrier_wait(&(CONTEXT_PTR)->barr_finish); \
   if (rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD) { \
-    printf("Could not wait on barrier (finish)\n"); \
+    BLOSC_TRACE_ERROR("Could not wait on barrier (finish)"); \
     return((RET_VAL));                              \
   }
 #else
@@ -178,7 +178,7 @@ static uint8_t* my_malloc(size_t size) {
 #endif  /* _WIN32 */
 
   if (block == NULL || res != 0) {
-    printf("Error allocating memory!");
+    BLOSC_TRACE_ERROR("Error allocating memory!");
     return NULL;
   }
 
@@ -286,7 +286,6 @@ int blosc_compcode_to_compname(int compcode, const char** compname) {
 
   return code;
 }
-
 
 /* Get the compressor code for the compressor name. -1 if it is not available */
 int blosc_compname_to_compcode(const char* compname) {
@@ -522,8 +521,8 @@ static int zstd_wrap_decompress(struct thread_context* thread_context,
         (void*)output, maxout, (void*)input, compressed_length);
   }
   if (ZSTD_isError(code) != ZSTD_error_no_error) {
-    fprintf(stderr, "Error in ZSTD decompression: '%s'.  Giving up.\n",
-            ZDICT_getErrorName(code));
+    BLOSC_TRACE_ERROR("Error in ZSTD decompression: '%s'.  Giving up.",
+                      ZDICT_getErrorName(code));
     return 0;
   }
   return (int)code;
@@ -627,7 +626,7 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
     pparams.ctx = context;
 
     if (context->prefilter(&pparams) != 0) {
-      fprintf(stderr, "Execution of prefilter function failed\n");
+      BLOSC_TRACE_ERROR("Execution of prefilter function failed");
       return NULL;
     }
 
@@ -666,7 +665,7 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
         break;
       default:
         if (filters[i] != BLOSC_NOFILTER) {
-          fprintf(stderr, "Filter %d not handled during compression\n", filters[i]);
+          BLOSC_TRACE_ERROR("Filter %d not handled during compression\n", filters[i]);
           return NULL;
         }
     }
@@ -848,8 +847,8 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
 
     else {
       blosc_compcode_to_compname(context->compcode, &compname);
-      fprintf(stderr, "Blosc has not been compiled with '%s' ", compname);
-      fprintf(stderr, "compression support.  Please use one having it.");
+      BLOSC_TRACE_ERROR("Blosc has not been compiled with '%s' compression support."
+                        "Please use one having it.", compname);
       return -5;    /* signals no compression support */
     }
 
@@ -948,8 +947,9 @@ int pipeline_d(blosc2_context* context, const int32_t bsize, uint8_t* dest,
         break;
       default:
         if (filters[i] != BLOSC_NOFILTER) {
-          fprintf(stderr, "Filter %d not handled during decompression\n",
-                  filters[i]);
+          BLOSC_TRACE_ERROR("Filter %d not handled during decompression.",
+                            filters[i]);
+
           errcode = -1;
         }
     }
@@ -998,11 +998,11 @@ static int blosc_d(
   if (is_lazy) {
     // The chunk is on disk, so just lazily load the block
     if (context->schunk == NULL) {
-      fprintf(stderr, "Lazy chunk needs an associated super-chunk");
+      BLOSC_TRACE_ERROR("Lazy chunk needs an associated super-chunk.");
       return -11;
     }
     if (context->schunk->frame == NULL) {
-      fprintf(stderr, "Lazy chunk needs an associated frame");
+      BLOSC_TRACE_ERROR("Lazy chunk needs an associated frame.");
       return -12;
     }
     char *urlpath = context->schunk->frame->urlpath;
@@ -1040,7 +1040,7 @@ static int blosc_d(
     size_t rbytes = fread((void*)(src + src_offset), 1, block_csize, fp);
     fclose(fp);
     if (rbytes != block_csize) {
-      fprintf(stderr, "Cannot read the (lazy) block out of the fileframe.\n");
+      BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");
       return -13;
     }
   }
@@ -1161,10 +1161,10 @@ static int blosc_d(
   #endif /*  HAVE_ZSTD */
       else {
         compname = clibcode_to_clibname(compformat);
-        fprintf(stderr,
+        BLOSC_TRACE_ERROR(
                 "Blosc has not been compiled with decompression "
-                    "support for '%s' format. ", compname);
-        fprintf(stderr, "Please recompile for adding this support.\n");
+                "support for '%s' format.  "
+                "Please recompile for adding this support.", compname);
         return -5;    /* signals no decompression support */
       }
 
@@ -1311,12 +1311,12 @@ static void init_thread_context(struct thread_context* thread_context, blosc2_co
   int hash_size = 0;
   status = ippsEncodeLZ4HashTableGetSize_8u(&hash_size);
   if (status != ippStsNoErr) {
-    fprintf(stderr, "Error in ippsEncodeLZ4HashTableGetSize_8u");
+      BLOSC_TRACE_ERROR("Error in ippsEncodeLZ4HashTableGetSize_8u.");
   }
   Ipp8u *hash_table = ippsMalloc_8u(hash_size);
   status = ippsEncodeLZ4HashTableInit_8u(hash_table, inlen);
   if (status != ippStsNoErr) {
-    fprintf(stderr, "Error in ippsEncodeLZ4HashTableInit_8u");
+    BLOSC_TRACE_ERROR("Error in ippsEncodeLZ4HashTableInit_8u.");
   }
   thread_context->lz4_hash_table = hash_table;
 #endif
@@ -1356,7 +1356,7 @@ void free_thread_context(struct thread_context* thread_context) {
 
 int check_nthreads(blosc2_context* context) {
   if (context->nthreads <= 0) {
-    fprintf(stderr, "Error.  nthreads must be a positive integer");
+    BLOSC_TRACE_ERROR("nthreads must be a positive integer.");
     return -1;
   }
 
@@ -1486,37 +1486,37 @@ static int initialize_context_compression(
   /* Check buffer size limits */
   if (srcsize > BLOSC_MAX_BUFFERSIZE) {
     if (warnlvl > 0) {
-      fprintf(stderr, "Input buffer size cannot exceed %d bytes\n",
-              BLOSC_MAX_BUFFERSIZE);
+      BLOSC_TRACE_ERROR("Input buffer size cannot exceed %d bytes.",
+                        BLOSC_MAX_BUFFERSIZE);
     }
     return 0;
   }
 
   if (destsize < BLOSC_MAX_OVERHEAD) {
     if (warnlvl > 0) {
-      fprintf(stderr, "Output buffer size should be larger than %d bytes\n",
-              BLOSC_MAX_OVERHEAD);
+      BLOSC_TRACE_ERROR("Output buffer size should be larger than %d bytes.",
+                        BLOSC_MAX_OVERHEAD);
     }
     return 0;
   }
 
   if (destsize < BLOSC_MAX_OVERHEAD) {
     if (warnlvl > 0) {
-      fprintf(stderr, "Output buffer size should be larger than %d bytes\n",
-              BLOSC_MAX_OVERHEAD);
+      BLOSC_TRACE_ERROR("Output buffer size should be larger than %d bytes.",
+                        BLOSC_MAX_OVERHEAD);
     }
     return -2;
   }
   if (destsize < BLOSC_MAX_OVERHEAD) {
-    fprintf(stderr, "Output buffer size should be larger than %d bytes\n",
-            BLOSC_MAX_OVERHEAD);
+    BLOSC_TRACE_ERROR("Output buffer size should be larger than %d bytes.",
+                      BLOSC_MAX_OVERHEAD);
     return -1;
   }
 
   /* Compression level */
   if (clevel < 0 || clevel > 9) {
     /* If clevel not in 0..9, print an error */
-    fprintf(stderr, "`clevel` parameter must be between 0 and 9!\n");
+    BLOSC_TRACE_ERROR("`clevel` parameter must be between 0 and 9!.");
     return -10;
   }
 
@@ -1600,8 +1600,9 @@ static int initialize_context_decompression(blosc2_context* context, const void*
                       context->nblocks + 1 : context->nblocks;
 
   if (context->block_maskout != NULL && context->block_maskout_nitems != context->nblocks) {
-    fprintf(stderr, "The number of items in block_maskout (%d) must match the number"
-                    " of blocks in chunk (%d)", context->block_maskout_nitems, context->nblocks);
+    BLOSC_TRACE_ERROR("The number of items in block_maskout (%d) must match the number"
+                      " of blocks in chunk (%d).",
+                      context->block_maskout_nitems, context->nblocks);
     return -2;
   }
 
@@ -1742,8 +1743,9 @@ static int write_compression_header(blosc2_context* context,
     default: {
       const char* compname;
       compname = clibcode_to_clibname(compformat);
-      fprintf(stderr, "Blosc has not been compiled with '%s' ", compname);
-      fprintf(stderr, "compression support.  Please use one having it.");
+      BLOSC_TRACE_ERROR("Blosc has not been compiled with '%s' "
+                        "compression support.  Please use one having it.",
+                        compname);
       return -5;    /* signals no compression support */
       break;
     }
@@ -1892,7 +1894,7 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
   int error, cbytes;
 
   if (context->do_compress != 1) {
-    fprintf(stderr, "Context is not meant for compression.  Giving up.\n");
+    BLOSC_TRACE_ERROR("Context is not meant for compression.  Giving up.");
     return -10;
   }
 
@@ -1921,8 +1923,8 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     if (context->compcode != BLOSC_ZSTD) {
       const char* compname;
       compname = clibcode_to_clibname(context->compcode);
-      fprintf(stderr, "Codec %s does not support dicts.  Giving up.\n",
-              compname);
+      BLOSC_TRACE_ERROR("Codec %s does not support dicts.  Giving up.",
+                        compname);
       return -20;
     }
 
@@ -1958,8 +1960,8 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     //size_t dict_actual_size = ZDICT_optimizeTrainFromBuffer_fastCover(dict_buffer, dict_maxsize, samples_buffer, samples_sizes, nblocks, &fast_cover_params);
 
     if (ZDICT_isError(dict_actual_size) != ZSTD_error_no_error) {
-      fprintf(stderr, "Error in ZDICT_trainFromBuffer(): '%s'."
-              "  Giving up.\n", ZDICT_getErrorName(dict_actual_size));
+      BLOSC_TRACE_ERROR("Error in ZDICT_trainFromBuffer(): '%s'."
+                        "  Giving up.", ZDICT_getErrorName(dict_actual_size));
       return -20;
     }
     assert(dict_actual_size > 0);
@@ -2193,7 +2195,7 @@ int blosc2_decompress_ctx(blosc2_context* context, const void* src, int32_t srcs
   int result;
 
   if (context->do_compress != 0) {
-    fprintf(stderr, "Context is not meant for decompression.  Giving up.\n");
+    BLOSC_TRACE_ERROR("Context is not meant for decompression.  Giving up.");
     return -10;
   }
 
@@ -2341,12 +2343,12 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
 
   /* Check region boundaries */
   if ((start < 0) || (start * typesize > nbytes)) {
-    fprintf(stderr, "`start` out of bounds");
+    BLOSC_TRACE_ERROR("`start` out of bounds.");
     return -1;
   }
 
   if ((stop < 0) || (stop * typesize > nbytes)) {
-    fprintf(stderr, "`start`+`nitems` out of bounds");
+    BLOSC_TRACE_ERROR("`start`+`nitems` out of bounds.");
     return -1;
   }
 
@@ -2449,7 +2451,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
     // Support for lazy chunks exists only for Blosc2, and needs the context.
     context.blosc2_flags = _src[BLOSC2_CHUNK_BLOSC2_FLAGS];
     if (context.blosc2_flags & 0x08) {
-      fprintf(stderr, "blosc_getitem does not support lazy chunks.  Use blosc2_getitem_ctx instead.");
+      BLOSC_TRACE_ERROR("blosc_getitem does not support lazy chunks.  Use blosc2_getitem_ctx instead.");
       return -2;
     }
   }
@@ -2749,8 +2751,8 @@ int init_threadpool(blosc2_context *context) {
                             (void *)thread_context);
       #endif
       if (rc2) {
-        fprintf(stderr, "ERROR; return code from pthread_create() is %d\n", rc2);
-        fprintf(stderr, "\tError detail: %s\n", strerror(rc2));
+        BLOSC_TRACE_ERROR("Return code from pthread_create() is %d.\n"
+                          "\tError detail: %s\n", rc2, strerror(rc2));
         return (-1);
       }
     }
@@ -3064,8 +3066,8 @@ int release_threadpool(blosc2_context *context) {
       for (t = 0; t < context->threads_started; t++) {
         rc = pthread_join(context->threads[t], &status);
         if (rc) {
-          fprintf(stderr, "ERROR; return code from pthread_join() is %d\n", rc);
-          fprintf(stderr, "\tError detail: %s\n", strerror(rc));
+          BLOSC_TRACE_ERROR("Return code from pthread_join() is %d\n"
+                            "\tError detail: %s.", rc, strerror(rc));
         }
       }
 
