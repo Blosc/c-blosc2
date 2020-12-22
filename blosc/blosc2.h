@@ -38,6 +38,17 @@ extern "C" {
 #define BLOSC_VERSION_DATE     "$Date:: 2020-04-21 #$"    /* date version */
 
 
+/* Tracing macros */
+#define BLOSC_TRACE_ERROR(msg, ...) BLOSC_TRACE(error, msg, ##__VA_ARGS__)
+#define BLOSC_TRACE_WARNING(msg, ...) BLOSC_TRACE(warning, msg, ##__VA_ARGS__)
+#define BLOSC_TRACE(cat, msg, ...) \
+    do { \
+         const char *__e = getenv("BLOSC_TRACE"); \
+         if (!__e) { break; } \
+         fprintf(stderr, "[%s] - " msg " (%s:%d)\n", #cat, ##__VA_ARGS__, __FILE__, __LINE__); \
+       } while(0)
+
+
 /* The VERSION_FORMAT symbols below should be just 1-byte long */
 enum {
   /* Blosc format version, starting at 1
