@@ -1,6 +1,6 @@
-===============================================================
+=============================================================================
  C-Blosc2: A simple, compressed, fast and persistent data store library for C
-===============================================================
+=============================================================================
 
 :Author: The Blosc Development Team
 :Contact: blosc@blosc.org
@@ -143,6 +143,14 @@ C-Blosc2 comes with support for a highly optimized version of the LZ4 codec pres
    $ sudo apt-get update && sudo apt-get install intel-ipp-64bit-2019.X  # replace .X by the latest version
 
 Check `Intel IPP website <https://software.intel.com/en-us/articles/intel-integrated-performance-primitives-intel-ipp-install-guide>`_ for instructions on how to install it for other platforms.
+
+
+Display error messages
+~~~~~~~~~~~~~~~~~~~~~~
+
+By default error messages are disabled. To activate it, you only need to activate the Blosc tracing machinery setting
+the `BLOSC_TRACE` environment variable.
+
 
 Mailing list
 ============
