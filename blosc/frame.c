@@ -901,7 +901,7 @@ uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, i
     fseek(fp, header_len + 0, SEEK_SET);
   }
   else{
-    fopen(frame->urlpath, "rb");
+    fp = fopen(frame->urlpath, "rb");
     fseek(fp, header_len + cbytes, SEEK_SET);
   }
   size_t rbytes = fread(coffsets, 1, (size_t)coffsets_cbytes, fp);
@@ -1572,8 +1572,18 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
     size_t chunk_cbytes;
     size_t chunk_blocksize;
     uint8_t header[BLOSC_MIN_HEADER_LENGTH];
-    FILE* fp = fopen(frame->urlpath, "rb");
-    fseek(fp, header_len + offset, SEEK_SET);
+    FILE* fp = NULL;
+    if (frame->eframe) {
+      // The chunk is not in the frame
+      char* chunkname = malloc(strlen(frame->urlpath) + 14 + 1);
+      sprintf(chunkname,"%s%08X.chunk", frame->urlpath, nchunk);
+      fp = fopen(chunkname,"rb");
+      free(chunkname);
+    }
+    else {
+      fp = fopen(frame->urlpath, "rb");
+      fseek(fp, header_len + offset, SEEK_SET);
+    }
     size_t rbytes = fread(header, 1, BLOSC_MIN_HEADER_LENGTH, fp);
     if (rbytes != BLOSC_MIN_HEADER_LENGTH) {
       fprintf(stderr, "Cannot read the header for chunk in the fileframe.\n");
@@ -1589,7 +1599,12 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
     *chunk = malloc(lazychunk_cbytes);
     *needs_free = true;
     // Read just the full header and bstarts section too (lazy partial length)
-    fseek(fp, header_len + offset, SEEK_SET);
+    if (frame->eframe) {
+      fseek(fp, 0, SEEK_SET);
+    }
+    else {
+      fseek(fp, header_len + offset, SEEK_SET);
+    }
     size_t lazy_partial_len = BLOSC_EXTENDED_HEADER_LENGTH + nblocks * sizeof(int32_t);
     rbytes = fread(*chunk, 1, lazy_partial_len, fp);
     fclose(fp);

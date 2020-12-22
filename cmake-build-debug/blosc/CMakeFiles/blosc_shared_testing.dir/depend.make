@@ -506,6 +506,7 @@ blosc/CMakeFiles/blosc_shared_testing.dir/blosc2.c.o: ../blosc/blosclz.h
 blosc/CMakeFiles/blosc_shared_testing.dir/blosc2.c.o: ../blosc/btune.h
 blosc/CMakeFiles/blosc_shared_testing.dir/blosc2.c.o: ../blosc/context.h
 blosc/CMakeFiles/blosc_shared_testing.dir/blosc2.c.o: ../blosc/delta.h
+blosc/CMakeFiles/blosc_shared_testing.dir/blosc2.c.o: ../blosc/frame.h
 blosc/CMakeFiles/blosc_shared_testing.dir/blosc2.c.o: ../blosc/shuffle.h
 blosc/CMakeFiles/blosc_shared_testing.dir/blosc2.c.o: ../blosc/trunc-prec.h
 blosc/CMakeFiles/blosc_shared_testing.dir/blosc2.c.o: ../blosc/win32/pthread.c

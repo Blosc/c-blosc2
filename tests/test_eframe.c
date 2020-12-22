@@ -88,11 +88,14 @@ static char* test_eframe(void) {
     mu_assert("Decompression error", dsize>=0);
   }
 
-  /* Check integrity of the second chunk (made of non-zeros) */
-  blosc2_schunk_decompress_chunk(schunk, 1, data_dest, isize);
-  for (int i = 0; i < CHUNKSIZE; i++) {
-    mu_assert("Decompressed data differs from original",data_dest[i]==(i+1));
+  if (nchunks >= 2) {
+    /* Check integrity of the second chunk (made of non-zeros) */
+    blosc2_schunk_decompress_chunk(schunk, 1, data_dest, isize);
+    for (int i = 0; i < CHUNKSIZE; i++) {
+      mu_assert("Decompressed data differs from original",data_dest[i]==(i+1));
+    }
   }
+
   /* Remove directory */
   remove_dir(storage.path);
   /* Free resources */
@@ -171,7 +174,11 @@ static char* test_metalayers(void) {
 
 
 static char *all_tests(void) {
-  nchunks = 2;
+  nchunks = 0;
+
+  mu_run_test(test_eframe);
+
+  nchunks = 1;
   mu_run_test(test_eframe);
 
   nchunks = 10;

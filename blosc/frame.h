@@ -51,7 +51,5 @@ int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk
 int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new);
 int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk);
 
-void swap_store(void *dest, const void *pa, int size);
-void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame);
 
 #endif //BLOSC_FRAME_H

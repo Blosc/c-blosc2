@@ -291,8 +291,8 @@
 					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/blosc/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
-			<Target title="test_frame">
-				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_frame" prefix_auto="0" extension_auto="0"/>
+			<Target title="test_update_chunk">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_update_chunk" prefix_auto="0" extension_auto="0"/>
 				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
 				<Option object_output="./"/>
 				<Option type="1"/>
@@ -307,14 +307,14 @@
 					<Add directory="/usr/include"/>
 				</Compiler>
 				<MakeCommands>
-					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_frame"/>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_update_chunk"/>
 					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
 					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
-			<Target title="test_frame/fast">
-				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_frame" prefix_auto="0" extension_auto="0"/>
+			<Target title="test_update_chunk/fast">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_update_chunk" prefix_auto="0" extension_auto="0"/>
 				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
 				<Option object_output="./"/>
 				<Option type="1"/>
@@ -329,14 +329,14 @@
 					<Add directory="/usr/include"/>
 				</Compiler>
 				<MakeCommands>
-					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_frame/fast"/>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_update_chunk/fast"/>
 					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
 					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
-			<Target title="test_schunk_frame">
-				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_schunk_frame" prefix_auto="0" extension_auto="0"/>
+			<Target title="test_compress_roundtrip">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_compress_roundtrip" prefix_auto="0" extension_auto="0"/>
 				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
 				<Option object_output="./"/>
 				<Option type="1"/>
@@ -351,14 +351,14 @@
 					<Add directory="/usr/include"/>
 				</Compiler>
 				<MakeCommands>
-					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_schunk_frame"/>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_compress_roundtrip"/>
 					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
 					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
-			<Target title="test_schunk_frame/fast">
-				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_schunk_frame" prefix_auto="0" extension_auto="0"/>
+			<Target title="test_compress_roundtrip/fast">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_compress_roundtrip" prefix_auto="0" extension_auto="0"/>
 				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
 				<Option object_output="./"/>
 				<Option type="1"/>
@@ -373,95 +373,7 @@
 					<Add directory="/usr/include"/>
 				</Compiler>
 				<MakeCommands>
-					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_schunk_frame/fast"/>
-					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-				</MakeCommands>
-			</Target>
-			<Target title="test_change_nthreads_append">
-				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_change_nthreads_append" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
-				<Option object_output="./"/>
-				<Option type="1"/>
-				<Option compiler="gcc"/>
-				<Compiler>
-					<Add option="-DBLOSC_TESTING"/>
-					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
-					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
-					<Add directory="/usr/local/include"/>
-					<Add directory="/usr/include/x86_64-linux-gnu"/>
-					<Add directory="/usr/include"/>
-				</Compiler>
-				<MakeCommands>
-					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_change_nthreads_append"/>
-					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-				</MakeCommands>
-			</Target>
-			<Target title="test_change_nthreads_append/fast">
-				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_change_nthreads_append" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
-				<Option object_output="./"/>
-				<Option type="1"/>
-				<Option compiler="gcc"/>
-				<Compiler>
-					<Add option="-DBLOSC_TESTING"/>
-					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
-					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
-					<Add directory="/usr/local/include"/>
-					<Add directory="/usr/include/x86_64-linux-gnu"/>
-					<Add directory="/usr/include"/>
-				</Compiler>
-				<MakeCommands>
-					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_change_nthreads_append/fast"/>
-					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-				</MakeCommands>
-			</Target>
-			<Target title="test_lazychunk">
-				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_lazychunk" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
-				<Option object_output="./"/>
-				<Option type="1"/>
-				<Option compiler="gcc"/>
-				<Compiler>
-					<Add option="-DBLOSC_TESTING"/>
-					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
-					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
-					<Add directory="/usr/local/include"/>
-					<Add directory="/usr/include/x86_64-linux-gnu"/>
-					<Add directory="/usr/include"/>
-				</Compiler>
-				<MakeCommands>
-					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_lazychunk"/>
-					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-				</MakeCommands>
-			</Target>
-			<Target title="test_lazychunk/fast">
-				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_lazychunk" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
-				<Option object_output="./"/>
-				<Option type="1"/>
-				<Option compiler="gcc"/>
-				<Compiler>
-					<Add option="-DBLOSC_TESTING"/>
-					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
-					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
-					<Add directory="/usr/local/include"/>
-					<Add directory="/usr/include/x86_64-linux-gnu"/>
-					<Add directory="/usr/include"/>
-				</Compiler>
-				<MakeCommands>
-					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_lazychunk/fast"/>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_compress_roundtrip/fast"/>
 					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
 					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
@@ -550,6 +462,182 @@
 				</Compiler>
 				<MakeCommands>
 					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_delta_schunk/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_frame">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_frame" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DBLOSC_TESTING"/>
+					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
+					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_frame"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_frame/fast">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_frame" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DBLOSC_TESTING"/>
+					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
+					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_frame/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_lazychunk">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_lazychunk" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DBLOSC_TESTING"/>
+					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
+					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_lazychunk"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_lazychunk/fast">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_lazychunk" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DBLOSC_TESTING"/>
+					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
+					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_lazychunk/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_change_nthreads_append">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_change_nthreads_append" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DBLOSC_TESTING"/>
+					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
+					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_change_nthreads_append"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_change_nthreads_append/fast">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_change_nthreads_append" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DBLOSC_TESTING"/>
+					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
+					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_change_nthreads_append/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_schunk_frame">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_schunk_frame" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DBLOSC_TESTING"/>
+					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
+					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_schunk_frame"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_schunk_frame/fast">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_schunk_frame" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DBLOSC_TESTING"/>
+					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
+					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_schunk_frame/fast"/>
 					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
 					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
@@ -726,50 +814,6 @@
 				</Compiler>
 				<MakeCommands>
 					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_insert_chunk/fast"/>
-					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-				</MakeCommands>
-			</Target>
-			<Target title="test_compress_roundtrip">
-				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_compress_roundtrip" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
-				<Option object_output="./"/>
-				<Option type="1"/>
-				<Option compiler="gcc"/>
-				<Compiler>
-					<Add option="-DBLOSC_TESTING"/>
-					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
-					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
-					<Add directory="/usr/local/include"/>
-					<Add directory="/usr/include/x86_64-linux-gnu"/>
-					<Add directory="/usr/include"/>
-				</Compiler>
-				<MakeCommands>
-					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_compress_roundtrip"/>
-					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-				</MakeCommands>
-			</Target>
-			<Target title="test_compress_roundtrip/fast">
-				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_compress_roundtrip" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
-				<Option object_output="./"/>
-				<Option type="1"/>
-				<Option compiler="gcc"/>
-				<Compiler>
-					<Add option="-DBLOSC_TESTING"/>
-					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
-					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
-					<Add directory="/usr/local/include"/>
-					<Add directory="/usr/include/x86_64-linux-gnu"/>
-					<Add directory="/usr/include"/>
-				</Compiler>
-				<MakeCommands>
-					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_compress_roundtrip/fast"/>
 					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
 					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
@@ -1039,8 +1083,8 @@
 					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
-			<Target title="test_update_chunk">
-				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_update_chunk" prefix_auto="0" extension_auto="0"/>
+			<Target title="test_eframe_lazychunk">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_eframe_lazychunk" prefix_auto="0" extension_auto="0"/>
 				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
 				<Option object_output="./"/>
 				<Option type="1"/>
@@ -1055,14 +1099,14 @@
 					<Add directory="/usr/include"/>
 				</Compiler>
 				<MakeCommands>
-					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_update_chunk"/>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_eframe_lazychunk"/>
 					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
 					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
-			<Target title="test_update_chunk/fast">
-				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_update_chunk" prefix_auto="0" extension_auto="0"/>
+			<Target title="test_eframe_lazychunk/fast">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_eframe_lazychunk" prefix_auto="0" extension_auto="0"/>
 				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
 				<Option object_output="./"/>
 				<Option type="1"/>
@@ -1077,7 +1121,7 @@
 					<Add directory="/usr/include"/>
 				</Compiler>
 				<MakeCommands>
-					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_update_chunk/fast"/>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_eframe_lazychunk/fast"/>
 					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
 					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
@@ -1215,50 +1259,6 @@
 					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
-			<Target title="test_getitem">
-				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_getitem" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
-				<Option object_output="./"/>
-				<Option type="1"/>
-				<Option compiler="gcc"/>
-				<Compiler>
-					<Add option="-DBLOSC_TESTING"/>
-					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
-					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
-					<Add directory="/usr/local/include"/>
-					<Add directory="/usr/include/x86_64-linux-gnu"/>
-					<Add directory="/usr/include"/>
-				</Compiler>
-				<MakeCommands>
-					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_getitem"/>
-					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-				</MakeCommands>
-			</Target>
-			<Target title="test_getitem/fast">
-				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_getitem" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
-				<Option object_output="./"/>
-				<Option type="1"/>
-				<Option compiler="gcc"/>
-				<Compiler>
-					<Add option="-DBLOSC_TESTING"/>
-					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
-					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
-					<Add directory="/usr/local/include"/>
-					<Add directory="/usr/include/x86_64-linux-gnu"/>
-					<Add directory="/usr/include"/>
-				</Compiler>
-				<MakeCommands>
-					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_getitem/fast"/>
-					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
-				</MakeCommands>
-			</Target>
 			<Target title="test_dict_schunk">
 				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_dict_schunk" prefix_auto="0" extension_auto="0"/>
 				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
@@ -1298,6 +1298,50 @@
 				</Compiler>
 				<MakeCommands>
 					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_dict_schunk/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_getitem">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_getitem" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DBLOSC_TESTING"/>
+					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
+					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_getitem"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="test_getitem/fast">
+				<Option output="/home/martaiborra/c-blosc2/cmake-build-debug/tests/test_getitem" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/martaiborra/c-blosc2/cmake-build-debug/tests"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DBLOSC_TESTING"/>
+					<Add directory="/home/martaiborra/c-blosc2/cmake-build-debug/blosc"/>
+					<Add directory="/home/martaiborra/c-blosc2/blosc"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 test_getitem/fast"/>
 					<CompileFile command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
 					<Clean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
 					<DistClean command="/usr/bin/make -j4 -f &quot;/home/martaiborra/c-blosc2/cmake-build-debug/tests/Makefile&quot;  VERBOSE=1 clean"/>
@@ -2936,6 +2980,8 @@
 			<Option target="blosc2_shared"/>
 		</Unit>
 		<Unit filename="/home/martaiborra/c-blosc2/blosc/eframe.h">
+			<Option target="blosc2_static"/>
+			<Option target="blosc_shared_testing"/>
 			<Option target="blosc2_shared"/>
 		</Unit>
 		<Unit filename="/home/martaiborra/c-blosc2/blosc/fastcopy.c">
@@ -3405,6 +3451,9 @@
 		</Unit>
 		<Unit filename="/home/martaiborra/c-blosc2/tests/test_eframe.c">
 			<Option target="test_eframe"/>
+		</Unit>
+		<Unit filename="/home/martaiborra/c-blosc2/tests/test_eframe_lazychunk.c">
+			<Option target="test_eframe_lazychunk"/>
 		</Unit>
 		<Unit filename="/home/martaiborra/c-blosc2/tests/test_empty_schunk.c">
 			<Option target="test_empty_schunk"/>

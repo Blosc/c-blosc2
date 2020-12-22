@@ -242,56 +242,30 @@ blosc2_shared/fast:
 .PHONY : blosc2_shared/fast
 
 #=============================================================================
-# Target rules for targets named test_frame
+# Target rules for targets named test_update_chunk
 
 # Build rule for target.
-test_frame: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 test_frame
-.PHONY : test_frame
+test_update_chunk: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 test_update_chunk
+.PHONY : test_update_chunk
 
 # fast build rule for target.
-test_frame/fast:
-	$(MAKE) -f tests/CMakeFiles/test_frame.dir/build.make tests/CMakeFiles/test_frame.dir/build
-.PHONY : test_frame/fast
+test_update_chunk/fast:
+	$(MAKE) -f tests/CMakeFiles/test_update_chunk.dir/build.make tests/CMakeFiles/test_update_chunk.dir/build
+.PHONY : test_update_chunk/fast
 
 #=============================================================================
-# Target rules for targets named test_schunk_frame
+# Target rules for targets named test_compress_roundtrip
 
 # Build rule for target.
-test_schunk_frame: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 test_schunk_frame
-.PHONY : test_schunk_frame
+test_compress_roundtrip: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 test_compress_roundtrip
+.PHONY : test_compress_roundtrip
 
 # fast build rule for target.
-test_schunk_frame/fast:
-	$(MAKE) -f tests/CMakeFiles/test_schunk_frame.dir/build.make tests/CMakeFiles/test_schunk_frame.dir/build
-.PHONY : test_schunk_frame/fast
-
-#=============================================================================
-# Target rules for targets named test_change_nthreads_append
-
-# Build rule for target.
-test_change_nthreads_append: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 test_change_nthreads_append
-.PHONY : test_change_nthreads_append
-
-# fast build rule for target.
-test_change_nthreads_append/fast:
-	$(MAKE) -f tests/CMakeFiles/test_change_nthreads_append.dir/build.make tests/CMakeFiles/test_change_nthreads_append.dir/build
-.PHONY : test_change_nthreads_append/fast
-
-#=============================================================================
-# Target rules for targets named test_lazychunk
-
-# Build rule for target.
-test_lazychunk: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 test_lazychunk
-.PHONY : test_lazychunk
-
-# fast build rule for target.
-test_lazychunk/fast:
-	$(MAKE) -f tests/CMakeFiles/test_lazychunk.dir/build.make tests/CMakeFiles/test_lazychunk.dir/build
-.PHONY : test_lazychunk/fast
+test_compress_roundtrip/fast:
+	$(MAKE) -f tests/CMakeFiles/test_compress_roundtrip.dir/build.make tests/CMakeFiles/test_compress_roundtrip.dir/build
+.PHONY : test_compress_roundtrip/fast
 
 #=============================================================================
 # Target rules for targets named test_shuffle_roundtrip_avx2
@@ -318,6 +292,58 @@ test_delta_schunk: cmake_check_build_system
 test_delta_schunk/fast:
 	$(MAKE) -f tests/CMakeFiles/test_delta_schunk.dir/build.make tests/CMakeFiles/test_delta_schunk.dir/build
 .PHONY : test_delta_schunk/fast
+
+#=============================================================================
+# Target rules for targets named test_frame
+
+# Build rule for target.
+test_frame: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 test_frame
+.PHONY : test_frame
+
+# fast build rule for target.
+test_frame/fast:
+	$(MAKE) -f tests/CMakeFiles/test_frame.dir/build.make tests/CMakeFiles/test_frame.dir/build
+.PHONY : test_frame/fast
+
+#=============================================================================
+# Target rules for targets named test_lazychunk
+
+# Build rule for target.
+test_lazychunk: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 test_lazychunk
+.PHONY : test_lazychunk
+
+# fast build rule for target.
+test_lazychunk/fast:
+	$(MAKE) -f tests/CMakeFiles/test_lazychunk.dir/build.make tests/CMakeFiles/test_lazychunk.dir/build
+.PHONY : test_lazychunk/fast
+
+#=============================================================================
+# Target rules for targets named test_change_nthreads_append
+
+# Build rule for target.
+test_change_nthreads_append: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 test_change_nthreads_append
+.PHONY : test_change_nthreads_append
+
+# fast build rule for target.
+test_change_nthreads_append/fast:
+	$(MAKE) -f tests/CMakeFiles/test_change_nthreads_append.dir/build.make tests/CMakeFiles/test_change_nthreads_append.dir/build
+.PHONY : test_change_nthreads_append/fast
+
+#=============================================================================
+# Target rules for targets named test_schunk_frame
+
+# Build rule for target.
+test_schunk_frame: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 test_schunk_frame
+.PHONY : test_schunk_frame
+
+# fast build rule for target.
+test_schunk_frame/fast:
+	$(MAKE) -f tests/CMakeFiles/test_schunk_frame.dir/build.make tests/CMakeFiles/test_schunk_frame.dir/build
+.PHONY : test_schunk_frame/fast
 
 #=============================================================================
 # Target rules for targets named test_eframe
@@ -370,19 +396,6 @@ test_insert_chunk: cmake_check_build_system
 test_insert_chunk/fast:
 	$(MAKE) -f tests/CMakeFiles/test_insert_chunk.dir/build.make tests/CMakeFiles/test_insert_chunk.dir/build
 .PHONY : test_insert_chunk/fast
-
-#=============================================================================
-# Target rules for targets named test_compress_roundtrip
-
-# Build rule for target.
-test_compress_roundtrip: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 test_compress_roundtrip
-.PHONY : test_compress_roundtrip
-
-# fast build rule for target.
-test_compress_roundtrip/fast:
-	$(MAKE) -f tests/CMakeFiles/test_compress_roundtrip.dir/build.make tests/CMakeFiles/test_compress_roundtrip.dir/build
-.PHONY : test_compress_roundtrip/fast
 
 #=============================================================================
 # Target rules for targets named test_bitshuffle_leftovers
@@ -463,17 +476,17 @@ test_shuffle_roundtrip_generic/fast:
 .PHONY : test_shuffle_roundtrip_generic/fast
 
 #=============================================================================
-# Target rules for targets named test_update_chunk
+# Target rules for targets named test_eframe_lazychunk
 
 # Build rule for target.
-test_update_chunk: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 test_update_chunk
-.PHONY : test_update_chunk
+test_eframe_lazychunk: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 test_eframe_lazychunk
+.PHONY : test_eframe_lazychunk
 
 # fast build rule for target.
-test_update_chunk/fast:
-	$(MAKE) -f tests/CMakeFiles/test_update_chunk.dir/build.make tests/CMakeFiles/test_update_chunk.dir/build
-.PHONY : test_update_chunk/fast
+test_eframe_lazychunk/fast:
+	$(MAKE) -f tests/CMakeFiles/test_eframe_lazychunk.dir/build.make tests/CMakeFiles/test_eframe_lazychunk.dir/build
+.PHONY : test_eframe_lazychunk/fast
 
 #=============================================================================
 # Target rules for targets named test_api
@@ -515,19 +528,6 @@ test_getitem_delta/fast:
 .PHONY : test_getitem_delta/fast
 
 #=============================================================================
-# Target rules for targets named test_getitem
-
-# Build rule for target.
-test_getitem: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 test_getitem
-.PHONY : test_getitem
-
-# fast build rule for target.
-test_getitem/fast:
-	$(MAKE) -f tests/CMakeFiles/test_getitem.dir/build.make tests/CMakeFiles/test_getitem.dir/build
-.PHONY : test_getitem/fast
-
-#=============================================================================
 # Target rules for targets named test_dict_schunk
 
 # Build rule for target.
@@ -539,6 +539,19 @@ test_dict_schunk: cmake_check_build_system
 test_dict_schunk/fast:
 	$(MAKE) -f tests/CMakeFiles/test_dict_schunk.dir/build.make tests/CMakeFiles/test_dict_schunk.dir/build
 .PHONY : test_dict_schunk/fast
+
+#=============================================================================
+# Target rules for targets named test_getitem
+
+# Build rule for target.
+test_getitem: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 test_getitem
+.PHONY : test_getitem
+
+# fast build rule for target.
+test_getitem/fast:
+	$(MAKE) -f tests/CMakeFiles/test_getitem.dir/build.make tests/CMakeFiles/test_getitem.dir/build
+.PHONY : test_getitem/fast
 
 #=============================================================================
 # Target rules for targets named test_shuffle_roundtrip_sse2
@@ -936,29 +949,30 @@ help:
 	@echo "... blosc2_static"
 	@echo "... blosc_shared_testing"
 	@echo "... blosc2_shared"
-	@echo "... test_frame"
-	@echo "... test_schunk_frame"
-	@echo "... test_change_nthreads_append"
-	@echo "... test_lazychunk"
+	@echo "... test_update_chunk"
+	@echo "... test_compress_roundtrip"
 	@echo "... test_shuffle_roundtrip_avx2"
 	@echo "... test_delta_schunk"
+	@echo "... test_frame"
+	@echo "... test_lazychunk"
+	@echo "... test_change_nthreads_append"
+	@echo "... test_schunk_frame"
 	@echo "... test_eframe"
 	@echo "... test_delta"
 	@echo "... test_contexts"
 	@echo "... test_insert_chunk"
-	@echo "... test_compress_roundtrip"
 	@echo "... test_bitshuffle_leftovers"
 	@echo "... test_noinit"
 	@echo "... test_nthreads"
 	@echo "... test_empty_schunk"
 	@echo "... test_prefilter"
 	@echo "... test_shuffle_roundtrip_generic"
-	@echo "... test_update_chunk"
+	@echo "... test_eframe_lazychunk"
 	@echo "... test_api"
 	@echo "... test_nolock"
 	@echo "... test_getitem_delta"
-	@echo "... test_getitem"
 	@echo "... test_dict_schunk"
+	@echo "... test_getitem"
 	@echo "... test_shuffle_roundtrip_sse2"
 	@echo "... test_maskout"
 	@echo "... test_reorder_offsets"

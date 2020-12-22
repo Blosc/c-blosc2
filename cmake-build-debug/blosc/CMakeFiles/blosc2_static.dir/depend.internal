@@ -507,6 +507,7 @@ blosc/CMakeFiles/blosc2_static.dir/blosc2.c.o
  /home/martaiborra/c-blosc2/blosc/btune.h
  /home/martaiborra/c-blosc2/blosc/context.h
  /home/martaiborra/c-blosc2/blosc/delta.h
+ /home/martaiborra/c-blosc2/blosc/frame.h
  /home/martaiborra/c-blosc2/blosc/shuffle.h
  /home/martaiborra/c-blosc2/blosc/trunc-prec.h
  /home/martaiborra/c-blosc2/blosc/win32/pthread.c

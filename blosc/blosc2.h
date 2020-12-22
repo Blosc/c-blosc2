@@ -1111,12 +1111,6 @@ BLOSC_EXPORT int blosc2_schunk_free(blosc2_schunk *schunk);
  */
 BLOSC_EXPORT int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy);
 
-
-
-BLOSC_EXPORT int schunk_sparse_append_chunk(blosc2_schunk *schunk, uint8_t *chunk);
-
-
-
 /**
   * @brief Update a chunk at a specific position in a super-chunk.
   *
@@ -1456,12 +1450,6 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_new(const char* urlpath);
  * @return The size in bytes of the frame. If an error occurs it returns a negative value.
  */
 BLOSC_EXPORT int64_t blosc2_frame_from_schunk(blosc2_schunk* schunk, blosc2_frame* frame);
-
-
-
-BLOSC_EXPORT int64_t blosc2_sparse_new_header(blosc2_schunk* schunk);
-
-
 
 /**
  * @brief Free all memory from a frame.

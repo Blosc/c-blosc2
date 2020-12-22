@@ -190,64 +190,34 @@ depend:
 .PHONY : depend
 
 # Convenience name for target.
-tests/CMakeFiles/test_frame.dir/rule:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_frame.dir/rule
-.PHONY : tests/CMakeFiles/test_frame.dir/rule
+tests/CMakeFiles/test_update_chunk.dir/rule:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_update_chunk.dir/rule
+.PHONY : tests/CMakeFiles/test_update_chunk.dir/rule
 
 # Convenience name for target.
-test_frame: tests/CMakeFiles/test_frame.dir/rule
+test_update_chunk: tests/CMakeFiles/test_update_chunk.dir/rule
 
-.PHONY : test_frame
+.PHONY : test_update_chunk
 
 # fast build rule for target.
-test_frame/fast:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_frame.dir/build.make tests/CMakeFiles/test_frame.dir/build
-.PHONY : test_frame/fast
+test_update_chunk/fast:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_update_chunk.dir/build.make tests/CMakeFiles/test_update_chunk.dir/build
+.PHONY : test_update_chunk/fast
 
 # Convenience name for target.
-tests/CMakeFiles/test_schunk_frame.dir/rule:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_schunk_frame.dir/rule
-.PHONY : tests/CMakeFiles/test_schunk_frame.dir/rule
+tests/CMakeFiles/test_compress_roundtrip.dir/rule:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_compress_roundtrip.dir/rule
+.PHONY : tests/CMakeFiles/test_compress_roundtrip.dir/rule
 
 # Convenience name for target.
-test_schunk_frame: tests/CMakeFiles/test_schunk_frame.dir/rule
+test_compress_roundtrip: tests/CMakeFiles/test_compress_roundtrip.dir/rule
 
-.PHONY : test_schunk_frame
+.PHONY : test_compress_roundtrip
 
 # fast build rule for target.
-test_schunk_frame/fast:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_schunk_frame.dir/build.make tests/CMakeFiles/test_schunk_frame.dir/build
-.PHONY : test_schunk_frame/fast
-
-# Convenience name for target.
-tests/CMakeFiles/test_change_nthreads_append.dir/rule:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_change_nthreads_append.dir/rule
-.PHONY : tests/CMakeFiles/test_change_nthreads_append.dir/rule
-
-# Convenience name for target.
-test_change_nthreads_append: tests/CMakeFiles/test_change_nthreads_append.dir/rule
-
-.PHONY : test_change_nthreads_append
-
-# fast build rule for target.
-test_change_nthreads_append/fast:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_change_nthreads_append.dir/build.make tests/CMakeFiles/test_change_nthreads_append.dir/build
-.PHONY : test_change_nthreads_append/fast
-
-# Convenience name for target.
-tests/CMakeFiles/test_lazychunk.dir/rule:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_lazychunk.dir/rule
-.PHONY : tests/CMakeFiles/test_lazychunk.dir/rule
-
-# Convenience name for target.
-test_lazychunk: tests/CMakeFiles/test_lazychunk.dir/rule
-
-.PHONY : test_lazychunk
-
-# fast build rule for target.
-test_lazychunk/fast:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_lazychunk.dir/build.make tests/CMakeFiles/test_lazychunk.dir/build
-.PHONY : test_lazychunk/fast
+test_compress_roundtrip/fast:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_compress_roundtrip.dir/build.make tests/CMakeFiles/test_compress_roundtrip.dir/build
+.PHONY : test_compress_roundtrip/fast
 
 # Convenience name for target.
 tests/CMakeFiles/test_shuffle_roundtrip_avx2.dir/rule:
@@ -278,6 +248,66 @@ test_delta_schunk: tests/CMakeFiles/test_delta_schunk.dir/rule
 test_delta_schunk/fast:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_delta_schunk.dir/build.make tests/CMakeFiles/test_delta_schunk.dir/build
 .PHONY : test_delta_schunk/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_frame.dir/rule:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_frame.dir/rule
+.PHONY : tests/CMakeFiles/test_frame.dir/rule
+
+# Convenience name for target.
+test_frame: tests/CMakeFiles/test_frame.dir/rule
+
+.PHONY : test_frame
+
+# fast build rule for target.
+test_frame/fast:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_frame.dir/build.make tests/CMakeFiles/test_frame.dir/build
+.PHONY : test_frame/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_lazychunk.dir/rule:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_lazychunk.dir/rule
+.PHONY : tests/CMakeFiles/test_lazychunk.dir/rule
+
+# Convenience name for target.
+test_lazychunk: tests/CMakeFiles/test_lazychunk.dir/rule
+
+.PHONY : test_lazychunk
+
+# fast build rule for target.
+test_lazychunk/fast:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_lazychunk.dir/build.make tests/CMakeFiles/test_lazychunk.dir/build
+.PHONY : test_lazychunk/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_change_nthreads_append.dir/rule:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_change_nthreads_append.dir/rule
+.PHONY : tests/CMakeFiles/test_change_nthreads_append.dir/rule
+
+# Convenience name for target.
+test_change_nthreads_append: tests/CMakeFiles/test_change_nthreads_append.dir/rule
+
+.PHONY : test_change_nthreads_append
+
+# fast build rule for target.
+test_change_nthreads_append/fast:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_change_nthreads_append.dir/build.make tests/CMakeFiles/test_change_nthreads_append.dir/build
+.PHONY : test_change_nthreads_append/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_schunk_frame.dir/rule:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_schunk_frame.dir/rule
+.PHONY : tests/CMakeFiles/test_schunk_frame.dir/rule
+
+# Convenience name for target.
+test_schunk_frame: tests/CMakeFiles/test_schunk_frame.dir/rule
+
+.PHONY : test_schunk_frame
+
+# fast build rule for target.
+test_schunk_frame/fast:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_schunk_frame.dir/build.make tests/CMakeFiles/test_schunk_frame.dir/build
+.PHONY : test_schunk_frame/fast
 
 # Convenience name for target.
 tests/CMakeFiles/test_eframe.dir/rule:
@@ -338,21 +368,6 @@ test_insert_chunk: tests/CMakeFiles/test_insert_chunk.dir/rule
 test_insert_chunk/fast:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_insert_chunk.dir/build.make tests/CMakeFiles/test_insert_chunk.dir/build
 .PHONY : test_insert_chunk/fast
-
-# Convenience name for target.
-tests/CMakeFiles/test_compress_roundtrip.dir/rule:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_compress_roundtrip.dir/rule
-.PHONY : tests/CMakeFiles/test_compress_roundtrip.dir/rule
-
-# Convenience name for target.
-test_compress_roundtrip: tests/CMakeFiles/test_compress_roundtrip.dir/rule
-
-.PHONY : test_compress_roundtrip
-
-# fast build rule for target.
-test_compress_roundtrip/fast:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_compress_roundtrip.dir/build.make tests/CMakeFiles/test_compress_roundtrip.dir/build
-.PHONY : test_compress_roundtrip/fast
 
 # Convenience name for target.
 tests/CMakeFiles/test_bitshuffle_leftovers.dir/rule:
@@ -445,19 +460,19 @@ test_shuffle_roundtrip_generic/fast:
 .PHONY : test_shuffle_roundtrip_generic/fast
 
 # Convenience name for target.
-tests/CMakeFiles/test_update_chunk.dir/rule:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_update_chunk.dir/rule
-.PHONY : tests/CMakeFiles/test_update_chunk.dir/rule
+tests/CMakeFiles/test_eframe_lazychunk.dir/rule:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_eframe_lazychunk.dir/rule
+.PHONY : tests/CMakeFiles/test_eframe_lazychunk.dir/rule
 
 # Convenience name for target.
-test_update_chunk: tests/CMakeFiles/test_update_chunk.dir/rule
+test_eframe_lazychunk: tests/CMakeFiles/test_eframe_lazychunk.dir/rule
 
-.PHONY : test_update_chunk
+.PHONY : test_eframe_lazychunk
 
 # fast build rule for target.
-test_update_chunk/fast:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_update_chunk.dir/build.make tests/CMakeFiles/test_update_chunk.dir/build
-.PHONY : test_update_chunk/fast
+test_eframe_lazychunk/fast:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_eframe_lazychunk.dir/build.make tests/CMakeFiles/test_eframe_lazychunk.dir/build
+.PHONY : test_eframe_lazychunk/fast
 
 # Convenience name for target.
 tests/CMakeFiles/test_api.dir/rule:
@@ -505,21 +520,6 @@ test_getitem_delta/fast:
 .PHONY : test_getitem_delta/fast
 
 # Convenience name for target.
-tests/CMakeFiles/test_getitem.dir/rule:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_getitem.dir/rule
-.PHONY : tests/CMakeFiles/test_getitem.dir/rule
-
-# Convenience name for target.
-test_getitem: tests/CMakeFiles/test_getitem.dir/rule
-
-.PHONY : test_getitem
-
-# fast build rule for target.
-test_getitem/fast:
-	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_getitem.dir/build.make tests/CMakeFiles/test_getitem.dir/build
-.PHONY : test_getitem/fast
-
-# Convenience name for target.
 tests/CMakeFiles/test_dict_schunk.dir/rule:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_dict_schunk.dir/rule
 .PHONY : tests/CMakeFiles/test_dict_schunk.dir/rule
@@ -533,6 +533,21 @@ test_dict_schunk: tests/CMakeFiles/test_dict_schunk.dir/rule
 test_dict_schunk/fast:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_dict_schunk.dir/build.make tests/CMakeFiles/test_dict_schunk.dir/build
 .PHONY : test_dict_schunk/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_getitem.dir/rule:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_getitem.dir/rule
+.PHONY : tests/CMakeFiles/test_getitem.dir/rule
+
+# Convenience name for target.
+test_getitem: tests/CMakeFiles/test_getitem.dir/rule
+
+.PHONY : test_getitem
+
+# fast build rule for target.
+test_getitem/fast:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_getitem.dir/build.make tests/CMakeFiles/test_getitem.dir/build
+.PHONY : test_getitem/fast
 
 # Convenience name for target.
 tests/CMakeFiles/test_shuffle_roundtrip_sse2.dir/rule:
@@ -893,6 +908,33 @@ test_eframe.s: test_eframe.c.s
 test_eframe.c.s:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_eframe.dir/build.make tests/CMakeFiles/test_eframe.dir/test_eframe.c.s
 .PHONY : test_eframe.c.s
+
+test_eframe_lazychunk.o: test_eframe_lazychunk.c.o
+
+.PHONY : test_eframe_lazychunk.o
+
+# target to build an object file
+test_eframe_lazychunk.c.o:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_eframe_lazychunk.dir/build.make tests/CMakeFiles/test_eframe_lazychunk.dir/test_eframe_lazychunk.c.o
+.PHONY : test_eframe_lazychunk.c.o
+
+test_eframe_lazychunk.i: test_eframe_lazychunk.c.i
+
+.PHONY : test_eframe_lazychunk.i
+
+# target to preprocess a source file
+test_eframe_lazychunk.c.i:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_eframe_lazychunk.dir/build.make tests/CMakeFiles/test_eframe_lazychunk.dir/test_eframe_lazychunk.c.i
+.PHONY : test_eframe_lazychunk.c.i
+
+test_eframe_lazychunk.s: test_eframe_lazychunk.c.s
+
+.PHONY : test_eframe_lazychunk.s
+
+# target to generate assembly for a file
+test_eframe_lazychunk.c.s:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f tests/CMakeFiles/test_eframe_lazychunk.dir/build.make tests/CMakeFiles/test_eframe_lazychunk.dir/test_eframe_lazychunk.c.s
+.PHONY : test_eframe_lazychunk.c.s
 
 test_empty_schunk.o: test_empty_schunk.c.o
 
@@ -1420,17 +1462,18 @@ help:
 	@echo "... test"
 	@echo "... package_source"
 	@echo "... package"
-	@echo "... test_frame"
-	@echo "... test_schunk_frame"
-	@echo "... test_change_nthreads_append"
-	@echo "... test_lazychunk"
+	@echo "... test_update_chunk"
+	@echo "... test_compress_roundtrip"
 	@echo "... test_shuffle_roundtrip_avx2"
 	@echo "... test_delta_schunk"
+	@echo "... test_frame"
+	@echo "... test_lazychunk"
+	@echo "... test_change_nthreads_append"
+	@echo "... test_schunk_frame"
 	@echo "... test_eframe"
 	@echo "... test_delta"
 	@echo "... test_contexts"
 	@echo "... test_insert_chunk"
-	@echo "... test_compress_roundtrip"
 	@echo "... test_bitshuffle_leftovers"
 	@echo "... test_noinit"
 	@echo "... test_nthreads"
@@ -1439,12 +1482,12 @@ help:
 	@echo "... test_prefilter"
 	@echo "... install/strip"
 	@echo "... test_shuffle_roundtrip_generic"
-	@echo "... test_update_chunk"
+	@echo "... test_eframe_lazychunk"
 	@echo "... test_api"
 	@echo "... test_nolock"
 	@echo "... test_getitem_delta"
-	@echo "... test_getitem"
 	@echo "... test_dict_schunk"
+	@echo "... test_getitem"
 	@echo "... test_shuffle_roundtrip_sse2"
 	@echo "... test_maskout"
 	@echo "... test_reorder_offsets"
@@ -1481,6 +1524,9 @@ help:
 	@echo "... test_eframe.o"
 	@echo "... test_eframe.i"
 	@echo "... test_eframe.s"
+	@echo "... test_eframe_lazychunk.o"
+	@echo "... test_eframe_lazychunk.i"
+	@echo "... test_eframe_lazychunk.s"
 	@echo "... test_empty_schunk.o"
 	@echo "... test_empty_schunk.i"
 	@echo "... test_empty_schunk.s"
