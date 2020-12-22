@@ -149,7 +149,7 @@ Display error messages
 ~~~~~~~~~~~~~~~~~~~~~~
 
 By default error messages are disabled. To activate it, you only need to activate the Blosc tracing machinery setting
-the `BLOSC_TRACE` environment variable.
+the ``BLOSC_TRACE`` environment variable.
 
 
 Mailing list
