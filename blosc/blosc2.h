@@ -45,7 +45,7 @@ extern "C" {
     do { \
          const char *__e = getenv("BLOSC_TRACE"); \
          if (!__e) { break; } \
-         fprintf(stderr, "[%s] - " msg "\n", #cat, ##__VA_ARGS__); \
+         fprintf(stderr, "[%s] - " msg (%s:%s)"\n", #cat, ##__VA_ARGS__, __FILE__, __LINE__); \
        } while(0)
 
 
