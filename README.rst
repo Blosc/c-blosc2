@@ -148,7 +148,7 @@ Check `Intel IPP website <https://software.intel.com/en-us/articles/intel-integr
 Display error messages
 ~~~~~~~~~~~~~~~~~~~~~~
 
-By default error messages are disabled. To display it, you only need to activate the Blosc tracing machinery setting
+By default error messages are disabled. To display them, you just need to activate the Blosc tracing machinery by setting
 the ``BLOSC_TRACE`` environment variable.
 
 
