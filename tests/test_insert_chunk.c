@@ -31,7 +31,6 @@ static char* test_insert_schunk(void) {
 
   /* Initialize the Blosc compressor */
   blosc_init();
-  BLOSC_TRACE_ERROR("HOLA");
 
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
