@@ -1587,6 +1587,39 @@ delta.c.s:
 	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_shared.dir/build.make blosc/CMakeFiles/blosc2_shared.dir/delta.c.s
 .PHONY : delta.c.s
 
+directories.o: directories.c.o
+
+.PHONY : directories.o
+
+# target to build an object file
+directories.c.o:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_static.dir/build.make blosc/CMakeFiles/blosc2_static.dir/directories.c.o
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc_shared_testing.dir/build.make blosc/CMakeFiles/blosc_shared_testing.dir/directories.c.o
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_shared.dir/build.make blosc/CMakeFiles/blosc2_shared.dir/directories.c.o
+.PHONY : directories.c.o
+
+directories.i: directories.c.i
+
+.PHONY : directories.i
+
+# target to preprocess a source file
+directories.c.i:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_static.dir/build.make blosc/CMakeFiles/blosc2_static.dir/directories.c.i
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc_shared_testing.dir/build.make blosc/CMakeFiles/blosc_shared_testing.dir/directories.c.i
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_shared.dir/build.make blosc/CMakeFiles/blosc2_shared.dir/directories.c.i
+.PHONY : directories.c.i
+
+directories.s: directories.c.s
+
+.PHONY : directories.s
+
+# target to generate assembly for a file
+directories.c.s:
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_static.dir/build.make blosc/CMakeFiles/blosc2_static.dir/directories.c.s
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc_shared_testing.dir/build.make blosc/CMakeFiles/blosc_shared_testing.dir/directories.c.s
+	cd /home/martaiborra/c-blosc2/cmake-build-debug && $(MAKE) -f blosc/CMakeFiles/blosc2_shared.dir/build.make blosc/CMakeFiles/blosc2_shared.dir/directories.c.s
+.PHONY : directories.c.s
+
 eframe.o: eframe.c.o
 
 .PHONY : eframe.o
@@ -2058,6 +2091,9 @@ help:
 	@echo "... delta.o"
 	@echo "... delta.i"
 	@echo "... delta.s"
+	@echo "... directories.o"
+	@echo "... directories.i"
+	@echo "... directories.s"
 	@echo "... eframe.o"
 	@echo "... eframe.i"
 	@echo "... eframe.s"

@@ -40,6 +40,7 @@ file(REMOVE_RECURSE
   "CMakeFiles/blosc2_shared.dir/blosclz.c.o"
   "CMakeFiles/blosc2_shared.dir/btune.c.o"
   "CMakeFiles/blosc2_shared.dir/delta.c.o"
+  "CMakeFiles/blosc2_shared.dir/directories.c.o"
   "CMakeFiles/blosc2_shared.dir/eframe.c.o"
   "CMakeFiles/blosc2_shared.dir/fastcopy.c.o"
   "CMakeFiles/blosc2_shared.dir/frame.c.o"

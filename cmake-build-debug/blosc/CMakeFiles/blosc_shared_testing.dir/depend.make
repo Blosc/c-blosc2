@@ -538,6 +538,12 @@ blosc/CMakeFiles/blosc_shared_testing.dir/delta.c.o: ../blosc/delta.c
 blosc/CMakeFiles/blosc_shared_testing.dir/delta.c.o: ../blosc/delta.h
 blosc/CMakeFiles/blosc_shared_testing.dir/delta.c.o: ../blosc/win32/stdint-windows.h
 
+blosc/CMakeFiles/blosc_shared_testing.dir/directories.c.o: ../blosc/blosc2-common.h
+blosc/CMakeFiles/blosc_shared_testing.dir/directories.c.o: ../blosc/blosc2-export.h
+blosc/CMakeFiles/blosc_shared_testing.dir/directories.c.o: ../blosc/blosc2.h
+blosc/CMakeFiles/blosc_shared_testing.dir/directories.c.o: ../blosc/directories.c
+blosc/CMakeFiles/blosc_shared_testing.dir/directories.c.o: ../blosc/win32/stdint-windows.h
+
 blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../blosc/blosc2-common.h
 blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../blosc/blosc2-export.h
 blosc/CMakeFiles/blosc_shared_testing.dir/eframe.c.o: ../blosc/blosc2.h

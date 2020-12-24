@@ -538,6 +538,12 @@ blosc/CMakeFiles/blosc2_shared.dir/delta.c.o
  /home/martaiborra/c-blosc2/blosc/delta.c
  /home/martaiborra/c-blosc2/blosc/delta.h
  /home/martaiborra/c-blosc2/blosc/win32/stdint-windows.h
+blosc/CMakeFiles/blosc2_shared.dir/directories.c.o
+ /home/martaiborra/c-blosc2/blosc/blosc2-common.h
+ /home/martaiborra/c-blosc2/blosc/blosc2-export.h
+ /home/martaiborra/c-blosc2/blosc/blosc2.h
+ /home/martaiborra/c-blosc2/blosc/directories.c
+ /home/martaiborra/c-blosc2/blosc/win32/stdint-windows.h
 blosc/CMakeFiles/blosc2_shared.dir/eframe.c.o
  /home/martaiborra/c-blosc2/blosc/blosc2-common.h
  /home/martaiborra/c-blosc2/blosc/blosc2-export.h

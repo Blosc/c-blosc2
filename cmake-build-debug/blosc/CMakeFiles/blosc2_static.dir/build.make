@@ -213,9 +213,22 @@ blosc/CMakeFiles/blosc2_static.dir/eframe.c.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/blosc2_static.dir/eframe.c.s"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/martaiborra/c-blosc2/blosc/eframe.c -o CMakeFiles/blosc2_static.dir/eframe.c.s
 
+blosc/CMakeFiles/blosc2_static.dir/directories.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
+blosc/CMakeFiles/blosc2_static.dir/directories.c.o: ../blosc/directories.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building C object blosc/CMakeFiles/blosc2_static.dir/directories.c.o"
+	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/directories.c.o   -c /home/martaiborra/c-blosc2/blosc/directories.c
+
+blosc/CMakeFiles/blosc2_static.dir/directories.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/blosc2_static.dir/directories.c.i"
+	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/martaiborra/c-blosc2/blosc/directories.c > CMakeFiles/blosc2_static.dir/directories.c.i
+
+blosc/CMakeFiles/blosc2_static.dir/directories.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/blosc2_static.dir/directories.c.s"
+	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/martaiborra/c-blosc2/blosc/directories.c -o CMakeFiles/blosc2_static.dir/directories.c.s
+
 blosc/CMakeFiles/blosc2_static.dir/shuffle-sse2.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/shuffle-sse2.c.o: ../blosc/shuffle-sse2.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building C object blosc/CMakeFiles/blosc2_static.dir/shuffle-sse2.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building C object blosc/CMakeFiles/blosc2_static.dir/shuffle-sse2.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -msse2 -o CMakeFiles/blosc2_static.dir/shuffle-sse2.c.o   -c /home/martaiborra/c-blosc2/blosc/shuffle-sse2.c
 
 blosc/CMakeFiles/blosc2_static.dir/shuffle-sse2.c.i: cmake_force
@@ -228,7 +241,7 @@ blosc/CMakeFiles/blosc2_static.dir/shuffle-sse2.c.s: cmake_force
 
 blosc/CMakeFiles/blosc2_static.dir/bitshuffle-sse2.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/bitshuffle-sse2.c.o: ../blosc/bitshuffle-sse2.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building C object blosc/CMakeFiles/blosc2_static.dir/bitshuffle-sse2.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Building C object blosc/CMakeFiles/blosc2_static.dir/bitshuffle-sse2.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -msse2 -o CMakeFiles/blosc2_static.dir/bitshuffle-sse2.c.o   -c /home/martaiborra/c-blosc2/blosc/bitshuffle-sse2.c
 
 blosc/CMakeFiles/blosc2_static.dir/bitshuffle-sse2.c.i: cmake_force
@@ -241,7 +254,7 @@ blosc/CMakeFiles/blosc2_static.dir/bitshuffle-sse2.c.s: cmake_force
 
 blosc/CMakeFiles/blosc2_static.dir/shuffle-avx2.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/shuffle-avx2.c.o: ../blosc/shuffle-avx2.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Building C object blosc/CMakeFiles/blosc2_static.dir/shuffle-avx2.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Building C object blosc/CMakeFiles/blosc2_static.dir/shuffle-avx2.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -mavx2 -o CMakeFiles/blosc2_static.dir/shuffle-avx2.c.o   -c /home/martaiborra/c-blosc2/blosc/shuffle-avx2.c
 
 blosc/CMakeFiles/blosc2_static.dir/shuffle-avx2.c.i: cmake_force
@@ -254,7 +267,7 @@ blosc/CMakeFiles/blosc2_static.dir/shuffle-avx2.c.s: cmake_force
 
 blosc/CMakeFiles/blosc2_static.dir/bitshuffle-avx2.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/bitshuffle-avx2.c.o: ../blosc/bitshuffle-avx2.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Building C object blosc/CMakeFiles/blosc2_static.dir/bitshuffle-avx2.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Building C object blosc/CMakeFiles/blosc2_static.dir/bitshuffle-avx2.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -mavx2 -o CMakeFiles/blosc2_static.dir/bitshuffle-avx2.c.o   -c /home/martaiborra/c-blosc2/blosc/bitshuffle-avx2.c
 
 blosc/CMakeFiles/blosc2_static.dir/bitshuffle-avx2.c.i: cmake_force
@@ -267,7 +280,7 @@ blosc/CMakeFiles/blosc2_static.dir/bitshuffle-avx2.c.s: cmake_force
 
 blosc/CMakeFiles/blosc2_static.dir/shuffle.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/shuffle.c.o: ../blosc/shuffle.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Building C object blosc/CMakeFiles/blosc2_static.dir/shuffle.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Building C object blosc/CMakeFiles/blosc2_static.dir/shuffle.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) -DSHUFFLE_AVX2_ENABLED -DSHUFFLE_SSE2_ENABLED $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/shuffle.c.o   -c /home/martaiborra/c-blosc2/blosc/shuffle.c
 
 blosc/CMakeFiles/blosc2_static.dir/shuffle.c.i: cmake_force
@@ -280,7 +293,7 @@ blosc/CMakeFiles/blosc2_static.dir/shuffle.c.s: cmake_force
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lz4-1.9.1/lz4.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lz4-1.9.1/lz4.c.o: ../internal-complibs/lz4-1.9.1/lz4.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lz4-1.9.1/lz4.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_19) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lz4-1.9.1/lz4.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/lz4-1.9.1/lz4.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/lz4-1.9.1/lz4.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lz4-1.9.1/lz4.c.i: cmake_force
@@ -293,7 +306,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lz4-1.9.1/lz4.c.s: cmake
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lz4-1.9.1/lz4hc.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lz4-1.9.1/lz4hc.c.o: ../internal-complibs/lz4-1.9.1/lz4hc.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_19) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lz4-1.9.1/lz4hc.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_20) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lz4-1.9.1/lz4hc.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/lz4-1.9.1/lz4hc.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/lz4-1.9.1/lz4hc.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lz4-1.9.1/lz4hc.c.i: cmake_force
@@ -306,7 +319,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lz4-1.9.1/lz4hc.c.s: cma
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_compress.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_compress.c.o: ../internal-complibs/lizard-1.0/lizard_compress.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_20) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_compress.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_21) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_compress.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_compress.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/lizard-1.0/lizard_compress.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_compress.c.i: cmake_force
@@ -319,7 +332,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_compre
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_decompress.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_decompress.c.o: ../internal-complibs/lizard-1.0/lizard_decompress.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_21) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_decompress.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_22) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_decompress.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_decompress.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/lizard-1.0/lizard_decompress.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_decompress.c.i: cmake_force
@@ -332,7 +345,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_decomp
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_frame.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_frame.c.o: ../internal-complibs/lizard-1.0/lizard_frame.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_22) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_frame.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_23) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_frame.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_frame.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/lizard-1.0/lizard_frame.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_frame.c.i: cmake_force
@@ -345,7 +358,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/lizard-1.0/lizard_frame.
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/debug.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/debug.c.o: ../internal-complibs/zstd-1.4.5/common/debug.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_23) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/debug.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_24) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/debug.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/debug.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/common/debug.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/debug.c.i: cmake_force
@@ -358,7 +371,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/debug.
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/entropy_common.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/entropy_common.c.o: ../internal-complibs/zstd-1.4.5/common/entropy_common.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_24) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/entropy_common.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_25) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/entropy_common.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/entropy_common.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/common/entropy_common.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/entropy_common.c.i: cmake_force
@@ -371,7 +384,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/entrop
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/error_private.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/error_private.c.o: ../internal-complibs/zstd-1.4.5/common/error_private.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_25) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/error_private.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_26) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/error_private.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/error_private.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/common/error_private.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/error_private.c.i: cmake_force
@@ -384,7 +397,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/error_
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/fse_decompress.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/fse_decompress.c.o: ../internal-complibs/zstd-1.4.5/common/fse_decompress.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_26) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/fse_decompress.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_27) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/fse_decompress.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/fse_decompress.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/common/fse_decompress.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/fse_decompress.c.i: cmake_force
@@ -397,7 +410,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/fse_de
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/pool.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/pool.c.o: ../internal-complibs/zstd-1.4.5/common/pool.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_27) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/pool.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_28) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/pool.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/pool.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/common/pool.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/pool.c.i: cmake_force
@@ -410,7 +423,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/pool.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/threading.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/threading.c.o: ../internal-complibs/zstd-1.4.5/common/threading.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_28) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/threading.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_29) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/threading.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/threading.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/common/threading.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/threading.c.i: cmake_force
@@ -423,7 +436,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/thread
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/xxhash.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/xxhash.c.o: ../internal-complibs/zstd-1.4.5/common/xxhash.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_29) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/xxhash.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_30) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/xxhash.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/xxhash.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/common/xxhash.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/xxhash.c.i: cmake_force
@@ -436,7 +449,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/xxhash
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/zstd_common.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/zstd_common.c.o: ../internal-complibs/zstd-1.4.5/common/zstd_common.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_30) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/zstd_common.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_31) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/zstd_common.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/zstd_common.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/common/zstd_common.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/zstd_common.c.i: cmake_force
@@ -449,7 +462,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/common/zstd_c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/fse_compress.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/fse_compress.c.o: ../internal-complibs/zstd-1.4.5/compress/fse_compress.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_31) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/fse_compress.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_32) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/fse_compress.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/fse_compress.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/compress/fse_compress.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/fse_compress.c.i: cmake_force
@@ -462,7 +475,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/fse_
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/hist.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/hist.c.o: ../internal-complibs/zstd-1.4.5/compress/hist.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_32) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/hist.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_33) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/hist.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/hist.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/compress/hist.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/hist.c.i: cmake_force
@@ -475,7 +488,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/hist
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/huf_compress.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/huf_compress.c.o: ../internal-complibs/zstd-1.4.5/compress/huf_compress.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_33) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/huf_compress.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_34) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/huf_compress.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/huf_compress.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/compress/huf_compress.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/huf_compress.c.i: cmake_force
@@ -488,7 +501,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/huf_
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress.c.o: ../internal-complibs/zstd-1.4.5/compress/zstd_compress.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_34) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_35) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/compress/zstd_compress.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress.c.i: cmake_force
@@ -501,7 +514,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_literals.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_literals.c.o: ../internal-complibs/zstd-1.4.5/compress/zstd_compress_literals.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_35) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_literals.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_36) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_literals.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_literals.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/compress/zstd_compress_literals.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_literals.c.i: cmake_force
@@ -514,7 +527,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_sequences.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_sequences.c.o: ../internal-complibs/zstd-1.4.5/compress/zstd_compress_sequences.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_36) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_sequences.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_37) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_sequences.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_sequences.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/compress/zstd_compress_sequences.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_sequences.c.i: cmake_force
@@ -527,7 +540,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_superblock.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_superblock.c.o: ../internal-complibs/zstd-1.4.5/compress/zstd_compress_superblock.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_37) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_superblock.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_38) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_superblock.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_superblock.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/compress/zstd_compress_superblock.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_compress_superblock.c.i: cmake_force
@@ -540,7 +553,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_double_fast.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_double_fast.c.o: ../internal-complibs/zstd-1.4.5/compress/zstd_double_fast.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_38) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_double_fast.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_39) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_double_fast.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_double_fast.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/compress/zstd_double_fast.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_double_fast.c.i: cmake_force
@@ -553,7 +566,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_fast.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_fast.c.o: ../internal-complibs/zstd-1.4.5/compress/zstd_fast.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_39) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_fast.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_40) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_fast.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_fast.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/compress/zstd_fast.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_fast.c.i: cmake_force
@@ -566,7 +579,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_lazy.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_lazy.c.o: ../internal-complibs/zstd-1.4.5/compress/zstd_lazy.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_40) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_lazy.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_41) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_lazy.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_lazy.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/compress/zstd_lazy.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_lazy.c.i: cmake_force
@@ -579,7 +592,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_ldm.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_ldm.c.o: ../internal-complibs/zstd-1.4.5/compress/zstd_ldm.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_41) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_ldm.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_42) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_ldm.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_ldm.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/compress/zstd_ldm.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_ldm.c.i: cmake_force
@@ -592,7 +605,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_opt.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_opt.c.o: ../internal-complibs/zstd-1.4.5/compress/zstd_opt.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_42) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_opt.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_43) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_opt.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_opt.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/compress/zstd_opt.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd_opt.c.i: cmake_force
@@ -605,7 +618,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstdmt_compress.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstdmt_compress.c.o: ../internal-complibs/zstd-1.4.5/compress/zstdmt_compress.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_43) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstdmt_compress.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_44) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstdmt_compress.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstdmt_compress.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/compress/zstdmt_compress.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstdmt_compress.c.i: cmake_force
@@ -618,7 +631,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/compress/zstd
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/huf_decompress.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/huf_decompress.c.o: ../internal-complibs/zstd-1.4.5/decompress/huf_decompress.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_44) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/huf_decompress.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_45) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/huf_decompress.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/huf_decompress.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/decompress/huf_decompress.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/huf_decompress.c.i: cmake_force
@@ -631,7 +644,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/hu
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_ddict.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_ddict.c.o: ../internal-complibs/zstd-1.4.5/decompress/zstd_ddict.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_45) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_ddict.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_46) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_ddict.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_ddict.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/decompress/zstd_ddict.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_ddict.c.i: cmake_force
@@ -644,7 +657,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zs
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_decompress.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_decompress.c.o: ../internal-complibs/zstd-1.4.5/decompress/zstd_decompress.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_46) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_decompress.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_47) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_decompress.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_decompress.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/decompress/zstd_decompress.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_decompress.c.i: cmake_force
@@ -657,7 +670,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zs
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_decompress_block.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_decompress_block.c.o: ../internal-complibs/zstd-1.4.5/decompress/zstd_decompress_block.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_47) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_decompress_block.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_48) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_decompress_block.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_decompress_block.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/decompress/zstd_decompress_block.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zstd_decompress_block.c.i: cmake_force
@@ -670,7 +683,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/decompress/zs
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/cover.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/cover.c.o: ../internal-complibs/zstd-1.4.5/dictBuilder/cover.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_48) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/cover.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_49) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/cover.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/cover.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/dictBuilder/cover.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/cover.c.i: cmake_force
@@ -683,7 +696,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/divsufsort.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/divsufsort.c.o: ../internal-complibs/zstd-1.4.5/dictBuilder/divsufsort.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_49) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/divsufsort.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_50) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/divsufsort.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/divsufsort.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/dictBuilder/divsufsort.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/divsufsort.c.i: cmake_force
@@ -696,7 +709,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/d
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/fastcover.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/fastcover.c.o: ../internal-complibs/zstd-1.4.5/dictBuilder/fastcover.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_50) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/fastcover.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_51) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/fastcover.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/fastcover.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/dictBuilder/fastcover.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/fastcover.c.i: cmake_force
@@ -709,7 +722,7 @@ blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/f
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/zdict.c.o: blosc/CMakeFiles/blosc2_static.dir/flags.make
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/zdict.c.o: ../internal-complibs/zstd-1.4.5/dictBuilder/zdict.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_51) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/zdict.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_52) "Building C object blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/zdict.c.o"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/zdict.c.o   -c /home/martaiborra/c-blosc2/internal-complibs/zstd-1.4.5/dictBuilder/zdict.c
 
 blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/zdict.c.i: cmake_force
@@ -734,6 +747,7 @@ blosc2_static_OBJECTS = \
 "CMakeFiles/blosc2_static.dir/trunc-prec.c.o" \
 "CMakeFiles/blosc2_static.dir/timestamp.c.o" \
 "CMakeFiles/blosc2_static.dir/eframe.c.o" \
+"CMakeFiles/blosc2_static.dir/directories.c.o" \
 "CMakeFiles/blosc2_static.dir/shuffle-sse2.c.o" \
 "CMakeFiles/blosc2_static.dir/bitshuffle-sse2.c.o" \
 "CMakeFiles/blosc2_static.dir/shuffle-avx2.c.o" \
@@ -789,6 +803,7 @@ blosc/libblosc2.a: blosc/CMakeFiles/blosc2_static.dir/bitshuffle-generic.c.o
 blosc/libblosc2.a: blosc/CMakeFiles/blosc2_static.dir/trunc-prec.c.o
 blosc/libblosc2.a: blosc/CMakeFiles/blosc2_static.dir/timestamp.c.o
 blosc/libblosc2.a: blosc/CMakeFiles/blosc2_static.dir/eframe.c.o
+blosc/libblosc2.a: blosc/CMakeFiles/blosc2_static.dir/directories.c.o
 blosc/libblosc2.a: blosc/CMakeFiles/blosc2_static.dir/shuffle-sse2.c.o
 blosc/libblosc2.a: blosc/CMakeFiles/blosc2_static.dir/bitshuffle-sse2.c.o
 blosc/libblosc2.a: blosc/CMakeFiles/blosc2_static.dir/shuffle-avx2.c.o
@@ -830,7 +845,7 @@ blosc/libblosc2.a: blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-
 blosc/libblosc2.a: blosc/CMakeFiles/blosc2_static.dir/__/internal-complibs/zstd-1.4.5/dictBuilder/zdict.c.o
 blosc/libblosc2.a: blosc/CMakeFiles/blosc2_static.dir/build.make
 blosc/libblosc2.a: blosc/CMakeFiles/blosc2_static.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_52) "Linking C static library libblosc2.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/martaiborra/c-blosc2/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_53) "Linking C static library libblosc2.a"
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && $(CMAKE_COMMAND) -P CMakeFiles/blosc2_static.dir/cmake_clean_target.cmake
 	cd /home/martaiborra/c-blosc2/cmake-build-debug/blosc && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/blosc2_static.dir/link.txt --verbose=$(VERBOSE)
 

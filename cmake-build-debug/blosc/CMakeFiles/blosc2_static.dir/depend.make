@@ -538,6 +538,12 @@ blosc/CMakeFiles/blosc2_static.dir/delta.c.o: ../blosc/delta.c
 blosc/CMakeFiles/blosc2_static.dir/delta.c.o: ../blosc/delta.h
 blosc/CMakeFiles/blosc2_static.dir/delta.c.o: ../blosc/win32/stdint-windows.h
 
+blosc/CMakeFiles/blosc2_static.dir/directories.c.o: ../blosc/blosc2-common.h
+blosc/CMakeFiles/blosc2_static.dir/directories.c.o: ../blosc/blosc2-export.h
+blosc/CMakeFiles/blosc2_static.dir/directories.c.o: ../blosc/blosc2.h
+blosc/CMakeFiles/blosc2_static.dir/directories.c.o: ../blosc/directories.c
+blosc/CMakeFiles/blosc2_static.dir/directories.c.o: ../blosc/win32/stdint-windows.h
+
 blosc/CMakeFiles/blosc2_static.dir/eframe.c.o: ../blosc/blosc2-common.h
 blosc/CMakeFiles/blosc2_static.dir/eframe.c.o: ../blosc/blosc2-export.h
 blosc/CMakeFiles/blosc2_static.dir/eframe.c.o: ../blosc/blosc2.h

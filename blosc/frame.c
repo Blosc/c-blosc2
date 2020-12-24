@@ -786,7 +786,7 @@ blosc2_frame* blosc2_frame_from_file(const char *urlpath) {
   bool eframe = false;
   struct stat path_stat;
   stat(urlpath, &path_stat);
-  if (S_ISDIR(path_stat.st_mode)) {
+  if (path_stat.st_mode & S_IFDIR) {
     char* eframe_name = malloc(strlen(urlpath) + 14 + 1);
     sprintf(eframe_name, "%schunks.b2frame", urlpath);
     fp = fopen(eframe_name, "rb");
@@ -1490,7 +1490,7 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
 
   if (offset<0) {
     if (!frame->eframe) {
-      fprintf(stderr,"Chunk offset can be negative only for eframes\n");
+      BLOSC_TRACE_ERROR("Chunk offset can be negative only for eframes.");
       return -1;
     }
     else {
@@ -1798,7 +1798,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     fseek(fp, header_len, SEEK_SET);
     size_t wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
     if (wbytes != (size_t)new_off_cbytes) {
-      fprintf(stderr, "cannot write the offsets to fileframe.");
+      BLOSC_TRACE_ERROR("cannot write the offsets to fileframe.");
       return NULL;
     }
     fclose(fp);

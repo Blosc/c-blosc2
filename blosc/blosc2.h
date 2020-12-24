@@ -1517,6 +1517,15 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len
 BLOSC_EXPORT blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy);
 
 
+/*********************************************************************
+  Directory utilities for needed for doing tests.
+*********************************************************************/
+
+/*
+ * Remove a directory and its files.
+ */
+BLOSC_EXPORT int remove_dir(const char *path);
+
 #ifdef __cplusplus
 }
 #endif

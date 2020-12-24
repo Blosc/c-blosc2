@@ -45,6 +45,7 @@ set(CMAKE_DEPENDS_CHECK_C
   "/home/martaiborra/c-blosc2/blosc/blosclz.c" "/home/martaiborra/c-blosc2/cmake-build-debug/blosc/CMakeFiles/blosc2_static.dir/blosclz.c.o"
   "/home/martaiborra/c-blosc2/blosc/btune.c" "/home/martaiborra/c-blosc2/cmake-build-debug/blosc/CMakeFiles/blosc2_static.dir/btune.c.o"
   "/home/martaiborra/c-blosc2/blosc/delta.c" "/home/martaiborra/c-blosc2/cmake-build-debug/blosc/CMakeFiles/blosc2_static.dir/delta.c.o"
+  "/home/martaiborra/c-blosc2/blosc/directories.c" "/home/martaiborra/c-blosc2/cmake-build-debug/blosc/CMakeFiles/blosc2_static.dir/directories.c.o"
   "/home/martaiborra/c-blosc2/blosc/eframe.c" "/home/martaiborra/c-blosc2/cmake-build-debug/blosc/CMakeFiles/blosc2_static.dir/eframe.c.o"
   "/home/martaiborra/c-blosc2/blosc/fastcopy.c" "/home/martaiborra/c-blosc2/cmake-build-debug/blosc/CMakeFiles/blosc2_static.dir/fastcopy.c.o"
   "/home/martaiborra/c-blosc2/blosc/frame.c" "/home/martaiborra/c-blosc2/cmake-build-debug/blosc/CMakeFiles/blosc2_static.dir/frame.c.o"

@@ -146,7 +146,7 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
   if (!storage.sequential && storage.path != NULL){
     //Create directory
     if (mkdir(storage.path,0777) == -1) {
-      fprintf(stderr, "Error during the creation of the directory, maybe it already exists\n");
+      BLOSC_TRACE_ERROR("Error during the creation of the directory, maybe it already exists.");
       return NULL;
     }
     // We want a frame as storage

@@ -22,9 +22,6 @@
 
 #include <stdio.h>
 #include <blosc2.h>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 #define KB  1024.
 #define MB  (1024*KB)
@@ -34,37 +31,6 @@
 #define NCHUNKS 100
 #define NTHREADS 4
 
-/* Function needed for removing each time the directory */
-void remove_dir(const char *path) {
-  DIR *dr = opendir(path);
-  struct stat statbuf;
-  if (dr == NULL) {
-    fprintf(stderr,"No file or directory found");
-    return;
-  }
-  struct dirent *de;
-  int ret;
-  char* fname;
-  while ((de = readdir(dr)) != NULL) {
-    fname = malloc(strlen(path) + strlen(de->d_name) + 1);
-    sprintf(fname,"%s%s",path,de->d_name);
-    if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")) {
-      free(fname);
-      continue;
-    }
-    if (!stat(fname, &statbuf)) {
-      ret = unlink(fname);
-      if (ret < 0) {
-        fprintf(stderr, "Could not remove file %s", fname);
-        free(fname);
-        return;
-      }
-    }
-    free(fname);
-  }
-  closedir(dr);
-  rmdir(path);
-}
 
 int main(void) {
   static int32_t data[CHUNKSIZE];

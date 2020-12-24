@@ -2974,6 +2974,11 @@
 			<Option target="blosc_shared_testing"/>
 			<Option target="blosc2_shared"/>
 		</Unit>
+		<Unit filename="/home/martaiborra/c-blosc2/blosc/directories.c">
+			<Option target="blosc2_static"/>
+			<Option target="blosc_shared_testing"/>
+			<Option target="blosc2_shared"/>
+		</Unit>
 		<Unit filename="/home/martaiborra/c-blosc2/blosc/eframe.c">
 			<Option target="blosc2_static"/>
 			<Option target="blosc_shared_testing"/>
