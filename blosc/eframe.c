@@ -39,8 +39,8 @@
 /* Append an existing chunk into an extended frame. */
 void* eframe_append_chunk(blosc2_frame *frame, uint8_t *chunk, int32_t nchunk, int64_t cbytes) {
   //get directory/nchunk.chunk
-  char* chunkname = malloc(strlen(frame->urlpath) + 14 + 1);
-  sprintf(chunkname,"%s%08X.chunk", frame->urlpath, nchunk);
+  char* chunkname = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+  sprintf(chunkname,"%s/%08X.chunk", frame->urlpath, nchunk);
   FILE* fpc = fopen(chunkname,"wb");
   free(chunkname);
 
@@ -57,8 +57,8 @@ void* eframe_append_chunk(blosc2_frame *frame, uint8_t *chunk, int32_t nchunk, i
 /*Get chunk from extended frame. */
 int eframe_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free){
   //get directory/nchunk.chunk
-  char* chunkname = malloc(strlen(frame->urlpath) + 14 + 1);
-  sprintf(chunkname,"%s%08X.chunk", frame->urlpath, nchunk);
+  char* chunkname = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+  sprintf(chunkname,"%s/%08X.chunk", frame->urlpath, nchunk);
   FILE* fpc = fopen(chunkname,"rb");
   free(chunkname);
   if(fpc == NULL){

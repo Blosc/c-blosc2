@@ -144,13 +144,21 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
   update_schunk_properties(schunk);
 
   if (!storage.sequential && storage.path != NULL){
+    char* urlpath = malloc(strlen(storage.path) + 1);
+    strcpy(urlpath, storage.path);
+    char last_char = storage.path[strlen(storage.path) - 1];
+    if (last_char == '\\' || last_char == '/') {
+      urlpath = malloc(strlen(storage.path));
+      strncpy(urlpath, storage.path, strlen(storage.path) - 1);
+      urlpath[strlen(storage.path) - 1] = '\0';
+    }
     //Create directory
-    if (mkdir(storage.path,0777) == -1) {
+    if (mkdir(urlpath,0777) == -1) {
       BLOSC_TRACE_ERROR("Error during the creation of the directory, maybe it already exists.");
       return NULL;
     }
     // We want a frame as storage
-    blosc2_frame* frame = blosc2_frame_new(storage.path);
+    blosc2_frame* frame = blosc2_frame_new(urlpath);
     frame->eframe = true;
     // Initialize frame (basically, encode the header)
     int64_t frame_len = blosc2_frame_from_schunk(schunk, frame);
@@ -159,6 +167,7 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
       return NULL;
     }
     schunk->frame = frame;
+    free(urlpath);
   }
   if (storage.sequential){
     // We want a frame as storage

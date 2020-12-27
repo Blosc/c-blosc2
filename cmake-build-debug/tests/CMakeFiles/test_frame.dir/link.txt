@@ -1,1 +1,0 @@
-/usr/bin/cc  -std=gnu99 -std=gnu99 -g  -rdynamic CMakeFiles/test_frame.dir/test_frame.c.o  -o test_frame   -L/home/martaiborra/c-blosc2/cmake-build-debug/blosc  -Wl,-rpath,/home/martaiborra/c-blosc2/cmake-build-debug/blosc -lblosc_testing 

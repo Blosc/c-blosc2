@@ -1,1 +1,0 @@
-/usr/bin/cc  -std=gnu99 -std=gnu99 -g  -rdynamic CMakeFiles/filegen.dir/filegen.c.o  -o filegen   -L/home/martaiborra/c-blosc2/cmake-build-debug/blosc  -Wl,-rpath,/home/martaiborra/c-blosc2/cmake-build-debug/blosc ../blosc/libblosc2.so.2.0.0 -lpthread -lrt 

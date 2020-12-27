@@ -1,1 +1,0 @@
-/usr/bin/cc  -std=gnu99 -std=gnu99 -g  -rdynamic CMakeFiles/test_lazychunk.dir/test_lazychunk.c.o  -o test_lazychunk   -L/home/martaiborra/c-blosc2/cmake-build-debug/blosc  -Wl,-rpath,/home/martaiborra/c-blosc2/cmake-build-debug/blosc -lblosc_testing 

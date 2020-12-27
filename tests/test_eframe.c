@@ -17,6 +17,7 @@
 /* Global vars */
 int tests_run = 0;
 int nchunks;
+char* directory;
 
 
 
@@ -37,7 +38,7 @@ static char* test_eframe(void) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {false, "dir1", .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {false, directory, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
@@ -89,7 +90,7 @@ static char* test_metalayers(void) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {false, "dir1", .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {false, directory, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
 
   // Add some metalayers (one must add metalayers prior to actual data)
@@ -111,7 +112,7 @@ static char* test_metalayers(void) {
   blosc2_update_metalayer(schunk, "my_metalayer2", (uint8_t *) "my_content2",
                           (uint32_t) strlen("my_content2"));
 
-  blosc2_storage storage2 = {false, "dir1", .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage2 = {false, directory, .cparams=&cparams, .dparams=&dparams};
   blosc2_schunk* schunk2 = blosc2_schunk_open(storage2);
   mu_assert("ERROR: Cannot get the schunk from eframe", schunk2 != NULL);
 
@@ -141,8 +142,9 @@ static char* test_metalayers(void) {
 
 
 static char *all_tests(void) {
-  nchunks = 0;
+  directory = "dir1";
 
+  nchunks = 0;
   mu_run_test(test_eframe);
 
   nchunks = 1;
@@ -156,6 +158,20 @@ static char *all_tests(void) {
 
   mu_run_test(test_metalayers);
 
+  directory = "dir1/";
+  nchunks = 0;
+  mu_run_test(test_eframe);
+
+  nchunks = 1;
+  mu_run_test(test_eframe);
+
+  nchunks = 10;
+  mu_run_test(test_eframe);
+
+  nchunks = 100;
+  mu_run_test(test_eframe);
+
+  mu_run_test(test_metalayers);
 
   return EXIT_SUCCESS;
 }

@@ -1,1 +1,0 @@
-/usr/bin/cc  -std=gnu99 -std=gnu99 -g  -rdynamic CMakeFiles/pschunk_test1.dir/pschunk_test1.c.o  -o pschunk_test1  -Wl,-rpath,/home/martaiborra/c-blosc2/cmake-build-debug/blosc -lrt ../blosc/libblosc2.so.2.0.0 -lpthread -lrt 

@@ -392,8 +392,8 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
     size_t rbytes = 0;
     FILE *fp = NULL;
     if (frame->eframe) {
-      char* eframe_name = malloc(strlen(frame->urlpath) + 14 + 1);
-      sprintf(eframe_name, "%schunks.b2frame", frame->urlpath);
+      char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
+      sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = fopen(eframe_name, "rb");
       free(eframe_name);
     }
@@ -481,8 +481,8 @@ int update_frame_len(blosc2_frame* frame, int64_t len) {
   else {
     FILE *fp = NULL;
     if (frame->eframe) {
-      char* eframe_name = malloc(strlen(frame->urlpath) + 14 + 1);
-      sprintf(eframe_name, "%schunks.b2frame", frame->urlpath);
+      char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
+      sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = fopen(eframe_name, "rb+");
       free(eframe_name);
     }
@@ -572,8 +572,8 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
   else {
     FILE* fp = NULL;
     if (frame->eframe) {
-      char* eframe_name = malloc(strlen(frame->urlpath) + 14 + 1);
-      sprintf(eframe_name, "%schunks.b2frame", frame->urlpath);
+      char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
+      sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = fopen(eframe_name, "rb+");
       free(eframe_name);
     }
@@ -683,8 +683,8 @@ int64_t blosc2_frame_from_schunk(blosc2_schunk *schunk, blosc2_frame *frame) {
   }
   else {
     if (frame->eframe) {
-      char* eframe_name = malloc(strlen(frame->urlpath) + 14 + 1);
-      sprintf(eframe_name, "%schunks.b2frame", frame->urlpath);
+      char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
+      sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = fopen(eframe_name, "wb");
       fwrite(h2, h2len, 1, fp);
       free(eframe_name);
@@ -785,10 +785,23 @@ blosc2_frame* blosc2_frame_from_file(const char *urlpath) {
   FILE* fp = NULL;
   bool eframe = false;
   struct stat path_stat;
-  stat(urlpath, &path_stat);
+
+  if(stat(urlpath, &path_stat) < 0) {
+    BLOSC_TRACE_ERROR("Cannot get information about the path %s.", urlpath);
+    return NULL;
+  }
+  char* urlpath_cpy = malloc(strlen(urlpath) + 1);
+  strcpy(urlpath_cpy, urlpath);
   if (path_stat.st_mode & S_IFDIR) {
-    char* eframe_name = malloc(strlen(urlpath) + 14 + 1);
-    sprintf(eframe_name, "%schunks.b2frame", urlpath);
+    //afegir comprovació si l'últim char és una barra
+    char last_char = urlpath[strlen(urlpath) - 1];
+    if (last_char == '\\' || last_char == '/') {
+      urlpath_cpy = malloc(strlen(urlpath));
+      strncpy(urlpath_cpy,urlpath, strlen(urlpath) - 1);
+      urlpath_cpy[strlen(urlpath) - 1] = '\0';
+    }
+    char* eframe_name = malloc(strlen(urlpath_cpy) + strlen("/chunks.b2frame") + 1);
+    sprintf(eframe_name, "%s/chunks.b2frame", urlpath_cpy);
     fp = fopen(eframe_name, "rb");
     free(eframe_name);
     eframe = true;
@@ -806,8 +819,7 @@ blosc2_frame* blosc2_frame_from_file(const char *urlpath) {
   swap_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
 
   blosc2_frame* frame = calloc(1, sizeof(blosc2_frame));
-  char* urlpath_cpy = malloc(strlen(urlpath) + 1);
-  frame->urlpath = strcpy(urlpath_cpy, urlpath);
+  frame->urlpath = urlpath_cpy;
   frame->len = frame_len;
   frame->eframe = eframe;
 
@@ -893,8 +905,8 @@ uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, i
   FILE* fp = NULL;
   uint8_t* coffsets = malloc((size_t)coffsets_cbytes);
   if (frame->eframe) {
-    char* eframe_name = malloc(strlen(frame->urlpath) + 14 + 1);
-    sprintf(eframe_name, "%schunks.b2frame", frame->urlpath);
+    char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
+    sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
     fp = fopen(eframe_name, "rb");
     free(eframe_name);
     fseek(fp, header_len + 0, SEEK_SET);
@@ -934,8 +946,8 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
     size_t rbytes = 0;
     FILE *fp = NULL;
     if (frame->eframe) {
-      char* eframe_name = malloc(strlen(frame->urlpath) + 14 + 1);
-      sprintf(eframe_name, "%schunks.b2frame", frame->urlpath);
+      char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
+      sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = fopen(eframe_name, "rb+");
       free(eframe_name);
     }
@@ -976,8 +988,8 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
   if (frame->sdata == NULL) {
     // Write updated header down to file
     if (frame->eframe) {
-      char* eframe_name = malloc(strlen(frame->urlpath) + 14 + 1);
-      sprintf(eframe_name, "%schunks.b2frame", frame->urlpath);
+      char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
+      sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = fopen(eframe_name, "rb+");
       free(eframe_name);
     }
@@ -1029,8 +1041,8 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
   else {
     FILE* fp = NULL;
     if (frame->eframe) {
-      char* eframe_name = malloc(strlen(frame->urlpath) + 14 + 1);
-      sprintf(eframe_name, "%schunks.b2frame", frame->urlpath);
+      char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
+      sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = fopen(eframe_name, "rb");
       free(eframe_name);
     }
@@ -1061,8 +1073,8 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
   else {
     FILE* fp = NULL;
     if (frame->eframe) {
-      char* eframe_name = malloc(strlen(frame->urlpath) + 14 + 1);
-      sprintf(eframe_name, "%schunks.b2frame", frame->urlpath);
+      char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
+      sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = fopen(eframe_name, "rb+");
       free(eframe_name);
     }
@@ -1107,8 +1119,8 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
     header = malloc(header_len);
     FILE* fp = NULL;
     if (frame->eframe) {
-      char* eframe_name = malloc(strlen(frame->urlpath) + 14 + 1);
-      sprintf(eframe_name, "%schunks.b2frame", frame->urlpath);
+      char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
+      sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = fopen(eframe_name, "rb");
       free(eframe_name);
     }
@@ -1575,8 +1587,8 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
     FILE* fp = NULL;
     if (frame->eframe) {
       // The chunk is not in the frame
-      char* chunkname = malloc(strlen(frame->urlpath) + 14 + 1);
-      sprintf(chunkname,"%s%08X.chunk", frame->urlpath, nchunk);
+      char* chunkname = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+      sprintf(chunkname,"%s/%08X.chunk", frame->urlpath, nchunk);
       fp = fopen(chunkname,"rb");
       free(chunkname);
     }
@@ -1791,8 +1803,8 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     //Create nchunks.chunk file
     eframe_append_chunk(frame, chunk, nchunks, cbytes_chunk);
     // fileframe
-    char* eframe_name = malloc(strlen(frame->urlpath) + 14 + 1);
-    sprintf(eframe_name, "%schunks.b2frame", frame->urlpath);
+    char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
+    sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
     fp = fopen(eframe_name, "rb+");
     free(eframe_name);
     fseek(fp, header_len, SEEK_SET);

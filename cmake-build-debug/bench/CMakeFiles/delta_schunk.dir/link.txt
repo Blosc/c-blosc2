@@ -1,1 +1,0 @@
-/usr/bin/cc  -std=gnu99 -std=gnu99 -g  -rdynamic CMakeFiles/delta_schunk.dir/delta_schunk.c.o  -o delta_schunk  -Wl,-rpath,/home/martaiborra/c-blosc2/cmake-build-debug/blosc -lrt ../blosc/libblosc2.so.2.0.0 -lpthread -lrt 

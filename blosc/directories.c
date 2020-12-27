@@ -14,7 +14,15 @@
 
 
 /* Function needed for removing each time the directory */
-int remove_dir(const char *path) {
+int remove_dir(const char *dir_path) {
+  char last_char = dir_path[strlen(dir_path) - 1];
+  char* path = malloc(strlen(dir_path) + 1);
+  strcpy(path, dir_path);
+  if (last_char != '\\' || last_char != '/'){
+    path = malloc(strlen(dir_path) + 1 + 1);
+    sprintf(path, "%s/", dir_path);
+  }
+
   DIR *dr = opendir(path);
   struct stat statbuf;
   if (dr == NULL) {

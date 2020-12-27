@@ -1025,8 +1025,8 @@ static int blosc_d(
     FILE* fp = NULL;
     if (context->schunk->frame->eframe) {
       // The chunk is not in the frame
-      char* chunkname = malloc(strlen(context->schunk->frame->urlpath) + 14 + 1);
-      sprintf(chunkname,"%s%08X.chunk", context->schunk->frame->urlpath, nchunk);
+      char* chunkname = malloc(strlen(context->schunk->frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+      sprintf(chunkname,"%s/%08X.chunk", context->schunk->frame->urlpath, nchunk);
       fp = fopen(chunkname,"rb");
       free(chunkname);
       // The offset of the block is src_offset
