@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2015  Francesc Alted
+ Copyright (C) 2020  The Blosc Developers
  http://blosc.org
  License: BSD 3-Clause (see LICENSE.txt)
 
@@ -12,12 +12,6 @@
  To run:
 
  $ ./eframe_simple
- Blosc version info: 2.0.0-beta.1 ($Date:: 2019-08-09 #$)
- Compression ratio: 381.5 MB -> 12.2 MB (31.2x)
- Compression time: 0.119 s, 3192.9 MB/s
- Decompression time: 0.035 s, 10888.3 MB/s
- Successful roundtrip data <-> schunk !
-
 */
 
 #include <stdio.h>
