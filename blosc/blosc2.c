@@ -766,20 +766,34 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       dest += sizeof(int32_t);
       ntbytes += sizeof(int32_t);
       ctbytes += sizeof(int32_t);
-    }
 
-    // See if we have a run here
-    const uint8_t* ip = (uint8_t*)_src + j * neblock;
-    const uint8_t* ipbound = (uint8_t*)_src + (j + 1) * neblock;
-    if (get_run(ip, ipbound)) {
-      // A run.  Encode the repeated byte as a negative length in the length of the split.
-      int32_t value = _src[j * neblock];
-      if (ntbytes > destsize) {
-        /* Not enough space to write out compressed block size */
-        return -1;
+      // See whether we have a run here
+      const uint8_t* ip = (uint8_t*)_src + j * neblock;
+      const uint8_t* ipbound = (uint8_t*)_src + (j + 1) * neblock;
+      if (get_run(ip, ipbound)) {
+        // A run
+        int32_t value = _src[j * neblock];
+        if (ntbytes > destsize) {
+          /* Not enough space to write out compressed block size */
+          return -1;
+        }
+        // Encode the repeated byte in the first (LSB) byte of the length of the split.
+        _sw32(dest - 4, -value);    // write the value in two's complement
+        if (value > 0) {
+          // Mark the encoding as a run-length (== 0 is always a 0's run)
+          ntbytes += 1;
+          ctbytes += 1;
+          if (ntbytes > destsize) {
+            /* Not enough space to write out compressed block size */
+            return -1;
+          }
+          // Set MSB bit (sign) to 1 (not really necessary here, but for demonstration purposes)
+          // dest[-1] |= 0x80;
+          dest[0] = 0x1;   // set run-length bit (0) in token
+          dest += 1;
+        }
+        continue;
       }
-      _sw32(dest - 4, -value);
-      continue;
     }
 
     maxout = neblock;
@@ -1109,16 +1123,27 @@ static int blosc_d(
     ctbytes += (int32_t)sizeof(int32_t);
 
     /* Uncompress */
-    if (cbytes <= 0) {
-      // A run
-      if (cbytes < -255) {
-        // Runs can only encode a byte
-        return -2;
-      }
-      uint8_t value = -cbytes;
-      memset(_dest, value, (unsigned int)neblock);
+    if (cbytes == 0) {
+      // A run of 0's
+      memset(_dest, 0, (unsigned int)neblock);
       nbytes = neblock;
-      cbytes = 0;  // everything is encoded in the cbytes token
+    }
+    else if (cbytes < 0) {
+      // A negative number means some encoding depending on the token that comes next
+      uint8_t token = src[0];
+      src += 1;
+      ctbytes += 1;
+      if (token & 0x1) {
+        // A run of bytes that are different than 0
+        if (cbytes < -255) {
+          // Runs can only encode a byte
+          return -2;
+        }
+        uint8_t value = -cbytes;
+        memset(_dest, value, (unsigned int) neblock);
+        nbytes = neblock;
+        cbytes = 0;  // everything is encoded in the cbytes token
+      }
     }
     else if (cbytes == neblock) {
       memcpy(_dest, src, (unsigned int)neblock);
