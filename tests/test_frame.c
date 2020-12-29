@@ -139,7 +139,7 @@ static char* test_frame(void) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
     _nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
-    mu_assert("ERROR: bad append in frame", nchunk >= 0);
+    mu_assert("ERROR: bad append in frame", _nchunks >= 0);
   }
   mu_assert("ERROR: wrong number of append chunks", _nchunks == nchunks);
 

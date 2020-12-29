@@ -790,8 +790,7 @@ blosc2_frame* blosc2_frame_from_file(const char *urlpath) {
     BLOSC_TRACE_ERROR("Cannot get information about the path %s.", urlpath);
     return NULL;
   }
-  char* urlpath_cpy = malloc(strlen(urlpath) + 1);
-  strcpy(urlpath_cpy, urlpath);
+  char* urlpath_cpy;
   if (path_stat.st_mode & S_IFDIR) {
     //afegir comprovació si l'últim char és una barra
     char last_char = urlpath[strlen(urlpath) - 1];
@@ -800,6 +799,10 @@ blosc2_frame* blosc2_frame_from_file(const char *urlpath) {
       strncpy(urlpath_cpy,urlpath, strlen(urlpath) - 1);
       urlpath_cpy[strlen(urlpath) - 1] = '\0';
     }
+    else {
+      urlpath_cpy = malloc(strlen(urlpath) + 1);
+      strcpy(urlpath_cpy, urlpath);
+    }
     char* eframe_name = malloc(strlen(urlpath_cpy) + strlen("/chunks.b2frame") + 1);
     sprintf(eframe_name, "%s/chunks.b2frame", urlpath_cpy);
     fp = fopen(eframe_name, "rb");
@@ -807,12 +810,15 @@ blosc2_frame* blosc2_frame_from_file(const char *urlpath) {
     eframe = true;
   }
   else {
+    urlpath_cpy = malloc(strlen(urlpath) + 1);
+    strcpy(urlpath_cpy, urlpath);
     fp = fopen(urlpath, "rb");
   }
   size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
   if (rbytes != FRAME_HEADER_MINLEN) {
     BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
     fclose(fp);
+    free(urlpath_cpy);
     return NULL;
   }
   int64_t frame_len;
@@ -829,6 +835,7 @@ blosc2_frame* blosc2_frame_from_file(const char *urlpath) {
   fclose(fp);
   if (rbytes != FRAME_TRAILER_MINLEN) {
     BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
+    free(urlpath_cpy);
     return NULL;
   }
   int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
@@ -1347,6 +1354,12 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
         }
       }
       if (rbytes != BLOSC_MIN_HEADER_LENGTH) {
+        if (frame->eframe) {
+          free(data_chunk);
+        }
+        else {
+          fclose(fp);
+        }
         free(offsets);
         blosc2_free_ctx(schunk->cctx);
         blosc2_free_ctx(schunk->dctx);
@@ -1359,7 +1372,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
         data_chunk = realloc(data_chunk, (size_t)csize);
         prev_alloc = csize;
       }
-      if (frame->eframe) {
+      if (!frame->eframe) {
         fseek(fp, header_len + offsets[i], SEEK_SET);
         rbytes = fread(data_chunk, 1, (size_t)csize, fp);
         if (rbytes != (size_t)csize) {

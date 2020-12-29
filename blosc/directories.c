@@ -19,6 +19,7 @@ int remove_dir(const char *dir_path) {
   char* path = malloc(strlen(dir_path) + 1);
   strcpy(path, dir_path);
   if (last_char != '\\' || last_char != '/'){
+    free(path);
     path = malloc(strlen(dir_path) + 1 + 1);
     sprintf(path, "%s/", dir_path);
   }
@@ -27,6 +28,7 @@ int remove_dir(const char *dir_path) {
   struct stat statbuf;
   if (dr == NULL) {
     BLOSC_TRACE_ERROR("No file or directory found.");
+    free(path);
     return -1;
   }
   struct dirent *de;
@@ -44,6 +46,8 @@ int remove_dir(const char *dir_path) {
       if (ret < 0) {
         BLOSC_TRACE_ERROR("Could not remove file %s", fname);
         free(fname);
+        closedir(dr);
+        free(path);
         return -1;
       }
     }
@@ -51,5 +55,6 @@ int remove_dir(const char *dir_path) {
   }
   closedir(dr);
   rmdir(path);
+  free(path);
   return 0;
 }
