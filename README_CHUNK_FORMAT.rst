@@ -180,6 +180,25 @@ data stream is stored with the size of the stream `int32 csize` preceeding the b
     | csize | cdata |
     +=======+=======+
 
+There are a couple of special cases for `int32 csize`.  If zero, that means that the data stream is fully made of zeros.
+If negative, the stream is stored like this::
+
+    +=======+=======+=======+
+    | csize | token | cdata |
+    +=======+=======+=======+
+
+where `uint8_t token` is a byte for providing different meanings to `int32 csize`::
+
+:token:
+    (``bitfield``) Flags for different meanings.
+    :bit 0 (``0x01``):
+        Inidicates a run-length stream.  The least significant byte of ``int32 csize` contains the repeated byte.
+        For more info, see the **Run-Length Encoding** section below.
+    :bit 1 (``0x02``):
+        Reserved for two-codes in a row. TODO: complete description
+    :bit 2 (``0x04``):
+        Reserved for two-codes in a row. TODO: complete description
+
 If bit 4 of the `flags` header field is set, each block is stored in a single data stream::
 
     +=========+
@@ -207,7 +226,7 @@ The `csize` field of each compressed data stream can be used to support run-leng
 
     - When the most significant bit is *not* set, `csize` represents the size of the compressed
       data stream that follows. (as in C-Blosc1)
-    - When the most significant bit is set, the lowest significant byte of `csize` is used to fill the entire
+    - When the most significant bit is set, the least significant byte of `csize` is used to fill the entire
       block.
 
 For example, a csize of 10000 means that the compressed data stream that follows is 10000 bytes long
