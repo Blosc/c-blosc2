@@ -925,6 +925,10 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
     BLOSC_TRACE_ERROR("Unable to get the trailer offset from frame.");
     return -1;
   }
+  if (trailer_offset + FRAME_TRAILER_USERMETA_LEN_OFFSET > frame_len) {
+    BLOSC_TRACE_ERROR("Invalid trailer offset exceeds frame length.");
+    return -1;
+  }
 
   // Get the size of usermeta (inside the trailer)
   int32_t usermeta_len_network;
