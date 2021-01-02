@@ -942,6 +942,10 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
   int32_t usermeta_len;
   swap_store(&usermeta_len, &usermeta_len_network, sizeof(int32_t));
 
+  if (usermeta_len < 0) {
+    BLOSC_TRACE_ERROR("Invalid usermeta length.");
+    return -1;
+  }
   if (usermeta_len == 0) {
     *usermeta = NULL;
     return 0;
