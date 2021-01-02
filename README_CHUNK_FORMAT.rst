@@ -135,6 +135,8 @@ for encoding blocks with a filter pipeline::
         in place, but not the actual block data.  In addition, they have an additional
         trailer for making it easy to read the data blocks.  In general, lazy chunks
         appear when reading data from disk.
+    :bit 4 (``0x10``):
+        Whether the chunk is fully made of zeros or not.
 
 
 Blocks

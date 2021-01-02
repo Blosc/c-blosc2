@@ -1873,14 +1873,31 @@ int blosc_compress_context(blosc2_context* context) {
       context->header_flags &= ~(uint8_t)BLOSC_MEMCPYED;
     }
   }
+  else {
+    // Check whether we have a run for the whole chunk
+    int start_csizes = BLOSC_MAX_OVERHEAD + 4 * context->nblocks;
+    int dont_split = (context->header_flags & 0x10) >> 4;
+    int nstreams = context->nblocks;
+    if (!dont_split) {
+      // When splitting, the number of streams is computed differently
+      nstreams = (context->nblocks - 1) * context->typesize;
+      if (context->leftover) {
+        nstreams += 1;
+      }
+    }
+    if (ntbytes == start_csizes + nstreams * sizeof(int32_t)) {
+      // The streams are all zero runs (by construction).  Encode it...
+      context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] |= 0x10;
+      // ...and assign the new chunk length
+      ntbytes = BLOSC_MAX_OVERHEAD;
+    }
+  }
 
   /* Set the number of compressed bytes in header */
   _sw32(context->dest + BLOSC2_CHUNK_CBYTES, ntbytes);
 
   /* Set the number of bytes in dest buffer (might be useful for btune) */
   context->destsize = ntbytes;
-
-  assert(ntbytes <= context->destsize);
 
   if (context->btune != NULL) {
     blosc_set_timestamp(&current);
@@ -2175,6 +2192,22 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
   if (version > BLOSC_VERSION_FORMAT) {
     /* Version from future */
     return -1;
+  }
+
+  ntbytes = sw32_(_src + BLOSC2_CHUNK_NBYTES);
+  if (ntbytes > destsize) {
+    // Not enough space for writing into the destination
+    return -1;
+  }
+  // Is that a run with zeros?
+  int cbytes = sw32_(_src + BLOSC2_CHUNK_CBYTES);
+  if (cbytes == BLOSC_EXTENDED_HEADER_LENGTH) {
+    bool all_zeros = _src[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x10;
+    if (all_zeros) {
+      // Yup, it is.  Set the dest to zeros and return.
+      memset(dest, 0, ntbytes);
+      return ntbytes;
+    }
   }
 
   error = initialize_context_decompression(context, src, srcsize, dest, destsize);

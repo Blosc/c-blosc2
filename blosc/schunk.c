@@ -500,6 +500,10 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes
 
   // We don't need a copy of the chunk, as it will be shrinked if necessary
   int nchunks = blosc2_schunk_append_chunk(schunk, chunk, false);
+  if (nchunks < 0) {
+    BLOSC_TRACE_ERROR("Error appending a buffer in super-chunk");
+    return nchunks;
+  }
 
   return nchunks;
 }

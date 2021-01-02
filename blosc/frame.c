@@ -814,9 +814,11 @@ uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, i
 
   if (frame->sdata != NULL) {
     // For in-memory frames, the coffset is just one pointer away
-    if (off_cbytes != NULL)
-      *off_cbytes = (int32_t)cbytes;
-    return frame->sdata + header_len + cbytes;
+    uint8_t* off_start = frame->sdata + header_len + cbytes;
+    if (off_cbytes != NULL) {
+      *off_cbytes = *(int32_t*) (off_start + BLOSC2_CHUNK_CBYTES);
+    }
+    return off_start;
   }
 
   int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
@@ -1582,7 +1584,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
           off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
 
-//  // You may want to uncomment this code block for debugging
+// You may want to uncomment this code block for debugging
 //  int64_t offset;
 //  int rc2 = blosc_getitem(off_chunk, nchunks, 1, &offset);
 //  // Safety check.  This is cheap and can save time while debugging.
