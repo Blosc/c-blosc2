@@ -65,9 +65,6 @@
   #include <unistd.h>
   #include <sys/stat.h>
   #include <dirent.h>
-#endif  /* _WIN32 */
-
-
 
 /* Function needed for removing each time the directory */
 int blosc2_remove_dir(const char *dir_path) {
@@ -78,8 +75,8 @@ int blosc2_remove_dir(const char *dir_path) {
     sprintf(path, "%s/", dir_path);
   }
   else {
-      path = malloc(strlen(dir_path) + 1);
-      strcpy(path, dir_path);
+    path = malloc(strlen(dir_path) + 1);
+    strcpy(path, dir_path);
   }
 
   DIR *dr = opendir(path);
@@ -116,3 +113,9 @@ int blosc2_remove_dir(const char *dir_path) {
   free(path);
   return 0;
 }
+
+#endif  /* _WIN32 */
+
+
+
+
