@@ -17,10 +17,6 @@
 #include <stdio.h>
 #include <blosc2.h>
 
-#if defined(_WIN32)
-  #define blosc2_remove_dir _blosc2_remove_dir
-#endif
-
 #define KB  1024.
 #define MB  (1024*KB)
 #define GB  (1024*MB)
