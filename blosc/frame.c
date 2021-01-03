@@ -493,11 +493,11 @@ int update_frame_len(blosc2_frame* frame, int64_t len) {
     int64_t swap_len;
     swap_store(&swap_len, &len, sizeof(int64_t));
     size_t wbytes = fwrite(&swap_len, 1, sizeof(int64_t), fp);
+    fclose(fp);
     if (wbytes != sizeof(int64_t)) {
       BLOSC_TRACE_ERROR("Cannot write the frame length in header.");
       return -1;
     }
-    fclose(fp);
   }
   return rc;
 }
@@ -922,12 +922,11 @@ uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, i
     fseek(fp, header_len + cbytes, SEEK_SET);
   }
   size_t rbytes = fread(coffsets, 1, (size_t)coffsets_cbytes, fp);
+  fclose(fp);
   if (rbytes != (size_t)coffsets_cbytes) {
     BLOSC_TRACE_ERROR("Cannot read the offsets out of the fileframe.");
-    fclose(fp);
     return NULL;
   }
-  fclose(fp);
   frame->coffsets = coffsets;
 
   return coffsets;
@@ -1038,6 +1037,10 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
     BLOSC_TRACE_ERROR("Unable to get the trailer offset from frame.");
     return -1;
   }
+  if (trailer_offset + FRAME_TRAILER_USERMETA_LEN_OFFSET > frame_len) {
+    BLOSC_TRACE_ERROR("Invalid trailer offset exceeds frame length.");
+    return -1;
+  }
 
   // Get the size of usermeta (inside the trailer)
   int32_t usermeta_len_network;
@@ -1057,16 +1060,19 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
     }
     fseek(fp, trailer_offset + FRAME_TRAILER_USERMETA_LEN_OFFSET, SEEK_SET);
     size_t rbytes = fread(&usermeta_len_network, 1, sizeof(int32_t), fp);
+    fclose(fp);
     if (rbytes != sizeof(int32_t)) {
       BLOSC_TRACE_ERROR("Cannot access the usermeta_len out of the fileframe.");
-      fclose(fp);
       return -1;
     }
-    fclose(fp);
   }
   int32_t usermeta_len;
   swap_store(&usermeta_len, &usermeta_len_network, sizeof(int32_t));
 
+  if (usermeta_len < 0) {
+    BLOSC_TRACE_ERROR("Invalid usermeta length.");
+    return -1;
+  }
   if (usermeta_len == 0) {
     *usermeta = NULL;
     return 0;
@@ -1089,12 +1095,12 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
     }
     fseek(fp, trailer_offset + FRAME_TRAILER_USERMETA_OFFSET, SEEK_SET);
     size_t rbytes = fread(*usermeta, 1, usermeta_len, fp);
+    fclose(fp);
     if (rbytes != (size_t)usermeta_len) {
       BLOSC_TRACE_ERROR("Cannot read the complete usermeta chunk in frame. %ld != %ld.",
               (long)rbytes, (long)usermeta_len);
       return -1;
     }
-    fclose(fp);
   }
 
   return usermeta_len;
@@ -1529,17 +1535,18 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
     size_t rbytes = fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
     if (rbytes != sizeof(chunk_cbytes)) {
       BLOSC_TRACE_ERROR("Cannot read the cbytes for chunk in the fileframe.");
+      fclose(fp);
       return -5;
     }
     chunk_cbytes = sw32_(&chunk_cbytes);
     *chunk = malloc((size_t)chunk_cbytes);
     fseek(fp, header_len + offset, SEEK_SET);
     rbytes = fread(*chunk, 1, (size_t)chunk_cbytes, fp);
+    fclose(fp);
     if (rbytes != (size_t)chunk_cbytes) {
       BLOSC_TRACE_ERROR("Cannot read the chunk out of the fileframe.");
       return -6;
     }
-    fclose(fp);
     *needs_free = true;
   } else {
     // The chunk is in memory and just one pointer away
@@ -1610,6 +1617,7 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
     size_t rbytes = fread(header, 1, BLOSC_MIN_HEADER_LENGTH, fp);
     if (rbytes != BLOSC_MIN_HEADER_LENGTH) {
       BLOSC_TRACE_ERROR("Cannot read the header for chunk in the fileframe.");
+      fclose(fp);
       return -5;
     }
     blosc_cbuffer_sizes(header, &chunk_nbytes, &chunk_cbytes, &chunk_blocksize);
@@ -1838,14 +1846,15 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     size_t wbytes = fwrite(chunk, 1, (size_t)cbytes_chunk, fp);  // the new chunk
     if (wbytes != (size_t)cbytes_chunk) {
       BLOSC_TRACE_ERROR("Cannot write the full chunk to fileframe.");
+      fclose(fp);
       return NULL;
     }
     wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
+    fclose(fp);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to fileframe.");
       return NULL;
     }
-    fclose(fp);
     // Invalidate the cache for chunk offsets
     if (frame->coffsets != NULL) {
       free(frame->coffsets);
