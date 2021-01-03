@@ -44,18 +44,18 @@ void* eframe_append_chunk(blosc2_frame *frame, uint8_t *chunk, int32_t nchunk, i
   FILE* fpc = fopen(chunkname,"wb");
   free(chunkname);
 
-  size_t wbytes = fwrite(chunk, 1, (size_t)cbytes,fpc);
+  size_t wbytes = fwrite(chunk, 1, (size_t)cbytes, fpc);
+  fclose(fpc);
   if (wbytes != (size_t)cbytes) {
-    BLOSC_TRACE_ERROR("cannot write the full chunk.");
-    fclose(fpc);
+    BLOSC_TRACE_ERROR("Cannot write the full chunk.");
     return NULL;
   }
-  fclose(fpc);
+  return frame;
 }
 
 
 /*Get chunk from extended frame. */
-int eframe_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free){
+int eframe_get_chunk(blosc2_frame *frame, int64_t nchunk, uint8_t **chunk, bool *needs_free){
   //get directory/nchunk.chunk
   char* chunkname = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
   sprintf(chunkname,"%s/%08X.chunk", frame->urlpath, nchunk);
@@ -72,13 +72,11 @@ int eframe_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *nee
 
   fseek(fpc, 0L, SEEK_SET);
   size_t rbytes = fread(*chunk, 1, (size_t)chunk_cbytes, fpc);
+  fclose(fpc);
   if (rbytes != (size_t)chunk_cbytes) {
     BLOSC_TRACE_ERROR("Cannot read the chunk out of the chunkfile.");
-    fclose(fpc);
     return -1;
   }
-
-  fclose(fpc);
   *needs_free = true;
 
   return chunk_cbytes;

@@ -22,6 +22,8 @@
   #include <windows.h>
   #include <malloc.h>
 
+  #define mkdir _mkdir
+
 /* stdint.h only available in VS2010 (VC++ 16.0) and newer */
   #if defined(_MSC_VER) && _MSC_VER < 1600
     #include "win32/stdint-windows.h"
@@ -156,7 +158,7 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
       strcpy(urlpath, storage.path);
     }
     //Create directory
-    if (mkdir(urlpath,0777) == -1) {
+    if (mkdir(urlpath, 0777) == -1) {
       BLOSC_TRACE_ERROR("Error during the creation of the directory, maybe it already exists.");
       return NULL;
     }

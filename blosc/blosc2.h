@@ -1518,13 +1518,13 @@ BLOSC_EXPORT blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool cop
 
 
 /*********************************************************************
-  Directory utilities for needed for doing tests.
+  Directory utilities.
 *********************************************************************/
 
 /*
  * Remove a directory and its files.
  */
-BLOSC_EXPORT int remove_dir(const char *path);
+BLOSC_EXPORT int blosc2_remove_dir(const char *path);
 
 #ifdef __cplusplus
 }

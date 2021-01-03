@@ -17,6 +17,10 @@
 #include <stdio.h>
 #include <blosc2.h>
 
+#if defined(_WIN32)
+  #define blosc2_remove_dir _blosc2_remove_dir
+#endif
+
 #define KB  1024.
 #define MB  (1024*KB)
 #define GB  (1024*MB)
@@ -45,7 +49,7 @@ int main(void) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {false,"dir1", .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {false, "dir1.b2eframe", .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
 
   blosc_set_timestamp(&last);
@@ -96,7 +100,7 @@ int main(void) {
   printf("Successful roundtrip data <-> schunk !\n");
 
   /* Remove directory */
-  remove_dir(storage.path);
+  blosc2_remove_dir(storage.path);
   /* Free resources */
   /* Destroy the super-chunk */
   blosc2_schunk_free(schunk);

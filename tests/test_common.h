@@ -33,6 +33,7 @@
 #if defined(_WIN32)
   /* MSVC does not have setenv */
   #define setenv(name, value, overwrite) do {_putenv_s(name, value);} while(0)
+  #define blosc2_remove_dir _blosc2_remove_dir
 #endif
 
 

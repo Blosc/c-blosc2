@@ -486,7 +486,7 @@ int update_frame_len(blosc2_frame* frame, int64_t len) {
       fp = fopen(eframe_name, "rb+");
       free(eframe_name);
     }
-    else{
+    else {
       fp = fopen(frame->urlpath, "rb+");
     }
     fseek(fp, FRAME_LEN, SEEK_SET);
@@ -582,12 +582,11 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
     }
     fseek(fp, trailer_offset, SEEK_SET);
     size_t wbytes = fwrite(trailer, 1, trailer_len, fp);
+    fclose(fp);
     if (wbytes != (size_t)trailer_len) {
       BLOSC_TRACE_ERROR("Cannot write the trailer length in trailer.");
-      fclose(fp);
       return -2;
     }
-    fclose(fp);
   }
   free(trailer);
 
@@ -626,7 +625,7 @@ int64_t blosc2_frame_from_schunk(blosc2_schunk *schunk, blosc2_frame *frame) {
     if (frame->eframe) {
       eframe_get_chunk(frame, i, &data_chunk, &needs_free);
     }
-    else{
+    else {
       data_chunk = schunk->data[i];
     }
     int32_t chunk_cbytes = sw32_(data_chunk + BLOSC2_CHUNK_CBYTES);
@@ -918,7 +917,7 @@ uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, i
     free(eframe_name);
     fseek(fp, header_len + 0, SEEK_SET);
   }
-  else{
+  else {
     fp = fopen(frame->urlpath, "rb");
     fseek(fp, header_len + cbytes, SEEK_SET);
   }
@@ -958,7 +957,7 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
       fp = fopen(eframe_name, "rb+");
       free(eframe_name);
     }
-    else{
+    else {
       fp = fopen(frame->urlpath, "rb");
     }
     if (fp != NULL) {
@@ -1131,7 +1130,7 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
       fp = fopen(eframe_name, "rb");
       free(eframe_name);
     }
-    else{
+    else {
       fp = fopen(frame->urlpath, "rb");
     }
     if (fp != NULL) {
@@ -1366,7 +1365,6 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
         free(schunk);
         return NULL;
       }
-
       csize = sw32_(data_chunk + BLOSC2_CHUNK_CBYTES);
       if (csize > prev_alloc) {
         data_chunk = realloc(data_chunk, (size_t)csize);
@@ -1513,15 +1511,15 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
   // Get the offset to nchunk
   int64_t offset = get_coffset(frame, header_len, cbytes, nchunk);
 
-  if (offset<0) {
+  if (offset < 0) {
     if (!frame->eframe) {
       BLOSC_TRACE_ERROR("Chunk offset can be negative only for eframes.");
       return -1;
     }
     else {
-      // sparse on-disk
+      // Sparse on-disk
       nchunk = -offset;
-      return eframe_get_chunk(frame,nchunk,chunk,needs_free);
+      return eframe_get_chunk(frame, nchunk, chunk, needs_free);
     }
   }
   int32_t chunk_cbytes;
@@ -1763,7 +1761,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   }
 
   // Add the new offset
-  if(frame->eframe) {
+  if (frame->eframe) {
     offsets[nchunks] = -nchunks;
   }
   else {
@@ -1794,7 +1792,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   }
 
   int64_t new_frame_len = header_len + new_cbytes + new_off_cbytes + trailer_len;
-  if (frame->eframe){
+  if (frame->eframe) {
     new_frame_len = header_len + new_off_cbytes + trailer_len;
   }
 
@@ -1822,11 +1820,11 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     free(eframe_name);
     fseek(fp, header_len, SEEK_SET);
     size_t wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
+    fclose(fp);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("cannot write the offsets to fileframe.");
       return NULL;
     }
-    fclose(fp);
     // Invalidate the cache for chunk offsets
     if (frame->coffsets != NULL) {
       free(frame->coffsets);
@@ -1888,7 +1886,6 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk
     BLOSC_TRACE_ERROR("Cannot get the chunk in position %d.", nchunk);
     return -1;
   }
-
   if (chunk_cbytes < sizeof(int32_t)) {
     /* Not enough input to read `nbytes` */
     return -1;

@@ -194,7 +194,7 @@ static char* test_eframe(void) {
   }
 
   /* Remove directory */
-  remove_dir(storage.path);
+  blosc2_remove_dir(storage.path);
   /* Free resources */
   free(data_dest);
   free(data);
@@ -251,7 +251,7 @@ static char* test_eframe_simple(void) {
   }
 
   /* Remove directory */
-  remove_dir(storage.path);
+  blosc2_remove_dir(storage.path);
   /* Free resources */
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
@@ -262,7 +262,7 @@ static char* test_eframe_simple(void) {
 
 
 static char *all_tests(void) {
-  directory = "dir1";
+  directory = "dir1.b2eframe";
 
   nchunks = 0;
   mu_run_test(test_eframe_simple);
@@ -277,7 +277,7 @@ static char *all_tests(void) {
   mu_run_test(test_eframe_simple);
 
 
-  directory = "dir1/";
+  directory = "dir1.b2eframe/";
   nchunks = 0;
   mu_run_test(test_eframe_simple);
 
@@ -306,10 +306,10 @@ static char *all_tests(void) {
                 filter_pipeline = (bool) ifilter_pipeline;
                 metalayers = (bool) imetalayers;
                 usermeta = (bool) iusermeta;
-                snprintf(buf, sizeof(buf), "test_eframe_nc%d", nchunks);
+                snprintf(buf, sizeof(buf), "test_eframe_nc%d.b2eframe", nchunks);
                 directory = buf;
                 mu_run_test(test_eframe);
-                snprintf(buf, sizeof(buf), "test_eframe_nc%d/", nchunks);
+                snprintf(buf, sizeof(buf), "test_eframe_nc%d.b2eframe/", nchunks);
                 directory = buf;
                 mu_run_test(test_eframe);
               }

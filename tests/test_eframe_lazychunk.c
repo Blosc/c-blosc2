@@ -96,7 +96,7 @@ static char* test_lazy_chunk(void) {
   }
 
   /* Remove directory */
-  remove_dir(storage.path);
+  blosc2_remove_dir(storage.path);
   /* Free resources */
   blosc2_schunk_free(schunk);
 
@@ -108,7 +108,7 @@ static char* test_lazy_chunk(void) {
 }
 
 static char *all_tests(void) {
-  directory = "dir1/";
+  directory = "dir1.b2eframe/";
   nchunks = 0;
   clevel = 5;
   nthreads = 1;
@@ -144,7 +144,7 @@ static char *all_tests(void) {
   nthreads = 2;
   mu_run_test(test_lazy_chunk);
 
-  directory = "dir1";
+  directory = "dir1.b2eframe";
   nchunks = 0;
   clevel = 5;
   nthreads = 1;
