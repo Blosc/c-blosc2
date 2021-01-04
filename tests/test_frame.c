@@ -100,6 +100,12 @@ static char* test_frame(void) {
         blosc2_storage storage2 = {.sequential=true, .path=fname};
         schunk = blosc2_schunk_open(storage2);
         mu_assert("blosc2_schunk_open() failed", schunk != NULL);
+        mu_assert("storage is not recovered correctly",
+                  schunk->storage->sequential == true);
+        mu_assert("cparams are not recovered correctly",
+                  schunk->storage->cparams->clevel == BLOSC2_CPARAMS_DEFAULTS.clevel);
+        mu_assert("dparams are not recovered correctly",
+                  schunk->storage->dparams->nthreads == BLOSC2_DPARAMS_DEFAULTS.nthreads);
       } else {
         // Dump the schunk to a sframe and regenerate it from there
         uint8_t* sframe;
