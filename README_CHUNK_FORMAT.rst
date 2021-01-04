@@ -194,12 +194,20 @@ where `uint8_t token` is a byte for providing different meanings to `int32 csize
 :token:
     (``bitfield``) Flags for different meanings.
 
-    :bit 0 (``0x01``):
-        Indicates a run-length stream.  The least significant byte of `int32 csize` contains the repeated byte.
+    :bits 0 and 1:
+        Indicates a run-length stream for the whole chunk.
         For more info, see the **Run-Length Encoding** section below.
-    :bit 1 (``0x02``):
-        Reserved for two-codes in a row. TODO: complete description
-    :bit 2 (``0x04``):
+
+            :``0``:
+                No run.
+            :``1``:
+                Zero value.
+            :``2``:
+                NaN (Not-a-Number) float value.
+            :``3``:
+                Run-length of a value that follows the header (i.e. no blocks section).
+
+    :bits 2 and 3:
         Reserved for two-codes in a row. TODO: complete description
 
 If bit 4 of the `flags` header field is set, each block is stored in a single data stream::
