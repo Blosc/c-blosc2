@@ -390,7 +390,7 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
 
   if (frame->sdata == NULL) {
     size_t rbytes = 0;
-    FILE *fp = NULL;
+    FILE* fp = NULL;
     if (frame->eframe) {
       char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
       sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
@@ -479,7 +479,7 @@ int update_frame_len(blosc2_frame* frame, int64_t len) {
     swap_store(frame->sdata + FRAME_LEN, &len, sizeof(int64_t));
   }
   else {
-    FILE *fp = NULL;
+    FILE* fp = NULL;
     if (frame->eframe) {
       char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
       sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
@@ -736,7 +736,7 @@ int64_t blosc2_schunk_to_sframe(blosc2_schunk* schunk, uint8_t** sframe) {
   blosc2_frame* frame = NULL;
   uint8_t* sdata = NULL;
   int64_t sdata_len = 0;
-  //if ((schunk->storage->sequential == true) && (schunk->storage->path == NULL)) {
+  //if ((schunk->storage->sequential == true) && (schunk->storage->urlpath == NULL)) {
   // TODO: the above is the canonical way to check, but that does not work (??)
   if (schunk->frame != NULL && schunk->frame->sdata != NULL) {
     sdata = schunk->frame->sdata;
@@ -762,7 +762,7 @@ int64_t blosc2_schunk_to_sframe(blosc2_schunk* schunk, uint8_t** sframe) {
 
 
 /* Write an in-memory frame out to a file. */
-int64_t blosc2_frame_to_file(blosc2_frame *frame, const char *urlpath) {
+int64_t blosc2_frame_to_file(blosc2_frame* frame, const char* urlpath) {
   // make sure that we are using an in-memory frame
   if (frame->urlpath != NULL) {
     BLOSC_TRACE_ERROR("The original frame must be in-memory.");
@@ -776,7 +776,7 @@ int64_t blosc2_frame_to_file(blosc2_frame *frame, const char *urlpath) {
 
 
 /* Initialize a frame out of a file */
-blosc2_frame* blosc2_frame_from_file(const char *urlpath) {
+blosc2_frame* blosc2_frame_from_file(const char* urlpath) {
   // Get the length of the frame
   uint8_t header[FRAME_HEADER_MINLEN];
   uint8_t trailer[FRAME_TRAILER_MINLEN];
@@ -791,7 +791,6 @@ blosc2_frame* blosc2_frame_from_file(const char *urlpath) {
   }
   char* urlpath_cpy;
   if (path_stat.st_mode & S_IFDIR) {
-    //afegir comprovació si l'últim char és una barra
     char last_char = urlpath[strlen(urlpath) - 1];
     if (last_char == '\\' || last_char == '/') {
       urlpath_cpy = malloc(strlen(urlpath));
@@ -949,7 +948,7 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
 
   if (frame->sdata == NULL) {
     size_t rbytes = 0;
-    FILE *fp = NULL;
+    FILE* fp = NULL;
     if (frame->eframe) {
       char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
       sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
@@ -1605,10 +1604,10 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
     FILE* fp = NULL;
     if (frame->eframe) {
       // The chunk is not in the frame
-      char* chunkname = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-      sprintf(chunkname,"%s/%08X.chunk", frame->urlpath, nchunk);
-      fp = fopen(chunkname,"rb");
-      free(chunkname);
+      char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+      sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
+      fp = fopen(chunkpath, "rb");
+      free(chunkpath);
     }
     else {
       fp = fopen(frame->urlpath, "rb");

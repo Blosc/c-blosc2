@@ -79,13 +79,13 @@ blosc2_storage* get_new_storage(const blosc2_storage* storage, const blosc2_cpar
                                 const blosc2_dparams* ddefaults) {
   blosc2_storage* new_storage = (blosc2_storage*)calloc(1, sizeof(blosc2_storage));
   memcpy(new_storage, &storage, sizeof(blosc2_storage));
-  if (storage->path != NULL) {
-    size_t pathlen = strlen(storage->path);
-    new_storage->path = malloc(pathlen + 1);
-    strcpy(new_storage->path, storage->path);
+  if (storage->urlpath != NULL) {
+    size_t pathlen = strlen(storage->urlpath);
+    new_storage->urlpath = malloc(pathlen + 1);
+    strcpy(new_storage->urlpath, storage->urlpath);
   }
   else {
-    new_storage->path = NULL;
+    new_storage->urlpath = NULL;
   }
   // cparams
   blosc2_cparams* cparams = malloc(sizeof(blosc2_cparams));
@@ -146,17 +146,17 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
   // ...and update internal properties
   update_schunk_properties(schunk);
 
-  if (!storage.sequential && storage.path != NULL){
+  if (!storage.sequential && storage.urlpath != NULL){
     char* urlpath;
-    char last_char = storage.path[strlen(storage.path) - 1];
+    char last_char = storage.urlpath[strlen(storage.urlpath) - 1];
     if (last_char == '\\' || last_char == '/') {
-      urlpath = malloc(strlen(storage.path));
-      strncpy(urlpath, storage.path, strlen(storage.path) - 1);
-      urlpath[strlen(storage.path) - 1] = '\0';
+      urlpath = malloc(strlen(storage.urlpath));
+      strncpy(urlpath, storage.urlpath, strlen(storage.urlpath) - 1);
+      urlpath[strlen(storage.urlpath) - 1] = '\0';
     }
     else {
-      urlpath = malloc(strlen(storage.path) + 1);
-      strcpy(urlpath, storage.path);
+      urlpath = malloc(strlen(storage.urlpath) + 1);
+      strcpy(urlpath, storage.urlpath);
     }
     //Create directory
     if (mkdir(urlpath, 0777) == -1) {
@@ -177,7 +177,7 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
   }
   if (storage.sequential){
     // We want a frame as storage
-    blosc2_frame* frame = blosc2_frame_new(storage.path);
+    blosc2_frame* frame = blosc2_frame_new(storage.urlpath);
     frame->eframe = false;
     // Initialize frame (basically, encode the header)
     int64_t frame_len = blosc2_frame_from_schunk(schunk, frame);
@@ -215,13 +215,13 @@ blosc2_schunk *blosc2_schunk_empty(int nchunks, const blosc2_storage storage) {
 
 /* Open an existing super-chunk that is on-disk (no copy is made). */
 blosc2_schunk* blosc2_schunk_open(const blosc2_storage storage) {
-  if (storage.path == NULL) {
-    BLOSC_TRACE_ERROR("You need to supply a storage.path.");
+  if (storage.urlpath == NULL) {
+    BLOSC_TRACE_ERROR("You need to supply a storage.urlpath.");
     return NULL;
   }
 
   // We only support frames yet
-  blosc2_frame* frame = blosc2_frame_from_file(storage.path);
+  blosc2_frame* frame = blosc2_frame_from_file(storage.urlpath);
   blosc2_schunk* schunk = blosc2_frame_to_schunk(frame, false);
 
   // Get the storage with proper defaults
@@ -260,8 +260,8 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
   }
 
   if (schunk->storage != NULL) {
-    if (schunk->storage->path != NULL) {
-      free(schunk->storage->path);
+    if (schunk->storage->urlpath != NULL) {
+      free(schunk->storage->urlpath);
     }
     free(schunk->storage->cparams);
     free(schunk->storage->dparams);
@@ -318,7 +318,7 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   schunk->cbytes += cbytes;
   // Update super-chunk or frame
   if (schunk->frame == NULL) {
-    if (schunk->storage->path != NULL) {
+    if (schunk->storage->urlpath != NULL) {
       BLOSC_TRACE_ERROR("The persistent sparse storage is not supported yet.");
       return -1;
     }
@@ -575,7 +575,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
  * is returned instead.
 */
 int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, bool *needs_free) {
-  if (!schunk->storage->sequential && schunk->storage->path != NULL){
+  if (!schunk->storage->sequential && schunk->storage->urlpath != NULL){
     return eframe_get_chunk(schunk->frame, nchunk, chunk, needs_free);
   }
   if (schunk->frame != NULL) {

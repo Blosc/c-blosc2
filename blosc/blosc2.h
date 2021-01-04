@@ -938,7 +938,8 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 typedef struct {
     bool sequential;
     //!< Whether the chunks are sequential (frame) or sparse.
-    char* path;
+    char*
+    urlpath;
     //!< The path for persistent storage. If NULL, that means in-memory.
     blosc2_cparams* cparams;
     //!< The compression params when creating a schunk.
@@ -1032,7 +1033,7 @@ typedef struct blosc2_schunk {
  *
  * @param storage The storage properties.
  *
- * @remark In case that storage.path is not NULL, the data is stored
+ * @remark In case that storage.urlpath is not NULL, the data is stored
  * on-disk.  If the data file(s) exist, they are *overwritten*.
  *
  * @return The new super-chunk.
@@ -1046,7 +1047,7 @@ blosc2_schunk_new(blosc2_storage storage);
  * @param nchunks The number of non-initialized chunks in the super-chunk.
  * @param storage The storage properties.
  *
- * @remark In case that storage.path is not NULL, the data is stored
+ * @remark In case that storage.urlpath is not NULL, the data is stored
  * on-disk.  If the data file(s) exist, they are *overwritten*.
  *
  * @return The new super-chunk.
@@ -1059,7 +1060,7 @@ blosc2_schunk_empty(int nchunks, blosc2_storage storage);
  *
  * @param storage The storage properties of the source.
  *
- * @remark The storage.path must be not NULL and it should exist on-disk.
+ * @remark The storage.urlpath must be not NULL and it should exist on-disk.
  * New data or metadata can be appended or updated.
  *
  * @return The new super-chunk.

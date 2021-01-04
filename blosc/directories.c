@@ -45,14 +45,13 @@
       sprintf(fname, "%s\\%s", dir_path, cfile.name);
 
       ret = remove(fname);
+      free(fname);
       if (ret < 0) {
         BLOSC_TRACE_ERROR("Could not remove file %s", fname);
-        free(fname);
         free(path);
         _findclose(file);
         return -1;
       }
-      free(fname);
     }
 
     rmdir(dir_path);
@@ -67,7 +66,7 @@
   #include <dirent.h>
 
 /* Function needed for removing each time the directory */
-int blosc2_remove_dir(const char *dir_path) {
+int blosc2_remove_dir(const char* dir_path) {
   char last_char = dir_path[strlen(dir_path) - 1];
   char* path;
   if (last_char != '\\' || last_char != '/'){
@@ -79,7 +78,7 @@ int blosc2_remove_dir(const char *dir_path) {
     strcpy(path, dir_path);
   }
 
-  DIR *dr = opendir(path);
+  DIR* dr = opendir(path);
   struct stat statbuf;
   if (dr == NULL) {
     BLOSC_TRACE_ERROR("No file or directory found.");
@@ -91,7 +90,7 @@ int blosc2_remove_dir(const char *dir_path) {
   char* fname;
   while ((de = readdir(dr)) != NULL) {
     fname = malloc(strlen(path) + strlen(de->d_name) + 1);
-    sprintf(fname,"%s%s",path,de->d_name);
+    sprintf(fname, "%s%s", path, de->d_name);
     if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")) {
       free(fname);
       continue;

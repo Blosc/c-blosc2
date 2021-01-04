@@ -71,7 +71,7 @@ static char* test_frame(void) {
     cparams.nthreads = 1;
     dparams.nthreads = 1;
   }
-  blosc2_storage storage = {.sequential=true, .path=fname, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.sequential=true, .urlpath=fname, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
   mu_assert("blosc2_schunk_new() failed", schunk != NULL);
   char* content = "This is a pretty long string with a good number of chars";
@@ -95,7 +95,7 @@ static char* test_frame(void) {
     if (free_new) {
       if (fname != NULL) {
         blosc2_schunk_free(schunk);
-        blosc2_storage storage2 = {.sequential=true, .path=fname};
+        blosc2_storage storage2 = {.sequential=true, .urlpath=fname};
         schunk = blosc2_schunk_open(storage2);
         mu_assert("blosc2_schunk_open() failed", schunk != NULL);
       } else {
@@ -177,7 +177,7 @@ static char* test_frame(void) {
     if (free_new) {
       if (fname != NULL) {
         blosc2_schunk_free(schunk);
-        blosc2_storage storage2 = {.sequential=true, .path=fname};
+        blosc2_storage storage2 = {.sequential=true, .urlpath=fname};
         schunk = blosc2_schunk_open(storage2);
       } else {
         // Dump the schunk to a sframe and regenerate it from there

@@ -24,14 +24,14 @@ bool free_new;
 bool filter_pipeline;
 bool metalayers;
 bool usermeta;
-char *directory;
+char* directory;
 char buf[256];
 
 
 static char* test_eframe(void) {
   size_t isize = CHUNKSIZE * sizeof(int32_t);
-  int32_t *data = malloc(isize);
-  int32_t *data_dest = malloc(isize);
+  int32_t* data = malloc(isize);
+  int32_t* data_dest = malloc(isize);
   int dsize;
   int64_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -65,7 +65,7 @@ static char* test_eframe(void) {
     cparams.nthreads = 1;
     dparams.nthreads = 1;
   }
-  blosc2_storage storage = {.sequential=false, .path=directory, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.sequential=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
   mu_assert("blosc2_schunk_new() failed", schunk != NULL);
   char* content = "This is a pretty long string with a good number of chars";
@@ -88,7 +88,7 @@ static char* test_eframe(void) {
   if (free_new) {
     blosc2_schunk_free(schunk);
   }
-  blosc2_storage storage2 = {.sequential=false, .path=directory};
+  blosc2_storage storage2 = {.sequential=false, .urlpath=directory};
   schunk = blosc2_schunk_open(storage2);
   mu_assert("blosc2_schunk_open() failed", schunk != NULL);
 
@@ -167,7 +167,7 @@ static char* test_eframe(void) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
     for (int i = 0; i < CHUNKSIZE; i++) {
-      mu_assert("ERROR: bad roundtrip",data_dest[i] == i + nchunk * CHUNKSIZE);
+      mu_assert("ERROR: bad roundtrip", data_dest[i] == i + nchunk * CHUNKSIZE);
     }
   }
 
@@ -194,7 +194,7 @@ static char* test_eframe(void) {
   }
 
   /* Remove directory */
-  blosc2_remove_dir(storage.path);
+  blosc2_remove_dir(storage.urlpath);
   /* Free resources */
   free(data_dest);
   free(data);
@@ -246,12 +246,12 @@ static char* test_eframe_simple(void) {
     /* Check integrity of the second chunk (made of non-zeros) */
     blosc2_schunk_decompress_chunk(schunk, 1, data_dest, isize);
     for (int i = 0; i < CHUNKSIZE; i++) {
-      mu_assert("Decompressed data differs from original",data_dest[i]==(i+1));
+      mu_assert("Decompressed data differs from original", data_dest[i]==(i+1));
     }
   }
 
   /* Remove directory */
-  blosc2_remove_dir(storage.path);
+  blosc2_remove_dir(storage.urlpath);
   /* Free resources */
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */

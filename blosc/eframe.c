@@ -37,12 +37,12 @@
 
 
 /* Append an existing chunk into an extended frame. */
-void* eframe_append_chunk(blosc2_frame *frame, uint8_t *chunk, int32_t nchunk, int64_t cbytes) {
+void* eframe_append_chunk(blosc2_frame* frame, uint8_t* chunk, int32_t nchunk, int64_t cbytes) {
   //get directory/nchunk.chunk
-  char* chunkname = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-  sprintf(chunkname,"%s/%08X.chunk", frame->urlpath, nchunk);
-  FILE* fpc = fopen(chunkname,"wb");
-  free(chunkname);
+  char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+  sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
+  FILE* fpc = fopen(chunkpath, "wb");
+  free(chunkpath);
 
   size_t wbytes = fwrite(chunk, 1, (size_t)cbytes, fpc);
   fclose(fpc);
@@ -55,12 +55,12 @@ void* eframe_append_chunk(blosc2_frame *frame, uint8_t *chunk, int32_t nchunk, i
 
 
 /*Get chunk from extended frame. */
-int eframe_get_chunk(blosc2_frame *frame, int64_t nchunk, uint8_t **chunk, bool *needs_free){
+int eframe_get_chunk(blosc2_frame* frame, int64_t nchunk, uint8_t** chunk, bool* needs_free){
   //get directory/nchunk.chunk
-  char* chunkname = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-  sprintf(chunkname,"%s/%08X.chunk", frame->urlpath, nchunk);
-  FILE* fpc = fopen(chunkname,"rb");
-  free(chunkname);
+  char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+  sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
+  FILE* fpc = fopen(chunkpath, "rb");
+  free(chunkpath);
   if(fpc == NULL){
     BLOSC_TRACE_ERROR("Cannot open the chunkfile.");
     return -1;

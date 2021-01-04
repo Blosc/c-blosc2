@@ -43,7 +43,7 @@ static char* test_lazy_chunk(void) {
   cparams.nthreads = nthreads;
   cparams.blocksize = BLOCKSIZE * cparams.typesize;
   dparams.nthreads = nthreads;
-  blosc2_storage storage = {.sequential=false, .path=directory, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.sequential=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
@@ -96,13 +96,12 @@ static char* test_lazy_chunk(void) {
   }
 
   /* Remove directory */
-  blosc2_remove_dir(storage.path);
+  blosc2_remove_dir(storage.urlpath);
   /* Free resources */
   blosc2_schunk_free(schunk);
 
   /* Destroy the Blosc environment */
   blosc_destroy();
-
 
   return EXIT_SUCCESS;
 }
@@ -185,7 +184,7 @@ static char *all_tests(void) {
 
 
 int main(void) {
-  char *result;
+  char* result;
 
   install_blosc_callback_test(); /* optionally install callback test */
   blosc_init();

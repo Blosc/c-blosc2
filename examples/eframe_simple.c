@@ -96,7 +96,7 @@ int main(void) {
   printf("Successful roundtrip data <-> schunk !\n");
 
   /* Remove directory */
-  blosc2_remove_dir(storage.path);
+  blosc2_remove_dir(storage.urlpath);
   /* Free resources */
   /* Destroy the super-chunk */
   blosc2_schunk_free(schunk);
