@@ -92,7 +92,7 @@ blosc2_frame* blosc2_frame_new(const char* fname) {
 /* Free memory from a frame. */
 int blosc2_frame_free(blosc2_frame *frame) {
 
-  if (frame->sdata != NULL) {
+  if (frame->sdata != NULL && !frame->avoid_sdata_free) {
     free(frame->sdata);
   }
 
@@ -800,6 +800,7 @@ blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy) 
   }
   else {
     frame->sdata = sframe;
+    frame->avoid_sdata_free = true;
   }
 
   return frame;
