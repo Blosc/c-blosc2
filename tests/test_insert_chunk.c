@@ -60,7 +60,7 @@ static char* test_insert_schunk(void) {
     mu_assert("ERROR: chunk cannot be compressed", csize >= 0);
 
     // Insert in a random position
-    int pos = rand() % schunk->nchunks;
+    int pos = rand() % (schunk->nchunks + 1);
     int _nchunks = blosc2_schunk_insert_chunk(schunk, pos, chunk, copy);
     mu_assert("ERROR: chunk cannot be inserted correctly", _nchunks > 0);
 
@@ -111,6 +111,16 @@ static char *all_tests(void) {
   nchunks = 12;
   n_insertions = 24;
   copy = true;
+  mu_run_test(test_insert_schunk);
+
+  nchunks = 0;
+  n_insertions = 24;
+  copy = true;
+  mu_run_test(test_insert_schunk);
+
+  nchunks = 0;
+  n_insertions = 3;
+  copy = false;
   mu_run_test(test_insert_schunk);
 
 
