@@ -16,9 +16,34 @@
 
 /* Global vars */
 int tests_run = 0;
-int nchunks;
-int n_updates;
 
+typedef struct {
+  int nchunks;
+  int nupdates;
+  char* urlpath;
+  bool squential;
+} test_data;
+
+test_data tdata = {};
+
+typedef struct {
+  int nchunks;
+  int nupdates;
+} test_ndata;
+
+typedef struct {
+  bool squential;
+  char *urlpath;
+}test_storage;
+
+test_ndata tndata[] = {{10, 4},
+                       {5,  0},
+                       {33, 32},
+                       {1,  0}};
+
+test_storage tstorage[] = {{false, NULL},  // memory - schunk
+                           {true, NULL},  // memory - frame
+                           {true, "test_update_chunk.b2frame"}};  // disk - frame
 
 static char* test_update_chunk(void) {
   static int32_t data[CHUNKSIZE];
@@ -38,11 +63,14 @@ static char* test_update_chunk(void) {
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
+                            .path = tdata.urlpath,
+                            .sequential = tdata.squential};
+
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
-  for (int nchunk = 0; nchunk < nchunks; nchunk++) {
+  for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
@@ -51,7 +79,7 @@ static char* test_update_chunk(void) {
   }
 
   // Check that the chunks have been decompressed correctly
-  for (int nchunk = 0; nchunk < nchunks; nchunk++) {
+  for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
     for (int i = 0; i < CHUNKSIZE; i++) {
@@ -59,7 +87,7 @@ static char* test_update_chunk(void) {
     }
   }
 
-  for (int i = 0; i < n_updates; ++i) {
+  for (int i = 0; i < tdata.nupdates; ++i) {
     // Create chunk
     for (int j = 0; j < CHUNKSIZE; ++j) {
       data[j] = i;
@@ -93,26 +121,16 @@ static char* test_update_chunk(void) {
 }
 
 static char *all_tests(void) {
+  for (int i = 0; i < sizeof(tstorage) / sizeof(test_storage); ++i) {
+    for (int j = 0; j < sizeof(tndata) / sizeof(test_ndata); ++j) {
+      tdata.squential = tstorage[i].squential;
+      tdata.urlpath = tstorage[i].urlpath;
+      tdata.nchunks = tndata[i].nchunks;
+      tdata.nupdates = tndata[i].nupdates;
 
-  nchunks = 10;
-  n_updates = 4;
-  mu_run_test(test_update_chunk);
-
-  nchunks = 5;
-  n_updates = 0;
-  mu_run_test(test_update_chunk);
-
-  nchunks = 33;
-  n_updates = 32;
-  mu_run_test(test_update_chunk);
-
-  nchunks = 1;
-  n_updates = 0;
-  mu_run_test(test_update_chunk);
-
-  nchunks = 1;
-  n_updates = 0;
-  mu_run_test(test_update_chunk);
+      mu_run_test(test_update_chunk);
+    }
+  }
 
   return EXIT_SUCCESS;
 }

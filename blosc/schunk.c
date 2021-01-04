@@ -409,7 +409,6 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
 
 
 int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy) {
-  int32_t nchunks = schunk->nchunks;
   int32_t nbytes = sw32_(chunk + BLOSC2_CHUNK_NBYTES);
   int32_t cbytes = sw32_(chunk + BLOSC2_CHUNK_CBYTES);
 
@@ -417,7 +416,7 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     schunk->chunksize = nbytes;  // The super-chunk is initialized now
   }
 
-  if ((schunk->chunksize != 0) && (nbytes > schunk->chunksize)) {
+  if ((schunk->chunksize != 0) && (nbytes != schunk->chunksize)) {
     BLOSC_TRACE_ERROR("Inserting chunks that have different lengths in the same schunk "
                       "is not supported yet: %d > %d.", nbytes, schunk->chunksize);
     return -1;
@@ -443,23 +442,6 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     schunk->cbytes += cbytes;
     schunk->cbytes -= cbytes_old;
 
-    // Check that we are not appending a small chunk after another small chunk
-    if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize) && (nchunk == nchunks - 1)) {
-      uint8_t* last_chunk = schunk->data[nchunks - 1];
-      int32_t last_nbytes;
-      if (last_chunk == 0) {
-        last_nbytes = 0;
-      } else {
-        last_nbytes = sw32_(last_chunk + BLOSC2_CHUNK_NBYTES);
-      }
-      if ((last_nbytes < schunk->chunksize) && (nbytes < schunk->chunksize)) {
-        BLOSC_TRACE_ERROR("Appending two consecutive chunks with a chunksize smaller "
-                          "than the schunk chunksize is not allowed yet: %d != %d.",
-                          nbytes, schunk->chunksize);
-        return -1;
-      }
-    }
-
     if (copy) {
       // Make a copy of the chunk
       uint8_t *chunk_copy = malloc(cbytes);
@@ -478,8 +460,10 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     schunk->data[nchunk] = chunk;
   }
   else {
-    BLOSC_TRACE_ERROR("Updating chunks in a frame is not allowed yet.");
-    return -1;
+    if (frame_update_chunk(schunk->frame, nchunk, chunk, schunk) == NULL) {
+        BLOSC_TRACE_ERROR("Problems updating a chunk in a frame.");
+        return -1;
+    }
   }
 
   return schunk->nchunks;
