@@ -938,8 +938,7 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 typedef struct {
     bool sequential;
     //!< Whether the chunks are sequential (frame) or sparse.
-    char*
-    urlpath;
+    char* urlpath;
     //!< The path for persistent storage. If NULL, that means in-memory.
     blosc2_cparams* cparams;
     //!< The compression params when creating a schunk.

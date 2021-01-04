@@ -1025,11 +1025,11 @@ static int blosc_d(
     int64_t chunk_offset;
     if (context->schunk->frame->eframe) {
       // The nchunk of the actual chunk is in the trailer
-      nchunk = *(int32_t *)(src + non_lazy_chunklen);
+      nchunk = *(int32_t*)(src + non_lazy_chunklen);
     }
     else {
       // The offset of the actual chunk is in the trailer
-      chunk_offset = *(int64_t *)(src + non_lazy_chunklen + sizeof(int32_t));
+      chunk_offset = *(int64_t*)(src + non_lazy_chunklen + sizeof(int32_t));
     }
     // Get the csize of the nblock
     int32_t *block_csizes = (int32_t *)(src + non_lazy_chunklen + sizeof(int32_t) + sizeof(int64_t));
