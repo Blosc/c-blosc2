@@ -91,6 +91,10 @@ int main(void) {
   cbytes = schunk->cbytes;
   printf("Compression super-chunk: %ld -> %ld (%.1fx)\n",
          (long)nbytes, (long)cbytes, (1. * nbytes) / cbytes);
+  int64_t nbytes_off = nchunks * sizeof(int64_t) * 2;
+  int64_t cbytes_off = schunk->frame->len - cbytes;
+  printf("Compressed offsets: %ld -> %ld (%.1fx)\n",
+         (long)nbytes_off, (long)cbytes_off, (1. * nbytes_off) / cbytes_off);
 
   /* Retrieve and decompress the chunks */
   blosc_set_timestamp(&last);

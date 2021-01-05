@@ -106,7 +106,7 @@ using the msgpack format. Here is the format for the *metalayers*::
         :``2``:
             64-bit
         :``3``:
-            Reserved
+            128-bit
     :``6``:
         Chunks of fixed length (0) or variable length (1)
     :``7``:
