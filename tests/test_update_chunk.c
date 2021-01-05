@@ -47,6 +47,7 @@ test_storage tstorage[] = {
     {false, NULL},  // memory - schunk
     {true, NULL},  // memory - frame
     {true, "test_update_chunk.b2frame"}, // disk - frame
+    {false, "test_eframe_update_chunk.b2frame"}, // disk - eframe
 };
 
 static char* test_update_chunk(void) {
@@ -68,7 +69,7 @@ static char* test_update_chunk(void) {
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
-                            .path = tdata.urlpath,
+                            .urlpath = tdata.urlpath,
                             .sequential = tdata.sequential};
 
   schunk = blosc2_schunk_new(storage);
@@ -118,6 +119,9 @@ static char* test_update_chunk(void) {
     }
   }
   /* Free resources */
+  if (!storage.sequential && storage.urlpath != NULL) {
+    blosc2_remove_dir(storage.urlpath);
+  }
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
