@@ -422,20 +422,28 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     return -1;
   }
 
+  bool needs_free;
+  uint8_t *chunk_old;
+  int err = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_old, &needs_free);
+  if (err < 0) {
+    BLOSC_TRACE_ERROR("%d chunk con not obtenined from schunk.", nchunk);
+  }
+  int32_t cbytes_old;
+  int32_t nbytes_old;
+
+  if (chunk_old == 0) {
+    nbytes_old = 0;
+    cbytes_old = 0;
+  } else {
+    nbytes_old = sw32_(chunk_old + BLOSC2_CHUNK_NBYTES);
+    cbytes_old = sw32_(chunk_old + BLOSC2_CHUNK_CBYTES);
+  }
+  if (needs_free) {
+    free(chunk_old);
+  }
+
   // Update super-chunk or frame
   if (schunk->frame == NULL) {
-    uint8_t *chunk_old = schunk->data[nchunk];
-    int32_t cbytes_old;
-    int32_t nbytes_old;
-
-    if (chunk_old == 0) {
-      nbytes_old = 0;
-      cbytes_old = 0;
-    } else {
-      nbytes_old = sw32_(chunk_old + BLOSC2_CHUNK_NBYTES);
-      cbytes_old = sw32_(chunk_old + BLOSC2_CHUNK_CBYTES);
-    }
-
     /* Update counters */
     schunk->nbytes += nbytes;
     schunk->nbytes -= nbytes_old;
@@ -460,6 +468,10 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     schunk->data[nchunk] = chunk;
   }
   else {
+    /* Update counters */
+    schunk->nbytes += nbytes;
+    schunk->cbytes += cbytes;
+
     if (frame_update_chunk(schunk->frame, nchunk, chunk, schunk) == NULL) {
         BLOSC_TRACE_ERROR("Problems updating a chunk in a frame.");
         return -1;

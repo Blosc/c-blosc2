@@ -31,23 +31,25 @@ typedef struct {
   int nupdates;
 } test_ndata;
 
-typedef struct {
-  bool squential;
-  char *urlpath;
-}test_storage;
-
 test_ndata tndata[] = {{10, 4},
                        {5,  0},
                        {33, 32},
                        {1,  0}};
 
-test_storage tstorage[] = {{false, NULL},  // memory - schunk
-                           {true, NULL},  // memory - frame
-                           {true, "test_update_chunk.b2frame"}};  // disk - frame
+typedef struct {
+  bool sequential;
+  char *urlpath;
+}test_storage;
+
+test_storage tstorage[] = {
+    {false, NULL},  // memory - schunk
+    {true, NULL},  // memory - frame
+    {true, "test_update_chunk.b2frame"}, // disk - frame
+};
 
 static char* test_update_chunk(void) {
   static int32_t data[CHUNKSIZE];
-  static int32_t data_dest[CHUNKSIZE];
+  int32_t *data_dest = malloc(CHUNKSIZE * sizeof(int32_t));
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -109,7 +111,8 @@ static char* test_update_chunk(void) {
     dsize = blosc2_schunk_decompress_chunk(schunk, pos, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
     for (int j = 0; j < CHUNKSIZE; j++) {
-      mu_assert("ERROR: bad roundtrip", data_dest[j] == i);
+      int32_t a = data_dest[j];
+      mu_assert("ERROR: bad roundtrip", a == i);
     }
   }
   /* Free resources */
@@ -117,13 +120,15 @@ static char* test_update_chunk(void) {
   /* Destroy the Blosc environment */
   blosc_destroy();
 
+  free(data_dest);
+
   return EXIT_SUCCESS;
 }
 
 static char *all_tests(void) {
   for (int i = 0; i < sizeof(tstorage) / sizeof(test_storage); ++i) {
     for (int j = 0; j < sizeof(tndata) / sizeof(test_ndata); ++j) {
-      tdata.squential = tstorage[i].squential;
+      tdata.squential = tstorage[i].sequential;
       tdata.urlpath = tstorage[i].urlpath;
       tdata.nchunks = tndata[i].nchunks;
       tdata.nupdates = tndata[i].nupdates;

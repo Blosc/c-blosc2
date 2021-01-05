@@ -1699,6 +1699,9 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
       BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
       return NULL;
     }
+    if (coffsets_cbytes == 0) {
+      coffsets_cbytes = cbytes;
+    }
 
     // Decompress offsets
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
@@ -1768,7 +1771,6 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
       frame->coffsets = NULL;
     }
   }
-  free(chunk);
   free(off_chunk);
 
   frame->len = new_frame_len;
