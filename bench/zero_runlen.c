@@ -17,9 +17,10 @@
 #define MB  (1024*KB)
 #define GB  (1024*MB)
 
-#define NCHUNKS 200
+#define NCHUNKS 2000
 #define CHUNKSIZE (500 * 1000)
 #define NTHREADS 4
+#define ACTIVATE_ZERO_DETECTION false
 
 
 void fill_buffer(int32_t *buffer) {
@@ -61,14 +62,25 @@ int main(void) {
 
   /* Append the chunks */
   blosc_set_timestamp(&last);
+  void* chunk = malloc(BLOSC_EXTENDED_HEADER_LENGTH);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    fill_buffer(data_buffer);
-    nchunks = blosc2_schunk_append_buffer(schunk, data_buffer, isize);
+    if (ACTIVATE_ZERO_DETECTION) {
+      fill_buffer(data_buffer);
+      nchunks = blosc2_schunk_append_buffer(schunk, data_buffer, isize);
+    }
+    else {
+      int csize = blosc2_chunk_zeros(isize, sizeof(int32_t), chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+      if (csize < 0) {
+        printf("Error creating chunk: %d\n", csize);
+      }
+      nchunks = blosc2_schunk_append_chunk(schunk, chunk, true);
+    }
     if (nchunks < 0) {
-      printf("Error appending chunk %d\n", nchunks);
+      printf("Error appending chunk: %d\n", nchunks);
     }
   }
   blosc_set_timestamp(&current);
+  free(chunk);
   totaltime = blosc_elapsed_secs(last, current);
   printf("[Compr] Elapsed time:\t %6.3f s."
                  "  Processed data: %.3f GB (%.3f GB/s)\n",

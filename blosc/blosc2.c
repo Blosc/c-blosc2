@@ -3254,3 +3254,23 @@ int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks) {
 
   return 0;
 }
+
+
+/* Create a chunk made of zeros */
+int blosc2_chunk_zeros(const size_t nbytes, const size_t typesize, void* dest, size_t destsize) {
+  if (destsize < BLOSC_EXTENDED_HEADER_LENGTH) {
+    BLOSC_TRACE_ERROR("dest buffer is not long enough");
+    return -1;
+  }
+  uint8_t* dest_ = dest;
+
+  memset(dest, 0, BLOSC_EXTENDED_HEADER_LENGTH);
+  dest_[BLOSC2_CHUNK_VERSION] = BLOSC_VERSION_FORMAT;
+  dest_[BLOSC2_CHUNK_VERSIONLZ] = BLOSC_BLOSCLZ_VERSION_FORMAT;
+  *(int32_t*)(dest_ + BLOSC2_CHUNK_NBYTES) = nbytes;
+  *(int32_t*)(dest_ + BLOSC2_CHUNK_BLOCKSIZE) = nbytes;
+  *(int32_t*)(dest_ + BLOSC2_CHUNK_CBYTES) = BLOSC_MAX_OVERHEAD;
+  dest_[BLOSC2_CHUNK_BLOSC2_FLAGS] = 0x10;  // mark block as all zeros
+
+  return BLOSC_EXTENDED_HEADER_LENGTH;
+}
