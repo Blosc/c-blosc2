@@ -21,20 +21,22 @@ typedef struct {
   int nchunks;
   int nupdates;
   char* urlpath;
-  bool squential;
+  bool sequential;
 } test_data;
 
-test_data tdata = {};
+test_data tdata;
 
 typedef struct {
   int nchunks;
   int nupdates;
 } test_ndata;
 
-test_ndata tndata[] = {{10, 4},
-                       {5,  0},
-                       {33, 32},
-                       {1,  0}};
+test_ndata tndata[] = {
+    {10, 4},
+    {5,  0},
+    {33, 32},
+    {1,  0}
+};
 
 typedef struct {
   bool sequential;
@@ -67,7 +69,7 @@ static char* test_update_chunk(void) {
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .path = tdata.urlpath,
-                            .sequential = tdata.squential};
+                            .sequential = tdata.sequential};
 
   schunk = blosc2_schunk_new(storage);
 
@@ -128,10 +130,10 @@ static char* test_update_chunk(void) {
 static char *all_tests(void) {
   for (int i = 0; i < sizeof(tstorage) / sizeof(test_storage); ++i) {
     for (int j = 0; j < sizeof(tndata) / sizeof(test_ndata); ++j) {
-      tdata.squential = tstorage[i].sequential;
+      tdata.sequential = tstorage[i].sequential;
       tdata.urlpath = tstorage[i].urlpath;
-      tdata.nchunks = tndata[i].nchunks;
-      tdata.nupdates = tndata[i].nupdates;
+      tdata.nchunks = tndata[j].nchunks;
+      tdata.nupdates = tndata[j].nupdates;
 
       mu_run_test(test_update_chunk);
     }

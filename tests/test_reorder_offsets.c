@@ -16,9 +16,29 @@
 
 /* Global vars */
 int tests_run = 0;
-int nchunks;
-bool serialized;
-char* filename;
+
+
+
+typedef struct {
+  int nchunks;
+  char* urlpath;
+  bool sequential;
+} test_data;
+
+test_data tdata;
+
+typedef struct {
+  bool sequential;
+  char *urlpath;
+}test_storage;
+
+test_storage tstorage[] = {
+    {false, NULL},  // memory - schunk
+    {true, NULL},  // memory - frame
+    {true, "test_insert_chunk.b2frame"}, // disk - frame
+};
+
+int32_t tnchunks[] = {5, 12, 24, 33, 1};
 
 int32_t *data;
 int32_t *data_dest;
@@ -37,11 +57,11 @@ static char* test_reorder_offsets(void) {
   cparams.typesize = sizeof(int32_t);
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {.sequential=true, .path=filename, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.sequential=tdata.sequential, .path=tdata.urlpath, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
-  for (int nchunk = 0; nchunk < nchunks; nchunk++) {
+  for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
@@ -49,15 +69,15 @@ static char* test_reorder_offsets(void) {
     mu_assert("ERROR: bad append in frame", nchunks_ > 0);
   }
 
-  int *offsets_order = malloc(sizeof(int) * nchunks);
-  for (int i = 0; i < nchunks; ++i) {
-    offsets_order[i] = (i + 3) % nchunks;
+  int *offsets_order = malloc(sizeof(int) * tdata.nchunks);
+  for (int i = 0; i < tdata.nchunks; ++i) {
+    offsets_order[i] = (i + 3) % tdata.nchunks;
   }
   int err = blosc2_schunk_reorder_offsets(schunk, offsets_order);
   mu_assert("ERROR: can not reorder chunks", err >= 0);
 
   // Check that the chunks have been decompressed correctly
-  for (int nchunk = 0; nchunk < nchunks; nchunk++) {
+  for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
     for (int i = 0; i < CHUNKSIZE; i++) {
@@ -77,35 +97,17 @@ static char* test_reorder_offsets(void) {
 
 static char *all_tests(void) {
 
-  nchunks = 5;
-  serialized = false;
-  filename = NULL;
-  mu_run_test(test_reorder_offsets);
+  for (int i = 0; i < sizeof(tstorage) / sizeof(test_storage); ++i) {
+    for (int j = 0; j < sizeof(tnchunks) / sizeof(int32_t); ++j) {
 
-  nchunks = 13;
-  serialized = false;
-  filename = NULL;
-  mu_run_test(test_reorder_offsets);
+      tdata.sequential = tstorage[i].sequential;
+      tdata.urlpath = tstorage[i].urlpath;
+      tdata.nchunks = tnchunks[j];
 
-  nchunks = 44;
-  serialized = true;
-  filename = NULL;
-  mu_run_test(test_reorder_offsets);
+      mu_run_test(test_reorder_offsets);
 
-  nchunks = 13;
-  serialized = true;
-  filename = NULL;
-  mu_run_test(test_reorder_offsets);
-
-  nchunks = 23;
-  serialized = true;
-  filename = "test_reorder_offsets.b2frame";
-  mu_run_test(test_reorder_offsets);
-
-  nchunks = 13;
-  serialized = true;
-  filename = "test_reorder_offsets2.b2frame";
-  mu_run_test(test_reorder_offsets);
+    }
+  }
 
   return EXIT_SUCCESS;
 }
