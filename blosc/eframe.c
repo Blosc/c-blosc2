@@ -50,12 +50,13 @@ void* eframe_append_chunk(blosc2_frame* frame, uint8_t* chunk, int32_t nchunk, i
     BLOSC_TRACE_ERROR("Cannot write the full chunk.");
     return NULL;
   }
+
   return frame;
 }
 
 
 /*Get chunk from extended frame. */
-int eframe_get_chunk(blosc2_frame* frame, int64_t nchunk, uint8_t** chunk, bool* needs_free){
+int eframe_get_chunk(blosc2_frame* frame, int32_t nchunk, uint8_t** chunk, bool* needs_free){
   //get directory/nchunk.chunk
   char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
   sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
