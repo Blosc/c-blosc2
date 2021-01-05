@@ -92,7 +92,7 @@ blosc2_frame* blosc2_frame_new(const char* fname) {
 /* Free memory from a frame. */
 int blosc2_frame_free(blosc2_frame *frame) {
 
-  if (frame->sdata != NULL) {
+  if (frame->sdata != NULL && !frame->avoid_sdata_free) {
     free(frame->sdata);
   }
 
@@ -439,9 +439,16 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
     *nchunks = (int32_t) (*nbytes / *chunksize);
     if (*nbytes % *chunksize > 0) {
       if (*nchunks == INT32_MAX) {
+        BLOSC_TRACE_ERROR("Number of chunks exceeds maximum allowed.");
         return -1;
       }
       *nchunks += 1;
+    }
+
+    // Sanity check for compressed sizes
+    if ((*cbytes < 0) || (*nbytes > 0 && *cbytes == 0) || ((int64_t)*nchunks * *chunksize < *nbytes)) {
+      BLOSC_TRACE_ERROR("Invalid compressed size in frame header.");
+      return -1;
     }
   } else {
     *nchunks = 0;
@@ -800,6 +807,7 @@ blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy) 
   }
   else {
     frame->sdata = sframe;
+    frame->avoid_sdata_free = true;
   }
 
   return frame;

@@ -1109,9 +1109,18 @@ static int blosc_d(
     }
     else if (cbytes < 0) {
       // A negative number means some encoding depending on the token that comes next
-      uint8_t token = src[0];
+      uint8_t token;
+
+      if (srcsize < sizeof(uint8_t)) {
+        // Not enough input to read token */
+        return -1;
+      }
+      srcsize -= sizeof(uint8_t);
+
+      token = src[0];
       src += 1;
       ctbytes += 1;
+
       if (token & 0x1) {
         // A run of bytes that are different than 0
         if (cbytes < -255) {
