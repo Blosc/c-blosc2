@@ -74,7 +74,7 @@ if(NOT WIN32)
 endif()
 
 cmake_minimum_required(VERSION 2.8.10)
-if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} GREATER 3.4)
+if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_GREATER 3.4)
   cmake_policy(SET CMP0063 NEW)
 endif()
 project(blosc LANGUAGES C)
