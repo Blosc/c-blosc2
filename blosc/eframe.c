@@ -37,10 +37,11 @@
 
 
 /* Append an existing chunk into an extended frame. */
-void* eframe_append_chunk(blosc2_frame* frame, uint8_t* chunk, int32_t nchunk, int64_t cbytes) {
-  //get directory/nchunk.chunk
-  char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-  sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
+void* eframe_append_chunk(blosc2_frame* frame, uint8_t* chunk, int64_t nchunk, int64_t cbytes) {
+  // Get directory/nchunk.chunk with 16 zeros of padding
+  char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 16 + strlen(".chunk") + 1);
+  // j for printing int64_t values
+  sprintf(chunkpath, "%s/%016jX.chunk", frame->urlpath, nchunk);
   FILE* fpc = fopen(chunkpath, "wb");
   free(chunkpath);
 
@@ -56,10 +57,11 @@ void* eframe_append_chunk(blosc2_frame* frame, uint8_t* chunk, int32_t nchunk, i
 
 
 /*Get chunk from extended frame. */
-int eframe_get_chunk(blosc2_frame* frame, int32_t nchunk, uint8_t** chunk, bool* needs_free){
+int eframe_get_chunk(blosc2_frame* frame, int64_t nchunk, uint8_t** chunk, bool* needs_free){
   //get directory/nchunk.chunk
-  char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-  sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
+  char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 16 + strlen(".chunk") + 1);
+  // j for printing int64_t values
+  sprintf(chunkpath, "%s/%016jX.chunk", frame->urlpath, nchunk);
   FILE* fpc = fopen(chunkpath, "rb");
   free(chunkpath);
   if(fpc == NULL){

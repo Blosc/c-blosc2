@@ -10,7 +10,7 @@
 #define BLOSC_EFRAME_H
 
 
-void* eframe_append_chunk(blosc2_frame* frame, uint8_t* chunk, int32_t nchunk, int64_t cbytes);
-int eframe_get_chunk(blosc2_frame* frame, int32_t nchunk, uint8_t** chunk, bool* needs_free);
+void* eframe_append_chunk(blosc2_frame* frame, uint8_t* chunk, int64_t nchunk, int64_t cbytes);
+int eframe_get_chunk(blosc2_frame* frame, int64_t nchunk, uint8_t** chunk, bool* needs_free);
 
 #endif //BLOSC_EFRAME_H
