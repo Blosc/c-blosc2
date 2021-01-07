@@ -427,8 +427,10 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   }
 
   else {
-    BLOSC_TRACE_ERROR("Frames are not allowed yet.");
-    return -1;
+    if (frame_insert_chunk(schunk->frame, nchunk, chunk, schunk) == NULL) {
+      BLOSC_TRACE_ERROR("Problems updating a chunk in a frame.");
+      return -1;
+    }
   }
   return schunk->nchunks;
 }

@@ -31,10 +31,12 @@ typedef struct {
   int nupdates;
 } test_ndata;
 
-test_ndata tndata[] = {{10, 4},
-                       {5,  0},
-                       {33, 32},
-                       {1,  0}};
+test_ndata tndata[] = {
+    {10, 4},
+    {5,  0},
+    {33, 32},
+    {1,  0}
+};
 
 typedef struct {
   bool sequential;
@@ -134,8 +136,8 @@ static char *all_tests(void) {
     for (int j = 0; j < sizeof(tndata) / sizeof(test_ndata); ++j) {
       tdata.sequential = tstorage[i].sequential;
       tdata.urlpath = tstorage[i].urlpath;
-      tdata.nchunks = tndata[i].nchunks;
-      tdata.nupdates = tndata[i].nupdates;
+      tdata.nchunks = tndata[j].nchunks;
+      tdata.nupdates = tndata[j].nupdates;
 
       mu_run_test(test_update_chunk);
     }
