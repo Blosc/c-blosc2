@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include "blosc2.h"
+#include "frame.h"
 
 
 #define KB  1024
@@ -91,7 +92,9 @@ int main(void) {
   cbytes = schunk->cbytes;
   printf("Compression super-chunk: %ld -> %ld (%.1fx)\n",
          (long)nbytes, (long)cbytes, (1. * nbytes) / cbytes);
-  int64_t nbytes_off = nchunks * sizeof(int64_t) * 2;
+
+  uint8_t offset_bytes = 1 << (((schunk->frame->sdata[FRAME_FLAGS] & 0x30) >> 4) + 1);
+  int64_t nbytes_off = nchunks * offset_bytes;
   int64_t cbytes_off = schunk->frame->len - cbytes;
   printf("Compressed offsets: %ld -> %ld (%.1fx)\n",
          (long)nbytes_off, (long)cbytes_off, (1. * nbytes_off) / cbytes_off);

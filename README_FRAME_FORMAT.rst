@@ -17,7 +17,7 @@ Each of the three parts of the frame are variable length; with the header and tr
 
 
 Header
-------------------
+------
 
 The header contains information needed to decompress the Blosc chunks contained in the frame. It is encoded using
 `msgpack <https://msgpack.org>`_ and the format is as follows::
