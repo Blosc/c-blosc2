@@ -51,6 +51,7 @@ test_storage tstorage[] = {
     {false, NULL},  // memory - schunk
     {true, NULL},  // memory - frame
     {true, "test_insert_chunk.b2frame"}, // disk - frame
+    {false, "test_eframe_insert_chunk.b2frame"}, // disk - frame
 };
 
 bool tcopy[] = {
@@ -123,6 +124,9 @@ static char* test_insert_chunk(void) {
 
 
   /* Free resources */
+  if (!storage.sequential && storage.urlpath != NULL) {
+    blosc2_remove_dir(storage.urlpath);
+  }
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();

@@ -1613,7 +1613,7 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
     if (frame->eframe) {
       // The chunk is not in the frame
       char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 16 + strlen(".chunk") + 1);
-      sprintf(chunkpath, "%s/%016jX.chunk", frame->urlpath, nchunk);
+      sprintf(chunkpath, "%s/%016llX.chunk", frame->urlpath, nchunk);
       fp = fopen(chunkpath, "rb");
       free(chunkpath);
     }
@@ -1929,11 +1929,37 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
 
   // TODO: Improvement: Check if new chunk is smaller than previous one
 
-  // Add the new offset
-  for (int i = nchunks; i > nchunk; i--) {
-    offsets[i] = offsets[i - 1];
+  if (frame->eframe) {
+    bool needs_free;
+    uint8_t* aux_chunk;
+    int64_t aux_cbytes;
+    for (int i = nchunks; i > nchunk; i--) {
+      needs_free = false;
+      aux_cbytes = eframe_get_chunk(frame, i - 1, &aux_chunk, &needs_free);
+      if (aux_cbytes < 0) {
+        BLOSC_TRACE_ERROR("Cannot read the chunk out of the chunkfile.");
+        if (needs_free) {
+          free(aux_chunk);
+        }
+        return NULL;
+      }
+      if (eframe_append_chunk(frame, aux_chunk, i, aux_cbytes) == NULL) {
+        BLOSC_TRACE_ERROR("Cannot write the full chunk.");
+        free(aux_chunk);
+        return NULL;
+      }
+      free(aux_chunk);
+      offsets[i] = -i;
+    }
+    offsets[nchunk] = -nchunk;
   }
-  offsets[nchunk] = cbytes;
+  else {
+    // Add the new offset
+    for (int i = nchunks; i > nchunk; i--) {
+      offsets[i] = offsets[i - 1];
+    }
+    offsets[nchunk] = cbytes;
+  }
 
   // Re-compress the offsets again
   blosc2_context* cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
@@ -1949,7 +1975,13 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
     return NULL;
   }
 
-  int64_t new_frame_len = header_len + new_cbytes + new_off_cbytes + trailer_len;
+  int64_t new_frame_len;
+  if (frame->eframe) {
+    new_frame_len = header_len + 0 + new_off_cbytes + trailer_len;
+  }
+  else {
+    new_frame_len = header_len + new_cbytes + new_off_cbytes + trailer_len;
+  }
 
   FILE* fp = NULL;
   if (frame->sdata != NULL) {
@@ -1965,14 +1997,29 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
     /* Copy the offsets */
     memcpy(framep + header_len + new_cbytes, off_chunk, (size_t)new_off_cbytes);
   } else {
-    // fileframe
-    fp = fopen(frame->urlpath, "rb+");
-    fseek(fp, header_len + cbytes, SEEK_SET);
-    size_t wbytes = fwrite(chunk, 1, (size_t)cbytes_chunk, fp);  // the new chunk
-    if (wbytes != (size_t)cbytes_chunk) {
-      BLOSC_TRACE_ERROR("Cannot write the full chunk to fileframe.");
-      fclose(fp);
-      return NULL;
+    size_t wbytes;
+    if (frame->eframe) {
+      if (eframe_append_chunk(frame, chunk, nchunk, cbytes_chunk) == NULL) {
+        BLOSC_TRACE_ERROR("Cannot write the full chunk.");
+        return NULL;
+      }
+      // Fileframe for updating the offsets chunk
+      char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
+      sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
+      fp = fopen(eframe_name, "rb+");
+      free(eframe_name);
+      fseek(fp, header_len + 0, SEEK_SET);
+    }
+    else {
+      // fileframe
+      fp = fopen(frame->urlpath, "rb+");
+      fseek(fp, header_len + cbytes, SEEK_SET);
+      wbytes = fwrite(chunk, 1, (size_t)cbytes_chunk, fp);  // the new chunk
+      if (wbytes != (size_t)cbytes_chunk) {
+        BLOSC_TRACE_ERROR("Cannot write the full chunk to fileframe.");
+        fclose(fp);
+        return NULL;
+      }
     }
     wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
     fclose(fp);

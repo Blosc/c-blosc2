@@ -41,7 +41,7 @@ void* eframe_append_chunk(blosc2_frame* frame, uint8_t* chunk, int64_t nchunk, i
   // Get directory/nchunk.chunk with 16 zeros of padding
   char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 16 + strlen(".chunk") + 1);
   // j for printing int64_t values
-  sprintf(chunkpath, "%s/%016jX.chunk", frame->urlpath, nchunk);
+  sprintf(chunkpath, "%s/%016llX.chunk", frame->urlpath, nchunk);
   FILE* fpc = fopen(chunkpath, "wb");
   free(chunkpath);
 
@@ -61,7 +61,7 @@ int eframe_get_chunk(blosc2_frame* frame, int64_t nchunk, uint8_t** chunk, bool*
   //get directory/nchunk.chunk
   char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 16 + strlen(".chunk") + 1);
   // j for printing int64_t values
-  sprintf(chunkpath, "%s/%016jX.chunk", frame->urlpath, nchunk);
+  sprintf(chunkpath, "%s/%016llX.chunk", frame->urlpath, nchunk);
   FILE* fpc = fopen(chunkpath, "rb");
   free(chunkpath);
   if(fpc == NULL){
