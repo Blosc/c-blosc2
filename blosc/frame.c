@@ -1651,7 +1651,6 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
       frame->coffsets = NULL;
     }
   }
-  free(chunk);
   free(off_chunk);
 
   frame->len = new_frame_len;

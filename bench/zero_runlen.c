@@ -74,7 +74,7 @@ int main(void) {
       if (csize < 0) {
         printf("Error creating chunk: %d\n", csize);
       }
-      nchunks = blosc2_schunk_append_chunk(schunk, chunk, true);
+      nchunks = blosc2_schunk_append_chunk(schunk, chunk, false);
     }
     if (nchunks < 0) {
       printf("Error appending chunk: %d\n", nchunks);
