@@ -1973,7 +1973,7 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
     memcpy(framep + header_len + new_cbytes, off_chunk, (size_t)new_off_cbytes);
   } else {
     // fileframe
-    fp = fopen(frame->fname, "rb+");
+    fp = fopen(frame->urlpath, "rb+");
     fseek(fp, header_len + cbytes, SEEK_SET);
     size_t wbytes = fwrite(chunk, 1, (size_t)cbytes_chunk, fp);  // the new chunk
     if (wbytes != (size_t)cbytes_chunk) {

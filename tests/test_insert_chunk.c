@@ -75,7 +75,7 @@ static char* test_insert_chunk(void) {
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
-                            .path=tdata.urlpath, .sequential=tdata.sequential};
+                            .urlpath=tdata.urlpath, .sequential=tdata.sequential};
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
