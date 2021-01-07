@@ -10,6 +10,11 @@ Changes from 2.0.0-beta.5 to 2.0.0.beta6
  of the provided buffer.  See #144.  Thanks to Nathan Moinvaziri
  (@nmoinvaz).
 
+* [BREAKING CHANGE] The format for frames has changed and
+  BLOSC2_VERSION_FRAME_FORMAT is now set to 2.  There is no attempt to support
+  previous formats, but there will probably be backward compatibility support
+  starting from version 2 on.
+
 * Internal Zstd sources updated to 1.4.5.
 
 
