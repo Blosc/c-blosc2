@@ -1525,14 +1525,14 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
   int64_t offset = get_coffset(frame, header_len, cbytes, nchunk);
 
   if (offset <= 0) {
-    if (!frame->eframe && offset < 0) {
-      BLOSC_TRACE_ERROR("Chunk offset can be negative only for eframes.");
-      return -1;
-    }
-    else {
+    if (frame->eframe) {
       // Sparse on-disk
       nchunk = -offset;
       return eframe_get_chunk(frame, nchunk, chunk, needs_free);
+    }
+    else if (offset < 0) {
+      BLOSC_TRACE_ERROR("Chunk offset can be negative only for eframes.");
+      return -1;
     }
   }
   int32_t chunk_cbytes;
