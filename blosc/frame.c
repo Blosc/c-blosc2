@@ -1612,8 +1612,8 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
     FILE* fp = NULL;
     if (frame->eframe) {
       // The chunk is not in the frame
-      char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 16 + strlen(".chunk") + 1);
-      sprintf(chunkpath, "%s/%016llX.chunk", frame->urlpath, nchunk);
+      char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+      sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
       fp = fopen(chunkpath, "rb");
       free(chunkpath);
     }
