@@ -2296,7 +2296,14 @@ int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk
     return -1;
   }
   free(offsets);
-  int64_t new_frame_len = header_len + cbytes + new_off_cbytes + trailer_len;
+  int64_t new_frame_len;
+  if (frame->eframe) {
+    // The chunks are not in the frame
+    new_frame_len = header_len + 0 + new_off_cbytes + trailer_len;
+  }
+  else {
+    new_frame_len = header_len + cbytes + new_off_cbytes + trailer_len;
+  }
 
   if (frame->sdata != NULL) {
     uint8_t* framep = frame->sdata;
@@ -2308,21 +2315,33 @@ int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk
     }
     /* Copy the offsets */
     memcpy(framep + header_len + cbytes, off_chunk, (size_t)new_off_cbytes);
-  } else {
-    // fileframe
-    FILE* fp = fopen(frame->urlpath, "rb+");
-    fseek(fp, header_len + cbytes, SEEK_SET);
+  }
+  else {
+    FILE* fp = NULL;
+    if (frame->eframe) {
+      // Fileframe for updating the offsets chunk
+      char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
+      sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
+      fp = fopen(eframe_name, "rb+");
+      free(eframe_name);
+      fseek(fp, header_len + 0, SEEK_SET);
+    }
+    else {
+      // fileframe
+      fp = fopen(frame->urlpath, "rb+");
+      fseek(fp, header_len + cbytes, SEEK_SET);
+    }
     size_t wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
     fclose(fp);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to fileframe.");
       return -1;
     }
-    // Invalidate the cache for chunk offsets
-    if (frame->coffsets != NULL) {
-      free(frame->coffsets);
-      frame->coffsets = NULL;
-    }
+  }
+  // Invalidate the cache for chunk offsets
+  if (frame->coffsets != NULL) {
+    free(frame->coffsets);
+    frame->coffsets = NULL;
   }
   free(off_chunk);
 

@@ -51,7 +51,7 @@ test_storage tstorage[] = {
     {false, NULL},  // memory - schunk
     {true, NULL},  // memory - frame
     {true, "test_insert_chunk.b2frame"}, // disk - frame
-    {false, "test_eframe_insert_chunk.b2eframe"}, // disk - eframe
+    {false, "test_insert_chunk.b2eframe"}, // disk - eframe
 };
 
 bool tcopy[] = {

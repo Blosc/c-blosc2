@@ -36,6 +36,7 @@ test_storage tstorage[] = {
     {false, NULL},  // memory - schunk
     {true, NULL},  // memory - frame
     {true, "test_insert_chunk.b2frame"}, // disk - frame
+    {true, "test_insert_chunk.b2eframe"}, // disk - eframe
 };
 
 int32_t tnchunks[] = {5, 12, 24, 33, 1};
@@ -86,6 +87,9 @@ static char* test_reorder_offsets(void) {
   }
 
   /* Free resources */
+  if (!storage.sequential && storage.urlpath != NULL) {
+    blosc2_remove_dir(storage.urlpath);
+  }
   free(offsets_order);
   blosc2_schunk_free(schunk);
 
