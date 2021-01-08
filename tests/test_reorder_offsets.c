@@ -35,8 +35,8 @@ typedef struct {
 test_storage tstorage[] = {
     {false, NULL},  // memory - schunk
     {true, NULL},  // memory - frame
-    {true, "test_insert_chunk.b2frame"}, // disk - frame
-    {true, "test_insert_chunk.b2eframe"}, // disk - eframe
+    {true, "test_reorder_offsets.b2frame"}, // disk - frame
+    {false, "test_reorder_offsets.b2eframe"}, // disk - eframe
 };
 
 int32_t tnchunks[] = {5, 12, 24, 33, 1};

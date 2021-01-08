@@ -2199,7 +2199,7 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk
   bool needs_free;
   int chunk_cbytes;
   if (frame->eframe) {
-    chunk_cbytes = eframe_get_chunk(frame, nchunk, &src, &needs_free);
+    chunk_cbytes = frame_get_chunk(frame, nchunk, &src, &needs_free);
   }
   else {
     // Use a lazychunk here in order to do a potential parallel read.
