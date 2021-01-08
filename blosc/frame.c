@@ -1855,11 +1855,11 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
       BLOSC_TRACE_ERROR("Cannot write the offsets to fileframe.");
       return NULL;
     }
-    // Invalidate the cache for chunk offsets
-    if (frame->coffsets != NULL) {
-      free(frame->coffsets);
-      frame->coffsets = NULL;
-    }
+  }
+  // Invalidate the cache for chunk offsets
+  if (frame->coffsets != NULL) {
+    free(frame->coffsets);
+    frame->coffsets = NULL;
   }
   free(chunk);
   free(off_chunk);
