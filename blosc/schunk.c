@@ -288,7 +288,22 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   /* Update counters */
   schunk->nchunks = nchunks + 1;
   schunk->nbytes += nbytes;
-  schunk->cbytes += cbytes;
+  if (schunk->frame == NULL) {
+    schunk->cbytes += cbytes;
+  }
+  else {
+    // A frame
+    if (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x10) {
+      if (schunk->cbytes == 0) {
+        // Increase by 0 just to say that we have data
+        schunk->cbytes += 0;
+      }
+    }
+    else {
+      // A non-special chunk is always stored in frames
+      schunk->cbytes += cbytes;
+    }
+  }
 
   if (copy) {
     // Make a copy of the chunk

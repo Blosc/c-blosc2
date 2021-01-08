@@ -38,7 +38,7 @@ int main(void) {
   blosc2_schunk *schunk;
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
-  int64_t nbytes, cbytes;
+  int64_t nbytes, cbytes, frame_len;
   int nchunk, nchunks = 0;
   blosc_timestamp_t last, current;
   double totaltime;
@@ -78,6 +78,7 @@ int main(void) {
     }
     if (nchunks < 0) {
       printf("Error appending chunk: %d\n", nchunks);
+      return -1;
     }
   }
   blosc_set_timestamp(&current);
@@ -89,15 +90,14 @@ int main(void) {
 
   /* Gather some info */
   nbytes = schunk->nbytes;
-  cbytes = schunk->cbytes;
+  frame_len = schunk->frame->len;
   printf("Compression super-chunk: %ld -> %ld (%.1fx)\n",
-         (long)nbytes, (long)cbytes, (1. * nbytes) / cbytes);
+         (long)nbytes, (long)frame_len, (1. * nbytes) / frame_len);
 
   uint8_t offset_bytes = 1 << (((schunk->frame->sdata[FRAME_FLAGS] & 0x30) >> 4) + 1);
   int64_t nbytes_off = nchunks * offset_bytes;
-  int64_t cbytes_off = schunk->frame->len - cbytes;
   printf("Compressed offsets: %ld -> %ld (%.1fx)\n",
-         (long)nbytes_off, (long)cbytes_off, (1. * nbytes_off) / cbytes_off);
+         (long)nbytes_off, (long)frame_len, (1. * nbytes_off) / frame_len);
 
   /* Retrieve and decompress the chunks */
   blosc_set_timestamp(&last);
@@ -116,7 +116,7 @@ int main(void) {
                  "  Processed data: %.3f GB (%.3f GB/s)\n",
          totaltime, totalsize / GB, totalsize / (GB * totaltime));
 
-  /* Check that all the values are in the precision range */
+  /* Check that all the values have a good rouundtrip */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) rec_buffer, isize);

@@ -107,7 +107,7 @@ static char* test_frame(void) {
         mu_assert("dparams are not recovered correctly",
                   schunk->storage->dparams->nthreads == BLOSC2_DPARAMS_DEFAULTS.nthreads);
       } else {
-        // Dump the schunk to a sframe and regenerate it from there
+        // Dump the schunk into a sframe and regenerate it from there
         uint8_t* sframe;
         int64_t sframe_len = blosc2_schunk_to_sframe(schunk, &sframe);
         blosc2_schunk_free(schunk);
@@ -193,7 +193,7 @@ static char* test_frame(void) {
         int64_t sframe_len = blosc2_schunk_to_sframe(schunk, &sframe);
         blosc2_schunk_free(schunk);
         schunk = blosc2_schunk_open_sframe(sframe, sframe_len);
-        mu_assert("blosc2_schunk_open_sframe() failed", schunk != NULL);
+        mu_assert("blosc2_schunk_open_sframe() failed (2)", schunk != NULL);
 
       }
     }
