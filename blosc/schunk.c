@@ -16,7 +16,6 @@
 #include "blosc-private.h"
 #include "context.h"
 #include "frame.h"
-#include "eframe.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <windows.h>
@@ -573,9 +572,6 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
  * is returned instead.
 */
 int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, bool *needs_free) {
-  if (!schunk->storage->sequential && schunk->storage->urlpath != NULL){
-    return eframe_get_chunk(schunk->frame, nchunk, chunk, needs_free);
-  }
   if (schunk->frame != NULL) {
     return frame_get_chunk(schunk->frame, nchunk, chunk, needs_free);
   }
