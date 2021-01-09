@@ -686,7 +686,7 @@ static bool get_run(const uint8_t* ip, const uint8_t* ip_bound) {
   memset(&value, x, 8);
   while (ip < (ip_bound - 8)) {
 #if defined(BLOSC_STRICT_ALIGN)
-    memcpy(&value2, ref, 8);
+    memcpy(&value2, ip, 8);
 #else
     value2 = *(int64_t*)ip;
 #endif
