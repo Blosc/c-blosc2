@@ -74,7 +74,7 @@ if(NOT WIN32)
 endif()
 
 cmake_minimum_required(VERSION 2.8.10)
-if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} GREATER 3.4)
+if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_GREATER 3.4)
   cmake_policy(SET CMP0063 NEW)
 endif()
 project(blosc LANGUAGES C)
@@ -222,6 +222,17 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     # Set the possible values of build type for cmake-gui
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
             "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
+# Workaround for Darwin with new Apple Silicon (arm64)
+# For now, it is necessary to compile the beast with:
+# CC="clang -arch arm64" cmake ..
+if (CMAKE_C_COMPILER_ARG1)
+    string(FIND ${CMAKE_C_COMPILER_ARG1} "arm64" IS_APPLE_SILICON)
+    if (IS_APPLE_SILICON)
+        message(STATUS "Detected Apple arm64 arch")
+        set(CMAKE_SYSTEM_PROCESSOR "arm64")
+    endif()
 endif()
 
 # Based on the target system's processor and the compiler being used,

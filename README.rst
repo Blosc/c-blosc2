@@ -1,6 +1,6 @@
-===============================================================
+=============================================================================
  C-Blosc2: A simple, compressed, fast and persistent data store library for C
-===============================================================
+=============================================================================
 
 :Author: The Blosc Development Team
 :Contact: blosc@blosc.org
@@ -113,7 +113,7 @@ You can also disable support for some compression libraries:
 Supported platforms
 ~~~~~~~~~~~~~~~~~~~
 
-C-Blosc2 is meant to support all platforms where a C99 compliant C compiler can be found.  The ones that are mostly tested are Intel (Linux, Mac OSX and Windows) and ARM (Linux), but exotic ones as IBM Blue Gene Q embedded "A2" processor are reported to work too.
+C-Blosc2 is meant to support all platforms where a C99 compliant C compiler can be found.  The ones that are mostly tested are Intel (Linux, Mac OSX and Windows), ARM (Linux, Mac), and PowerPC (Linux) but exotic ones as IBM Blue Gene Q embedded "A2" processor are reported to work too.  More on ARM support in `README_ARM.rst`.
 
 For Windows, you will need at least VS2015 or higher on x86 and x64 targets (i.e. ARM is not supported on Windows).
 
@@ -122,6 +122,13 @@ For Mac OSX, make sure that you have installed the command line developer tools.
 .. code-block:: console
 
   $ xcode-select --install
+
+For Mac OSX on arm64 architecture, you need to compile like this:
+
+.. code-block:: console
+
+  $ CC="clang -arch arm64" cmake ..
+
 
 Support for the LZ4 optimized version in Intel IPP
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -136,6 +143,14 @@ C-Blosc2 comes with support for a highly optimized version of the LZ4 codec pres
    $ sudo apt-get update && sudo apt-get install intel-ipp-64bit-2019.X  # replace .X by the latest version
 
 Check `Intel IPP website <https://software.intel.com/en-us/articles/intel-integrated-performance-primitives-intel-ipp-install-guide>`_ for instructions on how to install it for other platforms.
+
+
+Display error messages
+~~~~~~~~~~~~~~~~~~~~~~
+
+By default error messages are disabled. To display them, you just need to activate the Blosc tracing machinery by setting
+the ``BLOSC_TRACE`` environment variable.
+
 
 Mailing list
 ============

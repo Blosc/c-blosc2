@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "blosc2.h"
+#include <blosc2.h>
 
 #ifdef __cplusplus
 extern "C" {

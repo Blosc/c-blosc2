@@ -6,7 +6,9 @@ link_directories(${PROJECT_BINARY_DIR}/blosc)
 include_directories(${PROJECT_SOURCE_DIR}/blosc)
 
 # Check SIMD features for the local CPU
-find_package(SIMD)
+if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
+    find_package(SIMD)
+endif()
 
 # targets and tests
 foreach(source ${SOURCES})

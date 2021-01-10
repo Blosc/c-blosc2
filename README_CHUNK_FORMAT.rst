@@ -3,11 +3,14 @@ Blosc Chunk Format
 
 The chunk is composed of a header and a blocks section::
 
-    +---------+--------+
-    |  header | blocks |
-    +---------+--------+
+    +---------+--------+---------+
+    |  header | blocks | trailer |
+    +---------+--------+---------+
 
-These two sections are described below. All integer types are stored in little endian.
+These three sections are described below.
+
+*Note:* All integer types are stored in little endian.
+
 
 Header
 ------
@@ -84,13 +87,13 @@ for encoding blocks with a filter pipeline::
     (``uint8``) Number of bytes for the atomic type.
 
 :nbytes:
-    (``uint32``) Uncompressed size of the buffer (this header is not included).
+    (``int32``) Uncompressed size of the buffer (this header is not included).
 
 :blocksize:
-    (``uint32``) Size of internal blocks.
+    (``int32``) Size of internal blocks.
 
 :cbytes:
-    (``uint32``) Compressed size of the buffer (including this header).
+    (``int32``) Compressed size of the buffer (including this header).
 
 :filter_codes:
     (``uint8``) Filter code.
@@ -113,7 +116,6 @@ for encoding blocks with a filter pipeline::
     `filter_code` has an associated field in `filter_meta` that can contain metadata about the filter.
 
 :filter_meta:
-
     (``uint8``) Filter metadata.
 
     Possible metadata associated with a filter code.
@@ -128,6 +130,11 @@ for encoding blocks with a filter pipeline::
     :bit 2 (``0x04``):
         Whether the codec is stored in a byte previous to this compressed buffer
         or it is in the global `flags` for chunk.
+    :bit 3 (``0x08``):
+        Whether the chunk is 'lazy' or not.  A lazy chunk has the header and bstarts
+        in place, but not the actual block data.  In addition, they have an additional
+        trailer for making it easy to read the data blocks.  In general, lazy chunks
+        appear when reading data from disk.
 
 
 Blocks
@@ -173,6 +180,34 @@ data stream is stored with the size of the stream `int32 csize` preceeding the b
     | csize | cdata |
     +=======+=======+
 
+There are a couple of special cases for `int32 csize`.  If zero, that means that the data stream is fully made of zeros.
+If negative, the stream is stored like this::
+
+    +=======+=======+=======+
+    | csize | token | cdata |
+    +=======+=======+=======+
+
+where `uint8_t token` is a byte for providing different meanings to `int32 csize`:
+
+:token:
+    (``bitfield``) Flags for different meanings.
+
+    :bits 0 and 1:
+        Indicates a run-length stream for the whole chunk.
+        For more info, see the **Run-Length Encoding** section below.
+
+            :``0``:
+                No run.
+            :``1``:
+                Zero value.
+            :``2``:
+                NaN (Not-a-Number) float value.
+            :``3``:
+                Run-length of a value that follows the header (i.e. no blocks section).
+
+    :bits 2 and 3:
+        Reserved for two-codes in a row. TODO: complete description
+
 If bit 4 of the `flags` header field is set, each block is stored in a single data stream::
 
     +=========+
@@ -200,8 +235,31 @@ The `csize` field of each compressed data stream can be used to support run-leng
 
     - When the most significant bit is *not* set, `csize` represents the size of the compressed
       data stream that follows. (as in C-Blosc1)
-    - When the most significant bit is set, the lowest significant byte of `csize` is used to fill the entire
+    - When the most significant bit is set, the least significant byte of `csize` is used to fill the entire
       block.
 
 For example, a csize of 10000 means that the compressed data stream that follows is 10000 bytes long
 and a csize of -32 means that the whole block is made of bytes with a value of 32.
+
+Trailer
+-------
+
+This is an optional section, mainly for lazy chunks use.  A lazy chunk is similar to a regular one, except that
+only the meta-information has been loaded.  The actual data from blocks is 'lazily' only loaded on demand.
+This allows for improved selectivity, and hence less input bandwidth demands, during partial chunk reads
+(e.g. `blosc_getitem`) from data that is on disk.
+
+Here it is its structure::
+
+    +=========+=========+========+========+=========+
+    | nchunk  | offset  | bsize0 |   ...  | bsizeN |
+    +=========+=========+========+========+=========+
+
+:nchunk:
+    (``int32_t``) The number of the chunk in the super-chunk.
+
+:offset:
+    (``int64_t``) The offset of the chunk in the frame (sequential super-chunk).
+
+:bsize0 .. bsizeN:
+    (``int32_t``) The sizes in bytes for every block.

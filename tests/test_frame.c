@@ -18,12 +18,14 @@
 #endif
 
 #define CHUNKSIZE (200 * 1000)
-#define NTHREADS (2)
+#define NTHREADS (4)
 
 /* Global vars */
 int nchunks_[] = {0, 1, 2, 10};
 int tests_run = 0;
 int nchunks;
+bool multithread;
+bool splits;
 bool free_new;
 bool sparse_schunk;
 bool filter_pipeline;
@@ -53,8 +55,24 @@ static char* test_frame(void) {
 
   /* Create a frame container */
   cparams.typesize = sizeof(int32_t);
-  cparams.nthreads = NTHREADS;
-  dparams.nthreads = NTHREADS;
+  if (splits) {
+    // Use a codec that splits blocks (important for lazy chunks).
+    // Only BLOSCLZ is doing that.
+    cparams.compcode = BLOSC_BLOSCLZ;
+  }
+#if defined(HAVE_LZ4)
+  else {
+    cparams.compcode = BLOSC_LZ4;
+  }
+#endif
+  if (multithread) {
+    cparams.nthreads = NTHREADS;
+    dparams.nthreads = NTHREADS;
+  }
+  else {
+    cparams.nthreads = 1;
+    dparams.nthreads = 1;
+  }
   blosc2_storage storage = {.sequential=true, .path=fname, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
   mu_assert("blosc2_schunk_new() failed", schunk != NULL);
@@ -82,6 +100,12 @@ static char* test_frame(void) {
         blosc2_storage storage2 = {.sequential=true, .path=fname};
         schunk = blosc2_schunk_open(storage2);
         mu_assert("blosc2_schunk_open() failed", schunk != NULL);
+        mu_assert("storage is not recovered correctly",
+                  schunk->storage->sequential == true);
+        mu_assert("cparams are not recovered correctly",
+                  schunk->storage->cparams->clevel == BLOSC2_CPARAMS_DEFAULTS.clevel);
+        mu_assert("dparams are not recovered correctly",
+                  schunk->storage->dparams->nthreads == BLOSC2_DPARAMS_DEFAULTS.nthreads);
       } else {
         // Dump the schunk to a sframe and regenerate it from there
         uint8_t* sframe;
@@ -214,8 +238,8 @@ static char* test_frame(void) {
   }
 
   /* Free resources */
-  free(data);
   free(data_dest);
+  free(data);
   blosc2_schunk_free(schunk);
 
   /* Destroy the Blosc environment */
@@ -230,21 +254,27 @@ static char *all_tests(void) {
   // Iterate over all different parameters
   for (int i = 0; i < (int)sizeof(nchunks_) / (int)sizeof(int); i++) {
     nchunks = nchunks_[i];
-    for (int ifree_new = 0; ifree_new < 2; ifree_new++) {
-      for (int isparse_schunk = 0; isparse_schunk < 2; isparse_schunk++) {
-        for (int ifilter_pipeline = 0; ifilter_pipeline < 2; ifilter_pipeline++) {
-          for (int imetalayers = 0; imetalayers < 2; imetalayers++) {
-            for (int iusermeta = 0; iusermeta < 2; iusermeta++) {
-              sparse_schunk = (bool) isparse_schunk;
-              free_new = (bool) ifree_new;
-              filter_pipeline = (bool) ifilter_pipeline;
-              metalayers = (bool) imetalayers;
-              usermeta = (bool) iusermeta;
-              fname = NULL;
-              mu_run_test(test_frame);
-              snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
-              fname = buf;
-              mu_run_test(test_frame);
+    for (int isplits = 0; isplits < 2; isplits++) {
+      for (int imultithread = 0; imultithread < 2; imultithread++) {
+        for (int ifree_new = 0; ifree_new < 2; ifree_new++) {
+          for (int isparse_schunk = 0; isparse_schunk < 2; isparse_schunk++) {
+            for (int ifilter_pipeline = 0; ifilter_pipeline < 2; ifilter_pipeline++) {
+              for (int imetalayers = 0; imetalayers < 2; imetalayers++) {
+                for (int iusermeta = 0; iusermeta < 2; iusermeta++) {
+                  splits = (bool) isplits;
+                  multithread = (bool) imultithread;
+                  sparse_schunk = (bool) isparse_schunk;
+                  free_new = (bool) ifree_new;
+                  filter_pipeline = (bool) ifilter_pipeline;
+                  metalayers = (bool) imetalayers;
+                  usermeta = (bool) iusermeta;
+                  fname = NULL;
+                  mu_run_test(test_frame);
+                  snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
+                  fname = buf;
+                  mu_run_test(test_frame);
+                }
+              }
             }
           }
         }
