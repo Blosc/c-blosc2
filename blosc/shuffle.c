@@ -13,6 +13,7 @@
 #include "bitshuffle-generic.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
 
 #if !defined(__clang__) && defined(__GNUC__) && defined(__GNUC_MINOR__) && \
