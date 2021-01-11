@@ -1336,11 +1336,19 @@ int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize,
   *needs_free = true;
 
   // Detect the kind of special value
-  uint64_t zeros_mask = (uint64_t) 1 << (8 * 7);  // indicate a chunk of zeros
+  uint64_t zeros_mask = (uint64_t) BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
+  uint64_t nans_mask = (uint64_t) BLOSC2_NAN_RUNLEN << (8 * 7);  // indicate a chunk of zeros
   if (special_value & zeros_mask) {
     int rc = blosc2_chunk_zeros(nbytes, typesize, *chunk, cbytes);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Error creating a zero chunk");
+      return -1;
+    }
+  }
+  else if (special_value & nans_mask) {
+    int rc = blosc2_chunk_nans(nbytes, typesize, *chunk, cbytes);
+    if (rc < 0) {
+      BLOSC_TRACE_ERROR("Error creating a nan chunk");
       return -1;
     }
   }
@@ -1637,10 +1645,17 @@ void* frame_append_chunk(blosc2_frame* frame, uint8_t* chunk, blosc2_schunk* sch
   }
 
   // Add the new offset
-  if (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x10) {
+  if (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_ZERO_RUNLEN << 4)) {
     // Zero chunk.  Code it in a special way.
     uint64_t special_value = ((uint64_t)1 << 63);
-    special_value += (uint64_t)1 << (8 * 7);  // indicate a chunk of zeros
+    special_value += (uint64_t)BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
+    swap_store(offsets + nchunks, &special_value, sizeof(uint64_t));
+    cbytes_chunk = 0;   // we don't need to store the chunk
+  }
+  else if (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_NAN_RUNLEN << 4)) {
+    // NaN chunk.  Code it in a special way.
+    uint64_t special_value = ((uint64_t)1 << 63);
+    special_value += (uint64_t)BLOSC2_NAN_RUNLEN << (8 * 7);  // indicate a chunk of NANs
     swap_store(offsets + nchunks, &special_value, sizeof(uint64_t));
     cbytes_chunk = 0;   // we don't need to store the chunk
   }

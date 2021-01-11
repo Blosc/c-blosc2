@@ -14,6 +14,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <assert.h>
+#include <math.h>
 
 #include "blosc2.h"
 #include "blosc-private.h"
@@ -2186,6 +2187,38 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
 }
 
 
+int get_special_values(uint8_t* src, int32_t nitems, uint8_t* dest, int32_t destsize) {
+  int32_t typesize = src[BLOSC2_CHUNK_TYPESIZE];
+  int32_t nbytes_chunk = sw32_(src + BLOSC2_CHUNK_NBYTES);;
+  int32_t nbytes = nitems * typesize;
+  if (nbytes > nbytes_chunk) {
+    BLOSC_TRACE_ERROR("Not enough space in src");
+    return -1;
+  }
+  if (nbytes < destsize) {
+    BLOSC_TRACE_ERROR("Not enough space in dest");
+    return -1;
+  }
+  if (typesize == 4) {
+    float* dest_ = (float*)dest;
+    for (int i = 0; i < nitems; i++) {
+      dest_[i] = nanf("");
+    }
+    return nbytes;
+  }
+  else if (typesize == 8) {
+    double* dest_ = (double*)dest;
+    for (int i = 0; i < nitems; i++) {
+      dest_[i] = nan("");
+    }
+    return nbytes;
+  }
+
+  BLOSC_TRACE_ERROR("Unsupported typesize for NaN");
+  return -1;
+}
+
+
 int blosc_run_decompression_with_context(blosc2_context* context, const void* src, int32_t srcsize,
                                          void* dest, int32_t destsize) {
   int32_t ntbytes;
@@ -2208,14 +2241,25 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
     // Not enough space for writing into the destination
     return -1;
   }
-  // Is that a run with zeros?
+  // Is that a runlen?
   int cbytes = sw32_(_src + BLOSC2_CHUNK_CBYTES);
   if (cbytes == BLOSC_EXTENDED_HEADER_LENGTH) {
     bool all_zeros = _src[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_ZERO_RUNLEN << 4);
+    bool all_nans = _src[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_NAN_RUNLEN << 4);
     if (all_zeros) {
-      // Yup, it is.  Set the dest to zeros and return.
       memset(dest, 0, ntbytes);
       return ntbytes;
+    }
+    else if (all_nans) {
+      int32_t typesize = _src[BLOSC2_CHUNK_TYPESIZE];
+      int32_t nbytes = sw32_(_src + BLOSC2_CHUNK_NBYTES);;
+      int32_t nitems = nbytes / typesize;
+      int rc = get_special_values(_src, nitems, dest, destsize);
+      return ntbytes;
+    }
+    else {
+      BLOSC_TRACE_ERROR("Unsupported runlen code");
+      return -1;
     }
   }
 
@@ -2346,14 +2390,22 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
   cbytes = sw32_(_src + BLOSC2_CHUNK_CBYTES);    /* compressed buffer size */
   ebsize = blocksize + typesize * (int32_t)sizeof(int32_t);
 
-  // Is that a run with zeros?
+  // Is that a runlen?
   if (cbytes == BLOSC_EXTENDED_HEADER_LENGTH) {
     ntbytes = nitems * typesize;
     bool all_zeros = _src[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_ZERO_RUNLEN << 4);
+    bool all_nans = _src[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_NAN_RUNLEN << 4);
     if (all_zeros) {
-      // Yup, it is.  Set the dest to zeros and return.
       memset(dest, 0, ntbytes);
       return ntbytes;
+    }
+    else if (all_nans) {
+      int rc = get_special_values(_src, nitems, dest, nitems * typesize);
+      return ntbytes;
+    }
+    else {
+      BLOSC_TRACE_ERROR("Unsupported runlen code");
+      return -1;
     }
   }
 
@@ -3272,6 +3324,12 @@ int blosc2_chunk_zeros(const size_t nbytes, const size_t typesize, void* dest, s
     BLOSC_TRACE_ERROR("dest buffer is not long enough");
     return -1;
   }
+
+  if (nbytes % typesize != 0) {
+    BLOSC_TRACE_ERROR("nbytes is not a multiple of typesize");
+    return -1;
+  }
+
   uint8_t* dest_ = dest;
 
   memset(dest, 0, BLOSC_EXTENDED_HEADER_LENGTH);
@@ -3282,6 +3340,33 @@ int blosc2_chunk_zeros(const size_t nbytes, const size_t typesize, void* dest, s
   *(int32_t*)(dest_ + BLOSC2_CHUNK_BLOCKSIZE) = nbytes;
   *(int32_t*)(dest_ + BLOSC2_CHUNK_CBYTES) = BLOSC_MAX_OVERHEAD;
   dest_[BLOSC2_CHUNK_BLOSC2_FLAGS] = BLOSC2_ZERO_RUNLEN << 4;  // mark chunk as all zeros
+
+  return BLOSC_EXTENDED_HEADER_LENGTH;
+}
+
+
+/* Create a chunk made of nans */
+int blosc2_chunk_nans(const size_t nbytes, const size_t typesize, void* dest, size_t destsize) {
+  if (destsize < BLOSC_EXTENDED_HEADER_LENGTH) {
+    BLOSC_TRACE_ERROR("dest buffer is not long enough");
+    return -1;
+  }
+
+  if (nbytes % typesize != 0) {
+    BLOSC_TRACE_ERROR("nbytes is not a multiple of typesize");
+    return -1;
+  }
+
+  uint8_t* dest_ = dest;
+  memset(dest, 0, BLOSC_EXTENDED_HEADER_LENGTH);
+
+  dest_[BLOSC2_CHUNK_VERSION] = BLOSC_VERSION_FORMAT;
+  dest_[BLOSC2_CHUNK_VERSIONLZ] = BLOSC_BLOSCLZ_VERSION_FORMAT;
+  dest_[BLOSC2_CHUNK_TYPESIZE] = typesize;
+  *(int32_t*)(dest_ + BLOSC2_CHUNK_NBYTES) = nbytes;
+  *(int32_t*)(dest_ + BLOSC2_CHUNK_BLOCKSIZE) = nbytes;
+  *(int32_t*)(dest_ + BLOSC2_CHUNK_CBYTES) = BLOSC_MAX_OVERHEAD;
+  dest_[BLOSC2_CHUNK_BLOSC2_FLAGS] = BLOSC2_NAN_RUNLEN << 4;  // mark chunk as all NaNs
 
   return BLOSC_EXTENDED_HEADER_LENGTH;
 }

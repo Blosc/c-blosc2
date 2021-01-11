@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
+#include <math.h>
+
 #include "blosc2.h"
 #include "frame.h"
 
@@ -21,12 +23,19 @@
 #define NCHUNKS 2000
 #define CHUNKSIZE (500 * 1000)  // > NCHUNKS for the bench purposes
 #define NTHREADS 4
+
 #define ACTIVATE_ZERO_DETECTION false
+#define CHECK_NAN true
 
 
 void fill_buffer(int32_t *buffer) {
   for (int i = 0; i < CHUNKSIZE; i++) {
-    buffer[i] = 0;
+    if (CHECK_NAN) {
+      buffer[i] = nanf("");
+    }
+    else {
+      buffer[i] = 0;
+    }
 //    if (i == CHUNKSIZE - 1) {
 //      buffer[i] = 1;
 //    }
@@ -70,7 +79,12 @@ int main(void) {
       nchunks = blosc2_schunk_append_buffer(schunk, data_buffer, isize);
     }
     else {
-      int csize = blosc2_chunk_zeros(isize, sizeof(int32_t), chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+      int csize;
+      if (CHECK_NAN) {
+        csize = blosc2_chunk_nans(isize, sizeof(float), chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+      } else {
+        csize = blosc2_chunk_zeros(isize, sizeof(int32_t), chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+      }
       if (csize < 0) {
         printf("Error creating chunk: %d\n", csize);
       }
@@ -127,9 +141,16 @@ int main(void) {
       return csize;
     }
     assert (csize == BLOSC_EXTENDED_HEADER_LENGTH);
-    int32_t value;
-    blosc_getitem(chunk_, nchunk, 1, &value);
-    assert (value == 0);
+    if (CHECK_NAN) {
+      float value;
+      blosc_getitem(chunk_, nchunk, 1, &value);
+      assert (isnan(value));
+    }
+    else {
+      int32_t value;
+      blosc_getitem(chunk_, nchunk, 1, &value);
+      assert (value == 0);
+    }
     if (needs_free) {
       free(chunk_);
     }
@@ -138,7 +159,7 @@ int main(void) {
   totaltime = blosc_elapsed_secs(last, current);
   printf("[getitem] Elapsed time:\t %6.3f s.\n", totaltime);
 
-  /* Check that all the values have a good rouundtrip */
+  /* Check that all the values have a good roundtrip */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) rec_buffer, isize);
@@ -147,14 +168,22 @@ int main(void) {
       return dsize;
     }
     assert (dsize == (int)isize);
-    fill_buffer(data_buffer);
-    for (int i = 0; i < CHUNKSIZE; i++) {
-      if (data_buffer[i] != rec_buffer[i]) {
-        printf("Values are not equal: ");
-        printf("%d - %d: %d, (nchunk: %d, nelem: %d)\n",
-               data_buffer[i], rec_buffer[i],
-               (data_buffer[i] - rec_buffer[i]), nchunk, i);
-        return -1;
+    if (CHECK_NAN) {
+      float* buffer = (float*)rec_buffer;
+      for (int i = 0; i < CHUNKSIZE; i++) {
+        if (!isnan(buffer[i])) {
+          printf("Value is not correct in chunk %d, position: %d\n", nchunk, i);
+          return -1;
+        }
+      }
+    }
+    else {
+      int32_t* buffer = (float*)rec_buffer;
+      for (int i = 0; i < CHUNKSIZE; i++) {
+        if (buffer[i] != 0) {
+          printf("Value is not correct in chunk %d, position: %d\n", nchunk, i);
+          return -1;
+        }
       }
     }
   }

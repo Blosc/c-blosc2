@@ -293,7 +293,9 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   }
   else {
     // A frame
-    if (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x10) {
+    if ((chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_ZERO_RUNLEN << 4)) ||
+        (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_NAN_RUNLEN << 4)))
+    {
       if (schunk->cbytes == 0) {
         // Increase by 0 just to say that we have data
         schunk->cbytes += 0;
