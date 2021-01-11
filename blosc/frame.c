@@ -1653,7 +1653,7 @@ void* frame_append_chunk(blosc2_frame* frame, uint8_t* chunk, blosc2_schunk* sch
   cctx->typesize = sizeof(int64_t);  // 64-bit offsets
   // The params below have been fine-tuned with the zero_runlen bench
   cctx->clevel = 1;
-  cctx->compcode = BLOSC_LZ4;
+  // cctx->compcode = BLOSC_LZ4;
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
                                                off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
