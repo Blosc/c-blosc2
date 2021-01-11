@@ -1896,7 +1896,7 @@ int blosc_compress_context(blosc2_context* context) {
     }
     if (ntbytes == start_csizes + nstreams * sizeof(int32_t)) {
       // The streams are all zero runs (by construction).  Encode it...
-      context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] |= 0x10;
+      context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] |= BLOSC2_ZERO_RUNLEN << 4;
       // ...and assign the new chunk length
       ntbytes = BLOSC_MAX_OVERHEAD;
     }
@@ -2211,7 +2211,7 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
   // Is that a run with zeros?
   int cbytes = sw32_(_src + BLOSC2_CHUNK_CBYTES);
   if (cbytes == BLOSC_EXTENDED_HEADER_LENGTH) {
-    bool all_zeros = _src[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x10;
+    bool all_zeros = _src[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_ZERO_RUNLEN << 4);
     if (all_zeros) {
       // Yup, it is.  Set the dest to zeros and return.
       memset(dest, 0, ntbytes);
@@ -2344,8 +2344,18 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
   nbytes = sw32_(_src + BLOSC2_CHUNK_NBYTES);         /* buffer size */
   blocksize = sw32_(_src + BLOSC2_CHUNK_BLOCKSIZE);      /* block size */
   cbytes = sw32_(_src + BLOSC2_CHUNK_CBYTES);    /* compressed buffer size */
-
   ebsize = blocksize + typesize * (int32_t)sizeof(int32_t);
+
+  // Is that a run with zeros?
+  if (cbytes == BLOSC_EXTENDED_HEADER_LENGTH) {
+    ntbytes = nitems * typesize;
+    bool all_zeros = _src[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_ZERO_RUNLEN << 4);
+    if (all_zeros) {
+      // Yup, it is.  Set the dest to zeros and return.
+      memset(dest, 0, ntbytes);
+      return ntbytes;
+    }
+  }
 
   if (blocksize <= 0) {
     /* Invalid block size */
@@ -3267,10 +3277,11 @@ int blosc2_chunk_zeros(const size_t nbytes, const size_t typesize, void* dest, s
   memset(dest, 0, BLOSC_EXTENDED_HEADER_LENGTH);
   dest_[BLOSC2_CHUNK_VERSION] = BLOSC_VERSION_FORMAT;
   dest_[BLOSC2_CHUNK_VERSIONLZ] = BLOSC_BLOSCLZ_VERSION_FORMAT;
+  dest_[BLOSC2_CHUNK_TYPESIZE] = typesize;
   *(int32_t*)(dest_ + BLOSC2_CHUNK_NBYTES) = nbytes;
   *(int32_t*)(dest_ + BLOSC2_CHUNK_BLOCKSIZE) = nbytes;
   *(int32_t*)(dest_ + BLOSC2_CHUNK_CBYTES) = BLOSC_MAX_OVERHEAD;
-  dest_[BLOSC2_CHUNK_BLOSC2_FLAGS] = 0x10;  // mark block as all zeros
+  dest_[BLOSC2_CHUNK_BLOSC2_FLAGS] = BLOSC2_ZERO_RUNLEN << 4;  // mark chunk as all zeros
 
   return BLOSC_EXTENDED_HEADER_LENGTH;
 }

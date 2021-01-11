@@ -240,6 +240,15 @@ enum {
     BLOSC2_CHUNK_BLOSC2_FLAGS = 0x1F, //!< flags specific for Blosc2 functionality
 };
 
+/**
+ * @brief Run lengths for special values for chunks/streams
+ */
+enum {
+    BLOSC2_NO_RUNLEN = 0x0,       //!< no run-length
+    BLOSC2_ZERO_RUNLEN = 0x1,     //!< zero run-length
+    BLOSC2_NAN_RUNLEN = 0x2,      //!< NaN run-length
+    BLOSC2_VALUE_RUNLEN = 0x2,    //!< generic value run-length
+};
 
 
 /**

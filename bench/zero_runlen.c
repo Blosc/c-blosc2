@@ -19,7 +19,7 @@
 #define GB  (1024*MB)
 
 #define NCHUNKS 2000
-#define CHUNKSIZE (500 * 1000)
+#define CHUNKSIZE (500 * 1000)  // > NCHUNKS for the bench purposes
 #define NTHREADS 4
 #define ACTIVATE_ZERO_DETECTION false
 
@@ -113,8 +113,30 @@ int main(void) {
   totaltime = blosc_elapsed_secs(last, current);
   totalsize = (double)(isize * nchunks);
   printf("[Decompr] Elapsed time:\t %6.3f s."
-                 "  Processed data: %.3f GB (%.3f GB/s)\n",
+         "  Processed data: %.3f GB (%.3f GB/s)\n",
          totaltime, totalsize / GB, totalsize / (GB * totaltime));
+
+  /* Exercise the getitem */
+  blosc_set_timestamp(&last);
+  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    bool needs_free;
+    uint8_t* chunk_;
+    int csize = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_, &needs_free);
+    if (csize < 0) {
+      printf("blosc2_schunk_get_chunk error.  Error code: %d\n", dsize);
+      return csize;
+    }
+    assert (csize == BLOSC_EXTENDED_HEADER_LENGTH);
+    int32_t value;
+    blosc_getitem(chunk_, nchunk, 1, &value);
+    assert (value == 0);
+    if (needs_free) {
+      free(chunk_);
+    }
+  }
+  blosc_set_timestamp(&current);
+  totaltime = blosc_elapsed_secs(last, current);
+  printf("[getitem] Elapsed time:\t %6.3f s.\n", totaltime);
 
   /* Check that all the values have a good rouundtrip */
   blosc_set_timestamp(&last);
