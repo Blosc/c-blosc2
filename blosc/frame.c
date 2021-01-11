@@ -2080,7 +2080,8 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
   // TODO: Improvement: Check if new chunk is smaller than previous one
 
   if (frame->eframe) {
-    offsets[nchunk] = -nchunk;
+    // In case there was a reorder
+    nchunk = -offsets[nchunk];
   }
   else {
     // Add the new offset
