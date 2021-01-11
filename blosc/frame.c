@@ -1929,30 +1929,14 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
 
   // TODO: Improvement: Check if new chunk is smaller than previous one
 
+  // Add the new offset
+  for (int i = nchunks; i > nchunk; i--) {
+    offsets[i] = offsets[i - 1];
+  }
   if (frame->eframe) {
-    for (int i = nchunks; i > nchunk; i--) {
-      // Rename the chunk
-      char* old_chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-      sprintf(old_chunkpath, "%s/%08X.chunk", frame->urlpath, i - 1);
-      char* new_chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-      sprintf(new_chunkpath, "%s/%08X.chunk", frame->urlpath, i);
-      rc = rename(old_chunkpath, new_chunkpath);
-      free(old_chunkpath);
-      free(new_chunkpath);
-      if (rc < 0) {
-        BLOSC_TRACE_ERROR("Error while moving the chunks.");
-        return NULL;
-      }
-
-      offsets[i] = -i;
-    }
-    offsets[nchunk] = -nchunk;
+    offsets[nchunk] = -nchunks;
   }
   else {
-    // Add the new offset
-    for (int i = nchunks; i > nchunk; i--) {
-      offsets[i] = offsets[i - 1];
-    }
     offsets[nchunk] = cbytes;
   }
 
@@ -1994,7 +1978,7 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
   } else {
     size_t wbytes;
     if (frame->eframe) {
-      if (eframe_append_chunk(frame, chunk, nchunk, cbytes_chunk) == NULL) {
+      if (eframe_append_chunk(frame, chunk, nchunks, cbytes_chunk) == NULL) {
         BLOSC_TRACE_ERROR("Cannot write the full chunk.");
         return NULL;
       }
