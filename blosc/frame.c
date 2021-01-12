@@ -1355,7 +1355,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
       size_t rbytes;
       bool needs_free = false;
       if (frame->eframe) {
-        rbytes = eframe_get_chunk(frame, -offsets[i], &data_chunk, &needs_free);
+        rbytes = eframe_get_chunk(frame, offsets[i], &data_chunk, &needs_free);
       }
       else {
         fseek(fp, header_len + offsets[i], SEEK_SET);
@@ -1524,16 +1524,10 @@ int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *need
   // Get the offset to nchunk
   int64_t offset = get_coffset(frame, header_len, cbytes, nchunk);
 
-  if (offset <= 0) {
-    if (frame->eframe) {
-      // Sparse on-disk
-      nchunk = -offset;
-      return eframe_get_chunk(frame, nchunk, chunk, needs_free);
-    }
-    else if (offset < 0) {
-      BLOSC_TRACE_ERROR("Chunk offset can be negative only for eframes.");
-      return -1;
-    }
+  if (frame->eframe) {
+    // Sparse on-disk
+    nchunk = offset;
+    return eframe_get_chunk(frame, nchunk, chunk, needs_free);
   }
   int32_t chunk_cbytes;
   if (frame->sdata == NULL) {
@@ -1613,7 +1607,7 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
     if (frame->eframe) {
       // The chunk is not in the frame
       char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-      sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
+      sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, offset);
       fp = fopen(chunkpath, "rb");
       free(chunkpath);
     }
@@ -1777,7 +1771,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
 
   // Add the new offset
   if (frame->eframe) {
-    offsets[nchunks] = -nchunks;
+    offsets[nchunks] = nchunks;
   }
   else {
     offsets[nchunks] = cbytes;
@@ -1934,7 +1928,7 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
     offsets[i] = offsets[i - 1];
   }
   if (frame->eframe) {
-    offsets[nchunk] = -nchunks;
+    offsets[nchunk] = nchunks;
   }
   else {
     offsets[nchunk] = cbytes;
@@ -2042,6 +2036,10 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return NULL;
   }
+  if (nchunk >= nchunks) {
+    BLOSC_TRACE_ERROR("The chunk must already exist.");
+    return NULL;
+  }
 
   int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
   int64_t trailer_len = frame->len - trailer_offset;
@@ -2081,7 +2079,7 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
 
   if (frame->eframe) {
     // In case there was a reorder
-    nchunk = -offsets[nchunk];
+    nchunk = offsets[nchunk];
   }
   else {
     // Add the new offset
