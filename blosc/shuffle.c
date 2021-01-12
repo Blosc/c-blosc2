@@ -244,10 +244,6 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
 #endif /* HAVE_CPU_FEAT_INTRIN */
 
 #elif defined(SHUFFLE_NEON_ENABLED) /* ARM-NEON */
-  #if !defined(__arm64)
-      #include <sys/auxv.h>
-      #include <asm/hwcap.h>
-  #endif
 static blosc_cpu_features blosc_get_cpu_features(void) {
   blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
 #if defined(__aarch64__)
@@ -311,12 +307,16 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
     impl_neon.name = "neon";
     impl_neon.shuffle = (shuffle_func)shuffle_neon;
     impl_neon.unshuffle = (unshuffle_func)unshuffle_neon;
-//    impl_neon.shuffle = (shuffle_func)shuffle_generic;
-//    impl_neon.unshuffle = (unshuffle_func)unshuffle_generic;
-    impl_neon.bitshuffle = (bitshuffle_func)bitshuffle_neon;
-    impl_neon.bitunshuffle = (bitunshuffle_func)bitunshuffle_neon;
-//    impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_scal;
-//    impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_scal;
+    //impl_neon.shuffle = (shuffle_func)shuffle_generic;
+    //impl_neon.unshuffle = (unshuffle_func)unshuffle_generic;
+    //impl_neon.bitshuffle = (bitshuffle_func)bitshuffle_neon;
+    //impl_neon.bitunshuffle = (bitunshuffle_func)bitunshuffle_neon;
+    // The current bitshuffle optimized for NEON is not any faster
+    // (in fact, it is pretty much slower) than the scalar implementation.
+    // Also, bitshuffle_neon (forward direction) is broken for 1, 2 and 4 bytes.
+    // So, let's use the the scalar one, which is pretty fast, at least on a M1 CPU.
+    impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_scal;
+    impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_scal;
     return impl_neon;
   }
 #endif  /* defined(SHUFFLE_NEON_ENABLED) */

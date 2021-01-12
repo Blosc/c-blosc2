@@ -912,7 +912,7 @@ bitunshuffle16_neon(void* _src, void* dest, const size_t size, const size_t elem
 int64_t
 bitshuffle_neon(void* _src, void* _dest, const size_t size,
                 const size_t elem_size, void* tmp_buf) {
-  size_t vectorized_chunk_size;
+  size_t vectorized_chunk_size = 0;
   int64_t count;
   if (elem_size == 1 || elem_size == 2 || elem_size == 4) {
     vectorized_chunk_size = elem_size * 16;
@@ -959,7 +959,7 @@ bitshuffle_neon(void* _src, void* _dest, const size_t size,
 int64_t
 bitunshuffle_neon(void* _src, void* _dest, const size_t size,
                   const size_t elem_size, void* tmp_buf) {
-  size_t vectorized_chunk_size;
+  size_t vectorized_chunk_size = 0;
   int64_t count;
   if (size * elem_size == 1 || size * elem_size == 2 || size * elem_size == 4) {
     vectorized_chunk_size = size * elem_size * 16;
