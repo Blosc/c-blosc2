@@ -218,12 +218,12 @@ static char *test_typesize(void) {
 
 /* Check small blocksize */
 static char *test_small_blocksize(void) {
-    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-    cparams.blocksize = 2;
-    cparams.typesize = 1;
-    blosc2_context *cctx = blosc2_create_cctx(cparams);
-    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-    blosc2_context *dctx = blosc2_create_dctx(dparams);
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.blocksize = 2;
+  cparams.typesize = 1;
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
   size = 8;
   /* Get a compressed buffer */
   cbytes = blosc2_compress_ctx(cctx, src, size, dest, size + BLOSC_MAX_OVERHEAD);

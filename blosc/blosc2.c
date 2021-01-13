@@ -1615,6 +1615,7 @@ static int initialize_context_decompression(blosc2_context* context, const void*
   context->bstarts = (int32_t*)(context->src + bstarts_offset);
 
   if (context->header_flags & (uint8_t)BLOSC_MEMCPYED) {
+    /* If chunk is a memcpy, bstarts not exists */
     bstarts_end = bstarts_offset;
   } else {
     bstarts_end = bstarts_offset + (context->nblocks * sizeof(int32_t));
