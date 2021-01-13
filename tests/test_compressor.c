@@ -238,6 +238,14 @@ static char *test_small_blocksize(void) {
 
 
 static char *all_tests(void) {
+  mu_run_test(test_compressor);
+  mu_run_test(test_compress_decompress);
+  mu_run_test(test_clevel);
+  mu_run_test(test_noshuffle);
+  mu_run_test(test_shuffle);
+  mu_run_test(test_bitshuffle);
+  mu_run_test(test_delta);
+  mu_run_test(test_typesize);
   mu_run_test(test_small_blocksize);
 
   return 0;
