@@ -1018,18 +1018,38 @@ static int blosc_d(
       BLOSC_TRACE_ERROR("Lazy chunk needs an associated frame.");
       return -12;
     }
-    char *fname = context->schunk->frame->fname;
+    char* urlpath = context->schunk->frame->urlpath;
     int32_t trailer_len = sizeof(int32_t) + sizeof(int64_t) + context->nblocks * sizeof(int32_t);
     int32_t non_lazy_chunklen = srcsize - trailer_len;
-    // The offset of the actual chunk is in the trailer
-    int64_t chunk_offset = *(int64_t*)(src + non_lazy_chunklen + sizeof(int32_t));
+    int32_t nchunk;
+    int64_t chunk_offset;
+    if (context->schunk->frame->eframe) {
+      // The nchunk of the actual chunk is in the trailer
+      nchunk = *(int32_t*)(src + non_lazy_chunklen);
+    }
+    else {
+      // The offset of the actual chunk is in the trailer
+      chunk_offset = *(int64_t*)(src + non_lazy_chunklen + sizeof(int32_t));
+    }
     // Get the csize of the nblock
     int32_t *block_csizes = (int32_t *)(src + non_lazy_chunklen + sizeof(int32_t) + sizeof(int64_t));
     int32_t block_csize = block_csizes[nblock];
     // Read the lazy block on disk
-    FILE* fp = fopen(fname, "rb");
-    // The offset of the block is src_offset
-    fseek(fp, chunk_offset + src_offset, SEEK_SET);
+    FILE* fp = NULL;
+    if (context->schunk->frame->eframe) {
+      // The chunk is not in the frame
+      char* chunkpath = malloc(strlen(context->schunk->frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+      sprintf(chunkpath, "%s/%08X.chunk", context->schunk->frame->urlpath, nchunk);
+      fp = fopen(chunkpath, "rb");
+      free(chunkpath);
+      // The offset of the block is src_offset
+      fseek(fp, 0 + src_offset, SEEK_SET);
+    }
+    else {
+      fp = fopen(urlpath, "rb");
+      // The offset of the block is src_offset
+      fseek(fp, chunk_offset + src_offset, SEEK_SET);
+    }
     size_t rbytes = fread((void*)(src + src_offset), 1, block_csize, fp);
     fclose(fp);
     if (rbytes != block_csize) {

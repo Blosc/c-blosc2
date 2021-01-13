@@ -137,7 +137,7 @@ int main(void) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for fileframe (%s) -> frame : %.3g s, %.1f GB/s\n",
-         frame2->fname, ttotal, nbytes / (ttotal * GB));
+         frame2->urlpath, ttotal, nbytes / (ttotal * GB));
 
   // frame1 (in-memory) -> schunk
   blosc_set_timestamp(&last);
