@@ -1294,12 +1294,16 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
   schunk->dctx = blosc2_create_dctx(*dparams);
   free(dparams);
 
-  if (!copy || nchunks == 0) {
+  if (!copy) {
     goto out;
   }
 
   // We are not attached to a frame anymore
   schunk->frame = NULL;
+
+  if (nchunks == 0) {
+    goto out;
+  }
 
   // Get the compressed offsets
   int32_t coffsets_cbytes = 0;
