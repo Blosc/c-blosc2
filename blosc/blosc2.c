@@ -1668,7 +1668,13 @@ static int initialize_context_decompression(blosc2_context* context, const void*
   }
 
   context->bstarts = (int32_t*)(context->src + bstarts_offset);
-  bstarts_end = bstarts_offset + (context->nblocks * sizeof(int32_t));
+
+  if (context->header_flags & (uint8_t)BLOSC_MEMCPYED) {
+    /* If chunk is a memcpy, bstarts does not exist */
+    bstarts_end = bstarts_offset;
+  } else {
+    bstarts_end = bstarts_offset + (context->nblocks * sizeof(int32_t));
+  }
   if (srcsize < bstarts_end) {
     /* Not enough input to read entire `bstarts` section */
     return -1;
@@ -1703,7 +1709,6 @@ static int initialize_context_decompression(blosc2_context* context, const void*
     context->dict_ddict = ZSTD_createDDict(context->dict_buffer, context->dict_size);
 #endif   // HAVE_ZSTD
   }
-
 
   return 0;
 }
