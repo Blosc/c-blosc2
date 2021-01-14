@@ -1033,7 +1033,9 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
   uint16_t idx_size;
   frame_pos += sizeof(idx_size);
   if (frame_len < frame_pos) {
-    free(header);
+    if (frame->sdata == NULL) {
+      free(header);
+    }
     return -1;
   }
   swap_store(&idx_size, header + FRAME_IDX_SIZE, sizeof(idx_size));
@@ -1042,18 +1044,24 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
   uint8_t* metalayers_idx = header + FRAME_IDX_SIZE + 2;
   frame_pos += 1;
   if (frame_len < frame_pos) {
-    free(header);
+    if (frame->sdata == NULL) {
+      free(header);
+    }
     return -1;
   }
   if (metalayers_idx[0] != 0xde) {   // sanity check
-    free(header);
+    if (frame->sdata == NULL) {
+      free(header);
+    }
     return -1;
   }
   uint8_t* idxp = metalayers_idx + 1;
   uint16_t nmetalayers;
   frame_pos += sizeof(nmetalayers);
   if (frame_len < frame_pos) {
-    free(header);
+    if (frame->sdata == NULL) {
+      free(header);
+    }
     return -1;
   }
   swap_store(&nmetalayers, idxp, sizeof(uint16_t));
@@ -1064,11 +1072,15 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
     frame_pos += 1;
     if (frame_len < frame_pos) {
-      free(header);
+      if (frame->sdata == NULL) {
+        free(header);
+      }
       return -1;
     }
     if ((*idxp & 0xe0u) != 0xa0u) {   // sanity check
-      free(header);
+      if (frame->sdata == NULL) {
+        free(header);
+      }
       return -1;
     }
     blosc2_metalayer* metalayer = calloc(sizeof(blosc2_metalayer), 1);
@@ -1079,7 +1091,9 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
     idxp += 1;
     frame_pos += nslen;
     if (frame_len < frame_pos) {
-      free(header);
+      if (frame->sdata == NULL) {
+        free(header);
+      }
       return -1;
     }
     char* ns = malloc((size_t)nslen + 1);
@@ -1092,21 +1106,27 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
     // Get the offset
     frame_pos += 1;
     if (frame_len < frame_pos) {
+      if (frame->sdata == NULL) {
+        free(header);
+      }
       free(ns);
-      free(header);
       return -1;
     }
     if ((*idxp & 0xffu) != 0xd2u) {   // sanity check
+      if (frame->sdata == NULL) {
+        free(header);
+      }
       free(ns);
-      free(header);
       return -1;
     }
     idxp += 1;
     int32_t offset;
     frame_pos += sizeof(offset);
     if (frame_len < frame_pos) {
+      if (frame->sdata == NULL) {
+        free(header);
+      }
       free(ns);
-      free(header);
       return -1;
     }
     swap_store(&offset, idxp, sizeof(offset));
@@ -1115,8 +1135,10 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
     // Go to offset and see if we have the correct marker
     uint8_t* content_marker = header + offset;
     if (*content_marker != 0xc6) {
+      if (frame->sdata == NULL) {
+        free(header);
+      }
       free(ns);
-      free(header);
       return -1;
     }
 
@@ -1124,8 +1146,10 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
     int32_t content_len;
     frame_pos += sizeof(content_len);
     if (frame_len < frame_pos) {
+      if (frame->sdata == NULL) {
+        free(header);
+      }
       free(ns);
-      free(header);
       return -1;
     }
     swap_store(&content_len, content_marker + 1, sizeof(content_len));
@@ -1134,8 +1158,10 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
     // Finally, read the content
     frame_pos += content_len;
     if (frame_len < frame_pos) {
+      if (frame->sdata == NULL) {
+        free(header);
+      }
       free(ns);
-      free(header);
       return -1;
     }
     char* content = malloc((size_t)content_len);
