@@ -293,11 +293,16 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   }
   else {
     // A frame
-    if ((chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_ZERO_RUNLEN << 4)) ||
-        (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_NAN_RUNLEN << 4)))
-    {
+    bool all_zeros = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_ZERO_RUNLEN << 4);
+    bool all_nans = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_NAN_RUNLEN << 4);
+    bool all_repeats = all_nans & all_zeros;
+    if (all_repeats) {
+      // A non-special chunk is always stored in frames
+      schunk->cbytes += cbytes;
+    }
+    else if (all_zeros || all_nans) {
       if (schunk->cbytes == 0) {
-        // Increase by 0 just to say that we have data
+        // Increase by 0 just to be explicit
         schunk->cbytes += 0;
       }
     }

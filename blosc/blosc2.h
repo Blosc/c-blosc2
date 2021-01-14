@@ -247,7 +247,7 @@ enum {
     BLOSC2_NO_RUNLEN = 0x0,       //!< no run-length
     BLOSC2_ZERO_RUNLEN = 0x1,     //!< zero run-length
     BLOSC2_NAN_RUNLEN = 0x2,      //!< NaN run-length
-    BLOSC2_VALUE_RUNLEN = 0x2,    //!< generic value run-length
+    BLOSC2_VALUE_RUNLEN = 0x3,    //!< generic value run-length
 };
 
 
@@ -379,6 +379,23 @@ BLOSC_EXPORT int blosc2_chunk_zeros(const size_t nbytes, const size_t typesize,
  * */
 BLOSC_EXPORT int blosc2_chunk_nans(const size_t nbytes, const size_t typesize,
                                    void* dest, size_t destsize);
+
+
+/**
+ * @brief Create a chunk made of repeated values.
+ *
+ * @param nbytes The size (in bytes) of the chunk.
+ * @param typesize The size (in bytes) of the type.
+ * @param dest The buffer where the data chunk will be put.
+ * @param destsize The size (in bytes) of the @p dest buffer;
+ * @param repeatval A pointer to the repeated value (little endian).  The size
+ * of the value is given by @p typesize param.
+ *
+ * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH + typesize).
+ * If negative, there has been an error and @dest is unusable.
+ * */
+BLOSC_EXPORT int blosc2_chunk_repeatval(const size_t nbytes, const size_t typesize,
+                                        void* dest, size_t destsize, void* repeatval);
 
 
 /**

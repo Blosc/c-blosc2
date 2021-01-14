@@ -1645,14 +1645,20 @@ void* frame_append_chunk(blosc2_frame* frame, uint8_t* chunk, blosc2_schunk* sch
   }
 
   // Add the new offset
-  if (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_ZERO_RUNLEN << 4)) {
+  bool all_zeros = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_ZERO_RUNLEN << 4);
+  bool all_nans = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_NAN_RUNLEN << 4);
+  if (all_zeros & all_nans) {
+    // All repeated values
+    offsets[nchunks] = cbytes;
+  }
+  else if (all_zeros) {
     // Zero chunk.  Code it in a special way.
     uint64_t special_value = ((uint64_t)1 << 63);
     special_value += (uint64_t)BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
     swap_store(offsets + nchunks, &special_value, sizeof(uint64_t));
     cbytes_chunk = 0;   // we don't need to store the chunk
   }
-  else if (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_NAN_RUNLEN << 4)) {
+  else if (all_nans) {
     // NaN chunk.  Code it in a special way.
     uint64_t special_value = ((uint64_t)1 << 63);
     special_value += (uint64_t)BLOSC2_NAN_RUNLEN << (8 * 7);  // indicate a chunk of NANs
@@ -1759,6 +1765,7 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk
   }
 
   /* And decompress it */
+  dctx->header_overhead = BLOSC_EXTENDED_HEADER_LENGTH;
   int32_t chunksize = blosc2_decompress_ctx(dctx, src, chunk_cbytes, dest, nbytes);
   if (chunksize < 0 || chunksize != nbytes_) {
     BLOSC_TRACE_ERROR("Error in decompressing chunk.");

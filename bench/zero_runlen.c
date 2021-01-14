@@ -25,12 +25,17 @@
 #define NTHREADS 4
 
 #define ACTIVATE_ZERO_DETECTION false
-#define CHECK_NAN true
+#define CHECK_NAN false
+#define CHECK_VALUE true
+#define REPEATED_VALUE 1
 
 
 void fill_buffer(int32_t *buffer) {
   for (int i = 0; i < CHUNKSIZE; i++) {
-    if (CHECK_NAN) {
+    if (CHECK_VALUE) {
+      buffer[i] = REPEATED_VALUE;
+    }
+    else if (CHECK_NAN) {
       buffer[i] = nanf("");
     }
     else {
@@ -47,7 +52,7 @@ int main(void) {
   blosc2_schunk *schunk;
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
-  int64_t nbytes, cbytes, frame_len;
+  int64_t nbytes, frame_len;
   int nchunk, nchunks = 0;
   blosc_timestamp_t last, current;
   double totaltime;
@@ -72,7 +77,7 @@ int main(void) {
 
   /* Append the chunks */
   blosc_set_timestamp(&last);
-  void* chunk = malloc(BLOSC_EXTENDED_HEADER_LENGTH);
+  void* chunk = malloc(BLOSC_EXTENDED_HEADER_LENGTH + sizeof(int32_t));
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     if (ACTIVATE_ZERO_DETECTION) {
       fill_buffer(data_buffer);
@@ -80,8 +85,13 @@ int main(void) {
     }
     else {
       int csize;
-      if (CHECK_NAN) {
-        csize = blosc2_chunk_nans(isize, sizeof(float), chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+      if (CHECK_VALUE) {
+        int32_t value = REPEATED_VALUE;
+        csize = blosc2_chunk_repeatval(isize, sizeof(int32_t), chunk,
+                                       BLOSC_EXTENDED_HEADER_LENGTH + sizeof(int32_t), &value);
+      }
+      else if (CHECK_NAN) {
+          csize = blosc2_chunk_nans(isize, sizeof(float), chunk, BLOSC_EXTENDED_HEADER_LENGTH);
       } else {
         csize = blosc2_chunk_zeros(isize, sizeof(int32_t), chunk, BLOSC_EXTENDED_HEADER_LENGTH);
       }
@@ -107,11 +117,6 @@ int main(void) {
   frame_len = schunk->frame->len;
   printf("Compression super-chunk: %ld -> %ld (%.1fx)\n",
          (long)nbytes, (long)frame_len, (1. * nbytes) / frame_len);
-
-  uint8_t offset_bytes = 1 << (((schunk->frame->sdata[FRAME_FLAGS] & 0x30) >> 4) + 1);
-  int64_t nbytes_off = nchunks * offset_bytes;
-  printf("Compressed offsets: %ld -> %ld (%.1fx)\n",
-         (long)nbytes_off, (long)frame_len, (1. * nbytes_off) / frame_len);
 
   /* Retrieve and decompress the chunks */
   blosc_set_timestamp(&last);
@@ -140,10 +145,24 @@ int main(void) {
       printf("blosc2_schunk_get_chunk error.  Error code: %d\n", dsize);
       return csize;
     }
-    assert (csize == BLOSC_EXTENDED_HEADER_LENGTH);
-    if (CHECK_NAN) {
+    int expected_csize = CHECK_VALUE ? BLOSC_EXTENDED_HEADER_LENGTH + sizeof(int32_t) : BLOSC_EXTENDED_HEADER_LENGTH;
+    assert (csize == expected_csize);
+    if (CHECK_VALUE) {
+      int32_t value;
+      int rc = blosc_getitem(chunk_, nchunk, 1, &value);
+      if (rc < 0) {
+        printf("Error in getitem of a special value\n");
+        return rc;
+      }
+      assert (value == REPEATED_VALUE);
+    }
+    else if (CHECK_NAN) {
       float value;
-      blosc_getitem(chunk_, nchunk, 1, &value);
+      int rc = blosc_getitem(chunk_, nchunk, 1, &value);
+      if (rc < 0) {
+        printf("Error in getitem of a special value\n");
+        return rc;
+      }
       assert (isnan(value));
     }
     else {
@@ -168,7 +187,16 @@ int main(void) {
       return dsize;
     }
     assert (dsize == (int)isize);
-    if (CHECK_NAN) {
+    if (CHECK_VALUE) {
+      int32_t* buffer = (int32_t*)rec_buffer;
+      for (int i = 0; i < CHUNKSIZE; i++) {
+        if (buffer[i] != REPEATED_VALUE) {
+          printf("Value is not correct in chunk %d, position: %d\n", nchunk, i);
+          return -1;
+        }
+      }
+    }
+    else if (CHECK_NAN) {
       float* buffer = (float*)rec_buffer;
       for (int i = 0; i < CHUNKSIZE; i++) {
         if (!isnan(buffer[i])) {
@@ -178,7 +206,7 @@ int main(void) {
       }
     }
     else {
-      int32_t* buffer = (float*)rec_buffer;
+      int32_t* buffer = (int32_t*)rec_buffer;
       for (int i = 0; i < CHUNKSIZE; i++) {
         if (buffer[i] != 0) {
           printf("Value is not correct in chunk %d, position: %d\n", nchunk, i);

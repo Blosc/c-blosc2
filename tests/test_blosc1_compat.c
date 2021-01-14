@@ -1,9 +1,9 @@
 /*********************************************************************
   Blosc - Blocked Shuffling and Compression Library
 
-  Unit tests for BLOSC_NOLOCK environment variable in Blosc.
+  Unit tests for BLOSC_BLOSC1_COMPAT environment variable in Blosc.
 
-  Creation date: 2016-04-25
+  Creation date: 2021-01-14
   Author: The Blosc Developers <blosc@blosc.org>
 
   See LICENSE.txt for details about copyright and rights to use.
@@ -13,7 +13,7 @@
 #include <assert.h>
 #include "test_common.h"
 
-#define BUFFER_ALIGN_SIZE   32
+#define BUFFER_ALIGN_SIZE 32
 #define NCHILDREN 4
 #define NTHREADS 4
 
@@ -28,36 +28,27 @@ size_t typesize = 4;
 size_t size = sizeof(int32_t) * 1000 * 1000;
 
 
-/* Check just compressing */
-static char *test_compress(void) {
-
-  /* Get a compressed buffer */
-  cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
-                          dest, size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
-
-  return 0;
-}
-
-
 /* Check compressing + decompressing */
 static char *test_compress_decompress(void) {
 
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
-                          dest, size + BLOSC_MAX_OVERHEAD);
+                          dest, size + BLOSC_MIN_HEADER_LENGTH);
   mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   /* Decompress the buffer */
   nbytes = blosc_decompress(dest, dest2, size);
   mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
+  // Check roundtrip
+  int exit_code = memcmp(src, dest2, size) ? EXIT_FAILURE : EXIT_SUCCESS;
+  mu_assert("ERROR: Bad roundtrip!", exit_code == EXIT_SUCCESS);
+
   return 0;
 }
 
 
 static char *all_tests(void) {
-  mu_run_test(test_compress);
   mu_run_test(test_compress_decompress);
 
   return 0;
@@ -68,14 +59,8 @@ int main(void) {
   int32_t *_src;
   char *result;
 
-  /* Activate the BLOSC_NOLOCK variable */
-  setenv("BLOSC_NOLOCK", "TRUE", 0);
-
-  /* Launch several subprocesses */
-  for (int i = 1; i <= NCHILDREN; i++) {
-    int pid = fork();
-    assert(pid >= 0);
-  }
+  /* Activate the BLOSC_BLOSC1_COMPAT variable */
+  setenv("BLOSC_BLOSC1_COMPAT", "TRUE", 0);
 
   blosc_init();
   blosc_set_nthreads(NTHREADS);
@@ -83,7 +68,7 @@ int main(void) {
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
   srccpy = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
-  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, size + BLOSC_MAX_OVERHEAD);
+  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, size + BLOSC_MIN_HEADER_LENGTH);
   dest2 = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
   _src = (int32_t *)src;
   for (int i = 0; i < (int)(size / sizeof(int32_t)); i++) {
@@ -109,7 +94,7 @@ int main(void) {
   blosc_destroy();
 
   /* Reset envvar */
-  unsetenv("BLOSC_NOLOCK");
+  unsetenv("BLOSC_BLOSC1_COMPAT");
 
   return result != 0;
 }

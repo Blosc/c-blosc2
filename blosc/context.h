@@ -43,6 +43,8 @@ struct blosc2_context_s {
   /* Flags specific for blosc2 */
   int32_t sourcesize;
   /* Number of bytes in source buffer */
+  int32_t header_overhead;
+  /* The number of bytes in chunk header */
   int32_t nblocks;
   /* Number of total blocks in buffer */
   int32_t leftover;
