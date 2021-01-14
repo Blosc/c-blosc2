@@ -50,7 +50,7 @@ int main(void) {
   dparams.nthreads = NTHREADS;
 
   /* Create a new super-chunk backed by a fileframe */
-  blosc2_storage storage = {.sequential=true, .path="frame_big.b2frame",
+  blosc2_storage storage = {.sequential=true, .urlpath="frame_big.b2frame",
                             .cparams=&cparams, .dparams=&dparams};
   blosc2_schunk* schunk = blosc2_schunk_new(storage);
 
