@@ -157,7 +157,7 @@ if(HAVE_IPP)
 endif()
 
 if(UNIX AND NOT APPLE)
-    set(LIBS ${LIBS} "rt m")
+    set(LIBS ${LIBS} "rt")
 endif()
 
 # targets
