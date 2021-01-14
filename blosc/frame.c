@@ -846,7 +846,7 @@ blosc2_frame* blosc2_frame_from_file(const char* urlpath) {
   rbytes = fread(trailer, 1, FRAME_TRAILER_MINLEN, fp);
   fclose(fp);
   if (rbytes != FRAME_TRAILER_MINLEN) {
-    BLOSC_TRACE_ERROR("Cannot read from file '%s'.", fname);
+    BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
     free(urlpath_cpy);
     free(fname_cpy);
     free(frame);
