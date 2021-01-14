@@ -903,36 +903,26 @@ blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy) 
 // Get the compressed data offsets
 uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, int32_t *off_cbytes) {
   if (frame->coffsets != NULL) {
+    if (off_cbytes != NULL) {
+      *off_cbytes = *(int32_t *) (frame->coffsets + BLOSC2_CHUNK_CBYTES);
+    }
     return frame->coffsets;
   }
-
   if (frame->sdata != NULL) {
     // For in-memory frames, the coffset is just one pointer away
-    if (off_cbytes != NULL)
-      *off_cbytes = (int32_t)cbytes;
-    return frame->sdata + header_len + cbytes;
+    uint8_t* off_start = frame->sdata + header_len + cbytes;
+    if (off_cbytes != NULL) {
+      *off_cbytes = *(int32_t*) (off_start + BLOSC2_CHUNK_CBYTES);
+    }
+    return off_start;
   }
-
-  int64_t trailer_offset = get_trailer_offset(frame, header_len, cbytes);
+  int64_t trailer_offset = get_trailer_offset(frame, header_len, true);
   int32_t coffsets_cbytes = (int32_t)(trailer_offset - (header_len + cbytes));
-  if (frame->eframe) {
-    coffsets_cbytes = (int32_t)(trailer_offset - (header_len + 0));
-  }
   if (off_cbytes != NULL)
     *off_cbytes = coffsets_cbytes;
-  FILE* fp = NULL;
+  FILE* fp = fopen(frame->urlpath, "rb");
   uint8_t* coffsets = malloc((size_t)coffsets_cbytes);
-  if (frame->eframe) {
-    char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
-    sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
-    fp = fopen(eframe_name, "rb");
-    free(eframe_name);
-    fseek(fp, header_len + 0, SEEK_SET);
-  }
-  else {
-    fp = fopen(frame->urlpath, "rb");
-    fseek(fp, header_len + cbytes, SEEK_SET);
-  }
+  fseek(fp, header_len + cbytes, SEEK_SET);
   size_t rbytes = fread(coffsets, 1, (size_t)coffsets_cbytes, fp);
   fclose(fp);
   if (rbytes != (size_t)coffsets_cbytes) {
@@ -940,7 +930,6 @@ uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, i
     return NULL;
   }
   frame->coffsets = coffsets;
-
   return coffsets;
 }
 
