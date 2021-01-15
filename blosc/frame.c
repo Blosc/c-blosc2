@@ -1472,7 +1472,7 @@ int64_t get_coffset(blosc2_frame* frame, int32_t header_len, int64_t cbytes, int
   int64_t offset;
   uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, NULL);
   if (coffsets == NULL) {
-  BLOSC_TRACE_ERROR("Cannot get the offset for chunk %d for the frame.", nchunk);
+    BLOSC_TRACE_ERROR("Cannot get the offset for chunk %d for the frame.", nchunk);
     return -3;
   }
 

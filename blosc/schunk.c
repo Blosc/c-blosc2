@@ -157,7 +157,7 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
       urlpath = malloc(strlen(storage.urlpath) + 1);
       strcpy(urlpath, storage.urlpath);
     }
-    //Create directory
+    // Create directory
     if (mkdir(urlpath, 0777) == -1) {
       BLOSC_TRACE_ERROR("Error during the creation of the directory, maybe it already exists.");
       return NULL;
