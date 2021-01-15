@@ -767,10 +767,11 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       ntbytes += sizeof(int32_t);
       ctbytes += sizeof(int32_t);
 
+      const uint8_t *ip = (uint8_t *) _src + j * neblock;
+      const uint8_t *ipbound = (uint8_t *) _src + (j + 1) * neblock;
+
       // See whether we have a run here
-      const uint8_t* ip = (uint8_t*)_src + j * neblock;
-      const uint8_t* ipbound = (uint8_t*)_src + (j + 1) * neblock;
-      if (get_run(ip, ipbound)) {
+      if (context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH && get_run(ip, ipbound)) {
         // A run
         int32_t value = _src[j * neblock];
         if (ntbytes > destsize) {
@@ -1008,7 +1009,8 @@ static int blosc_d(
     return bsize;
   }
 
-  bool is_lazy = context->blosc2_flags & 0x08u;
+  bool is_lazy = ((context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH) &&
+          (context->blosc2_flags & 0x08u));
   if (is_lazy) {
     // The chunk is on disk, so just lazily load the block
     if (context->schunk == NULL) {
@@ -1807,11 +1809,10 @@ static int write_compression_header(blosc2_context* context, bool extended_heade
     // Regular header
     if (memcpyed) {
       context->bstarts = NULL;
-      context->output_bytes = BLOSC_MIN_HEADER_LENGTH;
+      context->output_bytes = context->header_overhead;
     } else {
-      context->bstarts = (int32_t *) (context->dest + BLOSC_MIN_HEADER_LENGTH);
-      context->output_bytes = BLOSC_MIN_HEADER_LENGTH +
-                              sizeof(int32_t) * context->nblocks;
+      context->bstarts = (int32_t *) (context->dest + context->header_overhead);
+      context->output_bytes = context->header_overhead + sizeof(int32_t) * context->nblocks;
     }
   }
 
