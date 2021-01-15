@@ -1979,7 +1979,7 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
 
     // Train from samples
     void* dict_buffer = malloc(dict_maxsize);
-    size_t dict_actual_size = ZDICT_trainFromBuffer(dict_buffer, dict_maxsize, samples_buffer, samples_sizes, nblocks);
+    int32_t dict_actual_size = (int32_t)ZDICT_trainFromBuffer(dict_buffer, dict_maxsize, samples_buffer, samples_sizes, nblocks);
 
     // TODO: experiment with parameters of low-level fast cover algorithm
     // Note that this API is still unstable.  See: https://github.com/facebook/zstd/issues/1599
@@ -3383,6 +3383,7 @@ int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks) {
 /* Create a chunk made of zeros */
 int blosc2_chunk_zeros(const size_t nbytes, const size_t typesize, void* dest, size_t destsize) {
   uint8_t* dest_ = dest;
+  int32_t nbytes_ = (int32_t)nbytes;
 
   if (typesize > 255) {
     BLOSC_TRACE_ERROR("typesize cannot be larger than 255 bytes");
@@ -3404,8 +3405,8 @@ int blosc2_chunk_zeros(const size_t nbytes, const size_t typesize, void* dest, s
   dest_[BLOSC2_CHUNK_VERSIONLZ] = BLOSC_BLOSCLZ_VERSION_FORMAT;
   dest_[BLOSC2_CHUNK_FLAGS] = (BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE);  // extended header
   dest_[BLOSC2_CHUNK_TYPESIZE] = (uint8_t)typesize;
-  _sw32(dest_ + BLOSC2_CHUNK_NBYTES, nbytes);
-  _sw32(dest_ + BLOSC2_CHUNK_BLOCKSIZE, nbytes);
+  _sw32(dest_ + BLOSC2_CHUNK_NBYTES, nbytes_);
+  _sw32(dest_ + BLOSC2_CHUNK_BLOCKSIZE, nbytes_);
   _sw32(dest_ + BLOSC2_CHUNK_CBYTES, BLOSC_EXTENDED_HEADER_LENGTH);
   dest_[BLOSC2_CHUNK_BLOSC2_FLAGS] = BLOSC2_ZERO_RUNLEN << 4;  // mark chunk as all zeros
 
@@ -3416,6 +3417,7 @@ int blosc2_chunk_zeros(const size_t nbytes, const size_t typesize, void* dest, s
 /* Create a chunk made of nans */
 int blosc2_chunk_nans(const size_t nbytes, const size_t typesize, void* dest, size_t destsize) {
   uint8_t* dest_ = dest;
+  int32_t nbytes_ = (int32_t)nbytes;
 
   if (typesize > 255) {
     BLOSC_TRACE_ERROR("typesize cannot be larger than 255 bytes");
@@ -3437,8 +3439,8 @@ int blosc2_chunk_nans(const size_t nbytes, const size_t typesize, void* dest, si
   dest_[BLOSC2_CHUNK_VERSIONLZ] = BLOSC_BLOSCLZ_VERSION_FORMAT;
   dest_[BLOSC2_CHUNK_FLAGS] = (BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE);  // extended header
   dest_[BLOSC2_CHUNK_TYPESIZE] = (uint8_t)typesize;
-  _sw32(dest_ + BLOSC2_CHUNK_NBYTES, nbytes);
-  _sw32(dest_ + BLOSC2_CHUNK_BLOCKSIZE, nbytes);
+  _sw32(dest_ + BLOSC2_CHUNK_NBYTES, nbytes_);
+  _sw32(dest_ + BLOSC2_CHUNK_BLOCKSIZE, nbytes_);
   _sw32(dest_ + BLOSC2_CHUNK_CBYTES, BLOSC_EXTENDED_HEADER_LENGTH);
   dest_[BLOSC2_CHUNK_BLOSC2_FLAGS] = BLOSC2_NAN_RUNLEN << 4;  // mark chunk as all NaNs
 
@@ -3450,6 +3452,8 @@ int blosc2_chunk_nans(const size_t nbytes, const size_t typesize, void* dest, si
 int blosc2_chunk_repeatval(const size_t nbytes, const size_t typesize, void* dest,
                            size_t destsize, void* repeatval) {
   uint8_t* dest_ = dest;
+  int32_t nbytes_ = (int32_t)nbytes;
+
   if (typesize > 255) {
     BLOSC_TRACE_ERROR("typesize cannot be larger than 255 bytes");
     return -1;
@@ -3470,8 +3474,8 @@ int blosc2_chunk_repeatval(const size_t nbytes, const size_t typesize, void* des
   dest_[BLOSC2_CHUNK_VERSIONLZ] = BLOSC_BLOSCLZ_VERSION_FORMAT;
   dest_[BLOSC2_CHUNK_FLAGS] = (BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE);  // extended header
   dest_[BLOSC2_CHUNK_TYPESIZE] = (uint8_t)typesize;
-  _sw32(dest_ + BLOSC2_CHUNK_NBYTES, nbytes);
-  _sw32(dest_ + BLOSC2_CHUNK_BLOCKSIZE, nbytes);
+  _sw32(dest_ + BLOSC2_CHUNK_NBYTES, nbytes_);
+  _sw32(dest_ + BLOSC2_CHUNK_BLOCKSIZE, nbytes_);
   _sw32(dest_ + BLOSC2_CHUNK_CBYTES, BLOSC_EXTENDED_HEADER_LENGTH + typesize);
   dest_[BLOSC2_CHUNK_BLOSC2_FLAGS] = BLOSC2_VALUE_RUNLEN << 4;  // mark chunk as all repeated value
 

@@ -25,8 +25,8 @@
 #define NTHREADS 4
 
 #define ACTIVATE_ZERO_DETECTION false
-#define CHECK_NAN false
-#define CHECK_VALUE true
+#define CHECK_NAN true
+#define CHECK_VALUE false
 #define REPEATED_VALUE 1
 
 
@@ -36,7 +36,7 @@ void fill_buffer(int32_t *buffer) {
       buffer[i] = REPEATED_VALUE;
     }
     else if (CHECK_NAN) {
-      buffer[i] = nanf("");
+      *(float*)(buffer + i) = nanf("");
     }
     else {
       buffer[i] = 0;

@@ -1480,7 +1480,8 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
   if (offset < 0) {
     // Special value
     lazychunk_cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
-    int rc = frame_special_chunk(offset, chunksize, typesize, chunk, lazychunk_cbytes, needs_free);
+    int rc = frame_special_chunk(offset, chunksize, typesize, chunk,
+                                 (int32_t)lazychunk_cbytes, needs_free);
     if (rc < 0) {
       return rc;
     }
@@ -1673,7 +1674,7 @@ void* frame_append_chunk(blosc2_frame* frame, uint8_t* chunk, blosc2_schunk* sch
   blosc2_context* cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
   cctx->typesize = sizeof(int64_t);  // 64-bit offsets
   // The params below have been fine-tuned with the zero_runlen bench
-  cctx->clevel = 1;
+  cctx->clevel = 5;
   // cctx->compcode = BLOSC_LZ4;
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
