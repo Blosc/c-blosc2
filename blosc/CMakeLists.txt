@@ -158,6 +158,7 @@ endif()
 
 if(UNIX AND NOT APPLE)
     set(LIBS ${LIBS} "rt")
+    set(LIBS ${LIBS} "m")
 endif()
 
 # targets
