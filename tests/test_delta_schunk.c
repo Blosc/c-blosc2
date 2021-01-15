@@ -16,7 +16,7 @@
 int main(void) {
   static int32_t data[SIZE];
   static int32_t data_dest[SIZE];
-  size_t isize = SIZE * sizeof(int32_t);
+  int32_t isize = SIZE * sizeof(int32_t);
   int dsize;
   int64_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;

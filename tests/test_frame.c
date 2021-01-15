@@ -37,7 +37,7 @@ char buf[256];
 
 
 static char* test_frame(void) {
-  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int32_t *data = malloc(isize);
   int32_t *data_dest = malloc(isize);
   int dsize;
