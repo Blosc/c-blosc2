@@ -20,7 +20,7 @@
 #define MB  (1024*KB)
 #define GB  (1024*MB)
 
-#define CHUNKSIZE (5 * 1000 * 1000)
+#define CHUNKSIZE (50 * 1000)
 #define NCHUNKS 100
 // Setting NTHREADS > 1 increases the likelihood of a crash.  See #112.
 #define NTHREADS 1
