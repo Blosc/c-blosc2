@@ -17,11 +17,11 @@
 #define snprintf _snprintf
 #endif
 
-#define CHUNKSIZE (200 * 1000)
+#define CHUNKSIZE (20 * 1000)
 #define NTHREADS (4)
 
 /* Global vars */
-int nchunks_[] = {0, 1, 2, 10};
+int nchunks_[] = {0, 1, 2, 5};
 int tests_run = 0;
 int nchunks;
 bool multithread;
@@ -31,7 +31,6 @@ bool sparse_schunk;
 bool filter_pipeline;
 bool metalayers;
 bool usermeta;
-bool check_sframe;
 char *fname;
 char buf[256];
 

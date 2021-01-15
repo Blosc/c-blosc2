@@ -3476,7 +3476,7 @@ int blosc2_chunk_repeatval(const size_t nbytes, const size_t typesize, void* des
   dest_[BLOSC2_CHUNK_TYPESIZE] = (uint8_t)typesize;
   _sw32(dest_ + BLOSC2_CHUNK_NBYTES, nbytes_);
   _sw32(dest_ + BLOSC2_CHUNK_BLOCKSIZE, nbytes_);
-  _sw32(dest_ + BLOSC2_CHUNK_CBYTES, BLOSC_EXTENDED_HEADER_LENGTH + typesize);
+  _sw32(dest_ + BLOSC2_CHUNK_CBYTES, BLOSC_EXTENDED_HEADER_LENGTH + (int32_t)typesize);
   dest_[BLOSC2_CHUNK_BLOSC2_FLAGS] = BLOSC2_VALUE_RUNLEN << 4;  // mark chunk as all repeated value
 
   // The repeated value comes after the header

@@ -1,10 +1,15 @@
 # sources for examples
 set(SOURCES contexts delta_schunk_ex multithread simple frame_metalayers noinit find_roots)
 if(NOT DEACTIVATE_LZ4)
-    set(SOURCES ${SOURCES} schunk_simple frame_simple frame_big frame_backed_schunk compress_file)
+    set(SOURCES ${SOURCES} schunk_simple frame_simple frame_backed_schunk compress_file)
 endif()
 if(NOT DEACTIVATE_ZSTD)
     set(SOURCES ${SOURCES} zstd_dict)
+endif()
+
+if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
+    # frame_big uses containers of more than 4 GB and cannot run on 32-bit platforms
+    set(SOURCES ${SOURCES} frame_big)
 endif()
 
 if(EXISTS btune_schunk.c)
