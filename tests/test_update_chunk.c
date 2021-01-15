@@ -23,7 +23,7 @@ int pos;
 static char* test_insert_schunk(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
-  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;

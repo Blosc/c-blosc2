@@ -50,7 +50,7 @@ void fill_buffer(int32_t *buffer) {
 
 int main(void) {
   blosc2_schunk *schunk;
-  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   int64_t nbytes, frame_len;
   int nchunk, nchunks = 0;
