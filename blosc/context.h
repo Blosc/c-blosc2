@@ -69,7 +69,7 @@ struct blosc2_context_s {
   /* Whether to use dicts or not */
   void* dict_buffer;
   /* The buffer to keep the trained dictionary */
-  size_t dict_size;
+  int32_t dict_size;
   /* The size of the trained dictionary */
   void* dict_cdict;
   /* The dictionary in digested form for compression */
