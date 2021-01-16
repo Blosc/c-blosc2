@@ -1920,7 +1920,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   else {
     size_t wbytes;
     if (frame->eframe) {
-      // Create index file
+      // Update the offsets chunk in the chunks frame
       eframe_append_chunk(frame, chunk, nchunks, cbytes_chunk);
       char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
       sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
@@ -1930,7 +1930,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
       wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
     }
     else {
-      // fileframe
+      // Regular frame
       fp = fopen(frame->urlpath, "rb+");
       fseek(fp, header_len + cbytes, SEEK_SET);
       wbytes = fwrite(chunk, 1, (size_t)cbytes_chunk, fp);  // the new chunk
@@ -2071,7 +2071,7 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
         BLOSC_TRACE_ERROR("Cannot write the full chunk.");
         return NULL;
       }
-      // Fileframe for updating the offsets chunk
+      // Update the offsets chunk in the chunks frame
       char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
       sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = fopen(eframe_name, "rb+");
@@ -2079,7 +2079,7 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
       fseek(fp, header_len + 0, SEEK_SET);
     }
     else {
-      // fileframe
+      // Regular frame
       fp = fopen(frame->urlpath, "rb+");
       fseek(fp, header_len + cbytes, SEEK_SET);
       wbytes = fwrite(chunk, 1, (size_t)cbytes_chunk, fp);  // the new chunk
@@ -2222,7 +2222,7 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
         BLOSC_TRACE_ERROR("Cannot write the full chunk.");
         return NULL;
       }
-      // Fileframe for updating the offsets chunk
+      // Update the offsets chunk in the chunks frame
       char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
       sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = fopen(eframe_name, "rb+");
@@ -2230,7 +2230,7 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
       fseek(fp, header_len + 0, SEEK_SET);
     }
     else {
-      // fileframe
+      // Regular frame
       fp = fopen(frame->urlpath, "rb+");
       fseek(fp, header_len + cbytes, SEEK_SET);
       wbytes = fwrite(chunk, 1, (size_t)cbytes_chunk, fp);  // the new chunk
@@ -2267,48 +2267,6 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
   }
 
   return frame;
-}
-
-
-/* Decompress and return a chunk that is part of a frame. */
-int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk, void *dest, int32_t nbytes) {
-  uint8_t* src;
-  bool needs_free;
-  int chunk_cbytes;
-  if (frame->eframe) {
-    chunk_cbytes = frame_get_chunk(frame, nchunk, &src, &needs_free);
-  }
-  else {
-    // Use a lazychunk here in order to do a potential parallel read.
-    chunk_cbytes = frame_get_lazychunk(frame, nchunk, &src, &needs_free);
-  }
-  if (chunk_cbytes < 0) {
-    BLOSC_TRACE_ERROR("Cannot get the chunk in position %d.", nchunk);
-    return -1;
-  }
-  if (chunk_cbytes < sizeof(int32_t)) {
-    /* Not enough input to read `nbytes` */
-    return -1;
-  }
-
-  /* Create a buffer for destination */
-  int32_t nbytes_ = sw32_(src + BLOSC2_CHUNK_NBYTES);
-  if (nbytes_ > (int32_t)nbytes) {
-    BLOSC_TRACE_ERROR("Not enough space for decompressing in dest.");
-    return -1;
-  }
-  /* And decompress it */
-  dctx->header_overhead = BLOSC_EXTENDED_HEADER_LENGTH;
-  int32_t chunksize = blosc2_decompress_ctx(dctx, src, chunk_cbytes, dest, nbytes);
-  if (chunksize < 0 || chunksize != nbytes_) {
-    BLOSC_TRACE_ERROR("Error in decompressing chunk.");
-    return -11;
-  }
-
-  if (needs_free) {
-    free(src);
-  }
-  return (int)chunksize;
 }
 
 
@@ -2391,7 +2349,7 @@ int frame_reorder_offsets(blosc2_frame* frame, int* offsets_order, blosc2_schunk
   else {
     FILE* fp = NULL;
     if (frame->eframe) {
-      // Fileframe for updating the offsets chunk
+      // Update the offsets chunk in the chunks frame
       char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
       sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = fopen(eframe_name, "rb+");
@@ -2399,7 +2357,7 @@ int frame_reorder_offsets(blosc2_frame* frame, int* offsets_order, blosc2_schunk
       fseek(fp, header_len + 0, SEEK_SET);
     }
     else {
-      // fileframe
+      // Regular frame
       fp = fopen(frame->urlpath, "rb+");
       fseek(fp, header_len + cbytes, SEEK_SET);
     }
@@ -2410,6 +2368,7 @@ int frame_reorder_offsets(blosc2_frame* frame, int* offsets_order, blosc2_schunk
       return -1;
     }
   }
+
   // Invalidate the cache for chunk offsets
   if (frame->coffsets != NULL) {
     free(frame->coffsets);
@@ -2429,4 +2388,46 @@ int frame_reorder_offsets(blosc2_frame* frame, int* offsets_order, blosc2_schunk
   }
 
   return 0;
+}
+
+
+/* Decompress and return a chunk that is part of a frame. */
+int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk, void *dest, int32_t nbytes) {
+  uint8_t* src;
+  bool needs_free;
+  int chunk_cbytes;
+  if (frame->eframe) {
+    chunk_cbytes = frame_get_chunk(frame, nchunk, &src, &needs_free);
+  }
+  else {
+    // Use a lazychunk here in order to do a potential parallel read.
+    chunk_cbytes = frame_get_lazychunk(frame, nchunk, &src, &needs_free);
+  }
+  if (chunk_cbytes < 0) {
+    BLOSC_TRACE_ERROR("Cannot get the chunk in position %d.", nchunk);
+    return -1;
+  }
+  if (chunk_cbytes < sizeof(int32_t)) {
+    /* Not enough input to read `nbytes` */
+    return -1;
+  }
+
+  /* Create a buffer for destination */
+  int32_t nbytes_ = sw32_(src + BLOSC2_CHUNK_NBYTES);
+  if (nbytes_ > (int32_t)nbytes) {
+    BLOSC_TRACE_ERROR("Not enough space for decompressing in dest.");
+    return -1;
+  }
+  /* And decompress it */
+  dctx->header_overhead = BLOSC_EXTENDED_HEADER_LENGTH;
+  int32_t chunksize = blosc2_decompress_ctx(dctx, src, chunk_cbytes, dest, nbytes);
+  if (chunksize < 0 || chunksize != nbytes_) {
+    BLOSC_TRACE_ERROR("Error in decompressing chunk.");
+    return -11;
+  }
+
+  if (needs_free) {
+    free(src);
+  }
+  return (int)chunksize;
 }
