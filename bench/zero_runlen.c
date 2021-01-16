@@ -20,7 +20,7 @@
 #define MB  (1024*KB)
 #define GB  (1024*MB)
 
-#define NCHUNKS 2000
+#define NCHUNKS (2000)
 #define CHUNKSIZE (500 * 1000)  // > NCHUNKS for the bench purposes
 #define NTHREADS 4
 
@@ -56,7 +56,7 @@ int main(void) {
   int nchunk, nchunks = 0;
   blosc_timestamp_t last, current;
   double totaltime;
-  double totalsize = (double)(isize * NCHUNKS);
+  double totalsize = (double)isize * NCHUNKS;
   int32_t *data_buffer = malloc(CHUNKSIZE * sizeof(int32_t));
   int32_t *rec_buffer = malloc(CHUNKSIZE * sizeof(int32_t));
 
@@ -98,7 +98,7 @@ int main(void) {
       if (csize < 0) {
         printf("Error creating chunk: %d\n", csize);
       }
-      nchunks = blosc2_schunk_append_chunk(schunk, chunk, false);
+      nchunks = blosc2_schunk_append_chunk(schunk, chunk, true);
     }
     if (nchunks < 0) {
       printf("Error appending chunk: %d\n", nchunks);
@@ -130,7 +130,7 @@ int main(void) {
   }
   blosc_set_timestamp(&current);
   totaltime = blosc_elapsed_secs(last, current);
-  totalsize = (double)(isize * nchunks);
+  totalsize = (double)(isize) * nchunks;
   printf("[Decompr] Elapsed time:\t %6.3f s."
          "  Processed data: %.3f GB (%.3f GB/s)\n",
          totaltime, totalsize / GB, totalsize / (GB * totaltime));
