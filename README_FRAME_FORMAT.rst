@@ -98,15 +98,15 @@ using the msgpack format. Here is the format for the *metalayers*::
         Format version.
     :``4`` and ``5``:
         Enumerated for chunk offsets.
-        
+
         :``0``:
-            16-bit
-        :``1``:
             32-bit
-        :``2``:
+        :``1``:
             64-bit
-        :``3``:
+        :``2``:
             128-bit
+        :``3``:
+            256-bit
     :``6``:
         Chunks of fixed length (0) or variable length (1)
     :``7``:

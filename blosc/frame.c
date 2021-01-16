@@ -160,7 +160,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
   // General flags
   *h2p = BLOSC2_VERSION_FRAME_FORMAT;  // version
-  *h2p += 0x20;  // 64-bit offsets.  We only support this for now.
+  *h2p += 0x10;  // 64-bit offsets.  We only support this for now.
   h2p += 1;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
     return NULL;
