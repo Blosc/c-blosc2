@@ -216,6 +216,26 @@ static char *test_typesize(void) {
   return 0;
 }
 
+/* Check small blocksize */
+static char *test_small_blocksize(void) {
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.blocksize = 2;
+  cparams.typesize = 1;
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
+  size = 8;
+  /* Get a compressed buffer */
+  cbytes = blosc2_compress_ctx(cctx, src, size, dest, size + BLOSC_MAX_OVERHEAD);
+  nbytes = blosc2_decompress_ctx(dctx, dest, size + BLOSC_MAX_OVERHEAD, src, size);
+  mu_assert("ERROR: nbytes is not correct", nbytes == (int) size);
+
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+  return 0;
+}
+
+
 
 static char *all_tests(void) {
   mu_run_test(test_compressor);
@@ -226,6 +246,7 @@ static char *all_tests(void) {
   mu_run_test(test_bitshuffle);
   mu_run_test(test_delta);
   mu_run_test(test_typesize);
+  mu_run_test(test_small_blocksize);
 
   return 0;
 }

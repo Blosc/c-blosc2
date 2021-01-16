@@ -20,12 +20,14 @@ int tests_run = 0;
 int nchunks;
 int clevel;
 int nthreads;
+char* directory;
+
 
 
 static char* test_lazy_chunk(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
-  int32_t isize = CHUNKSIZE * sizeof(int32_t);
+  size_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   int cbytes;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -41,7 +43,7 @@ static char* test_lazy_chunk(void) {
   cparams.nthreads = nthreads;
   cparams.blocksize = BLOCKSIZE * cparams.typesize;
   dparams.nthreads = nthreads;
-  blosc2_storage storage = {.sequential=true, .urlpath="test_lazy_chunk.b2frame", .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.sequential=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
@@ -93,8 +95,11 @@ static char* test_lazy_chunk(void) {
     }
   }
 
+  /* Remove directory */
+  blosc2_remove_dir(storage.urlpath);
   /* Free resources */
   blosc2_schunk_free(schunk);
+
   /* Destroy the Blosc environment */
   blosc_destroy();
 
@@ -102,6 +107,43 @@ static char* test_lazy_chunk(void) {
 }
 
 static char *all_tests(void) {
+  directory = "dir1.b2eframe/";
+  nchunks = 0;
+  clevel = 5;
+  nthreads = 1;
+  mu_run_test(test_lazy_chunk);
+
+  nchunks = 1;
+  clevel = 5;
+  nthreads = 2;
+  mu_run_test(test_lazy_chunk);
+
+  nchunks = 1;
+  clevel = 0;
+  nthreads = 2;
+  mu_run_test(test_lazy_chunk);
+
+  nchunks = 10;
+  clevel = 5;
+  nthreads = 1;
+  mu_run_test(test_lazy_chunk);
+
+  nchunks = 10;
+  clevel = 5;
+  nthreads = 2;
+  mu_run_test(test_lazy_chunk);
+
+  nchunks = 10;
+  clevel = 0;
+  nthreads = 1;
+  mu_run_test(test_lazy_chunk);
+
+  nchunks = 10;
+  clevel = 0;
+  nthreads = 2;
+  mu_run_test(test_lazy_chunk);
+
+  directory = "dir1.b2eframe";
   nchunks = 0;
   clevel = 5;
   nthreads = 1;
@@ -142,7 +184,7 @@ static char *all_tests(void) {
 
 
 int main(void) {
-  char *result;
+  char* result;
 
   install_blosc_callback_test(); /* optionally install callback test */
   blosc_init();

@@ -40,13 +40,15 @@
 #define FRAME_TRAILER_MINLEN (30)  // minimum length for the trailer (msgpack overhead)
 #define FRAME_TRAILER_LEN_OFFSET (22)  // offset to trailer length (counting from the end)
 
-void* frame_append_chunk(blosc2_frame* frame, uint8_t* chunk, blosc2_schunk* schunk);
+void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk);
+void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_schunk* schunk);
+void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_schunk* schunk);
+int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk* schunk);
+
 int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free);
 int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free);
 int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk,
                            void *dest, int32_t nbytes);
-
-int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk* schunk);
 
 int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new);
 int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk);

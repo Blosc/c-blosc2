@@ -997,7 +997,7 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 typedef struct {
     bool sequential;
     //!< Whether the chunks are sequential (frame) or sparse.
-    char* path;
+    char* urlpath;
     //!< The path for persistent storage. If NULL, that means in-memory.
     blosc2_cparams* cparams;
     //!< The compression params when creating a schunk.
@@ -1013,13 +1013,14 @@ typedef struct {
 static const blosc2_storage BLOSC2_STORAGE_DEFAULTS = {false, NULL, NULL, NULL};
 
 typedef struct {
-  char* fname;             //!< The name of the file; if NULL, this is in-memory
+  char* urlpath;           //!< The name of the file or directory if it's an eframe; if NULL, this is in-memory
   uint8_t* sdata;          //!< The in-memory serialized data
   bool avoid_sdata_free;   //!< Whether the sdata can be freed (false) or not (true).
   uint8_t* coffsets;       //!< Pointers to the (compressed, on-disk) chunk offsets
   int64_t len;             //!< The current length of the frame in (compressed) bytes
   int64_t maxlen;          //!< The maximum length of the frame; if 0, there is no maximum
   uint32_t trailer_len;    //!< The current length of the trailer in (compressed) bytes
+  bool eframe;             //!< Whether the frame is extended (sparse, on-disk)
 } blosc2_frame;
 
 /**
@@ -1091,7 +1092,7 @@ typedef struct blosc2_schunk {
  *
  * @param storage The storage properties.
  *
- * @remark In case that storage.path is not NULL, the data is stored
+ * @remark In case that storage.urlpath is not NULL, the data is stored
  * on-disk.  If the data file(s) exist, they are *overwritten*.
  *
  * @return The new super-chunk.
@@ -1105,7 +1106,7 @@ blosc2_schunk_new(blosc2_storage storage);
  * @param nchunks The number of non-initialized chunks in the super-chunk.
  * @param storage The storage properties.
  *
- * @remark In case that storage.path is not NULL, the data is stored
+ * @remark In case that storage.urlpath is not NULL, the data is stored
  * on-disk.  If the data file(s) exist, they are *overwritten*.
  *
  * @return The new super-chunk.
@@ -1118,7 +1119,7 @@ blosc2_schunk_empty(int nchunks, blosc2_storage storage);
  *
  * @param storage The storage properties of the source.
  *
- * @remark The storage.path must be not NULL and it should exist on-disk.
+ * @remark The storage.urlpath must be not NULL and it should exist on-disk.
  * New data or metadata can be appended or updated.
  *
  * @return The new super-chunk.
@@ -1180,7 +1181,6 @@ BLOSC_EXPORT int blosc2_schunk_free(blosc2_schunk *schunk);
  * detected, this number will be negative.
  */
 BLOSC_EXPORT int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy);
-
 
 /**
   * @brief Update a chunk at a specific position in a super-chunk.
@@ -1503,11 +1503,11 @@ BLOSC_EXPORT void blosc_set_schunk(blosc2_schunk* schunk);
 /**
  * @brief Create a new frame.
  *
- * @param fname The filename of the frame.  If not persistent, pass NULL.
+ * @param urlpath The filename of the frame.  If not persistent, pass NULL.
  *
  * @return The new frame.
  */
-BLOSC_EXPORT blosc2_frame* blosc2_frame_new(const char* fname);
+BLOSC_EXPORT blosc2_frame* blosc2_frame_new(const char* urlpath);
 
 /**
  * @brief Create a frame from a super-chunk.
@@ -1515,7 +1515,7 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_new(const char* fname);
  * @param schunk The super-chunk from where the frame will be created.
  * @param frame The pointer for the frame that will be populated.
  *
- * @note If frame->fname is NULL, a frame is created in-memory; else it is created
+ * @note If frame->urlpath is NULL, a frame is created in-memory; else it is created
  * on-disk.
  *
  * @return The size in bytes of the frame. If an error occurs it returns a negative value.
@@ -1534,24 +1534,24 @@ BLOSC_EXPORT int blosc2_frame_free(blosc2_frame *frame);
 /**
  * @brief Write an in-memory frame out to a file.
  *
- * The frame used must be an in-memory frame, i.e. frame->fname == NULL.
+ * The frame used must be an in-memory frame, i.e. frame->urlpath == NULL.
  *
  * @param frame The frame to be written into a file.
- * @param fname The name of the file.
+ * @param urlpath The name of the file.
  *
  * @return The size of the frame.  If negative, an error happened (including
  * that the original frame is not in-memory).
  */
-BLOSC_EXPORT int64_t blosc2_frame_to_file(blosc2_frame *frame, const char *fname);
+BLOSC_EXPORT int64_t blosc2_frame_to_file(blosc2_frame *frame, const char *urlpath);
 
 /**
  * @brief Initialize a frame out of a file.
  *
- * @param fname The file name.
+ * @param urlpath The file name.
  *
  * @return The frame created from the file.
  */
-BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(const char *fname);
+BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(const char *urlpath);
 
 /**
  * @brief Initialize a frame out of an in-memory serialized frame.
@@ -1576,6 +1576,15 @@ BLOSC_EXPORT blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy);
 
+
+/*********************************************************************
+  Directory utilities.
+*********************************************************************/
+
+/*
+ * Remove a directory and its files.
+ */
+BLOSC_EXPORT int blosc2_remove_dir(const char *path);
 
 #ifdef __cplusplus
 }

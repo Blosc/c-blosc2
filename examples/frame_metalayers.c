@@ -110,7 +110,7 @@ int main(void) {
   //blosc2_frame* frame2 = blosc2_frame_from_file("frame_metalayers.b2frame");
   //blosc2_schunk* schunk2 = blosc2_frame_to_schunk(frame2, false);
   blosc2_storage storage2 = {.cparams=&cparams, .dparams=&dparams, .sequential=true,
-                             .path="frame_metalayers.b2frame"};
+                             .urlpath="frame_metalayers.b2frame"};
   blosc2_schunk* schunk2 = blosc2_schunk_open(storage2);
   if (schunk2 == NULL) {
     printf("Cannot get the schunk from frame2");
@@ -119,7 +119,7 @@ int main(void) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for fileframe (%s) -> schunk : %.3g s, %.1f GB/s\n",
-         schunk2->storage->path, ttotal, nbytes / (ttotal * GB));
+         schunk2->storage->urlpath, ttotal, nbytes / (ttotal * GB));
 
   // Check that the metalayers had a good roundtrip
   if (schunk2->nmetalayers != 2) {

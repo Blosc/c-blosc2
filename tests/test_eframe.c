@@ -3,42 +3,35 @@
   http://blosc.org
   License: BSD (see LICENSE.txt)
 
-  Creation date: 2019-08-06
+  Creation date: 2020-12-02
 
   See LICENSE.txt for details about copyright and rights to use.
 */
 
 #include <stdio.h>
-#include <stdbool.h>
 #include "test_common.h"
-#include "frame.h"
 
-#if defined(_WIN32)
-#define snprintf _snprintf
-#endif
-
-#define CHUNKSIZE (20 * 1000)
-#define NTHREADS (4)
+#define CHUNKSIZE (200 * 1000)
+#define NTHREADS (2)
 
 /* Global vars */
-int nchunks_[] = {0, 1, 2, 5};
+int nchunks_[] = {0, 1, 2, 10};
 int tests_run = 0;
 int nchunks;
 bool multithread;
 bool splits;
 bool free_new;
-bool sparse_schunk;
 bool filter_pipeline;
 bool metalayers;
 bool usermeta;
-char *fname;
+char* directory;
 char buf[256];
 
 
-static char* test_frame(void) {
-  int32_t isize = CHUNKSIZE * sizeof(int32_t);
-  int32_t *data = malloc(isize);
-  int32_t *data_dest = malloc(isize);
+static char* test_eframe(void) {
+  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t* data = malloc(isize);
+  int32_t* data_dest = malloc(isize);
   int dsize;
   int64_t nbytes, cbytes;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -72,7 +65,7 @@ static char* test_frame(void) {
     cparams.nthreads = 1;
     dparams.nthreads = 1;
   }
-  blosc2_storage storage = {.sequential=true, .urlpath=fname, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.sequential=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
   mu_assert("blosc2_schunk_new() failed", schunk != NULL);
   char* content = "This is a pretty long string with a good number of chars";
@@ -92,29 +85,12 @@ static char* test_frame(void) {
     blosc2_update_usermeta(schunk, (uint8_t *) content, (int32_t) content_len, BLOSC2_CPARAMS_DEFAULTS);
   }
 
-  if (!sparse_schunk) {
-    if (free_new) {
-      if (fname != NULL) {
-        blosc2_schunk_free(schunk);
-        blosc2_storage storage2 = {.sequential=true, .urlpath=fname};
-        schunk = blosc2_schunk_open(storage2);
-        mu_assert("blosc2_schunk_open() failed", schunk != NULL);
-        mu_assert("storage is not recovered correctly",
-                  schunk->storage->sequential == true);
-        mu_assert("cparams are not recovered correctly",
-                  schunk->storage->cparams->clevel == BLOSC2_CPARAMS_DEFAULTS.clevel);
-        mu_assert("dparams are not recovered correctly",
-                  schunk->storage->dparams->nthreads == BLOSC2_DPARAMS_DEFAULTS.nthreads);
-      } else {
-        // Dump the schunk into a sframe and regenerate it from there
-        uint8_t* sframe;
-        int64_t sframe_len = blosc2_schunk_to_sframe(schunk, &sframe);
-        blosc2_schunk_free(schunk);
-        schunk = blosc2_schunk_open_sframe(sframe, sframe_len);
-        mu_assert("blosc2_schunk_open_sframe() failed", schunk != NULL);
-      }
-    }
+  if (free_new) {
+    blosc2_schunk_free(schunk);
   }
+  blosc2_storage storage2 = {.sequential=false, .urlpath=directory};
+  schunk = blosc2_schunk_open(storage2);
+  mu_assert("blosc2_schunk_open() failed", schunk != NULL);
 
   if (metalayers) {
     uint8_t* _content;
@@ -146,15 +122,9 @@ static char* test_frame(void) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
     _nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
-    mu_assert("ERROR: bad append in frame", _nchunks >= 0);
+    mu_assert("ERROR: bad append in frame", nchunk >= 0);
   }
   mu_assert("ERROR: wrong number of append chunks", _nchunks == nchunks);
-
-  if (!sparse_schunk) {
-    blosc2_frame* frame = schunk->frame;
-    mu_assert("ERROR: frame->len must be larger or equal than schunk->cbytes",
-              frame->len >= schunk->cbytes + FRAME_HEADER_MINLEN);
-  }
 
   if (metalayers) {
     uint8_t* _content;
@@ -180,23 +150,10 @@ static char* test_frame(void) {
     blosc2_update_usermeta(schunk, (uint8_t *) content3, (int32_t) content_len3, BLOSC2_CPARAMS_DEFAULTS);
   }
 
-  if (!sparse_schunk) {
-    if (free_new) {
-      if (fname != NULL) {
-        blosc2_schunk_free(schunk);
-        blosc2_storage storage2 = {.sequential=true, .urlpath=fname};
-        schunk = blosc2_schunk_open(storage2);
-      } else {
-        // Dump the schunk to a sframe and regenerate it from there
-        uint8_t* sframe;
-        int64_t sframe_len = blosc2_schunk_to_sframe(schunk, &sframe);
-        blosc2_schunk_free(schunk);
-        schunk = blosc2_schunk_open_sframe(sframe, sframe_len);
-        mu_assert("blosc2_schunk_open_sframe() failed (2)", schunk != NULL);
-
-      }
-    }
+  if (free_new) {
+    blosc2_schunk_free(schunk);
   }
+  schunk = blosc2_schunk_open(storage2);
 
   /* Gather some info */
   nbytes = schunk->nbytes;
@@ -210,7 +167,7 @@ static char* test_frame(void) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
     for (int i = 0; i < CHUNKSIZE; i++) {
-      mu_assert("ERROR: bad roundtrip",data_dest[i] == i + nchunk * CHUNKSIZE);
+      mu_assert("ERROR: bad roundtrip", data_dest[i] == i + nchunk * CHUNKSIZE);
     }
   }
 
@@ -236,6 +193,8 @@ static char* test_frame(void) {
     free(content_);
   }
 
+  /* Remove directory */
+  blosc2_remove_dir(storage.urlpath);
   /* Free resources */
   free(data_dest);
   free(data);
@@ -248,7 +207,84 @@ static char* test_frame(void) {
 }
 
 
+static char* test_eframe_simple(void) {
+  static int32_t data[CHUNKSIZE];
+  static int32_t data_dest[CHUNKSIZE];
+  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int dsize;
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_schunk* schunk;
+
+  /* Initialize the Blosc compressor */
+  blosc_init();
+
+  /* Create a super-chunk container */
+  cparams.typesize = sizeof(int32_t);
+  cparams.clevel = 9;
+  cparams.nthreads = NTHREADS;
+  dparams.nthreads = NTHREADS;
+  blosc2_storage storage = {.sequential=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
+  blosc2_remove_dir(storage.urlpath);
+  schunk = blosc2_schunk_new(storage);
+  mu_assert("Error in creating schunk", schunk != NULL);
+
+  // Feed it with data
+  for (int nchunk = 0; nchunk < nchunks; nchunk++) {
+    for (int i = 0; i < CHUNKSIZE; i++) {
+      data[i] = i + nchunk;
+    }
+    int _nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
+    mu_assert("ERROR: bad append in eframe", _nchunks > 0);
+  }
+
+  /* Retrieve and decompress the chunks (0-based count) */
+  for (int nchunk = nchunks-1; nchunk >= 0; nchunk--) {
+    dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, data_dest, isize);
+    mu_assert("Decompression error", dsize>=0);
+  }
+
+  if (nchunks >= 2) {
+    /* Check integrity of the second chunk (made of non-zeros) */
+    blosc2_schunk_decompress_chunk(schunk, 1, data_dest, isize);
+    for (int i = 0; i < CHUNKSIZE; i++) {
+      mu_assert("Decompressed data differs from original", data_dest[i]==(i+1));
+    }
+  }
+
+  /* Remove directory */
+  blosc2_remove_dir(storage.urlpath);
+  /* Free resources */
+  blosc2_schunk_free(schunk);
+  /* Destroy the Blosc environment */
+  blosc_destroy();
+
+  return EXIT_SUCCESS;
+}
+
+
 static char *all_tests(void) {
+  directory = "dir1.b2eframe";
+
+  nchunks = 0;
+  mu_run_test(test_eframe_simple);
+
+  nchunks = 1;
+  mu_run_test(test_eframe_simple);
+
+  nchunks = 2;
+  mu_run_test(test_eframe_simple);
+
+  nchunks = 10;
+  mu_run_test(test_eframe_simple);
+
+  // Check directory with a trailing slash
+  directory = "dir1.b2eframe/";
+  nchunks = 0;
+  mu_run_test(test_eframe_simple);
+
+  nchunks = 1;
+  mu_run_test(test_eframe_simple);
 
   // Iterate over all different parameters
   for (int i = 0; i < (int)sizeof(nchunks_) / (int)sizeof(int); i++) {
@@ -256,23 +292,21 @@ static char *all_tests(void) {
     for (int isplits = 0; isplits < 2; isplits++) {
       for (int imultithread = 0; imultithread < 2; imultithread++) {
         for (int ifree_new = 0; ifree_new < 2; ifree_new++) {
-          for (int isparse_schunk = 0; isparse_schunk < 2; isparse_schunk++) {
-            for (int ifilter_pipeline = 0; ifilter_pipeline < 2; ifilter_pipeline++) {
-              for (int imetalayers = 0; imetalayers < 2; imetalayers++) {
-                for (int iusermeta = 0; iusermeta < 2; iusermeta++) {
-                  splits = (bool) isplits;
-                  multithread = (bool) imultithread;
-                  sparse_schunk = (bool) isparse_schunk;
-                  free_new = (bool) ifree_new;
-                  filter_pipeline = (bool) ifilter_pipeline;
-                  metalayers = (bool) imetalayers;
-                  usermeta = (bool) iusermeta;
-                  fname = NULL;
-                  mu_run_test(test_frame);
-                  snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
-                  fname = buf;
-                  mu_run_test(test_frame);
-                }
+          for (int ifilter_pipeline = 0; ifilter_pipeline < 2; ifilter_pipeline++) {
+            for (int imetalayers = 0; imetalayers < 2; imetalayers++) {
+              for (int iusermeta = 0; iusermeta < 2; iusermeta++) {
+                splits = (bool) isplits;
+                multithread = (bool) imultithread;
+                free_new = (bool) ifree_new;
+                filter_pipeline = (bool) ifilter_pipeline;
+                metalayers = (bool) imetalayers;
+                usermeta = (bool) iusermeta;
+                snprintf(buf, sizeof(buf), "test_eframe_nc%d.b2eframe", nchunks);
+                directory = buf;
+                mu_run_test(test_eframe);
+                snprintf(buf, sizeof(buf), "test_eframe_nc%d.b2eframe/", nchunks);
+                directory = buf;
+                mu_run_test(test_eframe);
               }
             }
           }
@@ -288,6 +322,7 @@ static char *all_tests(void) {
 int main(void) {
   char *result;
 
+  install_blosc_callback_test(); /* optionally install callback test */
   blosc_init();
 
   /* Run all the suite */

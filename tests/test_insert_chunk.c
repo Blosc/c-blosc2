@@ -16,11 +16,50 @@
 
 /* Global vars */
 int tests_run = 0;
-int nchunks;
-int n_insertions;
-bool copy;
 
-static char* test_insert_schunk(void) {
+
+typedef struct {
+  int nchunks;
+  int ninsertions;
+  char* urlpath;
+  bool sequential;
+  bool copy;
+} test_data;
+
+test_data tdata;
+
+typedef struct {
+  int nchunks;
+  int ninsertions;
+} test_ndata;
+
+test_ndata tndata[] = {{10, 1},
+                       {5,  3},
+                       {33, 5},
+                       {1,  0},
+                       {12, 24},
+                       {0, 3},
+                       {0, 0}
+};
+
+typedef struct {
+  bool sequential;
+  char *urlpath;
+}test_storage;
+
+test_storage tstorage[] = {
+    {false, NULL},  // memory - schunk
+    {true, NULL},  // memory - frame
+    {true, "test_insert_chunk.b2frame"}, // disk - frame
+    {false, "test_insert_chunk.b2eframe"}, // disk - eframe
+};
+
+bool tcopy[] = {
+    true,
+    false
+};
+
+static char* test_insert_chunk(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -36,11 +75,12 @@ static char* test_insert_schunk(void) {
   cparams.typesize = sizeof(int32_t);
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
+                            .urlpath=tdata.urlpath, .sequential=tdata.sequential};
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
-  for (int nchunk = 0; nchunk < nchunks; nchunk++) {
+  for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
@@ -48,7 +88,7 @@ static char* test_insert_schunk(void) {
     mu_assert("ERROR: bad append", nchunks_ > 0);
   }
 
-  for (int i = 0; i < n_insertions; ++i) {
+  for (int i = 0; i < tdata.ninsertions; ++i) {
     // Create chunk
     for (int j = 0; j < CHUNKSIZE; ++j) {
       data[j] = i;
@@ -60,8 +100,8 @@ static char* test_insert_schunk(void) {
     mu_assert("ERROR: chunk cannot be compressed", csize >= 0);
 
     // Insert in a random position
-    int pos = rand() % schunk->nchunks;
-    int _nchunks = blosc2_schunk_insert_chunk(schunk, pos, chunk, copy);
+    int pos = rand() % (schunk->nchunks + 1);
+    int _nchunks = blosc2_schunk_insert_chunk(schunk, pos, chunk, tdata.copy);
     mu_assert("ERROR: chunk cannot be inserted correctly", _nchunks > 0);
 
     // Check that the inserted chunk can be decompressed correctly
@@ -71,7 +111,7 @@ static char* test_insert_schunk(void) {
       mu_assert("ERROR: bad roundtrip", data_dest[j] == i);
     }
     // Free allocated chunk
-    if (copy) {
+    if (tdata.copy) {
       free(chunk);
     }
   }
@@ -84,6 +124,9 @@ static char* test_insert_schunk(void) {
 
 
   /* Free resources */
+  if (!storage.sequential && storage.urlpath != NULL) {
+    blosc2_remove_dir(storage.urlpath);
+  }
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
@@ -93,26 +136,19 @@ static char* test_insert_schunk(void) {
 
 static char *all_tests(void) {
 
-  nchunks = 10;
-  n_insertions = 1;
-  copy = true;
-  mu_run_test(test_insert_schunk);
+  for (int i = 0; i < sizeof(tstorage) / sizeof(test_storage); ++i) {
+    for (int j = 0; j < sizeof(tndata) / sizeof(test_ndata); ++j) {
+      for (int k = 0; k < sizeof(tcopy) / sizeof(bool); ++k) {
 
-  nchunks = 5;
-  n_insertions = 3;
-  copy = true;
-  mu_run_test(test_insert_schunk);
-
-  nchunks = 33;
-  n_insertions = 5;
-  copy = false;
-  mu_run_test(test_insert_schunk);
-
-  nchunks = 12;
-  n_insertions = 24;
-  copy = true;
-  mu_run_test(test_insert_schunk);
-
+        tdata.sequential = tstorage[i].sequential;
+        tdata.urlpath = tstorage[i].urlpath;
+        tdata.nchunks = tndata[j].nchunks;
+        tdata.ninsertions = tndata[j].ninsertions;
+        tdata.copy = tcopy[k];
+        mu_run_test(test_insert_chunk);
+      }
+    }
+  }
 
   return EXIT_SUCCESS;
 }

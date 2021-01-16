@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
 
   /* Create a super-chunk backed by an in-memory frame */
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
-                            .sequential=true, .path=argv[2]};
+                            .sequential=true, .urlpath=argv[2]};
   blosc2_schunk* schunk = blosc2_schunk_new(storage);
 
   // Compress the file
