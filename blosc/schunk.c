@@ -410,6 +410,13 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   schunk->nbytes += nbytes;
   schunk->cbytes += cbytes;
 
+  if (copy) {
+    // Make a copy of the chunk
+    uint8_t *chunk_copy = malloc(cbytes);
+    memcpy(chunk_copy, chunk, cbytes);
+    chunk = chunk_copy;
+  }
+
   // Update super-chunk or frame
   if (schunk->frame == NULL) {
     // Check that we are not appending a small chunk after another small chunk
@@ -424,13 +431,7 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
       }
     }
 
-    if (copy) {
-      // Make a copy of the chunk
-      uint8_t *chunk_copy = malloc(cbytes);
-      memcpy(chunk_copy, chunk, cbytes);
-      chunk = chunk_copy;
-    }
-    else if (cbytes < nbytes) {
+    if (!copy && (cbytes < nbytes)) {
       // We still want to do a shrink of the chunk
       chunk = realloc(chunk, cbytes);
     }
@@ -493,6 +494,13 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     free(chunk_old);
   }
 
+  if (copy) {
+    // Make a copy of the chunk
+    uint8_t *chunk_copy = malloc(cbytes);
+    memcpy(chunk_copy, chunk, cbytes);
+    chunk = chunk_copy;
+  }
+
   // Update super-chunk or frame
   if (schunk->frame == NULL) {
     /* Update counters */
@@ -501,13 +509,7 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     schunk->cbytes += cbytes;
     schunk->cbytes -= cbytes_old;
 
-    if (copy) {
-      // Make a copy of the chunk
-      uint8_t *chunk_copy = malloc(cbytes);
-      memcpy(chunk_copy, chunk, cbytes);
-      chunk = chunk_copy;
-    }
-    else if (cbytes < nbytes) {
+    if (!copy && (cbytes < nbytes)) {
       // We still want to do a shrink of the chunk
       chunk = realloc(chunk, cbytes);
     }

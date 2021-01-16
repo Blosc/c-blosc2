@@ -1952,6 +1952,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     free(frame->coffsets);
     frame->coffsets = NULL;
   }
+  free(chunk);  // chunk has always to be a copy when reaching here...
   free(off_chunk);
 
   frame->len = new_frame_len;
@@ -2251,6 +2252,7 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
       frame->coffsets = NULL;
     }
   }
+  free(chunk);  // chunk has always to be a copy when reaching here...
   free(off_chunk);
 
   frame->len = new_frame_len;
