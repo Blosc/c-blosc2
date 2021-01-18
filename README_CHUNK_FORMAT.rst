@@ -204,19 +204,13 @@ where `uint8_t token` is a byte for providing different meanings to `int32 csize
     (``bitfield``) Flags for different meanings.
 
     :bits 0 and 1:
-        Indicates a run-length stream for the entire data stream.
-
-            :``0``:
-                No run.
-            :``1``:
-                A run of zeros.
-            :``2``:
-                A run of NaN (Not-a-Number) floats (whether f32 or f64 depends on typesize).
-            :``3``:
-                Run-length of a (typesize) value that follows the token (not currently implemented).
+        Reserved for future use.
 
     :bits 2 and 3:
-        Reserved for two-codes in a row. TODO: complete description
+        Reserved for two-codecs in a row. TODO: complete description
+
+    :bits 4, 5 and 6:
+        Reserved for secondary codec. TODO: complete description
 
 If bit 4 of the `flags` header field is set, each block is stored in a single data stream::
 
