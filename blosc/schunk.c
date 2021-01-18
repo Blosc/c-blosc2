@@ -316,25 +316,18 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   schunk->nbytes += nbytes;
   if (schunk->frame == NULL) {
     schunk->cbytes += cbytes;
-  }
-  else {
+  } else {
     // A frame
-    bool all_zeros = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_ZERO_RUNLEN << 4);
-    bool all_nans = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_NAN_RUNLEN << 4);
-    bool all_repeats = all_nans & all_zeros;
-    if (all_repeats) {
-      // A non-special chunk is always stored in frames
-      schunk->cbytes += cbytes;
-    }
-    else if (all_zeros || all_nans) {
-      if (schunk->cbytes == 0) {
-        // Increase by 0 just to be explicit
+    int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
+    switch (special_value) {
+      case BLOSC2_ZERO_RUNLEN:
         schunk->cbytes += 0;
-      }
-    }
-    else {
-      // A non-special chunk is always stored in frames
-      schunk->cbytes += cbytes;
+            break;
+      case BLOSC2_NAN_RUNLEN:
+        schunk->cbytes += 0;
+            break;
+      default:
+        schunk->cbytes += cbytes;
     }
   }
 
@@ -347,10 +340,6 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
 
   // Update super-chunk or frame
   if (schunk->frame == NULL) {
-    if (schunk->storage->urlpath != NULL) {
-      BLOSC_TRACE_ERROR("The persistent sparse storage is not supported yet.");
-      return -1;
-    }
     // Check that we are not appending a small chunk after another small chunk
     if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
       uint8_t* last_chunk = schunk->data[nchunks - 1];
@@ -382,9 +371,6 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
       return -1;
     }
   }
-
-  /* printf("Compression chunk #%lld: %d -> %d (%.1fx)\n", */
-  /*         nchunks, nbytes, cbytes, (1.*nbytes) / cbytes); */
   return schunk->nchunks;
 }
 
@@ -408,7 +394,22 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   /* Update counters */
   schunk->nchunks = nchunks + 1;
   schunk->nbytes += nbytes;
-  schunk->cbytes += cbytes;
+  if (schunk->frame == NULL) {
+    schunk->cbytes += cbytes;
+  } else {
+    // A frame
+    int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
+    switch (special_value) {
+      case BLOSC2_ZERO_RUNLEN:
+        schunk->cbytes += 0;
+            break;
+      case BLOSC2_NAN_RUNLEN:
+        schunk->cbytes += 0;
+            break;
+      default:
+        schunk->cbytes += cbytes;
+    }
+  }
 
   if (copy) {
     // Make a copy of the chunk
@@ -489,6 +490,9 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   } else {
     nbytes_old = sw32_(chunk_old + BLOSC2_CHUNK_NBYTES);
     cbytes_old = sw32_(chunk_old + BLOSC2_CHUNK_CBYTES);
+    if (cbytes_old == BLOSC_MAX_OVERHEAD) {
+        cbytes_old = 0;
+    }
   }
   if (needs_free) {
     free(chunk_old);
@@ -501,14 +505,31 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     chunk = chunk_copy;
   }
 
-  // Update super-chunk or frame
   if (schunk->frame == NULL) {
     /* Update counters */
     schunk->nbytes += nbytes;
     schunk->nbytes -= nbytes_old;
     schunk->cbytes += cbytes;
     schunk->cbytes -= cbytes_old;
+  } else {
+    // A frame
+    int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
+    switch (special_value) {
+      case BLOSC2_ZERO_RUNLEN:
+        schunk->nbytes += nbytes;
+        break;
+      case BLOSC2_NAN_RUNLEN:
+        schunk->nbytes += nbytes;
+        break;
+      default:
+        /* Update counters */
+        schunk->nbytes += nbytes;
+        schunk->cbytes += cbytes;
+    }
+  }
 
+  // Update super-chunk or frame
+  if (schunk->frame == NULL) {
     if (!copy && (cbytes < nbytes)) {
       // We still want to do a shrink of the chunk
       chunk = realloc(chunk, cbytes);
@@ -521,10 +542,6 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     schunk->data[nchunk] = chunk;
   }
   else {
-    /* Update counters */
-    schunk->nbytes += nbytes;
-    schunk->cbytes += cbytes;
-
     if (frame_update_chunk(schunk->frame, nchunk, chunk, schunk) == NULL) {
         BLOSC_TRACE_ERROR("Problems updating a chunk in a frame.");
         return -1;

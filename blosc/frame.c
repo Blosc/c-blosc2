@@ -1915,7 +1915,12 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     size_t wbytes;
     if (frame->eframe) {
       // Update the offsets chunk in the chunks frame
-      eframe_append_chunk(frame, chunk, nchunks, cbytes_chunk);
+      if (cbytes_chunk != 0) {
+        if (eframe_create_chunk(frame, chunk, nchunks, cbytes_chunk) != NULL) {
+          BLOSC_TRACE_ERROR("Cannot write the full chunk.");
+          return NULL;
+        }
+      }
       char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
       sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = fopen(eframe_name, "rb+");
@@ -1965,6 +1970,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
 
 
 void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_schunk* schunk) {
+  uint8_t* chunk_ = chunk;
   int32_t header_len;
   int64_t frame_len;
   int64_t nbytes;
@@ -1979,8 +1985,8 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
   }
 
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
-  int32_t nbytes_chunk = sw32_((uint8_t*)chunk + BLOSC2_CHUNK_NBYTES);
-  int32_t cbytes_chunk = sw32_((uint8_t*)chunk + BLOSC2_CHUNK_CBYTES);
+  int32_t nbytes_chunk = sw32_(chunk_ + BLOSC2_CHUNK_NBYTES);
+  int32_t cbytes_chunk = sw32_(chunk_ + BLOSC2_CHUNK_CBYTES);
   int64_t new_cbytes = cbytes + cbytes_chunk;
 
   // Get the current offsets
@@ -2012,14 +2018,32 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
   // TODO: Improvement: Check if new chunk is smaller than previous one
 
   // Add the new offset
-  for (int i = nchunks; i > nchunk; i--) {
-    offsets[i] = offsets[i - 1];
-  }
-  if (frame->eframe) {
-    offsets[nchunk] = nchunks;
-  }
-  else {
-    offsets[nchunk] = cbytes;
+  int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
+  uint64_t offset_value = ((uint64_t)1 << 63);
+  switch (special_value) {
+    case BLOSC2_ZERO_RUNLEN:
+      // Zero chunk.  Code it in a special way.
+      offset_value += (uint64_t)BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
+          swap_store(offsets + nchunks, &offset_value, sizeof(uint64_t));
+          cbytes_chunk = 0;   // we don't need to store the chunk
+          break;
+    case BLOSC2_NAN_RUNLEN:
+      // NaN chunk.  Code it in a special way.
+      offset_value += (uint64_t)BLOSC2_NAN_RUNLEN << (8 * 7);  // indicate a chunk of NANs
+          swap_store(offsets + nchunks, &offset_value, sizeof(uint64_t));
+          cbytes_chunk = 0;   // we don't need to store the chunk
+          break;
+    default:
+      // Add the new offset
+      for (int i = nchunks; i > nchunk; i--) {
+        offsets[i] = offsets[i - 1];
+      }
+          if (frame->eframe) {
+            offsets[nchunk] = nchunks;
+          }
+          else {
+            offsets[nchunk] = cbytes;
+          }
   }
 
   // Re-compress the offsets again
@@ -2061,9 +2085,11 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
   } else {
     size_t wbytes;
     if (frame->eframe) {
-      if (eframe_append_chunk(frame, chunk, nchunks, cbytes_chunk) == NULL) {
-        BLOSC_TRACE_ERROR("Cannot write the full chunk.");
-        return NULL;
+      if (cbytes_chunk != 0) {
+        if (eframe_create_chunk(frame, chunk, nchunks, cbytes_chunk) == NULL) {
+          BLOSC_TRACE_ERROR("Cannot write the full chunk.");
+          return NULL;
+        }
       }
       // Update the offsets chunk in the chunks frame
       char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
@@ -2114,6 +2140,7 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
 
 
 void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_schunk* schunk) {
+  uint8_t *chunk_ = (uint8_t *) chunk;
   int32_t header_len;
   int64_t frame_len;
   int64_t nbytes;
@@ -2162,15 +2189,31 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
     }
   }
 
-  // TODO: Improvement: Check if new chunk is smaller than previous one
-
-  if (frame->eframe) {
-    // In case there was a reorder
-    nchunk = offsets[nchunk];
-  }
-  else {
-    // Add the new offset
-    offsets[nchunk] = cbytes;
+  // Add the new offset
+  int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
+  uint64_t offset_value = ((uint64_t)1 << 63);
+  switch (special_value) {
+    case BLOSC2_ZERO_RUNLEN:
+      // Zero chunk.  Code it in a special way.
+      offset_value += (uint64_t)BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
+      swap_store(offsets + nchunk, &offset_value, sizeof(uint64_t));
+      cbytes_chunk = 0;   // we don't need to store the chunk
+      break;
+    case BLOSC2_NAN_RUNLEN:
+      // NaN chunk.  Code it in a special way.
+      offset_value += (uint64_t)BLOSC2_NAN_RUNLEN << (8 * 7);  // indicate a chunk of NANs
+      swap_store(offsets + nchunk, &offset_value, sizeof(uint64_t));
+      cbytes_chunk = 0;   // we don't need to store the chunk
+      break;
+    default:
+      if (frame->eframe) {
+        // In case there was a reorder
+        nchunk = offsets[nchunk];
+      }
+      else {
+        // Add the new offset
+        offsets[nchunk] = cbytes;
+      }
   }
 
   // Re-compress the offsets again
@@ -2212,9 +2255,11 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
   } else {
     size_t wbytes;
     if (frame->eframe) {
-      if (eframe_append_chunk(frame, chunk, nchunk, cbytes_chunk) == NULL) {
-        BLOSC_TRACE_ERROR("Cannot write the full chunk.");
-        return NULL;
+      if (cbytes_chunk) {
+        if (eframe_create_chunk(frame, chunk, nchunk, cbytes_chunk) == NULL) {
+          BLOSC_TRACE_ERROR("Cannot write the full chunk.");
+          return NULL;
+        }
       }
       // Update the offsets chunk in the chunks frame
       char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
