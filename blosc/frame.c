@@ -1498,8 +1498,6 @@ int64_t get_coffset(blosc2_frame* frame, int32_t header_len, int64_t cbytes, int
   // Get the 64-bit offset
   int rc = blosc_getitem(coffsets, nchunk, 1, &offset);
   if (rc < 0) {
-    // size_t nbytes_, cbytes_, blocksize_;
-    // blosc_cbuffer_sizes(coffsets, &nbytes_, &cbytes_, &blocksize_);
     BLOSC_TRACE_ERROR("Problems retrieving a chunk offset.");
     return -4;
   }
@@ -1507,6 +1505,7 @@ int64_t get_coffset(blosc2_frame* frame, int32_t header_len, int64_t cbytes, int
 }
 
 
+// Detect and return a chunk with special values in offsets (only zeros and NaNs)
 int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize,
                         uint8_t** chunk, int32_t cbytes, bool *needs_free) {
   *chunk = malloc(cbytes);
@@ -1848,33 +1847,28 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   }
 
   // Add the new offset
-  bool all_zeros = chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_ZERO_RUNLEN << 4);
-  bool all_nans = chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_NAN_RUNLEN << 4);
-  if (all_zeros && all_nans) {
-    // All repeated values
-    offsets[nchunks] = cbytes;
-  }
-  else if (all_zeros) {
-    // Zero chunk.  Code it in a special way.
-    uint64_t special_value = ((uint64_t)1 << 63);
-    special_value += (uint64_t)BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
-    swap_store(offsets + nchunks, &special_value, sizeof(uint64_t));
-    cbytes_chunk = 0;   // we don't need to store the chunk
-  }
-  else if (all_nans) {
-    // NaN chunk.  Code it in a special way.
-    uint64_t special_value = ((uint64_t)1 << 63);
-    special_value += (uint64_t)BLOSC2_NAN_RUNLEN << (8 * 7);  // indicate a chunk of NANs
-    swap_store(offsets + nchunks, &special_value, sizeof(uint64_t));
-    cbytes_chunk = 0;   // we don't need to store the chunk
-  }
-  else {
-    if (frame->eframe) {
-      offsets[nchunks] = nchunks;
-    }
-    else {
-      offsets[nchunks] = cbytes;
-    }
+  int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
+  uint64_t offset_value = ((uint64_t)1 << 63);
+  switch (special_value) {
+    case BLOSC2_ZERO_RUNLEN:
+      // Zero chunk.  Code it in a special way.
+      offset_value += (uint64_t)BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
+      swap_store(offsets + nchunks, &offset_value, sizeof(uint64_t));
+      cbytes_chunk = 0;   // we don't need to store the chunk
+      break;
+    case BLOSC2_NAN_RUNLEN:
+      // NaN chunk.  Code it in a special way.
+      offset_value += (uint64_t)BLOSC2_NAN_RUNLEN << (8 * 7);  // indicate a chunk of NANs
+      swap_store(offsets + nchunks, &offset_value, sizeof(uint64_t));
+      cbytes_chunk = 0;   // we don't need to store the chunk
+      break;
+    default:
+      if (frame->eframe) {
+        offsets[nchunks] = nchunks;
+      }
+      else {
+        offsets[nchunks] = cbytes;
+      }
   }
 
   // Re-compress the offsets again
