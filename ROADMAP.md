@@ -37,6 +37,8 @@ Right now (August 2019), the next features are already implemented (although the
 
 * Frames: allow to store super-chunks contiguously, either on-disk or in-memory.  When a super-chunk is backed by a frame, instead of storing all the chunks sparsely in-memory, they are serialized inside the frame container.  The frame can be stored on-disk too, meaning that persistence of super-chunks is supported.
 
+* Sparse storage support for super-chunks.  This means that each chunk is stored in a separate file, as well as the metadata.  This is be the counterpart of in-memory super-chunk, and allows for more efficient updates than in frames (i.e. avoiding 'holes' in monolithic files).
+
 * Meta-layers: optionally, the user can add meta-data for different uses and in different layers.  For example, one may think on providing a meta-layer for [NumPy](http://www.numpy.org) so that most of the meta-data for it is stored in a meta-layer; then, one can place another meta-layer on top of the latter for adding more high-level info if desired (e.g. geo-spatial, meteorological...).
 
 * Nice markup for documentation: we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  Thanks to Alberto Sabater for contributing the support for this.
@@ -45,7 +47,7 @@ Right now (August 2019), the next features are already implemented (although the
 Actions to be done
 ------------------
 
-* Sparse storage support for super-chunks.  This means that each chunk will be stored in a separate file, and the metadata will be stored on its own files too.  This would be the counterpart of in-memory super-chunk, and will allow for more efficient updates than in frames.
+* Support for network storage.  Sparse storage already supports disk I/O, but it could be nice to expand this support to network I/O (using S3, HDFS or others).  We need to consider which backends are more useful for users, and also that the implementation should be feasible (read: reasonably simple) for a C library as C-Blosc2. 
 
 * Plugin capabilities for allowing users to add more filters and codecs.  There should also be a plugin register capability so that the info about the new filters and codecs can be persistent and propagated to different machines.
 
