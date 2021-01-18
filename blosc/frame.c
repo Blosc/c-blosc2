@@ -1875,7 +1875,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
   blosc2_context* cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
   cctx->typesize = sizeof(int64_t);  // 64-bit offsets
   // The params below have been fine-tuned with the zero_runlen bench
-  cctx->clevel = 5;
+  cctx->nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
   // cctx->compcode = BLOSC_LZ4;
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
