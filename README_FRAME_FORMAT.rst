@@ -191,7 +191,7 @@ that represents a chunk with a run-length of special values.  The supported spec
     (``uint8``) Flags for special values.
 
         :``0``:
-            A run-length of zeros.  The size of zeros depends on the typesize.
+            A run-length of zeros.
         :``1``:
             A run-length of NaNs. The size of the NaN depends on the typesize.
         :``2``:
