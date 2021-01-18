@@ -65,7 +65,7 @@ int check_special_values(int svalue) {
 
   /* Append the chunks */
   blosc_set_timestamp(&last);
-  void* chunk = malloc(BLOSC_EXTENDED_HEADER_LENGTH + sizeof(int32_t));
+  void* chunk = malloc(BLOSC_EXTENDED_HEADER_LENGTH + isize);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     switch (svalue) {
       case ZERO_DETECTION:
@@ -234,8 +234,11 @@ int check_special_values(int svalue) {
 int main(void) {
   int rc;
   // TODO: Check why this is not working...
-//  printf("Testing zero detection...");
-//  check_special_values(ZERO_DETECTION);
+  printf("Testing zero detection...");
+  rc = check_special_values(ZERO_DETECTION);
+  if (rc < 0) {
+    return rc;
+  }
   printf("*** Testing special zeros...");
   rc = check_special_values(CHECK_ZEROS);
   if (rc < 0) {
