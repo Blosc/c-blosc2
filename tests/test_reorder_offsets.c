@@ -33,9 +33,9 @@ typedef struct {
 }test_storage;
 
 test_storage tstorage[] = {
-    {false, NULL},  // memory - schunk
-    {true, NULL},  // memory - frame
-    {true, "test_reorder_offsets.b2frame"}, // disk - frame
+    // {false, NULL},  // memory - schunk
+    // {true, NULL},  // memory - frame
+    // {true, "test_reorder_offsets.b2frame"}, // disk - frame
     {false, "test_reorder_offsets.b2eframe"}, // disk - eframe
 };
 
@@ -45,6 +45,11 @@ int32_t *data;
 int32_t *data_dest;
 
 static char* test_reorder_offsets(void) {
+  /* Free resources */
+  if (tdata.urlpath != NULL && tdata.sequential == false) {
+    blosc2_remove_dir(tdata.urlpath);
+  }
+
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;

@@ -1916,7 +1916,7 @@ void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk
     if (frame->eframe) {
       // Update the offsets chunk in the chunks frame
       if (cbytes_chunk != 0) {
-        if (eframe_create_chunk(frame, chunk, nchunks, cbytes_chunk) != NULL) {
+        if (eframe_create_chunk(frame, chunk, nchunks, cbytes_chunk) == NULL) {
           BLOSC_TRACE_ERROR("Cannot write the full chunk.");
           return NULL;
         }
@@ -1987,7 +1987,6 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
   int32_t nbytes_chunk = sw32_(chunk_ + BLOSC2_CHUNK_NBYTES);
   int32_t cbytes_chunk = sw32_(chunk_ + BLOSC2_CHUNK_CBYTES);
-  int64_t new_cbytes = cbytes + cbytes_chunk;
 
   // Get the current offsets
   int32_t off_nbytes = (nchunks + 1) * 8;
@@ -2024,26 +2023,32 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
     case BLOSC2_ZERO_RUNLEN:
       // Zero chunk.  Code it in a special way.
       offset_value += (uint64_t)BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
-          swap_store(offsets + nchunks, &offset_value, sizeof(uint64_t));
-          cbytes_chunk = 0;   // we don't need to store the chunk
+      for (int i = nchunks; i > nchunk; i--) {
+        offsets[i] = offsets[i - 1];
+      }
+      swap_store(offsets + nchunk, &offset_value, sizeof(uint64_t));
+      cbytes_chunk = 0;   // we don't need to store the chunk
           break;
     case BLOSC2_NAN_RUNLEN:
       // NaN chunk.  Code it in a special way.
       offset_value += (uint64_t)BLOSC2_NAN_RUNLEN << (8 * 7);  // indicate a chunk of NANs
-          swap_store(offsets + nchunks, &offset_value, sizeof(uint64_t));
-          cbytes_chunk = 0;   // we don't need to store the chunk
-          break;
+      for (int i = nchunks; i > nchunk; i--) {
+        offsets[i] = offsets[i - 1];
+      }
+      swap_store(offsets + nchunk, &offset_value, sizeof(uint64_t));
+      cbytes_chunk = 0;   // we don't need to store the chunk
+      break;
     default:
       // Add the new offset
       for (int i = nchunks; i > nchunk; i--) {
         offsets[i] = offsets[i - 1];
       }
-          if (frame->eframe) {
-            offsets[nchunk] = nchunks;
-          }
-          else {
-            offsets[nchunk] = cbytes;
-          }
+      if (frame->eframe) {
+        offsets[nchunk] = nchunks;
+      }
+      else {
+        offsets[nchunk] = cbytes;
+      }
   }
 
   // Re-compress the offsets again
@@ -2059,6 +2064,8 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
     free(off_chunk);
     return NULL;
   }
+
+  int64_t new_cbytes = cbytes + cbytes_chunk;
 
   int64_t new_frame_len;
   if (frame->eframe) {
@@ -2161,7 +2168,6 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
   int32_t nbytes_chunk = sw32_((uint8_t*)chunk + BLOSC2_CHUNK_NBYTES);
   int32_t cbytes_chunk = sw32_((uint8_t*)chunk + BLOSC2_CHUNK_CBYTES);
-  int64_t new_cbytes = cbytes + cbytes_chunk;
 
   // Get the current offsets
   int32_t off_nbytes = nchunks * 8;
@@ -2208,7 +2214,7 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
     default:
       if (frame->eframe) {
         // In case there was a reorder
-        nchunk = offsets[nchunk];
+        offsets[nchunk] = nchunk;
       }
       else {
         // Add the new offset
@@ -2230,6 +2236,7 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
     return NULL;
   }
 
+  int64_t new_cbytes = schunk->cbytes;
   int64_t new_frame_len;
   if (frame->eframe) {
     // The chunk is not stored in the frame

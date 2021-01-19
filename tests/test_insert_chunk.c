@@ -60,6 +60,11 @@ bool tcopy[] = {
 };
 
 static char* test_insert_chunk(void) {
+  /* Free resources */
+  if (tdata.urlpath != NULL && tdata.sequential == false) {
+    blosc2_remove_dir(tdata.urlpath);
+  }
+
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -108,7 +113,9 @@ static char* test_insert_chunk(void) {
     dsize = blosc2_schunk_decompress_chunk(schunk, pos, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
     for (int j = 0; j < CHUNKSIZE; j++) {
-      mu_assert("ERROR: bad roundtrip", data_dest[j] == i);
+      int32_t a = data_dest[j];
+      int32_t b = a + 1;
+      mu_assert("ERROR: bad roundtrip", a == i);
     }
     // Free allocated chunk
     if (tdata.copy) {

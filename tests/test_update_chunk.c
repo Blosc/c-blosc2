@@ -32,6 +32,7 @@ typedef struct {
 } test_ndata;
 
 test_ndata tndata[] = {
+    {1, 4},
     {10, 4},
     {5,  0},
     {33, 32},
@@ -51,6 +52,11 @@ test_storage tstorage[] = {
 };
 
 static char* test_update_chunk(void) {
+  /* Free resources */
+  if (tdata.urlpath != NULL && tdata.sequential == false) {
+    blosc2_remove_dir(tdata.urlpath);
+  }
+
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   int32_t isize = CHUNKSIZE * sizeof(int32_t);

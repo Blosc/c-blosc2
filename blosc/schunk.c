@@ -517,14 +517,26 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     switch (special_value) {
       case BLOSC2_ZERO_RUNLEN:
         schunk->nbytes += nbytes;
+        schunk->nbytes -= nbytes_old;
+        if (schunk->frame->eframe) {
+          schunk->cbytes -= cbytes_old;
+        }
         break;
       case BLOSC2_NAN_RUNLEN:
         schunk->nbytes += nbytes;
+        schunk->nbytes -= nbytes_old;
+        if (schunk->frame->eframe) {
+          schunk->cbytes -= cbytes_old;
+        }
         break;
       default:
         /* Update counters */
         schunk->nbytes += nbytes;
+        schunk->nbytes -= nbytes_old;
         schunk->cbytes += cbytes;
+        if (schunk->frame->eframe) {
+          schunk->cbytes -= cbytes_old;
+        }
     }
   }
 
