@@ -225,6 +225,7 @@ static char* test_eframe_simple(void) {
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.sequential=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
+  blosc2_remove_dir(storage.urlpath);
   schunk = blosc2_schunk_new(storage);
   mu_assert("Error in creating schunk", schunk != NULL);
 
@@ -271,10 +272,10 @@ static char *all_tests(void) {
   nchunks = 1;
   mu_run_test(test_eframe_simple);
 
-  nchunks = 10;
+  nchunks = 2;
   mu_run_test(test_eframe_simple);
 
-  nchunks = 100;
+  nchunks = 10;
   mu_run_test(test_eframe_simple);
 
   // Check directory with a trailing slash

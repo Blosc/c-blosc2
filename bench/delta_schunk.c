@@ -20,7 +20,7 @@
 #define MB  (1024*KB)
 #define GB  (1024*MB)
 
-#define CHUNKSIZE (5 * 1000 * 1000)
+#define CHUNKSIZE (50 * 1000)
 #define NCHUNKS 100
 // Setting NTHREADS > 1 increases the likelihood of a crash.  See #112.
 #define NTHREADS 1
@@ -31,7 +31,7 @@ int main(void) {
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk *schunk;
-  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   int64_t nbytes, cbytes;
   int nchunk;

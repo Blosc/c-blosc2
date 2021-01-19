@@ -17,7 +17,7 @@ Each of the three parts of the frame are variable length; with the header and tr
 
 
 Header
-------------------
+------
 
 The header contains information needed to decompress the Blosc chunks contained in the frame. It is encoded using
 `msgpack <https://msgpack.org>`_ and the format is as follows::
@@ -98,15 +98,15 @@ using the msgpack format. Here is the format for the *metalayers*::
         Format version.
     :``4`` and ``5``:
         Enumerated for chunk offsets.
-        
+
         :``0``:
-            16-bit
-        :``1``:
             32-bit
-        :``2``:
+        :``1``:
             64-bit
+        :``2``:
+            128-bit
         :``3``:
-            Reserved
+            256-bit
     :``6``:
         Chunks of fixed length (0) or variable length (1)
     :``7``:
@@ -171,8 +171,41 @@ Each chunk is stored sequentially and follows the format described in the
 `chunk format <README_CHUNK_FORMAT.rst>`_ document.
 
 The `chunk idx` is a Blosc chunk containing the indexes to each chunk in this section.  The data in the
-chunk is a list of (16-bit, 32-bit or 64-bit, see above) offsets to each chunk. The index chunk follows
+chunk is a list of (32-bit, 64-bit or more, see above) offsets to each chunk. The index chunk follows
 the regular Blosc chunk format and can be compressed.
+
+**Note:** The offsets can take *special values* so as to represent chunks with run-length (equal) values.
+The codification for the offsets is as follows::
+
+    +========+========+========+========+
+    | byte 0 | byte 1 |   ...  | byte N |
+    +========+========+========+========+
+                                   ^
+                                   |
+                                   +--> Byte for special values
+
+If the most significant bit (7) of the most significant byte above (byte N, as little endian is used) is set,
+that represents a chunk with a run-length of special values.  The supported special values are:
+
+:special_values:
+    (``uint8``) Flags for special values.
+
+        :``0``:
+            A run-length of zeros.
+        :``1``:
+            A run-length of NaNs. The size of the NaN depends on the typesize.
+        :``2``:
+            Reserved.
+        :``3``:
+            Reserved.
+        :``4``:
+            Reserved.
+        :``5``:
+            Reserved.
+        :``6``:
+            Reserved.
+        :``7``:
+            Indicates a special value.  If not set, a regular value.
 
 
 Trailer

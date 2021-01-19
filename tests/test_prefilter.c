@@ -26,8 +26,8 @@ static int32_t data[SIZE];
 static int32_t data2[SIZE];
 static int32_t data_out[SIZE + BLOSC_MAX_OVERHEAD / sizeof(int32_t)];
 static int32_t data_dest[SIZE];
-size_t isize = SIZE * sizeof(int32_t);
-size_t osize = SIZE * sizeof(int32_t) + BLOSC_MAX_OVERHEAD;
+int32_t isize = SIZE * sizeof(int32_t);
+int32_t osize = SIZE * sizeof(int32_t) + BLOSC_MAX_OVERHEAD;
 int dsize = SIZE * sizeof(int32_t);
 int csize;
 
@@ -68,7 +68,7 @@ static char *test_prefilter1(void) {
   cparams.pparams = &pparams;
   cctx = blosc2_create_cctx(cparams);
 
-  csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
+  csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
   mu_assert("Compression error", csize > 0);
 
   /* Create a context for decompression */
@@ -105,7 +105,7 @@ static char *test_prefilter2(void) {
   cparams.pparams = &pparams;
   cctx = blosc2_create_cctx(cparams);
 
-  csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
+  csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
   mu_assert("Buffer is uncompressible", csize != 0);
   mu_assert("Compression error", csize > 0);
 

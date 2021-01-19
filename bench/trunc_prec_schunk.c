@@ -40,7 +40,7 @@ void fill_buffer(double *buffer, int nchunk) {
 
 int main(void) {
   blosc2_schunk *schunk;
-  size_t isize = CHUNKSIZE * sizeof(double);
+  int32_t isize = CHUNKSIZE * sizeof(double);
   int dsize;
   int64_t nbytes, cbytes;
   int nchunk, nchunks = 0;

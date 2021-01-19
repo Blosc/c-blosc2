@@ -18,7 +18,7 @@ int main(void) {
   static int32_t data_dest[SIZE];
   int32_t data_subset[5];
   int32_t data_subset_ref[5] = {5, 6, 7, 8, 9};
-  size_t isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
+  int32_t isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
   int dsize = SIZE * sizeof(int32_t), csize;
   int i, ret;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;

@@ -1,10 +1,10 @@
 # sources for main bench
 set(SOURCES b2bench.c)
-# sources for delta filter
+# other benchmarks
 set(SOURCES_DELTA delta_schunk.c)
-# sources for trunc_prec filter
 set(SOURCES_TRUNC_PREC trunc_prec_schunk.c)
 set(SOURCES_SUM_OPENMP sum_openmp.c)
+set(SOURCES_ZERO_RUNLEN zero_runlen.c)
 
 # targets
 set(BENCH_EXE b2bench)
@@ -12,6 +12,7 @@ add_executable(${BENCH_EXE} ${SOURCES})
 add_executable(delta_schunk ${SOURCES_DELTA})
 add_executable(trunc_prec_schunk ${SOURCES_TRUNC_PREC})
 add_executable(sum_openmp ${SOURCES_SUM_OPENMP})
+add_executable(zero_runlen ${SOURCES_ZERO_RUNLEN})
 if(UNIX AND NOT APPLE)
     # cmake is complaining about LINK_PRIVATE in original PR
     # and removing it does not seem to hurt, so be it.
@@ -20,6 +21,7 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(delta_schunk rt)
     target_link_libraries(trunc_prec_schunk rt)
     target_link_libraries(sum_openmp rt)
+    target_link_libraries(zero_runlen rt)
 endif()
 if(UNIX)
     # Avoid a warning when using gcc without -fopenmp
@@ -29,6 +31,7 @@ target_link_libraries(${BENCH_EXE} blosc2_shared)
 target_link_libraries(delta_schunk blosc2_shared)
 target_link_libraries(trunc_prec_schunk blosc2_shared)
 target_link_libraries(sum_openmp blosc2_shared)
+target_link_libraries(zero_runlen blosc2_shared)
 
 
 # have to copy blosc dlls on Windows
@@ -162,6 +165,11 @@ if(BUILD_TESTS)
     option(TEST_INCLUDE_BENCH_SUM_OPENMP "Include sum_openmp in the tests" OFF)
     if(TEST_INCLUDE_BENCH_SUM_OPENMP)
         add_test(test_bench_sum_openmp sum_openmp)
+    endif()
+
+    option(TEST_INCLUDE_BENCH_ZERO_RUNLEN "Include zero_runlen in the tests" ON)
+    if(TEST_INCLUDE_BENCH_ZERO_RUNLEN)
+        add_test(test_bench_zero_runlen zero_runlen)
     endif()
 
 endif()

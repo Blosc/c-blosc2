@@ -31,7 +31,7 @@
 
 int main(int argc, char* argv[]) {
   static int32_t data[CHUNKSIZE];
-  int32_t isize;
+  size_t isize;
   int64_t nbytes, cbytes;
   blosc_timestamp_t last, current;
   double ttotal;
@@ -66,7 +66,7 @@ int main(int argc, char* argv[]) {
     printf("Input file cannot be open.");
     exit(1);
   }
-  while ((isize = fread(data, 1, CHUNKSIZE, finput)) == CHUNKSIZE) {
+  while ((isize = (int32_t)fread(data, 1, CHUNKSIZE, finput)) == CHUNKSIZE) {
     if (blosc2_schunk_append_buffer(schunk, data, isize) < 0) {
       fprintf(stderr, "Error in appending data to destination file");
       return -1;

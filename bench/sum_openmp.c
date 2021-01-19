@@ -74,7 +74,7 @@
 int main(void) {
   static DTYPE udata[N];
   DTYPE chunk_buf[CHUNKSIZE];
-  size_t isize = CHUNKSIZE * sizeof(DTYPE);
+  int32_t isize = CHUNKSIZE * sizeof(DTYPE);
   DTYPE sum, compressed_sum;
   int64_t nbytes, cbytes;
   blosc2_schunk* schunk;

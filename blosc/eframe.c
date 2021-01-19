@@ -37,7 +37,7 @@
 
 
 /* Append an existing chunk into an extended frame. */
-void* eframe_append_chunk(blosc2_frame* frame, uint8_t* chunk, int32_t nchunk, int64_t cbytes) {
+void* eframe_create_chunk(blosc2_frame* frame, uint8_t* chunk, int32_t nchunk, int64_t cbytes) {
   // Get directory/nchunk.chunk with 8 zeros of padding
   char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
   sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);

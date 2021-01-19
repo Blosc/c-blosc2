@@ -52,8 +52,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   /* Compress data */
   int32_t chunksize = max_chunksize;
-  for (i = 0; chunksize > 0 && i < size; i += chunksize, nchunks++) {
-    if (i + chunksize > size)
+  for (i = 0; chunksize > 0 && i < (int32_t)size; i += chunksize, nchunks++) {
+    if (i + chunksize > (int32_t)size)
       chunksize = size - i;
     nchunks = blosc2_schunk_append_buffer(schunk, (uint8_t *)data + i, chunksize);
     if (nchunks < 0) {
