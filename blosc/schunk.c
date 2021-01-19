@@ -710,12 +710,14 @@ int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order) {
     int index = offsets_order[i];
     if (index >= schunk->nchunks) {
       BLOSC_TRACE_ERROR("Index is bigger than the number of chunks.");
+      free(index_check);
       return -1;
     }
     if (index_check[index] == false) {
       index_check[index] = true;
     } else {
       BLOSC_TRACE_ERROR("Index is yet used.");
+      free(index_check);
       return -1;
     }
   }
