@@ -3410,8 +3410,8 @@ int blosc2_chunk_zeros(const size_t nbytes, const size_t typesize, void* dest, s
   uint8_t* dest_ = dest;
   int32_t nbytes_ = (int32_t)nbytes;
 
-  if (typesize > 255) {
-    BLOSC_TRACE_ERROR("typesize cannot be larger than 255 bytes");
+  if (typesize == 0 || typesize > 255) {
+    BLOSC_TRACE_ERROR("typesize cannot be 0 or larger than 255 bytes");
     return -1;
   }
 
