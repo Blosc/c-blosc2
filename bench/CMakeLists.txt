@@ -5,6 +5,8 @@ set(SOURCES_DELTA delta_schunk.c)
 # sources for trunc_prec filter
 set(SOURCES_TRUNC_PREC trunc_prec_schunk.c)
 set(SOURCES_SUM_OPENMP sum_openmp.c)
+# sources for eframe bench
+set(SOURCES_EFRAME eframe_bench.c)
 
 # targets
 set(BENCH_EXE b2bench)
@@ -12,6 +14,7 @@ add_executable(${BENCH_EXE} ${SOURCES})
 add_executable(delta_schunk ${SOURCES_DELTA})
 add_executable(trunc_prec_schunk ${SOURCES_TRUNC_PREC})
 add_executable(sum_openmp ${SOURCES_SUM_OPENMP})
+add_executable(eframe_bench ${SOURCES_EFRAME})
 if(UNIX AND NOT APPLE)
     # cmake is complaining about LINK_PRIVATE in original PR
     # and removing it does not seem to hurt, so be it.
@@ -20,6 +23,7 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(delta_schunk rt)
     target_link_libraries(trunc_prec_schunk rt)
     target_link_libraries(sum_openmp rt)
+    target_link_libraries(eframe_bench rt)
 endif()
 if(UNIX)
     # Avoid a warning when using gcc without -fopenmp
@@ -29,6 +33,7 @@ target_link_libraries(${BENCH_EXE} blosc2_shared)
 target_link_libraries(delta_schunk blosc2_shared)
 target_link_libraries(trunc_prec_schunk blosc2_shared)
 target_link_libraries(sum_openmp blosc2_shared)
+target_link_libraries(eframe_bench blosc2_shared)
 
 
 # have to copy blosc dlls on Windows
