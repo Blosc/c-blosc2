@@ -74,7 +74,7 @@ void find_root(const double *x, const double *y,
 int compute_vectors(void) {
   static double buffer_x[CHUNKSIZE];
   static double buffer_y[CHUNKSIZE];
-  const size_t isize = CHUNKSIZE * sizeof(double);
+  const int32_t isize = CHUNKSIZE * sizeof(double);
   int dsize;
   long nbytes = 0;
   blosc2_schunk *sc_x, *sc_y;

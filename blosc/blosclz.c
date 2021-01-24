@@ -426,7 +426,7 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
     ref = ibase + htab[hval];
 
     /* calculate distance to the match */
-    distance = anchor - ref;
+    distance = (unsigned int)(anchor - ref);
 
     /* update hash table */
     htab[hval] = (uint32_t) (anchor - ibase);
@@ -607,7 +607,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
     ref = ibase + htab[hval];
 
     /* calculate distance to the match */
-    distance = anchor - ref;
+    distance = (unsigned int)(anchor - ref);
 
     /* update hash table */
     htab[hval] = (uint32_t) (anchor - ibase);

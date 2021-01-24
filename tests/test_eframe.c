@@ -224,8 +224,10 @@ static char* test_eframe_simple(void) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {false, directory, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.sequential=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
+  blosc2_remove_dir(storage.urlpath);
   schunk = blosc2_schunk_new(storage);
+  mu_assert("Error in creating schunk", schunk != NULL);
 
   // Feed it with data
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
@@ -270,26 +272,19 @@ static char *all_tests(void) {
   nchunks = 1;
   mu_run_test(test_eframe_simple);
 
+  nchunks = 2;
+  mu_run_test(test_eframe_simple);
+
   nchunks = 10;
   mu_run_test(test_eframe_simple);
 
-  nchunks = 100;
-  mu_run_test(test_eframe_simple);
-
-
+  // Check directory with a trailing slash
   directory = "dir1.b2eframe/";
   nchunks = 0;
   mu_run_test(test_eframe_simple);
 
   nchunks = 1;
   mu_run_test(test_eframe_simple);
-
-  nchunks = 10;
-  mu_run_test(test_eframe_simple);
-
-  nchunks = 100;
-  mu_run_test(test_eframe_simple);
-
 
   // Iterate over all different parameters
   for (int i = 0; i < (int)sizeof(nchunks_) / (int)sizeof(int); i++) {

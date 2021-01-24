@@ -14,11 +14,12 @@ endif()
 foreach(source ${SOURCES})
     get_filename_component(target ${source} NAME_WE)
 
-    # test_nolock and test_noinit will be enabled only for Unix
+    # Some tests will be enabled only for Unix
     if(WIN32)
         if(target STREQUAL test_nolock OR
             target STREQUAL test_noinit OR
-            target STREQUAL test_compressor)
+            target STREQUAL test_compressor OR
+            target STREQUAL test_blosc1_compat)
             message("Skipping ${target} on Windows systems")
             continue()
         endif()

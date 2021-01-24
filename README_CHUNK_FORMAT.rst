@@ -135,6 +135,17 @@ for encoding blocks with a filter pipeline::
         in place, but not the actual block data.  In addition, they have an additional
         trailer for making it easy to read the data blocks.  In general, lazy chunks
         appear when reading data from disk.
+    :bits 4 and 5:
+        Indicate run-lengths for the entire chunk.
+
+            :``0``:
+                No run.
+            :``1``:
+                A run of zeros.
+            :``2``:
+                A run of NaN (Not-a-Number) floats (whether f32 or f64 depends on typesize).
+            :``3``:
+                Run-length of a value that follows the header (i.e. no blocks section).
 
 
 Blocks
@@ -193,20 +204,13 @@ where `uint8_t token` is a byte for providing different meanings to `int32 csize
     (``bitfield``) Flags for different meanings.
 
     :bits 0 and 1:
-        Indicates a run-length stream for the whole chunk.
-        For more info, see the **Run-Length Encoding** section below.
-
-            :``0``:
-                No run.
-            :``1``:
-                Zero value.
-            :``2``:
-                NaN (Not-a-Number) float value.
-            :``3``:
-                Run-length of a value that follows the header (i.e. no blocks section).
+        Reserved for future use.
 
     :bits 2 and 3:
-        Reserved for two-codes in a row. TODO: complete description
+        Reserved for two-codecs in a row. TODO: complete description
+
+    :bits 4, 5 and 6:
+        Reserved for secondary codec. TODO: complete description
 
 If bit 4 of the `flags` header field is set, each block is stored in a single data stream::
 
@@ -226,20 +230,6 @@ If bit 4 of the `flags` header is *not* set, each block can be stored using mult
 
 The uncompressed size for each block is equivalent to the `blocksize` field in the header, with the exception
 of the last block which may be equal to or less than the `blocksize`.
-
-**Run-Length Encoding**
-
-*Only for C-Blosc2*
-
-The `csize` field of each compressed data stream can be used to support run-length encoding for blocks as follows:
-
-    - When the most significant bit is *not* set, `csize` represents the size of the compressed
-      data stream that follows. (as in C-Blosc1)
-    - When the most significant bit is set, the least significant byte of `csize` is used to fill the entire
-      block.
-
-For example, a csize of 10000 means that the compressed data stream that follows is 10000 bytes long
-and a csize of -32 means that the whole block is made of bytes with a value of 32.
 
 Trailer
 -------

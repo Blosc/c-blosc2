@@ -68,15 +68,13 @@ enum {
 /* The FRAME_FORMAT_VERSION symbols below should be just 4-bit long */
 enum {
   /* Blosc format version
-   *  4 -> First version (introduced in beta.1)
-   *  1 -> Second version (introduced in beta.2)
+   *  1 -> First version (introduced in beta.2)
+   *  2 -> Second version (introduced in beta.6)
    *
-   *  *Important note*: version 4 should be avoided because it was used
-   *  for beta.1 and before, and it won't be supported anymore.
    */
-  BLOSC2_VERSION_FRAME_FORMAT_BETA1 = 4,  // for beta.1 and before
-  BLOSC2_VERSION_FRAME_FORMAT_BETA2 = 1,  // for beta.2 and after
-  BLOSC2_VERSION_FRAME_FORMAT = BLOSC2_VERSION_FRAME_FORMAT_BETA2,
+  BLOSC2_VERSION_FRAME_FORMAT_BETA2 = 1,  // for 2.0.0-beta2 and after
+  BLOSC2_VERSION_FRAME_FORMAT_BETA6 = 2,  // for 2.0.0-beta6 and after
+  BLOSC2_VERSION_FRAME_FORMAT = BLOSC2_VERSION_FRAME_FORMAT_BETA6,
 };
 
 enum {
@@ -242,6 +240,15 @@ enum {
     BLOSC2_CHUNK_BLOSC2_FLAGS = 0x1F, //!< flags specific for Blosc2 functionality
 };
 
+/**
+ * @brief Run lengths for special values for chunks/frames
+ */
+enum {
+    BLOSC2_NO_RUNLEN = 0x0,       //!< no run-length
+    BLOSC2_ZERO_RUNLEN = 0x1,     //!< zero run-length
+    BLOSC2_NAN_RUNLEN = 0x2,      //!< NaN run-length
+    BLOSC2_VALUE_RUNLEN = 0x3,    //!< generic value run-length
+};
 
 
 /**
@@ -337,6 +344,58 @@ BLOSC_EXPORT int blosc_compress(int clevel, int doshuffle, size_t typesize,
  * available in blosc2_decompress.
  */
 BLOSC_EXPORT int blosc_decompress(const void* src, void* dest, size_t destsize);
+
+
+/**
+ * @brief Create a chunk made of zeros.
+ *
+ * @param nbytes The size (in bytes) of the chunk.
+ * @param typesize The size (in bytes) of the type.
+ * @param dest The buffer where the data chunk will be put.
+ * @param destsize The size (in bytes) of the @p dest buffer;
+ * must be BLOSC_EXTENDED_HEADER_LENGTH at least.
+ *
+ * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH).
+ * If negative, there has been an error and @dest is unusable.
+ * */
+BLOSC_EXPORT int blosc2_chunk_zeros(size_t nbytes, size_t typesize,
+                                    void* dest, size_t destsize);
+
+
+/**
+ * @brief Create a chunk made of nans.
+ *
+ * @param nbytes The size (in bytes) of the chunk.
+ * @param typesize The size (in bytes) of the type;
+ * only 4 bytes (float) and 8 bytes (double) are supported.
+ * @param dest The buffer where the data chunk will be put.
+ * @param destsize The size (in bytes) of the @p dest buffer;
+ * must be BLOSC_EXTENDED_HEADER_LENGTH at least.
+ *
+ * @note Whether the NaNs are floats or doubles will be given by the typesize.
+ *
+ * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH).
+ * If negative, there has been an error and @dest is unusable.
+ * */
+BLOSC_EXPORT int blosc2_chunk_nans(size_t nbytes, size_t typesize,
+                                   void* dest, size_t destsize);
+
+
+/**
+ * @brief Create a chunk made of repeated values.
+ *
+ * @param nbytes The size (in bytes) of the chunk.
+ * @param typesize The size (in bytes) of the type.
+ * @param dest The buffer where the data chunk will be put.
+ * @param destsize The size (in bytes) of the @p dest buffer.
+ * @param repeatval A pointer to the repeated value (little endian).
+ * The size of the value is given by @p typesize param.
+ *
+ * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH + typesize).
+ * If negative, there has been an error and @dest is unusable.
+ * */
+BLOSC_EXPORT int blosc2_chunk_repeatval(size_t nbytes, size_t typesize,
+                                        void* dest, size_t destsize, void* repeatval);
 
 
 /**

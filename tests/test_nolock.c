@@ -108,5 +108,8 @@ int main(void) {
 
   blosc_destroy();
 
+  /* Reset envvar */
+  unsetenv("BLOSC_NOLOCK");
+
   return result != 0;
 }

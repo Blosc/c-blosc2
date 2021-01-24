@@ -17,11 +17,11 @@
 #define snprintf _snprintf
 #endif
 
-#define CHUNKSIZE (200 * 1000)
+#define CHUNKSIZE (20 * 1000)
 #define NTHREADS (4)
 
 /* Global vars */
-int nchunks_[] = {0, 1, 2, 10};
+int nchunks_[] = {0, 1, 2, 5};
 int tests_run = 0;
 int nchunks;
 bool multithread;
@@ -31,13 +31,12 @@ bool sparse_schunk;
 bool filter_pipeline;
 bool metalayers;
 bool usermeta;
-bool check_sframe;
 char *fname;
 char buf[256];
 
 
 static char* test_frame(void) {
-  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int32_t *data = malloc(isize);
   int32_t *data_dest = malloc(isize);
   int dsize;
@@ -107,7 +106,7 @@ static char* test_frame(void) {
         mu_assert("dparams are not recovered correctly",
                   schunk->storage->dparams->nthreads == BLOSC2_DPARAMS_DEFAULTS.nthreads);
       } else {
-        // Dump the schunk to a sframe and regenerate it from there
+        // Dump the schunk into a sframe and regenerate it from there
         uint8_t* sframe;
         int64_t sframe_len = blosc2_schunk_to_sframe(schunk, &sframe);
         blosc2_schunk_free(schunk);
@@ -193,7 +192,7 @@ static char* test_frame(void) {
         int64_t sframe_len = blosc2_schunk_to_sframe(schunk, &sframe);
         blosc2_schunk_free(schunk);
         schunk = blosc2_schunk_open_sframe(sframe, sframe_len);
-        mu_assert("blosc2_schunk_open_sframe() failed", schunk != NULL);
+        mu_assert("blosc2_schunk_open_sframe() failed (2)", schunk != NULL);
 
       }
     }
