@@ -1278,6 +1278,14 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
     swap_store(&offset, idxp, sizeof(offset));
     idxp += 4;
 
+    if (offset >= header_len) {
+      // Offset exceeds header length
+      if (frame->sdata == NULL) {
+        free(header);
+      }
+      free(ns);
+      return -1;
+    }
     // Go to offset and see if we have the correct marker
     uint8_t* content_marker = header + offset;
     if (*content_marker != 0xc6) {
