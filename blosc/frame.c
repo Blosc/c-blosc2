@@ -423,8 +423,8 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
     swap_store(typesize, framep + FRAME_TYPESIZE, sizeof(*typesize));
   }
 
-  if (*header_len > *frame_len) {
-    BLOSC_TRACE_ERROR("Header length exceeds length of the frame.");
+  if (*header_len <= 0 || *header_len > *frame_len) {
+    BLOSC_TRACE_ERROR("Header length is invalid or exceeds length of the frame.");
     return -1;
   }
 
@@ -1278,6 +1278,14 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
     swap_store(&offset, idxp, sizeof(offset));
     idxp += 4;
 
+    if (offset >= header_len) {
+      // Offset exceeds header length
+      if (frame->sdata == NULL) {
+        free(header);
+      }
+      free(ns);
+      return -1;
+    }
     // Go to offset and see if we have the correct marker
     uint8_t* content_marker = header + offset;
     if (*content_marker != 0xc6) {

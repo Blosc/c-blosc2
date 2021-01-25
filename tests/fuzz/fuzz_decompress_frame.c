@@ -25,7 +25,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     blosc_destroy();
     return 0;
   }
-
+  /* Don't allow address sanitizer to allocate more than INT32_MAX */
+  if (schunk->nbytes >= INT32_MAX) {
+    blosc2_schunk_free(schunk);
+    blosc_destroy();
+    return 0;
+  }
   /* Decompress data */
   uint8_t *uncompressed_data = (uint8_t *)malloc((size_t)schunk->nbytes+1);
   if (uncompressed_data != NULL) {
