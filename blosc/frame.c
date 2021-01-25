@@ -423,8 +423,8 @@ int get_header_info(blosc2_frame *frame, int32_t *header_len, int64_t *frame_len
     swap_store(typesize, framep + FRAME_TYPESIZE, sizeof(*typesize));
   }
 
-  if (*header_len > *frame_len) {
-    BLOSC_TRACE_ERROR("Header length exceeds length of the frame.");
+  if (*header_len <= 0 || *header_len > *frame_len) {
+    BLOSC_TRACE_ERROR("Header length is invalid or exceeds length of the frame.");
     return -1;
   }
 
