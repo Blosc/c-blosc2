@@ -1333,7 +1333,7 @@ static void init_thread_context(struct thread_context* thread_context, blosc2_co
   thread_context->tmp = my_malloc(thread_context->tmp_nbytes);
   thread_context->tmp2 = thread_context->tmp + context->blocksize;
   thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
-  thread_context->tmp4 = thread_context->tmp + 2 * context->blocksize + ebsize;
+  thread_context->tmp4 = thread_context->tmp + (size_t)2 * context->blocksize + ebsize;
   thread_context->tmp_blocksize = context->blocksize;
   #if defined(HAVE_ZSTD)
   thread_context->zstd_cctx = NULL;
