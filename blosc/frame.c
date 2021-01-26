@@ -921,7 +921,7 @@ uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, i
     // For in-memory frames, the coffset is just one pointer away
     uint8_t* off_start = frame->sdata + header_len + cbytes;
     if (off_cbytes != NULL) {
-      if (header_len + cbytes + BLOSC2_CHUNK_CBYTES + sizeof(int32_t) > frame->len) {
+      if (header_len + cbytes + BLOSC2_CHUNK_CBYTES + (signed)sizeof(int32_t) > frame->len) {
         BLOSC_TRACE_ERROR("Cannot read the offsets compressed size past frame boundary.");
         return NULL;
       }
@@ -1070,7 +1070,7 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
     BLOSC_TRACE_ERROR("Unable to get the trailer offset from frame.");
     return -1;
   }
-  if (trailer_offset + FRAME_TRAILER_USERMETA_LEN_OFFSET + sizeof(int32_t) > frame_len) {
+  if (trailer_offset + FRAME_TRAILER_USERMETA_LEN_OFFSET + (signed)sizeof(int32_t) > frame_len) {
     BLOSC_TRACE_ERROR("Invalid trailer offset exceeds frame length.");
     return -1;
   }
@@ -2052,8 +2052,6 @@ void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
     return NULL;
   }
 
-  /* The uncompressed and compressed sizes start at byte 4 and 12 */
-  int32_t nbytes_chunk = sw32_(chunk_ + BLOSC2_CHUNK_NBYTES);
   int32_t cbytes_chunk = sw32_(chunk_ + BLOSC2_CHUNK_CBYTES);
 
   // Get the current offsets
@@ -2233,8 +2231,6 @@ void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_sc
     return NULL;
   }
 
-  /* The uncompressed and compressed sizes start at byte 4 and 12 */
-  int32_t nbytes_chunk = sw32_((uint8_t*)chunk + BLOSC2_CHUNK_NBYTES);
   int32_t cbytes_chunk = sw32_((uint8_t*)chunk + BLOSC2_CHUNK_CBYTES);
 
   // Get the current offsets
@@ -2394,6 +2390,10 @@ int frame_reorder_offsets(blosc2_frame* frame, int* offsets_order, blosc2_schunk
   int32_t nchunks;
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL, NULL);
+  if (ret < 0) {
+      BLOSC_TRACE_ERROR("Cannot get the header info for the frame.");
+      return ret;
+  }
 
   // Get the current offsets and add one more
   int32_t off_nbytes = nchunks * sizeof(int64_t);
@@ -2523,7 +2523,7 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk
     BLOSC_TRACE_ERROR("Cannot get the chunk in position %d.", nchunk);
     return -1;
   }
-  if (chunk_cbytes < sizeof(int32_t)) {
+  if (chunk_cbytes < (signed)sizeof(int32_t)) {
     /* Not enough input to read `nbytes` */
     return -1;
   }

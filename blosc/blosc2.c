@@ -1061,7 +1061,7 @@ static int blosc_d(
     }
     size_t rbytes = fread((void*)(src + src_offset), 1, block_csize, fp);
     fclose(fp);
-    if (rbytes != block_csize) {
+    if ((int32_t)rbytes != block_csize) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");
       return -13;
     }
@@ -1114,7 +1114,7 @@ static int blosc_d(
 
   neblock = bsize / nstreams;
   for (int j = 0; j < nstreams; j++) {
-    if (srcsize < sizeof(int32_t)) {
+    if (srcsize < (signed)sizeof(int32_t)) {
       /* Not enough input to read compressed size */
       return -1;
     }
@@ -1128,7 +1128,7 @@ static int blosc_d(
       srcsize -= cbytes;
     }
     src += sizeof(int32_t);
-    ctbytes += (int32_t)sizeof(int32_t);
+    ctbytes += (signed)sizeof(int32_t);
 
     /* Uncompress */
     if (cbytes == 0) {
@@ -1140,7 +1140,7 @@ static int blosc_d(
       // A negative number means some encoding depending on the token that comes next
       uint8_t token;
 
-      if (srcsize < sizeof(uint8_t)) {
+      if (srcsize < (signed)sizeof(uint8_t)) {
         // Not enough input to read token */
         return -1;
       }
@@ -1334,7 +1334,7 @@ static void init_thread_context(struct thread_context* thread_context, blosc2_co
   thread_context->parent_context = context;
   thread_context->tid = tid;
 
-  ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
+  ebsize = context->blocksize + context->typesize * (signed)sizeof(int32_t);
   thread_context->tmp_nbytes = (size_t)3 * context->blocksize + ebsize;
   thread_context->tmp = my_malloc(thread_context->tmp_nbytes);
   thread_context->tmp2 = thread_context->tmp + context->blocksize;
@@ -1698,7 +1698,7 @@ static int initialize_context_decompression(blosc2_context* context, const void*
       ZSTD_freeDDict(context->dict_ddict);
     }
     // The trained dictionary is after the bstarts block
-    if (srcsize < sizeof(int32_t)) {
+    if (srcsize < (signed)sizeof(int32_t)) {
       /* Not enough input to size of dictionary */
       return -1;
     }
@@ -2491,7 +2491,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
   nbytes = sw32_(_src + BLOSC2_CHUNK_NBYTES);         /* buffer size */
   blocksize = sw32_(_src + BLOSC2_CHUNK_BLOCKSIZE);      /* block size */
   cbytes = sw32_(_src + BLOSC2_CHUNK_CBYTES);    /* compressed buffer size */
-  ebsize = blocksize + typesize * (int32_t)sizeof(int32_t);
+  ebsize = blocksize + typesize * (signed)sizeof(int32_t);
 
   // Is that a chunk with a special value (runlen)?
   int rc = handle_runlen(context, _src, nitems * typesize, dest, nitems * typesize);
