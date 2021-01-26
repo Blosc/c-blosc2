@@ -1009,6 +1009,12 @@ static int blosc_d(
     return bsize;
   }
 
+  // In some situations (lazychunks) the context can arrive uninitialized
+  // (but BITSHUFFLE needs it for accessing the format of the chunk)
+  if (context->src == NULL) {
+    context->src = src;
+  }
+
   bool is_lazy = ((context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH) &&
           (context->blosc2_flags & 0x08u));
   if (is_lazy) {

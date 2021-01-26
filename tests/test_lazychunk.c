@@ -20,6 +20,7 @@ int tests_run = 0;
 int nchunks;
 int clevel;
 int nthreads;
+uint8_t filter;
 
 
 static char* test_lazy_chunk(void) {
@@ -29,6 +30,7 @@ static char* test_lazy_chunk(void) {
   int dsize;
   int cbytes;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.filters[5] = filter;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
 
@@ -105,36 +107,43 @@ static char *all_tests(void) {
   nchunks = 0;
   clevel = 5;
   nthreads = 1;
+  filter = BLOSC_SHUFFLE;
   mu_run_test(test_lazy_chunk);
 
   nchunks = 1;
   clevel = 5;
   nthreads = 2;
+  filter = BLOSC_SHUFFLE;
   mu_run_test(test_lazy_chunk);
 
   nchunks = 1;
   clevel = 0;
   nthreads = 2;
+  filter = BLOSC_BITSHUFFLE;
   mu_run_test(test_lazy_chunk);
 
   nchunks = 10;
   clevel = 5;
   nthreads = 1;
+  filter = BLOSC_SHUFFLE;
   mu_run_test(test_lazy_chunk);
 
   nchunks = 10;
   clevel = 5;
   nthreads = 2;
+  filter = BLOSC_BITSHUFFLE;
   mu_run_test(test_lazy_chunk);
 
   nchunks = 10;
   clevel = 0;
   nthreads = 1;
+  filter = BLOSC_SHUFFLE;
   mu_run_test(test_lazy_chunk);
 
   nchunks = 10;
   clevel = 0;
   nthreads = 2;
+  filter = BLOSC_BITSHUFFLE;
   mu_run_test(test_lazy_chunk);
 
   return EXIT_SUCCESS;
