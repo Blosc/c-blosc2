@@ -282,6 +282,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
   // Now, deal with metalayers
   int16_t nmetalayers = schunk->nmetalayers;
+  if (nmetalayers < 0 || nmetalayers > BLOSC2_MAX_METALAYERS) {
+    return NULL;
+  }
 
   // Make space for the header of metalayers (array marker, size, map of offsets)
   h2 = realloc(h2, (size_t)hsize + 1 + 1 + 2 + 1 + 2);
@@ -1220,6 +1223,12 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
   }
   swap_store(&nmetalayers, idxp, sizeof(uint16_t));
   idxp += 2;
+  if (nmetalayers < 0 || nmetalayers > BLOSC2_MAX_METALAYERS) {
+    if (frame->sdata == NULL) {
+      free(header);
+    }
+    return -1;
+  }
   schunk->nmetalayers = nmetalayers;
 
   // Populate the metalayers and its serialized values
