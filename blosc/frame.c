@@ -914,17 +914,15 @@ uint8_t* get_coffsets(blosc2_frame *frame, int32_t header_len, int64_t cbytes, i
     return frame->coffsets;
   }
   if (frame->sdata != NULL) {
-    if (header_len + cbytes > frame->len) {
+    int32_t off_pos = header_len + cbytes;
+    // Check that there is enough room to read Blosc header
+    if (off_pos + BLOSC_EXTENDED_HEADER_LENGTH > frame->len) {
       BLOSC_TRACE_ERROR("Cannot read the offsets past frame boundary.");
       return NULL;
     }
     // For in-memory frames, the coffset is just one pointer away
-    uint8_t* off_start = frame->sdata + header_len + cbytes;
+    uint8_t* off_start = frame->sdata + off_pos;
     if (off_cbytes != NULL) {
-      if (header_len + cbytes + BLOSC2_CHUNK_CBYTES + (signed)sizeof(int32_t) > frame->len) {
-        BLOSC_TRACE_ERROR("Cannot read the offsets compressed size past frame boundary.");
-        return NULL;
-      }
       *off_cbytes = *(int32_t*) (off_start + BLOSC2_CHUNK_CBYTES);
     }
     return off_start;
