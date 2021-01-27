@@ -1420,6 +1420,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
       // If not the chunks won't be in the frame
       fp = fopen(frame->urlpath, "rb");
       if (fp == NULL) {
+        free(data_chunk);
         free(offsets);
         blosc2_schunk_free(schunk);
         return NULL;
