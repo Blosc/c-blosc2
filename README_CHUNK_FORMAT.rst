@@ -255,4 +255,4 @@ Here it is its structure::
     (``int64_t``) The offset of the chunk in the frame (sequential super-chunk).
 
 :bsize0 .. bsizeN:
-    (``int32_t``) The sizes in bytes for every block.
+    (``int32_t``) The sizes in bytes for every stream.
