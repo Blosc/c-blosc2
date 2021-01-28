@@ -1032,19 +1032,14 @@ static int blosc_d(
     }
     char* urlpath = context->schunk->frame->urlpath;
     int32_t trailer_len = sizeof(int32_t) + sizeof(int64_t) + context->nblocks * sizeof(int32_t);
-    int32_t non_lazy_chunklen = srcsize - trailer_len;
+    size_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH + context->nblocks * sizeof(int32_t);
     int32_t nchunk;
     int64_t chunk_offset;
-    if (context->schunk->frame->eframe) {
-      // The nchunk of the actual chunk is in the trailer
-      nchunk = *(int32_t*)(src + non_lazy_chunklen);
-    }
-    else {
-      // The offset of the actual chunk is in the trailer
-      chunk_offset = *(int64_t*)(src + non_lazy_chunklen + sizeof(int32_t));
-    }
+    // The nchunk and the offset of the current chunk are in the trailer
+    nchunk = *(int32_t*)(src + trailer_offset);
+    chunk_offset = *(int64_t*)(src + trailer_offset + sizeof(int32_t));
     // Get the csize of the nblock
-    int32_t *block_csizes = (int32_t *)(src + non_lazy_chunklen + sizeof(int32_t) + sizeof(int64_t));
+    int32_t *block_csizes = (int32_t *)(src + trailer_offset + sizeof(int32_t) + sizeof(int64_t));
     int32_t block_csize = block_csizes[nblock];
     // Read the lazy block on disk
     FILE* fp = NULL;
@@ -1630,12 +1625,6 @@ static int initialize_context_decompression(blosc2_context* context, const void*
   context->blocksize = sw32_(context->src + BLOSC2_CHUNK_BLOCKSIZE);
   cbytes = sw32_(context->src + BLOSC2_CHUNK_CBYTES);
 
-  // Some checks for malformed headers
-  if (context->blocksize <= 0 || context->blocksize > destsize ||
-      context->typesize <= 0 || context->typesize > BLOSC_MAX_TYPESIZE ||
-      cbytes > srcsize) {
-    return -1;
-  }
   /* Check that we have enough space to decompress */
   if (context->sourcesize > (int32_t)destsize) {
     return -1;
@@ -1654,6 +1643,7 @@ static int initialize_context_decompression(blosc2_context* context, const void*
     return -2;
   }
 
+  bool is_lazy = false;
   if ((context->header_flags & BLOSC_DOSHUFFLE) &&
       (context->header_flags & BLOSC_DOBITSHUFFLE)) {
     /* Extended header */
@@ -1674,12 +1664,20 @@ static int initialize_context_decompression(blosc2_context* context, const void*
     }
     context->filter_flags = filters_to_flags(filters);
     context->blosc2_flags = context->src[BLOSC2_CHUNK_BLOSC2_FLAGS];
+    is_lazy = (context->blosc2_flags & 0x08u);
   } else {
     /* Regular (Blosc1) header */
     context->header_overhead = BLOSC_MIN_HEADER_LENGTH;
     context->filter_flags = get_filter_flags(context->header_flags,
                                              context->typesize);
     flags_to_filters(context->header_flags, context->filters);
+  }
+
+  // Some checks for malformed headers
+  if (context->blocksize <= 0 || context->blocksize > destsize ||
+      context->typesize <= 0 || context->typesize > BLOSC_MAX_TYPESIZE ||
+      (!is_lazy && cbytes > srcsize)) {
+    return -1;
   }
 
   context->bstarts = (int32_t*)(context->src + context->header_overhead);
