@@ -50,7 +50,7 @@ if(NOT DEACTIVATE_ZSTD)
     if(ZSTD_FOUND)
         set(BLOSC_INCLUDE_DIRS ${BLOSC_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIR})
     else()
-        set(ZSTD_LOCAL_DIR ${INTERNAL_LIBS}/zstd-1.4.5)
+        set(ZSTD_LOCAL_DIR ${INTERNAL_LIBS}/zstd-1.4.8)
         set(BLOSC_INCLUDE_DIRS ${BLOSC_INCLUDE_DIRS} ${ZSTD_LOCAL_DIR}
                 ${ZSTD_LOCAL_DIR}/common ${ZSTD_LOCAL_DIR}/dictBuilder)
     endif()
