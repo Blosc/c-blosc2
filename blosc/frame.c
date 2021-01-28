@@ -1765,9 +1765,10 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
     size_t nblocks = chunk_nbytes / chunk_blocksize;
     size_t leftover_block = chunk_nbytes % chunk_blocksize;
     nblocks = leftover_block ? nblocks + 1 : nblocks;
-    // Allocate space for lazy chunk (cbytes + trailer)
+    // Allocate space for the lazy chunk
     size_t trailer_len = sizeof(int32_t) + sizeof(int64_t) + nblocks * sizeof(int32_t);
-    lazychunk_cbytes = chunk_cbytes + trailer_len;
+    size_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH + nblocks * sizeof(int32_t);
+    lazychunk_cbytes = trailer_offset + trailer_len;
     *chunk = malloc(lazychunk_cbytes);
     *needs_free = true;
     // Read just the full header and bstarts section too (lazy partial length)
@@ -1777,10 +1778,9 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
     else {
       fseek(fp, header_len + offset, SEEK_SET);
     }
-    size_t lazy_partial_len = BLOSC_EXTENDED_HEADER_LENGTH + nblocks * sizeof(int32_t);
-    rbytes = fread(*chunk, 1, lazy_partial_len, fp);
+    rbytes = fread(*chunk, 1, trailer_offset, fp);
     fclose(fp);
-    if (rbytes != lazy_partial_len) {
+    if (rbytes != trailer_offset) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) chunk out of the fileframe.");
       return -6;
     }
@@ -1790,8 +1790,8 @@ int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *
     *blosc2_flags |= 0x08U;
 
     // Add the trailer (currently, nchunk + offset + block_csizes)
-    *(int32_t*)(*chunk + chunk_cbytes) = nchunk;
-    *(int64_t*)(*chunk + chunk_cbytes + sizeof(int32_t)) = header_len + offset;
+    *(int32_t*)(*chunk + trailer_offset) = nchunk;
+    *(int64_t*)(*chunk + trailer_offset + sizeof(int32_t)) = header_len + offset;
 
     int32_t* block_csizes = malloc(nblocks * sizeof(int32_t));
 
