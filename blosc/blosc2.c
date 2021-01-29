@@ -993,6 +993,9 @@ static int blosc_d(
   uint8_t *tmp3 = thread_context->tmp4;
   int32_t compformat = (context->header_flags & (uint8_t)0xe0) >> 5u;
   int dont_split = (context->header_flags & (uint8_t)0x10) >> 4u;
+  int memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
+  int32_t chunk_nbytes = *(int32_t*)(src + BLOSC2_CHUNK_NBYTES);
+  int32_t chunk_cbytes = *(int32_t*)(src + BLOSC2_CHUNK_CBYTES);
   //uint8_t blosc_version_format = src[BLOSC2_CHUNK_VERSION];
   int nstreams;
   int32_t neblock;
@@ -1009,6 +1012,12 @@ static int blosc_d(
     return bsize;
   }
 
+  // In some situations (lazychunks) the context can arrive uninitialized
+  // (but BITSHUFFLE needs it for accessing the format of the chunk)
+  if (context->src == NULL) {
+    context->src = src;
+  }
+
   bool is_lazy = ((context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH) &&
           (context->blosc2_flags & 0x08u));
   if (is_lazy) {
@@ -1023,19 +1032,14 @@ static int blosc_d(
     }
     char* urlpath = context->schunk->frame->urlpath;
     int32_t trailer_len = sizeof(int32_t) + sizeof(int64_t) + context->nblocks * sizeof(int32_t);
-    int32_t non_lazy_chunklen = srcsize - trailer_len;
+    size_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH + context->nblocks * sizeof(int32_t);
     int32_t nchunk;
     int64_t chunk_offset;
-    if (context->schunk->frame->eframe) {
-      // The nchunk of the actual chunk is in the trailer
-      nchunk = *(int32_t*)(src + non_lazy_chunklen);
-    }
-    else {
-      // The offset of the actual chunk is in the trailer
-      chunk_offset = *(int64_t*)(src + non_lazy_chunklen + sizeof(int32_t));
-    }
+    // The nchunk and the offset of the current chunk are in the trailer
+    nchunk = *(int32_t*)(src + trailer_offset);
+    chunk_offset = *(int64_t*)(src + trailer_offset + sizeof(int32_t));
     // Get the csize of the nblock
-    int32_t *block_csizes = (int32_t *)(src + non_lazy_chunklen + sizeof(int32_t) + sizeof(int64_t));
+    int32_t *block_csizes = (int32_t *)(src + trailer_offset + sizeof(int32_t) + sizeof(int64_t));
     int32_t block_csize = block_csizes[nblock];
     // Read the lazy block on disk
     FILE* fp = NULL;
@@ -1046,26 +1050,27 @@ static int blosc_d(
       fp = fopen(chunkpath, "rb");
       free(chunkpath);
       // The offset of the block is src_offset
-      fseek(fp, 0 + src_offset, SEEK_SET);
+      fseek(fp, src_offset, SEEK_SET);
     }
     else {
       fp = fopen(urlpath, "rb");
       // The offset of the block is src_offset
       fseek(fp, chunk_offset + src_offset, SEEK_SET);
     }
-    size_t rbytes = fread((void*)(src + src_offset), 1, block_csize, fp);
+    // We can make use of tmp3 because it will be used after src is not needed anymore
+    size_t rbytes = fread(tmp3, 1, block_csize, fp);
     fclose(fp);
-    if (rbytes != block_csize) {
+    if ((int32_t)rbytes != block_csize) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");
       return -13;
     }
+    src = tmp3;
+    src_offset = 0;
+    srcsize = block_csize;
   }
 
   // If the chunk is memcpyed, we just have to copy the block to dest and return
-  int memcpyed = src[BLOSC2_CHUNK_FLAGS] & (uint8_t)BLOSC_MEMCPYED;
   if (memcpyed) {
-    int32_t chunk_nbytes = *(int32_t*)(src + BLOSC2_CHUNK_NBYTES);
-    int32_t chunk_cbytes = *(int32_t*)(src + BLOSC2_CHUNK_CBYTES);
     if (chunk_nbytes + context->header_overhead != chunk_cbytes) {
       return -1;
     }
@@ -1074,11 +1079,14 @@ static int blosc_d(
       /* Not enough input to copy block */
       return -1;
     }
-    memcpy(dest + dest_offset, src + context->header_overhead + nblock * context->blocksize, bsize_);
+    if (!is_lazy) {
+      src += context->header_overhead + nblock * context->blocksize;
+    }
+    memcpy(dest + dest_offset, src, bsize_);
     return bsize_;
   }
 
-  if (src_offset <= 0 || src_offset >= srcsize) {
+  if (!is_lazy && (src_offset <= 0 || src_offset >= srcsize)) {
     /* Invalid block src offset encountered */
     return -1;
   }
@@ -1108,7 +1116,7 @@ static int blosc_d(
 
   neblock = bsize / nstreams;
   for (int j = 0; j < nstreams; j++) {
-    if (srcsize < sizeof(int32_t)) {
+    if (srcsize < (signed)sizeof(int32_t)) {
       /* Not enough input to read compressed size */
       return -1;
     }
@@ -1122,7 +1130,7 @@ static int blosc_d(
       srcsize -= cbytes;
     }
     src += sizeof(int32_t);
-    ctbytes += (int32_t)sizeof(int32_t);
+    ctbytes += (signed)sizeof(int32_t);
 
     /* Uncompress */
     if (cbytes == 0) {
@@ -1134,7 +1142,7 @@ static int blosc_d(
       // A negative number means some encoding depending on the token that comes next
       uint8_t token;
 
-      if (srcsize < sizeof(uint8_t)) {
+      if (srcsize < (signed)sizeof(uint8_t)) {
         // Not enough input to read token */
         return -1;
       }
@@ -1328,12 +1336,12 @@ static void init_thread_context(struct thread_context* thread_context, blosc2_co
   thread_context->parent_context = context;
   thread_context->tid = tid;
 
-  ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
+  ebsize = context->blocksize + context->typesize * (signed)sizeof(int32_t);
   thread_context->tmp_nbytes = (size_t)3 * context->blocksize + ebsize;
   thread_context->tmp = my_malloc(thread_context->tmp_nbytes);
   thread_context->tmp2 = thread_context->tmp + context->blocksize;
   thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
-  thread_context->tmp4 = thread_context->tmp + 2 * context->blocksize + ebsize;
+  thread_context->tmp4 = thread_context->tmp + (size_t)2 * context->blocksize + ebsize;
   thread_context->tmp_blocksize = context->blocksize;
   #if defined(HAVE_ZSTD)
   thread_context->zstd_cctx = NULL;
@@ -1617,12 +1625,6 @@ static int initialize_context_decompression(blosc2_context* context, const void*
   context->blocksize = sw32_(context->src + BLOSC2_CHUNK_BLOCKSIZE);
   cbytes = sw32_(context->src + BLOSC2_CHUNK_CBYTES);
 
-  // Some checks for malformed headers
-  if (context->blocksize <= 0 || context->blocksize > destsize ||
-      context->typesize <= 0 || context->typesize > BLOSC_MAX_TYPESIZE ||
-      cbytes > srcsize) {
-    return -1;
-  }
   /* Check that we have enough space to decompress */
   if (context->sourcesize > (int32_t)destsize) {
     return -1;
@@ -1641,6 +1643,7 @@ static int initialize_context_decompression(blosc2_context* context, const void*
     return -2;
   }
 
+  bool is_lazy = false;
   if ((context->header_flags & BLOSC_DOSHUFFLE) &&
       (context->header_flags & BLOSC_DOBITSHUFFLE)) {
     /* Extended header */
@@ -1661,12 +1664,20 @@ static int initialize_context_decompression(blosc2_context* context, const void*
     }
     context->filter_flags = filters_to_flags(filters);
     context->blosc2_flags = context->src[BLOSC2_CHUNK_BLOSC2_FLAGS];
+    is_lazy = (context->blosc2_flags & 0x08u);
   } else {
     /* Regular (Blosc1) header */
     context->header_overhead = BLOSC_MIN_HEADER_LENGTH;
     context->filter_flags = get_filter_flags(context->header_flags,
                                              context->typesize);
     flags_to_filters(context->header_flags, context->filters);
+  }
+
+  // Some checks for malformed headers
+  if (context->blocksize <= 0 || context->blocksize > destsize ||
+      context->typesize <= 0 || context->typesize > BLOSC_MAX_TYPESIZE ||
+      (!is_lazy && cbytes > srcsize)) {
+    return -1;
   }
 
   context->bstarts = (int32_t*)(context->src + context->header_overhead);
@@ -1692,7 +1703,7 @@ static int initialize_context_decompression(blosc2_context* context, const void*
       ZSTD_freeDDict(context->dict_ddict);
     }
     // The trained dictionary is after the bstarts block
-    if (srcsize < sizeof(int32_t)) {
+    if (srcsize < (signed)sizeof(int32_t)) {
       /* Not enough input to size of dictionary */
       return -1;
     }
@@ -2296,6 +2307,10 @@ int handle_runlen(blosc2_context* context, uint8_t* src, uint32_t nbytes, uint8_
   context->header_overhead = BLOSC_EXTENDED_HEADER_LENGTH;  // a Blosc2 chunk
   int32_t cbytes_chunk = src[BLOSC2_CHUNK_CBYTES];
   int32_t typesize = src[BLOSC2_CHUNK_TYPESIZE];
+  // Some checks for malformed headers
+  if (typesize <= 0 || typesize > BLOSC_MAX_TYPESIZE) {
+    return -1;
+  }
   bool all_zeros = src[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_ZERO_RUNLEN << 4);
   bool all_nans = src[BLOSC2_CHUNK_BLOSC2_FLAGS] & (BLOSC2_NAN_RUNLEN << 4);
   if ((cbytes_chunk != context->header_overhead + typesize) && (cbytes_chunk != context->header_overhead)) {
@@ -2481,7 +2496,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
   nbytes = sw32_(_src + BLOSC2_CHUNK_NBYTES);         /* buffer size */
   blocksize = sw32_(_src + BLOSC2_CHUNK_BLOCKSIZE);      /* block size */
   cbytes = sw32_(_src + BLOSC2_CHUNK_CBYTES);    /* compressed buffer size */
-  ebsize = blocksize + typesize * (int32_t)sizeof(int32_t);
+  ebsize = blocksize + typesize * (signed)sizeof(int32_t);
 
   // Is that a chunk with a special value (runlen)?
   int rc = handle_runlen(context, _src, nitems * typesize, dest, nitems * typesize);
@@ -2583,7 +2598,7 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
       scontext->tmp = my_malloc(scontext->tmp_nbytes);
       scontext->tmp2 = scontext->tmp + blocksize;
       scontext->tmp3 = scontext->tmp + blocksize + ebsize;
-      scontext->tmp4 = scontext->tmp + 2 * blocksize + ebsize;
+      scontext->tmp4 = scontext->tmp + (size_t)2 * blocksize + ebsize;
       scontext->tmp_blocksize = (int32_t)blocksize;
     }
 
@@ -2663,6 +2678,11 @@ int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize
   uint8_t* _src = (uint8_t*)(src);
   int result;
 
+  if (srcsize < BLOSC_MIN_HEADER_LENGTH) {
+    /* Not enough input to parse Blosc1 header */
+    return -1;
+  }
+
   /* Minimally populate the context */
   context->typesize = _src[BLOSC2_CHUNK_TYPESIZE];
   context->blocksize = sw32_(_src + BLOSC2_CHUNK_BLOCKSIZE);
@@ -2724,7 +2744,7 @@ static void t_blosc_do_job(void *ctxt)
     thcontext->tmp = my_malloc(thcontext->tmp_nbytes);
     thcontext->tmp2 = thcontext->tmp + blocksize;
     thcontext->tmp3 = thcontext->tmp + blocksize + ebsize;
-    thcontext->tmp4 = thcontext->tmp + 2 * blocksize + ebsize;
+    thcontext->tmp4 = thcontext->tmp + (size_t)2 * blocksize + ebsize;
     thcontext->tmp_blocksize = blocksize;
   }
 
@@ -3410,8 +3430,8 @@ int blosc2_chunk_zeros(const size_t nbytes, const size_t typesize, void* dest, s
   uint8_t* dest_ = dest;
   int32_t nbytes_ = (int32_t)nbytes;
 
-  if (typesize > 255) {
-    BLOSC_TRACE_ERROR("typesize cannot be larger than 255 bytes");
+  if (typesize == 0 || typesize > BLOSC_MAX_TYPESIZE) {
+    BLOSC_TRACE_ERROR("typesize cannot be larger than %d bytes", BLOSC_MAX_TYPESIZE);
     return -1;
   }
 
@@ -3444,8 +3464,8 @@ int blosc2_chunk_nans(const size_t nbytes, const size_t typesize, void* dest, si
   uint8_t* dest_ = dest;
   int32_t nbytes_ = (int32_t)nbytes;
 
-  if (typesize > 255) {
-    BLOSC_TRACE_ERROR("typesize cannot be larger than 255 bytes");
+  if (typesize == 0 || typesize > BLOSC_MAX_TYPESIZE) {
+    BLOSC_TRACE_ERROR("typesize cannot be larger than %d bytes", BLOSC_MAX_TYPESIZE);
     return -1;
   }
 
@@ -3479,8 +3499,8 @@ int blosc2_chunk_repeatval(const size_t nbytes, const size_t typesize, void* des
   uint8_t* dest_ = dest;
   int32_t nbytes_ = (int32_t)nbytes;
 
-  if (typesize > 255) {
-    BLOSC_TRACE_ERROR("typesize cannot be larger than 255 bytes");
+  if (typesize == 0 || typesize > BLOSC_MAX_TYPESIZE) {
+    BLOSC_TRACE_ERROR("typesize cannot be larger than %d bytes", BLOSC_MAX_TYPESIZE);
     return -1;
   }
 

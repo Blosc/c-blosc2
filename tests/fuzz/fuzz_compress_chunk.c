@@ -46,6 +46,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   blosc_cbuffer_sizes(output, &nbytes, &cbytes, &blocksize);
 
+  /* Don't allow address sanitizer to allocate more than INT32_MAX */
+  if (cbytes >= INT32_MAX) {
+    free(output);
+    return 0;
+  }
+
   input = malloc(cbytes);
   if (input != NULL) {
     blosc_decompress(output, input, cbytes);

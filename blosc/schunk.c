@@ -246,14 +246,20 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     }
     free(schunk->data);
   }
-  blosc2_free_ctx(schunk->cctx);
-  blosc2_free_ctx(schunk->dctx);
+  if (schunk->cctx != NULL)
+    blosc2_free_ctx(schunk->cctx);
+  if (schunk->dctx != NULL)
+    blosc2_free_ctx(schunk->dctx);
 
   if (schunk->nmetalayers > 0) {
     for (int i = 0; i < schunk->nmetalayers; i++) {
-      free(schunk->metalayers[i]->name);
-      free(schunk->metalayers[i]->content);
-      free(schunk->metalayers[i]);
+      if (schunk->metalayers[i] != NULL) {
+        if (schunk->metalayers[i]->name != NULL)
+          free(schunk->metalayers[i]->name);
+        if (schunk->metalayers[i]->content != NULL)
+          free(schunk->metalayers[i]->content);
+        free(schunk->metalayers[i]);
+      }
     }
     schunk->nmetalayers = 0;
   }
@@ -267,7 +273,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     free(schunk->storage);
   }
 
-  if (schunk->frame != NULL) {
+  if (schunk->frame != NULL && !schunk->avoid_frame_free) {
     blosc2_frame_free(schunk->frame);
   }
 
@@ -289,8 +295,7 @@ blosc2_schunk* blosc2_schunk_open_sframe(uint8_t *sframe, int64_t len) {
   }
   blosc2_schunk* schunk = blosc2_frame_to_schunk(frame, false);
   if (schunk == NULL) {
-    /* Use free instead of blosc2_frame_free since no copy */
-    free(frame);
+    blosc2_frame_free(frame);
   }
   return schunk;
 }

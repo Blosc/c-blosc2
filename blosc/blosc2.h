@@ -1071,6 +1071,7 @@ typedef struct blosc2_schunk {
   //!< Pointer to storage info.
   blosc2_frame* frame;
   //!< Pointer to frame used as store for chunks.
+  bool avoid_frame_free;   //!< Whether the frame can be freed (false) or not (true).
   //!<uint8_t* ctx;
   //!< Context for the thread holder. NULL if not acquired.
   blosc2_context* cctx;

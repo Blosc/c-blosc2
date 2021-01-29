@@ -1,15 +1,25 @@
 Blosc Chunk Format
 ==================
 
-The chunk is composed of a header and a blocks section::
+A regular chunk is composed of a header and a blocks section::
 
-    +---------+--------+---------+
-    |  header | blocks | trailer |
-    +---------+--------+---------+
+    +---------+--------+
+    |  header | blocks |
+    +---------+--------+
 
-These three sections are described below.
+Also, there are the so-called lazy chunks that do not have the actual compressed data,
+but only metainformation about how to read it. Lazy chunks typically appear when reading
+data from persistent media.  A lazy chunk has the header and bstarts sections in place
+and in addition, they have an additional trailer for allowing to read the data blocks::
 
-*Note:* All integer types are stored in little endian.
+    +---------+---------+---------+
+    |  header | bstarts | trailer |
+    +---------+---------+---------+
+
+All these sections are described below.  Note that the bstarts section is described as
+part of the blocks section.
+
+*Note:* All integer types in this document are stored in little endian.
 
 
 Header
@@ -131,10 +141,7 @@ for encoding blocks with a filter pipeline::
         Whether the codec is stored in a byte previous to this compressed buffer
         or it is in the global `flags` for chunk.
     :bit 3 (``0x08``):
-        Whether the chunk is 'lazy' or not.  A lazy chunk has the header and bstarts
-        in place, but not the actual block data.  In addition, they have an additional
-        trailer for making it easy to read the data blocks.  In general, lazy chunks
-        appear when reading data from disk.
+        Whether the chunk is 'lazy' or not.
     :bits 4 and 5:
         Indicate run-lengths for the entire chunk.
 
@@ -203,14 +210,17 @@ where `uint8_t token` is a byte for providing different meanings to `int32 csize
 :token:
     (``bitfield``) Flags for different meanings.
 
-    :bits 0 and 1:
-        Reserved for future use.
+    :bit 0:
+        The cdata stream is a run-length of a repeated bytes.
 
-    :bits 2 and 3:
+    :bits 1 and 2:
         Reserved for two-codecs in a row. TODO: complete description
 
-    :bits 4, 5 and 6:
+    :bits 3, 4 and 5:
         Reserved for secondary codec. TODO: complete description
+
+    :bits 6 and 7:
+        Reserved for future use.
 
 If bit 4 of the `flags` header field is set, each block is stored in a single data stream::
 
