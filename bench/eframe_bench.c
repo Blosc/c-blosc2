@@ -1,10 +1,6 @@
 /*********************************************************************
   Benchmark for testing eframe vs frame.
 
-  You can select different degrees of 'randomness' in input buffer, as
-  well as external datafiles (uncomment the lines after "For data
-  coming from a file" comment).
-
   For usage instructions of this benchmark, please see:
 
     http://blosc.org/synthetic-benchmarks.html
@@ -13,11 +9,6 @@
   benchmarks and your processor specifications are welcome!
 
   Author: The Blosc Developers <blosc@blosc.org>
-
-  Note: Compiling this with VS2008 does not work well with cmake.  Here
-  it is a way to compile the benchmark (with added support for LZ4):
-
-  > cl /DHAVE_LZ4 /arch:SSE2 /Ox /Febench.exe /Iblosc /Iinternal-complibs\lz4-1.7.0 bench\bench.c blosc\blosc.c blosc\blosclz.c blosc\shuffle.c blosc\shuffle-sse2.c blosc\shuffle-generic.c blosc\bitshuffle-generic.c blosc\bitshuffle-sse2.c internal-complibs\lz4-1.7.0\*.c
 
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
@@ -168,6 +159,7 @@ int main(int argc, char* argv[]) {
     iter = (int)strtol(argv[2], NULL, 10);
   }
 
+  // Run as much as iter tests
   for (int i = 0; i < iter; i++) {
     test_comparation();
   }
