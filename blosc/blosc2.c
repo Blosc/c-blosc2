@@ -2678,6 +2678,11 @@ int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize
   uint8_t* _src = (uint8_t*)(src);
   int result;
 
+  if (srcsize < BLOSC_MIN_HEADER_LENGTH) {
+    /* Not enough input to parse Blosc1 header */
+    return -1;
+  }
+
   /* Minimally populate the context */
   context->typesize = _src[BLOSC2_CHUNK_TYPESIZE];
   context->blocksize = sw32_(_src + BLOSC2_CHUNK_BLOCKSIZE);
