@@ -282,6 +282,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
 
   // Now, deal with metalayers
   int16_t nmetalayers = schunk->nmetalayers;
+  if (nmetalayers < 0 || nmetalayers > BLOSC2_MAX_METALAYERS) {
+    return NULL;
+  }
 
   // Make space for the header of metalayers (array marker, size, map of offsets)
   h2 = realloc(h2, (size_t)hsize + 1 + 1 + 2 + 1 + 2);
@@ -1139,11 +1142,117 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
   return usermeta_len;
 }
 
+static int frame_get_metalayers_from_header(blosc2_frame* frame, blosc2_schunk* schunk, uint8_t* header,
+                                            int32_t header_len) {
+  int64_t header_pos = FRAME_IDX_SIZE;
+
+  // Get the size for the index of metalayers
+  uint16_t idx_size;
+  header_pos += sizeof(idx_size);
+  if (header_len < header_pos) {
+    return -1;
+  }
+  swap_store(&idx_size, header + FRAME_IDX_SIZE, sizeof(idx_size));
+
+  // Get the actual index of metalayers
+  uint8_t* metalayers_idx = header + FRAME_IDX_SIZE + 2;
+  header_pos += 1;
+  if (header_len < header_pos) {
+    return -1;
+  }
+  if (metalayers_idx[0] != 0xde) {   // sanity check
+    return -1;
+  }
+  uint8_t* idxp = metalayers_idx + 1;
+  uint16_t nmetalayers;
+  header_pos += sizeof(nmetalayers);
+  if (header_len < header_pos) {
+    return -1;
+  }
+  swap_store(&nmetalayers, idxp, sizeof(uint16_t));
+  idxp += 2;
+  if (nmetalayers < 0 || nmetalayers > BLOSC2_MAX_METALAYERS) {
+    return -1;
+  }
+  schunk->nmetalayers = nmetalayers;
+
+  // Populate the metalayers and its serialized values
+  for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
+    header_pos += 1;
+    if (header_len < header_pos) {
+      return -1;
+    }
+    if ((*idxp & 0xe0u) != 0xa0u) {   // sanity check
+      return -1;
+    }
+    blosc2_metalayer* metalayer = calloc(sizeof(blosc2_metalayer), 1);
+    schunk->metalayers[nmetalayer] = metalayer;
+
+    // Populate the metalayer string
+    int8_t nslen = *idxp & (uint8_t)0x1F;
+    idxp += 1;
+    header_pos += nslen;
+    if (header_len < header_pos) {
+      return -1;
+    }
+    char* ns = malloc((size_t)nslen + 1);
+    memcpy(ns, idxp, nslen);
+    ns[nslen] = '\0';
+    idxp += nslen;
+    metalayer->name = ns;
+
+    // Populate the serialized value for this metalayer
+    // Get the offset
+    header_pos += 1;
+    if (header_len < header_pos) {
+      return -1;
+    }
+    if ((*idxp & 0xffu) != 0xd2u) {   // sanity check
+      return -1;
+    }
+    idxp += 1;
+    int32_t offset;
+    header_pos += sizeof(offset);
+    if (header_len < header_pos) {
+      return -1;
+    }
+    swap_store(&offset, idxp, sizeof(offset));
+    idxp += 4;
+    if (offset >= header_len) {
+      // Offset exceeds header length
+      return -1;
+    }
+    // Go to offset and see if we have the correct marker
+    uint8_t* content_marker = header + offset;
+    if (*content_marker != 0xc6) {
+      return -1;
+    }
+
+    // Read the size of the content
+    int32_t content_len;
+    header_pos += sizeof(content_len);
+    if (header_len < header_pos) {
+      return -1;
+    }
+    swap_store(&content_len, content_marker + 1, sizeof(content_len));
+    metalayer->content_len = content_len;
+
+    // Finally, read the content
+    header_pos += content_len;
+    if (header_len < header_pos) {
+      return -1;
+    }
+    char* content = malloc((size_t)content_len);
+    memcpy(content, content_marker + 1 + 4, (size_t)content_len);
+    metalayer->content = (uint8_t*)content;
+  }
+
+  return 1;
+}
 
 int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
   int32_t header_len;
   int64_t frame_len;
-  int64_t frame_pos = FRAME_IDX_SIZE;
   int64_t nbytes;
   int64_t cbytes;
   int32_t chunksize;
@@ -1183,158 +1292,13 @@ int frame_get_metalayers(blosc2_frame* frame, blosc2_schunk* schunk) {
     }
   }
 
-  // Get the size for the index of metalayers
-  uint16_t idx_size;
-  frame_pos += sizeof(idx_size);
-  if (frame_len < frame_pos) {
-    if (frame->sdata == NULL) {
-      free(header);
-    }
-    return -1;
-  }
-  swap_store(&idx_size, header + FRAME_IDX_SIZE, sizeof(idx_size));
-
-  // Get the actual index of metalayers
-  uint8_t* metalayers_idx = header + FRAME_IDX_SIZE + 2;
-  frame_pos += 1;
-  if (frame_len < frame_pos) {
-    if (frame->sdata == NULL) {
-      free(header);
-    }
-    return -1;
-  }
-  if (metalayers_idx[0] != 0xde) {   // sanity check
-    if (frame->sdata == NULL) {
-      free(header);
-    }
-    return -1;
-  }
-  uint8_t* idxp = metalayers_idx + 1;
-  uint16_t nmetalayers;
-  frame_pos += sizeof(nmetalayers);
-  if (frame_len < frame_pos) {
-    if (frame->sdata == NULL) {
-      free(header);
-    }
-    return -1;
-  }
-  swap_store(&nmetalayers, idxp, sizeof(uint16_t));
-  idxp += 2;
-  schunk->nmetalayers = nmetalayers;
-
-  // Populate the metalayers and its serialized values
-  for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
-    frame_pos += 1;
-    if (frame_len < frame_pos) {
-      if (frame->sdata == NULL) {
-        free(header);
-      }
-      return -1;
-    }
-    if ((*idxp & 0xe0u) != 0xa0u) {   // sanity check
-      if (frame->sdata == NULL) {
-        free(header);
-      }
-      return -1;
-    }
-    blosc2_metalayer* metalayer = calloc(sizeof(blosc2_metalayer), 1);
-    schunk->metalayers[nmetalayer] = metalayer;
-
-    // Populate the metalayer string
-    int8_t nslen = *idxp & (uint8_t)0x1F;
-    idxp += 1;
-    frame_pos += nslen;
-    if (frame_len < frame_pos) {
-      if (frame->sdata == NULL) {
-        free(header);
-      }
-      return -1;
-    }
-    char* ns = malloc((size_t)nslen + 1);
-    memcpy(ns, idxp, nslen);
-    ns[nslen] = '\0';
-    idxp += nslen;
-    metalayer->name = ns;
-
-    // Populate the serialized value for this metalayer
-    // Get the offset
-    frame_pos += 1;
-    if (frame_len < frame_pos) {
-      if (frame->sdata == NULL) {
-        free(header);
-      }
-      free(ns);
-      return -1;
-    }
-    if ((*idxp & 0xffu) != 0xd2u) {   // sanity check
-      if (frame->sdata == NULL) {
-        free(header);
-      }
-      free(ns);
-      return -1;
-    }
-    idxp += 1;
-    int32_t offset;
-    frame_pos += sizeof(offset);
-    if (frame_len < frame_pos) {
-      if (frame->sdata == NULL) {
-        free(header);
-      }
-      free(ns);
-      return -1;
-    }
-    swap_store(&offset, idxp, sizeof(offset));
-    idxp += 4;
-
-    if (offset >= header_len) {
-      // Offset exceeds header length
-      if (frame->sdata == NULL) {
-        free(header);
-      }
-      free(ns);
-      return -1;
-    }
-    // Go to offset and see if we have the correct marker
-    uint8_t* content_marker = header + offset;
-    if (*content_marker != 0xc6) {
-      if (frame->sdata == NULL) {
-        free(header);
-      }
-      free(ns);
-      return -1;
-    }
-
-    // Read the size of the content
-    int32_t content_len;
-    frame_pos += sizeof(content_len);
-    if (frame_len < frame_pos) {
-      if (frame->sdata == NULL) {
-        free(header);
-      }
-      free(ns);
-      return -1;
-    }
-    swap_store(&content_len, content_marker + 1, sizeof(content_len));
-    metalayer->content_len = content_len;
-
-    // Finally, read the content
-    frame_pos += content_len;
-    if (frame_len < frame_pos) {
-      if (frame->sdata == NULL) {
-        free(header);
-      }
-      free(ns);
-      return -1;
-    }
-    char* content = malloc((size_t)content_len);
-    memcpy(content, content_marker + 1 + 4, (size_t)content_len);
-    metalayer->content = (uint8_t*)content;
-  }
+  ret = frame_get_metalayers_from_header(frame, schunk, header, header_len);
 
   if (frame->sdata == NULL) {
     free(header);
   }
-  return 1;
+
+  return ret;
 }
 
 
@@ -1345,12 +1309,13 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
 
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
   schunk->frame = frame;
+  schunk->avoid_frame_free = !copy;
   int ret = get_header_info(frame, &header_len, &frame_len, &schunk->nbytes, &schunk->cbytes,
                             &schunk->chunksize, &schunk->nchunks, &schunk->typesize,
                             &schunk->compcode, &schunk->clevel, schunk->filters, schunk->filters_meta);
   if (ret < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
-    free(schunk);
+    blosc2_schunk_free(schunk);
     return NULL;
   }
   int32_t nchunks = schunk->nchunks;
@@ -1383,9 +1348,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
   int32_t coffsets_cbytes = 0;
   uint8_t* coffsets = get_coffsets(frame, header_len, cbytes, &coffsets_cbytes);
   if (coffsets == NULL) {
-    blosc2_free_ctx(schunk->cctx);
-    blosc2_free_ctx(schunk->dctx);
-    free(schunk);
+    blosc2_schunk_free(schunk);
     BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
     return NULL;
   }
@@ -1399,9 +1362,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
   blosc2_free_ctx(dctx);
   if (off_nbytes < 0) {
     free(offsets);
-    blosc2_free_ctx(schunk->cctx);
-    blosc2_free_ctx(schunk->dctx);
-    free(schunk);
+    blosc2_schunk_free(schunk);
     BLOSC_TRACE_ERROR("Cannot decompress the offsets chunk.");
     return NULL;
   }
@@ -1421,10 +1382,9 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
       // If not the chunks won't be in the frame
       fp = fopen(frame->urlpath, "rb");
       if (fp == NULL) {
+        free(data_chunk);
         free(offsets);
-        blosc2_free_ctx(schunk->cctx);
-        blosc2_free_ctx(schunk->dctx);
-        free(schunk);
+        blosc2_schunk_free(schunk);
         return NULL;
       }
     }
@@ -1457,9 +1417,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
           fclose(fp);
         }
         free(offsets);
-        blosc2_free_ctx(schunk->cctx);
-        blosc2_free_ctx(schunk->dctx);
-        free(schunk);
+        blosc2_schunk_free(schunk);
         return NULL;
       }
       csize = sw32_(data_chunk + BLOSC2_CHUNK_CBYTES);
@@ -1473,9 +1431,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
         if (rbytes != (size_t)csize) {
           fclose(fp);
           free(offsets);
-          blosc2_free_ctx(schunk->cctx);
-          blosc2_free_ctx(schunk->dctx);
-          free(schunk);
+          blosc2_schunk_free(schunk);
           return NULL;
         }
       }
@@ -1505,9 +1461,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
   free(offsets);
 
   if (acc_nbytes != nbytes || acc_cbytes != cbytes) {
-    blosc2_free_ctx(schunk->cctx);
-    blosc2_free_ctx(schunk->dctx);
-    free(schunk);
+    blosc2_schunk_free(schunk);
     return NULL;
   }
 
@@ -1518,18 +1472,14 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
   out:
   rc = frame_get_metalayers(frame, schunk);
   if (rc < 0) {
-    blosc2_free_ctx(schunk->cctx);
-    blosc2_free_ctx(schunk->dctx);
-    free(schunk);
+    blosc2_schunk_free(schunk);
     BLOSC_TRACE_ERROR("Cannot access the metalayers.");
     return NULL;
   }
 
   usermeta_len = frame_get_usermeta(frame, &usermeta);
   if (usermeta_len < 0) {
-    blosc2_free_ctx(schunk->cctx);
-    blosc2_free_ctx(schunk->dctx);
-    free(schunk);
+    blosc2_schunk_free(schunk);
     BLOSC_TRACE_ERROR("Cannot access the usermeta chunk.");
     return NULL;
   }
