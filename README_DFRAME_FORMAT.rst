@@ -1,14 +1,14 @@
-Blosc2 Extended-Frame Format
+Blosc2 Disperse-Frame Format
 ============================
 
-Blosc (as of version 2.0.0) has an extended-frame format that allows for the storage of different Blosc data chunks
-sparse, on-disk.
+Blosc (as of version 2.0.0) has an disperse-frame format that allows for the storage of different Blosc data chunks
+disperse, on-disk.
 
-When creating an eframe one must denote the `storage.sequential` as false and provide a name (which will be a directory)
-in `storage.urlpath` for the eframe to be stored. It is recommended to name the directory with the `.b2eframe`
+When creating a dframe one must denote the `storage.sequential` as false and provide a name (which will be a directory)
+in `storage.urlpath` for the dframe to be stored. It is recommended to name the directory with the `.b2dframe`
 extension.
 
-An eframe is made up of a frame file and the chunks stored in the same directory on-disk.
+A dframe is made up of a frame file and the chunks stored in the same directory on-disk.
 The frame follows the format described in the `frame format <README_FRAME_FORMAT.rst>`_ document, with the difference
 that the frame's chunks section is made up only of the index chunk which will have the indexes to each chunk. The frame
 file name is always `chunks.b2frame`.
@@ -33,9 +33,9 @@ Examples
 
 Structure example
 ^^^^^^^^^^^^^^^^^
-As shown below, an eframe of 4 chunks will be composed of a directory with each chunk file and the frame file::
+As shown below, an dframe of 4 chunks will be composed of a directory with each chunk file and the frame file::
 
- dir.b2eframe/
+ dir.b2dframe/
  │
  ├── 00000000.chunk
  │
@@ -58,7 +58,7 @@ after an insertion in the 2nd position::
 
  Before                                 After
 
- dir.b2eframe/                          dir.b2eframe/
+ dir.b2dframe/                          dir.b2dframe/
  │                                      │
  ├── 00000000.chunk                     ├── 00000000.chunk
  │                                      │

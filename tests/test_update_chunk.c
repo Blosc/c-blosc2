@@ -48,7 +48,7 @@ test_storage tstorage[] = {
     {false, NULL},  // memory - schunk
     {true, NULL},  // memory - frame
     {true, "test_update_chunk.b2frame"}, // disk - frame
-    {false, "test_update_chunk.b2eframe"}, // disk - eframe
+    {false, "test_update_chunk.b2dframe"}, // disk - dframe
 };
 
 static char* test_update_chunk(void) {

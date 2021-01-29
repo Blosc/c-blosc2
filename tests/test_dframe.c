@@ -28,7 +28,7 @@ char* directory;
 char buf[256];
 
 
-static char* test_eframe(void) {
+static char* test_dframe(void) {
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int32_t* data = malloc(isize);
   int32_t* data_dest = malloc(isize);
@@ -207,7 +207,7 @@ static char* test_eframe(void) {
 }
 
 
-static char* test_eframe_simple(void) {
+static char* test_dframe_simple(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -235,7 +235,7 @@ static char* test_eframe_simple(void) {
       data[i] = i + nchunk;
     }
     int _nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
-    mu_assert("ERROR: bad append in eframe", _nchunks > 0);
+    mu_assert("ERROR: bad append in dframe", _nchunks > 0);
   }
 
   /* Retrieve and decompress the chunks (0-based count) */
@@ -264,27 +264,27 @@ static char* test_eframe_simple(void) {
 
 
 static char *all_tests(void) {
-  directory = "dir1.b2eframe";
+  directory = "dir1.b2dframe";
 
   nchunks = 0;
-  mu_run_test(test_eframe_simple);
+  mu_run_test(test_dframe_simple);
 
   nchunks = 1;
-  mu_run_test(test_eframe_simple);
+  mu_run_test(test_dframe_simple);
 
   nchunks = 2;
-  mu_run_test(test_eframe_simple);
+  mu_run_test(test_dframe_simple);
 
   nchunks = 10;
-  mu_run_test(test_eframe_simple);
+  mu_run_test(test_dframe_simple);
 
   // Check directory with a trailing slash
-  directory = "dir1.b2eframe/";
+  directory = "dir1.b2dframe/";
   nchunks = 0;
-  mu_run_test(test_eframe_simple);
+  mu_run_test(test_dframe_simple);
 
   nchunks = 1;
-  mu_run_test(test_eframe_simple);
+  mu_run_test(test_dframe_simple);
 
   // Iterate over all different parameters
   for (int i = 0; i < (int)sizeof(nchunks_) / (int)sizeof(int); i++) {
@@ -301,12 +301,12 @@ static char *all_tests(void) {
                 filter_pipeline = (bool) ifilter_pipeline;
                 metalayers = (bool) imetalayers;
                 usermeta = (bool) iusermeta;
-                snprintf(buf, sizeof(buf), "test_eframe_nc%d.b2eframe", nchunks);
+                snprintf(buf, sizeof(buf), "test_dframe_nc%d.b2dframe", nchunks);
                 directory = buf;
-                mu_run_test(test_eframe);
-                snprintf(buf, sizeof(buf), "test_eframe_nc%d.b2eframe/", nchunks);
+                mu_run_test(test_dframe);
+                snprintf(buf, sizeof(buf), "test_dframe_nc%d.b2dframe/", nchunks);
                 directory = buf;
-                mu_run_test(test_eframe);
+                mu_run_test(test_dframe);
               }
             }
           }

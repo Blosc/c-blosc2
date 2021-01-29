@@ -165,7 +165,7 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
     // We want a frame as storage
     blosc2_frame* frame = blosc2_frame_new(urlpath);
     free(urlpath);
-    frame->eframe = true;
+    frame->dframe = true;
     // Initialize frame (basically, encode the header)
     int64_t frame_len = blosc2_frame_from_schunk(schunk, frame);
     if (frame_len < 0) {
@@ -177,7 +177,7 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
   if (storage.sequential){
     // We want a frame as storage
     blosc2_frame* frame = blosc2_frame_new(storage.urlpath);
-    frame->eframe = false;
+    frame->dframe = false;
     // Initialize frame (basically, encode the header)
     int64_t frame_len = blosc2_frame_from_schunk(schunk, frame);
     if (frame_len < 0) {
@@ -523,14 +523,14 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
       case BLOSC2_ZERO_RUNLEN:
         schunk->nbytes += nbytes;
         schunk->nbytes -= nbytes_old;
-        if (schunk->frame->eframe) {
+        if (schunk->frame->dframe) {
           schunk->cbytes -= cbytes_old;
         }
         break;
       case BLOSC2_NAN_RUNLEN:
         schunk->nbytes += nbytes;
         schunk->nbytes -= nbytes_old;
-        if (schunk->frame->eframe) {
+        if (schunk->frame->dframe) {
           schunk->cbytes -= cbytes_old;
         }
         break;
@@ -539,7 +539,7 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
         schunk->nbytes += nbytes;
         schunk->nbytes -= nbytes_old;
         schunk->cbytes += cbytes;
-        if (schunk->frame->eframe) {
+        if (schunk->frame->dframe) {
           schunk->cbytes -= cbytes_old;
         }
     }

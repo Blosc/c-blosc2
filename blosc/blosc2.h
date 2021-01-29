@@ -1013,14 +1013,14 @@ typedef struct {
 static const blosc2_storage BLOSC2_STORAGE_DEFAULTS = {false, NULL, NULL, NULL};
 
 typedef struct {
-  char* urlpath;           //!< The name of the file or directory if it's an eframe; if NULL, this is in-memory
+  char* urlpath;           //!< The name of the file or directory if it's a dframe; if NULL, this is in-memory
   uint8_t* sdata;          //!< The in-memory serialized data
   bool avoid_sdata_free;   //!< Whether the sdata can be freed (false) or not (true).
   uint8_t* coffsets;       //!< Pointers to the (compressed, on-disk) chunk offsets
   int64_t len;             //!< The current length of the frame in (compressed) bytes
   int64_t maxlen;          //!< The maximum length of the frame; if 0, there is no maximum
   uint32_t trailer_len;    //!< The current length of the trailer in (compressed) bytes
-  bool eframe;             //!< Whether the frame is extended (sparse, on-disk)
+  bool dframe;             //!< Whether the frame is disperse, on-disk
 } blosc2_frame;
 
 /**

@@ -36,7 +36,7 @@ test_storage tstorage[] = {
     // {false, NULL},  // memory - schunk
     // {true, NULL},  // memory - frame
     // {true, "test_reorder_offsets.b2frame"}, // disk - frame
-    {false, "test_reorder_offsets.b2eframe"}, // disk - eframe
+    {false, "test_reorder_offsets.b2dframe"}, // disk - dframe
 };
 
 int32_t tnchunks[] = {5, 12, 24, 33, 1};
