@@ -33,7 +33,7 @@ Examples
 
 Structure example
 ^^^^^^^^^^^^^^^^^
-As shown below, an dframe of 4 chunks will be composed of a directory with each chunk file and the frame file::
+As shown below, a dframe of 4 chunks will be composed of a directory with each chunk file and the frame file::
 
  dir.b2dframe/
  │

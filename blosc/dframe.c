@@ -36,7 +36,7 @@
 #endif
 
 
-/* Append an existing chunk into an extended frame. */
+/* Append an existing chunk into a dispersed frame. */
 void* dframe_create_chunk(blosc2_frame* frame, uint8_t* chunk, int32_t nchunk, int64_t cbytes) {
   // Get directory/nchunk.chunk with 8 zeros of padding
   char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
@@ -55,7 +55,7 @@ void* dframe_create_chunk(blosc2_frame* frame, uint8_t* chunk, int32_t nchunk, i
 }
 
 
-/*Get chunk from extended frame. */
+/*Get chunk from disperse frame. */
 int dframe_get_chunk(blosc2_frame* frame, int32_t nchunk, uint8_t** chunk, bool* needs_free){
   //get directory/nchunk.chunk
   char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
