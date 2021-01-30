@@ -1565,9 +1565,18 @@ static int initialize_context_compression(
   }
 
   /* Check typesize limits */
+  if (context->typesize <= 0) {
+    BLOSC_TRACE_ERROR("`typesize` is less than or equal to zero.");
+    return -1;
+  }
   if (context->typesize > BLOSC_MAX_TYPESIZE) {
     /* If typesize is too large, treat buffer as an 1-byte stream. */
     context->typesize = 1;
+  }
+  /* Check blocksize limits */
+  if (context->blocksize <= 0) {
+    BLOSC_TRACE_ERROR("`blocksize` is less than or equal to zero.");
+    return -1;
   }
 
   /* Compute number of blocks in buffer */
@@ -1627,6 +1636,11 @@ static int initialize_context_decompression(blosc2_context* context, const void*
 
   /* Check that we have enough space to decompress */
   if (context->sourcesize > (int32_t)destsize) {
+    return -1;
+  }
+  /* Some checks for malformed headers */
+  if (context->blocksize <= 0 || context->blocksize > destsize ||
+      context->typesize <= 0 || context->typesize > BLOSC_MAX_TYPESIZE) {
     return -1;
   }
 
