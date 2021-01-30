@@ -1,8 +1,8 @@
-Blosc2 Disperse-Frame Format
-============================
+Blosc2 Dispersed-Frame Format
+=============================
 
-Blosc (as of version 2.0.0) has an disperse-frame format that allows for the storage of different Blosc data chunks
-disperse, on-disk.
+Blosc (as of version 2.0.0) has a dispersed-frame format that allows for the storage of different Blosc data chunks
+dispersed, on-disk.
 
 When creating a dframe one must denote the `storage.sequential` as false and provide a name (which will be a directory)
 in `storage.urlpath` for the dframe to be stored. It is recommended to name the directory with the `.b2dframe`

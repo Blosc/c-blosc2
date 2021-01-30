@@ -55,7 +55,7 @@ void* dframe_create_chunk(blosc2_frame* frame, uint8_t* chunk, int32_t nchunk, i
 }
 
 
-/*Get chunk from disperse frame. */
+/*Get chunk from dispersed frame. */
 int dframe_get_chunk(blosc2_frame* frame, int32_t nchunk, uint8_t** chunk, bool* needs_free){
   //get directory/nchunk.chunk
   char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);

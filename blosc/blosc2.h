@@ -996,7 +996,7 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
  */
 typedef struct {
     bool sequential;
-    //!< Whether the chunks are sequential (frame) or sparse.
+    //!< Whether the chunks are sequential (frame) or dispersed.
     char* urlpath;
     //!< The path for persistent storage. If NULL, that means in-memory.
     blosc2_cparams* cparams;
@@ -1020,7 +1020,7 @@ typedef struct {
   int64_t len;             //!< The current length of the frame in (compressed) bytes
   int64_t maxlen;          //!< The maximum length of the frame; if 0, there is no maximum
   uint32_t trailer_len;    //!< The current length of the trailer in (compressed) bytes
-  bool dframe;             //!< Whether the frame is disperse, on-disk
+  bool dframe;             //!< Whether the frame is dispersed, on-disk
 } blosc2_frame;
 
 /**
