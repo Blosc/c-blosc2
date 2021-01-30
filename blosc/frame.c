@@ -1307,7 +1307,7 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
 
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
   schunk->frame = frame;
-  schunk->avoid_frame_free = !copy;
+  schunk->avoid_frame_free = copy;
   int ret = get_header_info(frame, &header_len, &frame_len, &schunk->nbytes, &schunk->cbytes,
                             &schunk->chunksize, &schunk->nchunks, &schunk->typesize,
                             &schunk->compcode, &schunk->clevel, schunk->filters, schunk->filters_meta);
