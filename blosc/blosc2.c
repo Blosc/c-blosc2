@@ -1160,9 +1160,9 @@ static int blosc_d(
         }
         uint8_t value = -cbytes;
         memset(_dest, value, (unsigned int) neblock);
-        nbytes = neblock;
-        cbytes = 0;  // everything is encoded in the cbytes token
       }
+      nbytes = neblock;
+      cbytes = 0;  // everything is encoded in the cbytes token
     }
     else if (cbytes == neblock) {
       memcpy(_dest, src, (unsigned int)neblock);
