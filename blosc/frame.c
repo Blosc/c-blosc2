@@ -1216,8 +1216,8 @@ static int frame_get_metalayers_from_header(blosc2_frame* frame, blosc2_schunk* 
     }
     swap_store(&offset, idxp, sizeof(offset));
     idxp += 4;
-    if (offset >= header_len) {
-      // Offset exceeds header length
+    if (offset < 0 || offset >= header_len) {
+      // Offset is less than zero or exceeds header length
       return -1;
     }
     // Go to offset and see if we have the correct marker
