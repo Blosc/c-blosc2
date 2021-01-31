@@ -79,7 +79,7 @@ int main(void) {
                                      BLOSC2_CPARAMS_DEFAULTS);
   if (umlen < 0) {
     printf("Cannot write usermeta chunk");
-    return -1;
+    return umlen;
   }
 
   /* Gather some info */

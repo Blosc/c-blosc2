@@ -64,7 +64,7 @@ int eframe_get_chunk(blosc2_frame* frame, int32_t nchunk, uint8_t** chunk, bool*
   free(chunkpath);
   if(fpc == NULL){
     BLOSC_TRACE_ERROR("Cannot open the chunkfile.");
-    return -1;
+    return BLOSC2_ERROR_FILE_OPEN;
   }
 
   fseek(fpc, 0L, SEEK_END);
@@ -76,7 +76,7 @@ int eframe_get_chunk(blosc2_frame* frame, int32_t nchunk, uint8_t** chunk, bool*
   fclose(fpc);
   if (rbytes != (size_t)chunk_cbytes) {
     BLOSC_TRACE_ERROR("Cannot read the chunk out of the chunkfile.");
-    return -1;
+    return BLOSC2_ERROR_FILE_READ;
   }
   *needs_free = true;
 
