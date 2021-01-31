@@ -25,12 +25,6 @@ jobs:
             packages: liblz4-1 liblz4-dev
             cmake-args: -DPREFER_EXTERNAL_LZ4=ON
 
-          - name: Ubuntu GCC External LIZARD
-            os: ubuntu-latest
-            compiler: gcc
-            packages: libsnappy-dev
-            cmake-args: -DPREFER_EXTERNAL_LIZARD=ON
-
           - name: Ubuntu GCC External ZLIB
             os: ubuntu-latest
             compiler: gcc
@@ -59,11 +53,6 @@ jobs:
             os: ubuntu-latest
             compiler: clang
             cmake-args: -DDEACTIVATE_LZ4=ON
-
-          - name: Ubuntu Clang No LIZARD
-            os: ubuntu-latest
-            compiler: clang
-            cmake-args: -DDEACTIVATE_LIZARD=ON
 
           - name: Ubuntu Clang No SNAPPY
             os: ubuntu-latest

@@ -23,8 +23,6 @@ static bool is_HCR(blosc2_context * context) {
       return (context->filter_flags & BLOSC_DOBITSHUFFLE) ? true : false;
     case BLOSC_LZ4HC :
       return true;
-    case BLOSC_LIZARD :
-      return true;
     case BLOSC_ZLIB :
       return true;
     case BLOSC_ZSTD :
