@@ -1337,11 +1337,11 @@ static void init_thread_context(struct thread_context* thread_context, blosc2_co
   thread_context->tid = tid;
 
   ebsize = context->blocksize + context->typesize * (signed)sizeof(int32_t);
-  thread_context->tmp_nbytes = (size_t)3 * context->blocksize + ebsize;
+  thread_context->tmp_nbytes = (size_t)4 * ebsize;
   thread_context->tmp = my_malloc(thread_context->tmp_nbytes);
-  thread_context->tmp2 = thread_context->tmp + context->blocksize;
-  thread_context->tmp3 = thread_context->tmp + context->blocksize + ebsize;
-  thread_context->tmp4 = thread_context->tmp + (size_t)2 * context->blocksize + ebsize;
+  thread_context->tmp2 = thread_context->tmp + ebsize;
+  thread_context->tmp3 = thread_context->tmp2 + ebsize;
+  thread_context->tmp4 = thread_context->tmp3 + ebsize;
   thread_context->tmp_blocksize = context->blocksize;
   #if defined(HAVE_ZSTD)
   thread_context->zstd_cctx = NULL;
@@ -2592,13 +2592,13 @@ int _blosc_getitem(blosc2_context* context, const void* src, int32_t srcsize,
     struct thread_context* scontext = context->serial_context;
 
     /* Resize the temporaries in serial context if needed */
-    if (blocksize != scontext->tmp_blocksize) {
+    if (blocksize > scontext->tmp_blocksize) {
       my_free(scontext->tmp);
-      scontext->tmp_nbytes = (size_t)3 * context->blocksize + ebsize;
+      scontext->tmp_nbytes = (size_t)4 * ebsize;
       scontext->tmp = my_malloc(scontext->tmp_nbytes);
-      scontext->tmp2 = scontext->tmp + blocksize;
-      scontext->tmp3 = scontext->tmp + blocksize + ebsize;
-      scontext->tmp4 = scontext->tmp + (size_t)2 * blocksize + ebsize;
+      scontext->tmp2 = scontext->tmp + ebsize;
+      scontext->tmp3 = scontext->tmp2 + ebsize;
+      scontext->tmp4 = scontext->tmp3 + ebsize;
       scontext->tmp_blocksize = (int32_t)blocksize;
     }
 
@@ -2738,13 +2738,13 @@ static void t_blosc_do_job(void *ctxt)
   dest = context->dest;
 
   /* Resize the temporaries if needed */
-  if (blocksize != thcontext->tmp_blocksize) {
+  if (blocksize > thcontext->tmp_blocksize) {
     my_free(thcontext->tmp);
-    thcontext->tmp_nbytes = (size_t)3 * context->blocksize + ebsize;
+    thcontext->tmp_nbytes = (size_t) 4 * ebsize;
     thcontext->tmp = my_malloc(thcontext->tmp_nbytes);
-    thcontext->tmp2 = thcontext->tmp + blocksize;
-    thcontext->tmp3 = thcontext->tmp + blocksize + ebsize;
-    thcontext->tmp4 = thcontext->tmp + (size_t)2 * blocksize + ebsize;
+    thcontext->tmp2 = thcontext->tmp + ebsize;
+    thcontext->tmp3 = thcontext->tmp2 + ebsize;
+    thcontext->tmp4 = thcontext->tmp3 + ebsize;
     thcontext->tmp_blocksize = blocksize;
   }
 
