@@ -250,6 +250,34 @@ enum {
     BLOSC2_VALUE_RUNLEN = 0x3,    //!< generic value run-length
 };
 
+/**
+ * @brief Error codes
+ */
+enum {
+  BLOSC2_ERROR_SUCCESS = 0,           //<! Success
+  BLOSC2_ERROR_FAILURE = -1,          //<! Generic failure
+  BLOSC2_ERROR_STREAM = 2,            //<! Bad stream
+  BLOSC2_ERROR_DATA = -3,             //<! Invalid data
+  BLOSC2_ERROR_MEMORY_ALLOC = -4,     //<! Memory alloc/realloc failure
+  BLOSC2_ERROR_READ_BUFFER = -5,      //!< Not enough space to read
+  BLOSC2_ERROR_WRITE_BUFFER = -6,     //!< Not enough space to write
+  BLOSC2_ERROR_CODEC_SUPPORT = -7,    //!< Codec not supported
+  BLOSC2_ERROR_CODEC_PARAM = -8,      //!< Invalid parameter supplied to codec
+  BLOSC2_ERROR_CODEC_DICT = -9,       //!< Codec dictionary error
+  BLOSC2_ERROR_VERSION_SUPPORT = -10, //!< Version not supported
+  BLOSC2_ERROR_INVALID_HEADER = -11,  //!< Invalid value in header
+  BLOSC2_ERROR_INVALID_PARAM = -12,   //!< Invalid parameter supplied to function
+  BLOSC2_ERROR_FILE_READ = -13,       //!< File read failure
+  BLOSC2_ERROR_FILE_WRITE = -14,      //!< File write failure
+  BLOSC2_ERROR_FILE_OPEN = -15,       //!< File open failure
+  BLOSC2_ERROR_NOT_FOUND = -16,       //!< Not found
+  BLOSC2_ERROR_RUN_LENGTH = -17,      //!< Bad run length encoding
+  BLOSC2_ERROR_FILTER_PIPELINE = -18, //!< Filter pipeline error
+  BLOSC2_ERROR_CHUNK_INSERT = -19,    //!< Chunk insert failure
+  BLOSC2_ERROR_CHUNK_APPEND = -20,    //!< Chunk append failure
+  BLOSC2_ERROR_CHUNK_UPDATE = -21,    //!< Chunk update failure
+  BLOSC2_ERROR_2GB_LIMIT = -22,       //!< Sizes larger than 2gb not supported
+};
 
 /**
  * @brief Initialize the Blosc library environment.
