@@ -1115,6 +1115,10 @@ static int blosc_d(
   }
 
   neblock = bsize / nstreams;
+  if (neblock == 0) {
+    /* Not enough space to output bytes */
+    return -1;
+  }
   for (int j = 0; j < nstreams; j++) {
     if (srcsize < (signed)sizeof(int32_t)) {
       /* Not enough input to read compressed size */
