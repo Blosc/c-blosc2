@@ -153,7 +153,6 @@ enum {
   BLOSC_SNAPPY = 3,
   BLOSC_ZLIB = 4,
   BLOSC_ZSTD = 5,
-  BLOSC_LIZARD = 6,
   BLOSC_MAX_CODECS = 7,  //!< maximum number of reserved codecs
 };
 
@@ -163,7 +162,6 @@ enum {
 #define BLOSC_BLOSCLZ_COMPNAME   "blosclz"
 #define BLOSC_LZ4_COMPNAME       "lz4"
 #define BLOSC_LZ4HC_COMPNAME     "lz4hc"
-#define BLOSC_LIZARD_COMPNAME    "lizard"
 #define BLOSC_SNAPPY_COMPNAME    "snappy"
 #define BLOSC_ZLIB_COMPNAME      "zlib"
 #define BLOSC_ZSTD_COMPNAME      "zstd"
@@ -177,7 +175,6 @@ enum {
   BLOSC_SNAPPY_LIB = 2,
   BLOSC_ZLIB_LIB = 3,
   BLOSC_ZSTD_LIB = 4,
-  BLOSC_LIZARD_LIB = 5,
   BLOSC_SCHUNK_LIB = 7,   //!< compressor library in super-chunk header
 };
 
@@ -186,7 +183,6 @@ enum {
  */
 #define BLOSC_BLOSCLZ_LIBNAME   "BloscLZ"
 #define BLOSC_LZ4_LIBNAME       "LZ4"
-#define BLOSC_LIZARD_LIBNAME    "Lizard"
 #define BLOSC_SNAPPY_LIBNAME    "Snappy"
 #if defined(HAVE_MINIZ)
   #define BLOSC_ZLIB_LIBNAME    "Zlib (via miniz)"
@@ -203,7 +199,6 @@ enum {
   BLOSC_LZ4_FORMAT = BLOSC_LZ4_LIB,
   //!< LZ4HC and LZ4 share the same format
   BLOSC_LZ4HC_FORMAT = BLOSC_LZ4_LIB,
-  BLOSC_LIZARD_FORMAT = BLOSC_LIZARD_LIB,
   BLOSC_SNAPPY_FORMAT = BLOSC_SNAPPY_LIB,
   BLOSC_ZLIB_FORMAT = BLOSC_ZLIB_LIB,
   BLOSC_ZSTD_FORMAT = BLOSC_ZSTD_LIB,
@@ -217,7 +212,6 @@ enum {
   BLOSC_BLOSCLZ_VERSION_FORMAT = 1,
   BLOSC_LZ4_VERSION_FORMAT = 1,
   BLOSC_LZ4HC_VERSION_FORMAT = 1,  /* LZ4HC and LZ4 share the same format */
-  BLOSC_LIZARD_VERSION_FORMAT = 1,
   BLOSC_SNAPPY_VERSION_FORMAT = 1,
   BLOSC_ZLIB_VERSION_FORMAT = 1,
   BLOSC_ZSTD_VERSION_FORMAT = 1,
@@ -867,7 +861,7 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * **BLOSC_TYPESIZE=(INTEGER)**: This will overwrite the *typesize*
  * parameter before the compression process starts.
  *
- * **BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | LIZARD | SNAPPY | ZLIB]**:
+ * **BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | SNAPPY | ZLIB]**:
  * This will call *blosc_set_compressor(BLOSC_COMPRESSOR)* before the
  * compression process starts.
  *

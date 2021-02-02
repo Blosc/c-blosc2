@@ -87,7 +87,7 @@ for encoding blocks with a filter pipeline::
     :``4``:
         ``zstd``
     :``5``:
-        ``lizard``
+        Reserved
     :``6``:
         Reserved
     :``7``:

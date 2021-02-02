@@ -43,7 +43,7 @@ Meta-compression and other advantages over existing compressors
 
 C-Blosc2 is not like other compressors: it should rather be called a meta-compressor.  This is so because it can use different compressors and filters (programs that generally improve compression ratio).  At any rate, it can also be called a compressor because it happens that it already comes with several compressor and filters, so it can actually work like so.
 
-Currently C-Blosc2 comes with support of BloscLZ, a compressor heavily based on `FastLZ <http://fastlz.org/>`_, `LZ4 and LZ4HC <https://github.com/lz4/lz4>`_, `Zstd <https://github.com/facebook/zstd>`_, `Lizard <https://github.com/inikep/lizard>`_ and `Zlib, via miniz: <https://github.com/richgel999/miniz>`_, as well as a highly optimized (it can use SSE2, AVX2, NEON or ALTIVEC instructions, if available) shuffle and bitshuffle filters (for info on how shuffling works, see slide 17 of http://www.slideshare.net/PyData/blosc-py-data-2014).
+Currently C-Blosc2 comes with support of BloscLZ, a compressor heavily based on `FastLZ <http://fastlz.org/>`_, `LZ4 and LZ4HC <https://github.com/lz4/lz4>`_, `Zstd <https://github.com/facebook/zstd>`_, and `Zlib, via miniz: <https://github.com/richgel999/miniz>`_, as well as a highly optimized (it can use SSE2, AVX2, NEON or ALTIVEC instructions, if available) shuffle and bitshuffle filters (for info on how shuffling works, see slide 17 of http://www.slideshare.net/PyData/blosc-py-data-2014).
 
 Blosc is in charge of coordinating the different compressor and filters so that they can leverage the `blocking technique <https://www.blosc.org/docs/StarvingCPUs-CISE-2010.pdf>`_ as well as multi-threaded execution automatically. That makes that every codec and filter in the pipeline will run efficiently on modern CPUs, even if it was not initially designed for doing blocking or multi-threading.
 
@@ -93,10 +93,10 @@ The static and dynamic version of the Blosc library, together with header files,
 
 Once you have compiled your Blosc library, you can easily link your apps with it as shown in the `examples/ directory <https://github.com/Blosc/c-blosc2/blob/master/examples>`_.
 
-Handling support for codecs (LZ4, LZ4HC, Zstd, Lizard, Zlib)
+Handling support for codecs (LZ4, LZ4HC, Zstd, Zlib)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-C-Blosc2 comes with full sources for LZ4, LZ4HC, Zstd, Lizard and Zlib and in general, you should not worry about not having (or CMake not finding) the libraries in your system because by default the included sources will be automatically compiled and included in the C-Blosc2 library. This means that you can be confident in having a complete support for all the codecs in all the Blosc deployments (unless you are explicitly excluding support for some of them).
+C-Blosc2 comes with full sources for LZ4, LZ4HC, Zstd, and Zlib and in general, you should not worry about not having (or CMake not finding) the libraries in your system because by default the included sources will be automatically compiled and included in the C-Blosc2 library. This means that you can be confident in having a complete support for all the codecs in all the Blosc deployments (unless you are explicitly excluding support for some of them).
 
 If you want to force Blosc to use external libraries instead of the included compression sources:
 
