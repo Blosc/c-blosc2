@@ -40,17 +40,114 @@
 #define FRAME_TRAILER_MINLEN (30)  // minimum length for the trailer (msgpack overhead)
 #define FRAME_TRAILER_LEN_OFFSET (22)  // offset to trailer length (counting from the end)
 
-void* frame_append_chunk(blosc2_frame* frame, void* chunk, blosc2_schunk* schunk);
-void* frame_insert_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_schunk* schunk);
-void* frame_update_chunk(blosc2_frame* frame, int nchunk, void* chunk, blosc2_schunk* schunk);
-int frame_reorder_offsets(blosc2_frame *frame, int *offsets_order, blosc2_schunk* schunk);
 
-int frame_get_chunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free);
-int frame_get_lazychunk(blosc2_frame *frame, int nchunk, uint8_t **chunk, bool *needs_free);
-int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame *frame, int nchunk,
+typedef struct {
+  char* urlpath;           //!< The name of the file or directory if it's an eframe; if NULL, this is in-memory
+  uint8_t* sdata;          //!< The in-memory serialized data
+  bool avoid_sdata_free;   //!< Whether the sdata can be freed (false) or not (true).
+  uint8_t* coffsets;       //!< Pointers to the (compressed, on-disk) chunk offsets
+  int64_t len;             //!< The current length of the frame in (compressed) bytes
+  int64_t maxlen;          //!< The maximum length of the frame; if 0, there is no maximum
+  uint32_t trailer_len;    //!< The current length of the trailer in (compressed) bytes
+  bool eframe;             //!< Whether the frame is extended (sparse, on-disk)
+} blosc2_frame_s;
+
+
+/*********************************************************************
+  Frame struct related functions.
+  These are rather low-level and the blosc2_schunk interface is
+  recommended instead.
+*********************************************************************/
+
+/**
+ * @brief Create a new frame.
+ *
+ * @param urlpath The filename of the frame.  If not persistent, pass NULL.
+ *
+ * @return The new frame.
+ */
+blosc2_frame_s* blosc2_frame_new(const char* urlpath);
+
+/**
+ * @brief Create a frame from a super-chunk.
+ *
+ * @param schunk The super-chunk from where the frame will be created.
+ * @param frame The pointer for the frame that will be populated.
+ *
+ * @note If frame->urlpath is NULL, a frame is created in-memory; else it is created
+ * on-disk.
+ *
+ * @return The size in bytes of the frame. If an error occurs it returns a negative value.
+ */
+int64_t blosc2_frame_from_schunk(blosc2_schunk* schunk, blosc2_frame_s* frame);
+
+/**
+ * @brief Free all memory from a frame.
+ *
+ * @param frame The frame to be freed.
+ *
+ * @return 0 if succeeds.
+ */
+BLOSC_EXPORT int blosc2_frame_free(blosc2_frame_s *frame);
+
+/**
+ * @brief Write an in-memory frame out to a file.
+ *
+ * The frame used must be an in-memory frame, i.e. frame->urlpath == NULL.
+ *
+ * @param frame The frame to be written into a file.
+ * @param urlpath The name of the file.
+ *
+ * @return The size of the frame.  If negative, an error happened (including
+ * that the original frame is not in-memory).
+ */
+BLOSC_EXPORT int64_t blosc2_frame_to_file(blosc2_frame_s *frame, const char *urlpath);
+
+/**
+ * @brief Initialize a frame out of a file.
+ *
+ * @param urlpath The file name.
+ *
+ * @return The frame created from the file.
+ */
+BLOSC_EXPORT blosc2_frame_s* blosc2_frame_from_file(const char *urlpath);
+
+/**
+ * @brief Initialize a frame out of an in-memory serialized frame.
+ *
+ * @param buffer The buffer for the serialized frame.
+ * @param len The length of buffer for the serialized frame.
+ * @param copy Whether the serialized frame should be copied internally or not.
+ *
+ * @return The frame created from the serialized frame.
+ */
+BLOSC_EXPORT blosc2_frame_s* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy);
+
+/**
+ * @brief Create a super-chunk from a frame.
+ *
+ * @param frame The frame from which the super-chunk will be created.
+ * @param copy If true, a new, serialized in-memory frame is created
+ * internally to serve as storage for the super-chunk. Else, the
+ * super-chunk will be backed by the sframe (i.e. no copies are made).
+ *
+ * @return The super-chunk corresponding to the frame.
+ */
+BLOSC_EXPORT blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame_s* frame, bool copy);
+
+
+
+void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schunk);
+void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_schunk* schunk);
+void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_schunk* schunk);
+int frame_reorder_offsets(blosc2_frame_s *frame, int *offsets_order, blosc2_schunk* schunk);
+
+int frame_get_chunk(blosc2_frame_s* frame, int nchunk, uint8_t **chunk, bool *needs_free);
+int frame_get_lazychunk(blosc2_frame_s* frame, int nchunk, uint8_t **chunk, bool *needs_free);
+int frame_decompress_chunk(blosc2_context* dctx, blosc2_frame_s* frame, int nchunk,
                            void *dest, int32_t nbytes);
 
-int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new);
-int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk);
+int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new);
+int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk);
 
 #endif //BLOSC_FRAME_H

@@ -151,7 +151,7 @@ static char* test_frame(void) {
   mu_assert("ERROR: wrong number of append chunks", _nchunks == nchunks);
 
   if (!sparse_schunk) {
-    blosc2_frame* frame = schunk->frame;
+    blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
     mu_assert("ERROR: frame->len must be larger or equal than schunk->cbytes",
               frame->len >= schunk->cbytes + FRAME_HEADER_MINLEN);
   }
