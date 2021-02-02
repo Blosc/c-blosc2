@@ -272,6 +272,7 @@ enum {
   BLOSC2_ERROR_CHUNK_APPEND = -20,    //!< Chunk append failure
   BLOSC2_ERROR_CHUNK_UPDATE = -21,    //!< Chunk update failure
   BLOSC2_ERROR_2GB_LIMIT = -22,       //!< Sizes larger than 2gb not supported
+  BLOSC2_ERROR_SCHUNK_COPY = -23,     //!< Super-chunk copy failure
 };
 
 /**
@@ -1025,7 +1026,7 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 typedef struct {
     bool sequential;
     //!< Whether the chunks are sequential (frame) or sparse.
-    char* urlpath;
+    const char* urlpath;
     //!< The path for persistent storage. If NULL, that means in-memory.
     blosc2_cparams* cparams;
     //!< The compression params when creating a schunk.
@@ -1175,19 +1176,6 @@ blosc2_schunk_open(blosc2_storage storage);
  */
 BLOSC_EXPORT blosc2_schunk*
 blosc2_schunk_open_sframe(uint8_t *sframe, int64_t len);
-
-/**
- * @brief Create an in-memory frame out of a super-chunk.
- *
- * @param schunk The super-chunk to be serialized.
- * @param sframe A pointer where the serialized frame will be returned.
- *
- * @remark A freshly allocated sframe is returned, so you can use it
- * independently of what you do with the super-chunk later on.
- *
- * @return The length of the sframe.  If <= 0 this indicate an error.
- */
-BLOSC_EXPORT int64_t blosc2_schunk_to_sframe(blosc2_schunk* schunk, uint8_t** sframe);
 
 /**
  * @brief Release resources from a super-chunk.
@@ -1451,6 +1439,32 @@ BLOSC_EXPORT int blosc2_update_usermeta(blosc2_schunk *schunk, uint8_t *content,
  * Else, a negative value.
  */
 BLOSC_EXPORT int blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content);
+
+
+/* @brief Convert a super-chunk into a sequential buffer.
+ *
+ * @param schunk The super-chunk to convert.
+ * @param dest The address of the destination buffer (output).
+ * @param needs_free The pointer to a boolean indicating if it is the user's
+ * responsibility to free the chunk returned or not.
+ *
+ * @note The user is responsible to free the @p dest buffer (not always required).
+ * You can check whether the dest requires a free with the @p needs_free parameter.
+ *
+ * @return If successful, return the size of the (frame) @p dest buffer.
+ * Else, a negative value.
+ */
+BLOSC_EXPORT int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* needs_free);
+
+/* @brief Store a super-chunk into a file.
+ *
+ * @param schunk The super-chunk to write.
+ * @param urlpath The path for persistent storage.
+ *
+ * @return If successful, return the size of the (fileframe) in @p urlpath.
+ * Else, a negative value.
+ */
+BLOSC_EXPORT int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath);
 
 
 /*********************************************************************

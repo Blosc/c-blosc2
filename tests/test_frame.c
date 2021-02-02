@@ -108,7 +108,8 @@ static char* test_frame(void) {
       } else {
         // Dump the schunk into a sframe and regenerate it from there
         uint8_t* sframe;
-        int64_t sframe_len = blosc2_schunk_to_sframe(schunk, &sframe);
+        bool needs_free;
+        int64_t sframe_len = blosc2_schunk_to_buffer(schunk, &sframe, &needs_free);
         blosc2_schunk_free(schunk);
         schunk = blosc2_schunk_open_sframe(sframe, sframe_len);
         mu_assert("blosc2_schunk_open_sframe() failed", schunk != NULL);
