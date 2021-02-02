@@ -748,46 +748,53 @@ int64_t blosc2_frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
 }
 
 
-/* Create an in-memory frame out of a super-chunk */
-int64_t blosc2_schunk_to_sframe(blosc2_schunk* schunk, uint8_t** sframe) {
+int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* needs_free) {
   blosc2_frame_s* frame = (blosc2_frame_s*)(schunk->frame);
-  uint8_t* sdata = NULL;
   int64_t sdata_len = 0;
-  //if ((schunk->storage->sequential == true) && (schunk->storage->urlpath == NULL)) {
+  if ((schunk->storage->sequential == true) && (schunk->storage->urlpath == NULL)) {
   // TODO: the above is the canonical way to check, but that does not work (??)
-  if (frame != NULL && frame->sdata != NULL) {
-    sdata = frame->sdata;
+  //if (frame != NULL && frame->sdata != NULL) {
+    *dest = frame->sdata;
     sdata_len = frame->len;
+    *needs_free = false;
   }
   else {
-    frame = blosc2_frame_new(NULL);
-    sdata_len = blosc2_frame_from_schunk(schunk, frame);
-    if (sdata_len < 0) {
-      BLOSC_TRACE_ERROR("Error during the conversion of schunk to frame.");
-      return sdata_len;
+    // Copy to a sequential storage
+    blosc2_storage frame_storage = {.sequential=true};
+    blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, frame_storage);
+    if (schunk_copy == NULL) {
+      BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
+      return BLOSC2_ERROR_SCHUNK_COPY;
     }
-    sdata = frame->sdata;
+    frame = (blosc2_frame_s*)(schunk_copy->frame);
+    *dest = frame->sdata;
+    sdata_len = frame->len;
+    *needs_free = true;
+    frame->avoid_sdata_free = true;
+    blosc2_schunk_free(schunk_copy);
   }
-  // Get a copy of the internal sframe
-  *sframe = malloc((size_t)sdata_len);
-  memcpy(*sframe, sdata, (size_t)sdata_len);
-  if (frame != NULL) {
-    blosc2_frame_free(frame);
-  }
+
   return sdata_len;
+
 }
 
 
-/* Write an in-memory frame out to a file. */
-int64_t blosc2_frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
-  // make sure that we are using an in-memory frame
-  if (frame->urlpath != NULL) {
-    BLOSC_TRACE_ERROR("The original frame must be in-memory.");
-    return BLOSC2_ERROR_INVALID_PARAM;
+/* Write super-frame out to a file. */
+int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath) {
+  if (urlpath == NULL) {
+    BLOSC_TRACE_ERROR("urlpath cannot be NULL");
+    return -1;
   }
-  FILE* fp = fopen(urlpath, "wb");
-  fwrite(frame->sdata, (size_t)frame->len, 1, fp);
-  fclose(fp);
+  // Copy to a sequential file
+  blosc2_storage frame_storage = {.sequential=true, .urlpath=urlpath};
+  blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, frame_storage);
+  if (schunk_copy == NULL) {
+    BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
+    return BLOSC2_ERROR_SCHUNK_COPY;
+  }
+  blosc2_frame_s* frame = (blosc2_frame_s*)(schunk_copy->frame);
+  int64_t frame_len = frame->len;
+  blosc2_schunk_free(schunk_copy);
   return frame->len;
 }
 
