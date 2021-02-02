@@ -45,13 +45,11 @@ CUTEST_TEST_SETUP(copy) {
   blosc_init();
   data->cparams = BLOSC2_CPARAMS_DEFAULTS;
   data->cparams.typesize = sizeof(int32_t);
-  data->cparams.compcode = BLOSC_BLOSCLZ;
   data->cparams.clevel = 9;
   data->cparams.nthreads = NTHREADS;
 
   data->cparams2 = BLOSC2_CPARAMS_DEFAULTS;
   data->cparams2.typesize = sizeof(int32_t);
-  data->cparams2.compcode = BLOSC_LZ4;
   data->cparams2.clevel = 2;
   data->cparams2.nthreads = NTHREADS;
   data->cparams2.blocksize = 10000;
