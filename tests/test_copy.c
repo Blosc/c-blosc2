@@ -36,10 +36,12 @@ typedef struct {
   char *urlpath;
 }test_copy_backend;
 
+
 CUTEST_TEST_DATA(copy) {
   blosc2_cparams cparams;
   blosc2_cparams cparams2;
 };
+
 
 CUTEST_TEST_SETUP(copy) {
   blosc_init();
@@ -136,7 +138,6 @@ CUTEST_TEST_TEST(copy) {
   blosc2_schunk * schunk_copy = blosc2_schunk_copy(schunk, storage2);
   CUTEST_ASSERT("Error copying a schunk", schunk_copy != NULL);
 
-
   if (metalayers) {
     int64_t *content = malloc(meta_content_len);
     uint32_t content_len;
@@ -161,7 +162,6 @@ CUTEST_TEST_TEST(copy) {
     CUTEST_ASSERT("Decompression size is not equal to input size", dsize == (int) isize);
   }
 
-
   /* Free resources */
   free(data_buffer);
   free(rec_buffer);
@@ -180,6 +180,7 @@ CUTEST_TEST_TEST(copy) {
 
   return 0;
 }
+
 
 CUTEST_TEST_TEARDOWN(copy) {
   blosc_destroy();
