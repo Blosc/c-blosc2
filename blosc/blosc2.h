@@ -1137,6 +1137,19 @@ blosc2_schunk_new(blosc2_storage storage);
 BLOSC_EXPORT blosc2_schunk *
 blosc2_schunk_empty(int nchunks, blosc2_storage storage);
 
+
+/**
+ * Create a copy of a super-chunk.
+ *
+ * @param schunk The super-chunk to be copied.
+ * @param storage The storage properties.
+ *
+ * @return The new super-chunk.
+ */
+BLOSC_EXPORT blosc2_schunk *
+blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage);
+
+
 /**
  * @brief Open an existing super-chunk that is on-disk (no copy is made).
  *

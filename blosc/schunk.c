@@ -212,6 +212,96 @@ blosc2_schunk *blosc2_schunk_empty(int nchunks, const blosc2_storage storage) {
 }
 
 
+/* Create a copy of a super-chunk */
+blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage) {
+  if (schunk == NULL) {
+    BLOSC_TRACE_ERROR("Can not copy a NULL `schunk`.");
+    return NULL;
+  }
+
+  // Check if cparams are equals
+  bool cparams_equal = true;
+  blosc2_cparams *cparams = storage.cparams;
+  if (cparams->blocksize == 0) {
+    cparams->blocksize = schunk->cctx->blocksize;
+  }
+
+  if (cparams->typesize != schunk->cctx->typesize ||
+      cparams->clevel != schunk->cctx->clevel ||
+      cparams->compcode != schunk->cctx->compcode ||
+      cparams->use_dict != schunk->cctx->use_dict ||
+      cparams->blocksize != schunk->cctx->blocksize) {
+    cparams_equal = false;
+  }
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+    if (cparams->filters[i] != schunk->cctx->filters[i] ||
+        cparams->filters_meta[i] != schunk->cctx->filters_meta[i]) {
+      cparams_equal = false;
+    }
+  }
+
+  // Create new schunk
+  blosc2_schunk *new_schunk = blosc2_schunk_new(storage);
+  if (new_schunk == NULL) {
+    BLOSC_TRACE_ERROR("Can not create a new schunk");
+    return NULL;
+  }
+
+  // Copy metalayers
+  for (int nmeta = 0; nmeta < schunk->nmetalayers; ++nmeta) {
+    blosc2_metalayer *meta = schunk->metalayers[0];
+    if (blosc2_add_metalayer(new_schunk, meta->name, meta->content, meta->content_len) < 0) {
+      BLOSC_TRACE_ERROR("Con not add %s `metalayer`.", meta->name);
+      return NULL;
+    }
+  }
+
+  // Copy chunks
+  if (cparams_equal) {
+    for (int nchunk = 0; nchunk < schunk->nchunks; ++nchunk) {
+      uint8_t *chunk;
+      bool needs_free;
+      if (blosc2_schunk_get_chunk(schunk, nchunk, &chunk, &needs_free) < 0) {
+        BLOSC_TRACE_ERROR("Can not get the `chunk` %d.", nchunk);
+        return NULL;
+      }
+      if (blosc2_schunk_append_chunk(new_schunk, chunk, !needs_free) < 0) {
+        BLOSC_TRACE_ERROR("Can not append the `chunk` into super-chunk.");
+        return NULL;
+      }
+    }
+  } else {
+    uint8_t *buffer = malloc(schunk->chunksize);
+    for (int nchunk = 0; nchunk < schunk->nchunks; ++nchunk) {
+      if (blosc2_schunk_decompress_chunk(schunk, nchunk, buffer, schunk->chunksize) < 0) {
+        BLOSC_TRACE_ERROR("Can not decompress the `chunk` %d.", nchunk);
+        return NULL;
+      }
+      if (blosc2_schunk_append_buffer(new_schunk, buffer, schunk->chunksize) < 0) {
+        BLOSC_TRACE_ERROR("Can not append the `buffer` into super-chunk.");
+        return NULL;
+      }
+    }
+    free(buffer);
+  }
+
+  // Copy user meta
+  if (schunk->usermeta != NULL) {
+    uint8_t *usermeta;
+    int32_t usermeta_len = blosc2_get_usermeta(schunk, &usermeta);
+    if (usermeta_len < 0) {
+      BLOSC_TRACE_ERROR("Can not get `usermeta` from schunk");
+      return NULL;
+    }
+    if (blosc2_update_usermeta(new_schunk, usermeta, usermeta_len, *storage.cparams) < 0) {
+      BLOSC_TRACE_ERROR("Can not update the `usermeta`.");
+      return NULL;
+    }
+  }
+  return new_schunk;
+}
+
+
 /* Open an existing super-chunk that is on-disk (no copy is made). */
 blosc2_schunk* blosc2_schunk_open(const blosc2_storage storage) {
   if (storage.urlpath == NULL) {
