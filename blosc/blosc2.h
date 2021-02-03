@@ -1020,7 +1020,7 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 typedef struct {
     bool sequential;
     //!< Whether the chunks are sequential (frame) or sparse.
-    const char* urlpath;
+    char* urlpath;
     //!< The path for persistent storage. If NULL, that means in-memory.
     blosc2_cparams* cparams;
     //!< The compression params when creating a schunk.
@@ -1112,8 +1112,7 @@ typedef struct blosc2_schunk {
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk *
-blosc2_schunk_new(blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_new(blosc2_storage storage);
 
 /**
  * @brief Create a non-initialized super-chunk.
@@ -1126,8 +1125,7 @@ blosc2_schunk_new(blosc2_storage storage);
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk *
-blosc2_schunk_empty(int nchunks, blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_empty(int nchunks, blosc2_storage storage);
 
 
 /**
@@ -1138,8 +1136,7 @@ blosc2_schunk_empty(int nchunks, blosc2_storage storage);
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk *
-blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage);
 
 
 /**
@@ -1152,8 +1149,7 @@ blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage);
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk*
-blosc2_schunk_open(blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open(char* urlpath);
 
 /**
  * @brief Create a super-chunk out of an in-memory frame (no copy is made).
@@ -1164,12 +1160,12 @@ blosc2_schunk_open(blosc2_storage storage);
  * automatically freed when blosc2_schunk_free() is called.  If the user
  * frees it after the opening, bad things will happen.  Don't do that.
  *
- * @param len The length of buffer of the in-memory frame (in bytes).
+ * @param len The length of the buffer (in bytes).
  *
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk*
-blosc2_schunk_open_sframe(uint8_t *sframe, int64_t len);
+blosc2_schunk_from_buffer(uint8_t *sframe, int64_t len);
 
 /**
  * @brief Release resources from a super-chunk.

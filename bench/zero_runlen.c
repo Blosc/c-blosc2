@@ -106,7 +106,7 @@ int check_special_values(int svalue) {
 
   /* Gather some info */
   nbytes = schunk->nbytes;
-  frame_len = schunk->frame->len;
+  frame_len = schunk->cbytes;
   printf("Compression super-chunk: %ld -> %ld (%.1fx)\n",
          (long)nbytes, (long)frame_len, (1. * nbytes) / frame_len);
 

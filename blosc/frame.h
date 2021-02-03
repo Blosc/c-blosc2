@@ -88,7 +88,7 @@ int64_t blosc2_frame_from_schunk(blosc2_schunk* schunk, blosc2_frame_s* frame);
  *
  * @return 0 if succeeds.
  */
-BLOSC_EXPORT int blosc2_frame_free(blosc2_frame_s *frame);
+int blosc2_frame_free(blosc2_frame_s *frame);
 
 /**
  * @brief Write an in-memory frame out to a file.
@@ -101,7 +101,7 @@ BLOSC_EXPORT int blosc2_frame_free(blosc2_frame_s *frame);
  * @return The size of the frame.  If negative, an error happened (including
  * that the original frame is not in-memory).
  */
-BLOSC_EXPORT int64_t blosc2_frame_to_file(blosc2_frame_s *frame, const char *urlpath);
+int64_t blosc2_frame_to_file(blosc2_frame_s *frame, const char *urlpath);
 
 /**
  * @brief Initialize a frame out of a file.
@@ -110,7 +110,7 @@ BLOSC_EXPORT int64_t blosc2_frame_to_file(blosc2_frame_s *frame, const char *url
  *
  * @return The frame created from the file.
  */
-BLOSC_EXPORT blosc2_frame_s* blosc2_frame_from_file(const char *urlpath);
+blosc2_frame_s* blosc2_frame_from_file(const char *urlpath);
 
 /**
  * @brief Initialize a frame out of an in-memory serialized frame.
@@ -121,7 +121,7 @@ BLOSC_EXPORT blosc2_frame_s* blosc2_frame_from_file(const char *urlpath);
  *
  * @return The frame created from the serialized frame.
  */
-BLOSC_EXPORT blosc2_frame_s* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy);
+blosc2_frame_s* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy);
 
 /**
  * @brief Create a super-chunk from a frame.
@@ -133,9 +133,10 @@ BLOSC_EXPORT blosc2_frame_s* blosc2_frame_from_sframe(uint8_t *sframe, int64_t l
  *
  * @return The super-chunk corresponding to the frame.
  */
-BLOSC_EXPORT blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame_s* frame, bool copy);
+blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame_s* frame, bool copy);
 
-
+blosc2_storage* get_new_storage(const blosc2_storage* storage, const blosc2_cparams* cdefaults,
+                                const blosc2_dparams* ddefaults);
 
 void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schunk);
 void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_schunk* schunk);

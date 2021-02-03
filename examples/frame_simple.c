@@ -103,6 +103,9 @@ int main(void) {
   uint8_t* sframe;
   bool needs_free;
   int64_t frame_len = blosc2_schunk_to_buffer(schunk, &sframe, &needs_free);
+  if (frame_len < 0) {
+    return frame_len;
+  }
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for schunk -> frame: %.3g s, %.1f MB/s\n",
@@ -121,36 +124,40 @@ int main(void) {
   printf("Time for frame -> fileframe (frame_simple.b2frame): %.3g s, %.1f GB/s\n",
          ttotal, nbytes / (ttotal * GB));
 
-  // Ens hem quedat ací...
-//  // fileframe (file) -> frame2 (on-disk frame)
-//  blosc_set_timestamp(&last);
-//  blosc2_frame* frame2 = blosc2_frame_from_file("frame_simple.b2frame");
-//  blosc_set_timestamp(&current);
-//  ttotal = blosc_elapsed_secs(last, current);
-//  printf("Time for fileframe (%s) -> frame : %.3g s, %.1f GB/s\n",
-//         frame2->urlpath, ttotal, nbytes / (ttotal * GB));
-//
-//  // frame1 (in-memory) -> schunk
-//  blosc_set_timestamp(&last);
-//  // The next creates a schunk made of sequential chunks
-//  blosc2_schunk* schunk1 = blosc2_frame_to_schunk(frame1, true);
-//  // The next creates a frame-backed schunk
-//  // blosc2_schunk* schunk1 = blosc2_frame_to_schunk(frame1, false);
-//  if (schunk1 == NULL) {
-//    printf("Bad conversion frame1 -> schunk1!\n");
-//    return -1;
-//  }
-//  blosc_set_timestamp(&current);
-//  ttotal = blosc_elapsed_secs(last, current);
-//  printf("Time for frame -> schunk: %.3g s, %.1f GB/s\n",
-//         ttotal, nbytes / (ttotal * GB));
-//
+  // fileframe (file) -> schunk2 (on-disk sequential, super-chunk)
+  blosc_set_timestamp(&last);
+  blosc2_schunk* schunk2 = blosc2_schunk_open("frame_simple.b2frame");
+  blosc_set_timestamp(&current);
+  ttotal = blosc_elapsed_secs(last, current);
+  printf("Time for fileframe (%s) -> frame : %.3g s, %.1f GB/s\n",
+         schunk2->storage->urlpath, ttotal, nbytes / (ttotal * GB));
+
+  // frame1 (in-memory) -> schunk
+  blosc_set_timestamp(&last);
+  // The next creates a schunk made of sequential chunks
+  blosc2_schunk* schunk1 = blosc2_schunk_from_buffer(sframe, frame_len);
+  // The next creates a frame-backed schunk
+  // blosc2_schunk* schunk1 = blosc2_frame_to_schunk(frame1, false);
+  if (schunk1 == NULL) {
+    printf("Bad conversion frame1 -> schunk1!\n");
+    return -1;
+  }
+  blosc_set_timestamp(&current);
+  ttotal = blosc_elapsed_secs(last, current);
+  printf("Time for frame -> schunk: %.3g s, %.1f GB/s\n",
+         ttotal, nbytes / (ttotal * GB));
+
 
   /* Retrieve and decompress the chunks from the super-chunks and compare values */
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     int32_t dsize = blosc2_schunk_decompress_chunk(schunk1, nchunk, data_dest, isize);
     if (dsize < 0) {
       printf("Decompression error in schunk1.  Error code: %d\n", dsize);
+      return dsize;
+    }
+    dsize = blosc2_schunk_decompress_chunk(schunk2, nchunk, data_dest2, isize);
+    if (dsize < 0) {
+      printf("Decompression error in schunk2.  Error code: %d\n", dsize);
       return dsize;
     }
     /* Check integrity of this chunk */

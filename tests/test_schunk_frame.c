@@ -45,13 +45,14 @@ static char* test_schunk_sframe(void) {
 
   // Get a memory frame out of the schunk
   uint8_t* sframe;
-  int64_t len = blosc2_schunk_to_sframe(schunk, &sframe);
+  bool needs_free;
+  int64_t len = blosc2_schunk_to_buffer(schunk, &sframe, &needs_free);
   mu_assert("Error in getting a sframe", len > 0);
 
   // Free completely schunk
   blosc2_schunk_free(schunk);
   // ...and another schunk backed by the sframe
-  schunk = blosc2_schunk_open_sframe(sframe, len);
+  schunk = blosc2_schunk_from_buffer(sframe, len);
 
   // Check that the chunks have been decompressed correctly
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
@@ -66,6 +67,9 @@ static char* test_schunk_sframe(void) {
   free(data);
   free(data_dest);
   blosc2_schunk_free(schunk);
+  if (needs_free) {
+    free(sframe);
+  }
   /* Destroy the Blosc environment */
   blosc_destroy();
 
