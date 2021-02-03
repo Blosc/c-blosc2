@@ -74,37 +74,6 @@ int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams) {
   return 0;
 }
 
-blosc2_storage* get_new_storage(const blosc2_storage* storage, const blosc2_cparams* cdefaults,
-                                const blosc2_dparams* ddefaults) {
-  blosc2_storage* new_storage = (blosc2_storage*)calloc(1, sizeof(blosc2_storage));
-  memcpy(new_storage, storage, sizeof(blosc2_storage));
-  if (storage->urlpath != NULL) {
-    size_t pathlen = strlen(storage->urlpath);
-    new_storage->urlpath = malloc(pathlen + 1);
-    strcpy(new_storage->urlpath, storage->urlpath);
-  }
-  else {
-    new_storage->urlpath = NULL;
-  }
-  // cparams
-  blosc2_cparams* cparams = malloc(sizeof(blosc2_cparams));
-  if (storage->cparams != NULL) {
-    memcpy(cparams, storage->cparams, sizeof(blosc2_cparams));
-  } else {
-    memcpy(cparams, cdefaults, sizeof(blosc2_cparams));
-  }
-  new_storage->cparams = cparams;
-  // dparams
-  blosc2_dparams* dparams = malloc(sizeof(blosc2_dparams));
-  if (storage->dparams != NULL) {
-    memcpy(dparams, storage->dparams, sizeof(blosc2_dparams));
-  }
-  else {
-    memcpy(dparams, ddefaults, sizeof(blosc2_dparams));
-  }
-  new_storage->dparams = dparams;
-  return new_storage;
-}
 
 void update_schunk_properties(struct blosc2_schunk* schunk) {
   blosc2_cparams* cparams = schunk->storage->cparams;
@@ -221,21 +190,27 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
 
   // Check if cparams are equals
   bool cparams_equal = true;
-  blosc2_cparams *cparams = storage.cparams;
-  if (cparams->blocksize == 0) {
-    cparams->blocksize = schunk->cctx->blocksize;
+  blosc2_cparams cparams;
+  if (storage.cparams == NULL) {
+    cparams = BLOSC2_CPARAMS_DEFAULTS;
+  }
+  else {
+    cparams = *storage.cparams;
+  }
+  if (cparams.blocksize == 0) {
+    cparams.blocksize = schunk->cctx->blocksize;
   }
 
-  if (cparams->typesize != schunk->cctx->typesize ||
-      cparams->clevel != schunk->cctx->clevel ||
-      cparams->compcode != schunk->cctx->compcode ||
-      cparams->use_dict != schunk->cctx->use_dict ||
-      cparams->blocksize != schunk->cctx->blocksize) {
+  if (cparams.typesize != schunk->cctx->typesize ||
+      cparams.clevel != schunk->cctx->clevel ||
+      cparams.compcode != schunk->cctx->compcode ||
+      cparams.use_dict != schunk->cctx->use_dict ||
+      cparams.blocksize != schunk->cctx->blocksize) {
     cparams_equal = false;
   }
   for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
-    if (cparams->filters[i] != schunk->cctx->filters[i] ||
-        cparams->filters_meta[i] != schunk->cctx->filters_meta[i]) {
+    if (cparams.filters[i] != schunk->cctx->filters[i] ||
+        cparams.filters_meta[i] != schunk->cctx->filters_meta[i]) {
       cparams_equal = false;
     }
   }
@@ -293,7 +268,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
       BLOSC_TRACE_ERROR("Can not get `usermeta` from schunk");
       return NULL;
     }
-    if (blosc2_update_usermeta(new_schunk, usermeta, usermeta_len, *storage.cparams) < 0) {
+    if (blosc2_update_usermeta(new_schunk, usermeta, usermeta_len, cparams) < 0) {
       BLOSC_TRACE_ERROR("Can not update the `usermeta`.");
       return NULL;
     }
@@ -303,14 +278,14 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
 
 
 /* Open an existing super-chunk that is on-disk (no copy is made). */
-blosc2_schunk* blosc2_schunk_open(const blosc2_storage storage) {
-  if (storage.urlpath == NULL) {
-    BLOSC_TRACE_ERROR("You need to supply a storage.urlpath.");
+blosc2_schunk* blosc2_schunk_open(char* urlpath) {
+  if (urlpath == NULL) {
+    BLOSC_TRACE_ERROR("You need to supply a urlpath.");
     return NULL;
   }
 
   // We only support frames yet
-  blosc2_frame_s* frame = blosc2_frame_from_file(storage.urlpath);
+  blosc2_frame_s* frame = blosc2_frame_from_file(urlpath);
   blosc2_schunk* schunk = blosc2_frame_to_schunk(frame, false);
 
   // Get the storage with proper defaults
@@ -318,6 +293,7 @@ blosc2_schunk* blosc2_schunk_open(const blosc2_storage storage) {
   blosc2_schunk_get_cparams(schunk, &store_cparams);
   blosc2_dparams *store_dparams;
   blosc2_schunk_get_dparams(schunk, &store_dparams);
+  blosc2_storage storage = {.urlpath=urlpath, .sequential=!frame->eframe};
   schunk->storage = get_new_storage(&storage, store_cparams, store_dparams);
   free(store_cparams);
   free(store_dparams);
@@ -378,7 +354,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
 
 
 /* Create a super-chunk out of a serialized frame (no copy is made). */
-blosc2_schunk* blosc2_schunk_open_sframe(uint8_t *sframe, int64_t len) {
+blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *sframe, int64_t len) {
   blosc2_frame_s* frame = blosc2_frame_from_sframe(sframe, len, false);
   if (frame == NULL) {
     return NULL;

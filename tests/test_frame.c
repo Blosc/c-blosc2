@@ -41,6 +41,9 @@ static char* test_frame(void) {
   int32_t *data_dest = malloc(isize);
   int dsize;
   int64_t nbytes, cbytes;
+  uint8_t* buffer;
+  bool buffer_needs_free;
+
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   if (filter_pipeline) {
@@ -96,8 +99,7 @@ static char* test_frame(void) {
     if (free_new) {
       if (fname != NULL) {
         blosc2_schunk_free(schunk);
-        blosc2_storage storage2 = {.sequential=true, .urlpath=fname};
-        schunk = blosc2_schunk_open(storage2);
+        schunk = blosc2_schunk_open(fname);
         mu_assert("blosc2_schunk_open() failed", schunk != NULL);
         mu_assert("storage is not recovered correctly",
                   schunk->storage->sequential == true);
@@ -106,13 +108,12 @@ static char* test_frame(void) {
         mu_assert("dparams are not recovered correctly",
                   schunk->storage->dparams->nthreads == BLOSC2_DPARAMS_DEFAULTS.nthreads);
       } else {
-        // Dump the schunk into a sframe and regenerate it from there
-        uint8_t* sframe;
-        bool needs_free;
-        int64_t sframe_len = blosc2_schunk_to_buffer(schunk, &sframe, &needs_free);
+        // Dump the schunk into a buffer and regenerate it from there
+        int64_t buffer_len = blosc2_schunk_to_buffer(schunk, &buffer, &buffer_needs_free);
         blosc2_schunk_free(schunk);
-        schunk = blosc2_schunk_open_sframe(sframe, sframe_len);
-        mu_assert("blosc2_schunk_open_sframe() failed", schunk != NULL);
+        mu_assert("blosc2_schunk_to_buffer() failed", buffer_len > 0);
+        schunk = blosc2_schunk_from_buffer(buffer, buffer_len);
+        mu_assert("blosc2_schunk_from_buffer() failed", schunk != NULL);
       }
     }
   }
@@ -185,16 +186,17 @@ static char* test_frame(void) {
     if (free_new) {
       if (fname != NULL) {
         blosc2_schunk_free(schunk);
-        blosc2_storage storage2 = {.sequential=true, .urlpath=fname};
-        schunk = blosc2_schunk_open(storage2);
+        schunk = blosc2_schunk_open(fname);
       } else {
-        // Dump the schunk to a sframe and regenerate it from there
-        uint8_t* sframe;
-        int64_t sframe_len = blosc2_schunk_to_sframe(schunk, &sframe);
+        if (buffer_needs_free) {
+          free(buffer);
+        }
+        // Dump the schunk to a buffer and regenerate it from there
+        int64_t buffer_len = blosc2_schunk_to_buffer(schunk, &buffer, &buffer_needs_free);
         blosc2_schunk_free(schunk);
-        schunk = blosc2_schunk_open_sframe(sframe, sframe_len);
-        mu_assert("blosc2_schunk_open_sframe() failed (2)", schunk != NULL);
-
+        mu_assert("blosc2_schunk_to_buffer() failed (2)", buffer_len > 0);
+        schunk = blosc2_schunk_from_buffer(buffer, buffer_len);
+        mu_assert("blosc2_schunk_from_buffer() failed (2)", schunk != NULL);
       }
     }
   }
@@ -241,6 +243,9 @@ static char* test_frame(void) {
   free(data_dest);
   free(data);
   blosc2_schunk_free(schunk);
+//  if (buffer_needs_free) {
+//    free(buffer);
+//  }
 
   /* Destroy the Blosc environment */
   blosc_destroy();

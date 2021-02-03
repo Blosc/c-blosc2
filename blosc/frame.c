@@ -786,7 +786,9 @@ int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath) {
     return -1;
   }
   // Copy to a sequential file
-  blosc2_storage frame_storage = {.sequential=true, .urlpath=urlpath};
+  char* urlpath_copy = malloc(strlen(urlpath) + 1);
+  strcpy(urlpath_copy, urlpath);
+  blosc2_storage frame_storage = {.sequential=true, .urlpath=urlpath_copy};
   blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, frame_storage);
   if (schunk_copy == NULL) {
     BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
@@ -1311,6 +1313,40 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
 }
 
 
+blosc2_storage* get_new_storage(const blosc2_storage* storage, const blosc2_cparams* cdefaults,
+                                const blosc2_dparams* ddefaults) {
+
+  blosc2_storage* new_storage = (blosc2_storage*)calloc(1, sizeof(blosc2_storage));
+  memcpy(new_storage, storage, sizeof(blosc2_storage));
+  if (storage->urlpath != NULL) {
+    size_t pathlen = strlen(storage->urlpath);
+    new_storage->urlpath = malloc(pathlen + 1);
+    strcpy(new_storage->urlpath, storage->urlpath);
+  }
+
+  // cparams
+  blosc2_cparams* cparams = malloc(sizeof(blosc2_cparams));
+  if (storage->cparams != NULL) {
+    memcpy(cparams, storage->cparams, sizeof(blosc2_cparams));
+  } else {
+    memcpy(cparams, cdefaults, sizeof(blosc2_cparams));
+  }
+  new_storage->cparams = cparams;
+
+  // dparams
+  blosc2_dparams* dparams = malloc(sizeof(blosc2_dparams));
+  if (storage->dparams != NULL) {
+    memcpy(dparams, storage->dparams, sizeof(blosc2_dparams));
+  }
+  else {
+    memcpy(dparams, ddefaults, sizeof(blosc2_dparams));
+  }
+  new_storage->dparams = dparams;
+
+  return new_storage;
+}
+
+
 /* Get a super-chunk out of a frame */
 blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame_s* frame, bool copy) {
   int32_t header_len;
@@ -1336,10 +1372,12 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame_s* frame, bool copy) {
   blosc2_cparams *cparams;
   blosc2_schunk_get_cparams(schunk, &cparams);
   schunk->cctx = blosc2_create_cctx(*cparams);
-  free(cparams);
   blosc2_dparams *dparams;
   blosc2_schunk_get_dparams(schunk, &dparams);
   schunk->dctx = blosc2_create_dctx(*dparams);
+  blosc2_storage storage = {.sequential = copy ? false : true};
+  schunk->storage = get_new_storage(&storage, cparams, dparams);
+  free(cparams);
   free(dparams);
 
   if (!copy) {
