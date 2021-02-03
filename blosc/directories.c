@@ -33,7 +33,7 @@
 
     if (file == -1) {
       BLOSC_TRACE_ERROR("Could not open the file.");
-      return -1;
+      return BLOSC2_ERROR_FILE_OPEN;
     }
     int ret;
 
@@ -50,7 +50,7 @@
         BLOSC_TRACE_ERROR("Could not remove file %s", fname);
         free(path);
         _findclose(file);
-        return -1;
+        return BLOSC2_ERROR_FAILURE;
       }
     }
 
@@ -83,7 +83,7 @@ int blosc2_remove_dir(const char* dir_path) {
   if (dr == NULL) {
     BLOSC_TRACE_ERROR("No file or directory found.");
     free(path);
-    return -1;
+    return BLOSC2_ERROR_NOT_FOUND;
   }
   struct dirent *de;
   int ret;
@@ -102,7 +102,7 @@ int blosc2_remove_dir(const char* dir_path) {
         free(fname);
         closedir(dr);
         free(path);
-        return -1;
+        return BLOSC2_ERROR_FAILURE;
       }
     }
     free(fname);
@@ -114,7 +114,3 @@ int blosc2_remove_dir(const char* dir_path) {
 }
 
 #endif  /* _WIN32 */
-
-
-
-

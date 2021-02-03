@@ -117,7 +117,7 @@ using the msgpack format. Here is the format for the *metalayers*::
 
     :``0`` to ``3``:
         Enumerated for codecs (up to 16).
-        
+
         :``0``:
             ``blosclz``
         :``1``:
@@ -129,7 +129,7 @@ using the msgpack format. Here is the format for the *metalayers*::
         :``4``:
             ``zstd``
         :``5``:
-            ``lizard``
+            Reserved
     :``4`` to ``7``: Compression level (up to 16)
 
 :reserved_flags:

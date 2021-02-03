@@ -153,7 +153,6 @@ enum {
   BLOSC_SNAPPY = 3,
   BLOSC_ZLIB = 4,
   BLOSC_ZSTD = 5,
-  BLOSC_LIZARD = 6,
   BLOSC_MAX_CODECS = 7,  //!< maximum number of reserved codecs
 };
 
@@ -163,7 +162,6 @@ enum {
 #define BLOSC_BLOSCLZ_COMPNAME   "blosclz"
 #define BLOSC_LZ4_COMPNAME       "lz4"
 #define BLOSC_LZ4HC_COMPNAME     "lz4hc"
-#define BLOSC_LIZARD_COMPNAME    "lizard"
 #define BLOSC_SNAPPY_COMPNAME    "snappy"
 #define BLOSC_ZLIB_COMPNAME      "zlib"
 #define BLOSC_ZSTD_COMPNAME      "zstd"
@@ -177,7 +175,6 @@ enum {
   BLOSC_SNAPPY_LIB = 2,
   BLOSC_ZLIB_LIB = 3,
   BLOSC_ZSTD_LIB = 4,
-  BLOSC_LIZARD_LIB = 5,
   BLOSC_SCHUNK_LIB = 7,   //!< compressor library in super-chunk header
 };
 
@@ -186,7 +183,6 @@ enum {
  */
 #define BLOSC_BLOSCLZ_LIBNAME   "BloscLZ"
 #define BLOSC_LZ4_LIBNAME       "LZ4"
-#define BLOSC_LIZARD_LIBNAME    "Lizard"
 #define BLOSC_SNAPPY_LIBNAME    "Snappy"
 #if defined(HAVE_MINIZ)
   #define BLOSC_ZLIB_LIBNAME    "Zlib (via miniz)"
@@ -203,7 +199,6 @@ enum {
   BLOSC_LZ4_FORMAT = BLOSC_LZ4_LIB,
   //!< LZ4HC and LZ4 share the same format
   BLOSC_LZ4HC_FORMAT = BLOSC_LZ4_LIB,
-  BLOSC_LIZARD_FORMAT = BLOSC_LIZARD_LIB,
   BLOSC_SNAPPY_FORMAT = BLOSC_SNAPPY_LIB,
   BLOSC_ZLIB_FORMAT = BLOSC_ZLIB_LIB,
   BLOSC_ZSTD_FORMAT = BLOSC_ZSTD_LIB,
@@ -217,7 +212,6 @@ enum {
   BLOSC_BLOSCLZ_VERSION_FORMAT = 1,
   BLOSC_LZ4_VERSION_FORMAT = 1,
   BLOSC_LZ4HC_VERSION_FORMAT = 1,  /* LZ4HC and LZ4 share the same format */
-  BLOSC_LIZARD_VERSION_FORMAT = 1,
   BLOSC_SNAPPY_VERSION_FORMAT = 1,
   BLOSC_ZLIB_VERSION_FORMAT = 1,
   BLOSC_ZSTD_VERSION_FORMAT = 1,
@@ -250,6 +244,34 @@ enum {
     BLOSC2_VALUE_RUNLEN = 0x3,    //!< generic value run-length
 };
 
+/**
+ * @brief Error codes
+ */
+enum {
+  BLOSC2_ERROR_SUCCESS = 0,           //<! Success
+  BLOSC2_ERROR_FAILURE = -1,          //<! Generic failure
+  BLOSC2_ERROR_STREAM = 2,            //<! Bad stream
+  BLOSC2_ERROR_DATA = -3,             //<! Invalid data
+  BLOSC2_ERROR_MEMORY_ALLOC = -4,     //<! Memory alloc/realloc failure
+  BLOSC2_ERROR_READ_BUFFER = -5,      //!< Not enough space to read
+  BLOSC2_ERROR_WRITE_BUFFER = -6,     //!< Not enough space to write
+  BLOSC2_ERROR_CODEC_SUPPORT = -7,    //!< Codec not supported
+  BLOSC2_ERROR_CODEC_PARAM = -8,      //!< Invalid parameter supplied to codec
+  BLOSC2_ERROR_CODEC_DICT = -9,       //!< Codec dictionary error
+  BLOSC2_ERROR_VERSION_SUPPORT = -10, //!< Version not supported
+  BLOSC2_ERROR_INVALID_HEADER = -11,  //!< Invalid value in header
+  BLOSC2_ERROR_INVALID_PARAM = -12,   //!< Invalid parameter supplied to function
+  BLOSC2_ERROR_FILE_READ = -13,       //!< File read failure
+  BLOSC2_ERROR_FILE_WRITE = -14,      //!< File write failure
+  BLOSC2_ERROR_FILE_OPEN = -15,       //!< File open failure
+  BLOSC2_ERROR_NOT_FOUND = -16,       //!< Not found
+  BLOSC2_ERROR_RUN_LENGTH = -17,      //!< Bad run length encoding
+  BLOSC2_ERROR_FILTER_PIPELINE = -18, //!< Filter pipeline error
+  BLOSC2_ERROR_CHUNK_INSERT = -19,    //!< Chunk insert failure
+  BLOSC2_ERROR_CHUNK_APPEND = -20,    //!< Chunk append failure
+  BLOSC2_ERROR_CHUNK_UPDATE = -21,    //!< Chunk update failure
+  BLOSC2_ERROR_2GB_LIMIT = -22,       //!< Sizes larger than 2gb not supported
+};
 
 /**
  * @brief Initialize the Blosc library environment.
@@ -839,7 +861,7 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * **BLOSC_TYPESIZE=(INTEGER)**: This will overwrite the *typesize*
  * parameter before the compression process starts.
  *
- * **BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | LIZARD | SNAPPY | ZLIB]**:
+ * **BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | SNAPPY | ZLIB]**:
  * This will call *blosc_set_compressor(BLOSC_COMPRESSOR)* before the
  * compression process starts.
  *
@@ -1114,6 +1136,19 @@ blosc2_schunk_new(blosc2_storage storage);
  */
 BLOSC_EXPORT blosc2_schunk *
 blosc2_schunk_empty(int nchunks, blosc2_storage storage);
+
+
+/**
+ * Create a copy of a super-chunk.
+ *
+ * @param schunk The super-chunk to be copied.
+ * @param storage The storage properties.
+ *
+ * @return The new super-chunk.
+ */
+BLOSC_EXPORT blosc2_schunk *
+blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage);
+
 
 /**
  * @brief Open an existing super-chunk that is on-disk (no copy is made).
