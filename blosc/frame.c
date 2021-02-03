@@ -749,11 +749,10 @@ int64_t blosc2_frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
 
 
 int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* needs_free) {
-  blosc2_frame_s* frame = (blosc2_frame_s*)(schunk->frame);
+  blosc2_frame_s* frame;
   int64_t sdata_len = 0;
   if ((schunk->storage->sequential == true) && (schunk->storage->urlpath == NULL)) {
-  // TODO: the above is the canonical way to check, but that does not work (??)
-  //if (frame != NULL && frame->sdata != NULL) {
+    frame =  (blosc2_frame_s*)(schunk->frame);
     *dest = frame->sdata;
     sdata_len = frame->len;
     *needs_free = false;

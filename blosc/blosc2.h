@@ -1158,20 +1158,23 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_sto
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open(char* urlpath);
 
 /**
- * @brief Create a super-chunk out of an in-memory frame (no copy is made).
+ * @brief Create a super-chunk out of an in-memory frame.
  *
  * @param sframe The buffer of the in-memory serialized frame.
+ * @param copy Whether the super-chunk should make a copy of
+ * the sframe or not.
  *
- * @remark The sframe passed will be owned by the super-chunk and will be
- * automatically freed when blosc2_schunk_free() is called.  If the user
- * frees it after the opening, bad things will happen.  Don't do that.
+ * @remark If copy is false, the sframe buffer passed will be owned
+ * by the super-chunk and will be automatically freed when
+ * blosc2_schunk_free() is called.  If the user frees it after the
+ * opening, bad things will happen.  Don't do that (or set @p copy).
  *
  * @param len The length of the buffer (in bytes).
  *
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk*
-blosc2_schunk_from_buffer(uint8_t *sframe, int64_t len);
+blosc2_schunk_from_buffer(uint8_t *sframe, int64_t len, bool copy);
 
 /**
  * @brief Release resources from a super-chunk.
