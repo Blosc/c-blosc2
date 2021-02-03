@@ -8,11 +8,11 @@ if(MSVC OR MINGW)
             POST_BUILD
             COMMAND ${CMAKE_COMMAND}
             ARGS -E copy_if_different
-            "$<TARGET_FILE:blosc2_shared>"
-            "$<TARGET_FILE_DIR:filegen>/$<TARGET_FILE_NAME:blosc2_shared>")
+            "$<TARGET_FILE:blosc_shared_testing>"
+            "$<TARGET_FILE_DIR:filegen>/$<TARGET_FILE_NAME:blosc_shared_testing>")
 endif()
-target_link_libraries(filegen blosc2_shared)
-add_dependencies(filegen blosc2_shared)
+target_link_libraries(filegen blosc_shared_testing)
+add_dependencies(filegen blosc_shared_testing)
 
 # tests
 if(BUILD_TESTS)

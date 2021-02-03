@@ -54,7 +54,7 @@ if(UNIX AND NOT APPLE)
 endif()
 
 foreach(src ${SOURCES})
-    target_link_libraries(${src} blosc2_shared)
+    target_link_libraries(${src} blosc_shared_testing)
 endforeach()
 
 # tests
