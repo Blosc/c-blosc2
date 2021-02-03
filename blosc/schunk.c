@@ -249,7 +249,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
 
   // Copy metalayers
   for (int nmeta = 0; nmeta < schunk->nmetalayers; ++nmeta) {
-    blosc2_metalayer *meta = schunk->metalayers[0];
+    blosc2_metalayer *meta = schunk->metalayers[nmeta];
     if (blosc2_add_metalayer(new_schunk, meta->name, meta->content, meta->content_len) < 0) {
       BLOSC_TRACE_ERROR("Con not add %s `metalayer`.", meta->name);
       return NULL;
