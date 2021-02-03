@@ -190,14 +190,25 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
 
   // Check if cparams are equals
   bool cparams_equal = true;
-  blosc2_cparams cparams;
+  blosc2_cparams cparams = {0};
   if (storage.cparams == NULL) {
-    cparams = BLOSC2_CPARAMS_DEFAULTS;
+    // When cparams are not specified, just use the same of schunk
+    cparams.typesize = schunk->cctx->typesize;
+    cparams.clevel = schunk->cctx->clevel;
+    cparams.compcode = schunk->cctx->compcode;
+    cparams.use_dict = schunk->cctx->use_dict;
+    cparams.blocksize = schunk->cctx->blocksize;
+    memcpy(cparams.filters, schunk->cctx->filters, BLOSC2_MAX_FILTERS);
+    memcpy(cparams.filters_meta, schunk->cctx->filters_meta, BLOSC2_MAX_FILTERS);
+    storage.cparams = &cparams;
   }
   else {
     cparams = *storage.cparams;
   }
   if (cparams.blocksize == 0) {
+    // TODO: blocksize should be read from schunk->blocksize
+    // For this, it should be updated during the first append
+    // (or change API to make this a property during schunk creation).
     cparams.blocksize = schunk->cctx->blocksize;
   }
 
@@ -224,7 +235,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
 
   // Copy metalayers
   for (int nmeta = 0; nmeta < schunk->nmetalayers; ++nmeta) {
-    blosc2_metalayer *meta = schunk->metalayers[0];
+    blosc2_metalayer *meta = schunk->metalayers[nmeta];
     if (blosc2_add_metalayer(new_schunk, meta->name, meta->content, meta->content_len) < 0) {
       BLOSC_TRACE_ERROR("Con not add %s `metalayer`.", meta->name);
       return NULL;
@@ -354,13 +365,13 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
 
 
 /* Create a super-chunk out of a serialized frame (no copy is made). */
-blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *sframe, int64_t len) {
+blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *sframe, int64_t len, bool copy) {
   blosc2_frame_s* frame = blosc2_frame_from_sframe(sframe, len, false);
   if (frame == NULL) {
     return NULL;
   }
-  // Super-chunk will assume ownership of frame and free it
-  blosc2_schunk* schunk = blosc2_frame_to_schunk(frame, false);
+  // If copy == true super-chunk will assume ownership of frame and will free it
+  blosc2_schunk* schunk = blosc2_frame_to_schunk(frame, copy);
   return schunk;
 }
 
