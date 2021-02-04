@@ -98,11 +98,11 @@ int main(void) {
 
   // Start different conversions between schunks, frames and fileframes
 
-  // super-chunk -> sframe (sequential frame, or buffer)
+  // super-chunk -> framebuf (sequential frame, or buffer)
   blosc_set_timestamp(&last);
-  uint8_t* sframe;
-  bool sframe_needs_free;
-  int64_t frame_len = blosc2_schunk_to_buffer(schunk, &sframe, &sframe_needs_free);
+  uint8_t* framebuf;
+  bool framebuf_needs_free;
+  int64_t frame_len = blosc2_schunk_to_buffer(schunk, &framebuf, &framebuf_needs_free);
   if (frame_len < 0) {
     return frame_len;
   }
@@ -135,7 +135,7 @@ int main(void) {
   // frame1 (in-memory) -> schunk
   blosc_set_timestamp(&last);
   // The next creates a schunk from the in-memory frame
-  blosc2_schunk* schunk1 = blosc2_schunk_from_buffer(sframe, frame_len, false);
+  blosc2_schunk* schunk1 = blosc2_schunk_from_buffer(framebuf, frame_len, false);
   if (schunk1 == NULL) {
     printf("Bad conversion frame1 -> schunk1!\n");
     return -1;
@@ -174,8 +174,8 @@ int main(void) {
   blosc2_schunk_free(schunk);
   blosc2_schunk_free(schunk1);
   blosc2_schunk_free(schunk2);
-  if (sframe_needs_free) {
-    free(sframe);
+  if (framebuf_needs_free) {
+    free(framebuf);
   }
 
   return 0;

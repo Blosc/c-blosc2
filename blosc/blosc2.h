@@ -1144,14 +1144,14 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_empty(int nchunks, blosc2_storage stor
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage);
 
 /**
- * @brief Create a super-chunk out of an in-memory frame.
+ * @brief Create a super-chunk out of a frame buffer.
  *
- * @param sframe The buffer of the in-memory serialized frame.
+ * @param framebuf The buffer of the in-memory frame.
  * @param copy Whether the super-chunk should make a copy of
- * the sframe or not.  The copy will be made into an internal
+ * the framebuf or not.  The copy will be made into an internal
  * sparse frame.
  *
- * @remark If copy is false, the sframe buffer passed will be owned
+ * @remark If copy is false, the framebuf buffer passed will be owned
  * by the super-chunk and will be automatically freed when
  * blosc2_schunk_free() is called.  If the user frees it after the
  * opening, bad things will happen.  Don't do that (or set @p copy).
@@ -1160,7 +1160,7 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_sto
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *sframe, int64_t len, bool copy);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *framebuf, int64_t len, bool copy);
 
 /**
  * @brief Open an existing super-chunk that is on-disk (no copy is made).
@@ -1174,20 +1174,20 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *sframe, int64_t l
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open(char* urlpath);
 
-/* @brief Convert a super-chunk into a sequential buffer.
+/* @brief Convert a super-chunk into a frame buffer.
  *
  * @param schunk The super-chunk to convert.
- * @param dest The address of the destination buffer (output).
+ * @param framebuf The address of the destination buffer (output).
  * @param needs_free The pointer to a boolean indicating if it is the user's
  * responsibility to free the chunk returned or not.
  *
- * @note The user is responsible to free the @p dest buffer (not always required).
- * You can check whether the dest requires a free with the @p needs_free parameter.
+ * @note The user is responsible to free the @p framebuf buffer (not always required).
+ * You can check whether the framebuf requires a free with the @p needs_free parameter.
  *
- * @return If successful, return the size of the (frame) @p dest buffer.
+ * @return If successful, return the size of the (frame) @p framebuf buffer.
  * Else, a negative value.
  */
-BLOSC_EXPORT int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* needs_free);
+BLOSC_EXPORT int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** framebuf, bool* needs_free);
 
 /* @brief Store a super-chunk into a file.
  *

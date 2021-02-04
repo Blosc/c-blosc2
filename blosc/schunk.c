@@ -313,11 +313,11 @@ blosc2_schunk* blosc2_schunk_open(char* urlpath) {
 
 int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* needs_free) {
   blosc2_frame_s* frame;
-  int64_t sdata_len;
+  int64_t framebuf_len;
   if ((schunk->storage->sequential == true) && (schunk->storage->urlpath == NULL)) {
     frame =  (blosc2_frame_s*)(schunk->frame);
-    *dest = frame->sdata;
-    sdata_len = frame->len;
+    *dest = frame->framebuf;
+    framebuf_len = frame->len;
     *needs_free = false;
   }
   else {
@@ -329,14 +329,14 @@ int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* nee
       return BLOSC2_ERROR_SCHUNK_COPY;
     }
     frame = (blosc2_frame_s*)(schunk_copy->frame);
-    *dest = frame->sdata;
-    sdata_len = frame->len;
+    *dest = frame->framebuf;
+    framebuf_len = frame->len;
     *needs_free = true;
-    frame->avoid_sdata_free = true;
+    frame->avoid_framebuf_free = true;
     blosc2_schunk_free(schunk_copy);
   }
 
-  return sdata_len;
+  return framebuf_len;
 
 }
 
@@ -344,7 +344,7 @@ int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* nee
 /* Write an in-memory frame out to a file. */
 int64_t frame_to_file(blosc2_frame_s* frame, char* urlpath) {
   FILE* fp = fopen(urlpath, "wb");
-  size_t nitems = fwrite(frame->sdata, (size_t)frame->len, 1, fp);
+  size_t nitems = fwrite(frame->framebuf, (size_t)frame->len, 1, fp);
   fclose(fp);
   return nitems * (size_t)frame->len;
 }
@@ -430,9 +430,9 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
 }
 
 
-/* Create a super-chunk out of a serialized frame (no copy is made). */
-blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *sframe, int64_t len, bool copy) {
-  blosc2_frame_s* frame = frame_from_sframe(sframe, len, false);
+/* Create a super-chunk out of a frame buffer */
+blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *framebuf, int64_t len, bool copy) {
+  blosc2_frame_s* frame = frame_from_framebuf(framebuf, len, false);
   if (frame == NULL) {
     return NULL;
   }

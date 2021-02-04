@@ -42,14 +42,14 @@
 
 
 typedef struct {
-  char* urlpath;           //!< The name of the file or directory if it's an eframe; if NULL, this is in-memory
-  uint8_t* sdata;          //!< The in-memory serialized data
-  bool avoid_sdata_free;   //!< Whether the sdata can be freed (false) or not (true).
-  uint8_t* coffsets;       //!< Pointers to the (compressed, on-disk) chunk offsets
-  int64_t len;             //!< The current length of the frame in (compressed) bytes
-  int64_t maxlen;          //!< The maximum length of the frame; if 0, there is no maximum
-  uint32_t trailer_len;    //!< The current length of the trailer in (compressed) bytes
-  bool eframe;             //!< Whether the frame is extended (sparse, on-disk)
+  char* urlpath;            //!< The name of the file or directory if it's an eframe; if NULL, this is in-memory
+  uint8_t* framebuf;        //!< The in-memory frame buffer
+  bool avoid_framebuf_free; //!< Whether the framebuf can be freed (false) or not (true).
+  uint8_t* coffsets;        //!< Pointers to the (compressed, on-disk) chunk offsets
+  int64_t len;              //!< The current length of the frame in (compressed) bytes
+  int64_t maxlen;           //!< The maximum length of the frame; if 0, there is no maximum
+  uint32_t trailer_len;     //!< The current length of the trailer in (compressed) bytes
+  bool eframe;              //!< Whether the frame is extended (sparse, on-disk)
 } blosc2_frame_s;
 
 
@@ -100,23 +100,23 @@ int frame_free(blosc2_frame_s *frame);
 blosc2_frame_s* frame_from_file(const char *urlpath);
 
 /**
- * @brief Initialize a frame out of an in-memory serialized frame.
+ * @brief Initialize a frame out of a frame buffer.
  *
- * @param buffer The buffer for the serialized frame.
- * @param len The length of buffer for the serialized frame.
- * @param copy Whether the serialized frame should be copied internally or not.
+ * @param buffer The buffer for the frame.
+ * @param len The length of buffer for the frame.
+ * @param copy Whether the frame buffer should be copied internally or not.
  *
- * @return The frame created from the serialized frame.
+ * @return The frame created from the frame buffer.
  */
-blosc2_frame_s* frame_from_sframe(uint8_t *sframe, int64_t len, bool copy);
+blosc2_frame_s* frame_from_framebuf(uint8_t *framebuf, int64_t len, bool copy);
 
 /**
  * @brief Create a super-chunk from a frame.
  *
  * @param frame The frame from which the super-chunk will be created.
- * @param copy If true, a new, serialized in-memory frame is created
+ * @param copy If true, a new frame buffer is created
  * internally to serve as storage for the super-chunk. Else, the
- * super-chunk will be backed by the sframe (i.e. no copies are made).
+ * super-chunk will be backed by @p frame (i.e. no copies are made).
  *
  * @return The super-chunk corresponding to the frame.
  */

@@ -20,7 +20,7 @@ int nchunks;
 int sequential = false;
 
 
-static char* test_schunk_sframe(void) {
+static char* test_schunk_framebuf(void) {
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int32_t *data = malloc(isize);
   int32_t *data_dest = malloc(isize);
@@ -44,17 +44,17 @@ static char* test_schunk_sframe(void) {
   }
 
   // Get a memory frame out of the schunk
-  uint8_t* sframe;
-  bool sframe_needs_free;
-  int64_t len = blosc2_schunk_to_buffer(schunk, &sframe, &sframe_needs_free);
-  mu_assert("Error in getting a sframe", len > 0);
+  uint8_t* framebuf;
+  bool framebuf_needs_free;
+  int64_t len = blosc2_schunk_to_buffer(schunk, &framebuf, &framebuf_needs_free);
+  mu_assert("Error in getting a frame buffer", len > 0);
 
-  // ...and another schunk backed by the sframe
-  blosc2_schunk* schunk2 = blosc2_schunk_from_buffer(sframe, len, false);
+  // ...and another schunk backed by the frame buffer
+  blosc2_schunk* schunk2 = blosc2_schunk_from_buffer(framebuf, len, false);
 
   // Now store frame in a file
   len = blosc2_schunk_to_file(schunk2, "test_file.b2frame");
-  mu_assert("Error in storing a sframe", len > 0);
+  mu_assert("Error in storing a frame buffer", len > 0);
 
   // Free completely all the schunks
   blosc2_schunk_free(schunk);
@@ -76,8 +76,8 @@ static char* test_schunk_sframe(void) {
   free(data);
   free(data_dest);
   blosc2_schunk_free(schunk);
-  if (sframe_needs_free) {
-    free(sframe);
+  if (framebuf_needs_free) {
+    free(framebuf);
   }
   /* Destroy the Blosc environment */
   blosc_destroy();
@@ -88,19 +88,19 @@ static char* test_schunk_sframe(void) {
 static char *all_tests(void) {
   nchunks = 0;
   sequential = true;
-  mu_run_test(test_schunk_sframe);
+  mu_run_test(test_schunk_framebuf);
 
   nchunks = 0;
   sequential = false;
-  mu_run_test(test_schunk_sframe);
+  mu_run_test(test_schunk_framebuf);
 
   nchunks = 1;
   sequential = false;
-  mu_run_test(test_schunk_sframe);
+  mu_run_test(test_schunk_framebuf);
 
   nchunks = 10;
   sequential = true;
-  mu_run_test(test_schunk_sframe);
+  mu_run_test(test_schunk_framebuf);
 
   return EXIT_SUCCESS;
 }
