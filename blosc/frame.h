@@ -91,19 +91,6 @@ int64_t frame_from_schunk(blosc2_schunk* schunk, blosc2_frame_s* frame);
 int frame_free(blosc2_frame_s *frame);
 
 /**
- * @brief Write an in-memory frame out to a file.
- *
- * The frame used must be an in-memory frame, i.e. frame->urlpath == NULL.
- *
- * @param frame The frame to be written into a file.
- * @param urlpath The name of the file.
- *
- * @return The size of the frame.  If negative, an error happened (including
- * that the original frame is not in-memory).
- */
-int64_t blosc2_frame_to_file(blosc2_frame_s *frame, const char *urlpath);
-
-/**
  * @brief Initialize a frame out of a file.
  *
  * @param urlpath The file name.
