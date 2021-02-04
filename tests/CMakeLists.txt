@@ -87,7 +87,7 @@ foreach(source ${SOURCES})
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
 
     target_link_libraries(${target} blosc_testing)
-    add_dependencies(${target} blosc_shared_testing)
+    add_dependencies(${target} blosc_testing)
 
     # If there's a CSV file present for this test, read it to get the list
     # of test parameters then add a test for each parameter set.
