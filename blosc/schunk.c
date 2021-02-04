@@ -295,19 +295,14 @@ blosc2_schunk* blosc2_schunk_open(char* urlpath) {
     return NULL;
   }
 
-  // We only support frames yet
   blosc2_frame_s* frame = blosc2_frame_from_file(urlpath);
   blosc2_schunk* schunk = blosc2_frame_to_schunk(frame, false);
 
-  // Get the storage with proper defaults
-  blosc2_cparams *store_cparams;
-  blosc2_schunk_get_cparams(schunk, &store_cparams);
-  blosc2_dparams *store_dparams;
-  blosc2_schunk_get_dparams(schunk, &store_dparams);
-  blosc2_storage storage = {.urlpath=urlpath, .sequential=!frame->eframe};
-  schunk->storage = get_new_storage(&storage, store_cparams, store_dparams);
-  free(store_cparams);
-  free(store_dparams);
+  // Set the storage with proper defaults
+  size_t pathlen = strlen(urlpath);
+  schunk->storage->urlpath = malloc(pathlen + 1);
+  strcpy(schunk->storage->urlpath, urlpath);
+  schunk->storage->sequential = !frame->eframe;
   // Update the existing cparams/dparams with the new defaults
   update_schunk_properties(schunk);
 
