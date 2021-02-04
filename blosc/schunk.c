@@ -341,7 +341,7 @@ int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* nee
 }
 
 
-/* Write super-frame out to a file. */
+/* Write super-chunk out to a file. */
 int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath) {
   if (urlpath == NULL) {
     BLOSC_TRACE_ERROR("urlpath cannot be NULL");
