@@ -173,6 +173,7 @@ int main(void) {
   /* Free resources */
   blosc2_schunk_free(schunk);
   blosc2_schunk_free(schunk1);
+  blosc2_schunk_free(schunk2);
   if (sframe_needs_free) {
     free(sframe);
   }
