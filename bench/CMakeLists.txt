@@ -27,31 +27,11 @@ if(UNIX)
     # Avoid a warning when using gcc without -fopenmp
     target_compile_options(sum_openmp PRIVATE "-Wno-unknown-pragmas")
 endif()
-target_link_libraries(${BENCH_EXE} blosc2_shared)
-target_link_libraries(delta_schunk blosc2_shared)
-target_link_libraries(trunc_prec_schunk blosc2_shared)
-target_link_libraries(sum_openmp blosc2_shared)
-target_link_libraries(zero_runlen blosc2_shared)
-
-
-# have to copy blosc dlls on Windows
-if(MSVC)
-    add_custom_command(
-            TARGET ${BENCH_EXE}
-            POST_BUILD
-            COMMAND ${CMAKE_COMMAND}
-            ARGS -E copy_if_different
-            "${PROJECT_BINARY_DIR}/blosc/\$\(Configuration\)/blosc2.dll"
-            "${CMAKE_CURRENT_BINARY_DIR}/\$\(Configuration\)/blosc2.dll")
-elseif(MINGW)
-    add_custom_command(
-            TARGET ${BENCH_EXE}
-            POST_BUILD
-            COMMAND ${CMAKE_COMMAND}
-            ARGS -E copy_if_different
-            "${PROJECT_BINARY_DIR}/blosc/libblosc2.dll"
-            "${CMAKE_CURRENT_BINARY_DIR}/libblosc2.dll")
-endif()
+target_link_libraries(${BENCH_EXE} blosc_testing)
+target_link_libraries(delta_schunk blosc_testing)
+target_link_libraries(trunc_prec_schunk blosc_testing)
+target_link_libraries(sum_openmp blosc_testing)
+target_link_libraries(zero_runlen blosc_testing)
 
 # tests
 if(BUILD_TESTS)
