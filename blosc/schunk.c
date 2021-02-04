@@ -342,7 +342,7 @@ int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* nee
 
 
 /* Write an in-memory frame out to a file. */
-int64_t frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
+int64_t frame_to_file(blosc2_frame_s* frame, char* urlpath) {
   FILE* fp = fopen(urlpath, "wb");
   size_t nitems = fwrite(frame->sdata, (size_t)frame->len, 1, fp);
   fclose(fp);
@@ -351,7 +351,7 @@ int64_t frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
 
 
 /* Write super-chunk out to a file. */
-int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath) {
+int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, char* urlpath) {
   if (urlpath == NULL) {
     BLOSC_TRACE_ERROR("urlpath cannot be NULL");
     return -1;
@@ -368,17 +368,16 @@ int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath) {
   }
 
   // Copy to a sequential file
-  char* urlpath_copy = malloc(strlen(urlpath) + 1);
-  strcpy(urlpath_copy, urlpath);
-  blosc2_storage frame_storage = {.sequential=true, .urlpath=urlpath_copy};
+  blosc2_storage frame_storage = {.sequential=true, .urlpath=urlpath};
   blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, frame_storage);
   if (schunk_copy == NULL) {
     BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
     return BLOSC2_ERROR_SCHUNK_COPY;
   }
   blosc2_frame_s* frame = (blosc2_frame_s*)(schunk_copy->frame);
+  int64_t frame_len = frame->len;
   blosc2_schunk_free(schunk_copy);
-  return frame->len;
+  return frame_len;
 }
 
 

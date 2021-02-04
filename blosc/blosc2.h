@@ -1191,7 +1191,7 @@ BLOSC_EXPORT int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** de
  * @return If successful, return the size of the (fileframe) in @p urlpath.
  * Else, a negative value.
  */
-BLOSC_EXPORT int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath);
+BLOSC_EXPORT int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, char* urlpath);
 
 
 /**
