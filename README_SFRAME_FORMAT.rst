@@ -1,15 +1,14 @@
-Blosc2 Extended-Frame Format
-============================
+Blosc2 Sparse Frame Format
+==========================
 
-Blosc (as of version 2.0.0) has an extended-frame format that allows for the storage of different Blosc data chunks
-sparse, on-disk.
+Blosc (as of version 2.0.0) has a sparse frame (sframe for short) format that allows for the storage of different Blosc data chunks on disk in a sparse way.
 
-When creating an eframe one must denote the `storage.sequential` as false and provide a name (which will be a directory)
-in `storage.urlpath` for the eframe to be stored. It is recommended to name the directory with the `.b2eframe`
+When creating an sparse frame one must denote the `storage.sequential` as false and provide a name (which will be a directory)
+in `storage.urlpath` for the sframe to be stored. It is recommended to name the directory with the `.b2sframe`
 extension.
 
-An eframe is made up of a frame file and the chunks stored in the same directory on-disk.
-The frame follows the format described in the `frame format <README_FRAME_FORMAT.rst>`_ document, with the difference
+An sframe is made up of a frame file and the chunks stored in the same directory on-disk.
+The frame file follows the format described in the `frame format <README_FRAME_FORMAT.rst>`_ document, with the difference
 that the frame's chunks section is made up only of the index chunk which will have the indexes to each chunk. The frame
 file name is always `chunks.b2frame`.
 
@@ -33,9 +32,9 @@ Examples
 
 Structure example
 ^^^^^^^^^^^^^^^^^
-As shown below, an eframe of 4 chunks will be composed of a directory with each chunk file and the frame file::
+As shown below, an sframe of 4 chunks will be composed of a directory with each chunk file and the frame file::
 
- dir.b2eframe/
+ dir.b2sframe/
  │
  ├── 00000000.chunk
  │
@@ -58,7 +57,7 @@ after an insertion in the 2nd position::
 
  Before                                 After
 
- dir.b2eframe/                          dir.b2eframe/
+ dir.b2sframe/                          dir.b2sframe/
  │                                      │
  ├── 00000000.chunk                     ├── 00000000.chunk
  │                                      │
@@ -78,10 +77,10 @@ after an insertion in the 2nd position::
 Note that neither the file names nor their contents change, so when accesing the 2nd chunk the
 `00000004.chunk` file will be read.
 
+
 Reorder example
 ^^^^^^^^^^^^^^^
-As in the insertion case, when doing a reorder the chunks names and their contents are not changed, but the content of the
-index chunk does. When reordering the chunks, a new order list is passed and the index chunk is changed according to that
+As in the insertion case, when doing a reorder the chunks names and their contents are not changed, but the content of the index chunk does. When reordering the chunks, a new order list is passed and the index chunk is changed according to that
 list. Following with the first example of this section, the content of the index chunk is shown before and after reordering::
 
  Before                                 After

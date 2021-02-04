@@ -12,8 +12,7 @@
 #include <string.h>
 #include "blosc2.h"
 #include "frame.h"
-#include "eframe.h"
-
+#include "sframe.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
 #include <windows.h>
@@ -36,8 +35,8 @@
 #endif
 
 
-/* Append an existing chunk into an extended frame. */
-void* eframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int32_t nchunk, int64_t cbytes) {
+/* Append an existing chunk into a sparse frame. */
+void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int32_t nchunk, int64_t cbytes) {
   // Get directory/nchunk.chunk with 8 zeros of padding
   char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
   sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
@@ -55,8 +54,8 @@ void* eframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int32_t nchunk,
 }
 
 
-/*Get chunk from extended frame. */
-int eframe_get_chunk(blosc2_frame_s* frame, int32_t nchunk, uint8_t** chunk, bool* needs_free){
+/*Get chunk from sparse frame. */
+int sframe_get_chunk(blosc2_frame_s* frame, int32_t nchunk, uint8_t** chunk, bool* needs_free){
   //get directory/nchunk.chunk
   char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
   sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);

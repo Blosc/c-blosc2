@@ -60,7 +60,7 @@ CUTEST_TEST_SETUP(zero_runlen) {
       {false, NULL},  // memory - schunk
       {true, NULL},  // memory - frame
       {true, "test_zero_runlen.b2frame"}, // disk - frame
-      {false, "test_zero_runlen.b2eframe"}, // disk - eframe
+      {false, "test_zero_runlen.b2sframe"}, // disk - sframe
   ));
 }
 

@@ -28,6 +28,11 @@ Changes from 2.0.0-beta.5 to 2.0.0.beta6
   unnecessary cognitive load.  Care have been carried out so as to ensure
   the same functionality via the super-chunk (schunk) API.
 
+* [FORMAT] New *sparse frame* format for on-disk I/O.  This allows for storing
+  data chunks in super-chunks in separate files inside a directory.  The way
+  to generate sparse frames is via `storage.sequential=false` and
+  `storage.urlpath=dirname`.  See `README_SFRAME_FORMAT.rst` for details.
+
 
 Changes from 2.0.0-beta.4 to 2.0.0.beta5
 ========================================

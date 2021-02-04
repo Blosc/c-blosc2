@@ -134,7 +134,7 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
     // We want a frame as storage
     blosc2_frame_s* frame = frame_new(urlpath);
     free(urlpath);
-    frame->eframe = true;
+    frame->sframe = true;
     // Initialize frame (basically, encode the header)
     int64_t frame_len = frame_from_schunk(schunk, frame);
     if (frame_len < 0) {
@@ -146,7 +146,7 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
   if (storage.sequential){
     // We want a frame as storage
     blosc2_frame_s* frame = frame_new(storage.urlpath);
-    frame->eframe = false;
+    frame->sframe = false;
     // Initialize frame (basically, encode the header)
     int64_t frame_len = frame_from_schunk(schunk, frame);
     if (frame_len < 0) {
@@ -303,7 +303,7 @@ blosc2_schunk* blosc2_schunk_open(char* urlpath) {
   size_t pathlen = strlen(urlpath);
   schunk->storage->urlpath = malloc(pathlen + 1);
   strcpy(schunk->storage->urlpath, urlpath);
-  schunk->storage->sequential = !frame->eframe;
+  schunk->storage->sequential = !frame->sframe;
   // Update the existing cparams/dparams with the new defaults
   update_schunk_properties(schunk);
 
@@ -667,7 +667,7 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
       case BLOSC2_NAN_RUNLEN:
         schunk->nbytes += nbytes;
         schunk->nbytes -= nbytes_old;
-        if (frame->eframe) {
+        if (frame->sframe) {
           schunk->cbytes -= cbytes_old;
         }
         break;
@@ -676,7 +676,7 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
         schunk->nbytes += nbytes;
         schunk->nbytes -= nbytes_old;
         schunk->cbytes += cbytes;
-        if (frame->eframe) {
+        if (frame->sframe) {
           schunk->cbytes -= cbytes_old;
         }
     }
