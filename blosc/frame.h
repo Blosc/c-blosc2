@@ -66,7 +66,7 @@ typedef struct {
  *
  * @return The new frame.
  */
-blosc2_frame_s* blosc2_frame_new(const char* urlpath);
+blosc2_frame_s* frame_new(const char* urlpath);
 
 /**
  * @brief Create a frame from a super-chunk.
@@ -79,7 +79,7 @@ blosc2_frame_s* blosc2_frame_new(const char* urlpath);
  *
  * @return The size in bytes of the frame. If an error occurs it returns a negative value.
  */
-int64_t blosc2_frame_from_schunk(blosc2_schunk* schunk, blosc2_frame_s* frame);
+int64_t frame_from_schunk(blosc2_schunk* schunk, blosc2_frame_s* frame);
 
 /**
  * @brief Free all memory from a frame.
@@ -88,7 +88,7 @@ int64_t blosc2_frame_from_schunk(blosc2_schunk* schunk, blosc2_frame_s* frame);
  *
  * @return 0 if succeeds.
  */
-int blosc2_frame_free(blosc2_frame_s *frame);
+int frame_free(blosc2_frame_s *frame);
 
 /**
  * @brief Write an in-memory frame out to a file.
@@ -110,7 +110,7 @@ int64_t blosc2_frame_to_file(blosc2_frame_s *frame, const char *urlpath);
  *
  * @return The frame created from the file.
  */
-blosc2_frame_s* blosc2_frame_from_file(const char *urlpath);
+blosc2_frame_s* frame_from_file(const char *urlpath);
 
 /**
  * @brief Initialize a frame out of an in-memory serialized frame.
@@ -121,7 +121,7 @@ blosc2_frame_s* blosc2_frame_from_file(const char *urlpath);
  *
  * @return The frame created from the serialized frame.
  */
-blosc2_frame_s* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy);
+blosc2_frame_s* frame_from_sframe(uint8_t *sframe, int64_t len, bool copy);
 
 /**
  * @brief Create a super-chunk from a frame.
@@ -133,7 +133,7 @@ blosc2_frame_s* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy
  *
  * @return The super-chunk corresponding to the frame.
  */
-blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame_s* frame, bool copy);
+blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy);
 
 blosc2_storage* get_new_storage(const blosc2_storage* storage, const blosc2_cparams* cdefaults,
                                 const blosc2_dparams* ddefaults);
