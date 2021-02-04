@@ -345,7 +345,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     free(schunk->storage);
   }
 
-  if (schunk->frame != NULL && !schunk->avoid_frame_free) {
+  if (schunk->frame != NULL) {
     blosc2_frame_free((blosc2_frame_s*)schunk->frame);
   }
 
@@ -365,7 +365,6 @@ blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *sframe, int64_t len, bool copy
   if (frame == NULL) {
     return NULL;
   }
-  // If copy == true super-chunk will assume ownership of frame and will free it
   blosc2_schunk* schunk = blosc2_frame_to_schunk(frame, copy);
   return schunk;
 }
