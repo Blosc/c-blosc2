@@ -82,6 +82,21 @@ static inline void _sw32(void* dest, int32_t a) {
   }
 }
 
+/* Reverse swap bits in a 32-bit integer */
+static inline int32_t bswap32_(int32_t a) {
+#if defined (__GNUC__)
+  return __builtin_bswap32(a);
+#elif defined (_MSC_VER) /* Visual Studio */
+  return _byteswap_ulong(a);
+#else
+  a = ((a & 0x000000FF) << 24) |
+      ((a & 0x0000FF00) <<  8) |
+      ((a & 0x00FF0000) >>  8) |
+      ((a & 0xFF000000) >> 24);
+  return a;
+#endif
+}
+
 #ifdef __cplusplus
 }
 #endif
