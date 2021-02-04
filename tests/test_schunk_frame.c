@@ -50,10 +50,18 @@ static char* test_schunk_sframe(void) {
   mu_assert("Error in getting a sframe", len > 0);
 
   // ...and another schunk backed by the sframe
-  blosc2_schunk* schunk2 = blosc2_schunk_from_buffer(sframe, len, true);
-  // Free completely the original schunk
+  blosc2_schunk* schunk2 = blosc2_schunk_from_buffer(sframe, len, false);
+
+  // Now store frame in a file
+  len = blosc2_schunk_to_file(schunk2, "test_file.b2frame");
+  mu_assert("Error in storing a sframe", len > 0);
+
+  // Free completely all the schunks
   blosc2_schunk_free(schunk);
-  schunk = schunk2;
+  blosc2_schunk_free(schunk2);
+
+  // ...and open a new one back
+  schunk = blosc2_schunk_open("test_file.b2frame");
 
   // Check that the chunks have been decompressed correctly
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {

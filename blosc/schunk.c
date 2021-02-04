@@ -341,12 +341,32 @@ int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* nee
 }
 
 
+/* Write an in-memory frame out to a file. */
+int64_t frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
+  FILE* fp = fopen(urlpath, "wb");
+  size_t nitems = fwrite(frame->sdata, (size_t)frame->len, 1, fp);
+  fclose(fp);
+  return nitems * (size_t)frame->len;
+}
+
+
 /* Write super-chunk out to a file. */
 int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath) {
   if (urlpath == NULL) {
     BLOSC_TRACE_ERROR("urlpath cannot be NULL");
     return -1;
   }
+
+  // Accelerated path for in-memory frames
+  if (schunk->storage->sequential && schunk->storage->urlpath == NULL) {
+    int64_t len = frame_to_file((blosc2_frame_s*)(schunk->frame), urlpath);
+    if (len <= 0) {
+      BLOSC_TRACE_ERROR("Error writing to file");
+      return len;
+    }
+    return len;
+  }
+
   // Copy to a sequential file
   char* urlpath_copy = malloc(strlen(urlpath) + 1);
   strcpy(urlpath_copy, urlpath);
