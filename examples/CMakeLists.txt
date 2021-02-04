@@ -19,24 +19,6 @@ endif()
 # targets
 foreach(src ${SOURCES})
     add_executable(${src} ${src}.c)
-    # have to copy blosc dlls on Windows
-    if(MSVC)
-        add_custom_command(
-                TARGET ${src}
-                POST_BUILD
-                COMMAND ${CMAKE_COMMAND}
-                ARGS -E copy_if_different
-                "${PROJECT_BINARY_DIR}/blosc/\$\(Configuration\)/blosc2.dll"
-                "${CMAKE_CURRENT_BINARY_DIR}/\$\(Configuration\)/blosc2.dll")
-    elseif(MINGW)
-        add_custom_command(
-                TARGET ${src}
-                POST_BUILD
-                COMMAND ${CMAKE_COMMAND}
-                ARGS -E copy_if_different
-                "${PROJECT_BINARY_DIR}/blosc/libblosc2.dll"
-                "${CMAKE_CURRENT_BINARY_DIR}/libblosc2.dll")
-    endif()
     # Define the BLOSC_TESTING symbol so normally-hidden functions
     # aren't hidden from the view of the test programs.
     set_property(
@@ -54,7 +36,7 @@ if(UNIX AND NOT APPLE)
 endif()
 
 foreach(src ${SOURCES})
-    target_link_libraries(${src} blosc2_shared)
+    target_link_libraries(${src} blosc_testing)
 endforeach()
 
 # tests

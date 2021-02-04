@@ -140,6 +140,9 @@ endif()
 if(BUILD_SHARED)
     add_library(blosc2_shared SHARED ${SOURCES})
     set_target_properties(blosc2_shared PROPERTIES OUTPUT_NAME blosc2)
+    if(MSVC OR MINGW)
+        set_target_properties(blosc2_shared PROPERTIES PREFIX lib)
+    endif()
     set_target_properties(blosc2_shared PROPERTIES
             VERSION ${version_string}
             SOVERSION 2  # Change this when an ABI change happens
@@ -221,22 +224,25 @@ if(COMPILER_SUPPORT_ALTIVEC)
 endif()
 
 # When the option has been selected to compile the test suite,
-# compile an additional version of blosc2_shared which exports
+# compile an additional version of blosc2_static which exports
 # some normally-hidden symbols (to facilitate unit testing).
 if(BUILD_TESTS)
-    add_library(blosc_shared_testing SHARED ${SOURCES})
-    set_target_properties(blosc_shared_testing PROPERTIES OUTPUT_NAME blosc_testing)
+    add_library(blosc_testing STATIC ${SOURCES})
+    set_target_properties(blosc_testing PROPERTIES OUTPUT_NAME blosc_testing)
+    if(MSVC OR MINGW)
+        set_target_properties(blosc_testing PROPERTIES PREFIX lib)
+    endif()
     set_property(
-            TARGET blosc_shared_testing
+            TARGET blosc_testing
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_SHARED_LIBRARY)
     set_property(
-            TARGET blosc_shared_testing
+            TARGET blosc_testing
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
     # TEMP : CMake doesn't automatically add -lpthread here like it does
     # for the blosc2_shared target. Force it for now.
     if(UNIX)
         set_property(
-                TARGET blosc_shared_testing
+                TARGET blosc_testing
                 APPEND PROPERTY LINK_FLAGS "-lpthread")
     endif()
 endif()
@@ -247,14 +253,14 @@ if(BUILD_SHARED)
 endif()
 
 if(BUILD_TESTS)
-    target_link_libraries(blosc_shared_testing ${LIBS})
-    target_include_directories(blosc_shared_testing PUBLIC ${BLOSC_INCLUDE_DIRS})
+    target_link_libraries(blosc_testing ${LIBS})
+    target_include_directories(blosc_testing PUBLIC ${BLOSC_INCLUDE_DIRS})
 endif()
 
 if(BUILD_STATIC)
     add_library(blosc2_static STATIC ${SOURCES})
     set_target_properties(blosc2_static PROPERTIES OUTPUT_NAME blosc2)
-    if(MSVC)
+    if(MSVC OR MINGW)
         set_target_properties(blosc2_static PROPERTIES PREFIX lib)
     endif()
     target_link_libraries(blosc2_static ${LIBS})
