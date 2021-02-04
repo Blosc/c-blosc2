@@ -33,26 +33,6 @@ target_link_libraries(trunc_prec_schunk blosc_shared_testing)
 target_link_libraries(sum_openmp blosc_shared_testing)
 target_link_libraries(zero_runlen blosc_shared_testing)
 
-
-# have to copy blosc dlls on Windows
-if(MSVC)
-    add_custom_command(
-            TARGET ${BENCH_EXE}
-            POST_BUILD
-            COMMAND ${CMAKE_COMMAND}
-            ARGS -E copy_if_different
-            "${PROJECT_BINARY_DIR}/blosc/\$\(Configuration\)/blosc2.dll"
-            "${CMAKE_CURRENT_BINARY_DIR}/\$\(Configuration\)/blosc2.dll")
-elseif(MINGW)
-    add_custom_command(
-            TARGET ${BENCH_EXE}
-            POST_BUILD
-            COMMAND ${CMAKE_COMMAND}
-            ARGS -E copy_if_different
-            "${PROJECT_BINARY_DIR}/blosc/libblosc2.dll"
-            "${CMAKE_CURRENT_BINARY_DIR}/libblosc2.dll")
-endif()
-
 # tests
 if(BUILD_TESTS)
 

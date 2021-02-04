@@ -1,16 +1,6 @@
 # build the filegen utility
 link_directories(${PROJECT_BINARY_DIR}/blosc)
 add_executable(filegen filegen.c)
-# have to copy blosc dlls on Windows
-if(MSVC OR MINGW)
-    add_custom_command(
-            TARGET filegen
-            POST_BUILD
-            COMMAND ${CMAKE_COMMAND}
-            ARGS -E copy_if_different
-            "$<TARGET_FILE:blosc_shared_testing>"
-            "$<TARGET_FILE_DIR:filegen>/$<TARGET_FILE_NAME:blosc_shared_testing>")
-endif()
 target_link_libraries(filegen blosc_shared_testing)
 add_dependencies(filegen blosc_shared_testing)
 

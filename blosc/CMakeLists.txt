@@ -140,6 +140,9 @@ endif()
 if(BUILD_SHARED)
     add_library(blosc2_shared SHARED ${SOURCES})
     set_target_properties(blosc2_shared PROPERTIES OUTPUT_NAME blosc2)
+    if(MSVC OR MINGW)
+        set_target_properties(blosc2_shared PROPERTIES PREFIX lib)
+    endif()
     set_target_properties(blosc2_shared PROPERTIES
             VERSION ${version_string}
             SOVERSION 2  # Change this when an ABI change happens
@@ -226,6 +229,9 @@ endif()
 if(BUILD_TESTS)
     add_library(blosc_shared_testing SHARED ${SOURCES})
     set_target_properties(blosc_shared_testing PROPERTIES OUTPUT_NAME blosc_testing)
+    if(MSVC OR MINGW)
+        set_target_properties(blosc_shared_testing PROPERTIES PREFIX lib)
+    endif()
     set_property(
             TARGET blosc_shared_testing
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_SHARED_LIBRARY)
@@ -254,7 +260,7 @@ endif()
 if(BUILD_STATIC)
     add_library(blosc2_static STATIC ${SOURCES})
     set_target_properties(blosc2_static PROPERTIES OUTPUT_NAME blosc2)
-    if(MSVC)
+    if(MSVC OR MINGW)
         set_target_properties(blosc2_static PROPERTIES PREFIX lib)
     endif()
     target_link_libraries(blosc2_static ${LIBS})
