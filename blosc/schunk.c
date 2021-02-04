@@ -283,6 +283,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
       BLOSC_TRACE_ERROR("Can not update the `usermeta`.");
       return NULL;
     }
+    free(usermeta);
   }
   return new_schunk;
 }
