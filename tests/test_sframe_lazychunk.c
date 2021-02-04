@@ -107,7 +107,7 @@ static char* test_lazy_chunk(void) {
 }
 
 static char *all_tests(void) {
-  directory = "dir1.b2eframe/";
+  directory = "dir1.b2sframe/";
   nchunks = 0;
   clevel = 5;
   nthreads = 1;
@@ -143,7 +143,7 @@ static char *all_tests(void) {
   nthreads = 2;
   mu_run_test(test_lazy_chunk);
 
-  directory = "dir1.b2eframe";
+  directory = "dir1.b2sframe";
   nchunks = 0;
   clevel = 5;
   nthreads = 1;

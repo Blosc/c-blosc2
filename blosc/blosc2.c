@@ -1261,7 +1261,7 @@ static int blosc_d(
     int32_t block_csize = block_csizes[nblock];
     // Read the lazy block on disk
     FILE* fp = NULL;
-    if (frame->eframe) {
+    if (frame->sframe) {
       // The chunk is not in the frame
       char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
       sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
