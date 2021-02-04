@@ -82,7 +82,7 @@ void swap_store(void *dest, const void *pa, int size) {
 
 
 /* Create a new (empty) frame */
-blosc2_frame_s* blosc2_frame_new(const char* urlpath) {
+blosc2_frame_s* frame_new(const char* urlpath) {
   blosc2_frame_s* new_frame = calloc(1, sizeof(blosc2_frame_s));
   if (urlpath != NULL) {
     char* new_urlpath = malloc(strlen(urlpath) + 1);  // + 1 for the trailing NULL
@@ -93,7 +93,7 @@ blosc2_frame_s* blosc2_frame_new(const char* urlpath) {
 
 
 /* Free memory from a frame. */
-int blosc2_frame_free(blosc2_frame_s *frame) {
+int frame_free(blosc2_frame_s *frame) {
 
   if (frame->sdata != NULL && !frame->avoid_sdata_free) {
     free(frame->sdata);
@@ -617,8 +617,124 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
 }
 
 
+/* Initialize a frame out of a file */
+blosc2_frame_s* frame_from_file(const char* urlpath) {
+  // Get the length of the frame
+  uint8_t header[FRAME_HEADER_MINLEN];
+  uint8_t trailer[FRAME_TRAILER_MINLEN];
+
+  FILE* fp = NULL;
+  bool eframe = false;
+  struct stat path_stat;
+
+  if(stat(urlpath, &path_stat) < 0) {
+    BLOSC_TRACE_ERROR("Cannot get information about the path %s.", urlpath);
+    return NULL;
+  }
+  char* urlpath_cpy;
+  if (path_stat.st_mode & S_IFDIR) {
+    char last_char = urlpath[strlen(urlpath) - 1];
+    if (last_char == '\\' || last_char == '/') {
+      urlpath_cpy = malloc(strlen(urlpath));
+      strncpy(urlpath_cpy,urlpath, strlen(urlpath) - 1);
+      urlpath_cpy[strlen(urlpath) - 1] = '\0';
+    }
+    else {
+      urlpath_cpy = malloc(strlen(urlpath) + 1);
+      strcpy(urlpath_cpy, urlpath);
+    }
+    char* eframe_name = malloc(strlen(urlpath_cpy) + strlen("/chunks.b2frame") + 1);
+    sprintf(eframe_name, "%s/chunks.b2frame", urlpath_cpy);
+    fp = fopen(eframe_name, "rb");
+    free(eframe_name);
+    eframe = true;
+  }
+  else {
+    urlpath_cpy = malloc(strlen(urlpath) + 1);
+    strcpy(urlpath_cpy, urlpath);
+    fp = fopen(urlpath, "rb");
+  }
+  size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
+  if (rbytes != FRAME_HEADER_MINLEN) {
+    BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
+    fclose(fp);
+    free(urlpath_cpy);
+    return NULL;
+  }
+  int64_t frame_len;
+  swap_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
+
+  blosc2_frame_s* frame = calloc(1, sizeof(blosc2_frame_s));
+  frame->urlpath = urlpath_cpy;
+  frame->len = frame_len;
+  frame->eframe = eframe;
+
+  // Now, the trailer length
+  fseek(fp, frame_len - FRAME_TRAILER_MINLEN, SEEK_SET);
+  rbytes = fread(trailer, 1, FRAME_TRAILER_MINLEN, fp);
+  fclose(fp);
+  if (rbytes != FRAME_TRAILER_MINLEN) {
+    BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
+    free(urlpath_cpy);
+    free(frame);
+    return NULL;
+  }
+  int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
+  if (trailer[trailer_offset - 1] != 0xce) {
+    free(urlpath_cpy);
+    free(frame);
+    return NULL;
+  }
+  uint32_t trailer_len;
+  swap_store(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
+  frame->trailer_len = trailer_len;
+
+  return frame;
+}
+
+
+/* Initialize a frame out of a serialized frame */
+blosc2_frame_s* frame_from_sframe(uint8_t *sframe, int64_t len, bool copy) {
+  // Get the length of the frame
+  const uint8_t* header = sframe;
+  int64_t frame_len;
+  if (len < FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
+  swap_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
+  if (frame_len != len) {   // sanity check
+    return NULL;
+  }
+
+  blosc2_frame_s* frame = calloc(1, sizeof(blosc2_frame_s));
+  frame->len = frame_len;
+
+  // Now, the trailer length
+  const uint8_t* trailer = sframe + frame_len - FRAME_TRAILER_MINLEN;
+  int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
+  if (trailer[trailer_offset - 1] != 0xce) {
+    free(frame);
+    return NULL;
+  }
+  uint32_t trailer_len;
+  swap_store(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
+  frame->trailer_len = trailer_len;
+
+  if (copy) {
+    frame->sdata = malloc((size_t)len);
+    memcpy(frame->sdata, sframe, (size_t)len);
+  }
+  else {
+    frame->sdata = sframe;
+    frame->avoid_sdata_free = true;
+  }
+
+  return frame;
+}
+
+
 /* Create a frame out of a super-chunk. */
-int64_t blosc2_frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
+int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   int32_t nchunks = schunk->nchunks;
   int64_t cbytes = schunk->cbytes;
   FILE* fp = NULL;
@@ -745,174 +861,6 @@ int64_t blosc2_frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   }
 
   return frame->len;
-}
-
-
-int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* needs_free) {
-  blosc2_frame_s* frame;
-  int64_t sdata_len = 0;
-  if ((schunk->storage->sequential == true) && (schunk->storage->urlpath == NULL)) {
-    frame =  (blosc2_frame_s*)(schunk->frame);
-    *dest = frame->sdata;
-    sdata_len = frame->len;
-    *needs_free = false;
-  }
-  else {
-    // Copy to a sequential storage
-    blosc2_storage frame_storage = {.sequential=true};
-    blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, frame_storage);
-    if (schunk_copy == NULL) {
-      BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
-      return BLOSC2_ERROR_SCHUNK_COPY;
-    }
-    frame = (blosc2_frame_s*)(schunk_copy->frame);
-    *dest = frame->sdata;
-    sdata_len = frame->len;
-    *needs_free = true;
-    frame->avoid_sdata_free = true;
-    blosc2_schunk_free(schunk_copy);
-  }
-
-  return sdata_len;
-
-}
-
-
-/* Write super-frame out to a file. */
-int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath) {
-  if (urlpath == NULL) {
-    BLOSC_TRACE_ERROR("urlpath cannot be NULL");
-    return -1;
-  }
-  // Copy to a sequential file
-  char* urlpath_copy = malloc(strlen(urlpath) + 1);
-  strcpy(urlpath_copy, urlpath);
-  blosc2_storage frame_storage = {.sequential=true, .urlpath=urlpath_copy};
-  blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, frame_storage);
-  if (schunk_copy == NULL) {
-    BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
-    return BLOSC2_ERROR_SCHUNK_COPY;
-  }
-  blosc2_frame_s* frame = (blosc2_frame_s*)(schunk_copy->frame);
-  int64_t frame_len = frame->len;
-  blosc2_schunk_free(schunk_copy);
-  return frame->len;
-}
-
-
-/* Initialize a frame out of a file */
-blosc2_frame_s* blosc2_frame_from_file(const char* urlpath) {
-  // Get the length of the frame
-  uint8_t header[FRAME_HEADER_MINLEN];
-  uint8_t trailer[FRAME_TRAILER_MINLEN];
-
-  FILE* fp = NULL;
-  bool eframe = false;
-  struct stat path_stat;
-
-  if(stat(urlpath, &path_stat) < 0) {
-    BLOSC_TRACE_ERROR("Cannot get information about the path %s.", urlpath);
-    return NULL;
-  }
-  char* urlpath_cpy;
-  if (path_stat.st_mode & S_IFDIR) {
-    char last_char = urlpath[strlen(urlpath) - 1];
-    if (last_char == '\\' || last_char == '/') {
-      urlpath_cpy = malloc(strlen(urlpath));
-      strncpy(urlpath_cpy,urlpath, strlen(urlpath) - 1);
-      urlpath_cpy[strlen(urlpath) - 1] = '\0';
-    }
-    else {
-      urlpath_cpy = malloc(strlen(urlpath) + 1);
-      strcpy(urlpath_cpy, urlpath);
-    }
-    char* eframe_name = malloc(strlen(urlpath_cpy) + strlen("/chunks.b2frame") + 1);
-    sprintf(eframe_name, "%s/chunks.b2frame", urlpath_cpy);
-    fp = fopen(eframe_name, "rb");
-    free(eframe_name);
-    eframe = true;
-  }
-  else {
-    urlpath_cpy = malloc(strlen(urlpath) + 1);
-    strcpy(urlpath_cpy, urlpath);
-    fp = fopen(urlpath, "rb");
-  }
-  size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
-  if (rbytes != FRAME_HEADER_MINLEN) {
-    BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
-    fclose(fp);
-    free(urlpath_cpy);
-    return NULL;
-  }
-  int64_t frame_len;
-  swap_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
-
-  blosc2_frame_s* frame = calloc(1, sizeof(blosc2_frame_s));
-  frame->urlpath = urlpath_cpy;
-  frame->len = frame_len;
-  frame->eframe = eframe;
-
-  // Now, the trailer length
-  fseek(fp, frame_len - FRAME_TRAILER_MINLEN, SEEK_SET);
-  rbytes = fread(trailer, 1, FRAME_TRAILER_MINLEN, fp);
-  fclose(fp);
-  if (rbytes != FRAME_TRAILER_MINLEN) {
-    BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
-    free(urlpath_cpy);
-    free(frame);
-    return NULL;
-  }
-  int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
-  if (trailer[trailer_offset - 1] != 0xce) {
-    free(urlpath_cpy);
-    free(frame);
-    return NULL;
-  }
-  uint32_t trailer_len;
-  swap_store(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
-  frame->trailer_len = trailer_len;
-
-  return frame;
-}
-
-
-/* Initialize a frame out of a serialized frame */
-blosc2_frame_s* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy) {
-  // Get the length of the frame
-  const uint8_t* header = sframe;
-  int64_t frame_len;
-  if (len < FRAME_HEADER_MINLEN) {
-    return NULL;
-  }
-  swap_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
-  if (frame_len != len) {   // sanity check
-    return NULL;
-  }
-
-  blosc2_frame_s* frame = calloc(1, sizeof(blosc2_frame_s));
-  frame->len = frame_len;
-
-  // Now, the trailer length
-  const uint8_t* trailer = sframe + frame_len - FRAME_TRAILER_MINLEN;
-  int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
-  if (trailer[trailer_offset - 1] != 0xce) {
-    free(frame);
-    return NULL;
-  }
-  uint32_t trailer_len;
-  swap_store(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
-  frame->trailer_len = trailer_len;
-
-  if (copy) {
-    frame->sdata = malloc((size_t)len);
-    memcpy(frame->sdata, sframe, (size_t)len);
-  }
-  else {
-    frame->sdata = sframe;
-    frame->avoid_sdata_free = true;
-  }
-
-  return frame;
 }
 
 
@@ -1347,7 +1295,7 @@ blosc2_storage* get_new_storage(const blosc2_storage* storage, const blosc2_cpar
 
 
 /* Get a super-chunk out of a frame */
-blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame_s* frame, bool copy) {
+blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
   int32_t header_len;
   int64_t frame_len;
 

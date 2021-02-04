@@ -1143,19 +1143,6 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_empty(int nchunks, blosc2_storage stor
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage);
 
-
-/**
- * @brief Open an existing super-chunk that is on-disk (no copy is made).
- *
- * @param storage The storage properties of the source.
- *
- * @remark The storage.urlpath must be not NULL and it should exist on-disk.
- * New data or metadata can be appended or updated.
- *
- * @return The new super-chunk.
- */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open(char* urlpath);
-
 /**
  * @brief Create a super-chunk out of an in-memory frame.
  *
@@ -1172,8 +1159,45 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open(char* urlpath);
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk*
-blosc2_schunk_from_buffer(uint8_t *sframe, int64_t len, bool copy);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *sframe, int64_t len, bool copy);
+
+/**
+ * @brief Open an existing super-chunk that is on-disk (no copy is made).
+ *
+ * @param storage The storage properties of the source.
+ *
+ * @remark The storage.urlpath must be not NULL and it should exist on-disk.
+ * New data or metadata can be appended or updated.
+ *
+ * @return The new super-chunk.
+ */
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open(char* urlpath);
+
+/* @brief Convert a super-chunk into a sequential buffer.
+ *
+ * @param schunk The super-chunk to convert.
+ * @param dest The address of the destination buffer (output).
+ * @param needs_free The pointer to a boolean indicating if it is the user's
+ * responsibility to free the chunk returned or not.
+ *
+ * @note The user is responsible to free the @p dest buffer (not always required).
+ * You can check whether the dest requires a free with the @p needs_free parameter.
+ *
+ * @return If successful, return the size of the (frame) @p dest buffer.
+ * Else, a negative value.
+ */
+BLOSC_EXPORT int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* needs_free);
+
+/* @brief Store a super-chunk into a file.
+ *
+ * @param schunk The super-chunk to write.
+ * @param urlpath The path for persistent storage.
+ *
+ * @return If successful, return the size of the (fileframe) in @p urlpath.
+ * Else, a negative value.
+ */
+BLOSC_EXPORT int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath);
+
 
 /**
  * @brief Release resources from a super-chunk.
@@ -1412,7 +1436,7 @@ BLOSC_EXPORT int blosc2_get_metalayer(blosc2_schunk *schunk, const char *name, u
  *
  * If the @p schunk has an attached frame, the later will be updated accordingly too.
  *
- * @param schunk The super-chunk to which one should add the usermeta chunk.
+ * @param schunk The super-chunk to add the usermeta chunk.
  * @param content The content of the usermeta chunk.
  * @param content_len The length of the content.
  * @param cparams The parameters for compressing the usermeta chunk.
@@ -1437,32 +1461,6 @@ BLOSC_EXPORT int blosc2_update_usermeta(blosc2_schunk *schunk, uint8_t *content,
  * Else, a negative value.
  */
 BLOSC_EXPORT int blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content);
-
-
-/* @brief Convert a super-chunk into a sequential buffer.
- *
- * @param schunk The super-chunk to convert.
- * @param dest The address of the destination buffer (output).
- * @param needs_free The pointer to a boolean indicating if it is the user's
- * responsibility to free the chunk returned or not.
- *
- * @note The user is responsible to free the @p dest buffer (not always required).
- * You can check whether the dest requires a free with the @p needs_free parameter.
- *
- * @return If successful, return the size of the (frame) @p dest buffer.
- * Else, a negative value.
- */
-BLOSC_EXPORT int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* needs_free);
-
-/* @brief Store a super-chunk into a file.
- *
- * @param schunk The super-chunk to write.
- * @param urlpath The path for persistent storage.
- *
- * @return If successful, return the size of the (fileframe) in @p urlpath.
- * Else, a negative value.
- */
-BLOSC_EXPORT int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath);
 
 
 /*********************************************************************

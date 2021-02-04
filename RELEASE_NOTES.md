@@ -36,7 +36,7 @@ Changes from 2.0.0-beta.4 to 2.0.0.beta5
   https://github.com/Blosc/c-blosc2/pull/98.  Thanks to Jerome Kieffer
   and ESRF for making this happen.
 
-* New blosc2_frame_from_sframe() function for getting a `blosc2_frame`
+* New frame_from_sframe() function for getting a `blosc2_frame`
   out of an in-memory serialized frame.
 
 * Zstd codec updated to 1.4.4.

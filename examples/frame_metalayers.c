@@ -106,10 +106,6 @@ int main(void) {
 
   // fileframe (file) -> schunk2 (schunk based on a on-disk frame)
   blosc_set_timestamp(&last);
-  //blosc2_frame* frame2 = blosc2_frame_from_file("frame_metalayers.b2frame");
-  //blosc2_schunk* schunk2 = blosc2_frame_to_schunk(frame2, false);
-//  blosc2_storage storage2 = {.cparams=&cparams, .dparams=&dparams, .sequential=true,
-//                             .urlpath="frame_metalayers.b2frame"};
   blosc2_schunk* schunk2 = blosc2_schunk_open("frame_metalayers.b2frame");
   if (schunk2 == NULL) {
     printf("Cannot get the schunk from frame2");
