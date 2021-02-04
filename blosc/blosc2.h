@@ -1142,7 +1142,8 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_sto
  *
  * @param sframe The buffer of the in-memory serialized frame.
  * @param copy Whether the super-chunk should make a copy of
- * the sframe or not.
+ * the sframe or not.  The copy will be made into an internal
+ * sparse frame.
  *
  * @remark If copy is false, the sframe buffer passed will be owned
  * by the super-chunk and will be automatically freed when
