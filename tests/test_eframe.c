@@ -87,10 +87,9 @@ static char* test_eframe(void) {
 
   if (free_new) {
     blosc2_schunk_free(schunk);
+    schunk = blosc2_schunk_open(directory);
+    mu_assert("blosc2_schunk_open() failed", schunk != NULL);
   }
-  //blosc2_storage storage2 = {.sequential=false, .urlpath=directory};
-  schunk = blosc2_schunk_open(directory);
-  mu_assert("blosc2_schunk_open() failed", schunk != NULL);
 
   if (metalayers) {
     uint8_t* _content;
@@ -152,8 +151,9 @@ static char* test_eframe(void) {
 
   if (free_new) {
     blosc2_schunk_free(schunk);
+    schunk = blosc2_schunk_open(directory);
+    mu_assert("blosc2_schunk_open() failed (2)", schunk != NULL);
   }
-  schunk = blosc2_schunk_open(directory);
 
   /* Gather some info */
   nbytes = schunk->nbytes;
