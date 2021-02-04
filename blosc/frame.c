@@ -93,7 +93,7 @@ blosc2_frame_s* frame_new(const char* urlpath) {
 
 
 /* Free memory from a frame. */
-int frame_free(blosc2_frame_s *frame) {
+int frame_free(blosc2_frame_s* frame) {
 
   if (frame->sdata != NULL && !frame->avoid_sdata_free) {
     free(frame->sdata);
