@@ -451,8 +451,6 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
     int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
     switch (special_value) {
       case BLOSC2_ZERO_RUNLEN:
-        schunk->cbytes += 0;
-        break;
       case BLOSC2_NAN_RUNLEN:
         schunk->cbytes += 0;
         break;
@@ -532,8 +530,6 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
     switch (special_value) {
       case BLOSC2_ZERO_RUNLEN:
-        schunk->cbytes += 0;
-        break;
       case BLOSC2_NAN_RUNLEN:
         schunk->cbytes += 0;
         break;
@@ -649,12 +645,6 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
     switch (special_value) {
       case BLOSC2_ZERO_RUNLEN:
-        schunk->nbytes += nbytes;
-        schunk->nbytes -= nbytes_old;
-        if (frame->eframe) {
-          schunk->cbytes -= cbytes_old;
-        }
-        break;
       case BLOSC2_NAN_RUNLEN:
         schunk->nbytes += nbytes;
         schunk->nbytes -= nbytes_old;
