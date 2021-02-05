@@ -6,7 +6,7 @@ set(SOURCES_TRUNC_PREC trunc_prec_schunk.c)
 set(SOURCES_SUM_OPENMP sum_openmp.c)
 set(SOURCES_ZERO_RUNLEN zero_runlen.c)
 # sources for eframe bench
-set(SOURCES_EFRAME eframe_bench.c)
+set(SOURCES_EFRAME sframe_bench.c)
 
 # targets
 set(BENCH_EXE b2bench)
