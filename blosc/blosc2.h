@@ -1172,7 +1172,7 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *framebuf, int64_t
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open(char* urlpath);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open(const char* urlpath);
 
 /* @brief Convert a super-chunk into a frame buffer.
  *
@@ -1197,7 +1197,7 @@ BLOSC_EXPORT int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** fr
  * @return If successful, return the size of the (fileframe) in @p urlpath.
  * Else, a negative value.
  */
-BLOSC_EXPORT int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, char* urlpath);
+BLOSC_EXPORT int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath);
 
 
 /**
