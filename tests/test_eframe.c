@@ -109,8 +109,8 @@ static char* test_eframe(void) {
 
   if (usermeta) {
     int content_len_ = blosc2_get_usermeta(schunk, &content_);
-    mu_assert("ERROR: bad usermeta length in frame", (size_t) content_len_ == content_len);
-    mu_assert("ERROR: bad usermeta data in frame", strncmp((char*)content_, content, content_len) == 0);
+    mu_assert("ERROR: bad umetalayers length in frame", (size_t) content_len_ == content_len);
+    mu_assert("ERROR: bad umetalayers data in frame", strncmp((char*)content_, content, content_len) == 0);
     free(content_);
     blosc2_update_usermeta(schunk, (uint8_t *) content2, (int32_t) content_len2, BLOSC2_CPARAMS_DEFAULTS);
   }
@@ -144,8 +144,8 @@ static char* test_eframe(void) {
 
   if (usermeta) {
     int content_len_ = blosc2_get_usermeta(schunk, &content_);
-    mu_assert("ERROR: bad usermeta length in frame", (size_t) content_len_ == content_len2);
-    mu_assert("ERROR: bad usermeta data in frame", strncmp((char*)content_, content2, content_len2) == 0);
+    mu_assert("ERROR: bad umetalayers length in frame", (size_t) content_len_ == content_len2);
+    mu_assert("ERROR: bad umetalayers data in frame", strncmp((char*)content_, content2, content_len2) == 0);
     free(content_);
     blosc2_update_usermeta(schunk, (uint8_t *) content3, (int32_t) content_len3, BLOSC2_CPARAMS_DEFAULTS);
   }
@@ -188,8 +188,8 @@ static char* test_eframe(void) {
 
   if (usermeta) {
     int content_len_ = blosc2_get_usermeta(schunk, &content_);
-    mu_assert("ERROR: bad usermeta length in frame", (size_t) content_len_ == content_len3);
-    mu_assert("ERROR: bad usermeta data in frame", strncmp((char*)content_, content3, content_len3) == 0);
+    mu_assert("ERROR: bad umetalayers length in frame", (size_t) content_len_ == content_len3);
+    mu_assert("ERROR: bad umetalayers data in frame", strncmp((char*)content_, content3, content_len3) == 0);
     free(content_);
   }
 
