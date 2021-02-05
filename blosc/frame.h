@@ -41,10 +41,9 @@
 #define FRAME_TRAILER_VERSION_BETA2 (0U)  // for beta.2 and former
 #define FRAME_TRAILER_VERSION (1U)        // can be up to 127
 
-#define FRAME_TRAILER_USERMETA_LEN_OFFSET (3)  // offset to usermeta length
-#define FRAME_TRAILER_USERMETA_OFFSET (7)  // offset to usermeta chunk
-#define FRAME_TRAILER_MINLEN (30)  // minimum length for the trailer (msgpack overhead)
+#define FRAME_TRAILER_MINLEN (35)  // minimum length for the trailer (msgpack overhead)
 #define FRAME_TRAILER_LEN_OFFSET (22)  // offset to trailer length (counting from the end)
+#define FRAME_TRAILER_VLMETALAYERS (2)
 
 
 typedef struct {

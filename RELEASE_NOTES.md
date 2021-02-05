@@ -96,10 +96,10 @@ Changes from 2.0.0-beta.2 to 2.0.0-beta.3
 Changes from 2.0.0-beta.1 to 2.0.0-beta.2
 ========================================
 
-* A new `usermeta` chunk in `schunk` allows to store arbitrary meta-information
+* A new `vlmetalayers` chunk in `schunk` allows to store arbitrary meta-information
   that is up to the user.  If the `schunk` has an attached `frame`, the later
   will be updated accordingly too.  For more info, see PR #74 and docstrings of
-  new `blosc2_update_usermeta()` and `blosc2_get_usermeta()` functions.
+  new `blosc2_update_vlmetalayer()` and `blosc2_get_vlmetalayer()` functions.
 
 * Metalayers must now be attached to super-chunks, not frames.  The reason is
   that frames are increasingly treated as a storage specifier (in-memory or

@@ -257,7 +257,8 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
       }
     }
   } else {
-    uint8_t *buffer = malloc(schunk->chunksize);
+    int32_t chunksize = schunk->chunksize == -1 ? 0 : schunk->chunksize;
+    uint8_t *buffer = malloc(chunksize);
     for (int nchunk = 0; nchunk < schunk->nchunks; ++nchunk) {
       if (blosc2_schunk_decompress_chunk(schunk, nchunk, buffer, schunk->chunksize) < 0) {
         BLOSC_TRACE_ERROR("Can not decompress the `chunk` %d.", nchunk);
@@ -271,19 +272,19 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
     free(buffer);
   }
 
-  // Copy user meta
-  if (schunk->usermeta != NULL) {
-    uint8_t *usermeta;
-    int32_t usermeta_len = blosc2_get_usermeta(schunk, &usermeta);
-    if (usermeta_len < 0) {
-      BLOSC_TRACE_ERROR("Can not get `usermeta` from schunk");
+  // Copy vlmetalayers
+  for (int nmeta = 0; nmeta < schunk->nvlmetalayers; ++nmeta) {
+    uint8_t *content;
+    uint32_t content_len;
+    char* name = schunk->vlmetalayers[nmeta]->name;
+    if (blosc2_get_vlmetalayer(schunk, name, &content, &content_len) < 0) {
+      BLOSC_TRACE_ERROR("Can not get %s `umetalayer`.", name);
+    }
+    if (blosc2_add_vlmetalayer(new_schunk, name, content, content_len, NULL) < 0) {
+      BLOSC_TRACE_ERROR("Can not add %s `umetalayer`.", name);
       return NULL;
     }
-    if (blosc2_update_usermeta(new_schunk, usermeta, usermeta_len, cparams) < 0) {
-      BLOSC_TRACE_ERROR("Can not update the `usermeta`.");
-      return NULL;
-    }
-    free(usermeta);
+    free(content);
   }
   return new_schunk;
 }
@@ -420,8 +421,16 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     frame_free((blosc2_frame_s *) schunk->frame);
   }
 
-  if (schunk->usermeta_len > 0) {
-    free(schunk->usermeta);
+  if (schunk->nvlmetalayers > 0) {
+    for (int i = 0; i < schunk->nvlmetalayers; ++i) {
+      if (schunk->vlmetalayers[i] != NULL) {
+        if (schunk->vlmetalayers[i]->name != NULL)
+          free(schunk->vlmetalayers[i]->name);
+        if (schunk->vlmetalayers[i]->content != NULL)
+          free(schunk->vlmetalayers[i]->content);
+        free(schunk->vlmetalayers[i]);
+      }
+    }
   }
 
   free(schunk);
@@ -1007,57 +1016,146 @@ int blosc2_get_metalayer(blosc2_schunk *schunk, const char *name, uint8_t **cont
   return nmetalayer;
 }
 
-
-/* Update the content of the usermeta chunk. */
-int blosc2_update_usermeta(blosc2_schunk *schunk, uint8_t *content, int32_t content_len,
-                           blosc2_cparams cparams) {
-  if ((uint32_t) content_len > (1u << 31u)) {
-    BLOSC_TRACE_ERROR("content_len cannot exceed 2 GB.");
-    return BLOSC2_ERROR_2GB_LIMIT;
+/* Find whether the schunk has a variable-length metalayer or not.
+ *
+ * If successful, return the index of the variable-length metalayer.  Else, return a negative value.
+ */
+int blosc2_has_vlmetalayer(blosc2_schunk *schunk, const char *name) {
+  if (strlen(name) > BLOSC2_METALAYER_NAME_MAXLEN) {
+    BLOSC_TRACE_ERROR("Variable-length metalayer names cannot be larger than %d chars.", BLOSC2_METALAYER_NAME_MAXLEN);
+    return BLOSC2_ERROR_INVALID_PARAM;
   }
 
-  // Compress the usermeta chunk
-  void* usermeta_chunk = malloc(content_len + BLOSC_MAX_OVERHEAD);
-  blosc2_context *cctx = blosc2_create_cctx(cparams);
-  int usermeta_cbytes = blosc2_compress_ctx(cctx, content, content_len, usermeta_chunk,
-                                            content_len + BLOSC_MAX_OVERHEAD);
-  blosc2_free_ctx(cctx);
-  if (usermeta_cbytes < 0) {
-    free(usermeta_chunk);
-    return usermeta_cbytes;
-  }
-
-  // Update the contents of the usermeta chunk
-  if (schunk->usermeta_len > 0) {
-    free(schunk->usermeta);
-  }
-  schunk->usermeta = malloc(usermeta_cbytes);
-  memcpy(schunk->usermeta, usermeta_chunk, usermeta_cbytes);
-  free(usermeta_chunk);
-  schunk->usermeta_len = usermeta_cbytes;
-
-  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
-  if (frame != NULL) {
-    int rc = frame_update_trailer(frame, schunk);
-    if (rc < 0) {
-      return rc;
+  for (int numeta = 0; numeta < schunk->nvlmetalayers; numeta++) {
+    if (strcmp(name, schunk->vlmetalayers[numeta]->name) == 0) {
+      return numeta;
     }
   }
+  return BLOSC2_ERROR_NOT_FOUND;
+}
 
-  return usermeta_cbytes;
+int umetalayer_flush(blosc2_schunk* schunk) {
+  int rc;
+  if (schunk->frame == NULL) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  rc = frame_update_header(schunk->frame, schunk, false);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Unable to update metalayers into frame.");
+    return rc;
+  }
+  rc = frame_update_trailer(schunk->frame, schunk);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Unable to update trailer into frame.");
+    return rc;
+  }
+  return rc;
+}
+
+/* Add content into a new variable-length metalayer.
+ *
+ * If successful, return the index of the new variable-length metalayer.  Else, return a negative value.
+ */
+int blosc2_add_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t *content, uint32_t content_len,
+                           blosc2_cparams *cparams) {
+  int numeta = blosc2_has_vlmetalayer(schunk, name);
+  if (numeta >= 0) {
+    BLOSC_TRACE_ERROR("Variable-length metalayer \"%s\" already exists.", name);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  // Add the umeta
+  blosc2_metalayer *umeta = malloc(sizeof(blosc2_metalayer));
+  umeta->name = strdup(name);
+  uint8_t* content_buf = malloc((size_t) content_len + BLOSC_MAX_OVERHEAD);
+
+  blosc2_context *cctx;
+  if (cparams != NULL) {
+    cctx = blosc2_create_cctx(*cparams);
+  } else {
+    cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
+  }
+
+  int csize = blosc2_compress_ctx(cctx, content, content_len, content_buf, content_len + BLOSC_MAX_OVERHEAD);
+  if (csize < 0) {
+    BLOSC_TRACE_ERROR("Can not compress the `%s` variable-length metalayer.", name);
+    return csize;
+  }
+  blosc2_free_ctx(cctx);
+
+  umeta->content = realloc(content_buf, csize);
+  umeta->content_len = csize;
+  schunk->vlmetalayers[schunk->nvlmetalayers] = umeta;
+  schunk->nvlmetalayers += 1;
+
+  // Propagate to frames
+  int rc = umetalayer_flush(schunk);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Can not propagate de `%s` variable-length metalayer to a frame.", name);
+    return rc;
+  }
+
+  return schunk->nvlmetalayers - 1;
 }
 
 
-/* Retrieve the usermeta chunk */
-int32_t blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content) {
-  size_t nbytes, cbytes, blocksize;
-  blosc_cbuffer_sizes(schunk->usermeta, &nbytes, &cbytes, &blocksize);
-  *content = malloc(nbytes);
-  blosc2_context *dctx = blosc2_create_dctx(BLOSC2_DPARAMS_DEFAULTS);
-  int usermeta_nbytes = blosc2_decompress_ctx(dctx, schunk->usermeta, schunk->usermeta_len, *content, (int32_t)nbytes);
-  blosc2_free_ctx(dctx);
-  if (usermeta_nbytes < 0) {
-    return usermeta_nbytes;
+int blosc2_get_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t **content,
+                           uint32_t *content_len) {
+  int numeta = blosc2_has_vlmetalayer(schunk, name);
+  if (numeta < 0) {
+    BLOSC_TRACE_ERROR("User metalayer \"%s\" not found.", name);
+    return numeta;
   }
-  return (int32_t)nbytes;
+  blosc2_metalayer *meta = schunk->vlmetalayers[numeta];
+  size_t nbytes, cbytes, blocksize;
+  blosc_cbuffer_sizes(meta->content, &nbytes, &cbytes, &blocksize);
+  if (cbytes != meta->content_len) {
+    BLOSC_TRACE_ERROR("User metalayer \"%s\" is corrupted.", meta->name);
+    return BLOSC2_ERROR_DATA;
+  }
+  *content_len = nbytes;
+  *content = malloc((size_t) nbytes);
+  int nbytes_ = blosc2_decompress_ctx(schunk->dctx, meta->content, meta->content_len, *content, nbytes);
+  if (nbytes_ != nbytes) {
+    BLOSC_TRACE_ERROR("User metalayer \"%s\" is corrupted.", meta->name);
+    return BLOSC2_ERROR_READ_BUFFER;
+  }
+  return numeta;
+}
+
+int blosc2_update_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t *content, uint32_t content_len,
+                              blosc2_cparams *cparams) {
+  int numeta = blosc2_has_vlmetalayer(schunk, name);
+  if (numeta < 0) {
+    BLOSC_TRACE_ERROR("User umeta \"%s\" not found.", name);
+    return numeta;
+  }
+
+  blosc2_metalayer *umeta = schunk->vlmetalayers[numeta];
+  free(umeta->content);
+  uint8_t* content_buf = malloc((size_t) content_len + BLOSC_MAX_OVERHEAD);
+
+  blosc2_context *cctx;
+  if (cparams != NULL) {
+    cctx = blosc2_create_cctx(*cparams);
+  } else {
+    cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
+  }
+
+  int csize = blosc2_compress_ctx(cctx, content, content_len, content_buf, content_len + BLOSC_MAX_OVERHEAD);
+  if (csize < 0) {
+    BLOSC_TRACE_ERROR("Can not compress the `%s` variable-length metalayer.", name);
+    return csize;
+  }
+  umeta->content = realloc(content_buf, csize);
+  umeta->content_len = csize;
+
+  // Propagate to frames
+  int rc = umetalayer_flush(schunk);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Can not propagate de `%s` variable-length metalayer to a frame.", name);
+    return rc;
+  }
+
+  return numeta;
 }
