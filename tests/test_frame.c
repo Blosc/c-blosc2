@@ -75,7 +75,7 @@ static char* test_frame(void) {
     cparams.nthreads = 1;
     dparams.nthreads = 1;
   }
-  blosc2_storage storage = {.sequential=true, .urlpath=fname, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.contiguous=true, .urlpath=fname, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
   mu_assert("blosc2_schunk_new() failed", schunk != NULL);
   char* content = "This is a pretty long string with a good number of chars";
@@ -102,7 +102,7 @@ static char* test_frame(void) {
         schunk = blosc2_schunk_open(fname);
         mu_assert("blosc2_schunk_open() failed", schunk != NULL);
         mu_assert("storage is not recovered correctly",
-                  schunk->storage->sequential == true);
+                  schunk->storage->contiguous == true);
         mu_assert("cparams are not recovered correctly",
                   schunk->storage->cparams->clevel == BLOSC2_CPARAMS_DEFAULTS.clevel);
         mu_assert("dparams are not recovered correctly",

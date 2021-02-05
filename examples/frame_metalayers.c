@@ -58,7 +58,7 @@ int main(void) {
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams, .sequential=true};
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams, .contiguous=true};
   blosc2_schunk* schunk = blosc2_schunk_new(storage);
 
   // Add some metalayers (one must add metalayers prior to actual data)

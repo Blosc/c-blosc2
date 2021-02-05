@@ -17,10 +17,10 @@
 /* Global vars */
 int tests_run = 0;
 int nchunks;
-int sequential = false;
+int contiguous = false;
 
 
-static char* test_schunk_framebuf(void) {
+static char* test_schunk_cframe(void) {
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int32_t *data = malloc(isize);
   int32_t *data_dest = malloc(isize);
@@ -31,7 +31,7 @@ static char* test_schunk_framebuf(void) {
   blosc_init();
 
   /* Create a super-chunk container */
-  blosc2_storage storage = {.sequential=sequential};
+  blosc2_storage storage = {.contiguous=contiguous};
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
@@ -44,13 +44,13 @@ static char* test_schunk_framebuf(void) {
   }
 
   // Get a memory frame out of the schunk
-  uint8_t* framebuf;
-  bool framebuf_needs_free;
-  int64_t len = blosc2_schunk_to_buffer(schunk, &framebuf, &framebuf_needs_free);
+  uint8_t* cframe;
+  bool cframe_needs_free;
+  int64_t len = blosc2_schunk_to_buffer(schunk, &cframe, &cframe_needs_free);
   mu_assert("Error in getting a frame buffer", len > 0);
 
-  // ...and another schunk backed by the frame buffer
-  blosc2_schunk* schunk2 = blosc2_schunk_from_buffer(framebuf, len, false);
+  // ...and another schunk backed by the contiguous frame buffer
+  blosc2_schunk* schunk2 = blosc2_schunk_from_buffer(cframe, len, false);
 
   // Now store frame in a file
   len = blosc2_schunk_to_file(schunk2, "test_file.b2frame");
@@ -76,8 +76,8 @@ static char* test_schunk_framebuf(void) {
   free(data);
   free(data_dest);
   blosc2_schunk_free(schunk);
-  if (framebuf_needs_free) {
-    free(framebuf);
+  if (cframe_needs_free) {
+    free(cframe);
   }
   /* Destroy the Blosc environment */
   blosc_destroy();
@@ -87,20 +87,20 @@ static char* test_schunk_framebuf(void) {
 
 static char *all_tests(void) {
   nchunks = 0;
-  sequential = true;
-  mu_run_test(test_schunk_framebuf);
+  contiguous = true;
+  mu_run_test(test_schunk_cframe);
 
   nchunks = 0;
-  sequential = false;
-  mu_run_test(test_schunk_framebuf);
+  contiguous = false;
+  mu_run_test(test_schunk_cframe);
 
   nchunks = 1;
-  sequential = false;
-  mu_run_test(test_schunk_framebuf);
+  contiguous = false;
+  mu_run_test(test_schunk_cframe);
 
   nchunks = 10;
-  sequential = true;
-  mu_run_test(test_schunk_framebuf);
+  contiguous = true;
+  mu_run_test(test_schunk_cframe);
 
   return EXIT_SUCCESS;
 }

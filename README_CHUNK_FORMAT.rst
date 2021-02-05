@@ -259,7 +259,7 @@ Here it is its structure::
     (``int32_t``) The number of the chunk in the super-chunk.
 
 :offset:
-    (``int64_t``) The offset of the chunk in the frame (sequential super-chunk).
+    (``int64_t``) The offset of the chunk in the frame (contiguous super-chunk).
 
 :bsize0 .. bsizeN:
     (``int32_t``) The sizes in bytes for every block.

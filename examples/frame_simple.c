@@ -98,11 +98,11 @@ int main(void) {
 
   // Start different conversions between schunks, frames and fileframes
 
-  // super-chunk -> framebuf (sequential frame, or buffer)
+  // super-chunk -> cframe (contiguous frame, or buffer)
   blosc_set_timestamp(&last);
-  uint8_t* framebuf;
-  bool framebuf_needs_free;
-  int64_t frame_len = blosc2_schunk_to_buffer(schunk, &framebuf, &framebuf_needs_free);
+  uint8_t* cframe;
+  bool cframe_needs_free;
+  int64_t frame_len = blosc2_schunk_to_buffer(schunk, &cframe, &cframe_needs_free);
   if (frame_len < 0) {
     return frame_len;
   }
@@ -112,7 +112,7 @@ int main(void) {
          ttotal, nbytes / (ttotal * MB));
   printf("Frame length in memory: %ld bytes\n", (long)frame_len);
 
-  // super-chunk -> fileframe (sequential frame, on-disk)
+  // super-chunk -> fileframe (contiguous frame, on-disk)
   blosc_set_timestamp(&last);
   frame_len = blosc2_schunk_to_file(schunk, "frame_simple.b2frame");
   if (frame_len < 0) {
@@ -124,7 +124,7 @@ int main(void) {
   printf("Time for frame -> fileframe (frame_simple.b2frame): %.3g s, %.1f GB/s\n",
          ttotal, nbytes / (ttotal * GB));
 
-  // fileframe (file) -> schunk2 (on-disk sequential, super-chunk)
+  // fileframe (file) -> schunk2 (on-disk contiguous, super-chunk)
   blosc_set_timestamp(&last);
   blosc2_schunk* schunk2 = blosc2_schunk_open("frame_simple.b2frame");
   blosc_set_timestamp(&current);
@@ -135,7 +135,7 @@ int main(void) {
   // frame1 (in-memory) -> schunk
   blosc_set_timestamp(&last);
   // The next creates a schunk from the in-memory frame
-  blosc2_schunk* schunk1 = blosc2_schunk_from_buffer(framebuf, frame_len, false);
+  blosc2_schunk* schunk1 = blosc2_schunk_from_buffer(cframe, frame_len, false);
   if (schunk1 == NULL) {
     printf("Bad conversion frame1 -> schunk1!\n");
     return -1;
@@ -174,8 +174,8 @@ int main(void) {
   blosc2_schunk_free(schunk);
   blosc2_schunk_free(schunk1);
   blosc2_schunk_free(schunk2);
-  if (framebuf_needs_free) {
-    free(framebuf);
+  if (cframe_needs_free) {
+    free(cframe);
   }
 
   return 0;
