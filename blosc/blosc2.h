@@ -242,6 +242,7 @@ enum {
     BLOSC2_ZERO_RUNLEN = 0x1,     //!< zero run-length
     BLOSC2_NAN_RUNLEN = 0x2,      //!< NaN run-length
     BLOSC2_VALUE_RUNLEN = 0x3,    //!< generic value run-length
+    BLOSC2_RUNLEN_MASK = 0x3      //!< run-length value mask
 };
 
 /**
@@ -994,14 +995,19 @@ BLOSC_EXPORT int blosc2_decompress_ctx(blosc2_context* context, const void* src,
 /**
  * @brief Context interface counterpart for #blosc_getitem.
  *
- * It uses similar parameters than the blosc_getitem() function plus a
- * @p context parameter and @srcsize compressed buffer length parameter.
+ * It uses many of the same parameters as blosc_getitem() function with
+ * a few additions.
+ *
+ * @param context Context pointer.
+ * @param srcsize Compressed buffer length.
+ * @param destsize Output buffer length.
  *
  * @return The number of bytes copied to @p dest or a negative value if
  * some error happens.
  */
 BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
-                                    int32_t srcsize, int start, int nitems, void* dest);
+                                    int32_t srcsize, int start, int nitems, void* dest,
+                                    int32_t destsize);
 
 
 /*********************************************************************
