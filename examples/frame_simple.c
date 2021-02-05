@@ -74,11 +74,16 @@ int main(void) {
     assert(nchunks == nchunk + 1);
   }
 
-  // Add some usermeta data
-  int umlen = blosc2_update_usermeta(schunk, (uint8_t *) "This is a usermeta content.....", 32,
-                                     BLOSC2_CPARAMS_DEFAULTS);
+  // Add some vlmetalayers data
+  uint32_t content_len = 10;
+  uint8_t *content = malloc(content_len);
+  for (uint32_t j = 0; j < content_len; ++j) {
+    content[j] = (uint8_t) j;
+  }
+  int umlen = blosc2_add_vlmetalayer(schunk, "umetalayer", content, content_len, NULL);
+  free(content);
   if (umlen < 0) {
-    printf("Cannot write usermeta chunk");
+    printf("Cannot write vlmetalayers chunk");
     return umlen;
   }
 
@@ -92,8 +97,13 @@ int main(void) {
   printf("Compression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
   uint8_t* usermeta;
-  int content_len = blosc2_get_usermeta(schunk, &usermeta);
-  printf("Usermeta in schunk: '%s' with length: %d\n", usermeta, content_len);
+
+  blosc2_get_vlmetalayer(schunk, "umetalayer", &usermeta, &content_len);
+  printf("Usermeta length: %d\n", content_len);
+  for (int j = 0; j < content_len; ++j) {
+    printf("%3d", usermeta[j]);
+  }
+  printf("\n");
   free(usermeta);
 
   // Start different conversions between schunks, frames and fileframes
@@ -166,8 +176,17 @@ int main(void) {
   }
   printf("Successful roundtrip schunk <-> frame <-> fileframe !\n");
 
-  content_len = blosc2_get_usermeta(schunk1, &usermeta);
-  printf("Usermeta in schunk1: '%s' with length: %d\n", usermeta, content_len);
+  blosc2_get_vlmetalayer(schunk1, "umetalayer", &usermeta, &content_len);
+  for (int j = 0; j < content_len; ++j) {
+    printf("%3d", usermeta[j]);
+  }
+  printf("\n");
+  free(usermeta);
+  blosc2_get_vlmetalayer(schunk2, "umetalayer", &usermeta, &content_len);
+  for (int j = 0; j < content_len; ++j) {
+    printf("%3d", usermeta[j]);
+  }
+  printf("\n");
   free(usermeta);
 
   /* Free resources */

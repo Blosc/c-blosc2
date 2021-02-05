@@ -123,7 +123,7 @@ CUTEST_TEST_TEST(copy) {
     blosc2_add_metalayer(schunk, meta_name, (uint8_t *) &meta_content, meta_content_len);
   }
   if (usermeta) {
-    blosc2_update_usermeta(schunk, (uint8_t *) &meta_content, meta_content_len, *storage.cparams);
+    blosc2_add_vlmetalayer(schunk, "umetalayer", (uint8_t *) &meta_content, meta_content_len, NULL);
   }
 
   /* Append the chunks */
@@ -146,8 +146,9 @@ CUTEST_TEST_TEST(copy) {
     free(content);
   }
   if (usermeta) {
+    uint32_t content_len;
     int64_t *content;
-    blosc2_get_usermeta(schunk_copy,  (uint8_t **) &content);
+    blosc2_get_vlmetalayer(schunk_copy, "umetalayer", (uint8_t **) &content, &content_len);
     CUTEST_ASSERT("Usermeta are not equal.", *content == meta_content);
     free(content);
   }

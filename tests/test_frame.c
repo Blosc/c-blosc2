@@ -92,7 +92,7 @@ static char* test_frame(void) {
   }
 
   if (usermeta) {
-    blosc2_update_usermeta(schunk, (uint8_t *) content, (int32_t) content_len, BLOSC2_CPARAMS_DEFAULTS);
+    blosc2_add_vlmetalayer(schunk, "umetalayer", (uint8_t *) content, (int32_t) content_len, NULL);
   }
 
   if (!sparse_schunk) {
@@ -139,11 +139,12 @@ static char* test_frame(void) {
   }
 
   if (usermeta) {
-    int content_len_ = blosc2_get_usermeta(schunk, &content_);
-    mu_assert("ERROR: bad usermeta length in frame", (size_t) content_len_ == content_len);
-    mu_assert("ERROR: bad usermeta data in frame", strncmp((char*)content_, content, content_len) == 0);
+    uint32_t content_len_;
+    blosc2_get_vlmetalayer(schunk, "umetalayer", &content_, &content_len_);
+    mu_assert("ERROR: bad vlmetalayers length in frame", (size_t) content_len_ == content_len);
+    mu_assert("ERROR: bad vlmetalayers data in frame", strncmp((char*)content_, content, content_len) == 0);
     free(content_);
-    blosc2_update_usermeta(schunk, (uint8_t *) content2, (int32_t) content_len2, BLOSC2_CPARAMS_DEFAULTS);
+    blosc2_update_vlmetalayer(schunk, "umetalayer", (uint8_t *) content2, (int32_t) content_len2, NULL);
   }
 
   // Feed it with data
@@ -180,11 +181,12 @@ static char* test_frame(void) {
   }
 
   if (usermeta) {
-    int content_len_ = blosc2_get_usermeta(schunk, &content_);
-    mu_assert("ERROR: bad usermeta length in frame", (size_t) content_len_ == content_len2);
-    mu_assert("ERROR: bad usermeta data in frame", strncmp((char*)content_, content2, content_len2) == 0);
+    uint32_t content_len_;
+    blosc2_get_vlmetalayer(schunk, "umetalayer", &content_, &content_len_);
+    mu_assert("ERROR: bad vlmetalayers length in frame", (size_t) content_len_ == content_len2);
+    mu_assert("ERROR: bad vlmetalayers data in frame", strncmp((char*)content_, content2, content_len2) == 0);
     free(content_);
-    blosc2_update_usermeta(schunk, (uint8_t *) content3, (int32_t) content_len3, BLOSC2_CPARAMS_DEFAULTS);
+    blosc2_update_vlmetalayer(schunk, "umetalayer", (uint8_t *) content3, (int32_t) content_len3, NULL);
   }
 
   if (!sparse_schunk) {
@@ -240,9 +242,10 @@ static char* test_frame(void) {
   }
 
   if (usermeta) {
-    int content_len_ = blosc2_get_usermeta(schunk, &content_);
-    mu_assert("ERROR: bad usermeta length in frame", (size_t) content_len_ == content_len3);
-    mu_assert("ERROR: bad usermeta data in frame", strncmp((char*)content_, content3, content_len3) == 0);
+    uint32_t content_len_;
+    blosc2_get_vlmetalayer(schunk, "umetalayer", &content_, &content_len_);
+    mu_assert("ERROR: bad vlmetalayers length in frame", (size_t) content_len_ == content_len3);
+    mu_assert("ERROR: bad vlmetalayers data in frame", strncmp((char*)content_, content3, content_len3) == 0);
     free(content_);
   }
 

@@ -75,15 +75,19 @@ At the end of the header *metalayers* are stored which contain meta-information 
 frame. It is up to the user to store whatever data they want with the only (strong) suggestion that they be stored
 using the msgpack format. Here is the format for the *metalayers*::
 
-  |-52|-53|-54|-55|-56|-----------------------
-  | 93| cd| idx   | de| map_of_metalayers
-  |---|---------------|-----------------------
-    ^   ^    ^      ^
-    |   |    |      |
-    |   |    |      +--[msgpack] map of name/offset pairs
-    |   |    +--size of the map
-    |   +--[msgpack] uint16
-    +-- [msgpack] fixarray with 3 elements
+    |-52|-53|-54|-55|-56|-57|-58|====================|---|---|---|================|
+    | 93| cd| idx   | de| size  | meta keys/values   | dc|  idy  | meta content   |
+    |---|---|-------|---|---|---|====================|---|-------|================|
+     ^   ^      ^     ^     ^             ^            ^     ^            ^
+     |   |      |     |     |             |            |     |            +-- [msgpack] bin32
+     |   |      |     |     |             |            |     +-- number of elements in the array
+     |   |      |     |     |             |            +-- [msgpack] array16
+     |   |      |     |     |             +-- [msgpack] fixstr/int32
+     |   |      |     |     +-- number of elements in the map
+     |   |      |     +-- [msgpack] map of name/offset pairs
+     |   |      +-- size of metalayers
+     |   +-- [msgpack] uint16
+     +-- [msgpack] fixarray with 3 elements
 
 :header_size:
     (``int32``) Size of the header of the frame (including metalayers).
@@ -171,7 +175,7 @@ using the msgpack format. Here is the format for the *metalayers*::
 :map of metalayers:
     This is a *msgpack-formattted* map for the different metalayers.  The keys will be a string (0xa0 + namelen) for
     the names of the metalayers, followed by an int32 (0xd2) for the *offset* of the value of this metalayer.  The
-    actual value will be encoded as a bin32 (0xc6) value later in frame.
+    actual value will be encoded as a bin32 (0xc6) value later in header.
 
 Chunks
 ------
@@ -229,27 +233,23 @@ Trailer
 The trailer for the frame is encoded via `msgpack <https://msgpack.org>`_ and contains a user meta data chunk and
 a fingerprint.::
 
-    |-0-|-1-|-2-|-3-|-4-|-5-|-6-|====================|---|---------------|---|---|=================|
-    | 9X| aX| c6| usermeta_len  |   usermeta_chunk   | ce| trailer_len   | d8|fpt| fingerprint     |
-    |---|---|---|---------------|====================|---|---------------|---|---|=================|
-      ^   ^   ^       ^                                ^       ^           ^   ^
-      |   |   |       |                                |       |           |   +-- fingerprint type
-      |   |   |       |                                |       |           +--[msgpack] fixext 16
-      |   |   |       |                                |       +-- trailer length (network endian)
-      |   |   |       |                                +--[msgpack] uint32 for trailer length
-      |   |   |       +--[msgpack] usermeta length (network endian)
+    |-0-|-1-|================|---|---------------|---|---|---------------|
+    | 9X| aX| vlmetalayers   | ce| trailer_len   | d8|fpt| fingerprint   |
+    |---|---|================|---|---------------|---|---|---------------|
+      ^   ^   ^    ^           ^       ^           ^   ^
+      |   |   |    |           |       |           |   +-- fingerprint type
+      |   |   |    |           |       |           +--[msgpack] fixext 16
+      |   |   |    |           |       +-- trailer length (network endian)
+      |   |   |    |           +--[msgpack] uint32 for trailer length
+      |   |   |    +--Variable-length metalayers (See header metalayers)
       |   |   +---[msgpack] bin32 for usermeta
       |   +------[msgpack] int8 for trailer version
       +---[msgpack] fixarray with X=4 elements
 
-The *usermeta* chunk which stores the user meta data can change in size during the lifetime of the frame.
-This is an important feature and the reason why the *usermeta* is stored in the trailer and not in the header.
+The *vlmetalayers* object which stores the variable-length user meta data can change in size during the lifetime of the frame.
+This is an important feature and the reason why the *vlmetalayers* are stored in the trailer and not in the header.
+However, the *vlmetalayers* follows the same format than the metalayers stored in the header.
 
-:usermeta_len:
-    (``int32``) The length of the usermeta chunk.
-
-:usermeta_chunk:
-    (``varlen``) The usermeta chunk (a Blosc chunk).
 
 :trailer_len:
     (``uint32``) Size of the trailer of the frame (including usermeta chunk).
@@ -258,4 +258,4 @@ This is an important feature and the reason why the *usermeta* is stored in the 
     (``int8``) Fingerprint type:  0 -> no fp; 1 -> 32-bit; 2 -> 64-bit; 3 -> 128-bit
 
 :fingerprint:
-    (``uint128``) Fix storage space for the fingerprint, padded to the left.
+    (``uint128``) Fix storage space for the fingerprint (16 bytes), padded to the left.
