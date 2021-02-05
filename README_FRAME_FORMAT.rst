@@ -222,25 +222,77 @@ a fingerprint.::
       |   |   |       |                                |       |           +--[msgpack] fixext 16
       |   |   |       |                                |       +-- trailer length (network endian)
       |   |   |       |                                +--[msgpack] uint32 for trailer length
-      |   |   |       +--[msgpack] usermeta length (network endian)
-      |   |   +---[msgpack] bin32 for usermeta
+      |   |   |       +--[msgpack] umetalayers length (network endian)
+      |   |   +---[msgpack] bin32 for umetalayers
       |   +------[msgpack] int8 for trailer version
       +---[msgpack] fixarray with X=4 elements
 
-The *usermeta* chunk which stores the user meta data can change in size during the lifetime of the frame.
-This is an important feature and the reason why the *usermeta* is stored in the trailer and not in the header.
+The *umetalayers* chunk which stores the user meta data can change in size during the lifetime of the frame.
+This is an important feature and the reason why the *umetalayers* is stored in the trailer and not in the header.
 
 :usermeta_len:
-    (``int32``) The length of the usermeta chunk.
+    (``int32``) The length of the umetalayers chunk.
 
 :usermeta_chunk:
-    (``varlen``) The usermeta chunk (a Blosc chunk).
+    (``varlen``) The umetalayers chunk (a Blosc chunk).
 
 :trailer_len:
-    (``uint32``) Size of the trailer of the frame (including usermeta chunk).
+    (``uint32``) Size of the trailer of the frame (including umetalayers chunk).
 
 :fpt:
     (``int8``) Fingerprint type:  0 -> no fp; 1 -> 32-bit; 2 -> 64-bit; 3 -> 128-bit
 
 :fingerprint:
     (``uint128``) Fix storage space for the fingerprint, padded to the left.
+
+
+Trailer2
+--------
+
+The trailer for the frame is encoded via `msgpack <https://msgpack.org>`_ and contains user data and a
+fingerprint.::
+
+        +--------+--------+--------+--------+--------+-------+
+        |  0x94  |0XXXXXXX|  0x93  |  0xcd  |XXXXXXXX|XXXXXXX| ...
+        +--------+--------+--------+--------+--------+-------+
+        ^        ^        ^        ^
+        |        |        |        +-- [msgpack - uint 16] usermetalayers size
+        |        |        +-- [msgpack - fixarray]
+        |        +-- [msgpack - positive fixnum] trailer version
+        +-- [msgpack - fixarray]
+
+
+        +--------+--------+--------+--------+========+--------+--------+--------+--------+--------+~~~~~~~~~~~~~~~~~~+
+    ... |  0xde  |XXXXXXXX|XXXXXXXX|101XXXXX|  data  |  0xd2  |XXXXXXXX|XXXXXXXX|XXXXXXXX|XXXXXXXX|  repeat N-times  | ...
+        +--------+--------+--------+--------+========+--------+--------+--------+--------+--------+~~~~~~~~~~~~~~~~~~+
+        ^                          ^                 ^                                            ^
+        |                          |                 |                                            +-- repeat the key value objects N times.
+        |                          |                 +-- [msgpack - int 32] metalayer value offset
+        |                          +-- [msgpack - fixstr] metalayer name
+        +-- [msgpack - map 16]
+
+
+        +--------+--------+--------+--------+--------+--------+--------+--------+========+~~~~~~~~~~~~~~~~~~+
+    ... |  0xdc  |XXXXXXXX|XXXXXXXX|  0xc6  |XXXXXXXX|XXXXXXXX|XXXXXXXX|XXXXXXXX|  data  |  repeat N-times  | ...
+        +--------+--------+--------+--------+--------+--------+--------+--------+========+~~~~~~~~~~~~~~~~~~+
+        ^        ^                 ^        ^                                   ^        ^
+        |        |                 |        |                                   |        +-- repeat the bin object N times.
+        |        |                 |        |                                   |
+        |        |                 |        |                                   +-- metalayer content
+        |        |                 |        +-- metalayer content size
+        |        |                 +-- [msgpack - bin 32]
+        |        +-- number of metalayers, N
+        +-- [msgpack - array 16]
+
+
+        +--------+--------+--------+--------+--------+--------+--------+---16---+
+    ... |  0xce  |XXXXXXXX|XXXXXXXX|XXXXXXXX|XXXXXXXX|  0xd8  |  type  |  data  |
+        +--------+--------+--------+--------+--------+--------+--------+--------+
+        ^        ^                                   ^        ^        ^
+        |        |                                   |        |        +-- fingerprint
+        |        |                                   |        +-- fingerprint type
+        |        |                                   +-- [msgpack - bin 32]
+        |        |
+        |        |
+        |        +-- trailer length
+        +-- [msgpack - uint 32]

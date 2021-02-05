@@ -80,7 +80,7 @@ Changes from 2.0.0-beta.2 to 2.0.0-beta.3
 Changes from 2.0.0-beta.1 to 2.0.0-beta.2
 ========================================
 
-* A new `usermeta` chunk in `schunk` allows to store arbitrary meta-information
+* A new `umetalayers` chunk in `schunk` allows to store arbitrary meta-information
   that is up to the user.  If the `schunk` has an attached `frame`, the later
   will be updated accordingly too.  For more info, see PR #74 and docstrings of
   new `blosc2_update_usermeta()` and `blosc2_get_usermeta()` functions.

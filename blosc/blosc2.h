@@ -271,6 +271,8 @@ enum {
   BLOSC2_ERROR_CHUNK_APPEND = -20,    //!< Chunk append failure
   BLOSC2_ERROR_CHUNK_UPDATE = -21,    //!< Chunk update failure
   BLOSC2_ERROR_2GB_LIMIT = -22,       //!< Sizes larger than 2gb not supported
+  BLOSC2_ERROR_FILE_TRUNCATE = -23,   //!< File truncate failure
+
 };
 
 /**
@@ -1011,6 +1013,9 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 #define BLOSC2_MAX_METALAYERS 16
 #define BLOSC2_METALAYER_NAME_MAXLEN 31
 
+#define BLOSC2_MAX_USERMETAS BLOSC2_MAX_METALAYERS
+#define BLOSC2_USERMETA_NAME_MAXLEN BLOSC2_METALAYER_NAME_MAXLEN
+
 /**
  * @brief This struct is meant for holding storage parameters for a
  * for a blosc2 container, allowing to specify, for example, how to interpret
@@ -1104,10 +1109,10 @@ typedef struct blosc2_schunk {
   //!< The array of metalayers.
   int16_t nmetalayers;
   //!< The number of metalayers in the frame
-  uint8_t* usermeta;
-  //<! The user-defined metadata.
-  int32_t usermeta_len;
-  //<! The (compressed) length of the user-defined metadata.
+  struct blosc2_metalayer *umetalayers[BLOSC2_MAX_USERMETAS];
+  //<! The array of user-defined metadata.
+  int16_t numetalayers;
+  //!< The number of user-defined metadata.
 } blosc2_schunk;
 
 /**
@@ -1425,14 +1430,14 @@ BLOSC_EXPORT int blosc2_get_metalayer(blosc2_schunk *schunk, const char *name, u
 *********************************************************************/
 
 /**
- * @brief Update content into a usermeta chunk.
+ * @brief Update content into a umetalayers chunk.
  *
  * If the @p schunk has an attached frame, the later will be updated accordingly too.
  *
- * @param schunk The super-chunk to which one should add the usermeta chunk.
- * @param content The content of the usermeta chunk.
+ * @param schunk The super-chunk to which one should add the umetalayers chunk.
+ * @param content The content of the umetalayers chunk.
  * @param content_len The length of the content.
- * @param cparams The parameters for compressing the usermeta chunk.
+ * @param cparams The parameters for compressing the umetalayers chunk.
  *
  * @note The previous content, if any, will be overwritten by the new content.
  * The user is responsible to keep the new content in sync with any previous content.
@@ -1440,22 +1445,28 @@ BLOSC_EXPORT int blosc2_get_metalayer(blosc2_schunk *schunk, const char *name, u
  * @return If successful, return the number of compressed bytes that takes the content.
  * Else, a negative value.
  */
-BLOSC_EXPORT int blosc2_update_usermeta(blosc2_schunk *schunk, uint8_t *content,
-                                        int32_t content_len, blosc2_cparams cparams);
+//BLOSC_EXPORT int blosc2_update_usermeta(blosc2_schunk *schunk, uint8_t *content,
+//                                        int32_t content_len, blosc2_cparams cparams);
 
-/* @brief Retrieve the usermeta chunk in a decompressed form.
+/* @brief Retrieve the umetalayers chunk in a decompressed form.
  *
- * @param schunk The super-chunk to which add the usermeta chunk.
- * @param content The content of the usermeta chunk (output).
+ * @param schunk The super-chunk to which add the umetalayers chunk.
+ * @param content The content of the umetalayers chunk (output).
  *
  * @note The user is responsible to free the @p content buffer.
  *
  * @return If successful, return the size of the (decompressed) chunk.
  * Else, a negative value.
  */
-BLOSC_EXPORT int blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content);
+//BLOSC_EXPORT int blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content);
 
-
+BLOSC_EXPORT int blosc2_has_umetalayer(blosc2_schunk *schunk, const char *name);
+BLOSC_EXPORT int blosc2_add_umetalayer(blosc2_schunk *schunk, const char *name,
+                                       uint8_t *content, uint32_t content_len);
+BLOSC_EXPORT int blosc2_get_umetalayer(blosc2_schunk *schunk, const char *name,
+                                       uint8_t **content, uint32_t *content_len);
+BLOSC_EXPORT int blosc2_update_umetalayer(blosc2_schunk *schunk, const char *name,
+                                          uint8_t *content, uint32_t content_len);
 /*********************************************************************
   Time measurement utilities.
 *********************************************************************/
