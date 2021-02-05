@@ -30,7 +30,7 @@ Changes from 2.0.0-beta.5 to 2.0.0.beta6
 
 * [FORMAT] New *sparse frame* format for on-disk I/O.  This allows for storing
   data chunks in super-chunks in separate files inside a directory.  The way
-  to generate sparse frames is via `storage.sequential=false` and
+  to generate sparse frames is via `storage.contiguous=false` and
   `storage.urlpath=dirname`.  See `README_SFRAME_FORMAT.rst` for details.
 
 
@@ -107,7 +107,7 @@ Changes from 2.0.0-beta.1 to 2.0.0-beta.2
   I/O (including metainfo) goes into super-chunks.  See PR #75.
 
 * New frame format documented in
-  [README_FRAME_FORMAT.rst](README_FRAME_FORMAT.rst). Remember that the frame
+  [README_CFRAME_FORMAT.rst](README_CFRAME_FORMAT.rst). Remember that the frame
   format is not written in stone yet, so some changes may be introduced before
   getting out of beta.
 

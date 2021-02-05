@@ -101,7 +101,7 @@ inline static void blosc_test_free(void* ptr) {
 #endif  /* _WIN32 */
 }
 
-/** Fills a buffer with sequential values. */
+/** Fills a buffer with contiguous values. */
 inline static void blosc_test_fill_seq(void* const ptr, const size_t size) {
   size_t k;
   uint8_t* const byte_ptr = (uint8_t*)ptr;

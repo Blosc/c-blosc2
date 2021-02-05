@@ -43,8 +43,8 @@
 
 typedef struct {
   char* urlpath;            //!< The name of the file or directory if it's an sframe; if NULL, this is in-memory
-  uint8_t* framebuf;        //!< The in-memory frame buffer
-  bool avoid_framebuf_free; //!< Whether the framebuf can be freed (false) or not (true).
+  uint8_t* cframe;          //!< The in-memory, contiguous frame buffer
+  bool avoid_cframe_free;   //!< Whether the cframe can be freed (false) or not (true).
   uint8_t* coffsets;        //!< Pointers to the (compressed, on-disk) chunk offsets
   int64_t len;              //!< The current length of the frame in (compressed) bytes
   int64_t maxlen;           //!< The maximum length of the frame; if 0, there is no maximum
@@ -108,7 +108,7 @@ blosc2_frame_s* frame_from_file(const char *urlpath);
  *
  * @return The frame created from the frame buffer.
  */
-blosc2_frame_s* frame_from_framebuf(uint8_t *framebuf, int64_t len, bool copy);
+blosc2_frame_s* frame_from_cframe(uint8_t *cframe, int64_t len, bool copy);
 
 /**
  * @brief Create a super-chunk from a frame.

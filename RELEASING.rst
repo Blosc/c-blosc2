@@ -69,7 +69,8 @@ Update documentation
 Go the the `blosc-doc <https://github.com/Blosc/blosc-doc>`_ git repo and update some README files, `blosc2.h` and if API has changed, `c-blosc2_api.rst` too::
 
   $ cp ../c-blosc2/README.rst src/c-blosc2_files
-  $ cp ../c-blosc2/README_FRAME_FORMAT.rst src/c-blosc2_files
+  $ cp ../c-blosc2/README_CFRAME_FORMAT.rst src/c-blosc2_files
+  $ cp ../c-blosc2/README_SFRAME_FORMAT.rst src/c-blosc2_files
   $ cp ../c-blosc2/blosc/blosc2.h src/c-blosc2_files
   $ vi doc/c-blosc2_api.rst  # update with the new API
   $ git commit -a -m"Updated documentation for release X.Y.Z"

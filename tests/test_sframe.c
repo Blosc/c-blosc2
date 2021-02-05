@@ -65,7 +65,7 @@ static char* test_sframe(void) {
     cparams.nthreads = 1;
     dparams.nthreads = 1;
   }
-  blosc2_storage storage = {.sequential=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.contiguous=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
   mu_assert("blosc2_schunk_new() failed", schunk != NULL);
   char* content = "This is a pretty long string with a good number of chars";
@@ -224,7 +224,7 @@ static char* test_sframe_simple(void) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {.sequential=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.contiguous=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
   blosc2_remove_dir(storage.urlpath);
   schunk = blosc2_schunk_new(storage);
   mu_assert("Error in creating schunk", schunk != NULL);

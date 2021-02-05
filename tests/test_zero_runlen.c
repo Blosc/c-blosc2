@@ -34,7 +34,7 @@ enum {
 };
 
 typedef struct {
-  bool sequential;
+  bool contiguous;
   char *urlpath;
 }test_zero_runlen_backend;
 
@@ -71,7 +71,7 @@ CUTEST_TEST_TEST(zero_runlen) {
   CUTEST_GET_PARAMETER(backend, test_zero_runlen_backend);
 
   /* Free resources */
-  if (backend.urlpath != NULL && backend.sequential == false) {
+  if (backend.urlpath != NULL && backend.contiguous == false) {
     blosc2_remove_dir(backend.urlpath);
   }
 
@@ -96,7 +96,7 @@ CUTEST_TEST_TEST(zero_runlen) {
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
-  blosc2_storage storage = {.cparams=&cparams, .sequential=backend.sequential, .urlpath = backend.urlpath};
+  blosc2_storage storage = {.cparams=&cparams, .contiguous=backend.contiguous, .urlpath = backend.urlpath};
   schunk = blosc2_schunk_new(storage);
 
   /* Append the chunks */
@@ -200,7 +200,7 @@ CUTEST_TEST_TEST(zero_runlen) {
   /* Destroy the Blosc environment */
 
   /* Free resources */
-  if (backend.urlpath != NULL && backend.sequential == false) {
+  if (backend.urlpath != NULL && backend.contiguous == false) {
     blosc2_remove_dir(backend.urlpath);
   }
 
