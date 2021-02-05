@@ -2323,7 +2323,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
 }
 
 
-int frame_reorder_offsets(blosc2_frame_s* frame, int* offsets_order, blosc2_schunk* schunk) {
+int frame_reorder_offsets(blosc2_frame_s* frame, const int* offsets_order, blosc2_schunk* schunk) {
   // Get header info
   int32_t header_len;
   int64_t frame_len;

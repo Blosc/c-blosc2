@@ -2,7 +2,6 @@
   Blosc - Blocked Shuffling and Compression Library
 
   Author: The Blosc Developers <blosc@blosc.org>
-  Creation date: 2018-07-04
 
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
@@ -12,7 +11,6 @@
 #include <string.h>
 #include "blosc2.h"
 #include "frame.h"
-#include "sframe.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
 #include <windows.h>

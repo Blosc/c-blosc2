@@ -290,7 +290,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
 
 
 /* Open an existing super-chunk that is on-disk (no copy is made). */
-blosc2_schunk* blosc2_schunk_open(char* urlpath) {
+blosc2_schunk* blosc2_schunk_open(const char* urlpath) {
   if (urlpath == NULL) {
     BLOSC_TRACE_ERROR("You need to supply a urlpath.");
     return NULL;
@@ -342,7 +342,7 @@ int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* nee
 
 
 /* Write an in-memory frame out to a file. */
-int64_t frame_to_file(blosc2_frame_s* frame, char* urlpath) {
+int64_t frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
   FILE* fp = fopen(urlpath, "wb");
   size_t nitems = fwrite(frame->framebuf, (size_t)frame->len, 1, fp);
   fclose(fp);
@@ -351,10 +351,10 @@ int64_t frame_to_file(blosc2_frame_s* frame, char* urlpath) {
 
 
 /* Write super-chunk out to a file. */
-int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, char* urlpath) {
+int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath) {
   if (urlpath == NULL) {
     BLOSC_TRACE_ERROR("urlpath cannot be NULL");
-    return -1;
+    return BLOSC2_ERROR_INVALID_PARAM;
   }
 
   // Accelerated path for in-memory frames
@@ -368,7 +368,7 @@ int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, char* urlpath) {
   }
 
   // Copy to a sequential file
-  blosc2_storage frame_storage = {.sequential=true, .urlpath=urlpath};
+  blosc2_storage frame_storage = {.sequential=true, .urlpath=(char*)urlpath};
   blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, frame_storage);
   if (schunk_copy == NULL) {
     BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
@@ -439,7 +439,7 @@ blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *framebuf, int64_t len, bool co
   blosc2_schunk* schunk = frame_to_schunk(frame, copy);
   if (copy) {
     // We don't need the frame anymore
-    free(frame);
+    frame_free(frame);
   }
   return schunk;
 }
