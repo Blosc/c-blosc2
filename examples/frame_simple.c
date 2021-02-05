@@ -74,11 +74,11 @@ int main(void) {
     assert(nchunks == nchunk + 1);
   }
 
-  // Add some usermeta data
-  int umlen = blosc2_update_usermeta(schunk, (uint8_t *) "This is a usermeta content.....", 32,
-                                     BLOSC2_CPARAMS_DEFAULTS);
+  // Add some umetalayers data
+  int umlen = blosc2_add_umetalayer(schunk, "umetalayer",
+                                    (uint8_t *) "This is a umetalayers content...", 32);
   if (umlen < 0) {
-    printf("Cannot write usermeta chunk");
+    printf("Cannot write umetalayers chunk");
     return umlen;
   }
 
@@ -91,9 +91,11 @@ int main(void) {
          nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
   printf("Compression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
+
   uint8_t* usermeta;
-  int content_len = blosc2_get_usermeta(schunk, &usermeta);
-  printf("Usermeta in schunk: '%s' with length: %d\n", usermeta, content_len);
+  uint32_t content_len;
+  blosc2_get_umetalayer(schunk, "umetalayer", &usermeta, &content_len);
+  printf("Usermeta in schunk: '%s' with length: %d\n", (char *) usermeta, content_len);
   free(usermeta);
 
   // Start different conversions between schunks, frames and fileframes
@@ -190,11 +192,11 @@ int main(void) {
   }
   printf("Successful roundtrip schunk <-> frame <-> fileframe !\n");
 
-  content_len = blosc2_get_usermeta(schunk1, &usermeta);
-  printf("Usermeta in schunk1: '%s' with length: %d\n", usermeta, content_len);
+  blosc2_get_umetalayer(schunk1, "umetalayer", &usermeta, &content_len);
+  printf("Usermeta in schunk1: '%s' with length: %d\n", (char *) usermeta, content_len);
   free(usermeta);
-  content_len = blosc2_get_usermeta(schunk2, &usermeta);
-  printf("Usermeta in schunk2: '%s' with length: %d\n", usermeta, content_len);
+  blosc2_get_umetalayer(schunk2, "umetalayer", &usermeta, &content_len);
+  printf("Usermeta in schunk2: '%s' with length: %d\n", (char *) usermeta, content_len);
   free(usermeta);
 
   /* Free resources */

@@ -285,16 +285,11 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
     free(buffer);
   }
 
-  // Copy user meta
-  if (schunk->usermeta != NULL) {
-    uint8_t *usermeta;
-    int32_t usermeta_len = blosc2_get_usermeta(schunk, &usermeta);
-    if (usermeta_len < 0) {
-      BLOSC_TRACE_ERROR("Can not get `usermeta` from schunk");
-      return NULL;
-    }
-    if (blosc2_update_usermeta(new_schunk, usermeta, usermeta_len, *storage.cparams) < 0) {
-      BLOSC_TRACE_ERROR("Can not update the `usermeta`.");
+  // Copy metalayers
+  for (int nmeta = 0; nmeta < schunk->nmetalayers; ++nmeta) {
+    blosc2_metalayer *meta = schunk->metalayers[nmeta];
+    if (blosc2_add_metalayer(new_schunk, meta->name, meta->content, meta->content_len) < 0) {
+      BLOSC_TRACE_ERROR("Con not add %s `metalayer`.", meta->name);
       return NULL;
     }
   }
@@ -367,8 +362,16 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     blosc2_frame_free(schunk->frame);
   }
 
-  if (schunk->usermeta_len > 0) {
-    free(schunk->usermeta);
+  if (schunk->numetalayers > 0) {
+    for (int i = 0; i < schunk->numetalayers; ++i) {
+      if (schunk->umetalayers[i] != NULL) {
+        if (schunk->umetalayers[i]->name != NULL)
+          free(schunk->umetalayers[i]->name);
+        if (schunk->umetalayers[i]->content != NULL)
+          free(schunk->umetalayers[i]->content);
+        free(schunk->umetalayers[i]);
+      }
+    }
   }
 
   free(schunk);
@@ -951,56 +954,168 @@ int blosc2_get_metalayer(blosc2_schunk *schunk, const char *name, uint8_t **cont
   return nmetalayer;
 }
 
+//
+///* Update the content of the umetalayers chunk. */
+//int blosc2_update_usermeta(blosc2_schunk *schunk, uint8_t *content, int32_t content_len,
+//                           blosc2_cparams cparams) {
+//  if ((uint32_t) content_len > (1u << 31u)) {
+//    BLOSC_TRACE_ERROR("content_len cannot exceed 2 GB.");
+//    return BLOSC2_ERROR_2GB_LIMIT;
+//  }
+//
+//  // Compress the umetalayers chunk
+//  void* usermeta_chunk = malloc(content_len + BLOSC_MAX_OVERHEAD);
+//  blosc2_context *cctx = blosc2_create_cctx(cparams);
+//  int usermeta_cbytes = blosc2_compress_ctx(cctx, content, content_len, usermeta_chunk,
+//                                            content_len + BLOSC_MAX_OVERHEAD);
+//  blosc2_free_ctx(cctx);
+//  if (usermeta_cbytes < 0) {
+//    free(usermeta_chunk);
+//    return usermeta_cbytes;
+//  }
+//
+//  // Update the contents of the umetalayers chunk
+//  if (schunk->usermeta_len > 0) {
+//    free(schunk->umetalayers);
+//  }
+//  schunk->umetalayers = malloc(usermeta_cbytes);
+//  memcpy(schunk->umetalayers, usermeta_chunk, usermeta_cbytes);
+//  free(usermeta_chunk);
+//  schunk->usermeta_len = usermeta_cbytes;
+//
+//  if (schunk->frame != NULL) {
+//    int rc = frame_update_trailer(schunk->frame, schunk);
+//    if (rc < 0) {
+//      return rc;
+//    }
+//  }
+//
+//  return usermeta_cbytes;
+//}
+//
+//
+///* Retrieve the umetalayers chunk */
+//int32_t blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content) {
+//  size_t nbytes, cbytes, blocksize;
+//  blosc_cbuffer_sizes(schunk->umetalayers, &nbytes, &cbytes, &blocksize);
+//  *content = malloc(nbytes);
+//  blosc2_context *dctx = blosc2_create_dctx(BLOSC2_DPARAMS_DEFAULTS);
+//  int usermeta_nbytes = blosc2_decompress_ctx(dctx, schunk->umetalayers, schunk->usermeta_len, *content, (int32_t)nbytes);
+//  blosc2_free_ctx(dctx);
+//  if (usermeta_nbytes < 0) {
+//    return usermeta_nbytes;
+//  }
+//  return (int32_t)nbytes;
+//}
 
-/* Update the content of the usermeta chunk. */
-int blosc2_update_usermeta(blosc2_schunk *schunk, uint8_t *content, int32_t content_len,
-                           blosc2_cparams cparams) {
-  if ((uint32_t) content_len > (1u << 31u)) {
-    BLOSC_TRACE_ERROR("content_len cannot exceed 2 GB.");
-    return BLOSC2_ERROR_2GB_LIMIT;
+
+/* Find whether the schunk has a umetalayers layer or not.
+ *
+ * If successful, return the index of the umetalayers layer.  Else, return a negative value.
+ */
+int blosc2_has_umetalayer(blosc2_schunk *schunk, const char *name) {
+  if (strlen(name) > BLOSC2_METALAYER_NAME_MAXLEN) {
+    BLOSC_TRACE_ERROR("Usermeta names cannot be larger than %d chars.", BLOSC2_METALAYER_NAME_MAXLEN);
+    return BLOSC2_ERROR_INVALID_PARAM;
   }
 
-  // Compress the usermeta chunk
-  void* usermeta_chunk = malloc(content_len + BLOSC_MAX_OVERHEAD);
-  blosc2_context *cctx = blosc2_create_cctx(cparams);
-  int usermeta_cbytes = blosc2_compress_ctx(cctx, content, content_len, usermeta_chunk,
-                                            content_len + BLOSC_MAX_OVERHEAD);
-  blosc2_free_ctx(cctx);
-  if (usermeta_cbytes < 0) {
-    free(usermeta_chunk);
-    return usermeta_cbytes;
-  }
-
-  // Update the contents of the usermeta chunk
-  if (schunk->usermeta_len > 0) {
-    free(schunk->usermeta);
-  }
-  schunk->usermeta = malloc(usermeta_cbytes);
-  memcpy(schunk->usermeta, usermeta_chunk, usermeta_cbytes);
-  free(usermeta_chunk);
-  schunk->usermeta_len = usermeta_cbytes;
-
-  if (schunk->frame != NULL) {
-    int rc = frame_update_trailer(schunk->frame, schunk);
-    if (rc < 0) {
-      return rc;
+  for (int numeta = 0; numeta < schunk->numetalayers; numeta++) {
+    if (strcmp(name, schunk->umetalayers[numeta]->name) == 0) {
+      return numeta;
     }
   }
+  return BLOSC2_ERROR_NOT_FOUND;
+}
 
-  return usermeta_cbytes;
+int umetalayer_flush(blosc2_schunk* schunk) {
+  int rc;
+  if (schunk->frame == NULL) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  rc = frame_update_header(schunk->frame, schunk, false);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Unable to update metalayers into frame.");
+    return rc;
+  }
+  rc = frame_update_trailer(schunk->frame, schunk);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Unable to update trailer into frame.");
+    return rc;
+  }
+  return rc;
+}
+
+/* Add content into a new umetalayers.
+ *
+ * If successful, return the index of the new umetalayers.  Else, return a negative value.
+ */
+int blosc2_add_umetalayer(blosc2_schunk *schunk, const char *name, uint8_t *content, uint32_t content_len) {
+  int numeta = blosc2_has_umetalayer(schunk, name);
+  if (numeta >= 0) {
+    BLOSC_TRACE_ERROR("Metalayer \"%s\" already exists.", name);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  // Add the umeta
+  blosc2_metalayer *umeta = malloc(sizeof(blosc2_metalayer));
+  umeta->name = strdup(name);
+  uint8_t* content_buf = malloc((size_t) content_len + BLOSC_MAX_OVERHEAD);
+  int csize = blosc2_compress_ctx(schunk->cctx, content, content_len, content_buf, content_len + BLOSC_MAX_OVERHEAD);
+  umeta->content = realloc(content_buf, csize);
+  umeta->content_len = csize;
+  schunk->umetalayers[schunk->numetalayers] = umeta;
+  schunk->numetalayers += 1;
+
+  // Propagate to frames
+  int rc = umetalayer_flush(schunk);
+  if (rc < 0) {
+    return rc;
+  }
+
+  return schunk->numetalayers - 1;
 }
 
 
-/* Retrieve the usermeta chunk */
-int32_t blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content) {
-  size_t nbytes, cbytes, blocksize;
-  blosc_cbuffer_sizes(schunk->usermeta, &nbytes, &cbytes, &blocksize);
-  *content = malloc(nbytes);
-  blosc2_context *dctx = blosc2_create_dctx(BLOSC2_DPARAMS_DEFAULTS);
-  int usermeta_nbytes = blosc2_decompress_ctx(dctx, schunk->usermeta, schunk->usermeta_len, *content, (int32_t)nbytes);
-  blosc2_free_ctx(dctx);
-  if (usermeta_nbytes < 0) {
-    return usermeta_nbytes;
+int blosc2_get_umetalayer(blosc2_schunk *schunk, const char *name, uint8_t **content,
+                         uint32_t *content_len) {
+  int numeta = blosc2_has_umetalayer(schunk, name);
+  if (numeta < 0) {
+    BLOSC_TRACE_ERROR("User metalayer \"%s\" not found.", name);
+    return numeta;
   }
-  return (int32_t)nbytes;
+  blosc2_metalayer *meta = schunk->umetalayers[numeta];
+  size_t nbytes, cbytes, blocksize;
+  blosc_cbuffer_sizes(meta->content, &nbytes, &cbytes, &blocksize);
+  if (cbytes != meta->content_len) {
+    BLOSC_TRACE_ERROR("User metalayer \"%s\" is corrupted.", meta->name);
+    return BLOSC2_ERROR_DATA;
+  }
+  *content_len = nbytes;
+  *content = malloc((size_t) nbytes);
+  blosc2_decompress_ctx(schunk->dctx, meta->content, meta->content_len, *content, nbytes);
+  return numeta;
+}
+
+int blosc2_update_umetalayer(blosc2_schunk *schunk, const char *name, uint8_t *content, uint32_t content_len) {
+  int numeta = blosc2_has_umetalayer(schunk, name);
+  if (numeta < 0) {
+    BLOSC_TRACE_ERROR("User umeta \"%s\" not found.", name);
+    return numeta;
+  }
+
+  blosc2_metalayer *umeta = schunk->umetalayers[numeta];
+  free(umeta->content);
+  uint8_t* content_buf = malloc((size_t) content_len + BLOSC_MAX_OVERHEAD);
+  int csize = blosc2_compress_ctx(schunk->cctx, content, content_len, content_buf, content_len + BLOSC_MAX_OVERHEAD);
+  umeta->content = realloc(content_buf, csize);
+  umeta->content_len = csize;
+  printf("csize: %d\n", csize);
+
+  // Propagate to frames
+  int rc = umetalayer_flush(schunk);
+  if (rc < 0) {
+    return rc;
+  }
+
+  return numeta;
 }

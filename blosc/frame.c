@@ -38,11 +38,20 @@
 #include <stdalign.h>
 #endif
 
+// Truncate file
+#if defined(_WIN32)
+#include <io.h>
+#define TRUNCATE _chsize_s
+#else
+#include <unistd.h>
+#define TRUNCATE ftruncate
+#endif
+
 
 // big <-> little-endian and store it in a memory position.  Sizes supported: 1, 2, 4, 8 bytes.
 void swap_store(void *dest, const void *pa, int size) {
     bool little_endian = is_little_endian();
-    if (little_endian) {
+    if (!little_endian) {
       memcpy(dest, pa, size);
     }
     else {
@@ -248,7 +257,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame *frame) {
   }
 
   // The boolean for FRAME_HAS_USERMETA
-  *h2p = (schunk->usermeta_len > 0) ? (uint8_t)0xc3 : (uint8_t)0xc2;
+  *h2p = (schunk->numetalayers > 0) ? (uint8_t)0xc3 : (uint8_t)0xc2;
   h2p += 1;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
     return NULL;
@@ -525,7 +534,7 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
   }
 
   // Create the trailer in msgpack (see the frame format document)
-  uint32_t trailer_len = FRAME_TRAILER_MINLEN + schunk->usermeta_len;
+  uint32_t trailer_len = FRAME_TRAILER_MINLEN;
   uint8_t* trailer = (uint8_t*)calloc((size_t)trailer_len, 1);
   uint8_t* ptrailer = trailer;
   *ptrailer = 0x90 + 4;  // fixarray with 4 elements
@@ -533,18 +542,115 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
   // Trailer format version
   *ptrailer = FRAME_TRAILER_VERSION;
   ptrailer += 1;
-  // usermeta
-  *ptrailer = 0xc6;     // bin32
+
+  int32_t current_trailer_len = (int32_t)(ptrailer - trailer);
+
+  // Now, deal with metalayers
+  int16_t numetalayers = schunk->numetalayers;
+  if (numetalayers < 0 || numetalayers > BLOSC2_MAX_METALAYERS) {
+    return -1;
+  }
+
+  // Make space for the header of metalayers (array marker, size, map of offsets)
+  trailer = realloc(trailer, (size_t) current_trailer_len + 1 + 1 + 2 + 1 + 2);
+  ptrailer = trailer + current_trailer_len;
+
+  // The msgpack header for the metalayers (array_marker, size, map of offsets, list of metalayers)
+  *ptrailer = 0x90 + 3;  // array with 3 elements
   ptrailer += 1;
-  swap_store(ptrailer, &(schunk->usermeta_len), 4);
-  ptrailer += 4;
-  if (schunk->usermeta_len > 0)
-    memcpy(ptrailer, schunk->usermeta, schunk->usermeta_len);
-  ptrailer += schunk->usermeta_len;
+
+  int32_t tsize = (ptrailer - trailer);
+
+  // Size for the map (index) of offsets, including this uint16 size (to be filled out later on)
+  *ptrailer = 0xcd;  // uint16
+  ptrailer += 1 + 2;
+
+  // Map (index) of offsets for optional metalayers
+  *ptrailer = 0xde;  // map 16 with N keys
+  ptrailer += 1;
+  swap_store(ptrailer, &numetalayers, sizeof(numetalayers));
+  ptrailer += sizeof(numetalayers);
+  current_trailer_len = (int32_t)(ptrailer - trailer);
+  int32_t *offtodata = malloc(numetalayers * sizeof(int32_t));
+  for (int numeta = 0; numeta < numetalayers; numeta++) {
+    if (frame == NULL) {
+      return -1;
+    }
+    blosc2_metalayer *umetalayer = schunk->umetalayers[numeta];
+    uint8_t namelen = (uint8_t) strlen(umetalayer->name);
+    trailer = realloc(trailer, (size_t)current_trailer_len + 1 + namelen + 1 + 4);
+    ptrailer = trailer + current_trailer_len;
+    // Store the umetalayer
+    if (namelen >= (1U << 5U)) {  // metalayer strings cannot be longer than 32 bytes
+      free(offtodata);
+      return -1;
+    }
+    *ptrailer = (uint8_t)0xa0 + namelen;  // str
+    ptrailer += 1;
+    memcpy(ptrailer, umetalayer->name, namelen);
+    ptrailer += namelen;
+    // Space for storing the offset for the value of this umetalayer
+    *ptrailer = 0xd2;  // int32
+    ptrailer += 1;
+    offtodata[numeta] = (int32_t)(ptrailer - trailer);
+    ptrailer += 4;
+    current_trailer_len += 1 + namelen + 1 + 4;
+  }
+  int32_t tsize2 = (int32_t)(ptrailer - trailer);
+  if (tsize2 != current_trailer_len) {  // sanity check
+    return -1;
+  }
+
+  // Map size + int16 size
+  if ((uint32_t) (tsize2 - tsize) >= (1U << 16U)) {
+    return -1;
+  }
+  uint16_t map_size = (uint16_t) (tsize2 - tsize);
+  swap_store(trailer + 4, &map_size, sizeof(map_size));
+
+  // Make space for an (empty) array
+  tsize = (int32_t)(ptrailer - trailer);
+  trailer = realloc(trailer, (size_t) tsize + 2 + 1 + 2);
+  ptrailer = trailer + tsize;
+
+  // Now, store the values in an array
+  *ptrailer = 0xdc;  // array 16 with N elements
+  ptrailer += 1;
+  swap_store(ptrailer, &numetalayers, sizeof(numetalayers));
+  ptrailer += sizeof(numetalayers);
+  current_trailer_len = (int32_t)(ptrailer - trailer);
+  for (int numeta = 0; numeta < numetalayers; numeta++) {
+    if (frame == NULL) {
+      return -1;
+    }
+    blosc2_metalayer *umetalayer = schunk->umetalayers[numeta];
+    trailer = realloc(trailer, (size_t)current_trailer_len + 1 + 4 + umetalayer->content_len);
+    ptrailer = trailer + current_trailer_len;
+    // Store the serialized contents for this umetalayer
+    *ptrailer = 0xc6;  // bin32
+    ptrailer += 1;
+    swap_store(ptrailer, &(umetalayer->content_len), sizeof(umetalayer->content_len));
+    ptrailer += 4;
+    memcpy(ptrailer, umetalayer->content, umetalayer->content_len);  // buffer, no need to swap
+    ptrailer += umetalayer->content_len;
+    // Update the offset now that we know it
+    swap_store(trailer + offtodata[numeta], &current_trailer_len, sizeof(current_trailer_len));
+    current_trailer_len += 1 + 4 + umetalayer->content_len;
+  }
+  free(offtodata);
+  tsize = (int32_t)(ptrailer - trailer);
+  if (tsize != current_trailer_len) {  // sanity check
+    return -1;
+  }
+
+  trailer = realloc(trailer, (size_t)current_trailer_len + 22);
+  ptrailer = trailer + current_trailer_len;
+
   // Trailer length
   *ptrailer = 0xce;  // uint32
   ptrailer += 1;
-  swap_store(ptrailer, &(trailer_len), sizeof(uint32_t));
+  trailer_len = (ptrailer - trailer) + 22;
+  swap_store(ptrailer, &trailer_len, sizeof(uint32_t));
   ptrailer += sizeof(uint32_t);
   // Up to 16 bytes for frame fingerprint (using XXH3 included in https://github.com/Cyan4973/xxHash)
   // Maybe someone would need 256-bit in the future, but for the time being 128-bit seems like a good tradeoff
@@ -552,13 +658,16 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
   ptrailer += 1;
   *ptrailer = 0;  // fingerprint type: 0 -> no fp; 1 -> 32-bit; 2 -> 64-bit; 3 -> 128-bit
   ptrailer += 1;
+
   // Uncomment this when we compute an actual fingerprint
   // memcpy(ptrailer, xxh3_fingerprint, sizeof(xxh3_fingerprint));
   ptrailer += 16;
+
   // Sanity check
   if (ptrailer - trailer != trailer_len) {
     return BLOSC2_ERROR_DATA;
   }
+
   int32_t header_len;
   int64_t frame_len;
   int64_t nbytes;
@@ -598,11 +707,16 @@ int frame_update_trailer(blosc2_frame* frame, blosc2_schunk* schunk) {
     }
     fseek(fp, trailer_offset, SEEK_SET);
     size_t wbytes = fwrite(trailer, 1, trailer_len, fp);
-    fclose(fp);
     if (wbytes != (size_t)trailer_len) {
       BLOSC_TRACE_ERROR("Cannot write the trailer length in trailer.");
       return BLOSC2_ERROR_FILE_WRITE;
     }
+    if (TRUNCATE(fileno(fp), trailer_offset + trailer_len) != 0) {
+      BLOSC_TRACE_ERROR("Cannot truncate the frame.");
+      return BLOSC2_ERROR_FILE_TRUNCATE;
+    }
+    fclose(fp);
+
   }
   free(trailer);
 
@@ -1052,7 +1166,7 @@ int frame_update_header(blosc2_frame* frame, blosc2_schunk* schunk, bool new) {
 }
 
 
-/* Get the (compressed) usermeta chunk out of a frame */
+/* Get the (compressed) umetalayers chunk out of a frame */
 int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
   int32_t header_len;
   int64_t frame_len;
@@ -1076,7 +1190,7 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
     return BLOSC2_ERROR_READ_BUFFER;
   }
 
-  // Get the size of usermeta (inside the trailer)
+  // Get the size of umetalayers (inside the trailer)
   int32_t usermeta_len_network;
   if (frame->sdata != NULL) {
     memcpy(&usermeta_len_network, frame->sdata + trailer_offset + FRAME_TRAILER_USERMETA_LEN_OFFSET, sizeof(int32_t));
@@ -1104,7 +1218,7 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
   swap_store(&usermeta_len, &usermeta_len_network, sizeof(int32_t));
 
   if (usermeta_len < 0) {
-    BLOSC_TRACE_ERROR("Invalid usermeta length.");
+    BLOSC_TRACE_ERROR("Invalid umetalayers length.");
     return BLOSC2_ERROR_READ_BUFFER;
   }
   if (usermeta_len == 0) {
@@ -1112,7 +1226,7 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
     return 0;
   }
   if (trailer_offset + FRAME_TRAILER_USERMETA_OFFSET + usermeta_len > frame_len) {
-    BLOSC_TRACE_ERROR("Invalid usermeta offset exceeds frame length.");
+    BLOSC_TRACE_ERROR("Invalid umetalayers offset exceeds frame length.");
     return -1;
   }
 
@@ -1135,7 +1249,7 @@ int32_t frame_get_usermeta(blosc2_frame* frame, uint8_t** usermeta) {
     size_t rbytes = fread(*usermeta, 1, usermeta_len, fp);
     fclose(fp);
     if (rbytes != (size_t)usermeta_len) {
-      BLOSC_TRACE_ERROR("Cannot read the complete usermeta chunk in frame. %ld != %ld.",
+      BLOSC_TRACE_ERROR("Cannot read the complete umetalayers chunk in frame. %ld != %ld.",
               (long)rbytes, (long)usermeta_len);
       return BLOSC2_ERROR_READ_BUFFER;
     }
@@ -1482,10 +1596,10 @@ blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy) {
   usermeta_len = frame_get_usermeta(frame, &usermeta);
   if (usermeta_len < 0) {
     blosc2_schunk_free(schunk);
-    BLOSC_TRACE_ERROR("Cannot access the usermeta chunk.");
+    BLOSC_TRACE_ERROR("Cannot access the umetalayers chunk.");
     return NULL;
   }
-  schunk->usermeta = usermeta;
+  schunk->umetalayers[0] = usermeta;
   schunk->usermeta_len = usermeta_len;
 
   return schunk;
