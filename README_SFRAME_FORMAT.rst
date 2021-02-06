@@ -1,11 +1,11 @@
 Blosc2 Sparse Frame Format
 ==========================
 
-Blosc (as of version 2.0.0) has a sparse frame (sframe for short) format that allows for the storage of different Blosc data chunks on disk in a sparse way.
+Blosc (as of version 2.0.0) has a sparse frame (sframe for short) format that allows for non-contiguous storage of Blosc data chunks on disk.
 
 When creating an sparse frame one must denote the `storage.contiguous` as false and provide a name (which will be a directory) in `storage.urlpath` for the sframe to be stored. It is recommended to name the directory with the `.b2sframe` extension.
 
-An sframe is made up of a frame file and the chunks stored in the same directory on-disk.  The frame file follows the format described in the `contiguous frame format <README_CFRAME_FORMAT.rst>`_ document, with the difference that the frame's chunks section is made up only of the index chunk which will have the indexes to each chunk. The frame file name is always `chunks.b2frame`.
+An sframe is made up of a frame index file and the chunks stored in the same directory on-disk.  The frame file follows the format described in the `contiguous frame format <README_CFRAME_FORMAT.rst>`_ document, with the difference that the frame's chunks section is made up of multiple files (one per chunk). The frame index file name is always `chunks.b2frame`, and it also contains the metadata for the sframe.
 
 Chunks
 ------
