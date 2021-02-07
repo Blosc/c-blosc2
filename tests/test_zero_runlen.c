@@ -58,9 +58,9 @@ CUTEST_TEST_SETUP(zero_runlen) {
   ));
   CUTEST_PARAMETRIZE(backend, test_zero_runlen_backend, CUTEST_DATA(
       {false, NULL},  // memory - schunk
-      {true, NULL},  // memory - frame
-      {true, "test_zero_runlen.b2frame"}, // disk - frame
-      {false, "test_zero_runlen.b2sframe"}, // disk - sframe
+      {true, NULL},  // memory - cframe
+      {true, "test_zero_runlen.b2frame"}, // disk - cframe
+      {false, "test_zero_runlen_s.b2frame"}, // disk - sframe
   ));
 }
 

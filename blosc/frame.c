@@ -166,7 +166,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     return NULL;
   }
 
-  // Reserved flags
+  // Frame type
+  // We only support contiguous and sparse directories frames currently
+  *h2p = frame->sframe ? 1 : 0;
   h2p += 1;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
     return NULL;
@@ -414,6 +416,18 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
       return BLOSC2_ERROR_FILE_READ;
     }
     framep = header;
+  }
+
+  // Consistency check for frame type
+  uint8_t frame_type = framep[FRAME_TYPE];
+  if (frame->sframe) {
+    if (frame_type != FRAME_DIRECTORY_TYPE) {
+      return BLOSC2_ERROR_FRAME_TYPE;
+    }
+  } else {
+    if (frame_type != FRAME_CONTIGUOUS_TYPE) {
+      return BLOSC2_ERROR_FRAME_TYPE;
+    }
   }
 
   // Fetch some internal lengths
@@ -914,7 +928,7 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
   size_t rbytes = fread(coffsets, 1, (size_t)coffsets_cbytes, fp);
   fclose(fp);
   if (rbytes != (size_t)coffsets_cbytes) {
-    BLOSC_TRACE_ERROR("Cannot read the offsets out of the fileframe.");
+    BLOSC_TRACE_ERROR("Cannot read the offsets out of the frame.");
     free(coffsets);
     return NULL;
   }
@@ -1052,7 +1066,7 @@ int32_t frame_get_usermeta(blosc2_frame_s* frame, uint8_t** usermeta) {
     size_t rbytes = fread(&usermeta_len_network, 1, sizeof(int32_t), fp);
     fclose(fp);
     if (rbytes != sizeof(int32_t)) {
-      BLOSC_TRACE_ERROR("Cannot access the usermeta_len out of the fileframe.");
+      BLOSC_TRACE_ERROR("Cannot access the usermeta_len out of the frame.");
       return BLOSC2_ERROR_READ_BUFFER;
     }
   }
@@ -1244,7 +1258,7 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       fclose(fp);
     }
     if (rbytes != (size_t) header_len) {
-      BLOSC_TRACE_ERROR("Cannot access the header out of the fileframe.");
+      BLOSC_TRACE_ERROR("Cannot access the header out of the frame.");
       free(header);
       return BLOSC2_ERROR_FILE_READ;
     }
@@ -1605,7 +1619,7 @@ int frame_get_chunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool *ne
     fseek(fp, header_len + offset + BLOSC2_CHUNK_CBYTES, SEEK_SET);
     size_t rbytes = fread(&chunk_cbytes, 1, sizeof(chunk_cbytes), fp);
     if (rbytes != sizeof(chunk_cbytes)) {
-      BLOSC_TRACE_ERROR("Cannot read the cbytes for chunk in the fileframe.");
+      BLOSC_TRACE_ERROR("Cannot read the cbytes for chunk in the frame.");
       fclose(fp);
       return BLOSC2_ERROR_FILE_READ;
     }
@@ -1615,7 +1629,7 @@ int frame_get_chunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool *ne
     rbytes = fread(*chunk, 1, (size_t)chunk_cbytes, fp);
     fclose(fp);
     if (rbytes != (size_t)chunk_cbytes) {
-      BLOSC_TRACE_ERROR("Cannot read the chunk out of the fileframe.");
+      BLOSC_TRACE_ERROR("Cannot read the chunk out of the frame.");
       return BLOSC2_ERROR_FILE_READ;
     }
     *needs_free = true;
@@ -1700,7 +1714,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     }
     size_t rbytes = fread(header, 1, BLOSC_MIN_HEADER_LENGTH, fp);
     if (rbytes != BLOSC_MIN_HEADER_LENGTH) {
-      BLOSC_TRACE_ERROR("Cannot read the header for chunk in the fileframe.");
+      BLOSC_TRACE_ERROR("Cannot read the header for chunk in the frame.");
       fclose(fp);
       return BLOSC2_ERROR_FILE_READ;
     }
@@ -1724,7 +1738,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     rbytes = fread(*chunk, 1, trailer_offset, fp);
     fclose(fp);
     if (rbytes != trailer_offset) {
-      BLOSC_TRACE_ERROR("Cannot read the (lazy) chunk out of the fileframe.");
+      BLOSC_TRACE_ERROR("Cannot read the (lazy) chunk out of the frame.");
       return BLOSC2_ERROR_FILE_READ;
     }
 
@@ -1945,7 +1959,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
       fseek(fp, header_len + cbytes, SEEK_SET);
       wbytes = fwrite(chunk, 1, (size_t)cbytes_chunk, fp);  // the new chunk
       if (wbytes != (size_t)cbytes_chunk) {
-        BLOSC_TRACE_ERROR("Cannot write the full chunk to fileframe.");
+        BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
         fclose(fp);
         return NULL;
       }
@@ -1953,7 +1967,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
     }
     fclose(fp);
     if (wbytes != (size_t)new_off_cbytes) {
-      BLOSC_TRACE_ERROR("Cannot write the offsets to fileframe.");
+      BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return NULL;
     }
   }
@@ -2120,7 +2134,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
       fseek(fp, header_len + cbytes, SEEK_SET);
       wbytes = fwrite(chunk, 1, (size_t)cbytes_chunk, fp);  // the new chunk
       if (wbytes != (size_t)cbytes_chunk) {
-        BLOSC_TRACE_ERROR("Cannot write the full chunk to fileframe.");
+        BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
         fclose(fp);
         return NULL;
       }
@@ -2128,7 +2142,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
     wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
     fclose(fp);
     if (wbytes != (size_t)new_off_cbytes) {
-      BLOSC_TRACE_ERROR("Cannot write the offsets to fileframe.");
+      BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return NULL;
     }
     // Invalidate the cache for chunk offsets
@@ -2288,7 +2302,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
       fseek(fp, header_len + cbytes, SEEK_SET);
       wbytes = fwrite(chunk, 1, (size_t)cbytes_chunk, fp);  // the new chunk
       if (wbytes != (size_t)cbytes_chunk) {
-        BLOSC_TRACE_ERROR("Cannot write the full chunk to fileframe.");
+        BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
         fclose(fp);
         return NULL;
       }
@@ -2296,7 +2310,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
     wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
     fclose(fp);
     if (wbytes != (size_t)new_off_cbytes) {
-      BLOSC_TRACE_ERROR("Cannot write the offsets to fileframe.");
+      BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return NULL;
     }
     // Invalidate the cache for chunk offsets
@@ -2423,7 +2437,7 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int* offsets_order, blosc
     size_t wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
     fclose(fp);
     if (wbytes != (size_t)new_off_cbytes) {
-      BLOSC_TRACE_ERROR("Cannot write the offsets to fileframe.");
+      BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return BLOSC2_ERROR_FILE_WRITE;
     }
   }

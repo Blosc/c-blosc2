@@ -131,7 +131,7 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
       BLOSC_TRACE_ERROR("Error during the creation of the directory, maybe it already exists.");
       return NULL;
     }
-    // We want a frame as storage
+    // We want a sparse (directory) frame as storage
     blosc2_frame_s* frame = frame_new(urlpath);
     free(urlpath);
     frame->sframe = true;
@@ -144,7 +144,7 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
     schunk->frame = (blosc2_frame*)frame;
   }
   if (storage.contiguous){
-    // We want a frame as storage
+    // We want a contiguous frame as storage
     blosc2_frame_s* frame = frame_new(storage.urlpath);
     frame->sframe = false;
     // Initialize frame (basically, encode the header)
