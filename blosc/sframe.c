@@ -33,14 +33,37 @@
 #endif
 
 
+/* Open sparse frame index chunk */
+FILE* sframe_open_index(const char* urlpath, const char* mode) {
+  FILE* fp = NULL;
+  char* index_path = malloc(strlen(urlpath) + strlen("/chunks.b2frame") + 1);
+  if (index_path) {
+    sprintf(index_path, "%s/chunks.b2frame", urlpath);
+    fp = fopen(index_path, mode);
+    free(index_path);
+  }
+  return fp;
+}
+
+/* Open directory/nchunk.chunk with 8 zeros of padding */
+FILE* sframe_open_chunk(const char* urlpath, int64_t nchunk, const char* mode) {
+  FILE* fp = NULL;
+  char* chunk_path = malloc(strlen(urlpath) + 1 + 8 + strlen(".chunk") + 1);
+  if (chunk_path) {
+    sprintf(chunk_path, "%s/%08X.chunk", urlpath, (unsigned int)nchunk);
+    fp = fopen(chunk_path, mode);
+    free(chunk_path);
+  }
+  return fp;
+}
+
 /* Append an existing chunk into a sparse frame. */
 void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int32_t nchunk, int64_t cbytes) {
-  // Get directory/nchunk.chunk with 8 zeros of padding
-  char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-  sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
-  FILE* fpc = fopen(chunkpath, "wb");
-  free(chunkpath);
-
+  FILE *fpc = sframe_open_chunk(frame->urlpath, nchunk, "wb");
+  if (fpc == NULL) {
+    BLOSC_TRACE_ERROR("Cannot open the chunkfile.");
+    return NULL;
+  }
   size_t wbytes = fwrite(chunk, 1, (size_t)cbytes, fpc);
   fclose(fpc);
   if (wbytes != (size_t)cbytes) {
@@ -52,13 +75,9 @@ void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int32_t nchunk,
 }
 
 
-/*Get chunk from sparse frame. */
+/* Get chunk from sparse frame. */
 int sframe_get_chunk(blosc2_frame_s* frame, int32_t nchunk, uint8_t** chunk, bool* needs_free){
-  //get directory/nchunk.chunk
-  char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-  sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
-  FILE* fpc = fopen(chunkpath, "rb");
-  free(chunkpath);
+  FILE *fpc = sframe_open_chunk(frame->urlpath, nchunk, "rb");
   if(fpc == NULL){
     BLOSC_TRACE_ERROR("Cannot open the chunkfile.");
     return BLOSC2_ERROR_FILE_OPEN;
