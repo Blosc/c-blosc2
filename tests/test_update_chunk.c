@@ -46,9 +46,9 @@ typedef struct {
 
 test_storage tstorage[] = {
     {false, NULL},  // memory - schunk
-    {true, NULL},  // memory - frame
-    {true, "test_update_chunk.b2frame"}, // disk - frame
-    {false, "test_update_chunk.b2sframe"}, // disk - sframe
+    {true, NULL},  // memory - cframe
+    {true, "test_update_chunk.b2frame"}, // disk - cframe
+    {false, "test_update_chunk_s.b2frame"}, // disk - sframe
 };
 
 static char* test_update_chunk(void) {

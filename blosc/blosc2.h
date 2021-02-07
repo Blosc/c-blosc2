@@ -273,6 +273,7 @@ enum {
   BLOSC2_ERROR_CHUNK_UPDATE = -21,    //!< Chunk update failure
   BLOSC2_ERROR_2GB_LIMIT = -22,       //!< Sizes larger than 2gb not supported
   BLOSC2_ERROR_SCHUNK_COPY = -23,     //!< Super-chunk copy failure
+  BLOSC2_ERROR_FRAME_TYPE = -24,      //!< Wrong type for frame
 };
 
 /**

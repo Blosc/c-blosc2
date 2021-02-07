@@ -264,7 +264,7 @@ static char* test_sframe_simple(void) {
 
 
 static char *all_tests(void) {
-  directory = "dir1.b2sframe";
+  directory = "dir1.b2frame";
 
   nchunks = 0;
   mu_run_test(test_sframe_simple);
@@ -279,7 +279,7 @@ static char *all_tests(void) {
   mu_run_test(test_sframe_simple);
 
   // Check directory with a trailing slash
-  directory = "dir1.b2sframe/";
+  directory = "dir1.b2frame/";
   nchunks = 0;
   mu_run_test(test_sframe_simple);
 
@@ -301,10 +301,10 @@ static char *all_tests(void) {
                 filter_pipeline = (bool) ifilter_pipeline;
                 metalayers = (bool) imetalayers;
                 usermeta = (bool) iusermeta;
-                snprintf(buf, sizeof(buf), "test_sframe_nc%d.b2sframe", nchunks);
+                snprintf(buf, sizeof(buf), "test_sframe_nc%d.b2frame", nchunks);
                 directory = buf;
                 mu_run_test(test_sframe);
-                snprintf(buf, sizeof(buf), "test_sframe_nc%d.b2sframe/", nchunks);
+                snprintf(buf, sizeof(buf), "test_sframe_nc%d.b2frame/", nchunks);
                 directory = buf;
                 mu_run_test(test_sframe);
               }

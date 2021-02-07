@@ -1,8 +1,8 @@
 Blosc2 Contiguous Frame Format
 ==============================
 
-Blosc (as of version 2.0.0) has a contiguous frame format (cframe for short) that allows for the storage of different Blosc data chunks contiguously,
-either in-memory or on-disk.
+Blosc (as of version 2.0.0) has a contiguous frame format (cframe for short) that allows for the storage of
+different Blosc data chunks contiguously, either in-memory or on-disk.
 
 The frame is composed of a header, a chunks section, and a trailer::
 
@@ -42,7 +42,7 @@ The header contains information needed to decompress the Blosc chunks contained 
       |   |   |   |   |   +--[msgpack] int64
       |   |   |   |   +-- reserved flags
       |   |   |   +--codec_flags (see below)
-      |   |   +---reserved flags
+      |   |   +---frame_type (see below)
       |   +------general_flags (see below)
       +---[msgpack] str with 4 elements (flags)
 
@@ -112,6 +112,21 @@ using the msgpack format. Here is the format for the *metalayers*::
     :``7``:
         Reserved
 
+:frame_type:
+    (``uint8``) The type of frame.
+
+    :``0`` to ``3``:
+        Enumerated for the type of frame (up to 16).
+
+        :``0``:
+            ``Contiguous``
+        :``1``:
+            ``Sparse (directory)``
+        :``2 to 15``:
+            Reserved
+
+    :``4`` to ``7``: Reserved for user-defined frame types (up to 16)
+
 :codec_flags:
     (``uint8``) Compressor enumeration (defaults for all the chunks in storage).
 
@@ -128,7 +143,7 @@ using the msgpack format. Here is the format for the *metalayers*::
             ``zlib``
         :``4``:
             ``zstd``
-        :``5``:
+        :``5 to 15``:
             Reserved
     :``4`` to ``7``: Compression level (up to 16)
 

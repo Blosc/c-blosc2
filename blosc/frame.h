@@ -12,11 +12,17 @@
 #include <stdio.h>
 #include <stdint.h>
 
+// Different types of frames
+#define FRAME_CONTIGUOUS_TYPE 0
+#define FRAME_DIRECTORY_TYPE 1
+
+
 // Constants for metadata placement in header
 #define FRAME_HEADER_MAGIC 2
 #define FRAME_HEADER_LEN (FRAME_HEADER_MAGIC + 8 + 1)  // 11
 #define FRAME_LEN (FRAME_HEADER_LEN + 4 + 1)  // 16
 #define FRAME_FLAGS (FRAME_LEN + 8 + 1)  // 25
+#define FRAME_TYPE (FRAME_FLAGS + 1)  // 26
 #define FRAME_CODECS (FRAME_FLAGS + 2)  // 27
 #define FRAME_NBYTES (FRAME_FLAGS + 4 + 1)  // 30
 #define FRAME_CBYTES (FRAME_NBYTES + 8 + 1)  // 39
