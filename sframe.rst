@@ -4,27 +4,27 @@ Blosc2  Sparse Frame
 Overview
 --------
 The sparse frame implementation allows the storage of different Blosc
-data chunks sparse on-disk. For this feature it is used a frame file, which
-was implemented for sequentially on-disk storage purposes.
+data chunks sparse on-disk. For this feature it is used a contiguous
+frame file, which was implemented for sequentially on-disk storage purposes.
 
-A frame file is a binary file
+A contiguous frame file is a binary file
 composed of a header, a chunks section and a trailer.
 The header contains information needed to decompress the chunks and the
 trailer contains a user meta data chunk and a fingerprint.
-As seen in the comparative image below (on the left the frame
-structure and on the right the sparse frame structure), the chunks section is composed of all the
-data chunks of the frame plus the index chunk. This last one contains
-the index to each chunk (where each chunk begins inside the frame file).
+As seen in the comparative image below (on the left the contiguous
+frame and on the right the sparse frame), the chunks section is composed of all the
+data chunks of the contiguous frame plus the index chunk. This last one contains
+the index to each chunk (where each chunk begins inside the contiguous frame file).
 All of this is stored sequentially, that means one part is followed
 by the next one without (initially) any empty spaces.
 
-However, in a sparse frame the chunks are already stored in a
+However, in an sparse frame the chunks are already stored in a
 specified directory as independent binary files.
 But there is still the
 need to store the information to decompress the chunks
 as well as a place to store user meta data.
 This is stored in the `chunks.b2frame`,
-which is in fact a frame file with the main difference that its
+which is in fact a contiguous frame file with the main difference that its
 chunks section is only composed of the index chunk. Thus, as seen
 in the image following, the `chunks.b2frame`
 file is composed of the header, the index chunk and the trailer.
@@ -50,17 +50,17 @@ a pretty reasonable number considering that the limitations of the most
 used file systems are between :math:`2^16` and :math:`2^32` files
 per directory.
 
-Another advantage compared with the frame is the lack of empty
+Another advantage compared with the contiguous frame is the lack of empty
 spaces when updating a chunk.
-To illustrate how a frame and a sparse frame behave when updating
+To illustrate how a contiguous frame and an sparse frame behave when updating
 a chunk an example is used  for each case.
 
-The set of the data chunks from a frame could be structured as the
+The set of the data chunks from a contiguous frame could be structured as the
 `Jenga board game tower <https://en.wikipedia.org/wiki/Jenga>`_, a tower
 built with wood blocks but, in constrast to the genuine
 `Jenga board game`, not all the
 blocks have the same size. Below is showed the initially structure
-of this tower. If the orange piece is updated (changed by another
+of this tower. If the yellow piece is updated (changed by another
 piece) there are two possibilities. The first one is that the new piece
 fits into the empty space left where the old piece was. In that case,
 the new piece is put in the previous space without any problem.
@@ -73,14 +73,14 @@ where the old piece was empty.
   :width: 50%
   :align: center
 
-On the other hand, the chunks of a sparse frame can be seen as books. So the
+On the other hand, the chunks of an sparse frame can be seen as books. So the
 chunks structure could be seen as a bookshelf in which each book
 is a different chunk. If it is needed to update one book with
 the new edition, one only has to grab the old edition and
 replace it by the new one. And the books on the right are moved
 so that there is the exact space needed for the new edition. In the
-following image the yellow book is replaced by the maroon with the
-green rim. Note there is not a single empty space between
+following image the yellow book is replaced with a larger book.
+Note there is not a single empty space between
 the books after replacing the book.
 
 .. image:: C:\Users\Marta\Desktop\bookshelf.svg
@@ -96,13 +96,13 @@ with a little bit more of work.
 For example, adjusting the code to work in the network,
 instead of storing the chunks in a local computer
 they could be stored in another machine and accessed remotely.
-That way, with just the metainfo (the frame file) we could
+That way, with just the metainfo (the contiguous frame file) we could
 access the whole sparse frame with its data chunks.
 For a clearer idea
-of how much this will mean a sparse frame of 1000 chunks was created.
+of how much this will mean an sparse frame of 1000 chunks was created.
 The
 total size of the data chunks from this sparse frame
-was 58 MB and the frames file size was
+was 58 MB and the contiguous frame file size was
 only 1 KB. This could be surely practical for teleworking. With just an
 email of something more than a 1 KB any worker could access all
 the data stored in the sparse frame.

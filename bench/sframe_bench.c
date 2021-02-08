@@ -27,6 +27,7 @@
 #define CHUNKSIZE (200 * 1000)
 
 int nchunks = NCHUNKS;
+int iterations = 1;
 
 #if defined(_WIN32)
 #include <malloc.h>
@@ -35,7 +36,7 @@ int nchunks = NCHUNKS;
 
 
 
-void test_update(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_frame) {
+void test_update(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_frame, int iter) {
   blosc_timestamp_t last, current;
   double frame_update_time, sframe_update_time;
 
@@ -52,6 +53,11 @@ void test_update(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_frame) {
   printf("*******************************************************\n");
   printf("******************* Updating 5 chunks ******************\n");
   printf("*******************************************************\n");
+
+  printf("Sframeschunk->nbytes before updates %ld\n", schunk_sframe->nbytes);
+  printf("Frameschunk->nbytes before updates %ld\n", schunk_frame->nbytes);
+  printf("Sframeschunk->cbytes before updates %ld\n", schunk_sframe->cbytes);
+  printf("Frameschunk->cbytes before updates %ld\n", schunk_frame->cbytes);
 
   // Update the sframe chunks
   sframe_update_time = 0.0;
@@ -92,22 +98,27 @@ void test_update(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_frame) {
     free(chunk);
   }
 
-  printf("[Sframe Update] Elapsed time:\t %6.3f s.  Total sframe size: %l bytes \n", sframe_update_time, schunk_sframe->nbytes);
-  printf("[Frame Update] Elapsed time:\t %6.3f s.  Total frame size: %l bytes \n", frame_update_time, schunk_frame->nbytes);
+  printf("[Sframe Update] Elapsed time:\t %6.3f s.  Total sframe size: %ld bytes \n", sframe_update_time, schunk_sframe->cbytes);
+  printf("[Frame Update] Elapsed time:\t %6.3f s.  Total  frame size: %ld bytes \n", frame_update_time, schunk_frame->cbytes);
 
-  /* Remove directory */
-  blosc2_remove_dir(schunk_sframe->storage->urlpath);
+  printf("Sframeschunk->nbytes after updates %ld\n", schunk_sframe->nbytes);
+  printf("Frameschunk->nbytes after updates %ld\n", schunk_frame->nbytes);
+  printf("Sframeschunk->cbytes after updates %ld\n", schunk_sframe->cbytes);
+  printf("Frameschunk->cbytes after updates %ld\n", schunk_frame->cbytes);
   /* Free blosc resources */
   free(update_chunks);
-  free(datasize);
   free(data);
-  blosc2_schunk_free(schunk_sframe);
-  blosc2_schunk_free(schunk_frame);
-  /* Destroy the Blosc environment */
-  blosc_destroy();
+  if ((iter + 1) == iterations) {
+    /* Remove directory */
+    //blosc2_remove_dir(schunk_sframe->storage->urlpath);
+    blosc2_schunk_free(schunk_sframe);
+    blosc2_schunk_free(schunk_frame);
+    /* Destroy the Blosc environment */
+    blosc_destroy();
+  }
 }
 
-void test_insert(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_frame) {
+void test_insert(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_frame, int iter) {
   blosc_timestamp_t last, current;
   double frame_insert_time, sframe_insert_time;
 
@@ -164,23 +175,26 @@ void test_insert(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_frame) {
     free(chunk);
   }
 
-  printf("[Sframe Update] Elapsed time:\t %6.3f s.  Total sframe size: %l bytes \n", sframe_insert_time, schunk_sframe->nbytes);
-  printf("[Frame Update] Elapsed time:\t %6.3f s.  Total frame size: %l bytes \n", frame_insert_time, schunk_frame->nbytes);
+  printf("[Sframe Update] Elapsed time:\t %6.3f s.  Total sframe size: %ld bytes \n", sframe_insert_time, schunk_sframe->cbytes);
+  printf("[Frame Update] Elapsed time:\t %6.3f s.  Total  frame size: %ld bytes \n", frame_insert_time, schunk_frame->cbytes);
 
-  /* Remove directory */
-  blosc2_remove_dir(schunk_sframe->storage->urlpath);
+
   /* Free blosc resources */
   free(insert_chunks);
-  free(datasize);
   free(data);
-  blosc2_schunk_free(schunk_sframe);
-  blosc2_schunk_free(schunk_frame);
-  /* Destroy the Blosc environment */
-  blosc_destroy();
+  if ((iter + 1) == iterations) {
+    /* Remove directory */
+    blosc2_remove_dir(schunk_sframe->storage->urlpath);
+    blosc2_schunk_free(schunk_sframe);
+    blosc2_schunk_free(schunk_frame);
+    /* Destroy the Blosc environment */
+    blosc_destroy();
+  }
+
 }
 
 
-void test_reorder(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_frame) {
+void test_reorder(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_frame, int iter) {
   blosc_timestamp_t last, current;
   double frame_reorder_time, sframe_reorder_time;
 
@@ -212,19 +226,21 @@ void test_reorder(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_frame) {
   }
   frame_reorder_time = blosc_elapsed_secs(current, last);
 
+  printf("[Sframe Update] Elapsed time:\t %f s.  Total sframe size: %ld bytes \n", sframe_reorder_time, schunk_sframe->cbytes);
+  printf("[Frame Update] Elapsed time:\t %f s.  Total  frame size: %ld bytes \n", frame_reorder_time, schunk_frame->cbytes);
 
 
-  printf("[Sframe Update] Elapsed time:\t %f s.  Total sframe size: %l bytes \n", sframe_reorder_time, schunk_sframe->nbytes);
-  printf("[Frame Update] Elapsed time:\t %f s.  Total frame size: %l bytes \n", frame_reorder_time, schunk_frame->nbytes);
-
-  /* Remove directory */
-  blosc2_remove_dir(schunk_sframe->storage->urlpath);
   /* Free blosc resources */
   free(offsets_order);
-  blosc2_schunk_free(schunk_sframe);
-  blosc2_schunk_free(schunk_frame);
-  /* Destroy the Blosc environment */
-  blosc_destroy();
+  if ((iter + 1) == iterations) {
+    /* Remove directory */
+    blosc2_remove_dir(schunk_sframe->storage->urlpath);
+    blosc2_schunk_free(schunk_sframe);
+    blosc2_schunk_free(schunk_frame);
+    /* Destroy the Blosc environment */
+    blosc_destroy();
+  }
+
 }
 
 void test_create_sframe_frame(char* operation, int32_t iter) {
@@ -262,6 +278,11 @@ void test_create_sframe_frame(char* operation, int32_t iter) {
   schunk_frame = blosc2_schunk_new(storage2);
 
   printf("Test comparation frame vs sframe with %d chunks.\n", nchunks);
+  printf("Sframeschunk->nbytes before appends %ld\n", schunk_sframe->nbytes);
+  printf("Frameschunk->nbytes before appends %ld\n", schunk_frame->nbytes);
+  printf("Sframeschunk->cbytes before appends %ld\n", schunk_sframe->cbytes);
+  printf("Frameschunk->cbytes before appends %ld\n", schunk_frame->cbytes);
+
   // Feed it with data
   sframe_append_time=0.0;
   frame_append_time=0.0;
@@ -327,6 +348,10 @@ void test_create_sframe_frame(char* operation, int32_t iter) {
   printf("Decompression successful!\n");
 
   printf("Successful roundtrip!\n");
+  printf("Sframeschunk->nbytes after appends %ld\n", schunk_sframe->nbytes);
+  printf("Frameschunk->nbytes after appends %ld\n", schunk_frame->nbytes);
+  printf("Sframeschunk->cbytes after appends %ld\n", schunk_sframe->cbytes);
+  printf("Frameschunk->cbytes after appends %ld\n", schunk_frame->cbytes);
 
   /* Free blosc resources */
   free(data_dest);
@@ -335,25 +360,24 @@ void test_create_sframe_frame(char* operation, int32_t iter) {
   // Run as much as iter tests
   if (strcmp(operation, "insert") == 0) {
     for (int i = 0; i < iter; i++) {
-      test_insert(schunk_sframe, schunk_frame);
+      test_insert(schunk_sframe, schunk_frame, i);
     }
   }
   else if (strcmp(operation, "update") == 0) {
     for (int i = 0; i < iter; i++) {
-      test_update(schunk_sframe, schunk_frame);
+      test_update(schunk_sframe, schunk_frame, i);
     }
   }
   else if (strcmp(operation, "reorder") == 0) {
     // reorder
     for (int i = 0; i < iter; i++) {
-      test_reorder(schunk_sframe, schunk_frame);
+      test_reorder(schunk_sframe, schunk_frame, i);
     }
   }
 
 }
 
 int main(int argc, char* argv[]) {
-  int iterations = 1;
   char* operation;
 
   if (argc >= 5) {
