@@ -83,12 +83,14 @@ int main(void) {
     printf("Cannot write umetalayers chunk");
     return umlen;
   }
+
   blosc2_storage st2 = {.urlpath="umeta.b2frame"};
   blosc2_schunk *sc = blosc2_schunk_open(st2);
 
   /* Free resources */
   blosc2_schunk_free(schunk);
   blosc2_schunk_free(sc);
+
 
   return 0;
 }
