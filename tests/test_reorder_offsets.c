@@ -22,21 +22,21 @@ int tests_run = 0;
 typedef struct {
   int nchunks;
   char* urlpath;
-  bool sequential;
+  bool contiguous;
 } test_data;
 
 test_data tdata;
 
 typedef struct {
-  bool sequential;
+  bool contiguous;
   char *urlpath;
 }test_storage;
 
 test_storage tstorage[] = {
-    // {false, NULL},  // memory - schunk
-    // {true, NULL},  // memory - frame
-    // {true, "test_reorder_offsets.b2frame"}, // disk - frame
-    {false, "test_reorder_offsets.b2eframe"}, // disk - eframe
+    {false, NULL},  // memory - schunk
+    {true, NULL},  // memory - frame
+    {true, "test_reorder_offsets.b2frame"}, // disk - cframe
+    {false, "test_reorder_offsets_s.b2frame"}, // disk - sframe
 };
 
 int32_t tnchunks[] = {5, 12, 24, 33, 1};
@@ -46,7 +46,7 @@ int32_t *data_dest;
 
 static char* test_reorder_offsets(void) {
   /* Free resources */
-  if (tdata.urlpath != NULL && tdata.sequential == false) {
+  if (tdata.urlpath != NULL && tdata.contiguous == false) {
     blosc2_remove_dir(tdata.urlpath);
   }
 
@@ -63,7 +63,7 @@ static char* test_reorder_offsets(void) {
   cparams.typesize = sizeof(int32_t);
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {.sequential=tdata.sequential, .urlpath=tdata.urlpath, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.contiguous=tdata.contiguous, .urlpath=tdata.urlpath, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
@@ -92,7 +92,7 @@ static char* test_reorder_offsets(void) {
   }
 
   /* Free resources */
-  if (!storage.sequential && storage.urlpath != NULL) {
+  if (!storage.contiguous && storage.urlpath != NULL) {
     blosc2_remove_dir(storage.urlpath);
   }
   free(offsets_order);
@@ -109,7 +109,7 @@ static char *all_tests(void) {
   for (int i = 0; i < sizeof(tstorage) / sizeof(test_storage); ++i) {
     for (int j = 0; j < sizeof(tnchunks) / sizeof(int32_t); ++j) {
 
-      tdata.sequential = tstorage[i].sequential;
+      tdata.contiguous = tstorage[i].contiguous;
       tdata.urlpath = tstorage[i].urlpath;
       tdata.nchunks = tnchunks[j];
 

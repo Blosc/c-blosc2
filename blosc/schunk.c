@@ -74,37 +74,6 @@ int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams) {
   return 0;
 }
 
-blosc2_storage* get_new_storage(const blosc2_storage* storage, const blosc2_cparams* cdefaults,
-                                const blosc2_dparams* ddefaults) {
-  blosc2_storage* new_storage = (blosc2_storage*)calloc(1, sizeof(blosc2_storage));
-  memcpy(new_storage, storage, sizeof(blosc2_storage));
-  if (storage->urlpath != NULL) {
-    size_t pathlen = strlen(storage->urlpath);
-    new_storage->urlpath = malloc(pathlen + 1);
-    strcpy(new_storage->urlpath, storage->urlpath);
-  }
-  else {
-    new_storage->urlpath = NULL;
-  }
-  // cparams
-  blosc2_cparams* cparams = malloc(sizeof(blosc2_cparams));
-  if (storage->cparams != NULL) {
-    memcpy(cparams, storage->cparams, sizeof(blosc2_cparams));
-  } else {
-    memcpy(cparams, cdefaults, sizeof(blosc2_cparams));
-  }
-  new_storage->cparams = cparams;
-  // dparams
-  blosc2_dparams* dparams = malloc(sizeof(blosc2_dparams));
-  if (storage->dparams != NULL) {
-    memcpy(dparams, storage->dparams, sizeof(blosc2_dparams));
-  }
-  else {
-    memcpy(dparams, ddefaults, sizeof(blosc2_dparams));
-  }
-  new_storage->dparams = dparams;
-  return new_storage;
-}
 
 void update_schunk_properties(struct blosc2_schunk* schunk) {
   blosc2_cparams* cparams = schunk->storage->cparams;
@@ -145,7 +114,7 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
   // ...and update internal properties
   update_schunk_properties(schunk);
 
-  if (!storage.sequential && storage.urlpath != NULL){
+  if (!storage.contiguous && storage.urlpath != NULL){
     char* urlpath;
     char last_char = storage.urlpath[strlen(storage.urlpath) - 1];
     if (last_char == '\\' || last_char == '/') {
@@ -162,29 +131,29 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
       BLOSC_TRACE_ERROR("Error during the creation of the directory, maybe it already exists.");
       return NULL;
     }
-    // We want a frame as storage
-    blosc2_frame* frame = blosc2_frame_new(urlpath);
+    // We want a sparse (directory) frame as storage
+    blosc2_frame_s* frame = frame_new(urlpath);
     free(urlpath);
-    frame->eframe = true;
+    frame->sframe = true;
     // Initialize frame (basically, encode the header)
-    int64_t frame_len = blosc2_frame_from_schunk(schunk, frame);
+    int64_t frame_len = frame_from_schunk(schunk, frame);
     if (frame_len < 0) {
       BLOSC_TRACE_ERROR("Error during the conversion of schunk to frame.");
       return NULL;
     }
-    schunk->frame = frame;
+    schunk->frame = (blosc2_frame*)frame;
   }
-  if (storage.sequential){
-    // We want a frame as storage
-    blosc2_frame* frame = blosc2_frame_new(storage.urlpath);
-    frame->eframe = false;
+  if (storage.contiguous){
+    // We want a contiguous frame as storage
+    blosc2_frame_s* frame = frame_new(storage.urlpath);
+    frame->sframe = false;
     // Initialize frame (basically, encode the header)
-    int64_t frame_len = blosc2_frame_from_schunk(schunk, frame);
+    int64_t frame_len = frame_from_schunk(schunk, frame);
     if (frame_len < 0) {
       BLOSC_TRACE_ERROR("Error during the conversion of schunk to frame.");
       return NULL;
     }
-    schunk->frame = frame;
+    schunk->frame = (blosc2_frame*)frame;
   }
 
   return schunk;
@@ -194,7 +163,7 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
 /* Create an empty super-chunk */
 blosc2_schunk *blosc2_schunk_empty(int nchunks, const blosc2_storage storage) {
   blosc2_schunk* schunk = blosc2_schunk_new(storage);
-  if (storage.sequential) {
+  if (storage.contiguous) {
     BLOSC_TRACE_ERROR("Creating empty frames is not supported yet.");
     return NULL;
   }
@@ -221,21 +190,38 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
 
   // Check if cparams are equals
   bool cparams_equal = true;
-  blosc2_cparams *cparams = storage.cparams;
-  if (cparams->blocksize == 0) {
-    cparams->blocksize = schunk->cctx->blocksize;
+  blosc2_cparams cparams = {0};
+  if (storage.cparams == NULL) {
+    // When cparams are not specified, just use the same of schunk
+    cparams.typesize = schunk->cctx->typesize;
+    cparams.clevel = schunk->cctx->clevel;
+    cparams.compcode = schunk->cctx->compcode;
+    cparams.use_dict = schunk->cctx->use_dict;
+    cparams.blocksize = schunk->cctx->blocksize;
+    memcpy(cparams.filters, schunk->cctx->filters, BLOSC2_MAX_FILTERS);
+    memcpy(cparams.filters_meta, schunk->cctx->filters_meta, BLOSC2_MAX_FILTERS);
+    storage.cparams = &cparams;
+  }
+  else {
+    cparams = *storage.cparams;
+  }
+  if (cparams.blocksize == 0) {
+    // TODO: blocksize should be read from schunk->blocksize
+    // For this, it should be updated during the first append
+    // (or change API to make this a property during schunk creation).
+    cparams.blocksize = schunk->cctx->blocksize;
   }
 
-  if (cparams->typesize != schunk->cctx->typesize ||
-      cparams->clevel != schunk->cctx->clevel ||
-      cparams->compcode != schunk->cctx->compcode ||
-      cparams->use_dict != schunk->cctx->use_dict ||
-      cparams->blocksize != schunk->cctx->blocksize) {
+  if (cparams.typesize != schunk->cctx->typesize ||
+      cparams.clevel != schunk->cctx->clevel ||
+      cparams.compcode != schunk->cctx->compcode ||
+      cparams.use_dict != schunk->cctx->use_dict ||
+      cparams.blocksize != schunk->cctx->blocksize) {
     cparams_equal = false;
   }
   for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
-    if (cparams->filters[i] != schunk->cctx->filters[i] ||
-        cparams->filters_meta[i] != schunk->cctx->filters_meta[i]) {
+    if (cparams.filters[i] != schunk->cctx->filters[i] ||
+        cparams.filters_meta[i] != schunk->cctx->filters_meta[i]) {
       cparams_equal = false;
     }
   }
@@ -293,38 +279,105 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
       BLOSC_TRACE_ERROR("Can not get `usermeta` from schunk");
       return NULL;
     }
-    if (blosc2_update_usermeta(new_schunk, usermeta, usermeta_len, *storage.cparams) < 0) {
+    if (blosc2_update_usermeta(new_schunk, usermeta, usermeta_len, cparams) < 0) {
       BLOSC_TRACE_ERROR("Can not update the `usermeta`.");
       return NULL;
     }
+    free(usermeta);
   }
   return new_schunk;
 }
 
 
 /* Open an existing super-chunk that is on-disk (no copy is made). */
-blosc2_schunk* blosc2_schunk_open(const blosc2_storage storage) {
-  if (storage.urlpath == NULL) {
-    BLOSC_TRACE_ERROR("You need to supply a storage.urlpath.");
+blosc2_schunk* blosc2_schunk_open(const char* urlpath) {
+  if (urlpath == NULL) {
+    BLOSC_TRACE_ERROR("You need to supply a urlpath.");
     return NULL;
   }
 
-  // We only support frames yet
-  blosc2_frame* frame = blosc2_frame_from_file(storage.urlpath);
-  blosc2_schunk* schunk = blosc2_frame_to_schunk(frame, false);
+  blosc2_frame_s* frame = frame_from_file(urlpath);
+  blosc2_schunk* schunk = frame_to_schunk(frame, false);
 
-  // Get the storage with proper defaults
-  blosc2_cparams *store_cparams;
-  blosc2_schunk_get_cparams(schunk, &store_cparams);
-  blosc2_dparams *store_dparams;
-  blosc2_schunk_get_dparams(schunk, &store_dparams);
-  schunk->storage = get_new_storage(&storage, store_cparams, store_dparams);
-  free(store_cparams);
-  free(store_dparams);
+  // Set the storage with proper defaults
+  size_t pathlen = strlen(urlpath);
+  schunk->storage->urlpath = malloc(pathlen + 1);
+  strcpy(schunk->storage->urlpath, urlpath);
+  schunk->storage->contiguous = !frame->sframe;
   // Update the existing cparams/dparams with the new defaults
   update_schunk_properties(schunk);
 
   return schunk;
+}
+
+
+int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* needs_free) {
+  blosc2_frame_s* frame;
+  int64_t cframe_len;
+  if ((schunk->storage->contiguous == true) && (schunk->storage->urlpath == NULL)) {
+    frame =  (blosc2_frame_s*)(schunk->frame);
+    *dest = frame->cframe;
+    cframe_len = frame->len;
+    *needs_free = false;
+  }
+  else {
+    // Copy to a contiguous storage
+    blosc2_storage frame_storage = {.contiguous=true};
+    blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, frame_storage);
+    if (schunk_copy == NULL) {
+      BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
+      return BLOSC2_ERROR_SCHUNK_COPY;
+    }
+    frame = (blosc2_frame_s*)(schunk_copy->frame);
+    *dest = frame->cframe;
+    cframe_len = frame->len;
+    *needs_free = true;
+    frame->avoid_cframe_free = true;
+    blosc2_schunk_free(schunk_copy);
+  }
+
+  return cframe_len;
+
+}
+
+
+/* Write an in-memory frame out to a file. */
+int64_t frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
+  FILE* fp = fopen(urlpath, "wb");
+  size_t nitems = fwrite(frame->cframe, (size_t)frame->len, 1, fp);
+  fclose(fp);
+  return nitems * (size_t)frame->len;
+}
+
+
+/* Write super-chunk out to a file. */
+int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath) {
+  if (urlpath == NULL) {
+    BLOSC_TRACE_ERROR("urlpath cannot be NULL");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  // Accelerated path for in-memory frames
+  if (schunk->storage->contiguous && schunk->storage->urlpath == NULL) {
+    int64_t len = frame_to_file((blosc2_frame_s*)(schunk->frame), urlpath);
+    if (len <= 0) {
+      BLOSC_TRACE_ERROR("Error writing to file");
+      return len;
+    }
+    return len;
+  }
+
+  // Copy to a contiguous file
+  blosc2_storage frame_storage = {.contiguous=true, .urlpath=(char*)urlpath};
+  blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, frame_storage);
+  if (schunk_copy == NULL) {
+    BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
+    return BLOSC2_ERROR_SCHUNK_COPY;
+  }
+  blosc2_frame_s* frame = (blosc2_frame_s*)(schunk_copy->frame);
+  int64_t frame_len = frame->len;
+  blosc2_schunk_free(schunk_copy);
+  return frame_len;
 }
 
 
@@ -363,8 +416,8 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     free(schunk->storage);
   }
 
-  if (schunk->frame != NULL && !schunk->avoid_frame_free) {
-    blosc2_frame_free(schunk->frame);
+  if (schunk->frame != NULL) {
+    frame_free((blosc2_frame_s *) schunk->frame);
   }
 
   if (schunk->usermeta_len > 0) {
@@ -377,14 +430,17 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
 }
 
 
-/* Create a super-chunk out of a serialized frame (no copy is made). */
-blosc2_schunk* blosc2_schunk_open_sframe(uint8_t *sframe, int64_t len) {
-  blosc2_frame* frame = blosc2_frame_from_sframe(sframe, len, false);
+/* Create a super-chunk out of a contiguous frame buffer */
+blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy) {
+  blosc2_frame_s* frame = frame_from_cframe(cframe, len, false);
   if (frame == NULL) {
     return NULL;
   }
-  // Super-chunk will assume ownership of frame and free it
-  blosc2_schunk* schunk = blosc2_frame_to_schunk(frame, false);
+  blosc2_schunk* schunk = frame_to_schunk(frame, copy);
+  if (copy) {
+    // We don't need the frame anymore
+    frame_free(frame);
+  }
   return schunk;
 }
 
@@ -414,11 +470,9 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
     int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
     switch (special_value) {
       case BLOSC2_ZERO_RUNLEN:
-        schunk->cbytes += 0;
-            break;
       case BLOSC2_NAN_RUNLEN:
         schunk->cbytes += 0;
-            break;
+        break;
       default:
         schunk->cbytes += cbytes;
     }
@@ -432,7 +486,8 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   }
 
   // Update super-chunk or frame
-  if (schunk->frame == NULL) {
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+  if (frame == NULL) {
     // Check that we are not appending a small chunk after another small chunk
     if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
       uint8_t* last_chunk = schunk->data[nchunks - 1];
@@ -459,7 +514,7 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
     schunk->data[nchunks] = chunk;
   }
   else {
-    if (frame_append_chunk(schunk->frame, chunk, schunk) == NULL) {
+    if (frame_append_chunk(frame, chunk, schunk) == NULL) {
       BLOSC_TRACE_ERROR("Problems appending a chunk.");
       return BLOSC2_ERROR_CHUNK_APPEND;
     }
@@ -494,11 +549,9 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
     switch (special_value) {
       case BLOSC2_ZERO_RUNLEN:
-        schunk->cbytes += 0;
-            break;
       case BLOSC2_NAN_RUNLEN:
         schunk->cbytes += 0;
-            break;
+        break;
       default:
         schunk->cbytes += cbytes;
     }
@@ -512,7 +565,8 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   }
 
   // Update super-chunk or frame
-  if (schunk->frame == NULL) {
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+  if (frame == NULL) {
     // Check that we are not appending a small chunk after another small chunk
     if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
       uint8_t* last_chunk = schunk->data[nchunks - 1];
@@ -545,7 +599,7 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   }
 
   else {
-    if (frame_insert_chunk(schunk->frame, nchunk, chunk, schunk) == NULL) {
+    if (frame_insert_chunk(frame, nchunk, chunk, schunk) == NULL) {
       BLOSC_TRACE_ERROR("Problems inserting a chunk in a frame.");
       return BLOSC2_ERROR_CHUNK_INSERT;
     }
@@ -598,6 +652,7 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     chunk = chunk_copy;
   }
 
+  blosc2_frame_s* frame = (blosc2_frame_s*)(schunk->frame);
   if (schunk->frame == NULL) {
     /* Update counters */
     schunk->nbytes += nbytes;
@@ -609,16 +664,10 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
     switch (special_value) {
       case BLOSC2_ZERO_RUNLEN:
-        schunk->nbytes += nbytes;
-        schunk->nbytes -= nbytes_old;
-        if (schunk->frame->eframe) {
-          schunk->cbytes -= cbytes_old;
-        }
-        break;
       case BLOSC2_NAN_RUNLEN:
         schunk->nbytes += nbytes;
         schunk->nbytes -= nbytes_old;
-        if (schunk->frame->eframe) {
+        if (frame->sframe) {
           schunk->cbytes -= cbytes_old;
         }
         break;
@@ -627,7 +676,7 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
         schunk->nbytes += nbytes;
         schunk->nbytes -= nbytes_old;
         schunk->cbytes += cbytes;
-        if (schunk->frame->eframe) {
+        if (frame->sframe) {
           schunk->cbytes -= cbytes_old;
         }
     }
@@ -647,7 +696,7 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     schunk->data[nchunk] = chunk;
   }
   else {
-    if (frame_update_chunk(schunk->frame, nchunk, chunk, schunk) == NULL) {
+    if (frame_update_chunk(frame, nchunk, chunk, schunk) == NULL) {
         BLOSC_TRACE_ERROR("Problems updating a chunk in a frame.");
         return BLOSC2_ERROR_CHUNK_UPDATE;
     }
@@ -681,7 +730,9 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes
 int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
                                    void *dest, int32_t nbytes) {
   int chunksize;
-  if (schunk->frame == NULL) {
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+
+  if (frame == NULL) {
     if (nchunk >= schunk->nchunks) {
       BLOSC_TRACE_ERROR("nchunk ('%d') exceeds the number of chunks "
                         "('%d') in super-chunk.", nchunk, schunk->nchunks);
@@ -707,7 +758,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
       return BLOSC2_ERROR_FAILURE;
     }
   } else {
-    chunksize = frame_decompress_chunk(schunk->dctx, schunk->frame, nchunk, dest, nbytes);
+    chunksize = frame_decompress_chunk(schunk->dctx, frame, nchunk, dest, nbytes);
     if (chunksize < 0) {
       return chunksize;
     }
@@ -726,8 +777,9 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
  * is returned instead.
 */
 int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, bool *needs_free) {
-  if (schunk->frame != NULL) {
-    return frame_get_chunk(schunk->frame, nchunk, chunk, needs_free);
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+  if (frame != NULL) {
+    return frame_get_chunk(frame, nchunk, chunk, needs_free);
   }
 
   if (nchunk >= schunk->nchunks) {
@@ -758,8 +810,9 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, 
  * is returned instead.
 */
 int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, bool *needs_free) {
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (schunk->frame != NULL) {
-    return frame_get_lazychunk(schunk->frame, nchunk, chunk, needs_free);
+    return frame_get_lazychunk(frame, nchunk, chunk, needs_free);
   }
 
   if (nchunk >= schunk->nchunks) {
@@ -818,8 +871,9 @@ int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order) {
   }
   free(index_check);
 
-  if (schunk->frame != NULL) {
-    return frame_reorder_offsets(schunk->frame, offsets_order, schunk);
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+  if (frame != NULL) {
+    return frame_reorder_offsets(frame, offsets_order, schunk);
   }
   uint8_t **offsets = schunk->data;
 
@@ -850,15 +904,16 @@ int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order) {
 // very few metalayers, this overhead should be negligible in practice.
 int metalayer_flush(blosc2_schunk* schunk) {
   int rc = 1;
-  if (schunk->frame == NULL) {
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+  if (frame == NULL) {
     return rc;
   }
-  rc = frame_update_header(schunk->frame, schunk, true);
+  rc = frame_update_header(frame, schunk, true);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to update metalayers into frame.");
     return rc;
   }
-  rc = frame_update_trailer(schunk->frame, schunk);
+  rc = frame_update_trailer(frame, schunk);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to update trailer into frame.");
     return rc;
@@ -920,8 +975,9 @@ int blosc2_update_metalayer(blosc2_schunk *schunk, const char *name, uint8_t *co
   memcpy(metalayer->content, content, content_len);
 
   // Update the metalayers in frame (as size has not changed, we don't need to update the trailer)
-  if (schunk->frame != NULL) {
-    int rc = frame_update_header(schunk->frame, schunk, false);
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+  if (frame != NULL) {
+    int rc = frame_update_header(frame, schunk, false);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Unable to update meta info from frame.");
       return rc;
@@ -980,8 +1036,9 @@ int blosc2_update_usermeta(blosc2_schunk *schunk, uint8_t *content, int32_t cont
   free(usermeta_chunk);
   schunk->usermeta_len = usermeta_cbytes;
 
-  if (schunk->frame != NULL) {
-    int rc = frame_update_trailer(schunk->frame, schunk);
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+  if (frame != NULL) {
+    int rc = frame_update_trailer(frame, schunk);
     if (rc < 0) {
       return rc;
     }

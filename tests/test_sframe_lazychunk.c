@@ -43,7 +43,7 @@ static char* test_lazy_chunk(void) {
   cparams.nthreads = nthreads;
   cparams.blocksize = BLOCKSIZE * cparams.typesize;
   dparams.nthreads = nthreads;
-  blosc2_storage storage = {.sequential=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.contiguous=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
@@ -107,7 +107,7 @@ static char* test_lazy_chunk(void) {
 }
 
 static char *all_tests(void) {
-  directory = "dir1.b2eframe/";
+  directory = "dir1.b2frame/";
   nchunks = 0;
   clevel = 5;
   nthreads = 1;
@@ -143,7 +143,7 @@ static char *all_tests(void) {
   nthreads = 2;
   mu_run_test(test_lazy_chunk);
 
-  directory = "dir1.b2eframe";
+  directory = "dir1.b2frame";
   nchunks = 0;
   clevel = 5;
   nthreads = 1;

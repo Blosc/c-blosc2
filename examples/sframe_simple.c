@@ -7,11 +7,11 @@
 
  To compile this program:
 
- $ gcc eframe_simple.c -o eframe_simple -lblosc2
+ $ gcc sframe_simple.c -o sframe_simple -lblosc2
 
  To run:
 
- $ ./eframe_simple
+ $ ./sframe_simple
 */
 
 #include <stdio.h>
@@ -45,7 +45,7 @@ int main(void) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {false, "dir1.b2eframe", .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {false, "dir1.b2frame", .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
 
   blosc_set_timestamp(&last);

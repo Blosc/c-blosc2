@@ -22,7 +22,7 @@ typedef struct {
   int nchunks;
   int ninsertions;
   char* urlpath;
-  bool sequential;
+  bool contiguous;
   bool copy;
 } test_data;
 
@@ -43,15 +43,15 @@ test_ndata tndata[] = {{10, 1},
 };
 
 typedef struct {
-  bool sequential;
+  bool contiguous;
   char *urlpath;
 }test_storage;
 
 test_storage tstorage[] = {
     {false, NULL},  // memory - schunk
-    {true, NULL},  // memory - frame
-    {true, "test_insert_chunk.b2frame"}, // disk - frame
-    {false, "test_insert_chunk.b2eframe"}, // disk - eframe
+    {true, NULL},  // memory - cframe
+    {true, "test_insert_chunk.b2frame"}, // disk - cframe
+    {false, "test_insert_chunk_s.b2frame"}, // disk - sframe
 };
 
 bool tcopy[] = {
@@ -61,7 +61,7 @@ bool tcopy[] = {
 
 static char* test_insert_chunk(void) {
   /* Free resources */
-  if (tdata.urlpath != NULL && tdata.sequential == false) {
+  if (tdata.urlpath != NULL && tdata.contiguous == false) {
     blosc2_remove_dir(tdata.urlpath);
   }
 
@@ -81,7 +81,7 @@ static char* test_insert_chunk(void) {
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
-                            .urlpath=tdata.urlpath, .sequential=tdata.sequential};
+                            .urlpath=tdata.urlpath, .contiguous=tdata.contiguous};
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
@@ -131,7 +131,7 @@ static char* test_insert_chunk(void) {
 
 
   /* Free resources */
-  if (!storage.sequential && storage.urlpath != NULL) {
+  if (!storage.contiguous && storage.urlpath != NULL) {
     blosc2_remove_dir(storage.urlpath);
   }
   blosc2_schunk_free(schunk);
@@ -147,7 +147,7 @@ static char *all_tests(void) {
     for (int j = 0; j < sizeof(tndata) / sizeof(test_ndata); ++j) {
       for (int k = 0; k < sizeof(tcopy) / sizeof(bool); ++k) {
 
-        tdata.sequential = tstorage[i].sequential;
+        tdata.contiguous = tstorage[i].contiguous;
         tdata.urlpath = tstorage[i].urlpath;
         tdata.nchunks = tndata[j].nchunks;
         tdata.ninsertions = tndata[j].ninsertions;

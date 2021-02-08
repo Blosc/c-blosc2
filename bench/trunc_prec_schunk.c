@@ -69,7 +69,7 @@ int main(void) {
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
-  blosc2_storage storage = {.cparams=&cparams, .sequential=true};
+  blosc2_storage storage = {.cparams=&cparams, .contiguous=true};
   schunk = blosc2_schunk_new(storage);
 
   /* Append the chunks */

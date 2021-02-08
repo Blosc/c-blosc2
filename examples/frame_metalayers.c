@@ -58,9 +58,8 @@ int main(void) {
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams, .sequential=true};
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams, .contiguous=true};
   blosc2_schunk* schunk = blosc2_schunk_new(storage);
-  blosc2_frame* frame1 = schunk->frame;
 
   // Add some metalayers (one must add metalayers prior to actual data)
   blosc2_add_metalayer(schunk, "my_metalayer1", (uint8_t *) "my_content1",
@@ -94,11 +93,11 @@ int main(void) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for update metalayer in header: %.2g s\n", ttotal);
-  printf("Frame length in memory: %ld bytes\n", (long)frame1->len);
+  printf("Frame length in memory: %ld bytes\n", (long)schunk->cbytes);
 
-  // frame1 (in-memory) -> fileframe (on-disk)
+  // schunk (in-memory) -> fileframe (on-disk)
   blosc_set_timestamp(&last);
-  int64_t frame_len = blosc2_frame_to_file(frame1, "frame_metalayers.b2frame");
+  int64_t frame_len = blosc2_schunk_to_file(schunk, "frame_metalayers.b2frame");
   printf("Frame length on disk: %ld bytes\n", (long)frame_len);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
@@ -107,11 +106,7 @@ int main(void) {
 
   // fileframe (file) -> schunk2 (schunk based on a on-disk frame)
   blosc_set_timestamp(&last);
-  //blosc2_frame* frame2 = blosc2_frame_from_file("frame_metalayers.b2frame");
-  //blosc2_schunk* schunk2 = blosc2_frame_to_schunk(frame2, false);
-  blosc2_storage storage2 = {.cparams=&cparams, .dparams=&dparams, .sequential=true,
-                             .urlpath="frame_metalayers.b2frame"};
-  blosc2_schunk* schunk2 = blosc2_schunk_open(storage2);
+  blosc2_schunk* schunk2 = blosc2_schunk_open("frame_metalayers.b2frame");
   if (schunk2 == NULL) {
     printf("Cannot get the schunk from frame2");
     return -1;

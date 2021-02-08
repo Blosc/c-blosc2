@@ -6,11 +6,11 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#ifndef BLOSC_EFRAME_H
-#define BLOSC_EFRAME_H
+#ifndef BLOSC_SFRAME_H
+#define BLOSC_SFRAME_H
 
 
-void* eframe_create_chunk(blosc2_frame* frame, uint8_t* chunk, int32_t nchunk, int64_t cbytes);
-int eframe_get_chunk(blosc2_frame* frame, int32_t nchunk, uint8_t** chunk, bool* needs_free);
+void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int32_t nchunk, int64_t cbytes);
+int sframe_get_chunk(blosc2_frame_s* frame, int32_t nchunk, uint8_t** chunk, bool* needs_free);
 
-#endif //BLOSC_EFRAME_H
+#endif //BLOSC_SFRAME_H

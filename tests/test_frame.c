@@ -41,6 +41,9 @@ static char* test_frame(void) {
   int32_t *data_dest = malloc(isize);
   int dsize;
   int64_t nbytes, cbytes;
+  uint8_t* buffer;
+  bool buffer_needs_free;
+
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   if (filter_pipeline) {
@@ -72,7 +75,7 @@ static char* test_frame(void) {
     cparams.nthreads = 1;
     dparams.nthreads = 1;
   }
-  blosc2_storage storage = {.sequential=true, .urlpath=fname, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.contiguous=true, .urlpath=fname, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
   mu_assert("blosc2_schunk_new() failed", schunk != NULL);
   char* content = "This is a pretty long string with a good number of chars";
@@ -96,22 +99,26 @@ static char* test_frame(void) {
     if (free_new) {
       if (fname != NULL) {
         blosc2_schunk_free(schunk);
-        blosc2_storage storage2 = {.sequential=true, .urlpath=fname};
-        schunk = blosc2_schunk_open(storage2);
+        schunk = blosc2_schunk_open(fname);
         mu_assert("blosc2_schunk_open() failed", schunk != NULL);
         mu_assert("storage is not recovered correctly",
-                  schunk->storage->sequential == true);
+                  schunk->storage->contiguous == true);
         mu_assert("cparams are not recovered correctly",
                   schunk->storage->cparams->clevel == BLOSC2_CPARAMS_DEFAULTS.clevel);
         mu_assert("dparams are not recovered correctly",
                   schunk->storage->dparams->nthreads == BLOSC2_DPARAMS_DEFAULTS.nthreads);
       } else {
-        // Dump the schunk into a sframe and regenerate it from there
-        uint8_t* sframe;
-        int64_t sframe_len = blosc2_schunk_to_sframe(schunk, &sframe);
+        // Dump the schunk into a buffer and regenerate it from there
+        int64_t buffer_len = blosc2_schunk_to_buffer(schunk, &buffer, &buffer_needs_free);
+        mu_assert("blosc2_schunk_to_buffer() failed", buffer_len > 0);
+        blosc2_schunk* schunk2 = blosc2_schunk_from_buffer(buffer, buffer_len, true);
+        mu_assert("blosc2_schunk_from_buffer() failed", schunk2 != NULL);
+        // We've made a copy, so it is safe to clean the original schunk up
         blosc2_schunk_free(schunk);
-        schunk = blosc2_schunk_open_sframe(sframe, sframe_len);
-        mu_assert("blosc2_schunk_open_sframe() failed", schunk != NULL);
+        schunk = schunk2;
+        if (buffer_needs_free) {
+          free(buffer);
+        }
       }
     }
   }
@@ -150,8 +157,8 @@ static char* test_frame(void) {
   }
   mu_assert("ERROR: wrong number of append chunks", _nchunks == nchunks);
 
-  if (!sparse_schunk) {
-    blosc2_frame* frame = schunk->frame;
+  if (!sparse_schunk && schunk->frame != NULL) {
+    blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
     mu_assert("ERROR: frame->len must be larger or equal than schunk->cbytes",
               frame->len >= schunk->cbytes + FRAME_HEADER_MINLEN);
   }
@@ -184,16 +191,19 @@ static char* test_frame(void) {
     if (free_new) {
       if (fname != NULL) {
         blosc2_schunk_free(schunk);
-        blosc2_storage storage2 = {.sequential=true, .urlpath=fname};
-        schunk = blosc2_schunk_open(storage2);
+        schunk = blosc2_schunk_open(fname);
       } else {
-        // Dump the schunk to a sframe and regenerate it from there
-        uint8_t* sframe;
-        int64_t sframe_len = blosc2_schunk_to_sframe(schunk, &sframe);
+        // Dump the schunk to a buffer and regenerate it from there
+        int64_t buffer_len = blosc2_schunk_to_buffer(schunk, &buffer, &buffer_needs_free);
+        mu_assert("blosc2_schunk_to_buffer() failed (2)", buffer_len > 0);
+        blosc2_schunk* schunk2 = blosc2_schunk_from_buffer(buffer, buffer_len, true);
+        mu_assert("blosc2_schunk_from_buffer() failed (2)", schunk2 != NULL);
+        // We've made a copy, so it is safe to clean the original schunk up
         blosc2_schunk_free(schunk);
-        schunk = blosc2_schunk_open_sframe(sframe, sframe_len);
-        mu_assert("blosc2_schunk_open_sframe() failed (2)", schunk != NULL);
-
+        schunk = schunk2;
+        if (buffer_needs_free) {
+          free(buffer);
+        }
       }
     }
   }

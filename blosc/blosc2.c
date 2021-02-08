@@ -19,6 +19,8 @@
 #include "blosc2.h"
 #include "blosc-private.h"
 #include "blosc2-common.h"
+#include "frame.h"
+
 
 #if defined(USING_CMAKE)
   #include "config.h"
@@ -1245,7 +1247,8 @@ static int blosc_d(
       BLOSC_TRACE_ERROR("Lazy chunk needs an associated frame.");
       return BLOSC2_ERROR_INVALID_PARAM;
     }
-    char* urlpath = context->schunk->frame->urlpath;
+    blosc2_frame_s* frame = (blosc2_frame_s*)context->schunk->frame;
+    char* urlpath = frame->urlpath;
     int32_t trailer_len = sizeof(int32_t) + sizeof(int64_t) + context->nblocks * sizeof(int32_t);
     size_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH + context->nblocks * sizeof(int32_t);
     int32_t nchunk;
@@ -1258,10 +1261,10 @@ static int blosc_d(
     int32_t block_csize = block_csizes[nblock];
     // Read the lazy block on disk
     FILE* fp = NULL;
-    if (context->schunk->frame->eframe) {
+    if (frame->sframe) {
       // The chunk is not in the frame
-      char* chunkpath = malloc(strlen(context->schunk->frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-      sprintf(chunkpath, "%s/%08X.chunk", context->schunk->frame->urlpath, nchunk);
+      char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+      sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
       fp = fopen(chunkpath, "rb");
       free(chunkpath);
       // The offset of the block is src_offset

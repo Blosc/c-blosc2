@@ -28,7 +28,7 @@ char* directory;
 char buf[256];
 
 
-static char* test_eframe(void) {
+static char* test_sframe(void) {
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int32_t* data = malloc(isize);
   int32_t* data_dest = malloc(isize);
@@ -65,7 +65,7 @@ static char* test_eframe(void) {
     cparams.nthreads = 1;
     dparams.nthreads = 1;
   }
-  blosc2_storage storage = {.sequential=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.contiguous=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(storage);
   mu_assert("blosc2_schunk_new() failed", schunk != NULL);
   char* content = "This is a pretty long string with a good number of chars";
@@ -87,10 +87,9 @@ static char* test_eframe(void) {
 
   if (free_new) {
     blosc2_schunk_free(schunk);
+    schunk = blosc2_schunk_open(directory);
+    mu_assert("blosc2_schunk_open() failed", schunk != NULL);
   }
-  blosc2_storage storage2 = {.sequential=false, .urlpath=directory};
-  schunk = blosc2_schunk_open(storage2);
-  mu_assert("blosc2_schunk_open() failed", schunk != NULL);
 
   if (metalayers) {
     uint8_t* _content;
@@ -152,8 +151,9 @@ static char* test_eframe(void) {
 
   if (free_new) {
     blosc2_schunk_free(schunk);
+    schunk = blosc2_schunk_open(directory);
+    mu_assert("blosc2_schunk_open() failed (2)", schunk != NULL);
   }
-  schunk = blosc2_schunk_open(storage2);
 
   /* Gather some info */
   nbytes = schunk->nbytes;
@@ -207,7 +207,7 @@ static char* test_eframe(void) {
 }
 
 
-static char* test_eframe_simple(void) {
+static char* test_sframe_simple(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -224,7 +224,7 @@ static char* test_eframe_simple(void) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {.sequential=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.contiguous=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
   blosc2_remove_dir(storage.urlpath);
   schunk = blosc2_schunk_new(storage);
   mu_assert("Error in creating schunk", schunk != NULL);
@@ -235,7 +235,7 @@ static char* test_eframe_simple(void) {
       data[i] = i + nchunk;
     }
     int _nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
-    mu_assert("ERROR: bad append in eframe", _nchunks > 0);
+    mu_assert("ERROR: bad append in sframe", _nchunks > 0);
   }
 
   /* Retrieve and decompress the chunks (0-based count) */
@@ -264,27 +264,27 @@ static char* test_eframe_simple(void) {
 
 
 static char *all_tests(void) {
-  directory = "dir1.b2eframe";
+  directory = "dir1.b2frame";
 
   nchunks = 0;
-  mu_run_test(test_eframe_simple);
+  mu_run_test(test_sframe_simple);
 
   nchunks = 1;
-  mu_run_test(test_eframe_simple);
+  mu_run_test(test_sframe_simple);
 
   nchunks = 2;
-  mu_run_test(test_eframe_simple);
+  mu_run_test(test_sframe_simple);
 
   nchunks = 10;
-  mu_run_test(test_eframe_simple);
+  mu_run_test(test_sframe_simple);
 
   // Check directory with a trailing slash
-  directory = "dir1.b2eframe/";
+  directory = "dir1.b2frame/";
   nchunks = 0;
-  mu_run_test(test_eframe_simple);
+  mu_run_test(test_sframe_simple);
 
   nchunks = 1;
-  mu_run_test(test_eframe_simple);
+  mu_run_test(test_sframe_simple);
 
   // Iterate over all different parameters
   for (int i = 0; i < (int)sizeof(nchunks_) / (int)sizeof(int); i++) {
@@ -301,12 +301,12 @@ static char *all_tests(void) {
                 filter_pipeline = (bool) ifilter_pipeline;
                 metalayers = (bool) imetalayers;
                 usermeta = (bool) iusermeta;
-                snprintf(buf, sizeof(buf), "test_eframe_nc%d.b2eframe", nchunks);
+                snprintf(buf, sizeof(buf), "test_sframe_nc%d.b2frame", nchunks);
                 directory = buf;
-                mu_run_test(test_eframe);
-                snprintf(buf, sizeof(buf), "test_eframe_nc%d.b2eframe/", nchunks);
+                mu_run_test(test_sframe);
+                snprintf(buf, sizeof(buf), "test_sframe_nc%d.b2frame/", nchunks);
                 directory = buf;
-                mu_run_test(test_eframe);
+                mu_run_test(test_sframe);
               }
             }
           }

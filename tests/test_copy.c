@@ -32,7 +32,7 @@ enum {
 };
 
 typedef struct {
-  bool sequential;
+  bool contiguous;
   char *urlpath;
 }test_copy_backend;
 
@@ -70,15 +70,15 @@ CUTEST_TEST_SETUP(copy) {
   ));
   CUTEST_PARAMETRIZE(backend, test_copy_backend, CUTEST_DATA(
       {false, NULL},  // memory - schunk
-      {true, NULL},  // memory - frame
-      {true, "test_copy.b2frame"}, // disk - frame
-      {false, "test_copy.b2eframe"}, // disk - eframe
+      {true, NULL},  // memory - cframe
+      {true, "test_copy.b2frame"}, // disk - cframe
+      {false, "test_copy_s.b2frame"}, // disk - sframe
   ));
   CUTEST_PARAMETRIZE(backend2, test_copy_backend, CUTEST_DATA(
       {false, NULL},  // memory - schunk
-      {true, NULL},  // memory - frame
-      {true, "test_copy2.b2frame"}, // disk - frame
-      {false, "test_copy2.b2eframe"}, // disk - eframe
+      {true, NULL},  // memory - cframe
+      {true, "test_copy2.b2frame"}, // disk - cframe
+      {false, "test_copy2_s.b2frame"}, // disk - sframe
   ));
 }
 
@@ -92,10 +92,10 @@ CUTEST_TEST_TEST(copy) {
   CUTEST_GET_PARAMETER(backend2, test_copy_backend);
 
   /* Free resources */
-  if (backend.urlpath != NULL && backend.sequential == false) {
+  if (backend.urlpath != NULL && backend.contiguous == false) {
     blosc2_remove_dir(backend.urlpath);
   }
-  if (backend2.urlpath != NULL && backend2.sequential == false) {
+  if (backend2.urlpath != NULL && backend2.contiguous == false) {
     blosc2_remove_dir(backend2.urlpath);
   }
 
@@ -111,7 +111,7 @@ CUTEST_TEST_TEST(copy) {
   blosc_init();
 
   /* Create a super-chunk container */
-  blosc2_storage storage = {.cparams=&data->cparams, .sequential=backend.sequential, .urlpath = backend.urlpath};
+  blosc2_storage storage = {.cparams=&data->cparams, .contiguous=backend.contiguous, .urlpath = backend.urlpath};
   blosc2_schunk *schunk = blosc2_schunk_new(storage);
   CUTEST_ASSERT("Error creating a schunk", schunk != NULL);
 
@@ -133,7 +133,7 @@ CUTEST_TEST_TEST(copy) {
   }
 
   /* Copy schunk */
-  blosc2_storage storage2 = {.sequential=backend2.sequential, .urlpath = backend2.urlpath};
+  blosc2_storage storage2 = {.contiguous=backend2.contiguous, .urlpath = backend2.urlpath};
   storage2.cparams = different_cparams ? &data->cparams2 : &data->cparams;
   blosc2_schunk * schunk_copy = blosc2_schunk_copy(schunk, storage2);
   CUTEST_ASSERT("Error copying a schunk", schunk_copy != NULL);
@@ -171,10 +171,10 @@ CUTEST_TEST_TEST(copy) {
   blosc2_schunk_free(schunk_copy);
 
   /* Free resources */
-  if (backend.urlpath != NULL && backend.sequential == false) {
+  if (backend.urlpath != NULL && backend.contiguous == false) {
     blosc2_remove_dir(backend.urlpath);
   }
-  if (backend2.urlpath != NULL && backend2.sequential == false) {
+  if (backend2.urlpath != NULL && backend2.contiguous == false) {
     blosc2_remove_dir(backend2.urlpath);
   }
 

@@ -15,7 +15,23 @@ Changes from 2.0.0-beta.5 to 2.0.0.beta6
   previous formats, but there will probably be backward compatibility support
   starting from version 2 on.
 
-* Internal Zstd sources updated to 1.4.5.
+* Internal Zstd sources updated to 1.4.8.
+
+* Internal LZ4 sources updated to 1.9.3.
+
+* The Lizard codec has been removed.  Lizard is a pretty good one, but it
+  looks like it is not timely maintained.  Zstd/Zlib can cover its place pretty
+  nicely.
+
+* Public APIs for frames have been removed.  Frames should be considered an
+  storage detail, so having them accessible publicly should only bring
+  unnecessary cognitive load.  Care have been carried out so as to ensure
+  the same functionality via the super-chunk (schunk) API.
+
+* [FORMAT] New *sparse frame* format for on-disk I/O.  This allows for storing
+  data chunks in super-chunks in separate files inside a directory.  The way
+  to generate sparse frames is via `storage.contiguous=false` and
+  `storage.urlpath=dirname`.  See `README_SFRAME_FORMAT.rst` for details.
 
 
 Changes from 2.0.0-beta.4 to 2.0.0.beta5
@@ -36,7 +52,7 @@ Changes from 2.0.0-beta.4 to 2.0.0.beta5
   https://github.com/Blosc/c-blosc2/pull/98.  Thanks to Jerome Kieffer
   and ESRF for making this happen.
 
-* New blosc2_frame_from_sframe() function for getting a `blosc2_frame`
+* New frame_from_bframe() function for getting a `blosc2_frame`
   out of an in-memory serialized frame.
 
 * Zstd codec updated to 1.4.4.
@@ -91,7 +107,7 @@ Changes from 2.0.0-beta.1 to 2.0.0-beta.2
   I/O (including metainfo) goes into super-chunks.  See PR #75.
 
 * New frame format documented in
-  [README_FRAME_FORMAT.rst](README_FRAME_FORMAT.rst). Remember that the frame
+  [README_CFRAME_FORMAT.rst](README_CFRAME_FORMAT.rst). Remember that the frame
   format is not written in stone yet, so some changes may be introduced before
   getting out of beta.
 

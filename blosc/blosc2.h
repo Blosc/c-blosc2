@@ -272,6 +272,8 @@ enum {
   BLOSC2_ERROR_CHUNK_APPEND = -20,    //!< Chunk append failure
   BLOSC2_ERROR_CHUNK_UPDATE = -21,    //!< Chunk update failure
   BLOSC2_ERROR_2GB_LIMIT = -22,       //!< Sizes larger than 2gb not supported
+  BLOSC2_ERROR_SCHUNK_COPY = -23,     //!< Super-chunk copy failure
+  BLOSC2_ERROR_FRAME_TYPE = -24,      //!< Wrong type for frame
 };
 
 /**
@@ -1023,8 +1025,8 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
  * the contents included in the schunk.
  */
 typedef struct {
-    bool sequential;
-    //!< Whether the chunks are sequential (frame) or sparse.
+    bool contiguous;
+    //!< Whether the chunks are contiguous (frame) or sparse.
     char* urlpath;
     //!< The path for persistent storage. If NULL, that means in-memory.
     blosc2_cparams* cparams;
@@ -1040,16 +1042,7 @@ typedef struct {
  */
 static const blosc2_storage BLOSC2_STORAGE_DEFAULTS = {false, NULL, NULL, NULL};
 
-typedef struct {
-  char* urlpath;           //!< The name of the file or directory if it's an eframe; if NULL, this is in-memory
-  uint8_t* sdata;          //!< The in-memory serialized data
-  bool avoid_sdata_free;   //!< Whether the sdata can be freed (false) or not (true).
-  uint8_t* coffsets;       //!< Pointers to the (compressed, on-disk) chunk offsets
-  int64_t len;             //!< The current length of the frame in (compressed) bytes
-  int64_t maxlen;          //!< The maximum length of the frame; if 0, there is no maximum
-  uint32_t trailer_len;    //!< The current length of the trailer in (compressed) bytes
-  bool eframe;             //!< Whether the frame is extended (sparse, on-disk)
-} blosc2_frame;
+typedef struct blosc2_frame_s blosc2_frame;   /* opaque type */
 
 /**
  * @brief This struct is meant to store metadata information inside
@@ -1099,7 +1092,6 @@ typedef struct blosc2_schunk {
   //!< Pointer to storage info.
   blosc2_frame* frame;
   //!< Pointer to frame used as store for chunks.
-  bool avoid_frame_free;   //!< Whether the frame can be freed (false) or not (true).
   //!<uint8_t* ctx;
   //!< Context for the thread holder. NULL if not acquired.
   blosc2_context* cctx;
@@ -1126,8 +1118,7 @@ typedef struct blosc2_schunk {
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk *
-blosc2_schunk_new(blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_new(blosc2_storage storage);
 
 /**
  * @brief Create a non-initialized super-chunk.
@@ -1140,8 +1131,7 @@ blosc2_schunk_new(blosc2_storage storage);
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk *
-blosc2_schunk_empty(int nchunks, blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_empty(int nchunks, blosc2_storage storage);
 
 
 /**
@@ -1152,9 +1142,26 @@ blosc2_schunk_empty(int nchunks, blosc2_storage storage);
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk *
-blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage);
 
+/**
+ * @brief Create a super-chunk out of a contiguous frame buffer.
+ *
+ * @param cframe The buffer of the in-memory frame.
+ * @param copy Whether the super-chunk should make a copy of
+ * the @p cframe data or not.  The copy will be made to an internal
+ * sparse frame.
+ *
+ * @remark If copy is false, the @p cframe buffer passed will be owned
+ * by the super-chunk and will be automatically freed when
+ * blosc2_schunk_free() is called.  If the user frees it after the
+ * opening, bad things will happen.  Don't do that (or set @p copy).
+ *
+ * @param len The length of the buffer (in bytes).
+ *
+ * @return The new super-chunk.
+ */
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy);
 
 /**
  * @brief Open an existing super-chunk that is on-disk (no copy is made).
@@ -1166,37 +1173,33 @@ blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage);
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk*
-blosc2_schunk_open(blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open(const char* urlpath);
 
-/**
- * @brief Create a super-chunk out of an in-memory frame (no copy is made).
+/* @brief Convert a super-chunk into a contiguous frame buffer.
  *
- * @param sframe The buffer of the in-memory serialized frame.
+ * @param schunk The super-chunk to convert.
+ * @param cframe The address of the destination buffer (output).
+ * @param needs_free The pointer to a boolean indicating if it is the user's
+ * responsibility to free the chunk returned or not.
  *
- * @remark The sframe passed will be owned by the super-chunk and will be
- * automatically freed when blosc2_schunk_free() is called.  If the user
- * frees it after the opening, bad things will happen.  Don't do that.
+ * @note The user is responsible to free the @p cframe buffer (not always required).
+ * You can check whether the cframe requires a free with the @p needs_free parameter.
  *
- * @param len The length of buffer of the in-memory frame (in bytes).
- *
- * @return The new super-chunk.
+ * @return If successful, return the size of the (frame) @p cframe buffer.
+ * Else, a negative value.
  */
-BLOSC_EXPORT blosc2_schunk*
-blosc2_schunk_open_sframe(uint8_t *sframe, int64_t len);
+BLOSC_EXPORT int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** cframe, bool* needs_free);
 
-/**
- * @brief Create an in-memory frame out of a super-chunk.
+/* @brief Store a super-chunk into a file.
  *
- * @param schunk The super-chunk to be serialized.
- * @param sframe A pointer where the serialized frame will be returned.
+ * @param schunk The super-chunk to write.
+ * @param urlpath The path for persistent storage.
  *
- * @remark A freshly allocated sframe is returned, so you can use it
- * independently of what you do with the super-chunk later on.
- *
- * @return The length of the sframe.  If <= 0 this indicate an error.
+ * @return If successful, return the size of the (fileframe) in @p urlpath.
+ * Else, a negative value.
  */
-BLOSC_EXPORT int64_t blosc2_schunk_to_sframe(blosc2_schunk* schunk, uint8_t** sframe);
+BLOSC_EXPORT int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath);
+
 
 /**
  * @brief Release resources from a super-chunk.
@@ -1435,7 +1438,7 @@ BLOSC_EXPORT int blosc2_get_metalayer(blosc2_schunk *schunk, const char *name, u
  *
  * If the @p schunk has an attached frame, the later will be updated accordingly too.
  *
- * @param schunk The super-chunk to which one should add the usermeta chunk.
+ * @param schunk The super-chunk to add the usermeta chunk.
  * @param content The content of the usermeta chunk.
  * @param content_len The length of the content.
  * @param cparams The parameters for compressing the usermeta chunk.
@@ -1534,89 +1537,6 @@ BLOSC_EXPORT void blosc_set_blocksize(size_t blocksize);
  * available (the default).
  */
 BLOSC_EXPORT void blosc_set_schunk(blosc2_schunk* schunk);
-
-
-/*********************************************************************
-  Frame struct related functions.
-  These are rather low-level and the blosc2_schunk interface is
-  recommended instead.
-*********************************************************************/
-
-/**
- * @brief Create a new frame.
- *
- * @param urlpath The filename of the frame.  If not persistent, pass NULL.
- *
- * @return The new frame.
- */
-BLOSC_EXPORT blosc2_frame* blosc2_frame_new(const char* urlpath);
-
-/**
- * @brief Create a frame from a super-chunk.
- *
- * @param schunk The super-chunk from where the frame will be created.
- * @param frame The pointer for the frame that will be populated.
- *
- * @note If frame->urlpath is NULL, a frame is created in-memory; else it is created
- * on-disk.
- *
- * @return The size in bytes of the frame. If an error occurs it returns a negative value.
- */
-BLOSC_EXPORT int64_t blosc2_frame_from_schunk(blosc2_schunk* schunk, blosc2_frame* frame);
-
-/**
- * @brief Free all memory from a frame.
- *
- * @param frame The frame to be freed.
- *
- * @return 0 if succeeds.
- */
-BLOSC_EXPORT int blosc2_frame_free(blosc2_frame *frame);
-
-/**
- * @brief Write an in-memory frame out to a file.
- *
- * The frame used must be an in-memory frame, i.e. frame->urlpath == NULL.
- *
- * @param frame The frame to be written into a file.
- * @param urlpath The name of the file.
- *
- * @return The size of the frame.  If negative, an error happened (including
- * that the original frame is not in-memory).
- */
-BLOSC_EXPORT int64_t blosc2_frame_to_file(blosc2_frame *frame, const char *urlpath);
-
-/**
- * @brief Initialize a frame out of a file.
- *
- * @param urlpath The file name.
- *
- * @return The frame created from the file.
- */
-BLOSC_EXPORT blosc2_frame* blosc2_frame_from_file(const char *urlpath);
-
-/**
- * @brief Initialize a frame out of an in-memory serialized frame.
- *
- * @param buffer The buffer for the serialized frame.
- * @param len The length of buffer for the serialized frame.
- * @param copy Whether the serialized frame should be copied internally or not.
- *
- * @return The frame created from the serialized frame.
- */
-BLOSC_EXPORT blosc2_frame* blosc2_frame_from_sframe(uint8_t *sframe, int64_t len, bool copy);
-
-/**
- * @brief Create a super-chunk from a frame.
- *
- * @param frame The frame from which the super-chunk will be created.
- * @param copy If true, a new, serialized in-memory frame is created
- * internally to serve as storage for the super-chunk. Else, the
- * super-chunk will be backed by the sframe (i.e. no copies are made).
- *
- * @return The super-chunk corresponding to the frame.
- */
-BLOSC_EXPORT blosc2_schunk* blosc2_frame_to_schunk(blosc2_frame* frame, bool copy);
 
 
 /*********************************************************************

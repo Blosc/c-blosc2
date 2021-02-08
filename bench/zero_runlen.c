@@ -60,7 +60,7 @@ int check_special_values(int svalue) {
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
-  blosc2_storage storage = {.cparams=&cparams, .sequential=true};
+  blosc2_storage storage = {.cparams=&cparams, .contiguous=true};
   schunk = blosc2_schunk_new(storage);
 
   /* Append the chunks */
@@ -106,7 +106,7 @@ int check_special_values(int svalue) {
 
   /* Gather some info */
   nbytes = schunk->nbytes;
-  frame_len = schunk->frame->len;
+  frame_len = schunk->cbytes;
   printf("Compression super-chunk: %ld -> %ld (%.1fx)\n",
          (long)nbytes, (long)frame_len, (1. * nbytes) / frame_len);
 

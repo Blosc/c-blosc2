@@ -57,7 +57,7 @@ int main(void) {
   dparams.nthreads = NTHREADS;
 
   /* Create a new super-chunk backed by an in-memory frame */
-  blosc2_storage storage = {.sequential=true, .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.contiguous=true, .cparams=&cparams, .dparams=&dparams};
   blosc2_schunk* schunk1 = blosc2_schunk_new(storage);
 
   blosc_set_timestamp(&last);
@@ -79,7 +79,7 @@ int main(void) {
          ttotal, nbytes / (ttotal * MB));
 
   /* Create a new super-chunk backed by an in-memory frame */
-  storage = (blosc2_storage){.sequential=true, .cparams=&cparams, .dparams=&dparams};
+  storage = (blosc2_storage){.contiguous=true, .cparams=&cparams, .dparams=&dparams};
   blosc2_schunk* schunk2 = blosc2_schunk_new(storage);
 
   blosc_set_timestamp(&last);

@@ -21,7 +21,7 @@ typedef struct {
   int nchunks;
   int nupdates;
   char* urlpath;
-  bool sequential;
+  bool contiguous;
 } test_data;
 
 test_data tdata;
@@ -40,20 +40,20 @@ test_ndata tndata[] = {
 };
 
 typedef struct {
-  bool sequential;
+  bool contiguous;
   char *urlpath;
 }test_storage;
 
 test_storage tstorage[] = {
     {false, NULL},  // memory - schunk
-    {true, NULL},  // memory - frame
-    {true, "test_update_chunk.b2frame"}, // disk - frame
-    {false, "test_update_chunk.b2eframe"}, // disk - eframe
+    {true, NULL},  // memory - cframe
+    {true, "test_update_chunk.b2frame"}, // disk - cframe
+    {false, "test_update_chunk_s.b2frame"}, // disk - sframe
 };
 
 static char* test_update_chunk(void) {
   /* Free resources */
-  if (tdata.urlpath != NULL && tdata.sequential == false) {
+  if (tdata.urlpath != NULL && tdata.contiguous == false) {
     blosc2_remove_dir(tdata.urlpath);
   }
 
@@ -76,7 +76,7 @@ static char* test_update_chunk(void) {
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .urlpath = tdata.urlpath,
-                            .sequential = tdata.sequential};
+                            .contiguous = tdata.contiguous};
 
   schunk = blosc2_schunk_new(storage);
 
@@ -125,7 +125,7 @@ static char* test_update_chunk(void) {
     }
   }
   /* Free resources */
-  if (!storage.sequential && storage.urlpath != NULL) {
+  if (!storage.contiguous && storage.urlpath != NULL) {
     blosc2_remove_dir(storage.urlpath);
   }
   blosc2_schunk_free(schunk);
@@ -138,7 +138,7 @@ static char* test_update_chunk(void) {
 static char *all_tests(void) {
   for (int i = 0; i < sizeof(tstorage) / sizeof(test_storage); ++i) {
     for (int j = 0; j < sizeof(tndata) / sizeof(test_ndata); ++j) {
-      tdata.sequential = tstorage[i].sequential;
+      tdata.contiguous = tstorage[i].contiguous;
       tdata.urlpath = tstorage[i].urlpath;
       tdata.nchunks = tndata[j].nchunks;
       tdata.nupdates = tndata[j].nupdates;

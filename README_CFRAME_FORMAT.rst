@@ -1,8 +1,8 @@
-Blosc2 Frame Format
-===================
+Blosc2 Contiguous Frame Format
+==============================
 
-Blosc (as of version 2.0.0) has a frame format that allows for the storage of different Blosc data chunks sequentially,
-either in-memory or on-disk.
+Blosc (as of version 2.0.0) has a contiguous frame format (cframe for short) that allows for the storage of
+different Blosc data chunks contiguously, either in-memory or on-disk.
 
 The frame is composed of a header, a chunks section, and a trailer::
 
@@ -42,7 +42,7 @@ The header contains information needed to decompress the Blosc chunks contained 
       |   |   |   |   |   +--[msgpack] int64
       |   |   |   |   +-- reserved flags
       |   |   |   +--codec_flags (see below)
-      |   |   +---reserved flags
+      |   |   +---frame_type (see below)
       |   +------general_flags (see below)
       +---[msgpack] str with 4 elements (flags)
 
@@ -112,6 +112,21 @@ using the msgpack format. Here is the format for the *metalayers*::
     :``7``:
         Reserved
 
+:frame_type:
+    (``uint8``) The type of frame.
+
+    :``0`` to ``3``:
+        Enumerated for the type of frame (up to 16).
+
+        :``0``:
+            ``Contiguous``
+        :``1``:
+            ``Sparse (directory)``
+        :``2 to 15``:
+            Reserved
+
+    :``4`` to ``7``: Reserved for user-defined frame types (up to 16)
+
 :codec_flags:
     (``uint8``) Compressor enumeration (defaults for all the chunks in storage).
 
@@ -128,7 +143,7 @@ using the msgpack format. Here is the format for the *metalayers*::
             ``zlib``
         :``4``:
             ``zstd``
-        :``5``:
+        :``5 to 15``:
             Reserved
     :``4`` to ``7``: Compression level (up to 16)
 
@@ -167,12 +182,12 @@ The chunks section is composed of one or more Blosc data chunks followed by an i
     | chunk0 | chunk1 |   ...  | chunkN | chunk idx |
     +========+========+========+========+===========+
 
-Each chunk is stored sequentially and follows the format described in the
+Each chunk is stored contiguously one after the other, and each follows the format described in the
 `chunk format <README_CHUNK_FORMAT.rst>`_ document.
 
-The `chunk idx` is a Blosc chunk containing the indexes to each chunk in this section.  The data in the
+The `chunk idx` is a Blosc2 chunk containing the indexes to each chunk in this section.  The data in the
 chunk is a list of (32-bit, 64-bit or more, see above) offsets to each chunk. The index chunk follows
-the regular Blosc chunk format and can be compressed.
+the regular Blosc2 chunk format and can be compressed.
 
 **Note:** The offsets can take *special values* so as to represent chunks with run-length (equal) values.
 The codification for the offsets is as follows::
