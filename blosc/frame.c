@@ -1055,7 +1055,7 @@ int32_t frame_get_usermeta(blosc2_frame_s* frame, uint8_t** usermeta) {
   }
   if (trailer_offset + FRAME_TRAILER_USERMETA_OFFSET + usermeta_len > frame_len) {
     BLOSC_TRACE_ERROR("Invalid usermeta offset exceeds frame length.");
-    return -1;
+    return BLOSC2_ERROR_INVALID_HEADER;
   }
 
   *usermeta = malloc(usermeta_len);
