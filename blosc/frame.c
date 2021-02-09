@@ -1479,9 +1479,8 @@ int sort_offset(const void* a, const void* b) {
 }
 
 
-int64_t get_coffset(blosc2_frame_s* frame, int32_t header_len, int64_t cbytes, int32_t nchunk) {
+int get_coffset(blosc2_frame_s* frame, int32_t header_len, int64_t cbytes, int32_t nchunk, int64_t *offset) {
   // Get the offset to nchunk
-  int64_t offset;
   uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, NULL);
   if (coffsets == NULL) {
     BLOSC_TRACE_ERROR("Cannot get the offset for chunk %d for the frame.", nchunk);
@@ -1489,12 +1488,11 @@ int64_t get_coffset(blosc2_frame_s* frame, int32_t header_len, int64_t cbytes, i
   }
 
   // Get the 64-bit offset
-  int rc = blosc_getitem(coffsets, nchunk, 1, &offset);
+  int rc = blosc_getitem(coffsets, nchunk, 1, offset);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Problems retrieving a chunk offset.");
-    return rc;
   }
-  return offset;
+  return rc;
 }
 
 
@@ -1554,6 +1552,7 @@ int frame_get_chunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool *ne
   int32_t nchunks;
   int32_t typesize;
   int32_t chunk_cbytes;
+  int64_t offset;
 
   *chunk = NULL;
   *needs_free = false;
@@ -1571,7 +1570,11 @@ int frame_get_chunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool *ne
   }
 
   // Get the offset to nchunk
-  int64_t offset = get_coffset(frame, header_len, cbytes, nchunk);
+  ret = get_coffset(frame, header_len, cbytes, nchunk, &offset);
+  if (ret < 0) {
+    BLOSC_TRACE_ERROR("Unable to get offset to chunk %d.", nchunk);
+    return ret;
+  }
 
   if (offset < 0) {
     // Special value
@@ -1637,6 +1640,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
   int32_t nchunks;
   int32_t typesize;
   size_t lazychunk_cbytes;
+  int64_t offset;
 
   *chunk = NULL;
   *needs_free = false;
@@ -1654,7 +1658,11 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
   }
 
   // Get the offset to nchunk
-  int64_t offset = get_coffset(frame, header_len, cbytes, nchunk);
+  ret = get_coffset(frame, header_len, cbytes, nchunk, &offset);
+  if (ret < 0) {
+    BLOSC_TRACE_ERROR("Unable to get offset to chunk %d.", nchunk);
+    return ret;
+  }
 
   if (offset < 0) {
     // Special value
