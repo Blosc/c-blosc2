@@ -77,7 +77,6 @@ static char* test_update_chunk(void) {
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .urlpath = tdata.urlpath,
                             .contiguous = tdata.contiguous};
-
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
