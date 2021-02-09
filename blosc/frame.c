@@ -1498,32 +1498,37 @@ int64_t get_coffset(blosc2_frame_s* frame, int32_t header_len, int64_t cbytes, i
 // Detect and return a chunk with special values in offsets (only zeros and NaNs)
 int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize,
                         uint8_t** chunk, int32_t cbytes, bool *needs_free) {
+  int rc = 0;
   *chunk = malloc(cbytes);
   *needs_free = true;
 
   // Detect the kind of special value
   uint64_t zeros_mask = (uint64_t) BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
   uint64_t nans_mask = (uint64_t) BLOSC2_NAN_RUNLEN << (8 * 7);  // indicate a chunk of zeros
+
   if (special_value & zeros_mask) {
-    int rc = blosc2_chunk_zeros(nbytes, typesize, *chunk, cbytes);
+    rc = blosc2_chunk_zeros(nbytes, typesize, *chunk, cbytes);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Error creating a zero chunk");
-      return rc;
     }
   }
   else if (special_value & nans_mask) {
-    int rc = blosc2_chunk_nans(nbytes, typesize, *chunk, cbytes);
+    rc = blosc2_chunk_nans(nbytes, typesize, *chunk, cbytes);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Error creating a nan chunk");
-      return rc;
     }
   }
   else {
     BLOSC_TRACE_ERROR("Special value not recognized: %lld", special_value);
-    return BLOSC2_ERROR_DATA;
+    rc = BLOSC2_ERROR_DATA;
   }
 
-  return 0;
+  if (rc < 0) {
+    free(*chunk);
+    *chunk = NULL;
+  }
+
+  return rc;
 }
 
 
