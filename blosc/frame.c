@@ -1176,6 +1176,9 @@ static int frame_get_metalayers_from_header(blosc2_frame_s* frame, blosc2_schunk
       return BLOSC2_ERROR_READ_BUFFER;
     }
     swap_store(&content_len, content_marker + 1, sizeof(content_len));
+    if (content_len < 0) {
+      return BLOSC2_ERROR_DATA;
+    }
     metalayer->content_len = content_len;
 
     // Finally, read the content
