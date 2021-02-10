@@ -1147,6 +1147,8 @@ int blosc2_update_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t *
     BLOSC_TRACE_ERROR("Can not compress the `%s` variable-length metalayer.", name);
     return csize;
   }
+  blosc2_free_ctx(cctx);
+
   umeta->content = realloc(content_buf, csize);
   umeta->content_len = csize;
 
