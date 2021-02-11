@@ -23,7 +23,7 @@ bool splits;
 bool free_new;
 bool filter_pipeline;
 bool metalayers;
-bool usermeta;
+bool vlmetalayers;
 char* directory;
 char buf[256];
 
@@ -84,9 +84,9 @@ static char* test_sframe(void) {
     blosc2_add_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
   }
 
-  if (usermeta) {
-    blosc2_add_vlmetalayer(schunk, "umetalayer", (uint8_t *) content, (int32_t) content_len, NULL);
-    blosc2_add_vlmetalayer(schunk, "umetalayer2", (uint8_t *) content2, (int32_t) content_len2, NULL);
+  if (vlmetalayers) {
+    blosc2_add_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) content, (int32_t) content_len, NULL);
+    blosc2_add_vlmetalayer(schunk, "vlmetalayer2", (uint8_t *) content2, (int32_t) content_len2, NULL);
   }
 
   if (free_new) {
@@ -110,13 +110,13 @@ static char* test_sframe(void) {
     }
   }
 
-  if (usermeta) {
+  if (vlmetalayers) {
     uint32_t content_len_;
-    blosc2_get_vlmetalayer(schunk, "umetalayer", &content_, &content_len_);
+    blosc2_get_vlmetalayer(schunk, "vlmetalayer", &content_, &content_len_);
     mu_assert("ERROR: bad vlmetalayers length in frame", (size_t) content_len_ == content_len);
     mu_assert("ERROR: bad vlmetalayers data in frame", strncmp((char*)content_, content, content_len) == 0);
     free(content_);
-    blosc2_update_vlmetalayer(schunk, "umetalayer", (uint8_t *) content2, (int32_t) content_len2, NULL);
+    blosc2_update_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) content2, (int32_t) content_len2, NULL);
   }
 
   // Feed it with data
@@ -146,13 +146,13 @@ static char* test_sframe(void) {
     blosc2_update_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer2", sizeof("my metalayer2"));
   }
 
-  if (usermeta) {
+  if (vlmetalayers) {
     uint32_t content_len_;
-    blosc2_get_vlmetalayer(schunk, "umetalayer", &content_, &content_len_);
+    blosc2_get_vlmetalayer(schunk, "vlmetalayer", &content_, &content_len_);
     mu_assert("ERROR: bad vlmetalayers length in frame", (size_t) content_len_ == content_len2);
     mu_assert("ERROR: bad vlmetalayers data in frame", strncmp((char*)content_, content2, content_len2) == 0);
     free(content_);
-    blosc2_update_vlmetalayer(schunk, "umetalayer", (uint8_t *) content3, (int32_t) content_len3, NULL);
+    blosc2_update_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) content3, (int32_t) content_len3, NULL);
   }
 
   if (free_new) {
@@ -192,9 +192,9 @@ static char* test_sframe(void) {
     }
   }
 
-  if (usermeta) {
+  if (vlmetalayers) {
     uint32_t content_len_;
-    blosc2_get_vlmetalayer(schunk, "umetalayer", &content_, &content_len_);
+    blosc2_get_vlmetalayer(schunk, "vlmetalayer", &content_, &content_len_);
     mu_assert("ERROR: bad vlmetalayers length in frame", (size_t) content_len_ == content_len3);
     mu_assert("ERROR: bad vlmetalayers data in frame", strncmp((char*)content_, content3, content_len3) == 0);
     free(content_);
@@ -301,13 +301,13 @@ static char *all_tests(void) {
         for (int ifree_new = 0; ifree_new < 2; ifree_new++) {
           for (int ifilter_pipeline = 0; ifilter_pipeline < 2; ifilter_pipeline++) {
             for (int imetalayers = 0; imetalayers < 2; imetalayers++) {
-              for (int iusermeta = 0; iusermeta < 2; iusermeta++) {
+              for (int ivlmetalayers = 0; ivlmetalayers < 2; ivlmetalayers++) {
                 splits = (bool) isplits;
                 multithread = (bool) imultithread;
                 free_new = (bool) ifree_new;
                 filter_pipeline = (bool) ifilter_pipeline;
                 metalayers = (bool) imetalayers;
-                usermeta = (bool) iusermeta;
+                vlmetalayers = (bool) ivlmetalayers;
                 snprintf(buf, sizeof(buf), "test_sframe_nc%d.b2frame", nchunks);
                 directory = buf;
                 mu_run_test(test_sframe);
