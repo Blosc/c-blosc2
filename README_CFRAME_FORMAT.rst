@@ -50,7 +50,7 @@ The header contains information needed to decompress the Blosc chunks contained 
     | d2| type_size     | d2| chunk_size    | d1| tcomp | d1|tdecomp| cX|
     |---|---------------|---|---------------|---|-------|---|-------|---|
       ^                   ^                   ^     ^     ^     ^     ^
-      |                   |                   |     |     |     |     +--[msgpack] bool for has_usermeta
+      |                   |                   |     |     |     |     +--[msgpack] bool for has_vlmetalayers
       |                   |                   |     |     |     +--number of threads for decompression
       |                   |                   |     |     +-- [msgpack] int16
       |                   |                   |     +--number of threads for compression
@@ -242,7 +242,7 @@ a fingerprint.::
       |   |   |    |           |       +-- trailer length (network endian)
       |   |   |    |           +--[msgpack] uint32 for trailer length
       |   |   |    +--Variable-length metalayers (See header metalayers)
-      |   |   +---[msgpack] bin32 for usermeta
+      |   |   +---[msgpack] bin32 for vlmetalayers
       |   +------[msgpack] int8 for trailer version
       +---[msgpack] fixarray with X=4 elements
 
@@ -252,7 +252,7 @@ However, the *vlmetalayers* follows the same format than the metalayers stored i
 
 
 :trailer_len:
-    (``uint32``) Size of the trailer of the frame (including usermeta chunk).
+    (``uint32``) Size of the trailer of the frame (including vlmetalayers chunk).
 
 :fpt:
     (``int8``) Fingerprint type:  0 -> no fp; 1 -> 32-bit; 2 -> 64-bit; 3 -> 128-bit

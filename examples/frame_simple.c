@@ -80,7 +80,7 @@ int main(void) {
   for (uint32_t j = 0; j < content_len; ++j) {
     content[j] = (uint8_t) j;
   }
-  int umlen = blosc2_add_vlmetalayer(schunk, "umetalayer", content, content_len, NULL);
+  int umlen = blosc2_add_vlmetalayer(schunk, "vlmetalayer", content, content_len, NULL);
   free(content);
   if (umlen < 0) {
     printf("Cannot write vlmetalayers chunk");
@@ -96,15 +96,15 @@ int main(void) {
          nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
   printf("Compression time: %.3g s, %.1f MB/s\n",
          ttotal, nbytes / (ttotal * MB));
-  uint8_t* usermeta;
+  uint8_t* vlmetalayer;
 
-  blosc2_get_vlmetalayer(schunk, "umetalayer", &usermeta, &content_len);
-  printf("Usermeta length: %d\n", content_len);
+  blosc2_get_vlmetalayer(schunk, "vlmetalayer", &vlmetalayer, &content_len);
+  printf("Variable-length metalayer length: %d\n", content_len);
   for (int j = 0; j < content_len; ++j) {
-    printf("%3d", usermeta[j]);
+    printf("%3d", vlmetalayer[j]);
   }
   printf("\n");
-  free(usermeta);
+  free(vlmetalayer);
 
   // Start different conversions between schunks, frames and fileframes
 
@@ -176,18 +176,18 @@ int main(void) {
   }
   printf("Successful roundtrip schunk <-> frame <-> fileframe !\n");
 
-  blosc2_get_vlmetalayer(schunk1, "umetalayer", &usermeta, &content_len);
+  blosc2_get_vlmetalayer(schunk1, "vlmetalayer", &vlmetalayer, &content_len);
   for (int j = 0; j < content_len; ++j) {
-    printf("%3d", usermeta[j]);
+    printf("%3d", vlmetalayer[j]);
   }
   printf("\n");
-  free(usermeta);
-  blosc2_get_vlmetalayer(schunk2, "umetalayer", &usermeta, &content_len);
+  free(vlmetalayer);
+  blosc2_get_vlmetalayer(schunk2, "vlmetalayer", &vlmetalayer, &content_len);
   for (int j = 0; j < content_len; ++j) {
-    printf("%3d", usermeta[j]);
+    printf("%3d", vlmetalayer[j]);
   }
   printf("\n");
-  free(usermeta);
+  free(vlmetalayer);
 
   /* Free resources */
   blosc2_schunk_free(schunk);

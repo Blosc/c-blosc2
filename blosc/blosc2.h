@@ -1022,7 +1022,7 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 #define BLOSC2_METALAYER_NAME_MAXLEN 31
 
 #define BLOSC2_MAX_VLMETALAYERS BLOSC2_MAX_METALAYERS
-#define BLOSC2_USERMETA_NAME_MAXLEN BLOSC2_METALAYER_NAME_MAXLEN
+#define BLOSC2_VLMETALAYERS_NAME_MAXLEN BLOSC2_METALAYER_NAME_MAXLEN
 
 /**
  * @brief This struct is meant for holding storage parameters for a
@@ -1031,7 +1031,7 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
  */
 typedef struct {
     bool contiguous;
-    //!< Whether the chunks are contiguous (frame) or sparse.
+    //!< Whether the chunks are contiguous or sparse.
     char* urlpath;
     //!< The path for persistent storage. If NULL, that means in-memory.
     blosc2_cparams* cparams;

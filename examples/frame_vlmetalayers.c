@@ -58,27 +58,27 @@ int main(void) {
 
 
   // Add a metalayer
-  int umlen = blosc2_add_metalayer(schunk, "umetalayer", (uint8_t *) "This is a vlmetalayers content...", 10);
+  int umlen = blosc2_add_metalayer(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 10);
   if (umlen < 0) {
     printf("Cannot write vlmetalayers chunk");
     return umlen;
   }
 
   // Add some vlmetalayers data
-  umlen = blosc2_add_vlmetalayer(schunk, "umetalayer", (uint8_t *) "This is a vlmetalayers content...", 32, NULL);
+  umlen = blosc2_add_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 32, NULL);
   if (umlen < 0) {
     printf("Cannot write vlmetalayers chunk");
     return umlen;
   }
 
   // Add some vlmetalayers data
-  umlen = blosc2_add_vlmetalayer(schunk, "umetalayer2", (uint8_t *) "This is a content...", 10, NULL);
+  umlen = blosc2_add_vlmetalayer(schunk, "vlmetalayer2", (uint8_t *) "This is a content...", 10, NULL);
   if (umlen < 0) {
     printf("Cannot write vlmetalayers chunk");
     return umlen;
   }
 
-  umlen = blosc2_update_vlmetalayer(schunk, "umetalayer", (uint8_t *) "This is a another umetalayer content...", 20,
+  umlen = blosc2_update_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) "This is a another vlmetalayer content...", 20,
                                     NULL);
   if (umlen < 0) {
     printf("Cannot write vlmetalayers chunk");

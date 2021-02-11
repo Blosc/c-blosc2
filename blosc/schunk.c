@@ -278,10 +278,10 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
     uint32_t content_len;
     char* name = schunk->vlmetalayers[nmeta]->name;
     if (blosc2_get_vlmetalayer(schunk, name, &content, &content_len) < 0) {
-      BLOSC_TRACE_ERROR("Can not get %s `umetalayer`.", name);
+      BLOSC_TRACE_ERROR("Can not get %s `vlmetalayer`.", name);
     }
     if (blosc2_add_vlmetalayer(new_schunk, name, content, content_len, NULL) < 0) {
-      BLOSC_TRACE_ERROR("Can not add %s `umetalayer`.", name);
+      BLOSC_TRACE_ERROR("Can not add %s `vlmetalayer`.", name);
       return NULL;
     }
     free(content);
@@ -1034,7 +1034,7 @@ int blosc2_has_vlmetalayer(blosc2_schunk *schunk, const char *name) {
   return BLOSC2_ERROR_NOT_FOUND;
 }
 
-int umetalayer_flush(blosc2_schunk* schunk) {
+int vlmetalayer_flush(blosc2_schunk* schunk) {
   int rc;
   if (schunk->frame == NULL) {
     return BLOSC2_ERROR_SUCCESS;
@@ -1089,7 +1089,7 @@ int blosc2_add_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t *con
   schunk->nvlmetalayers += 1;
 
   // Propagate to frames
-  int rc = umetalayer_flush(schunk);
+  int rc = vlmetalayer_flush(schunk);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Can not propagate de `%s` variable-length metalayer to a frame.", name);
     return rc;
@@ -1153,7 +1153,7 @@ int blosc2_update_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t *
   umeta->content_len = csize;
 
   // Propagate to frames
-  int rc = umetalayer_flush(schunk);
+  int rc = vlmetalayer_flush(schunk);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Can not propagate de `%s` variable-length metalayer to a frame.", name);
     return rc;
