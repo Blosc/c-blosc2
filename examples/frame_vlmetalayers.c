@@ -53,39 +53,39 @@ int main(void) {
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {.contiguous=true, .urlpath="umeta.b2frame", .cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.contiguous=true, .urlpath="vlmetalaters.b2frame", .cparams=&cparams, .dparams=&dparams};
   blosc2_schunk* schunk = blosc2_schunk_new(storage);
 
 
   // Add a metalayer
-  int umlen = blosc2_add_metalayer(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 10);
-  if (umlen < 0) {
+  int vlmetalater_len = blosc2_add_metalayer(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 10);
+  if (vlmetalater_len < 0) {
     printf("Cannot write vlmetalayers chunk");
-    return umlen;
+    return vlmetalater_len;
   }
 
   // Add some vlmetalayers data
-  umlen = blosc2_add_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 32, NULL);
-  if (umlen < 0) {
+  vlmetalater_len = blosc2_add_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 32, NULL);
+  if (vlmetalater_len < 0) {
     printf("Cannot write vlmetalayers chunk");
-    return umlen;
+    return vlmetalater_len;
   }
 
   // Add some vlmetalayers data
-  umlen = blosc2_add_vlmetalayer(schunk, "vlmetalayer2", (uint8_t *) "This is a content...", 10, NULL);
-  if (umlen < 0) {
+  vlmetalater_len = blosc2_add_vlmetalayer(schunk, "vlmetalayer2", (uint8_t *) "This is a content...", 10, NULL);
+  if (vlmetalater_len < 0) {
     printf("Cannot write vlmetalayers chunk");
-    return umlen;
+    return vlmetalater_len;
   }
 
-  umlen = blosc2_update_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) "This is a another vlmetalayer content...", 20,
+  vlmetalater_len = blosc2_update_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) "This is a another vlmetalayer content...", 20,
                                     NULL);
-  if (umlen < 0) {
+  if (vlmetalater_len < 0) {
     printf("Cannot write vlmetalayers chunk");
-    return umlen;
+    return vlmetalater_len;
   }
 
-  blosc2_schunk *sc = blosc2_schunk_open("umeta.b2frame");
+  blosc2_schunk *sc = blosc2_schunk_open("vlmetalaters.b2frame");
 
   /* Free resources */
   blosc2_schunk_free(schunk);

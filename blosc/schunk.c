@@ -904,7 +904,7 @@ int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order) {
  *
  * @param schunk The super-chunk to which the flush should be applied.
  *
- * @return If successful, a 1 is returned. Else, return a negative value.
+ * @return If successful, a 0 is returned. Else, return a negative value.
  */
 // Initially, this was a public function, but as it is really meant to be used only
 // in the schunk_add_metalayer(), I decided to convert it into private and call it
@@ -912,7 +912,7 @@ int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order) {
 // each add operation requires a complete frame re-build, but as users should need
 // very few metalayers, this overhead should be negligible in practice.
 int metalayer_flush(blosc2_schunk* schunk) {
-  int rc = 1;
+  int rc = BLOSC2_ERROR_SUCCESS;
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (frame == NULL) {
     return rc;
@@ -1026,25 +1026,26 @@ int blosc2_has_vlmetalayer(blosc2_schunk *schunk, const char *name) {
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
-  for (int numeta = 0; numeta < schunk->nvlmetalayers; numeta++) {
-    if (strcmp(name, schunk->vlmetalayers[numeta]->name) == 0) {
-      return numeta;
+  for (int nvlmetalayer = 0; nvlmetalayer < schunk->nvlmetalayers; nvlmetalayer++) {
+    if (strcmp(name, schunk->vlmetalayers[nvlmetalayer]->name) == 0) {
+      return nvlmetalayer;
     }
   }
   return BLOSC2_ERROR_NOT_FOUND;
 }
 
 int vlmetalayer_flush(blosc2_schunk* schunk) {
-  int rc;
-  if (schunk->frame == NULL) {
-    return BLOSC2_ERROR_SUCCESS;
+  int rc = BLOSC2_ERROR_SUCCESS;
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+  if (frame == NULL) {
+    return rc;
   }
-  rc = frame_update_header(schunk->frame, schunk, false);
+  rc = frame_update_header(frame, schunk, false);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to update metalayers into frame.");
     return rc;
   }
-  rc = frame_update_trailer(schunk->frame, schunk);
+  rc = frame_update_trailer(frame, schunk);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to update trailer into frame.");
     return rc;
@@ -1058,15 +1059,15 @@ int vlmetalayer_flush(blosc2_schunk* schunk) {
  */
 int blosc2_add_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t *content, uint32_t content_len,
                            blosc2_cparams *cparams) {
-  int numeta = blosc2_has_vlmetalayer(schunk, name);
-  if (numeta >= 0) {
+  int nvlmetalayer = blosc2_has_vlmetalayer(schunk, name);
+  if (nvlmetalayer >= 0) {
     BLOSC_TRACE_ERROR("Variable-length metalayer \"%s\" already exists.", name);
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
-  // Add the umeta
-  blosc2_metalayer *umeta = malloc(sizeof(blosc2_metalayer));
-  umeta->name = strdup(name);
+  // Add the vlmetalayer
+  blosc2_metalayer *vlmetalayer = malloc(sizeof(blosc2_metalayer));
+  vlmetalayer->name = strdup(name);
   uint8_t* content_buf = malloc((size_t) content_len + BLOSC_MAX_OVERHEAD);
 
   blosc2_context *cctx;
@@ -1083,9 +1084,9 @@ int blosc2_add_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t *con
   }
   blosc2_free_ctx(cctx);
 
-  umeta->content = realloc(content_buf, csize);
-  umeta->content_len = csize;
-  schunk->vlmetalayers[schunk->nvlmetalayers] = umeta;
+  vlmetalayer->content = realloc(content_buf, csize);
+  vlmetalayer->content_len = csize;
+  schunk->vlmetalayers[schunk->nvlmetalayers] = vlmetalayer;
   schunk->nvlmetalayers += 1;
 
   // Propagate to frames
@@ -1101,12 +1102,12 @@ int blosc2_add_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t *con
 
 int blosc2_get_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t **content,
                            uint32_t *content_len) {
-  int numeta = blosc2_has_vlmetalayer(schunk, name);
-  if (numeta < 0) {
+  int nvlmetalayer = blosc2_has_vlmetalayer(schunk, name);
+  if (nvlmetalayer < 0) {
     BLOSC_TRACE_ERROR("User metalayer \"%s\" not found.", name);
-    return numeta;
+    return nvlmetalayer;
   }
-  blosc2_metalayer *meta = schunk->vlmetalayers[numeta];
+  blosc2_metalayer *meta = schunk->vlmetalayers[nvlmetalayer];
   size_t nbytes, cbytes, blocksize;
   blosc_cbuffer_sizes(meta->content, &nbytes, &cbytes, &blocksize);
   if (cbytes != meta->content_len) {
@@ -1120,19 +1121,19 @@ int blosc2_get_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t **co
     BLOSC_TRACE_ERROR("User metalayer \"%s\" is corrupted.", meta->name);
     return BLOSC2_ERROR_READ_BUFFER;
   }
-  return numeta;
+  return nvlmetalayer;
 }
 
 int blosc2_update_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t *content, uint32_t content_len,
                               blosc2_cparams *cparams) {
-  int numeta = blosc2_has_vlmetalayer(schunk, name);
-  if (numeta < 0) {
-    BLOSC_TRACE_ERROR("User umeta \"%s\" not found.", name);
-    return numeta;
+  int nvlmetalayer = blosc2_has_vlmetalayer(schunk, name);
+  if (nvlmetalayer < 0) {
+    BLOSC_TRACE_ERROR("User vlmetalayer \"%s\" not found.", name);
+    return nvlmetalayer;
   }
 
-  blosc2_metalayer *umeta = schunk->vlmetalayers[numeta];
-  free(umeta->content);
+  blosc2_metalayer *vlmetalayer = schunk->vlmetalayers[nvlmetalayer];
+  free(vlmetalayer->content);
   uint8_t* content_buf = malloc((size_t) content_len + BLOSC_MAX_OVERHEAD);
 
   blosc2_context *cctx;
@@ -1149,8 +1150,8 @@ int blosc2_update_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t *
   }
   blosc2_free_ctx(cctx);
 
-  umeta->content = realloc(content_buf, csize);
-  umeta->content_len = csize;
+  vlmetalayer->content = realloc(content_buf, csize);
+  vlmetalayer->content_len = csize;
 
   // Propagate to frames
   int rc = vlmetalayer_flush(schunk);
@@ -1159,5 +1160,5 @@ int blosc2_update_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t *
     return rc;
   }
 
-  return numeta;
+  return nvlmetalayer;
 }
