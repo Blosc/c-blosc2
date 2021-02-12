@@ -856,10 +856,14 @@ blosc2_frame_s* frame_from_cframe(uint8_t *cframe, int64_t len, bool copy) {
   if (len < FRAME_HEADER_MINLEN) {
     return NULL;
   }
+
   big_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
   if (frame_len != len) {   // sanity check
     return NULL;
   }
+  uint8_t has_meta = 3;
+  big_store(&has_meta, header + FRAME_HAS_VLMETALAYERS, 1);
+  printf("HASMETA: %d\n", has_meta);
 
   blosc2_frame_s* frame = calloc(1, sizeof(blosc2_frame_s));
   frame->len = frame_len;
@@ -1151,8 +1155,8 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
 }
 
 
-static int frame_get_metalayers_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, uint8_t* header,
-                                            int32_t header_len) {
+static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, uint8_t* header,
+                                int32_t header_len) {
   int64_t header_pos = FRAME_IDX_SIZE;
 
   // Get the size for the index of metalayers
@@ -1301,7 +1305,7 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     }
   }
 
-  ret = frame_get_metalayers_from_header(frame, schunk, header, header_len);
+  ret = get_meta_from_header(frame, schunk, header, header_len);
 
   if (frame->cframe == NULL) {
     free(header);
@@ -1310,28 +1314,31 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   return ret;
 }
 
-static int frame_get_vlmetalayers_from_trailer(blosc2_frame* frame, blosc2_schunk* schunk, uint8_t* trailer,
-                                               int32_t trailer_len) {
-  int64_t trailer_pos = FRAME_TRAILER_VLMETALAYERS;
+static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk, uint8_t* trailer,
+                                   int32_t trailer_len) {
+
+  int64_t trailer_pos = FRAME_TRAILER_VLMETALAYERS + 2;
+  uint8_t* idxp = trailer + trailer_pos;
 
   // Get the size for the index of metalayers
+  trailer_pos += 2;
+  if (trailer_len < trailer_pos) {
+    return BLOSC2_ERROR_READ_BUFFER;
+  }
   uint16_t idx_size;
-  trailer_pos += 2 + sizeof(idx_size);
-  if (trailer_len < trailer_pos) {
-    return BLOSC2_ERROR_READ_BUFFER;
-  }
-  big_store(&idx_size, trailer + FRAME_TRAILER_VLMETALAYERS + 2, sizeof(idx_size));
+  big_store(&idx_size, idxp, sizeof(idx_size));
+  idxp += 2;
 
-  // Get the actual index of metalayers
-  uint8_t* metalayers_idx = trailer + FRAME_TRAILER_VLMETALAYERS + 4;
   trailer_pos += 1;
+  // Get the actual index of metalayers
   if (trailer_len < trailer_pos) {
     return BLOSC2_ERROR_READ_BUFFER;
   }
-  if (metalayers_idx[0] != 0xde) {   // sanity check
+  if (idxp[0] != 0xde) {   // sanity check
     return BLOSC2_ERROR_DATA;
   }
-  uint8_t* idxp = metalayers_idx + 1;
+  idxp += 1;
+
   uint16_t nmetalayers;
   trailer_pos += sizeof(nmetalayers);
   if (trailer_len < trailer_pos) {
@@ -1431,9 +1438,18 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     return ret;
   }
 
+  printf("frame_len: %lld\n", frame_len);
+  printf("header_len: %d\n", header_len);
+  printf("frame_len: %lld\n", frame_len);
+  printf("nbytes: %lld\n", nbytes);
+  printf("cbytes: %lld\n", cbytes);
+  printf("chunksize: %d\n", chunksize);
+  printf("nchunks: %d\n", nchunks);
 
   int32_t trailer_offset = get_trailer_offset(frame, header_len, nbytes > 0);
   int32_t trailer_len = frame->trailer_len;
+  printf("trailer_length: %d\n", trailer_len);
+  printf("trailer_offset: %d\n", trailer_offset);
 
   // Get the trailer
   uint8_t* trailer = NULL;
@@ -1464,7 +1480,7 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     }
   }
 
-  ret = frame_get_vlmetalayers_from_trailer(frame, schunk, trailer, trailer_len);
+  ret = get_vlmeta_from_trailer(frame, schunk, trailer, trailer_len);
 
   if (frame->cframe == NULL) {
     free(trailer);
