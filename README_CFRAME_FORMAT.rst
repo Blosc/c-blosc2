@@ -13,7 +13,7 @@ The frame is composed of a header, a chunks section, and a trailer::
 Each of the three parts of the frame are variable length; with the header and trailer both stored using the
 `msgpack <https://msgpack.org>`_ format.
 
-*Note:*  All integer types are stored in big endian for msgpack format. All the rest are stored in little endian.
+*Note:*  Integer types are stored in big endian for msgpack format. All the rest are stored in little endian.
 
 
 Header
