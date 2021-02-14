@@ -730,6 +730,11 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
 
   int64_t trailer_offset = get_trailer_offset(frame, header_len, nbytes > 0);
 
+  if (trailer_offset < BLOSC_EXTENDED_HEADER_LENGTH) {
+    BLOSC_TRACE_ERROR("Unable to get trailer offset in frame.");
+    return BLOSC2_ERROR_READ_BUFFER;
+  }
+
   // Update the trailer.  As there are no internal offsets to the trailer section,
   // and it is always at the end of the frame, we can just write (or overwrite) it
   // at the end of the frame.
@@ -1041,6 +1046,12 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
   }
 
   int64_t trailer_offset = get_trailer_offset(frame, header_len, true);
+
+  if (trailer_offset < BLOSC_EXTENDED_HEADER_LENGTH || trailer_offset + FRAME_TRAILER_MINLEN > frame->len) {
+    BLOSC_TRACE_ERROR("Cannot read the trailer out of the frame.");
+    return NULL;
+  }
+
   int32_t coffsets_cbytes;
   if (frame->sframe) {
     coffsets_cbytes = (int32_t) (trailer_offset - (header_len + 0));
@@ -1048,6 +1059,7 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
   else {
     coffsets_cbytes = (int32_t) (trailer_offset - (header_len + cbytes));
   }
+
   if (off_cbytes != NULL) {
     *off_cbytes = coffsets_cbytes;
   }
@@ -1435,8 +1447,13 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     return ret;
   }
 
-  int32_t trailer_offset = get_trailer_offset(frame, header_len, nbytes > 0);
+  int64_t trailer_offset = get_trailer_offset(frame, header_len, nbytes > 0);
   int32_t trailer_len = frame->trailer_len;
+
+  if (trailer_offset < BLOSC_EXTENDED_HEADER_LENGTH || trailer_offset + trailer_len > frame->len) {
+    BLOSC_TRACE_ERROR("Cannot access the trailer out of the frame.");
+    return BLOSC2_ERROR_READ_BUFFER;
+  }
 
   // Get the trailer
   uint8_t* trailer = NULL;
