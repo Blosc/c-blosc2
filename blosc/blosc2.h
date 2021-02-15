@@ -1123,7 +1123,7 @@ typedef struct blosc2_schunk {
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_new(blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage);
 
 /**
  * @brief Create a non-initialized super-chunk.
@@ -1136,7 +1136,7 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_new(blosc2_storage storage);
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_empty(int nchunks, blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_empty(int nchunks, blosc2_storage *storage);
 
 
 /**
@@ -1147,7 +1147,7 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_empty(int nchunks, blosc2_storage stor
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage);
 
 /**
  * @brief Create a super-chunk out of a contiguous frame buffer.

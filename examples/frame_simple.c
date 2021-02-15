@@ -62,7 +62,7 @@ int main(void) {
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
-  blosc2_schunk* schunk = blosc2_schunk_new(storage);
+  blosc2_schunk* schunk = blosc2_schunk_new(&storage);
 
   // Add some data
   blosc_set_timestamp(&last);

@@ -45,7 +45,7 @@ static char* test_dict(void) {
   cparams.blocksize = blocksize;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
 
   // Feed it with data
   blosc_set_timestamp(&last);

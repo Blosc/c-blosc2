@@ -38,7 +38,7 @@ static char* test_schunk(void) {
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
 
   // Add a couple of metalayers
   blosc2_meta_add(schunk, "metalayer1", (uint8_t *) "my metalayer1", sizeof("my metalayer1"));

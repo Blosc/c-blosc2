@@ -82,7 +82,7 @@ static char* test_insert_chunk(void) {
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .urlpath=tdata.urlpath, .contiguous=tdata.contiguous};
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
 
   // Feed it with data
   for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {

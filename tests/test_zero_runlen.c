@@ -97,7 +97,7 @@ CUTEST_TEST_TEST(zero_runlen) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .contiguous=backend.contiguous, .urlpath = backend.urlpath};
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
 
   /* Append the chunks */
   void* chunk = malloc(BLOSC_EXTENDED_HEADER_LENGTH + isize);

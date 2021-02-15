@@ -112,7 +112,7 @@ CUTEST_TEST_TEST(copy) {
 
   /* Create a super-chunk container */
   blosc2_storage storage = {.cparams=&data->cparams, .contiguous=backend.contiguous, .urlpath = backend.urlpath};
-  blosc2_schunk *schunk = blosc2_schunk_new(storage);
+  blosc2_schunk *schunk = blosc2_schunk_new(&storage);
   CUTEST_ASSERT("Error creating a schunk", schunk != NULL);
 
   char* meta_name = "test_copy";
@@ -135,7 +135,7 @@ CUTEST_TEST_TEST(copy) {
   /* Copy schunk */
   blosc2_storage storage2 = {.contiguous=backend2.contiguous, .urlpath = backend2.urlpath};
   storage2.cparams = different_cparams ? &data->cparams2 : &data->cparams;
-  blosc2_schunk * schunk_copy = blosc2_schunk_copy(schunk, storage2);
+  blosc2_schunk * schunk_copy = blosc2_schunk_copy(schunk, &storage2);
   CUTEST_ASSERT("Error copying a schunk", schunk_copy != NULL);
 
   if (metalayers) {

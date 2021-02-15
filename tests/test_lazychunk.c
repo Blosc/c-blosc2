@@ -44,7 +44,7 @@ static char* test_lazy_chunk(void) {
   cparams.blocksize = BLOCKSIZE * cparams.typesize;
   dparams.nthreads = nthreads;
   blosc2_storage storage = {.contiguous=true, .urlpath="test_lazy_chunk.b2frame", .cparams=&cparams, .dparams=&dparams};
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
 
   // Feed it with data
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {

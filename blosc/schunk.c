@@ -105,26 +105,26 @@ void update_schunk_properties(struct blosc2_schunk* schunk) {
 }
 
 /* Create a new super-chunk */
-blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
+blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
   schunk->version = 0;     /* pre-first version */
 
   // Get the storage with proper defaults
-  schunk->storage = get_new_storage(&storage, &BLOSC2_CPARAMS_DEFAULTS, &BLOSC2_DPARAMS_DEFAULTS);
+  schunk->storage = get_new_storage(storage, &BLOSC2_CPARAMS_DEFAULTS, &BLOSC2_DPARAMS_DEFAULTS);
   // ...and update internal properties
   update_schunk_properties(schunk);
 
-  if (!storage.contiguous && storage.urlpath != NULL){
+  if (!storage->contiguous && storage->urlpath != NULL){
     char* urlpath;
-    char last_char = storage.urlpath[strlen(storage.urlpath) - 1];
+    char last_char = storage->urlpath[strlen(storage->urlpath) - 1];
     if (last_char == '\\' || last_char == '/') {
-      urlpath = malloc(strlen(storage.urlpath));
-      strncpy(urlpath, storage.urlpath, strlen(storage.urlpath) - 1);
-      urlpath[strlen(storage.urlpath) - 1] = '\0';
+      urlpath = malloc(strlen(storage->urlpath));
+      strncpy(urlpath, storage->urlpath, strlen(storage->urlpath) - 1);
+      urlpath[strlen(storage->urlpath) - 1] = '\0';
     }
     else {
-      urlpath = malloc(strlen(storage.urlpath) + 1);
-      strcpy(urlpath, storage.urlpath);
+      urlpath = malloc(strlen(storage->urlpath) + 1);
+      strcpy(urlpath, storage->urlpath);
     }
     // Create directory
     if (mkdir(urlpath, 0777) == -1) {
@@ -143,9 +143,9 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
     }
     schunk->frame = (blosc2_frame*)frame;
   }
-  if (storage.contiguous){
+  if (storage->contiguous){
     // We want a contiguous frame as storage
-    blosc2_frame_s* frame = frame_new(storage.urlpath);
+    blosc2_frame_s* frame = frame_new(storage->urlpath);
     frame->sframe = false;
     // Initialize frame (basically, encode the header)
     int64_t frame_len = frame_from_schunk(schunk, frame);
@@ -161,9 +161,9 @@ blosc2_schunk* blosc2_schunk_new(const blosc2_storage storage) {
 
 
 /* Create an empty super-chunk */
-blosc2_schunk *blosc2_schunk_empty(int nchunks, const blosc2_storage storage) {
+blosc2_schunk *blosc2_schunk_empty(int nchunks, blosc2_storage *storage) {
   blosc2_schunk* schunk = blosc2_schunk_new(storage);
-  if (storage.contiguous) {
+  if (storage->contiguous) {
     BLOSC_TRACE_ERROR("Creating empty frames is not supported yet.");
     return NULL;
   }
@@ -182,7 +182,7 @@ blosc2_schunk *blosc2_schunk_empty(int nchunks, const blosc2_storage storage) {
 
 
 /* Create a copy of a super-chunk */
-blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage) {
+blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage) {
   if (schunk == NULL) {
     BLOSC_TRACE_ERROR("Can not copy a NULL `schunk`.");
     return NULL;
@@ -191,7 +191,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
   // Check if cparams are equals
   bool cparams_equal = true;
   blosc2_cparams cparams = {0};
-  if (storage.cparams == NULL) {
+  if (storage->cparams == NULL) {
     // When cparams are not specified, just use the same of schunk
     cparams.typesize = schunk->cctx->typesize;
     cparams.clevel = schunk->cctx->clevel;
@@ -200,10 +200,10 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
     cparams.blocksize = schunk->cctx->blocksize;
     memcpy(cparams.filters, schunk->cctx->filters, BLOSC2_MAX_FILTERS);
     memcpy(cparams.filters_meta, schunk->cctx->filters_meta, BLOSC2_MAX_FILTERS);
-    storage.cparams = &cparams;
+    storage->cparams = &cparams;
   }
   else {
-    cparams = *storage.cparams;
+    cparams = *storage->cparams;
   }
   if (cparams.blocksize == 0) {
     // TODO: blocksize should be read from schunk->blocksize
@@ -324,7 +324,7 @@ int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* nee
   else {
     // Copy to a contiguous storage
     blosc2_storage frame_storage = {.contiguous=true};
-    blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, frame_storage);
+    blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, &frame_storage);
     if (schunk_copy == NULL) {
       BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
       return BLOSC2_ERROR_SCHUNK_COPY;
@@ -370,7 +370,7 @@ int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath) {
 
   // Copy to a contiguous file
   blosc2_storage frame_storage = {.contiguous=true, .urlpath=(char*)urlpath};
-  blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, frame_storage);
+  blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, &frame_storage);
   if (schunk_copy == NULL) {
     BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
     return BLOSC2_ERROR_SCHUNK_COPY;

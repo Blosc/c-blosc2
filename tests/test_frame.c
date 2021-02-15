@@ -76,7 +76,7 @@ static char* test_frame(void) {
     dparams.nthreads = 1;
   }
   blosc2_storage storage = {.contiguous=true, .urlpath=fname, .cparams=&cparams, .dparams=&dparams};
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
   mu_assert("blosc2_schunk_new() failed", schunk != NULL);
   char* content = "This is a pretty long string with a good number of chars";
   char* content2 = "This is a pretty long string with a good number of chars; longer than content";

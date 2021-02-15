@@ -78,7 +78,7 @@ static char* test_update_chunk(void) {
                             .urlpath = tdata.urlpath,
                             .contiguous = tdata.contiguous};
 
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
 
   // Feed it with data
   for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
