@@ -32,11 +32,11 @@ typedef struct {
 } test_ndata;
 
 test_ndata tndata[] = {
-    {1, 4},
+    //{1, 4},
     {10, 4},
-    {5,  0},
-    {33, 32},
-    {1,  0}
+   // {5,  0},
+   // {33, 32},
+   // {1,  0}
 };
 
 typedef struct {
@@ -45,9 +45,9 @@ typedef struct {
 }test_storage;
 
 test_storage tstorage[] = {
-    {false, NULL},  // memory - schunk
-    {true, NULL},  // memory - cframe
-    {true, "test_update_chunk.b2frame"}, // disk - cframe
+   // {false, NULL},  // memory - schunk
+    //{true, NULL},  // memory - cframe
+    //{true, "test_update_chunk.b2frame"}, // disk - cframe
     {false, "test_update_chunk_s.b2frame"}, // disk - sframe
 };
 
@@ -77,6 +77,9 @@ static char* test_update_chunk(void) {
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .urlpath = tdata.urlpath,
                             .contiguous = tdata.contiguous};
+  if (!storage.contiguous && storage.urlpath != NULL) {
+    blosc2_remove_dir(storage.urlpath);
+  }
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
