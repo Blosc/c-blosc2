@@ -120,10 +120,10 @@ CUTEST_TEST_TEST(copy) {
   int64_t meta_content = -66;
 
   if (metalayers) {
-    blosc2_add_metalayer(schunk, meta_name, (uint8_t *) &meta_content, meta_content_len);
+    blosc2_meta_add(schunk, meta_name, (uint8_t *) &meta_content, meta_content_len);
   }
   if (vlmetalayers) {
-    blosc2_add_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) &meta_content, meta_content_len, NULL);
+    blosc2_vlmeta_add(schunk, "vlmetalayer", (uint8_t *) &meta_content, meta_content_len, NULL);
   }
 
   /* Append the chunks */
@@ -141,14 +141,14 @@ CUTEST_TEST_TEST(copy) {
   if (metalayers) {
     int64_t *content = malloc(meta_content_len);
     uint32_t content_len;
-    blosc2_get_metalayer(schunk_copy, meta_name,  (uint8_t **) &content, &content_len);
+    blosc2_meta_get(schunk_copy, meta_name, (uint8_t **) &content, &content_len);
     CUTEST_ASSERT("Metalayers are not equals.", *content == meta_content);
     free(content);
   }
   if (vlmetalayers) {
     uint32_t content_len;
     int64_t *content;
-    blosc2_get_vlmetalayer(schunk_copy, "vlmetalayer", (uint8_t **) &content, &content_len);
+    blosc2_vlmeta_get(schunk_copy, "vlmetalayer", (uint8_t **) &content, &content_len);
     CUTEST_ASSERT("Variable-length metalayers are not equal.", *content == meta_content);
     free(content);
   }

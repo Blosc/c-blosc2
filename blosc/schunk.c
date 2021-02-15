@@ -236,7 +236,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
   // Copy metalayers
   for (int nmeta = 0; nmeta < schunk->nmetalayers; ++nmeta) {
     blosc2_metalayer *meta = schunk->metalayers[nmeta];
-    if (blosc2_add_metalayer(new_schunk, meta->name, meta->content, meta->content_len) < 0) {
+    if (blosc2_meta_add(new_schunk, meta->name, meta->content, meta->content_len) < 0) {
       BLOSC_TRACE_ERROR("Con not add %s `metalayer`.", meta->name);
       return NULL;
     }
@@ -277,10 +277,10 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage)
     uint8_t *content;
     uint32_t content_len;
     char* name = schunk->vlmetalayers[nmeta]->name;
-    if (blosc2_get_vlmetalayer(schunk, name, &content, &content_len) < 0) {
+    if (blosc2_vlmeta_get(schunk, name, &content, &content_len) < 0) {
       BLOSC_TRACE_ERROR("Can not get %s `vlmetalayer`.", name);
     }
-    if (blosc2_add_vlmetalayer(new_schunk, name, content, content_len, NULL) < 0) {
+    if (blosc2_vlmeta_add(new_schunk, name, content, content_len, NULL) < 0) {
       BLOSC_TRACE_ERROR("Can not add %s `vlmetalayer`.", name);
       return NULL;
     }
@@ -845,7 +845,7 @@ int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int nchunk, uint8_t **chu
  *
  * If successful, return the index of the metalayer.  Else, return a negative value.
  */
-int blosc2_has_metalayer(blosc2_schunk *schunk, const char *name) {
+int blosc2_meta_exists(blosc2_schunk *schunk, const char *name) {
   if (strlen(name) > BLOSC2_METALAYER_NAME_MAXLEN) {
     BLOSC_TRACE_ERROR("Metalayers cannot be larger than %d chars.", BLOSC2_METALAYER_NAME_MAXLEN);
     return BLOSC2_ERROR_INVALID_PARAM;
@@ -935,8 +935,8 @@ int metalayer_flush(blosc2_schunk* schunk) {
  *
  * If successful, return the index of the new metalayer.  Else, return a negative value.
  */
-int blosc2_add_metalayer(blosc2_schunk *schunk, const char *name, uint8_t *content, uint32_t content_len) {
-  int nmetalayer = blosc2_has_metalayer(schunk, name);
+int blosc2_meta_add(blosc2_schunk *schunk, const char *name, uint8_t *content, uint32_t content_len) {
+  int nmetalayer = blosc2_meta_exists(schunk, name);
   if (nmetalayer >= 0) {
     BLOSC_TRACE_ERROR("Metalayer \"%s\" already exists.", name);
     return BLOSC2_ERROR_INVALID_PARAM;
@@ -967,8 +967,8 @@ int blosc2_add_metalayer(blosc2_schunk *schunk, const char *name, uint8_t *conte
  *
  * If successful, return the index of the new metalayer.  Else, return a negative value.
  */
-int blosc2_update_metalayer(blosc2_schunk *schunk, const char *name, uint8_t *content, uint32_t content_len) {
-  int nmetalayer = blosc2_has_metalayer(schunk, name);
+int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content, uint32_t content_len) {
+  int nmetalayer = blosc2_meta_exists(schunk, name);
   if (nmetalayer < 0) {
     BLOSC_TRACE_ERROR("Metalayer \"%s\" not found.", name);
     return nmetalayer;
@@ -1003,9 +1003,9 @@ int blosc2_update_metalayer(blosc2_schunk *schunk, const char *name, uint8_t *co
  *
  * If successful, return the index of the new metalayer.  Else, return a negative value.
  */
-int blosc2_get_metalayer(blosc2_schunk *schunk, const char *name, uint8_t **content,
-                         uint32_t *content_len) {
-  int nmetalayer = blosc2_has_metalayer(schunk, name);
+int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
+                    uint32_t *content_len) {
+  int nmetalayer = blosc2_meta_exists(schunk, name);
   if (nmetalayer < 0) {
     BLOSC_TRACE_ERROR("Metalayer \"%s\" not found.", name);
     return nmetalayer;
@@ -1020,7 +1020,7 @@ int blosc2_get_metalayer(blosc2_schunk *schunk, const char *name, uint8_t **cont
  *
  * If successful, return the index of the variable-length metalayer.  Else, return a negative value.
  */
-int blosc2_has_vlmetalayer(blosc2_schunk *schunk, const char *name) {
+int blosc2_vlmeta_exists(blosc2_schunk *schunk, const char *name) {
   if (strlen(name) > BLOSC2_METALAYER_NAME_MAXLEN) {
     BLOSC_TRACE_ERROR("Variable-length metalayer names cannot be larger than %d chars.", BLOSC2_METALAYER_NAME_MAXLEN);
     return BLOSC2_ERROR_INVALID_PARAM;
@@ -1057,9 +1057,9 @@ int vlmetalayer_flush(blosc2_schunk* schunk) {
  *
  * If successful, return the index of the new variable-length metalayer.  Else, return a negative value.
  */
-int blosc2_add_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t *content, uint32_t content_len,
-                           blosc2_cparams *cparams) {
-  int nvlmetalayer = blosc2_has_vlmetalayer(schunk, name);
+int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name, uint8_t *content, uint32_t content_len,
+                      blosc2_cparams *cparams) {
+  int nvlmetalayer = blosc2_vlmeta_exists(schunk, name);
   if (nvlmetalayer >= 0) {
     BLOSC_TRACE_ERROR("Variable-length metalayer \"%s\" already exists.", name);
     return BLOSC2_ERROR_INVALID_PARAM;
@@ -1100,9 +1100,9 @@ int blosc2_add_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t *con
 }
 
 
-int blosc2_get_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t **content,
-                           uint32_t *content_len) {
-  int nvlmetalayer = blosc2_has_vlmetalayer(schunk, name);
+int blosc2_vlmeta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
+                      uint32_t *content_len) {
+  int nvlmetalayer = blosc2_vlmeta_exists(schunk, name);
   if (nvlmetalayer < 0) {
     BLOSC_TRACE_ERROR("User metalayer \"%s\" not found.", name);
     return nvlmetalayer;
@@ -1124,9 +1124,9 @@ int blosc2_get_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t **co
   return nvlmetalayer;
 }
 
-int blosc2_update_vlmetalayer(blosc2_schunk *schunk, const char *name, uint8_t *content, uint32_t content_len,
-                              blosc2_cparams *cparams) {
-  int nvlmetalayer = blosc2_has_vlmetalayer(schunk, name);
+int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name, uint8_t *content, uint32_t content_len,
+                         blosc2_cparams *cparams) {
+  int nvlmetalayer = blosc2_vlmeta_exists(schunk, name);
   if (nvlmetalayer < 0) {
     BLOSC_TRACE_ERROR("User vlmetalayer \"%s\" not found.", name);
     return nvlmetalayer;
