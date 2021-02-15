@@ -32,7 +32,7 @@ static char* test_schunk_cframe(void) {
 
   /* Create a super-chunk container */
   blosc2_storage storage = {.contiguous=contiguous};
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
 
   // Feed it with data
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {

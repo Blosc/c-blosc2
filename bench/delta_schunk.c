@@ -59,7 +59,7 @@ int main(void) {
   cparams.clevel = 1;
   cparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
 
   /* Append chunks (the first will be taken as reference for delta) */
   blosc_set_timestamp(&last);

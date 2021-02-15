@@ -44,7 +44,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   /* Create a super-chunk backed by an in-memory frame */
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
-  blosc2_schunk* schunk = blosc2_schunk_new(storage);
+  blosc2_schunk* schunk = blosc2_schunk_new(&storage);
   if (schunk == NULL) {
     blosc_destroy();
     return 0;

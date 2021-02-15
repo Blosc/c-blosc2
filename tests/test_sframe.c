@@ -69,7 +69,7 @@ static char* test_sframe(void) {
   /* Remove directory */
   blosc2_remove_dir(storage.urlpath);
 
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
   mu_assert("blosc2_schunk_new() failed", schunk != NULL);
   char* content = "This is a pretty long string with a good number of chars";
   char* content2 = "This is a pretty long string with a good number of chars; longer than content";
@@ -233,7 +233,7 @@ static char* test_sframe_simple(void) {
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.contiguous=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
   blosc2_remove_dir(storage.urlpath);
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
   mu_assert("Error in creating schunk", schunk != NULL);
 
   // Feed it with data

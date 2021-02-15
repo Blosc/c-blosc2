@@ -165,7 +165,7 @@ int main(void) {
   dparams.nthreads = 1;
   blosc_set_timestamp(&last);
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     for (i = 0; i < CHUNKSIZE; i++) {
       chunk_buf[i] = udata[i + nchunk * CHUNKSIZE];
