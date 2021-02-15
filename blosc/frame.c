@@ -861,9 +861,6 @@ blosc2_frame_s* frame_from_cframe(uint8_t *cframe, int64_t len, bool copy) {
   if (frame_len != len) {   // sanity check
     return NULL;
   }
-  uint8_t has_meta = 3;
-  big_store(&has_meta, header + FRAME_HAS_VLMETALAYERS, 1);
-  printf("HASMETA: %d\n", has_meta);
 
   blosc2_frame_s* frame = calloc(1, sizeof(blosc2_frame_s));
   frame->len = frame_len;
@@ -1438,18 +1435,8 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     return ret;
   }
 
-  printf("frame_len: %lld\n", frame_len);
-  printf("header_len: %d\n", header_len);
-  printf("frame_len: %lld\n", frame_len);
-  printf("nbytes: %lld\n", nbytes);
-  printf("cbytes: %lld\n", cbytes);
-  printf("chunksize: %d\n", chunksize);
-  printf("nchunks: %d\n", nchunks);
-
   int32_t trailer_offset = get_trailer_offset(frame, header_len, nbytes > 0);
   int32_t trailer_len = frame->trailer_len;
-  printf("trailer_length: %d\n", trailer_len);
-  printf("trailer_offset: %d\n", trailer_offset);
 
   // Get the trailer
   uint8_t* trailer = NULL;
