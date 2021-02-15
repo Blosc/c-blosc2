@@ -121,6 +121,10 @@ option(PREFER_EXTERNAL_ZSTD
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
+if (ENABLE_ASAN)
+    message(STATUS "Enabling ASAN")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Os -fno-omit-frame-pointer -fsanitize=address")
+endif()
 
 if(NOT DEACTIVATE_LZ4)
     if(PREFER_EXTERNAL_LZ4)

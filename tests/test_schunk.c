@@ -54,8 +54,10 @@ static char* test_schunk(void) {
   }
 
   blosc2_update_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer2", sizeof("my metalayer2"));
+
   // Attach some user metadata into it
-  blosc2_update_usermeta(schunk, (uint8_t *) "testing the usermeta", 16, BLOSC2_CPARAMS_DEFAULTS);
+  blosc2_add_vlmetalayer(schunk, "vlmetalayer1", (uint8_t *) "testing the vlmetalayers", 23, NULL);
+  blosc2_add_vlmetalayer(schunk, "vlmetalayer2", (uint8_t *) "vlmetalayers", 11, NULL);
 
   /* Gather some info */
   nbytes = schunk->nbytes;
@@ -91,6 +93,8 @@ static char* test_schunk(void) {
       mu_assert("ERROR: bad roundtrip",data_dest[i] == i + nchunk * CHUNKSIZE);
     }
   }
+  // update metalayer
+  blosc2_update_vlmetalayer(schunk, "vlmetalayer1", (uint8_t *) "testing the  vlmetalayers", 24, NULL);
 
   // metalayers
   uint8_t* content;
@@ -102,11 +106,14 @@ static char* test_schunk(void) {
   mu_assert("ERROR: bad metalayer content", strncmp((char*)content, "my metalayer2", content_len) == 0);
   free(content);
 
-  // Check the usermeta
+  // Check the vlmetalayers
   uint8_t* content2;
-  int32_t content2_len = blosc2_get_usermeta(schunk, &content2);
-  mu_assert("ERROR: bad usermeta", strncmp((char*)content2, "testing the usermeta", 16) == 0);
-  mu_assert("ERROR: bad usermeta_len", content2_len == 16);
+  uint32_t content2_len;
+  blosc2_get_vlmetalayer(schunk, "vlmetalayer1", &content2, &content2_len);
+  mu_assert("ERROR: bad vlmetalayer content", strncmp((char*)content2, "testing the  vlmetalayers", content2_len) == 0);
+
+  blosc2_get_vlmetalayer(schunk, "vlmetalayer2", &content2, &content2_len);
+  mu_assert("ERROR: bad vlmetalayer content", strncmp((char*)content2, "vlmetalayers", content2_len) == 0);
   free(content2);
 
   /* Free resources */

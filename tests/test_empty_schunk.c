@@ -77,7 +77,7 @@ static char* test_schunk(void) {
 
   blosc2_update_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer2", sizeof("my metalayer2"));
   // Attach some user metadata into it
-  blosc2_update_usermeta(schunk, (uint8_t *) "testing the usermeta", 16, BLOSC2_CPARAMS_DEFAULTS);
+  blosc2_add_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) "testing the vlmetalayers", 16, NULL);
 
   /* Gather some info */
   nbytes = schunk->nbytes;
@@ -126,11 +126,13 @@ static char* test_schunk(void) {
     free(content);
   }
 
-  // Check the usermeta
+  // Check the vlmetalayers
   uint8_t* content2;
-  int32_t content2_len = blosc2_get_usermeta(schunk, &content2);
-  mu_assert("ERROR: bad usermeta", strncmp((char*)content2, "testing the usermeta", 16) == 0);
-  mu_assert("ERROR: bad usermeta_len", content2_len == 16);
+  uint32_t content2_len;
+  blosc2_get_vlmetalayer(schunk, "vlmetalayer", &content2, &content2_len);
+
+  mu_assert("ERROR: bad vlmetalayers", strncmp((char*)content2, "testing the vlmetalayers", 16) == 0);
+  mu_assert("ERROR: bad vlmetalayer_len", content2_len == 16);
   free(content2);
 
   /* Free resources */

@@ -274,6 +274,8 @@ enum {
   BLOSC2_ERROR_2GB_LIMIT = -22,       //!< Sizes larger than 2gb not supported
   BLOSC2_ERROR_SCHUNK_COPY = -23,     //!< Super-chunk copy failure
   BLOSC2_ERROR_FRAME_TYPE = -24,      //!< Wrong type for frame
+  BLOSC2_ERROR_FILE_TRUNCATE = -25,   //!< File truncate failure
+
 };
 
 /**
@@ -1019,6 +1021,9 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 #define BLOSC2_MAX_METALAYERS 16
 #define BLOSC2_METALAYER_NAME_MAXLEN 31
 
+#define BLOSC2_MAX_VLMETALAYERS BLOSC2_MAX_METALAYERS
+#define BLOSC2_VLMETALAYERS_NAME_MAXLEN BLOSC2_METALAYER_NAME_MAXLEN
+
 /**
  * @brief This struct is meant for holding storage parameters for a
  * for a blosc2 container, allowing to specify, for example, how to interpret
@@ -1026,7 +1031,7 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
  */
 typedef struct {
     bool contiguous;
-    //!< Whether the chunks are contiguous (frame) or sparse.
+    //!< Whether the chunks are contiguous or sparse.
     char* urlpath;
     //!< The path for persistent storage. If NULL, that means in-memory.
     blosc2_cparams* cparams;
@@ -1101,11 +1106,11 @@ typedef struct blosc2_schunk {
   struct blosc2_metalayer *metalayers[BLOSC2_MAX_METALAYERS];
   //!< The array of metalayers.
   int16_t nmetalayers;
-  //!< The number of metalayers in the frame
-  uint8_t* usermeta;
-  //<! The user-defined metadata.
-  int32_t usermeta_len;
-  //<! The (compressed) length of the user-defined metadata.
+  //!< The number of metalayers in the super-chunk
+  struct blosc2_metalayer *vlmetalayers[BLOSC2_MAX_VLMETALAYERS];
+  //<! The array of variable-length metalayers.
+  int16_t nvlmetalayers;
+  //!< The number of variable-length metalayers.
 } blosc2_schunk;
 
 /**
@@ -1430,39 +1435,61 @@ BLOSC_EXPORT int blosc2_get_metalayer(blosc2_schunk *schunk, const char *name, u
 
 
 /*********************************************************************
-  Usermeta functions.
+  Variable-length metalayers functions.
 *********************************************************************/
 
 /**
- * @brief Update content into a usermeta chunk.
+ * @brief Find whether the schunk has a variable-length metalayer or not.
  *
- * If the @p schunk has an attached frame, the later will be updated accordingly too.
+ * @param schunk The super-chunk from which the variable-length metalayer will be checked.
+ * @param name The name of the variable-length metalayer to be checked.
  *
- * @param schunk The super-chunk to add the usermeta chunk.
- * @param content The content of the usermeta chunk.
- * @param content_len The length of the content.
- * @param cparams The parameters for compressing the usermeta chunk.
- *
- * @note The previous content, if any, will be overwritten by the new content.
- * The user is responsible to keep the new content in sync with any previous content.
- *
- * @return If successful, return the number of compressed bytes that takes the content.
- * Else, a negative value.
+ * @return If successful, return the index of the variable-length metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_update_usermeta(blosc2_schunk *schunk, uint8_t *content,
-                                        int32_t content_len, blosc2_cparams cparams);
+BLOSC_EXPORT int blosc2_has_vlmetalayer(blosc2_schunk *schunk, const char *name);
 
-/* @brief Retrieve the usermeta chunk in a decompressed form.
+/**
+ * @brief Add content into a new variable-length metalayer.
  *
- * @param schunk The super-chunk to which add the usermeta chunk.
- * @param content The content of the usermeta chunk (output).
+ * @param schunk The super-chunk to which the variable-length metalayer should be added.
+ * @param name The name of the variable-length metalayer.
+ * @param content The content to be added.
+ * @param content_len The length of the content.
+ * @param cparams The parameters for compressing the variable-length metalayer content.
  *
- * @note The user is responsible to free the @p content buffer.
- *
- * @return If successful, return the size of the (decompressed) chunk.
- * Else, a negative value.
+ * @return If successful, the index of the new variable-length metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_get_usermeta(blosc2_schunk* schunk, uint8_t** content);
+BLOSC_EXPORT int blosc2_add_vlmetalayer(blosc2_schunk *schunk, const char *name,
+                                        uint8_t *content, uint32_t content_len, blosc2_cparams *cparams);
+
+/**
+ * @brief Update the content of an existing variable-length metalayer.
+ *
+ * @param schunk The super-chunk containing the variable-length metalayer.
+ * @param name The name of the variable-length metalayer to be updated.
+ * @param content The new content of the variable-length metalayer.
+ * @param content_len The length of the content.
+ *
+ * @return If successful, the index of the variable-length metalayer. Else, return a negative value.
+ */
+BLOSC_EXPORT int blosc2_update_vlmetalayer(blosc2_schunk *schunk, const char *name,
+                                           uint8_t *content, uint32_t content_len, blosc2_cparams *cparams);
+
+/**
+ * @brief Get the content out of a variable-length metalayer.
+ *
+ * @param schunk The super-chunk containing the variable-length metalayer.
+ * @param name The name of the variable-length metalayer.
+ * @param content The pointer where the content will be put.
+ * @param content_len The pointer where the length of the content will be put.
+ *
+ * @warning The @p **content receives a malloc'ed copy of the content.
+ * The user is responsible of freeing it.
+ *
+ * @return If successful, the index of the new variable-length metalayer. Else, return a negative value.
+ */
+BLOSC_EXPORT int blosc2_get_vlmetalayer(blosc2_schunk *schunk, const char *name,
+                                        uint8_t **content, uint32_t *content_len);
 
 
 /*********************************************************************

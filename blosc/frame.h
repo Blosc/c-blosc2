@@ -30,8 +30,8 @@
 #define FRAME_CHUNKSIZE (FRAME_TYPESIZE + 4 + 1)  // 53
 #define FRAME_NTHREADS_C (FRAME_CHUNKSIZE + 4 + 1)  // 58
 #define FRAME_NTHREADS_D (FRAME_NTHREADS_C + 2 + 1)  // 61
-#define FRAME_HAS_USERMETA (FRAME_NTHREADS_D + 2)  // 63
-#define FRAME_FILTER_PIPELINE (FRAME_HAS_USERMETA + 1 + 1) // 65
+#define FRAME_HAS_VLMETALAYERS (FRAME_NTHREADS_D + 2)  // 63
+#define FRAME_FILTER_PIPELINE (FRAME_HAS_VLMETALAYERS + 1 + 1) // 65
 #define FRAME_HEADER_MINLEN (FRAME_FILTER_PIPELINE + 1 + 16)  // 82 <- minimum length
 #define FRAME_METALAYERS (FRAME_HEADER_MINLEN)  // 82
 #define FRAME_IDX_SIZE (FRAME_METALAYERS + 1 + 1)  // 84
@@ -41,10 +41,9 @@
 #define FRAME_TRAILER_VERSION_BETA2 (0U)  // for beta.2 and former
 #define FRAME_TRAILER_VERSION (1U)        // can be up to 127
 
-#define FRAME_TRAILER_USERMETA_LEN_OFFSET (3)  // offset to usermeta length
-#define FRAME_TRAILER_USERMETA_OFFSET (7)  // offset to usermeta chunk
-#define FRAME_TRAILER_MINLEN (30)  // minimum length for the trailer (msgpack overhead)
+#define FRAME_TRAILER_MINLEN (25)  // minimum length for the trailer (msgpack overhead)
 #define FRAME_TRAILER_LEN_OFFSET (22)  // offset to trailer length (counting from the end)
+#define FRAME_TRAILER_VLMETALAYERS (2)
 
 
 typedef struct {
