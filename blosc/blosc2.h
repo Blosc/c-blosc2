@@ -1373,6 +1373,16 @@ BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams
  */
 BLOSC_EXPORT int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order);
 
+/**
+ * @brief Get the length (in bytes) of the internal frame of the super-chunk.
+ *
+ * @param schunk The super-chunk whose chunk offsets are to be reordered.
+ *
+ * @return The length (in bytes) of the internal frame.
+ * 0 means that there is not such an attached frame.
+ */
+BLOSC_EXPORT int64_t blosc2_schunk_frame_len(blosc2_schunk* schunk);
+
 
 /*********************************************************************
   Functions related with fixed-length metalayers.
