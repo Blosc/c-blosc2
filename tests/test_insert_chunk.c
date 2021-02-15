@@ -33,13 +33,14 @@ typedef struct {
   int ninsertions;
 } test_ndata;
 
-test_ndata tndata[] = {{10, 1},
-                       {5,  3},
-                       {33, 5},
-                       {1,  0},
-                       {12, 24},
-                       {0, 3},
-                       {0, 0}
+test_ndata tndata[] = {
+                        {10, 1},
+                       //{5,  3},
+                       //{33, 5},
+                       //{1,  0},
+                       //{12, 24},
+                       //{0, 3},
+                      // {0, 0}
 };
 
 typedef struct {
@@ -48,10 +49,10 @@ typedef struct {
 }test_storage;
 
 test_storage tstorage[] = {
-    {false, NULL},  // memory - schunk
-    {true, NULL},  // memory - cframe
-    {true, "test_insert_chunk.b2frame"}, // disk - cframe
-    {false, "test_insert_chunk_s.b2frame"}, // disk - sframe
+   // {false, NULL},  // memory - schunk
+   // {true, NULL},  // memory - cframe
+   // {true, "test_insert_chunk.b2frame"}, // disk - cframe
+    {false, "/home/martaiborra/test_insert_chunk_s.b2frame"}, // disk - sframe
 };
 
 bool tcopy[] = {
@@ -82,6 +83,9 @@ static char* test_insert_chunk(void) {
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .urlpath=tdata.urlpath, .contiguous=tdata.contiguous};
+  if (!storage.contiguous && storage.urlpath != NULL) {
+    blosc2_remove_dir(storage.urlpath);
+  }
   schunk = blosc2_schunk_new(storage);
 
   // Feed it with data
@@ -106,6 +110,7 @@ static char* test_insert_chunk(void) {
 
     // Insert in a random position
     int pos = rand() % (schunk->nchunks + 1);
+    printf("pos %d",pos);
     int _nchunks = blosc2_schunk_insert_chunk(schunk, pos, chunk, tdata.copy);
     mu_assert("ERROR: chunk cannot be inserted correctly", _nchunks > 0);
 
@@ -126,7 +131,11 @@ static char* test_insert_chunk(void) {
   // Check that the chunks have been decompressed correctly
   for (int nchunk = 0; nchunk < schunk->nchunks; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
+    if(dsize < 0) {
+      printf(" nchunk %d", nchunk);
+    }
     mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
+
   }
 
 

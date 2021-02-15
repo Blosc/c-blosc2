@@ -2656,13 +2656,9 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int nchu
   uint8_t* src;
   bool needs_free;
   int chunk_cbytes;
-  if (frame->sframe) {
-    chunk_cbytes = frame_get_chunk(frame, nchunk, &src, &needs_free);
-  }
-  else {
-    // Use a lazychunk here in order to do a potential parallel read.
-    chunk_cbytes = frame_get_lazychunk(frame, nchunk, &src, &needs_free);
-  }
+
+  // Use a lazychunk here in order to do a potential parallel read.
+  chunk_cbytes = frame_get_lazychunk(frame, nchunk, &src, &needs_free);
   if (chunk_cbytes < 0) {
     BLOSC_TRACE_ERROR("Cannot get the chunk in position %d.", nchunk);
     return BLOSC2_ERROR_DATA;
