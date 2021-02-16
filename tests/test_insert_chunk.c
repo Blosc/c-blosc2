@@ -82,9 +82,6 @@ static char* test_insert_chunk(void) {
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .urlpath=tdata.urlpath, .contiguous=tdata.contiguous};
-  if (!storage.contiguous && storage.urlpath != NULL) {
-    blosc2_remove_dir(storage.urlpath);
-  }
   schunk = blosc2_schunk_new(&storage);
 
   // Feed it with data
