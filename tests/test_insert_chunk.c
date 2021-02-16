@@ -33,14 +33,13 @@ typedef struct {
   int ninsertions;
 } test_ndata;
 
-test_ndata tndata[] = {
-                        {10, 1},
-                       //{5,  3},
-                       //{33, 5},
-                       //{1,  0},
-                       //{12, 24},
-                       //{0, 3},
-                      // {0, 0}
+test_ndata tndata[] = {{10, 1},
+                       {5,  3},
+                       {33, 5},
+                       {1,  0},
+                       {12, 24},
+                       {0, 3},
+                       {0, 0}
 };
 
 typedef struct {
@@ -49,9 +48,9 @@ typedef struct {
 }test_storage;
 
 test_storage tstorage[] = {
-   // {false, NULL},  // memory - schunk
-   // {true, NULL},  // memory - cframe
-   // {true, "test_insert_chunk.b2frame"}, // disk - cframe
+    {false, NULL},  // memory - schunk
+    {true, NULL},  // memory - cframe
+    {true, "test_insert_chunk.b2frame"}, // disk - cframe
     {false, "/home/martaiborra/test_insert_chunk_s.b2frame"}, // disk - sframe
 };
 

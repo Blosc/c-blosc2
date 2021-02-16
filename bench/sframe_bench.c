@@ -236,8 +236,8 @@ void test_create_sframe_frame(char* operation) {
   /* Create a frame container */
   cparams.typesize = sizeof(int32_t);
 
-  cparams.nthreads = 1;
-  dparams.nthreads = 1;
+  cparams.nthreads = 2;
+  dparams.nthreads = 2;
 
   blosc2_storage storage = {.contiguous=false, .urlpath="dir.b2frame", .cparams=&cparams, .dparams=&dparams};
   schunk_sframe = blosc2_schunk_new(&storage);

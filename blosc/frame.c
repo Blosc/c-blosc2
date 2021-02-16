@@ -1964,8 +1964,14 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     *blosc2_flags |= 0x08U;
 
     // Add the trailer (currently, nchunk + offset + block_csizes)
-    *(int32_t*)(*chunk + trailer_offset) = nchunk;
-    *(int64_t*)(*chunk + trailer_offset + sizeof(int32_t)) = header_len + offset;
+    if (frame->sframe) {
+      *(int32_t*)(*chunk + trailer_offset) = offset;
+      *(int64_t*)(*chunk + trailer_offset + sizeof(int32_t)) = offset;
+    }
+    else {
+      *(int32_t*)(*chunk + trailer_offset) = nchunk;
+      *(int64_t*)(*chunk + trailer_offset + sizeof(int32_t)) = header_len + offset;
+    }
 
     int32_t* block_csizes = malloc(nblocks * sizeof(int32_t));
 
