@@ -1123,7 +1123,7 @@ typedef struct blosc2_schunk {
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_new(blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage);
 
 /**
  * @brief Create a non-initialized super-chunk.
@@ -1136,7 +1136,7 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_new(blosc2_storage storage);
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_empty(int nchunks, blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_empty(int nchunks, blosc2_storage *storage);
 
 
 /**
@@ -1147,7 +1147,7 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_empty(int nchunks, blosc2_storage stor
  *
  * @return The new super-chunk.
  */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage storage);
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage);
 
 /**
  * @brief Create a super-chunk out of a contiguous frame buffer.
@@ -1373,9 +1373,19 @@ BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams
  */
 BLOSC_EXPORT int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order);
 
+/**
+ * @brief Get the length (in bytes) of the internal frame of the super-chunk.
+ *
+ * @param schunk The super-chunk whose chunk offsets are to be reordered.
+ *
+ * @return The length (in bytes) of the internal frame.
+ * 0 means that there is not such an attached frame.
+ */
+BLOSC_EXPORT int64_t blosc2_schunk_frame_len(blosc2_schunk* schunk);
+
 
 /*********************************************************************
-  Functions related with metalayers.
+  Functions related with fixed-length metalayers.
 *********************************************************************/
 
 /**
@@ -1386,7 +1396,7 @@ BLOSC_EXPORT int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offse
  *
  * @return If successful, return the index of the metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_has_metalayer(blosc2_schunk *schunk, const char *name);
+BLOSC_EXPORT int blosc2_meta_exists(blosc2_schunk *schunk, const char *name);
 
 /**
  * @brief Add content into a new metalayer.
@@ -1398,8 +1408,8 @@ BLOSC_EXPORT int blosc2_has_metalayer(blosc2_schunk *schunk, const char *name);
  *
  * @return If successful, the index of the new metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_add_metalayer(blosc2_schunk *schunk, const char *name, uint8_t *content,
-                                      uint32_t content_len);
+BLOSC_EXPORT int blosc2_meta_add(blosc2_schunk *schunk, const char *name, uint8_t *content,
+                                 uint32_t content_len);
 
 /**
  * @brief Update the content of an existing metalayer.
@@ -1409,13 +1419,13 @@ BLOSC_EXPORT int blosc2_add_metalayer(blosc2_schunk *schunk, const char *name, u
  * @param content The new content of the metalayer.
  * @param content_len The length of the content.
  *
- * @note Contrarily to #blosc2_add_metalayer the updates to metalayers
+ * @note Contrarily to #blosc2_meta_add the updates to metalayers
  * are automatically serialized into a possible attached frame.
  *
  * @return If successful, the index of the metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_update_metalayer(blosc2_schunk *schunk, const char *name, uint8_t *content,
-                                         uint32_t content_len);
+BLOSC_EXPORT int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content,
+                                    uint32_t content_len);
 
 /**
  * @brief Get the content out of a metalayer.
@@ -1430,8 +1440,8 @@ BLOSC_EXPORT int blosc2_update_metalayer(blosc2_schunk *schunk, const char *name
  *
  * @return If successful, the index of the new metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_get_metalayer(blosc2_schunk *schunk, const char *name, uint8_t **content,
-                                      uint32_t *content_len);
+BLOSC_EXPORT int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
+                                 uint32_t *content_len);
 
 
 /*********************************************************************
@@ -1446,7 +1456,7 @@ BLOSC_EXPORT int blosc2_get_metalayer(blosc2_schunk *schunk, const char *name, u
  *
  * @return If successful, return the index of the variable-length metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_has_vlmetalayer(blosc2_schunk *schunk, const char *name);
+BLOSC_EXPORT int blosc2_vlmeta_exists(blosc2_schunk *schunk, const char *name);
 
 /**
  * @brief Add content into a new variable-length metalayer.
@@ -1459,8 +1469,8 @@ BLOSC_EXPORT int blosc2_has_vlmetalayer(blosc2_schunk *schunk, const char *name)
  *
  * @return If successful, the index of the new variable-length metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_add_vlmetalayer(blosc2_schunk *schunk, const char *name,
-                                        uint8_t *content, uint32_t content_len, blosc2_cparams *cparams);
+BLOSC_EXPORT int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name,
+                                   uint8_t *content, uint32_t content_len, blosc2_cparams *cparams);
 
 /**
  * @brief Update the content of an existing variable-length metalayer.
@@ -1472,8 +1482,8 @@ BLOSC_EXPORT int blosc2_add_vlmetalayer(blosc2_schunk *schunk, const char *name,
  *
  * @return If successful, the index of the variable-length metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_update_vlmetalayer(blosc2_schunk *schunk, const char *name,
-                                           uint8_t *content, uint32_t content_len, blosc2_cparams *cparams);
+BLOSC_EXPORT int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name,
+                                      uint8_t *content, uint32_t content_len, blosc2_cparams *cparams);
 
 /**
  * @brief Get the content out of a variable-length metalayer.
@@ -1488,8 +1498,8 @@ BLOSC_EXPORT int blosc2_update_vlmetalayer(blosc2_schunk *schunk, const char *na
  *
  * @return If successful, the index of the new variable-length metalayer. Else, return a negative value.
  */
-BLOSC_EXPORT int blosc2_get_vlmetalayer(blosc2_schunk *schunk, const char *name,
-                                        uint8_t **content, uint32_t *content_len);
+BLOSC_EXPORT int blosc2_vlmeta_get(blosc2_schunk *schunk, const char *name,
+                                   uint8_t **content, uint32_t *content_len);
 
 
 /*********************************************************************

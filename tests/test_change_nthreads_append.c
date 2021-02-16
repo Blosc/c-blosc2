@@ -46,7 +46,7 @@ static char* all_tests(void) {
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
 
   struct blosc2_context_s * cctx = schunk->cctx;
   blosc_set_timestamp(&last);

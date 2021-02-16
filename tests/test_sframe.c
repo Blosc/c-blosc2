@@ -69,7 +69,7 @@ static char* test_sframe(void) {
   /* Remove directory */
   blosc2_remove_dir(storage.urlpath);
 
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
   mu_assert("blosc2_schunk_new() failed", schunk != NULL);
   char* content = "This is a pretty long string with a good number of chars";
   char* content2 = "This is a pretty long string with a good number of chars; longer than content";
@@ -80,13 +80,13 @@ static char* test_sframe(void) {
   size_t content_len3 = strlen(content3);
 
   if (metalayers) {
-    blosc2_add_metalayer(schunk, "metalayer1", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
-    blosc2_add_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
+    blosc2_meta_add(schunk, "metalayer1", (uint8_t *) "my metalayer1", sizeof("my metalayer1"));
+    blosc2_meta_add(schunk, "metalayer2", (uint8_t *) "my metalayer1", sizeof("my metalayer1"));
   }
 
   if (vlmetalayers) {
-    blosc2_add_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) content, (int32_t) content_len, NULL);
-    blosc2_add_vlmetalayer(schunk, "vlmetalayer2", (uint8_t *) content2, (int32_t) content_len2, NULL);
+    blosc2_vlmeta_add(schunk, "vlmetalayer", (uint8_t *) content, (int32_t) content_len, NULL);
+    blosc2_vlmeta_add(schunk, "vlmetalayer2", (uint8_t *) content2, (int32_t) content_len2, NULL);
   }
 
   if (free_new) {
@@ -98,12 +98,12 @@ static char* test_sframe(void) {
   if (metalayers) {
     uint8_t* _content;
     uint32_t _content_len;
-    blosc2_get_metalayer(schunk, "metalayer1", &_content, &_content_len);
+    blosc2_meta_get(schunk, "metalayer1", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
     if (_content != NULL) {
       free(_content);
     }
-    blosc2_get_metalayer(schunk, "metalayer2", &_content, &_content_len);
+    blosc2_meta_get(schunk, "metalayer2", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
     if (_content != NULL) {
       free(_content);
@@ -112,11 +112,11 @@ static char* test_sframe(void) {
 
   if (vlmetalayers) {
     uint32_t content_len_;
-    blosc2_get_vlmetalayer(schunk, "vlmetalayer", &content_, &content_len_);
+    blosc2_vlmeta_get(schunk, "vlmetalayer", &content_, &content_len_);
     mu_assert("ERROR: bad vlmetalayers length in frame", (size_t) content_len_ == content_len);
     mu_assert("ERROR: bad vlmetalayers data in frame", strncmp((char*)content_, content, content_len) == 0);
     free(content_);
-    blosc2_update_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) content2, (int32_t) content_len2, NULL);
+    blosc2_vlmeta_update(schunk, "vlmetalayer", (uint8_t *) content2, (int32_t) content_len2, NULL);
   }
 
   // Feed it with data
@@ -133,26 +133,26 @@ static char* test_sframe(void) {
   if (metalayers) {
     uint8_t* _content;
     uint32_t _content_len;
-    blosc2_get_metalayer(schunk, "metalayer1", &_content, &_content_len);
+    blosc2_meta_get(schunk, "metalayer1", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
     if (_content != NULL) {
       free(_content);
     }
-    blosc2_get_metalayer(schunk, "metalayer2", &_content, &_content_len);
+    blosc2_meta_get(schunk, "metalayer2", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
     if (_content != NULL) {
       free(_content);
     }
-    blosc2_update_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer2", sizeof("my metalayer2"));
+    blosc2_meta_update(schunk, "metalayer2", (uint8_t *) "my metalayer2", sizeof("my metalayer2"));
   }
 
   if (vlmetalayers) {
     uint32_t content_len_;
-    blosc2_get_vlmetalayer(schunk, "vlmetalayer", &content_, &content_len_);
+    blosc2_vlmeta_get(schunk, "vlmetalayer", &content_, &content_len_);
     mu_assert("ERROR: bad vlmetalayers length in frame", (size_t) content_len_ == content_len2);
     mu_assert("ERROR: bad vlmetalayers data in frame", strncmp((char*)content_, content2, content_len2) == 0);
     free(content_);
-    blosc2_update_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) content3, (int32_t) content_len3, NULL);
+    blosc2_vlmeta_update(schunk, "vlmetalayer", (uint8_t *) content3, (int32_t) content_len3, NULL);
   }
 
   if (free_new) {
@@ -180,12 +180,12 @@ static char* test_sframe(void) {
   if (metalayers) {
     uint8_t* _content;
     uint32_t _content_len;
-    blosc2_get_metalayer(schunk, "metalayer1", &_content, &_content_len);
+    blosc2_meta_get(schunk, "metalayer1", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
     if (_content != NULL) {
       free(_content);
     }
-    blosc2_get_metalayer(schunk, "metalayer2", &_content, &_content_len);
+    blosc2_meta_get(schunk, "metalayer2", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer2", _content_len) == 0);
     if (_content != NULL) {
       free(_content);
@@ -194,7 +194,7 @@ static char* test_sframe(void) {
 
   if (vlmetalayers) {
     uint32_t content_len_;
-    blosc2_get_vlmetalayer(schunk, "vlmetalayer", &content_, &content_len_);
+    blosc2_vlmeta_get(schunk, "vlmetalayer", &content_, &content_len_);
     mu_assert("ERROR: bad vlmetalayers length in frame", (size_t) content_len_ == content_len3);
     mu_assert("ERROR: bad vlmetalayers data in frame", strncmp((char*)content_, content3, content_len3) == 0);
     free(content_);
@@ -233,7 +233,7 @@ static char* test_sframe_simple(void) {
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.contiguous=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
   blosc2_remove_dir(storage.urlpath);
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
   mu_assert("Error in creating schunk", schunk != NULL);
 
   // Feed it with data

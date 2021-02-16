@@ -37,11 +37,11 @@ static char* test_schunk(void) {
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
-  schunk = blosc2_schunk_empty(nchunks, storage);
+  schunk = blosc2_schunk_empty(nchunks, &storage);
 
   // Add a couple of metalayers
-  blosc2_add_metalayer(schunk, "metalayer1", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
-  blosc2_add_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
+  blosc2_meta_add(schunk, "metalayer1", (uint8_t *) "my metalayer1", sizeof("my metalayer1"));
+  blosc2_meta_add(schunk, "metalayer2", (uint8_t *) "my metalayer1", sizeof("my metalayer1"));
 
   bool needs_free;
   int32_t datasize = sizeof(int32_t) * CHUNKSIZE;
@@ -75,9 +75,9 @@ static char* test_schunk(void) {
     }
   }
 
-  blosc2_update_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer2", sizeof("my metalayer2"));
+  blosc2_meta_update(schunk, "metalayer2", (uint8_t *) "my metalayer2", sizeof("my metalayer2"));
   // Attach some user metadata into it
-  blosc2_add_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) "testing the vlmetalayers", 16, NULL);
+  blosc2_vlmeta_add(schunk, "vlmetalayer", (uint8_t *) "testing the vlmetalayers", 16, NULL);
 
   /* Gather some info */
   nbytes = schunk->nbytes;
@@ -115,12 +115,12 @@ static char* test_schunk(void) {
   // metalayers
   uint8_t* content;
   uint32_t content_len;
-  blosc2_get_metalayer(schunk, "metalayer1", &content, &content_len);
+  blosc2_meta_get(schunk, "metalayer1", &content, &content_len);
   mu_assert("ERROR: bad metalayer content", strncmp((char*)content, "my metalayer1", content_len) == 0);
   if (content != NULL) {
     free(content);
   }
-  blosc2_get_metalayer(schunk, "metalayer2", &content, &content_len);
+  blosc2_meta_get(schunk, "metalayer2", &content, &content_len);
   mu_assert("ERROR: bad metalayer content", strncmp((char*)content, "my metalayer2", content_len) == 0);
   if (content != NULL) {
     free(content);
@@ -129,7 +129,7 @@ static char* test_schunk(void) {
   // Check the vlmetalayers
   uint8_t* content2;
   uint32_t content2_len;
-  blosc2_get_vlmetalayer(schunk, "vlmetalayer", &content2, &content2_len);
+  blosc2_vlmeta_get(schunk, "vlmetalayer", &content2, &content2_len);
 
   mu_assert("ERROR: bad vlmetalayers", strncmp((char*)content2, "testing the vlmetalayers", 16) == 0);
   mu_assert("ERROR: bad vlmetalayer_len", content2_len == 16);

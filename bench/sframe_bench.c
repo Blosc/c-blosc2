@@ -240,10 +240,11 @@ void test_create_sframe_frame(char* operation) {
   dparams.nthreads = 1;
 
   blosc2_storage storage = {.contiguous=false, .urlpath="dir.b2frame", .cparams=&cparams, .dparams=&dparams};
-  schunk_sframe = blosc2_schunk_new(storage);
+  schunk_sframe = blosc2_schunk_new(&storage);
+
 
   blosc2_storage storage2 = {.contiguous=true, .urlpath="test_cframe.b2frame", .cparams=&cparams, .dparams=&dparams};
-  schunk_cframe = blosc2_schunk_new(storage2);
+  schunk_cframe = blosc2_schunk_new(&storage2);
 
   printf("Test comparation frame vs sframe with %d chunks.\n", nchunks);
 

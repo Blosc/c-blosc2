@@ -54,32 +54,33 @@ int main(void) {
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.contiguous=true, .urlpath="vlmetalaters.b2frame", .cparams=&cparams, .dparams=&dparams};
-  blosc2_schunk* schunk = blosc2_schunk_new(storage);
+  blosc2_schunk* schunk = blosc2_schunk_new(&storage);
 
 
   // Add a metalayer
-  int vlmetalater_len = blosc2_add_metalayer(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 10);
+  int vlmetalater_len = blosc2_meta_add(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 10);
   if (vlmetalater_len < 0) {
     printf("Cannot write vlmetalayers chunk");
     return vlmetalater_len;
   }
 
   // Add some vlmetalayers data
-  vlmetalater_len = blosc2_add_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 32, NULL);
+  vlmetalater_len = blosc2_vlmeta_add(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 32, NULL);
   if (vlmetalater_len < 0) {
     printf("Cannot write vlmetalayers chunk");
     return vlmetalater_len;
   }
 
   // Add some vlmetalayers data
-  vlmetalater_len = blosc2_add_vlmetalayer(schunk, "vlmetalayer2", (uint8_t *) "This is a content...", 10, NULL);
+  vlmetalater_len = blosc2_vlmeta_add(schunk, "vlmetalayer2", (uint8_t *) "This is a content...", 10, NULL);
   if (vlmetalater_len < 0) {
     printf("Cannot write vlmetalayers chunk");
     return vlmetalater_len;
   }
 
-  vlmetalater_len = blosc2_update_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) "This is a another vlmetalayer content...", 20,
-                                    NULL);
+  vlmetalater_len = blosc2_vlmeta_update(schunk, "vlmetalayer", (uint8_t *) "This is a another vlmetalayer content...",
+                                         20,
+                                         NULL);
   if (vlmetalater_len < 0) {
     printf("Cannot write vlmetalayers chunk");
     return vlmetalater_len;

@@ -38,7 +38,7 @@ int main(void) {
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
 
   for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     for (int i = 0; i < SIZE; i++) {

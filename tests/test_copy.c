@@ -112,7 +112,7 @@ CUTEST_TEST_TEST(copy) {
 
   /* Create a super-chunk container */
   blosc2_storage storage = {.cparams=&data->cparams, .contiguous=backend.contiguous, .urlpath = backend.urlpath};
-  blosc2_schunk *schunk = blosc2_schunk_new(storage);
+  blosc2_schunk *schunk = blosc2_schunk_new(&storage);
   CUTEST_ASSERT("Error creating a schunk", schunk != NULL);
 
   char* meta_name = "test_copy";
@@ -120,10 +120,10 @@ CUTEST_TEST_TEST(copy) {
   int64_t meta_content = -66;
 
   if (metalayers) {
-    blosc2_add_metalayer(schunk, meta_name, (uint8_t *) &meta_content, meta_content_len);
+    blosc2_meta_add(schunk, meta_name, (uint8_t *) &meta_content, meta_content_len);
   }
   if (vlmetalayers) {
-    blosc2_add_vlmetalayer(schunk, "vlmetalayer", (uint8_t *) &meta_content, meta_content_len, NULL);
+    blosc2_vlmeta_add(schunk, "vlmetalayer", (uint8_t *) &meta_content, meta_content_len, NULL);
   }
 
   /* Append the chunks */
@@ -135,20 +135,20 @@ CUTEST_TEST_TEST(copy) {
   /* Copy schunk */
   blosc2_storage storage2 = {.contiguous=backend2.contiguous, .urlpath = backend2.urlpath};
   storage2.cparams = different_cparams ? &data->cparams2 : &data->cparams;
-  blosc2_schunk * schunk_copy = blosc2_schunk_copy(schunk, storage2);
+  blosc2_schunk * schunk_copy = blosc2_schunk_copy(schunk, &storage2);
   CUTEST_ASSERT("Error copying a schunk", schunk_copy != NULL);
 
   if (metalayers) {
     int64_t *content = malloc(meta_content_len);
     uint32_t content_len;
-    blosc2_get_metalayer(schunk_copy, meta_name,  (uint8_t **) &content, &content_len);
+    blosc2_meta_get(schunk_copy, meta_name, (uint8_t **) &content, &content_len);
     CUTEST_ASSERT("Metalayers are not equals.", *content == meta_content);
     free(content);
   }
   if (vlmetalayers) {
     uint32_t content_len;
     int64_t *content;
-    blosc2_get_vlmetalayer(schunk_copy, "vlmetalayer", (uint8_t **) &content, &content_len);
+    blosc2_vlmeta_get(schunk_copy, "vlmetalayer", (uint8_t **) &content, &content_len);
     CUTEST_ASSERT("Variable-length metalayers are not equal.", *content == meta_content);
     free(content);
   }

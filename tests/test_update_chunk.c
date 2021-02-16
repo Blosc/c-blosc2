@@ -77,10 +77,7 @@ static char* test_update_chunk(void) {
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .urlpath = tdata.urlpath,
                             .contiguous = tdata.contiguous};
-  if (!storage.contiguous && storage.urlpath != NULL) {
-    blosc2_remove_dir(storage.urlpath);
-  }
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
 
   // Feed it with data
   for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {

@@ -62,7 +62,7 @@ int main(void) {
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
-  blosc2_schunk* schunk = blosc2_schunk_new(storage);
+  blosc2_schunk* schunk = blosc2_schunk_new(&storage);
 
   // Add some data
   blosc_set_timestamp(&last);
@@ -80,7 +80,7 @@ int main(void) {
   for (uint32_t j = 0; j < content_len; ++j) {
     content[j] = (uint8_t) j;
   }
-  int umlen = blosc2_add_vlmetalayer(schunk, "vlmetalayer", content, content_len, NULL);
+  int umlen = blosc2_vlmeta_add(schunk, "vlmetalayer", content, content_len, NULL);
   free(content);
   if (umlen < 0) {
     printf("Cannot write vlmetalayers chunk");
@@ -98,7 +98,7 @@ int main(void) {
          ttotal, nbytes / (ttotal * MB));
   uint8_t* vlmetalayer;
 
-  blosc2_get_vlmetalayer(schunk, "vlmetalayer", &vlmetalayer, &content_len);
+  blosc2_vlmeta_get(schunk, "vlmetalayer", &vlmetalayer, &content_len);
   printf("Variable-length metalayer length: %d\n", content_len);
   for (int j = 0; j < content_len; ++j) {
     printf("%3d", vlmetalayer[j]);
@@ -176,13 +176,13 @@ int main(void) {
   }
   printf("Successful roundtrip schunk <-> frame <-> fileframe !\n");
 
-  blosc2_get_vlmetalayer(schunk1, "vlmetalayer", &vlmetalayer, &content_len);
+  blosc2_vlmeta_get(schunk1, "vlmetalayer", &vlmetalayer, &content_len);
   for (int j = 0; j < content_len; ++j) {
     printf("%3d", vlmetalayer[j]);
   }
   printf("\n");
   free(vlmetalayer);
-  blosc2_get_vlmetalayer(schunk2, "vlmetalayer", &vlmetalayer, &content_len);
+  blosc2_vlmeta_get(schunk2, "vlmetalayer", &vlmetalayer, &content_len);
   for (int j = 0; j < content_len; ++j) {
     printf("%3d", vlmetalayer[j]);
   }

@@ -38,11 +38,11 @@ static char* test_schunk(void) {
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
 
   // Add a couple of metalayers
-  blosc2_add_metalayer(schunk, "metalayer1", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
-  blosc2_add_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer1", sizeof("my metalayer1"));
+  blosc2_meta_add(schunk, "metalayer1", (uint8_t *) "my metalayer1", sizeof("my metalayer1"));
+  blosc2_meta_add(schunk, "metalayer2", (uint8_t *) "my metalayer1", sizeof("my metalayer1"));
 
   // Feed it with data
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
@@ -53,11 +53,11 @@ static char* test_schunk(void) {
     mu_assert("ERROR: bad append in frame", nchunks_ > 0);
   }
 
-  blosc2_update_metalayer(schunk, "metalayer2", (uint8_t*)"my metalayer2", sizeof("my metalayer2"));
+  blosc2_meta_update(schunk, "metalayer2", (uint8_t *) "my metalayer2", sizeof("my metalayer2"));
 
   // Attach some user metadata into it
-  blosc2_add_vlmetalayer(schunk, "vlmetalayer1", (uint8_t *) "testing the vlmetalayers", 23, NULL);
-  blosc2_add_vlmetalayer(schunk, "vlmetalayer2", (uint8_t *) "vlmetalayers", 11, NULL);
+  blosc2_vlmeta_add(schunk, "vlmetalayer1", (uint8_t *) "testing the vlmetalayers", 23, NULL);
+  blosc2_vlmeta_add(schunk, "vlmetalayer2", (uint8_t *) "vlmetalayers", 11, NULL);
 
   /* Gather some info */
   nbytes = schunk->nbytes;
@@ -94,25 +94,25 @@ static char* test_schunk(void) {
     }
   }
   // update metalayer
-  blosc2_update_vlmetalayer(schunk, "vlmetalayer1", (uint8_t *) "testing the  vlmetalayers", 24, NULL);
+  blosc2_vlmeta_update(schunk, "vlmetalayer1", (uint8_t *) "testing the  vlmetalayers", 24, NULL);
 
   // metalayers
   uint8_t* content;
   uint32_t content_len;
-  blosc2_get_metalayer(schunk, "metalayer1", &content, &content_len);
+  blosc2_meta_get(schunk, "metalayer1", &content, &content_len);
   mu_assert("ERROR: bad metalayer content", strncmp((char*)content, "my metalayer1", content_len) == 0);
   free(content);
-  blosc2_get_metalayer(schunk, "metalayer2", &content, &content_len);
+  blosc2_meta_get(schunk, "metalayer2", &content, &content_len);
   mu_assert("ERROR: bad metalayer content", strncmp((char*)content, "my metalayer2", content_len) == 0);
   free(content);
 
   // Check the vlmetalayers
   uint8_t* content2;
   uint32_t content2_len;
-  blosc2_get_vlmetalayer(schunk, "vlmetalayer1", &content2, &content2_len);
+  blosc2_vlmeta_get(schunk, "vlmetalayer1", &content2, &content2_len);
   mu_assert("ERROR: bad vlmetalayer content", strncmp((char*)content2, "testing the  vlmetalayers", content2_len) == 0);
 
-  blosc2_get_vlmetalayer(schunk, "vlmetalayer2", &content2, &content2_len);
+  blosc2_vlmeta_get(schunk, "vlmetalayer2", &content2, &content2_len);
   mu_assert("ERROR: bad vlmetalayer content", strncmp((char*)content2, "vlmetalayers", content2_len) == 0);
   free(content2);
 

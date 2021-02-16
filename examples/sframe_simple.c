@@ -49,7 +49,7 @@ int main(void) {
   /* Remove directory */
   blosc2_remove_dir(storage.urlpath);
 
-  schunk = blosc2_schunk_new(storage);
+  schunk = blosc2_schunk_new(&storage);
 
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
