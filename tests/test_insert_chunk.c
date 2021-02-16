@@ -51,7 +51,7 @@ test_storage tstorage[] = {
     {false, NULL},  // memory - schunk
     {true, NULL},  // memory - cframe
     {true, "test_insert_chunk.b2frame"}, // disk - cframe
-    {false, "/home/martaiborra/test_insert_chunk_s.b2frame"}, // disk - sframe
+    {false, "test_insert_chunk_s.b2frame"}, // disk - sframe
 };
 
 bool tcopy[] = {
@@ -82,6 +82,9 @@ static char* test_insert_chunk(void) {
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .urlpath=tdata.urlpath, .contiguous=tdata.contiguous};
+  if (!storage.contiguous && storage.urlpath != NULL) {
+    blosc2_remove_dir(storage.urlpath);
+  }
   schunk = blosc2_schunk_new(&storage);
 
   // Feed it with data
