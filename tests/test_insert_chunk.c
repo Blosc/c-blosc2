@@ -106,7 +106,6 @@ static char* test_insert_chunk(void) {
 
     // Insert in a random position
     int pos = rand() % (schunk->nchunks + 1);
-    printf("pos %d",pos);
     int _nchunks = blosc2_schunk_insert_chunk(schunk, pos, chunk, tdata.copy);
     mu_assert("ERROR: chunk cannot be inserted correctly", _nchunks > 0);
 
@@ -127,11 +126,7 @@ static char* test_insert_chunk(void) {
   // Check that the chunks have been decompressed correctly
   for (int nchunk = 0; nchunk < schunk->nchunks; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
-    if(dsize < 0) {
-      printf(" nchunk %d", nchunk);
-    }
     mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
-
   }
 
 
