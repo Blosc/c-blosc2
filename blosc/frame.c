@@ -1419,6 +1419,9 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
       return BLOSC2_ERROR_READ_BUFFER;
     }
     big_store(&content_len, content_marker + 1, sizeof(content_len));
+    if (content_len < 0) {
+      return BLOSC2_ERROR_DATA;
+    }
     metalayer->content_len = content_len;
 
     // Finally, read the content
