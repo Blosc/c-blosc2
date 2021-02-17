@@ -915,12 +915,7 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   bool needs_free = false;
   for (int i = 0; i < nchunks; i++) {
     uint8_t* data_chunk;
-   /* if (frame->sframe) {
-      frame_get_lazychunk(frame, i, &data_chunk, &needs_free);
-    }
-    else {*/
-      data_chunk = schunk->data[i];
-   // }
+    data_chunk = schunk->data[i];
     int32_t chunk_cbytes = sw32_(data_chunk + BLOSC2_CHUNK_CBYTES);
     data_tmp[i] = coffset;
     coffset += chunk_cbytes;
