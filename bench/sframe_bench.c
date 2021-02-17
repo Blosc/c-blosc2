@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "blosc2.h"
+#include <blosc2.h>
 #include <assert.h>
 
 #define KB  1024

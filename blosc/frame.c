@@ -915,12 +915,12 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   bool needs_free = false;
   for (int i = 0; i < nchunks; i++) {
     uint8_t* data_chunk;
-    if (frame->sframe) {
-      sframe_get_chunk(frame, i, &data_chunk, &needs_free);
+   /* if (frame->sframe) {
+      frame_get_lazychunk(frame, i, &data_chunk, &needs_free);
     }
-    else {
+    else {*/
       data_chunk = schunk->data[i];
-    }
+   // }
     int32_t chunk_cbytes = sw32_(data_chunk + BLOSC2_CHUNK_CBYTES);
     data_tmp[i] = coffset;
     coffset += chunk_cbytes;
@@ -1626,7 +1626,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
       size_t rbytes;
       bool needs_free = false;
       if (frame->sframe) {
-        rbytes = sframe_get_chunk(frame, offsets[i], &data_chunk, &needs_free);
+        rbytes = frame_get_lazychunk(frame, offsets[i], &data_chunk, &needs_free);
       }
       else {
         fseek(fp, header_len + offsets[i], SEEK_SET);
