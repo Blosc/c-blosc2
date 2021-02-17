@@ -305,8 +305,6 @@ blosc2_schunk* blosc2_schunk_open(const char* urlpath) {
   schunk->storage->urlpath = malloc(pathlen + 1);
   strcpy(schunk->storage->urlpath, urlpath);
   schunk->storage->contiguous = !frame->sframe;
-  // Update the existing cparams/dparams with the new defaults
-  update_schunk_properties(schunk);
 
   return schunk;
 }
