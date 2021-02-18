@@ -17,13 +17,15 @@
 #define snprintf _snprintf
 #endif
 
-#define CHUNKSIZE (20 * 1000)
+#define CHUNKSIZE (40 * 1000)
 #define NTHREADS (4)
 
 /* Global vars */
 int nchunks_[] = {0, 1, 2, 5};
 int tests_run = 0;
 int nchunks;
+int32_t blocksize_[] = {0, 20 * 1000};
+int32_t blocksize;
 bool multithread;
 bool splits;
 bool free_new;
@@ -62,6 +64,8 @@ static char* test_frame(void) {
     // Only BLOSCLZ is doing that.
     cparams.compcode = BLOSC_BLOSCLZ;
   }
+  cparams.blocksize = blocksize;
+
 #if defined(HAVE_LZ4)
   else {
     cparams.compcode = BLOSC_LZ4;
@@ -107,6 +111,8 @@ static char* test_frame(void) {
                   schunk->storage->cparams->clevel == BLOSC2_CPARAMS_DEFAULTS.clevel);
         mu_assert("dparams are not recovered correctly",
                   schunk->storage->dparams->nthreads == BLOSC2_DPARAMS_DEFAULTS.nthreads);
+        mu_assert("blocksize is not recovered correctly",
+                  schunk->storage->cparams->blocksize == cparams.blocksize);
       } else {
         // Dump the schunk into a buffer and regenerate it from there
         int64_t buffer_len = blosc2_schunk_to_buffer(schunk, &buffer, &buffer_needs_free);
@@ -273,18 +279,21 @@ static char *all_tests(void) {
             for (int ifilter_pipeline = 0; ifilter_pipeline < 2; ifilter_pipeline++) {
               for (int imetalayers = 0; imetalayers < 2; imetalayers++) {
                 for (int ivlmetalayers = 0; ivlmetalayers < 2; ivlmetalayers++) {
-                  splits = (bool) isplits;
-                  multithread = (bool) imultithread;
-                  sparse_schunk = (bool) isparse_schunk;
-                  free_new = (bool) ifree_new;
-                  filter_pipeline = (bool) ifilter_pipeline;
-                  metalayers = (bool) imetalayers;
-                  vlmetalayers = (bool) ivlmetalayers;
-                  fname = NULL;
-                  mu_run_test(test_frame);
-                  snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
-                  fname = buf;
-                  mu_run_test(test_frame);
+                  for (int iblocksize = 0; iblocksize < sizeof(blocksize_) / sizeof(int32_t); ++iblocksize) {
+                        blocksize = blocksize_[iblocksize];
+                        splits = (bool) isplits;
+                        multithread = (bool) imultithread;
+                        sparse_schunk = (bool) isparse_schunk;
+                        free_new = (bool) ifree_new;
+                        filter_pipeline = (bool) ifilter_pipeline;
+                        metalayers = (bool) imetalayers;
+                        vlmetalayers = (bool) ivlmetalayers;
+                        fname = NULL;
+                        mu_run_test(test_frame);
+                        snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
+                        fname = buf;
+                        mu_run_test(test_frame);
+                    }
                 }
               }
             }

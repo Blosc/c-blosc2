@@ -170,7 +170,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
 
   // The msgpack header starts here
   *h2p = 0x90;  // fixarray...
-  *h2p += 13;   // ...with 13 elements
+  *h2p += 14;   // ...with 13 elements
   h2p += 1;
 
   // Magic number
@@ -262,6 +262,16 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   h2p += 1;
   int32_t typesize = schunk->typesize;
   big_store(h2p, &typesize, sizeof(typesize));
+  h2p += 4;
+  if (h2p - h2 >= FRAME_HEADER_MINLEN) {
+    return NULL;
+  }
+
+  // Block size
+  *h2p = 0xd2;  // int32
+  h2p += 1;
+  int32_t blocksize = schunk->blocksize;
+  big_store(h2p, &blocksize, sizeof(blocksize));
   h2p += 4;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
     return NULL;
@@ -434,8 +444,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
 
 
 int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_len, int64_t *nbytes,
-                    int64_t *cbytes, int32_t *chunksize, int32_t *nchunks, int32_t *typesize,
-                    uint8_t *compcode, uint8_t *clevel, uint8_t *filters, uint8_t *filters_meta) {
+                    int64_t *cbytes, int32_t *blocksize, int32_t *chunksize, int32_t *nchunks,
+                    int32_t *typesize, uint8_t *compcode, uint8_t *clevel, uint8_t *filters,
+                    uint8_t *filters_meta) {
   uint8_t* framep = frame->cframe;
   uint8_t header[FRAME_HEADER_MINLEN];
 
@@ -480,6 +491,7 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
   big_store(frame_len, framep + FRAME_LEN, sizeof(*frame_len));
   big_store(nbytes, framep + FRAME_NBYTES, sizeof(*nbytes));
   big_store(cbytes, framep + FRAME_CBYTES, sizeof(*cbytes));
+  big_store(blocksize, framep + FRAME_BLOCKSIZE, sizeof(*blocksize));
   big_store(chunksize, framep + FRAME_CHUNKSIZE, sizeof(*chunksize));
   if (typesize != NULL) {
     big_store(typesize, framep + FRAME_TYPESIZE, sizeof(*typesize));
@@ -719,9 +731,11 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   int64_t frame_len;
   int64_t nbytes;
   int64_t cbytes;
+  int32_t blocksize;
   int32_t chunksize;
   int32_t nchunks;
-  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
+                            &blocksize, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL, NULL);
   if (ret < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
@@ -1283,9 +1297,11 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   int64_t frame_len;
   int64_t nbytes;
   int64_t cbytes;
+  int32_t blocksize;
   int32_t chunksize;
   int32_t nchunks;
-  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
+                            &blocksize, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL, NULL);
   if (ret < 0) {
     BLOSC_TRACE_ERROR("Unable to get the header info from frame.");
@@ -1444,9 +1460,11 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   int64_t frame_len;
   int64_t nbytes;
   int64_t cbytes;
+  int32_t blocksize;
   int32_t chunksize;
   int32_t nchunks;
-  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
+                            &blocksize, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL, NULL);
   if (ret < 0) {
     BLOSC_TRACE_ERROR("Unable to get the trailer info from frame.");
@@ -1541,9 +1559,11 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
 
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
   schunk->frame = (blosc2_frame*)frame;
-  int ret = get_header_info(frame, &header_len, &frame_len, &schunk->nbytes, &schunk->cbytes,
+  int ret = get_header_info(frame, &header_len, &frame_len, &schunk->nbytes,
+                            &schunk->cbytes, &schunk->blocksize,
                             &schunk->chunksize, &schunk->nchunks, &schunk->typesize,
-                            &schunk->compcode, &schunk->clevel, schunk->filters, schunk->filters_meta);
+                            &schunk->compcode, &schunk->clevel, schunk->filters,
+                            schunk->filters_meta);
   if (ret < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     blosc2_schunk_free(schunk);
@@ -1800,6 +1820,7 @@ int frame_get_chunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool *ne
   int64_t frame_len;
   int64_t nbytes;
   int64_t cbytes;
+  int32_t blocksize;
   int32_t chunksize;
   int32_t nchunks;
   int32_t typesize;
@@ -1808,7 +1829,8 @@ int frame_get_chunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool *ne
 
   *chunk = NULL;
   *needs_free = false;
-  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
+                            &blocksize, &chunksize, &nchunks,
                             &typesize, NULL, NULL, NULL, NULL);
   if (ret < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
@@ -1888,6 +1910,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
   int64_t frame_len;
   int64_t nbytes;
   int64_t cbytes;
+  int32_t blocksize;
   int32_t chunksize;
   int32_t nchunks;
   int32_t typesize;
@@ -1896,7 +1919,8 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
 
   *chunk = NULL;
   *needs_free = false;
-  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
+                            &blocksize, &chunksize, &nchunks,
                             &typesize, NULL, NULL, NULL, NULL);
   if (ret < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
@@ -2033,9 +2057,11 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   int64_t frame_len;
   int64_t nbytes;
   int64_t cbytes;
+  int32_t blocksize;
   int32_t chunksize;
   int32_t nchunks;
-  int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+  int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &blocksize, &chunksize,
+                           &nchunks,
                            NULL, NULL, NULL, NULL, NULL);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
@@ -2227,9 +2253,11 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
   int64_t frame_len;
   int64_t nbytes;
   int64_t cbytes;
+  int32_t blocksize;
   int32_t chunksize;
   int32_t nchunks;
-  int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+  int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
+                           &blocksize, &chunksize,  &nchunks,
                            NULL, NULL, NULL, NULL, NULL);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
@@ -2399,9 +2427,11 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
   int64_t frame_len;
   int64_t nbytes;
   int64_t cbytes;
+  int32_t blocksize;
   int32_t chunksize;
   int32_t nchunks;
-  int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+  int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
+                           &blocksize, &chunksize, &nchunks,
                            NULL, NULL, NULL, NULL, NULL);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
@@ -2564,9 +2594,11 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int* offsets_order, blosc
   int64_t frame_len;
   int64_t nbytes;
   int64_t cbytes;
+  int32_t blocksize;
   int32_t chunksize;
   int32_t nchunks;
-  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &chunksize, &nchunks,
+  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
+                            &blocksize, &chunksize,  &nchunks,
                             NULL, NULL, NULL, NULL, NULL);
   if (ret < 0) {
       BLOSC_TRACE_ERROR("Cannot get the header info for the frame.");

@@ -32,7 +32,7 @@ The header contains information needed to decompress the Blosc chunks contained 
       |   |       |                           +--[msgpack] int32
       |   |       +---magic number, currently "b2frame"
       |   +------[msgpack] str with 8 elements
-      +---[msgpack] fixarray with X=0xD (13) elements
+      +---[msgpack] fixarray with X=0xE (14) elements
 
     |-18|-19|-1A|-1B|-1C|-1D|-1E|-1F|-20|-21|-22|-23|-24|-25|-26|-27|-28|-29|-2A|-2B|-2C|-2D|-2E|
     | a4|_f0|_f1|_f2|_f3| d3| uncompressed_size             | d3| compressed_size               |
@@ -46,24 +46,25 @@ The header contains information needed to decompress the Blosc chunks contained 
       |   +------general_flags (see below)
       +---[msgpack] str with 4 elements (flags)
 
-    |-2F|-30|-31|-32|-33|-34|-35|-36|-37|-38|-39|-3A|-3B|-3C|-3D|-3E|-3F|
-    | d2| type_size     | d2| chunk_size    | d1| tcomp | d1|tdecomp| cX|
-    |---|---------------|---|---------------|---|-------|---|-------|---|
-      ^                   ^                   ^     ^     ^     ^     ^
-      |                   |                   |     |     |     |     +--[msgpack] bool for has_vlmetalayers
-      |                   |                   |     |     |     +--number of threads for decompression
-      |                   |                   |     |     +-- [msgpack] int16
-      |                   |                   |     +--number of threads for compression
-      |                   |                   +---[msgpack] int16
-      |                   +------[msgpack] int32
-      +---[msgpack] int32
+    |-2F|-30|-31|-32|-33|-34|-35|-36|-37|-38|-39|-3A|-3B|-3C|-3D|-3E|-3F|-40|-41|-42|-43|-44|
+    | d2| type_size     | d2| block_size    | d2| chunk_size    | d1| tcomp | d1|tdecomp| cX|
+    |---|---------------|---|---------------|---|---------------|---|-------|---|-------|---|
+      ^                   ^                   ^                   ^     ^     ^     ^     ^
+      |                   |                   |                   |     |     |     |     +-- [msgpack] bool for has_vlmetalayers
+      |                   |                   |                   |     |     |     +-- number of threads for decompression
+      |                   |                   |                   |     |     +-- [msgpack] int16
+      |                   |                   |                   |     +-- number of threads for compression
+      |                   |                   |                   +-- [msgpack] int16
+      |                   |                   +-- [msgpack] int32
+      |                   +-- [msgpack] int32
+      +-- [msgpack] int32
 
 The filter pipeline is stored next in the header. It contains 8 slots, one for each filter that can be applied. For
 each slot there is a byte used to store the filter code in `filter_codes` and an associated byte used to store any
 possible filter meta-info in `filter_meta`::
 
 
-    |-40|-41|-42|-43|-44|-45|-46|-47|-48|-49|-4A|-4B|-4C|-4D|-4E|-4F|-50|-51|
+    |-45|-46|-47|-48|-49|-4A|-4B|-4C|-4D|-4E|-4F|-50|-51|-52|-53|-54|-55|-56|
     | d2| X | filter_codes                  | filter_meta                   |
     |---|---|-------------------------------|-------------------------------|
       ^   ^
@@ -75,7 +76,7 @@ At the end of the header *metalayers* are stored which contain meta-information 
 frame. It is up to the user to store whatever data they want with the only (strong) suggestion that they be stored
 using the msgpack format. Here is the format for the *metalayers*::
 
-    |-52|-53|-54|-55|-56|-57|-58|====================|---|---|---|================|
+    |-57|-58|-59|-5A|-5B|-5C|-5D|====================|---|---|---|================|
     | 93| cd| idx   | de| size  | meta keys/values   | dc|  idy  | meta content   |
     |---|---|-------|---|---|---|====================|---|-------|================|
      ^   ^      ^     ^     ^             ^            ^     ^            ^
