@@ -848,12 +848,7 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   bool needs_free = false;
   for (int i = 0; i < nchunks; i++) {
     uint8_t* data_chunk;
-    if (frame->sframe) {
-      sframe_get_chunk(frame, i, &data_chunk, &needs_free);
-    }
-    else {
-      data_chunk = schunk->data[i];
-    }
+    data_chunk = schunk->data[i];
     int32_t chunk_cbytes = sw32_(data_chunk + BLOSC2_CHUNK_CBYTES);
     data_tmp[i] = coffset;
     coffset += chunk_cbytes;
@@ -1571,7 +1566,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
       size_t rbytes;
       bool needs_free = false;
       if (frame->sframe) {
-        rbytes = sframe_get_chunk(frame, offsets[i], &data_chunk, &needs_free);
+        rbytes = frame_get_lazychunk(frame, offsets[i], &data_chunk, &needs_free);
       }
       else {
         fseek(fp, header_len + offsets[i], SEEK_SET);
@@ -1925,8 +1920,14 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     *blosc2_flags |= 0x08U;
 
     // Add the trailer (currently, nchunk + offset + block_csizes)
-    *(int32_t*)(*chunk + trailer_offset) = nchunk;
-    *(int64_t*)(*chunk + trailer_offset + sizeof(int32_t)) = header_len + offset;
+    if (frame->sframe) {
+      *(int32_t*)(*chunk + trailer_offset) = offset;
+      *(int64_t*)(*chunk + trailer_offset + sizeof(int32_t)) = offset;
+    }
+    else {
+      *(int32_t *)(*chunk + trailer_offset) = nchunk;
+      *(int64_t *)(*chunk + trailer_offset + sizeof(int32_t)) = header_len + offset;
+    }
 
     int32_t* block_csizes = malloc(nblocks * sizeof(int32_t));
 
@@ -2642,13 +2643,9 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int nchu
   uint8_t* src;
   bool needs_free;
   int chunk_cbytes;
-  if (frame->sframe) {
-    chunk_cbytes = frame_get_chunk(frame, nchunk, &src, &needs_free);
-  }
-  else {
-    // Use a lazychunk here in order to do a potential parallel read.
-    chunk_cbytes = frame_get_lazychunk(frame, nchunk, &src, &needs_free);
-  }
+
+  // Use a lazychunk here in order to do a potential parallel read.
+  chunk_cbytes = frame_get_lazychunk(frame, nchunk, &src, &needs_free);
   if (chunk_cbytes < 0) {
     BLOSC_TRACE_ERROR("Cannot get the chunk in position %d.", nchunk);
     return BLOSC2_ERROR_DATA;
