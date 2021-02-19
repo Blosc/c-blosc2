@@ -1209,8 +1209,8 @@ static int blosc_d(
   int32_t compformat = (context->header_flags & (uint8_t)0xe0) >> 5u;
   int dont_split = (context->header_flags & (uint8_t)0x10) >> 4u;
   int memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
-  int32_t chunk_nbytes = *(int32_t*)(src + BLOSC2_CHUNK_NBYTES);
-  int32_t chunk_cbytes = *(int32_t*)(src + BLOSC2_CHUNK_CBYTES);
+  int32_t chunk_nbytes = sw32_(src + BLOSC2_CHUNK_NBYTES);
+  int32_t chunk_cbytes = sw32_(src + BLOSC2_CHUNK_CBYTES);
   //uint8_t blosc_version_format = src[BLOSC2_CHUNK_VERSION];
   int nstreams;
   int32_t neblock;
