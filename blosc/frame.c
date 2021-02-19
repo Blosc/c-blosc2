@@ -998,6 +998,7 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
   if (off_cbytes != NULL) {
     *off_cbytes = coffsets_cbytes;
   }
+
   FILE* fp = NULL;
   uint8_t* coffsets = malloc((size_t)coffsets_cbytes);
   if (frame->sframe) {
@@ -1670,15 +1671,16 @@ int sort_offset(const void* a, const void* b) {
 
 
 int get_coffset(blosc2_frame_s* frame, int32_t header_len, int64_t cbytes, int32_t nchunk, int64_t *offset) {
+  int32_t off_cbytes;
   // Get the offset to nchunk
-  uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, NULL);
+  uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, &off_cbytes);
   if (coffsets == NULL) {
     BLOSC_TRACE_ERROR("Cannot get the offset for chunk %d for the frame.", nchunk);
     return BLOSC2_ERROR_DATA;
   }
 
   // Get the 64-bit offset
-  int rc = blosc_getitem(coffsets, nchunk, 1, offset);
+  int rc = blosc2_getitem(coffsets, frame->len - off_cbytes, nchunk, 1, offset, sizeof(int64_t));
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Problems retrieving a chunk offset.");
   } else if (*offset > frame->len) {

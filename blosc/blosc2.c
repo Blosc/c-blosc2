@@ -2553,10 +2553,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
   return ntbytes;
 }
 
-
-/* Specific routine optimized for decompression a small number of
-   items out of a compressed chunk.  Public non-contextual API. */
-int blosc_getitem(const void* src, int start, int nitems, void* dest) {
+int blosc2_getitem(const void* src, int32_t srcsize, int start, int nitems, void* dest, int32_t destsize) {
   blosc2_context context;
   int result;
 
@@ -2567,13 +2564,19 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
   context.nthreads = 1;  // force a serial decompression; fixes #95
 
   /* Call the actual getitem function */
-  result = blosc2_getitem_ctx(&context, src, INT32_MAX, start, nitems, dest, INT32_MAX);
+  result = blosc2_getitem_ctx(&context, src, srcsize, start, nitems, dest, destsize);
 
   /* Release resources */
   if (context.serial_context != NULL) {
     free_thread_context(context.serial_context);
   }
   return result;
+}
+
+/* Specific routine optimized for decompression a small number of
+   items out of a compressed chunk.  Public non-contextual API. */
+int blosc_getitem(const void* src, int start, int nitems, void* dest) {
+  return blosc2_getitem(src, INT32_MAX, start, nitems, dest, INT32_MAX);
 }
 
 int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize,
