@@ -953,7 +953,7 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
 uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes, int32_t *off_cbytes) {
   if (frame->coffsets != NULL) {
     if (off_cbytes != NULL) {
-      *off_cbytes = *(int32_t *) (frame->coffsets + BLOSC2_CHUNK_CBYTES);
+      *off_cbytes = sw32_(frame->coffsets + BLOSC2_CHUNK_CBYTES);
     }
     return frame->coffsets;
   }
@@ -971,7 +971,7 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
     // For in-memory frames, the coffset is just one pointer away
     uint8_t* off_start = frame->cframe + off_pos;
     if (off_cbytes != NULL) {
-      *off_cbytes = *(int32_t*) (off_start + BLOSC2_CHUNK_CBYTES);
+      *off_cbytes = sw32_(off_start + BLOSC2_CHUNK_CBYTES);
     }
     return off_start;
   }
