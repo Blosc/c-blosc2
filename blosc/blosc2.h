@@ -441,6 +441,24 @@ BLOSC_EXPORT int blosc2_chunk_repeatval(size_t nbytes, size_t typesize,
  */
 BLOSC_EXPORT int blosc_getitem(const void* src, int start, int nitems, void* dest);
 
+/**
+ * @brief Get @p nitems (of @p typesize size) in @p src buffer starting in @p start.
+ * The items are returned in @p dest buffer. The dest buffer should have enough space
+ * for storing all items. This function is a more secure version of #blosc_getitem.
+ *
+ * @param src The compressed buffer from data will be decompressed.
+ * @param srcsize Size of the compressed buffer from data will be decompressed.
+ * @param start The position of the first item (of @p typesize size) from where data
+ * will be retrieved.
+ * @param nitems The number of items (of @p typesize size) that will be retrieved.
+ * @param dest The buffer where the decompressed data retrieved will be put.
+ * @param destsize Size of the buffer where decompressed data received.
+ *
+ * @return The number of bytes copied to @p dest or a negative value if
+ * some error happens.
+ */
+BLOSC_EXPORT int blosc2_getitem(const void* src, int32_t srcsize, int start, int nitems,
+                                void* dest, int32_t destsize);
 
 /**
   Pointer to a callback function that executes `dojob(jobdata + i*jobdata_elsize)` for `i = 0 to numjobs-1`,
