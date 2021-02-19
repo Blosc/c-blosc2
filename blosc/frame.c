@@ -47,87 +47,6 @@
 #define TRUNCATE ftruncate
 #endif
 
-void little_store(void *dest, const void *pa, int size) {
-  bool little_endian = is_little_endian();
-  if (little_endian) {
-    memcpy(dest, pa, size);
-  }
-  else {
-    uint8_t* pa_ = (uint8_t*)pa;
-    uint8_t* pa2_ = malloc((size_t)size);
-    switch (size) {
-      case 8:
-        pa2_[0] = pa_[7];
-        pa2_[1] = pa_[6];
-        pa2_[2] = pa_[5];
-        pa2_[3] = pa_[4];
-        pa2_[4] = pa_[3];
-        pa2_[5] = pa_[2];
-        pa2_[6] = pa_[1];
-        pa2_[7] = pa_[0];
-        break;
-      case 4:
-        pa2_[0] = pa_[3];
-        pa2_[1] = pa_[2];
-        pa2_[2] = pa_[1];
-        pa2_[3] = pa_[0];
-        break;
-      case 2:
-        pa2_[0] = pa_[1];
-        pa2_[1] = pa_[0];
-        break;
-      case 1:
-        pa2_[0] = pa_[1];
-        break;
-      default:
-        BLOSC_TRACE_ERROR("Unhandled size: %d.", size);
-    }
-    memcpy(dest, pa2_, size);
-    free(pa2_);
-  }
-}
-
-// big <-> little-endian and store it in a memory position.  Sizes supported: 1, 2, 4, 8 bytes.
-void big_store(void *dest, const void *pa, int size) {
-    bool little_endian = is_little_endian();
-    if (!little_endian) {
-      memcpy(dest, pa, size);
-    }
-    else {
-      uint8_t* pa_ = (uint8_t*)pa;
-      uint8_t* pa2_ = malloc((size_t)size);
-      switch (size) {
-        case 8:
-          pa2_[0] = pa_[7];
-          pa2_[1] = pa_[6];
-          pa2_[2] = pa_[5];
-          pa2_[3] = pa_[4];
-          pa2_[4] = pa_[3];
-          pa2_[5] = pa_[2];
-          pa2_[6] = pa_[1];
-          pa2_[7] = pa_[0];
-          break;
-      case 4:
-          pa2_[0] = pa_[3];
-          pa2_[1] = pa_[2];
-          pa2_[2] = pa_[1];
-          pa2_[3] = pa_[0];
-          break;
-      case 2:
-          pa2_[0] = pa_[1];
-          pa2_[1] = pa_[0];
-          break;
-      case 1:
-          pa2_[0] = pa_[1];
-          break;
-      default:
-        BLOSC_TRACE_ERROR("Unhandled size: %d.", size);
-    }
-    memcpy(dest, pa2_, size);
-    free(pa2_);
-  }
-}
-
 
 /* Create a new (empty) frame */
 blosc2_frame_s* frame_new(const char* urlpath) {
@@ -193,7 +112,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   *h2p = 0xcf;  // uint64
   // Fill it with frame->len which is known *after* the creation of the frame (e.g. when updating the header)
   int64_t flen = frame->len;
-  big_store(h2 + FRAME_LEN, &flen, sizeof(flen));
+  to_big(h2 + FRAME_LEN, &flen, sizeof(flen));
   h2p += 1 + 8;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
     return NULL;
@@ -241,7 +160,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   *h2p = 0xd3;  // int64
   h2p += 1;
   int64_t nbytes = schunk->nbytes;
-  big_store(h2p, &nbytes, sizeof(nbytes));
+  to_big(h2p, &nbytes, sizeof(nbytes));
   h2p += 8;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
     return NULL;
@@ -251,7 +170,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   *h2p = 0xd3;  // int64
   h2p += 1;
   int64_t cbytes = schunk->cbytes;
-  big_store(h2p, &cbytes, sizeof(cbytes));
+  to_big(h2p, &cbytes, sizeof(cbytes));
   h2p += 8;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
     return NULL;
@@ -261,7 +180,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   *h2p = 0xd2;  // int32
   h2p += 1;
   int32_t typesize = schunk->typesize;
-  big_store(h2p, &typesize, sizeof(typesize));
+  to_big(h2p, &typesize, sizeof(typesize));
   h2p += 4;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
     return NULL;
@@ -271,7 +190,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   *h2p = 0xd2;  // int32
   h2p += 1;
   int32_t blocksize = schunk->blocksize;
-  big_store(h2p, &blocksize, sizeof(blocksize));
+  to_big(h2p, &blocksize, sizeof(blocksize));
   h2p += 4;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
     return NULL;
@@ -281,7 +200,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   *h2p = 0xd2;  // int32
   h2p += 1;
   int32_t chunksize = schunk->chunksize;
-  big_store(h2p, &chunksize, sizeof(chunksize));
+  to_big(h2p, &chunksize, sizeof(chunksize));
   h2p += 4;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
     return NULL;
@@ -291,7 +210,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   *h2p = 0xd1;  // int16
   h2p += 1;
   int16_t nthreads = (int16_t)schunk->cctx->nthreads;
-  big_store(h2p, &nthreads, sizeof(nthreads));
+  to_big(h2p, &nthreads, sizeof(nthreads));
   h2p += 2;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
     return NULL;
@@ -301,7 +220,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   *h2p = 0xd1;  // int16
   h2p += 1;
   nthreads = (int16_t)schunk->dctx->nthreads;
-  big_store(h2p, &nthreads, sizeof(nthreads));
+  to_big(h2p, &nthreads, sizeof(nthreads));
   h2p += 2;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
     return NULL;
@@ -361,7 +280,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   // Map (index) of offsets for optional metalayers
   *h2p = 0xde;  // map 16 with N keys
   h2p += 1;
-  big_store(h2p, &nmetalayers, sizeof(nmetalayers));
+  to_big(h2p, &nmetalayers, sizeof(nmetalayers));
   h2p += sizeof(nmetalayers);
   int32_t current_header_len = (int32_t)(h2p - h2);
   int32_t *offtooff = malloc(nmetalayers * sizeof(int32_t));
@@ -399,7 +318,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     return NULL;
   }
   uint16_t map_size = (uint16_t) (hsize2 - hsize);
-  big_store(h2 + FRAME_IDX_SIZE, &map_size, sizeof(map_size));
+  to_big(h2 + FRAME_IDX_SIZE, &map_size, sizeof(map_size));
 
   // Make space for an (empty) array
   hsize = (int32_t)(h2p - h2);
@@ -409,7 +328,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   // Now, store the values in an array
   *h2p = 0xdc;  // array 16 with N elements
   h2p += 1;
-  big_store(h2p, &nmetalayers, sizeof(nmetalayers));
+  to_big(h2p, &nmetalayers, sizeof(nmetalayers));
   h2p += sizeof(nmetalayers);
   current_header_len = (int32_t)(h2p - h2);
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
@@ -422,12 +341,12 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     // Store the serialized contents for this metalayer
     *h2p = 0xc6;  // bin32
     h2p += 1;
-    big_store(h2p, &(metalayer->content_len), sizeof(metalayer->content_len));
+    to_big(h2p, &(metalayer->content_len), sizeof(metalayer->content_len));
     h2p += 4;
     memcpy(h2p, metalayer->content, metalayer->content_len);  // buffer, no need to swap
     h2p += metalayer->content_len;
     // Update the offset now that we know it
-    big_store(h2 + offtooff[nmetalayer], &current_header_len, sizeof(current_header_len));
+    to_big(h2 + offtooff[nmetalayer], &current_header_len, sizeof(current_header_len));
     current_header_len += 1 + 4 + metalayer->content_len;
   }
   free(offtooff);
@@ -437,7 +356,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   }
 
   // Set the length of the whole header now that we know it
-  big_store(h2 + FRAME_HEADER_LEN, &hsize, sizeof(hsize));
+  to_big(h2 + FRAME_HEADER_LEN, &hsize, sizeof(hsize));
 
   return h2;
 }
@@ -487,14 +406,14 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
   }
 
   // Fetch some internal lengths
-  big_store(header_len, framep + FRAME_HEADER_LEN, sizeof(*header_len));
-  big_store(frame_len, framep + FRAME_LEN, sizeof(*frame_len));
-  big_store(nbytes, framep + FRAME_NBYTES, sizeof(*nbytes));
-  big_store(cbytes, framep + FRAME_CBYTES, sizeof(*cbytes));
-  big_store(blocksize, framep + FRAME_BLOCKSIZE, sizeof(*blocksize));
-  big_store(chunksize, framep + FRAME_CHUNKSIZE, sizeof(*chunksize));
+  from_big(header_len, framep + FRAME_HEADER_LEN, sizeof(*header_len));
+  from_big(frame_len, framep + FRAME_LEN, sizeof(*frame_len));
+  from_big(nbytes, framep + FRAME_NBYTES, sizeof(*nbytes));
+  from_big(cbytes, framep + FRAME_CBYTES, sizeof(*cbytes));
+  from_big(blocksize, framep + FRAME_BLOCKSIZE, sizeof(*blocksize));
+  from_big(chunksize, framep + FRAME_CHUNKSIZE, sizeof(*chunksize));
   if (typesize != NULL) {
-    big_store(typesize, framep + FRAME_TYPESIZE, sizeof(*typesize));
+    from_big(typesize, framep + FRAME_TYPESIZE, sizeof(*typesize));
   }
 
   if (*header_len <= 0 || *header_len > *frame_len) {
@@ -563,7 +482,7 @@ int64_t get_trailer_offset(blosc2_frame_s *frame, int32_t header_len, bool has_c
 int update_frame_len(blosc2_frame_s* frame, int64_t len) {
   int rc = 1;
   if (frame->cframe != NULL) {
-    big_store(frame->cframe + FRAME_LEN, &len, sizeof(int64_t));
+    to_big(frame->cframe + FRAME_LEN, &len, sizeof(int64_t));
   }
   else {
     FILE* fp = NULL;
@@ -575,7 +494,7 @@ int update_frame_len(blosc2_frame_s* frame, int64_t len) {
     }
     fseek(fp, FRAME_LEN, SEEK_SET);
     int64_t swap_len;
-    big_store(&swap_len, &len, sizeof(int64_t));
+    to_big(&swap_len, &len, sizeof(int64_t));
     size_t wbytes = fwrite(&swap_len, 1, sizeof(int64_t), fp);
     fclose(fp);
     if (wbytes != sizeof(int64_t)) {
@@ -627,7 +546,7 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   // Map (index) of offsets for optional metalayers
   *ptrailer = 0xde;  // map 16 with N keys
   ptrailer += 1;
-  big_store(ptrailer, &nvlmetalayers, sizeof(nvlmetalayers));
+  to_big(ptrailer, &nvlmetalayers, sizeof(nvlmetalayers));
   ptrailer += sizeof(nvlmetalayers);
   current_trailer_len = (int32_t)(ptrailer - trailer);
   int32_t *offtodata = malloc(nvlmetalayers * sizeof(int32_t));
@@ -665,7 +584,7 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     return -1;
   }
   uint16_t map_size = (uint16_t) (tsize2 - tsize);
-  big_store(trailer + 4, &map_size, sizeof(map_size));
+  to_big(trailer + 4, &map_size, sizeof(map_size));
 
   // Make space for an (empty) array
   tsize = (int32_t)(ptrailer - trailer);
@@ -675,7 +594,7 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   // Now, store the values in an array
   *ptrailer = 0xdc;  // array 16 with N elements
   ptrailer += 1;
-  big_store(ptrailer, &nvlmetalayers, sizeof(nvlmetalayers));
+  to_big(ptrailer, &nvlmetalayers, sizeof(nvlmetalayers));
   ptrailer += sizeof(nvlmetalayers);
   current_trailer_len = (int32_t)(ptrailer - trailer);
   for (int nvlmetalayer = 0; nvlmetalayer < nvlmetalayers; nvlmetalayer++) {
@@ -688,12 +607,12 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     // Store the serialized contents for this vlmetalayer
     *ptrailer = 0xc6;  // bin32
     ptrailer += 1;
-    big_store(ptrailer, &(vlmetalayer->content_len), sizeof(vlmetalayer->content_len));
+    to_big(ptrailer, &(vlmetalayer->content_len), sizeof(vlmetalayer->content_len));
     ptrailer += 4;
     memcpy(ptrailer, vlmetalayer->content, vlmetalayer->content_len);  // buffer, no need to swap
     ptrailer += vlmetalayer->content_len;
     // Update the offset now that we know it
-    big_store(trailer + offtodata[nvlmetalayer], &current_trailer_len, sizeof(current_trailer_len));
+    to_big(trailer + offtodata[nvlmetalayer], &current_trailer_len, sizeof(current_trailer_len));
     current_trailer_len += 1 + 4 + vlmetalayer->content_len;
   }
   free(offtodata);
@@ -709,7 +628,7 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   // Trailer length
   *ptrailer = 0xce;  // uint32
   ptrailer += 1;
-  big_store(ptrailer, &trailer_len, sizeof(uint32_t));
+  to_big(ptrailer, &trailer_len, sizeof(uint32_t));
   ptrailer += sizeof(uint32_t);
   // Up to 16 bytes for frame fingerprint (using XXH3 included in https://github.com/Cyan4973/xxHash)
   // Maybe someone would need 256-bit in the future, but for the time being 128-bit seems like a good tradeoff
@@ -836,7 +755,7 @@ blosc2_frame_s* frame_from_file(const char* urlpath) {
     return NULL;
   }
   int64_t frame_len;
-  big_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
+  to_big(&frame_len, header + FRAME_LEN, sizeof(frame_len));
 
   blosc2_frame_s* frame = calloc(1, sizeof(blosc2_frame_s));
   frame->urlpath = urlpath_cpy;
@@ -860,7 +779,7 @@ blosc2_frame_s* frame_from_file(const char* urlpath) {
     return NULL;
   }
   uint32_t trailer_len;
-  big_store(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
+  to_big(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
   frame->trailer_len = trailer_len;
 
   return frame;
@@ -876,7 +795,7 @@ blosc2_frame_s* frame_from_cframe(uint8_t *cframe, int64_t len, bool copy) {
     return NULL;
   }
 
-  big_store(&frame_len, header + FRAME_LEN, sizeof(frame_len));
+  from_big(&frame_len, header + FRAME_LEN, sizeof(frame_len));
   if (frame_len != len) {   // sanity check
     return NULL;
   }
@@ -892,7 +811,7 @@ blosc2_frame_s* frame_from_cframe(uint8_t *cframe, int64_t len, bool copy) {
     return NULL;
   }
   uint32_t trailer_len;
-  big_store(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
+  from_big(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
   frame->trailer_len = trailer_len;
 
   if (copy) {
@@ -919,7 +838,7 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     return BLOSC2_ERROR_DATA;
   }
   uint32_t h2len;
-  big_store(&h2len, h2 + FRAME_HEADER_LEN, sizeof(h2len));
+  from_big(&h2len, h2 + FRAME_HEADER_LEN, sizeof(h2len));
   // Build the offsets chunk
   int32_t chunksize = -1;
   int32_t off_cbytes = 0;
@@ -975,13 +894,13 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   free(data_tmp);
 
   // Now that we know them, fill the chunksize and frame length in header
-  big_store(h2 + FRAME_CHUNKSIZE, &chunksize, sizeof(chunksize));
+  to_big(h2 + FRAME_CHUNKSIZE, &chunksize, sizeof(chunksize));
   frame->len = h2len + cbytes + off_cbytes + FRAME_TRAILER_MINLEN;
   if (frame->sframe) {
     frame->len = h2len + off_cbytes + FRAME_TRAILER_MINLEN;
   }
   int64_t tbytes = frame->len;
-  big_store(h2 + FRAME_LEN, &tbytes, sizeof(tbytes));
+  to_big(h2 + FRAME_LEN, &tbytes, sizeof(tbytes));
 
   // Create the frame and put the header at the beginning
   if (frame->urlpath == NULL) {
@@ -1136,17 +1055,17 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
     framep = header;
   }
   uint32_t prev_h2len;
-  big_store(&prev_h2len, framep + FRAME_HEADER_LEN, sizeof(prev_h2len));
+  from_big(&prev_h2len, framep + FRAME_HEADER_LEN, sizeof(prev_h2len));
 
   // Build a new header
   uint8_t* h2 = new_header_frame(schunk, frame);
   uint32_t h2len;
-  big_store(&h2len, h2 + FRAME_HEADER_LEN, sizeof(h2len));
+  from_big(&h2len, h2 + FRAME_HEADER_LEN, sizeof(h2len));
 
   // The frame length is outdated when adding a new metalayer, so update it
   if (new) {
     int64_t frame_len = h2len;  // at adding time, we only have to worry of the header for now
-    big_store(h2 + FRAME_LEN, &frame_len, sizeof(frame_len));
+    to_big(h2 + FRAME_LEN, &frame_len, sizeof(frame_len));
     frame->len = frame_len;
   }
 
@@ -1191,7 +1110,7 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
   if (header_len < header_pos) {
     return BLOSC2_ERROR_READ_BUFFER;
   }
-  big_store(&idx_size, header + FRAME_IDX_SIZE, sizeof(idx_size));
+  from_big(&idx_size, header + FRAME_IDX_SIZE, sizeof(idx_size));
 
   // Get the actual index of metalayers
   uint8_t* metalayers_idx = header + FRAME_IDX_SIZE + 2;
@@ -1208,7 +1127,7 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
   if (header_len < header_pos) {
     return BLOSC2_ERROR_READ_BUFFER;
   }
-  big_store(&nmetalayers, idxp, sizeof(uint16_t));
+  from_big(&nmetalayers, idxp, sizeof(uint16_t));
   idxp += 2;
   if (nmetalayers < 0 || nmetalayers > BLOSC2_MAX_METALAYERS) {
     return BLOSC2_ERROR_DATA;
@@ -1255,7 +1174,7 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
     if (header_len < header_pos) {
       return BLOSC2_ERROR_READ_BUFFER;
     }
-    big_store(&offset, idxp, sizeof(offset));
+    from_big(&offset, idxp, sizeof(offset));
     idxp += 4;
     if (offset < 0 || offset >= header_len) {
       // Offset is less than zero or exceeds header length
@@ -1273,7 +1192,7 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
     if (header_len < header_pos) {
       return BLOSC2_ERROR_READ_BUFFER;
     }
-    big_store(&content_len, content_marker + 1, sizeof(content_len));
+    from_big(&content_len, content_marker + 1, sizeof(content_len));
     if (content_len < 0) {
       return BLOSC2_ERROR_DATA;
     }
@@ -1354,7 +1273,7 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
     return BLOSC2_ERROR_READ_BUFFER;
   }
   uint16_t idx_size;
-  big_store(&idx_size, idxp, sizeof(idx_size));
+  from_big(&idx_size, idxp, sizeof(idx_size));
   idxp += 2;
 
   trailer_pos += 1;
@@ -1372,7 +1291,7 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
   if (trailer_len < trailer_pos) {
     return BLOSC2_ERROR_READ_BUFFER;
   }
-  big_store(&nmetalayers, idxp, sizeof(uint16_t));
+  from_big(&nmetalayers, idxp, sizeof(uint16_t));
   idxp += 2;
   if (nmetalayers < 0 || nmetalayers > BLOSC2_MAX_VLMETALAYERS) {
     return BLOSC2_ERROR_DATA;
@@ -1419,7 +1338,7 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
     if (trailer_len < trailer_pos) {
       return BLOSC2_ERROR_READ_BUFFER;
     }
-    big_store(&offset, idxp, sizeof(offset));
+    from_big(&offset, idxp, sizeof(offset));
     idxp += 4;
     if (offset < 0 || offset >= trailer_len) {
       // Offset is less than zero or exceeds trailer length
@@ -1437,7 +1356,7 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
     if (trailer_len < trailer_pos) {
       return BLOSC2_ERROR_READ_BUFFER;
     }
-    big_store(&content_len, content_marker + 1, sizeof(content_len));
+    from_big(&content_len, content_marker + 1, sizeof(content_len));
     if (content_len < 0) {
       return BLOSC2_ERROR_DATA;
     }
@@ -2139,13 +2058,13 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
     case BLOSC2_ZERO_RUNLEN:
       // Zero chunk.  Code it in a special way.
       offset_value += (uint64_t) BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
-      little_store(offsets + nchunks, &offset_value, sizeof(uint64_t));
+          to_little(offsets + nchunks, &offset_value, sizeof(uint64_t));
       cbytes_chunk = 0;   // we don't need to store the chunk
       break;
     case BLOSC2_NAN_RUNLEN:
       // NaN chunk.  Code it in a special way.
       offset_value += (uint64_t)BLOSC2_NAN_RUNLEN << (8 * 7);  // indicate a chunk of NANs
-      little_store(offsets + nchunks, &offset_value, sizeof(uint64_t));
+          to_little(offsets + nchunks, &offset_value, sizeof(uint64_t));
       cbytes_chunk = 0;   // we don't need to store the chunk
       break;
     default:
@@ -2308,7 +2227,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
       for (int i = nchunks; i > nchunk; i--) {
         offsets[i] = offsets[i - 1];
       }
-      little_store(offsets + nchunk, &offset_value, sizeof(uint64_t));
+          to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
       cbytes_chunk = 0;   // we don't need to store the chunk
           break;
     case BLOSC2_NAN_RUNLEN:
@@ -2317,7 +2236,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
       for (int i = nchunks; i > nchunk; i--) {
         offsets[i] = offsets[i - 1];
       }
-      little_store(offsets + nchunk, &offset_value, sizeof(uint64_t));
+          to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
       cbytes_chunk = 0;   // we don't need to store the chunk
       break;
     default:
@@ -2481,13 +2400,13 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
     case BLOSC2_ZERO_RUNLEN:
       // Zero chunk.  Code it in a special way.
       offset_value += (uint64_t)BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
-      little_store(offsets + nchunk, &offset_value, sizeof(uint64_t));
+          to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
       cbytes_chunk = 0;   // we don't need to store the chunk
       break;
     case BLOSC2_NAN_RUNLEN:
       // NaN chunk.  Code it in a special way.
       offset_value += (uint64_t)BLOSC2_NAN_RUNLEN << (8 * 7);  // indicate a chunk of NANs
-      little_store(offsets + nchunk, &offset_value, sizeof(uint64_t));
+          to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
       cbytes_chunk = 0;   // we don't need to store the chunk
       break;
     default:

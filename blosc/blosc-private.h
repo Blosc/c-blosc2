@@ -22,6 +22,11 @@ extern "C" {
 
 *********************************************************************/
 
+#define to_little(dest, src, itemsize)    endian_handler(true, dest, src, itemsize)
+#define from_little(dest, src, itemsize)  endian_handler(true, dest, src, itemsize)
+#define to_big(dest, src, itemsize)       endian_handler(false, dest, src, itemsize)
+#define from_big(dest, src, itemsize)     endian_handler(false, dest, src, itemsize)
+
 // Return true if platform is little endian; else false
 static bool is_little_endian(void) {
   const static int i = 1;
@@ -32,6 +37,47 @@ static bool is_little_endian(void) {
   }
   else {
     return false;
+  }
+}
+
+
+static void endian_handler(bool little, void *dest, const void *pa, int size) {
+  bool little_endian = is_little_endian();
+  if (little_endian == little) {
+    memcpy(dest, pa, size);
+  }
+  else {
+    uint8_t* pa_ = (uint8_t*)pa;
+    uint8_t* pa2_ = malloc((size_t)size);
+    switch (size) {
+      case 8:
+        pa2_[0] = pa_[7];
+            pa2_[1] = pa_[6];
+            pa2_[2] = pa_[5];
+            pa2_[3] = pa_[4];
+            pa2_[4] = pa_[3];
+            pa2_[5] = pa_[2];
+            pa2_[6] = pa_[1];
+            pa2_[7] = pa_[0];
+            break;
+      case 4:
+        pa2_[0] = pa_[3];
+            pa2_[1] = pa_[2];
+            pa2_[2] = pa_[1];
+            pa2_[3] = pa_[0];
+            break;
+      case 2:
+        pa2_[0] = pa_[1];
+            pa2_[1] = pa_[0];
+            break;
+      case 1:
+        pa2_[0] = pa_[1];
+            break;
+      default:
+        BLOSC_TRACE_ERROR("Unhandled size: %d.", size);
+    }
+    memcpy(dest, pa2_, size);
+    free(pa2_);
   }
 }
 
@@ -86,6 +132,7 @@ static inline void _sw32(void* dest, int32_t a) {
 static inline int32_t bswap32_(int32_t a) {
 #if defined (__GNUC__)
   return __builtin_bswap32(a);
+
 #elif defined (_MSC_VER) /* Visual Studio */
   return _byteswap_ulong(a);
 #else
