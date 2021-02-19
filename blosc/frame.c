@@ -1925,8 +1925,8 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
       *(int64_t*)(*chunk + trailer_offset + sizeof(int32_t)) = offset;
     }
     else {
-      *(int32_t *)(*chunk + trailer_offset) = nchunk;
-      *(int64_t *)(*chunk + trailer_offset + sizeof(int32_t)) = header_len + offset;
+      *(int32_t*)(*chunk + trailer_offset) = nchunk;
+      *(int64_t*)(*chunk + trailer_offset + sizeof(int32_t)) = header_len + offset;
     }
 
     int32_t* block_csizes = malloc(nblocks * sizeof(int32_t));
