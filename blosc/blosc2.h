@@ -623,6 +623,24 @@ BLOSC_EXPORT int blosc_free_resources(void);
  */
 BLOSC_EXPORT void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
                                       size_t* cbytes, size_t* blocksize);
+/**
+ * @brief Get information about a compressed buffer, namely the number of
+ * uncompressed bytes (@p nbytes) and compressed (@p cbytes). It also
+ * returns the @p blocksize (which is used internally for doing the
+ * compression by blocks).
+ *
+ * @param cbuffer The buffer of compressed data.
+ * @param nbytes The pointer where the number of uncompressed bytes will be put.
+ * @param cbytes The pointer where the number of compressed bytes will be put.
+ * @param blocksize The pointer where the block size will be put.
+ *
+ * You only need to pass the first BLOSC_EXTENDED_HEADER_LENGTH bytes of a
+ * compressed buffer for this call to work.
+ *
+ * @return On failure, returns negative value.
+ */
+BLOSC_EXPORT int blosc2_cbuffer_sizes(const void* cbuffer, int32_t* nbytes,
+                                      int32_t* cbytes, int32_t* blocksize);
 
 /**
  * @brief Checks that the compressed buffer starting at @cbuffer of length @cbytes may
@@ -636,10 +654,10 @@ BLOSC_EXPORT void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
  * @param cbytes The number of compressed bytes.
  * @param nbytes The pointer where the number of uncompressed bytes will be put.
  *
- * @return On failure, returns -1.
+ * @return On failure, returns negative value.
  */
 BLOSC_EXPORT int blosc_cbuffer_validate(const void* cbuffer, size_t cbytes,
-                                         size_t* nbytes);
+                                        size_t* nbytes);
 
 /**
  * @brief Get information about a compressed buffer, namely the type size

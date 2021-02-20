@@ -1209,9 +1209,8 @@ static int blosc_d(
   int32_t compformat = (context->header_flags & (uint8_t)0xe0) >> 5u;
   int dont_split = (context->header_flags & (uint8_t)0x10) >> 4u;
   int memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
-  int32_t chunk_nbytes = sw32_(src + BLOSC2_CHUNK_NBYTES);
-  int32_t chunk_cbytes = sw32_(src + BLOSC2_CHUNK_CBYTES);
-  //uint8_t blosc_version_format = src[BLOSC2_CHUNK_VERSION];
+  int32_t chunk_nbytes;
+  int32_t chunk_cbytes;
   int nstreams;
   int32_t neblock;
   int32_t nbytes;                /* number of decompressed bytes in split */
@@ -1221,6 +1220,12 @@ static int blosc_d(
   uint8_t* _dest;
   int32_t typesize = context->typesize;
   const char* compname;
+  int rc;
+
+  rc = blosc2_cbuffer_sizes(src, &chunk_nbytes, &chunk_cbytes, NULL);
+  if (rc < 0) {
+    return rc;
+  }
 
   if (context->block_maskout != NULL && context->block_maskout[nblock]) {
     // Do not decompress, but act as if we successfully decompressed everything
@@ -3035,29 +3040,46 @@ int blosc_get_complib_info(const char* compname, char** complib, char** version)
 }
 
 /* Return `nbytes`, `cbytes` and `blocksize` from a compressed buffer. */
-void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
-                         size_t* cbytes, size_t* blocksize) {
+void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes, size_t* cbytes, size_t* blocksize) {
+  int32_t nbytes32, cbytes32, blocksize32;
+  blosc2_cbuffer_sizes(cbuffer, &nbytes32, &cbytes32, &blocksize32);
+  *nbytes = nbytes32;
+  *cbytes = cbytes32;
+  *blocksize = blocksize32;
+}
+
+int blosc2_cbuffer_sizes(const void* cbuffer, int32_t* nbytes, int32_t* cbytes, int32_t* blocksize) {
   blosc_header header;
   int rc = blosc_read_header((uint8_t*)cbuffer, BLOSC_MIN_HEADER_LENGTH, false, &header);
   if (rc < 0) {
-    *nbytes = *blocksize = *cbytes = 0;
-    return;
+    /* Return zeros if error reading header */
+    memset(&header, 0, sizeof(header));
   }
 
   /* Read the interesting values */
-  *nbytes = header.nbytes;
-  *blocksize = header.blocksize;
-  *cbytes = header.cbytes;
+  if (nbytes != NULL)
+    *nbytes = header.nbytes;
+  if (cbytes != NULL)
+    *cbytes = header.cbytes;
+  if (blocksize != NULL)
+    *blocksize = header.blocksize;
+  return rc;
 }
 
 int blosc_cbuffer_validate(const void* cbuffer, size_t cbytes, size_t* nbytes) {
-  size_t header_cbytes, header_blocksize;
+  int32_t header_cbytes;
+  int32_t header_nbytes;
   if (cbytes < BLOSC_MIN_HEADER_LENGTH) {
     /* Compressed data should contain enough space for header */
     *nbytes = 0;
     return BLOSC2_ERROR_WRITE_BUFFER;
   }
-  blosc_cbuffer_sizes(cbuffer, nbytes, &header_cbytes, &header_blocksize);
+  int rc = blosc2_cbuffer_sizes(cbuffer, &header_nbytes, &header_cbytes, NULL);
+  if (rc < 0) {
+    *nbytes = 0;
+    return rc;
+  }
+  *nbytes = header_nbytes;
   if (header_cbytes != cbytes) {
     /* Compressed size from header does not match `cbytes` */
     *nbytes = 0;
@@ -3087,8 +3109,7 @@ void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize, int* flags) {
 
 
 /* Return version information from a compressed buffer. */
-void blosc_cbuffer_versions(const void* cbuffer, int* version,
-                            int* versionlz) {
+void blosc_cbuffer_versions(const void* cbuffer, int* version, int* versionlz) {
   blosc_header header;
   int rc = blosc_read_header((uint8_t*)cbuffer, BLOSC_MIN_HEADER_LENGTH, false, &header);
   if (rc < 0) {
