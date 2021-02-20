@@ -454,24 +454,29 @@ blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy
 
 /* Append an existing chunk into a super-chunk. */
 int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy) {
+  int32_t chunk_nbytes;
+  int32_t chunk_cbytes;
   int32_t nchunks = schunk->nchunks;
-  int32_t nbytes = sw32_(chunk + BLOSC2_CHUNK_NBYTES);
-  int32_t cbytes = sw32_(chunk + BLOSC2_CHUNK_CBYTES);
+
+  int rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
+  if (rc < 0) {
+    return rc;
+  }
 
   if (schunk->chunksize == -1) {
-    schunk->chunksize = nbytes;  // The super-chunk is initialized now
+    schunk->chunksize = chunk_nbytes;  // The super-chunk is initialized now
   }
-  if (nbytes > schunk->chunksize) {
+  if (chunk_nbytes > (size_t)schunk->chunksize) {
     BLOSC_TRACE_ERROR("Appending chunks that have different lengths in the same schunk "
-                      "is not supported yet: %d > %d.", nbytes, schunk->chunksize);
+                      "is not supported yet: %d > %d.", chunk_nbytes, schunk->chunksize);
     return BLOSC2_ERROR_CHUNK_APPEND;
   }
 
   /* Update counters */
   schunk->nchunks = nchunks + 1;
-  schunk->nbytes += nbytes;
+  schunk->nbytes += chunk_nbytes;
   if (schunk->frame == NULL) {
-    schunk->cbytes += cbytes;
+    schunk->cbytes += chunk_cbytes;
   } else {
     // A frame
     int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
@@ -481,14 +486,14 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
         schunk->cbytes += 0;
         break;
       default:
-        schunk->cbytes += cbytes;
+        schunk->cbytes += chunk_cbytes;
     }
   }
 
   if (copy) {
     // Make a copy of the chunk
-    uint8_t *chunk_copy = malloc(cbytes);
-    memcpy(chunk_copy, chunk, cbytes);
+    uint8_t *chunk_copy = malloc(chunk_cbytes);
+    memcpy(chunk_copy, chunk, chunk_cbytes);
     chunk = chunk_copy;
   }
 
@@ -496,20 +501,24 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (frame == NULL) {
     // Check that we are not appending a small chunk after another small chunk
-    if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
+    if ((schunk->nchunks > 0) && (chunk_nbytes < (size_t)schunk->chunksize)) {
       uint8_t* last_chunk = schunk->data[nchunks - 1];
-      int32_t last_nbytes = sw32_(last_chunk + BLOSC2_CHUNK_NBYTES);
-      if ((last_nbytes < schunk->chunksize) && (nbytes < schunk->chunksize)) {
+      int32_t last_nbytes;
+      rc = blosc2_cbuffer_sizes(last_chunk, &last_nbytes, NULL, NULL);
+      if (rc < 0) {
+        return rc;
+      }
+      if ((last_nbytes < schunk->chunksize) && (chunk_nbytes < (size_t)schunk->chunksize)) {
         BLOSC_TRACE_ERROR(
                 "Appending two consecutive chunks with a chunksize smaller than the schunk chunksize "
-                "is not allowed yet: %d != %d.", nbytes, schunk->chunksize);
+                "is not allowed yet: %d != %d.", chunk_nbytes, schunk->chunksize);
         return BLOSC2_ERROR_CHUNK_APPEND;
       }
     }
 
-    if (!copy && (cbytes < nbytes)) {
+    if (!copy && (chunk_cbytes < chunk_nbytes)) {
       // We still want to do a shrink of the chunk
-      chunk = realloc(chunk, cbytes);
+      chunk = realloc(chunk, chunk_cbytes);
     }
 
     /* Make space for appending the copy of the chunk and do it */
@@ -532,25 +541,30 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
 
 /* Insert an existing @p chunk in a specified position on a super-chunk */
 int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy) {
+  int32_t chunk_nbytes;
+  int32_t chunk_cbytes;
   int32_t nchunks = schunk->nchunks;
-  int32_t nbytes = sw32_(chunk + BLOSC2_CHUNK_NBYTES);
-  int32_t cbytes = sw32_(chunk + BLOSC2_CHUNK_CBYTES);
 
-  if (schunk->chunksize == -1) {
-    schunk->chunksize = nbytes;  // The super-chunk is initialized now
+  int rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
+  if (rc < 0) {
+    return rc;
   }
 
-  if (nbytes > schunk->chunksize) {
+  if (schunk->chunksize == -1) {
+    schunk->chunksize = chunk_nbytes;  // The super-chunk is initialized now
+  }
+
+  if (chunk_nbytes > schunk->chunksize) {
     BLOSC_TRACE_ERROR("Inserting chunks that have different lengths in the same schunk "
-                      "is not supported yet: %d > %d.", nbytes, schunk->chunksize);
+                      "is not supported yet: %d > %d.", chunk_nbytes, schunk->chunksize);
     return BLOSC2_ERROR_CHUNK_INSERT;
   }
 
   /* Update counters */
   schunk->nchunks = nchunks + 1;
-  schunk->nbytes += nbytes;
+  schunk->nbytes += chunk_nbytes;
   if (schunk->frame == NULL) {
-    schunk->cbytes += cbytes;
+    schunk->cbytes += chunk_cbytes;
   } else {
     // A frame
     int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
@@ -560,14 +574,14 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
         schunk->cbytes += 0;
         break;
       default:
-        schunk->cbytes += cbytes;
+        schunk->cbytes += chunk_cbytes;
     }
   }
 
   if (copy) {
     // Make a copy of the chunk
-    uint8_t *chunk_copy = malloc(cbytes);
-    memcpy(chunk_copy, chunk, cbytes);
+    uint8_t *chunk_copy = malloc(chunk_cbytes);
+    memcpy(chunk_copy, chunk, chunk_cbytes);
     chunk = chunk_copy;
   }
 
@@ -575,20 +589,24 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (frame == NULL) {
     // Check that we are not appending a small chunk after another small chunk
-    if ((schunk->nchunks > 0) && (nbytes < schunk->chunksize)) {
+    if ((schunk->nchunks > 0) && (chunk_nbytes < schunk->chunksize)) {
       uint8_t* last_chunk = schunk->data[nchunks - 1];
-      int32_t last_nbytes = sw32_(last_chunk + BLOSC2_CHUNK_NBYTES);
-      if ((last_nbytes < schunk->chunksize) && (nbytes < schunk->chunksize)) {
+      int32_t last_nbytes;
+      rc = blosc2_cbuffer_sizes(last_chunk, &last_nbytes, NULL, NULL);
+      if (rc < 0) {
+        return rc;
+      }
+      if ((last_nbytes < schunk->chunksize) && (chunk_nbytes < schunk->chunksize)) {
         BLOSC_TRACE_ERROR("Appending two consecutive chunks with a chunksize smaller "
                           "than the schunk chunksize is not allowed yet:  %d != %d",
-                          nbytes, schunk->chunksize);
+                          chunk_nbytes, schunk->chunksize);
         return BLOSC2_ERROR_CHUNK_APPEND;
       }
     }
 
-    if (!copy && (cbytes < nbytes)) {
+    if (!copy && (chunk_cbytes < chunk_nbytes)) {
       // We still want to do a shrink of the chunk
-      chunk = realloc(chunk, cbytes);
+      chunk = realloc(chunk, chunk_cbytes);
     }
 
     // Make space for appending the copy of the chunk and do it
@@ -616,16 +634,22 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
 
 
 int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy) {
-  int32_t nbytes = sw32_(chunk + BLOSC2_CHUNK_NBYTES);
-  int32_t cbytes = sw32_(chunk + BLOSC2_CHUNK_CBYTES);
+  int32_t chunk_nbytes;
+  int32_t chunk_cbytes;
+  int32_t nchunks = schunk->nchunks;
 
-  if (schunk->chunksize == -1) {
-    schunk->chunksize = nbytes;  // The super-chunk is initialized now
+  int rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
+  if (rc < 0) {
+    return rc;
   }
 
-  if ((schunk->chunksize != 0) && (nbytes != schunk->chunksize)) {
+  if (schunk->chunksize == -1) {
+    schunk->chunksize = chunk_nbytes;  // The super-chunk is initialized now
+  }
+
+  if ((schunk->chunksize != 0) && (chunk_nbytes != schunk->chunksize)) {
     BLOSC_TRACE_ERROR("Inserting chunks that have different lengths in the same schunk "
-                      "is not supported yet: %d > %d.", nbytes, schunk->chunksize);
+                      "is not supported yet: %d > %d.", chunk_nbytes, schunk->chunksize);
     return BLOSC2_ERROR_CHUNK_INSERT;
   }
 
@@ -636,17 +660,16 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     BLOSC_TRACE_ERROR("%d chunk can not be obtained from schunk.", nchunk);
     return -1;
   }
-  int32_t cbytes_old;
-  int32_t nbytes_old;
+  int32_t chunk_nbytes_old = 0;
+  int32_t chunk_cbytes_old = 0;
 
-  if (chunk_old == 0) {
-    nbytes_old = 0;
-    cbytes_old = 0;
-  } else {
-    nbytes_old = sw32_(chunk_old + BLOSC2_CHUNK_NBYTES);
-    cbytes_old = sw32_(chunk_old + BLOSC2_CHUNK_CBYTES);
-    if (cbytes_old == BLOSC_MAX_OVERHEAD) {
-        cbytes_old = 0;
+  if (chunk_old != 0) {
+    rc = blosc2_cbuffer_sizes(chunk_old, &chunk_nbytes_old, &chunk_cbytes_old, NULL);
+    if (rc < 0) {
+      return rc;
+    }
+    if (chunk_cbytes_old == BLOSC_MAX_OVERHEAD) {
+        chunk_cbytes_old = 0;
     }
   }
   if (needs_free) {
@@ -655,41 +678,41 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
 
   if (copy) {
     // Make a copy of the chunk
-    uint8_t *chunk_copy = malloc(cbytes);
-    memcpy(chunk_copy, chunk, cbytes);
+    uint8_t *chunk_copy = malloc(chunk_cbytes);
+    memcpy(chunk_copy, chunk, chunk_cbytes);
     chunk = chunk_copy;
   }
 
   blosc2_frame_s* frame = (blosc2_frame_s*)(schunk->frame);
   if (schunk->frame == NULL) {
     /* Update counters */
-    schunk->nbytes += nbytes;
-    schunk->nbytes -= nbytes_old;
-    schunk->cbytes += cbytes;
-    schunk->cbytes -= cbytes_old;
+    schunk->nbytes += chunk_nbytes;
+    schunk->nbytes -= chunk_nbytes_old;
+    schunk->cbytes += chunk_cbytes;
+    schunk->cbytes -= chunk_cbytes_old;
   } else {
     // A frame
     int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
     switch (special_value) {
       case BLOSC2_ZERO_RUNLEN:
       case BLOSC2_NAN_RUNLEN:
-        schunk->nbytes += nbytes;
-        schunk->nbytes -= nbytes_old;
+        schunk->nbytes += chunk_nbytes;
+        schunk->nbytes -= chunk_nbytes_old;
         if (frame->sframe) {
-          schunk->cbytes -= cbytes_old;
+          schunk->cbytes -= chunk_cbytes_old;
         }
         break;
       default:
         /* Update counters */
-        schunk->nbytes += nbytes;
-        schunk->nbytes -= nbytes_old;
-        schunk->cbytes += cbytes;
+        schunk->nbytes += chunk_nbytes;
+        schunk->nbytes -= chunk_nbytes_old;
+        schunk->cbytes += chunk_cbytes;
         if (frame->sframe) {
-          schunk->cbytes -= cbytes_old;
+          schunk->cbytes -= chunk_cbytes_old;
         }
         else {
-          if (cbytes_old >= cbytes) {
-            schunk->cbytes -= cbytes;
+          if (chunk_cbytes_old >= chunk_cbytes) {
+            schunk->cbytes -= chunk_cbytes;
           }
         }
     }
@@ -697,9 +720,9 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
 
   // Update super-chunk or frame
   if (schunk->frame == NULL) {
-    if (!copy && (cbytes < nbytes)) {
+    if (!copy && (chunk_cbytes < chunk_nbytes)) {
       // We still want to do a shrink of the chunk
-      chunk = realloc(chunk, cbytes);
+      chunk = realloc(chunk, chunk_cbytes);
     }
 
     // Free old chunk and add reference to new chunk
@@ -742,7 +765,10 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes
 /* Decompress and return a chunk that is part of a super-chunk. */
 int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
                                    void *dest, int32_t nbytes) {
+  int32_t chunk_nbytes;
+  int32_t chunk_cbytes;
   int chunksize;
+  int rc;
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
 
   if (frame == NULL) {
@@ -756,15 +782,19 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
       return 0;
     }
 
-    int nbytes_ = sw32_(src + BLOSC2_CHUNK_NBYTES);
-    if (nbytes < nbytes_) {
+    rc = blosc2_cbuffer_sizes(src, &chunk_nbytes, &chunk_cbytes, NULL);
+    if (rc < 0) {
+      return rc;
+    }
+
+    if (nbytes < chunk_nbytes) {
       BLOSC_TRACE_ERROR("Buffer size is too small for the decompressed buffer "
-                        "('%d' bytes, but '%d' are needed).", nbytes, nbytes_);
+                        "('%d' bytes, but '%d' are needed).", nbytes, chunk_nbytes);
       return BLOSC2_ERROR_INVALID_PARAM;
     }
-    int cbytes = sw32_(src + BLOSC2_CHUNK_CBYTES);
-    chunksize = blosc2_decompress_ctx(schunk->dctx, src, cbytes, dest, nbytes);
-    if (chunksize < 0 || chunksize != nbytes_) {
+
+    chunksize = blosc2_decompress_ctx(schunk->dctx, src, chunk_cbytes, dest, nbytes);
+    if (chunksize < 0 || chunksize != chunk_nbytes) {
       BLOSC_TRACE_ERROR("Error in decompressing chunk.");
       if (chunksize < 0)
         return chunksize;
@@ -808,7 +838,12 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, 
   }
 
   *needs_free = false;
-  return sw32_(*chunk + BLOSC2_CHUNK_CBYTES);
+  int32_t chunk_cbytes;
+  int rc = blosc2_cbuffer_sizes(*chunk, NULL, &chunk_cbytes, NULL);
+  if (rc < 0) {
+    return rc;
+  }
+  return (int)chunk_cbytes;
 }
 
 
@@ -841,7 +876,12 @@ int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int nchunk, uint8_t **chu
   }
 
   *needs_free = false;
-  return sw32_(*chunk + BLOSC2_CHUNK_CBYTES);
+  int32_t chunk_cbytes;
+  int rc = blosc2_cbuffer_sizes(*chunk, NULL, &chunk_cbytes, NULL);
+  if (rc < 0) {
+    return rc;
+  }
+  return (int)chunk_cbytes;
 }
 
 
@@ -1124,8 +1164,8 @@ int blosc2_vlmeta_get(blosc2_schunk *schunk, const char *name, uint8_t **content
     return nvlmetalayer;
   }
   blosc2_metalayer *meta = schunk->vlmetalayers[nvlmetalayer];
-  size_t nbytes, cbytes, blocksize;
-  blosc_cbuffer_sizes(meta->content, &nbytes, &cbytes, &blocksize);
+  int32_t nbytes, cbytes;
+  blosc2_cbuffer_sizes(meta->content, &nbytes, &cbytes, NULL);
   if (cbytes != meta->content_len) {
     BLOSC_TRACE_ERROR("User metalayer \"%s\" is corrupted.", meta->name);
     return BLOSC2_ERROR_DATA;
