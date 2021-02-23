@@ -998,8 +998,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
         // A run
         int32_t value = _src[j * neblock];
         if (ntbytes > destsize) {
-          /* Not enough space to write out compressed block size */
-          return BLOSC2_ERROR_WRITE_BUFFER;
+          return 0;    /* Non-compressible data */
         }
         // Encode the repeated byte in the first (LSB) byte of the length of the split.
         _sw32(dest - 4, -value);    // write the value in two's complement
@@ -1008,8 +1007,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
           ntbytes += 1;
           ctbytes += 1;
           if (ntbytes > destsize) {
-            /* Not enough space to write out compressed block size */
-            return BLOSC2_ERROR_WRITE_BUFFER;
+            return 0;    /* Non-compressible data */
           }
           // Set MSB bit (sign) to 1 (not really necessary here, but for demonstration purposes)
           // dest[-1] |= 0x80;
