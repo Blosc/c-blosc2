@@ -2393,6 +2393,31 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
       return NULL;
     }
   }
+  int32_t cbytes_old;
+  int32_t old_offset;
+  if (!frame->sframe) {
+    // See how big would be the space
+    old_offset = offsets[nchunk];
+    bool needs_free;
+    uint8_t *chunk_old;
+    int err = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_old, &needs_free);
+    if (err < 0) {
+      BLOSC_TRACE_ERROR("%d chunk con not obtenined from schunk.", nchunk);
+    }
+
+    if (chunk_old == 0) {
+      cbytes_old = 0;
+    }
+    else {
+      cbytes_old = sw32_(chunk_old + BLOSC2_CHUNK_CBYTES);
+      if (cbytes_old == BLOSC_MAX_OVERHEAD) {
+        cbytes_old = 0;
+      }
+    }
+    if (needs_free) {
+      free(chunk_old);
+    }
+  }
 
   // Add the new offset
   int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
@@ -2421,6 +2446,10 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
       }
   }
 
+  if (!frame->sframe && cbytes_chunk != 0 && cbytes_old >= cbytes_chunk) {
+    offsets[nchunk] = old_offset;
+    cbytes = old_offset;
+  }
   // Re-compress the offsets again
   blosc2_context* cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
   cctx->typesize = 8;
