@@ -2402,7 +2402,8 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
     uint8_t *chunk_old;
     int err = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_old, &needs_free);
     if (err < 0) {
-      BLOSC_TRACE_ERROR("%d chunk con not obtenined from schunk.", nchunk);
+      BLOSC_TRACE_ERROR("%d chunk can not be obtained from schunk.", nchunk);
+      return NULL;
     }
 
     if (chunk_old == 0) {
