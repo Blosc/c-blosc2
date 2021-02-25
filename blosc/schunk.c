@@ -237,7 +237,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
   for (int nmeta = 0; nmeta < schunk->nmetalayers; ++nmeta) {
     blosc2_metalayer *meta = schunk->metalayers[nmeta];
     if (blosc2_meta_add(new_schunk, meta->name, meta->content, meta->content_len) < 0) {
-      BLOSC_TRACE_ERROR("Con not add %s `metalayer`.", meta->name);
+      BLOSC_TRACE_ERROR("Can not add %s `metalayer`.", meta->name);
       return NULL;
     }
   }
@@ -633,7 +633,8 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   uint8_t *chunk_old;
   int err = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_old, &needs_free);
   if (err < 0) {
-    BLOSC_TRACE_ERROR("%d chunk con not obtenined from schunk.", nchunk);
+    BLOSC_TRACE_ERROR("%d chunk can not be obtained from schunk.", nchunk);
+    return -1;
   }
   int32_t cbytes_old;
   int32_t nbytes_old;
