@@ -2406,7 +2406,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
       return NULL;
     }
 
-    if (chunk_old == 0) {
+    if (chunk_old == NULL) {
       cbytes_old = 0;
     }
     else {
