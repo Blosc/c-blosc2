@@ -166,7 +166,7 @@ int ndcell_encoder(blosc2_context* context, const void* input, int length, void*
 
   uint8_t* content;
   uint32_t content_len;
-  int nmetalayer = blosc2_get_metalayer(context->schunk, "caterva", &content, &content_len);
+  int nmetalayer = blosc2_meta_get(context->schunk, "caterva", &content, &content_len);
   if (nmetalayer < 0) {
     BLOSC_TRACE_ERROR("Metalayer \"caterva\" not found.");
     return nmetalayer;
@@ -326,7 +326,7 @@ int ndcell_decoder(blosc2_context* context, const void* input, int length, void*
 
   uint8_t* content;
   uint32_t content_len;
-  int nmetalayer = blosc2_get_metalayer(context->schunk, "caterva", &content, &content_len);
+  int nmetalayer = blosc2_meta_get(context->schunk, "caterva", &content, &content_len);
   if (nmetalayer < 0) {
     BLOSC_TRACE_ERROR("Metalayer \"caterva\" not found.");
     return nmetalayer;
