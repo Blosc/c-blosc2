@@ -32,6 +32,7 @@
 #include "trunc-prec.h"
 #include "blosclz.h"
 #include "btune.h"
+#include "ndcell.h"
 
 #if defined(HAVE_LZ4)
   #include "lz4.h"
@@ -880,6 +881,9 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
       case BLOSC_BITSHUFFLE:
         bitshuffle(typesize, bsize, _src, _dest, tmp2);
         break;
+      case BLOSC_NDCELL:
+        ndcell_encoder(context, _src, bsize, _dest);
+        break;
       case BLOSC_DELTA:
         delta_encoder(src, offset, bsize, typesize, _src, _dest);
         break;
@@ -1149,6 +1153,9 @@ int pipeline_d(blosc2_context* context, const int32_t bsize, uint8_t* dest,
         break;
       case BLOSC_BITSHUFFLE:
         bitunshuffle(typesize, bsize, _src, _dest, _tmp, context->src[BLOSC2_CHUNK_VERSION]);
+        break;
+      case BLOSC_NDCELL:
+        ndcell_decoder(context, _src, bsize, _dest);
         break;
       case BLOSC_DELTA:
         if (context->nthreads == 1) {

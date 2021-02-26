@@ -110,12 +110,21 @@ enum {
   BLOSC_BITSHUFFLE = 2,  //!< bit-wise shuffle
   BLOSC_DELTA = 3,       //!< delta filter
   BLOSC_TRUNC_PREC = 4,  //!< truncate precision filter
-  BLOSC_LAST_FILTER= 5,  //!< sentinel
+  BLOSC_NDCELL= 5,       //!< ndcell filter
+  BLOSC_LAST_FILTER= 6,  //!< sentinel
 };
 
 enum {
   BLOSC2_MAX_FILTERS = 6,
   //!< Maximum number of filters in the filter pipeline
+};
+
+enum {
+  BLOSC2_NDCELL_2 = 2,
+  BLOSC2_NDCELL_4 = 4,
+  BLOSC2_NDCELL_8 = 8,
+  BLOSC2_NDCELL_16 = 16,
+  BLOSC2_NDCELL_32 = 32,
 };
 
 /**
