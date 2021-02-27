@@ -637,7 +637,9 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   *ptrailer = 0;  // fingerprint type: 0 -> no fp; 1 -> 32-bit; 2 -> 64-bit; 3 -> 128-bit
   ptrailer += 1;
 
-  // Uncomment this when we compute an actual fingerprint
+  // Remove call to memset when we compute an actual fingerprint
+  memset(ptrailer, 0, 16);
+  // Uncomment call to memcpy when we compute an actual fingerprint
   // memcpy(ptrailer, xxh3_fingerprint, sizeof(xxh3_fingerprint));
   ptrailer += 16;
 
