@@ -1755,6 +1755,7 @@ int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize,
 
   if (rc < 0) {
     free(*chunk);
+    *needs_free = false;
     *chunk = NULL;
   }
 
@@ -2063,22 +2064,21 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   }
 
   // Check that we are not appending a small chunk after another small chunk
+  int32_t chunk_nbytes_last;
   if (chunksize == 0 && (nchunks > 0) && (chunk_nbytes < (size_t)chunksize)) {
     uint8_t* last_chunk;
     bool needs_free;
     rc = frame_get_lazychunk(frame, nchunks - 1, &last_chunk, &needs_free);
     if (rc < 0) {
-      BLOSC_TRACE_ERROR("Cannot get the last chunk (in position %d).",
-                        nchunks - 1);
-      return NULL;
-    }
-    int32_t chunk_nbytes_last;
-    rc = blosc2_cbuffer_sizes(last_chunk, &chunk_nbytes_last, NULL, NULL);
-    if (rc < 0) {
-      return NULL;
+      BLOSC_TRACE_ERROR("Cannot get the last chunk (in position %d).", nchunks - 1);
+    } else {
+      rc = blosc2_cbuffer_sizes(last_chunk, &chunk_nbytes_last, NULL, NULL);
     }
     if (needs_free) {
       free(last_chunk);
+    }
+    if (rc < 0) {
+      return NULL;
     }
     if ((chunk_nbytes_last < (size_t)chunksize) && (nbytes < (size_t)chunksize)) {
       BLOSC_TRACE_ERROR("Appending two consecutive chunks with a chunksize smaller "
