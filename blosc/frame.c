@@ -2118,7 +2118,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
 
   // Add the new offset
   int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
-  uint64_t offset_value = ((uint64_t)1 << 63);
+  uint64_t offset_value = 0;
   switch (special_value) {
     case BLOSC2_ZERO_RUNLEN:
       // Zero chunk.  Code it in a special way.
@@ -2287,7 +2287,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
 
   // Add the new offset
   int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
-  uint64_t offset_value = ((uint64_t)1 << 63);
+  uint64_t offset_value = 0;
   switch (special_value) {
     case BLOSC2_ZERO_RUNLEN:
       // Zero chunk.  Code it in a special way.
@@ -2492,7 +2492,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
 
   // Add the new offset
   int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
-  uint64_t offset_value = ((uint64_t)1 << 63);
+  uint64_t offset_value = 0;
   switch (special_value) {
     case BLOSC2_ZERO_RUNLEN:
       // Zero chunk.  Code it in a special way.

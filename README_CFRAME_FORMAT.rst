@@ -204,8 +204,8 @@ The codification for the offsets is as follows::
                                    |
                                    +--> Byte for special values
 
-If the most significant bit (7) of the most significant byte above (byte N, as little endian is used) is set,
-that represents a chunk with a run-length of special values.  The supported special values are:
+The most significant byte above (byte N, as little endian is used) is reserved
+to represent a chunk with a run-length of special values.  The supported special values are:
 
 :special_values:
     (``uint8``) Flags for special values.
@@ -225,7 +225,7 @@ that represents a chunk with a run-length of special values.  The supported spec
         :``6``:
             Reserved.
         :``7``:
-            Indicates a special value.  If not set, a regular value.
+            Reserved.
 
 
 Trailer
