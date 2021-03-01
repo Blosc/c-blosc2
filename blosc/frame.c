@@ -1885,6 +1885,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
   int32_t typesize;
   int32_t lazychunk_cbytes;
   int64_t offset;
+  FILE* fp = NULL;
 
   *chunk = NULL;
   *needs_free = false;
@@ -1914,9 +1915,6 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     lazychunk_cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
     rc = frame_special_chunk(offset, chunksize, typesize, chunk,
                              (int32_t)lazychunk_cbytes, needs_free);
-    if (rc < 0) {
-      return rc;
-    }
     goto end;
   }
 
@@ -1927,7 +1925,6 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     int32_t chunk_cbytes;
     int32_t chunk_blocksize;
     uint8_t header[BLOSC_MIN_HEADER_LENGTH];
-    FILE* fp = NULL;
     if (frame->sframe) {
       // The chunk is not in the frame
       fp = sframe_open_chunk(frame->urlpath, offset, "rb");
@@ -1939,13 +1936,12 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     size_t rbytes = fread(header, 1, BLOSC_MIN_HEADER_LENGTH, fp);
     if (rbytes != BLOSC_MIN_HEADER_LENGTH) {
       BLOSC_TRACE_ERROR("Cannot read the header for chunk in the frame.");
-      fclose(fp);
-      return BLOSC2_ERROR_FILE_READ;
+      rc = BLOSC2_ERROR_FILE_READ;
+      goto end;
     }
     rc = blosc2_cbuffer_sizes(header, &chunk_nbytes, &chunk_cbytes, &chunk_blocksize);
     if (rc < 0) {
-      fclose(fp);
-      return rc;
+      goto end;
     }
     size_t nblocks = chunk_nbytes / chunk_blocksize;
     size_t leftover_block = chunk_nbytes % chunk_blocksize;
@@ -1956,6 +1952,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     lazychunk_cbytes = trailer_offset + trailer_len;
     *chunk = malloc(lazychunk_cbytes);
     *needs_free = true;
+
     // Read just the full header and bstarts section too (lazy partial length)
     if (frame->sframe) {
       fseek(fp, 0, SEEK_SET);
@@ -1963,11 +1960,12 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     else {
       fseek(fp, header_len + offset, SEEK_SET);
     }
+
     rbytes = fread(*chunk, 1, trailer_offset, fp);
-    fclose(fp);
     if (rbytes != trailer_offset) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) chunk out of the frame.");
-      return BLOSC2_ERROR_FILE_READ;
+      rc = BLOSC2_ERROR_FILE_READ;
+      goto end;
     }
 
     // Mark chunk as lazy
@@ -2022,12 +2020,20 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     // The chunk is in memory and just one pointer away
     *chunk = frame->cframe + header_len + offset;
     rc = blosc2_cbuffer_sizes(*chunk, NULL, &lazychunk_cbytes, NULL);
-    if (rc < 0) {
-      return rc;
-    }
   }
 
   end:
+  if (fp != NULL) {
+    fclose(fp);
+  }
+  if (rc < 0) {
+    if (needs_free) {
+      free(*chunk);
+      *chunk = NULL;
+    }
+    return rc;
+  }
+
   return (int)lazychunk_cbytes;
 }
 
