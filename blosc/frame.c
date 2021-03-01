@@ -2019,7 +2019,12 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
   } else {
     // The chunk is in memory and just one pointer away
     *chunk = frame->cframe + header_len + offset;
-    rc = blosc2_cbuffer_sizes(*chunk, NULL, &lazychunk_cbytes, NULL);
+    if ((int64_t)header_len + offset + BLOSC_MIN_HEADER_LENGTH > frame->len) {
+      BLOSC_TRACE_ERROR("Cannot read the header for chunk in the (contiguous) frame.");
+      rc = BLOSC2_ERROR_READ_BUFFER;
+    } else {
+      rc = blosc2_cbuffer_sizes(*chunk, NULL, &lazychunk_cbytes, NULL);
+    }
   }
 
   end:
