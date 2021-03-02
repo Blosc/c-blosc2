@@ -994,7 +994,7 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
         return NULL;
       }
       *off_cbytes = (int32_t)chunk_cbytes;
-      if (*off_cbytes < 0 || *off_cbytes > frame->len) {
+      if (*off_cbytes < 0 || off_pos + *off_cbytes > frame->len) {
         BLOSC_TRACE_ERROR("Cannot read the cbytes outside of frame boundary.");
         return NULL;
       }
