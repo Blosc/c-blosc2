@@ -1384,7 +1384,10 @@ static int blosc_d(
           return BLOSC2_ERROR_RUN_LENGTH;
         }
         uint8_t value = -cbytes;
-        memset(_dest, value, (unsigned int) neblock);
+        memset(_dest, value, (unsigned int)neblock);
+      } else {
+        BLOSC_TRACE_ERROR("Invalid or unsupported compressed stream token value - %d", token);
+        return BLOSC2_ERROR_RUN_LENGTH;
       }
       nbytes = neblock;
       cbytes = 0;  // everything is encoded in the cbytes token
