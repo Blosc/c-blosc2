@@ -35,13 +35,15 @@ Right now (August 2019), the next features are already implemented (although the
 
 * Dictionaries: when a block is going to be compressed, C-Blosc2 can use a previously made dictionary (stored in the header of the super-chunk) for compressing all the blocks that are part of the chunks.  This usually improves the compression ratio, as well as the decompression speed, at the expense of a (small) overhead in compression speed.  Currently, it is only supported in the `zstd` codec, but would be nice to extend it to `lz4` and `blosclz` at least.
 
-* Frames: allow to store super-chunks contiguously, either on-disk or in-memory.  When a super-chunk is backed by a frame, instead of storing all the chunks sparsely in-memory, they are serialized inside the frame container.  The frame can be stored on-disk too, meaning that persistence of super-chunks is supported.
+* Contiguous frames: allow to store super-chunks contiguously, either on-disk or in-memory.  When a super-chunk is backed by a frame, instead of storing all the chunks sparsely in-memory, they are serialized inside the frame container.  The frame can be stored on-disk too, meaning that persistence of super-chunks is supported.
 
-* Sparse storage support for super-chunks.  This means that each chunk is stored in a separate file, as well as the metadata.  This is be the counterpart of in-memory super-chunk, and allows for more efficient updates than in frames (i.e. avoiding 'holes' in monolithic files).
+* Sparse frames (on-disk): each chunk in a super-chunk is stored in a separate file, as well as the metadata.  This is the counterpart of in-memory super-chunk, and allows for more efficient updates than in frames (i.e. avoiding 'holes' in monolithic files).
 
 * Meta-layers: optionally, the user can add meta-data for different uses and in different layers.  For example, one may think on providing a meta-layer for [NumPy](http://www.numpy.org) so that most of the meta-data for it is stored in a meta-layer; then, one can place another meta-layer on top of the latter for adding more high-level info if desired (e.g. geo-spatial, meteorological...).
 
-* Nice markup for documentation: we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  Thanks to Alberto Sabater for contributing the support for this.
+* Variable length meta-layers: the user may want to add variable-length meta information that can be potentially very large (up to 2 GB). The regular meta-layer described above is very quick to read, but meant to store fixed-length and relatively small meta information.  Variable length metalayers are stored in the trailer of a frame, whereas regular meta-layers are in the header. 
+
+* Nice markup for documentation: we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  See https://blosc-doc.readthedocs.io/en/latest/c-blosc2_api.html.  Thanks to Alberto Sabater for contributing the support for this.
 
 
 Actions to be done
@@ -69,8 +71,8 @@ Actions to be done
 Outreaching
 -----------
 
-* Improve the Blosc website: create a nice, modern-looking and easy to navigate website so that new potential users can see at first glimpse what's Blosc all about and power-users can access the documentation part easily.  Ideally, a site-only search box would be great (sphix-based docs would offer this for free).
+* Improve the Blosc website: create a nice, modern-looking and easy to navigate website so that new potential users can see at first glimpse what's Blosc all about and power-users can access the documentation part easily.  Ideally, a site-only search box would be great (sphinx-based docs would offer this for free).
 
-* Attend to meetings and conferences: it is very important to plan going to conferences for advertising C-Blosc2 and meeting people in-person.  Questions is, which meetings?  When on the Python arena, the answer would be quite clear, but for general C libraries like C-Blosc2, it is not that straightforward which ones are the most suited.
+* Attend to meetings and conferences: it is very important to plan going to conferences for advertising C-Blosc2 and meeting people in-person.  We need to decide which meetings to attend.  When on the Python arena, the answer would be quite clear, but for general C libraries like C-Blosc2, it is not that straightforward which ones are the most suited.
   
 * Other outreaching activities would be to produce videos of the kind 'Blosc in 10 minutes', but not sure if this would be interesting for potential Blosc users (probably short tutorials in docs would be better suited).
