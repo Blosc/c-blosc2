@@ -39,9 +39,15 @@ Right now (August 2019), the next features are already implemented (although the
 
 * Sparse frames (on-disk): each chunk in a super-chunk is stored in a separate file, as well as the metadata.  This is the counterpart of in-memory super-chunk, and allows for more efficient updates than in frames (i.e. avoiding 'holes' in monolithic files).
 
+* Partial chunk reads: there is support for reading just part of chunks, so avoiding to read the whole thing and then discard the unnecessary data.
+
+* Parallel chunk reads: when several blocks of a chunk are to be read, this is done in parallel by the decompressing machinery.  That means that every thread is responsible to read, post-filter and decompress a block by itself, leading to an efficient overlap of I/O and CPU usage that optimizes reads to a maximum.
+
 * Meta-layers: optionally, the user can add meta-data for different uses and in different layers.  For example, one may think on providing a meta-layer for [NumPy](http://www.numpy.org) so that most of the meta-data for it is stored in a meta-layer; then, one can place another meta-layer on top of the latter for adding more high-level info if desired (e.g. geo-spatial, meteorological...).
 
-* Variable length meta-layers: the user may want to add variable-length meta information that can be potentially very large (up to 2 GB). The regular meta-layer described above is very quick to read, but meant to store fixed-length and relatively small meta information.  Variable length metalayers are stored in the trailer of a frame, whereas regular meta-layers are in the header. 
+* Variable length meta-layers: the user may want to add variable-length meta information that can be potentially very large (up to 2 GB). The regular meta-layer described above is very quick to read, but meant to store fixed-length and relatively small meta information.  Variable length metalayers are stored in the trailer of a frame, whereas regular meta-layers are in the header.
+
+* Efficient support for large run-lengths: large sequences of repeated values can be efficiently represented with a very efficient and fast run-length representation, without the need to use regular codecs for this.  This is going to be useful in situations where a lot of zeros ned to be stored (e.g. sparse matrices).
 
 * Nice markup for documentation: we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  See https://blosc-doc.readthedocs.io/en/latest/c-blosc2_api.html.  Thanks to Alberto Sabater for contributing the support for this.
 
@@ -49,7 +55,7 @@ Right now (August 2019), the next features are already implemented (although the
 Actions to be done
 ------------------
 
-* Support for network storage.  Sparse storage already supports disk I/O, but it could be nice to expand this support to network I/O (using S3, HDFS or others).  We need to consider which backends are more useful for users, and also that the implementation should be feasible (read: reasonably simple) for a C library as C-Blosc2. 
+* Improve the safety of the library.  We are actively using using the [OSS-Fuzz](https://github.com/google/oss-fuzz) and ClusterFuzz (https://oss-fuzz.com) for uncovering programming errors in C-Blosc2.  Although this is always a work in progress, we did a long way in improving our safety, mainly thanks to the efforts of Nathan Moinvaziri.
 
 * Plugin capabilities for allowing users to add more filters and codecs.  There should also be a plugin register capability so that the info about the new filters and codecs can be persistent and propagated to different machines.
 
@@ -61,11 +67,13 @@ Actions to be done
   
   - Tutorials/book: besides the API docstrings, more documentation materials should be provided, like tutorials or a book about Blosc (or at least, the beginnings of it).  Due to its adoption in GitHub and Jupyter notebooks, one of the most extended and useful markup systems is MarkDown, so this should also be the first candidate to use here.
   
-* Wrappers for other languages: Python and Java are the most obvious candidates, but others like R or Julia would be nice to have.  Still not sure if these should be produced and maintained by the Blosc development team, or leave them for third-party players that would be interested. [The steering [council discussed this](https://github.com/Blosc/governance/blob/master/steering_council_minutes/2020-03-26.md), and probably just the Python wrapper should be maintained by Blosc maintainers themselves, while the other languages should be maintained by the community.]
+* Wrappers for other languages: Python and Java are the most obvious candidates, but others like R or Julia would be nice to have.  Still not sure if these should be produced and maintained by the Blosc development team, or leave them for third-party players that would be interested. [The steering [council discussed this](https://github.com/Blosc/governance/blob/master/steering_council_minutes/2020-03-26.md), and probably just the Python wrapper should be maintained by Blosc maintainers themselves, while the other languages should be maintained by the community.]  Update: we have got a grant from the PSF for producing a Python wrapper; thanks guys!
 
 * It would be nice to use [LGTM](https://lgtm.com), a CI-friendly analyzer for security.
 
 * Lock support for super-chunks: when different processes are accessing concurrently to super-chunks, make them to sync properly by using locks, either on-disk (frame-backed super-chunks), or in-memory. Such a lock support would be configured in build time, so it could be disabled with a cmake flag.
+
+* Support for network storage.  Sparse storage already supports disk I/O, but it could be nice to expand this support to network I/O (using S3, HDFS or others).  We need to consider which backends are more useful for users, and also that the implementation should be feasible (read: reasonably simple) for a C library as C-Blosc2.
 
 
 Outreaching
