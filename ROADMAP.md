@@ -80,4 +80,4 @@ Outreaching
 Increase diversity
 ------------------
 
-* We strive to make our team as diverse as possible.  We are actively looking into more women and people from a variety of cultures to join our team.  Update: we are glad to have Marta Iborra, our first female among us; thanks to the Python Software Foundation for providing funds for allowing this.
+* **We strive to make our team as diverse as possible:**  we are actively looking into more women and people from a variety of cultures to join our team.  Update: we are glad to have Marta Iborra, our first female among us; thanks to the Python Software Foundation for providing funds for allowing this.
