@@ -198,7 +198,7 @@ data stream is stored with the size of the stream `int32 csize` preceeding the b
     | csize | cdata |
     +=======+=======+
 
-There are a couple of special cases for `int32 csize`.  If zero, that means that the data stream is fully made of zeros.
+There are a couple of special cases for `int32 csize`.  If zero, that means that the stream is fully made of zeros, *and* there is not a `cdata` section. The actual size of the stream is inferred from `blocksize` and whether or not the block is split.
 If negative, the stream is stored like this::
 
     +=======+=======+=======+
@@ -211,7 +211,7 @@ where `uint8_t token` is a byte for providing different meanings to `int32 csize
     (``bitfield``) Flags for different meanings.
 
     :bit 0:
-        The cdata stream is a run-length of a repeated bytes.
+        Repeated byte (stream is a run-length of bytes). The `cdata` section is one single byte, representing the repeated value in the stream. Note that repeated zeros cannot happen here (already handled by the `csize == 0` case above).
 
     :bits 1 and 2:
         Reserved for two-codecs in a row. TODO: complete description
