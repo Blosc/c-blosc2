@@ -27,6 +27,26 @@ extern "C" {
 #define to_big(dest, src, itemsize)       endian_handler(false, dest, src, itemsize)
 #define from_big(dest, src, itemsize)     endian_handler(false, dest, src, itemsize)
 
+#ifdef NDEBUG
+#define DEBUG_PRINT(...) \
+    do {                 \
+    } while (0)
+#else
+#define DEBUG_PRINT(...)                                                         \
+    do {                                                                         \
+        fprintf(stderr, "ERROR: %s (%s:%d)\n", __VA_ARGS__, __FILE__, __LINE__); \
+    } while (0)
+#endif
+
+#define BLOSC_ERROR_NULL(pointer, rc)                             \
+    do {                                                        \
+        if (pointer == NULL) {                                  \
+            DEBUG_PRINT(print_error(rc)); \
+            return rc;                    \
+        }                                                       \
+    } while (0)
+
+
 // Return true if platform is little endian; else false
 static bool is_little_endian(void) {
   const static int i = 1;

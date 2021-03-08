@@ -186,9 +186,13 @@ int ndcell_encoder(blosc2_context* context, const void* input, int length, void*
   uint8_t cell_shape = context->filters_meta[filter_ind];
   const int cell_size = (int) pow(cell_shape, ndim);
   int32_t typesize = context->typesize;
+  int32_t blocksize = typesize;
+  for (int i = 0; i < ndim; i++){
+    blocksize *= blockshape[i];
+  }
 
-  if (NDCELL_UNEXPECT_CONDITIONAL(length != (blockshape[0] * blockshape[1] * typesize))) {
-    printf("Length not equal to blocksize %d %d %d \n", length, blockshape[0], blockshape[1]);
+  if (NDCELL_UNEXPECT_CONDITIONAL(length != blocksize)) {
+    printf("Length not equal to blocksize %d %d \n", length, blocksize);
     return -1;
   }
 
@@ -350,8 +354,12 @@ int ndcell_decoder(blosc2_context* context, const void* input, int length, void*
   uint8_t* ip = (uint8_t*)input;
   uint8_t* ip_limit = ip + length;
   uint8_t* op = (uint8_t*)output;
+  int32_t blocksize = typesize;
+  for (int i = 0; i < ndim; i++){
+    blocksize *= blockshape[i];
+  }
 
-  if (NDCELL_UNEXPECT_CONDITIONAL(length != (blockshape[0] * blockshape[1] * typesize))) {
+  if (NDCELL_UNEXPECT_CONDITIONAL(length != blocksize)) {
     printf("Length not equal to blocksize \n");
     return -1;
   }
@@ -418,8 +426,8 @@ int ndcell_decoder(blosc2_context* context, const void* input, int length, void*
   ind += pad_shape[ndim - 1];
 
 
-  if (ind != (int32_t) (blockshape[0] * blockshape[1])) {
-    printf("Output size is not compatible with embeded blockshape ind %d, %d \n", ind, (blockshape[0] * blockshape[1] * typesize));
+  if (ind != (int32_t) (blocksize / typesize)) {
+    printf("Output size is not compatible with embeded blockshape ind %d \n", ind, (blocksize / typesize));
     return 0;
   }
 

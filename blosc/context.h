@@ -41,7 +41,7 @@ struct blosc2_context_s {
   /* Flags for header */
   uint8_t blosc2_flags;
   /* Flags specific for blosc2 */
-  int32_t sourcesize;
+  size_t sourcesize;
   /* Number of bytes in source buffer */
   int32_t header_overhead;
   /* The number of bytes in chunk header */
@@ -53,9 +53,9 @@ struct blosc2_context_s {
   /* Length of the block in bytes */
   int32_t output_bytes;
   /* Counter for the number of input bytes */
-  int32_t srcsize;
+  size_t srcsize;
   /* Counter for the number of output bytes */
-  int32_t destsize;
+  size_t destsize;
   /* Maximum size for destination buffer */
   int32_t typesize;
   /* Type size */
