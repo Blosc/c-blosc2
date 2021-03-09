@@ -1,23 +1,7 @@
 /*
-  Copyright (C) 2015  Francesc Alted
+  Copyright (C) 2021 The Blosc Developers
   http://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
-
-  Example program demonstrating use of the Blosc filter from C code.
-
-  To compile this program:
-
-  $ gcc schunk_simple.c -o schunk_simple -lblosc2
-
-  To run:
-
-  $ ./schunk_simple
-  Blosc version info: 2.0.0-beta.1 ($Date:: 2019-08-09 #$)
-  Compression ratio: 381.5 MB -> 12.2 MB (31.2x)
-  Compression time: 0.119 s, 3192.9 MB/s
-  Decompression time: 0.035 s, 10888.3 MB/s
-  Successful roundtrip data <-> schunk !
-
 */
 
 
@@ -89,7 +73,7 @@ int main(void) {
 
   filter_params params = {.itemsize=sizeof(int32_t)};
   blosc2_udfilter udfilter;
-  udfilter.id = 150;
+  udfilter.id = 128;
   udfilter.forward = filter_forward;
   udfilter.backward = filter_backward;
   udfilter.params = &params;
@@ -97,7 +81,7 @@ int main(void) {
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.udfilters[5] = udfilter;
   cparams.filters[4] = BLOSC_UDFILTER;
-  cparams.filters_meta[4] = 150;
+  cparams.filters_meta[4] = 128;
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.udfilters[0] = udfilter;
