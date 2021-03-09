@@ -232,8 +232,8 @@ endif()
 #            WORKING_DIRECTORY "${ZLIB_LOCAL_DIR}"
 #    )
 #    add_custom_command(
-#            OUTPUT "b"
-#            COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/internal-complibs/zlib-ng-2.0.0-RC2/zconf-ng.h ${ZLIB_LOCAL_DIR}
+#            OUTPUT "zconf.h"
+#            COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/internal-complibs/zlib-ng-2.0.0-RC2/zconf.h ${ZLIB_LOCAL_DIR}
 #    )
 #
 #    #set(ZLIB_LOCAL_DIR ${ZLIB_LOCAL_DIR} "${WORKING_DIRECTORY}/internal-complibs/zlib-ng-2.0.0-RC2")
