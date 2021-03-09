@@ -171,7 +171,7 @@ int ndcell_encoder(blosc2_context* context, const void* input, int length, void*
     BLOSC_TRACE_ERROR("Metalayer \"caterva\" not found.");
     return nmetalayer;
   }
-  int8_t ndim;
+  const int8_t ndim;
   int64_t shape[CATERVA_MAX_DIM];
   int32_t chunkshape[CATERVA_MAX_DIM];
   int32_t blockshape[CATERVA_MAX_DIM];
@@ -419,6 +419,7 @@ int ndcell_decoder(blosc2_context* context, const void* input, int length, void*
         ind += kk[i] * nd_aux;
         nd_aux *= blockshape[i];
       }
+      printf("\n ip: %u op: %u \n", ip[0], op[ind * typesize]);
       memcpy(&op[ind * typesize], ip, pad_shape[ndim - 1] * typesize);
       ip += pad_shape[ndim - 1] * typesize;
     }

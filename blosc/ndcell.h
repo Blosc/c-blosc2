@@ -16,8 +16,6 @@
 extern "C" {
 #endif
 #define XXH_INLINE_ALL
-#include <xxhash.h>
-
 
 #define NDCELL_VERSION_STRING "1.0.0"
 

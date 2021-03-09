@@ -1600,9 +1600,7 @@ static struct thread_context*
 create_thread_context(blosc2_context* context, int32_t tid) {
   struct thread_context* thread_context;
   thread_context = (struct thread_context*)my_malloc(sizeof(struct thread_context));
-  if (thread_context == NULL) {
-    return NULL;
-  }
+  BLOSC_ERROR_NULL(thread_context, NULL);
   init_thread_context(thread_context, context, tid);
   return thread_context;
 }
@@ -3263,9 +3261,7 @@ int blosc_free_resources(void) {
 /* Create a context for compression */
 blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   blosc2_context* context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
-  if (context == NULL) {
-    return NULL;
-  }
+  BLOSC_ERROR_NULL(context, NULL);
 
   /* Populate the context, using zeros as default values */
   memset(context, 0, sizeof(blosc2_context));
@@ -3287,9 +3283,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   if (cparams.prefilter != NULL) {
     context->prefilter = cparams.prefilter;
     context->pparams = (blosc2_prefilter_params*)my_malloc(sizeof(blosc2_prefilter_params));
-    if (context->pparams == NULL) {
-      return NULL;
-    }
+    BLOSC_ERROR_NULL(context->pparams, NULL);
     memcpy(context->pparams, cparams.pparams, sizeof(blosc2_prefilter_params));
   }
 
@@ -3300,9 +3294,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
 /* Create a context for decompression */
 blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   blosc2_context* context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
-  if (context == NULL) {
-    return NULL;
-  }
+  BLOSC_ERROR_NULL(context, NULL);
 
   /* Populate the context, using zeros as default values */
   memset(context, 0, sizeof(blosc2_context));
