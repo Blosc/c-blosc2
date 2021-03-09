@@ -153,12 +153,12 @@ if(NOT DEACTIVATE_ZLIB)
         set(ZLIB_ROOT $ENV{ZLIB_ROOT})
         find_package(ZLIB)
         if(NOT ZLIB_FOUND)
-            message(STATUS "No ZLIB found.  Using MINIZ internal sources.")
-            set(HAVE_MINIZ TRUE)
+            message(STATUS "No ZLIB found.  Using ZLIB-NG internal sources.")
+            set(HAVE_ZLIB_NG TRUE)
         endif()
     else()
-        message(STATUS "Using MINIZ internal sources for ZLIB support.")
-        set(HAVE_MINIZ TRUE)
+        message(STATUS "Using ZLIB-NG internal sources for ZLIB support.")
+        set(HAVE_ZLIB_NG TRUE)
     endif()
     # HAVE_ZLIB will be set to true because even if the library is not found,
     # we will use the included sources for it
@@ -356,6 +356,12 @@ endif()
 
 # subdirectories
 add_subdirectory(blosc)
+if(DEFINED HAVE_ZLIB_NG)
+    message("Configuring for ZLIB-NG: ")
+    set(ZLIB_COMPAT TRUE)
+    add_subdirectory(internal-complibs/zlib-ng-2.0.0-RC2)
+endif()
+
 
 if(BUILD_TESTS)
     enable_testing()
