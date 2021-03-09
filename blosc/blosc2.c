@@ -214,6 +214,8 @@ static int compname_to_clibcode(const char* compname) {
     return BLOSC_ZLIB_LIB;
   if (strcmp(compname, BLOSC_ZSTD_COMPNAME) == 0)
     return BLOSC_ZSTD_LIB;
+  if (strcmp(compname, BLOSC_UDCODEC_COMPNAME) == 0)
+    return BLOSC_UDCODEC_LIB;
   return BLOSC2_ERROR_NOT_FOUND;
 }
 
@@ -224,6 +226,7 @@ static const char* clibcode_to_clibname(int clibcode) {
   if (clibcode == BLOSC_SNAPPY_LIB) return BLOSC_SNAPPY_LIBNAME;
   if (clibcode == BLOSC_ZLIB_LIB) return BLOSC_ZLIB_LIBNAME;
   if (clibcode == BLOSC_ZSTD_LIB) return BLOSC_ZSTD_LIBNAME;
+  if (clibcode == BLOSC_UDCODEC_LIB) return BLOSC_UDCODEC_LIBNAME;
   return NULL;                  /* should never happen */
 }
 
@@ -250,6 +253,8 @@ int blosc_compcode_to_compname(int compcode, const char** compname) {
     name = BLOSC_ZLIB_COMPNAME;
   else if (compcode == BLOSC_ZSTD)
     name = BLOSC_ZSTD_COMPNAME;
+  else if (compcode == BLOSC_UDCODEC)
+    name = BLOSC_UDCODEC_COMPNAME;
 
   *compname = name;
 
@@ -274,7 +279,8 @@ int blosc_compcode_to_compname(int compcode, const char** compname) {
   else if (compcode == BLOSC_ZSTD)
     code = BLOSC_ZSTD;
 #endif /* HAVE_ZSTD */
-
+  else if (compcode == BLOSC_UDCODEC)
+    code = BLOSC_UDCODEC;
   return code;
 }
 
@@ -308,7 +314,9 @@ int blosc_compname_to_compcode(const char* compname) {
     code = BLOSC_ZSTD;
   }
 #endif /*  HAVE_ZSTD */
-
+  else if (strcmp(compname, BLOSC_UDCODEC_COMPNAME) == 0) {
+    code = BLOSC_UDCODEC;
+  }
   return code;
 }
 
@@ -334,6 +342,8 @@ static int compcode_to_compformat(int compcode) {
     case BLOSC_ZSTD:    return BLOSC_ZSTD_FORMAT;
       break;
 #endif /*  HAVE_ZSTD */
+    case BLOSC_UDCODEC: return BLOSC_UDCODEC_FORMAT;
+      break;
   }
   return -1;
 }
@@ -363,6 +373,8 @@ static int compcode_to_compversion(int compcode) {
     case BLOSC_ZSTD:    return BLOSC_ZSTD_VERSION_FORMAT;
       break;
 #endif /*  HAVE_ZSTD */
+    case BLOSC_UDCODEC: return BLOSC_UDCODEC_VERSION_FORMAT;
+      break;
   }
   return -1;
 }
@@ -660,7 +672,8 @@ typedef struct blosc_header_s {
   int32_t cbytes;
   // Extended Blosc2 header
   uint8_t filter_codes[BLOSC2_MAX_FILTERS];
-  int16_t reserved1;
+  uint8_t reserved1;
+  uint8_t compcode_meta;
   uint8_t filter_meta[BLOSC2_MAX_FILTERS];
   uint8_t reserved2;
   uint8_t blosc2_flags;
@@ -772,6 +785,7 @@ static int blosc2_initialize_context_from_header(blosc2_context* context, blosc_
 
     memcpy(context->filters, header->filter_codes, BLOSC2_MAX_FILTERS);
     memcpy(context->filters_meta, header->filter_meta, BLOSC2_MAX_FILTERS);
+    context->compcode_meta = header->compcode_meta;
 
     context->filter_flags = filters_to_flags(header->filter_codes);
     context->special_type = (header->blosc2_flags >> 4) & BLOSC2_SPECIAL_MASK;
@@ -816,6 +830,7 @@ static int blosc2_intialize_header_from_context(blosc2_context* context, blosc_h
       header->filter_codes[i] = context->filters[i];
       header->filter_meta[i] = context->filters_meta[i];
     }
+    header->compcode_meta = context->compcode_meta;
 
     if (!little_endian) {
       header->blosc2_flags |= BLOSC2_BIGENDIAN;
@@ -1111,8 +1126,22 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
                                   (char*)dest, (size_t)maxout, context->clevel);
     }
   #endif /* HAVE_ZSTD */
-
-    else {
+    else if (context->compcode == BLOSC_UDCODEC) {
+      for (int i = 0; i < BLOSC2_MAX_UDCODECS; ++i) {
+        if (context->udcodecs[i].id == context->compcode_meta) {
+          cbytes = context->udcodecs[i].encoder(_src + j * neblock,
+                                                neblock,
+                                                dest,
+                                                maxout,
+                                                context->udcodecs[i].params);
+          goto udcodecsuccess;
+        }
+      }
+      BLOSC_TRACE_ERROR("User-defined compressor codec %d not found during compression", context->compcode_meta);
+      return BLOSC2_ERROR_CODEC_SUPPORT;
+    udcodecsuccess:
+      ;
+    } else {
       blosc_compcode_to_compname(context->compcode, &compname);
       BLOSC_TRACE_ERROR("Blosc has not been compiled with '%s' compression support."
                         "Please use one having it.", compname);
@@ -1657,6 +1686,22 @@ static int blosc_d(
                                       (char*)_dest, (size_t)neblock);
       }
   #endif /*  HAVE_ZSTD */
+      else if (compformat == BLOSC_UDCODEC_FORMAT) { ;
+        for (int i = 0; i < BLOSC2_MAX_UDCODECS; ++i) {
+          if (context->udcodecs[i].id == context->compcode_meta) {
+            nbytes = context->udcodecs[i].decoder(src,
+                                                  cbytes,
+                                                  _dest,
+                                                  neblock,
+                                                  context->udcodecs[i].params);
+            goto udcodecsuccess;
+          }
+        }
+        BLOSC_TRACE_ERROR("User-defined compressor codec %d not found during decompression", context->compcode_meta);
+        return BLOSC2_ERROR_CODEC_SUPPORT;
+      udcodecsuccess:
+        ;
+      }
       else {
         compname = clibcode_to_clibname(compformat);
         BLOSC_TRACE_ERROR(
@@ -3517,6 +3562,17 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     }
   }
 
+
+  context->compcode_meta = cparams.compcode_meta;
+  if (context->compcode == BLOSC_UDCODEC && context->compcode_meta < 128) {
+    BLOSC_TRACE_ERROR("compcode_meta (%d) can not be smaller than 128", context->compcode_meta);
+    free(context);
+    return NULL;
+  }
+  for (int i = 0; i < BLOSC2_MAX_UDCODECS; ++i) {
+    memcpy(&context->udcodecs, &cparams.udcodecs, sizeof(blosc2_udcodec));
+  }
+
   context->nthreads = cparams.nthreads;
   context->new_nthreads = context->nthreads;
   context->blocksize = cparams.blocksize;
@@ -3561,6 +3617,10 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   context->block_maskout = NULL;
   context->block_maskout_nitems = 0;
   context->schunk = dparams.schunk;
+
+  for (int i = 0; i < BLOSC2_MAX_UDCODECS; ++i) {
+    memcpy(&context->udcodecs, &dparams.udcodecs, sizeof(blosc2_udcodec));
+  }
 
   if (dparams.postfilter != NULL) {
     context->postfilter = dparams.postfilter;

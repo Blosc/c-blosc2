@@ -40,10 +40,10 @@ Starting in Blosc 2.0.0, there is an extension of the header above that allows
 for encoding blocks with a filter pipeline::
 
   1+|-0-|-1-|-2-|-3-|-4-|-5-|-6-|-7-|-8-|-9-|-A-|-B-|-C-|-D-|-E-|-F-|
-    |     filter codes      |   ^   |     filter meta       | ^ | ^ |
-                                |                             |   |
-                                +-reserved                    |   +-blosc2_flags
-                                                              +-reserved
+    |     filter codes      | ^ | ^ |     filter meta       | ^ | ^ |
+                              |   |                           |   |
+                              |   +- compcode_meta            |   +-blosc2_flags
+                              +-reserved                      +-reserved
 
 :version:
     (``uint8``) Blosc format version.
@@ -126,6 +126,11 @@ for encoding blocks with a filter pipeline::
     The filter pipeline has 6 reserved slots for the filters. They are applied sequentially to the chunk according
     to their index in increasing order. The type of filter applied is specified by the `filter_code`. Each
     `filter_code` has an associated field in `filter_meta` that can contain metadata about the filter.
+
+:compcode_meta:
+    (``uint8``) Compression codec metadata.
+
+    Possible metadata associated with the compression codec.
 
 :filter_meta:
     (``uint8``) Filter metadata.
