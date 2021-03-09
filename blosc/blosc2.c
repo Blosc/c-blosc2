@@ -897,6 +897,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
         truncate_precision(filters_meta[i], typesize, bsize, _src, _dest);
         break;
       case BLOSC_UDFILTER:
+        // Look for the filters_meta in user filters and run it
         for (int j = 0; j < BLOSC2_MAX_FILTERS; ++j) {
           if (udfilters[j].id == filters_meta[i]) {
             if (udfilters[j].forward != NULL) {
@@ -1209,6 +1210,7 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
         // TRUNC_PREC filter does not need to be undone
         break;
       case BLOSC_UDFILTER:
+        // Look for the filters_meta in user filters and run it
         for (int j = 0; j < BLOSC2_MAX_FILTERS; ++j) {
           if (udfilters[j].id == filters_meta[i]) {
             if (udfilters[j].backward != NULL) {
@@ -3488,6 +3490,12 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     context->filters[i] = cparams.filters[i];
     context->filters_meta[i] = cparams.filters_meta[i];
+    if (context->filters[i] == BLOSC_UDFILTER && context->filters_meta[i] < 128) {
+      BLOSC_TRACE_ERROR("filters_meta (%d) can not be smaller than 128 in user-defined filters",
+                        context->filters_meta[i]);
+      free(context);
+      return NULL;
+    }
   }
   for (int i = 0; i < BLOSC2_MAX_UDFILTERS; ++i) {
     memcpy(&context->udfilters[i], &cparams.udfilters[i], sizeof(blosc2_udfilter));

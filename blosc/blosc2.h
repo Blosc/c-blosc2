@@ -118,6 +118,7 @@ enum {
   BLOSC2_MAX_FILTERS = 6,
   //!< Maximum number of filters in the filter pipeline
   BLOSC2_MAX_UDFILTERS = 16,
+  //!< Maximum number of filters that a user can register.
 };
 
 /**
@@ -786,7 +787,7 @@ typedef struct {
   uint8_t filters_meta[BLOSC2_MAX_FILTERS];
   //!< The metadata for filters.
   blosc2_udfilter udfilters[BLOSC2_MAX_UDFILTERS];
-    //!< The user-defined filters.
+  //!< The user-defined filters.
   blosc2_prefilter_fn prefilter;
   //!< The prefilter function.
   blosc2_prefilter_params *preparams;
@@ -822,7 +823,7 @@ typedef struct {
   blosc2_postfilter_params *postparams;
   //!< The postfilter parameters.
   blosc2_udfilter udfilters[BLOSC2_MAX_UDFILTERS];
-    //!< The user-defined filters.
+  //!< The user-defined filters.
 } blosc2_dparams;
 
 /**

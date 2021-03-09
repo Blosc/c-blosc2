@@ -120,6 +120,8 @@ for encoding blocks with a filter pipeline::
         Delta filter.
     :``4``:
         Truncate precision filter.
+    :``5``:
+        User-defined filter.
 
     The filter pipeline has 6 reserved slots for the filters. They are applied sequentially to the chunk according
     to their index in increasing order. The type of filter applied is specified by the `filter_code`. Each
