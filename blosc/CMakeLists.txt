@@ -109,6 +109,11 @@ endif()
 if(NOT DEACTIVATE_ZLIB)
     if(ZLIB_FOUND)
         set(LIBS ${LIBS} ${ZLIB_LIBRARY})
+    else()
+        set(ZLIB_LOCAL_DIR ${INTERNAL_LIBS}/zlib-ng-2.0.0-RC2)
+        file(GLOB ZLIB_FILES ${ZLIB_LOCAL_DIR}/*.c)
+        set(SOURCES ${SOURCES} ${ZLIB_FILES})
+        source_group("Zlib" FILES ${ZLIB_FILES})
     endif()
 endif()
 
@@ -222,22 +227,6 @@ if(COMPILER_SUPPORT_ALTIVEC)
             SOURCE shuffle.c
             APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_ALTIVEC_ENABLED)
 endif()
-
-#if(DEFINED HAVE_ZLIB_NG)
-#    message("Configuring for ZLIB-NG: " "${CMAKE_COMMAND} --config Release .")
-#    message("ZLIB_LOCAL_DIR: " ${ZLIB_LOCAL_DIR})
-#    add_custom_command(
-#            OUTPUT "zconf-ng.h"
-#            COMMAND ${CMAKE_COMMAND} --config Release .
-#            WORKING_DIRECTORY "${ZLIB_LOCAL_DIR}"
-#    )
-#    add_custom_command(
-#            OUTPUT "zconf.h"
-#            COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/internal-complibs/zlib-ng-2.0.0-RC2/zconf.h ${ZLIB_LOCAL_DIR}
-#    )
-#
-#    #set(ZLIB_LOCAL_DIR ${ZLIB_LOCAL_DIR} "${WORKING_DIRECTORY}/internal-complibs/zlib-ng-2.0.0-RC2")
-#endif()
 
 
 # When the option has been selected to compile the test suite,

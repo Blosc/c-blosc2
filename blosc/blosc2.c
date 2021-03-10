@@ -45,7 +45,6 @@
   #include "snappy-c.h"
 #endif /*  HAVE_SNAPPY */
 #if defined(HAVE_ZLIB_NG)
-  #include "zconf.h"
   #include "zlib.h"
 #elif defined(HAVE_ZLIB)
   #include "zlib.h"

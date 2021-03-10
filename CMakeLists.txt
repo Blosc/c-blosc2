@@ -165,6 +165,18 @@ if(NOT DEACTIVATE_ZLIB)
     set(HAVE_ZLIB TRUE)
 endif()
 
+if (HAVE_ZLIB_NG)
+    add_definitions(-DZLIB_COMPAT)
+    set(ZLIB_COMPAT TRUE)
+    set(SKIP_INSTALL_ALL TRUE)
+    set(ZLIB_ENABLE_TESTS OFF)
+    add_subdirectory(internal-complibs/zlib-ng-2.0.0-RC2)
+
+    file(COPY
+            ${CMAKE_CURRENT_BINARY_DIR}/internal-complibs/zlib-ng-2.0.0-RC2/zconf.h
+            DESTINATION ${CMAKE_SOURCE_DIR}/internal-complibs/zlib-ng-2.0.0-RC2/)
+endif ()
+
 if(NOT DEACTIVATE_ZSTD)
     if(PREFER_EXTERNAL_ZSTD)
         find_package(ZSTD)
@@ -356,11 +368,7 @@ endif()
 
 # subdirectories
 add_subdirectory(blosc)
-if(DEFINED HAVE_ZLIB_NG)
-    message("Configuring for ZLIB-NG: ")
-    set(ZLIB_COMPAT TRUE)
-    add_subdirectory(internal-complibs/zlib-ng-2.0.0-RC2)
-endif()
+
 
 
 if(BUILD_TESTS)
