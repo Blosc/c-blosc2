@@ -878,7 +878,9 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
         }
         break;
       case BLOSC_BITSHUFFLE:
-        bitshuffle(typesize, bsize, _src, _dest, tmp2);
+        if (bitshuffle(typesize, bsize, _src, _dest, tmp2) < 0) {
+          return NULL;
+        }
         break;
       case BLOSC_DELTA:
         delta_encoder(src, offset, bsize, typesize, _src, _dest);
@@ -1148,7 +1150,9 @@ int pipeline_d(blosc2_context* context, const int32_t bsize, uint8_t* dest,
         }
         break;
       case BLOSC_BITSHUFFLE:
-        bitunshuffle(typesize, bsize, _src, _dest, _tmp, context->src[BLOSC2_CHUNK_VERSION]);
+        if (bitunshuffle(typesize, bsize, _src, _dest, _tmp, context->src[BLOSC2_CHUNK_VERSION]) < 0) {
+          return BLOSC2_ERROR_FILTER_PIPELINE;
+        }
         break;
       case BLOSC_DELTA:
         if (context->nthreads == 1) {
@@ -1267,6 +1271,7 @@ static int blosc_d(
     if (frame->sframe) {
       // The chunk is not in the frame
       char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+      BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
       sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
       fp = fopen(chunkpath, "rb");
       free(chunkpath);
@@ -1592,6 +1597,7 @@ static struct thread_context*
 create_thread_context(blosc2_context* context, int32_t tid) {
   struct thread_context* thread_context;
   thread_context = (struct thread_context*)my_malloc(sizeof(struct thread_context));
+  BLOSC_ERROR_NULL(thread_context, NULL);
   init_thread_context(thread_context, context, tid);
   return thread_context;
 }
@@ -2028,12 +2034,14 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
 
     // Populate the samples sizes for training the dictionary
     size_t* samples_sizes = malloc(nblocks * sizeof(void*));
+    BLOSC_ERROR_NULL(samples_sizes, BLOSC2_ERROR_MEMORY_ALLOC);
     for (size_t i = 0; i < nblocks; i++) {
       samples_sizes[i] = sample_size;
     }
 
     // Train from samples
     void* dict_buffer = malloc(dict_maxsize);
+    BLOSC_ERROR_NULL(dict_buffer, BLOSC2_ERROR_MEMORY_ALLOC);
     int32_t dict_actual_size = (int32_t)ZDICT_trainFromBuffer(dict_buffer, dict_maxsize, samples_buffer, samples_sizes, nblocks);
 
     // TODO: experiment with parameters of low-level fast cover algorithm
@@ -2206,7 +2214,9 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
 
   /* Initialize a context compression */
   uint8_t* filters = calloc(1, BLOSC2_MAX_FILTERS);
+  BLOSC_ERROR_NULL(filters, BLOSC2_ERROR_MEMORY_ALLOC);
   uint8_t* filters_meta = calloc(1, BLOSC2_MAX_FILTERS);
+  BLOSC_ERROR_NULL(filters_meta, BLOSC2_ERROR_MEMORY_ALLOC);
   build_filters(doshuffle, g_delta, typesize, filters);
   error = initialize_context_compression(
     g_global_context, src, srcsize, dest, destsize, clevel, filters,
@@ -2290,6 +2300,7 @@ int set_values(blosc_header* header, uint8_t* src, uint8_t* dest, int32_t destsi
   }
   // Get the value at the end of the header
   void* value = malloc(header->typesize);
+  BLOSC_ERROR_NULL(value, BLOSC2_ERROR_MEMORY_ALLOC);
   memcpy(value, src + BLOSC_EXTENDED_HEADER_LENGTH, header->typesize);
   // And copy it to dest
   for (int i = 0; i < nitems; i++) {
@@ -2528,6 +2539,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
       my_free(scontext->tmp);
       scontext->tmp_nbytes = (size_t)4 * ebsize;
       scontext->tmp = my_malloc(scontext->tmp_nbytes);
+      BLOSC_ERROR_NULL(scontext->tmp, BLOSC2_ERROR_MEMORY_ALLOC);
       scontext->tmp2 = scontext->tmp + ebsize;
       scontext->tmp3 = scontext->tmp2 + ebsize;
       scontext->tmp4 = scontext->tmp3 + ebsize;
@@ -2860,6 +2872,7 @@ int init_threadpool(blosc2_context *context) {
       /* Create thread contexts to store data for callback threads */
     context->thread_contexts = (struct thread_context *)my_malloc(
             context->nthreads * sizeof(struct thread_context));
+    BLOSC_ERROR_NULL(context->thread_contexts, BLOSC2_ERROR_MEMORY_ALLOC);
     for (tid = 0; tid < context->nthreads; tid++)
       init_thread_context(context->thread_contexts + tid, context, tid);
   }
@@ -2873,6 +2886,7 @@ int init_threadpool(blosc2_context *context) {
     /* Make space for thread handlers */
     context->threads = (pthread_t*)my_malloc(
             context->nthreads * sizeof(pthread_t));
+    BLOSC_ERROR_NULL(context->threads, BLOSC2_ERROR_MEMORY_ALLOC);
     /* Finally, create the threads */
     for (tid = 0; tid < context->nthreads; tid++) {
       /* Create a thread context (will destroy when finished) */
@@ -3263,6 +3277,7 @@ int blosc_free_resources(void) {
 /* Create a context for compression */
 blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   blosc2_context* context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
+  BLOSC_ERROR_NULL(context, NULL);
 
   /* Populate the context, using zeros as default values */
   memset(context, 0, sizeof(blosc2_context));
@@ -3284,6 +3299,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   if (cparams.prefilter != NULL) {
     context->prefilter = cparams.prefilter;
     context->pparams = (blosc2_prefilter_params*)my_malloc(sizeof(blosc2_prefilter_params));
+    BLOSC_ERROR_NULL(context->pparams, NULL);
     memcpy(context->pparams, cparams.pparams, sizeof(blosc2_prefilter_params));
   }
 
@@ -3294,6 +3310,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
 /* Create a context for decompression */
 blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   blosc2_context* context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
+  BLOSC_ERROR_NULL(context, NULL);
 
   /* Populate the context, using zeros as default values */
   memset(context, 0, sizeof(blosc2_context));
@@ -3348,6 +3365,7 @@ int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks) {
   }
 
   bool *maskout_ = malloc(nblocks);
+  BLOSC_ERROR_NULL(maskout_, BLOSC2_ERROR_MEMORY_ALLOC);
   memcpy(maskout_, maskout, nblocks);
   ctx->block_maskout = maskout_;
   ctx->block_maskout_nitems = nblocks;
