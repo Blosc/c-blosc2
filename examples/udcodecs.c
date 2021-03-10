@@ -1,6 +1,6 @@
 /*
-  Copyright (C) 2015  Francesc Alted
-  http://blosc.org
+Copyright (C) 2021  The Blosc developers
+ http://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 
   Example program demonstrating use of the Blosc filter from C code.

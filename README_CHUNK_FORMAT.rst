@@ -130,12 +130,12 @@ for encoding blocks with a filter pipeline::
 :compcode_meta:
     (``uint8``) Compression codec metadata.
 
-    Possible metadata associated with the compression codec.
+    Metadata associated with the compression codec. Only used in user-defined codecs.
 
 :filter_meta:
     (``uint8``) Filter metadata.
 
-    Possible metadata associated with a filter code.
+    Metadata associated with the filter code.
 
 :blosc2_flags:
     (``bitfield``) The flags for a Blosc2 buffer.
