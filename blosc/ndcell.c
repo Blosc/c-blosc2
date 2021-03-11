@@ -208,7 +208,7 @@ int ndcell_encoder(blosc2_context* context, const void* input, int length, void*
 
   uint8_t* obase = op;
 
-  int64_t i_shape[ndim];
+  int64_t i_shape[CATERVA_MAX_DIM];
   for (int i = 0; i < ndim; ++i) {
     i_shape[i] = (blockshape[i] + cell_shape - 1) / cell_shape;
   }
@@ -219,14 +219,14 @@ int ndcell_encoder(blosc2_context* context, const void* input, int length, void*
   }
 
   /* main loop */
-  int64_t pad_shape[ndim];
-  int64_t ii[ndim];
+  int64_t pad_shape[CATERVA_MAX_DIM];
+  int64_t ii[CATERVA_MAX_DIM];
   for (int cell_ind = 0; cell_ind < ncells; cell_ind++) {      // for each cell
     index_unidim_to_multidim(ndim, i_shape, cell_ind, ii);
     uint32_t orig = 0;
     int64_t nd_aux = cell_shape;
     for (int i = ndim - 1; i >= 0; i--) {
-      orig += ii[i] * nd_aux;
+      orig += (int32_t) (ii[i] * nd_aux);
       nd_aux *= blockshape[i];
     }
 
@@ -241,7 +241,7 @@ int ndcell_encoder(blosc2_context* context, const void* input, int length, void*
     for (int i = 0; i < ndim - 1; ++i) {
       ncopies *= pad_shape[i];
     }
-    int64_t kk[ndim];
+    int64_t kk[CATERVA_MAX_DIM];
     for (int copy_ind = 0; copy_ind < ncopies; ++copy_ind) {
       index_unidim_to_multidim(ndim - 1, pad_shape, copy_ind, kk);
       nd_aux = blockshape[ndim - 1];
@@ -250,7 +250,7 @@ int ndcell_encoder(blosc2_context* context, const void* input, int length, void*
         ind += kk[i] * nd_aux;
         nd_aux *= blockshape[i];
       }
-      memcpy(op, &ip[ind * typesize], pad_shape[ndim - 1] * typesize);
+      memcpy(op, &ip[ind * typesize], (size_t) (pad_shape[ndim - 1] * typesize));
       op += pad_shape[ndim - 1] * typesize;
     }
 
@@ -370,7 +370,7 @@ int ndcell_decoder(blosc2_context* context, const void* input, int length, void*
     return 0;
   }
 
-  int64_t i_shape[ndim];
+  int64_t i_shape[CATERVA_MAX_DIM];
   for (int i = 0; i < ndim; ++i) {
     i_shape[i] = (blockshape[i] + cell_shape - 1) / cell_shape;
   }
@@ -381,8 +381,8 @@ int ndcell_decoder(blosc2_context* context, const void* input, int length, void*
   }
 
   /* main loop */
-  int64_t pad_shape[ndim];
-  int64_t ii[ndim];
+  int64_t pad_shape[CATERVA_MAX_DIM];
+  int64_t ii[CATERVA_MAX_DIM];
   int32_t ind;
   for (int cell_ind = 0; cell_ind < ncells; cell_ind++) {      // for each cell
 
@@ -391,10 +391,10 @@ int ndcell_decoder(blosc2_context* context, const void* input, int length, void*
       return 0;
     }
     index_unidim_to_multidim(ndim, i_shape, cell_ind, ii);
-    uint32_t orig = 0;
+    int32_t orig = 0;
     int64_t nd_aux = cell_shape;
     for (int i = ndim - 1; i >= 0; i--) {
-      orig += ii[i] * nd_aux;
+      orig += (int32_t) (ii[i] * nd_aux);
       nd_aux *= blockshape[i];
     }
 
@@ -410,25 +410,25 @@ int ndcell_decoder(blosc2_context* context, const void* input, int length, void*
     for (int i = 0; i < ndim - 1; ++i) {
       ncopies *= pad_shape[i];
     }
-    int64_t kk[ndim];
+    int64_t kk[CATERVA_MAX_DIM];
     for (int copy_ind = 0; copy_ind < ncopies; ++copy_ind) {
       index_unidim_to_multidim(ndim - 1, pad_shape, copy_ind, kk);
       nd_aux = blockshape[ndim - 1];
       ind = orig;
       for (int i = ndim - 2; i >= 0; i--) {
-        ind += kk[i] * nd_aux;
+        ind += (int32_t) (kk[i] * nd_aux);
         nd_aux *= blockshape[i];
       }
       printf("\n ip: %u op: %u \n", ip[0], op[ind * typesize]);
-      memcpy(&op[ind * typesize], ip, pad_shape[ndim - 1] * typesize);
+      memcpy(&op[ind * typesize], ip, (size_t) (pad_shape[ndim - 1] * typesize));
       ip += pad_shape[ndim - 1] * typesize;
     }
   }
-  ind += pad_shape[ndim - 1];
+  ind += (int32_t) (pad_shape[ndim - 1]);
 
 
   if (ind != (int32_t) (blocksize / typesize)) {
-    printf("Output size is not compatible with embeded blockshape ind %d \n", ind, (blocksize / typesize));
+    printf("Output size is not compatible with embeded blockshape ind \n");
     return 0;
   }
 
