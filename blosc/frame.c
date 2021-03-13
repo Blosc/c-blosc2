@@ -2018,12 +2018,20 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     free(block_csizes);
   } else {
     // The chunk is in memory and just one pointer away
-    *chunk = frame->cframe + header_len + offset;
-    if ((int64_t)header_len + offset + BLOSC_MIN_HEADER_LENGTH > frame->len) {
+    int64_t chunk_header_offset = header_len + offset;
+    int64_t chunk_cbytes_offset = chunk_header_offset + BLOSC_MIN_HEADER_LENGTH;
+
+    *chunk = frame->cframe + chunk_header_offset;
+
+    if (chunk_cbytes_offset > frame->len) {
       BLOSC_TRACE_ERROR("Cannot read the header for chunk in the (contiguous) frame.");
       rc = BLOSC2_ERROR_READ_BUFFER;
     } else {
       rc = blosc2_cbuffer_sizes(*chunk, NULL, &lazychunk_cbytes, NULL);
+      if (rc && chunk_cbytes_offset + lazychunk_cbytes > frame_len) {
+        BLOSC_TRACE_ERROR("Compressed bytes exceed beyond frame length.");
+        rc = BLOSC2_ERROR_READ_BUFFER;
+      }
     }
   }
 
