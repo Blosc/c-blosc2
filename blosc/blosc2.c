@@ -1556,7 +1556,7 @@ static int parallel_blosc(blosc2_context* context) {
 }
 
 /* initialize a thread_context that has already been allocated */
-static void init_thread_context(struct thread_context* thread_context, blosc2_context* context, int32_t tid)
+static int init_thread_context(struct thread_context* thread_context, blosc2_context* context, int32_t tid)
 {
   int32_t ebsize;
 
@@ -1566,6 +1566,7 @@ static void init_thread_context(struct thread_context* thread_context, blosc2_co
   ebsize = context->blocksize + context->typesize * (signed)sizeof(int32_t);
   thread_context->tmp_nbytes = (size_t)4 * ebsize;
   thread_context->tmp = my_malloc(thread_context->tmp_nbytes);
+  BLOSC_ERROR_NULL(thread_context->tmp, BLOSC2_ERROR_MEMORY_ALLOC);
   thread_context->tmp2 = thread_context->tmp + ebsize;
   thread_context->tmp3 = thread_context->tmp2 + ebsize;
   thread_context->tmp4 = thread_context->tmp3 + ebsize;
@@ -1591,6 +1592,7 @@ static void init_thread_context(struct thread_context* thread_context, blosc2_co
   }
   thread_context->lz4_hash_table = hash_table;
 #endif
+  return 0;
 }
 
 static struct thread_context*
@@ -1598,7 +1600,10 @@ create_thread_context(blosc2_context* context, int32_t tid) {
   struct thread_context* thread_context;
   thread_context = (struct thread_context*)my_malloc(sizeof(struct thread_context));
   BLOSC_ERROR_NULL(thread_context, NULL);
-  init_thread_context(thread_context, context, tid);
+  int rc = init_thread_context(thread_context, context, tid);
+  if (rc < 0) {
+    return NULL;
+  }
   return thread_context;
 }
 
@@ -1667,6 +1672,7 @@ static int do_job(blosc2_context* context) {
       free_thread_context(context->serial_context);
       context->serial_context = create_thread_context(context, 0);
     }
+    BLOSC_ERROR_NULL(context->serial_context, BLOSC2_ERROR_THREAD_CREATE);
     ntbytes = serial_blosc(context->serial_context);
   }
   else {
@@ -2623,7 +2629,7 @@ int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize
   if (context->serial_context == NULL) {
     context->serial_context = create_thread_context(context, 0);
   }
-
+  BLOSC_ERROR_NULL(context->serial_context, BLOSC2_ERROR_THREAD_CREATE);
   /* Call the actual getitem function */
   result = _blosc_getitem(context, &header, src, srcsize, start, nitems, dest, destsize);
 
@@ -2891,7 +2897,7 @@ int init_threadpool(blosc2_context *context) {
     for (tid = 0; tid < context->nthreads; tid++) {
       /* Create a thread context (will destroy when finished) */
       struct thread_context *thread_context = create_thread_context(context, tid);
-
+      BLOSC_ERROR_NULL(thread_context, BLOSC2_ERROR_THREAD_CREATE);
       #if !defined(_WIN32)
         rc2 = pthread_create(&context->threads[tid], &context->ct_attr, t_blosc,
                             (void*)thread_context);
@@ -2902,7 +2908,7 @@ int init_threadpool(blosc2_context *context) {
       if (rc2) {
         BLOSC_TRACE_ERROR("Return code from pthread_create() is %d.\n"
                           "\tError detail: %s\n", rc2, strerror(rc2));
-        return (-1);
+        return BLOSC2_ERROR_THREAD_CREATE;
       }
     }
   }
@@ -2911,7 +2917,7 @@ int init_threadpool(blosc2_context *context) {
   context->threads_started = context->nthreads;
   context->new_nthreads = context->nthreads;
 
-  return (0);
+  return 0;
 }
 
 int blosc_get_nthreads(void)
