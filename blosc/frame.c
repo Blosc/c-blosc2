@@ -2032,7 +2032,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     fclose(fp);
   }
   if (rc < 0) {
-    if (needs_free) {
+    if (*needs_free) {
       free(*chunk);
       *chunk = NULL;
     }
