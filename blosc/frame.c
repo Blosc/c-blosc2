@@ -244,13 +244,10 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   uint8_t* mp_meta = h2 + FRAME_FILTER_PIPELINE + 1 + FRAME_FILTER_PIPELINE_MAX;
   int nfilters = 0;
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
-    if (schunk->filters[i] != BLOSC_NOFILTER) {
-      mp_filters[nfilters] = schunk->filters[i];
-      mp_meta[nfilters] = schunk->filters_meta[i];
-      nfilters++;
-    }
+      mp_filters[i] = schunk->filters[i];
+      mp_meta[i] = schunk->filters_meta[i];
   }
-  *h2p = (uint8_t)nfilters;
+  *h2p = (uint8_t)BLOSC2_MAX_FILTERS;
   h2p += 1;
   h2p += 16;
   if (h2p - h2 != FRAME_HEADER_MINLEN) {

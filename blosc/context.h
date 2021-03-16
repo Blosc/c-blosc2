@@ -103,7 +103,8 @@ struct blosc2_context_s {
   /* 1 if we are compressing, 0 if decompressing */
   void *btune;
   /* Entry point for BTune persistence between runs */
-
+  blosc2_btune *udbtune;
+  /* User-defined BTune parameters */
   /* Threading */
   int nthreads;
   int new_nthreads;

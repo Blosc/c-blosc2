@@ -7,8 +7,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#ifndef BTUNE_H
-#define BTUNE_H
+#ifndef STUNE_H
+#define STUNE_H
 
 #include "context.h"
 
@@ -21,15 +21,25 @@
 #define MAX_STREAMS 16 /* Cannot be larger than 128 */
 
 
-BLOSC_EXPORT void btune_init(void * config, blosc2_context* cctx, blosc2_context* dctx);
+void blosc_stune_init(void * config, blosc2_context* cctx, blosc2_context* dctx);
 
-void btune_next_blocksize(blosc2_context * context);
+void blosc_stune_next_blocksize(blosc2_context * context);
 
-void btune_next_cparams(blosc2_context * context);
+void blosc_stune_next_cparams(blosc2_context * context);
 
-void btune_update(blosc2_context * context, double ctime);
+void blosc_stune_update(blosc2_context * context, double ctime);
 
-void btune_free(blosc2_context * context);
+void blosc_stune_free(blosc2_context * context);
+
+static blosc2_btune BTUNE_DEFAULTS = {
+    .btune_init = blosc_stune_init,
+    .btune_free = blosc_stune_free,
+    .btune_update = blosc_stune_update,
+    .btune_next_cparams = blosc_stune_next_cparams,
+    .btune_next_blocksize = blosc_stune_next_blocksize,
+    .btune_config = NULL,
+};
+
 
 /* Conditions for splitting a block before compressing with a codec. */
 static int split_block(blosc2_context* context, int32_t typesize,
@@ -51,4 +61,4 @@ static int split_block(blosc2_context* context, int32_t typesize,
      (blocksize / typesize) >= BLOSC_MIN_BUFFERSIZE);
 }
 
-#endif  /* BTUNE_H */
+#endif  /* STUNE_H */

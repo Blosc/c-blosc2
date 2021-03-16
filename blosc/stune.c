@@ -9,7 +9,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
-#include "btune.h"
+#include "stune.h"
 
 
 /* Whether a codec is meant for High Compression Ratios
@@ -34,8 +34,11 @@ static bool is_HCR(blosc2_context * context) {
   return false;
 }
 
+void blosc_stune_init(void * config, blosc2_context* cctx, blosc2_context* dctx) {
+}
+
 // Set the automatic blocksize 0 to its real value
-void btune_next_blocksize(blosc2_context *context) {
+void blosc_stune_next_blocksize(blosc2_context *context) {
   int32_t clevel = context->clevel;
   int32_t typesize = context->typesize;
   int32_t nbytes = context->sourcesize;
@@ -148,15 +151,15 @@ void btune_next_blocksize(blosc2_context *context) {
   context->blocksize = blocksize;
 }
 
-void btune_next_cparams(blosc2_context * context) {
+void blosc_stune_next_cparams(blosc2_context * context) {
     BLOSC_UNUSED_PARAM(context);
 }
 
-void btune_update(blosc2_context * context, double ctime) {
+void blosc_stune_update(blosc2_context * context, double ctime) {
     BLOSC_UNUSED_PARAM(context);
     BLOSC_UNUSED_PARAM(ctime);
 }
 
-void btune_free(blosc2_context * context) {
+void blosc_stune_free(blosc2_context * context) {
     BLOSC_UNUSED_PARAM(context);
 }
