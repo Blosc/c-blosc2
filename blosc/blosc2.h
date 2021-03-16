@@ -718,6 +718,21 @@ BLOSC_EXPORT const char* blosc_cbuffer_complib(const void* cbuffer);
 
 typedef struct blosc2_context_s blosc2_context;   /* opaque type */
 
+typedef struct {
+  void (*btune_init)(void * config, blosc2_context* cctx, blosc2_context* dctx);
+  //!< Initialize BTune.
+  void (*btune_next_blocksize)(blosc2_context * context);
+  //!< Only compute the next blocksize. Only it is executed if BTune is not initialized.
+  void (*btune_next_cparams)(blosc2_context * context);
+  //!< Compute the next cparams. Only is executed if BTune is initialized.
+  void (*btune_update)(blosc2_context * context, double ctime);
+  //!< Update the BTune parameters.
+  void (*btune_free)(blosc2_context * context);
+  //!< Free the BTune.
+  void *btune_config;
+  //!> BTune configuration.
+}blosc2_btune;
+
 /**
  * @brief The parameters for a prefilter function.
  *
@@ -795,6 +810,8 @@ typedef struct {
   //!< The prefilter function.
   blosc2_prefilter_params *preparams;
   //!< The prefilter parameters.
+  blosc2_btune *udbtune;
+  //!< The user-defined BTune parameters.
 } blosc2_cparams;
 
 /**
@@ -803,7 +820,7 @@ typedef struct {
 static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
         BLOSC_BLOSCLZ, 5, 0, 8, 1, 0, NULL,
         {0, 0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0, 0},
-        NULL, NULL };
+        NULL, NULL, NULL};
 
 /**
   @brief The parameters for creating a context for decompression purposes.
@@ -1178,7 +1195,9 @@ typedef struct blosc2_schunk {
   //<! The array of variable-length metalayers.
   int16_t nvlmetalayers;
   //!< The number of variable-length metalayers.
+  blosc2_btune *udbtune;
 } blosc2_schunk;
+
 
 /**
  * @brief Create a new super-chunk.

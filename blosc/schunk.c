@@ -16,6 +16,7 @@
 #include "blosc-private.h"
 #include "context.h"
 #include "frame.h"
+#include "stune.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <windows.h>
@@ -111,8 +112,19 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
 
   // Get the storage with proper defaults
   schunk->storage = get_new_storage(storage, &BLOSC2_CPARAMS_DEFAULTS, &BLOSC2_DPARAMS_DEFAULTS);
+
+  schunk->udbtune = malloc(sizeof(blosc2_btune));
+  if (schunk->storage->cparams->udbtune == NULL) {
+    memcpy(schunk->udbtune, &BTUNE_DEFAULTS, sizeof(blosc2_btune));
+  } else {
+    memcpy(schunk->udbtune, schunk->storage->cparams->udbtune, sizeof(blosc2_btune));
+  }
+  schunk->storage->cparams->udbtune = schunk->udbtune;
+
   // ...and update internal properties
   update_schunk_properties(schunk);
+
+  schunk->cctx->udbtune->btune_init(schunk->udbtune->btune_config, schunk->cctx, schunk->dctx);
 
   if (!storage->contiguous && storage->urlpath != NULL){
     char* urlpath;
@@ -431,6 +443,9 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     }
   }
 
+  if (schunk->udbtune != NULL) {
+    free(schunk->udbtune);
+  }
   free(schunk);
 
   return 0;

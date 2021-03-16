@@ -31,7 +31,7 @@
 #include "delta.h"
 #include "trunc-prec.h"
 #include "blosclz.h"
-#include "btune.h"
+#include "stune.h"
 
 #if defined(HAVE_LZ4)
   #include "lz4.h"
@@ -1731,7 +1731,9 @@ static int initialize_context_compression(
   blosc2_context* context, const void* src, int32_t srcsize, void* dest,
   int32_t destsize, int clevel, uint8_t const *filters,
   uint8_t const *filters_meta, int32_t typesize, int compressor,
-  int32_t blocksize, int new_nthreads, int nthreads, blosc2_schunk* schunk) {
+  int32_t blocksize, int new_nthreads, int nthreads,
+  blosc2_btune *udbtune, void *btune_config,
+  blosc2_schunk* schunk) {
 
   /* Set parameters */
   context->do_compress = 1;
@@ -1753,13 +1755,14 @@ static int initialize_context_compression(
   context->end_threads = 0;
   context->clevel = clevel;
   context->schunk = schunk;
-
+  context->btune = btune_config;
+  context->udbtune = udbtune;
   /* Tune some compression parameters */
   context->blocksize = (int32_t)blocksize;
   if (context->btune != NULL) {
-    btune_next_cparams(context);
+    context->udbtune->btune_next_cparams(context);
   } else {
-    btune_next_blocksize(context);
+    context->udbtune->btune_next_blocksize(context);
   }
 
   char* envvar = getenv("BLOSC_WARN");
@@ -2024,7 +2027,7 @@ int blosc_compress_context(blosc2_context* context) {
   if (context->btune != NULL) {
     blosc_set_timestamp(&current);
     double ctime = blosc_elapsed_secs(last, current);
-    btune_update(context, ctime);
+    context->udbtune->btune_update(context, ctime);
   }
 
   return ntbytes;
@@ -2045,7 +2048,8 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     context, src, srcsize, dest, destsize,
     context->clevel, context->filters, context->filters_meta,
     context->typesize, context->compcode, context->blocksize,
-    context->new_nthreads, context->nthreads, context->schunk);
+    context->new_nthreads, context->nthreads,
+    context->udbtune, context->btune, context->schunk);
   if (error <= 0) {
     return error;
   }
@@ -2272,7 +2276,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   error = initialize_context_compression(
     g_global_context, src, srcsize, dest, destsize, clevel, filters,
     filters_meta, (int32_t)typesize, g_compressor, g_force_blocksize, g_nthreads, g_nthreads,
-    g_schunk);
+    &BTUNE_DEFAULTS, NULL, g_schunk);
   free(filters);
   free(filters_meta);
   if (error <= 0) {
@@ -3341,6 +3345,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     context->filters[i] = cparams.filters[i];
     context->filters_meta[i] = cparams.filters_meta[i];
   }
+
   context->nthreads = cparams.nthreads;
   context->new_nthreads = context->nthreads;
   context->blocksize = cparams.blocksize;
@@ -3352,6 +3357,18 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     context->preparams = (blosc2_prefilter_params*)my_malloc(sizeof(blosc2_prefilter_params));
     BLOSC_ERROR_NULL(context->preparams, NULL);
     memcpy(context->preparams, cparams.preparams, sizeof(blosc2_prefilter_params));
+  }
+
+  if (cparams.udbtune == NULL) {
+    context->udbtune = &BTUNE_DEFAULTS;
+  } else {
+    context->udbtune = cparams.udbtune;
+  }
+
+  if (cparams.udbtune != NULL) {
+    context->udbtune = cparams.udbtune;
+  } else {
+    context->udbtune = &BTUNE_DEFAULTS;
   }
 
   return context;
@@ -3400,7 +3417,7 @@ void blosc2_free_ctx(blosc2_context* context) {
 #endif
   }
   if (context->btune != NULL) {
-    btune_free(context);
+    context->udbtune->btune_free(context);
   }
   if (context->prefilter != NULL) {
     my_free(context->preparams);
@@ -3412,7 +3429,6 @@ void blosc2_free_ctx(blosc2_context* context) {
   if (context->block_maskout != NULL) {
     free(context->block_maskout);
   }
-
   my_free(context);
 }
 
