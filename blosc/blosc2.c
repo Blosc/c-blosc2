@@ -1842,6 +1842,7 @@ static int write_compression_header(blosc2_context* context, bool extended_heade
   int dont_split;
   int dict_training = context->use_dict && (context->dict_cdict == NULL);
 
+  context->header_flags = 0;
 
   if (context->clevel == 0) {
     /* Compression level 0 means buffer to be memcpy'ed */
