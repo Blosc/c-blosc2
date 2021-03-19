@@ -169,6 +169,7 @@ if (HAVE_ZLIB_NG)
     add_definitions(-DZLIB_COMPAT)
     set(ZLIB_COMPAT TRUE)
     set(SKIP_INSTALL_ALL TRUE)
+    set(BUILD_SHARED_LIBS FALSE)
     set(ZLIB_ENABLE_TESTS OFF)
     add_subdirectory(internal-complibs/zlib-ng-2.0.1)
 
