@@ -1,5 +1,5 @@
- Release notes for C-Blosc2 2.0.0.beta.6 (sixth beta)
-======================================================
+Release notes for C-Blosc2 2.0.0.beta.6 (sixth beta)
+====================================================
 
 
 Changes from 2.0.0-beta.5 to 2.0.0.beta6
@@ -15,9 +15,11 @@ Changes from 2.0.0-beta.5 to 2.0.0.beta6
   previous formats, but there will probably be backward compatibility support
   starting from version 2 on.
 
-* Internal Zstd sources updated to 1.4.8.
+* Internal Zstd sources updated to 1.4.9.
 
 * Internal LZ4 sources updated to 1.9.3.
+
+* Internal zlib support is provided now by new zlib-ng 2.0.1 (replacing miniz).
 
 * The Lizard codec has been removed.  Lizard is a pretty good one, but it
   looks like it is not timely maintained.  Zstd/Zlib can cover its place pretty
