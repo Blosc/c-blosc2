@@ -170,11 +170,11 @@ if (HAVE_ZLIB_NG)
     set(ZLIB_COMPAT TRUE)
     set(SKIP_INSTALL_ALL TRUE)
     set(ZLIB_ENABLE_TESTS OFF)
-    add_subdirectory(internal-complibs/zlib-ng-2.0.0-RC2)
+    add_subdirectory(internal-complibs/zlib-ng-2.0.1)
 
     file(COPY
-            ${CMAKE_CURRENT_BINARY_DIR}/internal-complibs/zlib-ng-2.0.0-RC2/zconf.h
-            DESTINATION ${CMAKE_SOURCE_DIR}/internal-complibs/zlib-ng-2.0.0-RC2/)
+            ${CMAKE_CURRENT_BINARY_DIR}/internal-complibs/zlib-ng-2.0.1/zconf.h
+            DESTINATION ${CMAKE_SOURCE_DIR}/internal-complibs/zlib-ng-2.0.1/)
 endif ()
 
 if(NOT DEACTIVATE_ZSTD)
