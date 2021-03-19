@@ -275,6 +275,7 @@ enum {
   BLOSC2_ERROR_SCHUNK_COPY = -23,     //!< Super-chunk copy failure
   BLOSC2_ERROR_FRAME_TYPE = -24,      //!< Wrong type for frame
   BLOSC2_ERROR_FILE_TRUNCATE = -25,   //!< File truncate failure
+  BLOSC2_ERROR_THREAD_CREATE = -26,   //!< Thread or thread context creation failure
 
 };
 

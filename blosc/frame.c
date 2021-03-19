@@ -416,7 +416,7 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
     from_big(typesize, framep + FRAME_TYPESIZE, sizeof(*typesize));
   }
 
-  if (*header_len <= 0 || *header_len > *frame_len) {
+  if (*header_len < FRAME_HEADER_MINLEN || *header_len > *frame_len) {
     BLOSC_TRACE_ERROR("Header length is invalid or exceeds length of the frame.");
     return BLOSC2_ERROR_INVALID_HEADER;
   }
@@ -2018,12 +2018,20 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     free(block_csizes);
   } else {
     // The chunk is in memory and just one pointer away
-    *chunk = frame->cframe + header_len + offset;
-    if ((int64_t)header_len + offset + BLOSC_MIN_HEADER_LENGTH > frame->len) {
+    int64_t chunk_header_offset = header_len + offset;
+    int64_t chunk_cbytes_offset = chunk_header_offset + BLOSC_MIN_HEADER_LENGTH;
+
+    *chunk = frame->cframe + chunk_header_offset;
+
+    if (chunk_cbytes_offset > frame->len) {
       BLOSC_TRACE_ERROR("Cannot read the header for chunk in the (contiguous) frame.");
       rc = BLOSC2_ERROR_READ_BUFFER;
     } else {
       rc = blosc2_cbuffer_sizes(*chunk, NULL, &lazychunk_cbytes, NULL);
+      if (rc && chunk_cbytes_offset + lazychunk_cbytes > frame_len) {
+        BLOSC_TRACE_ERROR("Compressed bytes exceed beyond frame length.");
+        rc = BLOSC2_ERROR_READ_BUFFER;
+      }
     }
   }
 
@@ -2032,7 +2040,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     fclose(fp);
   }
   if (rc < 0) {
-    if (needs_free) {
+    if (*needs_free) {
       free(*chunk);
       *chunk = NULL;
     }
