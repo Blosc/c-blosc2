@@ -32,7 +32,7 @@ if(NOT DEACTIVATE_ZLIB)
     if(ZLIB_FOUND)
         set(BLOSC_INCLUDE_DIRS ${BLOSC_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIR})
     else()
-        set(ZLIB_LOCAL_DIR ${INTERNAL_LIBS}/miniz-2.0.8)
+        set(ZLIB_LOCAL_DIR ${INTERNAL_LIBS}/zlib-ng-2.0.1)
         set(BLOSC_INCLUDE_DIRS ${BLOSC_INCLUDE_DIRS} ${ZLIB_LOCAL_DIR})
     endif()
 endif()
@@ -109,6 +109,11 @@ endif()
 if(NOT DEACTIVATE_ZLIB)
     if(ZLIB_FOUND)
         set(LIBS ${LIBS} ${ZLIB_LIBRARY})
+    else()
+        set(ZLIB_LOCAL_DIR ${INTERNAL_LIBS}/zlib-ng-2.0.1)
+        file(GLOB ZLIB_FILES ${ZLIB_LOCAL_DIR}/*.c)
+        set(SOURCES ${SOURCES} ${ZLIB_FILES})
+        source_group("Zlib" FILES ${ZLIB_FILES})
     endif()
 endif()
 
@@ -222,6 +227,7 @@ if(COMPILER_SUPPORT_ALTIVEC)
             SOURCE shuffle.c
             APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_ALTIVEC_ENABLED)
 endif()
+
 
 # When the option has been selected to compile the test suite,
 # compile an additional version of blosc2_static which exports

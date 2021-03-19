@@ -44,8 +44,8 @@
 #if defined(HAVE_SNAPPY)
   #include "snappy-c.h"
 #endif /*  HAVE_SNAPPY */
-#if defined(HAVE_MINIZ)
-  #include "miniz.c"
+#if defined(HAVE_ZLIB_NG)
+  #include "zlib.h"
 #elif defined(HAVE_ZLIB)
   #include "zlib.h"
 #endif /*  HAVE_MINIZ */

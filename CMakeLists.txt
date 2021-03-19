@@ -153,17 +153,30 @@ if(NOT DEACTIVATE_ZLIB)
         set(ZLIB_ROOT $ENV{ZLIB_ROOT})
         find_package(ZLIB)
         if(NOT ZLIB_FOUND)
-            message(STATUS "No ZLIB found.  Using MINIZ internal sources.")
-            set(HAVE_MINIZ TRUE)
+            message(STATUS "No ZLIB found.  Using ZLIB-NG internal sources.")
+            set(HAVE_ZLIB_NG TRUE)
         endif()
     else()
-        message(STATUS "Using MINIZ internal sources for ZLIB support.")
-        set(HAVE_MINIZ TRUE)
+        message(STATUS "Using ZLIB-NG internal sources for ZLIB support.")
+        set(HAVE_ZLIB_NG TRUE)
     endif()
     # HAVE_ZLIB will be set to true because even if the library is not found,
     # we will use the included sources for it
     set(HAVE_ZLIB TRUE)
 endif()
+
+if (HAVE_ZLIB_NG)
+    add_definitions(-DZLIB_COMPAT)
+    set(ZLIB_COMPAT TRUE)
+    set(SKIP_INSTALL_ALL TRUE)
+    set(BUILD_SHARED_LIBS FALSE)
+    set(ZLIB_ENABLE_TESTS OFF)
+    add_subdirectory(internal-complibs/zlib-ng-2.0.1)
+
+    file(COPY
+            ${CMAKE_CURRENT_BINARY_DIR}/internal-complibs/zlib-ng-2.0.1/zconf.h
+            DESTINATION ${CMAKE_SOURCE_DIR}/internal-complibs/zlib-ng-2.0.1/)
+endif ()
 
 if(NOT DEACTIVATE_ZSTD)
     if(PREFER_EXTERNAL_ZSTD)
@@ -356,6 +369,8 @@ endif()
 
 # subdirectories
 add_subdirectory(blosc)
+
+
 
 if(BUILD_TESTS)
     enable_testing()

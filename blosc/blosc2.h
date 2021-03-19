@@ -184,11 +184,11 @@ enum {
 #define BLOSC_BLOSCLZ_LIBNAME   "BloscLZ"
 #define BLOSC_LZ4_LIBNAME       "LZ4"
 #define BLOSC_SNAPPY_LIBNAME    "Snappy"
-#if defined(HAVE_MINIZ)
-  #define BLOSC_ZLIB_LIBNAME    "Zlib (via miniz)"
+#if defined(HAVE_ZIB_NG)
+  #define BLOSC_ZLIB_LIBNAME    "Zlib (via zlib-ng)"
 #else
   #define BLOSC_ZLIB_LIBNAME    "Zlib"
-#endif	/* HAVE_MINIZ */
+#endif	/* HAVE_ZLIB_NG */
 #define BLOSC_ZSTD_LIBNAME      "Zstd"
 
 /**

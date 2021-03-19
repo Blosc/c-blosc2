@@ -4,7 +4,7 @@
 #cmakedefine HAVE_LZ4 @HAVE_LZ4@
 #cmakedefine HAVE_SNAPPY @HAVE_SNAPPY@
 #cmakedefine HAVE_ZLIB @HAVE_ZLIB@
-#cmakedefine HAVE_MINIZ @HAVE_MINIZ@
+#cmakedefine HAVE_ZLIB_NG @HAVE_ZLIB_NG@
 #cmakedefine HAVE_ZSTD @HAVE_ZSTD@
 #cmakedefine HAVE_IPP @HAVE_IPP@
 #cmakedefine BLOSC_DLL_EXPORT @DLL_EXPORT@

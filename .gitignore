@@ -1,4 +1,4 @@
 bench/bench
-build/
+build*
 .idea
 cmake-build-*
