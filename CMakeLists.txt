@@ -175,7 +175,7 @@ if (HAVE_ZLIB_NG)
 
     file(COPY
             ${CMAKE_CURRENT_BINARY_DIR}/internal-complibs/zlib-ng-2.0.1/zconf.h
-            DESTINATION ${CMAKE_SOURCE_DIR}/internal-complibs/zlib-ng-2.0.1/)
+            DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/internal-complibs/zlib-ng-2.0.1/)
 endif ()
 
 if(NOT DEACTIVATE_ZSTD)
