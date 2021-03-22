@@ -52,6 +52,8 @@ Actions to be done
 
 * **Plugin capabilities for filters and codecs:**  we are looking forward to implement a plugin register capability so that the info about the new filters and codecs can be persisted and propagated to different machines.
 
+* **Suport for postfilters:** support a user-provided function that will be triggered after the filter pipeline during decompression.  That would mimic the current pre-filter implementation. This will be interesting for supporting e.g. encryption (via pre-filters) and decryption (post-filters), or on-the-flight computation based on data in the same chunk, or generic inputs that can be populated by the user in the postfilter struct that will be passed to the post-filter.
+
 * **Checksums:** the frame can benefit from having a checksum per every chunk/index/metalayer.  This will provide more safety towards frames that are damaged for whatever reason.  Also, this would provide better feedback when trying to determine the parts of the frame that are corrupted.  Candidates for checksums can be the xxhash32 or xxhash64, depending on the goals (to be decided).
 
 * **Documentation:** utterly important for attracting new users and making the life easier for existing ones.  Important points to have in mind here:
