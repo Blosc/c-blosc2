@@ -83,8 +83,12 @@ struct blosc2_context_s {
   /* the metainfo for filters */
   blosc2_prefilter_fn prefilter;
   /* prefilter function */
+  blosc2_postfilter_fn postfilter;
+  /* postfilter function */
   blosc2_prefilter_params *pparams;
   /* prefilter params */
+  blosc2_postfilter_params *postparams;
+  /* postfilter params */
   bool* block_maskout;
   /* The blocks that are not meant to be decompressed.
    * If NULL (default), all blocks in a chunk should be read. */

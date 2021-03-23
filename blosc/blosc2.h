@@ -276,6 +276,7 @@ enum {
   BLOSC2_ERROR_FRAME_TYPE = -24,      //!< Wrong type for frame
   BLOSC2_ERROR_FILE_TRUNCATE = -25,   //!< File truncate failure
   BLOSC2_ERROR_THREAD_CREATE = -26,   //!< Thread or thread context creation failure
+  BLOSC2_ERROR_POSTFILTER = -27,      //!< Postfilter failure
 
 };
 
@@ -730,8 +731,25 @@ typedef struct {
   int32_t tid;  // thread id
   uint8_t *ttmp;  // a temporary that is able to hold several blocks for the output and is private for each thread
   size_t ttmp_nbytes;  // the size of the temporary in bytes
-  blosc2_context *ctx;  // the decompression context
+  blosc2_context *ctx;  // the compression context
 } blosc2_prefilter_params;
+
+/**
+ * @brief The parameters for a postfilter function.
+ *
+ */
+typedef struct {
+  void *user_data;  // user-provided info (optional)
+  uint8_t *in;  // the input buffer
+  uint8_t *out;  // the output buffer
+  int32_t size;  // the input size (in bytes)
+  int32_t typesize;  // the input typesize
+  int32_t offset; // offset to reach the start of the input buffer
+  int32_t tid;  // thread id
+  uint8_t *ttmp;  // a temporary that is able to hold several blocks for the output and is private for each thread
+  size_t ttmp_nbytes;  // the size of the temporary in bytes
+  blosc2_context *ctx;  // the decompression context
+} blosc2_postfilter_params;
 
 /**
  * @brief The type of the prefilter function.
@@ -739,6 +757,13 @@ typedef struct {
  * If the function call is successful, the return value should be 0; else, a negative value.
  */
 typedef int (*blosc2_prefilter_fn)(blosc2_prefilter_params* params);
+
+/**
+ * @brief The type of the postfilter function.
+ *
+ * If the function call is successful, the return value should be 0; else, a negative value.
+ */
+typedef int (*blosc2_postfilter_fn)(blosc2_postfilter_params* params);
 
 /**
  * @brief The parameters for creating a context for compression purposes.
@@ -790,6 +815,10 @@ typedef struct {
   //!< The number of threads to use internally (1).
   void* schunk;
   //!< The associated schunk, if any (NULL).
+  blosc2_postfilter_fn postfilter;
+  //!< The postfilter function.
+  blosc2_postfilter_params *postparams;
+  //!< The postfilter parameters.
 } blosc2_dparams;
 
 /**
