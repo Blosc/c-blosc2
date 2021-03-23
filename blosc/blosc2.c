@@ -957,7 +957,6 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     if (memcpyed && context->prefilter != NULL) {
       // We only need the prefilter output
       _src = pipeline_c(thread_context, bsize, src, offset, dest, _tmp2, _tmp3);
-
       if (_src == NULL) {
         return BLOSC2_ERROR_FILTER_PIPELINE;
       }
@@ -965,7 +964,6 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     }
     /* Apply regular filter pipeline */
     _src = pipeline_c(thread_context, bsize, src, offset, _tmp, _tmp2, _tmp3);
-
     if (_src == NULL) {
       return BLOSC2_ERROR_FILTER_PIPELINE;
     }
@@ -1116,9 +1114,10 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
 
 
 /* Process the filter pipeline (decompression mode) */
-int pipeline_d(blosc2_context* context, const int32_t bsize, uint8_t* dest,
+int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8_t* dest,
                const int32_t offset, uint8_t* src, uint8_t* tmp,
                uint8_t* tmp2, int last_filter_index) {
+  blosc2_context* context = thread_context->parent_context;
   int32_t typesize = context->typesize;
   uint8_t* filters = context->filters;
   uint8_t* filters_meta = context->filters_meta;
@@ -1195,6 +1194,27 @@ int pipeline_d(blosc2_context* context, const int32_t bsize, uint8_t* dest,
       _src = _dest;
       _dest = _tmp;
       _tmp = _src;
+    }
+  }
+
+  /* Postfilter function */
+  if (context->postfilter != NULL) {
+    // Create new postfilter parameters for this block (must be private for each thread)
+    blosc2_postfilter_params postparams;
+    memcpy(&postparams, context->postparams, sizeof(postparams));
+    postparams.in = _src;
+    postparams.out = _dest;
+    postparams.size = (size_t)bsize;
+    postparams.typesize = typesize;
+    postparams.offset = offset;
+    postparams.tid = thread_context->tid;
+    postparams.ttmp = thread_context->tmp;
+    postparams.ttmp_nbytes = thread_context->tmp_nbytes;
+    postparams.ctx = context;
+
+    if (context->postfilter(&postparams) != 0) {
+      BLOSC_TRACE_ERROR("Execution of postfilter function failed");
+      return BLOSC2_ERROR_POSTFILTER;
     }
   }
 
@@ -1451,8 +1471,9 @@ static int blosc_d(
     ntbytes += nbytes;
   } /* Closes j < nstreams */
 
-  if (last_filter_index >= 0) {
-    int errcode = pipeline_d(context, bsize, dest, dest_offset, tmp, tmp2, tmp3,
+  if (last_filter_index >= 0 || context->postfilter != NULL) {
+    /* Apply regular filter pipeline */
+    int errcode = pipeline_d(thread_context, bsize, dest, dest_offset, tmp, tmp2, tmp3,
                              last_filter_index);
     if (errcode < 0)
       return errcode;
@@ -3329,6 +3350,13 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   context->block_maskout_nitems = 0;
   context->schunk = dparams.schunk;
 
+  if (dparams.postfilter != NULL) {
+    context->postfilter = dparams.postfilter;
+    context->postparams = (blosc2_postfilter_params*)my_malloc(sizeof(blosc2_postfilter_params));
+    BLOSC_ERROR_NULL(context->pparams, NULL);
+    memcpy(context->postparams, dparams.postparams, sizeof(blosc2_postfilter_params));
+  }
+
   return context;
 }
 
@@ -3353,6 +3381,9 @@ void blosc2_free_ctx(blosc2_context* context) {
   }
   if (context->prefilter != NULL) {
     my_free(context->pparams);
+  }
+  if (context->postfilter != NULL) {
+    my_free(context->postparams);
   }
 
   if (context->block_maskout != NULL) {
