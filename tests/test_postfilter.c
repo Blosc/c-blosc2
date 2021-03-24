@@ -21,7 +21,6 @@ typedef struct {
 // Global vars
 blosc2_cparams cparams;
 blosc2_dparams dparams;
-blosc2_context *cctx, *dctx;
 static int32_t data[SIZE];
 static int32_t data2[SIZE];
 static int32_t data_out[SIZE + BLOSC_MAX_OVERHEAD / sizeof(int32_t)];
@@ -56,6 +55,7 @@ int postfilter_func(blosc2_postfilter_params *postparams) {
 
 
 static char *test_postfilter1(void) {
+  blosc2_context *cctx, *dctx;
   cctx = blosc2_create_cctx(cparams);
 
   csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
@@ -63,7 +63,7 @@ static char *test_postfilter1(void) {
 
   // Set some postfilter parameters and function
   dparams.postfilter = (blosc2_postfilter_fn)postfilter_func;
-  // We need to zero the contents of the postparams.  TODO: make a constructor for ppostparams?
+  // We need to zero the contents of the postparams.  TODO: make a constructor for postparams?
   blosc2_postfilter_params postparams = {0};
   test_postparams tpostparams = {0};
   tpostparams.ninputs = 1;
@@ -92,6 +92,7 @@ static char *test_postfilter1(void) {
 
 
 static char *test_postfilter2(void) {
+  blosc2_context *cctx, *dctx;
   cctx = blosc2_create_cctx(cparams);
   csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
   mu_assert("Buffer is uncompressible", csize != 0);

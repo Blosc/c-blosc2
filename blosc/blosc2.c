@@ -1187,7 +1187,7 @@ int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8
         }
     }
     if (last_filter_index == i) {
-      return errcode;
+      break;
     }
     // Cycle buffers when required
     if ((filters[i] != BLOSC_NOFILTER) && (filters[i] != BLOSC_TRUNC_PREC)) {
@@ -1204,7 +1204,7 @@ int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8
     memcpy(&postparams, context->postparams, sizeof(postparams));
     postparams.in = _src;
     postparams.out = _dest;
-    postparams.size = (size_t)bsize;
+    postparams.size = bsize;
     postparams.typesize = typesize;
     postparams.offset = offset;
     postparams.tid = thread_context->tid;
@@ -1328,7 +1328,29 @@ static int blosc_d(
     if (!is_lazy) {
       src += context->header_overhead + nblock * context->blocksize;
     }
-    memcpy(dest + dest_offset, src, bsize_);
+    if (context->postfilter == NULL) {
+      memcpy(dest + dest_offset, src, bsize_);
+    }
+    else {
+      // Create new postfilter parameters for this block (must be private for each thread)
+      blosc2_postfilter_params postparams;
+      memcpy(&postparams, context->postparams, sizeof(postparams));
+      postparams.in = src;
+      postparams.out = dest + dest_offset;
+      postparams.size = bsize;
+      postparams.typesize = typesize;
+      postparams.offset = dest_offset;
+      postparams.tid = thread_context->tid;
+      postparams.ttmp = thread_context->tmp;
+      postparams.ttmp_nbytes = thread_context->tmp_nbytes;
+      postparams.ctx = context;
+
+      // Execute the postfilter (the processed block will be copied to dest)
+      if (context->postfilter(&postparams) != 0) {
+        BLOSC_TRACE_ERROR("Execution of postfilter function failed");
+        return BLOSC2_ERROR_POSTFILTER;
+      }
+    }
     return bsize_;
   }
 
@@ -1471,7 +1493,7 @@ static int blosc_d(
     ntbytes += nbytes;
   } /* Closes j < nstreams */
 
-  if (last_filter_index >= 0 || context->postfilter != NULL) {
+  if (last_filter_index >= 0) {
     /* Apply regular filter pipeline */
     int errcode = pipeline_d(thread_context, bsize, dest, dest_offset, tmp, tmp2, tmp3,
                              last_filter_index);
@@ -3353,7 +3375,7 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   if (dparams.postfilter != NULL) {
     context->postfilter = dparams.postfilter;
     context->postparams = (blosc2_postfilter_params*)my_malloc(sizeof(blosc2_postfilter_params));
-    BLOSC_ERROR_NULL(context->pparams, NULL);
+    BLOSC_ERROR_NULL(context->postparams, NULL);
     memcpy(context->postparams, dparams.postparams, sizeof(blosc2_postfilter_params));
   }
 
