@@ -1129,7 +1129,7 @@ int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8
   for (int i = BLOSC2_MAX_FILTERS - 1; i >= 0; i--) {
     // Delta filter requires the whole chunk ready
     int last_copy_filter = (last_filter_index == i) || (next_filter(filters, i, 'd') == BLOSC_DELTA);
-    if (last_copy_filter) {
+    if (last_copy_filter && context->postfilter == NULL) {
       _dest = dest + offset;
     }
     switch (filters[i]) {
@@ -1186,14 +1186,14 @@ int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8
           errcode = -1;
         }
     }
-    if (last_filter_index == i) {
-      break;
-    }
     // Cycle buffers when required
     if ((filters[i] != BLOSC_NOFILTER) && (filters[i] != BLOSC_TRUNC_PREC)) {
       _src = _dest;
       _dest = _tmp;
       _tmp = _src;
+    }
+    if (last_filter_index == i) {
+      break;
     }
   }
 
@@ -1203,7 +1203,7 @@ int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8
     blosc2_postfilter_params postparams;
     memcpy(&postparams, context->postparams, sizeof(postparams));
     postparams.in = _src;
-    postparams.out = _dest;
+    postparams.out = dest + offset;
     postparams.size = bsize;
     postparams.typesize = typesize;
     postparams.offset = offset;

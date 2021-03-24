@@ -181,14 +181,18 @@ static char *all_tests(void) {
   cparams.nthreads = 1;
   dparams.nthreads = NTHREADS;
   mu_run_test(test_postfilter0);
-  // TODO: the next tests are still failing
-//  cparams.clevel = 1;
-//  cparams.nthreads = 1;
-//  dparams.nthreads = NTHREADS;
-//  mu_run_test(test_postfilter0);
-//  cparams.clevel = 7;
-//  cparams.nthreads = NTHREADS;
-//  mu_run_test(test_postfilter0);
+  cparams.clevel = 1;
+  cparams.nthreads = 1;
+  dparams.nthreads = 1;
+  mu_run_test(test_postfilter0);
+  cparams.clevel = 7;
+  cparams.nthreads = NTHREADS;
+  dparams.nthreads = 1;
+  mu_run_test(test_postfilter0);
+  cparams.clevel = 9;
+  cparams.nthreads = NTHREADS;
+  dparams.nthreads = NTHREADS;
+  mu_run_test(test_postfilter0);
 
   cparams.clevel = 0;
   cparams.nthreads = 1;
