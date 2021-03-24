@@ -740,7 +740,7 @@ typedef struct {
  */
 typedef struct {
   void *user_data;  // user-provided info (optional)
-  uint8_t *in;  // the input buffer
+  const uint8_t *in;  // the input buffer
   uint8_t *out;  // the output buffer
   int32_t size;  // the input size (in bytes)
   int32_t typesize;  // the input typesize
