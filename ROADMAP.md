@@ -54,6 +54,10 @@ Actions to be done
 
 * **Suport for postfilters:** support a user-provided function that will be triggered after the filter pipeline during decompression.  That would mimic the current pre-filter implementation. This will be interesting for supporting e.g. encryption (via pre-filters) and decryption (post-filters), or on-the-flight computation based on data in the same chunk, or generic inputs that can be populated by the user in the postfilter struct that will be passed to the post-filter.
 
+* **Pluggable tuning capabilities:** this will allow users with different needs to define an interface so as to better tune different parameters like the codec, the compression level, the filters to use, the blocksize or the shuffle size.
+
+* **Support for I/O plugins:** so that users can extend the I/O capabilities beyond the current filesystem support.  Things like use databases or S3 interfaces should be possible by implementing these interfaces.
+
 * **Checksums:** the frame can benefit from having a checksum per every chunk/index/metalayer.  This will provide more safety towards frames that are damaged for whatever reason.  Also, this would provide better feedback when trying to determine the parts of the frame that are corrupted.  Candidates for checksums can be the xxhash32 or xxhash64, depending on the goals (to be decided).
 
 * **Documentation:** utterly important for attracting new users and making the life easier for existing ones.  Important points to have in mind here:
@@ -65,8 +69,6 @@ Actions to be done
 * **Wrappers for other languages:** Python and Java are the most obvious candidates, but others like R or Julia would be nice to have.  Still not sure if these should be produced and maintained by the Blosc development team, or leave them for third-party players that would be interested. [The steering [council discussed this](https://github.com/Blosc/governance/blob/master/steering_council_minutes/2020-03-26.md), and probably just the Python wrapper should be maintained by Blosc maintainers themselves, while the other languages should be maintained by the community.]  Update: we have got a grant from the PSF for producing a Python wrapper; thanks guys!
 
 * **Lock support for super-chunks:** when different processes are accessing concurrently to super-chunks, make them to sync properly by using locks, either on-disk (frame-backed super-chunks), or in-memory. Such a lock support would be configured in build time, so it could be disabled with a cmake flag.
-
-* **Support for network storage:** sparse storage already supports disk I/O, but it could be nice to expand this support to network I/O (using S3, HDFS or others).  We need to consider which backends are more useful for users, and also that the implementation should be feasible (read: reasonably simple) for a C library as C-Blosc2.
 
 
 Outreaching
