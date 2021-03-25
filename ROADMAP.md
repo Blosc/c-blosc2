@@ -20,7 +20,9 @@ Right now (March 2021), the next features are already implemented (although they
   
 * **A filter pipeline:** the different filters can be pipelined so that the output of one can the input for the other.  A possible example is a `delta` followed by `shuffle`, or as described above, `trunc_prec` followed by `bitshuffle`.
 
-* **Prefilter support for user functions:** allows to apply user-defined C callbacks prior to the filter pipeline.  See [test_prefilter.c](https://github.com/Blosc/c-blosc2/blob/master/tests/test_prefilter.c) for an example of use. 
+* **Prefilters:** allows to apply user-defined C callbacks prior to the filter pipeline during compression.  See [test_prefilter.c](https://github.com/Blosc/c-blosc2/blob/master/tests/test_prefilter.c) for an example of use. 
+
+* **Postfilters:** allows to apply user-defined C callbacks after the filter pipeline during decompression.  That mimics the prefilter implementation. This could be interesting for supporting e.g. encryption (via prefilters) and decryption (postfilters), or on-the-flight computation based on data in the same chunk (based on e.g. coordinates). See [test_prefilter.c](https://github.com/Blosc/c-blosc2/blob/master/tests/test_postfilter.c) for an example of use. 
 
 * **SIMD support for ARM (NEON):** this allows for faster operation on ARM architectures.  Only `shuffle` is supported right now, but the idea is to implement `bitshuffle` for NEON too.
 
@@ -51,8 +53,6 @@ Actions to be done
 * **Improve the safety of the library:**  we are actively using using the [OSS-Fuzz](https://github.com/google/oss-fuzz) and ClusterFuzz (https://oss-fuzz.com) for uncovering programming errors in C-Blosc2.  Although this is always a work in progress, we did a long way in improving our safety, mainly thanks to the efforts of Nathan Moinvaziri.
 
 * **Plugin capabilities for filters and codecs:**  we are looking forward to implement a plugin register capability so that the info about the new filters and codecs can be persisted and propagated to different machines.
-
-* **Suport for postfilters:** support a user-provided function that will be triggered after the filter pipeline during decompression.  That would mimic the current pre-filter implementation. This will be interesting for supporting e.g. encryption (via pre-filters) and decryption (post-filters), or on-the-flight computation based on data in the same chunk, or generic inputs that can be populated by the user in the postfilter struct that will be passed to the post-filter.
 
 * **Pluggable tuning capabilities:** this will allow users with different needs to define an interface so as to better tune different parameters like the codec, the compression level, the filters to use, the blocksize or the shuffle size.
 
