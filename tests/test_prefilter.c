@@ -16,7 +16,7 @@ typedef struct {
     int ninputs;
     uint8_t *inputs[2];
     int32_t input_typesizes[2];
-} test_pparams;
+} test_preparams;
 
 // Global vars
 blosc2_cparams cparams;
@@ -32,26 +32,26 @@ int dsize = SIZE * sizeof(int32_t);
 int csize;
 
 
-int prefilter_func(blosc2_prefilter_params *pparams) {
-  test_pparams *tpparams = pparams->user_data;
-  int nelems = pparams->out_size / pparams->out_typesize;
-  if (tpparams->ninputs == 0) {
-    int32_t *input0 = (int32_t *)pparams->in;
+int prefilter_func(blosc2_prefilter_params *preparams) {
+  test_preparams *tpreparams = preparams->user_data;
+  int nelems = preparams->out_size / preparams->out_typesize;
+  if (tpreparams->ninputs == 0) {
+    int32_t *input0 = (int32_t *)preparams->in;
     for (int i = 0; i < nelems; i++) {
-      ((int32_t*)(pparams->out))[i] = input0[i] * 2;
+      ((int32_t*)(preparams->out))[i] = input0[i] * 2;
     }
   }
-  else if (tpparams->ninputs == 1) {
-    int32_t *input0 = ((int32_t *)(tpparams->inputs[0] + pparams->out_offset));
+  else if (tpreparams->ninputs == 1) {
+    int32_t *input0 = ((int32_t *)(tpreparams->inputs[0] + preparams->out_offset));
     for (int i = 0; i < nelems; i++) {
-      ((int32_t*)(pparams->out))[i] = input0[i] * 3;
+      ((int32_t*)(preparams->out))[i] = input0[i] * 3;
     }
   }
-  else if (tpparams->ninputs == 2) {
-    int32_t *input0 = ((int32_t *)(tpparams->inputs[0] + pparams->out_offset));
-    int32_t *input1 = ((int32_t *)(tpparams->inputs[1] + pparams->out_offset));
+  else if (tpreparams->ninputs == 2) {
+    int32_t *input0 = ((int32_t *)(tpreparams->inputs[0] + preparams->out_offset));
+    int32_t *input1 = ((int32_t *)(tpreparams->inputs[1] + preparams->out_offset));
     for (int i = 0; i < nelems; i++) {
-      ((int32_t *) (pparams->out))[i] = input0[i] + input1[i];
+      ((int32_t *) (preparams->out))[i] = input0[i] + input1[i];
     }
   }
   else {
@@ -64,11 +64,11 @@ int prefilter_func(blosc2_prefilter_params *pparams) {
 static char *test_prefilter0(void) {
   // Set some prefilter parameters and function
   cparams.prefilter = (blosc2_prefilter_fn)prefilter_func;
-  // We need to zero the contents of the pparams.  TODO: make a constructor for ppparams.
-  blosc2_prefilter_params pparams = {0};
-  test_pparams tpparams = {0};
-  pparams.user_data = (void*)&tpparams;
-  cparams.pparams = &pparams;
+  // We need to zero the contents of the preparams.  TODO: make a constructor for ppreparams.
+  blosc2_prefilter_params preparams = {0};
+  test_preparams tpreparams = {0};
+  preparams.user_data = (void*)&tpreparams;
+  cparams.preparams = &preparams;
   cctx = blosc2_create_cctx(cparams);
 
   csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
@@ -96,14 +96,14 @@ static char *test_prefilter0(void) {
 static char *test_prefilter1(void) {
   // Set some prefilter parameters and function
   cparams.prefilter = (blosc2_prefilter_fn)prefilter_func;
-  // We need to zero the contents of the pparams.  TODO: make a constructor for ppparams.
-  blosc2_prefilter_params pparams = {0};
-  test_pparams tpparams = {0};
-  tpparams.ninputs = 1;
-  tpparams.inputs[0] = (uint8_t*)data;
-  tpparams.input_typesizes[0] = cparams.typesize;
-  pparams.user_data = (void*)&tpparams;
-  cparams.pparams = &pparams;
+  // We need to zero the contents of the preparams.  TODO: make a constructor for ppreparams.
+  blosc2_prefilter_params preparams = {0};
+  test_preparams tpreparams = {0};
+  tpreparams.ninputs = 1;
+  tpreparams.inputs[0] = (uint8_t*)data;
+  tpreparams.input_typesizes[0] = cparams.typesize;
+  preparams.user_data = (void*)&tpreparams;
+  cparams.preparams = &preparams;
   cctx = blosc2_create_cctx(cparams);
 
   csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
@@ -131,16 +131,16 @@ static char *test_prefilter1(void) {
 static char *test_prefilter2(void) {
   // Set some prefilter parameters and function
   cparams.prefilter = (blosc2_prefilter_fn)prefilter_func;
-  // We need to zero the contents of the pparams.  TODO: make a constructor for ppparams.
-  blosc2_prefilter_params pparams = {0};
-  test_pparams tpparams = {0};
-  tpparams.ninputs = 2;
-  tpparams.inputs[0] = (uint8_t*)data;
-  tpparams.inputs[1] = (uint8_t*)data2;
-  tpparams.input_typesizes[0] = cparams.typesize;
-  tpparams.input_typesizes[1] = cparams.typesize;
-  pparams.user_data = (void*)&tpparams;
-  cparams.pparams = &pparams;
+  // We need to zero the contents of the preparams.  TODO: make a constructor for ppreparams.
+  blosc2_prefilter_params preparams = {0};
+  test_preparams tpreparams = {0};
+  tpreparams.ninputs = 2;
+  tpreparams.inputs[0] = (uint8_t*)data;
+  tpreparams.inputs[1] = (uint8_t*)data2;
+  tpreparams.input_typesizes[0] = cparams.typesize;
+  tpreparams.input_typesizes[1] = cparams.typesize;
+  preparams.user_data = (void*)&tpreparams;
+  cparams.preparams = &preparams;
   cctx = blosc2_create_cctx(cparams);
 
   csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);

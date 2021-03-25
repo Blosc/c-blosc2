@@ -837,19 +837,19 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
   /* Prefilter function */
   if (context->prefilter != NULL) {
     // Create new prefilter parameters for this block (must be private for each thread)
-    blosc2_prefilter_params pparams;
-    memcpy(&pparams, context->pparams, sizeof(pparams));
-    pparams.in = _src;
-    pparams.out = _dest;
-    pparams.out_size = (size_t)bsize;
-    pparams.out_typesize = typesize;
-    pparams.out_offset = offset;
-    pparams.tid = thread_context->tid;
-    pparams.ttmp = thread_context->tmp;
-    pparams.ttmp_nbytes = thread_context->tmp_nbytes;
-    pparams.ctx = context;
+    blosc2_prefilter_params preparams;
+    memcpy(&preparams, context->preparams, sizeof(preparams));
+    preparams.in = _src;
+    preparams.out = _dest;
+    preparams.out_size = (size_t)bsize;
+    preparams.out_typesize = typesize;
+    preparams.out_offset = offset;
+    preparams.tid = thread_context->tid;
+    preparams.ttmp = thread_context->tmp;
+    preparams.ttmp_nbytes = thread_context->tmp_nbytes;
+    preparams.ctx = context;
 
-    if (context->prefilter(&pparams) != 0) {
+    if (context->prefilter(&preparams) != 0) {
       BLOSC_TRACE_ERROR("Execution of prefilter function failed");
       return NULL;
     }
@@ -3349,9 +3349,9 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
 
   if (cparams.prefilter != NULL) {
     context->prefilter = cparams.prefilter;
-    context->pparams = (blosc2_prefilter_params*)my_malloc(sizeof(blosc2_prefilter_params));
-    BLOSC_ERROR_NULL(context->pparams, NULL);
-    memcpy(context->pparams, cparams.pparams, sizeof(blosc2_prefilter_params));
+    context->preparams = (blosc2_prefilter_params*)my_malloc(sizeof(blosc2_prefilter_params));
+    BLOSC_ERROR_NULL(context->preparams, NULL);
+    memcpy(context->preparams, cparams.preparams, sizeof(blosc2_prefilter_params));
   }
 
   return context;
@@ -3403,7 +3403,7 @@ void blosc2_free_ctx(blosc2_context* context) {
     btune_free(context);
   }
   if (context->prefilter != NULL) {
-    my_free(context->pparams);
+    my_free(context->preparams);
   }
   if (context->postfilter != NULL) {
     my_free(context->postparams);

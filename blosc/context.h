@@ -85,7 +85,7 @@ struct blosc2_context_s {
   /* prefilter function */
   blosc2_postfilter_fn postfilter;
   /* postfilter function */
-  blosc2_prefilter_params *pparams;
+  blosc2_prefilter_params *preparams;
   /* prefilter params */
   blosc2_postfilter_params *postparams;
   /* postfilter params */

@@ -793,7 +793,7 @@ typedef struct {
   //!< The metadata for filters.
   blosc2_prefilter_fn prefilter;
   //!< The prefilter function.
-  blosc2_prefilter_params *pparams;
+  blosc2_prefilter_params *preparams;
   //!< The prefilter parameters.
 } blosc2_cparams;
 
