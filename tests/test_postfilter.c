@@ -35,7 +35,7 @@ int postfilter_func(blosc2_postfilter_params *postparams) {
   test_postparams *tpostparams = postparams->user_data;
   int nelems = postparams->size / postparams->typesize;
   if (tpostparams->ninputs == 0) {
-    int32_t *input0 = ((int32_t *)(postparams->in));
+    int32_t *input0 = (int32_t *)postparams->in;
     for (int i = 0; i < nelems; i++) {
       ((int32_t*)(postparams->out))[i] = input0[i] * 2;
     }

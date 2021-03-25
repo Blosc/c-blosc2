@@ -724,6 +724,7 @@ typedef struct blosc2_context_s blosc2_context;   /* opaque type */
  */
 typedef struct {
   void *user_data;  // user-provided info (optional)
+  const uint8_t *in;  // the input buffer
   uint8_t *out;  // the output buffer
   int32_t out_size;  // the output size (in bytes)
   int32_t out_typesize;  // the output typesize

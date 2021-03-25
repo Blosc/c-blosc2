@@ -839,6 +839,7 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
     // Create new prefilter parameters for this block (must be private for each thread)
     blosc2_prefilter_params pparams;
     memcpy(&pparams, context->pparams, sizeof(pparams));
+    pparams.in = _src;
     pparams.out = _dest;
     pparams.out_size = (size_t)bsize;
     pparams.out_typesize = typesize;

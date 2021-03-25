@@ -35,10 +35,16 @@ int csize;
 int prefilter_func(blosc2_prefilter_params *pparams) {
   test_pparams *tpparams = pparams->user_data;
   int nelems = pparams->out_size / pparams->out_typesize;
-  if (tpparams->ninputs == 1) {
+  if (tpparams->ninputs == 0) {
+    int32_t *input0 = (int32_t *)pparams->in;
+    for (int i = 0; i < nelems; i++) {
+      ((int32_t*)(pparams->out))[i] = input0[i] * 2;
+    }
+  }
+  else if (tpparams->ninputs == 1) {
     int32_t *input0 = ((int32_t *)(tpparams->inputs[0] + pparams->out_offset));
     for (int i = 0; i < nelems; i++) {
-      ((int32_t*)(pparams->out))[i] = input0[i];
+      ((int32_t*)(pparams->out))[i] = input0[i] * 3;
     }
   }
   else if (tpparams->ninputs == 2) {
@@ -51,6 +57,38 @@ int prefilter_func(blosc2_prefilter_params *pparams) {
   else {
     return 1;
   }
+  return 0;
+}
+
+
+static char *test_prefilter0(void) {
+  // Set some prefilter parameters and function
+  cparams.prefilter = (blosc2_prefilter_fn)prefilter_func;
+  // We need to zero the contents of the pparams.  TODO: make a constructor for ppparams.
+  blosc2_prefilter_params pparams = {0};
+  test_pparams tpparams = {0};
+  pparams.user_data = (void*)&tpparams;
+  cparams.pparams = &pparams;
+  cctx = blosc2_create_cctx(cparams);
+
+  csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
+  mu_assert("Compression error", csize > 0);
+
+  /* Create a context for decompression */
+  dctx = blosc2_create_dctx(dparams);
+
+  /* Decompress  */
+  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, (size_t)dsize);
+  mu_assert("Decompression error", dsize > 0);
+
+  for (int i = 0; i < SIZE; i++) {
+    mu_assert("Decompressed data differs from original!", data[i] * 2 == data_dest[i]);
+  }
+
+  /* Free resources */
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+
   return 0;
 }
 
@@ -79,7 +117,7 @@ static char *test_prefilter1(void) {
   mu_assert("Decompression error", dsize > 0);
 
   for (int i = 0; i < SIZE; i++) {
-    mu_assert("Decompressed data differs from original!", data[i] == data_dest[i]);
+    mu_assert("Decompressed data differs from original!", data[i] * 3 == data_dest[i]);
   }
 
   /* Free resources */
@@ -133,6 +171,22 @@ static char *test_prefilter2(void) {
 
 static char *all_tests(void) {
   // Check with an assortment of clevels and nthreads
+
+  cparams.clevel = 0;
+  cparams.nthreads = 1;
+  dparams.nthreads = NTHREADS;
+  mu_run_test(test_prefilter0);
+  cparams.clevel = 1;
+  cparams.nthreads = 1;
+  mu_run_test(test_prefilter0);
+  cparams.clevel = 7;
+  cparams.nthreads = NTHREADS;
+  mu_run_test(test_prefilter0);
+  cparams.clevel = 9;
+  cparams.nthreads = NTHREADS;
+  dparams.nthreads = NTHREADS;
+  mu_run_test(test_prefilter0);
+
   cparams.clevel = 0;
   cparams.nthreads = 1;
   dparams.nthreads = NTHREADS;
@@ -143,6 +197,7 @@ static char *all_tests(void) {
   cparams.clevel = 7;
   cparams.nthreads = NTHREADS;
   mu_run_test(test_prefilter1);
+
   cparams.clevel = 0;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = 1;
