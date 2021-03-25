@@ -37,13 +37,13 @@ int postfilter_func(blosc2_postfilter_params *postparams) {
   if (tpostparams->ninputs == 0) {
     int32_t *input0 = ((int32_t *)(postparams->in));
     for (int i = 0; i < nelems; i++) {
-      ((int32_t*)(postparams->out))[i] = input0[i];
+      ((int32_t*)(postparams->out))[i] = input0[i] * 2;
     }
   }
   else if (tpostparams->ninputs == 1) {
     int32_t *input0 = ((int32_t *)(tpostparams->inputs[0] + postparams->offset));
     for (int i = 0; i < nelems; i++) {
-      ((int32_t*)(postparams->out))[i] = input0[i];
+      ((int32_t*)(postparams->out))[i] = input0[i] * 3;
     }
   }
   else if (tpostparams->ninputs == 2) {
@@ -84,7 +84,7 @@ static char *test_postfilter0(void) {
   mu_assert("Decompression error", dsize > 0);
 
   for (int i = 0; i < SIZE; i++) {
-    mu_assert("Decompressed data differs from original!", data[i] == data_dest[i]);
+    mu_assert("Decompressed data differs from original!", data[i] * 2 == data_dest[i]);
   }
 
   /* Free resources */
@@ -121,7 +121,7 @@ static char *test_postfilter1(void) {
   mu_assert("Decompression error", dsize > 0);
 
   for (int i = 0; i < SIZE; i++) {
-    mu_assert("Decompressed data differs from original!", data[i] == data_dest[i]);
+    mu_assert("Decompressed data differs from original!", data[i] * 3 == data_dest[i]);
   }
 
   /* Free resources */
