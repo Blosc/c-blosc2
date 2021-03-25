@@ -20,9 +20,9 @@ Right now (March 2021), the next features are already implemented (although they
   
 * **A filter pipeline:** the different filters can be pipelined so that the output of one can the input for the other.  A possible example is a `delta` followed by `shuffle`, or as described above, `trunc_prec` followed by `bitshuffle`.
 
-* **Prefilters:** allows to apply user-defined C callbacks prior to the filter pipeline during compression.  See [test_prefilter.c](https://github.com/Blosc/c-blosc2/blob/master/tests/test_prefilter.c) for an example of use. 
+* **Prefilters:** allows to apply user-defined C callbacks **prior** the filter pipeline during compression.  See [test_prefilter.c](https://github.com/Blosc/c-blosc2/blob/master/tests/test_prefilter.c) for an example of use. 
 
-* **Postfilters:** allows to apply user-defined C callbacks after the filter pipeline during decompression.  That mimics the prefilter implementation. This could be interesting for supporting e.g. encryption (via prefilters) and decryption (postfilters), or on-the-flight computation based on data in the same chunk (based on e.g. coordinates). See [test_prefilter.c](https://github.com/Blosc/c-blosc2/blob/master/tests/test_postfilter.c) for an example of use. 
+* **Postfilters:** allows to apply user-defined C callbacks **after** the filter pipeline during decompression. The combination of prefilters and postfilters could be interesting for supporting e.g. encryption (via prefilters) and decryption (via postfilters).  Also, a postfilter alone can used to produce on-the-flight computation based on existing data (or other metadata, like e.g. coordinates). See [test_postfilter.c](https://github.com/Blosc/c-blosc2/blob/master/tests/test_postfilter.c) for an example of use. 
 
 * **SIMD support for ARM (NEON):** this allows for faster operation on ARM architectures.  Only `shuffle` is supported right now, but the idea is to implement `bitshuffle` for NEON too.
 
