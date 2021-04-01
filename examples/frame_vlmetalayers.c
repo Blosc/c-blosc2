@@ -40,6 +40,8 @@
 
 
 int main(void) {
+  blosc_init();
+
   size_t isize = CHUNKSIZE * sizeof(int32_t);
 
   printf("Blosc version info: %s (%s)\n",
@@ -91,6 +93,7 @@ int main(void) {
   /* Free resources */
   blosc2_schunk_free(schunk);
   blosc2_schunk_free(sc);
+  blosc_destroy();
 
   return 0;
 }

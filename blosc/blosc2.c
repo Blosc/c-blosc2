@@ -1506,19 +1506,19 @@ static int blosc_d(
       char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
       BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
       sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
-      fp = fopen(chunkpath, "rb");
+      fp = context->schunk->storage->udio->open(chunkpath, "rb", NULL);
       free(chunkpath);
       // The offset of the block is src_offset
-      fseek(fp, src_offset, SEEK_SET);
+      context->schunk->storage->udio->seek(fp, src_offset, SEEK_SET, NULL);
     }
     else {
-      fp = fopen(urlpath, "rb");
+      fp = context->schunk->storage->udio->open(urlpath, "rb", NULL);
       // The offset of the block is src_offset
-      fseek(fp, chunk_offset + src_offset, SEEK_SET);
+      context->schunk->storage->udio->seek(fp, chunk_offset + src_offset, SEEK_SET, NULL);
     }
     // We can make use of tmp3 because it will be used after src is not needed anymore
-    size_t rbytes = fread(tmp3, 1, block_csize, fp);
-    fclose(fp);
+    size_t rbytes = context->schunk->storage->udio->read(tmp3, 1, block_csize, fp, NULL);
+   context->schunk->storage->udio->close(fp, NULL);
     if ((int32_t)rbytes != block_csize) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");
       return BLOSC2_ERROR_READ_BUFFER;
@@ -3474,6 +3474,7 @@ void blosc_set_schunk(blosc2_schunk* schunk) {
   g_global_context->schunk = schunk;
 }
 
+blosc2_io blosc2_io_global = {0};
 
 void blosc_init(void) {
   /* Return if Blosc is already initialized */
@@ -3486,6 +3487,9 @@ void blosc_init(void) {
   g_global_context->nthreads = g_nthreads;
   g_global_context->new_nthreads = g_nthreads;
   g_initlib = 1;
+
+  memcpy(&blosc2_io_global, &BLOSC2_IO_DEFAULTS, sizeof(blosc2_io));
+
 }
 
 
@@ -3618,12 +3622,6 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     context->udbtune = &BTUNE_DEFAULTS;
   } else {
     context->udbtune = cparams.udbtune;
-  }
-
-  if (cparams.udbtune != NULL) {
-    context->udbtune = cparams.udbtune;
-  } else {
-    context->udbtune = &BTUNE_DEFAULTS;
   }
 
   return context;

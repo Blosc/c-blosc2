@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "blosc2.h"
+#include "blosc-private.h"
 #include "frame.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
@@ -39,7 +40,7 @@ FILE* sframe_open_index(const char* urlpath, const char* mode) {
   char* index_path = malloc(strlen(urlpath) + strlen("/chunks.b2frame") + 1);
   if (index_path) {
     sprintf(index_path, "%s/chunks.b2frame", urlpath);
-    fp = fopen(index_path, mode);
+    fp = blosc2_io_global.open(index_path, mode, NULL);
     free(index_path);
   }
   return fp;
@@ -51,7 +52,7 @@ FILE* sframe_open_chunk(const char* urlpath, int64_t nchunk, const char* mode) {
   char* chunk_path = malloc(strlen(urlpath) + 1 + 8 + strlen(".chunk") + 1);
   if (chunk_path) {
     sprintf(chunk_path, "%s/%08X.chunk", urlpath, (unsigned int)nchunk);
-    fp = fopen(chunk_path, mode);
+    fp = blosc2_io_global.open(chunk_path, mode, NULL);
     free(chunk_path);
   }
   return fp;
@@ -64,8 +65,8 @@ void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int32_t nchunk,
     BLOSC_TRACE_ERROR("Cannot open the chunkfile.");
     return NULL;
   }
-  size_t wbytes = fwrite(chunk, 1, (size_t)cbytes, fpc);
-  fclose(fpc);
+  size_t wbytes = frame->schunk->storage->udio->write(chunk, 1, (size_t)cbytes, fpc, NULL);
+  frame->schunk->storage->udio->close(fpc, NULL);
   if (wbytes != (size_t)cbytes) {
     BLOSC_TRACE_ERROR("Cannot write the full chunk.");
     return NULL;
@@ -83,13 +84,13 @@ int sframe_get_chunk(blosc2_frame_s* frame, int32_t nchunk, uint8_t** chunk, boo
     return BLOSC2_ERROR_FILE_OPEN;
   }
 
-  fseek(fpc, 0L, SEEK_END);
+  frame->schunk->storage->udio->seek(fpc, 0L, SEEK_END, NULL);
   int32_t chunk_cbytes = ftell(fpc);
   *chunk = malloc((size_t)chunk_cbytes);
 
-  fseek(fpc, 0L, SEEK_SET);
-  size_t rbytes = fread(*chunk, 1, (size_t)chunk_cbytes, fpc);
-  fclose(fpc);
+  frame->schunk->storage->udio->seek(fpc, 0L, SEEK_SET, NULL);
+  size_t rbytes = frame->schunk->storage->udio->read(*chunk, 1, (size_t)chunk_cbytes, fpc, NULL);
+  frame->schunk->storage->udio->close(fpc, NULL);
   if (rbytes != (size_t)chunk_cbytes) {
     BLOSC_TRACE_ERROR("Cannot read the chunk out of the chunkfile.");
     return BLOSC2_ERROR_FILE_READ;

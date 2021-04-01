@@ -33,6 +33,8 @@
 
 
 int main(void) {
+  blosc_init();
+
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -89,6 +91,8 @@ int main(void) {
 
   /* Free resources */
   blosc2_schunk_free(schunk);
+
+  blosc_destroy();
 
   return 0;
 }

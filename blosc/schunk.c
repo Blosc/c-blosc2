@@ -112,7 +112,7 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
   schunk->version = 0;     /* pre-first version */
 
   // Get the storage with proper defaults
-  schunk->storage = get_new_storage(storage, &BLOSC2_CPARAMS_DEFAULTS, &BLOSC2_DPARAMS_DEFAULTS);
+  schunk->storage = get_new_storage(storage, &BLOSC2_CPARAMS_DEFAULTS, &BLOSC2_DPARAMS_DEFAULTS, &BLOSC2_IO_DEFAULTS);
 
   schunk->udbtune = malloc(sizeof(blosc2_btune));
   if (schunk->storage->cparams->udbtune == NULL) {
@@ -149,6 +149,7 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
     free(urlpath);
     frame->sframe = true;
     // Initialize frame (basically, encode the header)
+    frame->schunk = schunk;
     int64_t frame_len = frame_from_schunk(schunk, frame);
     if (frame_len < 0) {
       BLOSC_TRACE_ERROR("Error during the conversion of schunk to frame.");
@@ -161,6 +162,7 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
     blosc2_frame_s* frame = frame_new(storage->urlpath);
     frame->sframe = false;
     // Initialize frame (basically, encode the header)
+    frame->schunk = schunk;
     int64_t frame_len = frame_from_schunk(schunk, frame);
     if (frame_len < 0) {
       BLOSC_TRACE_ERROR("Error during the conversion of schunk to frame.");
@@ -358,9 +360,9 @@ int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* nee
 
 /* Write an in-memory frame out to a file. */
 int64_t frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
-  FILE* fp = fopen(urlpath, "wb");
-  size_t nitems = fwrite(frame->cframe, (size_t)frame->len, 1, fp);
-  fclose(fp);
+  FILE* fp = frame->schunk->storage->udio->open(urlpath, "wb", NULL);
+  size_t nitems = frame->schunk->storage->udio->write(frame->cframe, (size_t)frame->len, 1, fp, NULL);
+  frame->schunk->storage->udio->close(fp, NULL);
   return nitems * (size_t)frame->len;
 }
 
@@ -428,6 +430,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     }
     free(schunk->storage->cparams);
     free(schunk->storage->dparams);
+    free(schunk->storage->udio);
     free(schunk->storage);
   }
 

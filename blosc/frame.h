@@ -58,6 +58,7 @@ typedef struct {
   int64_t maxlen;           //!< The maximum length of the frame; if 0, there is no maximum
   uint32_t trailer_len;     //!< The current length of the trailer in (compressed) bytes
   bool sframe;              //!< Whether the frame is sparse (true) or not
+  blosc2_schunk *schunk;     //!< The schunk associated
 } blosc2_frame_s;
 
 
@@ -130,8 +131,9 @@ blosc2_frame_s* frame_from_cframe(uint8_t *cframe, int64_t len, bool copy);
  */
 blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy);
 
-blosc2_storage* get_new_storage(const blosc2_storage* storage, const blosc2_cparams* cdefaults,
-                                const blosc2_dparams* ddefaults);
+blosc2_storage *
+get_new_storage(const blosc2_storage *storage, const blosc2_cparams *cdefaults, const blosc2_dparams *ddefaults,
+                const blosc2_io *iodefaults);
 
 void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schunk);
 void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_schunk* schunk);
