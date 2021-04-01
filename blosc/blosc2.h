@@ -20,8 +20,28 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include "blosc2-export.h"
 #include "blosc2-common.h"
+
+#if defined(_WIN32) && !defined(__MINGW32__)
+#include <windows.h>
+  #include <malloc.h>
+
+/* stdint.h only available in VS2010 (VC++ 16.0) and newer */
+  #if defined(_MSC_VER) && _MSC_VER < 1600
+    #include "win32/stdint-windows.h"
+  #else
+    #include <stdint.h>
+  #endif
+
+  #define fseek _fseeki64
+
+  #include <process.h>
+  #define getpid _getpid
+#else
+#include <unistd.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -702,6 +722,24 @@ BLOSC_EXPORT void blosc_cbuffer_versions(const void* cbuffer, int* version,
  */
 BLOSC_EXPORT const char* blosc_cbuffer_complib(const void* cbuffer);
 
+/*********************************************************************
+  Structures and functions related with user-defined input/output.
+*********************************************************************/
+typedef struct {
+  void* (*open)(const char *urlpath, const char *mode, void *params);
+  int (*close)(void *stream, void* params);
+  int (*seek)(void *stream, long, int, void *params);
+  size_t (*write)(const void *ptr, size_t size, size_t nitems, void *stream, void *params);
+  size_t	 (*read)(void *ptr, size_t size, size_t nitems, void *stream, void *params);
+} blosc2_io;
+
+static const blosc2_io BLOSC2_IO_DEFAULTS = {
+    .open = (void * (*)(const char *, const char *, void *)) fopen,
+    .close = (int (*)(void *, void *)) fclose,
+    .seek = (int (*)(void *, long, int, void *)) fseek,
+    .write = (size_t (*) (const void *, size_t, size_t, void *, void *)) fwrite,
+    .read = (size_t	 (*)(void *, size_t, size_t, void *, void *)) fread,
+};
 
 
 /*********************************************************************
@@ -818,6 +856,7 @@ static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
         BLOSC_BLOSCLZ, 0, 5, 0, 8, 1, 0, BLOSC_FORWARD_COMPAT_SPLIT,
         NULL, {0, 0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0, 0},
         NULL, NULL, NULL};
+
 
 /**
   @brief The parameters for creating a context for decompression purposes.
@@ -1210,12 +1249,14 @@ typedef struct {
     blosc2_dparams* dparams;
     //!< The decompression params when creating a schunk.
     //!< If NULL, sensible defaults are used depending on the context.
+    blosc2_io *udio;
+    //!< User-defined iinput/output functions.
 } blosc2_storage;
 
 /**
  * @brief Default struct for #blosc2_storage meant for user initialization.
  */
-static const blosc2_storage BLOSC2_STORAGE_DEFAULTS = {false, NULL, NULL, NULL};
+static const blosc2_storage BLOSC2_STORAGE_DEFAULTS = {false, NULL, NULL, NULL, NULL};
 
 typedef struct blosc2_frame_s blosc2_frame;   /* opaque type */
 

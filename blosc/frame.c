@@ -385,11 +385,11 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
       fp = sframe_open_index(frame->urlpath, "rb");
     }
     else {
-      fp = fopen(frame->urlpath, "rb");
+      fp = blosc2_io_global.open(frame->urlpath, "rb", NULL);
     }
     if (fp != NULL) {
-      rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
-      fclose(fp);
+      rbytes = blosc2_io_global.read(header, 1, FRAME_HEADER_MINLEN, fp, NULL);
+      blosc2_io_global.close(fp, NULL);
     }
     (void) rbytes;
     if (rbytes != FRAME_HEADER_MINLEN) {
@@ -505,13 +505,13 @@ int update_frame_len(blosc2_frame_s* frame, int64_t len) {
       fp = sframe_open_index(frame->urlpath, "rb+");
     }
     else {
-      fp = fopen(frame->urlpath, "rb+");
+      fp = frame->schunk->storage->udio->open(frame->urlpath, "rb+", NULL);
     }
-    fseek(fp, FRAME_LEN, SEEK_SET);
+    frame->schunk->storage->udio->seek(fp, FRAME_LEN, SEEK_SET, NULL);
     int64_t swap_len;
     to_big(&swap_len, &len, sizeof(int64_t));
-    size_t wbytes = fwrite(&swap_len, 1, sizeof(int64_t), fp);
-    fclose(fp);
+    size_t wbytes = frame->schunk->storage->udio->write(&swap_len, 1, sizeof(int64_t), fp, NULL);
+    frame->schunk->storage->udio->close(fp, NULL);
     if (wbytes != sizeof(int64_t)) {
       BLOSC_TRACE_ERROR("Cannot write the frame length in header.");
       return BLOSC2_ERROR_FILE_WRITE;
@@ -702,10 +702,10 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       fp = sframe_open_index(frame->urlpath, "rb+");
     }
     else {
-      fp = fopen(frame->urlpath, "rb+");
+      fp = schunk->storage->udio->open(frame->urlpath, "rb+", NULL);
     }
-    fseek(fp, trailer_offset, SEEK_SET);
-    size_t wbytes = fwrite(trailer, 1, trailer_len, fp);
+    schunk->storage->udio->seek(fp, trailer_offset, SEEK_SET, NULL);
+    size_t wbytes = schunk->storage->udio->write(trailer, 1, trailer_len, fp, NULL);
     if (wbytes != (size_t)trailer_len) {
       BLOSC_TRACE_ERROR("Cannot write the trailer length in trailer.");
       return BLOSC2_ERROR_FILE_WRITE;
@@ -714,7 +714,7 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       BLOSC_TRACE_ERROR("Cannot truncate the frame.");
       return BLOSC2_ERROR_FILE_TRUNCATE;
     }
-    fclose(fp);
+    frame->schunk->storage->udio->close(fp, NULL);
 
   }
   free(trailer);
@@ -762,12 +762,12 @@ blosc2_frame_s* frame_from_file(const char* urlpath) {
   else {
     urlpath_cpy = malloc(strlen(urlpath) + 1);
     strcpy(urlpath_cpy, urlpath);
-    fp = fopen(urlpath, "rb");
+    fp = blosc2_io_global.open(urlpath, "rb", NULL);
   }
-  size_t rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
+  size_t rbytes = blosc2_io_global.read(header, 1, FRAME_HEADER_MINLEN, fp, NULL);
   if (rbytes != FRAME_HEADER_MINLEN) {
     BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
-    fclose(fp);
+    blosc2_io_global.close(fp, NULL);
     free(urlpath_cpy);
     return NULL;
   }
@@ -779,10 +779,11 @@ blosc2_frame_s* frame_from_file(const char* urlpath) {
   frame->len = frame_len;
   frame->sframe = sframe;
 
+  blosc2_io *pepe = &blosc2_io_global;
   // Now, the trailer length
-  fseek(fp, frame_len - FRAME_TRAILER_MINLEN, SEEK_SET);
-  rbytes = fread(trailer, 1, FRAME_TRAILER_MINLEN, fp);
-  fclose(fp);
+  blosc2_io_global.seek(fp, frame_len - FRAME_TRAILER_MINLEN, SEEK_SET, NULL);
+  rbytes = blosc2_io_global.read(trailer, 1, FRAME_TRAILER_MINLEN, fp, NULL);
+  blosc2_io_global.close(fp, NULL);
   if (rbytes != FRAME_TRAILER_MINLEN) {
     BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
     free(urlpath_cpy);
@@ -930,9 +931,9 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
       fp = sframe_open_index(frame->urlpath, "wb");
     }
     else {
-      fp = fopen(frame->urlpath, "wb");
+      fp = schunk->storage->udio->open(frame->urlpath, "wb", NULL);
     }
-    fwrite(h2, h2len, 1, fp);
+    schunk->storage->udio->write(h2, h2len, 1, fp, NULL);
   }
   free(h2);
 
@@ -948,7 +949,7 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
       if (frame->urlpath == NULL) {
         memcpy(frame->cframe + h2len + coffset, data_chunk, (size_t)chunk_cbytes);
       } else {
-        fwrite(data_chunk, (size_t)chunk_cbytes, 1, fp);
+        frame->schunk->storage->udio->write(data_chunk, (size_t)chunk_cbytes, 1, fp, NULL);
       }
       coffset += chunk_cbytes;
     }
@@ -962,8 +963,8 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     memcpy(frame->cframe + h2len + cbytes, off_chunk, off_cbytes);
   }
   else {
-    fwrite(off_chunk, (size_t)off_cbytes, 1, fp);
-    fclose(fp);
+    schunk->storage->udio->write(off_chunk, (size_t)off_cbytes, 1, fp, NULL);
+    schunk->storage->udio->close(fp, NULL);
   }
   free(off_chunk);
   rc = frame_update_trailer(frame, schunk);
@@ -1049,14 +1050,14 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
   uint8_t* coffsets = malloc((size_t)coffsets_cbytes);
   if (frame->sframe) {
     fp = sframe_open_index(frame->urlpath, "rb");
-    fseek(fp, header_len + 0, SEEK_SET);
+    frame->schunk->storage->udio->seek(fp, header_len + 0, SEEK_SET, NULL);
   }
   else {
-    fp = fopen(frame->urlpath, "rb");
-    fseek(fp, header_len + cbytes, SEEK_SET);
+    fp = frame->schunk->storage->udio->open(frame->urlpath, "rb", NULL);
+    frame->schunk->storage->udio->seek(fp, header_len + cbytes, SEEK_SET, NULL);
   }
-  size_t rbytes = fread(coffsets, 1, (size_t)coffsets_cbytes, fp);
-  fclose(fp);
+  size_t rbytes = frame->schunk->storage->udio->read(coffsets, 1, (size_t)coffsets_cbytes, fp, NULL);
+  frame->schunk->storage->udio->close(fp, NULL);
   if (rbytes != (size_t)coffsets_cbytes) {
     BLOSC_TRACE_ERROR("Cannot read the offsets out of the frame.");
     free(coffsets);
@@ -1088,11 +1089,11 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
       fp = sframe_open_index(frame->urlpath, "rb+");
     }
     else {
-      fp = fopen(frame->urlpath, "rb");
+      fp = frame->schunk->storage->udio->open(frame->urlpath, "rb", NULL);
     }
     if (fp != NULL) {
-      rbytes = fread(header, 1, FRAME_HEADER_MINLEN, fp);
-      fclose(fp);
+      rbytes = frame->schunk->storage->udio->read(header, 1, FRAME_HEADER_MINLEN, fp, NULL);
+      frame->schunk->storage->udio->close(fp, NULL);
     }
     (void) rbytes;
     if (rbytes != FRAME_HEADER_MINLEN) {
@@ -1127,11 +1128,11 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
       fp = sframe_open_index(frame->urlpath, "rb+");
     }
     else {
-      fp = fopen(frame->urlpath, "rb+");
+      fp = frame->schunk->storage->udio->open(frame->urlpath, "rb+", NULL);
     }
     if (fp != NULL) {
-      fwrite(h2, h2len, 1, fp);
-      fclose(fp);
+      frame->schunk->storage->udio->write(h2, h2len, 1, fp, NULL);
+      frame->schunk->storage->udio->close(fp, NULL);
     }
   }
   else {
@@ -1285,11 +1286,11 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       fp = sframe_open_index(frame->urlpath, "rb");
     }
     else {
-      fp = fopen(frame->urlpath, "rb");
+      fp = frame->schunk->storage->udio->open(frame->urlpath, "rb", NULL);
     }
     if (fp != NULL) {
-      rbytes = fread(header, 1, header_len, fp);
-      fclose(fp);
+      rbytes = frame->schunk->storage->udio->read(header, 1, header_len, fp, NULL);
+      frame->schunk->storage->udio->close(fp, NULL);
     }
     if (rbytes != (size_t) header_len) {
       BLOSC_TRACE_ERROR("Cannot access the header out of the frame.");
@@ -1453,16 +1454,16 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     if (frame->sframe) {
       char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
       sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
-      fp = fopen(eframe_name, "rb");
+      fp = frame->schunk->storage->udio->open(eframe_name, "rb", NULL);
       free(eframe_name);
     }
     else {
-      fp = fopen(frame->urlpath, "rb");
+      fp = frame->schunk->storage->udio->open(frame->urlpath, "rb", NULL);
     }
     if (fp != NULL) {
-      fseek(fp, trailer_offset, SEEK_SET);
-      rbytes = fread(trailer, 1, trailer_len, fp);
-      fclose(fp);
+      frame->schunk->storage->udio->seek(fp, trailer_offset, SEEK_SET, NULL);
+      rbytes = frame->schunk->storage->udio->read(trailer, 1, trailer_len, fp, NULL);
+      frame->schunk->storage->udio->close(fp, NULL);
     }
     if (rbytes != (size_t) trailer_len) {
       BLOSC_TRACE_ERROR("Cannot access the trailer out of the fileframe.");
@@ -1481,8 +1482,10 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
 }
 
 
-blosc2_storage* get_new_storage(const blosc2_storage* storage, const blosc2_cparams* cdefaults,
-                                const blosc2_dparams* ddefaults) {
+blosc2_storage* get_new_storage(const blosc2_storage* storage,
+                                const blosc2_cparams* cdefaults,
+                                const blosc2_dparams* ddefaults,
+                                const blosc2_io* iodefaults) {
 
   blosc2_storage* new_storage = (blosc2_storage*)calloc(1, sizeof(blosc2_storage));
   memcpy(new_storage, storage, sizeof(blosc2_storage));
@@ -1511,6 +1514,16 @@ blosc2_storage* get_new_storage(const blosc2_storage* storage, const blosc2_cpar
   }
   new_storage->dparams = dparams;
 
+  // iodefaults
+  blosc2_io* udio = malloc(sizeof(blosc2_io));
+  if (storage->udio != NULL) {
+    memcpy(udio, storage->udio, sizeof(blosc2_io));
+  }
+  else {
+    memcpy(udio, iodefaults, sizeof(blosc2_io));
+  }
+  new_storage->udio = udio;
+
   return new_storage;
 }
 
@@ -1522,6 +1535,8 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
   int rc;
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
   schunk->frame = (blosc2_frame*)frame;
+  frame->schunk = schunk;
+
   rc = get_header_info(frame, &header_len, &frame_len, &schunk->nbytes,
                        &schunk->cbytes, &schunk->blocksize,
                        &schunk->chunksize, &schunk->nchunks, &schunk->typesize,
@@ -1545,16 +1560,16 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
   blosc2_schunk_get_dparams(schunk, &dparams);
   schunk->dctx = blosc2_create_dctx(*dparams);
   blosc2_storage storage = {.contiguous = copy ? false : true};
-  schunk->storage = get_new_storage(&storage, cparams, dparams);
+  schunk->storage = get_new_storage(&storage, cparams, dparams, &BLOSC2_IO_DEFAULTS);
   free(cparams);
   free(dparams);
-
   if (!copy) {
     goto out;
   }
 
   // We are not attached to a frame anymore
   schunk->frame = NULL;
+  frame->schunk = NULL;
 
   if (nchunks == 0) {
     goto out;
@@ -1598,7 +1613,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
     data_chunk = malloc((size_t)prev_alloc);
     if (!frame->sframe) {
       // If not the chunks won't be in the frame
-      fp = fopen(frame->urlpath, "rb");
+      fp = frame->schunk->storage->udio->open(frame->urlpath, "rb", NULL);
       if (fp == NULL) {
         free(data_chunk);
         free(offsets);
@@ -1623,10 +1638,10 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
         rbytes = frame_get_lazychunk(frame, offsets[i], &data_chunk, &needs_free);
       }
       else {
-        fseek(fp, header_len + offsets[i], SEEK_SET);
-        rbytes = fread(data_chunk, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
+        frame->schunk->storage->udio->seek(fp, header_len + offsets[i], SEEK_SET);
+        rbytes = frame->schunk->storage->udio->read(data_chunk, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
         if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
-          fclose(fp);
+          frame->schunk->storage->udio->close(fp, NULL);
           return NULL;
         }
       }
@@ -1635,7 +1650,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
           free(data_chunk);
         }
         else {
-          fclose(fp);
+          frame->schunk->storage->udio->close(fp, NULL);
         }
         free(offsets);
         blosc2_schunk_free(schunk);
@@ -1650,10 +1665,10 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
         prev_alloc = chunk_cbytes;
       }
       if (!frame->sframe) {
-        fseek(fp, header_len + offsets[i], SEEK_SET);
-        rbytes = fread(data_chunk, 1, chunk_cbytes, fp);
+        frame->schunk->storage->udio->seek(fp, header_len + offsets[i], SEEK_SET, NULL);
+        rbytes = frame->schunk->storage->udio->read(data_chunk, 1, chunk_cbytes, fp, NULL);
         if (rbytes != chunk_cbytes) {
-          fclose(fp);
+          frame->schunk->storage->udio->close(fp, NULL);
           free(offsets);
           blosc2_schunk_free(schunk);
           return NULL;
@@ -1683,7 +1698,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
   if (frame->cframe == NULL) {
     free(data_chunk);
     if (!frame->sframe) {
-      fclose(fp);
+      frame->schunk->storage->udio->close(fp, NULL);
     }
   }
   free(offsets);
@@ -1865,24 +1880,24 @@ int frame_get_chunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool *ne
 
   if (frame->cframe == NULL) {
     uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
-    FILE* fp = fopen(frame->urlpath, "rb");
-    fseek(fp, header_len + offset, SEEK_SET);
-    size_t rbytes = fread(header, 1, sizeof(header), fp);
+    FILE* fp = frame->schunk->storage->udio->open(frame->urlpath, "rb", NULL);
+    frame->schunk->storage->udio->seek(fp, header_len + offset, SEEK_SET, NULL);
+    size_t rbytes = frame->schunk->storage->udio->read(header, 1, sizeof(header), fp, NULL);
     if (rbytes != sizeof(header)) {
       BLOSC_TRACE_ERROR("Cannot read the cbytes for chunk in the frame.");
-      fclose(fp);
+      frame->schunk->storage->udio->close(fp, NULL);
       return BLOSC2_ERROR_FILE_READ;
     }
     rc = blosc2_cbuffer_sizes(header, NULL, &chunk_cbytes, NULL);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Cannot read the cbytes for chunk in the frame.");
-      fclose(fp);
+      frame->schunk->storage->udio->close(fp, NULL);
       return rc;
     }
     *chunk = malloc(chunk_cbytes);
-    fseek(fp, header_len + offset, SEEK_SET);
-    rbytes = fread(*chunk, 1, chunk_cbytes, fp);
-    fclose(fp);
+    frame->schunk->storage->udio->seek(fp, header_len + offset, SEEK_SET, NULL);
+    rbytes = frame->schunk->storage->udio->read(*chunk, 1, chunk_cbytes, fp, NULL);
+    frame->schunk->storage->udio->close(fp, NULL);
     if (rbytes != chunk_cbytes) {
       BLOSC_TRACE_ERROR("Cannot read the chunk out of the frame.");
       return BLOSC2_ERROR_FILE_READ;
@@ -1973,10 +1988,10 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
       fp = sframe_open_chunk(frame->urlpath, offset, "rb");
     }
     else {
-      fp = fopen(frame->urlpath, "rb");
-      fseek(fp, header_len + offset, SEEK_SET);
+      fp = frame->schunk->storage->udio->open(frame->urlpath, "rb", NULL);
+      frame->schunk->storage->udio->seek(fp, header_len + offset, SEEK_SET, NULL);
     }
-    size_t rbytes = fread(header, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
+    size_t rbytes = frame->schunk->storage->udio->read(header, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
     if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
       BLOSC_TRACE_ERROR("Cannot read the header for chunk in the frame.");
       rc = BLOSC2_ERROR_FILE_READ;
@@ -2013,13 +2028,13 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
 
     // Read just the full header and bstarts section too (lazy partial length)
     if (frame->sframe) {
-      fseek(fp, 0, SEEK_SET);
+      frame->schunk->storage->udio->seek(fp, 0, SEEK_SET, NULL);
     }
     else {
-      fseek(fp, header_len + offset, SEEK_SET);
+      frame->schunk->storage->udio->seek(fp, header_len + offset, SEEK_SET, NULL);
     }
 
-    rbytes = fread(*chunk, 1, trailer_offset, fp);
+    rbytes = frame->schunk->storage->udio->read(*chunk, 1, trailer_offset, fp, NULL);
     if (rbytes != trailer_offset) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) chunk out of the frame.");
       rc = BLOSC2_ERROR_FILE_READ;
@@ -2099,7 +2114,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
 
   end:
   if (fp != NULL) {
-    fclose(fp);
+    frame->schunk->storage->udio->close(fp, NULL);
   }
   if (rc < 0) {
     if (*needs_free) {
@@ -2426,21 +2441,21 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
         }
       }
       fp = sframe_open_index(frame->urlpath, "rb+");
-      fseek(fp, header_len, SEEK_SET);
+      frame->schunk->storage->udio->seek(fp, header_len, SEEK_SET, NULL);
     }
     else {
       // Regular frame
-      fp = fopen(frame->urlpath, "rb+");
-      fseek(fp, header_len + cbytes, SEEK_SET);
-      wbytes = fwrite(chunk, 1, (size_t)chunk_cbytes, fp);  // the new chunk
+      fp = frame->schunk->storage->udio->open(frame->urlpath, "rb+", NULL);
+      frame->schunk->storage->udio->seek(fp, header_len + cbytes, SEEK_SET, NULL);
+      wbytes = frame->schunk->storage->udio->write(chunk, 1, (size_t)chunk_cbytes, fp, NULL);  // the new chunk
       if (wbytes != (size_t)chunk_cbytes) {
         BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
-        fclose(fp);
+        frame->schunk->storage->udio->close(fp, NULL);
         return NULL;
       }
     }
-    wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
-    fclose(fp);
+    wbytes = frame->schunk->storage->udio->write(off_chunk, 1, (size_t)new_off_cbytes, fp, NULL);  // the new offsets
+    frame->schunk->storage->udio->close(fp, NULL);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return NULL;
@@ -2612,21 +2627,21 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
       }
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+");
-      fseek(fp, header_len + 0, SEEK_SET);
+      frame->schunk->storage->udio->seek(fp, header_len + 0, SEEK_SET, NULL);
     }
     else {
       // Regular frame
-      fp = fopen(frame->urlpath, "rb+");
-      fseek(fp, header_len + cbytes, SEEK_SET);
-      wbytes = fwrite(chunk, 1, (size_t)chunk_cbytes, fp);  // the new chunk
+      fp = frame->schunk->storage->udio->open(frame->urlpath, "rb+", NULL);
+      frame->schunk->storage->udio->seek(fp, header_len + cbytes, SEEK_SET, NULL);
+      wbytes = frame->schunk->storage->udio->write(chunk, 1, (size_t)chunk_cbytes, fp, NULL);  // the new chunk
       if (wbytes != (size_t)chunk_cbytes) {
         BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
-        fclose(fp);
+        frame->schunk->storage->udio->close(fp, NULL);
         return NULL;
       }
     }
-    wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
-    fclose(fp);
+    wbytes = frame->schunk->storage->udio->write(off_chunk, 1, (size_t)new_off_cbytes, fp, NULL);  // the new offsets
+    frame->schunk->storage->udio->close(fp, NULL);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return NULL;
@@ -2818,21 +2833,21 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
       }
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+");
-      fseek(fp, header_len + 0, SEEK_SET);
+      frame->schunk->storage->udio->seek(fp, header_len + 0, SEEK_SET, NULL);
     }
     else {
       // Regular frame
-      fp = fopen(frame->urlpath, "rb+");
-      fseek(fp, header_len + cbytes, SEEK_SET);
-      wbytes = fwrite(chunk, 1, (size_t)chunk_cbytes, fp);  // the new chunk
+      fp = frame->schunk->storage->udio->open(frame->urlpath, "rb+", NULL);
+      frame->schunk->storage->udio->seek(fp, header_len + cbytes, SEEK_SET, NULL);
+      wbytes = frame->schunk->storage->udio->write(chunk, 1, (size_t)chunk_cbytes, fp, NULL);  // the new chunk
       if (wbytes != (size_t)chunk_cbytes) {
         BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
-        fclose(fp);
+        frame->schunk->storage->udio->close(fp, NULL);
         return NULL;
       }
     }
-    wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
-    fclose(fp);
+    wbytes = frame->schunk->storage->udio->write(off_chunk, 1, (size_t)new_off_cbytes, fp, NULL);  // the new offsets
+    frame->schunk->storage->udio->close(fp, NULL);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return NULL;
@@ -2950,15 +2965,15 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int* offsets_order, blosc
     if (frame->sframe) {
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+");
-      fseek(fp, header_len + 0, SEEK_SET);
+      frame->schunk->storage->udio->seek(fp, header_len + 0, SEEK_SET, NULL);
     }
     else {
       // Regular frame
-      fp = fopen(frame->urlpath, "rb+");
-      fseek(fp, header_len + cbytes, SEEK_SET);
+      fp = frame->schunk->storage->udio->open(frame->urlpath, "rb+", NULL);
+      frame->schunk->storage->udio->seek(fp, header_len + cbytes, SEEK_SET, NULL);
     }
-    size_t wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
-    fclose(fp);
+    size_t wbytes = frame->schunk->storage->udio->write(off_chunk, 1, (size_t)new_off_cbytes, fp, NULL);  // the new offsets
+    frame->schunk->storage->udio->close(fp, NULL);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return BLOSC2_ERROR_FILE_WRITE;

@@ -39,6 +39,8 @@
 
 
 int main(void) {
+  blosc_init();
+
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int32_t* data = malloc(isize);
   int64_t nbytes, cbytes;
@@ -137,6 +139,8 @@ int main(void) {
   blosc2_schunk_free(schunk);
   blosc2_schunk_free(schunk2);
   free(data);
+
+  blosc_destroy();
 
   return 0;
 }

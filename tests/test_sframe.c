@@ -15,7 +15,7 @@
 #define NTHREADS (2)
 
 /* Global vars */
-int nchunks_[] = {0, 1, 2, 10};
+int nchunks_[] = {1, 2, 10};
 int tests_run = 0;
 int nchunks;
 bool multithread;
@@ -330,7 +330,6 @@ int main(void) {
   char *result;
 
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc_init();
 
   /* Run all the suite */
   result = all_tests();
@@ -342,7 +341,6 @@ int main(void) {
   }
   printf("\tTests run: %d\n", tests_run);
 
-  blosc_destroy();
 
   return result != EXIT_SUCCESS;
 }
