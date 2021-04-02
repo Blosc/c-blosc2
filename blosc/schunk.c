@@ -960,10 +960,14 @@ int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order) {
 
 // Get the length (in bytes) of the internal frame of the super-chunk
 int64_t blosc2_schunk_frame_len(blosc2_schunk* schunk) {
-  int64_t len = 0;
+  int64_t len;
   blosc2_frame_s* frame_s = (blosc2_frame_s*)(schunk->frame);
   if (frame_s != NULL) {
     len = frame_s->len;
+  }
+  else {
+    // No attached frame, but we can still come with an estimate
+    len = schunk->cbytes + schunk->nchunks * sizeof(int64_t);
   }
 
   return len;

@@ -1462,10 +1462,10 @@ BLOSC_EXPORT int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offse
 /**
  * @brief Get the length (in bytes) of the internal frame of the super-chunk.
  *
- * @param schunk The super-chunk whose chunk offsets are to be reordered.
+ * @param schunk The super-chunk.
  *
  * @return The length (in bytes) of the internal frame.
- * 0 means that there is not such an attached frame.
+ * If there is not an internal frame, an estimate of the length is provided.
  */
 BLOSC_EXPORT int64_t blosc2_schunk_frame_len(blosc2_schunk* schunk);
 
