@@ -3,37 +3,36 @@
   http://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 
-  Simple benchamrk for frame creation.
+  Simple benchmark for frame creation.
 
   To run:
 
   $ ./create_frame
-Blosc version info: 2.0.0.beta.6.dev ($Date:: 2020-04-21 #$)
 
-*** Creating simple frame for blosclz
-Compression ratio: 1907.3 MB -> 51.6 MB (36.9x)
-Compression time: 0.357 s, 5347.5 MB/s
-Decompression time: 0.126 s, 15081.2 MB/s
+ *** Creating simple frame for blosclz
+Compression ratio: 1.86 GB -> 0.05 GB (36.9x)
+Compression time: 0.445 s, 4.2 GB/s
+Decompression time: 0.0905 s, 20.6 GB/s
 
 *** Creating simple frame for lz4
-Compression ratio: 1907.3 MB -> 82.7 MB (23.1x)
-Compression time: 0.305 s, 6259.2 MB/s
-Decompression time: 0.0979 s, 19475.7 MB/s
+Compression ratio: 1.86 GB -> 0.08 GB (23.1x)
+Compression time: 0.324 s, 5.8 GB/s
+Decompression time: 0.135 s, 13.8 GB/s
 
 *** Creating simple frame for lz4hc
-Compression ratio: 1907.3 MB -> 38.2 MB (50.0x)
-Compression time: 0.947 s, 2013.8 MB/s
-Decompression time: 0.0922 s, 20691.0 MB/s
+Compression ratio: 1.86 GB -> 0.04 GB (50.0x)
+Compression time: 0.96 s, 1.9 GB/s
+Decompression time: 0.12 s, 15.5 GB/s
 
 *** Creating simple frame for zlib
-Compression ratio: 1907.3 MB -> 36.4 MB (52.4x)
-Compression time: 1.44 s, 1328.0 MB/s
-Decompression time: 0.26 s, 7339.6 MB/s
+Compression ratio: 1.86 GB -> 0.04 GB (52.4x)
+Compression time: 1.17 s, 1.6 GB/s
+Decompression time: 0.32 s, 5.8 GB/s
 
 *** Creating simple frame for zstd
-Compression ratio: 1907.3 MB -> 19.3 MB (98.7x)
-Compression time: 1.08 s, 1768.3 MB/s
-Decompression time: 0.15 s, 12709.1 MB/s
+Compression ratio: 1.86 GB -> 0.02 GB (98.6x)
+Compression time: 0.773 s, 2.4 GB/s
+Decompression time: 0.17 s, 11.0 GB/s
 
 Process finished with exit code 0
 
@@ -44,20 +43,23 @@ Process finished with exit code 0
 
 #define KB  (1024.)
 #define MB  (1024*KB)
-#define GB  (1024*KB)
+#define GB  (1024*MB)
 
 #define CHUNKSIZE (500 * 1000)
 #define NCHUNKS 1000
 #define NTHREADS 8
 
+// For exercising the optimized zero chunk creators uncomment the line below
+//#define CREATE_ZEROS
+
 
 int create_cframe(const char* compname) {
-  static int32_t data[CHUNKSIZE];
-  static int32_t data_dest[CHUNKSIZE];
-  static int32_t data_dest2[CHUNKSIZE];
   size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t* data = malloc(isize);
+  int32_t* data_dest = malloc(isize);
+  int32_t* data_dest2 = malloc(isize);
   int64_t nbytes, cbytes;
-  int i, nchunk;
+  int nchunk;
   blosc_timestamp_t last, current;
   double ttotal;
   int compcode = blosc_compname_to_compcode(compname);
@@ -69,6 +71,7 @@ int create_cframe(const char* compname) {
   cparams.compcode = compcode;
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
+  //cparams.blocksize = 1024;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
   char filename[64];
@@ -77,28 +80,48 @@ int create_cframe(const char* compname) {
                             .urlpath=NULL, .contiguous=false};
   blosc2_schunk* schunk = blosc2_schunk_new(&storage);
 
+#ifdef CREATE_ZEROS
+  // Precompute chunk of zeros
+  int ret = blosc2_chunk_zeros(isize, sizeof(int32_t), data_dest, isize);
+  if (ret < 0) {
+    printf("Compression error in chunk_zeros.  Error code: %d\n", ret);
+    return ret;
+  }
+#endif
+
   // Add some data
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    for (i = 0; i < CHUNKSIZE; i++) {
+#ifdef CREATE_ZEROS
+    int nchunks = blosc2_schunk_append_chunk(schunk, (uint8_t *) data_dest, true);
+    if (nchunks != nchunk + 1) {
+      printf("Compression error in append chunk.  Error code: %d\n", nchunks);
+      return nchunk;
+    }
+#else
+    for (int i = 0; i < CHUNKSIZE; i++) {
+      // Different data patterns
       data[i] = i * nchunk;
+      // data[i] = nchunk;
+      // data[i] = 0;
     }
     int nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     if (nchunks != nchunk + 1) {
-      printf("Compression error in schunk.  Error code: %d\n", nchunks);
+      printf("Compression error appending in schunk.  Error code: %d\n", nchunks);
       return nchunk;
     }
+#endif
   }
   blosc_set_timestamp(&current);
 
   /* Gather some info */
   nbytes = schunk->nbytes;
-  cbytes = schunk->cbytes;
+  cbytes = blosc2_schunk_frame_len(schunk);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
-         nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
-  printf("Compression time: %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+  printf("Compression ratio: %.2f GB -> %.2f GB (%.1fx)\n",
+         nbytes / GB, cbytes / GB, (1. * nbytes) / (1. * cbytes));
+  printf("Compression time: %.3g s, %.1f GB/s\n",
+         ttotal, nbytes / (ttotal * GB));
 
   /* Retrieve and decompress the chunks from the super-chunks and compare values */
   blosc_set_timestamp(&last);
@@ -111,19 +134,23 @@ int create_cframe(const char* compname) {
   }
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Decompression time: %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+  printf("Decompression time: %.3g s, %.1f GB/s\n",
+         ttotal, nbytes / (ttotal * GB));
 
   /* Free resources */
   blosc2_schunk_free(schunk);
+  free(data);
+  free(data_dest);
+  free(data_dest2);
 
   return 0;
 }
 
 
 int main(void) {
-  printf("Blosc version info: %s (%s)\n",
-         BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+#ifdef CREATE_ZEROS
+  printf("\n   ***  Creating zeros!   ***\n");
+#endif
 
   create_cframe("blosclz");
   create_cframe("lz4");

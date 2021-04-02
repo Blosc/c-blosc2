@@ -48,9 +48,6 @@ int check_special_values(int svalue) {
   int32_t *data_buffer = malloc(CHUNKSIZE * sizeof(int32_t));
   int32_t *rec_buffer = malloc(CHUNKSIZE * sizeof(int32_t));
 
-  printf("Blosc version info: %s (%s)\n",
-         BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
-
   /* Initialize the Blosc compressor */
   blosc_init();
 
@@ -233,7 +230,6 @@ int check_special_values(int svalue) {
 
 int main(void) {
   int rc;
-  // TODO: Check why this is not working...
   printf("Testing zero detection...");
   rc = check_special_values(ZERO_DETECTION);
   if (rc < 0) {
