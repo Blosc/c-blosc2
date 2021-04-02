@@ -5,7 +5,7 @@ set(SOURCES_DELTA delta_schunk.c)
 set(SOURCES_TRUNC_PREC trunc_prec_schunk.c)
 set(SOURCES_SUM_OPENMP sum_openmp.c)
 set(SOURCES_ZERO_RUNLEN zero_runlen.c)
-# sources for sframe bench
+set(SOURCES_CFRAME create_frame.c)
 set(SOURCES_SFRAME sframe_bench.c)
 
 # targets
@@ -15,6 +15,7 @@ add_executable(delta_schunk ${SOURCES_DELTA})
 add_executable(trunc_prec_schunk ${SOURCES_TRUNC_PREC})
 add_executable(sum_openmp ${SOURCES_SUM_OPENMP})
 add_executable(zero_runlen ${SOURCES_ZERO_RUNLEN})
+add_executable(create_frame ${SOURCES_CFRAME})
 add_executable(sframe_bench ${SOURCES_SFRAME})
 if(UNIX AND NOT APPLE)
     # cmake is complaining about LINK_PRIVATE in original PR
@@ -25,6 +26,7 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(trunc_prec_schunk rt)
     target_link_libraries(sum_openmp rt)
     target_link_libraries(zero_runlen rt)
+    target_link_libraries(create_frame rt)
     target_link_libraries(sframe_bench rt)
 endif()
 if(UNIX)
@@ -36,6 +38,7 @@ target_link_libraries(delta_schunk blosc_testing)
 target_link_libraries(trunc_prec_schunk blosc_testing)
 target_link_libraries(sum_openmp blosc_testing)
 target_link_libraries(zero_runlen blosc_testing)
+target_link_libraries(create_frame blosc_testing)
 target_link_libraries(sframe_bench blosc_testing)
 
 # tests
