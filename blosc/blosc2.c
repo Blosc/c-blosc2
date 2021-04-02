@@ -2005,9 +2005,11 @@ int blosc_compress_context(blosc2_context* context) {
     int nstreams = context->nblocks;
     if (!dont_split) {
       // When splitting, the number of streams is computed differently
-      nstreams = (context->nblocks - 1) * context->typesize;
       if (context->leftover) {
-        nstreams += 1;
+        nstreams = (context->nblocks - 1) * context->typesize + 1;
+      }
+      else {
+        nstreams *= context->typesize;
       }
     }
     if (ntbytes == start_csizes + nstreams * sizeof(int32_t)) {
