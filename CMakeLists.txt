@@ -166,16 +166,17 @@ if(NOT DEACTIVATE_ZLIB)
 endif()
 
 if (HAVE_ZLIB_NG)
+    set(ZLIB_NG_DIR "zlib-ng-2.0.2")  # update to the actual included version
     add_definitions(-DZLIB_COMPAT)
     set(ZLIB_COMPAT TRUE)
     set(SKIP_INSTALL_ALL TRUE)
     set(BUILD_SHARED_LIBS FALSE)
     set(ZLIB_ENABLE_TESTS OFF)
-    add_subdirectory(internal-complibs/zlib-ng-2.0.1)
+    add_subdirectory("internal-complibs/${ZLIB_NG_DIR}")
 
     file(COPY
-            ${CMAKE_CURRENT_BINARY_DIR}/internal-complibs/zlib-ng-2.0.1/zconf.h
-            DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/internal-complibs/zlib-ng-2.0.1/)
+            ${CMAKE_CURRENT_BINARY_DIR}/internal-complibs/${ZLIB_NG_DIR}/zconf.h
+            DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/internal-complibs/${ZLIB_NG_DIR}/)
 endif ()
 
 if(NOT DEACTIVATE_ZSTD)
