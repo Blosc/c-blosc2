@@ -45,6 +45,7 @@ CUTEST_TEST_DATA(zero_runlen) {
 
 CUTEST_TEST_SETUP(zero_runlen) {
   blosc_init();
+
   data->cparams = BLOSC2_CPARAMS_DEFAULTS;
   data->cparams.typesize = sizeof(int32_t);
   data->cparams.compcode = BLOSC_BLOSCLZ;
@@ -83,9 +84,6 @@ CUTEST_TEST_TEST(zero_runlen) {
 
   int32_t *data_buffer = malloc(CHUNKSIZE * sizeof(int32_t));
   int32_t *rec_buffer = malloc(CHUNKSIZE * sizeof(int32_t));
-
-  /* Initialize the Blosc compressor */
-  blosc_init();
 
   /* Create a super-chunk container */
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;

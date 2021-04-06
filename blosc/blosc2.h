@@ -35,8 +35,6 @@
     #include <stdint.h>
   #endif
 
-  #define fseek _fseeki64
-
   #include <process.h>
   #define getpid _getpid
 #else
@@ -725,20 +723,27 @@ BLOSC_EXPORT const char* blosc_cbuffer_complib(const void* cbuffer);
 /*********************************************************************
   Structures and functions related with user-defined input/output.
 *********************************************************************/
+
+typedef void*  (*blosc2_open_cb)(const char *urlpath, const char *mode, void *params);
+typedef int    (*blosc2_close_cb)(void *stream, void* params);
+typedef int    (*blosc2_seek_cb)(void *stream, long, int, void* params);
+typedef size_t (*blosc2_write_cb)(const void *ptr, size_t size, size_t nitems, void *stream, void *params);
+typedef size_t (*blosc2_read_cb)(void *ptr, size_t size, size_t nitems, void *stream, void *params);
+
 typedef struct {
-  void* (*open)(const char *urlpath, const char *mode, void *params);
-  int (*close)(void *stream, void* params);
-  int (*seek)(void *stream, long, int, void *params);
-  size_t (*write)(const void *ptr, size_t size, size_t nitems, void *stream, void *params);
-  size_t	 (*read)(void *ptr, size_t size, size_t nitems, void *stream, void *params);
+  blosc2_open_cb open;
+  blosc2_close_cb close;
+  blosc2_seek_cb seek;
+  blosc2_write_cb write;
+  blosc2_read_cb read;
 } blosc2_io;
 
 static const blosc2_io BLOSC2_IO_DEFAULTS = {
-    .open = (void * (*)(const char *, const char *, void *)) fopen,
-    .close = (int (*)(void *, void *)) fclose,
-    .seek = (int (*)(void *, long, int, void *)) fseek,
-    .write = (size_t (*) (const void *, size_t, size_t, void *, void *)) fwrite,
-    .read = (size_t	 (*)(void *, size_t, size_t, void *, void *)) fread,
+  .open = (blosc2_open_cb) fopen,
+  .close = (blosc2_close_cb) fclose,
+  .seek = (blosc2_seek_cb) fseek,
+  .write = (blosc2_write_cb) fwrite,
+  .read = (blosc2_read_cb) fread,
 };
 
 

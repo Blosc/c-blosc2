@@ -51,22 +51,20 @@ test_storage tstorage[] = {
     {false, "test_update_chunk_s.b2frame"}, // disk - sframe
 };
 
+int32_t *data;
+int32_t *data_dest;
+
 static char* test_update_chunk(void) {
   /* Free resources */
   if (tdata.urlpath != NULL && tdata.contiguous == false) {
     blosc2_remove_dir(tdata.urlpath);
   }
 
-  static int32_t data[CHUNKSIZE];
-  static int32_t data_dest[CHUNKSIZE];
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
-
-  /* Initialize the Blosc compressor */
-  blosc_init();
 
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
@@ -130,7 +128,6 @@ static char* test_update_chunk(void) {
   }
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
-  blosc_destroy();
 
   return EXIT_SUCCESS;
 }
@@ -150,12 +147,16 @@ static char *all_tests(void) {
   return EXIT_SUCCESS;
 }
 
+#define BUFFER_ALIGN_SIZE   32
 
 int main(void) {
   char *result;
 
   install_blosc_callback_test(); /* optionally install callback test */
   blosc_init();
+
+  data = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int32_t));
+  data_dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int32_t));
 
   /* Run all the suite */
   result = all_tests();
@@ -166,6 +167,9 @@ int main(void) {
     printf(" ALL TESTS PASSED");
   }
   printf("\tTests run: %d\n", tests_run);
+
+  blosc_test_free(data);
+  blosc_test_free(data_dest);
 
   blosc_destroy();
 

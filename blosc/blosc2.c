@@ -1500,7 +1500,7 @@ static int blosc_d(
     int32_t *block_csizes = (int32_t *)(src + trailer_offset + sizeof(int32_t) + sizeof(int64_t));
     int32_t block_csize = block_csizes[nblock];
     // Read the lazy block on disk
-    FILE* fp = NULL;
+    void* fp = NULL;
     if (frame->sframe) {
       // The chunk is not in the frame
       char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
@@ -3474,7 +3474,7 @@ void blosc_set_schunk(blosc2_schunk* schunk) {
   g_global_context->schunk = schunk;
 }
 
-blosc2_io blosc2_io_global = {0};
+blosc2_io *blosc2_io_global = NULL;
 
 void blosc_init(void) {
   /* Return if Blosc is already initialized */
@@ -3487,9 +3487,6 @@ void blosc_init(void) {
   g_global_context->nthreads = g_nthreads;
   g_global_context->new_nthreads = g_nthreads;
   g_initlib = 1;
-
-  memcpy(&blosc2_io_global, &BLOSC2_IO_DEFAULTS, sizeof(blosc2_io));
-
 }
 
 
