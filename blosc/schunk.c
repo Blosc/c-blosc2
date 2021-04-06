@@ -360,7 +360,7 @@ int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* nee
 
 /* Write an in-memory frame out to a file. */
 int64_t frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
-  FILE* fp = frame->schunk->storage->udio->open(urlpath, "wb", NULL);
+  void* fp = frame->schunk->storage->udio->open(urlpath, "wb", NULL);
   size_t nitems = frame->schunk->storage->udio->write(frame->cframe, (size_t)frame->len, 1, fp, NULL);
   frame->schunk->storage->udio->close(fp, NULL);
   return nitems * (size_t)frame->len;

@@ -374,22 +374,29 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
   uint8_t* framep = frame->cframe;
   uint8_t header[FRAME_HEADER_MINLEN];
 
+  const blosc2_io *io;
+  if (blosc2_io_global != NULL) {
+    io = blosc2_io_global;
+  } else {
+    io = &BLOSC2_IO_DEFAULTS;
+  }
+
   if (frame->len <= 0) {
     return BLOSC2_ERROR_READ_BUFFER;
   }
 
   if (frame->cframe == NULL) {
     size_t rbytes = 0;
-    FILE* fp = NULL;
+    void* fp = NULL;
     if (frame->sframe) {
       fp = sframe_open_index(frame->urlpath, "rb");
     }
     else {
-      fp = blosc2_io_global.open(frame->urlpath, "rb", NULL);
+      fp = io->open(frame->urlpath, "rb", NULL);
     }
     if (fp != NULL) {
-      rbytes = blosc2_io_global.read(header, 1, FRAME_HEADER_MINLEN, fp, NULL);
-      blosc2_io_global.close(fp, NULL);
+      rbytes = io->read(header, 1, FRAME_HEADER_MINLEN, fp, NULL);
+      io->close(fp, NULL);
     }
     (void) rbytes;
     if (rbytes != FRAME_HEADER_MINLEN) {
@@ -500,7 +507,7 @@ int update_frame_len(blosc2_frame_s* frame, int64_t len) {
     to_big(frame->cframe + FRAME_LEN, &len, sizeof(int64_t));
   }
   else {
-    FILE* fp = NULL;
+    void* fp = NULL;
     if (frame->sframe) {
       fp = sframe_open_index(frame->urlpath, "rb+");
     }
@@ -697,7 +704,7 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     memcpy(frame->cframe + trailer_offset, trailer, trailer_len);
   }
   else {
-    FILE* fp = NULL;
+    void* fp = NULL;
     if (frame->sframe) {
       fp = sframe_open_index(frame->urlpath, "rb+");
     }
@@ -732,11 +739,18 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
 
 /* Initialize a frame out of a file */
 blosc2_frame_s* frame_from_file(const char* urlpath) {
+  const blosc2_io *io;
+  if (blosc2_io_global != NULL) {
+    io = blosc2_io_global;
+  } else {
+    io = &BLOSC2_IO_DEFAULTS;
+  }
+
   // Get the length of the frame
   uint8_t header[FRAME_HEADER_MINLEN];
   uint8_t trailer[FRAME_TRAILER_MINLEN];
 
-  FILE* fp = NULL;
+  void* fp = NULL;
   bool sframe = false;
   struct stat path_stat;
 
@@ -762,12 +776,12 @@ blosc2_frame_s* frame_from_file(const char* urlpath) {
   else {
     urlpath_cpy = malloc(strlen(urlpath) + 1);
     strcpy(urlpath_cpy, urlpath);
-    fp = blosc2_io_global.open(urlpath, "rb", NULL);
+    fp = io->open(urlpath, "rb", NULL);
   }
-  size_t rbytes = blosc2_io_global.read(header, 1, FRAME_HEADER_MINLEN, fp, NULL);
+  size_t rbytes = io->read(header, 1, FRAME_HEADER_MINLEN, fp, NULL);
   if (rbytes != FRAME_HEADER_MINLEN) {
     BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
-    blosc2_io_global.close(fp, NULL);
+    io->close(fp, NULL);
     free(urlpath_cpy);
     return NULL;
   }
@@ -779,11 +793,10 @@ blosc2_frame_s* frame_from_file(const char* urlpath) {
   frame->len = frame_len;
   frame->sframe = sframe;
 
-  blosc2_io *pepe = &blosc2_io_global;
   // Now, the trailer length
-  blosc2_io_global.seek(fp, frame_len - FRAME_TRAILER_MINLEN, SEEK_SET, NULL);
-  rbytes = blosc2_io_global.read(trailer, 1, FRAME_TRAILER_MINLEN, fp, NULL);
-  blosc2_io_global.close(fp, NULL);
+  io->seek(fp, frame_len - FRAME_TRAILER_MINLEN, SEEK_SET, NULL);
+  rbytes = io->read(trailer, 1, FRAME_TRAILER_MINLEN, fp, NULL);
+  io->close(fp, NULL);
   if (rbytes != FRAME_TRAILER_MINLEN) {
     BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
     free(urlpath_cpy);
@@ -851,7 +864,7 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   int64_t cbytes = schunk->cbytes;
   int32_t chunk_cbytes;
   int32_t chunk_nbytes;
-  FILE* fp = NULL;
+  void* fp = NULL;
   int rc;
 
   uint8_t* h2 = new_header_frame(schunk, frame);
@@ -1046,7 +1059,7 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
     *off_cbytes = coffsets_cbytes;
   }
 
-  FILE* fp = NULL;
+  void* fp = NULL;
   uint8_t* coffsets = malloc((size_t)coffsets_cbytes);
   if (frame->sframe) {
     fp = sframe_open_index(frame->urlpath, "rb");
@@ -1084,7 +1097,7 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
 
   if (frame->cframe == NULL) {
     size_t rbytes = 0;
-    FILE* fp = NULL;
+    void* fp = NULL;
     if (frame->sframe) {
       fp = sframe_open_index(frame->urlpath, "rb+");
     }
@@ -1121,7 +1134,7 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
     return BLOSC2_ERROR_DATA;
   }
 
-  FILE* fp = NULL;
+  void* fp = NULL;
   if (frame->cframe == NULL) {
     // Write updated header down to file
     if (frame->sframe) {
@@ -1281,7 +1294,7 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   } else {
     size_t rbytes = 0;
     header = malloc(header_len);
-    FILE* fp = NULL;
+    void* fp = NULL;
     if (frame->sframe) {
       fp = sframe_open_index(frame->urlpath, "rb");
     }
@@ -1450,7 +1463,7 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   } else {
     size_t rbytes = 0;
     trailer = malloc(trailer_len);
-    FILE* fp = NULL;
+    void* fp = NULL;
     if (frame->sframe) {
       char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
       sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
@@ -1608,7 +1621,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
   int32_t chunk_blocksize;
   size_t prev_alloc = BLOSC_EXTENDED_HEADER_LENGTH;
   uint8_t* data_chunk = NULL;
-  FILE* fp = NULL;
+  void* fp = NULL;
   if (frame->cframe == NULL) {
     data_chunk = malloc((size_t)prev_alloc);
     if (!frame->sframe) {
@@ -1880,7 +1893,7 @@ int frame_get_chunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool *ne
 
   if (frame->cframe == NULL) {
     uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
-    FILE* fp = frame->schunk->storage->udio->open(frame->urlpath, "rb", NULL);
+    void* fp = frame->schunk->storage->udio->open(frame->urlpath, "rb", NULL);
     frame->schunk->storage->udio->seek(fp, header_len + offset, SEEK_SET, NULL);
     size_t rbytes = frame->schunk->storage->udio->read(header, 1, sizeof(header), fp, NULL);
     if (rbytes != sizeof(header)) {
@@ -1938,7 +1951,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
   int32_t typesize;
   int32_t lazychunk_cbytes;
   int64_t offset;
-  FILE* fp = NULL;
+  void* fp = NULL;
 
   *chunk = NULL;
   *needs_free = false;
@@ -2416,7 +2429,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
     new_frame_len = header_len + new_cbytes + new_off_cbytes + frame->trailer_len;
   }
 
-  FILE* fp = NULL;
+  void* fp = NULL;
   if (frame->cframe != NULL) {
     uint8_t* framep = frame->cframe;
     /* Make space for the new chunk and copy it */
@@ -2603,7 +2616,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
   }
 
   // Add the chunk and update meta
-  FILE* fp = NULL;
+  void* fp = NULL;
   if (frame->cframe != NULL) {
     uint8_t* framep = frame->cframe;
     /* Make space for the new chunk and copy it */
@@ -2809,7 +2822,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
     new_frame_len = header_len + new_cbytes + new_off_cbytes + frame->trailer_len;
   }
 
-  FILE* fp = NULL;
+  void* fp = NULL;
   if (frame->cframe != NULL) {
     uint8_t* framep = frame->cframe;
     /* Make space for the new chunk and copy it */
@@ -2961,7 +2974,7 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int* offsets_order, blosc
     memcpy(framep + header_len + cbytes, off_chunk, (size_t)new_off_cbytes);
   }
   else {
-    FILE* fp = NULL;
+    void* fp = NULL;
     if (frame->sframe) {
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+");

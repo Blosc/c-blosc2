@@ -58,7 +58,7 @@ typedef struct {
   int64_t maxlen;           //!< The maximum length of the frame; if 0, there is no maximum
   uint32_t trailer_len;     //!< The current length of the trailer in (compressed) bytes
   bool sframe;              //!< Whether the frame is sparse (true) or not
-  blosc2_schunk *schunk;     //!< The schunk associated
+  blosc2_schunk *schunk;    //!< The schunk associated
 } blosc2_frame_s;
 
 
