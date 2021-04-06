@@ -144,6 +144,8 @@ int create_cframe(const char* compname) {
 
 
 int main(void) {
+  blosc_init();
+
   printf("Blosc version info: %s (%s)\n",
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
@@ -152,4 +154,6 @@ int main(void) {
   create_cframe("lz4hc");
   create_cframe("zlib");
   create_cframe("zstd");
+
+  blosc_destroy();
 }
