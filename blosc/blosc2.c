@@ -768,6 +768,7 @@ static int blosc2_initialize_context_from_header(blosc2_context* context, blosc_
     memcpy(context->filters_meta, header->filter_meta, BLOSC2_MAX_FILTERS);
 
     context->filter_flags = filters_to_flags(header->filter_codes);
+    context->runlen_type = (header->blosc2_flags >> 4) & BLOSC2_RUNLEN_MASK;
 
     is_lazy = (context->blosc2_flags & 0x08u);
   }
@@ -1223,17 +1224,73 @@ int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8
 }
 
 
+int set_nans(int32_t nbytes, int32_t typesize, const uint8_t* src,
+             uint8_t* dest, int32_t destsize) {
+  int32_t nitems = nbytes / typesize;
+  if (nitems > destsize / typesize) {
+    nitems = destsize / typesize;
+  }
+
+  if (typesize > destsize) {
+    BLOSC_TRACE_ERROR("Not enough space in dest");
+    return BLOSC2_ERROR_WRITE_BUFFER;
+  }
+
+  if (typesize == 4) {
+    float* dest_ = (float*)dest;
+    for (int i = 0; i < nitems; i++) {
+      dest_[i] = nanf("");
+    }
+    return nbytes;
+  }
+  else if (typesize == 8) {
+    double* dest_ = (double*)dest;
+    for (int i = 0; i < nitems; i++) {
+      dest_[i] = nan("");
+    }
+    return nbytes;
+  }
+
+  BLOSC_TRACE_ERROR("Unsupported typesize for NaN");
+  return BLOSC2_ERROR_DATA;
+}
+
+
+int set_values(int32_t nbytes, int32_t typesize, const uint8_t* src,
+               uint8_t* dest, int32_t destsize) {
+  int32_t nitems = nbytes / typesize;
+  if (nitems > destsize / typesize) {
+    nitems = destsize / typesize;
+  }
+
+  if (typesize > destsize) {
+    BLOSC_TRACE_ERROR("Not enough space in dest");
+    return BLOSC2_ERROR_WRITE_BUFFER;
+  }
+  // Get the value at the end of the header
+  void* value = malloc(typesize);
+  BLOSC_ERROR_NULL(value, BLOSC2_ERROR_MEMORY_ALLOC);
+  memcpy(value, src + BLOSC_EXTENDED_HEADER_LENGTH, typesize);
+  // And copy it to dest
+  for (int i = 0; i < nitems; i++) {
+    memcpy(dest + i * typesize, value, typesize);
+  }
+  free(value);
+
+  return nbytes;
+}
+
+
 /* Decompress & unshuffle a single block */
 static int blosc_d(
     struct thread_context* thread_context, int32_t bsize,
-    int32_t leftoverblock, const uint8_t* src, int32_t srcsize, int32_t src_offset,
+    int32_t leftoverblock, bool memcpyed, const uint8_t* src, int32_t srcsize, int32_t src_offset,
     int32_t nblock, uint8_t* dest, int32_t dest_offset, uint8_t* tmp, uint8_t* tmp2) {
   blosc2_context* context = thread_context->parent_context;
   uint8_t* filters = context->filters;
   uint8_t *tmp3 = thread_context->tmp4;
   int32_t compformat = (context->header_flags & (uint8_t)0xe0) >> 5u;
   int dont_split = (context->header_flags & (uint8_t)0x10) >> 4u;
-  int memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
   int nstreams;
@@ -1318,19 +1375,34 @@ static int blosc_d(
 
   // If the chunk is memcpyed, we just have to copy the block to dest and return
   if (memcpyed) {
-    if (chunk_nbytes + context->header_overhead != chunk_cbytes) {
-      return BLOSC2_ERROR_WRITE_BUFFER;
-    }
     int bsize_ = leftoverblock ? chunk_nbytes % context->blocksize : bsize;
-    if (chunk_cbytes < context->header_overhead + (nblock * context->blocksize) + bsize_) {
-      /* Not enough input to copy block */
-      return BLOSC2_ERROR_READ_BUFFER;
+    if (!context->runlen_type) {
+      if (chunk_nbytes + context->header_overhead != chunk_cbytes) {
+        return BLOSC2_ERROR_WRITE_BUFFER;
+      }
+      if (chunk_cbytes < context->header_overhead + (nblock * context->blocksize) + bsize_) {
+        /* Not enough input to copy block */
+        return BLOSC2_ERROR_READ_BUFFER;
+      }
     }
     if (!is_lazy) {
       src += context->header_overhead + nblock * context->blocksize;
     }
     if (context->postfilter == NULL) {
-      memcpy(dest + dest_offset, src, bsize_);
+      switch (context->runlen_type) {
+        case BLOSC2_VALUE_RUNLEN:
+          // All repeated values
+          rc = set_values(chunk_nbytes, context->typesize, src, dest, bsize_);
+          break;
+        case BLOSC2_NAN_RUNLEN:
+          rc = set_nans(chunk_nbytes, context->typesize, src, dest, bsize_);
+          break;
+        case BLOSC2_ZERO_RUNLEN:
+          memset(dest, 0, bsize_);
+          break;
+        default:
+          memcpy(dest + dest_offset, src, bsize_);
+      }
     }
     else {
       // Create new postfilter parameters for this block (must be private for each thread)
@@ -1519,6 +1591,10 @@ static int serial_blosc(struct thread_context* thread_context) {
   uint8_t* tmp2 = thread_context->tmp2;
   int dict_training = context->use_dict && (context->dict_cdict == NULL);
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
+  if (!context->do_compress && context->runlen_type) {
+    // Fake a runlen as if its a memcpyed chunk
+    memcpyed = true;
+  }
 
   for (j = 0; j < context->nblocks; j++) {
     if (context->do_compress && !memcpyed && !dict_training) {
@@ -1553,7 +1629,7 @@ static int serial_blosc(struct thread_context* thread_context) {
       // If memcpyed we don't have a bstarts section (because it is not needed)
       int32_t src_offset = memcpyed ?
           context->header_overhead + j * context->blocksize : sw32_(bstarts + j);
-      cbytes = blosc_d(thread_context, bsize, leftoverblock,
+      cbytes = blosc_d(thread_context, bsize, leftoverblock, memcpyed,
                        context->src, context->srcsize, src_offset, j,
                        context->dest, j * context->blocksize, tmp, tmp2);
     }
@@ -1837,19 +1913,23 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
     return BLOSC2_ERROR_DATA;
   }
 
-  context->bstarts = (int32_t*)(context->src + context->header_overhead);
-  if (context->header_flags & (uint8_t)BLOSC_MEMCPYED) {
-    /* If chunk is a memcpy, bstarts does not exist */
-    bstarts_end = context->header_overhead;
-  } else {
-    bstarts_end = context->header_overhead + (context->nblocks * sizeof(int32_t));
-  }
+  context->runlen_type = (header->blosc2_flags >> 4) & BLOSC2_RUNLEN_MASK;
 
-  if (srcsize < bstarts_end) {
-    BLOSC_TRACE_ERROR("`bstarts` exceeds length of source buffer.");
-    return BLOSC2_ERROR_READ_BUFFER;
+  if (context->runlen_type == 0) {
+    context->bstarts = (int32_t *) (context->src + context->header_overhead);
+    if (context->header_flags & (uint8_t) BLOSC_MEMCPYED) {
+      /* If chunk is a memcpy, bstarts does not exist */
+      bstarts_end = context->header_overhead;
+    } else {
+      bstarts_end = context->header_overhead + (context->nblocks * sizeof(int32_t));
+    }
+
+    if (srcsize < bstarts_end) {
+      BLOSC_TRACE_ERROR("`bstarts` exceeds length of source buffer.");
+      return BLOSC2_ERROR_READ_BUFFER;
+    }
+    srcsize -= bstarts_end;
   }
-  srcsize -= bstarts_end;
 
   /* Read optional dictionary if flag set */
   if (context->blosc2_flags & BLOSC2_USEDICT) {
@@ -2315,85 +2395,6 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
 }
 
 
-int set_nans(blosc_header* header, uint8_t* src, uint8_t* dest, int32_t destsize) {
-  int32_t nitems = header->nbytes / header->typesize;
-  if (nitems > destsize / header->typesize) {
-    nitems = destsize / header->typesize;
-  }
-
-  if (header->typesize > destsize) {
-    BLOSC_TRACE_ERROR("Not enough space in dest");
-    return BLOSC2_ERROR_WRITE_BUFFER;
-  }
-
-  if (header->typesize == 4) {
-    float* dest_ = (float*)dest;
-    for (int i = 0; i < nitems; i++) {
-      dest_[i] = nanf("");
-    }
-    return header->nbytes;
-  }
-  else if (header->typesize == 8) {
-    double* dest_ = (double*)dest;
-    for (int i = 0; i < nitems; i++) {
-      dest_[i] = nan("");
-    }
-    return header->nbytes;
-  }
-
-  BLOSC_TRACE_ERROR("Unsupported typesize for NaN");
-  return BLOSC2_ERROR_DATA;
-}
-
-
-int set_values(blosc_header* header, uint8_t* src, uint8_t* dest, int32_t destsize) {
-  int32_t nitems = header->nbytes / header->typesize;
-  if (nitems > destsize / header->typesize) {
-    nitems = destsize / header->typesize;
-  }
-
-  if (header->typesize > destsize) {
-    BLOSC_TRACE_ERROR("Not enough space in dest");
-    return BLOSC2_ERROR_WRITE_BUFFER;
-  }
-  // Get the value at the end of the header
-  void* value = malloc(header->typesize);
-  BLOSC_ERROR_NULL(value, BLOSC2_ERROR_MEMORY_ALLOC);
-  memcpy(value, src + BLOSC_EXTENDED_HEADER_LENGTH, header->typesize);
-  // And copy it to dest
-  for (int i = 0; i < nitems; i++) {
-    memcpy(dest + i * header->typesize, value, header->typesize);
-  }
-  free(value);
-
-  return header->nbytes;
-}
-
-
-// Return > 0 if runlen.  0 if not a runlen.
-int handle_runlen(blosc_header *header, uint8_t* src, uint8_t* dest, int32_t destsize) {
-  bool doshuffle_flag = header->flags & BLOSC_DOSHUFFLE;
-  bool dobitshuffle_flag = header->flags & BLOSC_DOBITSHUFFLE;
-  int rc = 0;
-
-  if (doshuffle_flag & dobitshuffle_flag) {
-    int32_t runlen_type = (header->blosc2_flags >> 4) & BLOSC2_RUNLEN_MASK;
-    if (runlen_type == BLOSC2_VALUE_RUNLEN) {
-      // All repeated values
-      rc = set_values(header, src, dest, destsize);
-    }
-    else if (runlen_type == BLOSC2_NAN_RUNLEN) {
-      rc = set_nans(header, src, dest, destsize);
-    }
-    else if (runlen_type == BLOSC2_ZERO_RUNLEN) {
-      memset(dest, 0, destsize);
-      rc = header->nbytes;
-    }
-  }
-
-  return rc;
-}
-
 
 int blosc_run_decompression_with_context(blosc2_context* context, const void* src, int32_t srcsize,
                                          void* dest, int32_t destsize) {
@@ -2410,16 +2411,6 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
   if (header.nbytes > destsize) {
     // Not enough space for writing into the destination
     return BLOSC2_ERROR_WRITE_BUFFER;
-  }
-
-  // Is that a chunk with a special value (runlen)?
-  rc = handle_runlen(&header, _src, dest, destsize);
-  if (rc < 0) {
-    return rc;
-  }
-  if (rc > 0) {
-    // This means that we have found a special value and we are done.
-    return rc;
   }
 
   rc = initialize_context_decompression(context, &header, src, srcsize, dest, destsize);
@@ -2533,16 +2524,6 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     return BLOSC2_ERROR_WRITE_BUFFER;
   }
 
-  // Is that a chunk with a special value (runlen)?
-  rc = handle_runlen(header, _src, dest, nitems * header->typesize);
-  if (rc < 0) {
-    return rc;
-  }
-  if (rc > 0) {
-    // This means that we have found a special value and we are done.
-    return rc;
-  }
-
   context->bstarts = (int32_t*)(_src + context->header_overhead);
 
   /* Check region boundaries */
@@ -2609,11 +2590,16 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     bool get_single_block = ((startb == 0) && (bsize == nitems * header->typesize));
     uint8_t* tmp2 = get_single_block ? dest : scontext->tmp2;
     bool memcpyed = header->flags & (uint8_t)BLOSC_MEMCPYED;
+    if (context->runlen_type) {
+      // Fake a runlen as if its a memcpyed chunk
+      memcpyed = true;
+    }
+
     // If memcpyed we don't have a bstarts section (because it is not needed)
     int32_t src_offset = memcpyed ?
       context->header_overhead + j * bsize : sw32_(context->bstarts + j);
 
-    cbytes = blosc_d(context->serial_context, bsize, leftoverblock,
+    cbytes = blosc_d(context->serial_context, bsize, leftoverblock, memcpyed,
                      src, srcsize, src_offset, j,
                      tmp2, 0, scontext->tmp, scontext->tmp3);
     if (cbytes < 0) {
@@ -2744,6 +2730,11 @@ static void t_blosc_do_job(void *ctxt)
 
   // Determine whether we can do a static distribution of workload among different threads
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
+  if (!context->do_compress && context->runlen_type) {
+    // Fake a runlen as if its a memcpyed chunk
+    memcpyed = true;
+  }
+
   bool static_schedule = (!compress || memcpyed) && context->block_maskout == NULL;
   if (static_schedule) {
       /* Blocks per thread */
@@ -2807,7 +2798,7 @@ static void t_blosc_do_job(void *ctxt)
         // If memcpyed we don't have a bstarts section (because it is not needed)
         int32_t src_offset = memcpyed ?
             context->header_overhead + nblock_ * blocksize : sw32_(bstarts + nblock_);
-        cbytes = blosc_d(thcontext, bsize, leftoverblock,
+        cbytes = blosc_d(thcontext, bsize, leftoverblock, memcpyed,
                           src, srcsize, src_offset, nblock_,
                           dest, nblock_ * blocksize, tmp, tmp2);
       }
@@ -3479,7 +3470,7 @@ int blosc2_chunk_zeros(const size_t nbytes, const size_t typesize, void* dest, s
   header.flags = BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE;  // extended header
   header.typesize = (uint8_t)typesize;
   header.nbytes = (int32_t)nbytes;
-  header.blocksize = (int32_t)nbytes;
+  header.blocksize = 4 * 4096;
   header.cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
   header.blosc2_flags = BLOSC2_ZERO_RUNLEN << 4;  // mark chunk as all zeros
 
@@ -3514,7 +3505,7 @@ int blosc2_chunk_nans(const size_t nbytes, const size_t typesize, void* dest, si
   header.flags = BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE;  // extended header
   header.typesize = (uint8_t)typesize;
   header.nbytes = (int32_t)nbytes;
-  header.blocksize = (int32_t)nbytes;
+  header.blocksize = 4096;
   header.cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
   header.blosc2_flags = BLOSC2_NAN_RUNLEN << 4;  // mark chunk as all NaNs
 
@@ -3550,7 +3541,7 @@ int blosc2_chunk_repeatval(const size_t nbytes, const size_t typesize, void* des
   header.flags = BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE;  // extended header
   header.typesize = (uint8_t)typesize;
   header.nbytes = (int32_t)nbytes;
-  header.blocksize = (int32_t)nbytes;
+  header.blocksize = 4096;
   header.cbytes = BLOSC_EXTENDED_HEADER_LENGTH + (int32_t)typesize;
   header.blosc2_flags = BLOSC2_VALUE_RUNLEN << 4;  // mark chunk as all repeated value
 

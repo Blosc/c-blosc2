@@ -50,7 +50,7 @@ Process finished with exit code 0
 #define NTHREADS 8
 
 // For exercising the optimized zero chunk creators uncomment the line below
-//#define CREATE_ZEROS
+#define CREATE_ZEROS
 
 
 int create_cframe(const char* compname) {
@@ -154,7 +154,7 @@ int main(void) {
 
   create_cframe("blosclz");
   create_cframe("lz4");
-  create_cframe("lz4hc");
-  create_cframe("zlib");
-  create_cframe("zstd");
+//  create_cframe("lz4hc");
+//  create_cframe("zlib");
+//  create_cframe("zstd");
 }
