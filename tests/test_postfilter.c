@@ -9,7 +9,7 @@
 
 int tests_run = 0;
 
-#define SIZE 500 * 1000
+#define SIZE (500 * 1000)
 #define NTHREADS 2
 
 typedef struct {
@@ -21,14 +21,39 @@ typedef struct {
 // Global vars
 blosc2_cparams cparams;
 blosc2_dparams dparams;
-static int32_t data[SIZE];
-static int32_t data2[SIZE];
-static int32_t data_out[SIZE + BLOSC_MAX_OVERHEAD / sizeof(int32_t)];
-static int32_t data_dest[SIZE];
+int32_t* data;
+int32_t* data2;
+int32_t* data_out;
+int32_t* data_dest;
 int32_t isize = SIZE * sizeof(int32_t);
 int32_t osize = SIZE * sizeof(int32_t) + BLOSC_MAX_OVERHEAD;
 int dsize = SIZE * sizeof(int32_t);
 int csize;
+bool data_cnt = false;
+
+
+int init_data(void) {
+  data = malloc(SIZE * sizeof(int32_t));
+  data2 = malloc(SIZE * sizeof(int32_t));
+  data_out = malloc(SIZE * sizeof(int32_t) + BLOSC_MAX_OVERHEAD);
+  data_dest = malloc(SIZE * sizeof(int32_t));
+
+  /* Initialize inputs */
+  for (int i = 0; i < SIZE; i++) {
+    data[i] = data_cnt ? 1 : i;
+    data2[i] = data_cnt ? 2 : i * 2;
+  }
+
+  return 0;
+}
+
+
+void free_data(void) {
+  free(data);
+  free(data2);
+  free(data_out);
+  free(data_dest);
+}
 
 
 int postfilter_func(blosc2_postfilter_params *postparams) {
@@ -63,6 +88,7 @@ int postfilter_func(blosc2_postfilter_params *postparams) {
 static char *test_postfilter0(void) {
   blosc2_context *cctx, *dctx;
   cctx = blosc2_create_cctx(cparams);
+  init_data();
 
   csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
   mu_assert("Compression error", csize > 0);
@@ -90,6 +116,7 @@ static char *test_postfilter0(void) {
   /* Free resources */
   blosc2_free_ctx(cctx);
   blosc2_free_ctx(dctx);
+  free_data();
 
   return 0;
 }
@@ -98,6 +125,7 @@ static char *test_postfilter0(void) {
 static char *test_postfilter1(void) {
   blosc2_context *cctx, *dctx;
   cctx = blosc2_create_cctx(cparams);
+  init_data();
 
   csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
   mu_assert("Compression error", csize > 0);
@@ -127,6 +155,7 @@ static char *test_postfilter1(void) {
   /* Free resources */
   blosc2_free_ctx(cctx);
   blosc2_free_ctx(dctx);
+  free_data();
 
   return 0;
 }
@@ -135,6 +164,8 @@ static char *test_postfilter1(void) {
 static char *test_postfilter2(void) {
   blosc2_context *cctx, *dctx;
   cctx = blosc2_create_cctx(cparams);
+  init_data();
+
   csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
   mu_assert("Buffer is uncompressible", csize != 0);
   mu_assert("Compression error", csize > 0);
@@ -169,6 +200,7 @@ static char *test_postfilter2(void) {
   /* Free resources */
   blosc2_free_ctx(cctx);
   blosc2_free_ctx(dctx);
+  free_data();
 
   return 0;
 }
@@ -177,6 +209,7 @@ static char *test_postfilter2(void) {
 static char *all_tests(void) {
   // Check with an assortment of clevels and nthreads
 
+  cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   cparams.clevel = 0;
   cparams.nthreads = 1;
   dparams.nthreads = NTHREADS;
@@ -211,29 +244,31 @@ static char *all_tests(void) {
   mu_run_test(test_postfilter2);
   cparams.clevel = 5;
   cparams.nthreads = 1;
+  data_cnt = true;
   mu_run_test(test_postfilter2);
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   mu_run_test(test_postfilter2);
+
+  // This exposes a bug that has been fixed
+  cparams.clevel = 9;
+  cparams.nthreads = 1;
+  dparams.nthreads = 1;
+  data_cnt = true;
+  cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOSHUFFLE;
+  mu_run_test(test_postfilter0);
 
   return 0;
 }
 
 
 int main(void) {
-  /* Initialize inputs */
-  for (int i = 0; i < SIZE; i++) {
-    data[i] = i;
-    data2[i] = i * 2;
-  }
-
   install_blosc_callback_test(); /* optionally install callback test */
 
   /* Create a context for compression */
   cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_BLOSCLZ;
-  cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   dparams = BLOSC2_DPARAMS_DEFAULTS;
 
   /* Run all the suite */

@@ -1365,8 +1365,9 @@ static int blosc_d(
 
   int last_filter_index = last_filter(filters, 'd');
 
-  if ((last_filter_index >= 0) &&
-          (next_filter(filters, BLOSC2_MAX_FILTERS, 'd') != BLOSC_DELTA)) {
+  if (((last_filter_index >= 0) &&
+      (next_filter(filters, BLOSC2_MAX_FILTERS, 'd') != BLOSC_DELTA)) ||
+      context->postfilter != NULL) {
    // We are making use of some filter, so use a temp for destination
    _dest = tmp;
   } else {
@@ -1494,7 +1495,7 @@ static int blosc_d(
     ntbytes += nbytes;
   } /* Closes j < nstreams */
 
-  if (last_filter_index >= 0) {
+  if (last_filter_index >= 0 || context->postfilter != NULL) {
     /* Apply regular filter pipeline */
     int errcode = pipeline_d(thread_context, bsize, dest, dest_offset, tmp, tmp2, tmp3,
                              last_filter_index);
