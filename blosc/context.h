@@ -61,6 +61,8 @@ struct blosc2_context_s {
   /* Type size */
   int32_t* bstarts;
   /* Starts for every block inside the compressed buffer */
+  int32_t runlen_type;
+  /* Run-length type for chunk.  0 if not run-length */
   int compcode;
   /* Compressor code to use */
   int clevel;
