@@ -1224,31 +1224,27 @@ int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8
 }
 
 
-int set_nans(int32_t nbytes, int32_t typesize, const uint8_t* src,
-             uint8_t* dest, int32_t destsize) {
-  int32_t nitems = nbytes / typesize;
+int32_t set_nans(int32_t typesize, uint8_t* dest, int32_t destsize) {
+  int32_t nitems = destsize / typesize;
   if (nitems > destsize / typesize) {
     nitems = destsize / typesize;
   }
 
-  if (typesize > destsize) {
-    BLOSC_TRACE_ERROR("Not enough space in dest");
-    return BLOSC2_ERROR_WRITE_BUFFER;
-  }
-
   if (typesize == 4) {
     float* dest_ = (float*)dest;
+    float val = nanf("");
     for (int i = 0; i < nitems; i++) {
-      dest_[i] = nanf("");
+      dest_[i] = val;
     }
-    return nbytes;
+    return nitems;
   }
   else if (typesize == 8) {
     double* dest_ = (double*)dest;
+    double val = nan("");
     for (int i = 0; i < nitems; i++) {
-      dest_[i] = nan("");
+      dest_[i] = val;
     }
-    return nbytes;
+    return nitems;
   }
 
   BLOSC_TRACE_ERROR("Unsupported typesize for NaN");
@@ -1256,28 +1252,49 @@ int set_nans(int32_t nbytes, int32_t typesize, const uint8_t* src,
 }
 
 
-int set_values(int32_t nbytes, int32_t typesize, const uint8_t* src,
-               uint8_t* dest, int32_t destsize) {
-  int32_t nitems = nbytes / typesize;
+int32_t set_values(int32_t typesize, const uint8_t* src, uint8_t* dest, int32_t destsize) {
+  int32_t nitems = destsize / typesize;
   if (nitems > destsize / typesize) {
     nitems = destsize / typesize;
   }
 
-  if (typesize > destsize) {
-    BLOSC_TRACE_ERROR("Not enough space in dest");
-    return BLOSC2_ERROR_WRITE_BUFFER;
+  // Copy the value of the repeated value to dest
+  int64_t val8 = ((int64_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
+  int64_t* dest8 = (int64_t*)dest;
+  int32_t val4 = ((int32_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
+  int32_t* dest4 = (int32_t*)dest;
+  int16_t val2 = ((int16_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
+  int16_t* dest2 = (int16_t*)dest;
+  int8_t val1 = ((int8_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
+  int8_t* dest1 = (int8_t*)dest;
+  switch (typesize) {
+    case 8:
+      for (int i = 0; i < nitems; i++) {
+        dest8[i] = val8;
+      }
+      break;
+    case 4:
+      for (int i = 0; i < nitems; i++) {
+        dest4[i] = val4;
+      }
+      break;
+    case 2:
+      for (int i = 0; i < nitems; i++) {
+        dest2[i] = val2;
+      }
+      break;
+    case 1:
+      for (int i = 0; i < nitems; i++) {
+        dest1[i] = val1;
+      }
+      break;
+    default:
+      for (int i = 0; i < nitems; i++) {
+        memcpy(dest + i * typesize, src + BLOSC_EXTENDED_HEADER_LENGTH, typesize);
+      }
   }
-  // Get the value at the end of the header
-  void* value = malloc(typesize);
-  BLOSC_ERROR_NULL(value, BLOSC2_ERROR_MEMORY_ALLOC);
-  memcpy(value, src + BLOSC_EXTENDED_HEADER_LENGTH, typesize);
-  // And copy it to dest
-  for (int i = 0; i < nitems; i++) {
-    memcpy(dest + i * typesize, value, typesize);
-  }
-  free(value);
 
-  return nbytes;
+  return nitems;
 }
 
 
@@ -1320,8 +1337,9 @@ static int blosc_d(
     context->src = src;
   }
 
+  // Chunks with special values cannot be lazy
   bool is_lazy = ((context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH) &&
-          (context->blosc2_flags & 0x08u));
+          (context->blosc2_flags & 0x08u) && (context->runlen_type == 0));
   if (is_lazy) {
     // The chunk is on disk, so just lazily load the block
     if (context->schunk == NULL) {
@@ -1392,13 +1410,13 @@ static int blosc_d(
       switch (context->runlen_type) {
         case BLOSC2_VALUE_RUNLEN:
           // All repeated values
-          rc = set_values(chunk_nbytes, context->typesize, src, dest, bsize_);
+          rc = set_values(context->typesize, context->src, dest + dest_offset, bsize_);
           break;
         case BLOSC2_NAN_RUNLEN:
-          rc = set_nans(chunk_nbytes, context->typesize, src, dest, bsize_);
+          rc = set_nans(context->typesize, dest + dest_offset, bsize_);
           break;
         case BLOSC2_ZERO_RUNLEN:
-          memset(dest, 0, bsize_);
+          memset(dest + dest_offset, 0, bsize_);
           break;
         default:
           memcpy(dest + dest_offset, src, bsize_);

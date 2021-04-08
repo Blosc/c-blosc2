@@ -1566,7 +1566,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
   int32_t chunk_blocksize;
-  size_t prev_alloc = BLOSC_MIN_HEADER_LENGTH;
+  size_t prev_alloc = BLOSC_EXTENDED_HEADER_LENGTH;
   uint8_t* data_chunk = NULL;
   FILE* fp = NULL;
   if (frame->cframe == NULL) {
@@ -1599,13 +1599,13 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
       }
       else {
         fseek(fp, header_len + offsets[i], SEEK_SET);
-        rbytes = fread(data_chunk, 1, BLOSC_MIN_HEADER_LENGTH, fp);
-        if (rbytes != BLOSC_MIN_HEADER_LENGTH) {
+        rbytes = fread(data_chunk, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
+        if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
           fclose(fp);
           return NULL;
         }
       }
-      if (rbytes != BLOSC_MIN_HEADER_LENGTH) {
+      if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
         if (frame->sframe) {
           free(data_chunk);
         }
@@ -1823,7 +1823,7 @@ int frame_get_chunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool *ne
   }
 
   if (frame->cframe == NULL) {
-    uint8_t header[BLOSC_MIN_HEADER_LENGTH];
+    uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
     FILE* fp = fopen(frame->urlpath, "rb");
     fseek(fp, header_len + offset, SEEK_SET);
     size_t rbytes = fread(header, 1, sizeof(header), fp);
@@ -1921,7 +1921,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     int32_t chunk_nbytes;
     int32_t chunk_cbytes;
     int32_t chunk_blocksize;
-    uint8_t header[BLOSC_MIN_HEADER_LENGTH];
+    uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
     if (frame->sframe) {
       // The chunk is not in the frame
       fp = sframe_open_chunk(frame->urlpath, offset, "rb");
@@ -1930,8 +1930,8 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
       fp = fopen(frame->urlpath, "rb");
       fseek(fp, header_len + offset, SEEK_SET);
     }
-    size_t rbytes = fread(header, 1, BLOSC_MIN_HEADER_LENGTH, fp);
-    if (rbytes != BLOSC_MIN_HEADER_LENGTH) {
+    size_t rbytes = fread(header, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
+    if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
       BLOSC_TRACE_ERROR("Cannot read the header for chunk in the frame.");
       rc = BLOSC2_ERROR_FILE_READ;
       goto end;
@@ -1945,8 +1945,22 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     nblocks = leftover_block ? nblocks + 1 : nblocks;
     // Allocate space for the lazy chunk
     size_t trailer_len = sizeof(int32_t) + sizeof(int64_t) + nblocks * sizeof(int32_t);
-    size_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH + nblocks * sizeof(int32_t);
-    lazychunk_cbytes = trailer_offset + trailer_len;
+    int32_t runlen_type = (header[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_RUNLEN_MASK;
+    size_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH;
+    lazychunk_cbytes = trailer_offset;
+    if (runlen_type == 0) {
+      // Regular values have offsets for blocks
+      trailer_offset += nblocks * sizeof(int32_t);
+      lazychunk_cbytes += trailer_len;
+    }
+    else if (runlen_type == BLOSC2_VALUE_RUNLEN) {
+      trailer_offset += typesize;
+      lazychunk_cbytes += typesize;
+    }
+    else {
+      rc = BLOSC2_ERROR_INVALID_HEADER;
+      goto end;
+    }
     *chunk = malloc(lazychunk_cbytes);
     *needs_free = true;
 
@@ -1964,6 +1978,10 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
       rc = BLOSC2_ERROR_FILE_READ;
       goto end;
     }
+    if (runlen_type == BLOSC2_VALUE_RUNLEN) {
+      // Value runlen is not returning a lazy chunk.  We are done.
+      goto end;
+    }
 
     // Mark chunk as lazy
     uint8_t* blosc2_flags = *chunk + BLOSC2_CHUNK_BLOSC2_FLAGS;
@@ -1971,7 +1989,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
 
     // Add the trailer (currently, nchunk + offset + block_csizes)
     if (frame->sframe) {
-      *(int32_t*)(*chunk + trailer_offset) = offset;
+      *(int32_t*)(*chunk + trailer_offset) = offset;   // why not nchunk?
       *(int64_t*)(*chunk + trailer_offset + sizeof(int32_t)) = offset;
     }
     else {
