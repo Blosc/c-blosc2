@@ -73,15 +73,15 @@ int main(void) {
 
   filter_params params = {.itemsize=sizeof(int32_t)};
   blosc2_udfilter udfilter;
-  udfilter.id = 128;
+  udfilter.id = 160;
   udfilter.forward = filter_forward;
   udfilter.backward = filter_backward;
   udfilter.params = &params;
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.udfilters[5] = udfilter;
-  cparams.filters[4] = BLOSC_UDFILTER;
-  cparams.filters_meta[4] = 128;
+  cparams.filters[4] = 160;
+  cparams.filters_meta[4] = 0;
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.udfilters[0] = udfilter;
