@@ -195,9 +195,7 @@ CUTEST_TEST_TEST(zero_runlen) {
   /* Free resources */
   free(data_buffer);
   free(rec_buffer);
-  /* Destroy the super-chunk */
   blosc2_schunk_free(schunk);
-  /* Destroy the Blosc environment */
 
   /* Free resources */
   if (backend.urlpath != NULL && backend.contiguous == false) {

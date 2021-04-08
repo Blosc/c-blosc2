@@ -44,7 +44,12 @@ static char* test_lazy_chunk(void) {
   cparams.blocksize = BLOCKSIZE * cparams.typesize;
   dparams.nthreads = nthreads;
   blosc2_storage storage = {.contiguous=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
+  blosc2_remove_dir(storage.urlpath);
   schunk = blosc2_schunk_new(&storage);
+  if (schunk == NULL) {
+    printf("ERROR: cannot create sframe: %s\n", directory);
+    return "";
+  }
 
   // Feed it with data
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {

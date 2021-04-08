@@ -230,11 +230,6 @@ int check_special_values(int svalue) {
 
 int main(void) {
   int rc;
-  printf("Testing zero detection...");
-  rc = check_special_values(ZERO_DETECTION);
-  if (rc < 0) {
-    return rc;
-  }
   printf("*** Testing special zeros...");
   rc = check_special_values(CHECK_ZEROS);
   if (rc < 0) {
@@ -247,6 +242,11 @@ int main(void) {
   }
   printf("*** Testing special values...");
   rc = check_special_values(CHECK_VALUES);
+  if (rc < 0) {
+    return rc;
+  }
+  printf("Testing zero detection...");
+  rc = check_special_values(ZERO_DETECTION);
   if (rc < 0) {
     return rc;
   }
