@@ -104,17 +104,23 @@ enum {
  * @see #blosc_compress
  */
 enum {
-  BLOSC_NOSHUFFLE = 0,    //!< no shuffle (for compatibility with Blosc1)
-  BLOSC_NOFILTER = 0,     //!< no filter
-  BLOSC_SHUFFLE = 1,      //!< byte-wise shuffle
-  BLOSC_BITSHUFFLE = 2,   //!< bit-wise shuffle
-  BLOSC_DELTA = 3,        //!< delta filter
-  BLOSC_TRUNC_PREC = 4,   //!< truncate precision filter
-  BLOSC_UDFILTER = 5,     //!< user-defined filter
-  BLOSC_LAST_FILTER = 6,  //!< sentinel
+  BLOSC_NOSHUFFLE = 0,   //!< no shuffle (for compatibility with Blosc1)
+  BLOSC_NOFILTER = 0,    //!< no filter
+  BLOSC_SHUFFLE = 1,     //!< byte-wise shuffle
+  BLOSC_BITSHUFFLE = 2,  //!< bit-wise shuffle
+  BLOSC_DELTA = 3,       //!< delta filter
+  BLOSC_TRUNC_PREC = 4,  //!< truncate precision filter
+  BLOSC_LAST_FILTER = 6, //!< sentinel
+  BLOSC_LAST_REGISTERED_FILTER = 32,
 };
 
 enum {
+  BLOSC2_BDEFINED_FILTERS = 32,
+  //!< Blosc-defined filters must be between 0 - 31.
+  BLOSC2_REGISTERED_FILTERS = 160,
+  //!< Blosc-registered filters must be between 64 - 159.
+  BLOSC2_UDEFINED_FILTERS = 256,
+  //!< User-defined filters must be between 128 - 255.
   BLOSC2_MAX_FILTERS = 6,
   //!< Maximum number of filters in the filter pipeline
   BLOSC2_MAX_UDFILTERS = 16,

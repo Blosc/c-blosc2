@@ -132,7 +132,7 @@ CUTEST_TEST_TEST(udfilters) {
 
   filter_params params = {.itemsize=itemsize};
   blosc2_udfilter udfilter;
-  udfilter.id = 150;
+  udfilter.id = 177;
   udfilter.forward = filter_forward;
   if (correct_backward) {
     udfilter.backward = filter_backward;
@@ -143,8 +143,8 @@ CUTEST_TEST_TEST(udfilters) {
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.udfilters[0] = udfilter;
-  cparams.filters[4] = BLOSC_UDFILTER;
-  cparams.filters_meta[4] = 150;
+  cparams.filters[4] = 177;
+  cparams.filters_meta[4] = 0;
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.udfilters[0] = udfilter;

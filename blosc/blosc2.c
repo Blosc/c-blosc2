@@ -873,56 +873,62 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
   /* Process the filter pipeline */
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     int rc = BLOSC2_ERROR_SUCCESS;
-    switch (filters[i]) {
-      case BLOSC_SHUFFLE:
-        for (int j = 0; j <= filters_meta[i]; j++) {
-          shuffle(typesize, bsize, _src, _dest);
-          // Cycle filters when required
-          if (j < filters_meta[i]) {
-            _src = _dest;
-            _dest = _tmp;
-            _tmp = _src;
-          }
-        }
-        break;
-      case BLOSC_BITSHUFFLE:
-        if (bitshuffle(typesize, bsize, _src, _dest, tmp2) < 0) {
-          return NULL;
-        }
-        break;
-      case BLOSC_DELTA:
-        delta_encoder(src, offset, bsize, typesize, _src, _dest);
-        break;
-      case BLOSC_TRUNC_PREC:
-        truncate_precision(filters_meta[i], typesize, bsize, _src, _dest);
-        break;
-      case BLOSC_UDFILTER:
-        // Look for the filters_meta in user filters and run it
-        for (int j = 0; j < BLOSC2_MAX_FILTERS; ++j) {
-          if (udfilters[j].id == filters_meta[i]) {
-            if (udfilters[j].forward != NULL) {
-              rc = udfilters[j].forward(_src, _dest, bsize, udfilters[j].params);
-            } else {
-              BLOSC_TRACE_ERROR("Forward function is NULL");
-              return NULL;
+    if (filters[i] < BLOSC2_BDEFINED_FILTERS) {
+      switch (filters[i]) {
+        case BLOSC_SHUFFLE:
+          for (int j = 0; j <= filters_meta[i]; j++) {
+            shuffle(typesize, bsize, _src, _dest);
+            // Cycle filters when required
+            if (j < filters_meta[i]) {
+              _src = _dest;
+              _dest = _tmp;
+              _tmp = _src;
             }
-            if (rc != BLOSC2_ERROR_SUCCESS) {
-              BLOSC_TRACE_ERROR("User-defined filter %d failed during compression\n", filters_meta[i]);
-              return NULL;
-            }
-            goto udfiltersuccess;
           }
+          break;
+        case BLOSC_BITSHUFFLE:
+          if (bitshuffle(typesize, bsize, _src, _dest, tmp2) < 0) {
+            return NULL;
+          }
+          break;
+        case BLOSC_DELTA:
+          delta_encoder(src, offset, bsize, typesize, _src, _dest);
+          break;
+        case BLOSC_TRUNC_PREC:
+          truncate_precision(filters_meta[i], typesize, bsize, _src, _dest);
+          break;
+        default:
+          if (filters[i] != BLOSC_NOFILTER) {
+            BLOSC_TRACE_ERROR("Filter %d not handled during compression\n", filters[i]);
+            return NULL;
+          }
+      }
+    } else if (filters[i] < BLOSC2_REGISTERED_FILTERS) {
+      // No filter registered
+    } else {
+      // Look for the filters_meta in user filters and run it
+      for (int j = 0; j < BLOSC2_MAX_FILTERS; ++j) {
+        if (udfilters[j].id == filters[i]) {
+          if (udfilters[j].forward != NULL) {
+            rc = udfilters[j].forward(_src, _dest, bsize, udfilters[j].params);
+          } else {
+            BLOSC_TRACE_ERROR("Forward function is NULL");
+            return NULL;
+          }
+          if (rc != BLOSC2_ERROR_SUCCESS) {
+            BLOSC_TRACE_ERROR("User-defined filter %d failed during compression\n", filters[i]);
+            return NULL;
+          }
+          goto udfiltersuccess;
         }
-        BLOSC_TRACE_ERROR("User-defined filter %d not found during compression\n", filters_meta[i]);
-        return NULL;
-      udfiltersuccess:
-        break;
-      default:
-        if (filters[i] != BLOSC_NOFILTER) {
-          BLOSC_TRACE_ERROR("Filter %d not handled during compression\n", filters[i]);
-          return NULL;
-        }
+      }
+      BLOSC_TRACE_ERROR("User-defined filter %d not found during compression\n", filters[i]);
+      return NULL;
+
+      udfiltersuccess:;
+
     }
+
     // Cycle buffers when required
     if (filters[i] != BLOSC_NOFILTER) {
       _src = _dest;
@@ -1163,56 +1169,67 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
       _dest = dest + offset;
     }
     int rc = BLOSC2_ERROR_SUCCESS;
-    switch (filters[i]) {
-      case BLOSC_SHUFFLE:
-        for (int j = 0; j <= filters_meta[i]; j++) {
-          unshuffle(typesize, bsize, _src, _dest);
-          // Cycle filters when required
-          if (j < filters_meta[i]) {
-            _src = _dest;
-            _dest = _tmp;
-            _tmp = _src;
-          }
-          // Check whether we have to copy the intermediate _dest buffer to final destination
-          if (last_copy_filter && (filters_meta[i] % 2) == 1 && j == filters_meta[i]) {
-            memcpy(dest + offset, _dest, (unsigned int)bsize);
-          }
-        }
-        break;
-      case BLOSC_BITSHUFFLE:
-        if (bitunshuffle(typesize, bsize, _src, _dest, _tmp, context->src[BLOSC2_CHUNK_VERSION]) < 0) {
-          return BLOSC2_ERROR_FILTER_PIPELINE;
-        }
-        break;
-      case BLOSC_DELTA:
-        if (context->nthreads == 1) {
-          /* Serial mode */
-          delta_decoder(dest, offset, bsize, typesize, _dest);
-        } else {
-          /* Force the thread in charge of the block 0 to go first */
-          pthread_mutex_lock(&context->delta_mutex);
-          if (context->dref_not_init) {
-            if (offset != 0) {
-              pthread_cond_wait(&context->delta_cv, &context->delta_mutex);
-            } else {
-              delta_decoder(dest, offset, bsize, typesize, _dest);
-              context->dref_not_init = 0;
-              pthread_cond_broadcast(&context->delta_cv);
+    if (filters[i] < BLOSC2_BDEFINED_FILTERS) {
+      switch (filters[i]) {
+        case BLOSC_SHUFFLE:
+          for (int j = 0; j <= filters_meta[i]; j++) {
+            unshuffle(typesize, bsize, _src, _dest);
+            // Cycle filters when required
+            if (j < filters_meta[i]) {
+              _src = _dest;
+              _dest = _tmp;
+              _tmp = _src;
+            }
+            // Check whether we have to copy the intermediate _dest buffer to final destination
+            if (last_copy_filter && (filters_meta[i] % 2) == 1 && j == filters_meta[i]) {
+              memcpy(dest + offset, _dest, (unsigned int) bsize);
             }
           }
-          pthread_mutex_unlock(&context->delta_mutex);
-          if (offset != 0) {
-            delta_decoder(dest, offset, bsize, typesize, _dest);
+          break;
+        case BLOSC_BITSHUFFLE:
+          if (bitunshuffle(typesize, bsize, _src, _dest, _tmp, context->src[BLOSC2_CHUNK_VERSION]) < 0) {
+            return BLOSC2_ERROR_FILTER_PIPELINE;
           }
-        }
-        break;
-      case BLOSC_TRUNC_PREC:
-        // TRUNC_PREC filter does not need to be undone
-        break;
-      case BLOSC_UDFILTER:
+          break;
+        case BLOSC_DELTA:
+          if (context->nthreads == 1) {
+            /* Serial mode */
+            delta_decoder(dest, offset, bsize, typesize, _dest);
+          } else {
+            /* Force the thread in charge of the block 0 to go first */
+            pthread_mutex_lock(&context->delta_mutex);
+            if (context->dref_not_init) {
+              if (offset != 0) {
+                pthread_cond_wait(&context->delta_cv, &context->delta_mutex);
+              } else {
+                delta_decoder(dest, offset, bsize, typesize, _dest);
+                context->dref_not_init = 0;
+                pthread_cond_broadcast(&context->delta_cv);
+              }
+            }
+            pthread_mutex_unlock(&context->delta_mutex);
+            if (offset != 0) {
+              delta_decoder(dest, offset, bsize, typesize, _dest);
+            }
+          }
+          break;
+        case BLOSC_TRUNC_PREC:
+          // TRUNC_PREC filter does not need to be undone
+          break;
+        default:
+          if (filters[i] != BLOSC_NOFILTER) {
+            BLOSC_TRACE_ERROR("Filter %d not handled during decompression.",
+                              filters[i]);
+
+            errcode = -1;
+          }
+      }
+    } else if (filters[i] < BLOSC2_REGISTERED_FILTERS) {
+      // No filter registered
+    } else {
         // Look for the filters_meta in user filters and run it
         for (int j = 0; j < BLOSC2_MAX_FILTERS; ++j) {
-          if (udfilters[j].id == filters_meta[i]) {
+          if (udfilters[j].id == filters[i]) {
             if (udfilters[j].backward != NULL) {
               rc = udfilters[j].backward(_src, _dest, bsize, udfilters[j].params);
             } else {
@@ -1220,24 +1237,17 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
               return BLOSC2_ERROR_FILTER_PIPELINE;
             }
             if (rc != BLOSC2_ERROR_SUCCESS) {
-              BLOSC_TRACE_ERROR("User-defined filter %d failed during decompression.", filters_meta[i]);
+              BLOSC_TRACE_ERROR("User-defined filter %d failed during decompression.", filters[i]);
               return rc;
             }
             goto udfiltersuccess;
           }
         }
-        BLOSC_TRACE_ERROR("User-defined filter %d not found during decompression.", filters_meta[i]);
-        return BLOSC2_ERROR_FILTER_PIPELINE;
-      udfiltersuccess:
-        break;
-      default:
-        if (filters[i] != BLOSC_NOFILTER) {
-          BLOSC_TRACE_ERROR("Filter %d not handled during decompression.",
-                            filters[i]);
-
-          errcode = -1;
-        }
+      BLOSC_TRACE_ERROR("User-defined filter %d not found during decompression.", filters[i]);
+      return BLOSC2_ERROR_FILTER_PIPELINE;
+      udfiltersuccess:;
     }
+
     // Cycle buffers when required
     if ((filters[i] != BLOSC_NOFILTER) && (filters[i] != BLOSC_TRUNC_PREC)) {
       _src = _dest;
@@ -3490,9 +3500,16 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     context->filters[i] = cparams.filters[i];
     context->filters_meta[i] = cparams.filters_meta[i];
-    if (context->filters[i] == BLOSC_UDFILTER && context->filters_meta[i] < 128) {
-      BLOSC_TRACE_ERROR("filters_meta (%d) can not be smaller than 128 in user-defined filters",
-                        context->filters_meta[i]);
+
+    if (context->filters[i] >= BLOSC_LAST_FILTER && context->filters[i] < BLOSC2_BDEFINED_FILTERS) {
+      BLOSC_TRACE_ERROR("filter (%d) is not yet defined",
+                        context->filters[i]);
+      free(context);
+      return NULL;
+    }
+    if (context->filters[i] >= BLOSC_LAST_REGISTERED_FILTER && context->filters[i] < BLOSC2_REGISTERED_FILTERS) {
+      BLOSC_TRACE_ERROR("filter (%d) is not yet defined",
+                        context->filters[i]);
       free(context);
       return NULL;
     }
