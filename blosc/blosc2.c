@@ -1406,27 +1406,30 @@ static int blosc_d(
     if (!is_lazy) {
       src += context->header_overhead + nblock * context->blocksize;
     }
-    if (context->postfilter == NULL) {
-      switch (context->runlen_type) {
-        case BLOSC2_VALUE_RUNLEN:
-          // All repeated values
-          rc = set_values(context->typesize, context->src, dest + dest_offset, bsize_);
-          break;
-        case BLOSC2_NAN_RUNLEN:
-          rc = set_nans(context->typesize, dest + dest_offset, bsize_);
-          break;
-        case BLOSC2_ZERO_RUNLEN:
-          memset(dest + dest_offset, 0, bsize_);
-          break;
-        default:
-          memcpy(dest + dest_offset, src, bsize_);
-      }
+    _dest = dest + dest_offset;
+    if (context->postfilter != NULL) {
+      // We are making use of a postfilter, so use a temp for destination
+      _dest = tmp;
     }
-    else {
+    switch (context->runlen_type) {
+      case BLOSC2_VALUE_RUNLEN:
+        // All repeated values
+        rc = set_values(context->typesize, context->src, _dest, bsize_);
+        break;
+      case BLOSC2_NAN_RUNLEN:
+        rc = set_nans(context->typesize, _dest, bsize_);
+        break;
+      case BLOSC2_ZERO_RUNLEN:
+        memset(_dest, 0, bsize_);
+        break;
+      default:
+        memcpy(_dest, src, bsize_);
+    }
+    if (context->postfilter != NULL) {
       // Create new postfilter parameters for this block (must be private for each thread)
       blosc2_postfilter_params postparams;
       memcpy(&postparams, context->postparams, sizeof(postparams));
-      postparams.in = src;
+      postparams.in = tmp;
       postparams.out = dest + dest_offset;
       postparams.size = bsize;
       postparams.typesize = typesize;
