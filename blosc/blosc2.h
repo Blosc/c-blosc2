@@ -37,8 +37,13 @@
 
   #include <process.h>
   #define getpid _getpid
+
+  #define fseek _fseeki64
+
 #else
 #include <unistd.h>
+#include <stdio.h>
+#define fseek fseek
 #endif
 
 #ifdef __cplusplus
@@ -726,7 +731,7 @@ BLOSC_EXPORT const char* blosc_cbuffer_complib(const void* cbuffer);
 
 typedef void*  (*blosc2_open_cb)(const char *urlpath, const char *mode, void *params);
 typedef int    (*blosc2_close_cb)(void *stream, void* params);
-typedef int    (*blosc2_seek_cb)(void *stream, long, int, void* params);
+typedef int    (*blosc2_seek_cb)(void *stream, int64_t, int, void* params);
 typedef size_t (*blosc2_write_cb)(const void *ptr, size_t size, size_t nitems, void *stream, void *params);
 typedef size_t (*blosc2_read_cb)(void *ptr, size_t size, size_t nitems, void *stream, void *params);
 
@@ -1399,6 +1404,20 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t l
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open(const char* urlpath);
+
+/**
+ * @brief Open an existing super-chunk (no copy is made) using a user-defined I/O interface.
+ *
+ * @param storage The storage properties of the source.
+ *
+ * @param udio The user-defined I/O interface.
+ *
+ * @remark The storage.urlpath must be not NULL and it should exist on-disk.
+ * New data or metadata can be appended or updated.
+ *
+ * @return The new super-chunk.
+ */
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_udio(const char* urlpath, const blosc2_io *udio);
 
 /* @brief Convert a super-chunk into a contiguous frame buffer.
  *

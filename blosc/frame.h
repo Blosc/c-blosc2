@@ -106,7 +106,7 @@ int frame_free(blosc2_frame_s *frame);
  *
  * @return The frame created from the file.
  */
-blosc2_frame_s* frame_from_file(const char *urlpath);
+blosc2_frame_s* frame_from_file(const char *urlpath, const blosc2_io *io);
 
 /**
  * @brief Initialize a frame out of a frame buffer.
@@ -129,7 +129,7 @@ blosc2_frame_s* frame_from_cframe(uint8_t *cframe, int64_t len, bool copy);
  *
  * @return The super-chunk corresponding to the frame.
  */
-blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy);
+blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io *udio);
 
 blosc2_storage *
 get_new_storage(const blosc2_storage *storage, const blosc2_cparams *cdefaults, const blosc2_dparams *ddefaults,

@@ -309,14 +309,14 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
 
 
 /* Open an existing super-chunk that is on-disk (no copy is made). */
-blosc2_schunk* blosc2_schunk_open(const char* urlpath) {
+blosc2_schunk* blosc2_schunk_open_udio(const char* urlpath, const blosc2_io *udio) {
   if (urlpath == NULL) {
     BLOSC_TRACE_ERROR("You need to supply a urlpath.");
     return NULL;
   }
 
-  blosc2_frame_s* frame = frame_from_file(urlpath);
-  blosc2_schunk* schunk = frame_to_schunk(frame, false);
+  blosc2_frame_s* frame = frame_from_file(urlpath, udio);
+  blosc2_schunk* schunk = frame_to_schunk(frame, false, udio);
 
   // Set the storage with proper defaults
   size_t pathlen = strlen(urlpath);
@@ -327,6 +327,9 @@ blosc2_schunk* blosc2_schunk_open(const char* urlpath) {
   return schunk;
 }
 
+blosc2_schunk* blosc2_schunk_open(const char* urlpath) {
+  return blosc2_schunk_open_udio(urlpath, &BLOSC2_IO_DEFAULTS);
+}
 
 int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* needs_free) {
   blosc2_frame_s* frame;
@@ -465,7 +468,7 @@ blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy
   if (frame == NULL) {
     return NULL;
   }
-  blosc2_schunk* schunk = frame_to_schunk(frame, copy);
+  blosc2_schunk* schunk = frame_to_schunk(frame, copy, &BLOSC2_IO_DEFAULTS);
   if (copy) {
     // We don't need the frame anymore
     frame_free(frame);

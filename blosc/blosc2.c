@@ -68,8 +68,6 @@
     #include <stdint.h>
   #endif
 
-  #define fseek _fseeki64
-
   #include <process.h>
   #define getpid _getpid
 #else
