@@ -40,7 +40,7 @@ int init_data(void) {
 
   /* Initialize inputs */
   for (int i = 0; i < SIZE; i++) {
-    data[i] = data_cnt ? 1 : i;
+    data[i] = data_cnt ? 0 : i;  // important to have a zero here for testing special chunks!
     data2[i] = data_cnt ? 2 : i * 2;
   }
 
@@ -242,10 +242,13 @@ static char *all_tests(void) {
   cparams.nthreads = NTHREADS;
   dparams.nthreads = 1;
   mu_run_test(test_postfilter2);
+
+  // Activate special chunks from now on
+  data_cnt = true;
+
   cparams.clevel = 5;
   cparams.nthreads = 1;
-  data_cnt = true;
-  mu_run_test(test_postfilter2);
+  mu_run_test(test_postfilter0);
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   mu_run_test(test_postfilter2);
@@ -254,7 +257,6 @@ static char *all_tests(void) {
   cparams.clevel = 9;
   cparams.nthreads = 1;
   dparams.nthreads = 1;
-  data_cnt = true;
   cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOSHUFFLE;
   mu_run_test(test_postfilter0);
 
