@@ -35,8 +35,6 @@ extern "C" {
         }                                                       \
     } while (0)
 
-// Global variable shared across modules
-extern blosc2_io *blosc2_io_global;
 
 // Return true if platform is little endian; else false
 static bool is_little_endian(void) {

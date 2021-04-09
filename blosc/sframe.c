@@ -35,14 +35,7 @@
 
 
 /* Open sparse frame index chunk */
-void* sframe_open_index(const char* urlpath, const char* mode) {
-  const blosc2_io *io;
-  if (blosc2_io_global != NULL) {
-    io = blosc2_io_global;
-  } else {
-    io = &BLOSC2_IO_DEFAULTS;
-  }
-
+void* sframe_open_index(const char* urlpath, const char* mode, const blosc2_io *io) {
   void* fp = NULL;
   char* index_path = malloc(strlen(urlpath) + strlen("/chunks.b2frame") + 1);
   if (index_path) {
@@ -54,14 +47,7 @@ void* sframe_open_index(const char* urlpath, const char* mode) {
 }
 
 /* Open directory/nchunk.chunk with 8 zeros of padding */
-void* sframe_open_chunk(const char* urlpath, int64_t nchunk, const char* mode) {
-  const blosc2_io *io;
-  if (blosc2_io_global != NULL) {
-    io = blosc2_io_global;
-  } else {
-    io = &BLOSC2_IO_DEFAULTS;
-  }
-
+void* sframe_open_chunk(const char* urlpath, int64_t nchunk, const char* mode, const blosc2_io *io) {
   void* fp = NULL;
   char* chunk_path = malloc(strlen(urlpath) + 1 + 8 + strlen(".chunk") + 1);
   if (chunk_path) {
@@ -74,7 +60,7 @@ void* sframe_open_chunk(const char* urlpath, int64_t nchunk, const char* mode) {
 
 /* Append an existing chunk into a sparse frame. */
 void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int32_t nchunk, int64_t cbytes) {
-  void* fpc = sframe_open_chunk(frame->urlpath, nchunk, "wb");
+  void* fpc = sframe_open_chunk(frame->urlpath, nchunk, "wb", frame->schunk->storage->udio);
   if (fpc == NULL) {
     BLOSC_TRACE_ERROR("Cannot open the chunkfile.");
     return NULL;
@@ -92,7 +78,7 @@ void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int32_t nchunk,
 
 /* Get chunk from sparse frame. */
 int sframe_get_chunk(blosc2_frame_s* frame, int32_t nchunk, uint8_t** chunk, bool* needs_free){
-  void *fpc = sframe_open_chunk(frame->urlpath, nchunk, "rb");
+  void *fpc = sframe_open_chunk(frame->urlpath, nchunk, "rb", frame->schunk->storage->udio);
   if(fpc == NULL){
     BLOSC_TRACE_ERROR("Cannot open the chunkfile.");
     return BLOSC2_ERROR_FILE_OPEN;

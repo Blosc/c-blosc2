@@ -29,8 +29,6 @@
     #include <stdint.h>
   #endif
 
-  #define fseek _fseeki64
-
 #endif  /* _WIN32 */
 
 /* If C11 is supported, use it's built-in aligned allocation. */
@@ -370,16 +368,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
 
 int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_len, int64_t *nbytes, int64_t *cbytes,
                     int32_t *blocksize, int32_t *chunksize, int32_t *nchunks, int32_t *typesize, uint8_t *compcode,
-                    uint8_t *compcode_meta, uint8_t *clevel, uint8_t *filters, uint8_t *filters_meta) {
+                    uint8_t *compcode_meta, uint8_t *clevel, uint8_t *filters, uint8_t *filters_meta, const blosc2_io *io) {
   uint8_t* framep = frame->cframe;
   uint8_t header[FRAME_HEADER_MINLEN];
-
-  const blosc2_io *io;
-  if (blosc2_io_global != NULL) {
-    io = blosc2_io_global;
-  } else {
-    io = &BLOSC2_IO_DEFAULTS;
-  }
 
   if (frame->len <= 0) {
     return BLOSC2_ERROR_READ_BUFFER;
@@ -389,7 +380,8 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
     size_t rbytes = 0;
     void* fp = NULL;
     if (frame->sframe) {
-      fp = sframe_open_index(frame->urlpath, "rb");
+      fp = sframe_open_index(frame->urlpath, "rb",
+                             io);
     }
     else {
       fp = io->open(frame->urlpath, "rb", NULL);
@@ -509,7 +501,8 @@ int update_frame_len(blosc2_frame_s* frame, int64_t len) {
   else {
     void* fp = NULL;
     if (frame->sframe) {
-      fp = sframe_open_index(frame->urlpath, "rb+");
+      fp = sframe_open_index(frame->urlpath, "rb+",
+                             frame->schunk->storage->udio);
     }
     else {
       fp = frame->schunk->storage->udio->open(frame->urlpath, "rb+", NULL);
@@ -679,7 +672,8 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   int32_t nchunks;
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                             &blocksize, &chunksize, &nchunks,
-                            NULL, NULL, NULL, NULL, NULL, NULL);
+                            NULL, NULL, NULL, NULL, NULL, NULL,
+                            frame->schunk->storage->udio);
   if (ret < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return ret;
@@ -706,7 +700,8 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   else {
     void* fp = NULL;
     if (frame->sframe) {
-      fp = sframe_open_index(frame->urlpath, "rb+");
+      fp = sframe_open_index(frame->urlpath, "rb+",
+                             frame->schunk->storage->udio);
     }
     else {
       fp = schunk->storage->udio->open(frame->urlpath, "rb+", NULL);
@@ -738,14 +733,7 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
 
 
 /* Initialize a frame out of a file */
-blosc2_frame_s* frame_from_file(const char* urlpath) {
-  const blosc2_io *io;
-  if (blosc2_io_global != NULL) {
-    io = blosc2_io_global;
-  } else {
-    io = &BLOSC2_IO_DEFAULTS;
-  }
-
+blosc2_frame_s* frame_from_file(const char* urlpath, const blosc2_io *io) {
   // Get the length of the frame
   uint8_t header[FRAME_HEADER_MINLEN];
   uint8_t trailer[FRAME_TRAILER_MINLEN];
@@ -770,7 +758,7 @@ blosc2_frame_s* frame_from_file(const char* urlpath) {
       urlpath_cpy = malloc(strlen(urlpath) + 1);
       strcpy(urlpath_cpy, urlpath);
     }
-    fp = sframe_open_index(urlpath_cpy, "rb");
+    fp = sframe_open_index(urlpath_cpy, "rb", io);
     sframe = true;
   }
   else {
@@ -941,7 +929,8 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   }
   else {
     if (frame->sframe) {
-      fp = sframe_open_index(frame->urlpath, "wb");
+      fp = sframe_open_index(frame->urlpath, "wb",
+                             frame->schunk->storage->udio);
     }
     else {
       fp = schunk->storage->udio->open(frame->urlpath, "wb", NULL);
@@ -1062,7 +1051,8 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
   void* fp = NULL;
   uint8_t* coffsets = malloc((size_t)coffsets_cbytes);
   if (frame->sframe) {
-    fp = sframe_open_index(frame->urlpath, "rb");
+    fp = sframe_open_index(frame->urlpath, "rb",
+                           frame->schunk->storage->udio);
     frame->schunk->storage->udio->seek(fp, header_len + 0, SEEK_SET, NULL);
   }
   else {
@@ -1099,7 +1089,8 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
     size_t rbytes = 0;
     void* fp = NULL;
     if (frame->sframe) {
-      fp = sframe_open_index(frame->urlpath, "rb+");
+      fp = sframe_open_index(frame->urlpath, "rb+",
+                             frame->schunk->storage->udio);
     }
     else {
       fp = frame->schunk->storage->udio->open(frame->urlpath, "rb", NULL);
@@ -1138,7 +1129,8 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
   if (frame->cframe == NULL) {
     // Write updated header down to file
     if (frame->sframe) {
-      fp = sframe_open_index(frame->urlpath, "rb+");
+      fp = sframe_open_index(frame->urlpath, "rb+",
+                             frame->schunk->storage->udio);
     }
     else {
       fp = frame->schunk->storage->udio->open(frame->urlpath, "rb+", NULL);
@@ -1281,7 +1273,8 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   int32_t nchunks;
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                             &blocksize, &chunksize, &nchunks,
-                            NULL, NULL, NULL, NULL, NULL, NULL);
+                            NULL, NULL, NULL, NULL, NULL, NULL,
+                            schunk->storage->udio);
   if (ret < 0) {
     BLOSC_TRACE_ERROR("Unable to get the header info from frame.");
     return ret;
@@ -1296,7 +1289,8 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     header = malloc(header_len);
     void* fp = NULL;
     if (frame->sframe) {
-      fp = sframe_open_index(frame->urlpath, "rb");
+      fp = sframe_open_index(frame->urlpath, "rb",
+                             frame->schunk->storage->udio);
     }
     else {
       fp = frame->schunk->storage->udio->open(frame->urlpath, "rb", NULL);
@@ -1442,7 +1436,8 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   int32_t nchunks;
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                             &blocksize, &chunksize, &nchunks,
-                            NULL, NULL, NULL, NULL, NULL, NULL);
+                            NULL, NULL, NULL, NULL, NULL, NULL,
+                            schunk->storage->udio);
   if (ret < 0) {
     BLOSC_TRACE_ERROR("Unable to get the trailer info from frame.");
     return ret;
@@ -1542,7 +1537,7 @@ blosc2_storage* get_new_storage(const blosc2_storage* storage,
 
 
 /* Get a super-chunk out of a frame */
-blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
+blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io *udio) {
   int32_t header_len;
   int64_t frame_len;
   int rc;
@@ -1554,7 +1549,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
                        &schunk->cbytes, &schunk->blocksize,
                        &schunk->chunksize, &schunk->nchunks, &schunk->typesize,
                        &schunk->compcode, &schunk->compcode_meta, &schunk->clevel, schunk->filters,
-                       schunk->filters_meta);
+                       schunk->filters_meta, udio);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     blosc2_schunk_free(schunk);
@@ -1573,7 +1568,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
   blosc2_schunk_get_dparams(schunk, &dparams);
   schunk->dctx = blosc2_create_dctx(*dparams);
   blosc2_storage storage = {.contiguous = copy ? false : true};
-  schunk->storage = get_new_storage(&storage, cparams, dparams, &BLOSC2_IO_DEFAULTS);
+  schunk->storage = get_new_storage(&storage, cparams, dparams, udio);
   free(cparams);
   free(dparams);
   if (!copy) {
@@ -1651,8 +1646,8 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy) {
         rbytes = frame_get_lazychunk(frame, offsets[i], &data_chunk, &needs_free);
       }
       else {
-        frame->schunk->storage->udio->seek(fp, header_len + offsets[i], SEEK_SET);
-        rbytes = frame->schunk->storage->udio->read(data_chunk, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
+        frame->schunk->storage->udio->seek(fp, header_len + offsets[i], SEEK_SET, NULL);
+        rbytes = frame->schunk->storage->udio->read(data_chunk, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp, NULL);
         if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
           frame->schunk->storage->udio->close(fp, NULL);
           return NULL;
@@ -1851,7 +1846,8 @@ int frame_get_chunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool *ne
   *needs_free = false;
   rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                        &blocksize, &chunksize, &nchunks,
-                       &typesize, NULL, NULL, NULL, NULL, NULL);
+                       &typesize, NULL, NULL, NULL, NULL, NULL,
+                       frame->schunk->storage->udio);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return rc;
@@ -1957,7 +1953,8 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
   *needs_free = false;
   int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                            &blocksize, &chunksize, &nchunks,
-                           &typesize, NULL, NULL, NULL, NULL, NULL);
+                           &typesize, NULL, NULL, NULL, NULL, NULL,
+                           frame->schunk->storage->udio);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return rc;
@@ -1998,13 +1995,14 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
     if (frame->sframe) {
       // The chunk is not in the frame
-      fp = sframe_open_chunk(frame->urlpath, offset, "rb");
+      fp = sframe_open_chunk(frame->urlpath, offset, "rb",
+                             frame->schunk->storage->udio);
     }
     else {
       fp = frame->schunk->storage->udio->open(frame->urlpath, "rb", NULL);
       frame->schunk->storage->udio->seek(fp, header_len + offset, SEEK_SET, NULL);
     }
-    size_t rbytes = frame->schunk->storage->udio->read(header, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
+    size_t rbytes = frame->schunk->storage->udio->read(header, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp, NULL);
     if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
       BLOSC_TRACE_ERROR("Cannot read the header for chunk in the frame.");
       rc = BLOSC2_ERROR_FILE_READ;
@@ -2153,7 +2151,8 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
   int32_t nchunks;
 
   int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &blocksize, NULL,
-                           &nchunks, &typesize, NULL, NULL, NULL, NULL, NULL);
+                           &nchunks, &typesize, NULL, NULL, NULL, NULL, NULL,
+                           schunk->storage->udio);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return BLOSC2_ERROR_DATA;
@@ -2249,7 +2248,7 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
     size_t wbytes;
     if (frame->sframe) {
       // Update the offsets chunk in the chunks frame
-      fp = sframe_open_index(frame->urlpath, "rb+");
+      fp = sframe_open_index(frame->urlpath, "rb+", schunk->storage->udio);
       fseek(fp, header_len, SEEK_SET);
     }
     else {
@@ -2298,7 +2297,8 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   int32_t chunksize;
   int32_t nchunks;
   int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &blocksize, &chunksize,
-                           &nchunks, NULL, NULL, NULL, NULL, NULL, NULL);
+                           &nchunks, NULL, NULL, NULL, NULL, NULL, NULL,
+                           frame->schunk->storage->udio);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return NULL;
@@ -2453,7 +2453,8 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
           return NULL;
         }
       }
-      fp = sframe_open_index(frame->urlpath, "rb+");
+      fp = sframe_open_index(frame->urlpath, "rb+",
+                             frame->schunk->storage->udio);
       frame->schunk->storage->udio->seek(fp, header_len, SEEK_SET, NULL);
     }
     else {
@@ -2508,7 +2509,8 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
   int32_t nchunks;
   int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                            &blocksize, &chunksize, &nchunks,
-                           NULL, NULL, NULL, NULL, NULL, NULL);
+                           NULL, NULL, NULL, NULL, NULL, NULL,
+                           frame->schunk->storage->udio);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return NULL;
@@ -2639,7 +2641,8 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
         }
       }
       // Update the offsets chunk in the chunks frame
-      fp = sframe_open_index(frame->urlpath, "rb+");
+      fp = sframe_open_index(frame->urlpath, "rb+",
+                             frame->schunk->storage->udio);
       frame->schunk->storage->udio->seek(fp, header_len + 0, SEEK_SET, NULL);
     }
     else {
@@ -2694,7 +2697,8 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
   int32_t nchunks;
   int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                            &blocksize, &chunksize, &nchunks,
-                           NULL, NULL, NULL, NULL, NULL, NULL);
+                           NULL, NULL, NULL, NULL, NULL, NULL,
+                           frame->schunk->storage->udio);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return NULL;
@@ -2845,7 +2849,8 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
         }
       }
       // Update the offsets chunk in the chunks frame
-      fp = sframe_open_index(frame->urlpath, "rb+");
+      fp = sframe_open_index(frame->urlpath, "rb+",
+                             frame->schunk->storage->udio);
       frame->schunk->storage->udio->seek(fp, header_len + 0, SEEK_SET, NULL);
     }
     else {
@@ -2900,7 +2905,8 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int* offsets_order, blosc
   int32_t nchunks;
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                             &blocksize, &chunksize, &nchunks,
-                            NULL, NULL, NULL, NULL, NULL, NULL);
+                            NULL, NULL, NULL, NULL, NULL, NULL,
+                            frame->schunk->storage->udio);
   if (ret < 0) {
       BLOSC_TRACE_ERROR("Cannot get the header info for the frame.");
       return ret;
@@ -2977,7 +2983,8 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int* offsets_order, blosc
     void* fp = NULL;
     if (frame->sframe) {
       // Update the offsets chunk in the chunks frame
-      fp = sframe_open_index(frame->urlpath, "rb+");
+      fp = sframe_open_index(frame->urlpath, "rb+",
+                             frame->schunk->storage->udio);
       frame->schunk->storage->udio->seek(fp, header_len + 0, SEEK_SET, NULL);
     }
     else {
