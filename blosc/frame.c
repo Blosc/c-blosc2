@@ -1944,18 +1944,19 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     size_t leftover_block = chunk_nbytes % chunk_blocksize;
     nblocks = leftover_block ? nblocks + 1 : nblocks;
     // Allocate space for the lazy chunk
-    size_t trailer_len = sizeof(int32_t) + sizeof(int64_t) + nblocks * sizeof(int32_t);
+    size_t trailer_len;
     int32_t runlen_type = (header[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_RUNLEN_MASK;
     size_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH;
-    lazychunk_cbytes = trailer_offset;
     if (runlen_type == 0) {
       // Regular values have offsets for blocks
       trailer_offset += nblocks * sizeof(int32_t);
-      lazychunk_cbytes += trailer_len;
+      trailer_len = sizeof(int32_t) + sizeof(int64_t) + nblocks * sizeof(int32_t);
+      lazychunk_cbytes = trailer_offset + trailer_len;
     }
     else if (runlen_type == BLOSC2_VALUE_RUNLEN) {
       trailer_offset += typesize;
-      lazychunk_cbytes += typesize;
+      trailer_len = 0;
+      lazychunk_cbytes = trailer_offset + trailer_len;
     }
     else {
       rc = BLOSC2_ERROR_INVALID_HEADER;
@@ -1989,7 +1990,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
 
     // Add the trailer (currently, nchunk + offset + block_csizes)
     if (frame->sframe) {
-      *(int32_t*)(*chunk + trailer_offset) = offset;   // why not nchunk?
+      *(int32_t*)(*chunk + trailer_offset) = (int32_t)offset;   // offset is nchunk for sframes
       *(int64_t*)(*chunk + trailer_offset + sizeof(int32_t)) = offset;
     }
     else {
