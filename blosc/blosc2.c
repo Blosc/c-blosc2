@@ -1225,9 +1225,10 @@ int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8
 
 
 int32_t set_nans(int32_t typesize, uint8_t* dest, int32_t destsize) {
+  // destsize can only be a multiple of typesize (by construction)
   int32_t nitems = destsize / typesize;
-  if (nitems > destsize / typesize) {
-    nitems = destsize / typesize;
+  if (nitems == 0) {
+    return 0;
   }
 
   if (typesize == 4) {
@@ -1253,9 +1254,10 @@ int32_t set_nans(int32_t typesize, uint8_t* dest, int32_t destsize) {
 
 
 int32_t set_values(int32_t typesize, const uint8_t* src, uint8_t* dest, int32_t destsize) {
+  // destsize can only be a multiple of typesize (by construction)
   int32_t nitems = destsize / typesize;
-  if (nitems > destsize / typesize) {
-    nitems = destsize / typesize;
+  if (nitems == 0) {
+    return 0;
   }
 
   // Copy the value of the repeated value to dest
