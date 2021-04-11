@@ -696,6 +696,10 @@ int blosc_read_header(const uint8_t* src, int32_t srcsize, bool extended_header,
     BLOSC_TRACE_ERROR("`blocksize` is zero or greater than uncompressed size");
     return BLOSC2_ERROR_INVALID_HEADER;
   }
+  if (header->blocksize > BLOSC2_MAXBLOCKSIZE) {
+    BLOSC_TRACE_ERROR("`blocksize` greater than maximum allowed");
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
   if (header->typesize <= 0 || header->typesize > BLOSC_MAX_TYPESIZE) {
     BLOSC_TRACE_ERROR("`typesize` is zero or greater than max allowed.");
     return BLOSC2_ERROR_INVALID_HEADER;
