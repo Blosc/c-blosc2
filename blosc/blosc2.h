@@ -110,7 +110,7 @@ enum {
   BLOSC_BITSHUFFLE = 2,  //!< bit-wise shuffle
   BLOSC_DELTA = 3,       //!< delta filter
   BLOSC_TRUNC_PREC = 4,  //!< truncate precision filter
-  BLOSC_LAST_FILTER= 5,  //!< sentinel
+  BLOSC_LAST_FILTER = 5,  //!< sentinel
 };
 
 enum {
@@ -223,27 +223,27 @@ enum {
  * @brief Offsets for fields in Blosc2 chunk header
  */
 enum {
-    BLOSC2_CHUNK_VERSION = 0x0,       //!< the version for the chunk format
-    BLOSC2_CHUNK_VERSIONLZ = 0x1,     //!< the version for the format of internal codec
-    BLOSC2_CHUNK_FLAGS = 0x2,         //!< flags and codec info
-    BLOSC2_CHUNK_TYPESIZE = 0x3,      //!< (uint8) the number of bytes of the atomic type
-    BLOSC2_CHUNK_NBYTES = 0x4,        //!< (int32) uncompressed size of the buffer (this header is not included)
-    BLOSC2_CHUNK_BLOCKSIZE = 0x8,     //!< (int32) size of internal blocks
-    BLOSC2_CHUNK_CBYTES = 0xc,        //!< (int32) compressed size of the buffer (including this header)
-    BLOSC2_CHUNK_FILTER_CODES = 0x10, //!< the codecs for the filter pipeline (1 byte per code)
-    BLOSC2_CHUNK_FILTER_META = 0x18,  //!< meta info for the filter pipeline (1 byte per code)
-    BLOSC2_CHUNK_BLOSC2_FLAGS = 0x1F, //!< flags specific for Blosc2 functionality
+  BLOSC2_CHUNK_VERSION = 0x0,       //!< the version for the chunk format
+  BLOSC2_CHUNK_VERSIONLZ = 0x1,     //!< the version for the format of internal codec
+  BLOSC2_CHUNK_FLAGS = 0x2,         //!< flags and codec info
+  BLOSC2_CHUNK_TYPESIZE = 0x3,      //!< (uint8) the number of bytes of the atomic type
+  BLOSC2_CHUNK_NBYTES = 0x4,        //!< (int32) uncompressed size of the buffer (this header is not included)
+  BLOSC2_CHUNK_BLOCKSIZE = 0x8,     //!< (int32) size of internal blocks
+  BLOSC2_CHUNK_CBYTES = 0xc,        //!< (int32) compressed size of the buffer (including this header)
+  BLOSC2_CHUNK_FILTER_CODES = 0x10, //!< the codecs for the filter pipeline (1 byte per code)
+  BLOSC2_CHUNK_FILTER_META = 0x18,  //!< meta info for the filter pipeline (1 byte per code)
+  BLOSC2_CHUNK_BLOSC2_FLAGS = 0x1F, //!< flags specific for Blosc2 functionality
 };
 
 /**
  * @brief Run lengths for special values for chunks/frames
  */
 enum {
-    BLOSC2_NO_RUNLEN = 0x0,       //!< no run-length
-    BLOSC2_ZERO_RUNLEN = 0x1,     //!< zero run-length
-    BLOSC2_NAN_RUNLEN = 0x2,      //!< NaN run-length
-    BLOSC2_VALUE_RUNLEN = 0x3,    //!< generic value run-length
-    BLOSC2_RUNLEN_MASK = 0x3      //!< run-length value mask
+  BLOSC2_NO_RUNLEN = 0x0,       //!< no run-length
+  BLOSC2_ZERO_RUNLEN = 0x1,     //!< zero run-length
+  BLOSC2_NAN_RUNLEN = 0x2,      //!< NaN run-length
+  BLOSC2_VALUE_RUNLEN = 0x3,    //!< generic value run-length
+  BLOSC2_RUNLEN_MASK = 0x3      //!< run-length value mask
 };
 
 /**
@@ -278,7 +278,6 @@ enum {
   BLOSC2_ERROR_FILE_TRUNCATE = -25,   //!< File truncate failure
   BLOSC2_ERROR_THREAD_CREATE = -26,   //!< Thread or thread context creation failure
   BLOSC2_ERROR_POSTFILTER = -27,      //!< Postfilter failure
-
 };
 
 /**
