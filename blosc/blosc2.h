@@ -325,7 +325,8 @@ enum {
   BLOSC2_ERROR_POSTFILTER = -27,      //!< Postfilter failure
   BLOSC2_ERROR_FRAME_SPECIAL = -28,   //!< Special frame failure
   BLOSC2_ERROR_SCHUNK_SPECIAL = -29,  //!< Special super-chunk failure
-  BLOSC2_ERROR_PLUGIN_IO = -30,              //!< IO plugin error
+  BLOSC2_ERROR_PLUGIN_IO = -30,       //!< IO plugin error
+  BLOSC2_ERROR_FILE_REMOVE = -31,     //!< Remove file failure
 };
 
 /**
@@ -1522,6 +1523,17 @@ BLOSC_EXPORT int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, u
  * detected, this number will be negative.
  */
 BLOSC_EXPORT int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy);
+
+/**
+ * @brief Delete a chunk at a specific position in a super-chunk.
+ *
+ * @param schunk The super-chunk where the chunk will be deleted.
+ * @param nchunk The position where the chunk will be deleted.
+ *
+ * @return The number of chunks in super-chunk. If some problem is
+ * detected, this number will be negative.
+ */
+BLOSC_EXPORT int blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int nchunk);
 
 /**
  * @brief Append a @p src data buffer to a super-chunk.

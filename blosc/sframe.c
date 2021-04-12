@@ -75,6 +75,17 @@ void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int32_t nchunk,
   return frame;
 }
 
+/* Append an existing chunk into a sparse frame. */
+int sframe_delete_chunk(const char *urlpath, int32_t nchunk) {
+  char* chunk_path = malloc(strlen(urlpath) + 1 + 8 + strlen(".chunk") + 1);
+  if (chunk_path) {
+    sprintf(chunk_path, "%s/%08X.chunk", urlpath, (unsigned int)nchunk);
+    int rc = remove(chunk_path);
+    free(chunk_path);
+    return rc;
+  }
+  return BLOSC2_ERROR_FILE_REMOVE;
+}
 
 /* Get chunk from sparse frame. */
 int sframe_get_chunk(blosc2_frame_s* frame, int32_t nchunk, uint8_t** chunk, bool* needs_free){
