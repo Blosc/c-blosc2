@@ -107,7 +107,7 @@ static char *test_postfilter0(void) {
 
   /* Decompress  */
   dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, (size_t)dsize);
-  mu_assert("Decompression error", dsize > 0);
+  mu_assert("Decompression error", dsize >= 0);
 
   for (int i = 0; i < SIZE; i++) {
     mu_assert("Decompressed data differs from original!", data[i] * 2 == data_dest[i]);
@@ -146,7 +146,7 @@ static char *test_postfilter1(void) {
 
   /* Decompress  */
   dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, (size_t)dsize);
-  mu_assert("Decompression error", dsize > 0);
+  mu_assert("Decompression error", dsize >= 0);
 
   for (int i = 0; i < SIZE; i++) {
     mu_assert("Decompressed data differs from original!", data[i] * 3 == data_dest[i]);
@@ -188,7 +188,7 @@ static char *test_postfilter2(void) {
 
   /* Decompress  */
   dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, (size_t)dsize);
-  mu_assert("Decompression error", dsize > 0);
+  mu_assert("Decompression error", dsize >= 0);
 
   for (int i = 0; i < SIZE; i++) {
     if ((data[i] + data2[i]) != data_dest[i]) {

@@ -368,7 +368,7 @@ BLOSC_EXPORT int blosc_compress(int clevel, int doshuffle, size_t typesize,
  *
  * @return The number of bytes decompressed.
  * If an error occurs, e.g. the compressed data is corrupted or the
- * output buffer is not large enough, then 0 (zero) or a negative value
+ * output buffer is not large enough, then a negative value
  * will be returned instead.
  *
  * This function supports all the configuration based environment variables
@@ -947,7 +947,7 @@ BLOSC_EXPORT int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
  *
  * @return The number of bytes decompressed.
  * If an error occurs, e.g. the compressed data is corrupted or the
- * output buffer is not large enough, then 0 (zero) or a negative value
+ * output buffer is not large enough, then a negative value
  * will be returned instead.
 */
 /*
@@ -1025,7 +1025,7 @@ BLOSC_EXPORT int blosc2_compress_ctx(
  * @return The number of bytes decompressed (i.e. the maskout blocks are not
  * counted). If an error occurs, e.g. the compressed data is corrupted,
  * @p destsize is not large enough or context is not meant for decompression,
- * then 0 (zero) or a negative value will be returned instead.
+ * then a negative value will be returned instead.
  */
 BLOSC_EXPORT int blosc2_decompress_ctx(blosc2_context* context, const void* src,
                                        int32_t srcsize, void* dest, int32_t destsize);

@@ -692,7 +692,7 @@ int read_chunk_header(const uint8_t* src, int32_t srcsize, bool extended_header,
     BLOSC_TRACE_ERROR("`cbytes` is too small to read min header.");
     return BLOSC2_ERROR_INVALID_HEADER;
   }
-  if (header->blocksize <= 0 || header->blocksize > header->nbytes) {
+  if (header->blocksize <= 0 || (header->nbytes > 0 && (header->blocksize > header->nbytes))) {
     BLOSC_TRACE_ERROR("`blocksize` is zero or greater than uncompressed size");
     return BLOSC2_ERROR_INVALID_HEADER;
   }
