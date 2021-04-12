@@ -142,17 +142,25 @@ for encoding blocks with a filter pipeline::
         or it is in the global `flags` for chunk.
     :bit 3 (``0x08``):
         Whether the chunk is 'lazy' or not.
-    :bits 4 and 5:
-        Indicate run-lengths for the entire chunk.
+    :bits 4, 5 and 6:
+        Indicate special values for the entire chunk.
 
             :``0``:
-                No run.
+                No special values.
             :``1``:
                 A run of zeros.
             :``2``:
                 A run of NaN (Not-a-Number) floats (whether f32 or f64 depends on typesize).
             :``3``:
                 Run-length of a value that follows the header (i.e. no blocks section).
+            :``4``:
+                Values that are not initialized.
+            :``5``:
+                Reserved.
+            :``6``:
+                Reserved.
+            :``7``:
+                Reserved.
 
 
 Blocks

@@ -31,6 +31,7 @@ enum {
   CHECK_ZEROS = 1,
   CHECK_NANS = 2,
   CHECK_VALUES = 3,
+  CHECK_UNINIT = 4,
 };
 
 typedef struct {
@@ -53,6 +54,7 @@ CUTEST_TEST_SETUP(zero_runlen) {
   CUTEST_PARAMETRIZE(svalue, int, CUTEST_DATA(
       ZERO_DETECTION,
       CHECK_ZEROS,
+      CHECK_UNINIT,
       CHECK_NANS,
       CHECK_VALUES
   ));
@@ -69,11 +71,6 @@ CUTEST_TEST_TEST(zero_runlen) {
 
   CUTEST_GET_PARAMETER(svalue, int);
   CUTEST_GET_PARAMETER(backend, test_zero_runlen_backend);
-
-  /* Free resources */
-  if (backend.urlpath != NULL && backend.contiguous == false) {
-    blosc2_remove_dir(backend.urlpath);
-  }
 
   blosc2_schunk *schunk;
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -109,6 +106,9 @@ CUTEST_TEST_TEST(zero_runlen) {
         break;
       case CHECK_ZEROS:
         csize = blosc2_chunk_zeros(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+        break;
+      case CHECK_UNINIT:
+        csize = blosc2_chunk_uninit(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
         break;
       case CHECK_NANS:
         csize = blosc2_chunk_nans(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
@@ -155,11 +155,15 @@ CUTEST_TEST_TEST(zero_runlen) {
         CUTEST_ASSERT("Error in getitem of a special value", rc >= 0);
         CUTEST_ASSERT("Wrong value!", isnan(fvalue));
         break;
-      default:
-        // It can only be zeros
+      case CHECK_ZEROS:
         rc = blosc_getitem(chunk_, nchunk, 1, &value);
         CUTEST_ASSERT("Error in getitem of a special value", rc >= 0);
         CUTEST_ASSERT("Wrong value!", value == 0);
+        break;
+      default:
+        // It can only be non initialized values
+        rc = blosc_getitem(chunk_, nchunk, 1, &value);
+        CUTEST_ASSERT("Error in getitem of a special value", rc >= 0);
     }
     if (needs_free) {
       free(chunk_);
@@ -170,8 +174,8 @@ CUTEST_TEST_TEST(zero_runlen) {
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) rec_buffer, isize);
     CUTEST_ASSERT("Decompression error", dsize >= 0);
-
     CUTEST_ASSERT("Dest size is not equal to src size", dsize == (int)isize);
+
     if (svalue == CHECK_VALUES) {
       int32_t* buffer = (int32_t*)rec_buffer;
       for (int i = 0; i < CHUNKSIZE; i++) {
@@ -184,11 +188,14 @@ CUTEST_TEST_TEST(zero_runlen) {
         CUTEST_ASSERT("Value is not correct in chunk", isnan(buffer[i]));
       }
     }
-    else {
-      int32_t* buffer = (int32_t*)rec_buffer;
+    else if (svalue == CHECK_ZEROS) {
+      float* buffer = (float*)rec_buffer;
       for (int i = 0; i < CHUNKSIZE; i++) {
         CUTEST_ASSERT("Value is not correct in chunk", buffer[i] == 0);
       }
+    }
+    else {
+      // We can't do any check for non initialized values
     }
   }
 

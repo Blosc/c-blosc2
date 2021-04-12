@@ -239,11 +239,12 @@ enum {
  * @brief Run lengths for special values for chunks/frames
  */
 enum {
-  BLOSC2_NO_RUNLEN = 0x0,       //!< no run-length
+  BLOSC2_NO_SPECIAL = 0x0,      //!< no run-length
   BLOSC2_ZERO_RUNLEN = 0x1,     //!< zero run-length
   BLOSC2_NAN_RUNLEN = 0x2,      //!< NaN run-length
   BLOSC2_VALUE_RUNLEN = 0x3,    //!< generic value run-length
-  BLOSC2_RUNLEN_MASK = 0x3      //!< run-length value mask
+  BLOSC2_UNINIT_VALUE = 0x4,    //!< non initialized values
+  BLOSC2_SPECIAL_MASK = 0x7     //!< special value mask (prev IDs cannot be larger than this)
 };
 
 /**
@@ -1078,6 +1079,22 @@ BLOSC_EXPORT int blosc2_chunk_nans(blosc2_cparams cparams, size_t nbytes,
  * */
 BLOSC_EXPORT int blosc2_chunk_repeatval(blosc2_cparams cparams, size_t nbytes,
                                         void* dest, size_t destsize, void* repeatval);
+
+
+/**
+ * @brief Create a chunk made of uninitialized values.
+ *
+ * @param cparams The compression parameters.
+ * @param nbytes The size (in bytes) of the chunk.
+ * @param dest The buffer where the data chunk will be put.
+ * @param destsize The size (in bytes) of the @p dest buffer;
+ * must be BLOSC_EXTENDED_HEADER_LENGTH at least.
+ *
+ * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH).
+ * If negative, there has been an error and @dest is unusable.
+ * */
+BLOSC_EXPORT int blosc2_chunk_uninit(blosc2_cparams cparams, size_t nbytes,
+                                     void* dest, size_t destsize);
 
 
 /**

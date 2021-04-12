@@ -28,6 +28,7 @@ enum {
   CHECK_ZEROS = 1,
   CHECK_NANS = 2,
   CHECK_VALUES = 3,
+  CHECK_UNINIT = 4,
 };
 #define REPEATED_VALUE 1
 
@@ -60,44 +61,49 @@ int check_special_values(int svalue) {
   blosc2_storage storage = {.cparams=&cparams, .contiguous=false};
   schunk = blosc2_schunk_new(&storage);
 
+  void* chunk = malloc(BLOSC_EXTENDED_HEADER_LENGTH + isize);
+
+  // Cache the special chunks
+  switch (svalue) {
+    case ZERO_DETECTION:
+      memset(data_buffer, 0, isize);
+      csize = blosc2_compress(5, 1, sizeof(int32_t), data_buffer, isize, chunk, osize);
+      break;
+    case CHECK_ZEROS:
+      csize = blosc2_chunk_zeros(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+      break;
+    case CHECK_UNINIT:
+      csize = blosc2_chunk_uninit(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+      break;
+    case CHECK_NANS:
+      csize = blosc2_chunk_nans(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+      break;
+    case CHECK_VALUES:
+      csize = blosc2_chunk_repeatval(cparams, isize, chunk,
+                                     BLOSC_EXTENDED_HEADER_LENGTH + sizeof(int32_t), &value);
+      break;
+    default:
+      printf("Unknown case\n");
+      exit(1);
+  }
+  if (csize < 0) {
+    printf("Error creating chunk: %d\n", csize);
+    exit(1);
+  }
+
   /* Append the chunks */
   blosc_set_timestamp(&last);
-  void* chunk = malloc(BLOSC_EXTENDED_HEADER_LENGTH + isize);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    switch (svalue) {
-      case ZERO_DETECTION:
-        memset(data_buffer, 0, isize);
-        csize = blosc2_compress(5, 1, sizeof(int32_t), data_buffer, isize, chunk, osize);
-        break;
-      case CHECK_ZEROS:
-        csize = blosc2_chunk_zeros(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
-        break;
-      case CHECK_NANS:
-        csize = blosc2_chunk_nans(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
-        break;
-      case CHECK_VALUES:
-        csize = blosc2_chunk_repeatval(cparams, isize, chunk,
-                                       BLOSC_EXTENDED_HEADER_LENGTH + sizeof(int32_t), &value);
-        break;
-      default:
-        printf("Unrecognized case");
-        exit(1);
-    }
-    if (csize < 0) {
-      printf("Error creating chunk: %d\n", csize);
-      exit(1);
-    }
     nchunks = blosc2_schunk_append_chunk(schunk, chunk, true);
     if (nchunks < 0) {
       printf("Error appending chunk: %d\n", nchunks);
       exit(1);
     }
   }
-
   blosc_set_timestamp(&current);
   free(chunk);
   totaltime = blosc_elapsed_secs(last, current);
-  printf("[Compr] Elapsed time:\t %6.3f s."
+  printf("\n[Compr] Elapsed time:\t %6.3f s."
                  "  Processed data: %.3f GB (%.3f GB/s)\n",
          totaltime, totalsize / GB, totalsize / (GB * totaltime));
 
@@ -157,17 +163,24 @@ int check_special_values(int svalue) {
           exit(1);
         }
         break;
-      default:
-        // It can only be zeros
+      case CHECK_ZEROS:
         rc = blosc_getitem(chunk_, nchunk, 1, &value);
         if (rc < 0) {
-          printf("Error in getitem of a special value\n");
+          printf("Error in getitem of zeros value\n");
           return rc;
         }
         if (value != 0) {
-        printf("Wrong value!");
-        exit(1);
-      }
+          printf("Wrong value!");
+          exit(1);
+        }
+        break;
+      default:
+        // It can only be non-initialized
+        rc = blosc_getitem(chunk_, nchunk, 1, &value);
+        if (rc < 0) {
+          printf("Error in getitem of an non-initialized value\n");
+          return rc;
+        }
     }
     if (needs_free) {
       free(chunk_);
@@ -242,6 +255,11 @@ int main(void) {
   }
   printf("*** Testing repeated values...");
   rc = check_special_values(CHECK_VALUES);
+  if (rc < 0) {
+    return rc;
+  }
+  printf("*** Testing non-initialized values...");
+  rc = check_special_values(CHECK_UNINIT);
   if (rc < 0) {
     return rc;
   }

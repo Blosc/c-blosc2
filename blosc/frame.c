@@ -1722,7 +1722,7 @@ int get_coffset(blosc2_frame_s* frame, int32_t header_len, int64_t cbytes, int32
 }
 
 
-// Detect and return a chunk with special values in offsets (only zeros and NaNs)
+// Detect and return a chunk with special values in offsets (only zeros, NaNs and non initialized)
 int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize, int32_t blocksize,
                         uint8_t** chunk, int32_t cbytes, bool *needs_free) {
   int rc = 0;
@@ -1730,8 +1730,9 @@ int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize,
   *needs_free = true;
 
   // Detect the kind of special value
-  uint64_t zeros_mask = (uint64_t) BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
-  uint64_t nans_mask = (uint64_t) BLOSC2_NAN_RUNLEN << (8 * 7);  // indicate a chunk of zeros
+  uint64_t zeros_mask = (uint64_t) BLOSC2_ZERO_RUNLEN << (8 * 7);  // chunk of zeros
+  uint64_t nans_mask = (uint64_t) BLOSC2_NAN_RUNLEN << (8 * 7);  // chunk of NaNs
+  uint64_t uninit_mask = (uint64_t) BLOSC2_UNINIT_VALUE << (8 * 7);  // chunk of uninit values
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = typesize;
@@ -1740,6 +1741,12 @@ int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize,
     rc = blosc2_chunk_zeros(cparams, nbytes, *chunk, cbytes);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Error creating a zero chunk");
+    }
+  }
+  else if (special_value & uninit_mask) {
+    rc = blosc2_chunk_uninit(cparams, nbytes, *chunk, cbytes);
+    if (rc < 0) {
+      BLOSC_TRACE_ERROR("Error creating a non initialized chunk");
     }
   }
   else if (special_value & nans_mask) {
@@ -1948,15 +1955,15 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     nblocks = leftover_block ? nblocks + 1 : nblocks;
     // Allocate space for the lazy chunk
     size_t trailer_len;
-    int32_t runlen_type = (header[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_RUNLEN_MASK;
+    int32_t special_type = (header[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
     size_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH;
-    if (runlen_type == 0) {
+    if (special_type == 0) {
       // Regular values have offsets for blocks
       trailer_offset += nblocks * sizeof(int32_t);
       trailer_len = sizeof(int32_t) + sizeof(int64_t) + nblocks * sizeof(int32_t);
       lazychunk_cbytes = trailer_offset + trailer_len;
     }
-    else if (runlen_type == BLOSC2_VALUE_RUNLEN) {
+    else if (special_type == BLOSC2_VALUE_RUNLEN) {
       trailer_offset += typesize;
       trailer_len = 0;
       lazychunk_cbytes = trailer_offset + trailer_len;
@@ -1982,7 +1989,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
       rc = BLOSC2_ERROR_FILE_READ;
       goto end;
     }
-    if (runlen_type == BLOSC2_VALUE_RUNLEN) {
+    if (special_type == BLOSC2_VALUE_RUNLEN) {
       // Value runlen is not returning a lazy chunk.  We are done.
       goto end;
     }
@@ -2155,18 +2162,24 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   }
 
   // Add the new offset
-  int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
+  int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
   uint64_t offset_value = ((uint64_t)1 << 63);
   switch (special_value) {
     case BLOSC2_ZERO_RUNLEN:
       // Zero chunk.  Code it in a special way.
-      offset_value += (uint64_t) BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
+      offset_value += (uint64_t) BLOSC2_ZERO_RUNLEN << (8 * 7);  // chunk of zeros
+      to_little(offsets + nchunks, &offset_value, sizeof(uint64_t));
+      chunk_cbytes = 0;   // we don't need to store the chunk
+      break;
+    case BLOSC2_UNINIT_VALUE:
+      // Non initizalized values chunk.  Code it in a special way.
+      offset_value += (uint64_t) BLOSC2_UNINIT_VALUE << (8 * 7);  // chunk of uninit values
       to_little(offsets + nchunks, &offset_value, sizeof(uint64_t));
       chunk_cbytes = 0;   // we don't need to store the chunk
       break;
     case BLOSC2_NAN_RUNLEN:
       // NaN chunk.  Code it in a special way.
-      offset_value += (uint64_t)BLOSC2_NAN_RUNLEN << (8 * 7);  // indicate a chunk of NANs
+      offset_value += (uint64_t)BLOSC2_NAN_RUNLEN << (8 * 7);  // chunk of NANs
       to_little(offsets + nchunks, &offset_value, sizeof(uint64_t));
       chunk_cbytes = 0;   // we don't need to store the chunk
       break;
@@ -2324,12 +2337,21 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
   // TODO: Improvement: Check if new chunk is smaller than previous one
 
   // Add the new offset
-  int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
+  int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
   uint64_t offset_value = ((uint64_t)1 << 63);
   switch (special_value) {
     case BLOSC2_ZERO_RUNLEN:
       // Zero chunk.  Code it in a special way.
       offset_value += (uint64_t)BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
+      for (int i = nchunks; i > nchunk; i--) {
+        offsets[i] = offsets[i - 1];
+      }
+      to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
+      chunk_cbytes = 0;   // we don't need to store the chunk
+      break;
+    case BLOSC2_UNINIT_VALUE:
+      // Non initizalized values chunk.  Code it in a special way.
+      offset_value += (uint64_t) BLOSC2_UNINIT_VALUE << (8 * 7);  // chunk of uninit values
       for (int i = nchunks; i > nchunk; i--) {
         offsets[i] = offsets[i - 1];
       }
@@ -2529,12 +2551,18 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
   }
 
   // Add the new offset
-  int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x30) >> 4;
+  int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
   uint64_t offset_value = ((uint64_t)1 << 63);
   switch (special_value) {
     case BLOSC2_ZERO_RUNLEN:
       // Zero chunk.  Code it in a special way.
       offset_value += (uint64_t)BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
+      to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
+      chunk_cbytes = 0;   // we don't need to store the chunk
+      break;
+    case BLOSC2_UNINIT_VALUE:
+      // Non initizalized values chunk.  Code it in a special way.
+      offset_value += (uint64_t)BLOSC2_UNINIT_VALUE << (8 * 7);  // indicate a chunk of uninit values
       to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
       chunk_cbytes = 0;   // we don't need to store the chunk
       break;
