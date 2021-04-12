@@ -1031,8 +1031,8 @@ BLOSC_EXPORT int blosc2_decompress_ctx(blosc2_context* context, const void* src,
 /**
  * @brief Create a chunk made of zeros.
  *
+ * @param cparams The compression parameters.
  * @param nbytes The size (in bytes) of the chunk.
- * @param typesize The size (in bytes) of the type.
  * @param dest The buffer where the data chunk will be put.
  * @param destsize The size (in bytes) of the @p dest buffer;
  * must be BLOSC_EXTENDED_HEADER_LENGTH at least.
@@ -1047,9 +1047,9 @@ BLOSC_EXPORT int blosc2_chunk_zeros(blosc2_cparams cparams, size_t nbytes,
 /**
  * @brief Create a chunk made of nans.
  *
- * @param nbytes The size (in bytes) of the chunk.
- * @param typesize The size (in bytes) of the type;
+ * @param cparams The compression parameters;
  * only 4 bytes (float) and 8 bytes (double) are supported.
+ * @param nbytes The size (in bytes) of the chunk.
  * @param dest The buffer where the data chunk will be put.
  * @param destsize The size (in bytes) of the @p dest buffer;
  * must be BLOSC_EXTENDED_HEADER_LENGTH at least.
@@ -1066,8 +1066,8 @@ BLOSC_EXPORT int blosc2_chunk_nans(blosc2_cparams cparams, size_t nbytes,
 /**
  * @brief Create a chunk made of repeated values.
  *
+ * @param cparams The compression parameters.
  * @param nbytes The size (in bytes) of the chunk.
- * @param typesize The size (in bytes) of the type.
  * @param dest The buffer where the data chunk will be put.
  * @param destsize The size (in bytes) of the @p dest buffer.
  * @param repeatval A pointer to the repeated value (little endian).
