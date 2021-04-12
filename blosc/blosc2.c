@@ -1225,6 +1225,7 @@ int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8
 
 
 int32_t set_nans(int32_t typesize, uint8_t* dest, int32_t destsize) {
+  // destsize can only be a multiple of typesize
   if (destsize % typesize != 0) {
     return -1;
   }
@@ -1256,6 +1257,16 @@ int32_t set_nans(int32_t typesize, uint8_t* dest, int32_t destsize) {
 
 
 int32_t set_values(int32_t typesize, const uint8_t* src, uint8_t* dest, int32_t destsize) {
+  // destsize can only be a multiple of typesize
+  int64_t val8;
+  int64_t* dest8;
+  int32_t val4;
+  int32_t* dest4;
+  int16_t val2;
+  int16_t* dest2;
+  int8_t val1;
+  int8_t* dest1;
+
   if (destsize % typesize != 0) {
     return -1;
   }
@@ -1264,32 +1275,31 @@ int32_t set_values(int32_t typesize, const uint8_t* src, uint8_t* dest, int32_t 
     return 0;
   }
 
-  // Copy the value of the repeated value to dest
-  int64_t val8 = ((int64_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
-  int64_t* dest8 = (int64_t*)dest;
-  int32_t val4 = ((int32_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
-  int32_t* dest4 = (int32_t*)dest;
-  int16_t val2 = ((int16_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
-  int16_t* dest2 = (int16_t*)dest;
-  int8_t val1 = ((int8_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
-  int8_t* dest1 = (int8_t*)dest;
   switch (typesize) {
     case 8:
+      val8 = ((int64_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
+      dest8 = (int64_t*)dest;
       for (int i = 0; i < nitems; i++) {
         dest8[i] = val8;
       }
       break;
     case 4:
+      val4 = ((int32_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
+      dest4 = (int32_t*)dest;
       for (int i = 0; i < nitems; i++) {
         dest4[i] = val4;
       }
       break;
     case 2:
+      val2 = ((int16_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
+      dest2 = (int16_t*)dest;
       for (int i = 0; i < nitems; i++) {
         dest2[i] = val2;
       }
       break;
     case 1:
+      val1 = ((int8_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
+      dest1 = (int8_t*)dest;
       for (int i = 0; i < nitems; i++) {
         dest1[i] = val1;
       }
