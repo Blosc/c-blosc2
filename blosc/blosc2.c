@@ -1499,24 +1499,26 @@ static int blosc_d(
     int32_t block_csize = block_csizes[nblock];
     // Read the lazy block on disk
     void* fp = NULL;
+    blosc2_io *io = context->schunk->storage->udio;
+
     if (frame->sframe) {
       // The chunk is not in the frame
       char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
       BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
       sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
-      fp = context->schunk->storage->udio->open(chunkpath, "rb", NULL);
+      fp = io->open(chunkpath, "rb", io->params);
       free(chunkpath);
       // The offset of the block is src_offset
-      context->schunk->storage->udio->seek(fp, src_offset, SEEK_SET, NULL);
+      io->seek(fp, src_offset, SEEK_SET, io->params);
     }
     else {
-      fp = context->schunk->storage->udio->open(urlpath, "rb", NULL);
+      fp = io->open(urlpath, "rb", io->params);
       // The offset of the block is src_offset
-      context->schunk->storage->udio->seek(fp, chunk_offset + src_offset, SEEK_SET, NULL);
+      io->seek(fp, chunk_offset + src_offset, SEEK_SET, io->params);
     }
     // We can make use of tmp3 because it will be used after src is not needed anymore
-    size_t rbytes = context->schunk->storage->udio->read(tmp3, 1, block_csize, fp, NULL);
-   context->schunk->storage->udio->close(fp, NULL);
+    size_t rbytes = io->read(tmp3, 1, block_csize, fp, io->params);
+    io->close(fp, io->params);
     if ((int32_t)rbytes != block_csize) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");
       return BLOSC2_ERROR_READ_BUFFER;
