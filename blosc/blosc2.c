@@ -1938,21 +1938,19 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
 
   context->runlen_type = (header->blosc2_flags >> 4) & BLOSC2_RUNLEN_MASK;
 
-  if (context->runlen_type == BLOSC2_NO_RUNLEN) {
-    context->bstarts = (int32_t *) (context->src + context->header_overhead);
-    if (context->header_flags & (uint8_t) BLOSC_MEMCPYED) {
-      /* If chunk is a memcpy, bstarts does not exist */
-      bstarts_end = context->header_overhead;
-    } else {
-      bstarts_end = context->header_overhead + (context->nblocks * sizeof(int32_t));
-    }
-
-    if (srcsize < bstarts_end) {
-      BLOSC_TRACE_ERROR("`bstarts` exceeds length of source buffer.");
-      return BLOSC2_ERROR_READ_BUFFER;
-    }
-    srcsize -= bstarts_end;
+  context->bstarts = (int32_t *) (context->src + context->header_overhead);
+  bstarts_end = context->header_overhead;
+  if ((context->runlen_type == BLOSC2_NO_RUNLEN) &&
+      (!(context->header_flags & (uint8_t) BLOSC_MEMCPYED))) {
+    /* If chunk is not special or a memcpy, we do have a bstarts section */
+    bstarts_end = context->header_overhead + (context->nblocks * sizeof(int32_t));
   }
+
+  if (srcsize < bstarts_end) {
+    BLOSC_TRACE_ERROR("`bstarts` exceeds length of source buffer.");
+    return BLOSC2_ERROR_READ_BUFFER;
+  }
+  srcsize -= bstarts_end;
 
   /* Read optional dictionary if flag set */
   if (context->blosc2_flags & BLOSC2_USEDICT) {
