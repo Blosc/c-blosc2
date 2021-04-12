@@ -1225,7 +1225,9 @@ int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8
 
 
 int32_t set_nans(int32_t typesize, uint8_t* dest, int32_t destsize) {
-  // destsize can only be a multiple of typesize (by construction)
+  if (destsize % typesize != 0) {
+    return -1;
+  }
   int32_t nitems = destsize / typesize;
   if (nitems == 0) {
     return 0;
@@ -1254,7 +1256,9 @@ int32_t set_nans(int32_t typesize, uint8_t* dest, int32_t destsize) {
 
 
 int32_t set_values(int32_t typesize, const uint8_t* src, uint8_t* dest, int32_t destsize) {
-  // destsize can only be a multiple of typesize (by construction)
+  if (destsize % typesize != 0) {
+    return -1;
+  }
   int32_t nitems = destsize / typesize;
   if (nitems == 0) {
     return 0;
@@ -1413,13 +1417,22 @@ static int blosc_d(
       // We are making use of a postfilter, so use a temp for destination
       _dest = tmp;
     }
+    rc = 0;
     switch (context->runlen_type) {
       case BLOSC2_VALUE_RUNLEN:
         // All repeated values
         rc = set_values(context->typesize, context->src, _dest, bsize_);
+        if (rc < 0) {
+          BLOSC_TRACE_ERROR("set_values failed");
+          return BLOSC2_ERROR_DATA;
+        }
         break;
       case BLOSC2_NAN_RUNLEN:
         rc = set_nans(context->typesize, _dest, bsize_);
+        if (rc < 0) {
+          BLOSC_TRACE_ERROR("set_nans failed");
+          return BLOSC2_ERROR_DATA;
+        }
         break;
       case BLOSC2_ZERO_RUNLEN:
         memset(_dest, 0, bsize_);
