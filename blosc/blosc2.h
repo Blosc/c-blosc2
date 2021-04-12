@@ -376,58 +376,6 @@ BLOSC_EXPORT int blosc_decompress(const void* src, void* dest, size_t destsize);
 
 
 /**
- * @brief Create a chunk made of zeros.
- *
- * @param nbytes The size (in bytes) of the chunk.
- * @param typesize The size (in bytes) of the type.
- * @param dest The buffer where the data chunk will be put.
- * @param destsize The size (in bytes) of the @p dest buffer;
- * must be BLOSC_EXTENDED_HEADER_LENGTH at least.
- *
- * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH).
- * If negative, there has been an error and @dest is unusable.
- * */
-BLOSC_EXPORT int blosc2_chunk_zeros(size_t nbytes, size_t typesize,
-                                    void* dest, size_t destsize);
-
-
-/**
- * @brief Create a chunk made of nans.
- *
- * @param nbytes The size (in bytes) of the chunk.
- * @param typesize The size (in bytes) of the type;
- * only 4 bytes (float) and 8 bytes (double) are supported.
- * @param dest The buffer where the data chunk will be put.
- * @param destsize The size (in bytes) of the @p dest buffer;
- * must be BLOSC_EXTENDED_HEADER_LENGTH at least.
- *
- * @note Whether the NaNs are floats or doubles will be given by the typesize.
- *
- * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH).
- * If negative, there has been an error and @dest is unusable.
- * */
-BLOSC_EXPORT int blosc2_chunk_nans(size_t nbytes, size_t typesize,
-                                   void* dest, size_t destsize);
-
-
-/**
- * @brief Create a chunk made of repeated values.
- *
- * @param nbytes The size (in bytes) of the chunk.
- * @param typesize The size (in bytes) of the type.
- * @param dest The buffer where the data chunk will be put.
- * @param destsize The size (in bytes) of the @p dest buffer.
- * @param repeatval A pointer to the repeated value (little endian).
- * The size of the value is given by @p typesize param.
- *
- * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH + typesize).
- * If negative, there has been an error and @dest is unusable.
- * */
-BLOSC_EXPORT int blosc2_chunk_repeatval(size_t nbytes, size_t typesize,
-                                        void* dest, size_t destsize, void* repeatval);
-
-
-/**
  * @brief Get @p nitems (of @p typesize size) in @p src buffer starting in @p start.
  * The items are returned in @p dest buffer, which has to have enough
  * space for storing all items.
@@ -1079,6 +1027,58 @@ BLOSC_EXPORT int blosc2_compress_ctx(
  */
 BLOSC_EXPORT int blosc2_decompress_ctx(blosc2_context* context, const void* src,
                                        int32_t srcsize, void* dest, int32_t destsize);
+
+/**
+ * @brief Create a chunk made of zeros.
+ *
+ * @param nbytes The size (in bytes) of the chunk.
+ * @param typesize The size (in bytes) of the type.
+ * @param dest The buffer where the data chunk will be put.
+ * @param destsize The size (in bytes) of the @p dest buffer;
+ * must be BLOSC_EXTENDED_HEADER_LENGTH at least.
+ *
+ * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH).
+ * If negative, there has been an error and @dest is unusable.
+ * */
+BLOSC_EXPORT int blosc2_chunk_zeros(blosc2_cparams cparams, size_t nbytes,
+                                    void* dest, size_t destsize);
+
+
+/**
+ * @brief Create a chunk made of nans.
+ *
+ * @param nbytes The size (in bytes) of the chunk.
+ * @param typesize The size (in bytes) of the type;
+ * only 4 bytes (float) and 8 bytes (double) are supported.
+ * @param dest The buffer where the data chunk will be put.
+ * @param destsize The size (in bytes) of the @p dest buffer;
+ * must be BLOSC_EXTENDED_HEADER_LENGTH at least.
+ *
+ * @note Whether the NaNs are floats or doubles will be given by the typesize.
+ *
+ * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH).
+ * If negative, there has been an error and @dest is unusable.
+ * */
+BLOSC_EXPORT int blosc2_chunk_nans(blosc2_cparams cparams, size_t nbytes,
+                                   void* dest, size_t destsize);
+
+
+/**
+ * @brief Create a chunk made of repeated values.
+ *
+ * @param nbytes The size (in bytes) of the chunk.
+ * @param typesize The size (in bytes) of the type.
+ * @param dest The buffer where the data chunk will be put.
+ * @param destsize The size (in bytes) of the @p dest buffer.
+ * @param repeatval A pointer to the repeated value (little endian).
+ * The size of the value is given by @p typesize param.
+ *
+ * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH + typesize).
+ * If negative, there has been an error and @dest is unusable.
+ * */
+BLOSC_EXPORT int blosc2_chunk_repeatval(blosc2_cparams cparams, size_t nbytes,
+                                        void* dest, size_t destsize, void* repeatval);
+
 
 /**
  * @brief Context interface counterpart for #blosc_getitem.

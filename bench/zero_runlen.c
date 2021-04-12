@@ -21,7 +21,7 @@
 
 #define NCHUNKS (2000)
 #define CHUNKSIZE (500 * 1000)  // > NCHUNKS for the bench purposes
-#define NTHREADS 4
+#define NTHREADS 8
 
 enum {
   ZERO_DETECTION = 0,
@@ -70,13 +70,13 @@ int check_special_values(int svalue) {
         csize = blosc2_compress(5, 1, sizeof(int32_t), data_buffer, isize, chunk, osize);
         break;
       case CHECK_ZEROS:
-        csize = blosc2_chunk_zeros(isize, sizeof(int32_t), chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+        csize = blosc2_chunk_zeros(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
         break;
       case CHECK_NANS:
-        csize = blosc2_chunk_nans(isize, sizeof(float), chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+        csize = blosc2_chunk_nans(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
         break;
       case CHECK_VALUES:
-        csize = blosc2_chunk_repeatval(isize, sizeof(int32_t), chunk,
+        csize = blosc2_chunk_repeatval(cparams, isize, chunk,
                                        BLOSC_EXTENDED_HEADER_LENGTH + sizeof(int32_t), &value);
         break;
       default:
@@ -235,12 +235,12 @@ int main(void) {
   if (rc < 0) {
     return rc;
   }
-  printf("*** Testing special NaNs...");
+  printf("*** Testing NaNs...");
   rc = check_special_values(CHECK_NANS);
   if (rc < 0) {
     return rc;
   }
-  printf("*** Testing special values...");
+  printf("*** Testing repeated values...");
   rc = check_special_values(CHECK_VALUES);
   if (rc < 0) {
     return rc;

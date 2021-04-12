@@ -1723,7 +1723,7 @@ int get_coffset(blosc2_frame_s* frame, int32_t header_len, int64_t cbytes, int32
 
 
 // Detect and return a chunk with special values in offsets (only zeros and NaNs)
-int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize,
+int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize, int32_t blocksize,
                         uint8_t** chunk, int32_t cbytes, bool *needs_free) {
   int rc = 0;
   *chunk = malloc(cbytes);
@@ -1733,14 +1733,17 @@ int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize,
   uint64_t zeros_mask = (uint64_t) BLOSC2_ZERO_RUNLEN << (8 * 7);  // indicate a chunk of zeros
   uint64_t nans_mask = (uint64_t) BLOSC2_NAN_RUNLEN << (8 * 7);  // indicate a chunk of zeros
 
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = typesize;
+  cparams.blocksize = blocksize;
   if (special_value & zeros_mask) {
-    rc = blosc2_chunk_zeros(nbytes, typesize, *chunk, cbytes);
+    rc = blosc2_chunk_zeros(cparams, nbytes, *chunk, cbytes);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Error creating a zero chunk");
     }
   }
   else if (special_value & nans_mask) {
-    rc = blosc2_chunk_nans(nbytes, typesize, *chunk, cbytes);
+    rc = blosc2_chunk_nans(cparams, nbytes, *chunk, cbytes);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Error creating a nan chunk");
     }
@@ -1809,7 +1812,7 @@ int frame_get_chunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool *ne
   if (offset < 0) {
     // Special value
     chunk_cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
-    rc = frame_special_chunk(offset, chunksize, typesize, chunk, chunk_cbytes, needs_free);
+    rc = frame_special_chunk(offset, chunksize, typesize, blocksize, chunk, chunk_cbytes, needs_free);
     if (rc < 0) {
       return rc;
     }
@@ -1910,7 +1913,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
   if (offset < 0) {
     // Special value
     lazychunk_cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
-    rc = frame_special_chunk(offset, chunksize, typesize, chunk,
+    rc = frame_special_chunk(offset, chunksize, typesize, blocksize, chunk,
                              (int32_t)lazychunk_cbytes, needs_free);
     goto end;
   }
