@@ -14,29 +14,43 @@
 #define NCHUNKS 10
 
 
+typedef struct {
+  int32_t open;
+  int32_t close;
+  int32_t seek;
+  int32_t write;
+  int32_t read;
+} test_udio_params;
+
+
 void* test_open(const char *urlpath, const char *mode, void *params) {
-  printf("OPEN\n");
-  return fopen(urlpath, mode);
+  test_udio_params *tparams = params;
+  tparams->open++;
+  return blosc2_stdio_open(urlpath, mode, params);
 }
 
 int test_close(void *stream, void* params) {
-  printf("CLOSE\n");
-  return fclose(stream);
+  test_udio_params *tparams = params;
+  tparams->close++;
+  return blosc2_stdio_close(stream, params);
 }
 
 int test_seek(void *stream, int64_t offset, int whence, void* params) {
-  printf("SEEK\n");
-  return fseek(stream, offset, whence);
+  test_udio_params *tparams = params;
+  tparams->seek++;
+  return blosc2_stdio_seek(stream, offset, whence, params);
 }
 
-size_t test_write(const void *ptr, size_t size, size_t nitems, void *stream, void *params) {
-  printf("WRITE\n");
-  return fwrite(ptr, size, nitems, stream);
+size_t test_write(const void *ptr, int64_t size, int64_t nitems, void *stream, void *params) {
+  test_udio_params *tparams = params;
+  tparams->write++;
+  return blosc2_stdio_write(ptr, size, nitems, stream, params);
 }
 
-size_t test_read(void *ptr, size_t size, size_t nitems, void *stream, void *params) {
-  printf("READ\n");
-  return fread(ptr, size, nitems, stream);
+size_t test_read(void *ptr, int64_t size, int64_t nitems, void *stream, void *params) {
+  test_udio_params *tparams = params;
+  tparams->read++;
+  return blosc2_stdio_read(ptr, size, nitems, stream, params);
 }
 
 
@@ -80,17 +94,7 @@ CUTEST_TEST_TEST(udio) {
     blosc2_remove_dir(backend.urlpath);
   }
 
-  blosc2_schunk *schunk;
-  int32_t isize =  CHUNKSIZE * sizeof(int32_t);
-  int32_t osize = CHUNKSIZE * sizeof(int32_t) + BLOSC_MAX_OVERHEAD;
-
-  int dsize, csize;
-  int nchunk, nchunks;
-  int rc;
-  float fvalue;
-
   int32_t nbytes = CHUNKSIZE * sizeof(int32_t);
-
   int32_t *data_buffer = malloc(nbytes);
   int32_t *rec_buffer = malloc(nbytes);
 
@@ -100,9 +104,12 @@ CUTEST_TEST_TEST(udio) {
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 9;
   cparams.nthreads = 2;
+  test_udio_params io_params = {0};
+  data->udio.params = &io_params;
+
   blosc2_storage storage = {.cparams=&cparams, .contiguous=backend.contiguous, .urlpath = backend.urlpath, .udio=&data->udio};
 
-  schunk = blosc2_schunk_new(&storage);
+  blosc2_schunk *schunk = blosc2_schunk_new(&storage);
 
   for (int i = 0; i < NCHUNKS; ++i) {
     int32_t cbytes = blosc2_schunk_append_buffer(schunk, data_buffer, nbytes);
@@ -118,6 +125,14 @@ CUTEST_TEST_TEST(udio) {
       CUTEST_ASSERT("Data are not equal", data_buffer[j] == rec_buffer[j]);
     }
   }
+
+  // Check io params
+  CUTEST_ASSERT("Open must be positive", io_params.open > 0);
+  CUTEST_ASSERT("Close must be positive", io_params.close > 0);
+  CUTEST_ASSERT("Seek must be positive", io_params.seek > 0);
+  CUTEST_ASSERT("Write must be positive", io_params.write > 0);
+  CUTEST_ASSERT("Read must be positive", io_params.read > 0);
+
   free(schunk);
   free(schunk2);
   free(data_buffer);

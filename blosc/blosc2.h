@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include "blosc2-export.h"
 #include "blosc2-common.h"
+#include "blosc2_stdio.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
 #include <windows.h>
@@ -37,13 +38,9 @@
 
   #include <process.h>
   #define getpid _getpid
-
-  #define fseek _fseeki64
-
 #else
 #include <unistd.h>
 #include <stdio.h>
-#define fseek fseek
 #endif
 
 #ifdef __cplusplus
@@ -731,9 +728,9 @@ BLOSC_EXPORT const char* blosc_cbuffer_complib(const void* cbuffer);
 
 typedef void*  (*blosc2_open_cb)(const char *urlpath, const char *mode, void *params);
 typedef int    (*blosc2_close_cb)(void *stream, void* params);
-typedef int    (*blosc2_seek_cb)(void *stream, int64_t, int, void* params);
-typedef size_t (*blosc2_write_cb)(const void *ptr, size_t size, size_t nitems, void *stream, void *params);
-typedef size_t (*blosc2_read_cb)(void *ptr, size_t size, size_t nitems, void *stream, void *params);
+typedef int    (*blosc2_seek_cb)(void *stream, int64_t offset, int whence, void* params);
+typedef size_t (*blosc2_write_cb)(const void *ptr, int64_t size, int64_t nitems, void *stream, void *params);
+typedef size_t (*blosc2_read_cb)(void *ptr, int64_t size, int64_t nitems, void *stream, void *params);
 
 typedef struct {
   blosc2_open_cb open;
@@ -741,14 +738,16 @@ typedef struct {
   blosc2_seek_cb seek;
   blosc2_write_cb write;
   blosc2_read_cb read;
+  void *params;
 } blosc2_io;
 
 static const blosc2_io BLOSC2_IO_DEFAULTS = {
-  .open = (blosc2_open_cb) fopen,
-  .close = (blosc2_close_cb) fclose,
-  .seek = (blosc2_seek_cb) fseek,
-  .write = (blosc2_write_cb) fwrite,
-  .read = (blosc2_read_cb) fread,
+  .open = (blosc2_open_cb) blosc2_stdio_open,
+  .close = (blosc2_close_cb) blosc2_stdio_close,
+  .seek = (blosc2_seek_cb) blosc2_stdio_seek,
+  .write = (blosc2_write_cb) blosc2_stdio_write,
+  .read = (blosc2_read_cb) blosc2_stdio_read,
+  .params = NULL,
 };
 
 
