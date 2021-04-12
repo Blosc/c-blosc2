@@ -108,13 +108,13 @@ CUTEST_TEST_TEST(zero_runlen) {
         csize = blosc2_compress(5, 1, sizeof(int32_t), data_buffer, isize, chunk, osize);
         break;
       case CHECK_ZEROS:
-        csize = blosc2_chunk_zeros(isize, sizeof(int32_t), chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+        csize = blosc2_chunk_zeros(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
         break;
       case CHECK_NANS:
-        csize = blosc2_chunk_nans(isize, sizeof(float), chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+        csize = blosc2_chunk_nans(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
         break;
       case CHECK_VALUES:
-        csize = blosc2_chunk_repeatval(isize, sizeof(int32_t), chunk,
+        csize = blosc2_chunk_repeatval(cparams, isize, chunk,
                                        BLOSC_EXTENDED_HEADER_LENGTH + sizeof(int32_t), &value);
         break;
       default:

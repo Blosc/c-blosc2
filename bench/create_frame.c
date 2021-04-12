@@ -69,7 +69,7 @@ int create_cframe(const char* compname) {
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = sizeof(int32_t);
   cparams.compcode = compcode;
-  cparams.clevel = 5;
+  cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   //cparams.blocksize = 1024;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
@@ -82,7 +82,7 @@ int create_cframe(const char* compname) {
 
 #ifdef CREATE_ZEROS
   // Precompute chunk of zeros
-  int ret = blosc2_chunk_zeros(isize, sizeof(int32_t), data_dest, isize);
+  int ret = blosc2_chunk_zeros(cparams, isize, data_dest, isize);
   if (ret < 0) {
     printf("Compression error in chunk_zeros.  Error code: %d\n", ret);
     return ret;
