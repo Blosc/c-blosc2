@@ -865,6 +865,71 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   return schunk->nchunks;
 }
 
+int blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int nchunk) {
+  int rc;
+  if (schunk->nchunks < nchunk) {
+    BLOSC_TRACE_ERROR("The schunk has not enough chunks (%d)!", schunk->nchunks);
+  }
+
+  bool needs_free;
+  uint8_t *chunk_old;
+  int err = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_old, &needs_free);
+  if (err < 0) {
+    BLOSC_TRACE_ERROR("%d chunk can not be obtained from schunk.", nchunk);
+    return -1;
+  }
+  int32_t chunk_nbytes_old = 0;
+  int32_t chunk_cbytes_old = 0;
+
+  if (chunk_old != 0) {
+    rc = blosc2_cbuffer_sizes(chunk_old, &chunk_nbytes_old, &chunk_cbytes_old, NULL);
+    if (rc < 0) {
+      return rc;
+    }
+    if (chunk_cbytes_old == BLOSC_MAX_OVERHEAD) {
+      chunk_cbytes_old = 0;
+    }
+  }
+  if (needs_free) {
+    free(chunk_old);
+  }
+
+  blosc2_frame_s* frame = (blosc2_frame_s*)(schunk->frame);
+  schunk->nchunks -= 1;
+  if (schunk->frame == NULL) {
+    /* Update counters */
+    schunk->nbytes -= chunk_nbytes_old;
+    schunk->cbytes -= chunk_cbytes_old;
+  } else {
+    // A frame
+    schunk->nbytes -= chunk_nbytes_old;
+    if (frame->sframe) {
+      schunk->cbytes -= chunk_cbytes_old;
+    }
+  }
+
+  // Update super-chunk or frame
+  if (schunk->frame == NULL) {
+    // Free old chunk
+    if (schunk->data[nchunk] != 0) {
+      free(schunk->data[nchunk]);
+    }
+    // Reorder the offsets and insert the new chunk
+    for (int i = nchunk; i < schunk->nchunks; i++) {
+      schunk->data[i] = schunk->data[i + 1];
+    }
+    schunk->data[schunk->nchunks] = NULL;
+
+  }
+  else {
+    if (frame_delete_chunk(frame, nchunk, schunk) == NULL) {
+      BLOSC_TRACE_ERROR("Problems deleting a chunk in a frame.");
+      return BLOSC2_ERROR_CHUNK_UPDATE;
+    }
+  }
+  return schunk->nchunks;
+}
+
 
 /* Append a data buffer to a super-chunk. */
 int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes) {

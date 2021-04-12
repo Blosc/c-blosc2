@@ -138,6 +138,7 @@ get_new_storage(const blosc2_storage *storage, const blosc2_cparams *cdefaults, 
 void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schunk);
 void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_schunk* schunk);
 void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_schunk* schunk);
+void* frame_delete_chunk(blosc2_frame_s* frame, int nchunk, blosc2_schunk* schunk);
 int frame_reorder_offsets(blosc2_frame_s *frame, const int *offsets_order, blosc2_schunk* schunk);
 
 int frame_get_chunk(blosc2_frame_s* frame, int nchunk, uint8_t **chunk, bool *needs_free);
