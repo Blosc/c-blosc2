@@ -3540,6 +3540,8 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const size_t nbytes, void* dest, 
 
   memcpy((uint8_t *)dest, &header, sizeof(header));
 
+  blosc2_free_ctx(context);
+
   return BLOSC_EXTENDED_HEADER_LENGTH;
 }
 
@@ -3571,6 +3573,8 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const size_t nbytes, void* dest,
 
   memcpy((uint8_t *)dest, &header, sizeof(header));
 
+  blosc2_free_ctx(context);
+
   return BLOSC_EXTENDED_HEADER_LENGTH;
 }
 
@@ -3601,6 +3605,8 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const size_t nbytes, void* dest, s
   header.blosc2_flags = BLOSC2_NAN_RUNLEN << 4;  // mark chunk as all NaNs
 
   memcpy((uint8_t *)dest, &header, sizeof(header));
+
+  blosc2_free_ctx(context);
 
   return BLOSC_EXTENDED_HEADER_LENGTH;
 }
@@ -3640,6 +3646,8 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const size_t nbytes,
 
   memcpy((uint8_t *)dest, &header, sizeof(header));
   memcpy((uint8_t *)dest + sizeof(header), repeatval, typesize);
+
+  blosc2_free_ctx(context);
 
   return BLOSC_EXTENDED_HEADER_LENGTH + (uint8_t)typesize;
 }
