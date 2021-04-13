@@ -1979,7 +1979,8 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
     return BLOSC2_ERROR_DATA;
   }
 
-  if ((srcsize == context->header_overhead) && !context->special_type) {
+  if ((header->nbytes == 0) && (header->cbytes == context->header_overhead) &&
+      !context->special_type) {
     // A compressed buffer with only a header can only contain a zero-length buffer
     return 0;
   }
