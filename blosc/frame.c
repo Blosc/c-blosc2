@@ -1365,16 +1365,15 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
     }
     // Go to offset and see if we have the correct marker
     uint8_t* content_marker = trailer + offset;
+    if (trailer_len < offset + 1 + 4) {
+      return BLOSC2_ERROR_READ_BUFFER;
+    }
     if (*content_marker != 0xc6) {
       return BLOSC2_ERROR_DATA;
     }
 
     // Read the size of the content
     int32_t content_len;
-    trailer_pos += sizeof(content_len);
-    if (trailer_len < trailer_pos) {
-      return BLOSC2_ERROR_READ_BUFFER;
-    }
     from_big(&content_len, content_marker + 1, sizeof(content_len));
     if (content_len < 0) {
       return BLOSC2_ERROR_DATA;
@@ -1382,8 +1381,7 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
     metalayer->content_len = content_len;
 
     // Finally, read the content
-    trailer_pos += content_len;
-    if (trailer_len < trailer_pos) {
+    if (trailer_len < offset + 1 + 4 + content_len) {
       return BLOSC2_ERROR_READ_BUFFER;
     }
     char* content = malloc((size_t)content_len);
