@@ -665,7 +665,7 @@ typedef struct blosc_header_s {
 } blosc_header;
 
 
-int blosc_read_header(const uint8_t* src, int32_t srcsize, bool extended_header, blosc_header* header)
+int read_chunk_header(const uint8_t* src, int32_t srcsize, bool extended_header, blosc_header* header)
 {
   memset(header, 0, sizeof(blosc_header));
 
@@ -2470,7 +2470,7 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
   uint8_t* _src = (uint8_t*)src;
   int rc;
 
-  rc = blosc_read_header(src, srcsize, true, &header);
+  rc = read_chunk_header(src, srcsize, true, &header);
   if (rc < 0) {
     return rc;
   }
@@ -2716,7 +2716,7 @@ int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize
   int result;
 
   /* Minimally populate the context */
-  result = blosc_read_header((uint8_t *)src, srcsize, true, &header);
+  result = read_chunk_header((uint8_t *) src, srcsize, true, &header);
   if (result < 0) {
     return result;
   }
@@ -3184,7 +3184,7 @@ void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes, size_t* cbytes, si
 
 int blosc2_cbuffer_sizes(const void* cbuffer, int32_t* nbytes, int32_t* cbytes, int32_t* blocksize) {
   blosc_header header;
-  int rc = blosc_read_header((uint8_t*)cbuffer, BLOSC_MIN_HEADER_LENGTH, false, &header);
+  int rc = read_chunk_header((uint8_t *) cbuffer, BLOSC_MIN_HEADER_LENGTH, false, &header);
   if (rc < 0) {
     /* Return zeros if error reading header */
     memset(&header, 0, sizeof(header));
@@ -3230,7 +3230,7 @@ int blosc_cbuffer_validate(const void* cbuffer, size_t cbytes, size_t* nbytes) {
 /* Return `typesize` and `flags` from a compressed buffer. */
 void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize, int* flags) {
   blosc_header header;
-  int rc = blosc_read_header((uint8_t*)cbuffer, BLOSC_MIN_HEADER_LENGTH, false, &header);
+  int rc = read_chunk_header((uint8_t *) cbuffer, BLOSC_MIN_HEADER_LENGTH, false, &header);
   if (rc < 0) {
     *typesize = *flags = 0;
     return;
@@ -3245,7 +3245,7 @@ void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize, int* flags) {
 /* Return version information from a compressed buffer. */
 void blosc_cbuffer_versions(const void* cbuffer, int* version, int* versionlz) {
   blosc_header header;
-  int rc = blosc_read_header((uint8_t*)cbuffer, BLOSC_MIN_HEADER_LENGTH, false, &header);
+  int rc = read_chunk_header((uint8_t *) cbuffer, BLOSC_MIN_HEADER_LENGTH, false, &header);
   if (rc < 0) {
     *version = *versionlz = 0;
     return;
@@ -3262,7 +3262,7 @@ const char* blosc_cbuffer_complib(const void* cbuffer) {
   blosc_header header;
   int clibcode;
   const char* complib;
-  int rc = blosc_read_header((uint8_t*)cbuffer, BLOSC_MIN_HEADER_LENGTH, false, &header);
+  int rc = read_chunk_header((uint8_t *) cbuffer, BLOSC_MIN_HEADER_LENGTH, false, &header);
   if (rc < 0) {
     return NULL;
   }
