@@ -1359,7 +1359,7 @@ static int blosc_d(
 
   // Chunks with special values cannot be lazy
   bool is_lazy = ((context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH) &&
-          (context->blosc2_flags & 0x08u) && (context->special_type == BLOSC2_NO_SPECIAL));
+          (context->blosc2_flags & 0x08u) && !context->special_type);
   if (is_lazy) {
     // The chunk is on disk, so just lazily load the block
     if (context->schunk == NULL) {
@@ -1414,7 +1414,7 @@ static int blosc_d(
   // If the chunk is memcpyed, we just have to copy the block to dest and return
   if (memcpyed) {
     int bsize_ = leftoverblock ? chunk_nbytes % context->blocksize : bsize;
-    if (context->special_type == BLOSC2_NO_SPECIAL) {
+    if (!context->special_type) {
       if (chunk_nbytes + context->header_overhead != chunk_cbytes) {
         return BLOSC2_ERROR_WRITE_BUFFER;
       }
@@ -1644,7 +1644,7 @@ static int serial_blosc(struct thread_context* thread_context) {
   uint8_t* tmp2 = thread_context->tmp2;
   int dict_training = context->use_dict && (context->dict_cdict == NULL);
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
-  if (!context->do_compress && context->special_type != BLOSC2_NO_SPECIAL) {
+  if (!context->do_compress && context->special_type) {
     // Fake a runlen as if its a memcpyed chunk
     memcpyed = true;
   }
@@ -1967,11 +1967,26 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
   }
 
   context->special_type = (header->blosc2_flags >> 4) & BLOSC2_SPECIAL_MASK;
+  if (context->special_type > BLOSC2_SPECIAL_LASTID) {
+    BLOSC_TRACE_ERROR("Unknown special values ID (%d) ",
+                      context->special_type);
+    return BLOSC2_ERROR_DATA;
+  }
+
+  int memcpy = (context->header_flags & (uint8_t) BLOSC_MEMCPYED);
+  if (memcpy && (header->cbytes != header->nbytes + context->header_overhead)) {
+    BLOSC_TRACE_ERROR("Wrong header info for this memcpyed chunk");
+    return BLOSC2_ERROR_DATA;
+  }
+
+  if ((srcsize == context->header_overhead) && !context->special_type) {
+    // A compressed buffer with only a header can only contain a zero-length buffer
+    return 0;
+  }
 
   context->bstarts = (int32_t *) (context->src + context->header_overhead);
   bstarts_end = context->header_overhead;
-  if ((context->special_type == BLOSC2_NO_SPECIAL) &&
-      (!(context->header_flags & (uint8_t) BLOSC_MEMCPYED))) {
+  if (!context->special_type && !memcpy) {
     /* If chunk is not special or a memcpy, we do have a bstarts section */
     bstarts_end = context->header_overhead + (context->nblocks * sizeof(int32_t));
   }
@@ -2641,7 +2656,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     bool get_single_block = ((startb == 0) && (bsize == nitems * header->typesize));
     uint8_t* tmp2 = get_single_block ? dest : scontext->tmp2;
     bool memcpyed = header->flags & (uint8_t)BLOSC_MEMCPYED;
-    if (context->special_type != BLOSC2_NO_SPECIAL) {
+    if (context->special_type) {
       // Fake a runlen as if its a memcpyed chunk
       memcpyed = true;
     }
@@ -2781,7 +2796,7 @@ static void t_blosc_do_job(void *ctxt)
 
   // Determine whether we can do a static distribution of workload among different threads
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
-  if (!context->do_compress && context->special_type != BLOSC2_NO_SPECIAL) {
+  if (!context->do_compress && context->special_type) {
     // Fake a runlen as if its a memcpyed chunk
     memcpyed = true;
   }

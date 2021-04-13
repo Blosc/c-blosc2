@@ -244,6 +244,7 @@ enum {
   BLOSC2_NAN_RUNLEN = 0x2,      //!< NaN run-length
   BLOSC2_VALUE_RUNLEN = 0x3,    //!< generic value run-length
   BLOSC2_UNINIT_VALUE = 0x4,    //!< non initialized values
+  BLOSC2_SPECIAL_LASTID = 0x4,  //!<last valid ID for special value (update this adequately)
   BLOSC2_SPECIAL_MASK = 0x7     //!< special value mask (prev IDs cannot be larger than this)
 };
 
