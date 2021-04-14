@@ -1517,7 +1517,7 @@ static int blosc_d(
       io->seek(fp, chunk_offset + src_offset, SEEK_SET, io->params);
     }
     // We can make use of tmp3 because it will be used after src is not needed anymore
-    size_t rbytes = io->read(tmp3, 1, block_csize, fp, io->params);
+    int64_t rbytes = io->read(tmp3, 1, block_csize, fp, io->params);
     io->close(fp, io->params);
     if ((int32_t)rbytes != block_csize) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");

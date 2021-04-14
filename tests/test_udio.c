@@ -41,13 +41,13 @@ int test_seek(void *stream, int64_t offset, int whence, void* params) {
   return blosc2_stdio_seek(stream, offset, whence, params);
 }
 
-size_t test_write(const void *ptr, int64_t size, int64_t nitems, void *stream, void *params) {
+int64_t test_write(const void *ptr, int64_t size, int64_t nitems, void *stream, void *params) {
   test_udio_params *tparams = params;
   tparams->write++;
   return blosc2_stdio_write(ptr, size, nitems, stream, params);
 }
 
-size_t test_read(void *ptr, int64_t size, int64_t nitems, void *stream, void *params) {
+int64_t test_read(void *ptr, int64_t size, int64_t nitems, void *stream, void *params) {
   test_udio_params *tparams = params;
   tparams->read++;
   return blosc2_stdio_read(ptr, size, nitems, stream, params);

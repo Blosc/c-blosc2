@@ -66,7 +66,7 @@ void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int32_t nchunk,
     return NULL;
   }
   blosc2_io *io = frame->schunk->storage->udio;
-  size_t wbytes = io->write(chunk, 1, cbytes, fpc, io->params);
+  int64_t wbytes = io->write(chunk, 1, cbytes, fpc, io->params);
   io->close(fpc, io->params);
   if (wbytes != (size_t)cbytes) {
     BLOSC_TRACE_ERROR("Cannot write the full chunk.");
@@ -91,7 +91,7 @@ int sframe_get_chunk(blosc2_frame_s* frame, int32_t nchunk, uint8_t** chunk, boo
   *chunk = malloc((size_t)chunk_cbytes);
 
   io->seek(fpc, 0L, SEEK_SET, io->params);
-  size_t rbytes = io->read(*chunk, 1, (size_t)chunk_cbytes, fpc, io->params);
+  int64_t rbytes = io->read(*chunk, 1, (size_t)chunk_cbytes, fpc, io->params);
   io->close(fpc, io->params);
   if (rbytes != (size_t)chunk_cbytes) {
     BLOSC_TRACE_ERROR("Cannot read the chunk out of the chunkfile.");

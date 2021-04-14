@@ -24,12 +24,12 @@ int blosc2_stdio_seek(void *stream, int64_t offset, int whence, void* params) {
 #endif
 }
 
-size_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, void *stream, void *params) {
+int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, void *stream, void *params) {
   size_t nitems_ = fwrite(ptr, (size_t) size, (size_t) nitems, stream);
-  return nitems_;
+  return (int64_t) nitems_;
 }
 
-size_t blosc2_stdio_read(void *ptr, int64_t size, int64_t nitems, void *stream, void *params) {
+int64_t blosc2_stdio_read(void *ptr, int64_t size, int64_t nitems, void *stream, void *params) {
   size_t nitems_ = fread(ptr, (size_t) size, (size_t) nitems, stream);
-  return nitems_;
+  return (int64_t) nitems_;
 }
