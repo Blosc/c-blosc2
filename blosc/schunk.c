@@ -366,7 +366,7 @@ int64_t frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
   blosc2_io *io = frame->schunk->storage->udio;
 
   void* fp = io->open(urlpath, "wb", io->params);
-  size_t nitems = io->write(frame->cframe, frame->len, 1, fp, io->params);
+  int64_t nitems = io->write(frame->cframe, frame->len, 1, fp, io->params);
   io->close(fp, io->params);
   return nitems * (size_t)frame->len;
 }

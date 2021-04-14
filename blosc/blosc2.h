@@ -726,11 +726,11 @@ BLOSC_EXPORT const char* blosc_cbuffer_complib(const void* cbuffer);
   Structures and functions related with user-defined input/output.
 *********************************************************************/
 
-typedef void*  (*blosc2_open_cb)(const char *urlpath, const char *mode, void *params);
-typedef int    (*blosc2_close_cb)(void *stream, void* params);
-typedef int    (*blosc2_seek_cb)(void *stream, int64_t offset, int whence, void* params);
-typedef size_t (*blosc2_write_cb)(const void *ptr, int64_t size, int64_t nitems, void *stream, void *params);
-typedef size_t (*blosc2_read_cb)(void *ptr, int64_t size, int64_t nitems, void *stream, void *params);
+typedef void*   (*blosc2_open_cb)(const char *urlpath, const char *mode, void *params);
+typedef int     (*blosc2_close_cb)(void *stream, void* params);
+typedef int     (*blosc2_seek_cb)(void *stream, int64_t offset, int whence, void* params);
+typedef int64_t (*blosc2_write_cb)(const void *ptr, int64_t size, int64_t nitems, void *stream, void *params);
+typedef int64_t (*blosc2_read_cb)(void *ptr, int64_t size, int64_t nitems, void *stream, void *params);
 
 typedef struct {
   blosc2_open_cb open;

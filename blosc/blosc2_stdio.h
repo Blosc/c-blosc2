@@ -35,7 +35,7 @@
 void *blosc2_stdio_open(const char *urlpath, const char *mode, void *params);
 int blosc2_stdio_close(void *stream, void* params);
 int blosc2_stdio_seek(void *stream, int64_t offset, int whence, void* params);
-size_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, void *stream, void *params);
-size_t blosc2_stdio_read(void *ptr, int64_t size, int64_t nitems, void *stream, void *params);
+int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, void *stream, void *params);
+int64_t blosc2_stdio_read(void *ptr, int64_t size, int64_t nitems, void *stream, void *params);
 
 #endif //BLOSC_BLOSC2_STDIO_H
