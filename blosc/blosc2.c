@@ -1973,8 +1973,8 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
     return BLOSC2_ERROR_DATA;
   }
 
-  int memcpy = (context->header_flags & (uint8_t) BLOSC_MEMCPYED);
-  if (memcpy && (header->cbytes != header->nbytes + context->header_overhead)) {
+  int memcpyed = (context->header_flags & (uint8_t) BLOSC_MEMCPYED);
+  if (memcpyed && (header->cbytes != header->nbytes + context->header_overhead)) {
     BLOSC_TRACE_ERROR("Wrong header info for this memcpyed chunk");
     return BLOSC2_ERROR_DATA;
   }
@@ -1987,8 +1987,8 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
 
   context->bstarts = (int32_t *) (context->src + context->header_overhead);
   bstarts_end = context->header_overhead;
-  if (!context->special_type && !memcpy) {
-    /* If chunk is not special or a memcpy, we do have a bstarts section */
+  if (!context->special_type && !memcpyed) {
+    /* If chunk is not special or a memcpyed, we do have a bstarts section */
     bstarts_end = context->header_overhead + (context->nblocks * sizeof(int32_t));
   }
 
