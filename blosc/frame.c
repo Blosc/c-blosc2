@@ -3006,7 +3006,7 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int nchunk, blosc2_schunk* schun
   int64_t* offsets = (int64_t *) malloc((size_t)off_nbytes);
   if (nchunks > 0) {
     int32_t coffsets_cbytes = 0;
-    uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, &coffsets_cbytes);
+    uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, nchunks, &coffsets_cbytes);
     if (coffsets == NULL) {
       BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
       return NULL;
@@ -3073,7 +3073,7 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int nchunk, blosc2_schunk* schun
     size_t wbytes;
     if (frame->sframe) {
       int64_t offset;
-      rc = get_coffset(frame, header_len, cbytes, nchunk, &offset);
+      rc = get_coffset(frame, header_len, cbytes, nchunk, nchunks, &offset);
       if (rc < 0) {
         BLOSC_TRACE_ERROR("Unable to get offset to chunk %d.", nchunk);
         return NULL;
