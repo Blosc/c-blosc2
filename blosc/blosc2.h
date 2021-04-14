@@ -1569,12 +1569,14 @@ BLOSC_EXPORT int blosc2_vlmeta_exists(blosc2_schunk *schunk, const char *name);
  * @param name The name of the variable-length metalayer.
  * @param content The content to be added.
  * @param content_len The length of the content.
- * @param cparams The parameters for compressing the variable-length metalayer content.
+ * @param cparams The parameters for compressing the variable-length metalayer content. If NULL,
+ * the `BLOSC2_CPARAMS_DEFAULTS` will be used.
  *
  * @return If successful, the index of the new variable-length metalayer. Else, return a negative value.
  */
 BLOSC_EXPORT int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name,
-                                   uint8_t *content, uint32_t content_len, blosc2_cparams *cparams);
+                                   uint8_t *content, uint32_t content_len,
+                                   blosc2_cparams *cparams);
 
 /**
  * @brief Update the content of an existing variable-length metalayer.
@@ -1583,11 +1585,14 @@ BLOSC_EXPORT int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name,
  * @param name The name of the variable-length metalayer to be updated.
  * @param content The new content of the variable-length metalayer.
  * @param content_len The length of the content.
+ * @param cparams The parameters for compressing the variable-length metalayer content. If NULL,
+ * the `BLOSC2_CPARAMS_DEFAULTS` will be used.
  *
  * @return If successful, the index of the variable-length metalayer. Else, return a negative value.
  */
 BLOSC_EXPORT int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name,
-                                      uint8_t *content, uint32_t content_len, blosc2_cparams *cparams);
+                                      uint8_t *content, uint32_t content_len,
+                                      blosc2_cparams *cparams);
 
 /**
  * @brief Get the content out of a variable-length metalayer.
