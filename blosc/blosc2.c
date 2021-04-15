@@ -3515,6 +3515,11 @@ int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks) {
 
 /* Create a chunk made of zeros */
 int blosc2_chunk_zeros(blosc2_cparams cparams, const size_t nbytes, void* dest, size_t destsize) {
+  if (destsize < BLOSC_EXTENDED_HEADER_LENGTH) {
+    BLOSC_TRACE_ERROR("dest buffer is not long enough");
+    return BLOSC2_ERROR_DATA;
+  }
+
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
 
@@ -3525,6 +3530,7 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const size_t nbytes, void* dest, 
           context->new_nthreads, context->nthreads,
           context->udbtune, context->btune, context->schunk);
   if (error <= 0) {
+    blosc2_free_ctx(context);
     return error;
   }
 
@@ -3537,7 +3543,6 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const size_t nbytes, void* dest, 
   header.blocksize = context->blocksize;
   header.cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
   header.blosc2_flags = BLOSC2_ZERO_RUNLEN << 4;  // mark chunk as all zeros
-
   memcpy((uint8_t *)dest, &header, sizeof(header));
 
   blosc2_free_ctx(context);
@@ -3546,11 +3551,15 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const size_t nbytes, void* dest, 
 }
 
 
-/* Create a chunk made of zeros */
+/* Create a chunk made of uninitialized values */
 int blosc2_chunk_uninit(blosc2_cparams cparams, const size_t nbytes, void* dest, size_t destsize) {
+  if (destsize < BLOSC_EXTENDED_HEADER_LENGTH) {
+    BLOSC_TRACE_ERROR("dest buffer is not long enough");
+    return BLOSC2_ERROR_DATA;
+  }
+
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
-
   int error = initialize_context_compression(
           context, NULL, nbytes, dest, destsize,
           context->clevel, context->filters, context->filters_meta,
@@ -3558,6 +3567,7 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const size_t nbytes, void* dest,
           context->new_nthreads, context->nthreads,
           context->udbtune, context->btune, context->schunk);
   if (error <= 0) {
+    blosc2_free_ctx(context);
     return error;
   }
 
@@ -3570,7 +3580,6 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const size_t nbytes, void* dest,
   header.blocksize = context->blocksize;
   header.cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
   header.blosc2_flags = BLOSC2_UNINIT_VALUE << 4;  // mark chunk as unitialized
-
   memcpy((uint8_t *)dest, &header, sizeof(header));
 
   blosc2_free_ctx(context);
@@ -3581,6 +3590,11 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const size_t nbytes, void* dest,
 
 /* Create a chunk made of nans */
 int blosc2_chunk_nans(blosc2_cparams cparams, const size_t nbytes, void* dest, size_t destsize) {
+  if (destsize < BLOSC_EXTENDED_HEADER_LENGTH) {
+    BLOSC_TRACE_ERROR("dest buffer is not long enough");
+    return BLOSC2_ERROR_DATA;
+  }
+
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
 
@@ -3591,6 +3605,7 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const size_t nbytes, void* dest, s
           context->new_nthreads, context->nthreads,
           context->udbtune, context->btune, context->schunk);
   if (error <= 0) {
+    blosc2_free_ctx(context);
     return error;
   }
 
@@ -3603,7 +3618,6 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const size_t nbytes, void* dest, s
   header.blocksize = context->blocksize;
   header.cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
   header.blosc2_flags = BLOSC2_NAN_RUNLEN << 4;  // mark chunk as all NaNs
-
   memcpy((uint8_t *)dest, &header, sizeof(header));
 
   blosc2_free_ctx(context);
@@ -3615,6 +3629,12 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const size_t nbytes, void* dest, s
 /* Create a chunk made of repeated values */
 int blosc2_chunk_repeatval(blosc2_cparams cparams, const size_t nbytes,
                            void* dest, size_t destsize, void* repeatval) {
+  uint8_t typesize = cparams.typesize;
+  if (destsize < BLOSC_EXTENDED_HEADER_LENGTH + typesize) {
+    BLOSC_TRACE_ERROR("dest buffer is not long enough");
+    return BLOSC2_ERROR_DATA;
+  }
+
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
 
@@ -3625,13 +3645,8 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const size_t nbytes,
           context->new_nthreads, context->nthreads,
           context->udbtune, context->btune, context->schunk);
   if (error <= 0) {
+    blosc2_free_ctx(context);
     return error;
-  }
-
-  uint8_t typesize = context->typesize;
-  if (destsize < BLOSC_EXTENDED_HEADER_LENGTH + typesize) {
-    BLOSC_TRACE_ERROR("dest buffer is not long enough");
-    return BLOSC2_ERROR_DATA;
   }
 
   memset(&header, 0, sizeof(header));
@@ -3643,7 +3658,6 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const size_t nbytes,
   header.blocksize = context->blocksize;
   header.cbytes = BLOSC_EXTENDED_HEADER_LENGTH + (int32_t)typesize;
   header.blosc2_flags = BLOSC2_VALUE_RUNLEN << 4;  // mark chunk as all repeated value
-
   memcpy((uint8_t *)dest, &header, sizeof(header));
   memcpy((uint8_t *)dest + sizeof(header), repeatval, typesize);
 
