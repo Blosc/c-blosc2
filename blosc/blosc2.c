@@ -60,18 +60,8 @@
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <windows.h>
   #include <malloc.h>
-
-/* stdint.h only available in VS2010 (VC++ 16.0) and newer */
-  #if defined(_MSC_VER) && _MSC_VER < 1600
-    #include "win32/stdint-windows.h"
-  #else
-    #include <stdint.h>
-  #endif
-
   #include <process.h>
   #define getpid _getpid
-#else
-  #include <unistd.h>
 #endif  /* _WIN32 */
 
 #if defined(_WIN32) && !defined(__GNUC__)
@@ -1509,16 +1499,16 @@ static int blosc_d(
       fp = io->open(chunkpath, "rb", io->params);
       free(chunkpath);
       // The offset of the block is src_offset
-      io->seek(fp, src_offset, SEEK_SET, io->params);
+      io->seek(fp, src_offset, SEEK_SET);
     }
     else {
       fp = io->open(urlpath, "rb", io->params);
       // The offset of the block is src_offset
-      io->seek(fp, chunk_offset + src_offset, SEEK_SET, io->params);
+      io->seek(fp, chunk_offset + src_offset, SEEK_SET);
     }
     // We can make use of tmp3 because it will be used after src is not needed anymore
-    int64_t rbytes = io->read(tmp3, 1, block_csize, fp, io->params);
-    io->close(fp, io->params);
+    int64_t rbytes = io->read(tmp3, 1, block_csize, fp);
+    io->close(fp);
     if ((int32_t)rbytes != block_csize) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");
       return BLOSC2_ERROR_READ_BUFFER;
