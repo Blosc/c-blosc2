@@ -10,23 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "blosc2.h"
-#include "blosc-private.h"
 #include "frame.h"
 
-#if defined(_WIN32) && !defined(__MINGW32__)
-#include <windows.h>
-  #include <malloc.h>
-
-/* stdint.h only available in VS2010 (VC++ 16.0) and newer */
-  #if defined(_MSC_VER) && _MSC_VER < 1600
-    #include "win32/stdint-windows.h"
-  #else
-    #include <stdint.h>
-  #endif
-
-  #define fseek _fseeki64
-
-#endif  /* _WIN32 */
 
 /* If C11 is supported, use it's built-in aligned allocation. */
 #if __STDC_VERSION__ >= 201112L
@@ -66,8 +51,8 @@ void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int32_t nchunk,
     return NULL;
   }
   blosc2_io *io = frame->schunk->storage->udio;
-  int64_t wbytes = io->write(chunk, 1, cbytes, fpc, io->params);
-  io->close(fpc, io->params);
+  int64_t wbytes = io->write(chunk, 1, cbytes, fpc);
+  io->close(fpc);
   if (wbytes != (size_t)cbytes) {
     BLOSC_TRACE_ERROR("Cannot write the full chunk.");
     return NULL;
@@ -86,13 +71,13 @@ int sframe_get_chunk(blosc2_frame_s* frame, int32_t nchunk, uint8_t** chunk, boo
   }
 
   blosc2_io *io = frame->schunk->storage->udio;
-  io->seek(fpc, 0L, SEEK_END, io->params);
-  int32_t chunk_cbytes = ftell(fpc);
+  io->seek(fpc, 0L, SEEK_END);
+  int64_t chunk_cbytes = io->tell(fpc);
   *chunk = malloc((size_t)chunk_cbytes);
 
-  io->seek(fpc, 0L, SEEK_SET, io->params);
-  int64_t rbytes = io->read(*chunk, 1, (size_t)chunk_cbytes, fpc, io->params);
-  io->close(fpc, io->params);
+  io->seek(fpc, 0L, SEEK_SET);
+  int64_t rbytes = io->read(*chunk, 1, (size_t)chunk_cbytes, fpc);
+  io->close(fpc);
   if (rbytes != (size_t)chunk_cbytes) {
     BLOSC_TRACE_ERROR("Cannot read the chunk out of the chunkfile.");
     return BLOSC2_ERROR_FILE_READ;

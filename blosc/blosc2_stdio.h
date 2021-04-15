@@ -18,6 +18,8 @@
 **********************************************************************/
 
 #include <stdio.h>
+#include <stdlib.h>
+
 
 #if defined(_WIN32) && !defined(__MINGW32__)
 
@@ -32,10 +34,22 @@
 #include <stdint.h>
 #endif
 
-void *blosc2_stdio_open(const char *urlpath, const char *mode, void *params);
-int blosc2_stdio_close(void *stream, void* params);
-int blosc2_stdio_seek(void *stream, int64_t offset, int whence, void* params);
-int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, void *stream, void *params);
-int64_t blosc2_stdio_read(void *ptr, int64_t size, int64_t nitems, void *stream, void *params);
+#if defined(_MSC_VER) && (_MSC_VER >= 1400)
+  #include <io.h>
+#else
+  #include <unistd.h>
+#endif
+
+typedef struct {
+  FILE *file;
+}blosc2_stdio_file;
+
+void *blosc2_stdio_open(const char *urlpath, const char *mode, void* params);
+int blosc2_stdio_close(void *stream);
+int64_t blosc2_stdio_tell(void *stream);
+int blosc2_stdio_seek(void *stream, int64_t offset, int whence);
+int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, void *stream);
+int64_t blosc2_stdio_read(void *ptr, int64_t size, int64_t nitems, void *stream);
+int blosc2_stdio_truncate(void *stream, int64_t size);
 
 #endif //BLOSC_BLOSC2_STDIO_H

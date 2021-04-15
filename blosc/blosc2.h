@@ -29,18 +29,8 @@
 #include <windows.h>
   #include <malloc.h>
 
-/* stdint.h only available in VS2010 (VC++ 16.0) and newer */
-  #if defined(_MSC_VER) && _MSC_VER < 1600
-    #include "win32/stdint-windows.h"
-  #else
-    #include <stdint.h>
-  #endif
-
   #include <process.h>
   #define getpid _getpid
-#else
-#include <unistd.h>
-#include <stdio.h>
 #endif
 
 #ifdef __cplusplus
@@ -727,26 +717,32 @@ BLOSC_EXPORT const char* blosc_cbuffer_complib(const void* cbuffer);
 *********************************************************************/
 
 typedef void*   (*blosc2_open_cb)(const char *urlpath, const char *mode, void *params);
-typedef int     (*blosc2_close_cb)(void *stream, void* params);
-typedef int     (*blosc2_seek_cb)(void *stream, int64_t offset, int whence, void* params);
-typedef int64_t (*blosc2_write_cb)(const void *ptr, int64_t size, int64_t nitems, void *stream, void *params);
-typedef int64_t (*blosc2_read_cb)(void *ptr, int64_t size, int64_t nitems, void *stream, void *params);
+typedef int     (*blosc2_close_cb)(void *stream);
+typedef int64_t (*blosc2_tell_cb)(void *stream);
+typedef int     (*blosc2_seek_cb)(void *stream, int64_t offset, int whence);
+typedef int64_t (*blosc2_write_cb)(const void *ptr, int64_t size, int64_t nitems, void *stream);
+typedef int64_t (*blosc2_read_cb)(void *ptr, int64_t size, int64_t nitems, void *stream);
+typedef int64_t (*blosc2_truncate_cb)(void *stream, int64_t size);
 
 typedef struct {
   blosc2_open_cb open;
   blosc2_close_cb close;
+  blosc2_tell_cb tell;
   blosc2_seek_cb seek;
   blosc2_write_cb write;
   blosc2_read_cb read;
+  blosc2_truncate_cb truncate;
   void *params;
 } blosc2_io;
 
 static const blosc2_io BLOSC2_IO_DEFAULTS = {
   .open = (blosc2_open_cb) blosc2_stdio_open,
   .close = (blosc2_close_cb) blosc2_stdio_close,
+  .tell = (blosc2_tell_cb) blosc2_stdio_tell,
   .seek = (blosc2_seek_cb) blosc2_stdio_seek,
   .write = (blosc2_write_cb) blosc2_stdio_write,
   .read = (blosc2_read_cb) blosc2_stdio_read,
+  .truncate = (blosc2_truncate_cb) blosc2_stdio_truncate,
   .params = NULL,
 };
 

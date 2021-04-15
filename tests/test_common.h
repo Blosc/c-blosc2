@@ -26,7 +26,6 @@
   #include "win32/stdint-windows.h"
 #else
   #include <stdint.h>
-  #include <unistd.h>
   #include <sys/time.h>
 #endif
 
