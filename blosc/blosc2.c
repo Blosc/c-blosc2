@@ -1122,7 +1122,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
 /* Process the filter pipeline (decompression mode) */
 int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8_t* dest,
                const int32_t offset, uint8_t* src, uint8_t* tmp,
-               uint8_t* tmp2, int last_filter_index) {
+               uint8_t* tmp2, int last_filter_index, int32_t nblock) {
   blosc2_context* context = thread_context->parent_context;
   int32_t typesize = context->typesize;
   uint8_t* filters = context->filters;
@@ -1212,7 +1212,7 @@ int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8
     postparams.out = dest + offset;
     postparams.size = bsize;
     postparams.typesize = typesize;
-    postparams.offset = offset;
+    postparams.offset = nblock * context->blocksize;
     postparams.tid = thread_context->tid;
     postparams.ttmp = thread_context->tmp;
     postparams.ttmp_nbytes = thread_context->tmp_nbytes;
@@ -1465,7 +1465,7 @@ static int blosc_d(
       postparams.out = dest + dest_offset;
       postparams.size = bsize;
       postparams.typesize = typesize;
-      postparams.offset = dest_offset;
+      postparams.offset = nblock * context->blocksize;
       postparams.tid = thread_context->tid;
       postparams.ttmp = thread_context->tmp;
       postparams.ttmp_nbytes = thread_context->tmp_nbytes;
@@ -1623,7 +1623,7 @@ static int blosc_d(
   if (last_filter_index >= 0 || context->postfilter != NULL) {
     /* Apply regular filter pipeline */
     int errcode = pipeline_d(thread_context, bsize, dest, dest_offset, tmp, tmp2, tmp3,
-                             last_filter_index);
+                             last_filter_index, nblock);
     if (errcode < 0)
       return errcode;
   }
@@ -2667,9 +2667,9 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     int32_t src_offset = memcpyed ?
       context->header_overhead + j * bsize : sw32_(context->bstarts + j);
 
-    cbytes = blosc_d(context->serial_context, bsize, leftoverblock, memcpyed,
-                     src, srcsize, src_offset, j,
-                     tmp2, 0, scontext->tmp, scontext->tmp3);
+    int cbytes = blosc_d(context->serial_context, bsize, leftoverblock, memcpyed,
+                         src, srcsize, src_offset, j,
+                         tmp2, 0, scontext->tmp, scontext->tmp3);
     if (cbytes < 0) {
       ntbytes = cbytes;
       break;
@@ -2678,8 +2678,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
       /* Copy to destination */
       memcpy((uint8_t *) dest + ntbytes, tmp2 + startb, (unsigned int) bsize2);
     }
-    cbytes = (int)bsize2;
-    ntbytes += cbytes;
+    ntbytes += bsize2;
   }
 
   return ntbytes;
