@@ -228,7 +228,10 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
       cparams.clevel != schunk->cctx->clevel ||
       cparams.compcode != schunk->cctx->compcode ||
       cparams.use_dict != schunk->cctx->use_dict ||
-      cparams.blocksize != schunk->cctx->blocksize) {
+      cparams.blocksize != schunk->cctx->blocksize ||
+      // In case of prefilters or postfilters, force their execution.
+      schunk->cctx->prefilter != NULL ||
+      schunk->dctx->postfilter != NULL) {
     cparams_equal = false;
   }
   for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
