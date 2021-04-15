@@ -160,8 +160,8 @@ static char *test_postfilter1(void) {
   }
 
   /* getitem */
-  int start = 0;
-  int nitems = 10;
+  int start = 3;
+  int nitems = SIZE - start;
   int dsize_ = blosc2_getitem_ctx(dctx, data_out, csize, start, nitems, data_dest, dsize);
   mu_assert("getitem error", dsize_ >= 0);
   for (int i = start; i < start + nitems; i++) {
@@ -214,8 +214,8 @@ static char *test_postfilter2(void) {
   }
 
   /* getitem */
-  int start = 3;
-  int nitems = 20;
+  int start = 0;
+  int nitems = SIZE - start;
   int dsize_ = blosc2_getitem_ctx(dctx, data_out, csize, start, nitems, data_dest, dsize);
   mu_assert("getitem error", dsize_ >= 0);
   for (int i = start; i < start + nitems; i++) {
@@ -296,7 +296,7 @@ int main(void) {
   /* Create a context for compression */
   cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = sizeof(int32_t);
-  cparams.compcode = BLOSC_BLOSCLZ;
+  cparams.blocksize = 2048;
   dparams = BLOSC2_DPARAMS_DEFAULTS;
 
   /* Run all the suite */
