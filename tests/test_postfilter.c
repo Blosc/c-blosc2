@@ -90,7 +90,7 @@ static char *test_postfilter0(void) {
   cctx = blosc2_create_cctx(cparams);
   init_data();
 
-  csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
+  csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
   mu_assert("Compression error", csize > 0);
 
   // Set some postfilter parameters and function
@@ -106,11 +106,19 @@ static char *test_postfilter0(void) {
   dctx = blosc2_create_dctx(dparams);
 
   /* Decompress  */
-  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, (size_t)dsize);
+  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, dsize);
   mu_assert("Decompression error", dsize >= 0);
-
   for (int i = 0; i < SIZE; i++) {
     mu_assert("Decompressed data differs from original!", data[i] * 2 == data_dest[i]);
+  }
+
+  /* getitem */
+  int start = 3;
+  int nitems = 10;
+  int dsize_ = blosc2_getitem_ctx(dctx, data_out, csize, start, nitems, data_dest, dsize);
+  mu_assert("getitem error", dsize_ >= 0);
+  for (int i = start; i < start + nitems; i++) {
+    mu_assert("getitem data differs from original!", data[i] * 2 == data_dest[i - start]);
   }
 
   /* Free resources */
@@ -127,7 +135,7 @@ static char *test_postfilter1(void) {
   cctx = blosc2_create_cctx(cparams);
   init_data();
 
-  csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
+  csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
   mu_assert("Compression error", csize > 0);
 
   // Set some postfilter parameters and function
@@ -145,11 +153,19 @@ static char *test_postfilter1(void) {
   dctx = blosc2_create_dctx(dparams);
 
   /* Decompress  */
-  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, (size_t)dsize);
-  mu_assert("Decompression error", dsize >= 0);
-
+  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, dsize);
+  mu_assert("getitem error", dsize >= 0);
   for (int i = 0; i < SIZE; i++) {
-    mu_assert("Decompressed data differs from original!", data[i] * 3 == data_dest[i]);
+    mu_assert("getitem data differs from original!", data[i] * 3 == data_dest[i]);
+  }
+
+  /* getitem */
+  int start = 0;
+  int nitems = 10;
+  int dsize_ = blosc2_getitem_ctx(dctx, data_out, csize, start, nitems, data_dest, dsize);
+  mu_assert("getitem error", dsize_ >= 0);
+  for (int i = start; i < start + nitems; i++) {
+    mu_assert("getitem data differs from original!", data[i] * 3 == data_dest[i - start]);
   }
 
   /* Free resources */
@@ -166,7 +182,7 @@ static char *test_postfilter2(void) {
   cctx = blosc2_create_cctx(cparams);
   init_data();
 
-  csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
+  csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
   mu_assert("Buffer is uncompressible", csize != 0);
   mu_assert("Compression error", csize > 0);
 
@@ -187,14 +203,24 @@ static char *test_postfilter2(void) {
   dctx = blosc2_create_dctx(dparams);
 
   /* Decompress  */
-  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, (size_t)dsize);
+  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, dsize);
   mu_assert("Decompression error", dsize >= 0);
-
   for (int i = 0; i < SIZE; i++) {
     if ((data[i] + data2[i]) != data_dest[i]) {
       printf("Error in pos '%d': (%d + %d) != %d\n", i, data[i], data2[i], data_dest[i]);
     }
-    mu_assert("Decompressed data differs from original!", (data[i] + data2[i]) == data_dest[i]);
+    mu_assert("Decompressed data differs from original!",
+              (data[i] + data2[i]) == data_dest[i]);
+  }
+
+  /* getitem */
+  int start = 3;
+  int nitems = 20;
+  int dsize_ = blosc2_getitem_ctx(dctx, data_out, csize, start, nitems, data_dest, dsize);
+  mu_assert("getitem error", dsize_ >= 0);
+  for (int i = start; i < start + nitems; i++) {
+    mu_assert("getitem data differs from original!",
+              (data[i] + data2[i]) == data_dest[i - start]);
   }
 
   /* Free resources */
