@@ -46,7 +46,8 @@ Process finished with exit code 0
 #define GB  (1024*MB)
 
 #define CHUNKSIZE (500 * 1000)
-#define NCHUNKS 1000
+//#define CHUNKSIZE (500)
+#define NCHUNKS 10000
 #define NTHREADS 8
 
 // For exercising the optimized zero chunk creators uncomment the line below

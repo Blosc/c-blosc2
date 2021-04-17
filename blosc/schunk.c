@@ -475,7 +475,9 @@ int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int specia
     return 0;
   }
 
-  if ((nitems / chunksize) > INT_MAX) {
+  int32_t typesize = schunk->typesize;
+
+  if ((nitems * typesize / chunksize) > INT_MAX) {
     BLOSC_TRACE_ERROR("nitems is too large.  Try increasing the chunksize.");
     return BLOSC2_ERROR_SCHUNK_SPECIAL;
   }
@@ -486,14 +488,14 @@ int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int specia
   }
 
   // Compute the number of chunks and the length of the offsets chunk
-  int32_t nchunks = nitems / chunksize;
+  int32_t nchunks = nitems * typesize / chunksize;
   int32_t leftover_items = nitems % chunksize;
-  int32_t leftover_size = leftover_items * schunk->typesize;
+  int32_t leftover_size = leftover_items * typesize;
 
   /* Update counters */
   schunk->chunksize = chunksize;
   schunk->nchunks = nchunks;
-  schunk->nbytes = nitems * schunk->typesize;
+  schunk->nbytes = nitems * typesize;
 
   if (schunk->frame == NULL) {
     // Build the special chunks
