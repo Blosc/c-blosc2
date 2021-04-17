@@ -280,6 +280,7 @@ enum {
   BLOSC2_ERROR_FILE_TRUNCATE = -25,   //!< File truncate failure
   BLOSC2_ERROR_THREAD_CREATE = -26,   //!< Thread or thread context creation failure
   BLOSC2_ERROR_POSTFILTER = -27,      //!< Postfilter failure
+  BLOSC2_ERROR_FRAME_SPECIAL = -28,   //!< Special frame failure
 };
 
 /**
@@ -1073,7 +1074,7 @@ BLOSC_EXPORT int blosc2_chunk_nans(blosc2_cparams cparams, size_t nbytes,
  * @param dest The buffer where the data chunk will be put.
  * @param destsize The size (in bytes) of the @p dest buffer.
  * @param repeatval A pointer to the repeated value (little endian).
- * The size of the value is given by @p typesize param.
+ * The size of the value is given by @p cparams.typesize param.
  *
  * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH + typesize).
  * If negative, there has been an error and @dest is unusable.
@@ -1486,6 +1487,9 @@ BLOSC_EXPORT int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offse
  * If there is not an internal frame, an estimate of the length is provided.
  */
 BLOSC_EXPORT int64_t blosc2_schunk_frame_len(blosc2_schunk* schunk);
+
+/* Fill an empty frame with special values (fast path). */
+int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int special_value);
 
 
 /*********************************************************************
