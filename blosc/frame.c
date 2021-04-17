@@ -2095,10 +2095,11 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
   int64_t nbytes;
   int64_t cbytes;
   int32_t blocksize;
+  int32_t typesize;
   int32_t nchunks;
 
   int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &blocksize, NULL,
-                           &nchunks, NULL, NULL, NULL, NULL, NULL);
+                           &nchunks, &typesize, NULL, NULL, NULL, NULL);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return BLOSC2_ERROR_DATA;
@@ -2119,9 +2120,9 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
   }
 
   // Compute the number of chunks and the length of the offsets chunk
-  nchunks = nitems / chunksize;
+  nchunks = nitems * typesize / chunksize;
   int32_t leftover_items = 0;
-  if (nchunks * chunksize > nitems) {
+  if (nchunks * chunksize > nitems * typesize) {
     nchunks += 1;
     leftover_items = nitems % chunksize;
   }
@@ -2159,21 +2160,31 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
   int new_off_cbytes = BLOSC_EXTENDED_HEADER_LENGTH + sizeof(int64_t);
   uint8_t* off_chunk = malloc(new_off_cbytes);
   uint64_t offset_value = ((uint64_t)1 << 63);
+  uint8_t* sample_chunk = malloc(BLOSC_EXTENDED_HEADER_LENGTH);
+  int csize;
   switch (special_value) {
     case BLOSC2_ZERO_RUNLEN:
       offset_value += (uint64_t) BLOSC2_ZERO_RUNLEN << (8 * 7);
+      csize = blosc2_chunk_zeros(*cparams, chunksize, sample_chunk, BLOSC_EXTENDED_HEADER_LENGTH);
       break;
     case BLOSC2_UNINIT_VALUE:
       offset_value += (uint64_t) BLOSC2_UNINIT_VALUE << (8 * 7);
+      csize = blosc2_chunk_uninit(*cparams, chunksize, sample_chunk, BLOSC_EXTENDED_HEADER_LENGTH);
       break;
     case BLOSC2_NAN_RUNLEN:
       offset_value += (uint64_t)BLOSC2_NAN_RUNLEN << (8 * 7);
+      csize = blosc2_chunk_nans(*cparams, chunksize, sample_chunk, BLOSC_EXTENDED_HEADER_LENGTH);
       break;
     default:
       BLOSC_TRACE_ERROR("Only zeros, NaNs or non-initialized values are supported.");
       return BLOSC2_ERROR_FRAME_SPECIAL;
   }
+  if (csize < 0) {
+    BLOSC_TRACE_ERROR("Error creating sample chunk");
+    return BLOSC2_ERROR_FRAME_SPECIAL;
+  }
   cparams->typesize = sizeof(int64_t);  // change it to offsets typesize
+  cparams->blocksize = 0;
   int32_t special_nbytes = nchunks * sizeof(int64_t);
   rc = blosc2_chunk_repeatval(*cparams, special_nbytes, off_chunk, new_off_cbytes, &offset_value);
   free(cparams);
@@ -2181,6 +2192,12 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
     BLOSC_TRACE_ERROR("Error creating a special offsets chunk");
     return BLOSC2_ERROR_DATA;
   }
+
+  // Get the blocksize associated to the sample chunk
+  blosc2_cbuffer_sizes(sample_chunk, NULL, NULL, &blocksize);
+  free(sample_chunk);
+  // and use it for the super-chunk
+  schunk->blocksize = blocksize;
 
   int64_t new_cbytes = cbytes + chunk_cbytes;
   int64_t new_frame_len;
