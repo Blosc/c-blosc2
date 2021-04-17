@@ -469,6 +469,17 @@ blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy
   return schunk;
 }
 
+/* Fill an empty frame with special values (fast path). */
+int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int special_value) {
+  if (schunk->frame == NULL) {
+    BLOSC_TRACE_ERROR("This only works for frames.");
+    return BLOSC2_ERROR_FRAME_SPECIAL;
+  }
+  /* Fill an empty frame with special values (fast path). */
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+  return frame_fill_special(frame, nitems, special_value, schunk);
+
+  }
 
 /* Append an existing chunk into a super-chunk. */
 int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy) {

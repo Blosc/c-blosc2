@@ -51,6 +51,7 @@ Process finished with exit code 0
 
 // For exercising the optimized zero chunk creators uncomment the line below
 #define CREATE_ZEROS
+#define CREATE_ZEROS_SPECIAL
 
 
 int create_cframe(const char* compname) {
@@ -91,6 +92,14 @@ int create_cframe(const char* compname) {
 
   // Add some data
   blosc_set_timestamp(&last);
+
+#ifdef CREATE_ZEROS_SPECIAL
+  int rc = blosc2_schunk_fill_special(schunk, NCHUNKS * CHUNKSIZE,BLOSC2_ZERO_RUNLEN);
+  if (rc < 0) {
+    printf("Error in fill special.  Error code: %d\n", rc);
+    return rc;
+  }
+#else
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
 #ifdef CREATE_ZEROS
     int nchunks = blosc2_schunk_append_chunk(schunk, (uint8_t *) data_dest, true);
@@ -112,6 +121,7 @@ int create_cframe(const char* compname) {
     }
 #endif
   }
+#endif
   blosc_set_timestamp(&current);
 
   /* Gather some info */
