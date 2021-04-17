@@ -281,6 +281,7 @@ enum {
   BLOSC2_ERROR_THREAD_CREATE = -26,   //!< Thread or thread context creation failure
   BLOSC2_ERROR_POSTFILTER = -27,      //!< Postfilter failure
   BLOSC2_ERROR_FRAME_SPECIAL = -28,   //!< Special frame failure
+  BLOSC2_ERROR_SCHUNK_SPECIAL = -29,  //!< Special super-chunk failure
 };
 
 /**
@@ -1489,7 +1490,8 @@ BLOSC_EXPORT int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offse
 BLOSC_EXPORT int64_t blosc2_schunk_frame_len(blosc2_schunk* schunk);
 
 /* Fill an empty frame with special values (fast path). */
-int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int special_value);
+int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int special_value,
+                               int32_t chunksize);
 
 
 /*********************************************************************

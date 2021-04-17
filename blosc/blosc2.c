@@ -3520,6 +3520,11 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const size_t nbytes, void* dest, 
     return BLOSC2_ERROR_DATA;
   }
 
+  if (nbytes % cparams.typesize) {
+    BLOSC_TRACE_ERROR("nbytes must be a multiple of typesize");
+    return BLOSC2_ERROR_DATA;
+  }
+
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
 
@@ -3555,6 +3560,11 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const size_t nbytes, void* dest, 
 int blosc2_chunk_uninit(blosc2_cparams cparams, const size_t nbytes, void* dest, size_t destsize) {
   if (destsize < BLOSC_EXTENDED_HEADER_LENGTH) {
     BLOSC_TRACE_ERROR("dest buffer is not long enough");
+    return BLOSC2_ERROR_DATA;
+  }
+
+  if (nbytes % cparams.typesize) {
+    BLOSC_TRACE_ERROR("nbytes must be a multiple of typesize");
     return BLOSC2_ERROR_DATA;
   }
 
@@ -3595,6 +3605,11 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const size_t nbytes, void* dest, s
     return BLOSC2_ERROR_DATA;
   }
 
+  if (nbytes % cparams.typesize) {
+    BLOSC_TRACE_ERROR("nbytes must be a multiple of typesize");
+    return BLOSC2_ERROR_DATA;
+  }
+
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
 
@@ -3632,6 +3647,11 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const size_t nbytes,
   uint8_t typesize = cparams.typesize;
   if (destsize < BLOSC_EXTENDED_HEADER_LENGTH + typesize) {
     BLOSC_TRACE_ERROR("dest buffer is not long enough");
+    return BLOSC2_ERROR_DATA;
+  }
+
+  if (nbytes % cparams.typesize) {
+    BLOSC_TRACE_ERROR("nbytes must be a multiple of typesize");
     return BLOSC2_ERROR_DATA;
   }
 

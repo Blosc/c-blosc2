@@ -408,7 +408,9 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
   from_big(nbytes, framep + FRAME_NBYTES, sizeof(*nbytes));
   from_big(cbytes, framep + FRAME_CBYTES, sizeof(*cbytes));
   from_big(blocksize, framep + FRAME_BLOCKSIZE, sizeof(*blocksize));
-  from_big(chunksize, framep + FRAME_CHUNKSIZE, sizeof(*chunksize));
+  if (chunksize != NULL) {
+    from_big(chunksize, framep + FRAME_CHUNKSIZE, sizeof(*chunksize));
+  }
   if (typesize != NULL) {
     from_big(typesize, framep + FRAME_TYPESIZE, sizeof(*typesize));
   }
@@ -2087,16 +2089,15 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
 
 /* Fill an empty frame with special values (fast path). */
 int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
-                       blosc2_schunk* schunk) {
+                       int32_t chunksize, blosc2_schunk* schunk) {
   int32_t header_len;
   int64_t frame_len;
   int64_t nbytes;
   int64_t cbytes;
   int32_t blocksize;
-  int32_t chunksize;
   int32_t nchunks;
 
-  int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &blocksize, &chunksize,
+  int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &blocksize, NULL,
                            &nchunks, NULL, NULL, NULL, NULL, NULL);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
@@ -2174,7 +2175,7 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
   }
   cparams->typesize = sizeof(int64_t);  // change it to offsets typesize
   int32_t special_nbytes = nchunks * sizeof(int64_t);
-  rc = blosc2_chunk_repeatval(*cparams, special_nbytes, off_chunk, cbytes, &offset_value);
+  rc = blosc2_chunk_repeatval(*cparams, special_nbytes, off_chunk, new_off_cbytes, &offset_value);
   free(cparams);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Error creating a special offsets chunk");
@@ -2256,7 +2257,7 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
     return BLOSC2_ERROR_FRAME_SPECIAL;
   }
 
-  return special_nbytes;
+  return frame->len;
 }
 
 
