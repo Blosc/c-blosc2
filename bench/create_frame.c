@@ -78,7 +78,7 @@ int create_cframe(const char* compname) {
   char filename[64];
   sprintf(filename, "frame_simple-%s.b2frame", compname);
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
-                            .urlpath=NULL, .contiguous=false};
+                            .urlpath=NULL, .contiguous=true};
   blosc2_schunk* schunk = blosc2_schunk_new(&storage);
 
 #ifdef CREATE_ZEROS
@@ -94,7 +94,8 @@ int create_cframe(const char* compname) {
   blosc_set_timestamp(&last);
 
 #ifdef CREATE_ZEROS_SPECIAL
-  int rc = blosc2_schunk_fill_special(schunk, NCHUNKS * CHUNKSIZE,BLOSC2_ZERO_RUNLEN);
+  int rc = blosc2_schunk_fill_special(schunk, NCHUNKS * CHUNKSIZE,
+                                      BLOSC2_ZERO_RUNLEN, isize);
   if (rc < 0) {
     printf("Error in fill special.  Error code: %d\n", rc);
     return rc;

@@ -14,7 +14,6 @@
 #include <sys/stat.h>
 #include "blosc2.h"
 #include "blosc-private.h"
-#include "context.h"
 #include "frame.h"
 #include "stune.h"
 
@@ -470,16 +469,93 @@ blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy
 }
 
 /* Fill an empty frame with special values (fast path). */
-int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int special_value) {
-  if (schunk->frame == NULL) {
-    BLOSC_TRACE_ERROR("This only works for frames.");
+int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int special_value,
+                               int32_t chunksize) {
+  if (nitems == 0) {
+    return 0;
+  }
+
+  if ((nitems / chunksize) > INT_MAX) {
+    BLOSC_TRACE_ERROR("nitems is too large.  Try increasing the chunksize.");
+    return BLOSC2_ERROR_SCHUNK_SPECIAL;
+  }
+
+  if ((schunk->nbytes > 0) || (schunk->cbytes > 0)) {
+    BLOSC_TRACE_ERROR("Filling with special values only works on empty super-chunks");
     return BLOSC2_ERROR_FRAME_SPECIAL;
   }
-  /* Fill an empty frame with special values (fast path). */
-  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
-  return frame_fill_special(frame, nitems, special_value, schunk);
 
+  // Compute the number of chunks and the length of the offsets chunk
+  int32_t nchunks = nitems / chunksize;
+  int32_t leftover_items = nitems % chunksize;
+  int32_t leftover_size = leftover_items * schunk->typesize;
+
+  /* Update counters */
+  schunk->chunksize = chunksize;
+  schunk->nchunks = nchunks;
+  schunk->nbytes = nitems * schunk->typesize;
+
+  if (schunk->frame == NULL) {
+    // Build the special chunks
+    void* chunk = malloc(BLOSC_EXTENDED_HEADER_LENGTH);
+    void* chunk2 = malloc(BLOSC_EXTENDED_HEADER_LENGTH);
+    blosc2_cparams* cparams;
+    blosc2_schunk_get_cparams(schunk, &cparams);
+    int csize, csize2;
+    switch (special_value) {
+      case BLOSC2_ZERO_RUNLEN:
+        csize = blosc2_chunk_zeros(*cparams, chunksize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+        csize2 = blosc2_chunk_zeros(*cparams, leftover_size, chunk2, BLOSC_EXTENDED_HEADER_LENGTH);
+        break;
+      case BLOSC2_UNINIT_VALUE:
+        csize = blosc2_chunk_uninit(*cparams, chunksize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+        csize2 = blosc2_chunk_uninit(*cparams, leftover_size, chunk2, BLOSC_EXTENDED_HEADER_LENGTH);
+        break;
+      case BLOSC2_NAN_RUNLEN:
+        csize = blosc2_chunk_nans(*cparams, chunksize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+        csize2 = blosc2_chunk_nans(*cparams, leftover_size, chunk2, BLOSC_EXTENDED_HEADER_LENGTH);
+        break;
+      default:
+        BLOSC_TRACE_ERROR("Only zeros, NaNs or non-initialized values are supported.");
+        return BLOSC2_ERROR_SCHUNK_SPECIAL;
+    }
+    free(cparams);
+    if (csize < 0 || csize2 < 0) {
+      BLOSC_TRACE_ERROR("Error creating special chunks.");
+      return BLOSC2_ERROR_SCHUNK_SPECIAL;
+    }
+
+    for (int nchunk = 0; nchunk < nchunks; nchunk++) {
+      int nchunk_ = blosc2_schunk_append_chunk(schunk, chunk, true);
+      if (nchunk_ != nchunk + 1) {
+        BLOSC_TRACE_ERROR("Error appending special chunks.");
+        return BLOSC2_ERROR_SCHUNK_SPECIAL;
+      }
+    }
+
+    if (leftover_items) {
+      nchunks += 1;
+      int nchunk_ = blosc2_schunk_append_chunk(schunk, chunk2, true);
+      if (nchunk_ != nchunks) {
+        BLOSC_TRACE_ERROR("Error appending last special chunk.");
+        return BLOSC2_ERROR_SCHUNK_SPECIAL;
+      }
+    }
+    free(chunk);
+    free(chunk2);
   }
+  else {
+    /* Fill an empty frame with special values (fast path). */
+    blosc2_frame_s *frame = (blosc2_frame_s *) schunk->frame;
+    int64_t frame_len = frame_fill_special(frame, nitems, special_value, chunksize, schunk);
+    if (frame_len < 0) {
+      BLOSC_TRACE_ERROR("Error creating special frame.");
+      return frame_len;
+    }
+  }
+
+  return schunk->nchunks;
+}
 
 /* Append an existing chunk into a super-chunk. */
 int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy) {
@@ -667,7 +743,6 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
 int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy) {
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
-  int32_t nchunks = schunk->nchunks;
 
   int rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {

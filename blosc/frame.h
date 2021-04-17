@@ -145,6 +145,6 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new);
 int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk);
 
 int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
-                       blosc2_schunk* schunk);
+                       int32_t chunksize, blosc2_schunk* schunk);
 
 #endif //BLOSC_FRAME_H
