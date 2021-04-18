@@ -2167,7 +2167,10 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
     return BLOSC2_ERROR_FRAME_SPECIAL;
   }
   cparams->typesize = sizeof(int64_t);  // change it to offsets typesize
-  cparams->blocksize = 0;  // ask for an automatic blocksize
+  // cparams->blocksize = 0;   // automatic blocksize
+  cparams->blocksize = 8 * 2 * 1024;  // based on experiments with create_frame.c bench
+  cparams->clevel = 5;
+  cparams->compcode = BLOSC_BLOSCLZ;
   int32_t special_nbytes = nchunks * sizeof(int64_t);
   rc = blosc2_chunk_repeatval(*cparams, special_nbytes, off_chunk, new_off_cbytes, &offset_value);
   free(cparams);
@@ -2181,6 +2184,7 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
   free(sample_chunk);
   // and use it for the super-chunk
   schunk->blocksize = blocksize;
+  // schunk->blocksize = 0;  // for experimenting with automatic blocksize
 
   // We have the new offsets; update the frame.
   int64_t new_frame_len = header_len + new_off_cbytes + frame->trailer_len;
@@ -2359,6 +2363,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   // The params below have been fine-tuned with the zero_runlen bench
   cctx->nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
   // cctx->compcode = BLOSC_LZ4;
+  cctx->blocksize = 4 * 1024;  // based on experiments with create_frame.c bench
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
                                                off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
