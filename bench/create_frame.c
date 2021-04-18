@@ -94,8 +94,9 @@ int create_cframe(const char* compname) {
   // Add some data
   blosc_set_timestamp(&last);
 
+  int64_t nitems = (int64_t)NCHUNKS * CHUNKSIZE;
 #ifdef CREATE_ZEROS_SPECIAL
-  int rc = blosc2_schunk_fill_special(schunk, NCHUNKS * CHUNKSIZE,
+  int rc = blosc2_schunk_fill_special(schunk, nitems,
                                       BLOSC2_ZERO_RUNLEN, isize);
   if (rc < 0) {
     printf("Error in fill special.  Error code: %d\n", rc);
@@ -142,6 +143,13 @@ int create_cframe(const char* compname) {
     if (dsize < 0) {
       printf("Decompression error in schunk.  Error code: %d\n", dsize);
       return dsize;
+    }
+    if (nchunk == NCHUNKS - 1) {
+      int32_t leftover_bytes = nitems / CHUNKSIZE;
+      if (leftover_bytes > 0 && dsize != isize) {
+        printf("Wrong size for last chunk.  It is %d and should be: %ld\n", dsize, isize);
+        return dsize;
+      }
     }
   }
   blosc_set_timestamp(&current);
