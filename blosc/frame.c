@@ -1829,7 +1829,12 @@ int frame_get_chunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool *ne
   if (offset < 0) {
     // Special value
     chunk_cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
-    rc = frame_special_chunk(offset, chunksize, typesize, blocksize, chunk, chunk_cbytes, needs_free);
+    int32_t chunksize_ = chunksize;
+    if ((nchunk == nchunks - 1) && (nbytes % chunksize)) {
+      // Last chunk is incomplete.  Compute its actual size.
+      chunksize_ = nbytes % chunksize;
+    }
+    rc = frame_special_chunk(offset, chunksize_, typesize, blocksize, chunk, chunk_cbytes, needs_free);
     if (rc < 0) {
       return rc;
     }
@@ -1930,7 +1935,12 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
   if (offset < 0) {
     // Special value
     lazychunk_cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
-    rc = frame_special_chunk(offset, chunksize, typesize, blocksize, chunk,
+    int32_t chunksize_ = chunksize;
+    if ((nchunk == nchunks - 1) && (nbytes % chunksize)) {
+      // Last chunk is incomplete.  Compute its actual size.
+      chunksize_ = nbytes % chunksize;
+    }
+    rc = frame_special_chunk(offset, chunksize_, typesize, blocksize, chunk,
                              (int32_t)lazychunk_cbytes, needs_free);
     goto end;
   }
@@ -2121,40 +2131,13 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
 
   // Compute the number of chunks and the length of the offsets chunk
   nchunks = nitems * typesize / chunksize;
-  int32_t leftover_items = 0;
-  if (nchunks * chunksize > nitems * typesize) {
+  int32_t leftover_items = nitems % chunksize;
+  if (leftover_items) {
     nchunks += 1;
-    leftover_items = nitems % chunksize;
   }
 
   blosc2_cparams* cparams;
   blosc2_schunk_get_cparams(schunk, &cparams);
-  int32_t chunk_nbytes = leftover_items * cparams->typesize;
-  int32_t chunk_cbytes = 0;
-  uint8_t* chunk = NULL;
-  // Create the leftover chunk (if necessary)
-  if (leftover_items) {
-    chunk_cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
-    chunk = malloc(chunk_cbytes);
-    switch (special_value) {
-      case BLOSC2_ZERO_RUNLEN:
-        rc = blosc2_chunk_zeros(*cparams, chunk_nbytes, chunk, chunk_cbytes);
-        break;
-      case BLOSC2_UNINIT_VALUE:
-        rc = blosc2_chunk_uninit(*cparams, chunk_nbytes, chunk, chunk_cbytes);
-        break;
-      case BLOSC2_NAN_RUNLEN:
-        rc = blosc2_chunk_nans(*cparams, chunk_nbytes, chunk, chunk_cbytes);
-        break;
-      default:
-        BLOSC_TRACE_ERROR("Only zeros, NaNs or non-initialized values are supported.");
-        return BLOSC2_ERROR_FRAME_SPECIAL;
-    }
-    if (rc < 0) {
-      BLOSC_TRACE_ERROR("Error creating a special leftover chunk");
-      return rc;
-    }
-  }
 
   // Build the offsets with a special chunk
   int new_off_cbytes = BLOSC_EXTENDED_HEADER_LENGTH + sizeof(int64_t);
@@ -2184,7 +2167,7 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
     return BLOSC2_ERROR_FRAME_SPECIAL;
   }
   cparams->typesize = sizeof(int64_t);  // change it to offsets typesize
-  cparams->blocksize = 0;
+  cparams->blocksize = 0;  // ask for an automatic blocksize
   int32_t special_nbytes = nchunks * sizeof(int64_t);
   rc = blosc2_chunk_repeatval(*cparams, special_nbytes, off_chunk, new_off_cbytes, &offset_value);
   free(cparams);
@@ -2199,15 +2182,8 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
   // and use it for the super-chunk
   schunk->blocksize = blocksize;
 
-  int64_t new_cbytes = cbytes + chunk_cbytes;
-  int64_t new_frame_len;
-  if (frame->sframe) {
-    new_frame_len = header_len + 0 + new_off_cbytes + frame->trailer_len;
-  }
-  else {
-    new_frame_len = header_len + new_cbytes + new_off_cbytes + frame->trailer_len;
-  }
-
+  // We have the new offsets; update the frame.
+  int64_t new_frame_len = header_len + new_off_cbytes + frame->trailer_len;
   FILE* fp = NULL;
   if (frame->cframe != NULL) {
     uint8_t* framep = frame->cframe;
@@ -2217,21 +2193,13 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
       BLOSC_TRACE_ERROR("Cannot realloc space for the frame.");
       return BLOSC2_ERROR_FRAME_SPECIAL;
     }
-    /* Copy the chunk */
-    memcpy(framep + header_len + cbytes, chunk, (size_t)chunk_cbytes);
     /* Copy the offsets */
-    memcpy(framep + header_len + new_cbytes, off_chunk, (size_t)new_off_cbytes);
+    memcpy(framep + header_len, off_chunk, (size_t)new_off_cbytes);
   }
   else {
     size_t wbytes;
     if (frame->sframe) {
       // Update the offsets chunk in the chunks frame
-      if (chunk_cbytes != 0) {
-        if (sframe_create_chunk(frame, chunk, nchunks, chunk_cbytes) == NULL) {
-          BLOSC_TRACE_ERROR("Cannot write the full chunk.");
-          return BLOSC2_ERROR_FRAME_SPECIAL;
-        }
-      }
       fp = sframe_open_index(frame->urlpath, "rb+");
       fseek(fp, header_len, SEEK_SET);
     }
@@ -2239,12 +2207,6 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
       // Regular frame
       fp = fopen(frame->urlpath, "rb+");
       fseek(fp, header_len + cbytes, SEEK_SET);
-      wbytes = fwrite(chunk, 1, (size_t)chunk_cbytes, fp);  // the new chunk
-      if (wbytes != (size_t)chunk_cbytes) {
-        BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
-        fclose(fp);
-        return BLOSC2_ERROR_FRAME_SPECIAL;
-      }
     }
     wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
     fclose(fp);
@@ -2253,13 +2215,11 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
       return BLOSC2_ERROR_FRAME_SPECIAL;
     }
   }
+
   // Invalidate the cache for chunk offsets
   if (frame->coffsets != NULL) {
     free(frame->coffsets);
     frame->coffsets = NULL;
-  }
-  if (chunk) {
-    free(chunk);
   }
   free(off_chunk);
 

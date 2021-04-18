@@ -46,11 +46,10 @@ Process finished with exit code 0
 #define GB  (1024*MB)
 
 #define CHUNKSIZE (500 * 1000)
-//#define CHUNKSIZE (500)
 #define NCHUNKS 10000
 #define NTHREADS 8
 
-// For exercising the optimized zero chunk creators uncomment the line below
+// For exercising the optimized zero chunk creators uncomment the lines below
 #define CREATE_ZEROS
 #define CREATE_ZEROS_SPECIAL
 
@@ -94,8 +93,10 @@ int create_cframe(const char* compname) {
   // Add some data
   blosc_set_timestamp(&last);
 
-  int64_t nitems = (int64_t)NCHUNKS * CHUNKSIZE;
+  int64_t nitems;
 #ifdef CREATE_ZEROS_SPECIAL
+  // Make nitems a non-divisible number of CHUNKSIZE
+  nitems = (int64_t)NCHUNKS * CHUNKSIZE + 1;
   int rc = blosc2_schunk_fill_special(schunk, nitems,
                                       BLOSC2_ZERO_RUNLEN, isize);
   if (rc < 0) {
@@ -103,6 +104,8 @@ int create_cframe(const char* compname) {
     return rc;
   }
 #else
+  // In these methods, nitems can only be an actual multiple of CHUNKSIZE
+  nitems = (int64_t)NCHUNKS * CHUNKSIZE;
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
 #ifdef CREATE_ZEROS
     int nchunks = blosc2_schunk_append_chunk(schunk, (uint8_t *) data_dest, true);
@@ -138,16 +141,17 @@ int create_cframe(const char* compname) {
 
   /* Retrieve and decompress the chunks from the super-chunks and compare values */
   blosc_set_timestamp(&last);
-  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+  int32_t leftover_bytes = (nitems % CHUNKSIZE) * sizeof(int32_t);
+  int32_t nchunks = leftover_bytes ? NCHUNKS + 1 : NCHUNKS;
+  for (nchunk = 0; nchunk < nchunks; nchunk++) {
     int32_t dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, data_dest, isize);
     if (dsize < 0) {
       printf("Decompression error in schunk.  Error code: %d\n", dsize);
       return dsize;
     }
-    if (nchunk == NCHUNKS - 1) {
-      int32_t leftover_bytes = nitems / CHUNKSIZE;
-      if (leftover_bytes > 0 && dsize != isize) {
-        printf("Wrong size for last chunk.  It is %d and should be: %ld\n", dsize, isize);
+    if ((nchunk == nchunks - 1) && (leftover_bytes > 0)) {
+      if (dsize != leftover_bytes) {
+        printf("Wrong size for last chunk.  It is %d and should be: %d\n", dsize, leftover_bytes);
         return dsize;
       }
     }
