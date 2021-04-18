@@ -46,12 +46,13 @@ Process finished with exit code 0
 #define GB  (1024*MB)
 
 #define CHUNKSIZE (500 * 1000)
-#define NCHUNKS 10000
-#define NTHREADS 8
+#define NCHUNKS 100000
+#define NTHREADS 1  // curiously, using 1 single thread is better for the uninitialized values
 
-// For exercising the optimized zero chunk creators uncomment the lines below
-#define CREATE_ZEROS
-#define CREATE_ZEROS_SPECIAL
+// For exercising the optimized chunk creators (un)comment the lines below as you please
+// #define CREATE_ZEROS
+#define CREATE_FILL
+// #define CREATE_LOOP
 
 
 int create_cframe(const char* compname) {
@@ -84,21 +85,28 @@ int create_cframe(const char* compname) {
 #ifdef CREATE_ZEROS
   // Precompute chunk of zeros
   int ret = blosc2_chunk_zeros(cparams, isize, data_dest, isize);
+#else
+  int ret = blosc2_chunk_uninit(cparams, isize, data_dest, isize);
+#endif
   if (ret < 0) {
-    printf("Compression error in chunk_zeros.  Error code: %d\n", ret);
+    printf("Creation error in special chunk.  Error code: %d\n", ret);
     return ret;
   }
-#endif
 
   // Add some data
   blosc_set_timestamp(&last);
 
   int64_t nitems;
-#ifdef CREATE_ZEROS_SPECIAL
+#ifdef CREATE_FILL
   // Make nitems a non-divisible number of CHUNKSIZE
   nitems = (int64_t)NCHUNKS * CHUNKSIZE + 1;
-  int rc = blosc2_schunk_fill_special(schunk, nitems,
-                                      BLOSC2_ZERO_RUNLEN, isize);
+#ifdef CREATE_ZEROS
+  // Precompute chunk of zeros
+  int special_value = BLOSC2_ZERO_RUNLEN;
+#else
+  int special_value = BLOSC2_UNINIT_VALUE;
+#endif
+  int rc = blosc2_schunk_fill_special(schunk, nitems, special_value, isize);
   if (rc < 0) {
     printf("Error in fill special.  Error code: %d\n", rc);
     return rc;
@@ -107,7 +115,7 @@ int create_cframe(const char* compname) {
   // In these methods, nitems can only be an actual multiple of CHUNKSIZE
   nitems = (int64_t)NCHUNKS * CHUNKSIZE;
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-#ifdef CREATE_ZEROS
+#ifdef CREATE_LOOP
     int nchunks = blosc2_schunk_append_chunk(schunk, (uint8_t *) data_dest, true);
     if (nchunks != nchunk + 1) {
       printf("Compression error in append chunk.  Error code: %d\n", nchunks);
@@ -116,9 +124,9 @@ int create_cframe(const char* compname) {
 #else
     for (int i = 0; i < CHUNKSIZE; i++) {
       // Different data patterns
-      data[i] = i * nchunk;
+      // data[i] = i * nchunk;
       // data[i] = nchunk;
-      // data[i] = 0;
+      data[i] = 0;
     }
     int nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     if (nchunks != nchunk + 1) {
@@ -173,7 +181,16 @@ int create_cframe(const char* compname) {
 
 int main(void) {
 #ifdef CREATE_ZEROS
-  printf("\n   ***  Creating zeros!   ***\n");
+  printf("\n   ***  Creating zeros   ***\n");
+#else
+  printf("\n   ***  Creating unitialized   ***\n");
+#endif
+#ifdef CREATE_FILL
+  printf("   ***  Using fill method!   ***\n");
+#elif defined(CREATE_LOOP)
+  printf("   ***  Using loop method!   ***\n");
+#else
+  printf("   ***  Using not optimized method!   ***\n");
 #endif
 
   create_cframe("blosclz");
