@@ -102,9 +102,9 @@ int create_cframe(const char* compname) {
   nitems = (int64_t)NCHUNKS * CHUNKSHAPE + 1;
 #ifdef CREATE_ZEROS
   // Precompute chunk of zeros
-  int special_value = BLOSC2_ZERO_RUNLEN;
+  int special_value = BLOSC2_SPECIAL_ZERO;
 #else
-  int special_value = BLOSC2_UNINIT_VALUE;
+  int special_value = BLOSC2_SPECIAL_UNINIT;
 #endif
   int rc = blosc2_schunk_fill_special(schunk, nitems, special_value, isize);
   if (rc < 0) {
