@@ -554,11 +554,11 @@ int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int specia
     int64_t frame_len = frame_fill_special(frame, nitems, special_value, chunksize, schunk);
     if (frame_len < 0) {
       BLOSC_TRACE_ERROR("Error creating special frame.");
-      return nchunks;
+      return frame_len;
     }
   }
 
-  return nchunks;
+  return schunk->nchunks;
 }
 
 /* Append an existing chunk into a super-chunk. */
