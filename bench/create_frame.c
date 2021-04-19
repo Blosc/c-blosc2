@@ -45,18 +45,20 @@ Process finished with exit code 0
 #define MB  (1024*KB)
 #define GB  (1024*MB)
 
-#define CHUNKSIZE (500 * 1000)
+#define CHUNKSHAPE (500 * 1000)
+//#define CHUNKSHAPE (500)
 #define NCHUNKS 100000
+//#define NCHUNKS 1
 #define NTHREADS 1  // curiously, using 1 single thread is better for the uninitialized values
 
 // For exercising the optimized chunk creators (un)comment the lines below as you please
-// #define CREATE_ZEROS
+#define CREATE_ZEROS
 #define CREATE_FILL
-// #define CREATE_LOOP
-
+//#define CREATE_LOOP
+#define CONTIGUOUS_FRAME false
 
 int create_cframe(const char* compname) {
-  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  size_t isize = CHUNKSHAPE * sizeof(int32_t);
   int32_t* data = malloc(isize);
   int32_t* data_dest = malloc(isize);
   int32_t* data_dest2 = malloc(isize);
@@ -79,7 +81,7 @@ int create_cframe(const char* compname) {
   char filename[64];
   sprintf(filename, "frame_simple-%s.b2frame", compname);
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
-                            .urlpath=NULL, .contiguous=true};
+                            .urlpath=NULL, .contiguous=CONTIGUOUS_FRAME};
   blosc2_schunk* schunk = blosc2_schunk_new(&storage);
 
 #ifdef CREATE_ZEROS
@@ -98,8 +100,8 @@ int create_cframe(const char* compname) {
 
   int64_t nitems;
 #ifdef CREATE_FILL
-  // Make nitems a non-divisible number of CHUNKSIZE
-  nitems = (int64_t)NCHUNKS * CHUNKSIZE + 1;
+  // Make nitems a non-divisible number of CHUNKSHAPE
+  nitems = (int64_t)NCHUNKS * CHUNKSHAPE + 1;
 #ifdef CREATE_ZEROS
   // Precompute chunk of zeros
   int special_value = BLOSC2_ZERO_RUNLEN;
@@ -112,8 +114,8 @@ int create_cframe(const char* compname) {
     return rc;
   }
 #else
-  // In these methods, nitems can only be an actual multiple of CHUNKSIZE
-  nitems = (int64_t)NCHUNKS * CHUNKSIZE;
+  // In these methods, nitems can only be an actual multiple of CHUNKSHAPE
+  nitems = (int64_t)NCHUNKS * CHUNKSHAPE;
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
 #ifdef CREATE_LOOP
     int nchunks = blosc2_schunk_append_chunk(schunk, (uint8_t *) data_dest, true);
@@ -122,7 +124,7 @@ int create_cframe(const char* compname) {
       return nchunk;
     }
 #else
-    for (int i = 0; i < CHUNKSIZE; i++) {
+    for (int i = 0; i < CHUNKSHAPE; i++) {
       // Different data patterns
       // data[i] = i * nchunk;
       // data[i] = nchunk;
@@ -149,7 +151,7 @@ int create_cframe(const char* compname) {
 
   /* Retrieve and decompress the chunks from the super-chunks and compare values */
   blosc_set_timestamp(&last);
-  int32_t leftover_bytes = (nitems % CHUNKSIZE) * sizeof(int32_t);
+  int32_t leftover_bytes = (nitems % CHUNKSHAPE) * sizeof(int32_t);
   int32_t nchunks = leftover_bytes ? NCHUNKS + 1 : NCHUNKS;
   for (nchunk = 0; nchunk < nchunks; nchunk++) {
     int32_t dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, data_dest, isize);

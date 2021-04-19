@@ -488,17 +488,13 @@ int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int specia
   }
 
   // Compute the number of chunks and the length of the offsets chunk
-  int32_t nchunks = nitems * typesize / chunksize;
-  int32_t leftover_items = nitems % chunksize;
-  int32_t leftover_size = leftover_items * typesize;
-
-  /* Update counters */
-  schunk->chunksize = chunksize;
-  schunk->nchunks = nchunks;
-  schunk->nbytes = nitems * typesize;
+  int32_t chunkitems = chunksize / typesize;
+  int32_t nchunks = (int32_t)(nitems / chunkitems);
+  int32_t leftover_items = (int32_t)(nitems % chunkitems);
 
   if (schunk->frame == NULL) {
     // Build the special chunks
+    int32_t leftover_size = leftover_items * typesize;
     void* chunk = malloc(BLOSC_EXTENDED_HEADER_LENGTH);
     void* chunk2 = malloc(BLOSC_EXTENDED_HEADER_LENGTH);
     blosc2_cparams* cparams;
@@ -536,9 +532,8 @@ int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int specia
     }
 
     if (leftover_items) {
-      nchunks += 1;
       int nchunk_ = blosc2_schunk_append_chunk(schunk, chunk2, true);
-      if (nchunk_ != nchunks) {
+      if (nchunk_ != nchunks + 1) {
         BLOSC_TRACE_ERROR("Error appending last special chunk.");
         return BLOSC2_ERROR_SCHUNK_SPECIAL;
       }
@@ -549,14 +544,21 @@ int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int specia
   else {
     /* Fill an empty frame with special values (fast path). */
     blosc2_frame_s *frame = (blosc2_frame_s *) schunk->frame;
+    /* Update counters (necessary for the frame_fill_special() logic) */
+    if (leftover_items) {
+      nchunks += 1;
+    }
+    schunk->chunksize = chunksize;
+    schunk->nchunks = nchunks;
+    schunk->nbytes = nitems * typesize;
     int64_t frame_len = frame_fill_special(frame, nitems, special_value, chunksize, schunk);
     if (frame_len < 0) {
       BLOSC_TRACE_ERROR("Error creating special frame.");
-      return frame_len;
+      return nchunks;
     }
   }
 
-  return schunk->nchunks;
+  return nchunks;
 }
 
 /* Append an existing chunk into a super-chunk. */
