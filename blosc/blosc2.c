@@ -725,7 +725,7 @@ int read_chunk_header(const uint8_t* src, int32_t srcsize, bool extended_header,
         BLOSC_TRACE_ERROR("`nbytes` is not a multiple of typesize");
         return BLOSC2_ERROR_INVALID_HEADER;
       }
-      if (special_type == BLOSC2_VALUE_RUNLEN) {
+      if (special_type == BLOSC2_SPECIAL_VALUE) {
         if (header->cbytes < BLOSC_EXTENDED_HEADER_LENGTH + header->typesize) {
           BLOSC_TRACE_ERROR("`cbytes` is too small for run length encoding");
           return BLOSC2_ERROR_READ_BUFFER;
@@ -1433,7 +1433,7 @@ static int blosc_d(
     }
     rc = 0;
     switch (context->special_type) {
-      case BLOSC2_VALUE_RUNLEN:
+      case BLOSC2_SPECIAL_VALUE:
         // All repeated values
         rc = set_values(context->typesize, context->src, _dest, bsize_);
         if (rc < 0) {
@@ -1441,17 +1441,17 @@ static int blosc_d(
           return BLOSC2_ERROR_DATA;
         }
         break;
-      case BLOSC2_NAN_RUNLEN:
+      case BLOSC2_SPECIAL_NAN:
         rc = set_nans(context->typesize, _dest, bsize_);
         if (rc < 0) {
           BLOSC_TRACE_ERROR("set_nans failed");
           return BLOSC2_ERROR_DATA;
         }
         break;
-      case BLOSC2_ZERO_RUNLEN:
+      case BLOSC2_SPECIAL_ZERO:
         memset(_dest, 0, bsize_);
         break;
-      case BLOSC2_UNINIT_VALUE:
+      case BLOSC2_SPECIAL_UNINIT:
         // We do nothing here
         break;
       default:
@@ -2162,7 +2162,7 @@ int blosc_compress_context(blosc2_context* context) {
     }
     if (ntbytes == start_csizes + nstreams * sizeof(int32_t)) {
       // The streams are all zero runs (by construction).  Encode it...
-      context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] |= BLOSC2_ZERO_RUNLEN << 4;
+      context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] |= BLOSC2_SPECIAL_ZERO << 4;
       // ...and assign the new chunk length
       ntbytes = context->header_overhead;
     }
@@ -3547,7 +3547,7 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const size_t nbytes, void* dest, 
   header.nbytes = (int32_t)nbytes;
   header.blocksize = context->blocksize;
   header.cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
-  header.blosc2_flags = BLOSC2_ZERO_RUNLEN << 4;  // mark chunk as all zeros
+  header.blosc2_flags = BLOSC2_SPECIAL_ZERO << 4;  // mark chunk as all zeros
   memcpy((uint8_t *)dest, &header, sizeof(header));
 
   blosc2_free_ctx(context);
@@ -3589,7 +3589,7 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const size_t nbytes, void* dest,
   header.nbytes = (int32_t)nbytes;
   header.blocksize = context->blocksize;
   header.cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
-  header.blosc2_flags = BLOSC2_UNINIT_VALUE << 4;  // mark chunk as unitialized
+  header.blosc2_flags = BLOSC2_SPECIAL_UNINIT << 4;  // mark chunk as unitialized
   memcpy((uint8_t *)dest, &header, sizeof(header));
 
   blosc2_free_ctx(context);
@@ -3632,7 +3632,7 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const size_t nbytes, void* dest, s
   header.nbytes = (int32_t)nbytes;
   header.blocksize = context->blocksize;
   header.cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
-  header.blosc2_flags = BLOSC2_NAN_RUNLEN << 4;  // mark chunk as all NaNs
+  header.blosc2_flags = BLOSC2_SPECIAL_NAN << 4;  // mark chunk as all NaNs
   memcpy((uint8_t *)dest, &header, sizeof(header));
 
   blosc2_free_ctx(context);
@@ -3677,7 +3677,7 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const size_t nbytes,
   header.nbytes = (int32_t)nbytes;
   header.blocksize = context->blocksize;
   header.cbytes = BLOSC_EXTENDED_HEADER_LENGTH + (int32_t)typesize;
-  header.blosc2_flags = BLOSC2_VALUE_RUNLEN << 4;  // mark chunk as all repeated value
+  header.blosc2_flags = BLOSC2_SPECIAL_VALUE << 4;  // mark chunk as all repeated value
   memcpy((uint8_t *)dest, &header, sizeof(header));
   memcpy((uint8_t *)dest + sizeof(header), repeatval, typesize);
 

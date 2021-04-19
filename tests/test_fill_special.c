@@ -92,15 +92,15 @@ CUTEST_TEST_TEST(fill_special) {
   int special_value;
   switch (svalue) {
     case CHECK_ZEROS:
-      special_value = BLOSC2_ZERO_RUNLEN;
+      special_value = BLOSC2_SPECIAL_ZERO;
       ret = blosc2_chunk_zeros(*cparams, isize, data_dest, isize);
       break;
     case CHECK_NANS:
-      special_value = BLOSC2_NAN_RUNLEN;
+      special_value = BLOSC2_SPECIAL_NAN;
       ret = blosc2_chunk_nans(*cparams, isize, data_dest, isize);
       break;
     case CHECK_UNINIT:
-      special_value = BLOSC2_UNINIT_VALUE;
+      special_value = BLOSC2_SPECIAL_UNINIT;
       ret = blosc2_chunk_uninit(*cparams, isize, data_dest, isize);
       break;
     default:

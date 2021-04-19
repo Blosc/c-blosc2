@@ -239,13 +239,13 @@ enum {
  * @brief Run lengths for special values for chunks/frames
  */
 enum {
-  BLOSC2_NO_SPECIAL = 0x0,      //!< no special value
-  BLOSC2_ZERO_RUNLEN = 0x1,     //!< zero run-length
-  BLOSC2_NAN_RUNLEN = 0x2,      //!< NaN run-length
-  BLOSC2_VALUE_RUNLEN = 0x3,    //!< generic value run-length
-  BLOSC2_UNINIT_VALUE = 0x4,    //!< non initialized values
-  BLOSC2_SPECIAL_LASTID = 0x4,  //!<last valid ID for special value (update this adequately)
-  BLOSC2_SPECIAL_MASK = 0x7     //!< special value mask (prev IDs cannot be larger than this)
+  BLOSC2_NO_SPECIAL = 0x0,       //!< no special value
+  BLOSC2_SPECIAL_ZERO = 0x1,     //!< zero special value
+  BLOSC2_SPECIAL_NAN = 0x2,      //!< NaN special value
+  BLOSC2_SPECIAL_VALUE = 0x3,    //!< generic special value
+  BLOSC2_SPECIAL_UNINIT = 0x4,   //!< non initialized values
+  BLOSC2_SPECIAL_LASTID = 0x4,   //!< last valid ID for special value (update this adequately)
+  BLOSC2_SPECIAL_MASK = 0x7      //!< special value mask (prev IDs cannot be larger than this)
 };
 
 /**
@@ -1495,7 +1495,7 @@ BLOSC_EXPORT int64_t blosc2_schunk_frame_len(blosc2_schunk* schunk);
  * @param schunk The super-chunk to be filled.  This must be empty initially.
  * @param nitems The number of items to fill.
  * @param special_value The special value to use for filling.  The only values
- * supported for now are BLOSC2_ZERO_RUNLEN, BLOSC2_NAN_RUNLEN and BLOSC2_UNINIT_VALUE.
+ * supported for now are BLOSC2_SPECIAL_ZERO, BLOSC2_SPECIAL_NAN and BLOSC2_SPECIAL_UNINIT.
  * @param chunksize The chunksize for the chunks that are to be added to the super-chunk.
  *
  * @return The total number of chunks that have been added to the super-chunk.
