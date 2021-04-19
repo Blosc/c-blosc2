@@ -2130,8 +2130,9 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
   }
 
   // Compute the number of chunks and the length of the offsets chunk
-  nchunks = nitems * typesize / chunksize;
-  int32_t leftover_items = nitems % chunksize;
+  int32_t chunkitems = chunksize / typesize;
+  nchunks = (int32_t)(nitems / chunkitems);
+  int32_t leftover_items = (int32_t)(nitems % chunkitems);
   if (leftover_items) {
     nchunks += 1;
   }
