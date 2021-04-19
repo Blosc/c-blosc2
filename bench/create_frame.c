@@ -46,13 +46,11 @@ Process finished with exit code 0
 #define GB  (1024*MB)
 
 #define CHUNKSHAPE (500 * 1000)
-//#define CHUNKSHAPE (500)
 #define NCHUNKS 100000
-//#define NCHUNKS 1
 #define NTHREADS 1  // curiously, using 1 single thread is better for the uninitialized values
 
 // For exercising the optimized chunk creators (un)comment the lines below as you please
-#define CREATE_ZEROS
+//#define CREATE_ZEROS
 #define CREATE_FILL
 //#define CREATE_LOOP
 #define CONTIGUOUS_FRAME false
