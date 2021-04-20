@@ -19,7 +19,7 @@
 int tests_run = 0;
 int nchunks;
 int clevel;
-int nthreads;
+int16_t nthreads;
 char* directory;
 
 
@@ -27,7 +27,7 @@ char* directory;
 static char* test_lazy_chunk(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
-  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   int cbytes;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -90,8 +90,12 @@ static char* test_lazy_chunk(void) {
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
     memset(data_dest, 0, isize);
     cbytes = blosc2_schunk_get_lazychunk(schunk, nchunk, &lazy_chunk, &needs_free);
+    mu_assert("ERROR: cannot get lazy chunk.", cbytes > 0);
     dsize = blosc2_decompress_ctx(schunk->dctx, lazy_chunk, cbytes, data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
+    if (needs_free) {
+      free(lazy_chunk);
+    }
     for (int i = 0; i < NBLOCKS; i++) {
       for (int j = 0; j < BLOCKSIZE; j++) {
         mu_assert("ERROR: bad roundtrip (blosc2_decompress_ctx)",
