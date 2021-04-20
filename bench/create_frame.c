@@ -53,7 +53,7 @@ Process finished with exit code 0
 //#define CREATE_ZEROS
 #define CREATE_FILL
 //#define CREATE_LOOP
-#define CONTIGUOUS_FRAME false
+#define CONTIGUOUS_FRAME true
 
 int create_cframe(const char* compname) {
   size_t isize = CHUNKSHAPE * sizeof(int32_t);
