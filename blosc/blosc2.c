@@ -2610,7 +2610,25 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     return BLOSC2_ERROR_READ_BUFFER;
   }
 
+  bool memcpyed = header->flags & (uint8_t)BLOSC_MEMCPYED;
+  if (context->special_type) {
+    // Fake a runlen as if its a memcpyed chunk
+    memcpyed = true;
+  }
+
   ebsize = header->blocksize + header->typesize * (signed)sizeof(int32_t);
+  struct thread_context* scontext = context->serial_context;
+  /* Resize the temporaries in serial context if needed */
+  if (header->blocksize > scontext->tmp_blocksize) {
+    my_free(scontext->tmp);
+    scontext->tmp_nbytes = (size_t)4 * ebsize;
+    scontext->tmp = my_malloc(scontext->tmp_nbytes);
+    BLOSC_ERROR_NULL(scontext->tmp, BLOSC2_ERROR_MEMORY_ALLOC);
+    scontext->tmp2 = scontext->tmp + ebsize;
+    scontext->tmp3 = scontext->tmp2 + ebsize;
+    scontext->tmp4 = scontext->tmp3 + ebsize;
+    scontext->tmp_blocksize = (int32_t)header->blocksize;
+  }
 
   for (j = 0; j < context->nblocks; j++) {
     bsize = header->blocksize;
@@ -2639,29 +2657,10 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     bsize2 = stopb - startb;
 
     /* Do the actual data copy */
-    struct thread_context* scontext = context->serial_context;
-
-    /* Resize the temporaries in serial context if needed */
-    if (header->blocksize > scontext->tmp_blocksize) {
-      my_free(scontext->tmp);
-      scontext->tmp_nbytes = (size_t)4 * ebsize;
-      scontext->tmp = my_malloc(scontext->tmp_nbytes);
-      BLOSC_ERROR_NULL(scontext->tmp, BLOSC2_ERROR_MEMORY_ALLOC);
-      scontext->tmp2 = scontext->tmp + ebsize;
-      scontext->tmp3 = scontext->tmp2 + ebsize;
-      scontext->tmp4 = scontext->tmp3 + ebsize;
-      scontext->tmp_blocksize = (int32_t)header->blocksize;
-    }
-
     // Regular decompression.  Put results in tmp2.
     // If the block is aligned and the worst case fits in destination, let's avoid a copy
     bool get_single_block = ((startb == 0) && (bsize == nitems * header->typesize));
     uint8_t* tmp2 = get_single_block ? dest : scontext->tmp2;
-    bool memcpyed = header->flags & (uint8_t)BLOSC_MEMCPYED;
-    if (context->special_type) {
-      // Fake a runlen as if its a memcpyed chunk
-      memcpyed = true;
-    }
 
     // If memcpyed we don't have a bstarts section (because it is not needed)
     int32_t src_offset = memcpyed ?
