@@ -75,10 +75,10 @@ CUTEST_TEST_SETUP(copy) {
       {false, "test_copy_s.b2frame"}, // disk - sframe
   ));
   CUTEST_PARAMETRIZE(backend2, test_copy_backend, CUTEST_DATA(
-      {false, NULL},  // memory - schunk
-      {true, NULL},  // memory - cframe
-      {true, "test_copy2.b2frame"}, // disk - cframe
-      {false, "test_copy2_s.b2frame"}, // disk - sframe
+          {false, NULL},  // memory - schunk
+          {true, NULL},  // memory - cframe
+          {true, "test_copy2.b2frame"}, // disk - cframe
+          {false, "test_copy2_s.b2frame"}, // disk - sframe
   ));
 }
 

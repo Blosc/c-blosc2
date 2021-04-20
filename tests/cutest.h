@@ -83,7 +83,8 @@
 
 
 
-#define _CUTEST_PARAMS_MAX 16
+#define CUTEST_PARAMS_MAX 16
+#define MAXLEN_TESTNAME 1024
 
 
 typedef struct {
@@ -91,47 +92,47 @@ typedef struct {
   uint8_t *params;
   int32_t params_len;
   int32_t param_size;
-} _cutest_param_t;
+} cutest_param_t;
 
-static _cutest_param_t _cutest_params[_CUTEST_PARAMS_MAX] = {0};
-static int32_t _cutest_params_ind[_CUTEST_PARAMS_MAX] = {0};
+static cutest_param_t cutest_params[CUTEST_PARAMS_MAX] = {0};
+static int32_t cutest_params_ind[CUTEST_PARAMS_MAX] = {0};
 
 
 void _cutest_parametrize(char* name, void *params, int32_t params_len, int32_t param_size) {
   int i = 0;
-  while(_cutest_params[i].name != NULL) {
+  while(cutest_params[i].name != NULL) {
     i++;
   }
   uint8_t *new_params = malloc(param_size * params_len);
   char *new_name = strdup(name);
   memcpy(new_params, params, param_size * params_len);
-  _cutest_params[i].name = new_name;
-  _cutest_params[i].params = new_params;
-  _cutest_params[i].param_size = param_size;
-  _cutest_params[i].params_len = params_len;
+  cutest_params[i].name = new_name;
+  cutest_params[i].params = new_params;
+  cutest_params[i].param_size = param_size;
+  cutest_params[i].params_len = params_len;
 }
 
 uint8_t *_cutest_get_parameter(char *name) {
   int i = 0;
-  while(strcmp(_cutest_params[i].name, name) != 0) {
+  while(strcmp(cutest_params[i].name, name) != 0) {
     i++;
   }
-  return _cutest_params[i].params + _cutest_params_ind[i] * _cutest_params[i].param_size;
+  return cutest_params[i].params + cutest_params_ind[i] * cutest_params[i].param_size;
 }
 
 
 void _cutest_setup() {
-  for (int i = 0; i < _CUTEST_PARAMS_MAX; ++i) {
-    _cutest_params[i].name = NULL;
+  for (int i = 0; i < CUTEST_PARAMS_MAX; ++i) {
+    cutest_params[i].name = NULL;
   }
 }
 
 
 void _cutest_teardown() {
   int i = 0;
-  while(_cutest_params[i].name != NULL) {
-    free(_cutest_params[i].params);
-    free(_cutest_params[i].name);
+  while(cutest_params[i].name != NULL) {
+    free(cutest_params[i].params);
+    free(cutest_params[i].name);
     i++;
   }
 }
@@ -146,32 +147,31 @@ int _cutest_run(int (*test)(void *), void *test_data, char *name) {
   int cutest_total = 0;
 
   int nparams = 0;
-  while(_cutest_params[nparams].name != NULL) {
+  while(cutest_params[nparams].name != NULL) {
     nparams++;
   }
 
   int niters = 1;
   for (int i = 0; i < nparams; ++i) {
-    niters *= _cutest_params[i].params_len;
+    niters *= cutest_params[i].params_len;
   }
 
-  int32_t params_strides[_CUTEST_PARAMS_MAX] = {0};
+  int32_t params_strides[CUTEST_PARAMS_MAX] = {0};
   params_strides[0] = 1;
   for (int i = 1; i < nparams; ++i) {
-    params_strides[i] = params_strides[i - 1] * _cutest_params[i - 1].params_len;
+    params_strides[i] = params_strides[i - 1] * cutest_params[i - 1].params_len;
   }
 
-  int max_test_name = 1024;
-  char test_name[max_test_name];
+  char test_name[MAXLEN_TESTNAME];
   int count = 0;
   int num = niters;
   do { count++; num /= 10;} while(num != 0);
   for (int niter = 0; niter < niters; ++niter) {
     sprintf(test_name, "[%0*d/%d] %s(", count, niter + 1, niters, name);
     for (int i = 0; i < nparams; ++i) {
-      _cutest_params_ind[i] = niter / params_strides[i] % _cutest_params[i].params_len;
-      snprintf(test_name, max_test_name, "%s%s[%d], ", test_name, _cutest_params[i].name,
-              _cutest_params_ind[i]);
+      cutest_params_ind[i] = niter / params_strides[i] % cutest_params[i].params_len;
+      snprintf(test_name, MAXLEN_TESTNAME, "%s%s[%d], ", test_name, cutest_params[i].name,
+               cutest_params_ind[i]);
     }
     test_name[strlen(test_name) - 1] = 0;
     test_name[strlen(test_name) - 1] = 0;
