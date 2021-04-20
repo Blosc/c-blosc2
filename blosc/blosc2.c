@@ -2575,6 +2575,7 @@ int blosc_decompress(const void* src, void* dest, size_t destsize) {
 int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* src, int32_t srcsize,
                    int start, int nitems, void* dest, int32_t destsize) {
   uint8_t* _src = (uint8_t*)(src);  /* current pos for source buffer */
+  uint8_t* _dest = (uint8_t*)(dest);
   int32_t ntbytes = 0;              /* the number of uncompressed bytes */
   int32_t bsize, bsize2, ebsize, leftoverblock;
   int32_t cbytes;
@@ -2614,6 +2615,44 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
   if (context->special_type) {
     // Fake a runlen as if its a memcpyed chunk
     memcpyed = true;
+  }
+
+  bool is_lazy = ((context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH) &&
+                  (context->blosc2_flags & 0x08u) && !context->special_type);
+  if (memcpyed && !is_lazy && !context->postfilter) {
+    // Short-circuit for (non-lazy) memcpyed or special values
+    ntbytes = nitems * header->typesize;
+    switch (context->special_type) {
+      case BLOSC2_SPECIAL_VALUE:
+        // All repeated values
+        rc = set_values(context->typesize, _src, _dest, ntbytes);
+        if (rc < 0) {
+          BLOSC_TRACE_ERROR("set_values failed");
+          return BLOSC2_ERROR_DATA;
+        }
+        break;
+      case BLOSC2_SPECIAL_NAN:
+        rc = set_nans(context->typesize, _dest, ntbytes);
+        if (rc < 0) {
+          BLOSC_TRACE_ERROR("set_nans failed");
+          return BLOSC2_ERROR_DATA;
+        }
+        break;
+      case BLOSC2_SPECIAL_ZERO:
+        memset(_dest, 0, ntbytes);
+        break;
+      case BLOSC2_SPECIAL_UNINIT:
+        // We do nothing here
+        break;
+      case BLOSC2_NO_SPECIAL:
+        _src += context->header_overhead + start * context->typesize;
+        memcpy(_dest, _src, ntbytes);
+        break;
+      default:
+        BLOSC_TRACE_ERROR("Unhandled special value case");
+        return -1;
+    }
+    return ntbytes;
   }
 
   ebsize = header->blocksize + header->typesize * (signed)sizeof(int32_t);
