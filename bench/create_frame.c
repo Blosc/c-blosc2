@@ -9,30 +9,28 @@
 
   $ ./create_frame
 
- *** Creating simple frame for blosclz
-Compression ratio: 1.86 GB -> 0.05 GB (36.9x)
-Compression time: 0.445 s, 4.2 GB/s
-Decompression time: 0.0905 s, 20.6 GB/s
+   ***  Creating unitialized   ***
+   ***  Using fill method!   ***
 
-*** Creating simple frame for lz4
-Compression ratio: 1.86 GB -> 0.08 GB (23.1x)
-Compression time: 0.324 s, 5.8 GB/s
-Decompression time: 0.135 s, 13.8 GB/s
+*** Creating *contiguous* super-chunk for *blosclz*
+Compression ratio: 186.26 GB -> 0.17 KB (1162790697.7x)
+Compression time: 8.5e-06 s, 21399.9 TB/s
+Decompression time: 0.0628 s, 2965.1 GB/s
 
-*** Creating simple frame for lz4hc
-Compression ratio: 1.86 GB -> 0.04 GB (50.0x)
-Compression time: 0.96 s, 1.9 GB/s
-Decompression time: 0.12 s, 15.5 GB/s
+*** Creating *sparse* super-chunk for *blosclz*
+Compression ratio: 186.26 GB -> 3906.29 KB (49999.5x)
+Compression time: 0.00294 s, 61.8 TB/s
+Decompression time: 0.00424 s, 43959.2 GB/s
 
-*** Creating simple frame for zlib
-Compression ratio: 1.86 GB -> 0.04 GB (52.4x)
-Compression time: 1.17 s, 1.6 GB/s
-Decompression time: 0.32 s, 5.8 GB/s
+*** Creating *contiguous* super-chunk for *lz4*
+Compression ratio: 186.26 GB -> 0.17 KB (1162790697.7x)
+Compression time: 4.71e-06 s, 38636.1 TB/s
+Decompression time: 0.0701 s, 2656.7 GB/s
 
-*** Creating simple frame for zstd
-Compression ratio: 1.86 GB -> 0.02 GB (98.6x)
-Compression time: 0.773 s, 2.4 GB/s
-Decompression time: 0.17 s, 11.0 GB/s
+*** Creating *sparse* super-chunk for *lz4*
+Compression ratio: 186.26 GB -> 3906.29 KB (49999.5x)
+Compression time: 0.00311 s, 58.5 TB/s
+Decompression time: 0.0101 s, 18516.4 GB/s
 
 Process finished with exit code 0
 
@@ -42,8 +40,9 @@ Process finished with exit code 0
 #include <blosc2.h>
 
 #define KB  (1024.)
-#define MB  (1024*KB)
-#define GB  (1024*MB)
+#define MB  (1024 * KB)
+#define GB  (1024 * MB)
+#define TB  (1024 * GB)
 
 #define CHUNKSHAPE (500 * 1000)
 #define NCHUNKS 100000
@@ -53,10 +52,9 @@ Process finished with exit code 0
 //#define CREATE_ZEROS
 #define CREATE_FILL
 //#define CREATE_LOOP
-#define CONTIGUOUS_FRAME true
 
-int create_cframe(const char* compname) {
-  size_t isize = CHUNKSHAPE * sizeof(int32_t);
+int create_cframe(const char* compname, bool contiguous) {
+  int32_t isize = CHUNKSHAPE * sizeof(int32_t);
   int32_t* data = malloc(isize);
   int32_t* data_dest = malloc(isize);
   int32_t* data_dest2 = malloc(isize);
@@ -65,7 +63,8 @@ int create_cframe(const char* compname) {
   blosc_timestamp_t last, current;
   double ttotal;
   int compcode = blosc_compname_to_compcode(compname);
-  printf("\n*** Creating simple frame for %s\n", compname);
+  printf("\n*** Creating *%s* super-chunk for *%s*\n",
+         contiguous ? "contiguous" : "sparse", compname);
 
   /* Create a super-chunk container */
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -79,7 +78,7 @@ int create_cframe(const char* compname) {
   char filename[64];
   sprintf(filename, "frame_simple-%s.b2frame", compname);
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
-                            .urlpath=NULL, .contiguous=CONTIGUOUS_FRAME};
+                            .urlpath=NULL, .contiguous=contiguous};
   blosc2_schunk* schunk = blosc2_schunk_new(&storage);
 
 #ifdef CREATE_ZEROS
@@ -142,14 +141,14 @@ int create_cframe(const char* compname) {
   nbytes = schunk->nbytes;
   cbytes = blosc2_schunk_frame_len(schunk);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Compression ratio: %.2f GB -> %.2f GB (%.1fx)\n",
-         nbytes / GB, cbytes / GB, (1. * nbytes) / (1. * cbytes));
-  printf("Compression time: %.3g s, %.1f GB/s\n",
-         ttotal, nbytes / (ttotal * GB));
+  printf("Compression ratio: %.2f GB -> %.2f KB (%4.1fx)\n",
+         (double)nbytes / GB, (double)cbytes / KB, (double)nbytes / (double)cbytes);
+  printf("Compression time: %.3g s, %.1f TB/s\n",
+         ttotal, (double)nbytes / (ttotal * TB));
 
   /* Retrieve and decompress the chunks from the super-chunks and compare values */
   blosc_set_timestamp(&last);
-  int32_t leftover_bytes = (nitems % CHUNKSHAPE) * sizeof(int32_t);
+  int32_t leftover_bytes = (int32_t)((nitems % CHUNKSHAPE) * sizeof(int32_t));
   int32_t nchunks = leftover_bytes ? NCHUNKS + 1 : NCHUNKS;
   for (nchunk = 0; nchunk < nchunks; nchunk++) {
     int32_t dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, data_dest, isize);
@@ -167,7 +166,7 @@ int create_cframe(const char* compname) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Decompression time: %.3g s, %.1f GB/s\n",
-         ttotal, nbytes / (ttotal * GB));
+         ttotal, (double)nbytes / (ttotal * GB));
 
   /* Free resources */
   blosc2_schunk_free(schunk);
@@ -193,9 +192,8 @@ int main(void) {
   printf("   ***  Using not optimized method!   ***\n");
 #endif
 
-  create_cframe("blosclz");
-  create_cframe("lz4");
-//  create_cframe("lz4hc");
-//  create_cframe("zlib");
-//  create_cframe("zstd");
+  create_cframe("blosclz", true);
+  create_cframe("blosclz", false);
+  create_cframe("lz4", true);
+  create_cframe("lz4", false);
 }
