@@ -1228,7 +1228,7 @@ int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8
 }
 
 
-int32_t set_nans(int32_t typesize, uint8_t* dest, int32_t destsize) {
+static int32_t set_nans(int32_t typesize, uint8_t* dest, int32_t destsize) {
   // destsize can only be a multiple of typesize
   if (destsize % typesize != 0) {
     return -1;
@@ -1260,7 +1260,7 @@ int32_t set_nans(int32_t typesize, uint8_t* dest, int32_t destsize) {
 }
 
 
-int32_t set_values(int32_t typesize, const uint8_t* src, uint8_t* dest, int32_t destsize) {
+static int32_t set_values(int32_t typesize, const uint8_t* src, uint8_t* dest, int32_t destsize) {
   // destsize can only be a multiple of typesize
   int64_t val8;
   int64_t* dest8;
