@@ -3449,6 +3449,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   context->nthreads = cparams.nthreads;
   context->new_nthreads = context->nthreads;
   context->blocksize = cparams.blocksize;
+  context->splitmode = cparams.splitmode;
   context->threads_started = 0;
   context->schunk = cparams.schunk;
 

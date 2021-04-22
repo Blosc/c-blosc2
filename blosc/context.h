@@ -51,6 +51,8 @@ struct blosc2_context_s {
   /* Extra bytes at end of buffer */
   int32_t blocksize;
   /* Length of the block in bytes */
+  int32_t splitmode;
+  /* Whether the blocks should be split or not */
   int32_t output_bytes;
   /* Counter for the number of input bytes */
   int32_t srcsize;
