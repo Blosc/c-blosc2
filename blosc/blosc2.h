@@ -218,9 +218,21 @@ enum {
   BLOSC_ZSTD_VERSION_FORMAT = 1,
 };
 
+/**
+ * @brief Split mode for blocks.
+ * NEVER and ALWAYS are for experimenting with compression ratio.
+ * AUTO for nearly optimal behaviour (based on heuristics).
+ * FORWARD_COMPAT provides best forward compatibility (default).
+ */
+enum {
+  BLOSC_ALWAYS_SPLIT = 1,
+  BLOSC_NEVER_SPLIT = 2,
+  BLOSC_AUTO_SPLIT = 3,
+  BLOSC_FORWARD_COMPAT_SPLIT = 4,
+};
 
 /**
- * @brief Offsets for fields in Blosc2 chunk header
+ * @brief Offsets for fields in Blosc2 chunk header.
  */
 enum {
   BLOSC2_CHUNK_VERSION = 0x0,       //!< the version for the chunk format
@@ -750,6 +762,8 @@ typedef struct {
   //!< The number of threads to use internally (1).
   int32_t blocksize;
   //!< The requested size of the compressed blocks (0; meaning automatic).
+  int32_t splitmode;
+  //!< Whether the blocks should be split or not.
   void* schunk;
   //!< The associated schunk, if any (NULL).
   uint8_t filters[BLOSC2_MAX_FILTERS];
@@ -768,8 +782,10 @@ typedef struct {
  * @brief Default struct for compression params meant for user initialization.
  */
 static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
-        BLOSC_BLOSCLZ, 5, 0, 8, 1, 0, NULL,
-        {0, 0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0, 0},
+        BLOSC_BLOSCLZ, 5, 0, 8, 1, 0,
+        BLOSC_FORWARD_COMPAT_SPLIT, NULL,
+        {0, 0, 0, 0, 0, BLOSC_SHUFFLE},
+        {0, 0, 0, 0, 0, 0},
         NULL, NULL, NULL};
 
 /**
