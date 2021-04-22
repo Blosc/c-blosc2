@@ -49,12 +49,14 @@ CUTEST_TEST_SETUP(copy) {
   data->cparams.typesize = sizeof(int32_t);
   data->cparams.clevel = 9;
   data->cparams.nthreads = NTHREADS;
+  data->cparams.splitmode = BLOSC_NEVER_SPLIT;
 
   data->cparams2 = BLOSC2_CPARAMS_DEFAULTS;
   data->cparams2.typesize = sizeof(int32_t);
   data->cparams2.clevel = 2;
   data->cparams2.nthreads = NTHREADS;
   data->cparams2.blocksize = 10000;
+  data->cparams2.splitmode = BLOSC_ALWAYS_SPLIT;
 
   CUTEST_PARAMETRIZE(nchunks, int32_t, CUTEST_DATA(
       0, 1, 10, 20

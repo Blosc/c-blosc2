@@ -41,6 +41,7 @@ int main(void) {
   cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
+  cparams.splitmode = BLOSC_AUTO_SPLIT;
   cctx = blosc2_create_cctx(cparams);
 
   /* Compress with clevel=5 and shuffle active  */
