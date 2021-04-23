@@ -25,21 +25,19 @@ Copyright (C) 2021  The Blosc developers
 #define NCHUNKS 100
 #define NTHREADS 4
 
-typedef struct {
-  uint8_t itemsize;
-} codec_params;
-
 
 int codec_encoder(const uint8_t* input, int32_t input_len,
                   uint8_t* output, int32_t output_len,
-                  void* params) {
-  codec_params *fparams = (codec_params *) params;
-  if (fparams->itemsize != 4) {
-    BLOSC_TRACE_ERROR("Itemsize %d != 4", fparams->itemsize);
+                  blosc2_cparams* cparams) {
+  if (cparams->schunk == NULL) {
+    return -1;
+  }
+  if (cparams->typesize != 4) {
+    BLOSC_TRACE_ERROR("Itemsize %d != 4", cparams->typesize);
     return BLOSC2_ERROR_FAILURE;
   }
 
-  int32_t nelem = input_len / fparams->itemsize;
+  int32_t nelem = input_len / 4;
   int32_t *in_ = ((int32_t *) input);
   int32_t *out_ = ((int32_t *) output);
 
@@ -64,15 +62,11 @@ int codec_encoder(const uint8_t* input, int32_t input_len,
 
 int codec_decoder(const uint8_t* input, int32_t input_len,
                   uint8_t* output, int32_t output_len,
-                  void* params) {
-
-  codec_params *fparams = (codec_params *) params;
-  if (fparams->itemsize != 4) {
-    BLOSC_TRACE_ERROR("Itemsize %d != 4", fparams->itemsize);
-    return BLOSC2_ERROR_FAILURE;
+                  blosc2_dparams *dparams) {
+  if (dparams->schunk == NULL) {
+    return -1;
   }
-
-  int32_t nelem = output_len / fparams->itemsize;
+  int32_t nelem = output_len / 4;
   int32_t *in_ = ((int32_t *) input);
   int32_t *out_ = ((int32_t *) output);
 
@@ -88,6 +82,7 @@ int codec_decoder(const uint8_t* input, int32_t input_len,
   return output_len;
 }
 
+
 int main(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
@@ -95,22 +90,23 @@ int main(void) {
   int dsize;
   int64_t nbytes, cbytes;
 
-  codec_params params = {.itemsize=sizeof(int32_t)};
-  blosc2_udcodec udcodec;
-  udcodec.id = 128;
+  blosc2_codec udcodec;
+  udcodec.compcode = 244;
+  udcodec.complib = "UDCodec";
+  udcodec.compname = "udcodec";
   udcodec.encoder = codec_encoder;
   udcodec.decoder = codec_decoder;
-  udcodec.params = &params;
+
+  blosc2_register_codec(&udcodec);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.udcodecs[0] = udcodec;
   cparams.compcode = BLOSC_UDCODEC;
-  cparams.compcode_meta = 128;
+  cparams.compcode_meta = 244;
+
   for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
     cparams.filters[i] = 0;
   }
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-  dparams.udcodecs[0] = udcodec;
 
   blosc2_schunk* schunk;
   int i, nchunk;

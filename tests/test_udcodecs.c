@@ -23,21 +23,25 @@
 #define NTHREADS 4
 
 
-typedef struct {
-  uint8_t itemsize;
-} codec_params;
-
 
 int codec_encoder(const uint8_t* input, int32_t input_len,
                   uint8_t* output, int32_t output_len,
-                  void* params) {
-  codec_params *fparams = (codec_params *) params;
-  if (fparams->itemsize != 4) {
-    BLOSC_TRACE_ERROR("Itemsize %d != 4", fparams->itemsize);
+                  blosc2_cparams* cparams) {
+  if (cparams->schunk == NULL) {
+    return -1;
+  }
+  if (cparams->typesize != 4) {
+    BLOSC_TRACE_ERROR("Itemsize %d != 4", cparams->typesize);
     return BLOSC2_ERROR_FAILURE;
   }
+  uint8_t *content;
+  uint32_t content_len;
+  blosc2_vlmeta_get(cparams->schunk, "codec_arange", &content, &content_len);
+  if (content[0] != 222) {
+    return -1;
+  }
 
-  int32_t nelem = input_len / fparams->itemsize;
+  int32_t nelem = input_len / 4;
   int32_t *in_ = ((int32_t *) input);
   int32_t *out_ = ((int32_t *) output);
 
@@ -62,15 +66,19 @@ int codec_encoder(const uint8_t* input, int32_t input_len,
 
 int codec_decoder(const uint8_t* input, int32_t input_len,
                   uint8_t* output, int32_t output_len,
-                  void* params) {
-
-  codec_params *fparams = (codec_params *) params;
-  if (fparams->itemsize != 4) {
-    BLOSC_TRACE_ERROR("Itemsize %d != 4", fparams->itemsize);
-    return BLOSC2_ERROR_FAILURE;
+                  blosc2_dparams *dparams) {
+  if (dparams->schunk == NULL) {
+    return -1;
   }
 
-  int32_t nelem = output_len / fparams->itemsize;
+  uint8_t *content;
+  uint32_t content_len;
+  blosc2_vlmeta_get(dparams->schunk, "codec_arange", &content, &content_len);
+  if (content[0] != 222) {
+    return -1;
+  }
+
+  int32_t nelem = output_len / 4;
   int32_t *in_ = ((int32_t *) input);
   int32_t *out_ = ((int32_t *) output);
 
@@ -88,15 +96,9 @@ int codec_decoder(const uint8_t* input, int32_t input_len,
 
 int codec_decoder_error(const uint8_t* input, int32_t input_len,
                         uint8_t* output, int32_t output_len,
-                        void* params) {
+                        blosc2_dparams* dparams) {
 
-  codec_params *fparams = (codec_params *) params;
-  if (fparams->itemsize != 4) {
-    BLOSC_TRACE_ERROR("Itemsize %d != 4", fparams->itemsize);
-    return BLOSC2_ERROR_FAILURE;
-  }
-
-  int32_t nelem = output_len / fparams->itemsize;
+  int32_t nelem = output_len / 4;
   int32_t *in_ = ((int32_t *) input);
   int32_t *out_ = ((int32_t *) output);
 
@@ -140,27 +142,31 @@ CUTEST_TEST_TEST(udcodecs) {
 
   int dsize;
 
-  codec_params params = {.itemsize=sizeof(int32_t)};
-  blosc2_udcodec udcodec;
-  udcodec.id = 128;
+  blosc2_codec udcodec;
+  udcodec.compname = "arange";
+  udcodec.complib = "1";
   udcodec.encoder = codec_encoder;
   if (correct_backward) {
+    udcodec.compcode = 250;
     udcodec.decoder = codec_decoder;
   } else {
+    udcodec.compcode = 251;
     udcodec.decoder = codec_decoder_error;
   }
-  udcodec.params = &params;
+  int rc = blosc2_register_codec(&udcodec);
+  if (rc != 0) {
+    BLOSC_TRACE_ERROR("Error registering the code.");
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
     cparams.filters[i] = 0;
   }
-  cparams.udcodecs[0] = udcodec;
   cparams.compcode = BLOSC_UDCODEC;
-  cparams.compcode_meta = 128;
+  cparams.compcode_meta = udcodec.compcode;
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-  dparams.udcodecs[0] = udcodec;
 
 
   blosc2_schunk* schunk;
@@ -171,6 +177,8 @@ CUTEST_TEST_TEST(udcodecs) {
   cparams.clevel = 9;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(&storage);
+  uint8_t codec_params = 222;
+  blosc2_vlmeta_add(schunk, "codec_arange", &codec_params, 1, &BLOSC2_CPARAMS_DEFAULTS);
 
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     for (i = 0; i < CHUNKSIZE; i++) {
