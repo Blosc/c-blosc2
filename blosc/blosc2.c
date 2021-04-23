@@ -93,6 +93,9 @@ static int32_t g_force_blocksize = 0;
 static int g_initlib = 0;
 static blosc2_schunk* g_schunk = NULL;   /* the pointer to super-chunk */
 
+blosc2_codec *g_codecs[256] = {0};
+uint8_t g_ncodecs = 0;
+
 static blosc2_filter *g_filters[256] = {0};
 static uint64_t g_nfilters = 0;
 
@@ -253,7 +256,7 @@ int blosc_compcode_to_compname(int compcode, const char** compname) {
     name = BLOSC_ZLIB_COMPNAME;
   else if (compcode == BLOSC_ZSTD)
     name = BLOSC_ZSTD_COMPNAME;
-  else if (compcode == BLOSC_UDCODEC)
+  else if (compcode >= BLOSC2_REGISTERED_CODECS)
     name = BLOSC_UDCODEC_COMPNAME;
 
   *compname = name;
@@ -1127,13 +1130,15 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     }
   #endif /* HAVE_ZSTD */
     else if (context->compcode == BLOSC_UDCODEC) {
-      for (int i = 0; i < BLOSC2_MAX_UDCODECS; ++i) {
-        if (context->udcodecs[i].id == context->compcode_meta) {
-          cbytes = context->udcodecs[i].encoder(_src + j * neblock,
-                                                neblock,
-                                                dest,
-                                                maxout,
-                                                context->udcodecs[i].params);
+      for (int i = 0; i < g_ncodecs; ++i) {
+        if (g_codecs[i]->compcode == context->compcode_meta) {
+          blosc2_cparams cparams;
+          blosc2_ctx_get_cparams(context, &cparams);
+          cbytes = g_codecs[i]->encoder(_src + j * neblock,
+                                        neblock,
+                                        dest,
+                                        maxout,
+                                        &cparams);
           goto udcodecsuccess;
         }
       }
@@ -1686,14 +1691,16 @@ static int blosc_d(
                                       (char*)_dest, (size_t)neblock);
       }
   #endif /*  HAVE_ZSTD */
-      else if (compformat == BLOSC_UDCODEC_FORMAT) { ;
-        for (int i = 0; i < BLOSC2_MAX_UDCODECS; ++i) {
-          if (context->udcodecs[i].id == context->compcode_meta) {
-            nbytes = context->udcodecs[i].decoder(src,
-                                                  cbytes,
-                                                  _dest,
-                                                  neblock,
-                                                  context->udcodecs[i].params);
+      else if (compformat == BLOSC_UDCODEC) { ;
+        for (int i = 0; i < g_ncodecs; ++i) {
+          if (g_codecs[i]->compcode == context->compcode_meta) {
+            blosc2_dparams dparams;
+            blosc2_ctx_get_dparams(context, &dparams);
+            nbytes = g_codecs[i]->decoder(src,
+                                          cbytes,
+                                          _dest,
+                                          neblock,
+                                          &dparams);
             goto udcodecsuccess;
           }
         }
@@ -3569,9 +3576,6 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     free(context);
     return NULL;
   }
-  for (int i = 0; i < BLOSC2_MAX_UDCODECS; ++i) {
-    memcpy(&context->udcodecs, &cparams.udcodecs, sizeof(blosc2_udcodec));
-  }
 
   context->nthreads = cparams.nthreads;
   context->new_nthreads = context->nthreads;
@@ -3602,6 +3606,36 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   return context;
 }
 
+int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams) {
+  cparams->compcode = ctx->compcode;
+  cparams->compcode = ctx->compcode;
+  cparams->compcode_meta = ctx->compcode_meta;
+  cparams->clevel = ctx->clevel;
+  cparams->use_dict = ctx->use_dict;
+  cparams->typesize = ctx->typesize;
+  cparams->nthreads = ctx->nthreads;
+  cparams->blocksize = ctx->blocksize;
+  cparams->splitmode = ctx->splitmode;
+  cparams->schunk = ctx->schunk;
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+      cparams->filters[i] = ctx->filters[i];
+      cparams->filters_meta[i] = ctx->filters_meta[i];
+  }
+  cparams->prefilter = ctx->prefilter;
+  cparams->preparams = ctx->preparams;
+  cparams->udbtune = ctx->udbtune;
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams) {
+  dparams->nthreads = ctx->nthreads;
+  dparams->schunk = ctx->schunk;
+  dparams->postfilter = ctx->postfilter;
+  dparams->postparams = ctx->postparams;
+
+  return BLOSC2_ERROR_SUCCESS;
+}
 
 /* Create a context for decompression */
 blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
@@ -3617,10 +3651,6 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   context->block_maskout = NULL;
   context->block_maskout_nitems = 0;
   context->schunk = dparams.schunk;
-
-  for (int i = 0; i < BLOSC2_MAX_UDCODECS; ++i) {
-    memcpy(&context->udcodecs, &dparams.udcodecs, sizeof(blosc2_udcodec));
-  }
 
   if (dparams.postfilter != NULL) {
     context->postfilter = dparams.postfilter;
@@ -3913,6 +3943,35 @@ int blosc2_register_filter(blosc2_filter *filter) {
   blosc2_filter *filter_new = malloc(sizeof(blosc2_filter));
   memcpy(filter_new, filter, sizeof(blosc2_filter));
   g_filters[g_nfilters++] = filter_new;
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+/* Register functions */
+
+int blosc2_register_codec(blosc2_codec *codec) {
+  BLOSC_ERROR_NULL(codec, BLOSC2_ERROR_INVALID_PARAM);
+  if (g_ncodecs == UINT8_MAX) {
+    BLOSC_TRACE_ERROR("Can not register more codecs");
+    return BLOSC2_ERROR_CODEC_SUPPORT;
+  }
+  if (codec->compcode < BLOSC2_REGISTERED_CODECS) {
+    BLOSC_TRACE_ERROR("The compcode must be greater or equal than %d", BLOSC2_REGISTERED_CODECS);
+    return BLOSC2_ERROR_CODEC_PARAM;
+  }
+
+  // Check if the code is already registered
+  for (int i = 0; i < g_ncodecs; ++i) {
+    if (g_codecs[i]->compcode == codec->compcode) {
+      BLOSC_TRACE_ERROR("The codec is already registered!");
+      return BLOSC2_ERROR_CODEC_PARAM;
+    }
+  }
+
+  blosc2_codec *codec_new = malloc(sizeof(blosc2_codec));
+  memcpy(codec_new, codec, sizeof(blosc2_codec));
+  g_codecs[g_ncodecs++] = codec_new;
 
   return BLOSC2_ERROR_SUCCESS;
 }

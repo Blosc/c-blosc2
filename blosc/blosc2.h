@@ -166,9 +166,18 @@ enum {
   BLOSC_ZLIB = 4,
   BLOSC_ZSTD = 5,
   BLOSC_UDCODEC = 6,
-  BLOSC_MAX_CODECS = 7,  //!< maximum number of reserved codecs
+  BLOSC_LAST_CODEC = 7,  //!< sentinel
+  BLOSC_LAST_REGISTERED_CODEC = 32,  //!< sentinel
 };
 
+enum {
+  BLOSC2_BDEFINED_CODECS = 32,
+  //!< Blosc-defined codecs must be between 0 - 31.
+  BLOSC2_REGISTERED_CODECS = 160,
+  //!< Blosc-registered codecs must be between 64 - 159.
+  BLOSC2_UDEFINED_CODECS = 256,
+  //!< User-defined codecs must be between 160 - 255.
+};
 
 // Names for the different compressors shipped with Blosc
 
@@ -693,16 +702,6 @@ BLOSC_EXPORT void blosc_cbuffer_versions(const void* cbuffer, int* version,
 BLOSC_EXPORT const char* blosc_cbuffer_complib(const void* cbuffer);
 
 
-/*********************************************************************
-  Structures and functions related with compression codecs.
-*********************************************************************/
-
-typedef struct {
-  uint8_t id;
-  int (*encoder)(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, void *params);
-  int (*decoder)(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, void *params);
-  void *params;
-} blosc2_udcodec;
 
 /*********************************************************************
   Structures and functions related with contexts.
@@ -724,6 +723,7 @@ typedef struct {
   void *btune_config;
   //!> BTune configuration.
 }blosc2_btune;
+
 
 /**
  * @brief The parameters for a prefilter function.
@@ -784,8 +784,6 @@ typedef struct {
   //!< The compressor codec.
   uint8_t compcode_meta;
   //!< The metadata for the compressor codec.
-  blosc2_udcodec udcodecs[BLOSC2_MAX_UDCODECS];
-  //!< The user-defined compression codecs.
   uint8_t clevel;
   //!< The compression level (5).
   int use_dict;
@@ -816,7 +814,7 @@ typedef struct {
  * @brief Default struct for compression params meant for user initialization.
  */
 static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
-        BLOSC_BLOSCLZ, 0, {0}, 5, 0, 8, 1, 0, BLOSC_FORWARD_COMPAT_SPLIT,
+        BLOSC_BLOSCLZ, 0, 5, 0, 8, 1, 0, BLOSC_FORWARD_COMPAT_SPLIT,
         NULL, {0, 0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0, 0},
         NULL, NULL, NULL};
 
@@ -831,8 +829,6 @@ typedef struct {
   //!< The number of threads to use internally (1).
   void* schunk;
   //!< The associated schunk, if any (NULL).
-  blosc2_udcodec udcodecs[BLOSC2_MAX_UDCODECS];
-  //!< The user-defined compression codecs.
   blosc2_postfilter_fn postfilter;
   //!< The postfilter function.
   blosc2_postfilter_params *postparams;
@@ -842,7 +838,7 @@ typedef struct {
 /**
  * @brief Default struct for decompression params meant for user initialization.
  */
-static const blosc2_dparams BLOSC2_DPARAMS_DEFAULTS = {1, NULL, {0}, NULL, NULL};
+static const blosc2_dparams BLOSC2_DPARAMS_DEFAULTS = {1, NULL, NULL, NULL};
 
 /**
  * @brief Create a context for @a *_ctx() compression functions.
@@ -1749,6 +1745,26 @@ BLOSC_EXPORT void blosc_set_blocksize(size_t blocksize);
  * available (the default).
  */
 BLOSC_EXPORT void blosc_set_schunk(blosc2_schunk* schunk);
+
+/*********************************************************************
+  Structures and functions related with compression codecs.
+*********************************************************************/
+
+int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams);
+int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams);
+
+typedef struct {
+  uint8_t compcode;
+  char *compname;
+  char *complib;
+  int (*encoder)(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, blosc2_cparams *cparams);
+  int (*decoder)(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, blosc2_dparams *dparams);
+} blosc2_codec;
+
+extern blosc2_codec *g_codecs[256];
+extern uint8_t g_ncodecs;
+
+int blosc2_register_codec(blosc2_codec *codec);
 
 
 /*********************************************************************
