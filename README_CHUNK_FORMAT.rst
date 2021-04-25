@@ -219,7 +219,7 @@ where `uint8_t token` is a byte for providing different meanings to `int32_t csi
     (``bitfield``) Flags for different meanings.
 
     :bit 0:
-        Repeated byte (stream is a run-length of bytes). The `cdata` section is one single byte, representing the repeated value in the stream. Note that repeated zeros cannot happen here (already handled by the `csize == 0` case above).
+        Repeated byte (stream is a run-length of bytes). This byte, representing the repeated value in the stream, is encoded in the LSB of the `int32_t csize`. In this case there is not a `cdata` section. Note that repeated zeros cannot happen here (already handled by the `csize == 0` case above).
 
     :bits 1 and 2:
         Reserved for two-codecs in a row. TODO: complete description
