@@ -191,7 +191,7 @@ data streams containing the contents of the block::
 *Only for C-Blosc2*
 
 Dictionaries are small datasets that are known to be repeated a lot and can help to compress data in blocks better.
-The dictionary section contains the size of the dictionary `int32 dsize` followed by the dictionary data::
+The dictionary section contains the size of the dictionary `int32_t dsize` followed by the dictionary data::
 
     +=======+=================+
     | dsize | dictionary data |
@@ -200,20 +200,20 @@ The dictionary section contains the size of the dictionary `int32 dsize` followe
 **Compressed Data Streams**
 
 Compressed data streams are the compressed set of bytes that are passed to codecs for decompression. Each compressed
-data stream (`uint8_t cdata`) is stored with the size of the stream (`int32 csize`) preceeding it::
+data stream (`uint8_t* cdata`) is stored with the size of the stream (`int32_t csize`) preceeding it::
 
     +=======+=======+
     | csize | cdata |
     +=======+=======+
 
-There are a couple of special cases for `int32 csize`.  If zero, that means that the stream is fully made of zeros, *and* there is not a `cdata` section. The actual size of the stream is inferred from `blocksize` and whether or not the block is split.
+There are a couple of special cases for `int32_t csize`.  If zero, that means that the stream is fully made of zeros, *and* there is not a `cdata` section. The actual size of the stream is inferred from `blocksize` and whether or not the block is split.
 If negative, the stream is stored like this::
 
     +=======+=======+=======+
     | csize | token | cdata |
     +=======+=======+=======+
 
-where `uint8_t token` is a byte for providing different meanings to `int32 csize`:
+where `uint8_t token` is a byte for providing different meanings to `int32_t csize`:
 
 :token:
     (``bitfield``) Flags for different meanings.
