@@ -200,7 +200,7 @@ The dictionary section contains the size of the dictionary `int32 dsize` followe
 **Compressed Data Streams**
 
 Compressed data streams are the compressed set of bytes that are passed to codecs for decompression. Each compressed
-data stream is stored with the size of the stream `int32 csize` preceeding the bytes for the stream::
+data stream (`uint8_t cdata`) is stored with the size of the stream (`int32 csize`) preceeding it::
 
     +=======+=======+
     | csize | cdata |
