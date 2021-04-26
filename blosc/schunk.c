@@ -48,6 +48,7 @@ int blosc2_schunk_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
     (*cparams)->filters_meta[i] = schunk->filters_meta[i];
   }
   (*cparams)->compcode = schunk->compcode;
+  (*cparams)->compcode_meta = schunk->compcode_meta;
   (*cparams)->clevel = schunk->clevel;
   (*cparams)->typesize = schunk->typesize;
   (*cparams)->blocksize = schunk->blocksize;
@@ -84,6 +85,7 @@ void update_schunk_properties(struct blosc2_schunk* schunk) {
     schunk->filters_meta[i] = cparams->filters_meta[i];
   }
   schunk->compcode = cparams->compcode;
+  schunk->compcode_meta = cparams->compcode_meta;
   schunk->clevel = cparams->clevel;
   schunk->typesize = cparams->typesize;
   schunk->blocksize = cparams->blocksize;
@@ -1287,7 +1289,9 @@ int blosc2_vlmeta_get(blosc2_schunk *schunk, const char *name, uint8_t **content
   }
   *content_len = nbytes;
   *content = malloc((size_t) nbytes);
-  int nbytes_ = blosc2_decompress_ctx(schunk->dctx, meta->content, meta->content_len, *content, nbytes);
+  blosc2_context *dctx = blosc2_create_dctx(*schunk->storage->dparams);
+  int nbytes_ = blosc2_decompress_ctx(dctx, meta->content, meta->content_len, *content, nbytes);
+  blosc2_free_ctx(dctx);
   if (nbytes_ != nbytes) {
     BLOSC_TRACE_ERROR("User metalayer \"%s\" is corrupted.", meta->name);
     return BLOSC2_ERROR_READ_BUFFER;

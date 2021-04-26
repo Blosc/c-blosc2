@@ -187,7 +187,6 @@ enum {
 #define BLOSC_SNAPPY_COMPNAME    "snappy"
 #define BLOSC_ZLIB_COMPNAME      "zlib"
 #define BLOSC_ZSTD_COMPNAME      "zstd"
-#define BLOSC_UDCODEC_COMPNAME   "udcodec"
 
 /**
  * @brief Codes for compression libraries shipped with Blosc (code must be < 8)
@@ -214,7 +213,6 @@ enum {
   #define BLOSC_ZLIB_LIBNAME    "Zlib"
 #endif	/* HAVE_ZLIB_NG */
 #define BLOSC_ZSTD_LIBNAME      "Zstd"
-#define BLOSC_UDCODEC_LIBNAME   "UDCodec"
 
 /**
  * @brief The codes for compressor formats shipped with Blosc
@@ -1220,6 +1218,8 @@ typedef struct blosc2_schunk {
   uint8_t version;
   uint8_t compcode;
   //!< The default compressor. Each chunk can override this.
+  uint8_t compcode_meta;
+  //!< The default compressor metadata. Each chunk can override this.
   uint8_t clevel;
   //!< The compression level and other compress params.
   int32_t typesize;
@@ -1756,7 +1756,8 @@ int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams);
 typedef struct {
   uint8_t compcode;
   char *compname;
-  char *complib;
+  uint8_t complib;
+  uint8_t compver;
   int (*encoder)(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, blosc2_cparams *cparams);
   int (*decoder)(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, blosc2_dparams *dparams);
 } blosc2_codec;

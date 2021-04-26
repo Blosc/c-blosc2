@@ -27,13 +27,9 @@ static bool is_HCR(blosc2_context * context) {
       return true;
     case BLOSC_ZSTD :
       return true;
-    case BLOSC_UDCODEC :
-      return false;
     default :
-      BLOSC_TRACE_ERROR("Error in is_COMP_HCR: codec %d not handled.",
-              context->compcode);
+      return false;
   }
-  return false;
 }
 
 void blosc_stune_init(void * config, blosc2_context* cctx, blosc2_context* dctx) {

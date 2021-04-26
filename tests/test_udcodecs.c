@@ -40,6 +40,11 @@ int codec_encoder(const uint8_t* input, int32_t input_len,
   if (content[0] != 222) {
     return -1;
   }
+  free(content);
+
+  if (cparams->compcode_meta != 111) {
+    return -1;
+  }
 
   int32_t nelem = input_len / 4;
   int32_t *in_ = ((int32_t *) input);
@@ -77,6 +82,7 @@ int codec_decoder(const uint8_t* input, int32_t input_len,
   if (content[0] != 222) {
     return -1;
   }
+  free(content);
 
   int32_t nelem = output_len / 4;
   int32_t *in_ = ((int32_t *) input);
@@ -116,6 +122,7 @@ int codec_decoder_error(const uint8_t* input, int32_t input_len,
 
 CUTEST_TEST_DATA(udcodecs) {
   blosc2_cparams cparams;
+  char* urlpath;
 };
 
 CUTEST_TEST_SETUP(udcodecs) {
@@ -124,7 +131,7 @@ CUTEST_TEST_SETUP(udcodecs) {
   data->cparams.typesize = sizeof(int32_t);
   data->cparams.clevel = 9;
   data->cparams.nthreads = NTHREADS;
-
+  data->urlpath = "test_udcodecs.b2frame";
 
   CUTEST_PARAMETRIZE(correct_backward, bool, CUTEST_DATA(
       true, false,
@@ -144,13 +151,15 @@ CUTEST_TEST_TEST(udcodecs) {
 
   blosc2_codec udcodec;
   udcodec.compname = "arange";
-  udcodec.complib = "1";
+  udcodec.compver = 1;
   udcodec.encoder = codec_encoder;
   if (correct_backward) {
     udcodec.compcode = 250;
+    udcodec.complib = 250;
     udcodec.decoder = codec_decoder;
   } else {
     udcodec.compcode = 251;
+    udcodec.complib = 251;
     udcodec.decoder = codec_decoder_error;
   }
   int rc = blosc2_register_codec(&udcodec);
@@ -163,8 +172,8 @@ CUTEST_TEST_TEST(udcodecs) {
   for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
     cparams.filters[i] = 0;
   }
-  cparams.compcode = BLOSC_UDCODEC;
-  cparams.compcode_meta = udcodec.compcode;
+  cparams.compcode = udcodec.compcode;
+  cparams.compcode_meta = 111;
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
 
@@ -175,7 +184,11 @@ CUTEST_TEST_TEST(udcodecs) {
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
   cparams.clevel = 9;
-  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.cparams=&cparams,
+                            .dparams=&dparams,
+                            .urlpath=data->urlpath,
+                            .contiguous=true};
+
   schunk = blosc2_schunk_new(&storage);
   uint8_t codec_params = 222;
   blosc2_vlmeta_add(schunk, "codec_arange", &codec_params, 1, &BLOSC2_CPARAMS_DEFAULTS);
@@ -190,6 +203,9 @@ CUTEST_TEST_TEST(udcodecs) {
       return -1;
     }
   }
+  blosc2_schunk_free(schunk);
+
+  schunk = blosc2_schunk_open(data->urlpath);
 
   /* Retrieve and decompress the chunks (0-based count) */
   for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {

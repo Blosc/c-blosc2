@@ -43,7 +43,7 @@ for encoding blocks with a filter pipeline::
     |     filter codes      | ^ | ^ |     filter meta       | ^ | ^ |
                               |   |                           |   |
                               |   +- compcode_meta            |   +-blosc2_flags
-                              +-reserved                      +-reserved
+                              +- user-defined codec           +-reserved
 
 :version:
     (``uint8``) Blosc format version.
@@ -89,7 +89,7 @@ for encoding blocks with a filter pipeline::
     :``5``:
         Reserved
     :``6``:
-        Reserved
+        The compressor is defined in the user-defined codec slot (see below).
     :``7``:
         The compressor is defined in the super-chunk.
 
@@ -126,6 +126,9 @@ for encoding blocks with a filter pipeline::
     The filter pipeline has 6 reserved slots for the filters. They are applied sequentially to the chunk according
     to their index in increasing order. The type of filter applied is specified by the `filter_code`. Each
     `filter_code` has an associated field in `filter_meta` that can contain metadata about the filter.
+
+:udcodec:
+    (``uint8``) User-defined codec identifier.
 
 :compcode_meta:
     (``uint8``) Compression codec metadata.

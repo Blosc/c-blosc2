@@ -92,7 +92,8 @@ int main(void) {
 
   blosc2_codec udcodec;
   udcodec.compcode = 244;
-  udcodec.complib = "UDCodec";
+  udcodec.compver = 1;
+  udcodec.complib = 1;
   udcodec.compname = "udcodec";
   udcodec.encoder = codec_encoder;
   udcodec.decoder = codec_decoder;
@@ -100,8 +101,7 @@ int main(void) {
   blosc2_register_codec(&udcodec);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.compcode = BLOSC_UDCODEC;
-  cparams.compcode_meta = 244;
+  cparams.compcode = 244;
 
   for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
     cparams.filters[i] = 0;
