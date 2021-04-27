@@ -1762,8 +1762,6 @@ typedef struct {
   int (*decoder)(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, blosc2_dparams *dparams);
 } blosc2_codec;
 
-extern blosc2_codec *g_codecs[256];
-extern uint8_t g_ncodecs;
 
 int blosc2_register_codec(blosc2_codec *codec);
 
