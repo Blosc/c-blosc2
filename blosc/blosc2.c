@@ -93,6 +93,8 @@ static int32_t g_force_blocksize = 0;
 static int g_initlib = 0;
 static blosc2_schunk* g_schunk = NULL;   /* the pointer to super-chunk */
 
+static blosc2_filter *g_filters[256] = {0};
+static uint64_t g_nfilters = 0;
 
 // Forward declarations
 
@@ -837,7 +839,6 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
   int32_t typesize = context->typesize;
   uint8_t* filters = context->filters;
   uint8_t* filters_meta = context->filters_meta;
-  blosc2_udfilter* udfilters = context->udfilters;
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
 
   /* Prefilter function */
@@ -903,14 +904,15 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
             return NULL;
           }
       }
-    } else if (filters[i] < BLOSC2_REGISTERED_FILTERS) {
-      // No filter registered
-    } else {
+    }
+    else {
       // Look for the filters_meta in user filters and run it
-      for (int j = 0; j < BLOSC2_MAX_FILTERS; ++j) {
-        if (udfilters[j].id == filters[i]) {
-          if (udfilters[j].forward != NULL) {
-            rc = udfilters[j].forward(_src, _dest, bsize, udfilters[j].params);
+      for (int j = 0; j < g_nfilters; ++j) {
+        if (g_filters[j]->id == filters[i]) {
+          if (g_filters[j]->forward != NULL) {
+            blosc2_cparams cparams;
+            blosc2_ctx_get_cparams(context, &cparams);
+            rc = g_filters[j]->forward(_src, _dest, bsize, &cparams);
           } else {
             BLOSC_TRACE_ERROR("Forward function is NULL");
             return NULL;
@@ -1156,7 +1158,7 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
   int32_t typesize = context->typesize;
   uint8_t* filters = context->filters;
   uint8_t* filters_meta = context->filters_meta;
-  blosc2_udfilter * udfilters = context->udfilters;
+  blosc2_filter * udfilters = context->udfilters;
   uint8_t* _src = src;
   uint8_t* _dest = tmp;
   uint8_t* _tmp = tmp2;
@@ -1224,14 +1226,14 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
             errcode = -1;
           }
       }
-    } else if (filters[i] < BLOSC2_REGISTERED_FILTERS) {
-      // No filter registered
     } else {
         // Look for the filters_meta in user filters and run it
-        for (int j = 0; j < BLOSC2_MAX_FILTERS; ++j) {
-          if (udfilters[j].id == filters[i]) {
-            if (udfilters[j].backward != NULL) {
-              rc = udfilters[j].backward(_src, _dest, bsize, udfilters[j].params);
+        for (int j = 0; j < g_nfilters; ++j) {
+          if (g_filters[j]->id == filters[i]) {
+            if (g_filters[j]->backward != NULL) {
+              blosc2_dparams dparams;
+              blosc2_ctx_get_dparams(context, &dparams);
+              rc = g_filters[j]->backward(_src, _dest, bsize, &dparams);
             } else {
               BLOSC_TRACE_ERROR("Backward function is NULL");
               return BLOSC2_ERROR_FILTER_PIPELINE;
@@ -3514,9 +3516,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
       return NULL;
     }
   }
-  for (int i = 0; i < BLOSC2_MAX_UDFILTERS; ++i) {
-    memcpy(&context->udfilters[i], &cparams.udfilters[i], sizeof(blosc2_udfilter));
-  }
+
   context->nthreads = cparams.nthreads;
   context->new_nthreads = context->nthreads;
   context->blocksize = cparams.blocksize;
@@ -3562,10 +3562,6 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   context->block_maskout_nitems = 0;
   context->schunk = dparams.schunk;
 
-  for (int i = 0; i < BLOSC2_MAX_UDFILTERS; ++i) {
-    memcpy(&context->udfilters[i], &dparams.udfilters[i], sizeof(blosc2_udfilter));
-  }
-
   if (dparams.postfilter != NULL) {
     context->postfilter = dparams.postfilter;
     context->postparams = (blosc2_postfilter_params*)my_malloc(sizeof(blosc2_postfilter_params));
@@ -3606,6 +3602,38 @@ void blosc2_free_ctx(blosc2_context* context) {
     free(context->block_maskout);
   }
   my_free(context);
+}
+
+
+int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams) {
+  cparams->compcode = ctx->compcode;
+  cparams->compcode = ctx->compcode;
+  cparams->clevel = ctx->clevel;
+  cparams->use_dict = ctx->use_dict;
+  cparams->typesize = ctx->typesize;
+  cparams->nthreads = ctx->nthreads;
+  cparams->blocksize = ctx->blocksize;
+  cparams->splitmode = ctx->splitmode;
+  cparams->schunk = ctx->schunk;
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+    cparams->filters[i] = ctx->filters[i];
+    cparams->filters_meta[i] = ctx->filters_meta[i];
+  }
+  cparams->prefilter = ctx->prefilter;
+  cparams->preparams = ctx->preparams;
+  cparams->udbtune = ctx->udbtune;
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams) {
+  dparams->nthreads = ctx->nthreads;
+  dparams->schunk = ctx->schunk;
+  dparams->postfilter = ctx->postfilter;
+  dparams->postparams = ctx->postparams;
+
+  return BLOSC2_ERROR_SUCCESS;
 }
 
 
@@ -3798,4 +3826,33 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const size_t nbytes,
   blosc2_free_ctx(context);
 
   return BLOSC_EXTENDED_HEADER_LENGTH + (uint8_t)typesize;
+}
+
+
+/* Register functions */
+
+int blosc2_register_filter(blosc2_filter *filter) {
+  BLOSC_ERROR_NULL(filter, BLOSC2_ERROR_INVALID_PARAM);
+  if (g_nfilters == UINT8_MAX) {
+    BLOSC_TRACE_ERROR("Can not register more filters");
+    return BLOSC2_ERROR_CODEC_SUPPORT;
+  }
+  if (filter->id < BLOSC2_REGISTERED_FILTERS) {
+    BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_REGISTERED_FILTERS);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  // Check if the filter is already registered
+  for (int i = 0; i < g_nfilters; ++i) {
+    if (g_filters[i]->id == filter->id) {
+      BLOSC_TRACE_ERROR("The filter is already registered!");
+      return BLOSC2_ERROR_FAILURE;
+    }
+  }
+
+  blosc2_filter *filter_new = malloc(sizeof(blosc2_filter));
+  memcpy(filter_new, filter, sizeof(blosc2_filter));
+  g_filters[g_nfilters++] = filter_new;
+
+  return BLOSC2_ERROR_SUCCESS;
 }

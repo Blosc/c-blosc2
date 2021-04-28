@@ -23,16 +23,11 @@
 #define NTHREADS 4
 
 
-typedef struct {
-  uint8_t itemsize;
-} filter_params;
+int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, blosc2_cparams *cparams) {
+  blosc2_schunk *schunk = cparams->schunk;
 
-
-int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, void* params) {
-  filter_params *fparams = (filter_params *) params;
-
-  for (int i = 0; i < size / fparams->itemsize; ++i) {
-    switch (fparams->itemsize) {
+  for (int i = 0; i < size / schunk->typesize; ++i) {
+    switch (schunk->typesize) {
       case 8:
         ((int64_t *) dest)[i] = ((int64_t *) src)[i] + 1;
         break;
@@ -43,17 +38,17 @@ int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, void* params
         ((int16_t *) dest)[i] = ((int16_t *) src)[i] + 1;
         break;
       default:
-        BLOSC_TRACE_ERROR("Item size %d not supported", fparams->itemsize);
+        BLOSC_TRACE_ERROR("Item size %d not supported", schunk->typesize);
         return BLOSC2_ERROR_FAILURE;
     }
   }
   return BLOSC2_ERROR_SUCCESS;
 }
-int filter_backward(const uint8_t* src, uint8_t* dest, int32_t size, void* params) {
-  filter_params *fparams = (filter_params *) params;
+int filter_backward(const uint8_t* src, uint8_t* dest, int32_t size, blosc2_dparams *dparams) {
+  blosc2_schunk *schunk = dparams->schunk;
 
-  for (int i = 0; i < size / fparams->itemsize; ++i) {
-    switch (fparams->itemsize) {
+  for (int i = 0; i < size / schunk->typesize; ++i) {
+    switch (schunk->typesize) {
       case 8:
         ((int64_t *) dest)[i] = ((int64_t *) src)[i] - 1;
         break;
@@ -64,18 +59,18 @@ int filter_backward(const uint8_t* src, uint8_t* dest, int32_t size, void* param
         ((int16_t *) dest)[i] = ((int16_t *) src)[i] - 1;
         break;
       default:
-        BLOSC_TRACE_ERROR("Item size %d not supported", fparams->itemsize);
+        BLOSC_TRACE_ERROR("Item size %d not supported", schunk->typesize);
         return BLOSC2_ERROR_FAILURE;
     }
   }
   return BLOSC2_ERROR_SUCCESS;
 }
 
-int filter_backward_error(const uint8_t* src, uint8_t* dest, int32_t size, void* params) {
-  filter_params *fparams = (filter_params *) params;
+int filter_backward_error(const uint8_t* src, uint8_t* dest, int32_t size, blosc2_dparams *dparams) {
+  blosc2_schunk *schunk = dparams->schunk;
 
-  for (int i = 0; i < size / fparams->itemsize; ++i) {
-    switch (fparams->itemsize) {
+  for (int i = 0; i < size / schunk->typesize; ++i) {
+    switch (schunk->typesize) {
       case 8:
         ((int64_t *) dest)[i] = ((int64_t *) src)[i];
         break;
@@ -86,7 +81,7 @@ int filter_backward_error(const uint8_t* src, uint8_t* dest, int32_t size, void*
         ((int16_t *) dest)[i] = ((int16_t *) src)[i] - 13;
         break;
       default:
-        BLOSC_TRACE_ERROR("Item size %d not supported", fparams->itemsize);
+        BLOSC_TRACE_ERROR("Item size %d not supported", schunk->typesize);
         return BLOSC2_ERROR_FAILURE;
     }
   }
@@ -106,16 +101,22 @@ CUTEST_TEST_SETUP(udfilters) {
   data->cparams.nthreads = NTHREADS;
 
   CUTEST_PARAMETRIZE(nchunks, int32_t, CUTEST_DATA(
-      0, 1, 10, 20,
+      0,
+      1,
+      10,
+      20,
   ));
+
   CUTEST_PARAMETRIZE(itemsize, int8_t, CUTEST_DATA(
-      2, 4, 8,
+      2,
+      4,
+      8,
   ));
 
   CUTEST_PARAMETRIZE(correct_backward, bool, CUTEST_DATA(
-      true, false,
+      true,
+      false,
   ));
-  
 }
 
 
@@ -130,32 +131,30 @@ CUTEST_TEST_TEST(udfilters) {
 
   int dsize;
 
-  filter_params params = {.itemsize=itemsize};
-  blosc2_udfilter udfilter;
-  udfilter.id = 177;
+  blosc2_filter udfilter;
   udfilter.forward = filter_forward;
   if (correct_backward) {
     udfilter.backward = filter_backward;
+    udfilter.id = 244;
   } else {
     udfilter.backward = filter_backward_error;
+    udfilter.id = 245;
   }
-  udfilter.params = &params;
+
+  blosc2_register_filter(&udfilter);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.udfilters[0] = udfilter;
-  cparams.filters[4] = 177;
+  cparams.typesize = (int32_t) itemsize;
+  cparams.filters[4] = udfilter.id;
   cparams.filters_meta[4] = 0;
+  cparams.clevel = 9;
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-  dparams.udfilters[0] = udfilter;
-
 
   blosc2_schunk* schunk;
   int i, nchunk;
 
   /* Create a super-chunk container */
-  cparams.typesize = sizeof(int32_t);
-  cparams.clevel = 9;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(&storage);
 

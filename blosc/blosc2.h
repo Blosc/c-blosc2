@@ -99,6 +99,21 @@ enum {
    */
 };
 
+
+enum {
+  BLOSC2_BDEFINED_FILTERS = 32,
+  //!< Blosc-defined filters must be between 0 - 31.
+  BLOSC2_REGISTERED_FILTERS = 160,
+  //!< Blosc-registered filters must be between 64 - 159.
+  BLOSC2_UDEFINED_FILTERS = 256,
+  //!< User-defined filters must be between 128 - 255.
+  BLOSC2_MAX_FILTERS = 6,
+  //!< Maximum number of filters in the filter pipeline
+  BLOSC2_MAX_UDFILTERS = 16,
+  //!< Maximum number of filters that a user can register.
+};
+
+
 /**
  * @brief Codes for filters.
  * @see #blosc_compress
@@ -114,18 +129,6 @@ enum {
   BLOSC_LAST_REGISTERED_FILTER = 32,
 };
 
-enum {
-  BLOSC2_BDEFINED_FILTERS = 32,
-  //!< Blosc-defined filters must be between 0 - 31.
-  BLOSC2_REGISTERED_FILTERS = 160,
-  //!< Blosc-registered filters must be between 64 - 159.
-  BLOSC2_UDEFINED_FILTERS = 256,
-  //!< User-defined filters must be between 128 - 255.
-  BLOSC2_MAX_FILTERS = 6,
-  //!< Maximum number of filters in the filter pipeline
-  BLOSC2_MAX_UDFILTERS = 16,
-  //!< Maximum number of filters that a user can register.
-};
 
 /**
  * @brief Codes for internal flags (see blosc_cbuffer_metainfo)
@@ -686,17 +689,6 @@ BLOSC_EXPORT const char* blosc_cbuffer_complib(const void* cbuffer);
 
 
 /*********************************************************************
-  Structures and functions related with filters plugins.
-*********************************************************************/
-
-typedef struct {
-    uint8_t id;
-    int (* forward)(const uint8_t *, uint8_t *, int32_t, void *);
-    int (* backward)(const uint8_t *, uint8_t *, int32_t, void *);
-    void *params;
-}blosc2_udfilter;
-
-/*********************************************************************
   Structures and functions related with contexts.
 *********************************************************************/
 
@@ -792,8 +784,6 @@ typedef struct {
   //!< The (sequence of) filters.
   uint8_t filters_meta[BLOSC2_MAX_FILTERS];
   //!< The metadata for filters.
-  blosc2_udfilter udfilters[BLOSC2_MAX_UDFILTERS];
-  //!< The user-defined filters.
   blosc2_prefilter_fn prefilter;
   //!< The prefilter function.
   blosc2_prefilter_params *preparams;
@@ -810,7 +800,6 @@ static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
         BLOSC_FORWARD_COMPAT_SPLIT, NULL,
         {0, 0, 0, 0, 0, BLOSC_SHUFFLE},
         {0, 0, 0, 0, 0, 0},
-        {0},
         NULL, NULL, NULL};
 
 /**
@@ -828,14 +817,12 @@ typedef struct {
   //!< The postfilter function.
   blosc2_postfilter_params *postparams;
   //!< The postfilter parameters.
-  blosc2_udfilter udfilters[BLOSC2_MAX_UDFILTERS];
-  //!< The user-defined filters.
 } blosc2_dparams;
 
 /**
  * @brief Default struct for decompression params meant for user initialization.
  */
-static const blosc2_dparams BLOSC2_DPARAMS_DEFAULTS = {1, NULL, NULL, NULL, {0}};
+static const blosc2_dparams BLOSC2_DPARAMS_DEFAULTS = {1, NULL, NULL, NULL};
 
 /**
  * @brief Create a context for @a *_ctx() compression functions.
@@ -885,6 +872,7 @@ BLOSC_EXPORT void blosc2_free_ctx(blosc2_context* context);
  *
  */
 BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks);
+
 /**
  * @brief Compress a block of data in the @p src buffer and returns the size of
  * compressed block.
@@ -1741,6 +1729,23 @@ BLOSC_EXPORT void blosc_set_blocksize(size_t blocksize);
  * available (the default).
  */
 BLOSC_EXPORT void blosc_set_schunk(blosc2_schunk* schunk);
+
+
+/*********************************************************************
+  Structures and functions related with filters plugins.
+*********************************************************************/
+
+int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams);
+int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams);
+
+typedef struct {
+  uint8_t id;
+  int (* forward)(const uint8_t *, uint8_t *, int32_t, blosc2_cparams *);
+  int (* backward)(const uint8_t *, uint8_t *, int32_t, blosc2_dparams *);
+  void *params;
+}blosc2_filter;
+
+BLOSC_EXPORT int blosc2_register_filter(blosc2_filter *filter);
 
 
 /*********************************************************************
