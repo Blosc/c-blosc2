@@ -155,6 +155,16 @@ enum {
   BLOSC2_MAXBLOCKSIZE = 536866816  //!< maximum size for blocks
 };
 
+
+enum {
+  BLOSC2_BDEFINED_CODECS = 32,
+  //!< Blosc-defined codecs must be between 0 - 31.
+  BLOSC2_REGISTERED_CODECS = 160,
+  //!< Blosc-registered codecs must be between 31 - 159.
+  BLOSC2_UDEFINED_CODECS = 256,
+  //!< User-defined codecs must be between 160 - 255.
+};
+
 /**
  * @brief Codes for the different compressors shipped with Blosc
  */
@@ -166,18 +176,12 @@ enum {
   BLOSC_ZLIB = 4,
   BLOSC_ZSTD = 5,
   BLOSC_UDCODEC = 6,
-  BLOSC_LAST_CODEC = 7,  //!< sentinel
-  BLOSC_LAST_REGISTERED_CODEC = 32,  //!< sentinel
+  BLOSC_LAST_CODEC = 7,
+  //!< Determine the last codec defined by Blosc.
+  BLOSC_LAST_REGISTERED_CODEC = BLOSC2_BDEFINED_CODECS + 0,
+  //!< Determine the last registered codec. It is used to check if a codec between 31 - 159 is registered or not.
 };
 
-enum {
-  BLOSC2_BDEFINED_CODECS = 32,
-  //!< Blosc-defined codecs must be between 0 - 31.
-  BLOSC2_REGISTERED_CODECS = 160,
-  //!< Blosc-registered codecs must be between 64 - 159.
-  BLOSC2_UDEFINED_CODECS = 256,
-  //!< User-defined codecs must be between 160 - 255.
-};
 
 // Names for the different compressors shipped with Blosc
 

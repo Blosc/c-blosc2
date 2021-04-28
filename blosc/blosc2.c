@@ -3236,6 +3236,7 @@ const char* blosc_get_compressor(void)
 int blosc_set_compressor(const char* compname) {
   int code = blosc_compname_to_compcode(compname);
   if (code >= BLOSC_UDCODEC) {
+    BLOSC_TRACE_ERROR("User defined codecs cannot be set here. Use Blosc2 mechanism instead.");
     return -1;
   }
   g_compressor = code;
