@@ -16,10 +16,6 @@
 #define NCHUNKS 100
 #define NTHREADS 4
 
-typedef struct {
-  uint8_t itemsize;
-} filter_params;
-
 
 int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, blosc2_cparams *cparams) {
   blosc2_schunk *schunk = cparams->schunk;
@@ -72,12 +68,10 @@ int main(void) {
   int dsize;
   int64_t nbytes, cbytes;
 
-  filter_params params = {.itemsize=sizeof(int32_t)};
   blosc2_filter udfilter;
   udfilter.id = 250;
   udfilter.forward = filter_forward;
   udfilter.backward = filter_backward;
-  udfilter.params = &params;
 
   blosc2_register_filter(&udfilter);
 

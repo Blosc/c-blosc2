@@ -1735,16 +1735,46 @@ BLOSC_EXPORT void blosc_set_schunk(blosc2_schunk* schunk);
   Structures and functions related with filters plugins.
 *********************************************************************/
 
+/**
+ * @brief Create a @p cparams associated to a context.
+ *
+ * @param schunk The context from where to extract the compression parameters.
+ * @param cparams The pointer where the compression params will be stored.
+ * *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
 int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams);
+
+/**
+ * @brief Fill the @p dparams associated to a context.
+ *
+ * @param schunk The context from where to extract the decompression parameters.
+ * @param dparams The pointer where the decompression params will be stored.
+ * *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
 int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams);
 
+
+/**
+ * @brief The parameters for a user-defined filter.
+ */
 typedef struct {
   uint8_t id;
+  //!< The filter identifier.
   int (* forward)(const uint8_t *, uint8_t *, int32_t, blosc2_cparams *);
+  //!< The filter function that is used during compression.
   int (* backward)(const uint8_t *, uint8_t *, int32_t, blosc2_dparams *);
-  void *params;
+  //!< The filter function that is used during decompression.
 }blosc2_filter;
 
+/**
+ * @brief Register a user-defined filter in Blosc.
+ *
+ * @param filter The filter to register.
+ *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
 BLOSC_EXPORT int blosc2_register_filter(blosc2_filter *filter);
 
 
