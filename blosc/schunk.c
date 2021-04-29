@@ -363,11 +363,14 @@ int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* nee
 
 /* Write an in-memory frame out to a file. */
 int64_t frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
-  blosc2_io *io = frame->schunk->storage->udio;
-
-  void* fp = io->open(urlpath, "wb", io->params);
-  int64_t nitems = io->write(frame->cframe, frame->len, 1, fp);
-  io->close(fp);
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return BLOSC2_ERROR_PLUGIN_IO;
+  }
+  void* fp = io_cb->open(urlpath, "wb", frame->schunk->storage->io);
+  int64_t nitems = io_cb->write(frame->cframe, frame->len, 1, fp);
+  io_cb->close(fp);
   return nitems * (size_t)frame->len;
 }
 
@@ -435,7 +438,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     }
     free(schunk->storage->cparams);
     free(schunk->storage->dparams);
-    free(schunk->storage->udio);
+    free(schunk->storage->io);
     free(schunk->storage);
   }
 
