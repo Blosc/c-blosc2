@@ -127,7 +127,7 @@ enum {
   BLOSC_TRUNC_PREC = 4,  //!< truncate precision filter
   BLOSC_LAST_FILTER = 5, //!< sentinel
   BLOSC_LAST_REGISTERED_FILTER = BLOSC2_BDEFINED_FILTERS + 0,
-
+};
 
 /**
  * @brief Codes for internal flags (see blosc_cbuffer_metainfo)
@@ -868,6 +868,26 @@ BLOSC_EXPORT blosc2_context* blosc2_create_dctx(blosc2_dparams dparams);
  * both compression and decompression.
  */
 BLOSC_EXPORT void blosc2_free_ctx(blosc2_context* context);
+
+/**
+ * @brief Create a @p cparams associated to a context.
+ *
+ * @param schunk The context from where to extract the compression parameters.
+ * @param cparams The pointer where the compression params will be stored.
+ * *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
+int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams);
+
+/**
+ * @brief Fill the @p dparams associated to a context.
+ *
+ * @param schunk The context from where to extract the decompression parameters.
+ * @param dparams The pointer where the decompression params will be stored.
+ * *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
+int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams);
 
 /**
  * @brief Set a maskout so as to avoid decompressing specified blocks.
@@ -1753,48 +1773,37 @@ BLOSC_EXPORT void blosc_set_schunk(blosc2_schunk* schunk);
   Structures and functions related with compression codecs.
 *********************************************************************/
 
-int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams);
-int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams);
-
 typedef int (* codec_encoder_cb) (const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, uint8_t meta, blosc2_cparams *cparams);
 typedef int (* codec_decoder_cb) (const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, uint8_t meta, blosc2_dparams *dparams);
 
 typedef struct {
   uint8_t compcode;
+  //!< The codec identifier.
   char *compname;
+  //!< The codec name.
   uint8_t complib;
+  //!< The codec library format.
   uint8_t compver;
+  //!< The codec version.
   codec_encoder_cb encoder;
+  //!< The codec encoder that is used during compression.
   codec_decoder_cb decoder;
+  //!< The codec decoder that is used during decompression.
 } blosc2_codec;
 
-
+/**
+ * @brief Register a user-defined codec in Blosc.
+ *
+ * @param filter The codec to register.
+ *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
 int blosc2_register_codec(blosc2_codec *codec);
 
 
 /*********************************************************************
   Structures and functions related with filters plugins.
 *********************************************************************/
-
-/**
- * @brief Create a @p cparams associated to a context.
- *
- * @param schunk The context from where to extract the compression parameters.
- * @param cparams The pointer where the compression params will be stored.
- * *
- * @return 0 if succeeds. Else a negative code is returned.
- */
-int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams);
-
-/**
- * @brief Fill the @p dparams associated to a context.
- *
- * @param schunk The context from where to extract the decompression parameters.
- * @param dparams The pointer where the decompression params will be stored.
- * *
- * @return 0 if succeeds. Else a negative code is returned.
- */
-int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams);
 
 typedef int (* filter_forward_cb)  (const uint8_t *, uint8_t *, int32_t, uint8_t, blosc2_cparams *);
 typedef int (* filter_backward_cb) (const uint8_t *, uint8_t *, int32_t, uint8_t, blosc2_dparams *);
