@@ -87,8 +87,11 @@ uint8_t g_ncodecs = 0;
 static blosc2_filter *g_filters[256] = {0};
 static uint64_t g_nfilters = 0;
 
-// Forward declarations
+static blosc2_io_cb *g_io[256] = {0};
+static uint64_t g_nio = 0;
 
+
+// Forward declarations
 int init_threadpool(blosc2_context *context);
 int release_threadpool(blosc2_context *context);
 
@@ -1489,26 +1492,30 @@ static int blosc_d(
     int32_t block_csize = block_csizes[nblock];
     // Read the lazy block on disk
     void* fp = NULL;
-    blosc2_io *io = context->schunk->storage->udio;
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(context->schunk->storage->io->id);
+    if (io_cb == NULL) {
+      BLOSC_TRACE_ERROR("Error getting the input/output API");
+      return BLOSC2_ERROR_PLUGIN_IO;
+    }
 
     if (frame->sframe) {
       // The chunk is not in the frame
       char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
       BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
       sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
-      fp = io->open(chunkpath, "rb", io->params);
+      fp = io_cb->open(chunkpath, "rb", context->schunk->storage->io->params);
       free(chunkpath);
       // The offset of the block is src_offset
-      io->seek(fp, src_offset, SEEK_SET);
+      io_cb->seek(fp, src_offset, SEEK_SET);
     }
     else {
-      fp = io->open(urlpath, "rb", io->params);
+      fp = io_cb->open(urlpath, "rb", context->schunk->storage->io->params);
       // The offset of the block is src_offset
-      io->seek(fp, chunk_offset + src_offset, SEEK_SET);
+      io_cb->seek(fp, chunk_offset + src_offset, SEEK_SET);
     }
     // We can make use of tmp3 because it will be used after src is not needed anymore
-    int64_t rbytes = io->read(tmp3, 1, block_csize, fp);
-    io->close(fp);
+    int64_t rbytes = io_cb->read(tmp3, 1, block_csize, fp);
+    io_cb->close(fp);
     if ((int32_t)rbytes != block_csize) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");
       return BLOSC2_ERROR_READ_BUFFER;
@@ -3951,4 +3958,52 @@ int blosc2_register_codec(blosc2_codec *codec) {
   g_codecs[g_ncodecs++] = codec_new;
 
   return BLOSC2_ERROR_SUCCESS;
+}
+
+int _blosc2_register_io_cb(const blosc2_io_cb *io) {
+
+  // Check if the io is already registered
+  for (int i = 0; i < g_nio; ++i) {
+    if (g_io[i]->id == io->id) {
+      BLOSC_TRACE_ERROR("The codec is already registered!");
+      return BLOSC2_ERROR_PLUGIN_IO;
+    }
+  }
+
+  blosc2_io_cb *io_new = malloc(sizeof(blosc2_io_cb));
+  memcpy(io_new, io, sizeof(blosc2_io_cb));
+  g_io[g_nio++] = io_new;
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+int blosc2_register_io_cb(const blosc2_io_cb *io) {
+  BLOSC_ERROR_NULL(io, BLOSC2_ERROR_INVALID_PARAM);
+  if (g_nio == UINT8_MAX) {
+    BLOSC_TRACE_ERROR("Can not register more codecs");
+    return BLOSC2_ERROR_PLUGIN_IO;
+  }
+
+  if (io->id < BLOSC2_IO_REGISTERED) {
+    BLOSC_TRACE_ERROR("The compcode must be greater or equal than %d", BLOSC2_IO_REGISTERED);
+    return BLOSC2_ERROR_PLUGIN_IO;
+  }
+
+  return _blosc2_register_io_cb(io);
+}
+
+blosc2_io_cb *blosc2_get_io_cb(uint8_t id) {
+  for (int i = 0; i < g_nio; ++i) {
+    if (g_io[i]->id == id) {
+      return g_io[i];
+    }
+  }
+  if (id == BLOSC2_IO_FILESYSTEM) {
+    if (_blosc2_register_io_cb(&BLOSC2_IO_CB_DEFAULTS) < 0) {
+      BLOSC_TRACE_ERROR("Error registering the default IO API");
+      return NULL;
+    }
+    return blosc2_get_io_cb(id);
+  }
+  return NULL;
 }

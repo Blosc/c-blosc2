@@ -331,6 +331,7 @@ enum {
   BLOSC2_ERROR_POSTFILTER = -27,      //!< Postfilter failure
   BLOSC2_ERROR_FRAME_SPECIAL = -28,   //!< Special frame failure
   BLOSC2_ERROR_SCHUNK_SPECIAL = -29,  //!< Special super-chunk failure
+  BLOSC2_ERROR_PLUGIN_IO = -30,              //!< IO plugin error
 };
 
 /**
@@ -716,6 +717,18 @@ BLOSC_EXPORT const char* blosc_cbuffer_complib(const void* cbuffer);
   Structures and functions related with user-defined input/output.
 *********************************************************************/
 
+enum {
+  BLOSC2_IO_FILESYSTEM = 0,
+  BLOSC_IO_LAST_BLOSC_DEFINED = 1,  // sentinel
+  BLOSC_IO_LAST_REGISTERED = 32,  // sentinel
+};
+
+enum {
+  BLOSC2_IO_BLOSC_DEFINED = 32,
+  BLOSC2_IO_REGISTERED = 160,
+  BLOSC2_IO_USER_DEFINED = 256
+};
+
 typedef void*   (*blosc2_open_cb)(const char *urlpath, const char *mode, void *params);
 typedef int     (*blosc2_close_cb)(void *stream);
 typedef int64_t (*blosc2_tell_cb)(void *stream);
@@ -725,6 +738,7 @@ typedef int64_t (*blosc2_read_cb)(void *ptr, int64_t size, int64_t nitems, void 
 typedef int64_t (*blosc2_truncate_cb)(void *stream, int64_t size);
 
 typedef struct {
+  uint8_t id;
   blosc2_open_cb open;
   blosc2_close_cb close;
   blosc2_tell_cb tell;
@@ -732,10 +746,16 @@ typedef struct {
   blosc2_write_cb write;
   blosc2_read_cb read;
   blosc2_truncate_cb truncate;
+} blosc2_io_cb;
+
+
+typedef struct {
+  uint8_t id;
   void *params;
 } blosc2_io;
 
-static const blosc2_io BLOSC2_IO_DEFAULTS = {
+static const blosc2_io_cb BLOSC2_IO_CB_DEFAULTS = {
+  .id = BLOSC2_IO_FILESYSTEM,
   .open = (blosc2_open_cb) blosc2_stdio_open,
   .close = (blosc2_close_cb) blosc2_stdio_close,
   .tell = (blosc2_tell_cb) blosc2_stdio_tell,
@@ -743,9 +763,24 @@ static const blosc2_io BLOSC2_IO_DEFAULTS = {
   .write = (blosc2_write_cb) blosc2_stdio_write,
   .read = (blosc2_read_cb) blosc2_stdio_read,
   .truncate = (blosc2_truncate_cb) blosc2_stdio_truncate,
-  .params = NULL,
 };
 
+static const blosc2_io BLOSC2_IO_DEFAULTS = {
+    .id = BLOSC2_IO_FILESYSTEM,
+    .params = NULL,
+};
+
+
+/**
+ * @brief Register a user-defined input/output callbacks in Blosc.
+ *
+ * @param filter The callbacks API to register.
+ *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
+BLOSC_EXPORT int blosc2_register_io_cb(const blosc2_io_cb *io);
+
+BLOSC_EXPORT blosc2_io_cb *blosc2_get_io_cb(uint8_t id);
 
 /*********************************************************************
   Structures and functions related with contexts.
@@ -1254,8 +1289,8 @@ typedef struct {
     blosc2_dparams* dparams;
     //!< The decompression params when creating a schunk.
     //!< If NULL, sensible defaults are used depending on the context.
-    blosc2_io *udio;
-    //!< User-defined iinput/output functions.
+    blosc2_io *io;
+    //!< Input/output backend.
 } blosc2_storage;
 
 /**

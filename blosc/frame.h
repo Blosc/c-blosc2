@@ -106,7 +106,7 @@ int frame_free(blosc2_frame_s *frame);
  *
  * @return The frame created from the file.
  */
-blosc2_frame_s* frame_from_file(const char *urlpath, const blosc2_io *io);
+blosc2_frame_s* frame_from_file(const char *urlpath, const blosc2_io *io_cb);
 
 /**
  * @brief Initialize a frame out of a frame buffer.

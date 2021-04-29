@@ -85,20 +85,24 @@ typedef struct {
 }test_udio_backend;
 
 CUTEST_TEST_DATA(udio) {
-  blosc2_io udio;
   blosc2_cparams cparams;
 };
 
 CUTEST_TEST_SETUP(udio) {
   blosc_init();
 
-  data->udio.open = (blosc2_open_cb) test_open;
-  data->udio.close = (blosc2_close_cb) test_close;
-  data->udio.read = (blosc2_read_cb) test_read;
-  data->udio.tell = (blosc2_tell_cb) test_tell;
-  data->udio.seek = (blosc2_seek_cb) test_seek;
-  data->udio.write = (blosc2_write_cb) test_write;
-  data->udio.truncate = (blosc2_truncate_cb) test_truncate;
+  blosc2_io_cb io_cb;
+
+  io_cb.id = 244;
+  io_cb.open = (blosc2_open_cb) test_open;
+  io_cb.close = (blosc2_close_cb) test_close;
+  io_cb.read = (blosc2_read_cb) test_read;
+  io_cb.tell = (blosc2_tell_cb) test_tell;
+  io_cb.seek = (blosc2_seek_cb) test_seek;
+  io_cb.write = (blosc2_write_cb) test_write;
+  io_cb.truncate = (blosc2_truncate_cb) test_truncate;
+
+  blosc2_register_io_cb(&io_cb);
 
   data->cparams = BLOSC2_CPARAMS_DEFAULTS;
   data->cparams.typesize = sizeof(int32_t);
@@ -131,10 +135,10 @@ CUTEST_TEST_TEST(udio) {
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 9;
   cparams.nthreads = 2;
-  test_udio_params io_params = {0};
-  data->udio.params = &io_params;
 
-  blosc2_storage storage = {.cparams=&cparams, .contiguous=backend.contiguous, .urlpath = backend.urlpath, .udio=&data->udio};
+  test_udio_params io_params = {0};
+  blosc2_io io = {.id = 244, .params = &io_params};
+  blosc2_storage storage = {.cparams=&cparams, .contiguous=backend.contiguous, .urlpath = backend.urlpath, .io=&io};
 
   blosc2_schunk *schunk = blosc2_schunk_new(&storage);
 
@@ -143,7 +147,7 @@ CUTEST_TEST_TEST(udio) {
     CUTEST_ASSERT("Error during compression", cbytes >= 0);
   }
 
-  blosc2_schunk *schunk2 = blosc2_schunk_open_udio(backend.urlpath, &data->udio);
+  blosc2_schunk *schunk2 = blosc2_schunk_open_udio(backend.urlpath, &io);
 
   for (int i = 0; i < NCHUNKS; ++i) {
     int32_t dbytes = blosc2_schunk_decompress_chunk(schunk2, i, rec_buffer, nbytes);

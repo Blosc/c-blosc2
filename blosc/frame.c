@@ -363,6 +363,12 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
   uint8_t* framep = frame->cframe;
   uint8_t header[FRAME_HEADER_MINLEN];
 
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(io->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return BLOSC2_ERROR_PLUGIN_IO;
+  }
+
   if (frame->len <= 0) {
     return BLOSC2_ERROR_READ_BUFFER;
   }
@@ -375,11 +381,11 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
                              io);
     }
     else {
-      fp = io->open(frame->urlpath, "rb", io->params);
+      fp = io_cb->open(frame->urlpath, "rb", io->params);
     }
     if (fp != NULL) {
-      rbytes = io->read(header, 1, FRAME_HEADER_MINLEN, fp);
-      io->close(fp);
+      rbytes = io_cb->read(header, 1, FRAME_HEADER_MINLEN, fp);
+      io_cb->close(fp);
     }
     (void) rbytes;
     if (rbytes != FRAME_HEADER_MINLEN) {
@@ -486,7 +492,12 @@ int64_t get_trailer_offset(blosc2_frame_s *frame, int32_t header_len, bool has_c
 // Update the length in the header
 int update_frame_len(blosc2_frame_s* frame, int64_t len) {
   int rc = 1;
-  blosc2_io *io = frame->schunk->storage->udio;
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return BLOSC2_ERROR_PLUGIN_IO;
+  }
+
   if (frame->cframe != NULL) {
     to_big(frame->cframe + FRAME_LEN, &len, sizeof(int64_t));
   }
@@ -494,16 +505,16 @@ int update_frame_len(blosc2_frame_s* frame, int64_t len) {
     void* fp = NULL;
     if (frame->sframe) {
       fp = sframe_open_index(frame->urlpath, "rb+",
-                             frame->schunk->storage->udio);
+                             frame->schunk->storage->io);
     }
     else {
-      fp = io->open(frame->urlpath, "rb+", io->params);
+      fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
     }
-    io->seek(fp, FRAME_LEN, SEEK_SET);
+    io_cb->seek(fp, FRAME_LEN, SEEK_SET);
     int64_t swap_len;
     to_big(&swap_len, &len, sizeof(int64_t));
-    int64_t wbytes = io->write(&swap_len, 1, sizeof(int64_t), fp);
-    io->close(fp);
+    int64_t wbytes = io_cb->write(&swap_len, 1, sizeof(int64_t), fp);
+    io_cb->close(fp);
     if (wbytes != sizeof(int64_t)) {
       BLOSC_TRACE_ERROR("Cannot write the frame length in header.");
       return BLOSC2_ERROR_FILE_WRITE;
@@ -665,7 +676,7 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                             &blocksize, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL, NULL, NULL,
-                            frame->schunk->storage->udio);
+                            frame->schunk->storage->io);
   if (ret < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return ret;
@@ -678,8 +689,11 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     return BLOSC2_ERROR_READ_BUFFER;
   }
 
-  blosc2_io *io = frame->schunk->storage->udio;
-
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return BLOSC2_ERROR_PLUGIN_IO;
+  }
   // Update the trailer.  As there are no internal offsets to the trailer section,
   // and it is always at the end of the frame, we can just write (or overwrite) it
   // at the end of the frame.
@@ -695,22 +709,22 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     void* fp = NULL;
     if (frame->sframe) {
       fp = sframe_open_index(frame->urlpath, "rb+",
-                             frame->schunk->storage->udio);
+                             frame->schunk->storage->io);
     }
     else {
-      fp = io->open(frame->urlpath, "rb+", io->params);
+      fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
     }
-    io->seek(fp, trailer_offset, SEEK_SET);
-    int64_t wbytes = io->write(trailer, 1, trailer_len, fp);
+    io_cb->seek(fp, trailer_offset, SEEK_SET);
+    int64_t wbytes = io_cb->write(trailer, 1, trailer_len, fp);
     if (wbytes != (size_t)trailer_len) {
       BLOSC_TRACE_ERROR("Cannot write the trailer length in trailer.");
       return BLOSC2_ERROR_FILE_WRITE;
     }
-    if (io->truncate(fp, trailer_offset + trailer_len) != 0) {
+    if (io_cb->truncate(fp, trailer_offset + trailer_len) != 0) {
       BLOSC_TRACE_ERROR("Cannot truncate the frame.");
       return BLOSC2_ERROR_FILE_TRUNCATE;
     }
-    io->close(fp);
+    io_cb->close(fp);
 
   }
   free(trailer);
@@ -740,6 +754,13 @@ blosc2_frame_s* frame_from_file(const char* urlpath, const blosc2_io *io) {
     BLOSC_TRACE_ERROR("Cannot get information about the path %s.", urlpath);
     return NULL;
   }
+
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(io->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return NULL;
+  }
+
   char* urlpath_cpy;
   if (path_stat.st_mode & S_IFDIR) {
     char last_char = urlpath[strlen(urlpath) - 1];
@@ -758,12 +779,12 @@ blosc2_frame_s* frame_from_file(const char* urlpath, const blosc2_io *io) {
   else {
     urlpath_cpy = malloc(strlen(urlpath) + 1);
     strcpy(urlpath_cpy, urlpath);
-    fp = io->open(urlpath, "rb", io->params);
+    fp = io_cb->open(urlpath, "rb", io->params);
   }
-  int64_t rbytes = io->read(header, 1, FRAME_HEADER_MINLEN, fp);
+  int64_t rbytes = io_cb->read(header, 1, FRAME_HEADER_MINLEN, fp);
   if (rbytes != FRAME_HEADER_MINLEN) {
     BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
-    io->close(fp);
+    io_cb->close(fp);
     free(urlpath_cpy);
     return NULL;
   }
@@ -776,9 +797,9 @@ blosc2_frame_s* frame_from_file(const char* urlpath, const blosc2_io *io) {
   frame->sframe = sframe;
 
   // Now, the trailer length
-  io->seek(fp, frame_len - FRAME_TRAILER_MINLEN, SEEK_SET);
-  rbytes = io->read(trailer, 1, FRAME_TRAILER_MINLEN, fp);
-  io->close(fp);
+  io_cb->seek(fp, frame_len - FRAME_TRAILER_MINLEN, SEEK_SET);
+  rbytes = io_cb->read(trailer, 1, FRAME_TRAILER_MINLEN, fp);
+  io_cb->close(fp);
   if (rbytes != FRAME_TRAILER_MINLEN) {
     BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
     free(urlpath_cpy);
@@ -916,7 +937,11 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   int64_t tbytes = frame->len;
   to_big(h2 + FRAME_LEN, &tbytes, sizeof(tbytes));
 
-  blosc2_io *io = frame->schunk->storage->udio;
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return BLOSC2_ERROR_PLUGIN_IO;
+  }
 
   // Create the frame and put the header at the beginning
   if (frame->urlpath == NULL) {
@@ -926,12 +951,12 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   else {
     if (frame->sframe) {
       fp = sframe_open_index(frame->urlpath, "wb",
-                             frame->schunk->storage->udio);
+                             frame->schunk->storage->io);
     }
     else {
-      fp = io->open(frame->urlpath, "wb", io->params);
+      fp = io_cb->open(frame->urlpath, "wb", frame->schunk->storage->io->params);
     }
-    io->write(h2, h2len, 1, fp);
+    io_cb->write(h2, h2len, 1, fp);
   }
   free(h2);
 
@@ -947,7 +972,7 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
       if (frame->urlpath == NULL) {
         memcpy(frame->cframe + h2len + coffset, data_chunk, (size_t)chunk_cbytes);
       } else {
-        io->write(data_chunk, chunk_cbytes, 1, fp);
+        io_cb->write(data_chunk, chunk_cbytes, 1, fp);
       }
       coffset += chunk_cbytes;
     }
@@ -961,8 +986,8 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     memcpy(frame->cframe + h2len + cbytes, off_chunk, off_cbytes);
   }
   else {
-    io->write(off_chunk, (size_t)off_cbytes, 1, fp);
-    schunk->storage->udio->close(fp);
+    io_cb->write(off_chunk, (size_t)off_cbytes, 1, fp);
+    io_cb->close(fp);
   }
   free(off_chunk);
   rc = frame_update_trailer(frame, schunk);
@@ -1043,21 +1068,26 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
   if (off_cbytes != NULL) {
     *off_cbytes = coffsets_cbytes;
   }
-  blosc2_io *io = frame->schunk->storage->udio;
+
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return NULL;
+  }
 
   void* fp = NULL;
   uint8_t* coffsets = malloc((size_t)coffsets_cbytes);
   if (frame->sframe) {
     fp = sframe_open_index(frame->urlpath, "rb",
-                           frame->schunk->storage->udio);
-    io->seek(fp, header_len + 0, SEEK_SET);
+                           frame->schunk->storage->io);
+    io_cb->seek(fp, header_len + 0, SEEK_SET);
   }
   else {
-    fp = io->open(frame->urlpath, "rb", io->params);
-    io->seek(fp, header_len + cbytes, SEEK_SET);
+    fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
+    io_cb->seek(fp, header_len + cbytes, SEEK_SET);
   }
-  int64_t rbytes = io->read(coffsets, 1, (size_t)coffsets_cbytes, fp);
-  io->close(fp);
+  int64_t rbytes = io_cb->read(coffsets, 1, (size_t)coffsets_cbytes, fp);
+  io_cb->close(fp);
   if (rbytes != coffsets_cbytes) {
     BLOSC_TRACE_ERROR("Cannot read the offsets out of the frame.");
     free(coffsets);
@@ -1082,21 +1112,25 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
-  blosc2_io *io = frame->schunk->storage->udio;
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return BLOSC2_ERROR_PLUGIN_IO;
+  }
 
   if (frame->cframe == NULL) {
     int64_t rbytes = 0;
     void* fp = NULL;
     if (frame->sframe) {
       fp = sframe_open_index(frame->urlpath, "rb+",
-                             frame->schunk->storage->udio);
+                             frame->schunk->storage->io);
     }
     else {
-      fp = io->open(frame->urlpath, "rb", io->params);
+      fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
     }
     if (fp != NULL) {
-      rbytes = io->read(header, 1, FRAME_HEADER_MINLEN, fp);
-      io->close(fp);
+      rbytes = io_cb->read(header, 1, FRAME_HEADER_MINLEN, fp);
+      io_cb->close(fp);
     }
     (void) rbytes;
     if (rbytes != FRAME_HEADER_MINLEN) {
@@ -1129,14 +1163,14 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
     // Write updated header down to file
     if (frame->sframe) {
       fp = sframe_open_index(frame->urlpath, "rb+",
-                             frame->schunk->storage->udio);
+                             frame->schunk->storage->io);
     }
     else {
-      fp = io->open(frame->urlpath, "rb+", io->params);
+      fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
     }
     if (fp != NULL) {
-      io->write(h2, h2len, 1, fp);
-      io->close(fp);
+      io_cb->write(h2, h2len, 1, fp);
+      io_cb->close(fp);
     }
   }
   else {
@@ -1273,7 +1307,7 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                             &blocksize, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL, NULL, NULL,
-                            schunk->storage->udio);
+                            schunk->storage->io);
   if (ret < 0) {
     BLOSC_TRACE_ERROR("Unable to get the header info from frame.");
     return ret;
@@ -1286,19 +1320,23 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   } else {
     int64_t rbytes = 0;
     header = malloc(header_len);
-    blosc2_io *io = frame->schunk->storage->udio;
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+    if (io_cb == NULL) {
+      BLOSC_TRACE_ERROR("Error getting the input/output API");
+      return BLOSC2_ERROR_PLUGIN_IO;
+    }
 
     void* fp = NULL;
     if (frame->sframe) {
       fp = sframe_open_index(frame->urlpath, "rb",
-                             frame->schunk->storage->udio);
+                             frame->schunk->storage->io);
     }
     else {
-      fp = io->open(frame->urlpath, "rb", io->params);
+      fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
     }
     if (fp != NULL) {
-      rbytes = io->read(header, 1, header_len, fp);
-      io->close(fp);
+      rbytes = io_cb->read(header, 1, header_len, fp);
+      io_cb->close(fp);
     }
     if (rbytes != (size_t) header_len) {
       BLOSC_TRACE_ERROR("Cannot access the header out of the frame.");
@@ -1438,7 +1476,7 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                             &blocksize, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL, NULL, NULL,
-                            schunk->storage->udio);
+                            schunk->storage->io);
   if (ret < 0) {
     BLOSC_TRACE_ERROR("Unable to get the trailer info from frame.");
     return ret;
@@ -1459,21 +1497,27 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   } else {
     int64_t rbytes = 0;
     trailer = malloc(trailer_len);
-    blosc2_io *io = frame->schunk->storage->udio;
+
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+    if (io_cb == NULL) {
+      BLOSC_TRACE_ERROR("Error getting the input/output API");
+      return BLOSC2_ERROR_PLUGIN_IO;
+    }
+
     void* fp = NULL;
     if (frame->sframe) {
       char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
       sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
-      fp = io->open(eframe_name, "rb", io->params);
+      fp = io_cb->open(eframe_name, "rb", frame->schunk->storage->io->params);
       free(eframe_name);
     }
     else {
-      fp = io->open(frame->urlpath, "rb", io->params);
+      fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
     }
     if (fp != NULL) {
-      io->seek(fp, trailer_offset, SEEK_SET);
-      rbytes = io->read(trailer, 1, trailer_len, fp);
-      io->close(fp);
+      io_cb->seek(fp, trailer_offset, SEEK_SET);
+      rbytes = io_cb->read(trailer, 1, trailer_len, fp);
+      io_cb->close(fp);
     }
     if (rbytes != (size_t) trailer_len) {
       BLOSC_TRACE_ERROR("Cannot access the trailer out of the fileframe.");
@@ -1526,13 +1570,13 @@ blosc2_storage* get_new_storage(const blosc2_storage* storage,
 
   // iodefaults
   blosc2_io* udio = malloc(sizeof(blosc2_io));
-  if (storage->udio != NULL) {
-    memcpy(udio, storage->udio, sizeof(blosc2_io));
+  if (storage->io != NULL) {
+    memcpy(udio, storage->io, sizeof(blosc2_io));
   }
   else {
     memcpy(udio, iodefaults, sizeof(blosc2_io));
   }
-  new_storage->udio = udio;
+  new_storage->io = udio;
 
   return new_storage;
 }
@@ -1618,13 +1662,18 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   int32_t chunk_blocksize;
   size_t prev_alloc = BLOSC_EXTENDED_HEADER_LENGTH;
   uint8_t* data_chunk = NULL;
-  const blosc2_io *io = udio;
+  const blosc2_io_cb *io_cb = blosc2_get_io_cb(udio->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return NULL;
+  }
+
   void* fp = NULL;
   if (frame->cframe == NULL) {
     data_chunk = malloc((size_t)prev_alloc);
     if (!frame->sframe) {
       // If not the chunks won't be in the frame
-      fp = io->open(frame->urlpath, "rb", io->params);
+      fp = io_cb->open(frame->urlpath, "rb", udio->params);
       if (fp == NULL) {
         free(data_chunk);
         free(offsets);
@@ -1649,10 +1698,10 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
         rbytes = frame_get_lazychunk(frame, offsets[i], &data_chunk, &needs_free);
       }
       else {
-        io->seek(fp, header_len + offsets[i], SEEK_SET);
-        rbytes = io->read(data_chunk, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
+        io_cb->seek(fp, header_len + offsets[i], SEEK_SET);
+        rbytes = io_cb->read(data_chunk, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
         if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
-          io->close(fp);
+          io_cb->close(fp);
           return NULL;
         }
       }
@@ -1661,7 +1710,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
           free(data_chunk);
         }
         else {
-          io->close(fp);
+          io_cb->close(fp);
         }
         free(offsets);
         blosc2_schunk_free(schunk);
@@ -1676,10 +1725,10 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
         prev_alloc = chunk_cbytes;
       }
       if (!frame->sframe) {
-        io->seek(fp, header_len + offsets[i], SEEK_SET);
-        rbytes = io->read(data_chunk, 1, chunk_cbytes, fp);
+        io_cb->seek(fp, header_len + offsets[i], SEEK_SET);
+        rbytes = io_cb->read(data_chunk, 1, chunk_cbytes, fp);
         if (rbytes != chunk_cbytes) {
-          io->close(fp);
+          io_cb->close(fp);
           free(offsets);
           blosc2_schunk_free(schunk);
           return NULL;
@@ -1709,7 +1758,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   if (frame->cframe == NULL) {
     free(data_chunk);
     if (!frame->sframe) {
-      io->close(fp);
+      io_cb->close(fp);
     }
   }
   free(offsets);
@@ -1850,7 +1899,7 @@ int frame_get_chunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool *ne
   rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                        &blocksize, &chunksize, &nchunks,
                        &typesize, NULL, NULL, NULL, NULL, NULL,
-                       frame->schunk->storage->udio);
+                       frame->schunk->storage->io);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return rc;
@@ -1890,28 +1939,32 @@ int frame_get_chunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool *ne
     return sframe_get_chunk(frame, nchunk, chunk, needs_free);
   }
 
-  blosc2_io *io = frame->schunk->storage->udio;
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return BLOSC2_ERROR_PLUGIN_IO;
+  }
 
   if (frame->cframe == NULL) {
     uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
-    void* fp = io->open(frame->urlpath, "rb", io->params);
-    io->seek(fp, header_len + offset, SEEK_SET);
-    int64_t rbytes = io->read(header, 1, sizeof(header), fp);
+    void* fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
+    io_cb->seek(fp, header_len + offset, SEEK_SET);
+    int64_t rbytes = io_cb->read(header, 1, sizeof(header), fp);
     if (rbytes != sizeof(header)) {
       BLOSC_TRACE_ERROR("Cannot read the cbytes for chunk in the frame.");
-      io->close(fp);
+      io_cb->close(fp);
       return BLOSC2_ERROR_FILE_READ;
     }
     rc = blosc2_cbuffer_sizes(header, NULL, &chunk_cbytes, NULL);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Cannot read the cbytes for chunk in the frame.");
-      io->close(fp);
+      io_cb->close(fp);
       return rc;
     }
     *chunk = malloc(chunk_cbytes);
-    io->seek(fp, header_len + offset, SEEK_SET);
-    rbytes = io->read(*chunk, 1, chunk_cbytes, fp);
-    io->close(fp);
+    io_cb->seek(fp, header_len + offset, SEEK_SET);
+    rbytes = io_cb->read(*chunk, 1, chunk_cbytes, fp);
+    io_cb->close(fp);
     if (rbytes != chunk_cbytes) {
       BLOSC_TRACE_ERROR("Cannot read the chunk out of the frame.");
       return BLOSC2_ERROR_FILE_READ;
@@ -1959,7 +2012,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
   int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                            &blocksize, &chunksize, &nchunks,
                            &typesize, NULL, NULL, NULL, NULL, NULL,
-                           frame->schunk->storage->udio);
+                           frame->schunk->storage->io);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return rc;
@@ -1991,7 +2044,11 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     goto end;
   }
 
-  blosc2_io *io = frame->schunk->storage->udio;
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return BLOSC2_ERROR_PLUGIN_IO;
+  }
 
   if (frame->cframe == NULL) {
     // TODO: make this portable across different endianness
@@ -2003,13 +2060,13 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     if (frame->sframe) {
       // The chunk is not in the frame
       fp = sframe_open_chunk(frame->urlpath, offset, "rb",
-                             frame->schunk->storage->udio);
+                             frame->schunk->storage->io);
     }
     else {
-      fp = io->open(frame->urlpath, "rb", io->params);
-      io->seek(fp, header_len + offset, SEEK_SET);
+      fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
+      io_cb->seek(fp, header_len + offset, SEEK_SET);
     }
-    int64_t rbytes = io->read(header, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
+    int64_t rbytes = io_cb->read(header, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
     if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
       BLOSC_TRACE_ERROR("Cannot read the header for chunk in the frame.");
       rc = BLOSC2_ERROR_FILE_READ;
@@ -2046,13 +2103,13 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
 
     // Read just the full header and bstarts section too (lazy partial length)
     if (frame->sframe) {
-      io->seek(fp, 0, SEEK_SET);
+      io_cb->seek(fp, 0, SEEK_SET);
     }
     else {
-      io->seek(fp, header_len + offset, SEEK_SET);
+      io_cb->seek(fp, header_len + offset, SEEK_SET);
     }
 
-    rbytes = io->read(*chunk, 1, trailer_offset, fp);
+    rbytes = io_cb->read(*chunk, 1, trailer_offset, fp);
     if (rbytes != trailer_offset) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) chunk out of the frame.");
       rc = BLOSC2_ERROR_FILE_READ;
@@ -2132,7 +2189,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
 
   end:
   if (fp != NULL) {
-    io->close(fp);
+    io_cb->close(fp);
   }
   if (rc < 0) {
     if (*needs_free) {
@@ -2159,7 +2216,7 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
 
   int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &blocksize, NULL,
                            &nchunks, &typesize, NULL, NULL, NULL, NULL, NULL,
-                           schunk->storage->udio);
+                           schunk->storage->io);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return BLOSC2_ERROR_DATA;
@@ -2238,6 +2295,12 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
   // schunk->blocksize = 0;  // for experimenting with automatic blocksize
 
   // We have the new offsets; update the frame.
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return BLOSC2_ERROR_PLUGIN_IO;
+  }
+
   int64_t new_frame_len = header_len + new_off_cbytes + frame->trailer_len;
   void* fp = NULL;
   if (frame->cframe != NULL) {
@@ -2255,16 +2318,16 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
     size_t wbytes;
     if (frame->sframe) {
       // Update the offsets chunk in the chunks frame
-      fp = sframe_open_index(frame->urlpath, "rb+", schunk->storage->udio);
-      schunk->storage->udio->seek(fp, header_len, SEEK_SET);
+      fp = sframe_open_index(frame->urlpath, "rb+", frame->schunk->storage->io);
+      io_cb->seek(fp, header_len, SEEK_SET);
     }
     else {
       // Regular frame
-      fp = schunk->storage->udio->open(frame->urlpath, "rb+", schunk->storage->udio->params);
-      schunk->storage->udio->seek(fp, header_len + cbytes, SEEK_SET);
+      fp = io_cb->open(frame->urlpath, "rb+", schunk->storage->io->params);
+      io_cb->seek(fp, header_len + cbytes, SEEK_SET);
     }
-    wbytes = schunk->storage->udio->write(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
-    schunk->storage->udio->close(fp);
+    wbytes = io_cb->write(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
+    io_cb->close(fp);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return BLOSC2_ERROR_FRAME_SPECIAL;
@@ -2305,7 +2368,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   int32_t nchunks;
   int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &blocksize, &chunksize,
                            &nchunks, NULL, NULL, NULL, NULL, NULL, NULL,
-                           frame->schunk->storage->udio);
+                           frame->schunk->storage->io);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return NULL;
@@ -2452,7 +2515,11 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   }
   else {
     int64_t wbytes;
-    blosc2_io *io = frame->schunk->storage->udio;
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+    if (io_cb == NULL) {
+      BLOSC_TRACE_ERROR("Error getting the input/output API");
+      return NULL;
+    }
 
     if (frame->sframe) {
       // Update the offsets chunk in the chunks frame
@@ -2463,22 +2530,22 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
         }
       }
       fp = sframe_open_index(frame->urlpath, "rb+",
-                             frame->schunk->storage->udio);
-      io->seek(fp, header_len, SEEK_SET);
+                             frame->schunk->storage->io);
+      io_cb->seek(fp, header_len, SEEK_SET);
     }
     else {
       // Regular frame
-      fp = io->open(frame->urlpath, "rb+", io->params);
-      io->seek(fp, header_len + cbytes, SEEK_SET);
-      wbytes = io->write(chunk, 1, chunk_cbytes, fp);  // the new chunk
+      fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
+      io_cb->seek(fp, header_len + cbytes, SEEK_SET);
+      wbytes = io_cb->write(chunk, 1, chunk_cbytes, fp);  // the new chunk
       if (wbytes != (size_t)chunk_cbytes) {
         BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
-        io->close(fp);
+        io_cb->close(fp);
         return NULL;
       }
     }
-    wbytes = io->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
-    io->close(fp);
+    wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
+    io_cb->close(fp);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return NULL;
@@ -2519,7 +2586,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
   int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                            &blocksize, &chunksize, &nchunks,
                            NULL, NULL, NULL, NULL, NULL, NULL,
-                           frame->schunk->storage->udio);
+                           frame->schunk->storage->io);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return NULL;
@@ -2642,7 +2709,13 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
     memcpy(framep + header_len + new_cbytes, off_chunk, (size_t)new_off_cbytes);
   } else {
     int64_t wbytes;
-    blosc2_io *io = frame->schunk->storage->udio;
+
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+    if (io_cb == NULL) {
+      BLOSC_TRACE_ERROR("Error getting the input/output API");
+      return NULL;
+    }
+
     if (frame->sframe) {
       if (chunk_cbytes != 0) {
         if (sframe_create_chunk(frame, chunk, nchunks, chunk_cbytes) == NULL) {
@@ -2652,22 +2725,22 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
       }
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+",
-                             frame->schunk->storage->udio);
-      io->seek(fp, header_len + 0, SEEK_SET);
+                             frame->schunk->storage->io);
+      io_cb->seek(fp, header_len + 0, SEEK_SET);
     }
     else {
       // Regular frame
-      fp = io->open(frame->urlpath, "rb+", io->params);
-      io->seek(fp, header_len + cbytes, SEEK_SET);
-      wbytes = io->write(chunk, 1, chunk_cbytes, fp);  // the new chunk
+      fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
+      io_cb->seek(fp, header_len + cbytes, SEEK_SET);
+      wbytes = io_cb->write(chunk, 1, chunk_cbytes, fp);  // the new chunk
       if (wbytes != (size_t)chunk_cbytes) {
         BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
-        io->close(fp);
+        io_cb->close(fp);
         return NULL;
       }
     }
-    wbytes = io->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
-    io->close(fp);
+    wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
+    io_cb->close(fp);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return NULL;
@@ -2708,7 +2781,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
   int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                            &blocksize, &chunksize, &nchunks,
                            NULL, NULL, NULL, NULL, NULL, NULL,
-                           frame->schunk->storage->udio);
+                           frame->schunk->storage->io);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return NULL;
@@ -2851,7 +2924,13 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
     memcpy(framep + header_len + new_cbytes, off_chunk, (size_t)new_off_cbytes);
   } else {
     int64_t wbytes;
-    blosc2_io *io = frame->schunk->storage->udio;
+
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+    if (io_cb == NULL) {
+      BLOSC_TRACE_ERROR("Error getting the input/output API");
+      return NULL;
+    }
+
     if (frame->sframe) {
       if (chunk_cbytes) {
         if (sframe_create_chunk(frame, chunk, nchunk, chunk_cbytes) == NULL) {
@@ -2861,22 +2940,22 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
       }
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+",
-                             frame->schunk->storage->udio);
-      io->seek(fp, header_len + 0, SEEK_SET);
+                             frame->schunk->storage->io);
+      io_cb->seek(fp, header_len + 0, SEEK_SET);
     }
     else {
       // Regular frame
-      fp = io->open(frame->urlpath, "rb+", io->params);
-      io->seek(fp, header_len + cbytes, SEEK_SET);
-      wbytes = io->write(chunk, 1, chunk_cbytes, fp);  // the new chunk
+      fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
+      io_cb->seek(fp, header_len + cbytes, SEEK_SET);
+      wbytes = io_cb->write(chunk, 1, chunk_cbytes, fp);  // the new chunk
       if (wbytes != (size_t)chunk_cbytes) {
         BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
-        io->close(fp);
+        io_cb->close(fp);
         return NULL;
       }
     }
-    wbytes = io->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
-    io->close(fp);
+    wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
+    io_cb->close(fp);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return NULL;
@@ -2917,7 +2996,7 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int* offsets_order, blosc
   int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                             &blocksize, &chunksize, &nchunks,
                             NULL, NULL, NULL, NULL, NULL, NULL,
-                            frame->schunk->storage->udio);
+                            frame->schunk->storage->io);
   if (ret < 0) {
       BLOSC_TRACE_ERROR("Cannot get the header info for the frame.");
       return ret;
@@ -2992,21 +3071,26 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int* offsets_order, blosc
   }
   else {
     void* fp = NULL;
-    blosc2_io *io = frame->schunk->storage->udio;
+
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+    if (io_cb == NULL) {
+      BLOSC_TRACE_ERROR("Error getting the input/output API");
+      return BLOSC2_ERROR_PLUGIN_IO;
+    }
 
     if (frame->sframe) {
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+",
-                             frame->schunk->storage->udio);
-      io->seek(fp, header_len + 0, SEEK_SET);
+                             frame->schunk->storage->io);
+      io_cb->seek(fp, header_len + 0, SEEK_SET);
     }
     else {
       // Regular frame
-      fp = io->open(frame->urlpath, "rb+", io->params);
-      io->seek(fp, header_len + cbytes, SEEK_SET);
+      fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
+      io_cb->seek(fp, header_len + cbytes, SEEK_SET);
     }
-    int64_t wbytes = io->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
-    io->close(fp);
+    int64_t wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
+    io_cb->close(fp);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return BLOSC2_ERROR_FILE_WRITE;
