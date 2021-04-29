@@ -26,6 +26,7 @@
 
 int codec_encoder(const uint8_t* input, int32_t input_len,
                   uint8_t* output, int32_t output_len,
+                  uint8_t meta,
                   blosc2_cparams* cparams) {
   if (cparams->schunk == NULL) {
     return -1;
@@ -42,7 +43,7 @@ int codec_encoder(const uint8_t* input, int32_t input_len,
   }
   free(content);
 
-  if (cparams->compcode_meta != 111) {
+  if (meta != 111) {
     return -1;
   }
 
@@ -71,6 +72,7 @@ int codec_encoder(const uint8_t* input, int32_t input_len,
 
 int codec_decoder(const uint8_t* input, int32_t input_len,
                   uint8_t* output, int32_t output_len,
+                  uint8_t meta,
                   blosc2_dparams *dparams) {
   if (dparams->schunk == NULL) {
     return -1;
@@ -83,6 +85,10 @@ int codec_decoder(const uint8_t* input, int32_t input_len,
     return -1;
   }
   free(content);
+
+  if (meta != 111) {
+    return -1;
+  }
 
   int32_t nelem = output_len / 4;
   int32_t *in_ = ((int32_t *) input);
@@ -102,7 +108,11 @@ int codec_decoder(const uint8_t* input, int32_t input_len,
 
 int codec_decoder_error(const uint8_t* input, int32_t input_len,
                         uint8_t* output, int32_t output_len,
+                        uint8_t meta,
                         blosc2_dparams* dparams) {
+  if (meta != 111) {
+    return -1;
+  }
 
   int32_t nelem = output_len / 4;
   int32_t *in_ = ((int32_t *) input);

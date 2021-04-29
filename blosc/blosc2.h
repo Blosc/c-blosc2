@@ -127,7 +127,7 @@ enum {
   BLOSC_TRUNC_PREC = 4,  //!< truncate precision filter
   BLOSC_LAST_FILTER = 5, //!< sentinel
   BLOSC_LAST_REGISTERED_FILTER = BLOSC2_BDEFINED_FILTERS + 0,
-};
+
 
 /**
  * @brief Codes for internal flags (see blosc_cbuffer_metainfo)
@@ -175,8 +175,7 @@ enum {
   BLOSC_SNAPPY = 3,
   BLOSC_ZLIB = 4,
   BLOSC_ZSTD = 5,
-  BLOSC_UDCODEC = 6,
-  BLOSC_LAST_CODEC = 7,
+  BLOSC_LAST_CODEC = 6,
   //!< Determine the last codec defined by Blosc.
   BLOSC_LAST_REGISTERED_CODEC = BLOSC2_BDEFINED_CODECS + 0,
   //!< Determine the last registered codec. It is used to check if a codec between 31 - 159 is registered or not.
@@ -1757,13 +1756,16 @@ BLOSC_EXPORT void blosc_set_schunk(blosc2_schunk* schunk);
 int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams);
 int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams);
 
+typedef int (* codec_encoder_cb) (const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, uint8_t meta, blosc2_cparams *cparams);
+typedef int (* codec_decoder_cb) (const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, uint8_t meta, blosc2_dparams *dparams);
+
 typedef struct {
   uint8_t compcode;
   char *compname;
   uint8_t complib;
   uint8_t compver;
-  int (*encoder)(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, blosc2_cparams *cparams);
-  int (*decoder)(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, blosc2_dparams *dparams);
+  codec_encoder_cb encoder;
+  codec_decoder_cb decoder;
 } blosc2_codec;
 
 

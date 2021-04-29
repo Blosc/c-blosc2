@@ -293,8 +293,8 @@ int blosc_compcode_to_compname(int compcode, const char** compname) {
   else if (compcode == BLOSC_ZSTD)
     code = BLOSC_ZSTD;
 #endif /* HAVE_ZSTD */
-  else if (compcode == BLOSC_UDCODEC)
-    code = BLOSC_UDCODEC;
+  else if (compcode >= BLOSC_LAST_CODEC)
+    code = compcode;
   return code;
 }
 
@@ -1162,6 +1162,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
                                         neblock,
                                         dest,
                                         maxout,
+                                        context->compcode_meta,
                                         &cparams);
           goto udcodecsuccess;
         }
@@ -1724,6 +1725,7 @@ static int blosc_d(
                                           cbytes,
                                           _dest,
                                           neblock,
+                                          context->compcode_meta,
                                           &dparams);
             goto udcodecsuccess;
           }
@@ -3235,7 +3237,7 @@ const char* blosc_get_compressor(void)
 
 int blosc_set_compressor(const char* compname) {
   int code = blosc_compname_to_compcode(compname);
-  if (code >= BLOSC_UDCODEC) {
+  if (code >= BLOSC_LAST_CODEC) {
     BLOSC_TRACE_ERROR("User defined codecs cannot be set here. Use Blosc2 mechanism instead.");
     return -1;
   }
