@@ -59,19 +59,12 @@ static int split_block(blosc2_context* context, int32_t typesize,
 
   // For now, BLOSC_FORWARD_COMPAT_SPLIT and BLOSC_AUTO_SPLIT will be treated the same
   int compcode = context->compcode;
-  bool shuffle = context->filter_flags & BLOSC_DOSHUFFLE;
   return (
-    (
-     // fast codecs like blosclz prefer to split always
-     (compcode == BLOSC_BLOSCLZ) ||
-     // generally, LZ4 works better by splitting blocks too
-     (compcode == BLOSC_LZ4) ||
-     // For forward compatibility with Blosc1 (http://blosc.org/posts/new-forward-compat-policy/)
-     (!extended_header && compcode == BLOSC_LZ4HC) ||
-     (!extended_header && compcode == BLOSC_ZLIB) ||
-     (compcode == BLOSC_SNAPPY)) &&
-     (typesize <= MAX_STREAMS) &&
-     (blocksize / typesize) >= BLOSC_MIN_BUFFERSIZE);
+          // fast codecs like blosclz and lz4 prefer to split always
+          (compcode == BLOSC_BLOSCLZ) ||
+          (compcode == BLOSC_LZ4) ||
+          (typesize <= MAX_STREAMS) &&
+          ((blocksize / typesize) >= BLOSC_MIN_BUFFERSIZE));
 }
 
 #endif  /* STUNE_H */

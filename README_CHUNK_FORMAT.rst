@@ -81,7 +81,7 @@ for encoding blocks with a filter pipeline::
     :``1``:
         ``lz4`` or ``lz4hc``
     :``2``:
-        ``snappy``
+        reserved (slot previously occupied by ``snappy`` and free now)
     :``3``:
         ``zlib``
     :``4``:

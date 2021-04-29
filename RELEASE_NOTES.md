@@ -1,9 +1,9 @@
-Release notes for C-Blosc2 2.0.0.beta.6 (sixth beta)
-====================================================
+Release notes for C-Blosc2 2.0.0.rc.1 (first release candidate)
+===============================================================
 
 
-Changes from 2.0.0-beta.5 to 2.0.0.beta6
-========================================
+Changes from 2.0.0-beta.5 to 2.0.0.rc.1
+=======================================
 
 * [API change] `blosc2_decompress_ctx()` gets a new `srcsize`
  parameter to ensure that it does not read past the end
@@ -19,11 +19,20 @@ Changes from 2.0.0-beta.5 to 2.0.0.beta6
 
 * Internal LZ4 sources updated to 1.9.3.
 
-* Internal zlib support is provided now by new zlib-ng 2.0.1 (replacing miniz).
+* Internal zlib support is provided now by new zlib-ng 2.0.2 (replacing miniz).
+
+* The support for Snappy codec has been completely removed.  Snappy is a C++
+  library, which is not good for a library that aims to be fully pure C.
+  Snappy was removed from sources in C-Blosc(1) some years ago, so there
+  should not be a lot of data compressed with Blosc/Snappy out there (and
+  for the existing ones, a transcoding is always possible using C-Blosc(1)).
 
 * The Lizard codec has been removed.  Lizard is a pretty good one, but it
   looks like it is not timely maintained.  Zstd/Zlib can cover its place pretty
   nicely.
+
+* The split of blocks only happens for BLOSCLZ and LZ4 codecs.  All
+  the rest are not split at all.
 
 * Public APIs for frames have been removed.  Frames should be considered an
   storage detail, so having them accessible publicly should only bring
@@ -236,7 +245,7 @@ Changes from 2.0.0a2 to 2.0.0a3
   smaller and besides tends to be a bit faster.  Also, miniz is
   preferred to an external Zlib.
 
-* The internal snappy sources have been removed.  If snappy library
+* The internal Snappy sources have been removed.  If the Snappy library
   is found, the support for it is still there.
 
 * Internal LZ4 sources upgraded to 1.7.1.

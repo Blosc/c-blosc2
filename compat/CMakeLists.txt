@@ -12,7 +12,6 @@ if(BUILD_TESTS)
         foreach(datafile ${DATAFILES})
             # Don't test data if compressor is deactivated
             if((datafile MATCHES "lz4" AND DEACTIVATE_LZ4) OR
-               (datafile MATCHES "snappy" AND DEACTIVATE_SNAPPY) OR
                (datafile MATCHES "zlib" AND DEACTIVATE_ZLIB) OR
                (datafile MATCHES "zstd" AND DEACTIVATE_ZSTD))
                continue()

@@ -146,7 +146,7 @@ using the msgpack format. Here is the format for the *metalayers*::
         :``1``:
             ``lz4`` or ``lz4hc``
         :``2``:
-            ``snappy``
+            reserved (slot previously occupied by ``snappy`` and free now)
         :``3``:
             ``zlib``
         :``4``:
