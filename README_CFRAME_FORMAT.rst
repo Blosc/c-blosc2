@@ -59,16 +59,19 @@ The header contains information needed to decompress the Blosc chunks contained 
       |                   +-- [msgpack] int32
       +-- [msgpack] int32
 
-The filter pipeline is stored next in the header. It contains 8 slots, one for each filter that can be applied. For
+The filter pipeline is stored next in the header. It contains 6 slots, one for each filter that can be applied. For
 each slot there is a byte used to store the filter code in `filter_codes` and an associated byte used to store any
 possible filter meta-info in `filter_meta`::
 
 
     |-45|-46|-47|-48|-49|-4A|-4B|-4C|-4D|-4E|-4F|-50|-51|-52|-53|-54|-55|-56|
-    | d2| X | filter_codes                  | filter_meta                   |
+    | d2| X | filter_codes          |_f4|_f5| filter_meta           |   |   |
     |---|---|-------------------------------|-------------------------------|
-      ^   ^
-      |   |
+      ^   ^                           ^   ^                           ^   ^
+      |   |                           |   |                           |   +-- reserved
+      |   |                           |   |                           +-- reserved
+      |   |                           |   +-- compcodec_meta
+      |   |                           +-- udcodec
       |   +--number of filters
       +--[msgpack] fixext 16
 
@@ -148,6 +151,10 @@ using the msgpack format. Here is the format for the *metalayers*::
             ``zlib``
         :``4``:
             ``zstd``
+        :``5``:
+            reserved
+        :``6``:
+            The compressor is defined in the user-defined codec slot (see below).
         :``5 to 15``:
             Reserved
     :``4`` to ``7``: Compression level (up to 16)
@@ -172,6 +179,12 @@ using the msgpack format. Here is the format for the *metalayers*::
 
 :tdecomp:
     (``int16``) Number of threads for decompression.  If 0, same than `dctx`.
+
+:udcodec:
+    (``uint8``) User-defined codec identifier.
+
+:compcode_meta:
+    (``uint8``) Compression codec metadata associated with the compression codec. Only used in user-defined codecs.
 
 :map of metalayers:
     This is a *msgpack-formattted* map for the different metalayers.  The keys will be a string (0xa0 + namelen) for

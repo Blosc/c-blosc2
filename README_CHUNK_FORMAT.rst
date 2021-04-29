@@ -40,10 +40,10 @@ Starting in Blosc 2.0.0, there is an extension of the header above that allows
 for encoding blocks with a filter pipeline::
 
   1+|-0-|-1-|-2-|-3-|-4-|-5-|-6-|-7-|-8-|-9-|-A-|-B-|-C-|-D-|-E-|-F-|
-    |     filter codes      |   ^   |     filter meta       | ^ | ^ |
-                                |                             |   |
-                                +-reserved                    |   +-blosc2_flags
-                                                              +-reserved
+    |     filter codes      | ^ | ^ |     filter meta       | ^ | ^ |
+                              |   |                           |   |
+                              |   +- compcode_meta            |   +-blosc2_flags
+                              +- user-defined codec           +-reserved
 
 :version:
     (``uint8``) Blosc format version.
@@ -89,7 +89,7 @@ for encoding blocks with a filter pipeline::
     :``5``:
         Reserved
     :``6``:
-        Reserved
+        The compressor is defined in the user-defined codec slot (see below).
     :``7``:
         The compressor is defined in the super-chunk.
 
@@ -120,15 +120,25 @@ for encoding blocks with a filter pipeline::
         Delta filter.
     :``4``:
         Truncate precision filter.
+    :``5``:
+        User-defined filter.
 
     The filter pipeline has 6 reserved slots for the filters. They are applied sequentially to the chunk according
     to their index in increasing order. The type of filter applied is specified by the `filter_code`. Each
     `filter_code` has an associated field in `filter_meta` that can contain metadata about the filter.
 
+:udcodec:
+    (``uint8``) User-defined codec identifier.
+
+:compcode_meta:
+    (``uint8``) Compression codec metadata.
+
+    Metadata associated with the compression codec. Only used in user-defined codecs.
+
 :filter_meta:
     (``uint8``) Filter metadata.
 
-    Possible metadata associated with a filter code.
+    Metadata associated with the filter code.
 
 :blosc2_flags:
     (``bitfield``) The flags for a Blosc2 buffer.

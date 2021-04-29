@@ -93,6 +93,11 @@ static int32_t g_force_blocksize = 0;
 static int g_initlib = 0;
 static blosc2_schunk* g_schunk = NULL;   /* the pointer to super-chunk */
 
+blosc2_codec *g_codecs[256] = {0};
+uint8_t g_ncodecs = 0;
+
+static blosc2_filter *g_filters[256] = {0};
+static uint64_t g_nfilters = 0;
 
 // Forward declarations
 
@@ -212,6 +217,10 @@ static int compname_to_clibcode(const char* compname) {
     return BLOSC_ZLIB_LIB;
   if (strcmp(compname, BLOSC_ZSTD_COMPNAME) == 0)
     return BLOSC_ZSTD_LIB;
+  for (int i = 0; i < g_ncodecs; ++i) {
+    if (strcmp(compname, g_codecs[i]->compname) == 0)
+      return g_codecs[i]->complib;
+  }
   return BLOSC2_ERROR_NOT_FOUND;
 }
 
@@ -222,6 +231,10 @@ static const char* clibcode_to_clibname(int clibcode) {
   if (clibcode == BLOSC_SNAPPY_LIB) return BLOSC_SNAPPY_LIBNAME;
   if (clibcode == BLOSC_ZLIB_LIB) return BLOSC_ZLIB_LIBNAME;
   if (clibcode == BLOSC_ZSTD_LIB) return BLOSC_ZSTD_LIBNAME;
+  for (int i = 0; i < g_ncodecs; ++i) {
+    if (clibcode == g_codecs[i]->complib)
+      return g_codecs[i]->compname;
+  }
   return NULL;                  /* should never happen */
 }
 
@@ -248,6 +261,14 @@ int blosc_compcode_to_compname(int compcode, const char** compname) {
     name = BLOSC_ZLIB_COMPNAME;
   else if (compcode == BLOSC_ZSTD)
     name = BLOSC_ZSTD_COMPNAME;
+  else {
+    for (int i = 0; i < g_ncodecs; ++i) {
+      if (compcode == g_codecs[i]->compcode) {
+        name = g_codecs[i]->compname;
+        break;
+      }
+    }
+  }
 
   *compname = name;
 
@@ -272,7 +293,8 @@ int blosc_compcode_to_compname(int compcode, const char** compname) {
   else if (compcode == BLOSC_ZSTD)
     code = BLOSC_ZSTD;
 #endif /* HAVE_ZSTD */
-
+  else if (compcode >= BLOSC_LAST_CODEC)
+    code = compcode;
   return code;
 }
 
@@ -306,7 +328,14 @@ int blosc_compname_to_compcode(const char* compname) {
     code = BLOSC_ZSTD;
   }
 #endif /*  HAVE_ZSTD */
-
+  else{
+    for (int i = 0; i < g_ncodecs; ++i) {
+      if (strcmp(compname, g_codecs[i]->compname) == 0) {
+        code = g_codecs[i]->compcode;
+        break;
+      }
+    }
+  }
   return code;
 }
 
@@ -332,6 +361,8 @@ static int compcode_to_compformat(int compcode) {
     case BLOSC_ZSTD:    return BLOSC_ZSTD_FORMAT;
       break;
 #endif /*  HAVE_ZSTD */
+    default:
+      return BLOSC_UDCODEC_FORMAT;
   }
   return -1;
 }
@@ -361,6 +392,12 @@ static int compcode_to_compversion(int compcode) {
     case BLOSC_ZSTD:    return BLOSC_ZSTD_VERSION_FORMAT;
       break;
 #endif /*  HAVE_ZSTD */
+    default:
+      for (int i = 0; i < g_ncodecs; ++i) {
+        if (compcode == g_codecs[i]->compcode) {
+          return g_codecs[i]->compver;
+        }
+      }
   }
   return -1;
 }
@@ -658,7 +695,8 @@ typedef struct blosc_header_s {
   int32_t cbytes;
   // Extended Blosc2 header
   uint8_t filter_codes[BLOSC2_MAX_FILTERS];
-  int16_t reserved1;
+  uint8_t udcompcode;
+  uint8_t compcode_meta;
   uint8_t filter_meta[BLOSC2_MAX_FILTERS];
   uint8_t reserved2;
   uint8_t blosc2_flags;
@@ -759,7 +797,10 @@ static int blosc2_initialize_context_from_header(blosc2_context* context, blosc_
   context->sourcesize = header->nbytes;
   context->blocksize = header->blocksize;
   context->blosc2_flags = header->blosc2_flags;
-
+  context->compcode = header->flags >> 5;
+  if (context->compcode == BLOSC_UDCODEC_FORMAT) {
+    context->compcode = header->udcompcode;
+  }
   blosc2_calculate_blocks(context);
 
   bool is_lazy = false;
@@ -770,6 +811,7 @@ static int blosc2_initialize_context_from_header(blosc2_context* context, blosc_
 
     memcpy(context->filters, header->filter_codes, BLOSC2_MAX_FILTERS);
     memcpy(context->filters_meta, header->filter_meta, BLOSC2_MAX_FILTERS);
+    context->compcode_meta = header->compcode_meta;
 
     context->filter_flags = filters_to_flags(header->filter_codes);
     context->special_type = (header->blosc2_flags >> 4) & BLOSC2_SPECIAL_MASK;
@@ -814,6 +856,8 @@ static int blosc2_intialize_header_from_context(blosc2_context* context, blosc_h
       header->filter_codes[i] = context->filters[i];
       header->filter_meta[i] = context->filters_meta[i];
     }
+    header->udcompcode = context->compcode;
+    header->compcode_meta = context->compcode_meta;
 
     if (!little_endian) {
       header->blosc2_flags |= BLOSC2_BIGENDIAN;
@@ -827,9 +871,9 @@ static int blosc2_intialize_header_from_context(blosc2_context* context, blosc_h
 }
 
 
-uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
-                    const uint8_t* src, const int32_t offset,
-                    uint8_t* dest, uint8_t* tmp, uint8_t* tmp2) {
+uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t bsize,
+                          const uint8_t* src, const int32_t offset,
+                          uint8_t* dest, uint8_t* tmp, uint8_t* tmp2) {
   blosc2_context* context = thread_context->parent_context;
   uint8_t* _src = (uint8_t*)src + offset;
   uint8_t* _tmp = tmp;
@@ -871,35 +915,64 @@ uint8_t* pipeline_c(struct thread_context* thread_context, const int32_t bsize,
 
   /* Process the filter pipeline */
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
-    switch (filters[i]) {
-      case BLOSC_SHUFFLE:
-        for (int j = 0; j <= filters_meta[i]; j++) {
-          shuffle(typesize, bsize, _src, _dest);
-          // Cycle filters when required
-          if (j < filters_meta[i]) {
-            _src = _dest;
-            _dest = _tmp;
-            _tmp = _src;
+    int rc = BLOSC2_ERROR_SUCCESS;
+    if (filters[i] < BLOSC2_BDEFINED_FILTERS) {
+      switch (filters[i]) {
+        case BLOSC_SHUFFLE:
+          for (int j = 0; j <= filters_meta[i]; j++) {
+            shuffle(typesize, bsize, _src, _dest);
+            // Cycle filters when required
+            if (j < filters_meta[i]) {
+              _src = _dest;
+              _dest = _tmp;
+              _tmp = _src;
+            }
           }
-        }
-        break;
-      case BLOSC_BITSHUFFLE:
-        if (bitshuffle(typesize, bsize, _src, _dest, tmp2) < 0) {
-          return NULL;
-        }
-        break;
-      case BLOSC_DELTA:
-        delta_encoder(src, offset, bsize, typesize, _src, _dest);
-        break;
-      case BLOSC_TRUNC_PREC:
-        truncate_precision(filters_meta[i], typesize, bsize, _src, _dest);
-        break;
-      default:
-        if (filters[i] != BLOSC_NOFILTER) {
-          BLOSC_TRACE_ERROR("Filter %d not handled during compression\n", filters[i]);
-          return NULL;
-        }
+          break;
+        case BLOSC_BITSHUFFLE:
+          if (bitshuffle(typesize, bsize, _src, _dest, tmp2) < 0) {
+            return NULL;
+          }
+          break;
+        case BLOSC_DELTA:
+          delta_encoder(src, offset, bsize, typesize, _src, _dest);
+          break;
+        case BLOSC_TRUNC_PREC:
+          truncate_precision(filters_meta[i], typesize, bsize, _src, _dest);
+          break;
+        default:
+          if (filters[i] != BLOSC_NOFILTER) {
+            BLOSC_TRACE_ERROR("Filter %d not handled during compression\n", filters[i]);
+            return NULL;
+          }
+      }
     }
+    else {
+      // Look for the filters_meta in user filters and run it
+      for (int j = 0; j < g_nfilters; ++j) {
+        if (g_filters[j]->id == filters[i]) {
+          if (g_filters[j]->forward != NULL) {
+            blosc2_cparams cparams;
+            blosc2_ctx_get_cparams(context, &cparams);
+            rc = g_filters[j]->forward(_src, _dest, bsize, filters_meta[i], &cparams);
+          } else {
+            BLOSC_TRACE_ERROR("Forward function is NULL");
+            return NULL;
+          }
+          if (rc != BLOSC2_ERROR_SUCCESS) {
+            BLOSC_TRACE_ERROR("User-defined filter %d failed during compression\n", filters[i]);
+            return NULL;
+          }
+          goto udfiltersuccess;
+        }
+      }
+      BLOSC_TRACE_ERROR("User-defined filter %d not found during compression\n", filters[i]);
+      return NULL;
+
+      udfiltersuccess:;
+
+    }
+
     // Cycle buffers when required
     if (filters[i] != BLOSC_NOFILTER) {
       _src = _dest;
@@ -962,14 +1035,14 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     /* Apply the filter pipeline just for the prefilter */
     if (memcpyed && context->prefilter != NULL) {
       // We only need the prefilter output
-      _src = pipeline_c(thread_context, bsize, src, offset, dest, _tmp2, _tmp3);
+      _src = pipeline_forward(thread_context, bsize, src, offset, dest, _tmp2, _tmp3);
       if (_src == NULL) {
         return BLOSC2_ERROR_FILTER_PIPELINE;
       }
       return bsize;
     }
     /* Apply regular filter pipeline */
-    _src = pipeline_c(thread_context, bsize, src, offset, _tmp, _tmp2, _tmp3);
+    _src = pipeline_forward(thread_context, bsize, src, offset, _tmp, _tmp2, _tmp3);
     if (_src == NULL) {
       return BLOSC2_ERROR_FILTER_PIPELINE;
     }
@@ -1080,8 +1153,25 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
                                   (char*)dest, (size_t)maxout, context->clevel);
     }
   #endif /* HAVE_ZSTD */
-
-    else {
+    else if (context->compcode >= BLOSC2_BDEFINED_CODECS) {
+      for (int i = 0; i < g_ncodecs; ++i) {
+        if (g_codecs[i]->compcode == context->compcode) {
+          blosc2_cparams cparams;
+          blosc2_ctx_get_cparams(context, &cparams);
+          cbytes = g_codecs[i]->encoder(_src + j * neblock,
+                                        neblock,
+                                        dest,
+                                        maxout,
+                                        context->compcode_meta,
+                                        &cparams);
+          goto udcodecsuccess;
+        }
+      }
+      BLOSC_TRACE_ERROR("User-defined compressor codec %d not found during compression", context->compcode);
+      return BLOSC2_ERROR_CODEC_SUPPORT;
+    udcodecsuccess:
+      ;
+    } else {
       blosc_compcode_to_compname(context->compcode, &compname);
       BLOSC_TRACE_ERROR("Blosc has not been compiled with '%s' compression support."
                         "Please use one having it.", compname);
@@ -1120,13 +1210,14 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
 
 
 /* Process the filter pipeline (decompression mode) */
-int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8_t* dest,
+int pipeline_backward(struct thread_context* thread_context, const int32_t bsize, uint8_t* dest,
                const int32_t offset, uint8_t* src, uint8_t* tmp,
                uint8_t* tmp2, int last_filter_index, int32_t nblock) {
   blosc2_context* context = thread_context->parent_context;
   int32_t typesize = context->typesize;
   uint8_t* filters = context->filters;
   uint8_t* filters_meta = context->filters_meta;
+  blosc2_filter * udfilters = context->udfilters;
   uint8_t* _src = src;
   uint8_t* _dest = tmp;
   uint8_t* _tmp = tmp2;
@@ -1138,60 +1229,86 @@ int pipeline_d(struct thread_context* thread_context, const int32_t bsize, uint8
     if (last_copy_filter && context->postfilter == NULL) {
       _dest = dest + offset;
     }
-    switch (filters[i]) {
-      case BLOSC_SHUFFLE:
-        for (int j = 0; j <= filters_meta[i]; j++) {
-          unshuffle(typesize, bsize, _src, _dest);
-          // Cycle filters when required
-          if (j < filters_meta[i]) {
-            _src = _dest;
-            _dest = _tmp;
-            _tmp = _src;
-          }
-          // Check whether we have to copy the intermediate _dest buffer to final destination
-          if (last_copy_filter && (filters_meta[i] % 2) == 1 && j == filters_meta[i]) {
-            memcpy(dest + offset, _dest, (unsigned int)bsize);
-          }
-        }
-        break;
-      case BLOSC_BITSHUFFLE:
-        if (bitunshuffle(typesize, bsize, _src, _dest, _tmp, context->src[BLOSC2_CHUNK_VERSION]) < 0) {
-          return BLOSC2_ERROR_FILTER_PIPELINE;
-        }
-        break;
-      case BLOSC_DELTA:
-        if (context->nthreads == 1) {
-          /* Serial mode */
-          delta_decoder(dest, offset, bsize, typesize, _dest);
-        } else {
-          /* Force the thread in charge of the block 0 to go first */
-          pthread_mutex_lock(&context->delta_mutex);
-          if (context->dref_not_init) {
-            if (offset != 0) {
-              pthread_cond_wait(&context->delta_cv, &context->delta_mutex);
-            } else {
-              delta_decoder(dest, offset, bsize, typesize, _dest);
-              context->dref_not_init = 0;
-              pthread_cond_broadcast(&context->delta_cv);
+    int rc = BLOSC2_ERROR_SUCCESS;
+    if (filters[i] < BLOSC2_BDEFINED_FILTERS) {
+      switch (filters[i]) {
+        case BLOSC_SHUFFLE:
+          for (int j = 0; j <= filters_meta[i]; j++) {
+            unshuffle(typesize, bsize, _src, _dest);
+            // Cycle filters when required
+            if (j < filters_meta[i]) {
+              _src = _dest;
+              _dest = _tmp;
+              _tmp = _src;
+            }
+            // Check whether we have to copy the intermediate _dest buffer to final destination
+            if (last_copy_filter && (filters_meta[i] % 2) == 1 && j == filters_meta[i]) {
+              memcpy(dest + offset, _dest, (unsigned int) bsize);
             }
           }
-          pthread_mutex_unlock(&context->delta_mutex);
-          if (offset != 0) {
+          break;
+        case BLOSC_BITSHUFFLE:
+          if (bitunshuffle(typesize, bsize, _src, _dest, _tmp, context->src[BLOSC2_CHUNK_VERSION]) < 0) {
+            return BLOSC2_ERROR_FILTER_PIPELINE;
+          }
+          break;
+        case BLOSC_DELTA:
+          if (context->nthreads == 1) {
+            /* Serial mode */
             delta_decoder(dest, offset, bsize, typesize, _dest);
+          } else {
+            /* Force the thread in charge of the block 0 to go first */
+            pthread_mutex_lock(&context->delta_mutex);
+            if (context->dref_not_init) {
+              if (offset != 0) {
+                pthread_cond_wait(&context->delta_cv, &context->delta_mutex);
+              } else {
+                delta_decoder(dest, offset, bsize, typesize, _dest);
+                context->dref_not_init = 0;
+                pthread_cond_broadcast(&context->delta_cv);
+              }
+            }
+            pthread_mutex_unlock(&context->delta_mutex);
+            if (offset != 0) {
+              delta_decoder(dest, offset, bsize, typesize, _dest);
+            }
+          }
+          break;
+        case BLOSC_TRUNC_PREC:
+          // TRUNC_PREC filter does not need to be undone
+          break;
+        default:
+          if (filters[i] != BLOSC_NOFILTER) {
+            BLOSC_TRACE_ERROR("Filter %d not handled during decompression.",
+                              filters[i]);
+
+            errcode = -1;
+          }
+      }
+    } else {
+        // Look for the filters_meta in user filters and run it
+        for (int j = 0; j < g_nfilters; ++j) {
+          if (g_filters[j]->id == filters[i]) {
+            if (g_filters[j]->backward != NULL) {
+              blosc2_dparams dparams;
+              blosc2_ctx_get_dparams(context, &dparams);
+              rc = g_filters[j]->backward(_src, _dest, bsize, filters_meta[i], &dparams);
+            } else {
+              BLOSC_TRACE_ERROR("Backward function is NULL");
+              return BLOSC2_ERROR_FILTER_PIPELINE;
+            }
+            if (rc != BLOSC2_ERROR_SUCCESS) {
+              BLOSC_TRACE_ERROR("User-defined filter %d failed during decompression.", filters[i]);
+              return rc;
+            }
+            goto udfiltersuccess;
           }
         }
-        break;
-      case BLOSC_TRUNC_PREC:
-        // TRUNC_PREC filter does not need to be undone
-        break;
-      default:
-        if (filters[i] != BLOSC_NOFILTER) {
-          BLOSC_TRACE_ERROR("Filter %d not handled during decompression.",
-                            filters[i]);
-
-          errcode = -1;
-        }
+      BLOSC_TRACE_ERROR("User-defined filter %d not found during decompression.", filters[i]);
+      return BLOSC2_ERROR_FILTER_PIPELINE;
+      udfiltersuccess:;
     }
+
     // Cycle buffers when required
     if ((filters[i] != BLOSC_NOFILTER) && (filters[i] != BLOSC_TRUNC_PREC)) {
       _src = _dest;
@@ -1599,6 +1716,25 @@ static int blosc_d(
                                       (char*)_dest, (size_t)neblock);
       }
   #endif /*  HAVE_ZSTD */
+      else if (compformat == BLOSC_UDCODEC_FORMAT) {
+        for (int i = 0; i < g_ncodecs; ++i) {
+          if (g_codecs[i]->compcode == context->compcode) {
+            blosc2_dparams dparams;
+            blosc2_ctx_get_dparams(context, &dparams);
+            nbytes = g_codecs[i]->decoder(src,
+                                          cbytes,
+                                          _dest,
+                                          neblock,
+                                          context->compcode_meta,
+                                          &dparams);
+            goto udcodecsuccess;
+          }
+        }
+        BLOSC_TRACE_ERROR("User-defined compressor codec %d not found during decompression", context->compcode);
+        return BLOSC2_ERROR_CODEC_SUPPORT;
+      udcodecsuccess:
+        ;
+      }
       else {
         compname = clibcode_to_clibname(compformat);
         BLOSC_TRACE_ERROR(
@@ -1622,7 +1758,7 @@ static int blosc_d(
 
   if (last_filter_index >= 0 || context->postfilter != NULL) {
     /* Apply regular filter pipeline */
-    int errcode = pipeline_d(thread_context, bsize, dest, dest_offset, tmp, tmp2, tmp3,
+    int errcode = pipeline_backward(thread_context, bsize, dest, dest_offset, tmp, tmp2, tmp3,
                              last_filter_index, nblock);
     if (errcode < 0)
       return errcode;
@@ -2096,7 +2232,8 @@ static int write_compression_header(blosc2_context* context, bool extended_heade
     /* dont_split is in bit 4 */
     context->header_flags |= dont_split << 4;
     /* codec starts at bit 5 */
-    context->header_flags |= compcode_to_compformat(context->compcode) << 5;
+    uint8_t compformat = compcode_to_compformat(context->compcode);
+    context->header_flags |= compformat << 5;
   }
 
   // Create blosc header and store to dest
@@ -3100,7 +3237,10 @@ const char* blosc_get_compressor(void)
 
 int blosc_set_compressor(const char* compname) {
   int code = blosc_compname_to_compcode(compname);
-
+  if (code >= BLOSC_LAST_CODEC) {
+    BLOSC_TRACE_ERROR("User defined codecs cannot be set here. Use Blosc2 mechanism instead.");
+    return -1;
+  }
   g_compressor = code;
 
   /* Check whether the library should be initialized */
@@ -3438,12 +3578,26 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   memset(context, 0, sizeof(blosc2_context));
   context->do_compress = 1;   /* meant for compression */
   context->compcode = cparams.compcode;
+  context->compcode_meta = cparams.compcode_meta;
   context->clevel = cparams.clevel;
   context->use_dict = cparams.use_dict;
   context->typesize = cparams.typesize;
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     context->filters[i] = cparams.filters[i];
     context->filters_meta[i] = cparams.filters_meta[i];
+
+    if (context->filters[i] >= BLOSC_LAST_FILTER && context->filters[i] < BLOSC2_BDEFINED_FILTERS) {
+      BLOSC_TRACE_ERROR("filter (%d) is not yet defined",
+                        context->filters[i]);
+      free(context);
+      return NULL;
+    }
+    if (context->filters[i] >= BLOSC_LAST_REGISTERED_FILTER && context->filters[i] < BLOSC2_REGISTERED_FILTERS) {
+      BLOSC_TRACE_ERROR("filter (%d) is not yet defined",
+                        context->filters[i]);
+      free(context);
+      return NULL;
+    }
   }
 
   context->nthreads = cparams.nthreads;
@@ -3474,7 +3628,6 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
 
   return context;
 }
-
 
 /* Create a context for decompression */
 blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
@@ -3531,6 +3684,38 @@ void blosc2_free_ctx(blosc2_context* context) {
     free(context->block_maskout);
   }
   my_free(context);
+}
+
+
+int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams) {
+  cparams->compcode = ctx->compcode;
+  cparams->compcode = ctx->compcode;
+  cparams->clevel = ctx->clevel;
+  cparams->use_dict = ctx->use_dict;
+  cparams->typesize = ctx->typesize;
+  cparams->nthreads = ctx->nthreads;
+  cparams->blocksize = ctx->blocksize;
+  cparams->splitmode = ctx->splitmode;
+  cparams->schunk = ctx->schunk;
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+    cparams->filters[i] = ctx->filters[i];
+    cparams->filters_meta[i] = ctx->filters_meta[i];
+  }
+  cparams->prefilter = ctx->prefilter;
+  cparams->preparams = ctx->preparams;
+  cparams->udbtune = ctx->udbtune;
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams) {
+  dparams->nthreads = ctx->nthreads;
+  dparams->schunk = ctx->schunk;
+  dparams->postfilter = ctx->postfilter;
+  dparams->postparams = ctx->postparams;
+
+  return BLOSC2_ERROR_SUCCESS;
 }
 
 
@@ -3723,4 +3908,62 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const size_t nbytes,
   blosc2_free_ctx(context);
 
   return BLOSC_EXTENDED_HEADER_LENGTH + (uint8_t)typesize;
+}
+
+
+/* Register functions */
+
+int blosc2_register_filter(blosc2_filter *filter) {
+  BLOSC_ERROR_NULL(filter, BLOSC2_ERROR_INVALID_PARAM);
+  if (g_nfilters == UINT8_MAX) {
+    BLOSC_TRACE_ERROR("Can not register more filters");
+    return BLOSC2_ERROR_CODEC_SUPPORT;
+  }
+  if (filter->id < BLOSC2_REGISTERED_FILTERS) {
+    BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_REGISTERED_FILTERS);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  // Check if the filter is already registered
+  for (int i = 0; i < g_nfilters; ++i) {
+    if (g_filters[i]->id == filter->id) {
+      BLOSC_TRACE_ERROR("The filter is already registered!");
+      return BLOSC2_ERROR_FAILURE;
+    }
+  }
+
+  blosc2_filter *filter_new = malloc(sizeof(blosc2_filter));
+  memcpy(filter_new, filter, sizeof(blosc2_filter));
+  g_filters[g_nfilters++] = filter_new;
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+/* Register functions */
+
+int blosc2_register_codec(blosc2_codec *codec) {
+  BLOSC_ERROR_NULL(codec, BLOSC2_ERROR_INVALID_PARAM);
+  if (g_ncodecs == UINT8_MAX) {
+    BLOSC_TRACE_ERROR("Can not register more codecs");
+    return BLOSC2_ERROR_CODEC_SUPPORT;
+  }
+  if (codec->compcode < BLOSC2_REGISTERED_CODECS) {
+    BLOSC_TRACE_ERROR("The compcode must be greater or equal than %d", BLOSC2_REGISTERED_CODECS);
+    return BLOSC2_ERROR_CODEC_PARAM;
+  }
+
+  // Check if the code is already registered
+  for (int i = 0; i < g_ncodecs; ++i) {
+    if (g_codecs[i]->compcode == codec->compcode) {
+      BLOSC_TRACE_ERROR("The codec is already registered!");
+      return BLOSC2_ERROR_CODEC_PARAM;
+    }
+  }
+
+  blosc2_codec *codec_new = malloc(sizeof(blosc2_codec));
+  memcpy(codec_new, codec, sizeof(blosc2_codec));
+  g_codecs[g_ncodecs++] = codec_new;
+
+  return BLOSC2_ERROR_SUCCESS;
 }

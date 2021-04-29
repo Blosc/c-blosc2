@@ -99,6 +99,21 @@ enum {
    */
 };
 
+
+enum {
+  BLOSC2_BDEFINED_FILTERS = 32,
+  //!< Blosc-defined filters must be between 0 - 31.
+  BLOSC2_REGISTERED_FILTERS = 160,
+  //!< Blosc-registered filters must be between 32 - 159.
+  BLOSC2_UDEFINED_FILTERS = 256,
+  //!< User-defined filters must be between 128 - 255.
+  BLOSC2_MAX_FILTERS = 6,
+  //!< Maximum number of filters in the filter pipeline
+  BLOSC2_MAX_UDFILTERS = 16,
+  //!< Maximum number of filters that a user can register.
+};
+
+
 /**
  * @brief Codes for filters.
  * @see #blosc_compress
@@ -110,12 +125,8 @@ enum {
   BLOSC_BITSHUFFLE = 2,  //!< bit-wise shuffle
   BLOSC_DELTA = 3,       //!< delta filter
   BLOSC_TRUNC_PREC = 4,  //!< truncate precision filter
-  BLOSC_LAST_FILTER = 5,  //!< sentinel
-};
-
-enum {
-  BLOSC2_MAX_FILTERS = 6,
-  //!< Maximum number of filters in the filter pipeline
+  BLOSC_LAST_FILTER = 5, //!< sentinel
+  BLOSC_LAST_REGISTERED_FILTER = BLOSC2_BDEFINED_FILTERS + 0,
 };
 
 /**
@@ -144,6 +155,16 @@ enum {
   BLOSC2_MAXBLOCKSIZE = 536866816  //!< maximum size for blocks
 };
 
+
+enum {
+  BLOSC2_BDEFINED_CODECS = 32,
+  //!< Blosc-defined codecs must be between 0 - 31.
+  BLOSC2_REGISTERED_CODECS = 160,
+  //!< Blosc-registered codecs must be between 31 - 159.
+  BLOSC2_UDEFINED_CODECS = 256,
+  //!< User-defined codecs must be between 160 - 255.
+};
+
 /**
  * @brief Codes for the different compressors shipped with Blosc
  */
@@ -154,7 +175,10 @@ enum {
   BLOSC_SNAPPY = 3,
   BLOSC_ZLIB = 4,
   BLOSC_ZSTD = 5,
-  BLOSC_MAX_CODECS = 7,  //!< maximum number of reserved codecs
+  BLOSC_LAST_CODEC = 6,
+  //!< Determine the last codec defined by Blosc.
+  BLOSC_LAST_REGISTERED_CODEC = BLOSC2_BDEFINED_CODECS + 0,
+  //!< Determine the last registered codec. It is used to check if a codec between 31 - 159 is registered or not.
 };
 
 
@@ -176,6 +200,7 @@ enum {
   BLOSC_SNAPPY_LIB = 2,
   BLOSC_ZLIB_LIB = 3,
   BLOSC_ZSTD_LIB = 4,
+  BLOSC_UDCODEC_LIB = 6,
   BLOSC_SCHUNK_LIB = 7,   //!< compressor library in super-chunk header
 };
 
@@ -203,6 +228,7 @@ enum {
   BLOSC_SNAPPY_FORMAT = BLOSC_SNAPPY_LIB,
   BLOSC_ZLIB_FORMAT = BLOSC_ZLIB_LIB,
   BLOSC_ZSTD_FORMAT = BLOSC_ZSTD_LIB,
+  BLOSC_UDCODEC_FORMAT = BLOSC_UDCODEC_LIB,
 };
 
 /**
@@ -216,6 +242,7 @@ enum {
   BLOSC_SNAPPY_VERSION_FORMAT = 1,
   BLOSC_ZLIB_VERSION_FORMAT = 1,
   BLOSC_ZSTD_VERSION_FORMAT = 1,
+  BLOSC_UDCODEC_VERSION_FORMAT = 1,
 };
 
 /**
@@ -676,6 +703,7 @@ BLOSC_EXPORT void blosc_cbuffer_versions(const void* cbuffer, int* version,
 BLOSC_EXPORT const char* blosc_cbuffer_complib(const void* cbuffer);
 
 
+
 /*********************************************************************
   Structures and functions related with contexts.
 *********************************************************************/
@@ -696,6 +724,7 @@ typedef struct {
   void *btune_config;
   //!> BTune configuration.
 }blosc2_btune;
+
 
 /**
  * @brief The parameters for a prefilter function.
@@ -754,6 +783,8 @@ typedef int (*blosc2_postfilter_fn)(blosc2_postfilter_params* params);
 typedef struct {
   uint8_t compcode;
   //!< The compressor codec.
+  uint8_t compcode_meta;
+  //!< The metadata for the compressor codec.
   uint8_t clevel;
   //!< The compression level (5).
   int use_dict;
@@ -784,10 +815,8 @@ typedef struct {
  * @brief Default struct for compression params meant for user initialization.
  */
 static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
-        BLOSC_BLOSCLZ, 5, 0, 8, 1, 0,
-        BLOSC_FORWARD_COMPAT_SPLIT, NULL,
-        {0, 0, 0, 0, 0, BLOSC_SHUFFLE},
-        {0, 0, 0, 0, 0, 0},
+        BLOSC_BLOSCLZ, 0, 5, 0, 8, 1, 0, BLOSC_FORWARD_COMPAT_SPLIT,
+        NULL, {0, 0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0, 0},
         NULL, NULL, NULL};
 
 /**
@@ -841,6 +870,26 @@ BLOSC_EXPORT blosc2_context* blosc2_create_dctx(blosc2_dparams dparams);
 BLOSC_EXPORT void blosc2_free_ctx(blosc2_context* context);
 
 /**
+ * @brief Create a @p cparams associated to a context.
+ *
+ * @param schunk The context from where to extract the compression parameters.
+ * @param cparams The pointer where the compression params will be stored.
+ * *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
+int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams);
+
+/**
+ * @brief Fill the @p dparams associated to a context.
+ *
+ * @param schunk The context from where to extract the decompression parameters.
+ * @param dparams The pointer where the decompression params will be stored.
+ * *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
+int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams);
+
+/**
  * @brief Set a maskout so as to avoid decompressing specified blocks.
  *
  * @param ctx The decompression context to update.
@@ -860,6 +909,7 @@ BLOSC_EXPORT void blosc2_free_ctx(blosc2_context* context);
  *
  */
 BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks);
+
 /**
  * @brief Compress a block of data in the @p src buffer and returns the size of
  * compressed block.
@@ -1191,6 +1241,8 @@ typedef struct blosc2_schunk {
   uint8_t version;
   uint8_t compcode;
   //!< The default compressor. Each chunk can override this.
+  uint8_t compcode_meta;
+  //!< The default compressor metadata. Each chunk can override this.
   uint8_t clevel;
   //!< The compression level and other compress params.
   int32_t typesize;
@@ -1716,6 +1768,66 @@ BLOSC_EXPORT void blosc_set_blocksize(size_t blocksize);
  * available (the default).
  */
 BLOSC_EXPORT void blosc_set_schunk(blosc2_schunk* schunk);
+
+/*********************************************************************
+  Structures and functions related with compression codecs.
+*********************************************************************/
+
+typedef int (* codec_encoder_cb) (const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, uint8_t meta, blosc2_cparams *cparams);
+typedef int (* codec_decoder_cb) (const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, uint8_t meta, blosc2_dparams *dparams);
+
+typedef struct {
+  uint8_t compcode;
+  //!< The codec identifier.
+  char *compname;
+  //!< The codec name.
+  uint8_t complib;
+  //!< The codec library format.
+  uint8_t compver;
+  //!< The codec version.
+  codec_encoder_cb encoder;
+  //!< The codec encoder that is used during compression.
+  codec_decoder_cb decoder;
+  //!< The codec decoder that is used during decompression.
+} blosc2_codec;
+
+/**
+ * @brief Register a user-defined codec in Blosc.
+ *
+ * @param filter The codec to register.
+ *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
+int blosc2_register_codec(blosc2_codec *codec);
+
+
+/*********************************************************************
+  Structures and functions related with filters plugins.
+*********************************************************************/
+
+typedef int (* filter_forward_cb)  (const uint8_t *, uint8_t *, int32_t, uint8_t, blosc2_cparams *);
+typedef int (* filter_backward_cb) (const uint8_t *, uint8_t *, int32_t, uint8_t, blosc2_dparams *);
+
+/**
+ * @brief The parameters for a user-defined filter.
+ */
+typedef struct {
+  uint8_t id;
+  //!< The filter identifier.
+  filter_forward_cb forward;
+  //!< The filter function that is used during compression.
+  filter_backward_cb backward;
+  //!< The filter function that is used during decompression.
+} blosc2_filter;
+
+/**
+ * @brief Register a user-defined filter in Blosc.
+ *
+ * @param filter The filter to register.
+ *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
+BLOSC_EXPORT int blosc2_register_filter(blosc2_filter *filter);
 
 
 /*********************************************************************

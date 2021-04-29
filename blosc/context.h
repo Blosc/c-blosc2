@@ -67,6 +67,8 @@ struct blosc2_context_s {
   /* Special type for chunk.  0 if not special. */
   int compcode;
   /* Compressor code to use */
+  uint8_t compcode_meta;
+  /* The metainfo for the compressor code */
   int clevel;
   /* Compression level (1-9) */
   int use_dict;
@@ -85,6 +87,8 @@ struct blosc2_context_s {
   /* the (sequence of) filters */
   uint8_t filters_meta[BLOSC2_MAX_FILTERS];
   /* the metainfo for filters */
+  blosc2_filter udfilters[BLOSC2_MAX_UDFILTERS];
+  /* The user-defined filters */
   blosc2_prefilter_fn prefilter;
   /* prefilter function */
   blosc2_postfilter_fn postfilter;
