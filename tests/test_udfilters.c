@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2020  The Blosc Developers
+  Copyright (C) 2021  The Blosc Developers
   http://blosc.org
   License: BSD (see LICENSE.txt)
 
@@ -23,8 +23,11 @@
 #define NTHREADS 4
 
 
-int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, blosc2_cparams *cparams) {
+int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta, blosc2_cparams *cparams) {
   blosc2_schunk *schunk = cparams->schunk;
+  if (meta != 101) {
+    return -1;
+  }
 
   for (int i = 0; i < size / schunk->typesize; ++i) {
     switch (schunk->typesize) {
@@ -44,7 +47,11 @@ int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, blosc2_cpara
   }
   return BLOSC2_ERROR_SUCCESS;
 }
-int filter_backward(const uint8_t* src, uint8_t* dest, int32_t size, blosc2_dparams *dparams) {
+int filter_backward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta, blosc2_dparams *dparams) {
+  if (meta != 101) {
+    return -1;
+  }
+
   blosc2_schunk *schunk = dparams->schunk;
 
   for (int i = 0; i < size / schunk->typesize; ++i) {
@@ -66,7 +73,11 @@ int filter_backward(const uint8_t* src, uint8_t* dest, int32_t size, blosc2_dpar
   return BLOSC2_ERROR_SUCCESS;
 }
 
-int filter_backward_error(const uint8_t* src, uint8_t* dest, int32_t size, blosc2_dparams *dparams) {
+int filter_backward_error(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta, blosc2_dparams *dparams) {
+  if (meta != 101) {
+    return -1;
+  }
+
   blosc2_schunk *schunk = dparams->schunk;
 
   for (int i = 0; i < size / schunk->typesize; ++i) {
@@ -146,7 +157,7 @@ CUTEST_TEST_TEST(udfilters) {
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = (int32_t) itemsize;
   cparams.filters[4] = udfilter.id;
-  cparams.filters_meta[4] = 0;
+  cparams.filters_meta[4] = 101;
   cparams.clevel = 9;
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;

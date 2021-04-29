@@ -912,7 +912,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
           if (g_filters[j]->forward != NULL) {
             blosc2_cparams cparams;
             blosc2_ctx_get_cparams(context, &cparams);
-            rc = g_filters[j]->forward(_src, _dest, bsize, &cparams);
+            rc = g_filters[j]->forward(_src, _dest, bsize, filters_meta[i], &cparams);
           } else {
             BLOSC_TRACE_ERROR("Forward function is NULL");
             return NULL;
@@ -1233,7 +1233,7 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
             if (g_filters[j]->backward != NULL) {
               blosc2_dparams dparams;
               blosc2_ctx_get_dparams(context, &dparams);
-              rc = g_filters[j]->backward(_src, _dest, bsize, &dparams);
+              rc = g_filters[j]->backward(_src, _dest, bsize, filters_meta[i], &dparams);
             } else {
               BLOSC_TRACE_ERROR("Backward function is NULL");
               return BLOSC2_ERROR_FILTER_PIPELINE;

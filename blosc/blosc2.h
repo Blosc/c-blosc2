@@ -104,7 +104,7 @@ enum {
   BLOSC2_BDEFINED_FILTERS = 32,
   //!< Blosc-defined filters must be between 0 - 31.
   BLOSC2_REGISTERED_FILTERS = 160,
-  //!< Blosc-registered filters must be between 64 - 159.
+  //!< Blosc-registered filters must be between 32 - 159.
   BLOSC2_UDEFINED_FILTERS = 256,
   //!< User-defined filters must be between 128 - 255.
   BLOSC2_MAX_FILTERS = 6,
@@ -125,8 +125,8 @@ enum {
   BLOSC_BITSHUFFLE = 2,  //!< bit-wise shuffle
   BLOSC_DELTA = 3,       //!< delta filter
   BLOSC_TRUNC_PREC = 4,  //!< truncate precision filter
-  BLOSC_LAST_FILTER = 6, //!< sentinel
-  BLOSC_LAST_REGISTERED_FILTER = 32,
+  BLOSC_LAST_FILTER = 5, //!< sentinel
+  BLOSC_LAST_REGISTERED_FILTER = BLOSC2_BDEFINED_FILTERS + 0,
 };
 
 
@@ -1755,6 +1755,8 @@ int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams);
  */
 int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams);
 
+typedef int (* filter_forward_cb)  (const uint8_t *, uint8_t *, int32_t, uint8_t, blosc2_cparams *);
+typedef int (* filter_backward_cb) (const uint8_t *, uint8_t *, int32_t, uint8_t, blosc2_dparams *);
 
 /**
  * @brief The parameters for a user-defined filter.
@@ -1762,11 +1764,11 @@ int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams);
 typedef struct {
   uint8_t id;
   //!< The filter identifier.
-  int (* forward)(const uint8_t *, uint8_t *, int32_t, blosc2_cparams *);
+  filter_forward_cb forward;
   //!< The filter function that is used during compression.
-  int (* backward)(const uint8_t *, uint8_t *, int32_t, blosc2_dparams *);
+  filter_backward_cb backward;
   //!< The filter function that is used during decompression.
-}blosc2_filter;
+} blosc2_filter;
 
 /**
  * @brief Register a user-defined filter in Blosc.
