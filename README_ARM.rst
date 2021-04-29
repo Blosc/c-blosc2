@@ -19,12 +19,10 @@ with a new M1 arm64 processor:
 
     (base) francesc@Francescs-MacBook-Air build % bench/b2bench blosclz
     Blosc version: 2.0.0.beta.6.dev ($Date:: 2020-04-21 #$)
-    List of supported compressors in this build: blosclz,lz4,lz4hc,lizard,zlib,zstd
+    List of supported compressors in this build: blosclz,lz4,lz4hc,zlib,zstd
     Supported compression libraries:
       BloscLZ: 2.3.0
       LZ4: 1.9.1
-      Lizard: 1.0.0
-      Snappy: unknown
       Zlib: 10.0.3
       Zstd: 1.4.5
     Using compressor: blosclz
@@ -75,12 +73,10 @@ with a new M1 arm64 processor:
 
     (base) francesc@Francescs-MacBook-Air build % bench/b2bench lz4
     Blosc version: 2.0.0.beta.6.dev ($Date:: 2020-04-21 #$)
-    List of supported compressors in this build: blosclz,lz4,lz4hc,lizard,zlib,zstd
+    List of supported compressors in this build: blosclz,lz4,lz4hc,zlib,zstd
     Supported compression libraries:
       BloscLZ: 2.3.0
       LZ4: 1.9.1
-      Lizard: 1.0.0
-      Snappy: unknown
       Zlib: 10.0.3
       Zstd: 1.4.5
     Using compressor: lz4
@@ -135,10 +131,10 @@ Yes, the speed is really good on the new Apple architecture!
 ARM environment for Ubuntu Intel
 ================================
 
-In order to create executable code for a platform other than the one on 
+In order to create executable code for a platform other than the one on
 which the compiler is running we can use cross compilers. In this case we
 want to create executables for ARM platforms but execute them on
-Intel platform with Ubuntu. The only package that is necessary 
+Intel platform with Ubuntu. The only package that is necessary
 (at least in Ubuntu 15.04) is gcc-arm-linux-gnueabihf.
 
 Once this is installed the way to compile an example is:
@@ -147,7 +143,7 @@ Once this is installed the way to compile an example is:
 
   $ arm-linux-gnueabihf-gcc -static  -mfpu=neon -flax-vector-conversions -DSHUFFLE_NEON_ENABLED -O3 simple.c ../blosc/blosc.c ../blosc/blosclz.c ../blosc/shuffle.c ../blosc/shuffle-generic.c ../blosc/bitshuffle-generic.c ../blosc/shuffle-neon.c ../blosc/bitshuffle-neon.c -I../blosc -o simple -lpthread
 
-Another example for runnig a bench with the cross compliler: 
+Another example for runnig a bench with the cross compliler:
 
 .. code-block:: console
 
@@ -157,7 +153,7 @@ In these cases the NEON flags are: `-mfpu=neon -flax-vector-conversions`
 
 This is explained in detail in: http://linux-sunxi.org/Toolchain
 
-This way you can develop and debug aplications for ARM on intel machines as if 
+This way you can develop and debug aplications for ARM on intel machines as if
 you were in ARM platforms.
 
 Benchmark for ODROID-XU3
@@ -182,7 +178,6 @@ implementation.
     Supported compression libraries:
       BloscLZ: 1.0.5
       LZ4: unknown
-      Snappy: unknown
       Zlib: unknown
     Using compressor: blosclz
     Using shuffle type: shuffle
@@ -278,7 +273,6 @@ implementation.
     Supported compression libraries:
       BloscLZ: 1.0.5
       LZ4: unknown
-      Snappy: unknown
       Zlib: unknown
     Using compressor: blosclz
     Using shuffle type: shuffle

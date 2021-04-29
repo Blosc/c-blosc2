@@ -182,7 +182,6 @@ enum {
   BLOSC_BLOSCLZ = 0,
   BLOSC_LZ4 = 1,
   BLOSC_LZ4HC = 2,
-  BLOSC_SNAPPY = 3,
   BLOSC_ZLIB = 4,
   BLOSC_ZSTD = 5,
   BLOSC_LAST_CODEC = 6,
@@ -197,7 +196,6 @@ enum {
 #define BLOSC_BLOSCLZ_COMPNAME   "blosclz"
 #define BLOSC_LZ4_COMPNAME       "lz4"
 #define BLOSC_LZ4HC_COMPNAME     "lz4hc"
-#define BLOSC_SNAPPY_COMPNAME    "snappy"
 #define BLOSC_ZLIB_COMPNAME      "zlib"
 #define BLOSC_ZSTD_COMPNAME      "zstd"
 
@@ -207,7 +205,6 @@ enum {
 enum {
   BLOSC_BLOSCLZ_LIB = 0,
   BLOSC_LZ4_LIB = 1,
-  BLOSC_SNAPPY_LIB = 2,
   BLOSC_ZLIB_LIB = 3,
   BLOSC_ZSTD_LIB = 4,
   BLOSC_UDCODEC_LIB = 6,
@@ -219,7 +216,6 @@ enum {
  */
 #define BLOSC_BLOSCLZ_LIBNAME   "BloscLZ"
 #define BLOSC_LZ4_LIBNAME       "LZ4"
-#define BLOSC_SNAPPY_LIBNAME    "Snappy"
 #if defined(HAVE_ZIB_NG)
   #define BLOSC_ZLIB_LIBNAME    "Zlib (via zlib-ng)"
 #else
@@ -235,7 +231,6 @@ enum {
   BLOSC_LZ4_FORMAT = BLOSC_LZ4_LIB,
   //!< LZ4HC and LZ4 share the same format
   BLOSC_LZ4HC_FORMAT = BLOSC_LZ4_LIB,
-  BLOSC_SNAPPY_FORMAT = BLOSC_SNAPPY_LIB,
   BLOSC_ZLIB_FORMAT = BLOSC_ZLIB_LIB,
   BLOSC_ZSTD_FORMAT = BLOSC_ZSTD_LIB,
   BLOSC_UDCODEC_FORMAT = BLOSC_UDCODEC_LIB,
@@ -249,7 +244,6 @@ enum {
   BLOSC_BLOSCLZ_VERSION_FORMAT = 1,
   BLOSC_LZ4_VERSION_FORMAT = 1,
   BLOSC_LZ4HC_VERSION_FORMAT = 1,  /* LZ4HC and LZ4 share the same format */
-  BLOSC_SNAPPY_VERSION_FORMAT = 1,
   BLOSC_ZLIB_VERSION_FORMAT = 1,
   BLOSC_ZSTD_VERSION_FORMAT = 1,
   BLOSC_UDCODEC_VERSION_FORMAT = 1,
@@ -511,7 +505,7 @@ BLOSC_EXPORT const char* blosc_get_compressor(void);
 
 /**
  * @brief Select the compressor to be used. The supported ones are "blosclz",
- * "lz4", "lz4hc", "snappy", "zlib" and "ztsd". If this function is not
+ * "lz4", "lz4hc", "zlib" and "ztsd". If this function is not
  * called, then "blosclz" will be used.
  *
  * @param compname The name identifier of the compressor to be set.
@@ -1047,7 +1041,7 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * **BLOSC_TYPESIZE=(INTEGER)**: This will overwrite the *typesize*
  * parameter before the compression process starts.
  *
- * **BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | SNAPPY | ZLIB | ZSTD]**:
+ * **BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | ZLIB | ZSTD]**:
  * This will call *blosc_set_compressor(BLOSC_COMPRESSOR)* before the
  * compression process starts.
  *

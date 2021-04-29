@@ -108,7 +108,7 @@ You can also disable support for some compression libraries:
 
 .. code-block:: console
 
-  $ cmake -DDEACTIVATE_SNAPPY=ON ..
+  $ cmake -DDEACTIVATE_ZSTD=ON ..
 
 Supported platforms
 ~~~~~~~~~~~~~~~~~~~

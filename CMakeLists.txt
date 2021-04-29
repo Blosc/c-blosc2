@@ -19,8 +19,6 @@
 #       do not attempt to build with AVX2 instructions
 #   DEACTIVATE_LZ4: default OFF
 #       do not include support for the LZ4 library
-#   DEACTIVATE_SNAPPY: default OFF
-#       do not include support for the Snappy library
 #   DEACTIVATE_ZLIB: default OFF
 #       do not include support for the Zlib library
 #   DEACTIVATE_ZSTD: default OFF
@@ -104,8 +102,6 @@ option(DEACTIVATE_AVX2
     "Do not attempt to build with AVX2 instructions" OFF)
 option(DEACTIVATE_LZ4
     "Do not include support for the LZ4 library." OFF)
-option(DEACTIVATE_SNAPPY
-    "Do not include support for the SNAPPY library." ON)
 option(DEACTIVATE_ZLIB
     "Do not include support for the ZLIB library." OFF)
 option(DEACTIVATE_ZSTD
@@ -135,16 +131,6 @@ if(NOT DEACTIVATE_LZ4)
     # HAVE_LZ4 will be set to true because even if the library is
     # not found, we will use the included sources for it
     set(HAVE_LZ4 TRUE)
-endif()
-
-if(NOT DEACTIVATE_SNAPPY)
-    find_package(Snappy)
-    if(SNAPPY_FOUND)
-        message(STATUS "Activating support for SNAPPY.")
-        set(HAVE_SNAPPY TRUE)
-    else()
-        message(STATUS "SNAPPY *not* found.  De-activating support for it.")
-    endif()
 endif()
 
 if(NOT DEACTIVATE_ZLIB)

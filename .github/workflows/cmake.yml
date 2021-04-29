@@ -54,11 +54,6 @@ jobs:
             compiler: clang
             cmake-args: -DDEACTIVATE_LZ4=ON
 
-          - name: Ubuntu Clang No SNAPPY
-            os: ubuntu-latest
-            compiler: clang
-            cmake-args: -DDEACTIVATE_SNAPPY=ON
-
           - name: Ubuntu Clang No ZLIB
             os: ubuntu-latest
             compiler: clang
