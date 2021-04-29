@@ -2239,7 +2239,7 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
 
   // We have the new offsets; update the frame.
   int64_t new_frame_len = header_len + new_off_cbytes + frame->trailer_len;
-  FILE* fp = NULL;
+  void* fp = NULL;
   if (frame->cframe != NULL) {
     uint8_t* framep = frame->cframe;
     /* Make space for the new chunk and copy it */
@@ -2256,15 +2256,15 @@ int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
     if (frame->sframe) {
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+", schunk->storage->udio);
-      fseek(fp, header_len, SEEK_SET);
+      schunk->storage->udio->seek(fp, header_len, SEEK_SET);
     }
     else {
       // Regular frame
-      fp = fopen(frame->urlpath, "rb+");
-      fseek(fp, header_len + cbytes, SEEK_SET);
+      fp = schunk->storage->udio->open(frame->urlpath, "rb+", schunk->storage->udio->params);
+      schunk->storage->udio->seek(fp, header_len + cbytes, SEEK_SET);
     }
-    wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
-    fclose(fp);
+    wbytes = schunk->storage->udio->write(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
+    schunk->storage->udio->close(fp);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return BLOSC2_ERROR_FRAME_SPECIAL;
