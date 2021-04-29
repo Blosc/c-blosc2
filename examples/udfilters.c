@@ -17,7 +17,7 @@
 #define NTHREADS 4
 
 
-int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, blosc2_cparams *cparams) {
+int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta, blosc2_cparams *cparams) {
   blosc2_schunk *schunk = cparams->schunk;
 
   for (int i = 0; i < size / schunk->typesize; ++i) {
@@ -39,7 +39,7 @@ int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, blosc2_cpara
   return BLOSC2_ERROR_SUCCESS;
 }
 
-int filter_backward(const uint8_t* src, uint8_t* dest, int32_t size, blosc2_dparams *dparams) {
+int filter_backward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta, blosc2_dparams *dparams) {
   blosc2_schunk *schunk = dparams->schunk;
 
   for (int i = 0; i < size / schunk->typesize; ++i) {
