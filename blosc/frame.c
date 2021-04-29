@@ -143,7 +143,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   // Codec flags
   *h2p = schunk->compcode;
   if (schunk->compcode >= BLOSC_LAST_CODEC) {
-    *h2p = BLOSC_UDCODEC;
+    *h2p = BLOSC_UDCODEC_FORMAT;
   }
   *h2p += (schunk->clevel) << 4u;  // clevel
   h2p += 1;
@@ -435,7 +435,7 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
   }
   if (compcode != NULL) {
     *compcode = frame_codecs & 0xFu;
-    if (*compcode == BLOSC_UDCODEC) {
+    if (*compcode == BLOSC_UDCODEC_FORMAT) {
       from_big(compcode, framep + FRAME_UDCODEC, sizeof(*compcode));
     }
   }

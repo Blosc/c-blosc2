@@ -28,6 +28,7 @@ Copyright (C) 2021  The Blosc developers
 
 int codec_encoder(const uint8_t* input, int32_t input_len,
                   uint8_t* output, int32_t output_len,
+                  uint8_t meta,
                   blosc2_cparams* cparams) {
   if (cparams->schunk == NULL) {
     return -1;
@@ -62,6 +63,7 @@ int codec_encoder(const uint8_t* input, int32_t input_len,
 
 int codec_decoder(const uint8_t* input, int32_t input_len,
                   uint8_t* output, int32_t output_len,
+                  uint8_t meta,
                   blosc2_dparams *dparams) {
   if (dparams->schunk == NULL) {
     return -1;
