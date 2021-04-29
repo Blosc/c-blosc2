@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
   blosc_set_nthreads(1);
 
   /* Use the argv[2] compressor. The supported ones are "blosclz",
-  "lz4", "lz4hc", "snappy", "zlib" and "zstd"*/
+  "lz4", "lz4hc", "zlib" and "zstd"*/
   blosc_set_compressor(argv[2]);
 
   for (i = 0; i < SIZE; i++) {

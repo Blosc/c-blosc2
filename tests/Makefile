@@ -16,14 +16,6 @@ BLOSC_LIB += $(wildcard $(LZ4_DIR)/*.c)
 # Support for external LZ4 and LZ4HC
 #LDFLAGS += -DHAVE_LZ4 -llz4
 
-# Support for internal Snappy
-#SNAPPY_DIR = ../internal-complibs/snappy-1.1.1
-#CFLAGS += -DHAVE_SNAPPY -I$(SNAPPY_DIR)
-#BLOSC_LIB += $(wildcard $(SNAPPY_DIR)/*.cc)
-
-# Support for external Snappy
-LDFLAGS += -DHAVE_SNAPPY -lsnappy
-
 # Support for external Zlib
 LDFLAGS += -DHAVE_ZLIB -lz
 
