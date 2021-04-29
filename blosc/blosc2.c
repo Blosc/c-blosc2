@@ -3227,7 +3227,7 @@ int blosc_get_complib_info(const char* compname, char** complib, char** version)
   const char* clibversion = "unknown";
 
 #if (defined(HAVE_LZ4) && defined(LZ4_VERSION_MAJOR)) || \
-    (defined(HAVE_ZSTD) && defined(ZSTD_VERSION_MAJOR))
+  (defined(HAVE_ZSTD) && defined(ZSTD_VERSION_MAJOR))
   char sbuffer[256];
 #endif
 

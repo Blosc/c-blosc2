@@ -172,6 +172,7 @@ enum {
   BLOSC_BLOSCLZ = 0,
   BLOSC_LZ4 = 1,
   BLOSC_LZ4HC = 2,
+  BLOSC_UNUSED = 3,
   BLOSC_ZLIB = 4,
   BLOSC_ZSTD = 5,
   BLOSC_LAST_CODEC = 6,
@@ -195,6 +196,7 @@ enum {
 enum {
   BLOSC_BLOSCLZ_LIB = 0,
   BLOSC_LZ4_LIB = 1,
+  BLOSC_UNUSED_LIB = 2,
   BLOSC_ZLIB_LIB = 3,
   BLOSC_ZSTD_LIB = 4,
   BLOSC_UDCODEC_LIB = 6,
@@ -494,8 +496,8 @@ BLOSC_EXPORT const char* blosc_get_compressor(void);
 
 /**
  * @brief Select the compressor to be used. The supported ones are "blosclz",
- * "lz4", "lz4hc", "zlib" and "ztsd". If this function is not
- * called, then "blosclz" will be used.
+ * "lz4", "lz4hc", "zlib" and "ztsd". If this function is not called,
+ * then "blosclz" will be used.
  *
  * @param compname The name identifier of the compressor to be set.
  *
