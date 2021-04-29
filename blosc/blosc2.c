@@ -3629,37 +3629,6 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   return context;
 }
 
-int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams) {
-  cparams->compcode = ctx->compcode;
-  cparams->compcode = ctx->compcode;
-  cparams->compcode_meta = ctx->compcode_meta;
-  cparams->clevel = ctx->clevel;
-  cparams->use_dict = ctx->use_dict;
-  cparams->typesize = ctx->typesize;
-  cparams->nthreads = ctx->nthreads;
-  cparams->blocksize = ctx->blocksize;
-  cparams->splitmode = ctx->splitmode;
-  cparams->schunk = ctx->schunk;
-  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
-      cparams->filters[i] = ctx->filters[i];
-      cparams->filters_meta[i] = ctx->filters_meta[i];
-  }
-  cparams->prefilter = ctx->prefilter;
-  cparams->preparams = ctx->preparams;
-  cparams->udbtune = ctx->udbtune;
-
-  return BLOSC2_ERROR_SUCCESS;
-}
-
-int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams) {
-  dparams->nthreads = ctx->nthreads;
-  dparams->schunk = ctx->schunk;
-  dparams->postfilter = ctx->postfilter;
-  dparams->postparams = ctx->postparams;
-
-  return BLOSC2_ERROR_SUCCESS;
-}
-
 /* Create a context for decompression */
 blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   blosc2_context* context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
