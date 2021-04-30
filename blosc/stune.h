@@ -57,14 +57,12 @@ static int split_block(blosc2_context* context, int32_t typesize,
       BLOSC_TRACE_WARNING("Unrecongnized split mode.  Default to BLOSC_FORWARD_COMPAT_SPLIT");
   }
 
-  // For now, BLOSC_FORWARD_COMPAT_SPLIT and BLOSC_AUTO_SPLIT will be treated the same
   int compcode = context->compcode;
   return (
           // fast codecs like blosclz and lz4 prefer to split always
-          (compcode == BLOSC_BLOSCLZ) ||
-          (compcode == BLOSC_LZ4) ||
+          ((compcode == BLOSC_BLOSCLZ) || (compcode == BLOSC_LZ4)) &&
           (typesize <= MAX_STREAMS) &&
-          ((blocksize / typesize) >= BLOSC_MIN_BUFFERSIZE));
+          (blocksize / typesize) >= BLOSC_MIN_BUFFERSIZE);
 }
 
 #endif  /* STUNE_H */
