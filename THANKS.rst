@@ -1,3 +1,6 @@
+Thanks
+======
+
 * Valentin Haenel did a terrific work implementing the support for the Snappy compression, fixing typos and improving docs and the plotting script.
 
 * Thibault North, with ideas from Oscar Villellas, contributed a way to call Blosc from different threads in a safe way.  Christopher

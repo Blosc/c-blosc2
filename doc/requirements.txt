@@ -1,0 +1,3 @@
+breathe
+sphinx
+pydata-sphinx-theme

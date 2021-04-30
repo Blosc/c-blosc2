@@ -1,11 +1,5 @@
-=================
-Releasing Blosc2
-=================
-
-:Author: The Blosc Developers
-:Contact: francesc@blosc.org
-:Date: 2019-08-09
-
+Releasing a version
+===================
 
 Preliminaries
 -------------
@@ -29,12 +23,10 @@ Create a new build/ directory, change into it and issue::
   $ cmake --build .
   $ ctest
 
-To actually test Blosc the hard way, look at the end of:
-
+To actually test Blosc the hard way, look at the end of
 http://blosc.org/synthetic-benchmarks.html
+where instructions on how to intensively test (and benchmark) Blosc are given.
 
-where instructions on how to intensively test (and benchmark) Blosc
-are given.
 
 Forward compatibility testing
 -----------------------------
@@ -97,7 +89,7 @@ Announcing
 ----------
 
 - Send an announcement to the blosc, pytables-dev, bcolz and
-  comp.compression lists.  Use the ``ANNOUNCE.rst`` file as skeleton
+  comp.compression lists.  Use the ``ANNOUNCE.md`` file as skeleton
   (possibly as the definitive version).
 
 
@@ -107,13 +99,13 @@ Post-release actions
 - Edit *VERSION* symbols in blosc/blosc.h in master to increment the
   version to the next minor one (i.e. X.Y.Z --> X.Y.(Z+1).dev).
 
-- Create new headers for adding new features in ``RELEASE_NOTES.rst``
-  and empty the release-specific information in ``ANNOUNCE.rst`` and
+- Create new headers for adding new features in ``RELEASE_NOTES.md``
+  and empty the release-specific information in ``ANNOUNCE.md`` and
   add this place-holder instead:
 
   #XXX version-specific blurb XXX#
 
-- Commit the changes:
+- Commit the changes::
 
   $ git commit -a -m"Post X.Y.Z release actions done"
   $ git push

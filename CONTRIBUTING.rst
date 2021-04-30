@@ -1,8 +1,11 @@
-# Contributing to C-Blosc2
+Contributing guidelines
+=======================
+
 We want to make contributing to this project as easy and transparent as
 possible.
 
-## Our Development Process
+Our Development Process
+-----------------------
 New versions are being developed in the "master" branch,
 or in their own feature branch.
 When they are deemed ready for a release, they are merged back into "master"
@@ -11,7 +14,8 @@ again.
 So all contributions must stage first through "master"
 or their own feature branch.
 
-## Pull Requests
+Pull Requests
+-------------
 We actively welcome your pull requests.
 
 1. Fork the repo and create your branch from `master`.
@@ -20,13 +24,17 @@ We actively welcome your pull requests.
 4. Ensure the test suite passes.
 5. Make sure your code does not issue new compiler warnings.
 
-## Issues
+Issues
+------
 We use GitHub issues to track public bugs. Please ensure your description is
 clear and has sufficient instructions to be able to reproduce the issue.
 
-## Coding Style  
+Coding Style 
+------------
 * 2 spaces for indentation rather than tabs.
 
-## License
+License
+-------
 By contributing to C-Blosc2, you agree that your contributions will be licensed
-under the [LICENSE](LICENSES/BLOSC.txt) file of the project.
+under the `LICENSE <https://github.com/Blosc/c-blosc2/blob/main/LICENSES/BLOSC.txt>`_ 
+file of the project.

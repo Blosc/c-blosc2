@@ -166,9 +166,9 @@ http://groups.google.es/group/blosc
 Acknowledgments
 ===============
 
-See THANKS.rst.
+See :doc:`THANKS <./THANKS>`.
 
 
 ----
 
-  **Enjoy data!**
+**Enjoy data!**

@@ -1,10 +1,10 @@
-ROADMAP for C-Blosc2
-====================
+Roadmap
+=======
 
 C-Blosc2 is the new iteration of C-Blosc 1.x series, adding more features and better documentation.
 This document lists the goals for a production release of C-Blosc2.
 
-Many of the features implemented so far have been possible thanks to a [grant from HUAWEI](https://www.blosc.org/posts/blosc-donation/).  Thanks to HUAWEI, and specially to Zeeman Wang, for a generous donation that allowed us to implement many of the exciting new features in C-Blosc2.
+Many of the features implemented so far have been possible thanks to a `grant from HUAWEI <https://www.blosc.org/posts/blosc-donation/>`_.  Thanks to HUAWEI, and specially to Zeeman Wang, for a generous donation that allowed us to implement many of the exciting new features in C-Blosc2.
 
 
 New features
@@ -22,13 +22,13 @@ Right now (May 2021), the next features are already implemented (although they m
   
 * **A filter pipeline:** the different filters can be pipelined so that the output of one can the input for the other.  A possible example is a `delta` followed by `shuffle`, or as described above, `trunc_prec` followed by `bitshuffle`.
 
-* **Prefilters:** allows to apply user-defined C callbacks **prior** the filter pipeline during compression.  See [test_prefilter.c](https://github.com/Blosc/c-blosc2/blob/master/tests/test_prefilter.c) for an example of use. 
+* **Prefilters:** allows to apply user-defined C callbacks **prior** the filter pipeline during compression.  See `test_prefilter.c <https://github.com/Blosc/c-blosc2/blob/master/tests/test_prefilter.c>`_ for an example of use. 
 
-* **Postfilters:** allows to apply user-defined C callbacks **after** the filter pipeline during decompression. The combination of prefilters and postfilters could be interesting for supporting e.g. encryption (via prefilters) and decryption (via postfilters).  Also, a postfilter alone can used to produce on-the-flight computation based on existing data (or other metadata, like e.g. coordinates). See [test_postfilter.c](https://github.com/Blosc/c-blosc2/blob/master/tests/test_postfilter.c) for an example of use. 
+* **Postfilters:** allows to apply user-defined C callbacks **after** the filter pipeline during decompression. The combination of prefilters and postfilters could be interesting for supporting e.g. encryption (via prefilters) and decryption (via postfilters).  Also, a postfilter alone can used to produce on-the-flight computation based on existing data (or other metadata, like e.g. coordinates). See `test_postfilter.c <https://github.com/Blosc/c-blosc2/blob/master/tests/test_postfilter.c>`_ for an example of use.
 
 * **SIMD support for ARM (NEON):** this allows for faster operation on ARM architectures.  Only `shuffle` is supported right now, but the idea is to implement `bitshuffle` for NEON too.  Thanks to Lucian Marc.
 
-* **SIMD support for PowerPC (ALTIVEC):** this allows for faster operation on PowerPC architectures.  Both `shuffle`  and `bitshuffle` are supported; however, this has been done via a transparent mapping from SSE2 into ALTIVEC emulation in GCC 8, so performance could be better (but still, it is already a nice improvement over native C code; see PR https://github.com/Blosc/c-blosc2/pull/59 for details).  Thanks to Jerome Kieffer and [ESRF](https://www.esrf.fr) for sponsoring the Blosc team in helping him in this task.
+* **SIMD support for PowerPC (ALTIVEC):** this allows for faster operation on PowerPC architectures.  Both `shuffle`  and `bitshuffle` are supported; however, this has been done via a transparent mapping from SSE2 into ALTIVEC emulation in GCC 8, so performance could be better (but still, it is already a nice improvement over native C code; see PR https://github.com/Blosc/c-blosc2/pull/59 for details).  Thanks to Jerome Kieffer and `ESRF <https://www.esrf.fr>`_ for sponsoring the Blosc team in helping him in this task.
 
 * **Dictionaries:** when a block is going to be compressed, C-Blosc2 can use a previously made dictionary (stored in the header of the super-chunk) for compressing all the blocks that are part of the chunks.  This usually improves the compression ratio, as well as the decompression speed, at the expense of a (small) overhead in compression speed.  Currently, it is only supported in the `zstd` codec, but would be nice to extend it to `lz4` and `blosclz` at least.
 
@@ -40,7 +40,7 @@ Right now (May 2021), the next features are already implemented (although they m
 
 * **Parallel chunk reads:** when several blocks of a chunk are to be read, this is done in parallel by the decompressing machinery.  That means that every thread is responsible to read, post-filter and decompress a block by itself, leading to an efficient overlap of I/O and CPU usage that optimizes reads to a maximum.
 
-* **Meta-layers:** optionally, the user can add meta-data for different uses and in different layers.  For example, one may think on providing a meta-layer for [NumPy](http://www.numpy.org) so that most of the meta-data for it is stored in a meta-layer; then, one can place another meta-layer on top of the latter for adding more high-level info if desired (e.g. geo-spatial, meteorological...).
+* **Meta-layers:** optionally, the user can add meta-data for different uses and in different layers.  For example, one may think on providing a meta-layer for `NumPy <http://www.numpy.org>`_ so that most of the meta-data for it is stored in a meta-layer; then, one can place another meta-layer on top of the latter for adding more high-level info if desired (e.g. geo-spatial, meteorological...).
 
 * **Variable length meta-layers:** the user may want to add variable-length meta information that can be potentially very large (up to 2 GB). The regular meta-layer described above is very quick to read, but meant to store fixed-length and relatively small meta information.  Variable length metalayers are stored in the trailer of a frame, whereas regular meta-layers are in the header.
 
@@ -54,9 +54,9 @@ Right now (May 2021), the next features are already implemented (although they m
 
 * **Support for I/O plugins:** so that users can extend the I/O capabilities beyond the current filesystem support.  Things like use databases or S3 interfaces should be possible by implementing these interfaces.  Thanks to ironArray for sponsoring us in doing this.
 
-* **Python wrapper:**  we have a preliminary wrapper in the works.  You can have a look at our ongoing efforts in the [python-blosc2 repo](https://github.com/Blosc/python-blosc2).  Thanks to the Python Software Foundation for providing a grant for doing this.
+* **Python wrapper:**  we have a preliminary wrapper in the works.  You can have a look at our ongoing efforts in the `python-blosc2 repo <https://github.com/Blosc/python-blosc2>`_.  Thanks to the Python Software Foundation for providing a grant for doing this.
 
-* **Security:** we are actively using using the [OSS-Fuzz](https://github.com/google/oss-fuzz) and [ClusterFuzz](https://oss-fuzz.com) for uncovering programming errors in C-Blosc2.  Thanks to Google for sponsoring us in doing this.
+* **Security:** we are actively using using the `OSS-Fuzz <https://github.com/google/oss-fuzz>`_ and `ClusterFuzz <https://oss-fuzz.com>`_ for uncovering programming errors in C-Blosc2.  Thanks to Google for sponsoring us in doing this.
 
 
 Actions to be done
@@ -72,11 +72,11 @@ Actions to be done
 
 * **Documentation:** utterly important for attracting new users and making the life easier for existing ones.  Important points to have in mind here:
 
-  - **Quality of API docstrings:** is the mission of the functions or data structures clearly and succinctly explained? Are all the parameters explained?  Is the return value explained?  What are the possible errors that can be returned?  [Mostly completed by Alberto Sabater].
+  - **Quality of API docstrings:** is the mission of the functions or data structures clearly and succinctly explained? Are all the parameters explained?  Is the return value explained?  What are the possible errors that can be returned?  `Mostly completed by Alberto Sabater].
   
   - **Tutorials/book:** besides the API docstrings, more documentation materials should be provided, like tutorials or a book about Blosc (or at least, the beginnings of it).  Due to its adoption in GitHub and Jupyter notebooks, one of the most extended and useful markup systems is Markdown, so this should also be the first candidate to use here.
   
-* **Wrappers for other languages:** Java, R or Julia are the most obvious candidates.  Still not sure if these should be produced and maintained by the Blosc development team, or leave them for third-party players that would be interested. The steering [council discussed this](https://github.com/Blosc/governance/blob/master/steering_council_minutes/2020-03-26.md), and probably just the Python wrapper (python-blosc2, see above) should be maintained by Blosc maintainers themselves, while the other languages should be maintained by the community.
+* **Wrappers for other languages:** Java, R or Julia are the most obvious candidates.  Still not sure if these should be produced and maintained by the Blosc development team, or leave them for third-party players that would be interested. The steering `council discussed this <https://github.com/Blosc/governance/blob/master/steering_council_minutes/2020-03-26.md>`_, and probably just the Python wrapper (python-blosc2, see above) should be maintained by Blosc maintainers themselves, while the other languages should be maintained by the community.
 
 * **Lock support for super-chunks:** when different processes are accessing concurrently to super-chunks, make them to sync properly by using locks, either on-disk (frame-backed super-chunks), or in-memory. Such a lock support would be configured in build time, so it could be disabled with a cmake flag.
 
