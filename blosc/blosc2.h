@@ -93,20 +93,16 @@ enum {
   BLOSC_EXTENDED_HEADER_LENGTH = 32,
   //!< Extended header length (Blosc2, see README_HEADER)
   BLOSC_MAX_OVERHEAD = BLOSC_EXTENDED_HEADER_LENGTH,
-  /** The maximum overhead during compression in bytes.  This equals to
-   *  BLOSC_EXTENDED_HEADER_LENGTH now, but can be higher in future
-   *  implementations
-   */
+  //!< The maximum overhead during compression in bytes. This equals
+  //!< to @ref BLOSC_EXTENDED_HEADER_LENGTH now, but can be higher in future
+  //!< implementations.
   BLOSC_MAX_BUFFERSIZE = (INT_MAX - BLOSC_MAX_OVERHEAD),
   //!< Maximum source buffer size to be compressed
   BLOSC_MAX_TYPESIZE = 255,
-  /** Maximum typesize before considering source buffer as a stream of bytes
-   * Cannot be larger than 255
-   */
+  //!< Maximum typesize before considering source buffer as a stream of bytes.
+  //!< Cannot be larger than 255.
   BLOSC_MIN_BUFFERSIZE = 128,
-  /** Minimum buffer size to be compressed.
-   *  Cannot be smaller than 66.
-   */
+  //!< Minimum buffer size to be compressed. Cannot be smaller than 66.
 };
 
 
@@ -126,15 +122,16 @@ enum {
 
 /**
  * @brief Codes for filters.
- * @see #blosc_compress
+ *
+ * @sa #blosc_compress
  */
 enum {
-  BLOSC_NOSHUFFLE = 0,   //!< no shuffle (for compatibility with Blosc1)
-  BLOSC_NOFILTER = 0,    //!< no filter
-  BLOSC_SHUFFLE = 1,     //!< byte-wise shuffle
-  BLOSC_BITSHUFFLE = 2,  //!< bit-wise shuffle
-  BLOSC_DELTA = 3,       //!< delta filter
-  BLOSC_TRUNC_PREC = 4,  //!< truncate precision filter
+  BLOSC_NOSHUFFLE = 0,   //!< No shuffle (for compatibility with Blosc1).
+  BLOSC_NOFILTER = 0,    //!< No filter.
+  BLOSC_SHUFFLE = 1,     //!< Byte-wise shuffle.
+  BLOSC_BITSHUFFLE = 2,  //!< Bit-wise shuffle.
+  BLOSC_DELTA = 3,       //!< Delta filter.
+  BLOSC_TRUNC_PREC = 4,  //!< Truncate precision filter.
   BLOSC_LAST_FILTER = 5, //!< sentinel
   BLOSC_LAST_REGISTERED_FILTER = BLOSC2_BDEFINED_FILTERS + 0,
 };
@@ -334,8 +331,9 @@ enum {
  *
  * You must call this previous to any other Blosc call, unless you want
  * Blosc to be used simultaneously in a multi-threaded environment, in
- * which case you can use the
- * @see #blosc2_compress_ctx #blosc2_decompress_ctx pair.
+ * which case you can use the #blosc2_compress_ctx #blosc2_decompress_ctx pair.
+ *
+ * @sa #blosc_destroy
  */
 BLOSC_EXPORT void blosc_init(void);
 
@@ -344,8 +342,9 @@ BLOSC_EXPORT void blosc_init(void);
  * @brief Destroy the Blosc library environment.
  *
  * You must call this after to you are done with all the Blosc calls,
- * unless you have not used blosc_init() before
- * @see #blosc_init.
+ * unless you have not used blosc_init() before.
+ *
+ * @sa #blosc_init
  */
 BLOSC_EXPORT void blosc_destroy(void);
 
@@ -363,9 +362,9 @@ BLOSC_EXPORT void blosc_destroy(void);
  * @param clevel The desired compression level and must be a number
  * between 0 (no compression) and 9 (maximum compression).
  * @param doshuffle Specifies whether the shuffle compression preconditioner
- * should be applied or not. @a BLOSC_NOFILTER means not applying filters,
- * @a BLOSC_SHUFFLE means applying shuffle at a byte level and
- * @a BLOSC_BITSHUFFLE at a bit level (slower but *may* achieve better
+ * should be applied or not. #BLOSC_NOFILTER means not applying filters,
+ * #BLOSC_SHUFFLE means applying shuffle at a byte level and
+ * #BLOSC_BITSHUFFLE at a bit level (slower but *may* achieve better
  * compression).
  * @param typesize Is the number of bytes for the atomic type in binary
  * @p src buffer.  This is mainly useful for the shuffle preconditioner.
@@ -378,7 +377,7 @@ BLOSC_EXPORT void blosc_destroy(void);
  * must have at least the size of @p destsize.
  * @param destsize The size of the dest buffer. Blosc
  * guarantees that if you set @p destsize to, at least,
- * (@p nbytes + @a BLOSC_MAX_OVERHEAD), the compression will always succeed.
+ * (@p nbytes + #BLOSC_MAX_OVERHEAD), the compression will always succeed.
  *
  * @return The number of bytes compressed.
  * If @p src buffer cannot be compressed into @p destsize, the return
@@ -387,8 +386,50 @@ BLOSC_EXPORT void blosc_destroy(void);
  * should never happen. If you see this, please report it back
  * together with the buffer data causing this and compression settings.
  *
- * This function supports all the configuration based environment variables
- * available in blosc2_compress.
+ *
+ * @par Environment variables
+ * @parblock
+ *
+ * This function honors different environment variables to control
+ * internal parameters without the need of doing that programatically.
+ * Here are the ones supported:
+ *
+ * * **BLOSC_CLEVEL=(INTEGER)**: This will overwrite the @p clevel parameter
+ * before the compression process starts.
+ *
+ * * **BLOSC_SHUFFLE=[NOSHUFFLE | SHUFFLE | BITSHUFFLE]**: This will
+ * overwrite the @p doshuffle parameter before the compression process
+ * starts.
+ *
+ * * **BLOSC_DELTA=(1|0)**: This will call #blosc_set_delta() before the
+ * compression process starts.
+ *
+ * * **BLOSC_TYPESIZE=(INTEGER)**: This will overwrite the @p typesize
+ * parameter before the compression process starts.
+ *
+ * * **BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | SNAPPY | ZLIB | ZSTD]**:
+ * This will call #blosc_set_compressor(BLOSC_COMPRESSOR) before the
+ * compression process starts.
+ *
+ * * **BLOSC_NTHREADS=(INTEGER)**: This will call
+ * #blosc_set_nthreads(BLOSC_NTHREADS) before the compression process
+ * starts.
+ *
+ * * **BLOSC_BLOCKSIZE=(INTEGER)**: This will call
+ * #blosc_set_blocksize(BLOSC_BLOCKSIZE) before the compression process
+ * starts.  *NOTE:* The *blocksize* is a critical parameter with
+ * important restrictions in the allowed values, so use this with care.
+ *
+ * * **BLOSC_NOLOCK=(ANY VALUE)**: This will call *blosc2_compress_ctx()* under
+ * the hood, with the *compressor*, *blocksize* and
+ * *numinternalthreads* parameters set to the same as the last calls to
+ * #blosc_set_compressor, #blosc_set_blocksize and
+ * #blosc_set_nthreads. *BLOSC_CLEVEL*, *BLOSC_SHUFFLE*, *BLOSC_DELTA* and
+ * *BLOSC_TYPESIZE* environment vars will also be honored.
+ *
+ * @endparblock
+ *
+ * @sa blosc_decompress
  */
 BLOSC_EXPORT int blosc_compress(int clevel, int doshuffle, size_t typesize,
                                 size_t nbytes, const void* src, void* dest,
@@ -418,8 +459,23 @@ BLOSC_EXPORT int blosc_compress(int clevel, int doshuffle, size_t typesize,
  * output buffer is not large enough, then a negative value
  * will be returned instead.
  *
- * This function supports all the configuration based environment variables
- * available in blosc2_decompress.
+ * @par Environment variables
+ * @parblock
+ * This function honors different environment variables to control
+ * internal parameters without the need of doing that programatically.
+ * Here are the ones supported:
+ *
+ * * **BLOSC_NTHREADS=(INTEGER)**: This will call
+ * #blosc_set_nthreads(BLOSC_NTHREADS) before the proper decompression
+ * process starts.
+ *
+ * * **BLOSC_NOLOCK=(ANY VALUE)**: This will call #blosc2_decompress_ctx
+ * under the hood, with the *numinternalthreads* parameter set to the
+ * same value as the last call to #blosc_set_nthreads.
+ *
+ * @endparblock
+ *
+ * @sa blosc_compress
  */
 BLOSC_EXPORT int blosc_decompress(const void* src, void* dest, size_t destsize);
 
@@ -732,22 +788,40 @@ typedef int64_t (*blosc2_write_cb)(const void *ptr, int64_t size, int64_t nitems
 typedef int64_t (*blosc2_read_cb)(void *ptr, int64_t size, int64_t nitems, void *stream);
 typedef int64_t (*blosc2_truncate_cb)(void *stream, int64_t size);
 
+
+/*
+ * Input/Ouput callbacks.
+ */
 typedef struct {
   uint8_t id;
+  //!< The IO identifier.
   blosc2_open_cb open;
+  //!< The IO open callback.
   blosc2_close_cb close;
+  //!< The IO close callback.
   blosc2_tell_cb tell;
+  //!< The IO tell callback.
   blosc2_seek_cb seek;
+  //!< The IO seek callback.
   blosc2_write_cb write;
+  //!< The IO write callback.
   blosc2_read_cb read;
+  //!< The IO read callback.
   blosc2_truncate_cb truncate;
+  //!< The IO truncate callback.
 } blosc2_io_cb;
 
 
+/*
+ * Input/Output parameters.
+ */
 typedef struct {
   uint8_t id;
+  //!< The IO identifier.
   void *params;
+  //!< The IO parameters.
 } blosc2_io;
+
 
 static const blosc2_io_cb BLOSC2_IO_CB_DEFAULTS = {
   .id = BLOSC2_IO_FILESYSTEM,
@@ -948,17 +1022,17 @@ BLOSC_EXPORT void blosc2_free_ctx(blosc2_context* context);
  *
  * @param schunk The context from where to extract the compression parameters.
  * @param cparams The pointer where the compression params will be stored.
- * *
+ *
  * @return 0 if succeeds. Else a negative code is returned.
  */
 int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams);
 
 /**
- * @brief Fill the @p dparams associated to a context.
+ * @brief Create a @p dparams associated to a context.
  *
  * @param schunk The context from where to extract the decompression parameters.
  * @param dparams The pointer where the decompression params will be stored.
- * *
+ *
  * @return 0 if succeeds. Else a negative code is returned.
  */
 int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams);
@@ -997,9 +1071,9 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * @param clevel The desired compression level and must be a number
  * between 0 (no compression) and 9 (maximum compression).
  * @param doshuffle Specifies whether the shuffle compression preconditioner
- * should be applied or not. @a BLOSC_NOFILTER means not applying filters,
- * @a BLOSC_SHUFFLE means applying shuffle at a byte level and
- * @a BLOSC_BITSHUFFLE at a bit level (slower but *may* achieve better
+ * should be applied or not. #BLOSC_NOFILTER means not applying filters,
+ * #BLOSC_SHUFFLE means applying shuffle at a byte level and
+ * #BLOSC_BITSHUFFLE at a bit level (slower but *may* achieve better
  * compression).
  * @param typesize Is the number of bytes for the atomic type in binary
  * @p src buffer.  This is mainly useful for the shuffle preconditioner.
@@ -1012,7 +1086,7 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * must have at least the size of @p destsize.
  * @param destsize The size of the dest buffer. Blosc
  * guarantees that if you set @p destsize to, at least,
- * (@p nbytes + @a BLOSC_MAX_OVERHEAD), the compression will always succeed.
+ * (@p nbytes + #BLOSC_MAX_OVERHEAD), the compression will always succeed.
  *
  * @return The number of bytes compressed.
  * If @p src buffer cannot be compressed into @p destsize, the return

@@ -2,3 +2,4 @@ bench/bench
 build*
 .idea
 cmake-build-*
+/doc/doxygen/xml/
