@@ -1874,8 +1874,8 @@ BLOSC_EXPORT void blosc_set_schunk(blosc2_schunk* schunk);
   Structures and functions related with compression codecs.
 *********************************************************************/
 
-typedef int (* codec_encoder_cb) (const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, uint8_t meta, blosc2_cparams *cparams);
-typedef int (* codec_decoder_cb) (const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, uint8_t meta, blosc2_dparams *dparams);
+typedef int (* blosc2_codec_encoder_cb) (const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, uint8_t meta, blosc2_cparams *cparams);
+typedef int (* blosc2_codec_decoder_cb) (const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, uint8_t meta, blosc2_dparams *dparams);
 
 typedef struct {
   uint8_t compcode;
@@ -1886,9 +1886,9 @@ typedef struct {
   //!< The codec library format.
   uint8_t compver;
   //!< The codec version.
-  codec_encoder_cb encoder;
+  blosc2_codec_encoder_cb encoder;
   //!< The codec encoder that is used during compression.
-  codec_decoder_cb decoder;
+  blosc2_codec_decoder_cb decoder;
   //!< The codec decoder that is used during decompression.
 } blosc2_codec;
 
@@ -1906,8 +1906,8 @@ int blosc2_register_codec(blosc2_codec *codec);
   Structures and functions related with filters plugins.
 *********************************************************************/
 
-typedef int (* filter_forward_cb)  (const uint8_t *, uint8_t *, int32_t, uint8_t, blosc2_cparams *);
-typedef int (* filter_backward_cb) (const uint8_t *, uint8_t *, int32_t, uint8_t, blosc2_dparams *);
+typedef int (* blosc2_filter_forward_cb)  (const uint8_t *, uint8_t *, int32_t, uint8_t, blosc2_cparams *);
+typedef int (* blosc2_filter_backward_cb) (const uint8_t *, uint8_t *, int32_t, uint8_t, blosc2_dparams *);
 
 /**
  * @brief The parameters for a user-defined filter.
@@ -1915,9 +1915,9 @@ typedef int (* filter_backward_cb) (const uint8_t *, uint8_t *, int32_t, uint8_t
 typedef struct {
   uint8_t id;
   //!< The filter identifier.
-  filter_forward_cb forward;
+  blosc2_filter_forward_cb forward;
   //!< The filter function that is used during compression.
-  filter_backward_cb backward;
+  blosc2_filter_backward_cb backward;
   //!< The filter function that is used during decompression.
 } blosc2_filter;
 
