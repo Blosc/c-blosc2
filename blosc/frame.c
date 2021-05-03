@@ -2995,7 +2995,7 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int nchunk, blosc2_schunk* schun
   int32_t nchunks;
   int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
                            &blocksize, &chunksize,  &nchunks,
-                           NULL, NULL, NULL, NULL, NULL);
+                           NULL, NULL, NULL, NULL, NULL, NULL, frame->schunk->storage->io);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return NULL;
@@ -3070,6 +3070,12 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int nchunk, blosc2_schunk* schun
     /* Copy the offsets */
     memcpy(framep + header_len + new_cbytes, off_chunk, (size_t)new_off_cbytes);
   } else {
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+    if (io_cb == NULL) {
+      BLOSC_TRACE_ERROR("Error getting the input/output API");
+      return NULL;
+    }
+
     size_t wbytes;
     if (frame->sframe) {
       int64_t offset;
@@ -3084,16 +3090,16 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int nchunk, blosc2_schunk* schun
         return NULL;
       }
       // Update the offsets chunk in the chunks frame
-      fp = sframe_open_index(frame->urlpath, "rb+");
-      fseek(fp, header_len + 0, SEEK_SET);
+      fp = sframe_open_index(frame->urlpath, "rb+", frame->schunk->storage->io);
+      io_cb->seek(fp, header_len + 0, SEEK_SET);
     }
     else {
       // Regular frame
-      fp = fopen(frame->urlpath, "rb+");
-      fseek(fp, header_len + cbytes, SEEK_SET);
+      fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io);
+      io_cb->seek(fp, header_len + cbytes, SEEK_SET);
     }
-    wbytes = fwrite(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
-    fclose(fp);
+    wbytes = io_cb->write(off_chunk, 1, (size_t)new_off_cbytes, fp);  // the new offsets
+    io_cb->close(fp);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return NULL;
