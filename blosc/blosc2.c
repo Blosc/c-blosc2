@@ -3414,6 +3414,16 @@ void blosc_destroy(void) {
   blosc2_free_ctx(g_global_context);
 
   pthread_mutex_destroy(&global_comp_mutex);
+
+  for (int i = 0; i < g_nio; ++i) {
+    free(g_io[i]);
+  }
+  for (int i = 0; i < g_nfilters; ++i) {
+    free(g_filters[i]);
+  }
+  for (int i = 0; i < g_ncodecs; ++i) {
+    free(g_codecs[i]);
+  }
 }
 
 
