@@ -290,7 +290,13 @@ static char *all_tests(void) {
                         vlmetalayers = (bool) ivlmetalayers;
                         fname = NULL;
                         mu_run_test(test_frame);
-                        snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
+                        // An easy way to test for file:/// prefix in some tests
+                        if (splits) {
+                          snprintf(buf, sizeof(buf), "test_frame_nc%d.b2frame", nchunks);
+                        }
+                        else {
+                          snprintf(buf, sizeof(buf), "file:///test_frame_nc%d.b2frame", nchunks);
+                        }
                         fname = buf;
                         mu_run_test(test_frame);
                     }

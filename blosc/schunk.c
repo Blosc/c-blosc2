@@ -113,6 +113,8 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
 
   // Get the storage with proper defaults
   schunk->storage = get_new_storage(storage, &BLOSC2_CPARAMS_DEFAULTS, &BLOSC2_DPARAMS_DEFAULTS, &BLOSC2_IO_DEFAULTS);
+  // Update the (local variable) storage
+  storage = schunk->storage;
 
   schunk->udbtune = malloc(sizeof(blosc2_btune));
   if (schunk->storage->cparams->udbtune == NULL) {

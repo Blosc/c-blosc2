@@ -127,7 +127,7 @@ int main(void) {
 
   // super-chunk -> fileframe (contiguous frame, on-disk)
   blosc_set_timestamp(&last);
-  frame_len = blosc2_schunk_to_file(schunk, "frame_simple.b2frame");
+  frame_len = blosc2_schunk_to_file(schunk, "file:///frame_simple.b2frame");
   if (frame_len < 0) {
     return frame_len;
   }
@@ -139,7 +139,7 @@ int main(void) {
 
   // fileframe (file) -> schunk2 (on-disk contiguous, super-chunk)
   blosc_set_timestamp(&last);
-  blosc2_schunk* schunk2 = blosc2_schunk_open("frame_simple.b2frame");
+  blosc2_schunk* schunk2 = blosc2_schunk_open("file:///frame_simple.b2frame");
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for fileframe (%s) -> frame : %.3g s, %.1f GB/s\n",

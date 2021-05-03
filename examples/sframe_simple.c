@@ -107,4 +107,3 @@ int main(void) {
   blosc_destroy();
   return 0;
 }
-

@@ -740,6 +740,21 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
 }
 
 
+// Remove a file:/// prefix
+// This is a temporary workaround for allowing to use proper URLs for local files/dirs
+static char* normalize_urlpath(const char* urlpath) {
+  char* localpath = strstr(urlpath, "file:///");
+  if (localpath == urlpath) {
+    // There is a file:/// prefix.  Get rid of it.
+    localpath += strlen("file:///");
+  }
+  else {
+    localpath = (char*)urlpath;
+  }
+  return localpath;
+}
+
+
 /* Initialize a frame out of a file */
 blosc2_frame_s* frame_from_file(const char* urlpath, const blosc2_io *io) {
   // Get the length of the frame
@@ -749,6 +764,8 @@ blosc2_frame_s* frame_from_file(const char* urlpath, const blosc2_io *io) {
   void* fp = NULL;
   bool sframe = false;
   struct stat path_stat;
+
+  urlpath = normalize_urlpath(urlpath);
 
   if(stat(urlpath, &path_stat) < 0) {
     BLOSC_TRACE_ERROR("Cannot get information about the path %s.", urlpath);
@@ -1544,9 +1561,9 @@ blosc2_storage* get_new_storage(const blosc2_storage* storage,
   blosc2_storage* new_storage = (blosc2_storage*)calloc(1, sizeof(blosc2_storage));
   memcpy(new_storage, storage, sizeof(blosc2_storage));
   if (storage->urlpath != NULL) {
-    size_t pathlen = strlen(storage->urlpath);
-    new_storage->urlpath = malloc(pathlen + 1);
-    strcpy(new_storage->urlpath, storage->urlpath);
+    char* urlpath = normalize_urlpath(storage->urlpath);
+    new_storage->urlpath = malloc(strlen(urlpath) + 1);
+    strcpy(new_storage->urlpath, urlpath);
   }
 
   // cparams
