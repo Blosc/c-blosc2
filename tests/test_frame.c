@@ -43,7 +43,7 @@ static char* test_frame(void) {
   int32_t *data_dest = malloc(isize);
   int dsize;
   int64_t nbytes, cbytes;
-  uint8_t* buffer;
+  uint8_t *buffer;
   bool buffer_needs_free;
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -52,7 +52,7 @@ static char* test_frame(void) {
     cparams.filters[BLOSC2_MAX_FILTERS - 2] = BLOSC_DELTA;
     cparams.filters_meta[BLOSC2_MAX_FILTERS - 2] = 0;
   }
-  blosc2_schunk* schunk;
+  blosc2_schunk *schunk;
 
   /* Initialize the Blosc compressor */
   blosc_init();
@@ -74,12 +74,20 @@ static char* test_frame(void) {
   if (multithread) {
     cparams.nthreads = NTHREADS;
     dparams.nthreads = NTHREADS;
-  }
-  else {
+  } else {
     cparams.nthreads = 1;
     dparams.nthreads = 1;
   }
   blosc2_storage storage = {.contiguous=true, .urlpath=fname, .cparams=&cparams, .dparams=&dparams};
+  if (fname != NULL) {
+    if (strncmp(fname, "file:///", strlen("file:///")) == 0) {
+      char *fname2 = fname + strlen("file:///");
+      remove(fname2);
+    }
+    else {
+      remove(fname);
+    }
+  }
   schunk = blosc2_schunk_new(&storage);
   mu_assert("blosc2_schunk_new() failed", schunk != NULL);
   char* content = "This is a pretty long string with a good number of chars";

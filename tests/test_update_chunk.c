@@ -56,8 +56,13 @@ int32_t *data_dest;
 
 static char* test_update_chunk(void) {
   /* Free resources */
-  if (tdata.urlpath != NULL && tdata.contiguous == false) {
-    blosc2_remove_dir(tdata.urlpath);
+  if (tdata.urlpath != NULL) {
+    if (!tdata.contiguous) {
+      blosc2_remove_dir(tdata.urlpath);
+    }
+    else {
+      remove(tdata.urlpath);
+    }
   }
 
   int32_t isize = CHUNKSIZE * sizeof(int32_t);

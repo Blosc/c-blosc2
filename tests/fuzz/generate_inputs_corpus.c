@@ -77,6 +77,7 @@ int create_cframe(const char* compname) {
   sprintf(filename, "frame_simple-%s.b2frame", compname);
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .urlpath=filename, .contiguous=true};
+  remove(filename);
   blosc2_schunk* schunk = blosc2_schunk_new(&storage);
 
   // Add some data

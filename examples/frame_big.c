@@ -52,8 +52,10 @@ int main(void) {
   dparams.nthreads = NTHREADS;
 
   /* Create a new super-chunk backed by a fileframe */
-  blosc2_storage storage = {.contiguous=true, .urlpath="frame_big.b2frame",
+  char* urlpath = "frame_big.b2frame";
+  blosc2_storage storage = {.contiguous=true, .urlpath=urlpath,
                             .cparams=&cparams, .dparams=&dparams};
+  remove(urlpath);
   blosc2_schunk* schunk = blosc2_schunk_new(&storage);
 
   blosc_set_timestamp(&last);

@@ -121,8 +121,13 @@ CUTEST_TEST_TEST(udio) {
   CUTEST_GET_PARAMETER(backend, test_udio_backend);
 
   /* Free resources */
-  if (backend.urlpath != NULL && backend.contiguous == false) {
-    blosc2_remove_dir(backend.urlpath);
+  if (backend.urlpath != NULL) {
+    if (backend.contiguous == false) {
+      blosc2_remove_dir(backend.urlpath);
+    }
+    else {
+      remove(backend.urlpath);
+    }
   }
 
   int32_t nbytes = CHUNKSIZE * sizeof(int32_t);

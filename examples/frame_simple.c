@@ -126,8 +126,9 @@ int main(void) {
   printf("Frame length in memory: %ld bytes\n", (long)frame_len);
 
   // super-chunk -> fileframe (contiguous frame, on-disk)
+  remove("frame_simple.b2frame");
   blosc_set_timestamp(&last);
-  frame_len = blosc2_schunk_to_file(schunk, "file:///frame_simple.b2frame");
+  frame_len = blosc2_schunk_to_file(schunk, "frame_simple.b2frame");
   if (frame_len < 0) {
     return frame_len;
   }

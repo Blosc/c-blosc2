@@ -114,6 +114,9 @@ CUTEST_TEST_TEST(copy) {
 
   /* Create a super-chunk container */
   blosc2_storage storage = {.cparams=&data->cparams, .contiguous=backend.contiguous, .urlpath = backend.urlpath};
+  if (backend.urlpath != NULL) {
+    remove(backend.urlpath);
+  }
   blosc2_schunk *schunk = blosc2_schunk_new(&storage);
   CUTEST_ASSERT("Error creating a schunk", schunk != NULL);
 
@@ -136,6 +139,9 @@ CUTEST_TEST_TEST(copy) {
 
   /* Copy schunk */
   blosc2_storage storage2 = {.contiguous=backend2.contiguous, .urlpath = backend2.urlpath};
+  if (backend2.urlpath != NULL) {
+    remove(backend2.urlpath);
+  }
   storage2.cparams = different_cparams ? &data->cparams2 : &data->cparams;
   blosc2_schunk * schunk_copy = blosc2_schunk_copy(schunk, &storage2);
   CUTEST_ASSERT("Error copying a schunk", schunk_copy != NULL);
@@ -174,11 +180,21 @@ CUTEST_TEST_TEST(copy) {
   blosc2_schunk_free(schunk_copy);
 
   /* Free resources */
-  if (backend.urlpath != NULL && backend.contiguous == false) {
-    blosc2_remove_dir(backend.urlpath);
+  if (backend.urlpath != NULL) {
+    if (backend.contiguous == false) {
+      blosc2_remove_dir(backend.urlpath);
+    }
+    else {
+      remove(backend.urlpath);
+    }
   }
-  if (backend2.urlpath != NULL && backend2.contiguous == false) {
-    blosc2_remove_dir(backend2.urlpath);
+  if (backend2.urlpath != NULL) {
+    if (backend2.contiguous == false) {
+      blosc2_remove_dir(backend2.urlpath);
+    }
+    else {
+      remove(backend2.urlpath);
+    }
   }
 
   return 0;

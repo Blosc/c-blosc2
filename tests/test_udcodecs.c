@@ -198,7 +198,7 @@ CUTEST_TEST_TEST(udcodecs) {
                             .dparams=&dparams,
                             .urlpath=data->urlpath,
                             .contiguous=true};
-
+  remove(data->urlpath);
   schunk = blosc2_schunk_new(&storage);
   uint8_t codec_params = 222;
   blosc2_cparams cparams2 = BLOSC2_CPARAMS_DEFAULTS;

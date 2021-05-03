@@ -106,6 +106,13 @@ void update_schunk_properties(struct blosc2_schunk* schunk) {
   schunk->dctx = blosc2_create_dctx(*dparams);
 }
 
+
+static bool file_exists (char *filename) {
+  struct stat   buffer;
+  return (stat (filename, &buffer) == 0);
+}
+
+
 /* Create a new super-chunk */
 blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
@@ -161,6 +168,12 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
   }
   if (storage->contiguous){
     // We want a contiguous frame as storage
+    if (storage->urlpath != NULL) {
+      if (file_exists(storage->urlpath)) {
+        BLOSC_TRACE_ERROR("You are trying to ovewrite an existing frame.  Remove it first!");
+        return NULL;
+      }
+    }
     blosc2_frame_s* frame = frame_new(storage->urlpath);
     frame->sframe = false;
     // Initialize frame (basically, encode the header)

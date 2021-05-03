@@ -56,6 +56,7 @@ int main(int argc, char* argv[]) {
   dparams.nthreads = NTHREADS;
 
   /* Create a super-chunk backed by an in-memory frame */
+  remove(argv[2]);
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .contiguous=true, .urlpath=argv[2]};
   blosc2_schunk* schunk = blosc2_schunk_new(&storage);

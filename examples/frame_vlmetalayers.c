@@ -55,7 +55,9 @@ int main(void) {
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {.contiguous=true, .urlpath="vlmetalaters.b2frame", .cparams=&cparams, .dparams=&dparams};
+  char* urlpath = "vlmetalayers.b2frame";
+  remove(urlpath);
+  blosc2_storage storage = {.contiguous=true, .urlpath=urlpath, .cparams=&cparams, .dparams=&dparams};
   blosc2_schunk* schunk = blosc2_schunk_new(&storage);
 
 
@@ -88,7 +90,7 @@ int main(void) {
     return vlmetalater_len;
   }
 
-  blosc2_schunk *sc = blosc2_schunk_open("vlmetalaters.b2frame");
+  blosc2_schunk *sc = blosc2_schunk_open(urlpath);
 
   /* Free resources */
   blosc2_schunk_free(schunk);

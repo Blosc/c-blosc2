@@ -61,8 +61,13 @@ bool tcopy[] = {
 
 static char* test_delete_chunk(void) {
   /* Free resources */
-  if (tdata.urlpath != NULL && tdata.contiguous == false) {
-    blosc2_remove_dir(tdata.urlpath);
+  if (tdata.urlpath != NULL) {
+    if (tdata.contiguous == false) {
+      blosc2_remove_dir(tdata.urlpath);
+    }
+    else {
+      remove(tdata.urlpath);
+    }
   }
 
   static int32_t data[CHUNKSIZE];
@@ -128,8 +133,13 @@ static char* test_delete_chunk(void) {
 
 
   /* Free resources */
-  if (!storage.contiguous && storage.urlpath != NULL) {
-    blosc2_remove_dir(storage.urlpath);
+  if (storage.urlpath != NULL) {
+    if (!storage.contiguous) {
+      blosc2_remove_dir(storage.urlpath);
+    }
+    else {
+      remove(storage.urlpath);
+    }
   }
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
