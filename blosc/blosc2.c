@@ -78,13 +78,13 @@ static int32_t g_force_blocksize = 0;
 static int g_initlib = 0;
 static blosc2_schunk* g_schunk = NULL;   /* the pointer to super-chunk */
 
-blosc2_codec *g_codecs[256] = {0};
+blosc2_codec g_codecs[256] = {0};
 uint8_t g_ncodecs = 0;
 
-static blosc2_filter *g_filters[256] = {0};
+static blosc2_filter g_filters[256] = {0};
 static uint64_t g_nfilters = 0;
 
-static blosc2_io_cb *g_io[256] = {0};
+static blosc2_io_cb g_io[256] = {0};
 static uint64_t g_nio = 0;
 
 
@@ -204,8 +204,8 @@ static int compname_to_clibcode(const char* compname) {
   if (strcmp(compname, BLOSC_ZSTD_COMPNAME) == 0)
     return BLOSC_ZSTD_LIB;
   for (int i = 0; i < g_ncodecs; ++i) {
-    if (strcmp(compname, g_codecs[i]->compname) == 0)
-      return g_codecs[i]->complib;
+    if (strcmp(compname, g_codecs[i].compname) == 0)
+      return g_codecs[i].complib;
   }
   return BLOSC2_ERROR_NOT_FOUND;
 }
@@ -217,8 +217,8 @@ static const char* clibcode_to_clibname(int clibcode) {
   if (clibcode == BLOSC_ZLIB_LIB) return BLOSC_ZLIB_LIBNAME;
   if (clibcode == BLOSC_ZSTD_LIB) return BLOSC_ZSTD_LIBNAME;
   for (int i = 0; i < g_ncodecs; ++i) {
-    if (clibcode == g_codecs[i]->complib)
-      return g_codecs[i]->compname;
+    if (clibcode == g_codecs[i].complib)
+      return g_codecs[i].compname;
   }
   return NULL;                  /* should never happen */
 }
@@ -246,8 +246,8 @@ int blosc_compcode_to_compname(int compcode, const char** compname) {
     name = BLOSC_ZSTD_COMPNAME;
   else {
     for (int i = 0; i < g_ncodecs; ++i) {
-      if (compcode == g_codecs[i]->compcode) {
-        name = g_codecs[i]->compname;
+      if (compcode == g_codecs[i].compcode) {
+        name = g_codecs[i].compname;
         break;
       }
     }
@@ -304,8 +304,8 @@ int blosc_compname_to_compcode(const char* compname) {
 #endif /*  HAVE_ZSTD */
   else{
     for (int i = 0; i < g_ncodecs; ++i) {
-      if (strcmp(compname, g_codecs[i]->compname) == 0) {
-        code = g_codecs[i]->compcode;
+      if (strcmp(compname, g_codecs[i].compname) == 0) {
+        code = g_codecs[i].compcode;
         break;
       }
     }
@@ -360,8 +360,8 @@ static int compcode_to_compversion(int compcode) {
 #endif /*  HAVE_ZSTD */
     default:
       for (int i = 0; i < g_ncodecs; ++i) {
-        if (compcode == g_codecs[i]->compcode) {
-          return g_codecs[i]->compver;
+        if (compcode == g_codecs[i].compcode) {
+          return g_codecs[i].compver;
         }
       }
   }
@@ -890,11 +890,11 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
     else {
       // Look for the filters_meta in user filters and run it
       for (int j = 0; j < g_nfilters; ++j) {
-        if (g_filters[j]->id == filters[i]) {
-          if (g_filters[j]->forward != NULL) {
+        if (g_filters[j].id == filters[i]) {
+          if (g_filters[j].forward != NULL) {
             blosc2_cparams cparams;
             blosc2_ctx_get_cparams(context, &cparams);
-            rc = g_filters[j]->forward(_src, _dest, bsize, filters_meta[i], &cparams);
+            rc = g_filters[j].forward(_src, _dest, bsize, filters_meta[i], &cparams);
           } else {
             BLOSC_TRACE_ERROR("Forward function is NULL");
             return NULL;
@@ -1084,10 +1084,10 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   #endif /* HAVE_ZSTD */
     else if (context->compcode >= BLOSC2_BDEFINED_CODECS) {
       for (int i = 0; i < g_ncodecs; ++i) {
-        if (g_codecs[i]->compcode == context->compcode) {
+        if (g_codecs[i].compcode == context->compcode) {
           blosc2_cparams cparams;
           blosc2_ctx_get_cparams(context, &cparams);
-          cbytes = g_codecs[i]->encoder(_src + j * neblock,
+          cbytes = g_codecs[i].encoder(_src + j * neblock,
                                         neblock,
                                         dest,
                                         maxout,
@@ -1217,11 +1217,11 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
     } else {
         // Look for the filters_meta in user filters and run it
         for (int j = 0; j < g_nfilters; ++j) {
-          if (g_filters[j]->id == filters[i]) {
-            if (g_filters[j]->backward != NULL) {
+          if (g_filters[j].id == filters[i]) {
+            if (g_filters[j].backward != NULL) {
               blosc2_dparams dparams;
               blosc2_ctx_get_dparams(context, &dparams);
-              rc = g_filters[j]->backward(_src, _dest, bsize, filters_meta[i], &dparams);
+              rc = g_filters[j].backward(_src, _dest, bsize, filters_meta[i], &dparams);
             } else {
               BLOSC_TRACE_ERROR("Backward function is NULL");
               return BLOSC2_ERROR_FILTER_PIPELINE;
@@ -1647,10 +1647,10 @@ static int blosc_d(
   #endif /*  HAVE_ZSTD */
       else if (compformat == BLOSC_UDCODEC_FORMAT) {
         for (int i = 0; i < g_ncodecs; ++i) {
-          if (g_codecs[i]->compcode == context->compcode) {
+          if (g_codecs[i].compcode == context->compcode) {
             blosc2_dparams dparams;
             blosc2_ctx_get_dparams(context, &dparams);
-            nbytes = g_codecs[i]->decoder(src,
+            nbytes = g_codecs[i].decoder(src,
                                           cbytes,
                                           _dest,
                                           neblock,
@@ -3415,15 +3415,6 @@ void blosc_destroy(void) {
 
   pthread_mutex_destroy(&global_comp_mutex);
 
-  for (int i = 0; i < g_nio; ++i) {
-    free(g_io[i]);
-  }
-  for (int i = 0; i < g_nfilters; ++i) {
-    free(g_filters[i]);
-  }
-  for (int i = 0; i < g_ncodecs; ++i) {
-    free(g_codecs[i]);
-  }
 }
 
 
@@ -3847,15 +3838,14 @@ int blosc2_register_filter(blosc2_filter *filter) {
 
   // Check if the filter is already registered
   for (int i = 0; i < g_nfilters; ++i) {
-    if (g_filters[i]->id == filter->id) {
+    if (g_filters[i].id == filter->id) {
       BLOSC_TRACE_ERROR("The filter is already registered!");
       return BLOSC2_ERROR_FAILURE;
     }
   }
 
-  blosc2_filter *filter_new = malloc(sizeof(blosc2_filter));
+  blosc2_filter *filter_new = &g_filters[g_nfilters++];
   memcpy(filter_new, filter, sizeof(blosc2_filter));
-  g_filters[g_nfilters++] = filter_new;
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -3876,15 +3866,14 @@ int blosc2_register_codec(blosc2_codec *codec) {
 
   // Check if the code is already registered
   for (int i = 0; i < g_ncodecs; ++i) {
-    if (g_codecs[i]->compcode == codec->compcode) {
+    if (g_codecs[i].compcode == codec->compcode) {
       BLOSC_TRACE_ERROR("The codec is already registered!");
       return BLOSC2_ERROR_CODEC_PARAM;
     }
   }
 
-  blosc2_codec *codec_new = malloc(sizeof(blosc2_codec));
+  blosc2_codec *codec_new = &g_codecs[g_ncodecs++];
   memcpy(codec_new, codec, sizeof(blosc2_codec));
-  g_codecs[g_ncodecs++] = codec_new;
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -3893,15 +3882,14 @@ int _blosc2_register_io_cb(const blosc2_io_cb *io) {
 
   // Check if the io is already registered
   for (int i = 0; i < g_nio; ++i) {
-    if (g_io[i]->id == io->id) {
+    if (g_io[i].id == io->id) {
       BLOSC_TRACE_ERROR("The codec is already registered!");
       return BLOSC2_ERROR_PLUGIN_IO;
     }
   }
 
-  blosc2_io_cb *io_new = malloc(sizeof(blosc2_io_cb));
+  blosc2_io_cb *io_new = &g_io[g_nio++];
   memcpy(io_new, io, sizeof(blosc2_io_cb));
-  g_io[g_nio++] = io_new;
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -3923,8 +3911,8 @@ int blosc2_register_io_cb(const blosc2_io_cb *io) {
 
 blosc2_io_cb *blosc2_get_io_cb(uint8_t id) {
   for (int i = 0; i < g_nio; ++i) {
-    if (g_io[i]->id == id) {
-      return g_io[i];
+    if (g_io[i].id == id) {
+      return &g_io[i];
     }
   }
   if (id == BLOSC2_IO_FILESYSTEM) {
