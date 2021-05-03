@@ -165,8 +165,8 @@ CUTEST_TEST_TEST(udio) {
   CUTEST_ASSERT("Read must be positive", io_params.read > 0);
   CUTEST_ASSERT("Truncate must be positive", io_params.truncate > 0);
 
-  free(schunk);
-  free(schunk2);
+  blosc2_schunk_free(schunk);
+  blosc2_schunk_free(schunk2);
   free(data_buffer);
   free(rec_buffer);
 
