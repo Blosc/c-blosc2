@@ -171,8 +171,11 @@ using the msgpack format. Here is the format for the *metalayers*::
 :type_size:
     (``int32``) Size of each item.
 
+:block_size:
+    (``int32``) Size of data blocks when all data chunks are equal size (the only case supported so far).
+
 :chunk_size:
-    (``int32``) Size of each data chunk.  0 if not a fixed chunksize.
+    (``int32``) Size of each data chunk.  0 if not a fixed chunksize (not supported yet).
 
 :tcomp:
     (``int16``) Number of threads for compression.  If 0, same than `cctx`.
