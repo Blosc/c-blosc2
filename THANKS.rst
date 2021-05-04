@@ -1,8 +1,3 @@
-I'd like to thank the PyTables community that have collaborated in the exhaustive testing of Blosc.  With an aggregate amount of more than
-300 TB of different datasets compressed *and* decompressed successfully, I can say that Blosc is pretty safe now and ready for production purposes.
-
-Other important contributions:
-
 * Valentin Haenel did a terrific work implementing the support for the Snappy compression, fixing typos and improving docs and the plotting script.
 
 * Thibault North, with ideas from Oscar Villellas, contributed a way to call Blosc from different threads in a safe way.  Christopher
@@ -25,3 +20,9 @@ Other important contributions:
 * Alberto Sabater, for his great efforts on producing really nice Blosc2 docs, among other aspects.
 
 * Kiyo Masui for relicensing his bitshuffle project for allowing the inclusion of part of his code in Blosc.
+
+* Aleix Alcacer for his implementation of mutable super-chunks, multiple variable length metalayers and many other things.
+
+* Nathan Moinvaziri for his outstanding work on the security side of the things via `fuzzer testing <https://google.github.io/oss-fuzz/>`_.
+
+* Marta Iborra for her implementation of sparse storage for persistent super-chunks.
