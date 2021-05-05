@@ -4,11 +4,13 @@ ROADMAP for C-Blosc2
 C-Blosc2 is the new iteration of C-Blosc 1.x series, adding more features and better documentation.
 This document lists the goals for a production release of C-Blosc2.
 
+Many of the features implemented so far have been possible thanks to a [grant from HUAWEI](https://www.blosc.org/posts/blosc-donation/).  Thanks to HUAWEI, and specially to Zeeman Wang, for a generous donation that allowed us to implement many of the exciting new features in C-Blosc2.
 
-Existing features
------------------
 
-Right now (March 2021), the next features are already implemented (although they may require some refactoring or more tests):
+New features
+------------
+
+Right now (May 2021), the next features are already implemented (although they may require some refactoring or more tests):
 
 * **64-bit containers:** the first-class container in C-Blosc2 is the `super-chunk` or, for brevity, `schunk`, that is made by smaller chunks which are essentially C-Blosc1 32-bit containers.  The super-chunk can be backed or not by another container which is called a `frame` (see later).
 
@@ -42,17 +44,19 @@ Right now (March 2021), the next features are already implemented (although they
 
 * **Variable length meta-layers:** the user may want to add variable-length meta information that can be potentially very large (up to 2 GB). The regular meta-layer described above is very quick to read, but meant to store fixed-length and relatively small meta information.  Variable length metalayers are stored in the trailer of a frame, whereas regular meta-layers are in the header.
 
-* **Efficient support for large run-lengths:** large sequences of repeated values can be represented with an efficient, simple and fast run-length representation, without the need to use regular codecs.  This can be useful in situations where a lot of zeros (or NaNs) need to be stored (e.g. sparse matrices).
+* **Efficient support for special values:** large sequences of repeated values can be represented with an efficient, simple and fast run-length representation, without the need to use regular codecs.  With that, chunks or super-chunks with values that are the same (zeros, NaNs or any value in general) can be built in constant time, regardless of the size.  This can be useful in situations where a lot of zeros (or NaNs) need to be stored (e.g. sparse matrices).
 
-* **Nice markup for documentation:** we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  See https://c-blosc2.readthedocs.io.  Thanks to Alberto Sabater for contributing the support for this.
+* **Nice markup for documentation:** we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  See https://c-blosc2.readthedocs.io.  Thanks to Alberto Sabater and Aleix Alcacer for contributing the support for this.
 
 * **Plugin capabilities for filters and codecs:** we have a plugin register capability inplace so that the info about the new filters and codecs can be persisted and transmitted to different machines.  Thanks to the NumFOCUS foundation for providing a grant for doing this.
 
-* **Pluggable tuning capabilities:** this will allow users with different needs to define an interface so as to better tune different parameters like the codec, the compression level, the filters to use, the blocksize or the shuffle size.
+* **Pluggable tuning capabilities:** this will allow users with different needs to define an interface so as to better tune different parameters like the codec, the compression level, the filters to use, the blocksize or the shuffle size.  Thanks to ironArray for sponsoring us in doing this.
 
-* **Support for I/O plugins:** so that users can extend the I/O capabilities beyond the current filesystem support.  Things like use databases or S3 interfaces should be possible by implementing these interfaces.
+* **Support for I/O plugins:** so that users can extend the I/O capabilities beyond the current filesystem support.  Things like use databases or S3 interfaces should be possible by implementing these interfaces.  Thanks to ironArray for sponsoring us in doing this.
 
-* **Python wrapper:**  we have got a grant from the PSF for producing a Python wrapper.  You can have a look at our ongoing efforts in the [python-blosc2 repo](https://github.com/Blosc/python-blosc2).
+* **Python wrapper:**  we have a preliminary wrapper in the works.  You can have a look at our ongoing efforts in the [python-blosc2 repo](https://github.com/Blosc/python-blosc2).  Thanks to the Python Software Foundation for providing a grant for doing this.
+
+* **Security:** we are actively using using the [OSS-Fuzz](https://github.com/google/oss-fuzz) and [ClusterFuzz](https://oss-fuzz.com) for uncovering programming errors in C-Blosc2.  Thanks to Google for sponsoring us in doing this.
 
 
 Actions to be done
@@ -60,7 +64,7 @@ Actions to be done
 
 * **Centralized plugin repository:** we have got a grant from NumFOCUS for implementing a centralized repository so that people can send their plugins (using the existing machinery) to the Blosc2 team.  If the plugins fulfill a series of requirements, they will be officially accepted, and distributed withing the library.
 
-* **Improve the safety of the library:**  we are actively using using the [OSS-Fuzz](https://github.com/google/oss-fuzz) and [ClusterFuzz](https://oss-fuzz.com) for uncovering programming errors in C-Blosc2.  Although this is always a work in progress, we did a long way in improving our safety, mainly thanks to the efforts of Nathan Moinvaziri.
+* **Improve the safety of the library:**   Although this is always a work in progress, we did a long way in improving our safety, mainly thanks to the efforts of Nathan Moinvaziri.
 
 * **Support for lossy compression codecs:** although we already support the `trunc_prec` filter, this is only valid for floating point data; we should come with lossy codecs that are meant for any data type.
 
@@ -90,4 +94,4 @@ Outreaching
 Increase diversity
 ------------------
 
-* **We strive to make our team as diverse as possible:**  we are actively looking into more women and people from a variety of cultures to join our team.  Update: we are glad to have Marta Iborra, our first female among us; thanks to the Python Software Foundation for providing funds for allowing this.
+* **We strive to make our team as diverse as possible:**  we are actively looking into more women and people from a variety of cultures to join our team.  Update: we are glad to have Marta Iborra, our first female among us; thanks to the Python Software Foundation and NumFOCUS for providing funds for allowing this.
