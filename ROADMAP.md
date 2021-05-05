@@ -44,21 +44,25 @@ Right now (March 2021), the next features are already implemented (although they
 
 * **Efficient support for large run-lengths:** large sequences of repeated values can be represented with an efficient, simple and fast run-length representation, without the need to use regular codecs.  This can be useful in situations where a lot of zeros (or NaNs) need to be stored (e.g. sparse matrices).
 
-* **Nice markup for documentation:** we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  See https://blosc-doc.readthedocs.io/en/latest/c-blosc2_api.html.  Thanks to Alberto Sabater for contributing the support for this.
+* **Nice markup for documentation:** we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  See https://c-blosc2.readthedocs.io.  Thanks to Alberto Sabater for contributing the support for this.
+
+* **Plugin capabilities for filters and codecs:** we have a plugin register capability inplace so that the info about the new filters and codecs can be persisted and transmitted to different machines.  Thanks to the NumFOCUS foundation for providing a grant for doing this.
+
+* **Pluggable tuning capabilities:** this will allow users with different needs to define an interface so as to better tune different parameters like the codec, the compression level, the filters to use, the blocksize or the shuffle size.
+
+* **Support for I/O plugins:** so that users can extend the I/O capabilities beyond the current filesystem support.  Things like use databases or S3 interfaces should be possible by implementing these interfaces.
+
+* **Python wrapper:**  we have got a grant from the PSF for producing a Python wrapper.  You can have a look at our ongoing efforts in the [python-blosc2 repo](https://github.com/Blosc/python-blosc2).
 
 
 Actions to be done
 ------------------
 
-* **Improve the safety of the library:**  we are actively using using the [OSS-Fuzz](https://github.com/google/oss-fuzz) and ClusterFuzz (https://oss-fuzz.com) for uncovering programming errors in C-Blosc2.  Although this is always a work in progress, we did a long way in improving our safety, mainly thanks to the efforts of Nathan Moinvaziri.
+* **Centralized plugin repository:** we have got a grant from NumFOCUS for implementing a centralized repository so that people can send their plugins (using the existing machinery) to the Blosc2 team.  If the plugins fulfill a series of requirements, they will be officially accepted, and distributed withing the library.
 
-* **Plugin capabilities for filters and codecs:**  we are looking forward to implement a plugin register capability so that the info about the new filters and codecs can be persisted and propagated to different machines.
-
-* **Pluggable tuning capabilities:** this will allow users with different needs to define an interface so as to better tune different parameters like the codec, the compression level, the filters to use, the blocksize or the shuffle size.
+* **Improve the safety of the library:**  we are actively using using the [OSS-Fuzz](https://github.com/google/oss-fuzz) and [ClusterFuzz](https://oss-fuzz.com) for uncovering programming errors in C-Blosc2.  Although this is always a work in progress, we did a long way in improving our safety, mainly thanks to the efforts of Nathan Moinvaziri.
 
 * **Support for lossy compression codecs:** although we already support the `trunc_prec` filter, this is only valid for floating point data; we should come with lossy codecs that are meant for any data type.
-
-* **Support for I/O plugins:** so that users can extend the I/O capabilities beyond the current filesystem support.  Things like use databases or S3 interfaces should be possible by implementing these interfaces.
 
 * **Checksums:** the frame can benefit from having a checksum per every chunk/index/metalayer.  This will provide more safety towards frames that are damaged for whatever reason.  Also, this would provide better feedback when trying to determine the parts of the frame that are corrupted.  Candidates for checksums can be the xxhash32 or xxhash64, depending on the goals (to be decided).
 
@@ -68,7 +72,7 @@ Actions to be done
   
   - **Tutorials/book:** besides the API docstrings, more documentation materials should be provided, like tutorials or a book about Blosc (or at least, the beginnings of it).  Due to its adoption in GitHub and Jupyter notebooks, one of the most extended and useful markup systems is Markdown, so this should also be the first candidate to use here.
   
-* **Wrappers for other languages:** Python and Java are the most obvious candidates, but others like R or Julia would be nice to have.  Still not sure if these should be produced and maintained by the Blosc development team, or leave them for third-party players that would be interested. [The steering [council discussed this](https://github.com/Blosc/governance/blob/master/steering_council_minutes/2020-03-26.md), and probably just the Python wrapper should be maintained by Blosc maintainers themselves, while the other languages should be maintained by the community.]  Update: we have got a grant from the PSF for producing a Python wrapper; thanks guys!
+* **Wrappers for other languages:** Java, R or Julia are the most obvious candidates.  Still not sure if these should be produced and maintained by the Blosc development team, or leave them for third-party players that would be interested. The steering [council discussed this](https://github.com/Blosc/governance/blob/master/steering_council_minutes/2020-03-26.md), and probably just the Python wrapper (python-blosc2, see above) should be maintained by Blosc maintainers themselves, while the other languages should be maintained by the community.
 
 * **Lock support for super-chunks:** when different processes are accessing concurrently to super-chunks, make them to sync properly by using locks, either on-disk (frame-backed super-chunks), or in-memory. Such a lock support would be configured in build time, so it could be disabled with a cmake flag.
 
