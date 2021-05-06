@@ -1,4 +1,8 @@
 /*********************************************************************
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
+
   Small benchmark for testing basic capabilities of Blosc.
 
   You can select different degrees of 'randomness' in input buffer, as
@@ -11,8 +15,6 @@
 
   I'm collecting speeds for different machines, so the output of your
   benchmarks and your processor specifications are welcome!
-
-  Author: The Blosc Developers <blosc@blosc.org>
 
   Note: Compiling this with VS2008 does not work well with cmake.  Here
   it is a way to compile the benchmark (with added support for LZ4):

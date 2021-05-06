@@ -1,26 +1,26 @@
 /*
-    Copyright (C) 2015  Francesc Alted
-    http://blosc.org
-    License: BSD 3-Clause (see LICENSE.txt)
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 
-    Example program demonstrating use of the Blosc filter using the Windows Run-Time Dynamic Linking technique:
-    
-    https://msdn.microsoft.com/en-us/library/windows/desktop/ms686944(v=vs.85).aspx
-    
-    This allows to link your app in run-time with DLLs made with different compatible compilers
-    (e.g. VS2013 and mingw-w64).
+  Example program demonstrating use of the Blosc filter using the Windows Run-Time Dynamic Linking technique:
 
-    To compile this program (be aware that you should match your compiler 32-bit/64-bit with your DLL):
+  https://msdn.microsoft.com/en-us/library/windows/desktop/ms686944(v=vs.85).aspx
 
-    cl /Ox /Fewin-dynamic-linking.exe /I..\blosc win-dynamic-linking.c
+  This allows to link your app in run-time with DLLs made with different compatible compilers
+  (e.g. VS2013 and mingw-w64).
 
-    To run:
+  To compile this program (be aware that you should match your compiler 32-bit/64-bit with your DLL):
 
-    $ win-dynamic-linking.exe
-    Blosc version info: 1.7.0.dev
-    Compression: 400000000 -> 19928862 (20.1x)
-    Decompression succesful!
-    Succesful roundtrip!
+  cl /Ox /Fewin-dynamic-linking.exe /I..\blosc win-dynamic-linking.c
+
+  To run:
+
+  $ win-dynamic-linking.exe
+  Blosc version info: 1.7.0.dev
+  Compression: 400000000 -> 19928862 (20.1x)
+  Decompression succesful!
+  Succesful roundtrip!
 
 */
 

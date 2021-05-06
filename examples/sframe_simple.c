@@ -1,7 +1,7 @@
 /*
- Copyright (C) 2020  The Blosc Developers
- http://blosc.org
- License: BSD 3-Clause (see LICENSE.txt)
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 
  Example program demonstrating use of the Blosc filter from C code.
 

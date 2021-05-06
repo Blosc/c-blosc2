@@ -5,8 +5,9 @@
   See https://github.com/Blosc/python-blosc/issues/220
   Probably related: https://github.com/Blosc/c-blosc/issues/240
 
-  Creation date: 2020-02-18
-  Author: The Blosc Developers <blosc@blosc.org>
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 
   See LICENSES/BLOSC.txt for details about copyright and rights to use.
  **********************************************************************/

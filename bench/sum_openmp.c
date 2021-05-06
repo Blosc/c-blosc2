@@ -1,6 +1,6 @@
 /*
-  Copyright (C) 2018  Francesc Alted
-  http://blosc.org
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 
   Example program showing how to operate with compressed buffers.

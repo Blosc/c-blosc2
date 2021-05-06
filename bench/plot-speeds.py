@@ -1,8 +1,10 @@
-"""Script for plotting the results of the 'suite' benchmark.
-Invoke without parameters for usage hints.
+"""
+Copyright (C) 2021  The Blosc developers <blosc@blosc.org>
+https://blosc.org
+License: BSD 3-Clause (see LICENSE.txt)
 
-:Author: The Blosc Developers
-:Date: 2010-06-01
+Script for plotting the results of the 'suite' benchmark.
+Invoke without parameters for usage hints.
 """
 from __future__ import print_function
 

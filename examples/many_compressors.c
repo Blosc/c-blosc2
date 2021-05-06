@@ -1,34 +1,34 @@
 /*
-    Copyright (C) 2014  Francesc Alted
-    http://blosc.org
-    License: BSD 3-Clause (see LICENSE.txt)
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 
-    Example program demonstrating use of the Blosc filter from C code.
+  Example program demonstrating use of the Blosc filter from C code.
 
-    To compile this program:
+  To compile this program:
 
-    $ gcc -O many_compressors.c -o many_compressors -lblosc2
+  $ gcc -O many_compressors.c -o many_compressors -lblosc2
 
-    To run:
+  To run:
 
-    $ ./many_compressors
-    Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
-    Using 4 threads (previously using 1)
-    Using blosclz compressor
-    Compression: 4000000 -> 57577 (69.5x)
-    Succesful roundtrip!
-    Using lz4 compressor
-    Compression: 4000000 -> 97276 (41.1x)
-    Succesful roundtrip!
-    Using lz4hc compressor
-    Compression: 4000000 -> 38314 (104.4x)
-    Succesful roundtrip!
-    Using zlib compressor
-    Compression: 4000000 -> 21486 (186.2x)
-    Succesful roundtrip!
-    Using zstd compressor
-    Compression: 4000000 -> 10692 (374.1x)
-    Succesful roundtrip!
+  $ ./many_compressors
+  Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
+  Using 4 threads (previously using 1)
+  Using blosclz compressor
+  Compression: 4000000 -> 57577 (69.5x)
+  Succesful roundtrip!
+  Using lz4 compressor
+  Compression: 4000000 -> 97276 (41.1x)
+  Succesful roundtrip!
+  Using lz4hc compressor
+  Compression: 4000000 -> 38314 (104.4x)
+  Succesful roundtrip!
+  Using zlib compressor
+  Compression: 4000000 -> 21486 (186.2x)
+  Succesful roundtrip!
+  Using zstd compressor
+  Compression: 4000000 -> 10692 (374.1x)
+  Succesful roundtrip!
 
  */
 

@@ -1,35 +1,35 @@
 /*
-    Copyright (C) 2020 The Blosc Developers
-    http://blosc.org
-    License: BSD (see LICENSE.txt)
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 
-    Test program trying to replicate the python-blosc issue:
+  Test program trying to replicate the python-blosc issue:
 
-    https://github.com/Blosc/python-blosc/issues/110
+  https://github.com/Blosc/python-blosc/issues/110
 
-    Apparently this only affects to blosc-powered Python extensions.
+  Apparently this only affects to blosc-powered Python extensions.
 
-    To compile this program:
+  To compile this program:
 
-    $ gcc -O3 gcc-segfault-issue.c -o gcc-segfault-issue -lblosc
+  $ gcc -O3 gcc-segfault-issue.c -o gcc-segfault-issue -lblosc
 
-    To run:
+  To run:
 
-    $ ./gcc-segfault-issue
-    Blosc version info: 1.8.1.dev ($Date:: 2016-03-31 #$)
-    Compression: 8000000 -> 73262 (109.2x)
+  $ ./gcc-segfault-issue
+  Blosc version info: 1.8.1.dev ($Date:: 2016-03-31 #$)
+  Compression: 8000000 -> 73262 (109.2x)
 
-    To check that everything goes well:
+  To check that everything goes well:
 
-    $ time for i in {1..1000}; do ./gcc-segfault-issue > p ; done
+  $ time for i in {1..1000}; do ./gcc-segfault-issue > p ; done
 
-    real    0m4.590s
-    user    0m2.516s
-    sys     0m1.884s
+  real    0m4.590s
+  user    0m2.516s
+  sys     0m1.884s
 
-    If you don't see any "Segmentation fault (core dumped)", the
-    C-Blosc library itself is probably not a victim of the infamous
-    issue above that only seems to affect Python extensions.
+  If you don't see any "Segmentation fault (core dumped)", the
+  C-Blosc library itself is probably not a victim of the infamous
+  issue above that only seems to affect Python extensions.
 
 */
 

@@ -1,10 +1,7 @@
 /*
-  Copyright (C) 2020  The Blosc Developers
-  http://blosc.org
-  License: BSD (see LICENSE.txt)
-
-  Benchmark showing Blosc zero detection capabilities via run-length.
-
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 */
 
 #include <stdio.h>
