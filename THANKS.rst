@@ -23,7 +23,7 @@
 
 * Aleix Alcacer for his implementation of mutable super-chunks, multiple variable length metalayers and many other things.
 
-* Oscar Guiñón for the optimization of reading a set of blocks of a chunk in parallel.
+* Oscar Guiñón for the optimization of reading a (sparse) set of blocks of a chunk in parallel.
 
 * Nathan Moinvaziri for his outstanding work on the security side of the things via `fuzzer testing <https://google.github.io/oss-fuzz/>`_.
 
