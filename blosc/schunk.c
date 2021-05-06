@@ -190,27 +190,6 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
 }
 
 
-/* Create an empty super-chunk */
-blosc2_schunk *blosc2_schunk_empty(int nchunks, blosc2_storage *storage) {
-  blosc2_schunk* schunk = blosc2_schunk_new(storage);
-  if (storage->contiguous) {
-    BLOSC_TRACE_ERROR("Creating empty frames is not supported yet.");
-    return NULL;
-  }
-
-  // Init offsets
-  schunk->nchunks = nchunks;
-  schunk->chunksize = -1;
-  schunk->nbytes = 0;
-  schunk->cbytes = 0;
-
-  schunk->data_len += sizeof(void *) * nchunks;  // must be a multiple of sizeof(void*)
-  schunk->data = calloc(nchunks, sizeof(void *));
-
-  return schunk;
-}
-
-
 /* Create a copy of a super-chunk */
 blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage) {
   if (schunk == NULL) {
