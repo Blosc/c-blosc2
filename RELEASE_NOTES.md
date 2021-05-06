@@ -1,5 +1,11 @@
-Release notes for C-Blosc2 2.0.0.rc.1 (first release candidate)
+Release notes for C-Blosc2 2.0.0.rc.2 (second release candidate)
 ===============================================================
+
+
+Changes from 2.0.0.rc.1 to 2.0.0.rc.2
+=====================================
+
+#XXX version-specific blurb XXX#
 
 
 Changes from 2.0.0-beta.5 to 2.0.0.rc.1

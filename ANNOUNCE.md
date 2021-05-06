@@ -13,7 +13,7 @@ There are a *lot* of new features to mentioned here.  Just have a look at [our
 RC1 blog](https://www.blosc.org/posts/blosc2-ready-general-review/) where we list
 the main improvements, with some historical overview too.
 
-In principle, C-Blosc2 should be backward compatible with C-Blosc, so you can start using it right away and slowly begin to use its new functionality, like the new filters, prefilters, super-chunks and frames.  See docs in: https://blosc2.readthedocs.io
+C-Blosc2 should be backward compatible with C-Blosc, so you can start using it right away and slowly begin to use its new functionality, like the new filters, prefilters, super-chunks and frames.  See docs in: https://blosc2.readthedocs.io
 
 **IMPORTANT**: Please note that, even if the API and format have been declared frozen, that does *not* mean that Blosc2 is ready for production yet: bad bugs can still exist at this stage.  So *do not assume* that your blosc2 data can be read with future versions.  This
   is just a call for general review of the library.

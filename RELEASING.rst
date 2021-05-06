@@ -12,6 +12,7 @@ Preliminaries
 - Commit the changes with::
 
     $ git commit -a -m "Getting ready for release X.Y.Z"
+    $ git push
 
 
 Testing
@@ -68,15 +69,17 @@ Tagging
 
     $ git push --tags
 
-- Add the release notes for this tag in the releases tab of github project at:
-  https://github.com/Blosc/c-blosc2/releases
+- Create a new release visiting https://github.com/Blosc/c-blosc2/releases/new
+  and add the release notes copying them from `RELEASE_NOTES.md` document.
+
 
 Announcing
 ----------
 
-- Send an announcement to the blosc, pytables-dev, bcolz and
-  comp.compression lists.  Use the ``ANNOUNCE.md`` file as skeleton
-  (possibly as the definitive version).
+- Send an announcement to the blosc and comp.compression mailing lists.
+  Use the ``ANNOUNCE.md`` file as skeleton (likely as the definitive version).
+
+- Tweet about it from the @Blosc2 account.
 
 
 Post-release actions
