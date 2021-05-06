@@ -1,31 +1,31 @@
 /*
-    Copyright (C) 2016  Francesc Alted
-    http://blosc.org
-    License: BSD 3-Clause (see LICENSE.txt)
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 
-    Example program demonstrating that from 1.9.0 on, Blosc does not
-    need to be initialized (although it is recommended).
+  Example program demonstrating that from 1.9.0 on, Blosc does not
+  need to be initialized (although it is recommended).
 
-    To compile this program:
+  To compile this program:
 
-    $ gcc noinit.c -o noinit -lblosc
+  $ gcc noinit.c -o noinit -lblosc
 
-    or, if you don't have the blosc library installed yet:
+  or, if you don't have the blosc library installed yet:
 
-    $ gcc -O3 -msse2 noinit.c -I../blosc -o noinit -L../build/blosc -lblosc2
-    $ export LD_LIBRARY_PATH=../build/blosc
+  $ gcc -O3 -msse2 noinit.c -I../blosc -o noinit -L../build/blosc -lblosc2
+  $ export LD_LIBRARY_PATH=../build/blosc
 
-    Using MSVC on Windows:
+  Using MSVC on Windows:
 
-    $ cl /arch:SSE2 /Ox /Fenoinit.exe /Iblosc examples\noinit.c blosc\blosc.c blosc\blosclz.c blosc\shuffle.c blosc\shuffle-sse2.c blosc\shuffle-generic.c blosc\bitshuffle-generic.c blosc\bitshuffle-sse2.c
+  $ cl /arch:SSE2 /Ox /Fenoinit.exe /Iblosc examples\noinit.c blosc\blosc.c blosc\blosclz.c blosc\shuffle.c blosc\shuffle-sse2.c blosc\shuffle-generic.c blosc\bitshuffle-generic.c blosc\bitshuffle-sse2.c
 
-    To run:
+  To run:
 
-    $ ./noinit
-    Blosc version info: 1.8.2.dev ($Date:: 2016-04-08 #$)
-    Compression: 4000000 -> 158788 (25.2x)
-    Decompression succesful!
-    Succesful roundtrip!
+  $ ./noinit
+  Blosc version info: 1.8.2.dev ($Date:: 2016-04-08 #$)
+  Compression: 4000000 -> 158788 (25.2x)
+  Decompression succesful!
+  Succesful roundtrip!
 
 */
 

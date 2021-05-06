@@ -1,10 +1,14 @@
 /*********************************************************************
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
+
   Benchmark for testing sframe vs frame.
   For usage instructions of this benchmark, please see:
     http://blosc.org/synthetic-benchmarks.html
   I'm collecting speeds for different machines, so the output of your
   benchmarks and your processor specifications are welcome!
-  Author: The Blosc Developers <blosc@blosc.org>
+
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 

@@ -1,8 +1,19 @@
 /*
-  Copyright (C) 2021 The Blosc Developers
-  http://blosc.org
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
-*/
+
+   Example program demonstrating use of the Blosc filter from C code.
+
+  To compile this program:
+
+  $ gcc udfilters.c -o udfilters -lblosc2
+
+  To run:
+
+  $ ./udfilters
+
+ */
 
 
 #include <stdio.h>

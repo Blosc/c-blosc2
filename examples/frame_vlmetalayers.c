@@ -1,28 +1,17 @@
 /*
-  Copyright (C) 2018  Francesc Alted
-  http://blosc.org
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 
-  Example program demonstrating use of the Blosc filter from C code.
+  Example program demonstrating use of the Blosc vlmetalayer from C code.
 
   To compile this program:
 
-  $ gcc frame_simple.c -o frame_simple -lblosc2
+  $ gcc frame_vlmetalayer.c -o frame_vlmetalyer -lblosc2
 
   To run:
 
-  $ ./frame_simple
-  Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
-  Compression ratio: 381.5 MB -> 9.5 MB (40.2x)
-  Compression time: 0.705 s, 541.0 MB/s
-  Time for schunk -> frame: 0.00796 s, 47905.3 MB/s
-  Frame length in memory: 9940344 bytes
-  Frame length on disk: 9940344 bytes
-  Time for frame -> fileframe (frame_simple.b2frame): 0.0108 s, 35159.6 MB/s
-  Time for fileframe (frame_simple.b2frame) -> frame : 0.000254 s, 1.5e+06 MB/s
-  Time for frame -> schunk: 1.1e-05 s, 3.48e+07 MB/s
-  Time for fileframe -> schunk: 1.25e-05 s, 3.05e+07 MB/s
-  Successful roundtrip schunk <-> frame <-> fileframe !
+  $ ./frame_vlmetalyer
 
  */
 

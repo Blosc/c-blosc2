@@ -1,22 +1,22 @@
 /*
-    Copyright (C) 2014  Francesc Alted
-    http://blosc.org
-    License: BSD 3-Clause (see LICENSE.txt)
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 
-    Example program demonstrating the use of a Blosc from C code.
+  Example program demonstrating the use of a Blosc from C code.
 
-    To compile this program:
+  To compile this program:
 
-    $ gcc -O simple.c -o simple -lblosc2
+  $ gcc -O simple.c -o simple -lblosc2
 
-    To run:
+  To run:
 
-    $ ./simple
-    Blosc version info: 2.0.0a2 ($Date:: 2016-01-08 #$)
-    Compression: 40000000 -> 832774 (48.0x)
-    Correctly extracted 5 elements from compressed chunk!
-    Decompression succesful!
-    Succesful roundtrip!
+  $ ./simple
+  Blosc version info: 2.0.0a2 ($Date:: 2016-01-08 #$)
+  Compression: 40000000 -> 832774 (48.0x)
+  Correctly extracted 5 elements from compressed chunk!
+  Decompression succesful!
+  Succesful roundtrip!
 
 */
 

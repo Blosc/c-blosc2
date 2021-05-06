@@ -1,11 +1,7 @@
 /*
-  Copyright (C) 2020- The Blosc Development Team <blosc@blosc.org>
-  http://blosc.org
-  License: BSD (see LICENSE.txt)
-
-  Creation date: 2021-04-12
-
-  See LICENSE.txt for details about copyright and rights to use.
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 */
 
 #include <stdio.h>

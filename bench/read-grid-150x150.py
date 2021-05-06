@@ -1,4 +1,8 @@
 """
+Copyright (C) 2021  The Blosc developers <blosc@blosc.org>
+https://blosc.org
+License: BSD 3-Clause (see LICENSE.txt)
+
 Script to extract a small grid of precipitation out of this file:
 
 ftp://ftp-cdc.dwd.de/pub/REA/COSMO_REA6/hourly/2D/TOT_PRECIP/TOT_PRECIP.2D.201512.grb.bz2

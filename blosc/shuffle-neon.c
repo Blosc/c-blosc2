@@ -1,7 +1,9 @@
 /*********************************************************************
   Blosc - Blocked Shuffling and Compression Library
 
-  Author: Lucian Marc <ruben.lucian@gmail.com>
+  Copyright (C) 2021  Lucian Marc <ruben.lucian@gmail.com>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/

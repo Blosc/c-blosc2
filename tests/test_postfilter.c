@@ -1,8 +1,7 @@
 /*
-  Copyright (C) 2021  The Blosc Developers
-  http://blosc.org
-  License: BSD (see LICENSE.txt)
-
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 */
 
 #include "test_common.h"

@@ -3,8 +3,9 @@
 
   Unit tests for BLOSC_NTHREADS environment variable in Blosc.
 
-  Creation date: 2016-04-25
-  Author: The Blosc Developers <blosc@blosc.org>
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/

@@ -1,43 +1,43 @@
 /*
-    Copyright (C) 2014  Francesc Alted
-    http://blosc.org
-    License: BSD 3-Clause (see LICENSE.txt)
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 
-    Example program demonstrating use of the Blosc filter from C code.
+  Example program demonstrating use of the Blosc filter from C code.
 
-    To compile this program using gcc or clang:
+  To compile this program using gcc or clang:
 
-    $ gcc/clang multithread.c -o multithread -lblosc2 -lpthread
+  $ gcc/clang multithread.c -o multithread -lblosc2 -lpthread
 
-    or, if you don't have the blosc library installed:
+  or, if you don't have the blosc library installed:
 
-    $ gcc -O3 -msse2 multithread.c ../blosc/!(*avx2*)*.c  -I../blosc -o multithread -lpthread
+  $ gcc -O3 -msse2 multithread.c ../blosc/!(*avx2*)*.c  -I../blosc -o multithread -lpthread
 
-    or alternatively:
+  or alternatively:
 
-    $ gcc -O3 -msse2 multithread.c -I../blosc -o multithread -L../build/blosc -lblosc2
-    $ export LD_LIBRARY_PATH=../build/blosc
+  $ gcc -O3 -msse2 multithread.c -I../blosc -o multithread -L../build/blosc -lblosc2
+  $ export LD_LIBRARY_PATH=../build/blosc
 
-    Using MSVC on Windows:
+  Using MSVC on Windows:
 
-    $ cl /Ox /Femultithread.exe /Iblosc multithread.c blosc\*.c
+  $ cl /Ox /Femultithread.exe /Iblosc multithread.c blosc\*.c
 
-    To run:
+  To run:
 
-    $ ./multithread
-    Blosc version info: 1.4.2.dev ($Date:: 2014-07-08 #$)
-    Using 1 threads (previously using 1)
-    Compression: 4000000 -> 158494 (25.2x)
-    Succesful roundtrip!
-    Using 2 threads (previously using 1)
-    Compression: 4000000 -> 158494 (25.2x)
-    Succesful roundtrip!
-    Using 3 threads (previously using 2)
-    Compression: 4000000 -> 158494 (25.2x)
-    Succesful roundtrip!
-    Using 4 threads (previously using 3)
-    Compression: 4000000 -> 158494 (25.2x)
-    Succesful roundtrip!
+  $ ./multithread
+  Blosc version info: 1.4.2.dev ($Date:: 2014-07-08 #$)
+  Using 1 threads (previously using 1)
+  Compression: 4000000 -> 158494 (25.2x)
+  Succesful roundtrip!
+  Using 2 threads (previously using 1)
+  Compression: 4000000 -> 158494 (25.2x)
+  Succesful roundtrip!
+  Using 3 threads (previously using 2)
+  Compression: 4000000 -> 158494 (25.2x)
+  Succesful roundtrip!
+  Using 4 threads (previously using 3)
+  Compression: 4000000 -> 158494 (25.2x)
+  Succesful roundtrip!
 
 */
 
