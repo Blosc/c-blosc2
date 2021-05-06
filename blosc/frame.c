@@ -2460,6 +2460,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   }
 
   // Add the new offset
+  int64_t sframe_chunk_id = -1;
   int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
   uint64_t offset_value = ((uint64_t)1 << 63);
   switch (special_value) {
@@ -2483,7 +2484,13 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
       break;
     default:
       if (frame->sframe) {
-        offsets[nchunks] = nchunks;
+        // Compute the sframe_chunk_id value
+        for (int i = 0; i < nchunks; ++i) {
+          if (offsets[i] > sframe_chunk_id) {
+            sframe_chunk_id = offsets[i];
+          }
+        }
+        offsets[nchunks] = ++sframe_chunk_id;
       }
       else {
         offsets[nchunks] = cbytes;
@@ -2542,7 +2549,11 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
     if (frame->sframe) {
       // Update the offsets chunk in the chunks frame
       if (chunk_cbytes != 0) {
-        if (sframe_create_chunk(frame, chunk, nchunks, chunk_cbytes) == NULL) {
+        if (sframe_chunk_id < 0) {
+          BLOSC_TRACE_ERROR("The chunk id (%lld) is not correct", sframe_chunk_id);
+          return NULL;
+        }
+        if (sframe_create_chunk(frame, chunk, sframe_chunk_id, chunk_cbytes) == NULL) {
           BLOSC_TRACE_ERROR("Cannot write the full chunk.");
           return NULL;
         }
@@ -2644,6 +2655,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
   // TODO: Improvement: Check if new chunk is smaller than previous one
 
   // Add the new offset
+  int64_t sframe_chunk_id = -1;
   int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
   uint64_t offset_value = ((uint64_t)1 << 63);
   switch (special_value) {
@@ -2680,7 +2692,12 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
         offsets[i] = offsets[i - 1];
       }
       if (frame->sframe) {
-        offsets[nchunk] = nchunks;
+        for (int i = 0; i < nchunks; ++i) {
+          if (offsets[i] > sframe_chunk_id) {
+            sframe_chunk_id = offsets[i];
+          }
+        }
+        offsets[nchunk] = ++sframe_chunk_id;
       }
       else {
         offsets[nchunk] = cbytes;
@@ -2736,7 +2753,11 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
 
     if (frame->sframe) {
       if (chunk_cbytes != 0) {
-        if (sframe_create_chunk(frame, chunk, nchunks, chunk_cbytes) == NULL) {
+        if (sframe_chunk_id < 0) {
+          BLOSC_TRACE_ERROR("The chunk id (%lld) is not correct", sframe_chunk_id);
+          return NULL;
+        }
+        if (sframe_create_chunk(frame, chunk, sframe_chunk_id, chunk_cbytes) == NULL) {
           BLOSC_TRACE_ERROR("Cannot write the full chunk.");
           return NULL;
         }
