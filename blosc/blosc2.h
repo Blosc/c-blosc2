@@ -1376,20 +1376,6 @@ typedef struct blosc2_schunk {
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage);
 
 /**
- * @brief Create a non-initialized super-chunk.
- *
- * @param nchunks The number of non-initialized chunks in the super-chunk.
- * @param storage The storage properties.
- *
- * @remark In case that storage.urlpath is not NULL, the data is stored
- * on-disk.  If the data file(s) exist, they are *overwritten*.
- *
- * @return The new super-chunk.
- */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_empty(int nchunks, blosc2_storage *storage);
-
-
-/**
  * Create a copy of a super-chunk.
  *
  * @param schunk The super-chunk to be copied.
