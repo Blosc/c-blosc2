@@ -1,17 +1,22 @@
-# Announcing C-Blosc2 2.0.0.beta.5
+# Announcing C-Blosc2 2.0.0.rc.1
 A simple, compressed, fast and persistent data store library for C.
 
 ## What is new?
 
-This is the fifth beta version, adding pre-filtering functionality and masked decompression. Prefiltering allows to callback arbitrary functions previous to any filter. This can be useful for performing (parallel) computations on chunks.
+On behalf of the Blosc team, we are happy to announce the first C-Blosc2
+release (Release Candidate 1) that is meant to be reviewed by users.  As of now
+we are declaring both the API and the format frozen, and we are seeking for
+feedback from the community so as to better check the library and declare it
+apt for its use in production.
 
-Also, with masked decompression, it is possible to do partial chunk decompressions.  By calling the `blosc2_set_maskout()` prior to `blosc2_decompress_ctx()` has the effect to select the set of blocks to decompress in a chunk. This will be useful for more efficient slicing operation in Caterva.
+There are a *lot* of new features to mentioned here.  Just have a look at [our
+RC1 blog](https://www.blosc.org/posts/blosc2-ready-general-review/) where we list
+the main improvements, with some historical overview too.
 
-Last, but not least, C-Blosc2 gained support for ALTIVEC optimzations on Power architecture. These include support for both shuffle and bitshuffle filters.  For details, see  https://github.com/Blosc/c-blosc2/pull/98.  Thanks to Jerome Kieffer and ESRF for making this happen.
+In principle, C-Blosc2 should be backward compatible with C-Blosc, so you can start using it right away and slowly begin to use its new functionality, like the new filters, prefilters, super-chunks and frames.  See docs in: https://blosc2.readthedocs.io
 
-In principle, C-Blosc2 should be backward compatible with C-Blosc, so you can start using it right away and slowly begin to use its new functionality, like the new filters, prefilters, super-chunks and frames.  See docs in: https://blosc-doc.readthedocs.io
-
-**IMPORTANT**: Please note that, even if the API has been declared frozen, that does *not* mean that Blosc2 is ready for production yet: internal structures can change, formats can change and most importantly, bugs can be normal at this stage.  So *do not assume* that your blosc2 data can be read with future versions.
+**IMPORTANT**: Please note that, even if the API and format have been declared frozen, that does *not* mean that Blosc2 is ready for production yet: bad bugs can still exist at this stage.  So *do not assume* that your blosc2 data can be read with future versions.  This
+  is just a call for general review of the library.
 
 For more info, please see the release notes in:
 
@@ -19,7 +24,7 @@ https://github.com/Blosc/c-blosc2/blob/master/RELEASE_NOTES.md
 
 Also, there is blog post introducing the most relevant changes in Blosc2:
 
-http://blosc.org/posts/blosc2-first-beta
+https://www.blosc.org/posts/blosc2-ready-general-review/
 
 ## What is it?
 

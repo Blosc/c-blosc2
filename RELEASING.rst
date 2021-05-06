@@ -23,10 +23,6 @@ Create a new build/ directory, change into it and issue::
   $ cmake --build .
   $ ctest
 
-To actually test Blosc the hard way, look at the end of
-http://blosc.org/synthetic-benchmarks.html
-where instructions on how to intensively test (and benchmark) Blosc are given.
-
 
 Forward compatibility testing
 -----------------------------
@@ -36,7 +32,7 @@ version::
 
   $ cd ../compat
   $ export LD_LIBRARY_PATH=../build/blosc
-  $ gcc -o filegen filegen.c -L$LD_LIBRARY_PATH -lblosc -I../blosc
+  $ gcc -o filegen filegen.c -L$LD_LIBRARY_PATH -lblosc2 -I../blosc
   $ ./filegen compress lz4 blosc-lz4-1.y.z.cdata
 
 In order to make sure that we are not breaking forward compatibility,
@@ -55,21 +51,11 @@ Then, test the file created with the new version with::
 Repeat this for every codec shipped with Blosc (blosclz, lz4, lz4hc, zlib and
 zstd).
 
-Update documentation
---------------------
+Check documentation
+-------------------
 
-Go the the `blosc-doc <https://github.com/Blosc/blosc-doc>`_ git repo and update some README files, `blosc2.h` and if API has changed, `c-blosc2_api.rst` too::
-
-  $ cp ../c-blosc2/README.rst src/c-blosc2_files
-  $ cp ../c-blosc2/README_CFRAME_FORMAT.rst src/c-blosc2_files
-  $ cp ../c-blosc2/README_SFRAME_FORMAT.rst src/c-blosc2_files
-  $ cp ../c-blosc2/blosc/blosc2.h src/c-blosc2_files
-  $ vi doc/c-blosc2_api.rst  # update with the new API
-  $ git commit -a -m"Updated documentation for release X.Y.Z"
-  $ git push
-
-After pushing, a new documentation will be rendered at: https://blosc-doc.readthedocs.io/en/latest/
-Check that it contains the updated docs.
+Go the the `blosc2 rtfd <https://c-blosc2.readthedocs.io/>`_ site and check that
+it contains the updated docs.
 
 Tagging
 -------

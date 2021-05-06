@@ -15,6 +15,12 @@ Changes from 2.0.0-beta.5 to 2.0.0.rc.1
   previous formats, but there will probably be backward compatibility support
   starting from version 2 on.
 
+* New functionality for updating, inserting and deleting chunks in a super-chunk.
+
+* Support for special values. Large sequences of repeated values can be represented
+  with an efficient, simple and fast run-length representation, without the need to use
+  regular codecs.
+
 * Internal Zstd sources updated to 1.4.9.
 
 * Internal LZ4 sources updated to 1.9.3.
