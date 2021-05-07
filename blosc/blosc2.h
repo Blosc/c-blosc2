@@ -1341,7 +1341,10 @@ BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
 #define BLOSC2_MAX_METALAYERS 16
 #define BLOSC2_METALAYER_NAME_MAXLEN 31
 
-#define BLOSC2_MAX_VLMETALAYERS 64 * 1024;  // due to msgpack map 16 in frame
+// Allow for a reasonable number of vl metalayers
+// max is 64 * 1024 due to msgpack map 16 in frame
+// mem usage 8 * 1024 entries for blosc2_schunk.vlmetalayers[] is 64 KB
+#define BLOSC2_MAX_VLMETALAYERS (8 * 1024)
 #define BLOSC2_VLMETALAYERS_NAME_MAXLEN BLOSC2_METALAYER_NAME_MAXLEN
 
 /**
