@@ -48,6 +48,10 @@ There is an official Blosc mailing list at:
 blosc@googlegroups.com
 http://groups.google.es/group/blosc
 
+## Tweeter feed
+
+Please follow @Blosc2 to get informed about the latest developments.
+
 
 Enjoy Data!
 - The Blosc Development Team
