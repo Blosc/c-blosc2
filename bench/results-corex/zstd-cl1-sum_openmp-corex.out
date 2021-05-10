@@ -1,0 +1,176 @@
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=1 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                     (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   45319996
+Sum time for uncompressed data: 0.0323 s, 11818.2 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.671 s, 568.2 MB/s
+Sum for *compressed* data:   46323164
+Sum time for *compressed* data: 0.241 s, 1582.4 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=1 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                     (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   45319996
+Sum time for uncompressed data: 0.0323 s, 11814.4 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.671 s, 568.5 MB/s
+Sum for *compressed* data:   46323164
+Sum time for *compressed* data: 0.239 s, 1593.8 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=2 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                     (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   45826496
+Sum time for uncompressed data: 0.0176 s, 21651.6 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.672 s, 567.6 MB/s
+Sum for *compressed* data:   46321328
+Sum time for *compressed* data: 0.13 s, 2926.1 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=2 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                     (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   45826496
+Sum time for uncompressed data: 0.0177 s, 21586.1 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.673 s, 566.7 MB/s
+Sum for *compressed* data:   46321328
+Sum time for *compressed* data: 0.129 s, 2955.5 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=4 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                     (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46118560
+Sum time for uncompressed data: 0.00974 s, 39182.0 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.672 s, 567.3 MB/s
+Sum for *compressed* data:   46320460
+Sum time for *compressed* data: 0.0673 s, 5669.4 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=4 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                     (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46118560
+Sum time for uncompressed data: 0.00958 s, 39816.2 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.673 s, 566.7 MB/s
+Sum for *compressed* data:   46320460
+Sum time for *compressed* data: 0.0673 s, 5664.8 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=8 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                     (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46248988
+Sum time for uncompressed data: 0.00665 s, 57392.3 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.674 s, 565.8 MB/s
+Sum for *compressed* data:   46320768
+Sum time for *compressed* data: 0.0341 s, 11201.3 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=8 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                     (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46248984
+Sum time for uncompressed data: 0.00669 s, 57026.4 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.674 s, 566.0 MB/s
+Sum for *compressed* data:   46320768
+Sum time for *compressed* data: 0.0339 s, 11244.7 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=12 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                    (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46285244
+Sum time for uncompressed data: 0.00665 s, 57329.8 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.673 s, 567.0 MB/s
+Sum for *compressed* data:   46320348
+Sum time for *compressed* data: 0.0233 s, 16363.2 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=12 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                    (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46285244
+Sum time for uncompressed data: 0.00659 s, 57899.4 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.671 s, 568.5 MB/s
+Sum for *compressed* data:   46320348
+Sum time for *compressed* data: 0.0234 s, 16315.3 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=14 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                    (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46290216
+Sum time for uncompressed data: 0.00667 s, 57162.5 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.672 s, 567.8 MB/s
+Sum for *compressed* data:   46320348
+Sum time for *compressed* data: 0.0208 s, 18306.0 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=14 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                    (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46290212
+Sum time for uncompressed data: 0.00668 s, 57129.5 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.675 s, 564.7 MB/s
+Sum for *compressed* data:   46320348
+Sum time for *compressed* data: 0.0208 s, 18377.6 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=16 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                    (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46295180
+Sum time for uncompressed data: 0.00767 s, 49711.6 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.674 s, 566.0 MB/s
+Sum for *compressed* data:   46320348
+Sum time for *compressed* data: 0.0298 s, 12814.4 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=16 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                    (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46295176
+Sum time for uncompressed data: 0.00768 s, 49680.6 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.674 s, 566.0 MB/s
+Sum for *compressed* data:   46320348
+Sum time for *compressed* data: 0.0297 s, 12865.2 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=20 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                    (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46305112
+Sum time for uncompressed data: 0.00691 s, 55204.8 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.674 s, 566.1 MB/s
+Sum for *compressed* data:   46320364
+Sum time for *compressed* data: 0.0241 s, 15817.6 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=20 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                    (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46305112
+Sum time for uncompressed data: 0.00687 s, 55565.0 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.673 s, 566.7 MB/s
+Sum for *compressed* data:   46320364
+Sum time for *compressed* data: 0.0241 s, 15830.7 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=24 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                    (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46310864
+Sum time for uncompressed data: 0.0069 s, 55261.4 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.675 s, 565.4 MB/s
+Sum for *compressed* data:   46320384
+Sum time for *compressed* data: 0.0205 s, 18641.4 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=24 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                    (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46310868
+Sum time for uncompressed data: 0.00691 s, 55239.8 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.673 s, 566.5 MB/s
+Sum for *compressed* data:   46320384
+Sum time for *compressed* data: 0.0204 s, 18736.9 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=28 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                    (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46311968
+Sum time for uncompressed data: 0.00679 s, 56218.0 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.673 s, 566.5 MB/s
+Sum for *compressed* data:   46320396
+Sum time for *compressed* data: 0.0178 s, 21474.3 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=28 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                    (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46311964
+Sum time for uncompressed data: 0.00674 s, 56574.7 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.672 s, 567.9 MB/s
+Sum for *compressed* data:   46320396
+Sum time for *compressed* data: 0.0181 s, 21132.3 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=32 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                    (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46313056
+Sum time for uncompressed data: 0.00812 s, 46950.8 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.673 s, 567.0 MB/s
+Sum for *compressed* data:   46320392
+Sum time for *compressed* data: 0.0364 s, 10466.3 MB/s
+faltet@corex14 ~/b/c/bench (main)> env LD_LIBRARY_PATH=../build/blosc OMP_PROC_BIND=spread OMP_NUM_THREADS=32 SUM_CLEVEL=1 SUM_COMPRESSOR=zstd ./sum_openmp                    (base)
+Blosc version info: 2.0.0.rc.2.dev ($Date:: 2021-05-06 #$)
+Sum for uncompressed data:   46313056
+Sum time for uncompressed data: 0.00809 s, 47138.4 MB/s
+Compression ratio: 381.5 MB -> 64.3 MB (5.9x)
+Compression time: 0.674 s, 565.6 MB/s
+Sum for *compressed* data:   46320392
+Sum time for *compressed* data: 0.0366 s, 10420.4 MB/s
