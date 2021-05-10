@@ -166,7 +166,7 @@ http://groups.google.es/group/blosc
 Acknowledgments
 ===============
 
-See :doc:`THANKS <./THANKS>`.
+See :doc:`THANKS <./THANKS>`_.
 
 
 ----
