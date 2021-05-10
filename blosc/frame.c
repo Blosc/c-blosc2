@@ -409,7 +409,15 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
 
   // Fetch some internal lengths
   from_big(header_len, framep + FRAME_HEADER_LEN, sizeof(*header_len));
+  if (*header_len < FRAME_HEADER_MINLEN) {
+    BLOSC_TRACE_ERROR("Header length is zero or smaller than min allowed.");
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
   from_big(frame_len, framep + FRAME_LEN, sizeof(*frame_len));
+  if (*header_len > *frame_len) {
+    BLOSC_TRACE_ERROR("Header length exceeds length of the frame.");
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
   from_big(nbytes, framep + FRAME_NBYTES, sizeof(*nbytes));
   from_big(cbytes, framep + FRAME_CBYTES, sizeof(*cbytes));
   from_big(blocksize, framep + FRAME_BLOCKSIZE, sizeof(*blocksize));
@@ -418,11 +426,10 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
   }
   if (typesize != NULL) {
     from_big(typesize, framep + FRAME_TYPESIZE, sizeof(*typesize));
-  }
-
-  if (*header_len < FRAME_HEADER_MINLEN || *header_len > *frame_len) {
-    BLOSC_TRACE_ERROR("Header length is invalid or exceeds length of the frame.");
-    return BLOSC2_ERROR_INVALID_HEADER;
+    if (*typesize <= 0 || *typesize > BLOSC_MAX_TYPESIZE) {
+      BLOSC_TRACE_ERROR("`typesize` is zero or greater than max allowed.");
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
   }
 
   // Codecs
