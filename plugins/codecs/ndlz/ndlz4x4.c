@@ -21,8 +21,8 @@
 #define XXH_INLINE_ALL
 #include <xxhash.c>
 #include <stdio.h>
-#include "ndlz4x4.h"
-#include "ndlz.h"
+#include <ndlz4x4.h>
+#include <ndlz.h>
 
 
 
@@ -70,7 +70,7 @@ int ndlz4_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
   uint32_t smeta_len;
   if (blosc2_meta_get(cparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
     printf("Blosc error");
-    return -1;
+    return 0;
   }
     deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
     free(smeta);
@@ -151,9 +151,6 @@ int ndlz4_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
       update_pair[2] = 0;
 
       if (NDLZ_UNEXPECT_CONDITIONAL(op + 16 + 1 > op_limit)) {
-        free(shape);
-        free(chunkshape);
-        free(blockshape);
         return 0;
       }
 
@@ -445,10 +442,6 @@ int ndlz4_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
       }
     }
   }
-
-  free(shape);
-  free(chunkshape);
-  free(blockshape);
 
   return (int)(op - obase);
 }

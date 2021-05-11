@@ -16,7 +16,7 @@
 extern "C" {
 #endif
 #define XXH_INLINE_ALL
-#include "ndlz.h"
+#include <ndlz.h>
 /*
 #include <stdio.h>
 #include "blosc2-common.h"

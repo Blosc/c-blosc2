@@ -13,28 +13,32 @@
 
 int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, void* params) {
     ndcell_params *fparams = (ndcell_params *) params;
-/*
-    printf("\n input \n");
-    for (int i = 0; i < length; i++) {
-        printf("%u, ", input[i]);
-    }
-*/
+
+    /*  uint8_t* content;
+      uint32_t content_len;
+      int nmetalayer = blosc2_meta_get(fparams->array->sc, "caterva", &content, &content_len);
+      if (nmetalayer < 0) {
+          BLOSC_TRACE_ERROR("Metalayer \"caterva\" not found.");
+          return nmetalayer;
+      }
+      int8_t ndim;
+      int64_t shape[CATERVA_MAX_DIM];
+      int32_t chunkshape[CATERVA_MAX_DIM];
+      int32_t blockshape[CATERVA_MAX_DIM];
+      deserialize_meta(content, content_len, &ndim, shape, chunkshape, blockshape);
+  */
     int8_t ndim = fparams->array->ndim;
     int64_t shape[CATERVA_MAX_DIM];
     int32_t chunkshape[CATERVA_MAX_DIM];
     int32_t blockshape[CATERVA_MAX_DIM];
-    int32_t cellshape[CATERVA_MAX_DIM];
-    int cell_size = 1;
     for (int i = 0; i < CATERVA_MAX_DIM; ++i) {
         shape[i] = fparams->array->shape[i];
         chunkshape[i] = fparams->array->chunkshape[i];
         blockshape[i] = fparams->array->blockshape[i];
-        cellshape[i] = fparams->cellshape[i];
-        if (cellshape[i] > blockshape[i]) {
-            cellshape[i] = blockshape[i];
-        }
-        cell_size *= cellshape[i];
     }
+
+    int32_t cell_shape = fparams->cellshape[0];
+    const int cell_size = (int) pow(cell_shape, ndim);
     int8_t typesize = fparams->array->itemsize;
     int32_t blocksize = (int32_t) typesize;
     for (int i = 0; i < ndim; i++){
@@ -53,6 +57,7 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, void* 
 
     /* input and output buffer cannot be less than cell size */
     if (length < cell_size * typesize) {
+//    if (NDCELL_UNEXPECT_CONDITIONAL(length < cell_size * typesize)) {
         printf("Incorrect length");
         return 0;
     }
@@ -61,7 +66,7 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, void* 
 
     int64_t i_shape[ndim];
     for (int i = 0; i < ndim; ++i) {
-        i_shape[i] = (blockshape[i] + cellshape[i] - 1) / cellshape[i];
+        i_shape[i] = (blockshape[i] + cell_shape - 1) / cell_shape;
     }
 
     int64_t ncells = 1;
@@ -75,17 +80,17 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, void* 
     for (int cell_ind = 0; cell_ind < ncells; cell_ind++) {      // for each cell
         index_unidim_to_multidim(ndim, i_shape, cell_ind, ii);
         uint32_t orig = 0;
-        int64_t nd_aux = 1;
+        int64_t nd_aux = cell_shape;
         for (int i = ndim - 1; i >= 0; i--) {
-            orig += ii[i] * cellshape[i] * nd_aux;
+            orig += ii[i] * nd_aux;
             nd_aux *= blockshape[i];
         }
 
         for (int dim_ind = 0; dim_ind < ndim; dim_ind++) {
-            if ((blockshape[dim_ind] % cellshape[dim_ind] != 0) && (ii[dim_ind] == i_shape[dim_ind] - 1)) {
-                pad_shape[dim_ind] = blockshape[dim_ind] % cellshape[dim_ind];
+            if ((blockshape[dim_ind] % cell_shape != 0) && (ii[dim_ind] == i_shape[dim_ind] - 1)) {
+                pad_shape[dim_ind] = blockshape[dim_ind] % cell_shape;
             } else {
-                pad_shape[dim_ind] = cellshape[dim_ind];
+                pad_shape[dim_ind] = cell_shape;
             }
         }
         int64_t ncopies = 1;
@@ -116,13 +121,9 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, void* 
         printf("Output size must be equal to input size \n");
         return 0;
     }
-/*
-   // free(content);
-    printf("\n op \n");
-    for (int i = 0; i < length; i++) {
-        printf("%u, ", output[i]);
-    }
-*/
+
+    // free(content);
+
     return BLOSC2_ERROR_SUCCESS;
 }
 
@@ -130,37 +131,33 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, void* 
 int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, void* params) {
     ndcell_params *fparams = (ndcell_params *) params;
 
- /*   uint8_t* content;
-    uint32_t content_len;
-    int nmetalayer = blosc2_meta_get(fparams->array->sc, "caterva", &content, &content_len);
-    if (nmetalayer < 0) {
-        BLOSC_TRACE_ERROR("Metalayer \"caterva\" not found.");
-        return nmetalayer;
-    }
-    int8_t ndim;
-    int64_t shape[CATERVA_MAX_DIM];
-    int32_t chunkshape[CATERVA_MAX_DIM];
-    int32_t blockshape[CATERVA_MAX_DIM];
-    deserialize_meta(content, content_len, &ndim, shape, chunkshape, blockshape);
-*/
+    /*   uint8_t* content;
+       uint32_t content_len;
+       int nmetalayer = blosc2_meta_get(fparams->array->sc, "caterva", &content, &content_len);
+       if (nmetalayer < 0) {
+           BLOSC_TRACE_ERROR("Metalayer \"caterva\" not found.");
+           return nmetalayer;
+       }
+       int8_t ndim;
+       int64_t shape[CATERVA_MAX_DIM];
+       int32_t chunkshape[CATERVA_MAX_DIM];
+       int32_t blockshape[CATERVA_MAX_DIM];
+       deserialize_meta(content, content_len, &ndim, shape, chunkshape, blockshape);
+   */
     int8_t ndim = fparams->array->ndim;
     int64_t shape[CATERVA_MAX_DIM];
     int32_t chunkshape[CATERVA_MAX_DIM];
     int32_t blockshape[CATERVA_MAX_DIM];
-    int32_t cellshape[CATERVA_MAX_DIM];
-    int cell_size = 1;
     for (int i = 0; i < CATERVA_MAX_DIM; ++i) {
         shape[i] = fparams->array->shape[i];
         chunkshape[i] = fparams->array->chunkshape[i];
         blockshape[i] = fparams->array->blockshape[i];
-        cellshape[i] = fparams->cellshape[i];
-        if (cellshape[i] > blockshape[i]) {
-            cellshape[i] = blockshape[i];
-        }
-        cell_size *= cellshape[i];
     }
 
+    int32_t cell_shape = fparams->cellshape[0];
+    const int cell_size = (int) pow(cell_shape, ndim);
     int8_t typesize = fparams->array->itemsize;
+
     uint8_t* ip = (uint8_t*)input;
     uint8_t* ip_limit = ip + length;
     uint8_t* op = (uint8_t*)output;
@@ -170,10 +167,11 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, void* 
     }
 
     if (length != blocksize) {
- //   if (NDCELL_UNEXPECT_CONDITIONAL(length != blocksize)) {
+        //   if (NDCELL_UNEXPECT_CONDITIONAL(length != blocksize)) {
         printf("Length not equal to blocksize \n");
         return -1;
     }
+
     /* input and output buffer cannot be less than cell size */
     if (length < cell_size * typesize) {
 //    if (NDCELL_UNEXPECT_CONDITIONAL(length < cell_size * typesize)) {
@@ -183,7 +181,7 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, void* 
 
     int64_t i_shape[ndim];
     for (int i = 0; i < ndim; ++i) {
-        i_shape[i] = (blockshape[i] + cellshape[i] - 1) / cellshape[i];
+        i_shape[i] = (blockshape[i] + cell_shape - 1) / cell_shape;
     }
 
     int64_t ncells = 1;
@@ -204,17 +202,17 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, void* 
         }
         index_unidim_to_multidim(ndim, i_shape, cell_ind, ii);
         uint32_t orig = 0;
-        int64_t nd_aux = 1;
+        int64_t nd_aux = cell_shape;
         for (int i = ndim - 1; i >= 0; i--) {
-            orig += ii[i] * cellshape[i] * nd_aux;
+            orig += ii[i] * nd_aux;
             nd_aux *= blockshape[i];
         }
 
         for (int dim_ind = 0; dim_ind < ndim; dim_ind++) {
-            if ((blockshape[dim_ind] % cellshape[dim_ind] != 0) && (ii[dim_ind] == i_shape[dim_ind] - 1)) {
-                pad_shape[dim_ind] = blockshape[dim_ind] % cellshape[dim_ind];
+            if ((blockshape[dim_ind] % cell_shape != 0) && (ii[dim_ind] == i_shape[dim_ind] - 1)) {
+                pad_shape[dim_ind] = blockshape[dim_ind] % cell_shape;
             } else {
-                pad_shape[dim_ind] = cellshape[dim_ind];
+                pad_shape[dim_ind] = cell_shape;
             }
         }
 
@@ -243,7 +241,7 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, void* 
         return 0;
     }
 
- //   free(content);
+    //   free(content);
 
     return BLOSC2_ERROR_SUCCESS;
 }

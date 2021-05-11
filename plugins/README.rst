@@ -16,15 +16,15 @@ The plugins that are stored in the repository can be codecs or filters.
 A **codec** is a program able to compress and decompress a digital data stream
 with the objective of reduce dataset size to enable a faster transmission
 of data.
-Some of the codecs most used by Blosc are BLOSCLZ, LZ4 and ZSTANDARD.
+Some of the codecs most used by Blosc are *BLOSCLZ*, *LZ4* and *ZSTANDARD*.
 
 A **filter** is a program that reorders a digital dataset without
 changing its size, so that the initial and final size are equal.
 A filter consists of encoder and decoder. Filter encoder is applyed before
-using codec encoder in order to make data easier to compress and filter
-decoder is used after codec decoder to recover the original data.
-Some filters really used by Blosc are SHUFFLE, which groups data in an
-array based on the typesize, and TRUNC, which removes decimal places
+using codec compressor in order to make data easier to compress and filter
+decoder is used after codec decompressor to recover the original data.
+Some filters really used by Blosc are *SHUFFLE*, which groups data in an
+array based on the typesize, and *TRUNC*, which removes decimal places
 from each dataset item.
 
 .. code-block:: console
@@ -35,6 +35,7 @@ from each dataset item.
      -------------------   filter encoder  -------------------
     |	    input       |   ----------->  |      output	      |
      -------------------                   -------------------
+
 
 Requirements for adding plugins
 ~~~~~~~~~~~~~~~~~~~
@@ -50,7 +51,7 @@ necessary requirements that their code must satisfy.
 
 Finally, even if these requirements are completely satisfied, it is not
 guaranteed that the plugin will be useful or contribute something
-different to the rest, so Blosc development team has the final say and
+different to the rest, so the Blosc development team has the final say and
 will decide if a plugin is accepted or not.
 
 
@@ -65,7 +66,18 @@ Steps
 
     - The plugin motivation, it means why and for what purpose was the plugin created.
     - What does the plugin do and how it works.
-    - The advantages and disadvantages of the plugin compared to the others.
+    - The advantages and disadvantages of the plugin compared to the rest.
+
+4. Finally, the Blosc development team will carry out the evaluation process to decide if the plugin is useful and must be integrated into c-blosc2.
+
+
+Examples
+~~~~~~~~~~~~~~~~~~~
+
+In c-blosc2/plugins there can be found different examples of codecs and filters available as plugins that can be used in the compression process, such as ndlz, ndcell or ndmean.
+
+
+
 
 
 
