@@ -28,13 +28,13 @@ array based on the typesize, and *TRUNC*, which removes decimal places
 from each dataset item.
 
 .. code-block:: console
-     -------------------   codec encoder   --------
-    |       input       |   ---------->   | output |
-     -------------------                   --------
+         -------------------   codec encoder   --------
+        |       input       |   ---------->   | output |
+         -------------------                   --------
 
-     -------------------   filter encoder  -------------------
-    |	    input       |   ----------->  |      output	      |
-     -------------------                   -------------------
+         -------------------   filter encoder  -------------------
+        |	    input       |   ----------->  |      output	      |
+         -------------------                   -------------------
 
 
 Requirements for adding plugins
