@@ -18,9 +18,9 @@
 
 
 #include <stdio.h>
-#include "ndlz4x4.h"
-#include "ndlz.h"
-#include "ndlz8x8.h"
+#include <ndlz4x4.h>
+#include <ndlz.h>
+#include <ndlz8x8.h>
 
 
 

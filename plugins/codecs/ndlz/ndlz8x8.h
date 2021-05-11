@@ -16,7 +16,7 @@
 extern "C" {
 #endif
 #define XXH_INLINE_ALL
-#include "ndlz.h"
+#include <ndlz.h>
 
 #define NDLZ_VERSION_STRING "1.0.0"
 

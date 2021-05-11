@@ -5,147 +5,40 @@
 */
 
 
-#include "ndmean.h"
-#include <blosc2.h>
-#include <stdio.h>
+#include <caterva.h>
+#include <ndmean.h>
+#include <caterva_utilities.h>
 
 
-static void index_unidim_to_multidim(int8_t ndim, int64_t *shape, int64_t i, int64_t *index) {
-    int64_t strides[8];
-    strides[0] = 1;
-    strides[ndim - 1] = 1;
-    for (int j = ndim - 2; j >= 0; --j) {
-        strides[j] = shape[j + 1] * strides[j + 1];
-    }
-
-    index[0] = i / strides[0];
-    for (int j = 1; j < ndim; ++j) {
-        index[j] = (i % strides[j - 1]) / strides[j];
-    }
-}
-
-void swap_store(void *dest, const void *pa, int size) {
-    uint8_t *pa_ = (uint8_t *) pa;
-    uint8_t *pa2_ = malloc((size_t) size);
-    int i = 1; /* for big/little endian detection */
-    char *p = (char *) &i;
-
-    if (p[0] == 1) {
-        /* little endian */
-        switch (size) {
-            case 8:
-                pa2_[0] = pa_[7];
-                pa2_[1] = pa_[6];
-                pa2_[2] = pa_[5];
-                pa2_[3] = pa_[4];
-                pa2_[4] = pa_[3];
-                pa2_[5] = pa_[2];
-                pa2_[6] = pa_[1];
-                pa2_[7] = pa_[0];
-                break;
-            case 4:
-                pa2_[0] = pa_[3];
-                pa2_[1] = pa_[2];
-                pa2_[2] = pa_[1];
-                pa2_[3] = pa_[0];
-                break;
-            case 2:
-                pa2_[0] = pa_[1];
-                pa2_[1] = pa_[0];
-                break;
-            case 1:
-                pa2_[0] = pa_[0];
-                break;
-            default:
-                fprintf(stderr, "Unhandled nitems: %d\n", size);
-        }
-    }
-    memcpy(dest, pa2_, size);
-    free(pa2_);
-}
-
-int32_t deserialize_meta(uint8_t *smeta, uint32_t smeta_len, int8_t *ndim, int64_t *shape,
-                         int32_t *chunkshape, int32_t *blockshape) {
-    uint8_t *pmeta = smeta;
-
-    // Check that we have an array with 5 entries (version, ndim, shape, chunkshape, blockshape)
-    pmeta += 1;
-
-    // version entry
-    int8_t version = pmeta[0];  // positive fixnum (7-bit positive integer)
-    pmeta += 1;
-
-    // ndim entry
-    *ndim = pmeta[0];
-    int8_t ndim_aux = *ndim;  // positive fixnum (7-bit positive integer)
-    pmeta += 1;
-
-    // shape entry
-    // Initialize to ones, as required by Caterva
-    for (int i = 0; i < 8; i++) shape[i] = 1;
-    pmeta += 1;
-    for (int8_t i = 0; i < ndim_aux; i++) {
-        pmeta += 1;
-        swap_store(shape + i, pmeta, sizeof(int64_t));
-        pmeta += sizeof(int64_t);
-    }
-
-    // chunkshape entry
-    // Initialize to ones, as required by Caterva
-    for (int i = 0; i < 8; i++) chunkshape[i] = 1;
-    pmeta += 1;
-    for (int8_t i = 0; i < ndim_aux; i++) {
-        pmeta += 1;
-        swap_store(chunkshape + i, pmeta, sizeof(int32_t));
-        pmeta += sizeof(int32_t);
-    }
-
-    // blockshape entry
-    // Initialize to ones, as required by Caterva
-    for (int i = 0; i < 8; i++) blockshape[i] = 1;
-    pmeta += 1;
-    for (int8_t i = 0; i < ndim_aux; i++) {
-        pmeta += 1;
-        swap_store(blockshape + i, pmeta, sizeof(int32_t));
-        pmeta += sizeof(int32_t);
-    }
-    uint32_t slen = (uint32_t)(pmeta - smeta);
-    return 0;
-}
-
-int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t meta, blosc2_cparams* cparams) {
-
-    int8_t ndim;
-    int64_t* shape = malloc(8 * sizeof(int64_t));
-    int32_t* chunkshape = malloc(8 * sizeof(int32_t));
-    int32_t* blockshape = malloc(8 * sizeof(int32_t));
-    uint8_t* smeta;
-    uint32_t smeta_len;
-    if (blosc2_meta_get(cparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
-        printf("Blosc error");
-        return 0;
-    }
-    deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
-    free(smeta);
-    int typesize = cparams->typesize;
+int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, void* params) {
+    ndmean_params *fparams = (ndmean_params *) params;
+    int8_t typesize = fparams->array->itemsize;
 
     if ((typesize != 4) && (typesize != 8)) {
         fprintf(stderr, "This filter only works for float or double buffers");
         return -1;
     }
-
-    int8_t cellshape[8];
+/*
+    printf("\n input \n");
+    for (int i = 0; i < 50; i++) {
+        printf("%u, ", input[i]);
+    }
+*/
+    int8_t ndim = fparams->array->ndim;
+    int64_t shape[CATERVA_MAX_DIM];
+    int32_t chunkshape[CATERVA_MAX_DIM];
+    int32_t blockshape[CATERVA_MAX_DIM];
+    int32_t cellshape[CATERVA_MAX_DIM];
     int cell_size = 1;
-    for (int i = 0; i < 8; ++i) {
-        if (i < ndim) {
-            cellshape[i] = meta;
-            if (cellshape[i] > blockshape[i]) {
-                cellshape[i] = (int8_t) blockshape[i];
-            }
-            cell_size *= cellshape[i];
-        } else {
-            cellshape[i] = 1;
+    for (int i = 0; i < CATERVA_MAX_DIM; ++i) {
+        shape[i] = fparams->array->shape[i];
+        chunkshape[i] = fparams->array->chunkshape[i];
+        blockshape[i] = fparams->array->blockshape[i];
+        cellshape[i] = fparams->cellshape[i];
+        if (cellshape[i] > blockshape[i]) {
+            cellshape[i] = blockshape[i];
         }
+        cell_size *= cellshape[i];
     }
     int32_t blocksize = (int32_t) typesize;
     for (int i = 0; i < ndim; i++){
@@ -153,6 +46,7 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     }
 
     if (length != blocksize) {
+//    if (NDCELL_UNEXPECT_CONDITIONAL(length != blocksize)) {
         printf("Length not equal to blocksize %d %d \n", length, blocksize);
         return -1;
     }
@@ -162,7 +56,9 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     double * ip_double = (double *) ip;
     uint8_t* op = (uint8_t *) output;
     uint8_t* op_limit = op + length;
-    int64_t cell_length = 0;
+ //   uint8_t* cell = malloc(cell_size);
+ //   double* cell_double = malloc(cell_size / typesize);
+    int64_t cell_length;
     float mean_float = 0;
     double mean_double = 0;
 
@@ -191,9 +87,9 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     for (int cell_ind = 0; cell_ind < ncells; cell_ind++) {      // for each cell
         index_unidim_to_multidim(ndim, i_shape, cell_ind, ii);
         uint32_t orig = 0;
-        int64_t nd_aux = cellshape[0];
+        int64_t nd_aux = 1;
         for (int i = ndim - 1; i >= 0; i--) {
-            orig += ii[i] * nd_aux;
+            orig += ii[i] * cellshape[i] * nd_aux;
             nd_aux *= blockshape[i];
         }
 
@@ -201,18 +97,18 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
             if ((blockshape[dim_ind] % cellshape[dim_ind] != 0) && (ii[dim_ind] == i_shape[dim_ind] - 1)) {
                 pad_shape[dim_ind] = blockshape[dim_ind] % cellshape[dim_ind];
             } else {
-                pad_shape[dim_ind] = (int32_t) cellshape[dim_ind];
+                pad_shape[dim_ind] = cellshape[dim_ind];
             }
         }
         int64_t ncopies = 1;
         for (int i = 0; i < ndim - 1; ++i) {
             ncopies *= pad_shape[i];
         }
-        int64_t kk[8];
+        int64_t kk[CATERVA_MAX_DIM];
         mean_float = 0;
         mean_double = 0;
         for (int copy_ind = 0; copy_ind < ncopies; ++copy_ind) {
-            index_unidim_to_multidim((int8_t) (ndim - 1), pad_shape, copy_ind, kk);
+            index_unidim_to_multidim(ndim - 1, pad_shape, copy_ind, kk);
             nd_aux = blockshape[ndim - 1];
             int64_t ind = orig;
             for (int i = ndim - 2; i >= 0; i--) {
@@ -220,15 +116,30 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
                 nd_aux *= blockshape[i];
             }
 
+/*
+   //         memcpy(cell, &ip[ind * typesize], pad_shape[ndim - 1] * typesize);
+     //       cell += pad_shape[ndim - 1] * typesize;
+            if (typesize == 8) {
+                for (int i = 0; i < pad_shape[ndim - 1]; i++) {
+           //         cell_double[i] = ((double*) ip)[ind + i];
+                    cell_double[i] = ip_double[ind + i];
+                }
+                cell_double += pad_shape[ndim - 1];
+            }
+*/
+    //        printf("\n mean: ");
+
             switch (typesize) {
                 case 4:
                     for (int i = 0; i < pad_shape[ndim - 1]; i++) {
                         mean_float += ip_float[ind + i];
+      //                  printf("%f, ", mean_float);
                     }
                     break;
                 case 8:
                     for (int i = 0; i < pad_shape[ndim - 1]; i++) {
                         mean_double += ip_double[ind + i];
+        //                printf("%f, ", mean_double);
                     }
                     break;
                 default :
@@ -237,7 +148,24 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
 
         }
         cell_length = ncopies * pad_shape[ndim - 1];
-
+  /*
+        printf("\n ip_float \n");
+        for (int i = 0; i < cell_length; i++) {
+            printf("%f, ", ip_float[i]);
+        }
+/*
+        cell -= cell_length * typesize;
+        printf("\n cell \n");
+        for (int i = 0; i < cell_length * typesize; i++) {
+            printf("%u, ", cell[i]);
+        }
+*
+        cell_double -= cell_length;
+        printf("\n cell_double \n");
+        for (int i = 0; i < cell_length; i++) {
+            printf("%f, ", cell_double[i]);
+        }
+*/
         switch (typesize) {
             case 4:
                 mean_float /= (float) cell_length;
@@ -256,56 +184,70 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
             default :
                 break;
         }
+   //     printf("\n MEAN: %f, %f", mean_float, mean_double);
+
+
+    //    printf("\n op \n");
+
 
         if (op > op_limit) {
+//        if (NDCELL_UNEXPECT_CONDITIONAL(op > op_limit)) {
             printf("Output too big");
             return 0;
         }
     }
 
-    free(shape);
-    free(chunkshape);
-    free(blockshape);
+ //   free(cell);
+//    free(cell_double);
     if((op - obase) != length) {
         printf("Output size must be equal to input size \n");
         return 0;
     }
-
+/*
+   // free(content);
+    printf("\n op \n");
+    for (int i = 0; i < length; i++) {
+        printf("%u, ", output[i]);
+    }
+*/
     return BLOSC2_ERROR_SUCCESS;
 }
 
 
-int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t meta, blosc2_dparams* dparams) {
+int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, void* params) {
+    ndmean_params *fparams = (ndmean_params *) params;
 
-    blosc2_schunk *schunk = dparams->schunk;
+ /*   uint8_t* content;
+    uint32_t content_len;
+    int nmetalayer = blosc2_meta_get(fparams->array->sc, "caterva", &content, &content_len);
+    if (nmetalayer < 0) {
+        BLOSC_TRACE_ERROR("Metalayer \"caterva\" not found.");
+        return nmetalayer;
+    }
     int8_t ndim;
-    int64_t* shape = malloc(8 * sizeof(int64_t));
-    int32_t* chunkshape = malloc(8 * sizeof(int32_t));
-    int32_t* blockshape = malloc(8 * sizeof(int32_t));
-    uint8_t* smeta;
-    uint32_t smeta_len;
-    if (blosc2_meta_get(schunk, "caterva", &smeta, &smeta_len) < 0) {
-        printf("Blosc error");
-        return 0;
-    }
-    deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
-    free(smeta);
-
-    int8_t cellshape[8];
+    int64_t shape[CATERVA_MAX_DIM];
+    int32_t chunkshape[CATERVA_MAX_DIM];
+    int32_t blockshape[CATERVA_MAX_DIM];
+    deserialize_meta(content, content_len, &ndim, shape, chunkshape, blockshape);
+*/
+    int8_t ndim = fparams->array->ndim;
+    int64_t shape[CATERVA_MAX_DIM];
+    int32_t chunkshape[CATERVA_MAX_DIM];
+    int32_t blockshape[CATERVA_MAX_DIM];
+    int32_t cellshape[CATERVA_MAX_DIM];
     int cell_size = 1;
-    for (int i = 0; i < 8; ++i) {
-        if (i < ndim) {
-            cellshape[i] = meta;
-            if (cellshape[i] > blockshape[i]) {
-                cellshape[i] = (int8_t) blockshape[i];
-            }
-            cell_size *= cellshape[i];
-        } else {
-            cellshape[i] = 1;
+    for (int i = 0; i < CATERVA_MAX_DIM; ++i) {
+        shape[i] = fparams->array->shape[i];
+        chunkshape[i] = fparams->array->chunkshape[i];
+        blockshape[i] = fparams->array->blockshape[i];
+        cellshape[i] = fparams->cellshape[i];
+        if (cellshape[i] > blockshape[i]) {
+            cellshape[i] = blockshape[i];
         }
+        cell_size *= cellshape[i];
     }
 
-    int8_t typesize = (int8_t) schunk->typesize;
+    int8_t typesize = fparams->array->itemsize;
     uint8_t* ip = (uint8_t*)input;
     uint8_t* ip_limit = ip + length;
     uint8_t* op = (uint8_t*)output;
@@ -315,11 +257,13 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     }
 
     if (length != blocksize) {
+ //   if (NDCELL_UNEXPECT_CONDITIONAL(length != blocksize)) {
         printf("Length not equal to blocksize \n");
         return -1;
     }
     /* input and output buffer cannot be less than cell size */
     if (length < cell_size * typesize) {
+//    if (NDCELL_UNEXPECT_CONDITIONAL(length < cell_size * typesize)) {
         printf("Incorrect length");
         return 0;
     }
@@ -341,14 +285,15 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     for (int cell_ind = 0; cell_ind < ncells; cell_ind++) {      // for each cell
 
         if (ip > ip_limit) {
+//        if (NDCELL_UNEXPECT_CONDITIONAL(ip > ip_limit)) {
             printf("Literal copy \n");
             return 0;
         }
         index_unidim_to_multidim(ndim, i_shape, cell_ind, ii);
         uint32_t orig = 0;
-        int64_t nd_aux = cellshape[0];
+        int64_t nd_aux = 1;
         for (int i = ndim - 1; i >= 0; i--) {
-            orig += ii[i] * nd_aux;
+            orig += ii[i] * cellshape[i] * nd_aux;
             nd_aux *= blockshape[i];
         }
 
@@ -356,7 +301,7 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
             if ((blockshape[dim_ind] % cellshape[dim_ind] != 0) && (ii[dim_ind] == i_shape[dim_ind] - 1)) {
                 pad_shape[dim_ind] = blockshape[dim_ind] % cellshape[dim_ind];
             } else {
-                pad_shape[dim_ind] = (int64_t) cellshape[dim_ind];
+                pad_shape[dim_ind] = cellshape[dim_ind];
             }
         }
 
@@ -366,18 +311,18 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
         }
         int64_t kk[ndim];
         for (int copy_ind = 0; copy_ind < ncopies; ++copy_ind) {
-            index_unidim_to_multidim((int8_t) (ndim - 1), pad_shape, copy_ind, kk);
+            index_unidim_to_multidim(ndim - 1, pad_shape, copy_ind, kk);
             nd_aux = blockshape[ndim - 1];
-            ind = (int32_t) orig;
+            ind = orig;
             for (int i = ndim - 2; i >= 0; i--) {
-                ind += (int32_t) (kk[i] * nd_aux);
+                ind += kk[i] * nd_aux;
                 nd_aux *= blockshape[i];
             }
             memcpy(&op[ind * typesize], ip, pad_shape[ndim - 1] * typesize);
             ip += pad_shape[ndim - 1] * typesize;
         }
     }
-    ind += (int32_t) pad_shape[ndim - 1];
+    ind += pad_shape[ndim - 1];
 
 
     if (ind != (int32_t) (blocksize / typesize)) {
@@ -385,9 +330,7 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
         return 0;
     }
 
-    free(shape);
-    free(chunkshape);
-    free(blockshape);
+ //   free(content);
 
     return BLOSC2_ERROR_SUCCESS;
 }
