@@ -64,9 +64,13 @@ Steps
 
 3. Furthermore, the user must create a text file named README where it is explained:
 
-    - The plugin motivation, why and for what purpose was the plugin created.
-    - What does the plugin do and how it works.
-    - The advantages and disadvantages of the plugin compared to the rest.
+   * The plugin motivation, why and for what purpose was the plugin created.
+
+   * How to use the plugin.
+
+   * What does the plugin do and how it works.
+
+   * The advantages and disadvantages of the plugin compared to the rest.
 
 4. Finally, the Blosc development team will carry out the evaluation process to decide if the plugin is useful and must be integrated into c-blosc2.
 
