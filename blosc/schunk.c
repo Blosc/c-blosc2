@@ -21,9 +21,6 @@
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <windows.h>
   #include <malloc.h>
-  #include <direct.h>
-
-  #define mkdir _mkdir
 
 /* stdint.h only available in VS2010 (VC++ 16.0) and newer */
   #if defined(_MSC_VER) && _MSC_VER < 1600
@@ -33,6 +30,12 @@
   #endif
 
 #endif  /* _WIN32 */
+
+#if defined(_WIN32)
+#include <direct.h>
+
+#define mkdir(D, M) _mkdir(D)
+#endif
 
 /* If C11 is supported, use it's built-in aligned allocation. */
 #if __STDC_VERSION__ >= 201112L
