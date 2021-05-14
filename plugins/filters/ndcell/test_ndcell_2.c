@@ -11,7 +11,7 @@
 
     To run:
 
-    $ ./test_ndmean
+    $ ./test_ndcell
     Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
     Using 4 threads (previously using 1)
     Using blosclz compressor
@@ -34,60 +34,28 @@
 
 #include <stdio.h>
 #include <caterva.h>
-#include <caterva_blosc.h>
-#include "../plugins/filters/ndmean/ndmean.h"
-#include <math.h>
+#include <ndcell.h>
 
-#define EPSILON (float) (1e-5)
+static int test_ndcell(void *data, int64_t nbytes, int typesize, int ndim, caterva_params_t params, caterva_storage_t storage) {
 
-static bool is_close(double d1, double d2) {
-
-    double aux = 1;
-    if (fabs(d1) < fabs(d2)) {
-        if (fabs(d1) > 0) {
-            aux = fabs(d2);
-        }
-    } else {
-        if (fabs(d2) > 0) {
-            aux = fabs(d1);
-        }
-    }
-
-    return fabs(d1 - d2) < aux * EPSILON;
-}
-
-
-static int test_ndmean(void *data, int64_t nbytes, int typesize, int ndim, caterva_params_t params, caterva_storage_t storage) {
-
-    bool ndmean = false;
-    if (storage.properties.blosc.cellshape[0] == -1) {
-        ndmean = true;
-    }
     uint8_t *data2 = (uint8_t*) data;
     caterva_array_t *array;
     caterva_ctx_t *ctx;
+    blosc2_filter ndcell;
+    ndcell.id = 164;
+    ndcell.forward = ndcell_encoder;
+    ndcell.backward = ndcell_decoder;
+    blosc2_register_filter(&ndcell);
+
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
     cfg.nthreads = 1;
-    cfg.compcodec = BLOSC_LZ4;
-    cfg.complevel = 9;
+    cfg.splitmode = BLOSC_ALWAYS_SPLIT;
+    cfg.compcodec = BLOSC_ZLIB;
  //   cfg.filters[BLOSC2_MAX_FILTERS - 2] = BLOSC_NDCELL;
     cfg.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
- //   cfg.filters[0] = BLOSC_TRUNC_PREC;
-   // cfg.filtersmeta[0] = 10;
  //   cfg.filtersmeta[BLOSC2_MAX_FILTERS - 2] = BLOSC2_NDCELL_4;
-    if (ndmean) {
-        for (int i = 0; i < CATERVA_MAX_DIM; ++i) {
-            if (i < params.ndim) {
-                storage.properties.blosc.cellshape[i] = 4;
-            } else {
-                storage.properties.blosc.cellshape[i] = 1;
-            }
-        }
- //       storage.properties.blosc.cellshape[1] = 1;
- //       storage.properties.blosc.cellshape[3] = 1;
-        cfg.filters[4] = BLOSC_UDFILTER;
-        cfg.filtersmeta[4] = 128;
-    }
+    cfg.filters[4] = 164;
+    cfg.filtersmeta[4] = 4;
     caterva_ctx_new(&cfg, &ctx);
     CATERVA_ERROR(caterva_from_buffer(ctx, data2, nbytes, &params, &storage, &array));
 
@@ -97,13 +65,13 @@ static int test_ndmean(void *data, int64_t nbytes, int typesize, int ndim, cater
     uint8_t *data_in = malloc(chunksize);
     CATERVA_ERROR_NULL(data_in);
     int decompressed;
-    int64_t csize = 0;
-    int64_t dsize = 0;
-    int64_t csize_f = 0;
-    uint8_t *data_out = malloc(chunksize + BLOSC_MAX_OVERHEAD);
+    int csize, dsize;
+    int csize_f = 0;
+    uint8_t *data_out = malloc(chunksize);
     uint8_t *data_dest = malloc(chunksize);
 
     blosc_timestamp_t start, comp, end;
+    blosc_set_timestamp(&start);
     double ctime, dtime;
     double ctime_f = 0;
     double dtime_f = 0;
@@ -115,8 +83,7 @@ static int test_ndmean(void *data, int64_t nbytes, int typesize, int ndim, cater
             return -1;
         }
         /* Compress with clevel=5 and shuffle active  */
-        blosc_set_timestamp(&start);
-        csize = blosc2_compress_ctx(array->sc->cctx, data_in, chunksize, data_out, chunksize + BLOSC_MAX_OVERHEAD);
+        csize = blosc2_compress_ctx(array->sc->cctx, data_in, chunksize, data_out, chunksize);
         if (csize == 0) {
             printf("Buffer is uncompressible.  Giving up.\n");
             return 0;
@@ -140,59 +107,13 @@ static int test_ndmean(void *data, int64_t nbytes, int typesize, int ndim, cater
         dtime = blosc_elapsed_nsecs(comp, end);
         ctime_f += ctime;
         dtime_f += dtime;
-/*
-        printf("\n data_in \n");
-        for (int i = 0; i < chunksize; i++) {
-            printf("%u, ", data_in[i]);
-        }
-        printf("\n");
-        for (int i = 0; i < chunksize / typesize; i++) {
-            if (typesize == 4) {
-                printf("%.16f, ", ((float *) data_in)[i]);
-            } else if (typesize == 8) {
-                printf("%.16f, ", ((double *) data_in)[i]);
-            }
-        }
-        printf("\n output \n");
-        for (int i = 0; i < 20; i++) {
-            printf("%u, ", data_out[i]);
-        }
 
-
-        printf("\n dest \n");
         for (int i = 0; i < chunksize; i++) {
-            printf("%u, ", data_dest[i]);
-        }
-        printf("\n");
-        for (int i = 0; i < chunksize / typesize; i++) {
-            if (typesize == 4) {
-                printf("%.16f, ", ((float *) data_dest)[i]);
-            } else if (typesize == 8) {
-                printf("%.16f, ", ((double *) data_dest)[i]);
+            if (data_in[i] != data_dest[i]) {
+                printf("i: %d, data %u, dest %u", i, data_in[i], data_dest[i]);
+                printf("\n Decompressed data differs from original!\n");
+                return -1;
             }
-        }
-  */
-        switch (typesize) {
-            case 4:
-                for (int i = 0; i < chunksize / typesize; i++) {
-                    if (!is_close(((float *) data_in)[i], ((float *) data_dest)[i])) {
-                        printf("i: %d, data %.9f, dest %.9f", i, ((float *) data_in)[i], ((float *) data_dest)[i]);
-                        printf("\n Decompressed data differs from original!\n");
-                        return -1;
-                    }
-                }
-                break;
-            case 8:
-                for (int i = 0; i < chunksize / typesize; i++) {
-                    if (!is_close(((double *) data_in)[i], ((double *) data_dest)[i])) {
-                        printf("i: %d, data %.9f, dest %.9f", i, ((double *) data_in)[i], ((double *) data_dest)[i]);
-                        printf("\n Decompressed data differs from original!\n");
-                        return -1;
-                    }
-                }
-                break;
-            default :
-                break;
         }
     }
     csize_f = csize_f / nchunks;
@@ -207,6 +128,22 @@ static int test_ndmean(void *data, int64_t nbytes, int typesize, int ndim, cater
     printf("\n ----------------------------------------------------------------------------- TEST NDLZ ----------"
            "----------------------------------------------------------------------- \n");
 */
+/*
+    printf("\n data_in \n");
+    for (int i = 0; i < isize; i++) {
+      printf("%u, ", data_in[i]);
+    }
+    printf("\n output \n");
+    for (int i = 0; i < osize; i++) {
+      printf("%u, ", data_out[i]);
+    }
+
+
+    printf("\n dest \n");
+    for (int i = 0; i < dsize; i++) {
+        printf("%u, ", data_dest[i]);
+    }
+*/
 
     caterva_free(ctx, &array);
     caterva_ctx_free(&ctx);
@@ -215,16 +152,16 @@ static int test_ndmean(void *data, int64_t nbytes, int typesize, int ndim, cater
     free(data_dest);
 
     printf("Succesful roundtrip!\n");
-    printf("Compression: %d -> %ld (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
-    printf("\n Test time: \n Compression: %f secs \n Decompression: %f secs \n", ctime_f / 1e9, dtime_f / 1e9);
+    printf("Compression: %d -> %d (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
+    printf("\n Test time: \n Compression: %f secs \n Decompression: %f secs \n", ctime_f / 1000000000, dtime_f / 1000000000);
     return chunksize - csize_f;
 }
 
 
 int rand_() {
     int ndim = 3;
-    int typesize = 4;
-    int32_t shape[8] = {133, 164, 43};
+    int typesize = 1;
+    int32_t shape[8] = {278, 264, 243};
     int32_t chunkshape[8] = {32, 64, 32};
     int32_t blockshape[8] = {8, 16, 8};
     int64_t isize = 1;
@@ -232,9 +169,9 @@ int rand_() {
         isize *= (int)(shape[i]);
     }
     int64_t nbytes = typesize * isize;
-    float *data = malloc(nbytes);
+    uint8_t *data = malloc(nbytes);
     for (int64_t i = 0; i < isize; i++) {
-        data[i] = (float) (rand() % 220);
+        data[i] = rand() % 120;
     }
     caterva_params_t params;
     params.itemsize = typesize;
@@ -251,74 +188,26 @@ int rand_() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    free(data);
-    return result;
-}
-
-int easy() {
-    int ndim = 2;
-    int typesize = 4;
-    int32_t shape[8] = {32, 32, 32};
-    int32_t chunkshape[8] = {16, 16, 16};
-    int32_t blockshape[8] = {8, 8, 8};
-    int64_t isize = 1;
-    for (int64_t i = 0; i < ndim; ++i) {
-        isize *= (int)(shape[i]);
-    }
-    int64_t nbytes = typesize * isize;
-    float *data = malloc(nbytes);
-    for (int i = 0; i < isize; i += 4) {
-        data[i] = 0;
-        data[i + 1] = 1;
-        data[i + 2] = 2;
-        data[i + 3] = 3;
-    }
-
-    caterva_params_t params;
-    params.itemsize = typesize;
-    params.ndim = ndim;
-    for (int i = 0; i < ndim; ++i) {
-        params.shape[i] = shape[i];
-    }
-
-    caterva_storage_t storage = {0};
-    storage.backend = CATERVA_STORAGE_BLOSC;
-    for (int i = 0; i < ndim; ++i) {
-        storage.properties.blosc.chunkshape[i] = chunkshape[i];
-        storage.properties.blosc.blockshape[i] = blockshape[i];
-    }
-
-    /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
 
 int no_matches() {
     int ndim = 3;
-    int typesize = 8;
+    int typesize = 1;
     int32_t shape[8] = {32, 32, 32};
     int32_t chunkshape[8] = {32, 32, 32};
     int32_t blockshape[8] = {16, 16, 16};
     int64_t isize = 1;
-    for (int64_t i = 0; i < ndim; ++i) {
+    for (int i = 0; i < ndim; ++i) {
       isize *= (int)(shape[i]);
     }
     int64_t nbytes = typesize * isize;
-    double *data = malloc(nbytes);
-    for (int i = 0; i < isize; i++) {
-        data[i] = (double) (i + 0.2 * i);
+    uint8_t *data = malloc(nbytes);
+    for (int64_t i = 0; i < isize; i++) {
+        data[i] = i;
     }
-
     caterva_params_t params;
     params.itemsize = typesize;
     params.ndim = ndim;
@@ -334,30 +223,25 @@ int no_matches() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
 
 int no_matches_pad() {
-    int ndim = 4;
-    int typesize = 8;
-    int32_t shape[8] = {9, 11, 11, 16};
-    int32_t chunkshape[8] = {8, 9, 8, 8};
-    int32_t blockshape[8] = {4, 6, 7, 8};
+    int ndim = 7;
+    int typesize = 4;
+    int32_t shape[8] = {5, 8, 8, 9, 11, 11, 16};
+    int32_t chunkshape[8] = {4, 5, 6, 5, 6, 8, 8};
+    int32_t blockshape[8] = {4, 4, 4, 5, 6, 7, 8};
     int64_t isize = 1;
     for (int i = 0; i < ndim; ++i) {
         isize *= (int)(shape[i]);
     }
     int64_t nbytes = typesize * isize;
-    double *data = malloc(nbytes);
+    uint32_t *data = malloc(nbytes);
     for (int64_t i = 0; i < isize; i++) {
-        data[i] = (double) ((-i^2) * 1111 - (-i^2) * 311 + i * 111 - i * 10 + i + 0.3 * i);
-    //    data[i] = (uint16_t) i;
+        data[i] = (-i^2) * 111111 - (-i^2) * 11111 + i * 1111 - i * 110 + i;
     }
     caterva_params_t params;
     params.itemsize = typesize;
@@ -374,11 +258,7 @@ int no_matches_pad() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
@@ -394,7 +274,7 @@ int all_elem_eq() {
       isize *= (int)(shape[i]);
     }
     int64_t nbytes = typesize * isize;
-    float *data = malloc(nbytes);
+    uint32_t *data = malloc(nbytes);
     for (int64_t i = 0; i < isize; i++) {
         data[i] = 1;
     }
@@ -413,11 +293,7 @@ int all_elem_eq() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
@@ -433,7 +309,7 @@ int all_elem_pad() {
       isize *= (int)(shape[i]);
     }
     int64_t nbytes = typesize * isize;
-    float *data = malloc(nbytes);
+    uint32_t *data = malloc(nbytes);
     for (int64_t i = 0; i < isize; i++) {
         data[i] = 1;
     }
@@ -452,18 +328,14 @@ int all_elem_pad() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
 
 int same_cells() {
     int ndim = 3;
-    int typesize = 8;
+    int typesize = 4;
     int32_t shape[8] = {31, 39, 32};
     int32_t chunkshape[8] = {22, 19, 23};
     int32_t blockshape[8] = {7, 13, 14};
@@ -472,7 +344,7 @@ int same_cells() {
       isize *= (int)(shape[i]);
     }
     int64_t nbytes = typesize * isize;
-    double *data = malloc(nbytes);
+    uint32_t *data = malloc(nbytes);
     for (int64_t i = 0; i < isize; i += 4) {
         data[i] = 0;
         data[i + 1] = 1111111;
@@ -495,30 +367,26 @@ int same_cells() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
 
 int same_cells_pad() {
-    int ndim = 2;
-    int typesize = 8;
-    int32_t shape[8] = {8, 8};
-    int32_t chunkshape[8] = {6, 6};
-    int32_t blockshape[8] = {5, 5};
+    int ndim = 4;
+    int typesize = 4;
+    int32_t shape[8] = {34, 47, 43, 44};
+    int32_t chunkshape[8] = {28, 28, 28, 22};
+    int32_t blockshape[8] = {17, 17, 23, 22};
     int64_t isize = 1;
     for (int i = 0; i < ndim; ++i) {
       isize *= (int)(shape[i]);
     }
     int64_t nbytes = typesize * isize;
-    double *data = malloc(nbytes);
+    uint32_t *data = malloc(nbytes);
     for (int64_t i = 0; i < (isize / 4); i++) {
-        data[i * 4] = (double ) 11111111;
-        data[i * 4 + 1] = (double ) 99999999;
+        data[i * 4] = (uint32_t) 11111111;
+        data[i * 4 + 1] = (uint32_t) 99999999;
     }
 
     caterva_params_t params;
@@ -536,18 +404,14 @@ int same_cells_pad() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
 
 int same_cells_pad_tam1() {
     int ndim = 6;
-    int typesize = 4;
+    int typesize = 1;
     int32_t shape[8] = {30, 24, 8, 11, 9, 16};
     int32_t chunkshape[8] = {26, 22, 5, 8, 8, 11};
     int32_t blockshape[8] = {13, 11, 4, 5, 6, 8};
@@ -556,10 +420,10 @@ int same_cells_pad_tam1() {
       isize *= (int)(shape[i]);
     }
     int64_t nbytes = typesize * isize;
-    float *data = malloc(nbytes);
+    uint8_t *data = malloc(nbytes);
     for (int64_t i = 0; i < (isize / 4); i++) {
-        data[i * 4] = (float) 111;
-        data[i * 4 + 1] = (float) 99;
+        data[i * 4] = (uint32_t) 111;
+        data[i * 4 + 1] = (uint32_t) 99;
     }
 
     caterva_params_t params;
@@ -577,18 +441,14 @@ int same_cells_pad_tam1() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
 
 int matches_2_rows() {
     int ndim = 4;
-    int typesize = 8;
+    int typesize = 4;
     int32_t shape[8] = {43, 63, 57, 52};
     int32_t chunkshape[8] = {42, 43, 33, 26};
     int32_t blockshape[8] = {23, 31, 13, 16};
@@ -597,7 +457,7 @@ int matches_2_rows() {
       isize *= (int)(shape[i]);
     }
     int64_t nbytes = typesize * isize;
-    double *data = malloc(nbytes);
+    uint32_t *data = malloc(nbytes);
     for (int64_t i = 0; i < isize; i += 4) {
         if ((i <= 20) || ((i >= 48) && (i <= 68)) || ((i >= 96) && (i <= 116))) {
             data[i] = 0;
@@ -629,11 +489,7 @@ int matches_2_rows() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
@@ -649,18 +505,18 @@ int matches_3_rows() {
       isize *= (int)(shape[i]);
     }
     int64_t nbytes = typesize * isize;
-    float *data = malloc(nbytes);
+    uint32_t *data = malloc(nbytes);
     for (int64_t i = 0; i < isize - 4; i += 4) {
         if ((i % 12 == 0) && (i != 0)) {
-            data[i] = 111;
+            data[i] = 1111111;
             data[i + 1] = 3;
-            data[i + 2] = 22;
+            data[i + 2] = 11111;
             data[i + 3] = 4;
         } else {
             data[i] = 0;
-            data[i + 1] = 11;
+            data[i + 1] = 1111111;
             data[i + 2] = 2;
-            data[i + 3] = 133;
+            data[i + 3] = 1111;
         }
     }
 
@@ -679,18 +535,14 @@ int matches_3_rows() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
 
 int matches_2_couples() {
     int ndim = 4;
-    int typesize = 4;
+    int typesize = 1;
     int32_t shape[8] = {42, 55, 62, 88};
     int32_t chunkshape[8] = {42, 53, 41, 33};
     int32_t blockshape[8] = {13, 39, 28, 11};
@@ -699,7 +551,7 @@ int matches_2_couples() {
       isize *= (int)(shape[i]);
     }
     int64_t nbytes = typesize * isize;
-    float *data = malloc(nbytes);
+    uint8_t *data = malloc(nbytes);
     for (int64_t i = 0; i < isize / 4; i++) {
         if (i % 4 == 0) {
             data[i * 4] = 0;
@@ -739,18 +591,14 @@ int matches_2_couples() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
 
 int some_matches() {
     int ndim = 4;
-    int typesize = 8;
+    int typesize = 4;
     int32_t shape[8] = {56, 46, 55, 66};
     int32_t chunkshape[8] = {48, 32, 42, 33};
     int32_t blockshape[8] = {14, 18, 26, 33};
@@ -759,12 +607,12 @@ int some_matches() {
       isize *= (int)(shape[i]);
     }
     int64_t nbytes = typesize * isize;
-    double *data = malloc(nbytes);
+    uint32_t *data = malloc(nbytes);
     for (int64_t i = 0; i < (isize / 2); i++) {
-        data[i] = (double ) i;
+        data[i] = i;
     }
     for (int64_t i = (isize / 2); i < isize; i++) {
-        data[i] = (double ) 1;
+        data[i] = 1;
     }
 
     caterva_params_t params;
@@ -782,18 +630,14 @@ int some_matches() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
 
 int padding_some() {
     int ndim = 4;
-    int typesize = 8;
+    int typesize = 4;
     int32_t shape[8] = {45, 53, 52, 38};
     int32_t chunkshape[8] = {32, 38, 48, 33};
     int32_t blockshape[8] = {16, 26, 17, 11};
@@ -802,12 +646,12 @@ int padding_some() {
       isize *= (int)(shape[i]);
     }
     int64_t nbytes = typesize * isize;
-    double *data = malloc(nbytes);
+    uint32_t *data = malloc(nbytes);
     for (int64_t i = 0; i < 2 * isize / 3; i++) {
-        data[i] = (double ) 0;
+        data[i] = 0;
     }
     for (int64_t i = 2 * isize / 3; i < isize; i++) {
-        data[i] = (double ) i;
+        data[i] = i;
     }
 
     caterva_params_t params;
@@ -825,18 +669,14 @@ int padding_some() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
 
 int pad_some_32() {
     int ndim = 6;
-    int typesize = 8;
+    int typesize = 4;
     int32_t shape[8] = {16, 8, 11, 12, 9, 16};
     int32_t chunkshape[8] = {5, 6, 5, 6, 8, 8};
     int32_t blockshape[8] = {4, 4, 5, 6, 7, 8};
@@ -845,12 +685,12 @@ int pad_some_32() {
       isize *= (int)(shape[i]);
     }
     int64_t nbytes = typesize * isize;
-    double *data = malloc(nbytes);
+    uint32_t *data = malloc(nbytes);
     for (int64_t i = 0; i < 2 * isize / 3; i++) {
-        data[i] = (double ) 0;
+        data[i] = 0;
     }
     for (int64_t i = 2 * isize / 3; i < isize; i++) {
-        data[i] = (double) i;
+        data[i] = i;
     }
 
     caterva_params_t params;
@@ -868,11 +708,7 @@ int pad_some_32() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
@@ -909,11 +745,7 @@ int image1() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
@@ -950,11 +782,7 @@ int image2() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
@@ -991,11 +819,7 @@ int image3() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
@@ -1032,11 +856,7 @@ int image4() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
@@ -1073,11 +893,7 @@ int image5() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
@@ -1114,11 +930,7 @@ int image6() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
@@ -1155,11 +967,7 @@ int image7() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
@@ -1196,11 +1004,7 @@ int image8() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
@@ -1237,11 +1041,7 @@ int image9() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
@@ -1278,11 +1078,7 @@ int image10() {
     }
 
     /* Run the test. */
-    printf("\n Sin filtro \n");
-    int result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
-    storage.properties.blosc.cellshape[0] = -1;
-    printf("\n Con filtro \n");
-    result = test_ndmean(data, nbytes, typesize, ndim, params, storage);
+    int result = test_ndcell(data, nbytes, typesize, ndim, params, storage);
     free(data);
     return result;
 }
@@ -1294,8 +1090,6 @@ int main(void) {
 
     result = rand_();
     printf("rand: %d obtained \n \n", result);
-    result = easy();
-    printf("easy: %d obtained \n \n", result);
     result = no_matches();
     printf("no_matches: %d obtained \n \n", result);
     result = no_matches_pad();
@@ -1338,15 +1132,11 @@ int main(void) {
     printf("image6 with NO padding: %d obtained \n \n", result);
     result = image7();
     printf("image7 with NO padding: %d obtained \n \n", result);
-/*    result = image8();
+    result = image8();
     printf("image8 with NO padding: %d obtained \n \n", result);
     result = image9();
     printf("image9 with NO padding: %d obtained \n \n", result);
     result = image10();
     printf("image10 with NO padding: %d obtained \n \n", result);
-    result = chessbd4();
-    printf("chessbd4 with NO padding: %d obtained \n \n", result);
-    result = chessbd8();
-    printf("chessbd8 with NO padding: %d obtained \n \n", result);
 */
 }

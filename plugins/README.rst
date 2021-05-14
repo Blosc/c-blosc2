@@ -1,4 +1,3 @@
-=============================================================================
 Plugins register for Blosc users
 =============================================================================
 
@@ -9,7 +8,7 @@ by using a repository that stores them in form of plugins.
 
 
 Plugin types
-~~~~~~~~~~~~~~~~~~~
+--------------
 
 The plugins that are stored in the repository can be codecs or filters.
 
@@ -27,14 +26,15 @@ Some filters really used by Blosc are *SHUFFLE*, which groups data in an
 array based on the typesize, and *TRUNC*, which removes decimal places
 from each dataset item.
 
-.. code-block:: console
-         -------------------   codec encoder   --------
-        |       input       |   ---------->   | output |
-         -------------------                   --------
+::
 
-         -------------------   filter encoder  -------------------
-        |	    input       |   ----------->  |      output	      |
-         -------------------                   -------------------
+    --------------------   codec encoder   --------
+    |       input       |   ---------->   | output |
+     -------------------                   --------
+
+     -------------------   filter encoder  -------------------
+    |	    input       |   ----------->  |      output	      |
+     -------------------                   -------------------
 
 
 Requirements for adding plugins
@@ -43,7 +43,7 @@ Requirements for adding plugins
 For users who want to register a new codec or filter, there are some
 necessary requirements that their code must satisfy.
 
-- In the first place, the plugin code must be **written/programmed in C**.
+- In the first place, the plugin code must be **developed in C**.
 
 - In the second place, users must develop some tests which prove that the plugin works correctly.
 
@@ -60,11 +60,11 @@ Steps
 
 1. First, testing and fuzzing processes must be successful.
 
-2. Once the plugin is ready, the user must make a fork of the c-blosc2 Github repository, adding a new folder with the plugin sources to the path c-blosc2/plugins/codecs or c-blosc2/plugins/codecs depending on the plugin type.
+2. Once the plugin is ready, the user must make a fork of the c-blosc2 Github repository, adding a new folder with the plugin sources to the path c-blosc2/plugins/codecs or c-blosc2/plugins/filters depending on the plugin type.
 
 3. Furthermore, the user must create a text file named README where it is explained:
 
-    - The plugin motivation, it means why and for what purpose was the plugin created.
+    - The plugin motivation, why and for what purpose was the plugin created.
     - What does the plugin do and how it works.
     - The advantages and disadvantages of the plugin compared to the rest.
 
