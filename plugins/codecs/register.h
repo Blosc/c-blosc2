@@ -1,5 +1,5 @@
 
 enum {
-    NDLZ = 32,
+    BLOSC_CODEC_NDLZ = 32,
 };
 
