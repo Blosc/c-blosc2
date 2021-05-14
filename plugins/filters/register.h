@@ -1,6 +1,6 @@
 
 enum {
-    BLOSC_FILTER_NDCELL = 32,
-    BLOSC_FILTER_NDMEAN = 33,
+    NDCELL = 33,
+    NDMEAN = 34,
 };
 
