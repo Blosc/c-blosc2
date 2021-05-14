@@ -2962,7 +2962,7 @@ static void t_blosc_do_job(void *ctxt)
     }
     else {
       /* Regular decompression */
-      if (context->special_type == BLOSC2_NO_SPECIAL &&
+      if (context->special_type == BLOSC2_NO_SPECIAL && !memcpyed &&
           (srcsize < (int32_t)(context->header_overhead + (sizeof(int32_t) * nblocks)))) {
         /* Not enough input to read all `bstarts` */
         cbytes = -1;
