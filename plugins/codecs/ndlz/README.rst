@@ -8,6 +8,19 @@ Plugin motivation
 
 *NDLZ* was created in order to search for patterns repetitions in multidimensional cells using the Caterva blocking machinery.
 
+Plugin usage
+-------------------
+
+The codec consists of an encoder called *ndlz_compress()* to codify data and
+a decoder called *ndlz_decompress()* to recover the original data.
+
+The parameters used by *NDLZ* are the ones specified in the *blosc2_codec*
+structure of *blosc2.h*.
+Furthermore, since *NDLZ* goes through dataset blocks dividing them into fixed size cells,
+user must specify the parameter meta as 4 to use cells of size 4x4 or
+8 to use 8x8 cells. If user tries to use other value for meta, the codec
+will return an error value.
+
 Plugin behaviour
 -------------------
 
@@ -16,9 +29,7 @@ better compression ratios.  The idea is to look for similarities
 in places that are closer in a euclidean metric, not the typical
 linear one.
 
-First *NDLZ* goes through dataset blocks dividing them into fixed size cells,
-so user must specify the parameter meta as 4 to use cells of size 4x4 or
-8 to use 8x8 cells.
+First *NDLZ* goes through dataset blocks dividing them into fixed size cells.
 Then, for each cell the codec searchs for data coincidences with previous
 cells in order to copy only references to those cells instead of copying
 the full current cell.
