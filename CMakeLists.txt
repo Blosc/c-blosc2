@@ -152,7 +152,7 @@ if(NOT DEACTIVATE_ZLIB)
 endif()
 
 if (HAVE_ZLIB_NG)
-    set(ZLIB_NG_DIR "zlib-ng-2.0.2")  # update to the actual included version
+    set(ZLIB_NG_DIR "zlib-ng-2.0.3")  # update to the actual included version
     add_definitions(-DZLIB_COMPAT)
     set(ZLIB_COMPAT TRUE)
     set(SKIP_INSTALL_ALL TRUE)

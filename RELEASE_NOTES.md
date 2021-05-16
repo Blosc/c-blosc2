@@ -7,6 +7,8 @@ Changes from 2.0.0.rc.1 to 2.0.0.rc.2
 
 * Zstd sources updated to 1.5.0.
 
+* zlib-ng sources updated to 2.0.3.
+
 
 Changes from 2.0.0-beta.5 to 2.0.0.rc.1
 =======================================
