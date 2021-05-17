@@ -1027,7 +1027,7 @@ BLOSC_EXPORT void blosc2_free_ctx(blosc2_context* context);
  *
  * @return 0 if succeeds. Else a negative code is returned.
  */
-int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams);
+BLOSC_EXPORT int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams);
 
 /**
  * @brief Create a @p dparams associated to a context.
@@ -1037,7 +1037,7 @@ int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams);
  *
  * @return 0 if succeeds. Else a negative code is returned.
  */
-int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams);
+BLOSC_EXPORT int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams);
 
 /**
  * @brief Set a maskout so as to avoid decompressing specified blocks.

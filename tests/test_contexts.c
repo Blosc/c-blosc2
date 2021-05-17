@@ -43,6 +43,14 @@ int main(void) {
   cparams.splitmode = BLOSC_AUTO_SPLIT;
   cctx = blosc2_create_cctx(cparams);
 
+  blosc2_cparams cparams2 = {0};
+  blosc2_ctx_get_cparams(cctx, &cparams2);
+
+  if (cparams2.clevel != cparams.clevel) {
+    printf("Clevels are not equal!");
+    return EXIT_FAILURE;
+  }
+
   /* Compress with clevel=5 and shuffle active  */
   csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
   blosc2_free_ctx(cctx);
@@ -58,6 +66,14 @@ int main(void) {
   /* Create a context for decompression */
   dparams.nthreads = NTHREADS;
   dctx = blosc2_create_dctx(dparams);
+
+  blosc2_dparams dparams2 = {0};
+  blosc2_ctx_get_dparams(cctx, &dparams2);
+
+  if (dparams2.nthreads != dparams.nthreads) {
+    printf("Nthreads are not equal!");
+    return EXIT_FAILURE;
+  }
 
   ret = blosc2_getitem_ctx(dctx, data_out, csize, 5, 5, data_subset, sizeof(data_subset));
   if (ret < 0) {
