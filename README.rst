@@ -66,7 +66,9 @@ Create the build directory inside the sources and move into it:
 
 .. code-block:: console
 
-  $ cd c-blosc2-sources
+  $ git clone https://github.com/Blosc/c-blosc2
+  $ git submodule update --init --recursive
+  $ cd c-blosc2
   $ mkdir build
   $ cd build
 
