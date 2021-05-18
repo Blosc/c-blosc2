@@ -18,9 +18,12 @@
 #include "frame.h"
 #include "stune.h"
 
-#if defined(_WIN32) && !defined(__MINGW32__)
+#if defined(_WIN32)
   #include <windows.h>
+  #include <direct.h>
   #include <malloc.h>
+
+  #define mkdir(D, M) _mkdir(D)
 
 /* stdint.h only available in VS2010 (VC++ 16.0) and newer */
   #if defined(_MSC_VER) && _MSC_VER < 1600
@@ -31,11 +34,6 @@
 
 #endif  /* _WIN32 */
 
-#if defined(_WIN32)
-#include <direct.h>
-
-#define mkdir(D, M) _mkdir(D)
-#endif
 
 /* If C11 is supported, use it's built-in aligned allocation. */
 #if __STDC_VERSION__ >= 201112L
