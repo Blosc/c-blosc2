@@ -19,7 +19,7 @@
 #include "frame.h"
 #include "sframe.h"
 
-#if defined(_WIN32) && !defined(__MINGW32__)
+#if defined(_WIN32)
 #include <windows.h>
   #include <malloc.h>
 

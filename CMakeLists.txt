@@ -117,6 +117,13 @@ option(PREFER_EXTERNAL_ZSTD
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
+if(MINGW)
+    # This gets us DLL resource information when compiling on MinGW.
+    if(NOT CMAKE_RC_COMPILER)
+        set(CMAKE_RC_COMPILER windres.exe)
+    endif()
+endif(MINGW)
+
 if (ENABLE_ASAN)
     message(STATUS "Enabling ASAN")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Os -fno-omit-frame-pointer -fsanitize=address")
