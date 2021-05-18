@@ -214,6 +214,7 @@ endif()
 # by this (the host) system, because we want to be able to support compiling
 # for newer hardware on older machines as well as cross-compilation.
 message(STATUS "Building for system processor ${CMAKE_SYSTEM_PROCESSOR}")
+message(STATUS "Building for compiler ID ${CMAKE_C_COMPILER_ID}")
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL i386 OR
         CMAKE_SYSTEM_PROCESSOR STREQUAL i686 OR
         CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64 OR
@@ -264,7 +265,7 @@ elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l OR
         else()
             set(COMPILER_SUPPORT_NEON FALSE)
         endif()
-    elseif(CMAKE_C_COMPILER_ID STREQUAL Clang)
+    elseif(CMAKE_C_COMPILER_ID STREQUAL Clang OR CMAKE_C_COMPILER_ID STREQUAL AppleClang)
         if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 3.3 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 3.3)
             set(COMPILER_SUPPORT_NEON TRUE)
         else()
