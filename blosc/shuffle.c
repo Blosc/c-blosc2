@@ -36,6 +36,7 @@
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
 #if defined(SHUFFLE_NEON_ENABLED)
+  #include <sys/auxv.h>
   #include "shuffle-neon.h"
   #include "bitshuffle-neon.h"
 #endif  /* defined(SHUFFLE_NEON_ENABLED) */
@@ -251,7 +252,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   /* aarch64 always has NEON */
   cpu_features |= BLOSC_HAVE_NEON;
 #else
-  if (getauxval(AT_HWCAP) & HWCAP_NEON) {
+  if (getauxval(AT_HWCAP) & HWCAP_ARM_NEON) {
     cpu_features |= BLOSC_HAVE_NEON;
   }
 #endif
