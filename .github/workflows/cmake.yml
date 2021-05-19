@@ -74,13 +74,15 @@ jobs:
             compiler: cl
             cmake-args: -A x64
 
-            # Windows GCC started to fail with commit 39e4c3c which was just a printf removal.
-            # Looks like this is a problem with this platform in upstream CI.
-            # Commenting this out for now.
-            # - name: Windows GCC
-            # os: windows-latest
-            # compiler: gcc
-            # cmake-args: -G Ninja
+          - name: Windows GCC Ninja
+            os: windows-latest
+            compiler: gcc
+            cmake-args: -G Ninja
+
+          - name: Windows GCC MinGW
+            os: windows-latest
+            compiler: gcc
+            cmake-args:  -G "MinGW Makefiles"
 
           - name: macOS Clang
             os: macOS-latest
