@@ -15,6 +15,8 @@
 #       build the benchmark programs
 #   BUILD_EXAMPLES: default ON
 #       build the examples programs
+#   BUILD_PLUGINS: default ON
+#       build the plugins programs
 #   DEACTIVATE_AVX2: default OFF
 #       do not attempt to build with AVX2 instructions
 #   DEACTIVATE_LZ4: default OFF
@@ -98,6 +100,8 @@ option(BUILD_BENCHMARKS
     "Build benchmark programs form the blosc compression library" ON)
 option(BUILD_EXAMPLES
     "Build example programs form the blosc compression library" ON)
+option(BUILD_PLUGINS
+    "Build plugins programs form the blosc compression library" ON)
 option(DEACTIVATE_AVX2
     "Do not attempt to build with AVX2 instructions" OFF)
 option(DEACTIVATE_LZ4
@@ -379,6 +383,12 @@ endif()
 
 if(BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+if(BUILD_PLUGINS)
+    enable_testing()
+    add_subdirectory(plugins)
+
 endif()
 
 
