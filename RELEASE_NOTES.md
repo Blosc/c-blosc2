@@ -5,9 +5,15 @@ Release notes for C-Blosc2 2.0.0.rc.2 (second release candidate)
 Changes from 2.0.0.rc.1 to 2.0.0.rc.2
 =====================================
 
+* New compatibility with MinGW32/64.  See #302.
+
+* Improved support for AArch64 (aka ARM64), ARMv7l, ARMv6l and powerpc64le.
+  See #306. Thanks to the Julia packaging team for their help.
+
 * Zstd sources updated to 1.5.0.
 
 * zlib-ng sources updated to 2.0.3.
+
 
 
 Changes from 2.0.0-beta.5 to 2.0.0.rc.1
