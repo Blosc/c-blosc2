@@ -7,10 +7,10 @@ However, it is clear that there will always be scenarios where a more richer var
 of them could be useful.  So the Blosc Development Team has set a new goals:
 
 1) Implement a way for users to locally register filters and codecs so that they can use
-them in their setup at will.
+   them in their setup at will.
 
 2) Setup a central registry so that *other* users can make use of these filters and codecs
-without intefering with others that have been created by others.
+   without intefering with others that have been created by others.
 
 As a bonus, those filters accepted in the central registry and meeting the quality standards
 defined in these guidelines will be distributed *inside* the C-Blosc2 library,
@@ -40,20 +40,23 @@ the precision of (floating point) data, and hence, increase the compression rati
 
 Here it is an example on how the compression process goes::
 
-(convindria que encadenares els processos)
-    --------------------   codec encoder   --------
-    |       input       |   ---------->   | output |
-     -------------------                   --------
 
-     -------------------   filter encoder  -------------------
-    |	    input       |   ----------->  |      output	      |
-     -------------------                   -------------------
+    --------------------   filter encoder  -------------------   codec encoder   -------
+    |        src        |   ----------->  |        tmp        |   ---------->   | c_src |
+    --------------------                   -------------------                   -------
 
-(i per consistència, afegir el process invers de decoding).
+And the decompression process::
+
+    --------   codec decoder    -------------------   filter decoder  -------------------
+    | c_src |    ----------->  |        tmp        |   ---------->   |        src        |
+    --------                    -------------------                   -------------------
+
+Moreover, during the pipeline process you can use even 6 different 
+filters ordered as you prefer.
 
 
 Requirements for adding plugins
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------
 
 For users wanting to register a new codec or filter, there are some requirements
 that their code must satisfy:
@@ -72,13 +75,13 @@ say and will decide if a plugin is to be accepted or not.
 
 
 Steps
-~~~~~
+-----
 
 1. First, both regular tests and fuzzing tests must be provided and be passing.
 
 2. Then, the user must make a fork of the C-Blosc2 Github repository,
-adding a new folder within the plugin sources to the path `plugins/codecs` or
-`plugins/filters` depending on the plugin type.
+   adding a new folder within the plugin sources to the path `plugins/codecs` or
+   `plugins/filters` depending on the plugin type.
 
 3. Furthermore, a text file named `README.rst` must be provided where it is explained:
 
@@ -91,52 +94,18 @@ adding a new folder within the plugin sources to the path `plugins/codecs` or
    * The advantages and disadvantages of the plugin compared to the rest.
 
 4. Finally, the Blosc development team will carry out the evaluation process
-(probably via a votation process, with the BDFL having the last say in case of the team is undecided)
-so as to decide whether the plugin is useful and hence, candidate to be integrated into the C-Blosc2
-source code distribution.
+   (probably via a votation process, with the BDFL having the last say in case of the team is undecided)
+   so as to decide whether the plugin is useful and hence, candidate to be integrated into the C-Blosc2
+   source code distribution.
 
 
 Examples
-~~~~~~~~
+--------
 
 In the `plugins/` directory there can be found different examples of codecs and filters
 available as plugins that can be used in the compression process, and that
 can be used as an example on how to implement plugins that can make into C-Blosc2.
 Some of these examples are `ndlz`, `ndcell` or `ndmean`.
-
-.
-
-.
-
-.
-
-.
-
-.
-
-APARTADOS
-- Tipos de plugins añadibles (només exemples de plugins!):
-    - Codecs -> explicar y ejemplos (LZ4, BLOSCLZ, ZSTD...)
-    - Filtros -> explicar (mismo tamaño ip-op) y ejemplos
-                 (SHUFFLE, TRUNC...)
-
-- Requisitos para añadir plugins (això ja està descrit més amunt, no?):
-    - Escrito en C
-    - Tests
-    - Fuzzer
-    - Blosc development team se reserva la última palabra
-
-- Pasos (si!):
-    1. Tests y fuzzer pasan
-    2. Hacer PR y explicar ahí:
-        - la motivación del plugin (para qué sirve)
-        - ventajas y desventajas del plugin
-    3. Proceso de evaluación
-
-- Ejemplos (si!):
-    - Filtros: ndcell, ndmean
-    - Codecs: ndlz
-
 
 
 

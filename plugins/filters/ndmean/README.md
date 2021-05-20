@@ -2,6 +2,7 @@ NDMEAN: a multidimensional filter for lossy compression
 =============================================================================
 
 Given an n-dim array or matrix, *NDMEAN* is a filter based on *NDCELL*
+(https://github.com/Blosc/c-blosc2/tree/main/plugins/filters/ndcell/README.rst)
 that not only divides data into multidimensional cells so
 that a codec compress cell by cell, but also replaces each cell elements by
 the cell mean.
