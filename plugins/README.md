@@ -64,7 +64,7 @@ that their code must satisfy:
 - First, the plugin code must be **developed in C**, have a relatively small footprint
   and meet decent quality code standards.
 
-- Second, users must develop a test suite which proves that the plugin works correctly.
+- Second, users must develop a test suite which prove that the plugin works correctly.
 
 - .............FUZZER........................
 

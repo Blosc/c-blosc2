@@ -33,8 +33,7 @@
  */
 
 #include <stdio.h>
-#include <caterva.h>
-#include <ndcell.h>
+#include "ndcell.h"
 
 static int test_ndcell(void *data, int64_t nbytes, int typesize, int ndim, caterva_params_t params, caterva_storage_t storage) {
 
