@@ -36,9 +36,17 @@
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
 #if defined(SHUFFLE_NEON_ENABLED)
-  #ifndef __aarch64__
-    /* Avoid including Linux header on macOS */
+  #if defined(__linux__)
     #include <sys/auxv.h>
+    #ifdef ARM_ASM_HWCAP
+      #include <asm/hwcap.h>
+    #endif
+  #elif defined(__FreeBSD__) && defined(__aarch64__)
+    #include <machine/armreg.h>
+  #elif defined(__APPLE__)
+    #include <sys/sysctl.h>
+  #elif defined(_WIN32)
+    #include <winapifamily.h>
   #endif
   #include "shuffle-neon.h"
   #include "bitshuffle-neon.h"
