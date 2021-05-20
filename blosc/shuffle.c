@@ -36,7 +36,10 @@
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
 #if defined(SHUFFLE_NEON_ENABLED)
-  #include <sys/auxv.h>
+  #ifndef __aarch64__
+    /* Avoid including Linux header on macOS */
+    #include <sys/auxv.h>
+  #endif
   #include "shuffle-neon.h"
   #include "bitshuffle-neon.h"
 #endif  /* defined(SHUFFLE_NEON_ENABLED) */
