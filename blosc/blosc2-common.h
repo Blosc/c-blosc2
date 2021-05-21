@@ -71,11 +71,10 @@
 #undef BLOSC_STRICT_ALIGN
 #elif defined(__I86__) /* Digital Mars */
 #undef BLOSC_STRICT_ALIGN
-/* Seems like unaligned access in ARM (at least ARMv6) is pretty
-   expensive, so we are going to always enforce strict aligment in ARM.
-   If anybody suggest that newer ARMs are better, we can revisit this. */
-/* #elif defined(__ARM_FEATURE_UNALIGNED) */  /* ARM, GNU C */
-/* #undef BLOSC_STRICT_ALIGN */
+/* Modern ARM systems (like ARM64) should support unaligned access
+   quite efficiently. */
+#elif defined(__ARM_FEATURE_UNALIGNED)   /* ARM, GNU C */
+#undef BLOSC_STRICT_ALIGN
 #elif defined(_ARCH_PPC) || defined(__PPC__)
 /* Modern PowerPC systems (like POWER8) should support unaligned access
    quite efficiently. */
