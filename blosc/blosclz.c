@@ -523,14 +523,10 @@ int blosclz_compress(const int clevel, const void* input, int length,
   op_limit = op + maxout;
 
   // Minimum lengths for encoding
-  // unsigned minlen_[10] = {0, 12, 12, 11, 10, 9, 8, 7, 6, 5};
-  // With modern processors there is not a noticeable impact on minimums
-  unsigned minlen_[10] = {0, 4, 4, 4, 4, 4, 4, 4, 4, 4};
+  unsigned minlen_[10] = {0, 16, 12, 11, 10, 9, 8, 7, 6, 5};
 
   // Minimum compression ratios for initiate encoding
-  // double cratio_[10] = {0, 2, 2, 2, 2, 1.8, 1.6, 1.4, 1.2, 1.1};
-  // With modern processors there is less of a noticeable impact on minimums
-  double cratio_[10] = {0, 2, 1.5, 1.3, 1.2, 1.1, 1.1, 1.1, 1.1, 1.1};
+  double cratio_[10] = {0, 2, 2, 2, 2, 1.8, 1.6, 1.4, 1.2, 1.1};
 
   uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
