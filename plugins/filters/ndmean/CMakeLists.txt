@@ -24,7 +24,7 @@ if(BUILD_TESTS)
 endif()
 
 # Copy test files
-file(GLOB TESTS_DATA ../../test_data/*.caterva)
+file(GLOB TESTS_DATA *.caterva)
 foreach (data ${TESTS_DATA})
     file(COPY ${data}
             DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

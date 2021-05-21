@@ -6,9 +6,9 @@
 
 
 #include <blosc2.h>
-#include <ndcell.h>
+#include "ndcell.h"
 #include <math.h>
-
+#include <stdio.h>
 
 
 static void index_unidim_to_multidim(int8_t ndim, int64_t *shape, int64_t i, int64_t *index) {
@@ -138,7 +138,6 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     }
 
     if (length != blocksize) {
-//    if (NDCELL_UNEXPECT_CONDITIONAL(length != blocksize)) {
         printf("Length not equal to blocksize %d %d \n", length, blocksize);
         return -1;
     }
@@ -149,7 +148,6 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
 
     /* input and output buffer cannot be less than cell size */
     if (length < cell_size * typesize) {
-//    if (NDCELL_UNEXPECT_CONDITIONAL(length < cell_size * typesize)) {
         printf("Incorrect length");
         return 0;
     }
@@ -203,7 +201,6 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
         }
 
         if (op > op_limit) {
-//        if (NDCELL_UNEXPECT_CONDITIONAL(op > op_limit)) {
             printf("Output too big");
             return 0;
         }
@@ -214,7 +211,9 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
         return 0;
     }
 
-   // free(content);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
 
     return BLOSC2_ERROR_SUCCESS;
 }
@@ -222,13 +221,14 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
 
 int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t meta, blosc2_dparams* dparams) {
 
+    blosc2_schunk *schunk = dparams->schunk;
     int8_t ndim;
     int64_t* shape = malloc(8 * sizeof(int64_t));
     int32_t* chunkshape = malloc(8 * sizeof(int32_t));
     int32_t* blockshape = malloc(8 * sizeof(int32_t));
     uint8_t* smeta;
     uint32_t smeta_len;
-    if (blosc2_meta_get(dparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
+    if (blosc2_meta_get(schunk, "caterva", &smeta, &smeta_len) < 0) {
         printf("Blosc error");
         return 0;
     }
@@ -237,7 +237,7 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
 
     int8_t cell_shape = meta;
     int cell_size = (int) pow(cell_shape, ndim);
-    int8_t typesize = dparams->typesize;
+    int8_t typesize = schunk->typesize;
     uint8_t* ip = (uint8_t*)input;
     uint8_t* ip_limit = ip + length;
     uint8_t* op = (uint8_t*)output;
@@ -247,14 +247,12 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     }
 
     if (length != blocksize) {
- //   if (NDCELL_UNEXPECT_CONDITIONAL(length != blocksize)) {
         printf("Length not equal to blocksize \n");
         return -1;
     }
 
     /* input and output buffer cannot be less than cell size */
     if (length < cell_size * typesize) {
-//    if (NDCELL_UNEXPECT_CONDITIONAL(length < cell_size * typesize)) {
         printf("Incorrect length");
         return 0;
     }
@@ -276,7 +274,6 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     for (int cell_ind = 0; cell_ind < ncells; cell_ind++) {      // for each cell
 
         if (ip > ip_limit) {
-//        if (NDCELL_UNEXPECT_CONDITIONAL(ip > ip_limit)) {
             printf("Literal copy \n");
             return 0;
         }
@@ -321,7 +318,9 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
         return 0;
     }
 
- //   free(content);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
 
     return BLOSC2_ERROR_SUCCESS;
 }

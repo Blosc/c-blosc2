@@ -5,8 +5,9 @@
 */
 
 
-#include <ndmean.h>
+#include "ndmean.h"
 #include <blosc2.h>
+#include <stdio.h>
 
 
 static void index_unidim_to_multidim(int8_t ndim, int64_t *shape, int64_t i, int64_t *index) {
@@ -235,25 +236,7 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
 
         }
         cell_length = ncopies * pad_shape[ndim - 1];
-/*
-        printf("\n ip_float \n");
-        for (int i = 0; i < cell_length; i++) {
-            printf("%f, ", ip_float[i]);
-        }
-        printf("\n cell_length: %ld", cell_length);
-/*
-        cell -= cell_length * typesize;
-        printf("\n cell \n");
-        for (int i = 0; i < cell_length * typesize; i++) {
-            printf("%u, ", cell[i]);
-        }
-*
-        cell_double -= cell_length;
-        printf("\n cell_double \n");
-        for (int i = 0; i < cell_length; i++) {
-            printf("%f, ", cell_double[i]);
-        }
-*/
+
         switch (typesize) {
             case 4:
                 mean_float /= (float) cell_length;
@@ -401,7 +384,9 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
         return 0;
     }
 
- //   free(content);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
 
     return BLOSC2_ERROR_SUCCESS;
 }
