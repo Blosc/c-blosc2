@@ -21,6 +21,10 @@ user must specify the parameter meta as 4 to use cells of size 4x4 or
 8 to use 8x8 cells. If user tries to use other value for meta, the codec
 will return an error value.
 
+NDLZ only works for 2-dim datasets of 1 byte items (typesize = 1),
+so if you want to use it for a dataset with bigger typesize then you
+must activate SHUFFLE filter and splitting mode.
+
 Plugin behaviour
 -------------------
 

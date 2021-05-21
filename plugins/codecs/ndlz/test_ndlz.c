@@ -39,10 +39,7 @@
 #include "ndlz8x8.h"
 
 
-
-
 static int test_ndlz(blosc2_schunk* schunk) {
-
 
     blosc2_codec ndlz;
     ndlz.compcode = 243;
@@ -67,7 +64,7 @@ static int test_ndlz(blosc2_schunk* schunk) {
     /* Create a context for compression */
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.splitmode = BLOSC_ALWAYS_SPLIT;
-    cparams.typesize = sizeof(uint32_t);
+    cparams.typesize = schunk->typesize;
     cparams.compcode = 243;
     cparams.compcode_meta = 4;
     cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
@@ -145,6 +142,8 @@ static int test_ndlz(blosc2_schunk* schunk) {
     free(data_in);
     free(data_out);
     free(data_dest);
+    blosc2_free_ctx(cctx);
+    blosc2_free_ctx(dctx);
 
     printf("Succesful roundtrip!\n");
     printf("Compression: %d -> %ld (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
@@ -156,6 +155,8 @@ int same_cells() {
 
     /* Run the test. */
     int result = test_ndlz(schunk);
+    blosc2_schunk_free(schunk);
+
     return result;
 }
 
@@ -164,6 +165,8 @@ int some_matches() {
 
     /* Run the test. */
     int result = test_ndlz(schunk);
+    blosc2_schunk_free(schunk);
+
     return result;
 }
 
