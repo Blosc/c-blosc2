@@ -574,7 +574,8 @@ int blosclz_compress(const int clevel, const void* input, int length,
       break;
     case 9:
       // case 9 is special.  we need to assess the optimal shift
-      maxlen = length / 8;
+      // maxlen can be quite less here because the blocksize is larger
+      maxlen = length / 16;
       csize_3b = get_csize(ibase, maxlen, true);
       csize_4b = get_csize(ibase, maxlen, false);
       ipshift = (csize_3b < csize_4b) ? 3 : 4;
