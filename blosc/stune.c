@@ -126,9 +126,9 @@ void blosc_stune_next_blocksize(blosc2_context *context) {
     }
     // Multiply by typesize so as to get proper split sizes
     blocksize *= typesize;
-    // But do not exceed 1 MB per thread (having this capacity in L3 is normal in modern CPUs)
-    if (blocksize > 1024 * 1024) {
-      blocksize = 1024 * 1024;
+    // But do not exceed 2 MB per thread (having this capacity in L3 is normal in modern CPUs)
+    if (blocksize > 2 * 1024 * 1024) {
+      blocksize = 2 * 1024 * 1024;
     }
     if (blocksize < 32 * 1024) {
       /* Do not use a too small blocksize (< 32 KB) when typesize is small */
