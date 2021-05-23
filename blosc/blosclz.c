@@ -490,18 +490,23 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
     /* update the hash at match boundary */
     seq = BLOSCLZ_READU32(ip);
     HASH_FUNCTION(hval, seq, HASH_LOG)
-    htab[hval] = (uint32_t) (ip++ - ibase);
+    uint32_t ic = (uint32_t)(ip++ - ibase);
+    htab[hval] = ic;
     seq >>= 8U;
     HASH_FUNCTION(hval, seq, HASH_LOG)
     htab[hval] = (uint32_t) (ip++ - ibase);
     /* assuming literal copy */
     oc++;
 
-  }
+    // Exit early if we are detecting compression
+    // The 4 KB figure is based on experiments
+    if ((ic > 4096) && (oc < 2 * ic)) {
+      // In case that we are testing 4 bytes vs 3 bytes,
+      // prefer the earlier (based on experiments)
+      return 1 + force_3b_shift;
+    }
 
-  /* if we have copied something, adjust the copy length */
-  if (!copy)
-    oc--;
+  }
 
   return (int)oc;
 }
