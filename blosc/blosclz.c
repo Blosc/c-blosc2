@@ -397,6 +397,7 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 
 // Get the compressed size of a buffer.  Useful for testing compression ratios for high clevels.
 static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
+  uint32_t maxlen8 = maxlen / 8;
   uint8_t* ip = ibase;
   int32_t oc = 0;
   uint8_t* ip_bound = ibase + maxlen - 1;
@@ -499,10 +500,9 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
     oc++;
 
     // Exit early if we are detecting compression
-    // The 4 KB figure is based on experiments
-    if ((ic > 4096) && (oc < 2 * ic)) {
+    if ((ic > maxlen8) && (oc < 2 * ic)) {
       // In case that we are testing 4 bytes vs 3 bytes,
-      // prefer the earlier (based on experiments)
+      // prefer the earlier (based on experiments).
       return 1 + force_3b_shift;
     }
 
