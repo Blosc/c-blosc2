@@ -781,15 +781,13 @@ blosc2_frame_s* frame_from_file(const char* urlpath, const blosc2_io *io) {
 
   char* urlpath_cpy;
   if (path_stat.st_mode & S_IFDIR) {
+    urlpath_cpy = malloc(strlen(urlpath) + 1);
+    strcpy(urlpath_cpy, urlpath);
     char last_char = urlpath[strlen(urlpath) - 1];
     if (last_char == '\\' || last_char == '/') {
-      urlpath_cpy = malloc(strlen(urlpath));
-      strncpy(urlpath_cpy,urlpath, strlen(urlpath) - 1);
       urlpath_cpy[strlen(urlpath) - 1] = '\0';
     }
     else {
-      urlpath_cpy = malloc(strlen(urlpath) + 1);
-      strcpy(urlpath_cpy, urlpath);
     }
     fp = sframe_open_index(urlpath_cpy, "rb", io);
     sframe = true;
