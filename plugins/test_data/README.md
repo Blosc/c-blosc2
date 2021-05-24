@@ -1,12 +1,12 @@
-Here there are stored testing complementary files that are avaiable for
+Here there are stored testing complementary files that are available for
 all users to test their plugins.
 
 The folder files are multidimensional arrays created in Caterva with 
 the next parameters:
-- cfg.nthreads = 1;
-- cfg.splitmode = BLOSC_ALWAYS_SPLIT;
-- cfg.compcodec = BLOSC_ZSTD;
-- cfg.complevel = 9;
+- nthreads = 1;
+- splitmode = BLOSC_ALWAYS_SPLIT;
+- compcodec = BLOSC_ZSTD;
+- complevel = 9;
 
 Moreover, each dataset has different types and shapes:
 
