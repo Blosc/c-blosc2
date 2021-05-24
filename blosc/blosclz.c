@@ -491,8 +491,7 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
     /* update the hash at match boundary */
     seq = BLOSCLZ_READU32(ip);
     HASH_FUNCTION(hval, seq, HASH_LOG)
-    uint32_t ic = (uint32_t)(ip++ - ibase);
-    htab[hval] = ic;
+    htab[hval] = (uint32_t)(ip++ - ibase);
     seq >>= 8U;
     HASH_FUNCTION(hval, seq, HASH_LOG)
     htab[hval] = (uint32_t) (ip++ - ibase);
@@ -500,10 +499,14 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
     oc++;
 
     // Exit early if we are detecting compression
-    if ((ic > maxlen8) && (oc < 2 * ic)) {
+    int32_t ic = (int32_t)(ip - ibase);
+    if ((ic > (maxlen / 8)) && (oc < 2 * ic)) {
       // In case that we are testing 4 bytes vs 3 bytes,
       // prefer the earlier (based on experiments).
-      return 1 + force_3b_shift;
+      //return 1 + force_3b_shift;
+      // Finally we use the next one, based on experiments
+      // witn python-blosc2.
+      return oc;
     }
 
   }
