@@ -28,7 +28,7 @@ user must specify the parameter meta as the cellshape, so if in a
 3-dim dataset user specifies meta = 4, then cellshape will be 4x4x4. If user tries to use other value for meta, the codec
 will return an error value.
 
-NDMEAN only works for float or doubble datasets (depending on the typesize), so if it is used 
+NDMEAN only works for float or double datasets (depending on the typesize), so if it is used 
 for a different data type it may return an error code.
 
 Plugin behaviour

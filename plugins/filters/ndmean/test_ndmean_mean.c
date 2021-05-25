@@ -36,7 +36,7 @@
 #include "ndmean.h"
 #include <math.h>
 
-#define EPSILON (float) (1e-5)
+#define EPSILON (float) (1)
 
 static bool is_close(double d1, double d2) {
 
@@ -56,6 +56,25 @@ static bool is_close(double d1, double d2) {
 
 
 static int test_ndmean(blosc2_schunk* schunk) {
+
+    int8_t ndim;
+    int64_t* shape = malloc(8 * sizeof(int64_t));
+    int32_t* chunkshape = malloc(8 * sizeof(int32_t));
+    int32_t* blockshape = malloc(8 * sizeof(int32_t));
+    uint8_t cellshape = 4;
+    uint8_t* smeta;
+    uint32_t smeta_len;
+    if (blosc2_meta_get(schunk, "caterva", &smeta, &smeta_len) < 0) {
+        printf("Blosc error");
+        return 0;
+    }
+    deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+    free(smeta);
+
+    if (ndim != 1) {
+        fprintf(stderr, "This test only works for ndim = 1");
+        return -1;
+    }
 
     blosc2_filter ndmean;
     ndmean.id = 165;
@@ -81,7 +100,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
     cparams.typesize = typesize;
     cparams.compcode = BLOSC_ZSTD;
     cparams.filters[4] = 165;
-    cparams.filters_meta[4] = 4;
+    cparams.filters_meta[4] = cellshape;
     cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
     cparams.clevel = 9;
     cparams.nthreads = 1;
@@ -96,6 +115,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
     blosc2_context *dctx;
     dctx = blosc2_create_dctx(dparams);
 
+    double cell_mean;
     for (int ci = 0; ci < nchunks; ci++) {
 
         decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
@@ -123,14 +143,22 @@ static int test_ndmean(blosc2_schunk* schunk) {
         csize_f += csize;
 
 /*
-        printf("data_in: \n");
+        printf("\n data_in: \n");
         for (int i = 0; i < chunksize / typesize; i++) {
-            printf("%f, ",((float *) data_in)[i]);
+            if (typesize == 4) {
+                printf("%f, ", ((float *) data_in)[i]);
+            } else if (typesize == 8) {
+                printf("%f, ", ((double *) data_in)[i]);
+            }
         }
 /*
         printf("\n out \n");
-        for (int i = 0; i < chunksize; i++) {
-            printf("%u, ", data_out[i]);
+        for (int i = 0; i < csize; i++) {
+            if (typesize == 4) {
+                printf("%f, ", ((float *) data_out)[i]);
+            } else if (typesize == 8) {
+                printf("%f, ", ((double *) data_out)[i]);
+            }
         }
 
         /* Decompress  */
@@ -139,28 +167,67 @@ static int test_ndmean(blosc2_schunk* schunk) {
             printf("Decompression error.  Error code: %d\n", dsize);
             return dsize;
         }
+/*
+        printf("\n data_dest: \n");
+        for (int i = 0; i < chunksize / typesize; i++) {
+            if (typesize == 4) {
+                printf("%f, ", ((float *) data_dest)[i]);
+            } else if (typesize == 8) {
+                printf("%f, ", ((double *) data_dest)[i]);
+            }
+        }
+*/
+        int chunk_shape = chunkshape[0];
+        if (ci == nchunks - 1) {
+            chunk_shape = shape[0] % chunkshape[0];
+        }
+        int nblocks = (chunk_shape + blockshape[0] - 1) / blockshape[0];
 
-        switch (typesize) {
-            case 4:
-                for (int i = 0; i < chunksize / typesize; i++) {
-                    if (!is_close(((float *) data_in)[i], ((float *) data_dest)[i])) {
-                        printf("i: %d, data %.9f, dest %.9f", i, ((float *) data_in)[i], ((float *) data_dest)[i]);
-                        printf("\n Decompressed data differs from original!\n");
-                        return -1;
-                    }
+        for (int bi = 0; bi < nblocks; bi++) {
+            int block_shape = blockshape[0];
+            if (bi == nblocks - 1) {
+                block_shape = chunk_shape % blockshape[0];
+            }
+            int ncells = (block_shape + cellshape - 1) / cellshape;
+
+            for (int cei = 0; cei < ncells; cei++) {
+                int ind = bi * blockshape[0] + cei * cellshape;
+                cell_mean = 0;
+                int cell_shape = cellshape;
+                if (cei == ncells - 1) {
+                    cell_shape = block_shape % cellshape;
                 }
-                break;
-            case 8:
-                for (int i = 0; i < chunksize / typesize; i++) {
-                    if (!is_close(((double *) data_in)[i], ((double *) data_dest)[i])) {
-                        printf("i: %d, data %.9f, dest %.9f", i, ((double *) data_in)[i], ((double *) data_dest)[i]);
-                        printf("\n Decompressed data differs from original!\n");
-                        return -1;
-                    }
+                switch (typesize) {
+                    case 4:
+                        for (int i = 0; i < cell_shape; i++) {
+                            cell_mean += ((float *) data_in)[ind + i];
+                        }
+                        cell_mean /= cell_shape;
+                        for (int i = 0; i < cell_shape; i++) {
+                            if (!is_close(cell_mean, ((float *) data_dest)[ind + i])) {
+                                printf("i: %d, cell_mean %.9f, dest %.9f", ind + i, cell_mean, ((float *) data_dest)[ind + i]);
+                                printf("\n Decompressed data differs from original!\n");
+                                return -1;
+                            }
+                        }
+                        break;
+                    case 8:
+                        for (int i = 0; i < cell_shape; i++) {
+                            cell_mean += ((double *) data_in)[ind + i];
+                        }
+                        cell_mean /= cell_shape;
+                        for (int i = 0; i < cell_shape; i++) {
+                            if (!is_close(cell_mean, ((double *) data_dest)[ind + i])) {
+                                printf("i: %d, cell_mean %.9f, dest %.9f", ind + i, cell_mean, ((double *) data_dest)[ind + i]);
+                                printf("\n Decompressed data differs from original!\n");
+                                return -1;
+                            }
+                        }
+                        break;
+                    default :
+                        break;
                 }
-                break;
-            default :
-                break;
+            }
         }
     }
     csize_f = csize_f / nchunks;
@@ -170,6 +237,9 @@ static int test_ndmean(blosc2_schunk* schunk) {
     free(data_dest);
     blosc2_free_ctx(cctx);
     blosc2_free_ctx(dctx);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
 
     printf("Succesful roundtrip!\n");
     printf("Compression: %d -> %ld (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
@@ -177,8 +247,8 @@ static int test_ndmean(blosc2_schunk* schunk) {
 }
 
 
-int rand() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_rand.caterva");
+int rows_matches() {
+    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_1dim_2rows.caterva");
 
     /* Run the test. */
     int result = test_ndmean(schunk);
@@ -187,7 +257,7 @@ int rand() {
 }
 
 int same_cells() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_same_cells.caterva");
+    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_1dim_same_cells.caterva");
 
     /* Run the test. */
     int result = test_ndmean(schunk);
@@ -196,7 +266,7 @@ int same_cells() {
 }
 
 int some_matches() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_some_matches.caterva");
+    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_1dim_some_matches.caterva");
 
     /* Run the test. */
     int result = test_ndmean(schunk);
@@ -209,8 +279,8 @@ int main(void) {
 
     int result;
 
-    result = rand();
-    printf("rand: %d obtained \n \n", result);
+    result = rows_matches();
+    printf("2_rows_matches: %d obtained \n \n", result);
     result = same_cells();
     printf("same_cells: %d obtained \n \n", result);
     result = some_matches();
