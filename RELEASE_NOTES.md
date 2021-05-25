@@ -10,10 +10,13 @@ Changes from 2.0.0.rc.1 to 2.0.0.rc.2
 * Improved support for AArch64 (aka ARM64), ARMv7l, ARMv6l and powerpc64le.
   See #306. Thanks to the Julia packaging team for their help.
 
+* BloscLZ updated to 2.4.0.  Aligned access in ARM has been enabled, as well
+  as other performance improvements.  Expect much better performance,
+  specially on ARM platforms (like Apple Silicon).
+
 * Zstd sources updated to 1.5.0.
 
 * zlib-ng sources updated to 2.0.3.
-
 
 
 Changes from 2.0.0-beta.5 to 2.0.0.rc.1
