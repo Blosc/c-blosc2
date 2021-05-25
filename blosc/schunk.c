@@ -141,14 +141,10 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
   if (!storage->contiguous && storage->urlpath != NULL){
     char* urlpath;
     char last_char = storage->urlpath[strlen(storage->urlpath) - 1];
+    urlpath = malloc(strlen(storage->urlpath) + 1);
+    strcpy(urlpath, storage->urlpath);
     if (last_char == '\\' || last_char == '/') {
-      urlpath = malloc(strlen(storage->urlpath));
-      strncpy(urlpath, storage->urlpath, strlen(storage->urlpath) - 1);
       urlpath[strlen(storage->urlpath) - 1] = '\0';
-    }
-    else {
-      urlpath = malloc(strlen(storage->urlpath) + 1);
-      strcpy(urlpath, storage->urlpath);
     }
     // Create directory
     if (mkdir(urlpath, 0777) == -1) {
