@@ -45,9 +45,9 @@ extern "C" {
 #define BLOSC_VERSION_MINOR    0    /* for minor interface/format changes  */
 #define BLOSC_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC_VERSION_STRING   "2.0.0.rc.2.dev"  /* string version.  Sync with above! */
+#define BLOSC_VERSION_STRING   "2.0.0.rc2"  /* string version.  Sync with above! */
 #define BLOSC_VERSION_REVISION "$Rev$"   /* revision version */
-#define BLOSC_VERSION_DATE     "$Date:: 2021-05-06 #$"    /* date version */
+#define BLOSC_VERSION_DATE     "$Date:: 2021-05-26 #$"    /* date version */
 
 
 /* Tracing macros */
@@ -85,7 +85,7 @@ enum {
    *
    */
   BLOSC2_VERSION_FRAME_FORMAT_BETA2 = 1,  // for 2.0.0-beta2 and after
-  BLOSC2_VERSION_FRAME_FORMAT_RC1 = 2,    // for 2.0.0-rc.1 and after
+  BLOSC2_VERSION_FRAME_FORMAT_RC1 = 2,    // for 2.0.0-rc1 and after
   BLOSC2_VERSION_FRAME_FORMAT = BLOSC2_VERSION_FRAME_FORMAT_RC1,
 };
 

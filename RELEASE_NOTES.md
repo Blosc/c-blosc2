@@ -1,14 +1,15 @@
-Release notes for C-Blosc2 2.0.0.rc.2 (second release candidate)
+Release notes for C-Blosc2 2.0.0.rc-2 (second release candidate)
 ===============================================================
 
 
-Changes from 2.0.0.rc.1 to 2.0.0.rc.2
-=====================================
+Changes from 2.0.0.rc.1 to 2.0.0.rc2
+====================================
 
 * New compatibility with MinGW32/64.  See #302.
 
 * Improved support for AArch64 (aka ARM64), ARMv7l, ARMv6l and powerpc64le.
-  See #306. Thanks to the Julia packaging team for their help.
+  See #306. Thanks to Alexandr Romanenko, Mark Kittisopikul and Mosè Giordano
+  from the Julia packaging team for their help.
 
 * BloscLZ updated to 2.4.0.  Aligned access in ARM has been enabled, as well
   as other performance improvements.  Expect much better performance,

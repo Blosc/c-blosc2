@@ -1,22 +1,33 @@
-# Announcing C-Blosc2 2.0.0.rc.1
-A simple, compressed, fast and persistent data store library for C.
+# Announcing C-Blosc2 2.0.0 RC2
+A fast, compressed and persistent data store library for C.
 
 ## What is new?
 
-On behalf of the Blosc team, we are happy to announce the first C-Blosc2
-release (Release Candidate 1) that is meant to be reviewed by users.  As of now
+On behalf of the Blosc team, we are happy to announce the second C-Blosc2
+release (Release Candidate 2) that is meant to be reviewed by users.  As of RC1
 we are declaring both the API and the format frozen, and we are seeking for
 feedback from the community so as to better check the library and declare it
 apt for its use in production.
 
-There are a *lot* of new features to mentioned here.  Just have a look at [our
-RC1 blog](https://www.blosc.org/posts/blosc2-ready-general-review/) where we list
-the main improvements, with some historical overview too.
+In RC2 there is improved support for AArch64 (aka ARM64), ARMv7l, ARMv6l
+and powerpc64le. Thanks to Alexandr Romanenko, Mark Kittisopikul and Mosè Giordano
+from the Julia packaging team for their help.
 
-C-Blosc2 should be backward compatible with C-Blosc, so you can start using it right away and slowly begin to use its new functionality, like the new filters, prefilters, super-chunks and frames.  See docs in: https://blosc2.readthedocs.io
+Also, we have implemented performance improvements in the BloscLZ codec
+and updated different codecs to latest versions (zlib-ng and zstd).
 
-**IMPORTANT**: Please note that, even if the API and format have been declared frozen, that does *not* mean that Blosc2 is ready for production yet: bad bugs can still exist at this stage.  So *do not assume* that your blosc2 data can be read with future versions.  This
-  is just a call for general review of the library.
+There are a *lot* of new features in C-Blosc2 compared with C-Blosc, its predecessor.
+Just have a look at [our RC1 blog](https://www.blosc.org/posts/blosc2-ready-general-review/)
+where we list the main improvements, with some historical overview too.
+
+C-Blosc2 should be backward compatible with C-Blosc, so you can start using it
+right away and slowly begin to useits new functionality, like the new filters,
+prefilters, super-chunks and frames.  See docs in: https://blosc2.readthedocs.io
+
+**IMPORTANT**: Please note that, even if the API and format have been declared frozen,
+that does *not* mean that Blosc2 is ready for production yet: bad bugs can still exist
+at this stage.  So *do not assume* that your Blosc2 data can be read with future versions.
+This is just a call for general review of the library.
 
 For more info, please see the release notes in:
 
