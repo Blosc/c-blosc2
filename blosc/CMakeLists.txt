@@ -263,7 +263,8 @@ endif()
 
 # install
 if(BLOSC_INSTALL)
-    install(FILES blosc2.h blosc2-export.h blosc2-common.h DESTINATION include COMPONENT DEV)
+    install(FILES blosc2.h blosc2-export.h blosc2-common.h blosc2_stdio.h
+            DESTINATION include COMPONENT DEV)
     if(BUILD_SHARED)
         install(TARGETS blosc2_shared
                 LIBRARY DESTINATION ${lib_dir}
