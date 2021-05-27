@@ -107,7 +107,7 @@ option(DEACTIVATE_ZLIB
 option(DEACTIVATE_ZSTD
     "Do not include support for the ZSTD library." OFF)
 option(DEACTIVATE_IPP
-    "Do not include support for the Intel IPP library." ON)
+    "Do not include support for the Intel IPP library." OFF)
 option(PREFER_EXTERNAL_LZ4
     "Find and use external LZ4 library instead of included sources." OFF)
 option(PREFER_EXTERNAL_ZLIB

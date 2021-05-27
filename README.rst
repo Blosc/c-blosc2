@@ -47,7 +47,7 @@ Currently C-Blosc2 comes with support of BloscLZ, a compressor heavily based on 
 
 Blosc is in charge of coordinating the codecs and filters so that they can leverage the blocking technique (described above) as
 well as multi-threaded execution (if several cores are available) automatically. That makes that every codec and filter
-will work at very high speeds, even if it was not initially designed for doing blocking or multi-threading. For example, 
+will work at very high speeds, even if it was not initially designed for doing blocking or multi-threading. For example,
 Blosc allows you to use the ``LZ4`` codec, but in a multi-threaded way.
 
 Another important aspect of C-Blosc2 is that it splits large datasets in smaller containers called *chunks*, which are basically `Blosc1 containers <https://github.com/Blosc/c-blosc>`_. For maximum performance, these chunks are meant to fit in the LLC (Last Level Cache) of CPUs.  In practice this means that in order to leverage C-Blosc2 containers effectively, the user should ask for C-Blosc2 to uncompress the chunks, consume them before they hit main memory and then proceed with the new chunk (as in any streaming operation).  We call this process *Streamed Compressed Computing* and it effectively avoids uncompressed data to travel to RAM, saving precious time in modern architectures where `RAM access is very expensive compared with CPU speeds <https://www.blosc.org/docs/StarvingCPUs-CISE-2010.pdf>`_.
@@ -137,16 +137,17 @@ For Mac OSX on arm64 architecture, you need to compile like this:
 Support for the LZ4 optimized version in Intel IPP
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-C-Blosc2 comes with support for a highly optimized version of the LZ4 codec present in Intel IPP, and actually if the cmake machinery in C-Blosc2 discovers IPP installed in your system it will use it automatically by default.  Here it is a way to easily install Intel IPP in Ubuntu machines:
+C-Blosc2 comes with support for a highly optimized version of the LZ4 codec present in Intel IPP.  Actually, the default is to enable LZ4/IPP if cmake discovers IPP installed in your system it will use it automatically.  Here it is a way to easily install Intel IPP using [conda](https://docs.conda.io):
 
 .. code-block:: console
 
-   $ wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
-   $ apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB
-   $ sudo sh -c 'echo deb https://apt.repos.intel.com/ipp all main > /etc/apt/sources.list.d/intel-ipp.list'
-   $ sudo apt-get update && sudo apt-get install intel-ipp-64bit-2019.X  # replace .X by the latest version
+   $ conda install -c intel ipp-static
 
-Check `Intel IPP website <https://software.intel.com/en-us/articles/intel-integrated-performance-primitives-intel-ipp-install-guide>`_ for instructions on how to install it for other platforms.
+In general, LZ4/IPP is faster than regular LZ4, although in some cases you may experience different compression ratios depending on which version you use.  If in doubt, or cmake is having difficulties in finding IPP files in your system, you can always manually disable LZ4/IPP by setting `DEACTIVATE_IPP` in cmake:
+
+.. code-block:: console
+
+   $ cmake .. -DDEACTIVATE_IPP=ON
 
 
 Display error messages
