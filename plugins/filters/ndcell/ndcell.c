@@ -154,7 +154,7 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
 
     uint8_t* obase = op;
 
-    int64_t i_shape[ndim];
+    int64_t i_shape[NDCELL_MAX_DIM];
     for (int i = 0; i < ndim; ++i) {
         i_shape[i] = (blockshape[i] + cell_shape - 1) / cell_shape;
     }
@@ -165,8 +165,8 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     }
 
     /* main loop */
-    int64_t pad_shape[ndim];
-    int64_t ii[ndim];
+    int64_t pad_shape[NDCELL_MAX_DIM];
+    int64_t ii[NDCELL_MAX_DIM];
     for (int cell_ind = 0; cell_ind < ncells; cell_ind++) {      // for each cell
         index_unidim_to_multidim(ndim, i_shape, cell_ind, ii);
         uint32_t orig = 0;
@@ -187,7 +187,7 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
         for (int i = 0; i < ndim - 1; ++i) {
             ncopies *= pad_shape[i];
         }
-        int64_t kk[ndim];
+        int64_t kk[NDCELL_MAX_DIM];
         for (int copy_ind = 0; copy_ind < ncopies; ++copy_ind) {
             index_unidim_to_multidim(ndim - 1, pad_shape, copy_ind, kk);
             nd_aux = blockshape[ndim - 1];
@@ -257,7 +257,7 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
         return 0;
     }
 
-    int64_t i_shape[ndim];
+    int64_t i_shape[NDCELL_MAX_DIM];
     for (int i = 0; i < ndim; ++i) {
         i_shape[i] = (blockshape[i] + cell_shape - 1) / cell_shape;
     }
@@ -268,8 +268,8 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     }
 
     /* main loop */
-    int64_t pad_shape[ndim];
-    int64_t ii[ndim];
+    int64_t pad_shape[NDCELL_MAX_DIM];
+    int64_t ii[NDCELL_MAX_DIM];
     int32_t ind;
     for (int cell_ind = 0; cell_ind < ncells; cell_ind++) {      // for each cell
 
@@ -297,7 +297,7 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
         for (int i = 0; i < ndim - 1; ++i) {
             ncopies *= pad_shape[i];
         }
-        int64_t kk[ndim];
+        int64_t kk[NDCELL_MAX_DIM];
         for (int copy_ind = 0; copy_ind < ncopies; ++copy_ind) {
             index_unidim_to_multidim(ndim - 1, pad_shape, copy_ind, kk);
             nd_aux = blockshape[ndim - 1];
