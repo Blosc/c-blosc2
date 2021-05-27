@@ -98,7 +98,7 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
   uint32_t hval, hash_cell;
   uint32_t hash_triple[6] = {0};
   uint32_t hash_pair[7] = {0};
-  uint8_t bufarea[cell_size];
+  uint8_t* bufarea = malloc(cell_size);
   uint8_t* buf_cell = bufarea;
   uint8_t* buf_aux;
   uint32_t tab_cell[1U << 12U] = {0};
@@ -156,6 +156,10 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
       }
 
       if (NDLZ_UNEXPECT_CONDITIONAL(op + cell_size + 1 > op_limit)) {
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
+        free(bufarea);
         return 0;
       }
 
@@ -353,7 +357,11 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
 
       }
       if((op - obase) > input_len) {
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
         return 0;
+        free(bufarea);
       }
     }
   }
@@ -361,6 +369,7 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
   free(shape);
   free(chunkshape);
   free(blockshape);
+  free(bufarea);
 
   return (int)(op - obase);
 }
@@ -434,7 +443,7 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   uint32_t blockshape[2];
   uint32_t eshape[2];
   uint8_t* buffercpy;
-  uint8_t local_buffer[cell_size];
+  uint8_t* local_buffer = malloc(cell_size);
   uint8_t token;
   if (NDLZ_UNEXPECT_CONDITIONAL(input_len <= 0)) {
     return 0;
@@ -466,7 +475,7 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   uint32_t ii[2];
   uint32_t padding[2];
   uint32_t ind;
-  uint8_t cell_aux[cell_size];
+  uint8_t* cell_aux = malloc(cell_size);
   for (ii[0] = 0; ii[0] < i_stop[0]; ++ii[0]) {
     for (ii[1] = 0; ii[1] < i_stop[1]; ++ii[1]) {      // for each cell
       if (NDLZ_UNEXPECT_CONDITIONAL(ip > ip_limit)) {
@@ -546,6 +555,9 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
     }
   }
   ind += padding[1];
+
+  free(cell_aux);
+  free(local_buffer);
 
   if (ind != (blockshape[0] * blockshape[1])) {
     printf("Output size is not compatible with embeded blockshape \n");

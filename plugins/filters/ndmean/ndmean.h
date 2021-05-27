@@ -7,6 +7,7 @@
 
 #include <blosc2.h>
 
+#define NDMEAN_MAX_DIM 8
 
 static void index_unidim_to_multidim(int8_t ndim, int64_t *shape, int64_t i, int64_t *index);
 
