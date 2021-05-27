@@ -10,9 +10,9 @@
 
 static void index_unidim_to_multidim(int8_t ndim, int64_t *shape, int64_t i, int64_t *index);
 
-void swap_store(void *dest, const void *pa, int size);
+static void swap_store(void *dest, const void *pa, int size);
 
-int32_t deserialize_meta(uint8_t *smeta, uint32_t smeta_len, int8_t *ndim, int64_t *shape,
+static int32_t deserialize_meta(uint8_t *smeta, uint32_t smeta_len, int8_t *ndim, int64_t *shape,
                          int32_t *chunkshape, int32_t *blockshape);
 
 

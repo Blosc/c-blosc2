@@ -23,7 +23,7 @@ static void index_unidim_to_multidim(int8_t ndim, int64_t *shape, int64_t i, int
     }
 }
 
-void swap_store(void *dest, const void *pa, int size) {
+static void swap_store(void *dest, const void *pa, int size) {
     uint8_t *pa_ = (uint8_t *) pa;
     uint8_t *pa2_ = malloc((size_t) size);
     int i = 1; /* for big/little endian detection */
@@ -63,7 +63,7 @@ void swap_store(void *dest, const void *pa, int size) {
     free(pa2_);
 }
 
-int32_t deserialize_meta(uint8_t *smeta, uint32_t smeta_len, int8_t *ndim, int64_t *shape,
+static int32_t deserialize_meta(uint8_t *smeta, uint32_t smeta_len, int8_t *ndim, int64_t *shape,
                          int32_t *chunkshape, int32_t *blockshape) {
     uint8_t *pmeta = smeta;
 
