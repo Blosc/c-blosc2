@@ -1,5 +1,5 @@
 # sources
-set(SOURCES ${SOURCES} ndlz.c ndlz.h ndlz4x4.c ndlz4x4.h ndlz8x8.c ndlz8x8.h)
+set(SOURCES ${SOURCES} ndlz.c ndlz.h ndlz4x4.c ndlz4x4.h ndlz8x8.c ndlz8x8.h xxhash.c xxhash.h)
 
 # targets
 add_executable(test_ndlz test_ndlz.c ${SOURCES})
