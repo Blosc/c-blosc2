@@ -19,7 +19,6 @@
 #define XXH_NAMESPACE ndlz4
 
 #define XXH_INLINE_ALL
-#include <xxhash.c>
 #include <stdio.h>
 #include "ndlz4x4.h"
 #include "ndlz.h"

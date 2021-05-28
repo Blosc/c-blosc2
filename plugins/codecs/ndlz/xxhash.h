@@ -292,7 +292,7 @@ XXH_PUBLIC_API XXH64_hash_t XXH64_hashFromCanonical(const XXH64_canonical_t* src
    statically, on stack, or in a struct for example.
    Do not use members directly. */
 
-   struct XXH32_state_s {
+   static struct XXH32_state_s {
        unsigned total_len_32;
        unsigned large_len;
        unsigned v1;
@@ -304,7 +304,7 @@ XXH_PUBLIC_API XXH64_hash_t XXH64_hashFromCanonical(const XXH64_canonical_t* src
        unsigned reserved;   /* never read nor write, will be removed in a future version */
    };   /* typedef'd to XXH32_state_t */
 
-   struct XXH64_state_s {
+   static struct XXH64_state_s {
        unsigned long long total_len;
        unsigned long long v1;
        unsigned long long v2;
