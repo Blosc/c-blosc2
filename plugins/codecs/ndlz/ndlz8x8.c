@@ -22,7 +22,7 @@
 #include <stdio.h>
 #include "ndlz8x8.h"
 #include "ndlz.h"
-
+#include "xxhash.h"
 
 
 /*
