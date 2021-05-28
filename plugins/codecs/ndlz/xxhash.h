@@ -48,8 +48,8 @@ XXH32        6.8 GB/s            6.0 GB/s
 extern "C" {
 #endif
 
-#ifndef XXHASH_H
-#define XXHASH_H
+#ifndef XXHASH_NDLZ
+#define XXHASH_NDLZ
 
 
 /* ****************************
