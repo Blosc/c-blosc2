@@ -48,8 +48,8 @@ XXH32        6.8 GB/s            6.0 GB/s
 extern "C" {
 #endif
 
-#ifndef XXHASH_NDLZ
-#define XXHASH_NDLZ
+#ifndef NDLZ_XXHASH
+#define NDLZ_XXHASH
 
 
 /* ****************************
@@ -276,7 +276,7 @@ XXH_PUBLIC_API void XXH64_canonicalFromHash(XXH64_canonical_t* dst, XXH64_hash_t
 XXH_PUBLIC_API XXH32_hash_t XXH32_hashFromCanonical(const XXH32_canonical_t* src);
 XXH_PUBLIC_API XXH64_hash_t XXH64_hashFromCanonical(const XXH64_canonical_t* src);
 
-#endif /* XXHASH_H_5627135585666179 */
+#endif /* NDLZ_XXHASH */
 
 
 
@@ -286,7 +286,6 @@ XXH_PUBLIC_API XXH64_hash_t XXH64_hashFromCanonical(const XXH64_canonical_t* src
    They shall only be used with static linking.
    Never use these definitions in association with dynamic linking !
 =================================================================================================== */
-#define XXH_STATIC_H_3543687687345
 
 /* These definitions are only meant to allow allocation of XXH state
    statically, on stack, or in a struct for example.
