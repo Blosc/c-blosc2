@@ -66,32 +66,32 @@ Create the build directory inside the sources and move into it:
 
 .. code-block:: console
 
-  $ git clone https://github.com/Blosc/c-blosc2
-  $ cd c-blosc2
-  $ mkdir build
-  $ cd build
+  git clone https://github.com/Blosc/c-blosc2
+  cd c-blosc2
+  mkdir build
+  cd build
 
 Now run CMake configuration and optionally specify the installation
 directory (e.g. '/usr' or '/usr/local'):
 
 .. code-block:: console
 
-  $ cmake -DCMAKE_INSTALL_PREFIX=your_install_prefix_directory ..
+  cmake -DCMAKE_INSTALL_PREFIX=your_install_prefix_directory ..
 
 CMake allows to configure Blosc in many different ways, like prefering internal or external sources for compressors or enabling/disabling them.  Please note that configuration can also be performed using UI tools provided by CMake (`ccmake`  or `cmake-gui`):
 
 .. code-block:: console
 
-  $ ccmake ..      # run a curses-based interface
-  $ cmake-gui ..   # run a graphical interface
+  ccmake ..      # run a curses-based interface
+  cmake-gui ..   # run a graphical interface
 
 Build, test and install Blosc:
 
 .. code-block:: console
 
-  $ cmake --build .
-  $ ctest
-  $ cmake --build . --target install
+  cmake --build .
+  ctest
+  cmake --build . --target install
 
 The static and dynamic version of the Blosc library, together with header files, will be installed into the specified CMAKE_INSTALL_PREFIX.
 
@@ -106,13 +106,13 @@ If you want to force Blosc to use external libraries instead of the included com
 
 .. code-block:: console
 
-  $ cmake -DPREFER_EXTERNAL_LZ4=ON ..
+  cmake -DPREFER_EXTERNAL_LZ4=ON ..
 
 You can also disable support for some compression libraries:
 
 .. code-block:: console
 
-  $ cmake -DDEACTIVATE_ZSTD=ON ..
+  cmake -DDEACTIVATE_ZSTD=ON ..
 
 Supported platforms
 ~~~~~~~~~~~~~~~~~~~
@@ -125,13 +125,13 @@ For Mac OSX, make sure that you have installed the command line developer tools.
 
 .. code-block:: console
 
-  $ xcode-select --install
+  xcode-select --install
 
 For Mac OSX on arm64 architecture, you need to compile like this:
 
 .. code-block:: console
 
-  $ CC="clang -arch arm64" cmake ..
+  CC="clang -arch arm64" cmake ..
 
 
 Support for the LZ4 optimized version in Intel IPP
@@ -141,13 +141,13 @@ C-Blosc2 comes with support for a highly optimized version of the LZ4 codec pres
 
 .. code-block:: console
 
-   $ conda install -c intel ipp-static
+   conda install -c intel ipp-static
 
 In general, LZ4/IPP is faster than regular LZ4, although in some cases you may experience different compression ratios depending on which version you use.  If in doubt, or cmake is having difficulties in finding IPP files in your system, you can always manually disable LZ4/IPP by setting `DEACTIVATE_IPP` in cmake:
 
 .. code-block:: console
 
-   $ cmake .. -DDEACTIVATE_IPP=ON
+   cmake .. -DDEACTIVATE_IPP=ON
 
 
 Display error messages
