@@ -41,9 +41,9 @@ endif()
 include_directories(${BLOSC_INCLUDE_DIRS})
 
 # library sources
-set(SOURCES blosc2.c blosclz.c fastcopy.c fastcopy.h schunk.c frame.c stune.c stune.h
+set(SOURCES blosc2.c blosc2-common.h blosclz.c fastcopy.c fastcopy.h schunk.c frame.c stune.c stune.h
         context.h delta.c delta.h shuffle-generic.c bitshuffle-generic.c trunc-prec.c trunc-prec.h
-        timestamp.c sframe.c directories.c blosc2-stdio.c)
+        timestamp.c sframe.c directories.c blosc2_stdio.c)
 if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
     if(COMPILER_SUPPORT_SSE2)
         message(STATUS "Adding run-time support for SSE2")
@@ -130,16 +130,15 @@ endif()
 
 if (BUILD_PLUGINS)
     file(GLOB CODECS_FILES ${PROJECT_SOURCE_DIR}/plugins/codecs/*/*.c)
-    file(GLOB CODECS_RM_FILES ${PROJECT_SOURCE_DIR}/plugins/codecs/*/test*.c)
+    file(GLOB CODECS_RM_FILES ${PROJECT_SOURCE_DIR}/plugins/codecs/*/test_*.c)
     foreach(file ${CODECS_RM_FILES})
         list(REMOVE_ITEM CODECS_FILES ${file})
     endforeach()
     file(GLOB FILTERS_FILES ${PROJECT_SOURCE_DIR}/plugins/filters/*/*.c)
-    file(GLOB FILTERS_RM_FILES ${PROJECT_SOURCE_DIR}/plugins/filters/*/test*.c)
+    file(GLOB FILTERS_RM_FILES ${PROJECT_SOURCE_DIR}/plugins/filters/*/test_*.c)
     foreach(file ${FILTERS_RM_FILES})
         list(REMOVE_ITEM FILTERS_FILES ${file})
     endforeach()
-    list(REMOVE_ITEM FILTERS_FILES ${PROJECT_SOURCE_DIR}/plugins/filters/*/test*.c)
     set(PLUGINS_FILES ${CODECS_FILES} ${FILTERS_FILES})
   #  message(STATUS "PLUGINS_FILES = ${PLUGINS_FILES}")
     set(SOURCES ${SOURCES} ${PLUGINS_FILES})
@@ -280,10 +279,8 @@ endif()
 
 # install
 if(BLOSC_INSTALL)
-    install(FILES ../include/blosc2.h DESTINATION include COMPONENT DEV)
-    install(FILES ../include/blosc2/blosc2-export.h ../include/blosc2/blosc2-common.h
-            DESTINATION include/blosc2 COMPONENT DEV)
-
+    install(FILES blosc2.h DESTINATION include COMPONENT DEV)
+    install(FILES blosc2-export.h blosc2-common.h ../plugins/plugins_includes.h DESTINATION include/blosc2 COMPONENT DEV)
     if(BUILD_SHARED)
         install(TARGETS blosc2_shared
                 LIBRARY DESTINATION ${lib_dir}
