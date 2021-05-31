@@ -48,6 +48,8 @@ XXH32        6.8 GB/s            6.0 GB/s
 extern "C" {
 #endif
 
+#define XXH_NAMESPACE NDLZ
+
 #ifndef NDLZ_XXHASH
 #define NDLZ_XXHASH
 

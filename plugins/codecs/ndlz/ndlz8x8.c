@@ -16,13 +16,12 @@
   linear one.
 **********************************************************************/
 
-#define XXH_NAMESPACE ndlz8
 
 #define XXH_INLINE_ALL
 #include <stdio.h>
 #include "ndlz8x8.h"
 #include "ndlz.h"
-#include "xxhash.h"
+#include <xxhash.h>
 
 
 /*

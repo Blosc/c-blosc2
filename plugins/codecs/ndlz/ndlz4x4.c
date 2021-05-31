@@ -16,7 +16,6 @@
   linear one.
 **********************************************************************/
 
-#define XXH_NAMESPACE ndlz4
 
 #define XXH_INLINE_ALL
 #include <stdio.h>
