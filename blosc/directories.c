@@ -65,6 +65,8 @@
 #else
   #include <sys/stat.h>
   #include <dirent.h>
+  #include <unistd.h>
+
 
 /* Function needed for removing each time the directory */
 int blosc2_remove_dir(const char* dir_path) {
