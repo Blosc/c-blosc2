@@ -73,7 +73,7 @@ endif()
 project(blosc LANGUAGES C)
 
 # parse the full version numbers from blosc.h
-file(READ include/blosc2.h _blosc_h_contents)
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/blosc/blosc2.h _blosc_h_contents)
 string(REGEX REPLACE ".*#define[ \t]+BLOSC_VERSION_MAJOR[ \t]+([0-9]+).*"
     "\\1" BLOSC_VERSION_MAJOR ${_blosc_h_contents})
 string(REGEX REPLACE ".*#define[ \t]+BLOSC_VERSION_MINOR[ \t]+([0-9]+).*"
@@ -351,12 +351,9 @@ if(NOT DEFINED BLOSC_INSTALL)
     endif()
 endif()
 
-
-# include directories
-include_directories(include include/blosc2)
-
 # subdirectories
 add_subdirectory(blosc)
+
 
 
 if(BUILD_TESTS)
