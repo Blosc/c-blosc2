@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include "blosc2-export.h"
 #include "blosc2-common.h"
+#include "blosc2-stdio.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
 #include <windows.h>
@@ -822,20 +823,6 @@ typedef struct {
   void *params;
   //!< The IO parameters.
 } blosc2_io;
-
-
-typedef struct {
-  FILE *file;
-}blosc2_stdio_file;
-
-void *blosc2_stdio_open(const char *urlpath, const char *mode, void* params);
-int blosc2_stdio_close(void *stream);
-int64_t blosc2_stdio_tell(void *stream);
-int blosc2_stdio_seek(void *stream, int64_t offset, int whence);
-int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, void *stream);
-int64_t blosc2_stdio_read(void *ptr, int64_t size, int64_t nitems, void *stream);
-int blosc2_stdio_truncate(void *stream, int64_t size);
-
 
 static const blosc2_io_cb BLOSC2_IO_CB_DEFAULTS = {
   .id = BLOSC2_IO_FILESYSTEM,
