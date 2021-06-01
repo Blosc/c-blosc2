@@ -96,26 +96,15 @@ static int test_ndcell(blosc2_schunk* schunk) {
             printf("Buffer is uncompressible.  Giving up.\n");
             return 0;
         } else if (csize < 0) {
-            printf("Compression error.  Error code: %ld\n", csize);
+            printf("Compression error.  Error code: %lld\n", csize);
             return (int) csize;
         }
         csize_f += csize;
 
-/*
-        printf("data_in: \n");
-        for (int i = 0; i < chunksize; i++) {
-            printf("%u, ", data_in[i]);
-        }
-
-        printf("\n out \n");
-        for (int i = 0; i < chunksize; i++) {
-            printf("%u, ", data_out[i]);
-        }
-
         /* Decompress  */
         dsize = blosc2_decompress_ctx(dctx, data_out, chunksize + BLOSC_MAX_OVERHEAD, data_dest, chunksize);
         if (dsize <= 0) {
-            printf("Decompression error.  Error code: %ld\n", dsize);
+            printf("Decompression error.  Error code: %lld\n", dsize);
             return (int) dsize;
         }
         /*
@@ -141,12 +130,12 @@ static int test_ndcell(blosc2_schunk* schunk) {
     blosc2_free_ctx(dctx);
 
     printf("Succesful roundtrip!\n");
-    printf("Compression: %d -> %ld (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
+    printf("Compression: %d -> %lld (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
     return (int) (chunksize - csize_f);
 }
 
 
-int rand() {
+int rand_() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_rand.caterva");
 
     /* Run the test. */
@@ -178,7 +167,7 @@ int main(void) {
 
     int result;
 
-    result = rand();
+    result = rand_();
     printf("rand: %d obtained \n \n", result);
     result = same_cells();
     printf("same_cells: %d obtained \n \n", result);
