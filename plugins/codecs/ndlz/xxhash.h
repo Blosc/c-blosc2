@@ -79,7 +79,6 @@ typedef enum { XXH_OK=0, XXH_ERROR } XXH_errorcode;
 #endif
 
 #define XXHASH_malloc(s) malloc(s)
-#define XXHASH_calloc(n,s) calloc((n), (s))
 #define XXHASH_free(p) free((p))
 
 typedef   uint8_t BYTE;
@@ -97,7 +96,7 @@ typedef   int64_t S64;
  */
 #  define INLINE_KEYWORD
 #if defined(__GNUC__) || defined(__ICCARM__)
-#  define FORCE_INLINE_ATTR __attribute__((always_inline))
+#  define FORCE_INLINE_ATTR __attribute__((always_inline)) inline
 #elif defined(_MSC_VER)
 #  define FORCE_INLINE_ATTR __forceinline
 #else
@@ -293,7 +292,7 @@ XXH_PUBLIC_API XXH64_hash_t XXH64_hashFromCanonical(const XXH64_canonical_t* src
    statically, on stack, or in a struct for example.
    Do not use members directly. */
 
-   static struct XXH32_state_s {
+   struct XXH32_state_s {
        unsigned total_len_32;
        unsigned large_len;
        unsigned v1;
@@ -305,7 +304,7 @@ XXH_PUBLIC_API XXH64_hash_t XXH64_hashFromCanonical(const XXH64_canonical_t* src
        unsigned reserved;   /* never read nor write, will be removed in a future version */
    };   /* typedef'd to XXH32_state_t */
 
-   static struct XXH64_state_s {
+   struct XXH64_state_s {
        unsigned long long total_len;
        unsigned long long v1;
        unsigned long long v2;

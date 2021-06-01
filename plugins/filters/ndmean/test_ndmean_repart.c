@@ -59,8 +59,8 @@ static int test_ndmean(blosc2_schunk* schunk) {
 
     blosc2_filter ndmean;
     ndmean.id = 165;
-    ndmean.forward = ndmean_encoder;
-    ndmean.backward = ndmean_decoder;
+    ndmean.forward = (blosc2_filter_forward_cb) ndmean_encoder;
+    ndmean.backward = (blosc2_filter_backward_cb) ndmean_decoder;
     blosc2_register_filter(&ndmean);
 
     int32_t typesize = schunk->typesize;
@@ -69,8 +69,8 @@ static int test_ndmean(blosc2_schunk* schunk) {
     //   int isize = (int) array->extchunknitems * typesize;
     uint8_t *data_in = malloc(chunksize);
     int decompressed;
-    int64_t csize = 0;
-    int64_t dsize = 0;
+    int64_t csize;
+    int64_t dsize;
     int64_t csize_f = 0;
     uint8_t *data_out = malloc(chunksize + BLOSC_MAX_OVERHEAD);
     uint8_t *data_dest = malloc(chunksize);
@@ -117,27 +117,16 @@ static int test_ndmean(blosc2_schunk* schunk) {
             printf("Buffer is uncompressible.  Giving up.\n");
             return 0;
         } else if (csize < 0) {
-            printf("Compression error.  Error code: %d\n", csize);
-            return csize;
+            printf("Compression error.  Error code: %ld\n", csize);
+            return (int) csize;
         }
         csize_f += csize;
-
-/*
-        printf("data_in: \n");
-        for (int i = 0; i < chunksize / typesize; i++) {
-            printf("%f, ",((float *) data_in)[i]);
-        }
-/*
-        printf("\n out \n");
-        for (int i = 0; i < chunksize; i++) {
-            printf("%u, ", data_out[i]);
-        }
 
         /* Decompress  */
         dsize = blosc2_decompress_ctx(dctx, data_out, chunksize + BLOSC_MAX_OVERHEAD, data_dest, chunksize);
         if (dsize <= 0) {
-            printf("Decompression error.  Error code: %d\n", dsize);
-            return dsize;
+            printf("Decompression error.  Error code: %ld\n", dsize);
+            return (int) dsize;
         }
 
         switch (typesize) {
@@ -173,7 +162,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
 
     printf("Succesful roundtrip!\n");
     printf("Compression: %d -> %ld (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
-    return chunksize - csize_f;
+    return (int) (chunksize - csize_f);
 }
 
 
