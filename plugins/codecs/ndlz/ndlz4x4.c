@@ -17,7 +17,6 @@
 **********************************************************************/
 
 
-#define XXH_INLINE_ALL
 #include <stdio.h>
 #include "ndlz4x4.h"
 #include "ndlz.h"
