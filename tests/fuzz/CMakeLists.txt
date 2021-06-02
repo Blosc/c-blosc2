@@ -67,8 +67,13 @@ foreach(source ${SOURCES})
         target_link_libraries(${target} ${FUZZING_ENGINE})
     endif()
 
-    target_link_libraries(${target} blosc2_static)
-    add_dependencies(${target} blosc2_static)
+    if(BUILD_PLUGINS)
+        target_link_libraries(${target} blosc2_plugins_static)
+        add_dependencies(${target} blosc2_plugins_static)
+    else()
+        target_link_libraries(${target} blosc2_static)
+        add_dependencies(${target} blosc2_static)
+    endif()
 
     # run standalone fuzzer against each file
     file(GLOB COMPAT_FILES ${PROJECT_SOURCE_DIR}/compat/*.cdata)
