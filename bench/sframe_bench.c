@@ -17,6 +17,7 @@
 #include <string.h>
 #include <blosc2.h>
 #include <assert.h>
+#include <inttypes.h>
 
 #define KB  1024
 #define MB  (1024*KB)
@@ -98,9 +99,9 @@ void test_update(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_cframe) {
     cframe_update_time += blosc_elapsed_secs(current, last);
   }
 
-  printf("[Sframe Update] Elapsed time:\t %6.3f s. Total sframe size: %.3lld bytes\n",
+  printf("[Sframe Update] Elapsed time:\t %6.3f s. Total sframe size: %.3I64d bytes\n",
          sframe_update_time, schunk_sframe->cbytes);
-  printf("[Cframe Update] Elapsed time:\t %6.3f s. Total cframe size: %.3lld bytes\n",
+  printf("[Cframe Update] Elapsed time:\t %6.3f s. Total cframe size: %.3I64d bytes\n",
          cframe_update_time, schunk_cframe->cbytes);
 
   /* Free resources */
@@ -164,9 +165,9 @@ void test_insert(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_cframe) {
     cframe_insert_time += blosc_elapsed_secs(current, last);
   }
 
-  printf("[Sframe Insert] Elapsed time:\t %6.3f s.  Total sframe size: %.3lld bytes \n",
+  printf("[Sframe Insert] Elapsed time:\t %6.3f s.  Total sframe size: %.3I64d bytes \n",
          sframe_insert_time, schunk_sframe->cbytes);
-  printf("[Cframe Insert] Elapsed time:\t %6.3f s.  Total cframe size: %.3lld bytes \n",
+  printf("[Cframe Insert] Elapsed time:\t %6.3f s.  Total cframe size: %.3I64d bytes \n",
          cframe_insert_time, schunk_cframe->cbytes);
 
 
@@ -207,9 +208,9 @@ void test_reorder(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_cframe) {
   }
   cframe_reorder_time = blosc_elapsed_secs(current, last);
 
-  printf("[Sframe Update] Elapsed time:\t %f s.  Total sframe size: %.3lld bytes \n",
+  printf("[Sframe Update] Elapsed time:\t %f s.  Total sframe size: %.3I64d bytes \n",
          sframe_reorder_time, schunk_sframe->cbytes);
-  printf("[Cframe Update] Elapsed time:\t %f s.  Total cframe size: %.3lld bytes \n",
+  printf("[Cframe Update] Elapsed time:\t %f s.  Total cframe size: %.3I64d bytes \n",
          cframe_reorder_time, schunk_cframe->cbytes);
 
   /* Free resources */
