@@ -227,7 +227,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
             printf("Buffer is uncompressible.  Giving up.\n");
             return 0;
         } else if (csize < 0) {
-            printf("Compression error.  Error code: %I64d\n", csize);
+            printf("Compression error.  Error code: %" PRId64 "\n", csize);
             return (int) csize;
         }
         csize_f += csize;
@@ -235,7 +235,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
         /* Decompress  */
         dsize = blosc2_decompress_ctx(dctx, data_out, chunksize + BLOSC_MAX_OVERHEAD, data_dest, chunksize);
         if (dsize <= 0) {
-            printf("Decompression error.  Error code: %I64d\n", dsize);
+            printf("Decompression error.  Error code: %" PRId64 "\n", dsize);
             return (int) dsize;
         }
 /*
@@ -313,7 +313,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
     free(blockshape);
 
     printf("Succesful roundtrip!\n");
-    printf("Compression: %d -> %I64d (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
+    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
     return (int) (chunksize - csize_f);
 }
 

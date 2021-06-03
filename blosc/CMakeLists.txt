@@ -147,7 +147,6 @@ endif ()
 # targets
 if(BUILD_SHARED)
     if(BUILD_PLUGINS)
-        message(STATUS "build_p = ${BUILD_PLUGINS}")
         add_library(blosc2_plugins_shared SHARED ${SOURCES})
         set_target_properties(blosc2_plugins_shared PROPERTIES OUTPUT_NAME blosc2+plugins)
         if(MSVC OR MINGW)
