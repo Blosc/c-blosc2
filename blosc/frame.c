@@ -1883,7 +1883,7 @@ int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize,
     }
   }
   else {
-    BLOSC_TRACE_ERROR("Special value not recognized: %I64d", special_value);
+    BLOSC_TRACE_ERROR("Special value not recognized: %" PRId64 "", special_value);
     rc = BLOSC2_ERROR_DATA;
   }
 
@@ -2558,7 +2558,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
       // Update the offsets chunk in the chunks frame
       if (chunk_cbytes != 0) {
         if (sframe_chunk_id < 0) {
-          BLOSC_TRACE_ERROR("The chunk id (%I64d) is not correct", sframe_chunk_id);
+          BLOSC_TRACE_ERROR("The chunk id (%" PRId64 ") is not correct", sframe_chunk_id);
           return NULL;
         }
         if (sframe_create_chunk(frame, chunk, sframe_chunk_id, chunk_cbytes) == NULL) {
@@ -2762,7 +2762,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
     if (frame->sframe) {
       if (chunk_cbytes != 0) {
         if (sframe_chunk_id < 0) {
-          BLOSC_TRACE_ERROR("The chunk id (%I64d) is not correct", sframe_chunk_id);
+          BLOSC_TRACE_ERROR("The chunk id (%" PRId64 ") is not correct", sframe_chunk_id);
           return NULL;
         }
         if (sframe_create_chunk(frame, chunk, sframe_chunk_id, chunk_cbytes) == NULL) {
