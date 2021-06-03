@@ -35,7 +35,7 @@
 #include <stdio.h>
 #include <blosc2.h>
 #include "ndlz.h"
-
+#include <inttypes.h>
 
 static int test_ndlz_4(blosc2_schunk* schunk) {
 
@@ -99,7 +99,7 @@ static int test_ndlz_4(blosc2_schunk* schunk) {
             printf("Buffer is uncompressible.  Giving up.\n");
             return 0;
         } else if (csize < 0) {
-            printf("Compression error.  Error code: %lld\n", csize);
+            printf("Compression error.  Error code: %I64d\n", csize);
             return (int) csize;
         }
         csize_f += csize;
@@ -108,7 +108,7 @@ static int test_ndlz_4(blosc2_schunk* schunk) {
         /* Decompress  */
         dsize = blosc2_decompress_ctx(dctx, data_out, chunksize + BLOSC_MAX_OVERHEAD, data_dest, chunksize);
         if (dsize <= 0) {
-            printf("Decompression error.  Error code: %lld\n", dsize);
+            printf("Decompression error.  Error code: %I64d\n", dsize);
             return (int) dsize;
         }
         /*
@@ -134,7 +134,7 @@ static int test_ndlz_4(blosc2_schunk* schunk) {
     blosc2_free_ctx(dctx);
 
     printf("Succesful roundtrip!\n");
-    printf("Compression: %d -> %lld (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
+    printf("Compression: %d -> %I64d (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
     return (int) (chunksize - csize_f);
 }
 
@@ -200,7 +200,7 @@ static int test_ndlz_8(blosc2_schunk* schunk) {
             printf("Buffer is uncompressible.  Giving up.\n");
             return 0;
         } else if (csize < 0) {
-            printf("Compression error.  Error code: %lld\n", csize);
+            printf("Compression error.  Error code: %I64d\n", csize);
             return (int) csize;
         }
         csize_f += csize;
@@ -208,7 +208,7 @@ static int test_ndlz_8(blosc2_schunk* schunk) {
         /* Decompress  */
         dsize = blosc2_decompress_ctx(dctx, data_out, chunksize + BLOSC_MAX_OVERHEAD, data_dest, chunksize);
         if (dsize <= 0) {
-            printf("Decompression error.  Error code: %lld\n", dsize);
+            printf("Decompression error.  Error code: %I64d\n", dsize);
             return (int) dsize;
         }
         /*
@@ -234,7 +234,7 @@ static int test_ndlz_8(blosc2_schunk* schunk) {
     blosc2_free_ctx(dctx);
 
     printf("Succesful roundtrip!\n");
-    printf("Compression: %d -> %lld (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
+    printf("Compression: %d -> %I64d (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
     return (int) (chunksize - csize_f);
 }
 
