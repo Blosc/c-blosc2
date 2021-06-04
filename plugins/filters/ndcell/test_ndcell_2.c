@@ -35,14 +35,9 @@
 #include <stdio.h>
 #include "ndcell.h"
 #include <inttypes.h>
+#include "../register-filters.h"
 
 static int test_ndcell(blosc2_schunk* schunk) {
-
-    blosc2_filter ndcell;
-    ndcell.id = 164;
-    ndcell.forward = (blosc2_filter_forward_cb) ndcell_encoder;
-    ndcell.backward = (blosc2_filter_backward_cb) ndcell_decoder;
-    blosc2_register_filter(&ndcell);
 
     int nchunks = schunk->nchunks;
     int32_t chunksize = (int32_t) (schunk->chunksize);
@@ -60,7 +55,7 @@ static int test_ndcell(blosc2_schunk* schunk) {
     cparams.splitmode = BLOSC_ALWAYS_SPLIT;
     cparams.typesize = schunk->typesize;
     cparams.compcode = BLOSC_ZSTD;
-    cparams.filters[4] = 164;
+    cparams.filters[4] = BLOSC_FILTER_NDCELL;
     cparams.filters_meta[4] =4;
     cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
     cparams.clevel = 9;
@@ -167,12 +162,12 @@ int some_matches() {
 int main(void) {
 
     int result;
-
+    blosc_init();
     result = rand_();
     printf("rand: %d obtained \n \n", result);
     result = same_cells();
     printf("same_cells: %d obtained \n \n", result);
     result = some_matches();
     printf("some_matches: %d obtained \n \n", result);
-
+    blosc_destroy();
 }

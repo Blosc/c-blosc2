@@ -34,6 +34,9 @@
 #include "trunc-prec.h"
 #include "blosclz.h"
 #include "stune.h"
+#include "config.h"
+#include <../plugins/codecs/register-codecs.h>
+#include <../plugins/filters/register-filters.h>
 
 #if defined(HAVE_LZ4)
   #include "lz4.h"
@@ -3398,6 +3401,10 @@ void blosc_init(void) {
   /* Return if Blosc is already initialized */
   if (g_initlib) return;
 
+#if (BUILD_PLUGINS == ON)
+  register_codecs();
+  register_filters();
+#endif
   pthread_mutex_init(&global_comp_mutex, NULL);
   /* Create a global context */
   g_global_context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
