@@ -35,18 +35,10 @@
 #include <stdio.h>
 #include <blosc2.h>
 #include "ndlz.h"
+#include "../register-codecs.h"
 #include <inttypes.h>
 
 static int test_ndlz_4(blosc2_schunk* schunk) {
-
-    blosc2_codec ndlz;
-    ndlz.compcode = 243;
-    ndlz.compver = 1;
-    ndlz.complib = 1;
-    ndlz.encoder = ndlz_compress;
-    ndlz.decoder = ndlz_decompress;
-    ndlz.compname = "ndlz";
-    blosc2_register_codec(&ndlz);
 
     int nchunks = schunk->nchunks;
     int32_t chunksize = (int32_t) (schunk->chunksize);
@@ -63,7 +55,7 @@ static int test_ndlz_4(blosc2_schunk* schunk) {
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.splitmode = BLOSC_ALWAYS_SPLIT;
     cparams.typesize = schunk->typesize;
-    cparams.compcode = 243;
+    cparams.compcode = BLOSC_CODEC_NDLZ;
     cparams.compcode_meta = 4;
     cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
     cparams.clevel = 5;
@@ -140,15 +132,6 @@ static int test_ndlz_4(blosc2_schunk* schunk) {
 
 static int test_ndlz_8(blosc2_schunk* schunk) {
 
-    blosc2_codec ndlz;
-    ndlz.compcode = 243;
-    ndlz.compver = 1;
-    ndlz.complib = 1;
-    ndlz.encoder = ndlz_compress;
-    ndlz.decoder = ndlz_decompress;
-    ndlz.compname = "ndlz";
-    blosc2_register_codec(&ndlz);
-
     int nchunks = schunk->nchunks;
     int32_t chunksize = (int32_t) (schunk->chunksize);
     //   int isize = (int) array->extchunknitems * typesize;
@@ -164,7 +147,7 @@ static int test_ndlz_8(blosc2_schunk* schunk) {
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.splitmode = BLOSC_ALWAYS_SPLIT;
     cparams.typesize = schunk->typesize;
-    cparams.compcode = 243;
+    cparams.compcode = BLOSC_CODEC_NDLZ;
     cparams.compcode_meta = 8;
     cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
     cparams.clevel = 5;
@@ -271,10 +254,11 @@ int some_matches() {
 int main(void) {
 
     int result;
-
+    blosc_init();   // this is mandatory for initiallizing the plugin mechanism
     result = same_cells();
     printf("same_cells: %d obtained \n \n", result);
     result = some_matches();
     printf("some_matches: %d obtained \n \n", result);
+    blosc_destroy();
 
 }

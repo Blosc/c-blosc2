@@ -93,7 +93,17 @@ Steps
 
    * The advantages and disadvantages of the plugin compared to the rest.
 
-4. Finally, the Blosc development team will carry out the evaluation process
+4. To register a plugin the user must choose a plugin ID greater than 160 and
+   write it at `plugins/codecs/register-codecs.h`
+   or `plugins/filters/register-filters.h` depending on the plugin type. Then, you have to edit `plugins/codecs/register-codecs.c`
+   or `plugins/filters/register-filters.c`. 
+  
+   At the top it must be added `#include "plugin_folder/plugin_header.h"`, 
+   
+   and into the register function you must follow the same steps that were done for the existing plugins.
+   
+
+5. Finally, the Blosc development team will carry out the evaluation process
    (probably via a votation process, with the BDFL having the last say in case of the team is undecided)
    so as to decide whether the plugin is useful and hence, candidate to be integrated into the C-Blosc2
    source code distribution.

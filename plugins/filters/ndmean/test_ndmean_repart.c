@@ -36,6 +36,7 @@
 #include "ndmean.h"
 #include <math.h>
 #include <inttypes.h>
+#include "../register-filters.h"
 
 #define EPSILON (float) (1e-5)
 
@@ -58,12 +59,6 @@ static bool is_close(double d1, double d2) {
 
 static int test_ndmean(blosc2_schunk* schunk) {
 
-    blosc2_filter ndmean;
-    ndmean.id = 165;
-    ndmean.forward = (blosc2_filter_forward_cb) ndmean_encoder;
-    ndmean.backward = (blosc2_filter_backward_cb) ndmean_decoder;
-    blosc2_register_filter(&ndmean);
-
     int32_t typesize = schunk->typesize;
     int nchunks = schunk->nchunks;
     int32_t chunksize = (int32_t) (schunk->chunksize);
@@ -81,7 +76,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
     cparams.splitmode = BLOSC_ALWAYS_SPLIT;
     cparams.typesize = typesize;
     cparams.compcode = BLOSC_ZSTD;
-    cparams.filters[4] = 165;
+    cparams.filters[4] = BLOSC_FILTER_NDMEAN;
     cparams.filters_meta[4] = 4;
     cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
     cparams.clevel = 9;
@@ -198,12 +193,12 @@ int some_matches() {
 int main(void) {
 
     int result;
-
+    blosc_init();
     result = rand_();
     printf("rand: %d obtained \n \n", result);
     result = same_cells();
     printf("same_cells: %d obtained \n \n", result);
     result = some_matches();
     printf("some_matches: %d obtained \n \n", result);
-
+    blosc_destroy();
 }
