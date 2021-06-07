@@ -17,7 +17,7 @@
 #ifndef BITSHUFFLE_GENERIC_H
 #define BITSHUFFLE_GENERIC_H
 
-#include "blosc2-common.h"
+#include <blosc2/blosc2-common.h>
 #include <stdlib.h>
 
 #ifdef __cplusplus

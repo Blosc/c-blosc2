@@ -23,9 +23,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include "blosc2-export.h"
-#include "blosc2-common.h"
-#include "blosc2-stdio.h"
+#include "blosc2/blosc2-export.h"
+#include "blosc2/blosc2-common.h"
+#include "blosc2/blosc2-stdio.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
 #include <windows.h>
@@ -109,11 +109,16 @@ enum {
 
 
 enum {
-  BLOSC2_BDEFINED_FILTERS = 32,
+  BLOSC2_DEFINED_FILTERS_START = 0,
+  BLOSC2_DEFINED_FILTERS_STOP = 31,
   //!< Blosc-defined filters must be between 0 - 31.
-  BLOSC2_REGISTERED_FILTERS = 160,
+  BLOSC2_REGISTERED_FILTERS_START = 32,
+  BLOSC2_REGISTERED_FILTERS_STOP = 159,
   //!< Blosc-registered filters must be between 32 - 159.
-  BLOSC2_UDEFINED_FILTERS = 256,
+  BLOSC2_REGISTERED_FILTERS = 2,
+  //!< Number of Blosc-registered filters at the moment.
+  BLOSC2_USER_DEFINED_FILTERS_START = 128,
+  BLOSC2_USER_DEFINED_FILTERS_STOP = 255,
   //!< User-defined filters must be between 128 - 255.
   BLOSC2_MAX_FILTERS = 6,
   //!< Maximum number of filters in the filter pipeline
@@ -135,7 +140,7 @@ enum {
   BLOSC_DELTA = 3,       //!< Delta filter.
   BLOSC_TRUNC_PREC = 4,  //!< Truncate precision filter.
   BLOSC_LAST_FILTER = 5, //!< sentinel
-  BLOSC_LAST_REGISTERED_FILTER = BLOSC2_BDEFINED_FILTERS + 0,
+  BLOSC_LAST_REGISTERED_FILTER = BLOSC2_REGISTERED_FILTERS_START + BLOSC2_REGISTERED_FILTERS - 1,
 };
 
 /**
@@ -166,11 +171,14 @@ enum {
 
 
 enum {
-  BLOSC2_BDEFINED_CODECS = 32,
+  BLOSC2_DEFINED_CODECS_START = 0,
+  BLOSC2_DEFINED_CODECS_STOP = 31,
   //!< Blosc-defined codecs must be between 0 - 31.
-  BLOSC2_REGISTERED_CODECS = 160,
+  BLOSC2_REGISTERED_CODECS_START = 32,
+  BLOSC2_REGISTERED_CODECS_STOP = 159,
   //!< Blosc-registered codecs must be between 31 - 159.
-  BLOSC2_UDEFINED_CODECS = 256,
+  BLOSC2_USER_DEFINED_CODECS_START = 160,
+  BLOSC2_USER_DEFINED_CODECS_STOP = 255,
   //!< User-defined codecs must be between 160 - 255.
 };
 
@@ -185,7 +193,7 @@ enum {
   BLOSC_ZSTD = 5,
   BLOSC_LAST_CODEC = 6,
   //!< Determine the last codec defined by Blosc.
-  BLOSC_LAST_REGISTERED_CODEC = BLOSC2_BDEFINED_CODECS + 0,
+  BLOSC_LAST_REGISTERED_CODEC = BLOSC2_DEFINED_CODECS_STOP + 1,
   //!< Determine the last registered codec. It is used to check if a codec between 31 - 159 is registered or not.
 };
 
@@ -1963,7 +1971,7 @@ typedef struct {
  *
  * @return 0 if succeeds. Else a negative code is returned.
  */
-int blosc2_register_codec(blosc2_codec *codec);
+BLOSC_EXPORT int blosc2_register_codec(blosc2_codec *codec);
 
 
 /*********************************************************************

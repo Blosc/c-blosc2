@@ -17,7 +17,7 @@
 #ifndef SHUFFLE_H
 #define SHUFFLE_H
 
-#include "blosc2-common.h"
+#include "blosc2/blosc2-common.h"
 
 #ifdef __cplusplus
 extern "C" {

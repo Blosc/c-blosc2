@@ -19,7 +19,7 @@
 **********************************************************************/
 
 #include <assert.h>
-#include "blosc2-common.h"
+#include "blosc2/blosc2-common.h"
 
 /*
  * Use inlined functions for supported systems.

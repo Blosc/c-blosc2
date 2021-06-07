@@ -9,7 +9,7 @@
 **********************************************************************/
 
 
-#include "../include/blosc2/blosc2-stdio.h"
+#include "blosc2/blosc2-stdio.h"
 
 void *blosc2_stdio_open(const char *urlpath, const char *mode, void *params) {
   blosc2_stdio_file *my_fp = malloc(sizeof(blosc2_stdio_file));

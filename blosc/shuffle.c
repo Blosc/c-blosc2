@@ -9,7 +9,7 @@
 **********************************************************************/
 
 #include "shuffle.h"
-#include "blosc2-common.h"
+#include "blosc2/blosc2-common.h"
 #include "shuffle-generic.h"
 #include "bitshuffle-generic.h"
 #include <stdio.h>

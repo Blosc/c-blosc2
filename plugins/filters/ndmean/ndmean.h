@@ -5,7 +5,7 @@
 #ifndef CATERVA_NDMEAN_H
 #define CATERVA_NDMEAN_H
 
-#include <blosc2.h>
+#include "blosc2.h"
 
 #define NDMEAN_MAX_DIM 8
 

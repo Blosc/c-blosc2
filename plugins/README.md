@@ -79,6 +79,11 @@ Steps
 
 1. First, both regular tests and fuzzing tests must be provided and be passing.
 
+   **It is completely mandatory and necessary to add these lines to `main()` in each test to make plugins machinery work:**
+   - `blosc_init()` at the beginning
+   - `blosc_destroy()` in the end
+
+
 2. Then, the user must make a fork of the C-Blosc2 Github repository,
    adding a new folder within the plugin sources to the path `plugins/codecs` or
    `plugins/filters` depending on the plugin type.
@@ -93,10 +98,11 @@ Steps
 
    * The advantages and disadvantages of the plugin compared to the rest.
 
-4. To register a plugin the user must choose a plugin ID greater than 160 and
+4. To register a plugin the user must choose a plugin ID between BLOSC2_REGISTERED_FILTERS_START (32) and BLOSC2_REGISTERED_FILTERS_STOP (159) and
    write it at `plugins/codecs/register-codecs.h`
-   or `plugins/filters/register-filters.h` depending on the plugin type. Then, you have to edit `plugins/codecs/register-codecs.c`
-   or `plugins/filters/register-filters.c`. 
+   or `plugins/filters/register-filters.h` depending on the plugin type. Then, you have to edit `plugins/codecs/register-codecs.c`or 
+   
+   `plugins/filters/register-filters.c` in the next way:
   
    At the top it must be added `#include "plugin_folder/plugin_header.h"`, 
    
