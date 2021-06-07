@@ -2,17 +2,17 @@ Plugins register for Blosc users
 =============================================================================
 
 Blosc has a tradition of supporting different filters and codecs for compressing data,
-and it was up to the user to choose one or another depending on her needs.
+and it was up to the user to choose one or another depending on his needs.
 However, it is clear that there will always be scenarios where a more richer variety
-of them could be useful.  So the Blosc Development Team has set a new goals:
+of them could be useful.  So the Blosc Development Team has set new goals:
 
 1) Implement a way for users to locally register filters and codecs so that they can use
    them in their setup at will.
 
 2) Setup a central registry so that *other* users can make use of these filters and codecs
-   without intefering with others that have been created by others.
+   without intefering with other ones that have been created by other users.
 
-As a bonus, those filters accepted in the central registry and meeting the quality standards
+As a bonus, those codecs and filters accepted in the central registry and meeting the quality standards
 defined in these guidelines will be distributed *inside* the C-Blosc2 library,
 allowing a much easier way for others to use them: install C-Blosc2 library and you are all set.
 Of course, to achieve such a status, plugins will require a careful testing process described below.
@@ -33,19 +33,19 @@ changing its size, so that the initial and final size are equal.
 A filter consists of encoder and decoder. Filter encoder is applyed before
 using the codec compressor (or codec encoder) in order to make data easier to compress
 and filter decoder is used after codec decompressor (or codec decoder) to recover
-the original data arrangement.
+the original data arrangement. 
 Some filters actually used by Blosc are e.g. *SHUFFLE*, which rearranges data 
 based on the typesize, or *TRUNC*, which zeroes mantissa bits so as to reduce
 the precision of (floating point) data, and hence, increase the compression ratio.
 
-Here it is an example on how the compression process goes::
+Here it is an example on how the compression process goes:
 
 
     --------------------   filter encoder  -------------------   codec encoder   -------
     |        src        |   ----------->  |        tmp        |   ---------->   | c_src |
     --------------------                   -------------------                   -------
 
-And the decompression process::
+And the decompression process: 
 
     --------   codec decoder    -------------------   filter decoder  -------------------
     | c_src |    ----------->  |        tmp        |   ---------->   |        src        |
@@ -66,8 +66,6 @@ that their code must satisfy:
 
 - Second, users must develop a test suite which prove that the plugin works correctly.
 
-- .............FUZZER........................
-
 Finally, even if these requirements are completely satisfied, it is not
 guaranteed that the plugin will be useful or contribute something
 different to the existing ones, so the Blosc development team has the final
@@ -77,7 +75,7 @@ say and will decide if a plugin is to be accepted or not.
 Steps
 -----
 
-1. First, both regular tests and fuzzing tests must be provided and be passing.
+1. First, tests must be provided and be passing.
 
    **It is completely mandatory and necessary to add these lines to `main()` in each test to make plugins machinery work:**
    - `blosc_init()` at the beginning
