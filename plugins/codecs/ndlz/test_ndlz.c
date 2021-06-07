@@ -33,7 +33,7 @@
  */
 
 #include <stdio.h>
-#include <blosc2.h>
+#include "blosc2.h"
 #include "ndlz.h"
 #include "../register-codecs.h"
 #include <inttypes.h>

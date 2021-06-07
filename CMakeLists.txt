@@ -201,6 +201,10 @@ if(NOT DEACTIVATE_IPP)
     endif()
 endif()
 
+if(BUILD_PLUGINS)
+    set(HAVE_PLUGINS TRUE)
+endif()
+
 # create the config.h file
 configure_file("blosc/config.h.in" "blosc/config.h")
 
@@ -357,7 +361,7 @@ endif()
 
 
 # include directories
-include_directories(include include/blosc2)
+include_directories(include)
 
 # subdirectories
 add_subdirectory(blosc)
@@ -388,7 +392,6 @@ endif()
 if(BUILD_PLUGINS)
     enable_testing()
     add_subdirectory(plugins)
-
 endif()
 
 

@@ -19,8 +19,8 @@
 
 #include "blosc2.h"
 #include "blosc-private.h"
-#include "blosc2-common.h"
-#include "blosc2-stdio.h"
+#include "blosc2/blosc2-common.h"
+#include "blosc2/blosc2-stdio.h"
 #include "frame.h"
 
 
@@ -861,7 +861,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
   /* Process the filter pipeline */
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     int rc = BLOSC2_ERROR_SUCCESS;
-    if (filters[i] < BLOSC2_BDEFINED_FILTERS) {
+    if (filters[i] <= BLOSC2_DEFINED_FILTERS_STOP) {
       switch (filters[i]) {
         case BLOSC_SHUFFLE:
           for (int j = 0; j <= filters_meta[i]; j++) {
@@ -1087,7 +1087,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
                                   (char*)dest, (size_t)maxout, context->clevel);
     }
   #endif /* HAVE_ZSTD */
-    else if (context->compcode >= BLOSC2_BDEFINED_CODECS) {
+    else if (context->compcode > BLOSC2_DEFINED_CODECS_STOP) {
       for (int i = 0; i < g_ncodecs; ++i) {
         if (g_codecs[i].compcode == context->compcode) {
           blosc2_cparams cparams;
@@ -1164,7 +1164,7 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
       _dest = dest + offset;
     }
     int rc = BLOSC2_ERROR_SUCCESS;
-    if (filters[i] < BLOSC2_BDEFINED_FILTERS) {
+    if (filters[i] <= BLOSC2_DEFINED_FILTERS_STOP) {
       switch (filters[i]) {
         case BLOSC_SHUFFLE:
           for (int j = 0; j <= filters_meta[i]; j++) {
@@ -3401,7 +3401,7 @@ void blosc_init(void) {
   /* Return if Blosc is already initialized */
   if (g_initlib) return;
 
-#if (BUILD_PLUGINS == ON)
+#if defined(HAVE_PLUGINS)
   register_codecs();
   register_filters();
 #endif
@@ -3513,13 +3513,13 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     context->filters[i] = cparams.filters[i];
     context->filters_meta[i] = cparams.filters_meta[i];
 
-    if (context->filters[i] >= BLOSC_LAST_FILTER && context->filters[i] < BLOSC2_BDEFINED_FILTERS) {
+    if (context->filters[i] >= BLOSC_LAST_FILTER && context->filters[i] <= BLOSC2_DEFINED_FILTERS_STOP) {
       BLOSC_TRACE_ERROR("filter (%d) is not yet defined",
                         context->filters[i]);
       free(context);
       return NULL;
     }
-    if (context->filters[i] >= BLOSC_LAST_REGISTERED_FILTER && context->filters[i] < BLOSC2_REGISTERED_FILTERS) {
+    if (context->filters[i] > BLOSC_LAST_REGISTERED_FILTER && context->filters[i] <= BLOSC2_REGISTERED_FILTERS_STOP) {
       BLOSC_TRACE_ERROR("filter (%d) is not yet defined",
                         context->filters[i]);
       free(context);
@@ -3834,58 +3834,71 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const size_t nbytes,
 
 /* Register functions */
 
+int register_filter_private(blosc2_filter *filter) {
+    BLOSC_ERROR_NULL(filter, BLOSC2_ERROR_INVALID_PARAM);
+    if (g_nfilters == UINT8_MAX) {
+        BLOSC_TRACE_ERROR("Can not register more filters");
+        return BLOSC2_ERROR_CODEC_SUPPORT;
+    }
+
+    // Check if the filter is already registered
+    for (int i = 0; i < g_nfilters; ++i) {
+        if (g_filters[i].id == filter->id) {
+            BLOSC_TRACE_ERROR("The filter is already registered!");
+            return BLOSC2_ERROR_FAILURE;
+        }
+    }
+
+    blosc2_filter *filter_new = &g_filters[g_nfilters++];
+    memcpy(filter_new, filter, sizeof(blosc2_filter));
+
+    return BLOSC2_ERROR_SUCCESS;
+}
+
+
 int blosc2_register_filter(blosc2_filter *filter) {
-  BLOSC_ERROR_NULL(filter, BLOSC2_ERROR_INVALID_PARAM);
-  if (g_nfilters == UINT8_MAX) {
-    BLOSC_TRACE_ERROR("Can not register more filters");
-    return BLOSC2_ERROR_CODEC_SUPPORT;
-  }
-  if (filter->id < BLOSC2_REGISTERED_FILTERS) {
-    BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_REGISTERED_FILTERS);
+  if (filter->id <= BLOSC2_REGISTERED_FILTERS_STOP) {
+    BLOSC_TRACE_ERROR("The id must be greater than %d", BLOSC2_REGISTERED_FILTERS_STOP);
     return BLOSC2_ERROR_FAILURE;
   }
 
-  // Check if the filter is already registered
-  for (int i = 0; i < g_nfilters; ++i) {
-    if (g_filters[i].id == filter->id) {
-      BLOSC_TRACE_ERROR("The filter is already registered!");
-      return BLOSC2_ERROR_FAILURE;
-    }
-  }
-
-  blosc2_filter *filter_new = &g_filters[g_nfilters++];
-  memcpy(filter_new, filter, sizeof(blosc2_filter));
-
-  return BLOSC2_ERROR_SUCCESS;
+  return register_filter_private(filter);
 }
 
 
 /* Register functions */
 
+int register_codec_private(blosc2_codec *codec) {
+    BLOSC_ERROR_NULL(codec, BLOSC2_ERROR_INVALID_PARAM);
+    if (g_ncodecs == UINT8_MAX) {
+        BLOSC_TRACE_ERROR("Can not register more codecs");
+        return BLOSC2_ERROR_CODEC_SUPPORT;
+    }
+
+    // Check if the code is already registered
+    for (int i = 0; i < g_ncodecs; ++i) {
+        if (g_codecs[i].compcode == codec->compcode) {
+            BLOSC_TRACE_ERROR("The codec is already registered!");
+            return BLOSC2_ERROR_CODEC_PARAM;
+        }
+    }
+
+    blosc2_codec *codec_new = &g_codecs[g_ncodecs++];
+    memcpy(codec_new, codec, sizeof(blosc2_codec));
+
+    return BLOSC2_ERROR_SUCCESS;
+}
+
+
 int blosc2_register_codec(blosc2_codec *codec) {
-  BLOSC_ERROR_NULL(codec, BLOSC2_ERROR_INVALID_PARAM);
-  if (g_ncodecs == UINT8_MAX) {
-    BLOSC_TRACE_ERROR("Can not register more codecs");
-    return BLOSC2_ERROR_CODEC_SUPPORT;
-  }
-  if (codec->compcode < BLOSC2_REGISTERED_CODECS) {
-    BLOSC_TRACE_ERROR("The compcode must be greater or equal than %d", BLOSC2_REGISTERED_CODECS);
+  if (codec->compcode <= BLOSC2_REGISTERED_CODECS_STOP) {
+    BLOSC_TRACE_ERROR("The compcode must be greater than %d", BLOSC2_REGISTERED_CODECS_STOP);
     return BLOSC2_ERROR_CODEC_PARAM;
   }
 
-  // Check if the code is already registered
-  for (int i = 0; i < g_ncodecs; ++i) {
-    if (g_codecs[i].compcode == codec->compcode) {
-      BLOSC_TRACE_ERROR("The codec is already registered!");
-      return BLOSC2_ERROR_CODEC_PARAM;
-    }
-  }
-
-  blosc2_codec *codec_new = &g_codecs[g_ncodecs++];
-  memcpy(codec_new, codec, sizeof(blosc2_codec));
-
-  return BLOSC2_ERROR_SUCCESS;
+  return register_codec_private(codec);
 }
+
 
 int _blosc2_register_io_cb(const blosc2_io_cb *io) {
 

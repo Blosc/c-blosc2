@@ -18,7 +18,7 @@
 #include <stdbool.h>
 #include "blosclz.h"
 #include "fastcopy.h"
-#include "blosc2-common.h"
+#include "blosc2/blosc2-common.h"
 
 
 /*

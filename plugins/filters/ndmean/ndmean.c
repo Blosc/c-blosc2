@@ -6,8 +6,8 @@
 
 
 #include "ndmean.h"
-#include <blosc2.h>
 #include <stdio.h>
+#include <blosc2/blosc2-common.h>
 
 
 static void index_unidim_to_multidim(int8_t ndim, int64_t *shape, int64_t i, int64_t *index) {

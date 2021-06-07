@@ -1,4 +1,4 @@
-#include <blosc2.h>
+#include <blosc-private.h>
 #include "register-codecs.h"
 #include "ndlz/ndlz.h"
 
@@ -11,5 +11,5 @@ void register_codecs() {
     ndlz.encoder = ndlz_compress;
     ndlz.decoder = ndlz_decompress;
     ndlz.compname = "ndlz";
-    blosc2_register_codec(&ndlz);
+    register_codec_private(&ndlz);
 }

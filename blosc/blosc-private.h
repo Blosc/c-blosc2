@@ -16,7 +16,9 @@
 extern "C" {
 #endif
 
-#include "blosc2-common.h"
+#include "stdbool.h"
+#include "blosc2.h"
+#include "blosc2/blosc2-common.h"
 
 /*********************************************************************
 
@@ -154,6 +156,10 @@ static inline int32_t bswap32_(int32_t a) {
   return a;
 #endif
 }
+
+int register_filter_private(blosc2_filter *filter);
+
+int register_codec_private(blosc2_codec *codec);
 
 #ifdef __cplusplus
 }
