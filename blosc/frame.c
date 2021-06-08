@@ -1685,6 +1685,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   uint8_t* data_chunk = NULL;
   const blosc2_io_cb *io_cb = blosc2_get_io_cb(udio->id);
   if (io_cb == NULL) {
+    blosc2_schunk_free(schunk);
     BLOSC_TRACE_ERROR("Error getting the input/output API");
     return NULL;
   }
@@ -1709,6 +1710,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
       data_chunk = frame->cframe + header_len + offsets[i];
       rc = blosc2_cbuffer_sizes(data_chunk, NULL, &chunk_cbytes, NULL);
       if (rc < 0) {
+        blosc2_schunk_free(schunk);
         return NULL;
       }
     }
@@ -1723,6 +1725,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
         rbytes = io_cb->read(data_chunk, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
         if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
           io_cb->close(fp);
+          blosc2_schunk_free(schunk);
           return NULL;
         }
       }
@@ -1739,6 +1742,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
       }
       rc = blosc2_cbuffer_sizes(data_chunk, NULL, &chunk_cbytes, NULL);
       if (rc < 0) {
+        blosc2_schunk_free(schunk);
         return NULL;
       }
       if (chunk_cbytes > prev_alloc) {
