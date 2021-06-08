@@ -469,8 +469,8 @@ blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy
     return NULL;
   }
   blosc2_schunk* schunk = frame_to_schunk(frame, copy, &BLOSC2_IO_DEFAULTS);
-  if (copy) {
-    // We don't need the frame anymore
+  if (schunk && copy) {
+    // Super-chunk has its own copy of frame
     frame_free(frame);
   }
   return schunk;
