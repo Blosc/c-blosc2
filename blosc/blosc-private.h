@@ -157,8 +157,22 @@ static inline int32_t bswap32_(int32_t a) {
 #endif
 }
 
+/**
+ * @brief Register a filter in Blosc.
+ *
+ * @param filter The filter to register.
+ *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
 int register_filter_private(blosc2_filter *filter);
 
+/**
+ * @brief Register a user-defined codec in Blosc.
+ *
+ * @param codec The codec to register.
+ *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
 int register_codec_private(blosc2_codec *codec);
 
 #ifdef __cplusplus
