@@ -202,17 +202,19 @@ For Mac OSX on arm64 architecture, you need to compile like this:
 Support for the LZ4 optimized version in Intel IPP
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-C-Blosc2 comes with support for a highly optimized version of the LZ4 codec present in Intel IPP.  Actually, the default is to enable LZ4/IPP if cmake discovers IPP installed in your system it will use it automatically.  Here it is a way to easily install Intel IPP using [conda](https://docs.conda.io):
+C-Blosc2 comes with support for a highly optimized version of the LZ4 codec present in Intel IPP.  Here it is a way to easily install Intel IPP using [conda](https://docs.conda.io):
 
 .. code-block:: console
 
    conda install -c intel ipp-static
 
-In general, LZ4/IPP is faster than regular LZ4, although in some cases you may experience different compression ratios depending on which version you use.  If in doubt, or cmake is having difficulties in finding IPP files in your system, you can always manually disable LZ4/IPP by setting `DEACTIVATE_IPP` in cmake:
+With that, you can enable support for LZ4/IPP (it is disabled by default) with:
 
 .. code-block:: console
 
-   cmake .. -DDEACTIVATE_IPP=ON
+   cmake .. -DDEACTIVATE_IPP=OFF
+
+In some Intel CPUs LZ4/IPP could be faster than regular LZ4, although in many cases you may experience different compression ratios depending on which version you use.  See #313 for some quick and dirty benchmarks.
 
 
 Display error messages
