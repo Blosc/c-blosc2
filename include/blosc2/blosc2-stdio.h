@@ -15,6 +15,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include "blosc2-export.h"
 
 
 #if defined(_WIN32) && !defined(__MINGW32__)
@@ -38,14 +39,14 @@
 
 typedef struct {
   FILE *file;
-}blosc2_stdio_file;
+} blosc2_stdio_file;
 
-void *blosc2_stdio_open(const char *urlpath, const char *mode, void* params);
-int blosc2_stdio_close(void *stream);
-int64_t blosc2_stdio_tell(void *stream);
-int blosc2_stdio_seek(void *stream, int64_t offset, int whence);
-int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, void *stream);
-int64_t blosc2_stdio_read(void *ptr, int64_t size, int64_t nitems, void *stream);
-int blosc2_stdio_truncate(void *stream, int64_t size);
+BLOSC_EXPORT void *blosc2_stdio_open(const char *urlpath, const char *mode, void* params);
+BLOSC_EXPORT int blosc2_stdio_close(void *stream);
+BLOSC_EXPORT int64_t blosc2_stdio_tell(void *stream);
+BLOSC_EXPORT int blosc2_stdio_seek(void *stream, int64_t offset, int whence);
+BLOSC_EXPORT int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, void *stream);
+BLOSC_EXPORT int64_t blosc2_stdio_read(void *ptr, int64_t size, int64_t nitems, void *stream);
+BLOSC_EXPORT int blosc2_stdio_truncate(void *stream, int64_t size);
 
 #endif //BLOSC_BLOSC2_STDIO_H

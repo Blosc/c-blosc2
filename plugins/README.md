@@ -21,7 +21,7 @@ Of course, to achieve such a status, plugins will require a careful testing proc
 Plugin types
 --------------
 
-The plugins that are stored in the repository can be codecs or filters.
+The plugins that are registered in the repository can be codecs or filters.
 
 A **codec** is a program able to compress and decompress a digital data stream
 with the objective of reduce dataset size to enable a faster transmission
@@ -55,8 +55,24 @@ Moreover, during the pipeline process you can use even 6 different
 filters ordered as you prefer.
 
 
-Requirements for adding plugins
--------------------------------
+Registered plugins vs user defined plugins
+-------------------------------------------
+
+**Blosc registered plugins** are official Blosc plugins that have passed through a selection process
+and have been recognised by the Blosc Development Team. These plugins are available for 
+everybody in the C-Blosc2 GitHub repository and users can install them anytime.
+
+**User defined plugins** are plugins that users register locally and they can use them 
+in the same way as in the examples `udcodecs.c` and `udfilters.c`.
+
+If you only want to use a plugin on your own devices you can just register it as a user defined 
+plugin with an ID between *BLOSC2_USER_DEFINED_FILTERS_START* and *BLOSC2_USER_DEFINED_FILTERS_STOP*. 
+Otherwise, if you think that your plugin could be useful for the community you can apply for 
+registering it as an official Blosc plugin following the next steps.
+
+
+Requirements for registering plugins
+------------------------------------
 
 For users wanting to register a new codec or filter, there are some requirements
 that their code must satisfy:
@@ -96,7 +112,7 @@ Steps
 
    * The advantages and disadvantages of the plugin compared to the rest.
 
-4. To register a plugin the user must choose a plugin ID between BLOSC2_REGISTERED_FILTERS_START (32) and BLOSC2_REGISTERED_FILTERS_STOP (159) and
+4. To register a plugin the user must choose a plugin ID between *BLOSC2_REGISTERED_FILTERS_START* and *BLOSC2_REGISTERED_FILTERS_STOP* and
    write it at `plugins/codecs/register-codecs.h`
    or `plugins/filters/register-filters.h` depending on the plugin type. Then, you have to edit `plugins/codecs/register-codecs.c`or 
    

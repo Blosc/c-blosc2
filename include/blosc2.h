@@ -1967,7 +1967,7 @@ typedef struct {
 /**
  * @brief Register a user-defined codec in Blosc.
  *
- * @param filter The codec to register.
+ * @param codec The codec to register.
  *
  * @return 0 if succeeds. Else a negative code is returned.
  */
