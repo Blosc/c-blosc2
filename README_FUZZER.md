@@ -5,4 +5,4 @@ How to look into fuzzer issues
 
 * This output always gives the base64 of the data that reproduced it (e.g. AiACDQEAAAAPAAAAFAAAABMAbZ0=).  This can be converted to hex and saved to a file.
 
-* This file can be passed as an argument to `tests/fuzz/decompress_fuzzer` so as to test it locally.
+* This file can be passed as an argument to the corresponding test of `tests/fuzz/` folder, so as to test it locally.
