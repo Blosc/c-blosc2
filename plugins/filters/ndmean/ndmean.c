@@ -126,6 +126,9 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     uint8_t* smeta;
     uint32_t smeta_len;
     if (blosc2_meta_get(cparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
         printf("Blosc error");
         return 0;
     }
@@ -134,6 +137,9 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     int typesize = cparams->typesize;
 
     if ((typesize != 4) && (typesize != 8)) {
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
         fprintf(stderr, "This filter only works for float or double buffers");
         return -1;
     }
@@ -157,6 +163,9 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     }
 
     if (length != blocksize) {
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
         printf("Length not equal to blocksize %d %d \n", length, blocksize);
         return -1;
     }
@@ -173,6 +182,9 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
 
     /* input and output buffer cannot be less than cell size */
     if (length < cell_size * typesize) {
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
         printf("Incorrect length");
         return 0;
     }
@@ -262,6 +274,9 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
         }
 
         if (op > op_limit) {
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             printf("Output too big");
             return 0;
         }
@@ -289,6 +304,9 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     uint8_t* smeta;
     uint32_t smeta_len;
     if (blosc2_meta_get(schunk, "caterva", &smeta, &smeta_len) < 0) {
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
         printf("Blosc error");
         return 0;
     }
@@ -319,11 +337,17 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     }
 
     if (length != blocksize) {
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
         printf("Length not equal to blocksize \n");
         return -1;
     }
     /* input and output buffer cannot be less than cell size */
     if (length < cell_size * typesize) {
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
         printf("Incorrect length");
         return 0;
     }
@@ -345,6 +369,9 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     for (int cell_ind = 0; cell_ind < ncells; cell_ind++) {      // for each cell
 
         if (ip > ip_limit) {
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             printf("Literal copy \n");
             return 0;
         }
@@ -383,15 +410,14 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     }
     ind += (int32_t) pad_shape[ndim - 1];
 
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
 
     if (ind != (int32_t) (blocksize / typesize)) {
         printf("Output size is not compatible with embeded blockshape ind %d %d \n", ind, (blocksize / typesize));
         return 0;
     }
-
-    free(shape);
-    free(chunkshape);
-    free(blockshape);
 
     return BLOSC2_ERROR_SUCCESS;
 }

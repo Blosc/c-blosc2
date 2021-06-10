@@ -3320,11 +3320,17 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int nchu
   // Use a lazychunk here in order to do a potential parallel read.
   rc = frame_get_lazychunk(frame, nchunk, &src, &needs_free);
   if (rc < 0) {
+    if (needs_free) {
+      free(src);
+    }
     BLOSC_TRACE_ERROR("Cannot get the chunk in position %d.", nchunk);
     return rc;
   }
   chunk_cbytes = rc;
   if (chunk_cbytes < (signed)sizeof(int32_t)) {
+    if (needs_free) {
+      free(src);
+    }
     /* Not enough input to read `nbytes` */
     return BLOSC2_ERROR_READ_BUFFER;
   }
