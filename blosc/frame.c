@@ -3331,11 +3331,17 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int nchu
 
   rc = blosc2_cbuffer_sizes(src, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {
+    if (needs_free) {
+      free(src);
+    }
     return rc;
   }
 
   /* Create a buffer for destination */
   if (chunk_nbytes > (size_t)nbytes) {
+    if (needs_free) {
+      free(src);
+    }
     BLOSC_TRACE_ERROR("Not enough space for decompressing in dest.");
     return BLOSC2_ERROR_WRITE_BUFFER;
   }
@@ -3344,16 +3350,13 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int nchu
   int32_t chunksize = blosc2_decompress_ctx(dctx, src, chunk_cbytes, dest, nbytes);
   if (chunksize < 0 || chunksize != chunk_nbytes) {
     BLOSC_TRACE_ERROR("Error in decompressing chunk.");
+    if (needs_free) {
+      free(src);
+    }
     if (chunksize < 0)
-      if (needs_free) {
-        free(src);
-      }
       return chunksize;
     return BLOSC2_ERROR_FAILURE;
   }
 
-  if (needs_free) {
-    free(src);
-  }
   return (int)chunksize;
 }
