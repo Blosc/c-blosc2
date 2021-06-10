@@ -1076,6 +1076,11 @@ int blosc2_meta_exists(blosc2_schunk *schunk, const char *name) {
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
+  if (schunk == NULL) {
+    BLOSC_TRACE_ERROR("Schunk must not be NUll.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
   for (int nmetalayer = 0; nmetalayer < schunk->nmetalayers; nmetalayer++) {
     if (strcmp(name, schunk->metalayers[nmetalayer]->name) == 0) {
       return nmetalayer;

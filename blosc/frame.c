@@ -3345,6 +3345,9 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int nchu
   if (chunksize < 0 || chunksize != chunk_nbytes) {
     BLOSC_TRACE_ERROR("Error in decompressing chunk.");
     if (chunksize < 0)
+      if (needs_free) {
+        free(src);
+      }
       return chunksize;
     return BLOSC2_ERROR_FAILURE;
   }
