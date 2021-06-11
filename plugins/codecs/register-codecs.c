@@ -1,3 +1,9 @@
+/*
+  Copyright (C) 2021 The Blosc Developers
+  http://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
+*/
+
 #include <blosc-private.h>
 #include "register-codecs.h"
 #include "ndlz/ndlz.h"

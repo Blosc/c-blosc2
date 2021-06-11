@@ -9,13 +9,6 @@ set_property(
         TARGET test_ndlz
         APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
 
-#if(UNIX AND NOT APPLE)
-    # cmake is complaining about LINK_PRIVATE in original PR
-    # and removing it does not seem to hurt, so be it.
-    # target_link_libraries(bench LINK_PRIVATE rt)
- #   target_link_libraries(test_ndlz rt)
-#endif()
-
 target_link_libraries(test_ndlz blosc_testing)
 
 # tests

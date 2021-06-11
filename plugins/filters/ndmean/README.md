@@ -62,11 +62,3 @@ compress.
 
 The main disadvantage of *NDMEAN* is that it changes the original data
 and can not recover it (lossy compression).
-
-
-
-
-
-
-
-

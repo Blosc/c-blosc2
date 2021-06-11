@@ -1,36 +1,35 @@
-/*
-    Copyright (C) 2014  Francesc Alted
-    http://blosc.org
+/*********************************************************************
+    Blosc - Blocked Shuffling and Compression Library
+
+    Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+    https://blosc.org
     License: BSD 3-Clause (see LICENSE.txt)
 
-    Example program demonstrating use of the Blosc filter from C code.
+    See LICENSE.txt for details about copyright and rights to use.
 
+    Test program demonstrating use of the Blosc filter from C code.
     To compile this program:
-
-    $ gcc -O many_compressors.c -o many_compressors -lblosc2
+    $ gcc -O test_ndmean_repart.c -o test_ndmean_repart -lblosc2+plugins
 
     To run:
 
-    $ ./test_ndmean
+    $ ./test_ndmean_repart
     Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
-    Using 4 threads (previously using 1)
-    Using blosclz compressor
-    Compression: 4000000 -> 57577 (69.5x)
+    Using 1 thread
+    Using ZSTD compressor
     Succesful roundtrip!
-    Using lz4 compressor
-    Compression: 4000000 -> 97276 (41.1x)
-    Succesful roundtrip!
-    Using lz4hc compressor
-    Compression: 4000000 -> 38314 (104.4x)
-    Succesful roundtrip!
-    Using zlib compressor
-    Compression: 4000000 -> 21486 (186.2x)
-    Succesful roundtrip!
-    Using zstd compressor
-    Compression: 4000000 -> 10692 (374.1x)
-    Succesful roundtrip!
+    Compression: 41472 -> 1015 (40.9x)
+    rand: 40457 obtained
 
- */
+    Succesful roundtrip!
+    Compression: 1792 -> 323 (5.5x)
+    same_cells: 1469 obtained
+
+    Succesful roundtrip!
+    Compression: 16128 -> 767 (21.0x)
+    some_matches: 15361 obtained
+
+**********************************************************************/
 
 #include <stdio.h>
 #include "ndmean.h"
