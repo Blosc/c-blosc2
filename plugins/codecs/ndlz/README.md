@@ -66,12 +66,3 @@ The main disadvantage of *NDLZ* is that it is only useful for 2-dim datsets
 and at the moment other more developed
 codecs that do not consider multidimensionality obtain better results
 (times and ratios) for 2-dim datasets.
-
-
-
-
-
-
-
-
-

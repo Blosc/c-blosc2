@@ -13,13 +13,6 @@ set_property(
         TARGET test_ndmean_repart
         APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
 
-#if(UNIX AND NOT APPLE)
-    # cmake is complaining about LINK_PRIVATE in original PR
-    # and removing it does not seem to hurt, so be it.
-    # target_link_libraries(bench LINK_PRIVATE rt)
- #   target_link_libraries(test_ndmean rt)
-#endif()
-
 target_link_libraries(test_ndmean_repart blosc_testing)
 target_link_libraries(test_ndmean_mean blosc_testing)
 

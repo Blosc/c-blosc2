@@ -1,36 +1,34 @@
-/*
-    Copyright (C) 2014  Francesc Alted
-    http://blosc.org
+/*********************************************************************
+    Blosc - Blocked Shuffling and Compression Library
+
+    Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+    https://blosc.org
     License: BSD 3-Clause (see LICENSE.txt)
 
-    Example program demonstrating use of the Blosc filter from C code.
+    See LICENSE.txt for details about copyright and rights to use.
 
+    Test program demonstrating use of the Blosc filter from C code.
     To compile this program:
 
-    $ gcc -O many_compressors.c -o many_compressors -lblosc2
+    $ gcc -O test_ndlz.c -o test_ndlz -lblosc2+plugins
 
     To run:
 
     $ ./test_ndlz
     Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
-    Using 4 threads (previously using 1)
-    Using blosclz compressor
-    Compression: 4000000 -> 57577 (69.5x)
     Succesful roundtrip!
-    Using lz4 compressor
-    Compression: 4000000 -> 97276 (41.1x)
+    Compression: 1792 -> 1630 (1.1x)
     Succesful roundtrip!
-    Using lz4hc compressor
-    Compression: 4000000 -> 38314 (104.4x)
-    Succesful roundtrip!
-    Using zlib compressor
-    Compression: 4000000 -> 21486 (186.2x)
-    Succesful roundtrip!
-    Using zstd compressor
-    Compression: 4000000 -> 10692 (374.1x)
-    Succesful roundtrip!
+    Compression: 1792 -> 1749 (1.0x)
+    same_cells: 43 obtained
 
- */
+    Succesful roundtrip!
+    Compression: 16128 -> 2579 (6.3x)
+    Succesful roundtrip!
+    Compression: 16128 -> 3829 (4.2x)
+    some_matches: 12299 obtained
+
+**********************************************************************/
 
 #include <stdio.h>
 #include "blosc2.h"
@@ -42,7 +40,6 @@ static int test_ndlz_4(blosc2_schunk* schunk) {
 
     int nchunks = schunk->nchunks;
     int32_t chunksize = (int32_t) (schunk->chunksize);
- //   int isize = (int) array->extchunknitems * typesize;
     uint8_t *data_in = malloc(chunksize);
     int decompressed;
     int64_t csize;
@@ -78,13 +75,6 @@ static int test_ndlz_4(blosc2_schunk* schunk) {
             return -1;
         }
 
-        /*
-        printf("\n data \n");
-        for (int i = 0; i < nbytes; i++) {
-        printf("%u, ", data2[i]);
-        }
-        */
-
         /* Compress with clevel=5 and shuffle active  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC_MAX_OVERHEAD);
         if (csize == 0) {
@@ -103,12 +93,7 @@ static int test_ndlz_4(blosc2_schunk* schunk) {
             printf("Decompression error.  Error code: %" PRId64 "\n", dsize);
             return (int) dsize;
         }
-        /*
-        printf("\n dest \n");
-        for (int i = 0; i < dsize; i++) {
-            printf("%u, ", data_dest[i]);
-        }
-        */
+
         for (int i = 0; i < chunksize; i++) {
             if (data_in[i] != data_dest[i]) {
                 printf("i: %d, data %u, dest %u", i, data_in[i], data_dest[i]);
@@ -170,13 +155,6 @@ static int test_ndlz_8(blosc2_schunk* schunk) {
             return -1;
         }
 
-        /*
-        printf("\n data \n");
-        for (int i = 0; i < nbytes; i++) {
-        printf("%u, ", data2[i]);
-        }
-        */
-
         /* Compress with clevel=5 and shuffle active  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC_MAX_OVERHEAD);
         if (csize == 0) {
@@ -194,12 +172,7 @@ static int test_ndlz_8(blosc2_schunk* schunk) {
             printf("Decompression error.  Error code: %" PRId64 "\n", dsize);
             return (int) dsize;
         }
-        /*
-        printf("\n dest \n");
-        for (int i = 0; i < dsize; i++) {
-            printf("%u, ", data_dest[i]);
-        }
-        */
+
         for (int i = 0; i < chunksize; i++) {
             if (data_in[i] != data_dest[i]) {
                 printf("i: %d, data %u, dest %u", i, data_in[i], data_dest[i]);
@@ -228,6 +201,7 @@ int same_cells() {
     /* Run the test. */
     int result = test_ndlz_4(schunk);
     if (result < 0) {
+        blosc2_schunk_free(schunk);
         return result;
     }
     result = test_ndlz_8(schunk);
@@ -242,6 +216,7 @@ int some_matches() {
     /* Run the test. */
     int result = test_ndlz_4(schunk);
     if (result < 0) {
+        blosc2_schunk_free(schunk);
         return result;
     }
     result = test_ndlz_8(schunk);
