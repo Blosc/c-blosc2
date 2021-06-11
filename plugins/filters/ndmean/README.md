@@ -38,7 +38,7 @@ This filter is meant first to order the data so that when the
 dataset is traversed the elements of a cell are all in a row.
 Furthermore, *NDMEAN* replaces cell elements by the cell mean.
 
-::
+
 
     ------------------------                  -----------------------------
     | 0 1 | 1 2 | 2 3 | 3 5 |                 | 1 1 1 1 1 1 | 2 2 2 2 2 2 |

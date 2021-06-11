@@ -30,7 +30,7 @@ This filter is meant to leverage multidimensionality for helping codecs to get
 better compression ratios. The idea is to order the data so that when the
 dataset is traversed the elements of a cell are all in a row.
 
-::
+
 
     ------------------------                  -----------------------------
     | 0 1 | 2 3 | 4 5 | 6 7 |                 |   0 1 8 9   |  2 3 10 11  |
