@@ -2,11 +2,15 @@
 set(SOURCES ndmean.c ndmean.h)
 
 # targets
-add_executable(test_ndmean test_ndmean.c ${SOURCES})
+add_executable(test_ndmean_repart test_ndmean_repart.c ${SOURCES})
+add_executable(test_ndmean_mean test_ndmean_mean.c ${SOURCES})
 # Define the BLOSC_TESTING symbol so normally-hidden functions
 # aren't hidden from the view of the test programs.
 set_property(
-        TARGET test_ndmean
+        TARGET test_ndmean_mean
+        APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
+set_property(
+        TARGET test_ndmean_repart
         APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
 
 #if(UNIX AND NOT APPLE)
@@ -16,11 +20,13 @@ set_property(
  #   target_link_libraries(test_ndmean rt)
 #endif()
 
-target_link_libraries(test_ndmean blosc_testing)
+target_link_libraries(test_ndmean_repart blosc_testing)
+target_link_libraries(test_ndmean_mean blosc_testing)
 
 # tests
 if(BUILD_TESTS)
-    add_test(test_plugin_test_ndmean test_ndmean)
+    add_test(test_plugin_ndmean_repart test_ndmean_repart)
+    add_test(test_plugin_ndmean_mean test_ndmean_mean)
 endif()
 
 # Copy test files
