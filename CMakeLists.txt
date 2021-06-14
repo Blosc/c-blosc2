@@ -101,7 +101,9 @@ option(BUILD_BENCHMARKS
 option(BUILD_EXAMPLES
     "Build example programs form the blosc compression library" ON)
 option(BUILD_PLUGINS
-    "Build plugins programs form the blosc compression library" ON)
+    "Build plugins programs form the blosc compression library" OFF)
+option(BUILD_LITE
+    "Build a lite version of the blosc library." OFF)
 option(DEACTIVATE_AVX2
     "Do not attempt to build with AVX2 instructions" OFF)
 option(DEACTIVATE_LZ4
@@ -131,6 +133,15 @@ endif(MINGW)
 if (ENABLE_ASAN)
     message(STATUS "Enabling ASAN")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Os -fno-omit-frame-pointer -fsanitize=address")
+endif()
+
+if (BUILD_PLUGINS AND BUILD_LITE)
+    message(FATAL_ERROR "Both plugins and lite Blosc versions can not be built at the same time.")
+endif()
+
+if(BUILD_LITE)
+    option(DEACTIVATE_ZLIB ON)
+    option(DEACTIVATE_ZSTD ON)
 endif()
 
 if(NOT DEACTIVATE_LZ4)

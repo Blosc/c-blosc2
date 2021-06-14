@@ -11,11 +11,11 @@ jobs:
           - name: Ubuntu GCC
             os: ubuntu-latest
             compiler: gcc
+            cmake-args: -DBUILD_PLUGINS=ON
 
           - name: Ubuntu GCC No Plugins
             os: ubuntu-latest
             compiler: gcc
-            cmake-args: -DBUILD_PLUGINS=OFF
 
           # Out of source build
           - name: Ubuntu GCC OSB
@@ -48,11 +48,11 @@ jobs:
           - name: Ubuntu Clang
             os: ubuntu-latest
             compiler: clang
+            cmake-args: -DBUILD_PLUGINS=ON
 
           - name: Ubuntu Clang No Plugins
             os: ubuntu-latest
             compiler: clang
-            cmake-args: -DBUILD_PLUGINS=OFF
 
           - name: Ubuntu Clang No AVX2
             os: ubuntu-latest
@@ -77,22 +77,22 @@ jobs:
           - name: Windows MSVC Win32
             os: windows-latest
             compiler: cl
-            cmake-args: -A Win32
+            cmake-args: -A Win32 -DBUILD_PLUGINS=ON
 
           - name: Windows MSVC Win32 No Plugins
             os: windows-latest
             compiler: cl
-            cmake-args: -A Win32 -DBUILD_PLUGINS=OFF
+            cmake-args: -A Win32
 
           - name: Windows MSVC Win64
             os: windows-latest
             compiler: cl
-            cmake-args: -A x64
+            cmake-args: -A x64 -DBUILD_PLUGINS=ON
 
           - name: Windows MSVC Win64 No Plugins
             os: windows-latest
             compiler: cl
-            cmake-args: -A x64 -DBUILD_PLUGINS=OFF
+            cmake-args: -A x64
 
           - name: Windows GCC Ninja
             os: windows-latest
@@ -107,20 +107,20 @@ jobs:
           - name: macOS Clang
             os: macOS-latest
             compiler: clang
+            cmake-args: -DBUILD_PLUGINS=ON
 
           - name: macOS Clang No Plugins
             os: macOS-latest
             compiler: clang
-            cmake-args: -DBUILD_PLUGINS=OFF
 
           - name: macOS GCC
             os: macOS-latest
             compiler: gcc
+            cmake-args: -DBUILD_PLUGINS=ON
 
           - name: macOS GCC No Plugins
             os: macOS-latest
             compiler: gcc
-            cmake-args: -DBUILD_PLUGINS=OFF
 
     steps:
     - uses: actions/checkout@v1
