@@ -1840,7 +1840,7 @@ int get_coffset(blosc2_frame_s* frame, int32_t header_len, int64_t cbytes,
   int rc = blosc2_getitem(coffsets, off_cbytes, nchunk, 1, offset, (int32_t)sizeof(int64_t));
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Problems retrieving a chunk offset.");
-  } else if (*offset > frame->len) {
+  } else if (!frame->sframe && *offset > frame->len) {
     BLOSC_TRACE_ERROR("Cannot read chunk %d outside of frame boundary.", nchunk);
     rc = BLOSC2_ERROR_READ_BUFFER;
   }
@@ -2506,22 +2506,23 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   }
 
   // Re-compress the offsets again
-  blosc2_context* cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
-  cctx->typesize = sizeof(int64_t);  // 64-bit offsets
-  // The params below have been fine-tuned with the zero_runlen bench
-  cctx->nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
-  // cctx->compcode = BLOSC_LZ4;
-  cctx->blocksize = 4 * 1024;  // based on experiments with create_frame.c bench
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.splitmode = BLOSC_NEVER_SPLIT;
+  cparams.typesize = sizeof(int64_t);
+  cparams.blocksize = 16 * 1024;  // based on experiments with create_frame.c bench
+  cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
+  cparams.compcode = BLOSC_BLOSCLZ;
+  blosc2_context* cctx = blosc2_create_cctx(cparams);
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
                                                off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
-
   free(offsets);
   if (new_off_cbytes < 0) {
     free(off_chunk);
     return NULL;
   }
+  // printf("%f\n", (double) off_nbytes / new_off_cbytes);
 
   int64_t new_cbytes = cbytes + chunk_cbytes;
   int64_t new_frame_len;
@@ -2713,8 +2714,13 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
   }
 
   // Re-compress the offsets again
-  blosc2_context* cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
-  cctx->typesize = sizeof(int64_t);
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.splitmode = BLOSC_NEVER_SPLIT;
+  cparams.typesize = sizeof(int64_t);
+  cparams.blocksize = 16 * 1024;  // based on experiments with create_frame.c bench
+  cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
+  cparams.compcode = BLOSC_BLOSCLZ;
+  blosc2_context* cctx = blosc2_create_cctx(cparams);
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
                                                off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
@@ -2934,8 +2940,13 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
     cbytes = old_offset;
   }
   // Re-compress the offsets again
-  blosc2_context* cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
-  cctx->typesize = sizeof(int64_t);
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.splitmode = BLOSC_NEVER_SPLIT;
+  cparams.typesize = sizeof(int64_t);
+  cparams.blocksize = 16 * 1024;  // based on experiments with create_frame.c bench
+  cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
+  cparams.compcode = BLOSC_BLOSCLZ;
+  blosc2_context* cctx = blosc2_create_cctx(cparams);
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
                                                off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
@@ -3081,8 +3092,13 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int nchunk, blosc2_schunk* schun
   offsets[nchunks - 1] = 0;
 
   // Re-compress the offsets again
-  blosc2_context* cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
-  cctx->typesize = sizeof(int64_t);
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.splitmode = BLOSC_NEVER_SPLIT;
+  cparams.typesize = sizeof(int64_t);
+  cparams.blocksize = 16 * 1024;  // based on experiments with create_frame.c bench
+  cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
+  cparams.compcode = BLOSC_BLOSCLZ;
+  blosc2_context* cctx = blosc2_create_cctx(cparams);
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes - sizeof(int64_t),
                                                off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
@@ -3226,8 +3242,13 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int* offsets_order, blosc
   free(offsets_copy);
 
   // Re-compress the offsets again
-  blosc2_context* cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
-  cctx->typesize = sizeof(int64_t);
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.splitmode = BLOSC_NEVER_SPLIT;
+  cparams.typesize = sizeof(int64_t);
+  cparams.blocksize = 16 * 1024;  // based on experiments with create_frame.c bench
+  cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
+  cparams.compcode = BLOSC_BLOSCLZ;
+  blosc2_context* cctx = blosc2_create_cctx(cparams);
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
                                                off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
