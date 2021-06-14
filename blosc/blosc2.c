@@ -19,8 +19,6 @@
 
 #include "blosc2.h"
 #include "blosc-private.h"
-#include "blosc2/blosc2-common.h"
-#include "blosc2/blosc2-stdio.h"
 #include "frame.h"
 
 
@@ -3402,6 +3400,8 @@ void blosc_init(void) {
   if (g_initlib) return;
 
 #if defined(HAVE_PLUGINS)
+  #include "blosc2/blosc2-common.h"
+  #include "blosc2/blosc2-stdio.h"
   register_codecs();
   register_filters();
 #endif
