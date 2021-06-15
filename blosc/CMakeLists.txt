@@ -146,46 +146,18 @@ endif ()
 
 # targets
 if(BUILD_SHARED)
-    if(BUILD_PLUGINS)
-        add_library(blosc2_plugins_shared SHARED ${SOURCES})
-        set_target_properties(blosc2_plugins_shared PROPERTIES OUTPUT_NAME blosc2+plugins)
-        if(MSVC OR MINGW)
-            set_target_properties(blosc2_plugins_shared PROPERTIES PREFIX lib)
-        endif()
-        set_target_properties(blosc2_plugins_shared PROPERTIES
-                VERSION ${version_string}
-                SOVERSION 2  # Change this when an ABI change happens
-                )
-        set_property(
-                TARGET blosc2_plugins_shared
-                APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_SHARED_LIBRARY)
-    elseif(BUILD_LITE)
-        add_library(blosc2_lite_shared SHARED ${SOURCES})
-        set_target_properties(blosc2_lite_shared PROPERTIES OUTPUT_NAME blosc2_lite)
-        if(MSVC OR MINGW)
-            set_target_properties(blosc2_lite_shared PROPERTIES PREFIX lib)
-        endif()
-        set_target_properties(blosc2_lite_shared PROPERTIES
-                VERSION ${version_string}
-                SOVERSION 2  # Change this when an ABI change happens
-                )
-        set_property(
-                TARGET blosc2_lite_shared
-                APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_SHARED_LIBRARY)
-    else()
-        add_library(blosc2_shared SHARED ${SOURCES})
-        set_target_properties(blosc2_shared PROPERTIES OUTPUT_NAME blosc2)
-        if(MSVC OR MINGW)
-            set_target_properties(blosc2_shared PROPERTIES PREFIX lib)
-        endif()
-        set_target_properties(blosc2_shared PROPERTIES
-                VERSION ${version_string}
-                SOVERSION 2  # Change this when an ABI change happens
-                )
-        set_property(
-                TARGET blosc2_shared
-                APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_SHARED_LIBRARY)
+    add_library(blosc2_shared SHARED ${SOURCES})
+    set_target_properties(blosc2_shared PROPERTIES OUTPUT_NAME blosc2)
+    if(MSVC OR MINGW)
+        set_target_properties(blosc2_shared PROPERTIES PREFIX lib)
     endif()
+    set_target_properties(blosc2_shared PROPERTIES
+            VERSION ${version_string}
+            SOVERSION 2  # Change this when an ABI change happens
+            )
+    set_property(
+            TARGET blosc2_shared
+            APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_SHARED_LIBRARY)
 endif()
 
 # Based on the target architecture and hardware features supported
@@ -285,16 +257,8 @@ if(BUILD_TESTS)
 endif()
 
 if(BUILD_SHARED)
-    if(BUILD_PLUGINS)
-        target_link_libraries(blosc2_plugins_shared ${LIBS})
-        target_include_directories(blosc2_plugins_shared PUBLIC ${BLOSC_INCLUDE_DIRS})
-    elseif(BUILD_LITE)
-        target_link_libraries(blosc2_lite_shared ${LIBS})
-        target_include_directories(blosc2_lite_shared PUBLIC ${BLOSC_INCLUDE_DIRS})
-    else()
-        target_link_libraries(blosc2_shared ${LIBS})
-        target_include_directories(blosc2_shared PUBLIC ${BLOSC_INCLUDE_DIRS})
-    endif()
+    target_link_libraries(blosc2_shared ${LIBS})
+    target_include_directories(blosc2_shared PUBLIC ${BLOSC_INCLUDE_DIRS})
 endif()
 
 if(BUILD_TESTS)
@@ -303,31 +267,13 @@ if(BUILD_TESTS)
 endif()
 
 if(BUILD_STATIC)
-    if(BUILD_PLUGINS)
-        add_library(blosc2_plugins_static STATIC ${SOURCES})
-        set_target_properties(blosc2_plugins_static PROPERTIES OUTPUT_NAME blosc2+plugins)
-        if(MSVC OR MINGW)
-            set_target_properties(blosc2_plugins_static PROPERTIES PREFIX lib)
-        endif()
-        target_link_libraries(blosc2_plugins_static ${LIBS})
-        target_include_directories(blosc2_plugins_static PUBLIC ${BLOSC_INCLUDE_DIRS})
-    elseif(BUILD_LITE)
-        add_library(blosc2_lite_static STATIC ${SOURCES})
-        set_target_properties(blosc2_lite_static PROPERTIES OUTPUT_NAME blosc2_lite)
-        if(MSVC OR MINGW)
-            set_target_properties(blosc2_lite_static PROPERTIES PREFIX lib)
-        endif()
-        target_link_libraries(blosc2_lite_static ${LIBS})
-        target_include_directories(blosc2_lite_static PUBLIC ${BLOSC_INCLUDE_DIRS})
-    else()
-        add_library(blosc2_static STATIC ${SOURCES})
-        set_target_properties(blosc2_static PROPERTIES OUTPUT_NAME blosc2)
-        if(MSVC OR MINGW)
-            set_target_properties(blosc2_static PROPERTIES PREFIX lib)
-        endif()
-        target_link_libraries(blosc2_static ${LIBS})
-        target_include_directories(blosc2_static PUBLIC ${BLOSC_INCLUDE_DIRS})
+    add_library(blosc2_static STATIC ${SOURCES})
+    set_target_properties(blosc2_static PROPERTIES OUTPUT_NAME blosc2)
+    if(MSVC OR MINGW)
+        set_target_properties(blosc2_static PROPERTIES PREFIX lib)
     endif()
+    target_link_libraries(blosc2_static ${LIBS})
+    target_include_directories(blosc2_static PUBLIC ${BLOSC_INCLUDE_DIRS})
 endif()
 
 # install
@@ -346,39 +292,15 @@ if(BLOSC_INSTALL)
     endif()
 
     if(BUILD_SHARED)
-        if(BUILD_PLUGINS)
-            install(TARGETS blosc2_plugins_shared
-                    LIBRARY DESTINATION ${lib_dir}
-                    ARCHIVE DESTINATION ${lib_dir}
-                    RUNTIME DESTINATION bin COMPONENT LIB)
-        elseif(BUILD_LITE)
-            install(TARGETS blosc2_lite_shared
-                    LIBRARY DESTINATION ${lib_dir}
-                    ARCHIVE DESTINATION ${lib_dir}
-                    RUNTIME DESTINATION bin COMPONENT LIB)
-        else()
-            install(TARGETS blosc2_shared
-                    LIBRARY DESTINATION ${lib_dir}
-                    ARCHIVE DESTINATION ${lib_dir}
-                    RUNTIME DESTINATION bin COMPONENT LIB)
-        endif()
+        install(TARGETS blosc2_shared
+                LIBRARY DESTINATION ${lib_dir}
+                ARCHIVE DESTINATION ${lib_dir}
+                RUNTIME DESTINATION bin COMPONENT LIB)
     endif()
     if(BUILD_STATIC)
-        if(BUILD_PLUGINS)
-            install(TARGETS blosc2_plugins_static
-                    LIBRARY DESTINATION ${lib_dir}
-                    ARCHIVE DESTINATION ${lib_dir}
-                    RUNTIME DESTINATION bin COMPONENT LIB)
-        elseif(BUILD_LITE)
-            install(TARGETS blosc2_lite_static
-                    LIBRARY DESTINATION ${lib_dir}
-                    ARCHIVE DESTINATION ${lib_dir}
-                    RUNTIME DESTINATION bin COMPONENT LIB)
-        else()
-            install(TARGETS blosc2_static
-                    LIBRARY DESTINATION ${lib_dir}
-                    ARCHIVE DESTINATION ${lib_dir}
-                    RUNTIME DESTINATION bin COMPONENT LIB)
-        endif()
+        install(TARGETS blosc2_static
+                LIBRARY DESTINATION ${lib_dir}
+                ARCHIVE DESTINATION ${lib_dir}
+                RUNTIME DESTINATION bin COMPONENT LIB)
     endif()
 endif()
