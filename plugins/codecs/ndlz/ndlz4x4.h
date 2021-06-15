@@ -18,6 +18,7 @@
 extern "C" {
 #endif
 #include "ndlz.h"
+#include "ndlz-private.h"
 /*
 #include <stdio.h>
 #include "blosc2-common.h"
