@@ -18,7 +18,7 @@
 extern "C" {
 #endif
 #include "ndlz.h"
-
+#include "ndlz-private.h"
 
 /**
   Compress a block of data in the input buffer and returns the size of
