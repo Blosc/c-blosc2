@@ -3522,7 +3522,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
       free(context);
       return NULL;
     }
-    if (context->filters[i] > BLOSC_LAST_REGISTERED_FILTER && context->filters[i] <= BLOSC2_REGISTERED_FILTERS_STOP) {
+    if (context->filters[i] > BLOSC_LAST_REGISTERED_FILTER && context->filters[i] <= BLOSC2_GLOBAL_REGISTERED_FILTERS_STOP) {
       BLOSC_TRACE_ERROR("filter (%d) is not yet defined",
                         context->filters[i]);
       free(context);
@@ -3843,12 +3843,12 @@ int register_filter_private(blosc2_filter *filter) {
         BLOSC_TRACE_ERROR("Can not register more filters");
         return BLOSC2_ERROR_CODEC_SUPPORT;
     }
-    if (filter->id < BLOSC2_REGISTERED_FILTERS_START) {
-        BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_REGISTERED_FILTERS_START);
+    if (filter->id < BLOSC2_GLOBAL_REGISTERED_FILTERS_START) {
+        BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_GLOBAL_REGISTERED_FILTERS_START);
         return BLOSC2_ERROR_FAILURE;
     }
-    if (filter->id > BLOSC2_USER_DEFINED_FILTERS_STOP) {
-        BLOSC_TRACE_ERROR("The id must be leather or equal than %d", BLOSC2_USER_DEFINED_FILTERS_STOP);
+    if (filter->id > BLOSC2_USER_REGISTERED_FILTERS_STOP) {
+        BLOSC_TRACE_ERROR("The id must be leather or equal than %d", BLOSC2_USER_REGISTERED_FILTERS_STOP);
         return BLOSC2_ERROR_FAILURE;
     }
 
@@ -3868,8 +3868,8 @@ int register_filter_private(blosc2_filter *filter) {
 
 
 int blosc2_register_filter(blosc2_filter *filter) {
-  if (filter->id < BLOSC2_USER_DEFINED_FILTERS_START) {
-    BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_USER_DEFINED_FILTERS_START);
+  if (filter->id < BLOSC2_USER_REGISTERED_FILTERS_START) {
+    BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_USER_REGISTERED_FILTERS_START);
     return BLOSC2_ERROR_FAILURE;
   }
 
@@ -3885,12 +3885,12 @@ int register_codec_private(blosc2_codec *codec) {
         BLOSC_TRACE_ERROR("Can not register more codecs");
         return BLOSC2_ERROR_CODEC_SUPPORT;
     }
-    if (codec->compcode < BLOSC2_REGISTERED_CODECS_START) {
-        BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_REGISTERED_CODECS_START);
+    if (codec->compcode < BLOSC2_GLOBAL_REGISTERED_CODECS_START) {
+        BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_GLOBAL_REGISTERED_CODECS_START);
         return BLOSC2_ERROR_FAILURE;
     }
-    if (codec->compcode > BLOSC2_USER_DEFINED_CODECS_STOP) {
-        BLOSC_TRACE_ERROR("The id must be leather or equal than %d", BLOSC2_USER_DEFINED_CODECS_STOP);
+    if (codec->compcode > BLOSC2_USER_REGISTERED_CODECS_STOP) {
+        BLOSC_TRACE_ERROR("The id must be leather or equal than %d", BLOSC2_USER_REGISTERED_CODECS_STOP);
         return BLOSC2_ERROR_FAILURE;
     }
 
@@ -3910,8 +3910,8 @@ int register_codec_private(blosc2_codec *codec) {
 
 
 int blosc2_register_codec(blosc2_codec *codec) {
-  if (codec->compcode < BLOSC2_USER_DEFINED_CODECS_START) {
-    BLOSC_TRACE_ERROR("The compcode must be greater or equal than %d", BLOSC2_USER_DEFINED_CODECS_START);
+  if (codec->compcode < BLOSC2_USER_REGISTERED_CODECS_START) {
+    BLOSC_TRACE_ERROR("The compcode must be greater or equal than %d", BLOSC2_USER_REGISTERED_CODECS_START);
     return BLOSC2_ERROR_CODEC_PARAM;
   }
 
