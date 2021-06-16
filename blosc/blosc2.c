@@ -3399,6 +3399,9 @@ void blosc_init(void) {
   /* Return if Blosc is already initialized */
   if (g_initlib) return;
 
+  g_ncodecs = 0;
+  g_nfilters = 0;
+
 #if defined(HAVE_PLUGINS)
   #include "blosc2/blosc2-common.h"
   #include "blosc2/blosc2-stdio.h"
