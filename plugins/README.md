@@ -55,18 +55,18 @@ Moreover, during the pipeline process you can use even 6 different
 filters ordered as you prefer.
 
 
-Registered plugins vs user defined plugins
--------------------------------------------
+Blosc global registered plugins vs user registered plugins
+----------------------------------------------------------
 
-**Blosc registered plugins** are official Blosc plugins that have passed through a selection process
+**Blosc global registered plugins** are official Blosc plugins that have passed through a selection process
 and have been recognised by the Blosc Development Team. These plugins are available for 
 everybody in the C-Blosc2 GitHub repository and users can install them anytime.
 
-**User defined plugins** are plugins that users register locally and they can use them 
+**User registered plugins** are plugins that users register locally and they can use them 
 in the same way as in the examples `udcodecs.c` and `udfilters.c`.
 
-If you only want to use a plugin on your own devices you can just register it as a user defined 
-plugin with an ID between *BLOSC2_USER_DEFINED_FILTERS_START* and *BLOSC2_USER_DEFINED_FILTERS_STOP*. 
+If you only want to use a plugin on your own devices you can just register it as a user registered 
+plugin with an ID between *BLOSC2_USER_REGISTERED_FILTERS_START* and *BLOSC2_USER_REGISTERED_FILTERS_STOP*. 
 Otherwise, if you think that your plugin could be useful for the community you can apply for 
 registering it as an official Blosc plugin following the next steps.
 
@@ -112,7 +112,7 @@ Steps
 
    * The advantages and disadvantages of the plugin compared to the rest.
 
-4. To register a plugin the user must choose a plugin ID between *BLOSC2_REGISTERED_FILTERS_START* and *BLOSC2_REGISTERED_FILTERS_STOP* and
+4. To register a plugin the user must choose a plugin ID between *BLOSC2_GLOBAL_REGISTERED_FILTERS_START* and *BLOSC2_GLOBAL_REGISTERED_FILTERS_STOP* and
    write it at `plugins/codecs/register-codecs.h`
    or `plugins/filters/register-filters.h` depending on the plugin type. Then, you have to edit `plugins/codecs/register-codecs.c`or 
    
