@@ -17,6 +17,8 @@
 #       build the examples programs
 #   BUILD_PLUGINS: default ON
 #       build the plugins programs
+#   BUILD_LITE: default OFF
+#       build a lite version (only with BloscLZ and LZ4/LZ4HC) of the blosc library
 #   DEACTIVATE_AVX2: default OFF
 #       do not attempt to build with AVX2 instructions
 #   DEACTIVATE_LZ4: default OFF
@@ -103,7 +105,7 @@ option(BUILD_EXAMPLES
 option(BUILD_PLUGINS
     "Build plugins programs form the blosc compression library" ON)
 option(BUILD_LITE
-    "Build a lite version of the blosc library." OFF)
+    "Build a lite version (only with BloscLZ and LZ4/LZ4HC) of the blosc library." OFF)
 option(DEACTIVATE_AVX2
     "Do not attempt to build with AVX2 instructions" OFF)
 option(DEACTIVATE_LZ4
