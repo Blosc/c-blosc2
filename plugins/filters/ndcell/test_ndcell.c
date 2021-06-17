@@ -35,7 +35,7 @@
 #include <stdio.h>
 #include "ndcell.h"
 #include <inttypes.h>
-#include "blosc2/filters-registry.h"
+#include "../filters-registry.h"
 
 static int test_ndcell(blosc2_schunk* schunk) {
 
