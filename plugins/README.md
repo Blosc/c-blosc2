@@ -63,7 +63,7 @@ and have been recognised by the Blosc Development Team. These plugins are availa
 everybody in the C-Blosc2 GitHub repository and users can install them anytime.
 
 **User registered plugins** are plugins that users register locally and they can use them 
-in the same way as in the examples `udcodecs.c` and `udfilters.c`.
+in the same way as in the examples `urcodecs.c` and `urfilters.c`.
 
 If you only want to use a plugin on your own devices you can just register it as a user registered 
 plugin with an ID between *BLOSC2_USER_REGISTERED_FILTERS_START* and *BLOSC2_USER_REGISTERED_FILTERS_STOP*. 
@@ -113,10 +113,10 @@ Steps
    * The advantages and disadvantages of the plugin compared to the rest.
 
 4. To register a plugin the user must choose a plugin ID between *BLOSC2_GLOBAL_REGISTERED_FILTERS_START* and *BLOSC2_GLOBAL_REGISTERED_FILTERS_STOP* and
-   write it at `plugins/codecs/register-codecs.h`
-   or `plugins/filters/register-filters.h` depending on the plugin type. Then, you have to edit `plugins/codecs/register-codecs.c`or 
+   write it at `plugins/codecs/codecs-registry.h`
+   or `plugins/filters/filters-registry.h` depending on the plugin type. Then, you have to edit `plugins/codecs/codecs-registry.c`or 
    
-   `plugins/filters/register-filters.c` in the next way:
+   `plugins/filters/filters-registry.c` in the next way:
   
    At the top it must be added `#include "plugin_folder/plugin_header.h"`, 
    

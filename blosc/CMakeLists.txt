@@ -129,12 +129,12 @@ if(UNIX AND NOT APPLE)
 endif()
 
 if (BUILD_PLUGINS)
-    file(GLOB CODECS_FILES ${PROJECT_SOURCE_DIR}/plugins/codecs/*/*.c ${PROJECT_SOURCE_DIR}/plugins/codecs/register-codecs.c)
+    file(GLOB CODECS_FILES ${PROJECT_SOURCE_DIR}/plugins/codecs/*/*.c ${PROJECT_SOURCE_DIR}/plugins/codecs/codecs-registry.c)
     file(GLOB CODECS_RM_FILES ${PROJECT_SOURCE_DIR}/plugins/codecs/*/test_*.c)
     foreach(file ${CODECS_RM_FILES})
         list(REMOVE_ITEM CODECS_FILES ${file})
     endforeach()
-    file(GLOB FILTERS_FILES ${PROJECT_SOURCE_DIR}/plugins/filters/*/*.c ${PROJECT_SOURCE_DIR}/plugins/filters/register-filters.c)
+    file(GLOB FILTERS_FILES ${PROJECT_SOURCE_DIR}/plugins/filters/*/*.c ${PROJECT_SOURCE_DIR}/plugins/filters/filters-registry.c)
     file(GLOB FILTERS_RM_FILES ${PROJECT_SOURCE_DIR}/plugins/filters/*/test_*.c)
     foreach(file ${FILTERS_RM_FILES})
         list(REMOVE_ITEM FILTERS_FILES ${file})
@@ -286,8 +286,8 @@ if(BLOSC_INSTALL)
             DESTINATION include/blosc2 COMPONENT DEV)
     if(BUILD_PLUGINS)
         install(FILES
-                ../plugins/filters/register-filters.h
-                ../plugins/codecs/register-codecs.h
+                ../plugins/filters/filters-registry.h
+                ../plugins/codecs/codecs-registry.h
                 DESTINATION include/blosc2 COMPONENT DEV)
     endif()
 

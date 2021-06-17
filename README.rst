@@ -74,7 +74,7 @@ New features in C-Blosc2
 
 * **Nice markup for documentation:** we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  See https://c-blosc2.readthedocs.io.  Thanks to Alberto Sabater and Aleix Alcacer for contributing the support for this.
 
-* **Plugin capabilities for filters and codecs:** we have a plugin register capability inplace so that the info about the new filters and codecs can be persisted and transmitted to different machines.  See https://github.com/Blosc/c-blosc2/blob/main/examples/udfilters.c for a self-contained example.  Thanks to the NumFOCUS foundation for providing a grant for doing this.
+* **Plugin capabilities for filters and codecs:** we have a plugin register capability inplace so that the info about the new filters and codecs can be persisted and transmitted to different machines.  See https://github.com/Blosc/c-blosc2/blob/main/examples/urfilters.c for a self-contained example.  Thanks to the NumFOCUS foundation for providing a grant for doing this.
 
 * **Pluggable tuning capabilities:** this will allow users with different needs to define an interface so as to better tune different parameters like the codec, the compression level, the filters to use, the blocksize or the shuffle size.  Thanks to ironArray for sponsoring us in doing this.
 
@@ -101,7 +101,7 @@ well as multi-threaded execution (if several cores are available) automatically.
 will work at very high speeds, even if it was not initially designed for doing blocking or multi-threading. For example,
 Blosc allows you to use the ``LZ4`` codec, but in a multi-threaded way.
 
-Last but not least, C-Blosc2 comes with an easy-to-use plugin mechanism for codecs and filters, so anyone can inject their own code in the compression pipeline of Blosc2 and reap its benefits (like multi-threading and integration with other filters) for free (see a `self-contained example <https://github.com/Blosc/c-blosc2/blob/main/examples/udfilters.c>`_).  In addition, we are implementing a centralized plugin system too (see the `docs in the plugins branch <https://github.com/Blosc/c-blosc2/blob/plugins/plugins/README.md>`_).
+Last but not least, C-Blosc2 comes with an easy-to-use plugin mechanism for codecs and filters, so anyone can inject their own code in the compression pipeline of Blosc2 and reap its benefits (like multi-threading and integration with other filters) for free (see a `self-contained example <https://github.com/Blosc/c-blosc2/blob/main/examples/urfilters.c>`_).  In addition, we are implementing a centralized plugin system too (see the `docs in the plugins branch <https://github.com/Blosc/c-blosc2/blob/plugins/plugins/README.md>`_).
 
 
 Multidimensional containers

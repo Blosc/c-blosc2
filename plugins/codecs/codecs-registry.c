@@ -5,7 +5,7 @@
 */
 
 #include <blosc-private.h>
-#include "register-codecs.h"
+#include "codecs-registry.h"
 #include "ndlz/ndlz.h"
 
 void register_codecs() {

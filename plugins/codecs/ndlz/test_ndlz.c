@@ -10,7 +10,7 @@
     Test program demonstrating use of the Blosc filter from C code.
     To compile this program:
 
-    $ gcc -O test_ndlz.c -o test_ndlz -lblosc2+plugins
+    $ gcc -O test_ndlz.c -o test_ndlz -lblosc2
 
     To run:
 
@@ -32,8 +32,7 @@
 
 #include <stdio.h>
 #include "blosc2.h"
-#include "ndlz.h"
-#include "../register-codecs.h"
+#include "blosc2/codecs-registry.h"
 #include <inttypes.h>
 
 static int test_ndlz_4(blosc2_schunk* schunk) {

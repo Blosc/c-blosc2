@@ -5,7 +5,7 @@
 */
 
 #include <blosc-private.h>
-#include "register-filters.h"
+#include "filters-registry.h"
 #include "ndmean/ndmean.h"
 #include "ndcell/ndcell.h"
 

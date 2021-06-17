@@ -10,7 +10,7 @@
     Test program demonstrating use of the Blosc filter from C code.
     To compile this program:
 
-    $ gcc -O test_ndcell.c -o test_ndcell -lblosc2+plugins
+    $ gcc -O test_ndcell.c -o test_ndcell -lblosc2
 
     To run:
 
@@ -35,7 +35,7 @@
 #include <stdio.h>
 #include "ndcell.h"
 #include <inttypes.h>
-#include "../register-filters.h"
+#include "blosc2/filters-registry.h"
 
 static int test_ndcell(blosc2_schunk* schunk) {
 

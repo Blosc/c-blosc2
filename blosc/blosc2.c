@@ -33,8 +33,8 @@
 #include "blosclz.h"
 #include "stune.h"
 #include "config.h"
-#include <../plugins/codecs/register-codecs.h>
-#include <../plugins/filters/register-filters.h>
+#include <../plugins/codecs/codecs-registry.h>
+#include <../plugins/filters/filters-registry.h>
 
 #if defined(HAVE_LZ4)
   #include "lz4.h"
@@ -906,13 +906,13 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
             BLOSC_TRACE_ERROR("User-defined filter %d failed during compression\n", filters[i]);
             return NULL;
           }
-          goto udfiltersuccess;
+          goto urfiltersuccess;
         }
       }
       BLOSC_TRACE_ERROR("User-defined filter %d not found during compression\n", filters[i]);
       return NULL;
 
-      udfiltersuccess:;
+      urfiltersuccess:;
 
     }
 
@@ -1096,12 +1096,12 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
                                         maxout,
                                         context->compcode_meta,
                                         &cparams);
-          goto udcodecsuccess;
+          goto urcodecsuccess;
         }
       }
       BLOSC_TRACE_ERROR("User-defined compressor codec %d not found during compression", context->compcode);
       return BLOSC2_ERROR_CODEC_SUPPORT;
-    udcodecsuccess:
+    urcodecsuccess:
       ;
     } else {
       blosc_compcode_to_compname(context->compcode, &compname);
@@ -1149,7 +1149,7 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
   int32_t typesize = context->typesize;
   uint8_t* filters = context->filters;
   uint8_t* filters_meta = context->filters_meta;
-  blosc2_filter * udfilters = context->udfilters;
+  blosc2_filter * urfilters = context->urfilters;
   uint8_t* _src = src;
   uint8_t* _dest = tmp;
   uint8_t* _tmp = tmp2;
@@ -1233,12 +1233,12 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
               BLOSC_TRACE_ERROR("User-defined filter %d failed during decompression.", filters[i]);
               return rc;
             }
-            goto udfiltersuccess;
+            goto urfiltersuccess;
           }
         }
       BLOSC_TRACE_ERROR("User-defined filter %d not found during decompression.", filters[i]);
       return BLOSC2_ERROR_FILTER_PIPELINE;
-      udfiltersuccess:;
+      urfiltersuccess:;
     }
 
     // Cycle buffers when required
@@ -1659,12 +1659,12 @@ static int blosc_d(
                                           neblock,
                                           context->compcode_meta,
                                           &dparams);
-            goto udcodecsuccess;
+            goto urcodecsuccess;
           }
         }
         BLOSC_TRACE_ERROR("User-defined compressor codec %d not found during decompression", context->compcode);
         return BLOSC2_ERROR_CODEC_SUPPORT;
-      udcodecsuccess:
+      urcodecsuccess:
         ;
       }
       else {
