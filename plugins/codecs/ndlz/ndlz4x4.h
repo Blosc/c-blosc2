@@ -21,7 +21,7 @@ extern "C" {
 #include "ndlz-private.h"
 /*
 #include <stdio.h>
-#include "blosc2-common.h"
+#include "blosc2/blosc2-common.h"
 #include "fastcopy.h"
 */
 
