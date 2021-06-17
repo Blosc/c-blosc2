@@ -97,11 +97,11 @@ int filter_backward_error(const uint8_t* src, uint8_t* dest, int32_t size, uint8
 }
 
 
-CUTEST_TEST_DATA(udfilters) {
+CUTEST_TEST_DATA(urfilters) {
   blosc2_cparams cparams;
 };
 
-CUTEST_TEST_SETUP(udfilters) {
+CUTEST_TEST_SETUP(urfilters) {
   blosc_init();
   data->cparams = BLOSC2_CPARAMS_DEFAULTS;
   data->cparams.typesize = sizeof(int32_t);
@@ -128,7 +128,7 @@ CUTEST_TEST_SETUP(udfilters) {
 }
 
 
-CUTEST_TEST_TEST(udfilters) {
+CUTEST_TEST_TEST(urfilters) {
   CUTEST_GET_PARAMETER(nchunks, int32_t);
   CUTEST_GET_PARAMETER(itemsize, int8_t);
   CUTEST_GET_PARAMETER(correct_backward, bool);
@@ -139,21 +139,21 @@ CUTEST_TEST_TEST(udfilters) {
 
   int dsize;
 
-  blosc2_filter udfilter;
-  udfilter.forward = filter_forward;
+  blosc2_filter urfilter;
+    urfilter.forward = filter_forward;
   if (correct_backward) {
-    udfilter.backward = filter_backward;
-    udfilter.id = 244;
+      urfilter.backward = filter_backward;
+      urfilter.id = 244;
   } else {
-    udfilter.backward = filter_backward_error;
-    udfilter.id = 245;
+      urfilter.backward = filter_backward_error;
+      urfilter.id = 245;
   }
 
-  blosc2_register_filter(&udfilter);
+  blosc2_register_filter(&urfilter);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = (int32_t) itemsize;
-  cparams.filters[4] = udfilter.id;
+  cparams.filters[4] = urfilter.id;
   cparams.filters_meta[4] = 101;
   cparams.clevel = 9;
 
@@ -243,11 +243,11 @@ CUTEST_TEST_TEST(udfilters) {
 }
 
 
-CUTEST_TEST_TEARDOWN(udfilters) {
+CUTEST_TEST_TEARDOWN(urfilters) {
   blosc_destroy();
 }
 
 
 int main() {
-  CUTEST_TEST_RUN(udfilters)
+  CUTEST_TEST_RUN(urfilters)
 }

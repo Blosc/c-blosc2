@@ -7,11 +7,11 @@
 
   To compile this program:
 
-  $ gcc udfilters.c -o udfilters -lblosc2
+  $ gcc urfilters.c -o urfilters -lblosc2
 
   To run:
 
-  $ ./udfilters
+  $ ./urfilters
 
  */
 
@@ -79,15 +79,15 @@ int main(void) {
   int dsize;
   int64_t nbytes, cbytes;
 
-  blosc2_filter udfilter;
-  udfilter.id = 250;
-  udfilter.forward = filter_forward;
-  udfilter.backward = filter_backward;
+  blosc2_filter urfilter;
+    urfilter.id = 250;
+    urfilter.forward = filter_forward;
+    urfilter.backward = filter_backward;
 
-  blosc2_register_filter(&udfilter);
+  blosc2_register_filter(&urfilter);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.filters[4] = udfilter.id;
+  cparams.filters[4] = urfilter.id;
   cparams.filters_meta[4] = 0;
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;

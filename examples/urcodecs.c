@@ -7,11 +7,11 @@
 
   To compile this program:
 
-  $ gcc udcodecs.c -o udcodecs -lblosc2
+  $ gcc urcodecs.c -o urcodecs -lblosc2
 
   To run:
 
-  $ ./udcodecs
+  $ ./urcodecs
 */
 
 #include <stdio.h>

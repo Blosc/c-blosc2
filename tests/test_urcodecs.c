@@ -127,12 +127,12 @@ int codec_decoder_error(const uint8_t* input, int32_t input_len,
   return output_len;
 }
 
-CUTEST_TEST_DATA(udcodecs) {
+CUTEST_TEST_DATA(urcodecs) {
   blosc2_cparams cparams;
   char* urlpath;
 };
 
-CUTEST_TEST_SETUP(udcodecs) {
+CUTEST_TEST_SETUP(urcodecs) {
   blosc_init();
   data->cparams = BLOSC2_CPARAMS_DEFAULTS;
   data->cparams.typesize = sizeof(int32_t);
@@ -147,7 +147,7 @@ CUTEST_TEST_SETUP(udcodecs) {
 }
 
 
-CUTEST_TEST_TEST(udcodecs) {
+CUTEST_TEST_TEST(urcodecs) {
   CUTEST_GET_PARAMETER(correct_backward, bool);
 
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -252,11 +252,11 @@ CUTEST_TEST_TEST(udcodecs) {
 }
 
 
-CUTEST_TEST_TEARDOWN(udcodecs) {
+CUTEST_TEST_TEARDOWN(urcodecs) {
   blosc_destroy();
 }
 
 
 int main() {
-  CUTEST_TEST_RUN(udcodecs)
+  CUTEST_TEST_RUN(urcodecs)
 }

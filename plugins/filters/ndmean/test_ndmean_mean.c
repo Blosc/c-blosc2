@@ -10,7 +10,7 @@
     Test program demonstrating use of the Blosc filter from C code.
     To compile this program:
 
-    $ gcc -O test_ndmean_mean.c -o test_ndmean_mean -lblosc2+plugins
+    $ gcc -O test_ndmean_mean.c -o test_ndmean_mean -lblosc2
 
     To run:
 
@@ -34,10 +34,9 @@
 **********************************************************************/
 
 #include <stdio.h>
-#include "ndmean.h"
 #include <math.h>
 #include <inttypes.h>
-#include "../register-filters.h"
+#include "blosc2/filters-registry.h"
 
 #define EPSILON (float) (1)
 
