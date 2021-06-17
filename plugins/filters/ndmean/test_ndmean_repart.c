@@ -32,9 +32,10 @@
 **********************************************************************/
 
 #include <stdio.h>
+#include "ndmean.h"
 #include <math.h>
 #include <inttypes.h>
-#include "blosc2/filters-registry.h"
+#include "../filters-registry.h"
 
 #define EPSILON (float) (1e-5)
 
