@@ -245,9 +245,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   h2p += 16;
 
   // User-defined codec and codec metadata
-  uint8_t* udcodec = h2 + FRAME_FILTER_PIPELINE + 1 + BLOSC2_MAX_FILTERS + 1;
+  uint8_t* udcodec = h2 + FRAME_UDCODEC;
   *udcodec = schunk->compcode;
-  uint8_t* codec_meta = h2 + FRAME_FILTER_PIPELINE + 1 + BLOSC2_MAX_FILTERS + 2;
+  uint8_t* codec_meta = h2 + FRAME_CODEC_META;
   *codec_meta = schunk->compcode_meta;
 
   if (h2p - h2 != FRAME_HEADER_MINLEN) {
