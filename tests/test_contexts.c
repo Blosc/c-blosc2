@@ -12,9 +12,9 @@
 
 
 int main(void) {
-  static int32_t data[SIZE];
-  static int32_t data_out[SIZE];
-  static int32_t data_dest[SIZE];
+  int32_t *data = malloc(SIZE * sizeof(int32_t));
+  int32_t *data_out = malloc(SIZE * sizeof(int32_t));
+  int32_t *data_dest = malloc(SIZE * sizeof(int32_t));
   int32_t data_subset[5];
   int32_t data_subset_ref[5] = {5, 6, 7, 8, 9};
   int32_t isize = SIZE * sizeof(int32_t), osize = SIZE * sizeof(int32_t);
@@ -48,6 +48,9 @@ int main(void) {
 
   if (cparams2.clevel != cparams.clevel) {
     printf("Clevels are not equal!");
+    free(data);
+    free(data_out);
+    free(data_dest);
     return EXIT_FAILURE;
   }
 
@@ -56,10 +59,16 @@ int main(void) {
   blosc2_free_ctx(cctx);
   if (csize == 0) {
     printf("Buffer is uncompressible.  Giving up.\n");
+    free(data);
+    free(data_out);
+    free(data_dest);
     return EXIT_FAILURE;
   }
   if (csize < 0) {
     printf("Compression error.  Error code: %d\n", csize);
+    free(data);
+    free(data_out);
+    free(data_dest);
     return EXIT_FAILURE;
   }
 
@@ -72,6 +81,9 @@ int main(void) {
 
   if (dparams2.nthreads != dparams.nthreads) {
     printf("Nthreads are not equal!");
+    free(data);
+    free(data_out);
+    free(data_dest);
     return EXIT_FAILURE;
   }
 
@@ -79,6 +91,9 @@ int main(void) {
   if (ret < 0) {
     printf("Error in blosc2_getitem_ctx().  Giving up.\n");
     blosc2_free_ctx(dctx);
+    free(data);
+    free(data_out);
+    free(data_dest);
     return EXIT_FAILURE;
   }
 
@@ -86,6 +101,9 @@ int main(void) {
     if (data_subset[i] != data_subset_ref[i]) {
       printf("blosc2_getitem_ctx() fetched data differs from original!\n");
       blosc2_free_ctx(dctx);
+      free(data);
+      free(data_out);
+      free(data_dest);
       return EXIT_FAILURE;
     }
   }
@@ -95,15 +113,25 @@ int main(void) {
   blosc2_free_ctx(dctx);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
+    free(data);
+    free(data_out);
+    free(data_dest);
     return EXIT_FAILURE;
   }
 
   for (i = 0; i < SIZE; i++) {
     if (data[i] != data_dest[i]) {
       printf("Decompressed data differs from original!\n");
+      free(data);
+      free(data_out);
+      free(data_dest);
       return EXIT_FAILURE;
     }
   }
+
+  free(data);
+  free(data_out);
+  free(data_dest);
 
   return EXIT_SUCCESS;
 }

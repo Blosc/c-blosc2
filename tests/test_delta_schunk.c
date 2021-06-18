@@ -13,8 +13,8 @@
 
 
 int main(void) {
-  static int32_t data[SIZE];
-  static int32_t data_dest[SIZE];
+  int32_t *data = malloc(SIZE * sizeof(int32_t));;
+  int32_t *data_dest = malloc(SIZE * sizeof(int32_t));
   int32_t isize = SIZE * sizeof(int32_t);
   int dsize;
   int64_t nbytes, cbytes;
@@ -44,13 +44,19 @@ int main(void) {
       data[i] = i * nchunk;
     }
     nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
-    if (nchunks != (nchunk + 1)) return EXIT_FAILURE;
+    if (nchunks != (nchunk + 1)){
+      free(data);
+      free(data_dest);
+      return EXIT_FAILURE;
+    }
   }
 
   /* Gather some info */
   nbytes = schunk->nbytes;
   cbytes = schunk->cbytes;
   if (cbytes > nbytes) {
+    free(data);
+    free(data_dest);
     return EXIT_FAILURE;
   }
 
@@ -58,12 +64,16 @@ int main(void) {
   for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     if (dsize < 0) {
+      free(data);
+      free(data_dest);
       return EXIT_FAILURE;
     }
     for (int i = 0; i < SIZE; i++) {
       if (data_dest[i] != i  * nchunk) {
         fprintf(stderr, "First error in: %u, %d, %d\n",
                 nchunk, i, data_dest[i]);
+        free(data);
+        free(data_dest);
         return EXIT_FAILURE;
       }
     }
@@ -73,6 +83,9 @@ int main(void) {
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
+
+  free(data);
+  free(data_dest);
 
   return EXIT_SUCCESS;
 }
