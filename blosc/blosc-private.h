@@ -65,27 +65,27 @@ static void endian_handler(bool little, void *dest, const void *pa, int size) {
     switch (size) {
       case 8:
         pa2_[0] = pa_[7];
-            pa2_[1] = pa_[6];
-            pa2_[2] = pa_[5];
-            pa2_[3] = pa_[4];
-            pa2_[4] = pa_[3];
-            pa2_[5] = pa_[2];
-            pa2_[6] = pa_[1];
-            pa2_[7] = pa_[0];
-            break;
+        pa2_[1] = pa_[6];
+        pa2_[2] = pa_[5];
+        pa2_[3] = pa_[4];
+        pa2_[4] = pa_[3];
+        pa2_[5] = pa_[2];
+        pa2_[6] = pa_[1];
+        pa2_[7] = pa_[0];
+        break;
       case 4:
         pa2_[0] = pa_[3];
-            pa2_[1] = pa_[2];
-            pa2_[2] = pa_[1];
-            pa2_[3] = pa_[0];
-            break;
+        pa2_[1] = pa_[2];
+        pa2_[2] = pa_[1];
+        pa2_[3] = pa_[0];
+        break;
       case 2:
         pa2_[0] = pa_[1];
-            pa2_[1] = pa_[0];
-            break;
+        pa2_[1] = pa_[0];
+        break;
       case 1:
-        pa2_[0] = pa_[1];
-            break;
+        pa2_[0] = pa_[0];
+        break;
       default:
         BLOSC_TRACE_ERROR("Unhandled size: %d.", size);
     }

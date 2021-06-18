@@ -203,6 +203,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
     cparams.typesize = schunk->cctx->typesize;
     cparams.clevel = schunk->cctx->clevel;
     cparams.compcode = schunk->cctx->compcode;
+    cparams.compcode_meta = schunk->cctx->compcode_meta;
     cparams.use_dict = schunk->cctx->use_dict;
     cparams.blocksize = schunk->cctx->blocksize;
     memcpy(cparams.filters, schunk->cctx->filters, BLOSC2_MAX_FILTERS);
