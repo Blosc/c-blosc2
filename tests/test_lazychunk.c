@@ -22,8 +22,8 @@ uint8_t filter;
 
 
 static char* test_lazy_chunk(void) {
-  static int32_t data[CHUNKSIZE];
-  static int32_t data_dest[CHUNKSIZE];
+  int32_t *data = malloc(CHUNKSIZE * sizeof(int32_t));
+    int32_t *data_dest = malloc(CHUNKSIZE * sizeof(int32_t));
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   int cbytes;
@@ -104,6 +104,9 @@ static char* test_lazy_chunk(void) {
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
   blosc_destroy();
+
+  free(data);
+  free(data_dest);
 
   return EXIT_SUCCESS;
 }
