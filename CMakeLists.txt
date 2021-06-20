@@ -128,12 +128,12 @@ if(MINGW)
     endif()
 endif(MINGW)
 
-if (ENABLE_ASAN)
+if(ENABLE_ASAN)
     message(STATUS "Enabling ASAN")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Os -fno-omit-frame-pointer -fsanitize=address")
 endif()
 
-if (BUILD_PLUGINS AND BUILD_LITE)
+if(BUILD_PLUGINS AND BUILD_LITE)
     message(FATAL_ERROR "Both plugins and lite Blosc versions can not be built at the same time.")
 endif()
 
@@ -166,7 +166,7 @@ if(NOT DEACTIVATE_ZLIB)
     set(HAVE_ZLIB TRUE)
 endif()
 
-if (HAVE_ZLIB_NG)
+if(HAVE_ZLIB_NG)
     set(ZLIB_NG_DIR "zlib-ng-2.0.3")  # update to the actual included version
     add_definitions(-DZLIB_COMPAT)
     set(ZLIB_COMPAT TRUE)
@@ -178,7 +178,7 @@ if (HAVE_ZLIB_NG)
     file(COPY
             ${CMAKE_CURRENT_BINARY_DIR}/internal-complibs/${ZLIB_NG_DIR}/zconf.h
             DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/internal-complibs/${ZLIB_NG_DIR}/)
-endif ()
+endif()
 
 if(NOT DEACTIVATE_ZSTD)
     if(PREFER_EXTERNAL_ZSTD)
