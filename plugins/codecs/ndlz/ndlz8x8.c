@@ -442,7 +442,7 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   uint8_t* buffercpy;
   uint8_t* local_buffer = malloc(cell_size);
   uint8_t token;
-  if (NDLZ_UNEXPECT_CONDITIONAL(input_len <= 0)) {
+  if (NDLZ_UNEXPECT_CONDITIONAL(input_len < 8)) {
     return 0;
   }
 
