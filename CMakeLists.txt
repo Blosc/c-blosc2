@@ -133,11 +133,11 @@ if (ENABLE_ASAN)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Os -fno-omit-frame-pointer -fsanitize=address")
 endif()
 
-if ((BUILD_PLUGINS STREQUAL ON) AND (BUILD_LITE STREQUAL ON))
+if (BUILD_PLUGINS AND BUILD_LITE)
     message(FATAL_ERROR "Both plugins and lite Blosc versions can not be built at the same time.")
 endif()
 
-if(BUILD_LITE STREQUAL ON)
+if(BUILD_LITE)
     set(DEACTIVATE_ZLIB ON)
     set(DEACTIVATE_ZSTD ON)
 endif()
