@@ -49,20 +49,10 @@ jobs:
             os: ubuntu-latest
             compiler: clang
 
-          - name: Ubuntu Clang No Plugins
-            os: ubuntu-latest
-            compiler: clang
-            cmake-args: -DBUILD_PLUGINS=OFF
-
           - name: Ubuntu Clang No AVX2
             os: ubuntu-latest
             compiler: clang
             cmake-args: -DDEACTIVATE_AVX2=ON
-
-          - name: Ubuntu Clang No LZ4
-            os: ubuntu-latest
-            compiler: clang
-            cmake-args: -DDEACTIVATE_LZ4=ON
 
           - name: Ubuntu Clang No ZLIB
             os: ubuntu-latest
@@ -79,20 +69,10 @@ jobs:
             compiler: cl
             cmake-args: -A Win32
 
-          - name: Windows MSVC Win32 No Plugins
-            os: windows-latest
-            compiler: cl
-            cmake-args: -A Win32 -DBUILD_PLUGINS=OFF
-
           - name: Windows MSVC Win64
             os: windows-latest
             compiler: cl
             cmake-args: -A x64
-
-          - name: Windows MSVC Win64 No Plugins
-            os: windows-latest
-            compiler: cl
-            cmake-args: -A x64 -DBUILD_PLUGINS=OFF
 
           - name: Windows GCC Ninja
             os: windows-latest
@@ -108,19 +88,9 @@ jobs:
             os: macOS-latest
             compiler: clang
 
-          - name: macOS Clang No Plugins
-            os: macOS-latest
-            compiler: clang
-            cmake-args: -DBUILD_PLUGINS=OFF
-
           - name: macOS GCC
             os: macOS-latest
             compiler: gcc
-
-          - name: macOS GCC No Plugins
-            os: macOS-latest
-            compiler: gcc
-            cmake-args: -DBUILD_PLUGINS=OFF
 
     steps:
     - uses: actions/checkout@v1
