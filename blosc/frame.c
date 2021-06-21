@@ -3148,7 +3148,7 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int nchunk, blosc2_schunk* schun
         return NULL;
       }
       if (offset >= 0){
-        // There is no need to delete any file if it is a special chunk
+        // Remove the chunk file only if it is not a special value chunk
         int err = sframe_delete_chunk(frame->urlpath, offset);
         if (err != 0) {
           BLOSC_TRACE_ERROR("Unable to delete chunk!");
