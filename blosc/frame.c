@@ -3147,10 +3147,13 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int nchunk, blosc2_schunk* schun
         BLOSC_TRACE_ERROR("Unable to get offset to chunk %d.", nchunk);
         return NULL;
       }
-      int err = sframe_delete_chunk(frame->urlpath, offset);
-      if (err != 0) {
-        BLOSC_TRACE_ERROR("Unable to delete chunk!");
-        return NULL;
+      if (offset >= 0){
+        // There is no need to delete any file if it is a special chunk
+        int err = sframe_delete_chunk(frame->urlpath, offset);
+        if (err != 0) {
+          BLOSC_TRACE_ERROR("Unable to delete chunk!");
+          return NULL;
+        }
       }
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+", frame->schunk->storage->io);
