@@ -11,8 +11,7 @@ if(BUILD_TESTS)
         file(GLOB DATAFILES *.cdata)
         foreach(datafile ${DATAFILES})
             # Don't test data if compressor is deactivated
-            if((datafile MATCHES "lz4" AND DEACTIVATE_LZ4) OR
-               (datafile MATCHES "zlib" AND DEACTIVATE_ZLIB) OR
+            if((datafile MATCHES "zlib" AND DEACTIVATE_ZLIB) OR
                (datafile MATCHES "zstd" AND DEACTIVATE_ZSTD))
                continue()
             endif()

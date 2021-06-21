@@ -1,8 +1,6 @@
 # sources for examples
 set(SOURCES contexts delta_schunk_ex multithread simple frame_metalayers noinit find_roots)
-if(NOT DEACTIVATE_LZ4)
-    set(SOURCES ${SOURCES} schunk_simple frame_simple urcodecs urfilters frame_vlmetalayers sframe_simple frame_backed_schunk compress_file)
-endif()
+set(SOURCES ${SOURCES} schunk_simple frame_simple urcodecs urfilters frame_vlmetalayers sframe_simple frame_backed_schunk compress_file)
 if(NOT DEACTIVATE_ZSTD)
     set(SOURCES ${SOURCES} zstd_dict)
 endif()
