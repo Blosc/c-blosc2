@@ -84,7 +84,7 @@ that their code must satisfy:
 
 Finally, even if these requirements are completely satisfied, it is not
 guaranteed that the plugin will be useful or contribute something
-different to the existing ones, so the Blosc development team has the final
+different than the existing ones, so the Blosc development team has the final
 say and will decide if a plugin is to be accepted or not.
 
 
@@ -120,13 +120,12 @@ Steps
   
    At the top it must be added `#include "plugin_folder/plugin_header.h"`, 
    
-   and into the register function you must follow the same steps that were done for the existing plugins.
-   
+   and into the register function you must follow the same steps that were done for the existing plugins.   
 
 5. Finally, the Blosc development team will carry out the evaluation process
    (probably via a votation process, with the BDFL having the last say in case of the team is undecided)
    so as to decide whether the plugin is useful and hence, candidate to be integrated into the C-Blosc2
-   source code distribution.
+   source code distribution.  In case of a negative decision, this will be properly stated.
 
 
 Examples
