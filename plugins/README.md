@@ -137,4 +137,8 @@ can be used as an example on how to implement plugins that can make into C-Blosc
 Some of these examples are `ndlz`, `ndcell` or `ndmean`.
 
 
+Thanks
+------
+
+We would like to express our gratitude to the NumFOCUS Foundation so as to provide the funds to implement this functionality.
 
