@@ -147,9 +147,6 @@ if(PREFER_EXTERNAL_LZ4)
 else()
     message(STATUS "Using LZ4 internal sources.")
 endif()
-# HAVE_LZ4 will be set to true because even if the library is
-# not found, we will use the included sources for it
-set(HAVE_LZ4 TRUE)
 
 if(NOT DEACTIVATE_ZLIB)
     # import the ZLIB_ROOT environment variable to help finding the zlib library
