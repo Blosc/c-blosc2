@@ -21,8 +21,6 @@
 #       build a lite version (only with BloscLZ and LZ4/LZ4HC) of the blosc library
 #   DEACTIVATE_AVX2: default OFF
 #       do not attempt to build with AVX2 instructions
-#   DEACTIVATE_LZ4: default OFF
-#       do not include support for the LZ4 library
 #   DEACTIVATE_ZLIB: default OFF
 #       do not include support for the Zlib library
 #   DEACTIVATE_ZSTD: default OFF
@@ -108,8 +106,6 @@ option(BUILD_LITE
     "Build a lite version (only with BloscLZ and LZ4/LZ4HC) of the blosc library." OFF)
 option(DEACTIVATE_AVX2
     "Do not attempt to build with AVX2 instructions" OFF)
-option(DEACTIVATE_LZ4
-    "Do not include support for the LZ4 library." OFF)
 option(DEACTIVATE_ZLIB
     "Do not include support for the ZLIB library." OFF)
 option(DEACTIVATE_ZSTD
@@ -146,16 +142,14 @@ if(BUILD_LITE STREQUAL ON)
     set(DEACTIVATE_ZSTD ON)
 endif()
 
-if(NOT DEACTIVATE_LZ4)
-    if(PREFER_EXTERNAL_LZ4)
-        find_package(LZ4)
-    else()
-        message(STATUS "Using LZ4 internal sources.")
-    endif()
-    # HAVE_LZ4 will be set to true because even if the library is
-    # not found, we will use the included sources for it
-    set(HAVE_LZ4 TRUE)
+if(PREFER_EXTERNAL_LZ4)
+    find_package(LZ4)
+else()
+    message(STATUS "Using LZ4 internal sources.")
 endif()
+# HAVE_LZ4 will be set to true because even if the library is
+# not found, we will use the included sources for it
+set(HAVE_LZ4 TRUE)
 
 if(NOT DEACTIVATE_ZLIB)
     # import the ZLIB_ROOT environment variable to help finding the zlib library
