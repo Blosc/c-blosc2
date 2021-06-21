@@ -49,12 +49,10 @@ static char* test_sframe(void) {
     // Use a codec that splits blocks (important for lazy chunks).
     // Only BLOSCLZ is doing that.
     cparams.compcode = BLOSC_BLOSCLZ;
-  }
-#if defined(HAVE_LZ4)
-  else {
+  } else {
     cparams.compcode = BLOSC_LZ4;
   }
-#endif
+
   if (multithread) {
     cparams.nthreads = NTHREADS;
     dparams.nthreads = NTHREADS;

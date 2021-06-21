@@ -1,7 +1,6 @@
 #ifndef _CONFIGURATION_HEADER_GUARD_H_
 #define _CONFIGURATION_HEADER_GUARD_H_
 
-#cmakedefine HAVE_LZ4 @HAVE_LZ4@
 #cmakedefine HAVE_ZLIB @HAVE_ZLIB@
 #cmakedefine HAVE_ZLIB_NG @HAVE_ZLIB_NG@
 #cmakedefine HAVE_ZSTD @HAVE_ZSTD@

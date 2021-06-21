@@ -10,11 +10,11 @@ EXECUTABLES := $(patsubst %.c, %.exe, $(SOURCES))
 
 # Support for internal LZ4 and LZ4HC
 LZ4_DIR = ../internal-complibs/lz4-1.7.0
-CFLAGS += -DHAVE_LZ4 -I$(LZ4_DIR)
+CFLAGS += -I$(LZ4_DIR)
 BLOSC_LIB += $(wildcard $(LZ4_DIR)/*.c)
 
 # Support for external LZ4 and LZ4HC
-#LDFLAGS += -DHAVE_LZ4 -llz4
+#LDFLAGS += -llz4
 
 # Support for external Zlib
 LDFLAGS += -DHAVE_ZLIB -lz
