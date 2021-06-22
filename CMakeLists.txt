@@ -210,7 +210,8 @@ if(BUILD_PLUGINS)
 endif()
 
 # create the config.h file
-configure_file("blosc/config.h.in" "blosc/config.h")
+configure_file("${PROJECT_SOURCE_DIR}/blosc/config.h.in"
+               "${PROJECT_SOURCE_DIR}/blosc/config.h")
 
 # now make sure that you set the build directory on your "Include" path when compiling
 include_directories("${PROJECT_BINARY_DIR}/blosc/")
