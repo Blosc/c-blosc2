@@ -3206,10 +3206,7 @@ int blosc_get_complib_info(const char* compname, char** complib, char** version)
   int clibcode;
   const char* clibname;
   const char* clibversion = "unknown";
-
-#if (defined(HAVE_ZSTD) && defined(ZSTD_VERSION_MAJOR))
   char sbuffer[256];
-#endif
 
   clibcode = compname_to_clibcode(compname);
   clibname = clibcode_to_clibname(clibcode);
@@ -3219,11 +3216,9 @@ int blosc_get_complib_info(const char* compname, char** complib, char** version)
     clibversion = BLOSCLZ_VERSION_STRING;
   }
   else if (clibcode == BLOSC_LZ4_LIB) {
-#if defined(LZ4_VERSION_MAJOR)
     sprintf(sbuffer, "%d.%d.%d",
             LZ4_VERSION_MAJOR, LZ4_VERSION_MINOR, LZ4_VERSION_RELEASE);
     clibversion = sbuffer;
-#endif /* LZ4_VERSION_MAJOR */
   }
 #if defined(HAVE_ZLIB)
   else if (clibcode == BLOSC_ZLIB_LIB) {
