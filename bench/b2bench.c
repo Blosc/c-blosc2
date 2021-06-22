@@ -313,10 +313,10 @@ int main(int argc, char* argv[]) {
   int extreme_suite = 0;
   int debug_suite = 0;
   int nthreads = 4;                     /* The number of threads */
-  int size = 12 * MB;                    /* Buffer size */
+  int size = 12 * MB;                   /* Buffer size */
   int elsize = 4;                       /* Datatype size */
   int rshift = 19;                      /* Significant bits */
-  int workingset = 386 * MB;              /* The maximum allocated memory */
+  int workingset = 256 * MB;            /* The maximum allocated memory */
   int nthreads_, size_, elsize_, rshift_, i;
   FILE* output_file = stdout;
   blosc_timestamp_t last, current;
