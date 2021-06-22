@@ -66,7 +66,8 @@ set(SOURCES ${SOURCES} shuffle.c)
 set(lib_dir lib${LIB_SUFFIX})
 set(version_string ${BLOSC_VERSION_MAJOR}.${BLOSC_VERSION_MINOR}.${BLOSC_VERSION_PATCH})
 
-set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE) # pre 3.1
+set(THREADS_PREFER_PTHREAD_FLAG TRUE) # CMake 3.1+
 if(WIN32)
     # try to use the system library
     find_package(Threads)
@@ -74,11 +75,19 @@ if(WIN32)
         message(STATUS "using the internal pthread library for win32 systems.")
         set(SOURCES ${SOURCES} win32/pthread.c)
     else()
-        set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
+        if(CMAKE_VERSION VERSION_LESS 3.1)
+            set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
+        else()
+            set(LIBS ${LIBS} Threads::Threads)
+        endif()
     endif()
 else()
     find_package(Threads REQUIRED)
-    set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
+    if(CMAKE_VERSION VERSION_LESS 3.1)
+        set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
+    else()
+        set(LIBS ${LIBS} Threads::Threads)
+    endif()
 endif()
 
 if(LZ4_FOUND)
@@ -243,13 +252,6 @@ if(BUILD_TESTS)
     set_property(
             TARGET blosc_testing
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
-    # TEMP : CMake doesn't automatically add -lpthread here like it does
-    # for the blosc2_shared target. Force it for now.
-    if(UNIX)
-        set_property(
-                TARGET blosc_testing
-                APPEND PROPERTY LINK_FLAGS "-lpthread")
-    endif()
 endif()
 
 if(BUILD_SHARED)
