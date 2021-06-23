@@ -33,8 +33,8 @@
 #include "blosclz.h"
 #include "stune.h"
 #include "config.h"
-#include <../plugins/codecs/codecs-registry.h>
-#include <../plugins/filters/filters-registry.h>
+#include <blosc2/codecs-registry.h>
+#include <blosc2/filters-registry.h>
 
 #include "lz4.h"
 #include "lz4hc.h"

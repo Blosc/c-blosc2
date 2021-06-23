@@ -113,10 +113,10 @@ Steps
    * The advantages and disadvantages of the plugin compared to the rest.
 
 4. To register a plugin the user must choose a plugin ID between *BLOSC2_GLOBAL_REGISTERED_FILTERS_START* and *BLOSC2_GLOBAL_REGISTERED_FILTERS_STOP* and
-   write it at `plugins/codecs/codecs-registry.h`
-   or `plugins/filters/filters-registry.h` depending on the plugin type. Then, you have to edit `plugins/codecs/codecs-registry.c`or 
+   write it at `include/blosc2/codecs-registry.h`
+   or `include/blosc2/filters-registry.h` depending on the plugin type. Then, you have to edit `include/blosc2/codecs-registry.c`or 
    
-   `plugins/filters/filters-registry.c` in the next way:
+   `include/blosc2/filters-registry.c` in the next way:
   
    At the top it must be added `#include "plugin_folder/plugin_header.h"`, 
    

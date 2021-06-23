@@ -37,7 +37,7 @@
 #include "ndmean.h"
 #include <math.h>
 #include <inttypes.h>
-#include "../filters-registry.h"
+#include "blosc2/filters-registry.h"
 
 #define EPSILON (float) (1)
 

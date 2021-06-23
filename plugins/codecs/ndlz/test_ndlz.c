@@ -32,7 +32,7 @@
 
 #include <stdio.h>
 #include "blosc2.h"
-#include "../codecs-registry.h"
+#include "blosc2/codecs-registry.h"
 #include <inttypes.h>
 
 static int test_ndlz_4(blosc2_schunk* schunk) {
