@@ -440,7 +440,6 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   uint32_t blockshape[2];
   uint32_t eshape[2];
   uint8_t* buffercpy;
-  uint8_t* local_buffer = malloc(cell_size);
   uint8_t token;
   if (NDLZ_UNEXPECT_CONDITIONAL(input_len < 8)) {
     return 0;
@@ -472,11 +471,14 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   uint32_t ii[2];
   uint32_t padding[2];
   uint32_t ind;
+  uint8_t* local_buffer = malloc(cell_size);
   uint8_t* cell_aux = malloc(cell_size);
   for (ii[0] = 0; ii[0] < i_stop[0]; ++ii[0]) {
     for (ii[1] = 0; ii[1] < i_stop[1]; ++ii[1]) {      // for each cell
       if (NDLZ_UNEXPECT_CONDITIONAL(ip > ip_limit)) {
         printf("Literal copy \n");
+        free(local_buffer);
+        free(cell_aux);
         return 0;
       }
       if (ii[0] == i_stop[0] - 1) {
@@ -534,6 +536,8 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
         }
       } else {
         printf("Invalid token: %u at cell [%d, %d]\n", token, ii[0], ii[1]);
+        free(local_buffer);
+        free(cell_aux);
         return 0;
       }
 
@@ -547,6 +551,8 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
       }
       if (ind > (uint32_t) output_len) {
         printf("Output size is bigger than max \n");
+        free(local_buffer);
+        free(cell_aux);
         return 0;
       }
     }
