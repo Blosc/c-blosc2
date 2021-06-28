@@ -5,7 +5,27 @@ Release notes for C-Blosc2 2.0.0 (final)
 Changes from 2.0.0.rc2 to 2.0.0 (final)
 =======================================
 
+* Now Blosc is always compiled with LZ4. See #324.
+
+* Implemented a system to register plugins (PR #314).
+  See our blog at: https://www.blosc.org/posts/registering-plugins.
+
+* Added Blosc Lite version. Just activate `BUILD_LITE` cmake option with:
+  `-DBUILD_LITE`.  See #316.
+
+* You can deactivate the plugins by setting cmake option `BUILD_PLUGINS` to OFF.
+
+* Created `include` folder. See #310.
+
+* Moved codecs-registry.h and filters-registry.h to include/blosc2. See #325.
+
+* Fix error in endian-handler function affecting frames metadata. See #320.
+
+* Improved tolerance to Win64 workflows failure. See #319.
+
 * zlib-ng updated to 2.0.5.
+
+* New COMPILING_WITH_WHEELS.rst doc added.
 
 
 Changes from 2.0.0.rc.1 to 2.0.0.rc2

@@ -3,18 +3,15 @@ A fast, compressed and persistent data store library for C.
 
 ## What is new?
 
-On behalf of the Blosc team, we are happy to announce the second C-Blosc2
-release (Release Candidate 2) that is meant to be reviewed by users.  As of RC1
-we are declaring both the API and the format frozen, and we are seeking for
-feedback from the community so as to better check the library and declare it
-apt for its use in production.
+On behalf of the Blosc team, we are happy to announce the
+2.0.0 release (final) of C-Blosc2.  As of now, both the API and
+the format are declared stable now and hence, apt for its use
+in production.
 
-In RC2 there is improved support for AArch64 (aka ARM64), ARMv7l, ARMv6l
-and powerpc64le. Thanks to Alexandr Romanenko, Mark Kittisopikul and Mosè Giordano
-from the Julia packaging team for their help.
-
-Also, we have implemented performance improvements in the BloscLZ codec
-and updated different codecs to latest versions (zlib-ng and zstd).
+In this release we have improved several things, but perhaps the most outstanding
+one is the addition of registering plugins.  That allows users of C-Blosc2 to
+produce filters and codecs that are better adapted to their needs.
+We have blogged about it: https://www.blosc.org/posts/registering-plugins/
 
 There are a *lot* of new features in C-Blosc2 compared with C-Blosc, its predecessor.
 Just have a look at [our RC1 blog](https://www.blosc.org/posts/blosc2-ready-general-review/)
