@@ -5,7 +5,7 @@ Release notes for C-Blosc2 2.0.0 (final)
 Changes from 2.0.0.rc2 to 2.0.0 (final)
 =======================================
 
-#XXX version-specific blurb XXX#
+* zlib-ng updated to 2.0.5.
 
 
 Changes from 2.0.0.rc.1 to 2.0.0.rc2
