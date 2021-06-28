@@ -86,7 +86,7 @@ New features in C-Blosc2
 
 More info about the `improved capabilities of C-Blosc2 can be found in this talk <https://www.blosc.org/docs/Caterva-HDF5-Workshop.pdf>`_.
 
-C-Blosc2 is currently in release candidate stage, so not ready to be used in production yet.  Having said this, the release candidate stage means that the API has been declared frozen, so there is guarantee that your programs will continue to work with future versions of the library. If you want to collaborate in this development you are welcome.  We need help in the different areas listed at the `ROADMAP <https://github.com/Blosc/c-blosc2/blob/master/ROADMAP.md>`_; also, be sure to read our `DEVELOPING-GUIDE <https://github.com/Blosc/c-blosc2/blob/master/DEVELOPING-GUIDE.rst>`_ and our `Code of Conduct <https://github.com/Blosc/community/blob/master/code_of_conduct.md>`_.  Blosc is distributed using the `BSD license <https://github.com/Blosc/c-blosc2/blob/master/LICENSE.txt>`_.
+After a long period of testing, C-Blosc2 entered production stage in 2.0.0.  The API and format have been frozen, and that means that there is guarantee that your programs will continue to work with future versions of the library, and that next releases will be able to read from persistent storage generated from previous releases (as of 2.0.0).
 
 
 Meta-compression and other advantages over existing compressors
@@ -222,6 +222,12 @@ Display error messages
 
 By default error messages are disabled. To display them, you just need to activate the Blosc tracing machinery by setting
 the ``BLOSC_TRACE`` environment variable.
+
+
+Contributing
+============
+
+If you want to collaborate in this development you are welcome.  We need help in the different areas listed at the `ROADMAP <https://github.com/Blosc/c-blosc2/blob/master/ROADMAP.md>`_; also, be sure to read our `DEVELOPING-GUIDE <https://github.com/Blosc/c-blosc2/blob/master/DEVELOPING-GUIDE.rst>`_ and our `Code of Conduct <https://github.com/Blosc/community/blob/master/code_of_conduct.md>`_.  Blosc is distributed using the `BSD license <https://github.com/Blosc/c-blosc2/blob/master/LICENSE.txt>`_.
 
 
 Tweeter feed
