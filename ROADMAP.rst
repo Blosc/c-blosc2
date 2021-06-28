@@ -50,6 +50,8 @@ Right now (May 2021), the next features are already implemented (although they m
 
 * **Plugin capabilities for filters and codecs:** we have a plugin register capability inplace so that the info about the new filters and codecs can be persisted and transmitted to different machines.  Thanks to the NumFOCUS foundation for providing a grant for doing this.
 
+* **Centralized plugin repository:** we have implemented a centralized repository so that people can send their plugins (using the existing machinery) to the Blosc2 team.  If the plugins fulfill a series of requirements, they will be officially accepted, and distributed withing the library. Thanks to NumFOCUS foundation for providing a grant for doing this. See https://www.blosc.org/posts/registering-plugins/.
+
 * **Pluggable tuning capabilities:** this will allow users with different needs to define an interface so as to better tune different parameters like the codec, the compression level, the filters to use, the blocksize or the shuffle size.  Thanks to ironArray for sponsoring us in doing this.
 
 * **Support for I/O plugins:** so that users can extend the I/O capabilities beyond the current filesystem support.  Things like use databases or S3 interfaces should be possible by implementing these interfaces.  Thanks to ironArray for sponsoring us in doing this.
@@ -61,8 +63,6 @@ Right now (May 2021), the next features are already implemented (although they m
 
 Actions to be done
 ------------------
-
-* **Centralized plugin repository:** we have got a grant from NumFOCUS for implementing a centralized repository so that people can send their plugins (using the existing machinery) to the Blosc2 team.  If the plugins fulfill a series of requirements, they will be officially accepted, and distributed withing the library.
 
 * **Improve the safety of the library:**   Although this is always a work in progress, we did a long way in improving our safety, mainly thanks to the efforts of Nathan Moinvaziri.
 
