@@ -1744,7 +1744,7 @@ BLOSC_EXPORT int64_t blosc2_schunk_frame_len(blosc2_schunk* schunk);
  * @return The total number of chunks that have been added to the super-chunk.
  * If there is an error, a negative value is returned.
  */
-int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int special_value,
+BLOSC_EXPORT int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int special_value,
                                int32_t chunksize);
 
 
