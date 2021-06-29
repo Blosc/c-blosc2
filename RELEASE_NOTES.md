@@ -1,9 +1,15 @@
-Release notes for C-Blosc2 2.0.1
+Release notes for C-Blosc2 2.0.2
 ================================
 
 
+Changes from 2.0.1 to 2.0.2
+===========================
+
+#XXX version-specific blurb XXX#
+
+
 Changes from 2.0.0 to 2.0.1
-=======================================
+===========================
 
 * The `blosc2_schunk_fill_special` function was not exported,
   so not in the shared library. This has been fixed; see #328.
