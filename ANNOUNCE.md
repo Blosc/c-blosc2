@@ -4,27 +4,21 @@ A fast, compressed and persistent data store library for C.
 ## What is new?
 
 On behalf of the Blosc team, we are happy to announce the
-2.0.0 release (final) of C-Blosc2.  As of now, both the API and
+2.0.1 release of C-Blosc2.  As of now, both the API and
 the format are declared stable now and hence, apt for its use
 in production.
 
-In this release we have improved several things, but perhaps the most outstanding
-one is the addition of registering plugins.  That allows users of C-Blosc2 to
-produce filters and codecs that are better adapted to their needs.
-We have blogged about it: https://www.blosc.org/posts/registering-plugins/
+This is a maintenance release for exporting the `blosc2_schunk_fill_special`
+function.  It should be present in the shared library too.  Thanks to
+Mark Kittisopikul.
 
 There are a *lot* of new features in C-Blosc2 compared with C-Blosc, its predecessor.
 Just have a look at [our RC1 blog](https://www.blosc.org/posts/blosc2-ready-general-review/)
 where we list the main improvements, with some historical overview too.
 
 C-Blosc2 should be backward compatible with C-Blosc, so you can start using it
-right away and slowly begin to useits new functionality, like the new filters,
+right away and increasingly start to use its new functionality, like the new filters,
 prefilters, super-chunks and frames.  See docs in: https://blosc2.readthedocs.io
-
-**IMPORTANT**: Please note that, even if the API and format have been declared frozen,
-that does *not* mean that Blosc2 is ready for production yet: bad bugs can still exist
-at this stage.  So *do not assume* that your Blosc2 data can be read with future versions.
-This is just a call for general review of the library.
 
 For more info, please see the release notes in:
 

@@ -43,11 +43,10 @@ extern "C" {
 /* Version numbers */
 #define BLOSC_VERSION_MAJOR    2    /* for major interface/format changes  */
 #define BLOSC_VERSION_MINOR    0    /* for minor interface/format changes  */
-#define BLOSC_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
+#define BLOSC_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC_VERSION_STRING   "2.0.1.dev"  /* string version.  Sync with above! */
-#define BLOSC_VERSION_REVISION "$Rev$"   /* revision version */
-#define BLOSC_VERSION_DATE     "$Date:: 2021-06-28 #$"    /* date version */
+#define BLOSC_VERSION_STRING   "2.0.1"  /* string version.  Sync with above! */
+#define BLOSC_VERSION_DATE     "$Date:: 2021-06-29 #$"    /* date version */
 
 
 /* Tracing macros */
@@ -1744,8 +1743,8 @@ BLOSC_EXPORT int64_t blosc2_schunk_frame_len(blosc2_schunk* schunk);
  * @return The total number of chunks that have been added to the super-chunk.
  * If there is an error, a negative value is returned.
  */
-BLOSC_EXPORT int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int special_value,
-                               int32_t chunksize);
+BLOSC_EXPORT int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems,
+                                            int special_value, int32_t chunksize);
 
 
 /*********************************************************************
