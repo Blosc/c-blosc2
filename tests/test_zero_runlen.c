@@ -91,14 +91,8 @@ CUTEST_TEST_TEST(zero_runlen) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .contiguous=backend.contiguous, .urlpath = backend.urlpath};
-  if (backend.urlpath != NULL) {
-    if (backend.contiguous) {
-      remove(backend.urlpath);
-    }
-    else {
-      blosc2_remove_dir(backend.urlpath);
-    }
-  }
+  blosc2_remove_urlpath(backend.urlpath);
+
   schunk = blosc2_schunk_new(&storage);
 
   /* Append the chunks */
@@ -210,14 +204,7 @@ CUTEST_TEST_TEST(zero_runlen) {
   blosc2_schunk_free(schunk);
 
   /* Free resources */
-  if (storage.urlpath != NULL) {
-    if (!storage.contiguous) {
-      blosc2_remove_dir(storage.urlpath);
-    }
-    else {
-      remove(storage.urlpath);
-    }
-  }
+  blosc2_remove_urlpath(storage.urlpath);
 
   return 0;
 }

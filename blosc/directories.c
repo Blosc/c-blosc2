@@ -10,6 +10,8 @@
 
 #include <stdio.h>
 #include "blosc2.h"
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #if defined(_WIN32)
   #include <windows.h>
@@ -63,7 +65,6 @@
   }
 
 #else
-  #include <sys/stat.h>
   #include <dirent.h>
   #include <unistd.h>
 
@@ -117,3 +118,17 @@ int blosc2_remove_dir(const char* dir_path) {
 }
 
 #endif  /* _WIN32 */
+
+int blosc2_remove_urlpath(const char* urlpath){
+  struct stat statbuf;
+  if (stat(urlpath, &statbuf) != 0){
+    BLOSC_TRACE_ERROR("Could not access %s", urlpath);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  if (S_ISDIR(statbuf.st_mode)) {
+    return blosc2_remove_dir(urlpath);
+  }
+  if (S_ISREG(statbuf.st_mode)) {
+    return remove(urlpath);
+  }
+}
