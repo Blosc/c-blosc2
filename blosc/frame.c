@@ -2108,15 +2108,24 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     // Allocate space for the lazy chunk
     size_t trailer_len;
     int32_t special_type = (header[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
+    int memcpyed = header[BLOSC2_CHUNK_FLAGS] & (uint8_t) BLOSC_MEMCPYED;
+
     size_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH;
+    size_t streams_offset = BLOSC_EXTENDED_HEADER_LENGTH;
     if (special_type == 0) {
       // Regular values have offsets for blocks
       trailer_offset += nblocks * sizeof(int32_t);
+      if (memcpyed) {
+        streams_offset += 0;
+      } else {
+        streams_offset += nblocks * sizeof(int32_t);
+      }
       trailer_len = sizeof(int32_t) + sizeof(int64_t) + nblocks * sizeof(int32_t);
       lazychunk_cbytes = trailer_offset + trailer_len;
     }
     else if (special_type == BLOSC2_SPECIAL_VALUE) {
       trailer_offset += typesize;
+      streams_offset += typesize;
       trailer_len = 0;
       lazychunk_cbytes = trailer_offset + trailer_len;
     }
@@ -2135,8 +2144,8 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
       io_cb->seek(fp, header_len + offset, SEEK_SET);
     }
 
-    rbytes = io_cb->read(*chunk, 1, trailer_offset, fp);
-    if (rbytes != trailer_offset) {
+    rbytes = io_cb->read(*chunk, 1, streams_offset, fp);
+    if (rbytes != streams_offset) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) chunk out of the frame.");
       rc = BLOSC2_ERROR_FILE_READ;
       goto end;
@@ -2162,7 +2171,6 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
 
     int32_t* block_csizes = malloc(nblocks * sizeof(int32_t));
 
-    int memcpyed = *(*chunk + BLOSC2_CHUNK_FLAGS) & (uint8_t)BLOSC_MEMCPYED;
     if (memcpyed) {
       // When memcpyed the blocksizes are trivial to compute
       for (int i = 0; i < (int)nblocks; i++) {
