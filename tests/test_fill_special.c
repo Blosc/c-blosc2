@@ -77,14 +77,7 @@ CUTEST_TEST_TEST(fill_special) {
   CUTEST_GET_PARAMETER(backend, test_fill_special_backend);
 
   // Remove a possible stale sparse frame
-  if (backend.urlpath != NULL) {
-    if (!backend.contiguous) {
-      blosc2_remove_dir(backend.urlpath);
-    }
-    else {
-      remove(backend.urlpath);
-    }
-  }
+  blosc2_remove_urlpath(backend.urlpath);
 
   /* Create a super-chunk container */
   blosc2_storage storage = {

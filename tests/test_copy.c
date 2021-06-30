@@ -179,22 +179,8 @@ CUTEST_TEST_TEST(copy) {
   blosc2_schunk_free(schunk_copy);
 
   /* Free resources */
-  if (backend.urlpath != NULL) {
-    if (backend.contiguous == false) {
-      blosc2_remove_dir(backend.urlpath);
-    }
-    else {
-      remove(backend.urlpath);
-    }
-  }
-  if (backend2.urlpath != NULL) {
-    if (backend2.contiguous == false) {
-      blosc2_remove_dir(backend2.urlpath);
-    }
-    else {
-      remove(backend2.urlpath);
-    }
-  }
+  blosc2_remove_urlpath(backend.urlpath);
+  blosc2_remove_urlpath(backend2.urlpath);
 
   return 0;
 }

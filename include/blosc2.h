@@ -2013,6 +2013,11 @@ BLOSC_EXPORT int blosc2_register_filter(blosc2_filter *filter);
  */
 BLOSC_EXPORT int blosc2_remove_dir(const char *path);
 
+/*
+ * Remove a file or a directory given by path.
+ */
+BLOSC_EXPORT int blosc2_remove_urlpath(const char *path);
+
 #ifdef __cplusplus
 }
 #endif
