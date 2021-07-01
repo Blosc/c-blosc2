@@ -3808,7 +3808,7 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const size_t nbytes,
 }
 
 
-/* Register functions */
+/* Register filters */
 
 int register_filter_private(blosc2_filter *filter) {
     BLOSC_ERROR_NULL(filter, BLOSC2_ERROR_INVALID_PARAM);
@@ -3850,7 +3850,7 @@ int blosc2_register_filter(blosc2_filter *filter) {
 }
 
 
-/* Register functions */
+/* Register codecs */
 
 int register_codec_private(blosc2_codec *codec) {
     BLOSC_ERROR_NULL(codec, BLOSC2_ERROR_INVALID_PARAM);

@@ -22,7 +22,7 @@ prefilters, super-chunks and frames.  See docs in: https://blosc2.readthedocs.io
 
 For more info, please see the release notes in:
 
-https://github.com/Blosc/c-blosc2/blob/master/RELEASE_NOTES.md
+https://github.com/Blosc/c-blosc2/blob/main/RELEASE_NOTES.md
 
 Also, there is blog post introducing the most relevant changes in Blosc2:
 

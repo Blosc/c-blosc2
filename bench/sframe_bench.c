@@ -5,7 +5,7 @@
 
   Benchmark for testing sframe vs frame.
   For usage instructions of this benchmark, please see:
-    http://blosc.org/synthetic-benchmarks.html
+    https://www.blosc.org/pages/synthetic-benchmarks/
   We are collecting speeds for different machines, so the output of your
   benchmarks and your processor specifications are welcome!
 
