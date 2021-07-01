@@ -3,7 +3,6 @@
 
   Generator data file for Blosc forward and backward tests.
 
-  Creation date: 2018-02-16
   Author: Elvis Stansvik, Francesc Alted <francesc@blosc.org>
 
   See LICENSES/BLOSC.txt for details about copyright and rights to use.

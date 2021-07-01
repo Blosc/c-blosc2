@@ -4,8 +4,6 @@
   http://blosc.org
   License: BSD (see LICENSE.txt)
 
-  Creation date: 2021-01-15
-
   See LICENSE.txt for details about copyright and rights to use.
 */
 

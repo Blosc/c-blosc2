@@ -48,9 +48,9 @@ New features in C-Blosc2
 
 * **A filter pipeline:** the different filters can be pipelined so that the output of one can the input for the other.  A possible example is a `delta` followed by `shuffle`, or as described above, `trunc_prec` followed by `bitshuffle`.
 
-* **Prefilters:** allows to apply user-defined C callbacks **prior** the filter pipeline during compression.  See `test_prefilter.c <https://github.com/Blosc/c-blosc2/blob/master/tests/test_prefilter.c>`_ for an example of use.
+* **Prefilters:** allow to apply user-defined C callbacks **prior** the filter pipeline during compression.  See `test_prefilter.c <https://github.com/Blosc/c-blosc2/blob/main/tests/test_prefilter.c>`_ for an example of use.
 
-* **Postfilters:** allows to apply user-defined C callbacks **after** the filter pipeline during decompression. The combination of prefilters and postfilters could be interesting for supporting e.g. encryption (via prefilters) and decryption (via postfilters).  Also, a postfilter alone can used to produce on-the-flight computation based on existing data (or other metadata, like e.g. coordinates). See `test_postfilter.c <https://github.com/Blosc/c-blosc2/blob/master/tests/test_postfilter.c>`_ for an example of use.
+* **Postfilters:** allow to apply user-defined C callbacks **after** the filter pipeline during decompression. The combination of prefilters and postfilters could be interesting for supporting e.g. encryption (via prefilters) and decryption (via postfilters).  Also, a postfilter alone can be used to produce on-the-flight computation based on existing data (or other metadata, like e.g. coordinates). See `test_postfilter.c <https://github.com/Blosc/c-blosc2/blob/main/tests/test_postfilter.c>`_ for an example of use.
 
 * **SIMD support for ARM (NEON):** this allows for faster operation on ARM architectures.  Only `shuffle` is supported right now, but the idea is to implement `bitshuffle` for NEON too.  Thanks to Lucian Marc.
 
@@ -78,7 +78,7 @@ New features in C-Blosc2
 
 * **Pluggable tuning capabilities:** this will allow users with different needs to define an interface so as to better tune different parameters like the codec, the compression level, the filters to use, the blocksize or the shuffle size.  Thanks to ironArray for sponsoring us in doing this.
 
-* **Support for I/O plugins:** so that users can extend the I/O capabilities beyond the current filesystem support.  Things like use databases or S3 interfaces should be possible by implementing these interfaces.  Thanks to ironArray for sponsoring us in doing this.
+* **Support for I/O plugins:** so that users can extend the I/O capabilities beyond the current filesystem support.  Things like the use of databases or S3 interfaces should be possible by implementing these interfaces.  Thanks to ironArray for sponsoring us in doing this.
 
 * **Python wrapper:**  we have a preliminary wrapper in the works.  You can have a look at our ongoing efforts in the `python-blosc2 repo <https://github.com/Blosc/python-blosc2>`_.  Thanks to the Python Software Foundation for providing a grant for doing this.
 
@@ -101,7 +101,7 @@ well as multi-threaded execution (if several cores are available) automatically.
 will work at very high speeds, even if it was not initially designed for doing blocking or multi-threading. For example,
 Blosc allows you to use the ``LZ4`` codec, but in a multi-threaded way.
 
-Last but not least, C-Blosc2 comes with an easy-to-use plugin mechanism for codecs and filters, so anyone can inject their own code in the compression pipeline of Blosc2 and reap its benefits (like multi-threading and integration with other filters) for free (see a `self-contained example <https://github.com/Blosc/c-blosc2/blob/main/examples/urfilters.c>`_).  In addition, we are implementing a centralized plugin system too (see the `docs in the plugins branch <https://github.com/Blosc/c-blosc2/blob/plugins/plugins/README.md>`_).
+Last but not least, C-Blosc2 comes with an easy-to-use plugin mechanism for codecs and filters, so anyone can inject their own code in the compression pipeline of Blosc2 and reap its benefits (like multi-threading and integration with other filters) for free (see a `self-contained example <https://github.com/Blosc/c-blosc2/blob/main/examples/urfilters.c>`_).  In addition, we have implemented a centralized plugin system too (see the `docs in the plugins directory <https://github.com/Blosc/c-blosc2/blob/main/plugins>`_).
 
 
 Multidimensional containers
@@ -158,7 +158,7 @@ Build, test and install Blosc:
 
 The static and dynamic version of the Blosc library, together with header files, will be installed into the specified CMAKE_INSTALL_PREFIX.
 
-Once you have compiled your Blosc library, you can easily link your apps with it as shown in the `examples/ directory <https://github.com/Blosc/c-blosc2/blob/master/examples>`_.
+Once you have compiled your Blosc library, you can easily link your apps with it as shown in the `examples/ directory <https://github.com/Blosc/c-blosc2/blob/main/examples>`_.
 
 
 Handling support for codecs (LZ4, LZ4HC, Zstd, Zlib)
@@ -202,7 +202,7 @@ For Mac OSX on arm64 architecture, you need to compile like this:
 Support for the LZ4 optimized version in Intel IPP
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-C-Blosc2 comes with support for a highly optimized version of the LZ4 codec present in Intel IPP.  Here it is a way to easily install Intel IPP using [conda](https://docs.conda.io):
+C-Blosc2 comes with support for a highly optimized version of the LZ4 codec present in Intel IPP.  Here it is a way to easily install Intel IPP using Conda(https://docs.conda.io):
 
 .. code-block:: console
 
@@ -227,7 +227,7 @@ the ``BLOSC_TRACE`` environment variable.
 Contributing
 ============
 
-If you want to collaborate in this development you are welcome.  We need help in the different areas listed at the `ROADMAP <https://github.com/Blosc/c-blosc2/blob/master/ROADMAP.md>`_; also, be sure to read our `DEVELOPING-GUIDE <https://github.com/Blosc/c-blosc2/blob/master/DEVELOPING-GUIDE.rst>`_ and our `Code of Conduct <https://github.com/Blosc/community/blob/master/code_of_conduct.md>`_.  Blosc is distributed using the `BSD license <https://github.com/Blosc/c-blosc2/blob/master/LICENSE.txt>`_.
+If you want to collaborate in this development you are welcome.  We need help in the different areas listed at the `ROADMAP <https://github.com/Blosc/c-blosc2/blob/main/ROADMAP.rst>`_; also, be sure to read our `DEVELOPING-GUIDE <https://github.com/Blosc/c-blosc2/blob/main/DEVELOPING-GUIDE.rst>`_ and our `Code of Conduct <https://github.com/Blosc/community/blob/master/code_of_conduct.md>`_.  Blosc is distributed using the `BSD license <https://github.com/Blosc/c-blosc2/blob/main/LICENSE.txt>`_.
 
 
 Tweeter feed
@@ -239,7 +239,7 @@ Follow `@Blosc2 <https://twitter.com/Blosc2>`_ so as to get informed about the l
 Acknowledgments
 ===============
 
-See :doc:`THANKS <./THANKS>`_.
+See `THANKS document <https://github.com/Blosc/c-blosc2/blob/main/THANKS.rst>`_.
 
 
 ----

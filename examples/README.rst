@@ -10,4 +10,4 @@ your apps with the Blosc library.  A few of them are:
 * compress_file.c -- Compress a file into a Blosc2 file-frame
 
 For more info, please visit the `official API documentation
-<https://github.com/Blosc/c-blosc2/blob/master/blosc/blosc.h>`_.
+<https://github.com/Blosc/c-blosc2/blob/main/include/blosc2.h>`_.

@@ -167,7 +167,7 @@ static inline int32_t bswap32_(int32_t a) {
 int register_filter_private(blosc2_filter *filter);
 
 /**
- * @brief Register a user-defined codec in Blosc.
+ * @brief Register a codec in Blosc.
  *
  * @param codec The codec to register.
  *

@@ -50,10 +50,6 @@
 /*
  * Implement simple condition variable for Windows threads, based on ACE
  * implementation.
- *
- * See original implementation: http://bit.ly/1vkDjo
- * ACE homepage: http://www.cse.wustl.edu/~schmidt/ACE.html
- * See also: http://www.cse.wustl.edu/~schmidt/win32-cv-1.html
  */
 typedef struct {
 	LONG waiters;

@@ -140,6 +140,7 @@ enum {
   BLOSC_TRUNC_PREC = 4,  //!< Truncate precision filter.
   BLOSC_LAST_FILTER = 5, //!< sentinel
   BLOSC_LAST_REGISTERED_FILTER = BLOSC2_GLOBAL_REGISTERED_FILTERS_START + BLOSC2_GLOBAL_REGISTERED_FILTERS - 1,
+  //!< Determine the last registered filter. It is used to check if a filter is registered or not.
 };
 
 /**
@@ -195,7 +196,7 @@ enum {
   BLOSC_LAST_CODEC = 6,
   //!< Determine the last codec defined by Blosc.
   BLOSC_LAST_REGISTERED_CODEC = BLOSC2_GLOBAL_REGISTERED_CODECS_START + BLOSC2_GLOBAL_REGISTERED_CODECS - 1,
-  //!< Determine the last registered codec. It is used to check if a codec between 31 - 159 is registered or not.
+  //!< Determine the last registered codec. It is used to check if a codec is registered or not.
 };
 
 
@@ -1557,7 +1558,7 @@ BLOSC_EXPORT int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* ur
 BLOSC_EXPORT int blosc2_schunk_free(blosc2_schunk *schunk);
 
 /**
- * @brief Append an existing @p chunk o a super-chunk.
+ * @brief Append an existing @p chunk to a super-chunk.
  *
  * @param schunk The super-chunk where the chunk will be appended.
  * @param chunk The @p chunk to append.  An internal copy is made, so @p chunk can be reused or
@@ -1966,7 +1967,7 @@ typedef struct {
 } blosc2_codec;
 
 /**
- * @brief Register a user-defined codec in Blosc.
+ * @brief Register locally a user-defined codec in Blosc.
  *
  * @param codec The codec to register.
  *
@@ -1995,7 +1996,7 @@ typedef struct {
 } blosc2_filter;
 
 /**
- * @brief Register a user-defined filter in Blosc.
+ * @brief Register locally a user-defined filter in Blosc.
  *
  * @param filter The filter to register.
  *
