@@ -65,7 +65,7 @@ static char* test_cbuffer_complib(void) {
 }
 
 static char *test_nthreads(void) {
-  int nthreads;
+  int16_t nthreads;
 
   nthreads = blosc_set_nthreads(4);
   mu_assert("ERROR: set_nthreads incorrect", nthreads == 1);
@@ -139,4 +139,3 @@ int main(void) {
 
   return result != 0;
 }
-

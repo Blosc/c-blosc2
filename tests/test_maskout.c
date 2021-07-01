@@ -17,7 +17,7 @@ int tests_run = 0;
 /* Global vars */
 void *src, *srcmasked, *srcmasked2, *dest, *dest2;
 int nbytes, cbytes;
-int nthreads = 1;
+int16_t nthreads = 1;
 int clevel = 1;
 int doshuffle = 1;
 #define size (1000 * 1000)

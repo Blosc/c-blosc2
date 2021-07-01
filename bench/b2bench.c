@@ -121,7 +121,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
     doshuffle = BLOSC_NOSHUFFLE;
   }
 
-  blosc_set_nthreads(nthreads);
+  blosc_set_nthreads((int16_t)nthreads);
   if (blosc_set_compressor(compressor) < 0) {
     printf("Compiled w/o support for compressor: '%s', so sorry.\n",
            compressor);

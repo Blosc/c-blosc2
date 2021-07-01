@@ -74,7 +74,7 @@ static pthread_mutex_t global_comp_mutex;
 static int g_compressor = BLOSC_BLOSCLZ;
 static int g_delta = 0;
 /* the compressor to use by default */
-static int g_nthreads = 1;
+static int16_t g_nthreads = 1;
 static int32_t g_force_blocksize = 0;
 static int g_initlib = 0;
 static blosc2_schunk* g_schunk = NULL;   /* the pointer to super-chunk */
@@ -1912,7 +1912,7 @@ static int initialize_context_compression(
   blosc2_context* context, const void* src, int32_t srcsize, void* dest,
   int32_t destsize, int clevel, uint8_t const *filters,
   uint8_t const *filters_meta, int32_t typesize, int compressor,
-  int32_t blocksize, int new_nthreads, int nthreads,
+  int32_t blocksize, int16_t new_nthreads, int16_t nthreads,
   blosc2_btune *udbtune, void *btune_config,
   blosc2_schunk* schunk) {
 
@@ -2458,7 +2458,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     cparams.typesize = (uint8_t)typesize;
     cparams.compcode = (uint8_t)g_compressor;
     cparams.clevel = (uint8_t)clevel;
-    cparams.nthreads = (uint8_t)g_nthreads;
+    cparams.nthreads = g_nthreads;
     cctx = blosc2_create_cctx(cparams);
     /* Do the actual compression */
     result = blosc2_compress_ctx(cctx, src, srcsize, dest, destsize);
@@ -3121,13 +3121,13 @@ int init_threadpool(blosc2_context *context) {
   return 0;
 }
 
-int blosc_get_nthreads(void)
+int16_t blosc_get_nthreads(void)
 {
   return g_nthreads;
 }
 
-int blosc_set_nthreads(int nthreads_new) {
-  int ret = g_nthreads;          /* the previous number of threads */
+int16_t blosc_set_nthreads(int16_t nthreads_new) {
+  int16_t ret = g_nthreads;          /* the previous number of threads */
 
   /* Check whether the library should be initialized */
   if (!g_initlib) blosc_init();

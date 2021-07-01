@@ -115,10 +115,10 @@ struct blosc2_context_s {
   blosc2_btune *udbtune;
   /* User-defined BTune parameters */
   /* Threading */
-  int nthreads;
-  int new_nthreads;
-  int threads_started;
-  int end_threads;
+  int16_t nthreads;
+  int16_t new_nthreads;
+  int16_t threads_started;
+  int16_t end_threads;
   pthread_t *threads;
   struct thread_context *thread_contexts; /* only for user-managed threads */
   pthread_mutex_t count_mutex;

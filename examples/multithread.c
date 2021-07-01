@@ -53,7 +53,8 @@ int main(void) {
   static float data_dest[SIZE];
   size_t isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize, csize;
-  int nthreads, pnthreads, i;
+  int16_t nthreads, pnthreads;
+  int i;
 
   for (i = 0; i < SIZE; i++) {
     data[i] = (float)i;

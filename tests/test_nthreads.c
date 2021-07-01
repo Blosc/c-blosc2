@@ -25,7 +25,7 @@ size_t size = 4 * 1000 * 1000;             /* must be divisible by 4 */
 
 /* Check just compressing */
 static char *test_compress(void) {
-  int nthreads;
+  int16_t nthreads;
 
   /* Before any blosc_compress() or blosc_decompress() the number of
      threads must be 1 */
@@ -46,7 +46,7 @@ static char *test_compress(void) {
 
 /* Check compressing + decompressing */
 static char *test_compress_decompress(void) {
-  int nthreads;
+  int16_t nthreads;
 
   nthreads = blosc_get_nthreads();
   mu_assert("ERROR: get_nthreads incorrect", nthreads == 3);

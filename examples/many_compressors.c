@@ -45,7 +45,8 @@ int main(void) {
   static float data_dest[SIZE];
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize = SIZE * sizeof(float), csize;
-  int nthreads, pnthreads, i;
+  int16_t nthreads, pnthreads;
+  int i;
   char* compressors[] = {"blosclz", "lz4", "lz4hc", "zlib", "zstd"};
   int ccode, rcode;
 

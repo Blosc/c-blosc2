@@ -547,7 +547,7 @@ BLOSC_EXPORT void blosc_set_threads_callback(blosc_threads_callback callback, vo
  * @brief Returns the current number of threads that are used for
  * compression/decompression.
  */
-BLOSC_EXPORT int blosc_get_nthreads(void);
+BLOSC_EXPORT int16_t blosc_get_nthreads(void);
 
 
 /**
@@ -560,7 +560,7 @@ BLOSC_EXPORT int blosc_get_nthreads(void);
  *
  * @return The previous number of threads.
  */
-BLOSC_EXPORT int blosc_set_nthreads(int nthreads);
+BLOSC_EXPORT int16_t blosc_set_nthreads(int16_t nthreads);
 
 
 /**
@@ -984,7 +984,7 @@ static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
   (zero) in the fields of the struct is passed to a function.
  */
 typedef struct {
-  int nthreads;
+  int16_t nthreads;
   //!< The number of threads to use internally (1).
   void* schunk;
   //!< The associated schunk, if any (NULL).

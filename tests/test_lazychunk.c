@@ -17,7 +17,7 @@
 int tests_run = 0;
 int nchunks;
 int clevel;
-int nthreads;
+int16_t nthreads;
 uint8_t filter;
 
 
