@@ -3020,6 +3020,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_
         io_cb->close(fp);
         return NULL;
       }
+      io_cb->seek(fp, header_len + new_cbytes, SEEK_SET);
     }
     wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
     io_cb->close(fp);
