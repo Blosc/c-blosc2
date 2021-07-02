@@ -118,6 +118,12 @@ static char* test_update_chunk(void) {
       mu_assert("ERROR: bad roundtrip", a == i);
     }
   }
+
+  // Check that the chunks can be decompressed
+  for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
+    dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
+    mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
+  }
   /* Free resources */
   if (!storage.contiguous && storage.urlpath != NULL) {
     blosc2_remove_dir(storage.urlpath);
