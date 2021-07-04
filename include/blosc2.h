@@ -797,7 +797,7 @@ typedef int64_t (*blosc2_tell_cb)(void *stream);
 typedef int     (*blosc2_seek_cb)(void *stream, int64_t offset, int whence);
 typedef int64_t (*blosc2_write_cb)(const void *ptr, int64_t size, int64_t nitems, void *stream);
 typedef int64_t (*blosc2_read_cb)(void *ptr, int64_t size, int64_t nitems, void *stream);
-typedef int64_t (*blosc2_truncate_cb)(void *stream, int64_t size);
+typedef int     (*blosc2_truncate_cb)(void *stream, int64_t size);
 
 
 /*
