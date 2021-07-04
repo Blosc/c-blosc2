@@ -723,6 +723,10 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     else {
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
     }
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Cannot open the frame for reading and writing.");
+      return BLOSC2_ERROR_FILE_OPEN;
+    }
     io_cb->seek(fp, trailer_offset, SEEK_SET);
     int64_t wbytes = io_cb->write(trailer, 1, trailer_len, fp);
     if (wbytes != (size_t)trailer_len) {
