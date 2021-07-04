@@ -12,8 +12,11 @@
 #include "blosc2/blosc2-stdio.h"
 
 void *blosc2_stdio_open(const char *urlpath, const char *mode, void *params) {
+  FILE *file = fopen(urlpath, mode);
+  if (file == NULL)
+    return NULL;
   blosc2_stdio_file *my_fp = malloc(sizeof(blosc2_stdio_file));
-  my_fp->file = fopen(urlpath, mode);
+  my_fp->file = file;
   return my_fp;
 }
 
