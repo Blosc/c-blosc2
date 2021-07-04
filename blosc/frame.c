@@ -1684,6 +1684,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   int32_t chunk_blocksize;
   size_t prev_alloc = BLOSC_EXTENDED_HEADER_LENGTH;
   uint8_t* data_chunk = NULL;
+  bool needs_free = false;
   const blosc2_io_cb *io_cb = blosc2_get_io_cb(udio->id);
   if (io_cb == NULL) {
     blosc2_schunk_free(schunk);
@@ -1694,14 +1695,13 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   void* fp = NULL;
   if (frame->cframe == NULL) {
     data_chunk = malloc((size_t)prev_alloc);
+    needs_free = true;
     if (!frame->sframe) {
       // If not the chunks won't be in the frame
       fp = io_cb->open(frame->urlpath, "rb", udio->params);
       if (fp == NULL) {
-        free(data_chunk);
-        free(offsets);
-        blosc2_schunk_free(schunk);
-        return NULL;
+        rc = BLOSC2_ERROR_FILE_OPEN;
+        goto end;
       }
     }
   }
@@ -1709,42 +1709,31 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   for (int i = 0; i < nchunks; i++) {
     if (frame->cframe != NULL) {
       data_chunk = frame->cframe + header_len + offsets[i];
+      needs_free = false;
       rc = blosc2_cbuffer_sizes(data_chunk, NULL, &chunk_cbytes, NULL);
       if (rc < 0) {
-        blosc2_schunk_free(schunk);
-        return NULL;
+        break;
       }
     }
     else {
       int64_t rbytes;
-      bool needs_free = false;
       if (frame->sframe) {
+        if (needs_free) {
+          free(data_chunk);
+        }
         rbytes = frame_get_lazychunk(frame, offsets[i], &data_chunk, &needs_free);
       }
       else {
         io_cb->seek(fp, header_len + offsets[i], SEEK_SET);
         rbytes = io_cb->read(data_chunk, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
-        if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
-          io_cb->close(fp);
-          blosc2_schunk_free(schunk);
-          return NULL;
-        }
       }
       if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
-        if (frame->sframe) {
-          free(data_chunk);
-        }
-        else {
-          io_cb->close(fp);
-        }
-        free(offsets);
-        blosc2_schunk_free(schunk);
-        return NULL;
+        rc = BLOSC2_ERROR_READ_BUFFER;
+        break;
       }
       rc = blosc2_cbuffer_sizes(data_chunk, NULL, &chunk_cbytes, NULL);
       if (rc < 0) {
-        blosc2_schunk_free(schunk);
-        return NULL;
+        break;
       }
       if (chunk_cbytes > prev_alloc) {
         data_chunk = realloc(data_chunk, chunk_cbytes);
@@ -1754,10 +1743,8 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
         io_cb->seek(fp, header_len + offsets[i], SEEK_SET);
         rbytes = io_cb->read(data_chunk, 1, chunk_cbytes, fp);
         if (rbytes != chunk_cbytes) {
-          io_cb->close(fp);
-          free(offsets);
-          blosc2_schunk_free(schunk);
-          return NULL;
+          rc = BLOSC2_ERROR_READ_BUFFER;
+          break;
         }
       }
     }
@@ -1766,8 +1753,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
     schunk->data[i] = new_chunk;
     rc = blosc2_cbuffer_sizes(data_chunk, &chunk_nbytes, NULL, &chunk_blocksize);
     if (rc < 0) {
-      blosc2_schunk_free(schunk);
-      return NULL;
+      break;
     }
     acc_nbytes += chunk_nbytes;
     acc_cbytes += chunk_cbytes;
@@ -1779,20 +1765,24 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
       blocksize = 0;
     }
   }
-  schunk->blocksize = blocksize;
 
-  if (frame->cframe == NULL) {
+  end:
+  if (needs_free) {
     free(data_chunk);
+  }
+  if (frame->cframe == NULL) {
     if (!frame->sframe) {
       io_cb->close(fp);
     }
   }
   free(offsets);
 
-  if (acc_nbytes != nbytes || acc_cbytes != cbytes) {
+  if (rc < 0 || acc_nbytes != nbytes || acc_cbytes != cbytes) {
     blosc2_schunk_free(schunk);
     return NULL;
   }
+
+  schunk->blocksize = blocksize;
 
   out:
   rc = frame_get_metalayers(frame, schunk);
@@ -2073,7 +2063,8 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
   blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
   if (io_cb == NULL) {
     BLOSC_TRACE_ERROR("Error getting the input/output API");
-    return BLOSC2_ERROR_PLUGIN_IO;
+    rc = BLOSC2_ERROR_PLUGIN_IO;
+    goto end;
   }
 
   if (frame->cframe == NULL) {
@@ -2229,6 +2220,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
     if (*needs_free) {
       free(*chunk);
       *chunk = NULL;
+      *needs_free = false;
     }
     return rc;
   }
@@ -3353,49 +3345,37 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int nchu
   // Use a lazychunk here in order to do a potential parallel read.
   rc = frame_get_lazychunk(frame, nchunk, &src, &needs_free);
   if (rc < 0) {
-    if (needs_free) {
-      free(src);
-    }
     BLOSC_TRACE_ERROR("Cannot get the chunk in position %d.", nchunk);
-    return rc;
+    goto end;
   }
   chunk_cbytes = rc;
   if (chunk_cbytes < (signed)sizeof(int32_t)) {
-    if (needs_free) {
-      free(src);
-    }
     /* Not enough input to read `nbytes` */
-    return BLOSC2_ERROR_READ_BUFFER;
+    rc = BLOSC2_ERROR_READ_BUFFER;
   }
 
   rc = blosc2_cbuffer_sizes(src, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {
-    if (needs_free) {
-      free(src);
-    }
-    return rc;
+    goto end;
   }
 
   /* Create a buffer for destination */
   if (chunk_nbytes > (size_t)nbytes) {
-    if (needs_free) {
-      free(src);
-    }
     BLOSC_TRACE_ERROR("Not enough space for decompressing in dest.");
-    return BLOSC2_ERROR_WRITE_BUFFER;
+    rc = BLOSC2_ERROR_WRITE_BUFFER;
+    goto end;
   }
   /* And decompress it */
   dctx->header_overhead = BLOSC_EXTENDED_HEADER_LENGTH;
-  int32_t chunksize = blosc2_decompress_ctx(dctx, src, chunk_cbytes, dest, nbytes);
+  int chunksize = rc = blosc2_decompress_ctx(dctx, src, chunk_cbytes, dest, nbytes);
   if (chunksize < 0 || chunksize != chunk_nbytes) {
     BLOSC_TRACE_ERROR("Error in decompressing chunk.");
-    if (needs_free) {
-      free(src);
-    }
-    if (chunksize < 0)
-      return chunksize;
-    return BLOSC2_ERROR_FAILURE;
+    if (chunksize >= 0)
+      rc = BLOSC2_ERROR_FAILURE;
   }
-
-  return (int)chunksize;
+  end:
+  if (needs_free) {
+    free(src);
+  }
+  return rc;
 }
