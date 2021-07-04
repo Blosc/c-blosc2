@@ -55,7 +55,7 @@ static int split_block(blosc2_context* context, int32_t typesize,
       // These cases will be handled later
       break;
     default:
-      BLOSC_TRACE_WARNING("Unrecongnized split mode.  Default to BLOSC_FORWARD_COMPAT_SPLIT");
+      BLOSC_TRACE_WARNING("Unrecognized split mode.  Default to BLOSC_FORWARD_COMPAT_SPLIT");
   }
 
   int compcode = context->compcode;
