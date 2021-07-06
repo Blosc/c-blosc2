@@ -8,12 +8,14 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-/** @file blosc.h
- * @brief Blosc header file.
- *
- * This file contains Blosc public API and the structures needed to use it.
- * @author The Blosc Developers <blosc@blosc.org>
- */
+/*********************************************************************
+  @file blosc.h
+  @brief Blosc header file.
+
+  This file contains Blosc public API and the structures needed to use it.
+  @author The Blosc Developers <blosc@blosc.org>
+**********************************************************************/
+
 
 #ifndef BLOSC_H
 #define BLOSC_H

@@ -1,17 +1,26 @@
-/*
- * Bitshuffle - Filter for improving compression of typed binary data.
- *
- * Author: Kiyoshi Masui <kiyo@physics.ubc.ca>
- * Website: http://www.github.com/kiyo-masui/bitshuffle
- * Created: 2014
- *
- * Note: Adapted for c-blosc by Francesc Alted
- *       Altivec/VSX version by Jerome Kieffer.
- *
- * See LICENSES/BITSHUFFLE.txt file for details about copyright and
- * rights to use.
- *
- */
+/*********************************************************************
+  Blosc - Blocked Shuffling and Compression Library
+
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
+
+  See LICENSE.txt for details about copyright and rights to use.
+**********************************************************************/
+
+/*********************************************************************
+  Bitshuffle - Filter for improving compression of typed binary data.
+
+  Author: Kiyoshi Masui <kiyo@physics.ubc.ca>
+  Website: http://www.github.com/kiyo-masui/bitshuffle
+
+  Note: Adapted for c-blosc by Francesc Alted
+        Altivec/VSX version by Jerome Kieffer.
+
+  See LICENSES/BITSHUFFLE.txt file for details about copyright and
+  rights to use.
+**********************************************************************/
+
 
 #include "bitshuffle-generic.h"
 #include "bitshuffle-altivec.h"
