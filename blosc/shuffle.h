@@ -8,11 +8,14 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-/*  Shuffle/unshuffle routines which dynamically dispatch to hardware-
-    accelerated routines based on the processor's architecture.
-    Consumers should almost always prefer to call these routines instead
-    of directly calling one of the hardware-accelerated routines, since
-    these are cross-platform and future-proof. */
+/*********************************************************************
+  Shuffle/unshuffle routines which dynamically dispatch to hardware-
+  accelerated routines based on the processor's architecture.
+  Consumers should almost always prefer to call these routines instead
+  of directly calling one of the hardware-accelerated routines, since
+  these are cross-platform and future-proof.
+**********************************************************************/
+
 
 #ifndef SHUFFLE_H
 #define SHUFFLE_H

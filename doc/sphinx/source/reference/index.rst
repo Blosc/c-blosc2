@@ -7,7 +7,7 @@ and format.  Furthermore, if you just use the C-Blosc1 API you are guaranteed
 to generate compressed data containers that can be read with a Blosc1 library.
 
 Having said that, the C-Blosc2 API gives you much more functionality, like
-63-bit data containers, more filters, more support for vector instructions,
+64-bit data containers, more filters, more support for vector instructions,
 support for accelerated versions of some codecs in Intel's IPP (like LZ4),
 the ability to work with data either in-memory or on-disk (frames) or attach
 metainfo to your datasets (metalayers).

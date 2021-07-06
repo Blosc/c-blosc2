@@ -8,11 +8,14 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-/* Generic (non-hardware-accelerated) shuffle/unshuffle routines.
-   These are used when hardware-accelerated functions aren't available
-   for a particular platform; they are also used by the hardware-
-   accelerated functions to handle any remaining elements in a block
-   which isn't a multiple of the hardware's vector size. */
+/*********************************************************************
+  Generic (non-hardware-accelerated) shuffle/unshuffle routines.
+  These are used when hardware-accelerated functions aren't available
+  for a particular platform; they are also used by the hardware-
+  accelerated functions to handle any remaining elements in a block
+  which isn't a multiple of the hardware's vector size.
+**********************************************************************/
+
 
 #ifndef SHUFFLE_GENERIC_H
 #define SHUFFLE_GENERIC_H
