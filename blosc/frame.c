@@ -3396,6 +3396,8 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int nchu
       return chunksize;
     return BLOSC2_ERROR_FAILURE;
   }
-
+  if (needs_free) {
+    free(src);
+  }
   return (int)chunksize;
 }
