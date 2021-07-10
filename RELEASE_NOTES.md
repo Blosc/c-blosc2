@@ -1,11 +1,23 @@
 Release notes for C-Blosc2 2.0.2
 ================================
 
-
 Changes from 2.0.1 to 2.0.2
 ===========================
 
-#XXX version-specific blurb XXX#
+* Fixed data chunk memory leaks in frame (see #335).
+
+* Fixed blosc2_stdio_open never returns NULL if it cannot open file.
+
+* Standarized places for headers in blosc/ and include/ dirs.
+
+* `nthreads` is int16_t everywhere in the API. Fixes #331.
+
+* Add blosc2_remove_urlpath function (see #330).
+
+* Fixed a bug when a lazy_chunk was created from a small, memcpyed chunk.
+  (see #329).
+  
+* Fixed many issues in documentation (see #333).
 
 
 Changes from 2.0.0 to 2.0.1
