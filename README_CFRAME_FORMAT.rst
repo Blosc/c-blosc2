@@ -75,9 +75,9 @@ possible filter meta-info in `filter_meta`::
       |   +--number of filters
       +--[msgpack] fixext 16
 
-At the end of the header *metalayers* are stored which contain meta-information about the chunked data stored in the
-frame. It is up to the user to store whatever data they want with the only (strong) suggestion that they be stored
-using the msgpack format. Here is the format for the *metalayers*::
+The last section of the header is for the *metalayers*, which contain meta-information about the data in the
+frame.  It is up to the user to store whatever data they want with the only (strong) suggestion that they be stored
+using the msgpack format. Here it is the format for the *metalayers*::
 
     |-57|-58|-59|-5A|-5B|-5C|-5D|====================|---|---|---|================|
     | 93| cd| idx   | de| size  | meta keys/values   | dc|  idy  | meta content   |
