@@ -34,6 +34,8 @@ What is it?
 
 C-Blosc2 is the new major version of `C-Blosc <https://github.com/Blosc/c-blosc>`_, and tries hard to be backward compatible with both the C-Blosc1 API and its in-memory format.  However, the reverse thing is generally not true; buffers generated with C-Blosc2 are not format-compatible with C-Blosc1 (i.e. forward compatibility is not supported).
 
+See a 3 minutes  `introductory video to Blosc2 <https://www.youtube.com/watch?v=HdscCz97mNs>`_. 
+
 
 New features in C-Blosc2
 ========================
