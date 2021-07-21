@@ -1916,6 +1916,10 @@ static int initialize_context_compression(
   blosc2_btune *udbtune, void *btune_config,
   blosc2_schunk* schunk) {
 
+  if (srcsize % typesize != 0) {
+    BLOSC_TRACE_ERROR("The srcsize must be a multiple of the typesize.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
   /* Set parameters */
   context->do_compress = 1;
   context->src = (const uint8_t*)src;
