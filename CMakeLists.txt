@@ -228,6 +228,13 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
             "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
+# Propagate CMAKE_OSX_ARCHITECTURES env variable into CMAKE_SYSTEM_PROCESSOR
+if(DEFINED ENV{CMAKE_OSX_ARCHITECTURES})
+    if($ENV{CMAKE_OSX_ARCHITECTURES} STREQUAL "arm64")
+        set(CMAKE_SYSTEM_PROCESSOR arm64)
+    endif()
+endif()
+
 # Based on the target system's processor and the compiler being used,
 # set build variables indicating which hardware features can be targeted
 # by the compiler. Note we DO NOT check which hardware features are supported
