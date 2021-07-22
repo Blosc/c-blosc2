@@ -27,7 +27,7 @@ static int test_roundtrip_bitshuffle8(int size, void *data, void *data_out, void
   }
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1.*isize) / csize);
 
-  FILE *fout = fopen("test-bitshuffle8-nomemcpy.cdata", "w");
+  FILE *fout = fopen("test-bitshuffle8-nomemcpy.cdata", "wb");
   fwrite(data_out, csize, 1, fout);
   fclose(fout);
 
@@ -65,7 +65,7 @@ static int test_roundtrip_bitshuffle4(int size, void *data, void *data_out, void
   }
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1.*isize) / csize);
 
-  FILE *fout = fopen("test-bitshuffle4-memcpy.cdata", "w");
+  FILE *fout = fopen("test-bitshuffle4-memcpy.cdata", "wb");
   fwrite(data_out, csize, 1, fout);
   fclose(fout);
 
