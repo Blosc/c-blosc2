@@ -96,8 +96,10 @@ static char* test_frame(void) {
     blosc2_meta_add(schunk, "metalayer2", (uint8_t *) "my metalayer1", sizeof("my metalayer1"));
   }
 
+  blosc2_cparams cparams2 = BLOSC2_CPARAMS_DEFAULTS;
+  cparams2.typesize = sizeof(char);
   if (vlmetalayers) {
-    blosc2_vlmeta_add(schunk, "vlmetalayer", (uint8_t *) content, (int32_t) content_len, NULL);
+    blosc2_vlmeta_add(schunk, "vlmetalayer", (uint8_t *) content, (int32_t) content_len, &cparams2);
   }
 
   if (!sparse_schunk) {
@@ -151,7 +153,7 @@ static char* test_frame(void) {
     mu_assert("ERROR: bad vlmetalayers length in frame", (size_t) content_len_ == content_len);
     mu_assert("ERROR: bad vlmetalayers data in frame", strncmp((char*)content_, content, content_len) == 0);
     free(content_);
-    blosc2_vlmeta_update(schunk, "vlmetalayer", (uint8_t *) content2, (int32_t) content_len2, NULL);
+    blosc2_vlmeta_update(schunk, "vlmetalayer", (uint8_t *) content2, (int32_t) content_len2, &cparams2);
   }
 
   // Feed it with data
@@ -193,7 +195,7 @@ static char* test_frame(void) {
     mu_assert("ERROR: bad vlmetalayers length in frame", (size_t) content_len_ == content_len2);
     mu_assert("ERROR: bad vlmetalayers data in frame", strncmp((char*)content_, content2, content_len2) == 0);
     free(content_);
-    blosc2_vlmeta_update(schunk, "vlmetalayer", (uint8_t *) content3, (int32_t) content_len3, NULL);
+    blosc2_vlmeta_update(schunk, "vlmetalayer", (uint8_t *) content3, (int32_t) content_len3, &cparams2);
   }
 
   if (!sparse_schunk) {

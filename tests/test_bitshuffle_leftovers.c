@@ -20,13 +20,10 @@ static int test_roundtrip_bitshuffle8(int size, void *data, void *data_out, void
   int isize = size;
   int osize = size + BLOSC_MIN_HEADER_LENGTH;
   int csize = blosc_compress(9, BLOSC_BITSHUFFLE, 8, isize, data, data_out, osize);
+  mu_assert("ERROR: undetected chunksize not being a multiple of typesize", csize < 0);
   if (csize == 0) {
     printf("Buffer is uncompressible.  Giving up.\n");
     return 1;
-  }
-  else if (csize < 0) {
-    printf("Compression error.  Error code: %d\n", csize);
-    return csize;
   }
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1.*isize) / csize);
 

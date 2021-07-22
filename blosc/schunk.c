@@ -291,7 +291,9 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
     if (blosc2_vlmeta_get(schunk, name, &content, &content_len) < 0) {
       BLOSC_TRACE_ERROR("Can not get %s `vlmetalayer`.", name);
     }
-    if (blosc2_vlmeta_add(new_schunk, name, content, content_len, NULL) < 0) {
+    blosc2_cparams cparams2 = BLOSC2_CPARAMS_DEFAULTS;
+    cparams2.typesize = sizeof(uint8_t);
+    if (blosc2_vlmeta_add(new_schunk, name, content, content_len, &cparams2) < 0) {
       BLOSC_TRACE_ERROR("Can not add %s `vlmetalayer`.", name);
       return NULL;
     }
