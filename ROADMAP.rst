@@ -36,7 +36,7 @@ Right now, the next features are already implemented (although they may require 
 
 * **Sparse frames (on-disk):** each chunk in a super-chunk is stored in a separate file, as well as the metadata.  This is the counterpart of in-memory super-chunk, and allows for more efficient updates than in frames (i.e. avoiding 'holes' in monolithic files).
 
-* **Partial chunk reads:** there is support for reading just part of chunks, so avoiding to read the whole thing and then discard the unnecessary data.
+* **Partial chunk reads:** there is support for reading just part of a chunk, so avoiding reading the whole thing and then discarding the unnecessary data (which is a waste of resources).
 
 * **Parallel chunk reads:** when several blocks of a chunk are to be read, this is done in parallel by the decompressing machinery.  That means that every thread is responsible to read, post-filter and decompress a block by itself, leading to an efficient overlap of I/O and CPU usage that optimizes reads to a maximum.
 
@@ -64,7 +64,7 @@ Right now, the next features are already implemented (although they may require 
 Actions to be done
 ------------------
 
-* **Improve the safety of the library:**   Although this is always a work in progress, we did a long way in improving our safety, mainly thanks to the efforts of Nathan Moinvaziri.
+* **Improve the safety of the library:**  even if we have already made a long way in improving our safety, mainly thanks to the efforts of Nathan Moinvaziri, we take safety seriously, so this is always a work in progress. 
 
 * **Support for lossy compression codecs:** although we already support the `trunc_prec` filter, this is only valid for floating point data; we should come with lossy codecs that are meant for any data type.
 
@@ -81,6 +81,8 @@ Actions to be done
 * **Wrappers for other languages:** Java, R or Julia are the most obvious candidates.  Still not sure if these should be produced and maintained by the Blosc development team, or leave them for third-party players that would be interested. The steering `council discussed this <https://github.com/Blosc/governance/blob/master/steering_council_minutes/2020-03-26.md>`_, and probably just the Python wrapper (python-blosc2, see above) should be maintained by Blosc maintainers themselves, while the other languages should be maintained by the community.
 
 * **Lock support for super-chunks:** when different processes are accessing concurrently to super-chunks, make them to sync properly by using locks, either on-disk (frame-backed super-chunks), or in-memory. Such a lock support would be configured in build time, so it could be disabled with a cmake flag.
+
+* **Hierarchical structure (aka Groups):** some libraries (like `xarray <http://xarray.pydata.org/>`_) need an easy way to tie different datasets together (groups).  This would also allow to create whole hierarchies so as to endow a structure to these datasets.  Besides the structural part (that will be part of the format specification), this will need an accompanying API that allows the user to create groups, add datasets to groups, (recursively) list datasets in groups, access a dataset inside a group, an so on.
 
 
 Outreaching
