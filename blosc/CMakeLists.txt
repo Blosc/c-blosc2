@@ -62,8 +62,6 @@ if(COMPILER_SUPPORT_ALTIVEC)
 endif()
 set(SOURCES ${SOURCES} shuffle.c)
 
-# library install directory
-set(lib_dir lib${LIB_SUFFIX})
 set(version_string ${BLOSC_VERSION_MAJOR}.${BLOSC_VERSION_MINOR}.${BLOSC_VERSION_PATCH})
 
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE) # pre 3.1
@@ -291,14 +289,14 @@ if(BLOSC_INSTALL)
 
     if(BUILD_SHARED)
         install(TARGETS blosc2_shared
-                LIBRARY DESTINATION ${lib_dir}
-                ARCHIVE DESTINATION ${lib_dir}
+                LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+                ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
                 RUNTIME DESTINATION bin COMPONENT LIB)
     endif()
     if(BUILD_STATIC)
         install(TARGETS blosc2_static
-                LIBRARY DESTINATION ${lib_dir}
-                ARCHIVE DESTINATION ${lib_dir}
+                LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+                ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
                 RUNTIME DESTINATION bin COMPONENT LIB)
     endif()
 endif()
