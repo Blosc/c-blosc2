@@ -682,7 +682,7 @@ int ndlz4_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   ind += padding[1];
 
   if (ind != (blockshape[0] * blockshape[1])) {
-    printf("Output size is not compatible with embeded blockshape \n");
+    printf("Output size is not compatible with embedded blockshape \n");
     return 0;
   }
   if (ind > (uint32_t) output_len) {

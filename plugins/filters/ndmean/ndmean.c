@@ -414,7 +414,7 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     free(blockshape);
 
     if (ind != (int32_t) (blocksize / typesize)) {
-        printf("Output size is not compatible with embeded blockshape ind %d %d \n", ind, (blocksize / typesize));
+        printf("Output size is not compatible with embedded blockshape ind %d %d \n", ind, (blocksize / typesize));
         return 0;
     }
 
