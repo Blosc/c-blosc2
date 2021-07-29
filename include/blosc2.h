@@ -1872,6 +1872,16 @@ BLOSC_EXPORT int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name,
 BLOSC_EXPORT int blosc2_vlmeta_get(blosc2_schunk *schunk, const char *name,
                                    uint8_t **content, uint32_t *content_len);
 
+/**
+ * @brief Delete the variable-length metalayer from the super-chunk.
+ *
+ * @param schunk The super-chunk containing the variable-length metalayer.
+ * @param name The name of the variable-length metalayer.
+ *
+ * @return If successful, the number of the variable-length metalayers in the super-chunk. Else, return a negative value.
+ */
+BLOSC_EXPORT int blosc2_vlmeta_delete(blosc2_schunk *schunk, const char *name);
+
 
 /*********************************************************************
   Time measurement utilities.
