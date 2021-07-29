@@ -51,9 +51,9 @@ int main(void) {
 
 
   // Add a metalayer
-  int vlmetalater_len = blosc2_meta_add(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 10);
+  int vlmetalater_len = blosc2_meta_add(schunk, "metalayer", (uint8_t *) "This is a metalayers content...", 10);
   if (vlmetalater_len < 0) {
-    printf("Cannot write vlmetalayers chunk");
+    printf("Cannot write metalayers chunk");
     return vlmetalater_len;
   }
 
@@ -81,6 +81,23 @@ int main(void) {
     return vlmetalater_len;
   }
 
+  // Delete a vlmetalayer
+  int nvlmetalayers =  blosc2_vlmeta_delete(schunk, "vlmetalayer");
+  if (nvlmetalayers < 0) {
+    printf("Cannot delete the  vlmetalayer");
+  }
+
+  vlmetalater_len = blosc2_vlmeta_exists(schunk, "vlmetalayer");
+  if (vlmetalater_len >= 0) {
+    printf("The vlmetalayer was not deleted succesfully");
+    return vlmetalater_len;
+  }
+
+  vlmetalater_len = blosc2_vlmeta_exists(schunk, "vlmetalayer2");
+  if (vlmetalater_len < 0) {
+    printf("The vlmetalayer was not deleted succesfully");
+    return vlmetalater_len;
+  }
   blosc2_schunk *sc = blosc2_schunk_open(urlpath);
 
   /* Free resources */
