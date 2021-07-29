@@ -267,7 +267,7 @@ only the meta-information has been loaded.  The actual data from blocks is 'lazi
 This allows for improved selectivity, and hence less input bandwidth demands, during partial chunk reads
 (e.g. `blosc_getitem`) from data that is on disk.
 
-Here it is its structure::
+It is arranged like this::
 
     +=========+=========+========+========+=========+
     | nchunk  | offset  | bsize0 |   ...  | bsizeN |
