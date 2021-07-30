@@ -51,34 +51,34 @@ int main(void) {
 
 
   // Add a metalayer
-  int vlmetalater_len = blosc2_meta_add(schunk, "metalayer", (uint8_t *) "This is a metalayers content...", 10);
-  if (vlmetalater_len < 0) {
+  int metalater_len = blosc2_meta_add(schunk, "metalayer", (uint8_t *) "This is a metalayers content...", 10);
+  if (metalater_len < 0) {
     printf("Cannot write metalayers chunk");
-    return vlmetalater_len;
+    return metalater_len;
   }
 
   // Add some vlmetalayers data
   blosc2_cparams cparams2 = BLOSC2_CPARAMS_DEFAULTS;
   cparams2.typesize = sizeof(uint8_t);
-  vlmetalater_len = blosc2_vlmeta_add(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 32, &cparams2);
-  if (vlmetalater_len < 0) {
+  metalater_len = blosc2_vlmeta_add(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 32, &cparams2);
+  if (metalater_len < 0) {
     printf("Cannot write vlmetalayers chunk");
-    return vlmetalater_len;
+    return metalater_len;
   }
 
   // Add some vlmetalayers data
-  vlmetalater_len = blosc2_vlmeta_add(schunk, "vlmetalayer2", (uint8_t *) "This is a content...", 10, &cparams2);
-  if (vlmetalater_len < 0) {
+  metalater_len = blosc2_vlmeta_add(schunk, "vlmetalayer2", (uint8_t *) "This is a content...", 10, &cparams2);
+  if (metalater_len < 0) {
     printf("Cannot write vlmetalayers chunk");
-    return vlmetalater_len;
+    return metalater_len;
   }
 
-  vlmetalater_len = blosc2_vlmeta_update(schunk, "vlmetalayer", (uint8_t *) "This is a another vlmetalayer content...",
-                                         20,
-                                         &cparams2);
-  if (vlmetalater_len < 0) {
+  metalater_len = blosc2_vlmeta_update(schunk, "vlmetalayer", (uint8_t *) "This is a another vlmetalayer content...",
+                                       20,
+                                       &cparams2);
+  if (metalater_len < 0) {
     printf("Cannot write vlmetalayers chunk");
-    return vlmetalater_len;
+    return metalater_len;
   }
 
   // Delete a vlmetalayer
@@ -87,16 +87,16 @@ int main(void) {
     printf("Cannot delete the  vlmetalayer");
   }
 
-  vlmetalater_len = blosc2_vlmeta_exists(schunk, "vlmetalayer");
-  if (vlmetalater_len >= 0) {
+  metalater_len = blosc2_vlmeta_exists(schunk, "vlmetalayer");
+  if (metalater_len >= 0) {
     printf("The vlmetalayer was not deleted succesfully");
-    return vlmetalater_len;
+    return metalater_len;
   }
 
-  vlmetalater_len = blosc2_vlmeta_exists(schunk, "vlmetalayer2");
-  if (vlmetalater_len < 0) {
+  metalater_len = blosc2_vlmeta_exists(schunk, "vlmetalayer2");
+  if (metalater_len < 0) {
     printf("The vlmetalayer was not deleted succesfully");
-    return vlmetalater_len;
+    return metalater_len;
   }
   blosc2_schunk *sc = blosc2_schunk_open(urlpath);
 
