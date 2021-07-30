@@ -117,8 +117,8 @@ static char* test_schunk(void) {
   free(content2);
 
   // Delete the second vlmetalayer
-  int nvmetalayers = blosc2_vlmeta_delete(schunk, "vlmetalayer2");
-  mu_assert("ERROR: error while deleting the vlmetalayer", nvmetalayers == 1);
+  int nvlmeta = blosc2_vlmeta_delete(schunk, "vlmetalayer2");
+  mu_assert("ERROR: error while deleting the vlmetalayer", nvlmeta == 1);
   int rc = blosc2_vlmeta_exists(schunk, "vlmetalayer2");
   mu_assert("ERROR: the vlmetalayer was not deleted correctly", rc < 0);
 
