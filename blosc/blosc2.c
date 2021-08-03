@@ -1424,26 +1424,33 @@ static int blosc_d(
     }
 
     if (frame->sframe) {
-      // The chunk is not in the frame
-      if (thread_context->fp == NULL || thread_context->nchunk != nchunk) {
-        // The thread_context->fp handler is not cached yet
-        if (thread_context->fp != NULL) {
-          io_cb->close(thread_context->fp);
-        }
-        thread_context->nchunk = nchunk;
-        char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-        BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
-        sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
-        thread_context->fp = io_cb->open(chunkpath, "rb", context->schunk->storage->io->params);
-        free(chunkpath);
-      }
+      // Experiments show that the next optimization is not efficient for sparse storage
+      // Not sure why not, but commenting it out until more benchmarks would be made.
+//      if (thread_context->fp == NULL || thread_context->nchunk != nchunk) {
+//        // The thread_context->fp handler is not cached yet
+//        if (thread_context->fp != NULL) {
+//          io_cb->close(thread_context->fp);
+//        }
+//        thread_context->nchunk = nchunk;
+//        char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+//        BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
+//        sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
+//        thread_context->fp = io_cb->open(chunkpath, "rb", context->schunk->storage->io->params);
+//        free(chunkpath);
+//      }
+//      io_cb->seek(thread_context->fp, src_offset, SEEK_SET);
+      char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+      BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
+      sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
+      thread_context->fp = io_cb->open(chunkpath, "rb", context->schunk->storage->io->params);
+      free(chunkpath);
       io_cb->seek(thread_context->fp, src_offset, SEEK_SET);
     }
     else {
       if (thread_context->fp == NULL) {
         thread_context->fp = io_cb->open(urlpath, "rb", context->schunk->storage->io->params);
       }
-      thread_context->nchunk = nchunk;  // not really necessary in this case, but for consistency
+      // thread_context->nchunk = nchunk;  // not really necessary in this case, but for consistency
       io_cb->seek(thread_context->fp, chunk_offset + src_offset, SEEK_SET);
     }
     // We can make use of tmp3 because it will be used after src is not needed anymore
@@ -1451,6 +1458,10 @@ static int blosc_d(
     if ((int32_t)rbytes != block_csize) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");
       return BLOSC2_ERROR_READ_BUFFER;
+    }
+    if (frame->sframe) {
+      io_cb->close(thread_context->fp);
+      thread_context->fp = NULL;
     }
     src = tmp3;
     src_offset = 0;
@@ -1803,7 +1814,7 @@ static int init_thread_context(struct thread_context* thread_context, blosc2_con
   thread_context->tmp4 = thread_context->tmp3 + ebsize;
   thread_context->tmp_blocksize = context->blocksize;
 
-  thread_context->nchunk = -1;
+  // thread_context->nchunk = -1;
   thread_context->fp = NULL;
   #if defined(HAVE_ZSTD)
   thread_context->zstd_cctx = NULL;
