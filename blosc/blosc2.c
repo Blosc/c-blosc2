@@ -1417,7 +1417,6 @@ static int blosc_d(
     int32_t *block_csizes = (int32_t *)(src + trailer_offset + sizeof(int32_t) + sizeof(int64_t));
     int32_t block_csize = block_csizes[nblock];
     // Read the lazy block on disk
-    void* fp = NULL;
     blosc2_io_cb *io_cb = blosc2_get_io_cb(context->schunk->storage->io->id);
     if (io_cb == NULL) {
       BLOSC_TRACE_ERROR("Error getting the input/output API");
@@ -1426,22 +1425,29 @@ static int blosc_d(
 
     if (frame->sframe) {
       // The chunk is not in the frame
-      char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-      BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
-      sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
-      fp = io_cb->open(chunkpath, "rb", context->schunk->storage->io->params);
-      free(chunkpath);
-      // The offset of the block is src_offset
-      io_cb->seek(fp, src_offset, SEEK_SET);
+      if (thread_context->fp == NULL || thread_context->nchunk != nchunk) {
+        // The thread_context->fp handler is not cached yet
+        if (thread_context->fp != NULL) {
+          io_cb->close(thread_context->fp);
+        }
+        thread_context->nchunk = nchunk;
+        char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+        BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
+        sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
+        thread_context->fp = io_cb->open(chunkpath, "rb", context->schunk->storage->io->params);
+        free(chunkpath);
+      }
+      io_cb->seek(thread_context->fp, src_offset, SEEK_SET);
     }
     else {
-      fp = io_cb->open(urlpath, "rb", context->schunk->storage->io->params);
-      // The offset of the block is src_offset
-      io_cb->seek(fp, chunk_offset + src_offset, SEEK_SET);
+      if (thread_context->fp == NULL) {
+        thread_context->fp = io_cb->open(urlpath, "rb", context->schunk->storage->io->params);
+      }
+      thread_context->nchunk = nchunk;  // not really necessary in this case, but for consistency
+      io_cb->seek(thread_context->fp, chunk_offset + src_offset, SEEK_SET);
     }
     // We can make use of tmp3 because it will be used after src is not needed anymore
-    int64_t rbytes = io_cb->read(tmp3, 1, block_csize, fp);
-    io_cb->close(fp);
+    int64_t rbytes = io_cb->read(tmp3, 1, block_csize, thread_context->fp);
     if ((int32_t)rbytes != block_csize) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");
       return BLOSC2_ERROR_READ_BUFFER;
@@ -1796,6 +1802,9 @@ static int init_thread_context(struct thread_context* thread_context, blosc2_con
   thread_context->tmp3 = thread_context->tmp2 + ebsize;
   thread_context->tmp4 = thread_context->tmp3 + ebsize;
   thread_context->tmp_blocksize = context->blocksize;
+
+  thread_context->nchunk = -1;
+  thread_context->fp = NULL;
   #if defined(HAVE_ZSTD)
   thread_context->zstd_cctx = NULL;
   thread_context->zstd_dctx = NULL;
@@ -1842,6 +1851,14 @@ static void destroy_thread_context(struct thread_context* thread_context) {
   if (thread_context->zstd_dctx != NULL) {
     ZSTD_freeDCtx(thread_context->zstd_dctx);
   }
+  if (thread_context->fp != NULL) {
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(thread_context->parent_context->schunk->storage->io->id);
+    if (io_cb == NULL) {
+      BLOSC_TRACE_ERROR("Error getting the input/output API");
+    }
+    io_cb->close(thread_context->fp);
+  }
+
 #endif
 #ifdef HAVE_IPP
   if (thread_context->lz4_hash_table != NULL) {

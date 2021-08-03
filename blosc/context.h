@@ -150,6 +150,8 @@ struct thread_context {
   uint8_t* tmp4;
   int32_t tmp_blocksize; /* the blocksize for different temporaries */
   size_t tmp_nbytes;   /* keep track of how big the temporary buffers are */
+  int32_t nchunk;   /* the chunk number that is being handled during persistent storage */
+  void* fp;  /* a file handler for persistent storage */
 #if defined(HAVE_ZSTD)
   /* The contexts for ZSTD */
   ZSTD_CCtx* zstd_cctx;

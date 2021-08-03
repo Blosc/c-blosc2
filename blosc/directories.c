@@ -118,7 +118,7 @@ int blosc2_remove_dir(const char* dir_path) {
 
 #endif  /* _WIN32 */
 
-int blosc2_remove_urlpath(const char* urlpath){
+int blosc2_remove_urlpath(const char* urlpath) {
   if (urlpath != NULL) {
     struct stat statbuf;
     if (stat(urlpath, &statbuf) != 0){
