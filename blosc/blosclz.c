@@ -51,7 +51,8 @@
   #define BLOSCLZ_READU32(p) *((const uint32_t*)(p))
 #endif
 
-#define HASH_LOG (12U)
+#define HASH_LOG (14U)
+#define HASH_LOG2 (12U)
 
 // This is used in LZ4 and seems to work pretty well here too
 #define HASH_FUNCTION(v, s, h) {      \
@@ -402,15 +403,13 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
   int32_t oc = 0;
   uint8_t* ip_bound = ibase + maxlen - 1;
   uint8_t* ip_limit = ibase + maxlen - 12;
-  uint32_t htab[1U << (uint8_t)HASH_LOG];
+  uint32_t htab[1U << (uint8_t)HASH_LOG2];
   uint32_t hval;
   uint32_t seq;
   uint8_t copy;
 
   // Initialize the hash table to distances of 0
-  for (unsigned i = 0; i < (1U << HASH_LOG); i++) {
-    htab[i] = 0;
-  }
+  memset(htab, 0, (1U << HASH_LOG2) * sizeof(uint32_t));
 
   /* we start with literal copy */
   copy = 4;
@@ -424,7 +423,7 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
 
     /* find potential match */
     seq = BLOSCLZ_READU32(ip);
-    HASH_FUNCTION(hval, seq, HASH_LOG)
+    HASH_FUNCTION(hval, seq, HASH_LOG2)
     ref = ibase + htab[hval];
 
     /* calculate distance to the match */
@@ -439,7 +438,7 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
     }
 
     /* is this a match? check the first 4 bytes */
-    if (BLOSCLZ_UNLIKELY(BLOSCLZ_READU32(ref) == BLOSCLZ_READU32(ip))) {
+    if (BLOSCLZ_READU32(ref) == BLOSCLZ_READU32(ip)) {
       ref += 4;
     }
     else {
@@ -460,9 +459,9 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
     ip -= force_3b_shift ? 3 : 4;
     unsigned len = (int)(ip - anchor);
     // If match is close, let's reduce the minimum length to encode it
-    unsigned minlen = (distance < MAX_DISTANCE) ? 3 : 4;
+    // unsigned minlen = (distance < MAX_DISTANCE) ? 3 : 4;
     // Encoding short lengths is expensive during decompression
-    if (len < minlen) {
+    if (len < 4) {
       LITERAL2(ip, oc, anchor, copy)
       continue;
     }
@@ -490,10 +489,10 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
 
     /* update the hash at match boundary */
     seq = BLOSCLZ_READU32(ip);
-    HASH_FUNCTION(hval, seq, HASH_LOG)
+    HASH_FUNCTION(hval, seq, HASH_LOG2)
     htab[hval] = (uint32_t)(ip++ - ibase);
     seq >>= 8U;
-    HASH_FUNCTION(hval, seq, HASH_LOG)
+    HASH_FUNCTION(hval, seq, HASH_LOG2)
     htab[hval] = (uint32_t) (ip++ - ibase);
     /* assuming literal copy */
     oc++;
@@ -505,7 +504,7 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
       // prefer the earlier (based on experiments).
       //return 1 + force_3b_shift;
       // Finally we use the next one, based on experiments
-      // witn python-blosc2.
+      // with python-blosc2.
       return oc;
     }
 
@@ -531,18 +530,16 @@ int blosclz_compress(const int clevel, const void* input, int length,
   op_limit = op + maxout;
 
   // Minimum lengths for encoding
-  unsigned minlen_[10] = {0, 16, 12, 11, 10, 9, 8, 7, 6, 5};
+  unsigned minlen_[10] = {0, 16, 12, 11, 10, 9, 8, 7, 6, 4};
 
-  // Minimum compression ratios for initiate encoding
+  // Minimum compression ratios for initiating encoding
   double cratio_[10] = {0, 2, 2, 2, 2, 1.8, 1.6, 1.4, 1.2, 1.1};
 
   uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[clevel];
   // Initialize the hash table to distances of 0
-  for (unsigned i = 0; i < (1U << hashlog); i++) {
-    htab[i] = 0;
-  }
+  memset(htab, 0, (1U << hashlog) * sizeof(uint32_t));
 
   /* input and output buffer cannot be less than 16 and 66 bytes or we can get into trouble */
   if (length < 16 || maxout < 66) {
@@ -584,10 +581,11 @@ int blosclz_compress(const int clevel, const void* input, int length,
       // case 9 is special.  we need to assess the optimal shift
       // maxlen can be quite less here because the blocksize is larger
       maxlen = length / 16;
-      csize_3b = get_csize(ibase, maxlen, true);
+      //csize_3b = get_csize(ibase, maxlen, true);
       csize_4b = get_csize(ibase, maxlen, false);
-      ipshift = (csize_3b < csize_4b) ? 3 : 4;
-      cratio = (csize_3b < csize_4b) ? ((double)maxlen / csize_3b) : ((double)maxlen / csize_4b);
+      //ipshift = (csize_3b < csize_4b) ? 3 : 4;
+      //cratio = (csize_3b < csize_4b) ? ((double)maxlen / csize_3b) : ((double)maxlen / csize_4b);
+      cratio = (double)maxlen / csize_4b;
       break;
     default:
       break;

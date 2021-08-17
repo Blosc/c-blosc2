@@ -28,9 +28,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+//#include <gperftools/profiler.h>
 #include "blosc2.h"
 
-#define KB  1024
+#define KB  1024u
 #define MB  (1024*KB)
 #define GB  (1024*MB)
 
@@ -38,7 +39,9 @@
 
 
 int nchunks = NCHUNKS;
-int niter = 3;
+int niter = 1;
+int niter_c = 6;
+int niter_d = 1;
 /* default number of iterations */
 double totalsize = 0.;          /* total compressed/decompressed size */
 
@@ -187,14 +190,14 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
     fprintf(ofile, "Compression level: %d\n", clevel);
 
     blosc_set_timestamp(&last);
-    for (i = 0; i < niter; i++) {
+    for (i = 0; i < niter_c; i++) {
       for (j = 0; j < nchunks; j++) {
         cbytes = blosc_compress(clevel, doshuffle, (size_t)elsize, size, src,
                                 dest[j], size + BLOSC_MAX_OVERHEAD);
       }
     }
     blosc_set_timestamp(&current);
-    tshuf = get_usec_chunk(last, current, niter, nchunks);
+    tshuf = get_usec_chunk(last, current, niter_c, nchunks);
     fprintf(ofile, "comp(write):\t %6.1f us, %.1f MB/s\t  ",
             tshuf, (size * 1e6) / (tshuf * MB));
     fprintf(ofile, "Final bytes: %d  ", cbytes);
@@ -211,7 +214,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
     }
 
     blosc_set_timestamp(&last);
-    for (i = 0; i < niter; i++) {
+    for (i = 0; i < niter_d; i++) {
       for (j = 0; j < nchunks; j++) {
         if (cbytes == 0) {
           memcpy(dest2, dest[j], size);
@@ -223,7 +226,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
       }
     }
     blosc_set_timestamp(&current);
-    tunshuf = get_usec_chunk(last, current, niter, nchunks);
+    tunshuf = get_usec_chunk(last, current, niter_d, nchunks);
     fprintf(ofile, "decomp(read):\t %6.1f us, %.1f MB/s\t  ",
             tunshuf, (nbytes * 1e6) / (tunshuf * MB));
     if (nbytes < 0) {
@@ -312,11 +315,11 @@ int main(int argc, char* argv[]) {
   int hard_suite = 0;
   int extreme_suite = 0;
   int debug_suite = 0;
-  int nthreads = 4;                     /* The number of threads */
-  int size = 12 * MB;                   /* Buffer size */
+  int nthreads = 16;                     /* The number of threads */
+  int size = 16 * MB;                   /* Buffer size */
   int elsize = 4;                       /* Datatype size */
   int rshift = 19;                      /* Significant bits */
-  int workingset = 256 * MB;            /* The maximum allocated memory */
+  unsigned int workingset = 3 * 512 * MB;            /* The maximum allocated memory */
   int nthreads_, size_, elsize_, rshift_, i;
   FILE* output_file = stdout;
   blosc_timestamp_t last, current;
@@ -330,12 +333,17 @@ int main(int argc, char* argv[]) {
       "[single | suite | hardsuite | extremesuite | debugsuite] "
       "[nthreads] [bufsize(bytes)] [typesize] [sbits]", 255);
 
-  if (argc < 2) {
+  if (argc < 1) {
     printf("%s\n", usage);
     exit(1);
   }
 
-  strcpy(compressor, argv[1]);
+  if (argc >= 2) {
+    strcpy(compressor, argv[1]);
+  }
+  else {
+    strcpy(compressor, "blosclz");
+  }
 
   if (strcmp(compressor, "blosclz") != 0 &&
       strcmp(compressor, "lz4") != 0 &&

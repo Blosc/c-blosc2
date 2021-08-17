@@ -103,10 +103,10 @@ void blosc_stune_next_blocksize(blosc2_context *context) {
 
   /* Now the blocksize for splittable codecs */
   if (clevel > 0 && split_block(context, typesize, blocksize, true)) {
-    // For performance reasons, do not exceed 256 KB (in must fit in L2 cache)
+    // For performance reasons, do not exceed 256 KB (it must fit in L2 cache)
     switch (clevel) {
       case 1:
-        blocksize = 8 * 1024;
+        blocksize = 16 * 1024;
         break;
       case 2:
         blocksize = 16 * 1024;
@@ -117,11 +117,11 @@ void blosc_stune_next_blocksize(blosc2_context *context) {
       case 6:
       case 7:
       case 8:
-        blocksize = 128 * 1024;
+        blocksize = 256 * 1024;
         break;
       case 9:
       default:
-        blocksize = 256 * 1024;
+        blocksize = 512 * 1024;
         break;
     }
     // Multiply by typesize so as to get proper split sizes
