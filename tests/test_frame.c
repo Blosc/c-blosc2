@@ -57,10 +57,10 @@ static char* test_frame(void) {
   cparams.typesize = sizeof(int32_t);
   if (splits) {
     // Use a codec that splits blocks (important for lazy chunks).
-    // Only BLOSCLZ is doing that.
+    // Only BLOSCLZ and LZ4 are doing that.
     cparams.compcode = BLOSC_BLOSCLZ;
   } else {
-    cparams.compcode = BLOSC_LZ4;
+    cparams.compcode = BLOSC_LZ4HC;
   }
   cparams.blocksize = blocksize;
 
@@ -223,6 +223,8 @@ static char* test_frame(void) {
   nbytes = schunk->nbytes;
   cbytes = schunk->cbytes;
   if (nchunks > 0) {
+    if (nbytes < 10 * cbytes)
+        printf("%ld -> %ld\n", nbytes, cbytes);
     mu_assert("ERROR: bad compression ratio in frame", nbytes > 10 * cbytes);
   }
 
