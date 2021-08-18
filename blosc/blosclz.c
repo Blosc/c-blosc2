@@ -494,12 +494,20 @@ static int get_csize(uint8_t* ibase, int maxlen, int minlen, int clevel) {
     /* assuming literal copy */
     oc++;
 
-    // Exit early if we are detecting compression.
-    // We cannot do that for clevel==9 because we need a better
-    // assessment because we are comparing different minlen's.
     int32_t ic = (int32_t)(ip - ibase);
-    if ((clevel != 9) && (ic > (maxlen / 8)) && (oc < 2 * ic)) {
-      return oc;
+    if (clevel == 9) {
+      // Exit as soon as we have a decent sample to compare with
+      if (ic > maxlen8) {
+        return oc;
+      }
+    }
+    else {
+      // Exit early if we are detecting compression.
+      // We cannot do that for clevel==9 because we need a better
+      // assessment because we are comparing different minlen's.
+      if ((ic > maxlen8) && (oc < 2 * ic)) {
+        return oc;
+      }
     }
 
   }
