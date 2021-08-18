@@ -28,7 +28,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
-//#include <gperftools/profiler.h>
 #include "blosc2.h"
 
 #define KB  1024u
@@ -40,8 +39,8 @@
 
 int nchunks = NCHUNKS;
 int niter = 1;
-int niter_c = 6;
-int niter_d = 1;
+int niter_c = 3;
+int niter_d = 3;
 /* default number of iterations */
 double totalsize = 0.;          /* total compressed/decompressed size */
 
@@ -315,11 +314,11 @@ int main(int argc, char* argv[]) {
   int hard_suite = 0;
   int extreme_suite = 0;
   int debug_suite = 0;
-  int nthreads = 16;                     /* The number of threads */
-  int size = 16 * MB;                   /* Buffer size */
+  int nthreads = 8;                     /* The number of threads */
+  int size = 8 * MB;                    /* Buffer size */
   int elsize = 4;                       /* Datatype size */
   int rshift = 19;                      /* Significant bits */
-  unsigned int workingset = 3 * 512 * MB;            /* The maximum allocated memory */
+  unsigned int workingset = 512 * MB;            /* The maximum allocated memory */
   int nthreads_, size_, elsize_, rshift_, i;
   FILE* output_file = stdout;
   blosc_timestamp_t last, current;
