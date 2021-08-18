@@ -397,19 +397,19 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 
 
 // Get the compressed size of a buffer.  Useful for testing compression ratios for high clevels.
-static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
+static int get_csize(uint8_t* ibase, int maxlen, int minlen, int clevel) {
   uint32_t maxlen8 = maxlen / 8;
   uint8_t* ip = ibase;
   int32_t oc = 0;
   uint8_t* ip_bound = ibase + maxlen - 1;
   uint8_t* ip_limit = ibase + maxlen - 12;
-  uint32_t htab[1U << (uint8_t)HASH_LOG2];
+  uint32_t htab[1U << (uint8_t)HASH_LOG];
   uint32_t hval;
   uint32_t seq;
   uint8_t copy;
 
   // Initialize the hash table to distances of 0
-  memset(htab, 0, (1U << HASH_LOG2) * sizeof(uint32_t));
+  memset(htab, 0, (1U << HASH_LOG) * sizeof(uint32_t));
 
   /* we start with literal copy */
   copy = 4;
@@ -423,7 +423,7 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
 
     /* find potential match */
     seq = BLOSCLZ_READU32(ip);
-    HASH_FUNCTION(hval, seq, HASH_LOG2)
+    HASH_FUNCTION(hval, seq, HASH_LOG)
     ref = ibase + htab[hval];
 
     /* calculate distance to the match */
@@ -456,12 +456,9 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
     /* get runs or matches; zero distance means a run */
     ip = get_run_or_match(ip, ip_bound, ref, !distance);
 
-    ip -= force_3b_shift ? 3 : 4;
+    ip -= 4;
     unsigned len = (int)(ip - anchor);
-    // If match is close, let's reduce the minimum length to encode it
-    // unsigned minlen = (distance < MAX_DISTANCE) ? 3 : 4;
-    // Encoding short lengths is expensive during decompression
-    if (len < 4) {
+    if (len < minlen) {
       LITERAL2(ip, oc, anchor, copy)
       continue;
     }
@@ -489,22 +486,19 @@ static int get_csize(uint8_t* ibase, int maxlen, bool force_3b_shift) {
 
     /* update the hash at match boundary */
     seq = BLOSCLZ_READU32(ip);
-    HASH_FUNCTION(hval, seq, HASH_LOG2)
+    HASH_FUNCTION(hval, seq, HASH_LOG)
     htab[hval] = (uint32_t)(ip++ - ibase);
     seq >>= 8U;
-    HASH_FUNCTION(hval, seq, HASH_LOG2)
+    HASH_FUNCTION(hval, seq, HASH_LOG)
     htab[hval] = (uint32_t) (ip++ - ibase);
     /* assuming literal copy */
     oc++;
 
-    // Exit early if we are detecting compression
+    // Exit early if we are detecting compression.
+    // We cannot do that for clevel==9 because we need a better
+    // assessment because we are comparing different minlen's.
     int32_t ic = (int32_t)(ip - ibase);
-    if ((ic > (maxlen / 8)) && (oc < 2 * ic)) {
-      // In case that we are testing 4 bytes vs 3 bytes,
-      // prefer the earlier (based on experiments).
-      //return 1 + force_3b_shift;
-      // Finally we use the next one, based on experiments
-      // with python-blosc2.
+    if ((clevel != 9) && (ic > (maxlen / 8)) && (oc < 2 * ic)) {
       return oc;
     }
 
@@ -530,12 +524,15 @@ int blosclz_compress(const int clevel, const void* input, int length,
   op_limit = op + maxout;
 
   // Minimum lengths for encoding
-  unsigned minlen_[10] = {0, 16, 12, 11, 10, 9, 8, 7, 6, 4};
+  //unsigned minlen_[10] = {0, 16, 12, 11, 10, 9, 8, 7, 6, 4};
+  unsigned minlen_[10] = {0, 4, 4, 4, 4, 4, 4, 4, 4, 4};
+  unsigned minlen = minlen_[clevel];
 
   // Minimum compression ratios for initiating encoding
-  double cratio_[10] = {0, 2, 2, 2, 2, 1.8, 1.6, 1.4, 1.2, 1.1};
+  //double cratio_[10] = {0, 2, 2, 2, 2, 1.8, 1.6, 1.4, 1.2, 1.1};
+  double cratio_[10] = {0, 1.2, 1.2, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1};
 
-  uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
+  uint8_t hashlog_[10] = {0, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG,
                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[clevel];
   // Initialize the hash table to distances of 0
@@ -555,18 +552,17 @@ int blosclz_compress(const int clevel, const void* input, int length,
    * eventually discard those that are small (take too long to decompress).
    * This process is called _entropy probing_.
    */
-  int ipshift = 4;
+  const int ipshift = 4;
   int maxlen;  // maximum length for entropy probing
-  int csize_3b;
-  int csize_4b;
+  int csize;
   double cratio = 0;
   switch (clevel) {
     case 1:
     case 2:
     case 3:
       maxlen = length / 8;
-      csize_4b = get_csize(ibase, maxlen, false);
-      cratio = (double)maxlen / csize_4b;
+      csize = get_csize(ibase, maxlen, minlen, clevel);
+      cratio = (double)maxlen / csize;
       break;
     case 4:
     case 5:
@@ -574,24 +570,23 @@ int blosclz_compress(const int clevel, const void* input, int length,
     case 7:
     case 8:
       maxlen = length / 8;
-      csize_4b = get_csize(ibase, maxlen, false);
-      cratio = (double)maxlen / csize_4b;
+      csize = get_csize(ibase, maxlen, minlen, clevel);
+      cratio = (double)maxlen / csize;
       break;
     case 9:
-      // case 9 is special.  we need to assess the optimal shift
-      // maxlen can be quite less here because the blocksize is larger
-      maxlen = length / 16;
-      //csize_3b = get_csize(ibase, maxlen, true);
-      csize_4b = get_csize(ibase, maxlen, false);
-      //ipshift = (csize_3b < csize_4b) ? 3 : 4;
-      //cratio = (csize_3b < csize_4b) ? ((double)maxlen / csize_3b) : ((double)maxlen / csize_4b);
-      cratio = (double)maxlen / csize_4b;
+      // case 9 is special.  we need to assess the optimal minlen (4 o 5).
+      // maxlen can be quite less here because the blocksize is larger.
+      maxlen = length / 32;
+      int csize_5 = get_csize(ibase, maxlen, 5, clevel);
+      csize = get_csize(ibase, maxlen, 4, clevel);
+      minlen = (csize_5 <= csize) ? 5 : 4;
+      cratio = (csize_5 <= csize) ? ((double)maxlen / csize_5) : ((double)maxlen / csize);
       break;
     default:
       break;
   }
   // discard probes with small compression ratios (too expensive)
-  if (cratio < cratio_ [clevel]) {
+  if (cratio < cratio_[clevel]) {
     goto out;
   }
 
@@ -647,12 +642,9 @@ int blosclz_compress(const int clevel, const void* input, int length,
     ip -= ipshift;
 
     unsigned len = (int)(ip - anchor);
-    // If match is close, let's reduce the minimum length to encode it
-    unsigned minlen = (clevel == 9) ? ipshift : minlen_[clevel];
 
     // Encoding short lengths is expensive during decompression
-    // Encode only for reasonable lengths (extensive experiments done)
-    if (len < minlen || (len <= 5 && distance >= MAX_DISTANCE)) {
+    if (len < minlen) {
       LITERAL(ip, op, op_limit, anchor, copy)
       continue;
     }
@@ -725,7 +717,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
 }
 
 // See https://habr.com/en/company/yandex/blog/457612/
-#ifdef __AVX2__
+#if defined(__AVX2__)
 
 #if defined(_MSC_VER)
 #define ALIGNED_(x) __declspec(align(x))
@@ -861,7 +853,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
       }
       else {
         // general copy with any overlap
-#ifdef __AVX2__
+#if defined(__AVX2__)
         if (op - ref <= 16) {
           // This is not faster on a combination of compilers (clang, gcc, icc) or machines, but
           // it is not slower either.  Let's activate here for experimentation.
@@ -870,7 +862,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         else {
 #endif
           op = copy_match(op, ref, (unsigned) len);
-#ifdef __AVX2__
+#if defined(__AVX2__)
         }
 #endif
       }

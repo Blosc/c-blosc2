@@ -101,12 +101,12 @@ static char *test_delta(void) {
                            dest, (size_t)size + BLOSC_MAX_OVERHEAD);
   if ((typesize == 12) || (typesize == 15) || (typesize == 24)) {
     // For typesizes 12, 15 and 24 we make an exception and allow less compression
-    if ((2 * cbytes2) > (3 * cbytes)) {
+    if ((2 * cbytes2) > (4 * cbytes)) {
       fprintf(stderr, "Failed test for DELTA and typesize: %d\n", typesize);
       fprintf(stderr, "Size with no DELTA: %d.  Size with DELTA: %d\n",
               cbytes, cbytes2);
       mu_assert("ERROR: DELTA does not work correctly",
-                (2 * cbytes2) < (3 * cbytes));
+                (2 * cbytes2) < (4 * cbytes));
     }
   }
   else if (cbytes2 > cbytes) {

@@ -97,7 +97,7 @@ static char *test_clevel(void) {
   setenv("BLOSC_CLEVEL", "9", 0);
   cbytes2 = blosc_compress(clevel, doshuffle, typesize, size, src,
                            dest, size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: BLOSC_CLEVEL does not work correctly", cbytes2 < cbytes);
+  mu_assert("ERROR: BLOSC_CLEVEL does not work correctly", cbytes2 != cbytes);
 
   /* Reset envvar */
   unsetenv("BLOSC_CLEVEL");

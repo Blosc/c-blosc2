@@ -195,7 +195,7 @@ if(COMPILER_SUPPORT_AVX2)
                 PROPERTIES COMPILE_FLAGS "/arch:AVX2")
     else()
         set_source_files_properties(
-                shuffle-avx2.c bitshuffle-avx2.c blosclz.c fastcopy.c
+                shuffle-avx2.c bitshuffle-avx2.c blosclz.c
                 PROPERTIES COMPILE_FLAGS -mavx2)
     endif()
 
