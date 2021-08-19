@@ -95,8 +95,8 @@ void init_buffer(void* src, size_t size, int rshift) {
      * _src[i] = 0x01020304;
      * _src[i] = i * 1/.3;
      * _src[i] = i; */
-      _src[i] = rand() >> (32 - rshift);
-    //_src[i] = get_value(i, rshift);
+    //_src[i] = rand() >> (32 - rshift);
+    _src[i] = get_value(i, rshift);
   }
 }
 

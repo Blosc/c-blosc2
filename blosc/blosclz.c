@@ -255,13 +255,17 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
   }                                                     \
 }
 
-#define LITERAL2(ip, oc, anchor, copy) {                \
+#define LITERAL2(ip, ipbase, limit, oc, anchor, copy) { \
   oc++; anchor++;                                       \
   ip = anchor;                                          \
   copy++;                                               \
   if (BLOSCLZ_UNLIKELY(copy == MAX_COPY)) {             \
     copy = 0;                                           \
     oc++;                                               \
+  }                                                     \
+  ic = (int32_t)(ip - ipbase);                          \
+  if (ic > limit && oc < 1.2 * ic) {                    \
+    goto out;                                           \
   }                                                     \
 }
 
@@ -315,9 +319,9 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 
 
 // Get the compressed size of a buffer.  Useful for testing compression ratios for high clevels.
-static int get_csize(uint8_t* ibase, int maxlen, int minlen, int clevel, int ipshift) {
-  uint32_t maxlen8 = maxlen / 8;
+static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int clevel, int ipshift) {
   uint8_t* ip = ibase;
+  int32_t ic = 0;
   int32_t oc = 0;
   uint8_t* ip_bound = ibase + maxlen - 1;
   uint8_t* ip_limit = ibase + maxlen - 12;
@@ -325,6 +329,7 @@ static int get_csize(uint8_t* ibase, int maxlen, int minlen, int clevel, int ips
   uint32_t hval;
   uint32_t seq;
   uint8_t copy;
+  uint32_t limit = (maxlen > 4096) ? 4096 : maxlen;
 
   // Initialize the hash table to distances of 0
   memset(htab, 0, (1U << HASH_LOG2) * sizeof(uint32_t));
@@ -351,7 +356,7 @@ static int get_csize(uint8_t* ibase, int maxlen, int minlen, int clevel, int ips
     htab[hval] = (uint32_t) (anchor - ibase);
 
     if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
-      LITERAL2(ip, oc, anchor, copy)
+      LITERAL2(ip, ibase, limit, oc, anchor, copy)
       continue;
     }
 
@@ -361,7 +366,7 @@ static int get_csize(uint8_t* ibase, int maxlen, int minlen, int clevel, int ips
     }
     else {
       /* no luck, copy as a literal */
-      LITERAL2(ip, oc, anchor, copy)
+      LITERAL2(ip, ibase, limit, oc, anchor, copy)
       continue;
     }
 
@@ -377,11 +382,11 @@ static int get_csize(uint8_t* ibase, int maxlen, int minlen, int clevel, int ips
     ip -= ipshift;
     unsigned len = (int)(ip - anchor);
     if (len < minlen) {
-      LITERAL2(ip, oc, anchor, copy)
+      LITERAL2(ip, ibase, limit, oc, anchor, copy)
       continue;
     }
 
-    /* if we have'nt copied anything, adjust the output counter */
+    /* if we haven't copied anything, adjust the output counter */
     if (!copy)
       oc--;
     /* reset literal counter */
@@ -412,30 +417,20 @@ static int get_csize(uint8_t* ibase, int maxlen, int minlen, int clevel, int ips
     /* assuming literal copy */
     oc++;
 
-    int32_t ic = (int32_t)(ip - ibase);
-    if (clevel == 9) {
-      // Exit as soon as we have a decent sample to compare with
-      if ((ic > maxlen8) || (ic > 4096)) {
-        return oc;
-      }
-    }
-    else {
-      // Exit early if we are detecting compression.
-      // We cannot do that for clevel==9 because we need a better
-      // assessment because we are comparing different minlen's.
-      if ((ic > maxlen8) && (oc < 2 * ic)) {
-        return oc;
-      }
+    ic = (int32_t)(ip - ibase);
+    if (ic > limit && oc < 1.2 * ic) {
+      goto out;
     }
 
   }
 
-  return (int)oc;
+out:
+  return (double)ic / (double)oc;
 }
 
 
 int blosclz_compress(const int clevel, const void* input, int length,
-                     void* output, int maxout) {
+                     void* output, int maxout, int typesize) {
   uint8_t* ibase = (uint8_t*)input;
   uint8_t* ip = ibase;
   uint8_t* ip_bound = ibase + length - 1;
@@ -455,7 +450,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
   // Minimum compression ratios for initiating encoding
   // The next parameters have been extensively fine tuned for large and small cratios
-  double cratio_[10] = {0, 4, 4, 4, 3, 3, 1.6, 1.4, 1.2, 1.1};
+  double cratio_[10] = {0, 4, 4, 4, 2, 1.2, 1.2, 1.2, 1.2, 1.1};
 
   uint8_t hashlog_[10] = {0, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG,
                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
@@ -477,45 +472,16 @@ int blosclz_compress(const int clevel, const void* input, int length,
    * This process is called _entropy probing_.
    */
   const int ipshift = 3;
-  int maxlen;  // maximum length for entropy probing
-  int csize;
-  int csize_4;
-  double cratio = 0;
   unsigned minlen = minlen_[clevel];
-  switch (clevel) {
-    case 1:
-    case 2:
-    case 3:
-    case 4:
-    case 5:
-      maxlen = length / 8;
-      csize = get_csize(ibase, maxlen, minlen, clevel, ipshift);
-      cratio = (double)maxlen / csize;
-      break;
-    case 6:
-    case 7:
-    case 8:
-      maxlen = length / 4;
-      csize = get_csize(ibase, maxlen, minlen, clevel, ipshift);
-      cratio = (double)maxlen / csize;
-      //printf("cr: %.2f; ", cratio);
-      //cratio = 3;
-      break;
-    case 9:
-      maxlen = length / 4;
-      // case 9 is special.  we need to assess the optimal minlen (3 o 4).
-      // maxlen can be quite less here because the blocksize is larger.
-      csize_4 = get_csize(ibase, maxlen, 4, clevel, ipshift);
-      csize = get_csize(ibase, maxlen, 3, clevel, ipshift);
-      minlen = (csize_4 <= csize) ? 4 : 3;
-      cratio = (csize_4 <= csize) ? ((double)maxlen / csize_4) : ((double)maxlen / csize);
-      break;
-    default:
-      break;
-  }
-  // discard probes with small compression ratios (too expensive)
-  if (cratio < cratio_[clevel]) {
-    goto out;
+  if (clevel < 9) {
+    // Only use entropy probing for clevel < 9
+    int maxlen = length / typesize;
+    int shift = length - maxlen;
+    double cratio = get_cratio(ibase + shift, maxlen, minlen, clevel, ipshift);
+    // discard probes with small compression ratios (too expensive)
+    if (cratio < cratio_[clevel]) {
+      goto out;
+    }
   }
 
   /* we start with literal copy */
