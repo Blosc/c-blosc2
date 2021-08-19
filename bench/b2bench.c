@@ -39,8 +39,8 @@
 
 int nchunks = NCHUNKS;
 int niter = 1;
-int niter_c = 3;
-int niter_d = 3;
+int niter_c = 1;
+int niter_d = 1;
 /* default number of iterations */
 double totalsize = 0.;          /* total compressed/decompressed size */
 
@@ -94,9 +94,9 @@ void init_buffer(void* src, size_t size, int rshift) {
      * _src[i] = 0x01010101;
      * _src[i] = 0x01020304;
      * _src[i] = i * 1/.3;
-     * _src[i] = i;
-     * _src[i] = rand() >> (32-rshift); */
-    _src[i] = get_value(i, rshift);
+     * _src[i] = i; */
+      _src[i] = rand() >> (32 - rshift);
+    //_src[i] = get_value(i, rshift);
   }
 }
 
@@ -317,8 +317,8 @@ int main(int argc, char* argv[]) {
   int nthreads = 8;                     /* The number of threads */
   int size = 8 * MB;                    /* Buffer size */
   int elsize = 4;                       /* Datatype size */
-  int rshift = 19;                      /* Significant bits */
-  unsigned int workingset = 512 * MB;            /* The maximum allocated memory */
+  int rshift = 10;                      /* Significant bits */
+  unsigned int workingset = 256 * MB;            /* The maximum allocated memory */
   int nthreads_, size_, elsize_, rshift_, i;
   FILE* output_file = stdout;
   blosc_timestamp_t last, current;

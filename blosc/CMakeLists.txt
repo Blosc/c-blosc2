@@ -195,7 +195,7 @@ if(COMPILER_SUPPORT_AVX2)
                 PROPERTIES COMPILE_FLAGS "/arch:AVX2")
     else()
         set_source_files_properties(
-                shuffle-avx2.c bitshuffle-avx2.c blosclz.c
+                shuffle-avx2.c bitshuffle-avx2.c
                 PROPERTIES COMPILE_FLAGS -mavx2)
     endif()
 
@@ -234,10 +234,6 @@ if(COMPILER_SUPPORT_ALTIVEC)
             SOURCE shuffle.c
             APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_ALTIVEC_ENABLED)
 endif()
-
-# set_property(
-#         SOURCE blosclz.c
-#         APPEND PROPERTY COMPILE_DEFINITIONS WITHGPERFTOOLS)
 
 # When the option has been selected to compile the test suite,
 # compile an additional version of blosc2_static which exports
