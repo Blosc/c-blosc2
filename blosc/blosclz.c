@@ -63,41 +63,7 @@
 #if defined(__AVX2__)
 static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
     uint8_t x = ip[-1];
-    /* safe because the outer check against ip limit */
-    if (ip < (ip_bound - sizeof(int64_t))) {
-        int64_t value, value2;
-        /* Broadcast the value for every byte in a 64-bit register */
-        memset(&value, x, 8);
-#if defined(BLOSC_STRICT_ALIGN)
-        memcpy(&value2, ref, 8);
-#else
-        value2 = ((int64_t*)ref)[0];
-#endif
-        if (value != value2) {
-            /* Return the byte that starts to differ */
-            while (*ref++ == x) ip++;
-            return ip;
-        }
-        else {
-            ip += 8;
-            ref += 8;
-        }
-    }
-    if (ip < (ip_bound - sizeof(__m128i))) {
-        __m128i value, value2, cmp;
-        /* Broadcast the value for every byte in a 128-bit register */
-        memset(&value, x, sizeof(__m128i));
-        value2 = _mm_loadu_si128((__m128i *) ref);
-        cmp = _mm_cmpeq_epi32(value, value2);
-        if (_mm_movemask_epi8(cmp) != 0xFFFF) {
-            /* Return the byte that starts to differ */
-            while (*ref++ == x) ip++;
-            return ip;
-        } else {
-            ip += sizeof(__m128i);
-            ref += sizeof(__m128i);
-        }
-    }
+
     while (ip < (ip_bound - (sizeof(__m256i)))) {
         __m256i value, value2, cmp;
         /* Broadcast the value for every byte in a 256-bit register */
@@ -118,32 +84,12 @@ static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *
     while ((ip < ip_bound) && (*ref++ == x)) ip++;
     return ip;
 }
+#endif
 
-#elif defined(__SSE2__)
-
+#if defined(__SSE2__)
 static uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
 
-  if (ip < (ip_bound - sizeof(int64_t))) {
-    int64_t value, value2;
-    /* Broadcast the value for every byte in a 64-bit register */
-    memset(&value, x, 8);
-#if defined(BLOSC_STRICT_ALIGN)
-    memcpy(&value2, ref, 8);
-#else
-    value2 = ((int64_t*)ref)[0];
-#endif
-    if (value != value2) {
-      /* Return the byte that starts to differ */
-      while (*ref++ == x) ip++;
-      return ip;
-    }
-    else {
-      ip += 8;
-      ref += 8;
-    }
-  }
-  /* safe because the outer check against ip limit */
   while (ip < (ip_bound - sizeof(__m128i))) {
     __m128i value, value2, cmp;
     /* Broadcast the value for every byte in a 128-bit register */
@@ -165,7 +111,8 @@ static uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *
   return ip;
 }
 
-#else
+#endif
+
 
 static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
@@ -194,8 +141,6 @@ static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref
   return ip;
 }
 
-#endif
-
 
 /* Return the byte that starts to differ */
 static uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
@@ -222,23 +167,14 @@ static uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *r
 static uint8_t *get_match_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   __m128i value, value2, cmp;
 
-  if (ip < (ip_bound - sizeof(int64_t))) {
-    if (*(int64_t *) ref != *(int64_t *) ip) {
-      /* Return the byte that starts to differ */
-      while (*ref++ == *ip++) {}
-      return ip;
-    } else {
-      ip += sizeof(int64_t);
-      ref += sizeof(int64_t);
-    }
-  }
   while (ip < (ip_bound - sizeof(__m128i))) {
     value = _mm_loadu_si128((__m128i *) ip);
     value2 = _mm_loadu_si128((__m128i *) ref);
     cmp = _mm_cmpeq_epi32(value, value2);
     if (_mm_movemask_epi8(cmp) != 0xFFFF) {
       /* Return the byte that starts to differ */
-      return get_match(ip, ip_bound, ref);
+      while (*ref++ == *ip++) {}
+      return ip;
     }
     else {
       ip += sizeof(__m128i);
@@ -255,30 +191,6 @@ static uint8_t *get_match_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
 #if defined(__AVX2__)
 static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
 
-  if (ip < (ip_bound - sizeof(int64_t))) {
-    if (*(int64_t *) ref != *(int64_t *) ip) {
-      /* Return the byte that starts to differ */
-      while (*ref++ == *ip++) {}
-      return ip;
-    } else {
-      ip += sizeof(int64_t);
-      ref += sizeof(int64_t);
-    }
-  }
-  if (ip < (ip_bound - sizeof(__m128i))) {
-    __m128i value, value2, cmp;
-    value = _mm_loadu_si128((__m128i *) ip);
-    value2 = _mm_loadu_si128((__m128i *) ref);
-    cmp = _mm_cmpeq_epi32(value, value2);
-    if (_mm_movemask_epi8(cmp) != 0xFFFF) {
-      /* Return the byte that starts to differ */
-      return get_match_16(ip, ip_bound, ref);
-    }
-    else {
-      ip += sizeof(__m128i);
-      ref += sizeof(__m128i);
-    }
-  }
   while (ip < (ip_bound - sizeof(__m256i))) {
     __m256i value, value2, cmp;
     value = _mm256_loadu_si256((__m256i *) ip);
@@ -304,16 +216,22 @@ static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
 static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* ref, bool run) {
   if (BLOSCLZ_UNLIKELY(run)) {
 #if defined(__AVX2__)
-    ip = get_run_32(ip, ip_bound, ref);
+    // Extensive experiments on AMD Ryzen3 say that regular get_run is faster
+    // ip = get_run_32(ip, ip_bound, ref);
+    ip = get_run(ip, ip_bound, ref);
 #elif defined(__SSE2__)
-    ip = get_run_16(ip, ip_bound, ref);
+    // Extensive experiments on AMD Ryzen3 say that regular get_run is faster
+    // ip = get_run_16(ip, ip_bound, ref);
+    ip = get_run(ip, ip_bound, ref);
 #else
     ip = get_run(ip, ip_bound, ref);
 #endif
   }
   else {
 #if defined(__AVX2__)
-    ip = get_match_32(ip, ip_bound, ref);
+    // Extensive experiments on AMD Ryzen3 say that regular get_match_16 is faster
+    // ip = get_match_32(ip, ip_bound, ref);
+    ip = get_match_16(ip, ip_bound, ref);
 #elif defined(__SSE2__)
     ip = get_match_16(ip, ip_bound, ref);
 #else
@@ -397,19 +315,19 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 
 
 // Get the compressed size of a buffer.  Useful for testing compression ratios for high clevels.
-static int get_csize(uint8_t* ibase, int maxlen, int minlen, int clevel) {
+static int get_csize(uint8_t* ibase, int maxlen, int minlen, int clevel, int ipshift) {
   uint32_t maxlen8 = maxlen / 8;
   uint8_t* ip = ibase;
   int32_t oc = 0;
   uint8_t* ip_bound = ibase + maxlen - 1;
   uint8_t* ip_limit = ibase + maxlen - 12;
-  uint32_t htab[1U << (uint8_t)HASH_LOG];
+  uint32_t htab[1U << (uint8_t)HASH_LOG2];
   uint32_t hval;
   uint32_t seq;
   uint8_t copy;
 
   // Initialize the hash table to distances of 0
-  memset(htab, 0, (1U << HASH_LOG) * sizeof(uint32_t));
+  memset(htab, 0, (1U << HASH_LOG2) * sizeof(uint32_t));
 
   /* we start with literal copy */
   copy = 4;
@@ -423,7 +341,7 @@ static int get_csize(uint8_t* ibase, int maxlen, int minlen, int clevel) {
 
     /* find potential match */
     seq = BLOSCLZ_READU32(ip);
-    HASH_FUNCTION(hval, seq, HASH_LOG)
+    HASH_FUNCTION(hval, seq, HASH_LOG2)
     ref = ibase + htab[hval];
 
     /* calculate distance to the match */
@@ -456,7 +374,7 @@ static int get_csize(uint8_t* ibase, int maxlen, int minlen, int clevel) {
     /* get runs or matches; zero distance means a run */
     ip = get_run_or_match(ip, ip_bound, ref, !distance);
 
-    ip -= 4;
+    ip -= ipshift;
     unsigned len = (int)(ip - anchor);
     if (len < minlen) {
       LITERAL2(ip, oc, anchor, copy)
@@ -486,10 +404,10 @@ static int get_csize(uint8_t* ibase, int maxlen, int minlen, int clevel) {
 
     /* update the hash at match boundary */
     seq = BLOSCLZ_READU32(ip);
-    HASH_FUNCTION(hval, seq, HASH_LOG)
+    HASH_FUNCTION(hval, seq, HASH_LOG2)
     htab[hval] = (uint32_t)(ip++ - ibase);
     seq >>= 8U;
-    HASH_FUNCTION(hval, seq, HASH_LOG)
+    HASH_FUNCTION(hval, seq, HASH_LOG2)
     htab[hval] = (uint32_t) (ip++ - ibase);
     /* assuming literal copy */
     oc++;
@@ -497,7 +415,7 @@ static int get_csize(uint8_t* ibase, int maxlen, int minlen, int clevel) {
     int32_t ic = (int32_t)(ip - ibase);
     if (clevel == 9) {
       // Exit as soon as we have a decent sample to compare with
-      if (ic > maxlen8) {
+      if ((ic > maxlen8) || (ic > 4096)) {
         return oc;
       }
     }
@@ -532,13 +450,12 @@ int blosclz_compress(const int clevel, const void* input, int length,
   op_limit = op + maxout;
 
   // Minimum lengths for encoding
-  //unsigned minlen_[10] = {0, 16, 12, 11, 10, 9, 8, 7, 6, 4};
-  unsigned minlen_[10] = {0, 4, 4, 4, 4, 4, 4, 4, 4, 4};
-  unsigned minlen = minlen_[clevel];
+  // The next parameters have been extensively fine tuned for large and small cratios
+  unsigned minlen_[10] = {0, 16, 16, 16, 3, 3, 3, 3, 3, 3};
 
   // Minimum compression ratios for initiating encoding
-  //double cratio_[10] = {0, 2, 2, 2, 2, 1.8, 1.6, 1.4, 1.2, 1.1};
-  double cratio_[10] = {0, 1.2, 1.2, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1};
+  // The next parameters have been extensively fine tuned for large and small cratios
+  double cratio_[10] = {0, 4, 4, 4, 3, 3, 1.6, 1.4, 1.2, 1.1};
 
   uint8_t hashlog_[10] = {0, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG,
                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
@@ -553,42 +470,45 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
   /* When we go back in a match (shift), we obtain quite different compression properties.
    * It looks like 4 is more useful in combination with bitshuffle and small typesizes
-   * (compress better and faster in e.g. `b2bench blosclz bitshuffle single 6 6291456 1 19`).
-   * Fallback to 4 because it provides more consistent results on small itemsizes.
+   * Fallback to 3 because it provides more consistent results on small and large cratios.
    *
    * In this block we also check cratios for the beginning of the buffers and
    * eventually discard those that are small (take too long to decompress).
    * This process is called _entropy probing_.
    */
-  const int ipshift = 4;
+  const int ipshift = 3;
   int maxlen;  // maximum length for entropy probing
   int csize;
+  int csize_4;
   double cratio = 0;
+  unsigned minlen = minlen_[clevel];
   switch (clevel) {
     case 1:
     case 2:
     case 3:
-      maxlen = length / 8;
-      csize = get_csize(ibase, maxlen, minlen, clevel);
-      cratio = (double)maxlen / csize;
-      break;
     case 4:
     case 5:
+      maxlen = length / 8;
+      csize = get_csize(ibase, maxlen, minlen, clevel, ipshift);
+      cratio = (double)maxlen / csize;
+      break;
     case 6:
     case 7:
     case 8:
-      maxlen = length / 8;
-      csize = get_csize(ibase, maxlen, minlen, clevel);
+      maxlen = length / 4;
+      csize = get_csize(ibase, maxlen, minlen, clevel, ipshift);
       cratio = (double)maxlen / csize;
+      //printf("cr: %.2f; ", cratio);
+      //cratio = 3;
       break;
     case 9:
-      // case 9 is special.  we need to assess the optimal minlen (4 o 5).
+      maxlen = length / 4;
+      // case 9 is special.  we need to assess the optimal minlen (3 o 4).
       // maxlen can be quite less here because the blocksize is larger.
-      maxlen = length / 32;
-      int csize_5 = get_csize(ibase, maxlen, 5, clevel);
-      csize = get_csize(ibase, maxlen, 4, clevel);
-      minlen = (csize_5 <= csize) ? 5 : 4;
-      cratio = (csize_5 <= csize) ? ((double)maxlen / csize_5) : ((double)maxlen / csize);
+      csize_4 = get_csize(ibase, maxlen, 4, clevel, ipshift);
+      csize = get_csize(ibase, maxlen, 3, clevel, ipshift);
+      minlen = (csize_4 <= csize) ? 4 : 3;
+      cratio = (csize_4 <= csize) ? ((double)maxlen / csize_4) : ((double)maxlen / csize);
       break;
     default:
       break;

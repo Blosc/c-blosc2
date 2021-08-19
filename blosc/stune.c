@@ -106,14 +106,14 @@ void blosc_stune_next_blocksize(blosc2_context *context) {
     // For performance reasons, do not exceed 256 KB (it must fit in L2 cache)
     switch (clevel) {
       case 1:
-        blocksize = 64 * 1024;
-        break;
       case 2:
-        blocksize = 128 * 1024;
+        blocksize = 32 * 1024;
         break;
       case 3:
       case 4:
       case 5:
+        blocksize = 64 * 1024;
+        break;
       case 6:
       case 7:
       case 8:
@@ -121,7 +121,7 @@ void blosc_stune_next_blocksize(blosc2_context *context) {
         break;
       case 9:
       default:
-        blocksize = 512 * 1024;
+        blocksize = 256 * 1024;
         break;
     }
     // Multiply by typesize so as to get proper split sizes
