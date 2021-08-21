@@ -469,7 +469,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
   int maxlen = length / 4;
   // Start probing somewhere inside the buffer
   int shift = length - maxlen;
-  // Actual entropy probe!
+  // Actual entropy probing!
   double cratio = get_cratio(ibase + shift, maxlen, minlen, ipshift);
   // discard probes with small compression ratios (too expensive)
   if (cratio < cratio_[clevel]) {
