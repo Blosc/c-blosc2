@@ -60,10 +60,8 @@ static int split_block(blosc2_context* context, int32_t typesize,
 
   int compcode = context->compcode;
   return (
-          // Fast codecs like blosclz always prefer to always split.
-          // However, lz4 prefers in general not to split.
-          // ((compcode == BLOSC_BLOSCLZ) || (compcode == BLOSC_LZ4)) &&
-          (compcode == BLOSC_BLOSCLZ) &&
+          // Fast codecs like blosclz and lz4 always prefer to always split
+          ((compcode == BLOSC_BLOSCLZ) || (compcode == BLOSC_LZ4)) &&
           (typesize <= MAX_STREAMS) &&
           (blocksize / typesize) >= BLOSC_MIN_BUFFERSIZE);
 }
