@@ -255,7 +255,7 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
   }                                                     \
 }
 
-#define LITERAL2(ip, ipbase, limit, oc, anchor, copy) { \
+#define LITERAL2(ip, anchor, copy) {                    \
   oc++; anchor++;                                       \
   ip = anchor;                                          \
   copy++;                                               \
@@ -263,7 +263,6 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
     copy = 0;                                           \
     oc++;                                               \
   }                                                     \
-  ic = (int32_t)(ip - ipbase);                          \
 }
 
 #define MATCH_SHORT(op, op_limit, len, distance) {      \
@@ -315,15 +314,15 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 }
 
 
-// Get the compressed size of a buffer.  Useful for testing compression ratios for high clevels.
-static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int clevel, int ipshift) {
+// Get a guess for the compressed size of a buffer
+static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift) {
   uint8_t* ip = ibase;
-  int32_t ic = 0;
   int32_t oc = 0;
   uint32_t htab[1U << (uint8_t)HASH_LOG2];
   uint32_t hval;
   uint32_t seq;
   uint8_t copy;
+  // Make a tradeoff between testing too much and too little
   uint32_t limit = (maxlen > 4096) ? 4096 : maxlen;
   uint8_t* ip_bound = ibase + limit - 1;
   uint8_t* ip_limit = ibase + limit - 12;
@@ -353,7 +352,7 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int clevel, int
     htab[hval] = (uint32_t) (anchor - ibase);
 
     if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
-      LITERAL2(ip, ibase, limit, oc, anchor, copy)
+      LITERAL2(ip, anchor, copy)
       continue;
     }
 
@@ -363,7 +362,7 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int clevel, int
     }
     else {
       /* no luck, copy as a literal */
-      LITERAL2(ip, ibase, limit, oc, anchor, copy)
+      LITERAL2(ip, anchor, copy)
       continue;
     }
 
@@ -379,7 +378,7 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int clevel, int
     ip -= ipshift;
     unsigned len = (int)(ip - anchor);
     if (len < minlen) {
-      LITERAL2(ip, ibase, limit, oc, anchor, copy)
+      LITERAL2(ip, anchor, copy)
       continue;
     }
 
@@ -413,18 +412,17 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int clevel, int
     htab[hval] = (uint32_t) (ip++ - ibase);
     /* assuming literal copy */
     oc++;
-
-    ic = (int32_t)(ip - ibase);
-
   }
 
+  double ic;
 out:
-  return (double)ic / (double)oc;
+  ic = (double)(ip - ibase);
+  return ic / (double)oc;
 }
 
 
 int blosclz_compress(const int clevel, const void* input, int length,
-                     void* output, int maxout, int typesize) {
+                     void* output, int maxout) {
   uint8_t* ibase = (uint8_t*)input;
   uint8_t* ip = ibase;
   uint8_t* ip_bound = ibase + length - 1;
@@ -441,12 +439,13 @@ int blosclz_compress(const int clevel, const void* input, int length,
   // Minimum lengths for encoding
   // The next parameters have been extensively fine tuned for large and small cratios
   unsigned minlen_[10] = {0, 16, 16, 16, 3, 3, 3, 3, 3, 3};
+  unsigned minlen = minlen_[clevel];
 
   // Minimum compression ratios for initiating encoding
   // The next parameters have been extensively fine tuned for large and small cratios
-  double cratio_[10] = {0, 4, 4, 4, 2, 1.2, 1.2, 1.2, 1.2, 1.1};
+  double cratio_[10] = {0, 4, 4, 4, 2, 1.2, 1.2, 1.2, 1.1, 1.0};
 
-  uint8_t hashlog_[10] = {0, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG,
+  uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[clevel];
   // Initialize the hash table to distances of 0
@@ -466,10 +465,12 @@ int blosclz_compress(const int clevel, const void* input, int length,
    * This process is called _entropy probing_.
    */
   const int ipshift = 3;
-  unsigned minlen = minlen_[clevel];
-  int maxlen = length / typesize;
+  // Experiments say that checking 1/4 of the buffer is enough to figure out approx cratio
+  int maxlen = length / 4;
+  // Start probing somewhere inside the buffer
   int shift = length - maxlen;
-  double cratio = get_cratio(ibase + shift, maxlen, minlen, clevel, ipshift);
+  // Actual entropy probe!
+  double cratio = get_cratio(ibase + shift, maxlen, minlen, ipshift);
   // discard probes with small compression ratios (too expensive)
   if (cratio < cratio_[clevel]) {
     goto out;

@@ -317,7 +317,7 @@ int main(int argc, char* argv[]) {
   int nthreads = 8;                     /* The number of threads */
   int size = 8 * MB;                    /* Buffer size */
   int elsize = 4;                       /* Datatype size */
-  int rshift = 10;                      /* Significant bits */
+  int rshift = 19;                      /* Significant bits */
   unsigned int workingset = 256 * MB;            /* The maximum allocated memory */
   int nthreads_, size_, elsize_, rshift_, i;
   FILE* output_file = stdout;
