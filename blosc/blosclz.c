@@ -264,9 +264,6 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
     oc++;                                               \
   }                                                     \
   ic = (int32_t)(ip - ipbase);                          \
-  if (ic > limit && oc < 1.2 * ic) {                    \
-    goto out;                                           \
-  }                                                     \
 }
 
 #define MATCH_SHORT(op, op_limit, len, distance) {      \
@@ -323,13 +320,13 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int clevel, int
   uint8_t* ip = ibase;
   int32_t ic = 0;
   int32_t oc = 0;
-  uint8_t* ip_bound = ibase + maxlen - 1;
-  uint8_t* ip_limit = ibase + maxlen - 12;
   uint32_t htab[1U << (uint8_t)HASH_LOG2];
   uint32_t hval;
   uint32_t seq;
   uint8_t copy;
   uint32_t limit = (maxlen > 4096) ? 4096 : maxlen;
+  uint8_t* ip_bound = ibase + limit - 1;
+  uint8_t* ip_limit = ibase + limit - 12;
 
   // Initialize the hash table to distances of 0
   memset(htab, 0, (1U << HASH_LOG2) * sizeof(uint32_t));
@@ -418,9 +415,6 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int clevel, int
     oc++;
 
     ic = (int32_t)(ip - ibase);
-    if (ic > limit && oc < 1.2 * ic) {
-      goto out;
-    }
 
   }
 
@@ -473,15 +467,12 @@ int blosclz_compress(const int clevel, const void* input, int length,
    */
   const int ipshift = 3;
   unsigned minlen = minlen_[clevel];
-  if (clevel < 9) {
-    // Only use entropy probing for clevel < 9
-    int maxlen = length / typesize;
-    int shift = length - maxlen;
-    double cratio = get_cratio(ibase + shift, maxlen, minlen, clevel, ipshift);
-    // discard probes with small compression ratios (too expensive)
-    if (cratio < cratio_[clevel]) {
-      goto out;
-    }
+  int maxlen = length / typesize;
+  int shift = length - maxlen;
+  double cratio = get_cratio(ibase + shift, maxlen, minlen, clevel, ipshift);
+  // discard probes with small compression ratios (too expensive)
+  if (cratio < cratio_[clevel]) {
+    goto out;
   }
 
   /* we start with literal copy */
