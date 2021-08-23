@@ -452,9 +452,9 @@ int blosclz_compress(const int clevel, const void* input, int length,
     memcpy(cratio_, cratio2_, 10 * sizeof(double));
   }
   else {
-    unsigned minlen2_[] = {0, 16, 12, 11, 10, 9, 8, 7, 6, 5};
+    unsigned minlen2_[] = {0, 16, 8, 4, 4, 4, 4, 4, 4, 4};
     memcpy(minlen_, minlen2_, 10 * sizeof(unsigned));
-    double cratio2_[10] = {0, 2, 2, 2, 2, 1.8, 1.6, 1.4, 1.2, 1.1};
+    double cratio2_[10] = {0, 2, 2, 1.3, 1.3, 1.2, 1.2, 1.2, 1.1, 1.1};
     memcpy(cratio_, cratio2_, 10 * sizeof(double));
   }
   unsigned minlen = minlen_[clevel];
