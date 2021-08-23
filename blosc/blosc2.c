@@ -1043,7 +1043,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     }
     else if (context->compcode == BLOSC_BLOSCLZ) {
       cbytes = blosclz_compress(context->clevel, _src + j * neblock,
-                                (int)neblock, dest, (int)maxout);
+                                (int)neblock, dest, (int)maxout, context);
     }
     else if (context->compcode == BLOSC_LZ4) {
       void *hash_table = NULL;

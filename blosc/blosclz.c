@@ -422,7 +422,7 @@ out:
 
 
 int blosclz_compress(const int clevel, const void* input, int length,
-                     void* output, int maxout) {
+                     void* output, int maxout, blosc2_context* ctx) {
   uint8_t* ibase = (uint8_t*)input;
   uint8_t* ip = ibase;
   uint8_t* ip_bound = ibase + length - 1;
@@ -437,13 +437,27 @@ int blosclz_compress(const int clevel, const void* input, int length,
   op_limit = op + maxout;
 
   // Minimum lengths for encoding
-  // The next parameters have been extensively fine tuned for large and small cratios
-  unsigned minlen_[10] = {0, 16, 16, 16, 3, 3, 3, 3, 3, 3};
-  unsigned minlen = minlen_[clevel];
-
+  unsigned minlen_[10];
   // Minimum compression ratios for initiating encoding
+  double cratio_[10];
+  // BloscLZ always works better with splits.  However, we will make use of the
+  // !split_block flag in order to use another set of parameters more apt for low
+  // entropy data.
+  const int split_block = !((ctx->header_flags & 0x10) >> 4);
   // The next parameters have been extensively fine tuned for large and small cratios
-  double cratio_[10] = {0, 4, 4, 4, 2, 1.2, 1.2, 1.2, 1.1, 1.0};
+  if (split_block) {
+    unsigned minlen2_[] = {0, 16, 16, 16, 3, 3, 3, 3, 3, 3};
+    memcpy(minlen_, minlen2_, 10 * sizeof(unsigned));
+    double cratio2_[10] = {0, 4, 4, 4, 2, 1.2, 1.2, 1.2, 1.1, 1.0};
+    memcpy(cratio_, cratio2_, 10 * sizeof(unsigned));
+  }
+  else {
+    unsigned minlen2_[] = {0, 16, 12, 11, 10, 9, 8, 7, 6, 5};
+    memcpy(minlen_, minlen2_, 10 * sizeof(unsigned));
+    double cratio2_[10] = {0, 2, 2, 2, 2, 1.8, 1.6, 1.4, 1.2, 1.1};
+    memcpy(cratio_, cratio2_, 10 * sizeof(unsigned));
+  }
+  unsigned minlen = minlen_[clevel];
 
   uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
@@ -464,16 +478,19 @@ int blosclz_compress(const int clevel, const void* input, int length,
    * eventually discard those that are small (take too long to decompress).
    * This process is called _entropy probing_.
    */
-  const int ipshift = 3;
-  // Experiments say that checking 1/4 of the buffer is enough to figure out approx cratio
-  int maxlen = length / 4;
-  // Start probing somewhere inside the buffer
-  int shift = length - maxlen;
-  // Actual entropy probing!
-  double cratio = get_cratio(ibase + shift, maxlen, minlen, ipshift);
-  // discard probes with small compression ratios (too expensive)
-  if (cratio < cratio_[clevel]) {
-    goto out;
+  const int ipshift = (split_block) ? 3 : 4;
+
+  if (clevel < 9) {
+    // Experiments say that checking 1/4 of the buffer is enough to figure out approx cratio
+    int maxlen = length / 4;
+    // Start probing somewhere inside the buffer
+    int shift = length - maxlen;
+    // Actual entropy probing!
+    double cratio = get_cratio(ibase + shift, maxlen, minlen, ipshift);
+    // discard probes with small compression ratios (too expensive)
+    if (cratio < cratio_[clevel]) {
+      goto out;
+    }
   }
 
   /* we start with literal copy */

@@ -17,6 +17,7 @@
 
 #ifndef BLOSCLZ_H
 #define BLOSCLZ_H
+#include "context.h"
 
 #if defined (__cplusplus)
 extern "C" {
@@ -46,7 +47,7 @@ extern "C" {
 */
 
 int blosclz_compress(int opt_level, const void* input, int length,
-                     void* output, int maxout);
+                     void* output, int maxout, blosc2_context* ctx);
 
 /**
   Decompress a block of compressed data and returns the size of the
