@@ -318,7 +318,7 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift) {
   uint8_t* ip = ibase;
   int32_t oc = 0;
-  uint32_t htab[1U << (uint8_t)HASH_LOG2];
+  uint16_t htab[1U << (uint8_t)HASH_LOG2];
   uint32_t hval;
   uint32_t seq;
   uint8_t copy;
@@ -328,7 +328,7 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift) {
   uint8_t* ip_limit = ibase + limit - 12;
 
   // Initialize the hash table to distances of 0
-  memset(htab, 0, (1U << HASH_LOG2) * sizeof(uint32_t));
+  memset(htab, 0, (1U << HASH_LOG2) * sizeof(uint16_t));
 
   /* we start with literal copy */
   copy = 4;
@@ -349,7 +349,7 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift) {
     distance = (unsigned int)(anchor - ref);
 
     /* update hash table */
-    htab[hval] = (uint32_t) (anchor - ibase);
+    htab[hval] = (uint16_t) (anchor - ibase);
 
     if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
       LITERAL2(ip, anchor, copy)
@@ -406,10 +406,10 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift) {
     /* update the hash at match boundary */
     seq = BLOSCLZ_READU32(ip);
     HASH_FUNCTION(hval, seq, HASH_LOG2)
-    htab[hval] = (uint32_t)(ip++ - ibase);
+    htab[hval] = (uint16_t)(ip++ - ibase);
     seq >>= 8U;
     HASH_FUNCTION(hval, seq, HASH_LOG2)
-    htab[hval] = (uint32_t) (ip++ - ibase);
+    htab[hval] = (uint16_t) (ip++ - ibase);
     /* assuming literal copy */
     oc++;
   }
@@ -446,20 +446,20 @@ int blosclz_compress(const int clevel, const void* input, int length,
   const int split_block = !((ctx->header_flags & 0x10) >> 4);
   // The next parameters have been extensively fine tuned for large and small cratios
   if (split_block) {
-    unsigned minlen2_[] = {0, 16, 16, 16, 3, 3, 3, 3, 3, 3};
+    unsigned minlen2_[] = {0, 16, 8, 3, 3, 3, 3, 3, 3, 3};
     memcpy(minlen_, minlen2_, 10 * sizeof(unsigned));
-    double cratio2_[10] = {0, 4, 4, 4, 2, 1.2, 1.2, 1.2, 1.1, 1.0};
-    memcpy(cratio_, cratio2_, 10 * sizeof(unsigned));
+    double cratio2_[10] = {0, 4, 2, 1.3, 1.3, 1.2, 1.2, 1.2, 1.1, 1.1};
+    memcpy(cratio_, cratio2_, 10 * sizeof(double));
   }
   else {
     unsigned minlen2_[] = {0, 16, 12, 11, 10, 9, 8, 7, 6, 5};
     memcpy(minlen_, minlen2_, 10 * sizeof(unsigned));
     double cratio2_[10] = {0, 2, 2, 2, 2, 1.8, 1.6, 1.4, 1.2, 1.1};
-    memcpy(cratio_, cratio2_, 10 * sizeof(unsigned));
+    memcpy(cratio_, cratio2_, 10 * sizeof(double));
   }
   unsigned minlen = minlen_[clevel];
 
-  uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
+  uint8_t hashlog_[10] = {0, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG,
                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[clevel];
   // Initialize the hash table to distances of 0
@@ -479,18 +479,15 @@ int blosclz_compress(const int clevel, const void* input, int length,
    * This process is called _entropy probing_.
    */
   const int ipshift = (split_block) ? 3 : 4;
-
-  if (clevel < 9) {
-    // Experiments say that checking 1/4 of the buffer is enough to figure out approx cratio
-    int maxlen = length / 4;
-    // Start probing somewhere inside the buffer
-    int shift = length - maxlen;
-    // Actual entropy probing!
-    double cratio = get_cratio(ibase + shift, maxlen, minlen, ipshift);
-    // discard probes with small compression ratios (too expensive)
-    if (cratio < cratio_[clevel]) {
-      goto out;
-    }
+  // Experiments say that checking 1/4 of the buffer is enough to figure out approx cratio
+  int maxlen = length / 4;
+  // Start probing somewhere inside the buffer
+  int shift = length - maxlen;
+  // Actual entropy probing!
+  double cratio = get_cratio(ibase + shift, maxlen, minlen, ipshift);
+  // discard probes with small compression ratios (too expensive)
+  if (cratio < cratio_[clevel]) {
+    goto out;
   }
 
   /* we start with literal copy */
