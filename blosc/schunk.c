@@ -329,6 +329,11 @@ blosc2_schunk* blosc2_schunk_open(const char* urlpath) {
 int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* needs_free) {
   blosc2_frame_s* frame;
   int64_t cframe_len;
+
+  // Initialize defaults in case of errors
+  *dest = NULL;
+  *needs_free = false;
+
   if ((schunk->storage->contiguous == true) && (schunk->storage->urlpath == NULL)) {
     frame =  (blosc2_frame_s*)(schunk->frame);
     *dest = frame->cframe;
