@@ -223,9 +223,9 @@ static char* test_frame(void) {
   nbytes = schunk->nbytes;
   cbytes = schunk->cbytes;
   if (nchunks > 0) {
-    if (nbytes < 3 * cbytes)
+    if (nbytes < 10 * cbytes)
         printf("%ld -> %ld\n", nbytes, cbytes);
-    mu_assert("ERROR: bad compression ratio in frame", nbytes > 3 * cbytes);
+    mu_assert("ERROR: bad compression ratio in frame", nbytes > 10 * cbytes);
   }
 
   // Check that the chunks have been decompressed correctly
