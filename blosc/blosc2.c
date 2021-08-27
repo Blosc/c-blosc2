@@ -946,8 +946,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
                    const uint8_t* src, const int32_t offset, uint8_t* dest,
                    uint8_t* tmp, uint8_t* tmp2) {
   blosc2_context* context = thread_context->parent_context;
-  // BLOSCLZ codec almost never gets benefited from splitting blocks
-  int dont_split = context->compcode != BLOSC_BLOSCLZ && (context->header_flags & 0x10) >> 4;
+  int dont_split = (context->header_flags & 0x10) >> 4;
   int dict_training = context->use_dict && context->dict_cdict == NULL;
   int32_t j, neblock, nstreams;
   int32_t cbytes;                   /* number of compressed bytes in split */
@@ -1362,8 +1361,7 @@ static int blosc_d(
   uint8_t* filters = context->filters;
   uint8_t *tmp3 = thread_context->tmp4;
   int32_t compformat = (context->header_flags & (uint8_t)0xe0) >> 5u;
-  // BLOSCLZ codec almost never gets benefited from splitting blocks
-  int dont_split = context->compcode != BLOSC_BLOSCLZ && (context->header_flags & 0x10) >> 4;
+  int dont_split = (context->header_flags & 0x10) >> 4;
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
   int nstreams;
