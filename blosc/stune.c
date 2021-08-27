@@ -107,13 +107,11 @@ void blosc_stune_next_blocksize(blosc2_context *context) {
     switch (clevel) {
       case 1:
       case 2:
+      case 3:
         blocksize = 32 * 1024;
         break;
-      case 3:
       case 4:
       case 5:
-        blocksize = 256 * 1024;
-        break;
       case 6:
       case 7:
       case 8:
@@ -124,11 +122,11 @@ void blosc_stune_next_blocksize(blosc2_context *context) {
         blocksize = 512 * 1024;
         break;
     }
-    // Multiply by typesize so as to get proper split sizes
+    // Multiply by typesize to get proper split sizes
     blocksize *= typesize;
-    // But do not exceed 2 MB per thread (having this capacity in L3 is normal in modern CPUs)
-    if (blocksize > 2 * 1024 * 1024) {
-      blocksize = 2 * 1024 * 1024;
+    // But do not exceed 4 MB per thread (having this capacity in L3 is normal in modern CPUs)
+    if (blocksize > 4 * 1024 * 1024) {
+      blocksize = 4 * 1024 * 1024;
     }
     if (blocksize < 32 * 1024) {
       /* Do not use a too small blocksize (< 32 KB) when typesize is small */

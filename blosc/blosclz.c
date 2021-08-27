@@ -425,71 +425,61 @@ out:
 int blosclz_compress(const int clevel, const void* input, int length,
                      void* output, int maxout, blosc2_context* ctx) {
   uint8_t* ibase = (uint8_t*)input;
+
+  // Experiments say that checking 1/4 of the buffer is enough to figure out approx cratio
+  int maxlen = length / 4;
+  // Start probing somewhere inside the buffer
+  int shift = length - maxlen;
+  // Actual entropy probing!
+  double cratio = get_cratio(ibase + shift, maxlen, 3, 3);
+  // discard probes with small compression ratios (too expensive)
+  double cratio_[10] = {0, 2, 1.5, 1.2, 1.2, 1.2, 1.2, 1.15, 1.1, 1.0};
+  if (cratio < cratio_[clevel]) {
+      goto out;
+  }
+
+  /* When we go back in a match (shift), we obtain quite different compression properties.
+   * It looks like 4 is more useful in combination with bitshuffle and small typesizes
+   * Fallback to 4 because it provides more consistent results for large cratios.
+   *
+   * In this block we also check cratios for the beginning of the buffers and
+   * eventually discard those that are small (take too long to decompress).
+   * This process is called _entropy probing_.
+   */
+  unsigned ipshift = 4;
+  // Compute optimal shift and minimum lengths for encoding
+  // Use 4 by default, except for low entropy data, where we should do a best effort
+  unsigned minlen = 4;
+  // BloscLZ works better with splits mostly, so when data is not split, do a best effort
+  const int split_block = !((ctx->header_flags & 0x10) >> 4);
+  // Why using cratio < 4 is based in experiments with low and high entropy
+  if (!split_block || cratio < 4) {
+    ipshift = 3;
+    minlen = 3;
+  }
+  else {
+    minlen = 4;
+  }
+
+  uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
+                          HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
+  uint8_t hashlog = hashlog_[clevel];
+
   uint8_t* ip = ibase;
   uint8_t* ip_bound = ibase + length - 1;
   uint8_t* ip_limit = ibase + length - 12;
   uint8_t* op = (uint8_t*)output;
-  uint8_t* op_limit;
-  uint32_t htab[1U << (uint8_t)HASH_LOG];
-  uint32_t hval;
   uint32_t seq;
   uint8_t copy;
-
-  op_limit = op + maxout;
-
-  // Minimum lengths for encoding
-  unsigned minlen_[10];
-  // Minimum compression ratios for initiating encoding
-  double cratio_[10];
-  // BloscLZ always works better with splits.  However, we will make use of the
-  // !split_block flag in order to use another set of parameters more apt for low
-  // entropy data.
-  const int split_block = !((ctx->header_flags & 0x10) >> 4);
-  // The next parameters have been extensively fine tuned for large and small cratios
-  if (split_block) {
-    unsigned minlen2_[] = {0, 16, 8, 3, 3, 3, 3, 3, 3, 3};
-    memcpy(minlen_, minlen2_, 10 * sizeof(unsigned));
-    double cratio2_[10] = {0, 2, 2, 1.3, 1.3, 1.2, 1.2, 1.2, 1.1, 1.1};
-    memcpy(cratio_, cratio2_, 10 * sizeof(double));
-  }
-  else {
-    unsigned minlen2_[] = {0, 16, 8, 4, 4, 4, 4, 4, 4, 4};
-    memcpy(minlen_, minlen2_, 10 * sizeof(unsigned));
-    double cratio2_[10] = {0, 2, 2, 1.3, 1.3, 1.2, 1.2, 1.2, 1.1, 1.1};
-    memcpy(cratio_, cratio2_, 10 * sizeof(double));
-  }
-  unsigned minlen = minlen_[clevel];
-
-  uint8_t hashlog_[10] = {0, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG,
-                          HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
-  uint8_t hashlog = hashlog_[clevel];
+  uint32_t hval;
 
   /* input and output buffer cannot be less than 16 and 66 bytes or we can get into trouble */
   if (length < 16 || maxout < 66) {
     return 0;
   }
 
-  /* When we go back in a match (shift), we obtain quite different compression properties.
-   * It looks like 4 is more useful in combination with bitshuffle and small typesizes
-   * Fallback to 3 because it provides more consistent results on small and large cratios.
-   *
-   * In this block we also check cratios for the beginning of the buffers and
-   * eventually discard those that are small (take too long to decompress).
-   * This process is called _entropy probing_.
-   */
-  const int ipshift = split_block ? 3 : 4;
-  // Experiments say that checking 1/4 of the buffer is enough to figure out approx cratio
-  int maxlen = length / 4;
-  // Start probing somewhere inside the buffer
-  int shift = length - maxlen;
-  // Actual entropy probing!
-  double cratio = get_cratio(ibase + shift, maxlen, minlen, ipshift);
-  // discard probes with small compression ratios (too expensive)
-  if (cratio < cratio_[clevel]) {
-    goto out;
-  }
-
-  // Initialize the hash table to distances of 0
+  // Initialize the hash table
+  uint32_t htab[1U << (uint8_t)HASH_LOG];
   memset(htab, 0, (1U << hashlog) * sizeof(uint32_t));
 
   /* we start with literal copy */
@@ -501,6 +491,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
   *op++ = *ip++;
 
   /* main loop */
+  const uint8_t* op_limit = op + maxout;
   while (BLOSCLZ_LIKELY(ip < ip_limit)) {
     const uint8_t* ref;
     unsigned distance;
