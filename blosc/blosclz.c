@@ -408,9 +408,7 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift) {
     seq = BLOSCLZ_READU32(ip);
     HASH_FUNCTION(hval, seq, HASH_LOG2)
     htab[hval] = (uint16_t)(ip++ - ibase);
-    seq >>= 8U;
-    HASH_FUNCTION(hval, seq, HASH_LOG2)
-    htab[hval] = (uint16_t) (ip++ - ibase);
+    ip++;
     /* assuming literal copy */
     oc++;
   }
@@ -573,13 +571,21 @@ int blosclz_compress(const int clevel, const void* input, int length,
     seq = BLOSCLZ_READU32(ip);
     HASH_FUNCTION(hval, seq, hashlog)
     htab[hval] = (uint32_t) (ip++ - ibase);
-    seq >>= 8U;
-    HASH_FUNCTION(hval, seq, hashlog)
-    htab[hval] = (uint32_t) (ip++ - ibase);
-    /* assuming literal copy */
+    if (ctx->clevel == 9) {
+      // In some situations, including a second hash proves to be useful,
+      // but not in others.  Activating here in max clevel only.
+      seq >>= 8U;
+      HASH_FUNCTION(hval, seq, hashlog)
+      htab[hval] = (uint32_t) (ip++ - ibase);
+    }
+    else {
+      ip++;
+    }
 
     if (BLOSCLZ_UNLIKELY(op + 1 > op_limit))
       goto out;
+
+    /* assuming literal copy */
     *op++ = MAX_COPY - 1;
   }
 
