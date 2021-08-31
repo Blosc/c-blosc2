@@ -4,7 +4,13 @@ Release notes for C-Blosc2 2.0.3
 Changes from 2.0.2 to 2.0.3
 ===========================
 
-#XXX version-specific blurb XXX#
+* Improved BloscLZ codec (bumped to 2.5.0) for achieving better compression ratios on data with high entropy.  Although in general LZ4 still does a better job in this scenario, *BloscLZ* can sometimes achieve better compression ratios.
+
+* Added `blosc2_vlmeta_delete()` for removing vlmeta data.  Thanks to Marta Iborra.
+
+* Update pkg-config file to support blosc2. Fixes #236.  Thanks to Håvard Flaget Aasen.
+
+* Build system: Change hard coded library path with `CMAKE_INSTALL_LIBDIR` CMake variable.  Thanks to Håvard Flaget Aasen.
 
 
 Changes from 2.0.1 to 2.0.2
