@@ -52,12 +52,6 @@ Then, test the file created with the new version with::
 Repeat this for every codec shipped with Blosc (blosclz, lz4, lz4hc, zlib and
 zstd).
 
-Check documentation
--------------------
-
-Go the the `blosc2 rtfd <https://c-blosc2.readthedocs.io/>`_ site and check that
-it contains the updated docs.
-
 Tagging
 -------
 
@@ -71,6 +65,13 @@ Tagging
 
 - Create a new release visiting https://github.com/Blosc/c-blosc2/releases/new
   and add the release notes copying them from `RELEASE_NOTES.md` document.
+
+
+Check documentation
+-------------------
+
+Go the the `blosc2 rtfd <https://c-blosc2.readthedocs.io/>`_ site and check that
+it contains the updated docs.
 
 
 Announcing
