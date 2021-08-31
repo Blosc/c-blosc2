@@ -66,15 +66,17 @@ extern "C" {
 enum {
   /* Blosc format version, starting at 1
      1 -> Blosc pre-1.0
-     2 -> Blosc 1.x series
+     2 -> Blosc 1.x stable series
      3 -> Blosc 2-alpha.x series
      4 -> Blosc 2.x beta.1 series
+     5 -> Blosc 2.x stable series
      */
   BLOSC_VERSION_FORMAT_PRE1 = 1,
   BLOSC1_VERSION_FORMAT = 2,
   BLOSC2_VERSION_FORMAT_ALPHA = 3,
   BLOSC2_VERSION_FORMAT_BETA1 = 4,
-  BLOSC_VERSION_FORMAT = BLOSC2_VERSION_FORMAT_BETA1,
+  BLOSC2_VERSION_FORMAT_STABLE = 5,
+  BLOSC_VERSION_FORMAT = BLOSC2_VERSION_FORMAT_STABLE,
 };
 
 
