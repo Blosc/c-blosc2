@@ -3589,7 +3589,7 @@ void blosc2_free_ctx(blosc2_context* context) {
 
 int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams) {
   cparams->compcode = ctx->compcode;
-  cparams->compcode = ctx->compcode;
+  cparams->compcode_meta = ctx->compcode_meta;
   cparams->clevel = ctx->clevel;
   cparams->use_dict = ctx->use_dict;
   cparams->typesize = ctx->typesize;
