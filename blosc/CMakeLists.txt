@@ -274,29 +274,26 @@ endif()
 
 # install
 if(BLOSC_INSTALL)
-    install(FILES ../include/blosc2.h DESTINATION include COMPONENT DEV)
+    install(FILES ${PROJECT_SOURCE_DIR}/include/blosc2.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT DEV)
     install(FILES
-            ../include/blosc2/blosc2-export.h
-            ../include/blosc2/blosc2-common.h
-            ../include/blosc2/blosc2-stdio.h
-            DESTINATION include/blosc2 COMPONENT DEV)
+            ${PROJECT_SOURCE_DIR}/include/blosc2/blosc2-export.h
+            ${PROJECT_SOURCE_DIR}/include/blosc2/blosc2-common.h
+            ${PROJECT_SOURCE_DIR}/include/blosc2/blosc2-stdio.h
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/blosc2 COMPONENT DEV)
     if(BUILD_PLUGINS)
         install(FILES
-                ../include/blosc2/filters-registry.h
-                ../include/blosc2/codecs-registry.h
-                DESTINATION include/blosc2 COMPONENT DEV)
+                ${PROJECT_SOURCE_DIR}/include/blosc2/filters-registry.h
+                ${PROJECT_SOURCE_DIR}/include/blosc2/codecs-registry.h
+                DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/blosc2 COMPONENT DEV)
     endif()
 
     if(BUILD_SHARED)
         install(TARGETS blosc2_shared
-                LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-                ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-                RUNTIME DESTINATION bin COMPONENT LIB)
+                LIBRARY COMPONENT LIB
+                ARCHIVE COMPONENT DEV
+                RUNTIME COMPONENT LIB)
     endif()
     if(BUILD_STATIC)
-        install(TARGETS blosc2_static
-                LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-                ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-                RUNTIME DESTINATION bin COMPONENT LIB)
+        install(TARGETS blosc2_static COMPONENT DEV)
     endif()
 endif()

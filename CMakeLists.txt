@@ -371,6 +371,22 @@ if(NOT DEFINED BLOSC_INSTALL)
     endif()
 endif()
 
+# uninstall target
+if(BLOSC_INSTALL)
+    include(GNUInstallDirs)
+    configure_file(
+         "${CMAKE_CURRENT_SOURCE_DIR}/blosc2.pc.in"
+         "${CMAKE_CURRENT_BINARY_DIR}/blosc2.pc"
+         @ONLY)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/blosc2.pc"
+            DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig" COMPONENT DEV)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+        @ONLY)
+    add_custom_target(uninstall
+        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+endif()
 
 # include directories
 include_directories(include)
@@ -406,24 +422,6 @@ if(BUILD_PLUGINS)
     add_subdirectory(plugins)
 endif()
 
-
-# uninstall target
-if(BLOSC_INSTALL)
-    include(GNUInstallDirs)
-    set(CMAKE_INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR})
-    configure_file(
-         "${CMAKE_CURRENT_SOURCE_DIR}/blosc2.pc.in"
-         "${CMAKE_CURRENT_BINARY_DIR}/blosc2.pc"
-         @ONLY)
-    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/blosc2.pc"
-            DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig" COMPONENT DEV)
-     configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
-        IMMEDIATE @ONLY)
-    add_custom_target(uninstall
-        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
-endif()
 
 # packaging
 if(NOT BLOSC_IS_SUBPROJECT)
