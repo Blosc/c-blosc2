@@ -246,10 +246,11 @@ void test_create_sframe_frame(char* operation) {
   dparams.nthreads = 2;
 
   blosc2_storage storage = {.contiguous=false, .urlpath="dir.b2frame", .cparams=&cparams, .dparams=&dparams};
+  blosc2_remove_urlpath(storage.urlpath);
   schunk_sframe = blosc2_schunk_new(&storage);
 
-
   blosc2_storage storage2 = {.contiguous=true, .urlpath="test_cframe.b2frame", .cparams=&cparams, .dparams=&dparams};
+  blosc2_remove_urlpath(storage2.urlpath);
   schunk_cframe = blosc2_schunk_new(&storage2);
 
   printf("Test comparation frame vs sframe with %d chunks.\n", nchunks);
@@ -324,18 +325,21 @@ void test_create_sframe_frame(char* operation) {
   free(data_dest);
   free(data);
 
-  if (strcmp(operation, "insert") == 0) {
-    test_insert(schunk_sframe, schunk_cframe);
-  }
-  else if (strcmp(operation, "update") == 0) {
-    test_update(schunk_sframe, schunk_cframe);
-  }
-  else if (strcmp(operation, "reorder") == 0) {
-    test_reorder(schunk_sframe, schunk_cframe);
-  }
+if (operation != NULL) {
+    if (strcmp(operation, "insert") == 0) {
+        test_insert(schunk_sframe, schunk_cframe);
+    }
+    else if (strcmp(operation, "update") == 0) {
+        test_update(schunk_sframe, schunk_cframe);
+    }
+    else if (strcmp(operation, "reorder") == 0) {
+        test_reorder(schunk_sframe, schunk_cframe);
+    }
+}
 
 
-  blosc2_remove_dir(schunk_sframe->storage->urlpath);
+  blosc2_remove_urlpath(schunk_sframe->storage->urlpath);
+  blosc2_remove_urlpath(schunk_cframe->storage->urlpath);
   blosc2_schunk_free(schunk_sframe);
   blosc2_schunk_free(schunk_cframe);
   /* Destroy the Blosc environment */
