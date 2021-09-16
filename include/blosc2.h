@@ -2033,6 +2033,11 @@ BLOSC_EXPORT int blosc2_remove_dir(const char *path);
  */
 BLOSC_EXPORT int blosc2_remove_urlpath(const char *path);
 
+/*
+ * Rename a file or a directory given by old_urlpath to new_path.
+ */
+BLOSC_EXPORT int blosc2_rename_urlpath(char* old_urlpath, char* new_path);
+
 #ifdef __cplusplus
 }
 #endif

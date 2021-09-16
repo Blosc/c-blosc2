@@ -18,8 +18,8 @@
   #include <io.h>
 
   int blosc2_remove_dir(const char* dir_path) {
-    char last_char = dir_path[strlen(dir_path) - 1];
     char* path;
+    char last_char = dir_path[strlen(dir_path) - 1];
     if (last_char != '\\' || last_char != '/') {
       path = malloc(strlen(dir_path) + 2 + 1);
       sprintf(path, "%s\\*", dir_path);
@@ -33,6 +33,7 @@
     struct _finddata_t cfile;
 
     intptr_t file = _findfirst(path, &cfile);
+    free(path);
 
     if (file == -1) {
       BLOSC_TRACE_ERROR("Could not open the file.");
@@ -51,14 +52,12 @@
       free(fname);
       if (ret < 0) {
         BLOSC_TRACE_ERROR("Could not remove file %s", fname);
-        free(path);
         _findclose(file);
         return BLOSC2_ERROR_FAILURE;
       }
     }
 
     rmdir(dir_path);
-    free(path);
     _findclose(file);
     return 0;
   }
@@ -67,9 +66,8 @@
   #include <dirent.h>
   #include <unistd.h>
 
-
-/* Function needed for removing each time the directory */
-int blosc2_remove_dir(const char* dir_path) {
+/* Return the directory path with the '/' at the end */
+char* blosc2_normalize_dirpath(const char* dir_path) {
   char last_char = dir_path[strlen(dir_path) - 1];
   char* path;
   if (last_char != '\\' || last_char != '/'){
@@ -80,6 +78,12 @@ int blosc2_remove_dir(const char* dir_path) {
     path = malloc(strlen(dir_path) + 1);
     strcpy(path, dir_path);
   }
+  return path;
+}
+
+/* Function needed for removing each time the directory */
+int blosc2_remove_dir(const char* dir_path) {
+  char* path = blosc2_normalize_dirpath(dir_path);
 
   DIR* dr = opendir(path);
   struct stat statbuf;
@@ -129,6 +133,22 @@ int blosc2_remove_urlpath(const char* urlpath){
       return blosc2_remove_dir(urlpath);
     }
     remove(urlpath);
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+int blosc2_rename_urlpath(char* old_urlpath, char* new_urlpath){
+  if (old_urlpath != NULL && new_urlpath != NULL) {
+    struct stat statbuf;
+    if (stat(old_urlpath, &statbuf) != 0) {
+      BLOSC_TRACE_ERROR("Could not access %s", old_urlpath);
+      return BLOSC2_ERROR_FAILURE;
+    }
+    int ret = rename(old_urlpath, new_urlpath);
+    if (ret < 0) {
+      BLOSC_TRACE_ERROR("Could not rename %s to %s", old_urlpath, new_urlpath);
+      return BLOSC2_ERROR_FAILURE;
+    }
   }
   return BLOSC2_ERROR_SUCCESS;
 }
