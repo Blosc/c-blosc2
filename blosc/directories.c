@@ -152,3 +152,4 @@ int blosc2_rename_urlpath(char* old_urlpath, char* new_urlpath){
   }
   return BLOSC2_ERROR_SUCCESS;
 }
+
