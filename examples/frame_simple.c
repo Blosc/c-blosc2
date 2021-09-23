@@ -83,9 +83,7 @@ int main(void) {
   for (uint32_t j = 0; j < content_len; ++j) {
     content[j] = (uint8_t) j;
   }
-  blosc2_cparams cparams2 = BLOSC2_CPARAMS_DEFAULTS;
-  cparams2.typesize = sizeof (uint8_t);
-  int umlen = blosc2_vlmeta_add(schunk, "vlmetalayer", content, content_len, &cparams2);
+  int umlen = blosc2_vlmeta_add(schunk, "vlmetalayer", content, content_len, NULL);
   free(content);
   if (umlen < 0) {
     printf("Cannot write vlmetalayers chunk");

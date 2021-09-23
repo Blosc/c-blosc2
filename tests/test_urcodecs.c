@@ -199,7 +199,6 @@ CUTEST_TEST_TEST(urcodecs) {
   schunk = blosc2_schunk_new(&storage);
   uint8_t codec_params = 222;
   blosc2_cparams cparams2 = BLOSC2_CPARAMS_DEFAULTS;
-  cparams2.typesize = sizeof(uint8_t);
   blosc2_vlmeta_add(schunk, "codec_arange", &codec_params, 1, &cparams2);
 
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {

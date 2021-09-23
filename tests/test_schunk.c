@@ -54,10 +54,8 @@ static char* test_schunk(void) {
   blosc2_meta_update(schunk, "metalayer2", (uint8_t *) "my metalayer2", sizeof("my metalayer2"));
 
   // Attach some user metadata into it
-  blosc2_cparams cparams2 = BLOSC2_CPARAMS_DEFAULTS;
-  cparams2.typesize = sizeof(char);
-  blosc2_vlmeta_add(schunk, "vlmetalayer1", (uint8_t *) "testing the vlmetalayers", 23, &cparams2);
-  blosc2_vlmeta_add(schunk, "vlmetalayer2", (uint8_t *) "vlmetalayers", 11, &cparams2);
+  blosc2_vlmeta_add(schunk, "vlmetalayer1", (uint8_t *) "testing the vlmetalayers", 23, NULL);
+  blosc2_vlmeta_add(schunk, "vlmetalayer2", (uint8_t *) "vlmetalayers", 11, NULL);
 
   /* Gather some info */
   nbytes = schunk->nbytes;
@@ -94,7 +92,7 @@ static char* test_schunk(void) {
     }
   }
   // update metalayer
-  blosc2_vlmeta_update(schunk, "vlmetalayer1", (uint8_t *) "testing the  vlmetalayers", 24, &cparams2);
+  blosc2_vlmeta_update(schunk, "vlmetalayer1", (uint8_t *) "testing the  vlmetalayers", 24, NULL);
 
   // metalayers
   uint8_t* content;

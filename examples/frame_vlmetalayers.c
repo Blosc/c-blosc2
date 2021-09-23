@@ -58,16 +58,14 @@ int main(void) {
   }
 
   // Add some vlmetalayers data
-  blosc2_cparams cparams2 = BLOSC2_CPARAMS_DEFAULTS;
-  cparams2.typesize = sizeof(uint8_t);
-  metalater_len = blosc2_vlmeta_add(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 32, &cparams2);
+  metalater_len = blosc2_vlmeta_add(schunk, "vlmetalayer", (uint8_t *) "This is a vlmetalayers content...", 32, NULL);
   if (metalater_len < 0) {
     printf("Cannot write vlmetalayers chunk");
     return metalater_len;
   }
 
   // Add some vlmetalayers data
-  metalater_len = blosc2_vlmeta_add(schunk, "vlmetalayer2", (uint8_t *) "This is a content...", 10, &cparams2);
+  metalater_len = blosc2_vlmeta_add(schunk, "vlmetalayer2", (uint8_t *) "This is a content...", 10, NULL);
   if (metalater_len < 0) {
     printf("Cannot write vlmetalayers chunk");
     return metalater_len;
@@ -75,7 +73,7 @@ int main(void) {
 
   metalater_len = blosc2_vlmeta_update(schunk, "vlmetalayer", (uint8_t *) "This is a another vlmetalayer content...",
                                        20,
-                                       &cparams2);
+                                       NULL);
   if (metalater_len < 0) {
     printf("Cannot write vlmetalayers chunk");
     return metalater_len;

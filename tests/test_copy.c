@@ -126,10 +126,8 @@ CUTEST_TEST_TEST(copy) {
   if (metalayers) {
     blosc2_meta_add(schunk, meta_name, (uint8_t *) &meta_content, meta_content_len);
   }
-  blosc2_cparams cparams2 = BLOSC2_CPARAMS_DEFAULTS;
-  cparams2.typesize = sizeof(uint8_t);
   if (vlmetalayers) {
-    blosc2_vlmeta_add(schunk, "vlmetalayer", (uint8_t *) &meta_content, meta_content_len, &cparams2);
+    blosc2_vlmeta_add(schunk, "vlmetalayer", (uint8_t *) &meta_content, meta_content_len, NULL);
   }
 
   /* Append the chunks */
