@@ -2168,9 +2168,12 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int nchunk, uint8_t **chunk, bool
 
     if (memcpyed) {
       // When memcpyed the blocksizes are trivial to compute
-      for (int i = 0; i < (int)nblocks; i++) {
+      for (int i = 0; i < (int)nblocks - 1; i++) {
         block_csizes[i] = (int)chunk_blocksize;
       }
+      // The last block could be incomplete, mainly due to the fact that the block size is not divisible
+      // by the typesize
+      block_csizes[nblocks - 1] = (int)(leftover_block ? leftover_block : chunk_blocksize);
     }
     else {
       // In regular, compressed chunks, we need to sort the bstarts (they can be out

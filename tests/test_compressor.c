@@ -210,7 +210,7 @@ static char *test_typesize(void) {
   setenv("BLOSC_TYPESIZE", "9", 0);
   cbytes2 = blosc_compress(clevel, doshuffle, typesize, size, src,
                            dest, size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: undetected chunksize not being a multiple of typesize", cbytes2 < 0);
+  mu_assert("ERROR: BLOSC_TYPESIZE does not work correctly", cbytes2 > cbytes);
 
   /* Reset envvar */
   unsetenv("BLOSC_TYPESIZE");

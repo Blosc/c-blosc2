@@ -267,6 +267,62 @@ static char* test_sframe_simple(void) {
 }
 
 
+static char* test_sframe_typesize(void) {
+  static int32_t data[CHUNKSIZE];
+  static int32_t data_dest[CHUNKSIZE];
+  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int dsize;
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_schunk* schunk;
+
+  /* Initialize the Blosc compressor */
+  blosc_init();
+
+  /* Create a super-chunk container with a typesize that is not a divisor of isize */
+  cparams.typesize = 7;
+  cparams.clevel = 9;
+  cparams.nthreads = NTHREADS;
+  dparams.nthreads = NTHREADS;
+  blosc2_storage storage = {.contiguous=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
+  blosc2_remove_dir(storage.urlpath);
+  schunk = blosc2_schunk_new(&storage);
+  mu_assert("Error in creating schunk", schunk != NULL);
+
+  // Feed it with data
+  for (int nchunk = 0; nchunk < nchunks; nchunk++) {
+    for (int i = 0; i < CHUNKSIZE; i++) {
+      data[i] = i + nchunk;
+    }
+    int _nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
+    mu_assert("ERROR: bad append in sframe", _nchunks > 0);
+  }
+
+  /* Retrieve and decompress the chunks (0-based count) */
+  for (int nchunk = nchunks-1; nchunk >= 0; nchunk--) {
+    dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, data_dest, isize);
+    mu_assert("Decompression error", dsize>=0);
+  }
+
+  if (nchunks >= 2) {
+    /* Check integrity of the second chunk (made of non-zeros) */
+    blosc2_schunk_decompress_chunk(schunk, 1, data_dest, isize);
+    for (int i = 0; i < CHUNKSIZE; i++) {
+      mu_assert("Decompressed data differs from original", data_dest[i]==(i+1));
+    }
+  }
+
+  /* Remove directory */
+  blosc2_remove_dir(storage.urlpath);
+  /* Free resources */
+  blosc2_schunk_free(schunk);
+  /* Destroy the Blosc environment */
+  blosc_destroy();
+
+  return EXIT_SUCCESS;
+}
+
+
 static char *all_tests(void) {
   directory = "dir1.b2frame";
 
@@ -281,6 +337,12 @@ static char *all_tests(void) {
 
   nchunks = 10;
   mu_run_test(test_sframe_simple);
+
+  nchunks = 1;
+  mu_run_test(test_sframe_typesize);
+
+  nchunks = 10;
+  mu_run_test(test_sframe_typesize);
 
   // Check directory with a trailing slash
   directory = "dir1.b2frame/";

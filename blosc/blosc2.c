@@ -1909,16 +1909,13 @@ static int do_job(blosc2_context* context) {
 
 
 static int initialize_context_compression(
-  blosc2_context* context, const void* src, int32_t srcsize, void* dest,
-  int32_t destsize, int clevel, uint8_t const *filters,
-  uint8_t const *filters_meta, int32_t typesize, int compressor,
-  int32_t blocksize, int16_t new_nthreads, int16_t nthreads,
-  blosc2_btune *udbtune, void *btune_config,
-  blosc2_schunk* schunk) {
-  if (srcsize % typesize != 0) {
-    BLOSC_TRACE_ERROR("srcsize must be a multiple of typesize.");
-    return BLOSC2_ERROR_INVALID_PARAM;
-  }
+    blosc2_context* context, const void* src, int32_t srcsize, void* dest,
+    int32_t destsize, int clevel, uint8_t const *filters,
+    uint8_t const *filters_meta, int32_t typesize, int compressor,
+    int32_t blocksize, int16_t new_nthreads, int16_t nthreads,
+    blosc2_btune *udbtune, void *btune_config,
+    blosc2_schunk* schunk) {
+
   /* Set parameters */
   context->do_compress = 1;
   context->src = (const uint8_t*)src;
