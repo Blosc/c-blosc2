@@ -59,7 +59,7 @@
 
     rmdir(dir_path);
     _findclose(file);
-    return 0;
+    return BLOSC2_ERROR_SUCCESS;
   }
 
 #else
@@ -117,7 +117,7 @@ int blosc2_remove_dir(const char* dir_path) {
   closedir(dr);
   rmdir(path);
   free(path);
-  return 0;
+  return BLOSC2_ERROR_SUCCESS;
 }
 
 #endif  /* _WIN32 */
@@ -132,7 +132,10 @@ int blosc2_remove_urlpath(const char* urlpath){
     if ((statbuf.st_mode & S_IFDIR) != 0) {
       return blosc2_remove_dir(urlpath);
     }
-    remove(urlpath);
+    if (remove(urlpath) < 0) {
+      BLOSC_TRACE_ERROR("Could not remove %s", urlpath);
+      return BLOSC2_ERROR_FILE_REMOVE;
+    }
   }
   return BLOSC2_ERROR_SUCCESS;
 }
