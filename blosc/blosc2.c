@@ -42,8 +42,11 @@
   #include <ipps.h>
   #include <ippdc.h>
 #endif
-#if defined(HAVE_ZLIB_NG)
-  #include "zlib.h"
+#if defined(HAVE_ZLIBNG)
+  #include "zlib-ng.h"
+#ifndef HAVE_ZLIB
+#define HAVE_ZLIB
+#endif
 #elif defined(HAVE_ZLIB)
   #include "zlib.h"
 #endif /*  HAVE_MINIZ */
@@ -432,7 +435,11 @@ static int zlib_wrap_compress(const char* input, size_t input_length,
                               char* output, size_t maxout, int clevel) {
   int status;
   uLongf cl = (uLongf)maxout;
+#if defined(HAVE_ZLIBNG)
+  status = zng_compress2(
+#else
   status = compress2(
+#endif
       (Bytef*)output, &cl, (Bytef*)input, (uLong)input_length, clevel);
   if (status != Z_OK) {
     return 0;
@@ -444,7 +451,11 @@ static int zlib_wrap_decompress(const char* input, size_t compressed_length,
                                 char* output, size_t maxout) {
   int status;
   uLongf ul = (uLongf)maxout;
+#if defined(HAVE_ZLIBNG)
+  status = zng_uncompress(
+#else
   status = uncompress(
+#endif
       (Bytef*)output, &ul, (Bytef*)input, (uLong)compressed_length);
   if (status != Z_OK) {
     return 0;
@@ -3346,11 +3357,15 @@ int blosc_get_complib_info(const char* compname, char** complib, char** version)
             LZ4_VERSION_MAJOR, LZ4_VERSION_MINOR, LZ4_VERSION_RELEASE);
     clibversion = sbuffer;
   }
-#if defined(HAVE_ZLIB)
+#if defined(HAVE_ZLIBNG)
+  else if (clibcode == BLOSC_ZLIB_LIB) {
+    clibversion = ZLIBNG_VERSION;
+  }
+#elif defined(HAVE_ZLIB)
   else if (clibcode == BLOSC_ZLIB_LIB) {
     clibversion = ZLIB_VERSION;
   }
-#endif /* HAVE_ZLIB */
+#endif /* HAVE_ZLIBNG or HAVE_ZLIB */
 #if defined(HAVE_ZSTD)
   else if (clibcode == BLOSC_ZSTD_LIB) {
     sprintf(sbuffer, "%d.%d.%d",

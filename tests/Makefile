@@ -16,13 +16,13 @@ BLOSC_LIB += $(wildcard $(LZ4_DIR)/*.c)
 # Support for external LZ4 and LZ4HC
 #LDFLAGS += -llz4
 
-# Support for external Zlib
-LDFLAGS += -DHAVE_ZLIB -lz
+# Support for external Zlib-ng
+LDFLAGS += -DHAVE_ZLIBNG -lz-ng
 
-# Support for internal Zlib
-#ZLIB_DIR = ../internal-complibs/zlib-1.2.8
-#CFLAGS += -DHAVE_ZLIB -I$(ZLIB_DIR)
-#BLOSC_LIB += $(wildcard $(ZLIB_DIR)/*.c)
+# Support for internal Zlib-ng
+#ZLIB_DIR = ../internal-complibs/zlib-ng-2.0.5
+#CFLAGS += -DHAVE_ZLIBNG -I$(ZLIBNG_DIR)
+#BLOSC_LIB += $(wildcard $(ZLIBNG_DIR)/*.c)
 
 
 # Support for internal Zstd

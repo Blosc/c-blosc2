@@ -21,14 +21,14 @@
 #       build a lite version (only with BloscLZ and LZ4/LZ4HC) of the blosc library
 #   DEACTIVATE_AVX2: default OFF
 #       do not attempt to build with AVX2 instructions
-#   DEACTIVATE_ZLIB: default OFF
+#   DEACTIVATE_ZLIBNG: default OFF
 #       do not include support for the Zlib library
 #   DEACTIVATE_ZSTD: default OFF
 #       do not include support for the Zstd library
 #   PREFER_EXTERNAL_LZ4: default OFF
 #       when found, use the installed LZ4 libs instead of included
 #       sources
-#   PREFER_EXTERNAL_ZLIB: default OFF
+#   PREFER_EXTERNAL_ZLIBNG: default OFF
 #       when found, use the installed ZLIB libs instead of included
 #       MINIZ sources
 #   PREFER_EXTERNAL_ZSTD: default OFF
@@ -107,16 +107,16 @@ option(BUILD_LITE
     "Build a lite version (only with BloscLZ and LZ4/LZ4HC) of the blosc library." OFF)
 option(DEACTIVATE_AVX2
     "Do not attempt to build with AVX2 instructions" OFF)
-option(DEACTIVATE_ZLIB
-    "Do not include support for the ZLIB library." OFF)
+option(DEACTIVATE_ZLIBNG
+    "Do not include support for the ZLIBNG library." OFF)
 option(DEACTIVATE_ZSTD
     "Do not include support for the ZSTD library." OFF)
 option(DEACTIVATE_IPP
     "Do not include support for the Intel IPP library." ON)
 option(PREFER_EXTERNAL_LZ4
     "Find and use external LZ4 library instead of included sources." OFF)
-option(PREFER_EXTERNAL_ZLIB
-    "Find and use external ZLIB library instead of included sources." OFF)
+option(PREFER_EXTERNAL_ZLIBNG
+    "Find and use external ZLIBNG library instead of included sources." OFF)
 option(PREFER_EXTERNAL_ZSTD
     "Find and use external ZSTD library instead of included sources." OFF)
 
@@ -139,7 +139,7 @@ if(BUILD_PLUGINS AND BUILD_LITE)
 endif()
 
 if(BUILD_LITE)
-    set(DEACTIVATE_ZLIB ON)
+    set(DEACTIVATE_ZLIBNG ON)
     set(DEACTIVATE_ZSTD ON)
 endif()
 
@@ -149,23 +149,16 @@ else()
     message(STATUS "Using LZ4 internal sources.")
 endif()
 
-if(NOT DEACTIVATE_ZLIB)
-    # import the ZLIB_ROOT environment variable to help finding the zlib library
-    if(PREFER_EXTERNAL_ZLIB)
-        set(ZLIB_ROOT $ENV{ZLIB_ROOT})
-        find_package(ZLIB)
-        if(NOT ZLIB_FOUND)
+if(NOT DEACTIVATE_ZLIBNG)
+    # import the ZLIBNG_ROOT environment variable to help finding the zlib library
+    if(PREFER_EXTERNAL_ZLIBNG)
+        set(ZLIBNG_ROOT $ENV{ZLIBNG_ROOT})
+        find_package(ZLIBNG)
+        if(NOT ZLIBNG_FOUND)
             message(STATUS "No ZLIB found.  Using ZLIB-NG internal sources.")
-            set(HAVE_ZLIB_NG TRUE)
         endif()
-    else()
-        message(STATUS "Using ZLIB-NG internal sources for ZLIB support.")
-        set(HAVE_ZLIB_NG TRUE)
+        set(HAVE_ZLIBNG TRUE)
     endif()
-    # HAVE_ZLIB will be set to true because even if the library is not found,
-    # we will use the included sources for it
-    set(HAVE_ZLIB TRUE)
-endif()
 
 if(HAVE_ZLIB_NG)
     set(ZLIB_NG_DIR "zlib-ng-2.0.6")  # update to the actual included version

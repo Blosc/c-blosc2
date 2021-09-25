@@ -1,8 +1,12 @@
 # build the filegen utility
-link_directories(${PROJECT_BINARY_DIR}/blosc)
 add_executable(filegen filegen.c)
-target_link_libraries(filegen blosc_testing)
-add_dependencies(filegen blosc_testing)
+if(BUILD_SHARED)
+    target_link_libraries(filegen blosc2_shared)
+elseif(BUILD_STATIC)
+    target_link_libraries(filegen blosc2_static)
+else()
+    set(BUILD_TESTS OFF FORCE)
+endif()
 
 # tests
 if(BUILD_TESTS)
