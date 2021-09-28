@@ -229,7 +229,7 @@ enum {
  */
 #define BLOSC_BLOSCLZ_LIBNAME   "BloscLZ"
 #define BLOSC_LZ4_LIBNAME       "LZ4"
-#if defined(HAVE_ZIB_NG)
+#if defined(HAVE_ZLIB_NG)
   #define BLOSC_ZLIB_LIBNAME    "Zlib (via zlib-ng)"
 #else
   #define BLOSC_ZLIB_LIBNAME    "Zlib"
