@@ -1,8 +1,8 @@
 Roadmap
 =======
 
-C-Blosc2 is the new iteration of C-Blosc 1.x series, adding more features and better documentation.
-This document lists the goals for a production release of C-Blosc2.
+C-Blosc2 is the new iteration of C-Blosc 1.x series, adding more features and `better documentation <https://c-blosc2.readthedocs.io>`_.
+This document lists the new features for the production release of C-Blosc2, as well as the plans for the future.
 
 Many of the features implemented so far have been possible with the funds of a `generous donation <https://www.blosc.org/posts/blosc-donation/>`_.  Thanks to HUAWEI, and specially to Zeeman Wang!
 
@@ -34,7 +34,7 @@ Right now, the next features are already implemented (although they may require 
 
 * **Contiguous frames:** allow to store super-chunks contiguously, either on-disk or in-memory.  When a super-chunk is backed by a frame, instead of storing all the chunks sparsely in-memory, they are serialized inside the frame container.  The frame can be stored on-disk too, meaning that persistence of super-chunks is supported.
 
-* **Sparse frames (on-disk):** each chunk in a super-chunk is stored in a separate file, as well as the metadata.  This is the counterpart of in-memory super-chunk, and allows for more efficient updates than in frames (i.e. avoiding 'holes' in monolithic files).
+* **Sparse frames:** each chunk in a super-chunk, as well as the metadata, are stored separately.  This allows for more efficient updates than in frames (i.e. avoiding 'holes' in monolithic files).
 
 * **Partial chunk reads:** there is support for reading just part of a chunk, so avoiding reading the whole thing and then discarding the unnecessary data (which is a waste of resources).
 
