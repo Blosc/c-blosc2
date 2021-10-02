@@ -34,7 +34,7 @@ test_ndata tndata[] = {
     {10, 4},
     {5,  0},
     {33, 32},
-    {1,  0}
+    {1,  0},
 };
 
 typedef struct {

@@ -7,7 +7,7 @@ Preliminaries
 - Make sure that ``RELEASE_NOTES.md`` and ``ANNOUNCE.md`` are up to
   date with the latest news in the release.
 
-- Check that *VERSION* symbols in blosc/blosc.h contains the correct info.
+- Check that *VERSION* symbols in include/blosc2.h contains the correct info.
 
 - Commit the changes with::
 

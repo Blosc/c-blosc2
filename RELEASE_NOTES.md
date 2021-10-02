@@ -4,7 +4,13 @@ Release notes for C-Blosc2 2.0.4
 Changes from 2.0.3 to 2.0.4
 ===========================
 
-#XXX version-specific blurb XXX#
+* Restored support for type size that is not a divisor of a buffer size for more info.  See #356.
+
+* Implemented a `blosc2_rename_urlpath`, a portable function to rename a file or a full directory.  See #355.
+
+* Several improvements for packaging.  See #354, #357, #359.
+
+* Fixed a bug in BloscLZ codec (bumped to 2.5.1).
 
 
 Changes from 2.0.2 to 2.0.3

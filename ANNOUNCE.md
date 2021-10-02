@@ -1,11 +1,11 @@
-# Announcing C-Blosc2 2.0.3
+# Announcing C-Blosc2 2.0.4
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
 The Blosc development team is happy to announce a new release of C-Blosc2.
-This is a maintenance release for improving performance of the BloscLZ codec,
-introducing a new `blosc2_vlmeta_delete()` function and some other small
+This is a maintenance release for fixing a recent issue with the BloscLZ codec,
+introducing a new `blosc2_rename_urlpath()` function and some other small
 improvements and fixes.
 
 C-Blosc2 should be backward compatible with C-Blosc, so you can start using
