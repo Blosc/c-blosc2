@@ -1,5 +1,11 @@
-Release notes for C-Blosc2 2.0.4
+Release notes for C-Blosc2 2.0.5
 ================================
+
+Changes from 2.0.4 to 2.0.5
+===========================
+
+#XXX version-specific blurb XXX#
+
 
 Changes from 2.0.3 to 2.0.4
 ===========================
