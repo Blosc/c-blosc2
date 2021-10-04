@@ -31,13 +31,15 @@ typedef struct {
   int ninsertions;
 } test_ndata;
 
-test_ndata tndata[] = {{10, 1},
-                       {5,  3},
-                       {33, 5},
-                       {1,  0},
-                       {12, 24},
-                       {0, 3},
-                       {0, 0}
+test_ndata tndata[] = {
+    {10, 1},
+    {5,  3},
+    {33, 5},
+    {1,  0},
+    {12, 24},
+    {0, 3},
+    {0, 0},
+    // {25000,  0},  // this tests super-chunks with more than 2**32 entries, but it takes too long
 };
 
 typedef struct {
@@ -61,9 +63,9 @@ static char* test_insert_chunk(void) {
   /* Free resources */
   blosc2_remove_urlpath(tdata.urlpath);
 
-  int32_t *data = malloc(CHUNKSIZE * sizeof(int32_t));
-  int32_t *data_dest = malloc(CHUNKSIZE * sizeof(int32_t));
-  int32_t isize = CHUNKSIZE * sizeof(int32_t);
+  int64_t *data = malloc(CHUNKSIZE * sizeof(int64_t));
+  int64_t *data_dest = malloc(CHUNKSIZE * sizeof(int64_t));
+  int32_t isize = CHUNKSIZE * sizeof(int64_t);
   int dsize;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
@@ -73,7 +75,7 @@ static char* test_insert_chunk(void) {
   blosc_init();
 
   /* Create a super-chunk container */
-  cparams.typesize = sizeof(int32_t);
+  cparams.typesize = sizeof(int64_t);
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
@@ -81,12 +83,21 @@ static char* test_insert_chunk(void) {
   schunk = blosc2_schunk_new(&storage);
 
   // Feed it with data
-  for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
-    for (int i = 0; i < CHUNKSIZE; i++) {
+  for (int64_t nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
+    for (int64_t i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
     int nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append", nchunks_ > 0);
+  }
+
+  // Check that the chunks can be decompressed correctly
+  for (int64_t nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
+    dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
+    mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
+    for (int64_t i = 0; i < CHUNKSIZE; i++) {
+      mu_assert("ERROR: bad roundtrip 1", data_dest[i] == i + nchunk * CHUNKSIZE);
+    }
   }
 
   for (int i = 0; i < tdata.ninsertions; ++i) {
@@ -94,8 +105,8 @@ static char* test_insert_chunk(void) {
     for (int j = 0; j < CHUNKSIZE; ++j) {
       data[j] = i;
     }
-    int32_t datasize = sizeof(int32_t) * CHUNKSIZE;
-    int32_t chunksize = sizeof(int32_t) * CHUNKSIZE + BLOSC_MAX_OVERHEAD;
+    int32_t datasize = sizeof(int64_t) * CHUNKSIZE;
+    int32_t chunksize = sizeof(int64_t) * CHUNKSIZE + BLOSC_MAX_OVERHEAD;
     uint8_t *chunk = malloc(chunksize);
     int csize = blosc2_compress_ctx(schunk->cctx, data, datasize, chunk, chunksize);
     mu_assert("ERROR: chunk cannot be compressed", csize >= 0);
@@ -109,8 +120,8 @@ static char* test_insert_chunk(void) {
     dsize = blosc2_schunk_decompress_chunk(schunk, pos, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
     for (int j = 0; j < CHUNKSIZE; j++) {
-      int32_t a = data_dest[j];
-      int32_t b = a + 1;
+      int64_t a = data_dest[j];
+      int64_t b = a + 1;
       mu_assert("ERROR: bad roundtrip", a == i);
     }
     // Free allocated chunk
@@ -124,7 +135,6 @@ static char* test_insert_chunk(void) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
   }
-
 
   /* Free resources */
   if (!storage.contiguous && storage.urlpath != NULL) {
