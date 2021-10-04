@@ -35,6 +35,7 @@ test_ndata tndata[] = {
     {5,  0},
     {33, 32},
     {1,  0},
+    // {25000,  0},  // this tests super-chunks with more than 2**32 entries, but it takes too long
 };
 
 typedef struct {
@@ -49,21 +50,21 @@ test_storage tstorage[] = {
     {false, "test_update_chunk_s.b2frame"}, // disk - sframe
 };
 
-int32_t *data;
-int32_t *data_dest;
+int64_t *data;
+int64_t *data_dest;
 
 static char* test_update_chunk(void) {
   /* Free resources */
   blosc2_remove_urlpath(tdata.urlpath);
 
-  int32_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t isize = CHUNKSIZE * sizeof(int64_t);
   int dsize;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
 
   /* Create a super-chunk container */
-  cparams.typesize = sizeof(int32_t);
+  cparams.typesize = sizeof(int64_t);
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
@@ -75,20 +76,20 @@ static char* test_update_chunk(void) {
   schunk = blosc2_schunk_new(&storage);
 
   // Feed it with data
-  for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
-    for (int i = 0; i < CHUNKSIZE; i++) {
+  for (int64_t nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
+    for (int64_t i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
     int nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append", nchunks_ > 0);
   }
 
-  // Check that the chunks have been decompressed correctly
-  for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
+  // Check that the chunks can be decompressed correctly
+  for (int64_t nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
-    for (int i = 0; i < CHUNKSIZE; i++) {
-      mu_assert("ERROR: bad roundtrip", data_dest[i] == i + nchunk * CHUNKSIZE);
+    for (int64_t i = 0; i < CHUNKSIZE; i++) {
+      mu_assert("ERROR: bad roundtrip 1", data_dest[i] == i + nchunk * CHUNKSIZE);
     }
   }
 
@@ -98,8 +99,8 @@ static char* test_update_chunk(void) {
       data[j] = i;
     }
 
-    int32_t datasize = sizeof(int32_t) * CHUNKSIZE;
-    int32_t chunksize = sizeof(int32_t) * CHUNKSIZE + BLOSC_MAX_OVERHEAD;
+    int32_t datasize = sizeof(int64_t) * CHUNKSIZE;
+    int32_t chunksize = sizeof(int64_t) * CHUNKSIZE + BLOSC_MAX_OVERHEAD;
     uint8_t *chunk = malloc(chunksize);
     int csize = blosc2_compress_ctx(schunk->cctx, data, datasize, chunk, chunksize);
     mu_assert("ERROR: chunk cannot be compressed", csize >= 0);
@@ -114,8 +115,8 @@ static char* test_update_chunk(void) {
     dsize = blosc2_schunk_decompress_chunk(schunk, pos, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
     for (int j = 0; j < CHUNKSIZE; j++) {
-      int32_t a = data_dest[j];
-      mu_assert("ERROR: bad roundtrip", a == i);
+      int64_t a = data_dest[j];
+      mu_assert("ERROR: bad roundtrip 2", a == i);
     }
   }
 
@@ -157,8 +158,8 @@ int main(void) {
   install_blosc_callback_test(); /* optionally install callback test */
   blosc_init();
 
-  data = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int32_t));
-  data_dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int32_t));
+  data = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int64_t));
+  data_dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int64_t));
 
   /* Run all the suite */
   result = all_tests();
