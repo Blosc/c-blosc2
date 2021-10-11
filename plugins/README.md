@@ -125,7 +125,8 @@ Steps
 5. Finally, the Blosc development team will carry out the evaluation process
    (probably via a votation process, with the BDFL having the last say in case of the team is undecided)
    so as to decide whether the plugin is useful and hence, candidate to be integrated into the C-Blosc2
-   source code distribution.  In case of a negative decision, this will be properly stated.
+   source code distribution.  In case of a negative decision, the original author will be informed,
+   together with a series of advices for starting a new iteration if desired.
 
 
 Examples
