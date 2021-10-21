@@ -203,6 +203,7 @@ enum {
   //!< Determine the last registered codec. It is used to check if a codec is registered or not.
 };
 
+#define BLOSC2_NUMA_CPUSET_MAX (256)
 
 // Names for the different compressors shipped with Blosc
 
@@ -337,6 +338,15 @@ enum {
   BLOSC2_ERROR_PLUGIN_IO = -30,       //!< IO plugin error
   BLOSC2_ERROR_FILE_REMOVE = -31,     //!< Remove file failure
 };
+
+/**
+ * @brief NUMA strategy.
+ */
+enum {
+  BLOSC2_NUMA_NONE = 0,
+  BLOSC2_NUMA_CUSTOM = 1,
+};
+
 
 /**
  * @brief Initialize the Blosc library environment.
@@ -967,6 +977,12 @@ typedef struct {
   //!< The prefilter parameters.
   blosc2_btune *udbtune;
   //!< The user-defined BTune parameters.
+  int numa_strategy;
+  /* The NUMA strategy */
+  int numa_ncpus;
+  /* The number of cpus in numa_cpuset */
+  int numa_cpuset[256];
+  /* The set of cpus for NUMA operation */
 } blosc2_cparams;
 
 /**
@@ -975,7 +991,7 @@ typedef struct {
 static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
         BLOSC_BLOSCLZ, 0, 5, 0, 8, 1, 0, BLOSC_FORWARD_COMPAT_SPLIT,
         NULL, {0, 0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0, 0},
-        NULL, NULL, NULL};
+        NULL, NULL, NULL, BLOSC2_NUMA_NONE, 0, {}};
 
 
 /**
@@ -993,12 +1009,19 @@ typedef struct {
   //!< The postfilter function.
   blosc2_postfilter_params *postparams;
   //!< The postfilter parameters.
+  int numa_strategy;
+  /* The NUMA strategy */
+  int numa_ncpus;
+  /* The number of cpus in numa_cpuset */
+  int numa_cpuset[BLOSC2_NUMA_CPUSET_MAX];
+  /* The set of cpus for NUMA operation */
 } blosc2_dparams;
 
 /**
  * @brief Default struct for decompression params meant for user initialization.
  */
-static const blosc2_dparams BLOSC2_DPARAMS_DEFAULTS = {1, NULL, NULL, NULL};
+static const blosc2_dparams BLOSC2_DPARAMS_DEFAULTS = {1, NULL, NULL, NULL,
+                                                       BLOSC2_NUMA_NONE, 0, {}};
 
 /**
  * @brief Create a context for @a *_ctx() compression functions.

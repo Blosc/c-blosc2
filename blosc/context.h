@@ -15,6 +15,11 @@
   #include "win32/pthread.h"
 #else
   #include <pthread.h>
+  #if defined(__linux__)
+    #include <sched.h>
+    #include <numa.h>
+  #endif
+
 #endif
 
 /* Have problems using posix barriers when symbol value is 200112L */
@@ -121,6 +126,12 @@ struct blosc2_context_s {
   int16_t end_threads;
   pthread_t *threads;
   struct thread_context *thread_contexts; /* only for user-managed threads */
+  int numa_strategy;
+  /* The NUMA strategy */
+  int numa_ncpus;
+  /* The number of cpus in numa_cpuset */
+  int numa_cpuset[BLOSC2_NUMA_CPUSET_MAX];
+  /* The set of cpus for NUMA operation */
   pthread_mutex_t count_mutex;
 #ifdef BLOSC_POSIX_BARRIERS
   pthread_barrier_t barr_init;

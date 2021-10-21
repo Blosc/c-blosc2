@@ -129,6 +129,7 @@ endif()
 if(UNIX AND NOT APPLE)
     set(LIBS ${LIBS} "rt")
     set(LIBS ${LIBS} "m")
+    set(LIBS ${LIBS} "numa")
     # set(LIBS ${LIBS} "profiler")
 endif()
 

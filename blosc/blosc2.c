@@ -8,6 +8,10 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+// We need to define this here to access non portable pthread functionality
+#if defined(__linux__)
+  #define _GNU_SOURCE
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +24,6 @@
 #include "blosc2.h"
 #include "blosc-private.h"
 #include "frame.h"
-
 
 #if defined(USING_CMAKE)
   #include "config.h"
@@ -1790,7 +1793,16 @@ static int init_thread_context(struct thread_context* thread_context, blosc2_con
 
   ebsize = context->blocksize + context->typesize * (signed)sizeof(int32_t);
   thread_context->tmp_nbytes = (size_t)4 * ebsize;
+#if defined(__linux__)
+  if (context->numa_strategy != BLOSC2_NUMA_NONE) {
+    thread_context->tmp = numa_alloc_local(thread_context->tmp_nbytes);
+  }
+  else {
+    thread_context->tmp = my_malloc(thread_context->tmp_nbytes);
+  }
+#else
   thread_context->tmp = my_malloc(thread_context->tmp_nbytes);
+#endif
   BLOSC_ERROR_NULL(thread_context->tmp, BLOSC2_ERROR_MEMORY_ALLOC);
   thread_context->tmp2 = thread_context->tmp + ebsize;
   thread_context->tmp3 = thread_context->tmp2 + ebsize;
@@ -1834,7 +1846,16 @@ create_thread_context(blosc2_context* context, int32_t tid) {
 
 /* free members of thread_context, but not thread_context itself */
 static void destroy_thread_context(struct thread_context* thread_context) {
+#if defined(__linux__)
+  if (thread_context->parent_context->numa_strategy != BLOSC2_NUMA_NONE) {
+    numa_free(thread_context->tmp, thread_context->tmp_nbytes);
+  }
+  else {
+    my_free(thread_context->tmp);
+  }
+#else
   my_free(thread_context->tmp);
+#endif
 #if defined(HAVE_ZSTD)
   if (thread_context->zstd_cctx != NULL) {
     ZSTD_freeCCtx(thread_context->zstd_cctx);
@@ -3090,6 +3111,15 @@ int init_threadpool(blosc2_context *context) {
       pthread_attr_setdetachstate(&context->ct_attr, PTHREAD_CREATE_JOINABLE);
     #endif
 
+
+    if (context->numa_strategy == BLOSC2_NUMA_CUSTOM) {
+      if (context->numa_ncpus != context->nthreads) {
+        BLOSC_TRACE_ERROR("Number of cores in numa_cpus (%d) is different than nthreads (%d).\n",
+                              context->numa_ncpus, context->nthreads);
+        return BLOSC2_ERROR_THREAD_CREATE;
+      }
+    }
+
     /* Make space for thread handlers */
     context->threads = (pthread_t*)my_malloc(
             context->nthreads * sizeof(pthread_t));
@@ -3111,6 +3141,21 @@ int init_threadpool(blosc2_context *context) {
                           "\tError detail: %s\n", rc2, strerror(rc2));
         return BLOSC2_ERROR_THREAD_CREATE;
       }
+
+#if defined(__linux__)
+      if (context->numa_strategy == BLOSC2_NUMA_CUSTOM) {
+        cpu_set_t set;
+        CPU_ZERO(&set);
+        CPU_SET(context->numa_cpuset[tid], &set);
+        rc2 = pthread_setaffinity_np(context->threads[tid], sizeof(set), &set);
+        if (rc2) {
+          BLOSC_TRACE_ERROR("Return code from pthread_setaffinity_np() is %d.\n"
+                            "\tError detail: %s\n", rc2, strerror(rc2));
+          return BLOSC2_ERROR_THREAD_CREATE;
+        }
+      }
+#endif
+
     }
   }
 
@@ -3523,6 +3568,18 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     context->udbtune = cparams.udbtune;
   }
 
+  if (cparams.numa_ncpus >= BLOSC2_NUMA_CPUSET_MAX) {
+    BLOSC_TRACE_ERROR("numa_ncpus exceeded (%d >= %d)", cparams.numa_ncpus, BLOSC2_NUMA_CPUSET_MAX);
+    return NULL;
+  }
+  memset(context->numa_cpuset, 0, sizeof(context->numa_cpuset));
+  if (cparams.numa_ncpus != 0) {
+    for (int i = 0; i < cparams.numa_ncpus; i++) {
+      context->numa_cpuset[i] = cparams.numa_cpuset[i];
+    }
+  }
+  context->numa_strategy = cparams.numa_strategy;
+
   return context;
 }
 
@@ -3547,6 +3604,18 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
     BLOSC_ERROR_NULL(context->postparams, NULL);
     memcpy(context->postparams, dparams.postparams, sizeof(blosc2_postfilter_params));
   }
+
+  if (dparams.numa_ncpus >= BLOSC2_NUMA_CPUSET_MAX) {
+    BLOSC_TRACE_ERROR("numa_ncpus exceeded (%d >= %d)", dparams.numa_ncpus, BLOSC2_NUMA_CPUSET_MAX);
+    return NULL;
+  }
+  memset(context->numa_cpuset, 0, sizeof(context->numa_cpuset));
+  if (dparams.numa_ncpus != 0) {
+    for (int i = 0; i < dparams.numa_ncpus; i++) {
+      context->numa_cpuset[i] = dparams.numa_cpuset[i];
+    }
+  }
+  context->numa_strategy = dparams.numa_strategy;
 
   return context;
 }

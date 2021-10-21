@@ -9,8 +9,8 @@
 **********************************************************************/
 
 
-#ifndef IARRAY_BLOSC_PRIVATE_H
-#define IARRAY_BLOSC_PRIVATE_H
+#ifndef BLOSC_PRIVATE_H
+#define BLOSC_PRIVATE_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -179,4 +179,4 @@ int register_codec_private(blosc2_codec *codec);
 }
 #endif
 
-#endif //IARRAY_BLOSC_PRIVATE_H
+#endif //BLOSC_PRIVATE_H
