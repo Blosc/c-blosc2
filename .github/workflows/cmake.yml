@@ -99,6 +99,7 @@ jobs:
       if: runner.os == 'Linux' && matrix.packages
       run: |
         sudo apt-get update
+        sudo apt-get install -y libnuma-dev
         sudo apt-get install -y ${{ matrix.packages }}
 
     - name: Install packages (Windows)
