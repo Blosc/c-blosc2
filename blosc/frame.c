@@ -1830,8 +1830,9 @@ int get_coffset(blosc2_frame_s* frame, int32_t header_len, int64_t cbytes,
     return BLOSC2_ERROR_DATA;
   }
 
-  // Get the 64-bit offset
-  int rc = blosc2_getitem(coffsets, off_cbytes, nchunk, 1, offset, (int32_t)sizeof(int64_t));
+  // Get the 64-bit offset.  Use the dctx so as to reuse internal data buffers.
+  int rc = blosc2_getitem_ctx(frame->schunk->dctx, coffsets, off_cbytes, nchunk,
+                              1, offset, (int32_t)sizeof(int64_t));
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Problems retrieving a chunk offset.");
   } else if (!frame->sframe && *offset > frame->len) {

@@ -184,15 +184,29 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
   fprintf(ofile, "memcpy(read):\t\t %6.1f us, %.1f MB/s\n",
           tmemcpy, (size * 1e6) / (tmemcpy * MB));
 
-  for (clevel = 0; clevel < 10; clevel++) {
+  /* Create a context for compression */
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  int codec = blosc_compname_to_compcode(compressor);
+  cparams.typesize = elsize;
+  cparams.compcode = codec;
+  cparams.nthreads = nthreads;
+  cparams.filters[BLOSC2_MAX_FILTERS - 1] = doshuffle;
 
+  /* Create a context for compression */
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  dparams.nthreads = nthreads;
+  blosc2_context* dctx = blosc2_create_dctx(dparams);
+
+  for (clevel = 0; clevel < 10; clevel++) {
     fprintf(ofile, "Compression level: %d\n", clevel);
+    cparams.clevel = clevel;
+    blosc2_context* cctx = blosc2_create_cctx(cparams);
 
     blosc_set_timestamp(&last);
     for (i = 0; i < niter_c; i++) {
       for (j = 0; j < nchunks; j++) {
-        cbytes = blosc_compress(clevel, doshuffle, (size_t)elsize, size, src,
-                                dest[j], size + BLOSC_MAX_OVERHEAD);
+        cbytes = blosc2_compress_ctx(cctx, src, (int32_t)size, dest[j], (int32_t)size + BLOSC_MAX_OVERHEAD);
+
       }
     }
     blosc_set_timestamp(&current);
@@ -220,7 +234,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
           nbytes = (int)size;
         }
         else {
-          nbytes = blosc_decompress(dest[j], dest2, size);
+          nbytes = blosc2_decompress_ctx(dctx, dest[j], (int32_t)size + BLOSC_MAX_OVERHEAD, dest2, (int32_t)size);
         }
       }
     }
@@ -254,8 +268,10 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
 
     if (i == (int)size) fprintf(ofile, "OK\n");
 
+    blosc2_free_ctx(cctx);
   } /* End clevel loop */
 
+  blosc2_free_ctx(dctx);
 
   /* To compute the totalsize, we should take into account the 10
      compression levels */

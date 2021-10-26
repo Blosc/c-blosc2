@@ -23,7 +23,7 @@ uint8_t filter;
 
 static char* test_lazy_chunk(void) {
   int32_t *data = malloc(CHUNKSIZE * sizeof(int32_t));
-    int32_t *data_dest = malloc(CHUNKSIZE * sizeof(int32_t));
+  int32_t *data_dest = malloc(CHUNKSIZE * sizeof(int32_t));
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   int cbytes;

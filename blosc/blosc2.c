@@ -1783,6 +1783,34 @@ static int parallel_blosc(blosc2_context* context) {
   return (int)context->output_bytes;
 }
 
+static uint8_t* alloc_local_tmp(blosc2_context* context, size_t nbytes) {
+  uint8_t* tmp = NULL;
+#if defined(__linux__)
+  if (context->numa_strategy != BLOSC2_NUMA_NONE) {
+    tmp = numa_alloc_local(nbytes);
+  }
+  else {
+    tmp = my_malloc(nbytes);
+  }
+#else
+  tmp = my_malloc(nbytes);
+#endif
+  return tmp;
+}
+
+static void free_local_tmp(blosc2_context* context, uint8_t* tmp, size_t nbytes) {
+#if defined(__linux__)
+  if (context->numa_strategy != BLOSC2_NUMA_NONE) {
+    numa_free(tmp, nbytes);
+  }
+  else {
+    my_free(tmp);
+  }
+#else
+  my_free(tmp);
+#endif
+}
+
 /* initialize a thread_context that has already been allocated */
 static int init_thread_context(struct thread_context* thread_context, blosc2_context* context, int32_t tid)
 {
@@ -1793,16 +1821,7 @@ static int init_thread_context(struct thread_context* thread_context, blosc2_con
 
   ebsize = context->blocksize + context->typesize * (signed)sizeof(int32_t);
   thread_context->tmp_nbytes = (size_t)4 * ebsize;
-#if defined(__linux__)
-  if (context->numa_strategy != BLOSC2_NUMA_NONE) {
-    thread_context->tmp = numa_alloc_local(thread_context->tmp_nbytes);
-  }
-  else {
-    thread_context->tmp = my_malloc(thread_context->tmp_nbytes);
-  }
-#else
-  thread_context->tmp = my_malloc(thread_context->tmp_nbytes);
-#endif
+  thread_context->tmp = alloc_local_tmp(context, thread_context->tmp_nbytes);
   BLOSC_ERROR_NULL(thread_context->tmp, BLOSC2_ERROR_MEMORY_ALLOC);
   thread_context->tmp2 = thread_context->tmp + ebsize;
   thread_context->tmp3 = thread_context->tmp2 + ebsize;
@@ -1846,16 +1865,7 @@ create_thread_context(blosc2_context* context, int32_t tid) {
 
 /* free members of thread_context, but not thread_context itself */
 static void destroy_thread_context(struct thread_context* thread_context) {
-#if defined(__linux__)
-  if (thread_context->parent_context->numa_strategy != BLOSC2_NUMA_NONE) {
-    numa_free(thread_context->tmp, thread_context->tmp_nbytes);
-  }
-  else {
-    my_free(thread_context->tmp);
-  }
-#else
-  my_free(thread_context->tmp);
-#endif
+  free_local_tmp(thread_context->parent_context, thread_context->tmp, thread_context->tmp_nbytes);
 #if defined(HAVE_ZSTD)
   if (thread_context->zstd_cctx != NULL) {
     ZSTD_freeCCtx(thread_context->zstd_cctx);
@@ -1875,7 +1885,6 @@ void free_thread_context(struct thread_context* thread_context) {
   destroy_thread_context(thread_context);
   my_free(thread_context);
 }
-
 
 int check_nthreads(blosc2_context* context) {
   if (context->nthreads <= 0) {
@@ -1967,7 +1976,22 @@ static int initialize_context_compression(
     context->udbtune->btune_next_blocksize(context);
   }
 
-  char* envvar = getenv("BLOSC_WARN");
+  /* Check for a BLOSC_NUMA environment variable */
+  int numa_strategy = context->numa_strategy;
+  char* envvar = getenv("BLOSC_NUMA");
+  if (envvar != NULL) {
+    // Override the value in context and always activate it
+    numa_strategy = BLOSC2_NUMA_CUSTOM;
+  }
+  if (numa_strategy != BLOSC2_NUMA_NONE) {
+    context->numa_strategy = numa_strategy;
+    context->numa_ncpus = new_nthreads;
+    for (int ncpu = 0; ncpu < new_nthreads; ncpu++) {
+      context->numa_cpuset[ncpu] = ncpu;
+    }
+  }
+
+  envvar = getenv("BLOSC_WARN");
   int warnlvl = 0;
   if (envvar != NULL) {
     warnlvl = strtol(envvar, NULL, 10);
@@ -2055,6 +2079,21 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
       !context->special_type) {
     // A compressed buffer with only a header can only contain a zero-length buffer
     return 0;
+  }
+
+  /* Check for a BLOSC_NUMA environment variable */
+  int numa_strategy = context->numa_strategy;
+  char* envvar = getenv("BLOSC_NUMA");
+  if (envvar != NULL) {
+    // Override the value in context and always activate it
+    numa_strategy = BLOSC2_NUMA_CUSTOM;
+  }
+  if (numa_strategy != BLOSC2_NUMA_NONE) {
+    context->numa_strategy = numa_strategy;
+    context->numa_ncpus = context->nthreads;
+    for (int ncpu = 0; ncpu < context->nthreads; ncpu++) {
+      context->numa_cpuset[ncpu] = ncpu;
+    }
   }
 
   context->bstarts = (int32_t *) (context->src + context->header_overhead);
@@ -2461,27 +2500,6 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     }
   }
 
-  /* Check for a BLOSC_NUMA environment variable */
-  int numa_strategy = BLOSC2_NUMA_NONE;
-  int numa_ncpus = 0;
-  int numa_cpuset[BLOSC2_NUMA_CPUSET_MAX];
-  envvar = getenv("BLOSC_NUMA");
-  if (envvar != NULL) {
-    if (strcmp(envvar, "ALL") == 0) {
-      numa_strategy = BLOSC2_NUMA_CUSTOM;
-      numa_ncpus = g_nthreads;
-      if (numa_ncpus >= BLOSC2_NUMA_CPUSET_MAX) {
-        return BLOSC2_ERROR_NUMA_PINNING;
-      }
-      for (int ncpu = 0; ncpu < numa_ncpus; ncpu++) {
-        numa_cpuset[ncpu] = ncpu;
-      }
-    }
-    else {
-      return BLOSC2_ERROR_NUMA_PINNING;
-    }
-  }
-
   /* Check for a BLOSC_NOLOCK environment variable.  It is important
      that this should be the last env var so that it can take the
      previous ones into account */
@@ -2501,13 +2519,6 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     cparams.compcode = (uint8_t)g_compressor;
     cparams.clevel = (uint8_t)clevel;
     cparams.nthreads = g_nthreads;
-    if (numa_strategy != BLOSC2_NUMA_NONE) {
-      cparams.numa_strategy = numa_strategy;
-      cparams.numa_ncpus = numa_ncpus;
-      for (int ncpu = 0; ncpu < numa_ncpus; ncpu++) {
-        cparams.numa_cpuset[ncpu] = ncpu;
-      }
-    }
     cctx = blosc2_create_cctx(cparams);
     /* Do the actual compression */
     result = blosc2_compress_ctx(cctx, src, srcsize, dest, destsize);
@@ -2761,9 +2772,9 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
   struct thread_context* scontext = context->serial_context;
   /* Resize the temporaries in serial context if needed */
   if (header->blocksize > scontext->tmp_blocksize) {
-    my_free(scontext->tmp);
+    free_local_tmp(context, scontext->tmp, scontext->tmp_nbytes);
     scontext->tmp_nbytes = (size_t)4 * ebsize;
-    scontext->tmp = my_malloc(scontext->tmp_nbytes);
+    scontext->tmp = alloc_local_tmp(context, scontext->tmp_nbytes);
     BLOSC_ERROR_NULL(scontext->tmp, BLOSC2_ERROR_MEMORY_ALLOC);
     scontext->tmp2 = scontext->tmp + ebsize;
     scontext->tmp3 = scontext->tmp2 + ebsize;
@@ -2834,6 +2845,18 @@ int blosc2_getitem(const void* src, int32_t srcsize, int start, int nitems, void
   context.schunk = g_schunk;
   context.nthreads = 1;  // force a serial decompression; fixes #95
 
+  /* Check for a BLOSC_NUMA environment variable.
+   * Critical for avoiding leaks in this function when using NUMA. */
+  int numa_strategy = BLOSC2_NUMA_NONE;
+  char* envvar = getenv("BLOSC_NUMA");
+  if (envvar != NULL) {
+    // Override the value in context and always activate it
+    numa_strategy = BLOSC2_NUMA_CUSTOM;
+    context.numa_strategy = numa_strategy;
+    context.numa_ncpus = context.nthreads;
+    context.numa_cpuset[0] = 0;
+  }
+
   /* Call the actual getitem function */
   result = blosc2_getitem_ctx(&context, src, srcsize, start, nitems, dest, destsize);
 
@@ -2851,7 +2874,7 @@ int blosc_getitem(const void* src, int start, int nitems, void* dest) {
 }
 
 int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize,
-    int start, int nitems, void* dest, int32_t destsize) {
+                       int start, int nitems, void* dest, int32_t destsize) {
   blosc_header header;
   int result;
 
@@ -2865,6 +2888,18 @@ int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize
   context->srcsize = srcsize;
   context->dest = dest;
   context->destsize = destsize;
+
+  /* Check for a BLOSC_NUMA environment variable.
+   * Critical for avoiding leaks in this function when using NUMA. */
+  int numa_strategy = context->numa_strategy;
+  char* envvar = getenv("BLOSC_NUMA");
+  if (envvar != NULL) {
+    // Override the value in context and always activate it
+    numa_strategy = BLOSC2_NUMA_CUSTOM;
+    context->numa_strategy = numa_strategy;
+    context->numa_ncpus = context->nthreads;
+    context->numa_cpuset[0] = 0;
+  }
 
   result = blosc2_initialize_context_from_header(context, &header);
   if (result < 0) {
@@ -2922,9 +2957,9 @@ static void t_blosc_do_job(void *ctxt)
 
   /* Resize the temporaries if needed */
   if (blocksize > thcontext->tmp_blocksize) {
-    my_free(thcontext->tmp);
+    free_local_tmp(context, thcontext->tmp, thcontext->tmp_nbytes);
     thcontext->tmp_nbytes = (size_t) 4 * ebsize;
-    thcontext->tmp = my_malloc(thcontext->tmp_nbytes);
+    thcontext->tmp = alloc_local_tmp(context, thcontext->tmp_nbytes);
     thcontext->tmp2 = thcontext->tmp + ebsize;
     thcontext->tmp3 = thcontext->tmp2 + ebsize;
     thcontext->tmp4 = thcontext->tmp3 + ebsize;
@@ -3126,7 +3161,7 @@ int init_threadpool(blosc2_context *context) {
 #endif
 
   if (threads_callback) {
-      /* Create thread contexts to store data for callback threads */
+    /* Create thread contexts to store data for callback threads */
     context->thread_contexts = (struct thread_context *)my_malloc(
             context->nthreads * sizeof(struct thread_context));
     BLOSC_ERROR_NULL(context->thread_contexts, BLOSC2_ERROR_MEMORY_ALLOC);
@@ -3139,7 +3174,6 @@ int init_threadpool(blosc2_context *context) {
       pthread_attr_init(&context->ct_attr);
       pthread_attr_setdetachstate(&context->ct_attr, PTHREAD_CREATE_JOINABLE);
     #endif
-
 
     if (context->numa_strategy == BLOSC2_NUMA_CUSTOM) {
       if (context->numa_ncpus != context->nthreads) {
@@ -3485,8 +3519,9 @@ int release_threadpool(blosc2_context *context) {
   if (context->threads_started > 0) {
     if (threads_callback) {
       /* free context data for user-managed threads */
-      for (t=0; t<context->threads_started; t++)
+      for (t = 0; t < context->threads_started; t++) {
         destroy_thread_context(context->thread_contexts + t);
+      }
       my_free(context->thread_contexts);
     }
     else {
@@ -3641,6 +3676,7 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   }
   memset(context->numa_cpuset, 0, sizeof(context->numa_cpuset));
   if (dparams.numa_ncpus > 0) {
+    context->numa_ncpus = dparams.numa_ncpus;
     for (int i = 0; i < dparams.numa_ncpus; i++) {
       context->numa_cpuset[i] = dparams.numa_cpuset[i];
     }
