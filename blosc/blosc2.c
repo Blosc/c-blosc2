@@ -2461,6 +2461,27 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     }
   }
 
+  /* Check for a BLOSC_NUMA environment variable */
+  int numa_strategy = BLOSC2_NUMA_NONE;
+  int numa_ncpus = 0;
+  int numa_cpuset[BLOSC2_NUMA_CPUSET_MAX];
+  envvar = getenv("BLOSC_NUMA");
+  if (envvar != NULL) {
+    if (strcmp(envvar, "ALL") == 0) {
+      numa_strategy = BLOSC2_NUMA_CUSTOM;
+      numa_ncpus = g_nthreads;
+      if (numa_ncpus >= BLOSC2_NUMA_CPUSET_MAX) {
+        return BLOSC2_ERROR_NUMA_PINNING;
+      }
+      for (int ncpu = 0; ncpu < numa_ncpus; ncpu++) {
+        numa_cpuset[ncpu] = ncpu;
+      }
+    }
+    else {
+      return BLOSC2_ERROR_NUMA_PINNING;
+    }
+  }
+
   /* Check for a BLOSC_NOLOCK environment variable.  It is important
      that this should be the last env var so that it can take the
      previous ones into account */
@@ -2480,6 +2501,13 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     cparams.compcode = (uint8_t)g_compressor;
     cparams.clevel = (uint8_t)clevel;
     cparams.nthreads = g_nthreads;
+    if (numa_strategy != BLOSC2_NUMA_NONE) {
+      cparams.numa_strategy = numa_strategy;
+      cparams.numa_ncpus = numa_ncpus;
+      for (int ncpu = 0; ncpu < numa_ncpus; ncpu++) {
+        cparams.numa_cpuset[ncpu] = ncpu;
+      }
+    }
     cctx = blosc2_create_cctx(cparams);
     /* Do the actual compression */
     result = blosc2_compress_ctx(cctx, src, srcsize, dest, destsize);
@@ -2496,6 +2524,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   uint8_t* filters_meta = calloc(1, BLOSC2_MAX_FILTERS);
   BLOSC_ERROR_NULL(filters_meta, BLOSC2_ERROR_MEMORY_ALLOC);
   build_filters(doshuffle, g_delta, typesize, filters);
+  g_global_context->splitmode = BLOSC_FORWARD_COMPAT_SPLIT;
   error = initialize_context_compression(
     g_global_context, src, srcsize, dest, destsize, clevel, filters,
     filters_meta, (int32_t)typesize, g_compressor, g_force_blocksize, g_nthreads, g_nthreads,
@@ -3573,7 +3602,8 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     return NULL;
   }
   memset(context->numa_cpuset, 0, sizeof(context->numa_cpuset));
-  if (cparams.numa_ncpus != 0) {
+  if (cparams.numa_ncpus > 0) {
+    context->numa_ncpus = cparams.numa_ncpus;
     for (int i = 0; i < cparams.numa_ncpus; i++) {
       context->numa_cpuset[i] = cparams.numa_cpuset[i];
     }
@@ -3610,7 +3640,7 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
     return NULL;
   }
   memset(context->numa_cpuset, 0, sizeof(context->numa_cpuset));
-  if (dparams.numa_ncpus != 0) {
+  if (dparams.numa_ncpus > 0) {
     for (int i = 0; i < dparams.numa_ncpus; i++) {
       context->numa_cpuset[i] = dparams.numa_cpuset[i];
     }

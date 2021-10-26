@@ -337,6 +337,7 @@ enum {
   BLOSC2_ERROR_SCHUNK_SPECIAL = -29,  //!< Special super-chunk failure
   BLOSC2_ERROR_PLUGIN_IO = -30,       //!< IO plugin error
   BLOSC2_ERROR_FILE_REMOVE = -31,     //!< Remove file failure
+  BLOSC2_ERROR_NUMA_PINNING = -32,    //!< NUMA pinning failure
 };
 
 /**
@@ -981,7 +982,7 @@ typedef struct {
   /* The NUMA strategy */
   int numa_ncpus;
   /* The number of cpus in numa_cpuset */
-  int numa_cpuset[256];
+  int numa_cpuset[BLOSC2_NUMA_CPUSET_MAX];
   /* The set of cpus for NUMA operation */
 } blosc2_cparams;
 
