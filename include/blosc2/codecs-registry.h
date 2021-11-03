@@ -10,6 +10,7 @@
 
 enum {
     BLOSC_CODEC_NDLZ = 32,
+    BLOSC_CODEC_ZFP = 33,
 };
 
 void register_codecs();
