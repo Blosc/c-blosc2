@@ -3,7 +3,7 @@ set(SOURCES ${SOURCES} ndlz.c ndlz.h ndlz-private.h ndlz4x4.c ndlz4x4.h ndlz8x8.
 
 # targets
 if(BUILD_TESTS)
-    add_executable(test_ndlz test_ndlz.c ${SOURCES})
+    add_executable(test_ndlz test_ndlz.c)
     # Define the BLOSC_TESTING symbol so normally-hidden functions
     # aren't hidden from the view of the test programs.
     set_property(

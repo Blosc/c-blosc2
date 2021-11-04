@@ -4,7 +4,7 @@ set(SOURCES ndcell.c ndcell.h)
 if(BUILD_TESTS)
 
     # targets
-    add_executable(test_ndcell test_ndcell.c ${SOURCES})
+    add_executable(test_ndcell test_ndcell.c)
     # Define the BLOSC_TESTING symbol so normally-hidden functions
     # aren't hidden from the view of the test programs.
     set_property(

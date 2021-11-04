@@ -3,8 +3,8 @@ set(SOURCES ndmean.c ndmean.h)
 
 if(BUILD_TESTS)
     # targets
-    add_executable(test_ndmean_repart test_ndmean_repart.c ${SOURCES})
-    add_executable(test_ndmean_mean test_ndmean_mean.c ${SOURCES})
+    add_executable(test_ndmean_repart test_ndmean_repart.c)
+    add_executable(test_ndmean_mean test_ndmean_mean.c)
     # Define the BLOSC_TESTING symbol so normally-hidden functions
     # aren't hidden from the view of the test programs.
     set_property(

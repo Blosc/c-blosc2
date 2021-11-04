@@ -52,16 +52,16 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
 
     switch (ndim) {
         case 1:
-            field = zfp_field_1d(input, type, shape[0]);
+            field = zfp_field_1d((void*) input, type, shape[0]);
             break;
         case 2:
-            field = zfp_field_2d(input, type, shape[0], shape[1]);
+            field = zfp_field_2d((void*) input, type, shape[0], shape[1]);
             break;
         case 3:
-            field = zfp_field_3d(input, type, shape[0], shape[1], shape[2]);
+            field = zfp_field_3d((void*) input, type, shape[0], shape[1], shape[2]);
             break;
         case 4:
-            field = zfp_field_4d(input, type, shape[0], shape[1], shape[2], shape[3]);
+            field = zfp_field_4d((void*) input, type, shape[0], shape[1], shape[2], shape[3]);
             break;
         default:
             printf("\n ZFP is not available for this number of dims \n");
@@ -82,7 +82,7 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
     zfp_stream_close(zfp);
     stream_close(stream);
 
-    return zfpsize;
+    return (int) zfpsize;
 }
 
 int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
@@ -104,6 +104,8 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
     deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
     free(smeta);
 
+    size_t typesize;
+    int flags;
     zfp_type type;     /* array scalar type */
     zfp_field* field;  /* array meta data */
     zfp_stream* zfp;   /* compressed stream */
@@ -111,7 +113,9 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
     size_t zfpsize;    /* byte size of compressed stream */
     double tolerance = 1e-3;
 
-    switch (meta) {
+    blosc_cbuffer_metainfo(input, &typesize, &flags);
+
+    switch (typesize) {
         case sizeof(float):
             type = zfp_type_float;
             break;
@@ -131,16 +135,16 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
 
     switch (ndim) {
         case 1:
-            field = zfp_field_1d(input, type, shape[0]);
+            field = zfp_field_1d((void*) input, type, shape[0]);
             break;
         case 2:
-            field = zfp_field_2d(input, type, shape[0], shape[1]);
+            field = zfp_field_2d((void*) input, type, shape[0], shape[1]);
             break;
         case 3:
-            field = zfp_field_3d(input, type, shape[0], shape[1], shape[2]);
+            field = zfp_field_3d((void*) input, type, shape[0], shape[1], shape[2]);
             break;
         case 4:
-            field = zfp_field_4d(input, type, shape[0], shape[1], shape[2], shape[3]);
+            field = zfp_field_4d((void*) input, type, shape[0], shape[1], shape[2], shape[3]);
             break;
         default:
             printf("\n ZFP is not available for this number of dims \n");
@@ -161,6 +165,6 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
     zfp_stream_close(zfp);
     stream_close(stream);
 
-    return zfpsize;
+    return (int) zfpsize;
 }
 
