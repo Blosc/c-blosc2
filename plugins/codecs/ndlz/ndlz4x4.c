@@ -64,7 +64,7 @@ int ndlz4_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
   int32_t* chunkshape = malloc(8 * sizeof(int32_t));
   int32_t* blockshape = malloc(8 * sizeof(int32_t));
   uint8_t* smeta;
-  uint32_t smeta_len;
+  int32_t smeta_len;
   if (blosc2_meta_get(cparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
     printf("Blosc error");
     return -1;
@@ -76,7 +76,7 @@ int ndlz4_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
     fprintf(stderr, "This codec only works for ndim = 2");
     return -1;
   }
-  
+
   if (input_len != (blockshape[0] * blockshape[1])) {
     printf("Length not equal to blocksize \n");
     return -1;
