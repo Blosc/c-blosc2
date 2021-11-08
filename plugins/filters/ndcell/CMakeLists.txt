@@ -1,6 +1,3 @@
-# sources
-set(SOURCES ndcell.c ndcell.h)
-
 if(BUILD_TESTS)
 
     # targets

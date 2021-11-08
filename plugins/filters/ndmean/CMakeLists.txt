@@ -1,6 +1,3 @@
-# sources
-set(SOURCES ndmean.c ndmean.h)
-
 if(BUILD_TESTS)
     # targets
     add_executable(test_ndmean_repart test_ndmean_repart.c)
