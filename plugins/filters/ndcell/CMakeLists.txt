@@ -1,5 +1,5 @@
 # sources
-set(SOURCES ndcell.c ndcell.h)
+set(SOURCES ${SOURCES} ../plugins/filters/ndcell/ndcell.c ../plugins/filters/ndcell/ndcell.h PARENT_SCOPE)
 
 if(BUILD_TESTS)
 

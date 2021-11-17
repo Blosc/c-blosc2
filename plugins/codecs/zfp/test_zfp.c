@@ -132,9 +132,9 @@ int main(void) {
 
     int result;
     blosc_init();   // this is mandatory for initiallizing the plugin mechanism
-    result = rand_();
+ /*   result = rand_();
     printf("rand: %d obtained \n \n", result);
-    result = same_cells();
+  */  result = same_cells();
     printf("same_cells: %d obtained \n \n", result);
     result = some_matches();
     printf("some_matches: %d obtained \n \n", result);
