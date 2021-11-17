@@ -69,18 +69,20 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
     }
 
     zfpsize = zfp_compress(zfp, field);
-    if (!zfpsize) {
-        printf("\n Compression failed\n");
-        zfp_field_free(field);
-        zfp_stream_close(zfp);
-        stream_close(stream);
-        return 0;
-    }
 
     /* clean up */
     zfp_field_free(field);
     zfp_stream_close(zfp);
     stream_close(stream);
+
+    if (!zfpsize) {
+        printf("\n ZFP: Compression failed\n");
+        return 0;
+    }
+    if(zfpsize > input_len) {
+        printf("\n ZFP: Compressed data is bigger than input! \n");
+        return 0;
+    }
 
     return (int) zfpsize;
 }

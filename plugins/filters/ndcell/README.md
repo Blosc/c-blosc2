@@ -20,8 +20,7 @@ The parameters used by *NDCELL* are the ones specified in the *blosc2_filter*
 structure of *blosc2.h*.
 Furthermore, since *NDCELL* goes through dataset blocks dividing them into fixed size cells,
 user must specify the parameter meta as the cellshape, so if in a
-3-dim dataset user specifies meta = 4, then cellshape will be 4x4x4. If user tries to use other value for meta, the codec
-will return an error value.
+3-dim dataset user specifies meta = 4, then cellshape will be 4x4x4. 
 
 Plugin behaviour
 -------------------

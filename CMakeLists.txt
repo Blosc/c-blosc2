@@ -392,8 +392,14 @@ endif()
 include_directories(include)
 
 # subdirectories
-add_subdirectory(blosc)
+set(SOURCES)
 
+if(BUILD_PLUGINS)
+    enable_testing()
+    add_subdirectory(plugins)
+endif()
+
+add_subdirectory(blosc)
 
 if(BUILD_TESTS)
     enable_testing()
@@ -415,11 +421,6 @@ endif()
 
 if(BUILD_EXAMPLES)
     add_subdirectory(examples)
-endif()
-
-if(BUILD_PLUGINS)
-    enable_testing()
-    add_subdirectory(plugins)
 endif()
 
 

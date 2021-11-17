@@ -39,7 +39,7 @@ endif()
 include_directories(${BLOSC_INCLUDE_DIRS})
 
 # library sources
-set(SOURCES blosc2.c blosclz.c fastcopy.c fastcopy.h schunk.c frame.c stune.c stune.h
+set(SOURCES ${SOURCES} blosc2.c blosclz.c fastcopy.c fastcopy.h schunk.c frame.c stune.c stune.h
         context.h delta.c delta.h shuffle-generic.c bitshuffle-generic.c trunc-prec.c trunc-prec.h
         timestamp.c sframe.c directories.c blosc2-stdio.c)
 if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
@@ -132,21 +132,6 @@ if(UNIX AND NOT APPLE)
     # set(LIBS ${LIBS} "profiler")
 endif()
 
-if (BUILD_PLUGINS)
-    file(GLOB CODECS_FILES ${PROJECT_SOURCE_DIR}/plugins/codecs/*/*.c ${PROJECT_SOURCE_DIR}/plugins/codecs/codecs-registry.c)
-    file(GLOB CODECS_RM_FILES ${PROJECT_SOURCE_DIR}/plugins/codecs/*/test_*.c)
-    foreach(file ${CODECS_RM_FILES})
-        list(REMOVE_ITEM CODECS_FILES ${file})
-    endforeach()
-    file(GLOB FILTERS_FILES ${PROJECT_SOURCE_DIR}/plugins/filters/*/*.c ${PROJECT_SOURCE_DIR}/plugins/filters/filters-registry.c)
-    file(GLOB FILTERS_RM_FILES ${PROJECT_SOURCE_DIR}/plugins/filters/*/test_*.c)
-    foreach(file ${FILTERS_RM_FILES})
-        list(REMOVE_ITEM FILTERS_FILES ${file})
-    endforeach()
-    set(PLUGINS_FILES ${CODECS_FILES} ${FILTERS_FILES})
-  #  message(STATUS "PLUGINS_FILES = ${PLUGINS_FILES}")
-    set(SOURCES ${SOURCES} ${PLUGINS_FILES})
-endif ()
 
 # targets
 if(BUILD_SHARED)
