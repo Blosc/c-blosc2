@@ -34,11 +34,11 @@ static int test_zfp(blosc2_schunk* schunk) {
 
     /* Create a context for compression */
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-    cparams.splitmode = BLOSC_ALWAYS_SPLIT;
+    cparams.splitmode = BLOSC_NEVER_SPLIT;
     cparams.typesize = schunk->typesize;
     cparams.compcode = BLOSC_CODEC_ZFP;
     cparams.compcode_meta = schunk->typesize;
-    cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
+    cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOFILTER;
     cparams.clevel = 5;
     cparams.nthreads = 1;
     cparams.blocksize = schunk->blocksize;
@@ -48,6 +48,7 @@ static int test_zfp(blosc2_schunk* schunk) {
 
     blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
     dparams.nthreads = 1;
+    dparams.schunk = schunk;
     blosc2_context *dctx;
     dctx = blosc2_create_dctx(dparams);
 
@@ -58,6 +59,12 @@ static int test_zfp(blosc2_schunk* schunk) {
             printf("Error decompressing chunk \n");
             return -1;
         }
+/*
+        printf("\n chunk \n");
+        for (int i = 0; i < chunksize; i++) {
+            printf("%f, ", ((float *) data_in)[i]);
+        }
+*/
 
         /* Compress with clevel=5 and shuffle active  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC_MAX_OVERHEAD);
@@ -132,9 +139,9 @@ int main(void) {
 
     int result;
     blosc_init();   // this is mandatory for initiallizing the plugin mechanism
- /*   result = rand_();
+    result = rand_();
     printf("rand: %d obtained \n \n", result);
-  */  result = same_cells();
+    result = same_cells();
     printf("same_cells: %d obtained \n \n", result);
     result = some_matches();
     printf("some_matches: %d obtained \n \n", result);
