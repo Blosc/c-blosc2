@@ -191,6 +191,7 @@ CUTEST_TEST_TEST(urcodecs) {
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
   cparams.clevel = 9;
+  dparams.typesize = sizeof(int32_t);
   blosc2_storage storage = {.cparams=&cparams,
                             .dparams=&dparams,
                             .urlpath=data->urlpath,

@@ -46,6 +46,7 @@ int main(void) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
+  dparams.typesize = sizeof(int32_t);
   blosc2_storage storage = {false, "dir1.b2frame", .cparams=&cparams, .dparams=&dparams};
   /* Remove directory */
   blosc2_remove_dir(storage.urlpath);

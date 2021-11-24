@@ -71,6 +71,7 @@ int main(void) {
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1. * isize) / csize);
 
   /* Create a context for decompression */
+  dparams.typesize = sizeof(float);
   dparams.nthreads = NTHREADS;
   dctx = blosc2_create_dctx(dparams);
 

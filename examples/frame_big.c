@@ -50,6 +50,7 @@ int main(void) {
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
+  dparams.typesize = sizeof(int32_t);
 
   /* Create a new super-chunk backed by a fileframe */
   char* urlpath = "frame_big.b2frame";

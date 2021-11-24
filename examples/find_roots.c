@@ -92,6 +92,7 @@ int compute_vectors(void) {
   cparams.filters_meta[0] = 23;  // treat doubles as floats
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  dparams.typesize = sizeof(double);
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
   sc_x = blosc2_schunk_new(&storage);

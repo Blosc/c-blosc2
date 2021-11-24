@@ -158,6 +158,7 @@ CUTEST_TEST_TEST(urfilters) {
   cparams.clevel = 9;
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  dparams.typesize = (int32_t) itemsize;
 
   blosc2_schunk* schunk;
   int i, nchunk;

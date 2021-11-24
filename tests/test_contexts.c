@@ -74,6 +74,7 @@ int main(void) {
 
   /* Create a context for decompression */
   dparams.nthreads = NTHREADS;
+  dparams.typesize = sizeof(int32_t);
   dctx = blosc2_create_dctx(dparams);
 
   blosc2_dparams dparams2 = {0};

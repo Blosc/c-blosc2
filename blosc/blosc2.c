@@ -3540,6 +3540,7 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   /* Populate the context, using zeros as default values */
   memset(context, 0, sizeof(blosc2_context));
   context->do_compress = 0;   /* Meant for decompression */
+  context->typesize = dparams.typesize;
   context->nthreads = dparams.nthreads;
   context->new_nthreads = context->nthreads;
   context->threads_started = 0;
@@ -3613,6 +3614,7 @@ int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams) {
 
 
 int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams) {
+  dparams->typesize = ctx->typesize;
   dparams->nthreads = ctx->nthreads;
   dparams->schunk = ctx->schunk;
   dparams->postfilter = ctx->postfilter;

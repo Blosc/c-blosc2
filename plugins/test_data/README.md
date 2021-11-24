@@ -1,8 +1,10 @@
 Here there are stored testing complementary files that are available for
 all users to test their plugins.
 
-The folder files are multidimensional arrays created in Caterva with 
-the next parameters:
+The folder files are multidimensional arrays created in Caterva using
+the Caterva example 'example_frame_generator.c' 
+(https://github.com/Blosc/caterva/blob/master/examples/example_frame_generator.c).
+Moreover, they have the next parameters:
 - nthreads = 1;
 - splitmode = BLOSC_ALWAYS_SPLIT;
 - compcodec = BLOSC_ZSTD;

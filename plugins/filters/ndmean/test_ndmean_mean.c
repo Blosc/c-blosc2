@@ -196,6 +196,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
     cctx = blosc2_create_cctx(cparams);
 
     blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+    dparams.typesize = typesize;
     dparams.nthreads = 1;
     dparams.schunk = schunk;
     blosc2_context *dctx;

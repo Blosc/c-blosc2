@@ -73,6 +73,7 @@ int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams) {
   }
   else {
     (*dparams)->nthreads = schunk->dctx->nthreads;
+    (*dparams)->typesize = schunk->dctx->typesize;
   }
   return 0;
 }
