@@ -34,7 +34,7 @@ in places that are closer in a euclidean metric, not the typical
 linear one.
 
 First *NDLZ* goes through dataset blocks dividing them into fixed size cells.
-Then, for each cell the codec searchs for data coincidences with previous
+Then, for each cell the codec searches for data coincidences with previous
 cells in order to copy only references to those cells instead of copying
 the full current cell.
 
@@ -62,7 +62,7 @@ The main advantage of *NDLZ* in front of most of the codecs is that this one
 considers dataset multidimensionality and takes advantage of it instead of
 processing all data as serial.
 
-The main disadvantage of *NDLZ* is that it is only useful for 2-dim datsets
+The main disadvantage of *NDLZ* is that it is only useful for 2-dim datasets
 and at the moment other more developed
 codecs that do not consider multidimensionality obtain better results
 (times and ratios) for 2-dim datasets.

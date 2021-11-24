@@ -30,7 +30,7 @@ Some of the codecs used by Blosc are e.g. *BLOSCLZ*, *LZ4* and *ZSTANDARD*.
 
 A **filter** is a program that reorders the data without
 changing its size, so that the initial and final size are equal.
-A filter consists of encoder and decoder. Filter encoder is applyed before
+A filter consists of encoder and decoder. Filter encoder is applied before
 using the codec compressor (or codec encoder) in order to make data easier to compress
 and filter decoder is used after codec decompressor (or codec decoder) to recover
 the original data arrangement. 

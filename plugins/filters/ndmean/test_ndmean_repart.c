@@ -17,15 +17,15 @@
     Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
     Using 1 thread
     Using ZSTD compressor
-    Succesful roundtrip!
+    Successful roundtrip!
     Compression: 41472 -> 1015 (40.9x)
     rand: 40457 obtained
 
-    Succesful roundtrip!
+    Successful roundtrip!
     Compression: 1792 -> 323 (5.5x)
     same_cells: 1469 obtained
 
-    Succesful roundtrip!
+    Successful roundtrip!
     Compression: 16128 -> 767 (21.0x)
     some_matches: 15361 obtained
 
@@ -155,7 +155,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
     blosc2_free_ctx(cctx);
     blosc2_free_ctx(dctx);
 
-    printf("Succesful roundtrip!\n");
+    printf("Successful roundtrip!\n");
     printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
     return (int) (chunksize - csize_f);
 }

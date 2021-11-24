@@ -16,15 +16,15 @@
 
     $ ./test_ndlz
     Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
-    Succesful roundtrip!
+    Successful roundtrip!
     Compression: 1792 -> 1630 (1.1x)
-    Succesful roundtrip!
+    Successful roundtrip!
     Compression: 1792 -> 1749 (1.0x)
     same_cells: 43 obtained
 
-    Succesful roundtrip!
+    Successful roundtrip!
     Compression: 16128 -> 2579 (6.3x)
-    Succesful roundtrip!
+    Successful roundtrip!
     Compression: 16128 -> 3829 (4.2x)
     some_matches: 12299 obtained
 
@@ -109,7 +109,7 @@ static int test_ndlz_4(blosc2_schunk* schunk) {
     blosc2_free_ctx(cctx);
     blosc2_free_ctx(dctx);
 
-    printf("Succesful roundtrip!\n");
+    printf("Successful roundtrip!\n");
     printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
     return (int) (chunksize - csize_f);
 }
@@ -188,7 +188,7 @@ static int test_ndlz_8(blosc2_schunk* schunk) {
     blosc2_free_ctx(cctx);
     blosc2_free_ctx(dctx);
 
-    printf("Succesful roundtrip!\n");
+    printf("Successful roundtrip!\n");
     printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
     return (int) (chunksize - csize_f);
 }

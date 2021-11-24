@@ -38,7 +38,7 @@ Changes from 2.0.1 to 2.0.2
 
 * Fixed blosc2_stdio_open never returns NULL if it cannot open file.
 
-* Standarized places for headers in blosc/ and include/ dirs.
+* Standardized places for headers in blosc/ and include/ dirs.
 
 * `nthreads` is int16_t everywhere in the API. Fixes #331.
 

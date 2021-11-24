@@ -61,7 +61,7 @@ When doing an insertion in the nth position, in the same position of the index c
  Possible index                         New index
  chunk content:  [0, 1, 2, 3]           chunk content: [0, 1, 4, 2, 3]
 
-Note that neither the file names nor their contents change, so when accesing the 2nd chunk the `00000004.chunk` file will be read.
+Note that neither the file names nor their contents change, so when accessing the 2nd chunk the `00000004.chunk` file will be read.
 
 
 Reorder example

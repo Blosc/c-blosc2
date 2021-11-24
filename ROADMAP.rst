@@ -50,7 +50,7 @@ Right now, the next features are already implemented (although they may require 
 
 * **Plugin capabilities for filters and codecs:** we have a plugin register capability inplace so that the info about the new filters and codecs can be persisted and transmitted to different machines.  Thanks to the NumFOCUS foundation for providing a grant for doing this.
 
-* **Centralized plugin repository:** we have implemented a centralized repository so that people can send their plugins (using the existing machinery) to the Blosc2 team.  If the plugins fulfill a series of requirements, they will be officially accepted, and distributed withing the library. Thanks to NumFOCUS foundation for providing a grant for doing this. See https://www.blosc.org/posts/registering-plugins/.
+* **Centralized plugin repository:** we have implemented a centralized repository so that people can send their plugins (using the existing machinery) to the Blosc2 team.  If the plugins fulfill a series of requirements, they will be officially accepted, and distributed within the library. Thanks to NumFOCUS foundation for providing a grant for doing this. See https://www.blosc.org/posts/registering-plugins/.
 
 * **Pluggable tuning capabilities:** this will allow users with different needs to define an interface so as to better tune different parameters like the codec, the compression level, the filters to use, the blocksize or the shuffle size.  Thanks to ironArray for sponsoring us in doing this.
 

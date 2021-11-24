@@ -143,7 +143,7 @@ Once this is installed the way to compile an example is:
 
   $ arm-linux-gnueabihf-gcc -static  -mfpu=neon -flax-vector-conversions -DSHUFFLE_NEON_ENABLED -O3 simple.c ../blosc/blosc.c ../blosc/blosclz.c ../blosc/shuffle.c ../blosc/shuffle-generic.c ../blosc/bitshuffle-generic.c ../blosc/shuffle-neon.c ../blosc/bitshuffle-neon.c -I../blosc -o simple -lpthread
 
-Another example for runnig a bench with the cross compliler:
+Another example for running a bench with the cross compiler:
 
 .. code-block:: console
 
@@ -153,7 +153,7 @@ In these cases the NEON flags are: `-mfpu=neon -flax-vector-conversions`
 
 This is explained in detail in: http://linux-sunxi.org/Toolchain
 
-This way you can develop and debug aplications for ARM on intel machines as if
+This way you can develop and debug applications for ARM on intel machines as if
 you were in ARM platforms.
 
 Benchmark for ODROID-XU3

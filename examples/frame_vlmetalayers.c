@@ -87,13 +87,13 @@ int main(void) {
 
   metalater_len = blosc2_vlmeta_exists(schunk, "vlmetalayer");
   if (metalater_len >= 0) {
-    printf("The vlmetalayer was not deleted succesfully");
+    printf("The vlmetalayer was not deleted successfully");
     return metalater_len;
   }
 
   metalater_len = blosc2_vlmeta_exists(schunk, "vlmetalayer2");
   if (metalater_len < 0) {
-    printf("The vlmetalayer was not deleted succesfully");
+    printf("The vlmetalayer was not deleted successfully");
     return metalater_len;
   }
   blosc2_schunk *sc = blosc2_schunk_open(urlpath);
