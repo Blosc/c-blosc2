@@ -69,6 +69,7 @@ static char* test_update_chunk(void) {
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
+  dparams.typesize = sizeof(int64_t);
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .urlpath = tdata.urlpath,
                             .contiguous = tdata.contiguous};

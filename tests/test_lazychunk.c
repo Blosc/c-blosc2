@@ -41,6 +41,7 @@ static char* test_lazy_chunk(void) {
   cparams.nthreads = nthreads;
   cparams.blocksize = BLOCKSIZE * cparams.typesize;
   dparams.nthreads = nthreads;
+  dparams.typesize = sizeof(int32_t);
   char* urlpath = "test_lazy_chunk.b2frame";
   remove(urlpath);
   blosc2_storage storage = {.contiguous=true, .urlpath=urlpath, .cparams=&cparams, .dparams=&dparams};

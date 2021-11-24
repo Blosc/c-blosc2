@@ -390,6 +390,9 @@ endif()
 
 # include directories
 include_directories(include)
+if(BUILD_PLUGINS)
+    include_directories(plugins/codecs/zfp/include)
+endif()
 
 # subdirectories
 set(SOURCES)

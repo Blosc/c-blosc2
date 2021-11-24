@@ -55,6 +55,7 @@ int main(void) {
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
+  dparams.typesize = sizeof(int32_t);
 
   /* Create a new super-chunk backed by an in-memory frame */
   blosc2_storage storage = {.contiguous=true, .cparams=&cparams, .dparams=&dparams};

@@ -43,6 +43,7 @@ int main(void) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  dparams.typesize = sizeof(int32_t);
   dparams.nthreads = NTHREADS;
   char* urlpath = "vlmetalayers.b2frame";
   remove(urlpath);

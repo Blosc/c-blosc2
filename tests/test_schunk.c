@@ -35,6 +35,7 @@ static char* test_schunk(void) {
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
+  dparams.typesize = sizeof(int32_t);
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(&storage);
 

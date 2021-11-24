@@ -41,6 +41,7 @@ static char* test_lazy_chunk(void) {
   cparams.nthreads = nthreads;
   cparams.blocksize = BLOCKSIZE * cparams.typesize;
   dparams.nthreads = nthreads;
+  dparams.typesize = sizeof(int32_t);
   blosc2_storage storage = {.contiguous=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
   blosc2_remove_dir(storage.urlpath);
   schunk = blosc2_schunk_new(&storage);

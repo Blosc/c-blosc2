@@ -1,5 +1,5 @@
 #include "blosc2.h"
-#include "src/zfp.h"
+#include "zfp.h"
 #include "zfp-private.h"
 #include "blosc2-zfp.h"
 
@@ -22,7 +22,6 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
     int64_t *shape = malloc(8 * sizeof(int64_t));
     int32_t *chunkshape = malloc(8 * sizeof(int32_t));
     int32_t *blockshape = malloc(8 * sizeof(int32_t));
-    int64_t *fieldshape = malloc(8 * sizeof(int32_t));
     uint8_t *smeta;
     uint32_t smeta_len;
     if (blosc2_meta_get(cparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
@@ -59,32 +58,18 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
     zfp_stream_set_bit_stream(zfp, stream);
     zfp_stream_rewind(zfp);
 
-    if (blockshape[0] != 0) {
-        for (int i = 0; i < ndim; i++) {
-            fieldshape[i] = blockshape[i];
-        }
-    } else if (chunkshape[0] != 0) {
-        for (int i = 0; i < ndim; i++) {
-            fieldshape[i] = chunkshape[i];
-        }
-    } else {
-        for (int i = 0; i < ndim; i++) {
-            fieldshape[i] = shape[i];
-        }
-    }
-
         switch (ndim) {
         case 1:
-            field = zfp_field_1d((void *) input, type, fieldshape[0]);
+            field = zfp_field_1d((void *) input, type, blockshape[0]);
             break;
         case 2:
-            field = zfp_field_2d((void *) input, type, fieldshape[0], fieldshape[1]);
+            field = zfp_field_2d((void *) input, type, blockshape[0], blockshape[1]);
             break;
         case 3:
-            field = zfp_field_3d((void *) input, type, fieldshape[0], fieldshape[1], fieldshape[2]);
+            field = zfp_field_3d((void *) input, type, blockshape[0], blockshape[1], blockshape[2]);
             break;
         case 4:
-            field = zfp_field_4d((void *) input, type, fieldshape[0], fieldshape[1], fieldshape[2], fieldshape[3]);
+            field = zfp_field_4d((void *) input, type, blockshape[0], blockshape[1], blockshape[2], blockshape[3]);
             break;
         default:
             printf("\n ZFP is not available for this number of dims \n");
@@ -105,7 +90,6 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
     free(shape);
     free(chunkshape);
     free(blockshape);
-    free(fieldshape);
 
     if (!zfpsize) {
         printf("\n ZFP: Compression failed\n");
@@ -129,7 +113,6 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
     int64_t *shape = malloc(8 * sizeof(int64_t));
     int32_t *chunkshape = malloc(8 * sizeof(int32_t));
     int32_t *blockshape = malloc(8 * sizeof(int32_t));
-    int64_t *fieldshape = malloc(8 * sizeof(int32_t));
     uint8_t *smeta;
     uint32_t smeta_len;
     if (blosc2_meta_get(dparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
@@ -139,8 +122,6 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
     deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
     free(smeta);
 
-    size_t typesize;
-    int flags;
     zfp_type type;     /* array scalar type */
     zfp_field *field;  /* array meta data */
     zfp_stream *zfp;   /* compressed stream */
@@ -148,7 +129,7 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
     size_t zfpsize;    /* byte size of compressed stream */
     double tolerance = 1e-3;
 
-    blosc_cbuffer_metainfo(input, &typesize, &flags);
+    int32_t typesize = dparams->typesize;
 
     switch (typesize) {
         case sizeof(float):
@@ -168,32 +149,18 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
     zfp_stream_set_bit_stream(zfp, stream);
     zfp_stream_rewind(zfp);
 
-    if (blockshape[0] != 0) {
-        for (int i = 0; i < ndim; i++) {
-            fieldshape[i] = blockshape[i];
-        }
-    } else if (chunkshape[0] != 0) {
-        for (int i = 0; i < ndim; i++) {
-            fieldshape[i] = chunkshape[i];
-        }
-    } else {
-        for (int i = 0; i < ndim; i++) {
-            fieldshape[i] = shape[i];
-        }
-    }
-
     switch (ndim) {
         case 1:
-            field = zfp_field_1d((void *) input, type, fieldshape[0]);
+            field = zfp_field_1d((void *) input, type, blockshape[0]);
             break;
         case 2:
-            field = zfp_field_2d((void *) input, type, fieldshape[0], fieldshape[1]);
+            field = zfp_field_2d((void *) input, type, blockshape[0], blockshape[1]);
             break;
         case 3:
-            field = zfp_field_3d((void *) input, type, fieldshape[0], fieldshape[1], fieldshape[2]);
+            field = zfp_field_3d((void *) input, type, blockshape[0], blockshape[1], blockshape[2]);
             break;
         case 4:
-            field = zfp_field_4d((void *) input, type, fieldshape[0], fieldshape[1], fieldshape[2], fieldshape[3]);
+            field = zfp_field_4d((void *) input, type, blockshape[0], blockshape[1], blockshape[2], blockshape[3]);
             break;
         default:
             printf("\n ZFP is not available for this number of dims \n");
@@ -209,7 +176,6 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
     free(shape);
     free(chunkshape);
     free(blockshape);
-    free(fieldshape);
 
     if (!zfpsize) {
         printf("\n Decompression failed\n");
