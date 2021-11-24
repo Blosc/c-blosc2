@@ -210,7 +210,7 @@ The dictionary section contains the size of the dictionary `int32_t dsize` follo
 **Compressed Data Streams**
 
 Compressed data streams are the compressed set of bytes that are passed to codecs for decompression. Each compressed
-data stream (`uint8_t* cdata`) is stored with the size of the stream (`int32_t csize`) preceeding it::
+data stream (`uint8_t* cdata`) is stored with the size of the stream (`int32_t csize`) preceding it::
 
     +=======+=======+
     | csize | cdata |

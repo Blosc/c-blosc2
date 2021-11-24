@@ -108,7 +108,7 @@ int main(void) {
 
     int dsize = blosc_getitem(cdata, 0, CHUNKSIZE, chunk_buf);
     if (dsize < 0) {
-      printf("blosc_getitem() error.  Error code: %d\n.  Probaly reading too much data?", dsize);
+      printf("blosc_getitem() error.  Error code: %d\n.  Probably reading too much data?", dsize);
       exit(1);
     }
     free(cdata);

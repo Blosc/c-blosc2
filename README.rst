@@ -143,7 +143,7 @@ directory (e.g. '/usr' or '/usr/local'):
 
   cmake -DCMAKE_INSTALL_PREFIX=your_install_prefix_directory ..
 
-CMake allows to configure Blosc in many different ways, like prefering internal or external sources for compressors or enabling/disabling them.  Please note that configuration can also be performed using UI tools provided by CMake (`ccmake`  or `cmake-gui`):
+CMake allows to configure Blosc in many different ways, like preferring internal or external sources for compressors or enabling/disabling them.  Please note that configuration can also be performed using UI tools provided by CMake (`ccmake`  or `cmake-gui`):
 
 .. code-block:: console
 

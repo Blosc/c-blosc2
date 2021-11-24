@@ -403,7 +403,7 @@ BLOSC_EXPORT void blosc_destroy(void);
  * @parblock
  *
  * This function honors different environment variables to control
- * internal parameters without the need of doing that programatically.
+ * internal parameters without the need of doing that programmatically.
  * Here are the ones supported:
  *
  * * **BLOSC_CLEVEL=(INTEGER)**: This will overwrite the @p clevel parameter
@@ -474,7 +474,7 @@ BLOSC_EXPORT int blosc_compress(int clevel, int doshuffle, size_t typesize,
  * @par Environment variables
  * @parblock
  * This function honors different environment variables to control
- * internal parameters without the need of doing that programatically.
+ * internal parameters without the need of doing that programmatically.
  * Here are the ones supported:
  *
  * * **BLOSC_NTHREADS=(INTEGER)**: This will call
@@ -802,7 +802,7 @@ typedef int     (*blosc2_truncate_cb)(void *stream, int64_t size);
 
 
 /*
- * Input/Ouput callbacks.
+ * Input/Output callbacks.
  */
 typedef struct {
   uint8_t id;
@@ -1111,7 +1111,7 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * _____________________
  *
  * *blosc_compress()* honors different environment variables to control
- * internal parameters without the need of doing that programatically.
+ * internal parameters without the need of doing that programmatically.
  * Here are the ones supported:
  *
  * **BLOSC_CLEVEL=(INTEGER)**: This will overwrite the @p clevel parameter
@@ -1182,7 +1182,7 @@ BLOSC_EXPORT int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
  * _____________________
  *
  * *blosc_decompress* honors different environment variables to control
- * internal parameters without the need of doing that programatically.
+ * internal parameters without the need of doing that programmatically.
  * Here are the ones supported:
  *
  * **BLOSC_NTHREADS=(INTEGER)**: This will call
@@ -1718,7 +1718,7 @@ BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams
  * @param schunk The super-chunk whose chunk offsets are to be reordered.
  * @param offsets_order The new order of the chunk offsets.
  *
- * @return 0 if suceeds. Else a negative code is returned.
+ * @return 0 if succeeds. Else a negative code is returned.
  */
 BLOSC_EXPORT int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order);
 

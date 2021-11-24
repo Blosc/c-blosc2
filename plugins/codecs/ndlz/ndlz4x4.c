@@ -141,7 +141,7 @@ int ndlz4_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
   for (ii[0] = 0; ii[0] < i_stop[0]; ++ii[0]) {
     for (ii[1] = 0; ii[1] < i_stop[1]; ++ii[1]) {      // for each cell
       uint8_t token;
-      for (int h = 0; h < 2; h++){          // new cell -> new possible refereces
+      for (int h = 0; h < 2; h++) {         // new cell -> new possible references
         update_triple[h] = 0;
         update_pair[h] = 0;
       }

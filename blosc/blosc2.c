@@ -3710,7 +3710,7 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const size_t nbytes, void* dest,
   header.nbytes = (int32_t)nbytes;
   header.blocksize = context->blocksize;
   header.cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
-  header.blosc2_flags = BLOSC2_SPECIAL_UNINIT << 4;  // mark chunk as unitialized
+  header.blosc2_flags = BLOSC2_SPECIAL_UNINIT << 4;  // mark chunk as uninitialized
   memcpy((uint8_t *)dest, &header, sizeof(header));
 
   blosc2_free_ctx(context);

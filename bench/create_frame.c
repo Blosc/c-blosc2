@@ -9,7 +9,7 @@
 
   $ ./create_frame
 
-   ***  Creating unitialized   ***
+   ***  Creating uninitialized   ***
    ***  Using fill method!   ***
 
 *** Creating *contiguous* super-chunk for *blosclz*
@@ -182,7 +182,7 @@ int main(void) {
 #ifdef CREATE_ZEROS
   printf("\n   ***  Creating zeros   ***\n");
 #else
-  printf("\n   ***  Creating unitialized   ***\n");
+  printf("\n   ***  Creating uninitialized   ***\n");
 #endif
 #ifdef CREATE_FILL
   printf("   ***  Using fill method!   ***\n");

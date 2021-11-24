@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;
     }
-    printf("Decompression succesful!\n");
+    printf("Decompression successful!\n");
 
     char *isbitshuf =  strstr(argv[2], "-bitshuffle");
     if ((isbitshuf != NULL) && (dsize % 8) != 0) {
@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
     exit_code = memcmp(data, data_dest, dsize) ? EXIT_FAILURE : EXIT_SUCCESS;
 
     if (exit_code == EXIT_SUCCESS) {
-      printf("Succesful roundtrip!\n");
+      printf("Successful roundtrip!\n");
     }
     else {
       printf("Decompressed data differs from original!\n");

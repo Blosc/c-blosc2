@@ -15,8 +15,8 @@
   Blosc version info: 2.0.0a2 ($Date:: 2016-01-08 #$)
   Compression: 40000000 -> 832774 (48.0x)
   Correctly extracted 5 elements from compressed chunk!
-  Decompression succesful!
-  Succesful roundtrip!
+  Decompression successful!
+  Successful roundtrip!
 
 */
 
@@ -84,7 +84,7 @@ int main(void) {
     return dsize;
   }
 
-  printf("Decompression succesful!\n");
+  printf("Decompression successful!\n");
 
   /* After using it, destroy the Blosc environment */
   blosc_destroy();
@@ -96,6 +96,6 @@ int main(void) {
     }
   }
 
-  printf("Succesful roundtrip!\n");
+  printf("Successful roundtrip!\n");
   return 0;
 }

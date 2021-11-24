@@ -1,6 +1,6 @@
 # Fuzzing
 
-The C-Blosc2 project is integrated with Google's [OSS-Fuzz](https://github.com/google/oss-fuzz) project to provide automated fuzz testing. Testing is performed continously on the source tree's default branch and instanteously whenever new pull requests are created.
+The C-Blosc2 project is integrated with Google's [OSS-Fuzz](https://github.com/google/oss-fuzz) project to provide automated fuzz testing. Testing is performed continuously on the source tree's default branch and instanteously whenever new pull requests are created.
 
 ## Background
 
