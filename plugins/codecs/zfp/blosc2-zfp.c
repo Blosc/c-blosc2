@@ -10,8 +10,6 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(cparams);
 
-    printf("input_len: %d", input_len);
-    printf("blocksize: %d", cparams->blocksize);
 /*
     printf("\n input \n");
     for (int i = 0; i < input_len; i++) {
@@ -145,22 +143,22 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
 
     zfp = zfp_stream_open(NULL);
     zfp_stream_set_accuracy(zfp, tolerance);
-    stream = stream_open(output, output_len);
+    stream = stream_open(input, input_len);
     zfp_stream_set_bit_stream(zfp, stream);
     zfp_stream_rewind(zfp);
 
     switch (ndim) {
         case 1:
-            field = zfp_field_1d((void *) input, type, blockshape[0]);
+            field = zfp_field_1d((void *) output, type, blockshape[0]);
             break;
         case 2:
-            field = zfp_field_2d((void *) input, type, blockshape[0], blockshape[1]);
+            field = zfp_field_2d((void *) output, type, blockshape[0], blockshape[1]);
             break;
         case 3:
-            field = zfp_field_3d((void *) input, type, blockshape[0], blockshape[1], blockshape[2]);
+            field = zfp_field_3d((void *) output, type, blockshape[0], blockshape[1], blockshape[2]);
             break;
         case 4:
-            field = zfp_field_4d((void *) input, type, blockshape[0], blockshape[1], blockshape[2], blockshape[3]);
+            field = zfp_field_4d((void *) output, type, blockshape[0], blockshape[1], blockshape[2], blockshape[3]);
             break;
         default:
             printf("\n ZFP is not available for this number of dims \n");
@@ -168,6 +166,8 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
     }
 
     zfpsize = zfp_decompress(zfp, field);
+
+    printf("\n Zfpsize: %d \n", (int) zfpsize);
 
     /* clean up */
     zfp_field_free(field);

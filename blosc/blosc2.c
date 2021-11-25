@@ -1663,6 +1663,7 @@ static int blosc_d(
 
       /* Check that decompressed bytes number is correct */
       if (nbytes != neblock) {
+          printf(" neblock: %d \n", (int) neblock);
         return BLOSC2_ERROR_DATA;
       }
 
