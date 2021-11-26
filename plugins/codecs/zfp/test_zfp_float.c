@@ -24,13 +24,13 @@ static int test_zfp(blosc2_schunk* schunk) {
 
     int nchunks = schunk->nchunks;
     int32_t chunksize = (int32_t) (schunk->chunksize);
-    uint8_t *data_in = malloc(chunksize);
+    float *data_in = malloc(chunksize);
     int decompressed;
     int64_t csize;
     int64_t dsize;
     int64_t csize_f = 0;
     uint8_t *data_out = malloc(chunksize + BLOSC_MAX_OVERHEAD);
-    uint8_t *data_dest = malloc(chunksize);
+    float *data_dest = malloc(chunksize);
 
     /* Create a context for compression */
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -59,12 +59,15 @@ static int test_zfp(blosc2_schunk* schunk) {
             printf("Error decompressing chunk \n");
             return -1;
         }
-/*
-        printf("\n chunk \n");
-        for (int i = 0; i < chunksize; i++) {
-            printf("%f, ", ((float *) data_in)[i]);
+
+        if (ci == 0){
+            printf("\n chunk \n");
+            for (int i = 0; i < chunksize; i++) {
+                printf("%f, ", data_in[i]);
+            }
+
         }
-*/
+
 
         /* Compress with clevel=5 and shuffle active  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC_MAX_OVERHEAD);
@@ -87,7 +90,7 @@ static int test_zfp(blosc2_schunk* schunk) {
 
         for (int i = 0; i < chunksize; i++) {
             if ((data_in[i] - data_dest[i]) > 1) {
-                printf("i: %d, data %u, dest %u", i, data_in[i], data_dest[i]);
+                printf("i: %d, data %f, dest %f", i, data_in[i], data_dest[i]);
                 printf("\n Decompressed data differs from original!\n");
                 return -1;
             }
@@ -107,26 +110,8 @@ static int test_zfp(blosc2_schunk* schunk) {
 }
 
 
-int rand_() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_repart_rand.caterva");
-
-    /* Run the test. */
-    int result = test_zfp(schunk);
-    blosc2_schunk_free(schunk);
-    return result;
-}
-
-int same_cells() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_repart_same_cells.caterva");
-
-    /* Run the test. */
-    int result = test_zfp(schunk);
-    blosc2_schunk_free(schunk);
-    return result;
-}
-
-int some_matches() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_repart_some_matches.caterva");
+int float_cyclic() {
+    blosc2_schunk *schunk = blosc2_schunk_open("example_float_cyclic.caterva");
 
     /* Run the test. */
     int result = test_zfp(schunk);
@@ -139,12 +124,8 @@ int main(void) {
 
     int result;
     blosc_init();   // this is mandatory for initiallizing the plugin mechanism
-    result = rand_();
-    printf("rand: %d obtained \n \n", result);
-    result = same_cells();
-    printf("same_cells: %d obtained \n \n", result);
-    result = some_matches();
-    printf("some_matches: %d obtained \n \n", result);
+    result = float_cyclic();
+    printf("float_cyclic: %d obtained \n \n", result);
     blosc_destroy();
 
 }
