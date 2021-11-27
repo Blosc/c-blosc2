@@ -190,7 +190,7 @@ using the msgpack format. Here it is the format for the *metalayers*::
     (``uint8``) Compression codec metadata associated with the compression codec. Only used in user-defined codecs.
 
 :map of metalayers:
-    This is a *msgpack-formattted* map for the different metalayers.  The keys will be a string (0xa0 + namelen) for
+    This is a *msgpack-formatted* map for the different metalayers.  The keys will be a string (0xa0 + namelen) for
     the names of the metalayers, followed by an int32 (0xd2) for the *offset* of the value of this metalayer.  The
     actual value will be encoded as a bin32 (0xc6) value later in header.
 

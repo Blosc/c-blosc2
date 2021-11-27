@@ -52,7 +52,7 @@ The particularity of *NDCELL* is that this filter
 considers datasets multidimensionality and takes advantage of it instead
 of processing all data as serial.
 
-The main disadvantage of *NDCELL* is that only a few codecs are benefied
+The main disadvantage of *NDCELL* is that only a few codecs are benefited
 by it and only for multidimensional datasets.
 
 
