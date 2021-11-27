@@ -14,7 +14,7 @@ Thanks
 
 * @littlezhou implemented the AVX2 version of shuffle routines.
 
-* Julian Taylor contributed a way to detect AVX2 in runtime and calling the appropriate routines only if the undelying hardware supports it.
+* Julian Taylor contributed a way to detect AVX2 in runtime and calling the appropriate routines only if the underlying hardware supports it.
 
 * Lucian Marc provided the support for ARM/NEON for the shuffle filter.
 

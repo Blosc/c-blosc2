@@ -253,7 +253,7 @@ void test_create_sframe_frame(char* operation) {
   blosc2_remove_urlpath(storage2.urlpath);
   schunk_cframe = blosc2_schunk_new(&storage2);
 
-  printf("Test comparation frame vs sframe with %d chunks.\n", nchunks);
+  printf("Test comparison frame vs sframe with %d chunks.\n", nchunks);
 
   // Feed it with data
   sframe_append_time=0.0;
