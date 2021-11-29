@@ -159,4 +159,5 @@ int main(void) {
     result = some_matches();
     printf("some_matches: %d obtained \n \n", result);
     blosc_destroy();
+    return BLOSC2_ERROR_SUCCESS;
 }

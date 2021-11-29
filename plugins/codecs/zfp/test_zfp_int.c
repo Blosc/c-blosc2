@@ -10,7 +10,7 @@
     Test program demonstrating use of the Blosc codec from C code.
     To compile this program:
 
-    $ gcc -O test_zfp.c -o test_zfp -lblosc2
+    $ gcc -O test_zfp_int.c -o test_zfp_int -lblosc2
 
 
 **********************************************************************/
@@ -148,4 +148,5 @@ int main(void) {
     printf("some_matches: %d obtained \n \n", result);
     blosc_destroy();
 
+    return BLOSC2_ERROR_SUCCESS;
 }

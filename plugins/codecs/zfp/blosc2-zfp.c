@@ -61,13 +61,13 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
             field = zfp_field_1d((void *) input, type, blockshape[0]);
             break;
         case 2:
-            field = zfp_field_2d((void *) input, type, blockshape[0], blockshape[1]);
+            field = zfp_field_2d((void *) input, type, blockshape[1], blockshape[0]);
             break;
         case 3:
-            field = zfp_field_3d((void *) input, type, blockshape[0], blockshape[1], blockshape[2]);
+            field = zfp_field_3d((void *) input, type, blockshape[2], blockshape[1], blockshape[0]);
             break;
         case 4:
-            field = zfp_field_4d((void *) input, type, blockshape[0], blockshape[1], blockshape[2], blockshape[3]);
+            field = zfp_field_4d((void *) input, type, blockshape[3], blockshape[2], blockshape[1], blockshape[0]);
             break;
         default:
             printf("\n ZFP is not available for this number of dims \n");
@@ -152,13 +152,13 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
             field = zfp_field_1d((void *) output, type, blockshape[0]);
             break;
         case 2:
-            field = zfp_field_2d((void *) output, type, blockshape[0], blockshape[1]);
+            field = zfp_field_2d((void *) output, type, blockshape[1], blockshape[0]);
             break;
         case 3:
-            field = zfp_field_3d((void *) output, type, blockshape[0], blockshape[1], blockshape[2]);
+            field = zfp_field_3d((void *) output, type, blockshape[2], blockshape[1], blockshape[0]);
             break;
         case 4:
-            field = zfp_field_4d((void *) output, type, blockshape[0], blockshape[1], blockshape[2], blockshape[3]);
+            field = zfp_field_4d((void *) output, type, blockshape[3], blockshape[2], blockshape[1], blockshape[0]);
             break;
         default:
             printf("\n ZFP is not available for this number of dims \n");

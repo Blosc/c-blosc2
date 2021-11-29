@@ -237,4 +237,5 @@ int main(void) {
     printf("some_matches: %d obtained \n \n", result);
     blosc_destroy();
 
+    return BLOSC2_ERROR_SUCCESS;
 }
