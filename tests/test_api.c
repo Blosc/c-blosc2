@@ -29,7 +29,7 @@ static char* test_cbuffer_sizes(void) {
   blosc_cbuffer_sizes(dest, &nbytes_, &cbytes_, &blocksize);
   mu_assert("ERROR: nbytes incorrect(1)", nbytes == size);
   mu_assert("ERROR: nbytes incorrect(2)", nbytes_ == (size_t)nbytes);
-  mu_assert("ERROR: cbytes incorrect", cbytes_ == (size_t)cbytes_);
+  mu_assert("ERROR: cbytes incorrect", cbytes_ == (size_t)cbytes);
   mu_assert("ERROR: blocksize incorrect", blocksize >= 128);
   return 0;
 }
