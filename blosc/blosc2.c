@@ -669,7 +669,7 @@ int read_chunk_header(const uint8_t* src, int32_t srcsize, bool extended_header,
     return BLOSC2_ERROR_INVALID_HEADER;
   }
   if (header->typesize == 0) {
-    BLOSC_TRACE_ERROR("`typesize` is zero or greater than max allowed.");
+    BLOSC_TRACE_ERROR("`typesize` is zero.");
     return BLOSC2_ERROR_INVALID_HEADER;
   }
 
