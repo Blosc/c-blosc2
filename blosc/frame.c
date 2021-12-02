@@ -257,7 +257,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   int32_t hsize = FRAME_HEADER_MINLEN;
 
   // Now, deal with metalayers
-  int16_t nmetalayers = schunk->nmetalayers;
+  uint16_t nmetalayers = schunk->nmetalayers;
   if (nmetalayers < 0 || nmetalayers > BLOSC2_MAX_METALAYERS) {
     return NULL;
   }
@@ -1242,7 +1242,7 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
   }
   from_big(&nmetalayers, idxp, sizeof(uint16_t));
   idxp += 2;
-  if (nmetalayers < 0 || nmetalayers > BLOSC2_MAX_METALAYERS) {
+  if (nmetalayers > BLOSC2_MAX_METALAYERS) {
     return BLOSC2_ERROR_DATA;
   }
   schunk->nmetalayers = nmetalayers;
@@ -1412,7 +1412,7 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
   }
   from_big(&nmetalayers, idxp, sizeof(uint16_t));
   idxp += 2;
-  if (nmetalayers < 0 || nmetalayers > BLOSC2_MAX_VLMETALAYERS) {
+  if (nmetalayers > BLOSC2_MAX_VLMETALAYERS) {
     return BLOSC2_ERROR_DATA;
   }
   schunk->nvlmetalayers = nmetalayers;

@@ -1441,7 +1441,7 @@ typedef struct blosc2_schunk {
   //!< Context for decompression.
   struct blosc2_metalayer *metalayers[BLOSC2_MAX_METALAYERS];
   //!< The array of metalayers.
-  int16_t nmetalayers;
+  uint16_t nmetalayers;
   //!< The number of metalayers in the super-chunk
   struct blosc2_metalayer *vlmetalayers[BLOSC2_MAX_VLMETALAYERS];
   //<! The array of variable-length metalayers.
