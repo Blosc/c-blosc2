@@ -103,7 +103,7 @@ enum {
   //!< implementations.
   BLOSC_MAX_BUFFERSIZE = (INT_MAX - BLOSC_MAX_OVERHEAD),
   //!< Maximum source buffer size to be compressed
-  BLOSC_MAX_TYPESIZE = 255,
+  BLOSC_MAX_TYPESIZE = UINT8_MAX,
   //!< Maximum typesize before considering source buffer as a stream of bytes.
   //!< Cannot be larger than 255.
   BLOSC_MIN_BUFFERSIZE = 128,
