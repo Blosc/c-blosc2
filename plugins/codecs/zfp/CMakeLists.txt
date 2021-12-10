@@ -25,7 +25,9 @@ if(BUILD_TESTS)
     add_test(test_plugin_test_zfp_float test_zfp_float)
 
     # Copy test files
-    file(GLOB TESTS_DATA ../../test_data/example_float_cyclic.caterva ../../filters/ndmean/example_ndmean_r*.caterva)
+    file(GLOB TESTS_DATA ../../test_data/example_float_cyclic.caterva ../../test_data/example_double_same_cells.caterva
+            ../../test_data/example_big_float_frame.caterva ../../test_data/example_day_month_temp.caterva
+            ../../test_data/example_item_prices.caterva ../../filters/ndmean/example_ndmean_r*.caterva)
     foreach (data ${TESTS_DATA})
         file(COPY ${data}
                 DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

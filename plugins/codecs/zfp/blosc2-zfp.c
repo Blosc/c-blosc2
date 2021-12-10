@@ -2,7 +2,7 @@
 #include "zfp.h"
 #include "zfp-private.h"
 #include "blosc2-zfp.h"
-
+#include <math.h>
 
 int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
                         int32_t output_len, uint8_t meta, blosc2_cparams *cparams) {
@@ -10,6 +10,11 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(cparams);
 
+    double tol = (int8_t) meta;
+    if (tol < -128 || tol > 128) {
+        printf("\n ZFP is not available for this tolerance \n");
+        return -1;
+    }
 /*
     printf("\n input \n");
     for (int i = 0; i < input_len; i++) {
@@ -34,7 +39,7 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
     zfp_stream *zfp;   /* compressed stream */
     bitstream *stream; /* bit stream to write to or read from */
     size_t zfpsize;    /* byte size of compressed stream */
-    double tolerance = 1e-3;
+    double tolerance = pow(10, tol);
 
     int32_t typesize = cparams->typesize;
 
@@ -89,12 +94,11 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
     free(chunkshape);
     free(blockshape);
 
-    if (!zfpsize) {
-        printf("\n ZFP: Compression failed\n");
-        return 0;
+    if (zfpsize < 0) {
+        BLOSC_TRACE_ERROR("\n ZFP: Compression failed\n");
     }
     if (zfpsize > input_len) {
-  //      printf("\n ZFP: Compressed data is bigger than input! \n");
+        BLOSC_TRACE_ERROR("\n ZFP: Compressed data is bigger than input! \n");
         return 0;
     }
 
@@ -107,6 +111,11 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(dparams);
 
+    double tol = (int8_t) meta;
+    if (tol < -128 || tol > 128) {
+        printf("\n ZFP is not available for this tolerance \n");
+        return -1;
+    }
     int8_t ndim;
     int64_t *shape = malloc(8 * sizeof(int64_t));
     int32_t *chunkshape = malloc(8 * sizeof(int32_t));
@@ -125,7 +134,7 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
     zfp_stream *zfp;   /* compressed stream */
     bitstream *stream; /* bit stream to write to or read from */
     size_t zfpsize;    /* byte size of compressed stream */
-    double tolerance = 1e-3;
+    double tolerance = pow(10, tol);
 
     int32_t typesize = dparams->typesize;
 
@@ -175,9 +184,9 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
     free(chunkshape);
     free(blockshape);
 
-    if (!zfpsize) {
-        printf("\n Decompression failed\n");
-        return 0;
+    if (zfpsize < 0) {
+        BLOSC_TRACE_ERROR("\n ZFP: Decompression failed\n");
+        return (int) zfpsize;
     }
 
     return (int) output_len;
