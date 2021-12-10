@@ -16,6 +16,7 @@
 **********************************************************************/
 
 #include <stdio.h>
+#include <math.h>
 #include "blosc2.h"
 #include "blosc2/codecs-registry.h"
 #include <inttypes.h>
@@ -37,11 +38,12 @@ static int test_zfp_float(blosc2_schunk* schunk) {
     float *data_dest = malloc(chunksize);
 
     /* Create a context for compression */
+    int zfp_tol = -2;
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.splitmode = BLOSC_NEVER_SPLIT;
     cparams.typesize = schunk->typesize;
     cparams.compcode = BLOSC_CODEC_ZFP;
-    cparams.compcode_meta = schunk->typesize;
+    cparams.compcode_meta = zfp_tol;
     cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOFILTER;
     cparams.clevel = 5;
     cparams.nthreads = 1;
@@ -93,8 +95,9 @@ static int test_zfp_float(blosc2_schunk* schunk) {
             printf("%f, ", data_dest[i]);
         }
 */
+        double tolerance = exp(zfp_tol);
         for (int i = 0; i < (chunksize / cparams.typesize); i++) {
-            if ((data_in[i] - data_dest[i]) > 1) {
+            if ((data_in[i] - data_dest[i]) > tolerance) {
                 printf("i: %d, data %f, dest %f", i, data_in[i], data_dest[i]);
                 printf("\n Decompressed data differs from original!\n");
                 return -1;
@@ -131,11 +134,12 @@ static int test_zfp_double(blosc2_schunk* schunk) {
     double *data_dest = malloc(chunksize);
 
     /* Create a context for compression */
+    int zfp_tol = -2;
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.splitmode = BLOSC_NEVER_SPLIT;
     cparams.typesize = schunk->typesize;
     cparams.compcode = BLOSC_CODEC_ZFP;
-    cparams.compcode_meta = schunk->typesize;
+    cparams.compcode_meta = zfp_tol;
     cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOFILTER;
     cparams.clevel = 5;
     cparams.nthreads = 1;
@@ -187,8 +191,9 @@ static int test_zfp_double(blosc2_schunk* schunk) {
             printf("%f, ", data_dest[i]);
         }
 */
+        double tolerance = exp(zfp_tol);
         for (int i = 0; i < (chunksize / cparams.typesize); i++) {
-            if ((data_in[i] - data_dest[i]) > 1) {
+            if ((data_in[i] - data_dest[i]) > tolerance) {
                 printf("i: %d, data %f, dest %f", i, data_in[i], data_dest[i]);
                 printf("\n Decompressed data differs from original!\n");
                 return -1;
@@ -218,6 +223,42 @@ int float_cyclic() {
     return result;
 }
 
+int double_same_cells() {
+    blosc2_schunk *schunk = blosc2_schunk_open("example_double_same_cells.caterva");
+
+    /* Run the test. */
+    int result = test_zfp_double(schunk);
+    blosc2_schunk_free(schunk);
+    return result;
+}
+
+int big_float_frame() {
+    blosc2_schunk *schunk = blosc2_schunk_open("example_big_float_frame.caterva");
+
+    /* Run the test. */
+    int result = test_zfp_float(schunk);
+    blosc2_schunk_free(schunk);
+    return result;
+}
+
+int day_month_temp() {
+    blosc2_schunk *schunk = blosc2_schunk_open("example_day_month_temp.caterva");
+
+    /* Run the test. */
+    int result = test_zfp_float(schunk);
+    blosc2_schunk_free(schunk);
+    return result;
+}
+
+int item_prices() {
+    blosc2_schunk *schunk = blosc2_schunk_open("example_item_prices.caterva");
+
+    /* Run the test. */
+    int result = test_zfp_float(schunk);
+    blosc2_schunk_free(schunk);
+    return result;
+}
+
 
 int main(void) {
 
@@ -225,7 +266,15 @@ int main(void) {
     blosc_init();   // this is mandatory for initiallizing the plugin mechanism
     result = float_cyclic();
     printf("float_cyclic: %d obtained \n \n", result);
-    blosc_destroy();
+    result = double_same_cells();
+    printf("double_same_cells: %d obtained \n \n", result);
+    result = big_float_frame();
+    printf("big_float_frame: %d obtained \n \n", result);
+    result = day_month_temp();
+    printf("day_month_temp: %d obtained \n \n", result);
+  /*  result = item_prices();
+    printf("item_prices: %d obtained \n \n", result);
+   */ blosc_destroy();
 
     return BLOSC2_ERROR_SUCCESS;
 }
