@@ -73,6 +73,8 @@ static blosc2_context* g_global_context;
 static pthread_mutex_t global_comp_mutex;
 static int g_compressor = BLOSC_BLOSCLZ;
 static int g_delta = 0;
+/* The default splitmode */
+static int32_t g_splitmode = BLOSC_FORWARD_COMPAT_SPLIT;
 /* the compressor to use by default */
 static int16_t g_nthreads = 1;
 static int32_t g_force_blocksize = 0;
@@ -1913,6 +1915,7 @@ static int initialize_context_compression(
     int32_t destsize, int clevel, uint8_t const *filters,
     uint8_t const *filters_meta, int32_t typesize, int compressor,
     int32_t blocksize, int16_t new_nthreads, int16_t nthreads,
+    int32_t splitmode,
     blosc2_btune *udbtune, void *btune_config,
     blosc2_schunk* schunk) {
 
@@ -1938,6 +1941,7 @@ static int initialize_context_compression(
   context->schunk = schunk;
   context->btune = btune_config;
   context->udbtune = udbtune;
+  context->splitmode = splitmode;
   /* Tune some compression parameters */
   context->blocksize = (int32_t)blocksize;
   if (context->btune != NULL) {
@@ -2250,7 +2254,7 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     context, src, srcsize, dest, destsize,
     context->clevel, context->filters, context->filters_meta,
     context->typesize, context->compcode, context->blocksize,
-    context->new_nthreads, context->nthreads,
+    context->new_nthreads, context->nthreads, context->splitmode,
     context->udbtune, context->btune, context->schunk);
   if (error <= 0) {
     return error;
@@ -2459,6 +2463,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     cparams.compcode = (uint8_t)g_compressor;
     cparams.clevel = (uint8_t)clevel;
     cparams.nthreads = g_nthreads;
+    cparams.splitmode = g_splitmode;
     cctx = blosc2_create_cctx(cparams);
     /* Do the actual compression */
     result = blosc2_compress_ctx(cctx, src, srcsize, dest, destsize);
@@ -2478,7 +2483,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   error = initialize_context_compression(
     g_global_context, src, srcsize, dest, destsize, clevel, filters,
     filters_meta, (int32_t)typesize, g_compressor, g_force_blocksize, g_nthreads, g_nthreads,
-    &BTUNE_DEFAULTS, NULL, g_schunk);
+    g_splitmode, &BTUNE_DEFAULTS, NULL, g_schunk);
   free(filters);
   free(filters_meta);
   if (error <= 0) {
@@ -3653,7 +3658,7 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const size_t nbytes, void* dest, 
           context, NULL, nbytes, dest, destsize,
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
-          context->new_nthreads, context->nthreads,
+          context->new_nthreads, context->nthreads, context->splitmode,
           context->udbtune, context->btune, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
@@ -3695,7 +3700,7 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const size_t nbytes, void* dest,
           context, NULL, nbytes, dest, destsize,
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
-          context->new_nthreads, context->nthreads,
+          context->new_nthreads, context->nthreads, context->splitmode,
           context->udbtune, context->btune, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
@@ -3738,7 +3743,7 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const size_t nbytes, void* dest, s
           context, NULL, nbytes, dest, destsize,
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
-          context->new_nthreads, context->nthreads,
+          context->new_nthreads, context->nthreads, context->splitmode,
           context->udbtune, context->btune, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
@@ -3783,7 +3788,7 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const size_t nbytes,
           context, NULL, nbytes, dest, destsize,
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
-          context->new_nthreads, context->nthreads,
+          context->new_nthreads, context->nthreads, context->splitmode,
           context->udbtune, context->btune, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
