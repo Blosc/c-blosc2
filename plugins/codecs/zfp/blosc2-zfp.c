@@ -11,10 +11,6 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
     ZFP_ERROR_NULL(cparams);
 
     double tol = (int8_t) meta;
-    if (tol < -128 || tol > 128) {
-        printf("\n ZFP is not available for this tolerance \n");
-        return -1;
-    }
 /*
     printf("\n input \n");
     for (int i = 0; i < input_len; i++) {
@@ -36,8 +32,10 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
 
     zfp_type type;     /* array scalar type */
     zfp_field *field;  /* array meta data */
-    zfp_stream *zfp;   /* compressed stream */
+    zfp_stream *zfp;   /* stream containing the real output buffer */
+    zfp_stream *zfp_aux;   /* auxiliar compressed stream */
     bitstream *stream; /* bit stream to write to or read from */
+    bitstream *stream_aux; /* auxiliar bit stream to write to or read from */
     size_t zfpsize;    /* byte size of compressed stream */
     double tolerance = pow(10, tol);
 
@@ -61,7 +59,7 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
     zfp_stream_set_bit_stream(zfp, stream);
     zfp_stream_rewind(zfp);
 
-        switch (ndim) {
+    switch (ndim) {
         case 1:
             field = zfp_field_1d((void *) input, type, blockshape[0]);
             break;
@@ -78,18 +76,23 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
             printf("\n ZFP is not available for this number of dims \n");
             return 0;
     }
-/*
-    printf("\n field \n");
-    for (int i = 0; i < input_len; i++) {
-        printf("%u, ", ((uint8_t *) field->data)[i]);
-    }
-*/
-    zfpsize = zfp_compress(zfp, field);
+
+    int zfp_maxout = (int) zfp_stream_maximum_size(zfp, field);
+    zfp_stream_close(zfp);
+    stream_close(stream);
+    uint8_t *aux_out = malloc(zfp_maxout);
+    zfp_aux = zfp_stream_open(NULL);
+    zfp_stream_set_accuracy(zfp_aux, tolerance);
+    stream_aux = stream_open(aux_out, zfp_maxout);
+    zfp_stream_set_bit_stream(zfp_aux, stream_aux);
+    zfp_stream_rewind(zfp_aux);
+
+    zfpsize = zfp_compress(zfp_aux, field);
 
     /* clean up */
     zfp_field_free(field);
-    zfp_stream_close(zfp);
-    stream_close(stream);
+    zfp_stream_close(zfp_aux);
+    stream_close(stream_aux);
     free(shape);
     free(chunkshape);
     free(blockshape);
@@ -102,6 +105,9 @@ int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output
         return 0;
     }
 
+    memcpy(output, aux_out, zfpsize);
+    free(aux_out);
+
     return (int) zfpsize;
 }
 
@@ -112,10 +118,6 @@ int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *outp
     ZFP_ERROR_NULL(dparams);
 
     double tol = (int8_t) meta;
-    if (tol < -128 || tol > 128) {
-        printf("\n ZFP is not available for this tolerance \n");
-        return -1;
-    }
     int8_t ndim;
     int64_t *shape = malloc(8 * sizeof(int64_t));
     int32_t *chunkshape = malloc(8 * sizeof(int32_t));
