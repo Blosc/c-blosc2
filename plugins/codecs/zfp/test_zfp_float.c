@@ -38,7 +38,7 @@ static int test_zfp_float(blosc2_schunk* schunk) {
     float *data_dest = malloc(chunksize);
 
     /* Create a context for compression */
-    int zfp_tol = -2;
+    int8_t zfp_tol = -2;
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.splitmode = BLOSC_NEVER_SPLIT;
     cparams.typesize = schunk->typesize;
@@ -232,15 +232,6 @@ int double_same_cells() {
     return result;
 }
 
-int big_float_frame() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_big_float_frame.caterva");
-
-    /* Run the test. */
-    int result = test_zfp_float(schunk);
-    blosc2_schunk_free(schunk);
-    return result;
-}
-
 int day_month_temp() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_day_month_temp.caterva");
 
@@ -268,13 +259,11 @@ int main(void) {
     printf("float_cyclic: %d obtained \n \n", result);
     result = double_same_cells();
     printf("double_same_cells: %d obtained \n \n", result);
-    result = big_float_frame();
-    printf("big_float_frame: %d obtained \n \n", result);
     result = day_month_temp();
     printf("day_month_temp: %d obtained \n \n", result);
-  /*  result = item_prices();
+    result = item_prices();
     printf("item_prices: %d obtained \n \n", result);
-   */ blosc_destroy();
+    blosc_destroy();
 
     return BLOSC2_ERROR_SUCCESS;
 }
