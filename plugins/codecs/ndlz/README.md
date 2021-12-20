@@ -1,7 +1,7 @@
-NDLZ: a multidimensional codec
+NDLZ: a multidimensional lossless codec
 =============================================================================
 
-Given an 2-dim array or matrix, *NDLZ* is a compressor based on the Lempel-Ziv algorithm of lossless data compression.
+Given a 2-dim array or matrix, *NDLZ* is a compressor based on the Lempel-Ziv algorithm of lossless data compression.
 
 Plugin motivation
 --------------------

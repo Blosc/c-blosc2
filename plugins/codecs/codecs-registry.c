@@ -20,10 +20,10 @@ void register_codecs() {
     ndlz.compname = "ndlz";
     register_codec_private(&ndlz);
 
-    blosc2_codec zfp;
-    zfp.compcode = BLOSC_CODEC_ZFP;
+    blosc2_codec zfp_acc;
+    zfp.compcode = BLOSC_CODEC_ZFP_FIXED_ACCURACY;
     zfp.compver = 1;
-    zfp.complib = BLOSC_CODEC_ZFP;
+    zfp.complib = BLOSC_CODEC_ZFP_FIXED_ACCURACY;
     zfp.encoder = blosc2_zfp_compress;
     zfp.decoder = blosc2_zfp_decompress;
     zfp.compname = "zfp";
