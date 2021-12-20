@@ -36,7 +36,7 @@ static int test_zfp(blosc2_schunk* schunk) {
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.splitmode = BLOSC_NEVER_SPLIT;
     cparams.typesize = schunk->typesize;
-    cparams.compcode = BLOSC_CODEC_ZFP;
+    cparams.compcode = BLOSC_CODEC_ZFP_FIXED_ACCURACY;
     cparams.compcode_meta = schunk->typesize;
     cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOFILTER;
     cparams.clevel = 5;

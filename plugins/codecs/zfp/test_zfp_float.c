@@ -42,7 +42,7 @@ static int test_zfp_float(blosc2_schunk* schunk) {
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.splitmode = BLOSC_NEVER_SPLIT;
     cparams.typesize = schunk->typesize;
-    cparams.compcode = BLOSC_CODEC_ZFP;
+    cparams.compcode = BLOSC_CODEC_ZFP_FIXED_ACCURACY;
     cparams.compcode_meta = zfp_tol;
     cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOFILTER;
     cparams.clevel = 5;
@@ -138,7 +138,7 @@ static int test_zfp_double(blosc2_schunk* schunk) {
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.splitmode = BLOSC_NEVER_SPLIT;
     cparams.typesize = schunk->typesize;
-    cparams.compcode = BLOSC_CODEC_ZFP;
+    cparams.compcode = BLOSC_CODEC_ZFP_FIXED_ACCURACY;
     cparams.compcode_meta = zfp_tol;
     cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOFILTER;
     cparams.clevel = 5;
