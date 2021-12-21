@@ -18,11 +18,11 @@
 extern "C" {
 #endif
 
-int blosc2_zfp_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
-                   uint8_t meta, blosc2_cparams *cparams);
+int blosc2_zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
+                            uint8_t meta, blosc2_cparams *cparams);
 
-int blosc2_zfp_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
-                     uint8_t meta, blosc2_dparams *dparams);
+int blosc2_zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
+                              uint8_t meta, blosc2_dparams *dparams);
 
 #if defined (__cplusplus)
 }
