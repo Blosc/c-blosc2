@@ -21,11 +21,11 @@ void register_codecs() {
     register_codec_private(&ndlz);
 
     blosc2_codec zfp_acc;
-    zfp.compcode = BLOSC_CODEC_ZFP_FIXED_ACCURACY;
-    zfp.compver = 1;
-    zfp.complib = BLOSC_CODEC_ZFP_FIXED_ACCURACY;
-    zfp.encoder = blosc2_zfp_compress;
-    zfp.decoder = blosc2_zfp_decompress;
-    zfp.compname = "zfp";
-    register_codec_private(&zfp);
+    zfp_acc.compcode = BLOSC_CODEC_ZFP_FIXED_ACCURACY;
+    zfp_acc.compver = 1;
+    zfp_acc.complib = BLOSC_CODEC_ZFP_FIXED_ACCURACY;
+    zfp_acc.encoder = blosc2_zfp_acc_compress;
+    zfp_acc.decoder = blosc2_zfp_acc_decompress;
+    zfp_acc.compname = "zfp_acc";
+    register_codec_private(&zfp_acc);
 }
