@@ -6,28 +6,34 @@ set(SOURCES ${SOURCES} ${ZFP_SRC_FILES} PARENT_SCOPE)
 
 # targets
 if(BUILD_TESTS)
-    add_executable(test_zfp_int test_zfp_int.c)
-    add_executable(test_zfp_float test_zfp_float.c)
+    add_executable(test_zfp_acc_int test_zfp_acc_int.c)
+    add_executable(test_zfp_acc_float test_zfp_acc_float.c)
+    add_executable(test_zfp_rate_float test_zfp_rate_float.c)
     # Define the BLOSC_TESTING symbol so normally-hidden functions
     # aren't hidden from the view of the test programs.
     set_property(
-            TARGET test_zfp_int
+            TARGET test_zfp_acc_int
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
     set_property(
-            TARGET test_zfp_float
+            TARGET test_zfp_acc_float
+            APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
+    set_property(
+            TARGET test_zfp_rate_float
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
 
-    target_link_libraries(test_zfp_int blosc_testing)
-    target_link_libraries(test_zfp_float blosc_testing)
+    target_link_libraries(test_zfp_acc_int blosc_testing)
+    target_link_libraries(test_zfp_acc_float blosc_testing)
+    target_link_libraries(test_zfp_rate_float blosc_testing)
 
     # tests
-    add_test(test_plugin_test_zfp_int test_zfp_int)
-    add_test(test_plugin_test_zfp_float test_zfp_float)
+    add_test(test_plugin_test_zfp_acc_int test_zfp_acc_int)
+    add_test(test_plugin_test_zfp_acc_float test_zfp_acc_float)
+    add_test(test_plugin_test_zfp_rate_float test_zfp_rate_float)
 
     # Copy test files
     file(GLOB TESTS_DATA ../../test_data/example_float_cyclic.caterva ../../test_data/example_double_same_cells.caterva
-            ../../test_data/example_big_float_frame.caterva ../../test_data/example_day_month_temp.caterva
-            ../../test_data/example_item_prices.caterva ../../filters/ndmean/example_ndmean_r*.caterva)
+         ../../test_data/example_day_month_temp.caterva ../../test_data/example_item_prices.caterva
+         ../../filters/ndmean/example_ndmean_r*.caterva)
     foreach (data ${TESTS_DATA})
         file(COPY ${data}
                 DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

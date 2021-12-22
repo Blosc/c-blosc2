@@ -28,4 +28,13 @@ void register_codecs() {
     zfp_acc.decoder = blosc2_zfp_acc_decompress;
     zfp_acc.compname = "zfp_acc";
     register_codec_private(&zfp_acc);
+
+    blosc2_codec zfp_rate;
+    zfp_rate.compcode = BLOSC_CODEC_ZFP_FIXED_RATE;
+    zfp_rate.compver = 1;
+    zfp_rate.complib = BLOSC_CODEC_ZFP_FIXED_RATE;
+    zfp_rate.encoder = blosc2_zfp_rate_compress;
+    zfp_rate.decoder = blosc2_zfp_rate_decompress;
+    zfp_rate.compname = "zfp_rate";
+    register_codec_private(&zfp_rate);
 }

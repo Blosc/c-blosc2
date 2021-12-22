@@ -10,7 +10,7 @@
     Test program demonstrating use of the Blosc codec from C code.
     To compile this program:
 
-    $ gcc -O test_zfp_int.c -o test_zfp_int -lblosc2
+    $ gcc -O test_zfp_acc_int.c -o test_zfp_acc_int -lblosc2
 
 
 **********************************************************************/
