@@ -10,7 +10,7 @@
     Test program demonstrating use of the Blosc codec from C code.
     To compile this program:
 
-    $ gcc -O test_zfp_float.c -o test_zfp_float -lblosc2
+    $ gcc -O test_zfp_acc_float.c -o test_zfp_acc_float -lblosc2
 
 
 **********************************************************************/
@@ -21,7 +21,7 @@
 #include "blosc2/codecs-registry.h"
 #include <inttypes.h>
 
-static int test_zfp_float(blosc2_schunk* schunk) {
+static int test_zfp_acc_float(blosc2_schunk* schunk) {
 
     if (schunk->typesize != 4) {
         printf("Error: This test is only for doubles.\n");
@@ -117,7 +117,7 @@ static int test_zfp_float(blosc2_schunk* schunk) {
     return (int) (chunksize - csize_f);
 }
 
-static int test_zfp_double(blosc2_schunk* schunk) {
+static int test_zfp_acc_double(blosc2_schunk* schunk) {
 
     if (schunk->typesize != 8) {
         printf("Error: This test is only for doubles.\n");
@@ -218,7 +218,7 @@ int float_cyclic() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_float_cyclic.caterva");
 
     /* Run the test. */
-    int result = test_zfp_float(schunk);
+    int result = test_zfp_acc_float(schunk);
     blosc2_schunk_free(schunk);
     return result;
 }
@@ -227,7 +227,7 @@ int double_same_cells() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_double_same_cells.caterva");
 
     /* Run the test. */
-    int result = test_zfp_double(schunk);
+    int result = test_zfp_acc_double(schunk);
     blosc2_schunk_free(schunk);
     return result;
 }
@@ -236,7 +236,7 @@ int day_month_temp() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_day_month_temp.caterva");
 
     /* Run the test. */
-    int result = test_zfp_float(schunk);
+    int result = test_zfp_acc_float(schunk);
     blosc2_schunk_free(schunk);
     return result;
 }
@@ -245,7 +245,7 @@ int item_prices() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_item_prices.caterva");
 
     /* Run the test. */
-    int result = test_zfp_float(schunk);
+    int result = test_zfp_acc_float(schunk);
     blosc2_schunk_free(schunk);
     return result;
 }
