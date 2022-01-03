@@ -99,9 +99,12 @@ int blosc2_zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *ou
 
     if (zfpsize < 0) {
         BLOSC_TRACE_ERROR("\n ZFP: Compression failed\n");
+        free(aux_out);
+        return (int) zfpsize;
     }
-    if (zfpsize > input_len) {
+    if (zfpsize >= input_len) {
         BLOSC_TRACE_ERROR("\n ZFP: Compressed data is bigger than input! \n");
+        free(aux_out);
         return 0;
     }
 
@@ -241,13 +244,25 @@ int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *o
             printf("\n ZFP is not available for this typesize \n");
             return 0;
     }
-
-    zfp = zfp_stream_open(NULL);
-    double new_rate = zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
-    if (rate != new_rate) {
-        printf("ZFP rate error: obtained rate is %f, and it should be %f", new_rate, rate);
-        return -1;
+    uint cellsize = 1u << (2 * ndim);
+    double min_rate;
+    switch (type) {
+        case zfp_type_float:
+            min_rate = (double) (1 + 8u) / cellsize;
+            if (rate < min_rate) {
+                BLOSC_TRACE_ERROR("\n ZFP minimum rate for this item type is %f. Compression will be done using this rate \n", min_rate);
+            }
+            break;
+        case zfp_type_double:
+            min_rate = (double) (1 + 11u) / cellsize;
+            if (rate < min_rate) {
+                BLOSC_TRACE_ERROR("\n ZFP minimum rate for this item type is %f. Compression will be done using this rate \n", min_rate);
+            }
+            break;
+        default:
+            break;
     }
+    zfp = zfp_stream_open(NULL);
     stream = stream_open(output, output_len);
     zfp_stream_set_bit_stream(zfp, stream);
     zfp_stream_rewind(zfp);
@@ -275,11 +290,6 @@ int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *o
     stream_close(stream);
     uint8_t *aux_out = malloc(zfp_maxout);
     zfp_aux = zfp_stream_open(NULL);
-    new_rate = zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
-    if (rate != new_rate) {
-        printf("ZFP rate error: obtained rate is %f, and it should be %f", new_rate, rate);
-        return -1;
-    }
     stream_aux = stream_open(aux_out, zfp_maxout);
     zfp_stream_set_bit_stream(zfp_aux, stream_aux);
     zfp_stream_rewind(zfp_aux);
@@ -296,9 +306,12 @@ int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *o
 
     if (zfpsize < 0) {
         BLOSC_TRACE_ERROR("\n ZFP: Compression failed\n");
+        free(aux_out);
+        return (int) zfpsize;
     }
-    if (zfpsize > input_len) {
+    if (zfpsize >= input_len) {
         BLOSC_TRACE_ERROR("\n ZFP: Compressed data is bigger than input! \n");
+        free(aux_out);
         return 0;
     }
 
@@ -350,10 +363,7 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
 
     zfp = zfp_stream_open(NULL);
     double new_rate = zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
-    if (rate != new_rate) {
-        printf("ZFP rate error: obtained rate is %f, and it should be %f", new_rate, rate);
-        return -1;
-    }
+
     stream = stream_open(input, input_len);
     zfp_stream_set_bit_stream(zfp, stream);
     zfp_stream_rewind(zfp);
