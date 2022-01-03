@@ -38,7 +38,7 @@ static int test_zfp_rate_float(blosc2_schunk* schunk) {
     float *data_dest = malloc(chunksize);
 
     /* Create a context for compression */
-    int8_t zfp_rate = 50;
+    int8_t zfp_rate = 70;
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.splitmode = BLOSC_NEVER_SPLIT;
     cparams.typesize = schunk->typesize;
@@ -95,9 +95,9 @@ static int test_zfp_rate_float(blosc2_schunk* schunk) {
             printf("%f, ", data_dest[i]);
         }
 */
-        double tolerance = 0.001;
+        double tolerance = 0.5;
         for (int i = 0; i < (chunksize / cparams.typesize); i++) {
-            if ((data_in[i] - data_dest[i]) > tolerance) {
+            if (fabsf(data_in[i] - data_dest[i]) > tolerance * data_in[i]) {
                 printf("i: %d, data %f, dest %f", i, data_in[i], data_dest[i]);
                 printf("\n Decompressed data differs from original!\n");
                 return -1;
@@ -134,7 +134,7 @@ static int test_zfp_rate_double(blosc2_schunk* schunk) {
     double *data_dest = malloc(chunksize);
 
     /* Create a context for compression */
-    int zfp_rate = 50;
+    int zfp_rate = 70;
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.splitmode = BLOSC_NEVER_SPLIT;
     cparams.typesize = schunk->typesize;
@@ -191,9 +191,9 @@ static int test_zfp_rate_double(blosc2_schunk* schunk) {
             printf("%f, ", data_dest[i]);
         }
 */
-        double tolerance = 0.001;
+        double tolerance = 0.5;
         for (int i = 0; i < (chunksize / cparams.typesize); i++) {
-            if ((data_in[i] - data_dest[i]) > tolerance) {
+            if (fabs(data_in[i] - data_dest[i]) > tolerance * data_in[i]) {
                 printf("i: %d, data %f, dest %f", i, data_in[i], data_dest[i]);
                 printf("\n Decompressed data differs from original!\n");
                 return -1;

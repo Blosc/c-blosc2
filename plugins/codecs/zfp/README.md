@@ -38,18 +38,10 @@ How ZFP works
 -------------------
 
 In order to compress n-dimensional arrays of floating-point data, ZFP partitions them into cells of size 4^n so; for example, in a 3-dim dataset, the cellshape will be 4x4x4.
-Then, depending on the compression mode, each block is compressed or decompressed individually into a fixed- or variable-length bit string, and these bit strings are concatenated into a single stream of bits:
-
-- BLOSC_CODEC_ZFP_FIXED_RATE: each cell is compressed with a fixed output size given by the parameter *zfp_stream.maxbits*. This number of compressed bits per cell is amortized over the cell size to give a *rate*:
-
-      rate = maxbits / 4^n
-
-  This rate can be changed using the function `zfp_stream_set_rate()`.
-
-- BLOSC_CODEC_ZFP_FIXED_ACCURACY: each cell is compressed using truncation with an absolute error tolerance. It can be changed using `zfp_stream_set_accuracy()`.
+Then, depending on the compression mode, each block is compressed or decompressed individually into a fixed- or variable-length bit string, and these bit strings are concatenated into a single stream of bits.
 
 For more info you can see ZFP official documentation:
-https://zfp.readthedocs.io/
+https://zfp.readthedocs.io/en/latest/
 
 And the offical repo:
 https://github.com/LLNL/zfp
