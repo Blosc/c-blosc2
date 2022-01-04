@@ -203,7 +203,7 @@ int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *o
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(cparams);
 
-    double rate = (double) meta / 100.0;
+    double ratio = (double) meta / 100.0;
 /*
     printf("\n input \n");
     for (int i = 0; i < input_len; i++) {
@@ -244,6 +244,7 @@ int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *o
             printf("\n ZFP is not available for this typesize \n");
             return 0;
     }
+    double rate = ratio * typesize * 8;     // convert from output size / input size to output bits per input value
     uint cellsize = 1u << (2 * ndim);
     double min_rate;
     switch (type) {
@@ -327,7 +328,7 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(dparams);
 
-    double rate = (double) meta / 100.0;
+    double ratio = (double) meta / 100.0;
     int8_t ndim;
     int64_t *shape = malloc(8 * sizeof(int64_t));
     int32_t *chunkshape = malloc(8 * sizeof(int32_t));
@@ -360,7 +361,7 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
             printf("\n ZFP is not available for this typesize \n");
             return 0;
     }
-
+    double rate = ratio * typesize * 8;     // convert from output size / input size to output bits per input value
     zfp = zfp_stream_open(NULL);
     double new_rate = zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
 
