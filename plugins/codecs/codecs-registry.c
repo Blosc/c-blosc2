@@ -29,6 +29,15 @@ void register_codecs() {
     zfp_acc.compname = "zfp_acc";
     register_codec_private(&zfp_acc);
 
+    blosc2_codec zfp_prec;
+    zfp_prec.compcode = BLOSC_CODEC_ZFP_FIXED_PRECISION;
+    zfp_prec.compver = 1;
+    zfp_prec.complib = BLOSC_CODEC_ZFP_FIXED_PRECISION;
+    zfp_prec.encoder = blosc2_zfp_prec_compress;
+    zfp_prec.decoder = blosc2_zfp_prec_decompress;
+    zfp_prec.compname = "zfp_prec";
+    register_codec_private(&zfp_prec);
+
     blosc2_codec zfp_rate;
     zfp_rate.compcode = BLOSC_CODEC_ZFP_FIXED_RATE;
     zfp_rate.compver = 1;

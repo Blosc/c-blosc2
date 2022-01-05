@@ -8,6 +8,7 @@ set(SOURCES ${SOURCES} ${ZFP_SRC_FILES} PARENT_SCOPE)
 if(BUILD_TESTS)
     add_executable(test_zfp_acc_int test_zfp_acc_int.c)
     add_executable(test_zfp_acc_float test_zfp_acc_float.c)
+    add_executable(test_zfp_prec_float test_zfp_prec_float.c)
     add_executable(test_zfp_rate_float test_zfp_rate_float.c)
     # Define the BLOSC_TESTING symbol so normally-hidden functions
     # aren't hidden from the view of the test programs.
@@ -18,16 +19,21 @@ if(BUILD_TESTS)
             TARGET test_zfp_acc_float
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
     set_property(
+            TARGET test_zfp_prec_float
+            APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
+    set_property(
             TARGET test_zfp_rate_float
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
 
     target_link_libraries(test_zfp_acc_int blosc_testing)
     target_link_libraries(test_zfp_acc_float blosc_testing)
+    target_link_libraries(test_zfp_prec_float blosc_testing)
     target_link_libraries(test_zfp_rate_float blosc_testing)
 
     # tests
     add_test(test_plugin_test_zfp_acc_int test_zfp_acc_int)
     add_test(test_plugin_test_zfp_acc_float test_zfp_acc_float)
+    add_test(test_plugin_test_zfp_prec_float test_zfp_prec_float)
     add_test(test_plugin_test_zfp_rate_float test_zfp_rate_float)
 
     # Copy test files
