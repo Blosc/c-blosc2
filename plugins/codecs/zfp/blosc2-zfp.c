@@ -529,6 +529,7 @@ int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *o
     stream_aux = stream_open(aux_out, zfp_maxout);
     zfp_stream_set_bit_stream(zfp_aux, stream_aux);
     zfp_stream_rewind(zfp_aux);
+    zfp_stream_set_rate(zfp_aux, rate, type, ndim, zfp_false);
 
     zfpsize = zfp_compress(zfp_aux, field);
 
@@ -598,7 +599,7 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
     }
     double rate = ratio * typesize * 8;     // convert from output size / input size to output bits per input value
     zfp = zfp_stream_open(NULL);
-    double new_rate = zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
+    zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
 
     stream = stream_open(input, input_len);
     zfp_stream_set_bit_stream(zfp, stream);

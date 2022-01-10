@@ -20,7 +20,8 @@ The parameters used by *ZFP* are the ones specified in the `blosc2_codec` struct
 Furthermore, *ZFP* allows to work in three modes, BLOSC_CODEC_ZFP_FIXED_ACCURACY, BLOSC_CODEC_ZFP_FIXED_PRECISION and BLOSC_CODEC_ZFP_FIXED_RATE, each of one can be fine-tuned via the `meta` parameter as follows:
 
 - BLOSC_CODEC_ZFP_FIXED_ACCURACY: `meta` is used as absolute error in truncation.  For example, if meta = -2, each value loss must be less than or equal to 10^(-2) = 0,01. Then, if 23,0567 is a value of the original input, after compressing and decompressing this input with meta = -2, this value must be between 23,0467 and 23,0667. As `meta` is unsigned in the codec plugin interface, if user does not want the compiler to show a warning, a cast to unsigned integer of 1 byte must be done before calling the plugin.
-- BLOSC_CODEC_ZFP_FIXED_PRECISION: `meta` must be a number between 1 and ZFP_MAX_PREC. It is called *precision* and represents the maximum number of bit planes encoded, which means the number of most significant uncompressed bits of each input value that will be encoded.
+- BLOSC_CODEC_ZFP_FIXED_PRECISION: `meta` must be a number between 1 and ZFP_MAX_PREC. It is called *precision* and represents the maximum number of bit planes encoded. This is, for each input value, the number of most significant bits that will be encoded. For more info, see:
+  https://zfp.readthedocs.io/en/latest/faq.html#q-relerr
 - BLOSC_CODEC_ZFP_FIXED_RATE: `meta` must be a number between 1 and 100. It is called *ratio* and represents the size that the compressed cells must have based on the input cell size. For example, if the cell size is 2000 bytes and meta = 50, the output cell size will be 50% of 2000 = 1000 bytes.
 
 To choose one of the compression modes, user must use its corresponding identifier as `blosc2_cparams.compcode`. For example:
