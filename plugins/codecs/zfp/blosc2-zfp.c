@@ -157,7 +157,7 @@ int blosc2_zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *
 
     zfp = zfp_stream_open(NULL);
     zfp_stream_set_accuracy(zfp, tolerance);
-    stream = stream_open(input, input_len);
+    stream = stream_open((void*) input, input_len);
     zfp_stream_set_bit_stream(zfp, stream);
     zfp_stream_rewind(zfp);
 
@@ -392,7 +392,7 @@ int blosc2_zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t 
 
     zfp = zfp_stream_open(NULL);
     zfp_stream_set_precision(zfp, prec);
-    stream = stream_open(input, input_len);
+    stream = stream_open((void*) input, input_len);
     zfp_stream_set_bit_stream(zfp, stream);
     zfp_stream_rewind(zfp);
 
@@ -477,7 +477,6 @@ int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *o
             break;
         default:
             printf("\n ZFP is not available for this typesize \n");
-            return 0;
     }
     double rate = ratio * typesize * 8;     // convert from output size / input size to output bits per input value
     uint cellsize = 1u << (2 * ndim);
@@ -496,7 +495,7 @@ int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *o
             }
             break;
         default:
-            break;
+            return 0;
     }
     zfp = zfp_stream_open(NULL);
     stream = stream_open(output, output_len);
@@ -601,7 +600,7 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
     zfp = zfp_stream_open(NULL);
     zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
 
-    stream = stream_open(input, input_len);
+    stream = stream_open((void*) input, input_len);
     zfp_stream_set_bit_stream(zfp, stream);
     zfp_stream_rewind(zfp);
 

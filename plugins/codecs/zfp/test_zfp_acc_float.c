@@ -113,7 +113,7 @@ static int test_zfp_acc_float(blosc2_schunk* schunk) {
     blosc2_free_ctx(dctx);
 
     printf("Succesful roundtrip!\n");
-    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
+    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / (double) csize_f);
     return (int) (chunksize - csize_f);
 }
 
@@ -209,7 +209,7 @@ static int test_zfp_acc_double(blosc2_schunk* schunk) {
     blosc2_free_ctx(dctx);
 
     printf("Succesful roundtrip!\n");
-    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
+    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / (double) csize_f);
     return (int) (chunksize - csize_f);
 }
 

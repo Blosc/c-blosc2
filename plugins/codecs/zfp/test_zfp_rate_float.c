@@ -16,7 +16,6 @@
 **********************************************************************/
 
 #include <stdio.h>
-#include <math.h>
 #include "blosc2.h"
 #include "blosc2/codecs-registry.h"
 #include <inttypes.h>
@@ -120,7 +119,7 @@ static int test_zfp_rate_float(blosc2_schunk* schunk) {
     blosc2_free_ctx(dctx);
 
     printf("Succesful roundtrip!\n");
-    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
+    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / (double) csize_f);
     return (int) (chunksize - csize_f);
 }
 
@@ -224,7 +223,7 @@ static int test_zfp_rate_double(blosc2_schunk* schunk) {
     blosc2_free_ctx(dctx);
 
     printf("Succesful roundtrip!\n");
-    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
+    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / (double) csize_f);
     return (int) (chunksize - csize_f);
 }
 
