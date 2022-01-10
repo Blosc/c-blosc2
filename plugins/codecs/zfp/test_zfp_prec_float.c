@@ -95,10 +95,16 @@ static int test_zfp_prec_float(blosc2_schunk* schunk) {
             printf("%f, ", data_dest[i]);
         }
 */
-        double tolerance = pow(10, zfp_prec - 64);
+        double tolerance = 0.01;
         for (int i = 0; i < (chunksize / cparams.typesize); i++) {
-            if (fabsf(data_in[i] - data_dest[i]) > tolerance * fmaxf(fabsf(data_in[i]), fabsf(data_dest[i]))) {
-                printf("i: %d, data %f, dest %f", i, data_in[i], data_dest[i]);
+            if ((data_in[i] == 0) || (data_dest[i] == 0)) {
+                if (fabsf(data_in[i] - data_dest[i]) > tolerance) {
+                    printf("i: %d, data %.8f, dest %.8f", i, data_in[i], data_dest[i]);
+                    printf("\n Decompressed data differs from original!\n");
+                    return -1;
+                }
+            } else if (fabsf(data_in[i] - data_dest[i]) > tolerance * fmaxf(fabsf(data_in[i]), fabsf(data_dest[i]))) {
+                printf("i: %d, data %.8f, dest %.8f", i, data_in[i], data_dest[i]);
                 printf("\n Decompressed data differs from original!\n");
                 return -1;
             }
@@ -191,10 +197,16 @@ static int test_zfp_prec_double(blosc2_schunk* schunk) {
             printf("%f, ", data_dest[i]);
         }
 */
-        double tolerance = pow(10, zfp_prec - 64);
+        double tolerance = 0.01;
         for (int i = 0; i < (chunksize / cparams.typesize); i++) {
-            if (fabs(data_in[i] - data_dest[i]) > tolerance * fmaxf(fabs(data_in[i]), fabs(data_dest[i]))) {
-                printf("i: %d, data %f, dest %f", i, data_in[i], data_dest[i]);
+            if ((data_in[i] == 0) || (data_dest[i] == 0)) {
+                if (fabs(data_in[i] - data_dest[i]) > tolerance) {
+                    printf("i: %d, data %.16f, dest %.16f", i, data_in[i], data_dest[i]);
+                    printf("\n Decompressed data differs from original!\n");
+                    return -1;
+                }
+            } else if (fabs(data_in[i] - data_dest[i]) > tolerance * fmax(fabs(data_in[i]), fabs(data_dest[i]))) {
+                printf("i: %d, data %.16f, dest %.16f", i, data_in[i], data_dest[i]);
                 printf("\n Decompressed data differs from original!\n");
                 return -1;
             }
