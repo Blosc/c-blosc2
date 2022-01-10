@@ -25,6 +25,9 @@ int blosc2_zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *ou
     uint32_t smeta_len;
     if (blosc2_meta_get(cparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
         printf("Blosc error");
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
         return -1;
     }
     deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
@@ -50,6 +53,9 @@ int blosc2_zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *ou
             break;
         default:
             printf("\n ZFP is not available for this typesize \n");
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             return 0;
     }
 
@@ -74,6 +80,9 @@ int blosc2_zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *ou
             break;
         default:
             printf("\n ZFP is not available for this number of dims \n");
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             return 0;
     }
 
@@ -129,6 +138,9 @@ int blosc2_zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *
     uint32_t smeta_len;
     if (blosc2_meta_get(dparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
         printf("Blosc error");
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
         return -1;
     }
     deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
@@ -152,6 +164,9 @@ int blosc2_zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *
             break;
         default:
             printf("\n ZFP is not available for this typesize \n");
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             return 0;
     }
 
@@ -176,6 +191,9 @@ int blosc2_zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *
             break;
         default:
             printf("\n ZFP is not available for this number of dims \n");
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             return 0;
     }
 
@@ -217,6 +235,9 @@ int blosc2_zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *o
     uint32_t smeta_len;
     if (blosc2_meta_get(cparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
         printf("Blosc error");
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
         return -1;
     }
     deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
@@ -246,6 +267,9 @@ int blosc2_zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *o
             break;
         default:
             printf("\n ZFP is not available for this ndim \n");
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             return 0;
     }
 
@@ -264,6 +288,9 @@ int blosc2_zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *o
             break;
         default:
             printf("\n ZFP is not available for this typesize \n");
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             return 0;
     }
 
@@ -288,6 +315,9 @@ int blosc2_zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *o
             break;
         default:
             printf("\n ZFP is not available for this number of dims \n");
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             return 0;
     }
 
@@ -342,6 +372,9 @@ int blosc2_zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t 
     uint32_t smeta_len;
     if (blosc2_meta_get(dparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
         printf("Blosc error");
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
         return -1;
     }
     deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
@@ -369,6 +402,9 @@ int blosc2_zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t 
             break;
         default:
             printf("\n ZFP is not available for this ndim \n");
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             return 0;
     }
 
@@ -387,6 +423,9 @@ int blosc2_zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t 
             break;
         default:
             printf("\n ZFP is not available for this typesize \n");
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             return 0;
     }
 
@@ -411,6 +450,9 @@ int blosc2_zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t 
             break;
         default:
             printf("\n ZFP is not available for this number of dims \n");
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             return 0;
     }
 
@@ -453,6 +495,9 @@ int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *o
     uint32_t smeta_len;
     if (blosc2_meta_get(cparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
         printf("Blosc error");
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
         return -1;
     }
     deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
@@ -495,6 +540,9 @@ int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *o
             }
             break;
         default:
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             return 0;
     }
     zfp = zfp_stream_open(NULL);
@@ -517,6 +565,9 @@ int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *o
             break;
         default:
             printf("\n ZFP is not available for this number of dims \n");
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             return 0;
     }
 
@@ -572,6 +623,9 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
     uint32_t smeta_len;
     if (blosc2_meta_get(dparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
         printf("Blosc error");
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
         return -1;
     }
     deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
@@ -594,6 +648,9 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
             break;
         default:
             printf("\n ZFP is not available for this typesize \n");
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             return 0;
     }
     double rate = ratio * typesize * 8;     // convert from output size / input size to output bits per input value
@@ -619,6 +676,9 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
             break;
         default:
             printf("\n ZFP is not available for this number of dims \n");
+            free(shape);
+            free(chunkshape);
+            free(blockshape);
             return 0;
     }
 
