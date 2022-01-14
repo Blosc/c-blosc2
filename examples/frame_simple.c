@@ -63,7 +63,6 @@ int main(void) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-  dparams.typesize = sizeof(int32_t);
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
   blosc2_schunk* schunk = blosc2_schunk_new(&storage);

@@ -63,7 +63,6 @@ static int test_ndlz_4(blosc2_schunk* schunk) {
 
     blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
     dparams.nthreads = 1;
-    dparams.typesize = schunk->typesize;
     blosc2_context *dctx;
     dctx = blosc2_create_dctx(dparams);
 
@@ -144,7 +143,6 @@ static int test_ndlz_8(blosc2_schunk* schunk) {
 
     blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
     dparams.nthreads = 1;
-    dparams.typesize = schunk->typesize;
     blosc2_context *dctx;
     dctx = blosc2_create_dctx(dparams);
 

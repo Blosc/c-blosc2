@@ -5,7 +5,7 @@
 #include <math.h>
 
 int blosc2_zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
-                            int32_t output_len, uint8_t meta, blosc2_cparams *cparams) {
+                            int32_t output_len, uint8_t meta, blosc2_cparams *cparams, const void* chunk) {
     ZFP_ERROR_NULL(input);
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(cparams);
@@ -124,10 +124,14 @@ int blosc2_zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *ou
 }
 
 int blosc2_zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
-                              int32_t output_len, uint8_t meta, blosc2_dparams *dparams) {
+                              int32_t output_len, uint8_t meta, blosc2_dparams *dparams, const void* chunk) {
     ZFP_ERROR_NULL(input);
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(dparams);
+
+    size_t typesize;
+    int flags;
+    blosc_cbuffer_metainfo(chunk, &typesize, &flags);
 
     double tol = (int8_t) meta;
     int8_t ndim;
@@ -152,8 +156,6 @@ int blosc2_zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *
     bitstream *stream; /* bit stream to write to or read from */
     size_t zfpsize;    /* byte size of compressed stream */
     double tolerance = pow(10, tol);
-
-    int32_t typesize = dparams->typesize;
 
     switch (typesize) {
         case sizeof(float):
@@ -216,7 +218,7 @@ int blosc2_zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *
 }
 
 int blosc2_zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
-                            int32_t output_len, uint8_t meta, blosc2_cparams *cparams) {
+                            int32_t output_len, uint8_t meta, blosc2_cparams *cparams, const void* chunk) {
     ZFP_ERROR_NULL(input);
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(cparams);
@@ -359,11 +361,14 @@ int blosc2_zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *o
 }
 
 int blosc2_zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
-                              int32_t output_len, uint8_t meta, blosc2_dparams *dparams) {
+                              int32_t output_len, uint8_t meta, blosc2_dparams *dparams, const void* chunk) {
     ZFP_ERROR_NULL(input);
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(dparams);
 
+    size_t typesize;
+    int flags;
+    blosc_cbuffer_metainfo(chunk, &typesize, &flags);
     int8_t ndim;
     int64_t *shape = malloc(8 * sizeof(int64_t));
     int32_t *chunkshape = malloc(8 * sizeof(int32_t));
@@ -413,7 +418,6 @@ int blosc2_zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t 
         prec = ZFP_MAX_PREC;
     }
 
-    int32_t typesize = dparams->typesize;
     switch (typesize) {
         case sizeof(float):
             type = zfp_type_float;
@@ -475,7 +479,7 @@ int blosc2_zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t 
 }
 
 int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
-                             int32_t output_len, uint8_t meta, blosc2_cparams *cparams) {
+                             int32_t output_len, uint8_t meta, blosc2_cparams *cparams, const void* chunk) {
     ZFP_ERROR_NULL(input);
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(cparams);
@@ -609,10 +613,14 @@ int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *o
 }
 
 int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
-                              int32_t output_len, uint8_t meta, blosc2_dparams *dparams) {
+                              int32_t output_len, uint8_t meta, blosc2_dparams *dparams, const void* chunk) {
     ZFP_ERROR_NULL(input);
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(dparams);
+
+    size_t typesize;
+    int flags;
+    blosc_cbuffer_metainfo(chunk, &typesize, &flags);
 
     double ratio = (double) meta / 100.0;
     int8_t ndim;
@@ -636,8 +644,6 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
     zfp_stream *zfp;   /* compressed stream */
     bitstream *stream; /* bit stream to write to or read from */
     size_t zfpsize;    /* byte size of compressed stream */
-
-    int32_t typesize = dparams->typesize;
 
     switch (typesize) {
         case sizeof(float):

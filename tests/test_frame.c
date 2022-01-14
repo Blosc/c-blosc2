@@ -63,7 +63,6 @@ static char* test_frame(void) {
     cparams.compcode = BLOSC_LZ4HC;
   }
   cparams.blocksize = blocksize;
-  dparams.typesize = sizeof(int32_t);
 
   if (multithread) {
     cparams.nthreads = NTHREADS;

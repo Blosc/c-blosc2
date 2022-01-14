@@ -45,7 +45,6 @@ static char* test_sframe(void) {
 
   /* Create a frame container */
   cparams.typesize = sizeof(int32_t);
-  dparams.typesize = sizeof(int32_t);
   if (splits) {
     // Use a codec that splits blocks (important for lazy chunks).
     // Only BLOSCLZ is doing that.
@@ -227,7 +226,6 @@ static char* test_sframe_simple(void) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  dparams.typesize = sizeof(int32_t);
   blosc2_storage storage = {.contiguous=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
   blosc2_remove_dir(storage.urlpath);
   schunk = blosc2_schunk_new(&storage);
@@ -284,7 +282,6 @@ static char* test_sframe_typesize(void) {
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  dparams.typesize = 7;
   blosc2_storage storage = {.contiguous=false, .urlpath=directory, .cparams=&cparams, .dparams=&dparams};
   blosc2_remove_dir(storage.urlpath);
   schunk = blosc2_schunk_new(&storage);
