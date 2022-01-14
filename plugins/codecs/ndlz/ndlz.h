@@ -19,10 +19,10 @@ extern "C" {
 #endif
 
 int ndlz_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
-                   uint8_t meta, blosc2_cparams *cparams);
+                   uint8_t meta, blosc2_cparams *cparams, const void* chunk);
 
 int ndlz_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
-                     uint8_t meta, blosc2_dparams *dparams);
+                     uint8_t meta, blosc2_dparams *dparams, const void* chunk);
 
 #if defined (__cplusplus)
 }

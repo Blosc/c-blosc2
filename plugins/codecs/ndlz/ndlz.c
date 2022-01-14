@@ -24,7 +24,7 @@
 #include "ndlz8x8.h"
 
 int ndlz_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
-                  uint8_t meta, blosc2_cparams *cparams) {
+                  uint8_t meta, blosc2_cparams *cparams, const void* chunk) {
     NDLZ_ERROR_NULL(input);
     NDLZ_ERROR_NULL(output);
     NDLZ_ERROR_NULL(cparams);
@@ -43,7 +43,7 @@ int ndlz_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int3
 }
 
 int ndlz_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
-                    uint8_t meta, blosc2_dparams *dparams) {
+                    uint8_t meta, blosc2_dparams *dparams, const void* chunk) {
     NDLZ_ERROR_NULL(input);
     NDLZ_ERROR_NULL(output);
     NDLZ_ERROR_NULL(dparams);
