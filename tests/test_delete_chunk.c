@@ -73,7 +73,6 @@ static char* test_delete_chunk(void) {
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
   cparams.nthreads = NTHREADS;
-  dparams.typesize = sizeof(int32_t);
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .urlpath=tdata.urlpath, .contiguous=tdata.contiguous};

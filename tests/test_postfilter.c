@@ -297,7 +297,6 @@ int main(void) {
   cparams.typesize = sizeof(int32_t);
   cparams.blocksize = 2048;
   dparams = BLOSC2_DPARAMS_DEFAULTS;
-  dparams.typesize = sizeof(int32_t);
 
   /* Run all the suite */
   char* result = all_tests();

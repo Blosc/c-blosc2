@@ -227,7 +227,6 @@ int main(void) {
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   dparams = BLOSC2_DPARAMS_DEFAULTS;
-  dparams.typesize = sizeof(int32_t);
 
   /* Run all the suite */
   char* result = all_tests();

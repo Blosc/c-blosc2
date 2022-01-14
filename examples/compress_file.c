@@ -54,7 +54,6 @@ int main(int argc, char* argv[]) {
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = NTHREADS;
-  dparams.typesize = 1;
 
   /* Create a super-chunk backed by an in-memory frame */
   remove(argv[2]);

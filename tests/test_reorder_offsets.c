@@ -59,7 +59,6 @@ static char* test_reorder_offsets(void) {
   cparams.typesize = sizeof(int32_t);
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  dparams.typesize = sizeof(int32_t);
   blosc2_storage storage = {.contiguous=tdata.contiguous, .urlpath=tdata.urlpath, .cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(&storage);
 

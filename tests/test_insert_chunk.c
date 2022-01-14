@@ -78,7 +78,6 @@ static char* test_insert_chunk(void) {
   cparams.typesize = sizeof(int64_t);
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  dparams.typesize = sizeof(int64_t);
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .urlpath=tdata.urlpath, .contiguous=tdata.contiguous};
   schunk = blosc2_schunk_new(&storage);

@@ -72,7 +72,6 @@ int create_cframe(const char* compname) {
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-  dparams.typesize = sizeof(int32_t);
   dparams.nthreads = NTHREADS;
   char filename[64];
   sprintf(filename, "frame_simple-%s.b2frame", compname);
