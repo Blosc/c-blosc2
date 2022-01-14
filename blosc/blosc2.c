@@ -2662,8 +2662,9 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
-  if (!context->special_type &&
-      (_src + srcsize < (uint8_t *)(context->bstarts + context->nblocks))) {
+  int chunk_memcpy = header->flags & 0x1;
+  if (!context->special_type && !chunk_memcpy &&
+      ((uint8_t *)(_src + srcsize) < (uint8_t *)(context->bstarts + context->nblocks))) {
     BLOSC_TRACE_ERROR("`bstarts` out of bounds.");
     return BLOSC2_ERROR_READ_BUFFER;
   }
