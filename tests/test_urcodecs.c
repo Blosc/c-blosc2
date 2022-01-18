@@ -24,7 +24,7 @@
 int codec_encoder(const uint8_t* input, int32_t input_len,
                   uint8_t* output, int32_t output_len,
                   uint8_t meta,
-                  blosc2_cparams* cparams) {
+                  blosc2_cparams* cparams, const void* chunk) {
   if (cparams->schunk == NULL) {
     return -1;
   }
@@ -70,7 +70,7 @@ int codec_encoder(const uint8_t* input, int32_t input_len,
 int codec_decoder(const uint8_t* input, int32_t input_len,
                   uint8_t* output, int32_t output_len,
                   uint8_t meta,
-                  blosc2_dparams *dparams) {
+                  blosc2_dparams *dparams, const void* chunk) {
   if (dparams->schunk == NULL) {
     return -1;
   }
@@ -106,7 +106,7 @@ int codec_decoder(const uint8_t* input, int32_t input_len,
 int codec_decoder_error(const uint8_t* input, int32_t input_len,
                         uint8_t* output, int32_t output_len,
                         uint8_t meta,
-                        blosc2_dparams* dparams) {
+                        blosc2_dparams* dparams, const void* chunk) {
   if (meta != 111) {
     return -1;
   }
