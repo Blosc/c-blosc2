@@ -181,7 +181,7 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
         }
       }
       else {
-        for (uint64_t i = 0; i < cell_shape; i++) {           // fill cell buffer
+        for (uint64_t i = 0; i < (uint64_t) cell_shape; i++) {           // fill cell buffer
           uint64_t ind = orig + i * blockshape[1];
           memcpy(buf_cell, &ip[ind], cell_shape);
           buf_cell += cell_shape;
@@ -542,7 +542,7 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
       }
 
       uint32_t orig = ii[0] * cell_shape * blockshape[1] + ii[1] * cell_shape;
-      for (uint32_t i = 0; i < cell_shape; i++) {
+      for (uint32_t i = 0; i < (uint32_t) cell_shape; i++) {
         if (i < padding[0]) {
           ind = orig + i * blockshape[1];
           memcpy(&op[ind], buffercpy, padding[1]);

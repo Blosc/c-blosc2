@@ -19,8 +19,6 @@ extern "C" {
 #endif
 #define XXH_INLINE_ALL
 
-#define NDLZ_VERSION_STRING "1.0.0"
-
 #define NDLZ_ERROR_NULL(pointer)         \
     do {                                 \
         if ((pointer) == NULL) {         \
@@ -113,7 +111,7 @@ static int32_t deserialize_meta(uint8_t *smeta, uint32_t smeta_len, int8_t *ndim
         swap_store(blockshape + i, pmeta, sizeof(int32_t));
         pmeta += sizeof(int32_t);
     }
-    uint32_t slen = (uint32_t)(pmeta - smeta);
+//    uint32_t slen = (uint32_t)(pmeta - smeta);
     return 0;
 }
 
