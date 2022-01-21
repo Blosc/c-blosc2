@@ -6,20 +6,19 @@ ZFP: a multidimensional lossy codec
 Plugin motivation
 --------------------
 
-A lossy codec like ZFP allows for much better compression ratios at the expense of loosing some precision in floating point data.  At the same time, and if executed carefully, it can tentatively allow for a third level partition for Caterva (a light-weight layer for multidimensional data on top of C-Blosc2) so that slicing could be done even more efficiently with this codec.
+A lossy codec like ZFP allows for much better compression ratios at the expense of loosing some precision in floating point data.  At the same time, and if executed carefully, it can tentatively allow for a third level partition for Caterva (a light-weight layer for multidimensional data on top of C-Blosc2) so that slicing could be done even more efficiently with this codec (not implemented yet).
 
 Plugin usage
 -------------------
 
-The codec consists of different encoders to codify data and
-decoders to recover the original data, placed at `blosc2-zfp.c`.
+The codec consists of different encoders to codify data and decoders to recover the original data, located at `blosc2-zfp.c`.
 
 This plugin only works with 1 to 4-dim datasets of floats or doubles, so if one tries to work with another type of dataset, it will return an error value.
 
 The parameters used by *ZFP* are the ones specified in the `blosc2_codec` structure in the `blosc2.h` header.
 Furthermore, *ZFP* allows to work in three modes, BLOSC_CODEC_ZFP_FIXED_ACCURACY, BLOSC_CODEC_ZFP_FIXED_PRECISION and BLOSC_CODEC_ZFP_FIXED_RATE, each of one can be fine-tuned via the `meta` parameter as follows:
 
-- BLOSC_CODEC_ZFP_FIXED_ACCURACY: `meta` is used as absolute error in truncation.  For example, if meta = -2, each value loss must be less than or equal to 10^(-2) = 0,01. Then, if 23,0567 is a value of the original input, after compressing and decompressing this input with meta = -2, this value must be between 23,0467 and 23,0667. As `meta` is unsigned in the codec plugin interface, if user does not want the compiler to show a warning, a cast to unsigned integer of 1 byte must be done before calling the plugin.
+- BLOSC_CODEC_ZFP_FIXED_ACCURACY: `meta` is used as absolute error in truncation.  For example, if meta = -2, each value loss must be less than or equal to 10^(-2) = 0,01. Then, if 23,0567 is a value of the original input, after compressing and decompressing this input with meta = -2, this value must be between 23,0467 and 23,0667. As `meta` is unsigned in the codec plugin interface, if user does not want the compiler to show a warning, a cast to a `uint8_t` must be done before calling the plugin.
 - BLOSC_CODEC_ZFP_FIXED_PRECISION: `meta` must be a number between 1 and ZFP_MAX_PREC. It is called *precision* and represents the maximum number of bit planes encoded. This is, for each input value, the number of most significant bits that will be encoded. For more info, see:
   https://zfp.readthedocs.io/en/latest/faq.html#q-relerr
 - BLOSC_CODEC_ZFP_FIXED_RATE: `meta` must be a number between 1 and 100. It is called *ratio* and represents the size that the compressed cells must have based on the input cell size. For example, if the cell size is 2000 bytes and meta = 50, the output cell size will be 50% of 2000 = 1000 bytes.
@@ -31,6 +30,7 @@ To choose one of the compression modes, user must use its corresponding identifi
 or:
 
     cparams.compcode = BLOSC_CODEC_ZFP_FIXED_PRECISION;    
+
 or:
 
     cparams.compcode = BLOSC_CODEC_ZFP_FIXED_RATE;
@@ -54,11 +54,9 @@ https://github.com/LLNL/zfp
 Advantages and disadvantages
 ------------------------------
 
-The main advantage of *ZFP* when compared with others is that *ZFP*
-makes use of the multidimensionality of datasets and takes advantage of this instead of
+The main advantage of *ZFP* when compared with others is that *ZFP* makes use of the multidimensionality of datasets and takes advantage of this instead of
 processing all data as serial.
 
-For example, the difference between *ZFP* and *NDLZ* is that *ZFP* codec uses lossy data compression (which implies better ratios) and lets user to work with floating-point datasets.
-Furthermore, *ZFP* implements different compression modes that brings interesting new possibilities.
+For example, the difference between *ZFP* and *NDLZ* is that *ZFP* codec uses lossy data compression (which implies better ratios) and lets user to work with floating-point datasets.  Furthermore, *ZFP* implements different compression modes that brings interesting new possibilities.
 
-The main disadvantage of *ZFP* is that it is mainlly useful for 2 to 4-dim datasets only. It can also be used for 1-dim datasets but then it loses most of its advantages (i.e. using spacial locality to better reduce data entropy).
+The main disadvantage of *ZFP* is that it is mainly useful for 2 to 4-dim datasets only. It can also be used for 1-dim datasets, but then it loses most of its advantages (i.e. using spacial locality to better reduce data entropy).
