@@ -1126,6 +1126,51 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
 }
 
 
+// Get the data offsets from a frame
+int64_t* blosc2_frame_get_offsets(blosc2_schunk *schunk) {
+  if (schunk->frame == NULL) {
+    BLOSC_TRACE_ERROR("This function needs a frame.");
+    return NULL;
+  }
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+
+  // Get header info
+  int32_t header_len;
+  int64_t frame_len;
+  int64_t nbytes;
+  int64_t cbytes;
+  int32_t blocksize;
+  int32_t chunksize;
+  int32_t nchunks;
+  int ret = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
+                            &blocksize, &chunksize, &nchunks,
+                            NULL, NULL, NULL, NULL, NULL, NULL,
+                            frame->schunk->storage->io);
+  if (ret < 0) {
+    BLOSC_TRACE_ERROR("Cannot get the header info for the frame.");
+    return ret;
+  }
+
+  int32_t off_nbytes = nchunks * sizeof(int64_t);
+  int64_t* offsets = (int64_t *) malloc((size_t)off_nbytes);
+
+  int32_t coffsets_cbytes = 0;
+  uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, nchunks, &coffsets_cbytes);
+  // Decompress offsets
+  blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context *dctx = blosc2_create_dctx(off_dparams);
+  int32_t prev_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes,
+                                              offsets, off_nbytes);
+  blosc2_free_ctx(dctx);
+  if (prev_nbytes < 0) {
+    free(offsets);
+    BLOSC_TRACE_ERROR("Cannot decompress the offsets chunk.");
+    return prev_nbytes;
+  }
+  return offsets;
+}
+
+
 int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) {
   uint8_t* framep = frame->cframe;
   uint8_t header[FRAME_HEADER_MINLEN];
