@@ -124,7 +124,7 @@ int main(void) {
       return -1;
   }
   uint8_t* content;
-  uint32_t content_len;
+  int32_t content_len;
   if (blosc2_meta_get(schunk2, "my_metalayer1", &content, &content_len) < 0) {
       printf("metalayer not found");
       return -1;

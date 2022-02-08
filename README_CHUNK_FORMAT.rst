@@ -171,6 +171,8 @@ for encoding blocks with a filter pipeline::
                 Reserved.
             :``7``:
                 Reserved.
+    :bit 7 (``0x80``):
+        Indicate whether codec has been instrumented or not.
 
 
 Blocks
