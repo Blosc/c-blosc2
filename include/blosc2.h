@@ -170,6 +170,7 @@ enum {
 enum {
   BLOSC2_USEDICT = 0x1,          //!< use dictionaries with codec
   BLOSC2_BIGENDIAN = 0x2,        //!< data is in big-endian ordering
+  BLOSC2_INSTRCODEC = 0x80,      //!< codec is instrumented
 };
 
 /**
@@ -963,7 +964,7 @@ typedef struct {
   int16_t nthreads;
   //!< The number of threads to use internally (1).
   int32_t blocksize;
-  //!< The requested size of the compressed blocks (0; meaning automatic).
+  //!< The requested size of the compressed blocks (0 means automatic).
   int32_t splitmode;
   //!< Whether the blocks should be split or not.
   void* schunk;
@@ -978,6 +979,8 @@ typedef struct {
   //!< The prefilter parameters.
   blosc2_btune *udbtune;
   //!< The user-defined BTune parameters.
+  bool instrument_codec;
+  //!< The mode for codec instrumentation (false means do not instrument)
 } blosc2_cparams;
 
 /**
@@ -986,7 +989,7 @@ typedef struct {
 static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
         BLOSC_BLOSCLZ, 0, 5, 0, 8, 1, 0, BLOSC_FORWARD_COMPAT_SPLIT,
         NULL, {0, 0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0, 0},
-        NULL, NULL, NULL};
+        NULL, NULL, NULL, 0};
 
 
 /**
