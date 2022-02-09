@@ -24,15 +24,15 @@
 #include "blosc2.h"
 
 #define SIZE (100 * 1000)
+#define BLOCKSIZE (40000)
+#define NBLOCKS (SIZE / BLOCKSIZE)
 #define NTHREADS 2
 
 
 int main(void) {
-  static float data[SIZE];
-  static float data_out[SIZE];
-  static float data_dest[SIZE];
-  float data_subset[5];
-  float data_subset_ref[5] = {5, 6, 7, 8, 9};
+  float *data = malloc(SIZE * sizeof(float));
+  float *data_out = malloc(SIZE * sizeof(float));
+  float *data_dest = malloc(SIZE * sizeof(float));
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize = SIZE * sizeof(float), csize;
   int i, ret;
@@ -54,7 +54,8 @@ int main(void) {
   cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
-  cparams.instrument_codec = true;
+  cparams.instr_codec = true;
+  cparams.blocksize = BLOCKSIZE;
   cctx = blosc2_create_cctx(cparams);
 
   /* Do the actual compression */
@@ -86,13 +87,18 @@ int main(void) {
 
   printf("Decompression successful!\n");
 
-  for (i = 0; i < SIZE; i++) {
-    if (data[i] != data_dest[i]) {
-      printf("Decompressed data differs from original!\n");
-      return -1;
-    }
+  blosc2_instr *datai = data_dest;
+  for (i = 0; i < dsize / sizeof(blosc2_instr); i++) {
+    printf("%.3g - ", datai->cratio);
+    printf("%.3g - ", datai->speed);
+    printf("%d ", datai->flags[0]);
+    printf("\n");
+    datai++;
   }
-  printf("Successful roundtrip!\n");
+
+  free(data);
+  free(data_out);
+  free(data_dest);
 
   return 0;
 }

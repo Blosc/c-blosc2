@@ -99,6 +99,18 @@ enum {
   BLOSC2_VERSION_FRAME_FORMAT = BLOSC2_VERSION_FRAME_FORMAT_RC1,
 };
 
+
+//!< Struct for storing data from instrumentation of codecs
+// This can be flexible because it is typically used mainly for development
+typedef struct {
+  float cratio;
+  float speed;
+  //float memory;
+  //float power;
+  uint8_t flags[4];
+} blosc2_instr;
+
+
 enum {
   BLOSC_MIN_HEADER_LENGTH = 16,
   //!< Minimum header length (Blosc1)
@@ -170,7 +182,7 @@ enum {
 enum {
   BLOSC2_USEDICT = 0x1,          //!< use dictionaries with codec
   BLOSC2_BIGENDIAN = 0x2,        //!< data is in big-endian ordering
-  BLOSC2_INSTRCODEC = 0x80,      //!< codec is instrumented
+  BLOSC2_INSTR_CODEC = 0x80,     //!< codec is instrumented (mainly for development)
 };
 
 /**
@@ -975,8 +987,8 @@ typedef struct {
   //!< The prefilter parameters.
   blosc2_btune *udbtune;
   //!< The user-defined BTune parameters.
-  bool instrument_codec;
-  //!< The mode for codec instrumentation (false means do not instrument)
+  bool instr_codec;
+  //!< Whether the codec is instrumented or not
 } blosc2_cparams;
 
 /**

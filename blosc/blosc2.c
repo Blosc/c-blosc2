@@ -797,8 +797,8 @@ static int blosc2_intialize_header_from_context(blosc2_context* context, blosc_h
     if (context->use_dict) {
       header->blosc2_flags |= BLOSC2_USEDICT;
     }
-    if (context->blosc2_flags & BLOSC2_INSTRCODEC) {
-      header->blosc2_flags |= BLOSC2_INSTRCODEC;
+    if (context->blosc2_flags & BLOSC2_INSTR_CODEC) {
+      header->blosc2_flags |= BLOSC2_INSTR_CODEC;
     }
   }
 
@@ -965,7 +965,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   uint8_t *_tmp3 = thread_context->tmp4;
   int last_filter_index = last_filter(context->filters, 'c');
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
-  bool instrument_codec = context->blosc2_flags & BLOSC2_INSTRCODEC;
+  bool instr_codec = context->blosc2_flags & BLOSC2_INSTR_CODEC;
   blosc_timestamp_t last, current;
 
   if (last_filter_index >= 0 || context->prefilter != NULL) {
@@ -1010,7 +1010,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       const uint8_t *ipbound = (uint8_t *) _src + (j + 1) * neblock;
 
       // See whether we have a run here
-      if (instrument_codec) {
+      if (instr_codec) {
         blosc_set_timestamp(&last);
       }
       if (context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH && get_run(ip, ipbound)) {
@@ -1020,26 +1020,23 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
           return 0;    /* Non-compressible data */
         }
 
-        if (instrument_codec) {
+        if (instr_codec) {
           blosc_set_timestamp(&current);
-          int32_t instr_size = 3 * sizeof(float) + 4;  // 3 floats + 4 bytes for extra flags
+          int32_t instr_size = sizeof(blosc2_instr);
           ntbytes += instr_size;
           ctbytes += instr_size;
           if (ntbytes > destsize) {
             return 0;    /* Non-compressible data */
           }
           _sw32(dest - 4, instr_size);
-          float ctime = (float) blosc_elapsed_secs(last, current);
+          blosc2_instr *desti = (blosc2_instr *)dest;
+          memset(desti, 0, sizeof(blosc2_instr));
           // Special values have an overhead of about 1 int32
           int32_t ssize = value == 0 ? sizeof(int32_t) : sizeof(int32_t) + 1;
-          float cratio = (float) neblock / (float)ssize;
-          float speed = (float) neblock / ctime;
-          float *destf = (float*)dest;
-          destf[0] = cratio;
-          destf[1] = speed;
-          // destf[2] = memory;  reserved for the future
-          uint8_t* flags = dest + 3 * sizeof(float);
-          flags[0] = 1;  // mark a runlen
+          desti->cratio = (float) neblock / (float) ssize;
+          float ctime = (float) blosc_elapsed_secs(last, current);
+          desti->speed = (float) neblock / ctime;
+          desti->flags[0] = 1;    // mark a runlen
           dest += instr_size;
           continue;
         }
@@ -1140,9 +1137,9 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       return BLOSC2_ERROR_DATA;
     }
 
-    if (instrument_codec) {
+    if (instr_codec) {
       blosc_set_timestamp(&current);
-      int32_t instr_size = 3 * sizeof(float) + 4;  // 3 floats + 4 bytes for extra flags
+      int32_t instr_size = sizeof(blosc2_instr);
       ntbytes += instr_size;
       ctbytes += instr_size;
       if (ntbytes > destsize) {
@@ -1150,14 +1147,13 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       }
       _sw32(dest - 4, instr_size);
       float ctime = (float)blosc_elapsed_secs(last, current);
+      blosc2_instr *desti = (blosc2_instr *)dest;
+      memset(desti, 0, sizeof(blosc2_instr));
       // cratio is computed having into account 1 additional int (csize)
-      float cratio = (float)neblock / (float)(cbytes + sizeof(int32_t));
-      float speed = (float)neblock / ctime;
-      float *destf = (float*)dest;
-      destf[0] = cratio;
-      destf[1] = speed;
-      // destf[2] = memory;  reserved for the future
+      desti->cratio = (float)neblock / (float)(cbytes + sizeof(int32_t));
+      desti->speed = (float)neblock / ctime;
       dest += instr_size;
+
       continue;
     }
 
@@ -1430,7 +1426,7 @@ static int blosc_d(
   int32_t ntbytes = 0;           /* number of uncompressed bytes in block */
   uint8_t* _dest;
   int32_t typesize = context->typesize;
-  bool instrument_codec = context->blosc2_flags & BLOSC2_INSTRCODEC;
+  bool instr_codec = context->blosc2_flags & BLOSC2_INSTR_CODEC;
   const char* compname;
   int rc;
 
@@ -1510,8 +1506,8 @@ static int blosc_d(
     srcsize = block_csize;
   }
 
-  // If the chunk is memcpyed or instrumented, we just have to copy the block to dest and return
-  if (memcpyed || instrument_codec) {
+  // If the chunk is memcpyed, we just have to copy the block to dest and return
+  if (memcpyed) {
     int bsize_ = leftoverblock ? chunk_nbytes % context->blocksize : bsize;
     if (!context->special_type) {
       if (chunk_nbytes + context->header_overhead != chunk_cbytes) {
@@ -1526,10 +1522,6 @@ static int blosc_d(
       src += context->header_overhead + nblock * context->blocksize;
     }
     _dest = dest + dest_offset;
-    if (instrument_codec) {
-      memcpy(_dest, src, bsize_);
-      return bsize_;
-    }
     if (context->postfilter != NULL) {
       // We are making use of a postfilter, so use a temp for destination
       _dest = tmp;
@@ -1592,15 +1584,19 @@ static int blosc_d(
   srcsize -= src_offset;
 
   int last_filter_index = last_filter(filters, 'd');
-
-  if (((last_filter_index >= 0) &&
-      (next_filter(filters, BLOSC2_MAX_FILTERS, 'd') != BLOSC_DELTA)) ||
-      context->postfilter != NULL) {
-   // We are making use of some filter, so use a temp for destination
-   _dest = tmp;
-  } else {
+  if (instr_codec) {
+    // If instrumented, we don't want to run the filters
+    _dest = dest + dest_offset;
+  }
+  else if (((last_filter_index >= 0) &&
+       (next_filter(filters, BLOSC2_MAX_FILTERS, 'd') != BLOSC_DELTA)) ||
+    context->postfilter != NULL) {
+    // We are making use of some filter, so use a temp for destination
+    _dest = tmp;
+  }
+  else {
     // If no filters, or only DELTA in pipeline
-   _dest = dest + dest_offset;
+    _dest = dest + dest_offset;
   }
 
   /* The number of compressed data streams for this block */
@@ -1735,12 +1731,14 @@ static int blosc_d(
     ntbytes += nbytes;
   } /* Closes j < nstreams */
 
-  if (last_filter_index >= 0 || context->postfilter != NULL) {
-    /* Apply regular filter pipeline */
-    int errcode = pipeline_backward(thread_context, bsize, dest, dest_offset, tmp, tmp2, tmp3,
-                             last_filter_index, nblock);
-    if (errcode < 0)
-      return errcode;
+  if (!instr_codec) {
+    if (last_filter_index >= 0 || context->postfilter != NULL) {
+      /* Apply regular filter pipeline */
+      int errcode = pipeline_backward(thread_context, bsize, dest, dest_offset, tmp, tmp2, tmp3,
+                                      last_filter_index, nblock);
+      if (errcode < 0)
+        return errcode;
+    }
   }
 
   /* Return the number of uncompressed bytes */
@@ -2288,6 +2286,12 @@ int blosc_compress_context(blosc2_context* context) {
 
   /* Set the number of compressed bytes in header */
   _sw32(context->dest + BLOSC2_CHUNK_CBYTES, ntbytes);
+  if (context->blosc2_flags & BLOSC2_INSTR_CODEC) {
+    int dont_split = (context->header_flags & 0x10) >> 4;
+    int blocksize = dont_split ? sizeof(blosc2_instr) : sizeof(blosc2_instr) * context->typesize;
+    _sw32(context->dest + BLOSC2_CHUNK_NBYTES, context->nblocks * blocksize);
+    _sw32(context->dest + BLOSC2_CHUNK_BLOCKSIZE, blocksize);
+  }
 
   /* Set the number of bytes in dest buffer (might be useful for btune) */
   context->destsize = ntbytes;
@@ -3552,8 +3556,8 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   context->compcode_meta = cparams.compcode_meta;
   context->clevel = cparams.clevel;
   context->use_dict = cparams.use_dict;
-  if (cparams.instrument_codec) {
-    context->blosc2_flags = BLOSC2_INSTRCODEC;
+  if (cparams.instr_codec) {
+    context->blosc2_flags = BLOSC2_INSTR_CODEC;
   }
   context->typesize = cparams.typesize;
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
@@ -3660,7 +3664,7 @@ int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams) {
   cparams->compcode_meta = ctx->compcode_meta;
   cparams->clevel = ctx->clevel;
   cparams->use_dict = ctx->use_dict;
-  cparams->instrument_codec = ctx->blosc2_flags & BLOSC2_INSTRCODEC;
+  cparams->instr_codec = ctx->blosc2_flags & BLOSC2_INSTR_CODEC;
   cparams->typesize = ctx->typesize;
   cparams->nthreads = ctx->nthreads;
   cparams->blocksize = ctx->blocksize;
