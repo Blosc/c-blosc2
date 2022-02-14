@@ -51,6 +51,7 @@ int main(void) {
   /* Create a context for compression */
   cparams.typesize = sizeof(float);
   cparams.compcode = BLOSC_BLOSCLZ;
+  cparams.splitmode = BLOSC_NEVER_SPLIT;
   cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
@@ -90,7 +91,8 @@ int main(void) {
   blosc2_instr *datai = data_dest;
   for (i = 0; i < dsize / sizeof(blosc2_instr); i++) {
     printf("%.3g - ", datai->cratio);
-    printf("%.3g - ", datai->speed);
+    printf("%.3g - ", datai->cspeed);
+    printf("%.3g - ", datai->filter_speed);
     printf("%d ", datai->flags[0]);
     printf("\n");
     datai++;

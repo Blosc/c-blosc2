@@ -104,7 +104,8 @@ enum {
 // This can be flexible because it is typically used mainly for development
 typedef struct {
   float cratio;
-  float speed;
+  float cspeed;
+  float filter_speed;
   //float memory;
   //float power;
   uint8_t flags[4];
