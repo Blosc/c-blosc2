@@ -825,6 +825,8 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
     preparams.out_size = (size_t)bsize;
     preparams.out_typesize = typesize;
     preparams.out_offset = offset;
+    preparams.nblock = offset / context->blocksize;
+    preparams.nchunk = context->schunk != NULL ? context->schunk->current_nchunk : -1;
     preparams.tid = thread_context->tid;
     preparams.ttmp = thread_context->tmp;
     preparams.ttmp_nbytes = thread_context->tmp_nbytes;
@@ -1250,6 +1252,8 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
     postparams.size = bsize;
     postparams.typesize = typesize;
     postparams.offset = nblock * context->blocksize;
+    postparams.nchunk = context->schunk != NULL ? context->schunk->current_nchunk : -1;
+    postparams.nblock = nblock;
     postparams.tid = thread_context->tid;
     postparams.ttmp = thread_context->tmp;
     postparams.ttmp_nbytes = thread_context->tmp_nbytes;
@@ -1509,6 +1513,8 @@ static int blosc_d(
       postparams.size = bsize;
       postparams.typesize = typesize;
       postparams.offset = nblock * context->blocksize;
+      postparams.nchunk = context->schunk != NULL ? context->schunk->current_nchunk : -1;
+      postparams.nblock = nblock;
       postparams.tid = thread_context->tid;
       postparams.ttmp = thread_context->tmp;
       postparams.ttmp_nbytes = thread_context->tmp_nbytes;

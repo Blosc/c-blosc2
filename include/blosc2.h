@@ -902,6 +902,8 @@ typedef struct {
   int32_t out_size;  // the output size (in bytes)
   int32_t out_typesize;  // the output typesize
   int32_t out_offset; // offset to reach the start of the output buffer
+  int32_t nchunk;  // the current nchunk in associated schunk (if exists; if not -1)
+  int32_t nblock;  // the current nblock in associated chunk
   int32_t tid;  // thread id
   uint8_t *ttmp;  // a temporary that is able to hold several blocks for the output and is private for each thread
   size_t ttmp_nbytes;  // the size of the temporary in bytes
@@ -918,7 +920,9 @@ typedef struct {
   uint8_t *out;  // the output buffer
   int32_t size;  // the input size (in bytes)
   int32_t typesize;  // the input typesize
-  int32_t offset; // offset to reach the start of the input buffer
+  int32_t offset;  // offset to reach the start of the input buffer
+  int32_t nchunk;  // the current nchunk in associated schunk (if exists; if not -1)
+  int32_t nblock;  // the current nblock in associated chunk
   int32_t tid;  // thread id
   uint8_t *ttmp;  // a temporary that is able to hold several blocks for the output and is private for each thread
   size_t ttmp_nbytes;  // the size of the temporary in bytes
@@ -1428,6 +1432,8 @@ typedef struct blosc2_schunk {
   //!< Metadata for filters. 8-bit per meta-slot.
   int32_t nchunks;
   //!< Number of chunks in super-chunk.
+  int32_t current_nchunk;
+  //!< The current chunk that is being accessed
   int64_t nbytes;
   //!< The data size + metadata size + header size (uncompressed).
   int64_t cbytes;

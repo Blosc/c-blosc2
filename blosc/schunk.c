@@ -593,6 +593,7 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
   }
 
   /* Update counters */
+  schunk->current_nchunk = nchunks;
   schunk->nchunks = nchunks + 1;
   schunk->nbytes += chunk_nbytes;
   if (schunk->frame == NULL) {
@@ -682,6 +683,7 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   }
 
   /* Update counters */
+  schunk->current_nchunk = nchunk;
   schunk->nchunks = nchunks + 1;
   schunk->nbytes += chunk_nbytes;
   if (schunk->frame == NULL) {
@@ -783,6 +785,7 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   }
   int32_t chunk_nbytes_old = 0;
   int32_t chunk_cbytes_old = 0;
+  schunk->current_nchunk = nchunk;
 
   if (chunk_old != 0) {
     rc = blosc2_cbuffer_sizes(chunk_old, &chunk_nbytes_old, &chunk_cbytes_old, NULL);
@@ -878,6 +881,7 @@ int blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int nchunk) {
   }
   int32_t chunk_nbytes_old = 0;
   int32_t chunk_cbytes_old = 0;
+  schunk->current_nchunk = nchunk;
 
   if (chunk_old != 0) {
     rc = blosc2_cbuffer_sizes(chunk_old, &chunk_nbytes_old, &chunk_cbytes_old, NULL);
@@ -932,6 +936,7 @@ int blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int nchunk) {
 /* Append a data buffer to a super-chunk. */
 int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes) {
   uint8_t* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
+  schunk->current_nchunk = schunk->nchunks;
   /* Compress the src buffer using super-chunk context */
   int cbytes = blosc2_compress_ctx(schunk->cctx, src, nbytes, chunk,
                                    nbytes + BLOSC_MAX_OVERHEAD);
@@ -949,6 +954,7 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes
   return nchunks;
 }
 
+
 /* Decompress and return a chunk that is part of a super-chunk. */
 int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
                                    void *dest, int32_t nbytes) {
@@ -958,6 +964,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
   int rc;
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
 
+  schunk->current_nchunk = nchunk;
   if (frame == NULL) {
     if (nchunk >= schunk->nchunks) {
       BLOSC_TRACE_ERROR("nchunk ('%d') exceeds the number of chunks "
@@ -996,6 +1003,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
   return chunksize;
 }
 
+
 /* Return a compressed chunk that is part of a super-chunk in the `chunk` parameter.
  * If the super-chunk is backed by a frame that is disk-based, a buffer is allocated for the
  * (compressed) chunk, and hence a free is needed.  You can check if the chunk requires a free
@@ -1018,6 +1026,7 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, 
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
+  schunk->current_nchunk = nchunk;
   *chunk = schunk->data[nchunk];
   if (*chunk == 0) {
     *needs_free = 0;
@@ -1056,6 +1065,7 @@ int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int nchunk, uint8_t **chu
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
+  schunk->current_nchunk = nchunk;
   *chunk = schunk->data[nchunk];
   if (*chunk == 0) {
     *needs_free = 0;
