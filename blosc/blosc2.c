@@ -969,6 +969,12 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
   bool instr_codec = context->blosc2_flags & BLOSC2_INSTR_CODEC;
   blosc_timestamp_t last, current;
+  float filter_time = 0.f;
+
+  // See whether we have a run here
+  if (instr_codec) {
+    blosc_set_timestamp(&last);
+  }
 
   if (last_filter_index >= 0 || context->prefilter != NULL) {
     /* Apply the filter pipeline just for the prefilter */
@@ -987,6 +993,12 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     }
   } else {
     _src = src + offset;
+  }
+
+  if (instr_codec) {
+    blosc_set_timestamp(&current);
+    filter_time = (float) blosc_elapsed_secs(last, current);
+    last = current;
   }
 
   assert(context->clevel > 0);
@@ -1011,10 +1023,6 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       const uint8_t *ip = (uint8_t *) _src + j * neblock;
       const uint8_t *ipbound = (uint8_t *) _src + (j + 1) * neblock;
 
-      // See whether we have a run here
-      if (instr_codec) {
-        blosc_set_timestamp(&last);
-      }
       if (context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH && get_run(ip, ipbound)) {
         // A run
         int32_t value = _src[j * neblock];
@@ -1037,7 +1045,8 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
           int32_t ssize = value == 0 ? sizeof(int32_t) : sizeof(int32_t) + 1;
           desti->cratio = (float) neblock / (float) ssize;
           float ctime = (float) blosc_elapsed_secs(last, current);
-          desti->speed = (float) neblock / ctime;
+          desti->cspeed = (float) neblock / ctime;
+          desti->filter_speed = (float) neblock / filter_time;
           desti->flags[0] = 1;    // mark a runlen
           dest += instr_size;
           continue;
@@ -1153,7 +1162,8 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       memset(desti, 0, sizeof(blosc2_instr));
       // cratio is computed having into account 1 additional int (csize)
       desti->cratio = (float)neblock / (float)(cbytes + sizeof(int32_t));
-      desti->speed = (float)neblock / ctime;
+      desti->cspeed = (float)neblock / ctime;
+      desti->filter_speed = (float) neblock / filter_time;
       dest += instr_size;
 
       continue;
