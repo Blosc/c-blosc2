@@ -107,7 +107,6 @@ for encoding blocks with a filter pipeline::
 
 :filter_codes:
     (``uint8``) Filter code.
-
     :``0``:
         No shuffle (for compatibility with Blosc1).
     :``0``:
@@ -142,7 +141,6 @@ for encoding blocks with a filter pipeline::
 
 :blosc2_flags:
     (``bitfield``) The flags for a Blosc2 buffer.
-
     :bit 0 (``0x01``):
         Whether the codec uses dictionaries or not.
     :bit 1 (``0x02``):
@@ -228,16 +226,12 @@ where `uint8_t token` is a byte for providing different meanings to `int32_t csi
 
 :token:
     (``bitfield``) Flags for different meanings.
-
     :bit 0:
         Repeated byte (stream is a run-length of bytes). This byte, representing the repeated value in the stream, is encoded in the LSB of the `int32_t csize`. In this case there is not a `cdata` section. Note that repeated zeros cannot happen here (already handled by the `csize == 0` case above).
-
     :bits 1 and 2:
         Reserved for two-codecs in a row. TODO: complete description
-
     :bits 3, 4 and 5:
         Reserved for secondary codec. TODO: complete description
-
     :bits 6 and 7:
         Reserved for future use.
 
