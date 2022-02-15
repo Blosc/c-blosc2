@@ -141,6 +141,7 @@ for encoding blocks with a filter pipeline::
 
 :blosc2_flags:
     (``bitfield``) The flags for a Blosc2 buffer.
+
     :bit 0 (``0x01``):
         Whether the codec uses dictionaries or not.
     :bit 1 (``0x02``):

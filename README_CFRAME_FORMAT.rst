@@ -101,6 +101,7 @@ using the msgpack format. Here it is the format for the *metalayers*::
 
 :general_flags:
     (``uint8``) General flags.
+
     :``0`` to ``3``:
         Format version.
     :``4`` and ``5``:
@@ -135,8 +136,10 @@ using the msgpack format. Here it is the format for the *metalayers*::
 
 :codec_flags:
     (``uint8``) Compressor enumeration (defaults for all the chunks in storage).
+
     :``0`` to ``3``:
         Enumerated for codecs (up to 16).
+
         :``0``:
             ``blosclz``
         :``1``:
@@ -222,6 +225,7 @@ that represents a chunk with a run-length of special values.  The supported spec
 
 :special_values:
     (``bitfield``) Flags for special values.
+
     :bits 0, 1 and 2:
         Indicate special values for the entire chunk.
             :``0``:
@@ -251,6 +255,7 @@ that represents a chunk with a run-length of special values.  The supported spec
     :bit 7 (``0x80``):
         Indicates a special value.  If not set, a regular value.
 
+
 Trailer
 -------
 
@@ -273,6 +278,7 @@ a fingerprint.::
 The *vlmetalayers* object which stores the variable-length user meta data can change in size during the lifetime of the frame.
 This is an important feature and the reason why the *vlmetalayers* are stored in the trailer and not in the header.
 However, the *vlmetalayers* follows the same format than the metalayers stored in the header.
+
 
 :trailer_len:
     (``uint32``) Size of the trailer of the frame (including vlmetalayers chunk).
