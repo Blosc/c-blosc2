@@ -225,23 +225,16 @@ If the most significant bit (7) of the most significant byte above (byte N, as l
 that represents a chunk with a run-length of special values.  The supported special values are:
 
 :special_values:
-    (``uint8``) Flags for special values.
-
-        :``0``:
-            A run-length of zeros.
-        :``1``:
-            A run-length of NaNs. The size of the NaN depends on the typesize.
-        :``2``:
+    (``bitfield``) Flags for special values.
+        :bit 0 (``0x01``):
+            A run of zeros.
+        :bit 1 (``0x02``):
+            A run of NaN (Not-a-Number) floats (whether f32 or f64 depends on typesize).
+        :bit 2 (``0x04``):
+            Values that are not initialized.
+        :bits 3, 4, 5 and 6:
             Reserved.
-        :``3``:
-            Reserved.
-        :``4``:
-            Reserved.
-        :``5``:
-            Reserved.
-        :``6``:
-            Reserved.
-        :``7``:
+        :bit 7 (``0x80``):
             Indicates a special value.  If not set, a regular value.
 
 

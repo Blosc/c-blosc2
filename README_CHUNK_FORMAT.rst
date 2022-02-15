@@ -154,7 +154,6 @@ for encoding blocks with a filter pipeline::
         Whether the chunk is 'lazy' or not.
     :bits 4, 5 and 6:
         Indicate special values for the entire chunk.
-
             :``0``:
                 No special values.
             :``1``:
