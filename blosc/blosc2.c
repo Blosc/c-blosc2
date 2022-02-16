@@ -971,11 +971,11 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   blosc_timestamp_t last, current;
   float filter_time = 0.f;
 
-  // See whether we have a run here
   if (instr_codec) {
     blosc_set_timestamp(&last);
   }
 
+  // See whether we have a run here
   if (last_filter_index >= 0 || context->prefilter != NULL) {
     /* Apply the filter pipeline just for the prefilter */
     if (memcpyed && context->prefilter != NULL) {
@@ -1015,6 +1015,9 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   }
   neblock = bsize / nstreams;
   for (j = 0; j < nstreams; j++) {
+    if (instr_codec) {
+      blosc_set_timestamp(&last);
+    }
     if (!dict_training) {
       dest += sizeof(int32_t);
       ntbytes += sizeof(int32_t);
@@ -1148,6 +1151,11 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       return BLOSC2_ERROR_DATA;
     }
 
+    if (cbytes == 0) {
+      // When cbytes is 0, the compressor has not been able to compress anything
+      cbytes = neblock;
+    }
+
     if (instr_codec) {
       blosc_set_timestamp(&current);
       int32_t instr_size = sizeof(blosc2_instr);
@@ -1165,12 +1173,11 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       desti->cspeed = (float)neblock / ctime;
       desti->filter_speed = (float) neblock / filter_time;
       dest += instr_size;
-
       continue;
     }
 
     if (!dict_training) {
-      if (cbytes == 0 || cbytes == neblock) {
+      if (cbytes == neblock) {
         /* The compressor has been unable to compress data at all. */
         /* Before doing the copy, check that we are not running into a
            buffer overflow. */
