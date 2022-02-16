@@ -2261,6 +2261,18 @@ int blosc_compress_context(blosc2_context* context) {
     }
   }
 
+  int dont_split = (context->header_flags & 0x10) >> 4;
+  int nstreams = context->nblocks;
+  if (!dont_split) {
+    // When splitting, the number of streams is computed differently
+    if (context->leftover) {
+      nstreams = (context->nblocks - 1) * context->typesize + 1;
+    }
+    else {
+      nstreams *= context->typesize;
+    }
+  }
+
   if (memcpyed) {
     if (context->sourcesize + context->header_overhead > context->destsize) {
       /* We are exceeding maximum output size */
@@ -2281,17 +2293,6 @@ int blosc_compress_context(blosc2_context* context) {
   else {
     // Check whether we have a run for the whole chunk
     int start_csizes = context->header_overhead + 4 * context->nblocks;
-    int dont_split = (context->header_flags & 0x10) >> 4;
-    int nstreams = context->nblocks;
-    if (!dont_split) {
-      // When splitting, the number of streams is computed differently
-      if (context->leftover) {
-        nstreams = (context->nblocks - 1) * context->typesize + 1;
-      }
-      else {
-        nstreams *= context->typesize;
-      }
-    }
     if (ntbytes == start_csizes + nstreams * sizeof(int32_t)) {
       // The streams are all zero runs (by construction).  Encode it...
       context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] |= BLOSC2_SPECIAL_ZERO << 4;
@@ -2305,7 +2306,7 @@ int blosc_compress_context(blosc2_context* context) {
   if (context->blosc2_flags & BLOSC2_INSTR_CODEC) {
     int dont_split = (context->header_flags & 0x10) >> 4;
     int blocksize = dont_split ? sizeof(blosc2_instr) : sizeof(blosc2_instr) * context->typesize;
-    _sw32(context->dest + BLOSC2_CHUNK_NBYTES, context->nblocks * blocksize);
+    _sw32(context->dest + BLOSC2_CHUNK_NBYTES, nstreams * sizeof(blosc2_instr));
     _sw32(context->dest + BLOSC2_CHUNK_BLOCKSIZE, blocksize);
   }
 
