@@ -132,7 +132,7 @@ for encoding blocks with a filter pipeline::
 :compcode_meta:
     (``uint8``) Compression codec metadata.
 
-    Metadata associated with the compression codec. Only used in user-defined codecs.
+    Metadata associated with the compression codec.
 
 :filter_meta:
     (``uint8``) Filter metadata.
