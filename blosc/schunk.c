@@ -309,6 +309,9 @@ blosc2_schunk* blosc2_schunk_open_udio(const char* urlpath, const blosc2_io *udi
   }
 
   blosc2_frame_s* frame = frame_from_file(urlpath, udio);
+  if (frame == NULL) {
+    return NULL;
+  }
   blosc2_schunk* schunk = frame_to_schunk(frame, false, udio);
 
   // Set the storage with proper defaults

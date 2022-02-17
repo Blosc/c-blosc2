@@ -1522,14 +1522,14 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_sto
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy);
 
 /**
- * @brief Open an existing super-chunk that is on-disk (no copy is made).
+ * @brief Open an existing super-chunk that is on-disk (frame). No in-memory copy is made.
  *
  * @param storage The storage properties of the source.
  *
  * @remark The storage.urlpath must be not NULL and it should exist on-disk.
  * New data or metadata can be appended or updated.
  *
- * @return The new super-chunk.
+ * @return The new super-chunk.  NULL if not found or not in frame format.
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open(const char* urlpath);
 
