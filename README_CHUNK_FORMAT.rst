@@ -224,19 +224,16 @@ If negative, the stream is stored like this::
     | csize | token | cdata |
     +=======+=======+=======+
 
-where `uint8_t token` is a byte for providing different meanings to `int32_t csize`:
+where **token** is a byte for providing different meanings to `int32_t csize`:
 
-:token:
-    (``bitfield``) Flags for different meanings.
-
-    :bit 0:
-        Repeated byte (stream is a run-length of bytes). This byte, representing the repeated value in the stream, is encoded in the LSB of the `int32_t csize`. In this case there is not a `cdata` section. Note that repeated zeros cannot happen here (already handled by the `csize == 0` case above).
-    :bits 1 and 2:
-        Reserved for two-codecs in a row. TODO: complete description
-    :bits 3, 4 and 5:
-        Reserved for secondary codec. TODO: complete description
-    :bits 6 and 7:
-        Reserved for future use.
+:bit 0:
+    Repeated byte (stream is a run-length of bytes). This byte, representing the repeated value in the stream, is encoded in the LSB of the `int32_t csize`. In this case there is not a `cdata` section. Note that repeated zeros cannot happen here (already handled by the `csize == 0` case above).
+:bits 1 and 2:
+    Reserved for two-codecs in a row. TODO: complete description
+:bits 3, 4 and 5:
+    Reserved for secondary codec. TODO: complete description
+:bits 6 and 7:
+    Reserved for future use.
 
 If bit 4 of the `flags` header field is set, each block is stored in a single data stream::
 
