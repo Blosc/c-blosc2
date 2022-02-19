@@ -107,6 +107,7 @@ for encoding blocks with a filter pipeline::
 
 :filter_codes:
     (``uint8``) Filter code.
+
     :``0``:
         No shuffle (for compatibility with Blosc1).
     :``0``:
@@ -227,6 +228,7 @@ where `uint8_t token` is a byte for providing different meanings to `int32_t csi
 
 :token:
     (``bitfield``) Flags for different meanings.
+
     :bit 0:
         Repeated byte (stream is a run-length of bytes). This byte, representing the repeated value in the stream, is encoded in the LSB of the `int32_t csize`. In this case there is not a `cdata` section. Note that repeated zeros cannot happen here (already handled by the `csize == 0` case above).
     :bits 1 and 2:
