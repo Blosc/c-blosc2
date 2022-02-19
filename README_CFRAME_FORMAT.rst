@@ -221,41 +221,40 @@ The codification for the offsets is as follows::
                                    +--> Byte for special values
 
 If the most significant bit (7) of the most significant byte above (byte N, as little endian is used) is set,
-that represents a chunk with a run-length of special values.  The supported special values are:
+that represents a chunk with a run-length of special values.
 
-:special_values:
-    (``bitfield``) Flags for special values.
+More specifically the **byte for special values** has this format:
 
-    :bits 0, 1 and 2:
-        Indicate special values for the entire chunk.
+:bits 0, 1 and 2:
+     Indicate special values for the entire chunk.
 
-            :``0``:
-                Reserved.
-            :``1``:
-                A run of zeros.
-            :``2``:
-                A run of NaN (Not-a-Number) floats (whether f32 or f64 depends on typesize).
-            :``3``:
-                Reserved.
-            :``4``:
-                Values that are not initialized.
-            :``5``:
-                Reserved.
-            :``6``:
-                Reserved.
-            :``7``:
-                Reserved.
+     :``0``:
+        Reserved.
+     :``1``:
+         A run of zeros.
+     :``2``:
+         A run of NaN (Not-a-Number) floats (whether f32 or f64 depends on typesize).
+     :``3``:
+         Reserved.
+     :``4``:
+         Values that are not initialized.
+     :``5``:
+         Reserved.
+     :``6``:
+         Reserved.
+     :``7``:
+         Reserved.
 
-    :bit 3 (``0x08``):
-        Reserved.
-    :bit 4 (``0x10``):
-        Reserved.
-    :bit 5 (``0x20``):
-        Reserved.
-    :bit 6 (``0x40``):
-        Reserved.
-    :bit 7 (``0x80``):
-        Indicates a special value.  If not set, a regular value.
+:bit 3 (``0x08``):
+    Reserved.
+:bit 4 (``0x10``):
+    Reserved.
+:bit 5 (``0x20``):
+    Reserved.
+:bit 6 (``0x40``):
+    Reserved.
+:bit 7 (``0x80``):
+    Indicates a special value.  If not set, a regular value.
 
 
 Trailer
