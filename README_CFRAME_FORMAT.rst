@@ -228,6 +228,7 @@ that represents a chunk with a run-length of special values.  The supported spec
 
     :bits 0, 1 and 2:
         Indicate special values for the entire chunk.
+
             :``0``:
                 Reserved.
             :``1``:
@@ -244,6 +245,7 @@ that represents a chunk with a run-length of special values.  The supported spec
                 Reserved.
             :``7``:
                 Reserved.
+
     :bit 3 (``0x08``):
         Reserved.
     :bit 4 (``0x10``):
