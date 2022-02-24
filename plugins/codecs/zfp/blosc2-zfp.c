@@ -1,11 +1,10 @@
 #include "blosc2.h"
 #include "blosc-private.h"
-#include "frame.h"
 #include "blosc2/codecs-registry.h"
 #include "zfp.h"
+#include "zfp-private.h"
 #include "blosc2-zfp.h"
 #include <math.h>
-#include "context.h"
 
 int blosc2_zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
                             int32_t output_len, uint8_t meta, blosc2_cparams *cparams, const void* chunk) {
@@ -662,7 +661,7 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
             free(blockshape);
             return 0;
     }
-    double rate = ratio * (double) typesize * 8;     // convert from output size / input size to output bits per input value
+    double rate = ratio * typesize * 8;     // convert from output size / input size to output bits per input value
     zfp = zfp_stream_open(NULL);
     zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
 
@@ -710,173 +709,18 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
 }
 
 
-int blosc2_zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, uint8_t *dest, int32_t destsize) {
-    uint8_t ndim;
-    int32_t blockshape[8];
-    for (int nmetalayer = 0; nmetalayer < context->schunk->nmetalayers; nmetalayer++) {
-        if (strcmp("caterva", context->schunk->metalayers[nmetalayer]->name) == 0) {
-            uint8_t *pmeta = context->schunk->metalayers[nmetalayer]->content;
-            ndim = pmeta[2];
-            pmeta += (6 + 2 * ndim * 9);
-            for (int8_t i = 0; i < ndim; i++) {
-                pmeta += 1;
-                swap_store(blockshape + i, pmeta, sizeof(int32_t));
-                pmeta += sizeof(int32_t);
-            }
-        }
-    }
-    if (ndim <= 4) {
-        int64_t cell_start_ndim[4], cell_ind_ndim[4], ncell_ndim[4], ind_strides[4], cell_strides[4];
-        int64_t cell_ind, ncell;
-        int cellshape = 4;
-        index_unidim_to_multidim((int8_t) ndim, (int64_t *) blockshape, context->cell_start, cell_start_ndim);
-        for (int i = 0; i < ndim; ++i) {
-            cell_ind_ndim[i] = cell_start_ndim[i] % cellshape;
-            ncell_ndim[i] = cell_start_ndim[i] / cellshape;
-        }
-        ind_strides[ndim - 1] = cell_strides[ndim - 1] = 1;
-        for (int i = ndim - 2; i >= 0; --i) {
-            ind_strides[i] = cellshape;
-            cell_strides[i] = (blockshape[i + 1] - 1) / cellshape + 1;
-        }
-        index_multidim_to_unidim(cell_ind_ndim, (int8_t) ndim, ind_strides, &cell_ind);
-        index_multidim_to_unidim(ncell_ndim, (int8_t) ndim, cell_strides, &ncell);
-        int cell_nitems = (int) (1u << (2 * ndim));
-        if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && (context->zfp_nitems <= cell_nitems) &&
-            ((cell_ind + context->zfp_nitems) <= cell_nitems)) {
+int blosc2_zfp_decompress_cell(blosc2_schunk* schunk, int nchunk, int nblock, int ncell, void *dest, size_t destsize) {
 
-            // Get the ZFP stream
-            zfp_type type;     /* array scalar type */
-            zfp_stream *zfp;   /* compressed stream */
-            bitstream *stream; /* bit stream to write to or read from */
-            int32_t typesize = context->typesize;
-            zfp = zfp_stream_open(NULL);
-
-            switch (typesize) {
-                case sizeof(float):
-                    type = zfp_type_float;
-                    break;
-                case sizeof(double):
-                    type = zfp_type_double;
-                    break;
-                default:
-                    printf("\n ZFP is not available for this typesize \n");
-                    return 0;
-            }
-            uint8_t compmeta = context->compcode_meta;                                 // access to compressed chunk header
-            double rate = (double) (compmeta * typesize * 8) /
-                          100.0;     // convert from output size / input size to output bits per input value
-            zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
-
-            stream = stream_open((void *) block, cbytes);
-            zfp_stream_set_bit_stream(zfp, stream);
-            zfp_stream_rewind(zfp);
-
-            // Check that ncell is a valid index
-            int ncells = (int) ((cbytes * 8) / zfp->maxbits);
-            if (ncell >= ncells) {
-                BLOSC_TRACE_ERROR("Invalid cell index");
-                return -1;
-            }
-
-            // Position the stream at the ncell bit offset for reading
-            stream_rseek(zfp->stream, ncell * zfp->maxbits);
-
-            // Get the cell
-            size_t zfpsize;
-            uint8_t *cell = malloc(cell_nitems * typesize);
-            switch (ndim) {
-                case 1:
-                    switch (type) {
-                        case zfp_type_float:
-                            zfpsize = zfp_decode_block_float_1(zfp, (float *) cell);
-                            break;
-                        case zfp_type_double:
-                            zfpsize = zfp_decode_block_double_1(zfp, (double *) cell);
-                            break;
-                        default:
-                            printf("\n ZFP is not available for this typesize \n");
-                            zfp_stream_close(zfp);
-                            stream_close(stream);
-                            return 0;
-                    }
-                    break;
-                case 2:
-                    switch (type) {
-                        case zfp_type_float:
-                            zfpsize = zfp_decode_block_float_2(zfp, (float *) cell);
-                            break;
-                        case zfp_type_double:
-                            zfpsize = zfp_decode_block_double_2(zfp, (double *) cell);
-                            break;
-                        default:
-                            printf("\n ZFP is not available for this typesize \n");
-                            zfp_stream_close(zfp);
-                            stream_close(stream);
-                            return 0;
-                    }
-                    break;
-                case 3:
-                    switch (type) {
-                        case zfp_type_float:
-                            zfpsize = zfp_decode_block_float_3(zfp, (float *) cell);
-                            break;
-                        case zfp_type_double:
-                            zfpsize = zfp_decode_block_double_3(zfp, (double *) cell);
-                            break;
-                        default:
-                            printf("\n ZFP is not available for this typesize \n");
-                            zfp_stream_close(zfp);
-                            stream_close(stream);
-                            return 0;
-                    }
-                    break;
-                case 4:
-                    switch (type) {
-                        case zfp_type_float:
-                            zfpsize = zfp_decode_block_float_4(zfp, (float *) cell);
-                            break;
-                        case zfp_type_double:
-                            zfpsize = zfp_decode_block_double_4(zfp, (double *) cell);
-                            break;
-                        default:
-                            printf("\n ZFP is not available for this typesize \n");
-                            zfp_stream_close(zfp);
-                            stream_close(stream);
-                            return 0;
-                    }
-                    break;
-                default:
-                    printf("\n ZFP is not available for this number of dims \n");
-                    return 0;
-            }
-
-            memcpy(dest, &cell[context->cell_start * typesize], context->zfp_nitems * typesize);
-            zfp_stream_close(zfp);
-            stream_close(stream);
-
-            if ((zfpsize < 0) || (zfpsize > (destsize * 8)) || (zfpsize > (cell_nitems * typesize * 8)) ||
-                ((context->zfp_nitems * typesize * 8) > zfpsize)) {
-                BLOSC_TRACE_ERROR("ZFP error or small destsize");
-                return -1;
-            }
-
-            return (int) (context->zfp_nitems * typesize);
-        }
-    }
-    return -1;
-}
-
-/*
-int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int ncell, void *dest, size_t destsize) {
     ZFP_ERROR_NULL(dest);
-    int32_t typesize = schunk->typesize;
+
+    int8_t typesize = schunk->typesize;
     int8_t ndim;
+    int32_t cellshape = 4;
     int64_t *shape = malloc(8 * sizeof(int64_t));
     int32_t *chunkshape = malloc(8 * sizeof(int32_t));
     int32_t *blockshape = malloc(8 * sizeof(int32_t));
     uint8_t *smeta;
-    int32_t smeta_len;
+    uint32_t smeta_len;
     if (blosc2_meta_get(schunk, "caterva", &smeta, &smeta_len) < 0) {
         printf("Blosc error");
         free(shape);
@@ -890,10 +734,10 @@ int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int nc
     // Get the chunk
     blosc2_context *context = schunk->dctx;
     bool is_lazy = false;
-    if (schunk->storage->urlpath != NULL) {
+ /*   if (schunk->storage->urlpath != NULL) {
         is_lazy = true;
     }
-
+*/
     bool needs_free;
     uint8_t *chunk;
     if (is_lazy) {
@@ -907,11 +751,6 @@ int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int nc
         return BLOSC2_ERROR_CODEC_SUPPORT;
     }
 
-    // Initialize the decompression context
-    int32_t nbytes, cbytes;
-    blosc2_cbuffer_sizes(chunk, &nbytes, &cbytes, NULL);
-    blosc_decompression_context_from_source(schunk->dctx, chunk, cbytes, dest, nbytes);
-
     // Get the offset of the nblock
     bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
     int32_t block_offset = memcpyed ?
@@ -919,9 +758,8 @@ int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int nc
 
     // Get the csize of the nblock
     int32_t block_csize;
-    size_t trailer_offset;
     if (is_lazy) {
-        trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH + context->nblocks * sizeof(int32_t);
+        size_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH + context->nblocks * sizeof(int32_t);
         int32_t *block_csizes = (int32_t *)(chunk + trailer_offset + sizeof(int32_t) + sizeof(int64_t));
         block_csize = block_csizes[nblock];
     } else if (memcpyed) {
@@ -929,49 +767,23 @@ int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int nc
     } else {
         block_csize = chunk[block_offset];
     }
-
+    printf("\n cchunk \n");
+    for (int i = 0; i < (4 * block_csize); ++i) {
+        printf("%u, ", chunk[i]);
+    }
     // Get the block
     uint8_t *block;
-    int64_t chunk_offset;
     if (is_lazy) {
-        chunk_offset = *(int64_t*)(chunk + trailer_offset + sizeof(int32_t));
-        void* fp = NULL;
-        blosc2_io_cb *io_cb = blosc2_get_io_cb(schunk->storage->io->id);
-        if (io_cb == NULL) {
-            BLOSC_TRACE_ERROR("Error getting the input/output API");
-            return BLOSC2_ERROR_PLUGIN_IO;
-        }
-        blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
-        if (frame->sframe) {
-            // The chunk is not in the frame
-            char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-            BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
-            sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
-            fp = io_cb->open(chunkpath, "rb", schunk->storage->io->params);
-            free(chunkpath);
-            io_cb->seek(fp, block_offset + sizeof(int32_t), SEEK_SET);
-        }
-        else {
-            fp = io_cb->open(frame->urlpath, "rb", schunk->storage->io->params);
-            io_cb->seek(fp, chunk_offset + block_offset + sizeof(int32_t), SEEK_SET);
-        }
-        block_csize -= sizeof(int32_t);
-        block = malloc(block_csize);
-        int64_t rbytes = io_cb->read(block, 1, block_csize, fp);
-        io_cb->close(fp);
-        if ((int32_t)rbytes != block_csize) {
-            BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");
-            return BLOSC2_ERROR_READ_BUFFER;
-        }
+
     } else {
         block = chunk + block_offset + sizeof(int32_t);
     }
 
     // Get the ZFP stream
     zfp_type type;     /* array scalar type */
-  /*  zfp_stream *zfp;   /* compressed stream */
-   /* bitstream *stream; /* bit stream to write to or read from */
-/*
+    zfp_stream *zfp;   /* compressed stream */
+    bitstream *stream; /* bit stream to write to or read from */
+
     zfp = zfp_stream_open(NULL);
 
     switch (typesize) {
@@ -986,12 +798,6 @@ int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int nc
             free(shape);
             free(chunkshape);
             free(blockshape);
-            if (needs_free) {
-                free(chunk);
-            }
-            if (is_lazy) {
-                free(block);
-            }
             return 0;
     }
     uint8_t compmeta = chunk[23];                                 // access to compressed chunk header
@@ -1013,7 +819,7 @@ int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int nc
     stream_rseek(zfp->stream, ncell * zfp->maxbits);
 
     // Get the cell
-    size_t zfpsize;
+    int zfpsize;
     switch (ndim) {
         case 1:
             switch (type) {
@@ -1028,14 +834,6 @@ int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int nc
                     free(shape);
                     free(chunkshape);
                     free(blockshape);
-                    zfp_stream_close(zfp);
-                    stream_close(stream);
-                    if (needs_free) {
-                        free(chunk);
-                    }
-                    if (is_lazy) {
-                        free(block);
-                    }
                     return 0;
             }
             break;
@@ -1052,14 +850,6 @@ int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int nc
                     free(shape);
                     free(chunkshape);
                     free(blockshape);
-                    zfp_stream_close(zfp);
-                    stream_close(stream);
-                    if (needs_free) {
-                        free(chunk);
-                    }
-                    if (is_lazy) {
-                        free(block);
-                    }
                     return 0;
             }
             break;
@@ -1076,14 +866,6 @@ int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int nc
                     free(shape);
                     free(chunkshape);
                     free(blockshape);
-                    zfp_stream_close(zfp);
-                    stream_close(stream);
-                    if (needs_free) {
-                        free(chunk);
-                    }
-                    if (is_lazy) {
-                        free(block);
-                    }
                     return 0;
             }
             break;
@@ -1100,14 +882,6 @@ int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int nc
                     free(shape);
                     free(chunkshape);
                     free(blockshape);
-                    zfp_stream_close(zfp);
-                    stream_close(stream);
-                    if (needs_free) {
-                        free(chunk);
-                    }
-                    if (is_lazy) {
-                        free(block);
-                    }
                     return 0;
             }
             break;
@@ -1115,83 +889,6 @@ int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int nc
             printf("\n ZFP is not available for this number of dims \n");
             return 0;
     }
+    return zfpsize;
 
-    free(shape);
-    free(chunkshape);
-    free(blockshape);
-    zfp_stream_close(zfp);
-    stream_close(stream);
-    if (needs_free) {
-        free(chunk);
-    }
-    if (is_lazy) {
-        free(block);
-    }
-
-    if ((zfpsize < 0) || (zfpsize > (destsize * typesize * 8))) {
-        BLOSC_TRACE_ERROR("ZFP error or small destsize");
-        return -1;
-    }
-
-    return (int) zfpsize;
 }
-
-
-int blosc2_zfp_getitem(blosc2_schunk* schunk, int64_t index, void* item) {
-    int32_t typesize = schunk->typesize;
-    int8_t ndim;
-    int64_t *shape = malloc(8 * sizeof(int64_t));
-    int32_t *chunkshape = malloc(8 * sizeof(int64_t));
-    int32_t *blockshape = malloc(8 * sizeof(int64_t));
-    int64_t cellshape[ZFP_MAX_DIM] = {ZFP_CELL_SHAPE, ZFP_CELL_SHAPE, ZFP_CELL_SHAPE, ZFP_CELL_SHAPE};
-    uint8_t *smeta;
-    int32_t smeta_len;
-    if (blosc2_meta_get(schunk, "caterva", &smeta, &smeta_len) < 0) {
-        printf("Blosc error");
-        free(shape);
-        free(chunkshape);
-        free(blockshape);
-        return -1;
-    }
-    deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
-    free(smeta);
-
-    int64_t index_ndim[ZFP_MAX_DIM];
-    int64_t index_chunk_ndim[ZFP_MAX_DIM];
-    int64_t index_block_ndim[ZFP_MAX_DIM];
-    int64_t index_cell_ndim[ZFP_MAX_DIM];
-    int64_t ind_ndim[ZFP_MAX_DIM];
-    index_unidim_to_multidim(ndim, shape, index, index_ndim);
-    int64_t cellsize = typesize;
-    for (int i = 0; i < ndim; ++i) {
-        index_chunk_ndim[i] = index_ndim[i] / chunkshape[i];
-        index_block_ndim[i] = (index_ndim[i] % chunkshape[i]) / blockshape[i];
-        index_cell_ndim[i] = ((index_ndim[i] % chunkshape[i]) % blockshape[i]) / ZFP_CELL_SHAPE;
-        ind_ndim[i] = ((index_ndim[i] % chunkshape[i]) % blockshape[i]) % ZFP_CELL_SHAPE;
-        cellsize *= cellshape[i];
-    }
-    int64_t chunk_strides[ZFP_MAX_DIM];
-    int64_t block_strides[ZFP_MAX_DIM];
-    int64_t cell_strides[ZFP_MAX_DIM];
-    int64_t item_strides[ZFP_MAX_DIM];
-    chunk_strides[ndim - 1] = block_strides[ndim - 1] = cell_strides[ndim - 1] = item_strides[ndim - 1] = 1;
-    for (int i = ndim - 2; i >= 0; --i) {
-        int j = i + 1;
-        chunk_strides[i] = (shape[j] - 1) / chunkshape[j] + 1;
-        block_strides[i] = (chunkshape[j] - 1) / blockshape[j] + 1;
-        cell_strides[i] = (blockshape[j] - 1) / cellshape[j] + 1;
-        item_strides[i] = cellshape[j];
-    }
-    int64_t nchunk, nblock, ncell, ind;
-    index_multidim_to_unidim(index_chunk_ndim, ndim, (int64_t*) chunk_strides, &nchunk);
-    index_multidim_to_unidim(index_block_ndim, ndim, (int64_t*) block_strides, &nblock);
-    index_multidim_to_unidim(index_cell_ndim, ndim, (int64_t*) cell_strides, &ncell);
-    index_multidim_to_unidim(ind_ndim, ndim, item_strides, &ind);
-
-    int8_t *cell = malloc(cellsize);
-    blosc2_zfp_getcell_old(schunk, (int) nchunk, (int) nblock, (int) ncell, cell, cellsize);
-    memcpy(item, cell + ind * typesize, typesize);
-
-    return typesize;
-}
-*/
