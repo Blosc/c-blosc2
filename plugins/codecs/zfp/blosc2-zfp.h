@@ -36,6 +36,8 @@ int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *o
 int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                                uint8_t meta, blosc2_dparams *dparams, const void* chunk);
 
+int blosc2_zfp_decompress_cell(blosc2_schunk* schunk, int nchunk, int nblock, int ncell, void *dest, size_t destsize);
+
 #if defined (__cplusplus)
 }
 #endif
