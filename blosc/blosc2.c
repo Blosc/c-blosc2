@@ -988,6 +988,8 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       }
       return bsize;
     }
+    /* Keep uninitialized values to zero */
+    memset(_tmp, 0, bsize);
     /* Apply regular filter pipeline */
     _src = pipeline_forward(thread_context, bsize, src, offset, _tmp, _tmp2, _tmp3);
     if (_src == NULL) {
