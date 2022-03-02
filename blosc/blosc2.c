@@ -820,6 +820,8 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
 
   /* Prefilter function */
   if (context->prefilter != NULL) {
+    /* Set unwritten values to zero */
+    memset(_dest, 0, bsize);
     // Create new prefilter parameters for this block (must be private for each thread)
     blosc2_prefilter_params preparams;
     memcpy(&preparams, context->preparams, sizeof(preparams));
