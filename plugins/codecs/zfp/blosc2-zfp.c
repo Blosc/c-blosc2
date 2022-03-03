@@ -1,5 +1,6 @@
 #include "blosc2.h"
 #include "blosc-private.h"
+#include "frame.h"
 #include "blosc2/codecs-registry.h"
 #include "zfp.h"
 #include "zfp-private.h"
@@ -661,7 +662,7 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
             free(blockshape);
             return 0;
     }
-    double rate = ratio * typesize * 8;     // convert from output size / input size to output bits per input value
+    double rate = ratio * (double) typesize * 8;     // convert from output size / input size to output bits per input value
     zfp = zfp_stream_open(NULL);
     zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
 
@@ -709,18 +710,17 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
 }
 
 
-int blosc2_zfp_decompress_cell(blosc2_schunk* schunk, int nchunk, int nblock, int ncell, void *dest, size_t destsize) {
+int blosc2_zfp_getcell(blosc2_schunk* schunk, int nchunk, int nblock, int ncell, void *dest, size_t destsize) {
 
     ZFP_ERROR_NULL(dest);
-
-    int8_t typesize = schunk->typesize;
+    int32_t typesize = schunk->typesize;
     int8_t ndim;
     int32_t cellshape = 4;
     int64_t *shape = malloc(8 * sizeof(int64_t));
     int32_t *chunkshape = malloc(8 * sizeof(int32_t));
     int32_t *blockshape = malloc(8 * sizeof(int32_t));
     uint8_t *smeta;
-    uint32_t smeta_len;
+    int32_t smeta_len;
     if (blosc2_meta_get(schunk, "caterva", &smeta, &smeta_len) < 0) {
         printf("Blosc error");
         free(shape);
@@ -734,10 +734,10 @@ int blosc2_zfp_decompress_cell(blosc2_schunk* schunk, int nchunk, int nblock, in
     // Get the chunk
     blosc2_context *context = schunk->dctx;
     bool is_lazy = false;
- /*   if (schunk->storage->urlpath != NULL) {
+    if (schunk->storage->urlpath != NULL) {
         is_lazy = true;
     }
-*/
+
     bool needs_free;
     uint8_t *chunk;
     if (is_lazy) {
@@ -758,8 +758,9 @@ int blosc2_zfp_decompress_cell(blosc2_schunk* schunk, int nchunk, int nblock, in
 
     // Get the csize of the nblock
     int32_t block_csize;
+    size_t trailer_offset;
     if (is_lazy) {
-        size_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH + context->nblocks * sizeof(int32_t);
+        trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH + context->nblocks * sizeof(int32_t);
         int32_t *block_csizes = (int32_t *)(chunk + trailer_offset + sizeof(int32_t) + sizeof(int64_t));
         block_csize = block_csizes[nblock];
     } else if (memcpyed) {
@@ -767,16 +768,46 @@ int blosc2_zfp_decompress_cell(blosc2_schunk* schunk, int nchunk, int nblock, in
     } else {
         block_csize = chunk[block_offset];
     }
-    printf("\n cchunk \n");
-    for (int i = 0; i < (4 * block_csize); ++i) {
-        printf("%u, ", chunk[i]);
-    }
+
     // Get the block
     uint8_t *block;
+    int64_t chunk_offset;
     if (is_lazy) {
-
+        chunk_offset = *(int64_t*)(chunk + trailer_offset + sizeof(int32_t));
+        void* fp = NULL;
+        blosc2_io_cb *io_cb = blosc2_get_io_cb(schunk->storage->io->id);
+        if (io_cb == NULL) {
+            BLOSC_TRACE_ERROR("Error getting the input/output API");
+            return BLOSC2_ERROR_PLUGIN_IO;
+        }
+        blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+        if (frame->sframe) {
+            // The chunk is not in the frame
+            char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+            BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
+            sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
+            fp = io_cb->open(chunkpath, "rb", schunk->storage->io->params);
+            free(chunkpath);
+            io_cb->seek(fp, block_offset + sizeof(int32_t), SEEK_SET);
+        }
+        else {
+            fp = io_cb->open(frame->urlpath, "rb", schunk->storage->io->params);
+            io_cb->seek(fp, chunk_offset + block_offset + sizeof(int32_t), SEEK_SET);
+        }
+        block_csize -= sizeof(int32_t);
+        block = malloc(block_csize);
+        int64_t rbytes = io_cb->read(block, 1, block_csize, fp);
+        io_cb->close(fp);
+        if ((int32_t)rbytes != block_csize) {
+            BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");
+            return BLOSC2_ERROR_READ_BUFFER;
+        }
     } else {
         block = chunk + block_offset + sizeof(int32_t);
+    }
+    printf("\n cblock \n");
+    for (int i = 0; i < (schunk->blocksize); ++i) {
+        printf("%u, ", block[i]);
     }
 
     // Get the ZFP stream
@@ -798,6 +829,12 @@ int blosc2_zfp_decompress_cell(blosc2_schunk* schunk, int nchunk, int nblock, in
             free(shape);
             free(chunkshape);
             free(blockshape);
+            if (needs_free) {
+                free(chunk);
+            }
+            if (is_lazy) {
+                free(block);
+            }
             return 0;
     }
     uint8_t compmeta = chunk[23];                                 // access to compressed chunk header
@@ -819,7 +856,7 @@ int blosc2_zfp_decompress_cell(blosc2_schunk* schunk, int nchunk, int nblock, in
     stream_rseek(zfp->stream, ncell * zfp->maxbits);
 
     // Get the cell
-    int zfpsize;
+    size_t zfpsize;
     switch (ndim) {
         case 1:
             switch (type) {
@@ -834,6 +871,14 @@ int blosc2_zfp_decompress_cell(blosc2_schunk* schunk, int nchunk, int nblock, in
                     free(shape);
                     free(chunkshape);
                     free(blockshape);
+                    zfp_stream_close(zfp);
+                    stream_close(stream);
+                    if (needs_free) {
+                        free(chunk);
+                    }
+                    if (is_lazy) {
+                        free(block);
+                    }
                     return 0;
             }
             break;
@@ -850,6 +895,14 @@ int blosc2_zfp_decompress_cell(blosc2_schunk* schunk, int nchunk, int nblock, in
                     free(shape);
                     free(chunkshape);
                     free(blockshape);
+                    zfp_stream_close(zfp);
+                    stream_close(stream);
+                    if (needs_free) {
+                        free(chunk);
+                    }
+                    if (is_lazy) {
+                        free(block);
+                    }
                     return 0;
             }
             break;
@@ -866,6 +919,14 @@ int blosc2_zfp_decompress_cell(blosc2_schunk* schunk, int nchunk, int nblock, in
                     free(shape);
                     free(chunkshape);
                     free(blockshape);
+                    zfp_stream_close(zfp);
+                    stream_close(stream);
+                    if (needs_free) {
+                        free(chunk);
+                    }
+                    if (is_lazy) {
+                        free(block);
+                    }
                     return 0;
             }
             break;
@@ -882,6 +943,14 @@ int blosc2_zfp_decompress_cell(blosc2_schunk* schunk, int nchunk, int nblock, in
                     free(shape);
                     free(chunkshape);
                     free(blockshape);
+                    zfp_stream_close(zfp);
+                    stream_close(stream);
+                    if (needs_free) {
+                        free(chunk);
+                    }
+                    if (is_lazy) {
+                        free(block);
+                    }
                     return 0;
             }
             break;
@@ -889,6 +958,23 @@ int blosc2_zfp_decompress_cell(blosc2_schunk* schunk, int nchunk, int nblock, in
             printf("\n ZFP is not available for this number of dims \n");
             return 0;
     }
-    return zfpsize;
 
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    zfp_stream_close(zfp);
+    stream_close(stream);
+    if (needs_free) {
+        free(chunk);
+    }
+    if (is_lazy) {
+        free(block);
+    }
+
+    if ((zfpsize < 0) || (zfpsize > (destsize * typesize * 8))) {
+        BLOSC_TRACE_ERROR("ZFP error or small destsize");
+        return -1;
+    }
+
+    return (int) zfpsize;
 }
