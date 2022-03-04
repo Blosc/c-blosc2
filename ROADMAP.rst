@@ -52,6 +52,8 @@ Right now, the next features are already implemented (although they may require 
 
 * **Centralized plugin repository:** we have implemented a centralized repository so that people can send their plugins (using the existing machinery) to the Blosc2 team.  If the plugins fulfill a series of requirements, they will be officially accepted, and distributed within the library. Thanks to NumFOCUS foundation for providing a grant for doing this. See https://www.blosc.org/posts/registering-plugins/.
 
+* **Support for lossy codecs:** besides supporting the `trunc_prec` filter (described above), we also offer support for [zfp](https://github.com/LLNL/zfp), a codec that is specifically meant for lossy compression of *multidimensional* floating point data.  For details on how use it, see https://github.com/Blosc/c-blosc2/tree/main/plugins/codecs/zfp.  Support for more lossy codecs may come in the future.
+
 * **Pluggable tuning capabilities:** this will allow users with different needs to define an interface so as to better tune different parameters like the codec, the compression level, the filters to use, the blocksize or the shuffle size.  Thanks to ironArray for sponsoring us in doing this.
 
 * **Support for I/O plugins:** so that users can extend the I/O capabilities beyond the current filesystem support.  Things like use databases or S3 interfaces should be possible by implementing these interfaces.  Thanks to ironArray for sponsoring us in doing this.
@@ -65,8 +67,6 @@ Actions to be done
 ------------------
 
 * **Improve the safety of the library:**  even if we have already made a long way in improving our safety, mainly thanks to the efforts of Nathan Moinvaziri, we take safety seriously, so this is always a work in progress. 
-
-* **Support for lossy compression codecs:** although we already support the `trunc_prec` filter, this is only valid for floating point data; we should come with lossy codecs that are meant for *any* data type.
 
 * **Checksums:** the frame can benefit from having a checksum per every chunk/index/metalayer.  This will provide more safety towards frames that are damaged for whatever reason.  Also, this would provide better feedback when trying to determine the parts of the frame that are corrupted.  Candidates for checksums can be the xxhash32 or xxhash64, depending on the goals (to be decided).
 
