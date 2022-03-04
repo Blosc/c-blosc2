@@ -52,7 +52,7 @@ Right now, the next features are already implemented (although they may require 
 
 * **Centralized plugin repository:** we have implemented a centralized repository so that people can send their plugins (using the existing machinery) to the Blosc2 team.  If the plugins fulfill a series of requirements, they will be officially accepted, and distributed within the library. Thanks to NumFOCUS foundation for providing a grant for doing this. See https://www.blosc.org/posts/registering-plugins/.
 
-* **Support for lossy codecs:** besides supporting the `trunc_prec` filter (described above), we also offer support for [zfp](https://github.com/LLNL/zfp), a codec that is specifically meant for lossy compression of *multidimensional* floating point data.  For details on how use it, see https://github.com/Blosc/c-blosc2/tree/main/plugins/codecs/zfp.  Support for more lossy codecs may come in the future.
+* **Support for lossy codecs:** besides supporting the `trunc_prec` filter (described above), we also offer support for `zfp <https://github.com/LLNL/zfp>`_, a codec that is specifically meant for lossy compression of *multidimensional* floating point data.  For details on how use it, see https://github.com/Blosc/c-blosc2/tree/main/plugins/codecs/zfp.  Support for more lossy codecs may come in the future.
 
 * **Pluggable tuning capabilities:** this will allow users with different needs to define an interface so as to better tune different parameters like the codec, the compression level, the filters to use, the blocksize or the shuffle size.  Thanks to ironArray for sponsoring us in doing this.
 
