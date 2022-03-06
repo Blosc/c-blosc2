@@ -1,5 +1,5 @@
-Plugins register for Blosc users
-=============================================================================
+Plugins registry for Blosc users
+================================
 
 Blosc has a tradition of supporting different filters and codecs for compressing data,
 and it was up to the user to choose one or another depending on his needs.
