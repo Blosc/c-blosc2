@@ -19,6 +19,7 @@ extern "C" {
 #endif
 
 #define ZFP_MAX_DIM 4
+#define ZFP_CELL_SHAPE 4
 
 int blosc2_zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                             uint8_t meta, blosc2_cparams *cparams, const void* chunk);
@@ -40,9 +41,7 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
 
 int blosc2_zfp_getcell(blosc2_schunk* schunk, int nchunk, int nblock, int ncell, void *dest, size_t destsize);
 
-int blosc2_zfp_get_partial_block(blosc2_schunk* schunk, int nchunk, int nblock, bool* block_mask, int mask_len, void *dest, size_t destsize);
-
-int blosc2_zfp_get_block_slice(blosc2_schunk* schunk, int nchunk, int nblock, int64_t *start, int64_t *stop, void *dest, size_t destsize);
+int blosc2_zfp_getitem(blosc2_schunk* schunk, int64_t index, void* item);
 
 #if defined (__cplusplus)
 }

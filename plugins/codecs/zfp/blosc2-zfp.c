@@ -711,11 +711,9 @@ int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t 
 
 
 int blosc2_zfp_getcell(blosc2_schunk* schunk, int nchunk, int nblock, int ncell, void *dest, size_t destsize) {
-
     ZFP_ERROR_NULL(dest);
     int32_t typesize = schunk->typesize;
     int8_t ndim;
-    int32_t cellshape = 4;
     int64_t *shape = malloc(8 * sizeof(int64_t));
     int32_t *chunkshape = malloc(8 * sizeof(int32_t));
     int32_t *blockshape = malloc(8 * sizeof(int32_t));
@@ -804,10 +802,6 @@ int blosc2_zfp_getcell(blosc2_schunk* schunk, int nchunk, int nblock, int ncell,
         }
     } else {
         block = chunk + block_offset + sizeof(int32_t);
-    }
-    printf("\n cblock \n");
-    for (int i = 0; i < (schunk->blocksize); ++i) {
-        printf("%u, ", block[i]);
     }
 
     // Get the ZFP stream
@@ -977,4 +971,90 @@ int blosc2_zfp_getcell(blosc2_schunk* schunk, int nchunk, int nblock, int ncell,
     }
 
     return (int) zfpsize;
+}
+
+
+static void index_unidim_to_multidim(int8_t ndim, int64_t *shape, int64_t i, int64_t *index) {
+    int64_t strides[ZFP_MAX_DIM];
+    strides[ndim - 1] = 1;
+    for (int j = ndim - 2; j >= 0; --j) {
+        strides[j] = shape[j + 1] * strides[j + 1];
+    }
+
+    index[0] = i / strides[0];
+    for (int j = 1; j < ndim; ++j) {
+        index[j] = (i % strides[j - 1]) / strides[j];
+    }
+}
+
+
+void index_multidim_to_unidim(int64_t *index, int8_t ndim, int64_t *strides, int64_t *i) {
+    *i = 0;
+    for (int j = 0; j < ndim; ++j) {
+        *i += index[j] * strides[j];
+    }
+}
+
+
+int blosc2_zfp_getitem(blosc2_schunk* schunk, int64_t index, void* item) {
+    int32_t typesize = schunk->typesize;
+    int8_t ndim;
+    int64_t *shape = malloc(8 * sizeof(int64_t));
+    int32_t *chunkshape = malloc(8 * sizeof(int64_t));
+    int32_t *blockshape = malloc(8 * sizeof(int64_t));
+    int64_t cellshape[ZFP_MAX_DIM] = {ZFP_CELL_SHAPE, ZFP_CELL_SHAPE, ZFP_CELL_SHAPE, ZFP_CELL_SHAPE};
+    uint8_t *smeta;
+    int32_t smeta_len;
+    if (blosc2_meta_get(schunk, "caterva", &smeta, &smeta_len) < 0) {
+        printf("Blosc error");
+        free(shape);
+        free(chunkshape);
+        free(blockshape);
+        return -1;
+    }
+    deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+    free(smeta);
+
+    int64_t index_ndim[ZFP_MAX_DIM];
+    int64_t index_chunk_ndim[ZFP_MAX_DIM];
+    int64_t index_block_ndim[ZFP_MAX_DIM];
+    int64_t index_cell_ndim[ZFP_MAX_DIM];
+    int64_t ind_ndim[ZFP_MAX_DIM];
+    index_unidim_to_multidim(ndim, shape, index, index_ndim);
+    int64_t cellsize = typesize;
+    for (int i = 0; i < ndim; ++i) {
+        index_chunk_ndim[i] = index_ndim[i] / chunkshape[i];
+        index_block_ndim[i] = (index_ndim[i] % chunkshape[i]) / blockshape[i];
+        index_cell_ndim[i] = ((index_ndim[i] % chunkshape[i]) % blockshape[i]) / ZFP_CELL_SHAPE;
+        ind_ndim[i] = ((index_ndim[i] % chunkshape[i]) % blockshape[i]) % ZFP_CELL_SHAPE;
+        cellsize *= cellshape[i];
+    }
+    int64_t chunk_strides[ZFP_MAX_DIM];
+    int64_t block_strides[ZFP_MAX_DIM];
+    int64_t cell_strides[ZFP_MAX_DIM];
+    int64_t item_strides[ZFP_MAX_DIM];
+    chunk_strides[ndim - 1] = block_strides[ndim - 1] = cell_strides[ndim - 1] = item_strides[ndim - 1] = 1;
+    for (int i = ndim - 2; i >= 0; --i) {
+        int j = i + 1;
+        chunk_strides[i] = (shape[j] - 1) / chunkshape[j] + 1;
+        block_strides[i] = (chunkshape[j] - 1) / blockshape[j] + 1;
+        cell_strides[i] = (blockshape[j] - 1) / cellshape[j] + 1;
+        item_strides[i] = cellshape[j];
+    }
+    int64_t nchunk, nblock, ncell, ind;
+    index_multidim_to_unidim(index_chunk_ndim, ndim, (int64_t*) chunk_strides, &nchunk);
+    index_multidim_to_unidim(index_block_ndim, ndim, (int64_t*) block_strides, &nblock);
+    index_multidim_to_unidim(index_cell_ndim, ndim, (int64_t*) cell_strides, &ncell);
+    index_multidim_to_unidim(ind_ndim, ndim, item_strides, &ind);
+
+    int8_t *cell = malloc(cellsize);
+    blosc2_zfp_getcell(schunk, (int) nchunk, (int) nblock, (int) ncell, cell, cellsize);
+    memcpy(item, cell + ind * typesize, typesize);
+    printf("\n cell \n");
+    for (int i = 0; i < (cellsize / typesize); ++i) {
+        printf("%f, ", ((float *) cell)[i]);
+    }
+    printf("\n cell[ind] %f nchunk %ld nblock %ld ncell %ld ind %ld item %f", ((float *) cell)[ind], nchunk, nblock, ncell, ind, ((float*) item)[0]);
+
+    return 0;
 }
