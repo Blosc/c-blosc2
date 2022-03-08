@@ -13,13 +13,12 @@
 #ifndef BLOSC2_ZFP_H
 #define BLOSC2_ZFP_H
 #include "context.h"
+#include "zfp-private.h"
 
 #if defined (__cplusplus)
 extern "C" {
 #endif
 
-#define ZFP_MAX_DIM 4
-#define ZFP_CELL_SHAPE 4
 
 int blosc2_zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                             uint8_t meta, blosc2_cparams *cparams, const void* chunk);
