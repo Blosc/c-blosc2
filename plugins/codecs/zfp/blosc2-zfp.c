@@ -3,7 +3,6 @@
 #include "frame.h"
 #include "blosc2/codecs-registry.h"
 #include "zfp.h"
-#include "zfp-private.h"
 #include "blosc2-zfp.h"
 #include <math.h>
 
@@ -974,28 +973,6 @@ int blosc2_zfp_getcell(blosc2_schunk* schunk, int nchunk, int nblock, int ncell,
 }
 
 
-static void index_unidim_to_multidim(int8_t ndim, int64_t *shape, int64_t i, int64_t *index) {
-    int64_t strides[ZFP_MAX_DIM];
-    strides[ndim - 1] = 1;
-    for (int j = ndim - 2; j >= 0; --j) {
-        strides[j] = shape[j + 1] * strides[j + 1];
-    }
-
-    index[0] = i / strides[0];
-    for (int j = 1; j < ndim; ++j) {
-        index[j] = (i % strides[j - 1]) / strides[j];
-    }
-}
-
-
-void index_multidim_to_unidim(int64_t *index, int8_t ndim, int64_t *strides, int64_t *i) {
-    *i = 0;
-    for (int j = 0; j < ndim; ++j) {
-        *i += index[j] * strides[j];
-    }
-}
-
-
 int blosc2_zfp_getitem(blosc2_schunk* schunk, int64_t index, void* item) {
     int32_t typesize = schunk->typesize;
     int8_t ndim;
@@ -1050,11 +1027,6 @@ int blosc2_zfp_getitem(blosc2_schunk* schunk, int64_t index, void* item) {
     int8_t *cell = malloc(cellsize);
     blosc2_zfp_getcell(schunk, (int) nchunk, (int) nblock, (int) ncell, cell, cellsize);
     memcpy(item, cell + ind * typesize, typesize);
-    printf("\n cell \n");
-    for (int i = 0; i < (cellsize / typesize); ++i) {
-        printf("%f, ", ((float *) cell)[i]);
-    }
-    printf("\n cell[ind] %f nchunk %ld nblock %ld ncell %ld ind %ld item %f", ((float *) cell)[ind], nchunk, nblock, ncell, ind, ((float*) item)[0]);
 
-    return 0;
+    return typesize;
 }
