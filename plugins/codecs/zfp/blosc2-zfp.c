@@ -1,5 +1,4 @@
 #include "blosc2.h"
-#include "blosc2.c"
 #include "blosc-private.h"
 #include "frame.h"
 #include "blosc2/codecs-registry.h"
@@ -750,31 +749,8 @@ int blosc2_zfp_getcell(blosc2_schunk* schunk, int nchunk, int nblock, int ncell,
     }
 
     // Initialize the decompression context
-    blosc_header header;
-    int32_t ntbytes;
-    int rc;
-    int32_t nbytes, cbytes;
-    blosc2_cbuffer_sizes(chunk, &nbytes, &cbytes, NULL);
 
-    rc = read_chunk_header(chunk, cbytes, true, &header);
-    if (rc < 0) {
-        return rc;
-    }
-
-    if (header.nbytes > destsize) {
-        // Not enough space for writing into the destination
-        return BLOSC2_ERROR_WRITE_BUFFER;
-    }
-
-    context->src = chunk;
-    context->srcsize = cbytes;
-    context->dest = dest;
-    context->destsize = nbytes;
-
-    rc = blosc2_initialize_context_from_header(schunk->dctx, &header);
-    if (rc < 0) {
-        return rc;
-    }
+    // NEED TO APPEND CODE
 
 
     // Get the offset of the nblock
