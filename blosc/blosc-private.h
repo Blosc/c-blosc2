@@ -175,6 +175,9 @@ int register_filter_private(blosc2_filter *filter);
  */
 int register_codec_private(blosc2_codec *codec);
 
+int blosc_decompression_context_from_source(blosc2_context* context, const void* src, int32_t srcsize,
+                                            void* dest, int32_t destsize);
+
 #ifdef __cplusplus
 }
 #endif
