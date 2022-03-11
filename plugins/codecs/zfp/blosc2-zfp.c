@@ -749,9 +749,9 @@ int blosc2_zfp_getcell(blosc2_schunk* schunk, int nchunk, int nblock, int ncell,
     }
 
     // Initialize the decompression context
-
-    // NEED TO APPEND CODE
-
+    int32_t nbytes, cbytes;
+    blosc2_cbuffer_sizes(chunk, &nbytes, &cbytes, NULL);
+    blosc_decompression_context_from_source(schunk->dctx, chunk, cbytes, dest, nbytes);
 
     // Get the offset of the nblock
     bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
