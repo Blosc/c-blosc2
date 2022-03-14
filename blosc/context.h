@@ -64,6 +64,10 @@ struct blosc2_context_s {
   /* Type size */
   int32_t* bstarts;
   /* Starts for every block inside the compressed buffer */
+  int32_t cell_start;
+  /* Cell starter index for ZFP fixed-rate mode */
+  int32_t zfp_nitems;
+  /* Number of items to get for ZFP fixed-rate mode */
   int32_t special_type;
   /* Special type for chunk.  0 if not special. */
   int compcode;
