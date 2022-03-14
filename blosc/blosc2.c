@@ -2851,6 +2851,19 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
       stopb = header->blocksize;
     }
     bsize2 = stopb - startb;
+#if defined(HAVE_PLUGINS)
+  uint8_t ndim;
+  for (int nmetalayer = 0; nmetalayer < context->schunk->nmetalayers; nmetalayer++) {
+      if (strcmp("caterva", context->schunk->metalayers[nmetalayer]->name) == 0) {
+          ndim = context->schunk->metalayers[nmetalayer]->content[2];
+      }
+  }
+  int cell_nitems = (int) (1u << (2 * ndim));
+  if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && (nitems <= cell_nitems)) {
+    context->cell_start = startb;
+    context->zfp_nitems = nitems;
+}
+#endif /* HAVE_PLUGINS */
 
     /* Do the actual data copy */
     // Regular decompression.  Put results in tmp2.
@@ -2875,6 +2888,8 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     }
     ntbytes += bsize2;
   }
+
+  context->cell_start = -1;
 
   return ntbytes;
 }
