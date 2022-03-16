@@ -19,6 +19,7 @@
 
 #include "blosc2.h"
 #include "blosc-private.h"
+#include "../plugins/codecs/zfp/blosc2-zfp.h"
 #include "frame.h"
 
 
@@ -1707,18 +1708,27 @@ static int blosc_d(
       }
   #endif /*  HAVE_ZSTD */
       else if (compformat == BLOSC_UDCODEC_FORMAT) {
-        for (int i = 0; i < g_ncodecs; ++i) {
-          if (g_codecs[i].compcode == context->compcode) {
-            blosc2_dparams dparams;
-            blosc2_ctx_get_dparams(context, &dparams);
-            nbytes = g_codecs[i].decoder(src,
-                                          cbytes,
-                                          _dest,
-                                          neblock,
-                                          context->compcode_meta,
-                                          &dparams,
-                                          context->src);
-            goto urcodecsuccess;
+        bool getcell = false;
+        if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && (context->zfp_nitems > 0)) {
+          nbytes = blosc2_zfp_getcell(context, src, cbytes, _dest, neblock);
+          if (nbytes == context->zfp_nitems * typesize) {
+            getcell = true;
+          }
+        }
+        if (!getcell) {
+          for (int i = 0; i < g_ncodecs; ++i) {
+            if (g_codecs[i].compcode == context->compcode) {
+              blosc2_dparams dparams;
+              blosc2_ctx_get_dparams(context, &dparams);
+              nbytes = g_codecs[i].decoder(src,
+                                           cbytes,
+                                           _dest,
+                                           neblock,
+                                           context->compcode_meta,
+                                           &dparams,
+                                           context->src);
+              goto urcodecsuccess;
+            }
           }
         }
         BLOSC_TRACE_ERROR("User-defined compressor codec %d not found during decompression", context->compcode);
@@ -2851,18 +2861,12 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
       stopb = header->blocksize;
     }
     bsize2 = stopb - startb;
+
 #if defined(HAVE_PLUGINS)
-  uint8_t ndim;
-  for (int nmetalayer = 0; nmetalayer < context->schunk->nmetalayers; nmetalayer++) {
-      if (strcmp("caterva", context->schunk->metalayers[nmetalayer]->name) == 0) {
-          ndim = context->schunk->metalayers[nmetalayer]->content[2];
-      }
-  }
-  int cell_nitems = (int) (1u << (2 * ndim));
-  if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && (nitems <= cell_nitems)) {
-    context->cell_start = startb;
-    context->zfp_nitems = nitems;
-}
+    if (context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) {
+      context->cell_start = startb;
+      context->zfp_nitems = nitems;
+    }
 #endif /* HAVE_PLUGINS */
 
     /* Do the actual data copy */
@@ -2889,7 +2893,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     ntbytes += bsize2;
   }
 
-  context->cell_start = -1;
+  context->zfp_nitems = 0;
 
   return ntbytes;
 }
@@ -3663,6 +3667,8 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   context->block_maskout = NULL;
   context->block_maskout_nitems = 0;
   context->schunk = dparams.schunk;
+  context->zfp_nitems = 0;
+  context->cell_start = 0;
 
   if (dparams.postfilter != NULL) {
     context->postfilter = dparams.postfilter;
