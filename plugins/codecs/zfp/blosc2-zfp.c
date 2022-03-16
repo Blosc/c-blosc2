@@ -783,14 +783,15 @@ int blosc2_zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cb
 
             // Get the cell
             size_t zfpsize;
+            uint8_t *cell = malloc(cell_nitems * typesize);
             switch (ndim) {
                 case 1:
                     switch (type) {
                         case zfp_type_float:
-                            zfpsize = zfp_decode_block_float_1(zfp, (float *) dest);
+                            zfpsize = zfp_decode_block_float_1(zfp, (float *) cell);
                             break;
                         case zfp_type_double:
-                            zfpsize = zfp_decode_block_double_1(zfp, (double *) dest);
+                            zfpsize = zfp_decode_block_double_1(zfp, (double *) cell);
                             break;
                         default:
                             printf("\n ZFP is not available for this typesize \n");
@@ -802,10 +803,10 @@ int blosc2_zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cb
                 case 2:
                     switch (type) {
                         case zfp_type_float:
-                            zfpsize = zfp_decode_block_float_2(zfp, (float *) dest);
+                            zfpsize = zfp_decode_block_float_2(zfp, (float *) cell);
                             break;
                         case zfp_type_double:
-                            zfpsize = zfp_decode_block_double_2(zfp, (double *) dest);
+                            zfpsize = zfp_decode_block_double_2(zfp, (double *) cell);
                             break;
                         default:
                             printf("\n ZFP is not available for this typesize \n");
@@ -817,10 +818,10 @@ int blosc2_zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cb
                 case 3:
                     switch (type) {
                         case zfp_type_float:
-                            zfpsize = zfp_decode_block_float_3(zfp, (float *) dest);
+                            zfpsize = zfp_decode_block_float_3(zfp, (float *) cell);
                             break;
                         case zfp_type_double:
-                            zfpsize = zfp_decode_block_double_3(zfp, (double *) dest);
+                            zfpsize = zfp_decode_block_double_3(zfp, (double *) cell);
                             break;
                         default:
                             printf("\n ZFP is not available for this typesize \n");
@@ -832,10 +833,10 @@ int blosc2_zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cb
                 case 4:
                     switch (type) {
                         case zfp_type_float:
-                            zfpsize = zfp_decode_block_float_4(zfp, (float *) dest);
+                            zfpsize = zfp_decode_block_float_4(zfp, (float *) cell);
                             break;
                         case zfp_type_double:
-                            zfpsize = zfp_decode_block_double_4(zfp, (double *) dest);
+                            zfpsize = zfp_decode_block_double_4(zfp, (double *) cell);
                             break;
                         default:
                             printf("\n ZFP is not available for this typesize \n");
@@ -849,15 +850,17 @@ int blosc2_zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cb
                     return 0;
             }
 
+            memcpy(dest, &cell[context->cell_start * typesize], context->zfp_nitems * typesize);
             zfp_stream_close(zfp);
             stream_close(stream);
 
-            if ((zfpsize < 0) || (zfpsize > (destsize * typesize * 8))) {
+            if ((zfpsize < 0) || (zfpsize > (destsize * 8)) || (zfpsize > (cell_nitems * typesize * 8)) ||
+                ((context->zfp_nitems * typesize * 8) > zfpsize)) {
                 BLOSC_TRACE_ERROR("ZFP error or small destsize");
                 return -1;
             }
 
-            return (int) zfpsize;
+            return (int) (context->zfp_nitems * typesize);
         }
     }
     return -1;
