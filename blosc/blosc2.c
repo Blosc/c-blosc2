@@ -1709,12 +1709,15 @@ static int blosc_d(
   #endif /*  HAVE_ZSTD */
       else if (compformat == BLOSC_UDCODEC_FORMAT) {
         bool getcell = false;
+
+#if defined(HAVE_PLUGINS)
         if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && (context->zfp_nitems > 0)) {
-          nbytes = blosc2_zfp_getcell(context, src, cbytes, _dest, neblock);
+        nbytes = blosc2_zfp_getcell(context, src, cbytes, _dest, neblock);
           if (nbytes == context->zfp_nitems * typesize) {
             getcell = true;
           }
         }
+#endif /* HAVE_PLUGINS */
         if (!getcell) {
           for (int i = 0; i < g_ncodecs; ++i) {
             if (g_codecs[i].compcode == context->compcode) {
