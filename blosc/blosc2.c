@@ -2621,24 +2621,6 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
 }
 
 
-
-int blosc_decompression_context_from_source(blosc2_context* context, const void* src, int32_t srcsize,
-                                            void* dest, int32_t destsize) {
-    blosc_header header;
-    int rc = read_chunk_header(src, srcsize, true, &header);
-    if (rc < 0) {
-        return rc;
-    }
-    if (header.nbytes > destsize) {
-        // Not enough space for writing into the destination
-        return BLOSC2_ERROR_WRITE_BUFFER;
-    }
-
-    return initialize_context_decompression(context, &header, src, srcsize, dest, destsize);
-}
-
-
-
 int blosc_run_decompression_with_context(blosc2_context* context, const void* src, int32_t srcsize,
                                          void* dest, int32_t destsize) {
   blosc_header header;

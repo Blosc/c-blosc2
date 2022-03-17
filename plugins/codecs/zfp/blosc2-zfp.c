@@ -5,6 +5,7 @@
 #include "zfp.h"
 #include "blosc2-zfp.h"
 #include <math.h>
+#include "context.h"
 
 int blosc2_zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
                             int32_t output_len, uint8_t meta, blosc2_cparams *cparams, const void* chunk) {
@@ -866,7 +867,7 @@ int blosc2_zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cb
     return -1;
 }
 
-
+/*
 int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int ncell, void *dest, size_t destsize) {
     ZFP_ERROR_NULL(dest);
     int32_t typesize = schunk->typesize;
@@ -968,9 +969,9 @@ int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int nc
 
     // Get the ZFP stream
     zfp_type type;     /* array scalar type */
-    zfp_stream *zfp;   /* compressed stream */
-    bitstream *stream; /* bit stream to write to or read from */
-
+  /*  zfp_stream *zfp;   /* compressed stream */
+   /* bitstream *stream; /* bit stream to write to or read from */
+/*
     zfp = zfp_stream_open(NULL);
 
     switch (typesize) {
@@ -1193,3 +1194,4 @@ int blosc2_zfp_getitem(blosc2_schunk* schunk, int64_t index, void* item) {
 
     return typesize;
 }
+*/
