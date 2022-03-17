@@ -12,7 +12,6 @@
 
 #ifndef ZFP_PRIVATE_H
 #define ZFP_PRIVATE_H
-#include "context.h"
 
 #define ZFP_MAX_DIM 4
 #define ZFP_CELL_SHAPE 4
