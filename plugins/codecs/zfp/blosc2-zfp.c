@@ -857,10 +857,19 @@ int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, u
             printf("\n ZFP is not available for this number of dims \n");
             return 0;
     }
-
-    memcpy(dest, &cell[context->zfp_cell_start * typesize], context->zfp_cell_nitems * typesize);
+    printf("\n cell\n");
+    for (int i = 0; i < cell_nitems; ++i) {
+        printf("%f, ", ((float *) cell)[i]);
+    }
+    memcpy(dest, &cell[cell_ind * typesize], context->zfp_cell_nitems * typesize);
+    printf("\n dest\n");
+    for (int i = 0; i < context->zfp_cell_nitems; ++i) {
+        printf("%f, ", ((float *) dest)[i]);
+    }
     zfp_stream_close(zfp);
     stream_close(stream);
+    printf("\n zfpsize %d, destsize %d, cell_nitems %d, items to get %d\n", zfpsize, destsize * 8,
+           cell_nitems * typesize * 8, context->zfp_cell_nitems * typesize * 8);
 
     if ((zfpsize < 0) || (zfpsize > (destsize * 8)) || (zfpsize > (cell_nitems * typesize * 8)) ||
         ((context->zfp_cell_nitems * typesize * 8) > zfpsize)) {
