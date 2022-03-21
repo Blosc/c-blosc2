@@ -1736,9 +1736,9 @@ static int blosc_d(
               goto urcodecsuccess;
             }
           }
+          BLOSC_TRACE_ERROR("User-defined compressor codec %d not found during decompression", context->compcode);
+          return BLOSC2_ERROR_CODEC_SUPPORT;
         }
-        BLOSC_TRACE_ERROR("User-defined compressor codec %d not found during decompression", context->compcode);
-        return BLOSC2_ERROR_CODEC_SUPPORT;
       urcodecsuccess:
         ;
       }
@@ -1752,7 +1752,7 @@ static int blosc_d(
       }
 
       /* Check that decompressed bytes number is correct */
-      if (nbytes != neblock) {
+      if ((nbytes != neblock) && (context->zfp_cell_nitems == 0)) {
         return BLOSC2_ERROR_DATA;
       }
 
@@ -2870,7 +2870,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
 
 #if defined(HAVE_PLUGINS)
     if (context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) {
-      context->zfp_cell_start = startb;
+      context->zfp_cell_start = startb / context->typesize;
       context->zfp_cell_nitems = nitems;
     }
 #endif /* HAVE_PLUGINS */
