@@ -20,30 +20,30 @@ extern "C" {
 #endif
 
 
-int blosc2_zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
+int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                             uint8_t meta, blosc2_cparams *cparams, const void* chunk);
 
-int blosc2_zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
+int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                               uint8_t meta, blosc2_dparams *dparams, const void* chunk);
 
-int blosc2_zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
+int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                             uint8_t meta, blosc2_cparams *cparams, const void* chunk);
 
-int blosc2_zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
+int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                               uint8_t meta, blosc2_dparams *dparams, const void* chunk);
 
-int blosc2_zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
+int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                              uint8_t meta, blosc2_cparams *cparams, const void* chunk);
 
-int blosc2_zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
+int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                                uint8_t meta, blosc2_dparams *dparams, const void* chunk);
 
-int blosc2_zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, uint8_t *dest, int32_t destsize);
-
+int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, uint8_t *dest, int32_t destsize);
+/*
 int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int ncell, void *dest, size_t destsize);
 
 int blosc2_zfp_getitem(blosc2_schunk* schunk, int64_t index, void* item);
-
+*/
 #if defined (__cplusplus)
 }
 #endif
