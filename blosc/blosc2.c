@@ -1711,9 +1711,12 @@ static int blosc_d(
         bool getcell = false;
 
 #if defined(HAVE_PLUGINS)
-        if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && (context->zfp_nitems > 0)) {
-        nbytes = blosc2_zfp_getcell(context, src, cbytes, _dest, neblock);
-          if (nbytes == context->zfp_nitems * typesize) {
+        if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && (context->zfp_cell_nitems > 0)) {
+        nbytes = zfp_getcell(context, src, cbytes, _dest, neblock);
+          if (nbytes < 0) {
+            return BLOSC2_ERROR_DATA;
+          }
+          if (nbytes == context->zfp_cell_nitems * typesize) {
             getcell = true;
           }
         }
@@ -2867,8 +2870,8 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
 
 #if defined(HAVE_PLUGINS)
     if (context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) {
-      context->cell_start = startb;
-      context->zfp_nitems = nitems;
+      context->zfp_cell_start = startb;
+      context->zfp_cell_nitems = nitems;
     }
 #endif /* HAVE_PLUGINS */
 
@@ -2896,7 +2899,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     ntbytes += bsize2;
   }
 
-  context->zfp_nitems = 0;
+  context->zfp_cell_nitems = 0;
 
   return ntbytes;
 }
@@ -3670,8 +3673,8 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   context->block_maskout = NULL;
   context->block_maskout_nitems = 0;
   context->schunk = dparams.schunk;
-  context->zfp_nitems = 0;
-  context->cell_start = 0;
+  context->zfp_cell_nitems = 0;
+  context->zfp_cell_start = 0;
 
   if (dparams.postfilter != NULL) {
     context->postfilter = dparams.postfilter;
