@@ -1453,3 +1453,14 @@ int blosc2_vlmeta_delete(blosc2_schunk *schunk, const char *name) {
 
   return schunk->nvlmetalayers;
 }
+
+
+int blosc2_vlmeta_get_names(blosc2_schunk *schunk, char **names) {
+  int16_t nvlmetalayers = schunk->nvlmetalayers;
+
+  for (int i = 0; i < nvlmetalayers; ++i) {
+    names[i] = schunk->vlmetalayers[i]->name;
+  }
+
+  return nvlmetalayers;
+}
