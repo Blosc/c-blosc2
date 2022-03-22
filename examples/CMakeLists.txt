@@ -1,7 +1,7 @@
 # sources for examples
 set(SOURCES contexts instrument_codec delta_schunk_ex multithread simple frame_metalayers noinit find_roots)
 set(SOURCES ${SOURCES} schunk_simple frame_simple urcodecs urfilters frame_vlmetalayers sframe_simple
-        frame_backed_schunk compress_file)
+        frame_backed_schunk compress_file entropy_probe7)
 if(NOT DEACTIVATE_ZSTD)
     set(SOURCES ${SOURCES} zstd_dict)
 endif()
