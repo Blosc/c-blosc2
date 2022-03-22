@@ -54,13 +54,15 @@ static char* test_schunk(void) {
   blosc2_meta_update(schunk, "metalayer2", (uint8_t *) "my metalayer2", sizeof("my metalayer2"));
 
   char names_[2][13] = {"vlmetalayer1", "vlmetalayer2"};
-  char **names = malloc(sizeof(char**));
+  char **names = malloc(schunk->nvlmetalayers * sizeof (char*));
   int nvlmetas = blosc2_vlmeta_get_names(schunk, names);
   mu_assert("ERROR: wrong number of vlmetalayers", nvlmetas == 0);
 
   // Attach some user metadata into it
   blosc2_vlmeta_add(schunk, "vlmetalayer1", (uint8_t *) "testing the vlmetalayers", 23, NULL);
 
+  free(names);
+  names = malloc(schunk->nvlmetalayers * sizeof (char*));
   nvlmetas = blosc2_vlmeta_get_names(schunk, names);
   mu_assert("ERROR: wrong number of vlmetalayers", nvlmetas == 1);
   for (int i = 0; i < nvlmetas; ++i) {
@@ -68,6 +70,8 @@ static char* test_schunk(void) {
   }
   blosc2_vlmeta_add(schunk, "vlmetalayer2", (uint8_t *) "vlmetalayers", 11, NULL);
 
+  free(names);
+  names = malloc(schunk->nvlmetalayers * sizeof (char*));
   nvlmetas = blosc2_vlmeta_get_names(schunk, names);
   mu_assert("ERROR: wrong number of vlmetalayers", nvlmetas == 2);
   for (int i = 0; i < nvlmetas; ++i) {
@@ -111,6 +115,8 @@ static char* test_schunk(void) {
   // update metalayer
   blosc2_vlmeta_update(schunk, "vlmetalayer1", (uint8_t *) "testing the  vlmetalayers", 24, NULL);
 
+  free(names);
+  names = malloc(schunk->nvlmetalayers * sizeof (char*));
   nvlmetas = blosc2_vlmeta_get_names(schunk, names);
   mu_assert("ERROR: wrong number of vlmetalayers", nvlmetas == 2);
   for (int i = 0; i < nvlmetas; ++i) {
@@ -140,6 +146,8 @@ static char* test_schunk(void) {
   int nvlmeta = blosc2_vlmeta_delete(schunk, "vlmetalayer2");
   mu_assert("ERROR: error while deleting the vlmetalayer", nvlmeta == 1);
 
+  free(names);
+  names = malloc(schunk->nvlmetalayers * sizeof (char*));
   nvlmetas = blosc2_vlmeta_get_names(schunk, names);
   mu_assert("ERROR: wrong number of vlmetalayers", nvlmetas == 1);
   for (int i = 0; i < nvlmetas; ++i) {

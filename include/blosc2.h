@@ -1910,9 +1910,13 @@ BLOSC_EXPORT int blosc2_vlmeta_get(blosc2_schunk *schunk, const char *name,
 BLOSC_EXPORT int blosc2_vlmeta_delete(blosc2_schunk *schunk, const char *name);
 
 /**
- * @brief Get a list of all the variable-length metalayer names
+ * @brief Get a list of all the variable-length metalayer names.
  * @param schunk The super-chunk containing the variable-length metalayers.
  * @param names The pointer to a char** to store the name pointers.
+ *
+ * @warning The @p **names receives a malloc'ed buffer of size @p *schunk->nvlmetalayers * sizeof(char*).
+ * The user is responsible of freeing it.
+ *
  * @return If successful, the number of the variable-length metalayers in the super-chunk.
  */
 BLOSC_EXPORT int blosc2_vlmeta_get_names(blosc2_schunk *schunk, char **names);
