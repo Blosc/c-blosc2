@@ -1589,6 +1589,7 @@ static int blosc_d(
         return BLOSC2_ERROR_POSTFILTER;
       }
     }
+    context->zfp_cell_nitems = 0;
     return bsize_;
   }
 
@@ -1712,7 +1713,7 @@ static int blosc_d(
 
 #if defined(HAVE_PLUGINS)
         if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && (context->zfp_cell_nitems > 0)) {
-        nbytes = zfp_getcell(context, src, cbytes, _dest, neblock);
+          nbytes = zfp_getcell(context, src, cbytes, _dest, neblock);
           if (nbytes < 0) {
             return BLOSC2_ERROR_DATA;
           }
@@ -1722,6 +1723,7 @@ static int blosc_d(
         }
 #endif /* HAVE_PLUGINS */
         if (!getcell) {
+          context->zfp_cell_nitems = 0;
           for (int i = 0; i < g_ncodecs; ++i) {
             if (g_codecs[i].compcode == context->compcode) {
               blosc2_dparams dparams;
@@ -2892,7 +2894,9 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
       ntbytes = cbytes;
       break;
     }
-    if (!get_single_block) {
+    if (context->zfp_cell_nitems > 0) {
+        memcpy((uint8_t *) dest, tmp2, (unsigned int) bsize2);
+    } else if (!get_single_block) {
       /* Copy to destination */
       memcpy((uint8_t *) dest + ntbytes, tmp2 + startb, (unsigned int) bsize2);
     }
