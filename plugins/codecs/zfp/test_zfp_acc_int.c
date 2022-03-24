@@ -60,13 +60,6 @@ static int test_zfp(blosc2_schunk* schunk) {
             return -1;
         }
 
-        /*
-        printf("\n chunk \n");
-        for (int i = 0; i < chunksize; i++) {
-            printf("%f, ", ((float *) data_in)[i]);
-        }
-        */
-
         /* Compress with clevel=5 and shuffle active  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC_MAX_OVERHEAD);
         if (csize == 0) {
@@ -77,7 +70,6 @@ static int test_zfp(blosc2_schunk* schunk) {
             return (int) csize;
         }
         csize_f += csize;
-
 
         /* Decompress  */
         dsize = blosc2_decompress_ctx(dctx, data_out, chunksize + BLOSC_MAX_OVERHEAD, data_dest, chunksize);
