@@ -65,12 +65,7 @@ static int test_zfp_prec_float(blosc2_schunk* schunk) {
             printf("Error decompressing chunk \n");
             return -1;
         }
-/*
-        printf("\n chunk \n");
-        for (int i = 0; i < (chunksize / cparams.typesize); i++) {
-            printf("%f, ", data_in[i]);
-        }
-*/
+
         /* Compress with clevel=5 and shuffle active  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC_MAX_OVERHEAD);
         if (csize == 0) {
@@ -89,12 +84,6 @@ static int test_zfp_prec_float(blosc2_schunk* schunk) {
             printf("Decompression error.  Error code: %" PRId64 "\n", dsize);
             return (int) dsize;
         }
-/*
-        printf("\n dest \n");
-        for (int i = 0; i < (chunksize / cparams.typesize); i++) {
-            printf("%f, ", data_dest[i]);
-        }
-*/
         double tolerance = 0.01;
         for (int i = 0; i < (chunksize / cparams.typesize); i++) {
             if ((data_in[i] == 0) || (data_dest[i] == 0)) {
@@ -167,12 +156,7 @@ static int test_zfp_prec_double(blosc2_schunk* schunk) {
             printf("Error decompressing chunk \n");
             return -1;
         }
-/*
-        printf("\n chunk \n");
-        for (int i = 0; i < (chunksize / cparams.typesize); i++) {
-            printf("%f, ", data_in[i]);
-        }
-*/
+
         /* Compress with clevel=5 and shuffle active  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC_MAX_OVERHEAD);
         if (csize == 0) {
@@ -191,12 +175,6 @@ static int test_zfp_prec_double(blosc2_schunk* schunk) {
             printf("Decompression error.  Error code: %" PRId64 "\n", dsize);
             return (int) dsize;
         }
-/*
-        printf("\n dest \n");
-        for (int i = 0; i < (chunksize / cparams.typesize); i++) {
-            printf("%f, ", data_dest[i]);
-        }
-*/
         double tolerance = 0.01;
         for (int i = 0; i < (chunksize / cparams.typesize); i++) {
             if ((data_in[i] == 0) || (data_dest[i] == 0)) {

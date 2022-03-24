@@ -10,7 +10,7 @@
     Test program demonstrating use of the Blosc codec from C code.
     To compile this program:
 
-    $ gcc -O test_zfp_rate_float.c -o test_zfp_rate_float -lblosc2
+    $ gcc -O test_zfp_rate_getitem.c -o test_zfp_rate_getitem -lblosc2
 
 
 **********************************************************************/
@@ -20,7 +20,7 @@
 #include "blosc2/codecs-registry.h"
 #include <inttypes.h>
 
-static int test_zfp_rate_float(blosc2_schunk* schunk) {
+static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
 
     if (schunk->typesize != 4) {
         printf("Error: This test is only for doubles.\n");
@@ -31,8 +31,6 @@ static int test_zfp_rate_float(blosc2_schunk* schunk) {
     float *data_in = malloc(chunksize);
     int decompressed;
     int64_t csize;
-    int64_t dsize;
-    int64_t csize_f = 0;
     uint8_t *data_out = malloc(chunksize + BLOSC_MAX_OVERHEAD);
     float *data_dest = malloc(chunksize);
 
@@ -64,7 +62,12 @@ static int test_zfp_rate_float(blosc2_schunk* schunk) {
             printf("Error decompressing chunk \n");
             return -1;
         }
-
+/*
+        printf("\n chunk \n");
+        for (int i = 0; i < (chunksize / cparams.typesize); i++) {
+            printf("%f, ", data_in[i]);
+        }
+*/
         /* Compress with clevel=5 and shuffle active  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC_MAX_OVERHEAD);
         if (csize == 0) {
@@ -74,16 +77,42 @@ static int test_zfp_rate_float(blosc2_schunk* schunk) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);
             return (int) csize;
         }
-        csize_f += csize;
+        int32_t chunk_nbytes, chunk_cbytes;
+        blosc2_cbuffer_sizes(data_out, &chunk_nbytes, &chunk_cbytes, NULL);
 
-        /* Decompress  */
-        dsize = blosc2_decompress_ctx(dctx, data_out, chunksize + BLOSC_MAX_OVERHEAD, data_dest, chunksize);
-        if (dsize <= 0) {
-            printf("Decompression error.  Error code: %" PRId64 "\n", dsize);
-            return (int) dsize;
+        /* Get item  */
+        int index, dsize_zfp, dsize_blosc;
+        float item_zfp, item_blosc;
+        blosc_timestamp_t t0, t1;
+        double zfp_time, blosc_time;
+        int nelems = schunk->chunksize / schunk->typesize;
+        for (int i = 0; i < 100; ++i) {
+            srand(i);
+            index = rand() % nelems;
+            blosc_set_timestamp(&t0);
+            dsize_blosc = blosc2_getitem_ctx(schunk->dctx, data_out, chunk_cbytes,
+                                             index, 1, &item_zfp, sizeof(item_zfp));
+            blosc_set_timestamp(&t1);
+            blosc_time += blosc_elapsed_secs(t0, t1);
+            blosc_set_timestamp(&t0);
+            dsize_zfp = blosc2_getitem_ctx(dctx, data_out, chunk_cbytes,
+                                           index, 1, &item_blosc, sizeof(item_blosc));
+            blosc_set_timestamp(&t1);
+            zfp_time += blosc_elapsed_secs(t0, t1);
+            if (dsize_blosc != dsize_zfp) {
+                printf("Different amount of items gotten");
+                return -1;
+            }
+            if (item_blosc != item_zfp) {
+                printf("\nIn index %d different items extracted zfp %f blosc %f", index, item_zfp, item_blosc);
+                return -1;
+            }
+
         }
+        printf("ZFP_FIXED_RATE time: %.10f s\n", zfp_time);
+        printf("Blosc2 time: %.10f s\n", blosc_time);
+
     }
-    csize_f = csize_f / nchunks;
 
     free(data_in);
     free(data_out);
@@ -92,11 +121,10 @@ static int test_zfp_rate_float(blosc2_schunk* schunk) {
     blosc2_free_ctx(dctx);
 
     printf("Succesful roundtrip!\n");
-    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / (double) csize_f);
-    return (int) (chunksize - csize_f);
+    return (int) (BLOSC2_ERROR_SUCCESS);
 }
 
-static int test_zfp_rate_double(blosc2_schunk* schunk) {
+static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
 
     if (schunk->typesize != 8) {
         printf("Error: This test is only for doubles.\n");
@@ -107,8 +135,6 @@ static int test_zfp_rate_double(blosc2_schunk* schunk) {
     double *data_in = malloc(chunksize);
     int decompressed;
     int64_t csize;
-    int64_t dsize;
-    int64_t csize_f = 0;
     uint8_t *data_out = malloc(chunksize + BLOSC_MAX_OVERHEAD);
     double *data_dest = malloc(chunksize);
 
@@ -140,7 +166,12 @@ static int test_zfp_rate_double(blosc2_schunk* schunk) {
             printf("Error decompressing chunk \n");
             return -1;
         }
-
+/*
+        printf("\n chunk \n");
+        for (int i = 0; i < (chunksize / cparams.typesize); i++) {
+            printf("%f, ", data_in[i]);
+        }
+*/
         /* Compress with clevel=5 and shuffle active  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC_MAX_OVERHEAD);
         if (csize == 0) {
@@ -150,17 +181,42 @@ static int test_zfp_rate_double(blosc2_schunk* schunk) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);
             return (int) csize;
         }
-        csize_f += csize;
+        int32_t chunk_nbytes, chunk_cbytes;
+        blosc2_cbuffer_sizes(data_out, &chunk_nbytes, &chunk_cbytes, NULL);
 
-        /* Decompress  */
-        dsize = blosc2_decompress_ctx(dctx, data_out, chunksize + BLOSC_MAX_OVERHEAD, data_dest, chunksize);
-        if (dsize <= 0) {
-            printf("Decompression error.  Error code: %" PRId64 "\n", dsize);
-            return (int) dsize;
+        /* Get item  */
+        int index, dsize_zfp, dsize_blosc;
+        double item_zfp, item_blosc;
+        blosc_timestamp_t t0, t1;
+        double zfp_time, blosc_time;
+        int nelems = schunk->chunksize / schunk->typesize;
+        for (int i = 0; i < 100; ++i) {
+            srand(i);
+            index = rand() % nelems;
+            blosc_set_timestamp(&t0);
+            dsize_blosc = blosc2_getitem_ctx(schunk->dctx, data_out, chunk_cbytes,
+                                             index, 1, &item_zfp, sizeof(item_zfp));
+            blosc_set_timestamp(&t1);
+            blosc_time += blosc_elapsed_secs(t0, t1);
+            blosc_set_timestamp(&t0);
+            dsize_zfp = blosc2_getitem_ctx(dctx, data_out, chunk_cbytes,
+                                           index, 1, &item_blosc, sizeof(item_blosc));
+            blosc_set_timestamp(&t1);
+            zfp_time += blosc_elapsed_secs(t0, t1);
+            if (dsize_blosc != dsize_zfp) {
+                printf("Different amount of items gotten");
+                return -1;
+            }
+            if (item_blosc != item_zfp) {
+                printf("\nIn index %d different items extracted zfp %.10f blosc %.10tykf", index, item_zfp, item_blosc);
+                return -1;
+            }
+
         }
-    }
+        printf("ZFP_FIXED_RATE time: %.10f s\n", zfp_time);
+        printf("Blosc2 time: %.10f s\n", blosc_time);
 
-    csize_f = csize_f / nchunks;
+    }
 
     free(data_in);
     free(data_out);
@@ -169,8 +225,7 @@ static int test_zfp_rate_double(blosc2_schunk* schunk) {
     blosc2_free_ctx(dctx);
 
     printf("Succesful roundtrip!\n");
-    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / (double) csize_f);
-    return (int) (chunksize - csize_f);
+    return (int) (BLOSC2_ERROR_SUCCESS);
 }
 
 
@@ -178,7 +233,7 @@ int float_cyclic() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_float_cyclic.caterva");
 
     /* Run the test. */
-    int result = test_zfp_rate_float(schunk);
+    int result = test_zfp_rate_getitem_float(schunk);
     blosc2_schunk_free(schunk);
     return result;
 }
@@ -187,7 +242,7 @@ int double_same_cells() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_double_same_cells.caterva");
 
     /* Run the test. */
-    int result = test_zfp_rate_double(schunk);
+    int result = test_zfp_rate_getitem_double(schunk);
     blosc2_schunk_free(schunk);
     return result;
 }
@@ -196,7 +251,7 @@ int day_month_temp() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_day_month_temp.caterva");
 
     /* Run the test. */
-    int result = test_zfp_rate_float(schunk);
+    int result = test_zfp_rate_getitem_float(schunk);
     blosc2_schunk_free(schunk);
     return result;
 }
@@ -205,7 +260,7 @@ int item_prices() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_item_prices.caterva");
 
     /* Run the test. */
-    int result = test_zfp_rate_float(schunk);
+    int result = test_zfp_rate_getitem_float(schunk);
     blosc2_schunk_free(schunk);
     return result;
 }
