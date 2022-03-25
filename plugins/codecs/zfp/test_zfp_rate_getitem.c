@@ -84,7 +84,8 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
         int index, dsize_zfp, dsize_blosc;
         float item_zfp, item_blosc;
         blosc_timestamp_t t0, t1;
-        double zfp_time, blosc_time;
+        double zfp_time = 0;
+        double blosc_time = 0;
         int nelems = schunk->chunksize / schunk->typesize;
         for (int i = 0; i < 100; ++i) {
             srand(i);
@@ -188,7 +189,8 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
         int index, dsize_zfp, dsize_blosc;
         double item_zfp, item_blosc;
         blosc_timestamp_t t0, t1;
-        double zfp_time, blosc_time;
+        double zfp_time = 0;
+        double blosc_time = 0;
         int nelems = schunk->chunksize / schunk->typesize;
         for (int i = 0; i < 100; ++i) {
             srand(i);
@@ -208,7 +210,7 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
                 return -1;
             }
             if (item_blosc != item_zfp) {
-                printf("\nIn index %d different items extracted zfp %.10f blosc %.10tykf", index, item_zfp, item_blosc);
+                printf("\nIn index %d different items extracted zfp %.10f blosc %.10f", index, item_zfp, item_blosc);
                 return -1;
             }
 
