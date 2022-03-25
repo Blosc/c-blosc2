@@ -39,11 +39,8 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
                                uint8_t meta, blosc2_dparams *dparams, const void* chunk);
 
 int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, uint8_t *dest, int32_t destsize);
-/*
-int blosc2_zfp_getcell_old(blosc2_schunk* schunk, int nchunk, int nblock, int ncell, void *dest, size_t destsize);
 
-int blosc2_zfp_getitem(blosc2_schunk* schunk, int64_t index, void* item);
-*/
+
 #if defined (__cplusplus)
 }
 #endif
