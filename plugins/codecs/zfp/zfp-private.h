@@ -16,8 +16,6 @@
 #define ZFP_MAX_DIM 4
 #define ZFP_CELL_SHAPE 4
 
-#define ZFP_MAX_DIM 4
-#define ZFP_CELL_SHAPE 4
 
 #if defined (__cplusplus)
 extern "C" {

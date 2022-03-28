@@ -14,12 +14,6 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     ZFP_ERROR_NULL(cparams);
 
     double tol = (int8_t) meta;
-/*
-    printf("\n input \n");
-    for (int i = 0; i < input_len; i++) {
-        printf("%u, ", input[i]);
-    }
-*/
     int8_t ndim;
     int64_t *shape = malloc(8 * sizeof(int64_t));
     int32_t *chunkshape = malloc(8 * sizeof(int32_t));
@@ -226,12 +220,6 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(cparams);
 
-/*
-    printf("\n input \n");
-    for (int i = 0; i < input_len; i++) {
-        printf("%u, ", input[i]);
-    }
-*/
     int8_t ndim;
     int64_t *shape = malloc(8 * sizeof(int64_t));
     int32_t *chunkshape = malloc(8 * sizeof(int32_t));
@@ -488,12 +476,6 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     ZFP_ERROR_NULL(cparams);
 
     double ratio = (double) meta / 100.0;
-/*
-    printf("\n input \n");
-    for (int i = 0; i < input_len; i++) {
-        printf("%u, ", input[i]);
-    }
-*/
     int8_t ndim;
     int64_t *shape = malloc(8 * sizeof(int64_t));
     int32_t *chunkshape = malloc(8 * sizeof(int32_t));

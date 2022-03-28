@@ -12,7 +12,6 @@
 
 #ifndef BLOSC2_ZFP_H
 #define BLOSC2_ZFP_H
-#include "context.h"
 #include "zfp-private.h"
 
 #if defined (__cplusplus)
