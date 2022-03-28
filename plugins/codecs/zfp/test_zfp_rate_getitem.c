@@ -16,9 +16,10 @@
 **********************************************************************/
 
 #include <stdio.h>
+#include <inttypes.h>
+#include <stdlib.h>
 #include "blosc2.h"
 #include "blosc2/codecs-registry.h"
-#include <inttypes.h>
 
 static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
 
@@ -56,19 +57,13 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
     dctx = blosc2_create_dctx(dparams);
 
     for (int ci = 0; ci < nchunks; ci++) {
-
         decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
         if (decompressed < 0) {
             printf("Error decompressing chunk \n");
             return -1;
         }
-/*
-        printf("\n chunk \n");
-        for (int i = 0; i < (chunksize / cparams.typesize); i++) {
-            printf("%f, ", data_in[i]);
-        }
-*/
-        /* Compress with clevel=5 and shuffle active  */
+
+        /* Compress using ZFP fixed-rate  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC_MAX_OVERHEAD);
         if (csize == 0) {
             printf("Buffer is uncompressible.  Giving up.\n");
@@ -83,24 +78,17 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
         /* Get item  */
         int index, dsize_zfp, dsize_blosc;
         float item_zfp, item_blosc;
-        blosc_timestamp_t t0, t1;
-        double zfp_time = 0;
-        double blosc_time = 0;
         int nelems = schunk->chunksize / schunk->typesize;
         for (int i = 0; i < 100; ++i) {
             srand(i);
             index = rand() % nelems;
-            blosc_set_timestamp(&t0);
+            // Usual getitem
             dsize_blosc = blosc2_getitem_ctx(schunk->dctx, data_out, chunk_cbytes,
                                              index, 1, &item_zfp, sizeof(item_zfp));
-            blosc_set_timestamp(&t1);
-            blosc_time += blosc_elapsed_secs(t0, t1);
-            blosc_set_timestamp(&t0);
+            // Optimized getitem using ZFP cell machinery
             dsize_zfp = blosc2_getitem_ctx(dctx, data_out, chunk_cbytes,
                                            index, 1, &item_blosc, sizeof(item_blosc));
-            blosc_set_timestamp(&t1);
-            zfp_time += blosc_elapsed_secs(t0, t1);
-            if (dsize_blosc != dsize_zfp) {
+           if (dsize_blosc != dsize_zfp) {
                 printf("Different amount of items gotten");
                 return -1;
             }
@@ -108,11 +96,7 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
                 printf("\nIn index %d different items extracted zfp %f blosc %f", index, item_zfp, item_blosc);
                 return -1;
             }
-
         }
-        printf("ZFP_FIXED_RATE time: %.10f s\n", zfp_time);
-        printf("Blosc2 time: %.10f s\n", blosc_time);
-
     }
 
     free(data_in);
@@ -161,19 +145,13 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
     dctx = blosc2_create_dctx(dparams);
 
     for (int ci = 0; ci < nchunks; ci++) {
-
         decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
         if (decompressed < 0) {
             printf("Error decompressing chunk \n");
             return -1;
         }
-/*
-        printf("\n chunk \n");
-        for (int i = 0; i < (chunksize / cparams.typesize); i++) {
-            printf("%f, ", data_in[i]);
-        }
-*/
-        /* Compress with clevel=5 and shuffle active  */
+
+        /* Compress using ZFP fixed-rate  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC_MAX_OVERHEAD);
         if (csize == 0) {
             printf("Buffer is uncompressible.  Giving up.\n");
@@ -188,23 +166,16 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
         /* Get item  */
         int index, dsize_zfp, dsize_blosc;
         double item_zfp, item_blosc;
-        blosc_timestamp_t t0, t1;
-        double zfp_time = 0;
-        double blosc_time = 0;
         int nelems = schunk->chunksize / schunk->typesize;
         for (int i = 0; i < 100; ++i) {
             srand(i);
             index = rand() % nelems;
-            blosc_set_timestamp(&t0);
+            // Usual getitem
             dsize_blosc = blosc2_getitem_ctx(schunk->dctx, data_out, chunk_cbytes,
                                              index, 1, &item_zfp, sizeof(item_zfp));
-            blosc_set_timestamp(&t1);
-            blosc_time += blosc_elapsed_secs(t0, t1);
-            blosc_set_timestamp(&t0);
+            // Optimized getitem using ZFP cell machinery
             dsize_zfp = blosc2_getitem_ctx(dctx, data_out, chunk_cbytes,
                                            index, 1, &item_blosc, sizeof(item_blosc));
-            blosc_set_timestamp(&t1);
-            zfp_time += blosc_elapsed_secs(t0, t1);
             if (dsize_blosc != dsize_zfp) {
                 printf("Different amount of items gotten");
                 return -1;
@@ -213,11 +184,7 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
                 printf("\nIn index %d different items extracted zfp %.10f blosc %.10f", index, item_zfp, item_blosc);
                 return -1;
             }
-
         }
-        printf("ZFP_FIXED_RATE time: %.10f s\n", zfp_time);
-        printf("Blosc2 time: %.10f s\n", blosc_time);
-
     }
 
     free(data_in);
@@ -270,16 +237,15 @@ int item_prices() {
 
 int main(void) {
 
-    int result;
     blosc_init();   // this is mandatory for initiallizing the plugin mechanism
-    result = float_cyclic();
-    printf("float_cyclic: %d obtained \n \n", result);
-    result = double_same_cells();
-    printf("double_same_cells: %d obtained \n \n", result);
-    result = day_month_temp();
-    printf("day_month_temp: %d obtained \n \n", result);
-    result = item_prices();
-    printf("item_prices: %d obtained \n \n", result);
+    printf("float_cyclic: ");
+    float_cyclic();
+    printf("double_same_cells: ");
+    double_same_cells();
+    printf("day_month_temp: ");
+    day_month_temp();
+    printf("item_prices: ");
+    item_prices();
     blosc_destroy();
 
     return BLOSC2_ERROR_SUCCESS;
