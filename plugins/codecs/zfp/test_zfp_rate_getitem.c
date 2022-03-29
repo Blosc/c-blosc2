@@ -84,10 +84,10 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
             index = rand() % nelems;
             // Usual getitem
             dsize_blosc = blosc2_getitem_ctx(schunk->dctx, data_out, chunk_cbytes,
-                                             index, 1, &item_zfp, sizeof(item_zfp));
+                                             index, 1, &item_blosc, sizeof(item_blosc));
             // Optimized getitem using ZFP cell machinery
             dsize_zfp = blosc2_getitem_ctx(dctx, data_out, chunk_cbytes,
-                                           index, 1, &item_blosc, sizeof(item_blosc));
+                                           index, 1, &item_zfp, sizeof(item_zfp));
            if (dsize_blosc != dsize_zfp) {
                 printf("Different amount of items gotten");
                 return -1;
@@ -172,10 +172,10 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
             index = rand() % nelems;
             // Usual getitem
             dsize_blosc = blosc2_getitem_ctx(schunk->dctx, data_out, chunk_cbytes,
-                                             index, 1, &item_zfp, sizeof(item_zfp));
+                                             index, 1, &item_blosc, sizeof(item_blosc));
             // Optimized getitem using ZFP cell machinery
             dsize_zfp = blosc2_getitem_ctx(dctx, data_out, chunk_cbytes,
-                                           index, 1, &item_blosc, sizeof(item_blosc));
+                                           index, 1, &item_zfp, sizeof(item_zfp));
             if (dsize_blosc != dsize_zfp) {
                 printf("Different amount of items gotten");
                 return -1;

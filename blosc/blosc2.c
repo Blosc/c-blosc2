@@ -821,6 +821,8 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
 
   /* Prefilter function */
   if (context->prefilter != NULL) {
+    /* Set unwritten values to zero */
+    memset(_dest, 0, bsize);
     // Create new prefilter parameters for this block (must be private for each thread)
     blosc2_prefilter_params preparams;
     memcpy(&preparams, context->preparams, sizeof(preparams));
@@ -972,11 +974,11 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   blosc_timestamp_t last, current;
   float filter_time = 0.f;
 
-  // See whether we have a run here
   if (instr_codec) {
     blosc_set_timestamp(&last);
   }
 
+  // See whether we have a run here
   if (last_filter_index >= 0 || context->prefilter != NULL) {
     /* Apply the filter pipeline just for the prefilter */
     if (memcpyed && context->prefilter != NULL) {
@@ -1016,6 +1018,9 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   }
   neblock = bsize / nstreams;
   for (j = 0; j < nstreams; j++) {
+    if (instr_codec) {
+      blosc_set_timestamp(&last);
+    }
     if (!dict_training) {
       dest += sizeof(int32_t);
       ntbytes += sizeof(int32_t);
@@ -1148,6 +1153,10 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       /* cbytes should never be negative */
       return BLOSC2_ERROR_DATA;
     }
+    if (cbytes == 0) {
+      // When cbytes is 0, the compressor has not been able to compress anything
+      cbytes = neblock;
+    }
 
     if (instr_codec) {
       blosc_set_timestamp(&current);
@@ -1166,12 +1175,11 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       desti->cspeed = (float)neblock / ctime;
       desti->filter_speed = (float) neblock / filter_time;
       dest += instr_size;
-
       continue;
     }
 
     if (!dict_training) {
-      if (cbytes == 0 || cbytes == neblock) {
+      if (cbytes == neblock) {
         /* The compressor has been unable to compress data at all. */
         /* Before doing the copy, check that we are not running into a
            buffer overflow. */
@@ -2279,6 +2287,18 @@ int blosc_compress_context(blosc2_context* context) {
     }
   }
 
+  int dont_split = (context->header_flags & 0x10) >> 4;
+  int nstreams = context->nblocks;
+  if (!dont_split) {
+    // When splitting, the number of streams is computed differently
+    if (context->leftover) {
+      nstreams = (context->nblocks - 1) * context->typesize + 1;
+    }
+    else {
+      nstreams *= context->typesize;
+    }
+  }
+
   if (memcpyed) {
     if (context->sourcesize + context->header_overhead > context->destsize) {
       /* We are exceeding maximum output size */
@@ -2299,17 +2319,6 @@ int blosc_compress_context(blosc2_context* context) {
   else {
     // Check whether we have a run for the whole chunk
     int start_csizes = context->header_overhead + 4 * context->nblocks;
-    int dont_split = (context->header_flags & 0x10) >> 4;
-    int nstreams = context->nblocks;
-    if (!dont_split) {
-      // When splitting, the number of streams is computed differently
-      if (context->leftover) {
-        nstreams = (context->nblocks - 1) * context->typesize + 1;
-      }
-      else {
-        nstreams *= context->typesize;
-      }
-    }
     if (ntbytes == start_csizes + nstreams * sizeof(int32_t)) {
       // The streams are all zero runs (by construction).  Encode it...
       context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] |= BLOSC2_SPECIAL_ZERO << 4;
@@ -2323,7 +2332,7 @@ int blosc_compress_context(blosc2_context* context) {
   if (context->blosc2_flags & BLOSC2_INSTR_CODEC) {
     int dont_split = (context->header_flags & 0x10) >> 4;
     int blocksize = dont_split ? sizeof(blosc2_instr) : sizeof(blosc2_instr) * context->typesize;
-    _sw32(context->dest + BLOSC2_CHUNK_NBYTES, context->nblocks * blocksize);
+    _sw32(context->dest + BLOSC2_CHUNK_NBYTES, nstreams * sizeof(blosc2_instr));
     _sw32(context->dest + BLOSC2_CHUNK_BLOCKSIZE, blocksize);
   }
 
@@ -2616,23 +2625,6 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
 int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
                    const void* src, void* dest, size_t destsize) {
   return blosc2_compress(clevel, doshuffle, (int32_t)typesize, src, (int32_t)nbytes, dest, (int32_t)destsize);
-}
-
-
-
-int blosc_decompression_context_from_source(blosc2_context* context, const void* src, int32_t srcsize,
-                                            void* dest, int32_t destsize) {
-    blosc_header header;
-    int rc = read_chunk_header(src, srcsize, true, &header);
-    if (rc < 0) {
-        return rc;
-    }
-    if (header.nbytes > destsize) {
-        // Not enough space for writing into the destination
-        return BLOSC2_ERROR_WRITE_BUFFER;
-    }
-
-    return initialize_context_decompression(context, &header, src, srcsize, dest, destsize);
 }
 
 
