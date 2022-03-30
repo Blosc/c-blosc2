@@ -2887,7 +2887,12 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
       break;
     }
     if (context->zfp_cell_nitems > 0) {
+      if (cbytes == bsize2) {
         memcpy((uint8_t *) dest, tmp2, (unsigned int) bsize2);
+      } else if (cbytes == context->blocksize) {
+        memcpy((uint8_t *) dest, tmp2 + context->zfp_cell_start * context->typesize, (unsigned int) bsize2);
+        cbytes = bsize2;
+      }
     } else if (!get_single_block) {
       /* Copy to destination */
       memcpy((uint8_t *) dest + ntbytes, tmp2 + startb, (unsigned int) bsize2);
