@@ -32,7 +32,8 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
     float *data_in = malloc(chunksize);
     int decompressed;
     int64_t csize;
-    uint8_t *data_out = malloc(chunksize + BLOSC_MAX_OVERHEAD);
+    uint8_t *chunk_zfp = malloc(chunksize + BLOSC_MAX_OVERHEAD);
+    uint8_t *chunk_blosc = malloc(chunksize + BLOSC_MAX_OVERHEAD);
     float *data_dest = malloc(chunksize);
 
     /* Create a context for compression */
@@ -55,6 +56,8 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
     dparams.schunk = schunk;
     blosc2_context *dctx;
     dctx = blosc2_create_dctx(dparams);
+    int32_t zfp_chunk_nbytes, zfp_chunk_cbytes, blosc_chunk_cbytes;
+    uint8_t *lossy_chunk = malloc(chunksize + BLOSC_MAX_OVERHEAD);
 
     for (int ci = 0; ci < nchunks; ci++) {
         decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
@@ -64,7 +67,7 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
         }
 
         /* Compress using ZFP fixed-rate  */
-        csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC_MAX_OVERHEAD);
+        csize = blosc2_compress_ctx(cctx, data_in, chunksize, chunk_zfp, chunksize + BLOSC_MAX_OVERHEAD);
         if (csize == 0) {
             printf("Buffer is uncompressible.  Giving up.\n");
             return 0;
@@ -72,8 +75,24 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);
             return (int) csize;
         }
-        int32_t chunk_nbytes, chunk_cbytes;
-        blosc2_cbuffer_sizes(data_out, &chunk_nbytes, &chunk_cbytes, NULL);
+        blosc2_cbuffer_sizes(chunk_zfp, &zfp_chunk_nbytes, &zfp_chunk_cbytes, NULL);
+
+        decompressed = blosc2_decompress_ctx(dctx, chunk_zfp, zfp_chunk_cbytes, lossy_chunk, chunksize);
+        if (decompressed < 0) {
+            printf("Error decompressing chunk \n");
+            return -1;
+        }
+
+        /* Compress not using ZFP fixed-rate  */
+        csize = blosc2_compress_ctx(schunk->cctx, lossy_chunk, chunksize, chunk_blosc, chunksize + BLOSC_MAX_OVERHEAD);
+        if (csize == 0) {
+            printf("Buffer is uncompressible.  Giving up.\n");
+            return 0;
+        } else if (csize < 0) {
+            printf("Compression error.  Error code: %" PRId64 "\n", csize);
+            return (int) csize;
+        }
+        blosc2_cbuffer_sizes(chunk_blosc, NULL, &blosc_chunk_cbytes, NULL);
 
         /* Get item  */
         int index, dsize_zfp, dsize_blosc;
@@ -83,25 +102,27 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
             srand(i);
             index = rand() % nelems;
             // Usual getitem
-            dsize_blosc = blosc2_getitem_ctx(schunk->dctx, data_out, chunk_cbytes,
+            dsize_blosc = blosc2_getitem_ctx(schunk->dctx, chunk_blosc, blosc_chunk_cbytes,
                                              index, 1, &item_blosc, sizeof(item_blosc));
             // Optimized getitem using ZFP cell machinery
-            dsize_zfp = blosc2_getitem_ctx(dctx, data_out, chunk_cbytes,
+            dsize_zfp = blosc2_getitem_ctx(dctx, chunk_zfp, zfp_chunk_cbytes,
                                            index, 1, &item_zfp, sizeof(item_zfp));
            if (dsize_blosc != dsize_zfp) {
-                printf("Different amount of items gotten");
+                printf("Different amount of items gotten\n");
                 return -1;
             }
             if (item_blosc != item_zfp) {
-                printf("\nIn index %d different items extracted zfp %f blosc %f", index, item_zfp, item_blosc);
+                printf("\nIn index %d different items extracted zfp %f blosc %f\n", index, item_zfp, item_blosc);
                 return -1;
             }
         }
     }
 
     free(data_in);
-    free(data_out);
     free(data_dest);
+    free(chunk_zfp);
+    free(chunk_blosc);
+    free(lossy_chunk);
     blosc2_free_ctx(cctx);
     blosc2_free_ctx(dctx);
 
@@ -120,7 +141,8 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
     double *data_in = malloc(chunksize);
     int decompressed;
     int64_t csize;
-    uint8_t *data_out = malloc(chunksize + BLOSC_MAX_OVERHEAD);
+    uint8_t *chunk_zfp = malloc(chunksize + BLOSC_MAX_OVERHEAD);
+    uint8_t *chunk_blosc = malloc(chunksize + BLOSC_MAX_OVERHEAD);
     double *data_dest = malloc(chunksize);
 
     /* Create a context for compression */
@@ -143,6 +165,8 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
     dparams.schunk = schunk;
     blosc2_context *dctx;
     dctx = blosc2_create_dctx(dparams);
+    int32_t zfp_chunk_nbytes, zfp_chunk_cbytes, blosc_chunk_cbytes;
+    uint8_t *lossy_chunk = malloc(chunksize + BLOSC_MAX_OVERHEAD);
 
     for (int ci = 0; ci < nchunks; ci++) {
         decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
@@ -152,7 +176,7 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
         }
 
         /* Compress using ZFP fixed-rate  */
-        csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC_MAX_OVERHEAD);
+        csize = blosc2_compress_ctx(cctx, data_in, chunksize, chunk_zfp, chunksize + BLOSC_MAX_OVERHEAD);
         if (csize == 0) {
             printf("Buffer is uncompressible.  Giving up.\n");
             return 0;
@@ -160,8 +184,24 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);
             return (int) csize;
         }
-        int32_t chunk_nbytes, chunk_cbytes;
-        blosc2_cbuffer_sizes(data_out, &chunk_nbytes, &chunk_cbytes, NULL);
+        blosc2_cbuffer_sizes(chunk_zfp, &zfp_chunk_nbytes, &zfp_chunk_cbytes, NULL);
+
+        decompressed = blosc2_decompress_ctx(dctx, chunk_zfp, zfp_chunk_cbytes, lossy_chunk, chunksize);
+        if (decompressed < 0) {
+            printf("Error decompressing chunk \n");
+            return -1;
+        }
+
+        /* Compress not using ZFP fixed-rate  */
+        csize = blosc2_compress_ctx(schunk->cctx, lossy_chunk, chunksize, chunk_blosc, chunksize + BLOSC_MAX_OVERHEAD);
+        if (csize == 0) {
+            printf("Buffer is uncompressible.  Giving up.\n");
+            return 0;
+        } else if (csize < 0) {
+            printf("Compression error.  Error code: %" PRId64 "\n", csize);
+            return (int) csize;
+        }
+        blosc2_cbuffer_sizes(chunk_blosc, NULL, &blosc_chunk_cbytes, NULL);
 
         /* Get item  */
         int index, dsize_zfp, dsize_blosc;
@@ -171,25 +211,27 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
             srand(i);
             index = rand() % nelems;
             // Usual getitem
-            dsize_blosc = blosc2_getitem_ctx(schunk->dctx, data_out, chunk_cbytes,
+            dsize_blosc = blosc2_getitem_ctx(schunk->dctx, chunk_blosc, blosc_chunk_cbytes,
                                              index, 1, &item_blosc, sizeof(item_blosc));
             // Optimized getitem using ZFP cell machinery
-            dsize_zfp = blosc2_getitem_ctx(dctx, data_out, chunk_cbytes,
+            dsize_zfp = blosc2_getitem_ctx(dctx, chunk_zfp, zfp_chunk_cbytes,
                                            index, 1, &item_zfp, sizeof(item_zfp));
             if (dsize_blosc != dsize_zfp) {
-                printf("Different amount of items gotten");
+                printf("Different amount of items gotten\n");
                 return -1;
             }
             if (item_blosc != item_zfp) {
-                printf("\nIn index %d different items extracted zfp %.10f blosc %.10f", index, item_zfp, item_blosc);
+                printf("\nIn index %d different items extracted zfp %f blosc %f\n", index, item_zfp, item_blosc);
                 return -1;
             }
         }
     }
 
     free(data_in);
-    free(data_out);
     free(data_dest);
+    free(chunk_zfp);
+    free(chunk_blosc);
+    free(lossy_chunk);
     blosc2_free_ctx(cctx);
     blosc2_free_ctx(dctx);
 

@@ -724,8 +724,8 @@ int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, u
     }
     ind_strides[ndim - 1] = cell_strides[ndim - 1] = 1;
     for (int i = ndim - 2; i >= 0; --i) {
-        ind_strides[i] = cellshape;
-        cell_strides[i] = (blockshape[i + 1] - 1) / cellshape + 1;
+        ind_strides[i] = cellshape * ind_strides[i + 1];
+        cell_strides[i] = ((blockshape[i + 1] - 1) / cellshape + 1) * cell_strides[i + 1];
     }
     index_multidim_to_unidim(cell_ind_ndim, (int8_t) ndim, ind_strides, &cell_ind);
     index_multidim_to_unidim(ncell_ndim, (int8_t) ndim, cell_strides, &ncell);
