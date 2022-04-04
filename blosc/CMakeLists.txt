@@ -111,15 +111,22 @@ if(NOT DEACTIVATE_ZSTD)
     if(ZSTD_FOUND)
         set(LIBS ${LIBS} ${ZSTD_LIBRARY})
     else()
-        if(MSVC)
-            add_compile_definitions("ZSTD_DISABLE_ASM")
-            file(GLOB ZSTD_DECOMPRESS_FILES
-                    ${ZSTD_LOCAL_DIR}/decompress/*.c)
+        # Enable assemble code only with GCC, clang or Intel compilers *and* x86
+        if((CMAKE_C_COMPILER_ID STREQUAL GNU OR
+            CMAKE_C_COMPILER_ID STREQUAL Clang OR
+            CMAKE_C_COMPILER_ID STREQUAL AppleClang OR
+            CMAKE_C_COMPILER_ID STREQUAL Intel)
+           AND COMPILER_SUPPORT_SSE2)   # if SSE2 is here, this is an x86 platform
+            #(CMAKE_SYSTEM_PROCESSOR STREQUAL amd64 OR
+            # CMAKE_SYSTEM_PROCESSOR STREQUAL AMD64))
+            message(STATUS "Adding support for assembly sources in ZSTD")
+            file(GLOB ZSTD_DECOMPRESS_FILES ${ZSTD_LOCAL_DIR}/decompress/*.S)
         else()
-            file(GLOB ZSTD_DECOMPRESS_FILES
-                    ${ZSTD_LOCAL_DIR}/decompress/*.c
-                    ${ZSTD_LOCAL_DIR}/decompress/*.S)
+            message(STATUS "Disabling support for assembly sources in ZSTD")
+            add_compile_definitions("ZSTD_DISABLE_ASM")
         endif()
+        file(GLOB ZSTD_DECOMPRESS_FILES ${ZSTD_DECOMPRESS_FILES}
+                ${ZSTD_LOCAL_DIR}/decompress/*.c)
         file(GLOB ZSTD_COMMON_FILES ${ZSTD_LOCAL_DIR}/common/*.c)
         file(GLOB ZSTD_COMPRESS_FILES ${ZSTD_LOCAL_DIR}/compress/*.c)
         file(GLOB ZSTD_DICT_FILES ${ZSTD_LOCAL_DIR}/dictBuilder/*.c)
