@@ -37,7 +37,7 @@ static char* test_schunk_cframe(void) {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
-    int nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
+    int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append in frame", nchunks_ > 0);
   }
 

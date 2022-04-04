@@ -1,5 +1,5 @@
 /* Routine for shuffling a buffer for a type size of 16 bytes. Non-optimized version */
-shuffle16_neon(uint8_t* const dest, const uint8_t* const src,
+void shuffle16_neon(uint8_t* const dest, const uint8_t* const src,
                const size_t vectorizable_elements, const size_t total_elements)
 {
   size_t i, j, k, l;

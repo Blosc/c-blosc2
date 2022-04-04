@@ -32,7 +32,7 @@
 #include <stdio.h>
 #include <blosc2.h>
 
-#define SIZE 100*100*100
+#define SIZE (100*100*100)
 
 int main(void){
   static float data[SIZE];

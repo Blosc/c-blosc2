@@ -15,10 +15,10 @@
 /* macros ------------------------------------------------------------------ */
 
 /* default compression parameters */
-#define ZFP_MIN_BITS     1 /* minimum number of bits per block */
-#define ZFP_MAX_BITS 16658 /* maximum number of bits per block */
-#define ZFP_MAX_PREC    64 /* maximum precision supported */
-#define ZFP_MIN_EXP  -1074 /* minimum floating-point base-2 exponent */
+#define ZFP_MIN_BITS     1    /* minimum number of bits per block */
+#define ZFP_MAX_BITS 16658    /* maximum number of bits per block */
+#define ZFP_MAX_PREC    64    /* maximum precision supported */
+#define ZFP_MIN_EXP  (-1074)  /* minimum floating-point base-2 exponent */
 
 /* header masks (enable via bitwise or; reader must use same mask) */
 #define ZFP_HEADER_NONE   0x0u /* no header */

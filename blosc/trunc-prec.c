@@ -9,7 +9,6 @@
 **********************************************************************/
 
 #include <stdio.h>
-#include "blosc2.h"
 #include "assert.h"
 #include "trunc-prec.h"
 
@@ -41,7 +40,7 @@ void truncate_precision64(uint8_t prec_bits, int32_t nelems,
   int zeroed_bits = BITS_MANTISSA_DOUBLE - prec_bits;
   uint64_t mask = ~((1ULL << zeroed_bits) - 1ULL);
   for (int i = 0; i < nelems; i++) {
-    dest[i] = src[i] & mask;
+    dest[i] = (int64_t)(src[i] & mask);
   }
 }
 

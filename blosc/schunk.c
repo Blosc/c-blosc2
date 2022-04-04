@@ -14,7 +14,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include "blosc2.h"
-#include "blosc-private.h"
 #include "frame.h"
 #include "stune.h"
 
@@ -286,7 +285,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
   // Copy vlmetalayers
   for (int nmeta = 0; nmeta < schunk->nvlmetalayers; ++nmeta) {
     uint8_t *content;
-    uint32_t content_len;
+    int32_t content_len;
     char* name = schunk->vlmetalayers[nmeta]->name;
     if (blosc2_vlmeta_get(schunk, name, &content, &content_len) < 0) {
       BLOSC_TRACE_ERROR("Can not get %s `vlmetalayer`.", name);
@@ -372,7 +371,7 @@ int64_t frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
   void* fp = io_cb->open(urlpath, "wb", frame->schunk->storage->io);
   int64_t nitems = io_cb->write(frame->cframe, frame->len, 1, fp);
   io_cb->close(fp);
-  return nitems * (size_t)frame->len;
+  return nitems * frame->len;
 }
 
 
@@ -483,7 +482,7 @@ blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy
 }
 
 /* Fill an empty frame with special values (fast path). */
-int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int special_value,
+int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int special_value,
                                int32_t chunksize) {
   if (nitems == 0) {
     return 0;
@@ -538,7 +537,7 @@ int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int specia
     }
 
     for (int nchunk = 0; nchunk < nchunks; nchunk++) {
-      int nchunk_ = blosc2_schunk_append_chunk(schunk, chunk, true);
+      int64_t nchunk_ = blosc2_schunk_append_chunk(schunk, chunk, true);
       if (nchunk_ != nchunk + 1) {
         BLOSC_TRACE_ERROR("Error appending special chunks.");
         return BLOSC2_ERROR_SCHUNK_SPECIAL;
@@ -546,7 +545,7 @@ int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int specia
     }
 
     if (leftover_items) {
-      int nchunk_ = blosc2_schunk_append_chunk(schunk, chunk2, true);
+      int64_t nchunk_ = blosc2_schunk_append_chunk(schunk, chunk2, true);
       if (nchunk_ != nchunks + 1) {
         BLOSC_TRACE_ERROR("Error appending last special chunk.");
         return BLOSC2_ERROR_SCHUNK_SPECIAL;
@@ -576,10 +575,10 @@ int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int specia
 }
 
 /* Append an existing chunk into a super-chunk. */
-int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy) {
+int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy) {
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
-  int32_t nchunks = schunk->nchunks;
+  int64_t nchunks = schunk->nchunks;
 
   int rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {
@@ -665,10 +664,10 @@ int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy)
 
 
 /* Insert an existing @p chunk in a specified position on a super-chunk */
-int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy) {
+int64_t blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk, bool copy) {
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
-  int32_t nchunks = schunk->nchunks;
+  int64_t nchunks = schunk->nchunks;
 
   int rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {
@@ -744,7 +743,7 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
     }
 
     // Reorder the offsets and insert the new chunk
-    for (int i = nchunks; i > nchunk; --i) {
+    for (int64_t i = nchunks; i > nchunk; --i) {
       schunk->data[i] = schunk->data[i-1];
     }
     schunk->data[nchunk] = chunk;
@@ -760,7 +759,7 @@ int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
 }
 
 
-int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy) {
+int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk, bool copy) {
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
 
@@ -783,7 +782,7 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   uint8_t *chunk_old;
   int err = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_old, &needs_free);
   if (err < 0) {
-    BLOSC_TRACE_ERROR("%d chunk can not be obtained from schunk.", nchunk);
+    BLOSC_TRACE_ERROR("%lld chunk can not be obtained from schunk.", nchunk);
     return -1;
   }
   int32_t chunk_nbytes_old = 0;
@@ -869,17 +868,17 @@ int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk
   return schunk->nchunks;
 }
 
-int blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int nchunk) {
+int64_t blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int64_t nchunk) {
   int rc;
   if (schunk->nchunks < nchunk) {
-    BLOSC_TRACE_ERROR("The schunk has not enough chunks (%d)!", schunk->nchunks);
+    BLOSC_TRACE_ERROR("The schunk has not enough chunks (%lld)!", schunk->nchunks);
   }
 
   bool needs_free;
   uint8_t *chunk_old;
   int err = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_old, &needs_free);
   if (err < 0) {
-    BLOSC_TRACE_ERROR("%d chunk can not be obtained from schunk.", nchunk);
+    BLOSC_TRACE_ERROR("%lld chunk can not be obtained from schunk.", nchunk);
     return -1;
   }
   int32_t chunk_nbytes_old = 0;
@@ -920,7 +919,7 @@ int blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int nchunk) {
       free(schunk->data[nchunk]);
     }
     // Reorder the offsets and insert the new chunk
-    for (int i = nchunk; i < schunk->nchunks; i++) {
+    for (int64_t i = nchunk; i < schunk->nchunks; i++) {
       schunk->data[i] = schunk->data[i + 1];
     }
     schunk->data[schunk->nchunks] = NULL;
@@ -937,7 +936,7 @@ int blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int nchunk) {
 
 
 /* Append a data buffer to a super-chunk. */
-int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes) {
+int64_t blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes) {
   uint8_t* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
   schunk->current_nchunk = schunk->nchunks;
   /* Compress the src buffer using super-chunk context */
@@ -948,7 +947,7 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes
     return cbytes;
   }
   // We don't need a copy of the chunk, as it will be shrunk if necessary
-  int nchunks = blosc2_schunk_append_chunk(schunk, chunk, false);
+  int64_t nchunks = blosc2_schunk_append_chunk(schunk, chunk, false);
   if (nchunks < 0) {
     BLOSC_TRACE_ERROR("Error appending a buffer in super-chunk");
     return nchunks;
@@ -959,7 +958,7 @@ int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes
 
 
 /* Decompress and return a chunk that is part of a super-chunk. */
-int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
+int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int64_t nchunk,
                                    void *dest, int32_t nbytes) {
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
@@ -970,8 +969,8 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
   schunk->current_nchunk = nchunk;
   if (frame == NULL) {
     if (nchunk >= schunk->nchunks) {
-      BLOSC_TRACE_ERROR("nchunk ('%d') exceeds the number of chunks "
-                        "('%d') in super-chunk.", nchunk, schunk->nchunks);
+      BLOSC_TRACE_ERROR("nchunk ('%lld') exceeds the number of chunks "
+                        "('%lld') in super-chunk.", nchunk, schunk->nchunks);
       return BLOSC2_ERROR_INVALID_PARAM;
     }
     uint8_t* src = schunk->data[nchunk];
@@ -1017,15 +1016,15 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk,
  * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
  * is returned instead.
 */
-int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, bool *needs_free) {
+int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chunk, bool *needs_free) {
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (frame != NULL) {
     return frame_get_chunk(frame, nchunk, chunk, needs_free);
   }
 
   if (nchunk >= schunk->nchunks) {
-    BLOSC_TRACE_ERROR("nchunk ('%d') exceeds the number of chunks "
-                      "('%d') in schunk.", nchunk, schunk->nchunks);
+    BLOSC_TRACE_ERROR("nchunk ('%lld') exceeds the number of chunks "
+                      "('%lld') in schunk.", nchunk, schunk->nchunks);
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
@@ -1056,15 +1055,15 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, 
  * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
  * is returned instead.
 */
-int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk, bool *needs_free) {
+int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chunk, bool *needs_free) {
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (schunk->frame != NULL) {
     return frame_get_lazychunk(frame, nchunk, chunk, needs_free);
   }
 
   if (nchunk >= schunk->nchunks) {
-    BLOSC_TRACE_ERROR("nchunk ('%d') exceeds the number of chunks "
-                      "('%d') in schunk.", nchunk, schunk->nchunks);
+    BLOSC_TRACE_ERROR("nchunk ('%lld') exceeds the number of chunks "
+                      "('%lld') in schunk.", nchunk, schunk->nchunks);
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
@@ -1109,11 +1108,11 @@ int blosc2_meta_exists(blosc2_schunk *schunk, const char *name) {
 }
 
 /* Reorder the chunk offsets of an existing super-chunk. */
-int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order) {
+int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int64_t *offsets_order) {
   // Check that the offsets order are correct
   bool *index_check = (bool *) calloc(schunk->nchunks, sizeof(bool));
   for (int i = 0; i < schunk->nchunks; ++i) {
-    int index = offsets_order[i];
+    int64_t index = offsets_order[i];
     if (index >= schunk->nchunks) {
       BLOSC_TRACE_ERROR("Index is bigger than the number of chunks.");
       free(index_check);
@@ -1157,7 +1156,7 @@ int64_t blosc2_schunk_frame_len(blosc2_schunk* schunk) {
   }
   else {
     // No attached frame, but we can still come with an estimate
-    len = schunk->cbytes + schunk->nchunks * sizeof(int64_t);
+    len = (int64_t) (schunk->cbytes + schunk->nchunks * sizeof(int64_t));
   }
 
   return len;
@@ -1275,7 +1274,7 @@ int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
     BLOSC_TRACE_ERROR("Metalayer \"%s\" not found.", name);
     return nmetalayer;
   }
-  *content_len = (uint32_t)schunk->metalayers[nmetalayer]->content_len;
+  *content_len = schunk->metalayers[nmetalayer]->content_len;
   *content = malloc((size_t)*content_len);
   memcpy(*content, schunk->metalayers[nmetalayer]->content, (size_t)*content_len);
   return nmetalayer;

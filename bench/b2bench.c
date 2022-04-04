@@ -81,7 +81,7 @@ int get_value(int i, int rshift) {
 
 
 void init_buffer(void* src, size_t size, int rshift) {
-  unsigned int i;
+  int i;
   int* _src = (int*)src;
 
   /* To have reproducible results */
@@ -158,7 +158,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
   fprintf(ofile, "Blosc version: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
   fprintf(ofile, "Using synthetic data with %d significant bits (out of 32)\n", rshift);
   fprintf(ofile, "Dataset size: %d bytes\tType size: %d bytes\n", (int)size, elsize);
-  fprintf(ofile, "Working set: %.1f MB\t\t", (size * nchunks) / (float)MB);
+  fprintf(ofile, "Working set: %.1f MB\t\t", (float)(size * nchunks) / (float)MB);
   fprintf(ofile, "Number of threads: %d\n", nthreads);
   fprintf(ofile, "********************** Running benchmarks *********************\n");
 
@@ -171,7 +171,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
   blosc_set_timestamp(&current);
   tmemcpy = get_usec_chunk(last, current, niter, nchunks);
   fprintf(ofile, "memcpy(write):\t\t %6.1f us, %.1f MB/s\n",
-          tmemcpy, (size * 1e6) / (tmemcpy * MB));
+          tmemcpy, ((float)size * 1e6) / (tmemcpy * MB));
 
   blosc_set_timestamp(&last);
   for (i = 0; i < niter; i++) {
@@ -182,7 +182,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
   blosc_set_timestamp(&current);
   tmemcpy = get_usec_chunk(last, current, niter, nchunks);
   fprintf(ofile, "memcpy(read):\t\t %6.1f us, %.1f MB/s\n",
-          tmemcpy, (size * 1e6) / (tmemcpy * MB));
+          tmemcpy, ((float)size * 1e6) / (tmemcpy * MB));
 
   for (clevel = 0; clevel < 10; clevel++) {
 
@@ -198,10 +198,10 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
     blosc_set_timestamp(&current);
     tshuf = get_usec_chunk(last, current, niter_c, nchunks);
     fprintf(ofile, "comp(write):\t %6.1f us, %.1f MB/s\t  ",
-            tshuf, (size * 1e6) / (tshuf * MB));
+            tshuf, ((float)size * 1e6) / (tshuf * MB));
     fprintf(ofile, "Final bytes: %d  ", cbytes);
     if (cbytes > 0) {
-      fprintf(ofile, "Ratio: %3.2f", size / (float)cbytes);
+      fprintf(ofile, "Ratio: %3.2f", (float)size / (float)cbytes);
     }
     fprintf(ofile, "\n");
 
@@ -259,7 +259,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
 
   /* To compute the totalsize, we should take into account the 10
      compression levels */
-  totalsize += (size * nchunks * niter * 10.);
+  totalsize += ((double)size * nchunks * niter * 10.);
 
   aligned_free(src);
   free(srccpy);
@@ -318,7 +318,7 @@ int main(int argc, char* argv[]) {
   int size = 8 * MB;                    /* Buffer size */
   int elsize = 4;                       /* Datatype size */
   int rshift = 19;                      /* Significant bits */
-  unsigned int workingset = 256 * MB;            /* The maximum allocated memory */
+  int workingset = 256 * MB;            /* The maximum allocated memory */
   int nthreads_, size_, elsize_, rshift_, i;
   FILE* output_file = stdout;
   blosc_timestamp_t last, current;

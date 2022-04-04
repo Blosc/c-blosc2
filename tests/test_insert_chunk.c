@@ -87,7 +87,7 @@ static char* test_insert_chunk(void) {
     for (int64_t i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
-    int nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
+    int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append", nchunks_ > 0);
   }
 
@@ -112,8 +112,8 @@ static char* test_insert_chunk(void) {
     mu_assert("ERROR: chunk cannot be compressed", csize >= 0);
 
     // Insert in a random position
-    int pos = rand() % (schunk->nchunks + 1);
-    int _nchunks = blosc2_schunk_insert_chunk(schunk, pos, chunk, tdata.copy);
+    int64_t pos = rand() % (schunk->nchunks + 1);
+    int64_t _nchunks = blosc2_schunk_insert_chunk(schunk, pos, chunk, tdata.copy);
     mu_assert("ERROR: chunk cannot be inserted correctly", _nchunks > 0);
 
     // Check that the inserted chunk can be decompressed correctly
@@ -121,7 +121,6 @@ static char* test_insert_chunk(void) {
     mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
     for (int j = 0; j < CHUNKSIZE; j++) {
       int64_t a = data_dest[j];
-      int64_t b = a + 1;
       mu_assert("ERROR: bad roundtrip", a == i);
     }
     // Free allocated chunk

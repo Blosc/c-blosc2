@@ -12,7 +12,6 @@
 
 #include "test_common.h"
 #include "../blosc/shuffle.h"
-#include "../blosc/shuffle-generic.h"
 
 
 /** Perform a compress + decompress round trip. */
@@ -111,11 +110,11 @@ int main(int argc, char** argv) {
   /* Initialize blosc before running tests. */
   install_blosc_callback_test(); /* optionally install callback test */
   blosc_init();
-  blosc_set_nthreads(blosc_thread_count);
+  blosc_set_nthreads((int16_t)blosc_thread_count);
 
   /* Run the test. */
   int result = test_compress_roundtrip(type_size, num_elements, buffer_align_size,
-                                       compression_level, shuffle_enabled);
+                                       (int)compression_level, shuffle_enabled);
 
   /* Cleanup blosc resources. */
   blosc_destroy();

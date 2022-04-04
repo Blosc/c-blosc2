@@ -39,7 +39,7 @@
 
 static int test_ndcell(blosc2_schunk* schunk) {
 
-    int nchunks = schunk->nchunks;
+    int64_t nchunks = schunk->nchunks;
     int32_t chunksize = (int32_t) (schunk->chunksize);
     //   int isize = (int) array->extchunknitems * typesize;
     uint8_t *data_in = malloc(chunksize);
@@ -114,7 +114,7 @@ static int test_ndcell(blosc2_schunk* schunk) {
     blosc2_free_ctx(dctx);
 
     printf("Successful roundtrip!\n");
-    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
+    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / (double)csize_f);
     return (int) (chunksize - csize_f);
 }
 

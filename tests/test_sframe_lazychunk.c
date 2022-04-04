@@ -56,7 +56,7 @@ static char* test_lazy_chunk(void) {
         data[j + i * BLOCKSIZE] = j + i * BLOCKSIZE + nchunk * CHUNKSIZE;
       }
     }
-    int nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
+    int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append in frame", nchunks_ > 0);
   }
 

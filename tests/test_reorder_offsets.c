@@ -67,11 +67,11 @@ static char* test_reorder_offsets(void) {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
-    int nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
+    int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append in frame", nchunks_ > 0);
   }
 
-  int *offsets_order = malloc(sizeof(int) * tdata.nchunks);
+  int64_t *offsets_order = malloc(sizeof(int64_t) * tdata.nchunks);
   for (int i = 0; i < tdata.nchunks; ++i) {
     offsets_order[i] = (i + 3) % tdata.nchunks;
   }

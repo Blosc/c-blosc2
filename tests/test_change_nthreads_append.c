@@ -31,8 +31,8 @@ static char* all_tests(void) {
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
   int32_t i;
-  int32_t nchunk;
-  int32_t nchunks;
+  int64_t nchunk;
+  int64_t nchunks;
   blosc_timestamp_t last, current;
   double ttotal;
 
@@ -59,7 +59,7 @@ static char* all_tests(void) {
       data[i] = i * (int64_t)nchunk;
     }
     // Alternate between 1 and NTHREADS
-    cctx->new_nthreads = nchunk % NTHREADS + 1;
+    cctx->new_nthreads = (int16_t) (nchunk % NTHREADS + 1);
     nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: nchunk is not correct", nchunks == nchunk);
   }
@@ -69,23 +69,23 @@ static char* all_tests(void) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
-         (double)nbytes / MB, (double)cbytes / MB, (double)nbytes / cbytes);
+         (double)nbytes / MB, (double)cbytes / MB, (double)nbytes / (double)cbytes);
   printf("Compression time: %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+         ttotal, (double)nbytes / (ttotal * MB));
 
   /* Retrieve and decompress the chunks (0-based count) */
   struct blosc2_context_s * dctx = schunk->dctx;
   blosc_set_timestamp(&last);
   for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
     // Alternate between 1 and NTHREADS
-    dctx->new_nthreads = nchunk % NTHREADS + 1;
+    dctx->new_nthreads = (int16_t) (nchunk % NTHREADS + 1);
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, data_dest, isize);
   }
   mu_assert("ERROR: chunk decompression error", dsize > 0);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Decompression time: %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+         ttotal, (double)nbytes / (ttotal * MB));
 
   /* Check integrity of the first chunk */
   for (i = 0; i < CHUNKSIZE; i++) {

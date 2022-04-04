@@ -16,7 +16,6 @@
  */
 
 #include <stdio.h>
-#include <assert.h>
 #include <blosc2.h>
 
 #define KB  1024.

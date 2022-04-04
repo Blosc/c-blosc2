@@ -122,11 +122,11 @@ int main(int argc, char** argv) {
 
   /* Initialize blosc before running tests. */
   blosc_init();
-  blosc_set_nthreads(blosc_thread_count);
+  blosc_set_nthreads((int16_t)blosc_thread_count);
 
   /* Run the test. */
   int result = test_getitem(type_size, num_elements, buffer_align_size,
-                            compression_level, shuffle_enabled);
+                            (int16_t)compression_level, (int16_t)shuffle_enabled);
 
   /* Cleanup blosc resources. */
   blosc_destroy();

@@ -22,7 +22,7 @@
 
 static int test_zfp(blosc2_schunk* schunk) {
 
-    int nchunks = schunk->nchunks;
+    int64_t nchunks = schunk->nchunks;
     int32_t chunksize = (int32_t) (schunk->chunksize);
     uint8_t *data_in = malloc(chunksize);
     int decompressed;
@@ -95,7 +95,7 @@ static int test_zfp(blosc2_schunk* schunk) {
     blosc2_free_ctx(dctx);
 
     printf("Succesful roundtrip!\n");
-    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
+    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / (double)csize_f);
     return (int) (chunksize - csize_f);
 }
 

@@ -84,7 +84,7 @@ bitunshuffle1_neon(const uint8_t* const src, uint8_t* dest, const size_t nbyte) 
     printf("\n");
   }
 }
-main()
+void main()
 {
   const uint8_t *src = "\x4f\x19\xed\x95\x5e\x59\x35\xdc\x46\xdf\x6c\x05\xdb\x53\x36\xbd"
                        "\x4f\x19\xed\x95\x5e\x59\x35\xdc\x46\xdf\x6c\x05\xdb\x53\x36\xbd"

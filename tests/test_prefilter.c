@@ -8,7 +8,7 @@
 
 int tests_run = 0;
 
-#define SIZE 500 * 1000
+#define SIZE (500 * 1000)
 #define NTHREADS 2
 
 typedef struct {
@@ -70,14 +70,14 @@ static char *test_prefilter0(void) {
   cparams.preparams = &preparams;
   cctx = blosc2_create_cctx(cparams);
 
-  csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
+  csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
   mu_assert("Compression error", csize > 0);
 
   /* Create a context for decompression */
   dctx = blosc2_create_dctx(dparams);
 
   /* Decompress  */
-  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, (size_t)dsize);
+  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, dsize);
   mu_assert("Decompression error", dsize >= 0);
 
   for (int i = 0; i < SIZE; i++) {
@@ -105,14 +105,14 @@ static char *test_prefilter1(void) {
   cparams.preparams = &preparams;
   cctx = blosc2_create_cctx(cparams);
 
-  csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
+  csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
   mu_assert("Compression error", csize > 0);
 
   /* Create a context for decompression */
   dctx = blosc2_create_dctx(dparams);
 
   /* Decompress  */
-  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, (size_t)dsize);
+  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, dsize);
   mu_assert("Decompression error", dsize >= 0);
 
   for (int i = 0; i < SIZE; i++) {
@@ -142,7 +142,7 @@ static char *test_prefilter2(void) {
   cparams.preparams = &preparams;
   cctx = blosc2_create_cctx(cparams);
 
-  csize = blosc2_compress_ctx(cctx, data, isize, data_out, (size_t)osize);
+  csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
   mu_assert("Buffer is uncompressible", csize != 0);
   mu_assert("Compression error", csize > 0);
 
@@ -150,7 +150,7 @@ static char *test_prefilter2(void) {
   dctx = blosc2_create_dctx(dparams);
 
   /* Decompress  */
-  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, (size_t)dsize);
+  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, dsize);
   mu_assert("Decompression error", dsize >= 0);
 
   for (int i = 0; i < SIZE; i++) {

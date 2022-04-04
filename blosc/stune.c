@@ -23,9 +23,7 @@ static bool is_HCR(blosc2_context * context) {
     case BLOSC_LZ4 :
       return (context->filter_flags & BLOSC_DOBITSHUFFLE) ? true : false;
     case BLOSC_LZ4HC :
-      return true;
     case BLOSC_ZLIB :
-      return true;
     case BLOSC_ZSTD :
       return true;
     default :
@@ -34,6 +32,9 @@ static bool is_HCR(blosc2_context * context) {
 }
 
 void blosc_stune_init(void * config, blosc2_context* cctx, blosc2_context* dctx) {
+  BLOSC_UNUSED_PARAM(config);
+  BLOSC_UNUSED_PARAM(cctx);
+  BLOSC_UNUSED_PARAM(dctx);
 }
 
 // Set the automatic blocksize 0 to its real value
@@ -102,7 +103,7 @@ void blosc_stune_next_blocksize(blosc2_context *context) {
   }
 
   /* Now the blocksize for splittable codecs */
-  if (clevel > 0 && split_block(context, typesize, blocksize, true)) {
+  if (clevel > 0 && split_block(context, typesize, blocksize)) {
     // For performance reasons, do not exceed 256 KB (it must fit in L2 cache)
     switch (clevel) {
       case 1:

@@ -38,10 +38,10 @@ int main(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest1[CHUNKSIZE];
   static int32_t data_dest2[CHUNKSIZE];
-  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int64_t nbytes, cbytes;
   int i, nchunk;
-  int nchunks;
+  int64_t nchunks;
   blosc_timestamp_t last, current;
   double ttotal;
 
@@ -74,9 +74,9 @@ int main(void) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
-         nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
+         (double)nbytes / MB, (double)cbytes / MB, (1. * (double)nbytes) / (double)cbytes);
   printf("Time for append data to a schunk backed by an in-memory frame: %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+         ttotal, (double)nbytes / (ttotal * MB));
 
   /* Create a new super-chunk backed by an in-memory frame */
   storage = (blosc2_storage){.contiguous=true, .cparams=&cparams, .dparams=&dparams};
@@ -96,9 +96,9 @@ int main(void) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
-         nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
+         (double)nbytes / MB, (double)cbytes / MB, (1. * (double)nbytes) / (double)cbytes);
   printf("Time for append data to a schunk backed by a fileframe: %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+         ttotal, (double)nbytes / (ttotal * MB));
 
   /* Retrieve and decompress the chunks from the super-chunks and compare values */
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {

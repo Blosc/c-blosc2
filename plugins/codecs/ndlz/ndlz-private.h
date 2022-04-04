@@ -66,19 +66,20 @@ static void swap_store(void *dest, const void *pa, int size) {
     memcpy(dest, pa2_, size);
 }
 
-static int32_t deserialize_meta(uint8_t *smeta, uint32_t smeta_len, int8_t *ndim, int64_t *shape,
+static int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
                          int32_t *chunkshape, int32_t *blockshape) {
-    uint8_t *pmeta = smeta;
+  BLOSC_UNUSED_PARAM(smeta_len);
+  uint8_t *pmeta = smeta;
 
     // Check that we have an array with 5 entries (version, ndim, shape, chunkshape, blockshape)
     pmeta += 1;
 
     // version entry
-    int8_t version = pmeta[0];  // positive fixnum (7-bit positive integer)
+    int8_t version = (int8_t)pmeta[0];  // positive fixnum (7-bit positive integer)
     pmeta += 1;
 
     // ndim entry
-    *ndim = pmeta[0];
+    *ndim = (int8_t)pmeta[0];
     int8_t ndim_aux = *ndim;  // positive fixnum (7-bit positive integer)
     pmeta += 1;
 

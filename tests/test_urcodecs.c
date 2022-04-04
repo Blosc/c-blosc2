@@ -25,6 +25,7 @@ int codec_encoder(const uint8_t* input, int32_t input_len,
                   uint8_t* output, int32_t output_len,
                   uint8_t meta,
                   blosc2_cparams* cparams, const void* chunk) {
+  BLOSC_UNUSED_PARAM(chunk);
   if (cparams->schunk == NULL) {
     return -1;
   }
@@ -33,7 +34,7 @@ int codec_encoder(const uint8_t* input, int32_t input_len,
     return BLOSC2_ERROR_FAILURE;
   }
   uint8_t *content;
-  uint32_t content_len;
+  int32_t content_len;
   blosc2_vlmeta_get(cparams->schunk, "codec_arange", &content, &content_len);
   if (content[0] != 222) {
     return -1;
@@ -71,12 +72,13 @@ int codec_decoder(const uint8_t* input, int32_t input_len,
                   uint8_t* output, int32_t output_len,
                   uint8_t meta,
                   blosc2_dparams *dparams, const void* chunk) {
+  BLOSC_UNUSED_PARAM(chunk);
   if (dparams->schunk == NULL) {
     return -1;
   }
 
   uint8_t *content;
-  uint32_t content_len;
+  int32_t content_len;
   blosc2_vlmeta_get(dparams->schunk, "codec_arange", &content, &content_len);
   if (content[0] != 222) {
     return -1;
@@ -107,6 +109,8 @@ int codec_decoder_error(const uint8_t* input, int32_t input_len,
                         uint8_t* output, int32_t output_len,
                         uint8_t meta,
                         blosc2_dparams* dparams, const void* chunk) {
+  BLOSC_UNUSED_PARAM(dparams);
+  BLOSC_UNUSED_PARAM(chunk);
   if (meta != 111) {
     return -1;
   }
@@ -205,7 +209,7 @@ CUTEST_TEST_TEST(urcodecs) {
     for (i = 0; i < CHUNKSIZE; i++) {
       ((int32_t *) bdata)[i] = i * nchunk;
     }
-    int nchunks_ = blosc2_schunk_append_buffer(schunk, bdata, isize);
+    int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, bdata, isize);
     if (nchunks_ != nchunk + 1) {
       BLOSC_TRACE_ERROR("Unexpected nchunks!");
       return -1;

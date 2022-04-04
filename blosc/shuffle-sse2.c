@@ -204,7 +204,7 @@ static void
 shuffle16_tiled_sse2(uint8_t* const dest, const uint8_t* const src,
                      const int32_t vectorizable_elements, const int32_t total_elements, const int32_t bytesoftype) {
   int32_t j;
-  const int32_t vecs_per_el_rem = bytesoftype % sizeof(__m128i);
+  const int32_t vecs_per_el_rem = bytesoftype % (int32_t)sizeof(__m128i);
   int k, l;
   uint8_t* dest_for_jth_element;
   __m128i xmm0[16], xmm1[16];
@@ -435,7 +435,7 @@ static void
 unshuffle16_tiled_sse2(uint8_t* const dest, const uint8_t* const orig,
                        const int32_t vectorizable_elements, const int32_t total_elements, const int32_t bytesoftype) {
   int32_t i;
-  const int32_t vecs_per_el_rem = bytesoftype % sizeof(__m128i);
+  const int32_t vecs_per_el_rem = bytesoftype % (int32_t)sizeof(__m128i);
 
   int j;
   uint8_t* dest_with_offset;
@@ -508,7 +508,7 @@ unshuffle16_tiled_sse2(uint8_t* const dest, const uint8_t* const orig,
 void
 shuffle_sse2(const int32_t bytesoftype, const int32_t blocksize,
              const uint8_t *_src, uint8_t *_dest) {
-  const int32_t vectorized_chunk_size = bytesoftype * sizeof(__m128i);
+  const int32_t vectorized_chunk_size = bytesoftype * (int32_t)sizeof(__m128i);
   /* If the blocksize is not a multiple of both the typesize and
      the vector size, round the blocksize down to the next value
      which is a multiple of both. The vectorized shuffle can be
@@ -564,7 +564,7 @@ shuffle_sse2(const int32_t bytesoftype, const int32_t blocksize,
 void
 unshuffle_sse2(const int32_t bytesoftype, const int32_t blocksize,
                const uint8_t *_src, uint8_t *_dest) {
-  const int32_t vectorized_chunk_size = bytesoftype * sizeof(__m128i);
+  const int32_t vectorized_chunk_size = bytesoftype * (int32_t)sizeof(__m128i);
   /* If the blocksize is not a multiple of both the typesize and
      the vector size, round the blocksize down to the next value
      which is a multiple of both. The vectorized unshuffle can be

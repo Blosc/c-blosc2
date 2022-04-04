@@ -59,7 +59,7 @@ int create_cframe(const char* compname) {
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int64_t nbytes, cbytes;
   int i, nchunk;
-  int nchunks;
+  int64_t nchunks;
   blosc_timestamp_t last, current;
   double ttotal;
   int compcode = blosc_compname_to_compcode(compname);
@@ -86,13 +86,13 @@ int create_cframe(const char* compname) {
     for (i = 0; i < CHUNKSIZE; i++) {
       data[i] = i * nchunk;
     }
-    nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
+    nchunks = blosc2_schunk_append_buffer(schunk, data, (int32_t)isize);
     assert(nchunks == nchunk + 1);
   }
   blosc_set_timestamp(&current);
 
   // Add some vlmetalayers data
-  uint32_t content_len = 10;
+  int32_t content_len = 10;
   uint8_t *content = malloc(content_len);
   for (uint32_t j = 0; j < content_len; ++j) {
     content[j] = (uint8_t) j;
@@ -109,21 +109,21 @@ int create_cframe(const char* compname) {
   cbytes = schunk->cbytes;
   ttotal = blosc_elapsed_secs(last, current);
   printf("Compression ratio: %.1f KB -> %.1f KB (%.1fx)\n",
-         nbytes / KB, cbytes / KB, (1. * nbytes) / cbytes);
+         (double)nbytes / KB, (double)cbytes / KB, (1. * (double)nbytes) / (double)cbytes);
   printf("Compression time: %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+         ttotal, (double)nbytes / (ttotal * MB));
 
   // Re-open the file and see if it is in a sane state
   blosc2_schunk* schunk2 = blosc2_schunk_open(filename);
 
   /* Retrieve and decompress the chunks from the super-chunks and compare values */
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    int32_t dsize = blosc2_schunk_decompress_chunk(schunk2, nchunk, data_dest, isize);
+    int32_t dsize = blosc2_schunk_decompress_chunk(schunk2, nchunk, data_dest, (int32_t)isize);
     if (dsize < 0) {
       printf("Decompression error in schunk2.  Error code: %d\n", dsize);
       return dsize;
     }
-    dsize = blosc2_schunk_decompress_chunk(schunk2, nchunk, data_dest2, isize);
+    dsize = blosc2_schunk_decompress_chunk(schunk2, nchunk, data_dest2, (int32_t)isize);
     if (dsize < 0) {
       printf("Decompression error in schunk2.  Error code: %d\n", dsize);
       return dsize;

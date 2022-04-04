@@ -200,7 +200,7 @@ int64_t bshuf_trans_byte_bitrow_avx2(void* in, void* out, const size_t size,
       out_b[jj * nrows + ii] = in_b[ii * nbyte_row + jj];
     }
   }
-  return size * elem_size;
+  return (int64_t)size * (int64_t)elem_size;
 }
 
 
@@ -237,7 +237,7 @@ int64_t bshuf_shuffle_bit_eightelem_avx2(void* in, void* out, const size_t size,
       }
     }
   }
-  return size * elem_size;
+  return (int64_t)size * (int64_t)elem_size;
 }
 
 

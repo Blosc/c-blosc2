@@ -111,8 +111,8 @@ int compute_vectors(void) {
   printf("Creation time for X values: %.3g s, %.1f MB/s\n",
          ttotal, (double) nbytes / (ttotal * MB));
   printf("Compression for X values: %.1f MB -> %.1f MB (%.1fx)\n",
-         sc_x->nbytes / MB, sc_x->cbytes / MB,
-         (1. * sc_x->nbytes) / sc_x->cbytes);
+         (double)sc_x->nbytes / MB, (double)sc_x->cbytes / MB,
+         (1. * (double)sc_x->nbytes) / (double)sc_x->cbytes);
 
   /* Retrieve the chunks and compute the polynomial in another super-chunk */
   blosc_set_timestamp(&last);
@@ -130,8 +130,8 @@ int compute_vectors(void) {
   printf("Computing Y polynomial: %.3g s, %.1f MB/s\n",
          ttotal, 2. * (double) nbytes / (ttotal * MB));    // 2 super-chunks involved
   printf("Compression for Y values: %.1f MB -> %.1f MB (%.1fx)\n",
-         sc_y->nbytes / MB, sc_y->cbytes / MB,
-         (1. * sc_y->nbytes) / sc_y->cbytes);
+         (double)sc_y->nbytes / MB, (double)sc_y->cbytes / MB,
+         (1. * (double)sc_y->nbytes) / (double)sc_y->cbytes);
 
   /* Find the roots of the polynomial */
   printf("Roots found at: ");

@@ -105,10 +105,10 @@ int create_cframe(const char* compname, bool contiguous) {
 #else
   int special_value = BLOSC2_SPECIAL_UNINIT;
 #endif
-  int rc = blosc2_schunk_fill_special(schunk, nitems, special_value, isize);
+  int64_t rc = blosc2_schunk_fill_special(schunk, nitems, special_value, isize);
   if (rc < 0) {
-    printf("Error in fill special.  Error code: %d\n", rc);
-    return rc;
+    printf("Error in fill special.  Error code: %lld\n", rc);
+    return (int)rc;
   }
 #else
   // In these methods, nitems can only be an actual multiple of CHUNKSHAPE

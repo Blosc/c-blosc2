@@ -35,7 +35,7 @@ printf("%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,"
           buf[7], buf[6], buf[5], buf[4],
           buf[3], buf[2], buf[1], buf[0]);
 }
-unshuffle16_neon(uint8_t* const dest, const uint8_t* const src,
+void unshuffle16_neon(uint8_t* const dest, const uint8_t* const src,
                  const size_t vectorizable_elements, const size_t total_elements)
 {
   size_t i, j, k, l;
@@ -124,7 +124,7 @@ unshuffle16_neon(uint8_t* const dest, const uint8_t* const src,
   }
 }
 
-main()
+void main()
 {
   uint8_t *src = "\xcb\x45\x56\x73\xbc\x44\x53\x88\xcb\x45\x56\x73\xbc\x44\x53\x88\x0\x0"
                  "\xff\x3e\x93\x4c\x2d\x3a\xa7\x4f\xff\x3e\x93\x4c\x2d\x3a\xa7\x4f\x0\x0"

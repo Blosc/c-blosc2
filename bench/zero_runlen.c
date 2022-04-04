@@ -39,7 +39,8 @@ int check_special_values(int svalue) {
   int32_t osize = CHUNKSIZE * sizeof(int32_t) + BLOSC_MAX_OVERHEAD;
   int dsize, csize;
   int64_t nbytes, frame_len;
-  int nchunk, nchunks = 0;
+  int nchunk;
+  int64_t nchunks = 0;
   int rc;
   int32_t value = REPEATED_VALUE;
   float fvalue;
@@ -96,7 +97,7 @@ int check_special_values(int svalue) {
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     nchunks = blosc2_schunk_append_chunk(schunk, chunk, true);
     if (nchunks < 0) {
-      printf("Error appending chunk: %d\n", nchunks);
+      printf("Error appending chunk: %lld\n", nchunks);
       exit(1);
     }
   }
@@ -111,7 +112,7 @@ int check_special_values(int svalue) {
   nbytes = schunk->nbytes;
   frame_len = blosc2_schunk_frame_len(schunk);
   printf("Compression super-chunk: %ld -> %ld (%.1fx)\n",
-         (long)nbytes, (long)frame_len, (1. * nbytes) / frame_len);
+         (long)nbytes, (long)frame_len, (1. * (double)nbytes) / (double)frame_len);
 
   /* Retrieve and decompress the chunks */
   blosc_set_timestamp(&last);
@@ -125,7 +126,7 @@ int check_special_values(int svalue) {
   }
   blosc_set_timestamp(&current);
   totaltime = blosc_elapsed_secs(last, current);
-  totalsize = (double)(isize) * nchunks;
+  totalsize = (double)(isize) * (double)nchunks;
   printf("[Decompr] Elapsed time:\t %6.3f s."
          "  Processed data: %.3f GB (%.3f GB/s)\n",
          totaltime, totalsize / GB, totalsize / (GB * totaltime));

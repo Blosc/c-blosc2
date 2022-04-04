@@ -138,20 +138,20 @@ get_new_storage(const blosc2_storage *storage, const blosc2_cparams *cdefaults, 
                 const blosc2_io *iodefaults);
 
 void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schunk);
-void* frame_insert_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_schunk* schunk);
-void* frame_update_chunk(blosc2_frame_s* frame, int nchunk, void* chunk, blosc2_schunk* schunk);
-void* frame_delete_chunk(blosc2_frame_s* frame, int nchunk, blosc2_schunk* schunk);
-int frame_reorder_offsets(blosc2_frame_s *frame, const int *offsets_order, blosc2_schunk* schunk);
+void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk);
+void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk);
+void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* schunk);
+int frame_reorder_offsets(blosc2_frame_s *frame, const int64_t *offsets_order, blosc2_schunk* schunk);
 
-int frame_get_chunk(blosc2_frame_s* frame, int nchunk, uint8_t **chunk, bool *needs_free);
-int frame_get_lazychunk(blosc2_frame_s* frame, int nchunk, uint8_t **chunk, bool *needs_free);
-int frame_decompress_chunk(blosc2_context* dctx, blosc2_frame_s* frame, int nchunk,
+int frame_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
+int frame_get_lazychunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
+int frame_decompress_chunk(blosc2_context* dctx, blosc2_frame_s* frame, int64_t nchunk,
                            void *dest, int32_t nbytes);
 
 int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new);
 int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk);
 
-int frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
+int64_t frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
                        int32_t chunksize, blosc2_schunk* schunk);
 
 #endif //BLOSC_FRAME_H

@@ -8,7 +8,6 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <assert.h>
 #include <math.h>
 
 #include "blosc2.h"
@@ -76,7 +75,8 @@ CUTEST_TEST_TEST(zero_runlen) {
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int32_t osize = CHUNKSIZE * sizeof(int32_t) + BLOSC_MAX_OVERHEAD;
   int dsize, csize;
-  int nchunk, nchunks;
+  int nchunk;
+  int64_t nchunks;
   int rc;
   int32_t value = REPEATED_VALUE;
   float fvalue;

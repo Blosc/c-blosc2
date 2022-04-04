@@ -56,7 +56,7 @@ void* sframe_open_chunk(const char* urlpath, int64_t nchunk, const char* mode, c
 }
 
 /* Append an existing chunk into a sparse frame. */
-void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int32_t nchunk, int64_t cbytes) {
+void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int64_t nchunk, int64_t cbytes) {
   void* fpc = sframe_open_chunk(frame->urlpath, nchunk, "wb", frame->schunk->storage->io);
   if (fpc == NULL) {
     BLOSC_TRACE_ERROR("Cannot open the chunkfile.");
@@ -78,7 +78,7 @@ void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int32_t nchunk,
 }
 
 /* Append an existing chunk into a sparse frame. */
-int sframe_delete_chunk(const char *urlpath, int32_t nchunk) {
+int sframe_delete_chunk(const char *urlpath, int64_t nchunk) {
   char* chunk_path = malloc(strlen(urlpath) + 1 + 8 + strlen(".chunk") + 1);
   if (chunk_path) {
     sprintf(chunk_path, "%s/%08X.chunk", urlpath, (unsigned int)nchunk);
@@ -90,7 +90,7 @@ int sframe_delete_chunk(const char *urlpath, int32_t nchunk) {
 }
 
 /* Get chunk from sparse frame. */
-int sframe_get_chunk(blosc2_frame_s* frame, int32_t nchunk, uint8_t** chunk, bool* needs_free){
+int32_t sframe_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t** chunk, bool* needs_free){
   void *fpc = sframe_open_chunk(frame->urlpath, nchunk, "rb", frame->schunk->storage->io);
   if(fpc == NULL){
     BLOSC_TRACE_ERROR("Cannot open the chunkfile.");
@@ -108,7 +108,7 @@ int sframe_get_chunk(blosc2_frame_s* frame, int32_t nchunk, uint8_t** chunk, boo
   *chunk = malloc((size_t)chunk_cbytes);
 
   io_cb->seek(fpc, 0L, SEEK_SET);
-  int64_t rbytes = io_cb->read(*chunk, 1, (size_t)chunk_cbytes, fpc);
+  int64_t rbytes = io_cb->read(*chunk, 1, chunk_cbytes, fpc);
   io_cb->close(fpc);
   if (rbytes != (size_t)chunk_cbytes) {
     BLOSC_TRACE_ERROR("Cannot read the chunk out of the chunkfile.");
@@ -116,5 +116,5 @@ int sframe_get_chunk(blosc2_frame_s* frame, int32_t nchunk, uint8_t** chunk, boo
   }
   *needs_free = true;
 
-  return chunk_cbytes;
+  return (int32_t)chunk_cbytes;
 }

@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include "test_common.h"
 
-#define SIZE 500 * 1000
+#define SIZE (500 * 1000)
 #define NTHREADS 2
 
 
@@ -109,7 +109,7 @@ int main(void) {
   }
 
   /* Decompress  */
-  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, (size_t)dsize);
+  dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, dsize);
   blosc2_free_ctx(dctx);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);

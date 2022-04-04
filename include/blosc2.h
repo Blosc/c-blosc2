@@ -818,7 +818,7 @@ typedef int     (*blosc2_close_cb)(void *stream);
 typedef int64_t (*blosc2_tell_cb)(void *stream);
 typedef int     (*blosc2_seek_cb)(void *stream, int64_t offset, int whence);
 typedef int64_t (*blosc2_write_cb)(const void *ptr, int64_t size, int64_t nitems, void *stream);
-typedef int64_t (*blosc2_read_cb)(void *ptr, int64_t size, int64_t nitems, void *stream);
+typedef int64_t (*blosc2_read_cb)(void *ptr, size_t size, size_t nitems, void *stream);
 typedef int     (*blosc2_truncate_cb)(void *stream, int64_t size);
 
 
@@ -916,7 +916,7 @@ typedef struct {
   int32_t out_size;  // the output size (in bytes)
   int32_t out_typesize;  // the output typesize
   int32_t out_offset; // offset to reach the start of the output buffer
-  int32_t nchunk;  // the current nchunk in associated schunk (if exists; if not -1)
+  int64_t nchunk;  // the current nchunk in associated schunk (if exists; if not -1)
   int32_t nblock;  // the current nblock in associated chunk
   int32_t tid;  // thread id
   uint8_t *ttmp;  // a temporary that is able to hold several blocks for the output and is private for each thread
@@ -935,7 +935,7 @@ typedef struct {
   int32_t size;  // the input size (in bytes)
   int32_t typesize;  // the input typesize
   int32_t offset;  // offset to reach the start of the input buffer
-  int32_t nchunk;  // the current nchunk in associated schunk (if exists; if not -1)
+  int64_t nchunk;  // the current nchunk in associated schunk (if exists; if not -1)
   int32_t nblock;  // the current nblock in associated chunk
   int32_t tid;  // thread id
   uint8_t *ttmp;  // a temporary that is able to hold several blocks for the output and is private for each thread
@@ -1296,8 +1296,8 @@ BLOSC_EXPORT int blosc2_decompress_ctx(blosc2_context* context, const void* src,
  * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH).
  * If negative, there has been an error and @dest is unusable.
  * */
-BLOSC_EXPORT int blosc2_chunk_zeros(blosc2_cparams cparams, size_t nbytes,
-                                    void* dest, size_t destsize);
+BLOSC_EXPORT int blosc2_chunk_zeros(blosc2_cparams cparams, int32_t nbytes,
+                                    void* dest, int32_t destsize);
 
 
 /**
@@ -1315,8 +1315,8 @@ BLOSC_EXPORT int blosc2_chunk_zeros(blosc2_cparams cparams, size_t nbytes,
  * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH).
  * If negative, there has been an error and @dest is unusable.
  * */
-BLOSC_EXPORT int blosc2_chunk_nans(blosc2_cparams cparams, size_t nbytes,
-                                   void* dest, size_t destsize);
+BLOSC_EXPORT int blosc2_chunk_nans(blosc2_cparams cparams, int32_t nbytes,
+                                   void* dest, int32_t destsize);
 
 
 /**
@@ -1332,8 +1332,8 @@ BLOSC_EXPORT int blosc2_chunk_nans(blosc2_cparams cparams, size_t nbytes,
  * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH + typesize).
  * If negative, there has been an error and @dest is unusable.
  * */
-BLOSC_EXPORT int blosc2_chunk_repeatval(blosc2_cparams cparams, size_t nbytes,
-                                        void* dest, size_t destsize, void* repeatval);
+BLOSC_EXPORT int blosc2_chunk_repeatval(blosc2_cparams cparams, int32_t nbytes,
+                                        void* dest, int32_t destsize, void* repeatval);
 
 
 /**
@@ -1348,8 +1348,8 @@ BLOSC_EXPORT int blosc2_chunk_repeatval(blosc2_cparams cparams, size_t nbytes,
  * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH).
  * If negative, there has been an error and @dest is unusable.
  * */
-BLOSC_EXPORT int blosc2_chunk_uninit(blosc2_cparams cparams, size_t nbytes,
-                                     void* dest, size_t destsize);
+BLOSC_EXPORT int blosc2_chunk_uninit(blosc2_cparams cparams, int32_t nbytes,
+                                     void* dest, int32_t destsize);
 
 
 /**
@@ -1446,9 +1446,9 @@ typedef struct blosc2_schunk {
   //!< The (sequence of) filters.  8-bit per filter.
   uint8_t filters_meta[BLOSC2_MAX_FILTERS];
   //!< Metadata for filters. 8-bit per meta-slot.
-  int32_t nchunks;
+  int64_t nchunks;
   //!< Number of chunks in super-chunk.
-  int32_t current_nchunk;
+  int64_t current_nchunk;
   //!< The current chunk that is being accessed
   int64_t nbytes;
   //!< The data size + metadata size + header size (uncompressed).
@@ -1597,7 +1597,7 @@ BLOSC_EXPORT int blosc2_schunk_free(blosc2_schunk *schunk);
  * @return The number of chunks in super-chunk. If some problem is
  * detected, this number will be negative.
  */
-BLOSC_EXPORT int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy);
+BLOSC_EXPORT int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy);
 
 /**
   * @brief Update a chunk at a specific position in a super-chunk.
@@ -1611,7 +1611,7 @@ BLOSC_EXPORT int blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chun
   * @return The number of chunks in super-chunk. If some problem is
   * detected, this number will be negative.
   */
-BLOSC_EXPORT int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy);
+BLOSC_EXPORT int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk, bool copy);
 
 /**
  * @brief Insert a chunk at a specific position in a super-chunk.
@@ -1625,7 +1625,7 @@ BLOSC_EXPORT int blosc2_schunk_update_chunk(blosc2_schunk *schunk, int nchunk, u
  * @return The number of chunks in super-chunk. If some problem is
  * detected, this number will be negative.
  */
-BLOSC_EXPORT int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, uint8_t *chunk, bool copy);
+BLOSC_EXPORT int64_t blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk, bool copy);
 
 /**
  * @brief Delete a chunk at a specific position in a super-chunk.
@@ -1636,7 +1636,7 @@ BLOSC_EXPORT int blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int nchunk, u
  * @return The number of chunks in super-chunk. If some problem is
  * detected, this number will be negative.
  */
-BLOSC_EXPORT int blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int nchunk);
+BLOSC_EXPORT int64_t blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int64_t nchunk);
 
 /**
  * @brief Append a @p src data buffer to a super-chunk.
@@ -1648,7 +1648,7 @@ BLOSC_EXPORT int blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int nchunk);
  * @return The number of chunks in super-chunk. If some problem is
  * detected, this number will be negative.
  */
-BLOSC_EXPORT int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes);
+BLOSC_EXPORT int64_t blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes);
 
 /**
  * @brief Decompress and return the @p nchunk chunk of a super-chunk.
@@ -1667,7 +1667,7 @@ BLOSC_EXPORT int blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, i
  * @return The size of the decompressed chunk or 0 if it is non-initialized. If some problem is
  * detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchunk, void *dest, int32_t nbytes);
+BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int64_t nchunk, void *dest, int32_t nbytes);
 
 /**
  * @brief Return a compressed chunk that is part of a super-chunk in the @p chunk parameter.
@@ -1687,7 +1687,7 @@ BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int nchun
  * @return The size of the (compressed) chunk or 0 if it is non-initialized. If some problem is
  * detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk,
+BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chunk,
                                          bool *needs_free);
 
 /**
@@ -1714,7 +1714,7 @@ BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int nchunk, uint
  * detected, a negative code is returned instead.  Note that a lazy chunk is somewhat larger than
  * a regular chunk because of the trailer section (for details see `README_CHUNK_FORMAT.rst`).
  */
-BLOSC_EXPORT int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int nchunk, uint8_t **chunk,
+BLOSC_EXPORT int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chunk,
                                              bool *needs_free);
 
 /**
@@ -1749,7 +1749,7 @@ BLOSC_EXPORT int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams
  *
  * @return 0 if succeeds. Else a negative code is returned.
  */
-BLOSC_EXPORT int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int *offsets_order);
+BLOSC_EXPORT int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int64_t *offsets_order);
 
 /**
  * @brief Get the length (in bytes) of the internal frame of the super-chunk.
@@ -1773,7 +1773,7 @@ BLOSC_EXPORT int64_t blosc2_schunk_frame_len(blosc2_schunk* schunk);
  * @return The total number of chunks that have been added to the super-chunk.
  * If there is an error, a negative value is returned.
  */
-BLOSC_EXPORT int blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems,
+BLOSC_EXPORT int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems,
                                             int special_value, int32_t chunksize);
 
 

@@ -571,5 +571,5 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
     return 0;
   }
 
-  return ind;
+  return (int)ind;
 }
