@@ -30,7 +30,7 @@ if(NOT DEACTIVATE_ZSTD)
     if(ZSTD_FOUND)
         set(BLOSC_INCLUDE_DIRS ${BLOSC_INCLUDE_DIRS} ${ZSTD_INCLUDE_DIR})
     else()
-        set(ZSTD_LOCAL_DIR ${INTERNAL_LIBS}/zstd-1.5.0)
+        set(ZSTD_LOCAL_DIR ${INTERNAL_LIBS}/zstd-1.5.2)
         set(BLOSC_INCLUDE_DIRS ${BLOSC_INCLUDE_DIRS} ${ZSTD_LOCAL_DIR}
                 ${ZSTD_LOCAL_DIR}/common)
     endif()
@@ -111,9 +111,17 @@ if(NOT DEACTIVATE_ZSTD)
     if(ZSTD_FOUND)
         set(LIBS ${LIBS} ${ZSTD_LIBRARY})
     else()
+        if(MSVC)
+            add_compile_definitions("ZSTD_DISABLE_ASM")
+            file(GLOB ZSTD_DECOMPRESS_FILES
+                    ${ZSTD_LOCAL_DIR}/decompress/*.c)
+        else()
+            file(GLOB ZSTD_DECOMPRESS_FILES
+                    ${ZSTD_LOCAL_DIR}/decompress/*.c
+                    ${ZSTD_LOCAL_DIR}/decompress/*.S)
+        endif()
         file(GLOB ZSTD_COMMON_FILES ${ZSTD_LOCAL_DIR}/common/*.c)
         file(GLOB ZSTD_COMPRESS_FILES ${ZSTD_LOCAL_DIR}/compress/*.c)
-        file(GLOB ZSTD_DECOMPRESS_FILES ${ZSTD_LOCAL_DIR}/decompress/*.c)
         file(GLOB ZSTD_DICT_FILES ${ZSTD_LOCAL_DIR}/dictBuilder/*.c)
         set(ZSTD_FILES ${ZSTD_COMMON_FILES} ${ZSTD_COMPRESS_FILES}
             ${ZSTD_DECOMPRESS_FILES} ${ZSTD_DICT_FILES})
