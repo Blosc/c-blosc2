@@ -30,6 +30,8 @@ int codec_encoder(const uint8_t* input, int32_t input_len,
                   uint8_t* output, int32_t output_len,
                   uint8_t meta,
                   blosc2_cparams* cparams, const void* chunk) {
+  BLOSC_UNUSED_PARAM(meta);
+  BLOSC_UNUSED_PARAM(chunk);
   if (cparams->schunk == NULL) {
     return -1;
   }
@@ -65,6 +67,8 @@ int codec_decoder(const uint8_t* input, int32_t input_len,
                   uint8_t* output, int32_t output_len,
                   uint8_t meta,
                   blosc2_dparams *dparams, const void* chunk) {
+  BLOSC_UNUSED_PARAM(meta);
+  BLOSC_UNUSED_PARAM(chunk);
   if (dparams->schunk == NULL) {
     return -1;
   }
@@ -128,7 +132,7 @@ int main(void) {
     for (i = 0; i < CHUNKSIZE; i++) {
       data[i] = i * nchunk;
     }
-    int nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
+    int64_t nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     if (nchunks != nchunk + 1) {
       printf("Unexpected nchunks!");
       return -1;
@@ -140,9 +144,9 @@ int main(void) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
-         nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
+         (double)nbytes / MB, (double)cbytes / MB, (1. * (double)nbytes) / (double)cbytes);
   printf("Compression time: %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+         ttotal, (double)nbytes / (ttotal * MB));
 
   /* Retrieve and decompress the chunks (0-based count) */
   blosc_set_timestamp(&last);
@@ -156,7 +160,7 @@ int main(void) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Decompression time: %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+         ttotal, (double)nbytes / (ttotal * MB));
 
   /* Check integrity of the second chunk (made of non-zeros) */
   blosc2_schunk_decompress_chunk(schunk, 1, data_dest, isize);

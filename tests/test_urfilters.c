@@ -35,7 +35,7 @@ int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta
         ((int32_t *) dest)[i] = ((int32_t *) src)[i] + 1;
         break;
       case 2:
-        ((int16_t *) dest)[i] = ((int16_t *) src)[i] + 1;
+        ((int16_t *) dest)[i] = (int16_t) (((int16_t *) src)[i] + 1);
         break;
       default:
         BLOSC_TRACE_ERROR("Item size %d not supported", schunk->typesize);
@@ -60,7 +60,7 @@ int filter_backward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t met
         ((int32_t *) dest)[i] = ((int32_t *) src)[i] - 1;
         break;
       case 2:
-        ((int16_t *) dest)[i] = ((int16_t *) src)[i] - 1;
+        ((int16_t *) dest)[i] = (int16_t)(((int16_t *) src)[i] - 1);
         break;
       default:
         BLOSC_TRACE_ERROR("Item size %d not supported", schunk->typesize);
@@ -86,7 +86,7 @@ int filter_backward_error(const uint8_t* src, uint8_t* dest, int32_t size, uint8
         ((int32_t *) dest)[i] = ((int32_t *) src)[i] + 31;
         break;
       case 2:
-        ((int16_t *) dest)[i] = ((int16_t *) src)[i] - 13;
+        ((int16_t *) dest)[i] = (int16_t)(((int16_t *) src)[i] - 13);
         break;
       default:
         BLOSC_TRACE_ERROR("Item size %d not supported", schunk->typesize);
@@ -176,14 +176,14 @@ CUTEST_TEST_TEST(urfilters) {
           ((int32_t *) bdata)[i] = i * nchunk;
           break;
         case 2:
-          ((int16_t *) bdata)[i] = i * nchunk;
+          ((int16_t *) bdata)[i] = (int16_t)(i * nchunk);
           break;
         default:
           BLOSC_TRACE_ERROR("Itemsize %d not supported\n", itemsize);
           return -1;
       }
     }
-    int nchunks_ = blosc2_schunk_append_buffer(schunk, bdata, isize);
+    int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, bdata, isize);
     if (nchunks_ != nchunk + 1) {
       BLOSC_TRACE_ERROR("Unexpected nchunks!");
       return -1;

@@ -42,7 +42,7 @@ printf("%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,"
           buf[3], buf[2], buf[1], buf[0]);
 }
 /* Routine optimized for shuffling a buffer for a type size of 16 bytes. */
-shuffle16_neon(uint8_t* const dest, const uint8_t* const src,
+void shuffle16_neon(uint8_t* const dest, const uint8_t* const src,
                const size_t vectorizable_elements, const size_t total_elements)
 {
   size_t i, j, k, l;
@@ -121,7 +121,7 @@ shuffle16_neon(uint8_t* const dest, const uint8_t* const src,
   }
 }
 
-main()
+void main()
 {
   uint8_t *src = "\xcb\xff\xf1\x79\x24\x7c\xb1\x58\x69\xd2\xee\xdd\x99\x9a\x7a\x86"
                  "\x45\x3e\x5f\xdf\xa2\x43\x41\x25\x77\xae\xfd\x22\x19\x1a\x38\x2b"

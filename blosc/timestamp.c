@@ -49,8 +49,8 @@ void blosc_set_timestamp(blosc_timestamp_t* timestamp) {
 /* Given two timestamp values, return the difference in nanoseconds. */
 double blosc_elapsed_nsecs(blosc_timestamp_t start_time,
                            blosc_timestamp_t end_time) {
-  return (1e9 * (end_time.tv_sec - start_time.tv_sec)) +
-          (end_time.tv_nsec - start_time.tv_nsec);
+  return (1e9 * (double)(end_time.tv_sec - start_time.tv_sec)) +
+          (double)(end_time.tv_nsec - start_time.tv_nsec);
 }
 
 #endif

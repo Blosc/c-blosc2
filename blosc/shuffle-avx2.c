@@ -632,7 +632,7 @@ unshuffle16_tiled_avx2(const uint8_t *dest, const uint8_t* const src,
 void
 shuffle_avx2(const int32_t bytesoftype, const int32_t blocksize,
              const uint8_t *_src, uint8_t *_dest) {
-  const int32_t vectorized_chunk_size = bytesoftype * sizeof(__m256i);
+  const int32_t vectorized_chunk_size = bytesoftype * (int32_t)sizeof(__m256i);
 
   /* If the block size is too small to be vectorized,
      use the generic implementation. */
@@ -691,7 +691,7 @@ shuffle_avx2(const int32_t bytesoftype, const int32_t blocksize,
 void
 unshuffle_avx2(const int32_t bytesoftype, const int32_t blocksize,
                const uint8_t *_src, uint8_t *_dest) {
-  const int32_t vectorized_chunk_size = bytesoftype * sizeof(__m256i);
+  const int32_t vectorized_chunk_size = bytesoftype * (int32_t)sizeof(__m256i);
 
   /* If the block size is too small to be vectorized,
      use the generic implementation. */

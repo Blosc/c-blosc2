@@ -138,7 +138,7 @@ CUTEST_TEST_TEST(udio) {
   blosc2_schunk *schunk = blosc2_schunk_new(&storage);
 
   for (int i = 0; i < NCHUNKS; ++i) {
-    int32_t cbytes = blosc2_schunk_append_buffer(schunk, data_buffer, nbytes);
+    int64_t cbytes = blosc2_schunk_append_buffer(schunk, data_buffer, nbytes);
     CUTEST_ASSERT("Error during compression", cbytes >= 0);
   }
 

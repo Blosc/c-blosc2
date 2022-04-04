@@ -88,7 +88,7 @@ int main(void) {
 
   printf("Decompression successful!\n");
 
-  blosc2_instr *datai = data_dest;
+  blosc2_instr *datai = (blosc2_instr *)data_dest;
   for (i = 0; i < dsize / sizeof(blosc2_instr); i++) {
     printf("%.3g - ", datai->cratio);
     printf("%.3g - ", datai->cspeed);

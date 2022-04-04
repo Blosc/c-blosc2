@@ -206,7 +206,7 @@ int64_t bshuf_copy(void* in, void* out, const size_t size,
   char* out_b = (char*)out;
 
   memcpy(out_b, in_b, size * elem_size);
-  return size * elem_size;
+  return (int64_t)size * (int64_t)elem_size;
 }
 
 
@@ -419,7 +419,7 @@ int64_t bshuf_trans_byte_bitrow_sse2(void* in, void* out, const size_t size,
       out_b[jj * nrows + ii + 7] = in_b[(ii + 7) * nbyte_row + jj];
     }
   }
-  return size * elem_size;
+  return (int64_t)size * (int64_t)elem_size;
 }
 
 
@@ -456,7 +456,7 @@ int64_t bshuf_shuffle_bit_eightelem_sse2(void* in, void* out, const size_t size,
       }
     }
   }
-  return size * elem_size;
+  return (int64_t)size * (int64_t)elem_size;
 }
 
 

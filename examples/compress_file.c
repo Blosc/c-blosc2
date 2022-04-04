@@ -32,7 +32,7 @@
 int main(int argc, char* argv[]) {
   blosc_init();
   static int32_t data[CHUNKSIZE];
-  size_t isize;
+  int32_t isize;
   int64_t nbytes, cbytes;
   blosc_timestamp_t last, current;
   double ttotal;
@@ -86,9 +86,9 @@ int main(int argc, char* argv[]) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
-         nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
+         (float)nbytes / MB, (float)cbytes / MB, (1. * (float)nbytes) / (float)cbytes);
   printf("Compression time: %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+         ttotal, (float)nbytes / (ttotal * MB));
 
   /* Free resources */
   blosc2_schunk_free(schunk);

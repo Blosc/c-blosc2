@@ -28,14 +28,13 @@ int ndlz_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int3
     NDLZ_ERROR_NULL(input);
     NDLZ_ERROR_NULL(output);
     NDLZ_ERROR_NULL(cparams);
+    BLOSC_UNUSED_PARAM(chunk);
 
     switch (meta) {
         case 4:
             return ndlz4_compress(input, input_len, output, output_len, meta, cparams);
-            break;
         case 8:
             return ndlz8_compress(input, input_len, output, output_len, meta, cparams);
-            break;
         default:
             printf("\n NDLZ is not available for this cellsize \n");
             return 0;
@@ -47,14 +46,13 @@ int ndlz_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, in
     NDLZ_ERROR_NULL(input);
     NDLZ_ERROR_NULL(output);
     NDLZ_ERROR_NULL(dparams);
+    BLOSC_UNUSED_PARAM(chunk);
 
     switch (meta) {
         case 4:
             return ndlz4_decompress(input, input_len, output, output_len, meta, dparams);
-            break;
         case 8:
             return ndlz8_decompress(input, input_len, output, output_len, meta, dparams);
-            break;
         default:
             printf("\n NDLZ is not available for this cellsize \n");
             return 0;

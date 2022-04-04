@@ -125,5 +125,5 @@ int main(int argc, char** argv) {
   }
 
   /* Run the test. */
-  return test_shuffle_roundtrip_sse2(type_size, num_elements, buffer_align_size, test_type);
+  return test_shuffle_roundtrip_sse2((int32_t)type_size, (int32_t)num_elements, buffer_align_size, (int)test_type);
 }

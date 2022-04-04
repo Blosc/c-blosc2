@@ -99,17 +99,18 @@ static void swap_store(void *dest, const void *pa, int size) {
 
 static int32_t deserialize_meta(uint8_t *smeta, uint32_t smeta_len, int8_t *ndim, int64_t *shape,
                          int32_t *chunkshape, int32_t *blockshape) {
+    BLOSC_UNUSED_PARAM(smeta_len);
     uint8_t *pmeta = smeta;
 
     // Check that we have an array with 5 entries (version, ndim, shape, chunkshape, blockshape)
     pmeta += 1;
 
     // version entry
-    int8_t version = pmeta[0];  // positive fixnum (7-bit positive integer)
+    int8_t version = (int8_t) pmeta[0];  // positive fixnum (7-bit positive integer)
     pmeta += 1;
 
     // ndim entry
-    *ndim = pmeta[0];
+    *ndim = (int8_t) pmeta[0];
     int8_t ndim_aux = *ndim;  // positive fixnum (7-bit positive integer)
     pmeta += 1;
 
@@ -155,7 +156,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
     int32_t* blockshape = malloc(8 * sizeof(int32_t));
     uint8_t cellshape = 4;
     uint8_t* smeta;
-    uint32_t smeta_len;
+    int32_t smeta_len;
     if (blosc2_meta_get(schunk, "caterva", &smeta, &smeta_len) < 0) {
         printf("Blosc error");
         return 0;
@@ -169,7 +170,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
     }
 
     int32_t typesize = schunk->typesize;
-    int nchunks = schunk->nchunks;
+    int64_t nchunks = schunk->nchunks;
     int32_t chunksize = (int32_t) (schunk->chunksize);
     //   int isize = (int) array->extchunknitems * typesize;
     uint8_t *data_in = malloc(chunksize);
@@ -309,7 +310,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
     free(blockshape);
 
     printf("Successful roundtrip!\n");
-    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / csize_f);
+    printf("Compression: %d -> %" PRId64 " (%.1fx)\n", chunksize, csize_f, (1. * chunksize) / (double)csize_f);
     return (int) (chunksize - csize_f);
 }
 

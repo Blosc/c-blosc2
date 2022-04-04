@@ -61,7 +61,7 @@ int main(void) {
   }
 
   printf("Compression: %zu -> %d (%.1fx)\n",
-         isize, csize, (1. * isize) / csize);
+         isize, csize, (1. * (double)isize) / csize);
 
   ret = blosc_getitem(data_out, 5, 5, data_subset);
   if (ret < 0) {

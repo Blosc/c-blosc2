@@ -80,7 +80,7 @@ static char* test_update_chunk(void) {
     for (int64_t i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
-    int nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
+    int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append", nchunks_ > 0);
   }
 
@@ -106,8 +106,8 @@ static char* test_update_chunk(void) {
     mu_assert("ERROR: chunk cannot be compressed", csize >= 0);
 
     // Update a random position
-    int pos = rand() % schunk->nchunks;
-    int _nchunks = blosc2_schunk_update_chunk(schunk, pos, chunk, true);
+    int64_t pos = rand() % schunk->nchunks;
+    int64_t _nchunks = blosc2_schunk_update_chunk(schunk, pos, chunk, true);
     mu_assert("ERROR: chunk cannot be updated correctly", _nchunks > 0);
     free(chunk);
 

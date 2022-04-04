@@ -51,7 +51,7 @@ void test_update(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_cframe) {
   int32_t* data = malloc(isize);
 
   // Random update list
-  int32_t* update_chunks = malloc(sizeof(int32_t) * iterations);
+  int64_t* update_chunks = malloc(sizeof(int64_t) * iterations);
   srand(time(NULL));
   for (int i = 0; i < iterations; i++) {
     update_chunks[i] = rand() % schunk_sframe->nchunks;
@@ -68,7 +68,7 @@ void test_update(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_cframe) {
   int32_t chunksize = sizeof(int32_t) * CHUNKSIZE + BLOSC_MAX_OVERHEAD;
   uint8_t* chunk;
   int csize;
-  int _nchunks;
+  int64_t _nchunks;
   for (int i = 0; i < iterations; i++) {
     // Generate data
     for (int j = 0; j < CHUNKSIZE; j++) {
@@ -117,7 +117,7 @@ void test_insert(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_cframe) {
   int32_t* data = malloc(isize);
 
   // Random insert list
-  int32_t* insert_chunks = malloc(sizeof(int32_t) * iterations);
+  int64_t* insert_chunks = malloc(sizeof(int64_t) * iterations);
   srand(time(NULL));
   for (int i = 0; i < iterations; i++) {
     insert_chunks[i] = rand() % schunk_sframe->nchunks;
@@ -134,7 +134,7 @@ void test_insert(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_cframe) {
   int32_t chunksize = sizeof(int32_t) * CHUNKSIZE + BLOSC_MAX_OVERHEAD;
   uint8_t* chunk;
   int csize;
-  int _nchunks;
+  int64_t _nchunks;
   for (int i = 0; i < iterations; i++) {
     // Generate data
     for (int j = 0; j < CHUNKSIZE; j++) {
@@ -181,7 +181,7 @@ void test_reorder(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_cframe) {
   double cframe_reorder_time, sframe_reorder_time;
 
   // Reorder list
-  int *offsets_order = malloc(sizeof(int) * schunk_sframe->nchunks);
+  int64_t *offsets_order = malloc(sizeof(int64_t) * schunk_sframe->nchunks);
   for (int i = 0; i < schunk_sframe->nchunks; ++i) {
     offsets_order[i] = (i + 3) % schunk_sframe->nchunks;
   }
@@ -222,7 +222,7 @@ void test_create_sframe_frame(char* operation) {
   double cframe_append_time, sframe_append_time, cframe_decompress_time, sframe_decompress_time;
 
   int64_t nbytes, cbytes;
-  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   float totalsize = (float)(isize * nchunks);
   int32_t* data = malloc(isize);
@@ -282,11 +282,11 @@ void test_create_sframe_frame(char* operation) {
   nbytes = schunk_sframe->nbytes;
   cbytes = schunk_sframe->cbytes;
   printf("Compression super-chunk-sframe: %ld -> %ld (%.1fx)\n",
-         (long)nbytes, (long)cbytes, (1. * nbytes) / cbytes);
+         (long)nbytes, (long)cbytes, (1. * (double)nbytes) / (double)cbytes);
   nbytes = schunk_cframe->nbytes;
   cbytes = schunk_cframe->cbytes;
   printf("Compression super-chunk-cframe: %ld -> %ld (%.1fx)\n",
-         (long)nbytes, (long)cbytes, (1. * nbytes) / cbytes);
+         (long)nbytes, (long)cbytes, (1. * (double)nbytes) / (double)cbytes);
 
   // Decompress the data
   sframe_decompress_time = 0;
@@ -348,7 +348,7 @@ if (operation != NULL) {
 }
 
 int main(int argc, char* argv[]) {
-  char* operation;
+  char* operation = NULL;
 
   if (argc >= 5) {
     printf("Usage: ./sframe_bench [nchunks] [insert | update | reorder] [num operations]\n");

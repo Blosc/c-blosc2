@@ -36,7 +36,7 @@
 
 #define CUTEST_PARAMETRIZE2(name, type, params_len, params)                                      \
     do {                                                                         \
-        type *cutest_##name = params;                                    \
+        (type) *cutest_##name = params;                                    \
         _cutest_parametrize(#name, cutest_##name, params_len, sizeof(type)); \
     } while(0)
 

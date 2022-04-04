@@ -177,9 +177,9 @@ int main(void) {
   nbytes = schunk->nbytes;
   cbytes = schunk->cbytes;
   printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
-         nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
+         (double)nbytes / MB, (double)cbytes / MB, (1. * (double)nbytes) / (double)cbytes);
   printf("Compression time: %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+         ttotal, (double)nbytes / (ttotal * MB));
 
   int nthreads = NTHREADS;
   envvar = getenv("OMP_NUM_THREADS");
@@ -230,7 +230,7 @@ int main(void) {
   }
   printf("Sum for *compressed* data: %10.0f\n", (double)compressed_sum);
   printf("Sum time for *compressed* data: %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+         ttotal, (double)nbytes / (ttotal * MB));
   //printf("sum, csum: %f, %f\n", sum, compressed_sum);
   if (SYNTHETIC) {
     // difficult to fulfill for single precision

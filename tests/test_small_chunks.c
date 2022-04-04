@@ -17,7 +17,7 @@ CUTEST_TEST_SETUP(small_chunks) {
 
 
 CUTEST_TEST_TEST(small_chunks) {
-    int rc;
+    int64_t rc;
 
     int8_t itemsize = 8;
     int32_t nitems = 50 * 1000;

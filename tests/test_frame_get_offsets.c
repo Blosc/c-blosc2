@@ -73,7 +73,7 @@ CUTEST_TEST_TEST(fill_special) {
 
   int32_t *data_ = malloc(isize);
   int chunksize = isize / schunk->typesize;
-  int _nchunks;
+  int64_t _nchunks;
   for (int j = 0; j < chunksize; j++) {
     data_[j] = j + chunksize;
   }

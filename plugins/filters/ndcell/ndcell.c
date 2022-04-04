@@ -11,7 +11,7 @@
 #include <stdio.h>
 
 
-static void index_unidim_to_multidim(int8_t ndim, int64_t *shape, int64_t i, int64_t *index) {
+static void index_unidim_to_multidim(int ndim, const int64_t *shape, int64_t i, int64_t *index) {
     int64_t strides[8];
     strides[ndim - 1] = 1;
     for (int j = ndim - 2; j >= 0; --j) {
@@ -63,19 +63,20 @@ static void swap_store(void *dest, const void *pa, int size) {
     memcpy(dest, pa2_, size);
 }
 
-static int32_t deserialize_meta(uint8_t *smeta, uint32_t smeta_len, int8_t *ndim, int64_t *shape,
+static int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
                          int32_t *chunkshape, int32_t *blockshape) {
+    BLOSC_UNUSED_PARAM(smeta_len);
     uint8_t *pmeta = smeta;
 
     // Check that we have an array with 5 entries (version, ndim, shape, chunkshape, blockshape)
     pmeta += 1;
 
     // version entry
-    int8_t version = pmeta[0];  // positive fixnum (7-bit positive integer)
+    int8_t version = (int8_t) pmeta[0];  // positive fixnum (7-bit positive integer)
     pmeta += 1;
 
     // ndim entry
-    *ndim = pmeta[0];
+    *ndim = (int8_t) pmeta[0];
     int8_t ndim_aux = *ndim;  // positive fixnum (7-bit positive integer)
     pmeta += 1;
 
@@ -178,7 +179,7 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     for (int cell_ind = 0; cell_ind < ncells; cell_ind++) {      // for each cell
         index_unidim_to_multidim(ndim, i_shape, cell_ind, ii);
         uint32_t orig = 0;
-        int64_t nd_aux = cell_shape;
+        int64_t nd_aux = (int64_t) cell_shape;
         for (int i = ndim - 1; i >= 0; i--) {
             orig += ii[i] * nd_aux;
             nd_aux *= blockshape[i];
@@ -188,7 +189,7 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
             if ((blockshape[dim_ind] % cell_shape != 0) && (ii[dim_ind] == i_shape[dim_ind] - 1)) {
                 pad_shape[dim_ind] = blockshape[dim_ind] % cell_shape;
             } else {
-                pad_shape[dim_ind] = cell_shape;
+                pad_shape[dim_ind] = (int64_t) cell_shape;
             }
         }
         int64_t ncopies = 1;
@@ -254,7 +255,7 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
 
     int8_t cell_shape = meta;
     int cell_size = (int) pow(cell_shape, ndim);
-    int8_t typesize = schunk->typesize;
+    int32_t typesize = schunk->typesize;
     uint8_t* ip = (uint8_t*)input;
     uint8_t* ip_limit = ip + length;
     uint8_t* op = (uint8_t*)output;
@@ -305,7 +306,7 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
         }
         index_unidim_to_multidim(ndim, i_shape, cell_ind, ii);
         uint32_t orig = 0;
-        int64_t nd_aux = cell_shape;
+        int64_t nd_aux = (int64_t) cell_shape;
         for (int i = ndim - 1; i >= 0; i--) {
             orig += ii[i] * nd_aux;
             nd_aux *= blockshape[i];
@@ -315,7 +316,7 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
             if ((blockshape[dim_ind] % cell_shape != 0) && (ii[dim_ind] == i_shape[dim_ind] - 1)) {
                 pad_shape[dim_ind] = blockshape[dim_ind] % cell_shape;
             } else {
-                pad_shape[dim_ind] = cell_shape;
+                pad_shape[dim_ind] = (int64_t) cell_shape;
             }
         }
 
@@ -327,16 +328,16 @@ int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
         for (int copy_ind = 0; copy_ind < ncopies; ++copy_ind) {
             index_unidim_to_multidim(ndim - 1, pad_shape, copy_ind, kk);
             nd_aux = blockshape[ndim - 1];
-            ind = orig;
+            ind = (int32_t) orig;
             for (int i = ndim - 2; i >= 0; i--) {
-                ind += kk[i] * nd_aux;
+                ind += (int32_t) (kk[i] * nd_aux);
                 nd_aux *= blockshape[i];
             }
             memcpy(&op[ind * typesize], ip, pad_shape[ndim - 1] * typesize);
             ip += pad_shape[ndim - 1] * typesize;
         }
     }
-    ind += pad_shape[ndim - 1];
+    ind += (int32_t) pad_shape[ndim - 1];
 
 
     if (ind != (int32_t) (blocksize / typesize)) {

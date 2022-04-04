@@ -46,10 +46,10 @@ int main(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   static int32_t data_dest2[CHUNKSIZE];
-  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int64_t nbytes, cbytes;
   int i, nchunk;
-  int nchunks;
+  int64_t nchunks;
   blosc_timestamp_t last, current;
   double ttotal;
 
@@ -78,7 +78,7 @@ int main(void) {
   }
 
   // Add some vlmetalayers data
-  uint32_t content_len = 10;
+  int32_t content_len = 10;
   uint8_t *content = malloc(content_len);
   for (uint32_t j = 0; j < content_len; ++j) {
     content[j] = (uint8_t) j;
@@ -96,9 +96,9 @@ int main(void) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Compression ratio: %.1f MB -> %.1f MB (%.1fx)\n",
-         nbytes / MB, cbytes / MB, (1. * nbytes) / cbytes);
+         (double)nbytes / MB, (double)cbytes / MB, (1. * (double)nbytes) / (double)cbytes);
   printf("Compression time: %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+         ttotal, (double)nbytes / (ttotal * MB));
   uint8_t* vlmetalayer;
 
   blosc2_vlmeta_get(schunk, "vlmetalayer", &vlmetalayer, &content_len);
@@ -117,12 +117,12 @@ int main(void) {
   bool cframe_needs_free;
   int64_t frame_len = blosc2_schunk_to_buffer(schunk, &cframe, &cframe_needs_free);
   if (frame_len < 0) {
-    return frame_len;
+    return (int)frame_len;
   }
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for schunk -> frame: %.3g s, %.1f MB/s\n",
-         ttotal, nbytes / (ttotal * MB));
+         ttotal, (double)nbytes / (ttotal * MB));
   printf("Frame length in memory: %ld bytes\n", (long)frame_len);
 
   // super-chunk -> fileframe (contiguous frame, on-disk)
@@ -130,13 +130,13 @@ int main(void) {
   blosc_set_timestamp(&last);
   frame_len = blosc2_schunk_to_file(schunk, "frame_simple.b2frame");
   if (frame_len < 0) {
-    return frame_len;
+    return (int)frame_len;
   }
   printf("Frame length on disk: %ld bytes\n", (long)frame_len);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for frame -> fileframe (frame_simple.b2frame): %.3g s, %.1f GB/s\n",
-         ttotal, nbytes / (ttotal * GB));
+         ttotal, (double)nbytes / (ttotal * GB));
 
   // fileframe (file) -> schunk2 (on-disk contiguous, super-chunk)
   blosc_set_timestamp(&last);
@@ -144,7 +144,7 @@ int main(void) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for fileframe (%s) -> frame : %.3g s, %.1f GB/s\n",
-         schunk2->storage->urlpath, ttotal, nbytes / (ttotal * GB));
+         schunk2->storage->urlpath, ttotal, (double)nbytes / (ttotal * GB));
 
   // frame1 (in-memory) -> schunk
   blosc_set_timestamp(&last);
@@ -157,7 +157,7 @@ int main(void) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for frame -> schunk: %.3g s, %.1f GB/s\n",
-         ttotal, nbytes / (ttotal * GB));
+         ttotal, (double)nbytes / (ttotal * GB));
 
 
   /* Retrieve and decompress the chunks from the super-chunks and compare values */

@@ -111,7 +111,7 @@ CUTEST_TEST_TEST(fill_special) {
   // Make nitems a non-divisible number of CHUNKSHAPE
   nitems = (int64_t)NCHUNKS * CHUNKSHAPE + leftover_items;
   int32_t leftover_bytes = (int32_t)(nitems % CHUNKSHAPE) * cparams->typesize;
-  int nchunks = blosc2_schunk_fill_special(schunk, nitems, special_value, isize);
+  int64_t nchunks = blosc2_schunk_fill_special(schunk, nitems, special_value, isize);
   if (leftover_items != 0) {
     CUTEST_ASSERT("Error in fill special", nchunks == NCHUNKS + 1);
   }

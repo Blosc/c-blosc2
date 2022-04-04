@@ -35,7 +35,7 @@ int main(void) {
   int dsize;
   int64_t nbytes, cbytes;
   int nchunk;
-  int nchunks = 0;
+  int64_t nchunks = 0;
   blosc_timestamp_t last, current;
   double totaltime;
   float totalsize = (float)(isize * NCHUNKS);
@@ -75,7 +75,7 @@ int main(void) {
   nbytes = schunk->nbytes;
   cbytes = schunk->cbytes;
   printf("Compression super-chunk: %ld -> %ld (%.1fx)\n",
-         (long)nbytes, (long)cbytes, (1. * nbytes) / cbytes);
+         (long)nbytes, (long)cbytes, (1. * (double)nbytes) / (double)cbytes);
 
   /* Retrieve and decompress the chunks */
   blosc_set_timestamp(&last);

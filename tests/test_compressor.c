@@ -20,7 +20,7 @@ int nbytes, cbytes;
 int clevel = 1;
 int doshuffle = 1;
 size_t typesize = 8;
-size_t size = 8 * 1000 * 1000;  /* must be divisible by typesize */
+int32_t size = 8 * 1000 * 1000;  /* must be divisible by typesize */
 
 
 /* Check compressor */
@@ -38,7 +38,7 @@ static char *test_compressor(void) {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < size);
 
   compressor = blosc_get_compressor();
   mu_assert("ERROR: get_compressor (compress, after) incorrect",
@@ -64,7 +64,7 @@ static char *test_compress_decompress(void) {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < size);
 
   compressor = blosc_get_compressor();
   mu_assert("ERROR: get_compressor incorrect",
@@ -72,7 +72,7 @@ static char *test_compress_decompress(void) {
 
   /* Decompress the buffer */
   nbytes = blosc_decompress(dest, dest2, size);
-  mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
+  mu_assert("ERROR: nbytes incorrect(1)", nbytes == size);
 
   compressor = blosc_get_compressor();
   mu_assert("ERROR: get_compressor incorrect",
@@ -91,7 +91,7 @@ static char *test_clevel(void) {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < size);
 
   /* Activate the BLOSC_CLEVEL variable */
   setenv("BLOSC_CLEVEL", "9", 0);
@@ -111,7 +111,7 @@ static char *test_noshuffle(void) {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < size);
 
   /* Activate the BLOSC_SHUFFLE variable */
   setenv("BLOSC_SHUFFLE", "NOSHUFFLE", 0);
@@ -133,7 +133,7 @@ static char *test_shuffle(void) {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: cbytes is not 0", cbytes < (int)size);
+  mu_assert("ERROR: cbytes is not 0", cbytes < size);
 
   /* Activate the BLOSC_SHUFFLE variable */
   setenv("BLOSC_SHUFFLE", "SHUFFLE", 0);
@@ -158,7 +158,7 @@ static char *test_bitshuffle(void) {
   };
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: cbytes is not 0", cbytes < (int)size);
+  mu_assert("ERROR: cbytes is not 0", cbytes < size);
 
   /* Activate the BLOSC_BITSHUFFLE variable */
   setenv("BLOSC_SHUFFLE", "BITSHUFFLE", 0);
@@ -182,7 +182,7 @@ static char *test_delta(void) {
   blosc_set_delta(0);
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: cbytes is not 0", cbytes < (int)size);
+  mu_assert("ERROR: cbytes is not 0", cbytes < size);
 
   /* Activate the BLOSC_DELTA variable */
   setenv("BLOSC_DELTA", "1", 0);
@@ -204,7 +204,7 @@ static char *test_typesize(void) {
   /* Get a compressed buffer */
   cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
                           dest, size + BLOSC_MAX_OVERHEAD);
-  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
+  mu_assert("ERROR: cbytes is not correct", cbytes < size);
 
   /* Activate the BLOSC_TYPESIZE variable */
   setenv("BLOSC_TYPESIZE", "9", 0);
@@ -229,7 +229,7 @@ static char *test_small_blocksize(void) {
   /* Get a compressed buffer */
   cbytes = blosc2_compress_ctx(cctx, src, size, dest, size + BLOSC_MAX_OVERHEAD);
   nbytes = blosc2_decompress_ctx(dctx, dest, size + BLOSC_MAX_OVERHEAD, src, size);
-  mu_assert("ERROR: nbytes is not correct", nbytes == (int) size);
+  mu_assert("ERROR: nbytes is not correct", nbytes == size);
 
   blosc2_free_ctx(cctx);
   blosc2_free_ctx(dctx);

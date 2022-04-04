@@ -27,7 +27,7 @@ static int test_zfp_acc_float(blosc2_schunk* schunk) {
         printf("Error: This test is only for doubles.\n");
         return 0;
     }
-    int nchunks = schunk->nchunks;
+    int64_t nchunks = schunk->nchunks;
     int32_t chunksize = (int32_t) (schunk->chunksize);
     float *data_in = malloc(chunksize);
     int decompressed;
@@ -112,7 +112,7 @@ static int test_zfp_acc_double(blosc2_schunk* schunk) {
         printf("Error: This test is only for doubles.\n");
         return 0;
     }
-    int nchunks = schunk->nchunks;
+    int64_t nchunks = schunk->nchunks;
     int32_t chunksize = (int32_t) (schunk->chunksize);
     double *data_in = malloc(chunksize);
     int decompressed;

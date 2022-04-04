@@ -25,7 +25,7 @@ static char* test_dict(void) {
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
-  int32_t nchunks;
+  int64_t nchunks;
   blosc_timestamp_t last, current;
   double cttotal, dttotal;
 
@@ -67,9 +67,9 @@ static char* test_dict(void) {
   /* Gather some info */
   nbytes = schunk->nbytes;
   cbytes = schunk->cbytes;
-  float cratio = nbytes / (float)cbytes;
-  float cspeed = nbytes / ((float)cttotal * MB);
-  float dspeed = nbytes / ((float)dttotal * MB);
+  float cratio =(float)nbytes / (float)cbytes;
+  float cspeed = (float)nbytes / ((float)cttotal * MB);
+  float dspeed = (float)nbytes / ((float)dttotal * MB);
   if (tests_run == 0) printf("\n");
   if (blocksize > 0) {
     printf("[blocksize: %d KB] ", blocksize / 1024);

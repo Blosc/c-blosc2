@@ -83,13 +83,13 @@ static char* test_delete_chunk(void) {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
-    int nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
+    int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append", nchunks_ > 0);
   }
 
   if (tdata.nchunks >= 2) {
     // Check that no file is removed if a special value chunk is deleted in a sframe
-    int _nchunks = blosc2_schunk_delete_chunk(schunk, 1);
+    int64_t _nchunks = blosc2_schunk_delete_chunk(schunk, 1);
     mu_assert("ERROR: chunk 1 cannot be deleted correctly", _nchunks >= 0);
     _nchunks = blosc2_schunk_delete_chunk(schunk, 0);
     mu_assert("ERROR: chunk 0 cannot be deleted correctly", _nchunks >= 0);
@@ -97,14 +97,14 @@ static char* test_delete_chunk(void) {
 
   for (int i = 0; i < tdata.ndeletes - 2; ++i) {
     // Delete in a random position
-    int pos = rand() % (schunk->nchunks);
-    int32_t nchunks_old = schunk->nchunks;
+    int64_t pos = rand() % (schunk->nchunks);
+    int64_t nchunks_old = schunk->nchunks;
     if (pos != nchunks_old - 1) {
       dsize = blosc2_schunk_decompress_chunk(schunk, pos + 1, (void *) data, isize);
       mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
     }
 
-    int _nchunks = blosc2_schunk_delete_chunk(schunk, pos);
+    int64_t _nchunks = blosc2_schunk_delete_chunk(schunk, pos);
     mu_assert("ERROR: chunk cannot be deleted correctly", _nchunks >= 0);
 
     if (pos != nchunks_old - 1) {

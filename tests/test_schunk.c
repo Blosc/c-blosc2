@@ -47,7 +47,7 @@ static char* test_schunk(void) {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
-    int nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
+    int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append in frame", nchunks_ > 0);
   }
 
@@ -95,8 +95,8 @@ static char* test_schunk(void) {
     dsize = blosc2_schunk_get_chunk(schunk, nchunk, &chunk, &needs_free);
     mu_assert("ERROR: chunk cannot be retrieved correctly.", dsize >= 0);
     blosc_cbuffer_sizes(chunk, &nbytes_, &cbytes_, &blocksize);
-    nbytes += nbytes_;
-    cbytes += cbytes_;
+    nbytes += (int64_t)nbytes_;
+    cbytes += (int64_t)cbytes_;
     if (needs_free) {
       free(chunk);
     }
@@ -124,7 +124,7 @@ static char* test_schunk(void) {
   }
   // metalayers
   uint8_t* content;
-  uint32_t content_len;
+  int32_t content_len;
   blosc2_meta_get(schunk, "metalayer1", &content, &content_len);
   mu_assert("ERROR: bad metalayer content", strncmp((char*)content, "my metalayer1", content_len) == 0);
   free(content);
@@ -134,7 +134,7 @@ static char* test_schunk(void) {
 
   // Check the vlmetalayers
   uint8_t* content2;
-  uint32_t content2_len;
+  int32_t content2_len;
   blosc2_vlmeta_get(schunk, "vlmetalayer1", &content2, &content2_len);
   mu_assert("ERROR: bad vlmetalayer content", strncmp((char*)content2, "testing the  vlmetalayers", content2_len) == 0);
 

@@ -43,8 +43,7 @@ static blosc2_btune BTUNE_DEFAULTS = {
 
 
 /* Conditions for splitting a block before compressing with a codec. */
-static int split_block(blosc2_context* context, int32_t typesize,
-                       int32_t blocksize, bool extended_header) {
+static int split_block(blosc2_context *context, int32_t typesize, int32_t blocksize) {
   switch (context->splitmode) {
     case BLOSC_ALWAYS_SPLIT:
       return 1;

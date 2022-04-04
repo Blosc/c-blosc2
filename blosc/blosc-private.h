@@ -33,7 +33,7 @@ extern "C" {
 
 #define BLOSC_ERROR_NULL(pointer, rc)                           \
     do {                                                        \
-        if (pointer == NULL) {                                  \
+        if ((pointer) == NULL) {                                \
             BLOSC_TRACE_ERROR("Pointer is NULL");               \
             return rc;                                          \
         }                                                       \

@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
       return csize;
     }
 
-    printf("Compression: %d -> %d (%.1fx)\n", (int) isize, csize, (1. * isize) / csize);
+    printf("Compression: %d -> %d (%.1fx)\n", (int) isize, csize, (1. * (int)isize) / csize);
 
     /* Write data_out to argv[3] */
     f = fopen(argv[3], "wb+");

@@ -27,7 +27,7 @@ char buf[256];
 
 
 static char* test_sframe(void) {
-  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int32_t* data = malloc(isize);
   int32_t* data_dest = malloc(isize);
   int dsize;
@@ -92,7 +92,7 @@ static char* test_sframe(void) {
 
   if (metalayers) {
     uint8_t* _content;
-    uint32_t _content_len;
+    int32_t _content_len;
     blosc2_meta_get(schunk, "metalayer1", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
     if (_content != NULL) {
@@ -106,7 +106,7 @@ static char* test_sframe(void) {
   }
 
   if (vlmetalayers) {
-    uint32_t content_len_;
+    int32_t content_len_;
     blosc2_vlmeta_get(schunk, "vlmetalayer", &content_, &content_len_);
     mu_assert("ERROR: bad vlmetalayers length in frame", (size_t) content_len_ == content_len);
     mu_assert("ERROR: bad vlmetalayers data in frame", strncmp((char*)content_, content, content_len) == 0);
@@ -115,7 +115,7 @@ static char* test_sframe(void) {
   }
 
   // Feed it with data
-  int _nchunks = 0;
+  int64_t _nchunks = 0;
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
@@ -127,7 +127,7 @@ static char* test_sframe(void) {
 
   if (metalayers) {
     uint8_t* _content;
-    uint32_t _content_len;
+    int32_t _content_len;
     blosc2_meta_get(schunk, "metalayer1", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
     if (_content != NULL) {
@@ -142,7 +142,7 @@ static char* test_sframe(void) {
   }
 
   if (vlmetalayers) {
-    uint32_t content_len_;
+    int32_t content_len_;
     blosc2_vlmeta_get(schunk, "vlmetalayer", &content_, &content_len_);
     mu_assert("ERROR: bad vlmetalayers length in frame", (size_t) content_len_ == content_len2);
     mu_assert("ERROR: bad vlmetalayers data in frame", strncmp((char*)content_, content2, content_len2) == 0);
@@ -174,7 +174,7 @@ static char* test_sframe(void) {
 
   if (metalayers) {
     uint8_t* _content;
-    uint32_t _content_len;
+    int32_t _content_len;
     blosc2_meta_get(schunk, "metalayer1", &_content, &_content_len);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
     if (_content != NULL) {
@@ -188,7 +188,7 @@ static char* test_sframe(void) {
   }
 
   if (vlmetalayers) {
-    uint32_t content_len_;
+    int32_t content_len_;
     blosc2_vlmeta_get(schunk, "vlmetalayer", &content_, &content_len_);
     mu_assert("ERROR: bad vlmetalayers length in frame", (size_t) content_len_ == content_len3);
     mu_assert("ERROR: bad vlmetalayers data in frame", strncmp((char*)content_, content3, content_len3) == 0);
@@ -212,7 +212,7 @@ static char* test_sframe(void) {
 static char* test_sframe_simple(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
-  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
@@ -236,7 +236,7 @@ static char* test_sframe_simple(void) {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk;
     }
-    int _nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
+    int64_t _nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append in sframe", _nchunks > 0);
   }
 
@@ -268,7 +268,7 @@ static char* test_sframe_simple(void) {
 static char* test_sframe_typesize(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
-  size_t isize = CHUNKSIZE * sizeof(int32_t);
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
@@ -292,7 +292,7 @@ static char* test_sframe_typesize(void) {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk;
     }
-    int _nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
+    int64_t _nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append in sframe", _nchunks > 0);
   }
 

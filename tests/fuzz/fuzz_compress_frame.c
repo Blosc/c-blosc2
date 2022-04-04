@@ -11,7 +11,8 @@ extern "C" {
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   const char *compressors[] = { "blosclz", "lz4", "lz4hc", "zlib", "zstd" };
   int32_t i = 0, dsize = 0, filter = BLOSC_BITSHUFFLE;
-  int32_t nchunk = 0,  nchunks = 0, max_chunksize = 512;
+  int32_t nchunk = 0, max_chunksize = 512;
+  int64_t nchunks = 0;
 
   blosc_init();
 
@@ -54,10 +55,10 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   int32_t chunksize = max_chunksize;
   for (i = 0; chunksize > 0 && i < (int32_t)size; i += chunksize, nchunks++) {
     if (i + chunksize > (int32_t)size)
-      chunksize = size - i;
+      chunksize = (int32_t)size - i;
     nchunks = blosc2_schunk_append_buffer(schunk, (uint8_t *)data + i, chunksize);
     if (nchunks < 0) {
-      printf("Compression error.  Error code: %d\n", nchunks);
+      printf("Compression error.  Error code: %lld\n", nchunks);
       break;
     }
   }

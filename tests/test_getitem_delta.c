@@ -43,8 +43,8 @@ static char* test_getitem(void) {
   blosc_compress(1, 0, type_size, buffer_size,
 		 original, intermediate, buffer_size + BLOSC_MAX_OVERHEAD);
     
-  unsigned start_item = 0;
-  unsigned num_items = 1;
+  int start_item = 0;
+  int num_items = 1;
   blosc_decompress(intermediate, result, buffer_size);
   assert(memcmp(original, result, buffer_size) == 0);
   mu_assert("ERROR: decompression with delta filter fails", memcmp(original, result, buffer_size) == 0);
