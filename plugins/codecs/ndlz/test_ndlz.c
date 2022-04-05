@@ -38,7 +38,7 @@
 static int test_ndlz_4(blosc2_schunk* schunk) {
 
     int64_t nchunks = schunk->nchunks;
-    int32_t chunksize = (int32_t) (schunk->chunksize);
+    int32_t chunksize = schunk->chunksize;
     uint8_t *data_in = malloc(chunksize);
     int decompressed;
     int64_t csize;

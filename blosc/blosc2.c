@@ -2169,7 +2169,7 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
     }
     srcsize -= sizeof(int32_t);
     // Read dictionary size
-    context->dict_size = (int32_t)sw32_(context->src + bstarts_end);
+    context->dict_size = sw32_(context->src + bstarts_end);
     if (context->dict_size <= 0 || context->dict_size > BLOSC2_MAXDICTSIZE) {
       BLOSC_TRACE_ERROR("Dictionary size is smaller than minimum or larger than maximum allowed.");
       return BLOSC2_ERROR_CODEC_DICT;

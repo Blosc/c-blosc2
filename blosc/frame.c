@@ -2184,7 +2184,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       io_cb->seek(fp, header_len + offset, SEEK_SET);
     }
 
-    rbytes = io_cb->read(*chunk, 1, streams_offset, fp);
+    rbytes = io_cb->read(*chunk, 1, (int64_t)streams_offset, fp);
     if (rbytes != streams_offset) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) chunk out of the frame.");
       rc = BLOSC2_ERROR_FILE_READ;
@@ -2316,7 +2316,7 @@ int64_t frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_va
 
   // Compute the number of chunks and the length of the offsets chunk
   int32_t chunkitems = chunksize / typesize;
-  nchunks = (int32_t)(nitems / chunkitems);
+  nchunks = nitems / chunkitems;
   int32_t leftover_items = (int32_t)(nitems % chunkitems);
   if (leftover_items) {
     nchunks += 1;
