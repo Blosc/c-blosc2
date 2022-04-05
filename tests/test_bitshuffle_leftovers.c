@@ -14,8 +14,15 @@
 
 #include "test_common.h"
 
+/* Global vars */
+int tests_run = 0;
+int size;
+int32_t *data;
+int32_t *data_out;
+int32_t *data_dest;
 
-static int test_roundtrip_bitshuffle8(int size, void *data, void *data_out, void *data_dest) {
+
+static char* test_roundtrip_bitshuffle8(void) {
   /* Compress with bitshuffle active  */
   int isize = size;
   int osize = size + BLOSC_MIN_HEADER_LENGTH;
@@ -29,36 +36,24 @@ static int test_roundtrip_bitshuffle8(int size, void *data, void *data_out, void
 
   /* Decompress  */
   int dsize = blosc_decompress(data_out, data_dest, isize);
-  if (dsize < 0) {
-    printf("Decompression error.  Error code: %d\n", dsize);
-    return dsize;
-  }
+  mu_assert("ERROR: Decompression error.", dsize > 0);
 
   printf("Decompression successful!\n");
 
   int exit_code = memcmp(data, data_dest, size) ? EXIT_FAILURE : EXIT_SUCCESS;
 
-  if (exit_code == EXIT_SUCCESS)
-    printf("Successful roundtrip!\n");
-  else
-    printf("Decompressed data differs from original!\n");
+  mu_assert("Decompressed data differs from original!", exit_code == EXIT_SUCCESS);
 
-  return exit_code;
+  return EXIT_SUCCESS;
 }
 
-static int test_roundtrip_bitshuffle4(int size, void *data, void *data_out, void *data_dest) {
+static char* test_roundtrip_bitshuffle4(void) {
   /* Compress with bitshuffle active  */
   int isize = size;
   int osize = size + BLOSC_MIN_HEADER_LENGTH;
   int csize = blosc_compress(9, BLOSC_BITSHUFFLE, 4, isize, data, data_out, osize);
-  if (csize == 0) {
-    printf("Buffer is uncompressible.  Giving up.\n");
-    return 1;
-  }
-  else if (csize < 0) {
-    printf("Compression error.  Error code: %d\n", csize);
-    return csize;
-  }
+  mu_assert("ERROR: Buffer is uncompressible.  Giving up.", csize != 0);
+  mu_assert("ERROR: Compression error.", csize > 0);
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1.*isize) / csize);
 
   FILE *fout = fopen("test-bitshuffle4-memcpy.cdata", "wb");
@@ -67,33 +62,26 @@ static int test_roundtrip_bitshuffle4(int size, void *data, void *data_out, void
 
   /* Decompress  */
   int dsize = blosc_decompress(data_out, data_dest, isize);
-  if (dsize < 0) {
-    printf("Decompression error.  Error code: %d\n", dsize);
-    return dsize;
-  }
+  mu_assert("ERROR: Decompression error.", dsize >= 0);
 
   printf("Decompression successful!\n");
 
   int exit_code = memcmp(data, data_dest, size) ? EXIT_FAILURE : EXIT_SUCCESS;
 
-  if (exit_code == EXIT_SUCCESS)
-    printf("Successful roundtrip!\n");
-  else
-    printf("Decompressed data differs from original!\n");
-
-  return exit_code;
+  mu_assert("ERROR: Decompressed data differs from original!", exit_code == EXIT_SUCCESS);
+  return EXIT_SUCCESS;
 }
 
-int main(void) {
+static char *all_tests(void) {
   /* `size` below is chosen so that it is not divisible by 8
    * (not supported by bitshuffle) and in addition, it is not
    * divisible by 8 (typesize) again.
    */
-  int size = 641092;
-  int32_t *data = malloc(size);
-  int32_t *data_out = malloc(size + BLOSC_MIN_HEADER_LENGTH);
-  int32_t *data_dest = malloc(size);
-  int result;
+
+  size = 641092;
+  data = malloc(size);
+  data_out = malloc(size + BLOSC_MIN_HEADER_LENGTH);
+  data_dest = malloc(size);
 
   /* Initialize data */
   for (int i = 0; i < (int) (size / sizeof(int32_t)); i++) {
@@ -104,25 +92,36 @@ int main(void) {
     ((uint8_t*)data)[i] = (uint8_t) i;
   }
 
-  blosc_init();
-  blosc_set_nthreads(1);
-  blosc_set_compressor("lz4");
-  printf("Blosc version info: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
-  result = test_roundtrip_bitshuffle4(size, data, data_out, data_dest);
-  if (result != EXIT_SUCCESS) {
-    goto fail;
-  }
-  result = test_roundtrip_bitshuffle8(size, data, data_out, data_dest);
-  if (result != EXIT_SUCCESS) {
-    goto fail;
-  }
+  mu_run_test(test_roundtrip_bitshuffle4);
+
+  mu_run_test(test_roundtrip_bitshuffle8);
 
   free(data);
   free(data_out);
   free(data_dest);
 
+  return EXIT_SUCCESS;
+}
+
+int main(void) {
+  char* result;
+
+  blosc_init();
+  blosc_set_nthreads(1);
+  blosc_set_compressor("lz4");
+  printf("Blosc version info: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+
+  /* Run all the suite */
+  result = all_tests();
+  if (result != EXIT_SUCCESS) {
+    printf(" (%s)\n", result);
+  }
+  else {
+    printf(" ALL TESTS PASSED");
+  }
+  printf("\tTests run: %d\n", tests_run);
+
   blosc_destroy();
 
-  fail:
-  return result;
+  return result != EXIT_SUCCESS;
 }
