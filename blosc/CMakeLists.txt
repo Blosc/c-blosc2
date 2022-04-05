@@ -117,8 +117,6 @@ if(NOT DEACTIVATE_ZSTD)
             CMAKE_C_COMPILER_ID STREQUAL AppleClang OR
             CMAKE_C_COMPILER_ID STREQUAL Intel)
            AND COMPILER_SUPPORT_SSE2)   # if SSE2 is here, this is an x86 platform
-            #(CMAKE_SYSTEM_PROCESSOR STREQUAL amd64 OR
-            # CMAKE_SYSTEM_PROCESSOR STREQUAL AMD64))
             message(STATUS "Adding support for assembly sources in ZSTD")
             file(GLOB ZSTD_DECOMPRESS_FILES ${ZSTD_LOCAL_DIR}/decompress/*.S)
         else()
