@@ -888,7 +888,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
     }
     else {
       // Look for the filters_meta in user filters and run it
-      for (int j = 0; j < g_nfilters; ++j) {
+      for (uint64_t j = 0; j < g_nfilters; ++j) {
         if (g_filters[j].id == filters[i]) {
           if (g_filters[j].forward != NULL) {
             blosc2_cparams cparams;
@@ -1208,7 +1208,6 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
   int32_t typesize = context->typesize;
   uint8_t* filters = context->filters;
   uint8_t* filters_meta = context->filters_meta;
-  blosc2_filter * urfilters = context->urfilters;
   uint8_t* _src = src;
   uint8_t* _dest = tmp;
   uint8_t* _tmp = tmp2;
@@ -1278,7 +1277,7 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
       }
     } else {
         // Look for the filters_meta in user filters and run it
-        for (int j = 0; j < g_nfilters; ++j) {
+        for (uint64_t j = 0; j < g_nfilters; ++j) {
           if (g_filters[j].id == filters[i]) {
             if (g_filters[j].backward != NULL) {
               blosc2_dparams dparams;
@@ -1483,7 +1482,6 @@ static int blosc_d(
     }
     blosc2_frame_s* frame = (blosc2_frame_s*)context->schunk->frame;
     char* urlpath = frame->urlpath;
-    int32_t trailer_len = (int32_t) (sizeof(int32_t) + sizeof(int64_t) + context->nblocks * sizeof(int32_t));
     size_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH + context->nblocks * sizeof(int32_t);
     int32_t nchunk;
     int64_t chunk_offset;
@@ -2632,7 +2630,6 @@ int blosc_run_decompression_with_context(blosc2_context* context, const void* sr
                                          void* dest, int32_t destsize) {
   blosc_header header;
   int32_t ntbytes;
-  uint8_t* _src = (uint8_t*)src;
   int rc;
 
   rc = read_chunk_header(src, srcsize, true, &header);
@@ -3413,7 +3410,7 @@ int blosc_cbuffer_validate(const void* cbuffer, size_t cbytes, size_t* nbytes) {
     return rc;
   }
   *nbytes = header_nbytes;
-  if (header_cbytes != cbytes) {
+  if (header_cbytes != (int32_t)cbytes) {
     /* Compressed size from header does not match `cbytes` */
     *nbytes = 0;
     return BLOSC2_ERROR_INVALID_HEADER;
@@ -3961,7 +3958,7 @@ int register_filter_private(blosc2_filter *filter) {
     }
 
     // Check if the filter is already registered
-    for (int i = 0; i < g_nfilters; ++i) {
+    for (uint64_t i = 0; i < g_nfilters; ++i) {
         if (g_filters[i].id == filter->id) {
             BLOSC_TRACE_ERROR("The filter is already registered!");
             return BLOSC2_ERROR_FAILURE;
@@ -4030,7 +4027,7 @@ int blosc2_register_codec(blosc2_codec *codec) {
 int _blosc2_register_io_cb(const blosc2_io_cb *io) {
 
   // Check if the io is already registered
-  for (int i = 0; i < g_nio; ++i) {
+  for (uint64_t i = 0; i < g_nio; ++i) {
     if (g_io[i].id == io->id) {
       BLOSC_TRACE_ERROR("The codec is already registered!");
       return BLOSC2_ERROR_PLUGIN_IO;
@@ -4059,7 +4056,7 @@ int blosc2_register_io_cb(const blosc2_io_cb *io) {
 }
 
 blosc2_io_cb *blosc2_get_io_cb(uint8_t id) {
-  for (int i = 0; i < g_nio; ++i) {
+  for (uint64_t i = 0; i < g_nio; ++i) {
     if (g_io[i].id == id) {
       return &g_io[i];
     }

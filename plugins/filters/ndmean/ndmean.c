@@ -76,7 +76,7 @@ static int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
     pmeta += 1;
 
     // version entry
-    int8_t version = (int8_t) pmeta[0];  // positive fixnum (7-bit positive integer)
+    // int8_t version = (int8_t) pmeta[0];  // positive fixnum (7-bit positive integer) commented to avoid warning
     pmeta += 1;
 
     // ndim entry
@@ -113,8 +113,8 @@ static int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
         swap_store(blockshape + i, pmeta, sizeof(int32_t));
         pmeta += sizeof(int32_t);
     }
-    uint32_t slen = (uint32_t)(pmeta - smeta);
-    return 0;
+    int32_t slen = (int32_t)(pmeta - smeta);
+    return slen;
 }
 
 int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t meta, blosc2_cparams* cparams) {
@@ -175,7 +175,7 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
     double * ip_double = (double *) ip;
     uint8_t* op = (uint8_t *) output;
     uint8_t* op_limit = op + length;
-    int64_t cell_length = 0;
+    int64_t cell_length;
     float mean_float = 0;
     double mean_double = 0;
 

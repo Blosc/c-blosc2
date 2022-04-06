@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include "test_common.h"
 #include "frame.h"
+#include <inttypes.h>
 
 #if defined(_WIN32)
 #define snprintf _snprintf
@@ -222,7 +223,7 @@ static char* test_frame(void) {
   cbytes = schunk->cbytes;
   if (nchunks > 0) {
     if (nbytes < 10 * cbytes)
-        printf("%lld -> %lld\n", nbytes, cbytes);
+        printf("%" PRId64 " -> %" PRId64 "\n", nbytes, cbytes);
     mu_assert("ERROR: bad compression ratio in frame", nbytes > 10 * cbytes);
   }
 

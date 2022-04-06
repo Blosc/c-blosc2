@@ -38,6 +38,7 @@ Process finished with exit code 0
 
 #include <stdio.h>
 #include <blosc2.h>
+#include <inttypes.h>
 
 #define KB  (1024.)
 #define MB  (1024 * KB)
@@ -107,7 +108,7 @@ int create_cframe(const char* compname, bool contiguous) {
 #endif
   int64_t rc = blosc2_schunk_fill_special(schunk, nitems, special_value, isize);
   if (rc < 0) {
-    printf("Error in fill special.  Error code: %lld\n", rc);
+    printf("Error in fill special.  Error code: %" PRId64 "\n", rc);
     return (int)rc;
   }
 #else

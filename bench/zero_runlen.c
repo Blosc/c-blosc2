@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include <math.h>
+#include <inttypes.h>
 
 #include "blosc2.h"
 
@@ -97,7 +98,7 @@ int check_special_values(int svalue) {
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     nchunks = blosc2_schunk_append_chunk(schunk, chunk, true);
     if (nchunks < 0) {
-      printf("Error appending chunk: %lld\n", nchunks);
+      printf("Error appending chunk: %" PRId64 "\n", nchunks);
       exit(1);
     }
   }

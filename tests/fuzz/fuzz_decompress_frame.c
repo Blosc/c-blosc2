@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  int32_t i = 0, dsize = 0, filter = BLOSC_BITSHUFFLE;
+  int32_t i = 0, dsize = 0;
   int32_t nchunk = 0;
 
   blosc_init();

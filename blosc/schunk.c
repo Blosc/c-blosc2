@@ -16,6 +16,7 @@
 #include "blosc2.h"
 #include "frame.h"
 #include "stune.h"
+#include <inttypes.h>
 
 #if defined(_WIN32)
   #include <windows.h>
@@ -588,7 +589,7 @@ int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool c
   if (schunk->chunksize == -1) {
     schunk->chunksize = chunk_nbytes;  // The super-chunk is initialized now
   }
-  if (chunk_nbytes > (size_t)schunk->chunksize) {
+  if (chunk_nbytes > schunk->chunksize) {
     BLOSC_TRACE_ERROR("Appending chunks that have different lengths in the same schunk "
                       "is not supported yet: %d > %d.", chunk_nbytes, schunk->chunksize);
     return BLOSC2_ERROR_CHUNK_APPEND;
@@ -625,14 +626,14 @@ int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool c
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (frame == NULL) {
     // Check that we are not appending a small chunk after another small chunk
-    if ((schunk->nchunks > 0) && (chunk_nbytes < (size_t)schunk->chunksize)) {
+    if ((schunk->nchunks > 0) && (chunk_nbytes < schunk->chunksize)) {
       uint8_t* last_chunk = schunk->data[nchunks - 1];
       int32_t last_nbytes;
       rc = blosc2_cbuffer_sizes(last_chunk, &last_nbytes, NULL, NULL);
       if (rc < 0) {
         return rc;
       }
-      if ((last_nbytes < schunk->chunksize) && (chunk_nbytes < (size_t)schunk->chunksize)) {
+      if ((last_nbytes < schunk->chunksize) && (chunk_nbytes < schunk->chunksize)) {
         BLOSC_TRACE_ERROR(
                 "Appending two consecutive chunks with a chunksize smaller than the schunk chunksize "
                 "is not allowed yet: %d != %d.", chunk_nbytes, schunk->chunksize);
@@ -782,7 +783,7 @@ int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
   uint8_t *chunk_old;
   int err = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_old, &needs_free);
   if (err < 0) {
-    BLOSC_TRACE_ERROR("%lld chunk can not be obtained from schunk.", nchunk);
+    BLOSC_TRACE_ERROR("%" PRId64 " chunk can not be obtained from schunk.", nchunk);
     return -1;
   }
   int32_t chunk_nbytes_old = 0;
@@ -871,14 +872,14 @@ int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
 int64_t blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int64_t nchunk) {
   int rc;
   if (schunk->nchunks < nchunk) {
-    BLOSC_TRACE_ERROR("The schunk has not enough chunks (%lld)!", schunk->nchunks);
+    BLOSC_TRACE_ERROR("The schunk has not enough chunks (%" PRId64 ")!", schunk->nchunks);
   }
 
   bool needs_free;
   uint8_t *chunk_old;
   int err = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_old, &needs_free);
   if (err < 0) {
-    BLOSC_TRACE_ERROR("%lld chunk can not be obtained from schunk.", nchunk);
+    BLOSC_TRACE_ERROR("%" PRId64 "chunk can not be obtained from schunk.", nchunk);
     return -1;
   }
   int32_t chunk_nbytes_old = 0;
@@ -969,8 +970,8 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int64_t nchunk,
   schunk->current_nchunk = nchunk;
   if (frame == NULL) {
     if (nchunk >= schunk->nchunks) {
-      BLOSC_TRACE_ERROR("nchunk ('%lld') exceeds the number of chunks "
-                        "('%lld') in super-chunk.", nchunk, schunk->nchunks);
+      BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') exceeds the number of chunks "
+                        "('%" PRId64 "') in super-chunk.", nchunk, schunk->nchunks);
       return BLOSC2_ERROR_INVALID_PARAM;
     }
     uint8_t* src = schunk->data[nchunk];
@@ -1023,8 +1024,8 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chu
   }
 
   if (nchunk >= schunk->nchunks) {
-    BLOSC_TRACE_ERROR("nchunk ('%lld') exceeds the number of chunks "
-                      "('%lld') in schunk.", nchunk, schunk->nchunks);
+    BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') exceeds the number of chunks "
+                      "('%" PRId64 "') in schunk.", nchunk, schunk->nchunks);
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
@@ -1062,8 +1063,8 @@ int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *
   }
 
   if (nchunk >= schunk->nchunks) {
-    BLOSC_TRACE_ERROR("nchunk ('%lld') exceeds the number of chunks "
-                      "('%lld') in schunk.", nchunk, schunk->nchunks);
+    BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') exceeds the number of chunks "
+                      "('%" PRId64 "') in schunk.", nchunk, schunk->nchunks);
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
@@ -1239,7 +1240,7 @@ int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content
   }
 
   blosc2_metalayer *metalayer = schunk->metalayers[nmetalayer];
-  if (content_len > (uint32_t)metalayer->content_len) {
+  if (content_len > metalayer->content_len) {
     BLOSC_TRACE_ERROR("`content_len` cannot exceed the existing size of %d bytes.", metalayer->content_len);
     return nmetalayer;
   }

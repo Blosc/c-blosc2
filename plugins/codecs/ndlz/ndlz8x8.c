@@ -58,6 +58,7 @@
 
 int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                    uint8_t meta, blosc2_cparams *cparams) {
+  BLOSC_UNUSED_PARAM(meta);
 
   const int cell_shape = 8;
   const int cell_size = 64;
@@ -357,8 +358,8 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
         free(shape);
         free(chunkshape);
         free(blockshape);
-        return 0;
         free(bufarea);
+        return 0;
       }
     }
   }
@@ -430,6 +431,8 @@ static unsigned char* copy_match_16(unsigned char *op, const unsigned char *matc
 
 int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                      uint8_t meta, blosc2_dparams *dparams) {
+  BLOSC_UNUSED_PARAM(meta);
+  BLOSC_UNUSED_PARAM(dparams);
 
   const int cell_shape = 8;
   const int cell_size = 64;

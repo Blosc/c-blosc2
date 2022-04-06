@@ -75,7 +75,7 @@ static int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
     pmeta += 1;
 
     // version entry
-    int8_t version = (int8_t)pmeta[0];  // positive fixnum (7-bit positive integer)
+    // int8_t version = (int8_t)pmeta[0];  // positive fixnum (7-bit positive integer) commented to avoid warning
     pmeta += 1;
 
     // ndim entry

@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #include <blosc2.h>
 
@@ -58,7 +59,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       chunksize = (int32_t)size - i;
     nchunks = blosc2_schunk_append_buffer(schunk, (uint8_t *)data + i, chunksize);
     if (nchunks < 0) {
-      printf("Compression error.  Error code: %lld\n", nchunks);
+      printf("Compression error.  Error code: %" PRId64 "\n", nchunks);
       break;
     }
   }
