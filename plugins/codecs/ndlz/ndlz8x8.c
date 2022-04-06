@@ -444,7 +444,7 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   if (NDLZ_UNEXPECT_CONDITIONAL(input_len < 8)) {
     return 0;
   }
-  if (NDLZ_UNEXPECT_CONDITIONAL(output_len > blockshape[0] * blockshape[1])) {
+  if (NDLZ_UNEXPECT_CONDITIONAL(output_len < blockshape[0] * blockshape[1])) {
     return 0;
   }
 
