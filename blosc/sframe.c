@@ -69,7 +69,7 @@ void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int64_t nchunk,
   }
   int64_t wbytes = io_cb->write(chunk, 1, cbytes, fpc);
   io_cb->close(fpc);
-  if (wbytes != (size_t)cbytes) {
+  if (wbytes != cbytes) {
     BLOSC_TRACE_ERROR("Cannot write the full chunk.");
     return NULL;
   }
@@ -110,7 +110,7 @@ int32_t sframe_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t** chunk,
   io_cb->seek(fpc, 0L, SEEK_SET);
   int64_t rbytes = io_cb->read(*chunk, 1, chunk_cbytes, fpc);
   io_cb->close(fpc);
-  if (rbytes != (size_t)chunk_cbytes) {
+  if (rbytes != chunk_cbytes) {
     BLOSC_TRACE_ERROR("Cannot read the chunk out of the chunkfile.");
     return BLOSC2_ERROR_FILE_READ;
   }

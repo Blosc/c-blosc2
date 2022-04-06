@@ -9,6 +9,7 @@
 
 int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
                      int32_t output_len, uint8_t meta, blosc2_cparams *cparams, const void* chunk) {
+    BLOSC_UNUSED_PARAM(chunk);
     ZFP_ERROR_NULL(input);
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(cparams);
@@ -216,6 +217,7 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
 
 int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
                       int32_t output_len, uint8_t meta, blosc2_cparams *cparams, const void* chunk) {
+    BLOSC_UNUSED_PARAM(chunk);
     ZFP_ERROR_NULL(input);
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(cparams);
@@ -471,6 +473,7 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
 
 int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
                       int32_t output_len, uint8_t meta, blosc2_cparams *cparams, const void* chunk) {
+    BLOSC_UNUSED_PARAM(chunk);
     ZFP_ERROR_NULL(input);
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(cparams);
@@ -844,8 +847,8 @@ int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, u
     stream_close(stream);
     free(cell);
 
-    if ((zfpsize < 0) || (zfpsize > (destsize * 8)) || (zfpsize > (cell_nitems * typesize * 8)) ||
-        ((context->zfp_cell_nitems * typesize * 8) > zfpsize)) {
+    if ((zfpsize < 0) || ((int32_t)zfpsize > (destsize * 8)) || ((int32_t)zfpsize > (cell_nitems * typesize * 8)) ||
+        ((context->zfp_cell_nitems * typesize * 8) > (int32_t)zfpsize)) {
         BLOSC_TRACE_ERROR("ZFP error or small destsize");
         return -1;
     }

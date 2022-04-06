@@ -58,6 +58,7 @@
 
 int ndlz4_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                   uint8_t meta, blosc2_cparams *cparams) {
+  BLOSC_UNUSED_PARAM(meta);
 
   int8_t ndim;
   int64_t* shape = malloc(8 * sizeof(int64_t));
@@ -509,6 +510,8 @@ static unsigned char* copy_match_16(unsigned char *op, const unsigned char *matc
 
 int ndlz4_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                     uint8_t meta, blosc2_dparams *dparams) {
+  BLOSC_UNUSED_PARAM(meta);
+  BLOSC_UNUSED_PARAM(dparams);
 
   uint8_t* ip = (uint8_t*)input;
   uint8_t* ip_limit = ip + input_len;
