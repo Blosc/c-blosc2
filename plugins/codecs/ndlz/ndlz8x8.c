@@ -444,9 +444,6 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   if (NDLZ_UNEXPECT_CONDITIONAL(input_len < 8)) {
     return 0;
   }
-  if (NDLZ_UNEXPECT_CONDITIONAL(output_len < blockshape[0] * blockshape[1])) {
-    return 0;
-  }
 
   /* we start with literal copy */
   ndim = *ip;
@@ -462,6 +459,9 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   eshape[0] = ((blockshape[0] + 7) / cell_shape) * cell_shape;
   eshape[1] = ((blockshape[1] + 7) / cell_shape) * cell_shape;
 
+  if (NDLZ_UNEXPECT_CONDITIONAL(output_len < blockshape[0] * blockshape[1])) {
+    return 0;
+  }
   memset(op, 0, blockshape[0] * blockshape[1]);
 
   uint32_t i_stop[2];
