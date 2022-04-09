@@ -1,12 +1,12 @@
-# Announcing C-Blosc2 2.0.4
+# Announcing C-Blosc2 2.1.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
 The Blosc development team is happy to announce a new release of C-Blosc2.
-This is a maintenance release for fixing a recent issue with the BloscLZ codec,
-introducing a new `blosc2_rename_urlpath()` function and some other small
-improvements and fixes.
+This is a minor release for giving support to the [ZFP codec]([ZFP lossy codec](https://zfp.readthedocs.io/)),
+meant to do lossy compression with multidimensional floating point data.
+More info at: https://www.blosc.org/posts/support-lossy-zfp/
 
 C-Blosc2 should be backward compatible with C-Blosc, so you can start using
 it right away and increasingly start to use its new functionality, like the

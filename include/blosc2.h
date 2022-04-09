@@ -51,11 +51,11 @@ extern "C" {
 
 /* Version numbers */
 #define BLOSC_VERSION_MAJOR    2    /* for major interface/format changes  */
-#define BLOSC_VERSION_MINOR    0    /* for minor interface/format changes  */
-#define BLOSC_VERSION_RELEASE  5    /* for tweaks, bug-fixes, or development */
+#define BLOSC_VERSION_MINOR    1    /* for minor interface/format changes  */
+#define BLOSC_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC_VERSION_STRING   "2.0.5.dev"  /* string version.  Sync with above! */
-#define BLOSC_VERSION_DATE     "$Date:: 2021-10-02 #$"    /* date version */
+#define BLOSC_VERSION_STRING   "2.1.0"  /* string version.  Sync with above! */
+#define BLOSC_VERSION_DATE     "$Date:: 2022-04-09 #$"    /* date version */
 
 
 /* Tracing macros */

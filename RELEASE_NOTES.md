@@ -1,10 +1,20 @@
-Release notes for C-Blosc2 2.0.5
+Release notes for C-Blosc2 2.1.0
 ================================
 
-Changes from 2.0.4 to 2.0.5
+Changes from 2.0.4 to 2.1.0
 ===========================
 
-#XXX version-specific blurb XXX#
+* Support of the [ZFP lossy codec](https://zfp.readthedocs.io/) as a plugin.  This is mainly meant for compressing multidimensional arrays of floating point data, so it is better used in combination with [Caterva](https://github.com/Blosc/caterva).  More info at our blog: https://www.blosc.org/posts/support-lossy-zfp/. Thanks to Oscar Guiñon and Francesc Alted.
+
+* Massive cleanup of warnings.  Thanks to Marta Iborra.
+
+* Fixed some bugs in test updates and insertions in 64-bit super chunks.  Thanks to Francesc Alted.
+
+* Fixed the build on FreeBSD/powerpc64le.  Thanks to @pkubaj.
+
+* Updated internal zstd sources to 1.5.2.
+
+* Updated internal zlib-ng to 2.0.6.
 
 
 Changes from 2.0.3 to 2.0.4
