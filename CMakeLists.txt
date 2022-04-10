@@ -158,16 +158,18 @@ if(NOT DEACTIVATE_ZLIB)
         endif()
     else()
         message(STATUS "Using ZLIB-NG internal sources for ZLIB support.")
+
         set(HAVE_ZLIB_NG TRUE)
+        add_definitions(-DZLIB_COMPAT)
         set(ZLIB_NG_DIR "zlib-ng-2.0.6")  # update to the actual included version
-        set(ZLIB_COMPAT FALSE)
+        set(ZLIB_COMPAT TRUE)
         set(SKIP_INSTALL_ALL TRUE)
         set(BUILD_SHARED_LIBS FALSE)
         set(ZLIB_ENABLE_TESTS OFF)
         add_subdirectory("internal-complibs/${ZLIB_NG_DIR}")
 
         file(COPY
-                ${CMAKE_CURRENT_BINARY_DIR}/internal-complibs/${ZLIB_NG_DIR}/zconf-ng.h
+                ${CMAKE_CURRENT_BINARY_DIR}/internal-complibs/${ZLIB_NG_DIR}/zconf.h
                 DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/internal-complibs/${ZLIB_NG_DIR}/)
     endif()
     # HAVE_ZLIB will be set to true because even if the library is not found,
