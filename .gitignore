@@ -1,4 +1,5 @@
 bench/bench
+blosc/config.h
 build*
 .idea
 cmake-build-*
