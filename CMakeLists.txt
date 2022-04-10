@@ -160,18 +160,19 @@ if(NOT DEACTIVATE_ZLIBNG)
         set(HAVE_ZLIBNG TRUE)
     endif()
 
-if(HAVE_ZLIB_NG)
-    set(ZLIB_NG_DIR "zlib-ng-2.0.6")  # update to the actual included version
-    add_definitions(-DZLIB_COMPAT)
-    set(ZLIB_COMPAT TRUE)
-    set(SKIP_INSTALL_ALL TRUE)
-    set(BUILD_SHARED_LIBS FALSE)
-    set(ZLIB_ENABLE_TESTS OFF)
-    add_subdirectory("internal-complibs/${ZLIB_NG_DIR}")
+    if(NOT HAVE_ZLIBNG)
+        set(ZLIBNG_DIR "zlib-ng-2.0.6")  # update to the actual included version
+        add_definitions(-DZLIB_COMPAT)
+        set(ZLIB_COMPAT TRUE)
+        set(SKIP_INSTALL_ALL TRUE)
+        set(BUILD_SHARED_LIBS FALSE)
+        set(ZLIB_ENABLE_TESTS OFF)
+        add_subdirectory("internal-complibs/${ZLIBNG_DIR}")
 
-    file(COPY
-            ${CMAKE_CURRENT_BINARY_DIR}/internal-complibs/${ZLIB_NG_DIR}/zconf.h
-            DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/internal-complibs/${ZLIB_NG_DIR}/)
+        file(COPY
+                ${CMAKE_CURRENT_BINARY_DIR}/internal-complibs/${ZLIBNG_DIR}/zconf.h
+                DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/internal-complibs/${ZLIBNG_DIR}/)
+    endif()
 endif()
 
 if(NOT DEACTIVATE_ZSTD)
