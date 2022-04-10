@@ -14,7 +14,7 @@ SOURCES += $(wildcard $(LZ4_DIR)/*.c)
 #LDFLAGS += -llz4
 
 # Support for external Zlib
-LDFLAGS += -DHAVE_ZLIB -lz
+LDFLAGS += -DHAVE_ZLIBNG -lz-ng
 
 # Support for internal Zlib
 #ZLIB_DIR = ../internal-complibs/zlib-1.2.8
