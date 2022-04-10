@@ -1,0 +1,11 @@
+#ifndef _CONFIGURATION_HEADER_GUARD_H_
+#define _CONFIGURATION_HEADER_GUARD_H_
+
+#define HAVE_ZLIB TRUE
+#define HAVE_ZLIB_NG TRUE
+#define HAVE_ZSTD TRUE
+/* #undef HAVE_IPP */
+/* #undef BLOSC_DLL_EXPORT */
+#define HAVE_PLUGINS TRUE
+
+#endif

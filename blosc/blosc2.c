@@ -43,7 +43,7 @@
   #include <ippdc.h>
 #endif
 #if defined(HAVE_ZLIB_NG)
-  #include "zlib.h"
+  #include "zlib-ng.h"
 #elif defined(HAVE_ZLIB)
   #include "zlib.h"
 #endif /*  HAVE_MINIZ */
@@ -432,7 +432,7 @@ static int zlib_wrap_compress(const char* input, size_t input_length,
                               char* output, size_t maxout, int clevel) {
   int status;
   uLongf cl = (uLongf)maxout;
-  status = compress2(
+  status = zng_compress2(
       (Bytef*)output, &cl, (Bytef*)input, (uLong)input_length, clevel);
   if (status != Z_OK) {
     return 0;
@@ -444,7 +444,7 @@ static int zlib_wrap_decompress(const char* input, size_t compressed_length,
                                 char* output, size_t maxout) {
   int status;
   uLongf ul = (uLongf)maxout;
-  status = uncompress(
+  status = zng_uncompress(
       (Bytef*)output, &ul, (Bytef*)input, (uLong)compressed_length);
   if (status != Z_OK) {
     return 0;
@@ -3348,7 +3348,7 @@ int blosc_get_complib_info(const char* compname, char** complib, char** version)
   }
 #if defined(HAVE_ZLIB)
   else if (clibcode == BLOSC_ZLIB_LIB) {
-    clibversion = ZLIB_VERSION;
+    clibversion = ZLIBNG_VERSION;
   }
 #endif /* HAVE_ZLIB */
 #if defined(HAVE_ZSTD)
