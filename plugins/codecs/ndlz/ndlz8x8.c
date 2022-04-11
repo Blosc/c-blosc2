@@ -104,8 +104,6 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
   uint32_t tab_pair[1U << 12U] = {0};
   uint32_t update_triple[6] = {0};
   uint32_t update_pair[7] = {0};
-  uint32_t triple_match[3] = {0};
-  uint32_t pair_matches[5] = {0};
 
   // Minimum cratios before issuing and _early giveup_
   // Remind that ndlz is not meant for cratios <= 2 (too costly to decompress)
@@ -233,7 +231,6 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
           bool literal = true;
 
           // rows triples matches
-          triple_match[0] = 0;
           for (int i = 0; i < 6; i++) {
             int triple_start = i * cell_shape;
             hval = XXH32(&buf_cell[triple_start], 24, 1);        // calculate triple hash
@@ -278,7 +275,6 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
           }
 
           // rows pairs matches
-          pair_matches[0] = 0;
           for (int i = 0; i < 7; i++) {
             int pair_start = i * cell_shape;
             hval = XXH32(&buf_cell[pair_start], 16, 1);        // calculate rows pair hash
@@ -473,7 +469,7 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   /* main loop */
   uint32_t ii[2];
   uint32_t padding[2];
-  uint32_t ind;
+  uint32_t ind = 0;
   uint8_t* local_buffer = malloc(cell_size);
   uint8_t* cell_aux = malloc(cell_size);
   for (ii[0] = 0; ii[0] < i_stop[0]; ++ii[0]) {

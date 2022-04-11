@@ -113,7 +113,7 @@ static int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
     return slen;
 }
 
-int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t meta, blosc2_cparams* cparams) {
+int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_cparams* cparams) {
 
     int8_t ndim;
     int64_t* shape = malloc(8 * sizeof(int64_t));
@@ -234,7 +234,7 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t
 }
 
 
-int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, int8_t meta, blosc2_dparams* dparams) {
+int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_dparams* dparams) {
 
     blosc2_schunk *schunk = dparams->schunk;
     int8_t ndim;

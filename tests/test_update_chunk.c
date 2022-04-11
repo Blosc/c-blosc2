@@ -136,8 +136,8 @@ static char* test_update_chunk(void) {
 }
 
 static char *all_tests(void) {
-  for (int i = 0; i < sizeof(tstorage) / sizeof(test_storage); ++i) {
-    for (int j = 0; j < sizeof(tndata) / sizeof(test_ndata); ++j) {
+  for (int i = 0; i < (int) (sizeof(tstorage) / sizeof(test_storage)); ++i) {
+    for (int j = 0; j < (int) (sizeof(tndata) / sizeof(test_ndata)); ++j) {
       tdata.contiguous = tstorage[i].contiguous;
       tdata.urlpath = tstorage[i].urlpath;
       tdata.nchunks = tndata[j].nchunks;

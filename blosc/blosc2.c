@@ -2316,7 +2316,7 @@ int blosc_compress_context(blosc2_context* context) {
   else {
     // Check whether we have a run for the whole chunk
     int start_csizes = context->header_overhead + 4 * context->nblocks;
-    if (ntbytes == start_csizes + nstreams * sizeof(int32_t)) {
+    if (ntbytes == (int)(start_csizes + nstreams * sizeof(int32_t))) {
       // The streams are all zero runs (by construction).  Encode it...
       context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] |= BLOSC2_SPECIAL_ZERO << 4;
       // ...and assign the new chunk length
@@ -3953,7 +3953,7 @@ int register_filter_private(blosc2_filter *filter) {
         return BLOSC2_ERROR_FAILURE;
     }
     if (filter->id > BLOSC2_USER_REGISTERED_FILTERS_STOP) {
-        BLOSC_TRACE_ERROR("The id must be leather or equal than %d", BLOSC2_USER_REGISTERED_FILTERS_STOP);
+        BLOSC_TRACE_ERROR("The id must be lower or equal than %d", BLOSC2_USER_REGISTERED_FILTERS_STOP);
         return BLOSC2_ERROR_FAILURE;
     }
 
@@ -3974,7 +3974,7 @@ int register_filter_private(blosc2_filter *filter) {
 
 int blosc2_register_filter(blosc2_filter *filter) {
   if (filter->id < BLOSC2_USER_REGISTERED_FILTERS_START) {
-    BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_USER_REGISTERED_FILTERS_START);
+    BLOSC_TRACE_ERROR("The id must be greater or equal to %d", BLOSC2_USER_REGISTERED_FILTERS_START);
     return BLOSC2_ERROR_FAILURE;
   }
 
@@ -3995,7 +3995,7 @@ int register_codec_private(blosc2_codec *codec) {
         return BLOSC2_ERROR_FAILURE;
     }
     if (codec->compcode > BLOSC2_USER_REGISTERED_CODECS_STOP) {
-        BLOSC_TRACE_ERROR("The id must be leather or equal than %d", BLOSC2_USER_REGISTERED_CODECS_STOP);
+        BLOSC_TRACE_ERROR("The id must be lower or equal to %d", BLOSC2_USER_REGISTERED_CODECS_STOP);
         return BLOSC2_ERROR_FAILURE;
     }
 

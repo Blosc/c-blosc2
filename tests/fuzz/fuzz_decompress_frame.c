@@ -15,9 +15,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   blosc_init();
   blosc_set_nthreads(1);
 
-  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-  dparams.nthreads = 1;
-
   /* Create a super-chunk backed by an in-memory frame */
   blosc2_schunk* schunk = blosc2_schunk_from_buffer((uint8_t *) data, (int64_t)size, false);
   if (schunk == NULL) {

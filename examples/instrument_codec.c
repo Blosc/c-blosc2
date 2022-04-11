@@ -35,7 +35,7 @@ int main(void) {
   float *data_dest = malloc(SIZE * sizeof(float));
   int isize = SIZE * sizeof(float), osize = SIZE * sizeof(float);
   int dsize = SIZE * sizeof(float), csize;
-  int i, ret;
+  int i;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_context *cctx, *dctx;
@@ -89,7 +89,7 @@ int main(void) {
   printf("Decompression successful!\n");
 
   blosc2_instr *datai = (blosc2_instr *)data_dest;
-  for (i = 0; i < dsize / sizeof(blosc2_instr); i++) {
+  for (i = 0; i < dsize / (int) sizeof(blosc2_instr); i++) {
     printf("%.3g - ", datai->cratio);
     printf("%.3g - ", datai->cspeed);
     printf("%.3g - ", datai->filter_speed);
