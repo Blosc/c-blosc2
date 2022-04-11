@@ -94,7 +94,7 @@ int create_cframe(const char* compname) {
   // Add some vlmetalayers data
   int32_t content_len = 10;
   uint8_t *content = malloc(content_len);
-  for (uint32_t j = 0; j < content_len; ++j) {
+  for (int32_t j = 0; j < content_len; ++j) {
     content[j] = (uint8_t) j;
   }
   int umlen = blosc2_vlmeta_add(schunk, "vlmetalayer", content, content_len, NULL);

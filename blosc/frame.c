@@ -2219,7 +2219,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       }
       // The last block could be incomplete, mainly due to the fact that the block size is not divisible
       // by the typesize
-      block_csizes[nblocks - 1] = (int32_t)(leftover_block ? leftover_block : chunk_blocksize);
+      block_csizes[nblocks - 1] = (int)(leftover_block ? leftover_block : chunk_blocksize);
     }
     else {
       // In regular, compressed chunks, we need to sort the bstarts (they can be out
