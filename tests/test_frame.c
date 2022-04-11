@@ -283,7 +283,7 @@ static char *all_tests(void) {
             for (int ifilter_pipeline = 0; ifilter_pipeline < 2; ifilter_pipeline++) {
               for (int imetalayers = 0; imetalayers < 2; imetalayers++) {
                 for (int ivlmetalayers = 0; ivlmetalayers < 2; ivlmetalayers++) {
-                  for (int iblocksize = 0; iblocksize < sizeof(blocksize_) / sizeof(int32_t); ++iblocksize) {
+                  for (int iblocksize = 0; iblocksize < (int) (sizeof(blocksize_) / sizeof(int32_t)); ++iblocksize) {
                         blocksize = blocksize_[iblocksize];
                         splits = (bool) isplits;
                         multithread = (bool) imultithread;

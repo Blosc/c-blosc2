@@ -91,7 +91,7 @@ static char *test_compress_getitem(void) {
 
   /* Decompress the buffer */
   nbytes = blosc_getitem(dest, 1, 10, dest2);
-  mu_assert("ERROR: nbytes incorrect(1)", nbytes == 10 * typesize);
+  mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int32_t) (10 * typesize));
 
   // Check roundtrip
   int exit_code = memcmp(srccpy + typesize, dest2, 10 * typesize) ? EXIT_FAILURE : EXIT_SUCCESS;

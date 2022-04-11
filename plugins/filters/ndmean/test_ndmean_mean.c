@@ -97,7 +97,7 @@ static void swap_store(void *dest, const void *pa, int size) {
     free(pa2_);
 }
 
-static int32_t deserialize_meta(uint8_t *smeta, uint32_t smeta_len, int8_t *ndim, int64_t *shape,
+static int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
                          int32_t *chunkshape, int32_t *blockshape) {
     BLOSC_UNUSED_PARAM(smeta_len);
     uint8_t *pmeta = smeta;
@@ -106,7 +106,7 @@ static int32_t deserialize_meta(uint8_t *smeta, uint32_t smeta_len, int8_t *ndim
     pmeta += 1;
 
     // version entry
-    int8_t version = (int8_t) pmeta[0];  // positive fixnum (7-bit positive integer)
+    // int8_t version = (int8_t) pmeta[0];  // positive fixnum (7-bit positive integer) commented to avoid warning
     pmeta += 1;
 
     // ndim entry
@@ -143,8 +143,8 @@ static int32_t deserialize_meta(uint8_t *smeta, uint32_t smeta_len, int8_t *ndim
         swap_store(blockshape + i, pmeta, sizeof(int32_t));
         pmeta += sizeof(int32_t);
     }
-    uint32_t slen = (uint32_t)(pmeta - smeta);
-    return 0;
+    int32_t slen = (int32_t)(pmeta - smeta);
+    return slen;
 }
 
 

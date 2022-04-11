@@ -42,7 +42,7 @@ extern "C" {
 
 // Return true if platform is little endian; else false
 static bool is_little_endian(void) {
-  const static int i = 1;
+  static const int i = 1;
   char* p = (char*)&i;
 
   if (p[0] == 1) {

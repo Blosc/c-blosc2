@@ -104,7 +104,7 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(chunkshape);
     free(blockshape);
 
-    if (zfpsize < 0) {
+    if (zfpsize == 0) {
         BLOSC_TRACE_ERROR("\n ZFP: Compression failed\n");
         free(aux_out);
         return (int) zfpsize;
@@ -207,7 +207,7 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(chunkshape);
     free(blockshape);
 
-    if (zfpsize < 0) {
+    if (zfpsize == 0) {
         BLOSC_TRACE_ERROR("\n ZFP: Decompression failed\n");
         return (int) zfpsize;
     }
@@ -336,7 +336,7 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(chunkshape);
     free(blockshape);
 
-    if (zfpsize < 0) {
+    if (zfpsize == 0) {
         BLOSC_TRACE_ERROR("\n ZFP: Compression failed\n");
         free(aux_out);
         return (int) zfpsize;
@@ -463,7 +463,7 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     free(chunkshape);
     free(blockshape);
 
-    if (zfpsize < 0) {
+    if (zfpsize == 0) {
         BLOSC_TRACE_ERROR("\n ZFP: Decompression failed\n");
         return (int) zfpsize;
     }
@@ -584,7 +584,7 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(chunkshape);
     free(blockshape);
 
-    if (zfpsize < 0) {
+    if (zfpsize == 0) {
         BLOSC_TRACE_ERROR("\n ZFP: Compression failed\n");
         free(aux_out);
         return (int) zfpsize;
@@ -687,7 +687,7 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     free(chunkshape);
     free(blockshape);
 
-    if (zfpsize < 0) {
+    if (zfpsize == 0) {
         BLOSC_TRACE_ERROR("\n ZFP: Decompression failed\n");
         return (int) zfpsize;
     }
@@ -698,7 +698,7 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
 
 int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, uint8_t *dest, int32_t destsize) {
     bool meta = false;
-    uint8_t ndim;
+    uint8_t ndim = ZFP_MAX_DIM + 1;
     int32_t blockshape[4];      // ZFP only works for caterva datasets
     for (int nmetalayer = 0; nmetalayer < context->schunk->nmetalayers; nmetalayer++) {
         if (strcmp("caterva", context->schunk->metalayers[nmetalayer]->name) == 0) {
@@ -716,7 +716,7 @@ int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, u
     if (!meta) {
         return -1;
     }
-    assert(ndim <= 4);
+    assert(ndim <= ZFP_MAX_DIM);
     int64_t cell_start_ndim[4], cell_ind_ndim[4], ncell_ndim[4], ind_strides[4], cell_strides[4];
     int64_t cell_ind, ncell;
     int cellshape = 4;
@@ -847,7 +847,7 @@ int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, u
     stream_close(stream);
     free(cell);
 
-    if ((zfpsize < 0) || ((int32_t)zfpsize > (destsize * 8)) || ((int32_t)zfpsize > (cell_nitems * typesize * 8)) ||
+    if ((zfpsize == 0) || ((int32_t)zfpsize > (destsize * 8)) || ((int32_t)zfpsize > (cell_nitems * typesize * 8)) ||
         ((context->zfp_cell_nitems * typesize * 8) > (int32_t)zfpsize)) {
         BLOSC_TRACE_ERROR("ZFP error or small destsize");
         return -1;

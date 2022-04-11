@@ -102,8 +102,8 @@ static char* test_reorder_offsets(void) {
 
 static char *all_tests(void) {
 
-  for (int i = 0; i < sizeof(tstorage) / sizeof(test_storage); ++i) {
-    for (int j = 0; j < sizeof(tnchunks) / sizeof(int32_t); ++j) {
+  for (int i = 0; i < (int) (sizeof(tstorage) / sizeof(test_storage)); ++i) {
+    for (int j = 0; j < (int) (sizeof(tnchunks) / sizeof(int32_t)); ++j) {
 
       tdata.contiguous = tstorage[i].contiguous;
       tdata.urlpath = tstorage[i].urlpath;

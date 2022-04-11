@@ -88,7 +88,7 @@ void init_buffer(void* src, size_t size, int rshift) {
   srand(1);
 
   /* Initialize the original buffer */
-  for (i = 0; i < size / sizeof(int); ++i) {
+  for (i = 0; i < (int) (size / sizeof(int)); ++i) {
     /* Choose one below */
     /* _src[i] = 0;
      * _src[i] = 0x01010101;
@@ -494,7 +494,7 @@ int main(int argc, char* argv[]) {
       for (elsize_ = elsize; elsize_ <= 32; elsize_++) {
         /* The next loop is for getting sizes that are not power of 2 */
         for (i = -elsize_ * 2; i <= elsize_ * 2; i += elsize_) {
-          for (size_ = size; size_ <= 16 * MB; size_ *= 2) {
+          for (size_ = size; size_ <= (int) (16 * MB); size_ *= 2) {
             nchunks = get_nchunks(size_ + i, workingset);
             for (nthreads_ = nthreads; nthreads_ <= 6; nthreads_++) {
               do_bench(compressor, shuffle, nthreads_, size_ + i, elsize_, rshift_, output_file);
