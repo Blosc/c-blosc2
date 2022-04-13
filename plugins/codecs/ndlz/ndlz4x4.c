@@ -21,6 +21,7 @@
 #include "ndlz4x4.h"
 #include "ndlz.h"
 #include "xxhash.h"
+#include "../plugins/plugin_utils.h"
 
 
 /*
