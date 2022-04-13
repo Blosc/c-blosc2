@@ -87,7 +87,7 @@ static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *
 #endif
 
 #if defined(__SSE2__)
-static uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
 
   while (ip < (ip_bound - sizeof(__m128i))) {
@@ -143,7 +143,7 @@ static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref
 
 
 /* Return the byte that starts to differ */
-static uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
 #if !defined(BLOSC_STRICT_ALIGN)
   while (ip < (ip_bound - sizeof(int64_t))) {
     if (*(int64_t*)ref != *(int64_t*)ip) {

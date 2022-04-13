@@ -6,6 +6,7 @@
 #include <math.h>
 #include "context.h"
 #include "assert.h"
+#include "../plugins/plugin_utils.h"
 
 int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
                      int32_t output_len, uint8_t meta, blosc2_cparams *cparams, const void* chunk) {
