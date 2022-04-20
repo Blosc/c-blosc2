@@ -6,14 +6,14 @@ ZFP: a multidimensional lossy codec
 Plugin motivation
 --------------------
 
-A lossy codec like ZFP allows for much better compression ratios at the expense of loosing some precision in floating point data.  At the same time, and if executed carefully, it can tentatively allow for a third level partition for Caterva (a light-weight layer for multidimensional data on top of C-Blosc2) so that slicing could be done even more efficiently with this codec (not implemented yet).
+A lossy codec like ZFP allows for much better compression ratios at the expense of loosing some precision in floating point data.  For a discussion on how it works and specially, how it performs, see our blog at: https://www.blosc.org/posts/support-lossy-zfp/.
 
 Plugin usage
 -------------------
 
 The codec consists of different encoders to codify data and decoders to recover the original data, located at `blosc2-zfp.c`.
 
-This plugin only works with 1 to 4-dim datasets of floats or doubles, so if one tries to work with another type of dataset, it will return an error value. Also, the blocksize requires to be a minimum of 4 items for 1 dim, 4x4 for 2 dim, 4x4x4 for 3 dim and 4x4x4x4 for 4 dim.
+This plugin only works with 1 to 4-dim datasets of floats or doubles, so if one tries to work with another type of dataset, it will return an error value. Also, the blocksize requires to be a minimum of 4 items for 1 dim, 4x4 for 2 dim, 4x4x4 for 3 dim and 4x4x4x4 for 4 dim.  Finally, the ZFP codecs do interpret the *values*, so they are meant to be used *without any shuffle filter* (that would break byte/bit ordering, and hence, changing the values before they would reach the ZFP codec).
 
 The parameters used by *ZFP* are the ones specified in the `blosc2_codec` structure in the `blosc2.h` header.
 Furthermore, *ZFP* allows to work in three modes, BLOSC_CODEC_ZFP_FIXED_ACCURACY, BLOSC_CODEC_ZFP_FIXED_PRECISION and BLOSC_CODEC_ZFP_FIXED_RATE, each of one can be fine-tuned via the `meta` parameter as follows:
@@ -54,8 +54,7 @@ https://github.com/LLNL/zfp
 Advantages and disadvantages
 ------------------------------
 
-The main advantage of *ZFP* when compared with others is that *ZFP* makes use of the multidimensionality of datasets and takes advantage of this instead of
-processing all data as serial.
+The main advantage of *ZFP* when compared with others is that *ZFP* makes use of the multidimensionality of datasets and takes advantage of this instead of processing all data as serial.
 
 For example, the difference between *ZFP* and *NDLZ* is that *ZFP* codec uses lossy data compression (which implies better ratios) and lets user to work with floating-point datasets.  Furthermore, *ZFP* implements different compression modes that brings interesting new possibilities.
 
