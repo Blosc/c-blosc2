@@ -13,7 +13,7 @@ Plugin usage
 
 The codec consists of different encoders to codify data and decoders to recover the original data, located at `blosc2-zfp.c`.
 
-This plugin only works with 1 to 4-dim datasets of floats or doubles, so if one tries to work with another type of dataset, it will return an error value.
+This plugin only works with 1 to 4-dim datasets of floats or doubles, so if one tries to work with another type of dataset, it will return an error value. Also, the blocksize requires to be a minimum of 4 items for 1 dim, 4x4 for 2 dim, 4x4x4 for 3 dim and 4x4x4x4 for 4 dim.
 
 The parameters used by *ZFP* are the ones specified in the `blosc2_codec` structure in the `blosc2.h` header.
 Furthermore, *ZFP* allows to work in three modes, BLOSC_CODEC_ZFP_FIXED_ACCURACY, BLOSC_CODEC_ZFP_FIXED_PRECISION and BLOSC_CODEC_ZFP_FIXED_RATE, each of one can be fine-tuned via the `meta` parameter as follows:
