@@ -1,0 +1,10 @@
+[package]
+name = "q_compress_blosc"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+q_compress = "0.9.2"
+
+[lib]
+crate-type = ["dylib"]

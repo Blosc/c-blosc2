@@ -8,6 +8,7 @@
 #include "blosc2/codecs-registry.h"
 #include "ndlz/ndlz.h"
 #include "zfp/blosc2-zfp.h"
+#include "qco/q_compress.h"
 
 void register_codecs() {
 
@@ -46,4 +47,13 @@ void register_codecs() {
     zfp_rate.decoder = zfp_rate_decompress;
     zfp_rate.compname = "zfp_rate";
     register_codec_private(&zfp_rate);
+
+    blosc2_codec q_compress;
+    q_compress.compcode = BLOSC_CODEC_Q_COMPRESS;
+    q_compress.compver = 0;
+    q_compress.complib = BLOSC_CODEC_Q_COMPRESS;
+    q_compress.encoder = q_compress_blosc;
+    q_compress.decoder = q_decompress_blosc;
+    q_compress.compname = "q_compress";
+    register_codec_private(&q_compress);
 }

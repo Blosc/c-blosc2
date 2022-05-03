@@ -3,3 +3,5 @@ build*
 .idea
 cmake-build-*
 /doc/doxygen/xml/
+Cargo.lock
+.swp
