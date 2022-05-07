@@ -15,7 +15,7 @@ jobs:
           - name: Ubuntu GCC No Plugins
             os: ubuntu-latest
             compiler: gcc
-            cmake-args: -DBUILD_PLUGINS=OFF
+            cmake-args: -D BUILD_PLUGINS=OFF
 
           # Out of source build
           - name: Ubuntu GCC OSB
@@ -28,13 +28,13 @@ jobs:
             os: ubuntu-latest
             compiler: gcc
             packages: liblz4-1 liblz4-dev
-            cmake-args: -DPREFER_EXTERNAL_LZ4=ON
+            cmake-args: -D PREFER_EXTERNAL_LZ4=ON
 
           - name: Ubuntu GCC External ZLIB
             os: ubuntu-latest
             compiler: gcc
             packages: zlib1g-dev
-            cmake-args: -DPREFER_EXTERNAL_ZLIB=ON
+            cmake-args: -D PREFER_EXTERNAL_ZLIB=ON
 
             # Not too recent Zstd libs (< 1.4.4) in distros perform pretty bad on compression
             # ratios when using dictionaries, making some tests not passing.
@@ -43,7 +43,7 @@ jobs:
             #   os: ubuntu-latest
             #   compiler: gcc
             #   packages: zstd libzstd-dev
-            #   cmake-args: -DPREFER_EXTERNAL_ZSTD=ON
+            #   cmake-args: -D PREFER_EXTERNAL_ZSTD=ON
 
           - name: Ubuntu GCC ARM SF
             os: ubuntu-latest
@@ -67,17 +67,17 @@ jobs:
           - name: Ubuntu Clang No AVX2
             os: ubuntu-latest
             compiler: clang
-            cmake-args: -DDEACTIVATE_AVX2=ON
+            cmake-args: -D DEACTIVATE_AVX2=ON
 
           - name: Ubuntu Clang No ZLIB
             os: ubuntu-latest
             compiler: clang
-            cmake-args: -DDEACTIVATE_ZLIB=ON
+            cmake-args: -D DEACTIVATE_ZLIB=ON
 
           - name: Ubuntu Clang No ZSTD
             os: ubuntu-latest
             compiler: clang
-            cmake-args: -DDEACTIVATE_ZSTD=ON
+            cmake-args: -D DEACTIVATE_ZSTD=ON
 
           - name: Windows MSVC Win32
             os: windows-latest
