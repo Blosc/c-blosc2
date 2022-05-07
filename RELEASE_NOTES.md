@@ -1,10 +1,16 @@
-Release notes for C-Blosc2 2.1.0
+Release notes for C-Blosc2 2.1.1
 ================================
 
 Changes from 2.1.0 to 2.1.1
 ===========================
 
-#XXX version-specific blurb XXX#
+* Fixed a nasty bug introduced in 2.1.0 that affects to the blosclz codec in ARM arch. See https://github.com/Blosc/c-blosc2/issues/392.
+
+* Added support for external zlib-ng (see https://github.com/Blosc/c-blosc2/pull/393).  Thanks to Mark Harfouche.
+
+* Fixed more compiler warnings (https://github.com/Blosc/c-blosc2/pull/394).  Now C-Blosc2 should be relatively free of them.
+
+* Fixed more fuzzer issues.
 
 
 Changes from 2.0.4 to 2.1.0
