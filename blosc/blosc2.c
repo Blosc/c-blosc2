@@ -1521,12 +1521,14 @@ static int blosc_d(
       BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
       sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
       fp = io_cb->open(chunkpath, "rb", context->schunk->storage->io->params);
+      BLOSC_ERROR_NULL(fp, BLOSC2_ERROR_FILE_OPEN);
       free(chunkpath);
       // The offset of the block is src_offset
       io_cb->seek(fp, src_offset, SEEK_SET);
     }
     else {
       fp = io_cb->open(urlpath, "rb", context->schunk->storage->io->params);
+      BLOSC_ERROR_NULL(fp, BLOSC2_ERROR_FILE_OPEN);
       // The offset of the block is src_offset
       io_cb->seek(fp, chunk_offset + src_offset, SEEK_SET);
     }
@@ -2891,8 +2893,8 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
       context->header_overhead + j * bsize : sw32_(context->bstarts + j);
 
     int32_t cbytes = blosc_d(context->serial_context, bsize, leftoverblock, memcpyed,
-                         src, srcsize, src_offset, j,
-                         tmp2, 0, scontext->tmp, scontext->tmp3);
+                             src, srcsize, src_offset, j,
+                             tmp2, 0, scontext->tmp, scontext->tmp3);
     if (cbytes < 0) {
       ntbytes = cbytes;
       break;
