@@ -14,7 +14,8 @@ if(BUILD_TESTS)
     target_link_libraries(test_ndcell blosc_testing)
 
     # tests
-    add_test(test_plugin_test_ndcell test_ndcell)
+    add_test(NAME test_plugin_test_ndcell
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_ndcell>)
 
     # Copy test files
     file(GLOB TESTS_DATA ../../test_data/*.caterva)

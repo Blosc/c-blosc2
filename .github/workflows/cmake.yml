@@ -64,6 +64,21 @@ jobs:
             compiler: clang
             cmake-args: -DDEACTIVATE_ZSTD=ON
 
+          - name: Ubuntu GCC ARM SF
+            os: ubuntu-latest
+            packages: qemu qemu-user gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libc-dev-armel-cross
+            cmake-args: -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain-armsf.cmake
+
+          - name: Ubuntu GCC ARM HF
+            os: ubuntu-latest
+            packages: qemu qemu-user gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf libc-dev-armel-cross
+            cmake-args: -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain-armhf.cmake
+
+          - name: Ubuntu GCC AARCH64
+            os: ubuntu-latest
+            packages: qemu qemu-user gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc-dev-arm64-cross
+            cmake-args: -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64.cmake
+
           - name: Windows MSVC Win32
             os: windows-latest
             compiler: cl

@@ -18,8 +18,10 @@ if(BUILD_TESTS)
     target_link_libraries(test_ndmean_mean blosc_testing)
 
     # tests
-    add_test(test_plugin_ndmean_repart test_ndmean_repart)
-    add_test(test_plugin_ndmean_mean test_ndmean_mean)
+    add_test(NAME test_plugin_ndmean_repart
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_ndmean_repart>)
+    add_test(NAME test_plugin_ndmean_mean
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_ndmean_mean>)
 
     # Copy test files
     file(GLOB TESTS_DATA *.caterva)

@@ -120,9 +120,11 @@ foreach(source ${SOURCES})
             set(test_name "${target}_${test_name_params}")
 
             separate_arguments(test_params)
-            add_test(${test_name} ${target} ${test_params})
+            add_test(NAME ${test_name}
+                COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:${target}> ${test_params})
         endforeach()
     else()
-        add_test(${target} ${target})
+        add_test(NAME ${target}
+            COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:${target}>)
     endif()
 endforeach()
