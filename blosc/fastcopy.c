@@ -208,16 +208,46 @@ static inline unsigned char *chunk_memcpy(unsigned char *out, const unsigned cha
   len -= by8;
   switch (by8) {
     case 7:
-    case 6:
-    case 5:
-    case 4:
-    case 3:
-    case 2:
-    case 1:
       out = copy_8_bytes(out, from);
       from += sz;
       #ifdef AVOID_FALLTHROUGH_WARNING
       __attribute__ ((fallthrough));  // Shut-up -Wimplicit-fallthrough warning in GCC
+      #endif
+    case 6:
+      out = copy_8_bytes(out, from);
+      from += sz;
+      #ifdef AVOID_FALLTHROUGH_WARNING
+      __attribute__ ((fallthrough));
+      #endif
+    case 5:
+      out = copy_8_bytes(out, from);
+      from += sz;
+      #ifdef AVOID_FALLTHROUGH_WARNING
+      __attribute__ ((fallthrough));
+      #endif
+    case 4:
+      out = copy_8_bytes(out, from);
+      from += sz;
+      #ifdef AVOID_FALLTHROUGH_WARNING
+      __attribute__ ((fallthrough));
+      #endif
+    case 3:
+      out = copy_8_bytes(out, from);
+      from += sz;
+      #ifdef AVOID_FALLTHROUGH_WARNING
+      __attribute__ ((fallthrough));
+      #endif
+    case 2:
+      out = copy_8_bytes(out, from);
+      from += sz;
+      #ifdef AVOID_FALLTHROUGH_WARNING
+      __attribute__ ((fallthrough));
+      #endif
+    case 1:
+      out = copy_8_bytes(out, from);
+      from += sz;
+      #ifdef AVOID_FALLTHROUGH_WARNING
+      __attribute__ ((fallthrough));
       #endif
     default:
       break;
