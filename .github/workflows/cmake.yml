@@ -118,19 +118,14 @@ jobs:
 
     - name: Install packages (Windows)
       if: runner.os == 'Windows'
-      run: |
-        choco install ninja ${{ matrix.packages }}
+      run: choco install ninja ${{ matrix.packages }}
 
     - name: Install packages (macOS)
       if: runner.os == 'macOS'
-      run: |
-        brew install ninja ${{ matrix.packages }}
+      run: brew install ninja ${{ matrix.packages }}
 
     - name: Generate project files
-      run: |
-        mkdir ${{ matrix.build-dir || '.not-used' }}
-        cd ${{ matrix.build-dir || '.' }}
-        cmake ${{ matrix.build-src-dir || '.' }} ${{ matrix.cmake-args }} -DCMAKE_BUILD_TYPE=${{ matrix.build-config || 'Release' }} -DBUILD_SHARED_LIBS=OFF
+      run: cmake -S ${{ matrix.build-src-dir || '.' }} -B ${{ matrix.build-dir || '.' }} ${{ matrix.cmake-args }} -D CMAKE_BUILD_TYPE=${{ matrix.build-config || 'Release' }} -D BUILD_SHARED_LIBS=OFF
       env:
         CC: ${{ matrix.compiler }}
         CFLAGS: ${{ matrix.cflags }}
@@ -138,11 +133,8 @@ jobs:
         CI: true
 
     - name: Compile source code
-      run: |
-        cd ${{ matrix.build-dir || '.' }}
-        cmake --build . --config ${{ matrix.build-config || 'Release' }}
+      run: cmake --build ${{ matrix.build-dir || '.' }} --config ${{ matrix.build-config || 'Release' }}
 
     - name: Run test cases
-      run: |
-        cd ${{ matrix.build-dir || '.' }}
-        ctest -C Release --output-on-failure --max-width 120
+      run: ctest -C Release --output-on-failure --max-width 120
+      working-directory: ${{ matrix.build-dir || '.' }}
