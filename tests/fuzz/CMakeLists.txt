@@ -72,6 +72,7 @@ foreach(source ${SOURCES})
 
     # run standalone fuzzer against each file
     file(GLOB COMPAT_FILES ${PROJECT_SOURCE_DIR}/compat/*.cdata)
-    add_test(NAME ${target} COMMAND ${target} ${COMPAT_FILES})
+    add_test(NAME ${target}
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:${target}> ${COMPAT_FILES})
 
 endforeach()

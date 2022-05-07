@@ -36,11 +36,16 @@ if(BUILD_TESTS)
     target_link_libraries(test_zfp_rate_getitem blosc_testing)
 
     # tests
-    add_test(test_plugin_test_zfp_acc_int test_zfp_acc_int)
-    add_test(test_plugin_test_zfp_acc_float test_zfp_acc_float)
-    add_test(test_plugin_test_zfp_prec_float test_zfp_prec_float)
-    add_test(test_plugin_test_zfp_rate_float test_zfp_rate_float)
-    add_test(test_plugin_test_zfp_rate_getitem test_zfp_rate_getitem)
+    add_test(NAME test_plugin_test_zfp_acc_int
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_zfp_acc_int>)
+    add_test(NAME test_plugin_test_zfp_acc_float
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_zfp_acc_float>)
+    add_test(NAME test_plugin_test_zfp_prec_float
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_zfp_prec_float>)
+    add_test(NAME test_plugin_test_zfp_rate_float
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_zfp_rate_float>)
+    add_test(NAME test_plugin_test_zfp_rate_getitem
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_zfp_rate_getitem>)
 
     # Copy test files
     file(GLOB TESTS_DATA ../../test_data/example_float_cyclic.caterva ../../test_data/example_double_same_cells.caterva
