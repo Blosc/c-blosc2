@@ -435,15 +435,15 @@ static int lz4_wrap_decompress(const char* input, size_t compressed_length,
 static int zlib_wrap_compress(const char* input, size_t input_length,
                               char* output, size_t maxout, int clevel) {
   int status;
-  uLongf cl = (uLongf)maxout;
-#ifdef ZLIB_COMPAT
-  status = compress2(
-#elif defined(HAVE_ZLIB_NG)
+#if defined(HAVE_ZLIB_NG) && ! defined(ZLIB_COMPAT)
+  size_t cl = maxout;
   status = zng_compress2(
+      (uint8_t*)output, &cl, (uint8_t*)input, input_length, clevel);
 #else
+  uLongf cl = (uLongf)maxout;
   status = compress2(
-#endif
       (Bytef*)output, &cl, (Bytef*)input, (uLong)input_length, clevel);
+#endif
   if (status != Z_OK) {
     return 0;
   }
@@ -453,15 +453,15 @@ static int zlib_wrap_compress(const char* input, size_t input_length,
 static int zlib_wrap_decompress(const char* input, size_t compressed_length,
                                 char* output, size_t maxout) {
   int status;
-  uLongf ul = (uLongf)maxout;
-#ifdef ZLIB_COMPAT
-  status = uncompress(
-#elif defined(HAVE_ZLIB_NG)
+#if defined(HAVE_ZLIB_NG) && ! defined(ZLIB_COMPAT)
+  size_t ul = maxout;
   status = zng_uncompress(
+      (uint8_t*)output, &ul, (uint8_t*)input, compressed_length);
 #else
+  uLongf ul = (uLongf)maxout;
   status = uncompress(
-#endif
       (Bytef*)output, &ul, (Bytef*)input, (uLong)compressed_length);
+#endif
   if (status != Z_OK) {
     return 0;
   }
