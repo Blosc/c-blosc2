@@ -1018,6 +1018,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int64_t nchunk,
  * is returned instead.
 */
 int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chunk, bool *needs_free) {
+  schunk->current_nchunk = nchunk;
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (frame != NULL) {
     return frame_get_chunk(frame, nchunk, chunk, needs_free);
@@ -1029,7 +1030,6 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chu
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
-  schunk->current_nchunk = nchunk;
   *chunk = schunk->data[nchunk];
   if (*chunk == 0) {
     *needs_free = 0;
@@ -1057,6 +1057,7 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chu
  * is returned instead.
 */
 int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chunk, bool *needs_free) {
+  schunk->current_nchunk = nchunk;
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (schunk->frame != NULL) {
     return frame_get_lazychunk(frame, nchunk, chunk, needs_free);
@@ -1068,7 +1069,6 @@ int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
-  schunk->current_nchunk = nchunk;
   *chunk = schunk->data[nchunk];
   if (*chunk == 0) {
     *needs_free = 0;
