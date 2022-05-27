@@ -106,6 +106,7 @@ using the msgpack format. Here it is the format for the *metalayers*::
         Format version.
     :``4`` and ``5``:
         Enumerated for chunk offsets.
+
         :``0``:
             32-bit
         :``1``:
