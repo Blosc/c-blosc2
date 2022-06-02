@@ -13,6 +13,7 @@
 #ifndef BLOSC2_ZFP_H
 #define BLOSC2_ZFP_H
 #include "zfp-private.h"
+#include "../plugins/plugin_utils.h"
 
 #if defined (__cplusplus)
 extern "C" {
