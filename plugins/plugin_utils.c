@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include "blosc2.h"
+#include "plugin_utils.h"
 
 
 void swap_store(void *dest, const void *pa, int size) {
@@ -97,7 +98,7 @@ int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_
   return slen;
 }
 
-static void index_unidim_to_multidim(uint8_t ndim, int32_t *shape, int64_t i, int64_t *index) {
+void index_unidim_to_multidim(uint8_t ndim, int32_t *shape, int64_t i, int64_t *index) {
     int64_t strides[8];
     strides[ndim - 1] = 1;
     for (int j = ndim - 2; j >= 0; --j) {
