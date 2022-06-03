@@ -700,7 +700,8 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
 int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, uint8_t *dest, int32_t destsize) {
     bool meta = false;
     uint8_t ndim = ZFP_MAX_DIM + 1;
-    int32_t blockshape[4];      // ZFP only works for caterva datasets
+    int64_t blockshape[ZFP_MAX_DIM];      // ZFP only works for caterva datasets
+    int32_t blockmeta[ZFP_MAX_DIM];
     for (int nmetalayer = 0; nmetalayer < context->schunk->nmetalayers; nmetalayer++) {
         if (strcmp("caterva", context->schunk->metalayers[nmetalayer]->name) == 0) {
             meta = true;
@@ -709,13 +710,16 @@ int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, u
             pmeta += (6 + ndim * 9 + ndim * 5);
             for (int8_t i = 0; (uint8_t) i < ndim; i++) {
                 pmeta += 1;
-                swap_store(blockshape + i, pmeta, sizeof(int32_t));
+                swap_store(blockmeta + i, pmeta, sizeof(int32_t));
                 pmeta += sizeof(int32_t);
             }
         }
     }
     if (!meta) {
         return -1;
+    }
+    for (int i = 0; i < ZFP_MAX_DIM; ++i) {
+        blockshape[i] = (int64_t) blockmeta[i];
     }
     assert(ndim <= ZFP_MAX_DIM);
     int64_t cell_start_ndim[4], cell_ind_ndim[4], ncell_ndim[4], ind_strides[4], cell_strides[4];
