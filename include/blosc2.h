@@ -58,6 +58,10 @@ extern "C" {
 #define BLOSC_VERSION_DATE     "$Date:: 2022-05-07 #$"    /* date version */
 
 
+/* The maximum number of dimensions for caterva arrays */
+#define BLOSC2_MAX_DIM 8
+
+
 /* Tracing macros */
 #define BLOSC_TRACE_ERROR(msg, ...) BLOSC_TRACE(error, msg, ##__VA_ARGS__)
 #define BLOSC_TRACE_WARNING(msg, ...) BLOSC_TRACE(warning, msg, ##__VA_ARGS__)

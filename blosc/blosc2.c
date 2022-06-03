@@ -4096,7 +4096,7 @@ blosc2_io_cb *blosc2_get_io_cb(uint8_t id) {
 }
 
 void blosc2_unidim_to_multidim(uint8_t ndim, int64_t *shape, int64_t i, int64_t *index) {
-    int64_t strides[8];
+    int64_t strides[BLOSC2_MAX_DIM];
     strides[ndim - 1] = 1;
     for (int j = ndim - 2; j >= 0; --j) {
         strides[j] = shape[j + 1] * strides[j + 1];
