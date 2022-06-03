@@ -97,23 +97,3 @@ int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_
   int32_t slen = (int32_t)(pmeta - smeta);
   return slen;
 }
-
-void index_unidim_to_multidim(uint8_t ndim, int64_t *shape, int64_t i, int64_t *index) {
-    int64_t strides[8];
-    strides[ndim - 1] = 1;
-    for (int j = ndim - 2; j >= 0; --j) {
-        strides[j] = shape[j + 1] * strides[j + 1];
-    }
-
-    index[0] = i / strides[0];
-    for (int j = 1; j < ndim; ++j) {
-        index[j] = (i % strides[j - 1]) / strides[j];
-    }
-}
-
-void index_multidim_to_unidim(const int64_t *index, int8_t ndim, const int64_t *strides, int64_t *i) {
-  *i = 0;
-  for (int j = 0; j < ndim; ++j) {
-    *i += index[j] * strides[j];
-  }
-}
