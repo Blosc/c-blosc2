@@ -98,7 +98,7 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_
     int64_t pad_shape[NDMEAN_MAX_DIM];
     int64_t ii[NDMEAN_MAX_DIM];
     for (int cell_ind = 0; cell_ind < ncells; cell_ind++) {      // for each cell
-        index_unidim_to_multidim(ndim, i_shape, cell_ind, ii);
+        blosc2_unidim_to_multidim(ndim, i_shape, cell_ind, ii);
         uint32_t orig = 0;
         int64_t nd_aux = (int64_t) (cellshape[0]);
         for (int i = ndim - 1; i >= 0; i--) {
@@ -121,7 +121,7 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_
         mean_float = 0;
         mean_double = 0;
         for (int copy_ind = 0; copy_ind < ncopies; ++copy_ind) {
-            index_unidim_to_multidim((int8_t) (ndim - 1), pad_shape, copy_ind, kk);
+            blosc2_unidim_to_multidim((int8_t) (ndim - 1), pad_shape, copy_ind, kk);
             nd_aux = blockshape[ndim - 1];
             int64_t ind = orig;
             for (int i = ndim - 2; i >= 0; i--) {
@@ -268,7 +268,7 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_
             printf("Literal copy \n");
             return 0;
         }
-        index_unidim_to_multidim(ndim, i_shape, cell_ind, ii);
+        blosc2_unidim_to_multidim(ndim, i_shape, cell_ind, ii);
         uint32_t orig = 0;
         int64_t nd_aux = (int64_t) (cellshape[0]);
         for (int i = ndim - 1; i >= 0; i--) {
@@ -290,7 +290,7 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_
         }
         int64_t kk[NDMEAN_MAX_DIM];
         for (int copy_ind = 0; copy_ind < ncopies; ++copy_ind) {
-            index_unidim_to_multidim((int8_t) (ndim - 1), pad_shape, copy_ind, kk);
+            blosc2_unidim_to_multidim((int8_t) (ndim - 1), pad_shape, copy_ind, kk);
             nd_aux = blockshape[ndim - 1];
             ind = (int32_t) orig;
             for (int i = ndim - 2; i >= 0; i--) {

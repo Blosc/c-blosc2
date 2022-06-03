@@ -2088,6 +2088,21 @@ BLOSC_EXPORT int blosc2_remove_urlpath(const char *path);
  */
 BLOSC_EXPORT int blosc2_rename_urlpath(char* old_urlpath, char* new_path);
 
+
+/*********************************************************************
+  Index utilities.
+*********************************************************************/
+
+/*
+ * @brief Convert a sequential index into a multidimensional index
+ */
+BLOSC_EXPORT void blosc2_unidim_to_multidim(uint8_t ndim, int64_t *shape, int64_t i, int64_t *index);
+
+/*
+ * @brief Convert a multidimensional index into a sequential index
+ */
+BLOSC_EXPORT void blosc2_multidim_to_unidim(const int64_t *index, int8_t ndim, const int64_t *strides, int64_t *i);
+
 #ifdef __cplusplus
 }
 #endif

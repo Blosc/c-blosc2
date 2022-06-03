@@ -721,7 +721,7 @@ int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, u
     int64_t cell_start_ndim[4], cell_ind_ndim[4], ncell_ndim[4], ind_strides[4], cell_strides[4];
     int64_t cell_ind, ncell;
     int cellshape = 4;
-    index_unidim_to_multidim(ndim, blockshape, context->zfp_cell_start, cell_start_ndim);
+    blosc2_unidim_to_multidim(ndim, blockshape, context->zfp_cell_start, cell_start_ndim);
     for (int i = 0; i < ndim; ++i) {
         cell_ind_ndim[i] = cell_start_ndim[i] % cellshape;
         ncell_ndim[i] = cell_start_ndim[i] / cellshape;
@@ -731,8 +731,8 @@ int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, u
         ind_strides[i] = cellshape * ind_strides[i + 1];
         cell_strides[i] = ((blockshape[i + 1] - 1) / cellshape + 1) * cell_strides[i + 1];
     }
-    index_multidim_to_unidim(cell_ind_ndim, (int8_t) ndim, ind_strides, &cell_ind);
-    index_multidim_to_unidim(ncell_ndim, (int8_t) ndim, cell_strides, &ncell);
+    blosc2_multidim_to_unidim(cell_ind_ndim, (int8_t) ndim, ind_strides, &cell_ind);
+    blosc2_multidim_to_unidim(ncell_ndim, (int8_t) ndim, cell_strides, &ncell);
     int cell_nitems = (int) (1u << (2 * ndim));
     if ((context->zfp_cell_nitems > cell_nitems) || ((cell_ind + context->zfp_cell_nitems) > cell_nitems)) {
         return 0;
