@@ -3159,10 +3159,12 @@ static void t_blosc_do_job(void *ctxt)
   } /* closes while (nblock_) */
 
   if (static_schedule) {
+    pthread_mutex_lock(&context->count_mutex);
     context->output_bytes = context->sourcesize;
     if (compress) {
       context->output_bytes += context->header_overhead;
     }
+    pthread_mutex_unlock(&context->count_mutex);
   }
 
 }

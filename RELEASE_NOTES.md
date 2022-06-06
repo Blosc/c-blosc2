@@ -4,7 +4,7 @@ Release notes for C-Blosc2 2.1.2
 Changes from 2.1.1 to 2.1.2
 ===========================
 
-#XXX version-specific blurb XXX#
+* Protect the update of a field in compression/decompression context.  Fixes issues when compressing/decompressing super-chunks in multi-thread mode.
 
 
 Changes from 2.1.0 to 2.1.1
