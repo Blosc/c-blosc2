@@ -115,6 +115,7 @@ CUTEST_TEST_TEST(fill_special) {
 }
 
 CUTEST_TEST_TEARDOWN(fill_special) {
+  BLOSC_UNUSED_PARAM(data);
   blosc_destroy();
 }
 

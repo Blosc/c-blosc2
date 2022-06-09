@@ -67,6 +67,7 @@ CUTEST_TEST_SETUP(zero_runlen) {
 
 
 CUTEST_TEST_TEST(zero_runlen) {
+  BLOSC_UNUSED_PARAM(data);
 
   CUTEST_GET_PARAMETER(svalue, int);
   CUTEST_GET_PARAMETER(backend, test_zero_runlen_backend);
@@ -210,6 +211,7 @@ CUTEST_TEST_TEST(zero_runlen) {
 }
 
 CUTEST_TEST_TEARDOWN(zero_runlen) {
+  BLOSC_UNUSED_PARAM(data);
   blosc_destroy();
 }
 

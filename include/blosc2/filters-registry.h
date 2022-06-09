@@ -13,4 +13,4 @@ enum {
     BLOSC_FILTER_NDMEAN = 33,
 };
 
-void register_filters();
+void register_filters(void);

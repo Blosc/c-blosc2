@@ -54,7 +54,8 @@ static bool is_little_endian(void) {
 }
 
 
-static void endian_handler(bool little, void *dest, const void *pa, int size) {
+static inline void endian_handler(bool little, void *dest, const void *pa, int size)
+{
   bool little_endian = is_little_endian();
   if (little_endian == little) {
     memcpy(dest, pa, size);

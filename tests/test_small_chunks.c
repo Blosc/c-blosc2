@@ -12,12 +12,14 @@ CUTEST_TEST_DATA(small_chunks) {
 };
 
 CUTEST_TEST_SETUP(small_chunks) {
+  BLOSC_UNUSED_PARAM(data);
   blosc_init();
 }
 
 
 CUTEST_TEST_TEST(small_chunks) {
-    int64_t rc;
+  BLOSC_UNUSED_PARAM(data);
+  int64_t rc;
 
     int8_t itemsize = 8;
     int32_t nitems = 50 * 1000;
@@ -68,6 +70,7 @@ CUTEST_TEST_TEST(small_chunks) {
 }
 
 CUTEST_TEST_TEARDOWN(small_chunks) {
+  BLOSC_UNUSED_PARAM(data);
   blosc_destroy();
 }
 

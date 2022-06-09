@@ -115,6 +115,7 @@ CUTEST_TEST_SETUP(udio) {
 
 
 CUTEST_TEST_TEST(udio) {
+  BLOSC_UNUSED_PARAM(data);
   CUTEST_GET_PARAMETER(backend, test_udio_backend);
 
   /* Free resources */
@@ -169,6 +170,7 @@ CUTEST_TEST_TEST(udio) {
 }
 
 CUTEST_TEST_TEARDOWN(udio) {
+  BLOSC_UNUSED_PARAM(data);
   blosc_destroy();
 }
 
