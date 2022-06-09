@@ -129,7 +129,7 @@ CUTEST_TEST_SETUP(urfilters) {
 
 
 CUTEST_TEST_TEST(urfilters) {
-  CUTEST_GET_PARAMETER(nchunks, int32_t);
+  BLOSC_UNUSED_PARAM(data);
   CUTEST_GET_PARAMETER(itemsize, int8_t);
   CUTEST_GET_PARAMETER(correct_backward, bool);
 
@@ -244,6 +244,7 @@ CUTEST_TEST_TEST(urfilters) {
 
 
 CUTEST_TEST_TEARDOWN(urfilters) {
+  BLOSC_UNUSED_PARAM(data);
   blosc_destroy();
 }
 

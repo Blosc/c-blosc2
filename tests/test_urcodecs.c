@@ -257,6 +257,7 @@ CUTEST_TEST_TEST(urcodecs) {
 
 
 CUTEST_TEST_TEARDOWN(urcodecs) {
+  BLOSC_UNUSED_PARAM(data);
   blosc_destroy();
 }
 

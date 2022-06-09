@@ -187,6 +187,7 @@ CUTEST_TEST_TEST(copy) {
 
 
 CUTEST_TEST_TEARDOWN(copy) {
+  BLOSC_UNUSED_PARAM(data);
   blosc_destroy();
 }
 

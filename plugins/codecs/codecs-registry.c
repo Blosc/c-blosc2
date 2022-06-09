@@ -9,7 +9,7 @@
 #include "ndlz/ndlz.h"
 #include "zfp/blosc2-zfp.h"
 
-void register_codecs() {
+void register_codecs(void) {
 
     blosc2_codec ndlz;
     ndlz.compcode = BLOSC_CODEC_NDLZ;

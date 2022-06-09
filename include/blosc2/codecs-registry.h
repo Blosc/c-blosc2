@@ -15,4 +15,4 @@ enum {
     BLOSC_CODEC_ZFP_FIXED_RATE = 35,
 };
 
-void register_codecs();
+void register_codecs(void);

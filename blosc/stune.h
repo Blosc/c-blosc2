@@ -43,26 +43,6 @@ static blosc2_btune BTUNE_DEFAULTS = {
 
 
 /* Conditions for splitting a block before compressing with a codec. */
-static int split_block(blosc2_context *context, int32_t typesize, int32_t blocksize) {
-  switch (context->splitmode) {
-    case BLOSC_ALWAYS_SPLIT:
-      return 1;
-    case BLOSC_NEVER_SPLIT:
-      return 0;
-    case BLOSC_FORWARD_COMPAT_SPLIT:
-    case BLOSC_AUTO_SPLIT:
-      // These cases will be handled later
-      break;
-    default:
-      BLOSC_TRACE_WARNING("Unrecognized split mode.  Default to BLOSC_FORWARD_COMPAT_SPLIT");
-  }
-
-  int compcode = context->compcode;
-  return (
-          // Fast codecs like blosclz and lz4 always prefer to always split
-          ((compcode == BLOSC_BLOSCLZ) || (compcode == BLOSC_LZ4)) &&
-          (typesize <= MAX_STREAMS) &&
-          (blocksize / typesize) >= BLOSC_MIN_BUFFERSIZE);
-}
+int split_block(blosc2_context *context, int32_t typesize, int32_t blocksize);
 
 #endif  /* STUNE_H */

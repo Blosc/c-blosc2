@@ -9,7 +9,7 @@
 #include "ndmean/ndmean.h"
 #include "ndcell/ndcell.h"
 
-void register_filters() {
+void register_filters(void) {
 
     blosc2_filter ndcell;
     ndcell.id = BLOSC_FILTER_NDCELL;

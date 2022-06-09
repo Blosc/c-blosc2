@@ -541,7 +541,7 @@ int ndlz4_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   eshape[0] = ((blockshape[0] + 3) / 4) * 4;
   eshape[1] = ((blockshape[1] + 3) / 4) * 4;
 
-  if (NDLZ_UNEXPECT_CONDITIONAL(output_len < blockshape[0] * blockshape[1])) {
+  if (NDLZ_UNEXPECT_CONDITIONAL(output_len < (int32_t)(blockshape[0] * blockshape[1]))) {
     return 0;
   }
   memset(op, 0, blockshape[0] * blockshape[1]);
