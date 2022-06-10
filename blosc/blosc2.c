@@ -1612,7 +1612,9 @@ static int blosc_d(
         return BLOSC2_ERROR_POSTFILTER;
       }
     }
+    pthread_mutex_lock(&context->count_mutex);
     context->zfp_cell_nitems = 0;
+    pthread_mutex_unlock(&context->count_mutex);
     return bsize_;
   }
 
