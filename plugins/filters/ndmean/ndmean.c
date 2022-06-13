@@ -256,9 +256,9 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_
     }
 
     /* main loop */
-    int64_t pad_shape[NDMEAN_MAX_DIM];
+    int64_t pad_shape[NDMEAN_MAX_DIM] = {0};
     int64_t ii[NDMEAN_MAX_DIM];
-    int32_t ind;
+    int32_t ind = 0;
     for (int cell_ind = 0; cell_ind < ncells; cell_ind++) {      // for each cell
 
         if (ip > ip_limit) {

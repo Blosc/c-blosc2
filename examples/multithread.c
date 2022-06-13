@@ -80,7 +80,7 @@ int main(void) {
       return csize;
     }
 
-    printf("Compression: %zu -> %d (%.1fx)\n", isize, csize, (1. * (double)isize) /
+    printf("Compression: %lld -> %d (%.1fx)\n", (int64_t)isize, csize, (1. * (double)isize) /
             csize);
 
     /* Decompress  */

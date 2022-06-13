@@ -472,7 +472,7 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
 
   /* main loop */
   int32_t ii[2];
-  int32_t padding[2];
+  int32_t padding[2] = {0};
   int32_t ind = 0;
   uint8_t* local_buffer = malloc(cell_size);
   uint8_t* cell_aux = malloc(cell_size);
