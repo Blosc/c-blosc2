@@ -12,6 +12,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <inttypes.h>
 #include <string.h>
 
 
@@ -160,17 +161,17 @@ int _cutest_run(int (*test)(void *), void *test_data, char *name) {
     params_strides[i] = params_strides[i - 1] * cutest_params[i - 1].params_len;
   }
 
-  char test_name[MAXLEN_TESTNAME];
+  char test_name[MAXLEN_TESTNAME + 1];
   uint8_t count = 0;
   int num = niters;
   do { count++; num /= 10;} while(num != 0);
-  char aux[MAXLEN_TESTNAME];
+  char aux[MAXLEN_TESTNAME + 1];
   for (int niter = 0; niter < niters; ++niter) {
     sprintf(test_name, "[%0*d/%d] %s(", count, niter + 1, niters, name);
     for (int i = 0; i < nparams; ++i) {
       cutest_params_ind[i] = (int8_t) (niter / params_strides[i] % cutest_params[i].params_len);
       strcpy(aux, test_name);
-      snprintf(test_name, MAXLEN_TESTNAME, "%s%s[%d], ", aux, cutest_params[i].name,
+      snprintf(test_name, MAXLEN_TESTNAME, "%s%s[%" PRId8 "], ", aux, cutest_params[i].name,
                cutest_params_ind[i]);
     }
     test_name[strlen(test_name) - 1] = 0;

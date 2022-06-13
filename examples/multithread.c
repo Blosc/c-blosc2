@@ -42,6 +42,7 @@
 */
 
 #include <stdio.h>
+#include <inttypes.h>
 #include <blosc2.h>
 
 #define SIZE (1000 * 1000)
@@ -80,7 +81,7 @@ int main(void) {
       return csize;
     }
 
-    printf("Compression: %lld -> %d (%.1fx)\n", (int64_t)isize, csize, (1. * (double)isize) /
+    printf("Compression: %" PRId64 " -> %d (%.1fx)\n", (int64_t)isize, csize, (1. * (double)isize) /
             csize);
 
     /* Decompress  */
