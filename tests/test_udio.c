@@ -69,7 +69,7 @@ int64_t test_read(void *ptr, int64_t size, int64_t nitems, void *stream) {
   return blosc2_stdio_read(ptr, size, nitems, my->bfile);
 }
 
-int64_t test_truncate(void *stream, int64_t size) {
+int test_truncate(void *stream, int64_t size) {
   test_file *my = (test_file *) stream;
   my->params->truncate++;
   return blosc2_stdio_truncate(my->bfile, size);
