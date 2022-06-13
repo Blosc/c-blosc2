@@ -554,8 +554,8 @@ int ndlz4_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
 
   /* main loop */
   uint32_t ii[2];
-  uint32_t padding[2];
-  uint32_t ind;
+  uint32_t padding[2] = {0};
+  uint32_t ind = 0;
   uint8_t cell_aux[16];
   for (ii[0] = 0; ii[0] < i_stop[0]; ++ii[0]) {
     for (ii[1] = 0; ii[1] < i_stop[1]; ++ii[1]) {      // for each cell

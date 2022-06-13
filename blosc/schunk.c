@@ -474,6 +474,12 @@ blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy
   if (frame == NULL) {
     return NULL;
   }
+  // Check that the buffer actually comes from a cframe
+  char *magic_number = (char *)cframe;
+  magic_number += FRAME_HEADER_MAGIC;
+  if (strcmp(magic_number, "b2frame\0") != 0) {
+    return NULL;
+  }
   blosc2_schunk* schunk = frame_to_schunk(frame, copy, &BLOSC2_IO_DEFAULTS);
   if (schunk && copy) {
     // Super-chunk has its own copy of frame
