@@ -111,6 +111,15 @@ int frame_free(blosc2_frame_s *frame);
 blosc2_frame_s* frame_from_file(const char *urlpath, const blosc2_io *io_cb);
 
 /**
+ * @brief Initialize a frame out of a file.
+ *
+ * @param urlpath The file name.
+ *
+ * @return The frame created from the file.
+ */
+blosc2_frame_s* frame_from_file_offset(const char *urlpath, const blosc2_io *io_cb, int64_t offset);
+
+/**
  * @brief Initialize a frame out of a frame buffer.
  *
  * @param buffer The buffer for the frame.

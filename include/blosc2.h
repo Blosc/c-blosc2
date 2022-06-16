@@ -1533,24 +1533,29 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t l
 /**
  * @brief Open an existing super-chunk that is on-disk (frame). No in-memory copy is made.
  *
- * @param storage The storage properties of the source.
- *
- * @remark The storage.urlpath must be not NULL and it should exist on-disk.
- * New data or metadata can be appended or updated.
+ * @param urlpath The file name.
  *
  * @return The new super-chunk.  NULL if not found or not in frame format.
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open(const char* urlpath);
 
 /**
+ * @brief Open an existing super-chunk that is on-disk (frame). No in-memory copy is made.
+ *
+ * @param urlpath The file name.
+ *
+ * @param offset The frame offset.
+ *
+ * @return The new super-chunk.  NULL if not found or not in frame format.
+ */
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_offset(const char* urlpath, int64_t offset);
+
+/**
  * @brief Open an existing super-chunk (no copy is made) using a user-defined I/O interface.
  *
- * @param storage The storage properties of the source.
+ * @param urlpath The file name.
  *
  * @param udio The user-defined I/O interface.
- *
- * @remark The storage.urlpath must be not NULL and it should exist on-disk.
- * New data or metadata can be appended or updated.
  *
  * @return The new super-chunk.
  */

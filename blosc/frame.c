@@ -847,6 +847,87 @@ blosc2_frame_s* frame_from_file(const char* urlpath, const blosc2_io *io) {
 }
 
 
+/* Initialize a frame out of a file */
+blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io, int64_t offset) {
+    // Get the length of the frame
+    uint8_t header[FRAME_HEADER_MINLEN];
+    uint8_t trailer[FRAME_TRAILER_MINLEN];
+
+    void* fp = NULL;
+    bool sframe = false;
+    struct stat path_stat;
+
+    urlpath = normalize_urlpath(urlpath);
+
+    if(stat(urlpath, &path_stat) < 0) {
+        BLOSC_TRACE_ERROR("Cannot get information about the path %s.", urlpath);
+        return NULL;
+    }
+
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(io->id);
+    if (io_cb == NULL) {
+        BLOSC_TRACE_ERROR("Error getting the input/output API");
+        return NULL;
+    }
+
+    char* urlpath_cpy;
+    if (path_stat.st_mode & S_IFDIR) {
+        urlpath_cpy = malloc(strlen(urlpath) + 1);
+        strcpy(urlpath_cpy, urlpath);
+        char last_char = urlpath[strlen(urlpath) - 1];
+        if (last_char == '\\' || last_char == '/') {
+            urlpath_cpy[strlen(urlpath) - 1] = '\0';
+        }
+        else {
+        }
+        fp = sframe_open_index(urlpath_cpy, "rb", io);
+        sframe = true;
+    }
+    else {
+        urlpath_cpy = malloc(strlen(urlpath) + 1);
+        strcpy(urlpath_cpy, urlpath);
+        fp = io_cb->open(urlpath, "rb", io->params);
+    }
+    io_cb->seek(fp, offset, SEEK_SET);
+    int64_t rbytes = io_cb->read(header, 1, FRAME_HEADER_MINLEN, fp);
+    if (rbytes != FRAME_HEADER_MINLEN) {
+        BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
+        io_cb->close(fp);
+        free(urlpath_cpy);
+        return NULL;
+    }
+    int64_t frame_len;
+    to_big(&frame_len, header + FRAME_LEN, sizeof(frame_len));
+
+    blosc2_frame_s* frame = calloc(1, sizeof(blosc2_frame_s));
+    frame->urlpath = urlpath_cpy;
+    frame->len = frame_len;
+    frame->sframe = sframe;
+
+    // Now, the trailer length
+    io_cb->seek(fp, frame_len - FRAME_TRAILER_MINLEN, SEEK_SET);
+    rbytes = io_cb->read(trailer, 1, FRAME_TRAILER_MINLEN, fp);
+    io_cb->close(fp);
+    if (rbytes != FRAME_TRAILER_MINLEN) {
+        BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
+        free(urlpath_cpy);
+        free(frame);
+        return NULL;
+    }
+    int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
+    if (trailer[trailer_offset - 1] != 0xce) {
+        free(urlpath_cpy);
+        free(frame);
+        return NULL;
+    }
+    uint32_t trailer_len;
+    to_big(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
+    frame->trailer_len = trailer_len;
+
+    return frame;
+}
+
+
 /* Initialize a frame out of a contiguous frame buffer */
 blosc2_frame_s* frame_from_cframe(uint8_t *cframe, int64_t len, bool copy) {
   // Get the length of the frame
