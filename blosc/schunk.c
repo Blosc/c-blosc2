@@ -327,6 +327,27 @@ blosc2_schunk* blosc2_schunk_open(const char* urlpath) {
   return blosc2_schunk_open_udio(urlpath, &BLOSC2_IO_DEFAULTS);
 }
 
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_offset(const char* urlpath, int64_t offset) {
+  if (urlpath == NULL) {
+    BLOSC_TRACE_ERROR("You need to supply a urlpath.");
+    return NULL;
+  }
+
+  blosc2_frame_s* frame = frame_from_file_offset(urlpath, &BLOSC2_IO_DEFAULTS, offset);
+  if (frame == NULL) {
+    return NULL;
+  }
+  blosc2_schunk* schunk = frame_to_schunk(frame, false, &BLOSC2_IO_DEFAULTS);
+
+  // Set the storage with proper defaults
+  size_t pathlen = strlen(urlpath);
+  schunk->storage->urlpath = malloc(pathlen + 1);
+  strcpy(schunk->storage->urlpath, urlpath);
+  schunk->storage->contiguous = !frame->sframe;
+
+  return schunk;
+}
+
 int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* needs_free) {
   blosc2_frame_s* frame;
   int64_t cframe_len;
