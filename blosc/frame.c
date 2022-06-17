@@ -45,6 +45,7 @@ blosc2_frame_s* frame_new(const char* urlpath) {
   if (urlpath != NULL) {
     char* new_urlpath = malloc(strlen(urlpath) + 1);  // + 1 for the trailing NULL
     new_frame->urlpath = strcpy(new_urlpath, urlpath);
+    new_frame->file_offset = 0;
   }
   return new_frame;
 }
@@ -385,6 +386,7 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
       fp = io_cb->open(frame->urlpath, "rb", io->params);
     }
     if (fp != NULL) {
+      io_cb->seek(fp, frame->file_offset, SEEK_SET);
       rbytes = io_cb->read(header, 1, FRAME_HEADER_MINLEN, fp);
       io_cb->close(fp);
     }
@@ -518,7 +520,7 @@ int update_frame_len(blosc2_frame_s* frame, int64_t len) {
     else {
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
     }
-    io_cb->seek(fp, FRAME_LEN, SEEK_SET);
+    io_cb->seek(fp, frame->file_offset + FRAME_LEN, SEEK_SET);
     int64_t swap_len;
     to_big(&swap_len, &len, sizeof(int64_t));
     int64_t wbytes = io_cb->write(&swap_len, 1, sizeof(int64_t), fp);
@@ -726,7 +728,7 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       BLOSC_TRACE_ERROR("Cannot open the frame for reading and writing.");
       return BLOSC2_ERROR_FILE_OPEN;
     }
-    io_cb->seek(fp, trailer_offset, SEEK_SET);
+    io_cb->seek(fp, frame->file_offset + trailer_offset, SEEK_SET);
     int64_t wbytes = io_cb->write(trailer, 1, trailer_len, fp);
     if (wbytes != trailer_len) {
       BLOSC_TRACE_ERROR("Cannot write the trailer length in trailer.");
@@ -822,6 +824,7 @@ blosc2_frame_s* frame_from_file(const char* urlpath, const blosc2_io *io) {
   frame->urlpath = urlpath_cpy;
   frame->len = frame_len;
   frame->sframe = sframe;
+  frame->file_offset = 0;
 
   // Now, the trailer length
   io_cb->seek(fp, frame_len - FRAME_TRAILER_MINLEN, SEEK_SET);
@@ -903,9 +906,10 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     frame->urlpath = urlpath_cpy;
     frame->len = frame_len;
     frame->sframe = sframe;
+    frame->file_offset = offset;
 
     // Now, the trailer length
-    io_cb->seek(fp, frame_len - FRAME_TRAILER_MINLEN, SEEK_SET);
+    io_cb->seek(fp, offset + frame_len - FRAME_TRAILER_MINLEN, SEEK_SET);
     rbytes = io_cb->read(trailer, 1, FRAME_TRAILER_MINLEN, fp);
     io_cb->close(fp);
     if (rbytes != FRAME_TRAILER_MINLEN) {
@@ -944,6 +948,7 @@ blosc2_frame_s* frame_from_cframe(uint8_t *cframe, int64_t len, bool copy) {
 
   blosc2_frame_s* frame = calloc(1, sizeof(blosc2_frame_s));
   frame->len = frame_len;
+  frame->file_offset = 0;
 
   // Now, the trailer length
   const uint8_t* trailer = cframe + frame_len - FRAME_TRAILER_MINLEN;
@@ -971,6 +976,7 @@ blosc2_frame_s* frame_from_cframe(uint8_t *cframe, int64_t len, bool copy) {
 
 /* Create a frame out of a super-chunk. */
 int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
+  frame->file_offset = 0;
   int64_t nchunks = schunk->nchunks;
   int64_t cbytes = schunk->cbytes;
   int32_t chunk_cbytes;
@@ -1188,11 +1194,11 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
   if (frame->sframe) {
     fp = sframe_open_index(frame->urlpath, "rb",
                            frame->schunk->storage->io);
-    io_cb->seek(fp, header_len + 0, SEEK_SET);
+    io_cb->seek(fp, frame->file_offset + header_len + 0, SEEK_SET);
   }
   else {
     fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
-    io_cb->seek(fp, header_len + cbytes, SEEK_SET);
+    io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
   }
   int64_t rbytes = io_cb->read(coffsets, 1, coffsets_cbytes, fp);
   io_cb->close(fp);
@@ -1282,6 +1288,7 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
       fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
     }
     if (fp != NULL) {
+      io_cb->seek(fp, frame->file_offset, SEEK_SET);
       rbytes = io_cb->read(header, 1, FRAME_HEADER_MINLEN, fp);
       io_cb->close(fp);
     }
@@ -1322,6 +1329,7 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
     }
     if (fp != NULL) {
+      io_cb->seek(fp, frame->file_offset, SEEK_SET);
       io_cb->write(h2, h2len, 1, fp);
       io_cb->close(fp);
     }
@@ -1487,6 +1495,7 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
     }
     if (fp != NULL) {
+      io_cb->seek(fp, frame->file_offset, SEEK_SET);
       rbytes = io_cb->read(header, 1, header_len, fp);
       io_cb->close(fp);
     }
@@ -1668,7 +1677,7 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
     }
     if (fp != NULL) {
-      io_cb->seek(fp, trailer_offset, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + trailer_offset, SEEK_SET);
       rbytes = io_cb->read(trailer, 1, trailer_len, fp);
       io_cb->close(fp);
     }
@@ -1855,7 +1864,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
         rbytes = frame_get_lazychunk(frame, offsets[i], &data_chunk, &needs_free);
       }
       else {
-        io_cb->seek(fp, header_len + offsets[i], SEEK_SET);
+        io_cb->seek(fp, frame->file_offset + header_len + offsets[i], SEEK_SET);
         rbytes = io_cb->read(data_chunk, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
       }
       if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
@@ -1871,7 +1880,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
         prev_alloc = chunk_cbytes;
       }
       if (!frame->sframe) {
-        io_cb->seek(fp, header_len + offsets[i], SEEK_SET);
+        io_cb->seek(fp, frame->file_offset + header_len + offsets[i], SEEK_SET);
         rbytes = io_cb->read(data_chunk, 1, chunk_cbytes, fp);
         if (rbytes != chunk_cbytes) {
           rc = BLOSC2_ERROR_READ_BUFFER;
@@ -2095,7 +2104,7 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
   if (frame->cframe == NULL) {
     uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
     void* fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
-    io_cb->seek(fp, header_len + offset, SEEK_SET);
+    io_cb->seek(fp, frame->file_offset + header_len + offset, SEEK_SET);
     int64_t rbytes = io_cb->read(header, 1, sizeof(header), fp);
     if (rbytes != sizeof(header)) {
       BLOSC_TRACE_ERROR("Cannot read the cbytes for chunk in the frame.");
@@ -2109,7 +2118,7 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
       return rc;
     }
     *chunk = malloc(chunk_cbytes);
-    io_cb->seek(fp, header_len + offset, SEEK_SET);
+    io_cb->seek(fp, frame->file_offset + header_len + offset, SEEK_SET);
     rbytes = io_cb->read(*chunk, 1, chunk_cbytes, fp);
     io_cb->close(fp);
     if (rbytes != chunk_cbytes) {
@@ -2212,7 +2221,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
     }
     else {
       fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
-      io_cb->seek(fp, header_len + offset, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len + offset, SEEK_SET);
     }
     int64_t rbytes = io_cb->read(header, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
     if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
@@ -2260,10 +2269,10 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
 
     // Read just the full header and bstarts section too (lazy partial length)
     if (frame->sframe) {
-      io_cb->seek(fp, 0, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset, SEEK_SET);
     }
     else {
-      io_cb->seek(fp, header_len + offset, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len + offset, SEEK_SET);
     }
 
     rbytes = io_cb->read(*chunk, 1, (int64_t)streams_offset, fp);
@@ -2479,12 +2488,12 @@ int64_t frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_va
     if (frame->sframe) {
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+", frame->schunk->storage->io);
-      io_cb->seek(fp, header_len, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len, SEEK_SET);
     }
     else {
       // Regular frame
       fp = io_cb->open(frame->urlpath, "rb+", schunk->storage->io->params);
-      io_cb->seek(fp, header_len + cbytes, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
     }
     wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
     io_cb->close(fp);
@@ -2703,12 +2712,12 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
       }
       fp = sframe_open_index(frame->urlpath, "rb+",
                              frame->schunk->storage->io);
-      io_cb->seek(fp, header_len, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len, SEEK_SET);
     }
     else {
       // Regular frame
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
-      io_cb->seek(fp, header_len + cbytes, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
       wbytes = io_cb->write(chunk, 1, chunk_cbytes, fp);  // the new chunk
       if (wbytes != chunk_cbytes) {
         BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
@@ -2913,12 +2922,12 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+",
                              frame->schunk->storage->io);
-      io_cb->seek(fp, header_len + 0, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len + 0, SEEK_SET);
     }
     else {
       // Regular frame
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
-      io_cb->seek(fp, header_len + cbytes, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
       wbytes = io_cb->write(chunk, 1, chunk_cbytes, fp);  // the new chunk
       if (wbytes != chunk_cbytes) {
         BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
@@ -3134,19 +3143,19 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+",
                              frame->schunk->storage->io);
-      io_cb->seek(fp, header_len + 0, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len + 0, SEEK_SET);
     }
     else {
       // Regular frame
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
-      io_cb->seek(fp, header_len + cbytes, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
       wbytes = io_cb->write(chunk, 1, chunk_cbytes, fp);  // the new chunk
       if (wbytes != chunk_cbytes) {
         BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
         io_cb->close(fp);
         return NULL;
       }
-      io_cb->seek(fp, header_len + new_cbytes, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len + new_cbytes, SEEK_SET);
     }
     wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
     io_cb->close(fp);
@@ -3292,12 +3301,12 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
       }
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+", frame->schunk->storage->io);
-      io_cb->seek(fp, header_len + 0, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len + 0, SEEK_SET);
     }
     else {
       // Regular frame
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io);
-      io_cb->seek(fp, header_len + cbytes, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
     }
     wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
     io_cb->close(fp);
@@ -3431,12 +3440,12 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+",
                              frame->schunk->storage->io);
-      io_cb->seek(fp, header_len + 0, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len + 0, SEEK_SET);
     }
     else {
       // Regular frame
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
-      io_cb->seek(fp, header_len + cbytes, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
     }
     int64_t wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
     io_cb->close(fp);

@@ -61,6 +61,7 @@ typedef struct {
   uint32_t trailer_len;     //!< The current length of the trailer in (compressed) bytes
   bool sframe;              //!< Whether the frame is sparse (true) or not
   blosc2_schunk *schunk;    //!< The schunk associated
+  int64_t file_offset;      //!< The offset where the frame starts inside the file
 } blosc2_frame_s;
 
 
