@@ -1614,9 +1614,21 @@ static int blosc_d(
     }
     // This mutex seems to create issues on Windows (not sure why yet).
     // Commenting that out for the time being.
-    // pthread_mutex_lock(&context->count_mutex);
-    context->zfp_cell_nitems = 0;
-    // pthread_mutex_unlock(&context->count_mutex);
+    switch (context->compcode) {
+      case BLOSC_CODEC_ZFP_FIXED_ACCURACY:
+      case BLOSC_CODEC_ZFP_FIXED_PRECISION:
+      case BLOSC_CODEC_ZFP_FIXED_RATE:
+        if (context->threads_started > 1) {
+          pthread_mutex_lock(&context->count_mutex);
+          context->zfp_cell_nitems = 0;
+          pthread_mutex_unlock(&context->count_mutex);
+        }
+        else {
+          context->zfp_cell_nitems = 0;
+        }
+        break;
+    }
+
     return bsize_;
   }
 
@@ -3209,6 +3221,7 @@ int init_threadpool(blosc2_context *context) {
   /* Initialize mutex and condition variable objects */
   pthread_mutex_init(&context->count_mutex, NULL);
   pthread_mutex_init(&context->delta_mutex, NULL);
+  pthread_mutex_init(&context->nchunk_mutex, NULL);
   pthread_cond_init(&context->delta_cv, NULL);
 
   /* Set context thread sentinels */
@@ -3597,6 +3610,7 @@ int release_threadpool(blosc2_context *context) {
     /* Release mutex and condition variable objects */
     pthread_mutex_destroy(&context->count_mutex);
     pthread_mutex_destroy(&context->delta_mutex);
+    pthread_mutex_destroy(&context->nchunk_mutex);
     pthread_cond_destroy(&context->delta_cv);
 
     /* Barriers */
