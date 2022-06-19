@@ -64,10 +64,6 @@ struct blosc2_context_s {
   /* Type size */
   int32_t* bstarts;
   /* Starts for every block inside the compressed buffer */
-  int32_t zfp_cell_start;
-  /* Cell starter index for ZFP fixed-rate mode */
-  int32_t zfp_cell_nitems;
-  /* Number of items to get for ZFP fixed-rate mode */
   int32_t special_type;
   /* Special type for chunk.  0 if not special. */
   int compcode;
@@ -153,8 +149,10 @@ struct thread_context {
   uint8_t* tmp2;
   uint8_t* tmp3;
   uint8_t* tmp4;
-  int32_t tmp_blocksize; /* the blocksize for different temporaries */
+  int32_t tmp_blocksize;  /* the blocksize for different temporaries */
   size_t tmp_nbytes;   /* keep track of how big the temporary buffers are */
+  int32_t zfp_cell_start;  /* cell starter index for ZFP fixed-rate mode */
+  int32_t zfp_cell_nitems;  /* number of items to get for ZFP fixed-rate mode */
 #if defined(HAVE_ZSTD)
   /* The contexts for ZSTD */
   ZSTD_CCtx* zstd_cctx;

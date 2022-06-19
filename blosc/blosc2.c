@@ -1612,22 +1612,7 @@ static int blosc_d(
         return BLOSC2_ERROR_POSTFILTER;
       }
     }
-    // This mutex seems to create issues on Windows (not sure why yet).
-    // Commenting that out for the time being.
-    switch (context->compcode) {
-      case BLOSC_CODEC_ZFP_FIXED_ACCURACY:
-      case BLOSC_CODEC_ZFP_FIXED_PRECISION:
-      case BLOSC_CODEC_ZFP_FIXED_RATE:
-        if (context->threads_started > 1) {
-          pthread_mutex_lock(&context->count_mutex);
-          context->zfp_cell_nitems = 0;
-          pthread_mutex_unlock(&context->count_mutex);
-        }
-        else {
-          context->zfp_cell_nitems = 0;
-        }
-        break;
-    }
+    thread_context->zfp_cell_nitems = 0;
 
     return bsize_;
   }
@@ -1751,18 +1736,19 @@ static int blosc_d(
         bool getcell = false;
 
 #if defined(HAVE_PLUGINS)
-        if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && (context->zfp_cell_nitems > 0)) {
-          nbytes = zfp_getcell(context, src, cbytes, _dest, neblock);
+        if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) &&
+            (thread_context->zfp_cell_nitems > 0)) {
+          nbytes = zfp_getcell(thread_context, src, cbytes, _dest, neblock);
           if (nbytes < 0) {
             return BLOSC2_ERROR_DATA;
           }
-          if (nbytes == context->zfp_cell_nitems * typesize) {
+          if (nbytes == thread_context->zfp_cell_nitems * typesize) {
             getcell = true;
           }
         }
 #endif /* HAVE_PLUGINS */
         if (!getcell) {
-          context->zfp_cell_nitems = 0;
+          thread_context->zfp_cell_nitems = 0;
           for (int i = 0; i < g_ncodecs; ++i) {
             if (g_codecs[i].compcode == context->compcode) {
               blosc2_dparams dparams;
@@ -1793,7 +1779,7 @@ static int blosc_d(
       }
 
       /* Check that decompressed bytes number is correct */
-      if ((nbytes != neblock) && (context->zfp_cell_nitems == 0)) {
+      if ((nbytes != neblock) && (thread_context->zfp_cell_nitems == 0)) {
         return BLOSC2_ERROR_DATA;
       }
 
@@ -1931,6 +1917,8 @@ static int init_thread_context(struct thread_context* thread_context, blosc2_con
   thread_context->tmp3 = thread_context->tmp2 + ebsize;
   thread_context->tmp4 = thread_context->tmp3 + ebsize;
   thread_context->tmp_blocksize = context->blocksize;
+  thread_context->zfp_cell_nitems = 0;
+  thread_context->zfp_cell_start = 0;
   #if defined(HAVE_ZSTD)
   thread_context->zstd_cctx = NULL;
   thread_context->zstd_dctx = NULL;
@@ -2893,8 +2881,8 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
 
 #if defined(HAVE_PLUGINS)
     if (context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) {
-      context->zfp_cell_start = startb / context->typesize;
-      context->zfp_cell_nitems = nitems;
+      scontext->zfp_cell_start = startb / context->typesize;
+      scontext->zfp_cell_nitems = nitems;
     }
 #endif /* HAVE_PLUGINS */
 
@@ -2915,11 +2903,11 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
       ntbytes = cbytes;
       break;
     }
-    if (context->zfp_cell_nitems > 0) {
+    if (scontext->zfp_cell_nitems > 0) {
       if (cbytes == bsize2) {
         memcpy((uint8_t *) dest, tmp2, (unsigned int) bsize2);
       } else if (cbytes == context->blocksize) {
-        memcpy((uint8_t *) dest, tmp2 + context->zfp_cell_start * context->typesize, (unsigned int) bsize2);
+        memcpy((uint8_t *) dest, tmp2 + scontext->zfp_cell_start * context->typesize, (unsigned int) bsize2);
         cbytes = bsize2;
       }
     } else if (!get_single_block) {
@@ -2929,7 +2917,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     ntbytes += bsize2;
   }
 
-  context->zfp_cell_nitems = 0;
+  scontext->zfp_cell_nitems = 0;
 
   return ntbytes;
 }
@@ -3713,8 +3701,6 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   context->block_maskout = NULL;
   context->block_maskout_nitems = 0;
   context->schunk = dparams.schunk;
-  context->zfp_cell_nitems = 0;
-  context->zfp_cell_start = 0;
 
   if (dparams.postfilter != NULL) {
     context->postfilter = dparams.postfilter;

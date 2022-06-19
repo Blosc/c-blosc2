@@ -696,8 +696,9 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     return (int) output_len;
 }
 
-
-int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, uint8_t *dest, int32_t destsize) {
+int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint8_t *dest, int32_t destsize) {
+    struct thread_context *thread_ctx = thread_context;
+    blosc2_context *context = thread_ctx->parent_context;
     bool meta = false;
     uint8_t ndim = ZFP_MAX_DIM + 1;
     int64_t blockshape[ZFP_MAX_DIM];      // ZFP only works for caterva datasets
@@ -725,7 +726,7 @@ int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, u
     int64_t cell_start_ndim[4], cell_ind_ndim[4], ncell_ndim[4], ind_strides[4], cell_strides[4];
     int64_t cell_ind, ncell;
     int cellshape = 4;
-    blosc2_unidim_to_multidim(ndim, blockshape, context->zfp_cell_start, cell_start_ndim);
+    blosc2_unidim_to_multidim(ndim, blockshape, thread_ctx->zfp_cell_start, cell_start_ndim);
     for (int i = 0; i < ndim; ++i) {
         cell_ind_ndim[i] = cell_start_ndim[i] % cellshape;
         ncell_ndim[i] = cell_start_ndim[i] / cellshape;
@@ -738,7 +739,8 @@ int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, u
     blosc2_multidim_to_unidim(cell_ind_ndim, (int8_t) ndim, ind_strides, &cell_ind);
     blosc2_multidim_to_unidim(ncell_ndim, (int8_t) ndim, cell_strides, &ncell);
     int cell_nitems = (int) (1u << (2 * ndim));
-    if ((context->zfp_cell_nitems > cell_nitems) || ((cell_ind + context->zfp_cell_nitems) > cell_nitems)) {
+    if ((thread_ctx->zfp_cell_nitems > cell_nitems) ||
+        ((cell_ind + thread_ctx->zfp_cell_nitems) > cell_nitems)) {
         return 0;
     }
 
@@ -847,16 +849,17 @@ int zfp_getcell(blosc2_context *context, const uint8_t *block, int32_t cbytes, u
             printf("\n ZFP is not available for this number of dims \n");
             return 0;
     }
-    memcpy(dest, &cell[cell_ind * typesize], context->zfp_cell_nitems * typesize);
+    memcpy(dest, &cell[cell_ind * typesize], thread_ctx->zfp_cell_nitems * typesize);
     zfp_stream_close(zfp);
     stream_close(stream);
     free(cell);
 
-    if ((zfpsize == 0) || ((int32_t)zfpsize > (destsize * 8)) || ((int32_t)zfpsize > (cell_nitems * typesize * 8)) ||
-        ((context->zfp_cell_nitems * typesize * 8) > (int32_t)zfpsize)) {
+    if ((zfpsize == 0) || ((int32_t)zfpsize > (destsize * 8)) ||
+        ((int32_t)zfpsize > (cell_nitems * typesize * 8)) ||
+        ((thread_ctx->zfp_cell_nitems * typesize * 8) > (int32_t)zfpsize)) {
         BLOSC_TRACE_ERROR("ZFP error or small destsize");
         return -1;
     }
 
-    return (int) (context->zfp_cell_nitems * typesize);
+    return (int) (thread_ctx->zfp_cell_nitems * typesize);
 }
