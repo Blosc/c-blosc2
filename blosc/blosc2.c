@@ -1530,7 +1530,7 @@ static int blosc_d(
       fp = io_cb->open(urlpath, "rb", context->schunk->storage->io->params);
       BLOSC_ERROR_NULL(fp, BLOSC2_ERROR_FILE_OPEN);
       // The offset of the block is src_offset
-      io_cb->seek(fp, chunk_offset + src_offset, SEEK_SET);
+      io_cb->seek(fp, frame->file_offset + chunk_offset + src_offset, SEEK_SET);
     }
     // We can make use of tmp3 because it will be used after src is not needed anymore
     int64_t rbytes = io_cb->read(tmp3, 1, block_csize, fp);
