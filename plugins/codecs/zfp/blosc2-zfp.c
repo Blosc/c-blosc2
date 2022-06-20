@@ -700,7 +700,7 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
     struct thread_context *thread_ctx = thread_context;
     blosc2_context *context = thread_ctx->parent_context;
     bool meta = false;
-    uint8_t ndim = ZFP_MAX_DIM + 1;
+    int8_t ndim = ZFP_MAX_DIM + 1;
     int32_t blockmeta[ZFP_MAX_DIM];
     if (context->schunk->blockshape == NULL) {
         // blockshape is not filled yet.  Use the Caterva layer to populate it.
