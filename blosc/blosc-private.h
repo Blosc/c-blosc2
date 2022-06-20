@@ -62,7 +62,7 @@ static inline void endian_handler(bool little, void *dest, const void *pa, int s
   }
   else {
     uint8_t* pa_ = (uint8_t*)pa;
-    uint8_t* pa2_ = malloc((size_t)size);
+    uint8_t pa2_[8];
     switch (size) {
       case 8:
         pa2_[0] = pa_[7];
@@ -91,7 +91,6 @@ static inline void endian_handler(bool little, void *dest, const void *pa, int s
         BLOSC_TRACE_ERROR("Unhandled size: %d.", size);
     }
     memcpy(dest, pa2_, size);
-    free(pa2_);
   }
 }
 
