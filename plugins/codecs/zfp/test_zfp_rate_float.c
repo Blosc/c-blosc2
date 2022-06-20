@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include "blosc2.h"
 #include "blosc2/codecs-registry.h"
+#include "blosc-private.h"
 #include <inttypes.h>
 
 static int test_zfp_rate_float(blosc2_schunk* schunk) {
@@ -176,6 +177,7 @@ static int test_zfp_rate_double(blosc2_schunk* schunk) {
 
 int float_cyclic() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_float_cyclic.caterva");
+    BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
 
     /* Run the test. */
     int result = test_zfp_rate_float(schunk);
@@ -185,6 +187,7 @@ int float_cyclic() {
 
 int double_same_cells() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_double_same_cells.caterva");
+    BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
 
     /* Run the test. */
     int result = test_zfp_rate_double(schunk);
@@ -194,6 +197,7 @@ int double_same_cells() {
 
 int day_month_temp() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_day_month_temp.caterva");
+    BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
 
     /* Run the test. */
     int result = test_zfp_rate_float(schunk);
@@ -203,6 +207,7 @@ int day_month_temp() {
 
 int item_prices() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_item_prices.caterva");
+    BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
 
     /* Run the test. */
     int result = test_zfp_rate_float(schunk);

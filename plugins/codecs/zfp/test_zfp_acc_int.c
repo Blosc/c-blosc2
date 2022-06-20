@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include "blosc2.h"
 #include "blosc2/codecs-registry.h"
+#include "blosc-private.h"
 #include <inttypes.h>
 
 static int test_zfp(blosc2_schunk* schunk) {
@@ -102,6 +103,7 @@ static int test_zfp(blosc2_schunk* schunk) {
 
 int rand_() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_repart_rand.caterva");
+    BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
 
     /* Run the test. */
     int result = test_zfp(schunk);
@@ -111,6 +113,7 @@ int rand_() {
 
 int same_cells() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_repart_same_cells.caterva");
+    BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
 
     /* Run the test. */
     int result = test_zfp(schunk);
@@ -120,6 +123,7 @@ int same_cells() {
 
 int some_matches() {
     blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_repart_some_matches.caterva");
+    BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
 
     /* Run the test. */
     int result = test_zfp(schunk);
