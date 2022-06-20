@@ -1481,6 +1481,11 @@ typedef struct blosc2_schunk {
   int16_t nvlmetalayers;
   //!< The number of variable-length metalayers.
   blosc2_btune *udbtune;
+  //<! Struct for BTune
+  int8_t ndim;
+  //<! The ndim (mainly for ZFP usage)
+  int64_t *blockshape;
+  //<! The blockshape (mainly for ZFP usage)
 } blosc2_schunk;
 
 

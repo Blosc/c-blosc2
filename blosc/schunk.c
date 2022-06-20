@@ -419,6 +419,8 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     blosc2_free_ctx(schunk->cctx);
   if (schunk->dctx != NULL)
     blosc2_free_ctx(schunk->dctx);
+  if (schunk->blockshape != NULL)
+    blosc2_free_ctx(schunk->blockshape);
 
   if (schunk->nmetalayers > 0) {
     for (int i = 0; i < schunk->nmetalayers; i++) {
