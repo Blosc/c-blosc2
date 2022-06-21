@@ -384,9 +384,9 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
     }
     else {
       fp = io_cb->open(frame->urlpath, "rb", io->params);
+      io_cb->seek(fp, frame->file_offset, SEEK_SET);
     }
     if (fp != NULL) {
-      io_cb->seek(fp, frame->file_offset, SEEK_SET);
       rbytes = io_cb->read(header, 1, FRAME_HEADER_MINLEN, fp);
       io_cb->close(fp);
     }
@@ -1194,7 +1194,7 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
   if (frame->sframe) {
     fp = sframe_open_index(frame->urlpath, "rb",
                            frame->schunk->storage->io);
-    io_cb->seek(fp, frame->file_offset + header_len + 0, SEEK_SET);
+    io_cb->seek(fp, header_len + 0, SEEK_SET);
   }
   else {
     fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
@@ -1286,9 +1286,9 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
     }
     else {
       fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
+      io_cb->seek(fp, frame->file_offset, SEEK_SET);
     }
     if (fp != NULL) {
-      io_cb->seek(fp, frame->file_offset, SEEK_SET);
       rbytes = io_cb->read(header, 1, FRAME_HEADER_MINLEN, fp);
       io_cb->close(fp);
     }
@@ -1493,9 +1493,9 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     }
     else {
       fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
+      io_cb->seek(fp, frame->file_offset, SEEK_SET);
     }
     if (fp != NULL) {
-      io_cb->seek(fp, frame->file_offset, SEEK_SET);
       rbytes = io_cb->read(header, 1, header_len, fp);
       io_cb->close(fp);
     }
@@ -1672,12 +1672,13 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = io_cb->open(eframe_name, "rb", frame->schunk->storage->io->params);
       free(eframe_name);
+      io_cb->seek(fp, trailer_offset, SEEK_SET);
     }
     else {
       fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
+      io_cb->seek(fp, frame->file_offset + trailer_offset, SEEK_SET);
     }
     if (fp != NULL) {
-      io_cb->seek(fp, frame->file_offset + trailer_offset, SEEK_SET);
       rbytes = io_cb->read(trailer, 1, trailer_len, fp);
       io_cb->close(fp);
     }
@@ -2269,7 +2270,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
 
     // Read just the full header and bstarts section too (lazy partial length)
     if (frame->sframe) {
-      io_cb->seek(fp, frame->file_offset, SEEK_SET);
+      io_cb->seek(fp, 0, SEEK_SET);
     }
     else {
       io_cb->seek(fp, frame->file_offset + header_len + offset, SEEK_SET);
