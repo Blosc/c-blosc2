@@ -397,6 +397,21 @@ int64_t frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
 }
 
 
+/* Append an in-memory frame to a file. */
+int64_t append_frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+    if (io_cb == NULL) {
+        BLOSC_TRACE_ERROR("Error getting the input/output API");
+        return BLOSC2_ERROR_PLUGIN_IO;
+    }
+    void* fp = io_cb->open(urlpath, "ab", frame->schunk->storage->io);
+    int64_t offset = io_cb->tell(fp);
+    int64_t nitems = io_cb->write(frame->cframe, frame->len, 1, fp);
+    io_cb->close(fp);
+    return offset;
+}
+
+
 /* Write super-chunk out to a file. */
 int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath) {
   if (urlpath == NULL) {
@@ -425,6 +440,37 @@ int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath) {
   int64_t frame_len = frame->len;
   blosc2_schunk_free(schunk_copy);
   return frame_len;
+}
+
+
+/* Append a super-chunk to a file. */
+int64_t blosc2_schunk_append_file(blosc2_schunk* schunk, const char* urlpath) {
+    if (urlpath == NULL) {
+        BLOSC_TRACE_ERROR("urlpath cannot be NULL");
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+
+    // Accelerated path for in-memory frames
+    if (schunk->storage->contiguous && schunk->storage->urlpath == NULL) {
+        int64_t offset = append_frame_to_file((blosc2_frame_s*)(schunk->frame), urlpath);
+        if (offset <= 0) {
+            BLOSC_TRACE_ERROR("Error writing to file");
+            return offset;
+        }
+        return offset;
+    }
+
+    // Copy to a contiguous file
+    blosc2_storage frame_storage = {.contiguous=true, .urlpath=NULL};
+    blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, &frame_storage);
+    if (schunk_copy == NULL) {
+        BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
+        return BLOSC2_ERROR_SCHUNK_COPY;
+    }
+    blosc2_frame_s* frame = (blosc2_frame_s*)(schunk_copy->frame);
+    int64_t offset = append_frame_to_file(frame, urlpath);
+    blosc2_schunk_free(schunk_copy);
+    return offset;
 }
 
 

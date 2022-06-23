@@ -1581,6 +1581,15 @@ BLOSC_EXPORT int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** cf
  */
 BLOSC_EXPORT int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath);
 
+/* @brief Append a super-chunk into a file.
+ *
+ * @param schunk The super-chunk to write.
+ * @param urlpath The path for persistent storage.
+ *
+ * @return If successful, return the offset where @p schunk has been appended in @p urlpath.
+ * Else, a negative value.
+ */
+int64_t blosc2_schunk_append_file(blosc2_schunk* schunk, const char* urlpath);
 
 /**
  * @brief Release resources from a super-chunk.
