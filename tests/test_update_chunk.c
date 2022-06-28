@@ -78,7 +78,7 @@ static char* test_update_chunk(void) {
   // Feed it with data
   for (int64_t nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
     for (int64_t i = 0; i < CHUNKSIZE; i++) {
-      data[i] = i + nchunk * CHUNKSIZE;
+      data[i] = nchunk;
     }
     int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
     mu_assert("ERROR: bad append", nchunks_ > 0);
@@ -89,14 +89,14 @@ static char* test_update_chunk(void) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
     for (int64_t i = 0; i < CHUNKSIZE; i++) {
-      mu_assert("ERROR: bad roundtrip 1", data_dest[i] == i + nchunk * CHUNKSIZE);
+      mu_assert("ERROR: bad roundtrip 1", data_dest[i] == nchunk);
     }
   }
 
   for (int i = 0; i < tdata.nupdates; ++i) {
     // Create chunk
     for (int j = 0; j < CHUNKSIZE; ++j) {
-      data[j] = i;
+      data[j] = j + i * CHUNKSIZE;
     }
 
     int32_t datasize = sizeof(int64_t) * CHUNKSIZE;
@@ -116,7 +116,21 @@ static char* test_update_chunk(void) {
     mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
     for (int j = 0; j < CHUNKSIZE; j++) {
       int64_t a = data_dest[j];
-      mu_assert("ERROR: bad roundtrip 2", a == i);
+      mu_assert("ERROR: bad roundtrip 2", a == (j + i * CHUNKSIZE));
+    }
+    if (i == 0 && tdata.nchunks > 1) {
+      if (i != pos) {
+        pos = 0;
+      }
+      else {
+        pos = 1;
+      }
+      dsize = blosc2_schunk_decompress_chunk(schunk, pos, (void *) data_dest, isize);
+      mu_assert("ERROR: chunk cannot be decompressed correctly", dsize >= 0);
+      for (int j = 0; j < CHUNKSIZE; j++) {
+        int64_t a = data_dest[j];
+        mu_assert("ERROR: bad roundtrip 3", a == pos);
+      }
     }
   }
 
