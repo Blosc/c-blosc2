@@ -2716,6 +2716,10 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
 
   // TODO: Improvement: Check if new chunk is smaller than previous one
 
+  // Move offsets
+  for (int64_t i = nchunks; i > nchunk; i--) {
+    offsets[i] = offsets[i - 1];
+  }
   // Add the new offset
   int64_t sframe_chunk_id = -1;
   int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
@@ -2724,35 +2728,22 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     case BLOSC2_SPECIAL_ZERO:
       // Zero chunk.  Code it in a special way.
       offset_value += (uint64_t)BLOSC2_SPECIAL_ZERO << (8 * 7);  // indicate a chunk of zeros
-      for (int64_t i = nchunks; i > nchunk; i--) {
-        offsets[i] = offsets[i - 1];
-      }
       to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
       chunk_cbytes = 0;   // we don't need to store the chunk
       break;
     case BLOSC2_SPECIAL_UNINIT:
       // Non initizalized values chunk.  Code it in a special way.
       offset_value += (uint64_t) BLOSC2_SPECIAL_UNINIT << (8 * 7);  // chunk of uninit values
-      for (int64_t i = nchunks; i > nchunk; i--) {
-        offsets[i] = offsets[i - 1];
-      }
       to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
       chunk_cbytes = 0;   // we don't need to store the chunk
       break;
     case BLOSC2_SPECIAL_NAN:
       // NaN chunk.  Code it in a special way.
       offset_value += (uint64_t)BLOSC2_SPECIAL_NAN << (8 * 7);  // indicate a chunk of NANs
-      for (int64_t i = nchunks; i > nchunk; i--) {
-        offsets[i] = offsets[i - 1];
-      }
       to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
       chunk_cbytes = 0;   // we don't need to store the chunk
       break;
     default:
-      // Add the new offset
-      for (int64_t i = nchunks; i > nchunk; i--) {
-        offsets[i] = offsets[i - 1];
-      }
       if (frame->sframe) {
         for (int i = 0; i < nchunks; ++i) {
           if (offsets[i] > sframe_chunk_id) {
@@ -2956,6 +2947,16 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   }
 
   // Add the new offset
+  int64_t sframe_chunk_id;
+  if (frame->sframe) {
+    if ((int64_t)offsets[nchunk] < 0) {
+      sframe_chunk_id = -1;
+    }
+    else {
+      // In case there was a reorder in a sframe
+      sframe_chunk_id = offsets[nchunk];
+    }
+  }
   int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
   uint64_t offset_value = ((uint64_t)1 << 63);
   switch (special_value) {
@@ -2979,8 +2980,14 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       break;
     default:
       if (frame->sframe) {
-        // In case there was a reorder
-        offsets[nchunk] = nchunk;
+        if (sframe_chunk_id < 0) {
+          for (int i = 0; i < nchunks; ++i) {
+            if (offsets[i] > sframe_chunk_id) {
+              sframe_chunk_id = offsets[i];
+            }
+          }
+          offsets[nchunk] = ++sframe_chunk_id;
+        }
       }
       else {
         // Add the new offset
@@ -3044,8 +3051,9 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     }
 
     if (frame->sframe) {
-      if (chunk_cbytes) {
-        if (sframe_create_chunk(frame, chunk, nchunk, chunk_cbytes) == NULL) {
+      // Create the chunks file, if it's a special value this will delete its old content
+      if (sframe_chunk_id >= 0) {
+        if (sframe_create_chunk(frame, chunk, sframe_chunk_id, chunk_cbytes) == NULL) {
           BLOSC_TRACE_ERROR("Cannot write the full chunk.");
           return NULL;
         }
