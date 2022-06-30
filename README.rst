@@ -62,7 +62,7 @@ New features in C-Blosc2
 
 * **Contiguous frames:** allow to store super-chunks contiguously, either on-disk or in-memory.  When a super-chunk is backed by a frame, instead of storing all the chunks sparsely in-memory, they are serialized inside the frame container.  The frame can be stored on-disk too, meaning that persistence of super-chunks is supported.
 
-* **Sparse frames (on-disk):** each chunk in a super-chunk is stored in a separate file, as well as the metadata.  This is the counterpart of in-memory super-chunk, and allows for more efficient updates than in frames (i.e. avoiding 'holes' in monolithic files).
+* **Sparse frames:** each chunk in a super-chunk is stored in a separate file or different memory area, as well as the metadata.  This is allows for more efficient updates/deletes than in contiguous frames (i.e. avoiding 'holes' in monolithic files).  The drawback is that it consumes more inodes when on-disk.  Thanks to Marta Iborra for this contribution.
 
 * **Partial chunk reads:** there is support for reading just part of chunks, so avoiding to read the whole thing and then discard the unnecessary data.
 
@@ -76,7 +76,7 @@ New features in C-Blosc2
 
 * **Nice markup for documentation:** we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  See https://c-blosc2.readthedocs.io.  Thanks to Alberto Sabater and Aleix Alcacer for contributing the support for this.
 
-* **Plugin capabilities for filters and codecs:** we have a plugin register capability inplace so that the info about the new filters and codecs can be persisted and transmitted to different machines.  See https://github.com/Blosc/c-blosc2/blob/main/examples/urfilters.c for a self-contained example.  Thanks to the NumFOCUS foundation for providing a grant for doing this.
+* **Plugin capabilities for filters and codecs:** we have a plugin register capability inplace so that the info about the new filters and codecs can be persisted and transmitted to different machines.  See https://github.com/Blosc/c-blosc2/blob/main/examples/urfilters.c for a self-contained example.  Thanks to the NumFOCUS foundation for providing a grant for doing this, and Oscar Griñón and Aleix Alcacer for the implementation.
 
 * **Pluggable tuning capabilities:** this will allow users with different needs to define an interface so as to better tune different parameters like the codec, the compression level, the filters to use, the blocksize or the shuffle size.  Thanks to ironArray for sponsoring us in doing this.
 
@@ -84,7 +84,7 @@ New features in C-Blosc2
 
 * **Python wrapper:**  we have a preliminary wrapper in the works.  You can have a look at our ongoing efforts in the `python-blosc2 repo <https://github.com/Blosc/python-blosc2>`_.  Thanks to the Python Software Foundation for providing a grant for doing this.
 
-* **Security:** we are actively using using the `OSS-Fuzz <https://github.com/google/oss-fuzz>`_ and `ClusterFuzz <https://oss-fuzz.com>`_ for uncovering programming errors in C-Blosc2.  Thanks to Google for sponsoring us in doing this.
+* **Security:** we are actively using using the `OSS-Fuzz <https://github.com/google/oss-fuzz>`_ and `ClusterFuzz <https://oss-fuzz.com>`_ for uncovering programming errors in C-Blosc2.  Thanks to Google for sponsoring us in doing this, and to Nathan Moinvaziri for most of the work here.
 
 More info about the `improved capabilities of C-Blosc2 can be found in this talk <https://www.blosc.org/docs/Caterva-HDF5-Workshop.pdf>`_.
 
