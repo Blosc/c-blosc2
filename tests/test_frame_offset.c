@@ -130,7 +130,7 @@ CUTEST_TEST_TEST(fill_special) {
   blosc2_schunk* schunk3o = blosc2_schunk_open_offset("file:///frame_simple.b2frame", offset);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Time for fileframe (%s) + offset %ld -> frame3 : %.3g s, %.1f GB/s\n",
+  printf("Time for fileframe (%s) + offset %lld -> frame3 : %.3g s, %.1f GB/s\n",
          schunk3o->storage->urlpath, offset, ttotal, (double)schunk3o->nbytes / (ttotal * GB));
 
   uint8_t* cframe2, *cframe3;
