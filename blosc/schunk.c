@@ -414,7 +414,7 @@ int64_t append_frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
     offset = io_cb->tell(fp);
 # endif
 
-    int64_t nitems = io_cb->write(frame->cframe, frame->len, 1, fp);
+    io_cb->write(frame->cframe, frame->len, 1, fp);
     io_cb->close(fp);
     return offset;
 }
