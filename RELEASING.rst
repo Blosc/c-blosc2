@@ -33,7 +33,7 @@ version::
 
   $ cd ../compat
   $ export LD_LIBRARY_PATH=../build/blosc
-  $ gcc -o filegen filegen.c -L$LD_LIBRARY_PATH -lblosc2 -I../blosc
+  $ gcc -o filegen filegen.c -L$LD_LIBRARY_PATH -lblosc2 -I../include
   $ ./filegen compress lz4 blosc-lz4-1.y.z.cdata
 
 In order to make sure that we are not breaking forward compatibility,
