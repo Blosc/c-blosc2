@@ -1,11 +1,26 @@
-Release notes for C-Blosc2 2.1.2
+Release notes for C-Blosc2 2.2.0
 ================================
 
-Changes from 2.1.1 to 2.1.2
+Changes from 2.1.1 to 2.2.0
 ===========================
+
+* Added new `blosc2_schunk_open_offset()` and `blosc2_schunk_append_file()` functions for being able to open a super-chunk inside of file, and append a super-chunk to the end of an existing file.  See https://github.com/Blosc/c-blosc2/pull/409.
 
 * Protect the update of a field in compression/decompression context.  Fixes issues when compressing/decompressing super-chunks in multi-thread mode.
 
+* Fix issue when inserting a chunk in a super-chunk.  See https://github.com/Blosc/c-blosc2/pull/408.
+
+* Fix issue when appending a special chunk in a super-chunk.  See https://github.com/Blosc/c-blosc2/pull/407.
+
+* Optimized the blockshape calculation when using the ZFP plugin in `BLOSC_CODEC_ZFP_FIXED_RATE` mode.  See https://github.com/Blosc/c-blosc2/pull/406.
+
+* New `blosc2_unidim_to_multidim` and `blosc2_multidim_to_unidim` which are useful for codecs that are meant to deal with multidimensional arrays (like ZFP).
+
+* Another round of squashing warnings has been carried out.  Thanks to Marta Iborra.
+
+* Added locks in situations where different threads were trying to update the same variable.  Thanks to Marta Iborra (and helgrind!).
+
+* Use proper types for native zlib-ng interface.  This allows for linking with zlib-ng native API. Thanks to Klaus Zimmermann.
 
 Changes from 2.1.0 to 2.1.1
 ===========================

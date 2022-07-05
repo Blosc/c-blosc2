@@ -1,10 +1,13 @@
-# Announcing C-Blosc2 2.1.1
+# Announcing C-Blosc2 2.2.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
 The Blosc development team is happy to announce a new release of C-Blosc2.
-This is a maintenance release for fixing a bug affecting [ARM platforms](https://github.com/Blosc/c-blosc2/issues/392)).  Also more warnings and fuzzer issues has been fixed.
+In this release, we are including API functions and fixed a series of bugs
+related with appends and insertions of chunks in super-chunks.  Also
+important, now linking against an external zlib-ng compiled with native API
+is supported.
 
 C-Blosc2 should be backward compatible with C-Blosc, so you can start using
 it right away and increasingly start to use its new functionality, like the
@@ -26,7 +29,9 @@ It builds on the shoulders of Blosc, the high performance meta-compressor
 (https://github.com/Blosc/c-blosc).
 
 Blosc2 expands the capabilities of Blosc by providing a higher lever
-container that is able to store many chunks on it (hence the super-block name).  It supports storing data on both memory and disk using the same API.  Also, it adds more compressors and filters.
+container that is able to store many chunks on it (hence the super-block name).
+It supports storing data on both memory and disk using the same API.
+Also, it adds more compressors and filters.
 
 ## Download sources
 
