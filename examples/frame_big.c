@@ -64,7 +64,10 @@ int main(void) {
       data[i] = i * nchunk;
     }
     int64_t nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
-    assert(nchunks == nchunk + 1);
+    if (nchunks != nchunk + 1) {
+      printf("Error: nchunks is not correct");
+      return -1;
+    }
   }
   /* Gather some info */
   int64_t nbytes = schunk->nbytes;

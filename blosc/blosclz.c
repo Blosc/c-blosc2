@@ -413,9 +413,7 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift) {
     oc++;
   }
 
-  double ic;
-out:
-  ic = (double)(ip - ibase);
+  double ic = (double)(ip - ibase);
   return ic / (double)oc;
 }
 
