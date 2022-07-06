@@ -19,7 +19,7 @@ subprocess.call('cd ../../doxygen && doxygen Doxyfile && cd ../sphinx/source', s
 # -- Project information -----------------------------------------------------
 
 project = 'Blosc2'
-copyright = '2021, The Blosc Developers'
+copyright = '2019-present, The Blosc Developers'
 author = 'The Blosc Developers'
 
 
