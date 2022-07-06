@@ -6,7 +6,7 @@
 version: 2
 
 conda:
-  environment: doc/conda-rtd-environment.yml
+  environment: doc/environment.yml
 
 # Set the version of Python and other tools you might need
 build:
