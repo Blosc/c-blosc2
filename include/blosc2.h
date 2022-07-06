@@ -445,19 +445,17 @@ BLOSC_EXPORT void blosc_destroy(void);
  * parameter before the compression process starts.
  *
  * * **BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | SNAPPY | ZLIB | ZSTD]**:
- * This will call #blosc_set_compressor(BLOSC_COMPRESSOR) before the
- * compression process starts.
+ * This will call #blosc_set_compressor before the compression process starts.
  *
  * * **BLOSC_NTHREADS=(INTEGER)**: This will call
- * #blosc_set_nthreads(BLOSC_NTHREADS) before the compression process
- * starts.
+ * #blosc_set_nthreads before the compression process starts.
  *
  * * **BLOSC_BLOCKSIZE=(INTEGER)**: This will call
- * #blosc_set_blocksize(BLOSC_BLOCKSIZE) before the compression process
- * starts.  *NOTE:* The *blocksize* is a critical parameter with
+ * #blosc_set_blocksize before the compression process starts.
+ * *NOTE:* The *blocksize* is a critical parameter with
  * important restrictions in the allowed values, so use this with care.
  *
- * * **BLOSC_NOLOCK=(ANY VALUE)**: This will call *blosc2_compress_ctx()* under
+ * * **BLOSC_NOLOCK=(ANY VALUE)**: This will call #blosc2_compress_ctx under
  * the hood, with the *compressor*, *blocksize* and
  * *numinternalthreads* parameters set to the same as the last calls to
  * #blosc_set_compressor, #blosc_set_blocksize and
@@ -503,7 +501,7 @@ BLOSC_EXPORT int blosc_compress(int clevel, int doshuffle, size_t typesize,
  * Here are the ones supported:
  *
  * * **BLOSC_NTHREADS=(INTEGER)**: This will call
- * #blosc_set_nthreads(BLOSC_NTHREADS) before the proper decompression
+ * #blosc_set_nthreads before the proper decompression
  * process starts.
  *
  * * **BLOSC_NOLOCK=(ANY VALUE)**: This will call #blosc2_decompress_ctx
@@ -735,10 +733,10 @@ BLOSC_EXPORT int blosc2_cbuffer_sizes(const void* cbuffer, int32_t* nbytes,
                                       int32_t* cbytes, int32_t* blocksize);
 
 /**
- * @brief Checks that the compressed buffer starting at @cbuffer of length @cbytes may
- * contain valid blosc compressed data, and that it is safe to call
+ * @brief Checks that the compressed buffer starting at @p cbuffer of length @p cbytes
+ * may contain valid blosc compressed data, and that it is safe to call
  * blosc_decompress/blosc_decompress_ctx/blosc_getitem.
- * On success, returns 0 and sets @nbytes to the size of the uncompressed data.
+ * On success, returns 0 and sets @p nbytes to the size of the uncompressed data.
  * This does not guarantee that the decompression function won't return an error,
  * but does guarantee that it is safe to attempt decompression.
  *
@@ -879,7 +877,7 @@ static const blosc2_io BLOSC2_IO_DEFAULTS = {
 /**
  * @brief Register a user-defined input/output callbacks in Blosc.
  *
- * @param filter The callbacks API to register.
+ * @param io The callbacks API to register.
  *
  * @return 0 if succeeds. Else a negative code is returned.
  */
@@ -1004,8 +1002,10 @@ typedef struct {
  * @brief Default struct for compression params meant for user initialization.
  */
 static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
-        BLOSC_BLOSCLZ, 0, 5, 0, 8, 1, 0, BLOSC_FORWARD_COMPAT_SPLIT,
-        NULL, {0, 0, 0, 0, 0, BLOSC_SHUFFLE}, {0, 0, 0, 0, 0, 0},
+        BLOSC_BLOSCLZ, 0, 5, 0, 8, 1, 0,
+        BLOSC_FORWARD_COMPAT_SPLIT, NULL,
+        .filters={0, 0, 0, 0, 0, BLOSC_SHUFFLE},
+        .filters_meta={0, 0, 0, 0, 0, 0},
         NULL, NULL, NULL, 0};
 
 
@@ -1062,7 +1062,7 @@ BLOSC_EXPORT void blosc2_free_ctx(blosc2_context* context);
 /**
  * @brief Create a @p cparams associated to a context.
  *
- * @param schunk The context from where to extract the compression parameters.
+ * @param ctx The context from where to extract the compression parameters.
  * @param cparams The pointer where the compression params will be stored.
  *
  * @return 0 if succeeds. Else a negative code is returned.
@@ -1072,7 +1072,7 @@ BLOSC_EXPORT int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cpa
 /**
  * @brief Create a @p dparams associated to a context.
  *
- * @param schunk The context from where to extract the decompression parameters.
+ * @param ctx The context from where to extract the decompression parameters.
  * @param dparams The pointer where the decompression params will be stored.
  *
  * @return 0 if succeeds. Else a negative code is returned.
@@ -1159,23 +1159,22 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * parameter before the compression process starts.
  *
  * **BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | ZLIB | ZSTD]**:
- * This will call *blosc_set_compressor(BLOSC_COMPRESSOR)* before the
- * compression process starts.
+ * This will call #blosc_set_compressor before the compression process starts.
  *
  * **BLOSC_NTHREADS=(INTEGER)**: This will call
- * *blosc_set_nthreads(BLOSC_NTHREADS)* before the compression process
+ * #blosc_set_nthreads before the compression process
  * starts.
  *
  * **BLOSC_BLOCKSIZE=(INTEGER)**: This will call
- * *blosc_set_blocksize(BLOSC_BLOCKSIZE)* before the compression process
- * starts.  *NOTE:* The blocksize is a critical parameter with
+ * #blosc_set_blocksize before the compression process starts.
+ * *NOTE:* The blocksize is a critical parameter with
  * important restrictions in the allowed values, so use this with care.
  *
- * **BLOSC_NOLOCK=(ANY VALUE)**: This will call *blosc2_compress_ctx()* under
+ * **BLOSC_NOLOCK=(ANY VALUE)**: This will call #blosc2_compress_ctx under
  * the hood, with the *compressor*, *blocksize* and
  * *numinternalthreads* parameters set to the same as the last calls to
- * *blosc_set_compressor*, *blosc_set_blocksize* and
- * *blosc_set_nthreads*. *BLOSC_CLEVEL*, *BLOSC_SHUFFLE*, *BLOSC_DELTA* and
+ * #blosc_set_compressor, #blosc_set_blocksize and
+ * #blosc_set_nthreads. *BLOSC_CLEVEL*, *BLOSC_SHUFFLE*, *BLOSC_DELTA* and
  * *BLOSC_TYPESIZE* environment vars will also be honored.
  *
  */
@@ -1298,7 +1297,7 @@ BLOSC_EXPORT int blosc2_decompress_ctx(blosc2_context* context, const void* src,
  * must be BLOSC_EXTENDED_HEADER_LENGTH at least.
  *
  * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH).
- * If negative, there has been an error and @dest is unusable.
+ * If negative, there has been an error and @p dest is unusable.
  * */
 BLOSC_EXPORT int blosc2_chunk_zeros(blosc2_cparams cparams, int32_t nbytes,
                                     void* dest, int32_t destsize);
@@ -1317,7 +1316,7 @@ BLOSC_EXPORT int blosc2_chunk_zeros(blosc2_cparams cparams, int32_t nbytes,
  * @note Whether the NaNs are floats or doubles will be given by the typesize.
  *
  * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH).
- * If negative, there has been an error and @dest is unusable.
+ * If negative, there has been an error and @p dest is unusable.
  * */
 BLOSC_EXPORT int blosc2_chunk_nans(blosc2_cparams cparams, int32_t nbytes,
                                    void* dest, int32_t destsize);
@@ -1334,7 +1333,7 @@ BLOSC_EXPORT int blosc2_chunk_nans(blosc2_cparams cparams, int32_t nbytes,
  * The size of the value is given by @p cparams.typesize param.
  *
  * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH + typesize).
- * If negative, there has been an error and @dest is unusable.
+ * If negative, there has been an error and @p dest is unusable.
  * */
 BLOSC_EXPORT int blosc2_chunk_repeatval(blosc2_cparams cparams, int32_t nbytes,
                                         void* dest, int32_t destsize, void* repeatval);
@@ -1350,7 +1349,7 @@ BLOSC_EXPORT int blosc2_chunk_repeatval(blosc2_cparams cparams, int32_t nbytes,
  * must be BLOSC_EXTENDED_HEADER_LENGTH at least.
  *
  * @return The number of bytes compressed (BLOSC_EXTENDED_HEADER_LENGTH).
- * If negative, there has been an error and @dest is unusable.
+ * If negative, there has been an error and @p dest is unusable.
  * */
 BLOSC_EXPORT int blosc2_chunk_uninit(blosc2_cparams cparams, int32_t nbytes,
                                      void* dest, int32_t destsize);
@@ -1359,11 +1358,13 @@ BLOSC_EXPORT int blosc2_chunk_uninit(blosc2_cparams cparams, int32_t nbytes,
 /**
  * @brief Context interface counterpart for #blosc_getitem.
  *
- * It uses many of the same parameters as blosc_getitem() function with
- * a few additions.
- *
  * @param context Context pointer.
+ * @param src The compressed buffer from data will be decompressed.
  * @param srcsize Compressed buffer length.
+ * @param start The position of the first item (of @p typesize size) from where data
+ * will be retrieved.
+ * @param nitems The number of items (of @p typesize size) that will be retrieved.
+ * @param dest The buffer where the decompressed data retrieved will be put.
  * @param destsize Output buffer length.
  *
  * @return The number of bytes copied to @p dest or a negative value if
