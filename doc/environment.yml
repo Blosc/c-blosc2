@@ -5,6 +5,7 @@ channels:
 dependencies:
   - python=3.9
   - doxygen=1.9
+  - breathe
+  - sphinx
+  - pydata-sphinx-theme
   - pip>=20.1
-  - pip:
-    - black==20.8b1
