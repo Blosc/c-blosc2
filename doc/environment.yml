@@ -7,5 +7,3 @@ dependencies:
   - doxygen=1.9
   - breathe
   - sphinx
-  - pydata-sphinx-theme
-  - pip>=20.1
