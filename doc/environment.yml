@@ -4,4 +4,7 @@ channels:
   - defaults
 dependencies:
   - python=3.9
-  - doxygen=1.9.3
+  - doxygen=1.9
+  - pip>=20.1
+  - pip:
+    - black==20.8b1
