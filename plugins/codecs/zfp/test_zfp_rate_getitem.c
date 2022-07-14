@@ -127,7 +127,7 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
     blosc2_free_ctx(cctx);
     blosc2_free_ctx(dctx);
 
-    printf("Succesful roundtrip!\n");
+    printf("Successful roundtrip!\n");
     return (int) (BLOSC2_ERROR_SUCCESS);
 }
 
@@ -236,7 +236,7 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
     blosc2_free_ctx(cctx);
     blosc2_free_ctx(dctx);
 
-    printf("Succesful roundtrip!\n");
+    printf("Successful roundtrip!\n");
     return (int) (BLOSC2_ERROR_SUCCESS);
 }
 

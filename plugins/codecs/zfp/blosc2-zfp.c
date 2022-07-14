@@ -35,9 +35,9 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     zfp_type type;     /* array scalar type */
     zfp_field *field;  /* array meta data */
     zfp_stream *zfp;   /* stream containing the real output buffer */
-    zfp_stream *zfp_aux;   /* auxiliar compressed stream */
+    zfp_stream *zfp_aux;   /* auxiliary compressed stream */
     bitstream *stream; /* bit stream to write to or read from */
-    bitstream *stream_aux; /* auxiliar bit stream to write to or read from */
+    bitstream *stream_aux; /* auxiliary bit stream to write to or read from */
     size_t zfpsize;    /* byte size of compressed stream */
     double tolerance = pow(10, tol);
 
@@ -242,9 +242,9 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     zfp_type type;     /* array scalar type */
     zfp_field *field;  /* array meta data */
     zfp_stream *zfp;   /* stream containing the real output buffer */
-    zfp_stream *zfp_aux;   /* auxiliar compressed stream */
+    zfp_stream *zfp_aux;   /* auxiliary compressed stream */
     bitstream *stream; /* bit stream to write to or read from */
-    bitstream *stream_aux; /* auxiliar bit stream to write to or read from */
+    bitstream *stream_aux; /* auxiliary bit stream to write to or read from */
     size_t zfpsize;    /* byte size of compressed stream */
 
     uint prec;
@@ -499,9 +499,9 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     zfp_type type;     /* array scalar type */
     zfp_field *field;  /* array meta data */
     zfp_stream *zfp;   /* stream containing the real output buffer */
-    zfp_stream *zfp_aux;   /* auxiliar compressed stream */
+    zfp_stream *zfp_aux;   /* auxiliary compressed stream */
     bitstream *stream; /* bit stream to write to or read from */
-    bitstream *stream_aux; /* auxiliar bit stream to write to or read from */
+    bitstream *stream_aux; /* auxiliary bit stream to write to or read from */
     size_t zfpsize;    /* byte size of compressed stream */
 
     int32_t typesize = cparams->typesize;
