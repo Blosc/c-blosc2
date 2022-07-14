@@ -6,7 +6,7 @@ ZFP: a multidimensional lossy codec
 Plugin motivation
 --------------------
 
-A lossy codec like ZFP allows for much better compression ratios at the expense of loosing some precision in floating point data.  For a discussion on how it works and specially, how it performs, see our blog at: https://www.blosc.org/posts/support-lossy-zfp/.
+A lossy codec like ZFP allows for much better compression ratios at the expense of losing some precision in floating point data.  For a discussion on how it works and specially, how it performs, see our blog at: https://www.blosc.org/posts/support-lossy-zfp/.
 
 Plugin usage
 -------------------
@@ -48,7 +48,7 @@ Then, depending on the compression mode, each block is compressed or decompresse
 For more info you can see ZFP official documentation:
 https://zfp.readthedocs.io/en/latest/
 
-And the offical repo:
+And the official repo:
 https://github.com/LLNL/zfp
 
 Advantages and disadvantages

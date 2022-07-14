@@ -168,7 +168,7 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
     // We want a contiguous frame as storage
     if (storage->urlpath != NULL) {
       if (file_exists(storage->urlpath)) {
-        BLOSC_TRACE_ERROR("You are trying to ovewrite an existing frame.  Remove it first!");
+        BLOSC_TRACE_ERROR("You are trying to overwrite an existing frame.  Remove it first!");
         return NULL;
       }
     }
