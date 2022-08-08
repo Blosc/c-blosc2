@@ -52,7 +52,7 @@ int main(){
 
   /* Register the filter with the library */
   printf("Blosc version info: %s (%s)\n",
-	 BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+	 BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   /* Initialize the global Blosc context */
   blosc_init();

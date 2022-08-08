@@ -155,7 +155,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
 
   fprintf(ofile, "--> %d, %d, %d, %d, %s, %s\n", nthreads, (int)size, elsize, rshift, compressor, shuffle);
   fprintf(ofile, "********************** Run info ******************************\n");
-  fprintf(ofile, "Blosc version: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+  fprintf(ofile, "Blosc version: %s (%s)\n", BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
   fprintf(ofile, "Using synthetic data with %d significant bits (out of 32)\n", rshift);
   fprintf(ofile, "Dataset size: %d bytes\tType size: %d bytes\n", (int)size, elsize);
   fprintf(ofile, "Working set: %.1f MB\t\t", (float)(size * nchunks) / (float)MB);
@@ -284,7 +284,7 @@ void print_compress_info(void) {
   char* name = NULL, * version = NULL;
   int ret;
 
-  printf("Blosc version: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+  printf("Blosc version: %s (%s)\n", BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   printf("List of supported compressors in this build: %s\n",
          blosc1_list_compressors());

@@ -75,18 +75,18 @@ endif()
 # The project can have ASM (zstd 1.5.2 is starting to use it)
 project(blosc LANGUAGES C ASM)
 
-# parse the full version numbers from blosc.h
-file(READ include/blosc2.h _blosc_h_contents)
-string(REGEX REPLACE ".*#define[ \t]+BLOSC_VERSION_MAJOR[ \t]+([0-9]+).*"
-    "\\1" BLOSC_VERSION_MAJOR ${_blosc_h_contents})
-string(REGEX REPLACE ".*#define[ \t]+BLOSC_VERSION_MINOR[ \t]+([0-9]+).*"
-    "\\1" BLOSC_VERSION_MINOR ${_blosc_h_contents})
-string(REGEX REPLACE ".*#define[ \t]+BLOSC_VERSION_RELEASE[ \t]+([0-9]+).*"
-    "\\1" BLOSC_VERSION_PATCH ${_blosc_h_contents})
-string(REGEX REPLACE ".*#define[ \t]+BLOSC_VERSION_STRING[ \t]+\"([-0-9A-Za-z.]+)\".*"
-    "\\1" BLOSC_VERSION_STRING ${_blosc_h_contents})
+# parse the full version numbers from blosc2.h
+file(READ include/blosc2.h _blosc2_h_contents)
+string(REGEX REPLACE ".*#define[ \t]+BLOSC2_VERSION_MAJOR[ \t]+([0-9]+).*"
+    "\\1" BLOSC2_VERSION_MAJOR ${_blosc2_h_contents})
+string(REGEX REPLACE ".*#define[ \t]+BLOSC2_VERSION_MINOR[ \t]+([0-9]+).*"
+    "\\1" BLOSC2_VERSION_MINOR ${_blosc2_h_contents})
+string(REGEX REPLACE ".*#define[ \t]+BLOSC2_VERSION_RELEASE[ \t]+([0-9]+).*"
+    "\\1" BLOSC2_VERSION_PATCH ${_blosc2_h_contents})
+string(REGEX REPLACE ".*#define[ \t]+BLOSC2_VERSION_STRING[ \t]+\"([-0-9A-Za-z.]+)\".*"
+    "\\1" BLOSC2_VERSION_STRING ${_blosc2_h_contents})
 
-message("Configuring for Blosc version: " ${BLOSC_VERSION_STRING})
+message("Configuring for Blosc version: " ${BLOSC2_VERSION_STRING})
 
 # options
 option(BUILD_STATIC
@@ -439,9 +439,9 @@ if(NOT BLOSC_IS_SUBPROJECT)
 
     set(CPACK_GENERATOR TGZ ZIP)
     set(CPACK_SOURCE_GENERATOR TGZ ZIP)
-    set(CPACK_PACKAGE_VERSION_MAJOR ${BLOSC_VERSION_MAJOR})
-    set(CPACK_PACKAGE_VERSION_MINOR ${BLOSC_VERSION_MINOR})
-    set(CPACK_PACKAGE_VERSION_PATCH ${BLOSC_VERSION_PATCH})
+    set(CPACK_PACKAGE_VERSION_MAJOR ${BLOSC2_VERSION_MAJOR})
+    set(CPACK_PACKAGE_VERSION_MINOR ${BLOSC2_VERSION_MINOR})
+    set(CPACK_PACKAGE_VERSION_PATCH ${BLOSC2_VERSION_PATCH})
     set(CPACK_PACKAGE_VERSION ${BLOSC_STRING_VERSION})
     set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README.rst")
     set(CPACK_PACKAGE_DESCRIPTION_SUMMARY

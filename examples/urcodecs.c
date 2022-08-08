@@ -119,7 +119,7 @@ int main(void) {
   blosc_timestamp_t last, current;
   double ttotal;
 
-  printf("Blosc version info: %s (%s)\n", blosc1_get_version_string(), BLOSC_VERSION_DATE);
+  printf("Blosc version info: %s (%s)\n", blosc1_get_version_string(), BLOSC2_VERSION_DATE);
 
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);

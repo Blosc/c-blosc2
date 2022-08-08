@@ -109,7 +109,7 @@ int main(void) {
   blosc1_init();
   blosc1_set_nthreads(1);
   blosc1_set_compressor("lz4");
-  printf("Blosc version info: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+  printf("Blosc version info: %s (%s)\n", BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   /* Run all the suite */
   result = all_tests();

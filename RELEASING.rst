@@ -43,7 +43,7 @@ the Blosc library (suggestion: 1.3.0, 1.7.0, 1.11.1, 1.14.1, 2.0.0).
 You can compile the utility with different blosc shared libraries with::
 
   $ export LD_LIBRARY_PATH=shared_blosc_library_path
-  $ gcc -o filegen filegen.c -L$LD_LIBRARY_PATH -lblosc -Iblosc.h_include_path
+  $ gcc -o filegen filegen.c -L$LD_LIBRARY_PATH -lblosc -Iblosc2.h_include_path
 
 Then, test the file created with the new version with::
 
@@ -86,7 +86,7 @@ Announcing
 Post-release actions
 --------------------
 
-- Edit *VERSION* symbols in blosc/blosc.h in master to increment the
+- Edit *VERSION* symbols in blosc/blosc2.h in master to increment the
   version to the next minor one (i.e. X.Y.Z --> X.Y.(Z+1).dev).
 
 - Create new headers for adding new features in ``RELEASE_NOTES.md``
