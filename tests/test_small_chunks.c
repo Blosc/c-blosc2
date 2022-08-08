@@ -13,7 +13,7 @@ CUTEST_TEST_DATA(small_chunks) {
 
 CUTEST_TEST_SETUP(small_chunks) {
   BLOSC_UNUSED_PARAM(data);
-  blosc_init();
+  blosc1_init();
 }
 
 
@@ -54,7 +54,7 @@ CUTEST_TEST_TEST(small_chunks) {
       return BLOSC2_ERROR_FAILURE;
     }
     CUTEST_ASSERT("Can not get chunk", rc >= 0);
-    
+
     if (needs_free) {
       free(chunk);
     }
@@ -63,7 +63,7 @@ CUTEST_TEST_TEST(small_chunks) {
 
     blosc2_remove_dir("ex_update.caterva");
 
-    blosc_destroy();
+  blosc1_destroy();
 
     return 0;
 
@@ -71,7 +71,7 @@ CUTEST_TEST_TEST(small_chunks) {
 
 CUTEST_TEST_TEARDOWN(small_chunks) {
   BLOSC_UNUSED_PARAM(data);
-  blosc_destroy();
+  blosc1_destroy();
 }
 
 

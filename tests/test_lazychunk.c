@@ -33,7 +33,7 @@ static char* test_lazy_chunk(void) {
   blosc2_schunk* schunk;
 
   /* Initialize the Blosc compressor */
-  blosc_init();
+  blosc1_init();
 
   /* Create a super-chunk container, backed by a frame */
   cparams.typesize = sizeof(int32_t);
@@ -103,7 +103,7 @@ static char* test_lazy_chunk(void) {
   /* Free resources */
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
-  blosc_destroy();
+  blosc1_destroy();
 
   free(data);
   free(data_dest);
@@ -162,7 +162,7 @@ int main(void) {
   char *result;
 
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc_init();
+  blosc1_init();
 
   /* Run all the suite */
   result = all_tests();
@@ -174,7 +174,7 @@ int main(void) {
   }
   printf("\tTests run: %d\n", tests_run);
 
-  blosc_destroy();
+  blosc1_destroy();
 
   return result != EXIT_SUCCESS;
 }

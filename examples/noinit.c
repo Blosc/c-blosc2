@@ -51,10 +51,10 @@ int main(void){
 	 BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* From 1.9 on, we don't need to initialize the Blosc compressor anymore */
-  /* blosc_init(); */
+  /* blosc1_init(); */
 
   /* Compress with clevel=5 and shuffle active  */
-  csize = blosc_compress(5, 1, sizeof(float), isize, data, data_out, osize);
+  csize = blosc1_compress(5, 1, sizeof(float), isize, data, data_out, osize);
   if (csize == 0) {
     printf("Buffer is uncompressible.  Giving up.\n");
     return 1;
@@ -67,7 +67,7 @@ int main(void){
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1.*isize) / csize);
 
   /* Decompress  */
-  dsize = blosc_decompress(data_out, data_dest, dsize);
+  dsize = blosc1_decompress(data_out, data_dest, dsize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;

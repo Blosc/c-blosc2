@@ -66,16 +66,16 @@ int main(void) {
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Initialize the Blosc compressor */
-  blosc_init();
+  blosc1_init();
 
   /* Tell Blosc to use some number of threads */
   for (nthreads = 1; nthreads <= 4; nthreads++) {
 
-    pnthreads = blosc_set_nthreads(nthreads);
+    pnthreads = blosc1_set_nthreads(nthreads);
     printf("Using %d threads (previously using %d)\n", nthreads, pnthreads);
 
     /* Compress with clevel=5 and shuffle active  */
-    csize = blosc_compress(5, 1, sizeof(float), isize, data, data_out, osize);
+    csize = blosc1_compress(5, 1, sizeof(float), isize, data, data_out, osize);
     if (csize < 0) {
       printf("Compression error.  Error code: %d\n", csize);
       return csize;
@@ -85,7 +85,7 @@ int main(void) {
             csize);
 
     /* Decompress  */
-    dsize = blosc_decompress(data_out, data_dest, isize);
+    dsize = blosc1_decompress(data_out, data_dest, isize);
     if (dsize < 0) {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;
@@ -102,7 +102,7 @@ int main(void) {
   }
 
   /* After using it, destroy the Blosc environment */
-  blosc_destroy();
+  blosc1_destroy();
 
   return 0;
 }

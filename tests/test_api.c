@@ -26,7 +26,7 @@ int size = 1 * MB;
 static char* test_cbuffer_sizes(void) {
   size_t nbytes_, cbytes_, blocksize;
 
-  blosc_cbuffer_sizes(dest, &nbytes_, &cbytes_, &blocksize);
+  blosc1_cbuffer_sizes(dest, &nbytes_, &cbytes_, &blocksize);
   mu_assert("ERROR: nbytes incorrect(1)", nbytes == size);
   mu_assert("ERROR: nbytes incorrect(2)", nbytes_ == (size_t)nbytes);
   mu_assert("ERROR: cbytes incorrect", cbytes_ == (size_t)cbytes);
@@ -38,7 +38,7 @@ static char* test_cbuffer_metainfo(void) {
   size_t typesize_;
   int flags;
 
-  blosc_cbuffer_metainfo(dest, &typesize_, &flags);
+  blosc1_cbuffer_metainfo(dest, &typesize_, &flags);
   mu_assert("ERROR: typesize incorrect", typesize_ == (size_t)typesize);
   mu_assert("ERROR: shuffle incorrect", (flags & BLOSC_DOSHUFFLE) == doshuffle);
   return 0;
@@ -49,7 +49,7 @@ static char* test_cbuffer_versions(void) {
   int version_;
   int versionlz_;
 
-  blosc_cbuffer_versions(dest, &version_, &versionlz_);
+  blosc1_cbuffer_versions(dest, &version_, &versionlz_);
   mu_assert("ERROR: version incorrect", version_ == BLOSC_VERSION_FORMAT);
   mu_assert("ERROR: versionlz incorrect", versionlz_ == BLOSC_BLOSCLZ_VERSION_FORMAT);
   return 0;
@@ -59,7 +59,7 @@ static char* test_cbuffer_versions(void) {
 static char* test_cbuffer_complib(void) {
   const char* complib;
 
-  complib = blosc_cbuffer_complib(dest);
+  complib = blosc1_cbuffer_complib(dest);
   mu_assert("ERROR: complib incorrect", strcmp(complib, "BloscLZ") == 0);
   return 0;
 }
@@ -67,9 +67,9 @@ static char* test_cbuffer_complib(void) {
 static char *test_nthreads(void) {
   int16_t nthreads;
 
-  nthreads = blosc_set_nthreads(4);
+  nthreads = blosc1_set_nthreads(4);
   mu_assert("ERROR: set_nthreads incorrect", nthreads == 1);
-  nthreads = blosc_get_nthreads();
+  nthreads = blosc1_get_nthreads();
   mu_assert("ERROR: get_nthreads incorrect", nthreads == 4);
   return 0;
 }
@@ -77,11 +77,11 @@ static char *test_nthreads(void) {
 static char *test_blocksize(void) {
   int blocksize;
 
-  blocksize = blosc_get_blocksize();
+  blocksize = blosc1_get_blocksize();
   mu_assert("ERROR: get_blocksize incorrect", blocksize == 0);
 
-  blosc_set_blocksize(4096);
-  blocksize = blosc_get_blocksize();
+  blosc1_set_blocksize(4096);
+  blocksize = blosc1_get_blocksize();
   mu_assert("ERROR: get_blocksize incorrect", blocksize == 4096);
   return 0;
 }
@@ -103,8 +103,8 @@ int main(void) {
   char* result;
 
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc_init();
-  blosc_set_nthreads(1);
+  blosc1_init();
+  blosc1_set_nthreads(1);
 
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
@@ -115,10 +115,10 @@ int main(void) {
   memcpy(srccpy, src, size);
 
   /* Get a compressed buffer */
-  cbytes = blosc_compress(clevel, doshuffle, typesize, size, src, dest, size);
+  cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src, dest, size);
 
   /* Get a decompressed buffer */
-  nbytes = blosc_decompress(dest, dest2, size);
+  nbytes = blosc1_decompress(dest, dest2, size);
 
   /* Run all the suite */
   result = all_tests();
@@ -135,7 +135,7 @@ int main(void) {
   blosc_test_free(dest);
   blosc_test_free(dest2);
 
-  blosc_destroy();
+  blosc1_destroy();
 
   return result != 0;
 }

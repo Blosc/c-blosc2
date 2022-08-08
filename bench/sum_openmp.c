@@ -106,9 +106,9 @@ int main(void) {
     assert(blocks_read == 1);
     fclose(f);
 
-    int dsize = blosc_getitem(cdata, 0, CHUNKSIZE, chunk_buf);
+    int dsize = blosc1_getitem(cdata, 0, CHUNKSIZE, chunk_buf);
     if (dsize < 0) {
-      printf("blosc_getitem() error.  Error code: %d\n.  Probably reading too much data?", dsize);
+      printf("blosc1_getitem() error.  Error code: %d\n.  Probably reading too much data?", dsize);
       exit(1);
     }
     free(cdata);
@@ -143,7 +143,7 @@ int main(void) {
   long codec = CODEC;
   envvar = getenv("SUM_COMPRESSOR");
   if (envvar != NULL) {
-    codec = blosc_compname_to_compcode(envvar);
+    codec = blosc1_compname_to_compcode(envvar);
     if (codec < 0) {
       printf("Unknown compresssor: %s\n", envvar);
       return 1;
@@ -209,7 +209,7 @@ int main(void) {
     for (j = 0; j < nthreads; j++) {
       dctx[j] = blosc2_create_dctx(dparams);
       for (nchunk = 0; nchunk < nchunks_thread; nchunk++) {
-        blosc2_decompress_ctx(dctx[j], schunk->data[j * nchunks_thread + nchunk], INT32_MAX, 
+        blosc2_decompress_ctx(dctx[j], schunk->data[j * nchunks_thread + nchunk], INT32_MAX,
                               (void*)(chunk[j]), isize);
         for (i = 0; i < CHUNKSIZE; i++) {
           compressed_sum += chunk[j][i];

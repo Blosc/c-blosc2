@@ -150,13 +150,13 @@ int some_matches() {
 int main(void) {
 
     int result;
-    blosc_init();
+  blosc1_init();
     result = rand_();
     printf("rand: %d obtained \n \n", result);
     result = same_cells();
     printf("same_cells: %d obtained \n \n", result);
     result = some_matches();
     printf("some_matches: %d obtained \n \n", result);
-    blosc_destroy();
+    blosc1_destroy();
     return BLOSC2_ERROR_SUCCESS;
 }

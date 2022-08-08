@@ -28,7 +28,7 @@ static char* test_schunk(void) {
   blosc2_schunk* schunk;
 
   /* Initialize the Blosc compressor */
-  blosc_init();
+  blosc1_init();
 
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
@@ -94,7 +94,7 @@ static char* test_schunk(void) {
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
     dsize = blosc2_schunk_get_chunk(schunk, nchunk, &chunk, &needs_free);
     mu_assert("ERROR: chunk cannot be retrieved correctly.", dsize >= 0);
-    blosc_cbuffer_sizes(chunk, &nbytes_, &cbytes_, &blocksize);
+    blosc1_cbuffer_sizes(chunk, &nbytes_, &cbytes_, &blocksize);
     nbytes += (int64_t)nbytes_;
     cbytes += (int64_t)cbytes_;
     if (needs_free) {
@@ -160,7 +160,7 @@ static char* test_schunk(void) {
   /* Free resources */
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
-  blosc_destroy();
+  blosc1_destroy();
 
   return EXIT_SUCCESS;
 }
@@ -183,7 +183,7 @@ int main(void) {
   char *result;
 
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc_init();
+  blosc1_init();
 
   /* Run all the suite */
   result = all_tests();
@@ -195,7 +195,7 @@ int main(void) {
   }
   printf("\tTests run: %d\n", tests_run);
 
-  blosc_destroy();
+  blosc1_destroy();
 
   return result != EXIT_SUCCESS;
 }

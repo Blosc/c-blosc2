@@ -170,12 +170,12 @@ int main(void) {
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Initialize the Blosc compressor */
-  blosc_init();
+  blosc1_init();
 
   compute_vectors();
 
   /* Destroy the Blosc environment */
-  blosc_destroy();
+  blosc1_destroy();
 
   return 0;
 }

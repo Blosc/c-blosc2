@@ -14,7 +14,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, int32_t size) {
   size_t nbytes, cbytes, blocksize;
   void *output, *input;
 
-  blosc_set_nthreads(1);
+  blosc1_set_nthreads(1);
 
   if (size > 0)
     level = data[0] % (9 + 1);
@@ -24,7 +24,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, int32_t size) {
     cindex = data[2];
 
   /* Find next available compressor */
-  while (blosc_set_compressor(compressors[cindex % num_comp]) == -1 && i < num_comp) {
+  while (blosc1_set_compressor(compressors[cindex % num_comp]) == -1 && i < num_comp) {
     cindex++, i++;
   }
   if (i == num_comp) {
@@ -33,7 +33,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, int32_t size) {
   }
 
   if (size > 3 && data[3] % 7 == 0)
-    blosc_set_blocksize(4096);
+    blosc1_set_blocksize(4096);
 
   output = malloc(size + 1);
   if (output == NULL)
@@ -45,7 +45,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, int32_t size) {
     return 0;
   }
 
-  blosc_cbuffer_sizes(output, &nbytes, &cbytes, &blocksize);
+  blosc1_cbuffer_sizes(output, &nbytes, &cbytes, &blocksize);
 
   /* Don't allow address sanitizer to allocate more than INT32_MAX */
   if (cbytes >= INT32_MAX) {
@@ -55,7 +55,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, int32_t size) {
 
   input = malloc(cbytes);
   if (input != NULL) {
-    blosc_decompress(output, input, cbytes);
+    blosc1_decompress(output, input, cbytes);
     free(input);
   }
 

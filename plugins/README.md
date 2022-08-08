@@ -94,8 +94,8 @@ Steps
 1. First, tests must be provided and be passing.
 
    **It is completely mandatory and necessary to add these lines to `main()` in each test to make plugins machinery work:**
-   - `blosc_init()` at the beginning
-   - `blosc_destroy()` in the end
+   - `blosc1_init()` at the beginning
+   - `blosc1_destroy()` in the end
 
 
 2. Then, the user must make a fork of the C-Blosc2 Github repository,
@@ -142,4 +142,3 @@ Thanks
 ------
 
 We would like to express our gratitude to the NumFOCUS Foundation so as to provide the funds to implement this functionality.
-

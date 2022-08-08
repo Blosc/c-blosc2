@@ -28,7 +28,7 @@
 
 
 int main(void) {
-  blosc_init();
+  blosc1_init();
 
   printf("Blosc version info: %s (%s)\n",
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
@@ -98,7 +98,7 @@ int main(void) {
   /* Free resources */
   blosc2_schunk_free(schunk);
   blosc2_schunk_free(sc);
-  blosc_destroy();
+  blosc1_destroy();
 
   return 0;
 }

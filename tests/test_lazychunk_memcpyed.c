@@ -63,7 +63,7 @@ int main(void) {
   char *result;
 
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc_init();
+  blosc1_init();
 
   /* Run all the suite */
   result = all_tests();
@@ -75,7 +75,7 @@ int main(void) {
   }
   printf("\tTests run: %d\n", tests_run);
 
-  blosc_destroy();
+  blosc1_destroy();
 
   return result != EXIT_SUCCESS;
 }

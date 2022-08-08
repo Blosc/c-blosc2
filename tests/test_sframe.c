@@ -41,7 +41,7 @@ static char* test_sframe(void) {
   blosc2_schunk* schunk;
 
   /* Initialize the Blosc compressor */
-  blosc_init();
+  blosc1_init();
 
   /* Create a frame container */
   cparams.typesize = sizeof(int32_t);
@@ -203,7 +203,7 @@ static char* test_sframe(void) {
   blosc2_schunk_free(schunk);
 
   /* Destroy the Blosc environment */
-  blosc_destroy();
+  blosc1_destroy();
 
   return EXIT_SUCCESS;
 }
@@ -219,7 +219,7 @@ static char* test_sframe_simple(void) {
   blosc2_schunk* schunk;
 
   /* Initialize the Blosc compressor */
-  blosc_init();
+  blosc1_init();
 
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
@@ -259,7 +259,7 @@ static char* test_sframe_simple(void) {
   /* Free resources */
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
-  blosc_destroy();
+  blosc1_destroy();
 
   return EXIT_SUCCESS;
 }
@@ -275,7 +275,7 @@ static char* test_sframe_typesize(void) {
   blosc2_schunk* schunk;
 
   /* Initialize the Blosc compressor */
-  blosc_init();
+  blosc1_init();
 
   /* Create a super-chunk container with a typesize that is not a divisor of isize */
   cparams.typesize = 7;
@@ -315,7 +315,7 @@ static char* test_sframe_typesize(void) {
   /* Free resources */
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
-  blosc_destroy();
+  blosc1_destroy();
 
   return EXIT_SUCCESS;
 }

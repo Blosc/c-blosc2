@@ -62,7 +62,7 @@ int create_cframe(const char* compname) {
   int64_t nchunks;
   blosc_timestamp_t last, current;
   double ttotal;
-  int compcode = blosc_compname_to_compcode(compname);
+  int compcode = blosc1_compname_to_compcode(compname);
   printf("\n*** Creating simple frame for %s\n", compname);
 
   /* Create a super-chunk container */
@@ -145,7 +145,7 @@ int create_cframe(const char* compname) {
 
 
 int main(void) {
-  blosc_init();
+  blosc1_init();
 
   printf("Blosc version info: %s (%s)\n",
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
@@ -156,5 +156,5 @@ int main(void) {
   create_cframe("zlib");
   create_cframe("zstd");
 
-  blosc_destroy();
+  blosc1_destroy();
 }

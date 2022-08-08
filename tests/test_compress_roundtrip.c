@@ -29,9 +29,9 @@ static int test_compress_roundtrip(size_t type_size, size_t num_elements,
 
   /* Compress the input data and store it in an intermediate buffer.
      Decompress the data from the intermediate buffer into a result buffer. */
-  blosc_compress(compression_level, do_shuffle, type_size, buffer_size,
-                 original, intermediate, buffer_size + BLOSC_MAX_OVERHEAD);
-  blosc_decompress(intermediate, result, buffer_size);
+  blosc1_compress(compression_level, do_shuffle, type_size, buffer_size,
+                  original, intermediate, buffer_size + BLOSC_MAX_OVERHEAD);
+  blosc1_decompress(intermediate, result, buffer_size);
 
   /* The round-tripped data matches the original data when the
      result of memcmp is 0. */
@@ -109,15 +109,15 @@ int main(int argc, char** argv) {
 
   /* Initialize blosc before running tests. */
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc_init();
-  blosc_set_nthreads((int16_t)blosc_thread_count);
+  blosc1_init();
+  blosc1_set_nthreads((int16_t) blosc_thread_count);
 
   /* Run the test. */
   int result = test_compress_roundtrip(type_size, num_elements, buffer_align_size,
                                        (int)compression_level, shuffle_enabled);
 
   /* Cleanup blosc resources. */
-  blosc_destroy();
+  blosc1_destroy();
 
   return result;
 }

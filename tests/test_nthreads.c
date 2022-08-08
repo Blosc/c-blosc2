@@ -27,17 +27,17 @@ size_t size = 4 * 1000 * 1000;             /* must be divisible by 4 */
 static char *test_compress(void) {
   int16_t nthreads;
 
-  /* Before any blosc_compress() or blosc_decompress() the number of
+  /* Before any blosc1_compress() or blosc1_decompress() the number of
      threads must be 1 */
-  nthreads = blosc_get_nthreads();
+  nthreads = blosc1_get_nthreads();
   mu_assert("ERROR: get_nthreads (compress, before) incorrect", nthreads == 1);
 
   /* Get a compressed buffer */
-  cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
-                          dest, size + BLOSC_MAX_OVERHEAD);
+  cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
+                           dest, size + BLOSC_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
-  nthreads = blosc_get_nthreads();
+  nthreads = blosc1_get_nthreads();
   mu_assert("ERROR: get_nthreads (compress, after) incorrect", nthreads == 3);
 
   return 0;
@@ -48,22 +48,22 @@ static char *test_compress(void) {
 static char *test_compress_decompress(void) {
   int16_t nthreads;
 
-  nthreads = blosc_get_nthreads();
+  nthreads = blosc1_get_nthreads();
   mu_assert("ERROR: get_nthreads incorrect", nthreads == 3);
 
   /* Get a compressed buffer */
-  cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
-                          dest, size + BLOSC_MAX_OVERHEAD);
+  cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
+                           dest, size + BLOSC_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
-  nthreads = blosc_get_nthreads();
+  nthreads = blosc1_get_nthreads();
   mu_assert("ERROR: get_nthreads incorrect", nthreads == 3);
 
   /* Decompress the buffer */
-  nbytes = blosc_decompress(dest, dest2, size);
+  nbytes = blosc1_decompress(dest, dest2, size);
   mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
-  nthreads = blosc_get_nthreads();
+  nthreads = blosc1_get_nthreads();
   mu_assert("ERROR: get_nthreads incorrect", nthreads == 3);
 
   return 0;
@@ -88,8 +88,8 @@ int main(void) {
   setenv("BLOSC_NTHREADS", "3", 1);
 
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc_init();
-  blosc_set_nthreads(1);
+  blosc1_init();
+  blosc1_set_nthreads(1);
 
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
@@ -117,7 +117,7 @@ int main(void) {
   blosc_test_free(dest);
   blosc_test_free(dest2);
 
-  blosc_destroy();
+  blosc1_destroy();
 
   return result != 0;
 }

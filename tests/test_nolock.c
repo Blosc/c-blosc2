@@ -33,8 +33,8 @@ size_t size = sizeof(int32_t) * 1000 * 1000;
 static char *test_compress(void) {
 
   /* Get a compressed buffer */
-  cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
-                          dest, size + BLOSC_MAX_OVERHEAD);
+  cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
+                           dest, size + BLOSC_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   return 0;
@@ -45,12 +45,12 @@ static char *test_compress(void) {
 static char *test_compress_decompress(void) {
 
   /* Get a compressed buffer */
-  cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
-                          dest, size + BLOSC_MAX_OVERHEAD);
+  cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
+                           dest, size + BLOSC_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   /* Decompress the buffer */
-  nbytes = blosc_decompress(dest, dest2, size);
+  nbytes = blosc1_decompress(dest, dest2, size);
   mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
   return 0;
@@ -78,8 +78,8 @@ int main(void) {
     assert(pid >= 0);
   }
 
-  blosc_init();
-  blosc_set_nthreads(NTHREADS);
+  blosc1_init();
+  blosc1_set_nthreads(NTHREADS);
 
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
@@ -107,7 +107,7 @@ int main(void) {
   blosc_test_free(dest);
   blosc_test_free(dest2);
 
-  blosc_destroy();
+  blosc1_destroy();
 
   /* Reset envvar */
   unsetenv("BLOSC_NOLOCK");

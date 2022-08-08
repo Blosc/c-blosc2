@@ -43,7 +43,7 @@ CUTEST_TEST_DATA(copy) {
 
 
 CUTEST_TEST_SETUP(copy) {
-  blosc_init();
+  blosc1_init();
   data->cparams = BLOSC2_CPARAMS_DEFAULTS;
   data->cparams.typesize = sizeof(int32_t);
   data->cparams.clevel = 9;
@@ -109,7 +109,7 @@ CUTEST_TEST_TEST(copy) {
   int32_t *rec_buffer = malloc(isize);
 
   /* Initialize the Blosc compressor */
-  blosc_init();
+  blosc1_init();
 
   /* Create a super-chunk container */
   blosc2_storage storage = {.cparams=&data->cparams, .contiguous=backend.contiguous, .urlpath = backend.urlpath};
@@ -188,7 +188,7 @@ CUTEST_TEST_TEST(copy) {
 
 CUTEST_TEST_TEARDOWN(copy) {
   BLOSC_UNUSED_PARAM(data);
-  blosc_destroy();
+  blosc1_destroy();
 }
 
 

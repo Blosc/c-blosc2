@@ -1,7 +1,7 @@
 /*********************************************************************
   Blosc - Blocked Shuffling and Compression Library
 
-  Unit tests for the blosc_getitem() function.
+  Unit tests for the blosc1_getitem() function.
 
   Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
   https://blosc.org
@@ -13,7 +13,7 @@
 #include "test_common.h"
 
 
-/** Test the blosc_getitem function. */
+/** Test the blosc1_getitem function. */
 static int test_getitem(size_t type_size, size_t num_elements,
                         size_t buffer_alignment, int compression_level,
                         int do_shuffle) {
@@ -29,16 +29,16 @@ static int test_getitem(size_t type_size, size_t num_elements,
   /* Fill the input data buffer with random values. */
   blosc_test_fill_seq(original, buffer_size);
 
-  /* Compress the input data, then use blosc_getitem to extract (decompress)
+  /* Compress the input data, then use blosc1_getitem to extract (decompress)
      a range of elements into a new buffer. */
-  csize = blosc_compress(compression_level, do_shuffle, type_size,
+  csize = blosc1_compress(compression_level, do_shuffle, type_size,
                           buffer_size, original, intermediate,
                           buffer_size + BLOSC_MAX_OVERHEAD);
   if (csize < 0) {
     printf("Compression error.  Error code: %d\n", csize);
     return csize;
   }
-  dsize = blosc_getitem(intermediate, 0, (int)num_elements, result);
+  dsize = blosc1_getitem(intermediate, 0, (int)num_elements, result);
   if (dsize < 0) {
     printf("getitem error.  Error code: %d\n", dsize);
     return dsize;
@@ -121,15 +121,15 @@ int main(int argc, char** argv) {
   }
 
   /* Initialize blosc before running tests. */
-  blosc_init();
-  blosc_set_nthreads((int16_t)blosc_thread_count);
+  blosc1_init();
+  blosc1_set_nthreads((int16_t) blosc_thread_count);
 
   /* Run the test. */
   int result = test_getitem(type_size, num_elements, buffer_align_size,
                             (int16_t)compression_level, (int16_t)shuffle_enabled);
 
   /* Cleanup blosc resources. */
-  blosc_destroy();
+  blosc1_destroy();
 
   return result;
 }
