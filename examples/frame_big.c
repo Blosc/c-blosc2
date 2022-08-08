@@ -41,7 +41,7 @@ int main(void) {
   blosc_timestamp_t last, current;
 
   printf("Blosc version info: %s (%s)\n",
-         BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+         BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   // Compression and decompression parameters
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;

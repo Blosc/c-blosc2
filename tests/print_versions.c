@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
   char* name = NULL, * version = NULL;
   int ret;
 
-  printf("Blosc version: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+  printf("Blosc version: %s (%s)\n", BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   printf("List of supported compressors in this build: %s\n",
          blosc_list_compressors());

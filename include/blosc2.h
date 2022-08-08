@@ -9,10 +9,10 @@
 **********************************************************************/
 
 /*********************************************************************
-  @file blosc.h
-  @brief Blosc header file.
+  @file blosc2.h
+  @brief Blosc2 header file.
 
-  This file contains Blosc public API and the structures needed to use it.
+  This file contains Blosc2 public API and the structures needed to use it.
   @author The Blosc Developers <blosc@blosc.org>
 **********************************************************************/
 
@@ -50,12 +50,12 @@ extern "C" {
 
 
 /* Version numbers */
-#define BLOSC_VERSION_MAJOR    2    /* for major interface/format changes  */
-#define BLOSC_VERSION_MINOR    2    /* for minor interface/format changes  */
-#define BLOSC_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
+#define BLOSC2_VERSION_MAJOR    2    /* for major interface/format changes  */
+#define BLOSC2_VERSION_MINOR    2    /* for minor interface/format changes  */
+#define BLOSC2_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC_VERSION_STRING   "2.2.1.dev"  /* string version.  Sync with above! */
-#define BLOSC_VERSION_DATE     "$Date:: 2022-07-05 #$"    /* date version */
+#define BLOSC2_VERSION_STRING   "2.2.1.dev"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_DATE     "$Date:: 2022-07-05 #$"    /* date version */
 
 
 /* The maximum number of dimensions for caterva arrays */

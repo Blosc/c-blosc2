@@ -3349,7 +3349,7 @@ const char* blosc1_list_compressors(void) {
 
 
 const char* blosc1_get_version_string(void) {
-  return BLOSC_VERSION_STRING;
+  return BLOSC2_VERSION_STRING;
 }
 
 

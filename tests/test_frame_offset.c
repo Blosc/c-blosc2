@@ -78,7 +78,7 @@ CUTEST_TEST_TEST(fill_special) {
   blosc_timestamp_t last, current;
   double ttotal;
   printf("Blosc version info: %s (%s)\n",
-         BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+         BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   // Start different conversions between schunks, frames and fileframes
 

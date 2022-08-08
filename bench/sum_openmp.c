@@ -84,7 +84,7 @@ int main(void) {
   char* envvar = NULL;
 
   printf("Blosc version info: %s (%s)\n",
-         BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+         BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   // Fill the buffer for a chunk
   if (SYNTHETIC) {

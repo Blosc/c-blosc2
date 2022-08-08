@@ -48,7 +48,7 @@ int main(void){
 
   /* Register the filter with the library */
   printf("Blosc version info: %s (%s)\n",
-	 BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+         BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   /* From 1.9 on, we don't need to initialize the Blosc compressor anymore */
   /* blosc1_init(); */

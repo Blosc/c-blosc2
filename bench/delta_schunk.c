@@ -46,7 +46,7 @@ int main(void) {
     data[i] = i;
   }
 
-  printf("Blosc version info: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+  printf("Blosc version info: %s (%s)\n", BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   /* Initialize the Blosc compressor */
   blosc1_init();

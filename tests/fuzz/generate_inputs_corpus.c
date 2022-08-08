@@ -148,7 +148,7 @@ int main(void) {
   blosc1_init();
 
   printf("Blosc version info: %s (%s)\n",
-         BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
+         BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   create_cframe("blosclz");
   create_cframe("lz4");
