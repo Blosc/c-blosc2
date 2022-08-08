@@ -670,7 +670,7 @@ int read_chunk_header(const uint8_t* src, int32_t srcsize, bool extended_header,
     header->cbytes = bswap32_(header->cbytes);
   }
 
-  if (header->version > BLOSC_VERSION_FORMAT) {
+  if (header->version > BLOSC2_VERSION_FORMAT) {
     /* Version from future */
     return BLOSC2_ERROR_VERSION_SUPPORT;
   }
@@ -784,7 +784,7 @@ static int blosc2_initialize_context_from_header(blosc2_context* context, blosc_
 static int blosc2_intialize_header_from_context(blosc2_context* context, blosc_header* header, bool extended_header) {
   memset(header, 0, sizeof(blosc_header));
 
-  header->version = BLOSC_VERSION_FORMAT;
+  header->version = BLOSC2_VERSION_FORMAT;
   header->versionlz = compcode_to_compversion(context->compcode);
   header->flags = context->header_flags;
   header->typesize = (uint8_t)context->typesize;
@@ -3830,7 +3830,7 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const int32_t nbytes, void* dest,
   }
 
   memset(&header, 0, sizeof(header));
-  header.version = BLOSC_VERSION_FORMAT;
+  header.version = BLOSC2_VERSION_FORMAT;
   header.versionlz = BLOSC_BLOSCLZ_VERSION_FORMAT;
   header.flags = BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE;  // extended header
   header.typesize = context->typesize;
@@ -3872,7 +3872,7 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const int32_t nbytes, void* dest
   }
 
   memset(&header, 0, sizeof(header));
-  header.version = BLOSC_VERSION_FORMAT;
+  header.version = BLOSC2_VERSION_FORMAT;
   header.versionlz = BLOSC_BLOSCLZ_VERSION_FORMAT;
   header.flags = BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE;  // extended header
   header.typesize = context->typesize;
@@ -3915,7 +3915,7 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const int32_t nbytes, void* dest, 
   }
 
   memset(&header, 0, sizeof(header));
-  header.version = BLOSC_VERSION_FORMAT;
+  header.version = BLOSC2_VERSION_FORMAT;
   header.versionlz = BLOSC_BLOSCLZ_VERSION_FORMAT;
   header.flags = BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE;  // extended header
   header.typesize = context->typesize;
@@ -3960,7 +3960,7 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const int32_t nbytes,
   }
 
   memset(&header, 0, sizeof(header));
-  header.version = BLOSC_VERSION_FORMAT;
+  header.version = BLOSC2_VERSION_FORMAT;
   header.versionlz = BLOSC_BLOSCLZ_VERSION_FORMAT;
   header.flags = BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE;  // extended header
   header.typesize = (uint8_t)typesize;
