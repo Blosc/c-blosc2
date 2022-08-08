@@ -260,7 +260,7 @@ Trailer
 This is an optional section, mainly for lazy chunks use.  A lazy chunk is similar to a regular one, except that
 only the meta-information has been loaded.  The actual data from blocks is 'lazily' only loaded on demand.
 This allows for improved selectivity, and hence less input bandwidth demands, during partial chunk reads
-(e.g. `blosc_getitem`) from data that is on disk.
+(e.g. `blosc1_getitem`) from data that is on disk.
 
 It is arranged like this::
 

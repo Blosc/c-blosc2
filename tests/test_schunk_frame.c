@@ -26,7 +26,7 @@ static char* test_schunk_cframe(void) {
   blosc2_schunk* schunk;
 
   /* Initialize the Blosc compressor */
-  blosc_init();
+  blosc1_init();
 
   /* Create a super-chunk container */
   blosc2_storage storage = {.contiguous=contiguous};
@@ -78,7 +78,7 @@ static char* test_schunk_cframe(void) {
     free(cframe);
   }
   /* Destroy the Blosc environment */
-  blosc_destroy();
+  blosc1_destroy();
 
   return EXIT_SUCCESS;
 }
@@ -108,7 +108,7 @@ int main(void) {
   char *result;
 
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc_init();
+  blosc1_init();
 
   /* Run all the suite */
   result = all_tests();
@@ -120,7 +120,7 @@ int main(void) {
   }
   printf("\tTests run: %d\n", tests_run);
 
-  blosc_destroy();
+  blosc1_destroy();
 
   return result != EXIT_SUCCESS;
 }

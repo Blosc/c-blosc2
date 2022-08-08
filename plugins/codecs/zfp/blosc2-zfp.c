@@ -130,7 +130,7 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
 
     size_t typesize;
     int flags;
-    blosc_cbuffer_metainfo(chunk, &typesize, &flags);
+  blosc1_cbuffer_metainfo(chunk, &typesize, &flags);
 
     double tol = (int8_t) meta;
     int8_t ndim;
@@ -362,7 +362,7 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
 
     size_t typesize;
     int flags;
-    blosc_cbuffer_metainfo(chunk, &typesize, &flags);
+  blosc1_cbuffer_metainfo(chunk, &typesize, &flags);
     int8_t ndim;
     int64_t *shape = malloc(8 * sizeof(int64_t));
     int32_t *chunkshape = malloc(8 * sizeof(int32_t));
@@ -610,7 +610,7 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
 
     size_t typesize;
     int flags;
-    blosc_cbuffer_metainfo(chunk, &typesize, &flags);
+  blosc1_cbuffer_metainfo(chunk, &typesize, &flags);
 
     double ratio = (double) meta / 100.0;
     int8_t ndim;

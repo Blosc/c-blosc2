@@ -236,7 +236,7 @@ static const char* clibcode_to_clibname(int clibcode) {
  */
 
 /* Get the compressor name associated with the compressor code */
-int blosc_compcode_to_compname(int compcode, const char** compname) {
+int blosc1_compcode_to_compname(int compcode, const char** compname) {
   int code = -1;    /* -1 means non-existent compressor code */
   const char* name = NULL;
 
@@ -283,7 +283,7 @@ int blosc_compcode_to_compname(int compcode, const char** compname) {
 }
 
 /* Get the compressor code for the compressor name. -1 if it is not available */
-int blosc_compname_to_compcode(const char* compname) {
+int blosc1_compname_to_compcode(const char* compname) {
   int code = -1;  /* -1 means non-existent compressor code */
 
   if (strcmp(compname, BLOSC_BLOSCLZ_COMPNAME) == 0) {
@@ -1154,7 +1154,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     urcodecsuccess:
       ;
     } else {
-      blosc_compcode_to_compname(context->compcode, &compname);
+      blosc1_compcode_to_compname(context->compcode, &compname);
       BLOSC_TRACE_ERROR("Blosc has not been compiled with '%s' compression support."
                         "Please use one having it.", compname);
       return BLOSC2_ERROR_CODEC_SUPPORT;
@@ -2498,7 +2498,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   char* envvar;
 
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc_init();
+  if (!g_initlib) blosc1_init();
 
   /* Check for a BLOSC_CLEVEL environment variable */
   envvar = getenv("BLOSC_CLEVEL");
@@ -2528,9 +2528,9 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   envvar = getenv("BLOSC_DELTA");
   if (envvar != NULL) {
     if (strcmp(envvar, "1") == 0) {
-      blosc_set_delta(1);
+      blosc1_set_delta(1);
     } else {
-      blosc_set_delta(0);
+      blosc1_set_delta(0);
     }
   }
 
@@ -2547,7 +2547,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   /* Check for a BLOSC_COMPRESSOR environment variable */
   envvar = getenv("BLOSC_COMPRESSOR");
   if (envvar != NULL) {
-    result = blosc_set_compressor(envvar);
+    result = blosc1_set_compressor(envvar);
     if (result < 0) { return result; }
   }
 
@@ -2557,7 +2557,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     long blocksize;
     blocksize = strtol(envvar, NULL, 10);
     if ((blocksize != EINVAL) && (blocksize > 0)) {
-      blosc_set_blocksize((size_t)blocksize);
+      blosc1_set_blocksize((size_t) blocksize);
     }
   }
 
@@ -2567,7 +2567,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     long nthreads;
     nthreads = strtol(envvar, NULL, 10);
     if ((nthreads != EINVAL) && (nthreads > 0)) {
-      result = blosc_set_nthreads((int16_t)nthreads);
+      result = blosc1_set_nthreads((int16_t) nthreads);
       if (result < 0) { return result; }
     }
   }
@@ -2578,12 +2578,12 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   envvar = getenv("BLOSC_NOLOCK");
   if (envvar != NULL) {
     // TODO: here is the only place that returns an extended header from
-    //   a blosc_compress() call.  This should probably be fixed.
+    //   a blosc1_compress() call.  This should probably be fixed.
     const char *compname;
     blosc2_context *cctx;
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
 
-    blosc_compcode_to_compname(g_compressor, &compname);
+    blosc1_compcode_to_compname(g_compressor, &compname);
     /* Create a context for compression */
     build_filters(doshuffle, g_delta, typesize, cparams.filters);
     // TODO: cparams can be shared in a multithreaded environment.  do a copy!
@@ -2641,8 +2641,8 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
 
 
 /* The public routine for compression. */
-int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
-                   const void* src, void* dest, size_t destsize) {
+int blosc1_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
+                    const void* src, void* dest, size_t destsize) {
   return blosc2_compress(clevel, doshuffle, (int32_t)typesize, src, (int32_t)nbytes, dest, (int32_t)destsize);
 }
 
@@ -2712,14 +2712,14 @@ int blosc2_decompress(const void* src, int32_t srcsize, void* dest, int32_t dest
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
 
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc_init();
+  if (!g_initlib) blosc1_init();
 
   /* Check for a BLOSC_NTHREADS environment variable */
   envvar = getenv("BLOSC_NTHREADS");
   if (envvar != NULL) {
     nthreads = strtol(envvar, NULL, 10);
     if ((nthreads != EINVAL) && (nthreads > 0)) {
-      result = blosc_set_nthreads((int16_t)nthreads);
+      result = blosc1_set_nthreads((int16_t) nthreads);
       if (result < 0) { return result; }
     }
   }
@@ -2748,7 +2748,7 @@ int blosc2_decompress(const void* src, int32_t srcsize, void* dest, int32_t dest
 
 
 /* The public routine for decompression. */
-int blosc_decompress(const void* src, void* dest, size_t destsize) {
+int blosc1_decompress(const void* src, void* dest, size_t destsize) {
   return blosc2_decompress(src, INT32_MAX, dest, (int32_t)destsize);
 }
 
@@ -2944,7 +2944,7 @@ int blosc2_getitem(const void* src, int32_t srcsize, int start, int nitems, void
 
 /* Specific routine optimized for decompression a small number of
    items out of a compressed chunk.  Public non-contextual API. */
-int blosc_getitem(const void* src, int start, int nitems, void* dest) {
+int blosc1_getitem(const void* src, int start, int nitems, void* dest) {
   return blosc2_getitem(src, INT32_MAX, start, nitems, dest, INT32_MAX);
 }
 
@@ -3272,20 +3272,20 @@ int init_threadpool(blosc2_context *context) {
   return 0;
 }
 
-int16_t blosc_get_nthreads(void)
+int16_t blosc1_get_nthreads(void)
 {
   return g_nthreads;
 }
 
-int16_t blosc_set_nthreads(int16_t nthreads_new) {
+int16_t blosc1_set_nthreads(int16_t nthreads) {
   int16_t ret = g_nthreads;          /* the previous number of threads */
 
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc_init();
+  if (!g_initlib) blosc1_init();
 
- if (nthreads_new != ret) {
-   g_nthreads = nthreads_new;
-   g_global_context->new_nthreads = nthreads_new;
+ if (nthreads != ret) {
+   g_nthreads = nthreads;
+   g_global_context->new_nthreads = nthreads;
    check_nthreads(g_global_context);
  }
 
@@ -3293,16 +3293,16 @@ int16_t blosc_set_nthreads(int16_t nthreads_new) {
 }
 
 
-const char* blosc_get_compressor(void)
+const char* blosc1_get_compressor(void)
 {
   const char* compname;
-  blosc_compcode_to_compname(g_compressor, &compname);
+  blosc1_compcode_to_compname(g_compressor, &compname);
 
   return compname;
 }
 
-int blosc_set_compressor(const char* compname) {
-  int code = blosc_compname_to_compcode(compname);
+int blosc1_set_compressor(const char* compname) {
+  int code = blosc1_compname_to_compcode(compname);
   if (code >= BLOSC_LAST_CODEC) {
     BLOSC_TRACE_ERROR("User defined codecs cannot be set here. Use Blosc2 mechanism instead.");
     return -1;
@@ -3310,21 +3310,21 @@ int blosc_set_compressor(const char* compname) {
   g_compressor = code;
 
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc_init();
+  if (!g_initlib) blosc1_init();
 
   return code;
 }
 
-void blosc_set_delta(int dodelta) {
+void blosc1_set_delta(int dodelta) {
 
   g_delta = dodelta;
 
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc_init();
+  if (!g_initlib) blosc1_init();
 
 }
 
-const char* blosc_list_compressors(void) {
+const char* blosc1_list_compressors(void) {
   static int compressors_list_done = 0;
   static char ret[256];
 
@@ -3348,12 +3348,12 @@ const char* blosc_list_compressors(void) {
 }
 
 
-const char* blosc_get_version_string(void) {
+const char* blosc1_get_version_string(void) {
   return BLOSC_VERSION_STRING;
 }
 
 
-int blosc_get_complib_info(const char* compname, char** complib, char** version) {
+int blosc1_get_complib_info(const char* compname, char** complib, char** version) {
   int clibcode;
   const char* clibname;
   const char* clibversion = "unknown";
@@ -3401,7 +3401,7 @@ int blosc_get_complib_info(const char* compname, char** complib, char** version)
 }
 
 /* Return `nbytes`, `cbytes` and `blocksize` from a compressed buffer. */
-void blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes, size_t* cbytes, size_t* blocksize) {
+void blosc1_cbuffer_sizes(const void* cbuffer, size_t* nbytes, size_t* cbytes, size_t* blocksize) {
   int32_t nbytes32, cbytes32, blocksize32;
   blosc2_cbuffer_sizes(cbuffer, &nbytes32, &cbytes32, &blocksize32);
   *nbytes = nbytes32;
@@ -3427,7 +3427,7 @@ int blosc2_cbuffer_sizes(const void* cbuffer, int32_t* nbytes, int32_t* cbytes, 
   return rc;
 }
 
-int blosc_cbuffer_validate(const void* cbuffer, size_t cbytes, size_t* nbytes) {
+int blosc1_cbuffer_validate(const void* cbuffer, size_t cbytes, size_t* nbytes) {
   int32_t header_cbytes;
   int32_t header_nbytes;
   if (cbytes < BLOSC_MIN_HEADER_LENGTH) {
@@ -3455,7 +3455,7 @@ int blosc_cbuffer_validate(const void* cbuffer, size_t cbytes, size_t* nbytes) {
 }
 
 /* Return `typesize` and `flags` from a compressed buffer. */
-void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize, int* flags) {
+void blosc1_cbuffer_metainfo(const void* cbuffer, size_t* typesize, int* flags) {
   blosc_header header;
   int rc = read_chunk_header((uint8_t *) cbuffer, BLOSC_MIN_HEADER_LENGTH, false, &header);
   if (rc < 0) {
@@ -3470,7 +3470,7 @@ void blosc_cbuffer_metainfo(const void* cbuffer, size_t* typesize, int* flags) {
 
 
 /* Return version information from a compressed buffer. */
-void blosc_cbuffer_versions(const void* cbuffer, int* version, int* versionlz) {
+void blosc1_cbuffer_versions(const void* cbuffer, int* version, int* versionlz) {
   blosc_header header;
   int rc = read_chunk_header((uint8_t *) cbuffer, BLOSC_MIN_HEADER_LENGTH, false, &header);
   if (rc < 0) {
@@ -3485,7 +3485,7 @@ void blosc_cbuffer_versions(const void* cbuffer, int* version, int* versionlz) {
 
 
 /* Return the compressor library/format used in a compressed buffer. */
-const char* blosc_cbuffer_complib(const void* cbuffer) {
+const char* blosc1_cbuffer_complib(const void* cbuffer) {
   blosc_header header;
   int clibcode;
   const char* complib;
@@ -3503,7 +3503,7 @@ const char* blosc_cbuffer_complib(const void* cbuffer) {
 
 /* Get the internal blocksize to be used during compression.  0 means
    that an automatic blocksize is computed internally. */
-int blosc_get_blocksize(void)
+int blosc1_get_blocksize(void)
 {
   return (int)g_force_blocksize;
 }
@@ -3511,8 +3511,15 @@ int blosc_get_blocksize(void)
 
 /* Force the use of a specific blocksize.  If 0, an automatic
    blocksize will be used (the default). */
-void blosc_set_blocksize(size_t size) {
-  g_force_blocksize = (int32_t)size;
+void blosc1_set_blocksize(size_t blocksize) {
+  g_force_blocksize = (int32_t)blocksize;
+}
+
+
+/* Force the use of a specific split mode. */
+void blosc1_set_splitmode(int mode)
+{
+  g_splitmode = mode;
 }
 
 
@@ -3525,7 +3532,7 @@ void blosc_set_schunk(blosc2_schunk* schunk) {
 
 blosc2_io *blosc2_io_global = NULL;
 
-void blosc_init(void) {
+void blosc1_init(void) {
   /* Return if Blosc is already initialized */
   if (g_initlib) return;
 
@@ -3548,7 +3555,7 @@ void blosc_init(void) {
 }
 
 
-void blosc_destroy(void) {
+void blosc1_destroy(void) {
   /* Return if Blosc is not initialized */
   if (!g_initlib) return;
 
@@ -3620,7 +3627,7 @@ int release_threadpool(blosc2_context *context) {
   return 0;
 }
 
-int blosc_free_resources(void) {
+int blosc1_free_resources(void) {
   /* Return if Blosc is not initialized */
   if (!g_initlib) return BLOSC2_ERROR_FAILURE;
 

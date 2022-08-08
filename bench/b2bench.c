@@ -123,8 +123,8 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
     doshuffle = BLOSC_NOSHUFFLE;
   }
 
-  blosc_set_nthreads((int16_t)nthreads);
-  if (blosc_set_compressor(compressor) < 0) {
+  blosc1_set_nthreads((int16_t) nthreads);
+  if (blosc1_set_compressor(compressor) < 0) {
     printf("Compiled w/o support for compressor: '%s', so sorry.\n",
            compressor);
     exit(1);
@@ -191,8 +191,8 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
     blosc_set_timestamp(&last);
     for (i = 0; i < niter_c; i++) {
       for (j = 0; j < nchunks; j++) {
-        cbytes = blosc_compress(clevel, doshuffle, (size_t)elsize, size, src,
-                                dest[j], size + BLOSC_MAX_OVERHEAD);
+        cbytes = blosc1_compress(clevel, doshuffle, (size_t)elsize, size, src,
+                                 dest[j], size + BLOSC_MAX_OVERHEAD);
       }
     }
     blosc_set_timestamp(&current);
@@ -220,7 +220,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
           nbytes = (int)size;
         }
         else {
-          nbytes = blosc_decompress(dest[j], dest2, size);
+          nbytes = blosc1_decompress(dest[j], dest2, size);
         }
       }
     }
@@ -287,19 +287,19 @@ void print_compress_info(void) {
   printf("Blosc version: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   printf("List of supported compressors in this build: %s\n",
-         blosc_list_compressors());
+         blosc1_list_compressors());
 
   printf("Supported compression libraries:\n");
-  ret = blosc_get_complib_info("blosclz", &name, &version);
+  ret = blosc1_get_complib_info("blosclz", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
   free(name); free(version);
-  ret = blosc_get_complib_info("lz4", &name, &version);
+  ret = blosc1_get_complib_info("lz4", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
   free(name); free(version);
-  ret = blosc_get_complib_info("zlib", &name, &version);
+  ret = blosc1_get_complib_info("zlib", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
   free(name); free(version);
-  ret = blosc_get_complib_info("zstd", &name, &version);
+  ret = blosc1_get_complib_info("zstd", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
   free(name); free(version);
 }
@@ -440,7 +440,7 @@ int main(int argc, char* argv[]) {
   nchunks = get_nchunks(size, workingset);
   blosc_set_timestamp(&last);
 
-  blosc_init();
+  blosc1_init();
 
   if (suite) {
     for (nthreads_ = 1; nthreads_ <= nthreads; nthreads_++) {
@@ -521,7 +521,7 @@ int main(int argc, char* argv[]) {
          totaltime, totalsize * 2 * 1.1 / (MB * totaltime));
 
   /* Free blosc resources */
-  blosc_free_resources();
-  blosc_destroy();
+  blosc1_free_resources();
+  blosc1_destroy();
   return 0;
 }

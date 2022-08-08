@@ -170,7 +170,7 @@ int main(void) {
   char *result;
 
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc_init();
+  blosc1_init();
 
   data = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int64_t));
   data_dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int64_t));
@@ -188,7 +188,7 @@ int main(void) {
   blosc_test_free(data);
   blosc_test_free(data_dest);
 
-  blosc_destroy();
+  blosc1_destroy();
 
   return result != EXIT_SUCCESS;
 }

@@ -28,7 +28,7 @@ int main(void) {
 
   /* Initialize the Blosc compressor */
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc_init();
+  blosc1_init();
 
   /* Create a super-chunk container */
   cparams.filters[0] = BLOSC_DELTA;
@@ -82,7 +82,7 @@ int main(void) {
   /* Free resources */
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
-  blosc_destroy();
+  blosc1_destroy();
 
   free(data);
   free(data_dest);

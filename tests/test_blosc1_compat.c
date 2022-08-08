@@ -35,12 +35,12 @@ static char *test_compress_decompress(void) {
   memcpy(srccpy, src, size);
 
   /* Get a compressed buffer */
-  cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
-                          dest, size + BLOSC_MIN_HEADER_LENGTH);
+  cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
+                           dest, size + BLOSC_MIN_HEADER_LENGTH);
   mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   /* Decompress the buffer */
-  nbytes = blosc_decompress(dest, dest2, size);
+  nbytes = blosc1_decompress(dest, dest2, size);
   mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
   // Check roundtrip
@@ -60,12 +60,12 @@ static char *test_compress_decompress_zeros(void) {
   memcpy(srccpy, src, size);
 
   /* Get a compressed buffer */
-  cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
-                          dest, size + BLOSC_MIN_HEADER_LENGTH);
+  cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
+                           dest, size + BLOSC_MIN_HEADER_LENGTH);
   mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   /* Decompress the buffer */
-  nbytes = blosc_decompress(dest, dest2, size);
+  nbytes = blosc1_decompress(dest, dest2, size);
   mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
   // Check roundtrip
@@ -85,12 +85,12 @@ static char *test_compress_getitem(void) {
   memcpy(srccpy, src, size);
 
   /* Get a compressed buffer */
-  cbytes = blosc_compress(clevel, doshuffle, typesize, size, src,
-                          dest, size + BLOSC_MIN_HEADER_LENGTH);
+  cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
+                           dest, size + BLOSC_MIN_HEADER_LENGTH);
   mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   /* Decompress the buffer */
-  nbytes = blosc_getitem(dest, 1, 10, dest2);
+  nbytes = blosc1_getitem(dest, 1, 10, dest2);
   mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int32_t) (10 * typesize));
 
   // Check roundtrip
@@ -115,8 +115,8 @@ int main(void) {
   /* Activate the BLOSC_BLOSC1_COMPAT variable */
   setenv("BLOSC_BLOSC1_COMPAT", "TRUE", 0);
 
-  blosc_init();
-  blosc_set_nthreads(NTHREADS);
+  blosc1_init();
+  blosc1_set_nthreads(NTHREADS);
 
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
@@ -139,7 +139,7 @@ int main(void) {
   blosc_test_free(dest);
   blosc_test_free(dest2);
 
-  blosc_destroy();
+  blosc1_destroy();
 
   /* Reset envvar */
   unsetenv("BLOSC_BLOSC1_COMPAT");

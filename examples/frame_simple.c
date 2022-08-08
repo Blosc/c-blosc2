@@ -41,7 +41,7 @@
 
 int main(void) {
 
-  blosc_init();
+  blosc1_init();
 
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
@@ -200,7 +200,7 @@ int main(void) {
   if (cframe_needs_free) {
     free(cframe);
   }
-  blosc_destroy();
+  blosc1_destroy();
 
   return 0;
 }

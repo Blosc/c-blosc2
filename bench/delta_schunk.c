@@ -49,7 +49,7 @@ int main(void) {
   printf("Blosc version info: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Initialize the Blosc compressor */
-  blosc_init();
+  blosc1_init();
 
   /* Create a super-chunk container */
   cparams.filters[0] = BLOSC_DELTA;
@@ -111,7 +111,7 @@ int main(void) {
   /* Destroy the super-chunk */
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
-  blosc_destroy();
+  blosc1_destroy();
 
   return 0;
 }

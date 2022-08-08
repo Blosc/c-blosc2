@@ -228,12 +228,12 @@ int some_matches() {
 int main(void) {
 
     int result;
-    blosc_init();   // this is mandatory for initiallizing the plugin mechanism
+  blosc1_init();   // this is mandatory for initiallizing the plugin mechanism
     result = same_cells();
     printf("same_cells: %d obtained \n \n", result);
     result = some_matches();
     printf("some_matches: %d obtained \n \n", result);
-    blosc_destroy();
+    blosc1_destroy();
 
     return BLOSC2_ERROR_SUCCESS;
 }

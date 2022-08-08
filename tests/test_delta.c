@@ -91,14 +91,14 @@ static char *test_delta(void) {
   memcpy(srccpy, src, size);
 
   /* Get a compressed buffer without delta */
-  blosc_set_delta(0);
-  cbytes = blosc_compress(clevel, doshuffle, (size_t)typesize, (size_t)size, src,
-                          dest, (size_t)size + BLOSC_MAX_OVERHEAD);
+  blosc1_set_delta(0);
+  cbytes = blosc1_compress(clevel, doshuffle, (size_t)typesize, (size_t)size, src,
+                           dest, (size_t)size + BLOSC_MAX_OVERHEAD);
 
   /* Activate the delta filter and compress again */
-  blosc_set_delta(1);
-  cbytes2 = blosc_compress(clevel, doshuffle, (size_t)typesize, (size_t)size, src,
-                           dest, (size_t)size + BLOSC_MAX_OVERHEAD);
+  blosc1_set_delta(1);
+  cbytes2 = blosc1_compress(clevel, doshuffle, (size_t)typesize, (size_t)size, src,
+                            dest, (size_t)size + BLOSC_MAX_OVERHEAD);
   if ((typesize == 12) || (typesize == 15) || (typesize == 24)) {
     // For typesizes 12, 15 and 24 we make an exception and allow less compression
     if ((2 * cbytes2) > (4 * cbytes)) {
@@ -117,7 +117,7 @@ static char *test_delta(void) {
   }
 
   /* Decompress the buffer with delta */
-  nbytes = blosc_decompress(dest, src, (size_t)size);
+  nbytes = blosc1_decompress(dest, src, (size_t)size);
   mu_assert("ERROR: nbytes incorrect", nbytes == size);
 
   buf_equal = memcmp(src, srccpy, (size_t)size);
@@ -157,8 +157,8 @@ static char *all_tests(void) {
 int main(void) {
   char *result;
 
-  blosc_init();
-  blosc_set_compressor("blosclz");
+  blosc1_init();
+  blosc1_set_compressor("blosclz");
 
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t)size);
@@ -179,7 +179,7 @@ int main(void) {
   blosc_test_free(srccpy);
   blosc_test_free(dest);
 
-  blosc_destroy();
+  blosc1_destroy();
 
   return result != 0;
 }

@@ -26,7 +26,7 @@ static char* test_roundtrip_bitshuffle8(void) {
   /* Compress with bitshuffle active  */
   int isize = size;
   int osize = size + BLOSC_MIN_HEADER_LENGTH;
-  int csize = blosc_compress(9, BLOSC_BITSHUFFLE, 8, isize, data, data_out, osize);
+  int csize = blosc1_compress(9, BLOSC_BITSHUFFLE, 8, isize, data, data_out, osize);
   mu_assert("ERROR: Compression error", csize > 0);
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1.*isize) / csize);
 
@@ -35,7 +35,7 @@ static char* test_roundtrip_bitshuffle8(void) {
   fclose(fout);
 
   /* Decompress  */
-  int dsize = blosc_decompress(data_out, data_dest, isize);
+  int dsize = blosc1_decompress(data_out, data_dest, isize);
   mu_assert("ERROR: Decompression error.", dsize > 0);
 
   printf("Decompression successful!\n");
@@ -51,7 +51,7 @@ static char* test_roundtrip_bitshuffle4(void) {
   /* Compress with bitshuffle active  */
   int isize = size;
   int osize = size + BLOSC_MIN_HEADER_LENGTH;
-  int csize = blosc_compress(9, BLOSC_BITSHUFFLE, 4, isize, data, data_out, osize);
+  int csize = blosc1_compress(9, BLOSC_BITSHUFFLE, 4, isize, data, data_out, osize);
   mu_assert("ERROR: Buffer is uncompressible.  Giving up.", csize != 0);
   mu_assert("ERROR: Compression error.", csize > 0);
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1.*isize) / csize);
@@ -61,7 +61,7 @@ static char* test_roundtrip_bitshuffle4(void) {
   fclose(fout);
 
   /* Decompress  */
-  int dsize = blosc_decompress(data_out, data_dest, isize);
+  int dsize = blosc1_decompress(data_out, data_dest, isize);
   mu_assert("ERROR: Decompression error.", dsize >= 0);
 
   printf("Decompression successful!\n");
@@ -106,9 +106,9 @@ static char *all_tests(void) {
 int main(void) {
   char* result;
 
-  blosc_init();
-  blosc_set_nthreads(1);
-  blosc_set_compressor("lz4");
+  blosc1_init();
+  blosc1_set_nthreads(1);
+  blosc1_set_compressor("lz4");
   printf("Blosc version info: %s (%s)\n", BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Run all the suite */
@@ -121,7 +121,7 @@ int main(void) {
   }
   printf("\tTests run: %d\n", tests_run);
 
-  blosc_destroy();
+  blosc1_destroy();
 
   return result != EXIT_SUCCESS;
 }

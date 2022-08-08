@@ -42,7 +42,7 @@ CUTEST_TEST_DATA(zero_runlen) {
 };
 
 CUTEST_TEST_SETUP(zero_runlen) {
-  blosc_init();
+  blosc1_init();
 
   data->cparams = BLOSC2_CPARAMS_DEFAULTS;
   data->cparams.typesize = sizeof(int32_t);
@@ -146,23 +146,23 @@ CUTEST_TEST_TEST(zero_runlen) {
 
     switch (svalue) {
       case CHECK_VALUES:
-        rc = blosc_getitem(chunk_, nchunk, 1, &value);
+        rc = blosc1_getitem(chunk_, nchunk, 1, &value);
         CUTEST_ASSERT("Error in getitem of a special value", rc >= 0);
         CUTEST_ASSERT("Wrong value!", value == REPEATED_VALUE);
         break;
       case CHECK_NANS:
-        rc = blosc_getitem(chunk_, nchunk, 1, &fvalue);
+        rc = blosc1_getitem(chunk_, nchunk, 1, &fvalue);
         CUTEST_ASSERT("Error in getitem of a special value", rc >= 0);
         CUTEST_ASSERT("Wrong value!", isnan(fvalue));
         break;
       case CHECK_ZEROS:
-        rc = blosc_getitem(chunk_, nchunk, 1, &value);
+        rc = blosc1_getitem(chunk_, nchunk, 1, &value);
         CUTEST_ASSERT("Error in getitem of a special value", rc >= 0);
         CUTEST_ASSERT("Wrong value!", value == 0);
         break;
       default:
         // It can only be non initialized values
-        rc = blosc_getitem(chunk_, nchunk, 1, &value);
+        rc = blosc1_getitem(chunk_, nchunk, 1, &value);
         CUTEST_ASSERT("Error in getitem of a special value", rc >= 0);
     }
     if (needs_free) {
@@ -212,7 +212,7 @@ CUTEST_TEST_TEST(zero_runlen) {
 
 CUTEST_TEST_TEARDOWN(zero_runlen) {
   BLOSC_UNUSED_PARAM(data);
-  blosc_destroy();
+  blosc1_destroy();
 }
 
 

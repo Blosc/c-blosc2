@@ -12,8 +12,8 @@
   To run:
 
   $ ./simple
-  Blosc version info: 2.0.0a2 ($Date:: 2016-01-08 #$)
-  Compression: 40000000 -> 832774 (48.0x)
+  Blosc version info: 2.2.1.dev ($Date:: 2022-07-05 #$)
+  Compression: 40000000 -> 172176 (232.3x)
   Correctly extracted 5 elements from compressed chunk!
   Decompression successful!
   Successful roundtrip!
@@ -46,12 +46,12 @@ int main(void) {
          BLOSC_VERSION_STRING, BLOSC_VERSION_DATE);
 
   /* Initialize the Blosc compressor */
-  blosc_init();
-  blosc_set_nthreads(NTHREADS);
+  blosc1_init();
+  blosc1_set_nthreads(NTHREADS);
 
   /* Compress with clevel=5 and shuffle active  */
-  csize = blosc_compress(5, BLOSC_BITSHUFFLE, sizeof(float), isize, data,
-                         data_out, osize);
+  csize = blosc1_compress(5, BLOSC_BITSHUFFLE, sizeof(float), isize, data,
+                          data_out, osize);
   if (csize == 0) {
     printf("Buffer is uncompressible.  Giving up.\n");
     return 1;
@@ -64,22 +64,22 @@ int main(void) {
   printf("Compression: %" PRId64 " -> %d (%.1fx)\n",
          (int64_t)isize, csize, (1. * (double)isize) / csize);
 
-  ret = blosc_getitem(data_out, 5, 5, data_subset);
+  ret = blosc1_getitem(data_out, 5, 5, data_subset);
   if (ret < 0) {
-    printf("Error in blosc_getitem().  Giving up.\n");
+    printf("Error in blosc1_getitem().  Giving up.\n");
     return 1;
   }
 
   for (i = 0; i < 5; i++) {
     if (data_subset[i] != data_subset_ref[i]) {
-      printf("blosc_getitem() fetched data differs from original!\n");
+      printf("blosc1_getitem() fetched data differs from original!\n");
       return -1;
     }
   }
   printf("Correctly extracted 5 elements from compressed chunk!\n");
 
   /* Decompress  */
-  dsize = blosc_decompress(data_out, data_dest, (size_t)dsize);
+  dsize = blosc1_decompress(data_out, data_dest, (size_t)dsize);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
     return dsize;
@@ -88,7 +88,7 @@ int main(void) {
   printf("Decompression successful!\n");
 
   /* After using it, destroy the Blosc environment */
-  blosc_destroy();
+  blosc1_destroy();
 
   for (i = 0; i < SIZE; i++) {
     if (data[i] != data_dest[i]) {

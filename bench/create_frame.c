@@ -63,7 +63,7 @@ int create_cframe(const char* compname, bool contiguous) {
   int nchunk;
   blosc_timestamp_t last, current;
   double ttotal;
-  int compcode = blosc_compname_to_compcode(compname);
+  int compcode = blosc1_compname_to_compcode(compname);
   printf("\n*** Creating *%s* super-chunk for *%s*\n",
          contiguous ? "contiguous" : "sparse", compname);
 

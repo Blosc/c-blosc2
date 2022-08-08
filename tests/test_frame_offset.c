@@ -39,7 +39,7 @@ CUTEST_TEST_DATA(fill_special) {
 };
 
 CUTEST_TEST_SETUP(fill_special) {
-  blosc_init();
+  blosc1_init();
   data->cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_cparams* cparams = &data->cparams;
   cparams->typesize = sizeof(int32_t);
@@ -183,7 +183,7 @@ CUTEST_TEST_TEST(fill_special) {
 
 CUTEST_TEST_TEARDOWN(fill_special) {
   BLOSC_UNUSED_PARAM(data);
-  blosc_destroy();
+  blosc1_destroy();
 }
 
 

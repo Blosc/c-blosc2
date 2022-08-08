@@ -46,7 +46,7 @@ Here, `threads_callback` is a function of the form:
      for (i = 0; i < numjobs; ++i)
        dojob(((char *) jobdata) + ((unsigned) i)*jobdata_elsize);
    }
-   
+
 that simply calls `dojob` on the given `jobdata` array for `numjobs` elements of size `jobdata_elsize`, returning when all of the `dojob` calls have completed.  The key point is that your `threads_callback` routine can execute the `dojob` calls *in parallel* if it wants.  For example, if you are using OpenMP your `threads_callback` function might use `#pragma omp parallel for`.
 
-The `blosc_set_threads_callback` function should be called before any Blosc function (before any Blosc contexts are created), to inhibit Blosc from spawning its own worker threads.   In this case, `blosc_set_nthreads` and similar functions set an upper bound to the `numjobs` that is passed to your `threads_callback` rather than an actual number of threads.
+The `blosc_set_threads_callback` function should be called before any Blosc function (before any Blosc contexts are created), to inhibit Blosc from spawning its own worker threads.   In this case, `blosc1_set_nthreads` and similar functions set an upper bound to the `numjobs` that is passed to your `threads_callback` rather than an actual number of threads.

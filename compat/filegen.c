@@ -48,15 +48,15 @@ int main(int argc, char *argv[]) {
   FILE *f;
 
   /* Register the filter with the library */
-  printf("Blosc version info: %s\n", blosc_get_version_string());
+  printf("Blosc version info: %s\n", blosc1_get_version_string());
 
   /* Initialize the Blosc compressor */
-  blosc_init();
-  blosc_set_nthreads(1);
+  blosc1_init();
+  blosc1_set_nthreads(1);
 
   /* Use the argv[2] compressor. The supported ones are "blosclz",
   "lz4", "lz4hc", "zlib" and "zstd"*/
-  blosc_set_compressor(argv[2]);
+  blosc1_set_compressor(argv[2]);
 
   for (i = 0; i < SIZE; i++) {
     data[i] = i;
@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
   if (strcmp(argv[1], "compress") == 0) {
 
     /* Compress with clevel=9 and shuffle active  */
-    csize = blosc_compress(9, 1, sizeof(int32_t), isize, data, data_out, osize);
+    csize = blosc1_compress(9, 1, sizeof(int32_t), isize, data, data_out, osize);
     if (csize == 0) {
       printf("Buffer is uncompressible.  Giving up.\n");
       return 1;
@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* Decompress */
-    dsize = blosc_decompress(data_out, data_dest, (size_t) dsize);
+    dsize = blosc1_decompress(data_out, data_dest, (size_t) dsize);
     if (dsize < 0) {
       printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;
@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
   }
 
   /* After using it, destroy the Blosc environment */
-  blosc_destroy();
+  blosc1_destroy();
 
   return exit_code;
 }

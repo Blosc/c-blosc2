@@ -27,7 +27,7 @@
 
 
 int main(void) {
-  blosc_init();
+  blosc1_init();
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -40,7 +40,7 @@ int main(void) {
   blosc_timestamp_t last, current;
   double ttotal;
 
-  printf("Blosc version info: %s (%s)\n", blosc_get_version_string(), BLOSC_VERSION_DATE);
+  printf("Blosc version info: %s (%s)\n", blosc1_get_version_string(), BLOSC_VERSION_DATE);
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
   cparams.clevel = 9;
@@ -104,6 +104,6 @@ int main(void) {
   /* Free resources */
   /* Destroy the super-chunk */
   blosc2_schunk_free(schunk);
-  blosc_destroy();
+  blosc1_destroy();
   return 0;
 }
