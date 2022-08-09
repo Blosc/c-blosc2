@@ -878,7 +878,7 @@ int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
     if (rc < 0) {
       return rc;
     }
-    if (chunk_cbytes_old == BLOSC_MAX_OVERHEAD) {
+    if (chunk_cbytes_old == BLOSC2_MAX_OVERHEAD) {
         chunk_cbytes_old = 0;
     }
   }
@@ -974,7 +974,7 @@ int64_t blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int64_t nchunk) {
     if (rc < 0) {
       return rc;
     }
-    if (chunk_cbytes_old == BLOSC_MAX_OVERHEAD) {
+    if (chunk_cbytes_old == BLOSC2_MAX_OVERHEAD) {
       chunk_cbytes_old = 0;
     }
   }
@@ -1021,11 +1021,11 @@ int64_t blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int64_t nchunk) {
 
 /* Append a data buffer to a super-chunk. */
 int64_t blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes) {
-  uint8_t* chunk = malloc(nbytes + BLOSC_MAX_OVERHEAD);
+  uint8_t* chunk = malloc(nbytes + BLOSC2_MAX_OVERHEAD);
   schunk->current_nchunk = schunk->nchunks;
   /* Compress the src buffer using super-chunk context */
   int cbytes = blosc2_compress_ctx(schunk->cctx, src, nbytes, chunk,
-                                   nbytes + BLOSC_MAX_OVERHEAD);
+                                   nbytes + BLOSC2_MAX_OVERHEAD);
   if (cbytes < 0) {
     free(chunk);
     return cbytes;
@@ -1430,7 +1430,7 @@ int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name, uint8_t *content,
   // Add the vlmetalayer
   blosc2_metalayer *vlmetalayer = malloc(sizeof(blosc2_metalayer));
   vlmetalayer->name = strdup(name);
-  uint8_t* content_buf = malloc((size_t) content_len + BLOSC_MAX_OVERHEAD);
+  uint8_t* content_buf = malloc((size_t) content_len + BLOSC2_MAX_OVERHEAD);
 
   blosc2_context *cctx;
   if (cparams != NULL) {
@@ -1439,7 +1439,7 @@ int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name, uint8_t *content,
     cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
   }
 
-  int csize = blosc2_compress_ctx(cctx, content, content_len, content_buf, content_len + BLOSC_MAX_OVERHEAD);
+  int csize = blosc2_compress_ctx(cctx, content, content_len, content_buf, content_len + BLOSC2_MAX_OVERHEAD);
   if (csize < 0) {
     BLOSC_TRACE_ERROR("Can not compress the `%s` variable-length metalayer.", name);
     return csize;
@@ -1498,7 +1498,7 @@ int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name, uint8_t *conte
 
   blosc2_metalayer *vlmetalayer = schunk->vlmetalayers[nvlmetalayer];
   free(vlmetalayer->content);
-  uint8_t* content_buf = malloc((size_t) content_len + BLOSC_MAX_OVERHEAD);
+  uint8_t* content_buf = malloc((size_t) content_len + BLOSC2_MAX_OVERHEAD);
 
   blosc2_context *cctx;
   if (cparams != NULL) {
@@ -1507,7 +1507,7 @@ int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name, uint8_t *conte
     cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
   }
 
-  int csize = blosc2_compress_ctx(cctx, content, content_len, content_buf, content_len + BLOSC_MAX_OVERHEAD);
+  int csize = blosc2_compress_ctx(cctx, content, content_len, content_buf, content_len + BLOSC2_MAX_OVERHEAD);
   if (csize < 0) {
     BLOSC_TRACE_ERROR("Can not compress the `%s` variable-length metalayer.", name);
     return csize;

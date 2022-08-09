@@ -25,7 +25,7 @@ static char* test_lazy_chunk_memcpyed(void) {
 
   uint8_t buffer_b[] = {1};
 
-  int32_t chunk_size = sc->typesize + BLOSC_MAX_OVERHEAD;
+  int32_t chunk_size = sc->typesize + BLOSC2_MAX_OVERHEAD;
   uint8_t *chunk = malloc(chunk_size);
   cbytes = blosc2_compress_ctx(sc->cctx, buffer_b, sc->typesize, chunk, chunk_size);
   mu_assert("ERROR: cbytes are incorrect", cbytes == 33);

@@ -30,7 +30,7 @@ static char* test_getitem(void) {
 
   /* Allocate memory for the test. */
   void* original = malloc(buffer_size);
-  void* intermediate = malloc(buffer_size + BLOSC_MAX_OVERHEAD);
+  void* intermediate = malloc(buffer_size + BLOSC2_MAX_OVERHEAD);
   void* items = malloc(buffer_size);
   void* result = malloc(buffer_size);
 
@@ -41,7 +41,7 @@ static char* test_getitem(void) {
   /* Compress the input data and store it in an intermediate buffer.
      Decompress the data from the intermediate buffer into a result buffer. */
   blosc1_compress(1, 0, type_size, buffer_size,
-                  original, intermediate, buffer_size + BLOSC_MAX_OVERHEAD);
+                  original, intermediate, buffer_size + BLOSC2_MAX_OVERHEAD);
 
   int start_item = 0;
   int num_items = 1;

@@ -106,7 +106,7 @@ static char* test_insert_chunk(void) {
       data[j] = i - 1;
     }
     int32_t datasize = sizeof(int64_t) * CHUNKSIZE;
-    int32_t chunksize = sizeof(int64_t) * CHUNKSIZE + BLOSC_MAX_OVERHEAD;
+    int32_t chunksize = sizeof(int64_t) * CHUNKSIZE + BLOSC2_MAX_OVERHEAD;
     uint8_t *chunk = malloc(chunksize);
     int csize = blosc2_compress_ctx(schunk->cctx, data, datasize, chunk, chunksize);
     mu_assert("ERROR: chunk cannot be compressed", csize >= 0);

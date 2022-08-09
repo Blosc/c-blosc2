@@ -8,11 +8,11 @@ Limits for different features
 
 .. doxygenenumvalue:: BLOSC_EXTENDED_HEADER_LENGTH
 
-.. doxygenenumvalue:: BLOSC_MAX_OVERHEAD
+.. doxygenenumvalue:: BLOSC2_MAX_OVERHEAD
 
 .. doxygenenumvalue:: BLOSC_MIN_BUFFERSIZE
 
-.. doxygenenumvalue:: BLOSC_MAX_BUFFERSIZE
+.. doxygenenumvalue:: BLOSC2_MAX_BUFFERSIZE
 
 .. doxygenenumvalue:: BLOSC_MAX_TYPESIZE
 

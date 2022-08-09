@@ -173,7 +173,7 @@ int main(void) {
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, bytesize);
   srcmasked = blosc_test_malloc(BUFFER_ALIGN_SIZE, bytesize);
   srcmasked2 = blosc_test_malloc(BUFFER_ALIGN_SIZE, bytesize);
-  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, bytesize + BLOSC_MAX_OVERHEAD);
+  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, bytesize + BLOSC2_MAX_OVERHEAD);
   dest2 = blosc_test_malloc(BUFFER_ALIGN_SIZE, bytesize);
   maskout = blosc_test_malloc(BUFFER_ALIGN_SIZE, nblocks);
   maskout2 = blosc_test_malloc(BUFFER_ALIGN_SIZE, nblocks);
@@ -187,7 +187,7 @@ int main(void) {
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.blocksize = blocksize;
   blosc2_context *cctx = blosc2_create_cctx(cparams);
-  cbytes = blosc2_compress_ctx(cctx, src, bytesize, dest, bytesize + BLOSC_MAX_OVERHEAD);
+  cbytes = blosc2_compress_ctx(cctx, src, bytesize, dest, bytesize + BLOSC2_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
 
   // Build a mask

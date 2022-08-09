@@ -23,10 +23,10 @@ blosc2_dparams dparams;
 blosc2_context *cctx, *dctx;
 static int32_t data[SIZE];
 static int32_t data2[SIZE];
-static int32_t data_out[SIZE + BLOSC_MAX_OVERHEAD / sizeof(int32_t)];
+static int32_t data_out[SIZE + BLOSC2_MAX_OVERHEAD / sizeof(int32_t)];
 static int32_t data_dest[SIZE];
 int32_t isize = SIZE * sizeof(int32_t);
-int32_t osize = SIZE * sizeof(int32_t) + BLOSC_MAX_OVERHEAD;
+int32_t osize = SIZE * sizeof(int32_t) + BLOSC2_MAX_OVERHEAD;
 int dsize = SIZE * sizeof(int32_t);
 int csize;
 

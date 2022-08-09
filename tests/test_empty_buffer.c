@@ -18,9 +18,9 @@ static char* test_empty_buffer(int clevel, int do_shuffle, int32_t typesize) {
   void* buf = NULL;
   int buf_size = 0;
   int csize, dsize;
-  void* dest = malloc(0 + BLOSC_MAX_OVERHEAD);
+  void* dest = malloc(0 + BLOSC2_MAX_OVERHEAD);
 
-  csize = blosc2_compress(clevel, do_shuffle, typesize, buf, buf_size, dest, 0+BLOSC_MAX_OVERHEAD);
+  csize = blosc2_compress(clevel, do_shuffle, typesize, buf, buf_size, dest, 0 + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: Compression error.", csize > 0);
 
   void* decomp = NULL;

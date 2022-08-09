@@ -944,11 +944,11 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   uint8_t *off_chunk = NULL;
   if (nchunks > 0) {
     // Compress the chunk of offsets
-    off_chunk = malloc(off_nbytes + BLOSC_MAX_OVERHEAD);
+    off_chunk = malloc(off_nbytes + BLOSC2_MAX_OVERHEAD);
     blosc2_context *cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
     cctx->typesize = sizeof(int64_t);
     off_cbytes = blosc2_compress_ctx(cctx, data_tmp, off_nbytes, off_chunk,
-                                     off_nbytes + BLOSC_MAX_OVERHEAD);
+                                     off_nbytes + BLOSC2_MAX_OVERHEAD);
     blosc2_free_ctx(cctx);
     if (off_cbytes < 0) {
       free(off_chunk);
@@ -2576,9 +2576,9 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
   cparams.compcode = BLOSC_BLOSCLZ;
   blosc2_context* cctx = blosc2_create_cctx(cparams);
-  void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
+  void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
-                                               off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
+                                               off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
   free(offsets);
   if (new_off_cbytes < 0) {
@@ -2776,9 +2776,9 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
   cparams.compcode = BLOSC_BLOSCLZ;
   blosc2_context* cctx = blosc2_create_cctx(cparams);
-  void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
+  void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
-                                               off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
+                                               off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
 
   free(offsets);
@@ -2948,7 +2948,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     }
     else {
       cbytes_old = sw32_(chunk_old + BLOSC2_CHUNK_CBYTES);
-      if (cbytes_old == BLOSC_MAX_OVERHEAD) {
+      if (cbytes_old == BLOSC2_MAX_OVERHEAD) {
         cbytes_old = 0;
       }
     }
@@ -3018,9 +3018,9 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
   cparams.compcode = BLOSC_BLOSCLZ;
   blosc2_context* cctx = blosc2_create_cctx(cparams);
-  void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
+  void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
-                                               off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
+                                               off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
 
   free(offsets);
@@ -3172,9 +3172,9 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
   cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
   cparams.compcode = BLOSC_BLOSCLZ;
   blosc2_context* cctx = blosc2_create_cctx(cparams);
-  void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
+  void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes - (int32_t)sizeof(int64_t),
-                                               off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
+                                               off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
 
   free(offsets);
@@ -3325,9 +3325,9 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
   cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
   cparams.compcode = BLOSC_BLOSCLZ;
   blosc2_context* cctx = blosc2_create_cctx(cparams);
-  void* off_chunk = malloc((size_t)off_nbytes + BLOSC_MAX_OVERHEAD);
+  void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
-                                               off_chunk, off_nbytes + BLOSC_MAX_OVERHEAD);
+                                               off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
 
   if (new_off_cbytes < 0) {

@@ -146,7 +146,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
   init_buffer(src, size, rshift);
   memcpy(srccpy, src, size);
   for (j = 0; j < nchunks; j++) {
-    retcode = posix_memalign(&dest[j], 32, size + BLOSC_MAX_OVERHEAD);
+    retcode = posix_memalign(&dest[j], 32, size + BLOSC2_MAX_OVERHEAD);
     if (retcode != 0) {
       printf("Error in allocating memory!");
     }
@@ -192,7 +192,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
     for (i = 0; i < niter_c; i++) {
       for (j = 0; j < nchunks; j++) {
         cbytes = blosc1_compress(clevel, doshuffle, (size_t)elsize, size, src,
-                                 dest[j], size + BLOSC_MAX_OVERHEAD);
+                                 dest[j], size + BLOSC2_MAX_OVERHEAD);
       }
     }
     blosc_set_timestamp(&current);

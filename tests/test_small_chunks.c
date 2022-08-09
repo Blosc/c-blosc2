@@ -37,7 +37,7 @@ CUTEST_TEST_TEST(small_chunks) {
     storage.contiguous = false;
     blosc2_schunk *sc = blosc2_schunk_new(&storage);
 
-    int32_t chunk_nbytes = itemsize + BLOSC_MAX_OVERHEAD;
+    int32_t chunk_nbytes = itemsize + BLOSC2_MAX_OVERHEAD;
     uint8_t *chunk = malloc(chunk_nbytes);
     int64_t rep_val = 8;
     blosc2_chunk_repeatval(cparams, chunksize, chunk, chunk_nbytes, &rep_val);

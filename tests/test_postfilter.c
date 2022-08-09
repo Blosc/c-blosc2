@@ -25,7 +25,7 @@ int32_t* data2;
 int32_t* data_out;
 int32_t* data_dest;
 int32_t isize = SIZE * sizeof(int32_t);
-int32_t osize = SIZE * sizeof(int32_t) + BLOSC_MAX_OVERHEAD;
+int32_t osize = SIZE * sizeof(int32_t) + BLOSC2_MAX_OVERHEAD;
 int dsize = SIZE * sizeof(int32_t);
 int csize;
 bool data_cnt = false;
@@ -34,7 +34,7 @@ bool data_cnt = false;
 int init_data(void) {
   data = malloc(SIZE * sizeof(int32_t));
   data2 = malloc(SIZE * sizeof(int32_t));
-  data_out = malloc(SIZE * sizeof(int32_t) + BLOSC_MAX_OVERHEAD);
+  data_out = malloc(SIZE * sizeof(int32_t) + BLOSC2_MAX_OVERHEAD);
   data_dest = malloc(SIZE * sizeof(int32_t));
 
   /* Initialize inputs */
