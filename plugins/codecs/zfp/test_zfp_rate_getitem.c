@@ -33,8 +33,8 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
     float *data_in = malloc(chunksize);
     int decompressed;
     int64_t csize;
-    uint8_t *chunk_zfp = malloc(chunksize + BLOSC_MAX_OVERHEAD);
-    uint8_t *chunk_blosc = malloc(chunksize + BLOSC_MAX_OVERHEAD);
+    uint8_t *chunk_zfp = malloc(chunksize + BLOSC2_MAX_OVERHEAD);
+    uint8_t *chunk_blosc = malloc(chunksize + BLOSC2_MAX_OVERHEAD);
     float *data_dest = malloc(chunksize);
 
     /* Create a context for compression */
@@ -58,7 +58,7 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
     blosc2_context *dctx;
     dctx = blosc2_create_dctx(dparams);
     int32_t zfp_chunk_nbytes, zfp_chunk_cbytes, blosc_chunk_cbytes;
-    uint8_t *lossy_chunk = malloc(chunksize + BLOSC_MAX_OVERHEAD);
+    uint8_t *lossy_chunk = malloc(chunksize + BLOSC2_MAX_OVERHEAD);
 
     for (int ci = 0; ci < nchunks; ci++) {
         decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
@@ -68,7 +68,7 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
         }
 
         /* Compress using ZFP fixed-rate  */
-        csize = blosc2_compress_ctx(cctx, data_in, chunksize, chunk_zfp, chunksize + BLOSC_MAX_OVERHEAD);
+        csize = blosc2_compress_ctx(cctx, data_in, chunksize, chunk_zfp, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
             printf("Buffer is uncompressible.  Giving up.\n");
             return 0;
@@ -85,7 +85,7 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
         }
 
         /* Compress not using ZFP fixed-rate  */
-        csize = blosc2_compress_ctx(schunk->cctx, lossy_chunk, chunksize, chunk_blosc, chunksize + BLOSC_MAX_OVERHEAD);
+        csize = blosc2_compress_ctx(schunk->cctx, lossy_chunk, chunksize, chunk_blosc, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
             printf("Buffer is uncompressible.  Giving up.\n");
             return 0;
@@ -142,8 +142,8 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
     double *data_in = malloc(chunksize);
     int decompressed;
     int64_t csize;
-    uint8_t *chunk_zfp = malloc(chunksize + BLOSC_MAX_OVERHEAD);
-    uint8_t *chunk_blosc = malloc(chunksize + BLOSC_MAX_OVERHEAD);
+    uint8_t *chunk_zfp = malloc(chunksize + BLOSC2_MAX_OVERHEAD);
+    uint8_t *chunk_blosc = malloc(chunksize + BLOSC2_MAX_OVERHEAD);
     double *data_dest = malloc(chunksize);
 
     /* Create a context for compression */
@@ -167,7 +167,7 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
     blosc2_context *dctx;
     dctx = blosc2_create_dctx(dparams);
     int32_t zfp_chunk_nbytes, zfp_chunk_cbytes, blosc_chunk_cbytes;
-    uint8_t *lossy_chunk = malloc(chunksize + BLOSC_MAX_OVERHEAD);
+    uint8_t *lossy_chunk = malloc(chunksize + BLOSC2_MAX_OVERHEAD);
 
     for (int ci = 0; ci < nchunks; ci++) {
         decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
@@ -177,7 +177,7 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
         }
 
         /* Compress using ZFP fixed-rate  */
-        csize = blosc2_compress_ctx(cctx, data_in, chunksize, chunk_zfp, chunksize + BLOSC_MAX_OVERHEAD);
+        csize = blosc2_compress_ctx(cctx, data_in, chunksize, chunk_zfp, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
             printf("Buffer is uncompressible.  Giving up.\n");
             return 0;
@@ -194,7 +194,7 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
         }
 
         /* Compress not using ZFP fixed-rate  */
-        csize = blosc2_compress_ctx(schunk->cctx, lossy_chunk, chunksize, chunk_blosc, chunksize + BLOSC_MAX_OVERHEAD);
+        csize = blosc2_compress_ctx(schunk->cctx, lossy_chunk, chunksize, chunk_blosc, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
             printf("Buffer is uncompressible.  Giving up.\n");
             return 0;

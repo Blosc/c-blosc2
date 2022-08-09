@@ -21,7 +21,7 @@ static int test_compress_roundtrip(size_t type_size, size_t num_elements,
 
   /* Allocate memory for the test. */
   void* original = blosc_test_malloc(buffer_alignment, buffer_size);
-  void* intermediate = blosc_test_malloc(buffer_alignment, buffer_size + BLOSC_MAX_OVERHEAD);
+  void* intermediate = blosc_test_malloc(buffer_alignment, buffer_size + BLOSC2_MAX_OVERHEAD);
   void* result = blosc_test_malloc(buffer_alignment, buffer_size);
 
   /* Fill the input data buffer with random values. */
@@ -30,7 +30,7 @@ static int test_compress_roundtrip(size_t type_size, size_t num_elements,
   /* Compress the input data and store it in an intermediate buffer.
      Decompress the data from the intermediate buffer into a result buffer. */
   blosc1_compress(compression_level, do_shuffle, type_size, buffer_size,
-                  original, intermediate, buffer_size + BLOSC_MAX_OVERHEAD);
+                  original, intermediate, buffer_size + BLOSC2_MAX_OVERHEAD);
   blosc1_decompress(intermediate, result, buffer_size);
 
   /* The round-tripped data matches the original data when the

@@ -74,7 +74,7 @@ CUTEST_TEST_TEST(zero_runlen) {
 
   blosc2_schunk *schunk;
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
-  int32_t osize = CHUNKSIZE * sizeof(int32_t) + BLOSC_MAX_OVERHEAD;
+  int32_t osize = CHUNKSIZE * sizeof(int32_t) + BLOSC2_MAX_OVERHEAD;
   int dsize, csize;
   int nchunk;
   int64_t nchunks;

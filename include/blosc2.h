@@ -51,11 +51,11 @@ extern "C" {
 
 /* Version numbers */
 #define BLOSC2_VERSION_MAJOR    2    /* for major interface/format changes  */
-#define BLOSC2_VERSION_MINOR    2    /* for minor interface/format changes  */
-#define BLOSC2_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
+#define BLOSC2_VERSION_MINOR    3    /* for minor interface/format changes  */
+#define BLOSC2_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC2_VERSION_STRING   "2.2.1.dev"  /* string version.  Sync with above! */
-#define BLOSC2_VERSION_DATE     "$Date:: 2022-07-05 #$"    /* date version */
+#define BLOSC2_VERSION_STRING   "2.3.0.dev"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_DATE     "$Date:: 2022-08-09 #$"    /* date version */
 
 
 /* The maximum number of dimensions for caterva arrays */
@@ -117,19 +117,23 @@ typedef struct {
 
 
 enum {
+#ifndef BLOSC_H
   BLOSC_MIN_HEADER_LENGTH = 16,
   //!< Minimum header length (Blosc1)
+#endif // BLOSC_H
   BLOSC_EXTENDED_HEADER_LENGTH = 32,
   //!< Extended header length (Blosc2, see README_HEADER)
-  BLOSC_MAX_OVERHEAD = BLOSC_EXTENDED_HEADER_LENGTH,
+  BLOSC2_MAX_OVERHEAD = BLOSC_EXTENDED_HEADER_LENGTH,
   //!< The maximum overhead during compression in bytes. This equals
   //!< to @ref BLOSC_EXTENDED_HEADER_LENGTH now, but can be higher in future
   //!< implementations.
-  BLOSC_MAX_BUFFERSIZE = (INT_MAX - BLOSC_MAX_OVERHEAD),
+  BLOSC2_MAX_BUFFERSIZE = (INT_MAX - BLOSC2_MAX_OVERHEAD),
   //!< Maximum source buffer size to be compressed
+#ifndef BLOSC_H
   BLOSC_MAX_TYPESIZE = UINT8_MAX,
   //!< Maximum typesize before considering source buffer as a stream of bytes.
   //!< Cannot be larger than 255.
+#endif // BLOSC_H
   BLOSC_MIN_BUFFERSIZE = 128,
   //!< Minimum buffer size to be compressed. Cannot be smaller than 66.
 };
@@ -160,10 +164,12 @@ enum {
  * @sa #blosc1_compress
  */
 enum {
+#ifndef BLOSC_H
   BLOSC_NOSHUFFLE = 0,   //!< No shuffle (for compatibility with Blosc1).
   BLOSC_NOFILTER = 0,    //!< No filter.
   BLOSC_SHUFFLE = 1,     //!< Byte-wise shuffle.
   BLOSC_BITSHUFFLE = 2,  //!< Bit-wise shuffle.
+#endif // BLOSC_H
   BLOSC_DELTA = 3,       //!< Delta filter.
   BLOSC_TRUNC_PREC = 4,  //!< Truncate precision filter.
   BLOSC_LAST_FILTER = 5, //!< sentinel
@@ -175,9 +181,11 @@ enum {
  * @brief Codes for internal flags (see blosc1_cbuffer_metainfo)
  */
 enum {
+#ifndef BLOSC_H
   BLOSC_DOSHUFFLE = 0x1,     //!< byte-wise shuffle
   BLOSC_MEMCPYED = 0x2,      //!< plain copy
   BLOSC_DOBITSHUFFLE = 0x4,  //!< bit-wise shuffle
+#endif // BLOSC_H
   BLOSC_DODELTA = 0x8,       //!< delta coding
 };
 
@@ -217,11 +225,13 @@ enum {
  * @brief Codes for the different compressors shipped with Blosc
  */
 enum {
+#ifndef BLOSC_H
   BLOSC_BLOSCLZ = 0,
   BLOSC_LZ4 = 1,
   BLOSC_LZ4HC = 2,
   BLOSC_ZLIB = 4,
   BLOSC_ZSTD = 5,
+#endif // BLOSC_H
   BLOSC_LAST_CODEC = 6,
   //!< Determine the last codec defined by Blosc.
   BLOSC_LAST_REGISTERED_CODEC = BLOSC2_GLOBAL_REGISTERED_CODECS_START + BLOSC2_GLOBAL_REGISTERED_CODECS - 1,
@@ -231,20 +241,24 @@ enum {
 
 // Names for the different compressors shipped with Blosc
 
+#ifndef BLOSC_H
 #define BLOSC_BLOSCLZ_COMPNAME   "blosclz"
 #define BLOSC_LZ4_COMPNAME       "lz4"
 #define BLOSC_LZ4HC_COMPNAME     "lz4hc"
 #define BLOSC_ZLIB_COMPNAME      "zlib"
 #define BLOSC_ZSTD_COMPNAME      "zstd"
+#endif // BLOSC_H
 
 /**
  * @brief Codes for compression libraries shipped with Blosc (code must be < 8)
  */
 enum {
+#ifndef BLOSC_H
   BLOSC_BLOSCLZ_LIB = 0,
   BLOSC_LZ4_LIB = 1,
   BLOSC_ZLIB_LIB = 3,
   BLOSC_ZSTD_LIB = 4,
+#endif // BLOSC_H
   BLOSC_UDCODEC_LIB = 6,
   BLOSC_SCHUNK_LIB = 7,   //!< compressor library in super-chunk header
 };
@@ -252,21 +266,25 @@ enum {
 /**
  * @brief Names for the different compression libraries shipped with Blosc
  */
+#ifndef BLOSC_H
 #define BLOSC_BLOSCLZ_LIBNAME   "BloscLZ"
 #define BLOSC_LZ4_LIBNAME       "LZ4"
 #define BLOSC_ZLIB_LIBNAME      "Zlib"
 #define BLOSC_ZSTD_LIBNAME      "Zstd"
+#endif // BLOSC_H
 
 /**
  * @brief The codes for compressor formats shipped with Blosc
  */
 enum {
+#ifndef BLOSC_H
   BLOSC_BLOSCLZ_FORMAT = BLOSC_BLOSCLZ_LIB,
   BLOSC_LZ4_FORMAT = BLOSC_LZ4_LIB,
   //!< LZ4HC and LZ4 share the same format
   BLOSC_LZ4HC_FORMAT = BLOSC_LZ4_LIB,
   BLOSC_ZLIB_FORMAT = BLOSC_ZLIB_LIB,
   BLOSC_ZSTD_FORMAT = BLOSC_ZSTD_LIB,
+#endif // BLOSC_H
   BLOSC_UDCODEC_FORMAT = BLOSC_UDCODEC_LIB,
 };
 
@@ -275,11 +293,13 @@ enum {
  * All versions here starts at 1
  */
 enum {
+#ifndef BLOSC_H
   BLOSC_BLOSCLZ_VERSION_FORMAT = 1,
   BLOSC_LZ4_VERSION_FORMAT = 1,
   BLOSC_LZ4HC_VERSION_FORMAT = 1,  /* LZ4HC and LZ4 share the same format */
   BLOSC_ZLIB_VERSION_FORMAT = 1,
   BLOSC_ZSTD_VERSION_FORMAT = 1,
+#endif // BLOSC_H
   BLOSC_UDCODEC_VERSION_FORMAT = 1,
 };
 
@@ -289,12 +309,14 @@ enum {
  * AUTO for nearly optimal behaviour (based on heuristics).
  * FORWARD_COMPAT provides best forward compatibility (default).
  */
+#ifndef BLOSC_H
 enum {
   BLOSC_ALWAYS_SPLIT = 1,
   BLOSC_NEVER_SPLIT = 2,
   BLOSC_AUTO_SPLIT = 3,
   BLOSC_FORWARD_COMPAT_SPLIT = 4,
 };
+#endif // BLOSC_H
 
 /**
  * @brief Offsets for fields in Blosc2 chunk header.
@@ -414,7 +436,7 @@ BLOSC_EXPORT void blosc1_destroy(void);
  * must have at least the size of @p destsize.
  * @param destsize The size of the dest buffer. Blosc
  * guarantees that if you set @p destsize to, at least,
- * (@p nbytes + #BLOSC_MAX_OVERHEAD), the compression will always succeed.
+ * (@p nbytes + #BLOSC2_MAX_OVERHEAD), the compression will always succeed.
  *
  * @return The number of bytes compressed.
  * If @p src buffer cannot be compressed into @p destsize, the return
@@ -1128,7 +1150,7 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * must have at least the size of @p destsize.
  * @param destsize The size of the dest buffer. Blosc
  * guarantees that if you set @p destsize to, at least,
- * (@p nbytes + #BLOSC_MAX_OVERHEAD), the compression will always succeed.
+ * (@p nbytes + #BLOSC2_MAX_OVERHEAD), the compression will always succeed.
  *
  * @return The number of bytes compressed.
  * If @p src buffer cannot be compressed into @p destsize, the return

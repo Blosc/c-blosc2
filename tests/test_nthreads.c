@@ -34,7 +34,7 @@ static char *test_compress(void) {
 
   /* Get a compressed buffer */
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                           dest, size + BLOSC_MAX_OVERHEAD);
+                           dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   nthreads = blosc1_get_nthreads();
@@ -53,7 +53,7 @@ static char *test_compress_decompress(void) {
 
   /* Get a compressed buffer */
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                           dest, size + BLOSC_MAX_OVERHEAD);
+                           dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
   nthreads = blosc1_get_nthreads();
@@ -94,7 +94,7 @@ int main(void) {
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
   srccpy = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
-  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, size + BLOSC_MAX_OVERHEAD);
+  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, size + BLOSC2_MAX_OVERHEAD);
   dest2 = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
   _src = (int32_t *)src;
   for (i=0; i < (size/4); i++) {

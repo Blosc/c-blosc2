@@ -93,12 +93,12 @@ static char *test_delta(void) {
   /* Get a compressed buffer without delta */
   blosc1_set_delta(0);
   cbytes = blosc1_compress(clevel, doshuffle, (size_t)typesize, (size_t)size, src,
-                           dest, (size_t)size + BLOSC_MAX_OVERHEAD);
+                           dest, (size_t)size + BLOSC2_MAX_OVERHEAD);
 
   /* Activate the delta filter and compress again */
   blosc1_set_delta(1);
   cbytes2 = blosc1_compress(clevel, doshuffle, (size_t)typesize, (size_t)size, src,
-                            dest, (size_t)size + BLOSC_MAX_OVERHEAD);
+                            dest, (size_t)size + BLOSC2_MAX_OVERHEAD);
   if ((typesize == 12) || (typesize == 15) || (typesize == 24)) {
     // For typesizes 12, 15 and 24 we make an exception and allow less compression
     if ((2 * cbytes2) > (4 * cbytes)) {
@@ -163,7 +163,7 @@ int main(void) {
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t)size);
   srccpy = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t)size);
-  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t)size + BLOSC_MAX_OVERHEAD);
+  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, (size_t)size + BLOSC2_MAX_OVERHEAD);
 
   /* Run all the suite */
   result = all_tests();

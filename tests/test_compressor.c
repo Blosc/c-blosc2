@@ -37,7 +37,7 @@ static char *test_compressor(void) {
 
   /* Get a compressed buffer */
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                           dest, size + BLOSC_MAX_OVERHEAD);
+                           dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not correct", cbytes < size);
 
   compressor = blosc1_get_compressor();
@@ -63,7 +63,7 @@ static char *test_compress_decompress(void) {
 
   /* Get a compressed buffer */
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                           dest, size + BLOSC_MAX_OVERHEAD);
+                           dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not correct", cbytes < size);
 
   compressor = blosc1_get_compressor();
@@ -90,13 +90,13 @@ static char *test_clevel(void) {
 
   /* Get a compressed buffer */
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                           dest, size + BLOSC_MAX_OVERHEAD);
+                           dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not correct", cbytes < size);
 
   /* Activate the BLOSC_CLEVEL variable */
   setenv("BLOSC_CLEVEL", "9", 0);
   cbytes2 = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                            dest, size + BLOSC_MAX_OVERHEAD);
+                            dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: BLOSC_CLEVEL does not work correctly", cbytes2 != cbytes);
 
   /* Reset envvar */
@@ -110,13 +110,13 @@ static char *test_noshuffle(void) {
 
   /* Get a compressed buffer */
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                           dest, size + BLOSC_MAX_OVERHEAD);
+                           dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not correct", cbytes < size);
 
   /* Activate the BLOSC_SHUFFLE variable */
   setenv("BLOSC_SHUFFLE", "NOSHUFFLE", 0);
   cbytes2 = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                            dest, size + BLOSC_MAX_OVERHEAD);
+                            dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: BLOSC_SHUFFLE=NOSHUFFLE does not work correctly",
             cbytes2 > cbytes);
 
@@ -132,13 +132,13 @@ static char *test_shuffle(void) {
 
   /* Get a compressed buffer */
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                           dest, size + BLOSC_MAX_OVERHEAD);
+                           dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not 0", cbytes < size);
 
   /* Activate the BLOSC_SHUFFLE variable */
   setenv("BLOSC_SHUFFLE", "SHUFFLE", 0);
   cbytes2 = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                            dest, size + BLOSC_MAX_OVERHEAD);
+                            dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: BLOSC_SHUFFLE=SHUFFLE does not work correctly",
             cbytes2 == cbytes);
 
@@ -157,13 +157,13 @@ static char *test_bitshuffle(void) {
     return 0;
   };
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                           dest, size + BLOSC_MAX_OVERHEAD);
+                           dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not 0", cbytes < size);
 
   /* Activate the BLOSC_BITSHUFFLE variable */
   setenv("BLOSC_SHUFFLE", "BITSHUFFLE", 0);
   cbytes2 = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                            dest, size + BLOSC_MAX_OVERHEAD);
+                            dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: BLOSC_SHUFFLE=BITSHUFFLE does not work correctly",
             cbytes2 < cbytes);
 
@@ -181,13 +181,13 @@ static char *test_delta(void) {
   blosc1_set_compressor("blosclz");  /* avoid lz4 here for now (see #168) */
   blosc1_set_delta(0);
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                           dest, size + BLOSC_MAX_OVERHEAD);
+                           dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not 0", cbytes < size);
 
   /* Activate the BLOSC_DELTA variable */
   setenv("BLOSC_DELTA", "1", 0);
   cbytes2 = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                            dest, size + BLOSC_MAX_OVERHEAD);
+                            dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: BLOSC_DELTA=1 does not work correctly",
             cbytes2 < 3 * cbytes / 4);
 
@@ -203,13 +203,13 @@ static char *test_typesize(void) {
 
   /* Get a compressed buffer */
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                           dest, size + BLOSC_MAX_OVERHEAD);
+                           dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not correct", cbytes < size);
 
   /* Activate the BLOSC_TYPESIZE variable */
   setenv("BLOSC_TYPESIZE", "9", 0);
   cbytes2 = blosc1_compress(clevel, doshuffle, typesize, size, src,
-                            dest, size + BLOSC_MAX_OVERHEAD);
+                            dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: BLOSC_TYPESIZE does not work correctly", cbytes2 > cbytes);
 
   /* Reset envvar */
@@ -227,8 +227,8 @@ static char *test_small_blocksize(void) {
   blosc2_context *dctx = blosc2_create_dctx(dparams);
   size = 8;
   /* Get a compressed buffer */
-  cbytes = blosc2_compress_ctx(cctx, src, size, dest, size + BLOSC_MAX_OVERHEAD);
-  nbytes = blosc2_decompress_ctx(dctx, dest, size + BLOSC_MAX_OVERHEAD, src, size);
+  cbytes = blosc2_compress_ctx(cctx, src, size, dest, size + BLOSC2_MAX_OVERHEAD);
+  nbytes = blosc2_decompress_ctx(dctx, dest, size + BLOSC2_MAX_OVERHEAD, src, size);
   mu_assert("ERROR: nbytes is not correct", nbytes == size);
 
   blosc2_free_ctx(cctx);
@@ -265,7 +265,7 @@ int main(void) {
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
   srccpy = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
-  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, size + BLOSC_MAX_OVERHEAD);
+  dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, size + BLOSC2_MAX_OVERHEAD);
   dest2 = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
   _src = (int64_t *)src;
   for (i=0; i < (size / sizeof(int64_t)); i++) {

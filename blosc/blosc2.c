@@ -2078,18 +2078,18 @@ static int initialize_context_compression(
   }
 
   /* Check buffer size limits */
-  if (srcsize > BLOSC_MAX_BUFFERSIZE) {
+  if (srcsize > BLOSC2_MAX_BUFFERSIZE) {
     if (warnlvl > 0) {
       BLOSC_TRACE_ERROR("Input buffer size cannot exceed %d bytes.",
-                        BLOSC_MAX_BUFFERSIZE);
+                        BLOSC2_MAX_BUFFERSIZE);
     }
     return 0;
   }
 
-  if (destsize < BLOSC_MAX_OVERHEAD) {
+  if (destsize < BLOSC2_MAX_OVERHEAD) {
     if (warnlvl > 0) {
       BLOSC_TRACE_ERROR("Output buffer size should be larger than %d bytes.",
-                        BLOSC_MAX_OVERHEAD);
+                        BLOSC2_MAX_OVERHEAD);
     }
     return 0;
   }
@@ -3446,7 +3446,7 @@ int blosc1_cbuffer_validate(const void* cbuffer, size_t cbytes, size_t* nbytes) 
     *nbytes = 0;
     return BLOSC2_ERROR_INVALID_HEADER;
   }
-  if (*nbytes > BLOSC_MAX_BUFFERSIZE) {
+  if (*nbytes > BLOSC2_MAX_BUFFERSIZE) {
     /* Uncompressed size is larger than allowed */
     *nbytes = 0;
     return BLOSC2_ERROR_MEMORY_ALLOC;

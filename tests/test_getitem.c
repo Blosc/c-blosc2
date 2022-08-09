@@ -23,7 +23,7 @@ static int test_getitem(size_t type_size, size_t num_elements,
   /* Allocate memory for the test. */
   void* original = blosc_test_malloc(buffer_alignment, buffer_size);
   void* intermediate = blosc_test_malloc(buffer_alignment,
-                                         buffer_size + BLOSC_MAX_OVERHEAD);
+                                         buffer_size + BLOSC2_MAX_OVERHEAD);
   void* result = blosc_test_malloc(buffer_alignment, buffer_size);
 
   /* Fill the input data buffer with random values. */
@@ -33,7 +33,7 @@ static int test_getitem(size_t type_size, size_t num_elements,
      a range of elements into a new buffer. */
   csize = blosc1_compress(compression_level, do_shuffle, type_size,
                           buffer_size, original, intermediate,
-                          buffer_size + BLOSC_MAX_OVERHEAD);
+                          buffer_size + BLOSC2_MAX_OVERHEAD);
   if (csize < 0) {
     printf("Compression error.  Error code: %d\n", csize);
     return csize;
