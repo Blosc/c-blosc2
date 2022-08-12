@@ -1726,7 +1726,7 @@ BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int64_t n
  *
  * @warning If the super-chunk is backed by a frame that is disk-based, a buffer is allocated for the
  * (compressed) chunk, and hence a free is needed.
- * You can check if the chunk requires a free with the @p needs_free parameter.
+ * You can check whether the chunk requires a free with the @p needs_free parameter.
  * If the chunk does not need a free, it means that a pointer to the location in the super-chunk
  * (or the backing in-memory frame) is returned in the @p chunk parameter.
  *
@@ -1751,7 +1751,7 @@ BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, 
  *
  * @warning If the super-chunk is backed by a frame that is disk-based, a buffer is allocated for the
  * (compressed) chunk, and hence a free is needed.
- * You can check if the chunk requires a free with the @p needs_free parameter.
+ * You can check whether requires a free with the @p needs_free parameter.
  * If the chunk does not need a free, it means that a pointer to the location in the super-chunk
  * (or the backing in-memory frame) is returned in the @p chunk parameter.  In this case the returned
  * chunk is not lazy.

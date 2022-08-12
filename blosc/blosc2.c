@@ -2219,10 +2219,6 @@ static int write_compression_header(blosc2_context* context, bool extended_heade
     /* Compression level 0 means buffer to be memcpy'ed */
     context->header_flags |= (uint8_t)BLOSC_MEMCPYED;
   }
-  if (context->sourcesize < BLOSC_MIN_BUFFERSIZE) {
-    /* Buffer is too small.  Try memcpy'ing. */
-    context->header_flags |= (uint8_t)BLOSC_MEMCPYED;
-  }
 
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
   if (extended_header) {
