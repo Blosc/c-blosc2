@@ -1705,9 +1705,9 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
 
   // We are not attached to a frame anymore
   schunk->frame = NULL;
-  frame->schunk = NULL;
 
   if (nchunks == 0) {
+    frame->schunk = NULL;
     goto out;
   }
 
@@ -1768,8 +1768,18 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   schunk->data = malloc(nchunks * sizeof(void*));
   for (int i = 0; i < nchunks; i++) {
     if (frame->cframe != NULL) {
-      data_chunk = frame->cframe + header_len + offsets[i];
-      needs_free = false;
+      if (needs_free) {
+        free(data_chunk);
+      }
+      if (offsets[i] < 0) {
+        int64_t rbytes = frame_get_lazychunk(frame, offsets[i], &data_chunk, &needs_free);
+        if (rbytes < 0) {
+          break;
+        }
+      }
+      else {
+       data_chunk = frame->cframe + header_len + offsets[i];
+      }
       rc = blosc2_cbuffer_sizes(data_chunk, NULL, &chunk_cbytes, NULL);
       if (rc < 0) {
         break;
@@ -1782,6 +1792,9 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
           free(data_chunk);
         }
         rbytes = frame_get_lazychunk(frame, offsets[i], &data_chunk, &needs_free);
+        if (rbytes < 0) {
+          break;
+        }
       }
       else {
         io_cb->seek(fp, frame->file_offset + header_len + offsets[i], SEEK_SET);
@@ -1826,6 +1839,9 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
     }
   }
 
+  // We are not attached to a schunk anymore
+  frame->schunk = NULL;
+
   end:
   if (needs_free) {
     free(data_chunk);
@@ -1837,11 +1853,19 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   }
   free(offsets);
 
-  if (rc < 0 || acc_nbytes != nbytes || acc_cbytes != cbytes) {
+  // cframes and sframes have different ways to store chunks with special values:
+  // 1) cframes represent special chunks as negative offsets
+  // 2) sframes does not have the concept of offsets, but rather of data pointers (.data)
+  //    so they always have a pointer to a special chunk
+  // This is why cframes and sframes have different cbytes and hence, we cannot enforce acc_bytes == schunk->cbytes
+  // In the future, maybe we could provide special meanings for .data[i] > 0x7FFFFFFF, but not there yet
+  // if (rc < 0 || acc_nbytes != nbytes || acc_cbytes != cbytes) {
+  if (rc < 0 || acc_nbytes != nbytes) {
     blosc2_schunk_free(schunk);
     return NULL;
   }
-
+  // Update counters
+  schunk->cbytes = acc_cbytes;
   schunk->blocksize = blocksize;
 
   out:

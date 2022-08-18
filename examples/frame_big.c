@@ -33,7 +33,7 @@
 
 
 int main(void) {
-  blosc1_init();
+  blosc2_init();
 
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
@@ -97,7 +97,7 @@ int main(void) {
   /* Free resources */
   blosc2_schunk_free(schunk);
 
-  blosc1_destroy();
+  blosc2_destroy();
 
   return 0;
 }

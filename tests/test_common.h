@@ -169,7 +169,7 @@ inline static void install_blosc_callback_test(void)
   char *callback_env;
   callback_env = getenv("BLOSC_TEST_CALLBACK");
   if (callback_env && !strcmp(callback_env, "yes"))
-    blosc_set_threads_callback(dummy_threads_callback, NULL);
+    blosc2_set_threads_callback(dummy_threads_callback, NULL);
 }
 
 #endif  /* !defined(BLOSC_TEST_COMMON_H) */

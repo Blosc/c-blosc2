@@ -39,7 +39,7 @@
 
 
 int main(void) {
-  blosc1_init();
+  blosc2_init();
 
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int32_t* data = malloc(isize);
@@ -140,7 +140,7 @@ int main(void) {
   blosc2_schunk_free(schunk2);
   free(data);
 
-  blosc1_destroy();
+  blosc2_destroy();
 
   return 0;
 }

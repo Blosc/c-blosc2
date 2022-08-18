@@ -49,7 +49,7 @@ static char* test_cbuffer_versions(void) {
   int version_;
   int versionlz_;
 
-  blosc1_cbuffer_versions(dest, &version_, &versionlz_);
+  blosc2_cbuffer_versions(dest, &version_, &versionlz_);
   mu_assert("ERROR: version incorrect", version_ == BLOSC2_VERSION_FORMAT);
   mu_assert("ERROR: versionlz incorrect", versionlz_ == BLOSC_BLOSCLZ_VERSION_FORMAT);
   return 0;
@@ -59,7 +59,7 @@ static char* test_cbuffer_versions(void) {
 static char* test_cbuffer_complib(void) {
   const char* complib;
 
-  complib = blosc1_cbuffer_complib(dest);
+  complib = blosc2_cbuffer_complib(dest);
   mu_assert("ERROR: complib incorrect", strcmp(complib, "BloscLZ") == 0);
   return 0;
 }
@@ -67,9 +67,9 @@ static char* test_cbuffer_complib(void) {
 static char *test_nthreads(void) {
   int16_t nthreads;
 
-  nthreads = blosc1_set_nthreads(4);
+  nthreads = blosc2_set_nthreads(4);
   mu_assert("ERROR: set_nthreads incorrect", nthreads == 1);
-  nthreads = blosc1_get_nthreads();
+  nthreads = blosc2_get_nthreads();
   mu_assert("ERROR: get_nthreads incorrect", nthreads == 4);
   return 0;
 }
@@ -103,8 +103,8 @@ int main(void) {
   char* result;
 
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc1_init();
-  blosc1_set_nthreads(1);
+  blosc2_init();
+  blosc2_set_nthreads(1);
 
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
@@ -135,7 +135,7 @@ int main(void) {
   blosc_test_free(dest);
   blosc_test_free(dest2);
 
-  blosc1_destroy();
+  blosc2_destroy();
 
   return result != 0;
 }

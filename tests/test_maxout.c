@@ -121,22 +121,22 @@ static char* test_maxout_great_memcpy(void) {
 
 /* Check maxout < BLOSC2_MAX_OVERHEAD */
 static char* test_max_overhead(void) {
-  blosc1_init();
+  blosc2_init();
   cbytes = blosc1_compress(0, doshuffle, typesize, size, src, dest,
                            BLOSC2_MAX_OVERHEAD - 1);
   mu_assert("ERROR: cbytes is not correct", cbytes == 0);
-  blosc1_destroy();
+  blosc2_destroy();
 
-  blosc1_init();
+  blosc2_init();
   cbytes = blosc1_compress(0, doshuffle, typesize, size, src, dest,
                            BLOSC2_MAX_OVERHEAD - 2);
   mu_assert("ERROR: cbytes is not correct", cbytes == 0);
-  blosc1_destroy();
+  blosc2_destroy();
 
-  blosc1_init();
+  blosc2_init();
   cbytes = blosc1_compress(0, doshuffle, typesize, size, src, dest, 0);
   mu_assert("ERROR: cbytes is not correct", cbytes == 0);
-  blosc1_destroy();
+  blosc2_destroy();
 
   return 0;
 }
@@ -162,8 +162,8 @@ int main(void) {
   char* result;
   size_t i;
 
-  blosc1_init();
-  blosc1_set_nthreads(1);
+  blosc2_init();
+  blosc2_set_nthreads(1);
 
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
@@ -191,7 +191,7 @@ int main(void) {
   blosc_test_free(dest);
   blosc_test_free(dest2);
 
-  blosc1_destroy();
+  blosc2_destroy();
 
   return result != 0;
 }

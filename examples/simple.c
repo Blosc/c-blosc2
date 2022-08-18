@@ -46,8 +46,8 @@ int main(void) {
          BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   /* Initialize the Blosc compressor */
-  blosc1_init();
-  blosc1_set_nthreads(NTHREADS);
+  blosc2_init();
+  blosc2_set_nthreads(NTHREADS);
 
   /* Compress with clevel=5 and shuffle active  */
   csize = blosc1_compress(5, BLOSC_BITSHUFFLE, sizeof(float), isize, data,
@@ -88,7 +88,7 @@ int main(void) {
   printf("Decompression successful!\n");
 
   /* After using it, destroy the Blosc environment */
-  blosc1_destroy();
+  blosc2_destroy();
 
   for (i = 0; i < SIZE; i++) {
     if (data[i] != data_dest[i]) {

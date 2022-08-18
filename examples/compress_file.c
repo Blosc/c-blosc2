@@ -30,7 +30,7 @@
 
 
 int main(int argc, char* argv[]) {
-  blosc1_init();
+  blosc2_init();
   static int32_t data[CHUNKSIZE];
   int32_t isize;
   int64_t nbytes, cbytes;
@@ -92,6 +92,6 @@ int main(int argc, char* argv[]) {
 
   /* Free resources */
   blosc2_schunk_free(schunk);
-  blosc1_destroy();
+  blosc2_destroy();
   return 0;
 }

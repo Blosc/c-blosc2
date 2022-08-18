@@ -51,7 +51,7 @@ int main(void){
          BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   /* From 1.9 on, we don't need to initialize the Blosc compressor anymore */
-  /* blosc1_init(); */
+  /* blosc2_init(); */
 
   /* Compress with clevel=5 and shuffle active  */
   csize = blosc1_compress(5, 1, sizeof(float), isize, data, data_out, osize);

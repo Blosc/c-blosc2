@@ -50,7 +50,7 @@ int main(void) {
          BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   /* Initialize the Blosc compressor */
-  blosc1_init();
+  blosc2_init();
 
   /* Create a super-chunk container */
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -108,7 +108,7 @@ int main(void) {
 
   /* Free resources */
   blosc2_schunk_free(schunk);
-  blosc1_destroy();
+  blosc2_destroy();
 
   return 0;
 }

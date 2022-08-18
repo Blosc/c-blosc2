@@ -35,7 +35,7 @@ Francesc Alted
 Pluggable Threading Backend
 ---------------------------
 
-Instead of having Blosc use its *own* thread pool, you can instead call `blosc_set_threads_callback(threads_callback, callback_data)` to install your own threading backend.  This gives Blosc the possibility to use the same threading mechanism as one you are using in the rest of your program (e.g. OpenMP or Intel TBB), sharing the same threads, rather than starting its own threads that compete with yours for the CPU cores.
+Instead of having Blosc use its *own* thread pool, you can instead call `blosc2_set_threads_callback(threads_callback, callback_data)` to install your own threading backend.  This gives Blosc the possibility to use the same threading mechanism as one you are using in the rest of your program (e.g. OpenMP or Intel TBB), sharing the same threads, rather than starting its own threads that compete with yours for the CPU cores.
 
 Here, `threads_callback` is a function of the form:
 
@@ -49,4 +49,4 @@ Here, `threads_callback` is a function of the form:
 
 that simply calls `dojob` on the given `jobdata` array for `numjobs` elements of size `jobdata_elsize`, returning when all of the `dojob` calls have completed.  The key point is that your `threads_callback` routine can execute the `dojob` calls *in parallel* if it wants.  For example, if you are using OpenMP your `threads_callback` function might use `#pragma omp parallel for`.
 
-The `blosc_set_threads_callback` function should be called before any Blosc function (before any Blosc contexts are created), to inhibit Blosc from spawning its own worker threads.   In this case, `blosc1_set_nthreads` and similar functions set an upper bound to the `numjobs` that is passed to your `threads_callback` rather than an actual number of threads.
+The `blosc2_set_threads_callback` function should be called before any Blosc function (before any Blosc contexts are created), to inhibit Blosc from spawning its own worker threads.   In this case, `blosc2_set_nthreads` and similar functions set an upper bound to the `numjobs` that is passed to your `threads_callback` rather than an actual number of threads.

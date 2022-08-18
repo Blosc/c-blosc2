@@ -123,7 +123,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
     doshuffle = BLOSC_NOSHUFFLE;
   }
 
-  blosc1_set_nthreads((int16_t) nthreads);
+  blosc2_set_nthreads((int16_t) nthreads);
   if (blosc1_set_compressor(compressor) < 0) {
     printf("Compiled w/o support for compressor: '%s', so sorry.\n",
            compressor);
@@ -287,19 +287,19 @@ void print_compress_info(void) {
   printf("Blosc version: %s (%s)\n", BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   printf("List of supported compressors in this build: %s\n",
-         blosc1_list_compressors());
+         blosc2_list_compressors());
 
   printf("Supported compression libraries:\n");
-  ret = blosc1_get_complib_info("blosclz", &name, &version);
+  ret = blosc2_get_complib_info("blosclz", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
   free(name); free(version);
-  ret = blosc1_get_complib_info("lz4", &name, &version);
+  ret = blosc2_get_complib_info("lz4", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
   free(name); free(version);
-  ret = blosc1_get_complib_info("zlib", &name, &version);
+  ret = blosc2_get_complib_info("zlib", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
   free(name); free(version);
-  ret = blosc1_get_complib_info("zstd", &name, &version);
+  ret = blosc2_get_complib_info("zstd", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
   free(name); free(version);
 }
@@ -440,7 +440,7 @@ int main(int argc, char* argv[]) {
   nchunks = get_nchunks(size, workingset);
   blosc_set_timestamp(&last);
 
-  blosc1_init();
+  blosc2_init();
 
   if (suite) {
     for (nthreads_ = 1; nthreads_ <= nthreads; nthreads_++) {
@@ -521,7 +521,7 @@ int main(int argc, char* argv[]) {
          totaltime, totalsize * 2 * 1.1 / (MB * totaltime));
 
   /* Free blosc resources */
-  blosc1_free_resources();
-  blosc1_destroy();
+  blosc2_free_resources();
+  blosc2_destroy();
   return 0;
 }

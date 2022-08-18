@@ -8,7 +8,7 @@ Thanks
 
 * The CMake support was initially contributed by Thibault North, and Antonio Valentino and Mark Wiebe made great enhancements to it.
 
-* Christopher Speller also introduced the two new '_ctx' calls to avoid the use of the blosc1_init() and blosc1_destroy().
+* Christopher Speller also introduced the two new '_ctx' calls to avoid the use of the blosc_init() and blosc_destroy().
 
 * Jack Pappas contributed important portability enhancements, specially runtime and cross-platform detection of SSE2/AVX2 as well as high precision timers (HPET) for the benchmark program.
 

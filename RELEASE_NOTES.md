@@ -229,7 +229,7 @@ Changes from 2.0.0-beta.3 to 2.0.0-beta.4
 
 * New pluggable threading backend.  Instead of having Blosc use its own
   thread pool, you can instead call
-  `blosc_set_threads_callback(threads_callback, callback_data)` to install
+  `blosc2_set_threads_callback(threads_callback, callback_data)` to install
   your own threading backend.  This gives Blosc the possibility to use the
   same threading mechanism as one you are using in the rest of your program
   (e.g. OpenMP or Intel TBB), sharing the same threads, rather than starting

@@ -91,12 +91,12 @@ static char *test_delta(void) {
   memcpy(srccpy, src, size);
 
   /* Get a compressed buffer without delta */
-  blosc1_set_delta(0);
+  blosc2_set_delta(0);
   cbytes = blosc1_compress(clevel, doshuffle, (size_t)typesize, (size_t)size, src,
                            dest, (size_t)size + BLOSC2_MAX_OVERHEAD);
 
   /* Activate the delta filter and compress again */
-  blosc1_set_delta(1);
+  blosc2_set_delta(1);
   cbytes2 = blosc1_compress(clevel, doshuffle, (size_t)typesize, (size_t)size, src,
                             dest, (size_t)size + BLOSC2_MAX_OVERHEAD);
   if ((typesize == 12) || (typesize == 15) || (typesize == 24)) {
@@ -157,7 +157,7 @@ static char *all_tests(void) {
 int main(void) {
   char *result;
 
-  blosc1_init();
+  blosc2_init();
   blosc1_set_compressor("blosclz");
 
   /* Initialize buffers */
@@ -179,7 +179,7 @@ int main(void) {
   blosc_test_free(srccpy);
   blosc_test_free(dest);
 
-  blosc1_destroy();
+  blosc2_destroy();
 
   return result != 0;
 }

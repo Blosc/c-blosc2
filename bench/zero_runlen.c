@@ -52,7 +52,7 @@ int check_special_values(int svalue) {
   int32_t *rec_buffer = malloc(CHUNKSIZE * sizeof(int32_t));
 
   /* Initialize the Blosc compressor */
-  blosc1_init();
+  blosc2_init();
 
   /* Create a super-chunk container */
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -237,7 +237,7 @@ int check_special_values(int svalue) {
   /* Destroy the super-chunk */
   blosc2_schunk_free(schunk);
   /* Destroy the Blosc environment */
-  blosc1_destroy();
+  blosc2_destroy();
 
   return 0;
 }

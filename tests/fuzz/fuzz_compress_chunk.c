@@ -14,7 +14,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, int32_t size) {
   size_t nbytes, cbytes, blocksize;
   void *output, *input;
 
-  blosc1_set_nthreads(1);
+  blosc2_set_nthreads(1);
 
   if (size > 0)
     level = data[0] % (9 + 1);

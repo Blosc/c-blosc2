@@ -43,7 +43,7 @@
 
 int main(void) {
 
-  blosc1_init();
+  blosc2_init();
 
   static int32_t data[CHUNKSIZE];
   static int32_t data2[CHUNKSIZE];
@@ -175,7 +175,7 @@ int main(void) {
   if (cframe_needs_free3) {
     free(cframe3);
   }
-  blosc1_destroy();
+  blosc2_destroy();
 
   return 0;
 }

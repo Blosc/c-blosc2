@@ -18,13 +18,13 @@ int tests_run = 0;
 
 
 static char* test_getitem(void) {
-  blosc1_set_nthreads(1);
+  blosc2_set_nthreads(1);
 
   size_t type_size = 131;
   size_t num_elements = 1;
 
   blosc1_set_compressor("blosclz");
-  blosc1_set_delta(1);
+  blosc2_set_delta(1);
 
   size_t buffer_size = type_size * num_elements;
 
@@ -69,11 +69,11 @@ static char *all_tests(void) {
 
 int main(void) {
   char *result;
-  blosc1_init();
+  blosc2_init();
 
   result = all_tests();
 
-  blosc1_destroy();
+  blosc2_destroy();
 
   return result != EXIT_SUCCESS;
 }

@@ -40,7 +40,7 @@ static char* all_tests(void) {
          BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
 /* Initialize the Blosc compressor */
-  blosc1_init();
+  blosc2_init();
 
 /* Create a super-chunk container */
   cparams.typesize = 8;
@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
   }
 
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc1_init();
+  blosc2_init();
 
   /* Run all the suite */
   result = all_tests();
@@ -121,7 +121,7 @@ int main(int argc, char **argv) {
   }
   printf("\tTests run: %d\n", tests_run);
 
-  blosc1_destroy();
+  blosc2_destroy();
 
   return result != EXIT_SUCCESS;
 }

@@ -109,15 +109,15 @@ int main(int argc, char** argv) {
 
   /* Initialize blosc before running tests. */
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc1_init();
-  blosc1_set_nthreads((int16_t) blosc_thread_count);
+  blosc2_init();
+  blosc2_set_nthreads((int16_t) blosc_thread_count);
 
   /* Run the test. */
   int result = test_compress_roundtrip(type_size, num_elements, buffer_align_size,
                                        (int)compression_level, shuffle_enabled);
 
   /* Cleanup blosc resources. */
-  blosc1_destroy();
+  blosc2_destroy();
 
   return result;
 }

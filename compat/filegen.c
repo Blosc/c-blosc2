@@ -48,11 +48,11 @@ int main(int argc, char *argv[]) {
   FILE *f;
 
   /* Register the filter with the library */
-  printf("Blosc version info: %s\n", blosc1_get_version_string());
+  printf("Blosc version info: %s\n", blosc2_get_version_string());
 
   /* Initialize the Blosc compressor */
-  blosc1_init();
-  blosc1_set_nthreads(1);
+  blosc2_init();
+  blosc2_set_nthreads(1);
 
   /* Use the argv[2] compressor. The supported ones are "blosclz",
   "lz4", "lz4hc", "zlib" and "zstd"*/
@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
   }
 
   /* After using it, destroy the Blosc environment */
-  blosc1_destroy();
+  blosc2_destroy();
 
   return exit_code;
 }

@@ -143,7 +143,7 @@ int main(void) {
   long codec = CODEC;
   envvar = getenv("SUM_COMPRESSOR");
   if (envvar != NULL) {
-    codec = blosc1_compname_to_compcode(envvar);
+    codec = blosc2_compname_to_compcode(envvar);
     if (codec < 0) {
       printf("Unknown compresssor: %s\n", envvar);
       return 1;

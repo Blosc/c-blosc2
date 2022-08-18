@@ -94,8 +94,8 @@ Steps
 1. First, tests must be provided and be passing.
 
    **It is completely mandatory and necessary to add these lines to `main()` in each test to make plugins machinery work:**
-   - `blosc1_init()` at the beginning
-   - `blosc1_destroy()` in the end
+   - `blosc2_init()` at the beginning
+   - `blosc2_destroy()` in the end
 
 
 2. Then, the user must make a fork of the C-Blosc2 Github repository,

@@ -102,7 +102,7 @@ CUTEST_TEST_DATA(urfilters) {
 };
 
 CUTEST_TEST_SETUP(urfilters) {
-  blosc1_init();
+  blosc2_init();
   data->cparams = BLOSC2_CPARAMS_DEFAULTS;
   data->cparams.typesize = sizeof(int32_t);
   data->cparams.clevel = 9;
@@ -245,7 +245,7 @@ CUTEST_TEST_TEST(urfilters) {
 
 CUTEST_TEST_TEARDOWN(urfilters) {
   BLOSC_UNUSED_PARAM(data);
-  blosc1_destroy();
+  blosc2_destroy();
 }
 
 

@@ -235,7 +235,7 @@ void test_create_sframe_frame(char* operation) {
   blosc2_schunk* schunk_cframe;
 
   /* Initialize the Blosc compressor */
-  blosc1_init();
+  blosc2_init();
   printf("*******************************************************\n");
   printf("***** Creating the frame and sframe with %d chunks ****\n", nchunks);
   printf("*******************************************************\n");
@@ -343,7 +343,7 @@ if (operation != NULL) {
   blosc2_schunk_free(schunk_sframe);
   blosc2_schunk_free(schunk_cframe);
   /* Destroy the Blosc environment */
-  blosc1_destroy();
+  blosc2_destroy();
 
 }
 
