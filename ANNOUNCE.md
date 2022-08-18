@@ -4,7 +4,7 @@ A fast, compressed and persistent binary data store library for C.
 ## What is new?
 
 The Blosc development team is happy to announce a new release of C-Blosc2.
-In order to allow to compile with both C-Blosc and C-Blosc2 libraries,
+In order to allow to compile an app with both C-Blosc and C-Blosc2 libraries,
 a new API has been created for the overlapping symbols and function names.
 Also, we have fixed the conversion between super-chunks and frames.
 
