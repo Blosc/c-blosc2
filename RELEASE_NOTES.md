@@ -7,6 +7,11 @@ Changes from 2.2.0 to 2.3.0
 * [API change] In order to allow to compile with both C-Blosc and C-Blosc2 libraries, a new API has been created for the symbols and function names that had collisions.  Here are the changed symbols and functions:
 
   * Blosc2 symbols that take different values than in Blosc1:
+    - BLOSC_VERSION_MAJOR -> BLOSC2_VERSION_MAJOR
+    - BLOSC_VERSION_MINOR -> BLOSC2_VERSION_MINOR
+    - BLOSC_VERSION_RELEASE -> BLOSC2_VERSION_RELEASE
+    - BLOSC_VERSION_STRING -> BLOSC2_VERSION_STRING
+    - BLOSC_VERSION_DATE -> BLOSC2_VERSION_DATE
     - BLOSC_MAX_OVERHEAD -> BLOSC2_MAX_OVERHEAD
     - BLOSC_MAX_BUFFERSIZE -> BLOSC2_MAX_BUFFERSIZE
 
@@ -37,7 +42,10 @@ Changes from 2.2.0 to 2.3.0
     - blosc_cbuffer_versions -> blosc2_cbuffer_versions
     - blosc_cbuffer_complib -> blosc2_cbuffer_complib
 
-  To compile with the previous API (corresponding to C-Blosc2 pre-2.3.0), it is enough to define the `BLOSC1_COMPAT` symbol in your C-Blosc2 app.
+  It is recommended to migrate to the new API as soon as possible.  In the meanwhile, you can still compile with the previous API (corresponding to C-Blosc2 pre-2.3.0), by defining the `BLOSC1_COMPAT` symbol in your C-Blosc2 app (before including the 'blosc2.h' header).
+
+* Fixed some issues in converting from super-chunks to frames and back.  Now it is possible to do a rountrip without (known) problems.
+
 
 Changes from 2.1.1 to 2.2.0
 ===========================
