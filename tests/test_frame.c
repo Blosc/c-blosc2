@@ -52,7 +52,7 @@ static char* test_frame(void) {
   blosc2_schunk *schunk;
 
   /* Initialize the Blosc compressor */
-  blosc1_init();
+  blosc2_init();
 
   /* Create a frame container */
   cparams.typesize = sizeof(int32_t);
@@ -265,7 +265,7 @@ static char* test_frame(void) {
   blosc2_schunk_free(schunk);
 
   /* Destroy the Blosc environment */
-  blosc1_destroy();
+  blosc2_destroy();
 
   return EXIT_SUCCESS;
 }
@@ -320,7 +320,7 @@ static char *all_tests(void) {
 int main(void) {
   char *result;
 
-  blosc1_init();
+  blosc2_init();
 
   /* Run all the suite */
   result = all_tests();
@@ -332,7 +332,7 @@ int main(void) {
   }
   printf("\tTests run: %d\n", tests_run);
 
-  blosc1_destroy();
+  blosc2_destroy();
 
   return result != EXIT_SUCCESS;
 }

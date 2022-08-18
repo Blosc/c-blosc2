@@ -15,7 +15,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   int32_t nchunk = 0, max_chunksize = 512;
   int64_t nchunks = 0;
 
-  blosc1_init();
+  blosc2_init();
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = 1;
@@ -26,7 +26,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   }
   if (i == 6) {
     /* No compressors available */
-    blosc1_destroy();
+    blosc2_destroy();
     return 0;
   }
   if (size > 0) {
@@ -48,7 +48,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
   blosc2_schunk* schunk = blosc2_schunk_new(&storage);
   if (schunk == NULL) {
-    blosc1_destroy();
+    blosc2_destroy();
     return 0;
   }
 
@@ -89,7 +89,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   /* Free resources */
   blosc2_schunk_free(schunk);
 
-  blosc1_destroy();
+  blosc2_destroy();
   return 0;
 }
 

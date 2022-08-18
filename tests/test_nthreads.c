@@ -29,7 +29,7 @@ static char *test_compress(void) {
 
   /* Before any blosc1_compress() or blosc1_decompress() the number of
      threads must be 1 */
-  nthreads = blosc1_get_nthreads();
+  nthreads = blosc2_get_nthreads();
   mu_assert("ERROR: get_nthreads (compress, before) incorrect", nthreads == 1);
 
   /* Get a compressed buffer */
@@ -37,7 +37,7 @@ static char *test_compress(void) {
                            dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
-  nthreads = blosc1_get_nthreads();
+  nthreads = blosc2_get_nthreads();
   mu_assert("ERROR: get_nthreads (compress, after) incorrect", nthreads == 3);
 
   return 0;
@@ -48,7 +48,7 @@ static char *test_compress(void) {
 static char *test_compress_decompress(void) {
   int16_t nthreads;
 
-  nthreads = blosc1_get_nthreads();
+  nthreads = blosc2_get_nthreads();
   mu_assert("ERROR: get_nthreads incorrect", nthreads == 3);
 
   /* Get a compressed buffer */
@@ -56,14 +56,14 @@ static char *test_compress_decompress(void) {
                            dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
 
-  nthreads = blosc1_get_nthreads();
+  nthreads = blosc2_get_nthreads();
   mu_assert("ERROR: get_nthreads incorrect", nthreads == 3);
 
   /* Decompress the buffer */
   nbytes = blosc1_decompress(dest, dest2, size);
   mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
-  nthreads = blosc1_get_nthreads();
+  nthreads = blosc2_get_nthreads();
   mu_assert("ERROR: get_nthreads incorrect", nthreads == 3);
 
   return 0;
@@ -88,8 +88,8 @@ int main(void) {
   setenv("BLOSC_NTHREADS", "3", 1);
 
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc1_init();
-  blosc1_set_nthreads(1);
+  blosc2_init();
+  blosc2_set_nthreads(1);
 
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
@@ -117,7 +117,7 @@ int main(void) {
   blosc_test_free(dest);
   blosc_test_free(dest2);
 
-  blosc1_destroy();
+  blosc2_destroy();
 
   return result != 0;
 }

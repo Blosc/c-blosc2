@@ -115,8 +115,8 @@ int main(void) {
   /* Activate the BLOSC_BLOSC1_COMPAT variable */
   setenv("BLOSC_BLOSC1_COMPAT", "TRUE", 0);
 
-  blosc1_init();
-  blosc1_set_nthreads(NTHREADS);
+  blosc2_init();
+  blosc2_set_nthreads(NTHREADS);
 
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
@@ -139,7 +139,7 @@ int main(void) {
   blosc_test_free(dest);
   blosc_test_free(dest2);
 
-  blosc1_destroy();
+  blosc2_destroy();
 
   /* Reset envvar */
   unsetenv("BLOSC_BLOSC1_COMPAT");

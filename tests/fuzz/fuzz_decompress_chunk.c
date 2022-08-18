@@ -15,17 +15,17 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     return 0;
   }
 
-  blosc1_init();
-  blosc1_set_nthreads(1);
+  blosc2_init();
+  blosc2_set_nthreads(1);
   blosc1_cbuffer_sizes(data, &nbytes, &cbytes, &blocksize);
 
   if (cbytes != size || nbytes == 0) {
-    blosc1_destroy();
+    blosc2_destroy();
     return 0;
   }
   if (blosc1_cbuffer_validate(data, size, &nbytes) != 0) {
     /* Unexpected `nbytes` specified in blosc header */
-    blosc1_destroy();
+    blosc2_destroy();
     return 0;
   }
 
@@ -35,7 +35,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     free(output);
   }
 
-  blosc1_destroy();
+  blosc2_destroy();
   return 0;
 }
 

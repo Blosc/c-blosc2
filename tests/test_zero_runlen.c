@@ -42,7 +42,7 @@ CUTEST_TEST_DATA(zero_runlen) {
 };
 
 CUTEST_TEST_SETUP(zero_runlen) {
-  blosc1_init();
+  blosc2_init();
 
   data->cparams = BLOSC2_CPARAMS_DEFAULTS;
   data->cparams.typesize = sizeof(int32_t);
@@ -212,7 +212,7 @@ CUTEST_TEST_TEST(zero_runlen) {
 
 CUTEST_TEST_TEARDOWN(zero_runlen) {
   BLOSC_UNUSED_PARAM(data);
-  blosc1_destroy();
+  blosc2_destroy();
 }
 
 

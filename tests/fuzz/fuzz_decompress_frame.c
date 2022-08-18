@@ -12,19 +12,19 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   int32_t i = 0, dsize = 0;
   int32_t nchunk = 0;
 
-  blosc1_init();
-  blosc1_set_nthreads(1);
+  blosc2_init();
+  blosc2_set_nthreads(1);
 
   /* Create a super-chunk backed by an in-memory frame */
   blosc2_schunk* schunk = blosc2_schunk_from_buffer((uint8_t *) data, (int64_t)size, false);
   if (schunk == NULL) {
-    blosc1_destroy();
+    blosc2_destroy();
     return 0;
   }
   /* Don't allow address sanitizer to allocate more than INT32_MAX */
   if (schunk->nbytes >= INT32_MAX) {
     blosc2_schunk_free(schunk);
-    blosc1_destroy();
+    blosc2_destroy();
     return 0;
   }
   /* Decompress data */
@@ -43,7 +43,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   }
 
   blosc2_schunk_free(schunk);
-  blosc1_destroy();
+  blosc2_destroy();
   return 0;
 }
 

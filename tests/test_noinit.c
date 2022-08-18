@@ -8,7 +8,7 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-/* Test for using blosc without blosc1_init() and blosc1_destroy() */
+/* Test for using blosc without blosc2_init() and blosc2_destroy() */
 
 #include <unistd.h>
 #include <assert.h>
@@ -74,7 +74,7 @@ int main(void) {
     assert(pid >= 0);
   }
 
-  blosc1_set_nthreads(4);
+  blosc2_set_nthreads(4);
 
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);

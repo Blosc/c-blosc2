@@ -137,7 +137,7 @@ CUTEST_TEST_DATA(urcodecs) {
 };
 
 CUTEST_TEST_SETUP(urcodecs) {
-  blosc1_init();
+  blosc2_init();
   data->cparams = BLOSC2_CPARAMS_DEFAULTS;
   data->cparams.typesize = sizeof(int32_t);
   data->cparams.clevel = 9;
@@ -258,7 +258,7 @@ CUTEST_TEST_TEST(urcodecs) {
 
 CUTEST_TEST_TEARDOWN(urcodecs) {
   BLOSC_UNUSED_PARAM(data);
-  blosc1_destroy();
+  blosc2_destroy();
 }
 
 

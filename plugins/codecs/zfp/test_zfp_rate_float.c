@@ -219,7 +219,7 @@ int item_prices() {
 int main(void) {
 
     int result;
-  blosc1_init();   // this is mandatory for initiallizing the plugin mechanism
+  blosc2_init();   // this is mandatory for initiallizing the plugin mechanism
     result = float_cyclic();
     printf("float_cyclic: %d obtained \n \n", result);
     result = double_same_cells();
@@ -228,7 +228,7 @@ int main(void) {
     printf("day_month_temp: %d obtained \n \n", result);
     result = item_prices();
     printf("item_prices: %d obtained \n \n", result);
-    blosc1_destroy();
+  blosc2_destroy();
 
     return BLOSC2_ERROR_SUCCESS;
 }

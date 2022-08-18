@@ -66,12 +66,12 @@ int main(void) {
          BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   /* Initialize the Blosc compressor */
-  blosc1_init();
+  blosc2_init();
 
   /* Tell Blosc to use some number of threads */
   for (nthreads = 1; nthreads <= 4; nthreads++) {
 
-    pnthreads = blosc1_set_nthreads(nthreads);
+    pnthreads = blosc2_set_nthreads(nthreads);
     printf("Using %d threads (previously using %d)\n", nthreads, pnthreads);
 
     /* Compress with clevel=5 and shuffle active  */
@@ -102,7 +102,7 @@ int main(void) {
   }
 
   /* After using it, destroy the Blosc environment */
-  blosc1_destroy();
+  blosc2_destroy();
 
   return 0;
 }

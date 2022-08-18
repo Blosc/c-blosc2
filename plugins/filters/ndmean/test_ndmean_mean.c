@@ -257,13 +257,13 @@ int some_matches() {
 int main(void) {
 
     int result;
-  blosc1_init();
+  blosc2_init();
     result = rows_matches();
     printf("2_rows_matches: %d obtained \n \n", result);
     result = same_cells();
     printf("same_cells: %d obtained \n \n", result);
     result = some_matches();
     printf("some_matches: %d obtained \n \n", result);
-    blosc1_destroy();
+  blosc2_destroy();
     return BLOSC2_ERROR_SUCCESS;
 }

@@ -179,7 +179,7 @@ static char *test_delta(void) {
 
   /* Get a compressed buffer */
   blosc1_set_compressor("blosclz");  /* avoid lz4 here for now (see #168) */
-  blosc1_set_delta(0);
+  blosc2_set_delta(0);
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
                            dest, size + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: cbytes is not 0", cbytes < size);
@@ -259,7 +259,7 @@ int main(void) {
   char *result;
   size_t i;
 
-  blosc1_init();
+  blosc2_init();
   blosc1_set_compressor("blosclz");
 
   /* Initialize buffers */
@@ -288,7 +288,7 @@ int main(void) {
   blosc_test_free(dest);
   blosc_test_free(dest2);
 
-  blosc1_destroy();
+  blosc2_destroy();
 
   return result != 0;
 }

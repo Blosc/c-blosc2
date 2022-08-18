@@ -106,8 +106,8 @@ static char *all_tests(void) {
 int main(void) {
   char* result;
 
-  blosc1_init();
-  blosc1_set_nthreads(1);
+  blosc2_init();
+  blosc2_set_nthreads(1);
   blosc1_set_compressor("lz4");
   printf("Blosc version info: %s (%s)\n", BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
@@ -121,7 +121,7 @@ int main(void) {
   }
   printf("\tTests run: %d\n", tests_run);
 
-  blosc1_destroy();
+  blosc2_destroy();
 
   return result != EXIT_SUCCESS;
 }

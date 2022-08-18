@@ -152,7 +152,7 @@ static void *threads_callback_data = 0;
 
 /* non-threadsafe function should be called before any other Blosc function in
    order to change how threads are managed */
-void blosc_set_threads_callback(blosc_threads_callback callback, void *callback_data)
+void blosc2_set_threads_callback(blosc_threads_callback callback, void *callback_data)
 {
   threads_callback = callback;
   threads_callback_data = callback_data;
@@ -236,7 +236,7 @@ static const char* clibcode_to_clibname(int clibcode) {
  */
 
 /* Get the compressor name associated with the compressor code */
-int blosc1_compcode_to_compname(int compcode, const char** compname) {
+int blosc2_compcode_to_compname(int compcode, const char** compname) {
   int code = -1;    /* -1 means non-existent compressor code */
   const char* name = NULL;
 
@@ -283,7 +283,7 @@ int blosc1_compcode_to_compname(int compcode, const char** compname) {
 }
 
 /* Get the compressor code for the compressor name. -1 if it is not available */
-int blosc1_compname_to_compcode(const char* compname) {
+int blosc2_compname_to_compcode(const char* compname) {
   int code = -1;  /* -1 means non-existent compressor code */
 
   if (strcmp(compname, BLOSC_BLOSCLZ_COMPNAME) == 0) {
@@ -1154,7 +1154,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     urcodecsuccess:
       ;
     } else {
-      blosc1_compcode_to_compname(context->compcode, &compname);
+      blosc2_compcode_to_compname(context->compcode, &compname);
       BLOSC_TRACE_ERROR("Blosc has not been compiled with '%s' compression support."
                         "Please use one having it.", compname);
       return BLOSC2_ERROR_CODEC_SUPPORT;
@@ -1467,14 +1467,14 @@ static int blosc_d(
   const char* compname;
   int rc;
 
-  rc = blosc2_cbuffer_sizes(src, &chunk_nbytes, &chunk_cbytes, NULL);
-  if (rc < 0) {
-    return rc;
-  }
-
   if (context->block_maskout != NULL && context->block_maskout[nblock]) {
     // Do not decompress, but act as if we successfully decompressed everything
     return bsize;
+  }
+
+  rc = blosc2_cbuffer_sizes(src, &chunk_nbytes, &chunk_cbytes, NULL);
+  if (rc < 0) {
+    return rc;
   }
 
   // In some situations (lazychunks) the context can arrive uninitialized
@@ -2494,7 +2494,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   char* envvar;
 
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc1_init();
+  if (!g_initlib) blosc2_init();
 
   /* Check for a BLOSC_CLEVEL environment variable */
   envvar = getenv("BLOSC_CLEVEL");
@@ -2524,9 +2524,9 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   envvar = getenv("BLOSC_DELTA");
   if (envvar != NULL) {
     if (strcmp(envvar, "1") == 0) {
-      blosc1_set_delta(1);
+      blosc2_set_delta(1);
     } else {
-      blosc1_set_delta(0);
+      blosc2_set_delta(0);
     }
   }
 
@@ -2563,7 +2563,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     long nthreads;
     nthreads = strtol(envvar, NULL, 10);
     if ((nthreads != EINVAL) && (nthreads > 0)) {
-      result = blosc1_set_nthreads((int16_t) nthreads);
+      result = blosc2_set_nthreads((int16_t) nthreads);
       if (result < 0) { return result; }
     }
   }
@@ -2579,7 +2579,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     blosc2_context *cctx;
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
 
-    blosc1_compcode_to_compname(g_compressor, &compname);
+    blosc2_compcode_to_compname(g_compressor, &compname);
     /* Create a context for compression */
     build_filters(doshuffle, g_delta, typesize, cparams.filters);
     // TODO: cparams can be shared in a multithreaded environment.  do a copy!
@@ -2708,14 +2708,14 @@ int blosc2_decompress(const void* src, int32_t srcsize, void* dest, int32_t dest
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
 
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc1_init();
+  if (!g_initlib) blosc2_init();
 
   /* Check for a BLOSC_NTHREADS environment variable */
   envvar = getenv("BLOSC_NTHREADS");
   if (envvar != NULL) {
     nthreads = strtol(envvar, NULL, 10);
     if ((nthreads != EINVAL) && (nthreads > 0)) {
-      result = blosc1_set_nthreads((int16_t) nthreads);
+      result = blosc2_set_nthreads((int16_t) nthreads);
       if (result < 0) { return result; }
     }
   }
@@ -3268,16 +3268,16 @@ int init_threadpool(blosc2_context *context) {
   return 0;
 }
 
-int16_t blosc1_get_nthreads(void)
+int16_t blosc2_get_nthreads(void)
 {
   return g_nthreads;
 }
 
-int16_t blosc1_set_nthreads(int16_t nthreads) {
+int16_t blosc2_set_nthreads(int16_t nthreads) {
   int16_t ret = g_nthreads;          /* the previous number of threads */
 
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc1_init();
+  if (!g_initlib) blosc2_init();
 
  if (nthreads != ret) {
    g_nthreads = nthreads;
@@ -3292,13 +3292,13 @@ int16_t blosc1_set_nthreads(int16_t nthreads) {
 const char* blosc1_get_compressor(void)
 {
   const char* compname;
-  blosc1_compcode_to_compname(g_compressor, &compname);
+  blosc2_compcode_to_compname(g_compressor, &compname);
 
   return compname;
 }
 
 int blosc1_set_compressor(const char* compname) {
-  int code = blosc1_compname_to_compcode(compname);
+  int code = blosc2_compname_to_compcode(compname);
   if (code >= BLOSC_LAST_CODEC) {
     BLOSC_TRACE_ERROR("User defined codecs cannot be set here. Use Blosc2 mechanism instead.");
     return -1;
@@ -3306,21 +3306,21 @@ int blosc1_set_compressor(const char* compname) {
   g_compressor = code;
 
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc1_init();
+  if (!g_initlib) blosc2_init();
 
   return code;
 }
 
-void blosc1_set_delta(int dodelta) {
+void blosc2_set_delta(int dodelta) {
 
   g_delta = dodelta;
 
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc1_init();
+  if (!g_initlib) blosc2_init();
 
 }
 
-const char* blosc1_list_compressors(void) {
+const char* blosc2_list_compressors(void) {
   static int compressors_list_done = 0;
   static char ret[256];
 
@@ -3344,12 +3344,12 @@ const char* blosc1_list_compressors(void) {
 }
 
 
-const char* blosc1_get_version_string(void) {
+const char* blosc2_get_version_string(void) {
   return BLOSC2_VERSION_STRING;
 }
 
 
-int blosc1_get_complib_info(const char* compname, char** complib, char** version) {
+int blosc2_get_complib_info(const char* compname, char** complib, char** version) {
   int clibcode;
   const char* clibname;
   const char* clibversion = "unknown";
@@ -3466,7 +3466,7 @@ void blosc1_cbuffer_metainfo(const void* cbuffer, size_t* typesize, int* flags) 
 
 
 /* Return version information from a compressed buffer. */
-void blosc1_cbuffer_versions(const void* cbuffer, int* version, int* versionlz) {
+void blosc2_cbuffer_versions(const void* cbuffer, int* version, int* versionlz) {
   blosc_header header;
   int rc = read_chunk_header((uint8_t *) cbuffer, BLOSC_MIN_HEADER_LENGTH, false, &header);
   if (rc < 0) {
@@ -3481,7 +3481,7 @@ void blosc1_cbuffer_versions(const void* cbuffer, int* version, int* versionlz) 
 
 
 /* Return the compressor library/format used in a compressed buffer. */
-const char* blosc1_cbuffer_complib(const void* cbuffer) {
+const char* blosc2_cbuffer_complib(const void* cbuffer) {
   blosc_header header;
   int clibcode;
   const char* complib;
@@ -3528,7 +3528,7 @@ void blosc_set_schunk(blosc2_schunk* schunk) {
 
 blosc2_io *blosc2_io_global = NULL;
 
-void blosc1_init(void) {
+void blosc2_init(void) {
   /* Return if Blosc is already initialized */
   if (g_initlib) return;
 
@@ -3551,10 +3551,19 @@ void blosc1_init(void) {
 }
 
 
-void blosc1_destroy(void) {
+int blosc2_free_resources(void) {
+  /* Return if Blosc is not initialized */
+  if (!g_initlib) return BLOSC2_ERROR_FAILURE;
+
+  return release_threadpool(g_global_context);
+}
+
+
+void blosc2_destroy(void) {
   /* Return if Blosc is not initialized */
   if (!g_initlib) return;
 
+  blosc2_free_resources();
   g_initlib = 0;
   blosc2_free_ctx(g_global_context);
 
@@ -3621,13 +3630,6 @@ int release_threadpool(blosc2_context *context) {
 
 
   return 0;
-}
-
-int blosc1_free_resources(void) {
-  /* Return if Blosc is not initialized */
-  if (!g_initlib) return BLOSC2_ERROR_FAILURE;
-
-  return release_threadpool(g_global_context);
 }
 
 

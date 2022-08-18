@@ -135,14 +135,14 @@ int some_matches() {
 int main(void) {
 
     int result;
-  blosc1_init();   // this is mandatory for initiallizing the plugin mechanism
+  blosc2_init();   // this is mandatory for initiallizing the plugin mechanism
     result = rand_();
     printf("rand: %d obtained \n \n", result);
     result = same_cells();
     printf("same_cells: %d obtained \n \n", result);
     result = some_matches();
     printf("some_matches: %d obtained \n \n", result);
-    blosc1_destroy();
+  blosc2_destroy();
 
     return BLOSC2_ERROR_SUCCESS;
 }

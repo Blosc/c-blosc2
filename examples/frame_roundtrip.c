@@ -3,7 +3,7 @@
   https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 
-  Example program demonstrating use of the Blosc filter from C code.
+  Example program demonstrating a schunk roundtrip via a frame.
 
   To compile this program:
 
@@ -18,60 +18,108 @@
 #include <stdio.h>
 #include <blosc2.h>
 
-#define CHUNKSIZE (1000)
-#define NCHUNKS 2
+#define CHUNKSIZE 100
+#define NCHUNKS 1000
 
 
 int main(void) {
-  int32_t* buf;
+  int32_t total_bytes = CHUNKSIZE * sizeof(int32_t);
 
-  buf = calloc(CHUNKSIZE, sizeof(int32_t));
-  for (int i = 0; i < CHUNKSIZE; i++) {
-    buf[i] = i;
-  }
+  int32_t *buf = calloc(CHUNKSIZE, sizeof(int32_t));
+  // You can initialize data, but zeros compress better ;-)
+  //  for (int i = 0; i < CHUNKSIZE; i++) {
+  //    buf[i] = i;
+  //  }
 
+  // Create the original schunk
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.typesize = 4;
-  cparams.filters[BLOSC_LAST_FILTER] = BLOSC_SHUFFLE;
+  cparams.typesize = sizeof(int32_t);
+  cparams.filters[BLOSC_LAST_FILTER] = BLOSC_BITSHUFFLE;
   cparams.clevel = 9;
-  cparams.nthreads = 1;
+  //  blosc2_remove_dir("/tmp/test.frame");
+  //  blosc2_storage storage = {.cparams=&cparams, .contiguous=false, .urlpath="/tmp/test.frame"};
   blosc2_storage storage = {.cparams=&cparams, .contiguous=false};
   blosc2_schunk* schunk = blosc2_schunk_new(&storage);
   if (schunk == NULL) {
+    printf("Error in creating schunk\n");
     goto failed;
   }
 
+  // Append some chunks
   for (int i = 0; i < NCHUNKS; i++) {
-    int64_t status = blosc2_schunk_append_buffer(schunk, buf, CHUNKSIZE * sizeof(int32_t));
+    int64_t status = blosc2_schunk_append_buffer(schunk, buf, total_bytes);
     if (status < 0) {
+      printf("Error in appending to schunk\n");
       goto failed;
     }
   }
+  printf("nbytes, cbytes for schunk: %lld, %lld \n", schunk->nbytes, schunk->cbytes);
 
-  printf("bytes, cbytes for schunk: %lld, %lld \n", schunk->nbytes, schunk->cbytes);
+  // Check contents
+  uint8_t *chunk;
+  bool needs_free;
+  int32_t *dest = malloc(CHUNKSIZE * sizeof(int32_t));
+  for (int i = 0; i < NCHUNKS; i++) {
+    int cbytes = blosc2_schunk_get_chunk(schunk, i, &chunk, &needs_free);
+    if (cbytes < 0) {
+      printf("Error in getting chunk %d from schunk\n", i);
+      goto failed;
+    }
+    int nbytes = blosc2_decompress(chunk, cbytes, dest, total_bytes);
+    if (nbytes != total_bytes) {
+      printf("Error in schunk: nbytes differs (%d != %d) \n", nbytes, total_bytes);
+      goto failed;
+    }
+    if (needs_free) {
+      free(chunk);
+    }
+    for (int j = 0; j < CHUNKSIZE; j++) {
+      if (buf[j] != dest[j]) {
+        printf("Error in schunk: data differs in index %d (%d != %d)! \n", j, buf[i], dest[i]);
+        goto failed;
+      }
+    }
+  }
 
+  // Convert into a cframe (contiguous buffer)
   bool cframe_needs_free;
   uint8_t* cframe;
   int64_t cframe_len = blosc2_schunk_to_buffer(schunk, &cframe, &cframe_needs_free);
   if (cframe_len < 0 || !cframe_needs_free) {
     goto failed;
   }
+  printf("converted into a cframe of %lld bytes\n", cframe_len);
 
-  printf("compressed into a cframe of %lld bytes\n", cframe_len);
-
+  // Convert back into a different schunk
   blosc2_schunk* schunk2 = blosc2_schunk_from_buffer(cframe, cframe_len, true);
   if (schunk2 == NULL) {
     goto failed;
   }
+  printf("nbytes, cbytes for schunk2: %lld, %lld \n", schunk2->nbytes, schunk2->cbytes);
 
-  printf("bytes, cbytes for schunk2: %lld, %lld \n", schunk2->nbytes, schunk2->cbytes);
-
-  uint8_t *chunk;
-  bool needs_free;
-  int cbytes = blosc2_schunk_get_chunk(schunk2, 0, &chunk, &needs_free);
-  if (cbytes < 0 || needs_free) {
-    goto failed;
+  // Check contents
+  for (int i = 0; i < NCHUNKS; i++) {
+    int cbytes = blosc2_schunk_get_chunk(schunk2, i, &chunk, &needs_free);
+    if (cbytes < 0) {
+      printf("Error in getting chunk %d from schunk2\n", i);
+      goto failed;
+    }
+    int nbytes = blosc2_decompress(chunk, cbytes, dest, total_bytes);
+    if (nbytes != total_bytes) {
+      printf("Error in schunk2: nbytes differs (%d != %d) \n", nbytes, total_bytes);
+      goto failed;
+    }
+    if (needs_free) {
+      free(chunk);
+    }
+    for (int j = 0; j < CHUNKSIZE; j++) {
+      if (buf[j] != dest[j]) {
+        printf("Error in schunk2: data differs in index %d (%d != %d)! \n", j, buf[i], dest[i]);
+        goto failed;
+      }
+    }
   }
+  free(dest);
 
   blosc2_schunk_free(schunk2);
   blosc2_schunk_free(schunk);
@@ -81,6 +129,7 @@ int main(void) {
   }
   free(buf);
 
+  printf("All good!\n");
   return 0;
 
   failed:

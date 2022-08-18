@@ -13,7 +13,7 @@ CUTEST_TEST_DATA(small_chunks) {
 
 CUTEST_TEST_SETUP(small_chunks) {
   BLOSC_UNUSED_PARAM(data);
-  blosc1_init();
+  blosc2_init();
 }
 
 
@@ -63,7 +63,7 @@ CUTEST_TEST_TEST(small_chunks) {
 
     blosc2_remove_dir("ex_update.caterva");
 
-  blosc1_destroy();
+  blosc2_destroy();
 
     return 0;
 
@@ -71,7 +71,7 @@ CUTEST_TEST_TEST(small_chunks) {
 
 CUTEST_TEST_TEARDOWN(small_chunks) {
   BLOSC_UNUSED_PARAM(data);
-  blosc1_destroy();
+  blosc2_destroy();
 }
 
 

@@ -34,7 +34,7 @@ static char* test_empty_buffer(int clevel, int do_shuffle, int32_t typesize) {
 
 int main(void) {
   /* Initialize blosc before running tests. */
-  blosc1_init();
+  blosc2_init();
   char* result = test_empty_buffer(3, BLOSC_NOSHUFFLE, 1);
   if (result != EXIT_SUCCESS) {
     printf(" (%s)\n", result);
@@ -44,7 +44,7 @@ int main(void) {
   }
 
   /* Cleanup blosc resources. */
-  blosc1_destroy();
+  blosc2_destroy();
   return result != EXIT_SUCCESS;
 
 }

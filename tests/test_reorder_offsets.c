@@ -53,7 +53,7 @@ static char* test_reorder_offsets(void) {
   blosc2_schunk* schunk;
 
   /* Initialize the Blosc compressor */
-  blosc1_init();
+  blosc2_init();
 
   /* Create a super-chunk container */
   cparams.typesize = sizeof(int32_t);
@@ -95,7 +95,7 @@ static char* test_reorder_offsets(void) {
   blosc2_schunk_free(schunk);
 
   /* Destroy the Blosc environment */
-  blosc1_destroy();
+  blosc2_destroy();
 
   return EXIT_SUCCESS;
 }
@@ -124,7 +124,7 @@ int main(void) {
   data_dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int32_t));
 
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc1_init();
+  blosc2_init();
 
   /* Run all the suite */
   char *result = all_tests();
@@ -139,7 +139,7 @@ int main(void) {
   blosc_test_free(data);
   blosc_test_free(data_dest);
 
-  blosc1_destroy();
+  blosc2_destroy();
 
   return result != EXIT_SUCCESS;
 }

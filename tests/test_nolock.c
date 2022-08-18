@@ -75,11 +75,13 @@ int main(void) {
   /* Launch several subprocesses */
   for (int i = 1; i <= NCHILDREN; i++) {
     int pid = fork();
-    assert(pid >= 0);
+    if (pid < 0) {
+      return -1;
+    }
   }
 
-  blosc1_init();
-  blosc1_set_nthreads(NTHREADS);
+  blosc2_init();
+  blosc2_set_nthreads(NTHREADS);
 
   /* Initialize buffers */
   src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
@@ -107,7 +109,7 @@ int main(void) {
   blosc_test_free(dest);
   blosc_test_free(dest2);
 
-  blosc1_destroy();
+  blosc2_destroy();
 
   /* Reset envvar */
   unsetenv("BLOSC_NOLOCK");
