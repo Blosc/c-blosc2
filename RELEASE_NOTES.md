@@ -46,6 +46,9 @@ Changes from 2.2.0 to 2.3.0
 
 * Fixed some issues in converting from super-chunks to frames and back.  Now it is possible to do a rountrip without (known) problems.
 
+* LZ4 codec has been bumped to 1.9.4.
+
+
 
 Changes from 2.1.1 to 2.2.0
 ===========================
