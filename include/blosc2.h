@@ -48,6 +48,40 @@ extern "C" {
 extern "C" {
 #endif
 
+// For compatibility with the Blosc 1.x series
+#ifdef BLOSC1_COMPAT
+  // Blosc2 symbols that should be accessible from Blosc 1.x API
+  #define BLOSC2_MAX_OVERHEAD BLOSC_MAX_OVERHEAD
+  #define BLOSC2_MAX_BUFFERSIZE BLOSC_MAX_BUFFERSIZE
+
+  // API that keeps the blosc1_ prefix
+  #define blosc1_compress blosc_compress
+  #define blosc1_decompress blosc_decompress
+  #define blosc1_getitem blosc_getitem
+  #define blosc1_get_compressor blosc_get_compressor
+  #define blosc1_set_compressor blosc_set_compressor
+  #define blosc1_cbuffer_sizes blosc_cbuffer_sizes
+  #define blosc1_cbuffer_validate blosc_cbuffer_validate
+  #define blosc1_cbuffer_metainfo blosc_cbuffer_metainfo
+  #define blosc1_get_blocksize blosc_get_blocksize
+  #define blosc1_set_blocksize blosc_set_blocksize
+  #define blosc1_set_splitmode blosc_set_splitmode
+
+  // API that has been migrated to blosc2_ prefix
+  #define blosc2_init blosc_init
+  #define blosc2_destroy blosc_destroy
+  #define blosc2_free_resources blosc_free_resources
+  #define blosc2_get_nthreads blosc_get_nthreads
+  #define blosc2_set_nthreads blosc_set_nthreads
+  #define blosc2_compcode_to_compname blosc_compcode_to_compname
+  #define blosc2_compname_to_compcode blosc_compname_to_compcode
+  #define blosc2_list_compressors blosc_list_compressors
+  #define blosc2_get_version_string blosc_get_version_string
+  #define blosc2_get_complib_info blosc_get_complib_info
+  #define blosc2_cbuffer_versions blosc_cbuffer_versions
+  #define blosc2_cbuffer_complib blosc_cbuffer_complib
+#endif
+
 
 /* Version numbers */
 #define BLOSC2_VERSION_MAJOR    2    /* for major interface/format changes  */
@@ -385,34 +419,6 @@ enum {
   BLOSC2_ERROR_FILE_REMOVE = -31,     //!< Remove file failure
 };
 
-// For compatibility with the Blosc 1.x series
-#ifdef BLOSC1_COMPAT
-  // API that keeps the blosc1_ prefix
-  #define blosc1_compress blosc_compress
-  #define blosc1_decompress blosc_decompress
-  #define blosc1_getitem blosc_getitem
-  #define blosc1_get_compressor blosc_get_compressor
-  #define blosc1_set_compressor blosc_set_compressor
-  #define blosc1_cbuffer_sizes blosc_cbuffer_sizes
-  #define blosc1_cbuffer_validate blosc_cbuffer_validate
-  #define blosc1_cbuffer_metainfo blosc_cbuffer_metainfo
-  #define blosc1_get_blocksize blosc_get_blocksize
-  #define blosc1_set_blocksize blosc_set_blocksize
-  #define blosc1_set_splitmode blosc_set_splitmode
-  // API that has been migrated to blosc2_ prefix
-  #define blosc2_init blosc_init
-  #define blosc2_destroy blosc_destroy
-  #define blosc2_free_resources blosc_free_resources
-  #define blosc2_get_nthreads blosc_get_nthreads
-  #define blosc2_set_nthreads blosc_set_nthreads
-  #define blosc2_compcode_to_compname blosc_compcode_to_compname
-  #define blosc2_compname_to_compcode blosc_compname_to_compcode
-  #define blosc2_list_compressors blosc_list_compressors
-  #define blosc2_get_version_string blosc_get_version_string
-  #define blosc2_get_complib_info blosc_get_complib_info
-  #define blosc2_cbuffer_versions blosc_cbuffer_versions
-  #define blosc2_cbuffer_complib blosc_cbuffer_complib
-#endif
 
 /**
  * @brief Initialize the Blosc library environment.
