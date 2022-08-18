@@ -51,6 +51,11 @@ extern "C" {
 // For compatibility with the Blosc 1.x series
 #ifdef BLOSC1_COMPAT
   // Blosc2 symbols that should be accessible from Blosc 1.x API
+  #define BLOSC2_VERSION_MAJOR BLOSC_VERSION_MAJOR
+  #define BLOSC2_VERSION_MINOR BLOSC_VERSION_MINOR
+  #define BLOSC2_VERSION_RELEASE BLOSC_VERSION_RELEASE
+  #define BLOSC2_VERSION_STRING BLOSC_VERSION_STRING
+  #define BLOSC2_VERSION_DATE BLOSC_VERSION_DATE
   #define BLOSC2_MAX_OVERHEAD BLOSC_MAX_OVERHEAD
   #define BLOSC2_MAX_BUFFERSIZE BLOSC_MAX_BUFFERSIZE
 
@@ -88,8 +93,8 @@ extern "C" {
 #define BLOSC2_VERSION_MINOR    3    /* for minor interface/format changes  */
 #define BLOSC2_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC2_VERSION_STRING   "2.3.0.dev"  /* string version.  Sync with above! */
-#define BLOSC2_VERSION_DATE     "$Date:: 2022-08-09 #$"    /* date version */
+#define BLOSC2_VERSION_STRING   "2.3.0"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_DATE     "$Date:: 2022-08-18 #$"    /* date version */
 
 
 /* The maximum number of dimensions for caterva arrays */
