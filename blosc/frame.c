@@ -2781,7 +2781,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       if (frame->sframe) {
         for (int i = 0; i <= nchunks; ++i) {
           // offsets[nchunk] is still uninitialized here
-          if (offsets[i] > sframe_chunk_id && i != nchunk) {
+          if (i != nchunk && offsets[i] > sframe_chunk_id) {
             sframe_chunk_id = offsets[i];
           }
         }
