@@ -16,11 +16,16 @@
 #define BITS_MANTISSA_DOUBLE 52
 
 
-void truncate_precision32(uint8_t prec_bits, int32_t nelems,
-                          const int32_t* src, int32_t* dest) {
-  if (prec_bits > BITS_MANTISSA_FLOAT) {
+int truncate_precision32(int8_t prec_bits, int32_t nelems,
+                         const int32_t* src, int32_t* dest) {
+  // Make sure that we don't remove all the bits in mantissa so that we
+  // don't mess with NaNs or Infinite representation in IEEE 754:
+  // https://en.wikipedia.org/wiki/NaN
+  if ((prec_bits > BITS_MANTISSA_FLOAT) ||
+      (prec_bits <= -BITS_MANTISSA_FLOAT)) {
     fprintf(stderr, "The precision cannot be larger than %d bits for floats",
             BITS_MANTISSA_FLOAT);
+    return -1;
   }
   assert (prec_bits <= BITS_MANTISSA_FLOAT);
   int zeroed_bits = BITS_MANTISSA_FLOAT - prec_bits;
@@ -28,44 +33,43 @@ void truncate_precision32(uint8_t prec_bits, int32_t nelems,
   for (int i = 0; i < nelems; i++) {
     dest[i] = src[i] & mask;
   }
+  return 0;
 }
 
-void truncate_precision64(uint8_t prec_bits, int32_t nelems,
+int truncate_precision64(int8_t prec_bits, int32_t nelems,
                           const int64_t* src, int64_t* dest) {
-  if (prec_bits > BITS_MANTISSA_DOUBLE) {
+  // Make sure that we don't remove all the bits in mantissa so that we
+  // don't mess with NaNs or Infinite representation in IEEE 754:
+  // https://en.wikipedia.org/wiki/NaN
+  if ((prec_bits > BITS_MANTISSA_DOUBLE) ||
+      (prec_bits <= -BITS_MANTISSA_DOUBLE)) {
     fprintf(stderr, "The precision cannot be larger than %d bits for doubles",
             BITS_MANTISSA_DOUBLE);
+    return -1;
   }
-  assert (prec_bits <= BITS_MANTISSA_DOUBLE);
-  int zeroed_bits = BITS_MANTISSA_DOUBLE - prec_bits;
+  int zeroed_bits = (prec_bits > 0) ? BITS_MANTISSA_DOUBLE - prec_bits : -prec_bits;
   uint64_t mask = ~((1ULL << zeroed_bits) - 1ULL);
   for (int i = 0; i < nelems; i++) {
     dest[i] = (int64_t)(src[i] & mask);
   }
+  return 0;
 }
 
 /* Apply the truncate precision to src.  This can never fail. */
-void truncate_precision(uint8_t prec_bits, int32_t typesize, int32_t nbytes,
-                        const uint8_t* src, uint8_t* dest) {
-  // Make sure that we don't remove all the bits in mantissa so that we
-  // don't mess with NaNs or Infinite representation in IEEE 754:
-  // https://en.wikipedia.org/wiki/NaN
-  if (prec_bits <= 0) {
-    fprintf(stderr, "The precision needs to be at least 1 bit");
-  }
-  assert (prec_bits > 0);
+int truncate_precision(int8_t prec_bits, int32_t typesize, int32_t nbytes,
+                       const uint8_t* src, uint8_t* dest) {
+  // Positive values of prec_bits will set absolute precision bits, whereas negative
+  // values will reduce the precision bits (similar to Python slicing convention).
   switch (typesize) {
     case 4:
-      truncate_precision32(prec_bits, nbytes / typesize,
-                           (int32_t *)src, (int32_t *)dest);
-      break;
+      return truncate_precision32(prec_bits, nbytes / typesize,
+                              (int32_t *)src, (int32_t *)dest);
     case 8:
-      truncate_precision64(prec_bits, nbytes / typesize,
-                           (int64_t *)src, (int64_t *)dest);
-      break;
+      return truncate_precision64(prec_bits, nbytes / typesize,
+                              (int64_t *)src, (int64_t *)dest);
     default:
       fprintf(stderr, "Error in trunc-prec filter: Precision for typesize %d "
               "not handled", (int)typesize);
-      assert(0);
+      return -1;
   }
 }

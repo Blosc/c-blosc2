@@ -4,7 +4,7 @@ Release notes for C-Blosc2 2.3.1
 Changes from 2.3.0 to 2.3.1
 ===========================
 
-#XXX version-specific blurb XXX#
+* Support for negative values for BLOSC_TRUNC_PREC filter.  Negatives values mean reduce mantissa precision bits, whereas positive values mean keep precision bits.
 
 
 Changes from 2.2.0 to 2.3.0

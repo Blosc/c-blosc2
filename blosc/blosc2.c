@@ -893,7 +893,9 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
           delta_encoder(src, offset, bsize, typesize, _src, _dest);
           break;
         case BLOSC_TRUNC_PREC:
-          truncate_precision(filters_meta[i], typesize, bsize, _src, _dest);
+          if (truncate_precision(filters_meta[i], typesize, bsize, _src, _dest) < 0) {
+            return NULL;
+          }
           break;
         default:
           if (filters[i] != BLOSC_NOFILTER) {

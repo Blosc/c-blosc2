@@ -210,7 +210,7 @@ enum {
   BLOSC_BITSHUFFLE = 2,  //!< Bit-wise shuffle.
 #endif // BLOSC_H
   BLOSC_DELTA = 3,       //!< Delta filter.
-  BLOSC_TRUNC_PREC = 4,  //!< Truncate precision filter.
+  BLOSC_TRUNC_PREC = 4,  //!< Truncate mantissa precision; positive values in cparams.filters_meta will keep bits; negative values will reduce bits.
   BLOSC_LAST_FILTER = 5, //!< sentinel
   BLOSC_LAST_REGISTERED_FILTER = BLOSC2_GLOBAL_REGISTERED_FILTERS_START + BLOSC2_GLOBAL_REGISTERED_FILTERS - 1,
   //!< Determine the last registered filter. It is used to check if a filter is registered or not.
