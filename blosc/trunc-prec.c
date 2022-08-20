@@ -9,8 +9,10 @@
 **********************************************************************/
 
 #include <stdio.h>
+#include <stdlib.h>
 #include "assert.h"
 #include "trunc-prec.h"
+#include "blosc2.h"
 
 #define BITS_MANTISSA_FLOAT 23
 #define BITS_MANTISSA_DOUBLE 52
@@ -21,14 +23,17 @@ int truncate_precision32(int8_t prec_bits, int32_t nelems,
   // Make sure that we don't remove all the bits in mantissa so that we
   // don't mess with NaNs or Infinite representation in IEEE 754:
   // https://en.wikipedia.org/wiki/NaN
-  if ((prec_bits > BITS_MANTISSA_FLOAT) ||
-      (prec_bits <= -BITS_MANTISSA_FLOAT)) {
-    fprintf(stderr, "The precision cannot be larger than %d bits for floats",
-            BITS_MANTISSA_FLOAT);
+  if ((abs(prec_bits) > BITS_MANTISSA_FLOAT)) {
+    BLOSC_TRACE_ERROR("The precision cannot be larger than %d bits for floats (asking for %d bits)",
+                      BITS_MANTISSA_FLOAT, prec_bits);
     return -1;
   }
-  assert (prec_bits <= BITS_MANTISSA_FLOAT);
-  int zeroed_bits = BITS_MANTISSA_FLOAT - prec_bits;
+  int zeroed_bits = (prec_bits >= 0) ? BITS_MANTISSA_FLOAT - prec_bits : -prec_bits;
+  if (zeroed_bits >= BITS_MANTISSA_FLOAT) {
+    BLOSC_TRACE_ERROR("The reduction in precision cannot be larger or equal than %d bits for floats (asking for %d bits)",
+                      BITS_MANTISSA_FLOAT, zeroed_bits);
+    return -1;
+  }
   int32_t mask = ~((1 << zeroed_bits) - 1);
   for (int i = 0; i < nelems; i++) {
     dest[i] = src[i] & mask;
@@ -41,13 +46,17 @@ int truncate_precision64(int8_t prec_bits, int32_t nelems,
   // Make sure that we don't remove all the bits in mantissa so that we
   // don't mess with NaNs or Infinite representation in IEEE 754:
   // https://en.wikipedia.org/wiki/NaN
-  if ((prec_bits > BITS_MANTISSA_DOUBLE) ||
-      (prec_bits <= -BITS_MANTISSA_DOUBLE)) {
-    fprintf(stderr, "The precision cannot be larger than %d bits for doubles",
-            BITS_MANTISSA_DOUBLE);
+  if ((abs(prec_bits) > BITS_MANTISSA_DOUBLE)) {
+    BLOSC_TRACE_ERROR("The precision cannot be larger than %d bits for floats (asking for %d bits)",
+                      BITS_MANTISSA_DOUBLE, prec_bits);
     return -1;
   }
-  int zeroed_bits = (prec_bits > 0) ? BITS_MANTISSA_DOUBLE - prec_bits : -prec_bits;
+  int zeroed_bits = (prec_bits >= 0) ? BITS_MANTISSA_DOUBLE - prec_bits : -prec_bits;
+  if (zeroed_bits >= BITS_MANTISSA_DOUBLE) {
+    BLOSC_TRACE_ERROR("The reduction in precision cannot be larger or equal than %d bits for floats (asking for %d bits)",
+                      BITS_MANTISSA_DOUBLE, zeroed_bits);
+    return -1;
+  }
   uint64_t mask = ~((1ULL << zeroed_bits) - 1ULL);
   for (int i = 0; i < nelems; i++) {
     dest[i] = (int64_t)(src[i] & mask);

@@ -1289,7 +1289,6 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
           if (filters[i] != BLOSC_NOFILTER) {
             BLOSC_TRACE_ERROR("Filter %d not handled during decompression.",
                               filters[i]);
-
             errcode = -1;
           }
       }
