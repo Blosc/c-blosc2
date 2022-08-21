@@ -173,8 +173,8 @@ enum {
   //!< Maximum typesize before considering source buffer as a stream of bytes.
   //!< Cannot be larger than 255.
 #endif // BLOSC_H
-  BLOSC_MIN_BUFFERSIZE = 128,
-  //!< Minimum buffer size to be compressed. Cannot be smaller than 66.
+  BLOSC_MIN_BUFFERSIZE = 32,
+  //!< Minimum buffer size to be compressed.
 };
 
 

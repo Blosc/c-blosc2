@@ -237,6 +237,40 @@ static char *test_small_blocksize(void) {
 }
 
 
+/* Check small buffer */
+static char *test_small_buffer(void) {
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
+  size = 2;
+  uint8_t *src2 = calloc(size, 1);
+  for (int i = 0; i < size; i++) {
+    src2[i] = (uint8_t)i;
+  }
+
+  /* Using contexts */
+  cbytes = blosc2_compress_ctx(cctx, src2, size, dest, size + BLOSC2_MAX_OVERHEAD);
+  nbytes = blosc2_decompress_ctx(dctx, dest, size + BLOSC2_MAX_OVERHEAD, src, size);
+  mu_assert("ERROR: nbytes is not correct", nbytes == size);
+
+  /* Not using contexts */
+  cbytes = blosc2_compress(9, 1, cparams.typesize, src2, size, dest, size + BLOSC2_MAX_OVERHEAD);
+  nbytes = blosc2_decompress(dest, size + BLOSC2_MAX_OVERHEAD, src, size);
+  mu_assert("ERROR: nbytes is not correct", nbytes == size);
+
+  /* Using Blosc1 interface */
+  cbytes = blosc1_compress(9, 1, cparams.typesize, size, src2, dest, size + BLOSC2_MAX_OVERHEAD);
+  nbytes = blosc1_decompress(dest, src, size);
+  mu_assert("ERROR: nbytes is not correct", nbytes == size);
+
+  free(src2);
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+  return 0;
+}
+
 
 static char *all_tests(void) {
   mu_run_test(test_compressor);
@@ -248,6 +282,7 @@ static char *all_tests(void) {
   mu_run_test(test_delta);
   mu_run_test(test_typesize);
   mu_run_test(test_small_blocksize);
+  mu_run_test(test_small_buffer);
 
   return 0;
 }
