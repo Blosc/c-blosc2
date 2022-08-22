@@ -2287,7 +2287,7 @@ static int write_compression_header(blosc2_context* context, bool extended_heade
 }
 
 
-int blosc_compress_context(blosc2_context* context) {
+static int blosc_compress_context(blosc2_context* context) {
   int ntbytes = 0;
   blosc_timestamp_t last, current;
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
@@ -2649,8 +2649,8 @@ int blosc1_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
 
 
 
-int blosc_run_decompression_with_context(blosc2_context* context, const void* src, int32_t srcsize,
-                                         void* dest, int32_t destsize) {
+static int blosc_run_decompression_with_context(blosc2_context* context, const void* src, int32_t srcsize,
+                                                void* dest, int32_t destsize) {
   blosc_header header;
   int32_t ntbytes;
   int rc;
