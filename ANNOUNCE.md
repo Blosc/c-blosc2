@@ -1,12 +1,11 @@
-# Announcing C-Blosc2 2.3.0
+# Announcing C-Blosc2 2.3.1
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
 The Blosc development team is happy to announce a new release of C-Blosc2.
-In order to allow to compile an app with both C-Blosc and C-Blosc2 libraries,
-a new API has been created for the overlapping symbols and function names.
-Also, we have fixed the conversion between super-chunks and frames.
+This is a maintenance release, fixing some issues introduced in previous one.
+Also, negative values for BLOSC_TRUNC_PREC filter are supported now.
 
 C-Blosc2 should be backward compatible with C-Blosc, so you can start using
 it right away and increasingly start to use its new functionality, like the

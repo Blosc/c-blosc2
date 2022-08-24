@@ -6,6 +6,10 @@ Changes from 2.3.0 to 2.3.1
 
 * Support for negative values for BLOSC_TRUNC_PREC filter.  Negatives values mean reduce mantissa precision bits, whereas positive values mean keep precision bits.
 
+* Re-add the check for small buffers and a new test (see https://github.com/Blosc/python-blosc2/issues/46).
+
+* Make `static` a couple of funcs to avoid collisions.  This can be useful in case someone tries to compile both C-Blosc and C-Blosc2 in the same name space (however, don't do that unless you know what you are doing; better use dynamic libraries which allow for a much better name space separation).
+
 
 Changes from 2.2.0 to 2.3.0
 ===========================
