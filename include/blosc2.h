@@ -91,9 +91,9 @@ extern "C" {
 /* Version numbers */
 #define BLOSC2_VERSION_MAJOR    2    /* for major interface/format changes  */
 #define BLOSC2_VERSION_MINOR    3    /* for minor interface/format changes  */
-#define BLOSC2_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
+#define BLOSC2_VERSION_RELEASE  2    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC2_VERSION_STRING   "2.3.1"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_STRING   "2.3.2.dev"  /* string version.  Sync with above! */
 #define BLOSC2_VERSION_DATE     "$Date:: 2022-08-24 #$"    /* date version */
 
 
