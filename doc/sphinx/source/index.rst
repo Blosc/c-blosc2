@@ -9,6 +9,4 @@
 .. toctree::
    :hidden:
 
-   API Reference <reference/index>
-   Format <format/index>
-   Development <development/index>
+   C-Blosc2 <toc>
