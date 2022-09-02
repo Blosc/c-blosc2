@@ -3,3 +3,4 @@ build*
 .idea
 cmake-build-*
 /doc/doxygen/xml/
+/doc/sphinx/source/xml

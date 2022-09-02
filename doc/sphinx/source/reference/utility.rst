@@ -61,7 +61,7 @@ Compressor names
 
 
 Internal flags (blosc1_cbuffer_metainfo)
----------------------------------------
+----------------------------------------
 .. doxygenenumvalue:: BLOSC_DOSHUFFLE
 
 .. doxygenenumvalue:: BLOSC_MEMCPYED

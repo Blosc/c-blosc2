@@ -1,6 +1,6 @@
 PROJECT_NAME         = "blosc2"
 XML_OUTPUT           = xml
-INPUT                = ../../include/blosc2.h
+INPUT                = ../../../include/blosc2.h
 GENERATE_LATEX       = NO
 GENERATE_MAN         = NO
 GENERATE_RTF         = NO
