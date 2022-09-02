@@ -11,7 +11,7 @@ subprocess.run('doxygen Doxyfile',
                shell=True, check=True)
 
 
-project = 'Blosc2'
+project = 'C-Blosc2'
 copyright = '2019-present, The Blosc Developers'
 author = 'The Blosc Developers'
 extensions = [
