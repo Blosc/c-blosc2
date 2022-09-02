@@ -2,6 +2,7 @@ C-Blosc2
 ========
 
 .. toctree::
+   :maxdepth: 2
 
    API Reference <reference/index>
    Format <format/index>
