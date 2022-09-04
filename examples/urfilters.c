@@ -82,9 +82,9 @@ int main(void) {
   int64_t nbytes, cbytes;
 
   blosc2_filter urfilter;
-    urfilter.id = 250;
-    urfilter.forward = filter_forward;
-    urfilter.backward = filter_backward;
+  urfilter.id = 250;
+  urfilter.forward = filter_forward;
+  urfilter.backward = filter_backward;
 
   blosc2_register_filter(&urfilter);
 
@@ -93,7 +93,6 @@ int main(void) {
   cparams.filters_meta[4] = 0;
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-
 
   blosc2_schunk* schunk;
   int i, nchunk;

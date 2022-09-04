@@ -3994,7 +3994,7 @@ int register_filter_private(blosc2_filter *filter) {
     }
     /* This condition can never be fulfilled
     if (filter->id > BLOSC2_USER_REGISTERED_FILTERS_STOP) {
-        BLOSC_TRACE_ERROR("The id must be lower or equal than %d", BLOSC2_USER_REGISTERED_FILTERS_STOP);
+        BLOSC_TRACE_ERROR("The id must be less than or equal to %d", BLOSC2_USER_REGISTERED_FILTERS_STOP);
         return BLOSC2_ERROR_FAILURE;
     }
     */
