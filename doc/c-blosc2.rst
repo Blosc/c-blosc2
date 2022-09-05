@@ -1,4 +1,6 @@
-C-Blosc2
+.. include:: ../README.rst
+
+Contents
 ========
 
 .. toctree::
@@ -7,4 +9,3 @@ C-Blosc2
    API Reference <reference/index>
    Format <format/index>
    Development <development/index>
-
