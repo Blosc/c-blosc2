@@ -38,6 +38,7 @@ html_theme_options = {
     "github_url": "https://github.com/Blosc/c-blosc2",
     "twitter_url": "https://twitter.com/Blosc2",
 }
+html_show_sourcelink = False
 breathe_projects = {
     "blosc2": pathlib.Path(__file__).parent.resolve() / "xml/",
 }
