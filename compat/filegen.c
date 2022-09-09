@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
     /* Compress with clevel=9 and shuffle active  */
     csize = blosc1_compress(9, 1, sizeof(int32_t), isize, data, data_out, osize);
     if (csize == 0) {
-      printf("Buffer is uncompressible.  Giving up.\n");
+      printf("Buffer is incompressible.  Giving up.\n");
       return 1;
     } else if (csize < 0) {
       printf("Compression error.  Error code: %d\n", csize);

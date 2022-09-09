@@ -52,7 +52,7 @@ static char* test_roundtrip_bitshuffle4(void) {
   int isize = size;
   int osize = size + BLOSC_MIN_HEADER_LENGTH;
   int csize = blosc1_compress(9, BLOSC_BITSHUFFLE, 4, isize, data, data_out, osize);
-  mu_assert("ERROR: Buffer is uncompressible.  Giving up.", csize != 0);
+  mu_assert("ERROR: Buffer is incompressible.  Giving up.", csize != 0);
   mu_assert("ERROR: Compression error.", csize > 0);
   printf("Compression: %d -> %d (%.1fx)\n", isize, csize, (1.*isize) / csize);
 

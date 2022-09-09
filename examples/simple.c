@@ -53,7 +53,7 @@ int main(void) {
   csize = blosc1_compress(5, BLOSC_BITSHUFFLE, sizeof(float), isize, data,
                           data_out, osize);
   if (csize == 0) {
-    printf("Buffer is uncompressible.  Giving up.\n");
+    printf("Buffer is incompressible.  Giving up.\n");
     return 1;
   }
   else if (csize < 0) {

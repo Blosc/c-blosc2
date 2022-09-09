@@ -70,7 +70,7 @@ static int test_zfp_acc_float(blosc2_schunk* schunk) {
         /* Compress with clevel=5 and shuffle active  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
-            printf("Buffer is uncompressible.  Giving up.\n");
+            printf("Buffer is incompressible.  Giving up.\n");
             return 0;
         } else if (csize < 0) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);
@@ -155,7 +155,7 @@ static int test_zfp_acc_double(blosc2_schunk* schunk) {
         /* Compress with clevel=5 and shuffle active  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
-            printf("Buffer is uncompressible.  Giving up.\n");
+            printf("Buffer is incompressible.  Giving up.\n");
             return 0;
         } else if (csize < 0) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);

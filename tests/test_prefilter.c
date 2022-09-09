@@ -143,7 +143,7 @@ static char *test_prefilter2(void) {
   cctx = blosc2_create_cctx(cparams);
 
   csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
-  mu_assert("Buffer is uncompressible", csize != 0);
+  mu_assert("Buffer is incompressible", csize != 0);
   mu_assert("Compression error", csize > 0);
 
   /* Create a context for decompression */

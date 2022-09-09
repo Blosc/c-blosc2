@@ -70,7 +70,7 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
         /* Compress using ZFP fixed-rate  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, chunk_zfp, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
-            printf("Buffer is uncompressible.  Giving up.\n");
+            printf("Buffer is incompressible.  Giving up.\n");
             return 0;
         } else if (csize < 0) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);
@@ -87,7 +87,7 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
         /* Compress not using ZFP fixed-rate  */
         csize = blosc2_compress_ctx(schunk->cctx, lossy_chunk, chunksize, chunk_blosc, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
-            printf("Buffer is uncompressible.  Giving up.\n");
+            printf("Buffer is incompressible.  Giving up.\n");
             return 0;
         } else if (csize < 0) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);
@@ -179,7 +179,7 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
         /* Compress using ZFP fixed-rate  */
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, chunk_zfp, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
-            printf("Buffer is uncompressible.  Giving up.\n");
+            printf("Buffer is incompressible.  Giving up.\n");
             return 0;
         } else if (csize < 0) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);
@@ -196,7 +196,7 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
         /* Compress not using ZFP fixed-rate  */
         csize = blosc2_compress_ctx(schunk->cctx, lossy_chunk, chunksize, chunk_blosc, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
-            printf("Buffer is uncompressible.  Giving up.\n");
+            printf("Buffer is incompressible.  Giving up.\n");
             return 0;
         } else if (csize < 0) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);
