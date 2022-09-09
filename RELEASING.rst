@@ -70,7 +70,7 @@ Tagging
 Check documentation
 -------------------
 
-Go the the `blosc2 rtfd <https://www.blosc.org/c-blosc2/c-blosc2.html/>`_ site and check that
+Go the the `blosc2 rtfd <https://www.blosc.org/c-blosc2/c-blosc2.html>`_ site and check that
 it contains the updated docs.
 
 
