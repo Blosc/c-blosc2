@@ -1182,6 +1182,98 @@ int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *
 }
 
 
+int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer) {
+  int64_t byte_start = start * schunk->typesize;
+  int64_t byte_stop = stop * schunk->typesize;
+  int64_t nchunk_start = byte_start / schunk->chunksize;
+  int32_t chunk_start = byte_start % schunk->chunksize;
+  int32_t chunk_stop;
+  if (byte_stop >= (nchunk_start + 1) * schunk->chunksize) {
+    chunk_stop = schunk->chunksize - 1;
+  }
+  else {
+    chunk_stop = (byte_stop - 1) % schunk->chunksize;
+  }
+
+  uint8_t *dst_ptr = (uint8_t *) buffer;
+  bool needs_free;
+  uint8_t *chunk;
+  int32_t cbytes;
+  int64_t nchunk = nchunk_start;
+  int64_t nbytes_read = 0;
+  int32_t nbytes;
+  uint8_t *data = malloc(schunk->chunksize);
+
+  while (nbytes_read < ((stop - start) * schunk->typesize)) {
+    cbytes = blosc2_schunk_get_lazychunk(schunk, nchunk, &chunk, &needs_free);
+    if (cbytes < 0) {
+      BLOSC_TRACE_ERROR("Cannot get lazychunk ('%" PRId64 "').", nchunk);
+      return BLOSC2_ERROR_FAILURE;
+    }
+    int32_t blocksize;
+    memcpy(&blocksize, &chunk[BLOSC2_CHUNK_BLOCKSIZE], sizeof(int32_t));
+    int32_t nblock_start = chunk_start / blocksize;
+    int32_t nblock_stop = chunk_stop / blocksize;
+    int32_t nblocks = schunk->chunksize / blocksize;
+
+    if (nblock_start != nblock_stop) {
+      /* We have more than 1 block to read, so use a masked read */
+      bool *block_maskout = calloc(nblocks, 1);
+      int32_t nblocks_set = 0;
+      for (int32_t nblock = 0; nblock < nblocks; nblock++) {
+        if ((nblock < nblock_start) || (nblock > nblock_stop)) {
+          block_maskout[nblock] = true;
+          nblocks_set++;
+        }
+      }
+      if (blosc2_set_maskout(schunk->dctx, block_maskout, nblocks) < 0) {
+        BLOSC_TRACE_ERROR("Cannot set maskout");
+        return BLOSC2_ERROR_FAILURE;
+      }
+      nbytes = blosc2_decompress_ctx(schunk->dctx, chunk, cbytes, dst_ptr, schunk->chunksize);
+      if (nbytes < 0) {
+        BLOSC_TRACE_ERROR("Cannot decompress chunk ('%" PRId64 "').", nchunk);
+        return BLOSC2_ERROR_FAILURE;
+      }
+      if ((nbytes_read + nbytes) > (byte_stop - byte_start)) {
+        nbytes = byte_stop - byte_start - nbytes_read;
+      }
+      free(block_maskout);
+    }
+    else {
+      /* Less than 1 block to read; use a getitem call */
+      nbytes = blosc2_getitem_ctx(schunk->dctx, chunk, cbytes, chunk_start / schunk->typesize,
+                                  (chunk_stop - chunk_start + 1) / schunk->typesize, data, schunk->chunksize);
+      if (nbytes < 0) {
+        BLOSC_TRACE_ERROR("Cannot get item from ('%" PRId64 "') chunk.", nchunk);
+        return BLOSC2_ERROR_FAILURE;
+      }
+      if ((nbytes_read + nbytes) > (byte_stop - byte_start)) {
+        nbytes = byte_stop - byte_start - nbytes_read;
+      }
+      memcpy(dst_ptr, data, nbytes);
+    }
+    dst_ptr += nbytes;
+    nbytes_read += nbytes;
+
+    if (needs_free) {
+      free(chunk);
+    }
+    chunk_start = 0;
+    if (byte_stop >= (nchunk + 1) * schunk->chunksize) {
+      chunk_stop = schunk->chunksize - 1;
+    }
+    else {
+      chunk_stop = (byte_stop - 1) % schunk->chunksize;
+    }
+    nchunk++;
+  }
+  free(data);
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 /* Find whether the schunk has a metalayer or not.
  *
  * If successful, return the index of the metalayer.  Else, return a negative value.
