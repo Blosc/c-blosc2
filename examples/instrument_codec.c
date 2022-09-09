@@ -63,7 +63,7 @@ int main(void) {
   csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
   blosc2_free_ctx(cctx);
   if (csize == 0) {
-    printf("Buffer is uncompressible.  Giving up.\n");
+    printf("Buffer is incompressible.  Giving up.\n");
     return 1;
   }
   else if (csize < 0) {

@@ -182,7 +182,7 @@ static char *test_postfilter2(void) {
   init_data();
 
   csize = blosc2_compress_ctx(cctx, data, isize, data_out, osize);
-  mu_assert("Buffer is uncompressible", csize != 0);
+  mu_assert("Buffer is incompressible", csize != 0);
   mu_assert("Compression error", csize > 0);
 
   // Set some postfilter parameters and function

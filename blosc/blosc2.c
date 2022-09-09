@@ -1845,7 +1845,7 @@ static int serial_blosc(struct thread_context* thread_context) {
                          context->destsize, context->src, j * context->blocksize,
                          context->dest + ntbytes, tmp, tmp2);
         if (cbytes == 0) {
-          ntbytes = 0;              /* uncompressible data */
+          ntbytes = 0;              /* incompressible data */
           break;
         }
       }
@@ -3137,7 +3137,7 @@ static void t_blosc_do_job(void *ctxt)
       }
 
       if ((cbytes == 0) || (ntdest + cbytes > maxbytes)) {
-        context->thread_giveup_code = 0;  /* uncompressible buf */
+        context->thread_giveup_code = 0;  /* incompressible buf */
         pthread_mutex_unlock(&context->count_mutex);
         break;
       }
