@@ -10,7 +10,7 @@ Also, negative values for BLOSC_TRUNC_PREC filter are supported now.
 C-Blosc2 should be backward compatible with C-Blosc, so you can start using
 it right away and increasingly start to use its new functionality, like the
 new filters, prefilters, super-chunks and frames.
-See docs in: https://blosc2.readthedocs.io
+See docs in: https://www.blosc.org/c-blosc2/c-blosc2.html
 
 For more info, please see the release notes in:
 

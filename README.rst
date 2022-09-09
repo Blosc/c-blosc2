@@ -78,7 +78,7 @@ New features in C-Blosc2
 
 * **Efficient support for special values:** large sequences of repeated values can be represented with an efficient, simple and fast run-length representation, without the need to use regular codecs.  With that, chunks or super-chunks with values that are the same (zeros, NaNs or any value in general) can be built in constant time, regardless of the size.  This can be useful in situations where a lot of zeros (or NaNs) need to be stored (e.g. sparse matrices).
 
-* **Nice markup for documentation:** we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  See https://c-blosc2.readthedocs.io.  Thanks to Alberto Sabater and Aleix Alcacer for contributing the support for this.
+* **Nice markup for documentation:** we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  See https://www.blosc.org/c-blosc2/c-blosc2.html.  Thanks to Alberto Sabater and Aleix Alcacer for contributing the support for this.
 
 * **Plugin capabilities for filters and codecs:** we have a plugin register capability inplace so that the info about the new filters and codecs can be persisted and transmitted to different machines.  See https://github.com/Blosc/c-blosc2/blob/main/examples/urfilters.c for a self-contained example.  Thanks to the NumFOCUS foundation for providing a grant for doing this, and Oscar Griñón and Aleix Alcacer for the implementation.
 

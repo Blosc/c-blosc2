@@ -1,7 +1,7 @@
 Roadmap
 =======
 
-C-Blosc2 is the new iteration of C-Blosc 1.x series, adding more features and `better documentation <https://c-blosc2.readthedocs.io>`_.
+C-Blosc2 is the new iteration of C-Blosc 1.x series, adding more features and `better documentation <https://www.blosc.org/c-blosc2/c-blosc2.html>`_.
 This document lists the new features for the production release of C-Blosc2, as well as the plans for the future.
 
 Many of the features implemented so far have been possible with the funds of a `generous donation <https://www.blosc.org/posts/blosc-donation/>`_.  Thanks to HUAWEI, and specially to Zeeman Wang!
@@ -46,7 +46,7 @@ Right now, the next features are already implemented (although they may require 
 
 * **Efficient support for special values:** large sequences of repeated values can be represented with an efficient, simple and fast run-length representation, without the need to use regular codecs.  With that, chunks or super-chunks with values that are the same (zeros, NaNs or any value in general) can be built in constant time, regardless of the size.  This can be useful in situations where a lot of zeros (or NaNs) need to be stored (e.g. sparse matrices).
 
-* **Nice markup for documentation:** we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  See https://c-blosc2.readthedocs.io.  Thanks to Alberto Sabater and Aleix Alcacer for contributing the support for this.
+* **Nice markup for documentation:** we are currently using a combination of Sphinx + Doxygen + Breathe for documenting the C-API.  See https://www.blosc.org/c-blosc2/c-blosc2.html.  Thanks to Alberto Sabater and Aleix Alcacer for contributing the support for this.
 
 * **Plugin capabilities for filters and codecs:** we have a plugin register capability inplace so that the info about the new filters and codecs can be persisted and transmitted to different machines.  Thanks to the NumFOCUS foundation for providing a grant for doing this.
 
@@ -66,11 +66,11 @@ Right now, the next features are already implemented (although they may require 
 Actions to be done
 ------------------
 
-* **Improve the safety of the library:**  even if we have already made a long way in improving our safety, mainly thanks to the efforts of Nathan Moinvaziri, we take safety seriously, so this is always a work in progress. 
+* **Improve the safety of the library:**  even if we have already made a long way in improving our safety, mainly thanks to the efforts of Nathan Moinvaziri, we take safety seriously, so this is always a work in progress.
 
 * **Checksums:** the frame can benefit from having a checksum per every chunk/index/metalayer.  This will provide more safety towards frames that are damaged for whatever reason.  Also, this would provide better feedback when trying to determine the parts of the frame that are corrupted.  Candidates for checksums can be the xxhash32 or xxhash64, depending on the goals (to be decided).
 
-* **Multiple index chunks in frames:** right now, only `one chunk <https://github.com/Blosc/c-blosc2/blob/main/README_CFRAME_FORMAT.rst#chunks>`_ is allowed for indexing other chunks.  Provided the 2GB limit for a chunksize, that means that 'only' 256 million of chunks can be stored in a frame.  Allowing for more than one index chunk would overcome this limitation. 
+* **Multiple index chunks in frames:** right now, only `one chunk <https://github.com/Blosc/c-blosc2/blob/main/README_CFRAME_FORMAT.rst#chunks>`_ is allowed for indexing other chunks.  Provided the 2GB limit for a chunksize, that means that 'only' 256 million of chunks can be stored in a frame.  Allowing for more than one index chunk would overcome this limitation.
 
 * **More robust detection of CPU capabilities:** although currently this detection is quite sophisticated, the code responsible for that has organically grow for more than 10 years and it is time to come with a more modern and robust way of doing this. https://github.com/google/cpu_features may be a good helper for doing this refactoring.
 
