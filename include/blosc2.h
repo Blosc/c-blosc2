@@ -1820,7 +1820,7 @@ BLOSC_EXPORT int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchu
 BLOSC_EXPORT int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer);
 
 /**
- * @brief Set a schunk into a schunk from a buffer.
+ * @brief Update a schunk slice from buffer.
  *
  * @param schunk The super-chunk where to set the slice.
  * @param start The coordinates where the slice will begin (0 indexed).
