@@ -1809,7 +1809,7 @@ BLOSC_EXPORT int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchu
  *
  * @param schunk The super-chunk from where to extract a slice.
  * @param start The coordinates where the slice will begin (0 indexed).
- * @param stop The coordinates where the slice will end..
+ * @param stop The coordinates where the slice will end.
  * @param buffer The buffer where the data will be stored.
  *
  * @warning You must make sure that you have space enough to store the
@@ -1818,6 +1818,19 @@ BLOSC_EXPORT int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchu
  * @return An error code.
  */
 BLOSC_EXPORT int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer);
+
+/**
+ * @brief Set a schunk into a schunk from a buffer.
+ *
+ * @param schunk The super-chunk where to set the slice.
+ * @param start The coordinates where the slice will begin (0 indexed).
+ * @param stop The coordinates where the slice will end.
+ * @param buffer The buffer containing the data to set.
+ *
+ *
+ * @return An error code.
+ */
+BLOSC_EXPORT int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer);
 
 /**
  * @brief Return the @p cparams associated to a super-chunk.
