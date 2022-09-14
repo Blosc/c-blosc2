@@ -14,8 +14,42 @@
 
 /* Global vars */
 int tests_run = 0;
-int nchunks;
 
+typedef struct {
+    int nchunks;
+    int64_t start;
+    int64_t stop;
+    char* urlpath;
+    bool contiguous;
+} test_data;
+
+test_data tdata;
+
+typedef struct {
+    int nchunks;
+    int64_t start;
+    int64_t stop;
+} test_ndata;
+
+test_ndata tndata[] = {
+        {10, 0, 10 * CHUNKSIZE}, //whole schunk
+        {5,  3, 200}, //piece of 1 block
+        {33, 5, 679}, // blocks of same chunk
+        {12,  129 * 100, 134 * 100 * 3}, // blocks of diferent chunks
+        {3, 200 * 100, CHUNKSIZE * 3}, // 2 chunks
+};
+
+typedef struct {
+    bool contiguous;
+    char *urlpath;
+}test_storage;
+
+test_storage tstorage[] = {
+        {false, NULL},  // memory - schunk
+        {true, NULL},  // memory - cframe
+        {true, "test_set_slice_buffer.b2frame"}, // disk - cframe
+        {false, "test_set_slice_buffer.b2frame"}, // disk - sframe
+};
 
 static char* test_set_slice_buffer(void) {
   static int32_t data[CHUNKSIZE];
@@ -29,15 +63,17 @@ static char* test_set_slice_buffer(void) {
   blosc2_init();
 
   /* Create a super-chunk container */
+  blosc2_remove_urlpath(tdata.urlpath);
   cparams.typesize = sizeof(int32_t);
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
+                            .urlpath=tdata.urlpath, .contiguous=tdata.contiguous};
   schunk = blosc2_schunk_new(&storage);
 
   // Feed it with data
-  for (int nchunk = 0; nchunk < nchunks; nchunk++) {
+  for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
     for (int i = 0; i < CHUNKSIZE; i++) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
@@ -45,26 +81,24 @@ static char* test_set_slice_buffer(void) {
     mu_assert("ERROR: bad append in frame", nchunks_ > 0);
   }
 
-  int64_t start = rand() % (schunk->nbytes / schunk->typesize) - 1;
-  int64_t stop = rand() % (schunk->nbytes / schunk->typesize) + 1;
-  int32_t *buffer = malloc((stop - start) * schunk->typesize);
-  for (int i = 0; i < (stop - start); ++i) {
-    buffer[i] = i + nchunks * CHUNKSIZE;
+  // Set slice
+  int32_t *buffer = malloc((tdata.stop - tdata.start) * schunk->typesize);
+  for (int i = 0; i < (tdata.stop - tdata.start); ++i) {
+    buffer[i] = i + tdata.nchunks * CHUNKSIZE;
   }
-  rc = blosc2_schunk_set_slice_buffer(schunk, start, stop, buffer);
+  rc = blosc2_schunk_set_slice_buffer(schunk, tdata.start, tdata.stop, buffer);
   mu_assert("ERROR: cannot set slice correctly.", rc >= 0);
-  int32_t *res = malloc((stop - start) * schunk->typesize);
-  rc = blosc2_schunk_get_slice_buffer(schunk, start, stop, res);
+  int32_t *res = malloc((tdata.stop - tdata.start) * schunk->typesize);
+  // Check that the data has been updated correctly
+  rc = blosc2_schunk_get_slice_buffer(schunk, tdata.start, tdata.stop, res);
   mu_assert("ERROR: cannot get slice correctly.", rc >= 0);
-
-  // Check that the chunks have been decompressed correctly
-  for (int64_t i = 0; i < (stop - start); ++i) {
-    mu_assert("ERROR: bad roundtrip get slice",buffer[i] == res[i]);
+  for (int64_t i = 0; i < (tdata.stop - tdata.start); ++i) {
+    mu_assert("ERROR: bad roundtrip",buffer[i] == res[i]);
   }
-
 
   /* Free resources */
   blosc2_schunk_free(schunk);
+  blosc2_remove_urlpath(tdata.urlpath);
   /* Destroy the Blosc environment */
   blosc2_destroy();
 
@@ -75,14 +109,16 @@ static char* test_set_slice_buffer(void) {
 }
 
 static char *all_tests(void) {
-  nchunks = 1;
-  mu_run_test(test_set_slice_buffer);
-
-  nchunks = 5;
-  mu_run_test(test_set_slice_buffer);
-
-  nchunks = 10;
-  mu_run_test(test_set_slice_buffer);
+  for (int i = 0; i < (int) (sizeof(tstorage) / sizeof(test_storage)); ++i) {
+    for (int j = 0; j < (int) (sizeof(tndata) / sizeof(test_ndata)); ++j) {
+      tdata.contiguous = tstorage[i].contiguous;
+      tdata.urlpath = tstorage[i].urlpath;
+      tdata.nchunks = tndata[j].nchunks;
+      tdata.start = tndata[j].start;
+      tdata.stop = tndata[j].stop;
+      mu_run_test(test_set_slice_buffer);
+    }
+  }
 
   return EXIT_SUCCESS;
 }
