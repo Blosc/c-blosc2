@@ -1215,7 +1215,9 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
     int32_t nblock_start = (int32_t) chunk_start / blocksize;
     int32_t nblock_stop = (int32_t) chunk_stop / blocksize;
     int32_t nblocks = schunk->chunksize / blocksize;
-
+    if (schunk->chunksize % blocksize != 0) {
+      nblocks ++;
+    }
     if (nblock_start != nblock_stop) {
       /* We have more than 1 block to read, so use a masked read */
       bool *block_maskout = calloc(nblocks, 1);
