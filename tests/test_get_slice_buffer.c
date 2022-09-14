@@ -17,7 +17,7 @@ int tests_run = 0;
 int nchunks;
 
 
-static char* test_schunk_get_slice_buffer(void) {
+static char* test_get_slice_buffer(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -79,13 +79,13 @@ static char* test_schunk_get_slice_buffer(void) {
 
 static char *all_tests(void) {
   nchunks = 1;
-  mu_run_test(test_schunk_get_slice_buffer);
+  mu_run_test(test_get_slice_buffer);
 
   nchunks = 5;
-  mu_run_test(test_schunk_get_slice_buffer);
+  mu_run_test(test_get_slice_buffer);
 
   nchunks = 10;
-  mu_run_test(test_schunk_get_slice_buffer);
+  mu_run_test(test_get_slice_buffer);
 
   return EXIT_SUCCESS;
 }
