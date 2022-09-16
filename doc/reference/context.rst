@@ -6,9 +6,12 @@ compression and decompression parameters. This allows the compression and
 decompression to happen in multithreaded scenarios, without the need for
 using the global lock.
 
-.. doxygenstruct:: blosc2_cparams
-   :members:
-.. doxygenvariable:: BLOSC2_CPARAMS_DEFAULTS
+..
+  .. doxygenstruct:: blosc2_cparams
+..
+    :members:
+..
+  .. doxygenvariable:: BLOSC2_CPARAMS_DEFAULTS
 
 .. doxygenstruct:: blosc2_dparams
    :members:
