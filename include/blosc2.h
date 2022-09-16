@@ -1068,8 +1068,8 @@ typedef struct {
 static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
         BLOSC_BLOSCLZ, 0, 5, 0, 8, 1, 0,
         BLOSC_FORWARD_COMPAT_SPLIT, NULL,
-        .filters={0, 0, 0, 0, 0, BLOSC_SHUFFLE},
-        .filters_meta={0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, BLOSC_SHUFFLE},
+        {0, 0, 0, 0, 0, 0},
         NULL, NULL, NULL, 0};
 
 
@@ -1595,7 +1595,7 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_sto
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy);
 
 /**
- * @brief Set the private `avoid_cframe_free` from a frame to @param avoid_cframe_free.
+ * @brief Set the private `avoid_cframe_free` field in a frame.
  *
  * @param schunk The super-chunk referencing the frame.
  * @param avoid_cframe_free The value to set in the blosc2_frame_s structure.
@@ -1822,7 +1822,7 @@ BLOSC_EXPORT int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchu
  * @param stop The first index (0-based) that is not in the selected slice.
  * @param buffer The buffer where the data will be stored.
  *
- * @warning You must make sure that you have space enough in @param buffer to store the
+ * @warning You must make sure that you have space enough in buffer to store the
  * uncompressed data.
  *
  * @return An error code.

@@ -70,8 +70,11 @@ Tagging
 Check documentation
 -------------------
 
-Go the the `blosc2 rtfd <https://www.blosc.org/c-blosc2/c-blosc2.html>`_ site and check that
-it contains the updated docs.
+Go to `blogsite actions <https://github.com/Blosc/blogsite/actions>`_ and trigger a build
+by going to the last run and clicking on "Re-run all jobs".
+
+Wait up to 10 min and go to the `blosc2 docs <https://www.blosc.org/c-blosc2/c-blosc2.html>`_
+and check that it contains the updated docs.
 
 
 Announcing
