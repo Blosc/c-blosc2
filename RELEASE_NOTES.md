@@ -1,10 +1,11 @@
-Release notes for C-Blosc2 2.3.2
+Release notes for C-Blosc2 2.4.0
 ================================
 
-Changes from 2.3.1 to 2.3.2
+Changes from 2.3.1 to 2.4.0
 ===========================
 
-#XXX version-specific blurb XXX#
+* New `blosc2_schunk_get_slice_buffer()` and `blosc2_schunk_set_slice_buffer()`
+  functions for getting and setting slices from/to a super-chunk.
 
 
 Changes from 2.3.0 to 2.3.1
