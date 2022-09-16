@@ -1595,6 +1595,16 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_sto
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy);
 
 /**
+ * @brief Set the private `avoid_cframe_free` from a frame to @param avoid_cframe_free.
+ *
+ * @param schunk The super-chunk referencing the frame.
+ * @param avoid_cframe_free The value to set in the blosc2_frame_s structure.
+ *
+ * @warning If you set it to `true` you will be responsible of freeing it.
+ */
+void blosc2_schunk_avoid_cframe_free(blosc2_schunk *schunk, bool avoid_cframe_free);
+
+/**
  * @brief Open an existing super-chunk that is on-disk (frame). No in-memory copy is made.
  *
  * @param urlpath The file name.

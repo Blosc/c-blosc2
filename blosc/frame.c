@@ -1887,6 +1887,11 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
 }
 
 
+void frame_avoid_cframe_free(blosc2_frame_s* frame, bool avoid_cframe_free) {
+  frame->avoid_cframe_free = avoid_cframe_free;
+}
+
+
 struct csize_idx {
     int32_t val;
     int32_t idx;

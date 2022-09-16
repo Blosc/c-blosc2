@@ -565,6 +565,14 @@ blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy
   return schunk;
 }
 
+
+/* Create a super-chunk out of a contiguous frame buffer */
+void blosc2_schunk_avoid_cframe_free(blosc2_schunk *schunk, bool avoid_cframe_free) {
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+  frame_avoid_cframe_free(frame, avoid_cframe_free);
+}
+
+
 /* Fill an empty frame with special values (fast path). */
 int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int special_value,
                                int32_t chunksize) {

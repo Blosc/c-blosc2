@@ -94,6 +94,15 @@ blosc2_frame_s* frame_new(const char* urlpath);
 int64_t frame_from_schunk(blosc2_schunk* schunk, blosc2_frame_s* frame);
 
 /**
+ * @brief Set `avoid_cframe_free` from @param frame to @param avoid_cframe_free.
+ *
+ * @param frame The frame to set the property to.
+ * @param avoid_cframe_free The value to set in @param frame.
+ * @warning If you set it to `true` you will be responsible of freeing it.
+ */
+void frame_avoid_cframe_free(blosc2_frame_s* frame, bool avoid_cframe_free);
+
+/**
  * @brief Free all memory from a frame.
  *
  * @param frame The frame to be freed.

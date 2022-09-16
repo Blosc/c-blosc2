@@ -31,6 +31,11 @@ short).
 
 .. doxygenfunction:: blosc2_schunk_append_buffer
 
+.. doxygenfunction:: blosc2_schunk_get_slice_buffer
+.. doxygenfunction:: blosc2_schunk_set_slice_buffer
+
+.. doxygenfunction:: blosc2_schunk_avoid_cframe_free
+
 
 Dealing with chunks
 -------------------
