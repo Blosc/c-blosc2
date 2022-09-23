@@ -21,6 +21,7 @@ typedef struct {
     int64_t stop;
     char* urlpath;
     bool contiguous;
+    bool shorter_last_chunk;
 } test_data;
 
 test_data tdata;
@@ -29,14 +30,17 @@ typedef struct {
     int nchunks;
     int64_t start;
     int64_t stop;
+    bool shorter_last_chunk;
 } test_ndata;
 
 test_ndata tndata[] = {
-        {10, 0, 10 * CHUNKSIZE}, //whole schunk
-        {5,  3, 200}, //piece of 1 block
-        {33, 5, 679}, // blocks of same chunk
-        {12,  129 * 100, 134 * 100 * 3}, // blocks of diferent chunks
-        {2, 200 * 100, CHUNKSIZE * 2}, // 1 chunk
+        {10, 0, 10 * CHUNKSIZE, false}, //whole schunk
+        {5,  3, 200, false}, //piece of 1 block
+        {33, 5, 679, false}, // blocks of same chunk
+        {12,  129 * 100, 134 * 100 * 3, false}, // blocks of diferent chunks
+        {2, 200 * 100, CHUNKSIZE * 2, false}, // 1 chunk
+        {5, 0, CHUNKSIZE * 5 + 200 * 100 + 300, true}, // last chunk shorter
+
 };
 
 typedef struct {
@@ -54,6 +58,7 @@ test_storage tstorage[] = {
 
 static char* test_get_slice_buffer(void) {
   static int32_t data[CHUNKSIZE];
+  int32_t *data_;
   static int32_t data_dest[CHUNKSIZE];
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int rc;
@@ -70,30 +75,53 @@ static char* test_get_slice_buffer(void) {
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   dparams.nthreads = NTHREADS;
-  cparams.blocksize = 200 * 100;
+  cparams.blocksize = 0;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .urlpath=tdata.urlpath, .contiguous=tdata.contiguous};
   schunk = blosc2_schunk_new(&storage);
 
   // Feed it with data
-  for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
-    for (int i = 0; i < CHUNKSIZE; i++) {
-      data[i] = i + nchunk * CHUNKSIZE;
+  if (!tdata.shorter_last_chunk) {
+    for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
+      for (int i = 0; i < CHUNKSIZE; i++) {
+        data[i] = i + nchunk * CHUNKSIZE;
+      }
+      int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
+      mu_assert("ERROR: bad append in frame", nchunks_ > 0);
     }
-    int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
-    mu_assert("ERROR: bad append in frame", nchunks_ > 0);
+  }
+  else {
+    data_ = malloc(sizeof(int32_t) * tdata.stop);
+    for (int i = 0; i < tdata.stop; i++) {
+      data_[i] = i;
+    }
+    for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
+      int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data_ + nchunk * CHUNKSIZE, isize);
+      mu_assert("ERROR: bad append in frame", nchunks_ > 0);
+    }
+    int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data_ + tdata.nchunks * CHUNKSIZE,
+                                                   (tdata.stop % CHUNKSIZE) * sizeof(int32_t));
   }
 
   // Get slice
   int32_t *buffer = malloc((tdata.stop - tdata.start) * schunk->typesize);
   rc = blosc2_schunk_get_slice_buffer(schunk, tdata.start, tdata.stop, buffer);
   mu_assert("ERROR: cannot get slice correctly.", rc >= 0);
-
-  // Check that the data has been decompressed correctly
-  for (int64_t i = 0; i < (tdata.stop - tdata.start); ++i) {
-    mu_assert("ERROR: bad roundtrip get slice",
-              buffer[i] == ((i + tdata.start) % CHUNKSIZE) + (i + tdata.start)/CHUNKSIZE * CHUNKSIZE);
+  if (tdata.shorter_last_chunk) {
+    for (int64_t i = 0; i < (tdata.stop - tdata.start); ++i) {
+      mu_assert("ERROR: bad roundtrip get slice",
+                buffer[i] == data_[i]);
+    }
+    free(data_);
   }
+  else {
+    // Check that the data has been decompressed correctly
+    for (int64_t i = 0; i < (tdata.stop - tdata.start); ++i) {
+      mu_assert("ERROR: bad roundtrip get slice",
+                buffer[i] == ((i + tdata.start) % CHUNKSIZE) + (i + tdata.start)/CHUNKSIZE * CHUNKSIZE);
+    }
+  }
+
 
   /* Free resources */
   blosc2_schunk_free(schunk);
@@ -114,6 +142,7 @@ static char *all_tests(void) {
       tdata.nchunks = tndata[j].nchunks;
       tdata.start = tndata[j].start;
       tdata.stop = tndata[j].stop;
+      tdata.shorter_last_chunk = tndata[j].shorter_last_chunk;
       mu_run_test(test_get_slice_buffer);
     }
   }
