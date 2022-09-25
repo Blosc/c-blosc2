@@ -1194,8 +1194,8 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
   int64_t byte_start = start * schunk->typesize;
   int64_t byte_stop = stop * schunk->typesize;
   int64_t nchunk_start = byte_start / schunk->chunksize;
-  int32_t chunk_start = (int32_t) byte_start % schunk->chunksize;
-  int32_t chunk_stop;
+  int32_t chunk_start = (int32_t) byte_start % schunk->chunksize; // 0 indexed
+  int32_t chunk_stop; // 0 indexed
   if (byte_stop >= (nchunk_start + 1) * schunk->chunksize) {
     chunk_stop = schunk->chunksize - 1;
   }
@@ -1231,7 +1231,7 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       nblocks ++;
     }
 
-    if (chunk_start == 0 && chunk_stop == chunksize) {
+    if (chunk_start == 0 && (chunk_stop + 1) == chunksize) {
       // Avoid memcpy
       nbytes = blosc2_decompress_ctx(schunk->dctx, chunk, cbytes, dst_ptr, chunksize);
       if (nbytes < 0) {
