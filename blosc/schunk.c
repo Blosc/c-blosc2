@@ -1197,10 +1197,10 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
   int32_t chunk_start = (int32_t) byte_start % schunk->chunksize; // 0 indexed
   int32_t chunk_stop; // 0 indexed
   if (byte_stop >= (nchunk_start + 1) * schunk->chunksize) {
-    chunk_stop = schunk->chunksize - 1;
+    chunk_stop = schunk->chunksize;
   }
   else {
-    chunk_stop = (int32_t) (byte_stop - 1) % schunk->chunksize;
+    chunk_stop = (int32_t) byte_stop % schunk->chunksize;
   }
 
   uint8_t *dst_ptr = (uint8_t *) buffer;
@@ -1221,6 +1221,9 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
     }
     int32_t blocksize;
     memcpy(&blocksize, &chunk[BLOSC2_CHUNK_BLOCKSIZE], sizeof(int32_t));
+    // TODO: for endianness portability, the above line should be more along the line below
+    //_sw32(&blocksize, chunk + BLOSC2_CHUNK_BLOCKSIZE);
+
     int32_t nblock_start = (int32_t) chunk_start / blocksize;
     int32_t nblock_stop = (int32_t) chunk_stop / blocksize;
     if (nchunk == (schunk->nchunks - 1) && schunk->nbytes % schunk->chunksize != 0) {
@@ -1228,10 +1231,10 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
     }
     int32_t nblocks = chunksize / blocksize;
     if (chunksize % blocksize != 0) {
-      nblocks ++;
+      nblocks++;
     }
 
-    if (chunk_start == 0 && (chunk_stop + 1) == chunksize) {
+    if (chunk_start == 0 && chunk_stop == chunksize) {
       // Avoid memcpy
       nbytes = blosc2_decompress_ctx(schunk->dctx, chunk, cbytes, dst_ptr, chunksize);
       if (nbytes < 0) {
@@ -1260,14 +1263,14 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
           BLOSC_TRACE_ERROR("Cannot decompress chunk ('%" PRId64 "').", nchunk);
           return BLOSC2_ERROR_FAILURE;
         }
-        nbytes = chunk_stop - chunk_start + 1;
+        nbytes = chunk_stop - chunk_start;
         memcpy(dst_ptr, &data[chunk_start], nbytes);
         free(block_maskout);
       }
       else {
         /* Less than 1 block to read; use a getitem call */
         nbytes = blosc2_getitem_ctx(schunk->dctx, chunk, cbytes, (int32_t) chunk_start / schunk->typesize,
-                                    (int32_t) (chunk_stop - chunk_start + 1) / schunk->typesize, data, chunksize);
+                                    (chunk_stop - chunk_start) / schunk->typesize, data, chunksize);
         if (nbytes < 0) {
           BLOSC_TRACE_ERROR("Cannot get item from ('%" PRId64 "') chunk.", nchunk);
           return BLOSC2_ERROR_FAILURE;
@@ -1285,10 +1288,10 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
     }
     chunk_start = 0;
     if (byte_stop >= (nchunk + 1) * chunksize) {
-      chunk_stop = chunksize - 1;
+      chunk_stop = chunksize;
     }
     else {
-      chunk_stop = (int32_t) (byte_stop - 1) % chunksize;
+      chunk_stop = (int32_t)(byte_stop) % chunksize;
     }
   }
   free(data);
