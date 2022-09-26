@@ -55,7 +55,7 @@ int blosc2_schunk_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
   (*cparams)->typesize = schunk->typesize;
   (*cparams)->blocksize = schunk->blocksize;
   if (schunk->cctx == NULL) {
-    (*cparams)->nthreads = BLOSC2_CPARAMS_DEFAULTS.nthreads;
+    (*cparams)->nthreads = blosc2_get_nthreads();
   }
   else {
     (*cparams)->nthreads = (int16_t)schunk->cctx->nthreads;
@@ -69,7 +69,7 @@ int blosc2_schunk_get_dparams(blosc2_schunk *schunk, blosc2_dparams **dparams) {
   *dparams = calloc(sizeof(blosc2_dparams), 1);
   (*dparams)->schunk = schunk;
   if (schunk->dctx == NULL) {
-    (*dparams)->nthreads = BLOSC2_DPARAMS_DEFAULTS.nthreads;
+    (*dparams)->nthreads = blosc2_get_nthreads();
   }
   else {
     (*dparams)->nthreads = schunk->dctx->nthreads;
