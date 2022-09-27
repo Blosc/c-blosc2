@@ -1221,8 +1221,7 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       BLOSC_TRACE_ERROR("Cannot get lazychunk ('%" PRId64 "').", nchunk);
       return BLOSC2_ERROR_FAILURE;
     }
-    int32_t blocksize;
-    _sw32(&blocksize, chunk + BLOSC2_CHUNK_BLOCKSIZE);
+    int32_t blocksize = sw32_(chunk + BLOSC2_CHUNK_BLOCKSIZE);
 
     int32_t nblock_start = (int32_t) (chunk_start / blocksize);
     int32_t nblock_stop = (int32_t) (chunk_stop / blocksize);
