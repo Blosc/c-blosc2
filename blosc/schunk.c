@@ -1243,8 +1243,8 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       }
     }
     else {
-      uint8_t *data = malloc(chunksize);
       if (nblock_start != nblock_stop) {
+        uint8_t *data = malloc(chunksize);
         /* We have more than 1 block to read, so use a masked read */
         bool *block_maskout = calloc(nblocks, 1);
         int32_t nblocks_set = 0;
@@ -1267,18 +1267,17 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
         nbytes = chunk_stop - chunk_start;
         memcpy(dst_ptr, &data[chunk_start], nbytes);
         free(block_maskout);
+        free(data);
       }
       else {
         /* Less than 1 block to read; use a getitem call */
         nbytes = blosc2_getitem_ctx(schunk->dctx, chunk, cbytes, (int32_t) (chunk_start / schunk->typesize),
-                                    (chunk_stop - chunk_start) / schunk->typesize, data, chunksize);
+                                    (chunk_stop - chunk_start) / schunk->typesize, dst_ptr, chunksize);
         if (nbytes < 0) {
           BLOSC_TRACE_ERROR("Cannot get item from ('%" PRId64 "') chunk.", nchunk);
           return BLOSC2_ERROR_FAILURE;
         }
-        memcpy(dst_ptr, data, nbytes);
       }
-      free(data);
     }
 
     dst_ptr += nbytes;
