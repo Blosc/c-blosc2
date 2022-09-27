@@ -17,6 +17,7 @@
 #include "frame.h"
 #include "stune.h"
 #include <inttypes.h>
+#include "blosc-private.h"
 
 #if defined(_WIN32)
   #include <windows.h>
@@ -717,7 +718,7 @@ int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool c
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (frame == NULL) {
     // Check that we are not appending a small chunk after another small chunk
-    if ((schunk->nchunks > 0) && (chunk_nbytes < schunk->chunksize)) {
+    if ((schunk->nchunks > 1) && (chunk_nbytes < schunk->chunksize)) {
       uint8_t* last_chunk = schunk->data[nchunks - 1];
       int32_t last_nbytes;
       rc = blosc2_cbuffer_sizes(last_chunk, &last_nbytes, NULL, NULL);
@@ -864,10 +865,12 @@ int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
     schunk->chunksize = chunk_nbytes;  // The super-chunk is initialized now
   }
 
-  if ((schunk->chunksize != 0) && (chunk_nbytes != schunk->chunksize)) {
-    BLOSC_TRACE_ERROR("Inserting chunks that have different lengths in the same schunk "
-                      "is not supported yet: %d > %d.", chunk_nbytes, schunk->chunksize);
-    return BLOSC2_ERROR_CHUNK_INSERT;
+  if (schunk->chunksize != 0 && (chunk_nbytes > schunk->chunksize ||
+      (chunk_nbytes < schunk->chunksize && nchunk != schunk->nchunks - 1))) {
+    BLOSC_TRACE_ERROR("Updating chunks that have different lengths in the same schunk "
+                      "is not supported yet (unless it's the last one and smaller):"
+                      " %d > %d.", chunk_nbytes, schunk->chunksize);
+    return BLOSC2_ERROR_CHUNK_UPDATE;
   }
 
   bool needs_free;
@@ -1210,7 +1213,6 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
   int64_t nchunk = nchunk_start;
   int64_t nbytes_read = 0;
   int32_t nbytes;
-  uint8_t *data = malloc(schunk->chunksize);
   int32_t chunksize = schunk->chunksize;
 
   while (nbytes_read < ((stop - start) * schunk->typesize)) {
@@ -1220,9 +1222,7 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       return BLOSC2_ERROR_FAILURE;
     }
     int32_t blocksize;
-    memcpy(&blocksize, &chunk[BLOSC2_CHUNK_BLOCKSIZE], sizeof(int32_t));
-    // TODO: for endianness portability, the above line should be more along the line below
-    //_sw32(&blocksize, chunk + BLOSC2_CHUNK_BLOCKSIZE);
+    _sw32(&blocksize, chunk + BLOSC2_CHUNK_BLOCKSIZE);
 
     int32_t nblock_start = (int32_t) (chunk_start / blocksize);
     int32_t nblock_stop = (int32_t) (chunk_stop / blocksize);
@@ -1243,6 +1243,7 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       }
     }
     else {
+      uint8_t *data = malloc(chunksize);
       if (nblock_start != nblock_stop) {
         /* We have more than 1 block to read, so use a masked read */
         bool *block_maskout = calloc(nblocks, 1);
@@ -1277,6 +1278,7 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
         }
         memcpy(dst_ptr, data, nbytes);
       }
+      free(data);
     }
 
     dst_ptr += nbytes;
@@ -1294,7 +1296,6 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       chunk_stop = (int32_t)(byte_stop % chunksize);
     }
   }
-  free(data);
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -1304,13 +1305,13 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
   int64_t byte_start = start * schunk->typesize;
   int64_t byte_stop = stop * schunk->typesize;
   int64_t nchunk_start = byte_start / schunk->chunksize;
-  int32_t chunk_start = (int32_t) byte_start % schunk->chunksize;
+  int32_t chunk_start = (int32_t) (byte_start % schunk->chunksize);
   int32_t chunk_stop;
   if (byte_stop >= (nchunk_start + 1) * schunk->chunksize) {
-    chunk_stop = schunk->chunksize - 1;
+    chunk_stop = schunk->chunksize;
   }
   else {
-    chunk_stop = (int32_t) (byte_stop - 1) % schunk->chunksize;
+    chunk_stop = (int32_t) (byte_stop % schunk->chunksize);
   }
 
   uint8_t *src_ptr = (uint8_t *) buffer;
@@ -1323,9 +1324,9 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
 
   while (nbytes_written < ((stop - start) * schunk->typesize)) {
     if (chunk_start == 0 &&
-        (chunk_stop == (schunk->chunksize - 1) || chunk_stop == schunk->nbytes % schunk->chunksize)) {
+        (chunk_stop == schunk->chunksize || chunk_stop == schunk->nbytes % schunk->chunksize)) {
       if (chunk_stop == schunk->nbytes % schunk->chunksize) {
-        chunksize = chunk_stop + 1;
+        chunksize = chunk_stop;
       }
       uint8_t *chunk = malloc(chunksize + BLOSC2_MAX_OVERHEAD);
       if (blosc2_compress_ctx(schunk->cctx, src_ptr, chunksize, chunk, chunksize + BLOSC2_MAX_OVERHEAD) < 0) {
@@ -1344,7 +1345,7 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
         BLOSC_TRACE_ERROR("Cannot decompress chunk ('%" PRId64 "').", nchunk);
         return BLOSC2_ERROR_FAILURE;
       }
-      memcpy(&data[chunk_start], src_ptr, chunk_stop - chunk_start + 1);
+      memcpy(&data[chunk_start], src_ptr, chunk_stop - chunk_start);
       uint8_t *chunk = malloc(nbytes + BLOSC2_MAX_OVERHEAD);
       if (blosc2_compress_ctx(schunk->cctx, data, nbytes, chunk, nbytes + BLOSC2_MAX_OVERHEAD) < 0) {
         BLOSC_TRACE_ERROR("Cannot compress data of chunk ('%" PRId64 "').", nchunk);
@@ -1357,14 +1358,14 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       }
     }
     nchunk++;
-    nbytes_written += chunk_stop - chunk_start + 1;
-    src_ptr += chunk_stop - chunk_start + 1;
+    nbytes_written += chunk_stop - chunk_start;
+    src_ptr += chunk_stop - chunk_start;
     chunk_start = 0;
     if (byte_stop >= (nchunk + 1) * schunk->chunksize) {
-      chunk_stop = schunk->chunksize - 1;
+      chunk_stop = schunk->chunksize;
     }
     else {
-      chunk_stop = (int32_t) (byte_stop - 1) % schunk->chunksize;
+      chunk_stop = (int32_t) (byte_stop % schunk->chunksize);
     }
   }
   free(data);

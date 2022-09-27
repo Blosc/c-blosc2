@@ -21,6 +21,7 @@ typedef struct {
     int64_t stop;
     char* urlpath;
     bool contiguous;
+    bool shorter_last_chunk;
 } test_data;
 
 test_data tdata;
@@ -29,14 +30,16 @@ typedef struct {
     int nchunks;
     int64_t start;
     int64_t stop;
+    bool shorter_last_chunk;
 } test_ndata;
 
 test_ndata tndata[] = {
-        {10, 0, 10 * CHUNKSIZE}, //whole schunk
-        {5,  3, 200}, //piece of 1 block
-        {33, 5, 679}, // blocks of same chunk
-        {12,  129 * 100, 134 * 100 * 3}, // blocks of diferent chunks
-        {3, 200 * 100, CHUNKSIZE * 3}, // 2 chunks
+        {10, 0, 10 * CHUNKSIZE, false}, //whole schunk
+        {5,  3, 200, false}, //piece of 1 block
+        {33, 5, 679, false}, // blocks of same chunk
+        {12,  129 * 100, 134 * 100 * 3, false}, // blocks of diferent chunks
+        {3, 200 * 100, CHUNKSIZE * 3, false}, // 2 chunks
+        {3, 200 * 100 + 17, CHUNKSIZE * 3 + 23, true}, // last chunk shorter
 };
 
 typedef struct {
@@ -53,6 +56,7 @@ test_storage tstorage[] = {
 
 static char* test_set_slice_buffer(void) {
   static int32_t data[CHUNKSIZE];
+  int32_t *data_;
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int rc;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -73,12 +77,27 @@ static char* test_set_slice_buffer(void) {
   schunk = blosc2_schunk_new(&storage);
 
   // Feed it with data
-  for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
-    for (int i = 0; i < CHUNKSIZE; i++) {
-      data[i] = i + nchunk * CHUNKSIZE;
+  if (!tdata.shorter_last_chunk) {
+    for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
+      for (int i = 0; i < CHUNKSIZE; i++) {
+        data[i] = i + nchunk * CHUNKSIZE;
+      }
+      int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
+      mu_assert("ERROR: bad append in frame", nchunks_ > 0);
     }
-    int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
-    mu_assert("ERROR: bad append in frame", nchunks_ > 0);
+  }
+  else {
+    data_ = malloc(sizeof(int32_t) * tdata.stop);
+    for (int i = 0; i < tdata.stop; i++) {
+      data_[i] = i;
+    }
+    for (int nchunk = 0; nchunk < tdata.nchunks; nchunk++) {
+      int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data_ + nchunk * CHUNKSIZE, isize);
+      mu_assert("ERROR: bad append in frame", nchunks_ > 0);
+    }
+    int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data_ + tdata.nchunks * CHUNKSIZE,
+                                                   (tdata.stop % CHUNKSIZE) * sizeof(int32_t));
+    free(data_);
   }
 
   // Set slice
@@ -116,6 +135,7 @@ static char *all_tests(void) {
       tdata.nchunks = tndata[j].nchunks;
       tdata.start = tndata[j].start;
       tdata.stop = tndata[j].stop;
+      tdata.shorter_last_chunk = tndata[j].shorter_last_chunk;
       mu_run_test(test_set_slice_buffer);
     }
   }

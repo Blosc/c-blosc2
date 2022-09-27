@@ -40,7 +40,7 @@ test_ndata tndata[] = {
         {12,  129 * 100, 134 * 100 * 3, false}, // blocks of diferent chunks
         {2, 200 * 100, CHUNKSIZE * 2, false}, // 1 chunk
         {5, 0, CHUNKSIZE * 5 + 200 * 100 + 300, true}, // last chunk shorter
-
+        {2, 10, CHUNKSIZE * 2 + 400, true}, // start != 0, last chunk shorter
 };
 
 typedef struct {
@@ -59,7 +59,6 @@ test_storage tstorage[] = {
 static char* test_get_slice_buffer(void) {
   static int32_t data[CHUNKSIZE];
   int32_t *data_;
-  static int32_t data_dest[CHUNKSIZE];
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int rc;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -108,9 +107,9 @@ static char* test_get_slice_buffer(void) {
   rc = blosc2_schunk_get_slice_buffer(schunk, tdata.start, tdata.stop, buffer);
   mu_assert("ERROR: cannot get slice correctly.", rc >= 0);
   if (tdata.shorter_last_chunk) {
-    for (int64_t i = 0; i < (tdata.stop - tdata.start); ++i) {
+    for (int64_t i = tdata.start; i < (tdata.stop - tdata.start); ++i) {
       mu_assert("ERROR: bad roundtrip get slice",
-                buffer[i] == data_[i]);
+                buffer[i - tdata.start] == data_[i]);
     }
     free(data_);
   }
