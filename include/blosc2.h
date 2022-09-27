@@ -51,40 +51,40 @@ extern "C" {
 // For compatibility with the Blosc 1.x series
 #ifdef BLOSC1_COMPAT
   // Blosc2 symbols that should be accessible from Blosc 1.x API
-  #define BLOSC2_VERSION_MAJOR BLOSC_VERSION_MAJOR
-  #define BLOSC2_VERSION_MINOR BLOSC_VERSION_MINOR
-  #define BLOSC2_VERSION_RELEASE BLOSC_VERSION_RELEASE
-  #define BLOSC2_VERSION_STRING BLOSC_VERSION_STRING
-  #define BLOSC2_VERSION_DATE BLOSC_VERSION_DATE
-  #define BLOSC2_MAX_OVERHEAD BLOSC_MAX_OVERHEAD
-  #define BLOSC2_MAX_BUFFERSIZE BLOSC_MAX_BUFFERSIZE
+  #define BLOSC_VERSION_MAJOR BLOSC2_VERSION_MAJOR
+  #define BLOSC_VERSION_MINOR BLOSC2_VERSION_MINOR
+  #define BLOSC_VERSION_RELEASE BLOSC2_VERSION_RELEASE
+  #define BLOSC_VERSION_STRING BLOSC2_VERSION_STRING
+  #define BLOSC_VERSION_DATE BLOSC2_VERSION_DATE
+  #define BLOSC_MAX_OVERHEAD BLOSC2_MAX_OVERHEAD
+  #define BLOSC_MAX_BUFFERSIZE BLOSC2_MAX_BUFFERSIZE
 
-  // API that keeps the blosc1_ prefix
-  #define blosc1_compress blosc_compress
-  #define blosc1_decompress blosc_decompress
-  #define blosc1_getitem blosc_getitem
-  #define blosc1_get_compressor blosc_get_compressor
-  #define blosc1_set_compressor blosc_set_compressor
-  #define blosc1_cbuffer_sizes blosc_cbuffer_sizes
-  #define blosc1_cbuffer_validate blosc_cbuffer_validate
-  #define blosc1_cbuffer_metainfo blosc_cbuffer_metainfo
-  #define blosc1_get_blocksize blosc_get_blocksize
-  #define blosc1_set_blocksize blosc_set_blocksize
-  #define blosc1_set_splitmode blosc_set_splitmode
+  // API that changed to blosc1_ prefix
+  #define blosc_compress blosc1_compress
+  #define blosc_decompress blosc1_decompress
+  #define blosc_getitem blosc1_getitem
+  #define blosc_get_compressor blosc1_get_compressor
+  #define blosc_set_compressor blosc1_set_compressor
+  #define blosc_cbuffer_sizes blosc1_cbuffer_sizes
+  #define blosc_cbuffer_validate blosc1_cbuffer_validate
+  #define blosc_cbuffer_metainfo blosc1_cbuffer_metainfo
+  #define blosc_get_blocksize blosc1_get_blocksize
+  #define blosc_set_blocksize blosc1_set_blocksize
+  #define blosc_set_splitmode blosc1_set_splitmode
 
-  // API that has been migrated to blosc2_ prefix
-  #define blosc2_init blosc_init
-  #define blosc2_destroy blosc_destroy
-  #define blosc2_free_resources blosc_free_resources
-  #define blosc2_get_nthreads blosc_get_nthreads
-  #define blosc2_set_nthreads blosc_set_nthreads
-  #define blosc2_compcode_to_compname blosc_compcode_to_compname
-  #define blosc2_compname_to_compcode blosc_compname_to_compcode
-  #define blosc2_list_compressors blosc_list_compressors
-  #define blosc2_get_version_string blosc_get_version_string
-  #define blosc2_get_complib_info blosc_get_complib_info
-  #define blosc2_cbuffer_versions blosc_cbuffer_versions
-  #define blosc2_cbuffer_complib blosc_cbuffer_complib
+  // API that changed to blosc2_ prefix
+  #define blosc_init blosc2_init
+  #define blosc_destroy blosc2_destroy
+  #define blosc_free_resources blosc2_free_resources
+  #define blosc_get_nthreads blosc2_get_nthreads
+  #define blosc_set_nthreads blosc2_set_nthreads
+  #define blosc_compcode_to_compname blosc2_compcode_to_compname
+  #define blosc_compname_to_compcode blosc2_compname_to_compcode
+  #define blosc_list_compressors blosc2_list_compressors
+  #define blosc_get_version_string blosc2_get_version_string
+  #define blosc_get_complib_info blosc2_get_complib_info
+  #define blosc_cbuffer_versions blosc2_cbuffer_versions
+  #define blosc_cbuffer_complib blosc2_cbuffer_complib
 #endif
 
 
