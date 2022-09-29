@@ -1772,7 +1772,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
         free(data_chunk);
       }
       if (offsets[i] < 0) {
-        int64_t rbytes = frame_get_lazychunk(frame, offsets[i], &data_chunk, &needs_free);
+        int64_t rbytes = frame_get_chunk(frame, i, &data_chunk, &needs_free);
         if (rbytes < 0) {
           break;
         }
@@ -1791,7 +1791,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
         if (needs_free) {
           free(data_chunk);
         }
-        rbytes = frame_get_lazychunk(frame, offsets[i], &data_chunk, &needs_free);
+        rbytes = frame_get_chunk(frame, i, &data_chunk, &needs_free);
         if (rbytes < 0) {
           break;
         }

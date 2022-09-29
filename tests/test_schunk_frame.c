@@ -16,11 +16,14 @@
 int tests_run = 0;
 int nchunks;
 int contiguous = false;
+bool copy = false;
+bool special_chunks = false;
 
 
 static char* test_schunk_cframe(void) {
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int32_t *data = malloc(isize);
+  int32_t *data_zeros = calloc(CHUNKSIZE, sizeof(int32_t));
   int32_t *data_dest = malloc(isize);
   int dsize;
   blosc2_schunk* schunk;
@@ -33,11 +36,17 @@ static char* test_schunk_cframe(void) {
   schunk = blosc2_schunk_new(&storage);
 
   // Feed it with data
+  int64_t nchunks_;
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
-    for (int i = 0; i < CHUNKSIZE; i++) {
-      data[i] = i + nchunk * CHUNKSIZE;
+    if (special_chunks && nchunk >= 2) {
+      nchunks_ = blosc2_schunk_append_buffer(schunk, data_zeros, isize);
     }
-    int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
+    else {
+      for (int i = 0; i < CHUNKSIZE; i++) {
+        data[i] = i + nchunk * CHUNKSIZE;
+      }
+      nchunks_ = blosc2_schunk_append_buffer(schunk, data, isize);
+    }
     mu_assert("ERROR: bad append in frame", nchunks_ > 0);
   }
 
@@ -48,30 +57,44 @@ static char* test_schunk_cframe(void) {
   mu_assert("Error in getting a frame buffer", len > 0);
 
   // ...and another schunk backed by the contiguous frame buffer
-  blosc2_schunk* schunk2 = blosc2_schunk_from_buffer(cframe, len, false);
+  blosc2_schunk* schunk2 = blosc2_schunk_from_buffer(cframe, len, copy);
 
-  // Now store frame in a file
-  len = blosc2_schunk_to_file(schunk2, "test_file.b2frame");
-  mu_assert("Error in storing a frame buffer", len > 0);
+  if (!copy) {
+    // Now store frame in a file
+    len = blosc2_schunk_to_file(schunk2, "test_file.b2frame");
+    mu_assert("Error in storing a frame buffer", len > 0);
+  }
 
-  // Free completely all the schunks
+  // Free completely the schunks
   blosc2_schunk_free(schunk);
-  blosc2_schunk_free(schunk2);
-
-  // ...and open a new one back
-  schunk = blosc2_schunk_open("test_file.b2frame");
+  if (!copy) {
+    blosc2_schunk_free(schunk2);
+    // ...and open a new one back
+    schunk = blosc2_schunk_open("test_file.b2frame");
+  }
+  else {
+    schunk = schunk2;
+  }
 
   // Check that the chunks have been decompressed correctly
   for (int nchunk = 0; nchunk < nchunks; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
-    for (int i = 0; i < CHUNKSIZE; i++) {
-      mu_assert("ERROR: bad roundtrip",data_dest[i] == i + nchunk * CHUNKSIZE);
+    if (special_chunks && nchunk >= 2) {
+      for (int i = 0; i < CHUNKSIZE; i++) {
+        mu_assert("ERROR: bad roundtrip",data_dest[i] == 0);
+      }
+    }
+    else {
+      for (int i = 0; i < CHUNKSIZE; i++) {
+        mu_assert("ERROR: bad roundtrip",data_dest[i] == i + nchunk * CHUNKSIZE);
+      }
     }
   }
 
   /* Free resources */
   free(data);
+  free(data_zeros);
   free(data_dest);
   blosc2_schunk_free(schunk);
   if (cframe_needs_free) {
@@ -98,6 +121,31 @@ static char *all_tests(void) {
 
   nchunks = 10;
   contiguous = true;
+  mu_run_test(test_schunk_cframe);
+
+  nchunks = 5;
+  contiguous = true;
+  copy = true;
+  special_chunks = true;
+  mu_run_test(test_schunk_cframe);
+
+  nchunks = 5;
+  contiguous = true;
+  copy = false;
+  special_chunks = true;
+  mu_run_test(test_schunk_cframe);
+
+
+  nchunks = 5;
+  contiguous = false;
+  copy = true;
+  special_chunks = true;
+  mu_run_test(test_schunk_cframe);
+
+  nchunks = 5;
+  contiguous = false;
+  copy = false;
+  special_chunks = true;
   mu_run_test(test_schunk_cframe);
 
   return EXIT_SUCCESS;
