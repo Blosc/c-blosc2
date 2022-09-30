@@ -1,17 +1,12 @@
-# Announcing C-Blosc2 2.4.1
+# Announcing C-Blosc2 2.4.2
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
 The Blosc development team is happy to announce a new release of C-Blosc2.
-We are introducing a new pair of `blosc2_schunk_get_slice_buffer()` and
-`blosc2_schunk_set_slice_buffer()` functions for getting and setting slices
-from/to a super-chunk.
-
-Also, a new `blosc2_schunk_avoid_cframe_free()` for avoiding the free of a
-cframe when destroying a super-chunk.  Mainly useful for situations where you
-build a super-chunk out of an existing cframe, so you don't want it to be freed
-automatically.
+This is a maintenance release where we have fixed the BLOSC1_COMPAT mode,
+different issues with special chunks during cframe creation and last but not
+least, several optimizations for `blosc2_schunk_get_slice_buffer()`.
 
 C-Blosc2 should be backward compatible with C-Blosc, so you can start using
 it right away and increasingly start to use its new functionality, like the

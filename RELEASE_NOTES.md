@@ -4,7 +4,13 @@ Release notes for C-Blosc2 2.4.2
 Changes from 2.4.1 to 2.4.2
 ===========================
 
-#XXX version-specific blurb XXX#
+* Fixed BLOSC1_COMPAT mode.  If the symbol `BLOSC1_COMPAT` is defined, one should actually get a correct map for the BLOSC1 API now.  Thanks to @MehdiChinoune for pointing this out.
+
+* Optimizations for `blosc2_schunk_get_slice_buffer()`.  Now more caution has been put in avoiding memcpy's as much as possible.
+
+* Now `blosc2_set_nthreads()` also modifies the schunk compression and decompression defaults.
+
+* Several other fixes, specially when converting schunks to cframe format.
 
 
 Changes from 2.4.0 to 2.4.1
