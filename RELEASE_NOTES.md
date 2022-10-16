@@ -85,7 +85,7 @@ Changes from 2.2.0 to 2.3.0
 
   It is recommended to migrate to the new API as soon as possible.  In the meanwhile, you can still compile with the previous API (corresponding to C-Blosc2 pre-2.3.0), by defining the `BLOSC1_COMPAT` symbol in your C-Blosc2 app (before including the 'blosc2.h' header).
 
-* Fixed some issues in converting from super-chunks to frames and back.  Now it is possible to do a rountrip without (known) problems.
+* Fixed some issues in converting from super-chunks to frames and back.  Now it is possible to do a roundtrip without (known) problems.
 
 * LZ4 codec has been bumped to 1.9.4.
 
