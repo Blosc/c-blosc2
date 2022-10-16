@@ -37,7 +37,7 @@ test_ndata tndata[] = {
         {10, 0, 10 * CHUNKSIZE, false}, //whole schunk
         {5,  3, 200, false}, //piece of 1 block
         {33, 5, 679, false}, // blocks of same chunk
-        {12,  129 * 100, 134 * 100 * 3, false}, // blocks of diferent chunks
+        {12,  129 * 100, 134 * 100 * 3, false}, // blocks of different chunks
         {3, 200 * 100, CHUNKSIZE * 3, false}, // 2 chunks
         {3, 200 * 100 + 17, CHUNKSIZE * 3 + 23, true}, // last chunk shorter
 };
