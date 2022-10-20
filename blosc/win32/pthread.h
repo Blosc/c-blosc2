@@ -47,6 +47,11 @@
 #define pthread_mutex_lock EnterCriticalSection
 #define pthread_mutex_unlock LeaveCriticalSection
 
+#define pthread_spin_init(a,b) InitializeCriticalSection((a))
+#define pthread_spin_destroy(a) DeleteCriticalSection((a))
+#define pthread_spin_lock EnterCriticalSection
+#define pthread_spin_unlock LeaveCriticalSection
+
 /*
  * Implement simple condition variable for Windows threads, based on ACE
  * implementation.
