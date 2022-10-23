@@ -5,7 +5,9 @@ Release notes for C-Blosc2 2.4.3
 Changes from 2.4.2 to 2.4.3
 ===========================
 
-#XXX version-specific blurb XXX#
+* Disable automatic split of blocks when not using shuffle.  Experiments are showing that cratio is suffering too much, specially when using BloscLZ.
+
+* Changed xxhash.h and xxhash.c to the newest version.  Thanks to Dimitri Papadopoulos.
 
 
 Changes from 2.4.1 to 2.4.2

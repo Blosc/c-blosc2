@@ -1,12 +1,12 @@
-# Announcing C-Blosc2 2.4.2
+# Announcing C-Blosc2 2.4.3
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
 The Blosc development team is happy to announce a new release of C-Blosc2.
-This is a maintenance release where we have fixed the BLOSC1_COMPAT mode,
-different issues with special chunks during cframe creation and last but not
-least, several optimizations for `blosc2_schunk_get_slice_buffer()`.
+This is a maintenance release where we are disabling automatic split of blocks
+when not using shuffle.  Experiments are showing that cratio is suffering too
+much in that case, specially when using BloscLZ.
 
 C-Blosc2 should be backward compatible with C-Blosc, so you can start using
 it right away and increasingly start to use its new functionality, like the
