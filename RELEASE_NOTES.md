@@ -1,5 +1,11 @@
-Release notes for C-Blosc2 2.4.3
+Release notes for C-Blosc2 2.4.4
 ================================
+
+
+Changes from 2.4.3 to 2.4.4
+===========================
+
+#XXX version-specific blurb XXX#
 
 
 Changes from 2.4.2 to 2.4.3
