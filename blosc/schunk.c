@@ -1224,7 +1224,7 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
     int32_t blocksize = sw32_(chunk + BLOSC2_CHUNK_BLOCKSIZE);
 
     int32_t nblock_start = (int32_t) (chunk_start / blocksize);
-    int32_t nblock_stop = (int32_t) (chunk_stop / blocksize);
+    int32_t nblock_stop = (int32_t) ((chunk_stop - 1) / blocksize);
     if (nchunk == (schunk->nchunks - 1) && schunk->nbytes % schunk->chunksize != 0) {
       chunksize = schunk->nbytes % schunk->chunksize;
     }
