@@ -10,7 +10,7 @@
 #   BUILD_TESTS: default ON
 #       build test programs and generates the "test" target
 #   BUILD_FUZZERS: default ON
-#       build fuzz programs and generates "fuzz" targets
+#       build fuzz test programs and generates the "fuzz" target
 #   BUILD_BENCHMARKS: default ON
 #       build the benchmark programs
 #   BUILD_EXAMPLES: default ON
@@ -29,10 +29,10 @@
 #       when found, use the installed LZ4 libs instead of included
 #       sources
 #   PREFER_EXTERNAL_ZLIB: default OFF
-#       when found, use the installed ZLIB libs instead of included
+#       when found, use the installed Zlib libs instead of included
 #       MINIZ sources
 #   PREFER_EXTERNAL_ZSTD: default OFF
-#       when found, use the installed ZSTD libs instead of included
+#       when found, use the installed Zstd libs instead of included
 #       sources
 #   TEST_INCLUDE_BENCH_SHUFFLE_1: default ON
 #       add a test that runs the benchmark program passing "shuffle" with 1
@@ -94,23 +94,23 @@ option(BUILD_STATIC
 option(BUILD_SHARED
     "Build a shared library version of the blosc library." ON)
 option(BUILD_TESTS
-    "Build test programs form the blosc compression library" ON)
+    "Build test programs from the blosc compression library" ON)
 option(BUILD_FUZZERS
     "Build fuzzer programs from the blosc compression library" ${BUILD_STATIC})
 option(BUILD_BENCHMARKS
-    "Build benchmark programs form the blosc compression library" ON)
+    "Build benchmark programs from the blosc compression library" ON)
 option(BUILD_EXAMPLES
-    "Build example programs form the blosc compression library" ON)
+    "Build example programs from the blosc compression library" ON)
 option(BUILD_PLUGINS
-    "Build plugins programs form the blosc compression library" ON)
+    "Build plugins programs from the blosc compression library" ON)
 option(BUILD_LITE
     "Build a lite version (only with BloscLZ and LZ4/LZ4HC) of the blosc library." OFF)
 option(DEACTIVATE_AVX2
     "Do not attempt to build with AVX2 instructions" OFF)
 option(DEACTIVATE_ZLIB
-    "Do not include support for the ZLIB library." OFF)
+    "Do not include support for the Zlib library." OFF)
 option(DEACTIVATE_ZSTD
-    "Do not include support for the ZSTD library." OFF)
+    "Do not include support for the Zstd library." OFF)
 option(DEACTIVATE_IPP
     "Do not include support for the Intel IPP library." ON)
 option(PREFER_EXTERNAL_LZ4
@@ -127,7 +127,7 @@ if(MINGW)
     if(NOT CMAKE_RC_COMPILER)
         set(CMAKE_RC_COMPILER windres.exe)
     endif()
-endif(MINGW)
+endif()
 
 if(ENABLE_ASAN)
     message(STATUS "Enabling ASAN")
@@ -152,7 +152,7 @@ endif()
 if(NOT DEACTIVATE_ZLIB)
     if(PREFER_EXTERNAL_ZLIB)
         find_package(ZLIB_NG)
-        if (ZLIB_NG_FOUND)
+        if(ZLIB_NG_FOUND)
             set(HAVE_ZLIB_NG TRUE)
         else()
             find_package(ZLIB)
@@ -163,7 +163,7 @@ if(NOT DEACTIVATE_ZLIB)
         endif()
     endif()
 
-    if (NOT (ZLIB_NG_FOUND OR ZLIB_FOUND))
+    if(NOT (ZLIB_NG_FOUND OR ZLIB_FOUND))
         message(STATUS "Using ZLIB-NG internal sources for ZLIB support.")
         set(HAVE_ZLIB_NG TRUE)
         add_definitions(-DZLIB_COMPAT)
@@ -245,10 +245,10 @@ endif()
 message(STATUS "Building for system processor ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "Building for compiler ID ${CMAKE_C_COMPILER_ID}")
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL i386 OR
-        CMAKE_SYSTEM_PROCESSOR STREQUAL i686 OR
-        CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64 OR
-        CMAKE_SYSTEM_PROCESSOR STREQUAL amd64 OR
-        CMAKE_SYSTEM_PROCESSOR STREQUAL AMD64)
+    CMAKE_SYSTEM_PROCESSOR STREQUAL i686 OR
+    CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64 OR
+    CMAKE_SYSTEM_PROCESSOR STREQUAL amd64 OR
+    CMAKE_SYSTEM_PROCESSOR STREQUAL AMD64)
     if(CMAKE_C_COMPILER_ID STREQUAL GNU)
         # We need C99 (GNU99 more exactly)
         SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
@@ -362,11 +362,11 @@ endif()
 
 if(NOT DEFINED BLOSC_IS_SUBPROJECT)
     if("^${CMAKE_SOURCE_DIR}$" STREQUAL "^${PROJECT_SOURCE_DIR}$")
-        set (BLOSC_IS_SUBPROJECT FALSE)
+        set(BLOSC_IS_SUBPROJECT FALSE)
     else()
-        set (BLOSC_IS_SUBPROJECT TRUE)
+        set(BLOSC_IS_SUBPROJECT TRUE)
         message(STATUS "Detected that BLOSC is used a subproject.")
-   endif()
+    endif()
 endif()
 
 if(NOT DEFINED BLOSC_INSTALL)
