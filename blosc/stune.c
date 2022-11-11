@@ -114,6 +114,8 @@ void blosc_stune_next_blocksize(blosc2_context *context) {
       case 4:
       case 5:
       case 6:
+        blocksize = 64 * 1024;
+        break;
       case 7:
       case 8:
         blocksize = 256 * 1024;
