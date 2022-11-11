@@ -1242,15 +1242,16 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       }
     }
     else {
-      if (nblock_start != nblock_stop) {
+      // After extensive timing I have not been able to see lots of situations where
+      // a maskout read is better than a getitem one.  Disabling for now.
+      // if (nblock_start != nblock_stop) {
+      if (false) {
         uint8_t *data = malloc(chunksize);
         /* We have more than 1 block to read, so use a masked read */
         bool *block_maskout = calloc(nblocks, 1);
-        int32_t nblocks_set = 0;
         for (int32_t nblock = 0; nblock < nblocks; nblock++) {
           if ((nblock < nblock_start) || (nblock > nblock_stop)) {
             block_maskout[nblock] = true;
-            nblocks_set++;
           }
         }
         if (blosc2_set_maskout(schunk->dctx, block_maskout, nblocks) < 0) {
