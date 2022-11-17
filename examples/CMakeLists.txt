@@ -1,6 +1,6 @@
 # Examples with correspondingly named source files
 set(EXAMPLES contexts instrument_codec delta_schunk_ex multithread simple frame_metalayers
-    noinit find_roots schunk_simple frame_simple urcodecs urfilters frame_vlmetalayers
+    noinit find_roots schunk_simple frame_simple schunk_postfilter urcodecs urfilters frame_vlmetalayers
     sframe_simple frame_backed_schunk compress_file frame_offset frame_roundtrip get_set_slice)
 
 if(NOT DEACTIVATE_ZSTD)
