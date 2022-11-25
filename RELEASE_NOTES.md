@@ -6,6 +6,12 @@ Changes from 2.4.3 to 2.5.0
 ===========================
 
 * A new `splitmode` field has been added to the `blosc2_schunk` structure.
+* Changed some fields in `blosc2_preparams` and `blosc2_postparams` structs:
+  * `in` -> `input`
+  * `out` -> `output`
+  * `out_size` -> `output_size`
+  * `out_typesize` -> `output_typesize`
+  * `out_offset` -> `output_offset`
 
 
 Changes from 2.4.2 to 2.4.3

@@ -977,11 +977,11 @@ typedef struct {
  */
 typedef struct {
   void *user_data;  // user-provided info (optional)
-  const uint8_t *in;  // the input buffer
-  uint8_t *out;  // the output buffer
-  int32_t out_size;  // the output size (in bytes)
-  int32_t out_typesize;  // the output typesize
-  int32_t out_offset; // offset to reach the start of the output buffer
+  const uint8_t *input;  // the input buffer
+  uint8_t *output;  // the output buffer
+  int32_t output_size;  // the output size (in bytes)
+  int32_t output_typesize;  // the output typesize
+  int32_t output_offset; // offset to reach the start of the output buffer
   int64_t nchunk;  // the current nchunk in associated schunk (if exists; if not -1)
   int32_t nblock;  // the current nblock in associated chunk
   int32_t tid;  // thread id
@@ -996,8 +996,8 @@ typedef struct {
  */
 typedef struct {
   void *user_data;  // user-provided info (optional)
-  const uint8_t *in;  // the input buffer
-  uint8_t *out;  // the output buffer
+  const uint8_t *input;  // the input buffer
+  uint8_t *output;  // the output buffer
   int32_t size;  // the input size (in bytes)
   int32_t typesize;  // the input typesize
   int32_t offset;  // offset to reach the start of the input buffer

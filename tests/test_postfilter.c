@@ -59,22 +59,22 @@ int postfilter_func(blosc2_postfilter_params *postparams) {
   test_postparams *tpostparams = postparams->user_data;
   int nelems = postparams->size / postparams->typesize;
   if (tpostparams->ninputs == 0) {
-    int32_t *input0 = (int32_t *)postparams->in;
+    int32_t *input0 = (int32_t *)postparams->input;
     for (int i = 0; i < nelems; i++) {
-      ((int32_t*)(postparams->out))[i] = input0[i] * 2;
+      ((int32_t*)(postparams->output))[i] = input0[i] * 2;
     }
   }
   else if (tpostparams->ninputs == 1) {
     int32_t *input0 = ((int32_t *)(tpostparams->inputs[0] + postparams->offset));
     for (int i = 0; i < nelems; i++) {
-      ((int32_t*)(postparams->out))[i] = input0[i] * 3;
+      ((int32_t*)(postparams->output))[i] = input0[i] * 3;
     }
   }
   else if (tpostparams->ninputs == 2) {
     int32_t *input0 = ((int32_t *)(tpostparams->inputs[0] + postparams->offset));
     int32_t *input1 = ((int32_t *)(tpostparams->inputs[1] + postparams->offset));
     for (int i = 0; i < nelems; i++) {
-      ((int32_t *) (postparams->out))[i] = input0[i] + input1[i];
+      ((int32_t *) (postparams->output))[i] = input0[i] + input1[i];
     }
   }
   else {
