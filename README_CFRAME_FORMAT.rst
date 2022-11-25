@@ -40,7 +40,7 @@ The header contains information needed to decompress the Blosc chunks contained 
       ^   ^   ^   ^   ^   ^                                   ^
       |   |   |   |   |   |                                   +--[msgpack] int64
       |   |   |   |   |   +--[msgpack] int64
-      |   |   |   |   +-- reserved flags
+      |   |   |   |   +-- other flags
       |   |   |   +--codec_flags (see below)
       |   |   +---frame_type (see below)
       |   +------general_flags (see below)
@@ -155,12 +155,25 @@ using the msgpack format. Here it is the format for the *metalayers*::
             reserved
         :``6``:
             The compressor is defined in the user-defined codec slot (see below).
-        :``5 to 15``:
+        :``7 to 15``:
             Reserved
     :``4`` to ``7``: Compression level (up to 16)
 
-:reserved_flags:
-    (``uint8``) Space reserved.
+:other_flags:
+    (``uint8``) Split mode and others.
+
+    :``0`` to ``1``:
+            Enumerated for splitmodes (up to 4).
+
+            :``0``:
+                ``BLOSC_ALWAYS_SPLIT``
+            :``1``:
+                ``BLOSC_NEVER_SPLIT``
+            :``2``:
+                ``BLOSC_AUTO_SPLIT``
+            :``3``:
+                ``BLOSC_FORWARD_COMPAT_SPLIT``
+    :``2`` to ``7``: Reserved.
 
 :uncompressed_size:
     (``int64``) Size of uncompressed data in frame (excluding metadata).
