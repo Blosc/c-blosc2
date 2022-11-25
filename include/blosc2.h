@@ -350,10 +350,10 @@ enum {
  */
 #ifndef BLOSC_H
 enum {
-  BLOSC_ALWAYS_SPLIT = 1,
-  BLOSC_NEVER_SPLIT = 2,
-  BLOSC_AUTO_SPLIT = 3,
-  BLOSC_FORWARD_COMPAT_SPLIT = 4,
+  BLOSC_ALWAYS_SPLIT = 0,
+  BLOSC_NEVER_SPLIT = 1,
+  BLOSC_AUTO_SPLIT = 2,
+  BLOSC_FORWARD_COMPAT_SPLIT = 3,
 };
 #endif // BLOSC_H
 
@@ -1504,6 +1504,8 @@ typedef struct blosc2_schunk {
   //!< The default compressor metadata. Each chunk can override this.
   uint8_t clevel;
   //!< The compression level and other compress params.
+  uint8_t splitmode;
+  //!< The split mode.
   int32_t typesize;
   //!< The type size.
   int32_t blocksize;
@@ -2208,7 +2210,6 @@ typedef struct {
  * @return 0 if succeeds. Else a negative code is returned.
  */
 BLOSC_EXPORT int blosc2_register_filter(blosc2_filter *filter);
-
 
 /*********************************************************************
   Directory utilities.

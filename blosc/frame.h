@@ -26,6 +26,7 @@
 #define FRAME_FLAGS (FRAME_LEN + 8 + 1)  // 25
 #define FRAME_TYPE (FRAME_FLAGS + 1)  // 26
 #define FRAME_CODECS (FRAME_FLAGS + 2)  // 27
+#define FRAME_OTHER_FLAGS (FRAME_FLAGS + 3)  // 28
 #define FRAME_NBYTES (FRAME_FLAGS + 4 + 1)  // 30
 #define FRAME_CBYTES (FRAME_NBYTES + 8 + 1)  // 39
 #define FRAME_TYPESIZE (FRAME_CBYTES + 8 + 1) // 48

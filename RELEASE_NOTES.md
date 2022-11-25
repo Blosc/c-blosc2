@@ -1,11 +1,11 @@
-Release notes for C-Blosc2 2.4.4
+Release notes for C-Blosc2 2.5.0
 ================================
 
 
-Changes from 2.4.3 to 2.4.4
+Changes from 2.4.3 to 2.5.0
 ===========================
 
-#XXX version-specific blurb XXX#
+* A new `splitmode` field has been added to the `blosc2_schunk` structure.
 
 
 Changes from 2.4.2 to 2.4.3
