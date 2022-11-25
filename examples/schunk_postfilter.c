@@ -28,8 +28,8 @@ typedef struct {
 
 int postfilter_func(blosc2_postfilter_params *postparams) {
   int nelems = postparams->size / postparams->typesize;
-  int32_t *in = ((int32_t *)(postparams->in));
-  int32_t *out = ((int32_t *)(postparams->out));
+  int32_t *in = ((int32_t *)(postparams->input));
+  int32_t *out = ((int32_t *)(postparams->output));
   my_postparams *user_data = postparams->user_data;
   for (int i = 0; i < nelems; i++) {
     out[i] = in[i] * user_data->mult + user_data->add ;

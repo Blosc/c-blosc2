@@ -33,24 +33,24 @@ int csize;
 
 int prefilter_func(blosc2_prefilter_params *preparams) {
   test_preparams *tpreparams = preparams->user_data;
-  int nelems = preparams->out_size / preparams->out_typesize;
+  int nelems = preparams->output_size / preparams->output_typesize;
   if (tpreparams->ninputs == 0) {
-    int32_t *input0 = (int32_t *)preparams->in;
+    int32_t *input0 = (int32_t *)preparams->input;
     for (int i = 0; i < nelems; i++) {
-      ((int32_t*)(preparams->out))[i] = input0[i] * 2;
+      ((int32_t*)(preparams->output))[i] = input0[i] * 2;
     }
   }
   else if (tpreparams->ninputs == 1) {
-    int32_t *input0 = ((int32_t *)(tpreparams->inputs[0] + preparams->out_offset));
+    int32_t *input0 = ((int32_t *)(tpreparams->inputs[0] + preparams->output_offset));
     for (int i = 0; i < nelems; i++) {
-      ((int32_t*)(preparams->out))[i] = input0[i] * 3;
+      ((int32_t*)(preparams->output))[i] = input0[i] * 3;
     }
   }
   else if (tpreparams->ninputs == 2) {
-    int32_t *input0 = ((int32_t *)(tpreparams->inputs[0] + preparams->out_offset));
-    int32_t *input1 = ((int32_t *)(tpreparams->inputs[1] + preparams->out_offset));
+    int32_t *input0 = ((int32_t *)(tpreparams->inputs[0] + preparams->output_offset));
+    int32_t *input1 = ((int32_t *)(tpreparams->inputs[1] + preparams->output_offset));
     for (int i = 0; i < nelems; i++) {
-      ((int32_t *) (preparams->out))[i] = input0[i] + input1[i];
+      ((int32_t *) (preparams->output))[i] = input0[i] + input1[i];
     }
   }
   else {

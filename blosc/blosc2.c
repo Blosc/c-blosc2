@@ -841,11 +841,11 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
     // Create new prefilter parameters for this block (must be private for each thread)
     blosc2_prefilter_params preparams;
     memcpy(&preparams, context->preparams, sizeof(preparams));
-    preparams.in = _src;
-    preparams.out = _dest;
-    preparams.out_size = bsize;
-    preparams.out_typesize = typesize;
-    preparams.out_offset = offset;
+    preparams.input = _src;
+    preparams.output = _dest;
+    preparams.output_size = bsize;
+    preparams.output_typesize = typesize;
+    preparams.output_offset = offset;
     preparams.nblock = offset / context->blocksize;
     preparams.nchunk = context->schunk != NULL ? context->schunk->current_nchunk : -1;
     preparams.tid = thread_context->tid;
@@ -1332,8 +1332,8 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
     // Create new postfilter parameters for this block (must be private for each thread)
     blosc2_postfilter_params postparams;
     memcpy(&postparams, context->postparams, sizeof(postparams));
-    postparams.in = _src;
-    postparams.out = dest + offset;
+    postparams.input = _src;
+    postparams.output = dest + offset;
     postparams.size = bsize;
     postparams.typesize = typesize;
     postparams.offset = nblock * context->blocksize;
@@ -1595,8 +1595,8 @@ static int blosc_d(
       // Create new postfilter parameters for this block (must be private for each thread)
       blosc2_postfilter_params postparams;
       memcpy(&postparams, context->postparams, sizeof(postparams));
-      postparams.in = tmp;
-      postparams.out = dest + dest_offset;
+      postparams.input = tmp;
+      postparams.output = dest + dest_offset;
       postparams.size = bsize;
       postparams.typesize = typesize;
       postparams.offset = nblock * context->blocksize;
