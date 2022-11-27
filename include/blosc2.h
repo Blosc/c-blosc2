@@ -1642,10 +1642,7 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_udio(const char* urlpath, const b
  * @param schunk The super-chunk to convert.
  * @param cframe The address of the destination buffer (output).
  * @param needs_free The pointer to a boolean indicating if it is the user's
- * responsibility to free the chunk returned or not.
- *
- * @note The user is responsible to free the @p cframe buffer (not always required).
- * You can check whether the cframe requires a free with the @p needs_free parameter.
+ * responsibility to free the resulting @p cframe buffer or not.
  *
  * @return If successful, return the size of the (frame) @p cframe buffer.
  * Else, a negative value.
