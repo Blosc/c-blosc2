@@ -3,8 +3,6 @@
   https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 
-  Benchmark showing Blosc zero detection capabilities via run-length.
-
 */
 
 #include <stdio.h>
@@ -15,8 +13,9 @@
 #include "cutest.h"
 
 
-#define NCHUNKS (10)
-#define CHUNKSHAPE (5 * 1000)
+// Exceed > 2 GB in size for more thorough tests
+#define NCHUNKS (600)
+#define CHUNKSHAPE (1000 * 1000)
 #define NTHREADS 4
 
 enum {
@@ -134,7 +133,12 @@ CUTEST_TEST_TEST(fill_special) {
     uint8_t* chunk;
     bool needs_free;
     float fvalue;
-    cbytes = blosc2_schunk_get_chunk(schunk, nchunk, &chunk, &needs_free);
+    if (svalue % 2) {
+      cbytes = blosc2_schunk_get_chunk(schunk, nchunk, &chunk, &needs_free);
+    }
+    else {
+      cbytes = blosc2_schunk_get_lazychunk(schunk, nchunk, &chunk, &needs_free);
+    }
     CUTEST_ASSERT("Wrong chunk size!", cbytes == BLOSC_EXTENDED_HEADER_LENGTH);
     dsize = blosc2_getitem_ctx(schunk->dctx, chunk, cbytes, 0, 1, &fvalue, sizeof(float));
     CUTEST_ASSERT("Wrong decompressed item size!", dsize == sizeof(float));
