@@ -2480,13 +2480,15 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
 
 
 void build_filters(const int doshuffle, const int delta,
-                   const size_t typesize, uint8_t* filters) {
+                   const int32_t typesize, uint8_t* filters) {
 
   /* Fill the end part of the filter pipeline */
   if ((doshuffle == BLOSC_SHUFFLE) && (typesize > 1))
     filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
   if (doshuffle == BLOSC_BITSHUFFLE)
     filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
+  if (doshuffle == BLOSC_NOSHUFFLE)
+    filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOSHUFFLE;
   if (delta)
     filters[BLOSC2_MAX_FILTERS - 2] = BLOSC_DELTA;
 }
@@ -2552,7 +2554,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     if (result < 0) { return result; }
   }
 
-  /* Check for a BLOSC_COMPRESSOR environment variable */
+  /* Check for a BLOSC_BLOCKSIZE environment variable */
   envvar = getenv("BLOSC_BLOCKSIZE");
   if (envvar != NULL) {
     long blocksize;
@@ -2570,6 +2572,15 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     if ((nthreads != EINVAL) && (nthreads > 0)) {
       result = blosc2_set_nthreads((int16_t) nthreads);
       if (result < 0) { return result; }
+    }
+  }
+
+  /* Check for a BLOSC_SPLITMODE environment variable */
+  envvar = getenv("BLOSC_SPLITMODE");
+  if (envvar != NULL) {
+    int32_t splitmode = (int32_t) strtol(envvar, NULL, 10);
+    if ((splitmode != EINVAL) && (splitmode >= 0)) {
+      blosc1_set_splitmode(splitmode);
     }
   }
 
@@ -3648,14 +3659,11 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   /* Populate the context, using zeros as default values */
   memset(context, 0, sizeof(blosc2_context));
   context->do_compress = 1;   /* meant for compression */
-  context->compcode = cparams.compcode;
-  context->compcode_meta = cparams.compcode_meta;
-  context->clevel = cparams.clevel;
   context->use_dict = cparams.use_dict;
   if (cparams.instr_codec) {
     context->blosc2_flags = BLOSC2_INSTR_CODEC;
   }
-  context->typesize = cparams.typesize;
+
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     context->filters[i] = cparams.filters[i];
     context->filters_meta[i] = cparams.filters_meta[i];
@@ -3674,10 +3682,98 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     }
   }
 
-  context->nthreads = cparams.nthreads;
-  context->new_nthreads = context->nthreads;
+  /* Check for a BLOSC_SHUFFLE environment variable */
+  int doshuffle = -1;
+  char* envvar = getenv("BLOSC_SHUFFLE");
+  if (envvar != NULL) {
+    if (strcmp(envvar, "NOSHUFFLE") == 0) {
+      doshuffle = BLOSC_NOSHUFFLE;
+    }
+    if (strcmp(envvar, "SHUFFLE") == 0) {
+      doshuffle = BLOSC_SHUFFLE;
+    }
+    if (strcmp(envvar, "BITSHUFFLE") == 0) {
+      doshuffle = BLOSC_BITSHUFFLE;
+    }
+  }
+  /* Check for a BLOSC_DELTA environment variable */
+  int dodelta = BLOSC_NOFILTER;
+  envvar = getenv("BLOSC_DELTA");
+  if (envvar != NULL) {
+    if (strcmp(envvar, "1") == 0) {
+      dodelta = BLOSC_DELTA;
+    } else {
+      dodelta = BLOSC_NOFILTER;
+    }
+  }
+  /* Check for a BLOSC_TYPESIZE environment variable */
+  context->typesize = cparams.typesize;
+  envvar = getenv("BLOSC_TYPESIZE");
+  if (envvar != NULL) {
+    int32_t value;
+    value = (int32_t) strtol(envvar, NULL, 10);
+    if ((value != EINVAL) && (value > 0)) {
+      context->typesize = value;
+    }
+  }
+  build_filters(doshuffle, dodelta, context->typesize, context->filters);
+
+  context->clevel = cparams.clevel;
+  /* Check for a BLOSC_CLEVEL environment variable */
+  envvar = getenv("BLOSC_CLEVEL");
+  if (envvar != NULL) {
+    int value;
+    value = (int)strtol(envvar, NULL, 10);
+    if ((value != EINVAL) && (value >= 0)) {
+      context->clevel = value;
+    }
+  }
+
+  context->compcode = cparams.compcode;
+  /* Check for a BLOSC_COMPRESSOR environment variable */
+  envvar = getenv("BLOSC_COMPRESSOR");
+  if (envvar != NULL) {
+    int codec = blosc2_compname_to_compcode(envvar);
+    if (codec >= BLOSC_LAST_CODEC) {
+      BLOSC_TRACE_ERROR("User defined codecs cannot be set here. Use Blosc2 mechanism instead.");
+      return NULL;
+    }
+    context->compcode = codec;
+  }
+  context->compcode_meta = cparams.compcode_meta;
+
   context->blocksize = cparams.blocksize;
+  /* Check for a BLOSC_BLOCKSIZE environment variable */
+  envvar = getenv("BLOSC_BLOCKSIZE");
+  if (envvar != NULL) {
+    int32_t blocksize;
+    blocksize = (int32_t) strtol(envvar, NULL, 10);
+    if ((blocksize != EINVAL) && (blocksize > 0)) {
+      context->blocksize = blocksize;
+    }
+  }
+
+  context->nthreads = cparams.nthreads;
+  /* Check for a BLOSC_NTHREADS environment variable */
+  envvar = getenv("BLOSC_NTHREADS");
+  if (envvar != NULL) {
+    int16_t nthreads = (int16_t) strtol(envvar, NULL, 10);
+    if ((nthreads != EINVAL) && (nthreads > 0)) {
+      context->nthreads = nthreads;
+    }
+  }
+  context->new_nthreads = context->nthreads;
+
   context->splitmode = cparams.splitmode;
+  /* Check for a BLOSC_SPLITMODE environment variable */
+  envvar = getenv("BLOSC_SPLITMODE");
+  if (envvar != NULL) {
+    int32_t splitmode = (int32_t) strtol(envvar, NULL, 10);
+    if ((splitmode != EINVAL) && (splitmode >= 0)) {
+      context->splitmode = splitmode;
+    }
+  }
+
   context->threads_started = 0;
   context->schunk = cparams.schunk;
 
@@ -3705,8 +3801,17 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   /* Populate the context, using zeros as default values */
   memset(context, 0, sizeof(blosc2_context));
   context->do_compress = 0;   /* Meant for decompression */
+
   context->nthreads = dparams.nthreads;
+  char* envvar = getenv("BLOSC_NTHREADS");
+  if (envvar != NULL) {
+    long nthreads = strtol(envvar, NULL, 10);
+    if ((nthreads != EINVAL) && (nthreads > 0)) {
+      context->nthreads = (int16_t) nthreads;
+    }
+  }
   context->new_nthreads = context->nthreads;
+
   context->threads_started = 0;
   context->block_maskout = NULL;
   context->block_maskout_nitems = 0;

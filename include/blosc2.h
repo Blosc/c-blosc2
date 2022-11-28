@@ -512,6 +512,9 @@ BLOSC_EXPORT void blosc2_destroy(void);
  * * **BLOSC_NTHREADS=(INTEGER)**: This will call
  * #blosc2_set_nthreads before the compression process starts.
  *
+ * * **BLOSC_SPLITMODE=(0|1|2|3)**: This will call #blosc1_set_splitmode() before the
+ * compression process starts.
+ *
  * * **BLOSC_BLOCKSIZE=(INTEGER)**: This will call
  * #blosc1_set_blocksize before the compression process starts.
  * *NOTE:* The *blocksize* is a critical parameter with

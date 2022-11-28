@@ -2612,6 +2612,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
   cparams.compcode = BLOSC_BLOSCLZ;
   blosc2_context* cctx = blosc2_create_cctx(cparams);
+  cctx->typesize = sizeof(int64_t);  // override a possible BLOSC_TYPESIZE env variable (or chaos may appear)
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
                                                off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);

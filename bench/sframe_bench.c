@@ -24,7 +24,7 @@
 #define GB  (1024*MB)
 
 #define NCHUNKS 1000       /* number of chunks */
-#define CHUNKSIZE (200 * 1000)
+#define CHUNKSIZE (2000 * 1000)
 
 int nchunks = NCHUNKS;
 int iterations = 5;
@@ -224,7 +224,7 @@ void test_create_sframe_frame(char* operation) {
   int64_t nbytes, cbytes;
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
-  float totalsize = (float)(isize * nchunks);
+  float totalsize = (float)isize * nchunks;
   int32_t* data = malloc(isize);
   int32_t* data_dest = malloc(isize);
 
