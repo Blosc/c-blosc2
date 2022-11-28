@@ -1,3 +1,9 @@
+/*
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
+*/
+
 #include "blosc2.h"
 #include "frame.h"
 #include "blosc2/codecs-registry.h"
@@ -7,6 +13,7 @@
 #include "context.h"
 #include "assert.h"
 #include "../plugins/plugin_utils.h"
+
 
 int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
                      int32_t output_len, uint8_t meta, blosc2_cparams *cparams, const void* chunk) {
@@ -127,10 +134,10 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
     ZFP_ERROR_NULL(input);
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(dparams);
+    BLOSC_UNUSED_PARAM(chunk);
 
-    size_t typesize;
-    int flags;
-  blosc1_cbuffer_metainfo(chunk, &typesize, &flags);
+    blosc2_schunk* sc = dparams->schunk;
+    size_t typesize = sc->typesize;
 
     double tol = (int8_t) meta;
     int8_t ndim;
@@ -139,12 +146,12 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
     int32_t *blockshape = malloc(8 * sizeof(int32_t));
     uint8_t *smeta;
     int32_t smeta_len;
-    if (blosc2_meta_get(dparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
-        printf("Blosc error");
+    if (blosc2_meta_get(sc, "caterva", &smeta, &smeta_len) < 0) {
+        BLOSC_TRACE_ERROR("Cannot acces caterva meta info");
         free(shape);
         free(chunkshape);
         free(blockshape);
-        return -1;
+        return BLOSC2_ERROR_FAILURE;
     }
     deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
     free(smeta);
@@ -359,22 +366,22 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     ZFP_ERROR_NULL(input);
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(dparams);
+    BLOSC_UNUSED_PARAM(chunk);
 
-    size_t typesize;
-    int flags;
-  blosc1_cbuffer_metainfo(chunk, &typesize, &flags);
+    blosc2_schunk* sc = dparams->schunk;
+    size_t typesize = sc->typesize;
     int8_t ndim;
     int64_t *shape = malloc(8 * sizeof(int64_t));
     int32_t *chunkshape = malloc(8 * sizeof(int32_t));
     int32_t *blockshape = malloc(8 * sizeof(int32_t));
     uint8_t *smeta;
     int32_t smeta_len;
-    if (blosc2_meta_get(dparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
-        printf("Blosc error");
+    if (blosc2_meta_get(sc, "caterva", &smeta, &smeta_len) < 0) {
+        BLOSC_TRACE_ERROR("Cannot acces caterva meta info");
         free(shape);
         free(chunkshape);
         free(blockshape);
-        return -1;
+        return BLOSC2_ERROR_FAILURE;
     }
     deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
     free(smeta);
@@ -607,10 +614,10 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     ZFP_ERROR_NULL(input);
     ZFP_ERROR_NULL(output);
     ZFP_ERROR_NULL(dparams);
+    BLOSC_UNUSED_PARAM(chunk);
 
-    size_t typesize;
-    int flags;
-  blosc1_cbuffer_metainfo(chunk, &typesize, &flags);
+    blosc2_schunk* sc = dparams->schunk;
+    size_t typesize = sc->typesize;
 
     double ratio = (double) meta / 100.0;
     int8_t ndim;
@@ -619,12 +626,12 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     int32_t *blockshape = malloc(8 * sizeof(int32_t));
     uint8_t *smeta;
     int32_t smeta_len;
-    if (blosc2_meta_get(dparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
-        printf("Blosc error");
+    if (blosc2_meta_get(sc, "caterva", &smeta, &smeta_len) < 0) {
+        BLOSC_TRACE_ERROR("Cannot acces caterva meta info");
         free(shape);
         free(chunkshape);
         free(blockshape);
-        return -1;
+        return BLOSC2_ERROR_FAILURE;
     }
     deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
     free(smeta);

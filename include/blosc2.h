@@ -2155,8 +2155,10 @@ BLOSC_EXPORT int64_t* blosc2_frame_get_offsets(blosc2_schunk *schunk);
   Structures and functions related with compression codecs.
 *********************************************************************/
 
-typedef int (* blosc2_codec_encoder_cb) (const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, uint8_t meta, blosc2_cparams *cparams, const void* chunk);
-typedef int (* blosc2_codec_decoder_cb) (const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len, uint8_t meta, blosc2_dparams *dparams, const void* chunk);
+typedef int (* blosc2_codec_encoder_cb) (const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
+            uint8_t meta, blosc2_cparams *cparams, const void* chunk);
+typedef int (* blosc2_codec_decoder_cb) (const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
+            uint8_t meta, blosc2_dparams *dparams, const void* chunk);
 
 typedef struct {
   uint8_t compcode;
