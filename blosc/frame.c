@@ -2149,7 +2149,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
     int32_t chunksize_ = chunksize;
     if ((nchunk == nchunks - 1) && (nbytes % chunksize)) {
       // Last chunk is incomplete.  Compute its actual size.
-      chunksize_ = (int32_t) nbytes % chunksize;
+      chunksize_ = (int32_t) (nbytes % chunksize);
     }
     rc = frame_special_chunk(offset, chunksize_, typesize, blocksize, chunk,
                              (int32_t)lazychunk_cbytes, needs_free);
