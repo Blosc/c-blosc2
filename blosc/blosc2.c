@@ -2519,10 +2519,10 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     if (strcmp(envvar, "NOSHUFFLE") == 0) {
       doshuffle = BLOSC_NOSHUFFLE;
     }
-    if (strcmp(envvar, "SHUFFLE") == 0) {
+    else if (strcmp(envvar, "SHUFFLE") == 0) {
       doshuffle = BLOSC_SHUFFLE;
     }
-    if (strcmp(envvar, "BITSHUFFLE") == 0) {
+    else if (strcmp(envvar, "BITSHUFFLE") == 0) {
       doshuffle = BLOSC_BITSHUFFLE;
     }
   }
@@ -2578,8 +2578,20 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   /* Check for a BLOSC_SPLITMODE environment variable */
   envvar = getenv("BLOSC_SPLITMODE");
   if (envvar != NULL) {
-    int32_t splitmode = (int32_t) strtol(envvar, NULL, 10);
-    if ((splitmode != EINVAL) && (splitmode >= 0)) {
+    int32_t splitmode = -1;
+    if (strcmp(envvar, "ALWAYS_SPLIT") == 0) {
+      splitmode = BLOSC_ALWAYS_SPLIT;
+    }
+    else if (strcmp(envvar, "NEVER_SPLIT") == 0) {
+      splitmode = BLOSC_NEVER_SPLIT;
+    }
+    else if (strcmp(envvar, "AUTO_SPLIT") == 0) {
+      splitmode = BLOSC_AUTO_SPLIT;
+    }
+    else if (strcmp(envvar, "FORWARD_COMPAT_SPLIT") == 0) {
+      splitmode = BLOSC_FORWARD_COMPAT_SPLIT;
+    }
+    if (splitmode >= 0) {
       blosc1_set_splitmode(splitmode);
     }
   }
@@ -3689,10 +3701,10 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     if (strcmp(envvar, "NOSHUFFLE") == 0) {
       doshuffle = BLOSC_NOSHUFFLE;
     }
-    if (strcmp(envvar, "SHUFFLE") == 0) {
+    else if (strcmp(envvar, "SHUFFLE") == 0) {
       doshuffle = BLOSC_SHUFFLE;
     }
-    if (strcmp(envvar, "BITSHUFFLE") == 0) {
+    else if (strcmp(envvar, "BITSHUFFLE") == 0) {
       doshuffle = BLOSC_BITSHUFFLE;
     }
   }
@@ -3768,8 +3780,20 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   /* Check for a BLOSC_SPLITMODE environment variable */
   envvar = getenv("BLOSC_SPLITMODE");
   if (envvar != NULL) {
-    int32_t splitmode = (int32_t) strtol(envvar, NULL, 10);
-    if ((splitmode != EINVAL) && (splitmode >= 0)) {
+    int32_t splitmode = -1;
+    if (strcmp(envvar, "ALWAYS_SPLIT") == 0) {
+      splitmode = BLOSC_ALWAYS_SPLIT;
+    }
+    else if (strcmp(envvar, "NEVER_SPLIT") == 0) {
+      splitmode = BLOSC_NEVER_SPLIT;
+    }
+    else if (strcmp(envvar, "AUTO_SPLIT") == 0) {
+      splitmode = BLOSC_AUTO_SPLIT;
+    }
+    else if (strcmp(envvar, "FORWARD_COMPAT_SPLIT") == 0) {
+      splitmode = BLOSC_FORWARD_COMPAT_SPLIT;
+    }
+    if (splitmode >= 0) {
       context->splitmode = splitmode;
     }
   }
