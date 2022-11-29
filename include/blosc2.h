@@ -91,9 +91,9 @@ extern "C" {
 /* Version numbers */
 #define BLOSC2_VERSION_MAJOR    2    /* for major interface/format changes  */
 #define BLOSC2_VERSION_MINOR    5    /* for minor interface/format changes  */
-#define BLOSC2_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
+#define BLOSC2_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC2_VERSION_STRING   "2.5.0"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_STRING   "2.5.1.dev"  /* string version.  Sync with above! */
 #define BLOSC2_VERSION_DATE     "$Date:: 2022-11-29 #$"    /* date version */
 
 
@@ -529,7 +529,7 @@ BLOSC_EXPORT void blosc2_destroy(void);
  *
  * @endparblock
  *
- * @sa blosc1_decompress
+ * @sa #blosc1_decompress
  */
 BLOSC_EXPORT int blosc1_compress(int clevel, int doshuffle, size_t typesize,
                                  size_t nbytes, const void* src, void* dest,
@@ -575,7 +575,7 @@ BLOSC_EXPORT int blosc1_compress(int clevel, int doshuffle, size_t typesize,
  *
  * @endparblock
  *
- * @sa blosc1_compress
+ * @sa #blosc1_compress
  */
 BLOSC_EXPORT int blosc1_decompress(const void* src, void* dest, size_t destsize);
 
@@ -1108,7 +1108,7 @@ static const blosc2_dparams BLOSC2_DPARAMS_DEFAULTS = {1, NULL, NULL, NULL};
  * @note This support the same environment variables than #blosc2_compress
  * for overriding the programmatic compression values.
  *
- * @sa blosc2_compress
+ * @sa #blosc2_compress
  */
 BLOSC_EXPORT blosc2_context* blosc2_create_cctx(blosc2_cparams cparams);
 
@@ -1122,7 +1122,7 @@ BLOSC_EXPORT blosc2_context* blosc2_create_cctx(blosc2_cparams cparams);
  * @note This support the same environment variables than #blosc2_decompress
  * for overriding the programmatic decompression values.
  *
- * @sa blosc2_decompress
+ * @sa #blosc2_decompress
  *
  */
 BLOSC_EXPORT blosc2_context* blosc2_create_dctx(blosc2_dparams dparams);
