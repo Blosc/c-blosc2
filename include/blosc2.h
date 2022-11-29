@@ -90,11 +90,11 @@ extern "C" {
 
 /* Version numbers */
 #define BLOSC2_VERSION_MAJOR    2    /* for major interface/format changes  */
-#define BLOSC2_VERSION_MINOR    4    /* for minor interface/format changes  */
-#define BLOSC2_VERSION_RELEASE  4    /* for tweaks, bug-fixes, or development */
+#define BLOSC2_VERSION_MINOR    5    /* for minor interface/format changes  */
+#define BLOSC2_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC2_VERSION_STRING   "2.4.4.dev"  /* string version.  Sync with above! */
-#define BLOSC2_VERSION_DATE     "$Date:: 2022-10-23 #$"    /* date version */
+#define BLOSC2_VERSION_STRING   "2.5.0"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_DATE     "$Date:: 2022-11-29 #$"    /* date version */
 
 
 /* The maximum number of dimensions for caterva arrays */
@@ -512,8 +512,8 @@ BLOSC_EXPORT void blosc2_destroy(void);
  * * **BLOSC_NTHREADS=(INTEGER)**: This will call
  * #blosc2_set_nthreads before the compression process starts.
  *
- * * **BLOSC_SPLITMODE=(0|1|2|3)**: This will call #blosc1_set_splitmode() before the
- * compression process starts.
+ * * **BLOSC_SPLITMODE=(ALWAYS_SPLIT | NEVER_SPLIT | AUTO_SPLIT | FORWARD_COMPAT_SPLIT)**:
+ * This will call #blosc1_set_splitmode() before the compression process starts.
  *
  * * **BLOSC_BLOCKSIZE=(INTEGER)**: This will call
  * #blosc1_set_blocksize before the compression process starts.
@@ -1104,6 +1104,11 @@ static const blosc2_dparams BLOSC2_DPARAMS_DEFAULTS = {1, NULL, NULL, NULL};
  * @param cparams The blosc2_cparams struct with the compression parameters.
  *
  * @return A pointer to the new context. NULL is returned if this fails.
+ *
+ * @note This support the same environment variables than #blosc2_compress
+ * for overriding the programmatic compression values.
+ *
+ * @sa blosc2_compress
  */
 BLOSC_EXPORT blosc2_context* blosc2_create_cctx(blosc2_cparams cparams);
 
@@ -1113,6 +1118,12 @@ BLOSC_EXPORT blosc2_context* blosc2_create_cctx(blosc2_cparams cparams);
  * @param dparams The blosc2_dparams struct with the decompression parameters.
  *
  * @return A pointer to the new context. NULL is returned if this fails.
+ *
+ * @note This support the same environment variables than #blosc2_decompress
+ * for overriding the programmatic decompression values.
+ *
+ * @sa blosc2_decompress
+ *
  */
 BLOSC_EXPORT blosc2_context* blosc2_create_dctx(blosc2_dparams dparams);
 
@@ -1207,7 +1218,7 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * Environment variables
  * _____________________
  *
- * *blosc1_compress()* honors different environment variables to control
+ * *blosc2_compress()* honors different environment variables to control
  * internal parameters without the need of doing that programmatically.
  * Here are the ones supported:
  *
@@ -1230,6 +1241,9 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * **BLOSC_NTHREADS=(INTEGER)**: This will call
  * #blosc_set_nthreads before the compression process
  * starts.
+ *
+ * **BLOSC_SPLITMODE=(ALWAYS_SPLIT | NEVER_SPLIT | AUTO_SPLIT | FORWARD_COMPAT_SPLIT)**:
+ * This will call #blosc1_set_splitmode() before the compression process starts.
  *
  * **BLOSC_BLOCKSIZE=(INTEGER)**: This will call
  * #blosc_set_blocksize before the compression process starts.

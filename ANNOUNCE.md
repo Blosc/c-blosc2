@@ -1,12 +1,13 @@
-# Announcing C-Blosc2 2.4.3
+# Announcing C-Blosc2 2.5.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
 The Blosc development team is happy to announce a new release of C-Blosc2.
-This is a maintenance release where we are disabling automatic split of blocks
-when not using shuffle.  Experiments are showing that cratio is suffering too
-much in that case, specially when using BloscLZ.
+This is a minor release where we fixed some nasty bugs.  Also, we have 
+introduced some (minor) API changes to allow ``splitmode`` to be better
+handled and serialized in frames.  Finally, some performance tweaks have
+been added too.
 
 C-Blosc2 should be backward compatible with C-Blosc, so you can start using
 it right away and increasingly start to use its new functionality, like the

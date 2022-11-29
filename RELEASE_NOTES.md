@@ -5,13 +5,30 @@ Release notes for C-Blosc2 2.5.0
 Changes from 2.4.3 to 2.5.0
 ===========================
 
+* Fixed a nasty bug that prevented retriving data correctly with large super-chunks (> 2^31 elements).
+
+* Fixed an issue in `blosc2_schunk_get_slice_buffer()` in the interpretation of the `stop` param.
+  Now `stop` is not part of the selected slice (as advertised).
+
+* Now `blosc2_create_cctx()` supports the same environment variables than `blosc2_compress()`.
+
+* Now `blosc2_create_dctx()` supports the same environment variables than `blosc2_decompress()`.
+
+* Added support for the split mode to be serialized in cframes/sframes.
+
 * A new `splitmode` field has been added to the `blosc2_schunk` structure.
+
 * Changed some fields in `blosc2_preparams` and `blosc2_postparams` structs:
   * `in` -> `input`
   * `out` -> `output`
   * `out_size` -> `output_size`
   * `out_typesize` -> `output_typesize`
   * `out_offset` -> `output_offset`
+  This was needed to allow Cython to map the fields (`in` is a reserved word in Python).
+
+* Disabled maskout reads in `blosc2_schunk_get_slice_buffer()` as they are not faster than getitem there.
+
+* Add an intermediate block size in its automatic calculation based on `clevel`.
 
 
 Changes from 2.4.2 to 2.4.3
