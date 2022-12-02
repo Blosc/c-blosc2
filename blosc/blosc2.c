@@ -2579,16 +2579,16 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   envvar = getenv("BLOSC_SPLITMODE");
   if (envvar != NULL) {
     int32_t splitmode = -1;
-    if (strcmp(envvar, "ALWAYS_SPLIT") == 0) {
+    if (strcmp(envvar, "ALWAYS") == 0) {
       splitmode = BLOSC_ALWAYS_SPLIT;
     }
-    else if (strcmp(envvar, "NEVER_SPLIT") == 0) {
+    else if (strcmp(envvar, "NEVER") == 0) {
       splitmode = BLOSC_NEVER_SPLIT;
     }
-    else if (strcmp(envvar, "AUTO_SPLIT") == 0) {
+    else if (strcmp(envvar, "AUTO") == 0) {
       splitmode = BLOSC_AUTO_SPLIT;
     }
-    else if (strcmp(envvar, "FORWARD_COMPAT_SPLIT") == 0) {
+    else if (strcmp(envvar, "FORWARD_COMPAT") == 0) {
       splitmode = BLOSC_FORWARD_COMPAT_SPLIT;
     }
     if (splitmode >= 0) {
