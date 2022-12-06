@@ -187,7 +187,7 @@ enum {
   //!< Blosc-registered filters must be between 32 - 159.
   BLOSC2_GLOBAL_REGISTERED_FILTERS = 2,
   //!< Number of Blosc-registered filters at the moment.
-  BLOSC2_USER_REGISTERED_FILTERS_START = 128,
+  BLOSC2_USER_REGISTERED_FILTERS_START = 160,
   BLOSC2_USER_REGISTERED_FILTERS_STOP = 255,
   //!< User-defined filters must be between 128 - 255.
   BLOSC2_MAX_FILTERS = 6,
