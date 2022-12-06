@@ -20,9 +20,13 @@
 #define NTHREADS 4
 
 
-int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta, blosc2_cparams *cparams) {
+int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta, blosc2_cparams *cparams,
+                   uint8_t id) {
   blosc2_schunk *schunk = cparams->schunk;
   if (meta != 101) {
+    return -1;
+  }
+  if (id != 244 && id != 245) {
     return -1;
   }
 
@@ -44,8 +48,12 @@ int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta
   }
   return BLOSC2_ERROR_SUCCESS;
 }
-int filter_backward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta, blosc2_dparams *dparams) {
+int filter_backward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta, blosc2_dparams *dparams,
+                    uint8_t id) {
   if (meta != 101) {
+    return -1;
+  }
+  if (id != 244) {
     return -1;
   }
 
@@ -70,8 +78,12 @@ int filter_backward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t met
   return BLOSC2_ERROR_SUCCESS;
 }
 
-int filter_backward_error(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta, blosc2_dparams *dparams) {
+int filter_backward_error(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta, blosc2_dparams *dparams,
+                          uint8_t id) {
   if (meta != 101) {
+    return -1;
+  }
+  if (id != 245) {
     return -1;
   }
 

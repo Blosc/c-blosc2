@@ -2203,8 +2203,10 @@ BLOSC_EXPORT int blosc2_register_codec(blosc2_codec *codec);
   Structures and functions related with filters plugins.
 *********************************************************************/
 
-typedef int (* blosc2_filter_forward_cb)  (const uint8_t *, uint8_t *, int32_t, uint8_t, blosc2_cparams *);
-typedef int (* blosc2_filter_backward_cb) (const uint8_t *, uint8_t *, int32_t, uint8_t, blosc2_dparams *);
+typedef int (* blosc2_filter_forward_cb)  (const uint8_t *, uint8_t *, int32_t, uint8_t, blosc2_cparams *,
+                                           uint8_t);
+typedef int (* blosc2_filter_backward_cb) (const uint8_t *, uint8_t *, int32_t, uint8_t, blosc2_dparams *,
+                                           uint8_t);
 
 /**
  * @brief The parameters for a user-defined filter.
