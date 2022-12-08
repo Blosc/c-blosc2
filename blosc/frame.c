@@ -144,7 +144,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   }
 
   // Other flags
-  *h2p = schunk->splitmode;
+  *h2p = schunk->splitmode - 1;
   h2p += 1;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
     return NULL;
@@ -452,6 +452,7 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
   if (splitmode != NULL) {
     *splitmode = other_flags & 0x4u;
     from_big(splitmode, framep + FRAME_OTHER_FLAGS, sizeof(*splitmode));
+    *splitmode += 1;
   }
 
   if (compcode_meta != NULL) {
