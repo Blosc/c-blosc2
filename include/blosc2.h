@@ -1242,7 +1242,7 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * #blosc_set_nthreads before the compression process
  * starts.
  *
- * **BLOSC_SPLITMODE=(ALWAYS_SPLIT | NEVER_SPLIT | AUTO_SPLIT | FORWARD_COMPAT_SPLIT)**:
+ * **BLOSC_SPLITMODE=(ALWAYS | NEVER | AUTO | FORWARD_COMPAT)**:
  * This will call #blosc1_set_splitmode() before the compression process starts.
  *
  * **BLOSC_BLOCKSIZE=(INTEGER)**: This will call

@@ -2511,6 +2511,9 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     if ((value != EINVAL) && (value >= 0)) {
       clevel = (int)value;
     }
+    else {
+      BLOSC_TRACE_WARNING("BLOSC_CLEVEL environment variable '%s' not recognized\n", envvar);
+    }
   }
 
   /* Check for a BLOSC_SHUFFLE environment variable */
@@ -2525,6 +2528,9 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     else if (strcmp(envvar, "BITSHUFFLE") == 0) {
       doshuffle = BLOSC_BITSHUFFLE;
     }
+    else {
+      BLOSC_TRACE_WARNING("BLOSC_SHUFFLE environment variable '%s' not recognized\n", envvar);
+    }
   }
 
   /* Check for a BLOSC_DELTA environment variable */
@@ -2532,8 +2538,11 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   if (envvar != NULL) {
     if (strcmp(envvar, "1") == 0) {
       blosc2_set_delta(1);
-    } else {
+    } else if (strcmp(envvar, "0") == 0) {
       blosc2_set_delta(0);
+    }
+    else {
+      BLOSC_TRACE_WARNING("BLOSC_DELTA environment variable '%s' not recognized\n", envvar);
     }
   }
 
@@ -2545,13 +2554,18 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     if ((value != EINVAL) && (value > 0)) {
       typesize = (int32_t)value;
     }
+    else {
+      BLOSC_TRACE_WARNING("BLOSC_TYPESIZE environment variable '%s' not recognized\n", envvar);
+    }
   }
 
   /* Check for a BLOSC_COMPRESSOR environment variable */
   envvar = getenv("BLOSC_COMPRESSOR");
   if (envvar != NULL) {
     result = blosc1_set_compressor(envvar);
-    if (result < 0) { return result; }
+    if (result < 0) {
+      BLOSC_TRACE_WARNING("BLOSC_COMPRESSOR environment variable '%s' not recognized\n", envvar);
+    }
   }
 
   /* Check for a BLOSC_BLOCKSIZE environment variable */
@@ -2562,6 +2576,9 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     if ((blocksize != EINVAL) && (blocksize > 0)) {
       blosc1_set_blocksize((size_t) blocksize);
     }
+    else {
+      BLOSC_TRACE_WARNING("BLOSC_BLOCKSIZE environment variable '%s' not recognized\n", envvar);
+    }
   }
 
   /* Check for a BLOSC_NTHREADS environment variable */
@@ -2571,7 +2588,9 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     nthreads = strtol(envvar, NULL, 10);
     if ((nthreads != EINVAL) && (nthreads > 0)) {
       result = blosc2_set_nthreads((int16_t) nthreads);
-      if (result < 0) { return result; }
+      if (result < 0) {
+        BLOSC_TRACE_WARNING("BLOSC_NTHREADS environment variable '%s' not recognized\n", envvar);
+      }
     }
   }
 
@@ -2591,6 +2610,10 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     else if (strcmp(envvar, "FORWARD_COMPAT") == 0) {
       splitmode = BLOSC_FORWARD_COMPAT_SPLIT;
     }
+    else {
+      BLOSC_TRACE_WARNING("BLOSC_SPLITMODE environment variable '%s' not recognized\n", envvar);
+    }
+
     if (splitmode >= 0) {
       blosc1_set_splitmode(splitmode);
     }
@@ -2602,7 +2625,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   envvar = getenv("BLOSC_NOLOCK");
   if (envvar != NULL) {
     // TODO: here is the only place that returns an extended header from
-    //   a blosc1_compress() call.  This should probably be fixed.
+    //  a blosc1_compress() call.  This should probably be fixed.
     const char *compname;
     blosc2_context *cctx;
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -2744,7 +2767,9 @@ int blosc2_decompress(const void* src, int32_t srcsize, void* dest, int32_t dest
     nthreads = strtol(envvar, NULL, 10);
     if ((nthreads != EINVAL) && (nthreads > 0)) {
       result = blosc2_set_nthreads((int16_t) nthreads);
-      if (result < 0) { return result; }
+      if (result < 0) {
+        return result;
+      }
     }
   }
 
@@ -3707,6 +3732,9 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     else if (strcmp(envvar, "BITSHUFFLE") == 0) {
       doshuffle = BLOSC_BITSHUFFLE;
     }
+    else {
+      BLOSC_TRACE_WARNING("BLOSC_SHUFFLE environment variable '%s' not recognized\n", envvar);
+    }
   }
   /* Check for a BLOSC_DELTA environment variable */
   int dodelta = BLOSC_NOFILTER;
@@ -3714,8 +3742,11 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   if (envvar != NULL) {
     if (strcmp(envvar, "1") == 0) {
       dodelta = BLOSC_DELTA;
-    } else {
+    } else if (strcmp(envvar, "0") == 0){
       dodelta = BLOSC_NOFILTER;
+    }
+    else {
+      BLOSC_TRACE_WARNING("BLOSC_DELTA environment variable '%s' not recognized\n", envvar);
     }
   }
   /* Check for a BLOSC_TYPESIZE environment variable */
@@ -3726,6 +3757,9 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     value = (int32_t) strtol(envvar, NULL, 10);
     if ((value != EINVAL) && (value > 0)) {
       context->typesize = value;
+    }
+    else {
+      BLOSC_TRACE_WARNING("BLOSC_TYPESIZE environment variable '%s' not recognized\n", envvar);
     }
   }
   build_filters(doshuffle, dodelta, context->typesize, context->filters);
@@ -3738,6 +3772,9 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     value = (int)strtol(envvar, NULL, 10);
     if ((value != EINVAL) && (value >= 0)) {
       context->clevel = value;
+    }
+    else {
+      BLOSC_TRACE_WARNING("BLOSC_CLEVEL environment variable '%s' not recognized\n", envvar);
     }
   }
 
@@ -3763,6 +3800,9 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     if ((blocksize != EINVAL) && (blocksize > 0)) {
       context->blocksize = blocksize;
     }
+    else {
+      BLOSC_TRACE_WARNING("BLOSC_BLOCKSIZE environment variable '%s' not recognized\n", envvar);
+    }
   }
 
   context->nthreads = cparams.nthreads;
@@ -3773,6 +3813,9 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     if ((nthreads != EINVAL) && (nthreads > 0)) {
       context->nthreads = nthreads;
     }
+    else {
+      BLOSC_TRACE_WARNING("BLOSC_NTHREADS environment variable '%s' not recognized\n", envvar);
+    }
   }
   context->new_nthreads = context->nthreads;
 
@@ -3781,17 +3824,20 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   envvar = getenv("BLOSC_SPLITMODE");
   if (envvar != NULL) {
     int32_t splitmode = -1;
-    if (strcmp(envvar, "ALWAYS_SPLIT") == 0) {
+    if (strcmp(envvar, "ALWAYS") == 0) {
       splitmode = BLOSC_ALWAYS_SPLIT;
     }
-    else if (strcmp(envvar, "NEVER_SPLIT") == 0) {
+    else if (strcmp(envvar, "NEVER") == 0) {
       splitmode = BLOSC_NEVER_SPLIT;
     }
-    else if (strcmp(envvar, "AUTO_SPLIT") == 0) {
+    else if (strcmp(envvar, "AUTO") == 0) {
       splitmode = BLOSC_AUTO_SPLIT;
     }
-    else if (strcmp(envvar, "FORWARD_COMPAT_SPLIT") == 0) {
+    else if (strcmp(envvar, "FORWARD_COMPAT") == 0) {
       splitmode = BLOSC_FORWARD_COMPAT_SPLIT;
+    }
+    else {
+      BLOSC_TRACE_WARNING("BLOSC_SPLITMODE environment variable '%s' not recognized\n", envvar);
     }
     if (splitmode >= 0) {
       context->splitmode = splitmode;
