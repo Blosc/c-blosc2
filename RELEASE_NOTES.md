@@ -1,10 +1,16 @@
-Release notes for C-Blosc2 2.5.1
+Release notes for C-Blosc2 2.6.0
 ================================
 
-Changes from 2.5.0 to 2.5.1
+Changes from 2.5.0 to 2.6.0
 ===========================
 
-#XXX version-specific blurb XXX#
+* [API] Now it is possible to pass filter ID to a User Defined Filter.
+
+* Unified convention for BLOSC_SPLITMODE environment variable in Blosc
+  and Blosc2. The list of valid values is "ALWAYS", "NEVER", "AUTO" and
+  "FORWARD_COMPAT" now.
+
+* Unified convention for BLOSC_SPLITMODE enum in Blosc and Blosc2 headers.
 
 
 Changes from 2.4.3 to 2.5.0

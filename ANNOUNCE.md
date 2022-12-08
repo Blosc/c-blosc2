@@ -1,13 +1,13 @@
-# Announcing C-Blosc2 2.5.0
+# Announcing C-Blosc2 2.6.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
 The Blosc development team is happy to announce a new release of C-Blosc2.
-This is a minor release where we fixed some nasty bugs.  Also, we have 
-introduced some (minor) API changes to allow ``splitmode`` to be better
-handled and serialized in frames.  Finally, some performance tweaks have
-been added too.
+This is a minor release where unified API among C-Blosc and C-Blosc2,
+specially regarding the splitmode. Also, now it is possible to pass the
+id of a user defined filter function; this is useful in multiple filter
+scenarios.
 
 C-Blosc2 should be backward compatible with C-Blosc, so you can start using
 it right away and increasingly start to use its new functionality, like the
