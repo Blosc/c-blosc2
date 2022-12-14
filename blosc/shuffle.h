@@ -22,6 +22,25 @@
 
 #include "blosc2/blosc2-common.h"
 
+/* Toggle hardware-accelerated routines based on SHUFFLE_*_ENABLED macros
+   and availability on the target architecture.
+*/
+#if defined(SHUFFLE_AVX2_ENABLED) && defined(__AVX2__)
+#define SHUFFLE_USE_AVX2
+#endif
+
+#if defined(SHUFFLE_SSE2_ENABLED) && defined(__SSE2__)
+#define SHUFFLE_USE_SSE2
+#endif
+
+#if defined(SHUFFLE_ALTIVEC_ENABLED) && defined(__ALTIVEC__)
+#define SHUFFLE_USE_ALTIVEC
+#endif
+
+#if defined(SHUFFLE_NEON_ENABLED) && defined(__ARM_NEON)
+#define SHUFFLE_USE_NEON
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
