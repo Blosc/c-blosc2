@@ -17,7 +17,7 @@
 
 /* Include NEON-accelerated shuffle implementation if supported by this compiler.
    TODO: Need to also do run-time CPU feature support here. */
-#if defined(SHUFFLE_NEON_ENABLED)
+#if defined(SHUFFLE_USE_NEON)
   #include "../blosc/shuffle-neon.h"
 #else
   #if defined(_MSC_VER)
@@ -25,13 +25,13 @@
   #else
     #warning NEON shuffle tests not enabled.
   #endif
-#endif  /* defined(SHUFFLE_NEON_ENABLED) */
+#endif  /* defined(SHUFFLE_USE_NEON) */
 
 
 /** Roundtrip tests for the NEON-accelerated shuffle/unshuffle. */
 static int test_shuffle_roundtrip_neon(size_t type_size, size_t num_elements,
                                        size_t buffer_alignment, int test_type) {
-#if defined(SHUFFLE_NEON_ENABLED)
+#if defined(SHUFFLE_USE_NEON)
   size_t buffer_size = type_size * num_elements;
 
   /* Allocate memory for the test. */
@@ -77,7 +77,7 @@ static int test_shuffle_roundtrip_neon(size_t type_size, size_t num_elements,
   return exit_code;
 #else
   return EXIT_SUCCESS;
-#endif /* defined(SHUFFLE_NEON_ENABLED) */
+#endif /* defined(SHUFFLE_USE_NEON) */
 }
 
 
