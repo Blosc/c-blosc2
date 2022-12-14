@@ -17,7 +17,7 @@
 
 /* Include SSE2-accelerated shuffle implementation if supported by this compiler.
    TODO: Need to also do run-time CPU feature support here. */
-#if defined(SHUFFLE_SSE2_ENABLED)
+#if defined(SHUFFLE_USE_SSE2)
   #include "../blosc/shuffle-sse2.h"
 #else
   #if defined(_MSC_VER)
@@ -25,13 +25,13 @@
   #else
     #warning SSE2 shuffle tests not enabled.
   #endif
-#endif  /* defined(SHUFFLE_SSE2_ENABLED) */
+#endif  /* defined(SHUFFLE_USE_SSE2) */
 
 
 /** Roundtrip tests for the SSE2-accelerated shuffle/unshuffle. */
 static int test_shuffle_roundtrip_sse2(int32_t type_size, int32_t num_elements,
                                        size_t buffer_alignment, int test_type) {
-#if defined(SHUFFLE_SSE2_ENABLED)
+#if defined(SHUFFLE_USE_SSE2)
   int32_t buffer_size = type_size * num_elements;
 
   /* Allocate memory for the test. */
@@ -77,7 +77,7 @@ static int test_shuffle_roundtrip_sse2(int32_t type_size, int32_t num_elements,
   return exit_code;
 #else
   return EXIT_SUCCESS;
-#endif /* defined(SHUFFLE_SSE2_ENABLED) */
+#endif /* defined(SHUFFLE_USE_SSE2) */
 }
 
 

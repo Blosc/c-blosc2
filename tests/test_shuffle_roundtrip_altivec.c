@@ -17,7 +17,7 @@
 
 /* Include ALTIVEC-accelerated shuffle implementation if supported by this compiler.
    TODO: Need to also do run-time CPU feature support here. */
-#if defined(SHUFFLE_ALTIVEC_ENABLED)
+#if defined(SHUFFLE_USE_ALTIVEC)
   #include "../blosc/shuffle-altivec.h"
 #else
   #if defined(_MSC_VER)
@@ -25,13 +25,13 @@
   #else
     #warning ALTIVEC shuffle tests not enabled.
   #endif
-#endif  /* defined(SHUFFLE_ALTIVEC_ENABLED) */
+#endif  /* defined(SHUFFLE_USE_ALTIVEC) */
 
 
 /** Roundtrip tests for the ALTIVEC-accelerated shuffle/unshuffle. */
 static int test_shuffle_roundtrip_altivec(int32_t type_size, int32_t num_elements,
                                           size_t buffer_alignment, int test_type) {
-#if defined(SHUFFLE_ALTIVEC_ENABLED)
+#if defined(SHUFFLE_USE_ALTIVEC)
   int32_t buffer_size = type_size * num_elements;
 
   /* Allocate memory for the test. */
@@ -77,7 +77,7 @@ static int test_shuffle_roundtrip_altivec(int32_t type_size, int32_t num_element
   return exit_code;
 #else
   return EXIT_SUCCESS;
-#endif /* defined(SHUFFLE_ALTIVEC_ENABLED) */
+#endif /* defined(SHUFFLE_USE_ALTIVEC) */
 }
 
 

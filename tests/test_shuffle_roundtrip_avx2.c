@@ -17,7 +17,7 @@
 /* Include accelerated shuffles if supported by this compiler.
    TODO: Need to also do run-time CPU feature support here. */
 
-#if defined(SHUFFLE_AVX2_ENABLED)
+#if defined(SHUFFLE_USE_AVX2)
   #include "../blosc/shuffle-avx2.h"
 #else
   #if defined(_MSC_VER)
@@ -25,13 +25,13 @@
   #else
     #warning AVX2 shuffle tests not enabled.
   #endif
-#endif  /* defined(SHUFFLE_AVX2_ENABLED) */
+#endif  /* defined(SHUFFLE_USE_AVX2) */
 
 
 /** Roundtrip tests for the AVX2-accelerated shuffle/unshuffle. */
 static int test_shuffle_roundtrip_avx2(int32_t type_size, int32_t num_elements,
                                        size_t buffer_alignment, int test_type) {
-#if defined(SHUFFLE_AVX2_ENABLED)
+#if defined(SHUFFLE_USE_AVX2)
   int32_t buffer_size = type_size * num_elements;
 
   /* Allocate memory for the test. */
@@ -78,7 +78,7 @@ static int test_shuffle_roundtrip_avx2(int32_t type_size, int32_t num_elements,
   return exit_code;
 #else
   return EXIT_SUCCESS;
-#endif /* defined(SHUFFLE_AVX2_ENABLED) */
+#endif /* defined(SHUFFLE_USE_AVX2) */
 }
 
 
