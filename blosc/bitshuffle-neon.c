@@ -12,9 +12,7 @@
 #include "bitshuffle-neon.h"
 
 /* Make sure NEON is available for the compilation target and compiler. */
-#if !defined(__ARM_NEON)
-  #error NEON is not supported by the target architecture/platform and/or this compiler.
-#endif
+#if defined(__ARM_NEON)
 
 #include <arm_neon.h>
 
@@ -1000,6 +998,8 @@ bitunshuffle_neon(void* _src, void* _dest, const size_t size,
          so we're done processing here. */
       return count;
   }
-  
+
   return (int64_t)size * (int64_t)elem_size;
 }
+
+#endif /* defined(__ARM_NEON) */

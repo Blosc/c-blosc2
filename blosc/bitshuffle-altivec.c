@@ -26,9 +26,8 @@
 #include "bitshuffle-altivec.h"
 
 /* Make sure ALTIVEC is available for the compilation target and compiler. */
-#if !defined(__ALTIVEC__)
-  #error ALTIVEC is not supported by the target architecture/platform and/or this compiler.
-#endif
+#if defined(__ALTIVEC__)
+
 #include <altivec.h>
 #include "transpose-altivec.h"
 
@@ -590,3 +589,5 @@ int64_t bshuf_untrans_bit_elem_altivec(void* in, void* out, const size_t size,
 
   return count;
 }
+
+#endif /* defined(__ALTIVEC__) */

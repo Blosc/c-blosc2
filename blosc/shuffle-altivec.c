@@ -12,9 +12,7 @@
 #include "shuffle-altivec.h"
 
 /* Make sure ALTIVEC is available for the compilation target and compiler. */
-#if !defined(__ALTIVEC__)
-  #error ALTIVEC is not supported by the target architecture/platform and/or this compiler.
-#endif
+#if defined(__ALTIVEC__)
 
 #include <altivec.h>
 #include "transpose-altivec.h"
@@ -421,3 +419,5 @@ unshuffle_altivec(const int32_t bytesoftype, const int32_t blocksize,
     unshuffle_generic_inline(bytesoftype, vectorizable_bytes, blocksize, _src, _dest);
   }
 }
+
+#endif /* defined(__ALTIVEC__) */
