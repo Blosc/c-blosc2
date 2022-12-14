@@ -141,7 +141,7 @@ __cpuidex(int32_t cpuInfo[4], int32_t function_id, int32_t subfunction_id) {
 
 // GCC folks added _xgetbv in immintrin.h starting in GCC 9
 // See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=71659
-#if !(defined(_IMMINTRIN_H_INCLUDED) && (BLOSC_GCC_VERSION >= 900))
+#if defined(__i386__) && !(defined(_IMMINTRIN_H_INCLUDED) && (BLOSC_GCC_VERSION >= 900))
 /* Reads the content of an extended control register.
    https://software.intel.com/en-us/articles/how-to-detect-new-instruction-support-in-the-4th-generation-intel-core-processor-family
 */
@@ -160,7 +160,7 @@ _xgetbv(uint32_t xcr) {
     );
   return ((uint64_t)edx << 32) | eax;
 }
-#endif  // !(defined(_IMMINTRIN_H_INCLUDED) && (BLOSC_GCC_VERSION >= 900))
+#endif  // defined(__i386__) && !(defined(_IMMINTRIN_H_INCLUDED) && (BLOSC_GCC_VERSION >= 900))
 #endif /* defined(_MSC_VER) */
 
 #ifndef _XCR_XFEATURE_ENABLED_MASK
@@ -204,7 +204,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   bool ymm_state_enabled = false;
   //bool zmm_state_enabled = false;  // commented this out for avoiding an 'unused variable' warning
 
-#if defined(_XCR_XFEATURE_ENABLED_MASK)
+#if defined(__i386__) && defined(_XCR_XFEATURE_ENABLED_MASK)
   if (xsave_available && xsave_enabled_by_os && (
       sse2_available || sse3_available || ssse3_available
       || sse41_available || sse42_available
@@ -219,7 +219,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
         restored as well as all of zmm16-zmm31 and the opmask registers. */
     //zmm_state_enabled = (xcr0_contents & 0x70) == 0x70;
   }
-#endif /* defined(_XCR_XFEATURE_ENABLED_MASK) */
+#endif /* defined(__i386__) && defined(_XCR_XFEATURE_ENABLED_MASK) */
 
 #if defined(BLOSC_DUMP_CPU_INFO)
   printf("Shuffle CPU Information:\n");
