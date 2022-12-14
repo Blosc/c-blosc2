@@ -25,9 +25,7 @@
 #include "bitshuffle-sse2.h"
 
 /* Make sure SSE2 is available for the compilation target and compiler. */
-#if !defined(__SSE2__)
-  #error SSE2 is not supported by the target architecture/platform and/or this compiler.
-#endif
+#if defined(__SSE2__)
 
 #include <emmintrin.h>
 
@@ -474,3 +472,5 @@ int64_t bshuf_untrans_bit_elem_sse2(void* in, void* out, const size_t size,
 
   return count;
 }
+
+#endif /* defined(__SSE2__) */

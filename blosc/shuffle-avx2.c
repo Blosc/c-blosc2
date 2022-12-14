@@ -12,9 +12,7 @@
 #include "shuffle-avx2.h"
 
 /* Make sure AVX2 is available for the compilation target and compiler. */
-#if !defined(__AVX2__)
-  #error AVX2 is not supported by the target architecture/platform and/or this compiler.
-#endif
+#if defined(__AVX2__)
 
 #include <immintrin.h>
 
@@ -745,3 +743,5 @@ unshuffle_avx2(const int32_t bytesoftype, const int32_t blocksize,
     unshuffle_generic_inline(bytesoftype, vectorizable_bytes, blocksize, _src, _dest);
   }
 }
+
+#endif /* defined(__AVX2__) */
