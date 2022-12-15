@@ -93,8 +93,8 @@ extern "C" {
 #define BLOSC2_VERSION_MINOR    6    /* for minor interface/format changes  */
 #define BLOSC2_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC2_VERSION_STRING   "2.6.1.dev"  /* string version.  Sync with above! */
-#define BLOSC2_VERSION_DATE     "$Date:: 2022-12-08 #$"    /* date version */
+#define BLOSC2_VERSION_STRING   "2.6.1"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_DATE     "$Date:: 2022-12-15 #$"    /* date version */
 
 
 /* The maximum number of dimensions for caterva arrays */

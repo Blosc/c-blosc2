@@ -1,12 +1,15 @@
 Release notes for C-Blosc2 2.6.1
 ================================
 
-
-Changes from 2.6.0 to 2.6.1
+Changes from 2.6.1 to 2.6.2
 ===========================
 
 #XXX version-specific blurb XXX#
 
+Changes from 2.6.0 to 2.6.1
+===========================
+
+* Add support for macos universal2 binaries (arm64+x86_64 build). Thanks to Thomas Vincent.
 
 Changes from 2.5.0 to 2.6.0
 ===========================
