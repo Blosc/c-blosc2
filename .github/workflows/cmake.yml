@@ -81,11 +81,6 @@ jobs:
             compiler: clang
             cmake-args: -D DEACTIVATE_ZSTD=ON
 
-          - name: Windows MSVC Win32
-            os: windows-latest
-            compiler: cl
-            cmake-args: -A Win32
-
           - name: Windows MSVC Win64
             os: windows-latest
             compiler: cl
