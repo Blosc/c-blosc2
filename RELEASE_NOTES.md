@@ -29,7 +29,7 @@ Changes from 2.5.0 to 2.6.0
 Changes from 2.4.3 to 2.5.0
 ===========================
 
-* Fixed a nasty bug that prevented retriving data correctly with large super-chunks (> 2^31 elements).
+* Fixed a nasty bug that prevented retrieving data correctly with large super-chunks (> 2^31 elements).
 
 * Fixed an issue in `blosc2_schunk_get_slice_buffer()` in the interpretation of the `stop` param.
   Now `stop` is not part of the selected slice (as advertised).
