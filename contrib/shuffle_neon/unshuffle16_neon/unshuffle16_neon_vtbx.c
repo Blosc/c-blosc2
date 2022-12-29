@@ -43,7 +43,7 @@ void unshuffle16_neon(uint8_t* const dest, const uint8_t* const src,
                            "\xff\xff\x0b\x1b\xff\xff\x0f\x1f";
 
   for(i = 0, k = 0; i < vectorizable_elements*bytesoftype; i += 128, k++) {
-    /* Load 16 gorups of 8 bytes to the structures */
+    /* Load 16 groups of 8 bytes to the structures */
     for(j = 0; j < 4; j++) {
       for (l = 0; l < 4; l++) {
         r0[j].val[l] = vld1_u8(src + j*total_elements + l*4*total_elements + k*8);

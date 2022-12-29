@@ -147,7 +147,7 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
     uint8_t *smeta;
     int32_t smeta_len;
     if (blosc2_meta_get(sc, "caterva", &smeta, &smeta_len) < 0) {
-        BLOSC_TRACE_ERROR("Cannot acces caterva meta info");
+        BLOSC_TRACE_ERROR("Cannot access caterva meta info");
         free(shape);
         free(chunkshape);
         free(blockshape);
@@ -377,7 +377,7 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     uint8_t *smeta;
     int32_t smeta_len;
     if (blosc2_meta_get(sc, "caterva", &smeta, &smeta_len) < 0) {
-        BLOSC_TRACE_ERROR("Cannot acces caterva meta info");
+        BLOSC_TRACE_ERROR("Cannot access caterva meta info");
         free(shape);
         free(chunkshape);
         free(blockshape);
@@ -627,7 +627,7 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     uint8_t *smeta;
     int32_t smeta_len;
     if (blosc2_meta_get(sc, "caterva", &smeta, &smeta_len) < 0) {
-        BLOSC_TRACE_ERROR("Cannot acces caterva meta info");
+        BLOSC_TRACE_ERROR("Cannot access caterva meta info");
         free(shape);
         free(chunkshape);
         free(blockshape);

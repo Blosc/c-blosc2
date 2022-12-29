@@ -58,4 +58,4 @@ The main advantage of *ZFP* when compared with others is that *ZFP* makes use of
 
 For example, the difference between *ZFP* and *NDLZ* is that *ZFP* codec uses lossy data compression (which implies better ratios) and lets user to work with floating-point datasets.  Furthermore, *ZFP* implements different compression modes that brings interesting new possibilities.
 
-The main disadvantage of *ZFP* is that it is mainly useful for 2 to 4-dim datasets only. It can also be used for 1-dim datasets, but then it loses most of its advantages (i.e. using spacial locality to better reduce data entropy).
+The main disadvantage of *ZFP* is that it is mainly useful for 2 to 4-dim datasets only. It can also be used for 1-dim datasets, but then it loses most of its advantages (i.e. using spatial locality to better reduce data entropy).
