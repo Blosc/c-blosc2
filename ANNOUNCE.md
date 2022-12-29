@@ -45,7 +45,7 @@ for details.
 There is an official Blosc mailing list at:
 
 blosc@googlegroups.com
-http://groups.google.es/group/blosc
+https://groups.google.com/g/blosc
 
 ## Tweeter feed
 

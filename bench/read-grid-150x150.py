@@ -9,7 +9,7 @@ ftp://ftp-cdc.dwd.de/pub/REA/COSMO_REA6/hourly/2D/TOT_PRECIP/TOT_PRECIP.2D.20151
 
 After downloading it and uncompressing it, just run this script for extracting a small grid.
 
-For more info on these datasets, see http://reanalysis.meteo.uni-bonn.de.
+For more info on these datasets, see https://reanalysis.meteo.uni-bonn.de.
 """
 
 from osgeo import gdal

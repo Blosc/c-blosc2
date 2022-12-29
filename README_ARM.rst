@@ -151,7 +151,7 @@ Another example for running a bench with the cross compiler:
 
 In these cases the NEON flags are: `-mfpu=neon -flax-vector-conversions`
 
-This is explained in detail in: http://linux-sunxi.org/Toolchain
+This is explained in detail in: https://linux-sunxi.org/Toolchain
 
 This way you can develop and debug applications for ARM on intel machines as if
 you were in ARM platforms.

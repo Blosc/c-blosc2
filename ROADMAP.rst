@@ -40,7 +40,7 @@ Right now, the next features are already implemented (although they may require 
 
 * **Parallel chunk reads:** when several blocks of a chunk are to be read, this is done in parallel by the decompressing machinery.  That means that every thread is responsible to read, post-filter and decompress a block by itself, leading to an efficient overlap of I/O and CPU usage that optimizes reads to a maximum.
 
-* **Meta-layers:** optionally, the user can add meta-data for different uses and in different layers.  For example, one may think on providing a meta-layer for `NumPy <http://www.numpy.org>`_ so that most of the meta-data for it is stored in a meta-layer; then, one can place another meta-layer on top of the latter for adding more high-level info if desired (e.g. geo-spatial, meteorological...).
+* **Meta-layers:** optionally, the user can add meta-data for different uses and in different layers.  For example, one may think on providing a meta-layer for `NumPy <https://numpy.org>`_ so that most of the meta-data for it is stored in a meta-layer; then, one can place another meta-layer on top of the latter for adding more high-level info if desired (e.g. geo-spatial, meteorological...).
 
 * **Variable length meta-layers:** the user may want to add variable-length meta information that can be potentially very large (up to 2 GB). The regular meta-layer described above is very quick to read, but meant to store fixed-length and relatively small meta information.  Variable length metalayers are stored in the trailer of a frame, whereas regular meta-layers are in the header.
 
@@ -84,7 +84,7 @@ Actions to be done
 
 * **Lock support for super-chunks:** when different processes are accessing concurrently to super-chunks, make them to sync properly by using locks, either on-disk (frame-backed super-chunks), or in-memory. Such a lock support would be configured in build time, so it could be disabled with a cmake flag.
 
-* **Hierarchical structure (aka Groups):** some libraries (like `xarray <http://xarray.pydata.org/>`_) need an easy way to tie different datasets together (groups).  This would also allow to create whole hierarchies so as to endow a structure to these datasets.  Besides the structural part (that will be part of the format specification), this will need an accompanying API that allows the user to create groups, add datasets to groups, (recursively) list datasets in groups, access a dataset inside a group, an so on.
+* **Hierarchical structure (aka Groups):** some libraries (like `xarray <https://xarray.dev>`_) need an easy way to tie different datasets together (groups).  This would also allow to create whole hierarchies so as to endow a structure to these datasets.  Besides the structural part (that will be part of the format specification), this will need an accompanying API that allows the user to create groups, add datasets to groups, (recursively) list datasets in groups, access a dataset inside a group, an so on.
 
 
 Outreaching
