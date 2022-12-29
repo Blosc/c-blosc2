@@ -8,7 +8,7 @@ A fast, compressed and persistent data store library for C
 
 :Author: The Blosc Development Team
 :Contact: blosc@blosc.org
-:URL: http://www.blosc.org
+:URL: https://www.blosc.org
 :Gitter: |gitter|
 :Actions: |actions|
 :NumFOCUS: |numfocus|
@@ -34,7 +34,7 @@ A fast, compressed and persistent data store library for C
 What is it?
 ===========
 
-`Blosc <http://blosc.org/pages/blosc-in-depth/>`_ is a high performance compressor optimized for binary data (i.e. floating point numbers, integers and booleans).  It has been designed to transmit data to the processor cache faster than the traditional, non-compressed, direct memory fetch approach via a memcpy() OS call.  Blosc main goal is not just to reduce the size of large datasets on-disk or in-memory, but also to accelerate memory-bound computations.
+`Blosc <https://www.blosc.org/pages/blosc-in-depth/>`_ is a high performance compressor optimized for binary data (i.e. floating point numbers, integers and booleans).  It has been designed to transmit data to the processor cache faster than the traditional, non-compressed, direct memory fetch approach via a memcpy() OS call.  Blosc main goal is not just to reduce the size of large datasets on-disk or in-memory, but also to accelerate memory-bound computations.
 
 C-Blosc2 is the new major version of `C-Blosc <https://github.com/Blosc/c-blosc>`_, and tries hard to be backward compatible with both the C-Blosc1 API and its in-memory format.  However, the reverse thing is generally not true for the format; buffers generated with C-Blosc2 are not format-compatible with C-Blosc1 (i.e. forward compatibility is not supported).  In case you want to ensure full API compatibility with C-Blosc1 API, define the `BLOSC1_COMPAT` symbol.
 
@@ -72,7 +72,7 @@ New features in C-Blosc2
 
 * **Parallel chunk reads:** when several blocks of a chunk are to be read, this is done in parallel by the decompressing machinery.  That means that every thread is responsible to read, post-filter and decompress a block by itself, leading to an efficient overlap of I/O and CPU usage that optimizes reads to a maximum.
 
-* **Meta-layers:** optionally, the user can add meta-data for different uses and in different layers.  For example, one may think on providing a meta-layer for `NumPy <http://www.numpy.org>`_ so that most of the meta-data for it is stored in a meta-layer; then, one can place another meta-layer on top of the latter for adding more high-level info if desired (e.g. geo-spatial, meteorological...).
+* **Meta-layers:** optionally, the user can add meta-data for different uses and in different layers.  For example, one may think on providing a meta-layer for `NumPy <https://numpy.org>`_ so that most of the meta-data for it is stored in a meta-layer; then, one can place another meta-layer on top of the latter for adding more high-level info if desired (e.g. geo-spatial, meteorological...).
 
 * **Variable length meta-layers:** the user may want to add variable-length meta information that can be potentially very large (up to 2 GB). The regular meta-layer described above is very quick to read, but meant to store fixed-length and relatively small meta information.  Variable length metalayers are stored in the trailer of a frame, whereas regular meta-layers are in the header.
 
@@ -100,7 +100,7 @@ Meta-compression and other advantages over existing compressors
 
 C-Blosc2 is not like other compressors: it should rather be called a meta-compressor.  This is so because it can use different codecs (libraries that can reduce the size of inputs) and filters (libraries that generally improve compression ratio).  At the same time, it can also be called a compressor because it makes an actual use of the several codecs and filters, so it can actually work like so.
 
-Currently C-Blosc2 comes with support of BloscLZ, a compressor heavily based on `FastLZ <http://fastlz.org/>`_, `LZ4 and LZ4HC <https://github.com/lz4/lz4>`_, `Zstd <https://github.com/facebook/zstd>`_, and `Zlib, via zlib-ng: <https://github.com/zlib-ng/zlib-ng>`_, as well as a highly optimized (it can use SSE2, AVX2, NEON or ALTIVEC instructions, if available) shuffle and bitshuffle filters (for info on how shuffling works, see slide 17 of http://www.slideshare.net/PyData/blosc-py-data-2014).
+Currently C-Blosc2 comes with support of BloscLZ, a compressor heavily based on `FastLZ <https://ariya.github.io/FastLZ/>`_, `LZ4 and LZ4HC <https://github.com/lz4/lz4>`_, `Zstandard <https://github.com/facebook/zstd>`_, and `Zlib, via zlib-ng: <https://github.com/zlib-ng/zlib-ng>`_, as well as a highly optimized (it can use SSE2, AVX2, NEON or ALTIVEC instructions, if available) shuffle and bitshuffle filters (for info on how shuffling works, see slide 17 of https://www.slideshare.net/PyData/blosc-py-data-2014).
 
 Blosc is in charge of coordinating the codecs and filters so that they can leverage the blocking technique (described above) as
 well as multi-threaded execution (if several cores are available) automatically. That makes that every codec and filter
@@ -129,7 +129,7 @@ We are officially supporting (thanks to the Python Software Foundation) a `Pytho
 Compiling the C-Blosc2 library with CMake
 =========================================
 
-Blosc can be built, tested and installed using `CMake <http://www.cmake.org>`_.  The following procedure describes a typical CMake build.
+Blosc can be built, tested and installed using `CMake <https://cmake.org>`_.  The following procedure describes a typical CMake build.
 
 Create the build directory inside the sources and move into it:
 

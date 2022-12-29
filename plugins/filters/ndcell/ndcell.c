@@ -1,6 +1,6 @@
 /*
   Copyright (C) 2021 The Blosc Developers
-  http://blosc.org
+  https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 */
 

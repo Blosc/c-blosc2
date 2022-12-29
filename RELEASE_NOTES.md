@@ -522,7 +522,7 @@ Changes from 2.0.0a2 to 2.0.0a3
 * Added support for new Zstd codec (https://github.com/Cyan4973/zstd).
   This is a new compressor by Yann Collet, the author of LZ4 and
   LZ4HC.  For details on Zstd, see this nice intro:
-  http://fastcompression.blogspot.com.es/2015/01/zstd-stronger-compression-algorithm.html.
+  https://fastcompression.blogspot.com/2015/01/zstd-stronger-compression-algorithm.html.
 
 * The blosc2_append_chunk() has been removed.  This is this because an
   existing chunk may not fulfill the sequence of filters in super

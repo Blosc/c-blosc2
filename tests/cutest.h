@@ -1,7 +1,7 @@
 /*
   Copyright (C) 2021 Aleix Alcacer
   Copyright (C) 2021 The Blosc Developers
-  http://blosc.org
+  https://blosc.org
   License: BSD (see LICENSE.txt)
 
   See LICENSE.txt for details about copyright and rights to use.
