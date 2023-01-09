@@ -172,11 +172,17 @@ if(COMPILER_SUPPORT_SSE2)
             set_source_files_properties(
                     shuffle-sse2.c bitshuffle-sse2.c blosclz.c fastcopy.c
                     PROPERTIES COMPILE_FLAGS "/arch:SSE2")
+            set_property(
+                    SOURCE shuffle.c
+                    APPEND PROPERTY COMPILE_OPTIONS "/arch:SSE2")
         endif()
     else()
         set_source_files_properties(
                 shuffle-sse2.c bitshuffle-sse2.c blosclz.c fastcopy.c
                 PROPERTIES COMPILE_FLAGS -msse2)
+        set_property(
+                SOURCE shuffle.c
+                APPEND PROPERTY COMPILE_OPTIONS -msse2)
     endif()
 
     # Define a symbol for the shuffle-dispatch implementation
@@ -191,10 +197,16 @@ if(COMPILER_SUPPORT_AVX2)
         set_source_files_properties(
                 shuffle-avx2.c bitshuffle-avx2.c
                 PROPERTIES COMPILE_FLAGS "/arch:AVX2")
+        set_property(
+                SOURCE shuffle.c
+                APPEND PROPERTY COMPILE_OPTIONS "/arch:AVX2")
     else()
         set_source_files_properties(
                 shuffle-avx2.c bitshuffle-avx2.c
                 PROPERTIES COMPILE_FLAGS -mavx2)
+        set_property(
+                SOURCE shuffle.c
+                APPEND PROPERTY COMPILE_OPTIONS -mavx2)
     endif()
 
     # Define a symbol for the shuffle-dispatch implementation
@@ -208,11 +220,17 @@ if(COMPILER_SUPPORT_NEON)
     set_source_files_properties(
             shuffle-neon.c bitshuffle-neon.c
             PROPERTIES COMPILE_FLAGS "-flax-vector-conversions")
+    set_property(
+            SOURCE shuffle.c
+            APPEND PROPERTY COMPILE_OPTIONS "-flax-vector-conversions")
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l)
         # Only armv7l needs special -mfpu=neon flag; aarch64 doesn't.
       set_source_files_properties(
             shuffle-neon.c bitshuffle-neon.c
             PROPERTIES COMPILE_FLAGS "-mfpu=neon -flax-vector-conversions")
+      set_property(
+            SOURCE shuffle.c
+            APPEND PROPERTY COMPILE_OPTIONS "-mfpu=neon -flax-vector-conversions")
     endif()
     # Define a symbol for the shuffle-dispatch implementation
     # so it knows NEON is supported even though that file is
@@ -222,8 +240,12 @@ if(COMPILER_SUPPORT_NEON)
             APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_NEON_ENABLED)
 endif()
 if(COMPILER_SUPPORT_ALTIVEC)
-    set_source_files_properties(shuffle-altivec.c bitshuffle-altivec.c
+    set_source_files_properties(
+            shuffle-altivec.c bitshuffle-altivec.c
             PROPERTIES COMPILE_FLAGS -DNO_WARN_X86_INTRINSICS)
+    set_property(
+            SOURCE shuffle.c
+            APPEND PROPERTY COMPILE_OPTIONS -DNO_WARN_X86_INTRINSICS)
 
     # Define a symbol for the shuffle-dispatch implementation
     # so it knows ALTIVEC is supported even though that file is
