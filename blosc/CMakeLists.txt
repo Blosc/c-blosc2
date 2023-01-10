@@ -43,7 +43,8 @@ include_directories(${BLOSC_INCLUDE_DIRS})
 # library sources
 set(SOURCES ${SOURCES} blosc2.c blosclz.c fastcopy.c fastcopy.h schunk.c frame.c stune.c stune.h
         context.h delta.c delta.h shuffle-generic.c bitshuffle-generic.c trunc-prec.c trunc-prec.h
-        timestamp.c sframe.c directories.c blosc2-stdio.c)
+        timestamp.c sframe.c directories.c blosc2-stdio.c
+        caterva.c caterva_utils.c)
 if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
     if(COMPILER_SUPPORT_SSE2)
         message(STATUS "Adding run-time support for SSE2")

@@ -3,6 +3,8 @@ set(EXAMPLES contexts instrument_codec delta_schunk_ex multithread simple frame_
     noinit find_roots schunk_simple frame_simple schunk_postfilter urcodecs urfilters frame_vlmetalayers
     sframe_simple frame_backed_schunk compress_file frame_offset frame_roundtrip get_set_slice)
 
+add_subdirectory(caterva)
+
 if(NOT DEACTIVATE_ZSTD)
     set(EXAMPLES ${EXAMPLES} zstd_dict)
 endif()
