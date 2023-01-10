@@ -141,7 +141,7 @@ __cpuidex(int32_t cpuInfo[4], int32_t function_id, int32_t subfunction_id) {
 
 // GCC folks added _xgetbv in immintrin.h starting in GCC 9
 // See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=71659
-#if !(defined(_IMMINTRIN_H_INCLUDED) && (BLOSC_GCC_VERSION >= 900))
+#if !(defined(_IMMINTRIN_H_INCLUDED) && (BLOSC_GCC_VERSION >= 900)) && !defined(__IMMINTRIN_H)
 /* Reads the content of an extended control register.
    https://software.intel.com/en-us/articles/how-to-detect-new-instruction-support-in-the-4th-generation-intel-core-processor-family
 */
@@ -160,7 +160,7 @@ _xgetbv(uint32_t xcr) {
     );
   return ((uint64_t)edx << 32) | eax;
 }
-#endif  // !(defined(_IMMINTRIN_H_INCLUDED) && (BLOSC_GCC_VERSION >= 900))
+#endif  // !(defined(_IMMINTRIN_H_INCLUDED) && (BLOSC_GCC_VERSION >= 900)) && !defined(__IMMINTRIN_H)
 #endif /* defined(_MSC_VER) */
 
 #ifndef _XCR_XFEATURE_ENABLED_MASK
