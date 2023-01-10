@@ -13,6 +13,7 @@
 
 #include "caterva_utils.h"
 #include "blosc2.h"
+#include "blosc2/blosc2-common.h"
 #include <inttypes.h>
 
 
