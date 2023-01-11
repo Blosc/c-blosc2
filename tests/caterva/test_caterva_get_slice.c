@@ -47,6 +47,7 @@ CUTEST_TEST_DATA(get_slice) {
 
 
 CUTEST_TEST_SETUP(get_slice) {
+    blosc2_init();
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
     cfg.nthreads = 2;
     cfg.compcodec = BLOSC_BLOSCLZ;
@@ -180,6 +181,7 @@ CUTEST_TEST_TEST(get_slice) {
 
 CUTEST_TEST_TEARDOWN(get_slice) {
     caterva_ctx_free(&data->ctx);
+    blosc2_destroy();
 }
 
 int main() {

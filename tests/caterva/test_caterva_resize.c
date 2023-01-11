@@ -27,6 +27,7 @@ CUTEST_TEST_DATA(resize_shape) {
 
 
 CUTEST_TEST_SETUP(resize_shape) {
+    blosc2_init();
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
     cfg.nthreads = 2;
     caterva_ctx_new(&cfg, &data->ctx);
@@ -217,6 +218,7 @@ CUTEST_TEST_TEST(resize_shape) {
 
 CUTEST_TEST_TEARDOWN(resize_shape) {
     caterva_ctx_free(&data->ctx);
+    blosc2_destroy();
 }
 
 int main() {
