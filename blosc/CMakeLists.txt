@@ -1,4 +1,12 @@
-# a simple way to detect that we are using CMAKE
+# Blosc - Blocked Shuffling and Compression Library
+#
+# Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+# https://blosc.org
+# License: BSD 3-Clause (see LICENSE.txt)
+#
+# See LICENSE.txt for details about copyright and rights to use.
+
+# A simple way to detect that we are using CMAKE
 add_definitions(-DUSING_CMAKE)
 
 set(INTERNAL_LIBS ${PROJECT_SOURCE_DIR}/internal-complibs)

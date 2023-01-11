@@ -1,13 +1,12 @@
-/*
- * Copyright (C) 2018 Francesc Alted, Aleix Alcacer.
- * Copyright (C) 2019-present Blosc Development team <blosc@blosc.org>
- * All rights reserved.
- *
- * This source code is licensed under both the BSD-style license (found in the
- * LICENSE file in the root directory of this source tree) and the GPLv2 (found
- * in the COPYING file in the root directory of this source tree).
- * You may select, at your option, one of the above-listed licenses.
- */
+/*********************************************************************
+  Blosc - Blocked Shuffling and Compression Library
+
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
+
+  See LICENSE.txt for details about copyright and rights to use.
+**********************************************************************/
 
 #include <caterva.h>
 
@@ -58,7 +57,7 @@ int main() {
         slice_storage.chunkshape[i] = slice_chunkshape[i];
         slice_storage.blockshape[i] = slice_blockshape[i];
     }
-    
+
     caterva_array_t *slice;
     CATERVA_ERROR(caterva_get_slice(ctx, arr, slice_start, slice_stop, &slice_storage,
                                     &slice));

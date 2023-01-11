@@ -1,11 +1,10 @@
-# Copyright (C) 2018 Francesc Alted, Aleix Alcacer.
-# Copyright (C) 2019-present Blosc Development team <blosc@blosc.org>
-# All rights reserved.
+# Blosc - Blocked Shuffling and Compression Library
 #
-# This source code is licensed under both the BSD-style license (found in the
-# LICENSE file in the root directory of this source tree) and the GPLv2 (found
-# in the COPYING file in the root directory of this source tree).
-# You may select, at your option, one of the above-listed licenses.
+# Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+# https://blosc.org
+# License: BSD 3-Clause (see LICENSE.txt)
+#
+# See LICENSE.txt for details about copyright and rights to use.
 
 file(GLOB SOURCES example_*.c)
 if (NOT HAVE_PLUGINS)

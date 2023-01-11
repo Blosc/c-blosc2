@@ -1,3 +1,11 @@
+# Blosc - Blocked Shuffling and Compression Library
+#
+# Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+# https://blosc.org
+# License: BSD 3-Clause (see LICENSE.txt)
+#
+# See LICENSE.txt for details about copyright and rights to use.
+
 # sources
 set(SOURCES ${SOURCES} ../plugins/codecs/ndlz/ndlz.c ../plugins/codecs/ndlz/ndlz.h ../plugins/codecs/ndlz/ndlz-private.h
     ../plugins/codecs/ndlz/ndlz4x4.c ../plugins/codecs/ndlz/ndlz4x4.h ../plugins/codecs/ndlz/ndlz8x8.c

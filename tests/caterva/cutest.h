@@ -1,11 +1,12 @@
-/*
-  Copyright (C) 2021 Aleix Alcacer
-  Copyright (C) 2021 The Blosc Developers
-  http://blosc.org
-  License: BSD (see LICENSE.txt)
+/*********************************************************************
+  Blosc - Blocked Shuffling and Compression Library
+
+  Copyright (C) 2021  The Blosc Developers <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 
   See LICENSE.txt for details about copyright and rights to use.
-*/
+**********************************************************************/
 
 #ifndef CUTEST_CUTEST_H
 #define CUTEST_CUTEST_H

@@ -8,8 +8,6 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-
-
 #ifndef NDLZ8_H
 #define NDLZ8_H
 #include "context.h"
