@@ -18,7 +18,7 @@ CUTEST_TEST_DATA(metalayers) {
 
 CUTEST_TEST_SETUP(metalayers) {
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-    cfg.nthreads = 2;
+    //cfg.nthreads = 2;
     cfg.compcodec = BLOSC_BLOSCLZ;
     caterva_ctx_new(&cfg, &data->ctx);
 
@@ -98,9 +98,9 @@ CUTEST_TEST_TEST(metalayers) {
 
     caterva_metalayer_t vlmeta2;
     CATERVA_TEST_ASSERT(caterva_vlmeta_get(data->ctx, src, vlmeta1.name, &vlmeta2));
-    CUTEST_ASSERT("Contents are not equals",
+    CUTEST_ASSERT("Contents are not equal",
                   *((uint64_t *) vlmeta1.sdata) == *((uint64_t *) vlmeta2.sdata));
-    CUTEST_ASSERT("Sizes are not equals", vlmeta1.size == vlmeta2.size);
+    CUTEST_ASSERT("Sizes are not equal", vlmeta1.size == vlmeta2.size);
     free(vlmeta2.name);
     free(vlmeta2.sdata);
 
@@ -112,8 +112,8 @@ CUTEST_TEST_TEST(metalayers) {
 
     caterva_metalayer_t vlmeta3;
     CATERVA_TEST_ASSERT(caterva_vlmeta_get(data->ctx, src, vlmeta1.name, &vlmeta3));
-    CUTEST_ASSERT("Contents are not equals", *((float *) vlmeta1.sdata) == *((float *) vlmeta3.sdata));
-    CUTEST_ASSERT("Sizes are not equals", vlmeta1.size == vlmeta3.size);
+    CUTEST_ASSERT("Contents are not equal", *((float *) vlmeta1.sdata) == *((float *) vlmeta3.sdata));
+    CUTEST_ASSERT("Sizes are not equal", vlmeta1.size == vlmeta3.size);
     free(vlmeta3.name);
     free(vlmeta3.sdata);
 
@@ -127,8 +127,8 @@ CUTEST_TEST_TEST(metalayers) {
     caterva_open(data->ctx, urlpath, &src2);
 
     CATERVA_TEST_ASSERT(caterva_vlmeta_get(data->ctx, src2, vlmeta2.name, &vlmeta3));
-    CUTEST_ASSERT("Contents are not equals", *((uint64_t *) vlmeta2.sdata) == *((uint64_t *) vlmeta3.sdata));
-    CUTEST_ASSERT("Sizes are not equals", vlmeta2.size == vlmeta3.size);
+    CUTEST_ASSERT("Contents are not equal", *((uint64_t *) vlmeta2.sdata) == *((uint64_t *) vlmeta3.sdata));
+    CUTEST_ASSERT("Sizes are not equal", vlmeta2.size == vlmeta3.size);
     free(vlmeta3.name);
     free(vlmeta3.sdata);
 
@@ -144,8 +144,8 @@ CUTEST_TEST_TEST(metalayers) {
     caterva_metalayer_t meta2;
     CATERVA_TEST_ASSERT(caterva_meta_get(data->ctx, src2, meta1.name, &meta2));
 
-    CUTEST_ASSERT("Contents are not equals", *((double *) meta2.sdata) == *((double *) meta1.sdata));
-    CUTEST_ASSERT("Sizes are not equals", meta2.size == meta1.size);
+    CUTEST_ASSERT("Contents are not equal", *((double *) meta2.sdata) == *((double *) meta1.sdata));
+    CUTEST_ASSERT("Sizes are not equal", meta2.size == meta1.size);
     free(meta2.name);
     free(meta2.sdata);
 

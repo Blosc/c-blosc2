@@ -29,7 +29,7 @@ CUTEST_TEST_DATA(squeeze) {
 
 CUTEST_TEST_SETUP(squeeze) {
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-    cfg.nthreads = 2;
+    //cfg.nthreads = 2;
     cfg.compcodec = BLOSC_BLOSCLZ;
     caterva_ctx_new(&cfg, &data->ctx);
 

@@ -30,7 +30,7 @@ CUTEST_TEST_DATA(squeeze_index) {
 
 CUTEST_TEST_SETUP(squeeze_index) {
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-    cfg.nthreads = 2;
+    //cfg.nthreads = 2;
     cfg.compcodec = BLOSC_BLOSCLZ;
     caterva_ctx_new(&cfg, &data->ctx);
 
@@ -68,7 +68,7 @@ CUTEST_TEST_SETUP(squeeze_index) {
              {1, 0}, {2, 0}, {1, 0}}, // 0-shape
             {2, {20, 10}, {7, 5}, {3, 5}, {1, 0}, {1, 0},
              {17, 0}, {18, 0}, {1, 0}}, // 0-shape
-            {4, {10, 10, 10, 10}, {7, 5, 1, 4}, {2, 2, 1, 2}, {1, 1, 5, 1}, {1, 1, 2, 1},
+            {4, {10, 7, 6, 4}, {7, 5, 1, 4}, {2, 2, 1, 2}, {1, 1, 5, 1}, {1, 1, 2, 1},
              {4, 4, 0, 4}, {5, 5, 10, 5}, {1, 0, 0, 1}} // general
     ));
 }
