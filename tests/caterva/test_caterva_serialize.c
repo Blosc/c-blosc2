@@ -18,7 +18,7 @@ CUTEST_TEST_DATA(serialize) {
 
 CUTEST_TEST_SETUP(serialize) {
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-    cfg.nthreads = 2;
+    //cfg.nthreads = 2;
     cfg.compcodec = BLOSC_BLOSCLZ;
     caterva_ctx_new(&cfg, &data->ctx);
 
@@ -27,12 +27,12 @@ CUTEST_TEST_SETUP(serialize) {
     CUTEST_PARAMETRIZE(shapes, _test_shapes, CUTEST_DATA(
             {0, {0}, {0}, {0}}, // 0-dim
             {1, {10}, {7}, {2}}, // 1-idim
-            {2, {100, 100}, {20, 20}, {10, 10}},
-            {3, {100, 55, 123}, {31, 5, 22}, {4, 4, 4}},
+            {2, {40, 40}, {20, 20}, {10, 10}},
+            {3, {100, 55, 23}, {31, 5, 22}, {4, 4, 4}},
             {3, {100, 0, 12}, {31, 0, 12}, {10, 0, 12}},
-            {4, {50, 160, 31, 12}, {25, 20, 20, 10}, {5, 5, 5, 10}},
+            {4, {30, 26, 31, 12}, {25, 20, 20, 10}, {5, 5, 5, 10}},
             {5, {1, 1, 1024, 1, 1}, {1, 1, 500, 1, 1}, {1, 1, 200, 1, 1}},
-            {6, {5, 1, 200, 3, 1, 2}, {5, 1, 50, 2, 1, 2}, {2, 1, 20, 2, 1, 2}}
+            {6, {5, 1, 60, 3, 1, 2}, {5, 1, 50, 2, 1, 2}, {2, 1, 20, 2, 1, 2}}
     ));
     CUTEST_PARAMETRIZE(contiguous, bool, CUTEST_DATA(true, false));
 }

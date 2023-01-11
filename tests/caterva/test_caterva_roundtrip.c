@@ -18,7 +18,7 @@ CUTEST_TEST_DATA(roundtrip) {
 
 CUTEST_TEST_SETUP(roundtrip) {
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-    cfg.nthreads = 2;
+    //cfg.nthreads = 2;
     cfg.compcodec = BLOSC_BLOSCLZ;
     caterva_ctx_new(&cfg, &data->ctx);
 

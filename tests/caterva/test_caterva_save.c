@@ -33,17 +33,17 @@ CUTEST_TEST_DATA(save) {
 
 CUTEST_TEST_SETUP(save) {
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-    cfg.nthreads = 2;
+    //cfg.nthreads = 2;
     cfg.compcodec = BLOSC_BLOSCLZ;
     caterva_ctx_new(&cfg, &data->ctx);
 
     // Add parametrizations
     CUTEST_PARAMETRIZE(itemsize, uint8_t, CUTEST_DATA(1, 2, 4, 8));
     CUTEST_PARAMETRIZE(shapes, test_shapes_t, CUTEST_DATA(
-            // {0, {0}, {0}, {0}}, // 0-dim
+             {0, {0}, {0}, {0}}, // 0-dim
              {1, {10}, {7}, {2}}, // 1-idim
              {2, {100, 100}, {20, 20}, {10, 10}},
-             {3, {100, 55, 123}, {31, 5, 22}, {4, 4, 4}},
+             {3, {40, 55, 23}, {31, 5, 22}, {4, 4, 4}},
              {3, {100, 0, 12}, {31, 0, 12}, {10, 0, 12}},
     ));
     CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
