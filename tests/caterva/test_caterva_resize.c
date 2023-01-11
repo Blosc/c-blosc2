@@ -29,7 +29,6 @@ CUTEST_TEST_DATA(resize_shape) {
 CUTEST_TEST_SETUP(resize_shape) {
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
     cfg.nthreads = 2;
-    cfg.compcodec = BLOSC_ZSTD;
     caterva_ctx_new(&cfg, &data->ctx);
 
     // Add parametrizations

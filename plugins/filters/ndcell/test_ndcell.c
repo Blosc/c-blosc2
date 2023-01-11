@@ -15,20 +15,17 @@
     To run:
 
     $ ./test_ndcell
-    Blosc version info: 2.0.0a6.dev ($Date:: 2018-05-18 #$)
-    Using 1 thread
-    Using ZSTD compressor
     Successful roundtrip!
-    Compression: 41472 -> 3992 (10.4x)
-    rand: 37480 obtained
+    Compression: 41472 -> 4937 (8.4x)
+    rand: 36535 obtained
 
     Successful roundtrip!
-    Compression: 1792 -> 979 (1.8x)
-    same_cells: 813 obtained
+    Compression: 1792 -> 1005 (1.8x)
+    same_cells: 787 obtained
 
     Successful roundtrip!
-    Compression: 16128 -> 1438 (11.2x)
-    some_matches: 14690 obtained
+    Compression: 16128 -> 1599 (10.1x)
+    some_matches: 14529 obtained
 
 **********************************************************************/
 
@@ -54,9 +51,9 @@ static int test_ndcell(blosc2_schunk* schunk) {
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.splitmode = BLOSC_ALWAYS_SPLIT;
     cparams.typesize = schunk->typesize;
-    cparams.compcode = BLOSC_ZSTD;
+    cparams.compcode = BLOSC_LZ4;
     cparams.filters[4] = BLOSC_FILTER_NDCELL;
-    cparams.filters_meta[4] =4;
+    cparams.filters_meta[4] = 4;
     cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
     cparams.clevel = 9;
     cparams.nthreads = 1;
@@ -148,15 +145,14 @@ int some_matches() {
 
 
 int main(void) {
-
     int result;
-  blosc2_init();
+    blosc2_init();
     result = rand_();
     printf("rand: %d obtained \n \n", result);
     result = same_cells();
     printf("same_cells: %d obtained \n \n", result);
     result = some_matches();
     printf("some_matches: %d obtained \n \n", result);
-  blosc2_destroy();
+    blosc2_destroy();
     return BLOSC2_ERROR_SUCCESS;
 }

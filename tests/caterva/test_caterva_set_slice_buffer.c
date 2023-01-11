@@ -28,7 +28,6 @@ CUTEST_TEST_DATA(set_slice_buffer) {
 CUTEST_TEST_SETUP(set_slice_buffer) {
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
     cfg.nthreads = 2;
-    cfg.compcodec = BLOSC_ZSTD;
     caterva_ctx_new(&cfg, &data->ctx);
 
     // Add parametrizations

@@ -143,7 +143,7 @@ typedef struct {
  */
 static const caterva_config_t CATERVA_CONFIG_DEFAULTS = {.alloc = malloc,
                                                          .free = free,
-                                                         .compcodec = BLOSC_ZSTD,
+                                                         .compcodec = BLOSC_BLOSCLZ,
                                                          .compmeta = 0,
                                                          .complevel = 5,
                                                          .splitmode = BLOSC_AUTO_SPLIT,
