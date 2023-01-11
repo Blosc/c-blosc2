@@ -8,6 +8,8 @@ set(SOURCES_ZERO_RUNLEN zero_runlen.c)
 set(SOURCES_CFRAME create_frame.c)
 set(SOURCES_SFRAME sframe_bench.c)
 
+add_subdirectory(caterva)
+
 # targets
 add_executable(b2bench ${SOURCES})
 add_executable(delta_schunk ${SOURCES_DELTA})
