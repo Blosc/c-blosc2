@@ -12,7 +12,7 @@
 #include "blosc2.h"
 #include <sys/stat.h>
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__MINGW32__)
   #include <windows.h>
   #include <malloc.h>
   #include <io.h>
@@ -155,4 +155,3 @@ int blosc2_rename_urlpath(char* old_urlpath, char* new_urlpath){
   }
   return BLOSC2_ERROR_SUCCESS;
 }
-
