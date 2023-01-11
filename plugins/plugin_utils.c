@@ -6,49 +6,11 @@
 
 #include <stdio.h>
 #include "blosc2.h"
+#include "blosc-private.h"
 #include "plugin_utils.h"
 
 #define BLOSC_PLUGINS_MAX_DIM 8
 
-void swap_store(void *dest, const void *pa, int size) {
-  uint8_t *pa_ = (uint8_t *) pa;
-  uint8_t *pa2_ = malloc((size_t) size);
-  int i = 1; /* for big/little endian detection */
-  char *p = (char *) &i;
-
-  if (p[0] == 1) {
-    /* little endian */
-    switch (size) {
-      case 8:
-        pa2_[0] = pa_[7];
-        pa2_[1] = pa_[6];
-        pa2_[2] = pa_[5];
-        pa2_[3] = pa_[4];
-        pa2_[4] = pa_[3];
-        pa2_[5] = pa_[2];
-        pa2_[6] = pa_[1];
-        pa2_[7] = pa_[0];
-        break;
-      case 4:
-        pa2_[0] = pa_[3];
-        pa2_[1] = pa_[2];
-        pa2_[2] = pa_[1];
-        pa2_[3] = pa_[0];
-        break;
-      case 2:
-        pa2_[0] = pa_[1];
-        pa2_[1] = pa_[0];
-        break;
-      case 1:
-        pa2_[0] = pa_[0];
-        break;
-      default:
-        fprintf(stderr, "Unhandled nitems: %d\n", size);
-    }
-  }
-  memcpy(dest, pa2_, size);
-  free(pa2_);
-}
 
 int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
                          int32_t *chunkshape, int32_t *blockshape) {

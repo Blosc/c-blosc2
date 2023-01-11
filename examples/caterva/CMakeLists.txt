@@ -8,6 +8,10 @@
 # You may select, at your option, one of the above-listed licenses.
 
 file(GLOB SOURCES example_*.c)
+if (NOT HAVE_PLUGINS)
+    file(GLOB NEED_PLUGINS example_plugins_*.c)
+    list(REMOVE_ITEM SOURCES ${NEED_PLUGINS})
+endif()
 
 foreach(source ${SOURCES})
     get_filename_component(target_name ${source} NAME_WE)

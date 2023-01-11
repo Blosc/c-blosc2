@@ -100,6 +100,7 @@ static char* test_get_slice_buffer(void) {
     }
     int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data_ + tdata.nchunks * CHUNKSIZE,
                                                    (tdata.stop % CHUNKSIZE) * sizeof(int32_t));
+    mu_assert("ERROR: bad append in frame", nchunks_ > 0);
   }
 
   // Get slice

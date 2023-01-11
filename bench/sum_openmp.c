@@ -103,7 +103,10 @@ int main(void) {
 
     FILE *f = fopen(filegrid, "rb");
     size_t blocks_read = fread(cdata, info.st_size, 1, f);
-    assert(blocks_read == 1);
+    if (blocks_read != 1) {
+      printf("Error reading file!\n");
+      exit(1);
+    }
     fclose(f);
 
     int dsize = blosc1_getitem(cdata, 0, CHUNKSIZE, chunk_buf);

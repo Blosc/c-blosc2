@@ -89,6 +89,4 @@
   #include <immintrin.h>
 #endif
 
-void swap_store(void *dest, const void *pa, int size);
-
 #endif  /* SHUFFLE_COMMON_H */

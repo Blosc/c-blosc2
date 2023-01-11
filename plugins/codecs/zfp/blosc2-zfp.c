@@ -5,6 +5,7 @@
 */
 
 #include "blosc2.h"
+#include "blosc-private.h"
 #include "frame.h"
 #include "blosc2/codecs-registry.h"
 #include "zfp.h"
