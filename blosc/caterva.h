@@ -110,15 +110,11 @@ static char *print_error(int rc) {
  * @brief Configuration parameters used to create a caterva context.
  */
 typedef struct {
-    void *(*alloc)(size_t);
-    //!< The memory allocation function used internally.
-    void (*free)(void *);
-    //!< The memory release function used internally.
-    uint8_t compcodec;
+    uint8_t compcode;
     //!< Defines the codec used in compression.
-    uint8_t compmeta;
+    uint8_t compcode_meta;
     //!< The metadata for the compressor codec.
-    uint8_t complevel;
+    uint8_t clevel;
     //!< Determines the compression level used in Blosc.
     int32_t splitmode;
     //!< Whether the blocks should be split or not.
@@ -128,7 +124,7 @@ typedef struct {
     //!< Determines the maximum number of threads that can be used.
     uint8_t filters[BLOSC2_MAX_FILTERS];
     //!< Defines the filters used in compression.
-    uint8_t filtersmeta[BLOSC2_MAX_FILTERS];
+    uint8_t filters_meta[BLOSC2_MAX_FILTERS];
     //!< Indicates the meta filters used in Blosc.
     blosc2_prefilter_fn prefilter;
     //!< Defines the function that is applied to the data before compressing it.
@@ -141,16 +137,15 @@ typedef struct {
 /**
  * @brief The default configuration parameters used in caterva.
  */
-static const caterva_config_t CATERVA_CONFIG_DEFAULTS = {.alloc = malloc,
-                                                         .free = free,
-                                                         .compcodec = BLOSC_BLOSCLZ,
-                                                         .compmeta = 0,
-                                                         .complevel = 5,
+static const caterva_config_t CATERVA_CONFIG_DEFAULTS = {
+                                                         .compcode = BLOSC_BLOSCLZ,
+                                                         .compcode_meta = 0,
+                                                         .clevel = 5,
                                                          .splitmode = BLOSC_AUTO_SPLIT,
                                                          .usedict = 0,
                                                          .nthreads = 1,
                                                          .filters = {0, 0, 0, 0, 0, BLOSC_SHUFFLE},
-                                                         .filtersmeta = {0, 0, 0, 0, 0, 0},
+                                                         .filters_meta = {0, 0, 0, 0, 0, 0},
                                                          .prefilter = NULL,
                                                          .pparams = NULL,
                                                          .udbtune = NULL,
@@ -167,18 +162,6 @@ typedef struct {
 
 
 /**
- * @brief The metalayer data needed to store it on an array
- */
-typedef struct {
-    char *name;
-    //!< The name of the metalayer
-    uint8_t *sdata;
-    //!< The serialized data to store
-    int32_t size;
-    //!< The size of the serialized data
-} caterva_metalayer_t;
-
-/**
  * @brief The storage properties for an array backed by a Blosc super-chunk.
  */
 typedef struct {
@@ -191,7 +174,7 @@ typedef struct {
     char *urlpath;
     //!< The super-chunk name. If @p urlpath is not @p NULL, the super-chunk will be stored on
     //!< disk.
-    caterva_metalayer_t metalayers[CATERVA_MAX_METALAYERS];
+    blosc2_metalayer metalayers[CATERVA_MAX_METALAYERS];
     //!< List with the metalayers desired.
     int32_t nmetalayers;
     //!< The number of metalayers.
@@ -252,10 +235,6 @@ typedef struct {
     //!< Number of items in a padded chunk.
     int8_t ndim;
     //!< Data dimensions.
-    uint8_t itemsize;
-    //!< Size of each item.
-    int64_t nchunks;
-    //!< Number of chunks in the array.
     struct chunk_cache_s chunk_cache;
     //!< A partition cache.
     int64_t item_array_strides[CATERVA_MAX_DIM];
@@ -561,7 +540,7 @@ int caterva_remove(caterva_ctx_t *ctx, char *urlpath);
  *
  * @return An error code
  */
-int caterva_vlmeta_add(caterva_ctx_t *ctx, caterva_array_t *array, caterva_metalayer_t *vlmeta);
+int caterva_vlmeta_add(caterva_ctx_t *ctx, caterva_array_t *array, blosc2_metalayer *vlmeta);
 
 
 /**
@@ -579,7 +558,7 @@ int caterva_vlmeta_add(caterva_ctx_t *ctx, caterva_array_t *array, caterva_metal
  * @return An error code
  */
 int caterva_vlmeta_get(caterva_ctx_t *ctx, caterva_array_t *array,
-                       const char *name, caterva_metalayer_t *vlmeta);
+                       const char *name, blosc2_metalayer *vlmeta);
 
 /**
  * @brief Check if a vl-metalayer exists or not.
@@ -604,7 +583,7 @@ int caterva_vlmeta_exists(caterva_ctx_t *ctx, caterva_array_t *array,
  * @return An error code
  */
 int caterva_vlmeta_update(caterva_ctx_t *ctx, caterva_array_t *array,
-                          caterva_metalayer_t *vlmeta);
+                          blosc2_metalayer *vlmeta);
 
 /**
  *
@@ -621,7 +600,7 @@ int caterva_vlmeta_update(caterva_ctx_t *ctx, caterva_array_t *array,
  * @return An error code
  */
 int caterva_meta_get(caterva_ctx_t *ctx, caterva_array_t *array,
-                       const char *name, caterva_metalayer_t *meta);
+                       const char *name, blosc2_metalayer *meta);
 
 /**
  * @brief Check if a metalayer exists or not.
@@ -655,7 +634,7 @@ int caterva_print_meta(caterva_array_t *array);
  * @return An error code
  */
 int caterva_meta_update(caterva_ctx_t *ctx, caterva_array_t *array,
-                          caterva_metalayer_t *meta);
+                        blosc2_metalayer *meta);
 
 /**
  * @brief Resize the shape of an array

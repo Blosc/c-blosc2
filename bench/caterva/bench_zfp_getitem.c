@@ -110,11 +110,11 @@ int comp(const char* urlpath) {
     storage.urlpath = "schunk_rate.cat";
     caterva_array_t *arr_rate;
     ctx_zfp = ctx;
-    ctx_zfp->cfg->compcodec = BLOSC_CODEC_ZFP_FIXED_RATE;
+    ctx_zfp->cfg->compcode = BLOSC_CODEC_ZFP_FIXED_RATE;
     ctx_zfp->cfg->splitmode = BLOSC_NEVER_SPLIT;
-    ctx_zfp->cfg->compmeta = (uint8_t) (100.0 * (float) arr->sc->cbytes / (float) arr->sc->nbytes);
+    ctx_zfp->cfg->compcode_meta = (uint8_t) (100.0 * (float) arr->sc->cbytes / (float) arr->sc->nbytes);
     ctx_zfp->cfg->filters[BLOSC2_MAX_FILTERS - 1] = 0;
-    ctx_zfp->cfg->filtersmeta[BLOSC2_MAX_FILTERS - 1] = 0;
+    ctx_zfp->cfg->filters_meta[BLOSC2_MAX_FILTERS - 1] = 0;
     copied = caterva_copy(ctx_zfp, arr, &storage, &arr_rate);
     if (copied != 0) {
         printf("Error BLOSC_CODEC_ZFP_FIXED_RATE \n");

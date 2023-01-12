@@ -20,7 +20,7 @@ CUTEST_TEST_SETUP(metalayers) {
     blosc2_init();
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
     cfg.nthreads = 2;
-    cfg.compcodec = BLOSC_BLOSCLZ;
+    cfg.compcode = BLOSC_BLOSCLZ;
     caterva_ctx_new(&cfg, &data->ctx);
 
     // Add parametrizations
@@ -61,12 +61,12 @@ CUTEST_TEST_TEST(metalayers) {
         storage.blockshape[i] = shapes.blockshape[i];
     }
     storage.nmetalayers = 1;
-    caterva_metalayer_t *meta0 = &storage.metalayers[0];
+    blosc2_metalayer *meta0 = &storage.metalayers[0];
     meta0->name = "test_meta";
-    meta0->size = 3;
+    meta0->content_len = 3;
     double sdata0 = 5.789;
-    meta0->sdata = (uint8_t *) &sdata0;
-    meta0->size = sizeof(sdata0);
+    meta0->content = (uint8_t *) &sdata0;
+    meta0->content_len = sizeof(sdata0);
 
     /* Create original data */
     size_t buffersize = itemsize;
@@ -82,12 +82,12 @@ CUTEST_TEST_TEST(metalayers) {
     CATERVA_TEST_ASSERT(caterva_from_buffer(data->ctx, buffer, buffersize, &params, &storage,
                                             &src));
 
-    caterva_metalayer_t vlmeta1;
+    blosc2_metalayer vlmeta1;
 
     uint64_t sdata1 = 56;
     vlmeta1.name = "vlmeta1";
-    vlmeta1.sdata = (uint8_t *) &sdata1;
-    vlmeta1.size = sizeof(sdata1);
+    vlmeta1.content = (uint8_t *) &sdata1;
+    vlmeta1.content_len = sizeof(sdata1);
 
     CATERVA_TEST_ASSERT(caterva_vlmeta_add(data->ctx, src, &vlmeta1));
 
@@ -97,30 +97,30 @@ CUTEST_TEST_TEST(metalayers) {
     CATERVA_TEST_ASSERT(caterva_vlmeta_exists(data->ctx, src, vlmeta1.name, &exists));
     CUTEST_ASSERT("", exists == true);
 
-    caterva_metalayer_t vlmeta2;
+    blosc2_metalayer vlmeta2;
     CATERVA_TEST_ASSERT(caterva_vlmeta_get(data->ctx, src, vlmeta1.name, &vlmeta2));
     CUTEST_ASSERT("Contents are not equal",
-                  *((uint64_t *) vlmeta1.sdata) == *((uint64_t *) vlmeta2.sdata));
-    CUTEST_ASSERT("Sizes are not equal", vlmeta1.size == vlmeta2.size);
+                  *((uint64_t *) vlmeta1.content) == *((uint64_t *) vlmeta2.content));
+    CUTEST_ASSERT("Sizes are not equal", vlmeta1.content_len == vlmeta2.content_len);
     free(vlmeta2.name);
-    free(vlmeta2.sdata);
+    free(vlmeta2.content);
 
     float sdata11 = 4.5f;
-    vlmeta1.sdata = (uint8_t *) &sdata11;
-    vlmeta1.size = sizeof(sdata11);
+    vlmeta1.content = (uint8_t *) &sdata11;
+    vlmeta1.content_len = sizeof(sdata11);
 
     CATERVA_TEST_ASSERT(caterva_vlmeta_update(data->ctx, src, &vlmeta1));
 
-    caterva_metalayer_t vlmeta3;
+    blosc2_metalayer vlmeta3;
     CATERVA_TEST_ASSERT(caterva_vlmeta_get(data->ctx, src, vlmeta1.name, &vlmeta3));
-    CUTEST_ASSERT("Contents are not equal", *((float *) vlmeta1.sdata) == *((float *) vlmeta3.sdata));
-    CUTEST_ASSERT("Sizes are not equal", vlmeta1.size == vlmeta3.size);
+    CUTEST_ASSERT("Contents are not equal", *((float *) vlmeta1.content) == *((float *) vlmeta3.content));
+    CUTEST_ASSERT("Sizes are not equal", vlmeta1.content_len == vlmeta3.content_len);
     free(vlmeta3.name);
-    free(vlmeta3.sdata);
+    free(vlmeta3.content);
 
     vlmeta2.name = "vlmeta2";
-    vlmeta2.sdata = (uint8_t *) &sdata1;
-    vlmeta2.size = sizeof(sdata1);
+    vlmeta2.content = (uint8_t *) &sdata1;
+    vlmeta2.content_len = sizeof(sdata1);
     CATERVA_TEST_ASSERT(caterva_vlmeta_add(data->ctx, src, &vlmeta2));
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
 
@@ -128,27 +128,27 @@ CUTEST_TEST_TEST(metalayers) {
     caterva_open(data->ctx, urlpath, &src2);
 
     CATERVA_TEST_ASSERT(caterva_vlmeta_get(data->ctx, src2, vlmeta2.name, &vlmeta3));
-    CUTEST_ASSERT("Contents are not equal", *((uint64_t *) vlmeta2.sdata) == *((uint64_t *) vlmeta3.sdata));
-    CUTEST_ASSERT("Sizes are not equal", vlmeta2.size == vlmeta3.size);
+    CUTEST_ASSERT("Contents are not equal", *((uint64_t *) vlmeta2.content) == *((uint64_t *) vlmeta3.content));
+    CUTEST_ASSERT("Sizes are not equal", vlmeta2.content_len == vlmeta3.content_len);
     free(vlmeta3.name);
-    free(vlmeta3.sdata);
+    free(vlmeta3.content);
 
     sdata0 = 1e-10;
-    caterva_metalayer_t meta1;
+    blosc2_metalayer meta1;
     meta1.name = meta0->name;
-    meta1.sdata = (uint8_t *) &sdata0;
-    meta1.size = sizeof(sdata0);
+    meta1.content = (uint8_t *) &sdata0;
+    meta1.content_len = sizeof(sdata0);
 
     CATERVA_TEST_ASSERT(caterva_meta_exists(data->ctx, src2, meta0->name, &exists));
     CATERVA_TEST_ASSERT(caterva_meta_update(data->ctx, src2, &meta1));
 
-    caterva_metalayer_t meta2;
+    blosc2_metalayer meta2;
     CATERVA_TEST_ASSERT(caterva_meta_get(data->ctx, src2, meta1.name, &meta2));
 
-    CUTEST_ASSERT("Contents are not equal", *((double *) meta2.sdata) == *((double *) meta1.sdata));
-    CUTEST_ASSERT("Sizes are not equal", meta2.size == meta1.size);
+    CUTEST_ASSERT("Contents are not equal", *((double *) meta2.content) == *((double *) meta1.content));
+    CUTEST_ASSERT("Sizes are not equal", meta2.content_len == meta1.content_len);
     free(meta2.name);
-    free(meta2.sdata);
+    free(meta2.content);
 
     /* Free mallocs */
     free(buffer);

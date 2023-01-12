@@ -58,8 +58,8 @@ int main() {
     for (int i = 0; i < ndim; ++i) {
         nitems *= buffershape[i];
     }
-    int64_t buffersize = nitems * arr->itemsize;
-    double *buffer = calloc(nitems, arr->itemsize);
+    int64_t buffersize = nitems * arr->sc->typesize;
+    double *buffer = calloc(nitems, arr->sc->typesize);
     CATERVA_ERROR(caterva_set_orthogonal_selection(ctx, arr, selection, selection_size, buffer, buffershape, buffersize));
     CATERVA_ERROR(caterva_get_orthogonal_selection(ctx, arr, selection, selection_size, buffer, buffershape, buffersize));
 

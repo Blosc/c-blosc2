@@ -178,8 +178,8 @@ CUTEST_TEST_TEST(resize_shape) {
     }
 
     /* Fill buffers with whole arrays */
-    uint8_t *src_buffer = data->ctx->cfg->alloc((size_t) buffersize);
-    uint8_t *aux_buffer = data->ctx->cfg->alloc((size_t) buffersize);
+    uint8_t *src_buffer = malloc((size_t) buffersize);
+    uint8_t *aux_buffer = malloc((size_t) buffersize);
     CATERVA_TEST_ASSERT(caterva_to_buffer(data->ctx, src, src_buffer, buffersize));
     CATERVA_TEST_ASSERT(caterva_to_buffer(data->ctx, aux, aux_buffer, buffersize));
     for (uint64_t i = 0; i < (uint64_t) buffersize / itemsize; ++i) {
@@ -206,8 +206,8 @@ CUTEST_TEST_TEST(resize_shape) {
     }
     /* Free mallocs */
     free(value);
-    data->ctx->cfg->free(src_buffer);
-    data->ctx->cfg->free(aux_buffer);
+    free(src_buffer);
+    free(aux_buffer);
 
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &aux));

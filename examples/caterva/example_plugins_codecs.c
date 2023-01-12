@@ -57,10 +57,10 @@ int main() {
      * NDLZ metainformation: - it calls the 4x4 version if meta == 4
                              - it calls the 8x8 version if meta == 8
     */
-    cfg.compcodec = BLOSC_CODEC_NDLZ;
+    cfg.compcode = BLOSC_CODEC_NDLZ;
     cfg.splitmode = BLOSC_ALWAYS_SPLIT;
-    cfg.compmeta = 4;
-    cfg.complevel = 5;
+    cfg.compcode_meta = 4;
+    cfg.clevel = 5;
     // We could use a filter plugin by setting cfg.filters[].
 
     caterva_ctx_t *ctx;

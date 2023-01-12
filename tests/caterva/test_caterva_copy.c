@@ -29,7 +29,7 @@ CUTEST_TEST_SETUP(copy) {
     blosc2_init();
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
     cfg.nthreads = 2;
-    cfg.compcodec = BLOSC_BLOSCLZ;
+    cfg.compcode = BLOSC_BLOSCLZ;
     caterva_ctx_new(&cfg, &data->ctx);
 
     // Add parametrizations
@@ -102,8 +102,8 @@ CUTEST_TEST_TEST(copy) {
     }
     storage.nmetalayers = 1;
     storage.metalayers[0].name = "random";
-    storage.metalayers[0].sdata = (uint8_t *) &datatoserialize;
-    storage.metalayers[0].size = 8;
+    storage.metalayers[0].content = (uint8_t *) &datatoserialize;
+    storage.metalayers[0].content_len = 8;
 
 
     /* Create original data */
@@ -125,15 +125,15 @@ CUTEST_TEST_TEST(copy) {
     if (!exists) {
         CATERVA_TEST_ASSERT(CATERVA_ERR_BLOSC_FAILED);
     }
-    caterva_metalayer_t meta;
+    blosc2_metalayer meta;
     CATERVA_TEST_ASSERT(caterva_meta_get(data->ctx, src, "random", &meta));
-    double serializeddata = *((double *) meta.sdata);
+    double serializeddata = *((double *) meta.content);
     if (serializeddata != datatoserialize) {
         CATERVA_TEST_ASSERT(CATERVA_ERR_BLOSC_FAILED);
     }
 
     CATERVA_TEST_ASSERT(caterva_vlmeta_add(data->ctx, src, &meta));
-    free(meta.sdata);
+    free(meta.content);
     free(meta.name);
 
 
@@ -157,20 +157,20 @@ CUTEST_TEST_TEST(copy) {
 
     /* Assert the metalayers creation */
     CATERVA_TEST_ASSERT(caterva_meta_get(data->ctx, dest, "random", &meta));
-    serializeddata = *((double *) meta.sdata);
+    serializeddata = *((double *) meta.content);
     if (serializeddata != datatoserialize) {
         CATERVA_TEST_ASSERT(CATERVA_ERR_BLOSC_FAILED);
     }
-    free(meta.sdata);
+    free(meta.content);
     free(meta.name);
 
-    caterva_metalayer_t vlmeta;
+    blosc2_metalayer vlmeta;
     CATERVA_TEST_ASSERT(caterva_vlmeta_get(data->ctx, dest, "random", &vlmeta));
-    serializeddata = *((double *) vlmeta.sdata);
+    serializeddata = *((double *) vlmeta.content);
     if (serializeddata != datatoserialize) {
         CATERVA_TEST_ASSERT(CATERVA_ERR_BLOSC_FAILED);
     }
-    free(vlmeta.sdata);
+    free(vlmeta.content);
     free(vlmeta.name);
 
 

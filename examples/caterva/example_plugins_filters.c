@@ -58,7 +58,7 @@ int main() {
      * if in a 3-dim dataset user specifies meta = 4, then cellshape will be 4x4x4.
     */
     cfg.filters[4] = BLOSC_FILTER_NDCELL;
-    cfg.filtersmeta[4] = 4;
+    cfg.filters_meta[4] = 4;
     // We could use a codec plugin by setting cfg.compcodec.
 
     caterva_ctx_t *ctx;

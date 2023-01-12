@@ -50,7 +50,7 @@ CUTEST_TEST_SETUP(get_slice) {
     blosc2_init();
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
     cfg.nthreads = 2;
-    cfg.compcodec = BLOSC_BLOSCLZ;
+    cfg.compcode = BLOSC_BLOSCLZ;
     caterva_ctx_new(&cfg, &data->ctx);
 
     // Add parametrizations
@@ -112,7 +112,7 @@ CUTEST_TEST_TEST(get_slice) {
     for (int i = 0; i < params.ndim; ++i) {
         buffersize *= (size_t) shapes.shape[i];
     }
-    uint8_t *buffer = data->ctx->cfg->alloc(buffersize);
+    uint8_t *buffer = malloc(buffersize);
     CUTEST_ASSERT("Buffer filled incorrectly", fill_buf(buffer, itemsize, buffersize / itemsize));
 
     /* Create caterva_array_t with original data */
@@ -122,11 +122,11 @@ CUTEST_TEST_TEST(get_slice) {
 
     /* Add vlmeta */
 
-    caterva_metalayer_t vlmeta;
+    blosc2_metalayer vlmeta;
     vlmeta.name = "test_get_slice";
     double sdata = 2.3;
-    vlmeta.sdata = (uint8_t *) &sdata;
-    vlmeta.size = sizeof(double);
+    vlmeta.content = (uint8_t *) &sdata;
+    vlmeta.content_len = sizeof(double);
 
     CATERVA_TEST_ASSERT(caterva_vlmeta_add(data->ctx, src, &vlmeta));
 
@@ -159,7 +159,7 @@ CUTEST_TEST_TEST(get_slice) {
         destbuffersize *= (shapes.stop[i] - shapes.start[i]);
     }
 
-    uint64_t *buffer_dest = data->ctx->cfg->alloc((size_t) destbuffersize);
+    uint64_t *buffer_dest = malloc((size_t) destbuffersize);
     CATERVA_TEST_ASSERT(caterva_to_buffer(data->ctx, dest, buffer_dest, destbuffersize));
 
     for (int i = 0; i < destbuffersize / itemsize; ++i) {
@@ -169,8 +169,8 @@ CUTEST_TEST_TEST(get_slice) {
     }
 
     /* Free mallocs */
-    data->ctx->cfg->free(buffer);
-    data->ctx->cfg->free(buffer_dest);
+    free(buffer);
+    free(buffer_dest);
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &dest));
     caterva_remove(data->ctx, urlpath);

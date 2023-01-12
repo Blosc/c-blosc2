@@ -301,12 +301,12 @@ int create_blosc_params(caterva_ctx_t *ctx,
     cparams->preparams = ctx->cfg->pparams;
     cparams->use_dict = ctx->cfg->usedict;
     cparams->nthreads = (int16_t) ctx->cfg->nthreads;
-    cparams->clevel = (uint8_t) ctx->cfg->complevel;
-    cparams->compcode = (uint8_t) ctx->cfg->compcodec;
-    cparams->compcode_meta = (uint8_t) ctx->cfg->compmeta;
+    cparams->clevel = (uint8_t) ctx->cfg->clevel;
+    cparams->compcode = (uint8_t) ctx->cfg->compcode;
+    cparams->compcode_meta = (uint8_t) ctx->cfg->compcode_meta;
     for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
         cparams->filters[i] = ctx->cfg->filters[i];
-        cparams->filters_meta[i] = ctx->cfg->filtersmeta[i];
+        cparams->filters_meta[i] = ctx->cfg->filters_meta[i];
     }
     cparams->udbtune = ctx->cfg->udbtune;
     cparams->splitmode = ctx->cfg->splitmode;
@@ -331,18 +331,15 @@ int create_blosc_params(caterva_ctx_t *ctx,
 
 
 int caterva_config_from_schunk(caterva_ctx_t *ctx, blosc2_schunk *sc, caterva_config_t *cfg) {
-    cfg->alloc = ctx->cfg->alloc;
-    cfg->free = ctx->cfg->free;
-
-    cfg->complevel = sc->storage->cparams->clevel;
-    cfg->compcodec = sc->storage->cparams->compcode;
-    cfg->compmeta = sc->storage->cparams->compcode_meta;
+    cfg->clevel = sc->storage->cparams->clevel;
+    cfg->compcode = sc->storage->cparams->compcode;
+    cfg->compcode_meta = sc->storage->cparams->compcode_meta;
     cfg->usedict = sc->storage->cparams->use_dict;
     cfg->splitmode = sc->storage->cparams->splitmode;
     cfg->nthreads = ctx->cfg->nthreads;
     for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
         cfg->filters[i] = sc->storage->cparams->filters[i];
-        cfg->filtersmeta[i] = sc->storage->cparams->filters_meta[i];
+        cfg->filters_meta[i] = sc->storage->cparams->filters_meta[i];
     }
 
     cfg->prefilter = ctx->cfg->prefilter;

@@ -31,7 +31,7 @@ CUTEST_TEST_SETUP(delete) {
     blosc2_init();
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
     cfg.nthreads = 2;
-    cfg.compcodec = BLOSC_LZ4;
+    cfg.compcode = BLOSC_LZ4;
     caterva_ctx_new(&cfg, &data->ctx);
 
     // Add parametrizations
@@ -153,7 +153,7 @@ CUTEST_TEST_TEST(delete) {
 
 
     /* Fill buffer with whole array data */
-    uint8_t *src_buffer = data->ctx->cfg->alloc((size_t) (src->nitems * itemsize));
+    uint8_t *src_buffer = malloc((size_t) (src->nitems * itemsize));
     CATERVA_TEST_ASSERT(caterva_to_buffer(data->ctx, src, src_buffer, src->nitems * itemsize));
 
     for (uint64_t i = 0; i < (uint64_t) src->nitems; ++i) {
@@ -181,7 +181,7 @@ CUTEST_TEST_TEST(delete) {
     /* Free mallocs */
     free(value);
     free(buffer);
-    data->ctx->cfg->free(src_buffer);
+    free(src_buffer);
 
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &aux));

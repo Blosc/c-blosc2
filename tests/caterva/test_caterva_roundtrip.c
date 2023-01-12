@@ -20,7 +20,7 @@ CUTEST_TEST_SETUP(roundtrip) {
     blosc2_init();
     caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
     cfg.nthreads = 2;
-    cfg.compcodec = BLOSC_BLOSCLZ;
+    cfg.compcode = BLOSC_BLOSCLZ;
     caterva_ctx_new(&cfg, &data->ctx);
 
     // Add parametrizations

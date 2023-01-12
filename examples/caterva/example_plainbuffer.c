@@ -69,7 +69,7 @@ int main() {
     for (int i = 0; i < slice->ndim; ++i) {
         buffer_size *= slice->shape[i];
     }
-    buffer_size *= slice->itemsize;
+    buffer_size *= slice->sc->typesize;
     buffer = malloc(buffer_size);
 
     CATERVA_ERROR(caterva_to_buffer(ctx, slice, buffer, buffer_size));
