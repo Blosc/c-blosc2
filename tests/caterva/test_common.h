@@ -15,7 +15,7 @@
 #include "cutest.h"
 
 
-#define CATERVA_TEST_ASSERT(rc) CUTEST_ASSERT(print_error(rc), (rc) == CATERVA_SUCCEED);
+#define CATERVA_TEST_ASSERT(rc) CUTEST_ASSERT(print_error(rc), (rc) >= 0);
 
 #ifdef __GNUC__
 #define CATERVA_TEST_UNUSED __attribute__((unused))

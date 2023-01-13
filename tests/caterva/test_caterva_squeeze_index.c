@@ -84,8 +84,8 @@ CUTEST_TEST_TEST(squeeze_index) {
     char *urlpath = "test_squeeze_index.b2frame";
     char *urlpath2 = "test_squezze_index2.b2frame";
 
-    caterva_remove(data->ctx, urlpath);
-    caterva_remove(data->ctx, urlpath2);
+    blosc2_remove_urlpath(urlpath);
+    blosc2_remove_urlpath(urlpath2);
 
     caterva_params_t params;
     params.itemsize = itemsize;
@@ -148,8 +148,8 @@ CUTEST_TEST_TEST(squeeze_index) {
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &dest));
 
-    caterva_remove(data->ctx, urlpath);
-    caterva_remove(data->ctx, urlpath2);
+    blosc2_remove_urlpath(urlpath);
+    blosc2_remove_urlpath(urlpath2);
 
     return 0;
 }

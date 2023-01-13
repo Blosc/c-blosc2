@@ -1027,11 +1027,8 @@ int caterva_copy(caterva_ctx_t *ctx, caterva_array_t *src, caterva_storage_t *st
                                   &content_len) < 0) {
                 CATERVA_ERROR(CATERVA_ERR_BLOSC_FAILED);
             }
-            blosc2_metalayer vlmeta;
-            vlmeta.name = src->sc->vlmetalayers[i]->name;
-            vlmeta.content = content;
-            vlmeta.content_len = content_len;
-            CATERVA_ERROR(caterva_vlmeta_add(ctx, *array, &vlmeta));
+            CATERVA_ERROR(blosc2_vlmeta_add((*array)->sc, src->sc->vlmetalayers[i]->name, content, content_len,
+                                            (*array)->sc->storage->cparams));
             free(content);
         }
 
@@ -1057,118 +1054,6 @@ int caterva_save(caterva_ctx_t *ctx, caterva_array_t *array, char *urlpath) {
     caterva_copy(ctx, array, &storage, &tmp);
     caterva_free(ctx, &tmp);
 
-    return CATERVA_SUCCEED;
-}
-
-int caterva_remove(caterva_ctx_t *ctx, char *urlpath) {
-    CATERVA_ERROR_NULL(ctx);
-    CATERVA_ERROR_NULL(urlpath);
-
-    int rc = blosc2_remove_urlpath(urlpath);
-    if (rc != BLOSC2_ERROR_SUCCESS) {
-        CATERVA_ERROR(CATERVA_ERR_BLOSC_FAILED);
-    }
-    return CATERVA_SUCCEED;
-}
-
-
-int caterva_vlmeta_add(caterva_ctx_t *ctx, caterva_array_t *array, blosc2_metalayer *vlmeta) {
-    CATERVA_ERROR_NULL(ctx);
-    CATERVA_ERROR_NULL(array);
-    CATERVA_ERROR_NULL(vlmeta);
-    CATERVA_ERROR_NULL(vlmeta->name);
-    CATERVA_ERROR_NULL(vlmeta->content);
-    if (vlmeta->content_len < 0) {
-        CATERVA_TRACE_ERROR("metalayer size must be hgreater than 0");
-        CATERVA_ERROR(CATERVA_ERR_INVALID_ARGUMENT);
-    }
-    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-    if (blosc2_vlmeta_add(array->sc, vlmeta->name, vlmeta->content, vlmeta->content_len, &cparams) < 0) {
-        CATERVA_ERROR(CATERVA_ERR_BLOSC_FAILED);
-    }
-
-    return CATERVA_SUCCEED;
-}
-
-
-int caterva_vlmeta_get(caterva_ctx_t *ctx, caterva_array_t *array,
-                             const char *name, blosc2_metalayer *vlmeta) {
-    CATERVA_ERROR_NULL(ctx);
-    CATERVA_ERROR_NULL(array);
-    CATERVA_ERROR_NULL(name);
-    CATERVA_ERROR_NULL(vlmeta);
-
-    if (blosc2_vlmeta_get(array->sc, name, &vlmeta->content, &vlmeta->content_len) < 0) {
-        CATERVA_ERROR(CATERVA_ERR_BLOSC_FAILED);
-    }
-    vlmeta->name = strdup(name);
-
-    return CATERVA_SUCCEED;
-}
-
-int caterva_vlmeta_exists(caterva_ctx_t *ctx, caterva_array_t *array,
-                                const char *name, bool *exists) {
-    CATERVA_ERROR_NULL(ctx);
-    CATERVA_ERROR_NULL(array);
-    CATERVA_ERROR_NULL(name);
-    CATERVA_ERROR_NULL(exists);
-
-    if (blosc2_vlmeta_exists(array->sc, name) < 0) {
-        *exists = false;
-    } else {
-        *exists = true;
-    }
-
-    return CATERVA_SUCCEED;
-}
-
-
-int caterva_vlmeta_update(caterva_ctx_t *ctx, caterva_array_t *array,
-                          blosc2_metalayer *vlmeta) {
-    CATERVA_ERROR_NULL(ctx);
-    CATERVA_ERROR_NULL(array);
-    CATERVA_ERROR_NULL(vlmeta);
-    CATERVA_ERROR_NULL(vlmeta->name);
-    CATERVA_ERROR_NULL(vlmeta->content);
-    if (vlmeta->content_len < 0) {
-        CATERVA_TRACE_ERROR("metalayer size must be hgreater than 0");
-        CATERVA_ERROR(CATERVA_ERR_INVALID_ARGUMENT);
-    }
-
-    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-    if (blosc2_vlmeta_update(array->sc, vlmeta->name, vlmeta->content, vlmeta->content_len, &cparams) < 0) {
-        CATERVA_ERROR(CATERVA_ERR_BLOSC_FAILED);
-    }
-
-    return CATERVA_SUCCEED;
-}
-
-int caterva_meta_get(caterva_ctx_t *ctx, caterva_array_t *array,
-                       const char *name, blosc2_metalayer *meta) {
-    CATERVA_ERROR_NULL(ctx);
-    CATERVA_ERROR_NULL(array);
-    CATERVA_ERROR_NULL(name);
-    CATERVA_ERROR_NULL(meta);
-
-    if (blosc2_meta_get(array->sc, name, &meta->content, &meta->content_len) < 0) {
-        CATERVA_ERROR(CATERVA_ERR_BLOSC_FAILED);
-    }
-    meta->name = strdup(name);
-    return CATERVA_SUCCEED;
-}
-
-int caterva_meta_exists(caterva_ctx_t *ctx, caterva_array_t *array,
-                          const char *name, bool *exists) {
-    CATERVA_ERROR_NULL(ctx);
-    CATERVA_ERROR_NULL(array);
-    CATERVA_ERROR_NULL(name);
-    CATERVA_ERROR_NULL(exists);
-
-    if (blosc2_meta_exists(array->sc, name) < 0) {
-        *exists = false;
-    } else {
-        *exists = true;
-    }
     return CATERVA_SUCCEED;
 }
 
@@ -1200,24 +1085,6 @@ int caterva_print_meta(caterva_array_t *array){
         printf(", %d", blockshape[i]);
     }
     printf("\n");
-    return CATERVA_SUCCEED;
-}
-
-int caterva_meta_update(caterva_ctx_t *ctx, caterva_array_t *array,
-                        blosc2_metalayer *meta) {
-    CATERVA_ERROR_NULL(ctx);
-    CATERVA_ERROR_NULL(array);
-    CATERVA_ERROR_NULL(meta);
-    CATERVA_ERROR_NULL(meta->name);
-    CATERVA_ERROR_NULL(meta->content);
-    if (meta->content_len < 0) {
-        CATERVA_TRACE_ERROR("metalayer size must be greater than 0");
-        CATERVA_ERROR(CATERVA_ERR_INVALID_ARGUMENT);
-    }
-
-    if (blosc2_meta_update(array->sc, meta->name, meta->content, meta->content_len) < 0) {
-        CATERVA_ERROR(CATERVA_ERR_BLOSC_FAILED);
-    }
     return CATERVA_SUCCEED;
 }
 

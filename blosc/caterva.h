@@ -519,102 +519,6 @@ int caterva_set_slice_buffer(caterva_ctx_t *ctx,
 int caterva_copy(caterva_ctx_t *ctx, caterva_array_t *src, caterva_storage_t *storage,
                  caterva_array_t **array);
 
-
-/**
- * @brief Remove a Caterva file from the file system. Both backends are supported.
- *
- * @param ctx The caterva context to be used.
- * @param urlpath The urlpath of the array to be removed.
- *
- * @return An error code
- */
-int caterva_remove(caterva_ctx_t *ctx, char *urlpath);
-
-
-/**
- * @brief Add a vl-metalayer to the Caterva array.
- *
- * @param ctx The context to be used.
- * @param array The array where the metalayer will be added.
- * @param name The vl-metalayer to add.
- *
- * @return An error code
- */
-int caterva_vlmeta_add(caterva_ctx_t *ctx, caterva_array_t *array, blosc2_metalayer *vlmeta);
-
-
-/**
- *
- * @brief Get a vl-metalayer from a Caterva array.
- *
- * @param ctx The context to be used.
- * @param array The array where the vl-metalayer will be added.
- * @param name The vl-metalayer name.
- * @param vlmeta Pointer to the metalayer where the data will be stored.
- *
- * @warning The contents of `vlmeta` are allocated inside the function.
- * Therefore, they must be released with a `free`.
- *
- * @return An error code
- */
-int caterva_vlmeta_get(caterva_ctx_t *ctx, caterva_array_t *array,
-                       const char *name, blosc2_metalayer *vlmeta);
-
-/**
- * @brief Check if a vl-metalayer exists or not.
- *
- * @param ctx The context to be used.
- * @param array The array where the check will be done.
- * @param name The name of the vl-metalayer to check.
- * @param exists Pointer where the result will be stored.
- *
- * @return An error code
- */
-int caterva_vlmeta_exists(caterva_ctx_t *ctx, caterva_array_t *array,
-                          const char *name, bool *exists);
-
-/**
- * @brief Update a vl-metalayer content in a Caterva array.
- *
- * @param ctx The context to be used.
- * @param array The array where the vl-metalayer will be updated.
- * @param vlmeta The vl-metalayer to update.
- *
- * @return An error code
- */
-int caterva_vlmeta_update(caterva_ctx_t *ctx, caterva_array_t *array,
-                          blosc2_metalayer *vlmeta);
-
-/**
- *
- * @brief Get a metalayer from a Caterva array.
- *
- * @param ctx The context to be used.
- * @param array The array where the metalayer will be added.
- * @param name The vl-metalayer name.
- * @param meta Pointer to the metalayer where the data will be stored.
- *
- * @warning The contents of `meta` are allocated inside the function.
- * Therefore, they must be released with a `free`.
- *
- * @return An error code
- */
-int caterva_meta_get(caterva_ctx_t *ctx, caterva_array_t *array,
-                       const char *name, blosc2_metalayer *meta);
-
-/**
- * @brief Check if a metalayer exists or not.
- *
- * @param ctx The context to be used.
- * @param array The array where the check will be done.
- * @param name The name of the metalayer to check.
- * @param exists Pointer where the result will be stored.
- *
- * @return An error code
- */
-int caterva_meta_exists(caterva_ctx_t *ctx, caterva_array_t *array,
-                          const char *name, bool *exists);
-
 /**
  * @brief Print metalayer parameters.
  *
@@ -623,18 +527,6 @@ int caterva_meta_exists(caterva_ctx_t *ctx, caterva_array_t *array,
  * @return An error code
  */
 int caterva_print_meta(caterva_array_t *array);
-
-/**
- * @brief Update a metalayer content in a Caterva array.
- *
- * @param ctx The context to be used.
- * @param array The array where the metalayer will be updated.
- * @param meta The metalayer to update.
- *
- * @return An error code
- */
-int caterva_meta_update(caterva_ctx_t *ctx, caterva_array_t *array,
-                        blosc2_metalayer *meta);
 
 /**
  * @brief Resize the shape of an array

@@ -65,7 +65,7 @@ CUTEST_TEST_TEST(delete) {
     CUTEST_GET_PARAMETER(itemsize, uint8_t);
 
     char *urlpath = "test_delete.b2frame";
-    caterva_remove(data->ctx, urlpath);
+    blosc2_remove_urlpath(urlpath);
 
     caterva_params_t params;
     params.itemsize = itemsize;
@@ -186,7 +186,7 @@ CUTEST_TEST_TEST(delete) {
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &aux));
 
-    caterva_remove(data->ctx, urlpath);
+    blosc2_remove_urlpath(urlpath);
 
     return 0;
 }

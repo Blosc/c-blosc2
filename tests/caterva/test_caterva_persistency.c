@@ -63,7 +63,7 @@ CUTEST_TEST_TEST(persistency) {
 
     char* urlpath = "test_persistency.b2frame";
 
-    caterva_remove(data->ctx, urlpath);
+    blosc2_remove_urlpath(urlpath);
 
     caterva_params_t params;
     params.itemsize = itemsize;
@@ -117,7 +117,7 @@ CUTEST_TEST_TEST(persistency) {
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &dest));
 
-    caterva_remove(data->ctx, urlpath);
+    blosc2_remove_urlpath(urlpath);
 
     return 0;
 }

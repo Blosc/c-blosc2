@@ -70,7 +70,7 @@ CUTEST_TEST_TEST(resize_shape) {
     CUTEST_GET_PARAMETER(itemsize, uint8_t);
 
     char *urlpath = "test_resize_shape.b2frame";
-    caterva_remove(data->ctx, urlpath);
+    blosc2_remove_urlpath(urlpath);
 
     caterva_params_t params;
     params.itemsize = itemsize;
@@ -211,7 +211,7 @@ CUTEST_TEST_TEST(resize_shape) {
 
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &aux));
-    caterva_remove(data->ctx, urlpath);
+    blosc2_remove_urlpath(urlpath);
 
     return 0;
 }

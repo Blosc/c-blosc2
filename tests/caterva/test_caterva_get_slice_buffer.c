@@ -80,7 +80,7 @@ CUTEST_TEST_TEST(get_slice_buffer) {
     CUTEST_GET_PARAMETER(itemsize, uint8_t);
 
     char *urlpath = "test_get_slice_buffer.b2frame";
-    caterva_remove(data->ctx, urlpath);
+    blosc2_remove_urlpath(urlpath);
 
     caterva_params_t params;
     params.itemsize = itemsize;
@@ -139,7 +139,7 @@ CUTEST_TEST_TEST(get_slice_buffer) {
     free(buffer);
     free(destbuffer);
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
-    caterva_remove(data->ctx, urlpath);
+    blosc2_remove_urlpath(urlpath);
 
     return 0;
 }

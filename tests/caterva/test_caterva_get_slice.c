@@ -87,8 +87,8 @@ CUTEST_TEST_TEST(get_slice) {
     char* urlpath = "test_get_slice.b2frame";
     char* urlpath2 = "test_get_slice2.b2frame";
 
-    caterva_remove(data->ctx, urlpath);
-    caterva_remove(data->ctx, urlpath2);
+    blosc2_remove_urlpath(urlpath);
+    blosc2_remove_urlpath(urlpath2);
 
     caterva_params_t params;
     params.itemsize = itemsize;
@@ -128,7 +128,8 @@ CUTEST_TEST_TEST(get_slice) {
     vlmeta.content = (uint8_t *) &sdata;
     vlmeta.content_len = sizeof(double);
 
-    CATERVA_TEST_ASSERT(caterva_vlmeta_add(data->ctx, src, &vlmeta));
+    CATERVA_TEST_ASSERT(blosc2_vlmeta_add(src->sc, vlmeta.name, vlmeta.content, vlmeta.content_len,
+                                          src->sc->storage->cparams));
 
     /* Create storage for dest container */
 
@@ -148,11 +149,10 @@ CUTEST_TEST_TEST(get_slice) {
 
     /* Check metalayers */
 
-    bool exists;
-    CATERVA_TEST_ASSERT(caterva_meta_exists(data->ctx, dest, "caterva", &exists));
-    CUTEST_ASSERT("metalayer not exists", exists == true);
-    CATERVA_TEST_ASSERT(caterva_vlmeta_exists(data->ctx, dest, vlmeta.name, &exists));
-    CUTEST_ASSERT("vlmetalayer not exists", exists == false);
+    int rc = blosc2_meta_exists(dest->sc, "caterva");
+    CUTEST_ASSERT("metalayer not exists", rc == 0);
+    rc = blosc2_vlmeta_exists(dest->sc, vlmeta.name);
+    CUTEST_ASSERT("vlmetalayer should not exist", rc < 0);
 
     int64_t destbuffersize = itemsize;
     for (int i = 0; i < src->ndim; ++i) {
@@ -173,8 +173,8 @@ CUTEST_TEST_TEST(get_slice) {
     free(buffer_dest);
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &dest));
-    caterva_remove(data->ctx, urlpath);
-    caterva_remove(data->ctx, urlpath2);
+    blosc2_remove_urlpath(urlpath);
+    blosc2_remove_urlpath(urlpath2);
 
     return 0;
 }

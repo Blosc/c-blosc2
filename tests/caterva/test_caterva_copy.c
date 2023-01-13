@@ -77,8 +77,8 @@ CUTEST_TEST_TEST(copy) {
     char *urlpath = "test_copy.b2frame";
     char *urlpath2 = "test_copy2.b2frame";
 
-    caterva_remove(data->ctx, urlpath);
-    caterva_remove(data->ctx, urlpath2);
+    blosc2_remove_urlpath(urlpath);
+    blosc2_remove_urlpath(urlpath2);
 
     caterva_params_t params;
     params.itemsize = itemsize;
@@ -120,21 +120,21 @@ CUTEST_TEST_TEST(copy) {
                                             &src));
 
     /* Assert the metalayers creation */
-    bool exists;
-    CATERVA_TEST_ASSERT(caterva_meta_exists(data->ctx, src, "random", &exists));
-    if (!exists) {
+    int rc = blosc2_meta_exists(src->sc, "random");
+    if (rc < 0) {
         CATERVA_TEST_ASSERT(CATERVA_ERR_BLOSC_FAILED);
     }
-    blosc2_metalayer meta;
-    CATERVA_TEST_ASSERT(caterva_meta_get(data->ctx, src, "random", &meta));
-    double serializeddata = *((double *) meta.content);
+    uint8_t *content;
+    int32_t content_len;
+    CATERVA_TEST_ASSERT(blosc2_meta_get(src->sc, "random", &content, &content_len));
+    double serializeddata = *((double *) content);
     if (serializeddata != datatoserialize) {
         CATERVA_TEST_ASSERT(CATERVA_ERR_BLOSC_FAILED);
     }
 
-    CATERVA_TEST_ASSERT(caterva_vlmeta_add(data->ctx, src, &meta));
-    free(meta.content);
-    free(meta.name);
+    CATERVA_TEST_ASSERT(blosc2_vlmeta_add(src->sc, "random", content, content_len,
+                                          src->sc->storage->cparams));
+    free(content);
 
 
     /* Create storage for dest container */
@@ -149,29 +149,25 @@ CUTEST_TEST_TEST(copy) {
     for (int i = 0; i < shapes.ndim; ++i) {
         storage2.chunkshape[i] = shapes.chunkshape2[i];
         storage2.blockshape[i] = shapes.blockshape2[i];
-            }
-
+    }
 
     caterva_array_t *dest;
     CATERVA_TEST_ASSERT(caterva_copy(data->ctx, src, &storage2, &dest));
 
     /* Assert the metalayers creation */
-    CATERVA_TEST_ASSERT(caterva_meta_get(data->ctx, dest, "random", &meta));
-    serializeddata = *((double *) meta.content);
+    CATERVA_TEST_ASSERT(blosc2_meta_get(dest->sc, "random", &content, &content_len));
+    serializeddata = *((double *) content);
     if (serializeddata != datatoserialize) {
         CATERVA_TEST_ASSERT(CATERVA_ERR_BLOSC_FAILED);
     }
-    free(meta.content);
-    free(meta.name);
+    free(content);
 
-    blosc2_metalayer vlmeta;
-    CATERVA_TEST_ASSERT(caterva_vlmeta_get(data->ctx, dest, "random", &vlmeta));
-    serializeddata = *((double *) vlmeta.content);
+    CATERVA_TEST_ASSERT(blosc2_vlmeta_get(dest->sc, "random", &content, &content_len));
+    serializeddata = *((double *) content);
     if (serializeddata != datatoserialize) {
         CATERVA_TEST_ASSERT(CATERVA_ERR_BLOSC_FAILED);
     }
-    free(vlmeta.content);
-    free(vlmeta.name);
+    free(content);
 
 
     uint8_t *buffer_dest = malloc(buffersize);
@@ -186,8 +182,8 @@ CUTEST_TEST_TEST(copy) {
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
     CATERVA_TEST_ASSERT(caterva_free(data->ctx, &dest));
 
-    caterva_remove(data->ctx, urlpath);
-    caterva_remove(data->ctx, urlpath2);
+    blosc2_remove_urlpath(urlpath);
+    blosc2_remove_urlpath(urlpath2);
 
     return 0;
 }
