@@ -159,6 +159,7 @@ CUTEST_TEST_TEST(metalayers) {
 
 
 CUTEST_TEST_TEARDOWN(metalayers) {
+    blosc2_free_ctx(data->ctx);
     blosc2_destroy();
 }
 

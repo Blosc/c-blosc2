@@ -124,6 +124,7 @@ CUTEST_TEST_TEST(persistency) {
 
 
 CUTEST_TEST_TEARDOWN(persistency) {
+    blosc2_free_ctx(data->ctx);
     blosc2_destroy();
 }
 

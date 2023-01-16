@@ -104,6 +104,7 @@ CUTEST_TEST_TEST(serialize) {
 
 
 CUTEST_TEST_TEARDOWN(serialize) {
+    blosc2_free_ctx(data->ctx);
     blosc2_destroy();
 }
 

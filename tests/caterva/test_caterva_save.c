@@ -119,6 +119,7 @@ CUTEST_TEST_TEST(save) {
 
 
 CUTEST_TEST_TEARDOWN(save) {
+    blosc2_free_ctx(data->ctx);
     blosc2_destroy();
 }
 

@@ -73,6 +73,7 @@ int main() {
 
     caterva_free(ctx, &arr);
     caterva_free(ctx, &dest);
+    blosc2_free_ctx(ctx);
 
     return 0;
 }
