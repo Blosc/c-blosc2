@@ -23,9 +23,9 @@
 #define CATERVA_TEST_UNUSED
 #endif
 
-static bool fill_buf(void *buf, uint8_t itemsize, size_t buf_size) CATERVA_TEST_UNUSED;
-        static bool fill_buf(void *buf, uint8_t itemsize, size_t buf_size) {
-    switch (itemsize) {
+static bool fill_buf(void *buf, uint8_t typesize, size_t buf_size) CATERVA_TEST_UNUSED;
+        static bool fill_buf(void *buf, uint8_t typesize, size_t buf_size) {
+    switch (typesize) {
         case 8:
             for (size_t i = 0; i < buf_size; ++i) {
                 ((uint64_t *) buf)[i] = (uint64_t) i + 1;
@@ -70,7 +70,7 @@ typedef struct {
 
 
 void caterva_default_parameters() {
-    CUTEST_PARAMETRIZE(itemsize, uint8_t, CUTEST_DATA(1, 2, 4, 8));
+    CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(1, 2, 4, 8));
     CUTEST_PARAMETRIZE(shapes, _test_shapes, CUTEST_DATA(
         {2, {40, 40}, {20, 20}, {10, 10}},
         {3, {40, 55, 23}, {31, 5, 22}, {4, 4, 4}},

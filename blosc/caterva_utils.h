@@ -26,13 +26,6 @@ int caterva_copy_buffer(int8_t ndim,
                         void *dst, const int64_t *dst_pad_shape,
                         int64_t *dst_start);
 
-int create_blosc_params(blosc2_context *ctx,
-                        caterva_params_t *params,
-                        caterva_storage_t *storage,
-                        blosc2_cparams *cparams,
-                        blosc2_dparams *dparams,
-                        blosc2_storage *b_storage);
-
 #ifdef __cplusplus
 }
 #endif

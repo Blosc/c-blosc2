@@ -109,7 +109,7 @@ int comp(const char* urlpath) {
     printf("LZ4 comp ratio: %f \n",(float) arr->sc->nbytes / (float) arr->sc->cbytes);
 
     /* Use BLOSC_CODEC_ZFP_FIXED_RATE */
-    storage.urlpath = "schunk_rate.cat";
+    storage.b_storage->urlpath = "schunk_rate.cat";
     caterva_array_t *arr_rate;
     ctx_zfp = ctx;
     ctx_zfp->compcode = BLOSC_CODEC_ZFP_FIXED_RATE;
@@ -122,7 +122,7 @@ int comp(const char* urlpath) {
         printf("Error BLOSC_CODEC_ZFP_FIXED_RATE \n");
         free(chunkshape);
         free(blockshape);
-        caterva_free(ctx_zfp, &arr);
+        caterva_free(&arr);
         return -1;
     }
     printf("ZFP_FIXED_RATE comp ratio: %f \n",(float) arr_rate->sc->nbytes / (float) arr_rate->sc->cbytes);
@@ -179,8 +179,8 @@ int comp(const char* urlpath) {
     free(shape_aux);
     free(chunkshape);
     free(blockshape);
-    caterva_free(ctx_zfp, &arr);
-    caterva_free(ctx_zfp, &arr_rate);
+    caterva_free(&arr);
+    caterva_free(&arr_rate);
     blosc2_free_ctx(ctx_zfp);
     if (needs_free_blosc) {
         free(chunk_blosc);

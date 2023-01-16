@@ -16,13 +16,13 @@ int main() {
     int64_t shape[] = {10, 10};
     int32_t chunkshape[] = {4, 4};
     int32_t blockshape[] = {2, 2};
-    int8_t itemsize = 8;
+    int8_t typesize = 8;
 
     int64_t nelem = 1;
     for (int i = 0; i < ndim; ++i) {
         nelem *= shape[i];
     }
-    int64_t size = nelem * itemsize;
+    int64_t size = nelem * typesize;
     double *data = malloc(size);
 
     for (int i = 0; i < nelem; ++i) {
@@ -34,20 +34,25 @@ int main() {
 
     caterva_params_t params = {0};
     params.ndim = ndim;
-    params.itemsize = itemsize;
     for (int i = 0; i < ndim; ++i) {
         params.shape[i] = shape[i];
     }
 
-    caterva_storage_t storage = {0};
+    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+    blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
+    caterva_storage_t storage = {.b_storage=&b_storage};
+    storage.b_storage->cparams->typesize = typesize;
+    int32_t blocknitems = 1;
     for (int i = 0; i < ndim; ++i) {
         storage.chunkshape[i] = chunkshape[i];
         storage.blockshape[i] = blockshape[i];
+        blocknitems *= storage.blockshape[i];
     }
-    storage.contiguous = false;
+    storage.b_storage->cparams->blocksize = blocknitems * storage.b_storage->cparams->typesize;
+    storage.b_storage->contiguous = false;
 
     caterva_array_t *arr;
-    CATERVA_ERROR(caterva_from_buffer(ctx, data, size, &params, &storage, &arr));
+    CATERVA_ERROR(caterva_from_buffer(data, size, &params, &storage, &arr));
 
     uint8_t *cframe;
     int64_t cframe_len;
@@ -71,8 +76,8 @@ int main() {
     free(data);
     free(data_dest);
 
-    caterva_free(ctx, &arr);
-    caterva_free(ctx, &dest);
+    caterva_free(&arr);
+    caterva_free(&dest);
     blosc2_free_ctx(ctx);
 
     return 0;

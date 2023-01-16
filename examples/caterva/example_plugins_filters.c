@@ -34,19 +34,19 @@ int main() {
 
     blosc2_init();
     int8_t ndim = 3;
-    uint8_t itemsize = sizeof(int64_t);
+    uint8_t typesize = sizeof(int64_t);
 
     int64_t shape[] = {745, 400, 350};
     int32_t chunkshape[] = {150, 100, 150};
     int32_t blockshape[] = {21, 30, 27};
 
-    int64_t nbytes = itemsize;
+    int64_t nbytes = typesize;
     for (int i = 0; i < ndim; ++i) {
         nbytes *= shape[i];
     }
 
     int64_t *src = malloc((size_t) nbytes);
-    for (int i = 0; i < nbytes / itemsize; ++i) {
+    for (int i = 0; i < nbytes / typesize; ++i) {
         src[i] = (int64_t) i;
     }
 
@@ -64,21 +64,26 @@ int main() {
     blosc2_context *ctx = blosc2_create_cctx(cparams);
 
     caterva_params_t params = {0};
-    params.itemsize = itemsize;
     params.ndim = ndim;
     for (int i = 0; i < ndim; ++i) {
         params.shape[i] = shape[i];
     }
 
-    caterva_storage_t storage = {0};
+    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+    blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
+    caterva_storage_t storage = {.b_storage=&b_storage};
+    storage.b_storage->cparams->typesize = typesize;
+    int32_t blocknitems = 1;
     for (int i = 0; i < ndim; ++i) {
         storage.chunkshape[i] = chunkshape[i];
         storage.blockshape[i] = blockshape[i];
+        blocknitems *= storage.blockshape[i];
     }
+    storage.b_storage->cparams->blocksize = blocknitems * storage.b_storage->cparams->typesize;
 
     caterva_array_t *arr;
     blosc_set_timestamp(&t0);
-    CATERVA_ERROR(caterva_from_buffer(ctx, src, nbytes, &params, &storage, &arr));
+    CATERVA_ERROR(caterva_from_buffer(src, nbytes, &params, &storage, &arr));
     blosc_set_timestamp(&t1);
     printf("from_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));
 
@@ -91,7 +96,7 @@ int main() {
 
     blosc2_destroy();
 
-    for (int i = 0; i < buffer_size / itemsize; i++) {
+    for (int i = 0; i < buffer_size / typesize; i++) {
         if (src[i] != buffer[i]) {
             printf("\n Decompressed data differs from original!\n");
             printf("i: %d, data %" PRId64 ", dest %" PRId64 "", i, src[i], buffer[i]);
@@ -102,7 +107,7 @@ int main() {
     free(src);
     free(buffer);
 
-    caterva_free(ctx, &arr);
+    caterva_free(&arr);
     blosc2_free_ctx(ctx);
 
     return 0;

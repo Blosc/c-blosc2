@@ -12,19 +12,14 @@
 
 
 CUTEST_TEST_DATA(serialize) {
-    blosc2_context *ctx;
 };
 
 
 CUTEST_TEST_SETUP(serialize) {
     blosc2_init();
-    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-    cparams.nthreads = 2;
-    cparams.compcode = BLOSC_BLOSCLZ;
-    data->ctx = blosc2_create_cctx(cparams);
 
     // Add parametrizations
-    CUTEST_PARAMETRIZE(itemsize, uint8_t, CUTEST_DATA(1, 2, 4, 8));
+    CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(1, 2, 4, 8));
     CUTEST_PARAMETRIZE(shapes, _test_shapes, CUTEST_DATA(
             {0, {0}, {0}, {0}}, // 0-dim
             {1, {10}, {7}, {2}}, // 1-idim
@@ -41,50 +36,60 @@ CUTEST_TEST_SETUP(serialize) {
 
 CUTEST_TEST_TEST(serialize) {
     CUTEST_GET_PARAMETER(shapes, _test_shapes);
-    CUTEST_GET_PARAMETER(itemsize, uint8_t);
+    CUTEST_GET_PARAMETER(typesize, uint8_t);
     CUTEST_GET_PARAMETER(contiguous, bool);
 
     caterva_params_t params;
-    params.itemsize = itemsize;
     params.ndim = shapes.ndim;
     for (int i = 0; i < params.ndim; ++i) {
         params.shape[i] = shapes.shape[i];
     }
 
-    caterva_storage_t storage = {0};
-    storage.urlpath = NULL;
-    storage.contiguous = contiguous;
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.nthreads = 2;
+    cparams.compcode = BLOSC_BLOSCLZ;
+    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+    blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
+    caterva_storage_t storage = {.b_storage=&b_storage};
+    storage.b_storage->cparams->typesize = typesize;
+    storage.b_storage->urlpath = NULL;
+    storage.b_storage->contiguous = contiguous;
+    int32_t blocknitems = 1;
+
     for (int i = 0; i < params.ndim; ++i) {
         storage.chunkshape[i] = shapes.chunkshape[i];
         storage.blockshape[i] = shapes.blockshape[i];
+      blocknitems *= storage.blockshape[i];
     }
+    storage.b_storage->cparams->blocksize = blocknitems * storage.b_storage->cparams->typesize;
+
+    blosc2_context *ctx = blosc2_create_cctx(*storage.b_storage->cparams);
 
     /* Create original data */
-    size_t buffersize = itemsize;
+    size_t buffersize = typesize;
     for (int i = 0; i < params.ndim; ++i) {
         buffersize *= (size_t) params.shape[i];
     }
 
-
     uint8_t *buffer = malloc(buffersize);
-    CUTEST_ASSERT("Buffer filled incorrectly", fill_buf(buffer, itemsize, buffersize / itemsize));
+    CUTEST_ASSERT("Buffer filled incorrectly", fill_buf(buffer, typesize, buffersize / typesize));
 
     /* Create caterva_array_t with original data */
     caterva_array_t *src;
-    CATERVA_TEST_ASSERT(caterva_from_buffer(data->ctx, buffer, buffersize, &params, &storage,
+    CATERVA_TEST_ASSERT(caterva_from_buffer(buffer, buffersize, &params, &storage,
                                             &src));
 
     uint8_t *cframe;
     int64_t cframe_len;
     bool needs_free;
-    CATERVA_TEST_ASSERT(caterva_to_cframe(data->ctx, src, &cframe, &cframe_len, &needs_free));
+    CATERVA_TEST_ASSERT(caterva_to_cframe(ctx, src, &cframe, &cframe_len, &needs_free));
 
     caterva_array_t *dest;
-    CATERVA_TEST_ASSERT(caterva_from_cframe(data->ctx, cframe, cframe_len, true, &dest));
+    CATERVA_TEST_ASSERT(caterva_from_cframe(ctx, cframe, cframe_len, true, &dest));
 
     /* Fill dest array with caterva_array_t data */
     uint8_t *buffer_dest = malloc(buffersize);
-    CATERVA_TEST_ASSERT(caterva_to_buffer(data->ctx, dest, buffer_dest, buffersize));
+    CATERVA_TEST_ASSERT(caterva_to_buffer(ctx, dest, buffer_dest, buffersize));
 
     /* Testing */
     CATERVA_TEST_ASSERT_BUFFER(buffer, buffer_dest, (int) buffersize);
@@ -96,15 +101,15 @@ CUTEST_TEST_TEST(serialize) {
 
     free(buffer);
     free(buffer_dest);
-    CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
-    CATERVA_TEST_ASSERT(caterva_free(data->ctx, &dest));
+    CATERVA_TEST_ASSERT(caterva_free(&src));
+    CATERVA_TEST_ASSERT(caterva_free(&dest));
+    blosc2_free_ctx(ctx);
 
     return 0;
 }
 
 
 CUTEST_TEST_TEARDOWN(serialize) {
-    blosc2_free_ctx(data->ctx);
     blosc2_destroy();
 }
 

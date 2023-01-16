@@ -21,19 +21,21 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(copy) {
-    blosc2_context *ctx;
+    blosc2_storage *b_storage;
 };
 
 
 CUTEST_TEST_SETUP(copy) {
     blosc2_init();
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
     cparams.nthreads = 2;
     cparams.compcode = BLOSC_BLOSCLZ;
-    data->ctx = blosc2_create_cctx(cparams);
+    blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
+    data->b_storage = &b_storage;
 
     // Add parametrizations
-    CUTEST_PARAMETRIZE(itemsize, uint8_t, CUTEST_DATA(
+    CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(
             2,
             4,
     ));
@@ -72,7 +74,7 @@ CUTEST_TEST_TEST(copy) {
     CUTEST_GET_PARAMETER(backend, _test_backend);
     CUTEST_GET_PARAMETER(shapes, test_shapes_t);
     CUTEST_GET_PARAMETER(backend2, _test_backend);
-    CUTEST_GET_PARAMETER(itemsize, uint8_t);
+    CUTEST_GET_PARAMETER(typesize, uint8_t);
 
     char *urlpath = "test_copy.b2frame";
     char *urlpath2 = "test_copy2.b2frame";
@@ -81,7 +83,6 @@ CUTEST_TEST_TEST(copy) {
     blosc2_remove_urlpath(urlpath2);
 
     caterva_params_t params;
-    params.itemsize = itemsize;
     params.ndim = shapes.ndim;
     for (int i = 0; i < shapes.ndim; ++i) {
         params.shape[i] = shapes.shape[i];
@@ -89,17 +90,23 @@ CUTEST_TEST_TEST(copy) {
 
     double datatoserialize = 8.34;
 
-    caterva_storage_t storage = {0};
+    caterva_storage_t storage = {.b_storage=data->b_storage};
+    storage.b_storage->cparams->typesize = typesize;
     if (backend.persistent) {
-        storage.urlpath = urlpath;
+        storage.b_storage->urlpath = urlpath;
     } else {
-        storage.urlpath = NULL;
+        storage.b_storage->urlpath = NULL;
     }
-    storage.contiguous = backend.contiguous;
+    storage.b_storage->contiguous = backend.contiguous;
     for (int i = 0; i < params.ndim; ++i) {
         storage.chunkshape[i] = shapes.chunkshape[i];
         storage.blockshape[i] = shapes.blockshape[i];
     }
+    int32_t blocknitems = 1;
+    for (int i = 0; i < params.ndim; ++i) {
+      blocknitems *= storage.blockshape[i];
+    }
+    storage.b_storage->cparams->blocksize = blocknitems * storage.b_storage->cparams->typesize;
     storage.nmetalayers = 1;
     storage.metalayers[0].name = "random";
     storage.metalayers[0].content = (uint8_t *) &datatoserialize;
@@ -107,16 +114,16 @@ CUTEST_TEST_TEST(copy) {
 
 
     /* Create original data */
-    size_t buffersize = itemsize;
+    size_t buffersize = typesize;
     for (int i = 0; i < params.ndim; ++i) {
         buffersize *= (size_t) params.shape[i];
     }
     uint8_t *buffer = malloc(buffersize);
-    CUTEST_ASSERT("Buffer filled incorrectly", fill_buf(buffer, itemsize, (buffersize / itemsize)));
+    CUTEST_ASSERT("Buffer filled incorrectly", fill_buf(buffer, typesize, (buffersize / typesize)));
 
     /* Create caterva_array_t with original data */
     caterva_array_t *src;
-    CATERVA_TEST_ASSERT(caterva_from_buffer(data->ctx, buffer, buffersize, &params, &storage,
+    CATERVA_TEST_ASSERT(caterva_from_buffer(buffer, buffersize, &params, &storage,
                                             &src));
 
     /* Assert the metalayers creation */
@@ -138,21 +145,27 @@ CUTEST_TEST_TEST(copy) {
 
 
     /* Create storage for dest container */
-    caterva_storage_t storage2 = {0};
-
+    caterva_storage_t storage2 = {.b_storage=data->b_storage};
+    storage2.b_storage->cparams->typesize = typesize;
     if (backend2.persistent) {
-        storage2.urlpath = urlpath2;
+        storage2.b_storage->urlpath = urlpath2;
     } else {
-        storage2.urlpath = NULL;
+        storage2.b_storage->urlpath = NULL;
     }
-    storage2.contiguous = backend2.contiguous;
+    storage2.b_storage->contiguous = backend2.contiguous;
     for (int i = 0; i < shapes.ndim; ++i) {
         storage2.chunkshape[i] = shapes.chunkshape2[i];
         storage2.blockshape[i] = shapes.blockshape2[i];
     }
+    blocknitems = 1;
+    for (int i = 0; i < params.ndim; ++i) {
+      blocknitems *= storage2.blockshape[i];
+    }
+    storage2.b_storage->cparams->blocksize = blocknitems * storage2.b_storage->cparams->typesize;
+    blosc2_context *ctx = blosc2_create_cctx(*storage2.b_storage->cparams);
 
     caterva_array_t *dest;
-    CATERVA_TEST_ASSERT(caterva_copy(data->ctx, src, &storage2, &dest));
+    CATERVA_TEST_ASSERT(caterva_copy(ctx, src, &storage2, &dest));
 
     /* Assert the metalayers creation */
     CATERVA_TEST_ASSERT(blosc2_meta_get(dest->sc, "random", &content, &content_len));
@@ -171,7 +184,7 @@ CUTEST_TEST_TEST(copy) {
 
 
     uint8_t *buffer_dest = malloc(buffersize);
-    CATERVA_TEST_ASSERT(caterva_to_buffer(data->ctx, dest, buffer_dest, buffersize));
+    CATERVA_TEST_ASSERT(caterva_to_buffer(ctx, dest, buffer_dest, buffersize));
 
     /* Testing */
     CATERVA_TEST_ASSERT_BUFFER(buffer, buffer_dest, (int) buffersize);
@@ -179,8 +192,9 @@ CUTEST_TEST_TEST(copy) {
     /* Free mallocs */
     free(buffer);
     free(buffer_dest);
-    CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
-    CATERVA_TEST_ASSERT(caterva_free(data->ctx, &dest));
+    CATERVA_TEST_ASSERT(caterva_free(&src));
+    CATERVA_TEST_ASSERT(caterva_free(&dest));
+    blosc2_free_ctx(ctx);
 
     blosc2_remove_urlpath(urlpath);
     blosc2_remove_urlpath(urlpath2);
@@ -189,7 +203,6 @@ CUTEST_TEST_TEST(copy) {
 }
 
 CUTEST_TEST_TEARDOWN(copy) {
-    blosc2_free_ctx(data->ctx);
     blosc2_destroy();
 }
 

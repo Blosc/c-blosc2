@@ -22,19 +22,19 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(append) {
-    blosc2_context *ctx;
+    blosc2_storage *b_storage;
 };
-
-
 CUTEST_TEST_SETUP(append) {
     blosc2_init();
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
     cparams.nthreads = 2;
     cparams.compcode = BLOSC_BLOSCLZ;
-    data->ctx = blosc2_create_cctx(cparams);
+    blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
+    data->b_storage = &b_storage;
 
     // Add parametrizations
-    CUTEST_PARAMETRIZE(itemsize, uint8_t, CUTEST_DATA(
+    CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(
             1,
             2,
             4,
@@ -61,38 +61,44 @@ CUTEST_TEST_SETUP(append) {
 CUTEST_TEST_TEST(append) {
     CUTEST_GET_PARAMETER(backend, _test_backend);
     CUTEST_GET_PARAMETER(shapes, test_shapes_t);
-    CUTEST_GET_PARAMETER(itemsize, uint8_t);
+    CUTEST_GET_PARAMETER(typesize, uint8_t);
 
     char *urlpath = "test_append_shape.b2frame";
     blosc2_remove_urlpath(urlpath);
 
     caterva_params_t params;
-    params.itemsize = itemsize;
     params.ndim = shapes.ndim;
     for (int i = 0; i < params.ndim; ++i) {
         params.shape[i] = shapes.shape[i];
     }
 
-    caterva_storage_t storage = {0};
+    caterva_storage_t storage = {.b_storage=data->b_storage};
+    storage.b_storage->cparams->typesize = typesize;
     if (backend.persistent) {
-        storage.urlpath = urlpath;
+        storage.b_storage->urlpath = urlpath;
     }
-    storage.contiguous = backend.contiguous;
+    storage.b_storage->contiguous = backend.contiguous;
     for (int i = 0; i < params.ndim; ++i) {
         storage.chunkshape[i] = shapes.chunkshape[i];
         storage.blockshape[i] = shapes.blockshape[i];
     }
+    int32_t blocknitems = 1;
+    for (int i = 0; i < params.ndim; ++i) {
+      blocknitems *= storage.blockshape[i];
+    }
+    storage.b_storage->cparams->blocksize = blocknitems * storage.b_storage->cparams->typesize;
+    blosc2_context *ctx = blosc2_create_cctx(*storage.b_storage->cparams);
 
-    int64_t buffersize = itemsize;
+    int64_t buffersize = typesize;
     for (int i = 0; i < params.ndim; ++i) {
         buffersize *= shapes.buffershape[i];
     }
 
     /* Create caterva_array_t with original data */
     caterva_array_t *src;
-    uint8_t *value = malloc(itemsize);
+    uint8_t *value = malloc(typesize);
     int8_t fill_value = 1;
-    switch (itemsize) {
+    switch (typesize) {
         case 8:
             ((int64_t *) value)[0] = (int64_t) fill_value;
             break;
@@ -108,11 +114,11 @@ CUTEST_TEST_TEST(append) {
         default:
             break;
     }
-    CATERVA_ERROR(caterva_full(data->ctx, &params, &storage, value, &src));
+    CATERVA_ERROR(caterva_full(&params, &storage, value, &src));
 
     uint8_t *buffer = malloc(buffersize);
-    fill_buf(buffer, itemsize, buffersize / itemsize);
-    CATERVA_ERROR(caterva_append(data->ctx, src, buffer, buffersize, shapes.axis));
+    fill_buf(buffer, typesize, buffersize / typesize);
+    CATERVA_ERROR(caterva_append(ctx, src, buffer, buffersize, shapes.axis));
 
     int64_t start[CATERVA_MAX_DIM] = {0};
     start[shapes.axis] = shapes.shape[shapes.axis];
@@ -124,11 +130,11 @@ CUTEST_TEST_TEST(append) {
 
     /* Fill buffer with a slice from the new chunks */
     uint8_t *res_buffer = malloc(buffersize);
-    CATERVA_ERROR(caterva_get_slice_buffer(data->ctx, src, start, stop, res_buffer,
+    CATERVA_ERROR(caterva_get_slice_buffer(ctx, src, start, stop, res_buffer,
                                            shapes.buffershape, buffersize));
 
-    for (uint64_t i = 0; i < (uint64_t) buffersize / itemsize; ++i) {
-        switch (itemsize) {
+    for (uint64_t i = 0; i < (uint64_t) buffersize / typesize; ++i) {
+        switch (typesize) {
             case 8:
                 CUTEST_ASSERT("Elements are not equal!",
                               ((uint64_t *) buffer)[i] == ((uint64_t *) res_buffer)[i]);
@@ -154,14 +160,14 @@ CUTEST_TEST_TEST(append) {
     free(buffer);
     free(res_buffer);
 
-    CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
+    CATERVA_TEST_ASSERT(caterva_free(&src));
+    blosc2_free_ctx(ctx);
     blosc2_remove_urlpath(urlpath);
 
     return 0;
 }
 
 CUTEST_TEST_TEARDOWN(append) {
-    blosc2_free_ctx(data->ctx);
     blosc2_destroy();
 }
 

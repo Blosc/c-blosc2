@@ -16,34 +16,40 @@ int main() {
     int64_t shape[] = {10, 10};
     int32_t chunkshape[] = {4, 4};
     int32_t blockshape[] = {2, 2};
-    int8_t itemsize = 8;
+    int8_t typesize = 8;
 
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     blosc2_context *ctx = blosc2_create_cctx(cparams);
 
     caterva_params_t params = {0};
     params.ndim = ndim;
-    params.itemsize = itemsize;
     for (int i = 0; i < ndim; ++i) {
         params.shape[i] = shape[i];
     }
 
-    caterva_storage_t storage = {0};
+    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+    blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
+    caterva_storage_t storage = {.b_storage=&b_storage};
+    storage.b_storage->cparams->typesize = typesize;
+    int32_t blocknitems = 1;
     for (int i = 0; i < ndim; ++i) {
-        storage.chunkshape[i] = chunkshape[i];
-        storage.blockshape[i] = blockshape[i];
+      storage.chunkshape[i] = chunkshape[i];
+      storage.blockshape[i] = blockshape[i];
+      blocknitems *= storage.blockshape[i];
     }
+    storage.b_storage->cparams->blocksize = blocknitems * storage.b_storage->cparams->typesize;
+
     int64_t dataitems = 1;
     for (int i = 0; i < ndim; ++i) {
         dataitems *= shape[i];
     }
-    int64_t datasize = dataitems * itemsize;
+    int64_t datasize = dataitems * typesize;
     double *data = malloc(datasize);
     for (int i = 0; i < dataitems; ++i) {
         data[i] = (double) i;
     }
     caterva_array_t *arr;
-    CATERVA_ERROR(caterva_from_buffer(ctx, data, datasize, &params, &storage, &arr));
+    CATERVA_ERROR(caterva_from_buffer(data, datasize, &params, &storage, &arr));
     free(data);
 
     int64_t sel0[] = {3, 1, 2};
@@ -70,7 +76,7 @@ int main() {
     }
     printf("\n");
     free(buffer);
-    CATERVA_ERROR(caterva_free(ctx, &arr));
+    CATERVA_ERROR(caterva_free(&arr));
     blosc2_free_ctx(ctx);
 
     return 0;

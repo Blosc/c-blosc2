@@ -12,19 +12,14 @@
 
 
 CUTEST_TEST_DATA(metalayers) {
-    blosc2_context *ctx;
 };
 
 
 CUTEST_TEST_SETUP(metalayers) {
     blosc2_init();
-    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-    cparams.nthreads = 2;
-    cparams.compcode = BLOSC_BLOSCLZ;
-    data->ctx = blosc2_create_cctx(cparams);
 
     // Add parametrizations
-    CUTEST_PARAMETRIZE(itemsize, uint8_t, CUTEST_DATA(1, 2, 4, 8));
+    CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(1, 2, 4, 8));
     CUTEST_PARAMETRIZE(shapes, _test_shapes, CUTEST_DATA(
             {0, {0}, {0}, {0}}, // 0-dim
             {1, {10}, {7}, {2}}, // 1-idim
@@ -39,27 +34,38 @@ CUTEST_TEST_SETUP(metalayers) {
 
 CUTEST_TEST_TEST(metalayers) {
     CUTEST_GET_PARAMETER(shapes, _test_shapes);
-    CUTEST_GET_PARAMETER(itemsize, uint8_t);
+    CUTEST_GET_PARAMETER(typesize, uint8_t);
     CUTEST_GET_PARAMETER(backend, _test_backend);
 
     char *urlpath = "test_metalayers.caterva";
     blosc2_remove_urlpath(urlpath);
     caterva_params_t params;
-    params.itemsize = itemsize;
     params.ndim = shapes.ndim;
     for (int i = 0; i < params.ndim; ++i) {
         params.shape[i] = shapes.shape[i];
     }
 
-    caterva_storage_t storage = {0};
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+    cparams.nthreads = 2;
+    cparams.compcode = BLOSC_BLOSCLZ;
+    blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
+    caterva_storage_t storage = {.b_storage=&b_storage};
+    storage.b_storage->cparams->typesize = typesize;
     if (backend.persistent) {
-        storage.urlpath = urlpath;
+        storage.b_storage->urlpath = urlpath;
     }
-    storage.contiguous = backend.contiguous;
+    storage.b_storage->contiguous = backend.contiguous;
     for (int i = 0; i < params.ndim; ++i) {
         storage.chunkshape[i] = shapes.chunkshape[i];
         storage.blockshape[i] = shapes.blockshape[i];
     }
+    int32_t blocknitems = 1;
+    for (int i = 0; i < params.ndim; ++i) {
+      blocknitems *= storage.blockshape[i];
+    }
+    storage.b_storage->cparams->blocksize = blocknitems * storage.b_storage->cparams->typesize;
+
     storage.nmetalayers = 1;
     blosc2_metalayer *meta0 = &storage.metalayers[0];
     meta0->name = "test_meta";
@@ -68,18 +74,20 @@ CUTEST_TEST_TEST(metalayers) {
     meta0->content = (uint8_t *) &sdata0;
     meta0->content_len = sizeof(sdata0);
 
+    blosc2_context *ctx = blosc2_create_cctx(*storage.b_storage->cparams);
+
     /* Create original data */
-    size_t buffersize = itemsize;
+    size_t buffersize = typesize;
     for (int i = 0; i < params.ndim; ++i) {
         buffersize *= (size_t) params.shape[i];
     }
 
     uint8_t *buffer = malloc(buffersize);
-    CUTEST_ASSERT("Buffer filled incorrectly", fill_buf(buffer, itemsize, buffersize / itemsize));
+    CUTEST_ASSERT("Buffer filled incorrectly", fill_buf(buffer, typesize, buffersize / typesize));
 
     /* Create caterva_array_t with original data */
     caterva_array_t *src;
-    CATERVA_TEST_ASSERT(caterva_from_buffer(data->ctx, buffer, buffersize, &params, &storage,
+    CATERVA_TEST_ASSERT(caterva_from_buffer(buffer, buffersize, &params, &storage,
                                             &src));
 
     blosc2_metalayer vlmeta1;
@@ -123,10 +131,10 @@ CUTEST_TEST_TEST(metalayers) {
     vlmeta2.content_len = sizeof(sdata1);
     CATERVA_TEST_ASSERT(blosc2_vlmeta_add(src->sc, vlmeta2.name, vlmeta2.content, vlmeta2.content_len,
                                           src->sc->storage->cparams));
-    CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src));
+    CATERVA_TEST_ASSERT(caterva_free(&src));
 
     caterva_array_t *src2;
-    caterva_open(data->ctx, urlpath, &src2);
+    caterva_open(ctx, urlpath, &src2);
 
     CATERVA_TEST_ASSERT(blosc2_vlmeta_get(src2->sc, vlmeta2.name, &content, &content_len));
     CUTEST_ASSERT("Contents are not equal", *((uint64_t *) vlmeta2.content) == *((uint64_t *) content));
@@ -152,14 +160,15 @@ CUTEST_TEST_TEST(metalayers) {
 
     /* Free mallocs */
     free(buffer);
-    CATERVA_TEST_ASSERT(caterva_free(data->ctx, &src2));
+    CATERVA_TEST_ASSERT(caterva_free(&src2));
+    blosc2_free_ctx(ctx);
+
     blosc2_remove_urlpath(urlpath);
     return 0;
 }
 
 
 CUTEST_TEST_TEARDOWN(metalayers) {
-    blosc2_free_ctx(data->ctx);
     blosc2_destroy();
 }
 

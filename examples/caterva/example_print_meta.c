@@ -33,7 +33,7 @@ int print_meta(char *urlpath) {
     caterva_array_t *arr;
     CATERVA_ERROR(caterva_open(ctx, urlpath, &arr));
     caterva_print_meta(arr);
-    caterva_free(ctx, &arr);
+    caterva_free(&arr);
     blosc2_free_ctx(ctx);
 
     return 0;
