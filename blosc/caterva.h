@@ -107,61 +107,6 @@ static char *print_error(int rc) {
 #define CATERVA_MAX_METALAYERS (BLOSC2_MAX_METALAYERS - 1)
 
 /**
- * @brief Configuration parameters used to create a caterva context.
- */
-typedef struct {
-    uint8_t compcode;
-    //!< Defines the codec used in compression.
-    uint8_t compcode_meta;
-    //!< The metadata for the compressor codec.
-    uint8_t clevel;
-    //!< Determines the compression level used in Blosc.
-    int32_t splitmode;
-    //!< Whether the blocks should be split or not.
-    int usedict;
-    //!< Indicates whether a dictionary is used to compress data or not.
-    int16_t nthreads;
-    //!< Determines the maximum number of threads that can be used.
-    uint8_t filters[BLOSC2_MAX_FILTERS];
-    //!< Defines the filters used in compression.
-    uint8_t filters_meta[BLOSC2_MAX_FILTERS];
-    //!< Indicates the meta filters used in Blosc.
-    blosc2_prefilter_fn prefilter;
-    //!< Defines the function that is applied to the data before compressing it.
-    blosc2_prefilter_params *pparams;
-    //!< Indicates the parameters of the prefilter function.
-    blosc2_btune *udbtune;
-    //!< Indicates user-defined parameters for btune.
-} caterva_config_t;
-
-/**
- * @brief The default configuration parameters used in caterva.
- */
-static const caterva_config_t CATERVA_CONFIG_DEFAULTS = {
-                                                         .compcode = BLOSC_BLOSCLZ,
-                                                         .compcode_meta = 0,
-                                                         .clevel = 5,
-                                                         .splitmode = BLOSC_AUTO_SPLIT,
-                                                         .usedict = 0,
-                                                         .nthreads = 1,
-                                                         .filters = {0, 0, 0, 0, 0, BLOSC_SHUFFLE},
-                                                         .filters_meta = {0, 0, 0, 0, 0, 0},
-                                                         .prefilter = NULL,
-                                                         .pparams = NULL,
-                                                         .udbtune = NULL,
-                                                         };
-
-/**
- * @brief Context for caterva arrays that specifies the functions used to manage memory and
- * the compression/decompression parameters used in Blosc.
- */
-typedef struct {
-    caterva_config_t *cfg;
-    //!< The configuration parameters.
-} caterva_ctx_t;
-
-
-/**
  * @brief The storage properties for an array backed by a Blosc super-chunk.
  */
 typedef struct {
@@ -209,7 +154,7 @@ struct chunk_cache_s {
  * @brief A multidimensional array of data that can be compressed.
  */
 typedef struct {
-    caterva_config_t *cfg;
+    blosc2_context *ctx;
     //!< Array configuration.
     blosc2_schunk *sc;
     //!< Pointer to a Blosc super-chunk
@@ -251,25 +196,6 @@ typedef struct {
     //!< Item - shape strides.
 } caterva_array_t;
 
-/**
- * @brief Create a context for caterva.
- *
- * @param cfg The configuration parameters needed for the context creation.
- * @param ctx The memory pointer where the context will be created.
- *
- * @return An error code.
- */
-BLOSC_EXPORT int caterva_ctx_new(caterva_config_t *cfg, caterva_ctx_t **ctx);
-
-/**
- * @brief Free a context.
- *
- * @param ctx The The context to be freed.
- *
- * @return An error code.
- */
-int caterva_ctx_free(caterva_ctx_t **ctx);
-
 
 /**
  * @brief Create an uninitialized array.
@@ -281,7 +207,7 @@ int caterva_ctx_free(caterva_ctx_t **ctx);
  *
  * @return An error code.
  */
-int caterva_uninit(caterva_ctx_t *ctx, caterva_params_t *params,
+int caterva_uninit(blosc2_context *ctx, caterva_params_t *params,
                    caterva_storage_t *storage, caterva_array_t **array);
 
 
@@ -295,7 +221,7 @@ int caterva_uninit(caterva_ctx_t *ctx, caterva_params_t *params,
  *
  * @return An error code.
  */
-int caterva_empty(caterva_ctx_t *ctx, caterva_params_t *params,
+int caterva_empty(blosc2_context *ctx, caterva_params_t *params,
                   caterva_storage_t *storage, caterva_array_t **array);
 
 
@@ -310,7 +236,7 @@ int caterva_empty(caterva_ctx_t *ctx, caterva_params_t *params,
  *
  * @return An error code.
  */
-int caterva_zeros(caterva_ctx_t *ctx, caterva_params_t *params,
+int caterva_zeros(blosc2_context *ctx, caterva_params_t *params,
                   caterva_storage_t *storage, caterva_array_t **array);
 
 
@@ -326,7 +252,7 @@ int caterva_zeros(caterva_ctx_t *ctx, caterva_params_t *params,
  *
  * @return An error code.
  */
-int caterva_full(caterva_ctx_t *ctx, caterva_params_t *params,
+int caterva_full(blosc2_context *ctx, caterva_params_t *params,
                  caterva_storage_t *storage, void *fill_value, caterva_array_t **array);
 /**
  * @brief Free an array.
@@ -336,7 +262,7 @@ int caterva_full(caterva_ctx_t *ctx, caterva_params_t *params,
  *
  * @return An error code.
  */
-int caterva_free(caterva_ctx_t *ctx, caterva_array_t **array);
+int caterva_free(blosc2_context *ctx, caterva_array_t **array);
 
 /**
  * @brief Create a caterva array from a super-chunk. It can only be used if the array
@@ -349,7 +275,7 @@ int caterva_free(caterva_ctx_t *ctx, caterva_array_t **array);
  * @return An error code.
  */
 int
-caterva_from_schunk(caterva_ctx_t *ctx, blosc2_schunk *schunk, caterva_array_t **array);
+caterva_from_schunk(blosc2_context *ctx, blosc2_schunk *schunk, caterva_array_t **array);
 
 /**
  * Create a serialized super-chunk from a caterva array.
@@ -362,7 +288,7 @@ caterva_from_schunk(caterva_ctx_t *ctx, blosc2_schunk *schunk, caterva_array_t *
  *
  * @return An error code
  */
-int caterva_to_cframe(caterva_ctx_t *ctx, caterva_array_t *array, uint8_t **cframe,
+int caterva_to_cframe(blosc2_context *ctx, caterva_array_t *array, uint8_t **cframe,
                       int64_t *cframe_len, bool *needs_free);
 
 /**
@@ -376,7 +302,7 @@ int caterva_to_cframe(caterva_ctx_t *ctx, caterva_array_t *array, uint8_t **cfra
  *
  * @return An error code.
  */
-int caterva_from_cframe(caterva_ctx_t *ctx, uint8_t *cframe, int64_t cframe_len, bool copy,
+int caterva_from_cframe(blosc2_context *ctx, uint8_t *cframe, int64_t cframe_len, bool copy,
                         caterva_array_t **array);
 
 /**
@@ -388,7 +314,7 @@ int caterva_from_cframe(caterva_ctx_t *ctx, uint8_t *cframe, int64_t cframe_len,
  *
  * @return An error code.
  */
-int caterva_open(caterva_ctx_t *ctx, const char *urlpath, caterva_array_t **array);
+int caterva_open(blosc2_context *ctx, const char *urlpath, caterva_array_t **array);
 
 /**
  * @brief Save caterva array into a specific urlpath.
@@ -399,7 +325,7 @@ int caterva_open(caterva_ctx_t *ctx, const char *urlpath, caterva_array_t **arra
  *
  * @return An error code.
  */
-BLOSC_EXPORT int caterva_save(caterva_ctx_t *ctx, caterva_array_t *array, char *urlpath);
+BLOSC_EXPORT int caterva_save(blosc2_context *ctx, caterva_array_t *array, char *urlpath);
 
 /**
  * @brief Create a caterva array from the data stored in a buffer.
@@ -413,7 +339,7 @@ BLOSC_EXPORT int caterva_save(caterva_ctx_t *ctx, caterva_array_t *array, char *
  *
  * @return An error code.
  */
-BLOSC_EXPORT int caterva_from_buffer(caterva_ctx_t *ctx, void *buffer, int64_t buffersize,
+BLOSC_EXPORT int caterva_from_buffer(blosc2_context *ctx, void *buffer, int64_t buffersize,
                                      caterva_params_t *params, caterva_storage_t *storage,
                                      caterva_array_t **array);
 
@@ -427,7 +353,7 @@ BLOSC_EXPORT int caterva_from_buffer(caterva_ctx_t *ctx, void *buffer, int64_t b
  *
  * @return An error code.
  */
-BLOSC_EXPORT int caterva_to_buffer(caterva_ctx_t *ctx, caterva_array_t *array, void *buffer,
+BLOSC_EXPORT int caterva_to_buffer(blosc2_context *ctx, caterva_array_t *array, void *buffer,
                                    int64_t buffersize);
 
 /**
@@ -442,7 +368,7 @@ BLOSC_EXPORT int caterva_to_buffer(caterva_ctx_t *ctx, caterva_array_t *array, v
  *
  * @return An error code.
  */
-int caterva_get_slice(caterva_ctx_t *ctx, caterva_array_t *src, const int64_t *start,
+int caterva_get_slice(blosc2_context *ctx, caterva_array_t *src, const int64_t *start,
                       const int64_t *stop, caterva_storage_t *storage, caterva_array_t **array);
 
 /**
@@ -457,7 +383,7 @@ int caterva_get_slice(caterva_ctx_t *ctx, caterva_array_t *src, const int64_t *s
  *
  * @return An error code
  */
-int caterva_squeeze_index(caterva_ctx_t *ctx, caterva_array_t *array,
+int caterva_squeeze_index(blosc2_context *ctx, caterva_array_t *array,
                           const bool *index);
 
 /**
@@ -470,7 +396,7 @@ int caterva_squeeze_index(caterva_ctx_t *ctx, caterva_array_t *array,
  *
  * @return An error code
  */
-int caterva_squeeze(caterva_ctx_t *ctx, caterva_array_t *array);
+int caterva_squeeze(blosc2_context *ctx, caterva_array_t *array);
 
 /**
  * @brief Get a slice from an array and store it into a C buffer.
@@ -485,7 +411,7 @@ int caterva_squeeze(caterva_ctx_t *ctx, caterva_array_t *array);
  *
  * @return An error code.
  */
-int caterva_get_slice_buffer(caterva_ctx_t *ctx, caterva_array_t *array,
+int caterva_get_slice_buffer(blosc2_context *ctx, caterva_array_t *array,
                              int64_t *start, int64_t *stop,
                              void *buffer, int64_t *buffershape, int64_t buffersize);
 
@@ -502,7 +428,7 @@ int caterva_get_slice_buffer(caterva_ctx_t *ctx, caterva_array_t *array,
  *
  * @return An error code.
  */
-int caterva_set_slice_buffer(caterva_ctx_t *ctx,
+int caterva_set_slice_buffer(blosc2_context *ctx,
                              void *buffer, int64_t *buffershape, int64_t buffersize,
                              int64_t *start, int64_t *stop, caterva_array_t *array);
 
@@ -516,7 +442,7 @@ int caterva_set_slice_buffer(caterva_ctx_t *ctx,
  *
  * @return An error code
  */
-int caterva_copy(caterva_ctx_t *ctx, caterva_array_t *src, caterva_storage_t *storage,
+int caterva_copy(blosc2_context *ctx, caterva_array_t *src, caterva_storage_t *storage,
                  caterva_array_t **array);
 
 /**
@@ -538,7 +464,7 @@ int caterva_print_meta(caterva_array_t *array);
  *
  * @return An error code
  */
-int caterva_resize(caterva_ctx_t *ctx, caterva_array_t *array, const int64_t *new_shape, const int64_t *start);
+int caterva_resize(blosc2_context *ctx, caterva_array_t *array, const int64_t *new_shape, const int64_t *start);
 
 
 /**
@@ -553,7 +479,7 @@ int caterva_resize(caterva_ctx_t *ctx, caterva_array_t *array, const int64_t *ne
  *
  * @return An error code.
  */
-int caterva_insert(caterva_ctx_t *ctx, caterva_array_t *array, void *buffer, int64_t buffersize,
+int caterva_insert(blosc2_context *ctx, caterva_array_t *array, void *buffer, int64_t buffersize,
                    const int8_t axis, int64_t insert_start);
 
 /**
@@ -567,7 +493,7 @@ int caterva_insert(caterva_ctx_t *ctx, caterva_array_t *array, void *buffer, int
  *
  * @return An error code.
  */
-int caterva_append(caterva_ctx_t *ctx, caterva_array_t *array, void *buffer, int64_t buffersize,
+int caterva_append(blosc2_context *ctx, caterva_array_t *array, void *buffer, int64_t buffersize,
                    const int8_t axis);
 
 /**
@@ -584,18 +510,18 @@ int caterva_append(caterva_ctx_t *ctx, caterva_array_t *array, void *buffer, int
  *
  * @note See also caterva_resize
  */
-int caterva_delete(caterva_ctx_t *ctx, caterva_array_t *array, const int8_t axis,
+int caterva_delete(blosc2_context *ctx, caterva_array_t *array, const int8_t axis,
                    int64_t delete_start, int64_t delete_len);
 
 
 
 // Indexing section
-int caterva_get_orthogonal_selection(caterva_ctx_t *ctx, caterva_array_t *array,
+int caterva_get_orthogonal_selection(blosc2_context *ctx, caterva_array_t *array,
                                      int64_t **selection, int64_t *selection_size,
                                      void *buffer, int64_t *buffershape,
                                      int64_t buffersize);
 
-int caterva_set_orthogonal_selection(caterva_ctx_t *ctx, caterva_array_t *array,
+int caterva_set_orthogonal_selection(blosc2_context *ctx, caterva_array_t *array,
                                      int64_t **selection, int64_t *selection_size,
                                      void *buffer, int64_t *buffershape,
                                      int64_t buffersize);

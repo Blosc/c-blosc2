@@ -33,11 +33,11 @@
 
 #include "pthread.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <process.h>
-#include <errno.h>
-#include <limits.h>
+#include "stdio.h"
+#include "stdlib.h"
+#include "process.h"
+#include "errno.h"
+#include "limits.h"
 
 
 #define PTHREAD_UNUSED_PARAM(x) ((void)(x))

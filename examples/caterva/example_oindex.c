@@ -18,10 +18,8 @@ int main() {
     int32_t blockshape[] = {2, 2};
     int8_t itemsize = 8;
 
-    caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-
-    caterva_ctx_t *ctx;
-    caterva_ctx_new(&cfg, &ctx);
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    blosc2_context *ctx = blosc2_create_cctx(cparams);
 
     caterva_params_t params = {0};
     params.ndim = ndim;
@@ -73,7 +71,7 @@ int main() {
     printf("\n");
     free(buffer);
     CATERVA_ERROR(caterva_free(ctx, &arr));
-    CATERVA_ERROR(caterva_ctx_free(&ctx));
+    blosc2_free_ctx(ctx);
 
     return 0;
 }

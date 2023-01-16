@@ -15,9 +15,8 @@
 int frame_generator(int8_t *data, int8_t ndim, const int64_t shape[8], const int32_t chunkshape[8],
                     const int32_t blockshape[8], int8_t itemsize, int64_t size, char *urlpath) {
 
-    caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-    caterva_ctx_t *ctx;
-    caterva_ctx_new(&cfg, &ctx);
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    blosc2_context *ctx = blosc2_create_cctx(cparams);
 
     caterva_params_t params = {0};
     params.ndim = ndim;

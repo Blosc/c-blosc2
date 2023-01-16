@@ -35,11 +35,9 @@ int main() {
         src[i] = i;
     }
 
-    caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-    cfg.nthreads = 4;
-
-    caterva_ctx_t *ctx;
-    caterva_ctx_new(&cfg, &ctx);
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.nthreads = 4;
+    blosc2_context *ctx = blosc2_create_cctx(cparams);
 
     caterva_params_t params;
     params.itemsize = itemsize;
@@ -88,7 +86,7 @@ int main() {
     free(src);
 
     caterva_free(ctx, &arr);
-    caterva_ctx_free(&ctx);
+    blosc2_free_ctx(ctx);
 
     return 0;
 }

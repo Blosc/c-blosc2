@@ -9,7 +9,7 @@
 **********************************************************************/
 
 #include <caterva_utils.h>
-
+#include "context.h"
 
 // copyNdim where N = {2-8} - specializations of copy loops to be used by caterva_copy_buffer
 // since we don't have c++ templates, substitute manual specializations for up to known CATERVA_MAX_DIM (8)
@@ -282,7 +282,7 @@ switch(ndim) {
 }
 
 
-int create_blosc_params(caterva_ctx_t *ctx,
+int create_blosc_params(blosc2_context *ctx,
                         caterva_params_t *params,
                         caterva_storage_t *storage,
                         blosc2_cparams *cparams,
@@ -297,23 +297,23 @@ int create_blosc_params(caterva_ctx_t *ctx,
     cparams->blocksize = blocknitems * params->itemsize;
     cparams->schunk = NULL;
     cparams->typesize = params->itemsize;
-    cparams->prefilter = ctx->cfg->prefilter;
-    cparams->preparams = ctx->cfg->pparams;
-    cparams->use_dict = ctx->cfg->usedict;
-    cparams->nthreads = (int16_t) ctx->cfg->nthreads;
-    cparams->clevel = (uint8_t) ctx->cfg->clevel;
-    cparams->compcode = (uint8_t) ctx->cfg->compcode;
-    cparams->compcode_meta = (uint8_t) ctx->cfg->compcode_meta;
+    cparams->prefilter = ctx->prefilter;
+    cparams->preparams = ctx->preparams;
+    cparams->use_dict = ctx->use_dict;
+    cparams->nthreads = (int16_t) ctx->nthreads;
+    cparams->clevel = (uint8_t) ctx->clevel;
+    cparams->compcode = (uint8_t) ctx->compcode;
+    cparams->compcode_meta = (uint8_t) ctx->compcode_meta;
     for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
-        cparams->filters[i] = ctx->cfg->filters[i];
-        cparams->filters_meta[i] = ctx->cfg->filters_meta[i];
+        cparams->filters[i] = ctx->filters[i];
+        cparams->filters_meta[i] = ctx->filters_meta[i];
     }
-    cparams->udbtune = ctx->cfg->udbtune;
-    cparams->splitmode = ctx->cfg->splitmode;
+    cparams->udbtune = ctx->udbtune;
+    cparams->splitmode = ctx->splitmode;
 
     memcpy(dparams, &BLOSC2_DPARAMS_DEFAULTS, sizeof(blosc2_dparams));
     dparams->schunk = NULL;
-    dparams->nthreads = ctx->cfg->nthreads;
+    dparams->nthreads = ctx->nthreads;
 
     memcpy(b_storage, &BLOSC2_STORAGE_DEFAULTS, sizeof(blosc2_storage));
     b_storage->cparams = cparams;
@@ -325,26 +325,6 @@ int create_blosc_params(caterva_ctx_t *ctx,
     if (storage->urlpath != NULL) {
         b_storage->urlpath = storage->urlpath;
     }
-
-    return CATERVA_SUCCEED;
-}
-
-
-int caterva_config_from_schunk(caterva_ctx_t *ctx, blosc2_schunk *sc, caterva_config_t *cfg) {
-    cfg->clevel = sc->storage->cparams->clevel;
-    cfg->compcode = sc->storage->cparams->compcode;
-    cfg->compcode_meta = sc->storage->cparams->compcode_meta;
-    cfg->usedict = sc->storage->cparams->use_dict;
-    cfg->splitmode = sc->storage->cparams->splitmode;
-    cfg->nthreads = ctx->cfg->nthreads;
-    for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
-        cfg->filters[i] = sc->storage->cparams->filters[i];
-        cfg->filters_meta[i] = sc->storage->cparams->filters_meta[i];
-    }
-
-    cfg->prefilter = ctx->cfg->prefilter;
-    cfg->pparams = ctx->cfg->pparams;
-    cfg->udbtune = ctx->cfg->udbtune;
 
     return CATERVA_SUCCEED;
 }

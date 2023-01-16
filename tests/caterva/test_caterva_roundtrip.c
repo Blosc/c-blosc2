@@ -12,16 +12,16 @@
 
 
 CUTEST_TEST_DATA(roundtrip) {
-    caterva_ctx_t *ctx;
+    blosc2_context *ctx;
 };
 
 
 CUTEST_TEST_SETUP(roundtrip) {
     blosc2_init();
-    caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-    cfg.nthreads = 2;
-    cfg.compcode = BLOSC_BLOSCLZ;
-    caterva_ctx_new(&cfg, &data->ctx);
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.nthreads = 2;
+    cparams.compcode = BLOSC_BLOSCLZ;
+    data->ctx = blosc2_create_cctx(cparams);
 
     // Add parametrizations
     caterva_default_parameters();
@@ -85,7 +85,7 @@ CUTEST_TEST_TEST(roundtrip) {
 
 
 CUTEST_TEST_TEARDOWN(roundtrip) {
-    caterva_ctx_free(&data->ctx);
+    blosc2_free_ctx(data->ctx);
     blosc2_destroy();
 }
 

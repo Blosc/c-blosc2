@@ -42,7 +42,7 @@
 #endif
 
 #if _MSC_VER >= 1600 // [
-#include <stdint.h>
+#include "stdint.h"
 #else // ] _MSC_VER >= 1600 [
 
 #include <limits.h>

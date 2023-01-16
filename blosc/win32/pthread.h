@@ -35,7 +35,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
-#include <windows.h>
+#include "windows.h"
 
 /*
  * Defines that adapt Windows API threads to pthreads API

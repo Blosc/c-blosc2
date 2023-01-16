@@ -12,16 +12,16 @@
 
 
 CUTEST_TEST_DATA(metalayers) {
-    caterva_ctx_t *ctx;
+    blosc2_context *ctx;
 };
 
 
 CUTEST_TEST_SETUP(metalayers) {
     blosc2_init();
-    caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-    cfg.nthreads = 2;
-    cfg.compcode = BLOSC_BLOSCLZ;
-    caterva_ctx_new(&cfg, &data->ctx);
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.nthreads = 2;
+    cparams.compcode = BLOSC_BLOSCLZ;
+    data->ctx = blosc2_create_cctx(cparams);
 
     // Add parametrizations
     CUTEST_PARAMETRIZE(itemsize, uint8_t, CUTEST_DATA(1, 2, 4, 8));
@@ -159,7 +159,6 @@ CUTEST_TEST_TEST(metalayers) {
 
 
 CUTEST_TEST_TEARDOWN(metalayers) {
-    caterva_ctx_free(&data->ctx);
     blosc2_destroy();
 }
 

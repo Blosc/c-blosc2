@@ -50,21 +50,20 @@ int main() {
         src[i] = (int64_t) i;
     }
 
-    caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-    cfg.nthreads = 1;
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.nthreads = 1;
     /*
      * Use the NDLZ codec through its plugin.
      * NDLZ metainformation: - it calls the 4x4 version if meta == 4
                              - it calls the 8x8 version if meta == 8
     */
-    cfg.compcode = BLOSC_CODEC_NDLZ;
-    cfg.splitmode = BLOSC_ALWAYS_SPLIT;
-    cfg.compcode_meta = 4;
-    cfg.clevel = 5;
-    // We could use a filter plugin by setting cfg.filters[].
+    cparams.compcode = BLOSC_CODEC_NDLZ;
+    cparams.splitmode = BLOSC_ALWAYS_SPLIT;
+    cparams.compcode_meta = 4;
+    cparams.clevel = 5;
+    // We could use a filter plugin by setting cparams.filters[].
 
-    caterva_ctx_t *ctx;
-    caterva_ctx_new(&cfg, &ctx);
+    blosc2_context *ctx = blosc2_create_cctx(cparams);
 
     caterva_params_t params = {0};
     params.itemsize = itemsize;
@@ -106,7 +105,7 @@ int main() {
     free(buffer);
 
     caterva_free(ctx, &arr);
-    caterva_ctx_free(&ctx);
+    blosc2_free_ctx(ctx);
 
     return 0;
 }

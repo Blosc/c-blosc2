@@ -50,19 +50,18 @@ int main() {
         src[i] = (int64_t) i;
     }
 
-    caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-    cfg.nthreads = 1;
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.nthreads = 1;
     /*
      * Use the NDCELL filter through its plugin.
      * NDCELL metainformation: user must specify the parameter meta as the cellshape, so
      * if in a 3-dim dataset user specifies meta = 4, then cellshape will be 4x4x4.
     */
-    cfg.filters[4] = BLOSC_FILTER_NDCELL;
-    cfg.filters_meta[4] = 4;
-    // We could use a codec plugin by setting cfg.compcodec.
+    cparams.filters[4] = BLOSC_FILTER_NDCELL;
+    cparams.filters_meta[4] = 4;
+    // We could use a codec plugin by setting cparams.compcodec.
 
-    caterva_ctx_t *ctx;
-    caterva_ctx_new(&cfg, &ctx);
+    blosc2_context *ctx = blosc2_create_cctx(cparams);
 
     caterva_params_t params = {0};
     params.itemsize = itemsize;
@@ -104,7 +103,7 @@ int main() {
     free(buffer);
 
     caterva_free(ctx, &arr);
-    caterva_ctx_free(&ctx);
+    blosc2_free_ctx(ctx);
 
     return 0;
 }

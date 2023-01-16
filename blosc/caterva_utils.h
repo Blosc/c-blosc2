@@ -26,14 +26,12 @@ int caterva_copy_buffer(int8_t ndim,
                         void *dst, const int64_t *dst_pad_shape,
                         int64_t *dst_start);
 
-int create_blosc_params(caterva_ctx_t *ctx,
+int create_blosc_params(blosc2_context *ctx,
                         caterva_params_t *params,
                         caterva_storage_t *storage,
                         blosc2_cparams *cparams,
                         blosc2_dparams *dparams,
                         blosc2_storage *b_storage);
-
-int caterva_config_from_schunk(caterva_ctx_t *ctx, blosc2_schunk *sc, caterva_config_t *cfg);
 
 #ifdef __cplusplus
 }

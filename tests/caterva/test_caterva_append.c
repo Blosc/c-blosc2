@@ -22,16 +22,16 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(append) {
-    caterva_ctx_t *ctx;
+    blosc2_context *ctx;
 };
 
 
 CUTEST_TEST_SETUP(append) {
     blosc2_init();
-    caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-    cfg.nthreads = 2;
-    cfg.compcode = BLOSC_BLOSCLZ;
-    caterva_ctx_new(&cfg, &data->ctx);
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.nthreads = 2;
+    cparams.compcode = BLOSC_BLOSCLZ;
+    data->ctx = blosc2_create_cctx(cparams);
 
     // Add parametrizations
     CUTEST_PARAMETRIZE(itemsize, uint8_t, CUTEST_DATA(
@@ -161,7 +161,7 @@ CUTEST_TEST_TEST(append) {
 }
 
 CUTEST_TEST_TEARDOWN(append) {
-    caterva_ctx_free(&data->ctx);
+    blosc2_free_ctx(data->ctx);
     blosc2_destroy();
 }
 

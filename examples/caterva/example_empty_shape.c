@@ -30,10 +30,8 @@ int main() {
     int64_t size = nelem * itemsize;
     int8_t *data = malloc(size);
 
-    caterva_config_t cfg = CATERVA_CONFIG_DEFAULTS;
-
-    caterva_ctx_t *ctx;
-    caterva_ctx_new(&cfg, &ctx);
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    blosc2_context *ctx = blosc2_create_cctx(cparams);
 
     caterva_params_t params = {0};
     params.ndim = ndim;
