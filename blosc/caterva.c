@@ -283,7 +283,6 @@ int caterva_from_schunk(blosc2_context *ctx, blosc2_schunk *schunk, caterva_arra
         CATERVA_TRACE_ERROR("Blosc error");
         return CATERVA_ERR_NULL_POINTER;
     }
-    uint8_t itemsize = (int8_t) cparams->typesize;
     free(cparams);
 
     caterva_params_t params = {0};
