@@ -55,11 +55,15 @@ int main() {
     CATERVA_ERROR(caterva_from_buffer(data, size, &params, &storage, &arr));
 
 
-    caterva_storage_t slice_storage = {0};
+    blosc2_storage slice_b_storage = {.cparams=&cparams, .dparams=&dparams};
+    caterva_storage_t slice_storage = {.b_storage=&slice_b_storage};
+    blocknitems = 1;
     for (int i = 0; i < ndim; ++i) {
         slice_storage.chunkshape[i] = slice_chunkshape[i];
         slice_storage.blockshape[i] = slice_blockshape[i];
+        blocknitems *= slice_storage.blockshape[i];
     }
+    slice_storage.b_storage->cparams->blocksize = blocknitems * slice_storage.b_storage->cparams->typesize;
 
     caterva_array_t *slice;
     CATERVA_ERROR(caterva_get_slice(arr, slice_start, slice_stop, &slice_storage,

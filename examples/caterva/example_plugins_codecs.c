@@ -84,7 +84,7 @@ int main() {
     storage.b_storage->cparams->blocksize = blocknitems * storage.b_storage->cparams->typesize;
 
 
-  caterva_array_t *arr;
+    caterva_array_t *arr;
     blosc_set_timestamp(&t0);
     CATERVA_ERROR(caterva_from_buffer(src, nbytes, &params, &storage, &arr));
     blosc_set_timestamp(&t1);

@@ -14,7 +14,7 @@
 
 int frame_generator(int8_t *data, int8_t ndim, const int64_t shape[8], const int32_t chunkshape[8],
                     const int32_t blockshape[8], int8_t typesize, int64_t size, char *urlpath) {
-
+    blosc2_remove_urlpath(urlpath);
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.typesize = typesize;
     blosc2_context *ctx = blosc2_create_cctx(cparams);
