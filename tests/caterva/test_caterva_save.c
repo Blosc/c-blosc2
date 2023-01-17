@@ -27,7 +27,7 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(save) {
-    blosc2_storage *b_storage;
+    void *unused;
 };
 
 
@@ -67,10 +67,10 @@ CUTEST_TEST_TEST(save) {
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.nthreads = 2;
     cparams.compcode = BLOSC_BLOSCLZ;
+    cparams.typesize = typesize;
     blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
     caterva_storage_t storage = {.b_storage=&b_storage};
-    storage.b_storage->cparams->typesize = typesize;
     storage.b_storage->urlpath = NULL;
     storage.b_storage->contiguous = backend.contiguous;
     int32_t blocknitems = 1;

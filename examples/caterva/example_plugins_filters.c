@@ -59,6 +59,7 @@ int main() {
     */
     cparams.filters[4] = BLOSC_FILTER_NDCELL;
     cparams.filters_meta[4] = 4;
+    cparams.typesize = typesize;
     // We could use a codec plugin by setting cparams.compcodec.
 
     blosc2_context *ctx = blosc2_create_cctx(cparams);
@@ -72,7 +73,6 @@ int main() {
     blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
     caterva_storage_t storage = {.b_storage=&b_storage};
-    storage.b_storage->cparams->typesize = typesize;
     int32_t blocknitems = 1;
     for (int i = 0; i < ndim; ++i) {
         storage.chunkshape[i] = chunkshape[i];

@@ -65,10 +65,10 @@ CUTEST_TEST_TEST(full) {
     blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
     cparams.nthreads = 2;
     cparams.compcode = BLOSC_BLOSCLZ;
+    cparams.typesize = typesize;
     blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
     data->b_storage = &b_storage;
     caterva_storage_t storage = {.b_storage=data->b_storage};
-    storage.b_storage->cparams->typesize = typesize;
     if (backend.persistent) {
         storage.b_storage->urlpath = urlpath;
     }

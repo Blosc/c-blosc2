@@ -30,6 +30,7 @@ int main() {
     }
 
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.typesize = typesize;
     blosc2_context *ctx = blosc2_create_cctx(cparams);
 
     caterva_params_t params = {0};
@@ -41,7 +42,6 @@ int main() {
     blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
     caterva_storage_t storage = {.b_storage=&b_storage};
-    storage.b_storage->cparams->typesize = typesize;
     int32_t blocknitems = 1;
     for (int i = 0; i < ndim; ++i) {
         storage.chunkshape[i] = chunkshape[i];

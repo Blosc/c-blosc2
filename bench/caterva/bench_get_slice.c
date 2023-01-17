@@ -37,6 +37,7 @@ int main() {
 
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.nthreads = 4;
+    cparams.typesize = itemsize;
     blosc2_context *ctx = blosc2_create_cctx(cparams);
 
     caterva_params_t params;

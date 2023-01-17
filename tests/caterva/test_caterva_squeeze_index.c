@@ -24,7 +24,7 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(squeeze_index) {
-    blosc2_storage *b_storage;
+    void *unused;
 };
 
 
@@ -92,10 +92,10 @@ CUTEST_TEST_TEST(squeeze_index) {
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.nthreads = 2;
     cparams.compcode = BLOSC_BLOSCLZ;
+    cparams.typesize = typesize;
     blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
     caterva_storage_t storage = {.b_storage=&b_storage};
-    storage.b_storage->cparams->typesize = typesize;
     if (backend.persistent) {
         storage.b_storage->urlpath = urlpath;
     }

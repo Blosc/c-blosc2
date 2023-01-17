@@ -16,6 +16,7 @@ int frame_generator(int8_t *data, int8_t ndim, const int64_t shape[8], const int
                     const int32_t blockshape[8], int8_t typesize, int64_t size, char *urlpath) {
 
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.typesize = typesize;
     blosc2_context *ctx = blosc2_create_cctx(cparams);
 
     caterva_params_t params = {0};
@@ -27,7 +28,6 @@ int frame_generator(int8_t *data, int8_t ndim, const int64_t shape[8], const int
     blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
     caterva_storage_t storage = {.b_storage=&b_storage};
-    storage.b_storage->cparams->typesize = typesize;
     int32_t blocknitems = 1;
     for (int i = 0; i < ndim; ++i) {
       storage.chunkshape[i] = chunkshape[i];
