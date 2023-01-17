@@ -64,8 +64,6 @@ int main() {
   cparams.typesize = typesize;
   // We could use a filter plugin by setting cparams.filters[].
 
-  blosc2_context *ctx = blosc2_create_cctx(cparams);
-
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
 
@@ -81,7 +79,7 @@ int main() {
   int64_t *buffer = malloc(nbytes);
   int64_t buffer_size = nbytes;
   blosc_set_timestamp(&t0);
-  CATERVA_ERROR(caterva_to_buffer(ctx, arr, buffer, buffer_size));
+  CATERVA_ERROR(caterva_to_buffer(arr, buffer, buffer_size));
   blosc_set_timestamp(&t1);
   printf("to_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));
 
@@ -100,7 +98,6 @@ int main() {
 
   caterva_free(&arr);
   CATERVA_ERROR(caterva_free_params(params));
-  blosc2_free_ctx(ctx);
 
   return 0;
 }

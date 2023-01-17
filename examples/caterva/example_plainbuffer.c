@@ -32,7 +32,6 @@ int main() {
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = typesize;
-  blosc2_context *ctx = blosc2_create_cctx(cparams);
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
@@ -54,7 +53,7 @@ int main() {
   CATERVA_ERROR(caterva_get_slice(arr, slice_start, slice_stop, slice_params,
                                   &slice));
 
-  CATERVA_ERROR(caterva_squeeze(ctx, slice));
+  CATERVA_ERROR(caterva_squeeze(slice));
 
   uint8_t *buffer;
   uint64_t buffer_size = 1;
@@ -64,12 +63,11 @@ int main() {
   buffer_size *= slice->sc->typesize;
   buffer = malloc(buffer_size);
 
-  CATERVA_ERROR(caterva_to_buffer(ctx, slice, buffer, buffer_size));
+  CATERVA_ERROR(caterva_to_buffer(slice, buffer, buffer_size));
   CATERVA_ERROR(caterva_free_params(params));
   CATERVA_ERROR(caterva_free_params(slice_params));
 
   // printf("Elapsed seconds: %.5f\n", blosc_elapsed_secs(t0, t1));
-  blosc2_free_ctx(ctx);
 
   return 0;
 }

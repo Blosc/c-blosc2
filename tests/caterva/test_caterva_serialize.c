@@ -71,14 +71,14 @@ CUTEST_TEST_TEST(serialize) {
   uint8_t *cframe;
   int64_t cframe_len;
   bool needs_free;
-  CATERVA_TEST_ASSERT(caterva_to_cframe(ctx, src, &cframe, &cframe_len, &needs_free));
+  CATERVA_TEST_ASSERT(caterva_to_cframe(src, &cframe, &cframe_len, &needs_free));
 
   caterva_array_t *dest;
   CATERVA_TEST_ASSERT(caterva_from_cframe(ctx, cframe, cframe_len, true, &dest));
 
   /* Fill dest array with caterva_array_t data */
   uint8_t *buffer_dest = malloc(buffersize);
-  CATERVA_TEST_ASSERT(caterva_to_buffer(ctx, dest, buffer_dest, buffersize));
+  CATERVA_TEST_ASSERT(caterva_to_buffer(dest, buffer_dest, buffersize));
 
   /* Testing */
   CATERVA_TEST_ASSERT_BUFFER(buffer, buffer_dest, (int) buffersize);

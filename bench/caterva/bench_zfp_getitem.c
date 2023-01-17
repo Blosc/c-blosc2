@@ -104,7 +104,7 @@ int comp(const char *urlpath) {
                                                 NULL, 0);
 
   caterva_array_t *arr;
-  caterva_from_schunk(ctx, schunk, &arr);
+  caterva_from_schunk(schunk, &arr);
   int copied;
   printf("LZ4 comp ratio: %f \n", (float) arr->sc->nbytes / (float) arr->sc->cbytes);
 

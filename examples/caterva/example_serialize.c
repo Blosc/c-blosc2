@@ -46,14 +46,14 @@ int main() {
   uint8_t *cframe;
   int64_t cframe_len;
   bool needs_free;
-  CATERVA_ERROR(caterva_to_cframe(ctx, arr, &cframe, &cframe_len, &needs_free));
+  CATERVA_ERROR(caterva_to_cframe(arr, &cframe, &cframe_len, &needs_free));
 
   caterva_array_t *dest;
   CATERVA_ERROR(caterva_from_cframe(ctx, cframe, cframe_len, true, &dest));
 
   /* Fill dest array with caterva_array_t data */
   uint8_t *data_dest = malloc(size);
-  CATERVA_ERROR(caterva_to_buffer(ctx, dest, data_dest, size));
+  CATERVA_ERROR(caterva_to_buffer(dest, data_dest, size));
 
   for (int i = 0; i < nelem; ++i) {
     if (data[i] != data_dest[i] && data[i] != i) {

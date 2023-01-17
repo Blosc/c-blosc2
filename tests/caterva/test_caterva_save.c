@@ -88,11 +88,11 @@ CUTEST_TEST_TEST(save) {
 
   CATERVA_TEST_ASSERT(caterva_save(ctx, src, urlpath));
   caterva_array_t *dest;
-  CATERVA_TEST_ASSERT(caterva_open(ctx, urlpath, &dest));
+  CATERVA_TEST_ASSERT(caterva_open(urlpath, &dest));
 
   /* Fill dest array with caterva_array_t data */
   uint8_t *buffer_dest = malloc(buffersize);
-  CATERVA_TEST_ASSERT(caterva_to_buffer(ctx, dest, buffer_dest, buffersize));
+  CATERVA_TEST_ASSERT(caterva_to_buffer(dest, buffer_dest, buffersize));
 
   /* Testing */
   if (dest->nitems != 0) {

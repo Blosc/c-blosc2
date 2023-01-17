@@ -116,9 +116,9 @@ CUTEST_TEST_TEST(resize_shape) {
   CATERVA_ERROR(caterva_full(params, value, &src));
 
   if (shapes.given_pos) {
-    CATERVA_ERROR(caterva_resize(ctx, src, shapes.newshape, shapes.start_resize));
+    CATERVA_ERROR(caterva_resize(src, shapes.newshape, shapes.start_resize));
   } else {
-    CATERVA_ERROR(caterva_resize(ctx, src, shapes.newshape, NULL));
+    CATERVA_ERROR(caterva_resize(src, shapes.newshape, NULL));
   }
 
   // Create aux array to compare values
@@ -160,7 +160,7 @@ CUTEST_TEST_TEST(resize_shape) {
       slice_stop[i] = slice_start[i] + slice_shape[i];
       buffer_len *= slice_shape[i];
       uint8_t *buffer = calloc((size_t) buffer_len, (size_t) typesize);
-      CATERVA_ERROR(caterva_set_slice_buffer(aux_ctx, buffer, slice_shape, buffer_len * typesize,
+      CATERVA_ERROR(caterva_set_slice_buffer(buffer, slice_shape, buffer_len * typesize,
                                              slice_start, slice_stop, aux));
       free(buffer);
     }
@@ -169,8 +169,8 @@ CUTEST_TEST_TEST(resize_shape) {
   /* Fill buffers with whole arrays */
   uint8_t *src_buffer = malloc((size_t) buffersize);
   uint8_t *aux_buffer = malloc((size_t) buffersize);
-  CATERVA_TEST_ASSERT(caterva_to_buffer(ctx, src, src_buffer, buffersize));
-  CATERVA_TEST_ASSERT(caterva_to_buffer(aux_ctx, aux, aux_buffer, buffersize));
+  CATERVA_TEST_ASSERT(caterva_to_buffer(src, src_buffer, buffersize));
+  CATERVA_TEST_ASSERT(caterva_to_buffer(aux, aux_buffer, buffersize));
   for (uint64_t i = 0; i < (uint64_t) buffersize / typesize; ++i) {
     switch (typesize) {
       case 8:
@@ -202,8 +202,6 @@ CUTEST_TEST_TEST(resize_shape) {
   CATERVA_TEST_ASSERT(caterva_free(&aux));
   CATERVA_TEST_ASSERT(caterva_free_params(params));
   CATERVA_TEST_ASSERT(caterva_free_params(aux_params));
-  blosc2_free_ctx(ctx);
-  blosc2_free_ctx(aux_ctx);
   blosc2_remove_urlpath(urlpath);
 
   return 0;

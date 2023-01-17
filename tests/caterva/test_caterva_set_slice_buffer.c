@@ -86,8 +86,6 @@ CUTEST_TEST_TEST(set_slice_buffer) {
   caterva_params_t *params = caterva_new_params(&b2_storage, shapes.ndim, shapes.shape,
                                                 shapes.chunkshape, shapes.blockshape, NULL, 0);
 
-  blosc2_context *ctx = blosc2_create_cctx(*b2_storage.cparams);
-
   /* Create dest buffer */
   int64_t shape[CATERVA_MAX_DIM] = {0};
   int64_t buffersize = typesize;
@@ -104,14 +102,14 @@ CUTEST_TEST_TEST(set_slice_buffer) {
   CATERVA_ERROR(caterva_zeros(params, &src));
 
 
-  CATERVA_ERROR(caterva_set_slice_buffer(ctx, buffer, shape, buffersize,
+  CATERVA_ERROR(caterva_set_slice_buffer(buffer, shape, buffersize,
                                          shapes.start, shapes.stop, src));
 
 
   uint8_t *destbuffer = malloc((size_t) buffersize);
 
   /* Fill dest buffer with a slice*/
-  CATERVA_TEST_ASSERT(caterva_get_slice_buffer(ctx, src, shapes.start, shapes.stop,
+  CATERVA_TEST_ASSERT(caterva_get_slice_buffer(src, shapes.start, shapes.stop,
                                                destbuffer,
                                                shape, buffersize));
 
@@ -144,7 +142,6 @@ CUTEST_TEST_TEST(set_slice_buffer) {
   free(destbuffer);
   CATERVA_TEST_ASSERT(caterva_free(&src));
   CATERVA_TEST_ASSERT(caterva_free_params(params));
-  blosc2_free_ctx(ctx);
   blosc2_remove_urlpath(urlpath);
 
   return 0;

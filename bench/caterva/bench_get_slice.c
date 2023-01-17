@@ -38,7 +38,6 @@ int main() {
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.nthreads = 4;
   cparams.typesize = itemsize;
-  blosc2_context *ctx = blosc2_create_cctx(cparams);
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
@@ -69,7 +68,7 @@ int main() {
     for (int slice = 0; slice < nslices; ++slice) {
       slice_start[dim] = rand() % shape[dim];
       slice_stop[dim] = slice_start[dim] + 1;
-      CATERVA_ERROR(caterva_get_slice_buffer(ctx, arr, slice_start, slice_stop, buffer, slice_shape, buffersize));
+      CATERVA_ERROR(caterva_get_slice_buffer(arr, slice_start, slice_stop, buffer, slice_shape, buffersize));
     }
     free(buffer);
   }
@@ -81,7 +80,6 @@ int main() {
 
   caterva_free(&arr);
   CATERVA_ERROR(caterva_free_params(params));
-  blosc2_free_ctx(ctx);
 
   return 0;
 }

@@ -162,7 +162,7 @@ CUTEST_TEST_TEST(copy) {
 
 
   uint8_t *buffer_dest = malloc(buffersize);
-  CATERVA_TEST_ASSERT(caterva_to_buffer(ctx, dest, buffer_dest, buffersize));
+  CATERVA_TEST_ASSERT(caterva_to_buffer(dest, buffer_dest, buffersize));
 
   /* Testing */
   CATERVA_TEST_ASSERT_BUFFER(buffer, buffer_dest, (int) buffersize);

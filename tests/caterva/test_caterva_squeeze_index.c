@@ -120,12 +120,10 @@ CUTEST_TEST_TEST(squeeze_index) {
   caterva_params_t *params2 = caterva_new_params(&b2_storage2, shapes.ndim, shapes.shape,
                                                 shapes.chunkshape2, shapes.blockshape2, NULL, 0);
 
-  blosc2_context *ctx2 = blosc2_create_cctx(*b2_storage2.cparams);
-
   caterva_array_t *dest;
   CATERVA_TEST_ASSERT(caterva_get_slice(src, shapes.start, shapes.stop, params2, &dest));
 
-  CATERVA_TEST_ASSERT(caterva_squeeze_index(ctx2, dest, shapes.squeeze_indexes));
+  CATERVA_TEST_ASSERT(caterva_squeeze_index(dest, shapes.squeeze_indexes));
 
   int8_t nsq = 0;
   for (int i = 0; i < params->ndim; ++i) {
@@ -140,7 +138,6 @@ CUTEST_TEST_TEST(squeeze_index) {
   CATERVA_TEST_ASSERT(caterva_free(&dest));
   CATERVA_TEST_ASSERT(caterva_free_params(params));
   CATERVA_TEST_ASSERT(caterva_free_params(params2));
-  blosc2_free_ctx(ctx2);
 
   blosc2_remove_urlpath(urlpath);
   blosc2_remove_urlpath(urlpath2);

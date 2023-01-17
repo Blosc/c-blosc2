@@ -28,13 +28,10 @@
 
 int print_meta(char *urlpath) {
 
-  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  blosc2_context *ctx = blosc2_create_cctx(cparams);
   caterva_array_t *arr;
-  CATERVA_ERROR(caterva_open(ctx, urlpath, &arr));
+  CATERVA_ERROR(caterva_open(urlpath, &arr));
   caterva_print_meta(arr);
   caterva_free(&arr);
-  blosc2_free_ctx(ctx);
 
   return 0;
 }

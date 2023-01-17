@@ -76,8 +76,6 @@ CUTEST_TEST_TEST(delete) {
   caterva_params_t *params = caterva_new_params(&b2_storage, shapes.ndim, shapes.shape,
                                                 shapes.chunkshape, shapes.blockshape, NULL, 0);
 
-  blosc2_context *ctx = blosc2_create_cctx(*b2_storage.cparams);
-
   /* Create caterva_array_t with original data */
   caterva_array_t *src;
   uint8_t *value = malloc(typesize);
@@ -118,9 +116,9 @@ CUTEST_TEST_TEST(delete) {
   int64_t start[CATERVA_MAX_DIM] = {0};
   start[shapes.axis] = shapes.start;
   uint8_t *buffer = calloc((size_t) bufferlen, (size_t) typesize);
-  CATERVA_ERROR(caterva_set_slice_buffer(ctx, buffer, buffer_shape, bufferlen * typesize, start, stop, src));
+  CATERVA_ERROR(caterva_set_slice_buffer(buffer, buffer_shape, bufferlen * typesize, start, stop, src));
 
-  CATERVA_ERROR(caterva_delete(ctx, src, shapes.axis, shapes.start, shapes.delete_len));
+  CATERVA_ERROR(caterva_delete(src, shapes.axis, shapes.start, shapes.delete_len));
 
   int64_t newshape[CATERVA_MAX_DIM] = {0};
   for (int i = 0; i < shapes.ndim; ++i) {
@@ -135,14 +133,12 @@ CUTEST_TEST_TEST(delete) {
   caterva_params_t *aux_params = caterva_new_params(&b2_storage, shapes.ndim, newshape,
                                                    shapes.chunkshape, shapes.blockshape, NULL, 0);
 
-  blosc2_context *aux_ctx = blosc2_create_cctx(*b2_storage.cparams);
-
   CATERVA_ERROR(caterva_full(aux_params, value, &aux));
 
 
   /* Fill buffer with whole array data */
   uint8_t *src_buffer = malloc((size_t) (src->nitems * typesize));
-  CATERVA_TEST_ASSERT(caterva_to_buffer(aux_ctx, src, src_buffer, src->nitems * typesize));
+  CATERVA_TEST_ASSERT(caterva_to_buffer(src, src_buffer, src->nitems * typesize));
 
   for (uint64_t i = 0; i < (uint64_t) src->nitems; ++i) {
     switch (typesize) {
@@ -175,8 +171,6 @@ CUTEST_TEST_TEST(delete) {
   CATERVA_TEST_ASSERT(caterva_free(&aux));
   CATERVA_TEST_ASSERT(caterva_free_params(params));
   CATERVA_TEST_ASSERT(caterva_free_params(aux_params));
-  blosc2_free_ctx(ctx);
-  blosc2_free_ctx(aux_ctx);
 
   blosc2_remove_urlpath(urlpath);
 
