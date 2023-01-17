@@ -107,22 +107,6 @@ static char *print_error(int rc) {
 #define CATERVA_MAX_METALAYERS (BLOSC2_MAX_METALAYERS - 1)
 
 /**
- * @brief The storage properties for an array backed by a Blosc super-chunk.
- */
-typedef struct {
-    int32_t chunkshape[CATERVA_MAX_DIM];
-    //!< The shape of each chunk of Blosc.
-    int32_t blockshape[CATERVA_MAX_DIM];
-    //!< The shape of each block of Blosc.
-    blosc2_storage *b_storage;
-    //!< The Blosc storage properties
-    blosc2_metalayer metalayers[CATERVA_MAX_METALAYERS];
-    //!< List with the metalayers desired.
-    int32_t nmetalayers;
-    //!< The number of metalayers.
-} caterva_storage_t;
-
-/**
  * @brief General parameters needed for the creation of a caterva array.
  */
 typedef struct {
@@ -130,6 +114,16 @@ typedef struct {
     //!< The array shape.
     int8_t ndim;
     //!< The array dimensions.
+    int32_t chunkshape[CATERVA_MAX_DIM];
+    //!< The shape of each chunk of Blosc.
+    int32_t blockshape[CATERVA_MAX_DIM];
+    //!< The shape of each block of Blosc.
+    blosc2_storage *b2_storage;
+    //!< The Blosc storage properties
+    blosc2_metalayer metalayers[CATERVA_MAX_METALAYERS];
+    //!< List with the metalayers desired.
+    int32_t nmetalayers;
+    //!< The number of metalayers.
 } caterva_params_t;
 
 /**
@@ -193,27 +187,59 @@ typedef struct {
 
 
 /**
+ * @brief Create caterva params.
+ *
+ * @param b2_storage The Blosc storage params.
+ * @param ndim The dimensions.
+ * @param shape The shape.
+ * @param chunkshape The chunk shape.
+ * @param blockshape The block shape.
+ * @param metalayers The memory pointer to the list of the metalayers desired.
+ * @param nmetalayers The number of metalayers.
+ *
+ * @return A pointer to the new caterva params. NULL is returned if this fails.
+ *
+ * @note The pointer returned must be freed when not used anymore with #caterva_free_params.
+ *
+ */
+caterva_params_t* caterva_new_params(blosc2_storage* b2_storage, int8_t ndim, int64_t *shape,
+                                     int32_t *chunkshape, int32_t *blockshape,
+                                     blosc2_metalayer *metalayers, int32_t nmetalayers);
+
+
+/**
+ * @brief Free the resources associated with caterva_params_t.
+ *
+ * @param params The params to free.
+ *
+ * @return An error code.
+ *
+ * @note This would not free the schunk pointer in the cparams.
+ *
+ */
+int caterva_free_params(caterva_params_t *params);
+
+
+/**
  * @brief Create an uninitialized array.
  *
  * @param params The general params of the array desired.
- * @param storage The storage params of the array desired.
  * @param array The memory pointer where the array will be created.
  *
  * @return An error code.
  */
-int caterva_uninit(caterva_params_t *params, caterva_storage_t *storage, caterva_array_t **array);
+int caterva_uninit(caterva_params_t *params, caterva_array_t **array);
 
 
 /**
  * @brief Create an empty array.
  *
  * @param params The general params of the array desired.
- * @param storage The storage params of the array desired.
  * @param array The memory pointer where the array will be created.
  *
  * @return An error code.
  */
-int caterva_empty(caterva_params_t *params, caterva_storage_t *storage, caterva_array_t **array);
+int caterva_empty(caterva_params_t *params, caterva_array_t **array);
 
 
 /**
@@ -221,12 +247,11 @@ int caterva_empty(caterva_params_t *params, caterva_storage_t *storage, caterva_
  * uninitialized portions of the array.
  *
  * @param params The general params of the array.
- * @param storage The storage params of the array.
  * @param array The memory pointer where the array will be created.
  *
  * @return An error code.
  */
-int caterva_zeros(caterva_params_t *params, caterva_storage_t *storage, caterva_array_t **array);
+int caterva_zeros(caterva_params_t *params, caterva_array_t **array);
 
 
 /**
@@ -234,13 +259,13 @@ int caterva_zeros(caterva_params_t *params, caterva_storage_t *storage, caterva_
  * uninitialized portions of the array.
  *
  * @param params The general params of the array.
- * @param storage The storage params of the array.
  * @param fill_value Default value for uninitialized portions of the array.
  * @param array The memory pointer where the array will be created.
  *
  * @return An error code.
  */
-int caterva_full(caterva_params_t *params, caterva_storage_t *storage, void *fill_value, caterva_array_t **array);
+int caterva_full(caterva_params_t *params, void *fill_value, caterva_array_t **array);
+
 /**
  * @brief Free an array.
  *
@@ -319,13 +344,12 @@ BLOSC_EXPORT int caterva_save(blosc2_context *ctx, caterva_array_t *array, char 
  * @param buffer The buffer where source data is stored.
  * @param buffersize The size (in bytes) of the buffer.
  * @param params The general params of the array desired.
- * @param storage The storage params of the array desired.
  * @param array The memory pointer where the array will be created.
  *
  * @return An error code.
  */
 BLOSC_EXPORT int caterva_from_buffer(void *buffer, int64_t buffersize,
-                                     caterva_params_t *params, caterva_storage_t *storage,
+                                     caterva_params_t *params,
                                      caterva_array_t **array);
 
 /**
@@ -347,13 +371,16 @@ BLOSC_EXPORT int caterva_to_buffer(blosc2_context *ctx, caterva_array_t *array, 
  * @param src The array from which the slice will be extracted
  * @param start The coordinates where the slice will begin.
  * @param stop The coordinates where the slice will end.
- * @param storage The storage params of the array desired.
+ * @param params The params of the array desired.
  * @param array The memory pointer where the array will be created.
  *
  * @return An error code.
+ *
+ * @note The ndim and shape from params will be overwritten by the src and stop-start respectively.
+ *
  */
 int caterva_get_slice(caterva_array_t *src, const int64_t *start,
-                      const int64_t *stop, caterva_storage_t *storage, caterva_array_t **array);
+                      const int64_t *stop, caterva_params_t *params, caterva_array_t **array);
 
 /**
  * @brief Squeeze a caterva array
@@ -421,12 +448,15 @@ int caterva_set_slice_buffer(blosc2_context *ctx,
  *
  * @param ctx The caterva context to be used.
  * @param src The array from which data is copied.
- * @param storage The storage params of the array desired.
+ * @param params The params of the array desired.
  * @param array The memory pointer where the array will be created.
  *
  * @return An error code
+ *
+ * @note The ndim and shape from params will be overwritten by the src params.
+ *
  */
-int caterva_copy(blosc2_context *ctx, caterva_array_t *src, caterva_storage_t *storage,
+int caterva_copy(blosc2_context *ctx, caterva_array_t *src, caterva_params_t *params,
                  caterva_array_t **array);
 
 /**

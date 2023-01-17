@@ -24,32 +24,33 @@
 #endif
 
 static bool fill_buf(void *buf, uint8_t typesize, size_t buf_size) CATERVA_TEST_UNUSED;
-        static bool fill_buf(void *buf, uint8_t typesize, size_t buf_size) {
-    switch (typesize) {
-        case 8:
-            for (size_t i = 0; i < buf_size; ++i) {
-                ((uint64_t *) buf)[i] = (uint64_t) i + 1;
-            }
-            break;
-        case 4:
-            for (size_t i = 0; i < buf_size; ++i) {
-                ((uint32_t *) buf)[i] = (uint32_t) i + 1;
-            }
-            break;
-        case 2:
-            for (size_t i = 0; i < buf_size; ++i) {
-                ((uint16_t *) buf)[i] = (uint16_t ) i + 1;
-            }
-            break;
-        case 1:
-            for (size_t i = 0; i < buf_size; ++i) {
-                ((uint8_t *) buf)[i] = (uint8_t ) i + 1;
-            }
-            break;
-        default:
-            return false;
-    }
-    return true;
+
+static bool fill_buf(void *buf, uint8_t typesize, size_t buf_size) {
+  switch (typesize) {
+    case 8:
+      for (size_t i = 0; i < buf_size; ++i) {
+        ((uint64_t *) buf)[i] = (uint64_t) i + 1;
+      }
+      break;
+    case 4:
+      for (size_t i = 0; i < buf_size; ++i) {
+        ((uint32_t *) buf)[i] = (uint32_t) i + 1;
+      }
+      break;
+    case 2:
+      for (size_t i = 0; i < buf_size; ++i) {
+        ((uint16_t *) buf)[i] = (uint16_t) i + 1;
+      }
+      break;
+    case 1:
+      for (size_t i = 0; i < buf_size; ++i) {
+        ((uint8_t *) buf)[i] = (uint8_t) i + 1;
+      }
+      break;
+    default:
+      return false;
+  }
+  return true;
 }
 
 
@@ -70,21 +71,21 @@ typedef struct {
 
 
 void caterva_default_parameters() {
-    CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(1, 2, 4, 8));
-    CUTEST_PARAMETRIZE(shapes, _test_shapes, CUTEST_DATA(
-        {2, {40, 40}, {20, 20}, {10, 10}},
-        {3, {40, 55, 23}, {31, 5, 22}, {4, 4, 4}},
-        {3, {40, 0, 12}, {31, 0, 12}, {10, 0, 12}},
-        {4, {50, 60, 31, 12}, {25, 20, 20, 10}, {5, 5, 5, 10}},
-        {5, {1, 1, 1024, 1, 1}, {1, 1, 500, 1, 1}, {1, 1, 200, 1, 1}},
-        {6, {5, 1, 50, 3, 1, 2}, {5, 1, 50, 2, 1, 2}, {2, 1, 20, 2, 1, 2}},
-    ));
-    CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
-        {false, false},
-        {true, false},
-        {false, true},
-        {true, true},
-    ));
+  CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(1, 2, 4, 8));
+  CUTEST_PARAMETRIZE(shapes, _test_shapes, CUTEST_DATA(
+          {2, {40, 40}, {20, 20}, {10, 10}},
+          {3, {40, 55, 23}, {31, 5, 22}, {4, 4, 4}},
+          {3, {40, 0, 12}, {31, 0, 12}, {10, 0, 12}},
+          {4, {50, 60, 31, 12}, {25, 20, 20, 10}, {5, 5, 5, 10}},
+          {5, {1, 1, 1024, 1, 1}, {1, 1, 500, 1, 1}, {1, 1, 200, 1, 1}},
+          {6, {5, 1, 50, 3, 1, 2}, {5, 1, 50, 2, 1, 2}, {2, 1, 20, 2, 1, 2}},
+  ));
+  CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
+          {false, false},
+          {true, false},
+          {false, true},
+          {true, true},
+  ));
 }
 
 

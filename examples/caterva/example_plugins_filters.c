@@ -30,85 +30,75 @@
 #include <inttypes.h>
 
 int main() {
-    blosc_timestamp_t t0, t1;
+  blosc_timestamp_t t0, t1;
 
-    blosc2_init();
-    int8_t ndim = 3;
-    uint8_t typesize = sizeof(int64_t);
+  blosc2_init();
+  int8_t ndim = 3;
+  int32_t typesize = sizeof(int64_t);
 
-    int64_t shape[] = {745, 400, 350};
-    int32_t chunkshape[] = {150, 100, 150};
-    int32_t blockshape[] = {21, 30, 27};
+  int64_t shape[] = {745, 400, 350};
+  int32_t chunkshape[] = {150, 100, 150};
+  int32_t blockshape[] = {21, 30, 27};
 
-    int64_t nbytes = typesize;
-    for (int i = 0; i < ndim; ++i) {
-        nbytes *= shape[i];
+  int64_t nbytes = typesize;
+  for (int i = 0; i < ndim; ++i) {
+    nbytes *= shape[i];
+  }
+
+  int64_t *src = malloc((size_t) nbytes);
+  for (int i = 0; i < nbytes / typesize; ++i) {
+    src[i] = (int64_t) i;
+  }
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.nthreads = 1;
+  /*
+   * Use the NDCELL filter through its plugin.
+   * NDCELL metainformation: user must specify the parameter meta as the cellshape, so
+   * if in a 3-dim dataset user specifies meta = 4, then cellshape will be 4x4x4.
+  */
+  cparams.filters[4] = BLOSC_FILTER_NDCELL;
+  cparams.filters_meta[4] = 4;
+  cparams.typesize = typesize;
+  // We could use a codec plugin by setting cparams.compcodec.
+
+  blosc2_context *ctx = blosc2_create_cctx(cparams);
+
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
+
+  caterva_params_t *params = caterva_new_params(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                                NULL, 0);
+
+  caterva_array_t *arr;
+  blosc_set_timestamp(&t0);
+  CATERVA_ERROR(caterva_from_buffer(src, nbytes, params, &arr));
+  blosc_set_timestamp(&t1);
+  printf("from_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));
+
+  int64_t *buffer = malloc(nbytes);
+  int64_t buffer_size = nbytes;
+  blosc_set_timestamp(&t0);
+  CATERVA_ERROR(caterva_to_buffer(ctx, arr, buffer, buffer_size));
+  blosc_set_timestamp(&t1);
+  printf("to_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));
+
+  blosc2_destroy();
+
+  for (int i = 0; i < buffer_size / typesize; i++) {
+    if (src[i] != buffer[i]) {
+      printf("\n Decompressed data differs from original!\n");
+      printf("i: %d, data %" PRId64 ", dest %" PRId64 "", i, src[i], buffer[i]);
+      return -1;
     }
+  }
 
-    int64_t *src = malloc((size_t) nbytes);
-    for (int i = 0; i < nbytes / typesize; ++i) {
-        src[i] = (int64_t) i;
-    }
+  free(src);
+  free(buffer);
 
-    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-    cparams.nthreads = 1;
-    /*
-     * Use the NDCELL filter through its plugin.
-     * NDCELL metainformation: user must specify the parameter meta as the cellshape, so
-     * if in a 3-dim dataset user specifies meta = 4, then cellshape will be 4x4x4.
-    */
-    cparams.filters[4] = BLOSC_FILTER_NDCELL;
-    cparams.filters_meta[4] = 4;
-    cparams.typesize = typesize;
-    // We could use a codec plugin by setting cparams.compcodec.
+  caterva_free(&arr);
+  CATERVA_ERROR(caterva_free_params(params));
+  blosc2_free_ctx(ctx);
 
-    blosc2_context *ctx = blosc2_create_cctx(cparams);
-
-    caterva_params_t params = {0};
-    params.ndim = ndim;
-    for (int i = 0; i < ndim; ++i) {
-        params.shape[i] = shape[i];
-    }
-
-    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-    blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
-    caterva_storage_t storage = {.b_storage=&b_storage};
-    int32_t blocknitems = 1;
-    for (int i = 0; i < ndim; ++i) {
-        storage.chunkshape[i] = chunkshape[i];
-        storage.blockshape[i] = blockshape[i];
-        blocknitems *= storage.blockshape[i];
-    }
-    storage.b_storage->cparams->blocksize = blocknitems * storage.b_storage->cparams->typesize;
-
-    caterva_array_t *arr;
-    blosc_set_timestamp(&t0);
-    CATERVA_ERROR(caterva_from_buffer(src, nbytes, &params, &storage, &arr));
-    blosc_set_timestamp(&t1);
-    printf("from_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));
-
-    int64_t *buffer = malloc(nbytes);
-    int64_t buffer_size = nbytes;
-    blosc_set_timestamp(&t0);
-    CATERVA_ERROR(caterva_to_buffer(ctx, arr, buffer, buffer_size));
-    blosc_set_timestamp(&t1);
-    printf("to_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));
-
-    blosc2_destroy();
-
-    for (int i = 0; i < buffer_size / typesize; i++) {
-        if (src[i] != buffer[i]) {
-            printf("\n Decompressed data differs from original!\n");
-            printf("i: %d, data %" PRId64 ", dest %" PRId64 "", i, src[i], buffer[i]);
-            return -1;
-        }
-    }
-
-    free(src);
-    free(buffer);
-
-    caterva_free(&arr);
-    blosc2_free_ctx(ctx);
-
-    return 0;
+  return 0;
 }
