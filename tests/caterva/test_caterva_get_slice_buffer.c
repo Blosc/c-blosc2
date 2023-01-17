@@ -44,6 +44,7 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(get_slice_buffer) {
+    blosc2_storage *b_storage;
 };
 
 

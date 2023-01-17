@@ -27,6 +27,7 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(save) {
+    blosc2_storage *b_storage;
 };
 
 

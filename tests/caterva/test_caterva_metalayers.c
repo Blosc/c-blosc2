@@ -12,6 +12,7 @@
 
 
 CUTEST_TEST_DATA(metalayers) {
+    blosc2_storage *b_storage;
 };
 
 

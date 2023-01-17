@@ -21,6 +21,7 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(set_slice_buffer) {
+    blosc2_storage *b_storage;
 };
 
 

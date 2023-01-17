@@ -22,6 +22,7 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(resize_shape) {
+    blosc2_storage *b_storage;
 };
 
 

@@ -23,6 +23,7 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(squeeze) {
+    blosc2_storage *b_storage;
 };
 
 

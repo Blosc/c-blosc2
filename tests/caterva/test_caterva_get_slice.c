@@ -42,7 +42,7 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(get_slice) {
-
+    blosc2_storage *b_storage;
 };
 
 

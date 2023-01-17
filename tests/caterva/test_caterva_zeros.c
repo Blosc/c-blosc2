@@ -12,6 +12,7 @@
 
 
 CUTEST_TEST_DATA(zeros) {
+    blosc2_storage *b_storage;
 };
 
 

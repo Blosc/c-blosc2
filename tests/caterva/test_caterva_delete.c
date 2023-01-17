@@ -29,12 +29,6 @@ CUTEST_TEST_DATA(delete) {
 
 CUTEST_TEST_SETUP(delete) {
     blosc2_init();
-    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-    cparams.nthreads = 2;
-    cparams.compcode = BLOSC_LZ4;
-    blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
-    data->b_storage = &b_storage;
 
     // Add parametrizations
     CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(
@@ -66,6 +60,14 @@ CUTEST_TEST_TEST(delete) {
     CUTEST_GET_PARAMETER(shapes, test_shapes_t);
     CUTEST_GET_PARAMETER(typesize, uint8_t);
 
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+    cparams.nthreads = 2;
+    cparams.compcode = BLOSC_LZ4;
+    cparams.typesize = typesize;
+    blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
+    data->b_storage = &b_storage;
+
     char *urlpath = "test_delete.b2frame";
     blosc2_remove_urlpath(urlpath);
 
@@ -76,7 +78,6 @@ CUTEST_TEST_TEST(delete) {
     }
 
     caterva_storage_t storage = {.b_storage=data->b_storage};
-    storage.b_storage->cparams->typesize = typesize;
     if (backend.persistent) {
         storage.b_storage->urlpath = urlpath;
     }

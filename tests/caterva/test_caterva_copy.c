@@ -27,12 +27,6 @@ CUTEST_TEST_DATA(copy) {
 
 CUTEST_TEST_SETUP(copy) {
     blosc2_init();
-    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-    cparams.nthreads = 2;
-    cparams.compcode = BLOSC_BLOSCLZ;
-    blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
-    data->b_storage = &b_storage;
 
     // Add parametrizations
     CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(
@@ -76,6 +70,14 @@ CUTEST_TEST_TEST(copy) {
     CUTEST_GET_PARAMETER(backend2, _test_backend);
     CUTEST_GET_PARAMETER(typesize, uint8_t);
 
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+    cparams.nthreads = 2;
+    cparams.compcode = BLOSC_BLOSCLZ;
+    cparams.typesize = typesize;
+    blosc2_storage b_storage = {.cparams=&cparams, .dparams=&dparams};
+    data->b_storage = &b_storage;
+
     char *urlpath = "test_copy.b2frame";
     char *urlpath2 = "test_copy2.b2frame";
 
@@ -91,7 +93,6 @@ CUTEST_TEST_TEST(copy) {
     double datatoserialize = 8.34;
 
     caterva_storage_t storage = {.b_storage=data->b_storage};
-    storage.b_storage->cparams->typesize = typesize;
     if (backend.persistent) {
         storage.b_storage->urlpath = urlpath;
     } else {

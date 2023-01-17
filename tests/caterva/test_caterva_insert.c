@@ -22,6 +22,7 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(insert) {
+    blosc2_storage *b_storage;
 };
 
 
