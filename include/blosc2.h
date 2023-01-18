@@ -447,7 +447,7 @@ enum {
 #ifdef __GNUC__
 #define BLOSC_ATTRIBUTE_UNUSED __attribute__((unused))
 #else
-#define CATERVA_ATTRIBUTE_UNUSED
+#define BLOSC_ATTRIBUTE_UNUSED
 #endif
 
 static char *print_error(int rc) BLOSC_ATTRIBUTE_UNUSED;
