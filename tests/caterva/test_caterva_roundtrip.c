@@ -11,11 +11,6 @@
 #include "test_common.h"
 
 
-CUTEST_TEST_DATA(roundtrip) {
-    void *unused;
-};
-
-
 CUTEST_TEST_SETUP(roundtrip) {
   blosc2_init();
 

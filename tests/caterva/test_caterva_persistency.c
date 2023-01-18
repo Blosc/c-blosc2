@@ -29,11 +29,6 @@ typedef struct {
 } test_shapes_t;
 
 
-CUTEST_TEST_DATA(persistency) {
-    void *unused;
-};
-
-
 CUTEST_TEST_SETUP(persistency) {
   blosc2_init();
 

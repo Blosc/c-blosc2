@@ -11,11 +11,6 @@
 #include "test_common.h"
 
 
-CUTEST_TEST_DATA(metalayers) {
-    void *unused;
-};
-
-
 CUTEST_TEST_SETUP(metalayers) {
   blosc2_init();
 

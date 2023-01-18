@@ -41,11 +41,6 @@ typedef struct {
 } test_shapes_t;
 
 
-CUTEST_TEST_DATA(get_slice) {
-    void *unused;
-};
-
-
 CUTEST_TEST_SETUP(get_slice) {
   blosc2_init();
 

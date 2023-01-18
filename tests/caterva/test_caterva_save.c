@@ -29,11 +29,6 @@ typedef struct {
 } test_shapes_t;
 
 
-CUTEST_TEST_DATA(save) {
-    void *unused;
-};
-
-
 CUTEST_TEST_SETUP(save) {
   blosc2_init();
 

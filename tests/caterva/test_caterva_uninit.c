@@ -11,11 +11,6 @@
 #include "test_common.h"
 
 
-CUTEST_TEST_DATA(uninit) {
-    void *unused;
-};
-
-
 CUTEST_TEST_SETUP(uninit) {
   blosc2_init();
 

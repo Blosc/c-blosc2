@@ -23,11 +23,6 @@ typedef struct {
 } test_squeeze_index_shapes_t;
 
 
-CUTEST_TEST_DATA(squeeze_index) {
-    void *unused;
-};
-
-
 CUTEST_TEST_SETUP(squeeze_index) {
   blosc2_init();
 

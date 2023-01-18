@@ -44,30 +44,25 @@
 #define CUTEST_GET_PARAMETER(name, type) \
     type name = * (type *) _cutest_get_parameter(#name)
 
-#define CUTEST_TEST_DATA(sname) \
-    struct sname##_data
-
 #define CUTEST_TEST_SETUP(sname) \
-    void sname##_setup(struct sname##_data *data)
+    void sname##_setup()
 
 #define CUTEST_TEST_TEARDOWN(sname) \
-    void sname##_teardown(struct sname##_data *data)
+    void sname##_teardown()
 
 #define CUTEST_TEST_TEST(sname)                           \
-    static struct sname##_data test_##sname##_data;  \
     CUTEST_TEST_SETUP(sname);                        \
     CUTEST_TEST_TEARDOWN(sname);                     \
-    int sname##_test(struct sname##_data* data);     \
-    int sname##_test(struct sname##_data* data)      \
+    int sname##_test();     \
+    int sname##_test()      \
 
 
 #define CUTEST_TEST_RUN(sname)                           \
     _cutest_setup();                                     \
-    sname##_setup(&test_##sname##_data);                 \
-    int rc = _cutest_run((int (*)(void *)) sname##_test, \
-                         (void *) &test_##sname##_data,  \
+    sname##_setup();                 \
+    int rc = _cutest_run((int (*)(void)) sname##_test, \
                          #sname);                        \
-    sname##_teardown(&test_##sname##_data);              \
+    sname##_teardown();              \
     _cutest_teardown();                                  \
     return rc;
 
@@ -139,7 +134,7 @@ void _cutest_teardown() {
 char _cutest_error_msg[1024];
 
 
-int _cutest_run(int (*test)(void *), void *test_data, char *name) {
+int _cutest_run(int (*test)(void), char *name) {
   int cutest_ok = 0;
   int cutest_failed = 0;
   int cutest_total = 0;
@@ -186,7 +181,7 @@ int _cutest_run(int (*test)(void *), void *test_data, char *name) {
 
     cutest_total++;
 
-    int rc = test(test_data);
+    int rc = test();
     if (rc == CUNIT_OK) {
       cutest_ok++;
       fprintf(stdout, GREEN "[  OK  ]\n" RESET);

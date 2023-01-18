@@ -11,11 +11,6 @@
 #include "test_common.h"
 
 
-CUTEST_TEST_DATA(serialize) {
-    void *unused;
-};
-
-
 CUTEST_TEST_SETUP(serialize) {
   blosc2_init();
 
