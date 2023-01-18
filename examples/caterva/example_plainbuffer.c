@@ -36,8 +36,8 @@ int main() {
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
 
-  caterva_params_t *params = caterva_new_params(&b2_storage, ndim, shape, chunkshape, blockshape,
-                                                NULL, 0);
+  caterva_context_t *params = caterva_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                                 NULL, 0);
 
   caterva_array_t *arr;
   CATERVA_ERROR(caterva_from_buffer(data, size, params, &arr));
@@ -46,8 +46,9 @@ int main() {
   blosc2_storage slice_b2_storage = {.cparams=&cparams, .dparams=&dparams};
 
   // shape will be overwritten by get_slice
-  caterva_params_t *slice_params = caterva_new_params(&slice_b2_storage, ndim, shape, slice_chunkshape, slice_blockshape,
-                                                NULL, 0);
+  caterva_context_t *slice_params = caterva_create_ctx(&slice_b2_storage, ndim, shape, slice_chunkshape,
+                                                       slice_blockshape,
+                                                       NULL, 0);
 
   caterva_array_t *slice;
   CATERVA_ERROR(caterva_get_slice(arr, slice_start, slice_stop, slice_params,
@@ -64,8 +65,8 @@ int main() {
   buffer = malloc(buffer_size);
 
   CATERVA_ERROR(caterva_to_buffer(slice, buffer, buffer_size));
-  CATERVA_ERROR(caterva_free_params(params));
-  CATERVA_ERROR(caterva_free_params(slice_params));
+  CATERVA_ERROR(caterva_free_ctx(params));
+  CATERVA_ERROR(caterva_free_ctx(slice_params));
 
   // printf("Elapsed seconds: %.5f\n", blosc_elapsed_secs(t0, t1));
 

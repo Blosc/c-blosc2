@@ -83,8 +83,8 @@ CUTEST_TEST_TEST(set_slice_buffer) {
   }
   b2_storage.contiguous = backend.contiguous;
 
-  caterva_params_t *params = caterva_new_params(&b2_storage, shapes.ndim, shapes.shape,
-                                                shapes.chunkshape, shapes.blockshape, NULL, 0);
+  caterva_context_t *params = caterva_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
+                                                 shapes.chunkshape, shapes.blockshape, NULL, 0);
 
   /* Create dest buffer */
   int64_t shape[CATERVA_MAX_DIM] = {0};
@@ -141,7 +141,7 @@ CUTEST_TEST_TEST(set_slice_buffer) {
   free(buffer);
   free(destbuffer);
   CATERVA_TEST_ASSERT(caterva_free(&src));
-  CATERVA_TEST_ASSERT(caterva_free_params(params));
+  CATERVA_TEST_ASSERT(caterva_free_ctx(params));
   blosc2_remove_urlpath(urlpath);
 
   return 0;

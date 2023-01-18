@@ -50,8 +50,8 @@ CUTEST_TEST_TEST(serialize) {
   b2_storage.contiguous = contiguous;
   int32_t blocknitems = 1;
 
-  caterva_params_t *params = caterva_new_params(&b2_storage, shapes.ndim, shapes.shape,
-                                                shapes.chunkshape, shapes.blockshape, NULL, 0);
+  caterva_context_t *params = caterva_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
+                                                 shapes.chunkshape, shapes.blockshape, NULL, 0);
 
   blosc2_context *ctx = blosc2_create_cctx(*b2_storage.cparams);
 
@@ -92,7 +92,7 @@ CUTEST_TEST_TEST(serialize) {
   free(buffer_dest);
   CATERVA_TEST_ASSERT(caterva_free(&src));
   CATERVA_TEST_ASSERT(caterva_free(&dest));
-  CATERVA_TEST_ASSERT(caterva_free_params(params));
+  CATERVA_TEST_ASSERT(caterva_free_ctx(params));
   blosc2_free_ctx(ctx);
 
   return 0;

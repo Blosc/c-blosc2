@@ -37,8 +37,8 @@ int main() {
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
   b2_storage.contiguous = false;
 
-  caterva_params_t *params = caterva_new_params(&b2_storage, ndim, shape, chunkshape, blockshape,
-                                                NULL, 0);
+  caterva_context_t *params = caterva_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                                 NULL, 0);
 
   caterva_array_t *arr;
   CATERVA_ERROR(caterva_from_buffer(data, size, params, &arr));
@@ -67,7 +67,7 @@ int main() {
 
   caterva_free(&arr);
   caterva_free(&dest);
-  CATERVA_ERROR(caterva_free_params(params));
+  CATERVA_ERROR(caterva_free_ctx(params));
   blosc2_free_ctx(ctx);
 
   return 0;

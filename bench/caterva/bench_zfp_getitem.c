@@ -100,8 +100,8 @@ int comp(const char *urlpath) {
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
   b2_storage.urlpath = "schunk_rate.cat";
 
-  caterva_params_t *params = caterva_new_params(&b2_storage, ndim, shape_aux, chunkshape, blockshape,
-                                                NULL, 0);
+  caterva_context_t *params = caterva_create_ctx(&b2_storage, ndim, shape_aux, chunkshape, blockshape,
+                                                 NULL, 0);
 
   caterva_array_t *arr;
   caterva_from_schunk(schunk, &arr);
@@ -116,7 +116,7 @@ int comp(const char *urlpath) {
   ctx_zfp->compcode_meta = (uint8_t) (100.0 * (float) arr->sc->cbytes / (float) arr->sc->nbytes);
   ctx_zfp->filters[BLOSC2_MAX_FILTERS - 1] = 0;
   ctx_zfp->filters_meta[BLOSC2_MAX_FILTERS - 1] = 0;
-  copied = caterva_copy(ctx_zfp, arr, params, &arr_rate);
+  copied = caterva_copy(params, arr, &arr_rate);
   if (copied != 0) {
     printf("Error BLOSC_CODEC_ZFP_FIXED_RATE \n");
     free(chunkshape);
@@ -180,7 +180,7 @@ int comp(const char *urlpath) {
   free(blockshape);
   caterva_free(&arr);
   caterva_free(&arr_rate);
-  CATERVA_ERROR(caterva_free_params(params));
+  CATERVA_ERROR(caterva_free_ctx(params));
   blosc2_free_ctx(ctx_zfp);
   if (needs_free_blosc) {
     free(chunk_blosc);
