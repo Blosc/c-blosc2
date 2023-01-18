@@ -244,6 +244,7 @@ int caterva_full(caterva_context_t *ctx, caterva_array_t **array, void *fill_val
 
   int32_t chunksize = BLOSC_EXTENDED_HEADER_LENGTH + (*array)->sc->typesize;
   uint8_t *chunk = malloc(chunksize);
+  BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
   if (blosc2_chunk_repeatval(*cparams, chunkbytes, chunk, chunksize, fill_value) < 0) {
     BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
   }
@@ -434,6 +435,7 @@ int caterva_blosc_slice(void *buffer, int64_t buffersize, int64_t *start, int64_
     if (set_slice) {
       int32_t chunk_size = array->sc->typesize + BLOSC2_MAX_OVERHEAD;
       uint8_t *chunk = malloc(chunk_size);
+      BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
       if (blosc2_compress_ctx(array->sc->cctx, buffer_b, array->sc->typesize, chunk, chunk_size) < 0) {
         BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
@@ -451,6 +453,7 @@ int caterva_blosc_slice(void *buffer, int64_t buffersize, int64_t *start, int64_
 
   int32_t data_nbytes = (int32_t) array->extchunknitems * array->sc->typesize;
   uint8_t *data = malloc(data_nbytes);
+  BLOSC_ERROR_NULL(data, BLOSC2_ERROR_MEMORY_ALLOC);
 
   int64_t chunks_in_array[CATERVA_MAX_DIM] = {0};
   for (int i = 0; i < ndim; ++i) {
@@ -677,6 +680,7 @@ int caterva_blosc_slice(void *buffer, int64_t buffersize, int64_t *start, int64_
       // Recompress the data
       int32_t chunk_nbytes = data_nbytes + BLOSC2_MAX_OVERHEAD;
       uint8_t *chunk = malloc(chunk_nbytes);
+      BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
       int brc;
       brc = blosc2_compress_ctx(array->sc->cctx, data, data_nbytes, chunk, chunk_nbytes);
       if (brc < 0) {
@@ -808,6 +812,7 @@ int caterva_get_slice(caterva_context_t *ctx, caterva_array_t **array, caterva_a
       buffersize *= chunk_shape[i];
     }
     uint8_t *buffer = malloc(buffersize);
+    BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_MEMORY_ALLOC);
     BLOSC_ERROR(caterva_get_slice_buffer(src, src_start, src_stop, buffer, chunk_shape,
                                            buffersize));
     BLOSC_ERROR(caterva_set_slice_buffer(buffer, chunk_shape, buffersize, chunk_start,
@@ -1032,6 +1037,7 @@ int extend_shape(caterva_array_t *array, const int64_t *new_shape, const int64_t
   int64_t old_nchunks = array->sc->nchunks;
   // aux array to keep old shapes
   caterva_array_t *aux = malloc(sizeof(caterva_array_t));
+  BLOSC_ERROR_NULL(aux, BLOSC2_ERROR_MEMORY_ALLOC);
   aux->sc = NULL;
   BLOSC_ERROR(caterva_update_shape(aux, ndim, array->shape, array->chunkshape, array->blockshape));
 
@@ -1058,6 +1064,7 @@ int extend_shape(caterva_array_t *array, const int64_t *new_shape, const int64_t
         if (start[j] <= (array->chunkshape[j] * nchunk_ndim[j])
             && (array->chunkshape[j] * nchunk_ndim[j]) < (start[j] + new_shape[j] - aux->shape[j])) {
           chunk = malloc(BLOSC_EXTENDED_HEADER_LENGTH);
+          BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
           csize = blosc2_chunk_zeros(*cparams, array->sc->chunksize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
           if (csize < 0) {
             free(aux);
@@ -1111,6 +1118,7 @@ int shrink_shape(caterva_array_t *array, const int64_t *new_shape, const int64_t
   int64_t old_nchunks = array->sc->nchunks;
   // aux array to keep old shapes
   caterva_array_t *aux = malloc(sizeof(caterva_array_t));
+  BLOSC_ERROR_NULL(aux, BLOSC2_ERROR_MEMORY_ALLOC);
   aux->sc = NULL;
   BLOSC_ERROR(caterva_update_shape(aux, ndim, array->shape, array->chunkshape, array->blockshape));
 
@@ -1380,8 +1388,11 @@ int caterva_iterate_over_block_copy(caterva_array_t *array, int8_t ndim,
         nblock += block_index[i] * block_chunk_strides[i];
       }
       caterva_selection_t **p_block_selection_0 = malloc(array->ndim * sizeof(caterva_selection_t *));
+      BLOSC_ERROR_NULL(p_block_selection_0, BLOSC2_ERROR_MEMORY_ALLOC);
       caterva_selection_t **p_block_selection_1 = malloc(array->ndim * sizeof(caterva_selection_t *));
+      BLOSC_ERROR_NULL(p_block_selection_1, BLOSC2_ERROR_MEMORY_ALLOC);
       int64_t *block_selection_size = malloc(array->ndim * sizeof(int64_t));
+      BLOSC_ERROR_NULL(block_selection_size, BLOSC2_ERROR_MEMORY_ALLOC);
       for (int i = 0; i < array->ndim; ++i) {
         block_selection_size[i] = chunk_selection_1[i] - chunk_selection_0[i];
       }
@@ -1489,11 +1500,12 @@ int caterva_iterate_over_chunk(caterva_array_t *array, int8_t ndim,
       }
 
       int64_t nblocks = array->extchunknitems / array->blocknitems;
-      caterva_selection_t **p_chunk_selection_0 = malloc(
-              array->ndim * sizeof(caterva_selection_t *));
-      caterva_selection_t **p_chunk_selection_1 = malloc(
-              array->ndim * sizeof(caterva_selection_t *));
+      caterva_selection_t **p_chunk_selection_0 = malloc(array->ndim * sizeof(caterva_selection_t *));
+      BLOSC_ERROR_NULL(p_chunk_selection_0, BLOSC2_ERROR_MEMORY_ALLOC);
+      caterva_selection_t **p_chunk_selection_1 = malloc(array->ndim * sizeof(caterva_selection_t *));
+      BLOSC_ERROR_NULL(p_chunk_selection_1, BLOSC2_ERROR_MEMORY_ALLOC);
       int64_t *chunk_selection_size = malloc(array->ndim * sizeof(int64_t));
+      BLOSC_ERROR_NULL(chunk_selection_size, BLOSC2_ERROR_MEMORY_ALLOC);
       for (int i = 0; i < array->ndim; ++i) {
         chunk_selection_size[i] = p_ordered_selection_1[i] - p_ordered_selection_0[i];
       }
@@ -1521,6 +1533,7 @@ int caterva_iterate_over_chunk(caterva_array_t *array, int8_t ndim,
       int data_nitems = (int) array->extchunknitems;
       int data_nbytes = data_nitems * array->sc->typesize;
       uint8_t *data = malloc(data_nitems * array->sc->typesize);
+      BLOSC_ERROR_NULL(data, BLOSC2_ERROR_MEMORY_ALLOC);
       int err = blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes);
       if (err < 0) {
         BLOSC_TRACE_ERROR("Error decompressing chunk");
@@ -1541,6 +1554,7 @@ int caterva_iterate_over_chunk(caterva_array_t *array, int8_t ndim,
       if (!get) {
         int32_t chunk_size = data_nbytes + BLOSC_EXTENDED_HEADER_LENGTH;
         uint8_t *chunk = malloc(chunk_size);
+        BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
         err = blosc2_compress_ctx(array->sc->cctx, data, data_nbytes, chunk, chunk_size);
         if (err < 0) {
           BLOSC_TRACE_ERROR("Error compressing data");
@@ -1598,6 +1612,7 @@ int caterva_orthogonal_selection(caterva_array_t *array, int64_t **selection, in
 
   // Sort selections
   caterva_selection_t **ordered_selection = malloc(ndim * sizeof(caterva_selection_t *));
+  BLOSC_ERROR_NULL(ordered_selection, BLOSC2_ERROR_MEMORY_ALLOC);
   for (int i = 0; i < ndim; ++i) {
     ordered_selection[i] = malloc(selection_size[i] * sizeof(caterva_selection_t));
     for (int j = 0; j < selection_size[i]; ++j) {
@@ -1609,8 +1624,9 @@ int caterva_orthogonal_selection(caterva_array_t *array, int64_t **selection, in
 
   // Define pointers to iterate over ordered_selection data
   caterva_selection_t **p_ordered_selection_0 = malloc(ndim * sizeof(caterva_selection_t *));
+  BLOSC_ERROR_NULL(p_ordered_selection_0, BLOSC2_ERROR_MEMORY_ALLOC);
   caterva_selection_t **p_ordered_selection_1 = malloc(ndim * sizeof(caterva_selection_t *));
-
+  BLOSC_ERROR_NULL(p_ordered_selection_1, BLOSC2_ERROR_MEMORY_ALLOC);
 
   int64_t bufferstrides[CATERVA_MAX_DIM];
   bufferstrides[array->ndim - 1] = 1;
@@ -1659,7 +1675,7 @@ int32_t caterva_serialize_meta(int8_t ndim, int64_t *shape, const int32_t *chunk
   int32_t max_smeta_len = (int32_t) (1 + 1 + 1 + (1 + ndim * (1 + sizeof(int64_t))) +
                                      (1 + ndim * (1 + sizeof(int32_t))) + (1 + ndim * (1 + sizeof(int32_t))));
   *smeta = malloc((size_t) max_smeta_len);
-  BLOSC_ERROR_NULL(smeta, BLOSC2_ERROR_MEMORY_ALLOC);
+  BLOSC_ERROR_NULL(*smeta, BLOSC2_ERROR_MEMORY_ALLOC);
   uint8_t *pmeta = *smeta;
 
   // Build an array with 5 entries (version, ndim, shape, chunkshape, blockshape)
@@ -1755,7 +1771,9 @@ caterva_context_t *caterva_create_ctx(blosc2_storage *b2_storage, int8_t ndim, i
                                       int32_t *chunkshape, int32_t *blockshape,
                                       blosc2_metalayer *metalayers, int32_t nmetalayers) {
   caterva_context_t *ctx = malloc(sizeof(caterva_context_t));
+  BLOSC_ERROR_NULL(ctx, NULL);
   blosc2_storage *params_b2_storage = malloc(sizeof(blosc2_storage));
+  BLOSC_ERROR_NULL(params_b2_storage, NULL);
   if (b2_storage == NULL) {
     memcpy(params_b2_storage, &BLOSC2_STORAGE_DEFAULTS, sizeof(blosc2_storage));
   }
@@ -1763,6 +1781,7 @@ caterva_context_t *caterva_create_ctx(blosc2_storage *b2_storage, int8_t ndim, i
     memcpy(params_b2_storage, b2_storage, sizeof(blosc2_storage));
   }
   blosc2_cparams *cparams = malloc(sizeof(blosc2_cparams));
+  BLOSC_ERROR_NULL(cparams, NULL);
   // We need a copy of cparams mainly to be able to modify blocksize
   if (b2_storage->cparams == NULL) {
     memcpy(cparams, &BLOSC2_CPARAMS_DEFAULTS, sizeof(blosc2_cparams));
