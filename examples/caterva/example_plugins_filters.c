@@ -36,8 +36,8 @@ int main() {
   int8_t ndim = 3;
   int32_t typesize = sizeof(int64_t);
 
-  int64_t shape[] = {745, 400, 350};
-  int32_t chunkshape[] = {150, 100, 150};
+  int64_t shape[] = {345, 200, 50};
+  int32_t chunkshape[] = {150, 100, 50};
   int32_t blockshape[] = {21, 30, 27};
 
   int64_t nbytes = typesize;
