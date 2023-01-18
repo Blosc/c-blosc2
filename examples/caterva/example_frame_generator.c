@@ -12,26 +12,22 @@
 # include <stdlib.h>
 
 
-int frame_generator(int8_t *data, int8_t ndim, const int64_t *shape, const int32_t *chunkshape,
-                    const int32_t *blockshape, int32_t typesize, int64_t size, char *urlpath) {
+int frame_generator(int8_t *data, int8_t ndim, int64_t *shape, int32_t *chunkshape,
+                    int32_t *blockshape, int32_t typesize, int64_t size, char *urlpath) {
   blosc2_remove_urlpath(urlpath);
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = typesize;
-  blosc2_context *ctx = blosc2_create_cctx(cparams);
-
-  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-  blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_storage b2_storage = {.cparams=&cparams};
   b2_storage.urlpath = urlpath;
   b2_storage.contiguous = true;
 
-  caterva_params_t *params = caterva_new_params(&b2_storage, ndim, (int64_t*) shape, (int32_t*) chunkshape,
-                                                (int32_t*) blockshape,NULL, 0);
+  caterva_context_t *ctx = caterva_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                                 NULL, 0);
 
   caterva_array_t *arr;
-  CATERVA_ERROR(caterva_from_buffer(data, size, params, &arr));
-  CATERVA_ERROR(caterva_free_params(params));
+  CATERVA_ERROR(caterva_from_buffer(ctx, &arr, data, size));
+  CATERVA_ERROR(caterva_free_ctx(ctx));
   caterva_print_meta(arr);
-  blosc2_free_ctx(ctx);
   CATERVA_ERROR(caterva_free(&arr));
 
   return 0;

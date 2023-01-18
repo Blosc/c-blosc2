@@ -85,48 +85,46 @@ CUTEST_TEST_TEST(squeeze_index) {
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.nthreads = 2;
-  cparams.compcode = BLOSC_BLOSCLZ;
   cparams.typesize = typesize;
-  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-  blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_storage b2_storage = {.cparams=&cparams};
   if (backend.persistent) {
     b2_storage.urlpath = urlpath;
   }
   b2_storage.contiguous = backend.persistent;
 
-  caterva_params_t *params = caterva_new_params(&b2_storage, shapes.ndim, shapes.shape,
-                                                shapes.chunkshape, shapes.blockshape, NULL, 0);
+  caterva_context_t *ctx = caterva_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
+                                              shapes.chunkshape, shapes.blockshape, NULL, 0);
 
   /* Create original data */
   size_t buffersize = typesize;
-  for (int i = 0; i < params->ndim; ++i) {
-    buffersize *= (size_t) params->shape[i];
+  for (int i = 0; i < ctx->ndim; ++i) {
+    buffersize *= (size_t) ctx->shape[i];
   }
   uint8_t *buffer = malloc(buffersize);
   CUTEST_ASSERT("Buffer filled incorrectly", fill_buf(buffer, typesize, buffersize / typesize));
 
   /* Create caterva_array_t with original data */
   caterva_array_t *src;
-  CATERVA_TEST_ASSERT(caterva_from_buffer(buffer, buffersize, params, &src));
+  CATERVA_TEST_ASSERT(caterva_from_buffer(ctx, &src, buffer, buffersize));
 
 
   /* Create storage for dest container */
-  blosc2_storage b2_storage2 = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_storage b2_storage2 = {.cparams=&cparams};
   if (backend2.persistent) {
     b2_storage2.urlpath = urlpath2;
   }
   b2_storage2.contiguous = backend2.contiguous;
 
-  caterva_params_t *params2 = caterva_new_params(&b2_storage2, shapes.ndim, shapes.shape,
-                                                shapes.chunkshape2, shapes.blockshape2, NULL, 0);
+  caterva_context_t *params2 = caterva_create_ctx(&b2_storage2, shapes.ndim, shapes.shape,
+                                                  shapes.chunkshape2, shapes.blockshape2, NULL, 0);
 
   caterva_array_t *dest;
-  CATERVA_TEST_ASSERT(caterva_get_slice(src, shapes.start, shapes.stop, params2, &dest));
+  CATERVA_TEST_ASSERT(caterva_get_slice(params2, &dest, src, shapes.start, shapes.stop));
 
   CATERVA_TEST_ASSERT(caterva_squeeze_index(dest, shapes.squeeze_indexes));
 
   int8_t nsq = 0;
-  for (int i = 0; i < params->ndim; ++i) {
+  for (int i = 0; i < ctx->ndim; ++i) {
     if (shapes.squeeze_indexes[i] == true) {
       nsq++;
     }
@@ -136,8 +134,8 @@ CUTEST_TEST_TEST(squeeze_index) {
   free(buffer);
   CATERVA_TEST_ASSERT(caterva_free(&src));
   CATERVA_TEST_ASSERT(caterva_free(&dest));
-  CATERVA_TEST_ASSERT(caterva_free_params(params));
-  CATERVA_TEST_ASSERT(caterva_free_params(params2));
+  CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
+  CATERVA_TEST_ASSERT(caterva_free_ctx(params2));
 
   blosc2_remove_urlpath(urlpath);
   blosc2_remove_urlpath(urlpath2);

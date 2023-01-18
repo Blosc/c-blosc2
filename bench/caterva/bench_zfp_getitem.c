@@ -93,15 +93,13 @@ int comp(const char *urlpath) {
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.nthreads = 6;
-  blosc2_context *ctx, *ctx_zfp;
-  ctx = blosc2_create_cctx(cparams);
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
   b2_storage.urlpath = "schunk_rate.cat";
 
-  caterva_params_t *params = caterva_new_params(&b2_storage, ndim, shape_aux, chunkshape, blockshape,
-                                                NULL, 0);
+  caterva_context_t *params = caterva_create_ctx(&b2_storage, ndim, shape_aux, chunkshape, blockshape,
+                                                 NULL, 0);
 
   caterva_array_t *arr;
   caterva_from_schunk(schunk, &arr);
@@ -110,13 +108,13 @@ int comp(const char *urlpath) {
 
   /* Use BLOSC_CODEC_ZFP_FIXED_RATE */
   caterva_array_t *arr_rate;
-  ctx_zfp = ctx;
+  blosc2_context *ctx_zfp = blosc2_create_cctx(cparams);
   ctx_zfp->compcode = BLOSC_CODEC_ZFP_FIXED_RATE;
   ctx_zfp->splitmode = BLOSC_NEVER_SPLIT;
   ctx_zfp->compcode_meta = (uint8_t) (100.0 * (float) arr->sc->cbytes / (float) arr->sc->nbytes);
   ctx_zfp->filters[BLOSC2_MAX_FILTERS - 1] = 0;
   ctx_zfp->filters_meta[BLOSC2_MAX_FILTERS - 1] = 0;
-  copied = caterva_copy(ctx_zfp, arr, params, &arr_rate);
+  copied = caterva_copy(params, arr, &arr_rate);
   if (copied != 0) {
     printf("Error BLOSC_CODEC_ZFP_FIXED_RATE \n");
     free(chunkshape);
@@ -136,7 +134,7 @@ int comp(const char *urlpath) {
   int64_t index_ndim[ZFP_MAX_DIM];
   int64_t index_chunk_ndim[ZFP_MAX_DIM];
   int64_t ind_ndim[ZFP_MAX_DIM];
-  int64_t stride_chunk, ind_chunk;
+  int32_t stride_chunk, ind_chunk;
   int64_t nchunk;
   bool needs_free_blosc, needs_free_zfp;
   uint8_t *chunk_blosc, *chunk_zfp;
@@ -150,7 +148,7 @@ int comp(const char *urlpath) {
       index_chunk_ndim[j] = index_ndim[j] / chunkshape[j];
       ind_ndim[j] = index_ndim[j] % chunkshape[j];
     }
-    stride_chunk = (shape[1] - 1) / chunkshape[1] + 1;
+    stride_chunk = (int32_t)(shape[1] - 1) / chunkshape[1] + 1;
     nchunk = index_chunk_ndim[0] * stride_chunk + index_chunk_ndim[1];
     ind_chunk = (int32_t) (ind_ndim[0] * chunkshape[1] + ind_ndim[1]);
     blosc2_schunk_get_lazychunk(arr->sc, nchunk, &chunk_blosc, &needs_free_blosc);
@@ -178,9 +176,9 @@ int comp(const char *urlpath) {
   free(shape_aux);
   free(chunkshape);
   free(blockshape);
-  CATERVA_ERROR(caterva_free(&arr));
-  CATERVA_ERROR(caterva_free(&arr_rate));
-  CATERVA_ERROR(caterva_free_params(params));
+  caterva_free(&arr);
+  caterva_free(&arr_rate);
+  CATERVA_ERROR(caterva_free_ctx(params));
   blosc2_free_ctx(ctx_zfp);
   if (needs_free_blosc) {
     free(chunk_blosc);

@@ -55,19 +55,17 @@ CUTEST_TEST_TEST(full) {
   blosc2_remove_urlpath(urlpath);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   cparams.nthreads = 2;
-  cparams.compcode = BLOSC_BLOSCLZ;
   cparams.typesize = typesize;
-  blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_storage b2_storage = {.cparams=&cparams};
 
   if (backend.persistent) {
     b2_storage.urlpath = urlpath;
   }
   b2_storage.contiguous = backend.contiguous;
 
-  caterva_params_t *params = caterva_new_params(&b2_storage, shapes.ndim, shapes.shape,
-                                                shapes.chunkshape, shapes.blockshape, NULL, 0);
+  caterva_context_t *ctx = caterva_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
+                                              shapes.chunkshape, shapes.blockshape, NULL, 0);
 
   /* Create original data */
   int64_t buffersize = typesize;
@@ -95,7 +93,7 @@ CUTEST_TEST_TEST(full) {
       break;
   }
 
-  CATERVA_TEST_ASSERT(caterva_full(params, value, &src));
+  CATERVA_TEST_ASSERT(caterva_full(ctx, &src, value));
 
   /* Fill dest array with caterva_array_t data */
   uint8_t *buffer_dest = malloc(buffersize);
@@ -127,7 +125,7 @@ CUTEST_TEST_TEST(full) {
   free(buffer_dest);
   free(value);
   CATERVA_TEST_ASSERT(caterva_free(&src));
-  CATERVA_TEST_ASSERT(caterva_free_params(params));
+  CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
 
   blosc2_remove_urlpath(urlpath);
 

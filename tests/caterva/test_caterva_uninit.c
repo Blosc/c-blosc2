@@ -11,12 +11,12 @@
 #include "test_common.h"
 
 
-CUTEST_TEST_DATA(zeros) {
+CUTEST_TEST_DATA(uninit) {
     void *unused;
 };
 
 
-CUTEST_TEST_SETUP(zeros) {
+CUTEST_TEST_SETUP(uninit) {
   blosc2_init();
 
   // Add parametrizations
@@ -41,12 +41,12 @@ CUTEST_TEST_SETUP(zeros) {
 }
 
 
-CUTEST_TEST_TEST(zeros) {
+CUTEST_TEST_TEST(uninit) {
   CUTEST_GET_PARAMETER(backend, _test_backend);
   CUTEST_GET_PARAMETER(shapes, _test_shapes);
   CUTEST_GET_PARAMETER(typesize, uint8_t);
 
-  char *urlpath = "test_zeros.b2frame";
+  char *urlpath = "test_uninit.b2frame";
   blosc2_remove_urlpath(urlpath);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -61,27 +61,18 @@ CUTEST_TEST_TEST(zeros) {
   caterva_context_t *ctx = caterva_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
                                               shapes.chunkshape, shapes.blockshape, NULL, 0);
 
-  /* Create original data */
-  int64_t buffersize = typesize;
-  for (int i = 0; i < shapes.ndim; ++i) {
-    buffersize *= shapes.shape[i];
-  }
-
-  /* Create caterva_array_t with original data */
+  /* Create caterva_array_t with uninitialized values */
   caterva_array_t *src;
-  CATERVA_TEST_ASSERT(caterva_zeros(ctx, &src));
+  CATERVA_TEST_ASSERT(caterva_uninit(ctx, &src));
 
-  /* Fill dest array with caterva_array_t data */
-  uint8_t *buffer_dest = malloc(buffersize);
-  CATERVA_TEST_ASSERT(caterva_to_buffer(src, buffer_dest, buffersize));
-
-  /* Testing */
-  for (int i = 0; i < buffersize; ++i) {
-    CUTEST_ASSERT("Elements are not equals", buffer_dest[i] == 0);
+  CUTEST_ASSERT("dims are not equal", src->ndim == shapes.ndim);
+  for (int i = 0; i < shapes.ndim; i++) {
+    CUTEST_ASSERT("shapes are not equal", src->shape[i] == shapes.shape[i]);
+    CUTEST_ASSERT("chunkshapes are not equal", src->chunkshape[i] == shapes.chunkshape[i]);
+    CUTEST_ASSERT("blockshapes are not equal", src->blockshape[i] == shapes.blockshape[i]);
   }
 
-  /* Free mallocs */
-  free(buffer_dest);
+  /* Free resources */
   CATERVA_TEST_ASSERT(caterva_free(&src));
   CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
   blosc2_remove_urlpath(urlpath);
@@ -90,10 +81,10 @@ CUTEST_TEST_TEST(zeros) {
 }
 
 
-CUTEST_TEST_TEARDOWN(zeros) {
+CUTEST_TEST_TEARDOWN(uninit) {
   blosc2_destroy();
 }
 
 int main() {
-  CUTEST_TEST_RUN(zeros);
+  CUTEST_TEST_RUN(uninit);
 }
