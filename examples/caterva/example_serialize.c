@@ -65,8 +65,8 @@ int main() {
   free(data);
   free(data_dest);
 
-  caterva_free(&arr);
-  caterva_free(&dest);
+  CATERVA_ERROR(caterva_free(&arr));
+  CATERVA_ERROR(caterva_free(&dest));
   CATERVA_ERROR(caterva_free_params(params));
   blosc2_free_ctx(ctx);
 

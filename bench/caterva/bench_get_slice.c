@@ -78,7 +78,7 @@ int main() {
 
   free(src);
 
-  caterva_free(&arr);
+  CATERVA_ERROR(caterva_free(&arr));
   CATERVA_ERROR(caterva_free_params(params));
 
   return 0;

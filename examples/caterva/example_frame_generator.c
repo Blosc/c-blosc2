@@ -32,6 +32,7 @@ int frame_generator(int8_t *data, int8_t ndim, const int64_t *shape, const int32
   CATERVA_ERROR(caterva_free_params(params));
   caterva_print_meta(arr);
   blosc2_free_ctx(ctx);
+  CATERVA_ERROR(caterva_free(&arr));
 
   return 0;
 }

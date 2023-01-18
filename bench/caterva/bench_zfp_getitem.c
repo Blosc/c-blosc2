@@ -178,8 +178,8 @@ int comp(const char *urlpath) {
   free(shape_aux);
   free(chunkshape);
   free(blockshape);
-  caterva_free(&arr);
-  caterva_free(&arr_rate);
+  CATERVA_ERROR(caterva_free(&arr));
+  CATERVA_ERROR(caterva_free(&arr_rate));
   CATERVA_ERROR(caterva_free_params(params));
   blosc2_free_ctx(ctx_zfp);
   if (needs_free_blosc) {

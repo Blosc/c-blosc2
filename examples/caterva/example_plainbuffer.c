@@ -66,6 +66,8 @@ int main() {
   CATERVA_ERROR(caterva_to_buffer(slice, buffer, buffer_size));
   CATERVA_ERROR(caterva_free_params(params));
   CATERVA_ERROR(caterva_free_params(slice_params));
+  CATERVA_ERROR(caterva_free(&arr));
+  CATERVA_ERROR(caterva_free(&slice));
 
   // printf("Elapsed seconds: %.5f\n", blosc_elapsed_secs(t0, t1));
 
