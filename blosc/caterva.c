@@ -124,9 +124,6 @@ int caterva_array_without_schunk(caterva_context_t *ctx, caterva_array_t **array
   (*array) = (caterva_array_t *) malloc(sizeof(caterva_array_t));
   CATERVA_ERROR_NULL(*array);
 
-  (*array)->ctx = (caterva_context_t *) malloc(sizeof(&ctx));
-  memcpy((*array)->ctx, ctx, sizeof(&ctx));
-
   (*array)->sc = NULL;
 
   (*array)->ndim = ctx->ndim;
@@ -200,33 +197,33 @@ int caterva_blosc_array_new(caterva_context_t *ctx, int special_value, caterva_a
 }
 
 
-int caterva_uninit(caterva_context_t *params, caterva_array_t **array) {
-  CATERVA_ERROR_NULL(params);
+int caterva_uninit(caterva_context_t *ctx, caterva_array_t **array) {
+  CATERVA_ERROR_NULL(ctx);
   CATERVA_ERROR_NULL(array);
 
-  CATERVA_ERROR(caterva_blosc_array_new(params, BLOSC2_SPECIAL_UNINIT, array));
+  CATERVA_ERROR(caterva_blosc_array_new(ctx, BLOSC2_SPECIAL_UNINIT, array));
 
   return CATERVA_SUCCEED;
 }
 
 
-int caterva_empty(caterva_context_t *params, caterva_array_t **array) {
-  CATERVA_ERROR_NULL(params);
+int caterva_empty(caterva_context_t *ctx, caterva_array_t **array) {
+  CATERVA_ERROR_NULL(ctx);
   CATERVA_ERROR_NULL(array);
 
   // CATERVA_ERROR(caterva_blosc_array_new(ctx, params, storage, BLOSC2_SPECIAL_UNINIT, array));
   // Avoid variable cratios
-  CATERVA_ERROR(caterva_blosc_array_new(params, BLOSC2_SPECIAL_ZERO, array));
+  CATERVA_ERROR(caterva_blosc_array_new(ctx, BLOSC2_SPECIAL_ZERO, array));
 
   return CATERVA_SUCCEED;
 }
 
 
-int caterva_zeros(caterva_context_t *params, caterva_array_t **array) {
-  CATERVA_ERROR_NULL(params);
+int caterva_zeros(caterva_context_t *ctx, caterva_array_t **array) {
+  CATERVA_ERROR_NULL(ctx);
   CATERVA_ERROR_NULL(array);
 
-  CATERVA_ERROR(caterva_blosc_array_new(params, BLOSC2_SPECIAL_ZERO, array));
+  CATERVA_ERROR(caterva_blosc_array_new(ctx, BLOSC2_SPECIAL_ZERO, array));
 
   return CATERVA_SUCCEED;
 }
@@ -752,7 +749,7 @@ int caterva_set_slice_buffer(void *buffer, int64_t *buffershape, int64_t buffers
     return CATERVA_SUCCEED;
   }
 
-  CATERVA_ERROR(caterva_blosc_slice(buffer, buffersize, start, stop, buffershape, array, true));
+  CATERVA_ERROR(caterva_blosc_slice(buffer, buffersize, start, stop, buffershape, array, true), "");
 
   return CATERVA_SUCCEED;
 }

@@ -125,10 +125,10 @@ CUTEST_TEST_TEST(delete) {
   caterva_array_t *aux;
   b2_storage.urlpath = NULL;
   b2_storage.contiguous = backend.contiguous;
-  caterva_context_t *aux_params = caterva_create_ctx(&b2_storage, shapes.ndim, newshape,
+  caterva_context_t *aux_ctx = caterva_create_ctx(&b2_storage, shapes.ndim, newshape,
                                                      shapes.chunkshape, shapes.blockshape, NULL, 0);
 
-  CATERVA_ERROR(caterva_full(aux_params, &aux, value));
+  CATERVA_ERROR(caterva_full(aux_ctx, &aux, value));
 
 
   /* Fill buffer with whole array data */
@@ -165,7 +165,7 @@ CUTEST_TEST_TEST(delete) {
   CATERVA_TEST_ASSERT(caterva_free(src));
   CATERVA_TEST_ASSERT(caterva_free(aux));
   CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
-  CATERVA_TEST_ASSERT(caterva_free_ctx(aux_params));
+  CATERVA_TEST_ASSERT(caterva_free_ctx(aux_ctx));
 
   blosc2_remove_urlpath(urlpath);
 

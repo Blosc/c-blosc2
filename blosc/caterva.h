@@ -144,8 +144,6 @@ struct chunk_cache_s {
  * @brief A multidimensional array of data that can be compressed.
  */
 typedef struct {
-  caterva_context_t *ctx;
-  //!< Array configuration.
   blosc2_schunk *sc;
   //!< Pointer to a Blosc super-chunk
   int64_t shape[CATERVA_MAX_DIM];

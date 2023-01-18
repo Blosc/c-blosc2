@@ -48,13 +48,13 @@ int main() {
   slice_b2_storage.urlpath = "example_hola.b2frame";
   blosc2_remove_urlpath(slice_b2_storage.urlpath);
 
-  caterva_context_t *slice_params = caterva_create_ctx(&slice_b2_storage, ndim, shape,
-                                                       slice_chunkshape, slice_blockshape, NULL, 0);
+  caterva_context_t *slice_ctx = caterva_create_ctx(&slice_b2_storage, ndim, shape,
+                                                    slice_chunkshape, slice_blockshape, NULL, 0);
 
   caterva_array_t *slice;
-  CATERVA_ERROR(caterva_get_slice(slice_params, &slice, arr, slice_start, slice_stop));
+  CATERVA_ERROR(caterva_get_slice(slice_ctx, &slice, arr, slice_start, slice_stop));
   CATERVA_ERROR(caterva_free(arr));
-  CATERVA_ERROR(caterva_free_ctx(slice_params));
+  CATERVA_ERROR(caterva_free_ctx(slice_ctx));
 
   uint8_t *buffer;
   uint64_t buffer_size = 1;

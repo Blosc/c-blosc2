@@ -46,12 +46,12 @@ int main() {
   blosc2_storage slice_b2_storage = {.cparams=&cparams, .dparams=&dparams};
 
   // shape will be overwritten by get_slice
-  caterva_context_t *slice_params = caterva_create_ctx(&slice_b2_storage, ndim, shape, slice_chunkshape,
+  caterva_context_t *slice_ctx = caterva_create_ctx(&slice_b2_storage, ndim, shape, slice_chunkshape,
                                                        slice_blockshape,
                                                        NULL, 0);
 
   caterva_array_t *slice;
-  CATERVA_ERROR(caterva_get_slice(slice_params,
+  CATERVA_ERROR(caterva_get_slice(slice_ctx,
                                   &slice, arr, slice_start, slice_stop));
 
   CATERVA_ERROR(caterva_squeeze(slice));
@@ -69,7 +69,7 @@ int main() {
   CATERVA_ERROR(caterva_free(arr));
   CATERVA_ERROR(caterva_free(slice));
   CATERVA_ERROR(caterva_free_ctx(ctx));
-  CATERVA_ERROR(caterva_free_ctx(slice_params));
+  CATERVA_ERROR(caterva_free_ctx(slice_ctx));
 
   // printf("Elapsed seconds: %.5f\n", blosc_elapsed_secs(t0, t1));
 
