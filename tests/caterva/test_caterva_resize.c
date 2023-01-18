@@ -82,8 +82,6 @@ CUTEST_TEST_TEST(resize_shape) {
   caterva_params_t *params = caterva_new_params(&b2_storage, shapes.ndim, shapes.shape,
                                                 shapes.chunkshape, shapes.blockshape, NULL, 0);
 
-  blosc2_context *ctx = blosc2_create_cctx(*b2_storage.cparams);
-
   int64_t buffersize = typesize;
   bool only_shrink = true;
   for (int i = 0; i < params->ndim; ++i) {
@@ -127,8 +125,6 @@ CUTEST_TEST_TEST(resize_shape) {
   aux_b2_storage.contiguous = backend.contiguous;
   caterva_params_t *aux_params = caterva_new_params(&aux_b2_storage, shapes.ndim, shapes.newshape,
                                                 shapes.chunkshape, shapes.blockshape, NULL, 0);
-
-  blosc2_context *aux_ctx = blosc2_create_cctx(*aux_b2_storage.cparams);
 
   CATERVA_ERROR(caterva_full(aux_params, value, &aux));
   if (!only_shrink) {

@@ -48,7 +48,6 @@ CUTEST_TEST_TEST(serialize) {
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
   b2_storage.urlpath = NULL;
   b2_storage.contiguous = contiguous;
-  int32_t blocknitems = 1;
 
   caterva_params_t *params = caterva_new_params(&b2_storage, shapes.ndim, shapes.shape,
                                                 shapes.chunkshape, shapes.blockshape, NULL, 0);
