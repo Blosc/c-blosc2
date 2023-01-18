@@ -232,11 +232,11 @@ int caterva_zeros(caterva_context_t *params, caterva_array_t **array) {
 }
 
 
-int caterva_full(caterva_context_t *params, void *fill_value, caterva_array_t **array) {
-  CATERVA_ERROR_NULL(params);
+int caterva_full(caterva_context_t *ctx, caterva_array_t **array, void *fill_value) {
+  CATERVA_ERROR_NULL(ctx);
   CATERVA_ERROR_NULL(array);
 
-  CATERVA_ERROR(caterva_empty(params, array));
+  CATERVA_ERROR(caterva_empty(ctx, array));
 
   int32_t chunkbytes = (int32_t) (*array)->extchunknitems * (*array)->sc->typesize;
 
@@ -324,9 +324,7 @@ int caterva_to_cframe(caterva_array_t *array, uint8_t **cframe, int64_t *cframe_
 }
 
 
-int caterva_from_cframe(blosc2_context *ctx, uint8_t *cframe, int64_t cframe_len, bool copy,
-                        caterva_array_t **array) {
-  CATERVA_ERROR_NULL(ctx);
+int caterva_from_cframe(uint8_t *cframe, int64_t cframe_len, bool copy, caterva_array_t **array) {
   CATERVA_ERROR_NULL(cframe);
   CATERVA_ERROR_NULL(array);
 
@@ -368,14 +366,12 @@ int caterva_free(caterva_array_t **array) {
 }
 
 
-int caterva_from_buffer(void *buffer, int64_t buffersize,
-                        caterva_context_t *params,
-                        caterva_array_t **array) {
-  CATERVA_ERROR_NULL(params);
+int caterva_from_buffer(caterva_context_t *ctx, caterva_array_t **array, void *buffer, int64_t buffersize) {
+  CATERVA_ERROR_NULL(ctx);
   CATERVA_ERROR_NULL(buffer);
   CATERVA_ERROR_NULL(array);
 
-  CATERVA_ERROR(caterva_empty(params, array));
+  CATERVA_ERROR(caterva_empty(ctx, array));
 
   if (buffersize < (int64_t) (*array)->nitems * (*array)->sc->typesize) {
     CATERVA_TRACE_ERROR("The buffersize (%lld) is smaller than the array size (%lld)",
@@ -762,20 +758,20 @@ int caterva_set_slice_buffer(void *buffer, int64_t *buffershape, int64_t buffers
 }
 
 
-int caterva_get_slice(caterva_array_t *src, const int64_t *start,
-                      const int64_t *stop, caterva_context_t *params, caterva_array_t **array) {
+int caterva_get_slice(caterva_context_t *ctx, caterva_array_t **array, caterva_array_t *src, const int64_t *start,
+                      const int64_t *stop) {
   CATERVA_ERROR_NULL(src);
   CATERVA_ERROR_NULL(start);
   CATERVA_ERROR_NULL(stop);
   CATERVA_ERROR_NULL(array);
 
-  params->ndim = src->ndim;
+  ctx->ndim = src->ndim;
   for (int i = 0; i < src->ndim; ++i) {
-    params->shape[i] = stop[i] - start[i];
+    ctx->shape[i] = stop[i] - start[i];
   }
 
   // Add data
-  CATERVA_ERROR(caterva_empty(params, array));
+  CATERVA_ERROR(caterva_empty(ctx, array));
 
   if ((*array)->nitems == 0) {
     return CATERVA_SUCCEED;
@@ -810,7 +806,7 @@ int caterva_get_slice(caterva_array_t *src, const int64_t *start,
       src_start[i] = chunk_start[i] + start[i];
       src_stop[i] = chunk_stop[i] + start[i];
     }
-    int64_t buffersize = params->b2_storage->cparams->typesize;
+    int64_t buffersize = ctx->b2_storage->cparams->typesize;
     for (int i = 0; i < ndim; ++i) {
       buffersize *= chunk_shape[i];
     }
@@ -938,7 +934,7 @@ int caterva_copy(caterva_context_t *ctx, caterva_array_t *src, caterva_array_t *
     params_meta.nmetalayers = j;
 
     // Copy data
-    CATERVA_ERROR(caterva_get_slice(src, start, stop, &params_meta, array));
+    CATERVA_ERROR(caterva_get_slice(&params_meta, array, src, start, stop));
 
     // Copy vlmetayers
     for (int i = 0; i < src->sc->nvlmetalayers; ++i) {
@@ -958,8 +954,7 @@ int caterva_copy(caterva_context_t *ctx, caterva_array_t *src, caterva_array_t *
 }
 
 
-int caterva_save(blosc2_context *ctx, caterva_array_t *array, char *urlpath) {
-  CATERVA_ERROR_NULL(ctx);
+int caterva_save(caterva_array_t *array, char *urlpath) {
   CATERVA_ERROR_NULL(array);
   CATERVA_ERROR_NULL(urlpath);
 
@@ -1576,11 +1571,8 @@ int caterva_iterate_over_chunk(caterva_array_t *array, int8_t ndim,
 }
 
 
-int caterva_orthogonal_selection(blosc2_context *ctx, caterva_array_t *array,
-                                 int64_t **selection, int64_t *selection_size,
-                                 void *buffer, int64_t *buffershape, int64_t buffersize,
-                                 bool get) {
-  CATERVA_ERROR_NULL(ctx);
+int caterva_orthogonal_selection(caterva_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
+                                 int64_t *buffershape, int64_t buffersize, bool get) {
   CATERVA_ERROR_NULL(array);
   CATERVA_ERROR_NULL(selection);
   CATERVA_ERROR_NULL(selection_size);
@@ -1647,21 +1639,19 @@ int caterva_orthogonal_selection(blosc2_context *ctx, caterva_array_t *array,
 }
 
 
-int caterva_get_orthogonal_selection(blosc2_context *ctx, caterva_array_t *array,
-                                     int64_t **selection, int64_t *selection_size,
-                                     void *buffer, int64_t *buffershape, int64_t buffersize) {
+int caterva_get_orthogonal_selection(caterva_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
+                                     int64_t *buffershape, int64_t buffersize) {
 
-  return caterva_orthogonal_selection(ctx, array, selection, selection_size,
+  return caterva_orthogonal_selection(array, selection, selection_size,
                                       buffer, buffershape, buffersize, true);
 }
 
 
-int caterva_set_orthogonal_selection(blosc2_context *ctx, caterva_array_t *array,
-                                     int64_t **selection, int64_t *selection_size,
-                                     void *buffer, int64_t *buffershape, int64_t buffersize) {
+int caterva_set_orthogonal_selection(caterva_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
+                                     int64_t *buffershape, int64_t buffersize) {
 
 
-  return caterva_orthogonal_selection(ctx, array, selection, selection_size,
+  return caterva_orthogonal_selection(array, selection, selection_size,
                                       buffer, buffershape, buffersize, false);
 }
 
@@ -1767,7 +1757,7 @@ int32_t caterva_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim
 caterva_context_t *caterva_create_ctx(blosc2_storage *b2_storage, int8_t ndim, int64_t *shape,
                                       int32_t *chunkshape, int32_t *blockshape,
                                       blosc2_metalayer *metalayers, int32_t nmetalayers) {
-  caterva_context_t *params = malloc(sizeof(caterva_context_t));
+  caterva_context_t *ctx = malloc(sizeof(caterva_context_t));
   blosc2_storage *params_b2_storage = malloc(sizeof(blosc2_storage));
   if (b2_storage == NULL) {
     memcpy(params_b2_storage, &BLOSC2_STORAGE_DEFAULTS, sizeof(blosc2_storage));
@@ -1785,31 +1775,31 @@ caterva_context_t *caterva_create_ctx(blosc2_storage *b2_storage, int8_t ndim, i
   }
 
   params_b2_storage->cparams = cparams;
-  params->b2_storage = params_b2_storage;
-  params->ndim = ndim;
+  ctx->b2_storage = params_b2_storage;
+  ctx->ndim = ndim;
   int32_t blocknitems = 1;
   for (int i = 0; i < ndim; i++) {
-    params->shape[i] = shape[i];
-    params->chunkshape[i] = chunkshape[i];
-    params->blockshape[i] = blockshape[i];
-    blocknitems *= params->blockshape[i];
+    ctx->shape[i] = shape[i];
+    ctx->chunkshape[i] = chunkshape[i];
+    ctx->blockshape[i] = blockshape[i];
+    blocknitems *= ctx->blockshape[i];
   }
   cparams->blocksize = blocknitems * cparams->typesize;
 
-  params->nmetalayers = nmetalayers;
+  ctx->nmetalayers = nmetalayers;
   for (int i = 0; i < nmetalayers; ++i) {
-    params->metalayers[i] = metalayers[i];
+    ctx->metalayers[i] = metalayers[i];
   }
 
-  return params;
+  return ctx;
 }
 
 
-int caterva_free_ctx(caterva_context_t *params) {
-  params->b2_storage->cparams->schunk = NULL;
-  free(params->b2_storage->cparams);
-  free(params->b2_storage);
-  free(params);
+int caterva_free_ctx(caterva_context_t *ctx) {
+  ctx->b2_storage->cparams->schunk = NULL;
+  free(ctx->b2_storage->cparams);
+  free(ctx->b2_storage);
+  free(ctx);
 
   return CATERVA_SUCCEED;
 }

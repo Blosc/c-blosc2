@@ -93,8 +93,6 @@ int comp(const char *urlpath) {
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.nthreads = 6;
-  blosc2_context *ctx, *ctx_zfp;
-  ctx = blosc2_create_cctx(cparams);
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
@@ -110,7 +108,7 @@ int comp(const char *urlpath) {
 
   /* Use BLOSC_CODEC_ZFP_FIXED_RATE */
   caterva_array_t *arr_rate;
-  ctx_zfp = ctx;
+  blosc2_context *ctx_zfp = blosc2_create_cctx(cparams);
   ctx_zfp->compcode = BLOSC_CODEC_ZFP_FIXED_RATE;
   ctx_zfp->splitmode = BLOSC_NEVER_SPLIT;
   ctx_zfp->compcode_meta = (uint8_t) (100.0 * (float) arr->sc->cbytes / (float) arr->sc->nbytes);
@@ -136,7 +134,7 @@ int comp(const char *urlpath) {
   int64_t index_ndim[ZFP_MAX_DIM];
   int64_t index_chunk_ndim[ZFP_MAX_DIM];
   int64_t ind_ndim[ZFP_MAX_DIM];
-  int64_t stride_chunk, ind_chunk;
+  int32_t stride_chunk, ind_chunk;
   int64_t nchunk;
   bool needs_free_blosc, needs_free_zfp;
   uint8_t *chunk_blosc, *chunk_zfp;
@@ -150,7 +148,7 @@ int comp(const char *urlpath) {
       index_chunk_ndim[j] = index_ndim[j] / chunkshape[j];
       ind_ndim[j] = index_ndim[j] % chunkshape[j];
     }
-    stride_chunk = (shape[1] - 1) / chunkshape[1] + 1;
+    stride_chunk = (int32_t)(shape[1] - 1) / chunkshape[1] + 1;
     nchunk = index_chunk_ndim[0] * stride_chunk + index_chunk_ndim[1];
     ind_chunk = (int32_t) (ind_ndim[0] * chunkshape[1] + ind_ndim[1]);
     blosc2_schunk_get_lazychunk(arr->sc, nchunk, &chunk_blosc, &needs_free_blosc);

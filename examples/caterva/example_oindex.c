@@ -20,13 +20,9 @@ int main() {
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = typesize;
-  blosc2_context *ctx = blosc2_create_cctx(cparams);
-
-  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-  blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
-
-  caterva_context_t *params = caterva_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
-                                                 NULL, 0);
+  blosc2_storage b2_storage = {.cparams=&cparams};
+  caterva_context_t *ctx = caterva_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                              NULL, 0);
 
   int64_t dataitems = 1;
   for (int i = 0; i < ndim; ++i) {
@@ -38,7 +34,7 @@ int main() {
     data[i] = (double) i;
   }
   caterva_array_t *arr;
-  CATERVA_ERROR(caterva_from_buffer(data, datasize, params, &arr));
+  CATERVA_ERROR(caterva_from_buffer(ctx, &arr, data, datasize));
   free(data);
 
   int64_t sel0[] = {3, 1, 2};
@@ -54,8 +50,8 @@ int main() {
   }
   int64_t buffersize = nitems * arr->sc->typesize;
   double *buffer = calloc(nitems, arr->sc->typesize);
-  CATERVA_ERROR(caterva_set_orthogonal_selection(ctx, arr, selection, selection_size, buffer, buffershape, buffersize));
-  CATERVA_ERROR(caterva_get_orthogonal_selection(ctx, arr, selection, selection_size, buffer, buffershape, buffersize));
+  CATERVA_ERROR(caterva_set_orthogonal_selection(arr, selection, selection_size, buffer, buffershape, buffersize));
+  CATERVA_ERROR(caterva_get_orthogonal_selection(arr, selection, selection_size, buffer, buffershape, buffersize));
 
   printf("Results: \n");
   for (int i = 0; i < nitems; ++i) {
@@ -67,8 +63,7 @@ int main() {
   printf("\n");
   free(buffer);
   CATERVA_ERROR(caterva_free(&arr));
-  CATERVA_ERROR(caterva_free_ctx(params));
-  blosc2_free_ctx(ctx);
+  CATERVA_ERROR(caterva_free_ctx(ctx));
 
   return 0;
 }

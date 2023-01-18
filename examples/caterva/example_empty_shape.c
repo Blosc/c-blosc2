@@ -36,13 +36,13 @@ int main() {
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
 
-  caterva_context_t *params = caterva_create_ctx(&b2_storage, ndim, shape,
-                                                 chunkshape, blockshape, NULL, 0);
+  caterva_context_t *ctx = caterva_create_ctx(&b2_storage, ndim, shape,
+                                              chunkshape, blockshape, NULL, 0);
 
   caterva_array_t *arr;
-  CATERVA_ERROR(caterva_from_buffer(data, size, params, &arr));
+  CATERVA_ERROR(caterva_from_buffer(ctx, &arr, data, size));
 
-  CATERVA_ERROR(caterva_free_ctx(params));
+  CATERVA_ERROR(caterva_free_ctx(ctx));
 
   blosc2_storage slice_b2_storage = {.cparams=&cparams, .dparams=&dparams};
   slice_b2_storage.urlpath = "example_hola.b2frame";
@@ -52,7 +52,7 @@ int main() {
                                                        slice_chunkshape, slice_blockshape, NULL, 0);
 
   caterva_array_t *slice;
-  CATERVA_ERROR(caterva_get_slice(arr, slice_start, slice_stop, slice_params, &slice));
+  CATERVA_ERROR(caterva_get_slice(slice_params, &slice, arr, slice_start, slice_stop));
 
   CATERVA_ERROR(caterva_free_ctx(slice_params));
 

@@ -101,7 +101,7 @@ CUTEST_TEST_TEST(append) {
     default:
       break;
   }
-  CATERVA_ERROR(caterva_full(ctx, value, &src));
+  CATERVA_ERROR(caterva_full(ctx, &src, value));
 
   uint8_t *buffer = malloc(buffersize);
   fill_buf(buffer, typesize, buffersize / typesize);

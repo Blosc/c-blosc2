@@ -64,18 +64,17 @@ CUTEST_TEST_TEST(delete) {
   blosc2_remove_urlpath(urlpath);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   cparams.nthreads = 2;
   cparams.compcode = BLOSC_LZ4;
   cparams.typesize = typesize;
-  blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_storage b2_storage = {.cparams=&cparams};
   if (backend.persistent) {
     b2_storage.urlpath = urlpath;
   }
   b2_storage.contiguous = backend.contiguous;
 
-  caterva_context_t *params = caterva_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
-                                                 shapes.chunkshape, shapes.blockshape, NULL, 0);
+  caterva_context_t *ctx = caterva_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
+                                              shapes.chunkshape, shapes.blockshape, NULL, 0);
 
   /* Create caterva_array_t with original data */
   caterva_array_t *src;
@@ -97,12 +96,12 @@ CUTEST_TEST_TEST(delete) {
     default:
       break;
   }
-  CATERVA_ERROR(caterva_full(params, value, &src));
+  CATERVA_ERROR(caterva_full(ctx, &src, value));
 
   int64_t bufferlen = 1;
   int64_t stop[CATERVA_MAX_DIM];
   int64_t buffer_shape[CATERVA_MAX_DIM];
-  for (int i = 0; i < params->ndim; ++i) {
+  for (int i = 0; i < ctx->ndim; ++i) {
     if (i != shapes.axis) {
       bufferlen *= shapes.shape[i];
       stop[i] = shapes.shape[i];
@@ -134,7 +133,7 @@ CUTEST_TEST_TEST(delete) {
   caterva_context_t *aux_params = caterva_create_ctx(&b2_storage, shapes.ndim, newshape,
                                                      shapes.chunkshape, shapes.blockshape, NULL, 0);
 
-  CATERVA_ERROR(caterva_full(aux_params, value, &aux));
+  CATERVA_ERROR(caterva_full(aux_params, &aux, value));
 
 
   /* Fill buffer with whole array data */
@@ -170,7 +169,7 @@ CUTEST_TEST_TEST(delete) {
 
   CATERVA_TEST_ASSERT(caterva_free(&src));
   CATERVA_TEST_ASSERT(caterva_free(&aux));
-  CATERVA_TEST_ASSERT(caterva_free_ctx(params));
+  CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
   CATERVA_TEST_ASSERT(caterva_free_ctx(aux_params));
 
   blosc2_remove_urlpath(urlpath);

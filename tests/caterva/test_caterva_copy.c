@@ -94,21 +94,21 @@ CUTEST_TEST_TEST(copy) {
   metalayers[0].content = (uint8_t *) &datatoserialize;
   metalayers[0].content_len = 8;
 
-  caterva_context_t *params = caterva_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
-                                                 shapes.chunkshape, shapes.blockshape, metalayers, nmetalayers);
+  caterva_context_t *ctx = caterva_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
+                                              shapes.chunkshape, shapes.blockshape, metalayers, nmetalayers);
 
   /* Create original data */
   size_t buffersize = typesize;
-  for (int i = 0; i < params->ndim; ++i) {
-    buffersize *= (size_t) params->shape[i];
+  for (int i = 0; i < ctx->ndim; ++i) {
+    buffersize *= (size_t) ctx->shape[i];
   }
   uint8_t *buffer = malloc(buffersize);
   CUTEST_ASSERT("Buffer filled incorrectly", fill_buf(buffer, typesize, (buffersize / typesize)));
 
   /* Create caterva_array_t with original data */
   caterva_array_t *src;
-  CATERVA_TEST_ASSERT(caterva_from_buffer(buffer, buffersize, params,
-                                          &src));
+  CATERVA_TEST_ASSERT(caterva_from_buffer(ctx,
+                                          &src, buffer, buffersize));
 
   /* Assert the metalayers creation */
   int rc = blosc2_meta_exists(src->sc, "random");
@@ -168,7 +168,7 @@ CUTEST_TEST_TEST(copy) {
   free(buffer_dest);
   CATERVA_TEST_ASSERT(caterva_free(&src));
   CATERVA_TEST_ASSERT(caterva_free(&dest));
-  CATERVA_TEST_ASSERT(caterva_free_ctx(params));
+  CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
   CATERVA_TEST_ASSERT(caterva_free_ctx(params2));
 
   blosc2_remove_urlpath(urlpath);

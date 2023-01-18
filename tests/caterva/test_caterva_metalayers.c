@@ -42,11 +42,9 @@ CUTEST_TEST_TEST(metalayers) {
   blosc2_remove_urlpath(urlpath);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   cparams.nthreads = 2;
-  cparams.compcode = BLOSC_BLOSCLZ;
   cparams.typesize = typesize;
-  blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_storage b2_storage = {.cparams=&cparams};
   if (backend.persistent) {
     b2_storage.urlpath = urlpath;
   }
@@ -61,13 +59,13 @@ CUTEST_TEST_TEST(metalayers) {
   meta0->content = (uint8_t *) &sdata0;
   meta0->content_len = sizeof(sdata0);
 
-  caterva_context_t *params = caterva_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
-                                                 shapes.chunkshape, shapes.blockshape, metalayers, nmetalayers);
+  caterva_context_t *ctx = caterva_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
+                                              shapes.chunkshape, shapes.blockshape, metalayers, nmetalayers);
 
   /* Create original data */
   size_t buffersize = typesize;
-  for (int i = 0; i < params->ndim; ++i) {
-    buffersize *= (size_t) params->shape[i];
+  for (int i = 0; i < ctx->ndim; ++i) {
+    buffersize *= (size_t) ctx->shape[i];
   }
 
   uint8_t *buffer = malloc(buffersize);
@@ -75,7 +73,7 @@ CUTEST_TEST_TEST(metalayers) {
 
   /* Create caterva_array_t with original data */
   caterva_array_t *src;
-  CATERVA_TEST_ASSERT(caterva_from_buffer(buffer, buffersize, params, &src));
+  CATERVA_TEST_ASSERT(caterva_from_buffer(ctx, &src, buffer, buffersize));
 
   blosc2_metalayer vlmeta1;
 
@@ -148,7 +146,7 @@ CUTEST_TEST_TEST(metalayers) {
   /* Free mallocs */
   free(buffer);
   CATERVA_TEST_ASSERT(caterva_free(&src2));
-  CATERVA_TEST_ASSERT(caterva_free_ctx(params));
+  CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
 
   blosc2_remove_urlpath(urlpath);
   return 0;

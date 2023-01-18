@@ -38,16 +38,13 @@ int main() {
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.nthreads = 4;
   cparams.typesize = itemsize;
-
-  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-  blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
-
-  caterva_context_t *params = caterva_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
-                                                 NULL, 0);
+  blosc2_storage b2_storage = {.cparams=&cparams};
+  caterva_context_t *ctx = caterva_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                              NULL, 0);
 
   caterva_array_t *arr;
   blosc_set_timestamp(&t0);
-  CATERVA_ERROR(caterva_from_buffer(src, nbytes, params, &arr));
+  CATERVA_ERROR(caterva_from_buffer(ctx, &arr, src, nbytes));
   blosc_set_timestamp(&t1);
   printf("from_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));
 
@@ -79,7 +76,7 @@ int main() {
   free(src);
 
   caterva_free(&arr);
-  CATERVA_ERROR(caterva_free_ctx(params));
+  CATERVA_ERROR(caterva_free_ctx(ctx));
 
   return 0;
 }

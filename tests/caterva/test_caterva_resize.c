@@ -70,23 +70,20 @@ CUTEST_TEST_TEST(resize_shape) {
   blosc2_remove_urlpath(urlpath);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   cparams.nthreads = 2;
   cparams.typesize = typesize;
-  blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_storage b2_storage = {.cparams=&cparams};
   if (backend.persistent) {
     b2_storage.urlpath = urlpath;
   }
   b2_storage.contiguous = backend.contiguous;
 
-  caterva_context_t *params = caterva_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
-                                                 shapes.chunkshape, shapes.blockshape, NULL, 0);
-
-  blosc2_context *ctx = blosc2_create_cctx(*b2_storage.cparams);
+  caterva_context_t *ctx = caterva_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
+                                              shapes.chunkshape, shapes.blockshape, NULL, 0);
 
   int64_t buffersize = typesize;
   bool only_shrink = true;
-  for (int i = 0; i < params->ndim; ++i) {
+  for (int i = 0; i < ctx->ndim; ++i) {
     if (shapes.newshape[i] > shapes.shape[i]) {
       only_shrink = false;
     }
@@ -113,7 +110,7 @@ CUTEST_TEST_TEST(resize_shape) {
     default:
       break;
   }
-  CATERVA_ERROR(caterva_full(params, value, &src));
+  CATERVA_ERROR(caterva_full(ctx, &src, value));
 
   if (shapes.given_pos) {
     CATERVA_ERROR(caterva_resize(src, shapes.newshape, shapes.start_resize));
@@ -123,14 +120,12 @@ CUTEST_TEST_TEST(resize_shape) {
 
   // Create aux array to compare values
   caterva_array_t *aux;
-  blosc2_storage aux_b2_storage = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_storage aux_b2_storage = {.cparams=&cparams};
   aux_b2_storage.contiguous = backend.contiguous;
   caterva_context_t *aux_params = caterva_create_ctx(&aux_b2_storage, shapes.ndim, shapes.newshape,
                                                      shapes.chunkshape, shapes.blockshape, NULL, 0);
 
-  blosc2_context *aux_ctx = blosc2_create_cctx(*aux_b2_storage.cparams);
-
-  CATERVA_ERROR(caterva_full(aux_params, value, &aux));
+  CATERVA_ERROR(caterva_full(aux_params, &aux, value));
   if (!only_shrink) {
     for (int i = 0; i < shapes.ndim; ++i) {
       if (shapes.newshape[i] <= shapes.shape[i]) {
@@ -200,7 +195,7 @@ CUTEST_TEST_TEST(resize_shape) {
 
   CATERVA_TEST_ASSERT(caterva_free(&src));
   CATERVA_TEST_ASSERT(caterva_free(&aux));
-  CATERVA_TEST_ASSERT(caterva_free_ctx(params));
+  CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
   CATERVA_TEST_ASSERT(caterva_free_ctx(aux_params));
   blosc2_remove_urlpath(urlpath);
 

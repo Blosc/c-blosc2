@@ -190,7 +190,7 @@ typedef struct {
 /**
  * @brief Create caterva params.
  *
- * @param b2_storage The Blosc storage params.
+ * @param b2_storage The Blosc2 storage params.
  * @param ndim The dimensions.
  * @param shape The shape.
  * @param chunkshape The chunk shape.
@@ -211,61 +211,61 @@ caterva_context_t *caterva_create_ctx(blosc2_storage *b2_storage, int8_t ndim, i
 /**
  * @brief Free the resources associated with caterva_context_t.
  *
- * @param params The params to free.
+ * @param ctx The caterva context to free.
  *
  * @return An error code.
  *
- * @note This would not free the schunk pointer in the cparams.
+ * @note This is safe in the sense that it will not free the schunk pointer in internal cparams.
  *
  */
-int caterva_free_ctx(caterva_context_t *params);
+int caterva_free_ctx(caterva_context_t *ctx);
 
 
 /**
  * @brief Create an uninitialized array.
  *
- * @param params The general params of the array desired.
+ * @param ctx The caterva context for the new array.
  * @param array The memory pointer where the array will be created.
  *
  * @return An error code.
  */
-int caterva_uninit(caterva_context_t *params, caterva_array_t **array);
+int caterva_uninit(caterva_context_t *ctx, caterva_array_t **array);
 
 
 /**
  * @brief Create an empty array.
  *
- * @param params The general params of the array desired.
+ * @param ctx The caterva context for the new array.
  * @param array The memory pointer where the array will be created.
  *
  * @return An error code.
  */
-int caterva_empty(caterva_context_t *params, caterva_array_t **array);
+int caterva_empty(caterva_context_t *ctx, caterva_array_t **array);
 
 
 /**
  * Create an array, with zero being used as the default value for
  * uninitialized portions of the array.
  *
- * @param params The general params of the array.
+ * @param ctx The caterva context for the new array.
  * @param array The memory pointer where the array will be created.
  *
  * @return An error code.
  */
-int caterva_zeros(caterva_context_t *params, caterva_array_t **array);
+int caterva_zeros(caterva_context_t *ctx, caterva_array_t **array);
 
 
 /**
  * Create an array, with @p fill_value being used as the default value for
  * uninitialized portions of the array.
  *
- * @param params The general params of the array.
+ * @param ctx The caterva context for the new array.
  * @param fill_value Default value for uninitialized portions of the array.
  * @param array The memory pointer where the array will be created.
  *
  * @return An error code.
  */
-int caterva_full(caterva_context_t *params, void *fill_value, caterva_array_t **array);
+int caterva_full(caterva_context_t *ctx, caterva_array_t **array, void *fill_value);
 
 /**
  * @brief Free an array.
@@ -285,8 +285,7 @@ int caterva_free(caterva_array_t **array);
  *
  * @return An error code.
  */
-int
-caterva_from_schunk(blosc2_schunk *schunk, caterva_array_t **array);
+int caterva_from_schunk(blosc2_schunk *schunk, caterva_array_t **array);
 
 /**
  * Create a serialized super-chunk from a caterva array.
@@ -304,7 +303,6 @@ int caterva_to_cframe(caterva_array_t *array, uint8_t **cframe,
 /**
  * @brief Create a caterva array from a serialized super-chunk.
  *
- * @param ctx The caterva context to be used.
  * @param cframe The buffer of the in-memory array.
  * @param cframe_len The size (in bytes) of the in-memory array.
  * @param copy Whether caterva should make a copy of the cframe data or not. The copy will be made to an internal sparse frame.
@@ -312,8 +310,7 @@ int caterva_to_cframe(caterva_array_t *array, uint8_t **cframe,
  *
  * @return An error code.
  */
-int caterva_from_cframe(blosc2_context *ctx, uint8_t *cframe, int64_t cframe_len, bool copy,
-                        caterva_array_t **array);
+int caterva_from_cframe(uint8_t *cframe, int64_t cframe_len, bool copy, caterva_array_t **array);
 
 /**
  * @brief Read a caterva array from disk.
@@ -328,27 +325,24 @@ int caterva_open(const char *urlpath, caterva_array_t **array);
 /**
  * @brief Save caterva array into a specific urlpath.
  *
- * @param ctx The context to be used.
  * @param array The array to be saved.
  * @param urlpath The urlpath where the array will be stored.
  *
  * @return An error code.
  */
-BLOSC_EXPORT int caterva_save(blosc2_context *ctx, caterva_array_t *array, char *urlpath);
+BLOSC_EXPORT int caterva_save(caterva_array_t *array, char *urlpath);
 
 /**
  * @brief Create a caterva array from the data stored in a buffer.
  *
+ * @param ctx The caterva context for the new array.
+ * @param array The memory pointer where the array will be created.
  * @param buffer The buffer where source data is stored.
  * @param buffersize The size (in bytes) of the buffer.
- * @param params The general params of the array desired.
- * @param array The memory pointer where the array will be created.
  *
  * @return An error code.
  */
-BLOSC_EXPORT int caterva_from_buffer(void *buffer, int64_t buffersize,
-                                     caterva_context_t *params,
-                                     caterva_array_t **array);
+BLOSC_EXPORT int caterva_from_buffer(caterva_context_t *ctx, caterva_array_t **array, void *buffer, int64_t buffersize);
 
 /**
  * @brief Extract the data into a C buffer from a caterva array.
@@ -365,19 +359,19 @@ BLOSC_EXPORT int caterva_to_buffer(caterva_array_t *array, void *buffer,
 /**
  * @brief Get a slice from an array and store it into a new array.
  *
+ * @param ctx The caterva context for the new array.
+ * @param array The memory pointer where the array will be created.
  * @param src The array from which the slice will be extracted
  * @param start The coordinates where the slice will begin.
  * @param stop The coordinates where the slice will end.
- * @param params The params of the array desired.
- * @param array The memory pointer where the array will be created.
  *
  * @return An error code.
  *
- * @note The ndim and shape from params will be overwritten by the src and stop-start respectively.
+ * @note The ndim and shape from ctx will be overwritten by the src and stop-start respectively.
  *
  */
-int caterva_get_slice(caterva_array_t *src, const int64_t *start,
-                      const int64_t *stop, caterva_context_t *params, caterva_array_t **array);
+int caterva_get_slice(caterva_context_t *ctx, caterva_array_t **array, caterva_array_t *src, const int64_t *start,
+                      const int64_t *stop);
 
 /**
  * @brief Squeeze a caterva array
@@ -437,14 +431,13 @@ int caterva_set_slice_buffer(void *buffer, int64_t *buffershape, int64_t buffers
 /**
  * @brief Make a copy of the array data. The copy is done into a new caterva array.
  *
- * @param ctx The caterva context to be used.
+ * @param ctx The caterva context for the new array.
  * @param src The array from which data is copied.
- * @param ctx The params of the array desired.
  * @param array The memory pointer where the array will be created.
  *
  * @return An error code
  *
- * @note The ndim and shape from params will be overwritten by the src params.
+ * @note The ndim and shape in ctx will be overwritten by the src ctx.
  *
  */
 int caterva_copy(caterva_context_t *ctx, caterva_array_t *src, caterva_array_t **array);
@@ -515,15 +508,11 @@ int caterva_delete(caterva_array_t *array, const int8_t axis,
 
 
 // Indexing section
-int caterva_get_orthogonal_selection(blosc2_context *ctx, caterva_array_t *array,
-                                     int64_t **selection, int64_t *selection_size,
-                                     void *buffer, int64_t *buffershape,
-                                     int64_t buffersize);
+int caterva_get_orthogonal_selection(caterva_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
+                                     int64_t *buffershape, int64_t buffersize);
 
-int caterva_set_orthogonal_selection(blosc2_context *ctx, caterva_array_t *array,
-                                     int64_t **selection, int64_t *selection_size,
-                                     void *buffer, int64_t *buffershape,
-                                     int64_t buffersize);
+int caterva_set_orthogonal_selection(caterva_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
+                                     int64_t *buffershape, int64_t buffersize);
 
 
 // Metainfo section

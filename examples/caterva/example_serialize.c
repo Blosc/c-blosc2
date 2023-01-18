@@ -31,8 +31,6 @@ int main() {
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = typesize;
-  blosc2_context *ctx = blosc2_create_cctx(cparams);
-
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
   b2_storage.contiguous = false;
@@ -41,7 +39,7 @@ int main() {
                                                  NULL, 0);
 
   caterva_array_t *arr;
-  CATERVA_ERROR(caterva_from_buffer(data, size, params, &arr));
+  CATERVA_ERROR(caterva_from_buffer(params, &arr, data, size));
 
   uint8_t *cframe;
   int64_t cframe_len;
@@ -49,7 +47,7 @@ int main() {
   CATERVA_ERROR(caterva_to_cframe(arr, &cframe, &cframe_len, &needs_free));
 
   caterva_array_t *dest;
-  CATERVA_ERROR(caterva_from_cframe(ctx, cframe, cframe_len, true, &dest));
+  CATERVA_ERROR(caterva_from_cframe(cframe, cframe_len, true, &dest));
 
   /* Fill dest array with caterva_array_t data */
   uint8_t *data_dest = malloc(size);
@@ -68,7 +66,6 @@ int main() {
   caterva_free(&arr);
   caterva_free(&dest);
   CATERVA_ERROR(caterva_free_ctx(params));
-  blosc2_free_ctx(ctx);
 
   return 0;
 }
