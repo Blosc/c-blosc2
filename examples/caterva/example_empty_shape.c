@@ -51,10 +51,10 @@ int main() {
   caterva_params_t *slice_params = caterva_new_params(&slice_b2_storage, ndim, shape,
                                                       slice_chunkshape, slice_blockshape, NULL, 0);
 
-  CATERVA_ERROR(caterva_free_params(slice_params));
-
   caterva_array_t *slice;
   CATERVA_ERROR(caterva_get_slice(arr, slice_start, slice_stop, slice_params, &slice));
+
+  CATERVA_ERROR(caterva_free_params(slice_params));
 
   uint8_t *buffer;
   uint64_t buffer_size = 1;
