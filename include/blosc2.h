@@ -111,6 +111,23 @@ extern "C" {
          fprintf(stderr, "[%s] - " msg " (%s:%d)\n", #cat, ##__VA_ARGS__, __FILE__, __LINE__); \
        } while(0)
 
+#define BLOSC_ERROR_NULL(pointer, rc)                           \
+    do {                                                        \
+        if ((pointer) == NULL) {                                \
+            BLOSC_TRACE_ERROR("Pointer is null");               \
+            return rc;                                          \
+        }\
+    } while (0)
+#define BLOSC_ERROR(rc)                             \
+    do {                                            \
+        int rc_ = rc;                               \
+        if (rc_ < BLOSC2_ERROR_SUCCESS) {           \
+            char *error_msg = print_error(rc_);     \
+            BLOSC_TRACE_ERROR("%s", error_msg);     \
+            return rc_;                             \
+        }                                           \
+    } while (0)
+
 
 /* The VERSION_FORMAT symbols below should be just 1-byte long */
 enum {
@@ -392,7 +409,7 @@ enum {
 enum {
   BLOSC2_ERROR_SUCCESS = 0,           //<! Success
   BLOSC2_ERROR_FAILURE = -1,          //<! Generic failure
-  BLOSC2_ERROR_STREAM = 2,            //<! Bad stream
+  BLOSC2_ERROR_STREAM = -2,           //<! Bad stream
   BLOSC2_ERROR_DATA = -3,             //<! Invalid data
   BLOSC2_ERROR_MEMORY_ALLOC = -4,     //<! Memory alloc/realloc failure
   BLOSC2_ERROR_READ_BUFFER = -5,      //!< Not enough space to read
@@ -422,7 +439,90 @@ enum {
   BLOSC2_ERROR_SCHUNK_SPECIAL = -29,  //!< Special super-chunk failure
   BLOSC2_ERROR_PLUGIN_IO = -30,       //!< IO plugin error
   BLOSC2_ERROR_FILE_REMOVE = -31,     //!< Remove file failure
+  BLOSC2_ERROR_NULL_POINTER = -32,    //!< Pointer is null
+  CATERVA_ERR_INVALID_INDEX = -33,    //!< Invalid index
 };
+
+
+#ifdef __GNUC__
+#define BLOSC_ATTRIBUTE_UNUSED __attribute__((unused))
+#else
+#define CATERVA_ATTRIBUTE_UNUSED
+#endif
+
+static char *print_error(int rc) BLOSC_ATTRIBUTE_UNUSED;
+static char *print_error(int rc) {
+  switch (rc) {
+    case BLOSC2_ERROR_FAILURE:
+      return (char *) "Generic failure";
+    case BLOSC2_ERROR_STREAM:
+      return (char *) "Bad stream";
+    case BLOSC2_ERROR_DATA:
+      return (char *) "Invalid data";
+    case BLOSC2_ERROR_MEMORY_ALLOC:
+      return (char *) "Memory alloc/realloc failure";
+    case BLOSC2_ERROR_READ_BUFFER:
+      return (char *) "Not enough space to read";
+    case BLOSC2_ERROR_WRITE_BUFFER:
+      return (char *) "Not enough space to write";
+    case BLOSC2_ERROR_CODEC_SUPPORT:
+      return (char *) "Codec not supported";
+    case BLOSC2_ERROR_CODEC_PARAM:
+      return (char *) "Invalid parameter supplied to codec";
+    case BLOSC2_ERROR_CODEC_DICT:
+      return (char *) "Codec dictionary error";
+    case BLOSC2_ERROR_VERSION_SUPPORT:
+      return (char *) "Version not supported";
+    case BLOSC2_ERROR_INVALID_HEADER:
+      return (char *) "Invalid value in header";
+    case BLOSC2_ERROR_INVALID_PARAM:
+      return (char *) "Invalid parameter supplied to function";
+    case BLOSC2_ERROR_FILE_READ:
+      return (char *) "File read failure";
+    case BLOSC2_ERROR_FILE_WRITE:
+      return (char *) "File write failure";
+    case BLOSC2_ERROR_FILE_OPEN:
+      return (char *) "File open failure";
+    case BLOSC2_ERROR_NOT_FOUND:
+      return (char *) "Not found";
+    case BLOSC2_ERROR_RUN_LENGTH:
+      return (char *) "Bad run length encoding";
+    case BLOSC2_ERROR_FILTER_PIPELINE:
+      return (char *) "Filter pipeline error";
+    case BLOSC2_ERROR_CHUNK_INSERT:
+      return (char *) "Chunk insert failure";
+    case BLOSC2_ERROR_CHUNK_APPEND:
+      return (char *) "Chunk append failure";
+    case BLOSC2_ERROR_CHUNK_UPDATE:
+      return (char *) "Chunk update failure";
+    case BLOSC2_ERROR_2GB_LIMIT:
+      return (char *) "Sizes larger than 2gb not supported";
+    case BLOSC2_ERROR_SCHUNK_COPY:
+      return (char *) "Super-chunk copy failure";
+    case BLOSC2_ERROR_FRAME_TYPE:
+      return (char *) "Wrong type for frame";
+    case BLOSC2_ERROR_FILE_TRUNCATE:
+      return (char *) "File truncate failure";
+    case BLOSC2_ERROR_THREAD_CREATE:
+      return (char *) "Thread or thread context creation failure";
+    case BLOSC2_ERROR_POSTFILTER:
+      return (char *) "Postfilter failure";
+    case BLOSC2_ERROR_FRAME_SPECIAL:
+      return (char *) "Special frame failure";
+    case BLOSC2_ERROR_SCHUNK_SPECIAL:
+      return (char *) "Special super-chunk failure";
+    case BLOSC2_ERROR_PLUGIN_IO:
+      return (char *) "IO plugin error";
+    case BLOSC2_ERROR_FILE_REMOVE:
+      return (char *) "Remove file failure";
+    case BLOSC2_ERROR_NULL_POINTER:
+      return (char *) "Pointer is null";
+    case CATERVA_ERR_INVALID_INDEX:
+      return (char *) "Invalid index";
+    default:
+      return (char *) "Unknown error";
+  }
+}
 
 
 /**

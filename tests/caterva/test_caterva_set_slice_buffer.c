@@ -93,10 +93,10 @@ CUTEST_TEST_TEST(set_slice_buffer) {
 
   /* Create caterva_array_t with original data */
   caterva_array_t *src;
-  CATERVA_ERROR(caterva_zeros(ctx, &src));
+  BLOSC_ERROR(caterva_zeros(ctx, &src));
 
 
-  CATERVA_ERROR(caterva_set_slice_buffer(buffer, shape, buffersize,
+  BLOSC_ERROR(caterva_set_slice_buffer(buffer, shape, buffersize,
                                          shapes.start, shapes.stop, src));
 
 
@@ -127,7 +127,7 @@ CUTEST_TEST_TEST(set_slice_buffer) {
                       (uint8_t) k == ((uint8_t *) destbuffer)[i]);
         break;
       default:
-        CATERVA_TEST_ASSERT(CATERVA_ERR_INVALID_ARGUMENT);
+        CATERVA_TEST_ASSERT(BLOSC2_ERROR_INVALID_PARAM);
     }
   }
 

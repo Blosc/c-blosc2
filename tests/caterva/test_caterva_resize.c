@@ -105,12 +105,12 @@ CUTEST_TEST_TEST(resize_shape) {
     default:
       break;
   }
-  CATERVA_ERROR(caterva_full(ctx, &src, value));
+  BLOSC_ERROR(caterva_full(ctx, &src, value));
 
   if (shapes.given_pos) {
-    CATERVA_ERROR(caterva_resize(src, shapes.newshape, shapes.start_resize));
+    BLOSC_ERROR(caterva_resize(src, shapes.newshape, shapes.start_resize));
   } else {
-    CATERVA_ERROR(caterva_resize(src, shapes.newshape, NULL));
+    BLOSC_ERROR(caterva_resize(src, shapes.newshape, NULL));
   }
 
   // Create aux array to compare values
@@ -120,7 +120,7 @@ CUTEST_TEST_TEST(resize_shape) {
   caterva_context_t *aux_ctx = caterva_create_ctx(&aux_b2_storage, shapes.ndim, shapes.newshape,
                                                   shapes.chunkshape, shapes.blockshape, NULL, 0);
 
-  CATERVA_ERROR(caterva_full(aux_ctx, &aux, value));
+  BLOSC_ERROR(caterva_full(aux_ctx, &aux, value));
   if (!only_shrink) {
     for (int i = 0; i < shapes.ndim; ++i) {
       if (shapes.newshape[i] <= shapes.shape[i]) {
@@ -150,7 +150,7 @@ CUTEST_TEST_TEST(resize_shape) {
       slice_stop[i] = slice_start[i] + slice_shape[i];
       buffer_len *= slice_shape[i];
       uint8_t *buffer = calloc((size_t) buffer_len, (size_t) typesize);
-      CATERVA_ERROR(caterva_set_slice_buffer(buffer, slice_shape, buffer_len * typesize,
+      BLOSC_ERROR(caterva_set_slice_buffer(buffer, slice_shape, buffer_len * typesize,
                                              slice_start, slice_stop, aux));
       free(buffer);
     }
@@ -180,7 +180,7 @@ CUTEST_TEST_TEST(resize_shape) {
                       ((uint8_t *) src_buffer)[i] == ((uint8_t *) aux_buffer)[i]);
         break;
       default:
-        CATERVA_TEST_ASSERT(CATERVA_ERR_INVALID_ARGUMENT);
+        CATERVA_TEST_ASSERT(BLOSC2_ERROR_INVALID_PARAM);
     }
   }
   /* Free mallocs */

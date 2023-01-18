@@ -124,7 +124,7 @@ CUTEST_TEST_TEST(full) {
 
   blosc2_remove_urlpath(urlpath);
 
-  return CATERVA_SUCCEED;
+  return BLOSC2_ERROR_SUCCESS;
 }
 
 

@@ -44,7 +44,7 @@ int main() {
 
   caterva_array_t *arr;
   blosc_set_timestamp(&t0);
-  CATERVA_ERROR(caterva_from_buffer(ctx, &arr, src, nbytes));
+  BLOSC_ERROR(caterva_from_buffer(ctx, &arr, src, nbytes));
   blosc_set_timestamp(&t1);
   printf("from_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));
 
@@ -65,7 +65,7 @@ int main() {
     for (int slice = 0; slice < nslices; ++slice) {
       slice_start[dim] = rand() % shape[dim];
       slice_stop[dim] = slice_start[dim] + 1;
-      CATERVA_ERROR(caterva_get_slice_buffer(arr, slice_start, slice_stop, buffer, slice_shape, buffersize));
+      BLOSC_ERROR(caterva_get_slice_buffer(arr, slice_start, slice_stop, buffer, slice_shape, buffersize));
     }
     free(buffer);
   }
@@ -75,8 +75,8 @@ int main() {
 
   free(src);
 
-  CATERVA_ERROR(caterva_free(arr));
-  CATERVA_ERROR(caterva_free_ctx(ctx));
+  BLOSC_ERROR(caterva_free(arr));
+  BLOSC_ERROR(caterva_free_ctx(ctx));
 
   return 0;
 }

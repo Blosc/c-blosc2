@@ -31,14 +31,6 @@ extern "C" {
 #define to_big(dest, src, itemsize)       endian_handler(false, dest, src, itemsize)
 #define from_big(dest, src, itemsize)     endian_handler(false, dest, src, itemsize)
 
-#define BLOSC_ERROR_NULL(pointer, rc)                           \
-    do {                                                        \
-        if ((pointer) == NULL) {                                \
-            BLOSC_TRACE_ERROR("Pointer is NULL");               \
-            return rc;                                          \
-        }                                                       \
-    } while (0)
-
 
 // Return true if platform is little endian; else false
 static bool is_little_endian(void) {

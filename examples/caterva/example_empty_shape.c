@@ -40,9 +40,9 @@ int main() {
                                               chunkshape, blockshape, NULL, 0);
 
   caterva_array_t *arr;
-  CATERVA_ERROR(caterva_from_buffer(ctx, &arr, data, size));
+  BLOSC_ERROR(caterva_from_buffer(ctx, &arr, data, size));
 
-  CATERVA_ERROR(caterva_free_ctx(ctx));
+  BLOSC_ERROR(caterva_free_ctx(ctx));
 
   blosc2_storage slice_b2_storage = {.cparams=&cparams, .dparams=&dparams};
   slice_b2_storage.urlpath = "example_hola.b2frame";
@@ -52,9 +52,9 @@ int main() {
                                                     slice_chunkshape, slice_blockshape, NULL, 0);
 
   caterva_array_t *slice;
-  CATERVA_ERROR(caterva_get_slice(slice_ctx, &slice, arr, slice_start, slice_stop));
-  CATERVA_ERROR(caterva_free(arr));
-  CATERVA_ERROR(caterva_free_ctx(slice_ctx));
+  BLOSC_ERROR(caterva_get_slice(slice_ctx, &slice, arr, slice_start, slice_stop));
+  BLOSC_ERROR(caterva_free(arr));
+  BLOSC_ERROR(caterva_free_ctx(slice_ctx));
 
   uint8_t *buffer;
   uint64_t buffer_size = 1;
@@ -64,8 +64,8 @@ int main() {
   buffer_size *= slice->sc->typesize;
   buffer = malloc(buffer_size);
 
-  CATERVA_ERROR(caterva_to_buffer(slice, buffer, buffer_size));
-  CATERVA_ERROR(caterva_free(slice));
+  BLOSC_ERROR(caterva_to_buffer(slice, buffer, buffer_size));
+  BLOSC_ERROR(caterva_free(slice));
   // printf("Elapsed seconds: %.5f\n", blosc_elapsed_secs(t0, t1));
 
   return 0;

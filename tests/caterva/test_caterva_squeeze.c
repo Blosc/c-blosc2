@@ -123,7 +123,7 @@ CUTEST_TEST_TEST(squeeze) {
   blosc2_remove_urlpath(urlpath);
   blosc2_remove_urlpath(urlpath2);
 
-  return CATERVA_SUCCEED;
+  return BLOSC2_ERROR_SUCCESS;
 }
 
 CUTEST_TEST_TEARDOWN(squeeze) {

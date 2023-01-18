@@ -25,10 +25,10 @@ int frame_generator(int8_t *data, int8_t ndim, int64_t *shape, int32_t *chunksha
                                                  NULL, 0);
 
   caterva_array_t *arr;
-  CATERVA_ERROR(caterva_from_buffer(ctx, &arr, data, size));
-  CATERVA_ERROR(caterva_free_ctx(ctx));
+  BLOSC_ERROR(caterva_from_buffer(ctx, &arr, data, size));
+  BLOSC_ERROR(caterva_free_ctx(ctx));
   caterva_print_meta(arr);
-  CATERVA_ERROR(caterva_free(arr));
+  BLOSC_ERROR(caterva_free(arr));
 
   return 0;
 }
@@ -50,7 +50,7 @@ int all_eq() {
     data[i] = (int8_t) 22;
   }
   char *urlpath = "all_eq.caterva";
-  CATERVA_ERROR(frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  BLOSC_ERROR(frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
 }
@@ -72,7 +72,7 @@ int cyclic() {
     data[i] = (int8_t) i;
   }
   char *urlpath = "cyclic.caterva";
-  CATERVA_ERROR(frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  BLOSC_ERROR(frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
 }
@@ -95,7 +95,7 @@ int many_matches() {
     data[i + 1] = (int8_t) 2;
   }
   char *urlpath = "many_matches.caterva";
-  CATERVA_ERROR(frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  BLOSC_ERROR(frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
 }
@@ -119,7 +119,7 @@ int float_cyclic() {
     data[i + 1] = (2 + j / 10 + j / 1000);
   }
   char *urlpath = "example_float_cyclic.caterva";
-  CATERVA_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
 }
@@ -144,7 +144,7 @@ int double_same_cells() {
     data[i + 3] = 3.2;
   }
   char *urlpath = "example_double_same_cells.caterva";
-  CATERVA_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
 }
@@ -170,7 +170,7 @@ int big_float_frame() {
     data[i + 3] = (11 + j / 100 - j / 1000);
   }
   char *urlpath = "example_big_float_frame.caterva";
-  CATERVA_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
 }
@@ -198,7 +198,7 @@ int day_month_temp() {
     i += 3;
   }
   char *urlpath = "example_day_month_temp.caterva";
-  CATERVA_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
 }
@@ -230,7 +230,7 @@ int item_prices() {
     }
   }
   char *urlpath = "example_item_prices.caterva";
-  CATERVA_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
 }
@@ -239,35 +239,35 @@ int item_prices() {
 int main() {
   int err;
   err = all_eq();
-  if (err != CATERVA_SUCCEED) {
+  if (err != BLOSC2_ERROR_SUCCESS) {
     printf("\n All_eq error: %d", err);
   }
   err = cyclic();
-  if (err != CATERVA_SUCCEED) {
+  if (err != BLOSC2_ERROR_SUCCESS) {
     printf("\n Cyclic error: %d", err);
   }
   err = many_matches();
-  if (err != CATERVA_SUCCEED) {
+  if (err != BLOSC2_ERROR_SUCCESS) {
     printf("\n Many_matches error: %d", err);
   }
   err = float_cyclic();
-  if (err != CATERVA_SUCCEED) {
+  if (err != BLOSC2_ERROR_SUCCESS) {
     printf("\n Float_cyclic error: %d", err);
   }
   err = double_same_cells();
-  if (err != CATERVA_SUCCEED) {
+  if (err != BLOSC2_ERROR_SUCCESS) {
     printf("\n Double_same_cells error: %d", err);
   }
   err = big_float_frame();
-  if (err != CATERVA_SUCCEED) {
+  if (err != BLOSC2_ERROR_SUCCESS) {
     printf("\n Double_same_cells error: %d", err);
   }
   err = day_month_temp();
-  if (err != CATERVA_SUCCEED) {
+  if (err != BLOSC2_ERROR_SUCCESS) {
     printf("\n Day_month_temp error: %d", err);
   }
   err = item_prices();
-  if (err != CATERVA_SUCCEED) {
+  if (err != BLOSC2_ERROR_SUCCESS) {
     printf("\n Item_prices error: %d", err);
   }
 

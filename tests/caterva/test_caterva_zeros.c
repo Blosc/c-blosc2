@@ -81,7 +81,7 @@ CUTEST_TEST_TEST(zeros) {
   CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
   blosc2_remove_urlpath(urlpath);
 
-  return CATERVA_SUCCEED;
+  return BLOSC2_ERROR_SUCCESS;
 }
 
 

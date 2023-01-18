@@ -34,7 +34,7 @@ int main() {
     data[i] = (double) i;
   }
   caterva_array_t *arr;
-  CATERVA_ERROR(caterva_from_buffer(ctx, &arr, data, datasize));
+  BLOSC_ERROR(caterva_from_buffer(ctx, &arr, data, datasize));
   free(data);
 
   int64_t sel0[] = {3, 1, 2};
@@ -50,8 +50,8 @@ int main() {
   }
   int64_t buffersize = nitems * arr->sc->typesize;
   double *buffer = calloc(nitems, arr->sc->typesize);
-  CATERVA_ERROR(caterva_set_orthogonal_selection(arr, selection, selection_size, buffer, buffershape, buffersize));
-  CATERVA_ERROR(caterva_get_orthogonal_selection(arr, selection, selection_size, buffer, buffershape, buffersize));
+  BLOSC_ERROR(caterva_set_orthogonal_selection(arr, selection, selection_size, buffer, buffershape, buffersize));
+  BLOSC_ERROR(caterva_get_orthogonal_selection(arr, selection, selection_size, buffer, buffershape, buffersize));
 
   printf("Results: \n");
   for (int i = 0; i < nitems; ++i) {
@@ -62,8 +62,8 @@ int main() {
   }
   printf("\n");
   free(buffer);
-  CATERVA_ERROR(caterva_free(arr));
-  CATERVA_ERROR(caterva_free_ctx(ctx));
+  BLOSC_ERROR(caterva_free(arr));
+  BLOSC_ERROR(caterva_free_ctx(ctx));
 
   return 0;
 }

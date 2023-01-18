@@ -91,7 +91,7 @@ CUTEST_TEST_TEST(delete) {
     default:
       break;
   }
-  CATERVA_ERROR(caterva_full(ctx, &src, value));
+  BLOSC_ERROR(caterva_full(ctx, &src, value));
 
   int64_t bufferlen = 1;
   int64_t stop[CATERVA_MAX_DIM];
@@ -111,9 +111,9 @@ CUTEST_TEST_TEST(delete) {
   int64_t start[CATERVA_MAX_DIM] = {0};
   start[shapes.axis] = shapes.start;
   uint8_t *buffer = calloc((size_t) bufferlen, (size_t) typesize);
-  CATERVA_ERROR(caterva_set_slice_buffer(buffer, buffer_shape, bufferlen * typesize, start, stop, src));
+  BLOSC_ERROR(caterva_set_slice_buffer(buffer, buffer_shape, bufferlen * typesize, start, stop, src));
 
-  CATERVA_ERROR(caterva_delete(src, shapes.axis, shapes.start, shapes.delete_len));
+  BLOSC_ERROR(caterva_delete(src, shapes.axis, shapes.start, shapes.delete_len));
 
   int64_t newshape[CATERVA_MAX_DIM] = {0};
   for (int i = 0; i < shapes.ndim; ++i) {
@@ -128,7 +128,7 @@ CUTEST_TEST_TEST(delete) {
   caterva_context_t *aux_ctx = caterva_create_ctx(&b2_storage, shapes.ndim, newshape,
                                                      shapes.chunkshape, shapes.blockshape, NULL, 0);
 
-  CATERVA_ERROR(caterva_full(aux_ctx, &aux, value));
+  BLOSC_ERROR(caterva_full(aux_ctx, &aux, value));
 
 
   /* Fill buffer with whole array data */
@@ -154,7 +154,7 @@ CUTEST_TEST_TEST(delete) {
                       ((uint8_t *) src_buffer)[i] == (uint8_t) fill_value);
         break;
       default:
-        CATERVA_TEST_ASSERT(CATERVA_ERR_INVALID_ARGUMENT);
+        CATERVA_TEST_ASSERT(BLOSC2_ERROR_INVALID_PARAM);
     }
   }
   /* Free mallocs */

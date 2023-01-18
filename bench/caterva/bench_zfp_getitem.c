@@ -178,7 +178,7 @@ int comp(const char *urlpath) {
   free(blockshape);
   caterva_free(arr);
   caterva_free(arr_rate);
-  CATERVA_ERROR(caterva_free_ctx(ctx));
+  BLOSC_ERROR(caterva_free_ctx(ctx));
   blosc2_free_ctx(ctx_zfp);
   if (needs_free_blosc) {
     free(chunk_blosc);
@@ -188,7 +188,7 @@ int comp(const char *urlpath) {
   }
   blosc2_destroy();
 
-  return CATERVA_SUCCEED;
+  return BLOSC2_ERROR_SUCCESS;
 }
 
 int solar1(void) {
@@ -251,21 +251,21 @@ int precip3m(void) {
 int main() {
 
   printf("wind1 \n");
-  CATERVA_ERROR(wind1());
+  BLOSC_ERROR(wind1());
   printf("air1 \n");
-  CATERVA_ERROR(air1());
+  BLOSC_ERROR(air1());
   printf("solar1 \n");
-  CATERVA_ERROR(solar1());
+  BLOSC_ERROR(solar1());
   printf("snow1 \n");
-  CATERVA_ERROR(snow1());
+  BLOSC_ERROR(snow1());
   printf("precip1 \n");
-  CATERVA_ERROR(precip1());
+  BLOSC_ERROR(precip1());
   printf("precip2 \n");
-  CATERVA_ERROR(precip2());
+  BLOSC_ERROR(precip2());
   printf("precip3 \n");
-  CATERVA_ERROR(precip3());
+  BLOSC_ERROR(precip3());
 //    printf("precip3m \n");
-  //  CATERVA_ERROR(precip3m());
-  return CATERVA_SUCCEED;
+  //  BLOSC_ERROR(precip3m());
+  return BLOSC2_ERROR_SUCCESS;
 
 }

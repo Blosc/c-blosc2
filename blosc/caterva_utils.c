@@ -218,7 +218,7 @@ int caterva_copy_buffer(int8_t ndim,
     for (int i = 0; i < ndim; ++i) {
         copy_shape[i] = src_stop[i] - src_start[i];
         if(copy_shape[i] == 0) {
-            return CATERVA_SUCCEED;
+            return BLOSC2_ERROR_SUCCESS;
         }
     }
 
@@ -277,5 +277,5 @@ switch(ndim) {
     break;
     }
 
-    return CATERVA_SUCCEED;
+    return BLOSC2_ERROR_SUCCESS;
 }

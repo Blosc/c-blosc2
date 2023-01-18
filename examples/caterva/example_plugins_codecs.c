@@ -72,14 +72,14 @@ int main() {
 
   caterva_array_t *arr;
   blosc_set_timestamp(&t0);
-  CATERVA_ERROR(caterva_from_buffer(ctx, &arr, src, nbytes));
+  BLOSC_ERROR(caterva_from_buffer(ctx, &arr, src, nbytes));
   blosc_set_timestamp(&t1);
   printf("from_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));
 
   int64_t *buffer = malloc(nbytes);
   int64_t buffer_size = nbytes;
   blosc_set_timestamp(&t0);
-  CATERVA_ERROR(caterva_to_buffer(arr, buffer, buffer_size));
+  BLOSC_ERROR(caterva_to_buffer(arr, buffer, buffer_size));
   blosc_set_timestamp(&t1);
   printf("to_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));
 
@@ -96,8 +96,8 @@ int main() {
   free(src);
   free(buffer);
 
-  CATERVA_ERROR(caterva_free(arr));
-  CATERVA_ERROR(caterva_free_ctx(ctx));
+  BLOSC_ERROR(caterva_free(arr));
+  BLOSC_ERROR(caterva_free_ctx(ctx));
 
   return 0;
 }

@@ -108,14 +108,14 @@ CUTEST_TEST_TEST(copy) {
   /* Assert the metalayers creation */
   int rc = blosc2_meta_exists(src->sc, "random");
   if (rc < 0) {
-    CATERVA_TEST_ASSERT(CATERVA_ERR_BLOSC_FAILED);
+    CATERVA_TEST_ASSERT(BLOSC2_ERROR_FAILURE);
   }
   uint8_t *content;
   int32_t content_len;
   CATERVA_TEST_ASSERT(blosc2_meta_get(src->sc, "random", &content, &content_len));
   double serializeddata = *((double *) content);
   if (serializeddata != datatoserialize) {
-    CATERVA_TEST_ASSERT(CATERVA_ERR_BLOSC_FAILED);
+    CATERVA_TEST_ASSERT(BLOSC2_ERROR_FAILURE);
   }
 
   CATERVA_TEST_ASSERT(blosc2_vlmeta_add(src->sc, "random", content, content_len,
@@ -140,14 +140,14 @@ CUTEST_TEST_TEST(copy) {
   CATERVA_TEST_ASSERT(blosc2_meta_get(dest->sc, "random", &content, &content_len));
   serializeddata = *((double *) content);
   if (serializeddata != datatoserialize) {
-    CATERVA_TEST_ASSERT(CATERVA_ERR_BLOSC_FAILED);
+    CATERVA_TEST_ASSERT(BLOSC2_ERROR_FAILURE);
   }
   free(content);
 
   CATERVA_TEST_ASSERT(blosc2_vlmeta_get(dest->sc, "random", &content, &content_len));
   serializeddata = *((double *) content);
   if (serializeddata != datatoserialize) {
-    CATERVA_TEST_ASSERT(CATERVA_ERR_BLOSC_FAILED);
+    CATERVA_TEST_ASSERT(BLOSC2_ERROR_FAILURE);
   }
   free(content);
 
