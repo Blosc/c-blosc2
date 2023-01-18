@@ -21,6 +21,7 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(copy) {
+  void *unused;
 };
 
 

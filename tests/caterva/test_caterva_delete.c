@@ -23,6 +23,7 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(delete) {
+  void *unused;
 };
 
 

@@ -22,6 +22,7 @@ typedef struct {
 
 
 CUTEST_TEST_DATA(append) {
+  void *unused;
 };
 
 

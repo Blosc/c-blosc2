@@ -13,6 +13,7 @@
 
 
 CUTEST_TEST_DATA(full) {
+  void *unused;
 };
 
 
