@@ -59,7 +59,6 @@ int create_cframe(const char* compname) {
   size_t isize = CHUNKSIZE * sizeof(int32_t);
   int64_t nbytes, cbytes;
   int i, nchunk;
-  int64_t nchunks;
   blosc_timestamp_t last, current;
   double ttotal;
   int compcode = blosc2_compname_to_compcode(compname);
@@ -86,8 +85,7 @@ int create_cframe(const char* compname) {
     for (i = 0; i < CHUNKSIZE; i++) {
       data[i] = i * nchunk;
     }
-    nchunks = blosc2_schunk_append_buffer(schunk, data, (int32_t)isize);
-    assert(nchunks == nchunk + 1);
+    BLOSC_ERROR(blosc2_schunk_append_buffer(schunk, data, (int32_t)isize));
   }
   blosc_set_timestamp(&current);
 
