@@ -9,7 +9,6 @@
 **********************************************************************/
 
 #include <caterva_utils.h>
-#include "context.h"
 
 // copyNdim where N = {2-8} - specializations of copy loops to be used by caterva_copy_buffer
 // since we don't have c++ templates, substitute manual specializations for up to known CATERVA_MAX_DIM (8)

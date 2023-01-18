@@ -111,7 +111,7 @@ CUTEST_TEST_TEST(metalayers) {
   vlmeta2.content_len = sizeof(sdata1);
   CATERVA_TEST_ASSERT(blosc2_vlmeta_add(src->sc, vlmeta2.name, vlmeta2.content, vlmeta2.content_len,
                                         src->sc->storage->cparams));
-  CATERVA_TEST_ASSERT(caterva_free(&src));
+  CATERVA_TEST_ASSERT(caterva_free(src));
 
   caterva_array_t *src2;
   caterva_open(urlpath, &src2);
@@ -140,7 +140,7 @@ CUTEST_TEST_TEST(metalayers) {
 
   /* Free mallocs */
   free(buffer);
-  CATERVA_TEST_ASSERT(caterva_free(&src2));
+  CATERVA_TEST_ASSERT(caterva_free(src2));
   CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
 
   blosc2_remove_urlpath(urlpath);

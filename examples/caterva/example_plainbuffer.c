@@ -66,8 +66,8 @@ int main() {
 
   CATERVA_ERROR(caterva_to_buffer(slice, buffer, buffer_size));
 
-  CATERVA_ERROR(caterva_free(&arr));
-  CATERVA_ERROR(caterva_free(&slice));
+  CATERVA_ERROR(caterva_free(arr));
+  CATERVA_ERROR(caterva_free(slice));
   CATERVA_ERROR(caterva_free_ctx(ctx));
   CATERVA_ERROR(caterva_free_ctx(slice_params));
 

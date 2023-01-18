@@ -161,8 +161,8 @@ CUTEST_TEST_TEST(copy) {
   /* Free mallocs */
   free(buffer);
   free(buffer_dest);
-  CATERVA_TEST_ASSERT(caterva_free(&src));
-  CATERVA_TEST_ASSERT(caterva_free(&dest));
+  CATERVA_TEST_ASSERT(caterva_free(src));
+  CATERVA_TEST_ASSERT(caterva_free(dest));
   CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
   CATERVA_TEST_ASSERT(caterva_free_ctx(params2));
 

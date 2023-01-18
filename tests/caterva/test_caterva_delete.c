@@ -162,8 +162,8 @@ CUTEST_TEST_TEST(delete) {
   free(buffer);
   free(src_buffer);
 
-  CATERVA_TEST_ASSERT(caterva_free(&src));
-  CATERVA_TEST_ASSERT(caterva_free(&aux));
+  CATERVA_TEST_ASSERT(caterva_free(src));
+  CATERVA_TEST_ASSERT(caterva_free(aux));
   CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
   CATERVA_TEST_ASSERT(caterva_free_ctx(aux_params));
 

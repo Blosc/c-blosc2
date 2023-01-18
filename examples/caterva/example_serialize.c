@@ -63,8 +63,8 @@ int main() {
   free(data);
   free(data_dest);
 
-  CATERVA_ERROR(caterva_free(&arr));
-  CATERVA_ERROR(caterva_free(&dest));
+  CATERVA_ERROR(caterva_free(arr));
+  CATERVA_ERROR(caterva_free(dest));
   CATERVA_ERROR(caterva_free_ctx(ctx));
 
   return 0;

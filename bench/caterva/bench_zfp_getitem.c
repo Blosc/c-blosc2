@@ -119,7 +119,7 @@ int comp(const char *urlpath) {
     printf("Error BLOSC_CODEC_ZFP_FIXED_RATE \n");
     free(chunkshape);
     free(blockshape);
-    caterva_free(&arr);
+    caterva_free(arr);
     return -1;
   }
   printf("ZFP_FIXED_RATE comp ratio: %f \n", (float) arr_rate->sc->nbytes / (float) arr_rate->sc->cbytes);
@@ -176,8 +176,8 @@ int comp(const char *urlpath) {
   free(shape_aux);
   free(chunkshape);
   free(blockshape);
-  caterva_free(&arr);
-  caterva_free(&arr_rate);
+  caterva_free(arr);
+  caterva_free(arr_rate);
   CATERVA_ERROR(caterva_free_ctx(params));
   blosc2_free_ctx(ctx_zfp);
   if (needs_free_blosc) {

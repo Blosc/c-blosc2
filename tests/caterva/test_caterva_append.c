@@ -142,7 +142,7 @@ CUTEST_TEST_TEST(append) {
   free(buffer);
   free(res_buffer);
 
-  CATERVA_TEST_ASSERT(caterva_free(&src));
+  CATERVA_TEST_ASSERT(caterva_free(src));
   CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
   blosc2_remove_urlpath(urlpath);
 

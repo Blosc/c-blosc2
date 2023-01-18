@@ -68,7 +68,7 @@ CUTEST_TEST_TEST(uninit) {
   }
 
   /* Free resources */
-  CATERVA_TEST_ASSERT(caterva_free(&src));
+  CATERVA_TEST_ASSERT(caterva_free(src));
   CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
   blosc2_remove_urlpath(urlpath);
 

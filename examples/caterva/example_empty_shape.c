@@ -53,7 +53,7 @@ int main() {
 
   caterva_array_t *slice;
   CATERVA_ERROR(caterva_get_slice(slice_params, &slice, arr, slice_start, slice_stop));
-  CATERVA_ERROR(caterva_free(&arr));
+  CATERVA_ERROR(caterva_free(arr));
   CATERVA_ERROR(caterva_free_ctx(slice_params));
 
   uint8_t *buffer;
@@ -65,7 +65,7 @@ int main() {
   buffer = malloc(buffer_size);
 
   CATERVA_ERROR(caterva_to_buffer(slice, buffer, buffer_size));
-  CATERVA_ERROR(caterva_free(&slice));
+  CATERVA_ERROR(caterva_free(slice));
   // printf("Elapsed seconds: %.5f\n", blosc_elapsed_secs(t0, t1));
 
   return 0;

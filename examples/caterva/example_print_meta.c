@@ -31,7 +31,7 @@ int print_meta(char *urlpath) {
   caterva_array_t *arr;
   CATERVA_ERROR(caterva_open(urlpath, &arr));
   caterva_print_meta(arr);
-  CATERVA_ERROR(caterva_free(&arr));
+  CATERVA_ERROR(caterva_free(arr));
 
   return 0;
 }

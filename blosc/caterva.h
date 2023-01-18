@@ -270,11 +270,11 @@ int caterva_full(caterva_context_t *ctx, caterva_array_t **array, void *fill_val
 /**
  * @brief Free an array.
  *
- * @param array The memory pointer where the array is placed.
+ * @param array The array.
  *
  * @return An error code.
  */
-int caterva_free(caterva_array_t **array);
+int caterva_free(caterva_array_t *array);
 
 /**
  * @brief Create a caterva array from a super-chunk. It can only be used if the array

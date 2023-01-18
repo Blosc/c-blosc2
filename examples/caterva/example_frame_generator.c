@@ -28,7 +28,7 @@ int frame_generator(int8_t *data, int8_t ndim, int64_t *shape, int32_t *chunksha
   CATERVA_ERROR(caterva_from_buffer(ctx, &arr, data, size));
   CATERVA_ERROR(caterva_free_ctx(ctx));
   caterva_print_meta(arr);
-  CATERVA_ERROR(caterva_free(&arr));
+  CATERVA_ERROR(caterva_free(arr));
 
   return 0;
 }

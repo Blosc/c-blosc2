@@ -96,7 +96,7 @@ int main() {
   free(src);
   free(buffer);
 
-  CATERVA_ERROR(caterva_free(&arr));
+  CATERVA_ERROR(caterva_free(arr));
   CATERVA_ERROR(caterva_free_ctx(ctx));
 
   return 0;

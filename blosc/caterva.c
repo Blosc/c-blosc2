@@ -353,14 +353,14 @@ int caterva_open(const char *urlpath, caterva_array_t **array) {
 }
 
 
-int caterva_free(caterva_array_t **array) {
+int caterva_free(caterva_array_t *array) {
   CATERVA_ERROR_NULL(array);
 
-  if (*array) {
-    if ((*array)->sc != NULL) {
-      blosc2_schunk_free((*array)->sc);
+  if (array) {
+    if (array->sc != NULL) {
+      blosc2_schunk_free(array->sc);
     }
-    free(*array);
+    free(array);
   }
   return CATERVA_SUCCEED;
 }
@@ -970,7 +970,7 @@ int caterva_save(caterva_array_t *array, char *urlpath) {
   }
 
   caterva_copy(&params, array, &tmp);
-  caterva_free(&tmp);
+  caterva_free(tmp);
 
   return CATERVA_SUCCEED;
 }

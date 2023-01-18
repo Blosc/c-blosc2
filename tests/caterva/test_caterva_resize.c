@@ -188,8 +188,8 @@ CUTEST_TEST_TEST(resize_shape) {
   free(src_buffer);
   free(aux_buffer);
 
-  CATERVA_TEST_ASSERT(caterva_free(&src));
-  CATERVA_TEST_ASSERT(caterva_free(&aux));
+  CATERVA_TEST_ASSERT(caterva_free(src));
+  CATERVA_TEST_ASSERT(caterva_free(aux));
   CATERVA_TEST_ASSERT(caterva_free_ctx(ctx));
   CATERVA_TEST_ASSERT(caterva_free_ctx(aux_ctx));
   blosc2_remove_urlpath(urlpath);
