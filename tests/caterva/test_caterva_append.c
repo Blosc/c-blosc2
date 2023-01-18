@@ -63,15 +63,14 @@ CUTEST_TEST_TEST(append) {
   blosc2_remove_urlpath(urlpath);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   cparams.nthreads = 2;
-  cparams.compcode = BLOSC_BLOSCLZ;
   cparams.typesize = typesize;
-  blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_storage b2_storage = BLOSC2_STORAGE_DEFAULTS;
+  b2_storage.cparams = &cparams;
+  b2_storage.contiguous = backend.contiguous;
   if (backend.persistent) {
     b2_storage.urlpath = urlpath;
   }
-  b2_storage.contiguous = backend.contiguous;
 
   caterva_params_t *params = caterva_new_params(&b2_storage, shapes.ndim, shapes.shape,
                                                 shapes.chunkshape, shapes.blockshape, NULL, 0);

@@ -395,7 +395,6 @@ int caterva_from_buffer(void *buffer, int64_t buffersize,
   int64_t start[CATERVA_MAX_DIM] = {0};
   int64_t *stop = (*array)->shape;
   int64_t *shape = (*array)->shape;
-  blosc2_context *ctx = blosc2_create_cctx(*params->b2_storage->cparams);
   CATERVA_ERROR(caterva_set_slice_buffer(buffer, shape, buffersize, start, stop, *array));
 
   return CATERVA_SUCCEED;
@@ -823,7 +822,6 @@ int caterva_get_slice(caterva_array_t *src, const int64_t *start,
       buffersize *= chunk_shape[i];
     }
     uint8_t *buffer = malloc(buffersize);
-    blosc2_context *ctx = blosc2_create_cctx(*params->b2_storage->cparams);
     CATERVA_ERROR(caterva_get_slice_buffer(src, src_start, src_stop, buffer, chunk_shape,
                                            buffersize));
     CATERVA_ERROR(caterva_set_slice_buffer(buffer, chunk_shape, buffersize, chunk_start,
@@ -1780,9 +1778,20 @@ caterva_params_t *caterva_new_params(blosc2_storage *b2_storage, int8_t ndim, in
                                      blosc2_metalayer *metalayers, int32_t nmetalayers) {
   caterva_params_t *params = malloc(sizeof(caterva_params_t));
   blosc2_storage *params_b2_storage = malloc(sizeof(blosc2_storage));
-  memcpy(params_b2_storage, b2_storage, sizeof(blosc2_storage));
+  if (b2_storage == NULL) {
+    memcpy(params_b2_storage, &BLOSC2_STORAGE_DEFAULTS, sizeof(blosc2_storage));
+  }
+  else {
+    memcpy(params_b2_storage, b2_storage, sizeof(blosc2_storage));
+  }
   blosc2_cparams *cparams = malloc(sizeof(blosc2_cparams));
-  memcpy(cparams, b2_storage->cparams, sizeof(blosc2_cparams));
+  // We need a copy of cparams mainly to be able to modify blocksize
+  if (b2_storage->cparams == NULL) {
+    memcpy(cparams, &BLOSC2_CPARAMS_DEFAULTS, sizeof(blosc2_cparams));
+  }
+  else {
+    memcpy(cparams, b2_storage->cparams, sizeof(blosc2_cparams));
+  }
 
   params_b2_storage->cparams = cparams;
   params->b2_storage = params_b2_storage;
@@ -1794,7 +1803,7 @@ caterva_params_t *caterva_new_params(blosc2_storage *b2_storage, int8_t ndim, in
     params->blockshape[i] = blockshape[i];
     blocknitems *= params->blockshape[i];
   }
-  params->b2_storage->cparams->blocksize = blocknitems * params->b2_storage->cparams->typesize;
+  cparams->blocksize = blocknitems * cparams->typesize;
 
   params->nmetalayers = nmetalayers;
   for (int i = 0; i < nmetalayers; ++i) {
