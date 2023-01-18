@@ -9,9 +9,14 @@
 #include <stdio.h>
 #include <blosc2/blosc2-common.h>
 #include "../plugins/plugin_utils.h"
+#include "../include/blosc2/filters-registry.h"
 
-int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_cparams* cparams) {
+int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_cparams* cparams, uint8_t id) {
 
+    if (id != BLOSC_FILTER_NDMEAN) {
+        fprintf(stderr, "This filter has ID %d", BLOSC_FILTER_NDMEAN);
+        return -1;
+    }
     int8_t ndim;
     int64_t* shape = malloc(8 * sizeof(int64_t));
     int32_t* chunkshape = malloc(8 * sizeof(int32_t));
@@ -187,8 +192,12 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_
 }
 
 
-int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_dparams* dparams) {
+int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_dparams* dparams, uint8_t id) {
 
+    if (id != BLOSC_FILTER_NDMEAN) {
+        fprintf(stderr, "This filter has ID %d", BLOSC_FILTER_NDMEAN);
+        return -1;
+    }
     blosc2_schunk *schunk = dparams->schunk;
     int8_t ndim;
     int64_t* shape = malloc(8 * sizeof(int64_t));

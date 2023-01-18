@@ -16,9 +16,9 @@
 #define NDCELL_MAX_DIM 8
 
 
-int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_cparams* cparams);
+int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_cparams* cparams, uint8_t id);
 
-int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_dparams* dparams);
+int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_dparams* dparams, uint8_t id);
 
 #endif //CATERVA_NDCELL_H
 

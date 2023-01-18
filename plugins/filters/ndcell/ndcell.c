@@ -10,10 +10,15 @@
 #include <math.h>
 #include <stdio.h>
 #include "../plugins/plugin_utils.h"
+#include "../include/blosc2/filters-registry.h"
 
 
-int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_cparams* cparams) {
+int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_cparams* cparams, uint8_t id) {
 
+    if (id != BLOSC_FILTER_NDCELL) {
+        fprintf(stderr, "This filter has ID %d", BLOSC_FILTER_NDCELL);
+        return -1;
+    }
     int8_t ndim;
     int64_t* shape = malloc(8 * sizeof(int64_t));
     int32_t* chunkshape = malloc(8 * sizeof(int32_t));
@@ -133,8 +138,12 @@ int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_
 }
 
 
-int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_dparams* dparams) {
+int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_dparams* dparams, uint8_t id) {
 
+    if (id != BLOSC_FILTER_NDCELL) {
+        fprintf(stderr, "This filter has ID %d", BLOSC_FILTER_NDCELL);
+        return -1;
+    }
     blosc2_schunk *schunk = dparams->schunk;
     int8_t ndim;
     int64_t* shape = malloc(8 * sizeof(int64_t));
