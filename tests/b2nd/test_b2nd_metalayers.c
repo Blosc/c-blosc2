@@ -114,7 +114,7 @@ CUTEST_TEST_TEST(metalayers) {
   B2ND_TEST_ASSERT(b2nd_free(src));
 
   b2nd_array_t *src2;
-    b2nd_open(urlpath, &src2);
+  b2nd_open(urlpath, &src2);
 
   B2ND_TEST_ASSERT(blosc2_vlmeta_get(src2->sc, vlmeta2.name, &content, &content_len));
   CUTEST_ASSERT("Contents are not equal", *((uint64_t *) vlmeta2.content) == *((uint64_t *) content));
