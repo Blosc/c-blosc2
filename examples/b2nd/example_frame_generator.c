@@ -49,7 +49,7 @@ int all_eq() {
   for (int i = 0; i < nelem; i++) {
     data[i] = (int8_t) 22;
   }
-  char *urlpath = "all_eq.b2nd";
+  char *urlpath = "all_eq.caterva";
   BLOSC_ERROR(frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
@@ -71,7 +71,7 @@ int cyclic() {
   for (int i = 0; i < nelem; i++) {
     data[i] = (int8_t) i;
   }
-  char *urlpath = "cyclic.b2nd";
+  char *urlpath = "cyclic.caterva";
   BLOSC_ERROR(frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
@@ -94,7 +94,7 @@ int many_matches() {
     data[i] = (int8_t) i;
     data[i + 1] = (int8_t) 2;
   }
-  char *urlpath = "many_matches.b2nd";
+  char *urlpath = "many_matches.caterva";
   BLOSC_ERROR(frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
@@ -118,7 +118,7 @@ int float_cyclic() {
     data[i] = (j + j / 10 + j / 100);
     data[i + 1] = (2 + j / 10 + j / 1000);
   }
-  char *urlpath = "example_float_cyclic.b2nd";
+  char *urlpath = "example_float_cyclic.caterva";
   BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
@@ -143,7 +143,7 @@ int double_same_cells() {
     data[i + 2] = 23.6;
     data[i + 3] = 3.2;
   }
-  char *urlpath = "example_double_same_cells.b2nd";
+  char *urlpath = "example_double_same_cells.caterva";
   BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
@@ -169,7 +169,7 @@ int big_float_frame() {
     data[i + 2] = (7 + j / 10 - j / 100);
     data[i + 3] = (11 + j / 100 - j / 1000);
   }
-  char *urlpath = "example_big_float_frame.b2nd";
+  char *urlpath = "example_big_float_frame.caterva";
   BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
@@ -197,7 +197,7 @@ int day_month_temp() {
     data[i + 2] = ((float) (rand() % 10000) / 10000 * (temp_max - temp_min) + temp_min);
     i += 3;
   }
-  char *urlpath = "example_day_month_temp.b2nd";
+  char *urlpath = "example_day_month_temp.caterva";
   BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
@@ -229,7 +229,7 @@ int item_prices() {
       }
     }
   }
-  char *urlpath = "example_item_prices.b2nd";
+  char *urlpath = "example_item_prices.caterva";
   BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;

@@ -31,8 +31,8 @@ CUTEST_TEST_TEST(small_chunks) {
     cparams.blocksize = blocksize;
     blosc2_storage storage = BLOSC2_STORAGE_DEFAULTS;
     storage.cparams = &cparams;
-    storage.urlpath = "ex_update.b2nd";
-    blosc2_remove_dir("ex_update.b2nd");
+    storage.urlpath = "ex_update.caterva";
+    blosc2_remove_dir("ex_update.caterva");
 
     storage.contiguous = false;
     blosc2_schunk *sc = blosc2_schunk_new(&storage);
@@ -61,7 +61,7 @@ CUTEST_TEST_TEST(small_chunks) {
 
     blosc2_schunk_free(sc);
 
-    blosc2_remove_dir("ex_update.b2nd");
+    blosc2_remove_dir("ex_update.caterva");
 
   blosc2_destroy();
 

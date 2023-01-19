@@ -176,7 +176,7 @@ static int test_zfp_rate_double(blosc2_schunk* schunk) {
 
 
 int float_cyclic() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_float_cyclic.b2nd");
+    blosc2_schunk *schunk = blosc2_schunk_open("example_float_cyclic.caterva");
     BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
 
     /* Run the test. */
@@ -186,7 +186,7 @@ int float_cyclic() {
 }
 
 int double_same_cells() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_double_same_cells.b2nd");
+    blosc2_schunk *schunk = blosc2_schunk_open("example_double_same_cells.caterva");
     BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
 
     /* Run the test. */
@@ -196,7 +196,7 @@ int double_same_cells() {
 }
 
 int day_month_temp() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_day_month_temp.b2nd");
+    blosc2_schunk *schunk = blosc2_schunk_open("example_day_month_temp.caterva");
     BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
 
     /* Run the test. */
@@ -206,7 +206,7 @@ int day_month_temp() {
 }
 
 int item_prices() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_item_prices.b2nd");
+    blosc2_schunk *schunk = blosc2_schunk_open("example_item_prices.caterva");
     BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
 
     /* Run the test. */

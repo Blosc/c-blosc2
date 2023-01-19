@@ -33,7 +33,7 @@ CUTEST_TEST_TEST(metalayers) {
   CUTEST_GET_PARAMETER(typesize, uint8_t);
   CUTEST_GET_PARAMETER(backend, _test_backend);
 
-  char *urlpath = "test_metalayers.b2nd";
+  char *urlpath = "test_metalayers.caterva";
   blosc2_remove_urlpath(urlpath);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
