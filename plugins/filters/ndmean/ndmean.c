@@ -23,7 +23,7 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_
     int32_t* blockshape = malloc(8 * sizeof(int32_t));
     uint8_t* smeta;
     int32_t smeta_len;
-    if (blosc2_meta_get(cparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
+    if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
         free(shape);
         free(chunkshape);
         free(blockshape);
@@ -205,7 +205,7 @@ int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_
     int32_t* blockshape = malloc(8 * sizeof(int32_t));
     uint8_t* smeta;
     int32_t smeta_len;
-    if (blosc2_meta_get(schunk, "caterva", &smeta, &smeta_len) < 0) {
+    if (blosc2_meta_get(schunk, "b2nd", &smeta, &smeta_len) < 0) {
         free(shape);
         free(chunkshape);
         free(blockshape);

@@ -68,7 +68,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
     uint8_t cellshape = 4;
     uint8_t* smeta;
     int32_t smeta_len;
-    if (blosc2_meta_get(schunk, "caterva", &smeta, &smeta_len) < 0) {
+    if (blosc2_meta_get(schunk, "b2nd", &smeta, &smeta_len) < 0) {
         printf("Blosc error");
         return 0;
     }

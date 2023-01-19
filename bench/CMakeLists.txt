@@ -16,7 +16,7 @@ set(SOURCES_ZERO_RUNLEN zero_runlen.c)
 set(SOURCES_CFRAME create_frame.c)
 set(SOURCES_SFRAME sframe_bench.c)
 
-add_subdirectory(caterva)
+add_subdirectory(b2nd)
 
 # targets
 add_executable(b2bench ${SOURCES})

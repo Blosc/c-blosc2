@@ -52,7 +52,7 @@ include_directories(${BLOSC_INCLUDE_DIRS})
 set(SOURCES ${SOURCES} blosc2.c blosclz.c fastcopy.c fastcopy.h schunk.c frame.c stune.c stune.h
         context.h delta.c delta.h shuffle-generic.c bitshuffle-generic.c trunc-prec.c trunc-prec.h
         timestamp.c sframe.c directories.c blosc2-stdio.c
-        caterva.c caterva_utils.c)
+        b2nd.c b2nd_utils.c)
 if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
     if(COMPILER_SUPPORT_SSE2)
         message(STATUS "Adding run-time support for SSE2")
@@ -304,6 +304,7 @@ endif()
 # install
 if(BLOSC_INSTALL)
     install(FILES ${PROJECT_SOURCE_DIR}/include/blosc2.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT DEV)
+    install(FILES ${PROJECT_SOURCE_DIR}/include/b2nd.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT DEV)
     install(FILES
             ${PROJECT_SOURCE_DIR}/include/blosc2/blosc2-export.h
             ${PROJECT_SOURCE_DIR}/include/blosc2/blosc2-common.h

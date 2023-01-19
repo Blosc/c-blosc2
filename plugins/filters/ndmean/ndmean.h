@@ -8,8 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#ifndef CATERVA_NDMEAN_H
-#define CATERVA_NDMEAN_H
+#ifndef B2ND_NDMEAN_H
+#define B2ND_NDMEAN_H
 
 #include "blosc2.h"
 
@@ -20,6 +20,6 @@ int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_
 
 int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_dparams* dparams, uint8_t id);
 
-#endif //CATERVA_NDMEAN_H
+#endif //B2ND_NDMEAN_H
 
 

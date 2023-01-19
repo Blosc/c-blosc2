@@ -30,7 +30,7 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     int32_t *blockshape = malloc(8 * sizeof(int32_t));
     uint8_t *smeta;
     int32_t smeta_len;
-    if (blosc2_meta_get(cparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
+    if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
         printf("Blosc error");
         free(shape);
         free(chunkshape);
@@ -147,8 +147,8 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
     int32_t *blockshape = malloc(8 * sizeof(int32_t));
     uint8_t *smeta;
     int32_t smeta_len;
-    if (blosc2_meta_get(sc, "caterva", &smeta, &smeta_len) < 0) {
-        BLOSC_TRACE_ERROR("Cannot access caterva meta info");
+    if (blosc2_meta_get(sc, "b2nd", &smeta, &smeta_len) < 0) {
+        BLOSC_TRACE_ERROR("Cannot access b2nd meta info");
         free(shape);
         free(chunkshape);
         free(blockshape);
@@ -237,7 +237,7 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     int32_t *blockshape = malloc(8 * sizeof(int32_t));
     uint8_t *smeta;
     int32_t smeta_len;
-    if (blosc2_meta_get(cparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
+    if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
         printf("Blosc error");
         free(shape);
         free(chunkshape);
@@ -377,8 +377,8 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     int32_t *blockshape = malloc(8 * sizeof(int32_t));
     uint8_t *smeta;
     int32_t smeta_len;
-    if (blosc2_meta_get(sc, "caterva", &smeta, &smeta_len) < 0) {
-        BLOSC_TRACE_ERROR("Cannot access caterva meta info");
+    if (blosc2_meta_get(sc, "b2nd", &smeta, &smeta_len) < 0) {
+        BLOSC_TRACE_ERROR("Cannot access b2nd meta info");
         free(shape);
         free(chunkshape);
         free(blockshape);
@@ -494,7 +494,7 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     int32_t *blockshape = malloc(8 * sizeof(int32_t));
     uint8_t *smeta;
     int32_t smeta_len;
-    if (blosc2_meta_get(cparams->schunk, "caterva", &smeta, &smeta_len) < 0) {
+    if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
         printf("Blosc error");
         free(shape);
         free(chunkshape);
@@ -627,8 +627,8 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     int32_t *blockshape = malloc(8 * sizeof(int32_t));
     uint8_t *smeta;
     int32_t smeta_len;
-    if (blosc2_meta_get(sc, "caterva", &smeta, &smeta_len) < 0) {
-        BLOSC_TRACE_ERROR("Cannot access caterva meta info");
+    if (blosc2_meta_get(sc, "b2nd", &smeta, &smeta_len) < 0) {
+        BLOSC_TRACE_ERROR("Cannot access b2nd meta info");
         free(shape);
         free(chunkshape);
         free(blockshape);
@@ -711,9 +711,9 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
     int8_t ndim = ZFP_MAX_DIM + 1;
     int32_t blockmeta[ZFP_MAX_DIM];
     if (context->schunk->blockshape == NULL) {
-        // blockshape is not filled yet.  Use the Caterva layer to populate it.
+        // blockshape is not filled yet.  Use the Blosc2 NDim layer to populate it.
         for (int nmetalayer = 0; nmetalayer < context->schunk->nmetalayers; nmetalayer++) {
-            if (strcmp("caterva", context->schunk->metalayers[nmetalayer]->name) == 0) {
+            if (strcmp("b2nd", context->schunk->metalayers[nmetalayer]->name) == 0) {
                 meta = true;
                 uint8_t *pmeta = context->schunk->metalayers[nmetalayer]->content;
                 ndim = (int8_t) pmeta[2];

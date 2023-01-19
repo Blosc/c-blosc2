@@ -7,7 +7,7 @@
 # See LICENSE.txt for details about copyright and rights to use.
 
 # sources
-file(GLOB SOURCES test_*.c caterva/test_*.c fuzz/generate_inputs_corpus.c)
+file(GLOB SOURCES test_*.c b2nd/test_*.c fuzz/generate_inputs_corpus.c)
 
 # flags
 link_directories(${PROJECT_BINARY_DIR}/blosc)

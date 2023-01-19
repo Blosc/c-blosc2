@@ -31,7 +31,7 @@ int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_
   pmeta += 1;
 
   // shape entry
-  // Initialize to ones, as required by Caterva
+  // Initialize to ones, as required by Blosc2 NDim
   for (int i = 0; i < BLOSC_PLUGINS_MAX_DIM; i++) shape[i] = 1;
   pmeta += 1;
   for (int8_t i = 0; i < ndim_aux; i++) {
@@ -41,7 +41,7 @@ int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_
   }
 
   // chunkshape entry
-  // Initialize to ones, as required by Caterva
+  // Initialize to ones, as required by Blosc2 NDim
   for (int i = 0; i < BLOSC_PLUGINS_MAX_DIM; i++) chunkshape[i] = 1;
   pmeta += 1;
   for (int8_t i = 0; i < ndim_aux; i++) {
@@ -51,7 +51,7 @@ int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_
   }
 
   // blockshape entry
-  // Initialize to ones, as required by Caterva
+  // Initialize to ones, as required by Blosc2 NDim
   for (int i = 0; i < BLOSC_PLUGINS_MAX_DIM; i++) blockshape[i] = 1;
   pmeta += 1;
   for (int8_t i = 0; i < ndim_aux; i++) {

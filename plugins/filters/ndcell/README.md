@@ -8,7 +8,7 @@ that the codec compress cell by cell.
 Plugin motivation
 --------------------
 
-*NDCELL* was created in order to make easy for codecs to search for patterns repetitions in multidimensional datasets using the Caterva blocking machinery.
+*NDCELL* was created in order to make easy for codecs to search for patterns repetitions in multidimensional datasets using the Blosc2 NDim blocking machinery.
 
 Plugin usage
 -------------------

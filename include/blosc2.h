@@ -97,7 +97,7 @@ extern "C" {
 #define BLOSC2_VERSION_DATE     "$Date:: 2022-12-15 #$"    /* date version */
 
 
-/* The maximum number of dimensions for caterva arrays */
+/* The maximum number of dimensions for Blosc2 NDim arrays */
 #define BLOSC2_MAX_DIM 8
 
 
@@ -440,7 +440,7 @@ enum {
   BLOSC2_ERROR_PLUGIN_IO = -30,       //!< IO plugin error
   BLOSC2_ERROR_FILE_REMOVE = -31,     //!< Remove file failure
   BLOSC2_ERROR_NULL_POINTER = -32,    //!< Pointer is null
-  CATERVA_ERR_INVALID_INDEX = -33,    //!< Invalid index
+  B2ND_ERR_INVALID_INDEX = -33,    //!< Invalid index
 };
 
 
@@ -517,7 +517,7 @@ static char *print_error(int rc) {
       return (char *) "Remove file failure";
     case BLOSC2_ERROR_NULL_POINTER:
       return (char *) "Pointer is null";
-    case CATERVA_ERR_INVALID_INDEX:
+    case B2ND_ERR_INVALID_INDEX:
       return (char *) "Invalid index";
     default:
       return (char *) "Unknown error";
@@ -1601,7 +1601,7 @@ typedef struct blosc2_frame_s blosc2_frame;   /* opaque type */
  * the contents included in the schunk.
  */
 typedef struct blosc2_metalayer {
-  char* name;          //!< The metalayer identifier for Blosc client (e.g. Caterva).
+  char* name;          //!< The metalayer identifier for Blosc client (e.g. Blosc2 NDim).
   uint8_t* content;    //!< The serialized (msgpack preferably) content of the metalayer.
   int32_t content_len; //!< The length in bytes of the content.
 } blosc2_metalayer;
