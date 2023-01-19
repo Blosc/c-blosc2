@@ -3,7 +3,7 @@ all users to test their plugins.
 
 The folder files are multidimensional arrays created in Caterva using
 the Caterva example 'example_frame_generator.c' 
-(https://github.com/Blosc/caterva/blob/master/examples/example_frame_generator.c).
+(https://github.com/Blosc/c-blosc2/blob/main/examples/b2nd/example_frame_generator.c).
 Moreover, they have the next parameters:
 - nthreads = 1;
 - splitmode = BLOSC_ALWAYS_SPLIT;
@@ -12,7 +12,7 @@ Moreover, they have the next parameters:
 
 Moreover, each dataset has different types and shapes:
 
-**example_rand.caterva**:
+**example_rand.b2nd**:
 
 - ndim = 3;
 - type = int;
@@ -21,7 +21,7 @@ Moreover, each dataset has different types and shapes:
 - chunkshape[8] = {17, 16, 24};
 - blockshape[8] = {8, 9, 8};
 
-**example_same_cells.caterva**:
+**example_same_cells.b2nd**:
 
 - ndim = 2;
 - type = int;
@@ -30,7 +30,7 @@ Moreover, each dataset has different types and shapes:
 - chunkshape[8] = {32, 11};
 - blockshape[8] = {16, 7};
 
-**example_some_matches.caterva**:
+**example_some_matches.b2nd**:
 
 - ndim = 2;
 - type = long;
@@ -39,7 +39,7 @@ Moreover, each dataset has different types and shapes:
 - chunkshape[8] = {48, 32};
 - blockshape[8] = {14, 18};
 
-**example_float_cyclic.caterva**:
+**example_float_cyclic.b2nd**:
 
 - int8_t ndim = 3;
 - type = float;
@@ -48,7 +48,7 @@ Moreover, each dataset has different types and shapes:
 - int32_t chunkshape[] = {20, 30, 16};
 - int32_t blockshape[] = {11, 14, 7};
 
-**example_double_same_cells.caterva**:
+**example_double_same_cells.b2nd**:
 
 - int8_t ndim = 2;
 - type = double;
@@ -57,7 +57,7 @@ Moreover, each dataset has different types and shapes:
 - int32_t chunkshape[] = {20, 30};
 - int32_t blockshape[] = {16, 16};
 
-**example_day_month_temp.caterva**:
+**example_day_month_temp.b2nd**:
 
 - int ndim = 2;
 - type = float;
@@ -74,7 +74,7 @@ This frame simulates values for:
 These fields are grouped by columns, so the frame has 400 rows that 
 represent different days with a value for each of the three columns.
 
-**example_item_prices.caterva**:
+**example_item_prices.b2nd**:
 
 - int ndim = 3;
 - type = float;

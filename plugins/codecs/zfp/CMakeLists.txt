@@ -48,9 +48,9 @@ if(BUILD_TESTS)
         COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_zfp_rate_getitem>)
 
     # Copy test files
-    file(GLOB TESTS_DATA ../../test_data/example_float_cyclic.caterva ../../test_data/example_double_same_cells.caterva
-         ../../test_data/example_day_month_temp.caterva ../../test_data/example_item_prices.caterva
-         ../../filters/ndmean/example_ndmean_r*.caterva)
+    file(GLOB TESTS_DATA ../../test_data/example_float_cyclic.b2nd ../../test_data/example_double_same_cells.b2nd
+         ../../test_data/example_day_month_temp.b2nd ../../test_data/example_item_prices.b2nd
+         ../../filters/ndmean/example_ndmean_r*.b2nd)
     foreach (data ${TESTS_DATA})
         file(COPY ${data}
                 DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

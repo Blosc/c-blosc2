@@ -15,7 +15,7 @@
  * $ ./example_print_meta <urlpath>
  *
  * Example of output:
- * $ ./b2nd_example_print_meta example_big_float_frame.caterva
+ * $ ./b2nd_example_print_meta example_big_float_frame.b2nd
  * Blosc2 NDim metalayer parameters:
  * Ndim:       3
  * Shape:      200, 310, 214

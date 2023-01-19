@@ -195,7 +195,7 @@ static int test_ndlz_8(blosc2_schunk* schunk) {
 
 
 int same_cells() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_same_cells.caterva");
+    blosc2_schunk *schunk = blosc2_schunk_open("example_same_cells.b2nd");
 
     /* Run the test. */
     int result = test_ndlz_4(schunk);
@@ -210,7 +210,7 @@ int same_cells() {
 }
 
 int some_matches() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_some_matches.caterva");
+    blosc2_schunk *schunk = blosc2_schunk_open("example_some_matches.b2nd");
 
     /* Run the test. */
     int result = test_ndlz_4(schunk);

@@ -27,7 +27,7 @@ if(BUILD_TESTS)
             COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_ndlz>)
 
     # Copy test files
-    file(GLOB TESTS_DATA ../../test_data/example_s*.caterva)
+    file(GLOB TESTS_DATA ../../test_data/example_s*.b2nd)
     foreach (data ${TESTS_DATA})
         file(COPY ${data}
                 DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

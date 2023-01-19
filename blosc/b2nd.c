@@ -853,7 +853,7 @@ int b2nd_squeeze_index(b2nd_array_t *array, const bool *index) {
   for (int i = 0; i < array->ndim; ++i) {
     if (index[i] == true) {
       if (array->shape[i] != 1) {
-        (B2ND_ERR_INVALID_INDEX);
+        (BLOSC2_ERR_INVALID_INDEX);
       }
     } else {
       newshape[nones] = array->shape[i];
@@ -1595,7 +1595,7 @@ int b2nd_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t 
     // Check that indexes are not larger than array shape
     for (int j = 0; j < selection_size[i]; ++j) {
       if (selection[i][j] > array->shape[i]) {
-        B2ND_ERR_INVALID_INDEX;
+        BLOSC2_ERR_INVALID_INDEX;
       }
     }
   }

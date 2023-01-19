@@ -20,7 +20,7 @@ foreach (source ${SOURCES})
     target_link_libraries(${target} blosc2_static ${LIBS})
     if (${target_name} STREQUAL example_print_meta)
         add_test(NAME ${target} COMMAND ${target}
-                "${PROJECT_BINARY_DIR}/examples/b2nd/example_big_float_frame.caterva")
+                "${PROJECT_BINARY_DIR}/examples/b2nd/example_big_float_frame.b2nd")
     else ()
         add_test(NAME ${target} COMMAND ${target})
     endif ()

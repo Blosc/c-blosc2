@@ -117,7 +117,7 @@ static int test_ndcell(blosc2_schunk* schunk) {
 
 
 int rand_() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_rand.caterva");
+    blosc2_schunk *schunk = blosc2_schunk_open("example_rand.b2nd");
 
     /* Run the test. */
     int result = test_ndcell(schunk);
@@ -126,7 +126,7 @@ int rand_() {
 }
 
 int same_cells() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_same_cells.caterva");
+    blosc2_schunk *schunk = blosc2_schunk_open("example_same_cells.b2nd");
 
     /* Run the test. */
     int result = test_ndcell(schunk);
@@ -135,7 +135,7 @@ int same_cells() {
 }
 
 int some_matches() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_some_matches.caterva");
+    blosc2_schunk *schunk = blosc2_schunk_open("example_some_matches.b2nd");
 
     /* Run the test. */
     int result = test_ndcell(schunk);

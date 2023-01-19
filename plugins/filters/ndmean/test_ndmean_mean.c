@@ -227,7 +227,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
 
 
 int rows_matches() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_1dim_2rows.caterva");
+    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_1dim_2rows.b2nd");
 
     /* Run the test. */
     int result = test_ndmean(schunk);
@@ -236,7 +236,7 @@ int rows_matches() {
 }
 
 int same_cells() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_1dim_same_cells.caterva");
+    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_1dim_same_cells.b2nd");
 
     /* Run the test. */
     int result = test_ndmean(schunk);
@@ -245,7 +245,7 @@ int same_cells() {
 }
 
 int some_matches() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_1dim_some_matches.caterva");
+    blosc2_schunk *schunk = blosc2_schunk_open("example_ndmean_1dim_some_matches.b2nd");
 
     /* Run the test. */
     int result = test_ndmean(schunk);
