@@ -440,7 +440,7 @@ enum {
   BLOSC2_ERROR_PLUGIN_IO = -30,       //!< IO plugin error
   BLOSC2_ERROR_FILE_REMOVE = -31,     //!< Remove file failure
   BLOSC2_ERROR_NULL_POINTER = -32,    //!< Pointer is null
-  BLOSC2_ERROR_INVALID_INDEX = -33,    //!< Invalid index
+  BLOSC2_ERROR_INVALID_INDEX = -33,   //!< Invalid index
 };
 
 
