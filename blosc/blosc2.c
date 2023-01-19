@@ -4255,7 +4255,7 @@ int register_codec_private(blosc2_codec *codec) {
     }
     /* This condition can never be fulfilled
     if (codec->compcode > BLOSC2_USER_REGISTERED_CODECS_STOP) {
-        BLOSC_TRACE_ERROR("The id must be lower or equal to %d", BLOSC2_USER_REGISTERED_CODECS_STOP);
+        BLOSC_TRACE_ERROR("The id must be less or equal to %d", BLOSC2_USER_REGISTERED_CODECS_STOP);
         return BLOSC2_ERROR_FAILURE;
     }
      */

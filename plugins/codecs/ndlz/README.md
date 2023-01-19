@@ -6,7 +6,7 @@ Given a 2-dim array or matrix, *NDLZ* is a compressor based on the Lempel-Ziv al
 Plugin motivation
 --------------------
 
-*NDLZ* was created in order to search for patterns repetitions in multidimensional cells using the Caterva blocking machinery.
+*NDLZ* was created in order to search for patterns repetitions in multidimensional cells using a multidimensional blocking machinery.
 
 Plugin usage
 -------------------
@@ -58,11 +58,10 @@ Otherwise, it is important to know that there exist different hash tables which 
 Advantages and disadvantages
 ------------------------------
 
-The main advantage of *NDLZ* in front of most of the codecs is that this one
+The main advantage of *NDLZ* when compared with most of the codecs is that this one
 considers dataset multidimensionality and takes advantage of it instead of
 processing all data as serial.
 
 The main disadvantage of *NDLZ* is that it is only useful for 2-dim datasets
-and at the moment other more developed
-codecs that do not consider multidimensionality obtain better results
-(times and ratios) for 2-dim datasets.
+and at the moment it gets worse results (times and ratios) than other, more developed codecs
+that do not consider multidimensionality, at least in our limited testing.
