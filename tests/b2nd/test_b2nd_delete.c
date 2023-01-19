@@ -130,7 +130,6 @@ CUTEST_TEST_TEST(delete) {
 
   BLOSC_ERROR(b2nd_full(aux_ctx, &aux, value));
 
-
   /* Fill buffer with whole array data */
   uint8_t *src_buffer = malloc((size_t) (src->nitems * typesize));
   B2ND_TEST_ASSERT(b2nd_to_buffer(src, src_buffer, src->nitems * typesize));

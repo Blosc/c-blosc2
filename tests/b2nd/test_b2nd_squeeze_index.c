@@ -102,7 +102,6 @@ CUTEST_TEST_TEST(squeeze_index) {
   b2nd_array_t *src;
   B2ND_TEST_ASSERT(b2nd_from_buffer(ctx, &src, buffer, buffersize));
 
-
   /* Create storage for dest container */
   blosc2_storage b2_storage2 = {.cparams=&cparams};
   if (backend2.persistent) {

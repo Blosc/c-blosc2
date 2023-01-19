@@ -51,8 +51,7 @@ int main() {
                                               NULL, 0);
 
   b2nd_array_t *slice;
-  BLOSC_ERROR(b2nd_get_slice(slice_ctx,
-                             &slice, arr, slice_start, slice_stop));
+  BLOSC_ERROR(b2nd_get_slice(slice_ctx, &slice, arr, slice_start, slice_stop));
 
   BLOSC_ERROR(b2nd_squeeze(slice));
 

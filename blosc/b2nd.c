@@ -104,11 +104,11 @@ int b2nd_update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
     // ... and update it in its metalayer
     if (blosc2_meta_exists(array->sc, "b2nd") < 0) {
       if (blosc2_meta_add(array->sc, "b2nd", smeta, smeta_len) < 0) {
-        (BLOSC2_ERROR_FAILURE);
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
     } else {
       if (blosc2_meta_update(array->sc, "b2nd", smeta, smeta_len) < 0) {
-        (BLOSC2_ERROR_FAILURE);
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
     }
     free(smeta);
@@ -132,7 +132,7 @@ int b2nd_array_without_schunk(b2nd_context_t *ctx, b2nd_array_t **array) {
   int32_t *chunkshape = ctx->chunkshape;
   int32_t *blockshape = ctx->blockshape;
 
-    b2nd_update_shape(*array, ctx->ndim, shape, chunkshape, blockshape);
+  BLOSC_ERROR(b2nd_update_shape(*array, ctx->ndim, shape, chunkshape, blockshape));
 
   // The partition cache (empty initially)
   (*array)->chunk_cache.data = NULL;
@@ -144,7 +144,7 @@ int b2nd_array_without_schunk(b2nd_context_t *ctx, b2nd_array_t **array) {
 
 // Only for internal use
 int b2nd_blosc_array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
-  (b2nd_array_without_schunk(ctx, array));
+  BLOSC_ERROR(b2nd_array_without_schunk(ctx, array));
 
   blosc2_schunk *sc = blosc2_schunk_new(ctx->b2_storage);
   if (sc == NULL) {
@@ -179,7 +179,7 @@ int b2nd_blosc_array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **
     uint8_t *data = ctx->metalayers[i].content;
     int32_t size = ctx->metalayers[i].content_len;
     if (blosc2_meta_add(sc, name, data, size) < 0) {
-      (BLOSC2_ERROR_FAILURE);
+      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
     }
   }
 
@@ -189,7 +189,7 @@ int b2nd_blosc_array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **
     int64_t nchunks = (*array)->extnitems / (*array)->chunknitems;
     int64_t nitems = nchunks * (*array)->extchunknitems;
     // blosc2_schunk_fill_special(sc, nitems, BLOSC2_SPECIAL_ZERO, chunksize);
-    blosc2_schunk_fill_special(sc, nitems, special_value, chunksize);
+    BLOSC_ERROR(blosc2_schunk_fill_special(sc, nitems, special_value, chunksize));
   }
   (*array)->sc = sc;
 
@@ -201,7 +201,7 @@ int b2nd_uninit(b2nd_context_t *ctx, b2nd_array_t **array) {
   BLOSC_ERROR_NULL(ctx, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
-  (b2nd_blosc_array_new(ctx, BLOSC2_SPECIAL_UNINIT, array));
+  BLOSC_ERROR(b2nd_blosc_array_new(ctx, BLOSC2_SPECIAL_UNINIT, array));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -213,7 +213,7 @@ int b2nd_empty(b2nd_context_t *ctx, b2nd_array_t **array) {
 
   // BLOSC_ERROR(b2nd_blosc_array_new(ctx, params, storage, BLOSC2_SPECIAL_UNINIT, array));
   // Avoid variable cratios
-  (b2nd_blosc_array_new(ctx, BLOSC2_SPECIAL_ZERO, array));
+  BLOSC_ERROR(b2nd_blosc_array_new(ctx, BLOSC2_SPECIAL_ZERO, array));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -223,7 +223,7 @@ int b2nd_zeros(b2nd_context_t *ctx, b2nd_array_t **array) {
   BLOSC_ERROR_NULL(ctx, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
-  (b2nd_blosc_array_new(ctx, BLOSC2_SPECIAL_ZERO, array));
+  BLOSC_ERROR(b2nd_blosc_array_new(ctx, BLOSC2_SPECIAL_ZERO, array));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -233,26 +233,26 @@ int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, void *fill_value) {
   BLOSC_ERROR_NULL(ctx, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
-  (b2nd_empty(ctx, array));
+  BLOSC_ERROR(b2nd_empty(ctx, array));
 
   int32_t chunkbytes = (int32_t) (*array)->extchunknitems * (*array)->sc->typesize;
 
   blosc2_cparams *cparams;
   if (blosc2_schunk_get_cparams((*array)->sc, &cparams) != 0) {
-    (BLOSC2_ERROR_FAILURE);
+    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
   }
 
   int32_t chunksize = BLOSC_EXTENDED_HEADER_LENGTH + (*array)->sc->typesize;
   uint8_t *chunk = malloc(chunksize);
   BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
   if (blosc2_chunk_repeatval(*cparams, chunkbytes, chunk, chunksize, fill_value) < 0) {
-    (BLOSC2_ERROR_FAILURE);
+    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
   }
   free(cparams);
 
   for (int i = 0; i < (*array)->sc->nchunks; ++i) {
     if (blosc2_schunk_update_chunk((*array)->sc, i, chunk, true) < 0) {
-      (BLOSC2_ERROR_FAILURE);
+      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
     }
   }
   free(chunk);
@@ -287,13 +287,14 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
     BLOSC_TRACE_ERROR("Blosc error");
     return BLOSC2_ERROR_FAILURE;
   }
-    b2nd_deserialize_meta(smeta, smeta_len, &params.ndim,
-                          params.shape,
-                          params.chunkshape,
-                          params.blockshape);
+  BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &params.ndim,
+                                        params.shape,
+                                        params.chunkshape,
+                                        params.blockshape)
+  );
   free(smeta);
 
-    b2nd_array_without_schunk(&params, array);
+  BLOSC_ERROR(b2nd_array_without_schunk(&params, array));
 
   (*array)->sc = schunk;
 
@@ -332,7 +333,7 @@ int b2nd_from_cframe(uint8_t *cframe, int64_t cframe_len, bool copy, b2nd_array_
     return BLOSC2_ERROR_FAILURE;
   }
   // ...and create a b2nd array out of it
-  (b2nd_from_schunk(sc, array));
+  BLOSC_ERROR(b2nd_from_schunk(sc, array));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -345,7 +346,7 @@ int b2nd_open(const char *urlpath, b2nd_array_t **array) {
   blosc2_schunk *sc = blosc2_schunk_open(urlpath);
 
   // ...and create a b2nd array out of it
-  (b2nd_from_schunk(sc, array));
+  BLOSC_ERROR(b2nd_from_schunk(sc, array));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -369,12 +370,12 @@ int b2nd_from_buffer(b2nd_context_t *ctx, b2nd_array_t **array, void *buffer, in
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
-  (b2nd_empty(ctx, array));
+  BLOSC_ERROR(b2nd_empty(ctx, array));
 
   if (buffersize < (int64_t) (*array)->nitems * (*array)->sc->typesize) {
     BLOSC_TRACE_ERROR("The buffersize (%lld) is smaller than the array size (%lld)",
                         (long long) buffersize, (long long) (*array)->nitems * (*array)->sc->typesize);
-    (BLOSC2_ERROR_INVALID_PARAM);
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
   if ((*array)->nitems == 0) {
@@ -384,7 +385,7 @@ int b2nd_from_buffer(b2nd_context_t *ctx, b2nd_array_t **array, void *buffer, in
   int64_t start[B2ND_MAX_DIM] = {0};
   int64_t *stop = (*array)->shape;
   int64_t *shape = (*array)->shape;
-  (b2nd_set_slice_buffer(buffer, shape, buffersize, start, stop, *array));
+  BLOSC_ERROR(b2nd_set_slice_buffer(buffer, shape, buffersize, start, stop, *array));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -396,7 +397,7 @@ int b2nd_to_buffer(b2nd_array_t *array, void *buffer,
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
 
   if (buffersize < (int64_t) array->nitems * array->sc->typesize) {
-    (BLOSC2_ERROR_INVALID_PARAM);
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
   if (array->nitems == 0) {
@@ -405,8 +406,9 @@ int b2nd_to_buffer(b2nd_array_t *array, void *buffer,
 
   int64_t start[B2ND_MAX_DIM] = {0};
   int64_t *stop = array->shape;
-  (b2nd_get_slice_buffer(array, start, stop,
-                                    buffer, array->shape, buffersize));
+  BLOSC_ERROR(b2nd_get_slice_buffer(array, start, stop,
+                                        buffer, array->shape, buffersize)
+                                        );
   return BLOSC2_ERROR_SUCCESS;
 }
 
@@ -420,7 +422,7 @@ int b2nd_blosc_slice(void *buffer, int64_t buffersize, int64_t *start, int64_t *
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   if (buffersize < 0) {
     BLOSC_TRACE_ERROR("buffersize is < 0");
-    (BLOSC2_ERROR_INVALID_PARAM);
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
   uint8_t *buffer_b = (uint8_t *) buffer;
@@ -437,15 +439,15 @@ int b2nd_blosc_slice(void *buffer, int64_t buffersize, int64_t *start, int64_t *
       uint8_t *chunk = malloc(chunk_size);
       BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
       if (blosc2_compress_ctx(array->sc->cctx, buffer_b, array->sc->typesize, chunk, chunk_size) < 0) {
-        (BLOSC2_ERROR_FAILURE);
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
       if (blosc2_schunk_update_chunk(array->sc, 0, chunk, false) < 0) {
-        (BLOSC2_ERROR_FAILURE);
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
 
     } else {
       if (blosc2_schunk_decompress_chunk(array->sc, 0, buffer_b, array->sc->typesize) < 0) {
-        (BLOSC2_ERROR_FAILURE);
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
     }
     return BLOSC2_ERROR_SUCCESS;
@@ -530,7 +532,7 @@ int b2nd_blosc_slice(void *buffer, int64_t buffersize, int64_t *start, int64_t *
         int err = blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes);
         if (err < 0) {
           BLOSC_TRACE_ERROR("Error decompressing chunk");
-          (BLOSC2_ERROR_FAILURE);
+          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
         }
       } else {
         // Avoid writing non zero padding from previous chunk
@@ -569,13 +571,13 @@ int b2nd_blosc_slice(void *buffer, int64_t buffersize, int64_t *start, int64_t *
 
       if (blosc2_set_maskout(array->sc->dctx, block_maskout, nblocks) != BLOSC2_ERROR_SUCCESS) {
         BLOSC_TRACE_ERROR("Error setting the maskout");
-        (BLOSC2_ERROR_FAILURE);
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
 
       int err = blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes);
       if (err < 0) {
         BLOSC_TRACE_ERROR("Error decompressing chunk");
-        (BLOSC2_ERROR_FAILURE);
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
 
       free(block_maskout);
@@ -641,7 +643,6 @@ int b2nd_blosc_slice(void *buffer, int64_t buffersize, int64_t *start, int64_t *
         slice_shape[i] = slice_stop[i] - slice_start[i];
       }
 
-
       uint8_t *src = &buffer_b[0];
       int64_t *src_pad_shape = buffer_shape;
 
@@ -685,12 +686,12 @@ int b2nd_blosc_slice(void *buffer, int64_t buffersize, int64_t *start, int64_t *
       brc = blosc2_compress_ctx(array->sc->cctx, data, data_nbytes, chunk, chunk_nbytes);
       if (brc < 0) {
         BLOSC_TRACE_ERROR("Blosc can not compress the data");
-        (BLOSC2_ERROR_FAILURE);
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
       int64_t brc_ = blosc2_schunk_update_chunk(array->sc, nchunk, chunk, false);
       if (brc_ < 0) {
         BLOSC_TRACE_ERROR("Blosc can not update the chunk");
-        (BLOSC2_ERROR_FAILURE);
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
     }
   }
@@ -724,9 +725,9 @@ int b2nd_get_slice_buffer(b2nd_array_t *array,
   }
 
   if (buffersize < size) {
-    (BLOSC2_ERROR_INVALID_PARAM);
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
-  (b2nd_blosc_slice(buffer, buffersize, start, stop, buffershape, array, false));
+  BLOSC_ERROR(b2nd_blosc_slice(buffer, buffersize, start, stop, buffershape, array, false));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -746,14 +747,14 @@ int b2nd_set_slice_buffer(void *buffer, int64_t *buffershape, int64_t buffersize
   }
 
   if (buffersize < size) {
-    (BLOSC2_ERROR_INVALID_PARAM);
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
   if (array->nitems == 0) {
     return BLOSC2_ERROR_SUCCESS;
   }
 
-  (b2nd_blosc_slice(buffer, buffersize, start, stop, buffershape, array, true));
+  BLOSC_ERROR(b2nd_blosc_slice(buffer, buffersize, start, stop, buffershape, array, true));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -772,7 +773,7 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, b2nd_array_t *src,
   }
 
   // Add data
-  (b2nd_empty(ctx, array));
+  BLOSC_ERROR(b2nd_empty(ctx, array));
 
   if ((*array)->nitems == 0) {
     return BLOSC2_ERROR_SUCCESS;
@@ -813,9 +814,9 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, b2nd_array_t *src,
     }
     uint8_t *buffer = malloc(buffersize);
     BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_MEMORY_ALLOC);
-    (b2nd_get_slice_buffer(src, src_start, src_stop, buffer, chunk_shape,
+    BLOSC_ERROR(b2nd_get_slice_buffer(src, src_start, src_stop, buffer, chunk_shape,
                                       buffersize));
-    (b2nd_set_slice_buffer(buffer, chunk_shape, buffersize, chunk_start,
+    BLOSC_ERROR(b2nd_set_slice_buffer(buffer, chunk_shape, buffersize, chunk_start,
                                       chunk_stop, *array));
     free(buffer);
   }
@@ -836,7 +837,7 @@ int b2nd_squeeze(b2nd_array_t *array) {
       index[i] = true;
     }
   }
-  (b2nd_squeeze_index(array, index));
+  BLOSC_ERROR(b2nd_squeeze_index(array, index));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -853,7 +854,7 @@ int b2nd_squeeze_index(b2nd_array_t *array, const bool *index) {
   for (int i = 0; i < array->ndim; ++i) {
     if (index[i] == true) {
       if (array->shape[i] != 1) {
-        (BLOSC2_ERR_INVALID_INDEX);
+        BLOSC_ERROR(BLOSC2_ERROR_INVALID_INDEX);
       }
     } else {
       newshape[nones] = array->shape[i];
@@ -873,7 +874,7 @@ int b2nd_squeeze_index(b2nd_array_t *array, const bool *index) {
     }
   }
 
-  (b2nd_update_shape(array, nones, newshape, newchunkshape, newblockshape));
+  BLOSC_ERROR(b2nd_update_shape(array, nones, newshape, newchunkshape, newblockshape));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -902,7 +903,7 @@ int b2nd_copy(b2nd_context_t *ctx, b2nd_array_t *src, b2nd_array_t **array) {
   }
 
   if (equals) {
-    (b2nd_array_without_schunk(ctx, array));
+    BLOSC_ERROR(b2nd_array_without_schunk(ctx, array));
 
     blosc2_schunk *new_sc = blosc2_schunk_copy(src->sc, ctx->b2_storage);
 
@@ -936,7 +937,7 @@ int b2nd_copy(b2nd_context_t *ctx, b2nd_array_t *src, b2nd_array_t **array) {
     params_meta.nmetalayers = j;
 
     // Copy data
-    (b2nd_get_slice(&params_meta, array, src, start, stop));
+    BLOSC_ERROR(b2nd_get_slice(&params_meta, array, src, start, stop));
 
     // Copy vlmetayers
     for (int i = 0; i < src->sc->nvlmetalayers; ++i) {
@@ -944,13 +945,12 @@ int b2nd_copy(b2nd_context_t *ctx, b2nd_array_t *src, b2nd_array_t **array) {
       int32_t content_len;
       if (blosc2_vlmeta_get(src->sc, src->sc->vlmetalayers[i]->name, &content,
                             &content_len) < 0) {
-        (BLOSC2_ERROR_FAILURE);
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
-      (blosc2_vlmeta_add((*array)->sc, src->sc->vlmetalayers[i]->name, content, content_len,
+      BLOSC_ERROR(blosc2_vlmeta_add((*array)->sc, src->sc->vlmetalayers[i]->name, content, content_len,
                                       (*array)->sc->storage->cparams));
       free(content);
     }
-
   }
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -971,8 +971,8 @@ int b2nd_save(b2nd_array_t *array, char *urlpath) {
     params.blockshape[i] = array->blockshape[i];
   }
 
-    b2nd_copy(&params, array, &tmp);
-    b2nd_free(tmp);
+  BLOSC_ERROR(b2nd_copy(&params, array, &tmp));
+  BLOSC_ERROR(b2nd_free(tmp));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -989,7 +989,7 @@ int b2nd_print_meta(b2nd_array_t *array) {
   if (blosc2_meta_get(array->sc, "b2nd", &smeta, &smeta_len) < 0) {
     BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
   }
-    b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape));
   free(smeta);
 
   printf("Caterva metalayer parameters: \n Ndim:       %d", ndim);
@@ -1022,11 +1022,11 @@ int extend_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
     diffs_sum += diffs_shape[i];
     if (diffs_shape[i] < 0) {
       BLOSC_TRACE_ERROR("The new shape must be greater than the old one");
-      (BLOSC2_ERROR_INVALID_PARAM);
+      BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
     }
     if (array->shape[i] == 0) {
       BLOSC_TRACE_ERROR("Cannot extend array with shape[%d] = 0", i);
-      (BLOSC2_ERROR_INVALID_PARAM);
+      BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
     }
   }
   if (diffs_sum == 0) {
@@ -1039,15 +1039,15 @@ int extend_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
   b2nd_array_t *aux = malloc(sizeof(b2nd_array_t));
   BLOSC_ERROR_NULL(aux, BLOSC2_ERROR_MEMORY_ALLOC);
   aux->sc = NULL;
-  (b2nd_update_shape(aux, ndim, array->shape, array->chunkshape, array->blockshape));
+  BLOSC_ERROR(b2nd_update_shape(aux, ndim, array->shape, array->chunkshape, array->blockshape));
 
-  (b2nd_update_shape(array, ndim, new_shape, array->chunkshape, array->blockshape));
+  BLOSC_ERROR(b2nd_update_shape(array, ndim, new_shape, array->chunkshape, array->blockshape));
 
   int64_t nchunks = array->extnitems / array->chunknitems;
   int64_t nchunks_;
   int64_t nchunk_ndim[B2ND_MAX_DIM];
   blosc2_cparams *cparams;
-  blosc2_schunk_get_cparams(array->sc, &cparams);
+  BLOSC_ERROR(blosc2_schunk_get_cparams(array->sc, &cparams));
   void *chunk;
   int64_t csize;
   if (nchunks != old_nchunks) {
@@ -1103,11 +1103,11 @@ int shrink_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
     diffs_sum += diffs_shape[i];
     if (diffs_shape[i] > 0) {
       BLOSC_TRACE_ERROR("The new shape must be smaller than the old one");
-      (BLOSC2_ERROR_INVALID_PARAM);
+      BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
     }
     if (array->shape[i] == 0) {
       BLOSC_TRACE_ERROR("Cannot shrink array with shape[%d] = 0", i);
-      (BLOSC2_ERROR_INVALID_PARAM);
+      BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
     }
   }
   if (diffs_sum == 0) {
@@ -1120,9 +1120,9 @@ int shrink_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
   b2nd_array_t *aux = malloc(sizeof(b2nd_array_t));
   BLOSC_ERROR_NULL(aux, BLOSC2_ERROR_MEMORY_ALLOC);
   aux->sc = NULL;
-  (b2nd_update_shape(aux, ndim, array->shape, array->chunkshape, array->blockshape));
+  BLOSC_ERROR(b2nd_update_shape(aux, ndim, array->shape, array->chunkshape, array->blockshape));
 
-  (b2nd_update_shape(array, ndim, new_shape, array->chunkshape, array->blockshape));
+  BLOSC_ERROR(b2nd_update_shape(array, ndim, new_shape, array->chunkshape, array->blockshape));
 
   // Delete chunks if needed
   int64_t chunks_in_array_old[B2ND_MAX_DIM] = {0};
@@ -1165,7 +1165,7 @@ int b2nd_resize(b2nd_array_t *array, const int64_t *new_shape,
     for (int i = 0; i < array->ndim; ++i) {
       if (start[i] > array->shape[i]) {
         BLOSC_TRACE_ERROR("`start` must be lower or equal than old array shape in all dims");
-        (BLOSC2_ERROR_INVALID_PARAM);
+        BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
       }
       if ((new_shape[i] > array->shape[i] && start[i] != array->shape[i])
           || (new_shape[i] < array->shape[i]
@@ -1174,12 +1174,12 @@ int b2nd_resize(b2nd_array_t *array, const int64_t *new_shape,
         if (start[i] % array->chunkshape[i] != 0) {
           BLOSC_TRACE_ERROR("If array end is not being modified "
                               "`start` must be a multiple of chunkshape in all dims");
-          (BLOSC2_ERROR_INVALID_PARAM);
+          BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
         }
         if ((new_shape[i] - array->shape[i]) % array->chunkshape[i] != 0) {
           BLOSC_TRACE_ERROR("If array end is not being modified "
                               "`(new_shape - shape)` must be multiple of chunkshape in all dims");
-          (BLOSC2_ERROR_INVALID_PARAM);
+          BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
         }
       }
     }
@@ -1195,8 +1195,8 @@ int b2nd_resize(b2nd_array_t *array, const int64_t *new_shape,
     }
   }
 
-  (shrink_shape(array, shrinked_shape, start));
-  (extend_shape(array, new_shape, start));
+  BLOSC_ERROR(shrink_shape(array, shrinked_shape, start));
+  BLOSC_ERROR(extend_shape(array, new_shape, start));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -1210,7 +1210,7 @@ int b2nd_insert(b2nd_array_t *array, void *buffer, int64_t buffersize,
 
   if (axis >= array->ndim) {
     BLOSC_TRACE_ERROR("`axis` cannot be greater than the number of dimensions");
-    (BLOSC2_ERROR_INVALID_PARAM);
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
   int64_t axis_size = array->sc->typesize;
@@ -1223,7 +1223,7 @@ int b2nd_insert(b2nd_array_t *array, void *buffer, int64_t buffersize,
   }
   if (buffersize % axis_size != 0) {
     BLOSC_TRACE_ERROR("`buffersize` must be multiple of the array");
-    (BLOSC2_ERROR_INVALID_PARAM);
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
   int64_t newshape[B2ND_MAX_DIM];
   memcpy(newshape, array->shape, array->ndim * sizeof(int64_t));
@@ -1233,15 +1233,15 @@ int b2nd_insert(b2nd_array_t *array, void *buffer, int64_t buffersize,
   start[axis] = insert_start;
 
   if (insert_start == array->shape[axis]) {
-    (b2nd_resize(array, newshape, NULL));
+    BLOSC_ERROR(b2nd_resize(array, newshape, NULL));
   } else {
-    (b2nd_resize(array, newshape, start));
+    BLOSC_ERROR(b2nd_resize(array, newshape, start));
   }
 
   int64_t stop[B2ND_MAX_DIM];
   memcpy(stop, array->shape, sizeof(int64_t) * array->ndim);
   stop[axis] = start[axis] + buffershape[axis];
-  (b2nd_set_slice_buffer(buffer, buffershape, buffersize, start, stop, array));
+  BLOSC_ERROR(b2nd_set_slice_buffer(buffer, buffershape, buffersize, start, stop, array));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -1252,7 +1252,7 @@ int b2nd_append(b2nd_array_t *array, void *buffer, int64_t buffersize,
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
 
-  (b2nd_insert(array, buffer, buffersize, axis, array->shape[axis]));
+  BLOSC_ERROR(b2nd_insert(array, buffer, buffersize, axis, array->shape[axis]));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -1264,7 +1264,7 @@ int b2nd_delete(b2nd_array_t *array, const int8_t axis,
 
   if (axis >= array->ndim) {
     BLOSC_TRACE_ERROR("axis cannot be greater than the number of dimensions");
-    (BLOSC2_ERROR_INVALID_PARAM);
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
 
@@ -1275,9 +1275,9 @@ int b2nd_delete(b2nd_array_t *array, const int8_t axis,
   start[axis] = delete_start;
 
   if (delete_start == (array->shape[axis] - delete_len)) {
-    (b2nd_resize(array, newshape, NULL));
+    BLOSC_ERROR(b2nd_resize(array, newshape, NULL));
   } else {
-    (b2nd_resize(array, newshape, start));
+    BLOSC_ERROR(b2nd_resize(array, newshape, start));
   }
 
   return BLOSC2_ERROR_SUCCESS;
@@ -1344,10 +1344,11 @@ int b2nd_copy_block_buffer_data(b2nd_array_t *array,
                array->sc->typesize);
       }
     } else {
-        b2nd_copy_block_buffer_data(array, (int8_t) (ndim + 1), block_selection_size,
-                                    chunk_selection,
-                                    p_block_selection_0, p_block_selection_1, block,
-                                    buffer, buffershape, bufferstrides, get);
+      BLOSC_ERROR(b2nd_copy_block_buffer_data(array, (int8_t) (ndim + 1), block_selection_size,
+                                                  chunk_selection,
+                                                  p_block_selection_0, p_block_selection_1, block,
+                                                  buffer, buffershape, bufferstrides, get)
+      );
     }
     p_block_selection_1[ndim]++;
   }
@@ -1397,24 +1398,26 @@ int b2nd_iterate_over_block_copy(b2nd_array_t *array, int8_t ndim,
         block_selection_size[i] = chunk_selection_1[i] - chunk_selection_0[i];
       }
 
-        b2nd_copy_block_buffer_data(array,
-                                    (int8_t) 0,
-                                    block_selection_size,
-                                    chunk_selection_0,
-                                    p_block_selection_0,
-                                    p_block_selection_1,
-                                    &data[nblock * array->blocknitems * array->sc->typesize],
-                                    buffer,
-                                    buffershape,
-                                    bufferstrides,
-                                    get);
+      BLOSC_ERROR(b2nd_copy_block_buffer_data(array,
+                                                  (int8_t) 0,
+                                                  block_selection_size,
+                                                  chunk_selection_0,
+                                                  p_block_selection_0,
+                                                  p_block_selection_1,
+                                                  &data[nblock * array->blocknitems * array->sc->typesize],
+                                                  buffer,
+                                                  buffershape,
+                                                  bufferstrides,
+                                                  get)
+      );
       free(p_block_selection_0);
       free(p_block_selection_1);
       free(block_selection_size);
     } else {
-        b2nd_iterate_over_block_copy(array, (int8_t) (ndim + 1), chunk_selection_size,
+      BLOSC_ERROR(b2nd_iterate_over_block_copy(array, (int8_t) (ndim + 1), chunk_selection_size,
                                      ordered_selection, chunk_selection_0, chunk_selection_1,
-                                     data, buffer, buffershape, bufferstrides, get);
+                                     data, buffer, buffershape, bufferstrides, get)
+      );
     }
     chunk_selection_0[ndim] = chunk_selection_1[ndim];
 
@@ -1454,9 +1457,10 @@ int b2nd_iterate_over_block_maskout(b2nd_array_t *array, int8_t ndim,
       }
       maskout[nblock] = false;
     } else {
-        b2nd_iterate_over_block_maskout(array, (int8_t) (ndim + 1), sel_block_size,
+      BLOSC_ERROR(b2nd_iterate_over_block_maskout(array, (int8_t) (ndim + 1), sel_block_size,
                                         o_selection, p_o_sel_block_0, p_o_sel_block_1,
-                                        maskout);
+                                        maskout)
+      );
     }
     p_o_sel_block_0[ndim] = p_o_sel_block_1[ndim];
 
@@ -1516,17 +1520,17 @@ int b2nd_iterate_over_chunk(b2nd_array_t *array, int8_t ndim,
           maskout[i] = true;
         }
 
-        (b2nd_iterate_over_block_maskout(array, (int8_t) 0,
-                                                    chunk_selection_size,
-                                                    p_ordered_selection_0,
-                                                    p_chunk_selection_0,
-                                                    p_chunk_selection_1,
-                                                    maskout));
+        BLOSC_ERROR(b2nd_iterate_over_block_maskout(array, (int8_t) 0,
+                                                        chunk_selection_size,
+                                                        p_ordered_selection_0,
+                                                        p_chunk_selection_0,
+                                                        p_chunk_selection_1,
+                                                        maskout));
 
         if (blosc2_set_maskout(array->sc->dctx, maskout, (int) nblocks) !=
             BLOSC2_ERROR_SUCCESS) {
           BLOSC_TRACE_ERROR("Error setting the maskout");
-          (BLOSC2_ERROR_FAILURE);
+          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
         }
         free(maskout);
       }
@@ -1537,19 +1541,20 @@ int b2nd_iterate_over_chunk(b2nd_array_t *array, int8_t ndim,
       int err = blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes);
       if (err < 0) {
         BLOSC_TRACE_ERROR("Error decompressing chunk");
-        (BLOSC2_ERROR_FAILURE);
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
-        b2nd_iterate_over_block_copy(array,
-                                     0,
-                                     chunk_selection_size,
-                                     p_ordered_selection_0,
-                                     p_chunk_selection_0,
-                                     p_chunk_selection_1,
-                                     data,
-                                     buffer,
-                                     buffershape,
-                                     bufferstrides,
-                                     get);
+      BLOSC_ERROR(b2nd_iterate_over_block_copy(array,
+                                                   0,
+                                                   chunk_selection_size,
+                                                   p_ordered_selection_0,
+                                                   p_chunk_selection_0,
+                                                   p_chunk_selection_1,
+                                                   data,
+                                                   buffer,
+                                                   buffershape,
+                                                   bufferstrides,
+                                                   get)
+                                                  );
 
       if (!get) {
         int32_t chunk_size = data_nbytes + BLOSC_EXTENDED_HEADER_LENGTH;
@@ -1558,12 +1563,12 @@ int b2nd_iterate_over_chunk(b2nd_array_t *array, int8_t ndim,
         err = blosc2_compress_ctx(array->sc->cctx, data, data_nbytes, chunk, chunk_size);
         if (err < 0) {
           BLOSC_TRACE_ERROR("Error compressing data");
-          (BLOSC2_ERROR_FAILURE);
+          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
         }
         err = (int) blosc2_schunk_update_chunk(array->sc, nchunk, chunk, false);
         if (err < 0) {
           BLOSC_TRACE_ERROR("Error updating chunk");
-          (BLOSC2_ERROR_FAILURE);
+          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
         }
       }
       free(data);
@@ -1571,7 +1576,7 @@ int b2nd_iterate_over_chunk(b2nd_array_t *array, int8_t ndim,
       free(p_chunk_selection_0);
       free(p_chunk_selection_1);
     } else {
-      (b2nd_iterate_over_chunk(array, (int8_t) (ndim + 1), selection_size,
+      BLOSC_ERROR(b2nd_iterate_over_chunk(array, (int8_t) (ndim + 1), selection_size,
                                           ordered_selection, p_ordered_selection_0, p_ordered_selection_1,
                                           buffer, buffershape, bufferstrides, get));
     }
@@ -1595,7 +1600,7 @@ int b2nd_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t 
     // Check that indexes are not larger than array shape
     for (int j = 0; j < selection_size[i]; ++j) {
       if (selection[i][j] > array->shape[i]) {
-        BLOSC2_ERR_INVALID_INDEX;
+        BLOSC_ERROR(BLOSC2_ERROR_INVALID_INDEX);
       }
     }
   }
@@ -1607,7 +1612,7 @@ int b2nd_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t 
   }
 
   if (sel_size < buffersize) {
-    (BLOSC2_ERROR_INVALID_PARAM);
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
   // Sort selections
@@ -1634,7 +1639,7 @@ int b2nd_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t 
     bufferstrides[i] = bufferstrides[i + 1] * buffershape[i + 1];
   }
 
-  (b2nd_iterate_over_chunk(array, 0,
+  BLOSC_ERROR(b2nd_iterate_over_chunk(array, 0,
                                       selection_size, ordered_selection,
                                       p_ordered_selection_0,
                                       p_ordered_selection_1,

@@ -102,7 +102,7 @@ int comp(const char *urlpath) {
                                         NULL, 0);
 
   b2nd_array_t *arr;
-    b2nd_from_schunk(schunk, &arr);
+  b2nd_from_schunk(schunk, &arr);
   int copied;
   printf("LZ4 comp ratio: %f \n", (float) arr->sc->nbytes / (float) arr->sc->cbytes);
 
