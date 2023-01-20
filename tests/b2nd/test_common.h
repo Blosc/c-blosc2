@@ -12,6 +12,7 @@
 #define B2ND_TEST_COMMON_H
 
 #include <b2nd.h>
+#include "context.h"
 #include "cutest.h"
 
 

@@ -9,7 +9,7 @@
 **********************************************************************/
 
 #include <b2nd.h>
-
+#include "context.h"
 #include "b2nd_utils.h"
 #include "blosc2.h"
 #include "blosc-private.h"

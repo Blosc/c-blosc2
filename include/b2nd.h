@@ -37,26 +37,6 @@ extern "C" {
 #define B2ND_MAX_METALAYERS (BLOSC2_MAX_METALAYERS - 1)
 
 /**
- * @brief General parameters needed for the creation of a b2nd array.
- */
-typedef struct {
-  int8_t ndim;
-  //!< The array dimensions.
-  int64_t shape[B2ND_MAX_DIM];
-  //!< The array shape.
-  int32_t chunkshape[B2ND_MAX_DIM];
-  //!< The shape of each chunk of Blosc.
-  int32_t blockshape[B2ND_MAX_DIM];
-  //!< The shape of each block of Blosc.
-  blosc2_storage *b2_storage;
-  //!< The Blosc storage properties
-  blosc2_metalayer metalayers[B2ND_MAX_METALAYERS];
-  //!< List with the metalayers desired.
-  int32_t nmetalayers;
-  //!< The number of metalayers.
-} b2nd_context_t;
-
-/**
  * @brief An *optional* cache for a single block.
  *
  * When a chunk is needed, it is copied into this cache. In this way, if the same chunk is needed
@@ -68,6 +48,11 @@ struct chunk_cache_s {
   int64_t nchunk;
   //!< The chunk number in cache. If @p nchunk equals to -1, it means that the cache is empty.
 };
+
+/**
+ * @brief General parameters needed for the creation of a b2nd array.
+ */
+typedef struct b2nd_context_s b2nd_context_t;   /* opaque type */
 
 /**
  * @brief A multidimensional array of data that can be compressed.
@@ -130,9 +115,9 @@ typedef struct {
  * @note The pointer returned must be freed when not used anymore with #b2nd_free_ctx.
  *
  */
-b2nd_context_t *b2nd_create_ctx(blosc2_storage *b2_storage, int8_t ndim, int64_t *shape,
-                                int32_t *chunkshape, int32_t *blockshape,
-                                blosc2_metalayer *metalayers, int32_t nmetalayers);
+BLOSC_EXPORT b2nd_context_t *b2nd_create_ctx(blosc2_storage *b2_storage, int8_t ndim, int64_t *shape,
+                                             int32_t *chunkshape, int32_t *blockshape,
+                                             blosc2_metalayer *metalayers, int32_t nmetalayers);
 
 
 /**
@@ -145,7 +130,7 @@ b2nd_context_t *b2nd_create_ctx(blosc2_storage *b2_storage, int8_t ndim, int64_t
  * @note This is safe in the sense that it will not free the schunk pointer in internal cparams.
  *
  */
-int b2nd_free_ctx(b2nd_context_t *ctx);
+BLOSC_EXPORT int b2nd_free_ctx(b2nd_context_t *ctx);
 
 
 /**
@@ -156,7 +141,7 @@ int b2nd_free_ctx(b2nd_context_t *ctx);
  *
  * @return An error code.
  */
-int b2nd_uninit(b2nd_context_t *ctx, b2nd_array_t **array);
+BLOSC_EXPORT int b2nd_uninit(b2nd_context_t *ctx, b2nd_array_t **array);
 
 
 /**
@@ -167,7 +152,7 @@ int b2nd_uninit(b2nd_context_t *ctx, b2nd_array_t **array);
  *
  * @return An error code.
  */
-int b2nd_empty(b2nd_context_t *ctx, b2nd_array_t **array);
+BLOSC_EXPORT int b2nd_empty(b2nd_context_t *ctx, b2nd_array_t **array);
 
 
 /**
@@ -179,7 +164,7 @@ int b2nd_empty(b2nd_context_t *ctx, b2nd_array_t **array);
  *
  * @return An error code.
  */
-int b2nd_zeros(b2nd_context_t *ctx, b2nd_array_t **array);
+BLOSC_EXPORT int b2nd_zeros(b2nd_context_t *ctx, b2nd_array_t **array);
 
 
 /**
@@ -192,7 +177,7 @@ int b2nd_zeros(b2nd_context_t *ctx, b2nd_array_t **array);
  *
  * @return An error code.
  */
-int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, void *fill_value);
+BLOSC_EXPORT int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, void *fill_value);
 
 /**
  * @brief Free an array.
@@ -201,7 +186,7 @@ int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, void *fill_value);
  *
  * @return An error code.
  */
-int b2nd_free(b2nd_array_t *array);
+BLOSC_EXPORT int b2nd_free(b2nd_array_t *array);
 
 /**
  * @brief Create a b2nd array from a super-chunk. It can only be used if the array
@@ -212,7 +197,7 @@ int b2nd_free(b2nd_array_t *array);
  *
  * @return An error code.
  */
-int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array);
+BLOSC_EXPORT int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array);
 
 /**
  * Create a serialized super-chunk from a b2nd array.
@@ -224,8 +209,8 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array);
  *
  * @return An error code
  */
-int b2nd_to_cframe(b2nd_array_t *array, uint8_t **cframe,
-                   int64_t *cframe_len, bool *needs_free);
+BLOSC_EXPORT int b2nd_to_cframe(b2nd_array_t *array, uint8_t **cframe,
+                                int64_t *cframe_len, bool *needs_free);
 
 /**
  * @brief Create a b2nd array from a serialized super-chunk.
@@ -237,7 +222,7 @@ int b2nd_to_cframe(b2nd_array_t *array, uint8_t **cframe,
  *
  * @return An error code.
  */
-int b2nd_from_cframe(uint8_t *cframe, int64_t cframe_len, bool copy, b2nd_array_t **array);
+BLOSC_EXPORT int b2nd_from_cframe(uint8_t *cframe, int64_t cframe_len, bool copy, b2nd_array_t **array);
 
 /**
  * @brief Read a b2nd array from disk.
@@ -247,7 +232,7 @@ int b2nd_from_cframe(uint8_t *cframe, int64_t cframe_len, bool copy, b2nd_array_
  *
  * @return An error code.
  */
-int b2nd_open(const char *urlpath, b2nd_array_t **array);
+BLOSC_EXPORT int b2nd_open(const char *urlpath, b2nd_array_t **array);
 
 /**
  * @brief Save b2nd array into a specific urlpath.
@@ -297,8 +282,8 @@ BLOSC_EXPORT int b2nd_to_buffer(b2nd_array_t *array, void *buffer,
  * @note The ndim and shape from ctx will be overwritten by the src and stop-start respectively.
  *
  */
-int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, b2nd_array_t *src, const int64_t *start,
-                   const int64_t *stop);
+BLOSC_EXPORT int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, b2nd_array_t *src, const int64_t *start,
+                                const int64_t *stop);
 
 /**
  * @brief Squeeze a b2nd array
@@ -311,7 +296,7 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, b2nd_array_t *src,
  *
  * @return An error code
  */
-int b2nd_squeeze_index(b2nd_array_t *array, const bool *index);
+BLOSC_EXPORT int b2nd_squeeze_index(b2nd_array_t *array, const bool *index);
 
 /**
  * @brief Squeeze a b2nd array
@@ -322,7 +307,7 @@ int b2nd_squeeze_index(b2nd_array_t *array, const bool *index);
  *
  * @return An error code
  */
-int b2nd_squeeze(b2nd_array_t *array);
+BLOSC_EXPORT int b2nd_squeeze(b2nd_array_t *array);
 
 /**
  * @brief Get a slice from an array and store it into a C buffer.
@@ -336,9 +321,9 @@ int b2nd_squeeze(b2nd_array_t *array);
  *
  * @return An error code.
  */
-int b2nd_get_slice_buffer(b2nd_array_t *array,
-                          int64_t *start, int64_t *stop,
-                          void *buffer, int64_t *buffershape, int64_t buffersize);
+BLOSC_EXPORT int b2nd_get_slice_buffer(b2nd_array_t *array,
+                                       int64_t *start, int64_t *stop,
+                                       void *buffer, int64_t *buffershape, int64_t buffersize);
 
 /**
  * @brief Set a slice into a b2nd array from a C buffer.
@@ -352,8 +337,8 @@ int b2nd_get_slice_buffer(b2nd_array_t *array,
  *
  * @return An error code.
  */
-int b2nd_set_slice_buffer(void *buffer, int64_t *buffershape, int64_t buffersize,
-                          int64_t *start, int64_t *stop, b2nd_array_t *array);
+BLOSC_EXPORT int b2nd_set_slice_buffer(void *buffer, int64_t *buffershape, int64_t buffersize,
+                                       int64_t *start, int64_t *stop, b2nd_array_t *array);
 
 /**
  * @brief Make a copy of the array data. The copy is done into a new b2nd array.
@@ -367,7 +352,7 @@ int b2nd_set_slice_buffer(void *buffer, int64_t *buffershape, int64_t buffersize
  * @note The ndim and shape in ctx will be overwritten by the src ctx.
  *
  */
-int b2nd_copy(b2nd_context_t *ctx, b2nd_array_t *src, b2nd_array_t **array);
+BLOSC_EXPORT int b2nd_copy(b2nd_context_t *ctx, b2nd_array_t *src, b2nd_array_t **array);
 
 /**
  * @brief Print metalayer parameters.
@@ -376,7 +361,7 @@ int b2nd_copy(b2nd_context_t *ctx, b2nd_array_t *src, b2nd_array_t **array);
  *
  * @return An error code
  */
-int b2nd_print_meta(b2nd_array_t *array);
+BLOSC_EXPORT int b2nd_print_meta(b2nd_array_t *array);
 
 /**
  * @brief Resize the shape of an array
@@ -387,7 +372,7 @@ int b2nd_print_meta(b2nd_array_t *array);
  *
  * @return An error code
  */
-int b2nd_resize(b2nd_array_t *array, const int64_t *new_shape, const int64_t *start);
+BLOSC_EXPORT int b2nd_resize(b2nd_array_t *array, const int64_t *new_shape, const int64_t *start);
 
 
 /**
@@ -401,8 +386,8 @@ int b2nd_resize(b2nd_array_t *array, const int64_t *new_shape, const int64_t *st
  *
  * @return An error code.
  */
-int b2nd_insert(b2nd_array_t *array, void *buffer, int64_t buffersize,
-                const int8_t axis, int64_t insert_start);
+BLOSC_EXPORT int b2nd_insert(b2nd_array_t *array, void *buffer, int64_t buffersize,
+                             const int8_t axis, int64_t insert_start);
 
 /**
  * Append a buffer at the end of a b2nd array.
@@ -414,8 +399,8 @@ int b2nd_insert(b2nd_array_t *array, void *buffer, int64_t buffersize,
  *
  * @return An error code.
  */
-int b2nd_append(b2nd_array_t *array, void *buffer, int64_t buffersize,
-                const int8_t axis);
+BLOSC_EXPORT int b2nd_append(b2nd_array_t *array, void *buffer, int64_t buffersize,
+                             const int8_t axis);
 
 /**
  * @brief Delete shrinking the given axis delete_len items.
@@ -430,21 +415,21 @@ int b2nd_append(b2nd_array_t *array, void *buffer, int64_t buffersize,
  *
  * @note See also b2nd_resize
  */
-int b2nd_delete(b2nd_array_t *array, const int8_t axis,
-                int64_t delete_start, int64_t delete_len);
+BLOSC_EXPORT int b2nd_delete(b2nd_array_t *array, const int8_t axis,
+                             int64_t delete_start, int64_t delete_len);
 
 
 // Indexing section
-int b2nd_get_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
-                                  int64_t *buffershape, int64_t buffersize);
+BLOSC_EXPORT int b2nd_get_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
+                                               int64_t *buffershape, int64_t buffersize);
 
-int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
-                                  int64_t *buffershape, int64_t buffersize);
+BLOSC_EXPORT int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
+                                               int64_t *buffershape, int64_t buffersize);
 
 
 // Metainfo section
-int32_t b2nd_serialize_meta(int8_t ndim, int64_t *shape, const int32_t *chunkshape,
-                            const int32_t *blockshape, uint8_t **smeta);
+BLOSC_EXPORT int32_t b2nd_serialize_meta(int8_t ndim, int64_t *shape, const int32_t *chunkshape,
+                                         const int32_t *blockshape, uint8_t **smeta);
 
 BLOSC_EXPORT int32_t b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
                                            int64_t *shape, int32_t *chunkshape,
