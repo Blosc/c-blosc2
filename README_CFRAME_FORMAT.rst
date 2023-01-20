@@ -207,6 +207,75 @@ using the msgpack format. Here it is the format for the *metalayers*::
     the names of the metalayers, followed by an int32 (0xd2) for the *offset* of the value of this metalayer.  The
     actual value will be encoded as a bin32 (0xc6) value later in header.
 
+Dumping info in metalayers
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Note:** The method in this section only works for Unix.
+
+Here it is a trick for printing the content of metalayers using the nice set of
+`msgpack-tools <https://github.com/ludocode/msgpack-tools>`_ command line utilities.  After installing the package we
+can do e.g.::
+
+    $ msgpack2json -dpi example_big_float_frame.b2nd
+    [
+        "b2frame\u0000",
+        175,
+        17141947,
+        "\u0012\u0000P\u0003",
+        134447040,
+        17141634,
+        4,
+        414960,
+        7469280,
+        1,
+        1,
+        false,
+        <ext of type 6 size 16>,
+        [
+            17,
+            {
+                "b2nd": 107
+            },
+            [
+                <bin of size 63>
+            ]
+        ]
+    ]
+
+Here we see that we have a `b2nd` metalayer that starts at position 107; but as there is a msgpack `bin32` there, we
+must add 5 bytes (4 bytes for an int32 and 1 byte for the msgpack `bin32` header), so the actual starting position is
+112 (107 + 5).  In addition we know that the size of the `b2nd` metalayer is 63.
+
+With that, and supposing that the metalayer info we want to dump is in msgpack format (as is the case for `b2nd`)::
+
+    $ dd bs=1 skip=112 count=63 <  example_big_float_frame.b2nd | msgpack2json -dp
+    63+0 records in
+    63+0 records out
+    63 bytes transferred in 0.000106 secs (594340 bytes/sec)
+    [
+        0,
+        3,
+        [
+            200,
+            310,
+            214
+        ],
+        [
+            110,
+            120,
+            76
+        ],
+        [
+            57,
+            52,
+            35
+        ]
+    ]
+
+By having a look at the `Blosc2 NDim metalayer description <B2ND_METALAYER.rst>`_, one can see that the
+number of dimensions is 3, the `shape` is [200, 310, 214], the `chunkshape` is [110, 120, 76] and the blockshape is
+[57, 52, 35].  Easy-peasy.
+
 Chunks
 ------
 
