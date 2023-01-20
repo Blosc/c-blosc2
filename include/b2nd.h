@@ -25,6 +25,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include "blosc2/blosc2-export.h"
 
 
 /* The version for metalayer format; starts from 0 and it must not exceed 127 */

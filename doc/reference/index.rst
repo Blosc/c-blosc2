@@ -23,3 +23,4 @@ metainfo to your datasets (metalayers).
    plugins
    schunk
    metalayers
+   b2nd
