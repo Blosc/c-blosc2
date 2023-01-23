@@ -1,8 +1,9 @@
 Blosc2 NDim
 ===========
 
-Blosc2 NDim has an internal structure managed by parameters that record the different properties of each dataset.
-The most fundamental parts of this structure are the Blosc2 NDim array and the context it depends on.
+The fundamental array object in Blosc NDim is the `b2nd_array_t` type.
+It contains both the data and metalayer that stores the dimensional info for the array.
+Blosc2 NDim has an internal context managed that stores the different properties of each array.
 
 Context
 -------

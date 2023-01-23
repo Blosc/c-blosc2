@@ -17,9 +17,8 @@
 #include <inttypes.h>
 
 
-// Only for internal use
-int b2nd_update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
-                      const int32_t *chunkshape, const int32_t *blockshape) {
+int update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
+                 const int32_t *chunkshape, const int32_t *blockshape) {
   array->ndim = ndim;
   array->nitems = 1;
   array->extnitems = 1;
@@ -118,8 +117,7 @@ int b2nd_update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
 }
 
 
-// Only for internal use
-int b2nd_array_without_schunk(b2nd_context_t *ctx, b2nd_array_t **array) {
+int array_without_schunk(b2nd_context_t *ctx, b2nd_array_t **array) {
   /* Create a b2nd_array_t buffer */
   (*array) = (b2nd_array_t *) malloc(sizeof(b2nd_array_t));
   BLOSC_ERROR_NULL(*array, BLOSC2_ERROR_MEMORY_ALLOC);
@@ -132,7 +130,7 @@ int b2nd_array_without_schunk(b2nd_context_t *ctx, b2nd_array_t **array) {
   int32_t *chunkshape = ctx->chunkshape;
   int32_t *blockshape = ctx->blockshape;
 
-  BLOSC_ERROR(b2nd_update_shape(*array, ctx->ndim, shape, chunkshape, blockshape));
+  BLOSC_ERROR(update_shape(*array, ctx->ndim, shape, chunkshape, blockshape));
 
   // The partition cache (empty initially)
   (*array)->chunk_cache.data = NULL;
@@ -142,9 +140,8 @@ int b2nd_array_without_schunk(b2nd_context_t *ctx, b2nd_array_t **array) {
 }
 
 
-// Only for internal use
-int b2nd_blosc_array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
-  BLOSC_ERROR(b2nd_array_without_schunk(ctx, array));
+int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
+  BLOSC_ERROR(array_without_schunk(ctx, array));
 
   blosc2_schunk *sc = blosc2_schunk_new(ctx->b2_storage);
   if (sc == NULL) {
@@ -201,7 +198,7 @@ int b2nd_uninit(b2nd_context_t *ctx, b2nd_array_t **array) {
   BLOSC_ERROR_NULL(ctx, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
-  BLOSC_ERROR(b2nd_blosc_array_new(ctx, BLOSC2_SPECIAL_UNINIT, array));
+  BLOSC_ERROR(array_new(ctx, BLOSC2_SPECIAL_UNINIT, array));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -211,9 +208,9 @@ int b2nd_empty(b2nd_context_t *ctx, b2nd_array_t **array) {
   BLOSC_ERROR_NULL(ctx, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
-  // BLOSC_ERROR(b2nd_blosc_array_new(ctx, params, storage, BLOSC2_SPECIAL_UNINIT, array));
+  // BLOSC_ERROR(array_new(ctx, params, storage, BLOSC2_SPECIAL_UNINIT, array));
   // Avoid variable cratios
-  BLOSC_ERROR(b2nd_blosc_array_new(ctx, BLOSC2_SPECIAL_ZERO, array));
+  BLOSC_ERROR(array_new(ctx, BLOSC2_SPECIAL_ZERO, array));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -223,7 +220,7 @@ int b2nd_zeros(b2nd_context_t *ctx, b2nd_array_t **array) {
   BLOSC_ERROR_NULL(ctx, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
-  BLOSC_ERROR(b2nd_blosc_array_new(ctx, BLOSC2_SPECIAL_ZERO, array));
+  BLOSC_ERROR(array_new(ctx, BLOSC2_SPECIAL_ZERO, array));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -294,7 +291,7 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
   );
   free(smeta);
 
-  BLOSC_ERROR(b2nd_array_without_schunk(&params, array));
+  BLOSC_ERROR(array_without_schunk(&params, array));
 
   (*array)->sc = schunk;
 
@@ -413,9 +410,9 @@ int b2nd_to_buffer(b2nd_array_t *array, void *buffer,
 }
 
 
-// Only for internal use: It is used for setting slices and for getting slices.
-int b2nd_blosc_slice(void *buffer, int64_t buffersize, int64_t *start, int64_t *stop, int64_t *shape,
-                     b2nd_array_t *array, bool set_slice) {
+// Setting and getting slices
+int get_set_slice(void *buffer, int64_t buffersize, int64_t *start, int64_t *stop, int64_t *shape,
+                  b2nd_array_t *array, bool set_slice) {
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
@@ -667,13 +664,13 @@ int b2nd_blosc_slice(void *buffer, int64_t buffersize, int64_t *start, int64_t *
       }
 
       if (set_slice) {
-          b2nd_copy_buffer(ndim, array->sc->typesize,
-                           src, src_pad_shape, src_start, src_stop,
-                           dst, dst_pad_shape, dst_start);
+        b2nd_copy_buffer(ndim, array->sc->typesize,
+                         src, src_pad_shape, src_start, src_stop,
+                         dst, dst_pad_shape, dst_start);
       } else {
-          b2nd_copy_buffer(ndim, array->sc->typesize,
-                           dst, dst_pad_shape, dst_start, dst_stop,
-                           src, src_pad_shape, src_start);
+        b2nd_copy_buffer(ndim, array->sc->typesize,
+                         dst, dst_pad_shape, dst_start, dst_stop,
+                         src, src_pad_shape, src_start);
       }
     }
 
@@ -727,7 +724,7 @@ int b2nd_get_slice_buffer(b2nd_array_t *array,
   if (buffersize < size) {
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
-  BLOSC_ERROR(b2nd_blosc_slice(buffer, buffersize, start, stop, buffershape, array, false));
+  BLOSC_ERROR(get_set_slice(buffer, buffersize, start, stop, buffershape, array, false));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -754,7 +751,7 @@ int b2nd_set_slice_buffer(void *buffer, int64_t *buffershape, int64_t buffersize
     return BLOSC2_ERROR_SUCCESS;
   }
 
-  BLOSC_ERROR(b2nd_blosc_slice(buffer, buffersize, start, stop, buffershape, array, true));
+  BLOSC_ERROR(get_set_slice(buffer, buffersize, start, stop, buffershape, array, true));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -874,7 +871,7 @@ int b2nd_squeeze_index(b2nd_array_t *array, const bool *index) {
     }
   }
 
-  BLOSC_ERROR(b2nd_update_shape(array, nones, newshape, newchunkshape, newblockshape));
+  BLOSC_ERROR(update_shape(array, nones, newshape, newchunkshape, newblockshape));
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -903,7 +900,7 @@ int b2nd_copy(b2nd_context_t *ctx, b2nd_array_t *src, b2nd_array_t **array) {
   }
 
   if (equals) {
-    BLOSC_ERROR(b2nd_array_without_schunk(ctx, array));
+    BLOSC_ERROR(array_without_schunk(ctx, array));
 
     blosc2_schunk *new_sc = blosc2_schunk_copy(src->sc, ctx->b2_storage);
 
@@ -1039,9 +1036,9 @@ int extend_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
   b2nd_array_t *aux = malloc(sizeof(b2nd_array_t));
   BLOSC_ERROR_NULL(aux, BLOSC2_ERROR_MEMORY_ALLOC);
   aux->sc = NULL;
-  BLOSC_ERROR(b2nd_update_shape(aux, ndim, array->shape, array->chunkshape, array->blockshape));
+  BLOSC_ERROR(update_shape(aux, ndim, array->shape, array->chunkshape, array->blockshape));
 
-  BLOSC_ERROR(b2nd_update_shape(array, ndim, new_shape, array->chunkshape, array->blockshape));
+  BLOSC_ERROR(update_shape(array, ndim, new_shape, array->chunkshape, array->blockshape));
 
   int64_t nchunks = array->extnitems / array->chunknitems;
   int64_t nchunks_;
@@ -1120,9 +1117,9 @@ int shrink_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
   b2nd_array_t *aux = malloc(sizeof(b2nd_array_t));
   BLOSC_ERROR_NULL(aux, BLOSC2_ERROR_MEMORY_ALLOC);
   aux->sc = NULL;
-  BLOSC_ERROR(b2nd_update_shape(aux, ndim, array->shape, array->chunkshape, array->blockshape));
+  BLOSC_ERROR(update_shape(aux, ndim, array->shape, array->chunkshape, array->blockshape));
 
-  BLOSC_ERROR(b2nd_update_shape(array, ndim, new_shape, array->chunkshape, array->blockshape));
+  BLOSC_ERROR(update_shape(array, ndim, new_shape, array->chunkshape, array->blockshape));
 
   // Delete chunks if needed
   int64_t chunks_in_array_old[B2ND_MAX_DIM] = {0};
@@ -1291,7 +1288,7 @@ typedef struct {
 } b2nd_selection_t;
 
 
-int b2nd_compare_selection(const void *a, const void *b) {
+int compare_selection(const void *a, const void *b) {
   int res = (int) (((b2nd_selection_t *) a)->value - ((b2nd_selection_t *) b)->value);
   // In case values are equal, sort by index
   if (res == 0) {
@@ -1301,17 +1298,17 @@ int b2nd_compare_selection(const void *a, const void *b) {
 }
 
 
-int b2nd_copy_block_buffer_data(b2nd_array_t *array,
-                                int8_t ndim,
-                                int64_t *block_selection_size,
-                                b2nd_selection_t **chunk_selection,
-                                b2nd_selection_t **p_block_selection_0,
-                                b2nd_selection_t **p_block_selection_1,
-                                uint8_t *block,
-                                uint8_t *buffer,
-                                int64_t *buffershape,
-                                int64_t *bufferstrides,
-                                bool get) {
+int copy_block_buffer_data(b2nd_array_t *array,
+                           int8_t ndim,
+                           int64_t *block_selection_size,
+                           b2nd_selection_t **chunk_selection,
+                           b2nd_selection_t **p_block_selection_0,
+                           b2nd_selection_t **p_block_selection_1,
+                           uint8_t *block,
+                           uint8_t *buffer,
+                           int64_t *buffershape,
+                           int64_t *bufferstrides,
+                           bool get) {
   p_block_selection_0[ndim] = chunk_selection[ndim];
   p_block_selection_1[ndim] = chunk_selection[ndim];
   while (p_block_selection_1[ndim] - p_block_selection_0[ndim] < block_selection_size[ndim]) {
@@ -1344,10 +1341,10 @@ int b2nd_copy_block_buffer_data(b2nd_array_t *array,
                array->sc->typesize);
       }
     } else {
-      BLOSC_ERROR(b2nd_copy_block_buffer_data(array, (int8_t) (ndim + 1), block_selection_size,
-                                                  chunk_selection,
-                                                  p_block_selection_0, p_block_selection_1, block,
-                                                  buffer, buffershape, bufferstrides, get)
+      BLOSC_ERROR(copy_block_buffer_data(array, (int8_t) (ndim + 1), block_selection_size,
+                                         chunk_selection,
+                                         p_block_selection_0, p_block_selection_1, block,
+                                         buffer, buffershape, bufferstrides, get)
       );
     }
     p_block_selection_1[ndim]++;
@@ -1356,16 +1353,16 @@ int b2nd_copy_block_buffer_data(b2nd_array_t *array,
 }
 
 
-int b2nd_iterate_over_block_copy(b2nd_array_t *array, int8_t ndim,
-                                 int64_t *chunk_selection_size,
-                                 b2nd_selection_t **ordered_selection,
-                                 b2nd_selection_t **chunk_selection_0,
-                                 b2nd_selection_t **chunk_selection_1,
-                                 uint8_t *data,
-                                 uint8_t *buffer,
-                                 int64_t *buffershape,
-                                 int64_t *bufferstrides,
-                                 bool get) {
+int iter_block_copy(b2nd_array_t *array, int8_t ndim,
+                    int64_t *chunk_selection_size,
+                    b2nd_selection_t **ordered_selection,
+                    b2nd_selection_t **chunk_selection_0,
+                    b2nd_selection_t **chunk_selection_1,
+                    uint8_t *data,
+                    uint8_t *buffer,
+                    int64_t *buffershape,
+                    int64_t *bufferstrides,
+                    bool get) {
   chunk_selection_0[ndim] = ordered_selection[ndim];
   chunk_selection_1[ndim] = ordered_selection[ndim];
   while (chunk_selection_1[ndim] - ordered_selection[ndim] < chunk_selection_size[ndim]) {
@@ -1398,25 +1395,25 @@ int b2nd_iterate_over_block_copy(b2nd_array_t *array, int8_t ndim,
         block_selection_size[i] = chunk_selection_1[i] - chunk_selection_0[i];
       }
 
-      BLOSC_ERROR(b2nd_copy_block_buffer_data(array,
-                                                  (int8_t) 0,
-                                                  block_selection_size,
-                                                  chunk_selection_0,
-                                                  p_block_selection_0,
-                                                  p_block_selection_1,
-                                                  &data[nblock * array->blocknitems * array->sc->typesize],
-                                                  buffer,
-                                                  buffershape,
-                                                  bufferstrides,
-                                                  get)
+      BLOSC_ERROR(copy_block_buffer_data(array,
+                                         (int8_t) 0,
+                                         block_selection_size,
+                                         chunk_selection_0,
+                                         p_block_selection_0,
+                                         p_block_selection_1,
+                                         &data[nblock * array->blocknitems * array->sc->typesize],
+                                         buffer,
+                                         buffershape,
+                                         bufferstrides,
+                                         get)
       );
       free(p_block_selection_0);
       free(p_block_selection_1);
       free(block_selection_size);
     } else {
-      BLOSC_ERROR(b2nd_iterate_over_block_copy(array, (int8_t) (ndim + 1), chunk_selection_size,
-                                     ordered_selection, chunk_selection_0, chunk_selection_1,
-                                     data, buffer, buffershape, bufferstrides, get)
+      BLOSC_ERROR(iter_block_copy(array, (int8_t) (ndim + 1), chunk_selection_size,
+                                  ordered_selection, chunk_selection_0, chunk_selection_1,
+                                  data, buffer, buffershape, bufferstrides, get)
       );
     }
     chunk_selection_0[ndim] = chunk_selection_1[ndim];
@@ -1427,12 +1424,12 @@ int b2nd_iterate_over_block_copy(b2nd_array_t *array, int8_t ndim,
 }
 
 
-int b2nd_iterate_over_block_maskout(b2nd_array_t *array, int8_t ndim,
-                                    int64_t *sel_block_size,
-                                    b2nd_selection_t **o_selection,
-                                    b2nd_selection_t **p_o_sel_block_0,
-                                    b2nd_selection_t **p_o_sel_block_1,
-                                    bool *maskout) {
+int iter_block_maskout(b2nd_array_t *array, int8_t ndim,
+                       int64_t *sel_block_size,
+                       b2nd_selection_t **o_selection,
+                       b2nd_selection_t **p_o_sel_block_0,
+                       b2nd_selection_t **p_o_sel_block_1,
+                       bool *maskout) {
   p_o_sel_block_0[ndim] = o_selection[ndim];
   p_o_sel_block_1[ndim] = o_selection[ndim];
   while (p_o_sel_block_1[ndim] - o_selection[ndim] < sel_block_size[ndim]) {
@@ -1457,9 +1454,9 @@ int b2nd_iterate_over_block_maskout(b2nd_array_t *array, int8_t ndim,
       }
       maskout[nblock] = false;
     } else {
-      BLOSC_ERROR(b2nd_iterate_over_block_maskout(array, (int8_t) (ndim + 1), sel_block_size,
-                                        o_selection, p_o_sel_block_0, p_o_sel_block_1,
-                                        maskout)
+      BLOSC_ERROR(iter_block_maskout(array, (int8_t) (ndim + 1), sel_block_size,
+                                     o_selection, p_o_sel_block_0, p_o_sel_block_1,
+                                     maskout)
       );
     }
     p_o_sel_block_0[ndim] = p_o_sel_block_1[ndim];
@@ -1470,15 +1467,15 @@ int b2nd_iterate_over_block_maskout(b2nd_array_t *array, int8_t ndim,
 }
 
 
-int b2nd_iterate_over_chunk(b2nd_array_t *array, int8_t ndim,
-                            int64_t *selection_size,
-                            b2nd_selection_t **ordered_selection,
-                            b2nd_selection_t **p_ordered_selection_0,
-                            b2nd_selection_t **p_ordered_selection_1,
-                            uint8_t *buffer,
-                            int64_t *buffershape,
-                            int64_t *bufferstrides,
-                            bool get) {
+int iter_chunk(b2nd_array_t *array, int8_t ndim,
+               int64_t *selection_size,
+               b2nd_selection_t **ordered_selection,
+               b2nd_selection_t **p_ordered_selection_0,
+               b2nd_selection_t **p_ordered_selection_1,
+               uint8_t *buffer,
+               int64_t *buffershape,
+               int64_t *bufferstrides,
+               bool get) {
   p_ordered_selection_0[ndim] = ordered_selection[ndim];
   p_ordered_selection_1[ndim] = ordered_selection[ndim];
   while (p_ordered_selection_1[ndim] - ordered_selection[ndim] < selection_size[ndim]) {
@@ -1520,12 +1517,12 @@ int b2nd_iterate_over_chunk(b2nd_array_t *array, int8_t ndim,
           maskout[i] = true;
         }
 
-        BLOSC_ERROR(b2nd_iterate_over_block_maskout(array, (int8_t) 0,
-                                                        chunk_selection_size,
-                                                        p_ordered_selection_0,
-                                                        p_chunk_selection_0,
-                                                        p_chunk_selection_1,
-                                                        maskout));
+        BLOSC_ERROR(iter_block_maskout(array, (int8_t) 0,
+                                       chunk_selection_size,
+                                       p_ordered_selection_0,
+                                       p_chunk_selection_0,
+                                       p_chunk_selection_1,
+                                       maskout));
 
         if (blosc2_set_maskout(array->sc->dctx, maskout, (int) nblocks) !=
             BLOSC2_ERROR_SUCCESS) {
@@ -1543,18 +1540,9 @@ int b2nd_iterate_over_chunk(b2nd_array_t *array, int8_t ndim,
         BLOSC_TRACE_ERROR("Error decompressing chunk");
         BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
-      BLOSC_ERROR(b2nd_iterate_over_block_copy(array,
-                                                   0,
-                                                   chunk_selection_size,
-                                                   p_ordered_selection_0,
-                                                   p_chunk_selection_0,
-                                                   p_chunk_selection_1,
-                                                   data,
-                                                   buffer,
-                                                   buffershape,
-                                                   bufferstrides,
-                                                   get)
-                                                  );
+      BLOSC_ERROR(iter_block_copy(array, 0, chunk_selection_size,
+                                  p_ordered_selection_0, p_chunk_selection_0, p_chunk_selection_1,
+                                  data, buffer, buffershape, bufferstrides, get));
 
       if (!get) {
         int32_t chunk_size = data_nbytes + BLOSC_EXTENDED_HEADER_LENGTH;
@@ -1576,9 +1564,9 @@ int b2nd_iterate_over_chunk(b2nd_array_t *array, int8_t ndim,
       free(p_chunk_selection_0);
       free(p_chunk_selection_1);
     } else {
-      BLOSC_ERROR(b2nd_iterate_over_chunk(array, (int8_t) (ndim + 1), selection_size,
-                                          ordered_selection, p_ordered_selection_0, p_ordered_selection_1,
-                                          buffer, buffershape, bufferstrides, get));
+      BLOSC_ERROR(iter_chunk(array, (int8_t) (ndim + 1), selection_size,
+                             ordered_selection, p_ordered_selection_0, p_ordered_selection_1,
+                             buffer, buffershape, bufferstrides, get));
     }
 
     p_ordered_selection_0[ndim] = p_ordered_selection_1[ndim];
@@ -1587,8 +1575,8 @@ int b2nd_iterate_over_chunk(b2nd_array_t *array, int8_t ndim,
 }
 
 
-int b2nd_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
-                              int64_t *buffershape, int64_t buffersize, bool get) {
+int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
+                         int64_t *buffershape, int64_t buffersize, bool get) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(selection, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(selection_size, BLOSC2_ERROR_NULL_POINTER);
@@ -1624,7 +1612,7 @@ int b2nd_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t 
       ordered_selection[i][j].index = j;
       ordered_selection[i][j].value = selection[i][j];
     }
-      qsort(ordered_selection[i], selection_size[i], sizeof(b2nd_selection_t), b2nd_compare_selection);
+    qsort(ordered_selection[i], selection_size[i], sizeof(b2nd_selection_t), compare_selection);
   }
 
   // Define pointers to iterate over ordered_selection data
@@ -1639,11 +1627,11 @@ int b2nd_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t 
     bufferstrides[i] = bufferstrides[i + 1] * buffershape[i + 1];
   }
 
-  BLOSC_ERROR(b2nd_iterate_over_chunk(array, 0,
-                                      selection_size, ordered_selection,
-                                      p_ordered_selection_0,
-                                      p_ordered_selection_1,
-                                      buffer, buffershape, bufferstrides, get));
+  BLOSC_ERROR(iter_chunk(array, 0,
+                         selection_size, ordered_selection,
+                         p_ordered_selection_0,
+                         p_ordered_selection_1,
+                         buffer, buffershape, bufferstrides, get));
 
   // Free allocated memory
   free(p_ordered_selection_0);
@@ -1660,8 +1648,8 @@ int b2nd_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t 
 int b2nd_get_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
                                   int64_t *buffershape, int64_t buffersize) {
 
-  return b2nd_orthogonal_selection(array, selection, selection_size,
-                                   buffer, buffershape, buffersize, true);
+  return orthogonal_selection(array, selection, selection_size,
+                              buffer, buffershape, buffersize, true);
 }
 
 
@@ -1669,8 +1657,8 @@ int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int6
                                   int64_t *buffershape, int64_t buffersize) {
 
 
-  return b2nd_orthogonal_selection(array, selection, selection_size,
-                                   buffer, buffershape, buffersize, false);
+  return orthogonal_selection(array, selection, selection_size,
+                              buffer, buffershape, buffersize, false);
 }
 
 
