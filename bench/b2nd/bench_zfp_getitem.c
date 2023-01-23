@@ -83,7 +83,7 @@ int comp(const char *urlpath) {
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(schunk, "b2nd", &smeta, &smeta_len) < 0) {
-    printf("This benchmark only supports Caterva datasets");
+    printf("This benchmark only supports b2nd arrays");
     free(chunkshape);
     free(blockshape);
     return -1;
