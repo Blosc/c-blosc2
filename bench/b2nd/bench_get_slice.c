@@ -44,7 +44,7 @@ int main() {
 
   b2nd_array_t *arr;
   blosc_set_timestamp(&t0);
-  BLOSC_ERROR(b2nd_from_buffer(ctx, &arr, src, nbytes));
+  BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, src, nbytes));
   blosc_set_timestamp(&t1);
   printf("from_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));
 
@@ -65,7 +65,7 @@ int main() {
     for (int slice = 0; slice < nslices; ++slice) {
       slice_start[dim] = rand() % shape[dim];
       slice_stop[dim] = slice_start[dim] + 1;
-      BLOSC_ERROR(b2nd_get_slice_buffer(arr, slice_start, slice_stop, buffer, slice_shape, buffersize));
+      BLOSC_ERROR(b2nd_get_slice_cbuffer(arr, slice_start, slice_stop, buffer, slice_shape, buffersize));
     }
     free(buffer);
   }

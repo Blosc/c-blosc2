@@ -72,14 +72,14 @@ int main() {
 
   b2nd_array_t *arr;
   blosc_set_timestamp(&t0);
-  BLOSC_ERROR(b2nd_from_buffer(ctx, &arr, src, nbytes));
+  BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, src, nbytes));
   blosc_set_timestamp(&t1);
   printf("from_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));
 
   int64_t *buffer = malloc(nbytes);
   int64_t buffer_size = nbytes;
   blosc_set_timestamp(&t0);
-  BLOSC_ERROR(b2nd_to_buffer(arr, buffer, buffer_size));
+  BLOSC_ERROR(b2nd_to_cbuffer(arr, buffer, buffer_size));
   blosc_set_timestamp(&t1);
   printf("to_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));
 

@@ -91,7 +91,7 @@ CUTEST_TEST_TEST(squeeze) {
 
   /* Create b2nd_array_t with original data */
   b2nd_array_t *src;
-  B2ND_TEST_ASSERT(b2nd_from_buffer(ctx, &src, buffer, buffersize));
+  B2ND_TEST_ASSERT(b2nd_from_cbuffer(ctx, &src, buffer, buffersize));
 
 
   /* Create storage for dest container */

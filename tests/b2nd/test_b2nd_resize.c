@@ -150,8 +150,8 @@ CUTEST_TEST_TEST(resize_shape) {
       slice_stop[i] = slice_start[i] + slice_shape[i];
       buffer_len *= slice_shape[i];
       uint8_t *buffer = calloc((size_t) buffer_len, (size_t) typesize);
-      BLOSC_ERROR(b2nd_set_slice_buffer(buffer, slice_shape, buffer_len * typesize,
-                                        slice_start, slice_stop, aux));
+      BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, slice_shape, buffer_len * typesize,
+                                         slice_start, slice_stop, aux));
       free(buffer);
     }
   }
@@ -159,8 +159,8 @@ CUTEST_TEST_TEST(resize_shape) {
   /* Fill buffers with whole arrays */
   uint8_t *src_buffer = malloc((size_t) buffersize);
   uint8_t *aux_buffer = malloc((size_t) buffersize);
-  B2ND_TEST_ASSERT(b2nd_to_buffer(src, src_buffer, buffersize));
-  B2ND_TEST_ASSERT(b2nd_to_buffer(aux, aux_buffer, buffersize));
+  B2ND_TEST_ASSERT(b2nd_to_cbuffer(src, src_buffer, buffersize));
+  B2ND_TEST_ASSERT(b2nd_to_cbuffer(aux, aux_buffer, buffersize));
   for (uint64_t i = 0; i < (uint64_t) buffersize / typesize; ++i) {
     switch (typesize) {
       case 8:

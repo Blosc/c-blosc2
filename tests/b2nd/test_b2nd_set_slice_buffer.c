@@ -96,16 +96,16 @@ CUTEST_TEST_TEST(set_slice_buffer) {
   BLOSC_ERROR(b2nd_zeros(ctx, &src));
 
 
-  BLOSC_ERROR(b2nd_set_slice_buffer(buffer, shape, buffersize,
-                                    shapes.start, shapes.stop, src));
+  BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, shape, buffersize,
+                                     shapes.start, shapes.stop, src));
 
 
   uint8_t *destbuffer = malloc((size_t) buffersize);
 
   /* Fill dest buffer with a slice*/
-  B2ND_TEST_ASSERT(b2nd_get_slice_buffer(src, shapes.start, shapes.stop,
-                                         destbuffer,
-                                         shape, buffersize));
+  B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(src, shapes.start, shapes.stop,
+                                          destbuffer,
+                                          shape, buffersize));
 
   for (uint64_t i = 0; i < (uint64_t) buffersize / typesize; ++i) {
     uint64_t k = i + 1;

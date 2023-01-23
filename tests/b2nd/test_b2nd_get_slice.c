@@ -103,7 +103,7 @@ CUTEST_TEST_TEST(get_slice) {
 
   /* Create b2nd_array_t with original data */
   b2nd_array_t *src;
-  B2ND_TEST_ASSERT(b2nd_from_buffer(ctx, &src, buffer, buffersize));
+  B2ND_TEST_ASSERT(b2nd_from_cbuffer(ctx, &src, buffer, buffersize));
 
   /* Add vlmeta */
 
@@ -142,7 +142,7 @@ CUTEST_TEST_TEST(get_slice) {
   }
 
   uint64_t *buffer_dest = malloc((size_t) destbuffersize);
-  B2ND_TEST_ASSERT(b2nd_to_buffer(dest, buffer_dest, destbuffersize));
+  B2ND_TEST_ASSERT(b2nd_to_cbuffer(dest, buffer_dest, destbuffersize));
 
   for (int i = 0; i < destbuffersize / typesize; ++i) {
     uint64_t a = shapes.result[i] + 1;

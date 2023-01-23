@@ -75,7 +75,7 @@ CUTEST_TEST_TEST(save) {
 
   /* Create b2nd_array_t with original data */
   b2nd_array_t *src;
-  B2ND_TEST_ASSERT(b2nd_from_buffer(ctx, &src, buffer, buffersize));
+  B2ND_TEST_ASSERT(b2nd_from_cbuffer(ctx, &src, buffer, buffersize));
 
   B2ND_TEST_ASSERT(b2nd_save(src, urlpath));
   b2nd_array_t *dest;
@@ -83,7 +83,7 @@ CUTEST_TEST_TEST(save) {
 
   /* Fill dest array with b2nd_array_t data */
   uint8_t *buffer_dest = malloc(buffersize);
-  B2ND_TEST_ASSERT(b2nd_to_buffer(dest, buffer_dest, buffersize));
+  B2ND_TEST_ASSERT(b2nd_to_cbuffer(dest, buffer_dest, buffersize));
 
   /* Testing */
   if (dest->nitems != 0) {

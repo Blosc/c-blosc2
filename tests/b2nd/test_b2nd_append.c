@@ -112,8 +112,8 @@ CUTEST_TEST_TEST(append) {
 
   /* Fill buffer with a slice from the new chunks */
   uint8_t *res_buffer = malloc(buffersize);
-  BLOSC_ERROR(b2nd_get_slice_buffer(src, start, stop, res_buffer,
-                                    shapes.buffershape, buffersize));
+  BLOSC_ERROR(b2nd_get_slice_cbuffer(src, start, stop, res_buffer,
+                                     shapes.buffershape, buffersize));
 
   for (uint64_t i = 0; i < (uint64_t) buffersize / typesize; ++i) {
     switch (typesize) {

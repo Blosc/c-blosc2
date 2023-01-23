@@ -96,7 +96,7 @@ CUTEST_TEST_TEST(get_slice_buffer) {
 
   /* Create b2nd_array_t with original data */
   b2nd_array_t *src;
-  B2ND_TEST_ASSERT(b2nd_from_buffer(ctx, &src, buffer, buffersize));
+  B2ND_TEST_ASSERT(b2nd_from_cbuffer(ctx, &src, buffer, buffersize));
 
   /* Create dest buffer */
   int64_t destshape[B2ND_MAX_DIM] = {0};
@@ -109,8 +109,8 @@ CUTEST_TEST_TEST(get_slice_buffer) {
   uint64_t *destbuffer = malloc((size_t) destbuffersize);
 
   /* Fill dest buffer with a slice*/
-  B2ND_TEST_ASSERT(b2nd_get_slice_buffer(src, shapes.start, shapes.stop, destbuffer,
-                                         destshape, destbuffersize));
+  B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(src, shapes.start, shapes.stop, destbuffer,
+                                          destshape, destbuffersize));
 
   for (int i = 0; i < destbuffersize / typesize; ++i) {
     uint64_t a = destbuffer[i];

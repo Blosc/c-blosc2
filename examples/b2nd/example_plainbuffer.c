@@ -40,7 +40,7 @@ int main() {
                                         NULL, 0);
 
   b2nd_array_t *arr;
-  BLOSC_ERROR(b2nd_from_buffer(ctx, &arr, data, size));
+  BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
 
 
   blosc2_storage slice_b2_storage = {.cparams=&cparams, .dparams=&dparams};
@@ -63,7 +63,7 @@ int main() {
   buffer_size *= slice->sc->typesize;
   buffer = malloc(buffer_size);
 
-  BLOSC_ERROR(b2nd_to_buffer(slice, buffer, buffer_size));
+  BLOSC_ERROR(b2nd_to_cbuffer(slice, buffer, buffer_size));
 
   BLOSC_ERROR(b2nd_free(arr));
   BLOSC_ERROR(b2nd_free(slice));

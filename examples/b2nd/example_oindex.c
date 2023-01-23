@@ -34,7 +34,7 @@ int main() {
     data[i] = (double) i;
   }
   b2nd_array_t *arr;
-  BLOSC_ERROR(b2nd_from_buffer(ctx, &arr, data, datasize));
+  BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, datasize));
   free(data);
 
   int64_t sel0[] = {3, 1, 2};

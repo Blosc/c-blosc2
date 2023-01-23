@@ -25,7 +25,7 @@ int frame_generator(int8_t *data, int8_t ndim, int64_t *shape, int32_t *chunksha
                                         NULL, 0);
 
   b2nd_array_t *arr;
-  BLOSC_ERROR(b2nd_from_buffer(ctx, &arr, data, size));
+  BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
   BLOSC_ERROR(b2nd_free_ctx(ctx));
   b2nd_print_meta(arr);
   BLOSC_ERROR(b2nd_free(arr));

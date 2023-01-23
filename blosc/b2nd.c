@@ -362,7 +362,7 @@ int b2nd_free(b2nd_array_t *array) {
 }
 
 
-int b2nd_from_buffer(b2nd_context_t *ctx, b2nd_array_t **array, void *buffer, int64_t buffersize) {
+int b2nd_from_cbuffer(b2nd_context_t *ctx, b2nd_array_t **array, void *buffer, int64_t buffersize) {
   BLOSC_ERROR_NULL(ctx, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
@@ -382,14 +382,14 @@ int b2nd_from_buffer(b2nd_context_t *ctx, b2nd_array_t **array, void *buffer, in
   int64_t start[B2ND_MAX_DIM] = {0};
   int64_t *stop = (*array)->shape;
   int64_t *shape = (*array)->shape;
-  BLOSC_ERROR(b2nd_set_slice_buffer(buffer, shape, buffersize, start, stop, *array));
+  BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, shape, buffersize, start, stop, *array));
 
   return BLOSC2_ERROR_SUCCESS;
 }
 
 
-int b2nd_to_buffer(b2nd_array_t *array, void *buffer,
-                   int64_t buffersize) {
+int b2nd_to_cbuffer(b2nd_array_t *array, void *buffer,
+                    int64_t buffersize) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
 
@@ -403,9 +403,7 @@ int b2nd_to_buffer(b2nd_array_t *array, void *buffer,
 
   int64_t start[B2ND_MAX_DIM] = {0};
   int64_t *stop = array->shape;
-  BLOSC_ERROR(b2nd_get_slice_buffer(array, start, stop,
-                                        buffer, array->shape, buffersize)
-                                        );
+  BLOSC_ERROR(b2nd_get_slice_cbuffer(array, start, stop, buffer, array->shape, buffersize));
   return BLOSC2_ERROR_SUCCESS;
 }
 
@@ -699,9 +697,9 @@ int get_set_slice(void *buffer, int64_t buffersize, int64_t *start, int64_t *sto
 }
 
 
-int b2nd_get_slice_buffer(b2nd_array_t *array,
-                          int64_t *start, int64_t *stop,
-                          void *buffer, int64_t *buffershape, int64_t buffersize) {
+int b2nd_get_slice_cbuffer(b2nd_array_t *array,
+                           int64_t *start, int64_t *stop,
+                           void *buffer, int64_t *buffershape, int64_t buffersize) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
@@ -730,9 +728,9 @@ int b2nd_get_slice_buffer(b2nd_array_t *array,
 }
 
 
-int b2nd_set_slice_buffer(void *buffer, int64_t *buffershape, int64_t buffersize,
-                          int64_t *start, int64_t *stop,
-                          b2nd_array_t *array) {
+int b2nd_set_slice_cbuffer(void *buffer, int64_t *buffershape, int64_t buffersize,
+                           int64_t *start, int64_t *stop,
+                           b2nd_array_t *array) {
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
@@ -811,10 +809,10 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, b2nd_array_t *src,
     }
     uint8_t *buffer = malloc(buffersize);
     BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_MEMORY_ALLOC);
-    BLOSC_ERROR(b2nd_get_slice_buffer(src, src_start, src_stop, buffer, chunk_shape,
-                                      buffersize));
-    BLOSC_ERROR(b2nd_set_slice_buffer(buffer, chunk_shape, buffersize, chunk_start,
-                                      chunk_stop, *array));
+    BLOSC_ERROR(b2nd_get_slice_cbuffer(src, src_start, src_stop, buffer, chunk_shape,
+                                       buffersize));
+    BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, chunk_shape, buffersize, chunk_start,
+                                       chunk_stop, *array));
     free(buffer);
   }
 
@@ -1238,7 +1236,7 @@ int b2nd_insert(b2nd_array_t *array, void *buffer, int64_t buffersize,
   int64_t stop[B2ND_MAX_DIM];
   memcpy(stop, array->shape, sizeof(int64_t) * array->ndim);
   stop[axis] = start[axis] + buffershape[axis];
-  BLOSC_ERROR(b2nd_set_slice_buffer(buffer, buffershape, buffersize, start, stop, array));
+  BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, buffershape, buffersize, start, stop, array));
 
   return BLOSC2_ERROR_SUCCESS;
 }

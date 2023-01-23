@@ -111,7 +111,7 @@ CUTEST_TEST_TEST(delete) {
   int64_t start[B2ND_MAX_DIM] = {0};
   start[shapes.axis] = shapes.start;
   uint8_t *buffer = calloc((size_t) bufferlen, (size_t) typesize);
-  BLOSC_ERROR(b2nd_set_slice_buffer(buffer, buffer_shape, bufferlen * typesize, start, stop, src));
+  BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, buffer_shape, bufferlen * typesize, start, stop, src));
 
   BLOSC_ERROR(b2nd_delete(src, shapes.axis, shapes.start, shapes.delete_len));
 
@@ -132,7 +132,7 @@ CUTEST_TEST_TEST(delete) {
 
   /* Fill buffer with whole array data */
   uint8_t *src_buffer = malloc((size_t) (src->nitems * typesize));
-  B2ND_TEST_ASSERT(b2nd_to_buffer(src, src_buffer, src->nitems * typesize));
+  B2ND_TEST_ASSERT(b2nd_to_cbuffer(src, src_buffer, src->nitems * typesize));
 
   for (uint64_t i = 0; i < (uint64_t) src->nitems; ++i) {
     switch (typesize) {

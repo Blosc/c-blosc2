@@ -92,7 +92,7 @@ CUTEST_TEST_TEST(full) {
 
   /* Fill dest array with b2nd_array_t data */
   uint8_t *buffer_dest = malloc(buffersize);
-  B2ND_TEST_ASSERT(b2nd_to_buffer(src, buffer_dest, buffersize));
+  B2ND_TEST_ASSERT(b2nd_to_cbuffer(src, buffer_dest, buffersize));
 
   /* Testing */
   for (int i = 0; i < buffersize / typesize; ++i) {

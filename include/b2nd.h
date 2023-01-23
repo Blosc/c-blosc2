@@ -246,7 +246,7 @@ BLOSC_EXPORT int b2nd_open(const char *urlpath, b2nd_array_t **array);
 BLOSC_EXPORT int b2nd_save(b2nd_array_t *array, char *urlpath);
 
 /**
- * @brief Create a b2nd array from the data stored in a buffer.
+ * @brief Create a b2nd array from a C buffer.
  *
  * @param ctx The b2nd context for the new array.
  * @param array The memory pointer where the array will be created.
@@ -255,10 +255,10 @@ BLOSC_EXPORT int b2nd_save(b2nd_array_t *array, char *urlpath);
  *
  * @return An error code.
  */
-BLOSC_EXPORT int b2nd_from_buffer(b2nd_context_t *ctx, b2nd_array_t **array, void *buffer, int64_t buffersize);
+BLOSC_EXPORT int b2nd_from_cbuffer(b2nd_context_t *ctx, b2nd_array_t **array, void *buffer, int64_t buffersize);
 
 /**
- * @brief Extract the data into a C buffer from a b2nd array.
+ * @brief Extract the data from a b2nd array into a C buffer.
  *
  * @param array The b2nd array.
  * @param buffer The buffer where the data will be stored.
@@ -266,8 +266,8 @@ BLOSC_EXPORT int b2nd_from_buffer(b2nd_context_t *ctx, b2nd_array_t **array, voi
  *
  * @return An error code.
  */
-BLOSC_EXPORT int b2nd_to_buffer(b2nd_array_t *array, void *buffer,
-                                int64_t buffersize);
+BLOSC_EXPORT int b2nd_to_cbuffer(b2nd_array_t *array, void *buffer,
+                                 int64_t buffersize);
 
 /**
  * @brief Get a slice from an array and store it into a new array.
@@ -322,12 +322,12 @@ BLOSC_EXPORT int b2nd_squeeze(b2nd_array_t *array);
  *
  * @return An error code.
  */
-BLOSC_EXPORT int b2nd_get_slice_buffer(b2nd_array_t *array,
-                                       int64_t *start, int64_t *stop,
-                                       void *buffer, int64_t *buffershape, int64_t buffersize);
+BLOSC_EXPORT int b2nd_get_slice_cbuffer(b2nd_array_t *array,
+                                        int64_t *start, int64_t *stop,
+                                        void *buffer, int64_t *buffershape, int64_t buffersize);
 
 /**
- * @brief Set a slice into a b2nd array from a C buffer.
+ * @brief Set a slice in a b2nd array using a C buffer.
  *
  * @param buffer The buffer where the slice data is.
  * @param buffersize The size (in bytes) of the buffer.
@@ -338,8 +338,8 @@ BLOSC_EXPORT int b2nd_get_slice_buffer(b2nd_array_t *array,
  *
  * @return An error code.
  */
-BLOSC_EXPORT int b2nd_set_slice_buffer(void *buffer, int64_t *buffershape, int64_t buffersize,
-                                       int64_t *start, int64_t *stop, b2nd_array_t *array);
+BLOSC_EXPORT int b2nd_set_slice_cbuffer(void *buffer, int64_t *buffershape, int64_t buffersize,
+                                        int64_t *start, int64_t *stop, b2nd_array_t *array);
 
 /**
  * @brief Make a copy of the array data. The copy is done into a new b2nd array.

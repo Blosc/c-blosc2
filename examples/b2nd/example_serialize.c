@@ -39,7 +39,7 @@ int main() {
                                         NULL, 0);
 
   b2nd_array_t *arr;
-  BLOSC_ERROR(b2nd_from_buffer(ctx, &arr, data, size));
+  BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
 
   uint8_t *cframe;
   int64_t cframe_len;
@@ -51,7 +51,7 @@ int main() {
 
   /* Fill dest array with b2nd_array_t data */
   uint8_t *data_dest = malloc(size);
-  BLOSC_ERROR(b2nd_to_buffer(dest, data_dest, size));
+  BLOSC_ERROR(b2nd_to_cbuffer(dest, data_dest, size));
 
   for (int i = 0; i < nelem; ++i) {
     if (data[i] != data_dest[i] && data[i] != i) {
