@@ -21,6 +21,7 @@
 #include "blosc2/codecs-registry.h"
 #include "blosc-private.h"
 #include <inttypes.h>
+#include "b2nd.h"
 
 static int test_zfp_prec_float(blosc2_schunk* schunk) {
 
@@ -206,32 +207,79 @@ static int test_zfp_prec_double(blosc2_schunk* schunk) {
 
 
 int float_cyclic() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_float_cyclic.b2nd");
-    BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
+    int8_t ndim = 3;
+    int64_t shape[] = {40, 60, 20};
+    int32_t chunkshape[] = {20, 30, 16};
+    int32_t blockshape[] = {11, 14, 7};
+    int32_t typesize = sizeof(float);
+    int64_t nelem = 1;
+    for (int i = 0; i < ndim; ++i) {
+        nelem *= shape[i];
+    }
+    int64_t size = nelem * typesize;
+
+    float *data = malloc(size);
+    for (int i = 0; i < nelem; i += 2) {
+        float j = (float) i;
+        data[i] = (j + j / 10 + j / 100);
+        data[i + 1] = (2 + j / 10 + j / 1000);
+    }
+
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.typesize = typesize;
+    blosc2_storage b2_storage = {.cparams=&cparams};
+    b2_storage.contiguous = true;
+
+    b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                          NULL, 0);
+
+    b2nd_array_t *arr;
+    BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
+    blosc2_schunk *schunk = arr->sc;
 
     /* Run the test. */
     int result = test_zfp_prec_float(schunk);
-    blosc2_schunk_free(schunk);
+    BLOSC_ERROR(b2nd_free_ctx(ctx));
+    BLOSC_ERROR(b2nd_free(arr));
     return result;
 }
 
 int double_same_cells() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_double_same_cells.b2nd");
-    BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
+    int8_t ndim = 2;
+    int64_t shape[] = {40, 60};
+    int32_t chunkshape[] = {20, 30};
+    int32_t blockshape[] = {16, 16};
+    int32_t typesize = sizeof(double);
+    int64_t nelem = 1;
+    for (int i = 0; i < ndim; ++i) {
+        nelem *= shape[i];
+    }
+    int64_t size = nelem * typesize;
+
+    double *data = malloc(size);
+    for (int i = 0; i < nelem; i += 4) {
+        data[i] = 1.5;
+        data[i + 1] = 14.7;
+        data[i + 2] = 23.6;
+        data[i + 3] = 3.2;
+    }
+
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.typesize = typesize;
+    blosc2_storage b2_storage = {.cparams=&cparams};
+    b2_storage.contiguous = true;
+
+    b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                          NULL, 0);
+
+    b2nd_array_t *arr;
+    BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
+    blosc2_schunk *schunk = arr->sc;
 
     /* Run the test. */
     int result = test_zfp_prec_double(schunk);
-    blosc2_schunk_free(schunk);
-    return result;
-}
-
-int day_month_temp() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_day_month_temp.b2nd");
-    BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
-
-    /* Run the test. */
-    int result = test_zfp_prec_float(schunk);
-    blosc2_schunk_free(schunk);
+    BLOSC_ERROR(b2nd_free_ctx(ctx));
+    BLOSC_ERROR(b2nd_free(arr));
     return result;
 }
 
@@ -252,12 +300,16 @@ int main(void) {
   blosc2_init();   // this is mandatory for initiallizing the plugin mechanism
     result = float_cyclic();
     printf("float_cyclic: %d obtained \n \n", result);
+    if (result < 0)
+        return result;
     result = double_same_cells();
     printf("double_same_cells: %d obtained \n \n", result);
-    result = day_month_temp();
-    printf("day_month_temp: %d obtained \n \n", result);
+    if (result < 0)
+        return result;
     result = item_prices();
     printf("item_prices: %d obtained \n \n", result);
+    if (result < 0)
+        return result;
   blosc2_destroy();
 
     return BLOSC2_ERROR_SUCCESS;

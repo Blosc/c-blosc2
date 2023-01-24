@@ -21,6 +21,7 @@
 #include "blosc2.h"
 #include "blosc2/codecs-registry.h"
 #include "blosc-private.h"
+#include "b2nd.h"
 
 static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
 
@@ -71,7 +72,7 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, chunk_zfp, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
             printf("Buffer is incompressible.  Giving up.\n");
-            return 0;
+            return -1;
         } else if (csize < 0) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);
             return (int) csize;
@@ -88,7 +89,7 @@ static int test_zfp_rate_getitem_float(blosc2_schunk* schunk) {
         csize = blosc2_compress_ctx(schunk->cctx, lossy_chunk, chunksize, chunk_blosc, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
             printf("Buffer is incompressible.  Giving up.\n");
-            return 0;
+            return -1;
         } else if (csize < 0) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);
             return (int) csize;
@@ -135,7 +136,7 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
 
     if (schunk->typesize != 8) {
         printf("Error: This test is only for doubles.\n");
-        return 0;
+        return -1;
     }
     int64_t nchunks = schunk->nchunks;
     int32_t chunksize = (int32_t) (schunk->chunksize);
@@ -180,7 +181,7 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, chunk_zfp, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
             printf("Buffer is incompressible.  Giving up.\n");
-            return 0;
+            return -1;
         } else if (csize < 0) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);
             return (int) csize;
@@ -197,7 +198,7 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
         csize = blosc2_compress_ctx(schunk->cctx, lossy_chunk, chunksize, chunk_blosc, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
             printf("Buffer is incompressible.  Giving up.\n");
-            return 0;
+            return -1;
         } else if (csize < 0) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);
             return (int) csize;
@@ -242,22 +243,79 @@ static int test_zfp_rate_getitem_double(blosc2_schunk* schunk) {
 
 
 int float_cyclic() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_float_cyclic.b2nd");
-    BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
+    int8_t ndim = 3;
+    int64_t shape[] = {40, 60, 20};
+    int32_t chunkshape[] = {20, 30, 16};
+    int32_t blockshape[] = {11, 14, 7};
+    int32_t typesize = sizeof(float);
+    int64_t nelem = 1;
+    for (int i = 0; i < ndim; ++i) {
+        nelem *= shape[i];
+    }
+    int64_t size = nelem * typesize;
+
+    float *data = malloc(size);
+    for (int i = 0; i < nelem; i += 2) {
+        float j = (float) i;
+        data[i] = (j + j / 10 + j / 100);
+        data[i + 1] = (2 + j / 10 + j / 1000);
+    }
+
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.typesize = typesize;
+    blosc2_storage b2_storage = {.cparams=&cparams};
+    b2_storage.contiguous = true;
+
+    b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                          NULL, 0);
+
+    b2nd_array_t *arr;
+    BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
+    blosc2_schunk *schunk = arr->sc;
 
     /* Run the test. */
     int result = test_zfp_rate_getitem_float(schunk);
-    blosc2_schunk_free(schunk);
+    BLOSC_ERROR(b2nd_free_ctx(ctx));
+    BLOSC_ERROR(b2nd_free(arr));
     return result;
 }
 
 int double_same_cells() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_double_same_cells.b2nd");
-    BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
+    int8_t ndim = 2;
+    int64_t shape[] = {40, 60};
+    int32_t chunkshape[] = {20, 30};
+    int32_t blockshape[] = {16, 16};
+    int32_t typesize = sizeof(double);
+    int64_t nelem = 1;
+    for (int i = 0; i < ndim; ++i) {
+        nelem *= shape[i];
+    }
+    int64_t size = nelem * typesize;
+
+    double *data = malloc(size);
+    for (int i = 0; i < nelem; i += 4) {
+        data[i] = 1.5;
+        data[i + 1] = 14.7;
+        data[i + 2] = 23.6;
+        data[i + 3] = 3.2;
+    }
+
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.typesize = typesize;
+    blosc2_storage b2_storage = {.cparams=&cparams};
+    b2_storage.contiguous = true;
+
+    b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                          NULL, 0);
+
+    b2nd_array_t *arr;
+    BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
+    blosc2_schunk *schunk = arr->sc;
 
     /* Run the test. */
     int result = test_zfp_rate_getitem_double(schunk);
-    blosc2_schunk_free(schunk);
+    BLOSC_ERROR(b2nd_free_ctx(ctx));
+    BLOSC_ERROR(b2nd_free(arr));
     return result;
 }
 
@@ -284,15 +342,24 @@ int item_prices() {
 
 int main(void) {
 
+  int result;
   blosc2_init();   // this is mandatory for initiallizing the plugin mechanism
     printf("float_cyclic: ");
-    float_cyclic();
+    result = float_cyclic();
+    if (result < 0)
+        return result;
     printf("double_same_cells: ");
-    double_same_cells();
+    result = double_same_cells();
+    if (result < 0)
+        return result;
     printf("day_month_temp: ");
-    day_month_temp();
+    result = day_month_temp();
+    if (result < 0)
+        return result;
     printf("item_prices: ");
-    item_prices();
+    result = item_prices();
+    if (result < 0)
+        return result;
   blosc2_destroy();
 
     return BLOSC2_ERROR_SUCCESS;

@@ -10,6 +10,7 @@
 
 # include <b2nd.h>
 # include <stdlib.h>
+# include "time.h"
 
 
 int frame_generator(int8_t *data, int8_t ndim, int64_t *shape, int32_t *chunkshape,
@@ -31,6 +32,27 @@ int frame_generator(int8_t *data, int8_t ndim, int64_t *shape, int32_t *chunksha
   BLOSC_ERROR(b2nd_free(arr));
 
   return 0;
+}
+
+int rand_() {
+    int ndim = 3;
+    int typesize = 4;
+    int64_t shape[] = {32, 18, 32};
+    int32_t chunkshape[] = {17, 16, 24};
+    int32_t blockshape[] = {8, 9, 8};
+    int64_t nelem = 1;
+    for (int i = 0; i < ndim; ++i) {
+        nelem *= (int)(shape[i]);
+    }
+    int64_t size = typesize * nelem;
+    float *data = malloc(size);
+    for (int64_t i = 0; i < nelem; i++) {
+        data[i] = (float) (rand() % 220);
+    }
+    char *urlpath = "rand.b2nd";
+    BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+
+    return 0;
 }
 
 int all_eq() {
@@ -75,6 +97,52 @@ int cyclic() {
   BLOSC_ERROR(frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
 
   return 0;
+}
+
+int same_cells() {
+    int ndim = 2;
+    int typesize = 8;
+    int64_t shape[] = {128, 111};
+    int32_t chunkshape[] = {32, 11};
+    int32_t blockshape[] = {16, 7};
+    int64_t nelem = 1;
+    for (int i = 0; i < ndim; ++i) {
+        nelem *= (int)(shape[i]);
+    }
+    int64_t size = typesize * nelem;
+    double *data = malloc(size);
+    for (int64_t i = 0; i < (nelem / 4); i++) {
+        data[i * 4] = (double ) 11111111;
+        data[i * 4 + 1] = (double ) 99999999;
+    }
+    char *urlpath = "same_cells.b2nd";
+    BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+
+    return 0;
+}
+
+int some_matches() {
+    int ndim = 2;
+    int typesize = 8;
+    int64_t shape[] = {128, 111};
+    int32_t chunkshape[] = {48, 32};
+    int32_t blockshape[] = {14, 18};
+    int64_t nelem = 1;
+    for (int i = 0; i < ndim; ++i) {
+        nelem *= (int)(shape[i]);
+    }
+    int64_t size = typesize * nelem;
+    double *data = malloc(size);
+    for (int64_t i = 0; i < (nelem / 2); i++) {
+        data[i] = (double ) i;
+    }
+    for (int64_t i = (nelem / 2); i < nelem; i++) {
+        data[i] = (double ) 1;
+    }
+    char *urlpath = "some_matches.b2nd";
+    BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+
+    return 0;
 }
 
 int many_matches() {
@@ -238,6 +306,10 @@ int item_prices() {
 
 int main() {
   int err;
+  err = rand_();
+  if (err != BLOSC2_ERROR_SUCCESS) {
+    printf("\n Rand_ error: %d", err);
+  }
   err = all_eq();
   if (err != BLOSC2_ERROR_SUCCESS) {
     printf("\n All_eq error: %d", err);
@@ -245,6 +317,14 @@ int main() {
   err = cyclic();
   if (err != BLOSC2_ERROR_SUCCESS) {
     printf("\n Cyclic error: %d", err);
+  }
+  err = same_cells();
+  if (err != BLOSC2_ERROR_SUCCESS) {
+    printf("\n Same_cells error: %d", err);
+  }
+  err = some_matches();
+  if (err != BLOSC2_ERROR_SUCCESS) {
+    printf("\n Some_matches error: %d", err);
   }
   err = many_matches();
   if (err != BLOSC2_ERROR_SUCCESS) {

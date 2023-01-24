@@ -33,6 +33,7 @@
 #include "ndcell.h"
 #include <inttypes.h>
 #include "blosc2/filters-registry.h"
+#include "b2nd.h"
 
 static int test_ndcell(blosc2_schunk* schunk) {
 
@@ -80,7 +81,7 @@ static int test_ndcell(blosc2_schunk* schunk) {
         csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC2_MAX_OVERHEAD);
         if (csize == 0) {
             printf("Buffer is incompressible.  Giving up.\n");
-            return 0;
+            return -1;
         } else if (csize < 0) {
             printf("Compression error.  Error code: %" PRId64 "\n", csize);
             return (int) csize;
@@ -117,29 +118,111 @@ static int test_ndcell(blosc2_schunk* schunk) {
 
 
 int rand_() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_rand.b2nd");
+    int ndim = 3;
+    int typesize = 4;
+    int64_t shape[] = {32, 18, 32};
+    int32_t chunkshape[] = {17, 16, 24};
+    int32_t blockshape[] = {8, 9, 8};
+    int64_t nelem = 1;
+    for (int i = 0; i < ndim; ++i) {
+        nelem *= (int)(shape[i]);
+    }
+    int64_t size = typesize * nelem;
+    float *data = malloc(size);
+    for (int64_t i = 0; i < nelem; i++) {
+        data[i] = (float) (rand() % 220);
+    }
+
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.typesize = typesize;
+    blosc2_storage b2_storage = {.cparams=&cparams};
+    b2_storage.contiguous = true;
+
+    b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                          NULL, 0);
+
+    b2nd_array_t *arr;
+    BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
+    blosc2_schunk *schunk = arr->sc;
 
     /* Run the test. */
     int result = test_ndcell(schunk);
-    blosc2_schunk_free(schunk);
+    BLOSC_ERROR(b2nd_free_ctx(ctx));
+    BLOSC_ERROR(b2nd_free(arr));
     return result;
 }
 
 int same_cells() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_same_cells.b2nd");
+    int ndim = 2;
+    int typesize = 8;
+    int64_t shape[] = {128, 111};
+    int32_t chunkshape[] = {32, 11};
+    int32_t blockshape[] = {16, 7};
+    int64_t nelem = 1;
+    for (int i = 0; i < ndim; ++i) {
+        nelem *= (int)(shape[i]);
+    }
+    int64_t size = typesize * nelem;
+    double *data = malloc(size);
+    for (int64_t i = 0; i < (nelem / 4); i++) {
+        data[i * 4] = (double ) 11111111;
+        data[i * 4 + 1] = (double ) 99999999;
+    }
+
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.typesize = typesize;
+    blosc2_storage b2_storage = {.cparams=&cparams};
+    b2_storage.contiguous = true;
+
+    b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                          NULL, 0);
+
+    b2nd_array_t *arr;
+    BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
+    blosc2_schunk *schunk = arr->sc;
 
     /* Run the test. */
     int result = test_ndcell(schunk);
-    blosc2_schunk_free(schunk);
+    BLOSC_ERROR(b2nd_free_ctx(ctx));
+    BLOSC_ERROR(b2nd_free(arr));
     return result;
 }
 
 int some_matches() {
-    blosc2_schunk *schunk = blosc2_schunk_open("example_some_matches.b2nd");
+    int ndim = 2;
+    int typesize = 8;
+    int64_t shape[] = {128, 111};
+    int32_t chunkshape[] = {48, 32};
+    int32_t blockshape[] = {14, 18};
+    int64_t nelem = 1;
+    for (int i = 0; i < ndim; ++i) {
+        nelem *= (int)(shape[i]);
+    }
+    int64_t size = typesize * nelem;
+    double *data = malloc(size);
+    for (int64_t i = 0; i < (nelem / 2); i++) {
+        data[i] = (double ) i;
+    }
+    for (int64_t i = (nelem / 2); i < nelem; i++) {
+        data[i] = (double ) 1;
+    }
+
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.typesize = typesize;
+    blosc2_storage b2_storage = {.cparams=&cparams};
+    b2_storage.contiguous = true;
+
+    b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                          NULL, 0);
+
+    b2nd_array_t *arr;
+    BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
+    blosc2_schunk *schunk = arr->sc;
 
     /* Run the test. */
     int result = test_ndcell(schunk);
-    blosc2_schunk_free(schunk);
+    BLOSC_ERROR(b2nd_free_ctx(ctx));
+    BLOSC_ERROR(b2nd_free(arr));
     return result;
 }
 
@@ -149,10 +232,16 @@ int main(void) {
     blosc2_init();
     result = rand_();
     printf("rand: %d obtained \n \n", result);
+    if (result < 0)
+        return result;
     result = same_cells();
     printf("same_cells: %d obtained \n \n", result);
+    if (result < 0)
+        return result;
     result = some_matches();
     printf("some_matches: %d obtained \n \n", result);
+    if (result < 0)
+        return result;
     blosc2_destroy();
     return BLOSC2_ERROR_SUCCESS;
 }
