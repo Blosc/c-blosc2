@@ -182,7 +182,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
                         for (int i = 0; i < cell_shape; i++) {
                             cell_mean += ((float *) data_in)[ind + i];
                         }
-                        cell_mean /= cell_shape;
+                        cell_mean /= (float) cell_shape;
                         for (int i = 0; i < cell_shape; i++) {
                             if (!is_close(cell_mean, ((float *) data_dest)[ind + i])) {
                                 printf("i: %d, cell_mean %.9f, dest %.9f", ind + i, cell_mean, ((float *) data_dest)[ind + i]);
@@ -195,7 +195,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
                         for (int i = 0; i < cell_shape; i++) {
                             cell_mean += ((double *) data_in)[ind + i];
                         }
-                        cell_mean /= cell_shape;
+                        cell_mean /= (double ) cell_shape;
                         for (int i = 0; i < cell_shape; i++) {
                             if (!is_close(cell_mean, ((double *) data_dest)[ind + i])) {
                                 printf("i: %d, cell_mean %.9f, dest %.9f", ind + i, cell_mean, ((double *) data_dest)[ind + i]);
