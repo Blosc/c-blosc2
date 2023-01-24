@@ -97,7 +97,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.splitmode = BLOSC_ALWAYS_SPLIT;
     cparams.typesize = typesize;
-    cparams.compcode = BLOSC_ZSTD;
+    cparams.compcode = BLOSC_BLOSCLZ;
     cparams.filters[4] = BLOSC_FILTER_NDMEAN;
     cparams.filters_meta[4] = cellshape;
     cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_SHUFFLE;
