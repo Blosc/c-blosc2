@@ -12,13 +12,13 @@
 #include "test_common.h"
 
 typedef struct {
-    int8_t ndim;
-    int64_t shape[B2ND_MAX_DIM];
-    int32_t chunkshape[B2ND_MAX_DIM];
-    int32_t blockshape[B2ND_MAX_DIM];
-    int8_t axis;
-    int64_t start;
-    int64_t delete_len;
+  int8_t ndim;
+  int64_t shape[B2ND_MAX_DIM];
+  int32_t chunkshape[B2ND_MAX_DIM];
+  int32_t blockshape[B2ND_MAX_DIM];
+  int8_t axis;
+  int64_t start;
+  int64_t delete_len;
 } test_shapes_t;
 
 
@@ -27,25 +27,25 @@ CUTEST_TEST_SETUP(delete) {
 
   // Add parametrizations
   CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(
-          1,
-          2,
-          4,
-          8,
+      1,
+      2,
+      4,
+      8,
   ));
 
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
-          {false, false},
-          {true, false},
-          {true, true},
-          {false, true},
+      {false, false},
+      {true, false},
+      {true, true},
+      {false, true},
   ));
 
 
   CUTEST_PARAMETRIZE(shapes, test_shapes_t, CUTEST_DATA(
-          {1, {10}, {3}, {2}, 0, 5, 5}, // delete the end
-          {2, {18, 12}, {6, 6}, {3, 3}, 1, 0, 6}, // delete at the beginning
-          {3, {12, 10, 27}, {3, 5, 9}, {3, 4, 4}, 2, 9, 9}, // delete in the middle
-          {4, {10, 10, 5, 30}, {5, 7, 3, 3}, {2, 2, 1, 1}, 3, 12, 9}, // delete in the middle
+      {1, {10}, {3}, {2}, 0, 5, 5}, // delete the end
+      {2, {18, 12}, {6, 6}, {3, 3}, 1, 0, 6}, // delete at the beginning
+      {3, {12, 10, 27}, {3, 5, 9}, {3, 4, 4}, 2, 9, 9}, // delete in the middle
+      {4, {10, 10, 5, 30}, {5, 7, 3, 3}, {2, 2, 1, 1}, 3, 12, 9}, // delete in the middle
 
   ));
 }

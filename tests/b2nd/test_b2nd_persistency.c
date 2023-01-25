@@ -22,10 +22,10 @@
 
 
 typedef struct {
-    int8_t ndim;
-    int64_t shape[B2ND_MAX_DIM];
-    int32_t chunkshape[B2ND_MAX_DIM];
-    int32_t blockshape[B2ND_MAX_DIM];
+  int8_t ndim;
+  int64_t shape[B2ND_MAX_DIM];
+  int32_t chunkshape[B2ND_MAX_DIM];
+  int32_t blockshape[B2ND_MAX_DIM];
 } test_shapes_t;
 
 
@@ -35,18 +35,18 @@ CUTEST_TEST_SETUP(persistency) {
   // Add parametrizations
   CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(1, 2, 4, 8));
   CUTEST_PARAMETRIZE(shapes, test_shapes_t, CUTEST_DATA(
-          {0, {0}, {0}, {0}}, // 0-dim
-          {1, {10}, {7}, {2}}, // 1-idim
-          {2, {100, 100}, {20, 20}, {10, 10}},
-          {3, {100, 55, 23}, {31, 5, 22}, {4, 4, 4}},
-          {3, {100, 0, 12}, {31, 0, 12}, {10, 0, 12}},
-          {4, {50, 30, 31, 12}, {25, 20, 20, 10}, {5, 5, 5, 10}},
-          {5, {1, 1, 1024, 1, 1}, {1, 1, 500, 1, 1}, {1, 1, 200, 1, 1}},
-          {6, {5, 1, 100, 3, 1, 2}, {5, 1, 50, 2, 1, 2}, {2, 1, 20, 2, 1, 2}}
+      {0, {0}, {0}, {0}}, // 0-dim
+      {1, {10}, {7}, {2}}, // 1-idim
+      {2, {100, 100}, {20, 20}, {10, 10}},
+      {3, {100, 55, 23}, {31, 5, 22}, {4, 4, 4}},
+      {3, {100, 0, 12}, {31, 0, 12}, {10, 0, 12}},
+      {4, {50, 30, 31, 12}, {25, 20, 20, 10}, {5, 5, 5, 10}},
+      {5, {1, 1, 1024, 1, 1}, {1, 1, 500, 1, 1}, {1, 1, 200, 1, 1}},
+      {6, {5, 1, 100, 3, 1, 2}, {5, 1, 50, 2, 1, 2}, {2, 1, 20, 2, 1, 2}}
   ));
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
-          {true, true},
-          {false, true},
+      {true, true},
+      {false, true},
   ));
 }
 

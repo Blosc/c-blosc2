@@ -21,12 +21,12 @@ int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_
   pmeta += 1;
 
   // version entry
-  int8_t version = (int8_t)pmeta[0];  // positive fixnum (7-bit positive integer)
+  int8_t version = (int8_t) pmeta[0];  // positive fixnum (7-bit positive integer)
   BLOSC_UNUSED_PARAM(version);
   pmeta += 1;
 
   // ndim entry
-  *ndim = (int8_t)pmeta[0];
+  *ndim = (int8_t) pmeta[0];
   int8_t ndim_aux = *ndim;  // positive fixnum (7-bit positive integer)
   pmeta += 1;
 
@@ -59,6 +59,6 @@ int32_t deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_
     swap_store(blockshape + i, pmeta, sizeof(int32_t));
     pmeta += sizeof(int32_t);
   }
-  int32_t slen = (int32_t)(pmeta - smeta);
+  int32_t slen = (int32_t) (pmeta - smeta);
   return slen;
 }

@@ -15,7 +15,7 @@ CUTEST_TEST_SETUP(roundtrip) {
   blosc2_init();
 
   // Add parametrizations
-    b2nd_default_parameters();
+  b2nd_default_parameters();
 }
 
 

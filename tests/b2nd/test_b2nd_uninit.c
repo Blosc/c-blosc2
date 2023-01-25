@@ -16,22 +16,22 @@ CUTEST_TEST_SETUP(uninit) {
 
   // Add parametrizations
   CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(
-          1, 2, 4, 7
+      1, 2, 4, 7
   ));
   CUTEST_PARAMETRIZE(shapes, _test_shapes, CUTEST_DATA(
-          {0, {0}, {0}, {0}}, // 0-dim
-          {1, {5}, {3}, {2}}, // 1-idim
-          {2, {20, 0}, {7, 0}, {3, 0}}, // 0-shape
-          {2, {20, 10}, {7, 5}, {3, 5}}, // 0-shape
-          {2, {14, 10}, {8, 5}, {2, 2}}, // general,
-          {3, {12, 10, 14}, {3, 5, 9}, {3, 4, 4}}, // general
-          {3, {10, 21, 30, 55}, {8, 7, 15, 3}, {5, 5, 10, 1}}, // general,
+      {0, {0}, {0}, {0}}, // 0-dim
+      {1, {5}, {3}, {2}}, // 1-idim
+      {2, {20, 0}, {7, 0}, {3, 0}}, // 0-shape
+      {2, {20, 10}, {7, 5}, {3, 5}}, // 0-shape
+      {2, {14, 10}, {8, 5}, {2, 2}}, // general,
+      {3, {12, 10, 14}, {3, 5, 9}, {3, 4, 4}}, // general
+      {3, {10, 21, 30, 55}, {8, 7, 15, 3}, {5, 5, 10, 1}}, // general,
   ));
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
-          {false, false},
-          {true, false},
-          {true, true},
-          {false, true},
+      {false, false},
+      {true, false},
+      {true, true},
+      {false, true},
   ));
 }
 
@@ -54,7 +54,7 @@ CUTEST_TEST_TEST(uninit) {
   b2_storage.contiguous = backend.contiguous;
 
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
-                                              shapes.chunkshape, shapes.blockshape, NULL, 0);
+                                        shapes.chunkshape, shapes.blockshape, NULL, 0);
 
   /* Create b2nd_array_t with uninitialized values */
   b2nd_array_t *src;

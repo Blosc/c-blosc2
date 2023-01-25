@@ -11,14 +11,14 @@
 #include "test_common.h"
 
 typedef struct {
-    int8_t ndim;
-    int64_t shape[B2ND_MAX_DIM];
-    int32_t chunkshape[B2ND_MAX_DIM];
-    int32_t blockshape[B2ND_MAX_DIM];
-    int32_t chunkshape2[B2ND_MAX_DIM];
-    int32_t blockshape2[B2ND_MAX_DIM];
-    int64_t start[B2ND_MAX_DIM];
-    int64_t stop[B2ND_MAX_DIM];
+  int8_t ndim;
+  int64_t shape[B2ND_MAX_DIM];
+  int32_t chunkshape[B2ND_MAX_DIM];
+  int32_t blockshape[B2ND_MAX_DIM];
+  int32_t chunkshape2[B2ND_MAX_DIM];
+  int32_t blockshape2[B2ND_MAX_DIM];
+  int64_t start[B2ND_MAX_DIM];
+  int64_t stop[B2ND_MAX_DIM];
 } test_shapes_t;
 
 
@@ -27,32 +27,32 @@ CUTEST_TEST_SETUP(squeeze) {
 
   // Add parametrizations
   CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(
-          1,
-          2,
-          4,
-          8
+      1,
+      2,
+      4,
+      8
   ));
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
-          {false, false},
-          {true, false},
-          {true, true},
-          {false, true},
+      {false, false},
+      {true, false},
+      {true, true},
+      {false, true},
   ));
   CUTEST_PARAMETRIZE(backend2, _test_backend, CUTEST_DATA(
-          {false, false},
-          {true, false},
-          {true, true},
-          {false, true},
+      {false, false},
+      {true, false},
+      {true, true},
+      {false, true},
   ));
 
 
   CUTEST_PARAMETRIZE(shapes, test_shapes_t, CUTEST_DATA(
-          {0, {0}, {0}, {0}, {0}, {0}, {0}, {0}}, // 0-dim
-          {1, {10}, {7}, {2}, {1}, {1}, {2}, {3}}, // 1-idim
-          {2, {14, 10}, {8, 5}, {2, 2}, {4, 1}, {2, 1}, {5, 3}, {9, 4}}, // general,
-          {3, {10, 10, 10}, {3, 5, 9}, {3, 4, 4}, {1, 7, 1}, {1, 5, 1}, {3, 0, 9}, {4, 7, 10}},
-          {2, {20, 0}, {7, 0}, {3, 0}, {1, 0}, {1, 0}, {1, 0}, {2, 0}}, // 0-shape
-          {2, {20, 10}, {7, 5}, {3, 5}, {1, 0}, {1, 0}, {17, 0}, {18, 0}}, // 0-shape
+      {0, {0}, {0}, {0}, {0}, {0}, {0}, {0}}, // 0-dim
+      {1, {10}, {7}, {2}, {1}, {1}, {2}, {3}}, // 1-idim
+      {2, {14, 10}, {8, 5}, {2, 2}, {4, 1}, {2, 1}, {5, 3}, {9, 4}}, // general,
+      {3, {10, 10, 10}, {3, 5, 9}, {3, 4, 4}, {1, 7, 1}, {1, 5, 1}, {3, 0, 9}, {4, 7, 10}},
+      {2, {20, 0}, {7, 0}, {3, 0}, {1, 0}, {1, 0}, {1, 0}, {2, 0}}, // 0-shape
+      {2, {20, 10}, {7, 5}, {3, 5}, {1, 0}, {1, 0}, {17, 0}, {18, 0}}, // 0-shape
   ));
 }
 

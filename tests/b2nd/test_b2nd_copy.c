@@ -11,12 +11,12 @@
 #include "test_common.h"
 
 typedef struct {
-    int8_t ndim;
-    int64_t shape[B2ND_MAX_DIM];
-    int32_t chunkshape[B2ND_MAX_DIM];
-    int32_t blockshape[B2ND_MAX_DIM];
-    int32_t chunkshape2[B2ND_MAX_DIM];
-    int32_t blockshape2[B2ND_MAX_DIM];
+  int8_t ndim;
+  int64_t shape[B2ND_MAX_DIM];
+  int32_t chunkshape[B2ND_MAX_DIM];
+  int32_t blockshape[B2ND_MAX_DIM];
+  int32_t chunkshape2[B2ND_MAX_DIM];
+  int32_t blockshape2[B2ND_MAX_DIM];
 } test_shapes_t;
 
 
@@ -25,16 +25,16 @@ CUTEST_TEST_SETUP(copy) {
 
   // Add parametrizations
   CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(
-          2,
-          4,
+      2,
+      4,
   ));
   CUTEST_PARAMETRIZE(shapes, test_shapes_t, CUTEST_DATA(
-          {2, {30, 30}, {20, 20}, {10, 10},
-           {20, 20}, {10, 10}},
-          {3, {40, 15, 23}, {31, 5, 22}, {4, 4, 4},
-           {30, 5, 20}, {10, 4, 4}},
-          {3, {40, 0, 12}, {31, 0, 12}, {10, 0, 12},
-           {20, 0, 12}, {25, 0, 6}},
+      {2, {30, 30}, {20, 20}, {10, 10},
+       {20, 20}, {10, 10}},
+      {3, {40, 15, 23}, {31, 5, 22}, {4, 4, 4},
+       {30, 5, 20}, {10, 4, 4}},
+      {3, {40, 0, 12}, {31, 0, 12}, {10, 0, 12},
+       {20, 0, 12}, {25, 0, 6}},
 // The following cases are skipped to reduce the execution time of the test suite
 //            {4, {25, 60, 31, 12}, {12, 20, 20, 10}, {5, 5, 5, 10},
 //                {25, 20, 20, 10}, {5, 5, 5, 10}},
@@ -44,18 +44,18 @@ CUTEST_TEST_SETUP(copy) {
 //                {4, 1, 50, 2, 1, 1}, {2, 1, 20, 2, 1, 1}},
   ));
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
-          {false, false},
-          {true, false},
-          {false, true},
-          {true, true},
+      {false, false},
+      {true, false},
+      {false, true},
+      {true, true},
   ));
 
   CUTEST_PARAMETRIZE(backend2, _test_backend, CUTEST_DATA(
-          {false, false},
-          {false, false},
-          {true, false},
-          {false, true},
-          {true, true},
+      {false, false},
+      {false, false},
+      {true, false},
+      {false, true},
+      {true, true},
   ));
 }
 
