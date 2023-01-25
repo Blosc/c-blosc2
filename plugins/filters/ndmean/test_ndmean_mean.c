@@ -175,7 +175,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
                 cell_mean = 0;
                 int cell_shape = cellshape;
                 if (cei == ncells - 1) {
-                    cell_shape = block_shape % cellshape;
+                    cell_shape = block_shape % cell_shape;
                 }
                 switch (typesize) {
                     case 4:
@@ -192,10 +192,13 @@ static int test_ndmean(blosc2_schunk* schunk) {
                         }
                         break;
                     case 8:
+                        printf("Cell_mean at 0: %f\n", cell_mean);
                         for (int i = 0; i < cell_shape; i++) {
                             cell_mean += ((double *) data_in)[ind + i];
                         }
+                        printf("Cell_mean post sum: %f\n", cell_mean);
                         cell_mean /= (double ) cell_shape;
+                        printf("Cell_mean post div: %f\n", cell_mean);
                         for (int i = 0; i < cell_shape; i++) {
                             if (!is_close(cell_mean, ((double *) data_dest)[ind + i])) {
                                 printf("i: %d, cell_mean %.9f, dest %.9f", ind + i, cell_mean, ((double *) data_dest)[ind + i]);
@@ -271,6 +274,7 @@ int rows_matches() {
     int result = test_ndmean(schunk);
     BLOSC_ERROR(b2nd_free_ctx(ctx));
     BLOSC_ERROR(b2nd_free(arr));
+    free(data);
     return result;
 }
 
@@ -309,6 +313,7 @@ int same_cells() {
     int result = test_ndmean(schunk);
     BLOSC_ERROR(b2nd_free_ctx(ctx));
     BLOSC_ERROR(b2nd_free(arr));
+    free(data);
     return result;
 }
 
@@ -347,6 +352,7 @@ int some_matches() {
     int result = test_ndmean(schunk);
     BLOSC_ERROR(b2nd_free_ctx(ctx));
     BLOSC_ERROR(b2nd_free(arr));
+    free(data);
     return result;
 }
 
