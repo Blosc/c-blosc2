@@ -182,7 +182,9 @@ static int test_ndmean(blosc2_schunk* schunk) {
                         for (int i = 0; i < cell_shape; i++) {
                             cell_mean += ((float *) data_in)[ind + i];
                         }
-                        cell_mean /= (float) cell_shape;
+                        if (cell_mean != 0) {
+                            cell_mean /= (float) cell_shape;
+                        }
                         for (int i = 0; i < cell_shape; i++) {
                             if (!is_close(cell_mean, ((float *) data_dest)[ind + i])) {
                                 printf("i: %d, cell_mean %.9f, dest %.9f", ind + i, cell_mean, ((float *) data_dest)[ind + i]);
@@ -192,13 +194,12 @@ static int test_ndmean(blosc2_schunk* schunk) {
                         }
                         break;
                     case 8:
-                        printf("Cell_mean at 0: %f\n", cell_mean);
                         for (int i = 0; i < cell_shape; i++) {
                             cell_mean += ((double *) data_in)[ind + i];
                         }
-                        printf("Cell_mean post sum: %f\n", cell_mean);
-                        cell_mean /= (double ) cell_shape;
-                        printf("Cell_mean post div: %f\n", cell_mean);
+                        if (cell_mean != 0) {
+                            cell_mean /= (double ) cell_shape;
+                        }
                         for (int i = 0; i < cell_shape; i++) {
                             if (!is_close(cell_mean, ((double *) data_dest)[ind + i])) {
                                 printf("i: %d, cell_mean %.9f, dest %.9f", ind + i, cell_mean, ((double *) data_dest)[ind + i]);
