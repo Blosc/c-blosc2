@@ -158,14 +158,14 @@ static int test_ndmean(blosc2_schunk* schunk) {
         }
 */
         int chunk_shape = chunkshape[0];
-        if (ci == nchunks - 1) {
+        if ((ci == nchunks - 1) && (shape[0] % chunkshape[0] != 0)) {
             chunk_shape = (int) (shape[0] % chunkshape[0]);
         }
         int nblocks = (chunk_shape + blockshape[0] - 1) / blockshape[0];
 
         for (int bi = 0; bi < nblocks; bi++) {
             int block_shape = blockshape[0];
-            if (bi == nblocks - 1) {
+            if ((bi == nblocks - 1) && (chunk_shape % blockshape[0] != 0)) {
                 block_shape = chunk_shape % blockshape[0];
             }
             int ncells = (block_shape + cellshape - 1) / cellshape;
@@ -174,7 +174,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
                 int ind = bi * blockshape[0] + cei * cellshape;
                 cell_mean = 0;
                 int cell_shape = cellshape;
-                if (cei == ncells - 1) {
+                if ((cei == ncells - 1) && (block_shape % cell_shape != 0)) {
                     cell_shape = block_shape % cell_shape;
                 }
                 switch (typesize) {
