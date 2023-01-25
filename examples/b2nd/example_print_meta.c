@@ -15,7 +15,7 @@
  * $ ./example_print_meta <urlpath>
  *
  * Example of output:
- * $ ./b2nd_example_print_meta example_big_float_frame.b2nd
+ * $ ./example_print_meta example_big_float_frame.b2nd
  * Blosc2 NDim metalayer parameters:
  * Ndim:       3
  * Shape:      200, 310, 214
@@ -30,7 +30,7 @@ int print_meta(char *urlpath) {
 
   b2nd_array_t *arr;
   BLOSC_ERROR(b2nd_open(urlpath, &arr));
-  b2nd_print_meta(arr);
+  BLOSC_ERROR(b2nd_print_meta(arr));
   BLOSC_ERROR(b2nd_free(arr));
 
   return 0;

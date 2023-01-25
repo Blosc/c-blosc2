@@ -1378,7 +1378,7 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
 
 /* Find whether the schunk has a metalayer or not.
  *
- * If successful, return the index of the metalayer.  Else, return a negative value.
+ * If found, return the index of the metalayer.  Else, return a negative value.
  */
 int blosc2_meta_exists(blosc2_schunk *schunk, const char *name) {
   if (strlen(name) > BLOSC2_METALAYER_NAME_MAXLEN) {
@@ -1563,7 +1563,7 @@ int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
                     int32_t *content_len) {
   int nmetalayer = blosc2_meta_exists(schunk, name);
   if (nmetalayer < 0) {
-    BLOSC_TRACE_ERROR("Metalayer \"%s\" not found.", name);
+    BLOSC_TRACE_WARNING("Metalayer \"%s\" not found.", name);
     return nmetalayer;
   }
   *content_len = schunk->metalayers[nmetalayer]->content_len;

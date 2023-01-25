@@ -441,6 +441,7 @@ enum {
   BLOSC2_ERROR_FILE_REMOVE = -31,     //!< Remove file failure
   BLOSC2_ERROR_NULL_POINTER = -32,    //!< Pointer is null
   BLOSC2_ERROR_INVALID_INDEX = -33,   //!< Invalid index
+  BLOSC2_ERROR_METALAYER_NOT_FOUND = -34,   //!< Metalayer has not been found
 };
 
 
@@ -519,6 +520,8 @@ static char *print_error(int rc) {
       return (char *) "Pointer is null";
     case BLOSC2_ERROR_INVALID_INDEX:
       return (char *) "Invalid index";
+    case BLOSC2_ERROR_METALAYER_NOT_FOUND:
+      return (char *) "Metalayer has not been found";
     default:
       return (char *) "Unknown error";
   }
