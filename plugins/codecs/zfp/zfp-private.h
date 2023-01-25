@@ -23,11 +23,11 @@ extern "C" {
 #define XXH_INLINE_ALL
 
 #define ZFP_ERROR_NULL(pointer)         \
-    do {                                 \
-        if ((pointer) == NULL) {         \
-            return 0;                    \
-        }                                \
-    } while (0)
+  do {                                 \
+    if ((pointer) == NULL) {         \
+      return 0;                    \
+    }                                \
+  } while (0)
 
 
 #if defined (__cplusplus)

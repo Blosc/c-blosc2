@@ -12,12 +12,12 @@
 #include "test_common.h"
 
 typedef struct {
-    int8_t ndim;
-    int64_t shape[B2ND_MAX_DIM];
-    int32_t chunkshape[B2ND_MAX_DIM];
-    int32_t blockshape[B2ND_MAX_DIM];
-    int64_t buffershape[B2ND_MAX_DIM];
-    int8_t axis;
+  int8_t ndim;
+  int64_t shape[B2ND_MAX_DIM];
+  int32_t chunkshape[B2ND_MAX_DIM];
+  int32_t blockshape[B2ND_MAX_DIM];
+  int64_t buffershape[B2ND_MAX_DIM];
+  int8_t axis;
 } test_shapes_t;
 
 
@@ -26,25 +26,25 @@ CUTEST_TEST_SETUP(append) {
 
   // Add parametrizations
   CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(
-          1,
-          2,
-          4,
-          8,
+      1,
+      2,
+      4,
+      8,
   ));
 
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
-          {false, false},
-          {true, false},
-          {true, true},
-          {false, true},
+      {false, false},
+      {true, false},
+      {true, true},
+      {false, true},
   ));
 
 
   CUTEST_PARAMETRIZE(shapes, test_shapes_t, CUTEST_DATA(
-          {1, {5}, {3}, {2}, {10}, 0},
-          {2, {18, 6}, {6, 6}, {3, 3}, {18, 12}, 1},
-          {3, {12, 10, 14}, {3, 5, 9}, {3, 4, 4}, {12, 10, 18}, 2},
-          {4, {10, 10, 5, 5}, {5, 7, 3, 3}, {2, 2, 1, 1}, {10, 10, 5, 30}, 3},
+      {1, {5}, {3}, {2}, {10}, 0},
+      {2, {18, 6}, {6, 6}, {3, 3}, {18, 12}, 1},
+      {3, {12, 10, 14}, {3, 5, 9}, {3, 4, 4}, {12, 10, 18}, 2},
+      {4, {10, 10, 5, 5}, {5, 7, 3, 3}, {2, 2, 1, 1}, {10, 10, 5, 30}, 3},
 
   ));
 }

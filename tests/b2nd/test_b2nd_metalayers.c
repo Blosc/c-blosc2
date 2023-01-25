@@ -17,13 +17,13 @@ CUTEST_TEST_SETUP(metalayers) {
   // Add parametrizations
   CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(1, 2, 4, 8));
   CUTEST_PARAMETRIZE(shapes, _test_shapes, CUTEST_DATA(
-          {0, {0}, {0}, {0}}, // 0-dim
-          {1, {10}, {7}, {2}}, // 1-idim
-          {2, {100, 100}, {20, 20}, {10, 10}},
+      {0, {0}, {0}, {0}}, // 0-dim
+      {1, {10}, {7}, {2}}, // 1-idim
+      {2, {100, 100}, {20, 20}, {10, 10}},
   ));
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
-          {true, true},
-          {false, true},
+      {true, true},
+      {false, true},
   ));
 }
 

@@ -10,11 +10,13 @@
 
 #ifndef NDLZ8_H
 #define NDLZ8_H
+
 #include "context.h"
 
 #if defined (__cplusplus)
 extern "C" {
 #endif
+
 #include "ndlz.h"
 #include "ndlz-private.h"
 

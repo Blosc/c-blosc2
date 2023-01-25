@@ -11,13 +11,13 @@
 #include "test_common.h"
 
 typedef struct {
-    int8_t ndim;
-    int64_t shape[B2ND_MAX_DIM];
-    int32_t chunkshape[B2ND_MAX_DIM];
-    int32_t blockshape[B2ND_MAX_DIM];
-    int64_t newshape[B2ND_MAX_DIM];
-    bool given_pos;
-    int64_t start_resize[B2ND_MAX_DIM];
+  int8_t ndim;
+  int64_t shape[B2ND_MAX_DIM];
+  int32_t chunkshape[B2ND_MAX_DIM];
+  int32_t blockshape[B2ND_MAX_DIM];
+  int64_t newshape[B2ND_MAX_DIM];
+  bool given_pos;
+  int64_t start_resize[B2ND_MAX_DIM];
 } test_shapes_t;
 
 
@@ -26,32 +26,32 @@ CUTEST_TEST_SETUP(resize_shape) {
 
   // Add parametrizations
   CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(
-          1,
-          2,
-          4,
-          8,
+      1,
+      2,
+      4,
+      8,
   ));
 
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
-          {false, false},
-          {true, false},
-          {true, true},
-          {false, true},
+      {false, false},
+      {true, false},
+      {true, true},
+      {false, true},
   ));
 
 
   CUTEST_PARAMETRIZE(shapes, test_shapes_t, CUTEST_DATA(
-          {1, {5}, {3}, {2}, {10}, false, {5}}, // extend only
-          {2, {20, 5}, {7, 5}, {3, 3}, {27, 10}, true, {14, 5}}, // extend only - start
-          {2, {20, 10}, {7, 5}, {3, 5}, {10, 10}, false, {10, 10}}, // shrink only
-          {2, {30, 20}, {8, 5}, {2, 2}, {22, 10}, true, {8, 5}}, // shrink only - start
-          {3, {12, 10, 14}, {3, 5, 9}, {3, 4, 4}, {10, 15, 14}, false, {10, 10, 14}}, // shrink and extend
-          {3, {10, 21, 30}, {8, 7, 15}, {5, 5, 10}, {10, 13, 10}, false, {10, 13, 10}}, // shrink only
-          {3, {10, 23, 30}, {8, 7, 15}, {5, 5, 10}, {10, 16, 45}, true, {0, 0, 0}}, // shrink and extend - start
-          {2, {75, 50}, {25, 13}, {8, 8}, {50, 76}, true, {50, 13}}, // shrink and extend - start
-          {2, {50, 50}, {25, 13}, {8, 8}, {49, 51}, false, {49, 50}}, // shrink and extend
-          {2, {143, 41}, {18, 13}, {7, 7}, {50, 50}, false, {50, 41}}, // shrink and extend
-          {4, {10, 10, 5, 5}, {5, 7, 3, 3}, {2, 2, 1, 1}, {11, 20, 2, 2}, false, {10, 10, 2, 2}}, // shrink and extend
+      {1, {5}, {3}, {2}, {10}, false, {5}}, // extend only
+      {2, {20, 5}, {7, 5}, {3, 3}, {27, 10}, true, {14, 5}}, // extend only - start
+      {2, {20, 10}, {7, 5}, {3, 5}, {10, 10}, false, {10, 10}}, // shrink only
+      {2, {30, 20}, {8, 5}, {2, 2}, {22, 10}, true, {8, 5}}, // shrink only - start
+      {3, {12, 10, 14}, {3, 5, 9}, {3, 4, 4}, {10, 15, 14}, false, {10, 10, 14}}, // shrink and extend
+      {3, {10, 21, 30}, {8, 7, 15}, {5, 5, 10}, {10, 13, 10}, false, {10, 13, 10}}, // shrink only
+      {3, {10, 23, 30}, {8, 7, 15}, {5, 5, 10}, {10, 16, 45}, true, {0, 0, 0}}, // shrink and extend - start
+      {2, {75, 50}, {25, 13}, {8, 8}, {50, 76}, true, {50, 13}}, // shrink and extend - start
+      {2, {50, 50}, {25, 13}, {8, 8}, {49, 51}, false, {49, 50}}, // shrink and extend
+      {2, {143, 41}, {18, 13}, {7, 7}, {50, 50}, false, {50, 41}}, // shrink and extend
+      {4, {10, 10, 5, 5}, {5, 7, 3, 3}, {2, 2, 1, 1}, {11, 20, 2, 2}, false, {10, 10, 2, 2}}, // shrink and extend
 
   ));
 }

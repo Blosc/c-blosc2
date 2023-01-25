@@ -17,25 +17,25 @@ CUTEST_TEST_SETUP(full) {
 
   // Add parametrizations
   CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(
-          1, 2, 4, 8
+      1, 2, 4, 8
   ));
   CUTEST_PARAMETRIZE(shapes, _test_shapes, CUTEST_DATA(
-          {0, {0}, {0}, {0}}, // 0-dim
-          {1, {5}, {3}, {2}}, // 1-idim
-          {2, {20, 0}, {7, 0}, {3, 0}}, // 0-shape
-          {2, {20, 10}, {7, 5}, {3, 5}}, // 0-shape
-          {2, {14, 10}, {8, 5}, {2, 2}}, // general,
-          {3, {12, 10, 14}, {3, 5, 9}, {3, 4, 4}}, // general
-          {3, {10, 21, 20, 5}, {8, 7, 15, 3}, {5, 5, 10, 1}}, // general,
+      {0, {0}, {0}, {0}}, // 0-dim
+      {1, {5}, {3}, {2}}, // 1-idim
+      {2, {20, 0}, {7, 0}, {3, 0}}, // 0-shape
+      {2, {20, 10}, {7, 5}, {3, 5}}, // 0-shape
+      {2, {14, 10}, {8, 5}, {2, 2}}, // general,
+      {3, {12, 10, 14}, {3, 5, 9}, {3, 4, 4}}, // general
+      {3, {10, 21, 20, 5}, {8, 7, 15, 3}, {5, 5, 10, 1}}, // general,
   ));
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
-          {false, false},
-          {true, false},
-          {true, true},
-          {false, true},
+      {false, false},
+      {true, false},
+      {true, true},
+      {false, true},
   ));
   CUTEST_PARAMETRIZE(fill_value, int8_t, CUTEST_DATA(
-          3, 113, 33, -5
+      3, 113, 33, -5
   ));
 }
 
