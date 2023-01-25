@@ -64,12 +64,11 @@ int main() {
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
-
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
                                         NULL, 0);
-
-  b2nd_array_t *arr;
+  BLOSC_ERROR_NULL(ctx, -1);
   blosc_set_timestamp(&t0);
+  b2nd_array_t *arr;
   BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, src, nbytes));
   blosc_set_timestamp(&t1);
   printf("from_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));

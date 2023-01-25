@@ -281,14 +281,13 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(schunk, "b2nd", &smeta, &smeta_len) < 0) {
-    BLOSC_TRACE_ERROR("Blosc error");
-    return BLOSC2_ERROR_FAILURE;
+    // Try with a caterva metalayer; we are meant to be backward compatible with it
+    if (blosc2_meta_get(schunk, "caterva", &smeta, &smeta_len) < 0) {
+      BLOSC_ERROR(BLOSC2_ERROR_METALAYER_NOT_FOUND);
+    }
   }
-  BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &params.ndim,
-                                        params.shape,
-                                        params.chunkshape,
-                                        params.blockshape)
-  );
+  BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &params.ndim, params.shape,
+                                    params.chunkshape, params.blockshape));
   free(smeta);
 
   BLOSC_ERROR(array_without_schunk(&params, array));
@@ -982,7 +981,10 @@ int b2nd_print_meta(b2nd_array_t *array) {
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(array->sc, "b2nd", &smeta, &smeta_len) < 0) {
-    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+    // Try with a caterva metalayer; we are meant to be backward compatible with it
+    if (blosc2_meta_get(array->sc, "caterva", &smeta, &smeta_len) < 0) {
+      BLOSC_ERROR(BLOSC2_ERROR_METALAYER_NOT_FOUND);
+    }
   }
   BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape));
   free(smeta);

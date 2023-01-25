@@ -69,7 +69,7 @@ int main() {
 
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
                                         NULL, 0);
-
+  BLOSC_ERROR_NULL(ctx, -1);
   b2nd_array_t *arr;
   blosc_set_timestamp(&t0);
   BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, src, nbytes));
