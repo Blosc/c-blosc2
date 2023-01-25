@@ -182,9 +182,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
                         for (int i = 0; i < cell_shape; i++) {
                             cell_mean += ((float *) data_in)[ind + i];
                         }
-                        if (cell_mean != 0) {
-                            cell_mean /= (float) cell_shape;
-                        }
+                        cell_mean /= (float) cell_shape;
                         for (int i = 0; i < cell_shape; i++) {
                             if (!is_close(cell_mean, ((float *) data_dest)[ind + i])) {
                                 printf("i: %d, cell_mean %.9f, dest %.9f", ind + i, cell_mean, ((float *) data_dest)[ind + i]);
@@ -197,9 +195,7 @@ static int test_ndmean(blosc2_schunk* schunk) {
                         for (int i = 0; i < cell_shape; i++) {
                             cell_mean += ((double *) data_in)[ind + i];
                         }
-                        if (cell_mean != 0) {
-                            cell_mean /= (double ) cell_shape;
-                        }
+                        cell_mean /= (double ) cell_shape;
                         for (int i = 0; i < cell_shape; i++) {
                             if (!is_close(cell_mean, ((double *) data_dest)[ind + i])) {
                                 printf("i: %d, cell_mean %.9f, dest %.9f", ind + i, cell_mean, ((double *) data_dest)[ind + i]);
@@ -256,6 +252,9 @@ int rows_matches() {
             data[i + 3] = i + 3;
         } else {
             data[i] = i;
+            data[i + 1] = i;
+            data[i + 2] = i;
+            data[i + 3] = i;
         }
     }
 
@@ -361,7 +360,7 @@ int some_matches() {
 int main(void) {
 
     int result;
-  blosc2_init();
+    blosc2_init();
     result = rows_matches();
     printf("2_rows_matches: %d obtained \n \n", result);
     if (result <= 0)
