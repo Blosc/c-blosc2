@@ -1502,7 +1502,7 @@ static int blosc_d(
   int32_t neblock;
   int32_t nbytes;                /* number of decompressed bytes in split */
   int32_t cbytes;                /* number of compressed bytes in split */
-  int32_t ctbytes = 0;           /* number of compressed bytes in block */
+  // int32_t ctbytes = 0;           /* number of compressed bytes in block */
   int32_t ntbytes = 0;           /* number of uncompressed bytes in block */
   uint8_t* _dest;
   int32_t typesize = context->typesize;
@@ -1713,7 +1713,7 @@ static int blosc_d(
       srcsize -= cbytes;
     }
     src += sizeof(int32_t);
-    ctbytes += (signed)sizeof(int32_t);
+    // ctbytes += (signed)sizeof(int32_t);
 
     /* Uncompress */
     if (cbytes == 0) {
@@ -1733,7 +1733,7 @@ static int blosc_d(
 
       token = src[0];
       src += 1;
-      ctbytes += 1;
+      // ctbytes += 1;
 
       if (token & 0x1) {
         // A run of bytes that are different than 0
@@ -1828,7 +1828,7 @@ static int blosc_d(
 
     }
     src += cbytes;
-    ctbytes += cbytes;
+    // ctbytes += cbytes;
     _dest += nbytes;
     ntbytes += nbytes;
   } /* Closes j < nstreams */
