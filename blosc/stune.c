@@ -21,7 +21,9 @@ static bool is_HCR(blosc2_context * context) {
     case BLOSC_BLOSCLZ :
       return false;
     case BLOSC_LZ4 :
-      return (context->filter_flags & BLOSC_DOBITSHUFFLE) ? true : false;
+      // return (context->filter_flags & BLOSC_DOBITSHUFFLE) ? true : false;
+      // Do not treat LZ4 differently than BloscLZ here
+      return false;
     case BLOSC_LZ4HC :
     case BLOSC_ZLIB :
     case BLOSC_ZSTD :
