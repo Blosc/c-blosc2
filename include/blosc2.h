@@ -609,7 +609,7 @@ BLOSC_EXPORT void blosc2_destroy(void);
  * * **BLOSC_TYPESIZE=(INTEGER)**: This will overwrite the @p typesize
  * parameter before the compression process starts.
  *
- * * **BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | SNAPPY | ZLIB | ZSTD]**:
+ * * **BLOSC_COMPRESSOR=[BLOSCLZ | LZ4 | LZ4HC | ZLIB | ZSTD]**:
  * This will call #blosc1_set_compressor before the compression process starts.
  *
  * * **BLOSC_NTHREADS=(INTEGER)**: This will call
