@@ -369,7 +369,7 @@ BLOSC_EXPORT int b2nd_print_meta(b2nd_array_t *array);
  *
  * @param array The array to be resized.
  * @param new_shape The new shape from the array.
- * @param start The position in which the array will be extended or shrinked.
+ * @param start The position in which the array will be extended or shrunk.
  *
  * @return An error code
  */

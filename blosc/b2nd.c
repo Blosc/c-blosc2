@@ -1182,17 +1182,17 @@ int b2nd_resize(b2nd_array_t *array, const int64_t *new_shape,
     }
   }
 
-  // Get shrinked shape
-  int64_t shrinked_shape[B2ND_MAX_DIM] = {0};
+  // Get shrunk shape
+  int64_t shrunk_shape[B2ND_MAX_DIM] = {0};
   for (int i = 0; i < array->ndim; ++i) {
     if (new_shape[i] <= array->shape[i]) {
-      shrinked_shape[i] = new_shape[i];
+      shrunk_shape[i] = new_shape[i];
     } else {
-      shrinked_shape[i] = array->shape[i];
+      shrunk_shape[i] = array->shape[i];
     }
   }
 
-  BLOSC_ERROR(shrink_shape(array, shrinked_shape, start));
+  BLOSC_ERROR(shrink_shape(array, shrunk_shape, start));
   BLOSC_ERROR(extend_shape(array, new_shape, start));
 
   return BLOSC2_ERROR_SUCCESS;
