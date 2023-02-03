@@ -2998,7 +2998,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   // Add the new offset
   int64_t sframe_chunk_id;
   if (frame->sframe) {
-    if ((int64_t)offsets[nchunk] < 0) {
+    if (offsets[nchunk] < 0) {
       sframe_chunk_id = -1;
     }
     else {
