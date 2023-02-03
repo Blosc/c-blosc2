@@ -119,7 +119,7 @@ As said, C-Blosc2 adds a powerful mechanism for adding different metalayers on t
 Python wrapper
 ==============
 
-We are officially supporting (thanks to the Python Software Foundation) a `Python wrapper for Blosc2 <https://github.com/Blosc/python-blosc2>`_.  Although this is still in early development, it already supports all the features of the venerable `python-blosc <https://github.com/Blosc/python-blosc>` package.  As a bonus, the `python-blosc2` package comes with wheels and binary versions of the C-Blosc2 libraries, so anyone, even non-Python users can install C-Blosc2 binaries easily with:
+We are officially supporting (thanks to the Python Software Foundation) a `Python wrapper for Blosc2 <https://github.com/Blosc/python-blosc2>`_.  Although this is still in early development, it already supports all the features of the venerable `python-blosc <https://github.com/Blosc/python-blosc>`_ package.  As a bonus, the `python-blosc2` package comes with wheels and binary versions of the C-Blosc2 libraries, so anyone, even non-Python users can install C-Blosc2 binaries easily with:
 
 .. code-block:: console
 
@@ -208,7 +208,7 @@ For Mac OSX on arm64 architecture, you need to compile like this:
 Support for the LZ4 optimized version in Intel IPP
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-C-Blosc2 comes with support for a highly optimized version of the LZ4 codec present in Intel IPP.  Here it is a way to easily install Intel IPP using Conda(https://docs.conda.io):
+C-Blosc2 comes with support for a highly optimized version of the LZ4 codec present in Intel IPP.  Here it is a way to easily install Intel IPP using Conda (https://docs.conda.io):
 
 .. code-block:: console
 
