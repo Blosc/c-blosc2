@@ -74,7 +74,7 @@ CUTEST_TEST_TEST(resize_shape) {
   b2_storage.contiguous = backend.contiguous;
 
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
-                                        shapes.chunkshape, shapes.blockshape, NULL, 0);
+                                        shapes.chunkshape, shapes.blockshape, NULL, NULL, 0);
 
   int64_t buffersize = typesize;
   bool only_shrink = true;
@@ -118,7 +118,7 @@ CUTEST_TEST_TEST(resize_shape) {
   blosc2_storage aux_b2_storage = {.cparams=&cparams};
   aux_b2_storage.contiguous = backend.contiguous;
   b2nd_context_t *aux_ctx = b2nd_create_ctx(&aux_b2_storage, shapes.ndim, shapes.newshape,
-                                            shapes.chunkshape, shapes.blockshape, NULL, 0);
+                                            shapes.chunkshape, shapes.blockshape, NULL, NULL, 0);
 
   BLOSC_ERROR(b2nd_full(aux_ctx, &aux, value));
   if (!only_shrink) {

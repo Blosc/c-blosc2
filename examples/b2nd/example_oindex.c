@@ -21,7 +21,7 @@ int main() {
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = typesize;
   blosc2_storage b2_storage = {.cparams=&cparams};
-  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL,
                                         NULL, 0);
 
   int64_t dataitems = 1;

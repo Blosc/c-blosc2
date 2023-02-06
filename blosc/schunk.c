@@ -1555,7 +1555,7 @@ int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content
 
 /* Get the content out of a metalayer.
  *
- * The `**content` receives a malloc'ed copy of the content.  The user is responsible of freeing it.
+ * The `**content` receives a malloc'ed copy of the content.  The user is responsible for freeing it.
  *
  * If successful, return the index of the new metalayer.  Else, return a negative value.
  */

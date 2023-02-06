@@ -35,7 +35,7 @@ int main() {
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
   b2_storage.contiguous = false;
 
-  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL,
                                         NULL, 0);
 
   b2nd_array_t *arr;
@@ -48,6 +48,10 @@ int main() {
 
   b2nd_array_t *dest;
   BLOSC_ERROR(b2nd_from_cframe(cframe, cframe_len, true, &dest));
+
+  if (needs_free) {
+    free(cframe);
+  }
 
   /* Fill dest array with b2nd_array_t data */
   uint8_t *data_dest = malloc(size);

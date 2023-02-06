@@ -37,6 +37,9 @@ extern "C" {
 /* The maximum number of metalayers for b2nd arrays */
 #define B2ND_MAX_METALAYERS (BLOSC2_MAX_METALAYERS - 1)
 
+/* The default data type */
+#define B2ND_DEFAULT_DTYPE "uint8"
+
 /**
  * @brief An *optional* cache for a single block.
  *
@@ -97,6 +100,8 @@ typedef struct {
   //!< Item - shape strides.
   int64_t chunk_array_strides[B2ND_MAX_DIM];
   //!< Item - shape strides.
+  char *dtype;
+  //!< Data type in NumPy format
 } b2nd_array_t;
 
 
@@ -116,9 +121,9 @@ typedef struct {
  * @note The pointer returned must be freed when not used anymore with #b2nd_free_ctx.
  *
  */
-BLOSC_EXPORT b2nd_context_t *b2nd_create_ctx(blosc2_storage *b2_storage, int8_t ndim, int64_t *shape,
-                                             int32_t *chunkshape, int32_t *blockshape,
-                                             blosc2_metalayer *metalayers, int32_t nmetalayers);
+BLOSC_EXPORT b2nd_context_t *
+b2nd_create_ctx(blosc2_storage *b2_storage, int8_t ndim, int64_t *shape, int32_t *chunkshape, int32_t *blockshape,
+                char *dtype, blosc2_metalayer *metalayers, int32_t nmetalayers);
 
 
 /**
@@ -430,10 +435,10 @@ BLOSC_EXPORT int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **se
 
 // Metainfo section
 BLOSC_EXPORT int b2nd_serialize_meta(int8_t ndim, int64_t *shape, const int32_t *chunkshape,
-                                     const int32_t *blockshape, uint8_t **smeta);
+                                     const int32_t *blockshape, const char *dtype, uint8_t **smeta);
 
 BLOSC_EXPORT int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
-                                       int64_t *shape, int32_t *chunkshape, int32_t *blockshape);
+                                       int64_t *shape, int32_t *chunkshape, int32_t *blockshape, char **dtype);
 
 
 #ifdef __cplusplus

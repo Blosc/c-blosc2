@@ -78,7 +78,7 @@ CUTEST_TEST_TEST(set_slice_buffer) {
   b2_storage.contiguous = backend.contiguous;
 
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
-                                        shapes.chunkshape, shapes.blockshape, NULL, 0);
+                                        shapes.chunkshape, shapes.blockshape, NULL, NULL, 0);
 
   /* Create dest buffer */
   int64_t shape[B2ND_MAX_DIM] = {0};

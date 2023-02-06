@@ -68,7 +68,7 @@ CUTEST_TEST_TEST(append) {
   }
 
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
-                                        shapes.chunkshape, shapes.blockshape,
+                                        shapes.chunkshape, shapes.blockshape, NULL,
                                         NULL, 0);
 
   int64_t buffersize = typesize;

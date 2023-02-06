@@ -77,19 +77,19 @@ int comp(const char *urlpath) {
   // Get multidimensional parameters and configure Blosc2 NDim array
   int8_t ndim;
   int64_t shape[4];
-  int64_t *shape_aux = malloc(8 * sizeof(int64_t));
-  int32_t *chunkshape = malloc(8 * sizeof(int32_t));
-  int32_t *blockshape = malloc(8 * sizeof(int32_t));
+  int64_t shape_aux[4];
+  int32_t chunkshape[4];
+  int32_t blockshape[4];
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(schunk, "b2nd", &smeta, &smeta_len) < 0) {
     printf("This benchmark only supports b2nd arrays");
-    free(chunkshape);
-    free(blockshape);
     return -1;
   }
-  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape_aux, chunkshape, blockshape);
+  char *dtype;
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape_aux, chunkshape, blockshape, dtype);
   free(smeta);
+  free(dtype);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.nthreads = 6;
@@ -98,7 +98,7 @@ int comp(const char *urlpath) {
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
   b2_storage.urlpath = "schunk_rate.cat";
 
-  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape_aux, chunkshape, blockshape,
+  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape_aux, chunkshape, blockshape, NULL,
                                         NULL, 0);
 
   b2nd_array_t *arr;
@@ -117,8 +117,6 @@ int comp(const char *urlpath) {
   copied = b2nd_copy(ctx, arr, &arr_rate);
   if (copied != 0) {
     printf("Error BLOSC_CODEC_ZFP_FIXED_RATE \n");
-    free(chunkshape);
-    free(blockshape);
     b2nd_free(arr);
     return -1;
   }
@@ -173,9 +171,6 @@ int comp(const char *urlpath) {
   printf("ZFP_FIXED_RATE time: %.5f microseconds\n", (zfp_time * 1000000.0 / ntests));
   printf("Blosc2 time: %.5f microseconds\n", (blosc_time * 1000000.0 / ntests));
 
-  free(shape_aux);
-  free(chunkshape);
-  free(blockshape);
   b2nd_free(arr);
   b2nd_free(arr_rate);
   BLOSC_ERROR(b2nd_free_ctx(ctx));

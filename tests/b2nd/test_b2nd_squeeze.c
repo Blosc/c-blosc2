@@ -79,7 +79,7 @@ CUTEST_TEST_TEST(squeeze) {
   b2_storage.contiguous = backend.contiguous;
 
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
-                                        shapes.chunkshape, shapes.blockshape, NULL, 0);
+                                        shapes.chunkshape, shapes.blockshape, NULL, NULL, 0);
 
   /* Create original data */
   size_t buffersize = typesize;
@@ -104,7 +104,7 @@ CUTEST_TEST_TEST(squeeze) {
 
   // shape will then be overwritten
   b2nd_context_t *ctx2 = b2nd_create_ctx(&b2_storage2, shapes.ndim, shapes.shape,
-                                         shapes.chunkshape2, shapes.blockshape2, NULL, 0);
+                                         shapes.chunkshape2, shapes.blockshape2, NULL, NULL, 0);
 
   b2nd_array_t *dest;
   B2ND_TEST_ASSERT(b2nd_get_slice(ctx2, &dest, src, shapes.start, shapes.stop));

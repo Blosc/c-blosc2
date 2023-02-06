@@ -36,7 +36,7 @@ int main() {
   dparams.nthreads = 2;
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
 
-  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL,
                                         NULL, 0);
 
   b2nd_array_t *arr;
@@ -47,7 +47,7 @@ int main() {
 
   // shape will be overwritten by get_slice
   b2nd_context_t *slice_ctx = b2nd_create_ctx(&slice_b2_storage, ndim, shape, slice_chunkshape,
-                                              slice_blockshape,
+                                              slice_blockshape, NULL,
                                               NULL, 0);
 
   b2nd_array_t *slice;
@@ -69,6 +69,8 @@ int main() {
   BLOSC_ERROR(b2nd_free(slice));
   BLOSC_ERROR(b2nd_free_ctx(ctx));
   BLOSC_ERROR(b2nd_free_ctx(slice_ctx));
+  free(buffer);
+  free(data);
 
   // printf("Elapsed seconds: %.5f\n", blosc_elapsed_secs(t0, t1));
 
