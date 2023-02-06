@@ -31,7 +31,7 @@ The header contains information needed to decompress the Blosc chunks contained 
       |   |       |                           |
       |   |       |                           +--[msgpack] int32
       |   |       +---magic number, currently "b2frame"
-      |   +------[msgpack] str with 8 elements
+      |   +------[msgpack] str with X=8 elements
       +---[msgpack] fixarray with X=0xE (14) elements
 
     |-18|-19|-1A|-1B|-1C|-1D|-1E|-1F|-20|-21|-22|-23|-24|-25|-26|-27|-28|-29|-2A|-2B|-2C|-2D|-2E|
@@ -76,8 +76,8 @@ possible filter meta-info in `filter_meta`::
       +--[msgpack] fixext 16
 
 The last section of the header is for the *metalayers*, which contain meta-information about the data in the
-frame.  It is up to the user to store whatever data they want with the only (strong) suggestion that they be stored
-using the msgpack format. Here it is the format for the *metalayers*::
+frame.  It is mandatory the use of the msgpack format for storing them, although the user may use another format
+(e.g. json) encoded as msgpack (in this case as a string). Here it is the format for the *metalayers*::
 
     |-57|-58|-59|-5A|-5B|-5C|-5D|====================|---|---|---|================|
     | 93| cd| idx   | de| size  | meta keys/values   | dc|  idy  | meta content   |
@@ -216,65 +216,25 @@ Here it is a trick for printing the content of metalayers using the nice set of
 `msgpack-tools <https://github.com/ludocode/msgpack-tools>`_ command line utilities.  After installing the package we
 can do e.g.::
 
-    $ msgpack2json -dpi example_big_float_frame.b2nd
-    [
-        "b2frame\u0000",
-        175,
-        17141947,
-        "\u0012\u0000P\u0003",
-        134447040,
-        17141634,
-        4,
-        414960,
-        7469280,
-        1,
-        1,
-        false,
-        <ext of type 6 size 16>,
-        [
-            17,
-            {
-                "b2nd": 107
-            },
-            [
-                <bin of size 63>
-            ]
-        ]
-    ]
+    $ msgpack2json -Bi plugins/test_data/example_day_month_temp.b2nd
+    ["b2frame\u0000",166,3947,"\u0012\u0000P\u0003",5472,3682,4,684,1368,1,1,false,
+     "ext:6:base64:AAAAAAABAAAAAAAAAAAAAA==",[17,{"b2nd":107},
+     ["lgACktMAAAAAAAABkNMAAAAAAAAAA5LSAAAAbtIAAAADktIAAAA50gAAAAPbAAAABXVpbnQ4"]]]
 
 Here we see that we have a `b2nd` metalayer that starts at position 107; but as there is a msgpack `bin32` there, we
 must add 5 bytes (4 bytes for an int32 and 1 byte for the msgpack `bin32` header), so the actual starting position is
-112 (107 + 5).  In addition we know that the size of the `b2nd` metalayer is 63.
+112 (107 + 5).  Also, although we don't know the length of the `b2nd` metalayer, it is typically less than 100 bytes,
+so let's err on the safe side and dump the first 1000 bytes, just in case::
 
-With that, and supposing that the metalayer info we want to dump is in msgpack format (as is the case for `b2nd`)::
+    $ dd bs=1 skip=112 count=1000 <  plugins/test_data/example_day_month_temp.b2nd | msgpack2json -B
+    1000+0 records in
+    1000+0 records out
+    1000 bytes transferred in 0.002187 secs (457247 bytes/sec)
+    [0,2,[400,3],[110,3],[57,3],"uint8"]
 
-    $ dd bs=1 skip=112 count=63 <  example_big_float_frame.b2nd | msgpack2json -dp
-    63+0 records in
-    63+0 records out
-    63 bytes transferred in 0.000106 secs (594340 bytes/sec)
-    [
-        0,
-        3,
-        [
-            200,
-            310,
-            214
-        ],
-        [
-            110,
-            120,
-            76
-        ],
-        [
-            57,
-            52,
-            35
-        ]
-    ]
-
-By having a look at the `Blosc2 NDim metalayer description <B2ND_METALAYER.rst>`_, one can see that the
-number of dimensions is 3, the `shape` is [200, 310, 214], the `chunkshape` is [110, 120, 76] and the blockshape is
-[57, 52, 35].  Easy-peasy.
+By having a look at the `Blosc2 NDim metalayer description <README_B2ND_METALAYER.rst>`_, one can see that the
+number of dimensions is 2, the `shape` is [400, 3], the `chunkshape` is [110, 3], the blockshape is
+[57, 3] and the dtype is "uint8".  Easy-peasy.
 
 Chunks
 ------
@@ -361,7 +321,7 @@ a fingerprint.::
 
 The *vlmetalayers* object which stores the variable-length user meta data can change in size during the lifetime of the frame.
 This is an important feature and the reason why the *vlmetalayers* are stored in the trailer and not in the header.
-However, the *vlmetalayers* follows the same format than the metalayers stored in the header.
+However, the *vlmetalayers* follows the same format as the ones stored in the header.
 
 
 :trailer_len:

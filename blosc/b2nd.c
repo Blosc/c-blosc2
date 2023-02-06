@@ -95,7 +95,7 @@ int update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
     // Serialize the dimension info ...
     int32_t smeta_len =
             b2nd_serialize_meta(array->ndim, array->shape, array->chunkshape, array->blockshape,
-                                &smeta);
+                                array->dtype, &smeta);
     if (smeta_len < 0) {
       fprintf(stderr, "error during serializing dims info for Blosc2 NDim");
       return -1;
@@ -125,12 +125,12 @@ int array_without_schunk(b2nd_context_t *ctx, b2nd_array_t **array) {
   (*array)->sc = NULL;
 
   (*array)->ndim = ctx->ndim;
-
   int64_t *shape = ctx->shape;
   int32_t *chunkshape = ctx->chunkshape;
   int32_t *blockshape = ctx->blockshape;
-
   BLOSC_ERROR(update_shape(*array, ctx->ndim, shape, chunkshape, blockshape));
+
+  (*array)->dtype = ctx->dtype;
 
   // The partition cache (empty initially)
   (*array)->chunk_cache.data = NULL;
@@ -158,7 +158,9 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
   int32_t smeta_len = b2nd_serialize_meta(ctx->ndim,
                                           (*array)->shape,
                                           (*array)->chunkshape,
-                                          (*array)->blockshape, &smeta);
+                                          (*array)->blockshape,
+                                          (*array)->dtype,
+                                          &smeta);
   if (smeta_len < 0) {
     BLOSC_TRACE_ERROR("error during serializing dims info for Blosc2 NDim");
     return BLOSC2_ERROR_FAILURE;
@@ -287,8 +289,9 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
     }
   }
   BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &params.ndim, params.shape,
-                                    params.chunkshape, params.blockshape));
+                                    params.chunkshape, params.blockshape, &params.dtype));
   free(smeta);
+  free(params.dtype);
 
   BLOSC_ERROR(array_without_schunk(&params, array));
 
@@ -975,9 +978,10 @@ int b2nd_save(b2nd_array_t *array, char *urlpath) {
 int b2nd_print_meta(b2nd_array_t *array) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   int8_t ndim;
-  int64_t shape[8];
-  int32_t chunkshape[8];
-  int32_t blockshape[8];
+  int64_t shape[B2ND_MAX_DIM];
+  int32_t chunkshape[B2ND_MAX_DIM];
+  int32_t blockshape[B2ND_MAX_DIM];
+  char *dtype;
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(array->sc, "b2nd", &smeta, &smeta_len) < 0) {
@@ -986,23 +990,24 @@ int b2nd_print_meta(b2nd_array_t *array) {
       BLOSC_ERROR(BLOSC2_ERROR_METALAYER_NOT_FOUND);
     }
   }
-  BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape));
+  BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, &dtype));
   free(smeta);
 
   printf("b2nd metalayer parameters: \n Ndim:       %d", ndim);
-  printf("\n Shape:      %" PRId64 "", shape[0]);
+  printf("\n shape:      %" PRId64 "", shape[0]);
   for (int i = 1; i < ndim; ++i) {
     printf(", %" PRId64 "", shape[i]);
   }
-  printf("\n Chunkshape: %d", chunkshape[0]);
+  printf("\n chunkshape: %d", chunkshape[0]);
   for (int i = 1; i < ndim; ++i) {
     printf(", %d", chunkshape[i]);
   }
-  printf("\n Blockshape: %d", blockshape[0]);
-  for (int i = 1; i < ndim; ++i) {
-    printf(", %d", blockshape[i]);
-  }
+  printf("\n dtype: %s", dtype);
+  free(dtype);
+
+  printf("\n dtype: %d", blockshape[0]);
   printf("\n");
+
   return BLOSC2_ERROR_SUCCESS;
 }
 
@@ -1663,16 +1668,27 @@ int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int6
 
 
 int b2nd_serialize_meta(int8_t ndim, int64_t *shape, const int32_t *chunkshape,
-                        const int32_t *blockshape, uint8_t **smeta) {
+                        const int32_t *blockshape, const char *dtype, uint8_t **smeta) {
+  // Check size for dtype
+  if (dtype == NULL) {
+    dtype = B2ND_DEFAULT_DTYPE;
+  }
+  size_t dtype_len0 = strlen(dtype);
+  if (dtype_len0 > INT32_MAX) {
+    BLOSC_TRACE_ERROR("dtype is too large (len > %d)", INT32_MAX);
+    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+  }
+  const int32_t dtype_len = (int32_t) dtype_len0;
   // Allocate space for b2nd metalayer
   int32_t max_smeta_len = (int32_t) (1 + 1 + 1 + (1 + ndim * (1 + sizeof(int64_t))) +
-                                     (1 + ndim * (1 + sizeof(int32_t))) + (1 + ndim * (1 + sizeof(int32_t))));
+                                     (1 + ndim * (1 + sizeof(int32_t))) + (1 + ndim * (1 + sizeof(int32_t))) +
+                                     1 + sizeof(int32_t) + dtype_len);
   *smeta = malloc((size_t) max_smeta_len);
   BLOSC_ERROR_NULL(*smeta, BLOSC2_ERROR_MEMORY_ALLOC);
   uint8_t *pmeta = *smeta;
 
-  // Build an array with 5 entries (version, ndim, shape, chunkshape, blockshape)
-  *pmeta++ = 0x90 + 5;
+  // Build an array with 6 entries (version, ndim, shape, chunkshape, blockshape, dtype)
+  *pmeta++ = 0x90 + 6;
 
   // version entry
   *pmeta++ = B2ND_METALAYER_VERSION;  // positive fixnum (7-bit positive integer)
@@ -1703,15 +1719,21 @@ int b2nd_serialize_meta(int8_t ndim, int64_t *shape, const int32_t *chunkshape,
     swap_store(pmeta, blockshape + i, sizeof(int32_t));
     pmeta += sizeof(int32_t);
   }
-  int32_t slen = (int32_t) (pmeta - *smeta);
 
+  // dtype entry
+  *pmeta++ = (uint8_t) (0xdb);  // str with up to 2^31 elements
+  swap_store(pmeta, &dtype_len, sizeof(int32_t));
+  pmeta += sizeof(int32_t);
+  memcpy(pmeta, dtype, dtype_len);
+  pmeta += dtype_len;
+
+  int32_t slen = (int32_t) (pmeta - *smeta);
   return (int)slen;
 }
 
 
 int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
-                          int32_t *chunkshape, int32_t *blockshape) {
-  BLOSC_UNUSED_PARAM(smeta_len);
+                          int32_t *chunkshape, int32_t *blockshape, char **dtype) {
   uint8_t *pmeta = smeta;
 
   // Check that we have an array with 5 entries (version, ndim, shape, chunkshape, blockshape)
@@ -1755,14 +1777,34 @@ int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64
     swap_store(blockshape + i, pmeta, sizeof(int32_t));
     pmeta += sizeof(int32_t);
   }
+
+  // dtype entry
+  if (pmeta - smeta < smeta_len) {
+    // dtype is here
+    pmeta += 1;
+    int dtype_len;
+    swap_store(&dtype_len, pmeta, sizeof(int32_t));
+    pmeta += sizeof(int32_t);
+    *dtype = malloc(dtype_len + 1);
+    strncpy(*dtype, (char*)pmeta, dtype_len);
+    dtype[dtype_len] = 0;
+    pmeta += dtype_len;
+  }
+  else {
+    // dtype is mandatory in b2nd metalayer, but this is mainly meant as
+    // a fall-back for deprecated caterva headers
+    char *dtype_default = strdup(B2ND_DEFAULT_DTYPE);
+    strcpy(*dtype, dtype_default);
+  }
+
   int32_t slen = (int32_t) (pmeta - smeta);
   return (int)slen;
 }
 
 
-b2nd_context_t *b2nd_create_ctx(blosc2_storage *b2_storage, int8_t ndim, int64_t *shape,
-                                int32_t *chunkshape, int32_t *blockshape,
-                                blosc2_metalayer *metalayers, int32_t nmetalayers) {
+b2nd_context_t *
+b2nd_create_ctx(blosc2_storage *b2_storage, int8_t ndim, int64_t *shape, int32_t *chunkshape, int32_t *blockshape,
+                char *dtype, blosc2_metalayer *metalayers, int32_t nmetalayers) {
   b2nd_context_t *ctx = malloc(sizeof(b2nd_context_t));
   BLOSC_ERROR_NULL(ctx, NULL);
   blosc2_storage *params_b2_storage = malloc(sizeof(blosc2_storage));
@@ -1781,6 +1823,13 @@ b2nd_context_t *b2nd_create_ctx(blosc2_storage *b2_storage, int8_t ndim, int64_t
   }
   else {
     memcpy(cparams, b2_storage->cparams, sizeof(blosc2_cparams));
+  }
+
+  if (dtype == NULL) {
+    ctx->dtype = strdup(B2ND_DEFAULT_DTYPE);
+  }
+  else {
+    ctx->dtype = strdup(dtype);
   }
 
   params_b2_storage->cparams = cparams;
@@ -1808,6 +1857,7 @@ int b2nd_free_ctx(b2nd_context_t *ctx) {
   ctx->b2_storage->cparams->schunk = NULL;
   free(ctx->b2_storage->cparams);
   free(ctx->b2_storage);
+  free(ctx->dtype);
   free(ctx);
 
   return BLOSC2_ERROR_SUCCESS;

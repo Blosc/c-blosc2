@@ -104,20 +104,22 @@ struct blosc2_context_s {
 };
 
 struct b2nd_context_s {
-    int8_t ndim;
-    //!< The array dimensions.
-    int64_t shape[B2ND_MAX_DIM];
-    //!< The array shape.
-    int32_t chunkshape[B2ND_MAX_DIM];
-    //!< The shape of each chunk of Blosc.
-    int32_t blockshape[B2ND_MAX_DIM];
-    //!< The shape of each block of Blosc.
-    blosc2_storage *b2_storage;
-    //!< The Blosc storage properties
-    blosc2_metalayer metalayers[B2ND_MAX_METALAYERS];
-    //!< List with the metalayers desired.
-    int32_t nmetalayers;
-    //!< The number of metalayers.
+  int8_t ndim;
+  //!< The array dimensions.
+  int64_t shape[B2ND_MAX_DIM];
+  //!< The array shape.
+  int32_t chunkshape[B2ND_MAX_DIM];
+  //!< The shape of each chunk of Blosc.
+  int32_t blockshape[B2ND_MAX_DIM];
+  //!< The shape of each block of Blosc.
+  char *dtype;
+  //!< The data type (follows NumPy convention).
+  blosc2_storage *b2_storage;
+  //!< The Blosc storage properties
+  blosc2_metalayer metalayers[B2ND_MAX_METALAYERS];
+  //!< List with the metalayers desired.
+  int32_t nmetalayers;
+  //!< The number of metalayers.
 };
 
 struct thread_context {

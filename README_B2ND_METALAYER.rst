@@ -15,7 +15,7 @@ and follows this format::
       |   |   |   +--[msgpack] fixarray with X=nd elements
       |   |   +--[msgpack] positive fixnum for the number of dimensions (up to 127)
       |   +--[msgpack] positive fixnum for the metalayer format version (up to 127)
-      +---[msgpack] fixarray with X=5 elements
+      +---[msgpack] fixarray with X=6 elements
 
 The `shape` section is meant to store the actual shape info::
 
@@ -41,7 +41,7 @@ Next, the `chunkshape` section is meant to store the actual chunk shape info::
       +--[msgpack] int32
 
 
-Finally, the `blockshape` section is meant to store the actual block shape info::
+Next, the `blockshape` section is meant to store the actual block shape info::
 
     |---|--4 bytes---|---|--4 bytes---|~~~~~|---|--4 bytes---|
     | d2| first_dim  | d2| second_dim | ... | d2| nth_dim    |
@@ -51,3 +51,13 @@ Finally, the `blockshape` section is meant to store the actual block shape info:
       |                |                      +--[msgpack] int32
       |                +--[msgpack] int32
       +--[msgpack] int32
+
+Finally, the `dtype` section is meant to store the data type information.  Its representation follows the NumPy
+convention (as in `repr(np.dtype)`; e.g. an `int32_t` dtype is represented as "int32")::
+
+    |---|--4 bytes---|--------------|
+    | db| dtype_len  | dtype_string |
+    |---|------------|--------------|
+      ^
+      |
+      +--[msgpack] str32
