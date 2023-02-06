@@ -66,6 +66,9 @@ int main() {
 
   BLOSC_ERROR(b2nd_to_cbuffer(slice, buffer, buffer_size));
   BLOSC_ERROR(b2nd_free(slice));
+  free(data);
+  free(buffer);
+
   // printf("Elapsed seconds: %.5f\n", blosc_elapsed_secs(t0, t1));
 
   return 0;
