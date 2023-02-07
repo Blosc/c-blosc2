@@ -1652,18 +1652,13 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
 
 int b2nd_get_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
                                   int64_t *buffershape, int64_t buffersize) {
-
-  return orthogonal_selection(array, selection, selection_size,
-                              buffer, buffershape, buffersize, true);
+  return orthogonal_selection(array, selection, selection_size, buffer, buffershape, buffersize, true);
 }
 
 
 int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
                                   int64_t *buffershape, int64_t buffersize) {
-
-
-  return orthogonal_selection(array, selection, selection_size,
-                              buffer, buffershape, buffersize, false);
+  return orthogonal_selection(array, selection, selection_size, buffer, buffershape, buffersize, false);
 }
 
 

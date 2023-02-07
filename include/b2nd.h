@@ -385,7 +385,7 @@ BLOSC_EXPORT int b2nd_resize(b2nd_array_t *array, const int64_t *new_shape, cons
 /**
  * @brief Insert given buffer in an array extending the given axis.
  *
- * @param array The array to insert the data.
+ * @param array The array to insert the data in.
  * @param buffer The buffer data to be inserted.
  * @param buffersize The size (in bytes) of the buffer.
  * @param axis The axis that will be extended.
@@ -399,8 +399,8 @@ BLOSC_EXPORT int b2nd_insert(b2nd_array_t *array, void *buffer, int64_t buffersi
 /**
  * Append a buffer at the end of a b2nd array.
  *
- * @param array The b2nd array.
- * @param buffer The buffer where the data is stored.
+ * @param array The array to append the data in.
+ * @param buffer The buffer data to be appended.
  * @param buffersize Size (in bytes) of the buffer.
  * @param axis The axis that will be extended to append the data.
  *
@@ -416,7 +416,7 @@ BLOSC_EXPORT int b2nd_append(b2nd_array_t *array, void *buffer, int64_t buffersi
  * @param axis The axis to shrink.
  * @param delete_start The start position from the axis to start deleting chunks.
  * @param delete_len The number of items to delete to the array->shape[axis].
- * The newshape[axis] will be the old array->shape[axis] - delete_len
+ *   The newshape[axis] will be the old array->shape[axis] - delete_len
  *
  * @return An error code.
  *
@@ -427,9 +427,38 @@ BLOSC_EXPORT int b2nd_delete(b2nd_array_t *array, const int8_t axis,
 
 
 // Indexing section
+
+/**
+ * @brief Get an element selection along each dimension of an array independently.
+ *
+ * @param array The array to get the data from.
+ * @param selection The elements along each dimension.
+ * @param selection_size The size of the selection along each dimension.
+ * @param buffer The buffer for getting the data.
+ * @param buffershape The shape of the buffer.
+ * @param buffersize The buffer size (in bytes).
+ *
+ * @return An error code.
+ *
+ * @note See also b2nd_set_orthogonal_selection.
+ */
 BLOSC_EXPORT int b2nd_get_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
                                                int64_t *buffershape, int64_t buffersize);
 
+/**
+ * @brief Set an element selection along each dimension of an array independently.
+ *
+ * @param array The array to set the data to.
+ * @param selection The elements along each dimension.
+ * @param selection_size The size of the selection along each dimension.
+ * @param buffer The buffer with the data for setting.
+ * @param buffershape The shape of the buffer.
+ * @param buffersize The buffer size (in bytes).
+ *
+ * @return An error code.
+ *
+ * @note See also b2nd_get_orthogonal_selection.
+ */
 BLOSC_EXPORT int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
                                                int64_t *buffershape, int64_t buffersize);
 
