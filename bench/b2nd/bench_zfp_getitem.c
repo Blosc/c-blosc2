@@ -87,7 +87,7 @@ int comp(const char *urlpath) {
     return -1;
   }
   char *dtype;
-  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape_aux, chunkshape, blockshape, dtype);
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape_aux, chunkshape, blockshape, &dtype);
   free(smeta);
   free(dtype);
 

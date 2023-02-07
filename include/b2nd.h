@@ -113,6 +113,7 @@ typedef struct {
  * @param shape The shape.
  * @param chunkshape The chunk shape.
  * @param blockshape The block shape.
+ * @param dtype The data type expressed as a string version of a NumPy dtype.
  * @param metalayers The memory pointer to the list of the metalayers desired.
  * @param nmetalayers The number of metalayers.
  *
