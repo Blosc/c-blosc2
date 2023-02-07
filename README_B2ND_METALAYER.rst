@@ -53,7 +53,7 @@ Next, the `blockshape` section is meant to store the actual block shape info::
       +--[msgpack] int32
 
 Finally, the `dtype` section is meant to store the data type information.  Its representation follows the NumPy
-convention (as in `repr(np.dtype)`; e.g. an `int32_t` dtype is represented as "int32")::
+convention (as in `str(np.dtype)`; e.g. an `int32_t` dtype is represented as "int32")::
 
     |---|--4 bytes---|--------------|
     | db| dtype_len  | dtype_string |
