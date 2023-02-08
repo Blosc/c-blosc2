@@ -36,7 +36,7 @@ int main() {
   dparams.nthreads = 2;
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
 
-  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL,
+  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL, 0,
                                         NULL, 0);
 
   b2nd_array_t *arr;
@@ -47,7 +47,7 @@ int main() {
 
   // shape will be overwritten by get_slice
   b2nd_context_t *slice_ctx = b2nd_create_ctx(&slice_b2_storage, ndim, shape, slice_chunkshape,
-                                              slice_blockshape, NULL,
+                                              slice_blockshape, NULL, 0,
                                               NULL, 0);
 
   b2nd_array_t *slice;

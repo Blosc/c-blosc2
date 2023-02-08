@@ -22,7 +22,7 @@ int frame_generator(int8_t *data, int8_t ndim, int64_t *shape, int32_t *chunksha
   b2_storage.urlpath = urlpath;
   b2_storage.contiguous = true;
 
-  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL,
+  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL, 0,
                                         NULL, 0);
 
   b2nd_array_t *arr;

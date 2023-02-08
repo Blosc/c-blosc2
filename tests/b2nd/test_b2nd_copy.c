@@ -90,7 +90,7 @@ CUTEST_TEST_TEST(copy) {
   metalayers[0].content_len = 8;
 
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
-                                        shapes.chunkshape, shapes.blockshape, NULL, metalayers, nmetalayers);
+                                        shapes.chunkshape, shapes.blockshape, NULL, 0, metalayers, nmetalayers);
 
   /* Create original data */
   size_t buffersize = typesize;
@@ -131,7 +131,7 @@ CUTEST_TEST_TEST(copy) {
   }
   b2_storage.contiguous = backend2.contiguous;
   b2nd_context_t *ctx2 = b2nd_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
-                                         shapes.chunkshape2, shapes.blockshape2, NULL, NULL, 0);
+                                         shapes.chunkshape2, shapes.blockshape2, NULL, 0, NULL, 0);
 
   b2nd_array_t *dest;
   B2ND_TEST_ASSERT(b2nd_copy(ctx2, src, &dest));

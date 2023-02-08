@@ -69,7 +69,7 @@ CUTEST_TEST_TEST(delete) {
   b2_storage.contiguous = backend.contiguous;
 
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, shapes.ndim, shapes.shape,
-                                        shapes.chunkshape, shapes.blockshape, NULL, NULL, 0);
+                                        shapes.chunkshape, shapes.blockshape, NULL, 0, NULL, 0);
 
   /* Create b2nd_array_t with original data */
   b2nd_array_t *src;
@@ -126,7 +126,7 @@ CUTEST_TEST_TEST(delete) {
   b2_storage.urlpath = NULL;
   b2_storage.contiguous = backend.contiguous;
   b2nd_context_t *aux_ctx = b2nd_create_ctx(&b2_storage, shapes.ndim, newshape,
-                                            shapes.chunkshape, shapes.blockshape, NULL, NULL, 0);
+                                            shapes.chunkshape, shapes.blockshape, NULL, 0, NULL, 0);
 
   BLOSC_ERROR(b2nd_full(aux_ctx, &aux, value));
 
