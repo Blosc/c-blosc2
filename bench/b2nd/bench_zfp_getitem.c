@@ -87,7 +87,8 @@ int comp(const char *urlpath) {
     return -1;
   }
   char *dtype;
-  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape_aux, chunkshape, blockshape, &dtype);
+  int8_t dtype_format;
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape_aux, chunkshape, blockshape, &dtype, &dtype_format);
   free(smeta);
   free(dtype);
 
@@ -98,7 +99,7 @@ int comp(const char *urlpath) {
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
   b2_storage.urlpath = "schunk_rate.cat";
 
-  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape_aux, chunkshape, blockshape, NULL,
+  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape_aux, chunkshape, blockshape, NULL, 0,
                                         NULL, 0);
 
   b2nd_array_t *arr;

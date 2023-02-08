@@ -37,7 +37,7 @@ int main() {
   blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams};
 
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape,
-                                        chunkshape, blockshape, NULL, NULL, 0);
+                                        chunkshape, blockshape, NULL, 0, NULL, 0);
 
   b2nd_array_t *arr;
   BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
@@ -49,7 +49,7 @@ int main() {
   blosc2_remove_urlpath(slice_b2_storage.urlpath);
 
   b2nd_context_t *slice_ctx = b2nd_create_ctx(&slice_b2_storage, ndim, shape,
-                                              slice_chunkshape, slice_blockshape, NULL, NULL, 0);
+                                              slice_chunkshape, slice_blockshape, NULL, 0, NULL, 0);
 
   b2nd_array_t *slice;
   BLOSC_ERROR(b2nd_get_slice(slice_ctx, &slice, arr, slice_start, slice_stop));

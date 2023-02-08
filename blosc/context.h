@@ -113,7 +113,9 @@ struct b2nd_context_s {
   int32_t blockshape[B2ND_MAX_DIM];
   //!< The shape of each block of Blosc.
   char *dtype;
-  //!< The data type (follows NumPy convention).
+  //!< Data type. Different formats can be supported (see dtype_format).
+  int8_t dtype_format;
+  //!< The format of the data type.  Default is 0 (NumPy).
   blosc2_storage *b2_storage;
   //!< The Blosc storage properties
   blosc2_metalayer metalayers[B2ND_MAX_METALAYERS];

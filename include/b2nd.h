@@ -37,8 +37,15 @@ extern "C" {
 /* The maximum number of metalayers for b2nd arrays */
 #define B2ND_MAX_METALAYERS (BLOSC2_MAX_METALAYERS - 1)
 
+/* NumPy dtype format
+ * https://numpy.org/doc/stable/reference/arrays.dtypes.html#arrays-dtypes-constructing
+ */
+#define DTYPE_NUMPY_FORMAT 0
+
 /* The default data type */
-#define B2ND_DEFAULT_DTYPE "uint8"
+#define B2ND_DEFAULT_DTYPE "|u1"
+/* The default data format */
+#define B2ND_DEFAULT_DTYPE_FORMAT DTYPE_NUMPY_FORMAT
 
 /**
  * @brief An *optional* cache for a single block.
@@ -101,7 +108,9 @@ typedef struct {
   int64_t chunk_array_strides[B2ND_MAX_DIM];
   //!< Item - shape strides.
   char *dtype;
-  //!< Data type in NumPy format
+  //!< Data type. Different formats can be supported (see dtype_format).
+  int8_t dtype_format;
+  //!< The format of the data type.  Default is DTYPE_NUMPY_FORMAT.
 } b2nd_array_t;
 
 
@@ -113,7 +122,8 @@ typedef struct {
  * @param shape The shape.
  * @param chunkshape The chunk shape.
  * @param blockshape The block shape.
- * @param dtype The data type expressed as a string version of a NumPy dtype.
+ * @param dtype The data type expressed as a string version.
+ * @param dtype_format The data type format; default is DTYPE_NUMPY_FORMAT.
  * @param metalayers The memory pointer to the list of the metalayers desired.
  * @param nmetalayers The number of metalayers.
  *
@@ -124,7 +134,7 @@ typedef struct {
  */
 BLOSC_EXPORT b2nd_context_t *
 b2nd_create_ctx(blosc2_storage *b2_storage, int8_t ndim, int64_t *shape, int32_t *chunkshape, int32_t *blockshape,
-                char *dtype, blosc2_metalayer *metalayers, int32_t nmetalayers);
+                char *dtype, int8_t dtype_format, blosc2_metalayer *metalayers, int32_t nmetalayers);
 
 
 /**
@@ -462,13 +472,10 @@ BLOSC_EXPORT int b2nd_get_orthogonal_selection(b2nd_array_t *array, int64_t **se
 BLOSC_EXPORT int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
                                                int64_t *buffershape, int64_t buffersize);
 
-
-// Metainfo section
-BLOSC_EXPORT int b2nd_serialize_meta(int8_t ndim, int64_t *shape, const int32_t *chunkshape,
-                                     const int32_t *blockshape, const char *dtype, uint8_t **smeta);
-
+// Not sure whether this should remain here or make it private...
 BLOSC_EXPORT int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
-                                       int64_t *shape, int32_t *chunkshape, int32_t *blockshape, char **dtype);
+                                       int64_t *shape, int32_t *chunkshape, int32_t *blockshape,
+                                       char **dtype, int8_t *dtype_format);
 
 
 #ifdef __cplusplus

@@ -138,7 +138,7 @@ int rand_() {
   blosc2_storage b2_storage = {.cparams=&cparams};
   b2_storage.contiguous = true;
 
-  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL,
+  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL, 0,
                                         NULL, 0);
 
   b2nd_array_t *arr;
@@ -174,7 +174,7 @@ int same_cells() {
   blosc2_storage b2_storage = {.cparams=&cparams};
   b2_storage.contiguous = true;
 
-  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL,
+  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL, 0,
                                         NULL, 0);
 
   b2nd_array_t *arr;
@@ -212,7 +212,7 @@ int some_matches() {
   blosc2_storage b2_storage = {.cparams=&cparams};
   b2_storage.contiguous = true;
 
-  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL,
+  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL, 0,
                                         NULL, 0);
 
   b2nd_array_t *arr;

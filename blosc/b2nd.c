@@ -17,6 +17,150 @@
 #include <inttypes.h>
 
 
+int b2nd_serialize_meta(int8_t ndim, int64_t *shape, int32_t *chunkshape,
+                        int32_t *blockshape, const char *dtype, const int8_t dtype_format,
+                        uint8_t **smeta) {
+  if (dtype == NULL) {
+    dtype = B2ND_DEFAULT_DTYPE;
+  }
+  // dtype checks
+  if (dtype_format < 0) {
+    BLOSC_TRACE_ERROR("dtype_format cannot be negative");
+    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+  }
+  size_t dtype_len0 = strlen(dtype);
+  if (dtype_len0 > INT32_MAX) {
+    BLOSC_TRACE_ERROR("dtype is too large (len > %d)", INT32_MAX);
+    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+  }
+  const int32_t dtype_len = (int32_t) dtype_len0;
+  // Allocate space for b2nd metalayer
+  int32_t max_smeta_len = (int32_t) (1 + 1 + 1 + (1 + ndim * (1 + sizeof(int64_t))) +
+                                     (1 + ndim * (1 + sizeof(int32_t))) + (1 + ndim * (1 + sizeof(int32_t))) +
+                                     1 + sizeof(int32_t) + dtype_len);
+  *smeta = malloc((size_t) max_smeta_len);
+  BLOSC_ERROR_NULL(*smeta, BLOSC2_ERROR_MEMORY_ALLOC);
+  uint8_t *pmeta = *smeta;
+
+  // Build an array with 6 entries (version, ndim, shape, chunkshape, blockshape, dtype)
+  *pmeta++ = 0x90 + 6;
+
+  // version entry
+  *pmeta++ = B2ND_METALAYER_VERSION;  // positive fixnum (7-bit positive integer)
+
+  // ndim entry
+  *pmeta++ = (uint8_t) ndim;  // positive fixnum (7-bit positive integer)
+
+  // shape entry
+  *pmeta++ = (uint8_t) (0x90) + ndim;  // fix array with ndim elements
+  for (uint8_t i = 0; i < ndim; i++) {
+    *pmeta++ = 0xd3;  // int64
+    swap_store(pmeta, shape + i, sizeof(int64_t));
+    pmeta += sizeof(int64_t);
+  }
+
+  // chunkshape entry
+  *pmeta++ = (uint8_t) (0x90) + ndim;  // fix array with ndim elements
+  for (uint8_t i = 0; i < ndim; i++) {
+    *pmeta++ = 0xd2;  // int32
+    swap_store(pmeta, chunkshape + i, sizeof(int32_t));
+    pmeta += sizeof(int32_t);
+  }
+
+  // blockshape entry
+  *pmeta++ = (uint8_t) (0x90) + ndim;  // fix array with ndim elements
+  for (uint8_t i = 0; i < ndim; i++) {
+    *pmeta++ = 0xd2;  // int32
+    swap_store(pmeta, blockshape + i, sizeof(int32_t));
+    pmeta += sizeof(int32_t);
+  }
+
+  // dtype entry
+  *pmeta++ = dtype_format;  // positive fixint (7-bit positive integer)
+  *pmeta++ = (uint8_t) (0xdb);  // str with up to 2^31 elements
+  swap_store(pmeta, &dtype_len, sizeof(int32_t));
+  pmeta += sizeof(int32_t);
+  memcpy(pmeta, dtype, dtype_len);
+  pmeta += dtype_len;
+
+  int32_t slen = (int32_t) (pmeta - *smeta);
+  return (int)slen;
+}
+
+
+int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
+                          int32_t *chunkshape, int32_t *blockshape, char **dtype, int8_t *dtype_format) {
+  uint8_t *pmeta = smeta;
+
+  // Check that we have an array with 5 entries (version, ndim, shape, chunkshape, blockshape)
+  pmeta += 1;
+
+  // version entry
+  // int8_t version = (int8_t)pmeta[0];  // positive fixnum (7-bit positive integer) commented to avoid warning
+  pmeta += 1;
+
+  // ndim entry
+  *ndim = (int8_t) pmeta[0];
+  int8_t ndim_aux = *ndim;  // positive fixnum (7-bit positive integer)
+  pmeta += 1;
+
+  // shape entry
+  // Initialize to ones, as required by b2nd
+  for (int i = 0; i < ndim_aux; i++) shape[i] = 1;
+  pmeta += 1;
+  for (int8_t i = 0; i < ndim_aux; i++) {
+    pmeta += 1;
+    swap_store(shape + i, pmeta, sizeof(int64_t));
+    pmeta += sizeof(int64_t);
+  }
+
+  // chunkshape entry
+  // Initialize to ones, as required by b2nd
+  for (int i = 0; i < ndim_aux; i++) chunkshape[i] = 1;
+  pmeta += 1;
+  for (int8_t i = 0; i < ndim_aux; i++) {
+    pmeta += 1;
+    swap_store(chunkshape + i, pmeta, sizeof(int32_t));
+    pmeta += sizeof(int32_t);
+  }
+
+  // blockshape entry
+  // Initialize to ones, as required by b2nd
+  for (int i = 0; i < ndim_aux; i++) blockshape[i] = 1;
+  pmeta += 1;
+  for (int8_t i = 0; i < ndim_aux; i++) {
+    pmeta += 1;
+    swap_store(blockshape + i, pmeta, sizeof(int32_t));
+    pmeta += sizeof(int32_t);
+  }
+
+  // dtype entry
+  if (pmeta - smeta < smeta_len) {
+    // dtype info is here
+    pmeta += 1;
+    *dtype_format = (int8_t) (*pmeta & 0x7F);
+    pmeta += 1;
+    int dtype_len;
+    swap_store(&dtype_len, pmeta, sizeof(int32_t));
+    pmeta += sizeof(int32_t);
+    *dtype = malloc(dtype_len + 1);
+    strncpy(*dtype, (char*)pmeta, dtype_len);
+    dtype[dtype_len] = 0;
+    pmeta += dtype_len;
+  }
+  else {
+    // dtype is mandatory in b2nd metalayer, but this is mainly meant as
+    // a fall-back for deprecated caterva headers
+    char *dtype_default = strdup(B2ND_DEFAULT_DTYPE);
+    strcpy(*dtype, dtype_default);
+    *dtype_format = 0;
+  }
+
+  int32_t slen = (int32_t) (pmeta - smeta);
+  return (int)slen;
+}
+
+
 int update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
                  const int32_t *chunkshape, const int32_t *blockshape) {
   array->ndim = ndim;
@@ -95,7 +239,7 @@ int update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
     // Serialize the dimension info ...
     int32_t smeta_len =
             b2nd_serialize_meta(array->ndim, array->shape, array->chunkshape, array->blockshape,
-                                array->dtype, &smeta);
+                                array->dtype, array->dtype_format, &smeta);
     if (smeta_len < 0) {
       fprintf(stderr, "error during serializing dims info for Blosc2 NDim");
       return -1;
@@ -131,6 +275,7 @@ int array_without_schunk(b2nd_context_t *ctx, b2nd_array_t **array) {
   BLOSC_ERROR(update_shape(*array, ctx->ndim, shape, chunkshape, blockshape));
 
   (*array)->dtype = ctx->dtype;
+  (*array)->dtype_format = DTYPE_NUMPY_FORMAT;
 
   // The partition cache (empty initially)
   (*array)->chunk_cache.data = NULL;
@@ -160,6 +305,7 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
                                           (*array)->chunkshape,
                                           (*array)->blockshape,
                                           (*array)->dtype,
+                                          (*array)->dtype_format,
                                           &smeta);
   if (smeta_len < 0) {
     BLOSC_TRACE_ERROR("error during serializing dims info for Blosc2 NDim");
@@ -289,7 +435,8 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
     }
   }
   BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &params.ndim, params.shape,
-                                    params.chunkshape, params.blockshape, &params.dtype));
+                                    params.chunkshape, params.blockshape, &params.dtype,
+                                    &params.dtype_format));
   free(smeta);
   free(params.dtype);
 
@@ -982,6 +1129,7 @@ int b2nd_print_meta(b2nd_array_t *array) {
   int32_t chunkshape[B2ND_MAX_DIM];
   int32_t blockshape[B2ND_MAX_DIM];
   char *dtype;
+  int8_t dtype_format;
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(array->sc, "b2nd", &smeta, &smeta_len) < 0) {
@@ -990,7 +1138,8 @@ int b2nd_print_meta(b2nd_array_t *array) {
       BLOSC_ERROR(BLOSC2_ERROR_METALAYER_NOT_FOUND);
     }
   }
-  BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, &dtype));
+  BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape,
+                                    &dtype, &dtype_format));
   free(smeta);
 
   printf("b2nd metalayer parameters: \n Ndim:       %d", ndim);
@@ -1662,144 +1811,9 @@ int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int6
 }
 
 
-int b2nd_serialize_meta(int8_t ndim, int64_t *shape, const int32_t *chunkshape,
-                        const int32_t *blockshape, const char *dtype, uint8_t **smeta) {
-  // Check size for dtype
-  if (dtype == NULL) {
-    dtype = B2ND_DEFAULT_DTYPE;
-  }
-  size_t dtype_len0 = strlen(dtype);
-  if (dtype_len0 > INT32_MAX) {
-    BLOSC_TRACE_ERROR("dtype is too large (len > %d)", INT32_MAX);
-    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
-  }
-  const int32_t dtype_len = (int32_t) dtype_len0;
-  // Allocate space for b2nd metalayer
-  int32_t max_smeta_len = (int32_t) (1 + 1 + 1 + (1 + ndim * (1 + sizeof(int64_t))) +
-                                     (1 + ndim * (1 + sizeof(int32_t))) + (1 + ndim * (1 + sizeof(int32_t))) +
-                                     1 + sizeof(int32_t) + dtype_len);
-  *smeta = malloc((size_t) max_smeta_len);
-  BLOSC_ERROR_NULL(*smeta, BLOSC2_ERROR_MEMORY_ALLOC);
-  uint8_t *pmeta = *smeta;
-
-  // Build an array with 6 entries (version, ndim, shape, chunkshape, blockshape, dtype)
-  *pmeta++ = 0x90 + 6;
-
-  // version entry
-  *pmeta++ = B2ND_METALAYER_VERSION;  // positive fixnum (7-bit positive integer)
-
-  // ndim entry
-  *pmeta++ = (uint8_t) ndim;  // positive fixnum (7-bit positive integer)
-
-  // shape entry
-  *pmeta++ = (uint8_t) (0x90) + ndim;  // fix array with ndim elements
-  for (uint8_t i = 0; i < ndim; i++) {
-    *pmeta++ = 0xd3;  // int64
-    swap_store(pmeta, shape + i, sizeof(int64_t));
-    pmeta += sizeof(int64_t);
-  }
-
-  // chunkshape entry
-  *pmeta++ = (uint8_t) (0x90) + ndim;  // fix array with ndim elements
-  for (uint8_t i = 0; i < ndim; i++) {
-    *pmeta++ = 0xd2;  // int32
-    swap_store(pmeta, chunkshape + i, sizeof(int32_t));
-    pmeta += sizeof(int32_t);
-  }
-
-  // blockshape entry
-  *pmeta++ = (uint8_t) (0x90) + ndim;  // fix array with ndim elements
-  for (uint8_t i = 0; i < ndim; i++) {
-    *pmeta++ = 0xd2;  // int32
-    swap_store(pmeta, blockshape + i, sizeof(int32_t));
-    pmeta += sizeof(int32_t);
-  }
-
-  // dtype entry
-  *pmeta++ = (uint8_t) (0xdb);  // str with up to 2^31 elements
-  swap_store(pmeta, &dtype_len, sizeof(int32_t));
-  pmeta += sizeof(int32_t);
-  memcpy(pmeta, dtype, dtype_len);
-  pmeta += dtype_len;
-
-  int32_t slen = (int32_t) (pmeta - *smeta);
-  return (int)slen;
-}
-
-
-int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
-                          int32_t *chunkshape, int32_t *blockshape, char **dtype) {
-  uint8_t *pmeta = smeta;
-
-  // Check that we have an array with 5 entries (version, ndim, shape, chunkshape, blockshape)
-  pmeta += 1;
-
-  // version entry
-  // int8_t version = (int8_t)pmeta[0];  // positive fixnum (7-bit positive integer) commented to avoid warning
-  pmeta += 1;
-
-  // ndim entry
-  *ndim = (int8_t) pmeta[0];
-  int8_t ndim_aux = *ndim;  // positive fixnum (7-bit positive integer)
-  pmeta += 1;
-
-  // shape entry
-  // Initialize to ones, as required by b2nd
-  for (int i = 0; i < ndim_aux; i++) shape[i] = 1;
-  pmeta += 1;
-  for (int8_t i = 0; i < ndim_aux; i++) {
-    pmeta += 1;
-    swap_store(shape + i, pmeta, sizeof(int64_t));
-    pmeta += sizeof(int64_t);
-  }
-
-  // chunkshape entry
-  // Initialize to ones, as required by b2nd
-  for (int i = 0; i < ndim_aux; i++) chunkshape[i] = 1;
-  pmeta += 1;
-  for (int8_t i = 0; i < ndim_aux; i++) {
-    pmeta += 1;
-    swap_store(chunkshape + i, pmeta, sizeof(int32_t));
-    pmeta += sizeof(int32_t);
-  }
-
-  // blockshape entry
-  // Initialize to ones, as required by b2nd
-  for (int i = 0; i < ndim_aux; i++) blockshape[i] = 1;
-  pmeta += 1;
-  for (int8_t i = 0; i < ndim_aux; i++) {
-    pmeta += 1;
-    swap_store(blockshape + i, pmeta, sizeof(int32_t));
-    pmeta += sizeof(int32_t);
-  }
-
-  // dtype entry
-  if (pmeta - smeta < smeta_len) {
-    // dtype is here
-    pmeta += 1;
-    int dtype_len;
-    swap_store(&dtype_len, pmeta, sizeof(int32_t));
-    pmeta += sizeof(int32_t);
-    *dtype = malloc(dtype_len + 1);
-    strncpy(*dtype, (char*)pmeta, dtype_len);
-    dtype[dtype_len] = 0;
-    pmeta += dtype_len;
-  }
-  else {
-    // dtype is mandatory in b2nd metalayer, but this is mainly meant as
-    // a fall-back for deprecated caterva headers
-    char *dtype_default = strdup(B2ND_DEFAULT_DTYPE);
-    strcpy(*dtype, dtype_default);
-  }
-
-  int32_t slen = (int32_t) (pmeta - smeta);
-  return (int)slen;
-}
-
-
 b2nd_context_t *
 b2nd_create_ctx(blosc2_storage *b2_storage, int8_t ndim, int64_t *shape, int32_t *chunkshape, int32_t *blockshape,
-                char *dtype, blosc2_metalayer *metalayers, int32_t nmetalayers) {
+                char *dtype, int8_t dtype_format, blosc2_metalayer *metalayers, int32_t nmetalayers) {
   b2nd_context_t *ctx = malloc(sizeof(b2nd_context_t));
   BLOSC_ERROR_NULL(ctx, NULL);
   blosc2_storage *params_b2_storage = malloc(sizeof(blosc2_storage));
@@ -1822,9 +1836,11 @@ b2nd_create_ctx(blosc2_storage *b2_storage, int8_t ndim, int64_t *shape, int32_t
 
   if (dtype == NULL) {
     ctx->dtype = strdup(B2ND_DEFAULT_DTYPE);
+    ctx->dtype_format = 0;  // The default is NumPy format
   }
   else {
     ctx->dtype = strdup(dtype);
+    ctx->dtype_format = dtype_format;
   }
 
   params_b2_storage->cparams = cparams;
