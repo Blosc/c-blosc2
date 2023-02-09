@@ -37,7 +37,7 @@ int b2nd_serialize_meta(int8_t ndim, int64_t *shape, int32_t *chunkshape,
   // Allocate space for b2nd metalayer
   int32_t max_smeta_len = (int32_t) (1 + 1 + 1 + (1 + ndim * (1 + sizeof(int64_t))) +
                                      (1 + ndim * (1 + sizeof(int32_t))) + (1 + ndim * (1 + sizeof(int32_t))) +
-                                     1 + sizeof(int32_t) + dtype_len);
+                                     1 + 1 + sizeof(int32_t) + dtype_len);
   *smeta = malloc((size_t) max_smeta_len);
   BLOSC_ERROR_NULL(*smeta, BLOSC2_ERROR_MEMORY_ALLOC);
   uint8_t *pmeta = *smeta;
