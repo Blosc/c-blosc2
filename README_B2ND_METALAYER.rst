@@ -62,6 +62,6 @@ Finally, the `dtype` section is meant to store the data type information::
       |   +--[msgpack] str32
       +--[msgpack] positive fixint (7-bit integer). dtype_format; 0 means NumPy format.
 
-The 0 value for dtype_format means that that the dtype_string field follows the NumPy convention
+The 0 value for dtype_format means that the dtype_string field follows the NumPy convention
 (e.g. an `int32_t` dtype is represented as "<i4").  For more examples on NumPy dtype specs, see
 https://numpy.org/doc/stable/reference/arrays.dtypes.html#arrays-dtypes-constructing.
