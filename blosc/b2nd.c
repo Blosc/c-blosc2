@@ -42,8 +42,8 @@ int b2nd_serialize_meta(int8_t ndim, int64_t *shape, int32_t *chunkshape,
   BLOSC_ERROR_NULL(*smeta, BLOSC2_ERROR_MEMORY_ALLOC);
   uint8_t *pmeta = *smeta;
 
-  // Build an array with 6 entries (version, ndim, shape, chunkshape, blockshape, dtype)
-  *pmeta++ = 0x90 + 6;
+  // Build an array with 7 entries (version, ndim, shape, chunkshape, blockshape, dtype_format, dtype)
+  *pmeta++ = 0x90 + 7;
 
   // version entry
   *pmeta++ = B2ND_METALAYER_VERSION;  // positive fixnum (7-bit positive integer)
