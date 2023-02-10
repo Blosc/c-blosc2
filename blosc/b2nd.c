@@ -138,7 +138,7 @@ int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64
   if (pmeta - smeta < smeta_len) {
     // dtype info is here
     pmeta += 1;
-    *dtype_format = (int8_t) (*pmeta & 0x7F);
+    *dtype_format = (int8_t) (*pmeta);
     pmeta += 1;
     int dtype_len;
     swap_store(&dtype_len, pmeta, sizeof(int32_t));
