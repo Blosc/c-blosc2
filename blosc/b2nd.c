@@ -274,7 +274,13 @@ int array_without_schunk(b2nd_context_t *ctx, b2nd_array_t **array) {
   int32_t *blockshape = ctx->blockshape;
   BLOSC_ERROR(update_shape(*array, ctx->ndim, shape, chunkshape, blockshape));
 
-  (*array)->dtype = ctx->dtype;
+  if (ctx->dtype != NULL) {
+    (*array)->dtype = malloc(strlen(ctx->dtype) + 1);
+    strcpy((*array)->dtype, ctx->dtype);
+  } else {
+    (*array)->dtype = NULL;
+  }
+
   (*array)->dtype_format = DTYPE_NUMPY_FORMAT;
 
   // The partition cache (empty initially)
@@ -438,9 +444,10 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
                                     params.chunkshape, params.blockshape, &params.dtype,
                                     &params.dtype_format));
   free(smeta);
-  free(params.dtype);
 
   BLOSC_ERROR(array_without_schunk(&params, array));
+
+  free(params.dtype);
 
   (*array)->sc = schunk;
 
@@ -504,6 +511,9 @@ int b2nd_free(b2nd_array_t *array) {
   if (array) {
     if (array->sc != NULL) {
       blosc2_schunk_free(array->sc);
+    }
+    if (array->dtype != NULL) {
+      free(array->dtype);
     }
     free(array);
   }

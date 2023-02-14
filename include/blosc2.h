@@ -1641,9 +1641,9 @@ typedef struct blosc2_schunk {
   int64_t current_nchunk;
   //!< The current chunk that is being accessed
   int64_t nbytes;
-  //!< The data size + metadata size + header size (uncompressed).
+  //!< The data size (uncompressed).
   int64_t cbytes;
-  //!< The data size + metadata size + header size (compressed).
+  //!< The data size + chunks header size (compressed).
   uint8_t** data;
   //!< Pointer to chunk data pointers buffer.
   size_t data_len;
