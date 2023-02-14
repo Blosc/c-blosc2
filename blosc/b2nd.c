@@ -144,8 +144,9 @@ int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64
     swap_store(&dtype_len, pmeta, sizeof(int32_t));
     pmeta += sizeof(int32_t);
     *dtype = malloc(dtype_len + 1);
-    strncpy(*dtype, (char*)pmeta, dtype_len);
-    dtype[dtype_len] = 0;
+    char* dtype_ = *dtype;
+    memcpy(dtype_, (char*)pmeta, dtype_len);
+    dtype_[dtype_len] = '\0';
     pmeta += dtype_len;
   }
   else {
