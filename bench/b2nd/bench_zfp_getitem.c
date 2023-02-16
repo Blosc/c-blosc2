@@ -90,7 +90,9 @@ int comp(const char *urlpath) {
   int8_t dtype_format;
   b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape_aux, chunkshape, blockshape, &dtype, &dtype_format);
   free(smeta);
-  free(dtype);
+  if (dtype != NULL) {
+    free(dtype);
+  }
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.nthreads = 6;

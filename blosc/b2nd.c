@@ -137,8 +137,7 @@ int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64
   // dtype entry
   if (pmeta - smeta < smeta_len) {
     // dtype info is here
-    pmeta += 1;
-    *dtype_format = (int8_t) (*pmeta);
+    *dtype_format = (int8_t) *(pmeta++);
     pmeta += 1;
     int dtype_len;
     swap_store(&dtype_len, pmeta, sizeof(int32_t));
@@ -152,8 +151,7 @@ int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64
   else {
     // dtype is mandatory in b2nd metalayer, but this is mainly meant as
     // a fall-back for deprecated caterva headers
-    char *dtype_default = strdup(B2ND_DEFAULT_DTYPE);
-    strcpy(*dtype, dtype_default);
+    *dtype = NULL;
     *dtype_format = 0;
   }
 
@@ -282,7 +280,7 @@ int array_without_schunk(b2nd_context_t *ctx, b2nd_array_t **array) {
     (*array)->dtype = NULL;
   }
 
-  (*array)->dtype_format = DTYPE_NUMPY_FORMAT;
+  (*array)->dtype_format = ctx->dtype_format;
 
   // The partition cache (empty initially)
   (*array)->chunk_cache.data = NULL;
@@ -448,7 +446,9 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
 
   BLOSC_ERROR(array_without_schunk(&params, array));
 
-  free(params.dtype);
+  if (params.dtype != NULL) {
+    free(params.dtype);
+  }
 
   (*array)->sc = schunk;
 
@@ -1162,10 +1162,15 @@ int b2nd_print_meta(b2nd_array_t *array) {
   for (int i = 1; i < ndim; ++i) {
     printf(", %d", chunkshape[i]);
   }
-  printf("\n dtype: %s", dtype);
-  free(dtype);
+  if (dtype != NULL) {
+    printf("\n dtype: %s", dtype);
+    free(dtype);
+  }
 
-  printf("\n dtype: %d", blockshape[0]);
+  printf("\n blockshape: %d", blockshape[0]);
+  for (int i = 1; i < ndim; ++i) {
+    printf(", %d", blockshape[i]);
+  }
   printf("\n");
 
   return BLOSC2_ERROR_SUCCESS;
