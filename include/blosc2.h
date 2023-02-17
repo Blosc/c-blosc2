@@ -1724,7 +1724,7 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t l
  *
  * @warning If you set it to `true` you will be responsible of freeing it.
  */
-void blosc2_schunk_avoid_cframe_free(blosc2_schunk *schunk, bool avoid_cframe_free);
+BLOSC_EXPORT void blosc2_schunk_avoid_cframe_free(blosc2_schunk *schunk, bool avoid_cframe_free);
 
 /**
  * @brief Open an existing super-chunk that is on-disk (frame). No in-memory copy is made.
@@ -1787,7 +1787,7 @@ BLOSC_EXPORT int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* ur
  * @return If successful, return the offset where @p schunk has been appended in @p urlpath.
  * Else, a negative value.
  */
-int64_t blosc2_schunk_append_file(blosc2_schunk* schunk, const char* urlpath);
+BLOSC_EXPORT int64_t blosc2_schunk_append_file(blosc2_schunk* schunk, const char* urlpath);
 
 /**
  * @brief Release resources from a super-chunk.
