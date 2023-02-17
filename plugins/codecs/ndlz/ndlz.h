@@ -13,6 +13,7 @@
 #ifndef NDLZ_H
 #define NDLZ_H
 #include "context.h"
+#include <b2nd.h>
 
 #if defined (__cplusplus)
 extern "C" {

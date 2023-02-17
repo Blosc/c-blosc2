@@ -9,10 +9,11 @@
 **********************************************************************/
 
 enum {
-    BLOSC_CODEC_NDLZ = 32,
-    BLOSC_CODEC_ZFP_FIXED_ACCURACY = 33,
-    BLOSC_CODEC_ZFP_FIXED_PRECISION = 34,
-    BLOSC_CODEC_ZFP_FIXED_RATE = 35,
+  BLOSC_CODEC_NDLZ = 32,
+  BLOSC_CODEC_ZFP_FIXED_ACCURACY = 33,
+  BLOSC_CODEC_ZFP_FIXED_PRECISION = 34,
+  BLOSC_CODEC_ZFP_FIXED_RATE = 35,
+  BLOSC_CODEC_J2K = 36,
 };
 
 void register_codecs(void);

@@ -46,6 +46,19 @@ if(NOT DEACTIVATE_ZSTD)
     endif()
 endif()
 
+if(HAVE_PLUGINS)
+    set(PLUGINS_INCLUDE_DIRS ../plugins/codecs/zfp/include)
+    if(NOT DEACTIVATE_J2K)
+        get_filename_component(J2K_LOCAL_DIR ../plugins/codecs/j2k/OpenHTJ2K/source ABSOLUTE)
+        set(PLUGINS_INCLUDE_DIRS ${PLUGINS_INCLUDE_DIRS}
+                ${J2K_LOCAL_DIR}/core/interface ${J2K_LOCAL_DIR}/apps/decoder
+                ${J2K_LOCAL_DIR}/core/common ${J2K_LOCAL_DIR}/core/codestream
+                ${J2K_LOCAL_DIR}/core/coding ${J2K_LOCAL_DIR}/core/jph
+                ${J2K_LOCAL_DIR}/core/transform)
+    endif()
+    set(BLOSC_INCLUDE_DIRS ${BLOSC_INCLUDE_DIRS} ${PLUGINS_INCLUDE_DIRS})
+endif()
+
 include_directories(${BLOSC_INCLUDE_DIRS})
 
 # library sources
@@ -284,11 +297,19 @@ endif()
 if(BUILD_SHARED)
     target_link_libraries(blosc2_shared ${LIBS})
     target_include_directories(blosc2_shared PUBLIC ${BLOSC_INCLUDE_DIRS})
+    if(BUILD_PLUGINS AND (NOT DEACTIVATE_J2K))
+        target_link_libraries(blosc2_shared blosc2_htj2k_shared)
+        target_link_libraries(blosc2_shared open_htj2k)
+    endif()
 endif()
 
 if(BUILD_TESTS)
     target_link_libraries(blosc_testing ${LIBS})
     target_include_directories(blosc_testing PUBLIC ${BLOSC_INCLUDE_DIRS})
+    if(BUILD_PLUGINS AND (NOT DEACTIVATE_J2K))
+        target_link_libraries(blosc_testing blosc2_htj2k)
+        target_link_libraries(blosc_testing open_htj2k)
+    endif()
 endif()
 
 if(BUILD_STATIC)
@@ -299,6 +320,10 @@ if(BUILD_STATIC)
     endif()
     target_link_libraries(blosc2_static ${LIBS})
     target_include_directories(blosc2_static PUBLIC ${BLOSC_INCLUDE_DIRS})
+    if(BUILD_PLUGINS AND (NOT DEACTIVATE_J2K))
+        target_link_libraries(blosc2_static blosc2_htj2k)
+        target_link_libraries(blosc2_static open_htj2k)
+    endif()
 endif()
 
 # install

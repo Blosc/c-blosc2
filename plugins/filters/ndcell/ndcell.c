@@ -9,7 +9,6 @@
 #include "ndcell.h"
 #include <math.h>
 #include <stdio.h>
-#include "../plugins/plugin_utils.h"
 #include "../include/blosc2/filters-registry.h"
 
 
@@ -33,8 +32,11 @@ int ndcell_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
     printf("Blosc error");
     return 0;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  char *dtype;
+  int8_t dtype_format;
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, &dtype, &dtype_format);
   free(smeta);
+  free(dtype);
   int typesize = cparams->typesize;
 
   int8_t cell_shape = (int8_t) meta;
@@ -160,8 +162,11 @@ int ndcell_decoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
     printf("Blosc error");
     return 0;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  char *dtype;
+  int8_t dtype_format;
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, &dtype, &dtype_format);
   free(smeta);
+  free(dtype);
 
   int8_t cell_shape = (int8_t) meta;
   int cell_size = (int) pow(cell_shape, ndim);

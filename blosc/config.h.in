@@ -7,5 +7,6 @@
 #cmakedefine HAVE_IPP @HAVE_IPP@
 #cmakedefine BLOSC_DLL_EXPORT @DLL_EXPORT@
 #cmakedefine HAVE_PLUGINS @HAVE_PLUGINS@
+#cmakedefine HAVE_J2K @HAVE_J2K@
 
 #endif

@@ -33,6 +33,8 @@
 #       do not include support for the Zlib library
 #   DEACTIVATE_ZSTD: default OFF
 #       do not include support for the Zstd library
+#   DEACTIVATE_J2K: default OFF
+#       do not include support for the J2K library
 #   PREFER_EXTERNAL_LZ4: default OFF
 #       when found, use the installed LZ4 libs instead of included
 #       sources
@@ -81,7 +83,10 @@ if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_GREATER 3.4)
   cmake_policy(SET CMP0063 NEW)
 endif()
 # The project can have ASM (zstd 1.5.2 is starting to use it)
-project(blosc LANGUAGES C ASM)
+# C++ could be used in plugins
+project(blosc LANGUAGES C CXX ASM)
+
+set(CMAKE_CXX_STANDARD 20)
 
 # parse the full version numbers from blosc2.h
 file(READ include/blosc2.h _blosc2_h_contents)
@@ -116,11 +121,13 @@ option(BUILD_LITE
 option(DEACTIVATE_AVX2
     "Do not attempt to build with AVX2 instructions" OFF)
 option(DEACTIVATE_ZLIB
-    "Do not include support for the Zlib library." OFF)
+    "Do not include support for the Zlib library." ON)
 option(DEACTIVATE_ZSTD
-    "Do not include support for the Zstd library." OFF)
+    "Do not include support for the Zstd library." ON)
 option(DEACTIVATE_IPP
     "Do not include support for the Intel IPP library." ON)
+option(DEACTIVATE_J2K
+    "Do not include support for the J2K library." OFF)
 option(PREFER_EXTERNAL_LZ4
     "Find and use external LZ4 library instead of included sources." OFF)
 option(PREFER_EXTERNAL_ZLIB
@@ -217,6 +224,9 @@ endif()
 
 if(BUILD_PLUGINS)
     set(HAVE_PLUGINS TRUE)
+    if(NOT DEACTIVATE_J2K)
+        set(HAVE_J2K TRUE)
+    endif()
 endif()
 
 # create the config.h file
@@ -406,6 +416,12 @@ endif()
 include_directories(include)
 if(BUILD_PLUGINS)
     include_directories(plugins/codecs/zfp/include)
+    if(NOT DEACTIVATE_J2K)
+        include_directories(plugins/codecs/j2k/OpenHTJ2K/source/core/interface plugins/codecs/j2k/OpenHTJ2K/source/apps/decoder
+                plugins/codecs/j2k/OpenHTJ2K/source/core/common plugins/codecs/j2k/OpenHTJ2K/source/core/codestream
+                plugins/codecs/j2k/OpenHTJ2K/source/core/coding plugins/codecs/j2k/OpenHTJ2K/source/core/jph
+                plugins/codecs/j2k/OpenHTJ2K/source/core/transform)
+    endif()
 endif()
 
 # subdirectories

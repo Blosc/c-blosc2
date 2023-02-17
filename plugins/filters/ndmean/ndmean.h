@@ -12,6 +12,7 @@
 #define B2ND_NDMEAN_H
 
 #include "blosc2.h"
+#include "b2nd.h"
 
 #define NDMEAN_MAX_DIM 8
 

@@ -12,6 +12,7 @@
 #define B2ND_NDCELL_H
 
 #include <blosc2.h>
+#include <b2nd.h>
 
 #define NDCELL_MAX_DIM 8
 

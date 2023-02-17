@@ -12,7 +12,6 @@
 #define B2ND_B2ND_UTILS_H_
 
 #include <b2nd.h>
-#include <../plugins/plugin_utils.h>
 
 #ifdef __cplusplus
 extern "C" {

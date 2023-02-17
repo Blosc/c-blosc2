@@ -20,7 +20,6 @@
 #include "ndlz8x8.h"
 #include "ndlz.h"
 #include "xxhash.h"
-#include "../plugins/plugin_utils.h"
 
 
 /*
@@ -72,8 +71,11 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
     printf("Blosc error");
     return 0;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  char *dtype;
+  int8_t dtype_format;
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, &dtype, &dtype_format);
   free(smeta);
+  free(dtype);
 
   if (ndim != 2) {
     fprintf(stderr, "This codec only works for ndim = 2");

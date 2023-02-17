@@ -8,6 +8,8 @@
 #include "blosc2/codecs-registry.h"
 #include "ndlz/ndlz.h"
 #include "zfp/blosc2-zfp.h"
+#include "j2k/blosc2_htj2k.h"
+#include "config.h"
 
 void register_codecs(void) {
 
@@ -46,4 +48,16 @@ void register_codecs(void) {
   zfp_rate.decoder = zfp_rate_decompress;
   zfp_rate.compname = "zfp_rate";
   register_codec_private(&zfp_rate);
+
+#if defined(HAVE_J2K)
+  blosc2_codec j2k;
+  j2k.compcode = BLOSC_CODEC_J2K;
+  j2k.compver = 1;
+  j2k.complib = BLOSC_CODEC_J2K;
+  j2k.encoder = htj2k_encoder;
+  j2k.decoder = htj2k_decoder;
+  j2k.compname = "j2k";
+  register_codec_private(&j2k);
+#endif /* HAVE_J2K */
+
 }

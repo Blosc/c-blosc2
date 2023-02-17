@@ -38,7 +38,6 @@
 #include <math.h>
 #include <inttypes.h>
 #include "blosc2/filters-registry.h"
-#include "../plugins/plugin_utils.h"
 #include "b2nd.h"
 
 #define EPSILON (float) (1)
@@ -73,8 +72,11 @@ static int test_ndmean(blosc2_schunk *schunk) {
     printf("Blosc error");
     return 0;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  char *dtype;
+  int8_t dtype_format;
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, &dtype, &dtype_format);
   free(smeta);
+  free(dtype);
 
   if (ndim != 1) {
     fprintf(stderr, "This test only works for ndim = 1");

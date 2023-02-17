@@ -2,8 +2,10 @@ Here there are stored testing complementary files that are available for
 all users to test their plugins.
 
 The folder files are multidimensional arrays created by b2nd using
-the 'example_frame_generator.c' example.
+the 'example_frame_generator.c' example. 
 (https://github.com/Blosc/c-blosc2/blob/main/examples/b2nd/example_frame_generator.c).
+There is one exception: teapot.ppm is an image used for testing J2K.
+
 Moreover, they have the next parameters:
 - nthreads = 1;
 - splitmode = BLOSC_ALWAYS_SPLIT;
@@ -11,51 +13,6 @@ Moreover, they have the next parameters:
 - complevel = 9;
 
 Moreover, each dataset has different types and shapes:
-
-**example_rand.b2nd**:
-
-- ndim = 3;
-- type = int;
-- typesize = 4;
-- shape[8] = {32, 18, 32};
-- chunkshape[8] = {17, 16, 24};
-- blockshape[8] = {8, 9, 8};
-
-**example_same_cells.b2nd**:
-
-- ndim = 2;
-- type = int;
-- typesize = 4;
-- shape[8] = {128, 111};
-- chunkshape[8] = {32, 11};
-- blockshape[8] = {16, 7};
-
-**example_some_matches.b2nd**:
-
-- ndim = 2;
-- type = long;
-- typesize = 8;
-- shape[8] = {128, 111};
-- chunkshape[8] = {48, 32};
-- blockshape[8] = {14, 18};
-
-**example_float_cyclic.b2nd**:
-
-- int8_t ndim = 3;
-- type = float;
-- typesize = 4;
-- int64_t shape[] = {40, 60, 20};
-- int32_t chunkshape[] = {20, 30, 16};
-- int32_t blockshape[] = {11, 14, 7};
-
-**example_double_same_cells.b2nd**:
-
-- int8_t ndim = 2;
-- type = double;
-- typesize = 8;
-- int64_t shape[] = {40, 60};
-- int32_t chunkshape[] = {20, 30};
-- int32_t blockshape[] = {16, 16};
 
 **example_day_month_temp.b2nd**:
 

@@ -13,7 +13,6 @@
 #include <math.h>
 #include "context.h"
 #include "assert.h"
-#include "../plugins/plugin_utils.h"
 
 
 int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
@@ -37,8 +36,11 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(blockshape);
     return -1;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  char *dtype;
+  int8_t dtype_format;
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, &dtype, &dtype_format);
   free(smeta);
+  free(dtype);
 
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
@@ -154,8 +156,11 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(blockshape);
     return BLOSC2_ERROR_FAILURE;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  char *dtype;
+  int8_t dtype_format;
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, &dtype, &dtype_format);
   free(smeta);
+  free(dtype);
 
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
@@ -244,8 +249,11 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(blockshape);
     return -1;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  char *dtype;
+  int8_t dtype_format;
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, &dtype, &dtype_format);
   free(smeta);
+  free(dtype);
 
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
@@ -384,8 +392,11 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     free(blockshape);
     return BLOSC2_ERROR_FAILURE;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  char *dtype;
+  int8_t dtype_format;
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, &dtype, &dtype_format);
   free(smeta);
+  free(dtype);
 
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
@@ -501,8 +512,11 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(blockshape);
     return -1;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  char *dtype;
+  int8_t dtype_format;
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, &dtype, &dtype_format);
   free(smeta);
+  free(dtype);
 
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
@@ -636,8 +650,11 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     free(blockshape);
     return BLOSC2_ERROR_FAILURE;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  char *dtype;
+  int8_t dtype_format;
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, &dtype, &dtype_format);
   free(smeta);
+  free(dtype);
 
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
