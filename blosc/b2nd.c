@@ -445,10 +445,7 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
   free(smeta);
 
   BLOSC_ERROR(array_without_schunk(&params, array));
-
-  if (params.dtype != NULL) {
-    free(params.dtype);
-  }
+  free(params.dtype);
 
   (*array)->sc = schunk;
 
@@ -513,9 +510,7 @@ int b2nd_free(b2nd_array_t *array) {
     if (array->sc != NULL) {
       blosc2_schunk_free(array->sc);
     }
-    if (array->dtype != NULL) {
-      free(array->dtype);
-    }
+    free(array->dtype);
     free(array);
   }
   return BLOSC2_ERROR_SUCCESS;
