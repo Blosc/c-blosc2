@@ -5,7 +5,7 @@ Release notes for C-Blosc2
 Changes from 2.6.1 to 2.6.2
 ===========================
 
-#XXX version-specific blurb XXX#
+* Updated internal zstd sources to 1.5.4.
 
 
 Changes from 2.6.0 to 2.6.1
