@@ -234,7 +234,7 @@ so let's err on the safe side and dump the first 1000 bytes, just in case::
 
 By having a look at the `Blosc2 NDim metalayer description <README_B2ND_METALAYER.rst>`_, one can see that the
 number of dimensions is 2, the `shape` is [400, 3], the `chunkshape` is [110, 3], the blockshape is
-[57, 3], the dtype format is 0 (NumPy) and the dtype is "uint8".
+[57, 3], the dtype format is 0 (NumPy) and the dtype is "|u1", which is a NumPy shortcut for `np.uint8`.
 
 Chunks
 ------
