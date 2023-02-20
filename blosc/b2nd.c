@@ -508,6 +508,19 @@ int b2nd_open(const char *urlpath, b2nd_array_t **array) {
 }
 
 
+int b2nd_open_offset(const char *urlpath, b2nd_array_t **array, int64_t offset) {
+  BLOSC_ERROR_NULL(urlpath, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+
+  blosc2_schunk *sc = blosc2_schunk_open_offset(urlpath, offset);
+
+  // ...and create a b2nd array out of it
+  BLOSC_ERROR(b2nd_from_schunk(sc, array));
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 int b2nd_free(b2nd_array_t *array) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
