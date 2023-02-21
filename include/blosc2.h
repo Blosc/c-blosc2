@@ -2035,6 +2035,29 @@ BLOSC_EXPORT int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t n
  */
 BLOSC_EXPORT int blosc2_meta_exists(blosc2_schunk *schunk, const char *name);
 
+/* Find whether the schunk has a metalayer or not.
+ *
+ * If found, return the index of the metalayer.  Else, return a negative value.
+ */
+int blosc2_meta_exists(blosc2_schunk *schunk, const char *name) {
+  if (strlen(name) > BLOSC2_METALAYER_NAME_MAXLEN) {
+    BLOSC_TRACE_ERROR("Metalayers cannot be larger than %d chars.", BLOSC2_METALAYER_NAME_MAXLEN);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  if (schunk == NULL) {
+    BLOSC_TRACE_ERROR("Schunk must not be NUll.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  for (int nmetalayer = 0; nmetalayer < schunk->nmetalayers; nmetalayer++) {
+    if (strcmp(name, schunk->metalayers[nmetalayer]->name) == 0) {
+      return nmetalayer;
+    }
+  }
+  return BLOSC2_ERROR_NOT_FOUND;
+}
+
 /**
  * @brief Add content into a new metalayer.
  *
@@ -2064,6 +2087,48 @@ BLOSC_EXPORT int blosc2_meta_add(blosc2_schunk *schunk, const char *name, uint8_
 BLOSC_EXPORT int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content,
                                     int32_t content_len);
 
+void swap_store(void *dest, const void *pa, int size);
+
+void swap_store(void *dest, const void *pa, int size) {
+  uint8_t *pa_ = (uint8_t *) pa;
+  uint8_t *pa2_ = (uint8_t*) malloc((size_t) size);
+  int i = 1; /* for big/little endian detection */
+  char *p = (char *) &i;
+
+  if (p[0] == 1) {
+    /* little endian */
+    switch (size) {
+      case 8:
+        pa2_[0] = pa_[7];
+        pa2_[1] = pa_[6];
+        pa2_[2] = pa_[5];
+        pa2_[3] = pa_[4];
+        pa2_[4] = pa_[3];
+        pa2_[5] = pa_[2];
+        pa2_[6] = pa_[1];
+        pa2_[7] = pa_[0];
+        break;
+      case 4:
+        pa2_[0] = pa_[3];
+        pa2_[1] = pa_[2];
+        pa2_[2] = pa_[1];
+        pa2_[3] = pa_[0];
+        break;
+      case 2:
+        pa2_[0] = pa_[1];
+        pa2_[1] = pa_[0];
+        break;
+      case 1:
+        pa2_[0] = pa_[0];
+        break;
+      default:
+        fprintf(stderr, "Unhandled nitems: %d\n", size);
+    }
+  }
+  memcpy(dest, pa2_, size);
+  free(pa2_);
+}
+
 /**
  * @brief Get the content out of a metalayer.
  *
@@ -2079,6 +2144,25 @@ BLOSC_EXPORT int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uin
  */
 BLOSC_EXPORT int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
                                  int32_t *content_len);
+
+/* Get the content out of a metalayer.
+ *
+ * The `**content` receives a malloc'ed copy of the content.  The user is responsible for freeing it.
+ *
+ * If successful, return the index of the new metalayer.  Else, return a negative value.
+ */
+int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
+                    int32_t *content_len) {
+  int nmetalayer = blosc2_meta_exists(schunk, name);
+  if (nmetalayer < 0) {
+    BLOSC_TRACE_WARNING("Metalayer \"%s\" not found.", name);
+    return nmetalayer;
+  }
+  *content_len = schunk->metalayers[nmetalayer]->content_len;
+  *content = (uint8_t*) malloc((size_t)*content_len);
+  memcpy(*content, schunk->metalayers[nmetalayer]->content, (size_t)*content_len);
+  return nmetalayer;
+}
 
 
 /*********************************************************************

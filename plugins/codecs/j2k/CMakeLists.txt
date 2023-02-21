@@ -1,6 +1,8 @@
 add_subdirectory(OpenHTJ2K)
 add_library(blosc2_htj2k STATIC blosc2_htj2k.cpp)
 add_library(blosc2_htj2k_shared SHARED blosc2_htj2k.cpp)
+target_link_libraries(blosc2_htj2k_shared open_htj2k)
+target_link_libraries(blosc2_htj2k open_htj2k)
 
 # targets
 if(BUILD_TESTS)

@@ -1376,29 +1376,6 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
 }
 
 
-/* Find whether the schunk has a metalayer or not.
- *
- * If found, return the index of the metalayer.  Else, return a negative value.
- */
-int blosc2_meta_exists(blosc2_schunk *schunk, const char *name) {
-  if (strlen(name) > BLOSC2_METALAYER_NAME_MAXLEN) {
-    BLOSC_TRACE_ERROR("Metalayers cannot be larger than %d chars.", BLOSC2_METALAYER_NAME_MAXLEN);
-    return BLOSC2_ERROR_INVALID_PARAM;
-  }
-
-  if (schunk == NULL) {
-    BLOSC_TRACE_ERROR("Schunk must not be NUll.");
-    return BLOSC2_ERROR_INVALID_PARAM;
-  }
-
-  for (int nmetalayer = 0; nmetalayer < schunk->nmetalayers; nmetalayer++) {
-    if (strcmp(name, schunk->metalayers[nmetalayer]->name) == 0) {
-      return nmetalayer;
-    }
-  }
-  return BLOSC2_ERROR_NOT_FOUND;
-}
-
 /* Reorder the chunk offsets of an existing super-chunk. */
 int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int64_t *offsets_order) {
   // Check that the offsets order are correct
@@ -1552,25 +1529,6 @@ int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content
   return nmetalayer;
 }
 
-
-/* Get the content out of a metalayer.
- *
- * The `**content` receives a malloc'ed copy of the content.  The user is responsible for freeing it.
- *
- * If successful, return the index of the new metalayer.  Else, return a negative value.
- */
-int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
-                    int32_t *content_len) {
-  int nmetalayer = blosc2_meta_exists(schunk, name);
-  if (nmetalayer < 0) {
-    BLOSC_TRACE_WARNING("Metalayer \"%s\" not found.", name);
-    return nmetalayer;
-  }
-  *content_len = schunk->metalayers[nmetalayer]->content_len;
-  *content = malloc((size_t)*content_len);
-  memcpy(*content, schunk->metalayers[nmetalayer]->content, (size_t)*content_len);
-  return nmetalayer;
-}
 
 /* Find whether the schunk has a variable-length metalayer or not.
  *

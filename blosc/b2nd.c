@@ -12,7 +12,6 @@
 #include "context.h"
 #include "b2nd_utils.h"
 #include "blosc2.h"
-#include "blosc-private.h"
 #include "blosc2/blosc2-common.h"
 #include <inttypes.h>
 
@@ -84,78 +83,6 @@ int b2nd_serialize_meta(int8_t ndim, int64_t *shape, int32_t *chunkshape,
   pmeta += dtype_len;
 
   int32_t slen = (int32_t) (pmeta - *smeta);
-  return (int)slen;
-}
-
-
-int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
-                          int32_t *chunkshape, int32_t *blockshape, char **dtype, int8_t *dtype_format) {
-  uint8_t *pmeta = smeta;
-
-  // Check that we have an array with 5 entries (version, ndim, shape, chunkshape, blockshape)
-  pmeta += 1;
-
-  // version entry
-  // int8_t version = (int8_t)pmeta[0];  // positive fixnum (7-bit positive integer) commented to avoid warning
-  pmeta += 1;
-
-  // ndim entry
-  *ndim = (int8_t) pmeta[0];
-  int8_t ndim_aux = *ndim;  // positive fixnum (7-bit positive integer)
-  pmeta += 1;
-
-  // shape entry
-  // Initialize to ones, as required by b2nd
-  for (int i = 0; i < ndim_aux; i++) shape[i] = 1;
-  pmeta += 1;
-  for (int8_t i = 0; i < ndim_aux; i++) {
-    pmeta += 1;
-    swap_store(shape + i, pmeta, sizeof(int64_t));
-    pmeta += sizeof(int64_t);
-  }
-
-  // chunkshape entry
-  // Initialize to ones, as required by b2nd
-  for (int i = 0; i < ndim_aux; i++) chunkshape[i] = 1;
-  pmeta += 1;
-  for (int8_t i = 0; i < ndim_aux; i++) {
-    pmeta += 1;
-    swap_store(chunkshape + i, pmeta, sizeof(int32_t));
-    pmeta += sizeof(int32_t);
-  }
-
-  // blockshape entry
-  // Initialize to ones, as required by b2nd
-  for (int i = 0; i < ndim_aux; i++) blockshape[i] = 1;
-  pmeta += 1;
-  for (int8_t i = 0; i < ndim_aux; i++) {
-    pmeta += 1;
-    swap_store(blockshape + i, pmeta, sizeof(int32_t));
-    pmeta += sizeof(int32_t);
-  }
-
-  // dtype entry
-  if (pmeta - smeta < smeta_len) {
-    // dtype info is here
-    *dtype_format = (int8_t) *(pmeta++);
-    pmeta += 1;
-    int dtype_len;
-    swap_store(&dtype_len, pmeta, sizeof(int32_t));
-    pmeta += sizeof(int32_t);
-    *dtype = malloc(dtype_len + 1);
-    char* dtype_ = *dtype;
-    memcpy(dtype_, (char*)pmeta, dtype_len);
-    dtype_[dtype_len] = '\0';
-    pmeta += dtype_len;
-  }
-  else {
-    // dtype is mandatory in b2nd metalayer, but this is mainly meant as
-    // a fall-back for deprecated caterva headers
-    *dtype = NULL;
-    *dtype_format = 0;
-  }
-
-  int32_t slen = (int32_t) (pmeta - smeta);
   return (int)slen;
 }
 
