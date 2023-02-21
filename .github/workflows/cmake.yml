@@ -86,15 +86,19 @@ jobs:
             compiler: cl
             cmake-args: -A x64
 
-          - name: Windows GCC Ninja
-            os: windows-latest
-            compiler: gcc
-            cmake-args: -G Ninja
+          # The GCC platforms on Win have been crashing in GH Actions quite randomly,
+          # and despite many efforts, we have been unable to reproduce the crashes in
+          # our local boxes.  valgrind is not providing any hint either.
+          # Commenting these out for now.
+          # - name: Windows GCC Ninja
+          #   os: windows-latest
+          #   compiler: gcc
+          #   cmake-args: -G Ninja
 
-          - name: Windows GCC MinGW
-            os: windows-latest
-            compiler: gcc
-            cmake-args:  -G "MinGW Makefiles"
+          # - name: Windows GCC MinGW
+          #   os: windows-latest
+          #   compiler: gcc
+          #   cmake-args:  -G "MinGW Makefiles"
 
           - name: macOS Clang
             os: macOS-latest
