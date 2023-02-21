@@ -252,11 +252,11 @@ BLOSC_EXPORT int b2nd_from_cframe(uint8_t *cframe, int64_t cframe_len, bool copy
 BLOSC_EXPORT int b2nd_open(const char *urlpath, b2nd_array_t **array);
 
 /**
- * @brief Read a b2nd array from disk.
+ * @brief Read a b2nd array from a file using an offset inside the file..
  *
  * @param urlpath The urlpath of the b2nd array on disk.
- * @param array The memory pointer where the array will be created.
- * @param offset The frame offset.
+ * @param array The memory pointer where the array will be stored.
+ * @param offset The offset where the b2nd array frame starts.
  *
  * @return An error code.
  */
