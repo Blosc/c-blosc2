@@ -9,6 +9,7 @@
 **********************************************************************/
 
 #include "test_common.h"
+#include "blosc2.h"
 
 
 CUTEST_TEST_SETUP(metalayers) {
