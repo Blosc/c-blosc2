@@ -22,12 +22,12 @@
 #define NTHREADS 4
 
 
-CUTEST_TEST_SETUP(frame_offset) {
+CUTEST_TEST_SETUP(open_offset) {
   blosc2_init();
 }
 
 
-CUTEST_TEST_TEST(frame_offset) {
+CUTEST_TEST_TEST(open_offset) {
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   int32_t *data1 = malloc(CHUNKSIZE * sizeof(int32_t));
@@ -129,7 +129,7 @@ CUTEST_TEST_TEST(frame_offset) {
   BLOSC_ERROR(b2nd_open_offset("file:///frame_simple.b2frame", &arr_read_offset, offset));
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Time for fileframe (%s) + offset %ld -> frame_offset : %.3g s, %.1f GB/s\n",
+  printf("Time for fileframe (%s) + offset %ld -> open_offset : %.3g s, %.1f GB/s\n",
          arr_read_offset->sc->storage->urlpath, offset, ttotal, (double)arr_read_offset->sc->nbytes / (ttotal * GB));
 
   uint8_t* cframe_read_start, *cframe_read_offset;
@@ -185,11 +185,11 @@ CUTEST_TEST_TEST(frame_offset) {
   return 0;
 }
 
-CUTEST_TEST_TEARDOWN(frame_offset) {
+CUTEST_TEST_TEARDOWN(open_offset) {
   blosc2_destroy();
 }
 
 
 int main() {
-  CUTEST_TEST_RUN(frame_offset)
+  CUTEST_TEST_RUN(open_offset)
 }
