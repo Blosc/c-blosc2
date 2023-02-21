@@ -2038,7 +2038,7 @@ BLOSC_EXPORT int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t n
  *
  * If found, return the index of the metalayer.  Else, return a negative value.
  */
-inline int blosc2_meta_exists(blosc2_schunk *schunk, const char *name) {
+static inline int blosc2_meta_exists(blosc2_schunk *schunk, const char *name) {
   if (strlen(name) > BLOSC2_METALAYER_NAME_MAXLEN) {
     BLOSC_TRACE_ERROR("Metalayers cannot be larger than %d chars.", BLOSC2_METALAYER_NAME_MAXLEN);
     return BLOSC2_ERROR_INVALID_PARAM;
@@ -2087,7 +2087,7 @@ BLOSC_EXPORT int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uin
                                     int32_t content_len);
 
 
-inline void swap_store(void *dest, const void *pa, int size) {
+static inline void swap_store(void *dest, const void *pa, int size) {
   uint8_t *pa_ = (uint8_t *) pa;
   uint8_t *pa2_ = (uint8_t*) malloc((size_t) size);
   int i = 1; /* for big/little endian detection */
@@ -2147,7 +2147,7 @@ inline void swap_store(void *dest, const void *pa, int size) {
  *
  * If successful, return the index of the new metalayer.  Else, return a negative value.
  */
-inline int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
+static inline int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
                     int32_t *content_len) {
   int nmetalayer = blosc2_meta_exists(schunk, name);
   if (nmetalayer < 0) {

@@ -475,7 +475,7 @@ BLOSC_EXPORT int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **se
 
 // Not sure whether this should remain here or make it private...
 
-inline int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
+static inline int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
                           int32_t *chunkshape, int32_t *blockshape, char **dtype, int8_t *dtype_format) {
   uint8_t *pmeta = smeta;
 
