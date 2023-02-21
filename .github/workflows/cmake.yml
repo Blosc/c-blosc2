@@ -117,9 +117,10 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y ${{ matrix.packages }}
 
-    - name: Install packages (Windows)
-      if: runner.os == 'Windows'
-      run: choco install ninja ${{ matrix.packages }}
+    # Ninja should be not necessary anymore (see note on Win / GCC above)
+    # - name: Install packages (Windows)
+    #   if: runner.os == 'Windows'
+    #   run: choco install ninja ${{ matrix.packages }}
 
     - name: Install packages (macOS)
       if: runner.os == 'macOS'
