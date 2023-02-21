@@ -2,10 +2,25 @@ Release notes for C-Blosc2
 ==========================
 
 
-Changes from 2.6.1 to 2.6.2
+Changes from 2.6.1 to 2.7.0
 ===========================
 
-* Updated internal zstd sources to 1.5.4.
+* Caterva has been merged and carefully integrated in C-Blosc2 in the new b2nd interface.
+  For more info on the new interface, see https://www.blosc.org/c-blosc2/reference/b2nd.html.
+  Thanks to Marta Iborra, Oscar Guiñón, J. David Ibáñez and Francesc Alted.  Also thanks to
+  Aleix Alcacer for his great work in the Caterva project.
+
+* Updated internal zstd sources to 1.5.4.  Thanks to Dimitri Papadopoulos.
+
+* `blosc2_schunk_avoid_cframe_free` and `blosc2_schunk_append_file` are exported as public functions now.
+  Thanks to @bnavigator.
+
+* BloscLZ codec is now treated exactly the same as LZ4.  Before BloscLZ was considered less capable of reaching
+ decent compression ratios, but this has changed quite a bit lately, so there is no point in treating both differently.
+
+* Fixed some leaks, mainly on the test suite.
+
+* Fixed quite a bit of compiler warnings.
 
 
 Changes from 2.6.0 to 2.6.1

@@ -1,11 +1,13 @@
-# Announcing C-Blosc2 2.6.1
+# Announcing C-Blosc2 2.7.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-The Blosc development team is happy to announce a new release of C-Blosc2.
-This is a maintenance release with support for MacOS universal2 binaries
-(arm64+x86_64 build).
+Caterva has been merged and carefully integrated in C-Blosc2 in the new b2nd
+interface. For info on the new interface, see
+https://www.blosc.org/c-blosc2/reference/b2nd.html.
+Thanks to Marta Iborra, Oscar Guiñón, J. David Ibáñez and Francesc Alted.
+Also thanks to Aleix Alcacer for his great work in the Caterva project.
 
 C-Blosc2 should be backward compatible with C-Blosc, so you can start using
 it right away and increasingly start to use its new functionality, like the

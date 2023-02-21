@@ -40,10 +40,10 @@ C-Blosc2 is the new major version of `C-Blosc <https://github.com/Blosc/c-blosc>
 
 See a 3 minutes  `introductory video to Blosc2 <https://www.youtube.com/watch?v=ER12R7FXosk>`_.
 
-B2ND: an N-Dimensional store
-============================
+Blosc2 NDim: an N-Dimensional store
+===================================
 
-One of the latest and more exciting additions in C-Blosc2 is the B2ND layer, allowing to create *and* read n-dimensional datasets in an extremely efficient way thanks to its implementation of a fully n-dim 2-level partitioning, allowing to slice and dice arbitrary large and compressed data in a very fine-grained way:
+One of the latest and more exciting additions in C-Blosc2 is the `Blosc2 NDim layer <https://www.blosc.org/c-blosc2/reference/b2nd.html>`_ (or b2nd for short), allowing to create *and* read n-dimensional datasets in an extremely efficient way thanks to its implementation of a fully n-dim 2-level partitioning, allowing to slice and dice arbitrary large and compressed data in a very fine-grained way:
 
 .. image:: ./images/b2nd-2level-parts.png
   :width: 50%
