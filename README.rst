@@ -40,13 +40,17 @@ C-Blosc2 is the new major version of `C-Blosc <https://github.com/Blosc/c-blosc>
 
 See a 3 minutes  `introductory video to Blosc2 <https://www.youtube.com/watch?v=ER12R7FXosk>`_.
 
-N-Dimensional store
-===================
+B2ND: an N-Dimensional store
+============================
 
-One of the latest and more exciting additions in C-Blosc2 is the capability to create *and* read n-dimensional datasets in an extremely efficient way thanks to its implementation of double partitioning, allowing to slice and dice n-dim datasets in a very fine-grained way.  To wet you appetite, here it is an example on how it performs on getting slices in the different axis of a 4-dim dataset:
+One of the latest and more exciting additions in C-Blosc2 is the B2ND layer, allowing to create *and* read n-dimensional datasets in an extremely efficient way thanks to its implementation of a fully n-dim 2-level partitioning, allowing to slice and dice arbitrary large and compressed data in a very fine-grained way:
+
+.. image:: ./images/b2nd-2level-parts.png
+  :width: 50%
+
+To wet you appetite, here it is how the NDArray object in the [python-blosc2](https://github.com/Blosc/c-blosc2#python-wrapper) wrapper performs on getting slices orthogonal to the different axis of a 4-dim dataset:
 
 .. image:: ./images/Read-Partial-Slices-B2ND.png
-  :align: center
   :width: 50%
 
 
