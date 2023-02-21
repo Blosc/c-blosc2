@@ -15,7 +15,7 @@ and follows this format::
       |   |   |   +--[msgpack] fixarray with X=nd elements
       |   |   +--[msgpack] positive fixnum for the number of dimensions (up to 127)
       |   +--[msgpack] positive fixnum for the metalayer format version (up to 127)
-      +---[msgpack] fixarray with X=6 elements
+      +---[msgpack] fixarray with X=7 elements
 
 The `shape` section is meant to store the actual shape info::
 

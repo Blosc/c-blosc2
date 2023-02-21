@@ -84,6 +84,11 @@ int b2nd_serialize_meta(int8_t ndim, int64_t *shape, int32_t *chunkshape,
   pmeta += dtype_len;
 
   int32_t slen = (int32_t) (pmeta - *smeta);
+  if (max_smeta_len != slen) {
+    BLOSC_TRACE_ERROR("meta length is inconsistent!");
+    return BLOSC2_ERROR_FAILURE;
+  }
+
   return (int)slen;
 }
 
@@ -92,7 +97,7 @@ int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64
                           int32_t *chunkshape, int32_t *blockshape, char **dtype, int8_t *dtype_format) {
   uint8_t *pmeta = smeta;
 
-  // Check that we have an array with 5 entries (version, ndim, shape, chunkshape, blockshape)
+  // Check that we have an array with 7 entries (version, ndim, shape, chunkshape, blockshape, dtype_format, dtype)
   pmeta += 1;
 
   // version entry
