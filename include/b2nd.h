@@ -18,7 +18,6 @@
 #ifndef B2ND_B2ND_H_
 #define B2ND_B2ND_H_
 
-#include "blosc-private.h"
 #include <blosc2.h>
 #include <stdio.h>
 #include <stdlib.h>
