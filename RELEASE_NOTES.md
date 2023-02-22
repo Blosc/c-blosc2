@@ -15,6 +15,8 @@ Changes from 2.6.1 to 2.7.1
   Thanks to Marta Iborra, Oscar Guiñón, J. David Ibáñez and Francesc Alted.  Also thanks to
   Aleix Alcacer for his great work in the Caterva project.
 
+  We have a blog about this: https://www.blosc.org/posts/blosc2-ndim-intro
+
 * Updated internal zstd sources to 1.5.4.  Thanks to Dimitri Papadopoulos.
 
 * `blosc2_schunk_avoid_cframe_free` and `blosc2_schunk_append_file` are exported as public functions now.

@@ -21,9 +21,6 @@ A fast, compressed and persistent data store library for C
 .. |actions| image:: https://github.com/Blosc/c-blosc2/workflows/CI%20CMake/badge.svg
         :target: https://github.com/Blosc/c-blosc2/actions?query=workflow%3A%22CI+CMake%22
 
-.. |appveyor| image:: https://ci.appveyor.com/api/projects/status/qiaxywqrouj6nkug/branch/master?svg=true
-        :target: https://ci.appveyor.com/project/FrancescAlted/c-blosc2/branch/master
-
 .. |numfocus| image:: https://img.shields.io/badge/powered%20by-NumFOCUS-orange.svg?style=flat&colorA=E1523D&colorB=007D8A
         :target: https://numfocus.org
 
@@ -43,7 +40,7 @@ See a 3 minutes  `introductory video to Blosc2 <https://www.youtube.com/watch?v=
 Blosc2 NDim: an N-Dimensional store
 ===================================
 
-One of the latest and more exciting additions in C-Blosc2 is the `Blosc2 NDim layer <https://www.blosc.org/c-blosc2/reference/b2nd.html>`_ (or b2nd for short), allowing to create *and* read n-dimensional datasets in an extremely efficient way thanks to its implementation of a fully n-dim 2-level partitioning, allowing to slice and dice arbitrary large and compressed data in a very fine-grained way:
+One of the latest and more exciting additions in C-Blosc2 is the `Blosc2 NDim layer <https://www.blosc.org/c-blosc2/reference/b2nd.html>`_ (or b2nd for short), allowing to create *and* read n-dimensional datasets in an extremely efficient way thanks to a n-dim 2-level partitioning, that allows to slice and dice arbitrary large and compressed data in a more fine-grained way:
 
 .. image:: ./images/b2nd-2level-parts.png
   :width: 50%
