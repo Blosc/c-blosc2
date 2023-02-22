@@ -2,7 +2,7 @@ Release notes for C-Blosc2
 ==========================
 
 
-Changes from 2.6.1 to 2.7.0
+Changes from 2.6.1 to 2.7.1
 ===========================
 
 * Caterva has been merged and carefully integrated in C-Blosc2 in the new b2nd interface.

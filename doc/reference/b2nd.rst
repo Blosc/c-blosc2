@@ -53,6 +53,7 @@ From/To file
 ~~~~~~~~~~~~
 
 .. doxygenfunction:: b2nd_open
+.. doxygenfunction:: b2nd_open_offset
 .. doxygenfunction:: b2nd_save
 
 From Blosc object

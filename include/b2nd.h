@@ -480,8 +480,27 @@ BLOSC_EXPORT int b2nd_get_orthogonal_selection(b2nd_array_t *array, int64_t **se
  *
  * @note See also b2nd_get_orthogonal_selection.
  */
-BLOSC_EXPORT int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
+BLOSC_EXPORT int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **selection,
+                                               int64_t *selection_size, void *buffer,
                                                int64_t *buffershape, int64_t buffersize);
+
+
+/**
+ * @brief Create the metainfo for the b2nd metalayer.
+ *
+ * @param ndim The number of dimensions in the array.
+ * @param shape The shape of the array.
+ * @param chunkshape The shape of the chunks in the array.
+ * @param blockshape The shape of the blocks in the array.
+ * @param dtype A string representation of the data type of the array.
+ * @param dtype_format The format of the dtype representation. 0 means NumPy.
+ * @param smeta The msgpack buffer (output).
+ *
+ * @return An error code.
+ */
+BLOSC_EXPORT int b2nd_serialize_meta(int8_t ndim, int64_t *shape, int32_t *chunkshape,
+                                     int32_t *blockshape, const char *dtype,
+                                     const int8_t dtype_format, uint8_t **smeta);
 
 /**
  * @brief Read the metainfo in the b2nd metalayer.
