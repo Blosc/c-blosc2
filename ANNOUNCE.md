@@ -6,6 +6,7 @@ A fast, compressed and persistent binary data store library for C.
 Caterva has been merged and carefully integrated in C-Blosc2 in the new b2nd
 interface. For info on the new interface, see
 https://www.blosc.org/c-blosc2/reference/b2nd.html.
+We have blogged about this too: https://www.blosc.org/posts/blosc2-ndim-intro
 Thanks to Marta Iborra, Oscar Guiñón, J. David Ibáñez and Francesc Alted.
 Also thanks to Aleix Alcacer for his great work in the Caterva project.
 

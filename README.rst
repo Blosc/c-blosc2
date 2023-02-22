@@ -53,6 +53,7 @@ To wet you appetite, here it is how the NDArray object in the [python-blosc2](ht
 .. image:: ./images/Read-Partial-Slices-B2ND.png
   :width: 50%
 
+We have blogged about this: https://www.blosc.org/posts/blosc2-ndim-intro
 
 New features in C-Blosc2
 ========================
