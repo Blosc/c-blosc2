@@ -1,6 +1,11 @@
 Release notes for C-Blosc2
 ==========================
 
+Changes from 2.7.1 to 2.7.2
+===========================
+
+#XXX version-specific blurb XXX#
+
 
 Changes from 2.6.1 to 2.7.1
 ===========================
