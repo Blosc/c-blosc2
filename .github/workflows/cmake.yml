@@ -116,6 +116,8 @@ jobs:
     - name: Install packages (Windows)
       if: runner.os == 'Windows'
       run: choco install ninja ${{ matrix.packages }}
+      env:
+        PATH: ${{ matrix.build-dir }}\bin
 
     - name: Install packages (macOS)
       if: runner.os == 'macOS'

@@ -2033,11 +2033,6 @@ BLOSC_EXPORT int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t n
  *
  * @return If successful, return the index of the metalayer. Else, return a negative value.
  */
-
-/* Find whether the schunk has a metalayer or not.
- *
- * If found, return the index of the metalayer.  Else, return a negative value.
- */
 static inline int blosc2_meta_exists(blosc2_schunk *schunk, const char *name) {
   if (strlen(name) > BLOSC2_METALAYER_NAME_MAXLEN) {
     BLOSC_TRACE_ERROR("Metalayers cannot be larger than %d chars.", BLOSC2_METALAYER_NAME_MAXLEN);
@@ -2139,13 +2134,6 @@ static inline void swap_store(void *dest, const void *pa, int size) {
  * The user is responsible of freeing it.
  *
  * @return If successful, the index of the new metalayer. Else, return a negative value.
- */
-
-/* Get the content out of a metalayer.
- *
- * The `**content` receives a malloc'ed copy of the content.  The user is responsible for freeing it.
- *
- * If successful, return the index of the new metalayer.  Else, return a negative value.
  */
 static inline int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
                     int32_t *content_len) {

@@ -1,6 +1,10 @@
 add_subdirectory(OpenHTJ2K)
 add_library(blosc2_htj2k STATIC blosc2_htj2k.cpp)
 add_library(blosc2_htj2k_shared SHARED blosc2_htj2k.cpp)
+if(MSVC OR MINGW)
+    # Necessary for compiling blosc2_htj2k_shared.lib
+    set_property(TARGET blosc2_htj2k_shared PROPERTY WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+endif()
 target_link_libraries(blosc2_htj2k_shared open_htj2k)
 target_link_libraries(blosc2_htj2k open_htj2k)
 
