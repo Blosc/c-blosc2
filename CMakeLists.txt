@@ -121,9 +121,9 @@ option(BUILD_LITE
 option(DEACTIVATE_AVX2
     "Do not attempt to build with AVX2 instructions" OFF)
 option(DEACTIVATE_ZLIB
-    "Do not include support for the Zlib library." ON)
+    "Do not include support for the Zlib library." OFF)
 option(DEACTIVATE_ZSTD
-    "Do not include support for the Zstd library." ON)
+    "Do not include support for the Zstd library." OFF)
 option(DEACTIVATE_IPP
     "Do not include support for the Intel IPP library." ON)
 option(DEACTIVATE_J2K

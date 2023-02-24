@@ -124,7 +124,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # Source files settings "libopen_htj2k" shared library target
-add_library(open_htj2k ${SOURCES})
+add_library(open_htj2k SHARED ${SOURCES})
 if (Threads_FOUND)
   message(STATUS "Thread library found")
   target_compile_definitions(open_htj2k PUBLIC "OPENHTJ2K_THREAD")
@@ -182,3 +182,8 @@ add_subdirectory(source/core/coding)
 add_subdirectory(source/core/transform)
 add_subdirectory(source/core/interface)
 add_subdirectory(source/core/jph)
+
+# imgcmp target
+add_executable(imgcmp)
+add_subdirectory(source/apps/imgcmp)
+target_include_directories(imgcmp PUBLIC source/apps/imgcmp/)

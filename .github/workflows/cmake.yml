@@ -116,15 +116,13 @@ jobs:
     - name: Install packages (Windows)
       if: runner.os == 'Windows'
       run: choco install ninja ${{ matrix.packages }}
-      env:
-        PATH: ${{ matrix.build-dir }}\bin
 
     - name: Install packages (macOS)
       if: runner.os == 'macOS'
       run: brew install ninja ${{ matrix.packages }}
 
     - name: Generate project files
-      run: cmake -S ${{ matrix.build-src-dir || '.' }} -B ${{ matrix.build-dir || '.' }} ${{ matrix.cmake-args }} -D CMAKE_BUILD_TYPE=${{ matrix.build-config || 'Release' }} -D BUILD_SHARED_LIBS=OFF
+      run: cmake -S ${{ matrix.build-src-dir || '.' }} -B ${{ matrix.build-dir || '.' }} ${{ matrix.cmake-args }} -D CMAKE_BUILD_TYPE=${{ matrix.build-config || 'Release' }} -D BUILD_SHARED_LIBS=ON
       env:
         CC: ${{ matrix.compiler }}
         CFLAGS: ${{ matrix.cflags }}
