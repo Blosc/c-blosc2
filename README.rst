@@ -52,6 +52,10 @@ To wet you appetite, here it is how the NDArray object in the [python-blosc2](ht
 
 We have blogged about this: https://www.blosc.org/posts/blosc2-ndim-intro
 
+We also have a `explanatory video on why the double partition is useful
+<https://www.youtube.com/watch?v=LvP9zxMGBng>`_ (~2 min).
+
+
 New features in C-Blosc2
 ========================
 
