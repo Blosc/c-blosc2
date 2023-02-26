@@ -1519,7 +1519,7 @@ BLOSC_EXPORT int blosc2_chunk_nans(blosc2_cparams cparams, int32_t nbytes,
  * If negative, there has been an error and @p dest is unusable.
  * */
 BLOSC_EXPORT int blosc2_chunk_repeatval(blosc2_cparams cparams, int32_t nbytes,
-                                        void* dest, int32_t destsize, void* repeatval);
+                                        void* dest, int32_t destsize, const void* repeatval);
 
 
 /**
