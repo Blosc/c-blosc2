@@ -4153,7 +4153,7 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const int32_t nbytes, void* dest, 
 
 /* Create a chunk made of repeated values */
 int blosc2_chunk_repeatval(blosc2_cparams cparams, const int32_t nbytes,
-                           void* dest, int32_t destsize, void* repeatval) {
+                           void* dest, int32_t destsize, const void* repeatval) {
   uint8_t typesize = cparams.typesize;
   if (destsize < BLOSC_EXTENDED_HEADER_LENGTH + typesize) {
     BLOSC_TRACE_ERROR("dest buffer is not long enough");

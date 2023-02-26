@@ -17,8 +17,8 @@
 #include <inttypes.h>
 
 
-int b2nd_serialize_meta(int8_t ndim, int64_t *shape, int32_t *chunkshape,
-                        int32_t *blockshape, const char *dtype, const int8_t dtype_format,
+int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const int32_t *chunkshape,
+                        const int32_t *blockshape, const char *dtype, int8_t dtype_format,
                         uint8_t **smeta) {
   if (dtype == NULL) {
     dtype = B2ND_DEFAULT_DTYPE;
@@ -93,9 +93,9 @@ int b2nd_serialize_meta(int8_t ndim, int64_t *shape, int32_t *chunkshape,
 }
 
 
-int b2nd_deserialize_meta(uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
+int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
                           int32_t *chunkshape, int32_t *blockshape, char **dtype, int8_t *dtype_format) {
-  uint8_t *pmeta = smeta;
+  const uint8_t *pmeta = smeta;
 
   // Check that we have an array with 7 entries (version, ndim, shape, chunkshape, blockshape, dtype_format, dtype)
   pmeta += 1;
@@ -384,7 +384,7 @@ int b2nd_zeros(b2nd_context_t *ctx, b2nd_array_t **array) {
 }
 
 
-int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, void *fill_value) {
+int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, const void *fill_value) {
   BLOSC_ERROR_NULL(ctx, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
@@ -463,7 +463,7 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
 }
 
 
-int b2nd_to_cframe(b2nd_array_t *array, uint8_t **cframe, int64_t *cframe_len,
+int b2nd_to_cframe(const b2nd_array_t *array, uint8_t **cframe, int64_t *cframe_len,
                    bool *needs_free) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(cframe, BLOSC2_ERROR_NULL_POINTER);
@@ -535,7 +535,7 @@ int b2nd_free(b2nd_array_t *array) {
 }
 
 
-int b2nd_from_cbuffer(b2nd_context_t *ctx, b2nd_array_t **array, void *buffer, int64_t buffersize) {
+int b2nd_from_cbuffer(b2nd_context_t *ctx, b2nd_array_t **array, const void *buffer, int64_t buffersize) {
   BLOSC_ERROR_NULL(ctx, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
@@ -561,7 +561,7 @@ int b2nd_from_cbuffer(b2nd_context_t *ctx, b2nd_array_t **array, void *buffer, i
 }
 
 
-int b2nd_to_cbuffer(b2nd_array_t *array, void *buffer,
+int b2nd_to_cbuffer(const b2nd_array_t *array, void *buffer,
                     int64_t buffersize) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
@@ -575,15 +575,15 @@ int b2nd_to_cbuffer(b2nd_array_t *array, void *buffer,
   }
 
   int64_t start[B2ND_MAX_DIM] = {0};
-  int64_t *stop = array->shape;
+  const int64_t *stop = array->shape;
   BLOSC_ERROR(b2nd_get_slice_cbuffer(array, start, stop, buffer, array->shape, buffersize));
   return BLOSC2_ERROR_SUCCESS;
 }
 
 
 // Setting and getting slices
-int get_set_slice(void *buffer, int64_t buffersize, int64_t *start, int64_t *stop, int64_t *shape,
-                  b2nd_array_t *array, bool set_slice) {
+int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const int64_t *stop,
+                  const int64_t *shape, b2nd_array_t *array, bool set_slice) {
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
@@ -594,9 +594,9 @@ int get_set_slice(void *buffer, int64_t buffersize, int64_t *start, int64_t *sto
   }
 
   uint8_t *buffer_b = (uint8_t *) buffer;
-  int64_t *buffer_start = start;
-  int64_t *buffer_stop = stop;
-  int64_t *buffer_shape = shape;
+  const int64_t *buffer_start = start;
+  const int64_t *buffer_stop = stop;
+  const int64_t *buffer_shape = shape;
 
   int8_t ndim = array->ndim;
 
@@ -812,7 +812,7 @@ int get_set_slice(void *buffer, int64_t buffersize, int64_t *start, int64_t *sto
       }
 
       uint8_t *src = &buffer_b[0];
-      int64_t *src_pad_shape = buffer_shape;
+      const int64_t *src_pad_shape = buffer_shape;
 
       int64_t src_start[B2ND_MAX_DIM] = {0};
       int64_t src_stop[B2ND_MAX_DIM] = {0};
@@ -870,9 +870,8 @@ int get_set_slice(void *buffer, int64_t buffersize, int64_t *start, int64_t *sto
 }
 
 
-int b2nd_get_slice_cbuffer(b2nd_array_t *array,
-                           int64_t *start, int64_t *stop,
-                           void *buffer, int64_t *buffershape, int64_t buffersize) {
+int b2nd_get_slice_cbuffer(const b2nd_array_t *array, const int64_t *start, const int64_t *stop,
+                           void *buffer, const int64_t *buffershape, int64_t buffersize) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
@@ -895,14 +894,14 @@ int b2nd_get_slice_cbuffer(b2nd_array_t *array,
   if (buffersize < size) {
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
-  BLOSC_ERROR(get_set_slice(buffer, buffersize, start, stop, buffershape, array, false));
+  BLOSC_ERROR(get_set_slice(buffer, buffersize, start, stop, buffershape, (b2nd_array_t *)array, false));
 
   return BLOSC2_ERROR_SUCCESS;
 }
 
 
-int b2nd_set_slice_cbuffer(void *buffer, int64_t *buffershape, int64_t buffersize,
-                           int64_t *start, int64_t *stop,
+int b2nd_set_slice_cbuffer(const void *buffer, const int64_t *buffershape, int64_t buffersize,
+                           const int64_t *start, const int64_t *stop,
                            b2nd_array_t *array) {
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
@@ -922,13 +921,13 @@ int b2nd_set_slice_cbuffer(void *buffer, int64_t *buffershape, int64_t buffersiz
     return BLOSC2_ERROR_SUCCESS;
   }
 
-  BLOSC_ERROR(get_set_slice(buffer, buffersize, start, stop, buffershape, array, true));
+  BLOSC_ERROR(get_set_slice((void*)buffer, buffersize, start, stop, (int64_t *)buffershape, array, true));
 
   return BLOSC2_ERROR_SUCCESS;
 }
 
 
-int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, b2nd_array_t *src, const int64_t *start,
+int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t *src, const int64_t *start,
                    const int64_t *stop) {
   BLOSC_ERROR_NULL(src, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
@@ -1048,7 +1047,7 @@ int b2nd_squeeze_index(b2nd_array_t *array, const bool *index) {
 }
 
 
-int b2nd_copy(b2nd_context_t *ctx, b2nd_array_t *src, b2nd_array_t **array) {
+int b2nd_copy(b2nd_context_t *ctx, const b2nd_array_t *src, b2nd_array_t **array) {
   BLOSC_ERROR_NULL(src, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
@@ -1124,7 +1123,7 @@ int b2nd_copy(b2nd_context_t *ctx, b2nd_array_t *src, b2nd_array_t **array) {
 }
 
 
-int b2nd_save(b2nd_array_t *array, char *urlpath) {
+int b2nd_save(const b2nd_array_t *array, char *urlpath) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(urlpath, BLOSC2_ERROR_NULL_POINTER);
 
@@ -1146,7 +1145,7 @@ int b2nd_save(b2nd_array_t *array, char *urlpath) {
 }
 
 
-int b2nd_print_meta(b2nd_array_t *array) {
+int b2nd_print_meta(const b2nd_array_t *array) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   int8_t ndim;
   int64_t shape[B2ND_MAX_DIM];
@@ -1382,8 +1381,8 @@ int b2nd_resize(b2nd_array_t *array, const int64_t *new_shape,
 }
 
 
-int b2nd_insert(b2nd_array_t *array, void *buffer, int64_t buffersize,
-                const int8_t axis, int64_t insert_start) {
+int b2nd_insert(b2nd_array_t *array, const void *buffer, int64_t buffersize,
+                int8_t axis, int64_t insert_start) {
 
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
@@ -1427,8 +1426,8 @@ int b2nd_insert(b2nd_array_t *array, void *buffer, int64_t buffersize,
 }
 
 
-int b2nd_append(b2nd_array_t *array, void *buffer, int64_t buffersize,
-                const int8_t axis) {
+int b2nd_append(b2nd_array_t *array, const void *buffer, int64_t buffersize,
+                int8_t axis) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
 
@@ -1828,21 +1827,22 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
 }
 
 
-int b2nd_get_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
+int b2nd_get_orthogonal_selection(const b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
                                   int64_t *buffershape, int64_t buffersize) {
-  return orthogonal_selection(array, selection, selection_size, buffer, buffershape, buffersize, true);
+  return orthogonal_selection((b2nd_array_t *)array, selection, selection_size, buffer, buffershape, buffersize, true);
 }
 
 
-int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
+int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, const void *buffer,
                                   int64_t *buffershape, int64_t buffersize) {
-  return orthogonal_selection(array, selection, selection_size, buffer, buffershape, buffersize, false);
+  return orthogonal_selection(array, selection, selection_size, (void*)buffer, buffershape, buffersize, false);
 }
 
 
 b2nd_context_t *
-b2nd_create_ctx(blosc2_storage *b2_storage, int8_t ndim, int64_t *shape, int32_t *chunkshape, int32_t *blockshape,
-                char *dtype, int8_t dtype_format, blosc2_metalayer *metalayers, int32_t nmetalayers) {
+b2nd_create_ctx(const blosc2_storage *b2_storage, int8_t ndim, const int64_t *shape, const int32_t *chunkshape,
+                const int32_t *blockshape, const char *dtype, int8_t dtype_format, const blosc2_metalayer *metalayers,
+                int32_t nmetalayers) {
   b2nd_context_t *ctx = malloc(sizeof(b2nd_context_t));
   BLOSC_ERROR_NULL(ctx, NULL);
   blosc2_storage *params_b2_storage = malloc(sizeof(blosc2_storage));
