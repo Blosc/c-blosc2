@@ -52,8 +52,13 @@ To wet you appetite, here it is how the NDArray object in the [python-blosc2](ht
 
 We have blogged about this: https://www.blosc.org/posts/blosc2-ndim-intro
 
-We also have a `explanatory video on why the double partition is useful
-<https://www.youtube.com/watch?v=LvP9zxMGBng>`_ (~2 min).
+We also have a ~2 min explanatory video on `why slicing in a pineapple-style (aka double partition)
+is useful <https://www.youtube.com/watch?v=LvP9zxMGBng>`_:
+
+.. image:: https://github.com/Blosc/blogsite/blob/master/files/images/slicing-pineapple-style.png?raw=true
+  :width: 50%
+  :alt: Slicing a dataset in pineapple-style
+  :target: https://www.youtube.com/watch?v=LvP9zxMGBng
 
 
 New features in C-Blosc2
