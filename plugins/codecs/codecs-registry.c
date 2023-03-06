@@ -13,7 +13,7 @@ void register_codecs(void) {
 
   blosc2_codec ndlz;
   ndlz.compcode = BLOSC_CODEC_NDLZ;
-  ndlz.compver = 1;
+  ndlz.version = 1;
   ndlz.complib = BLOSC_CODEC_NDLZ;
   ndlz.encoder = ndlz_compress;
   ndlz.decoder = ndlz_decompress;
@@ -22,7 +22,7 @@ void register_codecs(void) {
 
   blosc2_codec zfp_acc;
   zfp_acc.compcode = BLOSC_CODEC_ZFP_FIXED_ACCURACY;
-  zfp_acc.compver = 1;
+  zfp_acc.version = 1;
   zfp_acc.complib = BLOSC_CODEC_ZFP_FIXED_ACCURACY;
   zfp_acc.encoder = zfp_acc_compress;
   zfp_acc.decoder = zfp_acc_decompress;
@@ -31,7 +31,7 @@ void register_codecs(void) {
 
   blosc2_codec zfp_prec;
   zfp_prec.compcode = BLOSC_CODEC_ZFP_FIXED_PRECISION;
-  zfp_prec.compver = 1;
+  zfp_prec.version = 1;
   zfp_prec.complib = BLOSC_CODEC_ZFP_FIXED_PRECISION;
   zfp_prec.encoder = zfp_prec_compress;
   zfp_prec.decoder = zfp_prec_decompress;
@@ -40,7 +40,7 @@ void register_codecs(void) {
 
   blosc2_codec zfp_rate;
   zfp_rate.compcode = BLOSC_CODEC_ZFP_FIXED_RATE;
-  zfp_rate.compver = 1;
+  zfp_rate.version = 1;
   zfp_rate.complib = BLOSC_CODEC_ZFP_FIXED_RATE;
   zfp_rate.encoder = zfp_rate_compress;
   zfp_rate.decoder = zfp_rate_decompress;

@@ -162,7 +162,7 @@ CUTEST_TEST_TEST(urcodecs) {
 
   blosc2_codec udcodec;
   udcodec.compname = "arange";
-  udcodec.compver = 1;
+  udcodec.version = 1;
   udcodec.encoder = codec_encoder;
   if (correct_backward) {
     udcodec.compcode = 250;

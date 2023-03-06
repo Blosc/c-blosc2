@@ -2349,7 +2349,7 @@ typedef struct {
   //!< The codec name.
   uint8_t complib;
   //!< The codec library format.
-  uint8_t compver;
+  uint8_t version;
   //!< The codec version.
   blosc2_codec_encoder_cb encoder;
   //!< The codec encoder that is used during compression.
@@ -2382,6 +2382,10 @@ typedef int (* blosc2_filter_backward_cb) (const uint8_t *, uint8_t *, int32_t, 
 typedef struct {
   uint8_t id;
   //!< The filter identifier.
+  char * name;
+  //!< The filter name.
+  uint8_t version;
+  //!< The filter version.
   blosc2_filter_forward_cb forward;
   //!< The filter function that is used during compression.
   blosc2_filter_backward_cb backward;

@@ -100,7 +100,7 @@ int main(void) {
 
   blosc2_codec udcodec;
   udcodec.compcode = 244;
-  udcodec.compver = 1;
+  udcodec.version = 1;
   udcodec.complib = 1;
   udcodec.compname = "udcodec";
   udcodec.encoder = codec_encoder;
