@@ -1166,6 +1166,10 @@ typedef struct {
   //!< The user-defined BTune parameters.
   bool instr_codec;
   //!< Whether the codec is instrumented or not
+  void *codec_params;
+  //!< User defined parameters for the codec
+  void *filter_params[BLOSC2_MAX_FILTERS];
+  //!< User defined parameters for the filters
 } blosc2_cparams;
 
 /**
@@ -1176,7 +1180,9 @@ static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
         BLOSC_FORWARD_COMPAT_SPLIT, NULL,
         {0, 0, 0, 0, 0, BLOSC_SHUFFLE},
         {0, 0, 0, 0, 0, 0},
-        NULL, NULL, NULL, 0};
+        NULL, NULL, NULL, 0,
+        NULL, {NULL, NULL, NULL, NULL, NULL, NULL}
+        };
 
 
 /**

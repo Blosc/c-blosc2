@@ -76,6 +76,8 @@ struct blosc2_context_s {
   int do_compress;  /* 1 if we are compressing, 0 if decompressing */
   void *btune;  /* Entry point for BTune persistence between runs */
   blosc2_btune *udbtune;  /* User-defined BTune parameters */
+  void *codec_params; /* User defined parameters for the codec */
+  void *filter_params[BLOSC2_MAX_FILTERS]; /* User defined parameters for the filters */
   /* Threading */
   int16_t nthreads;
   int16_t new_nthreads;
