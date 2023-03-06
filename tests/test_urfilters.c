@@ -152,13 +152,16 @@ CUTEST_TEST_TEST(urfilters) {
   int dsize;
 
   blosc2_filter urfilter;
-    urfilter.forward = filter_forward;
+  urfilter.version = 1;
+  urfilter.forward = filter_forward;
   if (correct_backward) {
-      urfilter.backward = filter_backward;
-      urfilter.id = 244;
+    urfilter.backward = filter_backward;
+    urfilter.id = 244;
+    urfilter.name = "test_urfilter244";
   } else {
-      urfilter.backward = filter_backward_error;
-      urfilter.id = 245;
+    urfilter.backward = filter_backward_error;
+    urfilter.id = 245;
+    urfilter.name = "test_urfilter245";
   }
 
   blosc2_register_filter(&urfilter);

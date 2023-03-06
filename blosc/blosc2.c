@@ -360,7 +360,7 @@ static int compcode_to_compversion(int compcode) {
     default:
       for (int i = 0; i < g_ncodecs; ++i) {
         if (compcode == g_codecs[i].compcode) {
-          return g_codecs[i].compver;
+          return g_codecs[i].version;
         }
       }
   }

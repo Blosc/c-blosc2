@@ -89,6 +89,8 @@ int main(void) {
 
   blosc2_filter urfilter;
   urfilter.id = 250;
+  urfilter.name = "urfilter_example";
+  urfilter.version = 1;
   urfilter.forward = filter_forward;
   urfilter.backward = filter_backward;
 
