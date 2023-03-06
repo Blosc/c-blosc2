@@ -3902,6 +3902,9 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     context->udbtune = cparams.udbtune;
   }
 
+  context->codec_params = cparams.codec_params;
+  memcpy(context->filter_params, cparams.filter_params, BLOSC2_MAX_FILTERS * sizeof(void*));
+
   return context;
 }
 
@@ -3990,6 +3993,7 @@ int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams) {
   cparams->prefilter = ctx->prefilter;
   cparams->preparams = ctx->preparams;
   cparams->udbtune = ctx->udbtune;
+  cparams->codec_params = ctx->codec_params;
 
   return BLOSC2_ERROR_SUCCESS;
 }
