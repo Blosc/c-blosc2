@@ -227,14 +227,13 @@ must add 5 bytes (4 bytes for an int32 and 1 byte for the msgpack `bin32` header
 so let's err on the safe side and dump the first 1000 bytes, just in case::
 
     $ dd bs=1 skip=112 count=1000 <  plugins/test_data/example_day_month_temp.b2nd | msgpack2json -B
-    1000+0 records in
-    1000+0 records out
-    1000 bytes transferred in 0.002187 secs (457247 bytes/sec)
+    <snip>
     [0,2,[400,3],[110,3],[57,3],0,"|u1"]
 
-By having a look at the `Blosc2 NDim metalayer description <README_B2ND_METALAYER.rst>`_, one can see that the
-number of dimensions is 2, the `shape` is [400, 3], the `chunkshape` is [110, 3], the blockshape is
-[57, 3], the dtype format is 0 (NumPy) and the dtype is "|u1", which is a NumPy shortcut for `np.uint8`.
+By having a look at the
+`Blosc2 NDim metalayer format <https://github.com/Blosc/c-blosc2/blob/main/README_B2ND_METALAYER.rst>`_
+one may note that the number of dimensions is 2, `shape` is [400, 3], `chunkshape` is [110, 3], blockshape is
+[57, 3], dtype format is 0 (NumPy) and dtype is "|u1", which is a NumPy shortcut for `np.uint8`.
 
 Chunks
 ------
@@ -246,7 +245,7 @@ The chunks section is composed of one or more Blosc data chunks followed by an i
     +========+========+========+========+===========+
 
 Each chunk is stored contiguously one after the other, and each follows the format described in the
-`chunk format <README_CHUNK_FORMAT.rst>`_ document.
+`chunk format <https://github.com/Blosc/c-blosc2/blob/main/README_CHUNK_FORMAT.rst>`_ document.
 
 The `chunk idx` is a Blosc2 chunk containing the offsets (starting from the beginning of the header)
 to each chunk in this section.  The data in the chunk is a list of offsets (they can be 32-bit, 64-bit
