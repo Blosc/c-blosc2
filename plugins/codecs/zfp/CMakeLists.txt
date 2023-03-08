@@ -1,5 +1,5 @@
 get_filename_component(ZFP_LOCAL_DIR ./ ABSOLUTE)
-file(GLOB ZFP_SRC_FILES ${ZFP_LOCAL_DIR}/blosc2-zfp.* ${ZFP_LOCAL_DIR}/zfp-private.h ${ZFP_LOCAL_DIR}/src/zfp.c
+file(GLOB ZFP_SRC_FILES ${ZFP_LOCAL_DIR}/blosc2-zfp.* ${ZFP_LOCAL_DIR}/src/zfp.c
      ${ZFP_LOCAL_DIR}/src/bitstream.c ${ZFP_LOCAL_DIR}/src/decode*.c ${ZFP_LOCAL_DIR}/src/encode*.c)
 #message(status "--------------!!!!zfp:" ${ZFP_SRC_FILES})
 set(SOURCES ${SOURCES} ${ZFP_SRC_FILES} PARENT_SCOPE)

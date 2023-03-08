@@ -1,5 +1,5 @@
 # sources
-set(SOURCES ${SOURCES} ../plugins/filters/ndmean/ndmean.c ../plugins/filters/ndmean/ndmean.h PARENT_SCOPE)
+set(SOURCES ${SOURCES} ${PROJECT_SOURCE_DIR}/plugins/filters/ndmean/ndmean.c PARENT_SCOPE)
 
 if(BUILD_TESTS)
     # targets
