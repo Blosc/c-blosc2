@@ -154,6 +154,7 @@ int rand_() {
   int result = test_bytedelta(schunk);
   BLOSC_ERROR(b2nd_free_ctx(ctx));
   BLOSC_ERROR(b2nd_free(arr));
+  free(data);
   return result;
 }
 
@@ -190,6 +191,8 @@ int mixed_values() {
   int result = test_bytedelta(schunk);
   BLOSC_ERROR(b2nd_free_ctx(ctx));
   BLOSC_ERROR(b2nd_free(arr));
+  free(data);
+
   return result;
 }
 
@@ -225,6 +228,8 @@ int arange_like() {
   int result = test_bytedelta(schunk);
   BLOSC_ERROR(b2nd_free_ctx(ctx));
   BLOSC_ERROR(b2nd_free(arr));
+  free(data);
+
   return result;
 }
 
