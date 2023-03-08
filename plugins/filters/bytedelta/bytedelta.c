@@ -10,7 +10,7 @@
 
 // ByteDelta filter.  This is based on work by Aras Pranckevičius:
 // https://aras-p.info/blog/2023/03/01/Float-Compression-7-More-Filtering-Optimization/
-// This requires Intel SSE3 and ARM64 NEON, which should be widely available by now.
+// This requires Intel SSE4.1 and ARM64 NEON, which should be widely available by now.
 
 #include <blosc2.h>
 #include "bytedelta.h"
@@ -18,15 +18,15 @@
 #include "../plugins/plugin_utils.h"
 #include "../include/blosc2/filters-registry.h"
 
-#if defined(__SSE3__)
+#if defined(__x86_64__) || defined(_M_X64)
 #	define CPU_ARCH_X64 1
-#	include <emmintrin.h> // sse2
-#	include <tmmintrin.h> // sse3
+#	include <emmintrin.h>
+#	include <tmmintrin.h>
 #elif defined(__aarch64__) || defined(_M_ARM64)
 #	define CPU_ARCH_ARM64 1
 #	include <arm_neon.h>
 #else
-#   error Unsupported platform (SSE3/NEON required)
+#   error Unsupported platform (SSE4.1/NEON required)
 #endif
 
 #if CPU_ARCH_X64
