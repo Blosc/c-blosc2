@@ -8,10 +8,12 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-enum {
-    BLOSC_FILTER_NDCELL = 32,
-    BLOSC_FILTER_NDMEAN = 33,
-    BLOSC_FILTER_BYTEDELTA = 34,
-};
+#pragma once
+#include <stdint.h>
+#include <blosc2.h>
 
-void register_filters(void);
+int bytedelta_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta,
+                      blosc2_cparams* cparams, uint8_t id);
+
+int bytedelta_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta,
+                      blosc2_dparams* dparams, uint8_t id);

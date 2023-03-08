@@ -8,6 +8,7 @@
 #include "blosc2/filters-registry.h"
 #include "ndmean/ndmean.h"
 #include "ndcell/ndcell.h"
+#include "bytedelta/bytedelta.h"
 
 void register_filters(void) {
 
@@ -22,5 +23,11 @@ void register_filters(void) {
   ndmean.forward = (blosc2_filter_forward_cb) ndmean_encoder;
   ndmean.backward = (blosc2_filter_backward_cb) ndmean_decoder;
   register_filter_private(&ndmean);
+
+  blosc2_filter bytedelta;
+  bytedelta.id = BLOSC_FILTER_BYTEDELTA;
+  bytedelta.forward = (blosc2_filter_forward_cb) bytedelta_encoder;
+  bytedelta.backward = (blosc2_filter_backward_cb) bytedelta_decoder;
+  register_filter_private(&bytedelta);
 
 }

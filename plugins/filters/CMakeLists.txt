@@ -8,5 +8,6 @@
 
 add_subdirectory(ndcell)
 add_subdirectory(ndmean)
+add_subdirectory(bytedelta)
 
 set(SOURCES ${SOURCES} ${PROJECT_SOURCE_DIR}/plugins/filters/filters-registry.c PARENT_SCOPE)
