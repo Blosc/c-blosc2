@@ -95,7 +95,7 @@ int bytedelta_encoder(const uint8_t *input, uint8_t *output, int32_t length, uin
   const int stream_len = length / typesize;
   for (int ich = 0; ich < typesize; ++ich) {
     // delta within each channel, store
-    Bytes16 v2 = {};
+    Bytes16 v2 = {0};
     int ip = 0;
     for (; ip < stream_len - 15; ip += 16) {
       Bytes16 v = SimdLoad(input);
@@ -138,7 +138,7 @@ int bytedelta_decoder(const uint8_t *input, uint8_t *output, int32_t length, uin
   const int stream_len = length / typesize;
   for (int ich = 0; ich < typesize; ++ich) {
     // fetch 16 bytes from each channel, prefix-sum un-delta
-    Bytes16 v2 = {};
+    Bytes16 v2 = {0};
     int ip = 0;
     for (; ip < stream_len - 15; ip += 16) {
       Bytes16 v = SimdLoad(input);
