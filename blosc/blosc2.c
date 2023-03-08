@@ -70,6 +70,29 @@
   #include "win32/pthread.c"
 #endif
 
+#if defined(_WIN32)
+#include <windows.h>
+
+void *dlopen (const char *filename, int flags) {
+  HINSTANCE hInst;
+  hInst = LoadLibrary(filename);
+
+  return hInst;
+}
+
+void *dlsym(void *handle, const char *name) {
+  FARPROC fp;
+  fp = GetProcAddress ((HINSTANCE)handle, name);
+  return (void *)(intptr_t)fp;
+}
+
+void dlclose(void *handle) {
+  FreeLibrary ((HINSTANCE)handle);
+}
+#else
+#include <dlfcn.h>
+#endif
+
 /* Synchronization variables */
 
 /* Global context for non-contextual API */
@@ -90,6 +113,9 @@ uint8_t g_ncodecs = 0;
 
 static blosc2_filter g_filters[256] = {0};
 static uint64_t g_nfilters = 0;
+
+// Python path for dynamically loaded plugins
+static char g_python_path[PATH_MAX] = {0};
 
 static blosc2_io_cb g_io[256] = {0};
 static uint64_t g_nio = 0;
@@ -780,6 +806,91 @@ static int blosc2_initialize_context_from_header(blosc2_context* context, blosc_
 }
 
 
+void* load_lib(char *plugin_name, char *path) {
+  if (strlen(g_python_path) == 0) {
+    BLOSC_TRACE_ERROR("Could not find python path");
+    return NULL;
+  }
+#if defined(_WIN32)
+  sprintf(path, "%sblosc2_%s/libblosc2_%s.dll", g_python_path, plugin_name, plugin_name);
+#else
+  sprintf(path, "%sblosc2_%s/libblosc2_%s.so", g_python_path, plugin_name, plugin_name);
+#endif
+
+  return dlopen(path, RTLD_LAZY);
+}
+
+
+int fill_filter(blosc2_filter *filter) {
+  char path[PATH_MAX];
+  void *lib = load_lib(filter->name, path);
+  if(lib == NULL) {
+    BLOSC_TRACE_ERROR("Error while loading the library");
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  int (*check_filter)(blosc2_filter *) = dlsym(lib, "check_filter");
+  if((check_filter)(filter) < 0) {
+    BLOSC_TRACE_ERROR("Filter id or name is not correct");
+    dlclose(lib);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  char *forward_name = malloc(strlen(filter->name) + strlen("_forward") + 1);
+  sprintf(forward_name, "%s_forward", filter->name);
+  filter->forward = dlsym(lib, forward_name);
+  free(forward_name);
+
+  char *backward_name = malloc(strlen(filter->name) + strlen("_backward") + 1);
+  sprintf(forward_name, "%s_backward", filter->name);
+  printf("backward %s\n", backward_name);
+  filter->backward = dlsym(lib, backward_name);
+  free(backward_name);
+
+  if (filter->forward == NULL || filter->backward == NULL){
+    BLOSC_TRACE_ERROR("Wrong library loaded");
+    dlclose(lib);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+int fill_codec(blosc2_codec *codec) {
+  char path[PATH_MAX];
+  void *lib = load_lib(codec->compname, path);
+  if(lib == NULL) {
+    BLOSC_TRACE_ERROR("Error while loading the library");
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  int (*check_codec)(blosc2_codec *) = dlsym(lib, "check_codec");
+  if((check_codec)(codec) < 0) {
+    BLOSC_TRACE_ERROR("Codec id or name is not correct");
+    dlclose(lib);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  char *encoder_name = malloc(strlen(codec->compname) + strlen("_encoder") + 1);
+  sprintf(encoder_name, "%s_encoder", codec->compname);
+  codec->encoder = dlsym(lib, encoder_name);
+  free(encoder_name);
+
+  char *decoder_name = malloc(strlen(codec->compname) + strlen("_decoder") + 1);
+  sprintf(encoder_name, "%s_decoder", codec->compname);
+  codec->decoder = dlsym(lib, decoder_name);
+  free(decoder_name);
+
+  if (codec->encoder == NULL || codec->decoder == NULL){
+    BLOSC_TRACE_ERROR("Wrong library loaded");
+    dlclose(lib);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 static int blosc2_intialize_header_from_context(blosc2_context* context, blosc_header* header, bool extended_header) {
   memset(header, 0, sizeof(blosc_header));
 
@@ -907,6 +1018,13 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
       // Look for the filters_meta in user filters and run it
       for (uint64_t j = 0; j < g_nfilters; ++j) {
         if (g_filters[j].id == filters[i]) {
+          if (g_filters[j].forward == NULL) {
+            // Dynamically load library
+            if (fill_filter(&g_filters[j]) < 0) {
+              BLOSC_TRACE_ERROR("Could not load filter %d \n", g_filters[j].id);
+              return NULL;
+            }
+          }
           if (g_filters[j].forward != NULL) {
             blosc2_cparams cparams;
             blosc2_ctx_get_cparams(context, &cparams);
@@ -1138,6 +1256,13 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     else if (context->compcode > BLOSC2_DEFINED_CODECS_STOP) {
       for (int i = 0; i < g_ncodecs; ++i) {
         if (g_codecs[i].compcode == context->compcode) {
+          if (g_codecs[i].encoder == NULL) {
+            // Dynamically load codec plugin
+            if (fill_codec(&g_codecs[i]) < 0) {
+              BLOSC_TRACE_ERROR("Could not load codec %d.", g_codecs[i].compcode);
+              return BLOSC2_ERROR_CODEC_SUPPORT;
+            }
+          }
           blosc2_cparams cparams;
           blosc2_ctx_get_cparams(context, &cparams);
           cbytes = g_codecs[i].encoder(_src + j * neblock,
@@ -1294,6 +1419,13 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
         // Look for the filters_meta in user filters and run it
         for (uint64_t j = 0; j < g_nfilters; ++j) {
           if (g_filters[j].id == filters[i]) {
+            if (g_filters[j].backward == NULL) {
+              // Dynamically load filter
+              if (fill_filter(&g_filters[j]) < 0) {
+                BLOSC_TRACE_ERROR("Could not load filter %d.", g_filters[j].id);
+                return BLOSC2_ERROR_FILTER_PIPELINE;
+              }
+            }
             if (g_filters[j].backward != NULL) {
               blosc2_dparams dparams;
               blosc2_ctx_get_dparams(context, &dparams);
@@ -1750,6 +1882,13 @@ static int blosc_d(
           thread_context->zfp_cell_nitems = 0;
           for (int i = 0; i < g_ncodecs; ++i) {
             if (g_codecs[i].compcode == context->compcode) {
+              if (g_codecs[i].decoder == NULL) {
+                // Dynamically load codec plugin
+                if (fill_codec(&g_codecs[i]) < 0) {
+                  BLOSC_TRACE_ERROR("Could not load codec %d.", g_codecs[i].compcode);
+                  return BLOSC2_ERROR_CODEC_SUPPORT;
+                }
+              }
               blosc2_dparams dparams;
               blosc2_ctx_get_dparams(context, &dparams);
               nbytes = g_codecs[i].decoder(src,
@@ -3598,6 +3737,10 @@ void blosc2_init(void) {
 #if defined(HAVE_PLUGINS)
   #include "blosc2/blosc2-common.h"
   #include "blosc2/blosc2-stdio.h"
+  FILE *fp = popen("python -c \"exec(\\\"import sys\\npaths=sys.path\\nfor p in paths:\\n\\tif 'site-packages' in p:"
+                   "\\n \\t\\tprint(p+'/', end='')\\\")\"", "r");
+  fgets(g_python_path, PATH_MAX, fp);
+  pclose(fp);
   register_codecs();
   register_filters();
 #endif
