@@ -187,9 +187,9 @@ if(COMPILER_SUPPORT_SSE2)
         endif()
         # Add SIMD flags for the bytedelta filter and Intel (it seems that ARM64 does not need these)
         # https://stackoverflow.com/questions/64053597/how-do-i-enable-sse4-1-and-sse3-but-not-avx-in-msvc
-        set_source_files_properties(
-                ${PROJECT_SOURCE_DIR}/plugins/filters/bytedelta/bytedelta.c
-                PROPERTIES COMPILE_OPTIONS "/d2archSSE42")
+#        set_source_files_properties(
+#                ${PROJECT_SOURCE_DIR}/plugins/filters/bytedelta/bytedelta.c
+#                PROPERTIES COMPILE_OPTIONS "/d2archSSE42")
     else()
         set_source_files_properties(
                 shuffle-sse2.c bitshuffle-sse2.c blosclz.c fastcopy.c
@@ -200,7 +200,7 @@ if(COMPILER_SUPPORT_SSE2)
         # Add SIMD flags for the bytedelta filter and Intel (it seems that ARM64 does not need these)
         set_source_files_properties(
                 ${PROJECT_SOURCE_DIR}/plugins/filters/bytedelta/bytedelta.c
-                PROPERTIES COMPILE_OPTIONS "-msse4.2")
+                PROPERTIES COMPILE_OPTIONS "-mssse3")
     endif()
 
     # Define a symbol for the shuffle-dispatch implementation
