@@ -74,6 +74,8 @@
 #include <windows.h>
 #define PATH_MAX MAX_PATH
 #define RTLD_LAZY   0x000
+#define popen _popen
+#define pclose _pclose
 
 void *dlopen (const char *filename, int flags) {
   HINSTANCE hInst;
