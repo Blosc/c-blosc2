@@ -72,6 +72,8 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+#define PATH_MAX MAX_PATH
+#define RTLD_LAZY   0x000
 
 void *dlopen (const char *filename, int flags) {
   HINSTANCE hInst;
