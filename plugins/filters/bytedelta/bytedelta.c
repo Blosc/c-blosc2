@@ -18,18 +18,11 @@
 #include "../plugins/plugin_utils.h"
 #include "../include/blosc2/filters-registry.h"
 
-#if defined(__x86_64__) || defined(_M_X64)
-#	define CPU_ARCH_X64 1
-#	include <emmintrin.h>
-#	include <tmmintrin.h>
-#elif defined(__aarch64__) || defined(_M_ARM64)
-#	define CPU_ARCH_ARM64 1
-#	include <arm_neon.h>
-#else
-#   error Unsupported platform (SSE4.1/NEON required)
-#endif
-
-#if CPU_ARCH_X64
+#if defined __i386__ || defined _M_IX86 || defined __x86_64__ || defined _M_X64
+// SSSE3 code path for x64/x64
+#define CPU_HAS_SIMD 1
+#include <emmintrin.h>
+#include <tmmintrin.h>
 typedef __m128i bytes16;
 bytes16 simd_zero() { return _mm_setzero_si128(); }
 bytes16 simd_set1(uint8_t v) { return _mm_set1_epi8(v); }
@@ -39,7 +32,7 @@ void simd_store(void* ptr, bytes16 x) { _mm_storeu_si128((__m128i*)ptr, x); }
 bytes16 simd_concat(bytes16 hi, bytes16 lo) { return _mm_alignr_epi8(hi, lo, 15); }
 bytes16 simd_add(bytes16 a, bytes16 b) { return _mm_add_epi8(a, b); }
 bytes16 simd_sub(bytes16 a, bytes16 b) { return _mm_sub_epi8(a, b); }
-bytes16 simd_shuffle(bytes16 x, bytes16 table) { return _mm_shuffle_epi8(x, table); }
+bytes16 simd_duplane15(bytes16 x) { return _mm_shuffle_epi8(x, _mm_set1_epi8(15)); }
 
 bytes16 simd_prefix_sum(bytes16 x)
 {
@@ -51,7 +44,10 @@ bytes16 simd_prefix_sum(bytes16 x)
   return x;
 }
 
-#elif CPU_ARCH_ARM64
+#elif defined(__aarch64__) || defined(_M_ARM64)
+// ARM v8 NEON code path
+#define CPU_HAS_SIMD 1
+#include <arm_neon.h>
 typedef uint8x16_t bytes16;
 bytes16 simd_zero() { return vdupq_n_u8(0); }
 bytes16 simd_set1(uint8_t v) { return vdupq_n_u8(v); }
@@ -61,7 +57,7 @@ void simd_store(void* ptr, bytes16 x) { vst1q_u8((uint8_t*)ptr, x); }
 bytes16 simd_concat(bytes16 hi, bytes16 lo) { return vextq_u8(lo, hi, 15); }
 bytes16 simd_add(bytes16 a, bytes16 b) { return vaddq_u8(a, b); }
 bytes16 simd_sub(bytes16 a, bytes16 b) { return vsubq_u8(a, b); }
-bytes16 simd_shuffle(bytes16 x, bytes16 table) { return vqtbl1q_u8(x, table); }
+bytes16 simd_duplane15(bytes16 x) { return vdupq_laneq_u8(x, 15); }
 
 bytes16 simd_prefix_sum(bytes16 x)
 {
@@ -94,9 +90,10 @@ int bytedelta_encoder(const uint8_t *input, uint8_t *output, int32_t length, uin
 
   const int stream_len = length / typesize;
   for (int ich = 0; ich < typesize; ++ich) {
-    // delta within each channel, store
-    bytes16 v2 = {0};
     int ip = 0;
+    // SIMD delta within each channel, store
+#if defined(CPU_HAS_SIMD)
+    bytes16 v2 = {0};
     for (; ip < stream_len - 15; ip += 16) {
       bytes16 v = simd_load(input);
       input += 16;
@@ -105,7 +102,8 @@ int bytedelta_encoder(const uint8_t *input, uint8_t *output, int32_t length, uin
       output += 16;
       v2 = v;
     }
-    // leftover (should never happen, but anyway)
+#endif // #if defined(CPU_HAS_SIMD)
+    // scalar leftover
     uint8_t _v2 = 0;
     for (; ip < stream_len ; ip++) {
       uint8_t v = *input;
@@ -134,21 +132,22 @@ int bytedelta_decoder(const uint8_t *input, uint8_t *output, int32_t length, uin
     typesize = schunk->typesize;
   }
 
-  const bytes16 hibyte = simd_set1(15);
   const int stream_len = length / typesize;
   for (int ich = 0; ich < typesize; ++ich) {
-    // fetch 16 bytes from each channel, prefix-sum un-delta
-    bytes16 v2 = {0};
     int ip = 0;
+    // SIMD fetch 16 bytes from each channel, prefix-sum un-delta
+#if defined(CPU_HAS_SIMD)
+    bytes16 v2 = {0};
     for (; ip < stream_len - 15; ip += 16) {
       bytes16 v = simd_load(input);
       input += 16;
       // un-delta via prefix sum
-      v2 = simd_add(simd_prefix_sum(v), simd_shuffle(v2, hibyte));
+      v2 = simd_add(simd_prefix_sum(v), simd_duplane15(v2));
       simd_store(output, v2);
       output += 16;
     }
-    // leftover (should never happen, but anyway)
+#endif // #if defined(CPU_HAS_SIMD)
+    // scalar leftover
     uint8_t _v2 = 0;
     for (; ip < stream_len; ip++) {
       uint8_t v = *input + _v2;
