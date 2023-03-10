@@ -1027,16 +1027,7 @@ typedef struct {
   //!< The IO parameters.
 } blosc2_io;
 
-static const blosc2_io_cb BLOSC2_IO_CB_DEFAULTS = {
-  .id = BLOSC2_IO_FILESYSTEM,
-  .open = (blosc2_open_cb) blosc2_stdio_open,
-  .close = (blosc2_close_cb) blosc2_stdio_close,
-  .tell = (blosc2_tell_cb) blosc2_stdio_tell,
-  .seek = (blosc2_seek_cb) blosc2_stdio_seek,
-  .write = (blosc2_write_cb) blosc2_stdio_write,
-  .read = (blosc2_read_cb) blosc2_stdio_read,
-  .truncate = (blosc2_truncate_cb) blosc2_stdio_truncate,
-};
+static blosc2_io_cb BLOSC2_IO_CB_DEFAULTS = {0};
 
 static const blosc2_io BLOSC2_IO_DEFAULTS = {
     .id = BLOSC2_IO_FILESYSTEM,
