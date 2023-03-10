@@ -15,6 +15,8 @@
 int main() {
   blosc_timestamp_t t0, t1;
 
+  blosc2_init();
+
   int nslices = 10;
 
   int8_t ndim = 3;
@@ -77,6 +79,8 @@ int main() {
 
   BLOSC_ERROR(b2nd_free(arr));
   BLOSC_ERROR(b2nd_free_ctx(ctx));
+
+  blosc2_destroy();
 
   return 0;
 }

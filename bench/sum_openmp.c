@@ -72,6 +72,8 @@
 
 
 int main(void) {
+  blosc2_init();
+
   static DTYPE udata[N];
   DTYPE chunk_buf[CHUNKSIZE];
   int32_t isize = CHUNKSIZE * sizeof(DTYPE);
@@ -241,6 +243,8 @@ int main(void) {
   }
   /* Free resources */
   blosc2_schunk_free(schunk);
+
+  blosc2_destroy();
 
   return 0;
 }

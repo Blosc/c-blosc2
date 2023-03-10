@@ -23,6 +23,8 @@
 
 
 int main(void) {
+  blosc2_init();
+
   int32_t total_bytes = CHUNKSIZE * sizeof(int32_t);
 
   int32_t *buf = calloc(CHUNKSIZE, sizeof(int32_t));
@@ -130,6 +132,8 @@ int main(void) {
   free(buf);
 
   printf("All good!\n");
+  blosc2_destroy();
+
   return 0;
 
   failed:

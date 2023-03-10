@@ -38,7 +38,7 @@ precip0[:] = values
 8<---snip----
 
  * To call this script, you can run the following commands:
- * $ pip install b2nd
+ * $ pip install blosc2
  * $ python fetch_data.py
  *
  */

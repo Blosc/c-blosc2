@@ -83,8 +83,6 @@ int main() {
   blosc_set_timestamp(&t1);
   printf("to_buffer: %.4f s\n", blosc_elapsed_secs(t0, t1));
 
-  blosc2_destroy();
-
   for (int i = 0; i < buffer_size / typesize; i++) {
     if (src[i] != buffer[i]) {
       printf("\n Decompressed data differs from original!\n");
@@ -98,6 +96,8 @@ int main() {
 
   BLOSC_ERROR(b2nd_free(arr));
   BLOSC_ERROR(b2nd_free_ctx(ctx));
+
+  blosc2_destroy();
 
   return 0;
 }

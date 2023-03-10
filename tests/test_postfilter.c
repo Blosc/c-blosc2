@@ -290,6 +290,8 @@ static char *all_tests(void) {
 
 
 int main(void) {
+  blosc2_init();
+
   install_blosc_callback_test(); /* optionally install callback test */
 
   /* Create a context for compression */
@@ -307,6 +309,8 @@ int main(void) {
     printf(" ALL TESTS PASSED");
   }
   printf("\tTests run: %d\n", tests_run);
+
+  blosc2_destroy();
 
   return result != 0;
 }

@@ -12,6 +12,8 @@
 
 int main() {
 
+  blosc2_init();
+
   int8_t ndim = 2;
   int64_t shape[] = {10, 10};
   int32_t chunkshape[] = {4, 4};
@@ -72,6 +74,7 @@ int main() {
   free(buffer);
   free(data);
 
+  blosc2_destroy();
   // printf("Elapsed seconds: %.5f\n", blosc_elapsed_secs(t0, t1));
 
   return 0;

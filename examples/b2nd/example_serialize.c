@@ -12,6 +12,8 @@
 
 int main() {
 
+  blosc2_init();
+
   int8_t ndim = 2;
   int64_t shape[] = {10, 10};
   int32_t chunkshape[] = {4, 4};
@@ -70,6 +72,8 @@ int main() {
   BLOSC_ERROR(b2nd_free(arr));
   BLOSC_ERROR(b2nd_free(dest));
   BLOSC_ERROR(b2nd_free_ctx(ctx));
+
+  blosc2_destroy();
 
   return 0;
 }

@@ -180,6 +180,8 @@ int create_cframe(const char* compname, bool contiguous) {
 
 
 int main(void) {
+  blosc2_init();
+
 #ifdef CREATE_ZEROS
   printf("\n   ***  Creating zeros   ***\n");
 #else
@@ -197,4 +199,6 @@ int main(void) {
   create_cframe("blosclz", false);
   create_cframe("lz4", true);
   create_cframe("lz4", false);
+
+  blosc2_destroy();
 }
