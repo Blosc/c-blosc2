@@ -305,6 +305,8 @@ int item_prices() {
 
 
 int main() {
+  blosc2_init();
+
   int err;
   err = rand_();
   if (err != BLOSC2_ERROR_SUCCESS) {
@@ -350,6 +352,8 @@ int main() {
   if (err != BLOSC2_ERROR_SUCCESS) {
     printf("\n Item_prices error: %d", err);
   }
+
+  blosc2_destroy();
 
   return err;
 }

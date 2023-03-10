@@ -162,6 +162,8 @@ static char *all_tests(void) {
 #define BUFFER_ALIGN_SIZE   32
 
 int main(void) {
+  blosc2_init();
+
   char *result;
 
   nblocks = bytesize / blocksize;
@@ -230,5 +232,6 @@ int main(void) {
   blosc_test_free(maskout);
   blosc_test_free(maskout2);
 
+  blosc2_destroy();
   return result != 0;
 }

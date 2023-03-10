@@ -42,8 +42,12 @@ int main(int argc, char *argv[]) {
     exit(-1);
   }
 
+  blosc2_init();
+
   char *urlpath = argv[1];
   print_meta(urlpath);
+
+  blosc2_destroy();
 
   return 0;
 }

@@ -90,6 +90,8 @@ int codec_decoder(const uint8_t* input, int32_t input_len,
 
 
 int main(void) {
+  blosc2_init();
+
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
@@ -177,6 +179,8 @@ int main(void) {
   /* Free resources */
   /* Destroy the super-chunk */
   blosc2_schunk_free(schunk);
+
+  blosc2_destroy();
 
   return 0;
 }

@@ -213,6 +213,8 @@ static char *all_tests(void) {
 
 
 int main(void) {
+  blosc2_init();
+
   /* Initialize inputs */
   for (int i = 0; i < SIZE; i++) {
     data[i] = i;
@@ -238,5 +240,6 @@ int main(void) {
   }
   printf("\tTests run: %d\n", tests_run);
 
+  blosc2_destroy();
   return result != 0;
 }

@@ -28,6 +28,8 @@
 
 
 int main(void) {
+  blosc2_init();
+
   static float data[SIZE];
   static float data_out[SIZE];
   static float data_dest[SIZE];
@@ -108,6 +110,8 @@ int main(void) {
     }
   }
   printf("Successful roundtrip!\n");
+
+  blosc2_destroy();
 
   return 0;
 }
