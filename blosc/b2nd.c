@@ -366,7 +366,7 @@ int b2nd_empty(b2nd_context_t *ctx, b2nd_array_t **array) {
   BLOSC_ERROR_NULL(ctx, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
-  // BLOSC_ERROR(array_new(ctx, params, storage, BLOSC2_SPECIAL_UNINIT, array));
+  // BLOSC_ERROR(array_new(ctx, BLOSC2_SPECIAL_UNINIT, array));
   // Avoid variable cratios
   BLOSC_ERROR(array_new(ctx, BLOSC2_SPECIAL_ZERO, array));
 
