@@ -59,11 +59,11 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
       type = zfp_type_double;
       break;
     default:
-      printf("\n ZFP is not available for this typesize \n");
       free(shape);
       free(chunkshape);
       free(blockshape);
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for typesize: %d", typesize);
+      return BLOSC2_ERROR_FAILURE;
   }
 
   zfp = zfp_stream_open(NULL);
@@ -86,11 +86,11 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
       field = zfp_field_4d((void *) input, type, blockshape[3], blockshape[2], blockshape[1], blockshape[0]);
       break;
     default:
-      printf("\n ZFP is not available for this number of dims \n");
       free(shape);
       free(chunkshape);
       free(blockshape);
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for ndims: %d", ndim);
+      return BLOSC2_ERROR_FAILURE;
   }
 
   int zfp_maxout = (int) zfp_stream_maximum_size(zfp, field);
@@ -138,7 +138,7 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
   BLOSC_UNUSED_PARAM(chunk);
 
   blosc2_schunk *sc = dparams->schunk;
-  size_t typesize = sc->typesize;
+  int32_t typesize = sc->typesize;
 
   double tol = (int8_t) meta;
   int8_t ndim;
@@ -172,11 +172,11 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
       type = zfp_type_double;
       break;
     default:
-      printf("\n ZFP is not available for this typesize \n");
       free(shape);
       free(chunkshape);
       free(blockshape);
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for typesize: %d", typesize);
+      return BLOSC2_ERROR_FAILURE;
   }
 
   zfp = zfp_stream_open(NULL);
@@ -199,11 +199,11 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
       field = zfp_field_4d((void *) output, type, blockshape[3], blockshape[2], blockshape[1], blockshape[0]);
       break;
     default:
-      printf("\n ZFP is not available for this number of dims \n");
       free(shape);
       free(chunkshape);
       free(blockshape);
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for ndims: %d", ndim);
+      return BLOSC2_ERROR_FAILURE;
   }
 
   zfpsize = zfp_decompress(zfp, field);
@@ -270,11 +270,11 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
       prec = meta + 11;
       break;
     default:
-      printf("\n ZFP is not available for this ndim \n");
       free(shape);
       free(chunkshape);
       free(blockshape);
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for ndims: %d", ndim);
+      return BLOSC2_ERROR_FAILURE;
   }
 
   if (prec > ZFP_MAX_PREC) {
@@ -291,11 +291,11 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
       type = zfp_type_double;
       break;
     default:
-      printf("\n ZFP is not available for this typesize \n");
       free(shape);
       free(chunkshape);
       free(blockshape);
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for typesize: %d", typesize);
+      return BLOSC2_ERROR_FAILURE;
   }
 
   zfp = zfp_stream_open(NULL);
@@ -318,11 +318,11 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
       field = zfp_field_4d((void *) input, type, blockshape[3], blockshape[2], blockshape[1], blockshape[0]);
       break;
     default:
-      printf("\n ZFP is not available for this number of dims \n");
       free(shape);
       free(chunkshape);
       free(blockshape);
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for ndims: %d", ndim);
+      return BLOSC2_ERROR_FAILURE;
   }
 
   int zfp_maxout = (int) zfp_stream_maximum_size(zfp, field);
@@ -370,7 +370,7 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   BLOSC_UNUSED_PARAM(chunk);
 
   blosc2_schunk *sc = dparams->schunk;
-  size_t typesize = sc->typesize;
+  int32_t typesize = sc->typesize;
   int8_t ndim;
   int64_t *shape = malloc(8 * sizeof(int64_t));
   int32_t *chunkshape = malloc(8 * sizeof(int32_t));
@@ -408,11 +408,11 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
       prec = meta + 11;
       break;
     default:
-      printf("\n ZFP is not available for this ndim \n");
       free(shape);
       free(chunkshape);
       free(blockshape);
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for ndims: %d", ndim);
+      return BLOSC2_ERROR_FAILURE;
   }
 
   if (prec > ZFP_MAX_PREC) {
@@ -428,11 +428,11 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
       type = zfp_type_double;
       break;
     default:
-      printf("\n ZFP is not available for this typesize \n");
       free(shape);
       free(chunkshape);
       free(blockshape);
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for typesize: %d", typesize);
+      return BLOSC2_ERROR_FAILURE;
   }
 
   zfp = zfp_stream_open(NULL);
@@ -455,11 +455,11 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
       field = zfp_field_4d((void *) output, type, blockshape[3], blockshape[2], blockshape[1], blockshape[0]);
       break;
     default:
-      printf("\n ZFP is not available for this number of dims \n");
       free(shape);
       free(chunkshape);
       free(blockshape);
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for ndims: %d", ndim);
+      return BLOSC2_ERROR_FAILURE;
   }
 
   zfpsize = zfp_decompress(zfp, field);
@@ -495,11 +495,11 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
-    printf("Blosc error");
     free(shape);
     free(chunkshape);
     free(blockshape);
-    return -1;
+    BLOSC_TRACE_ERROR("b2nd layer not found!");
+    return BLOSC2_ERROR_FAILURE;
   }
   deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
   free(smeta);
@@ -522,32 +522,25 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
       type = zfp_type_double;
       break;
     default:
-      printf("\n ZFP is not available for this typesize \n");
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for typesize: %d", typesize);
+      return BLOSC2_ERROR_FAILURE;
   }
   double rate = ratio * typesize * 8;     // convert from output size / input size to output bits per input value
   uint cellsize = 1u << (2 * ndim);
   double min_rate;
-  switch (type) {
-    case zfp_type_float:
-      min_rate = (double) (1 + 8u) / cellsize;
-      if (rate < min_rate) {
-        BLOSC_TRACE_ERROR("\n ZFP minimum rate for this item type is %f. Compression will be done using this rate \n",
-                          min_rate);
-      }
-      break;
-    case zfp_type_double:
-      min_rate = (double) (1 + 11u) / cellsize;
-      if (rate < min_rate) {
-        BLOSC_TRACE_ERROR("\n ZFP minimum rate for this item type is %f. Compression will be done using this rate \n",
-                          min_rate);
-      }
-      break;
-    default:
-      free(shape);
-      free(chunkshape);
-      free(blockshape);
-      return 0;
+  if (type == zfp_type_float) {
+    min_rate = (double) (1 + 8u) / cellsize;
+    if (rate < min_rate) {
+      BLOSC_TRACE_ERROR("ZFP minimum rate for this item type is %f. Compression will be done using this one.\n",
+                        min_rate);
+    }
+  }
+  else {
+    min_rate = (double) (1 + 11u) / cellsize;
+    if (rate < min_rate) {
+      BLOSC_TRACE_ERROR("ZFP minimum rate for this item type is %f. Compression will be done using this one.\n",
+                        min_rate);
+    }
   }
   zfp = zfp_stream_open(NULL);
   stream = stream_open(output, output_len);
@@ -568,11 +561,11 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
       field = zfp_field_4d((void *) input, type, blockshape[3], blockshape[2], blockshape[1], blockshape[0]);
       break;
     default:
-      printf("\n ZFP is not available for this number of dims \n");
       free(shape);
       free(chunkshape);
       free(blockshape);
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for ndims: %d", ndim);
+      return BLOSC2_ERROR_FAILURE;
   }
 
   int zfp_maxout = (int) zfp_stream_maximum_size(zfp, field);
@@ -620,7 +613,7 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   BLOSC_UNUSED_PARAM(chunk);
 
   blosc2_schunk *sc = dparams->schunk;
-  size_t typesize = sc->typesize;
+  int32_t typesize = sc->typesize;
 
   double ratio = (double) meta / 100.0;
   int8_t ndim;
@@ -653,11 +646,11 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
       type = zfp_type_double;
       break;
     default:
-      printf("\n ZFP is not available for this typesize \n");
       free(shape);
       free(chunkshape);
       free(blockshape);
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for typesize: %d", typesize);
+      return BLOSC2_ERROR_FAILURE;
   }
   double rate =
       ratio * (double) typesize * 8;     // convert from output size / input size to output bits per input value
@@ -682,11 +675,11 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
       field = zfp_field_4d((void *) output, type, blockshape[3], blockshape[2], blockshape[1], blockshape[0]);
       break;
     default:
-      printf("\n ZFP is not available for this number of dims \n");
       free(shape);
       free(chunkshape);
       free(blockshape);
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for ndims: %d", ndim);
+      return BLOSC2_ERROR_FAILURE;
   }
 
   zfpsize = zfp_decompress(zfp, field);
@@ -781,8 +774,8 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
       type = zfp_type_double;
       break;
     default:
-      printf("\n ZFP is not available for this typesize \n");
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for typesize: %d", typesize);
+      return BLOSC2_ERROR_FAILURE;
   }
   uint8_t compmeta = context->compcode_meta;   // access to compressed chunk header
   double rate = (double) (compmeta * typesize * 8) /
@@ -808,68 +801,40 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
   uint8_t *cell = malloc(cell_nitems * typesize);
   switch (ndim) {
     case 1:
-      switch (type) {
-        case zfp_type_float:
-          zfpsize = zfp_decode_block_float_1(zfp, (float *) cell);
-          break;
-        case zfp_type_double:
-          zfpsize = zfp_decode_block_double_1(zfp, (double *) cell);
-          break;
-        default:
-          printf("\n ZFP is not available for this typesize \n");
-          zfp_stream_close(zfp);
-          stream_close(stream);
-          return 0;
+      if (type == zfp_type_float) {
+        zfpsize = zfp_decode_block_float_1(zfp, (float *) cell);
+      }
+      else {
+        zfpsize = zfp_decode_block_double_1(zfp, (double *) cell);
       }
       break;
     case 2:
-      switch (type) {
-        case zfp_type_float:
-          zfpsize = zfp_decode_block_float_2(zfp, (float *) cell);
-          break;
-        case zfp_type_double:
-          zfpsize = zfp_decode_block_double_2(zfp, (double *) cell);
-          break;
-        default:
-          printf("\n ZFP is not available for this typesize \n");
-          zfp_stream_close(zfp);
-          stream_close(stream);
-          return 0;
+      if (type == zfp_type_float) {
+        zfpsize = zfp_decode_block_float_2(zfp, (float *) cell);
+      }
+      else {
+        zfpsize = zfp_decode_block_double_2(zfp, (double *) cell);
       }
       break;
     case 3:
-      switch (type) {
-        case zfp_type_float:
-          zfpsize = zfp_decode_block_float_3(zfp, (float *) cell);
-          break;
-        case zfp_type_double:
-          zfpsize = zfp_decode_block_double_3(zfp, (double *) cell);
-          break;
-        default:
-          printf("\n ZFP is not available for this typesize \n");
-          zfp_stream_close(zfp);
-          stream_close(stream);
-          return 0;
+      if (type == zfp_type_float) {
+        zfpsize = zfp_decode_block_float_3(zfp, (float *) cell);
+      }
+      else {
+        zfpsize = zfp_decode_block_double_3(zfp, (double *) cell);
       }
       break;
     case 4:
-      switch (type) {
-        case zfp_type_float:
-          zfpsize = zfp_decode_block_float_4(zfp, (float *) cell);
-          break;
-        case zfp_type_double:
-          zfpsize = zfp_decode_block_double_4(zfp, (double *) cell);
-          break;
-        default:
-          printf("\n ZFP is not available for this typesize \n");
-          zfp_stream_close(zfp);
-          stream_close(stream);
-          return 0;
+      if (type == zfp_type_float) {
+        zfpsize = zfp_decode_block_float_4(zfp, (float *) cell);
+      }
+      else {
+        zfpsize = zfp_decode_block_double_4(zfp, (double *) cell);
       }
       break;
     default:
-      printf("\n ZFP is not available for this number of dims \n");
-      return 0;
+      BLOSC_TRACE_ERROR("ZFP is not available for ndims: %d", ndim);
+      return BLOSC2_ERROR_FAILURE;
   }
   memcpy(dest, &cell[cell_ind * typesize], thread_ctx->zfp_cell_nitems * typesize);
   zfp_stream_close(zfp);

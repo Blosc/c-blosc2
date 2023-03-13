@@ -1,14 +1,15 @@
 NDCELL: a multidimensional filter for lossless compression
 =============================================================================
 
-Given an n-dim array or matrix, *NDCELL* is a filter based on the codec *NDLZ*
-that divides data into multidimensional cells, reordering the dataset so
-that the codec compress cell by cell.
+Given an n-dim array or matrix, *NDCELL* is a filter based on the *NDLZ* codec
+that groups data in multidimensional cells, reordering them so that the codec
+can find better repetition patterns on a cell by cell basis.
 
 Plugin motivation
 --------------------
 
-*NDCELL* was created in order to make easy for codecs to search for patterns repetitions in multidimensional datasets using the Blosc2 NDim blocking machinery.
+*NDCELL* was created in order to make easy for codecs to search for pattern
+repetitions in multidimensional datasets using the Blosc2 NDim blocking machinery.
 
 Plugin usage
 -------------------
@@ -29,8 +30,6 @@ This filter is meant to leverage multidimensionality for helping codecs to get
 better compression ratios. The idea is to order the data so that when the
 dataset is traversed the elements of a cell are all in a row.
 
-
-
     ------------------------                  -----------------------------
     | 0 1 | 2 3 | 4 5 | 6 7 |                 |   0 1 8 9   |  2 3 10 11  |
     | 8 9 |10 11|12 13|14 15| NDCELL encoder  -----------------------------
@@ -41,23 +40,11 @@ dataset is traversed the elements of a cell are all in a row.
                                               | 20 21 28 29 | 22 23 30 31 |
                                               -----------------------------
 
-
-
-
 Advantages and disadvantages
 ------------------------------
 
-The particularity of *NDCELL* is that this filter
-considers datasets multidimensionality and takes advantage of it instead
-of processing all data as serial.
+The advantage of *NDCELL* is that it makes codecs finding duplicacies in
+multidimensional datasets.
 
-The main disadvantage of *NDCELL* is that only a few codecs are benefited
-by it and only for multidimensional datasets.
-
-
-
-
-
-
-
-
+The main disadvantage of *NDCELL* is that it only works for multidimensional
+datasets, and not all codecs can leverage it (only the fastest ones).

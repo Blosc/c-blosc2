@@ -13,11 +13,7 @@
 
 int ndmean_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta, blosc2_cparams *cparams,
                    uint8_t id) {
-
-  if (id != BLOSC_FILTER_NDMEAN) {
-    fprintf(stderr, "This filter has ID %d", BLOSC_FILTER_NDMEAN);
-    return -1;
-  }
+  BLOSC_UNUSED_PARAM(id);
   int8_t ndim;
   int64_t *shape = malloc(8 * sizeof(int64_t));
   int32_t *chunkshape = malloc(8 * sizeof(int32_t));
@@ -28,8 +24,8 @@ int ndmean_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
     free(shape);
     free(chunkshape);
     free(blockshape);
-    printf("Blosc error");
-    return 0;
+    BLOSC_TRACE_ERROR("b2nd layer not found!");
+    return BLOSC2_ERROR_FAILURE;
   }
   deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
   free(smeta);
@@ -39,8 +35,8 @@ int ndmean_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
     free(shape);
     free(chunkshape);
     free(blockshape);
-    fprintf(stderr, "This filter only works for float or double buffers");
-    return -1;
+    BLOSC_TRACE_ERROR("This filter only works for float or double");
+    return BLOSC2_ERROR_FAILURE;
   }
 
   int8_t cellshape[8];
@@ -65,8 +61,8 @@ int ndmean_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
     free(shape);
     free(chunkshape);
     free(blockshape);
-    printf("Length not equal to blocksize %d %d \n", length, blocksize);
-    return -1;
+    BLOSC_TRACE_ERROR("Length not equal to blocksize %d %d \n", length, blocksize);
+    return BLOSC2_ERROR_FAILURE;
   }
 
   uint8_t *ip = (uint8_t *) input;
@@ -79,13 +75,12 @@ int ndmean_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
   double mean_double = 0;
 
 
-  /* input and output buffer cannot be less than cell size */
   if (length < cell_size * typesize) {
     free(shape);
     free(chunkshape);
     free(blockshape);
-    printf("Incorrect length");
-    return 0;
+    BLOSC_TRACE_ERROR("input and output buffer cannot be smaller than cell size");
+    return BLOSC2_ERROR_FAILURE;
   }
 
   uint8_t *obase = op;
@@ -176,8 +171,8 @@ int ndmean_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
       free(shape);
       free(chunkshape);
       free(blockshape);
-      printf("Output too big");
-      return 0;
+      BLOSC_TRACE_ERROR("Exceeding output buffer limits!");
+      return BLOSC2_ERROR_FAILURE;
     }
   }
 
@@ -185,8 +180,8 @@ int ndmean_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
   free(chunkshape);
   free(blockshape);
   if ((op - obase) != length) {
-    printf("Output size must be equal to input size \n");
-    return 0;
+    BLOSC_TRACE_ERROR("Output size must be equal to input size");
+    return BLOSC2_ERROR_FAILURE;
   }
 
   return BLOSC2_ERROR_SUCCESS;
@@ -195,11 +190,7 @@ int ndmean_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
 
 int ndmean_decoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta, blosc2_dparams *dparams,
                    uint8_t id) {
-
-  if (id != BLOSC_FILTER_NDMEAN) {
-    fprintf(stderr, "This filter has ID %d", BLOSC_FILTER_NDMEAN);
-    return -1;
-  }
+  BLOSC_UNUSED_PARAM(id);
   blosc2_schunk *schunk = dparams->schunk;
   int8_t ndim;
   int64_t *shape = malloc(8 * sizeof(int64_t));
@@ -211,8 +202,8 @@ int ndmean_decoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
     free(shape);
     free(chunkshape);
     free(blockshape);
-    printf("Blosc error");
-    return 0;
+    BLOSC_TRACE_ERROR("b2nd layer not found!");
+    return BLOSC2_ERROR_FAILURE;
   }
   deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
   free(smeta);
@@ -244,16 +235,16 @@ int ndmean_decoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
     free(shape);
     free(chunkshape);
     free(blockshape);
-    printf("Length not equal to blocksize \n");
-    return -1;
+    BLOSC_TRACE_ERROR("Length not equal to blocksize");
+    return BLOSC2_ERROR_FAILURE;
   }
-  /* input and output buffer cannot be less than cell size */
+
   if (length < cell_size * typesize) {
     free(shape);
     free(chunkshape);
     free(blockshape);
-    printf("Incorrect length");
-    return 0;
+    BLOSC_TRACE_ERROR("input and output buffer cannot be smaller than cell size");
+    return BLOSC2_ERROR_FAILURE;
   }
 
   int64_t i_shape[NDMEAN_MAX_DIM];
@@ -276,8 +267,8 @@ int ndmean_decoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
       free(shape);
       free(chunkshape);
       free(blockshape);
-      printf("Literal copy \n");
-      return 0;
+      BLOSC_TRACE_ERROR("Exceeding input length!");
+      return BLOSC2_ERROR_FAILURE;
     }
     blosc2_unidim_to_multidim(ndim, i_shape, cell_ind, ii);
     uint32_t orig = 0;
@@ -319,8 +310,9 @@ int ndmean_decoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
   free(blockshape);
 
   if (ind != (int32_t) (blocksize / typesize)) {
-    printf("Output size is not compatible with embedded blockshape ind %d %d \n", ind, (blocksize / typesize));
-    return 0;
+    BLOSC_TRACE_ERROR("Output size is not compatible with embedded blockshape ind %d %d \n",
+                      ind, (blocksize / typesize));
+    return BLOSC2_ERROR_FAILURE;
   }
 
   return BLOSC2_ERROR_SUCCESS;
