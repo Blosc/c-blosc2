@@ -31,11 +31,11 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
-    printf("Blosc error");
     free(shape);
     free(chunkshape);
     free(blockshape);
-    return -1;
+    BLOSC_TRACE_ERROR("b2nd layer not found!");
+    return BLOSC2_ERROR_FAILURE;
   }
   deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
   free(smeta);
@@ -238,11 +238,11 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
-    printf("Blosc error");
     free(shape);
     free(chunkshape);
     free(blockshape);
-    return -1;
+    BLOSC_TRACE_ERROR("b2nd layer not found!");
+    return BLOSC2_ERROR_FAILURE;
   }
   deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
   free(smeta);
