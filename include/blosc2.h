@@ -2129,10 +2129,12 @@ static inline void swap_store(void *dest, const void *pa, int size) {
  * @warning The @p **content receives a malloc'ed copy of the content.
  * The user is responsible of freeing it.
  *
+ * @note This function is inlined and available even when not linking with libblosc2.
+ *
  * @return If successful, the index of the new metalayer. Else, return a negative value.
  */
 static inline int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
-                    int32_t *content_len) {
+                                  int32_t *content_len) {
   int nmetalayer = blosc2_meta_exists(schunk, name);
   if (nmetalayer < 0) {
     BLOSC_TRACE_WARNING("Metalayer \"%s\" not found.", name);
