@@ -19,7 +19,7 @@
 
 #include "blosc2.h"
 #include "blosc-private.h"
-#include "../plugins/codecs/zfp/blosc2-zfp.h"
+#include "../plugins/codecs/zfp/zfp-private.h"
 #include "frame.h"
 
 
@@ -1778,18 +1778,50 @@ static int blosc_d(
       else if (compformat == BLOSC_UDCODEC_FORMAT) {
         bool getcell = false;
 
-#if defined(HAVE_PLUGINS)
+  #if defined(HAVE_PLUGINS)
+    #include "../plugins/codecs/zfp/blosc2-zfp.h"
+
         if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) &&
             (thread_context->zfp_cell_nitems > 0)) {
-          nbytes = zfp_getcell(thread_context, src, cbytes, _dest, neblock);
+          nbytes = zfp_getitem(thread_context, src, cbytes, _dest, neblock);
           if (nbytes < 0) {
             return BLOSC2_ERROR_DATA;
           }
           if (nbytes == thread_context->zfp_cell_nitems * typesize) {
             getcell = true;
           }
+        } else if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) &&
+                   (context->codec_params != NULL)) {
+          int8_t ndim = context->schunk->ndim;
+          int8_t cellshape = 4;
+          zfp_dparams *zfp_params = (zfp_dparams*) context->codec_params;
+          int32_t ncells = zfp_params->ncells;
+
+          int32_t cell_bytes;
+          int32_t cell_size = ndim * cellshape;
+          bool *cell_maskout = zfp_params->cell_maskout;
+          for (int ncell = 0; ncell < ncells; ncell++) {
+            if (cell_maskout[nblock * ncells + ncell]) {
+              cell_bytes = zfp_getcell(context, ncell, src, cbytes, _dest + ncell * cell_size, neblock);
+              if (cell_bytes != cell_size) {
+                return BLOSC2_ERROR_DATA;
+              }
+              nbytes += cell_bytes;
+            }
+          }
+          if (nbytes == ncells * cell_size) {
+            getcell = true;
+          }
+          printf("\nFrom codec_params:\n");
+          for (int ncell = 0; ncell < ncells; ncell++) {
+            if ((zfp_params->cell_maskout[ncell])) {
+              printf("1, ");
+            } else {
+              printf("0, ");
+            }
+          }
         }
-#endif /* HAVE_PLUGINS */
+  #endif /* HAVE_PLUGINS */
         if (!getcell) {
           thread_context->zfp_cell_nitems = 0;
           for (int i = 0; i < g_ncodecs; ++i) {

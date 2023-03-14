@@ -15,6 +15,11 @@
 #include "blosc-private.h"
 #include "blosc2/blosc2-common.h"
 #include <inttypes.h>
+#if defined(USING_CMAKE)
+#include "config.h"
+#include "../plugins/codecs/zfp/zfp-private.h"
+
+#endif /*  USING_CMAKE */
 
 
 int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const int32_t *chunkshape,
@@ -668,7 +673,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     int64_t nchunk;
     blosc2_multidim_to_unidim(nchunk_ndim, ndim, chunks_in_array_strides, &nchunk);
 
-    // check if the chunk needs to be updated
+    // Check if the chunk needs to be updated
     int64_t chunk_start[B2ND_MAX_DIM] = {0};
     int64_t chunk_stop[B2ND_MAX_DIM] = {0};
     for (int i = 0; i < ndim; ++i) {
@@ -688,6 +693,13 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
 
     int32_t nblocks = (int32_t) array->extchunknitems / array->blocknitems;
 
+    int32_t cellshape = 4;
+    int32_t ncells = 1;
+    int64_t cells_in_block[B2ND_MAX_DIM] = {0};
+    int64_t ncell_ndim[B2ND_MAX_DIM] = {0};
+    int64_t cell_start[B2ND_MAX_DIM] = {0};
+    int64_t cell_stop[B2ND_MAX_DIM] = {0};
+    bool enable_zfp = true;
 
     if (set_slice) {
       // Check if all the chunk is going to be updated and avoid the decompression
@@ -709,11 +721,38 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     } else {
       bool *block_maskout = malloc(nblocks);
       BLOSC_ERROR_NULL(block_maskout, BLOSC2_ERROR_MEMORY_ALLOC);
+
+#if defined(HAVE_PLUGINS)
+  #include "blosc2/codecs-registry.h"
+      int32_t *blockshape = array->blockshape;
+      int32_t extblockshape[B2ND_MAX_DIM];
+      for(int i = 0; i < ndim; i++) {
+        if(blockshape[i] < 4) {
+          enable_zfp = false;
+          break;
+        }
+      }
+      if ((array->sc->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && enable_zfp) {
+        for (int i = 0; i < ndim; ++i) {
+          if (blockshape[i] % cellshape == 0) {
+            extblockshape[i] = blockshape[i];
+          } else {
+            extblockshape[i] = blockshape[i] + cellshape - blockshape[i] % cellshape;
+          }
+        }
+        for (int i = 0; i < ndim; ++i) {
+          cells_in_block[i] = extblockshape[i] / cellshape;
+          ncells *= cells_in_block[i];
+        }
+      }
+      bool cell_maskout[nblocks][ncells];
+#endif /* HAVE_PLUGINS */
+
       for (int nblock = 0; nblock < nblocks; ++nblock) {
         int64_t nblock_ndim[B2ND_MAX_DIM] = {0};
         blosc2_unidim_to_multidim(ndim, blocks_in_chunk, nblock, nblock_ndim);
 
-        // check if the block needs to be updated
+        // Check if the block needs to be updated
         int64_t block_start[B2ND_MAX_DIM] = {0};
         int64_t block_stop[B2ND_MAX_DIM] = {0};
         for (int i = 0; i < ndim; ++i) {
@@ -735,6 +774,62 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
           block_empty |= (block_stop[i] <= start[i] || block_start[i] >= stop[i]);
         }
         block_maskout[nblock] = block_empty ? true : false;
+
+#if defined(HAVE_PLUGINS)
+  #include "../plugins/codecs/zfp/zfp-private.h"
+  #include "blosc2/codecs-registry.h"
+        bool cell_empty;
+        zfp_dparams zfp_params = {0};
+        if ((array->sc->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && (!block_empty) && enable_zfp) {
+          for (int ncell = 0; ncell < ncells; ncell++) {
+            blosc2_unidim_to_multidim(ndim, cells_in_block, ncell, ncell_ndim);
+
+            // Check if the cell needs to be updated
+            for (int i = 0; i < ndim; ++i) {
+              cell_start[i] = ncell_ndim[i] * cellshape;
+              cell_stop[i] = cell_start[i] + cellshape;
+              cell_start[i] += block_start[i];
+              cell_stop[i] += block_start[i];
+
+              if (cell_start[i] > block_stop[i]) {
+                cell_start[i] = block_stop[i];
+              }
+              if (cell_stop[i] > block_stop[i]) {
+                cell_stop[i] = block_stop[i];
+              }
+            }
+
+            cell_empty = false;
+            for (int i = 0; i < ndim; ++i) {
+              cell_empty |= (cell_stop[i] <= start[i] || cell_start[i] >= stop[i]);
+            }
+            cell_maskout[nblock][ncell] = cell_empty ? true : false;
+          }
+          zfp_params.cell_maskout = (bool*) cell_maskout;
+          zfp_params.ncells = ncells;
+          array->sc->dctx->codec_params = (void*) &zfp_params;
+          if(nblock == 0) {
+            printf("\nBlock %d, cell_maskout:\n", nblock);
+            for (int ncell = 0; ncell < ncells; ncell++) {
+              if (cell_maskout[nblock][ncell]) {
+                printf("1, ");
+              } else {
+                printf("0, ");
+              }
+            }
+            zfp_dparams *zfp_auxp = (zfp_dparams *) array->sc->dctx->codec_params;
+            printf("\nFrom codec_params:\n");
+            for (int ncell = 0; ncell < ncells; ncell++) {
+              if ((zfp_auxp->cell_maskout[nblock * ncells + ncell])) {
+                printf("1, ");
+              } else {
+                printf("0, ");
+              }
+            }
+          }
+
+        }
+#endif /* HAVE_PLUGINS */
       }
 
       if (blosc2_set_maskout(array->sc->dctx, block_maskout, nblocks) != BLOSC2_ERROR_SUCCESS) {
@@ -757,7 +852,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       int64_t nblock_ndim[B2ND_MAX_DIM] = {0};
       blosc2_unidim_to_multidim(ndim, blocks_in_chunk, nblock, nblock_ndim);
 
-      // check if the block needs to be updated
+      // Check if the block needs to be updated
       int64_t block_start[B2ND_MAX_DIM] = {0};
       int64_t block_stop[B2ND_MAX_DIM] = {0};
       for (int i = 0; i < ndim; ++i) {
@@ -785,7 +880,101 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
         continue;
       }
 
-      // compute the start of the slice inside the block
+#if defined(HAVE_PLUGINS)
+  #include "../plugins/codecs/zfp/zfp-private.h"
+  #include "blosc2/codecs-registry.h"
+      int64_t zfp_slice_start[B2ND_MAX_DIM] = {0};
+      int64_t zfp_slice_stop[B2ND_MAX_DIM] = {0};
+      int64_t dest_start[B2ND_MAX_DIM] = {0};
+      uint8_t *zfp_src;
+      int64_t zfp_zfp_src_start[B2ND_MAX_DIM] = {0};
+      int64_t zfp_src_start[B2ND_MAX_DIM] = {0};
+      int64_t zfp_src_stop[B2ND_MAX_DIM] = {0};
+      int64_t zfp_src_pad_shape[B2ND_MAX_DIM];
+      int32_t cellnitems = 1;
+      zfp_dparams *zfp_params;
+      if ((array->sc->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && (!set_slice) && enable_zfp) {
+        printf("\nBlock %d, extracted cell_maskout:\n", nblock);
+        zfp_params = (zfp_dparams *) array->sc->dctx->codec_params;
+        for (int ncell = 0; ncell < ncells; ncell++) {
+          if ((zfp_params->cell_maskout[nblock * ncells + ncell])) {
+            printf("1, ");
+          } else {
+            printf("0, ");
+          }
+        }
+      }
+
+      if ((array->sc->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && (!set_slice) && enable_zfp) {
+        for (int ncell = 0; ncell < ncells; ncell++) {
+
+          // Check if the cell needs to be extracted
+          zfp_params = (zfp_dparams*) array->sc->dctx->codec_params;
+          if(! zfp_params->cell_maskout[nblock * ncells + ncell]) {
+            continue;
+          }
+
+          // Compute the start of the slice inside the cell
+          blosc2_unidim_to_multidim(ndim, cells_in_block, ncell, ncell_ndim);
+          for (int i = 0; i < ndim; ++i) {
+            cell_start[i] = ncell_ndim[i] * cellshape;
+            cell_stop[i] = cell_start[i] + cellshape;
+            cell_start[i] += block_start[i];
+            cell_stop[i] += block_start[i];
+
+            if (cell_start[i] > block_stop[i]) {
+              cell_start[i] = block_stop[i];
+            }
+            if (cell_stop[i] > block_stop[i]) {
+              cell_stop[i] = block_stop[i];
+            }
+          }
+
+          for (int i = 0; i < ndim; ++i) {
+            if (cell_start[i] < buffer_start[i]) {
+              zfp_slice_start[i] = buffer_start[i] - cell_start[i];
+            } else {
+              zfp_slice_start[i] = 0;
+            }
+            zfp_slice_start[i] += cell_start[i];
+          }
+
+          for (int i = 0; i < ndim; ++i) {
+            if (cell_stop[i] > buffer_stop[i]) {
+              zfp_slice_stop[i] = buffer_stop[i] - cell_start[i];
+            } else {
+              zfp_slice_stop[i] = cell_stop[i] - cell_start[i];
+            }
+            zfp_slice_stop[i] += cell_start[i];
+          }
+
+          for (int i = 0; i < ndim; ++i) {
+            dest_start[i] = zfp_slice_start[i] - buffer_start[i];
+            cellnitems *= cellshape;
+          }
+
+          zfp_src = &data[(nblock * array->blocknitems + ncell * cellnitems) * array->sc->typesize];
+          for (int i = 0; i < ndim; ++i) {
+            zfp_src_pad_shape[i] = cellshape;
+          }
+          printf("Zfp_src:\n");
+          for (int i = 0; i < cellnitems; ++i) {
+            printf("%u, ", zfp_src[i]);
+          }
+          for (int i = 0; i < ndim; ++i) {
+            zfp_src_start[i] = zfp_slice_start[i] - cell_start[i];
+            zfp_src_stop[i] = zfp_slice_stop[i] - cell_start[i];
+          }
+
+          b2nd_copy_buffer(ndim, array->sc->typesize,
+                           zfp_src, zfp_src_pad_shape, zfp_src_start, zfp_src_stop,
+                           buffer_b, buffer_shape, dest_start);
+        }
+        continue;
+      }
+#endif /* HAVE_PLUGINS */
+
+      // Compute the start of the slice inside the block
       int64_t slice_start[B2ND_MAX_DIM] = {0};
       for (int i = 0; i < ndim; ++i) {
         if (block_start[i] < buffer_start[i]) {
@@ -956,7 +1145,7 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t
     int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
     blosc2_unidim_to_multidim(ndim, chunks_in_array, nchunk, nchunk_ndim);
 
-    // check if the chunk needs to be updated
+    // Check if the chunk needs to be updated
     int64_t chunk_start[B2ND_MAX_DIM] = {0};
     int64_t chunk_stop[B2ND_MAX_DIM] = {0};
     int64_t chunk_shape[B2ND_MAX_DIM] = {0};

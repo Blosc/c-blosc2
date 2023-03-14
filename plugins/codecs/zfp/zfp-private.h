@@ -23,12 +23,16 @@ extern "C" {
 #define XXH_INLINE_ALL
 
 #define ZFP_ERROR_NULL(pointer)         \
-  do {                                 \
-    if ((pointer) == NULL) {         \
-      return 0;                    \
-    }                                \
+  do {                                  \
+    if ((pointer) == NULL) {            \
+      return 0;                         \
+    }                                   \
   } while (0)
 
+typedef struct {
+  bool* cell_maskout; // Array of cell maskouts for each block
+  int32_t ncells; // Number of cells of each block
+} zfp_dparams;
 
 #if defined (__cplusplus)
 }
