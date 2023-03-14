@@ -514,11 +514,14 @@ BLOSC_EXPORT int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const in
  * @param dtype A string representation of the data type of the array (output).
  * @param dtype_format The format of the dtype representation (output). 0 means NumPy (the default).
  *
+ * @note This function is inlined and available even when not linking with libblosc2.
+ *
  * @return An error code.
  */
-static inline int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
-                          int32_t *chunkshape, int32_t *blockshape, char **dtype, int8_t *dtype_format) {
-                          const uint8_t *pmeta = smeta;
+static inline int b2nd_deserialize_meta(
+    const uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
+    int32_t *chunkshape, int32_t *blockshape, char **dtype, int8_t *dtype_format) {
+    const uint8_t *pmeta = smeta;
 
   // Check that we have an array with 7 entries (version, ndim, shape, chunkshape, blockshape, dtype_format, dtype)
   pmeta += 1;
