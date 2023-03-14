@@ -840,13 +840,12 @@ int fill_filter(blosc2_filter *filter) {
     return BLOSC2_ERROR_FAILURE;
   }
   char *forward_name = malloc(strlen(filter->name) + strlen("_forward") + 1);
-  sprintf(forward_name, "%s_forward", filter->name);
+  sprintf(forward_name, "blosc2_%s_forward", filter->name);
   filter->forward = dlsym(lib, forward_name);
   free(forward_name);
 
   char *backward_name = malloc(strlen(filter->name) + strlen("_backward") + 1);
-  sprintf(forward_name, "%s_backward", filter->name);
-  printf("backward %s\n", backward_name);
+  sprintf(forward_name, "blosc2_%s_backward", filter->name);
   filter->backward = dlsym(lib, backward_name);
   free(backward_name);
 
@@ -876,12 +875,12 @@ int fill_codec(blosc2_codec *codec) {
   }
 
   char *encoder_name = malloc(strlen(codec->compname) + strlen("_encoder") + 1);
-  sprintf(encoder_name, "%s_encoder", codec->compname);
+  sprintf(encoder_name, "blosc2_%s_encoder", codec->compname);
   codec->encoder = dlsym(lib, encoder_name);
   free(encoder_name);
 
   char *decoder_name = malloc(strlen(codec->compname) + strlen("_decoder") + 1);
-  sprintf(encoder_name, "%s_decoder", codec->compname);
+  sprintf(encoder_name, "blosc2_%s_decoder", codec->compname);
   codec->decoder = dlsym(lib, decoder_name);
   free(decoder_name);
 
