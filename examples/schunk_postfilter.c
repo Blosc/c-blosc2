@@ -8,7 +8,6 @@
 */
 
 #include <stdio.h>
-#include <assert.h>
 #include <blosc2.h>
 
 #define KB  1024.
@@ -79,7 +78,10 @@ int main(void) {
       data[i] = i + nchunk * CHUNKSIZE;
     }
     nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
-    assert(nchunks == nchunk + 1);
+    if (nchunks != nchunk + 1) {
+      printf("blosc2_schunk_append_buffer is not working correctly");
+      return BLOSC2_ERROR_FAILURE;
+    }
   }
 
   /* Retrieve and decompress the chunks from the super-chunks and compare values */
@@ -91,7 +93,10 @@ int main(void) {
     }
     /* Check integrity of this chunk */
     for (i = 0; i < CHUNKSIZE; i++) {
-      assert (data_dest[i] == (i + nchunk * CHUNKSIZE) * user_data.mult + user_data.add);
+      if (data_dest[i] != (i + nchunk * CHUNKSIZE) * user_data.mult + user_data.add) {
+        printf("data mismatch!");
+        return BLOSC2_ERROR_FAILURE;
+      }
     }
   }
   printf("Postfilter is working correctly!\n");

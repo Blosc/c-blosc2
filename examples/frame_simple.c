@@ -27,7 +27,6 @@
  */
 
 #include <stdio.h>
-#include <assert.h>
 #include <blosc2.h>
 
 #define KB  1024.
@@ -74,7 +73,10 @@ int main(void) {
       data[i] = i * nchunk;
     }
     nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
-    assert(nchunks == nchunk + 1);
+    if (nchunks != nchunk + 1) {
+      printf("blosc2_schunk_append_buffer is not working correctly");
+      return BLOSC2_ERROR_FAILURE;
+    }
   }
 
   // Add some vlmetalayers data
@@ -174,8 +176,10 @@ int main(void) {
     }
     /* Check integrity of this chunk */
     for (i = 0; i < CHUNKSIZE; i++) {
-      assert (data_dest[i] == i * nchunk);
-      assert (data_dest2[i] == i * nchunk);
+      if ((data_dest[i] != i * nchunk) || (data_dest2[i] != i * nchunk)) {
+        printf("data mismatch");
+        return BLOSC2_ERROR_FAILURE;
+      }
     }
   }
   printf("Successful roundtrip schunk <-> frame <-> fileframe !\n");
