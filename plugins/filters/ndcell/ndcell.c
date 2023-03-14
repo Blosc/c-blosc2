@@ -19,19 +19,16 @@
 int ndcell_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta, blosc2_cparams *cparams,
                    uint8_t id) {
   BLOSC_UNUSED_PARAM(id);
+  uint8_t *smeta;
+  int32_t smeta_len;
+  if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
+    BLOSC_TRACE_ERROR("b2nd layer not found!");
+    return BLOSC2_ERROR_FAILURE;
+  }
   int8_t ndim;
   int64_t *shape = malloc(8 * sizeof(int64_t));
   int32_t *chunkshape = malloc(8 * sizeof(int32_t));
   int32_t *blockshape = malloc(8 * sizeof(int32_t));
-  uint8_t *smeta;
-  int32_t smeta_len;
-  if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
-    free(shape);
-    free(chunkshape);
-    free(blockshape);
-    BLOSC_TRACE_ERROR("b2nd layer not found!");
-    return BLOSC2_ERROR_FAILURE;
-  }
   deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
   free(smeta);
   int typesize = cparams->typesize;

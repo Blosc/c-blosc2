@@ -59,6 +59,13 @@
 int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                    uint8_t meta, blosc2_cparams *cparams) {
   BLOSC_UNUSED_PARAM(meta);
+  uint8_t *smeta;
+  int32_t smeta_len;
+
+  if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
+    BLOSC_TRACE_ERROR("b2nd layer not found!");
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   const int cell_shape = 8;
   const int cell_size = 64;
@@ -66,28 +73,22 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
   int64_t *shape = malloc(8 * sizeof(int64_t));
   int32_t *chunkshape = malloc(8 * sizeof(int32_t));
   int32_t *blockshape = malloc(8 * sizeof(int32_t));
-  uint8_t *smeta;
-  int32_t smeta_len;
-  if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
-    printf("Blosc error");
-    return 0;
-  }
   deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
   free(smeta);
 
   if (ndim != 2) {
-    fprintf(stderr, "This codec only works for ndim = 2");
-    return -1;
+    BLOSC_TRACE_ERROR("This codec only works for ndim = 2");
+    return BLOSC2_ERROR_FAILURE;
   }
 
   if (input_len != (blockshape[0] * blockshape[1])) {
-    printf("Length not equal to blocksize \n");
-    return -1;
+    BLOSC_TRACE_ERROR("Length not equal to blocksize");
+    return BLOSC2_ERROR_FAILURE;
   }
 
   if (NDLZ_UNEXPECT_CONDITIONAL(output_len < (int) (1 + ndim * sizeof(int32_t)))) {
-    printf("Output too small \n");
-    return -1;
+    BLOSC_TRACE_ERROR("Output too small");
+    return BLOSC2_ERROR_FAILURE;
   }
 
   uint8_t *ip = (uint8_t *) input;
@@ -120,7 +121,7 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
   /* input and output buffer cannot be less than 64 (cells are 8x8) */
   int overhead = 17 + (blockshape[0] * blockshape[1] / cell_size - 1) * 2;
   if (input_len < cell_size || output_len < overhead) {
-    printf("Incorrect length or maxout");
+    BLOSC_TRACE_ERROR("Incorrect length or maxout");
     return 0;
   }
 
@@ -354,6 +355,7 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
         free(chunkshape);
         free(blockshape);
         free(bufarea);
+        BLOSC_TRACE_ERROR("Compressed data is bigger than input!");
         return 0;
       }
     }
@@ -447,8 +449,8 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   ndim = *ip;
   ip++;
   if (ndim != 2) {
-    fprintf(stderr, "This codec only works for ndim = 2");
-    return -1;
+    BLOSC_TRACE_ERROR("This codec only works for ndim = 2");
+    return BLOSC2_ERROR_FAILURE;
   }
   memcpy(&blockshape[0], ip, 4);
   ip += 4;
@@ -467,7 +469,6 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
     i_stop[i] = eshape[i] / cell_shape;
   }
 
-
   /* main loop */
   int32_t ii[2];
   int32_t padding[2] = {0};
@@ -477,10 +478,10 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   for (ii[0] = 0; ii[0] < i_stop[0]; ++ii[0]) {
     for (ii[1] = 0; ii[1] < i_stop[1]; ++ii[1]) {      // for each cell
       if (NDLZ_UNEXPECT_CONDITIONAL(ip > ip_limit)) {
-        printf("Literal copy \n");
         free(local_buffer);
         free(cell_aux);
-        return 0;
+        BLOSC_TRACE_ERROR("Exceeding input length");
+        return BLOSC2_ERROR_FAILURE;
       }
       if (ii[0] == i_stop[0] - 1) {
         padding[0] = (blockshape[0] % cell_shape == 0) ? cell_shape : blockshape[0] % cell_shape;
@@ -536,13 +537,13 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
           }
         }
       } else {
-        printf("Invalid token: %u at cell [%d, %d]\n", token, ii[0], ii[1]);
         free(local_buffer);
         free(cell_aux);
-        return 0;
+        BLOSC_TRACE_ERROR("Invalid token: %u at cell [%d, %d]\n", token, ii[0], ii[1]);
+        return BLOSC2_ERROR_FAILURE;
       }
 
-      uint32_t orig = ii[0] * cell_shape * blockshape[1] + ii[1] * cell_shape;
+      int32_t orig = ii[0] * cell_shape * blockshape[1] + ii[1] * cell_shape;
       for (int32_t i = 0; i < (int32_t) cell_shape; i++) {
         if (i < padding[0]) {
           ind = orig + i * blockshape[1];
@@ -551,10 +552,10 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
         buffercpy += padding[1];
       }
       if (ind > output_len) {
-        printf("Output size is bigger than max \n");
         free(local_buffer);
         free(cell_aux);
-        return 0;
+        BLOSC_TRACE_ERROR("Exceeding output size");
+        return BLOSC2_ERROR_FAILURE;
       }
     }
   }
@@ -564,12 +565,12 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   free(local_buffer);
 
   if (ind != (blockshape[0] * blockshape[1])) {
-    printf("Output size is not compatible with embedded blockshape \n");
-    return 0;
+    BLOSC_TRACE_ERROR("Output size is not compatible with embedded blockshape");
+    return BLOSC2_ERROR_FAILURE;
   }
   if (ind > output_len) {
-    printf("Output size is bigger than max \n");
-    return 0;
+    BLOSC_TRACE_ERROR("Exceeding output size");
+    return BLOSC2_ERROR_FAILURE;
   }
 
   return (int) ind;

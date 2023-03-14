@@ -20,7 +20,7 @@ if(BUILD_TESTS)
     target_link_libraries(test_bytedelta blosc_testing)
 
     # tests
-    add_test(NAME test_plugin_test_bytedelta
+    add_test(NAME test_plugin_bytedelta
         COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_bytedelta>)
 
 #    # Copy test files

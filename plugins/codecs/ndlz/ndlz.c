@@ -35,9 +35,9 @@ int ndlz_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int3
     case 8:
       return ndlz8_compress(input, input_len, output, output_len, meta, cparams);
     default:
-      printf("\n NDLZ is not available for this cellsize \n");
-      return 0;
+      BLOSC_TRACE_ERROR("NDLZ is not available for this cellsize: %d", meta);
   }
+  return BLOSC2_ERROR_FAILURE;
 }
 
 int ndlz_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
@@ -53,7 +53,7 @@ int ndlz_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, in
     case 8:
       return ndlz8_decompress(input, input_len, output, output_len, meta, dparams);
     default:
-      printf("\n NDLZ is not available for this cellsize \n");
-      return 0;
+      BLOSC_TRACE_ERROR("NDLZ is not available for this cellsize: %d", meta);
   }
+  return BLOSC2_ERROR_FAILURE;
 }
