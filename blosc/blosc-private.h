@@ -149,8 +149,6 @@ static inline int32_t bswap32_(int32_t a) {
 #endif
 }
 
-void swap_store(void *dest, const void *pa, int size);
-
 /**
  * @brief Register a filter in Blosc.
  *
