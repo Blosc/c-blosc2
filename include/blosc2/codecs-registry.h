@@ -16,3 +16,9 @@ enum {
 };
 
 void register_codecs(void);
+
+// For dynamically loaded codecs
+typedef struct {
+    char *encoder;
+    char *decoder;
+}codec_info;
