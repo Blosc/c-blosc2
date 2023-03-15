@@ -74,7 +74,7 @@ bytes16 simd_prefix_sum(bytes16 x)
 
 
 // Fetch 16b from N streams, compute SIMD delta
-int bytedelta_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta,
+int bytedelta_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta,
                       blosc2_cparams *cparams, uint8_t id) {
   BLOSC_UNUSED_PARAM(id);
 
@@ -118,7 +118,7 @@ int bytedelta_encoder(const uint8_t *input, uint8_t *output, int32_t length, uin
 }
 
 // Fetch 16b from N streams, sum SIMD undelta
-int bytedelta_decoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta,
+int bytedelta_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta,
                       blosc2_dparams *dparams, uint8_t id) {
   BLOSC_UNUSED_PARAM(id);
 

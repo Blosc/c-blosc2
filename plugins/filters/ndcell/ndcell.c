@@ -16,7 +16,7 @@
 #include "../include/blosc2/filters-registry.h"
 
 
-int ndcell_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta, blosc2_cparams *cparams,
+int ndcell_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta, blosc2_cparams *cparams,
                    uint8_t id) {
   BLOSC_UNUSED_PARAM(id);
   uint8_t *smeta;
@@ -134,7 +134,7 @@ int ndcell_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
 }
 
 
-int ndcell_decoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta, blosc2_dparams *dparams,
+int ndcell_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta, blosc2_dparams *dparams,
                    uint8_t id) {
   BLOSC_UNUSED_PARAM(id);
   blosc2_schunk *schunk = dparams->schunk;

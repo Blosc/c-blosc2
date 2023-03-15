@@ -17,8 +17,8 @@ better compression ratios for the codecs.
 Plugin usage
 -------------------
 
-The codec consists of an encoder called *ndmean_encoder()* to reorder data and
-a decoder called *ndmean_decoder()* to recover the original order of data
+The codec consists of an encoder called *ndmean_forward()* to reorder data and
+a decoder called *ndmean_backward()* to recover the original order of data
 but not the original data (lossy compression).
 
 The parameters used by *NDMEAN* are the ones specified in the *blosc2_filter*

@@ -12,8 +12,8 @@
 #include <stdint.h>
 #include <blosc2.h>
 
-int bytedelta_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta,
+int bytedelta_forward(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta,
                       blosc2_cparams* cparams, uint8_t id);
 
-int bytedelta_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta,
+int bytedelta_backward(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta,
                       blosc2_dparams* dparams, uint8_t id);

@@ -14,8 +14,8 @@ repetitions in multidimensional datasets using the Blosc2 NDim blocking machiner
 Plugin usage
 -------------------
 
-The codec consists of an encoder called *ndcell_encoder()* to reorder data and
-a decoder called *ndcell_decoder()* to recover the original data.
+The codec consists of an encoder called *ndcell_forward()* to reorder data and
+a decoder called *ndcell_backward()* to recover the original data.
 
 The parameters used by *NDCELL* are the ones specified in the *blosc2_filter*
 structure of *blosc2.h*.

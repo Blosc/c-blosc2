@@ -11,7 +11,7 @@
 #include "../plugins/plugin_utils.h"
 #include "../include/blosc2/filters-registry.h"
 
-int ndmean_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta, blosc2_cparams *cparams,
+int ndmean_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta, blosc2_cparams *cparams,
                    uint8_t id) {
   BLOSC_UNUSED_PARAM(id);
   int8_t ndim;
@@ -188,7 +188,7 @@ int ndmean_encoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_
 }
 
 
-int ndmean_decoder(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta, blosc2_dparams *dparams,
+int ndmean_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta, blosc2_dparams *dparams,
                    uint8_t id) {
   BLOSC_UNUSED_PARAM(id);
   blosc2_schunk *schunk = dparams->schunk;
