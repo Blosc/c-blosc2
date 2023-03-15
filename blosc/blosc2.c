@@ -833,21 +833,9 @@ int fill_filter(blosc2_filter *filter) {
     return BLOSC2_ERROR_FAILURE;
   }
 
-  int (*check_filter)(blosc2_filter *) = dlsym(lib, "check_filter");
-  if((check_filter)(filter) < 0) {
-    BLOSC_TRACE_ERROR("Filter id or name is not correct");
-    dlclose(lib);
-    return BLOSC2_ERROR_FAILURE;
-  }
-  char *forward_name = malloc(strlen(filter->name) + strlen("_forward") + 1);
-  sprintf(forward_name, "blosc2_%s_forward", filter->name);
-  filter->forward = dlsym(lib, forward_name);
-  free(forward_name);
-
-  char *backward_name = malloc(strlen(filter->name) + strlen("_backward") + 1);
-  sprintf(forward_name, "blosc2_%s_backward", filter->name);
-  filter->backward = dlsym(lib, backward_name);
-  free(backward_name);
+  filter_info *info = dlsym(lib, "info");
+  filter->forward = dlsym(lib, info->forward);
+  filter->backward = dlsym(lib, info->backward);
 
   if (filter->forward == NULL || filter->backward == NULL){
     BLOSC_TRACE_ERROR("Wrong library loaded");
@@ -867,22 +855,9 @@ int fill_codec(blosc2_codec *codec) {
     return BLOSC2_ERROR_FAILURE;
   }
 
-  int (*check_codec)(blosc2_codec *) = dlsym(lib, "check_codec");
-  if((check_codec)(codec) < 0) {
-    BLOSC_TRACE_ERROR("Codec id or name is not correct");
-    dlclose(lib);
-    return BLOSC2_ERROR_FAILURE;
-  }
-
-  char *encoder_name = malloc(strlen(codec->compname) + strlen("_encoder") + 1);
-  sprintf(encoder_name, "blosc2_%s_encoder", codec->compname);
-  codec->encoder = dlsym(lib, encoder_name);
-  free(encoder_name);
-
-  char *decoder_name = malloc(strlen(codec->compname) + strlen("_decoder") + 1);
-  sprintf(encoder_name, "blosc2_%s_decoder", codec->compname);
-  codec->decoder = dlsym(lib, decoder_name);
-  free(decoder_name);
+  codec_info *info = dlsym(lib, "info");
+  codec->encoder = dlsym(lib, info->encoder);
+  codec->decoder = dlsym(lib, info->decoder);
 
   if (codec->encoder == NULL || codec->decoder == NULL){
     BLOSC_TRACE_ERROR("Wrong library loaded");

@@ -15,3 +15,9 @@ enum {
 };
 
 void register_filters(void);
+
+// For dynamically loaded filters
+typedef struct {
+    char *forward;
+    char *backward;
+}filter_info;
