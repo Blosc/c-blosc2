@@ -16,9 +16,9 @@
 #define NDMEAN_MAX_DIM 8
 
 
-int ndmean_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_cparams* cparams, uint8_t id);
+int ndmean_forward(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_cparams* cparams, uint8_t id);
 
-int ndmean_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_dparams* dparams, uint8_t id);
+int ndmean_backward(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_dparams* dparams, uint8_t id);
 
 #endif //B2ND_NDMEAN_H
 

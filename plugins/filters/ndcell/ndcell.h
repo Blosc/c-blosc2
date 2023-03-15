@@ -16,9 +16,9 @@
 #define NDCELL_MAX_DIM 8
 
 
-int ndcell_encoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_cparams* cparams, uint8_t id);
+int ndcell_forward(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_cparams* cparams, uint8_t id);
 
-int ndcell_decoder(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_dparams* dparams, uint8_t id);
+int ndcell_backward(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_dparams* dparams, uint8_t id);
 
 #endif //B2ND_NDCELL_H
 
