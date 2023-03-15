@@ -3741,7 +3741,7 @@ void blosc2_init(void) {
   #include "blosc2/blosc2-common.h"
   #include "blosc2/blosc2-stdio.h"
   FILE *fp = popen("python -c \"exec(\\\"import sys\\npaths=sys.path\\nfor p in paths:\\n\\tif 'site-packages' in p:"
-                   "\\n \\t\\tprint(p+'/', end='')\\\")\"", "r");
+                   "\\n \\t\\tprint(p+'/', end='')\\n \\t\\tbreak\\\")\"", "r");
   fgets(g_python_path, PATH_MAX, fp);
   pclose(fp);
   register_codecs();

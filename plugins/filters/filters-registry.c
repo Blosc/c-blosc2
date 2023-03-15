@@ -30,6 +30,7 @@ void register_filters(void) {
 
   blosc2_filter bytedelta;
   bytedelta.id = BLOSC_FILTER_BYTEDELTA;
+  bytedelta.name = "bytedelta";
   bytedelta.forward = (blosc2_filter_forward_cb) bytedelta_encoder;
   bytedelta.backward = (blosc2_filter_backward_cb) bytedelta_decoder;
   register_filter_private(&bytedelta);
