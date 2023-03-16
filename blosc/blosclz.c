@@ -52,7 +52,7 @@
 #endif
 
 #define HASH_LOG (14U)
-#define HASH_LOG2 (12U)
+#define HASH_LOG2 (14U)
 
 // This is used in LZ4 and seems to work pretty well here too
 #define HASH_FUNCTION(v, s, h) {      \
