@@ -2080,7 +2080,7 @@ BLOSC_EXPORT int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uin
 
 static inline void swap_store(void *dest, const void *pa, int size) {
   uint8_t *pa_ = (uint8_t *) pa;
-  uint8_t *pa2_ = malloc((size_t) size);
+  uint8_t *pa2_ = (uint8_t*)malloc((size_t) size);
   int i = 1; /* for big/little endian detection */
   char *p = (char *) &i;
 
@@ -2141,7 +2141,7 @@ static inline int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8
     return nmetalayer;
   }
   *content_len = schunk->metalayers[nmetalayer]->content_len;
-  *content = malloc((size_t)*content_len);
+  *content = (uint8_t*)malloc((size_t)*content_len);
   memcpy(*content, schunk->metalayers[nmetalayer]->content, (size_t)*content_len);
   return nmetalayer;
 }

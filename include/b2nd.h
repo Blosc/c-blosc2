@@ -573,7 +573,7 @@ static inline int b2nd_deserialize_meta(
     int dtype_len;
     swap_store(&dtype_len, pmeta, sizeof(int32_t));
     pmeta += sizeof(int32_t);
-    *dtype = malloc(dtype_len + 1);
+    *dtype = (char*)malloc(dtype_len + 1);
     char* dtype_ = *dtype;
     memcpy(dtype_, (char*)pmeta, dtype_len);
     dtype_[dtype_len] = '\0';
