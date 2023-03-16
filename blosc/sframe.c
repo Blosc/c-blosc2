@@ -34,6 +34,10 @@ void* sframe_open_index(const char* urlpath, const char* mode, const blosc2_io *
     }
     fp = io_cb->open(index_path, mode, io->params);
     free(index_path);
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Error creating index path in: %s", index_path);
+      return NULL;
+    }
   }
   return fp;
 }
@@ -51,6 +55,10 @@ void* sframe_open_chunk(const char* urlpath, int64_t nchunk, const char* mode, c
     }
     fp = io_cb->open(chunk_path, mode, io->params);
     free(chunk_path);
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Error opening chunk path in: %s", chunk_path);
+      return NULL;
+    }
   }
   return fp;
 }

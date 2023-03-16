@@ -380,18 +380,22 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
     int64_t rbytes = 0;
     void* fp = NULL;
     if (frame->sframe) {
-      fp = sframe_open_index(frame->urlpath, "rb",
-                             io);
+      fp = sframe_open_index(frame->urlpath, "rb", io);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
     }
     else {
       fp = io_cb->open(frame->urlpath, "rb", io->params);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
       io_cb->seek(fp, frame->file_offset, SEEK_SET);
     }
-    if (fp != NULL) {
-      rbytes = io_cb->read(header, 1, FRAME_HEADER_MINLEN, fp);
-      io_cb->close(fp);
-    }
-    (void) rbytes;
+    rbytes = io_cb->read(header, 1, FRAME_HEADER_MINLEN, fp);
+    io_cb->close(fp);
     if (rbytes != FRAME_HEADER_MINLEN) {
       return BLOSC2_ERROR_FILE_READ;
     }
@@ -527,6 +531,10 @@ int update_frame_len(blosc2_frame_s* frame, int64_t len) {
     }
     else {
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
+    }
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+      return BLOSC2_ERROR_FILE_OPEN;
     }
     io_cb->seek(fp, frame->file_offset + FRAME_LEN, SEEK_SET);
     int64_t swap_len;
@@ -733,7 +741,7 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
     }
     if (fp == NULL) {
-      BLOSC_TRACE_ERROR("Cannot open the frame for reading and writing.");
+      BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
       return BLOSC2_ERROR_FILE_OPEN;
     }
     io_cb->seek(fp, frame->file_offset + trailer_offset, SEEK_SET);
@@ -817,6 +825,10 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
         urlpath_cpy = malloc(strlen(urlpath) + 1);
         strcpy(urlpath_cpy, urlpath);
         fp = io_cb->open(urlpath, "rb", io->params);
+    }
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Error opening file in: %s", urlpath);
+      return NULL;
     }
     io_cb->seek(fp, offset, SEEK_SET);
     int64_t rbytes = io_cb->read(header, 1, FRAME_HEADER_MINLEN, fp);
@@ -997,6 +1009,10 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     else {
       fp = io_cb->open(frame->urlpath, "wb", frame->schunk->storage->io->params);
     }
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Error creating file in: %s", frame->urlpath);
+      return BLOSC2_ERROR_FILE_OPEN;
+    }
     io_cb->write(h2, h2len, 1, fp);
   }
   free(h2);
@@ -1121,10 +1137,18 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
   if (frame->sframe) {
     fp = sframe_open_index(frame->urlpath, "rb",
                            frame->schunk->storage->io);
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+      return NULL;
+    }
     io_cb->seek(fp, header_len + 0, SEEK_SET);
   }
   else {
     fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+      return NULL;
+    }
     io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
   }
   int64_t rbytes = io_cb->read(coffsets, 1, coffsets_cbytes, fp);
@@ -1210,9 +1234,17 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
     if (frame->sframe) {
       fp = sframe_open_index(frame->urlpath, "rb+",
                              frame->schunk->storage->io);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
     }
     else {
       fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
       io_cb->seek(fp, frame->file_offset, SEEK_SET);
     }
     if (fp != NULL) {
@@ -1255,11 +1287,13 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
     else {
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
     }
-    if (fp != NULL) {
-      io_cb->seek(fp, frame->file_offset, SEEK_SET);
-      io_cb->write(h2, h2len, 1, fp);
-      io_cb->close(fp);
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+      return BLOSC2_ERROR_FILE_OPEN;
     }
+    io_cb->seek(fp, frame->file_offset, SEEK_SET);
+    io_cb->write(h2, h2len, 1, fp);
+    io_cb->close(fp);
   }
   else {
     if (new) {
@@ -1417,9 +1451,17 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     if (frame->sframe) {
       fp = sframe_open_index(frame->urlpath, "rb",
                              frame->schunk->storage->io);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
     }
     else {
       fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
       io_cb->seek(fp, frame->file_offset, SEEK_SET);
     }
     if (fp != NULL) {
@@ -1599,10 +1641,18 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = io_cb->open(eframe_name, "rb", frame->schunk->storage->io->params);
       free(eframe_name);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", eframe_name);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
       io_cb->seek(fp, trailer_offset, SEEK_SET);
     }
     else {
       fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
       io_cb->seek(fp, frame->file_offset + trailer_offset, SEEK_SET);
     }
     if (fp != NULL) {
@@ -1768,6 +1818,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
       // If not the chunks won't be in the frame
       fp = io_cb->open(frame->urlpath, "rb", udio->params);
       if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
         rc = BLOSC2_ERROR_FILE_OPEN;
         goto end;
       }
@@ -2061,6 +2112,10 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
   if (frame->cframe == NULL) {
     uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
     void* fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+      return BLOSC2_ERROR_FILE_OPEN;
+    }
     io_cb->seek(fp, frame->file_offset + header_len + offset, SEEK_SET);
     int64_t rbytes = io_cb->read(header, 1, sizeof(header), fp);
     if (rbytes != sizeof(header)) {
@@ -2175,9 +2230,17 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       // The chunk is not in the frame
       fp = sframe_open_chunk(frame->urlpath, offset, "rb",
                              frame->schunk->storage->io);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
     }
     else {
       fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
       io_cb->seek(fp, frame->file_offset + header_len + offset, SEEK_SET);
     }
     int64_t rbytes = io_cb->read(header, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
@@ -2445,11 +2508,19 @@ int64_t frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_va
     if (frame->sframe) {
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+", frame->schunk->storage->io);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
       io_cb->seek(fp, frame->file_offset + header_len, SEEK_SET);
     }
     else {
       // Regular frame
       fp = io_cb->open(frame->urlpath, "rb+", schunk->storage->io->params);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
       io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
     }
     wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
@@ -2670,11 +2741,19 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
       }
       fp = sframe_open_index(frame->urlpath, "rb+",
                              frame->schunk->storage->io);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return NULL;
+      }
       io_cb->seek(fp, frame->file_offset + header_len, SEEK_SET);
     }
     else {
       // Regular frame
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return NULL;
+      }
       io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
       wbytes = io_cb->write(chunk, 1, chunk_cbytes, fp);  // the new chunk
       if (wbytes != chunk_cbytes) {
@@ -2872,11 +2951,19 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+",
                              frame->schunk->storage->io);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return NULL;
+      }
       io_cb->seek(fp, frame->file_offset + header_len + 0, SEEK_SET);
     }
     else {
       // Regular frame
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return NULL;
+      }
       io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
       wbytes = io_cb->write(chunk, 1, chunk_cbytes, fp);  // the new chunk
       if (wbytes != chunk_cbytes) {
@@ -3110,11 +3197,19 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+",
                              frame->schunk->storage->io);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return NULL;
+      }
       io_cb->seek(fp, frame->file_offset + header_len + 0, SEEK_SET);
     }
     else {
       // Regular frame
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return NULL;
+      }
       io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
       wbytes = io_cb->write(chunk, 1, chunk_cbytes, fp);  // the new chunk
       if (wbytes != chunk_cbytes) {
@@ -3268,11 +3363,19 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
       }
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+", frame->schunk->storage->io);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return NULL;
+      }
       io_cb->seek(fp, frame->file_offset + header_len + 0, SEEK_SET);
     }
     else {
       // Regular frame
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return NULL;
+      }
       io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
     }
     wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
@@ -3407,11 +3510,19 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
       // Update the offsets chunk in the chunks frame
       fp = sframe_open_index(frame->urlpath, "rb+",
                              frame->schunk->storage->io);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
       io_cb->seek(fp, frame->file_offset + header_len + 0, SEEK_SET);
     }
     else {
       // Regular frame
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
       io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
     }
     int64_t wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, fp);  // the new offsets
