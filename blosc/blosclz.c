@@ -423,7 +423,10 @@ int blosclz_compress(const int clevel, const void* input, int length,
   uint8_t* ibase = (uint8_t*)input;
 
   // Experiments say that checking 1/4 of the buffer is enough to figure out approx cratio
-  int maxlen = length / 4;
+  // UPDATE: new experiments with ERA5 datasets (float32) say that checking the whole buffer (1)
+  // is better (specially when combined with bitshuffle).
+  // The loss in speed for checking the whole buffer is pretty negligible too.
+  int maxlen = length / 1;
   // Start probing somewhere inside the buffer
   int shift = length - maxlen;
   // Actual entropy probing!
@@ -437,25 +440,15 @@ int blosclz_compress(const int clevel, const void* input, int length,
   /* When we go back in a match (shift), we obtain quite different compression properties.
    * It looks like 4 is more useful in combination with bitshuffle and small typesizes
    * Fallback to 4 because it provides more consistent results for large cratios.
+   * UPDATE: new experiments show that using a value of 3 is a bit better, at least for ERA5.
    *
    * In this block we also check cratios for the beginning of the buffers and
    * eventually discard those that are small (take too long to decompress).
    * This process is called _entropy probing_.
    */
-  unsigned ipshift = 4;
-  // Compute optimal shift and minimum lengths for encoding
-  // Use 4 by default, except for low entropy data, where we should do a best effort
-  unsigned minlen = 4;
-  // BloscLZ works better with splits mostly, so when data is not split, do a best effort
-  const int split_block = !((ctx->header_flags & 0x10) >> 4);
-  // Why using cratio < 4 is based in experiments with low and high entropy
-  if (!split_block || cratio < 4) {
-    ipshift = 3;
-    minlen = 3;
-  }
-  else {
-    minlen = 4;
-  }
+  unsigned ipshift = 3;
+  // Minimum lengths for encoding (normally it is good to match the shift value)
+  unsigned minlen = 3;
 
   uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};

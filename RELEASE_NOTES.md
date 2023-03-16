@@ -4,7 +4,8 @@ Release notes for C-Blosc2
 Changes from 2.7.1 to 2.7.2
 ===========================
 
-#XXX version-specific blurb XXX#
+* Minor improvements in BloscLZ, leading to better compression ratios in general.
+  BLoscLZ version bumped to 2.5.2.
 
 
 Changes from 2.6.1 to 2.7.1
