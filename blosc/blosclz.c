@@ -23,8 +23,9 @@
 
 /*
  * Give hints to the compiler for branch prediction optimization.
+ * This is not necessary anymore with modern CPUs.
  */
-#if defined(__GNUC__) && (__GNUC__ > 2)
+#if 0 && defined(__GNUC__) && (__GNUC__ > 2)
 #define BLOSCLZ_LIKELY(c)    (__builtin_expect((c), 1))
 #define BLOSCLZ_UNLIKELY(c)  (__builtin_expect((c), 0))
 #else
@@ -423,10 +424,16 @@ int blosclz_compress(const int clevel, const void* input, int length,
   uint8_t* ibase = (uint8_t*)input;
 
   // Experiments say that checking 1/4 of the buffer is enough to figure out approx cratio
-  // UPDATE: new experiments with ERA5 datasets (float32) say that checking the whole buffer (1)
+  // UPDATE: new experiments with ERA5 datasets (float32) say that checking the whole buffer
   // is better (specially when combined with bitshuffle).
   // The loss in speed for checking the whole buffer is pretty negligible too.
-  int maxlen = length / 1;
+  int maxlen = length;
+  if (clevel < 4) {
+    maxlen /= 4;
+  }
+  else if (clevel < 7) {
+    maxlen /= 2;
+  }
   // Start probing somewhere inside the buffer
   int shift = length - maxlen;
   // Actual entropy probing!
@@ -743,10 +750,10 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
       }
       else {
         // general copy with any overlap
-#if defined(__AVX2__)
+#if 0 && defined(__AVX2__)
         if (op - ref <= 16) {
           // This is not faster on a combination of compilers (clang, gcc, icc) or machines, but
-          // it is not slower either.  Let's activate here for experimentation.
+          // it is not too slower either.
           op = copy_match_16(op, ref, len);
         }
         else {
