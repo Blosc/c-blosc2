@@ -821,9 +821,14 @@ void* load_lib(char *plugin_name, char *path) {
     return NULL;
   }
 #if defined(_WIN32)
-  sprintf(path, "%sblosc2_%s/libblosc2_%s.dll", g_python_path, plugin_name, plugin_name);
+  sprintf(path, "%s%s/lib%s.dll", g_python_path, plugin_name, plugin_name);
 #else
-  sprintf(path, "%sblosc2_%s/libblosc2_%s.so", g_python_path, plugin_name, plugin_name);
+  sprintf(path, "%s%s/lib%s.so", g_python_path, plugin_name, plugin_name);
+  void* loaded_lib = dlopen(path, RTLD_LAZY);
+  if (loaded_lib != NULL) {
+    return loaded_lib;
+  }
+  sprintf(path, "%s%s/lib%s.dylib", g_python_path, plugin_name, plugin_name);  
 #endif
 
   return dlopen(path, RTLD_LAZY);
