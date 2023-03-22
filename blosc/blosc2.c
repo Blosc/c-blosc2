@@ -20,6 +20,7 @@
 #include "blosc2.h"
 #include "blosc-private.h"
 #include "../plugins/codecs/zfp/blosc2-zfp.h"
+#include "blosc2/plugins-utils.h"
 #include "frame.h"
 
 
@@ -70,32 +71,6 @@
   #include "win32/pthread.c"
 #endif
 
-#if defined(_WIN32)
-#include <windows.h>
-#define PATH_MAX MAX_PATH
-#define RTLD_LAZY   0x000
-#define popen _popen
-#define pclose _pclose
-
-void *dlopen (const char *filename, int flags) {
-  HINSTANCE hInst;
-  hInst = LoadLibrary(filename);
-
-  return hInst;
-}
-
-void *dlsym(void *handle, const char *name) {
-  FARPROC fp;
-  fp = GetProcAddress ((HINSTANCE)handle, name);
-  return (void *)(intptr_t)fp;
-}
-
-void dlclose(void *handle) {
-  FreeLibrary ((HINSTANCE)handle);
-}
-#else
-#include <dlfcn.h>
-#endif
 
 /* Synchronization variables */
 
@@ -117,9 +92,6 @@ uint8_t g_ncodecs = 0;
 
 static blosc2_filter g_filters[256] = {0};
 static uint64_t g_nfilters = 0;
-
-// Python path for dynamically loaded plugins
-static char g_python_path[PATH_MAX] = {0};
 
 static blosc2_io_cb g_io[256] = {0};
 static uint64_t g_nio = 0;
@@ -807,26 +779,6 @@ static int blosc2_initialize_context_from_header(blosc2_context* context, blosc_
   }
 
   return 0;
-}
-
-
-void* load_lib(char *plugin_name, char *path) {
-  if (strlen(g_python_path) == 0) {
-    BLOSC_TRACE_ERROR("Could not find python path");
-    return NULL;
-  }
-#if defined(_WIN32)
-  sprintf(path, "%s%s/lib%s.dll", g_python_path, plugin_name, plugin_name);
-#else
-  sprintf(path, "%s%s/lib%s.so", g_python_path, plugin_name, plugin_name);
-  void* loaded_lib = dlopen(path, RTLD_LAZY);
-  if (loaded_lib != NULL) {
-    return loaded_lib;
-  }
-  sprintf(path, "%s%s/lib%s.dylib", g_python_path, plugin_name, plugin_name);  
-#endif
-
-  return dlopen(path, RTLD_LAZY);
 }
 
 
@@ -3720,10 +3672,6 @@ void blosc2_init(void) {
 #if defined(HAVE_PLUGINS)
   #include "blosc2/blosc2-common.h"
   #include "blosc2/blosc2-stdio.h"
-  FILE *fp = popen("python -c \"exec(\\\"import sys\\npaths=sys.path\\nfor p in paths:\\n\\tif 'site-packages' in p:"
-                   "\\n \\t\\tprint(p+'/', end='')\\n \\t\\tbreak\\\")\"", "r");
-  fgets(g_python_path, PATH_MAX, fp);
-  pclose(fp);
   register_codecs();
   register_filters();
 #endif
