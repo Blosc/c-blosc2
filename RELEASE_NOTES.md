@@ -1,13 +1,19 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.7.1 to 2.7.2
+Changes from 2.7.1 to 2.8.0
 ===========================
+
+* New bytedelta filter added.  SIMD support for Intel and ARM platforms is there.
+  We have blogged about this: https://www.blosc.org/posts/bytedelta-enhance-compression-toolset.rst
+  Thanks to Aras Pranckevičius for inspiration and initial implementation.
 
 * Minor improvements in BloscLZ, leading to better compression ratios in general.
   BLoscLZ version bumped to 2.5.2.
 
 * Updated internal zlib-ng to 2.0.7.
+
+* Used `const` qualifier where possible in b2nd.  Thanks to @cf-natali.
 
 
 Changes from 2.6.1 to 2.7.1
