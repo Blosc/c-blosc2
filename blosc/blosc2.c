@@ -1792,34 +1792,30 @@ static int blosc_d(
           }
         } else if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) &&
                    (context->codec_params != NULL)) {
-          int8_t ndim = context->schunk->ndim;
           int8_t cellshape = 4;
           zfp_dparams *zfp_params = (zfp_dparams*) context->codec_params;
           int32_t ncells = zfp_params->ncells;
+          int8_t ndim = zfp_params->ndim;
 
           int32_t cell_bytes;
-          int32_t cell_size = ndim * cellshape;
+          int32_t cell_size = pow(cellshape, ndim) * typesize;
           bool *cell_maskout = zfp_params->cell_maskout;
+          nbytes = 0;
           for (int ncell = 0; ncell < ncells; ncell++) {
-            if (cell_maskout[nblock * ncells + ncell]) {
-              cell_bytes = zfp_getcell(context, ncell, src, cbytes, _dest + ncell * cell_size, neblock);
+            if (! cell_maskout[nblock * ncells + ncell]) {
+              printf("\nGet cell %d from block %d", ncell, nblock);
+              cell_bytes = zfp_getcell(context, ncell, src, cbytes, _dest + ncell * cell_size, cell_size);
+              /*printf("\nDecompressed cell:\n");
+              for (int i = 0; i < (cell_size / typesize); ++i) {
+                printf("%lu, ", ((uint64_t*) (_dest + ncell * cell_size))[i]);
+              }*/
               if (cell_bytes != cell_size) {
                 return BLOSC2_ERROR_DATA;
               }
-              nbytes += cell_bytes;
             }
+            nbytes += cell_size;
           }
-          if (nbytes == ncells * cell_size) {
-            getcell = true;
-          }
-          printf("\nFrom codec_params:\n");
-          for (int ncell = 0; ncell < ncells; ncell++) {
-            if ((zfp_params->cell_maskout[ncell])) {
-              printf("1, ");
-            } else {
-              printf("0, ");
-            }
-          }
+          getcell = true;
         }
   #endif /* HAVE_PLUGINS */
         if (!getcell) {
@@ -1854,7 +1850,7 @@ static int blosc_d(
       }
 
       /* Check that decompressed bytes number is correct */
-      if ((nbytes != neblock) && (thread_context->zfp_cell_nitems == 0)) {
+      if ((nbytes != neblock) && (thread_context->zfp_cell_nitems == 0) && (context->codec_params == NULL)) {
         return BLOSC2_ERROR_DATA;
       }
 
@@ -3793,6 +3789,13 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     }
   }
 
+#if defined(HAVE_PLUGINS)
+#include "blosc2/codecs-registry.h"
+  if ((context->compcode >= BLOSC_CODEC_ZFP_FIXED_ACCURACY) && (context->compcode <= BLOSC_CODEC_ZFP_FIXED_RATE)) {
+    context->filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOFILTER;
+  }
+#endif /* HAVE_PLUGINS */
+
   /* Check for a BLOSC_SHUFFLE environment variable */
   int doshuffle = -1;
   char* envvar = getenv("BLOSC_SHUFFLE");
@@ -4054,6 +4057,27 @@ int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks) {
   memcpy(maskout_, maskout, nblocks);
   ctx->block_maskout = maskout_;
   ctx->block_maskout_nitems = nblocks;
+
+  return 0;
+}
+
+
+/* Set a maskout in ZFP params */
+int zfp_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks, int ncells, int8_t ndim) {
+
+  if (ctx->codec_params != NULL) {
+    // Get rid of a possible mask here
+    free(ctx->codec_params);
+  }
+
+  bool *maskout_ = malloc(nblocks * ncells);
+  BLOSC_ERROR_NULL(maskout_, BLOSC2_ERROR_MEMORY_ALLOC);
+  memcpy(maskout_, maskout, nblocks * ncells);
+  zfp_dparams zfp_params = {0};
+  zfp_params.cell_maskout = maskout_;
+  zfp_params.ncells = ncells;
+  zfp_params.ndim = ndim;
+  ctx->codec_params = (void*) &zfp_params;
 
   return 0;
 }
@@ -4369,18 +4393,18 @@ blosc2_io_cb *blosc2_get_io_cb(uint8_t id) {
 }
 
 void blosc2_unidim_to_multidim(uint8_t ndim, int64_t *shape, int64_t i, int64_t *index) {
-    int64_t strides[BLOSC2_MAX_DIM];
+  int64_t strides[BLOSC2_MAX_DIM];
   if (ndim == 0) {
     return;
   }
   strides[ndim - 1] = 1;
     for (int j = ndim - 2; j >= 0; --j) {
-        strides[j] = shape[j + 1] * strides[j + 1];
+      strides[j] = shape[j + 1] * strides[j + 1];
     }
 
     index[0] = i / strides[0];
     for (int j = 1; j < ndim; ++j) {
-        index[j] = (i % strides[j - 1]) / strides[j];
+      index[j] = (i % strides[j - 1]) / strides[j];
     }
 }
 

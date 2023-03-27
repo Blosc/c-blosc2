@@ -32,6 +32,7 @@ extern "C" {
 typedef struct {
   bool* cell_maskout; // Array of cell maskouts for each block
   int32_t ncells; // Number of cells of each block
+  int8_t ndim;
 } zfp_dparams;
 
 #if defined (__cplusplus)

@@ -1088,7 +1088,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int64_t nchunk,
     }
 
     chunksize = blosc2_decompress_ctx(schunk->dctx, src, chunk_cbytes, dest, nbytes);
-    if (chunksize < 0 || chunksize != chunk_nbytes) {
+    if (chunksize < 0 || (chunksize != chunk_nbytes && schunk->dctx->codec_params == NULL)) {
       BLOSC_TRACE_ERROR("Error in decompressing chunk.");
       if (chunksize < 0)
         return chunksize;

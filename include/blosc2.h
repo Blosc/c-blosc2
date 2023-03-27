@@ -1287,6 +1287,28 @@ BLOSC_EXPORT int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dpa
 BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks);
 
 /**
+ * @brief Set a maskout so as to avoid decompressing specified cells.
+ *
+ * @param ctx The decompression context to update.
+ *
+ * @param maskout The boolean mask for the cells where decompression
+ * is to be avoided.
+ *
+ * @remark The maskout is valid for contexts *only* meant for decompressing
+ * a chunk via #blosc2_decompress_ctx.  Once a call to #blosc2_decompress_ctx
+ * is done, this mask is reset so that next call to #blosc2_decompress_ctx
+ * will decompress the whole chunk.
+ *
+ * @param nblocks The number of blocks in maskout above.
+ * @param ncells The number of cells in each block.
+ * @param ndim The number of dimensions.
+ *
+ * @return If success, a 0 is returned.  An error is signaled with a negative int.
+ *
+ */
+int zfp_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks, int ncells, int8_t ndim);
+
+/**
  * @brief Compress a block of data in the @p src buffer and returns the size of
  * compressed block.
  *

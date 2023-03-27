@@ -664,6 +664,8 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     update_nchunks *= update_shape[i];
   }
 
+  bool* cell_maskout = NULL;
+  bool enable_zfp = true;
   for (int update_nchunk = 0; update_nchunk < update_nchunks; ++update_nchunk) {
     int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
     blosc2_unidim_to_multidim(ndim, update_shape, update_nchunk, nchunk_ndim);
@@ -699,7 +701,6 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     int64_t ncell_ndim[B2ND_MAX_DIM] = {0};
     int64_t cell_start[B2ND_MAX_DIM] = {0};
     int64_t cell_stop[B2ND_MAX_DIM] = {0};
-    bool enable_zfp = true;
 
     if (set_slice) {
       // Check if all the chunk is going to be updated and avoid the decompression
@@ -726,10 +727,21 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   #include "blosc2/codecs-registry.h"
       int32_t *blockshape = array->blockshape;
       int32_t extblockshape[B2ND_MAX_DIM];
+      bool to_cbuffer = true;
       for(int i = 0; i < ndim; i++) {
-        if(blockshape[i] < 4) {
-          enable_zfp = false;
+        if ((start[i] != 0) || (stop[i] != array->shape[i])) {
+          to_cbuffer = false;
           break;
+        }
+      }
+      if (to_cbuffer) {
+        enable_zfp = false;
+      } else {
+        for(int i = 0; i < ndim; i++) {
+          if (blockshape[i] < 4) {
+            enable_zfp = false;
+            break;
+          }
         }
       }
       if ((array->sc->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && enable_zfp) {
@@ -745,7 +757,8 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
           ncells *= cells_in_block[i];
         }
       }
-      bool cell_maskout[nblocks][ncells];
+      cell_maskout = malloc(nblocks * ncells);
+      BLOSC_ERROR_NULL(cell_maskout, BLOSC2_ERROR_MEMORY_ALLOC);
 #endif /* HAVE_PLUGINS */
 
       for (int nblock = 0; nblock < nblocks; ++nblock) {
@@ -779,7 +792,6 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   #include "../plugins/codecs/zfp/zfp-private.h"
   #include "blosc2/codecs-registry.h"
         bool cell_empty;
-        zfp_dparams zfp_params = {0};
         if ((array->sc->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && (!block_empty) && enable_zfp) {
           for (int ncell = 0; ncell < ncells; ncell++) {
             blosc2_unidim_to_multidim(ndim, cells_in_block, ncell, ncell_ndim);
@@ -803,31 +815,8 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
             for (int i = 0; i < ndim; ++i) {
               cell_empty |= (cell_stop[i] <= start[i] || cell_start[i] >= stop[i]);
             }
-            cell_maskout[nblock][ncell] = cell_empty ? true : false;
+            cell_maskout[nblock * ncells + ncell] = cell_empty ? true : false;
           }
-          zfp_params.cell_maskout = (bool*) cell_maskout;
-          zfp_params.ncells = ncells;
-          array->sc->dctx->codec_params = (void*) &zfp_params;
-          if(nblock == 0) {
-            printf("\nBlock %d, cell_maskout:\n", nblock);
-            for (int ncell = 0; ncell < ncells; ncell++) {
-              if (cell_maskout[nblock][ncell]) {
-                printf("1, ");
-              } else {
-                printf("0, ");
-              }
-            }
-            zfp_dparams *zfp_auxp = (zfp_dparams *) array->sc->dctx->codec_params;
-            printf("\nFrom codec_params:\n");
-            for (int ncell = 0; ncell < ncells; ncell++) {
-              if ((zfp_auxp->cell_maskout[nblock * ncells + ncell])) {
-                printf("1, ");
-              } else {
-                printf("0, ");
-              }
-            }
-          }
-
         }
 #endif /* HAVE_PLUGINS */
       }
@@ -836,6 +825,20 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
         BLOSC_TRACE_ERROR("Error setting the maskout");
         BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
+
+#if defined(HAVE_PLUGINS)
+      zfp_dparams zfp_params = {0};
+      if ((array->sc->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) && enable_zfp) {
+        zfp_params.cell_maskout = (bool *) cell_maskout;
+        zfp_params.ncells = ncells;
+        zfp_params.ndim = ndim;
+        array->sc->dctx->codec_params = (void *) &zfp_params;
+        /*if (zfp_set_maskout(array->sc->dctx, cell_maskout, nblocks, ncells, ndim) != BLOSC2_ERROR_SUCCESS) {
+          BLOSC_TRACE_ERROR("Error setting the cell maskout");
+          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+        }*/
+      }
+#endif /* HAVE_PLUGINS */
 
       int err = blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes);
       if (err < 0) {
@@ -847,8 +850,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     }
 
     // Iterate over blocks
-
-    for (int nblock = 0; nblock < nblocks; ++nblock) {
+    for (int64_t nblock = 0; nblock < nblocks; ++nblock) {
       int64_t nblock_ndim[B2ND_MAX_DIM] = {0};
       blosc2_unidim_to_multidim(ndim, blocks_in_chunk, nblock, nblock_ndim);
 
@@ -910,7 +912,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
 
           // Check if the cell needs to be extracted
           zfp_params = (zfp_dparams*) array->sc->dctx->codec_params;
-          if(! zfp_params->cell_maskout[nblock * ncells + ncell]) {
+          if(zfp_params->cell_maskout[nblock * ncells + ncell]) {
             continue;
           }
 
@@ -948,6 +950,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
             zfp_slice_stop[i] += cell_start[i];
           }
 
+          cellnitems = 1;
           for (int i = 0; i < ndim; ++i) {
             dest_start[i] = zfp_slice_start[i] - buffer_start[i];
             cellnitems *= cellshape;
@@ -957,10 +960,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
           for (int i = 0; i < ndim; ++i) {
             zfp_src_pad_shape[i] = cellshape;
           }
-          printf("Zfp_src:\n");
-          for (int i = 0; i < cellnitems; ++i) {
-            printf("%u, ", zfp_src[i]);
-          }
+
           for (int i = 0; i < ndim; ++i) {
             zfp_src_start[i] = zfp_slice_start[i] - cell_start[i];
             zfp_src_stop[i] = zfp_slice_stop[i] - cell_start[i];
@@ -1051,6 +1051,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
         BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
     }
+    free(cell_maskout);
   }
 
   free(data);
@@ -2077,6 +2078,14 @@ b2nd_create_ctx(const blosc2_storage *b2_storage, int8_t ndim, const int64_t *sh
   for (int i = 0; i < nmetalayers; ++i) {
     ctx->metalayers[i] = metalayers[i];
   }
+
+#if defined(HAVE_PLUGINS)
+#include "blosc2/codecs-registry.h"
+  if ((ctx->b2_storage->cparams->compcode >= BLOSC_CODEC_ZFP_FIXED_ACCURACY) &&
+      (ctx->b2_storage->cparams->compcode <= BLOSC_CODEC_ZFP_FIXED_RATE)) {
+    ctx->b2_storage->cparams->filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOFILTER;
+  }
+#endif /* HAVE_PLUGINS */
 
   return ctx;
 }

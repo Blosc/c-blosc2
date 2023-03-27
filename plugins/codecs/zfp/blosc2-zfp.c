@@ -30,15 +30,16 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   int32_t *blockshape = malloc(8 * sizeof(int32_t));
   uint8_t *smeta;
   int32_t smeta_len;
-  if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
-    printf("Blosc error");
-    free(shape);
-    free(chunkshape);
-    free(blockshape);
-    return -1;
-  }
+  BLOSC_ERROR (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len));
   deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
   free(smeta);
+
+  for(int i = 0; i < ndim; i++) {
+    if (blockshape[i] < 4) {
+      BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4");
+      return BLOSC2_ERROR_FAILURE;
+    }
+  }
 
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
@@ -237,15 +238,16 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   int32_t *blockshape = malloc(8 * sizeof(int32_t));
   uint8_t *smeta;
   int32_t smeta_len;
-  if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
-    printf("Blosc error");
-    free(shape);
-    free(chunkshape);
-    free(blockshape);
-    return -1;
-  }
+  BLOSC_ERROR (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len));
   deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
   free(smeta);
+
+  for(int i = 0; i < ndim; i++) {
+    if (blockshape[i] < 4) {
+      BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4");
+      return BLOSC2_ERROR_FAILURE;
+    }
+  }
 
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
@@ -494,15 +496,16 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   int32_t *blockshape = malloc(8 * sizeof(int32_t));
   uint8_t *smeta;
   int32_t smeta_len;
-  if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
-    printf("Blosc error");
-    free(shape);
-    free(chunkshape);
-    free(blockshape);
-    return -1;
-  }
+  BLOSC_ERROR (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len));
   deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
   free(smeta);
+
+  for(int i = 0; i < ndim; i++) {
+    if (blockshape[i] < 4) {
+      BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4");
+      return BLOSC2_ERROR_FAILURE;
+    }
+  }
 
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
@@ -583,7 +586,7 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   stream_aux = stream_open(aux_out, zfp_maxout);
   zfp_stream_set_bit_stream(zfp_aux, stream_aux);
   zfp_stream_rewind(zfp_aux);
-  zfp_stream_set_rate(zfp_aux, rate, type, ndim, zfp_false);
+  double act_rate = zfp_stream_set_rate(zfp_aux, rate, type, ndim, zfp_false);
 
   zfpsize = zfp_compress(zfp_aux, field);
 
@@ -876,9 +879,9 @@ int zfp_getitem(void *thread_context, const uint8_t *block, int32_t cbytes, uint
   stream_close(stream);
   free(cell);
 
-  if ((zfpsize == 0) || ((int32_t) zfpsize > (destsize * 8)) ||
-      ((int32_t) zfpsize > (cell_nitems * typesize * 8)) ||
-      ((thread_ctx->zfp_cell_nitems * typesize * 8) > (int32_t) zfpsize)) {
+  if ((zfpsize == 0) || ((int32_t) zfpsize > (destsize * 8 * sizeof(uint8_t))) ||
+      ((int32_t) zfpsize > (cell_nitems * typesize * 8 * sizeof(uint8_t))) ||
+      ((thread_ctx->zfp_cell_nitems * typesize * 8 * sizeof(uint8_t)) > (int32_t) zfpsize)) {
     BLOSC_TRACE_ERROR("ZFP error or small destsize");
     return -1;
   }
@@ -892,10 +895,20 @@ int zfp_getcell(blosc2_context *context, int32_t ncell, const uint8_t *block, in
   zfp_type type;     /* array scalar type */
   zfp_stream *zfp;   /* compressed stream */
   bitstream *stream; /* bit stream to write to or read from */
-  int32_t typesize = context->typesize;
-  int8_t ndim = context->schunk->ndim;
-  zfp = zfp_stream_open(NULL);
+  bool meta = false;
+  zfp_dparams *zfp_params = (zfp_dparams*) context->codec_params;
+  int32_t ncells = zfp_params->ncells;
+  int8_t ndim = zfp_params->ndim;
 
+  // Check that ncell is a valid index
+
+  if (ncell >= ncells) {
+    BLOSC_TRACE_ERROR("Invalid cell index");
+    return -1;
+  }
+
+  int32_t typesize = context->typesize;
+  zfp = zfp_stream_open(NULL);
   switch (typesize) {
     case sizeof(float):
       type = zfp_type_float;
@@ -910,21 +923,13 @@ int zfp_getcell(blosc2_context *context, int32_t ncell, const uint8_t *block, in
   uint8_t compmeta = context->compcode_meta;   // access to compressed chunk header
   double rate = (double) (compmeta * typesize * 8) /
                 100.0;     // convert from output size / input size to output bits per input value
-  zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
-
+  double actual_rate = zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
   stream = stream_open((void *) block, cbytes);
   zfp_stream_set_bit_stream(zfp, stream);
   zfp_stream_rewind(zfp);
 
-  // Check that ncell is a valid index
-  int ncells = (int) ((cbytes * 8) / zfp->maxbits);
-  if (ncell >= ncells) {
-    BLOSC_TRACE_ERROR("Invalid cell index");
-    return -1;
-  }
-
   // Position the stream at the ncell bit offset for reading
-  stream_rseek(zfp->stream, (size_t) (ncell * zfp->maxbits));
+  stream_rseek(zfp->stream, (size_t) ((int64_t) ncell * zfp->maxbits));
 
   // Get the cell
   size_t zfpsize;
@@ -1000,11 +1005,12 @@ int zfp_getcell(blosc2_context *context, int32_t ncell, const uint8_t *block, in
   stream_close(stream);
   free(cell);
 
+  double compfact = actual_rate / (double) (typesize * 8);
   // Zfpsize is in bits, so multiply x8
-  if ((int32_t) zfpsize != (cell_nitems * typesize * 8)) {
+  if ((int32_t) ((double) zfpsize / compfact) != (cell_nitems * typesize * 8)) {
     BLOSC_TRACE_ERROR("ZFP error or small destsize");
     return -1;
   }
 
-  return (int) (zfpsize);
+  return cell_nitems * typesize;
 }
