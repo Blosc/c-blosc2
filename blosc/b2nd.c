@@ -1820,7 +1820,13 @@ b2nd_create_ctx(const blosc2_storage *b2_storage, int8_t ndim, const int64_t *sh
   #include "blosc2/codecs-registry.h"
   if ((ctx->b2_storage->cparams->compcode >= BLOSC_CODEC_ZFP_FIXED_ACCURACY) &&
       (ctx->b2_storage->cparams->compcode <= BLOSC_CODEC_ZFP_FIXED_RATE)) {
-    ctx->b2_storage->cparams->filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOFILTER;
+    for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+      if ((ctx->b2_storage->cparams->filters[i] == BLOSC_SHUFFLE) ||
+          (ctx->b2_storage->cparams->filters[i] == BLOSC_BITSHUFFLE)) {
+        BLOSC_TRACE_ERROR("ZFP cannot be run in presence of SHUFFLE / BITSHUFFLE");
+        return NULL;
+      }
+    }
   }
 #endif /* HAVE_PLUGINS */
 

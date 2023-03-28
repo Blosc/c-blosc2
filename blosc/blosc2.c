@@ -3729,9 +3729,17 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     }
   }
 
+#if defined(HAVE_PLUGINS)
+#include "blosc2/codecs-registry.h"
   if ((context->compcode >= BLOSC_CODEC_ZFP_FIXED_ACCURACY) && (context->compcode <= BLOSC_CODEC_ZFP_FIXED_RATE)) {
-    context->filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOFILTER;
+    for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+      if ((context->filters[i] == BLOSC_SHUFFLE) || (context->filters[i] == BLOSC_BITSHUFFLE)) {
+        BLOSC_TRACE_ERROR("ZFP cannot be run in presence of SHUFFLE / BITSHUFFLE");
+        return NULL;
+      }
+    }
   }
+#endif /* HAVE_PLUGINS */
 
   /* Check for a BLOSC_SHUFFLE environment variable */
   int doshuffle = -1;

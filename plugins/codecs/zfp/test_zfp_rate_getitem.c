@@ -26,8 +26,8 @@
 static int test_zfp_rate_getitem_float(blosc2_schunk *schunk) {
 
   if (schunk->typesize != 4) {
-    BLOSC_TRACE_ERROR("Error: This test is only for doubles.\n");
-    return BLOSC2_ERROR_FAILURE;
+    printf("Error: This test is only for doubles.\n");
+    return 0;
   }
   int64_t nchunks = schunk->nchunks;
   int32_t chunksize = (int32_t) (schunk->chunksize);
@@ -64,34 +64,34 @@ static int test_zfp_rate_getitem_float(blosc2_schunk *schunk) {
   for (int ci = 0; ci < nchunks; ci++) {
     decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
     if (decompressed < 0) {
-      BLOSC_TRACE_ERROR("Error decompressing chunk \n");
-      return BLOSC2_ERROR_FAILURE;
+      printf("Error decompressing chunk \n");
+      return -1;
     }
 
     /* Compress using ZFP fixed-rate  */
     csize = blosc2_compress_ctx(cctx, data_in, chunksize, chunk_zfp, chunksize + BLOSC2_MAX_OVERHEAD);
     if (csize == 0) {
-      BLOSC_TRACE_ERROR("Buffer is incompressible.  Giving up.\n");
-      return BLOSC2_ERROR_FAILURE;
+      printf("Buffer is incompressible.  Giving up.\n");
+      return -1;
     } else if (csize < 0) {
-      BLOSC_TRACE_ERROR("Compression error.  Error code: %" PRId64 "\n", csize);
+      printf("Compression error.  Error code: %" PRId64 "\n", csize);
       return (int) csize;
     }
     blosc2_cbuffer_sizes(chunk_zfp, &zfp_chunk_nbytes, &zfp_chunk_cbytes, NULL);
 
     decompressed = blosc2_decompress_ctx(dctx, chunk_zfp, zfp_chunk_cbytes, lossy_chunk, chunksize);
     if (decompressed < 0) {
-      BLOSC_TRACE_ERROR("Error decompressing chunk \n");
-      return BLOSC2_ERROR_FAILURE;
+      printf("Error decompressing chunk \n");
+      return -1;
     }
 
     /* Compress not using ZFP fixed-rate  */
     csize = blosc2_compress_ctx(schunk->cctx, lossy_chunk, chunksize, chunk_blosc, chunksize + BLOSC2_MAX_OVERHEAD);
     if (csize == 0) {
-      BLOSC_TRACE_ERROR("Buffer is incompressible.  Giving up.\n");
-      return BLOSC2_ERROR_FAILURE;
+      printf("Buffer is incompressible.  Giving up.\n");
+      return -1;
     } else if (csize < 0) {
-      BLOSC_TRACE_ERROR("Compression error.  Error code: %" PRId64 "\n", csize);
+      printf("Compression error.  Error code: %" PRId64 "\n", csize);
       return (int) csize;
     }
     blosc2_cbuffer_sizes(chunk_blosc, NULL, &blosc_chunk_cbytes, NULL);
@@ -110,12 +110,12 @@ static int test_zfp_rate_getitem_float(blosc2_schunk *schunk) {
       dsize_zfp = blosc2_getitem_ctx(dctx, chunk_zfp, zfp_chunk_cbytes,
                                      index, 1, &item_zfp, sizeof(item_zfp));
       if (dsize_blosc != dsize_zfp) {
-        BLOSC_TRACE_ERROR("Different amount of items gotten\n");
-        return BLOSC2_ERROR_FAILURE;
+        printf("Different amount of items gotten\n");
+        return -1;
       }
       if (item_blosc != item_zfp) {
-        BLOSC_TRACE_ERROR("\nIn index %d different items extracted zfp %f blosc %f\n", index, item_zfp, item_blosc);
-        return BLOSC2_ERROR_FAILURE;
+        printf("\nIn index %d different items extracted zfp %f blosc %f\n", index, item_zfp, item_blosc);
+        return -1;
       }
     }
   }
@@ -135,8 +135,8 @@ static int test_zfp_rate_getitem_float(blosc2_schunk *schunk) {
 static int test_zfp_rate_getitem_double(blosc2_schunk *schunk) {
 
   if (schunk->typesize != 8) {
-    BLOSC_TRACE_ERROR("Error: This test is only for doubles.\n");
-    return BLOSC2_ERROR_FAILURE;
+    printf("Error: This test is only for doubles.\n");
+    return -1;
   }
   int64_t nchunks = schunk->nchunks;
   int32_t chunksize = (int32_t) (schunk->chunksize);
@@ -173,34 +173,34 @@ static int test_zfp_rate_getitem_double(blosc2_schunk *schunk) {
   for (int ci = 0; ci < nchunks; ci++) {
     decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
     if (decompressed < 0) {
-      BLOSC_TRACE_ERROR("Error decompressing chunk \n");
-      return BLOSC2_ERROR_FAILURE;
+      printf("Error decompressing chunk \n");
+      return -1;
     }
 
     /* Compress using ZFP fixed-rate  */
     csize = blosc2_compress_ctx(cctx, data_in, chunksize, chunk_zfp, chunksize + BLOSC2_MAX_OVERHEAD);
     if (csize == 0) {
-      BLOSC_TRACE_ERROR("Buffer is incompressible.  Giving up.\n");
-      return BLOSC2_ERROR_FAILURE;
+      printf("Buffer is incompressible.  Giving up.\n");
+      return -1;
     } else if (csize < 0) {
-      BLOSC_TRACE_ERROR("Compression error.  Error code: %" PRId64 "\n", csize);
+      printf("Compression error.  Error code: %" PRId64 "\n", csize);
       return (int) csize;
     }
     blosc2_cbuffer_sizes(chunk_zfp, &zfp_chunk_nbytes, &zfp_chunk_cbytes, NULL);
 
     decompressed = blosc2_decompress_ctx(dctx, chunk_zfp, zfp_chunk_cbytes, lossy_chunk, chunksize);
     if (decompressed < 0) {
-      BLOSC_TRACE_ERROR("Error decompressing chunk \n");
-      return BLOSC2_ERROR_FAILURE;
+      printf("Error decompressing chunk \n");
+      return -1;
     }
 
     /* Compress not using ZFP fixed-rate  */
     csize = blosc2_compress_ctx(schunk->cctx, lossy_chunk, chunksize, chunk_blosc, chunksize + BLOSC2_MAX_OVERHEAD);
     if (csize == 0) {
-      BLOSC_TRACE_ERROR("Buffer is incompressible.  Giving up.\n");
-      return BLOSC2_ERROR_FAILURE;
+      printf("Buffer is incompressible.  Giving up.\n");
+      return -1;
     } else if (csize < 0) {
-      BLOSC_TRACE_ERROR("Compression error.  Error code: %" PRId64 "\n", csize);
+      printf("Compression error.  Error code: %" PRId64 "\n", csize);
       return (int) csize;
     }
     blosc2_cbuffer_sizes(chunk_blosc, NULL, &blosc_chunk_cbytes, NULL);
@@ -219,12 +219,12 @@ static int test_zfp_rate_getitem_double(blosc2_schunk *schunk) {
       dsize_zfp = blosc2_getitem_ctx(dctx, chunk_zfp, zfp_chunk_cbytes,
                                      index, 1, &item_zfp, sizeof(item_zfp));
       if (dsize_blosc != dsize_zfp) {
-        BLOSC_TRACE_ERROR("Different amount of items gotten\n");
-        return BLOSC2_ERROR_FAILURE;
+        printf("Different amount of items gotten\n");
+        return -1;
       }
       if (item_blosc != item_zfp) {
-        BLOSC_TRACE_ERROR("\nIn index %d different items extracted zfp %f blosc %f\n", index, item_zfp, item_blosc);
-        return BLOSC2_ERROR_FAILURE;
+        printf("\nIn index %d different items extracted zfp %f blosc %f\n", index, item_zfp, item_blosc);
+        return -1;
       }
     }
   }
@@ -319,6 +319,16 @@ int double_same_cells() {
   return result;
 }
 
+int day_month_temp() {
+  blosc2_schunk *schunk = blosc2_schunk_open("example_day_month_temp.b2nd");
+  BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
+
+  /* Run the test. */
+  int result = test_zfp_rate_getitem_float(schunk);
+  blosc2_schunk_free(schunk);
+  return result;
+}
+
 int item_prices() {
   blosc2_schunk *schunk = blosc2_schunk_open("example_item_prices.b2nd");
   BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
@@ -340,6 +350,10 @@ int main(void) {
     return result;
   printf("double_same_cells: ");
   result = double_same_cells();
+  if (result < 0)
+    return result;
+  printf("day_month_temp: ");
+  result = day_month_temp();
   if (result < 0)
     return result;
   printf("item_prices: ");
