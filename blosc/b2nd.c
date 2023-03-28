@@ -595,7 +595,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     int64_t nchunk;
     blosc2_multidim_to_unidim(nchunk_ndim, ndim, chunks_in_array_strides, &nchunk);
 
-    // check if the chunk needs to be updated
+    // Check if the chunk needs to be updated
     int64_t chunk_start[B2ND_MAX_DIM] = {0};
     int64_t chunk_stop[B2ND_MAX_DIM] = {0};
     for (int i = 0; i < ndim; ++i) {
@@ -640,7 +640,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
         int64_t nblock_ndim[B2ND_MAX_DIM] = {0};
         blosc2_unidim_to_multidim(ndim, blocks_in_chunk, nblock, nblock_ndim);
 
-        // check if the block needs to be updated
+        // Check if the block needs to be updated
         int64_t block_start[B2ND_MAX_DIM] = {0};
         int64_t block_stop[B2ND_MAX_DIM] = {0};
         for (int i = 0; i < ndim; ++i) {
@@ -684,7 +684,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       int64_t nblock_ndim[B2ND_MAX_DIM] = {0};
       blosc2_unidim_to_multidim(ndim, blocks_in_chunk, nblock, nblock_ndim);
 
-      // check if the block needs to be updated
+      // Check if the block needs to be updated
       int64_t block_start[B2ND_MAX_DIM] = {0};
       int64_t block_stop[B2ND_MAX_DIM] = {0};
       for (int i = 0; i < ndim; ++i) {
@@ -883,7 +883,7 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t
     int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
     blosc2_unidim_to_multidim(ndim, chunks_in_array, nchunk, nchunk_ndim);
 
-    // check if the chunk needs to be updated
+    // Check if the chunk needs to be updated
     int64_t chunk_start[B2ND_MAX_DIM] = {0};
     int64_t chunk_stop[B2ND_MAX_DIM] = {0};
     int64_t chunk_shape[B2ND_MAX_DIM] = {0};
@@ -1815,6 +1815,14 @@ b2nd_create_ctx(const blosc2_storage *b2_storage, int8_t ndim, const int64_t *sh
   for (int i = 0; i < nmetalayers; ++i) {
     ctx->metalayers[i] = metalayers[i];
   }
+
+#if defined(HAVE_PLUGINS)
+  #include "blosc2/codecs-registry.h"
+  if ((ctx->b2_storage->cparams->compcode >= BLOSC_CODEC_ZFP_FIXED_ACCURACY) &&
+      (ctx->b2_storage->cparams->compcode <= BLOSC_CODEC_ZFP_FIXED_RATE)) {
+    ctx->b2_storage->cparams->filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOFILTER;
+  }
+#endif /* HAVE_PLUGINS */
 
   return ctx;
 }

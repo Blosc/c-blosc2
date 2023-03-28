@@ -3729,6 +3729,10 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     }
   }
 
+  if ((context->compcode >= BLOSC_CODEC_ZFP_FIXED_ACCURACY) && (context->compcode <= BLOSC_CODEC_ZFP_FIXED_RATE)) {
+    context->filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOFILTER;
+  }
+
   /* Check for a BLOSC_SHUFFLE environment variable */
   int doshuffle = -1;
   char* envvar = getenv("BLOSC_SHUFFLE");

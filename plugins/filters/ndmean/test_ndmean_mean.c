@@ -70,15 +70,15 @@ static int test_ndmean(blosc2_schunk *schunk) {
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(schunk, "b2nd", &smeta, &smeta_len) < 0) {
-    printf("Blosc error");
-    return 0;
+    BLOSC_TRACE_ERROR("Blosc error");
+    return BLOSC2_ERROR_FAILURE;
   }
   deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
   free(smeta);
 
   if (ndim != 1) {
     fprintf(stderr, "This test only works for ndim = 1");
-    return -1;
+    return BLOSC2_ERROR_FAILURE;
   }
 
   int32_t typesize = schunk->typesize;
@@ -119,24 +119,17 @@ static int test_ndmean(blosc2_schunk *schunk) {
 
     decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
     if (decompressed < 0) {
-      printf("Error decompressing chunk \n");
-      return -1;
+      BLOSC_TRACE_ERROR("Error decompressing chunk \n");
+      return BLOSC2_ERROR_FAILURE;
     }
-
-    /*
-    printf("\n data \n");
-    for (int i = 0; i < nbytes; i++) {
-    printf("%u, ", data2[i]);
-    }
-    */
 
     /* Compress with clevel=5 and shuffle active  */
     csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC2_MAX_OVERHEAD);
     if (csize == 0) {
-      printf("Buffer is incompressible.  Giving up.\n");
-      return -1;
+      BLOSC_TRACE_ERROR("Buffer is incompressible.  Giving up.\n");
+      return BLOSC2_ERROR_FAILURE;
     } else if (csize < 0) {
-      printf("Compression error.  Error code: %" PRId64 "\n", csize);
+      BLOSC_TRACE_ERROR("Compression error.  Error code: %" PRId64 "\n", csize);
       return (int) csize;
     }
     csize_f += csize;
@@ -144,19 +137,10 @@ static int test_ndmean(blosc2_schunk *schunk) {
     /* Decompress  */
     dsize = blosc2_decompress_ctx(dctx, data_out, chunksize + BLOSC2_MAX_OVERHEAD, data_dest, chunksize);
     if (dsize <= 0) {
-      printf("Decompression error.  Error code: %" PRId64 "\n", dsize);
+      BLOSC_TRACE_ERROR("Decompression error.  Error code: %" PRId64 "\n", dsize);
       return (int) dsize;
     }
-/*
-        printf("\n data_dest: \n");
-        for (int i = 0; i < chunksize / typesize; i++) {
-            if (typesize == 4) {
-                printf("%f, ", ((float *) data_dest)[i]);
-            } else if (typesize == 8) {
-                printf("%f, ", ((double *) data_dest)[i]);
-            }
-        }
-*/
+
     int chunk_shape = chunkshape[0];
     if ((ci == nchunks - 1) && (shape[0] % chunkshape[0] != 0)) {
       chunk_shape = (int) (shape[0] % chunkshape[0]);
@@ -185,9 +169,9 @@ static int test_ndmean(blosc2_schunk *schunk) {
             cell_mean /= (float) cell_shape;
             for (int i = 0; i < cell_shape; i++) {
               if (!is_close(cell_mean, ((float *) data_dest)[ind + i])) {
-                printf("i: %d, cell_mean %.9f, dest %.9f", ind + i, cell_mean, ((float *) data_dest)[ind + i]);
-                printf("\n Decompressed data differs from original!\n");
-                return -1;
+                BLOSC_TRACE_ERROR("\n Decompressed data differs from original!\n");
+                BLOSC_TRACE_ERROR("i: %d, cell_mean %.9f, dest %.9f", ind + i, cell_mean, ((float *) data_dest)[ind + i]);
+                return BLOSC2_ERROR_FAILURE;
               }
             }
             break;
@@ -198,9 +182,9 @@ static int test_ndmean(blosc2_schunk *schunk) {
             cell_mean /= (double) cell_shape;
             for (int i = 0; i < cell_shape; i++) {
               if (!is_close(cell_mean, ((double *) data_dest)[ind + i])) {
-                printf("i: %d, cell_mean %.9f, dest %.9f", ind + i, cell_mean, ((double *) data_dest)[ind + i]);
-                printf("\n Decompressed data differs from original!\n");
-                return -1;
+                BLOSC_TRACE_ERROR("\n Decompressed data differs from original!\n");
+                BLOSC_TRACE_ERROR("i: %d, cell_mean %.9f, dest %.9f", ind + i, cell_mean, ((double *) data_dest)[ind + i]);
+                return BLOSC2_ERROR_FAILURE;
               }
             }
             break;
