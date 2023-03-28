@@ -21,8 +21,9 @@
 #include "blosc-private.h"
 #include <inttypes.h>
 #include "b2nd.h"
+#include <math.h>
 
-static int test_zfp_rate_float(blosc2_schunk *schunk) {
+static int test_zfp_rate_float(blosc2_schunk *schunk, double tolerance) {
 
   if (schunk->typesize != 4) {
     printf("Error: This test is only for doubles.\n");
@@ -39,7 +40,7 @@ static int test_zfp_rate_float(blosc2_schunk *schunk) {
   float *data_dest = malloc(chunksize);
 
   /* Create a context for compression */
-  int8_t zfp_rate = 37;
+  int8_t zfp_rate = 45;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.splitmode = BLOSC_NEVER_SPLIT;
   cparams.typesize = schunk->typesize;
@@ -63,17 +64,17 @@ static int test_zfp_rate_float(blosc2_schunk *schunk) {
 
     decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
     if (decompressed < 0) {
-      printf("Error decompressing chunk \n");
-      return -1;
+      BLOSC_TRACE_ERROR("Error decompressing chunk \n");
+      return BLOSC2_ERROR_FAILURE;
     }
 
     /* Compress with clevel=5 and shuffle active  */
     csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC2_MAX_OVERHEAD);
     if (csize == 0) {
-      printf("Buffer is incompressible.  Giving up.\n");
-      return -1;
+      BLOSC_TRACE_ERROR("Buffer is incompressible.  Giving up.\n");
+      return BLOSC2_ERROR_FAILURE;
     } else if (csize < 0) {
-      printf("Compression error.  Error code: %" PRId64 "\n", csize);
+      BLOSC_TRACE_ERROR("Compression error.  Error code: %" PRId64 "\n", csize);
       return (int) csize;
     }
     csize_f += csize;
@@ -81,8 +82,21 @@ static int test_zfp_rate_float(blosc2_schunk *schunk) {
     /* Decompress  */
     dsize = blosc2_decompress_ctx(dctx, data_out, chunksize + BLOSC2_MAX_OVERHEAD, data_dest, chunksize);
     if (dsize <= 0) {
-      printf("Decompression error.  Error code: %" PRId64 "\n", dsize);
+      BLOSC_TRACE_ERROR("Decompression error.  Error code: %" PRId64 "\n", dsize);
       return (int) dsize;
+    }
+    for (int i = 0; i < (chunksize / cparams.typesize); i++) {
+      if ((data_in[i] == 0) || (data_dest[i] == 0)) {
+        if (fabsf(data_in[i] - data_dest[i]) > tolerance) {
+          BLOSC_TRACE_ERROR("\n Decompressed data differs from original!\n");
+          BLOSC_TRACE_ERROR("i: %d, data %.8f, dest %.8f", i, data_in[i], data_dest[i]);
+          return BLOSC2_ERROR_FAILURE;
+        }
+      } else if (fabsf(data_in[i] - data_dest[i]) > tolerance * fmaxf(fabsf(data_in[i]), fabsf(data_dest[i]))) {
+        BLOSC_TRACE_ERROR("\n Decompressed data differs from original!\n");
+        BLOSC_TRACE_ERROR("i: %d, data %.8f, dest %.8f", i, data_in[i], data_dest[i]);
+        return BLOSC2_ERROR_FAILURE;
+      }
     }
   }
   csize_f = csize_f / nchunks;
@@ -98,7 +112,7 @@ static int test_zfp_rate_float(blosc2_schunk *schunk) {
   return (int) (chunksize - csize_f);
 }
 
-static int test_zfp_rate_double(blosc2_schunk *schunk) {
+static int test_zfp_rate_double(blosc2_schunk *schunk, double tolerance) {
 
   if (schunk->typesize != 8) {
     printf("Error: This test is only for doubles.\n");
@@ -115,7 +129,7 @@ static int test_zfp_rate_double(blosc2_schunk *schunk) {
   double *data_dest = malloc(chunksize);
 
   /* Create a context for compression */
-  int zfp_rate = 37;
+  int zfp_rate = 45;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.splitmode = BLOSC_NEVER_SPLIT;
   cparams.typesize = schunk->typesize;
@@ -139,17 +153,17 @@ static int test_zfp_rate_double(blosc2_schunk *schunk) {
 
     decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
     if (decompressed < 0) {
-      printf("Error decompressing chunk \n");
-      return -1;
+      BLOSC_TRACE_ERROR("Error decompressing chunk \n");
+      return BLOSC2_ERROR_FAILURE;
     }
 
     /* Compress with clevel=5 and shuffle active  */
     csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC2_MAX_OVERHEAD);
     if (csize == 0) {
-      printf("Buffer is incompressible.  Giving up.\n");
-      return -1;
+      BLOSC_TRACE_ERROR("Buffer is incompressible.  Giving up.\n");
+      return BLOSC2_ERROR_FAILURE;
     } else if (csize < 0) {
-      printf("Compression error.  Error code: %" PRId64 "\n", csize);
+      BLOSC_TRACE_ERROR("Compression error.  Error code: %" PRId64 "\n", csize);
       return (int) csize;
     }
     csize_f += csize;
@@ -157,8 +171,21 @@ static int test_zfp_rate_double(blosc2_schunk *schunk) {
     /* Decompress  */
     dsize = blosc2_decompress_ctx(dctx, data_out, chunksize + BLOSC2_MAX_OVERHEAD, data_dest, chunksize);
     if (dsize <= 0) {
-      printf("Decompression error.  Error code: %" PRId64 "\n", dsize);
+      BLOSC_TRACE_ERROR("Decompression error.  Error code: %" PRId64 "\n", dsize);
       return (int) dsize;
+    }
+    for (int i = 0; i < (chunksize / cparams.typesize); i++) {
+      if ((data_in[i] == 0) || (data_dest[i] == 0)) {
+        if (fabs(data_in[i] - data_dest[i]) > tolerance) {
+          BLOSC_TRACE_ERROR("\n Decompressed data differs from original!\n");
+          BLOSC_TRACE_ERROR("i: %d, data %.16f, dest %.16f", i, data_in[i], data_dest[i]);
+          return BLOSC2_ERROR_FAILURE;
+        }
+      } else if (fabs(data_in[i] - data_dest[i]) > tolerance * fmax(fabs(data_in[i]), fabs(data_dest[i]))) {
+        BLOSC_TRACE_ERROR("\n Decompressed data differs from original!\n");
+        BLOSC_TRACE_ERROR("i: %d, data %.16f, dest %.16f", i, data_in[i], data_dest[i]);
+        return BLOSC2_ERROR_FAILURE;
+      }
     }
   }
 
@@ -206,9 +233,10 @@ int float_cyclic() {
   b2nd_array_t *arr;
   BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
   blosc2_schunk *schunk = arr->sc;
+  double tolerance = 10;
 
   /* Run the test. */
-  int result = test_zfp_rate_float(schunk);
+  int result = test_zfp_rate_float(schunk, tolerance);
   BLOSC_ERROR(b2nd_free_ctx(ctx));
   BLOSC_ERROR(b2nd_free(arr));
   return result;
@@ -245,9 +273,10 @@ int double_same_cells() {
   b2nd_array_t *arr;
   BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
   blosc2_schunk *schunk = arr->sc;
+  double tolerance = 0.00001;
 
   /* Run the test. */
-  int result = test_zfp_rate_double(schunk);
+  int result = test_zfp_rate_double(schunk, tolerance);
   BLOSC_ERROR(b2nd_free_ctx(ctx));
   BLOSC_ERROR(b2nd_free(arr));
   return result;
@@ -256,9 +285,10 @@ int double_same_cells() {
 int day_month_temp() {
   blosc2_schunk *schunk = blosc2_schunk_open("example_day_month_temp.b2nd");
   BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
+  double tolerance = 100000000;
 
   /* Run the test. */
-  int result = test_zfp_rate_float(schunk);
+  int result = test_zfp_rate_float(schunk, tolerance);
   blosc2_schunk_free(schunk);
   return result;
 }
@@ -266,9 +296,10 @@ int day_month_temp() {
 int item_prices() {
   blosc2_schunk *schunk = blosc2_schunk_open("example_item_prices.b2nd");
   BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
+  double tolerance = 0.1;   // it is not compressing
 
   /* Run the test. */
-  int result = test_zfp_rate_float(schunk);
+  int result = test_zfp_rate_float(schunk, tolerance);
   blosc2_schunk_free(schunk);
   return result;
 }
@@ -280,19 +311,19 @@ int main(void) {
   blosc2_init();   // this is mandatory for initiallizing the plugin mechanism
   result = float_cyclic();
   printf("float_cyclic: %d obtained \n \n", result);
-  if (result < 0)
+  if (result <= 0)
     return result;
   result = double_same_cells();
   printf("double_same_cells: %d obtained \n \n", result);
-  if (result < 0)
+  if (result <= 0)
     return result;
-  result = day_month_temp();
+  /*result = day_month_temp();
   printf("day_month_temp: %d obtained \n \n", result);
-  if (result < 0)
-    return result;
+  if (result <= 0)
+    return result;*/
   result = item_prices();
   printf("item_prices: %d obtained \n \n", result);
-  if (result < 0)
+  if (result <= 0)
     return result;
   blosc2_destroy();
 

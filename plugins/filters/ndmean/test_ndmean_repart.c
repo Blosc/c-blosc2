@@ -96,24 +96,17 @@ static int test_ndmean(blosc2_schunk *schunk) {
 
     decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
     if (decompressed < 0) {
-      printf("Error decompressing chunk \n");
-      return -1;
+      BLOSC_TRACE_ERROR("Error decompressing chunk \n");
+      return BLOSC2_ERROR_FAILURE;
     }
-
-    /*
-    printf("\n data \n");
-    for (int i = 0; i < nbytes; i++) {
-    printf("%u, ", data2[i]);
-    }
-    */
 
     /* Compress with clevel=5 and shuffle active  */
     csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC2_MAX_OVERHEAD);
     if (csize == 0) {
-      printf("Buffer is incompressible.  Giving up.\n");
-      return -1;
+      BLOSC_TRACE_ERROR("Buffer is incompressible.  Giving up.\n");
+      return BLOSC2_ERROR_FAILURE;
     } else if (csize < 0) {
-      printf("Compression error.  Error code: %" PRId64 "\n", csize);
+      BLOSC_TRACE_ERROR("Compression error.  Error code: %" PRId64 "\n", csize);
       return (int) csize;
     }
     csize_f += csize;
@@ -121,7 +114,7 @@ static int test_ndmean(blosc2_schunk *schunk) {
     /* Decompress  */
     dsize = blosc2_decompress_ctx(dctx, data_out, chunksize + BLOSC2_MAX_OVERHEAD, data_dest, chunksize);
     if (dsize <= 0) {
-      printf("Decompression error.  Error code: %" PRId64 "\n", dsize);
+      BLOSC_TRACE_ERROR("Decompression error.  Error code: %" PRId64 "\n", dsize);
       return (int) dsize;
     }
 
@@ -129,18 +122,18 @@ static int test_ndmean(blosc2_schunk *schunk) {
       case 4:
         for (int i = 0; i < chunksize / typesize; i++) {
           if (!is_close(((float *) data_in)[i], ((float *) data_dest)[i])) {
-            printf("i: %d, data %.9f, dest %.9f", i, ((float *) data_in)[i], ((float *) data_dest)[i]);
-            printf("\n Decompressed data differs from original!\n");
-            return -1;
+            BLOSC_TRACE_ERROR("\n Decompressed data differs from original!\n");
+            BLOSC_TRACE_ERROR("i: %d, data %.9f, dest %.9f", i, ((float *) data_in)[i], ((float *) data_dest)[i]);
+            return BLOSC2_ERROR_FAILURE;
           }
         }
         break;
       case 8:
         for (int i = 0; i < chunksize / typesize; i++) {
           if (!is_close(((double *) data_in)[i], ((double *) data_dest)[i])) {
-            printf("i: %d, data %.9f, dest %.9f", i, ((double *) data_in)[i], ((double *) data_dest)[i]);
-            printf("\n Decompressed data differs from original!\n");
-            return -1;
+            BLOSC_TRACE_ERROR("i: %d, data %.9f, dest %.9f", i, ((double *) data_in)[i], ((double *) data_dest)[i]);
+            BLOSC_TRACE_ERROR("\n Decompressed data differs from original!\n");
+            return BLOSC2_ERROR_FAILURE;
           }
         }
         break;

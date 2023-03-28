@@ -274,8 +274,8 @@ int day_month_temp() {
 int item_prices() {
   int ndim = 3;
   int64_t shape[] = {12, 25, 250};
-  int32_t chunkshape[] = {6, 10, 50};
-  int32_t blockshape[] = {3, 5, 10};
+  int32_t chunkshape[] = {8, 10, 50};
+  int32_t blockshape[] = {4, 5, 10};
   int32_t typesize = sizeof(float);
   int64_t nelem = 1;
   for (int i = 0; i < ndim; ++i) {

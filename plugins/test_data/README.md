@@ -80,8 +80,8 @@ represent different days with a value for each of the three columns.
 - type = float;
 - typesize = 4;
 - int64_t shape[] = {12, 25, 250};
-- int32_t chunkshape[] = {6, 10, 50};
-- int32_t blockshape[] = {3, 5, 10};
+- int32_t chunkshape[] = {8, 10, 50};
+- int32_t blockshape[] = {4, 5, 10};
     
 This frame simulates item prices based on 3 dimensions:
 - Month (dim 0): items are more expensive depending on the month

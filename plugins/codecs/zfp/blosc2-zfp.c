@@ -40,6 +40,13 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
   free(smeta);
 
+  for(int i = 0; i < ndim; i++) {
+    if (blockshape[i] < 4) {
+      BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4");
+      return BLOSC2_ERROR_FAILURE;
+    }
+  }
+
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
   zfp_stream *zfp;   /* stream containing the real output buffer */
@@ -246,6 +253,13 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   }
   deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
   free(smeta);
+
+  for(int i = 0; i < ndim; i++) {
+    if (blockshape[i] < 4) {
+      BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4");
+      return BLOSC2_ERROR_FAILURE;
+    }
+  }
 
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
@@ -503,6 +517,13 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   }
   deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
   free(smeta);
+
+  for(int i = 0; i < ndim; i++) {
+    if (blockshape[i] < 4) {
+      BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4");
+      return BLOSC2_ERROR_FAILURE;
+    }
+  }
 
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
