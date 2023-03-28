@@ -95,6 +95,8 @@ void update_schunk_properties(struct blosc2_schunk* schunk) {
   schunk->typesize = cparams->typesize;
   schunk->blocksize = cparams->blocksize;
   schunk->chunksize = -1;
+  schunk->btune_params = cparams->btune_params;
+  schunk->btune_id = cparams->btune_id;
 
   /* The compression context */
   if (schunk->cctx != NULL) {
@@ -128,18 +130,22 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
   // Update the (local variable) storage
   storage = schunk->storage;
 
-  schunk->udbtune = malloc(sizeof(blosc2_btune));
-  if (schunk->storage->cparams->udbtune == NULL) {
-    memcpy(schunk->udbtune, &BTUNE_DEFAULTS, sizeof(blosc2_btune));
-  } else {
-    memcpy(schunk->udbtune, schunk->storage->cparams->udbtune, sizeof(blosc2_btune));
-  }
-  schunk->storage->cparams->udbtune = schunk->udbtune;
-
   // ...and update internal properties
   update_schunk_properties(schunk);
 
-  schunk->cctx->udbtune->btune_init(schunk->udbtune->btune_config, schunk->cctx, schunk->dctx);
+  if (schunk->cctx->btune_id < BLOSC_LAST_BTUNE && schunk->cctx->btune_id == BLOSC_STUNE) {
+    blosc_stune_init(schunk->storage->cparams->btune_params, schunk->cctx, schunk->dctx);
+  } else {
+    for (int i = 0; i < g_nbtunes; ++i) {
+      if (g_urbtune[i].id == schunk->cctx->btune_id) {
+        g_urbtune[i].btune_init(schunk->storage->cparams->btune_params, schunk->cctx, schunk->dctx);
+        goto urbtunesuccess;
+      }
+    }
+    BLOSC_TRACE_ERROR("User-defined btune %d not found\n", schunk->cctx->btune_id);
+    return NULL;
+  }
+  urbtunesuccess:;
 
   if (!storage->contiguous && storage->urlpath != NULL){
     char* urlpath;
@@ -540,9 +546,6 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     }
   }
 
-  if (schunk->udbtune != NULL) {
-    free(schunk->udbtune);
-  }
   free(schunk);
 
   return 0;

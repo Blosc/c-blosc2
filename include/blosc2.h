@@ -193,6 +193,32 @@ enum {
   //!< Minimum buffer size to be compressed.
 };
 
+enum {
+    BLOSC2_DEFINED_BTUNE_START = 0,
+    BLOSC2_DEFINED_BTUNE_STOP = 31,
+    //!< Blosc-defined btunes must be between 0 - 31.
+    BLOSC2_GLOBAL_REGISTERED_BTUNE_START = 32,
+    BLOSC2_GLOBAL_REGISTERED_BTUNE_STOP = 159,
+    //!< Blosc-registered btunes must be between 31 - 159.
+    BLOSC2_GLOBAL_REGISTERED_BTUNES = 0,
+    //!< Number of Blosc-registered btunes at the moment.
+    BLOSC2_USER_REGISTERED_BTUNE_START = 160,
+    BLOSC2_USER_REGISTERED_BTUNE_STOP = 255,
+    //!< User-defined btunes must be between 160 - 255.
+};
+
+/**
+ * @brief Codes for the different btunes shipped with Blosc
+ */
+enum {
+#ifndef BLOSC_H
+    BLOSC_STUNE = 0,
+#endif // BLOSC_H
+    BLOSC_LAST_BTUNE = 1,
+    //!< Determine the last btune defined by Blosc.
+    BLOSC_LAST_REGISTERED_BTUNE = BLOSC2_GLOBAL_REGISTERED_BTUNE_START + BLOSC2_GLOBAL_REGISTERED_BTUNES - 1,
+    //!< Determine the last registered btune. It is used to check if a btune is registered or not.
+};
 
 enum {
   BLOSC2_DEFINED_FILTERS_START = 0,
@@ -1062,9 +1088,27 @@ typedef struct {
   //!< Update the BTune parameters.
   void (*btune_free)(blosc2_context * context);
   //!< Free the BTune.
-  void *btune_config;
-  //!> BTune configuration.
+  int id;
+  //!< The BTune id
+  char *name;
+  //!< The BTune name
 }blosc2_btune;
+
+
+static blosc2_btune g_urbtune[256] = {0};
+static int g_nbtunes = 0;
+static int g_btune = BLOSC_STUNE;
+
+
+typedef struct {
+    char *btune_init;
+    char *btune_next_blocksize;
+    char *btune_next_cparams;
+    char *btune_update;
+    char *btune_free;
+
+    char *btune_params;
+}blosc2_btune_info;
 
 
 /**
@@ -1152,8 +1196,10 @@ typedef struct {
   //!< The prefilter function.
   blosc2_prefilter_params *preparams;
   //!< The prefilter parameters.
-  blosc2_btune *udbtune;
-  //!< The user-defined BTune parameters.
+  void *btune_params;
+  //!< BTune configuration.
+  int btune_id;
+  //!< The BTune id.
   bool instr_codec;
   //!< Whether the codec is instrumented or not
   void *codec_params;
@@ -1170,7 +1216,7 @@ static const blosc2_cparams BLOSC2_CPARAMS_DEFAULTS = {
         BLOSC_FORWARD_COMPAT_SPLIT, NULL,
         {0, 0, 0, 0, 0, BLOSC_SHUFFLE},
         {0, 0, 0, 0, 0, 0},
-        NULL, NULL, NULL, 0,
+        NULL, NULL, NULL, 0, 0,
         NULL, {NULL, NULL, NULL, NULL, NULL, NULL}
         };
 
@@ -1662,8 +1708,10 @@ typedef struct blosc2_schunk {
   //<! The array of variable-length metalayers.
   int16_t nvlmetalayers;
   //!< The number of variable-length metalayers.
-  blosc2_btune *udbtune;
-  //<! Struct for BTune
+  void *btune_params;
+  //!< BTune configuration.
+  int btune_id;
+  //<! Id for BTune
   int8_t ndim;
   //<! The ndim (mainly for ZFP usage)
   int64_t *blockshape;
