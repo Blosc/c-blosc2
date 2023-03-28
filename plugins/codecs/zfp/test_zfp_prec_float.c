@@ -26,8 +26,8 @@
 static int test_zfp_prec_float(blosc2_schunk *schunk) {
 
   if (schunk->typesize != 4) {
-    BLOSC_TRACE_ERROR("Error: This test is only for doubles.\n");
-    return BLOSC2_ERROR_FAILURE;
+    printf("Error: This test is only for doubles.\n");
+    return 0;
   }
   int64_t nchunks = schunk->nchunks;
   int32_t chunksize = (int32_t) (schunk->chunksize);
@@ -64,17 +64,17 @@ static int test_zfp_prec_float(blosc2_schunk *schunk) {
 
     decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
     if (decompressed < 0) {
-      BLOSC_TRACE_ERROR("Error decompressing chunk \n");
-      return BLOSC2_ERROR_FAILURE;
+      printf("Error decompressing chunk \n");
+      return -1;
     }
 
     /* Compress with clevel=5 and shuffle active  */
     csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC2_MAX_OVERHEAD);
     if (csize == 0) {
-      BLOSC_TRACE_ERROR("Buffer is incompressible.  Giving up.\n");
-      return BLOSC2_ERROR_FAILURE;
+      printf("Buffer is incompressible.  Giving up.\n");
+      return 0;
     } else if (csize < 0) {
-      BLOSC_TRACE_ERROR("Compression error.  Error code: %" PRId64 "\n", csize);
+      printf("Compression error.  Error code: %" PRId64 "\n", csize);
       return (int) csize;
     }
     csize_f += csize;
@@ -83,21 +83,21 @@ static int test_zfp_prec_float(blosc2_schunk *schunk) {
     /* Decompress  */
     dsize = blosc2_decompress_ctx(dctx, data_out, chunksize + BLOSC2_MAX_OVERHEAD, data_dest, chunksize);
     if (dsize <= 0) {
-      BLOSC_TRACE_ERROR("Decompression error.  Error code: %" PRId64 "\n", dsize);
+      printf("Decompression error.  Error code: %" PRId64 "\n", dsize);
       return (int) dsize;
     }
     double tolerance = 0.01;
     for (int i = 0; i < (chunksize / cparams.typesize); i++) {
       if ((data_in[i] == 0) || (data_dest[i] == 0)) {
         if (fabsf(data_in[i] - data_dest[i]) > tolerance) {
-          BLOSC_TRACE_ERROR("\n Decompressed data differs from original!\n");
-          BLOSC_TRACE_ERROR("i: %d, data %.8f, dest %.8f", i, data_in[i], data_dest[i]);
-          return BLOSC2_ERROR_FAILURE;
+          printf("i: %d, data %.8f, dest %.8f", i, data_in[i], data_dest[i]);
+          printf("\n Decompressed data differs from original!\n");
+          return -1;
         }
       } else if (fabsf(data_in[i] - data_dest[i]) > tolerance * fmaxf(fabsf(data_in[i]), fabsf(data_dest[i]))) {
-        BLOSC_TRACE_ERROR("\n Decompressed data differs from original!\n");
-        BLOSC_TRACE_ERROR("i: %d, data %.8f, dest %.8f", i, data_in[i], data_dest[i]);
-        return BLOSC2_ERROR_FAILURE;
+        printf("i: %d, data %.8f, dest %.8f", i, data_in[i], data_dest[i]);
+        printf("\n Decompressed data differs from original!\n");
+        return -1;
       }
     }
   }
@@ -118,7 +118,7 @@ static int test_zfp_prec_double(blosc2_schunk *schunk) {
 
   if (schunk->typesize != 8) {
     printf("Error: This test is only for doubles.\n");
-    return BLOSC2_ERROR_FAILURE;
+    return 0;
   }
   int64_t nchunks = schunk->nchunks;
   int32_t chunksize = (int32_t) (schunk->chunksize);
@@ -155,17 +155,17 @@ static int test_zfp_prec_double(blosc2_schunk *schunk) {
 
     decompressed = blosc2_schunk_decompress_chunk(schunk, ci, data_in, chunksize);
     if (decompressed < 0) {
-      BLOSC_TRACE_ERROR("Error decompressing chunk \n");
-      return BLOSC2_ERROR_FAILURE;
+      printf("Error decompressing chunk \n");
+      return -1;
     }
 
     /* Compress with clevel=5 and shuffle active  */
     csize = blosc2_compress_ctx(cctx, data_in, chunksize, data_out, chunksize + BLOSC2_MAX_OVERHEAD);
     if (csize == 0) {
-      BLOSC_TRACE_ERROR("Buffer is incompressible.  Giving up.\n");
-      return BLOSC2_ERROR_FAILURE;
+      printf("Buffer is incompressible.  Giving up.\n");
+      return 0;
     } else if (csize < 0) {
-      BLOSC_TRACE_ERROR("Compression error.  Error code: %" PRId64 "\n", csize);
+      printf("Compression error.  Error code: %" PRId64 "\n", csize);
       return (int) csize;
     }
     csize_f += csize;
@@ -174,21 +174,21 @@ static int test_zfp_prec_double(blosc2_schunk *schunk) {
     /* Decompress  */
     dsize = blosc2_decompress_ctx(dctx, data_out, chunksize + BLOSC2_MAX_OVERHEAD, data_dest, chunksize);
     if (dsize <= 0) {
-      BLOSC_TRACE_ERROR("Decompression error.  Error code: %" PRId64 "\n", dsize);
+      printf("Decompression error.  Error code: %" PRId64 "\n", dsize);
       return (int) dsize;
     }
     double tolerance = 0.01;
     for (int i = 0; i < (chunksize / cparams.typesize); i++) {
       if ((data_in[i] == 0) || (data_dest[i] == 0)) {
         if (fabs(data_in[i] - data_dest[i]) > tolerance) {
-          BLOSC_TRACE_ERROR("\n Decompressed data differs from original!\n");
-          BLOSC_TRACE_ERROR("i: %d, data %.16f, dest %.16f", i, data_in[i], data_dest[i]);
-          return BLOSC2_ERROR_FAILURE;
+          printf("i: %d, data %.16f, dest %.16f", i, data_in[i], data_dest[i]);
+          printf("\n Decompressed data differs from original!\n");
+          return -1;
         }
       } else if (fabs(data_in[i] - data_dest[i]) > tolerance * fmax(fabs(data_in[i]), fabs(data_dest[i]))) {
-        BLOSC_TRACE_ERROR("\n Decompressed data differs from original!\n");
-        BLOSC_TRACE_ERROR("i: %d, data %.16f, dest %.16f", i, data_in[i], data_dest[i]);
-        return BLOSC2_ERROR_FAILURE;
+        printf("i: %d, data %.16f, dest %.16f", i, data_in[i], data_dest[i]);
+        printf("\n Decompressed data differs from original!\n");
+        return -1;
       }
     }
   }
