@@ -74,8 +74,8 @@ struct blosc2_context_s {
   blosc2_schunk* schunk;  /* Associated super-chunk (if available) */
   struct thread_context* serial_context;  /* Cache for temporaries for serial operation */
   int do_compress;  /* 1 if we are compressing, 0 if decompressing */
-  void *btune;  /* Entry point for BTune persistence between runs */
-  blosc2_btune *udbtune;  /* User-defined BTune parameters */
+  void *btune_params;  /* Entry point for BTune persistence between runs */
+  int btune_id;  /* User-defined BTune id */
   void *codec_params; /* User defined parameters for the codec */
   void *filter_params[BLOSC2_MAX_FILTERS]; /* User defined parameters for the filters */
   /* Threading */
@@ -103,6 +103,7 @@ struct blosc2_context_s {
   int dref_not_init;  /* data ref in delta not initialized */
   pthread_mutex_t delta_mutex;
   pthread_cond_t delta_cv;
+  // Add new fields here to avoid breaking the ABI.
 };
 
 struct b2nd_context_s {

@@ -2115,7 +2115,7 @@ static int initialize_context_compression(
     uint8_t const *filters_meta, int32_t typesize, int compressor,
     int32_t blocksize, int16_t new_nthreads, int16_t nthreads,
     int32_t splitmode,
-    blosc2_btune *udbtune, void *btune_config,
+    int btune_id, void *btune_params,
     blosc2_schunk* schunk) {
 
   /* Set parameters */
@@ -2138,16 +2138,40 @@ static int initialize_context_compression(
   context->end_threads = 0;
   context->clevel = clevel;
   context->schunk = schunk;
-  context->btune = btune_config;
-  context->udbtune = udbtune;
+  context->btune_params = btune_params;
+  context->btune_id = btune_id;
   context->splitmode = splitmode;
   /* Tune some compression parameters */
   context->blocksize = (int32_t)blocksize;
-  if (context->btune != NULL) {
-    context->udbtune->btune_next_cparams(context);
+  if (context->btune_params != NULL) {
+    if (context->btune_id < BLOSC_LAST_BTUNE && context->btune_id == BLOSC_STUNE) {
+      blosc_stune_next_cparams(context);
+    } else {
+      for (int i = 0; i < g_nbtunes; ++i) {
+        if (g_urbtune[i].id == context->btune_id) {
+          g_urbtune[i].btune_next_cparams(context);
+          goto urbtunesuccess;
+        }
+      }
+      BLOSC_TRACE_ERROR("User-defined btune %d not found\n", context->btune_id);
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
   } else {
-    context->udbtune->btune_next_blocksize(context);
+    if (context->btune_id < BLOSC_LAST_BTUNE && context->btune_id == BLOSC_STUNE) {
+      blosc_stune_next_blocksize(context);
+    } else {
+      for (int i = 0; i < g_nbtunes; ++i) {
+        if (g_urbtune[i].id == context->btune_id) {
+          g_urbtune[i].btune_next_blocksize(context);
+          goto urbtunesuccess;
+        }
+      }
+      BLOSC_TRACE_ERROR("User-defined btune %d not found\n", context->btune_id);
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
   }
+  urbtunesuccess:;
+
 
   char* envvar = getenv("BLOSC_WARN");
   int64_t warnlvl = 0;
@@ -2436,10 +2460,22 @@ static int blosc_compress_context(blosc2_context* context) {
   /* Set the number of bytes in dest buffer (might be useful for btune) */
   context->destsize = ntbytes;
 
-  if (context->btune != NULL) {
+  if (context->btune_params != NULL) {
     blosc_set_timestamp(&current);
     double ctime = blosc_elapsed_secs(last, current);
-    context->udbtune->btune_update(context, ctime);
+    if (context->btune_id < BLOSC_LAST_BTUNE && context->btune_id == BLOSC_STUNE) {
+      blosc_stune_update(context, ctime);
+    } else {
+      for (int i = 0; i < g_nbtunes; ++i) {
+        if (g_urbtune[i].id == context->btune_id) {
+          g_urbtune[i].btune_update(context, ctime);
+          goto urbtunesuccess;
+        }
+      }
+      BLOSC_TRACE_ERROR("User-defined btune %d not found\n", context->btune_id);
+      return BLOSC2_ERROR_INVALID_PARAM;
+      urbtunesuccess:;
+    }
   }
 
   return ntbytes;
@@ -2461,7 +2497,7 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     context->clevel, context->filters, context->filters_meta,
     context->typesize, context->compcode, context->blocksize,
     context->new_nthreads, context->nthreads, context->splitmode,
-    context->udbtune, context->btune, context->schunk);
+    context->btune_id, context->btune_params, context->schunk);
   if (error <= 0) {
     return error;
   }
@@ -2735,7 +2771,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   error = initialize_context_compression(
     g_global_context, src, srcsize, dest, destsize, clevel, filters,
     filters_meta, (int32_t)typesize, g_compressor, g_force_blocksize, g_nthreads, g_nthreads,
-    g_splitmode, &BTUNE_DEFAULTS, NULL, g_schunk);
+    g_splitmode, g_btune, NULL, g_schunk);
   free(filters);
   free(filters_meta);
   if (error <= 0) {
@@ -3952,11 +3988,12 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     memcpy(context->preparams, cparams.preparams, sizeof(blosc2_prefilter_params));
   }
 
-  if (cparams.udbtune == NULL) {
-    context->udbtune = &BTUNE_DEFAULTS;
+  if (cparams.btune_id < 0) {
+    cparams.btune_id = g_btune;
   } else {
-    context->udbtune = cparams.udbtune;
+    context->btune_params = cparams.btune_params;
   }
+  context->btune_id = cparams.btune_id;
 
   context->codec_params = cparams.codec_params;
   memcpy(context->filter_params, cparams.filter_params, BLOSC2_MAX_FILTERS * sizeof(void*));
@@ -4014,8 +4051,20 @@ void blosc2_free_ctx(blosc2_context* context) {
     ZSTD_freeDDict(context->dict_ddict);
 #endif
   }
-  if (context->btune != NULL) {
-    context->udbtune->btune_free(context);
+  if (context->btune_params != NULL) {
+    if (context->btune_id < BLOSC_LAST_BTUNE && context->btune_id == BLOSC_STUNE) {
+      blosc_stune_free(context);
+    } else {
+      for (int i = 0; i < g_nbtunes; ++i) {
+        if (g_urbtune[i].id == context->btune_id) {
+          g_urbtune[i].btune_free(context);
+          goto urbtunesuccess;
+        }
+      }
+      BLOSC_TRACE_ERROR("User-defined btune %d not found\n", context->btune_id);
+      return;
+      urbtunesuccess:;
+    }
   }
   if (context->prefilter != NULL) {
     my_free(context->preparams);
@@ -4048,7 +4097,7 @@ int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams) {
   }
   cparams->prefilter = ctx->prefilter;
   cparams->preparams = ctx->preparams;
-  cparams->udbtune = ctx->udbtune;
+  cparams->btune_id = ctx->btune_id;
   cparams->codec_params = ctx->codec_params;
 
   return BLOSC2_ERROR_SUCCESS;
@@ -4103,7 +4152,7 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const int32_t nbytes, void* dest,
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
           context->new_nthreads, context->nthreads, context->splitmode,
-          context->udbtune, context->btune, context->schunk);
+          context->btune_id, context->btune_params, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
     return error;
@@ -4145,7 +4194,7 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const int32_t nbytes, void* dest
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
           context->new_nthreads, context->nthreads, context->splitmode,
-          context->udbtune, context->btune, context->schunk);
+          context->btune_id, context->btune_params, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
     return error;
@@ -4188,7 +4237,7 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const int32_t nbytes, void* dest, 
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
           context->new_nthreads, context->nthreads, context->splitmode,
-          context->udbtune, context->btune, context->schunk);
+          context->btune_id, context->btune_params, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
     return error;
@@ -4233,7 +4282,7 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const int32_t nbytes,
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
           context->new_nthreads, context->nthreads, context->splitmode,
-          context->udbtune, context->btune, context->schunk);
+          context->btune_id, context->btune_params, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
     return error;
@@ -4342,6 +4391,44 @@ int blosc2_register_codec(blosc2_codec *codec) {
   }
 
   return register_codec_private(codec);
+}
+
+
+/* Register btunes */
+
+int register_btune_private(blosc2_btune *btune) {
+  BLOSC_ERROR_NULL(btune, BLOSC2_ERROR_INVALID_PARAM);
+  if (g_nbtunes == UINT8_MAX) {
+    BLOSC_TRACE_ERROR("Can not register more btunes");
+    return BLOSC2_ERROR_CODEC_SUPPORT;
+  }
+  if (btune->id < BLOSC2_GLOBAL_REGISTERED_BTUNE_START) {
+    BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_GLOBAL_REGISTERED_BTUNE_START);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  // Check if the btune is already registered
+  for (int i = 0; i < g_nbtunes; ++i) {
+    if (g_urbtune[i].id == btune->id) {
+      BLOSC_TRACE_ERROR("The btune is already registered!");
+      return BLOSC2_ERROR_FAILURE;
+    }
+  }
+
+  blosc2_btune *btune_new = &g_urbtune[g_nbtunes++];
+  memcpy(btune_new, btune, sizeof(blosc2_btune));
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+int blosc2_register_btune(blosc2_btune *btune) {
+  if (btune->id < BLOSC2_USER_REGISTERED_BTUNE_START) {
+    BLOSC_TRACE_ERROR("The id must be greater or equal to %d", BLOSC2_USER_REGISTERED_BTUNE_START);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  return register_btune_private(btune);
 }
 
 

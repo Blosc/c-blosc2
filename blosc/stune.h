@@ -21,6 +21,7 @@
 /* The maximum number of compressed data streams in a block for compression */
 #define MAX_STREAMS 16 /* Cannot be larger than 128 */
 
+#define BLOSC_STUNE 0
 
 void blosc_stune_init(void * config, blosc2_context* cctx, blosc2_context* dctx);
 
@@ -31,15 +32,6 @@ void blosc_stune_next_cparams(blosc2_context * context);
 void blosc_stune_update(blosc2_context * context, double ctime);
 
 void blosc_stune_free(blosc2_context * context);
-
-static blosc2_btune BTUNE_DEFAULTS = {
-    .btune_init = blosc_stune_init,
-    .btune_free = blosc_stune_free,
-    .btune_update = blosc_stune_update,
-    .btune_next_cparams = blosc_stune_next_cparams,
-    .btune_next_blocksize = blosc_stune_next_blocksize,
-    .btune_config = NULL,
-};
 
 
 /* Conditions for splitting a block before compressing with a codec. */
