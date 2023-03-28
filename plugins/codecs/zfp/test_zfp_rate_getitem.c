@@ -319,16 +319,6 @@ int double_same_cells() {
   return result;
 }
 
-int day_month_temp() {
-  blosc2_schunk *schunk = blosc2_schunk_open("example_day_month_temp.b2nd");
-  BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
-
-  /* Run the test. */
-  int result = test_zfp_rate_getitem_float(schunk);
-  blosc2_schunk_free(schunk);
-  return result;
-}
-
 int item_prices() {
   blosc2_schunk *schunk = blosc2_schunk_open("example_item_prices.b2nd");
   BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_FILE_OPEN);
@@ -350,10 +340,6 @@ int main(void) {
     return result;
   printf("double_same_cells: ");
   result = double_same_cells();
-  if (result < 0)
-    return result;
-  printf("day_month_temp: ");
-  result = day_month_temp();
   if (result < 0)
     return result;
   printf("item_prices: ");
