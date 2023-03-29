@@ -47,12 +47,12 @@ void register_codecs(void) {
   zfp_rate.compname = "zfp_rate";
   register_codec_private(&zfp_rate);
 
-  blosc2_codec htj2k;
-  htj2k.compcode = BLOSC_CODEC_J2K;
-  htj2k.version = 1;
-  htj2k.complib = BLOSC_CODEC_J2K;
-  htj2k.encoder = NULL;
-  htj2k.decoder = NULL;
-  htj2k.compname = "openhtj2k";
-  register_codec_private(&htj2k);
+  blosc2_codec openhtj2k;
+  openhtj2k.compcode = BLOSC_CODEC_J2K;
+  openhtj2k.version = 1;
+  openhtj2k.complib = BLOSC_CODEC_J2K;
+  openhtj2k.encoder = NULL;
+  openhtj2k.decoder = NULL;
+  openhtj2k.compname = "openhtj2k";
+  register_codec_private(&openhtj2k);
 }
