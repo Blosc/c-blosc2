@@ -336,7 +336,7 @@ static int compcode_to_compformat(int compcode) {
     default:
       return BLOSC_UDCODEC_FORMAT;
   }
-  return -1;
+  BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
 }
 
 
@@ -364,7 +364,7 @@ static int compcode_to_compversion(int compcode) {
         }
       }
   }
-  return -1;
+  BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
 }
 
 
@@ -496,9 +496,7 @@ static int zstd_wrap_compress(struct thread_context* thread_context,
         (void*)output, maxout, (void*)input, input_length, clevel);
   }
   if (ZSTD_isError(code) != ZSTD_error_no_error) {
-    // Do not print anything because blosc will just memcpy this buffer
-    // fprintf(stderr, "Error in ZSTD compression: '%s'.  Giving up.\n",
-    //         ZDICT_getErrorName(code));
+    // Blosc will just memcpy this buffer
     return 0;
   }
   return (int)code;
@@ -1214,7 +1212,6 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     ctbytes += cbytes;
   }  /* Closes j < nstreams */
 
-  //printf("c%d", ctbytes);
   return ctbytes;
 }
 
@@ -1356,9 +1353,9 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
 
 
 static int32_t set_nans(int32_t typesize, uint8_t* dest, int32_t destsize) {
-  // destsize can only be a multiple of typesize
   if (destsize % typesize != 0) {
-    return -1;
+    BLOSC_TRACE_ERROR("destsize can only be a multiple of typesize");
+    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
   }
   int32_t nitems = destsize / typesize;
   if (nitems == 0) {
@@ -1399,7 +1396,7 @@ static int32_t set_values(int32_t typesize, const uint8_t* src, uint8_t* dest, i
   int8_t* dest1;
 
   if (destsize % typesize != 0) {
-    return -1;
+    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
   }
   int32_t nitems = destsize / typesize;
   if (nitems == 0) {
@@ -1655,7 +1652,7 @@ static int blosc_d(
   neblock = bsize / nstreams;
   if (neblock == 0) {
     /* Not enough space to output bytes */
-    return -1;
+    BLOSC_ERROR(BLOSC2_ERROR_WRITE_BUFFER);
   }
   for (int j = 0; j < nstreams; j++) {
     if (srcsize < (signed)sizeof(int32_t)) {
@@ -2884,7 +2881,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
         break;
       default:
         BLOSC_TRACE_ERROR("Unhandled special value case");
-        return -1;
+        BLOSC_ERROR(BLOSC2_ERROR_SCHUNK_SPECIAL);
     }
     return ntbytes;
   }
@@ -3355,7 +3352,7 @@ int blosc1_set_compressor(const char* compname) {
   int code = blosc2_compname_to_compcode(compname);
   if (code >= BLOSC_LAST_CODEC) {
     BLOSC_TRACE_ERROR("User defined codecs cannot be set here. Use Blosc2 mechanism instead.");
-    return -1;
+    BLOSC_ERROR(BLOSC2_ERROR_CODEC_SUPPORT);
   }
   g_compressor = code;
 

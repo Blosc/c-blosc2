@@ -172,8 +172,8 @@ int update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
             b2nd_serialize_meta(array->ndim, array->shape, array->chunkshape, array->blockshape,
                                 array->dtype, array->dtype_format, &smeta);
     if (smeta_len < 0) {
-      fprintf(stderr, "error during serializing dims info for Blosc2 NDim");
-      return -1;
+      BLOSC_TRACE_ERROR("Error during serializing dims info for Blosc2 NDim");
+      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
     }
     // ... and update it in its metalayer
     if (blosc2_meta_exists(array->sc, "b2nd") < 0) {
