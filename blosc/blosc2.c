@@ -19,7 +19,7 @@
 
 #include "blosc2.h"
 #include "blosc-private.h"
-#include "../plugins/codecs/zfp/blosc2-zfp.h"
+#include "../plugins/codecs/zfp/zfp-private.h"
 #include "frame.h"
 
 
@@ -1738,15 +1738,39 @@ static int blosc_d(
         bool getcell = false;
 
 #if defined(HAVE_PLUGINS)
+#include "../plugins/codecs/zfp/blosc2-zfp.h"
+
         if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) &&
             (thread_context->zfp_cell_nitems > 0)) {
-          nbytes = zfp_getcell(thread_context, src, cbytes, _dest, neblock);
+          nbytes = zfp_getitem(thread_context, src, cbytes, _dest, neblock);
           if (nbytes < 0) {
             return BLOSC2_ERROR_DATA;
           }
           if (nbytes == thread_context->zfp_cell_nitems * typesize) {
             getcell = true;
           }
+        } else if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) &&
+                   (context->codec_params != NULL)) {
+          int8_t cellshape = 4;
+          zfp_dparams *zfp_params = (zfp_dparams*) context->codec_params;
+          int32_t ncells = zfp_params->ncells;
+          int8_t ndim = zfp_params->ndim;
+
+          int32_t cell_bytes;
+          int32_t cell_size = pow(cellshape, ndim) * typesize;
+          bool *cell_maskout = zfp_params->cell_maskout;
+          nbytes = 0;
+          for (int ncell = 0; ncell < ncells; ncell++) {
+            if (! cell_maskout[nblock * ncells + ncell]) {
+              printf("\nGet cell %d from block %d", ncell, nblock);
+              cell_bytes = zfp_getcell(context, ncell, src, cbytes, _dest + ncell * cell_size, cell_size);
+              if (cell_bytes != cell_size) {
+                return BLOSC2_ERROR_DATA;
+              }
+            }
+            nbytes += cell_size;
+          }
+          getcell = true;
         }
 #endif /* HAVE_PLUGINS */
         if (!getcell) {
@@ -1781,7 +1805,7 @@ static int blosc_d(
       }
 
       /* Check that decompressed bytes number is correct */
-      if ((nbytes != neblock) && (thread_context->zfp_cell_nitems == 0)) {
+      if ((nbytes != neblock) && (thread_context->zfp_cell_nitems == 0) && (context->codec_params == NULL)) {
         return BLOSC2_ERROR_DATA;
       }
 

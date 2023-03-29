@@ -721,7 +721,7 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   return (int) output_len;
 }
 
-int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint8_t *dest, int32_t destsize) {
+int zfp_getitem(void *thread_context, const uint8_t *block, int32_t cbytes, uint8_t *dest, int32_t destsize) {
   struct thread_context *thread_ctx = thread_context;
   blosc2_context *context = thread_ctx->parent_context;
   bool meta = false;
@@ -870,4 +870,130 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
   }
 
   return (int) (thread_ctx->zfp_cell_nitems * typesize);
+}
+
+int zfp_getcell(blosc2_context *context, int32_t ncell, const uint8_t *block, int32_t cbytes, uint8_t *dest, int32_t destsize) {
+
+  // Get the ZFP stream
+  zfp_type type;     /* array scalar type */
+  zfp_stream *zfp;   /* compressed stream */
+  bitstream *stream; /* bit stream to write to or read from */
+  bool meta = false;
+  zfp_dparams *zfp_params = (zfp_dparams*) context->codec_params;
+  int32_t ncells = zfp_params->ncells;
+  int8_t ndim = zfp_params->ndim;
+
+  // Check that ncell is a valid index
+
+  if (ncell >= ncells) {
+    BLOSC_TRACE_ERROR("Invalid cell index");
+    return -1;
+  }
+
+  int32_t typesize = context->typesize;
+  zfp = zfp_stream_open(NULL);
+  switch (typesize) {
+    case sizeof(float):
+      type = zfp_type_float;
+      break;
+    case sizeof(double):
+      type = zfp_type_double;
+      break;
+    default:
+      printf("\n ZFP is not available for this typesize \n");
+      return 0;
+  }
+  uint8_t compmeta = context->compcode_meta;   // access to compressed chunk header
+  double rate = (double) (compmeta * typesize * 8) /
+                100.0;     // convert from output size / input size to output bits per input value
+  double actual_rate = zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
+  stream = stream_open((void *) block, cbytes);
+  zfp_stream_set_bit_stream(zfp, stream);
+  zfp_stream_rewind(zfp);
+
+  // Position the stream at the ncell bit offset for reading
+  stream_rseek(zfp->stream, (size_t) ((int64_t) ncell * zfp->maxbits));
+
+  // Get the cell
+  size_t zfpsize;
+  int cell_nitems = (int) (1u << (2 * ndim));
+  uint8_t *cell = malloc(cell_nitems * typesize);
+  switch (ndim) {
+    case 1:
+      switch (type) {
+        case zfp_type_float:
+          zfpsize = zfp_decode_block_float_1(zfp, (float *) cell);
+          break;
+        case zfp_type_double:
+          zfpsize = zfp_decode_block_double_1(zfp, (double *) cell);
+          break;
+        default:
+          printf("\n ZFP is not available for this typesize \n");
+          zfp_stream_close(zfp);
+          stream_close(stream);
+          return 0;
+      }
+      break;
+    case 2:
+      switch (type) {
+        case zfp_type_float:
+          zfpsize = zfp_decode_block_float_2(zfp, (float *) cell);
+          break;
+        case zfp_type_double:
+          zfpsize = zfp_decode_block_double_2(zfp, (double *) cell);
+          break;
+        default:
+          printf("\n ZFP is not available for this typesize \n");
+          zfp_stream_close(zfp);
+          stream_close(stream);
+          return 0;
+      }
+      break;
+    case 3:
+      switch (type) {
+        case zfp_type_float:
+          zfpsize = zfp_decode_block_float_3(zfp, (float *) cell);
+          break;
+        case zfp_type_double:
+          zfpsize = zfp_decode_block_double_3(zfp, (double *) cell);
+          break;
+        default:
+          printf("\n ZFP is not available for this typesize \n");
+          zfp_stream_close(zfp);
+          stream_close(stream);
+          return 0;
+      }
+      break;
+    case 4:
+      switch (type) {
+        case zfp_type_float:
+          zfpsize = zfp_decode_block_float_4(zfp, (float *) cell);
+          break;
+        case zfp_type_double:
+          zfpsize = zfp_decode_block_double_4(zfp, (double *) cell);
+          break;
+        default:
+          printf("\n ZFP is not available for this typesize \n");
+          zfp_stream_close(zfp);
+          stream_close(stream);
+          return 0;
+      }
+      break;
+    default:
+      printf("\n ZFP is not available for this number of dims \n");
+      return 0;
+  }
+  memcpy(dest, cell, cell_nitems * typesize);
+  zfp_stream_close(zfp);
+  stream_close(stream);
+  free(cell);
+
+  double compfact = actual_rate / (double) (typesize * 8);
+  // Zfpsize is in bits, so multiply x8
+  if ((int32_t) ((double) zfpsize / compfact) != (cell_nitems * typesize * 8)) {
+    BLOSC_TRACE_ERROR("ZFP error or small destsize");
+    return -1;
+  }
+
+  return cell_nitems * typesize;
 }

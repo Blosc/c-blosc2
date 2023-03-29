@@ -22,11 +22,17 @@ extern "C" {
 #endif
 #define XXH_INLINE_ALL
 
+typedef struct {
+  bool* cell_maskout; // Array of cell maskouts for each block
+  int32_t ncells; // Number of cells of each block
+  int8_t ndim;
+} zfp_dparams;
+
 #define ZFP_ERROR_NULL(pointer)         \
-  do {                                 \
-    if ((pointer) == NULL) {         \
-      return 0;                    \
-    }                                \
+  do {                                  \
+    if ((pointer) == NULL) {            \
+      return 0;                         \
+    }                                   \
   } while (0)
 
 
