@@ -106,7 +106,6 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
 #else
 
 #if defined(_MSC_VER) && !defined(__clang__)
-  #include <immintrin.h>  /* Needed for _xgetbv */
   #include <intrin.h>     /* Needed for __cpuid */
 #else
 
@@ -139,14 +138,11 @@ __cpuidex(int32_t cpuInfo[4], int32_t function_id, int32_t subfunction_id) {
 
 #define _XCR_XFEATURE_ENABLED_MASK 0
 
-// GCC folks added _xgetbv in immintrin.h starting in GCC 9
-// See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=71659
-#if !(defined(_IMMINTRIN_H_INCLUDED) && (BLOSC_GCC_VERSION >= 900)) && !defined(__IMMINTRIN_H)
 /* Reads the content of an extended control register.
    https://software.intel.com/en-us/articles/how-to-detect-new-instruction-support-in-the-4th-generation-intel-core-processor-family
 */
 static inline uint64_t
-_xgetbv(uint32_t xcr) {
+blosc_internal_xgetbv(uint32_t xcr) {
   uint32_t eax, edx;
   __asm__ __volatile__ (
     /* "xgetbv"
@@ -160,7 +156,6 @@ _xgetbv(uint32_t xcr) {
     );
   return ((uint64_t)edx << 32) | eax;
 }
-#endif  // !(defined(_IMMINTRIN_H_INCLUDED) && (BLOSC_GCC_VERSION >= 900)) && !defined(__IMMINTRIN_H)
 #endif /* defined(_MSC_VER) */
 
 #ifndef _XCR_XFEATURE_ENABLED_MASK
@@ -210,7 +205,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
       || sse41_available || sse42_available
       || avx2_available || avx512bw_available)) {
     /* Determine which register states can be restored by the OS. */
-    uint64_t xcr0_contents = _xgetbv(_XCR_XFEATURE_ENABLED_MASK);
+    uint64_t xcr0_contents = blosc_internal_xgetbv(_XCR_XFEATURE_ENABLED_MASK);
 
     xmm_state_enabled = (xcr0_contents & (1UL << 1)) != 0;
     ymm_state_enabled = (xcr0_contents & (1UL << 2)) != 0;
