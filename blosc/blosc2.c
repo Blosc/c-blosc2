@@ -344,17 +344,22 @@ static int compcode_to_compformat(int compcode) {
 static int compcode_to_compversion(int compcode) {
   /* Write compressor format */
   switch (compcode) {
-    case BLOSC_BLOSCLZ: return BLOSC_BLOSCLZ_VERSION_FORMAT;
-    case BLOSC_LZ4:     return BLOSC_LZ4_VERSION_FORMAT;
-    case BLOSC_LZ4HC:   return BLOSC_LZ4HC_VERSION_FORMAT;
+    case BLOSC_BLOSCLZ:
+      return BLOSC_BLOSCLZ_VERSION_FORMAT;
+    case BLOSC_LZ4:
+      return BLOSC_LZ4_VERSION_FORMAT;
+    case BLOSC_LZ4HC:
+      return BLOSC_LZ4HC_VERSION_FORMAT;
 
 #if defined(HAVE_ZLIB)
-    case BLOSC_ZLIB:    return BLOSC_ZLIB_VERSION_FORMAT;
+    case BLOSC_ZLIB:
+      return BLOSC_ZLIB_VERSION_FORMAT;
       break;
 #endif /*  HAVE_ZLIB */
 
 #if defined(HAVE_ZSTD)
-    case BLOSC_ZSTD:    return BLOSC_ZSTD_VERSION_FORMAT;
+    case BLOSC_ZSTD:
+      return BLOSC_ZSTD_VERSION_FORMAT;
       break;
 #endif /*  HAVE_ZSTD */
     default:
@@ -364,7 +369,7 @@ static int compcode_to_compversion(int compcode) {
         }
       }
   }
-  BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+  return BLOSC2_ERROR_FAILURE;
 }
 
 
