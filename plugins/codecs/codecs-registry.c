@@ -48,9 +48,9 @@ void register_codecs(void) {
   register_codec_private(&zfp_rate);
 
   blosc2_codec openhtj2k;
-  openhtj2k.compcode = BLOSC_CODEC_J2K;
+  openhtj2k.compcode = BLOSC_CODEC_OPENHTJ2K;
   openhtj2k.version = 1;
-  openhtj2k.complib = BLOSC_CODEC_J2K;
+  openhtj2k.complib = BLOSC_CODEC_OPENHTJ2K;
   openhtj2k.encoder = NULL;
   openhtj2k.decoder = NULL;
   openhtj2k.compname = "openhtj2k";
