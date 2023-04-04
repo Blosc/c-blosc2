@@ -70,8 +70,7 @@ New features in C-Blosc2
 
 * **More filters:** besides `shuffle` and `bitshuffle` already present in C-Blosc1, C-Blosc2 already implements:
 
-  - `bytedelta`: calculates the difference between bytes in a block that has been shuffle already.  We have `blogged about
-   bytedelta <https://www.blosc.org/posts/bytedelta-enhance-compression-toolset/>`_.
+  - `bytedelta`: calculates the difference between bytes in a block that has been shuffle already.  We have `blogged about bytedelta <https://www.blosc.org/posts/bytedelta-enhance-compression-toolset/>`_.
 
   - `delta`: the stored blocks inside a chunk are diff'ed with respect to first block in the chunk.  The idea is that, in some situations, the diff will have more zeros than the original data, leading to better compression.
 
