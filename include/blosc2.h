@@ -194,30 +194,30 @@ enum {
 };
 
 enum {
-    BLOSC2_DEFINED_BTUNE_START = 0,
-    BLOSC2_DEFINED_BTUNE_STOP = 31,
-    //!< Blosc-defined btunes must be between 0 - 31.
-    BLOSC2_GLOBAL_REGISTERED_BTUNE_START = 32,
-    BLOSC2_GLOBAL_REGISTERED_BTUNE_STOP = 159,
-    //!< Blosc-registered btunes must be between 31 - 159.
-    BLOSC2_GLOBAL_REGISTERED_BTUNES = 0,
-    //!< Number of Blosc-registered btunes at the moment.
-    BLOSC2_USER_REGISTERED_BTUNE_START = 160,
-    BLOSC2_USER_REGISTERED_BTUNE_STOP = 255,
-    //!< User-defined btunes must be between 160 - 255.
+    BLOSC2_DEFINED_TUNE_START = 0,
+    BLOSC2_DEFINED_TUNE_STOP = 31,
+    //!< Blosc-defined tunes must be between 0 - 31.
+    BLOSC2_GLOBAL_REGISTERED_TUNE_START = 32,
+    BLOSC2_GLOBAL_REGISTERED_TUNE_STOP = 159,
+    //!< Blosc-registered tunes must be between 31 - 159.
+    BLOSC2_GLOBAL_REGISTERED_TUNES = 0,
+    //!< Number of Blosc-registered tunes at the moment.
+    BLOSC2_USER_REGISTERED_TUNE_START = 160,
+    BLOSC2_USER_REGISTERED_TUNE_STOP = 255,
+    //!< User-defined tunes must be between 160 - 255.
 };
 
 /**
- * @brief Codes for the different btunes shipped with Blosc
+ * @brief Codes for the different tunes shipped with Blosc
  */
 enum {
 #ifndef BLOSC_H
     BLOSC_STUNE = 0,
 #endif // BLOSC_H
-    BLOSC_LAST_BTUNE = 1,
-    //!< Determine the last btune defined by Blosc.
-    BLOSC_LAST_REGISTERED_BTUNE = BLOSC2_GLOBAL_REGISTERED_BTUNE_START + BLOSC2_GLOBAL_REGISTERED_BTUNES - 1,
-    //!< Determine the last registered btune. It is used to check if a btune is registered or not.
+    BLOSC_LAST_TUNE = 1,
+    //!< Determine the last tune defined by Blosc.
+    BLOSC_LAST_REGISTERED_TUNE = BLOSC2_GLOBAL_REGISTERED_TUNE_START + BLOSC2_GLOBAL_REGISTERED_TUNES - 1,
+    //!< Determine the last registered tune. It is used to check if a tune is registered or not.
 };
 
 enum {
@@ -1078,24 +1078,34 @@ BLOSC_EXPORT blosc2_io_cb *blosc2_get_io_cb(uint8_t id);
 typedef struct blosc2_context_s blosc2_context;   /* opaque type */
 
 typedef struct {
-  void (*btune_init)(void * config, blosc2_context* cctx, blosc2_context* dctx);
-  //!< Initialize BTune.
-  void (*btune_next_blocksize)(blosc2_context * context);
-  //!< Only compute the next blocksize. Only it is executed if BTune is not initialized.
-  void (*btune_next_cparams)(blosc2_context * context);
-  //!< Compute the next cparams. Only is executed if BTune is initialized.
-  void (*btune_update)(blosc2_context * context, double ctime);
-  //!< Update the BTune parameters.
-  void (*btune_free)(blosc2_context * context);
-  //!< Free the BTune.
+  void (*init)(void * config, blosc2_context* cctx, blosc2_context* dctx);
+  //!< Initialize tune.
+  void (*next_blocksize)(blosc2_context * context);
+  //!< Only compute the next blocksize. Only it is executed if tune is not initialized.
+  void (*next_cparams)(blosc2_context * context);
+  //!< Compute the next cparams. Only is executed if tune is initialized.
+  void (*update)(blosc2_context * context, double ctime);
+  //!< Update the tune parameters.
+  void (*free)(blosc2_context * context);
+  //!< Free the tune.
   int id;
-  //!< The BTune id
+  //!< The tune id
   char *name;
-  //!< The BTune name
-}blosc2_btune;
+  //!< The tune name
+}blosc2_tune;
 
 
-static int g_btune = BLOSC_STUNE;
+/**
+ * @brief Register locally a user-defined tune in Blosc.
+ *
+ * @param tune The tune to register.
+ *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
+BLOSC_EXPORT int register_tune_private(blosc2_tune *tune);
+
+
+static int g_tune = BLOSC_STUNE;
 
 
 /**
@@ -1183,10 +1193,10 @@ typedef struct {
   //!< The prefilter function.
   blosc2_prefilter_params *preparams;
   //!< The prefilter parameters.
-  void *btune_params;
-  //!< BTune configuration.
-  int btune_id;
-  //!< The BTune id.
+  void *tune_params;
+  //!< Tune configuration.
+  int tune_id;
+  //!< The tune id.
   bool instr_codec;
   //!< Whether the codec is instrumented or not
   void *codec_params;
@@ -1695,10 +1705,10 @@ typedef struct blosc2_schunk {
   //<! The array of variable-length metalayers.
   int16_t nvlmetalayers;
   //!< The number of variable-length metalayers.
-  void *btune_params;
-  //!< BTune configuration.
-  int btune_id;
-  //<! Id for BTune
+  void *tune_params;
+  //!< Tune configuration.
+  int tune_id;
+  //<! Id for tune
   int8_t ndim;
   //<! The ndim (mainly for ZFP usage)
   int64_t *blockshape;
