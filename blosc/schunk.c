@@ -137,8 +137,14 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
     blosc_stune_init(schunk->storage->cparams->btune_params, schunk->cctx, schunk->dctx);
   } else {
     for (int i = 0; i < g_nbtunes; ++i) {
-      if (g_urbtune[i].id == schunk->cctx->btune_id) {
-        g_urbtune[i].btune_init(schunk->storage->cparams->btune_params, schunk->cctx, schunk->dctx);
+      if (g_btunes[i].id == schunk->cctx->btune_id) {
+        if (g_btunes[i].btune_init == NULL) {
+          if (fill_btune(&g_btunes[i]) < 0) {
+            BLOSC_TRACE_ERROR("Could not load btune %d.", g_btunes[i].id);
+            return NULL;
+          }
+        }
+        g_btunes[i].btune_init(schunk->storage->cparams->btune_params, schunk->cctx, schunk->dctx);
         goto urbtunesuccess;
       }
     }

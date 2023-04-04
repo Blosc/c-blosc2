@@ -167,6 +167,20 @@ int register_filter_private(blosc2_filter *filter);
  */
 int register_codec_private(blosc2_codec *codec);
 
+
+/**
+ * @brief Register a btune in Blosc.
+ *
+ * @param btune The btune to register.
+ *
+ * @return 0 if succeeds. Else a negative code is returned.
+ */
+int register_btune_private(blosc2_btune *btune);
+
+int fill_btune(blosc2_btune *btune);
+
+extern blosc2_btune g_btunes[256];
+extern int g_nbtunes;
 #ifdef __cplusplus
 }
 #endif
