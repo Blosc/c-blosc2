@@ -7,7 +7,7 @@
 # See LICENSE.txt for details about copyright and rights to use.
 
 add_subdirectory(codecs)
-add_subdirectory(btunes)
+add_subdirectory(tunes)
 add_subdirectory(filters)
 
 

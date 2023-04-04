@@ -95,8 +95,8 @@ void update_schunk_properties(struct blosc2_schunk* schunk) {
   schunk->typesize = cparams->typesize;
   schunk->blocksize = cparams->blocksize;
   schunk->chunksize = -1;
-  schunk->btune_params = cparams->btune_params;
-  schunk->btune_id = cparams->btune_id;
+  schunk->tune_params = cparams->tune_params;
+  schunk->tune_id = cparams->tune_id;
 
   /* The compression context */
   if (schunk->cctx != NULL) {
@@ -133,25 +133,25 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
   // ...and update internal properties
   update_schunk_properties(schunk);
 
-  if (schunk->cctx->btune_id < BLOSC_LAST_BTUNE && schunk->cctx->btune_id == BLOSC_STUNE) {
-    blosc_stune_init(schunk->storage->cparams->btune_params, schunk->cctx, schunk->dctx);
+  if (schunk->cctx->tune_id < BLOSC_LAST_TUNE && schunk->cctx->tune_id == BLOSC_STUNE) {
+    blosc_stune_init(schunk->storage->cparams->tune_params, schunk->cctx, schunk->dctx);
   } else {
-    for (int i = 0; i < g_nbtunes; ++i) {
-      if (g_btunes[i].id == schunk->cctx->btune_id) {
-        if (g_btunes[i].btune_init == NULL) {
-          if (fill_btune(&g_btunes[i]) < 0) {
-            BLOSC_TRACE_ERROR("Could not load btune %d.", g_btunes[i].id);
+    for (int i = 0; i < g_ntunes; ++i) {
+      if (g_tunes[i].id == schunk->cctx->tune_id) {
+        if (g_tunes[i].init == NULL) {
+          if (fill_tune(&g_tunes[i]) < 0) {
+            BLOSC_TRACE_ERROR("Could not load tune %d.", g_tunes[i].id);
             return NULL;
           }
         }
-        g_btunes[i].btune_init(schunk->storage->cparams->btune_params, schunk->cctx, schunk->dctx);
-        goto urbtunesuccess;
+        g_tunes[i].init(schunk->storage->cparams->tune_params, schunk->cctx, schunk->dctx);
+        goto urtunesuccess;
       }
     }
-    BLOSC_TRACE_ERROR("User-defined btune %d not found\n", schunk->cctx->btune_id);
+    BLOSC_TRACE_ERROR("User-defined tune %d not found\n", schunk->cctx->tune_id);
     return NULL;
   }
-  urbtunesuccess:;
+  urtunesuccess:;
 
   if (!storage->contiguous && storage->urlpath != NULL){
     char* urlpath;

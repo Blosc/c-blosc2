@@ -13,13 +13,13 @@ enum {
 
 };
 
-void register_btunes(void);
+void register_tunes(void);
 
-// For dynamically loaded btunes
+// For dynamically loaded tunes
 typedef struct {
-    char *btune_init;
-    char *btune_next_blocksize;
-    char *btune_next_cparams;
-    char *btune_update;
-    char *btune_free;
-}btune_info;
+    char *init;
+    char *next_blocksize;
+    char *next_cparams;
+    char *update;
+    char *free;
+}tune_info;

@@ -169,18 +169,18 @@ int register_codec_private(blosc2_codec *codec);
 
 
 /**
- * @brief Register a btune in Blosc.
+ * @brief Register a tune in Blosc.
  *
- * @param btune The btune to register.
+ * @param tune The tune to register.
  *
  * @return 0 if succeeds. Else a negative code is returned.
  */
-int register_btune_private(blosc2_btune *btune);
+int register_tune_private(blosc2_tune *tune);
 
-int fill_btune(blosc2_btune *btune);
+int fill_tune(blosc2_tune *tune);
 
-extern blosc2_btune g_btunes[256];
-extern int g_nbtunes;
+extern blosc2_tune g_tunes[256];
+extern int g_ntunes;
 #ifdef __cplusplus
 }
 #endif

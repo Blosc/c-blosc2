@@ -36,7 +36,7 @@
 #include "stune.h"
 #include "blosc2/codecs-registry.h"
 #include "blosc2/filters-registry.h"
-#include "blosc2/btunes-registry.h"
+#include "blosc2/tunes-registry.h"
 
 #include "lz4.h"
 #include "lz4hc.h"
@@ -97,8 +97,8 @@ static uint64_t g_nfilters = 0;
 static blosc2_io_cb g_io[256] = {0};
 static uint64_t g_nio = 0;
 
-blosc2_btune g_btunes[256] = {0};
-int g_nbtunes = 0;
+blosc2_tune g_tunes[256] = {0};
+int g_ntunes = 0;
 
 // Forward declarations
 int init_threadpool(blosc2_context *context);
@@ -834,23 +834,23 @@ int fill_codec(blosc2_codec *codec) {
 }
 
 
-int fill_btune(blosc2_btune *btune) {
+int fill_tune(blosc2_tune *tune) {
   char path[PATH_MAX] = {0};
-  void *lib = load_lib(btune->name, path);
+  void *lib = load_lib(tune->name, path);
   if(lib == NULL) {
     BLOSC_TRACE_ERROR("Error while loading the library");
     return BLOSC2_ERROR_FAILURE;
   }
 
-  btune_info *info = dlsym(lib, "info");
-  btune->btune_init = dlsym(lib, info->btune_init);
-  btune->btune_update = dlsym(lib, info->btune_update);
-  btune->btune_next_blocksize = dlsym(lib, info->btune_next_blocksize);
-  btune->btune_free = dlsym(lib, info->btune_free);
-  btune->btune_next_cparams = dlsym(lib, info->btune_next_cparams);
+  tune_info *info = dlsym(lib, "info");
+  tune->init = dlsym(lib, info->init);
+  tune->update = dlsym(lib, info->update);
+  tune->next_blocksize = dlsym(lib, info->next_blocksize);
+  tune->free = dlsym(lib, info->free);
+  tune->next_cparams = dlsym(lib, info->next_cparams);
 
-  if (btune->btune_init == NULL || btune->btune_update == NULL || btune->btune_next_blocksize == NULL || btune->btune_free == NULL
-  || btune->btune_next_cparams == NULL){
+  if (tune->init == NULL || tune->update == NULL || tune->next_blocksize == NULL || tune->free == NULL
+      || tune->next_cparams == NULL){
     BLOSC_TRACE_ERROR("Wrong library loaded");
     dlclose(lib);
     return BLOSC2_ERROR_FAILURE;
@@ -2139,13 +2139,13 @@ static int do_job(blosc2_context* context) {
 
 
 static int initialize_context_compression(
-    blosc2_context* context, const void* src, int32_t srcsize, void* dest,
-    int32_t destsize, int clevel, uint8_t const *filters,
-    uint8_t const *filters_meta, int32_t typesize, int compressor,
-    int32_t blocksize, int16_t new_nthreads, int16_t nthreads,
-    int32_t splitmode,
-    int btune_id, void *btune_params,
-    blosc2_schunk* schunk) {
+        blosc2_context* context, const void* src, int32_t srcsize, void* dest,
+        int32_t destsize, int clevel, uint8_t const *filters,
+        uint8_t const *filters_meta, int32_t typesize, int compressor,
+        int32_t blocksize, int16_t new_nthreads, int16_t nthreads,
+        int32_t splitmode,
+        int tune_id, void *tune_params,
+        blosc2_schunk* schunk) {
 
   /* Set parameters */
   context->do_compress = 1;
@@ -2167,51 +2167,51 @@ static int initialize_context_compression(
   context->end_threads = 0;
   context->clevel = clevel;
   context->schunk = schunk;
-  context->btune_params = btune_params;
-  context->btune_id = btune_id;
+  context->tune_params = tune_params;
+  context->tune_id = tune_id;
   context->splitmode = splitmode;
   /* Tune some compression parameters */
   context->blocksize = (int32_t)blocksize;
-  if (context->btune_params != NULL) {
-    if (context->btune_id < BLOSC_LAST_BTUNE && context->btune_id == BLOSC_STUNE) {
+  if (context->tune_params != NULL) {
+    if (context->tune_id < BLOSC_LAST_TUNE && context->tune_id == BLOSC_STUNE) {
       blosc_stune_next_cparams(context);
     } else {
-      for (int i = 0; i < g_nbtunes; ++i) {
-        if (g_btunes[i].id == context->btune_id) {
-          if (g_btunes[i].btune_next_cparams == NULL) {
-            if (fill_btune(&g_btunes[i]) < 0) {
-              BLOSC_TRACE_ERROR("Could not load btune %d.", g_btunes[i].id);
+      for (int i = 0; i < g_ntunes; ++i) {
+        if (g_tunes[i].id == context->tune_id) {
+          if (g_tunes[i].next_cparams == NULL) {
+            if (fill_tune(&g_tunes[i]) < 0) {
+              BLOSC_TRACE_ERROR("Could not load tune %d.", g_tunes[i].id);
               return BLOSC2_ERROR_FAILURE;
             }
           }
-          g_btunes[i].btune_next_cparams(context);
-          goto urbtunesuccess;
+          g_tunes[i].next_cparams(context);
+          goto urtunesuccess;
         }
       }
-      BLOSC_TRACE_ERROR("User-defined btune %d not found\n", context->btune_id);
+      BLOSC_TRACE_ERROR("User-defined tune %d not found\n", context->tune_id);
       return BLOSC2_ERROR_INVALID_PARAM;
     }
   } else {
-    if (context->btune_id < BLOSC_LAST_BTUNE && context->btune_id == BLOSC_STUNE) {
+    if (context->tune_id < BLOSC_LAST_TUNE && context->tune_id == BLOSC_STUNE) {
       blosc_stune_next_blocksize(context);
     } else {
-      for (int i = 0; i < g_nbtunes; ++i) {
-        if (g_btunes[i].id == context->btune_id) {
-          if (g_btunes[i].btune_next_blocksize == NULL) {
-            if (fill_btune(&g_btunes[i]) < 0) {
-              BLOSC_TRACE_ERROR("Could not load btune %d.", g_btunes[i].id);
+      for (int i = 0; i < g_ntunes; ++i) {
+        if (g_tunes[i].id == context->tune_id) {
+          if (g_tunes[i].next_blocksize == NULL) {
+            if (fill_tune(&g_tunes[i]) < 0) {
+              BLOSC_TRACE_ERROR("Could not load tune %d.", g_tunes[i].id);
               return BLOSC2_ERROR_FAILURE;
             }
           }
-          g_btunes[i].btune_next_blocksize(context);
-          goto urbtunesuccess;
+          g_tunes[i].next_blocksize(context);
+          goto urtunesuccess;
         }
       }
-      BLOSC_TRACE_ERROR("User-defined btune %d not found\n", context->btune_id);
+      BLOSC_TRACE_ERROR("User-defined tune %d not found\n", context->tune_id);
       return BLOSC2_ERROR_INVALID_PARAM;
     }
   }
-  urbtunesuccess:;
+  urtunesuccess:;
 
 
   char* envvar = getenv("BLOSC_WARN");
@@ -2498,30 +2498,30 @@ static int blosc_compress_context(blosc2_context* context) {
     _sw32(context->dest + BLOSC2_CHUNK_BLOCKSIZE, blocksize);
   }
 
-  /* Set the number of bytes in dest buffer (might be useful for btune) */
+  /* Set the number of bytes in dest buffer (might be useful for tune) */
   context->destsize = ntbytes;
 
-  if (context->btune_params != NULL) {
+  if (context->tune_params != NULL) {
     blosc_set_timestamp(&current);
     double ctime = blosc_elapsed_secs(last, current);
-    if (context->btune_id < BLOSC_LAST_BTUNE && context->btune_id == BLOSC_STUNE) {
+    if (context->tune_id < BLOSC_LAST_TUNE && context->tune_id == BLOSC_STUNE) {
       blosc_stune_update(context, ctime);
     } else {
-      for (int i = 0; i < g_nbtunes; ++i) {
-        if (g_btunes[i].id == context->btune_id) {
-          if (g_btunes[i].btune_update == NULL) {
-            if (fill_btune(&g_btunes[i]) < 0) {
-              BLOSC_TRACE_ERROR("Could not load btune %d.", g_btunes[i].id);
+      for (int i = 0; i < g_ntunes; ++i) {
+        if (g_tunes[i].id == context->tune_id) {
+          if (g_tunes[i].update == NULL) {
+            if (fill_tune(&g_tunes[i]) < 0) {
+              BLOSC_TRACE_ERROR("Could not load tune %d.", g_tunes[i].id);
               return BLOSC2_ERROR_FAILURE;
             }
           }
-          g_btunes[i].btune_update(context, ctime);
-          goto urbtunesuccess;
+          g_tunes[i].update(context, ctime);
+          goto urtunesuccess;
         }
       }
-      BLOSC_TRACE_ERROR("User-defined btune %d not found\n", context->btune_id);
+      BLOSC_TRACE_ERROR("User-defined tune %d not found\n", context->tune_id);
       return BLOSC2_ERROR_INVALID_PARAM;
-      urbtunesuccess:;
+      urtunesuccess:;
     }
   }
 
@@ -2540,11 +2540,11 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
   }
 
   error = initialize_context_compression(
-    context, src, srcsize, dest, destsize,
-    context->clevel, context->filters, context->filters_meta,
-    context->typesize, context->compcode, context->blocksize,
-    context->new_nthreads, context->nthreads, context->splitmode,
-    context->btune_id, context->btune_params, context->schunk);
+          context, src, srcsize, dest, destsize,
+          context->clevel, context->filters, context->filters_meta,
+          context->typesize, context->compcode, context->blocksize,
+          context->new_nthreads, context->nthreads, context->splitmode,
+          context->tune_id, context->tune_params, context->schunk);
   if (error <= 0) {
     return error;
   }
@@ -2816,9 +2816,9 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   BLOSC_ERROR_NULL(filters_meta, BLOSC2_ERROR_MEMORY_ALLOC);
   build_filters(doshuffle, g_delta, typesize, filters);
   error = initialize_context_compression(
-    g_global_context, src, srcsize, dest, destsize, clevel, filters,
-    filters_meta, (int32_t)typesize, g_compressor, g_force_blocksize, g_nthreads, g_nthreads,
-    g_splitmode, g_btune, NULL, g_schunk);
+          g_global_context, src, srcsize, dest, destsize, clevel, filters,
+          filters_meta, (int32_t)typesize, g_compressor, g_force_blocksize, g_nthreads, g_nthreads,
+          g_splitmode, g_tune, NULL, g_schunk);
   free(filters);
   free(filters_meta);
   if (error <= 0) {
@@ -3756,14 +3756,14 @@ void blosc2_init(void) {
 
   g_ncodecs = 0;
   g_nfilters = 0;
-  g_nbtunes = 0;
+  g_ntunes = 0;
 
 #if defined(HAVE_PLUGINS)
   #include "blosc2/blosc2-common.h"
   #include "blosc2/blosc2-stdio.h"
   register_codecs();
   register_filters();
-  register_btunes();
+  register_tunes();
 #endif
   pthread_mutex_init(&global_comp_mutex, NULL);
   /* Create a global context */
@@ -4037,12 +4037,12 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     memcpy(context->preparams, cparams.preparams, sizeof(blosc2_prefilter_params));
   }
 
-  if (cparams.btune_id < 0) {
-    cparams.btune_id = g_btune;
+  if (cparams.tune_id < 0) {
+    cparams.tune_id = g_tune;
   } else {
-    context->btune_params = cparams.btune_params;
+    context->tune_params = cparams.tune_params;
   }
-  context->btune_id = cparams.btune_id;
+  context->tune_id = cparams.tune_id;
 
   context->codec_params = cparams.codec_params;
   memcpy(context->filter_params, cparams.filter_params, BLOSC2_MAX_FILTERS * sizeof(void*));
@@ -4100,25 +4100,25 @@ void blosc2_free_ctx(blosc2_context* context) {
     ZSTD_freeDDict(context->dict_ddict);
 #endif
   }
-  if (context->btune_params != NULL) {
-    if (context->btune_id < BLOSC_LAST_BTUNE && context->btune_id == BLOSC_STUNE) {
+  if (context->tune_params != NULL) {
+    if (context->tune_id < BLOSC_LAST_TUNE && context->tune_id == BLOSC_STUNE) {
       blosc_stune_free(context);
     } else {
-      for (int i = 0; i < g_nbtunes; ++i) {
-        if (g_btunes[i].id == context->btune_id) {
-          if (g_btunes[i].btune_free == NULL) {
-            if (fill_btune(&g_btunes[i]) < 0) {
-              BLOSC_TRACE_ERROR("Could not load btune %d.", g_btunes[i].id);
+      for (int i = 0; i < g_ntunes; ++i) {
+        if (g_tunes[i].id == context->tune_id) {
+          if (g_tunes[i].free == NULL) {
+            if (fill_tune(&g_tunes[i]) < 0) {
+              BLOSC_TRACE_ERROR("Could not load tune %d.", g_tunes[i].id);
               return;
             }
           }
-          g_btunes[i].btune_free(context);
-          goto urbtunesuccess;
+          g_tunes[i].free(context);
+          goto urtunesuccess;
         }
       }
-      BLOSC_TRACE_ERROR("User-defined btune %d not found\n", context->btune_id);
+      BLOSC_TRACE_ERROR("User-defined tune %d not found\n", context->tune_id);
       return;
-      urbtunesuccess:;
+      urtunesuccess:;
     }
   }
   if (context->prefilter != NULL) {
@@ -4152,7 +4152,7 @@ int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams) {
   }
   cparams->prefilter = ctx->prefilter;
   cparams->preparams = ctx->preparams;
-  cparams->btune_id = ctx->btune_id;
+  cparams->tune_id = ctx->tune_id;
   cparams->codec_params = ctx->codec_params;
 
   return BLOSC2_ERROR_SUCCESS;
@@ -4207,7 +4207,7 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const int32_t nbytes, void* dest,
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
           context->new_nthreads, context->nthreads, context->splitmode,
-          context->btune_id, context->btune_params, context->schunk);
+          context->tune_id, context->tune_params, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
     return error;
@@ -4249,7 +4249,7 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const int32_t nbytes, void* dest
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
           context->new_nthreads, context->nthreads, context->splitmode,
-          context->btune_id, context->btune_params, context->schunk);
+          context->tune_id, context->tune_params, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
     return error;
@@ -4292,7 +4292,7 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const int32_t nbytes, void* dest, 
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
           context->new_nthreads, context->nthreads, context->splitmode,
-          context->btune_id, context->btune_params, context->schunk);
+          context->tune_id, context->tune_params, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
     return error;
@@ -4337,7 +4337,7 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const int32_t nbytes,
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
           context->new_nthreads, context->nthreads, context->splitmode,
-          context->btune_id, context->btune_params, context->schunk);
+          context->tune_id, context->tune_params, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
     return error;
@@ -4449,41 +4449,41 @@ int blosc2_register_codec(blosc2_codec *codec) {
 }
 
 
-/* Register btunes */
+/* Register tunes */
 
-int register_btune_private(blosc2_btune *btune) {
-  BLOSC_ERROR_NULL(btune, BLOSC2_ERROR_INVALID_PARAM);
-  if (g_nbtunes == UINT8_MAX) {
-    BLOSC_TRACE_ERROR("Can not register more btunes");
+int register_tune_private(blosc2_tune *tune) {
+  BLOSC_ERROR_NULL(tune, BLOSC2_ERROR_INVALID_PARAM);
+  if (g_ntunes == UINT8_MAX) {
+    BLOSC_TRACE_ERROR("Can not register more tunes");
     return BLOSC2_ERROR_CODEC_SUPPORT;
   }
-  if (btune->id < BLOSC2_GLOBAL_REGISTERED_BTUNE_START) {
-    BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_GLOBAL_REGISTERED_BTUNE_START);
+  if (tune->id < BLOSC2_GLOBAL_REGISTERED_TUNE_START) {
+    BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_GLOBAL_REGISTERED_TUNE_START);
     return BLOSC2_ERROR_FAILURE;
   }
 
-  // Check if the btune is already registered
-  for (int i = 0; i < g_nbtunes; ++i) {
-    if (g_btunes[i].id == btune->id) {
-      BLOSC_TRACE_ERROR("The btune is already registered!");
+  // Check if the tune is already registered
+  for (int i = 0; i < g_ntunes; ++i) {
+    if (g_tunes[i].id == tune->id) {
+      BLOSC_TRACE_ERROR("The tune is already registered!");
       return BLOSC2_ERROR_FAILURE;
     }
   }
 
-  blosc2_btune *btune_new = &g_btunes[g_nbtunes++];
-  memcpy(btune_new, btune, sizeof(blosc2_btune));
+  blosc2_tune *tune_new = &g_tunes[g_ntunes++];
+  memcpy(tune_new, tune, sizeof(blosc2_tune));
 
   return BLOSC2_ERROR_SUCCESS;
 }
 
 
-int blosc2_register_btune(blosc2_btune *btune) {
-  if (btune->id < BLOSC2_USER_REGISTERED_BTUNE_START) {
-    BLOSC_TRACE_ERROR("The id must be greater or equal to %d", BLOSC2_USER_REGISTERED_BTUNE_START);
+int blosc2_register_tune(blosc2_tune *tune) {
+  if (tune->id < BLOSC2_USER_REGISTERED_TUNE_START) {
+    BLOSC_TRACE_ERROR("The id must be greater or equal to %d", BLOSC2_USER_REGISTERED_TUNE_START);
     return BLOSC2_ERROR_FAILURE;
   }
 
-  return register_btune_private(btune);
+  return register_tune_private(tune);
 }
 
 
