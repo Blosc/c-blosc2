@@ -1095,20 +1095,7 @@ typedef struct {
 }blosc2_btune;
 
 
-static blosc2_btune g_urbtune[256] = {0};
-static int g_nbtunes = 0;
 static int g_btune = BLOSC_STUNE;
-
-
-typedef struct {
-    char *btune_init;
-    char *btune_next_blocksize;
-    char *btune_next_cparams;
-    char *btune_update;
-    char *btune_free;
-
-    char *btune_params;
-}blosc2_btune_info;
 
 
 /**
