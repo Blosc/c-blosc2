@@ -6,8 +6,6 @@ License: BSD 3-Clause (see LICENSE.txt)
 Script for plotting the results of the 'suite' benchmark.
 Invoke without parameters for usage hints.
 """
-from __future__ import print_function
-
 import matplotlib as mpl
 from pylab import *
 
