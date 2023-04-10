@@ -4,7 +4,7 @@ Release notes for C-Blosc2
 Changes from 2.8.0 to 2.8.1
 ===========================
 
-#XXX version-specific blurb XXX#
+* Internal Zstd sources updated to latest 1.5.5 version.
 
 
 Changes from 2.7.1 to 2.8.0
