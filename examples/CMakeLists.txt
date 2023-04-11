@@ -14,10 +14,6 @@ if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
     list(APPEND EXAMPLES frame_big)
 endif()
 
-if(EXISTS btune_schunk.c)
-    list(APPEND EXAMPLES btune_schunk)
-endif()
-
 # targets
 foreach(example ${EXAMPLES})
     add_executable(${example} ${example}.c)
