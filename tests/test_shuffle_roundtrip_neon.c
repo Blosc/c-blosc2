@@ -3,7 +3,7 @@
 
   Roundtrip tests for the NEON-accelerated shuffle/unshuffle.
 
-  Copyright (C) 2021  Lucian Marc <ruben.lucian@gmail.com>
+  Copyright (c) 2021  Lucian Marc <ruben.lucian@gmail.com>
   https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 

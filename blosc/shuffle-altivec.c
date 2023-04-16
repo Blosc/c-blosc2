@@ -1,7 +1,7 @@
 /*********************************************************************
   Blosc - Blocked Shuffling and Compression Library
 
-  Copyright (C) 2021  The Blosc developers <blosc@blosc.org> and Jerome Kieffer <jerome.kieffer@esrf.fr>
+  Copyright (c) 2021  The Blosc Developers <blosc@blosc.org> and Jerome Kieffer <jerome.kieffer@esrf.fr>
   https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 
