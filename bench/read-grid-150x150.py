@@ -1,5 +1,5 @@
 """
-Copyright (C) 2021  The Blosc developers <blosc@blosc.org>
+Copyright (c) 2021  The Blosc Developers <blosc@blosc.org>
 https://blosc.org
 License: BSD 3-Clause (see LICENSE.txt)
 
