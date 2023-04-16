@@ -38,10 +38,9 @@ extern "C" {
 
 #if defined(_WIN32) && !defined(__MINGW32__)
 #include <windows.h>
-  #include <malloc.h>
-
-  #include <process.h>
-  #define getpid _getpid
+#include <malloc.h>
+#include <process.h>
+#define getpid _getpid
 #endif
 
 #ifdef __cplusplus
@@ -104,19 +103,19 @@ extern "C" {
 /* Tracing macros */
 #define BLOSC_TRACE_ERROR(msg, ...) BLOSC_TRACE(error, msg, ##__VA_ARGS__)
 #define BLOSC_TRACE_WARNING(msg, ...) BLOSC_TRACE(warning, msg, ##__VA_ARGS__)
-#define BLOSC_TRACE(cat, msg, ...) \
-    do { \
-         const char *__e = getenv("BLOSC_TRACE"); \
-         if (!__e) { break; } \
-         fprintf(stderr, "[%s] - " msg " (%s:%d)\n", #cat, ##__VA_ARGS__, __FILE__, __LINE__); \
-       } while(0)
+#define BLOSC_TRACE(cat, msg, ...)                  \
+    do {                                            \
+        const char *__e = getenv("BLOSC_TRACE");    \
+        if (!__e) { break; }                        \
+        fprintf(stderr, "[%s] - " msg " (%s:%d)\n", #cat, ##__VA_ARGS__, __FILE__, __LINE__); \
+    } while(0)
 
-#define BLOSC_ERROR_NULL(pointer, rc)                           \
-    do {                                                        \
-        if ((pointer) == NULL) {                                \
-            BLOSC_TRACE_ERROR("Pointer is null");               \
-            return rc;                                          \
-        }\
+#define BLOSC_ERROR_NULL(pointer, rc)               \
+    do {                                            \
+        if ((pointer) == NULL) {                    \
+            BLOSC_TRACE_ERROR("Pointer is null");   \
+            return rc;                              \
+        }                                           \
     } while (0)
 #define BLOSC_ERROR(rc)                             \
     do {                                            \
