@@ -46,7 +46,7 @@ int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta
         ((int16_t *) dest)[i] = (int16_t)(((int16_t *) src)[i] + 1);
         break;
       default:
-        BLOSC_TRACE_ERROR("Item size %d not supported", schunk->typesize);
+        fprintf(stderr, "Item size %d not supported", schunk->typesize);
         return BLOSC2_ERROR_FAILURE;
     }
   }
@@ -71,7 +71,7 @@ int filter_backward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t met
         ((int16_t *) dest)[i] = (int16_t)(((int16_t *) src)[i] - 1);
         break;
       default:
-        BLOSC_TRACE_ERROR("Item size %d not supported", schunk->typesize);
+        fprintf(stderr, "Item size %d not supported", schunk->typesize);
         return BLOSC2_ERROR_FAILURE;
     }
   }

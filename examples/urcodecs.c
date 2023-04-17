@@ -36,7 +36,7 @@ int codec_encoder(const uint8_t* input, int32_t input_len,
     return -1;
   }
   if (cparams->typesize != 4) {
-    BLOSC_TRACE_ERROR("Itemsize %d != 4", cparams->typesize);
+    fprintf(stderr, "Itemsize %d != 4", cparams->typesize);
     return BLOSC2_ERROR_FAILURE;
   }
 
@@ -49,7 +49,7 @@ int codec_encoder(const uint8_t* input, int32_t input_len,
   int32_t step = in_[1] - start;
   for (int i = 1; i < nelem - 1; ++i) {
     if (in_[i + 1] - in_[i] != step) {
-      BLOSC_TRACE_ERROR("Buffer is not an arange");
+      fprintf(stderr, "Buffer is not an arange");
       return BLOSC2_ERROR_FAILURE;
     }
   }

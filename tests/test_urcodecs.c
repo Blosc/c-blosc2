@@ -30,7 +30,7 @@ int codec_encoder(const uint8_t* input, int32_t input_len,
     return -1;
   }
   if (cparams->typesize != 4) {
-    BLOSC_TRACE_ERROR("Itemsize %d != 4", cparams->typesize);
+    fprintf(stderr, "Itemsize %d != 4", cparams->typesize);
     return BLOSC2_ERROR_FAILURE;
   }
   uint8_t *content;
@@ -54,7 +54,7 @@ int codec_encoder(const uint8_t* input, int32_t input_len,
   int32_t step = in_[1] - start;
   for (int i = 1; i < nelem - 1; ++i) {
     if (in_[i + 1] - in_[i] != step) {
-      BLOSC_TRACE_ERROR("Buffer is not an arange");
+      fprintf(stderr, "Buffer is not an arange");
       return BLOSC2_ERROR_FAILURE;
     }
   }
@@ -175,7 +175,7 @@ CUTEST_TEST_TEST(urcodecs) {
   }
   int rc = blosc2_register_codec(&udcodec);
   if (rc != 0) {
-    BLOSC_TRACE_ERROR("Error registering the code.");
+    fprintf(stderr, "Error registering the code.");
     return BLOSC2_ERROR_FAILURE;
   }
 
@@ -211,7 +211,7 @@ CUTEST_TEST_TEST(urcodecs) {
     }
     int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, bdata, isize);
     if (nchunks_ != nchunk + 1) {
-      BLOSC_TRACE_ERROR("Unexpected nchunks!");
+      fprintf(stderr, "Unexpected nchunks!");
       return -1;
     }
   }
@@ -223,7 +223,7 @@ CUTEST_TEST_TEST(urcodecs) {
   for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, bdata_dest, isize);
     if (dsize < 0) {
-      BLOSC_TRACE_ERROR("Decompression error.  Error code: %d\n", dsize);
+      fprintf(stderr, "Decompression error.  Error code: %d\n", dsize);
       return dsize;
     }
   }
@@ -237,11 +237,11 @@ CUTEST_TEST_TEST(urcodecs) {
     }
 
     if (!equals && correct_backward) {
-      BLOSC_TRACE_ERROR("Decompressed bdata differs from original!\n");
+      fprintf(stderr, "Decompressed bdata differs from original!\n");
       return -1;
     }
     if (equals && !correct_backward) {
-      BLOSC_TRACE_ERROR("Decompressed bdata is equal than original!\n");
+      fprintf(stderr, "Decompressed bdata is equal than original!\n");
       return -1;
     }
   }

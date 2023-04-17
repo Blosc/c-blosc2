@@ -42,7 +42,7 @@ int filter_forward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t meta
         ((int16_t *) dest)[i] = (int16_t) (((int16_t *) src)[i] + 1);
         break;
       default:
-        BLOSC_TRACE_ERROR("Item size %d not supported", schunk->typesize);
+        fprintf(stderr, "Item size %d not supported", schunk->typesize);
         return BLOSC2_ERROR_FAILURE;
     }
   }
@@ -71,7 +71,7 @@ int filter_backward(const uint8_t* src, uint8_t* dest, int32_t size, uint8_t met
         ((int16_t *) dest)[i] = (int16_t)(((int16_t *) src)[i] - 1);
         break;
       default:
-        BLOSC_TRACE_ERROR("Item size %d not supported", schunk->typesize);
+        fprintf(stderr, "Item size %d not supported", schunk->typesize);
         return BLOSC2_ERROR_FAILURE;
     }
   }
@@ -101,7 +101,7 @@ int filter_backward_error(const uint8_t* src, uint8_t* dest, int32_t size, uint8
         ((int16_t *) dest)[i] = (int16_t)(((int16_t *) src)[i] - 13);
         break;
       default:
-        BLOSC_TRACE_ERROR("Item size %d not supported", schunk->typesize);
+        fprintf(stderr, "Item size %d not supported", schunk->typesize);
         return BLOSC2_ERROR_FAILURE;
     }
   }
@@ -191,13 +191,13 @@ CUTEST_TEST_TEST(urfilters) {
           ((int16_t *) bdata)[i] = (int16_t)(i * nchunk);
           break;
         default:
-          BLOSC_TRACE_ERROR("Itemsize %d not supported\n", itemsize);
+          fprintf(stderr, "Itemsize %d not supported\n", itemsize);
           return -1;
       }
     }
     int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, bdata, isize);
     if (nchunks_ != nchunk + 1) {
-      BLOSC_TRACE_ERROR("Unexpected nchunks!");
+      fprintf(stderr, "Unexpected nchunks!");
       return -1;
     }
   }
@@ -206,7 +206,7 @@ CUTEST_TEST_TEST(urfilters) {
   for (nchunk = NCHUNKS-1; nchunk >= 0; nchunk--) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, bdata_dest, isize);
     if (dsize < 0) {
-      BLOSC_TRACE_ERROR("Decompression error.  Error code: %d\n", dsize);
+      fprintf(stderr, "Decompression error.  Error code: %d\n", dsize);
       return dsize;
     }
   }
@@ -232,15 +232,15 @@ CUTEST_TEST_TEST(urfilters) {
         }
         break;
       default:
-        BLOSC_TRACE_ERROR("Itemsize %d not supported\n", itemsize);
+        fprintf(stderr, "Itemsize %d not supported\n", itemsize);
         return -1;
     }
     if (!equals && correct_backward) {
-      BLOSC_TRACE_ERROR("Decompressed bdata differs from original!\n");
+      fprintf(stderr, "Decompressed bdata differs from original!\n");
       return -1;
     }
     if (equals && !correct_backward) {
-      BLOSC_TRACE_ERROR("Decompressed bdata is equal than original!\n");
+      fprintf(stderr, "Decompressed bdata is equal than original!\n");
       return -1;
     }
   }
