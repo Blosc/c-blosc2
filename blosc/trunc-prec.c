@@ -77,8 +77,8 @@ int truncate_precision(int8_t prec_bits, int32_t typesize, int32_t nbytes,
       return truncate_precision64(prec_bits, nbytes / typesize,
                               (int64_t *)src, (int64_t *)dest);
     default:
-      fprintf(stderr, "Error in trunc-prec filter: Precision for typesize %d "
-              "not handled", (int)typesize);
+      BLOSC_TRACE_ERROR("Error in trunc-prec filter: Precision for typesize %d not handled",
+                        (int)typesize);
       return -1;
   }
 }
