@@ -436,7 +436,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
   // Minimum lengths for encoding (normally it is good to match the shift value)
   unsigned minlen = 3;
 
-  uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
+  uint8_t hashlog_[10] = {0, HASH_LOG - 1, HASH_LOG - 1, HASH_LOG, HASH_LOG,
                           HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[clevel];
 
@@ -445,7 +445,10 @@ int blosclz_compress(const int clevel, const void* input, int length,
   // is better (specially when combined with bitshuffle).
   // The loss in speed for checking the whole buffer is pretty negligible too.
   int maxlen = length;
-  if (clevel < 4) {
+  if (clevel < 2) {
+    maxlen /= 8;
+  }
+  else if (clevel < 4) {
     maxlen /= 4;
   }
   else if (clevel < 7) {
