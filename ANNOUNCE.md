@@ -41,7 +41,7 @@ The github repository is over here:
 
 https://github.com/Blosc/c-blosc2
 
-Blosc is distributed using the BSD license, see LICENSES/BLOSC2.txt
+Blosc is distributed using the BSD license, see LICENSE.txt
 for details.
 
 ## Mailing list
