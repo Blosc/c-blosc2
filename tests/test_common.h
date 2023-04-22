@@ -3,8 +3,9 @@
 
   Unit tests for basic features in Blosc.
 
-  Creation date: 2010-06-07
-  Author: The Blosc Development team <blosc@blosc.org>
+  Copyright (c) 2010  The Blosc Development team <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
