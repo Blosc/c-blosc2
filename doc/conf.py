@@ -12,8 +12,8 @@ subprocess.run('doxygen Doxyfile',
 
 
 project = 'C-Blosc2'
-copyright = '2019-present, The Blosc Developers'
-author = 'The Blosc Developers'
+copyright = '2019-present, The Blosc Development team'
+author = 'The Blosc Development team'
 extensions = [
     'breathe',
     'sphinx.ext.intersphinx',
