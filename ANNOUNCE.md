@@ -57,4 +57,4 @@ Please follow @Blosc2 to get informed about the latest developments.
 
 
 Enjoy Data!
-- The Blosc Development Team
+- The Blosc Development team

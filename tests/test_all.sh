@@ -3,7 +3,7 @@
 #
 #  Unit tests for basic features in Blosc.
 #
-#  Author: The Blosc Developers <blosc@blosc.org>
+#  Author: The Blosc Development team <blosc@blosc.org>
 #
 #  See LICENSE.txt for details about copyright and rights to use.
 #**********************************************************************
