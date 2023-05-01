@@ -6,7 +6,7 @@ A fast, compressed and persistent data store library for C
 ==========================================================
 
 
-:Author: The Blosc Development team
+:Author: The Blosc Development Team
 :Contact: blosc@blosc.org
 :URL: https://www.blosc.org
 :Gitter: |gitter|
