@@ -59,7 +59,7 @@ Blosc global registered plugins vs user registered plugins
 ----------------------------------------------------------
 
 **Blosc global registered plugins** are official Blosc plugins that have passed through a selection process
-and have been recognised by the Blosc Development team. These plugins are available for 
+and have been recognised by the Blosc Development Team. These plugins are available for 
 everybody in the C-Blosc2 GitHub repository and users can install them anytime.
 
 **User registered plugins** are plugins that users register locally, and they can use them

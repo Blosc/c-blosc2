@@ -1,7 +1,7 @@
 /*********************************************************************
   Blosc - Blocked Shuffling and Compression Library
 
-  Copyright (c) 2021  The Blosc Development team <blosc@blosc.org>
+  Copyright (c) 2021  The Blosc Development Team <blosc@blosc.org>
   https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 
@@ -12,7 +12,7 @@
  * @brief Blosc2 NDim header file.
  *
  * This file contains Blosc2 NDim public API and the structures needed to use it.
- * @author Blosc Development team <blosc@blosc.org>
+ * @author Blosc Development Team <blosc@blosc.org>
  */
 
 #ifndef B2ND_B2ND_H_
