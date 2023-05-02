@@ -10,7 +10,6 @@
 
 enum {
     BLOSC_BTUNE = 32,
-
 };
 
 void register_tunes(void);
