@@ -10,7 +10,7 @@
 void register_tunes(void) {
 
   blosc2_tune btune;
-  btune.id = 32;
+  btune.id = BLOSC_BTUNE;
   btune.name = "btune";
   btune.init = NULL;
   btune.next_cparams = NULL;

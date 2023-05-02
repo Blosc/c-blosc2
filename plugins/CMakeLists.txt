@@ -10,5 +10,4 @@ add_subdirectory(codecs)
 add_subdirectory(tunes)
 add_subdirectory(filters)
 
-
 set(SOURCES ${SOURCES} ${PROJECT_SOURCE_DIR}/plugins/plugin_utils.c PARENT_SCOPE)
