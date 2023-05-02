@@ -13,7 +13,6 @@ enum {
     BLOSC_CODEC_ZFP_FIXED_ACCURACY = 33,
     BLOSC_CODEC_ZFP_FIXED_PRECISION = 34,
     BLOSC_CODEC_ZFP_FIXED_RATE = 35,
-    BLOSC_CODEC_OPENHTJ2K = 36,
 };
 
 void register_codecs(void);
