@@ -29,7 +29,7 @@ static char* test_input_too_large(void) {
   /* Get a compressed buffer */
   cbytes = blosc1_compress(clevel, doshuffle, typesize, BLOSC2_MAX_BUFFERSIZE + 1, src,
                            dest, size + BLOSC2_MAX_OVERHEAD - 1);
-  mu_assert("ERROR: cbytes is not == 0", cbytes == 0);
+  mu_assert("ERROR: cbytes is not == 0", cbytes < 0);
 
   return 0;
 }
@@ -124,18 +124,18 @@ static char* test_max_overhead(void) {
   blosc2_init();
   cbytes = blosc1_compress(0, doshuffle, typesize, size, src, dest,
                            BLOSC2_MAX_OVERHEAD - 1);
-  mu_assert("ERROR: cbytes is not correct", cbytes == 0);
+  mu_assert("ERROR: cbytes is not correct", cbytes < 0);
   blosc2_destroy();
 
   blosc2_init();
   cbytes = blosc1_compress(0, doshuffle, typesize, size, src, dest,
                            BLOSC2_MAX_OVERHEAD - 2);
-  mu_assert("ERROR: cbytes is not correct", cbytes == 0);
+  mu_assert("ERROR: cbytes is not correct", cbytes < 0);
   blosc2_destroy();
 
   blosc2_init();
   cbytes = blosc1_compress(0, doshuffle, typesize, size, src, dest, 0);
-  mu_assert("ERROR: cbytes is not correct", cbytes == 0);
+  mu_assert("ERROR: cbytes is not correct", cbytes < 0);
   blosc2_destroy();
 
   return 0;

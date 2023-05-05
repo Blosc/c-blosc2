@@ -467,6 +467,7 @@ enum {
   BLOSC2_ERROR_NULL_POINTER = -32,    //!< Pointer is null
   BLOSC2_ERROR_INVALID_INDEX = -33,   //!< Invalid index
   BLOSC2_ERROR_METALAYER_NOT_FOUND = -34,   //!< Metalayer has not been found
+  BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED = -35,  //!< Max buffer size excceded
 };
 
 
@@ -1352,9 +1353,11 @@ BLOSC_EXPORT int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblo
  * @return The number of bytes compressed.
  * If @p src buffer cannot be compressed into @p destsize, the return
  * value is zero and you should discard the contents of the @p dest
- * buffer. A negative return value means that an internal error happened. This
- * should never happen. If you see this, please report it back
- * together with the buffer data causing this and compression settings.
+ * buffer. A negative return value means that either a parameter is not correct
+ * or that an internal error happened. Set the BLOSC_TRACE environment variable
+ * for getting more info on what is happening. If the error is not related with
+ * wrong params, please report it back together with the buffer data causing this,
+ * as well as the compression params used.
 */
 /*
  * Environment variables

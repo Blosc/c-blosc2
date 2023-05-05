@@ -2213,28 +2213,17 @@ static int initialize_context_compression(
   }
   urtunesuccess:;
 
-
-  char* envvar = getenv("BLOSC_WARN");
-  int64_t warnlvl = 0;
-  if (envvar != NULL) {
-    warnlvl = strtol(envvar, NULL, 10);
-  }
-
   /* Check buffer size limits */
   if (srcsize > BLOSC2_MAX_BUFFERSIZE) {
-    if (warnlvl > 0) {
-      BLOSC_TRACE_ERROR("Input buffer size cannot exceed %d bytes.",
-                        BLOSC2_MAX_BUFFERSIZE);
-    }
-    return 0;
+    BLOSC_TRACE_ERROR("Input buffer size cannot exceed %d bytes.",
+                      BLOSC2_MAX_BUFFERSIZE);
+    return BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
   }
 
   if (destsize < BLOSC2_MAX_OVERHEAD) {
-    if (warnlvl > 0) {
-      BLOSC_TRACE_ERROR("Output buffer size should be larger than %d bytes.",
-                        BLOSC2_MAX_OVERHEAD);
-    }
-    return 0;
+    BLOSC_TRACE_ERROR("Output buffer size should be larger than %d bytes.",
+                      BLOSC2_MAX_OVERHEAD);
+    return BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
   }
 
   /* Compression level */
