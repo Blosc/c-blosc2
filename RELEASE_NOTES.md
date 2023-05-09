@@ -1,10 +1,19 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.8.0 to 2.8.1
+Changes from 2.8.0 to 2.9.0
 ===========================
 
+* Dynamic plugins as Python wheels are supported now!
+  This new feature allows for creating plugins in C, distribute
+  them as wheels, and load them dynamically in runtime.
+  Small example at https://github.com/Blosc/blosc2_plugin_example
+
+* BloscLZ can achieve more speed in clevel 1 now.
+
 * Internal Zstd sources updated to latest 1.5.5 version.
+
+* Copyright notice updated.  Thanks to @DimitriPapadopoulos.
 
 
 Changes from 2.7.1 to 2.8.0

@@ -89,11 +89,11 @@ extern "C" {
 
 /* Version numbers */
 #define BLOSC2_VERSION_MAJOR    2    /* for major interface/format changes  */
-#define BLOSC2_VERSION_MINOR    8    /* for minor interface/format changes  */
-#define BLOSC2_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
+#define BLOSC2_VERSION_MINOR    9    /* for minor interface/format changes  */
+#define BLOSC2_VERSION_RELEASE  0    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC2_VERSION_STRING   "2.8.1.dev"  /* string version.  Sync with above! */
-#define BLOSC2_VERSION_DATE     "$Date:: 2023-03-24 #$"    /* date version */
+#define BLOSC2_VERSION_STRING   "2.9.0"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_DATE     "$Date:: 2023-05-09 #$"    /* date version */
 
 
 /* The maximum number of dimensions for Blosc2 NDim arrays */

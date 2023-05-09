@@ -1,15 +1,12 @@
-# Announcing C-Blosc2 2.8.0
+# Announcing C-Blosc2 2.9.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-New bytedelta filter added.  SIMD support for Intel and ARM platforms is there.
-We have blogged about this: https://www.blosc.org/posts/bytedelta-enhance-compression-toolset.rst
-Thanks to Aras Pranckevičius for inspiration and initial implementation.
-
-There are also some minor improvements in BloscLZ, leading to better
-compression ratios in general.  BLoscLZ version bumped to 2.5.2.
-Also, we have updated internal zlib-ng codecs to its latest version (2.0.7).
+Dynamic plugins as Python wheels are supported now! This new feature allows
+for creating plugins in C, distribute them as wheels, and load them
+dynamically in runtime.
+See this small example: https://github.com/Blosc/blosc2_plugin_example
 
 C-Blosc2 should be backward compatible with C-Blosc, so you can start using
 it right away and increasingly start to use its new functionality, like the
