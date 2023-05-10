@@ -4,7 +4,8 @@ Release notes for C-Blosc2
 Changes from 2.9.0 to 2.9.1
 ===========================
 
-#XXX version-specific blurb XXX#
+* Allow the use of BTUNE by detecting the ``BTUNE_BALANCE`` environment
+  variable.
 
 
 Changes from 2.8.0 to 2.9.0

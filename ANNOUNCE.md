@@ -1,12 +1,10 @@
-# Announcing C-Blosc2 2.9.0
+# Announcing C-Blosc2 2.9.1
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-Dynamic plugins as Python wheels are supported now! This new feature allows
-for creating plugins in C, distribute them as wheels, and load them
-dynamically in runtime.
-See this small example: https://github.com/Blosc/blosc2_plugin_example
+This a maintenance release for allowing the use of BTUNE by simply
+activating the ``BTUNE_BALANCE`` environment variable.
 
 C-Blosc2 should be backward compatible with C-Blosc, so you can start using
 it right away and increasingly start to use its new functionality, like the
