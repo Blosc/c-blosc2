@@ -18,6 +18,7 @@
 #include "stune.h"
 #include <inttypes.h>
 #include "blosc-private.h"
+#include "blosc2/tunes-registry.h"
 
 #if defined(_WIN32)
   #include <windows.h>
@@ -129,6 +130,12 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
   schunk->storage = get_new_storage(storage, &BLOSC2_CPARAMS_DEFAULTS, &BLOSC2_DPARAMS_DEFAULTS, &BLOSC2_IO_DEFAULTS);
   // Update the (local variable) storage
   storage = schunk->storage;
+
+  char* btune_balance = getenv("BTUNE_BALANCE");
+  if (btune_balance != NULL) {
+    // If BTUNE_BALANCE passed, automatically use btune
+    storage->cparams->tune_id = BLOSC_BTUNE;
+  }
 
   // ...and update internal properties
   update_schunk_properties(schunk);
