@@ -32,6 +32,15 @@ void *dlsym(void *handle, const char *name) {
 void dlclose(void *handle) {
   FreeLibrary((HINSTANCE)handle);
 }
+const char *dlerror (void) {
+  static char errstr [88];
+  if (var.lasterror) {
+      sprintf (errstr, "%s error #%ld", var.err_rutin, var.lasterror);
+      return errstr;
+  } else {
+      return NULL;
+  }
+}
 #else
 #include <dlfcn.h>
 #endif
@@ -63,8 +72,13 @@ static inline void* load_lib(char *plugin_name, char *path) {
   if (loaded_lib != NULL) {
     return loaded_lib;
   }
+  BLOSC_TRACE_WARNING("First attempt loading library %s. Trying 2nd path", dlerror());
   sprintf(path, "%sblosc2_%s/libblosc2_%s.dylib", python_path, plugin_name, plugin_name);
 #endif
 
-  return dlopen(path, RTLD_LAZY);
+  loaded_lib = dlopen(path, RTLD_LAZY);
+  if (loaded_lib == NULL) {
+    BLOSC_TRACE_ERROR("%s", dlerror());
+  }
+  return loaded_lib;
 }
