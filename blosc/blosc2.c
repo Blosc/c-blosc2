@@ -2185,6 +2185,10 @@ static int initialize_context_compression(
             }
           }
           g_tunes[i].next_cparams(context);
+          if (g_tunes[i].id == BLOSC_BTUNE && context->blocksize == 0) {
+            // Call stune for initializing blocksize
+            blosc_stune_next_blocksize(context);
+          }
           goto urtunesuccess;
         }
       }
