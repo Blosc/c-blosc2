@@ -1093,7 +1093,7 @@ typedef struct {
   //!< The tune id
   char *name;
   //!< The tune name
-}blosc2_tune;
+} blosc2_tune;
 
 
 /**

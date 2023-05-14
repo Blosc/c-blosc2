@@ -21,4 +21,4 @@ void register_codecs(void);
 typedef struct {
     char *encoder;
     char *decoder;
-}codec_info;
+} codec_info;

@@ -35,7 +35,7 @@ enum {
 typedef struct {
   bool contiguous;
   char *urlpath;
-}test_zero_runlen_backend;
+} test_zero_runlen_backend;
 
 CUTEST_TEST_DATA(zero_runlen) {
   blosc2_cparams cparams;
