@@ -170,9 +170,9 @@ static char* test_insert_chunk(void) {
 
 static char *all_tests(void) {
 
-  for (int i = 0; i < (int) (sizeof(tstorage) / sizeof(test_storage)); ++i) {
-    for (int j = 0; j < (int) (sizeof(tndata) / sizeof(test_ndata)); ++j) {
-      for (int k = 0; k < (int) (sizeof(tcopy) / sizeof(bool)); ++k) {
+  for (int i = 0; i < (int) ARRAY_SIZE(tstorage); ++i) {
+    for (int j = 0; j < (int) ARRAY_SIZE(tndata); ++j) {
+      for (int k = 0; k < (int) ARRAY_SIZE(tcopy); ++k) {
 
         tdata.contiguous = tstorage[i].contiguous;
         tdata.urlpath = tstorage[i].urlpath;
