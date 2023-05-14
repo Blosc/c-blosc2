@@ -49,6 +49,8 @@ extern int tests_run;
 #define MB  (1024*KB)
 #define GB  (1024*MB)
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
 /*
   Memory functions.
 */
