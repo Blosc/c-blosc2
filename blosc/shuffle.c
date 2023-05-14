@@ -8,11 +8,12 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include "blosc2.h"
 #include "shuffle.h"
+#include "blosc2.h"
 #include "blosc2/blosc2-common.h"
 #include "shuffle-generic.h"
 #include "bitshuffle-generic.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>

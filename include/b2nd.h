@@ -18,14 +18,22 @@
 #ifndef B2ND_B2ND_H_
 #define B2ND_B2ND_H_
 
-#include <blosc2.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "blosc2/blosc2-export.h"
+#ifdef __cplusplus
+}
+#endif
+
+#include "blosc2.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include "blosc2/blosc2-export.h"
 
 
 /* The version for metalayer format; starts from 0 and it must not exceed 127 */

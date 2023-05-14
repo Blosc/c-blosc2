@@ -18,8 +18,9 @@
     * Support for SSE2/AVX2 copy instructions for these routines
 **********************************************************************/
 
-#include <assert.h>
 #include "blosc2/blosc2-common.h"
+
+#include <assert.h>
 
 /*
  * Use inlined functions for supported systems.

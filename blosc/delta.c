@@ -8,8 +8,9 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include <stdio.h>
 #include "delta.h"
+
+#include <stdio.h>
 
 
 /* Apply the delta filters to src.  This can never fail. */

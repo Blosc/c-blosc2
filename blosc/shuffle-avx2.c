@@ -8,8 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include "shuffle-generic.h"
 #include "shuffle-avx2.h"
+#include "shuffle-generic.h"
 
 /* Make sure AVX2 is available for the compilation target and compiler. */
 #if defined(__AVX2__)

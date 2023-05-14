@@ -8,9 +8,10 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#include "stune.h"
+
 #include <stdbool.h>
 #include <stdio.h>
-#include "stune.h"
 
 
 /* Whether a codec is meant for High Compression Ratios

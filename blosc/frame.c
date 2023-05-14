@@ -8,16 +8,17 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#include "frame.h"
+#include "sframe.h"
+#include "context.h"
+#include "blosc-private.h"
+#include "blosc2.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <sys/stat.h>
-#include "blosc2.h"
-#include "blosc-private.h"
-#include "context.h"
-#include "frame.h"
-#include "sframe.h"
 #include <inttypes.h>
 
 #if defined(_WIN32)

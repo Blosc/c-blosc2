@@ -9,8 +9,8 @@
 **********************************************************************/
 
 
-#include "shuffle-generic.h"
 #include "shuffle-neon.h"
+#include "shuffle-generic.h"
 
 /* Make sure NEON is available for the compilation target and compiler. */
 #if defined(__ARM_NEON)

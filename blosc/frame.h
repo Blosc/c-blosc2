@@ -11,8 +11,11 @@
 #ifndef BLOSC_FRAME_H
 #define BLOSC_FRAME_H
 
+#include "blosc2.h"
+
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 // Different types of frames
 #define FRAME_CONTIGUOUS_TYPE 0

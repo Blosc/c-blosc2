@@ -8,8 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include "bitshuffle-generic.h"
 #include "bitshuffle-neon.h"
+#include "bitshuffle-generic.h"
 
 /* Make sure NEON is available for the compilation target and compiler. */
 #if defined(__ARM_NEON)

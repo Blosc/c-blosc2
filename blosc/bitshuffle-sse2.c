@@ -21,8 +21,8 @@
 **********************************************************************/
 
 
-#include "bitshuffle-generic.h"
 #include "bitshuffle-sse2.h"
+#include "bitshuffle-generic.h"
 
 /* Make sure SSE2 is available for the compilation target and compiler. */
 #if defined(__SSE2__)

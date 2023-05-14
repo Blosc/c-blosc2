@@ -4,8 +4,8 @@
   License: BSD 3-Clause (see LICENSE.txt)
 */
 
-#include <blosc-private.h>
 #include "blosc2/tunes-registry.h"
+#include "blosc-private.h"
 
 void register_tunes(void) {
 

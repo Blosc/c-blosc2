@@ -9,16 +9,17 @@
 **********************************************************************/
 
 
+#include "blosc-private.h"
+#include "blosc2/tunes-registry.h"
+#include "frame.h"
+#include "stune.h"
+#include "blosc2.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include "blosc2.h"
-#include "frame.h"
-#include "stune.h"
 #include <inttypes.h>
-#include "blosc-private.h"
-#include "blosc2/tunes-registry.h"
 
 #if defined(_WIN32)
   #include <windows.h>

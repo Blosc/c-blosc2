@@ -13,9 +13,10 @@
 #define BLOSC_BLOSC2_STDIO_H
 
 
+#include "blosc2-export.h"
+
 #include <stdio.h>
 #include <stdlib.h>
-#include "blosc2-export.h"
 
 
 #if defined(_WIN32) && !defined(__MINGW32__)

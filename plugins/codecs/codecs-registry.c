@@ -4,7 +4,7 @@
   License: BSD 3-Clause (see LICENSE.txt)
 */
 
-#include <blosc-private.h>
+#include "blosc-private.h"
 #include "blosc2/codecs-registry.h"
 #include "ndlz/ndlz.h"
 #include "zfp/blosc2-zfp.h"

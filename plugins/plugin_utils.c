@@ -4,10 +4,11 @@
   License: BSD 3-Clause (see LICENSE.txt)
 */
 
-#include <stdio.h>
-#include "blosc2.h"
-#include "blosc-private.h"
 #include "plugin_utils.h"
+#include "blosc-private.h"
+#include "blosc2.h"
+
+#include <stdio.h>
 
 #define BLOSC_PLUGINS_MAX_DIM 8
 

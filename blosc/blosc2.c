@@ -9,20 +9,11 @@
 **********************************************************************/
 
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-#include <assert.h>
-#include <math.h>
-
 #include "blosc2.h"
 #include "blosc-private.h"
 #include "../plugins/codecs/zfp/blosc2-zfp.h"
 #include "blosc2/plugins-utils.h"
 #include "frame.h"
-
 
 #if defined(USING_CMAKE)
   #include "config.h"
@@ -60,7 +51,6 @@
   #include "zdict.h"
 #endif /*  HAVE_ZSTD */
 
-
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <windows.h>
   #include <malloc.h>
@@ -71,6 +61,14 @@
 #if defined(_WIN32) && !defined(__GNUC__)
   #include "win32/pthread.c"
 #endif
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/types.h>
+#include <assert.h>
+#include <math.h>
 
 
 /* Synchronization variables */
