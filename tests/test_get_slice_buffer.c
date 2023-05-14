@@ -46,7 +46,7 @@ test_ndata tndata[] = {
 typedef struct {
     bool contiguous;
     char *urlpath;
-}test_storage;
+} test_storage;
 
 test_storage tstorage[] = {
         {false, NULL},  // memory - schunk

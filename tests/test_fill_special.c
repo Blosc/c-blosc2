@@ -27,7 +27,7 @@ enum {
 typedef struct {
   bool contiguous;
   char *urlpath;
-}test_fill_special_backend;
+} test_fill_special_backend;
 
 CUTEST_TEST_DATA(fill_special) {
   blosc2_cparams cparams;

@@ -33,7 +33,7 @@ enum {
 typedef struct {
   bool contiguous;
   char *urlpath;
-}test_copy_backend;
+} test_copy_backend;
 
 
 CUTEST_TEST_DATA(copy) {
