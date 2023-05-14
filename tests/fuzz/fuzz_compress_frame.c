@@ -29,6 +29,10 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     blosc2_destroy();
     return 0;
   }
+  if (size > INT32_MAX) {
+      printf("Conversion error: size_t does not fit in int32_t\n");
+      return 0;
+  }
   if (size > 0) {
     /* Variable size compression level and max chunksize */
     cparams.clevel = data[0] % (9 + 1);
