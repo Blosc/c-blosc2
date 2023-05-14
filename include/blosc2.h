@@ -20,12 +20,6 @@
 #ifndef BLOSC2_H
 #define BLOSC2_H
 
-#include <limits.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <stdio.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -42,6 +36,12 @@ extern "C" {
 #include <process.h>
 #define getpid _getpid
 #endif
+
+#include <limits.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {

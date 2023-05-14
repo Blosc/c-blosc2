@@ -8,8 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include "shuffle-generic.h"
 #include "shuffle-altivec.h"
+#include "shuffle-generic.h"
 
 /* Make sure ALTIVEC is available for the compilation target and compiler. */
 #if defined(__ALTIVEC__)

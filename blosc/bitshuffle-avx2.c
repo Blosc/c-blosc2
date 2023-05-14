@@ -21,10 +21,9 @@
 **********************************************************************/
 
 
-#include "bitshuffle-generic.h"
-#include "bitshuffle-sse2.h"
 #include "bitshuffle-avx2.h"
-
+#include "bitshuffle-sse2.h"
+#include "bitshuffle-generic.h"
 
 /* Make sure AVX2 is available for the compilation target and compiler. */
 #if defined(__AVX2__)

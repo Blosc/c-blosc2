@@ -8,8 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include "shuffle-generic.h"
 #include "shuffle-sse2.h"
+#include "shuffle-generic.h"
 
 /* Make sure SSE2 is available for the compilation target and compiler. */
 #if defined(__SSE2__)

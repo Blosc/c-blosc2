@@ -22,8 +22,8 @@
 **********************************************************************/
 
 
-#include "bitshuffle-generic.h"
 #include "bitshuffle-altivec.h"
+#include "bitshuffle-generic.h"
 
 /* Make sure ALTIVEC is available for the compilation target and compiler. */
 #if defined(__ALTIVEC__)

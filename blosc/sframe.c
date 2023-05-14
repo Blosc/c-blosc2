@@ -8,11 +8,12 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#include "frame.h"
+#include "blosc2.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "blosc2.h"
-#include "frame.h"
 
 
 /* If C11 is supported, use it's built-in aligned allocation. */

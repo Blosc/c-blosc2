@@ -8,11 +8,12 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include "assert.h"
 #include "trunc-prec.h"
 #include "blosc2.h"
+
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define BITS_MANTISSA_FLOAT 23
 #define BITS_MANTISSA_DOUBLE 52

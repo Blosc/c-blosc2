@@ -8,8 +8,9 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include <stdio.h>
 #include "blosc2.h"
+
+#include <stdio.h>
 #include <sys/stat.h>
 
 #if defined(_WIN32) || defined(__MINGW32__)
