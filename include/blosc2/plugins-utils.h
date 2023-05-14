@@ -41,7 +41,7 @@ static inline void* load_lib(char *plugin_name, char *path) {
   char python_path[PATH_MAX] = {0};
   FILE *fp = popen("python -c \"exec(\\\"import sys\\npaths=sys.path\\nfor p in paths:\\n\\tif 'site-packages' in p:"
                    "\\n \\t\\tprint(p+'/', end='')\\n \\t\\tbreak\\\")\"", "r");
-  fgets(python_path, PATH_MAX, fp);
+  (void)fgets(python_path, PATH_MAX, fp);
   pclose(fp);
 
   if (strlen(python_path) == 0) {
