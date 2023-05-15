@@ -22,3 +22,6 @@ typedef struct {
     char *encoder;
     char *decoder;
 } codec_info;
+
+// Silence unused codec_info typedef warning
+static codec_info codec_info_defaults BLOSC_ATTRIBUTE_UNUSED = {0};
