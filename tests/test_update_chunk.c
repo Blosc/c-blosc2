@@ -169,8 +169,8 @@ static char *all_tests(void) {
 int main(void) {
   char *result;
 
-  install_blosc_callback_test(); /* optionally install callback test */
   blosc2_init();
+  install_blosc_callback_test(); /* optionally install callback test */
 
   data = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int64_t));
   data_dest = blosc_test_malloc(BUFFER_ALIGN_SIZE, CHUNKSIZE * sizeof(int64_t));

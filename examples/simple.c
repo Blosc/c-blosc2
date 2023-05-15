@@ -38,16 +38,16 @@ int main(void) {
   int dsize = SIZE * sizeof(float), csize;
   int i, ret;
 
-  for (i = 0; i < SIZE; i++) {
-    data[i] = (float)i;
-  }
+  /* Initialize the Blosc compressor */
+  blosc2_init();
+  blosc2_set_nthreads(NTHREADS);
 
   printf("Blosc version info: %s (%s)\n",
          BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
-  /* Initialize the Blosc compressor */
-  blosc2_init();
-  blosc2_set_nthreads(NTHREADS);
+  for (i = 0; i < SIZE; i++) {
+    data[i] = (float)i;
+  }
 
   /* Compress with clevel=5 and shuffle active  */
   csize = blosc1_compress(5, BLOSC_BITSHUFFLE, sizeof(float), isize, data,
@@ -87,16 +87,16 @@ int main(void) {
 
   printf("Decompression successful!\n");
 
-  /* After using it, destroy the Blosc environment */
-  blosc2_destroy();
-
   for (i = 0; i < SIZE; i++) {
     if (data[i] != data_dest[i]) {
       printf("Decompressed data differs from original!\n");
       return -1;
     }
   }
-
   printf("Successful roundtrip!\n");
+
+  /* After using it, destroy the Blosc environment */
+  blosc2_destroy();
+
   return 0;
 }
