@@ -1051,8 +1051,6 @@ typedef struct {
   //!< The IO parameters.
 } blosc2_io;
 
-static blosc2_io_cb BLOSC2_IO_CB_DEFAULTS = {0};
-
 static const blosc2_io BLOSC2_IO_DEFAULTS = {
     .id = BLOSC2_IO_FILESYSTEM,
     .params = NULL,

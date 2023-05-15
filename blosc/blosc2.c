@@ -3729,6 +3729,7 @@ void blosc_set_schunk(blosc2_schunk* schunk) {
 }
 
 blosc2_io *blosc2_io_global = NULL;
+blosc2_io_cb BLOSC2_IO_CB_DEFAULTS;
 
 void blosc2_init(void) {
   /* Return if Blosc is already initialized */
