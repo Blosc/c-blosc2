@@ -20,4 +20,4 @@ void register_filters(void);
 typedef struct {
     char *forward;
     char *backward;
-}filter_info;
+} filter_info;

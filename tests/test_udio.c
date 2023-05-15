@@ -79,7 +79,7 @@ int test_truncate(void *stream, int64_t size) {
 typedef struct {
   bool contiguous;
   char *urlpath;
-}test_udio_backend;
+} test_udio_backend;
 
 CUTEST_TEST_DATA(udio) {
   blosc2_cparams cparams;

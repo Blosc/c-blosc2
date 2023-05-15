@@ -41,7 +41,7 @@ test_ndata tndata[] = {
 typedef struct {
   bool contiguous;
   char *urlpath;
-}test_storage;
+} test_storage;
 
 test_storage tstorage[] = {
     {false, NULL},  // memory - schunk
@@ -150,8 +150,8 @@ static char* test_update_chunk(void) {
 }
 
 static char *all_tests(void) {
-  for (int i = 0; i < (int) (sizeof(tstorage) / sizeof(test_storage)); ++i) {
-    for (int j = 0; j < (int) (sizeof(tndata) / sizeof(test_ndata)); ++j) {
+  for (int i = 0; i < (int) ARRAY_SIZE(tstorage); ++i) {
+    for (int j = 0; j < (int) ARRAY_SIZE(tndata); ++j) {
       tdata.contiguous = tstorage[i].contiguous;
       tdata.urlpath = tstorage[i].urlpath;
       tdata.nchunks = tndata[j].nchunks;

@@ -211,9 +211,7 @@ enum {
  * @brief Codes for the different tunes shipped with Blosc
  */
 enum {
-#ifndef BLOSC_H
     BLOSC_STUNE = 0,
-#endif // BLOSC_H
     BLOSC_LAST_TUNE = 1,
     //!< Determine the last tune defined by Blosc.
     BLOSC_LAST_REGISTERED_TUNE = BLOSC2_GLOBAL_REGISTERED_TUNE_START + BLOSC2_GLOBAL_REGISTERED_TUNES - 1,
@@ -1093,7 +1091,7 @@ typedef struct {
   //!< The tune id
   char *name;
   //!< The tune name
-}blosc2_tune;
+} blosc2_tune;
 
 
 /**
