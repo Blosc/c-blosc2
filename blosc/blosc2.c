@@ -98,6 +98,8 @@ static uint64_t g_nio = 0;
 blosc2_tune g_tunes[256] = {0};
 int g_ntunes = 0;
 
+static int g_tune = BLOSC_STUNE;
+
 // Forward declarations
 int init_threadpool(blosc2_context *context);
 int release_threadpool(blosc2_context *context);

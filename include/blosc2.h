@@ -1104,9 +1104,6 @@ typedef struct {
 BLOSC_EXPORT int register_tune_private(blosc2_tune *tune);
 
 
-static int g_tune = BLOSC_STUNE;
-
-
 /**
  * @brief The parameters for a prefilter function.
  *
