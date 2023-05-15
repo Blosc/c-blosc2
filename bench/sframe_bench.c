@@ -12,10 +12,22 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#include "blosc2.h"
+
+#if defined(_WIN32)
+#include <malloc.h>
+#endif
+
+#if defined(_WIN32) && !defined(__MINGW32__)
+#include <time.h>
+#else
+#include <sys/time.h>
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <blosc2.h>
+#include <stdint.h>
 #include <assert.h>
 #include <inttypes.h>
 
@@ -29,18 +41,6 @@
 int nchunks = NCHUNKS;
 int iterations = 5;
 
-#if defined(_WIN32) && !defined(__MINGW32__)
-#include <time.h>
-  #include "win32/stdint-windows.h"
-#else
-#include <stdint.h>
-#include <sys/time.h>
-#endif
-
-#if defined(_WIN32)
-#include <malloc.h>
-
-#endif  /* defined(_WIN32) && !defined(__MINGW32__) */
 
 
 void test_update(blosc2_schunk* schunk_sframe, blosc2_schunk* schunk_cframe) {

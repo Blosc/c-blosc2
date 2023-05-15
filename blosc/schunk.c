@@ -15,28 +15,20 @@
 #include "stune.h"
 #include "blosc2.h"
 
+#if defined(_WIN32)
+#include <windows.h>
+#include <direct.h>
+#include <malloc.h>
+
+#define mkdir(D, M) _mkdir(D)
+#endif  /* _WIN32 */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <sys/stat.h>
 #include <inttypes.h>
-
-#if defined(_WIN32)
-  #include <windows.h>
-  #include <direct.h>
-  #include <malloc.h>
-
-  #define mkdir(D, M) _mkdir(D)
-
-/* stdint.h only available in VS2010 (VC++ 16.0) and newer */
-  #if defined(_MSC_VER) && _MSC_VER < 1600
-    #include "win32/stdint-windows.h"
-  #else
-    #include <stdint.h>
-  #endif
-
-#endif  /* _WIN32 */
-
 
 /* If C11 is supported, use it's built-in aligned allocation. */
 #if __STDC_VERSION__ >= 201112L

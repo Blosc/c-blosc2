@@ -14,30 +14,23 @@
 #include "blosc-private.h"
 #include "blosc2.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
-#include <sys/stat.h>
-#include <inttypes.h>
-
 #if defined(_WIN32)
 #include <windows.h>
-  #include <malloc.h>
-
-/* stdint.h only available in VS2010 (VC++ 16.0) and newer */
-  #if defined(_MSC_VER) && _MSC_VER < 1600
-    #include "win32/stdint-windows.h"
-  #else
-    #include <stdint.h>
-  #endif
-
+#include <malloc.h>
 #endif  /* _WIN32 */
 
 /* If C11 is supported, use it's built-in aligned allocation. */
 #if __STDC_VERSION__ >= 201112L
 #include <stdalign.h>
 #endif
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+#include <sys/stat.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 
 /* Create a new (empty) frame */

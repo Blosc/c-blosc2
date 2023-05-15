@@ -8,26 +8,15 @@
   See LICENSES/BLOSC.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#include "blosc2.h"
+
 #include <stdio.h>
-#include <blosc2.h>
 #include <string.h>
+#include <stdint.h>
 
 #if defined(_WIN32) && !defined(__MINGW32__)
-  #include <windows.h>
-  /* stdint.h only available in VS2010 (VC++ 16.0) and newer */
-  #if defined(_MSC_VER) && _MSC_VER < 1600
-    #include "win32/stdint-windows.h"
-  #else
-    #include <stdint.h>
-  #endif
-#else
-  #include <stdint.h>
+#include <windows.h>
 #endif  /* _WIN32 */
-
-#ifdef __HAIKU__
-/* int32_t declared here */
-#include <stdint.h>
-#endif
 
 #define SIZE (1000 * 1000)
 

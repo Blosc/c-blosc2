@@ -32,7 +32,7 @@ int blosc2_stdio_close(void *stream) {
 int64_t blosc2_stdio_tell(void *stream) {
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
   int64_t pos;
-#if defined(_MSC_VER) && (_MSC_VER >= 1400)
+#if defined(_MSC_VER)
   pos = _ftelli64(my_fp->file);
 #else
   pos = (int64_t)ftell(my_fp->file);
@@ -43,7 +43,7 @@ int64_t blosc2_stdio_tell(void *stream) {
 int blosc2_stdio_seek(void *stream, int64_t offset, int whence) {
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
   int rc;
-#if defined(_MSC_VER) && (_MSC_VER >= 1400)
+#if defined(_MSC_VER)
   rc = _fseeki64(my_fp->file, offset, whence);
 #else
   rc = fseek(my_fp->file, (long) offset, whence);
@@ -67,7 +67,7 @@ int64_t blosc2_stdio_read(void *ptr, int64_t size, int64_t nitems, void *stream)
 int blosc2_stdio_truncate(void *stream, int64_t size) {
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
   int rc;
-#if defined(_MSC_VER) && (_MSC_VER >= 1400)
+#if defined(_MSC_VER)
   rc = _chsize_s(_fileno(my_fp->file), size);
 #else
   rc = ftruncate(fileno(my_fp->file), size);
