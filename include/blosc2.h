@@ -1076,7 +1076,7 @@ typedef struct blosc2_context_s blosc2_context;   /* opaque type */
 
 typedef struct {
   void (*init)(void * config, blosc2_context* cctx, blosc2_context* dctx);
-  //!< Initialize tune.
+  //!< Initialize tune. Keep in mind dctx may be NULL. This should memcpy the cctx->tune_params.
   void (*next_blocksize)(blosc2_context * context);
   //!< Only compute the next blocksize. Only it is executed if tune is not initialized.
   void (*next_cparams)(blosc2_context * context);
