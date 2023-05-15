@@ -41,7 +41,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   if (output == NULL)
     return 0;
 
-  if (blosc2_compress(level, filter, 1, data, size, output, size) == 0) {
+  int csize = blosc2_compress(level, filter, 1, data, size, output, size);
+  if (csize <= 0) {
     /* Cannot compress src buffer into dest */
     free(output);
     return 0;
