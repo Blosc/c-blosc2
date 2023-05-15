@@ -4031,11 +4031,26 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     memcpy(context->preparams, cparams.preparams, sizeof(blosc2_prefilter_params));
   }
 
-  if (cparams.tune_id < 0) {
+  if (cparams.tune_id <= 0) {
     cparams.tune_id = g_tune;
   } else {
-    context->tune_params = cparams.tune_params;
+    for (int i = 0; i < g_ntunes; ++i) {
+      if (g_tunes[i].id == cparams.tune_id) {
+        if (g_tunes[i].init == NULL) {
+          if (fill_tune(&g_tunes[i]) < 0) {
+            BLOSC_TRACE_ERROR("Could not load tune %d.", g_tunes[i].id);
+            return NULL;
+          }
+        }
+        g_tunes[i].init(cparams.tune_params, context, NULL);
+        goto urtunesuccess;
+      }
+    }
+    BLOSC_TRACE_ERROR("User-defined tune %d not found\n", cparams.tune_id);
+    return NULL;
   }
+  urtunesuccess:;
+
   context->tune_id = cparams.tune_id;
 
   context->codec_params = cparams.codec_params;
