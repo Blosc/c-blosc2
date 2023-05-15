@@ -1,8 +1,9 @@
 #include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-extern int LLVMFuzzerTestOneInput(const unsigned char *data, size_t size);
+extern int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size);
 
 int main(int argc, char **argv) {
   int i;
@@ -10,7 +11,7 @@ int main(int argc, char **argv) {
 
   for (i = 1; i < argc; i++) {
     size_t len, err, n_read = 0;
-    unsigned char *buf;
+    uint8_t *buf;
     FILE *f = NULL;
 
     f = fopen(argv[i], "rb+");
