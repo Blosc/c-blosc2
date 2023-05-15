@@ -17,7 +17,7 @@ foreach (source ${SOURCES})
     get_filename_component(target_name ${source} NAME_WE)
     set(target b2nd_${target_name})
     add_executable(${target} ${target_name}.c)
-    target_link_libraries(${target} blosc2_static ${LIBS})
+    target_link_libraries(${target} blosc_testing ${LIBS})
     if (${target_name} STREQUAL example_print_meta)
         add_test(NAME ${target} COMMAND ${target}
                 "${PROJECT_BINARY_DIR}/examples/b2nd/example_big_float_frame.b2nd")
