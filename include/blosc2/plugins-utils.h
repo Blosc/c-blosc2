@@ -25,12 +25,12 @@ void *dlopen (const char *filename, int flags) {
 
 void *dlsym(void *handle, const char *name) {
   FARPROC fp;
-  fp = GetProcAddress ((HINSTANCE)handle, name);
+  fp = GetProcAddress((HINSTANCE)handle, name);
   return (void *)(intptr_t)fp;
 }
 
 void dlclose(void *handle) {
-  FreeLibrary ((HINSTANCE)handle);
+  FreeLibrary((HINSTANCE)handle);
 }
 #else
 #include <dlfcn.h>
@@ -41,7 +41,14 @@ static inline void* load_lib(char *plugin_name, char *path) {
   char python_path[PATH_MAX] = {0};
   FILE *fp = popen("python -c \"exec(\\\"import sys\\npaths=sys.path\\nfor p in paths:\\n\\tif 'site-packages' in p:"
                    "\\n \\t\\tprint(p+'/', end='')\\n \\t\\tbreak\\\")\"", "r");
-  (void)fgets(python_path, PATH_MAX, fp);
+  if (fp == NULL) {
+    BLOSC_TRACE_ERROR("Could not run python");
+    return NULL;
+  }
+  if (fgets(python_path, PATH_MAX, fp) == NULL) {
+    BLOSC_TRACE_ERROR("Could not read python output");
+    return NULL;
+  }
   pclose(fp);
 
   if (strlen(python_path) == 0) {
