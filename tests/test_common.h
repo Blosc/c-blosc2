@@ -13,20 +13,20 @@
 #ifndef BLOSC_TEST_COMMON_H
 #define BLOSC_TEST_COMMON_H
 
+#include "blosc2.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdint.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <math.h>
-#include "blosc2.h"
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <time.h>
-  #include "win32/stdint-windows.h"
 #else
-  #include <stdint.h>
   #include <sys/time.h>
 #endif
 

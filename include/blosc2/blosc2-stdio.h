@@ -15,28 +15,15 @@
 
 #include "blosc2-export.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-
-
-#if defined(_WIN32) && !defined(__MINGW32__)
-
-/* stdint.h only available in VS2010 (VC++ 16.0) and newer */
-   #if defined(_MSC_VER) && _MSC_VER < 1600
-     #include "win32/stdint-windows.h"
-   #else
-     #include <stdint.h>
-   #endif
-
-#else
-#include <stdint.h>
-#endif
-
-#if defined(_MSC_VER) && (_MSC_VER >= 1400)
+#if defined(_MSC_VER)
 #include <io.h>
 #else
 #include <unistd.h>
 #endif
+
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 typedef struct {
   FILE *file;
