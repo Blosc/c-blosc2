@@ -9,6 +9,8 @@
 **********************************************************************/
 
 
+#include <blosc2.h>
+
 #if defined(_WIN32)
 #include <windows.h>
 #define PATH_MAX MAX_PATH
@@ -16,9 +18,22 @@
 #define popen _popen
 #define pclose _pclose
 
+static struct {
+    long lasterror;
+    const char *err_rutin;
+}
+var = {
+    0,
+    NULL
+};
+
 void *dlopen (const char *filename, int flags) {
   HINSTANCE hInst;
   hInst = LoadLibrary(filename);
+  if (hInst==NULL) {
+    var.lasterror = GetLastError();
+    var.err_rutin = "dlopen";
+  }
 
   return hInst;
 }
@@ -26,12 +41,23 @@ void *dlopen (const char *filename, int flags) {
 void *dlsym(void *handle, const char *name) {
   FARPROC fp;
   fp = GetProcAddress((HINSTANCE)handle, name);
+  if (!fp) {
+    var.lasterror = GetLastError ();
+    var.err_rutin = "dlsym";
+  }
   return (void *)(intptr_t)fp;
 }
 
-void dlclose(void *handle) {
-  FreeLibrary((HINSTANCE)handle);
+int dlclose(void *handle) {
+  bool ok = FreeLibrary((HINSTANCE)handle);
+  if (!ok) {
+    var.lasterror = GetLastError();
+    var.err_rutin = "dlclose";
+    return BLOSC2_ERROR_FAILURE;
+  }
+  return BLOSC2_ERROR_SUCCESS;
 }
+
 const char *dlerror (void) {
   static char errstr [88];
   if (var.lasterror) {
@@ -74,8 +100,8 @@ static inline void* load_lib(char *plugin_name, char *path) {
   if (loaded_lib != NULL) {
     return loaded_lib;
   }
-  BLOSC_TRACE_WARNING("First attempt loading library %s. Trying 2nd path", dlerror());
 #endif
+  BLOSC_TRACE_WARNING("First attempt loading library %s. Trying 2nd path", dlerror());
 
   sprintf(path, "%s/libblosc2_%s.dylib", python_path, plugin_name);
   BLOSC_TRACE_WARNING("Trying second path: %s\n", path);
