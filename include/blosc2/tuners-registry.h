@@ -12,7 +12,7 @@ enum {
     BLOSC_BTUNE = 32,
 };
 
-void register_tunes(void);
+void register_tuners(void);
 
 // For dynamically loaded tunes
 typedef struct {
@@ -21,4 +21,4 @@ typedef struct {
     char *next_cparams;
     char *update;
     char *free;
-} tune_info;
+} tuner_info;

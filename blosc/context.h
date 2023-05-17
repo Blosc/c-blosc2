@@ -74,8 +74,8 @@ struct blosc2_context_s {
   blosc2_schunk* schunk;  /* Associated super-chunk (if available) */
   struct thread_context* serial_context;  /* Cache for temporaries for serial operation */
   int do_compress;  /* 1 if we are compressing, 0 if decompressing */
-  void *tune_params;  /* Entry point for tune persistence between runs */
-  int tune_id;  /* User-defined tune id */
+  void *tuner_params;  /* Entry point for tuner persistence between runs */
+  int tuner_id;  /* User-defined tuner id */
   void *codec_params; /* User defined parameters for the codec */
   void *filter_params[BLOSC2_MAX_FILTERS]; /* User defined parameters for the filters */
   /* Threading */

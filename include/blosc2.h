@@ -194,28 +194,28 @@ enum {
 };
 
 enum {
-    BLOSC2_DEFINED_TUNE_START = 0,
-    BLOSC2_DEFINED_TUNE_STOP = 31,
-    //!< Blosc-defined tunes must be between 0 - 31.
-    BLOSC2_GLOBAL_REGISTERED_TUNE_START = 32,
-    BLOSC2_GLOBAL_REGISTERED_TUNE_STOP = 159,
-    //!< Blosc-registered tunes must be between 31 - 159.
-    BLOSC2_GLOBAL_REGISTERED_TUNES = 0,
-    //!< Number of Blosc-registered tunes at the moment.
-    BLOSC2_USER_REGISTERED_TUNE_START = 160,
-    BLOSC2_USER_REGISTERED_TUNE_STOP = 255,
-    //!< User-defined tunes must be between 160 - 255.
+    BLOSC2_DEFINED_TUNER_START = 0,
+    BLOSC2_DEFINED_TUNER_STOP = 31,
+    //!< Blosc-defined tuners must be between 0 - 31.
+    BLOSC2_GLOBAL_REGISTERED_TUNER_START = 32,
+    BLOSC2_GLOBAL_REGISTERED_TUNER_STOP = 159,
+    //!< Blosc-registered tuners must be between 31 - 159.
+    BLOSC2_GLOBAL_REGISTERED_TUNERS = 0,
+    //!< Number of Blosc-registered tuners at the moment.
+    BLOSC2_USER_REGISTERED_TUNER_START = 160,
+    BLOSC2_USER_REGISTERED_TUNER_STOP = 255,
+    //!< User-defined tuners must be between 160 - 255.
 };
 
 /**
- * @brief Codes for the different tunes shipped with Blosc
+ * @brief Codes for the different tuners shipped with Blosc
  */
 enum {
     BLOSC_STUNE = 0,
-    BLOSC_LAST_TUNE = 1,
-    //!< Determine the last tune defined by Blosc.
-    BLOSC_LAST_REGISTERED_TUNE = BLOSC2_GLOBAL_REGISTERED_TUNE_START + BLOSC2_GLOBAL_REGISTERED_TUNES - 1,
-    //!< Determine the last registered tune. It is used to check if a tune is registered or not.
+    BLOSC_LAST_TUNER = 1,
+    //!< Determine the last tuner defined by Blosc.
+    BLOSC_LAST_REGISTERED_TUNE = BLOSC2_GLOBAL_REGISTERED_TUNER_START + BLOSC2_GLOBAL_REGISTERED_TUNERS - 1,
+    //!< Determine the last registered tuner. It is used to check if a tuner is registered or not.
 };
 
 enum {
@@ -1076,30 +1076,30 @@ typedef struct blosc2_context_s blosc2_context;   /* opaque type */
 
 typedef struct {
   void (*init)(void * config, blosc2_context* cctx, blosc2_context* dctx);
-  //!< Initialize tune. Keep in mind dctx may be NULL. This should memcpy the cctx->tune_params.
+  //!< Initialize tuner. Keep in mind dctx may be NULL. This should memcpy the cctx->tuner_params.
   void (*next_blocksize)(blosc2_context * context);
-  //!< Only compute the next blocksize. Only it is executed if tune is not initialized.
+  //!< Only compute the next blocksize. Only it is executed if tuner is not initialized.
   void (*next_cparams)(blosc2_context * context);
-  //!< Compute the next cparams. Only is executed if tune is initialized.
+  //!< Compute the next cparams. Only is executed if tuner is initialized.
   void (*update)(blosc2_context * context, double ctime);
-  //!< Update the tune parameters.
+  //!< Update the tuner parameters.
   void (*free)(blosc2_context * context);
-  //!< Free the tune.
+  //!< Free the tuner.
   int id;
-  //!< The tune id
+  //!< The tuner id
   char *name;
-  //!< The tune name
-} blosc2_tune;
+  //!< The tuner name
+} blosc2_tuner;
 
 
 /**
- * @brief Register locally a user-defined tune in Blosc.
+ * @brief Register locally a user-defined tuner in Blosc.
  *
- * @param tune The tune to register.
+ * @param tuner The tuner to register.
  *
  * @return 0 if succeeds. Else a negative code is returned.
  */
-BLOSC_EXPORT int register_tune_private(blosc2_tune *tune);
+BLOSC_EXPORT int register_tuner_private(blosc2_tuner *tuner);
 
 
 /**
@@ -1187,10 +1187,10 @@ typedef struct {
   //!< The prefilter function.
   blosc2_prefilter_params *preparams;
   //!< The prefilter parameters.
-  void *tune_params;
+  void *tuner_params;
   //!< Tune configuration.
-  int tune_id;
-  //!< The tune id.
+  int tuner_id;
+  //!< The tuner id.
   bool instr_codec;
   //!< Whether the codec is instrumented or not
   void *codec_params;
@@ -1701,10 +1701,10 @@ typedef struct blosc2_schunk {
   //<! The array of variable-length metalayers.
   int16_t nvlmetalayers;
   //!< The number of variable-length metalayers.
-  void *tune_params;
+  void *tuner_params;
   //!< Tune configuration.
-  int tune_id;
-  //<! Id for tune
+  int tuner_id;
+  //<! Id for tuner
   int8_t ndim;
   //<! The ndim (mainly for ZFP usage)
   int64_t *blockshape;
