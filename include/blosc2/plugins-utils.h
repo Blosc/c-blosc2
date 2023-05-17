@@ -72,43 +72,29 @@ const char *dlerror (void) {
 #endif
 
 
-static inline void* load_lib(char *plugin_name, char *path) {
+static inline void* load_lib(char *plugin_name, char *libpath) {
   char python_cmd[PATH_MAX] = {0};
-  char python_path[PATH_MAX] = {0};
-  sprintf(python_cmd, "python -c \"import blosc2_%s; print(blosc2_%s.__path__[0], end='')\"", plugin_name, plugin_name);
+  sprintf(python_cmd, "python -c \"import blosc2_%s; blosc2_%s.print_libpath()\"", plugin_name, plugin_name);
   FILE *fp = popen(python_cmd, "r");
   if (fp == NULL) {
     BLOSC_TRACE_ERROR("Could not run python");
     return NULL;
   }
-  if (fgets(python_path, PATH_MAX, fp) == NULL) {
+  if (fgets(libpath, PATH_MAX, fp) == NULL) {
     BLOSC_TRACE_ERROR("Could not read python output");
     return NULL;
-  }  BLOSC_TRACE_WARNING("python path for plugin blosc2_%s: %s\n", plugin_name, python_path);
+  }
   pclose(fp);
-
-  if (strlen(python_path) == 0) {
-    BLOSC_TRACE_ERROR("Could not find python path");
+  if (strlen(libpath) == 0) {
+    BLOSC_TRACE_ERROR("Could not find plugin libpath");
     return NULL;
   }
   void* loaded_lib;
-#if defined(_WIN32)
-    sprintf(path, "%s/libblosc2_%s.dll", python_path, plugin_name);
-#else
-  sprintf(path, "%s/libblosc2_%s.so", python_path, plugin_name);
-  BLOSC_TRACE_WARNING("Trying first path: %s\n", path);
-  loaded_lib = dlopen(path, RTLD_LAZY);
-  if (loaded_lib != NULL) {
-    return loaded_lib;
-  }
-#endif
-  BLOSC_TRACE_WARNING("First attempt loading library %s. Trying 2nd path", dlerror());
-
-  sprintf(path, "%s/libblosc2_%s.dylib", python_path, plugin_name);
-  BLOSC_TRACE_WARNING("Trying second path: %s\n", path);
-  loaded_lib = dlopen(path, RTLD_LAZY);
+  BLOSC_TRACE_WARNING("libpath for plugin blosc2_%s: %s\n", plugin_name, libpath);
+  loaded_lib = dlopen(libpath, RTLD_LAZY);
   if (loaded_lib == NULL) {
-    BLOSC_TRACE_ERROR("Second attempt loading library %s", dlerror());
+    BLOSC_TRACE_ERROR("Attempt to load plugin in path '%s' failed with error: %s",
+                      libpath, dlerror());
   }
   return loaded_lib;
 }

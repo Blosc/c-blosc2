@@ -791,8 +791,8 @@ static int blosc2_initialize_context_from_header(blosc2_context* context, blosc_
 
 
 int fill_filter(blosc2_filter *filter) {
-  char path[PATH_MAX];
-  void *lib = load_lib(filter->name, path);
+  char libpath[PATH_MAX];
+  void *lib = load_lib(filter->name, libpath);
   if(lib == NULL) {
     BLOSC_TRACE_ERROR("Error while loading the library");
     return BLOSC2_ERROR_FAILURE;
@@ -813,8 +813,8 @@ int fill_filter(blosc2_filter *filter) {
 
 
 int fill_codec(blosc2_codec *codec) {
-  char path[PATH_MAX];
-  void *lib = load_lib(codec->compname, path);
+  char libpath[PATH_MAX];
+  void *lib = load_lib(codec->compname, libpath);
   if(lib == NULL) {
     BLOSC_TRACE_ERROR("Error while loading the library");
     return BLOSC2_ERROR_FAILURE;
@@ -835,8 +835,8 @@ int fill_codec(blosc2_codec *codec) {
 
 
 int fill_tuner(blosc2_tuner *tuner) {
-  char path[PATH_MAX] = {0};
-  void *lib = load_lib(tuner->name, path);
+  char libpath[PATH_MAX] = {0};
+  void *lib = load_lib(tuner->name, libpath);
   if(lib == NULL) {
     BLOSC_TRACE_ERROR("Error while loading the library");
     return BLOSC2_ERROR_FAILURE;
