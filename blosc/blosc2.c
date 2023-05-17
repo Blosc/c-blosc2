@@ -27,7 +27,7 @@
 #include "stune.h"
 #include "blosc2/codecs-registry.h"
 #include "blosc2/filters-registry.h"
-#include "blosc2/tunes-registry.h"
+#include "blosc2/tuners-registry.h"
 
 #include "lz4.h"
 #include "lz4hc.h"
@@ -95,10 +95,10 @@ static uint64_t g_nfilters = 0;
 static blosc2_io_cb g_io[256] = {0};
 static uint64_t g_nio = 0;
 
-blosc2_tune g_tunes[256] = {0};
-int g_ntunes = 0;
+blosc2_tuner g_tuners[256] = {0};
+int g_ntuners = 0;
 
-static int g_tune = BLOSC_STUNE;
+static int g_tuner = BLOSC_STUNE;
 
 // Forward declarations
 int init_threadpool(blosc2_context *context);
@@ -834,23 +834,23 @@ int fill_codec(blosc2_codec *codec) {
 }
 
 
-int fill_tune(blosc2_tune *tune) {
+int fill_tuner(blosc2_tuner *tuner) {
   char path[PATH_MAX] = {0};
-  void *lib = load_lib(tune->name, path);
+  void *lib = load_lib(tuner->name, path);
   if(lib == NULL) {
     BLOSC_TRACE_ERROR("Error while loading the library");
     return BLOSC2_ERROR_FAILURE;
   }
 
-  tune_info *info = dlsym(lib, "info");
-  tune->init = dlsym(lib, info->init);
-  tune->update = dlsym(lib, info->update);
-  tune->next_blocksize = dlsym(lib, info->next_blocksize);
-  tune->free = dlsym(lib, info->free);
-  tune->next_cparams = dlsym(lib, info->next_cparams);
+  tuner_info *info = dlsym(lib, "info");
+  tuner->init = dlsym(lib, info->init);
+  tuner->update = dlsym(lib, info->update);
+  tuner->next_blocksize = dlsym(lib, info->next_blocksize);
+  tuner->free = dlsym(lib, info->free);
+  tuner->next_cparams = dlsym(lib, info->next_cparams);
 
-  if (tune->init == NULL || tune->update == NULL || tune->next_blocksize == NULL || tune->free == NULL
-      || tune->next_cparams == NULL){
+  if (tuner->init == NULL || tuner->update == NULL || tuner->next_blocksize == NULL || tuner->free == NULL
+      || tuner->next_cparams == NULL){
     BLOSC_TRACE_ERROR("Wrong library loaded");
     dlclose(lib);
     return BLOSC2_ERROR_FAILURE;
@@ -2144,7 +2144,7 @@ static int initialize_context_compression(
         uint8_t const *filters_meta, int32_t typesize, int compressor,
         int32_t blocksize, int16_t new_nthreads, int16_t nthreads,
         int32_t splitmode,
-        int tune_id, void *tune_params,
+        int tuner_id, void *tuner_params,
         blosc2_schunk* schunk) {
 
   /* Set parameters */
@@ -2167,55 +2167,55 @@ static int initialize_context_compression(
   context->end_threads = 0;
   context->clevel = clevel;
   context->schunk = schunk;
-  context->tune_params = tune_params;
-  context->tune_id = tune_id;
+  context->tuner_params = tuner_params;
+  context->tuner_id = tuner_id;
   context->splitmode = splitmode;
-  /* Tune some compression parameters */
+  /* tuner some compression parameters */
   context->blocksize = (int32_t)blocksize;
-  if (context->tune_params != NULL) {
-    if (context->tune_id < BLOSC_LAST_TUNE && context->tune_id == BLOSC_STUNE) {
+  if (context->tuner_params != NULL) {
+    if (context->tuner_id < BLOSC_LAST_TUNER && context->tuner_id == BLOSC_STUNE) {
       blosc_stune_next_cparams(context);
     } else {
-      for (int i = 0; i < g_ntunes; ++i) {
-        if (g_tunes[i].id == context->tune_id) {
-          if (g_tunes[i].next_cparams == NULL) {
-            if (fill_tune(&g_tunes[i]) < 0) {
-              BLOSC_TRACE_ERROR("Could not load tune %d.", g_tunes[i].id);
+      for (int i = 0; i < g_ntuners; ++i) {
+        if (g_tuners[i].id == context->tuner_id) {
+          if (g_tuners[i].next_cparams == NULL) {
+            if (fill_tuner(&g_tuners[i]) < 0) {
+              BLOSC_TRACE_ERROR("Could not load tuner %d.", g_tuners[i].id);
               return BLOSC2_ERROR_FAILURE;
             }
           }
-          g_tunes[i].next_cparams(context);
-          if (g_tunes[i].id == BLOSC_BTUNE && context->blocksize == 0) {
+          g_tuners[i].next_cparams(context);
+          if (g_tuners[i].id == BLOSC_BTUNE && context->blocksize == 0) {
             // Call stune for initializing blocksize
             blosc_stune_next_blocksize(context);
           }
-          goto urtunesuccess;
+          goto urtunersuccess;
         }
       }
-      BLOSC_TRACE_ERROR("User-defined tune %d not found\n", context->tune_id);
+      BLOSC_TRACE_ERROR("User-defined tuner %d not found\n", context->tuner_id);
       return BLOSC2_ERROR_INVALID_PARAM;
     }
   } else {
-    if (context->tune_id < BLOSC_LAST_TUNE && context->tune_id == BLOSC_STUNE) {
+    if (context->tuner_id < BLOSC_LAST_TUNER && context->tuner_id == BLOSC_STUNE) {
       blosc_stune_next_blocksize(context);
     } else {
-      for (int i = 0; i < g_ntunes; ++i) {
-        if (g_tunes[i].id == context->tune_id) {
-          if (g_tunes[i].next_blocksize == NULL) {
-            if (fill_tune(&g_tunes[i]) < 0) {
-              BLOSC_TRACE_ERROR("Could not load tune %d.", g_tunes[i].id);
+      for (int i = 0; i < g_ntuners; ++i) {
+        if (g_tuners[i].id == context->tuner_id) {
+          if (g_tuners[i].next_blocksize == NULL) {
+            if (fill_tuner(&g_tuners[i]) < 0) {
+              BLOSC_TRACE_ERROR("Could not load tuner %d.", g_tuners[i].id);
               return BLOSC2_ERROR_FAILURE;
             }
           }
-          g_tunes[i].next_blocksize(context);
-          goto urtunesuccess;
+          g_tuners[i].next_blocksize(context);
+          goto urtunersuccess;
         }
       }
-      BLOSC_TRACE_ERROR("User-defined tune %d not found\n", context->tune_id);
+      BLOSC_TRACE_ERROR("User-defined tuner %d not found\n", context->tuner_id);
       return BLOSC2_ERROR_INVALID_PARAM;
     }
   }
-  urtunesuccess:;
+  urtunersuccess:;
 
   /* Check buffer size limits */
   if (srcsize > BLOSC2_MAX_BUFFERSIZE) {
@@ -2491,30 +2491,30 @@ static int blosc_compress_context(blosc2_context* context) {
     _sw32(context->dest + BLOSC2_CHUNK_BLOCKSIZE, blocksize);
   }
 
-  /* Set the number of bytes in dest buffer (might be useful for tune) */
+  /* Set the number of bytes in dest buffer (might be useful for tuner) */
   context->destsize = ntbytes;
 
-  if (context->tune_params != NULL) {
+  if (context->tuner_params != NULL) {
     blosc_set_timestamp(&current);
     double ctime = blosc_elapsed_secs(last, current);
-    if (context->tune_id < BLOSC_LAST_TUNE && context->tune_id == BLOSC_STUNE) {
+    if (context->tuner_id < BLOSC_LAST_TUNER && context->tuner_id == BLOSC_STUNE) {
       blosc_stune_update(context, ctime);
     } else {
-      for (int i = 0; i < g_ntunes; ++i) {
-        if (g_tunes[i].id == context->tune_id) {
-          if (g_tunes[i].update == NULL) {
-            if (fill_tune(&g_tunes[i]) < 0) {
-              BLOSC_TRACE_ERROR("Could not load tune %d.", g_tunes[i].id);
+      for (int i = 0; i < g_ntuners; ++i) {
+        if (g_tuners[i].id == context->tuner_id) {
+          if (g_tuners[i].update == NULL) {
+            if (fill_tuner(&g_tuners[i]) < 0) {
+              BLOSC_TRACE_ERROR("Could not load tuner %d.", g_tuners[i].id);
               return BLOSC2_ERROR_FAILURE;
             }
           }
-          g_tunes[i].update(context, ctime);
-          goto urtunesuccess;
+          g_tuners[i].update(context, ctime);
+          goto urtunersuccess;
         }
       }
-      BLOSC_TRACE_ERROR("User-defined tune %d not found\n", context->tune_id);
+      BLOSC_TRACE_ERROR("User-defined tuner %d not found\n", context->tuner_id);
       return BLOSC2_ERROR_INVALID_PARAM;
-      urtunesuccess:;
+      urtunersuccess:;
     }
   }
 
@@ -2537,7 +2537,7 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
           context->new_nthreads, context->nthreads, context->splitmode,
-          context->tune_id, context->tune_params, context->schunk);
+          context->tuner_id, context->tuner_params, context->schunk);
   if (error <= 0) {
     return error;
   }
@@ -2811,7 +2811,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   error = initialize_context_compression(
           g_global_context, src, srcsize, dest, destsize, clevel, filters,
           filters_meta, (int32_t)typesize, g_compressor, g_force_blocksize, g_nthreads, g_nthreads,
-          g_splitmode, g_tune, NULL, g_schunk);
+          g_splitmode, g_tuner, NULL, g_schunk);
   free(filters);
   free(filters_meta);
   if (error <= 0) {
@@ -3750,14 +3750,14 @@ void blosc2_init(void) {
 
   g_ncodecs = 0;
   g_nfilters = 0;
-  g_ntunes = 0;
+  g_ntuners = 0;
 
 #if defined(HAVE_PLUGINS)
   #include "blosc2/blosc2-common.h"
   #include "blosc2/blosc2-stdio.h"
   register_codecs();
   register_filters();
-  register_tunes();
+  register_tuners();
 #endif
   pthread_mutex_init(&global_comp_mutex, NULL);
   /* Create a global context */
@@ -4031,27 +4031,27 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     memcpy(context->preparams, cparams.preparams, sizeof(blosc2_prefilter_params));
   }
 
-  if (cparams.tune_id <= 0) {
-    cparams.tune_id = g_tune;
+  if (cparams.tuner_id <= 0) {
+    cparams.tuner_id = g_tuner;
   } else {
-    for (int i = 0; i < g_ntunes; ++i) {
-      if (g_tunes[i].id == cparams.tune_id) {
-        if (g_tunes[i].init == NULL) {
-          if (fill_tune(&g_tunes[i]) < 0) {
-            BLOSC_TRACE_ERROR("Could not load tune %d.", g_tunes[i].id);
+    for (int i = 0; i < g_ntuners; ++i) {
+      if (g_tuners[i].id == cparams.tuner_id) {
+        if (g_tuners[i].init == NULL) {
+          if (fill_tuner(&g_tuners[i]) < 0) {
+            BLOSC_TRACE_ERROR("Could not load tuner %d.", g_tuners[i].id);
             return NULL;
           }
         }
-        g_tunes[i].init(cparams.tune_params, context, NULL);
-        goto urtunesuccess;
+        g_tuners[i].init(cparams.tuner_params, context, NULL);
+        goto urtunersuccess;
       }
     }
-    BLOSC_TRACE_ERROR("User-defined tune %d not found\n", cparams.tune_id);
+    BLOSC_TRACE_ERROR("User-defined tuner %d not found\n", cparams.tuner_id);
     return NULL;
   }
-  urtunesuccess:;
+  urtunersuccess:;
 
-  context->tune_id = cparams.tune_id;
+  context->tuner_id = cparams.tuner_id;
 
   context->codec_params = cparams.codec_params;
   memcpy(context->filter_params, cparams.filter_params, BLOSC2_MAX_FILTERS * sizeof(void*));
@@ -4109,25 +4109,25 @@ void blosc2_free_ctx(blosc2_context* context) {
     ZSTD_freeDDict(context->dict_ddict);
 #endif
   }
-  if (context->tune_params != NULL) {
-    if (context->tune_id < BLOSC_LAST_TUNE && context->tune_id == BLOSC_STUNE) {
+  if (context->tuner_params != NULL) {
+    if (context->tuner_id < BLOSC_LAST_TUNER && context->tuner_id == BLOSC_STUNE) {
       blosc_stune_free(context);
     } else {
-      for (int i = 0; i < g_ntunes; ++i) {
-        if (g_tunes[i].id == context->tune_id) {
-          if (g_tunes[i].free == NULL) {
-            if (fill_tune(&g_tunes[i]) < 0) {
-              BLOSC_TRACE_ERROR("Could not load tune %d.", g_tunes[i].id);
+      for (int i = 0; i < g_ntuners; ++i) {
+        if (g_tuners[i].id == context->tuner_id) {
+          if (g_tuners[i].free == NULL) {
+            if (fill_tuner(&g_tuners[i]) < 0) {
+              BLOSC_TRACE_ERROR("Could not load tuner %d.", g_tuners[i].id);
               return;
             }
           }
-          g_tunes[i].free(context);
-          goto urtunesuccess;
+          g_tuners[i].free(context);
+          goto urtunersuccess;
         }
       }
-      BLOSC_TRACE_ERROR("User-defined tune %d not found\n", context->tune_id);
+      BLOSC_TRACE_ERROR("User-defined tuner %d not found\n", context->tuner_id);
       return;
-      urtunesuccess:;
+      urtunersuccess:;
     }
   }
   if (context->prefilter != NULL) {
@@ -4161,7 +4161,7 @@ int blosc2_ctx_get_cparams(blosc2_context *ctx, blosc2_cparams *cparams) {
   }
   cparams->prefilter = ctx->prefilter;
   cparams->preparams = ctx->preparams;
-  cparams->tune_id = ctx->tune_id;
+  cparams->tuner_id = ctx->tuner_id;
   cparams->codec_params = ctx->codec_params;
 
   return BLOSC2_ERROR_SUCCESS;
@@ -4216,7 +4216,7 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const int32_t nbytes, void* dest,
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
           context->new_nthreads, context->nthreads, context->splitmode,
-          context->tune_id, context->tune_params, context->schunk);
+          context->tuner_id, context->tuner_params, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
     return error;
@@ -4258,7 +4258,7 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const int32_t nbytes, void* dest
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
           context->new_nthreads, context->nthreads, context->splitmode,
-          context->tune_id, context->tune_params, context->schunk);
+          context->tuner_id, context->tuner_params, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
     return error;
@@ -4301,7 +4301,7 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const int32_t nbytes, void* dest, 
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
           context->new_nthreads, context->nthreads, context->splitmode,
-          context->tune_id, context->tune_params, context->schunk);
+          context->tuner_id, context->tuner_params, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
     return error;
@@ -4346,7 +4346,7 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const int32_t nbytes,
           context->clevel, context->filters, context->filters_meta,
           context->typesize, context->compcode, context->blocksize,
           context->new_nthreads, context->nthreads, context->splitmode,
-          context->tune_id, context->tune_params, context->schunk);
+          context->tuner_id, context->tuner_params, context->schunk);
   if (error <= 0) {
     blosc2_free_ctx(context);
     return error;
@@ -4458,41 +4458,41 @@ int blosc2_register_codec(blosc2_codec *codec) {
 }
 
 
-/* Register tunes */
+/* Register tuners */
 
-int register_tune_private(blosc2_tune *tune) {
-  BLOSC_ERROR_NULL(tune, BLOSC2_ERROR_INVALID_PARAM);
-  if (g_ntunes == UINT8_MAX) {
-    BLOSC_TRACE_ERROR("Can not register more tunes");
+int register_tuner_private(blosc2_tuner *tuner) {
+  BLOSC_ERROR_NULL(tuner, BLOSC2_ERROR_INVALID_PARAM);
+  if (g_ntuners == UINT8_MAX) {
+    BLOSC_TRACE_ERROR("Can not register more tuners");
     return BLOSC2_ERROR_CODEC_SUPPORT;
   }
-  if (tune->id < BLOSC2_GLOBAL_REGISTERED_TUNE_START) {
-    BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_GLOBAL_REGISTERED_TUNE_START);
+  if (tuner->id < BLOSC2_GLOBAL_REGISTERED_TUNER_START) {
+    BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_GLOBAL_REGISTERED_TUNER_START);
     return BLOSC2_ERROR_FAILURE;
   }
 
-  // Check if the tune is already registered
-  for (int i = 0; i < g_ntunes; ++i) {
-    if (g_tunes[i].id == tune->id) {
-      BLOSC_TRACE_ERROR("The tune is already registered!");
+  // Check if the tuner is already registered
+  for (int i = 0; i < g_ntuners; ++i) {
+    if (g_tuners[i].id == tuner->id) {
+      BLOSC_TRACE_ERROR("The tuner is already registered!");
       return BLOSC2_ERROR_FAILURE;
     }
   }
 
-  blosc2_tune *tune_new = &g_tunes[g_ntunes++];
-  memcpy(tune_new, tune, sizeof(blosc2_tune));
+  blosc2_tuner *tuner_new = &g_tuners[g_ntuners++];
+  memcpy(tuner_new, tuner, sizeof(blosc2_tuner));
 
   return BLOSC2_ERROR_SUCCESS;
 }
 
 
-int blosc2_register_tune(blosc2_tune *tune) {
-  if (tune->id < BLOSC2_USER_REGISTERED_TUNE_START) {
-    BLOSC_TRACE_ERROR("The id must be greater or equal to %d", BLOSC2_USER_REGISTERED_TUNE_START);
+int blosc2_register_tuner(blosc2_tuner *tuner) {
+  if (tuner->id < BLOSC2_USER_REGISTERED_TUNER_START) {
+    BLOSC_TRACE_ERROR("The id must be greater or equal to %d", BLOSC2_USER_REGISTERED_TUNER_START);
     return BLOSC2_ERROR_FAILURE;
   }
 
-  return register_tune_private(tune);
+  return register_tuner_private(tuner);
 }
 
 

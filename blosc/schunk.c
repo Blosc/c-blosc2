@@ -10,7 +10,7 @@
 
 
 #include "blosc-private.h"
-#include "blosc2/tunes-registry.h"
+#include "blosc2/tuners-registry.h"
 #include "frame.h"
 #include "stune.h"
 #include "blosc2.h"
@@ -89,8 +89,8 @@ void update_schunk_properties(struct blosc2_schunk* schunk) {
   schunk->typesize = cparams->typesize;
   schunk->blocksize = cparams->blocksize;
   schunk->chunksize = -1;
-  schunk->tune_params = cparams->tune_params;
-  schunk->tune_id = cparams->tune_id;
+  schunk->tuner_params = cparams->tuner_params;
+  schunk->tuner_id = cparams->tuner_id;
 
   /* The compression context */
   if (schunk->cctx != NULL) {
@@ -127,31 +127,31 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
   char* btune_balance = getenv("BTUNE_BALANCE");
   if (btune_balance != NULL) {
     // If BTUNE_BALANCE passed, automatically use btune
-    storage->cparams->tune_id = BLOSC_BTUNE;
+    storage->cparams->tuner_id = BLOSC_BTUNE;
   }
 
   // ...and update internal properties
   update_schunk_properties(schunk);
 
-  if (schunk->cctx->tune_id < BLOSC_LAST_TUNE && schunk->cctx->tune_id == BLOSC_STUNE) {
-    blosc_stune_init(schunk->storage->cparams->tune_params, schunk->cctx, schunk->dctx);
+  if (schunk->cctx->tuner_id < BLOSC_LAST_TUNER && schunk->cctx->tuner_id == BLOSC_STUNE) {
+    blosc_stune_init(schunk->storage->cparams->tuner_params, schunk->cctx, schunk->dctx);
   } else {
-    for (int i = 0; i < g_ntunes; ++i) {
-      if (g_tunes[i].id == schunk->cctx->tune_id) {
-        if (g_tunes[i].init == NULL) {
-          if (fill_tune(&g_tunes[i]) < 0) {
-            BLOSC_TRACE_ERROR("Could not load tune %d.", g_tunes[i].id);
+    for (int i = 0; i < g_ntuners; ++i) {
+      if (g_tuners[i].id == schunk->cctx->tuner_id) {
+        if (g_tuners[i].init == NULL) {
+          if (fill_tuner(&g_tuners[i]) < 0) {
+            BLOSC_TRACE_ERROR("Could not load tuner %d.", g_tuners[i].id);
             return NULL;
           }
         }
-        g_tunes[i].init(schunk->storage->cparams->tune_params, schunk->cctx, schunk->dctx);
-        goto urtunesuccess;
+        g_tuners[i].init(schunk->storage->cparams->tuner_params, schunk->cctx, schunk->dctx);
+        goto urtunersuccess;
       }
     }
-    BLOSC_TRACE_ERROR("User-defined tune %d not found\n", schunk->cctx->tune_id);
+    BLOSC_TRACE_ERROR("User-defined tuner %d not found\n", schunk->cctx->tuner_id);
     return NULL;
   }
-  urtunesuccess:;
+  urtunersuccess:;
 
   if (!storage->contiguous && storage->urlpath != NULL){
     char* urlpath;

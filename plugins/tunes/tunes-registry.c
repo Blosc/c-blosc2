@@ -4,12 +4,12 @@
   License: BSD 3-Clause (see LICENSE.txt)
 */
 
-#include "blosc2/tunes-registry.h"
+#include "blosc2/tuners-registry.h"
 #include "blosc-private.h"
 
-void register_tunes(void) {
+void register_tuners(void) {
 
-  blosc2_tune btune;
+  blosc2_tuner btune;
   btune.id = BLOSC_BTUNE;
   btune.name = "btune";
   btune.init = NULL;
@@ -18,5 +18,5 @@ void register_tunes(void) {
   btune.update = NULL;
   btune.free = NULL;
 
-  register_tune_private(&btune);
+  register_tuner_private(&btune);
 }

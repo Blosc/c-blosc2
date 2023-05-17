@@ -175,12 +175,12 @@ int register_codec_private(blosc2_codec *codec);
  *
  * @return 0 if succeeds. Else a negative code is returned.
  */
-int register_tune_private(blosc2_tune *tune);
+int register_tuner_private(blosc2_tuner *tuner);
 
-int fill_tune(blosc2_tune *tune);
+int fill_tuner(blosc2_tuner *tuner);
 
-extern blosc2_tune g_tunes[256];
-extern int g_ntunes;
+extern blosc2_tuner g_tuners[256];
+extern int g_ntuners;
 #ifdef __cplusplus
 }
 #endif
