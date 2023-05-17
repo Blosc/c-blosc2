@@ -91,12 +91,13 @@ static inline void* load_lib(char *plugin_name, char *path) {
     BLOSC_TRACE_ERROR("Could not find python path");
     return NULL;
   }
+  void* loaded_lib;
 #if defined(_WIN32)
     sprintf(path, "%s/libblosc2_%s.dll", python_path, plugin_name);
 #else
   sprintf(path, "%s/libblosc2_%s.so", python_path, plugin_name);
   BLOSC_TRACE_WARNING("Trying first path: %s\n", path);
-  void* loaded_lib = dlopen(path, RTLD_LAZY);
+  loaded_lib = dlopen(path, RTLD_LAZY);
   if (loaded_lib != NULL) {
     return loaded_lib;
   }
