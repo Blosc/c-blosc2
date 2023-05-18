@@ -106,7 +106,11 @@ int main(void) {
   udcodec.encoder = codec_encoder;
   udcodec.decoder = codec_decoder;
 
-  blosc2_register_codec(&udcodec);
+  int rc = blosc2_register_codec(&udcodec);
+  if (rc < 0) {
+    printf("Cannot register codec!");
+    return -1;
+  }
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.compcode = 244;

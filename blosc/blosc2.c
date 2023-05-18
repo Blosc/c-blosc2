@@ -92,7 +92,7 @@ uint8_t g_ncodecs = 0;
 static blosc2_filter g_filters[256] = {0};
 static uint64_t g_nfilters = 0;
 
-static blosc2_io_cb g_io[256] = {0};
+static blosc2_io_cb g_ios[256] = {0};
 static uint64_t g_nio = 0;
 
 blosc2_tuner g_tuners[256] = {0};
@@ -3740,6 +3740,7 @@ void blosc2_init(void) {
   if (g_initlib) return;
 
   BLOSC2_IO_CB_DEFAULTS.id = BLOSC2_IO_FILESYSTEM;
+  BLOSC2_IO_CB_DEFAULTS.name = "filesystem";
   BLOSC2_IO_CB_DEFAULTS.open = (blosc2_open_cb) blosc2_stdio_open;
   BLOSC2_IO_CB_DEFAULTS.close = (blosc2_close_cb) blosc2_stdio_close;
   BLOSC2_IO_CB_DEFAULTS.tell = (blosc2_tell_cb) blosc2_stdio_tell;
@@ -4389,12 +4390,14 @@ int register_filter_private(blosc2_filter *filter) {
     }
     */
 
-    // Check if the filter is already registered
     for (uint64_t i = 0; i < g_nfilters; ++i) {
-        if (g_filters[i].id == filter->id) {
-            BLOSC_TRACE_ERROR("The filter is already registered!");
-            return BLOSC2_ERROR_FAILURE;
+      if (g_filters[i].id == filter->id) {
+        if (strcmp(g_filters[i].name, filter->name) != 0) {
+          BLOSC_TRACE_ERROR("The filter (ID: %d) plugin is already registered with name: %s."
+                            "  Choose another one !", filter->id, g_filters[i].name);
+          return BLOSC2_ERROR_FAILURE;
         }
+      }
     }
 
     blosc2_filter *filter_new = &g_filters[g_nfilters++];
@@ -4419,26 +4422,28 @@ int blosc2_register_filter(blosc2_filter *filter) {
 int register_codec_private(blosc2_codec *codec) {
     BLOSC_ERROR_NULL(codec, BLOSC2_ERROR_INVALID_PARAM);
     if (g_ncodecs == UINT8_MAX) {
-        BLOSC_TRACE_ERROR("Can not register more codecs");
-        return BLOSC2_ERROR_CODEC_SUPPORT;
+      BLOSC_TRACE_ERROR("Can not register more codecs");
+      return BLOSC2_ERROR_CODEC_SUPPORT;
     }
     if (codec->compcode < BLOSC2_GLOBAL_REGISTERED_CODECS_START) {
-        BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_GLOBAL_REGISTERED_CODECS_START);
-        return BLOSC2_ERROR_FAILURE;
+      BLOSC_TRACE_ERROR("The id must be greater or equal than %d", BLOSC2_GLOBAL_REGISTERED_CODECS_START);
+      return BLOSC2_ERROR_FAILURE;
     }
     /* This condition can never be fulfilled
     if (codec->compcode > BLOSC2_USER_REGISTERED_CODECS_STOP) {
-        BLOSC_TRACE_ERROR("The id must be less or equal to %d", BLOSC2_USER_REGISTERED_CODECS_STOP);
-        return BLOSC2_ERROR_FAILURE;
+      BLOSC_TRACE_ERROR("The id must be less or equal to %d", BLOSC2_USER_REGISTERED_CODECS_STOP);
+      return BLOSC2_ERROR_FAILURE;
     }
      */
 
-    // Check if the code is already registered
     for (int i = 0; i < g_ncodecs; ++i) {
-        if (g_codecs[i].compcode == codec->compcode) {
-            BLOSC_TRACE_ERROR("The codec is already registered!");
-            return BLOSC2_ERROR_CODEC_PARAM;
+      if (g_codecs[i].compcode == codec->compcode) {
+        if (strcmp(g_codecs[i].compname, codec->compname) != 0) {
+          BLOSC_TRACE_ERROR("The codec (ID: %d) plugin is already registered with name: %s."
+                            "  Choose another one !", codec->compcode, codec->compname);
+          return BLOSC2_ERROR_CODEC_PARAM;
         }
+      }
     }
 
     blosc2_codec *codec_new = &g_codecs[g_ncodecs++];
@@ -4471,11 +4476,13 @@ int register_tuner_private(blosc2_tuner *tuner) {
     return BLOSC2_ERROR_FAILURE;
   }
 
-  // Check if the tuner is already registered
   for (int i = 0; i < g_ntuners; ++i) {
     if (g_tuners[i].id == tuner->id) {
-      BLOSC_TRACE_ERROR("The tuner is already registered!");
-      return BLOSC2_ERROR_FAILURE;
+      if (strcmp(g_tuners[i].name, tuner->name) != 0) {
+        BLOSC_TRACE_ERROR("The tuner (ID: %d) plugin is already registered with name: %s."
+                          "  Choose another one !", tuner->id, g_tuners[i].name);
+        return BLOSC2_ERROR_FAILURE;
+      }
     }
   }
 
@@ -4498,15 +4505,17 @@ int blosc2_register_tuner(blosc2_tuner *tuner) {
 
 int _blosc2_register_io_cb(const blosc2_io_cb *io) {
 
-  // Check if the io is already registered
   for (uint64_t i = 0; i < g_nio; ++i) {
-    if (g_io[i].id == io->id) {
-      BLOSC_TRACE_ERROR("The codec is already registered!");
-      return BLOSC2_ERROR_PLUGIN_IO;
+    if (g_ios[i].id == io->id) {
+      if (strcmp(g_ios[i].name, io->name) != 0) {
+        BLOSC_TRACE_ERROR("The IO (ID: %d) plugin is already registered with name: %s."
+                          "  Choose another one !", io->id, g_ios[i].name);
+        return BLOSC2_ERROR_PLUGIN_IO;
+      }
     }
   }
 
-  blosc2_io_cb *io_new = &g_io[g_nio++];
+  blosc2_io_cb *io_new = &g_ios[g_nio++];
   memcpy(io_new, io, sizeof(blosc2_io_cb));
 
   return BLOSC2_ERROR_SUCCESS;
@@ -4529,8 +4538,8 @@ int blosc2_register_io_cb(const blosc2_io_cb *io) {
 
 blosc2_io_cb *blosc2_get_io_cb(uint8_t id) {
   for (uint64_t i = 0; i < g_nio; ++i) {
-    if (g_io[i].id == id) {
-      return &g_io[i];
+    if (g_ios[i].id == id) {
+      return &g_ios[i];
     }
   }
   if (id == BLOSC2_IO_FILESYSTEM) {

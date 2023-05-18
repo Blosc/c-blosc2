@@ -1024,6 +1024,8 @@ typedef int     (*blosc2_truncate_cb)(void *stream, int64_t size);
 typedef struct {
   uint8_t id;
   //!< The IO identifier.
+  char* name;
+  //!< The IO name.
   blosc2_open_cb open;
   //!< The IO open callback.
   blosc2_close_cb close;
@@ -1046,6 +1048,7 @@ typedef struct {
  */
 typedef struct {
   uint8_t id;
+  char *name;
   //!< The IO identifier.
   void *params;
   //!< The IO parameters.
@@ -1053,6 +1056,7 @@ typedef struct {
 
 static const blosc2_io BLOSC2_IO_DEFAULTS = {
     .id = BLOSC2_IO_FILESYSTEM,
+    .name = "filesystem",
     .params = NULL,
 };
 
