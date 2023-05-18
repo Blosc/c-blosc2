@@ -18,6 +18,10 @@
 #define popen _popen
 #define pclose _pclose
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 static struct {
     long lasterror;
     const char *err_rutin;
@@ -98,3 +102,7 @@ static inline void* load_lib(char *plugin_name, char *libpath) {
   }
   return loaded_lib;
 }
+
+#ifdef __cplusplus
+}
+#endif

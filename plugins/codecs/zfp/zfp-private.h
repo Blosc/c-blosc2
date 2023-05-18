@@ -16,10 +16,6 @@
 #define ZFP_MAX_DIM 4
 #define ZFP_CELL_SHAPE 4
 
-
-#if defined (__cplusplus)
-extern "C" {
-#endif
 #define XXH_INLINE_ALL
 
 #define ZFP_ERROR_NULL(pointer)         \
@@ -28,10 +24,5 @@ extern "C" {
       return 0;                    \
     }                                \
   } while (0)
-
-
-#if defined (__cplusplus)
-}
-#endif
 
 #endif /* ZFP_PRIVATE_H */

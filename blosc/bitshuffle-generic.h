@@ -20,10 +20,6 @@
 #include <blosc2/blosc2-common.h>
 #include <stdlib.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 
 /*  Macros. */
 #define CHECK_MULT_EIGHT(n) if ((n) % 8) return -80;
@@ -157,10 +153,5 @@ bshuf_trans_bit_elem_scal(const void* in, void* out, const size_t size,
 BLOSC_NO_EXPORT int64_t
 bshuf_untrans_bit_elem_scal(const void* in, void* out, const size_t size,
                             const size_t elem_size, void* tmp_buf);
-
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* BITSHUFFLE_GENERIC_H */

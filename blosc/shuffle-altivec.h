@@ -15,10 +15,6 @@
 
 #include "blosc2/blosc2-common.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
   ALTIVEC-accelerated shuffle routine.
 */
@@ -30,9 +26,5 @@ BLOSC_NO_EXPORT void shuffle_altivec(const int32_t bytesoftype, const int32_t bl
 */
 BLOSC_NO_EXPORT void unshuffle_altivec(const int32_t bytesoftype, const int32_t blocksize,
                                        const uint8_t *_src, uint8_t *_dest);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* SHUFFLE_ALTIVEC_H */

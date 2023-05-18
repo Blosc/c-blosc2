@@ -15,9 +15,6 @@
 
 #include "context.h"
 
-#if defined (__cplusplus)
-extern "C" {
-#endif
 #define XXH_INLINE_ALL
 
 #define NDLZ_ERROR_NULL(pointer)         \
@@ -26,10 +23,5 @@ extern "C" {
       return 0;                    \
     }                                \
   } while (0)
-
-
-#if defined (__cplusplus)
-}
-#endif
 
 #endif /* NDLZ_PRIVATE_H */

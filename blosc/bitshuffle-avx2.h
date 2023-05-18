@@ -15,10 +15,6 @@
 
 #include <blosc2/blosc2-common.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
   AVX2-accelerated bitshuffle routine.
 */
@@ -32,9 +28,5 @@ BLOSC_NO_EXPORT int64_t
 BLOSC_NO_EXPORT int64_t
     bshuf_untrans_bit_elem_avx2(void* in, void* out, const size_t size,
                                 const size_t elem_size, void* tmp_buf);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* BITSHUFFLE_AVX2_H */

@@ -8,6 +8,10 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 enum {
     BLOSC_BTUNE = 32,
 };
@@ -22,3 +26,7 @@ typedef struct {
     char *update;
     char *free;
 } tuner_info;
+
+#ifdef __cplusplus
+}
+#endif

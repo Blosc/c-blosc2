@@ -20,15 +20,9 @@
 #ifndef BLOSC2_H
 #define BLOSC2_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 #include "blosc2/blosc2-export.h"
 #include "blosc2/blosc2-common.h"
 #include "blosc2/blosc2-stdio.h"
-#ifdef __cplusplus
-}
-#endif
 
 #if defined(_WIN32) && !defined(__MINGW32__)
 #include <windows.h>
