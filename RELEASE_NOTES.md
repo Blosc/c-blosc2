@@ -4,7 +4,29 @@ Release notes for C-Blosc2
 Changes from 2.9.1 to 2.9.2
 ===========================
 
-#XXX version-specific blurb XXX#
+* Now is possible to register the same plugin (as long as they have the same
+  ID *and* name) without errors.  This is useful for registering the same
+  plugin without worrying on whether it has been registered already.
+
+* Improved detection of dynamic plugin locations.  Now they must implement
+  `plugin_module.print_libpath()` as the canonical way to find the path for
+  the dynamic library plugin.
+
+* The `blosc2_static` has gained the cmake POSITION_INDEPENDENT_CODE property.
+  This should allow to use the static library in more situations.
+
+* `BLOSC_STUNE` is defined in `blosc2.h` now.  Fixes #481.  Thanks to
+  @DimitriPapadopoulos.
+
+* Fixed an issue when having incompressible data in combination with lazy_chunks.
+
+* Fix linking with static -DBUILD_STATIC=0. Fixes #480.
+
+* Visual Studio 2010 (version 10.0) has been deprecated.  Now, users will
+  need to use Visual Studio 2012 (version 11.0) or later.
+
+* Many small fixes and code improvements.  Thanks to @DimitriPapadopoulos,
+  @bnavigator.
 
 
 Changes from 2.9.0 to 2.9.1
