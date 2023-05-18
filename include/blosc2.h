@@ -1048,7 +1048,7 @@ typedef struct {
  */
 typedef struct {
   uint8_t id;
-  char *name;
+  const char *name;
   //!< The IO identifier.
   void *params;
   //!< The IO parameters.
