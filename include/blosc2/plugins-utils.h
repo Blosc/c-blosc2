@@ -86,6 +86,7 @@ static inline void* load_lib(char *plugin_name, char *libpath) {
   }
   if (fgets(libpath, PATH_MAX, fp) == NULL) {
     BLOSC_TRACE_ERROR("Could not read python output");
+    pclose(fp);
     return NULL;
   }
   pclose(fp);
