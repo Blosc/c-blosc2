@@ -172,11 +172,9 @@ int _cutest_run(int (*test)(void), char *name) {
       snprintf(test_name, MAXLEN_TESTNAME, "%s%s[%d], ", aux, cutest_params[i].name,
                cutest_params_ind[i]);
     }
-    test_name[strlen(test_name) - 1] = 0;
-    strncpy(&test_name[strlen(test_name) - 1], ")", 1);
-    if (nparams == 0) {
-      test_name[strlen(test_name) - 1] = 0;
-    }
+    if (nparams > 0)
+      test_name[strlen(test_name) - 2] = ')';
+    test_name[strlen(test_name) - 1] = '\0';
     printf("%s ", test_name);
 
     cutest_total++;
