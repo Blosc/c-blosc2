@@ -12,10 +12,6 @@
 #ifndef IARRAY_BLOSC_PRIVATE_H
 #define IARRAY_BLOSC_PRIVATE_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "stdbool.h"
 #include "blosc2.h"
 #include "blosc2/blosc2-common.h"
@@ -181,8 +177,5 @@ int fill_tuner(blosc2_tuner *tuner);
 
 extern blosc2_tuner g_tuners[256];
 extern int g_ntuners;
-#ifdef __cplusplus
-}
-#endif
 
 #endif //IARRAY_BLOSC_PRIVATE_H

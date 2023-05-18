@@ -8,6 +8,10 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 enum {
     BLOSC_CODEC_NDLZ = 32,
     BLOSC_CODEC_ZFP_FIXED_ACCURACY = 33,
@@ -25,3 +29,7 @@ typedef struct {
 
 // Silence unused codec_info typedef warning
 static codec_info codec_info_defaults BLOSC_ATTRIBUTE_UNUSED = {0};
+
+#ifdef __cplusplus
+}
+#endif

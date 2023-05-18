@@ -17,10 +17,6 @@
 
 #include "blosc2/blosc2-common.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
   NEON-accelerated shuffle routine.
 */
@@ -32,9 +28,5 @@ BLOSC_NO_EXPORT void shuffle_neon(const int32_t bytesoftype, const int32_t block
 */
 BLOSC_NO_EXPORT void unshuffle_neon(const int32_t bytesoftype, const int32_t blocksize,
                                     const uint8_t *_src, uint8_t *_dest);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* SHUFFLE_NEON_H */

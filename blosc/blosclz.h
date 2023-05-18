@@ -19,10 +19,6 @@
 #define BLOSCLZ_H
 #include "context.h"
 
-#if defined (__cplusplus)
-extern "C" {
-#endif
-
 #define BLOSCLZ_VERSION_STRING "2.5.3"
 
 
@@ -62,9 +58,5 @@ int blosclz_compress(int opt_level, const void* input, int length,
  */
 
 int blosclz_decompress(const void* input, int length, void* output, int maxout);
-
-#if defined (__cplusplus)
-}
-#endif
 
 #endif /* BLOSCLZ_H */

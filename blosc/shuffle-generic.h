@@ -23,10 +23,6 @@
 #include "blosc2/blosc2-common.h"
 #include <stdlib.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
   Generic (non-hardware-accelerated) shuffle routine.
   This is the pure element-copying nested loop. It is used by the
@@ -94,9 +90,5 @@ BLOSC_NO_EXPORT void shuffle_generic(const int32_t bytesoftype, const int32_t bl
 */
 BLOSC_NO_EXPORT void unshuffle_generic(const int32_t bytesoftype, const int32_t blocksize,
                                        const uint8_t *_src, uint8_t *_dest);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* SHUFFLE_GENERIC_H */

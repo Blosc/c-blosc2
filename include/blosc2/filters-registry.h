@@ -8,6 +8,10 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 enum {
     BLOSC_FILTER_NDCELL = 32,
     BLOSC_FILTER_NDMEAN = 33,
@@ -21,3 +25,7 @@ typedef struct {
     char *forward;
     char *backward;
 } filter_info;
+
+#ifdef __cplusplus
+}
+#endif
