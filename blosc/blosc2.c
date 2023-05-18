@@ -4397,6 +4397,10 @@ int register_filter_private(blosc2_filter *filter) {
                             "  Choose another one !", filter->id, g_filters[i].name);
           return BLOSC2_ERROR_FAILURE;
         }
+        else {
+          // Already registered, so no more actions needed
+          return BLOSC2_ERROR_SUCCESS;
+        }
       }
     }
 
@@ -4443,6 +4447,10 @@ int register_codec_private(blosc2_codec *codec) {
                             "  Choose another one !", codec->compcode, codec->compname);
           return BLOSC2_ERROR_CODEC_PARAM;
         }
+        else {
+          // Already registered, so no more actions needed
+          return BLOSC2_ERROR_SUCCESS;
+        }
       }
     }
 
@@ -4483,6 +4491,10 @@ int register_tuner_private(blosc2_tuner *tuner) {
                           "  Choose another one !", tuner->id, g_tuners[i].name);
         return BLOSC2_ERROR_FAILURE;
       }
+      else {
+        // Already registered, so no more actions needed
+        return BLOSC2_ERROR_SUCCESS;
+      }
     }
   }
 
@@ -4511,6 +4523,10 @@ int _blosc2_register_io_cb(const blosc2_io_cb *io) {
         BLOSC_TRACE_ERROR("The IO (ID: %d) plugin is already registered with name: %s."
                           "  Choose another one !", io->id, g_ios[i].name);
         return BLOSC2_ERROR_PLUGIN_IO;
+      }
+      else {
+        // Already registered, so no more actions needed
+        return BLOSC2_ERROR_SUCCESS;
       }
     }
   }
