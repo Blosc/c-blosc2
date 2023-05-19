@@ -90,7 +90,7 @@ static inline void* load_lib(char *plugin_name, char *libpath) {
     return NULL;
   }
   void* loaded_lib;
-  BLOSC_TRACE_WARNING("libpath for plugin blosc2_%s: %s\n", plugin_name, libpath);
+  BLOSC_TRACE_INFO("libpath for plugin blosc2_%s: %s\n", plugin_name, libpath);
   loaded_lib = dlopen(libpath, RTLD_LAZY);
   if (loaded_lib == NULL) {
     BLOSC_TRACE_ERROR("Attempt to load plugin in path '%s' failed with error: %s",

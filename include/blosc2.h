@@ -103,6 +103,7 @@ extern "C" {
 /* Tracing macros */
 #define BLOSC_TRACE_ERROR(msg, ...) BLOSC_TRACE(error, msg, ##__VA_ARGS__)
 #define BLOSC_TRACE_WARNING(msg, ...) BLOSC_TRACE(warning, msg, ##__VA_ARGS__)
+#define BLOSC_TRACE_INFO(msg, ...) BLOSC_TRACE(info, msg, ##__VA_ARGS__)
 #define BLOSC_TRACE(cat, msg, ...)                  \
     do {                                            \
         const char *__e = getenv("BLOSC_TRACE");    \
