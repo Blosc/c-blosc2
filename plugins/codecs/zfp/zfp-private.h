@@ -8,10 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-
-
-#ifndef ZFP_PRIVATE_H
-#define ZFP_PRIVATE_H
+#ifndef BLOSC_PLUGINS_CODECS_ZFP_ZFP_PRIVATE_H
+#define BLOSC_PLUGINS_CODECS_ZFP_ZFP_PRIVATE_H
 
 #define ZFP_MAX_DIM 4
 #define ZFP_CELL_SHAPE 4
@@ -25,4 +23,4 @@
     }                                \
   } while (0)
 
-#endif /* ZFP_PRIVATE_H */
+#endif /* BLOSC_PLUGINS_CODECS_ZFP_ZFP_PRIVATE_H */

@@ -10,8 +10,8 @@
 
 /* SSE2-accelerated shuffle/unshuffle routines. */
 
-#ifndef BITSHUFFLE_SSE2_H
-#define BITSHUFFLE_SSE2_H
+#ifndef BLOSC_BITSHUFFLE_SSE2_H
+#define BLOSC_BITSHUFFLE_SSE2_H
 
 #include "blosc2/blosc2-common.h"
 
@@ -43,4 +43,4 @@ BLOSC_NO_EXPORT int64_t
                                 const size_t elem_size, void* tmp_buf);
 
 
-#endif /* BITSHUFFLE_SSE2_H */
+#endif /* BLOSC_BITSHUFFLE_SSE2_H */

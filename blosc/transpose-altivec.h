@@ -109,4 +109,4 @@ static void transpose16x16(__vector uint8_t * xmm0){
   }
 }
 
-#endif //BLOSC_TRANSPOSE_ALTIVEC_H
+#endif /* BLOSC_TRANSPOSE_ALTIVEC_H */

@@ -8,8 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#ifndef CUTEST_CUTEST_H
-#define CUTEST_CUTEST_H
+#ifndef BLOSC_TESTS_CUTEST_H
+#define BLOSC_TESTS_CUTEST_H
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -202,5 +202,4 @@ int _cutest_run(int (*test)(void *), void *test_data, char *name) {
   return cutest_failed;
 }
 
-
-#endif //CUTEST_CUTEST_H
+#endif /* BLOSC_TESTS_CUTEST_H */

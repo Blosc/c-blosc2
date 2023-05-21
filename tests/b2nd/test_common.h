@@ -8,8 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#ifndef B2ND_TEST_COMMON_H
-#define B2ND_TEST_COMMON_H
+#ifndef BLOSC_TESTS_B2ND_TEST_COMMON_H
+#define BLOSC_TESTS_B2ND_TEST_COMMON_H
 
 #include <b2nd.h>
 #include "context.h"
@@ -96,4 +96,4 @@ void b2nd_default_parameters() {
     }
 
 
-#endif //B2ND_TEST_COMMON_H
+#endif /* BLOSC_TESTS_B2ND_TEST_COMMON_H */

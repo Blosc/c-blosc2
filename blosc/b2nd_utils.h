@@ -8,8 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#ifndef B2ND_B2ND_UTILS_H_
-#define B2ND_B2ND_UTILS_H_
+#ifndef BLOSC_B2ND_UTILS_H
+#define BLOSC_B2ND_UTILS_H
 
 #include <b2nd.h>
 #include <../plugins/plugin_utils.h>
@@ -22,4 +22,4 @@ int b2nd_copy_buffer(int8_t ndim,
                      void *dst, const int64_t *dst_pad_shape,
                      int64_t *dst_start);
 
-#endif  // B2ND_B2ND_UTILS_H_
+#endif /* BLOSC_B2ND_UTILS_H */

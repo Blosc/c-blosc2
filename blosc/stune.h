@@ -8,8 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#ifndef STUNE_H
-#define STUNE_H
+#ifndef BLOSC_STUNE_H
+#define BLOSC_STUNE_H
 
 #include "context.h"
 
@@ -37,4 +37,4 @@ void blosc_stune_free(blosc2_context * context);
 /* Conditions for splitting a block before compressing with a codec. */
 int split_block(blosc2_context *context, int32_t typesize, int32_t blocksize);
 
-#endif  /* STUNE_H */
+#endif  /* BLOSC_STUNE_H */

@@ -17,8 +17,8 @@
 **********************************************************************/
 
 
-#ifndef SHUFFLE_H
-#define SHUFFLE_H
+#ifndef BLOSC_SHUFFLE_H
+#define BLOSC_SHUFFLE_H
 
 #include "blosc2/blosc2-common.h"
 
@@ -80,4 +80,4 @@ BLOSC_NO_EXPORT int32_t
                  const uint8_t *_src, const uint8_t *_dest,
                  const uint8_t *_tmp, const uint8_t format_version);
 
-#endif /* SHUFFLE_H */
+#endif /* BLOSC_SHUFFLE_H */

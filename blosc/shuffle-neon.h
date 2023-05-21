@@ -12,8 +12,8 @@
 
 /* NEON-accelerated shuffle/unshuffle routines. */
 
-#ifndef SHUFFLE_NEON_H
-#define SHUFFLE_NEON_H
+#ifndef BLOSC_SHUFFLE_NEON_H
+#define BLOSC_SHUFFLE_NEON_H
 
 #include "blosc2/blosc2-common.h"
 
@@ -29,4 +29,4 @@ BLOSC_NO_EXPORT void shuffle_neon(const int32_t bytesoftype, const int32_t block
 BLOSC_NO_EXPORT void unshuffle_neon(const int32_t bytesoftype, const int32_t blocksize,
                                     const uint8_t *_src, uint8_t *_dest);
 
-#endif /* SHUFFLE_NEON_H */
+#endif /* BLOSC_SHUFFLE_NEON_H */

@@ -15,8 +15,8 @@
  * @author Blosc Development Team <blosc@blosc.org>
  */
 
-#ifndef B2ND_B2ND_H_
-#define B2ND_B2ND_H_
+#ifndef BLOSC_B2ND_H
+#define BLOSC_B2ND_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -603,4 +603,4 @@ static inline int b2nd_deserialize_meta(
 }
 #endif
 
-#endif  // B2ND_B2ND_H_
+#endif  /* BLOSC_B2ND_H */
