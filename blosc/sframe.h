@@ -17,4 +17,4 @@ int sframe_delete_chunk(const char* urlpath, int64_t nchunk);
 void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int64_t nchunk, int64_t cbytes);
 int32_t sframe_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t** chunk, bool* needs_free);
 
-#endif //BLOSC_SFRAME_H
+#endif /* BLOSC_SFRAME_H */

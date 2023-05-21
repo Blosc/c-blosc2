@@ -8,6 +8,9 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#ifndef BLOSC_BLOSC2_TUNERS_UTILS_H
+#define BLOSC_BLOSC2_TUNERS_UTILS_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,3 +33,5 @@ typedef struct {
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* BLOSC_BLOSC2_TUNERS_UTILS_H */

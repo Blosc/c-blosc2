@@ -8,17 +8,12 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#ifndef NDLZ8_H
-#define NDLZ8_H
+#ifndef BLOSC_PLUGINS_CODECS_NDLZ_NDLZ8X8_H
+#define BLOSC_PLUGINS_CODECS_NDLZ_NDLZ8X8_H
 
-#include "context.h"
-
-#if defined (__cplusplus)
-extern "C" {
-#endif
-
-#include "ndlz.h"
 #include "ndlz-private.h"
+#include "ndlz.h"
+#include "context.h"
 
 /**
   Compress a block of data in the input buffer and returns the size of
@@ -58,8 +53,4 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
 int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                      uint8_t meta, blosc2_dparams *dparams);
 
-#if defined (__cplusplus)
-}
-#endif
-
-#endif /* NDLZ8_H */
+#endif /* BLOSC_PLUGINS_CODECS_NDLZ_NDLZ8X8_H */

@@ -17,8 +17,8 @@
 **********************************************************************/
 
 
-#ifndef SHUFFLE_GENERIC_H
-#define SHUFFLE_GENERIC_H
+#ifndef BLOSC_SHUFFLE_GENERIC_H
+#define BLOSC_SHUFFLE_GENERIC_H
 
 #include "blosc2/blosc2-common.h"
 #include <stdlib.h>
@@ -91,4 +91,4 @@ BLOSC_NO_EXPORT void shuffle_generic(const int32_t bytesoftype, const int32_t bl
 BLOSC_NO_EXPORT void unshuffle_generic(const int32_t bytesoftype, const int32_t blocksize,
                                        const uint8_t *_src, uint8_t *_dest);
 
-#endif /* SHUFFLE_GENERIC_H */
+#endif /* BLOSC_SHUFFLE_GENERIC_H */

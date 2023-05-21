@@ -10,8 +10,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#ifndef BLOSC_TEST_COMMON_H
-#define BLOSC_TEST_COMMON_H
+#ifndef BLOSC_TESTS_TEST_COMMON_H
+#define BLOSC_TESTS_TEST_COMMON_H
 
 #include "blosc2.h"
 
@@ -175,4 +175,4 @@ inline static void install_blosc_callback_test(void)
     blosc2_set_threads_callback(dummy_threads_callback, NULL);
 }
 
-#endif  /* !defined(BLOSC_TEST_COMMON_H) */
+#endif /* BLOSC_TESTS_TEST_COMMON_H */

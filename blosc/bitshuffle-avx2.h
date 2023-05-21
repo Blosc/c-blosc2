@@ -10,8 +10,8 @@
 
 /* AVX2-accelerated shuffle/unshuffle routines. */
 
-#ifndef BITSHUFFLE_AVX2_H
-#define BITSHUFFLE_AVX2_H
+#ifndef BLOSC_BITSHUFFLE_AVX2_H
+#define BLOSC_BITSHUFFLE_AVX2_H
 
 #include <blosc2/blosc2-common.h>
 
@@ -29,4 +29,4 @@ BLOSC_NO_EXPORT int64_t
     bshuf_untrans_bit_elem_avx2(void* in, void* out, const size_t size,
                                 const size_t elem_size, void* tmp_buf);
 
-#endif /* BITSHUFFLE_AVX2_H */
+#endif /* BLOSC_BITSHUFFLE_AVX2_H */

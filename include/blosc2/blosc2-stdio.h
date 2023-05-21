@@ -8,10 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-
-#ifndef BLOSC_BLOSC2_STDIO_H
-#define BLOSC_BLOSC2_STDIO_H
-
+#ifndef BLOSC_BLOSC2_BLOSC2_STDIO_H
+#define BLOSC_BLOSC2_BLOSC2_STDIO_H
 
 #include "blosc2-export.h"
 
@@ -45,4 +43,4 @@ BLOSC_EXPORT int blosc2_stdio_truncate(void *stream, int64_t size);
 }
 #endif
 
-#endif //BLOSC_BLOSC2_STDIO_H
+#endif /* BLOSC_BLOSC2_BLOSC2_STDIO_H */

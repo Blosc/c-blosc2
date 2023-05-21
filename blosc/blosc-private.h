@@ -9,8 +9,8 @@
 **********************************************************************/
 
 
-#ifndef IARRAY_BLOSC_PRIVATE_H
-#define IARRAY_BLOSC_PRIVATE_H
+#ifndef BLOSC_BLOSC_PRIVATE_H
+#define BLOSC_BLOSC_PRIVATE_H
 
 #include "stdbool.h"
 #include "blosc2.h"
@@ -178,4 +178,4 @@ int fill_tuner(blosc2_tuner *tuner);
 extern blosc2_tuner g_tuners[256];
 extern int g_ntuners;
 
-#endif //IARRAY_BLOSC_PRIVATE_H
+#endif /* BLOSC_BLOSC_PRIVATE_H */

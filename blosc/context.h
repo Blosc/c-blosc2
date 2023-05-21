@@ -8,8 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#ifndef CONTEXT_H
-#define CONTEXT_H
+#ifndef BLOSC_CONTEXT_H
+#define BLOSC_CONTEXT_H
 
 #if defined(_WIN32) && !defined(__GNUC__)
   #include "win32/pthread.h"
@@ -149,4 +149,4 @@ struct thread_context {
 };
 
 
-#endif  /* CONTEXT_H */
+#endif  /* BLOSC_CONTEXT_H */

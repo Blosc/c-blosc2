@@ -8,8 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#ifndef B2ND_NDMEAN_H
-#define B2ND_NDMEAN_H
+#ifndef BLOSC_PLUGINS_FILTERS_NDMEAN_NDMEAN_H
+#define BLOSC_PLUGINS_FILTERS_NDMEAN_NDMEAN_H
 
 #include "blosc2.h"
 
@@ -20,6 +20,4 @@ int ndmean_forward(const uint8_t* input, uint8_t* output, int32_t length, uint8_
 
 int ndmean_backward(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta, blosc2_dparams* dparams, uint8_t id);
 
-#endif //B2ND_NDMEAN_H
-
-
+#endif /* BLOSC_PLUGINS_FILTERS_NDMEAN_NDMEAN_H */

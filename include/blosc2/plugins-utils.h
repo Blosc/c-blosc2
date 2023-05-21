@@ -8,6 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#ifndef BLOSC_BLOSC2_PLUGINS_UTILS_H
+#define BLOSC_BLOSC2_PLUGINS_UTILS_H
 
 #include <blosc2.h>
 
@@ -107,3 +109,5 @@ static inline void* load_lib(char *plugin_name, char *libpath) {
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* BLOSC_BLOSC2_PLUGINS_UTILS_H */

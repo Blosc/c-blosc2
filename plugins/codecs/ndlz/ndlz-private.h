@@ -8,8 +8,6 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-
-
 #ifndef NDLZ_PRIVATE_H
 #define NDLZ_PRIVATE_H
 

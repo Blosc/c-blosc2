@@ -14,8 +14,8 @@
    accelerated functions to handle any remaining elements in a block
    which isn't a multiple of the hardware's vector size. */
 
-#ifndef BITSHUFFLE_GENERIC_H
-#define BITSHUFFLE_GENERIC_H
+#ifndef BLOSC_BITSHUFFLE_GENERIC_H
+#define BLOSC_BITSHUFFLE_GENERIC_H
 
 #include <blosc2/blosc2-common.h>
 #include <stdlib.h>
@@ -154,4 +154,4 @@ BLOSC_NO_EXPORT int64_t
 bshuf_untrans_bit_elem_scal(const void* in, void* out, const size_t size,
                             const size_t elem_size, void* tmp_buf);
 
-#endif /* BITSHUFFLE_GENERIC_H */
+#endif /* BLOSC_BITSHUFFLE_GENERIC_H */

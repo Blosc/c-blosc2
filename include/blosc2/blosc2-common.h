@@ -8,8 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#ifndef SHUFFLE_COMMON_H
-#define SHUFFLE_COMMON_H
+#ifndef BLOSC_BLOSC2_BLOSC2_COMMON_H
+#define BLOSC_BLOSC2_BLOSC2_COMMON_H
 
 #include "blosc2-export.h"
 
@@ -77,4 +77,4 @@
   #include <immintrin.h>
 #endif
 
-#endif  /* SHUFFLE_COMMON_H */
+#endif  /* BLOSC_BLOSC2_BLOSC2_COMMON_H */

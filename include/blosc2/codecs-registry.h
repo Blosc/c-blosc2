@@ -8,6 +8,9 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#ifndef BLOSC_BLOSC2_CODECS_REGISTRY_H
+#define BLOSC_BLOSC2_CODECS_REGISTRY_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -33,3 +36,5 @@ static codec_info codec_info_defaults BLOSC_ATTRIBUTE_UNUSED = {0};
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* BLOSC_BLOSC2_CODECS_REGISTRY_H */

@@ -16,9 +16,8 @@
   @author The Blosc Development Team <blosc@blosc.org>
 **********************************************************************/
 
-
-#ifndef BLOSC2_H
-#define BLOSC2_H
+#ifndef BLOSC_BLOSC2_H
+#define BLOSC_BLOSC2_H
 
 #include "blosc2/blosc2-export.h"
 #include "blosc2/blosc2-common.h"
@@ -2479,5 +2478,4 @@ BLOSC_EXPORT void blosc2_multidim_to_unidim(const int64_t *index, int8_t ndim, c
 }
 #endif
 
-
-#endif  /* BLOSC2_H */
+#endif /* BLOSC_BLOSC2_H */
