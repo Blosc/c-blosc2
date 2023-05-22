@@ -11,15 +11,15 @@
 #ifndef NDLZ_PRIVATE_H
 #define NDLZ_PRIVATE_H
 
-#include "context.h"
+#include <stddef.h>
 
 #define XXH_INLINE_ALL
 
-#define NDLZ_ERROR_NULL(pointer)         \
-  do {                                 \
-    if ((pointer) == NULL) {         \
-      return 0;                    \
-    }                                \
+#define NDLZ_ERROR_NULL(pointer) \
+  do {                           \
+    if ((pointer) == NULL) {     \
+      return 0;                  \
+    }                            \
   } while (0)
 
 #endif /* NDLZ_PRIVATE_H */

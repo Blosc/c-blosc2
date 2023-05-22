@@ -16,12 +16,13 @@
   which isn't a multiple of the hardware's vector size.
 **********************************************************************/
 
-
 #ifndef BLOSC_SHUFFLE_GENERIC_H
 #define BLOSC_SHUFFLE_GENERIC_H
 
 #include "blosc2/blosc2-common.h"
-#include <stdlib.h>
+
+#include <stdint.h>
+#include <string.h>
 
 /**
   Generic (non-hardware-accelerated) shuffle routine.

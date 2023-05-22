@@ -11,9 +11,9 @@
 #ifndef BLOSC_PLUGINS_CODECS_ZFP_BLOSC2_ZFP_H
 #define BLOSC_PLUGINS_CODECS_ZFP_BLOSC2_ZFP_H
 
-#include "zfp-private.h"
-#include "../plugins/plugin_utils.h"
+#include "blosc2.h"
 
+#include <stdint.h>
 
 int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                      uint8_t meta, blosc2_cparams *cparams, const void *chunk);

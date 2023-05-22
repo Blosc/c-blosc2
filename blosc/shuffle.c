@@ -8,21 +8,7 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include "shuffle.h"
-#include "blosc2.h"
-#include "blosc2/blosc2-common.h"
-#include "shuffle-generic.h"
-#include "bitshuffle-generic.h"
-
-#include <stdio.h>
-#include <string.h>
-#include <stdbool.h>
-
-
-#if !defined(__clang__) && defined(__GNUC__) && defined(__GNUC_MINOR__) && \
-    __GNUC__ >= 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 8)
-#define HAVE_CPU_FEAT_INTRIN
-#endif
+#include "shuffle.h" /* needs to be included first to define macros */
 
 /*  Include hardware-accelerated shuffle/unshuffle routines based on
     the target architecture. Note that a target architecture may support
@@ -52,6 +38,22 @@
   #include "shuffle-altivec.h"
   #include "bitshuffle-altivec.h"
 #endif  /* defined(SHUFFLE_USE_ALTIVEC) */
+
+#include "shuffle-generic.h"
+#include "bitshuffle-generic.h"
+#include "blosc2/blosc2-common.h"
+#include "blosc2.h"
+
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+
+
+#if !defined(__clang__) && defined(__GNUC__) && defined(__GNUC_MINOR__) && \
+    __GNUC__ >= 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 8)
+#define HAVE_CPU_FEAT_INTRIN
+#endif
 
 
 /*  Define function pointer types for shuffle/unshuffle routines. */

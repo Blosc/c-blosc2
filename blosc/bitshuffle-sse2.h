@@ -15,6 +15,8 @@
 
 #include "blosc2/blosc2-common.h"
 
+#include <stddef.h>
+#include <stdint.h>
 
 BLOSC_NO_EXPORT int64_t
     bshuf_trans_byte_elem_sse2(void* in, void* out, const size_t size,
@@ -41,6 +43,5 @@ BLOSC_NO_EXPORT int64_t
 BLOSC_NO_EXPORT int64_t
     bshuf_untrans_bit_elem_sse2(void* in, void* out, const size_t size,
                                 const size_t elem_size, void* tmp_buf);
-
 
 #endif /* BLOSC_BITSHUFFLE_SSE2_H */

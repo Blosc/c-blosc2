@@ -11,7 +11,6 @@
 #ifndef BLOSC_TRUNC_PREC_H
 #define BLOSC_TRUNC_PREC_H
 
-#include <stdio.h>
 #include <stdint.h>
 
 int truncate_precision(int8_t prec_bits, int32_t typesize, int32_t nbytes,

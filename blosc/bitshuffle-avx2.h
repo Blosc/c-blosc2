@@ -13,7 +13,10 @@
 #ifndef BLOSC_BITSHUFFLE_AVX2_H
 #define BLOSC_BITSHUFFLE_AVX2_H
 
-#include <blosc2/blosc2-common.h>
+#include "blosc2/blosc2-common.h"
+
+#include <stddef.h>
+#include <stdint.h>
 
 /**
   AVX2-accelerated bitshuffle routine.

@@ -13,6 +13,8 @@
 
 #include "context.h"
 
+#include <stdint.h>
+
 /* The size of L1 cache.  32 KB is quite common nowadays. */
 #define L1 (32 * 1024)
 /* The size of L2 cache.  256 KB is quite common nowadays. */
@@ -32,7 +34,6 @@ void blosc_stune_next_cparams(blosc2_context * context);
 void blosc_stune_update(blosc2_context * context, double ctime);
 
 void blosc_stune_free(blosc2_context * context);
-
 
 /* Conditions for splitting a block before compressing with a codec. */
 int split_block(blosc2_context *context, int32_t typesize, int32_t blocksize);

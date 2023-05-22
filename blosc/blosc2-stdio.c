@@ -12,6 +12,10 @@
 #include "blosc2/blosc2-stdio.h"
 #include "blosc2.h"
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+
 void *blosc2_stdio_open(const char *urlpath, const char *mode, void *params) {
   BLOSC_UNUSED_PARAM(params);
   FILE *file = fopen(urlpath, mode);

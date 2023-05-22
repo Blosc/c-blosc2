@@ -16,11 +16,12 @@
   these are cross-platform and future-proof.
 **********************************************************************/
 
-
 #ifndef BLOSC_SHUFFLE_H
 #define BLOSC_SHUFFLE_H
 
 #include "blosc2/blosc2-common.h"
+
+#include <stdint.h>
 
 /* Toggle hardware-accelerated routines based on SHUFFLE_*_ENABLED macros
    and availability on the target architecture.

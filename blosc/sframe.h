@@ -11,6 +11,11 @@
 #ifndef BLOSC_SFRAME_H
 #define BLOSC_SFRAME_H
 
+#include "frame.h"
+
+#include <stdbool.h>
+#include <stdint.h>
+
 void* sframe_open_index(const char* urlpath, const char* mode, const blosc2_io *io);
 void* sframe_open_chunk(const char* urlpath, int64_t nchunk, const char* mode, const blosc2_io *io);
 int sframe_delete_chunk(const char* urlpath, int64_t nchunk);

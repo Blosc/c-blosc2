@@ -6,6 +6,9 @@
 
 #include "blosc2/tuners-registry.h"
 #include "blosc-private.h"
+#include "blosc2.h"
+
+#include <stddef.h>
 
 void register_tuners(void) {
 

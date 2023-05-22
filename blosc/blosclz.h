@@ -14,14 +14,12 @@
   about copyright and rights to use.
 **********************************************************************/
 
-
 #ifndef BLOSC_BLOSCLZ_H
 #define BLOSC_BLOSCLZ_H
 
 #include "context.h"
 
 #define BLOSCLZ_VERSION_STRING "2.5.3"
-
 
 /**
   Compress a block of data in the input buffer and returns the size of

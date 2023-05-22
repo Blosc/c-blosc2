@@ -13,7 +13,7 @@
 
 #include "ndlz-private.h"
 #include "ndlz.h"
-#include "context.h"
+#include "blosc2.h"
 
 /*
 #include <stdio.h>

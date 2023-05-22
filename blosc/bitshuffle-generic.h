@@ -17,9 +17,10 @@
 #ifndef BLOSC_BITSHUFFLE_GENERIC_H
 #define BLOSC_BITSHUFFLE_GENERIC_H
 
-#include <blosc2/blosc2-common.h>
-#include <stdlib.h>
+#include "blosc2/blosc2-common.h"
 
+#include <stddef.h>
+#include <stdint.h>
 
 /*  Macros. */
 #define CHECK_MULT_EIGHT(n) if ((n) % 8) return -80;

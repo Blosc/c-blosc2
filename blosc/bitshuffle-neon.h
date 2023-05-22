@@ -17,6 +17,9 @@
 
 #include "blosc2/blosc2-common.h"
 
+#include <stddef.h>
+#include <stdint.h>
+
 /**
   NEON-accelerated bitshuffle routine.
 */

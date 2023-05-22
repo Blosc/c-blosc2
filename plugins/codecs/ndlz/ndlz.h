@@ -11,7 +11,9 @@
 #ifndef BLOSC_PLUGINS_CODECS_NDLZ_NDLZ_H
 #define BLOSC_PLUGINS_CODECS_NDLZ_NDLZ_H
 
-#include "context.h"
+#include "blosc2.h"
+
+#include <stdint.h>
 
 int ndlz_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                   uint8_t meta, blosc2_cparams *cparams, const void* chunk);

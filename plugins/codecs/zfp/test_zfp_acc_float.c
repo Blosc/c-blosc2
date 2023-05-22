@@ -15,13 +15,14 @@
 
 **********************************************************************/
 
-#include <stdio.h>
-#include <math.h>
-#include "blosc2.h"
-#include "blosc2/codecs-registry.h"
 #include "blosc-private.h"
-#include <inttypes.h>
 #include "b2nd.h"
+#include "blosc2/codecs-registry.h"
+#include "blosc2.h"
+
+#include <inttypes.h>
+#include <math.h>
+#include <stdio.h>
 
 static int test_zfp_acc_float(blosc2_schunk *schunk) {
 

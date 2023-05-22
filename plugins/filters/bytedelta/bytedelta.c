@@ -12,11 +12,13 @@
 // https://aras-p.info/blog/2023/03/01/Float-Compression-7-More-Filtering-Optimization/
 // This requires Intel SSE4.1 and ARM64 NEON, which should be widely available by now.
 
-#include <blosc2.h>
 #include "bytedelta.h"
-#include <stdio.h>
 #include "../plugins/plugin_utils.h"
-#include "../include/blosc2/filters-registry.h"
+#include "blosc2/filters-registry.h"
+#include "blosc2.h"
+
+#include <stdint.h>
+#include <stdio.h>
 
 #if defined __i386__ || defined _M_IX86 || defined __x86_64__ || defined _M_X64
 // SSSE3 code path for x64/x64

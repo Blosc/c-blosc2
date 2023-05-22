@@ -18,9 +18,10 @@
 #include "fastcopy.h"
 #include "blosc2/blosc2-common.h"
 
-#include <stdio.h>
 #include <stdbool.h>
-
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
 
 /*
  * Give hints to the compiler for branch prediction optimization.

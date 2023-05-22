@@ -16,6 +16,8 @@
 
 #include <arm_neon.h>
 
+#include <stdint.h>
+
 /* The next is useful for debugging purposes */
 #if 0
 #include <stdio.h>

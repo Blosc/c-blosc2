@@ -15,13 +15,13 @@
   linear one.
 **********************************************************************/
 
-
-#include <stdio.h>
 #include "ndlz8x8.h"
 #include "ndlz.h"
 #include "xxhash.h"
 #include "../plugins/plugin_utils.h"
 
+#include <stdlib.h>
+#include <string.h>
 
 /*
  * Give hints to the compiler for branch prediction optimization.

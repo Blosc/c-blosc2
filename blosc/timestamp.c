@@ -13,6 +13,8 @@
 /* System-specific high-precision timing functions. */
 #if defined(_WIN32)
 
+#include <windows.h>
+
 /* Set a timestamp value to the current time. */
 void blosc_set_timestamp(blosc_timestamp_t* timestamp) {
   /* Ignore the return value, assume the call always succeeds. */
@@ -31,9 +33,14 @@ double blosc_elapsed_nsecs(blosc_timestamp_t start_time,
 
 #else
 
+#include <time.h>
+
+#if defined(__MACH__) // OS X does not have clock_gettime, use clock_get_time
+
+#include <mach/clock.h>
+
 /* Set a timestamp value to the current time. */
 void blosc_set_timestamp(blosc_timestamp_t* timestamp) {
-#ifdef __MACH__ // OS X does not have clock_gettime, use clock_get_time
   clock_serv_t cclock;
   mach_timespec_t mts;
   host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
@@ -41,10 +48,16 @@ void blosc_set_timestamp(blosc_timestamp_t* timestamp) {
   mach_port_deallocate(mach_task_self(), cclock);
   timestamp->tv_sec = mts.tv_sec;
   timestamp->tv_nsec = mts.tv_nsec;
-#else
-  clock_gettime(CLOCK_MONOTONIC, timestamp);
-#endif
 }
+
+#else
+
+/* Set a timestamp value to the current time. */
+void blosc_set_timestamp(blosc_timestamp_t* timestamp) {
+  clock_gettime(CLOCK_MONOTONIC, timestamp);
+}
+
+#endif
 
 /* Given two timestamp values, return the difference in nanoseconds. */
 double blosc_elapsed_nsecs(blosc_timestamp_t start_time,

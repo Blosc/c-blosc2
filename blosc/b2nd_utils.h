@@ -11,9 +11,7 @@
 #ifndef BLOSC_B2ND_UTILS_H
 #define BLOSC_B2ND_UTILS_H
 
-#include <b2nd.h>
-#include <../plugins/plugin_utils.h>
-
+#include <stdint.h>
 
 int b2nd_copy_buffer(int8_t ndim,
                      uint8_t itemsize,

@@ -15,12 +15,10 @@
   linear one.
 **********************************************************************/
 
-
-#include <stdio.h>
-#include "ndlz.h"
 #include "ndlz-private.h"
 #include "ndlz4x4.h"
 #include "ndlz8x8.h"
+#include "ndlz.h"
 
 int ndlz_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                   uint8_t meta, blosc2_cparams *cparams, const void *chunk) {

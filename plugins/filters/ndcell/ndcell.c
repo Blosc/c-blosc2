@@ -8,12 +8,15 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include <blosc2.h>
 #include "ndcell.h"
-#include <math.h>
-#include <stdio.h>
 #include "../plugins/plugin_utils.h"
-#include "../include/blosc2/filters-registry.h"
+#include "blosc2/filters-registry.h"
+#include "blosc2.h"
+
+#include <math.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
 
 
 int ndcell_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta, blosc2_cparams *cparams,

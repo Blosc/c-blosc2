@@ -43,11 +43,12 @@ precip0[:] = values
  *
  */
 
-#include <b2nd.h>
-#include "../../include/blosc2/codecs-registry.h"
+#include "../plugins/codecs/zfp/zfp-private.h"
 #include "../../plugins/codecs/zfp/blosc2-zfp.h"
-#include <blosc2.h>
-#include <context.h>
+#include "context.h"
+#include "blosc2/codecs-registry.h"
+#include "b2nd.h"
+#include "blosc2.h"
 
 int comp(const char *urlpath) {
   blosc2_init();

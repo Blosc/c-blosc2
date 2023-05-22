@@ -28,8 +28,11 @@
 /* Make sure ALTIVEC is available for the compilation target and compiler. */
 #if defined(__ALTIVEC__)
 
-#include <altivec.h>
 #include "transpose-altivec.h"
+
+#include <altivec.h>
+
+#include <stdint.h>
 
 /* The next is useful for debugging purposes */
 #if 0

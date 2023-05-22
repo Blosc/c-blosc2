@@ -9,6 +9,10 @@
 **********************************************************************/
 
 #include "b2nd_utils.h"
+#include "b2nd.h"
+
+#include <stdint.h>
+#include <string.h>
 
 // copyNdim where N = {2-8} - specializations of copy loops to be used by b2nd_copy_buffer
 // since we don't have c++ templates, substitute manual specializations for up to known B2ND_MAX_DIM (8)

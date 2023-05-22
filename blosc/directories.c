@@ -10,8 +10,11 @@
 
 #include "blosc2.h"
 
-#include <stdio.h>
 #include <sys/stat.h>
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 #if defined(_WIN32) || defined(__MINGW32__)
   #include <windows.h>

@@ -11,6 +11,8 @@
 #ifndef BLOSC_BLOSC2_CODECS_REGISTRY_H
 #define BLOSC_BLOSC2_CODECS_REGISTRY_H
 
+#include "blosc2.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

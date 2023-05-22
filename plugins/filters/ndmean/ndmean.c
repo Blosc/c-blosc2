@@ -6,10 +6,13 @@
 
 
 #include "ndmean.h"
-#include <stdio.h>
-#include <blosc2/blosc2-common.h>
 #include "../plugins/plugin_utils.h"
 #include "../include/blosc2/filters-registry.h"
+#include "blosc2/blosc2-common.h"
+
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 int ndmean_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta, blosc2_cparams *cparams,
                    uint8_t id) {
