@@ -11,7 +11,7 @@
 #ifndef BLOSC_PLUGINS_FILTERS_NDCELL_NDCELL_H
 #define BLOSC_PLUGINS_FILTERS_NDCELL_NDCELL_H
 
-#include <blosc2.h>
+#include "blosc2.h"
 
 #define NDCELL_MAX_DIM 8
 

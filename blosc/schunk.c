@@ -8,27 +8,26 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-
-#include "blosc-private.h"
-#include "blosc2/tuners-registry.h"
 #include "frame.h"
 #include "stune.h"
+#include "blosc-private.h"
+#include "blosc2/tuners-registry.h"
 #include "blosc2.h"
 
 #if defined(_WIN32)
 #include <windows.h>
 #include <direct.h>
 #include <malloc.h>
-
 #define mkdir(D, M) _mkdir(D)
 #endif  /* _WIN32 */
 
+#include <sys/stat.h>
+
+#include <inttypes.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
-#include <sys/stat.h>
-#include <inttypes.h>
 
 /* If C11 is supported, use it's built-in aligned allocation. */
 #if __STDC_VERSION__ >= 201112L

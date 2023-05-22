@@ -19,18 +19,19 @@
 #include <malloc.h>
 #endif  /* _WIN32 */
 
+#include <sys/stat.h>
+
+#include <inttypes.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
 /* If C11 is supported, use it's built-in aligned allocation. */
 #if __STDC_VERSION__ >= 201112L
 #include <stdalign.h>
 #endif
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
-#include <sys/stat.h>
-#include <stdint.h>
-#include <inttypes.h>
 
 
 /* Create a new (empty) frame */

@@ -12,9 +12,12 @@
 #ifndef BLOSC_BLOSC_PRIVATE_H
 #define BLOSC_BLOSC_PRIVATE_H
 
-#include "stdbool.h"
-#include "blosc2.h"
 #include "blosc2/blosc2-common.h"
+#include "blosc2.h"
+
+#include <stdbool.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 /*********************************************************************
 

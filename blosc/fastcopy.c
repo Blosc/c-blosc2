@@ -21,6 +21,10 @@
 #include "blosc2/blosc2-common.h"
 
 #include <assert.h>
+#include <stdint.h>
+#if defined(BLOSC_STRICT_ALIGN)
+#include <string.h>
+#endif
 
 /*
  * Use inlined functions for supported systems.

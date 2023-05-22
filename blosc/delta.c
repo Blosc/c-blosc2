@@ -11,6 +11,7 @@
 #include "delta.h"
 
 #include <stdio.h>
+#include <stdint.h>
 
 
 /* Apply the delta filters to src.  This can never fail. */

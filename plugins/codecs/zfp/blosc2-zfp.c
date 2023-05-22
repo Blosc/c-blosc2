@@ -4,16 +4,20 @@
   License: BSD 3-Clause (see LICENSE.txt)
 */
 
-#include "blosc2.h"
 #include "blosc-private.h"
-#include "frame.h"
-#include "blosc2/codecs-registry.h"
 #include "zfp.h"
 #include "blosc2-zfp.h"
-#include <math.h>
-#include "context.h"
-#include "assert.h"
+#include "../plugins/codecs/zfp/zfp-private.h"
 #include "../plugins/plugin_utils.h"
+#include "context.h"
+#include "frame.h"
+#include "blosc2/codecs-registry.h"
+#include "blosc2.h"
+
+#include <assert.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
 
 int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,

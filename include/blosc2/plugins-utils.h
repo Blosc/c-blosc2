@@ -11,7 +11,7 @@
 #ifndef BLOSC_BLOSC2_PLUGINS_UTILS_H
 #define BLOSC_BLOSC2_PLUGINS_UTILS_H
 
-#include <blosc2.h>
+#include "blosc2.h"
 
 #if defined(_WIN32)
 #include <windows.h>

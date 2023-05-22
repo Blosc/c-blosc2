@@ -8,7 +8,7 @@
 #include "blosc-private.h"
 #include "blosc2.h"
 
-#include <stdio.h>
+#include <stdint.h>
 
 #define BLOSC_PLUGINS_MAX_DIM 8
 

@@ -9,12 +9,15 @@
 **********************************************************************/
 
 #include "b2nd.h"
-#include "context.h"
 #include "b2nd_utils.h"
-#include "blosc2.h"
+#include "context.h"
 #include "blosc2/blosc2-common.h"
+#include "blosc2.h"
 
 #include <inttypes.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
 
 
 int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const int32_t *chunkshape,

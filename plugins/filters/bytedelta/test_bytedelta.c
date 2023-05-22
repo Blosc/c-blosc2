@@ -29,10 +29,13 @@
 
 **********************************************************************/
 
-#include <stdio.h>
-#include <inttypes.h>
 #include "blosc2/filters-registry.h"
 #include "b2nd.h"
+
+#include <inttypes.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
 
 static int test_bytedelta(blosc2_schunk *schunk) {
 

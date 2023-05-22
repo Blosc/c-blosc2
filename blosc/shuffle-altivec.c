@@ -14,8 +14,11 @@
 /* Make sure ALTIVEC is available for the compilation target and compiler. */
 #if defined(__ALTIVEC__)
 
-#include <altivec.h>
 #include "transpose-altivec.h"
+
+#include <altivec.h>
+
+#include <stdint.h>
 
 /* Routine optimized for shuffling a buffer for a type size of 2 bytes. */
 static void

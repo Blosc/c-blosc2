@@ -20,7 +20,6 @@
   rights to use.
 **********************************************************************/
 
-
 #include "bitshuffle-avx2.h"
 #include "bitshuffle-sse2.h"
 #include "bitshuffle-generic.h"
@@ -29,6 +28,8 @@
 #if defined(__AVX2__)
 
 #include <immintrin.h>
+
+#include <stdint.h>
 
 /* The next is useful for debugging purposes */
 #if 0

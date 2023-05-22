@@ -10,6 +10,8 @@
 
 #include "bitshuffle-generic.h"
 
+#include <stdint.h>
+
 #ifdef _MSC_VER
 #pragma warning (push)
 #pragma warning (disable: 4146)

@@ -15,6 +15,8 @@
 
 #include "blosc2/blosc2-common.h"
 
+#include <stddef.h>
+#include <stdint.h>
 
 BLOSC_NO_EXPORT int64_t
     bshuf_trans_byte_elem_altivec(void* in, void* out, const size_t size,

@@ -30,11 +30,12 @@
 
 **********************************************************************/
 
-#include <stdio.h>
-#include "blosc2.h"
-#include "blosc2/codecs-registry.h"
-#include <inttypes.h>
 #include "b2nd.h"
+#include "blosc2/codecs-registry.h"
+#include "blosc2.h"
+
+#include <inttypes.h>
+#include <stdio.h>
 
 static int test_ndlz_4(blosc2_schunk *schunk) {
 

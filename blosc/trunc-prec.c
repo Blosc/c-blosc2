@@ -13,6 +13,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #define BITS_MANTISSA_FLOAT 23

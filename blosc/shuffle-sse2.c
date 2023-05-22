@@ -16,6 +16,7 @@
 
 #include <emmintrin.h>
 
+#include <stdint.h>
 
 /* The next is useful for debugging purposes */
 #if 0

@@ -11,16 +11,18 @@
 #ifndef BLOSC_PLUGINS_CODECS_ZFP_ZFP_PRIVATE_H
 #define BLOSC_PLUGINS_CODECS_ZFP_ZFP_PRIVATE_H
 
+#include <stddef.h>
+
 #define ZFP_MAX_DIM 4
 #define ZFP_CELL_SHAPE 4
 
 #define XXH_INLINE_ALL
 
-#define ZFP_ERROR_NULL(pointer)         \
-  do {                                 \
-    if ((pointer) == NULL) {         \
-      return 0;                    \
-    }                                \
+#define ZFP_ERROR_NULL(pointer) \
+  do {                          \
+    if ((pointer) == NULL) {    \
+      return 0;                 \
+    }                           \
   } while (0)
 
 #endif /* BLOSC_PLUGINS_CODECS_ZFP_ZFP_PRIVATE_H */

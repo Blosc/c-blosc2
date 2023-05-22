@@ -15,6 +15,8 @@
 
 #include "blosc2/blosc2-common.h"
 
+#include <stdint.h>
+
 /**
   AVX2-accelerated shuffle routine.
 */

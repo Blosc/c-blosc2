@@ -13,7 +13,7 @@
 
 #include "ndlz-private.h"
 #include "ndlz.h"
-#include "context.h"
+#include "blosc2.h"
 
 /**
   Compress a block of data in the input buffer and returns the size of
