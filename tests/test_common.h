@@ -32,7 +32,7 @@
 
 #if defined(_WIN32)
   /* MSVC does not have setenv */
-  #define setenv(name, value, overwrite) do {_putenv_s(name, value);} while(0)
+  #define setenv(name, value, overwrite) (_putenv_s(name, value))
 #endif
 
 
