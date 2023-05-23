@@ -22,10 +22,18 @@
 
 
 /*  Macros. */
-#define CHECK_MULT_EIGHT(n) if ((n) % 8) return -80
+#define CHECK_MULT_EIGHT(n)               \
+        do {                              \
+          if ((n) % 8)                    \
+            return -80;                   \
+        } while (0)  
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 #define MAX(X,Y) ((X) > (Y) ? (X) : (Y))
-#define CHECK_ERR(count) if ((count) < 0) { return count; }
+#define CHECK_ERR(count)                  \
+        do {                              \
+          if ((count) < 0)                \
+            return count;                 \
+         } while (0)  
 
 
 /* ---- Worker code not requiring special instruction sets. ----
