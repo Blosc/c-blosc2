@@ -108,46 +108,54 @@ int release_threadpool(blosc2_context *context);
 
 /* Wait until all threads are initialized */
 #ifdef BLOSC_POSIX_BARRIERS
-#define WAIT_INIT(RET_VAL, CONTEXT_PTR)  \
-  rc = pthread_barrier_wait(&(CONTEXT_PTR)->barr_init); \
-  if (rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD) { \
-    BLOSC_TRACE_ERROR("Could not wait on barrier (init): %d", rc); \
-    return((RET_VAL));                            \
-  }
+#define WAIT_INIT(RET_VAL, CONTEXT_PTR)                                \
+  do {                                                                 \
+    rc = pthread_barrier_wait(&(CONTEXT_PTR)->barr_init);              \
+    if (rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD) {              \
+      BLOSC_TRACE_ERROR("Could not wait on barrier (init): %d", rc);   \
+      return((RET_VAL));                                               \
+    }                                                                  \
+  } while (0)
 #else
-#define WAIT_INIT(RET_VAL, CONTEXT_PTR)   \
-  pthread_mutex_lock(&(CONTEXT_PTR)->count_threads_mutex); \
-  if ((CONTEXT_PTR)->count_threads < (CONTEXT_PTR)->nthreads) { \
-    (CONTEXT_PTR)->count_threads++;  \
-    pthread_cond_wait(&(CONTEXT_PTR)->count_threads_cv, \
-                      &(CONTEXT_PTR)->count_threads_mutex); \
-  } \
-  else { \
-    pthread_cond_broadcast(&(CONTEXT_PTR)->count_threads_cv); \
-  } \
-  pthread_mutex_unlock(&(CONTEXT_PTR)->count_threads_mutex)
+#define WAIT_INIT(RET_VAL, CONTEXT_PTR)                                \
+  do {                                                                 \
+    pthread_mutex_lock(&(CONTEXT_PTR)->count_threads_mutex);           \
+    if ((CONTEXT_PTR)->count_threads < (CONTEXT_PTR)->nthreads) {      \
+      (CONTEXT_PTR)->count_threads++;                                  \
+      pthread_cond_wait(&(CONTEXT_PTR)->count_threads_cv,              \
+                        &(CONTEXT_PTR)->count_threads_mutex);          \
+    }                                                                  \
+    else {                                                             \
+      pthread_cond_broadcast(&(CONTEXT_PTR)->count_threads_cv);        \
+    }                                                                  \
+    pthread_mutex_unlock(&(CONTEXT_PTR)->count_threads_mutex);         \
+  } while (0)
 #endif
 
 /* Wait for all threads to finish */
 #ifdef BLOSC_POSIX_BARRIERS
-#define WAIT_FINISH(RET_VAL, CONTEXT_PTR)   \
-  rc = pthread_barrier_wait(&(CONTEXT_PTR)->barr_finish); \
-  if (rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD) { \
-    BLOSC_TRACE_ERROR("Could not wait on barrier (finish)"); \
-    return((RET_VAL));                              \
-  }
+#define WAIT_FINISH(RET_VAL, CONTEXT_PTR)                              \
+  do {                                                                 \
+    rc = pthread_barrier_wait(&(CONTEXT_PTR)->barr_finish);            \
+    if (rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD) {              \
+      BLOSC_TRACE_ERROR("Could not wait on barrier (finish)");         \
+      return((RET_VAL));                                               \
+    }                                                                  \
+  } while (0)
 #else
-#define WAIT_FINISH(RET_VAL, CONTEXT_PTR)                           \
-  pthread_mutex_lock(&(CONTEXT_PTR)->count_threads_mutex); \
-  if ((CONTEXT_PTR)->count_threads > 0) { \
-    (CONTEXT_PTR)->count_threads--; \
-    pthread_cond_wait(&(CONTEXT_PTR)->count_threads_cv, \
-                      &(CONTEXT_PTR)->count_threads_mutex); \
-  } \
-  else { \
-    pthread_cond_broadcast(&(CONTEXT_PTR)->count_threads_cv); \
-  } \
-  pthread_mutex_unlock(&(CONTEXT_PTR)->count_threads_mutex)
+#define WAIT_FINISH(RET_VAL, CONTEXT_PTR)                              \
+  do {                                                                 \
+    pthread_mutex_lock(&(CONTEXT_PTR)->count_threads_mutex);           \
+    if ((CONTEXT_PTR)->count_threads > 0) {                            \
+      (CONTEXT_PTR)->count_threads--;                                  \
+      pthread_cond_wait(&(CONTEXT_PTR)->count_threads_cv,              \
+                        &(CONTEXT_PTR)->count_threads_mutex);          \
+    }                                                                  \
+    else {                                                             \
+      pthread_cond_broadcast(&(CONTEXT_PTR)->count_threads_cv);        \
+    }                                                                  \
+    pthread_mutex_unlock(&(CONTEXT_PTR)->count_threads_mutex);         \
+  } while (0)
 #endif
 
 

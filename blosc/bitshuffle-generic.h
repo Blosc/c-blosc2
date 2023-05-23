@@ -59,8 +59,8 @@
 
 /* Transpose of an array of arbitrarily typed elements. */
 #define TRANS_ELEM_TYPE(in, out, lda, ldb, type_t) {                        \
-        type_t* in_type = (type_t*) (in);                                    \
-        type_t* out_type = (type_t*) (out);                                  \
+        type_t* in_type = (type_t*) (in);                                   \
+        type_t* out_type = (type_t*) (out);                                 \
         size_t ii, jj, kk;                                                  \
         for (ii = 0; ii + 7 < (lda); ii += 8) {                             \
             for (jj = 0; jj < (ldb); jj++) {                                \
