@@ -125,7 +125,7 @@ int release_threadpool(blosc2_context *context);
   else { \
     pthread_cond_broadcast(&(CONTEXT_PTR)->count_threads_cv); \
   } \
-  pthread_mutex_unlock(&(CONTEXT_PTR)->count_threads_mutex);
+  pthread_mutex_unlock(&(CONTEXT_PTR)->count_threads_mutex)
 #endif
 
 /* Wait for all threads to finish */
@@ -147,7 +147,7 @@ int release_threadpool(blosc2_context *context);
   else { \
     pthread_cond_broadcast(&(CONTEXT_PTR)->count_threads_cv); \
   } \
-  pthread_mutex_unlock(&(CONTEXT_PTR)->count_threads_mutex);
+  pthread_mutex_unlock(&(CONTEXT_PTR)->count_threads_mutex)
 #endif
 
 

@@ -22,7 +22,7 @@
 
 
 /*  Macros. */
-#define CHECK_MULT_EIGHT(n) if ((n) % 8) return -80;
+#define CHECK_MULT_EIGHT(n) if ((n) % 8) return -80
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 #define MAX(X,Y) ((X) > (Y) ? (X) : (Y))
 #define CHECK_ERR(count) if ((count) < 0) { return count; }
