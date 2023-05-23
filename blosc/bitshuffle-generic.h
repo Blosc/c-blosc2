@@ -8,6 +8,15 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+/*
+ * Bitshuffle - Filter for improving compression of typed binary data.
+ *
+ * Author: Kiyoshi Masui <kiyo@physics.ubc.ca>
+ * Website: http://www.github.com/kiyo-masui/bitshuffle
+ * Created: 2014
+ *
+ */
+
 /* Generic (non-hardware-accelerated) shuffle/unshuffle routines.
    These are used when hardware-accelerated functions aren't available
    for a particular platform; they are also used by the hardware-
@@ -22,14 +31,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/*  Macros. */
-#define CHECK_MULT_EIGHT(n)               \
-        do {                              \
-          if ((n) % 8)                    \
-            return -80;                   \
-        } while (0)  
-#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
+// Macros.
+#define CHECK_MULT_EIGHT(n) if (n % 8) return -80;
 #define MAX(X,Y) ((X) > (Y) ? (X) : (Y))
+
+#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 #define CHECK_ERR(count)                  \
         do {                              \
           if ((count) < 0)                \
@@ -47,41 +53,41 @@
 /* Transpose 8x8 bit array packed into a single quadword *x*.
  * *t* is workspace. */
 #define TRANS_BIT_8X8(x, t) {                                               \
-        (t) = ((x) ^ ((x) >> 7)) & 0x00AA00AA00AA00AALL;                    \
-        (x) = (x) ^ (t) ^ ((t) << 7);                                       \
-        (t) = ((x) ^ ((x) >> 14)) & 0x0000CCCC0000CCCCLL;                   \
-        (x) = (x) ^ (t) ^ ((t) << 14);                                      \
-        (t) = ((x) ^ ((x) >> 28)) & 0x00000000F0F0F0F0LL;                   \
-        (x) = (x) ^ (t) ^ ((t) << 28);                                      \
+        t = (x ^ (x >> 7)) & 0x00AA00AA00AA00AALL;                          \
+        x = x ^ t ^ (t << 7);                                               \
+        t = (x ^ (x >> 14)) & 0x0000CCCC0000CCCCLL;                         \
+        x = x ^ t ^ (t << 14);                                              \
+        t = (x ^ (x >> 28)) & 0x00000000F0F0F0F0LL;                         \
+        x = x ^ t ^ (t << 28);                                              \
     }
 
 /* Transpose 8x8 bit array along the diagonal from upper right
    to lower left */
 #define TRANS_BIT_8X8_BE(x, t) {                                            \
-        (t) = ((x) ^ ((x) >> 9)) & 0x0055005500550055LL;                    \
-        (x) = (x) ^ (t) ^ ((t) << 9);                                       \
-        (t) = ((x) ^ ((x) >> 18)) & 0x0000333300003333LL;                   \
-        (x) = (x) ^ (t) ^ ((t) << 18);                                      \
-        (t) = ((x) ^ ((x) >> 36)) & 0x000000000F0F0F0FLL;                   \
-        (x) = (x) ^ (t) ^ ((t) << 36);                                      \
+        t = (x ^ (x >> 9)) & 0x0055005500550055LL;                          \
+        x = x ^ t ^ (t << 9);                                               \
+        t = (x ^ (x >> 18)) & 0x0000333300003333LL;                         \
+        x = x ^ t ^ (t << 18);                                              \
+        t = (x ^ (x >> 36)) & 0x000000000F0F0F0FLL;                         \
+        x = x ^ t ^ (t << 36);                                              \
     }
 
 /* Transpose of an array of arbitrarily typed elements. */
 #define TRANS_ELEM_TYPE(in, out, lda, ldb, type_t) {                        \
-        type_t* in_type = (type_t*) (in);                                   \
-        type_t* out_type = (type_t*) (out);                                 \
         size_t ii, jj, kk;                                                  \
-        for (ii = 0; ii + 7 < (lda); ii += 8) {                             \
-            for (jj = 0; jj < (ldb); jj++) {                                \
-                for (kk = 0; kk < 8; kk++) {                                \
-                    out_type[jj*(lda) + ii + kk] =                          \
-                        in_type[ii*(ldb) + kk * (ldb) + jj];                \
+        const type_t* in_type = (const type_t*) in;                                 \
+        type_t* out_type = (type_t*) out;                                   \
+        for(ii = 0; ii + 7 < lda; ii += 8) {                                \
+            for(jj = 0; jj < ldb; jj++) {                                   \
+                for(kk = 0; kk < 8; kk++) {                                 \
+                    out_type[jj*lda + ii + kk] =                            \
+                        in_type[ii*ldb + kk * ldb + jj];                    \
                 }                                                           \
             }                                                               \
         }                                                                   \
-        for (ii = (lda) - (lda) % 8; ii < (lda); ii ++) {                   \
-            for (jj = 0; jj < (ldb); jj++) {                                \
-                out_type[jj*(lda) + ii] = in_type[ii*(ldb) + jj];           \
+        for(ii = lda - lda % 8; ii < lda; ii ++) {                          \
+            for(jj = 0; jj < ldb; jj++) {                                   \
+                out_type[jj*lda + ii] = in_type[ii*ldb + jj];                            \
             }                                                               \
         }                                                                   \
     }
