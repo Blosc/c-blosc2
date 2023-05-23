@@ -1096,7 +1096,7 @@ int b2nd_print_meta(const b2nd_array_t *array) {
                                     &dtype, &dtype_format));
   free(smeta);
 
-  printf("b2nd metalayer parameters: \n Ndim:       %d", ndim);
+  printf("b2nd metalayer parameters:\n Ndim:       %d", ndim);
   printf("\n shape:      %" PRId64 "", shape[0]);
   for (int i = 1; i < ndim; ++i) {
     printf(", %" PRId64 "", shape[i]);

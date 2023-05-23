@@ -55,7 +55,7 @@ int main(void) {
       goto failed;
     }
   }
-  printf("nbytes, cbytes for schunk: %lld, %lld \n",
+  printf("nbytes, cbytes for schunk: %lld, %lld\n",
          (long long int)schunk->nbytes, (long long int)schunk->cbytes);
 
   // Check contents
@@ -70,7 +70,7 @@ int main(void) {
     }
     int nbytes = blosc2_decompress(chunk, cbytes, dest, total_bytes);
     if (nbytes != total_bytes) {
-      printf("Error in schunk: nbytes differs (%d != %d) \n", nbytes, total_bytes);
+      printf("Error in schunk: nbytes differs (%d != %d)\n", nbytes, total_bytes);
       goto failed;
     }
     if (needs_free) {
@@ -78,7 +78,7 @@ int main(void) {
     }
     for (int j = 0; j < CHUNKSIZE; j++) {
       if (buf[j] != dest[j]) {
-        printf("Error in schunk: data differs in index %d (%d != %d)! \n", j, buf[i], dest[i]);
+        printf("Error in schunk: data differs in index %d (%d != %d)!\n", j, buf[i], dest[i]);
         goto failed;
       }
     }
@@ -98,7 +98,7 @@ int main(void) {
   if (schunk2 == NULL) {
     goto failed;
   }
-  printf("nbytes, cbytes for schunk2: %lld, %lld \n",
+  printf("nbytes, cbytes for schunk2: %lld, %lld\n",
          (long long int)schunk2->nbytes, (long long int)schunk2->cbytes);
 
   // Check contents
@@ -110,7 +110,7 @@ int main(void) {
     }
     int nbytes = blosc2_decompress(chunk, cbytes, dest, total_bytes);
     if (nbytes != total_bytes) {
-      printf("Error in schunk2: nbytes differs (%d != %d) \n", nbytes, total_bytes);
+      printf("Error in schunk2: nbytes differs (%d != %d)\n", nbytes, total_bytes);
       goto failed;
     }
     if (needs_free) {
@@ -118,7 +118,7 @@ int main(void) {
     }
     for (int j = 0; j < CHUNKSIZE; j++) {
       if (buf[j] != dest[j]) {
-        printf("Error in schunk2: data differs in index %d (%d != %d)! \n", j, buf[i], dest[i]);
+        printf("Error in schunk2: data differs in index %d (%d != %d)!\n", j, buf[i], dest[i]);
         goto failed;
       }
     }
