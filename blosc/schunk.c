@@ -343,7 +343,7 @@ blosc2_schunk* blosc2_schunk_open(const char* urlpath) {
   return blosc2_schunk_open_udio(urlpath, &BLOSC2_IO_DEFAULTS);
 }
 
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_offset(const char* urlpath, int64_t offset) {
+blosc2_schunk* blosc2_schunk_open_offset(const char* urlpath, int64_t offset) {
   if (urlpath == NULL) {
     BLOSC_TRACE_ERROR("You need to supply a urlpath.");
     return NULL;
