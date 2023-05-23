@@ -55,7 +55,8 @@ int main(void) {
       goto failed;
     }
   }
-  printf("nbytes, cbytes for schunk: %lld, %lld \n", schunk->nbytes, schunk->cbytes);
+  printf("nbytes, cbytes for schunk: %lld, %lld \n",
+         (long long int)schunk->nbytes, (long long int)schunk->cbytes);
 
   // Check contents
   uint8_t *chunk;
@@ -90,14 +91,15 @@ int main(void) {
   if (cframe_len < 0 || !cframe_needs_free) {
     goto failed;
   }
-  printf("converted into a cframe of %lld bytes\n", cframe_len);
+  printf("converted into a cframe of %lld bytes\n", (long long int)cframe_len);
 
   // Convert back into a different schunk
   blosc2_schunk* schunk2 = blosc2_schunk_from_buffer(cframe, cframe_len, true);
   if (schunk2 == NULL) {
     goto failed;
   }
-  printf("nbytes, cbytes for schunk2: %lld, %lld \n", schunk2->nbytes, schunk2->cbytes);
+  printf("nbytes, cbytes for schunk2: %lld, %lld \n",
+         (long long int)schunk2->nbytes, (long long int)schunk2->cbytes);
 
   // Check contents
   for (int i = 0; i < NCHUNKS; i++) {
