@@ -998,7 +998,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
           if (g_filters[j].forward == NULL) {
             // Dynamically load library
             if (fill_filter(&g_filters[j]) < 0) {
-              BLOSC_TRACE_ERROR("Could not load filter %d \n", g_filters[j].id);
+              BLOSC_TRACE_ERROR("Could not load filter %d\n", g_filters[j].id);
               return NULL;
             }
           }
