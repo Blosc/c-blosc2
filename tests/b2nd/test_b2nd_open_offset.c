@@ -191,5 +191,5 @@ CUTEST_TEST_TEARDOWN(open_offset) {
 
 
 int main() {
-  CUTEST_TEST_RUN(open_offset)
+  CUTEST_TEST_RUN(open_offset);
 }

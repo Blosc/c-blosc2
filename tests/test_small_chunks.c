@@ -76,5 +76,5 @@ CUTEST_TEST_TEARDOWN(small_chunks) {
 
 
 int main() {
-  CUTEST_TEST_RUN(small_chunks)
+  CUTEST_TEST_RUN(small_chunks);
 }

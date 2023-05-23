@@ -265,5 +265,5 @@ CUTEST_TEST_TEARDOWN(urfilters) {
 
 
 int main() {
-  CUTEST_TEST_RUN(urfilters)
+  CUTEST_TEST_RUN(urfilters);
 }

@@ -27,18 +27,17 @@
 
 #define CUTEST_DATA(...) __VA_ARGS__
 
-
-#define CUTEST_PARAMETRIZE(name, type, ...)                                      \
-    do {                                                                         \
-        type cutest_##name[] = {__VA_ARGS__};                                    \
-        _cutest_parametrize(#name, cutest_##name,                                \
-                            sizeof(cutest_##name) / sizeof(type), sizeof(type)); \
+#define CUTEST_PARAMETRIZE(name, type, ...)                                       \
+    do {                                                                          \
+        type cutest_##name[] = {__VA_ARGS__};                                     \
+        _cutest_parametrize(#name, cutest_##name,                                 \
+                            sizeof(cutest_##name) / sizeof(type), sizeof(type));  \
     } while(0)
 
-#define CUTEST_PARAMETRIZE2(name, type, params_len, params)                                      \
-    do {                                                                         \
-        (type) *cutest_##name = params;                                    \
-        _cutest_parametrize(#name, cutest_##name, params_len, sizeof(type)); \
+#define CUTEST_PARAMETRIZE2(name, type, params_len, params)                       \
+    do {                                                                          \
+        (type) *cutest_##name = params;                                           \
+        _cutest_parametrize(#name, cutest_##name, params_len, sizeof(type));      \
     } while(0)
 
 #define CUTEST_GET_PARAMETER(name, type) \
@@ -50,29 +49,31 @@
 #define CUTEST_TEST_TEARDOWN(sname) \
     void sname##_teardown()
 
-#define CUTEST_TEST_TEST(sname)                           \
-    CUTEST_TEST_SETUP(sname);                        \
-    CUTEST_TEST_TEARDOWN(sname);                     \
-    int sname##_test();     \
-    int sname##_test()      \
+
+#define CUTEST_TEST_TEST(sname)   \
+    CUTEST_TEST_SETUP(sname);     \
+    CUTEST_TEST_TEARDOWN(sname);  \
+    int sname##_test();           \
+    int sname##_test()
 
 
-#define CUTEST_TEST_RUN(sname)                           \
-    _cutest_setup();                                     \
-    sname##_setup();                 \
-    int rc = _cutest_run((int (*)(void)) sname##_test, \
-                         #sname);                        \
-    sname##_teardown();              \
-    _cutest_teardown();                                  \
-    return rc;
+#define CUTEST_TEST_RUN(sname)                                \
+        do {                                                  \
+          _cutest_setup();                                    \
+          sname##_setup();                                    \
+          int rc = _cutest_run((int (*)(void)) sname##_test,  \
+                               #sname);                       \
+          sname##_teardown();                                 \
+          _cutest_teardown();                                 \
+          return rc;                                          \
+    } while(0)
 
-
-#define CUTEST_ASSERT(msg, cond)                                                    \
-    do {                                                                            \
-        if (!(cond)) {                                                              \
-            sprintf(_cutest_error_msg, "Error: %s %s:%d", msg, __FILE__, __LINE__); \
-            return CUNIT_FAIL;                                                      \
-        }                                                                           \
+#define CUTEST_ASSERT(msg, cond)                                                     \
+    do {                                                                             \
+        if (!(cond)) {                                                               \
+            sprintf(_cutest_error_msg, "Error: %s %s:%d", msg, __FILE__, __LINE__);  \
+            return CUNIT_FAIL;                                                       \
+        }                                                                            \
     } while(0)
 
 

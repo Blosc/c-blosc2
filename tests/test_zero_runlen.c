@@ -217,5 +217,5 @@ CUTEST_TEST_TEARDOWN(zero_runlen) {
 
 
 int main() {
-  CUTEST_TEST_RUN(zero_runlen)
+  CUTEST_TEST_RUN(zero_runlen);
 }

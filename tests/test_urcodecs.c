@@ -263,5 +263,5 @@ CUTEST_TEST_TEARDOWN(urcodecs) {
 
 
 int main() {
-  CUTEST_TEST_RUN(urcodecs)
+  CUTEST_TEST_RUN(urcodecs);
 }

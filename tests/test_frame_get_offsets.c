@@ -121,5 +121,5 @@ CUTEST_TEST_TEARDOWN(fill_special) {
 
 
 int main() {
-  CUTEST_TEST_RUN(fill_special)
+  CUTEST_TEST_RUN(fill_special);
 }
