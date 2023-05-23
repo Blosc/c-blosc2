@@ -193,5 +193,5 @@ CUTEST_TEST_TEARDOWN(copy) {
 
 
 int main() {
-  CUTEST_TEST_RUN(copy)
+  CUTEST_TEST_RUN(copy);
 }

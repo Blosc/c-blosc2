@@ -176,5 +176,5 @@ CUTEST_TEST_TEARDOWN(udio) {
 
 
 int main() {
-  CUTEST_TEST_RUN(udio)
+  CUTEST_TEST_RUN(udio);
 }
