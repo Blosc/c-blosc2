@@ -19,10 +19,15 @@
 #define RTLD_LAZY   0x000
 #define popen _popen
 #define pclose _pclose
+#else
+#include <dlfcn.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#if defined(_WIN32)
 
 static struct {
     long lasterror;
@@ -73,10 +78,8 @@ const char *dlerror (void) {
       return NULL;
   }
 }
-#else
-#include <dlfcn.h>
-#endif
 
+#endif
 
 static inline void* load_lib(char *plugin_name, char *libpath) {
   char python_cmd[PATH_MAX] = {0};
