@@ -61,7 +61,7 @@ extern int tests_run;
     The allocated memory is 'cleaned' before returning to avoid
     accidental re-use of data within or between tests.
  */
-inline static void* blosc_test_malloc(const size_t alignment, const size_t size) {
+static inline void* blosc_test_malloc(const size_t alignment, const size_t size) {
   const int32_t clean_value = 0x99;
   void* block = NULL;
   int32_t res = 0;
@@ -95,7 +95,7 @@ inline static void* blosc_test_malloc(const size_t alignment, const size_t size)
 }
 
 /** Frees memory allocated by blosc_test_malloc. */
-inline static void blosc_test_free(void* ptr) {
+static inline void blosc_test_free(void* ptr) {
 #if defined(_WIN32)
   _aligned_free(ptr);
 #else
@@ -104,7 +104,7 @@ inline static void blosc_test_free(void* ptr) {
 }
 
 /** Fills a buffer with contiguous values. */
-inline static void blosc_test_fill_seq(void* const ptr, const size_t size) {
+static inline void blosc_test_fill_seq(void* const ptr, const size_t size) {
   size_t k;
   uint8_t* const byte_ptr = (uint8_t*)ptr;
   for (k = 0; k < size; k++) {
@@ -113,7 +113,7 @@ inline static void blosc_test_fill_seq(void* const ptr, const size_t size) {
 }
 
 /** Fills a buffer with random values. */
-inline static void blosc_test_fill_random(void* const ptr, const size_t size) {
+static inline void blosc_test_fill_random(void* const ptr, const size_t size) {
   size_t k;
   uint8_t* const byte_ptr = (uint8_t*)ptr;
   for (k = 0; k < size; k++) {
@@ -126,7 +126,7 @@ inline static void blosc_test_fill_random(void* const ptr, const size_t size) {
 */
 
 /** Parse a `int32_t` value from a string, checking for overflow. */
-inline static bool blosc_test_parse_uint32_t(const char* const str, uint32_t* value) {
+static inline bool blosc_test_parse_uint32_t(const char* const str, uint32_t* value) {
   char* str_end;
   long signed_value = strtol(str, &str_end, 10);
   if (signed_value < 0 || *str_end) {
@@ -144,7 +144,7 @@ inline static bool blosc_test_parse_uint32_t(const char* const str, uint32_t* va
 
 /** Print an error message when a test program has been invoked
     with an invalid number of arguments. */
-inline static void blosc_test_print_bad_argcount_msg(
+static inline void blosc_test_print_bad_argcount_msg(
     const int32_t num_expected_args, const int32_t num_actual_args) {
   fprintf(stderr, "Invalid number of arguments specified.\nExpected %d arguments but was given %d.",
           num_expected_args, num_actual_args);
@@ -152,7 +152,7 @@ inline static void blosc_test_print_bad_argcount_msg(
 
 /** Print an error message when a test program has been invoked
     with an invalid argument value. */
-inline static void blosc_test_print_bad_arg_msg(const int32_t arg_index) {
+static inline void blosc_test_print_bad_arg_msg(const int32_t arg_index) {
   fprintf(stderr, "Invalid value specified for argument at index %d.\n", arg_index);
 }
 
@@ -167,7 +167,7 @@ static void dummy_threads_callback(void *callback_data, void (*dojob)(void *), i
 }
 
 /* install the callback if environment variable BLOSC_TEST_CALLBACK="yes" */
-inline static void install_blosc_callback_test(void)
+static inline void install_blosc_callback_test(void)
 {
   char *callback_env;
   callback_env = getenv("BLOSC_TEST_CALLBACK");
