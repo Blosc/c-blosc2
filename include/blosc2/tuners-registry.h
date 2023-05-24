@@ -21,7 +21,7 @@ enum {
 
 void register_tuners(void);
 
-// For dynamically loaded tunes
+// For dynamically loaded tuners
 typedef struct {
     char *init;
     char *next_blocksize;
