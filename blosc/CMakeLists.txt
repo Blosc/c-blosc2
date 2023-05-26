@@ -97,6 +97,7 @@ else()
     else()
         set(LIBS ${LIBS} Threads::Threads)
     endif()
+    set(LIBS ${LIBS} ${CMAKE_DL_LIBS})
 endif()
 
 if(LZ4_FOUND)
