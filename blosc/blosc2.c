@@ -1188,7 +1188,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     }
 
     maxout = neblock;
-    if (ntbytes + maxout > destsize) {
+    if (ntbytes + maxout > destsize && !instr_codec) {
       /* avoid buffer * overrun */
       maxout = destsize - ntbytes;
       if (maxout <= 0) {
@@ -1925,7 +1925,7 @@ static int serial_blosc(struct thread_context* thread_context) {
   blosc2_context* context = thread_context->parent_context;
   int32_t j, bsize, leftoverblock;
   int32_t cbytes;
-  int32_t ntbytes = (int32_t)context->output_bytes;
+  int32_t ntbytes = context->output_bytes;
   int32_t* bstarts = context->bstarts;
   uint8_t* tmp = thread_context->tmp;
   uint8_t* tmp2 = thread_context->tmp2;
