@@ -90,7 +90,9 @@ void update_schunk_properties(struct blosc2_schunk* schunk) {
   schunk->chunksize = -1;
   schunk->tuner_params = cparams->tuner_params;
   schunk->tuner_id = cparams->tuner_id;
-
+  if (cparams->tuner_id == BLOSC_BTUNE) {
+    cparams->use_dict = 0;
+  }
   /* The compression context */
   if (schunk->cctx != NULL) {
     blosc2_free_ctx(schunk->cctx);
