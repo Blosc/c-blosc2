@@ -102,7 +102,13 @@ CUTEST_TEST_TEST(fill_special) {
       free(chunk);
     }
     for (int i = 1; i < schunk->nchunks; ++i) {
-      CUTEST_ASSERT("Error getting the offsets", (offsets[i] - offsets[i - 1]) == chunk_size);
+      dsize = blosc2_schunk_get_chunk(schunk, i-1, &chunk, &needs_free);
+      CUTEST_ASSERT("ERROR: chunk cannot be retrieved correctly.", dsize >= 0);
+      blosc2_cbuffer_sizes(chunk, &nbytes_, &cbytes_, &blocksize);
+      if (needs_free) {
+        free(chunk);
+      }
+      CUTEST_ASSERT("Error getting the offsets", (offsets[i] - offsets[i - 1]) == cbytes_);
     }
   }
 
