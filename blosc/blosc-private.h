@@ -18,6 +18,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <math.h>
 
 /*********************************************************************
 
@@ -147,6 +148,38 @@ static inline int32_t bswap32_(int32_t a) {
   return a;
 #endif
 }
+
+static inline int32_t set_nans(int32_t typesize, uint8_t* dest, int32_t destsize) {
+  if (destsize % typesize != 0) {
+    BLOSC_TRACE_ERROR("destsize can only be a multiple of typesize");
+    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+  }
+  int32_t nitems = destsize / typesize;
+  if (nitems == 0) {
+    return 0;
+  }
+
+  if (typesize == 4) {
+    float* dest_ = (float*)dest;
+    float val = nanf("");
+    for (int i = 0; i < nitems; i++) {
+      dest_[i] = val;
+    }
+    return nitems;
+  }
+  else if (typesize == 8) {
+    double* dest_ = (double*)dest;
+    double val = nan("");
+    for (int i = 0; i < nitems; i++) {
+      dest_[i] = val;
+    }
+    return nitems;
+  }
+
+  BLOSC_TRACE_ERROR("Unsupported typesize for NaN");
+  return BLOSC2_ERROR_DATA;
+}
+
 
 /**
  * @brief Register a filter in Blosc.

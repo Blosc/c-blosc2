@@ -13,6 +13,7 @@
 #include "context.h"
 #include "blosc2/blosc2-common.h"
 #include "blosc2.h"
+#include "blosc-private.h"
 
 #include <inttypes.h>
 #include <stdlib.h>
@@ -634,10 +635,49 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
           BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
         }
       } else {
-        // Avoid writing non zero padding from previous chunk
+        // Avoid writing non-zero padding from previous chunk
         memset(data, 0, data_nbytes);
       }
     } else {
+
+      // Check whether the complete chunk is needed and is special; if so, avoid the decompression
+      bool decompress_chunk = false;
+      for (int i = 0; i < ndim; ++i) {
+        // Maybe we can come with a more lax condition here
+        decompress_chunk |= (chunk_start[i] == start[i] && chunk_stop[i] == stop[i]);
+      }
+      if (decompress_chunk) {
+        bool needs_free;
+        uint8_t *lazychunk;
+        int err = blosc2_schunk_get_lazychunk(array->sc, nchunk, &lazychunk, &needs_free);
+        if (err < 0) {
+          BLOSC_TRACE_ERROR("Error getting lazy chunk");
+          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+        }
+        int8_t special_values = (lazychunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & 0x70) >> 4;
+        int rc;
+        //printf("special values: %d\n", special_values);
+        // test_b2nd_resize still fails.  probably due to zeroing too much here...
+        switch (special_values) {
+          case BLOSC2_SPECIAL_ZERO:
+            memset(buffer, 0, buffersize);
+            goto out;
+          case BLOSC2_SPECIAL_NAN:
+            rc = set_nans(array->sc->typesize, buffer, buffersize);
+            if (rc < 0) {
+              BLOSC_TRACE_ERROR("set_nans failed");
+              return BLOSC2_ERROR_DATA;
+            }
+            goto out;
+          default:
+            //printf("Hola default!\n");
+            break;
+        }
+        if (needs_free) {
+          free(lazychunk);
+        }
+      }
+
       bool *block_maskout = malloc(nblocks);
       BLOSC_ERROR_NULL(block_maskout, BLOSC2_ERROR_MEMORY_ALLOC);
       for (int nblock = 0; nblock < nblocks; ++nblock) {
@@ -795,6 +835,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     }
   }
 
+  out:
   free(data);
 
   return BLOSC2_ERROR_SUCCESS;

@@ -176,7 +176,10 @@ CUTEST_TEST_TEST(resize_shape) {
                       ((uint16_t *) src_buffer)[i] == ((uint16_t *) aux_buffer)[i]);
         break;
       case 1:
-        CUTEST_ASSERT("Elements are not equal!",
+        if (src_buffer[i] != aux_buffer[i]) {
+          printf("values differ in: %d (%d != %d)\n", i, src_buffer[i], aux_buffer[i]);
+        }
+        CUTEST_ASSERT("Elements are not equal! ",
                       ((uint8_t *) src_buffer)[i] == ((uint8_t *) aux_buffer)[i]);
         break;
       default:

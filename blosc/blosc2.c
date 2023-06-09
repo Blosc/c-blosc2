@@ -68,7 +68,6 @@
 #include <string.h>
 #include <sys/types.h>
 #include <assert.h>
-#include <math.h>
 
 
 /* Synchronization variables */
@@ -1458,38 +1457,6 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
   }
 
   return errcode;
-}
-
-
-static int32_t set_nans(int32_t typesize, uint8_t* dest, int32_t destsize) {
-  if (destsize % typesize != 0) {
-    BLOSC_TRACE_ERROR("destsize can only be a multiple of typesize");
-    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
-  }
-  int32_t nitems = destsize / typesize;
-  if (nitems == 0) {
-    return 0;
-  }
-
-  if (typesize == 4) {
-    float* dest_ = (float*)dest;
-    float val = nanf("");
-    for (int i = 0; i < nitems; i++) {
-      dest_[i] = val;
-    }
-    return nitems;
-  }
-  else if (typesize == 8) {
-    double* dest_ = (double*)dest;
-    double val = nan("");
-    for (int i = 0; i < nitems; i++) {
-      dest_[i] = val;
-    }
-    return nitems;
-  }
-
-  BLOSC_TRACE_ERROR("Unsupported typesize for NaN");
-  return BLOSC2_ERROR_DATA;
 }
 
 

@@ -27,10 +27,42 @@
 # include <b2nd.h>
 
 int print_meta(char *urlpath) {
-
+  blosc_timestamp_t last, current;
+  blosc_timestamp_t last2, current2;
+  double nsecs = 0;
   b2nd_array_t *arr;
+
   BLOSC_ERROR(b2nd_open(urlpath, &arr));
   BLOSC_ERROR(b2nd_print_meta(arr));
+
+  int r2 = 100;
+  int cube_size = 20 * 1000 / r2;
+  int r3 = 10;
+  blosc_set_timestamp(&current2);
+  for (int i = 0; i < r3; i++) {
+    for (int j = 0; j < r3; j++) {
+      blosc_set_timestamp(&last2);
+      nsecs = blosc_elapsed_secs(current2, last2);
+      printf("i, j: %d, %d (%.4f s)\n", i, j, nsecs);
+      blosc_set_timestamp(&current2);
+      for (int k = 0; k < r3; k++) {
+        int64_t slice_start[] = {i * cube_size, j * cube_size, k * cube_size};
+        int64_t slice_stop[] = {(i + 1) * cube_size, (j + 1) * cube_size, (k + 1) * cube_size};
+        int64_t buffer_shape[] = {cube_size, cube_size, cube_size};
+
+        blosc_set_timestamp(&current);
+        int64_t buffersize = cube_size * cube_size * cube_size * sizeof(float);
+        float *buffer = malloc(buffersize);
+        // float *buffer = calloc(buffersize, 1);
+        BLOSC_ERROR(b2nd_get_slice_cbuffer(arr, slice_start, slice_stop, buffer, buffer_shape, buffersize));
+        blosc_set_timestamp(&last);
+        nsecs = blosc_elapsed_secs(current, last);
+        //printf("i, j, k: %d, %d, %d; first buffer element (time): %.2f (%.4f s)\n", i, j, k, buffer[0], nsecs);
+        free(buffer);
+      }
+    }
+  }
+
   BLOSC_ERROR(b2nd_free(arr));
 
   return 0;
@@ -45,9 +77,9 @@ int main(int argc, char *argv[]) {
   blosc2_init();
 
   char *urlpath = argv[1];
-  print_meta(urlpath);
+  int rc = print_meta(urlpath);
 
   blosc2_destroy();
 
-  return 0;
+  return rc;
 }
