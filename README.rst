@@ -227,6 +227,21 @@ Tweeter feed
 Follow `@Blosc2 <https://twitter.com/Blosc2>`_ so as to get informed about the latest developments.
 
 
+Citing Blosc
+============
+
+You can cite our work on the different libraries under the Blosc umbrella as:
+
+.. code-block:: console
+
+  @ONLINE{blosc,
+    author = {{Blosc Development Team}},
+    title = "{A fast, compressed and persistent data store library}",
+    year = {2009-2023},
+    note = {https://blosc.org}
+  }
+
+
 Acknowledgments
 ===============
 
