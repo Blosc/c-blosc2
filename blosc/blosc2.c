@@ -12,7 +12,6 @@
 #include "blosc2.h"
 #include "blosc-private.h"
 #include "../plugins/codecs/zfp/blosc2-zfp.h"
-#include "blosc2/plugins-utils.h"
 #include "frame.h"
 
 #if defined(USING_CMAKE)

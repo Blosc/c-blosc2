@@ -321,7 +321,6 @@ if(BLOSC_INSTALL)
         install(FILES
                 ${PROJECT_SOURCE_DIR}/include/blosc2/filters-registry.h
                 ${PROJECT_SOURCE_DIR}/include/blosc2/codecs-registry.h
-                ${PROJECT_SOURCE_DIR}/include/blosc2/plugins-utils.h
                 ${PROJECT_SOURCE_DIR}/include/blosc2/tuners-registry.h
                 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/blosc2 COMPONENT DEV)
     endif()
