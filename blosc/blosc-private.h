@@ -198,7 +198,7 @@ var = {
     NULL
 };
 
-void *dlopen (const char *filename, int flags) {
+static inline void *dlopen (const char *filename, int flags) {
   HINSTANCE hInst;
   hInst = LoadLibrary(filename);
   if (hInst==NULL) {
@@ -209,7 +209,7 @@ void *dlopen (const char *filename, int flags) {
   return hInst;
 }
 
-void *dlsym(void *handle, const char *name) {
+static inline void *dlsym(void *handle, const char *name) {
   FARPROC fp;
   fp = GetProcAddress((HINSTANCE)handle, name);
   if (!fp) {
@@ -219,7 +219,7 @@ void *dlsym(void *handle, const char *name) {
   return (void *)(intptr_t)fp;
 }
 
-int dlclose(void *handle) {
+static inline int dlclose(void *handle) {
   bool ok = FreeLibrary((HINSTANCE)handle);
   if (!ok) {
     var.lasterror = GetLastError();
@@ -229,7 +229,7 @@ int dlclose(void *handle) {
   return BLOSC2_ERROR_SUCCESS;
 }
 
-const char *dlerror (void) {
+static inline const char *dlerror (void) {
   static char errstr [88];
   if (var.lasterror) {
       sprintf (errstr, "%s error #%ld", var.err_rutin, var.lasterror);
