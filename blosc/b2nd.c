@@ -269,6 +269,10 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
     }
   }
 
+  if ((*array)->extchunknitems * sc->typesize > BLOSC2_MAX_BUFFERSIZE){
+    BLOSC_TRACE_ERROR("Chunksize exceeds maximum of %d", BLOSC2_MAX_BUFFERSIZE);
+    return BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
+  }
   // Fill schunk with uninit values
   if ((*array)->nitems != 0) {
     int32_t chunksize = (int32_t) (*array)->extchunknitems * sc->typesize;

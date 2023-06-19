@@ -422,6 +422,8 @@ enum {
 
 /**
  * @brief Error codes
+ * Each time an error code is added here, its corresponding message error should be added in
+ * print_error()
  */
 enum {
   BLOSC2_ERROR_SUCCESS = 0,           //<! Success
@@ -459,7 +461,7 @@ enum {
   BLOSC2_ERROR_NULL_POINTER = -32,    //!< Pointer is null
   BLOSC2_ERROR_INVALID_INDEX = -33,   //!< Invalid index
   BLOSC2_ERROR_METALAYER_NOT_FOUND = -34,   //!< Metalayer has not been found
-  BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED = -35,  //!< Max buffer size excceded
+  BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED = -35,  //!< Max buffer size exceeded
 };
 
 
@@ -540,6 +542,8 @@ static char *print_error(int rc) {
       return (char *) "Invalid index";
     case BLOSC2_ERROR_METALAYER_NOT_FOUND:
       return (char *) "Metalayer has not been found";
+    case BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED:
+      return (char *) "Maximum buffersize exceeded";
     default:
       return (char *) "Unknown error";
   }
