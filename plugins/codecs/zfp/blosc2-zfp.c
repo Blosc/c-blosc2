@@ -26,6 +26,7 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   ZFP_ERROR_NULL(input);
   ZFP_ERROR_NULL(output);
   ZFP_ERROR_NULL(cparams);
+  ZFP_ERROR_NULL(cparams->schunk);
 
   double tol = (int8_t) meta;
   int8_t ndim;
@@ -146,6 +147,7 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
   ZFP_ERROR_NULL(input);
   ZFP_ERROR_NULL(output);
   ZFP_ERROR_NULL(dparams);
+  ZFP_ERROR_NULL(dparams->schunk);
   BLOSC_UNUSED_PARAM(chunk);
 
   blosc2_schunk *sc = dparams->schunk;
@@ -241,6 +243,7 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   ZFP_ERROR_NULL(input);
   ZFP_ERROR_NULL(output);
   ZFP_ERROR_NULL(cparams);
+  ZFP_ERROR_NULL(cparams->schunk);
 
   int8_t ndim;
   int64_t *shape = malloc(8 * sizeof(int64_t));
@@ -385,6 +388,7 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   ZFP_ERROR_NULL(input);
   ZFP_ERROR_NULL(output);
   ZFP_ERROR_NULL(dparams);
+  ZFP_ERROR_NULL(dparams->schunk);
   BLOSC_UNUSED_PARAM(chunk);
 
   blosc2_schunk *sc = dparams->schunk;
@@ -504,6 +508,7 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   ZFP_ERROR_NULL(input);
   ZFP_ERROR_NULL(output);
   ZFP_ERROR_NULL(cparams);
+  ZFP_ERROR_NULL(cparams->schunk);
 
   double ratio = (double) meta / 100.0;
   int8_t ndim;
@@ -635,6 +640,7 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   ZFP_ERROR_NULL(input);
   ZFP_ERROR_NULL(output);
   ZFP_ERROR_NULL(dparams);
+  ZFP_ERROR_NULL(dparams->schunk);
   BLOSC_UNUSED_PARAM(chunk);
 
   blosc2_schunk *sc = dparams->schunk;
