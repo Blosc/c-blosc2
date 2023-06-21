@@ -4,7 +4,13 @@ Release notes for C-Blosc2
 Changes from 2.9.2 to 2.9.3
 ===========================
 
-#XXX version-specific blurb XXX#
+* Thanks to Dimitri Papadopoulos for an extensive set of improvements in
+  documentation and code.
+
+* `load_lib` is now a private function. Before was public, but
+  never meant to be.
+
+* Several fixes for bugs discovered by the fuzzer.
 
 
 Changes from 2.9.1 to 2.9.2
