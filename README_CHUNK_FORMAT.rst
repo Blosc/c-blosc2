@@ -9,8 +9,8 @@ A regular chunk is composed of a header and a blocks section::
 
 Also, there are the so-called lazy chunks that do not have the actual compressed data,
 but only metainformation about how to read it. Lazy chunks typically appear when reading
-data from persistent media.  A lazy chunk has the header and bstarts sections in place
-and in addition, they have an additional trailer for allowing to read the data blocks::
+data from persistent media.  A lazy chunk has header and bstarts sections in place and
+in addition, an additional trailer for allowing to read the data blocks::
 
     +---------+---------+---------+
     |  header | bstarts | trailer |
@@ -184,7 +184,7 @@ compression, and finally a list of compressed data streams::
     | bstarts | dict | streams |
     +=========+======+=========+
 
-Each block is equal-sized as specified by the `blocksize` header field. The size of the last block that can be shorter
+Each block is equal-sized as specified by the `blocksize` header field. The size of the last block can be shorter
 or equal to the rest.
 
 **Block starts**

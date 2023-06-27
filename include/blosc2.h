@@ -1243,7 +1243,7 @@ static const blosc2_dparams BLOSC2_DPARAMS_DEFAULTS = {1, NULL, NULL, NULL};
  *
  * @return A pointer to the new context. NULL is returned if this fails.
  *
- * @note This support the same environment variables than #blosc2_compress
+ * @note This supports the same environment variables than #blosc2_compress
  * for overriding the programmatic compression values.
  *
  * @sa #blosc2_compress
@@ -1257,7 +1257,7 @@ BLOSC_EXPORT blosc2_context* blosc2_create_cctx(blosc2_cparams cparams);
  *
  * @return A pointer to the new context. NULL is returned if this fails.
  *
- * @note This support the same environment variables than #blosc2_decompress
+ * @note This supports the same environment variables than #blosc2_decompress
  * for overriding the programmatic decompression values.
  *
  * @sa #blosc2_decompress
@@ -1833,7 +1833,7 @@ BLOSC_EXPORT int64_t blosc2_schunk_append_file(blosc2_schunk* schunk, const char
  *
  * @param schunk The super-chunk to be freed.
  *
- * @remark All the memory resources attached to the super-frame are freed.
+ * @remark All the memory resources attached to the super-chunk are freed.
  * If the super-chunk is on-disk, the data continues there for a later
  * re-opening.
  *
@@ -1916,7 +1916,7 @@ BLOSC_EXPORT int64_t blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *sr
  * @param dest The buffer where the decompressed data will be put.
  * @param nbytes The size of the area pointed by @p *dest.
  *
- * @warning You must make sure that you have space enough to store the
+ * @warning You must make sure that you have enough space to store the
  * uncompressed data.
  *
  * @return The size of the decompressed chunk or 0 if it is non-initialized. If some problem is
@@ -1980,7 +1980,7 @@ BLOSC_EXPORT int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchu
  * @param stop The first index (0-based) that is not in the selected slice.
  * @param buffer The buffer where the data will be stored.
  *
- * @warning You must make sure that you have space enough in buffer to store the
+ * @warning You must make sure that you have enough space in buffer to store the
  * uncompressed data.
  *
  * @return An error code.
