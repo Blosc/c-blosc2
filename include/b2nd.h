@@ -198,8 +198,8 @@ BLOSC_EXPORT int b2nd_zeros(b2nd_context_t *ctx, b2nd_array_t **array);
  * uninitialized portions of the array.
  *
  * @param ctx The b2nd context for the new array.
- * @param fill_value Default value for uninitialized portions of the array.
  * @param array The memory pointer where the array will be created.
+ * @param fill_value Default value for uninitialized portions of the array.
  *
  * @return An error code.
  */

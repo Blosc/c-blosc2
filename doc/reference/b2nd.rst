@@ -2,7 +2,7 @@ Blosc2 NDim
 ===========
 
 It contains both the data and metalayer that stores the dimensional info for the array.
-Blosc2 NDim has an internal context managed that stores the different properties of each array.
+Blosc2 NDim has a managed internal context that stores the different properties of each array.
 
 Context
 -------
