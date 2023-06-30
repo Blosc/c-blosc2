@@ -125,9 +125,9 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
   // Update the (local variable) storage
   storage = schunk->storage;
 
-  char* btune_balance = getenv("BTUNE_BALANCE");
-  if (btune_balance != NULL) {
-    // If BTUNE_BALANCE passed, automatically use btune
+  char* tradeoff = getenv("BTUNE_TRADEOFF");
+  if (tradeoff != NULL) {
+    // If BTUNE_TRADEOFF passed, automatically use btune
     storage->cparams->tuner_id = BLOSC_BTUNE;
   }
 
