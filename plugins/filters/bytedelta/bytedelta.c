@@ -46,6 +46,8 @@ bytes16 simd_prefix_sum(bytes16 x)
   return x;
 }
 
+uint8_t simd_get_last(bytes16 x) { return (_mm_extract_epi16(x, 7) >> 8) & 0xFF; }
+
 #elif defined(__aarch64__) || defined(_M_ARM64)
 // ARM v8 NEON code path
 #define CPU_HAS_SIMD 1
@@ -72,6 +74,8 @@ bytes16 simd_prefix_sum(bytes16 x)
   return x;
 }
 
+uint8_t simd_get_last(bytes16 x) { return vgetq_lane_u8(x, 15); }
+
 #endif
 
 
@@ -93,6 +97,7 @@ int bytedelta_forward(const uint8_t *input, uint8_t *output, int32_t length, uin
   const int stream_len = length / typesize;
   for (int ich = 0; ich < typesize; ++ich) {
     int ip = 0;
+    uint8_t _v2 = 0;
     // SIMD delta within each channel, store
 #if defined(CPU_HAS_SIMD)
     bytes16 v2 = {0};
@@ -104,9 +109,12 @@ int bytedelta_forward(const uint8_t *input, uint8_t *output, int32_t length, uin
       output += 16;
       v2 = v;
     }
+    if (stream_len > 15) {
+      _v2 = simd_get_last(v2);
+
+    }
 #endif // #if defined(CPU_HAS_SIMD)
     // scalar leftover
-    uint8_t _v2 = 0;
     for (; ip < stream_len ; ip++) {
       uint8_t v = *input;
       input++;
@@ -137,6 +145,7 @@ int bytedelta_backward(const uint8_t *input, uint8_t *output, int32_t length, ui
   const int stream_len = length / typesize;
   for (int ich = 0; ich < typesize; ++ich) {
     int ip = 0;
+    uint8_t _v2 = 0;
     // SIMD fetch 16 bytes from each channel, prefix-sum un-delta
 #if defined(CPU_HAS_SIMD)
     bytes16 v2 = {0};
@@ -148,9 +157,11 @@ int bytedelta_backward(const uint8_t *input, uint8_t *output, int32_t length, ui
       simd_store(output, v2);
       output += 16;
     }
+    if (stream_len > 15) {
+      _v2 = simd_get_last(v2);
+    }
 #endif // #if defined(CPU_HAS_SIMD)
     // scalar leftover
-    uint8_t _v2 = 0;
     for (; ip < stream_len; ip++) {
       uint8_t v = *input + _v2;
       input++;
