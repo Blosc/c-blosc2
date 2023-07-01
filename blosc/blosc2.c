@@ -907,6 +907,12 @@ static int blosc2_intialize_header_from_context(blosc2_context* context, blosc_h
   return 0;
 }
 
+void _cycle_buffers(void **src, void **dest, void **tmp) {
+  void *tmp2 = *src;
+  *src = *dest;
+  *dest = *tmp;
+  *tmp = tmp2;
+}
 
 uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t bsize,
                           const uint8_t* src, const int32_t offset,
@@ -948,10 +954,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
       // No more filters are required
       return _dest;
     }
-    // Cycle buffers
-    _src = _dest;
-    _dest = _tmp;
-    _tmp = _src;
+    _cycle_buffers(&_src, &_dest, &_tmp);
   }
 
   /* Process the filter pipeline */
@@ -964,9 +967,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
             shuffle(typesize, bsize, _src, _dest);
             // Cycle filters when required
             if (j < filters_meta[i]) {
-              _src = _dest;
-              _dest = _tmp;
-              _tmp = _src;
+              _cycle_buffers(&_src, &_dest, &_tmp);
             }
           }
           break;
@@ -1025,9 +1026,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
 
     // Cycle buffers when required
     if (filters[i] != BLOSC_NOFILTER) {
-      _src = _dest;
-      _dest = _tmp;
-      _tmp = _src;
+      _cycle_buffers(&_src, &_dest, &_tmp);
     }
   }
   return _src;
@@ -1344,9 +1343,7 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
             unshuffle(typesize, bsize, _src, _dest);
             // Cycle filters when required
             if (j < filters_meta[i]) {
-              _src = _dest;
-              _dest = _tmp;
-              _tmp = _src;
+              _cycle_buffers(&_src, &_dest, &_tmp);
             }
             // Check whether we have to copy the intermediate _dest buffer to final destination
             if (last_copy_filter && (filters_meta[i] % 2) == 1 && j == filters_meta[i]) {
@@ -1424,9 +1421,7 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
 
     // Cycle buffers when required
     if ((filters[i] != BLOSC_NOFILTER) && (filters[i] != BLOSC_TRUNC_PREC)) {
-      _src = _dest;
-      _dest = _tmp;
-      _tmp = _src;
+      _cycle_buffers(&_src, &_dest, &_tmp);
     }
     if (last_filter_index == i) {
       break;
