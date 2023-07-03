@@ -19,6 +19,12 @@ int bytedelta_forward(const uint8_t* input, uint8_t* output, int32_t length, uin
                       blosc2_cparams* cparams, uint8_t id);
 
 int bytedelta_backward(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta,
-                      blosc2_dparams* dparams, uint8_t id);
+                       blosc2_dparams* dparams, uint8_t id);
 
-#endif /* BLOSC_PLUGINS_FILTERS_BYTEDELTA_BYTEDELTA_H*/
+int bytedelta_forward_v1(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta,
+                         blosc2_cparams* cparams, uint8_t id);
+
+int bytedelta_backward_v1(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta,
+                          blosc2_dparams* dparams, uint8_t id);
+
+#endif /* BLOSC_PLUGINS_FILTERS_BYTEDELTA_BYTEDELTA_H */
