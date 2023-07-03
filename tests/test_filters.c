@@ -10,6 +10,12 @@
 int main(void) {
   blosc2_init();
   srandom(0);
+  char *name = NULL;
+  char *version = NULL;
+  if (blosc2_get_complib_info("zstd", &name, &version) < 0) {
+    // We need ZSTD for the test here...
+    return 0;
+  }
   uint16_t *ref_data = (uint16_t *)malloc(CHUNKSIZE);
   uint16_t *data_dest = (uint16_t *)malloc(CHUNKSIZE);
   for (int i = 0; i < LEN; i++) {
