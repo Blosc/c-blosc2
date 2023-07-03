@@ -9,17 +9,23 @@
 
 int main(void) {
   blosc2_init();
-  srandom(0);
-  char *name = NULL;
+  srand(0);
+  char *libname = NULL;
   char *version = NULL;
-  if (blosc2_get_complib_info("zstd", &name, &version) < 0) {
+  int ret = blosc2_get_complib_info("zstd", &libname, &version);
+  if (libname != NULL) {
+    free(libname);
+    free(version);
+  }
+  if (ret < 0) {
     // We need ZSTD for the test here...
     return 0;
   }
+
   uint16_t *ref_data = (uint16_t *)malloc(CHUNKSIZE);
   uint16_t *data_dest = (uint16_t *)malloc(CHUNKSIZE);
   for (int i = 0; i < LEN; i++) {
-    ref_data[i] = random() % 118;
+    ref_data[i] = rand() % 118;
   }
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.compcode = BLOSC_ZSTD;
