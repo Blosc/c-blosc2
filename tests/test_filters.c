@@ -10,14 +10,7 @@
 int main(void) {
   blosc2_init();
   srand(0);
-  char *libname = NULL;
-  char *version = NULL;
-  int ret = blosc2_get_complib_info("zstd", &libname, &version);
-  if (libname != NULL) {
-    free(libname);
-    free(version);
-  }
-  if (ret < 0) {
+  if (blosc2_compname_to_compcode("zstd") < 0) {
     // We need ZSTD for the test here...
     return 0;
   }
