@@ -130,7 +130,7 @@ CUTEST_TEST_TEST(open_offset) {
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for fileframe (%s) + offset %ld -> open_offset : %.3g s, %.1f GB/s\n",
-         arr_read_offset->sc->storage->urlpath, offset, ttotal, (double)arr_read_offset->sc->nbytes / (ttotal * GB));
+         arr_read_offset->sc->storage->urlpath, (long)offset, ttotal, (double)arr_read_offset->sc->nbytes / (ttotal * GB));
 
   uint8_t* cframe_read_start, *cframe_read_offset;
   bool cframe_needs_free2, cframe_needs_free3;

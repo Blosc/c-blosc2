@@ -907,8 +907,8 @@ static int blosc2_intialize_header_from_context(blosc2_context* context, blosc_h
   return 0;
 }
 
-void _cycle_buffers(void **src, void **dest, void **tmp) {
-  void *tmp2 = *src;
+void _cycle_buffers(uint8_t **src, uint8_t **dest, uint8_t **tmp) {
+  uint8_t *tmp2 = *src;
   *src = *dest;
   *dest = *tmp;
   *tmp = tmp2;
