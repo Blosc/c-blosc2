@@ -175,8 +175,9 @@ int bytedelta_backward(const uint8_t *input, uint8_t *output, int32_t length, ui
 
 // This is the original (and buggy) version of bytedelta.  It is kept here for backwards compatibility.
 // See #524 for details.
-int bytedelta_forward_v1(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta,
-                         blosc2_cparams *cparams, uint8_t id) {
+// Fetch 16b from N streams, compute SIMD delta
+int bytedelta_forward_buggy(const uint8_t *input, uint8_t *output, int32_t length,
+                            uint8_t meta, blosc2_cparams *cparams, uint8_t id) {
   BLOSC_UNUSED_PARAM(id);
 
   int typesize = meta;
@@ -218,11 +219,9 @@ int bytedelta_forward_v1(const uint8_t *input, uint8_t *output, int32_t length, 
   return BLOSC2_ERROR_SUCCESS;
 }
 
-
-// This is the original (and buggy) version of bytedelta.  It is kept here for backwards compatibility.
-// See #524 for details.
-int bytedelta_backward_v1(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta,
-                          blosc2_dparams *dparams, uint8_t id) {
+// Fetch 16b from N streams, sum SIMD undelta
+int bytedelta_backward_buggy(const uint8_t *input, uint8_t *output, int32_t length,
+                             uint8_t meta, blosc2_dparams *dparams, uint8_t id) {
   BLOSC_UNUSED_PARAM(id);
 
   int typesize = meta;

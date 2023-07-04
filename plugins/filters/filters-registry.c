@@ -30,13 +30,13 @@ void register_filters(void) {
   register_filter_private(&ndmean);
 
   // Buggy version. See #524
-  blosc2_filter bytedelta_v1;
-  bytedelta_v1.id = BLOSC_FILTER_BYTEDELTA_V1;
-  bytedelta_v1.name = "bytedelta_v1";
-  bytedelta_v1.version = 1;
-  bytedelta_v1.forward = &bytedelta_forward_v1;
-  bytedelta_v1.backward = &bytedelta_backward_v1;
-  register_filter_private(&bytedelta_v1);
+  blosc2_filter bytedelta_buggy;
+  bytedelta_buggy.id = BLOSC_FILTER_BYTEDELTA_BUGGY;
+  bytedelta_buggy.name = "bytedelta_buggy";
+  bytedelta_buggy.version = 1;
+  bytedelta_buggy.forward = &bytedelta_forward_buggy;
+  bytedelta_buggy.backward = &bytedelta_backward_buggy;
+  register_filter_private(&bytedelta_buggy);
 
   // Fixed version. See #524
   blosc2_filter bytedelta;

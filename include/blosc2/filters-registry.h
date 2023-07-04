@@ -18,7 +18,7 @@ extern "C" {
 enum {
     BLOSC_FILTER_NDCELL = 32,
     BLOSC_FILTER_NDMEAN = 33,
-    BLOSC_FILTER_BYTEDELTA_V1 = 34, // buggy version. See #524
+    BLOSC_FILTER_BYTEDELTA_BUGGY = 34, // buggy version. See #524
     BLOSC_FILTER_BYTEDELTA = 35,  // fixed version
 };
 

@@ -49,6 +49,66 @@
 #include <stdio.h>
 #include <stdint.h>
 
+/* The original implmentation of the bytedelta filter had incorrect
+ * roundtrip behavior between SIMD and non-SIMD binaries. This filter provides
+ * the correct behavior regardless of SIMD availability.
+ * See https://github.com/Blosc/c-blosc2/issues/524 */
+int correct_bytedelta_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta,
+                              blosc2_cparams *cparams, uint8_t id)
+{
+  BLOSC_UNUSED_PARAM(id);
+  int typesize = meta;
+  if (typesize == 0) {
+    if (cparams->schunk == NULL) {
+      BLOSC_TRACE_ERROR("When meta is 0, you need to be on a schunk!");
+      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+    }
+    blosc2_schunk* schunk = (blosc2_schunk*)(cparams->schunk);
+    typesize = schunk->typesize;
+  }
+  int stream_len = length / typesize;
+  for (int ich = 0; ich < typesize; ++ich) {
+    int ip = 0;
+    uint8_t _v2 = 0;
+    for (; ip < stream_len ; ip++) {
+      uint8_t v = *input;
+      input++;
+      *output = v - _v2;
+      output++;
+      _v2 = v;
+    }
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+int correct_bytedelta_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta,
+                               blosc2_dparams *dparams, uint8_t id) {
+  BLOSC_UNUSED_PARAM(id);
+  int typesize = meta;
+  if (typesize == 0) {
+    if (dparams->schunk == NULL) {
+      BLOSC_TRACE_ERROR("When meta is 0, you need to be on a schunk!");
+      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+    }
+    blosc2_schunk* schunk = (blosc2_schunk*)(dparams->schunk);
+    typesize = schunk->typesize;
+  }
+
+  const int stream_len = length / typesize;
+  for (int ich = 0; ich < typesize; ++ich) {
+    int ip = 0;
+    uint8_t _v2 = 0;
+    for (; ip < stream_len; ip++) {
+      uint8_t v = *input + _v2;
+      input++;
+      *output = v;
+      output++;
+      _v2 = v;
+    }
+  }
+
+  return BLOSC2_ERROR_SUCCESS;
+}
 
 static int test_bytedelta(blosc2_schunk *schunk) {
 
@@ -62,6 +122,14 @@ static int test_bytedelta(blosc2_schunk *schunk) {
   uint8_t *data_out = malloc(chunksize + BLOSC2_MAX_OVERHEAD);
   uint8_t *data_dest = malloc(chunksize);
 
+  blosc2_filter correct_bytedelta = {.id = 250, .name = "bytedelta_correct", .version = 1,
+      .forward = correct_bytedelta_forward, .backward = correct_bytedelta_backward};
+  if (blosc2_register_filter(&correct_bytedelta)) {
+    printf("Cannot register bytedelta filter!");
+    return -1;
+  }
+
+
   // Test each pair of possible forward/backward implementations:
   for (int direction = 0; direction < 4; direction++) {
     bool write_correct = (direction % 2 == 0);
@@ -74,9 +142,9 @@ static int test_bytedelta(blosc2_schunk *schunk) {
     cparams.compcode = BLOSC_LZ4;
     cparams.filters[BLOSC2_MAX_FILTERS - 2] = BLOSC_SHUFFLE;
     if (write_correct) {
-      cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_FILTER_BYTEDELTA;
+      cparams.filters[BLOSC2_MAX_FILTERS - 1] = 250;
     } else {
-      cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_FILTER_BYTEDELTA_V1;
+      cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_FILTER_BYTEDELTA;
     }
     cparams.filters_meta[BLOSC2_MAX_FILTERS - 1] = 0;  // 0 means typesize when using schunks
     cparams.clevel = 9;
@@ -122,9 +190,9 @@ static int test_bytedelta(blosc2_schunk *schunk) {
 
       // Force usage of alternative decoder
       if (read_correct) {
-        data_out[BLOSC2_CHUNK_FILTER_CODES +  BLOSC2_MAX_FILTERS - 1] = BLOSC_FILTER_BYTEDELTA;
+        data_out[BLOSC2_CHUNK_FILTER_CODES +  BLOSC2_MAX_FILTERS - 1] = 250;
       } else {
-        data_out[BLOSC2_CHUNK_FILTER_CODES +  BLOSC2_MAX_FILTERS - 1] = BLOSC_FILTER_BYTEDELTA_V1;
+        data_out[BLOSC2_CHUNK_FILTER_CODES +  BLOSC2_MAX_FILTERS - 1] = BLOSC_FILTER_BYTEDELTA;
       }
 
       /* Decompress  */
@@ -179,8 +247,8 @@ int rand_() {
   blosc2_storage b2_storage = {.cparams=&cparams};
   b2_storage.contiguous = true;
 
-  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL, 0,
-                                        NULL, 0);
+  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL,
+                                        0,NULL, 0);
 
   b2nd_array_t *arr;
   BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
@@ -216,8 +284,8 @@ int mixed_values() {
   blosc2_storage b2_storage = {.cparams=&cparams};
   b2_storage.contiguous = true;
 
-  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL, 0,
-                                        NULL, 0);
+  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                        NULL, 0, NULL, 0);
 
   b2nd_array_t *arr;
   BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
@@ -253,8 +321,8 @@ int arange_like() {
   blosc2_storage b2_storage = {.cparams=&cparams};
   b2_storage.contiguous = true;
 
-  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL, 0,
-                                        NULL, 0);
+  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                        NULL, 0,NULL, 0);
 
   b2nd_array_t *arr;
   BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data, size));
