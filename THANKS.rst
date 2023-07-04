@@ -30,4 +30,6 @@ Thanks
 
 * Nathan Moinvaziri for his outstanding work on the security side of the things via `fuzzer testing <https://google.github.io/oss-fuzz/>`_.
 
-* Marta Iborra for her implementation of sparse storage for persistent super-chunks.
+* Marta Iborra for her implementation of sparse storage for persistent super-chunks and her attention to detail in many other aspects of the library.
+
+* Dimitri Papadopoulos for an extensive set of improvements in documentation and code.

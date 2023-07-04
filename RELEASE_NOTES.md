@@ -1,9 +1,14 @@
 Release notes for C-Blosc2
 ==========================
 
+Changes from 2.10.0 to 2.10.1
+=============================
+
+#XXX version-specific blurb XXX#
+
 
 Changes from 2.9.3 to 2.10.0
-===========================
+============================
 
 * bytedelta filter has been fixed. For backward compatibility, the old
   bytedelta filter is still available as `BLOSC_FILTER_BYTEDELTA_BUGGY`
@@ -22,7 +27,7 @@ Changes from 2.9.3 to 2.10.0
 
 * Minor fixes in the documentation.  Thanks to @ivilata (Ivan Vilata).
   See #523.
-* 
+
 
 Changes from 2.9.2 to 2.9.3
 ===========================
