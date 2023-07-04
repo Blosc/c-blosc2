@@ -1,11 +1,16 @@
-# Announcing C-Blosc2 2.9.3
+# Announcing C-Blosc2 2.10.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release with many improvements in documentation and code
-(thanks to Dimitri Papadopoulos). We also fixed several issues discovered
-by the fuzzer.
+This is a maintenance release with a couple of important fixes.  The first
+is bytedelta, which receives a new ID (35), whereas the previous one (34)
+is still available for backward compatibility.  The second is a fix for
+the filter pipeline, which e.g. allows to use several shuffle filters in a row
+(thanks to Tom Birch). There are also several fixes for helping integration
+of C-Blosc2 in other projects (thanks to Alex Huebel).
+
+Due to the important fixes, an upgrade is recommended for all users.
 
 For more info, please see the release notes in:
 

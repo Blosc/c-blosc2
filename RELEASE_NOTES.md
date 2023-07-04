@@ -2,10 +2,27 @@ Release notes for C-Blosc2
 ==========================
 
 
-Changes from 2.9.3 to 2.9.4
+Changes from 2.9.3 to 2.10.0
 ===========================
-#XXX version-specific blurb XXX#
 
+* bytedelta filter has been fixed. For backward compatibility, the old
+  bytedelta filter is still available as `BLOSC_FILTER_BYTEDELTA_BUGGY`
+  symbol, with the same ID (34) than before.  The new, fixed bytedelta
+  filter has received a new ID (35) and it can be used via the usual
+  `BLOSC_FILTER_BYTEDELTA` symbol. That means that old data written with
+  the buggy bytedelta filter should be decompressed without issues.
+  Thanks to @foody (Tom Birch) for the fix. See #531, #532 for more info.
+
+* Filter buffers are correctly cycled now.  Now it is possible to use e.g.
+  shuffle and bitshuffle filters in the pipeline.  Thanks to @foody (Tom Birch)
+  for the fix.  See #528 and PR #530.
+
+* Assorted fixes for allowing better inclusion in external projects.
+  Thanks to @ax3l (Axel Huebel). See #525, #527 and #529.
+
+* Minor fixes in the documentation.  Thanks to @ivilata (Ivan Vilata).
+  See #523.
+* 
 
 Changes from 2.9.2 to 2.9.3
 ===========================
