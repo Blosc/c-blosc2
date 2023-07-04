@@ -46,6 +46,8 @@ bytes16 simd_prefix_sum(bytes16 x)
   return x;
 }
 
+uint8_t simd_get_last(bytes16 x) { return (_mm_extract_epi16(x, 7) >> 8) & 0xFF; }
+
 #elif defined(__aarch64__) || defined(_M_ARM64)
 // ARM v8 NEON code path
 #define CPU_HAS_SIMD 1
@@ -72,12 +74,110 @@ bytes16 simd_prefix_sum(bytes16 x)
   return x;
 }
 
+uint8_t simd_get_last(bytes16 x) { return vgetq_lane_u8(x, 15); }
+
 #endif
 
 
 // Fetch 16b from N streams, compute SIMD delta
 int bytedelta_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta,
                       blosc2_cparams *cparams, uint8_t id) {
+  BLOSC_UNUSED_PARAM(id);
+
+  int typesize = meta;
+  if (typesize == 0) {
+    if (cparams->schunk == NULL) {
+      BLOSC_TRACE_ERROR("When meta is 0, you need to be on a schunk!");
+      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+    }
+    blosc2_schunk* schunk = (blosc2_schunk*)(cparams->schunk);
+    typesize = schunk->typesize;
+  }
+
+  const int stream_len = length / typesize;
+  for (int ich = 0; ich < typesize; ++ich) {
+    int ip = 0;
+    uint8_t _v2 = 0;
+    // SIMD delta within each channel, store
+#if defined(CPU_HAS_SIMD)
+    bytes16 v2 = {0};
+    for (; ip < stream_len - 15; ip += 16) {
+      bytes16 v = simd_load(input);
+      input += 16;
+      bytes16 delta = simd_sub(v, simd_concat(v, v2));
+      simd_store(output, delta);
+      output += 16;
+      v2 = v;
+    }
+    if (stream_len > 15) {
+      _v2 = simd_get_last(v2);
+    }
+#endif // #if defined(CPU_HAS_SIMD)
+    // scalar leftover
+    for (; ip < stream_len ; ip++) {
+      uint8_t v = *input;
+      input++;
+      *output = v - _v2;
+      output++;
+      _v2 = v;
+    }
+  }
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+// Fetch 16b from N streams, sum SIMD undelta
+int bytedelta_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta,
+                       blosc2_dparams *dparams, uint8_t id) {
+  BLOSC_UNUSED_PARAM(id);
+
+  int typesize = meta;
+  if (typesize == 0) {
+    if (dparams->schunk == NULL) {
+      BLOSC_TRACE_ERROR("When meta is 0, you need to be on a schunk!");
+      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+    }
+    blosc2_schunk* schunk = (blosc2_schunk*)(dparams->schunk);
+    typesize = schunk->typesize;
+  }
+
+  const int stream_len = length / typesize;
+  for (int ich = 0; ich < typesize; ++ich) {
+    int ip = 0;
+    uint8_t _v2 = 0;
+    // SIMD fetch 16 bytes from each channel, prefix-sum un-delta
+#if defined(CPU_HAS_SIMD)
+    bytes16 v2 = {0};
+    for (; ip < stream_len - 15; ip += 16) {
+      bytes16 v = simd_load(input);
+      input += 16;
+      // un-delta via prefix sum
+      v2 = simd_add(simd_prefix_sum(v), simd_duplane15(v2));
+      simd_store(output, v2);
+      output += 16;
+    }
+    if (stream_len > 15) {
+      _v2 = simd_get_last(v2);
+    }
+#endif // #if defined(CPU_HAS_SIMD)
+    // scalar leftover
+    for (; ip < stream_len; ip++) {
+      uint8_t v = *input + _v2;
+      input++;
+      *output = v;
+      output++;
+      _v2 = v;
+    }
+  }
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+// This is the original (and buggy) version of bytedelta.  It is kept here for backwards compatibility.
+// See #524 for details.
+// Fetch 16b from N streams, compute SIMD delta
+int bytedelta_forward_buggy(const uint8_t *input, uint8_t *output, int32_t length,
+                            uint8_t meta, blosc2_cparams *cparams, uint8_t id) {
   BLOSC_UNUSED_PARAM(id);
 
   int typesize = meta;
@@ -120,8 +220,8 @@ int bytedelta_forward(const uint8_t *input, uint8_t *output, int32_t length, uin
 }
 
 // Fetch 16b from N streams, sum SIMD undelta
-int bytedelta_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta,
-                      blosc2_dparams *dparams, uint8_t id) {
+int bytedelta_backward_buggy(const uint8_t *input, uint8_t *output, int32_t length,
+                             uint8_t meta, blosc2_dparams *dparams, uint8_t id) {
   BLOSC_UNUSED_PARAM(id);
 
   int typesize = meta;

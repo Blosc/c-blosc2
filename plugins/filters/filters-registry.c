@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2021  The Blosc Development Team <blosc@blosc.org> 
+  Copyright (c) 2021  The Blosc Development Team <blosc@blosc.org>
   https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 */
@@ -29,11 +29,21 @@ void register_filters(void) {
   ndmean.backward = &ndmean_backward;
   register_filter_private(&ndmean);
 
+  // Buggy version. See #524
+  blosc2_filter bytedelta_buggy;
+  bytedelta_buggy.id = BLOSC_FILTER_BYTEDELTA_BUGGY;
+  bytedelta_buggy.name = "bytedelta_buggy";
+  bytedelta_buggy.version = 1;
+  bytedelta_buggy.forward = &bytedelta_forward_buggy;
+  bytedelta_buggy.backward = &bytedelta_backward_buggy;
+  register_filter_private(&bytedelta_buggy);
+
+  // Fixed version. See #524
   blosc2_filter bytedelta;
   bytedelta.id = BLOSC_FILTER_BYTEDELTA;
   bytedelta.name = "bytedelta";
+  bytedelta.version = 1;
   bytedelta.forward = &bytedelta_forward;
   bytedelta.backward = &bytedelta_backward;
   register_filter_private(&bytedelta);
-
 }
