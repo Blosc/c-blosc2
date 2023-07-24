@@ -11,6 +11,7 @@
 #include "blosc2.h"
 
 #include <sys/stat.h>
+#include <errno.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -130,6 +131,10 @@ int blosc2_remove_urlpath(const char* urlpath){
   if (urlpath != NULL) {
     struct stat statbuf;
     if (stat(urlpath, &statbuf) != 0){
+      if (errno == ENOENT) {
+        // Path does not exist
+        return BLOSC2_ERROR_SUCCESS;
+      }
       BLOSC_TRACE_ERROR("Could not access %s", urlpath);
       return BLOSC2_ERROR_FAILURE;
     }
