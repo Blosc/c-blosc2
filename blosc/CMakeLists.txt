@@ -304,7 +304,7 @@ if(BUILD_STATIC)
     if(MSVC OR MINGW)
         set_target_properties(blosc2_static PROPERTIES PREFIX lib)
     endif()
-    target_link_libraries(blosc2_static ${LIBS})
+    target_link_libraries(blosc2_static PUBLIC ${LIBS})
     target_include_directories(blosc2_static PUBLIC ${BLOSC_INCLUDE_DIRS})
 endif()
 
