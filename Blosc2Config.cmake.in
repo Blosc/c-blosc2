@@ -1,0 +1,78 @@
+# only add PUBLIC dependencies as well
+#   https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#creating-a-package-configuration-file
+include(CMakeFindDependencyMacro)
+
+# Search in <PackageName>_ROOT:
+#   https://cmake.org/cmake/help/v3.12/policy/CMP0074.html
+if(POLICY CMP0074)
+    cmake_policy(SET CMP0074 NEW)
+endif()
+
+# locate the installed FindABC.cmake modules
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
+
+# dependencies
+set(HAVE_THREADS @Threads_FOUND@)
+set(HAVE_IPP @HAVE_IPP@)
+set(HAVE_ZLIB_NG @HAVE_ZLIB_NG@)
+set(DEACTIVATE_IPP @DEACTIVATE_IPP@)
+set(DEACTIVATE_ZLIB @DEACTIVATE_ZLIB@)
+set(DEACTIVATE_ZSTD @DEACTIVATE_ZSTD@)
+set(PREFER_EXTERNAL_LZ4 @PREFER_EXTERNAL_LZ4@)
+set(PREFER_EXTERNAL_ZLIB @PREFER_EXTERNAL_ZLIB@)
+set(PREFER_EXTERNAL_ZSTD @PREFER_EXTERNAL_ZSTD@)
+
+if(WIN32)
+    if(HAVE_THREADS)
+        find_dependency(Threads)
+        set(Blosc2_THREADS TRUE)
+    else()
+        set(Blosc2_THREADS FALSE)
+    endif()
+else()
+    find_dependency(Threads)
+    set(Blosc2_THREADS TRUE)
+endif()
+
+if(NOT DEACTIVATE_IPP AND HAVE_IPP)
+    find_dependency(IPP)
+    set(Blosc2_IPP FALSE)
+else()
+    set(Blosc2_IPP TRUE)
+endif()
+
+if(PREFER_EXTERNAL_LZ4)
+    find_dependency(LZ4)
+endif()
+set(Blosc2_LZ4_FOUND TRUE)
+
+if(DEACTIVATE_ZLIB)
+    set(Blosc2_ZLIB_FOUND FALSE)
+elseif(NOT DEACTIVATE_ZLIB AND PREFER_EXTERNAL_ZLIB)
+    if(HAVE_ZLIB_NG)
+        find_dependency(ZLIB_NG)
+    else()
+        find_dependency(ZLIB)
+    endif()
+    set(Blosc2_ZLIB_FOUND TRUE)
+endif()
+
+if(DEACTIVATE_ZSTD)
+    set(Blosc2_ZSTD_FOUND FALSE)
+elseif(NOT PREFER_EXTERNAL_ZSTD AND PREFER_EXTERNAL_ZSTD)
+    find_dependency(ZSTD)
+    set(Blosc2_ZSTD_FOUND TRUE)
+endif()
+
+# define central Blosc2::blosc2_shared/static targets
+include("${CMAKE_CURRENT_LIST_DIR}/Blosc2Targets.cmake")
+
+# check if components are fulfilled and set Blosc2_<COMPONENT>_FOUND vars
+foreach(comp ${Blosc2_FIND_COMPONENTS})
+    if(NOT Blosc2_${comp}_FOUND)
+        if(Blosc2_FIND_REQUIRED_${comp})
+            set(Blosc2_FOUND FALSE)
+        endif()
+    endif()
+endforeach()
+

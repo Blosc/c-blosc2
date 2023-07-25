@@ -1,6 +1,3 @@
-# flags
-link_directories(${PROJECT_BINARY_DIR}/blosc)
-
 # look for fuzzing lib and link with it if found
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     enable_language(CXX)
@@ -64,11 +61,10 @@ foreach(source ${SOURCES})
 
     if(FUZZING_ENGINE_FOUND)
         set_target_properties(${target} PROPERTIES LINKER_LANGUAGE CXX)
-        target_link_libraries(${target} ${FUZZING_ENGINE})
+        target_link_libraries(${target} PUBLIC ${FUZZING_ENGINE})
     endif()
 
-    target_link_libraries(${target} blosc2_static)
-    add_dependencies(${target} blosc2_static)
+    target_link_libraries(${target} PUBLIC blosc2_static)
 
     # run standalone fuzzer against each file
     file(GLOB COMPAT_FILES ${PROJECT_SOURCE_DIR}/compat/*.cdata)
