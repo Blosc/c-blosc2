@@ -467,6 +467,9 @@ if(BLOSC_INSTALL)
     # config files
     include(CMakePackageConfigHelpers)
 
+    # we need a general location for Unix and Windows to install our
+    # Blosc2Config.cmake files to. This is defined in CMake:
+    # https://cmake.org/cmake/help/latest/command/find_package.html#config-mode-search-procedure
     if(NOT Blosc2_INSTALL_CMAKEDIR)
         if(CMAKE_INSTALL_CMAKEDIR)
             set(Blosc2_INSTALL_CMAKEDIR "${CMAKE_INSTALL_CMAKEDIR}/Blosc2")
@@ -480,6 +483,8 @@ if(BLOSC_INSTALL)
     endif()
 
     # CMake config file
+    # This stores our targets and find and populates the targets we depend on,
+    # including third party interface libraries that we added.
     set(Blosc2_INSTALL_TARGET_NAMES)
     if(BUILD_SHARED)
         list(APPEND Blosc2_INSTALL_TARGET_NAMES blosc2_shared)

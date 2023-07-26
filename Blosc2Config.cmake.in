@@ -11,7 +11,7 @@ endif()
 # locate the installed FindABC.cmake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
-# dependencies
+# this section stores which configuration options were set
 set(HAVE_THREADS @Threads_FOUND@)
 set(HAVE_IPP @HAVE_IPP@)
 set(HAVE_ZLIB_NG @HAVE_ZLIB_NG@)
@@ -22,23 +22,27 @@ set(PREFER_EXTERNAL_LZ4 @PREFER_EXTERNAL_LZ4@)
 set(PREFER_EXTERNAL_ZLIB @PREFER_EXTERNAL_ZLIB@)
 set(PREFER_EXTERNAL_ZSTD @PREFER_EXTERNAL_ZSTD@)
 
+# find dependencies and their targets, which are used in our Blosc2Targets.cmake
+#   additionally, the Blosc2_..._FOUND variables are used to support
+#   find_package(Blosc2 ... COMPONENTS ... ...)
+#   this enables downstream projects to express the need for specific features.
 if(WIN32)
     if(HAVE_THREADS)
         find_dependency(Threads)
-        set(Blosc2_THREADS TRUE)
+        set(Blosc2_THREADS_FOUND TRUE)
     else()
-        set(Blosc2_THREADS FALSE)
+        set(Blosc2_THREADS_FOUND FALSE)
     endif()
 else()
     find_dependency(Threads)
-    set(Blosc2_THREADS TRUE)
+    set(Blosc2_THREADS_FOUND TRUE)
 endif()
 
 if(NOT DEACTIVATE_IPP AND HAVE_IPP)
     find_dependency(IPP)
-    set(Blosc2_IPP FALSE)
+    set(Blosc2_IPP_FOUND FALSE)
 else()
-    set(Blosc2_IPP TRUE)
+    set(Blosc2_IPP_FOUND TRUE)
 endif()
 
 if(PREFER_EXTERNAL_LZ4)
@@ -68,6 +72,8 @@ endif()
 include("${CMAKE_CURRENT_LIST_DIR}/Blosc2Targets.cmake")
 
 # check if components are fulfilled and set Blosc2_<COMPONENT>_FOUND vars
+#   Blosc2_FIND_COMPONENTS is a list set by find_package(... COMPONENTS ... ...)
+#   likewise Blosc2_FIND_REQUIRED_... per component specified
 foreach(comp ${Blosc2_FIND_COMPONENTS})
     if(NOT Blosc2_${comp}_FOUND)
         if(Blosc2_FIND_REQUIRED_${comp})
