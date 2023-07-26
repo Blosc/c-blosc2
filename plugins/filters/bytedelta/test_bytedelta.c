@@ -49,7 +49,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-/* The original implmentation of the bytedelta filter had incorrect
+/* The original implementation of the bytedelta filter had incorrect
  * roundtrip behavior between SIMD and non-SIMD binaries. This filter provides
  * the correct behavior regardless of SIMD availability.
  * See https://github.com/Blosc/c-blosc2/issues/524 */
