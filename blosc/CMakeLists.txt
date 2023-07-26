@@ -14,6 +14,8 @@ set(version_string ${BLOSC2_VERSION_MAJOR}.${BLOSC2_VERSION_MINOR}.${BLOSC2_VERS
 # targets
 if(BUILD_SHARED)
     add_library(blosc2_shared SHARED)
+    # ALIAS for superbuilds that use Blosc2 as sub-project
+    # must be the same as the NAMESPACE in Blosc2Targets
     add_library(Blosc2::blosc2_shared ALIAS blosc2_shared)
     set_target_properties(blosc2_shared PROPERTIES
         OUTPUT_NAME blosc2
@@ -36,6 +38,8 @@ if(BUILD_SHARED)
 endif()
 if(BUILD_STATIC)
     add_library(blosc2_static STATIC)
+    # ALIAS for superbuilds that use Blosc2 as sub-project
+    # must be the same as the NAMESPACE in Blosc2Targets
     add_library(Blosc2::blosc2_static ALIAS blosc2_static)
     set_target_properties(blosc2_static PROPERTIES
         OUTPUT_NAME blosc2
@@ -72,9 +76,10 @@ endif()
 
 set(INTERNAL_LIBS ${PROJECT_SOURCE_DIR}/internal-complibs)
 
-# includes
+# link dependencies
+#   "link" dependent targets via target_link_libraries (preferred) and
+#   manually add includes / libs for others
 if(LZ4_FOUND)
-    set(BLOSC_INCLUDE_DIRS ${BLOSC_INCLUDE_DIRS} ${LZ4_INCLUDE_DIR})
     if(BUILD_SHARED)
         target_include_directories(blosc2_shared PUBLIC ${LZ4_INCLUDE_DIR})
     endif()
@@ -86,7 +91,6 @@ if(LZ4_FOUND)
     endif()
 else()
     set(LZ4_LOCAL_DIR ${INTERNAL_LIBS}/lz4-1.9.4)
-    #set(BLOSC_INCLUDE_DIRS ${BLOSC_INCLUDE_DIRS} ${LZ4_LOCAL_DIR})
     if(BUILD_SHARED)
         target_include_directories(blosc2_shared PRIVATE ${LZ4_LOCAL_DIR})
     endif()
@@ -121,7 +125,6 @@ if(NOT DEACTIVATE_ZLIB)
         endif()
     else()
         set(ZLIB_LOCAL_DIR ${INTERNAL_LIBS}/${ZLIB_NG_DIR})
-        #set(BLOSC_INCLUDE_DIRS ${BLOSC_INCLUDE_DIRS} ${ZLIB_LOCAL_DIR})
         if(BUILD_SHARED)
             target_include_directories(blosc2_shared PRIVATE ${ZLIB_LOCAL_DIR})
         endif()
@@ -161,44 +164,6 @@ if(NOT DEACTIVATE_ZSTD)
         endif()
     endif()
 endif()
-
-# targets
-if(BUILD_SHARED)
-    target_link_libraries(blosc2_shared PUBLIC ${LIBS})
-endif()
-if(BUILD_STATIC)
-    target_link_libraries(blosc2_static PUBLIC ${LIBS})
-endif()
-if(BUILD_TESTS)
-    target_link_libraries(blosc_testing PUBLIC ${LIBS})
-endif()
-
-
-# library sources
-list(APPEND SOURCES
-    blosc/blosc2.c blosc/blosclz.c blosc/fastcopy.c blosc/fastcopy.h blosc/schunk.c blosc/frame.c blosc/stune.c blosc/stune.h
-        blosc/context.h blosc/delta.c blosc/delta.h blosc/shuffle-generic.c blosc/bitshuffle-generic.c blosc/trunc-prec.c blosc/trunc-prec.h
-        blosc/timestamp.c blosc/sframe.c blosc/directories.c blosc/blosc2-stdio.c
-        blosc/b2nd.c blosc/b2nd_utils.c)
-if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
-    if(COMPILER_SUPPORT_SSE2)
-        message(STATUS "Adding run-time support for SSE2")
-        list(APPEND SOURCES blosc/shuffle-sse2.c blosc/bitshuffle-sse2.c)
-    endif()
-    if(COMPILER_SUPPORT_AVX2)
-        message(STATUS "Adding run-time support for AVX2")
-        list(APPEND SOURCES blosc/shuffle-avx2.c blosc/bitshuffle-avx2.c)
-    endif()
-endif()
-if(COMPILER_SUPPORT_NEON)
-    message(STATUS "Adding run-time support for NEON")
-    list(APPEND SOURCES blosc/shuffle-neon.c blosc/bitshuffle-neon.c)
-endif()
-if(COMPILER_SUPPORT_ALTIVEC)
-    message(STATUS "Adding run-time support for ALTIVEC")
-    list(APPEND SOURCES blosc/shuffle-altivec.c blosc/bitshuffle-altivec.c)
-endif()
-list(APPEND SOURCES blosc/shuffle.c)
 
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE) # pre 3.1
 set(THREADS_PREFER_PTHREAD_FLAG TRUE) # CMake 3.1+
@@ -279,6 +244,51 @@ if(UNIX AND NOT APPLE)
     set(LIBS ${LIBS} "m")
     # set(LIBS ${LIBS} "profiler")
 endif()
+
+
+# Blosc2 library source files
+list(APPEND SOURCES
+    blosc/blosc2.c
+    blosc/blosclz.c
+    blosc/fastcopy.c
+    blosc/fastcopy.h
+    blosc/schunk.c
+    blosc/frame.c
+    blosc/stune.c
+    blosc/stune.h
+    blosc/context.h
+    blosc/delta.c
+    blosc/delta.h
+    blosc/shuffle-generic.c
+    blosc/bitshuffle-generic.c
+    blosc/trunc-prec.c
+    blosc/trunc-prec.h
+    blosc/timestamp.c
+    blosc/sframe.c
+    blosc/directories.c
+    blosc/blosc2-stdio.c
+    blosc/b2nd.c
+    blosc/b2nd_utils.c    
+)
+if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
+    if(COMPILER_SUPPORT_SSE2)
+        message(STATUS "Adding run-time support for SSE2")
+        list(APPEND SOURCES blosc/shuffle-sse2.c blosc/bitshuffle-sse2.c)
+    endif()
+    if(COMPILER_SUPPORT_AVX2)
+        message(STATUS "Adding run-time support for AVX2")
+        list(APPEND SOURCES blosc/shuffle-avx2.c blosc/bitshuffle-avx2.c)
+    endif()
+endif()
+if(COMPILER_SUPPORT_NEON)
+    message(STATUS "Adding run-time support for NEON")
+    list(APPEND SOURCES blosc/shuffle-neon.c blosc/bitshuffle-neon.c)
+endif()
+if(COMPILER_SUPPORT_ALTIVEC)
+    message(STATUS "Adding run-time support for ALTIVEC")
+    list(APPEND SOURCES blosc/shuffle-altivec.c blosc/bitshuffle-altivec.c)
+endif()
+list(APPEND SOURCES blosc/shuffle.c)
 
 # Based on the target architecture and hardware features supported
 # by the C compiler, set hardware architecture optimization flags
@@ -378,6 +388,7 @@ if(COMPILER_SUPPORT_ALTIVEC)
             APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_ALTIVEC_ENABLED)
 endif()
 
+# add libraries for dependencies that are not CMake targets
 if(BUILD_SHARED)
     target_link_libraries(blosc2_shared PUBLIC ${LIBS})
     target_include_directories(blosc2_shared PUBLIC ${BLOSC_INCLUDE_DIRS})
@@ -393,4 +404,5 @@ if(BUILD_TESTS)
     target_include_directories(blosc_testing PUBLIC ${BLOSC_INCLUDE_DIRS})
 endif()
 
+# we use this variable in the CMake file one directory above ours
 set(SOURCES ${SOURCES} PARENT_SCOPE)
