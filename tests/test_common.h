@@ -59,7 +59,7 @@ extern int tests_run;
 
 /** Allocates a block of memory with the specified size and alignment.
     The allocated memory is 'cleaned' before returning to avoid
-    accidental re-use of data within or between tests.
+    accidental reuse of data within or between tests.
  */
 static inline void* blosc_test_malloc(const size_t alignment, const size_t size) {
   const int32_t clean_value = 0x99;
