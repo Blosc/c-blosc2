@@ -71,7 +71,10 @@ int main(void) {
   /* Launch several subprocesses */
   for (i = 1; i <= nchildren; i++) {
     pid = fork();
-    assert(pid >= 0);
+    if (pid < 0) {
+      printf("Error at fork()!");
+      exit(1);
+    }
   }
 
   blosc2_set_nthreads(4);

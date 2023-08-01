@@ -67,7 +67,10 @@ CUTEST_TEST_TEST(open_offset) {
       data2[i] = 2 * i * nchunk;
     }
     nchunks = blosc2_schunk_append_buffer(schunk_write_start, data1, isize);
-    assert(nchunks == nchunk + 1);
+    if (nchunks != nchunk + 1) {
+      printf("Unexpected nchunks: %ld, %d\n", (long)nchunks, nchunk + 1);
+      return -1;
+    }
     blosc2_schunk_append_buffer(schunk_write_append, data2, isize);
   }
 
