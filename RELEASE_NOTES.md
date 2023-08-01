@@ -4,7 +4,16 @@ Release notes for C-Blosc2
 Changes from 2.10.0 to 2.10.1
 =============================
 
-#XXX version-specific blurb XXX#
+* `blosc2_remove_urlpath(const char *urlpath)` does not return an error
+  when path does not exist.
+
+* Changes in CMake installer to conserve targets and properties
+  on install, so CMake users do not need to write `FindBlosc2.cmake`
+  files anymore.  This also helps to preserve transitive dependencies on
+  CMake targets, especially useful for fully static builds, e.g., for
+  Python wheels.  Thanks to @ax3l (Axel Huebel). See PR #537.
+
+* Fix new typos.  Thanks to @DimitriPapadopoulos. See PR #538.
 
 
 Changes from 2.9.3 to 2.10.0
