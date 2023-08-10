@@ -823,16 +823,21 @@ int fill_codec(blosc2_codec *codec) {
   char libpath[PATH_MAX];
   void *lib = load_lib(codec->compname, libpath);
   if(lib == NULL) {
-    BLOSC_TRACE_ERROR("Error while loading the library");
+    BLOSC_TRACE_ERROR("Error while loading the library for codec `%s`", codec->compname);
     return BLOSC2_ERROR_FAILURE;
   }
 
   codec_info *info = dlsym(lib, "info");
+  if (info == NULL) {
+    BLOSC_TRACE_ERROR("`info` symbol cannot be loaded from plugin `%s`", codec->compname);
+    dlclose(lib);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
   codec->encoder = dlsym(lib, info->encoder);
   codec->decoder = dlsym(lib, info->decoder);
-
-  if (codec->encoder == NULL || codec->decoder == NULL){
-    BLOSC_TRACE_ERROR("Wrong library loaded");
+  if (codec->encoder == NULL || codec->decoder == NULL) {
+    BLOSC_TRACE_ERROR("encoder or decoder cannot be loaded from plugin `%s`", codec->compname);
     dlclose(lib);
     return BLOSC2_ERROR_FAILURE;
   }
