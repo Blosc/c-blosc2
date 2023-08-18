@@ -520,6 +520,12 @@ if(BLOSC_INSTALL)
         DESTINATION ${Blosc2_INSTALL_CMAKEDIR}
     )
 
+    # CMake Find*.cmake files used in Blosc2Config.cmake
+    install(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/cmake/
+        DESTINATION ${Blosc2_INSTALL_CMAKEDIR}/Modules
+    )
+
     # pkg-config .pc file
     configure_file(
          "${CMAKE_CURRENT_SOURCE_DIR}/blosc2.pc.in"

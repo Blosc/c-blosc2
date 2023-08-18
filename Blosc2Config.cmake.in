@@ -9,7 +9,7 @@ if(POLICY CMP0074)
 endif()
 
 # locate the installed FindABC.cmake modules
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/Modules")
 
 # this section stores which configuration options were set
 set(HAVE_THREADS @Threads_FOUND@)
