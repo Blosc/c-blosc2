@@ -184,7 +184,9 @@ extern int g_ntuners;
 
 #if defined(_WIN32)
 #include <windows.h>
+#ifndef PATH_MAX
 #define PATH_MAX MAX_PATH
+#endif
 #define RTLD_LAZY   0x000
 #define popen _popen
 #define pclose _pclose
