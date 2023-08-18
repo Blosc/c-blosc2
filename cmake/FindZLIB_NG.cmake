@@ -27,9 +27,21 @@ else(ZLIB_NG_INCLUDE_DIR AND ZLIB_NG_LIBRARIES)
   set(ZLIB_NG_FOUND FALSE)
 endif(ZLIB_NG_INCLUDE_DIR AND ZLIB_NG_LIBRARIES)
 
+# generate CMake target
 if(ZLIB_NG_FOUND)
   message(STATUS "Found zlib-ng: ${ZLIB_NG_LIBRARIES}, ${ZLIB_NG_INCLUDE_DIR}")
-endif(ZLIB_NG_FOUND)
+
+  set(ZLIB_NG_INCLUDE_DIRS ${ZLIB_NG_INCLUDE_DIR})
+
+  if(NOT TARGET ZLIB_NG::ZLIB_NG)
+    add_library(ZLIB_NG::ZLIB_NG UNKNOWN IMPORTED)
+    set_target_properties(ZLIB_NG::ZLIB_NG PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES "${ZLIB_NG_INCLUDE_DIRS}")
+
+    set_property(TARGET ZLIB_NG::ZLIB_NG APPEND PROPERTY
+      IMPORTED_LOCATION "${ZLIB_NG_LIBRARIES}")
+  endif()
+endif()
 
 #[[
 Copyright https://github.com/zlib-ng/minizip-ng, 2021
