@@ -201,6 +201,7 @@ var = {
 };
 
 static inline void *dlopen (const char *filename, int flags) {
+  BLOSC_UNUSED_PARAM(flags);
   HINSTANCE hInst;
   hInst = LoadLibrary(filename);
   if (hInst==NULL) {
