@@ -4,7 +4,9 @@ Release notes for C-Blosc2
 Changes from 2.10.1 to 2.10.2
 =============================
 
-#XXX version-specific blurb XXX#
+* Several fixes for the CMake system.  Thanks to Axel Huebl. See PR #541 and #542.
+
+* Several fixes for mingw plaform.  Thanks to Biswapriyo Nath.  See PR #540 and #543.
 
 
 Changes from 2.10.0 to 2.10.1
@@ -17,7 +19,7 @@ Changes from 2.10.0 to 2.10.1
   on install, so CMake users do not need to write `FindBlosc2.cmake`
   files anymore.  This also helps to preserve transitive dependencies on
   CMake targets, especially useful for fully static builds, e.g., for
-  Python wheels.  Thanks to @ax3l (Axel Huebel). See PR #537.
+  Python wheels.  Thanks to @ax3l (Axel Huebl). See PR #537.
 
 * Fix new typos.  Thanks to @DimitriPapadopoulos. See PR #538.
 

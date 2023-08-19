@@ -1,12 +1,11 @@
-# Announcing C-Blosc2 2.10.1
+# Announcing C-Blosc2 2.10.2
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
 This is a maintenance release with also several improvements for helping
-integration of C-Blosc2 in other projects (thanks to Alex Huebel).  Also,
-`blosc2_remove_urlpath(const char *urlpath)` does not return an error
-when path does not exist.
+integration of C-Blosc2 in other projects (thanks to Alex Huebl).  Also,
+some fixes for MinGW platform are in (thanks to Biswapriyo Nath).
 
 For more info, please see the release notes in:
 
