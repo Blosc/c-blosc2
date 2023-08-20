@@ -181,6 +181,7 @@ if(NOT DEACTIVATE_ZLIB)
                 SUBBUILD_DIR      internal-complibs/zlib-ng/subbuild
                 BINARY_DIR        internal-complibs/zlib-ng/build
         )
+        set(CMAKE_POSITION_INDEPENDENT_CODE ON)
         option(BUILD_SHARED_LIBS "" OFF)
         option(ZLIB_COMPAT "" ON)
         option(ZLIB_ENABLE_TESTS "" OFF)
