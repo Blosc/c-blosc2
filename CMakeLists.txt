@@ -510,7 +510,7 @@ if(BLOSC_INSTALL)
         DESTINATION ${Blosc2_INSTALL_CMAKEDIR}
     )
     write_basic_package_version_file("Blosc2ConfigVersion.cmake"
-        VERSION ${BLOSC2_VERSION_STRING}
+        VERSION ${BLOSC2_VERSION_MAJOR}.${BLOSC2_VERSION_MINOR}.${BLOSC2_VERSION_PATCH}
         COMPATIBILITY SameMajorVersion
     )
     install(
