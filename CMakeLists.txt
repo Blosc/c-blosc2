@@ -494,6 +494,18 @@ if(BLOSC_INSTALL)
     if(BUILD_STATIC)
         list(APPEND Blosc2_INSTALL_TARGET_NAMES blosc2_static)
     endif()
+    # internal zlib-ng aka superbuild
+    #   work-around: zlib-ng does not export its target to the build
+    #   tree yet
+    if(NOT DEACTIVATE_ZLIB)
+        if(NOT ZLIB_NG_FOUND AND NOT ZLIB_FOUND)
+            if(TARGET zlib)
+                list(APPEND Blosc2_INSTALL_TARGET_NAMES zlib)
+            elseif(TARGET zlibstatic)
+                list(APPEND Blosc2_INSTALL_TARGET_NAMES zlibstatic)
+            endif()
+        endif()
+    endif()
     configure_file(
         ${PROJECT_SOURCE_DIR}/Blosc2Config.cmake.in
         ${CMAKE_CURRENT_BINARY_DIR}/Blosc2Config.cmake
