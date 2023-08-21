@@ -165,28 +165,22 @@ if(NOT DEACTIVATE_ZSTD)
     endif()
 endif()
 
-set(CMAKE_THREAD_PREFER_PTHREAD TRUE) # pre 3.1
-set(THREADS_PREFER_PTHREAD_FLAG TRUE) # CMake 3.1+
-if(WIN32)
-    # try to use the system library
-    find_package(Threads)
-    if(NOT Threads_FOUND)
-        message(STATUS "using the internal pthread library for win32 systems.")
-        list(APPEND SOURCES blosc/win32/pthread.c)
-    else()
-        if(CMAKE_VERSION VERSION_LESS 3.1)
-            set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
-        else()
-            set(LIBS ${LIBS} Threads::Threads)
-        endif()
-    endif()
-else()
-    find_package(Threads REQUIRED)
+# Threads
+if(HAVE_THREADS)
     if(CMAKE_VERSION VERSION_LESS 3.1)
         set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
     else()
         set(LIBS ${LIBS} Threads::Threads)
     endif()
+elseif(WIN32)
+    message(STATUS "using the internal pthread library for win32 systems.")
+    list(APPEND SOURCES blosc/win32/pthread.c)
+else()
+    message(FATAL_ERROR "Threads required but not found.")
+endif()
+
+# dlopen/dlclose
+if(NOT WIN32)
     set(LIBS ${LIBS} ${CMAKE_DL_LIBS})
 endif()
 
