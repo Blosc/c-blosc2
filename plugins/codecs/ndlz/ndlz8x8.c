@@ -45,13 +45,8 @@
 #define MAX_DISTANCE 65535
 
 
-#ifdef BLOSC_STRICT_ALIGN
 #define NDLZ_READU16(p) ((p)[0] | (p)[1]<<8)
 #define NDLZ_READU32(p) ((p)[0] | (p)[1]<<8 | (p)[2]<<16 | (p)[3]<<24)
-#else
-#define NDLZ_READU16(p) *((const uint16_t*)(p))
-#define NDLZ_READU32(p) *((const uint32_t*)(p))
-#endif
 
 #define HASH_LOG (12)
 

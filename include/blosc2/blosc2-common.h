@@ -42,34 +42,6 @@
   #define __SSE2__
 #endif
 
-/*
- * Detect if the architecture is fine with unaligned access.
- */
-#if !defined(BLOSC_STRICT_ALIGN)
-#define BLOSC_STRICT_ALIGN
-#if defined(__i386__) || defined(__386) || defined (__amd64)  /* GNU C, Sun Studio */
-#undef BLOSC_STRICT_ALIGN
-#elif defined(__i486__) || defined(__i586__) || defined(__i686__)  /* GNU C */
-#undef BLOSC_STRICT_ALIGN
-#elif defined(_M_IX86) || defined(_M_X64)   /* Intel, MSVC */
-#undef BLOSC_STRICT_ALIGN
-#elif defined(__386)
-#undef BLOSC_STRICT_ALIGN
-#elif defined(_X86_) /* MinGW */
-#undef BLOSC_STRICT_ALIGN
-#elif defined(__I86__) /* Digital Mars */
-#undef BLOSC_STRICT_ALIGN
-/* Modern ARM systems (like ARM64) should support unaligned access
-   quite efficiently. */
-#elif defined(__ARM_FEATURE_UNALIGNED)   /* ARM, GNU C */
-#undef BLOSC_STRICT_ALIGN
-#elif defined(_ARCH_PPC) || defined(__PPC__)
-/* Modern PowerPC systems (like POWER8) should support unaligned access
-   quite efficiently. */
-#undef BLOSC_STRICT_ALIGN
-#endif
-#endif
-
 #if defined(__SSE2__)
   #include <emmintrin.h>
 #endif

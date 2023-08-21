@@ -22,9 +22,7 @@
 
 #include <assert.h>
 #include <stdint.h>
-#if defined(BLOSC_STRICT_ALIGN)
 #include <string.h>
-#endif
 
 /*
  * Use inlined functions for supported systems.
@@ -40,13 +38,9 @@ static inline unsigned char *copy_1_bytes(unsigned char *out, const unsigned cha
 }
 
 static inline unsigned char *copy_2_bytes(unsigned char *out, const unsigned char *from) {
-#if defined(BLOSC_STRICT_ALIGN)
   uint16_t chunk;
   memcpy(&chunk, from, 2);
   memcpy(out, &chunk, 2);
-#else
-  *(uint16_t *) out = *(uint16_t *) from;
-#endif
   return out + 2;
 }
 
@@ -56,13 +50,9 @@ static inline unsigned char *copy_3_bytes(unsigned char *out, const unsigned cha
 }
 
 static inline unsigned char *copy_4_bytes(unsigned char *out, const unsigned char *from) {
-#if defined(BLOSC_STRICT_ALIGN)
   uint32_t chunk;
   memcpy(&chunk, from, 4);
   memcpy(out, &chunk, 4);
-#else
-  *(uint32_t *) out = *(uint32_t *) from;
-#endif
   return out + 4;
 }
 
@@ -82,13 +72,9 @@ static inline unsigned char *copy_7_bytes(unsigned char *out, const unsigned cha
 }
 
 static inline unsigned char *copy_8_bytes(unsigned char *out, const unsigned char *from) {
-#if defined(BLOSC_STRICT_ALIGN)
   uint64_t chunk;
   memcpy(&chunk, from, 8);
   memcpy(out, &chunk, 8);
-#else
-  *(uint64_t *) out = *(uint64_t *) from;
-#endif
   return out + 8;
 }
 
@@ -99,16 +85,11 @@ static inline unsigned char *copy_16_bytes(unsigned char *out, const unsigned ch
   chunk = _mm_loadu_si128((__m128i*)from);
   _mm_storeu_si128((__m128i*)out, chunk);
   out += 16;
-#elif !defined(BLOSC_STRICT_ALIGN)
-  *(uint64_t*)out = *(uint64_t*)from;
-   from += 8; out += 8;
-   *(uint64_t*)out = *(uint64_t*)from;
-   from += 8; out += 8;
 #else
-   int i;
-   for (i = 0; i < 16; i++) {
-     *out++ = *from++;
-   }
+  int i;
+  for (i = 0; i < 16; i++) {
+    *out++ = *from++;
+  }
 #endif
   return out;
 }
@@ -127,15 +108,6 @@ static inline unsigned char *copy_32_bytes(unsigned char *out, const unsigned ch
   chunk = _mm_loadu_si128((__m128i*)from);
   _mm_storeu_si128((__m128i*)out, chunk);
   out += 16;
-#elif !defined(BLOSC_STRICT_ALIGN)
-  *(uint64_t*)out = *(uint64_t*)from;
-  from += 8; out += 8;
-  *(uint64_t*)out = *(uint64_t*)from;
-  from += 8; out += 8;
-  *(uint64_t*)out = *(uint64_t*)from;
-  from += 8; out += 8;
-  *(uint64_t*)out = *(uint64_t*)from;
-  from += 8; out += 8;
 #else
   int i;
   for (i = 0; i < 32; i++) {
@@ -159,32 +131,9 @@ static inline unsigned char *copy_32_bytes(unsigned char *out, const unsigned ch
 static inline unsigned char *copy_bytes(unsigned char *out, const unsigned char *from, unsigned len) {
   assert(len < 8);
 
-#ifdef BLOSC_STRICT_ALIGN
   while (len--) {
     *out++ = *from++;
   }
-#else
-  switch (len) {
-    case 7:
-      return copy_7_bytes(out, from);
-    case 6:
-      return copy_6_bytes(out, from);
-    case 5:
-      return copy_5_bytes(out, from);
-    case 4:
-      return copy_4_bytes(out, from);
-    case 3:
-      return copy_3_bytes(out, from);
-    case 2:
-      return copy_2_bytes(out, from);
-    case 1:
-      return copy_1_bytes(out, from);
-    case 0:
-      return out;
-    default:
-      assert(0);
-  }
-#endif /* BLOSC_STRICT_ALIGN */
   return out;
 }
 

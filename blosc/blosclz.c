@@ -46,13 +46,8 @@
 #define MAX_DISTANCE 8191
 #define MAX_FARDISTANCE (65535 + MAX_DISTANCE - 1)
 
-#ifdef BLOSC_STRICT_ALIGN
-  #define BLOSCLZ_READU16(p) ((p)[0] | (p)[1]<<8)
-  #define BLOSCLZ_READU32(p) ((p)[0] | (p)[1]<<8 | (p)[2]<<16 | (p)[3]<<24)
-#else
-  #define BLOSCLZ_READU16(p) *((const uint16_t*)(p))
-  #define BLOSCLZ_READU32(p) *((const uint32_t*)(p))
-#endif
+#define BLOSCLZ_READU16(p) ((p)[0] | (p)[1]<<8)
+#define BLOSCLZ_READU32(p) ((p)[0] | (p)[1]<<8 | (p)[2]<<16 | (p)[3]<<24)
 
 #define HASH_LOG (14U)
 
@@ -123,11 +118,7 @@ static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref
   memset(&value, x, 8);
   /* safe because the outer check against ip limit */
   while (ip < (ip_bound - sizeof(int64_t))) {
-#if defined(BLOSC_STRICT_ALIGN)
     memcpy(&value2, ref, 8);
-#else
-    value2 = ((int64_t*)ref)[0];
-#endif
     if (value != value2) {
       /* Return the byte that starts to differ */
       while (*ref++ == x) ip++;
@@ -146,19 +137,6 @@ static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref
 
 /* Return the byte that starts to differ */
 uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
-#if !defined(BLOSC_STRICT_ALIGN)
-  while (ip < (ip_bound - sizeof(int64_t))) {
-    if (*(int64_t*)ref != *(int64_t*)ip) {
-      /* Return the byte that starts to differ */
-      while (*ref++ == *ip++) {}
-      return ip;
-    }
-    else {
-      ip += sizeof(int64_t);
-      ref += sizeof(int64_t);
-    }
-  }
-#endif
   /* Look into the remainder */
   while ((ip < ip_bound) && (*ref++ == *ip++)) {}
   return ip;
