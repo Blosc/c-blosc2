@@ -151,6 +151,21 @@ if(BUILD_LITE)
     set(DEACTIVATE_ZSTD ON)
 endif()
 
+# Threads
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE) # pre 3.1
+set(THREADS_PREFER_PTHREAD_FLAG TRUE) # CMake 3.1+
+if(WIN32)
+    # try to use the system library
+    find_package(Threads)
+else()
+    find_package(Threads REQUIRED)
+endif()
+if(Threads_FOUND)
+    set(HAVE_THREADS ON)
+else()
+    set(HAVE_THREADS OFF)
+endif()
+
 if(PREFER_EXTERNAL_LZ4)
     find_package(LZ4)
 else()
