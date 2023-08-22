@@ -46,9 +46,6 @@
 #define MAX_DISTANCE 8191
 #define MAX_FARDISTANCE (65535 + MAX_DISTANCE - 1)
 
-#define BLOSCLZ_READU16(p) ((p)[0] | (p)[1]<<8)
-#define BLOSCLZ_READU32(p) ((p)[0] | (p)[1]<<8 | (p)[2]<<16 | (p)[3]<<24)
-
 #define HASH_LOG (14U)
 
 // This is used in LZ4 and seems to work pretty well here too
@@ -56,6 +53,14 @@
   (v) = ((s) * 2654435761U) >> (32U - (h)); \
 }
 
+static inline uint16_t BLOSCLZ_READU16(const unsigned char* src) {
+    return (uint16_t)(src[0] << 0) | (uint16_t)(src[1] << 8);
+}
+
+static inline uint32_t BLOSCLZ_READU32(const unsigned char* src) {
+    return ((uint32_t)src[0] << 0) | ((uint32_t)src[1] << 8) | ((uint32_t)src[2] << 16) |
+           ((uint32_t)src[3] << 24);
+}
 
 #if defined(__AVX2__)
 static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {

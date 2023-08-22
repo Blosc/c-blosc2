@@ -44,12 +44,16 @@
 #define MAX_COPY 32U
 #define MAX_DISTANCE 65535
 
-
-#define NDLZ_READU16(p) ((p)[0] | (p)[1]<<8)
-#define NDLZ_READU32(p) ((p)[0] | (p)[1]<<8 | (p)[2]<<16 | (p)[3]<<24)
-
 #define HASH_LOG (12)
 
+static inline uint16_t NDLZ_READU16(const unsigned char* src) {
+  return (uint16_t)(src[0] << 0) | (uint16_t)(src[1] << 8);
+}
+
+static inline uint32_t NDLZ_READU32(const unsigned char* src) {
+  return ((uint32_t)src[0] << 0) | ((uint32_t)src[1] << 8) | ((uint32_t)src[2] << 16) |
+           ((uint32_t)src[3] << 24);
+}
 
 int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                    uint8_t meta, blosc2_cparams *cparams) {
