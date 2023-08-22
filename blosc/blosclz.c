@@ -16,6 +16,7 @@
 
 #include "blosclz.h"
 #include "fastcopy.h"
+#include "blosc-private.h"
 #include "blosc2/blosc2-common.h"
 
 #include <stdbool.h>
@@ -54,12 +55,19 @@
 }
 
 static inline uint16_t BLOSCLZ_READU16(const unsigned char* src) {
-    return (uint16_t)(src[0] << 0) | (uint16_t)(src[1] << 8);
+    uint16_t result;
+    memcpy(&result, src, 2);
+    if (!is_little_endian())
+      result = __builtin_bswap16(result);
+    return result;
 }
 
 static inline uint32_t BLOSCLZ_READU32(const unsigned char* src) {
-    return ((uint32_t)src[0] << 0) | ((uint32_t)src[1] << 8) | ((uint32_t)src[2] << 16) |
-           ((uint32_t)src[3] << 24);
+    uint32_t result;
+    memcpy(&result, src, 4);
+    if (!is_little_endian())
+      result = __builtin_bswap32(result);
+    return result;
 }
 
 #if defined(__AVX2__)

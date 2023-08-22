@@ -18,6 +18,7 @@
 #include "ndlz4x4.h"
 #include "ndlz.h"
 #include "xxhash.h"
+#include "blosc-private.h"
 #include "../plugins/plugin_utils.h"
 
 #include <stdlib.h>
@@ -47,12 +48,19 @@
 #define HASH_LOG (12)
 
 static inline uint16_t NDLZ_READU16(const unsigned char* src) {
-  return (uint16_t)(src[0] << 0) | (uint16_t)(src[1] << 8);
+  uint16_t result;
+  memcpy(&result, src, 2);
+  if (!is_little_endian())
+    result = __builtin_bswap16(result);
+  return result;
 }
 
 static inline uint32_t NDLZ_READU32(const unsigned char* src) {
-  return ((uint32_t)src[0] << 0) | ((uint32_t)src[1] << 8) | ((uint32_t)src[2] << 16) |
-           ((uint32_t)src[3] << 24);
+  uint32_t result;
+  memcpy(&result, src, 4);
+  if (!is_little_endian())
+    result = __builtin_bswap32(result);
+  return result;
 }
 
 int ndlz4_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
