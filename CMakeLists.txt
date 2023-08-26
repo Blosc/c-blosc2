@@ -189,7 +189,7 @@ if(NOT DEACTIVATE_ZLIB)
     if(NOT (ZLIB_NG_FOUND OR ZLIB_FOUND))
         message(STATUS "Using ZLIB-NG external sources for ZLIB support.")
         include(FetchContent)
-        FetchContent_Declare(z-ng
+        FetchContent_Declare(zlib-ng
             GIT_REPOSITORY  https://github.com/zlib-ng/zlib-ng
             GIT_TAG         2.1.3
             SOURCE_DIR      ${PROJECT_BINARY_DIR}/blosc2-internal-complibs/zlib-ng
@@ -200,7 +200,7 @@ if(NOT DEACTIVATE_ZLIB)
         option(ZLIB_COMPAT "" ON)
         option(ZLIB_ENABLE_TESTS "" OFF)
         option(ZLIBNG_ENABLE_TESTS "" OFF)
-        FetchContent_MakeAvailable(z-ng)
+        FetchContent_MakeAvailable(zlib-ng)
     endif()
     set(HAVE_ZLIB TRUE)
 endif()
