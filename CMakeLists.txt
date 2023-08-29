@@ -190,10 +190,11 @@ if(NOT DEACTIVATE_ZLIB)
         message(STATUS "Using ZLIB-NG external sources for ZLIB support.")
         include(FetchContent)
         FetchContent_Declare(z-ng
-            GIT_REPOSITORY  https://github.com/zlib-ng/zlib-ng
-            GIT_TAG         2.1.3
-            SOURCE_DIR      ${PROJECT_BINARY_DIR}/blosc2-internal-complibs/zlib-ng
-            BUILD_IN_SOURCE 0
+                GIT_REPOSITORY    https://github.com/zlib-ng/zlib-ng
+                GIT_TAG 2.1.3
+                SOURCE_DIR        ${CMAKE_CURRENT_SOURCE_DIR}/internal-complibs/zlib-ng
+                SUBBUILD_DIR      internal-complibs/zlib-ng/subbuild
+                BINARY_DIR        internal-complibs/zlib-ng/build
         )
         set(CMAKE_POSITION_INDEPENDENT_CODE ON)
         option(BUILD_SHARED_LIBS "" OFF)
