@@ -33,11 +33,11 @@
   #define BLOSC_EXPORT
 #endif  /* defined(BLOSC_SHARED_LIBRARY) */
 
-#if (defined(__GNUC__) || defined(__clang__)) && !defined(__MINGW32__)
+#if defined(__GNUC__) || defined(__clang__)
   #define BLOSC_NO_EXPORT __attribute__((visibility("hidden")))
 #else
   #define BLOSC_NO_EXPORT
-#endif  /* (defined(__GNUC__) || defined(__clang__)) && !defined(__MINGW32__) */
+#endif  /* defined(__GNUC__) || defined(__clang__) */
 
 /* When testing, export everything to make it easier to implement tests. */
 #if defined(BLOSC_TESTING)
