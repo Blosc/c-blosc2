@@ -1635,11 +1635,12 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
       sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
       fp = io_cb->open(eframe_name, "rb", frame->schunk->storage->io->params);
-      free(eframe_name);
       if (fp == NULL) {
         BLOSC_TRACE_ERROR("Error opening file in: %s", eframe_name);
+        free(eframe_name);
         return BLOSC2_ERROR_FILE_OPEN;
       }
+      free(eframe_name);
       io_cb->seek(fp, trailer_offset, SEEK_SET);
     }
     else {
