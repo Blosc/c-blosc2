@@ -16,7 +16,7 @@
   Compression: 10000000 -> 32 (312500.0x)
   osize, csize, blocksize: 10000000, 32, 16384
   Compression: 10000000 -> 32 (312500.0x)
-  osize, csize, blocksize: 10000000, 32, 32768
+  osize, csize, blocksize: 10000000, 32, 131072
   Compression: 10000000 -> 32 (312500.0x)
   osize, csize, blocksize: 10000000, 32, 65536
   Compression: 10000000 -> 32 (312500.0x)
@@ -28,11 +28,11 @@
   Compression: 10000000 -> 32 (312500.0x)
   osize, csize, blocksize: 10000000, 32, 524288
   Compression: 10000000 -> 32 (312500.0x)
-  osize, csize, blocksize: 10000000, 32, 524288
-  Compression: 10000000 -> 32 (312500.0x)
-  osize, csize, blocksize: 10000000, 32, 524288
-  Compression: 10000000 -> 32 (312500.0x)
   osize, csize, blocksize: 10000000, 32, 1048576
+  Compression: 10000000 -> 32 (312500.0x)
+  osize, csize, blocksize: 10000000, 32, 524288
+  Compression: 10000000 -> 32 (312500.0x)
+  osize, csize, blocksize: 10000000, 32, 2097152
 
   Process finished with exit code 0
 
@@ -56,6 +56,7 @@ int main(void) {
   /* Do the actual compression */
   for (int clevel=0; clevel < 10; clevel++) {
     cparams.clevel = clevel;
+    cparams.splitmode = clevel % 2;
     int isize = 10 * 1000 * 1000;
     int osize, csize, blocksize;
     csize = blosc2_chunk_zeros(cparams, isize, data_dest, BLOSC2_MAX_OVERHEAD);
