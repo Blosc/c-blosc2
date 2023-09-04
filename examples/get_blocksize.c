@@ -45,7 +45,7 @@
 int main(void) {
   blosc2_init();
 
-  static float data_dest[BLOSC2_MAX_OVERHEAD];
+  static uint8_t data_dest[BLOSC2_MAX_OVERHEAD];
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = sizeof(float);
   cparams.compcode = BLOSC_ZSTD;
