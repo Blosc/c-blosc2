@@ -121,6 +121,13 @@ extern "C" {
         }                                           \
     } while (0)
 
+#define BLOSC_INFO(msg, ...)                        \
+    do {                                            \
+        const char *__e = getenv("BLOSC_INFO");     \
+        if (!__e) { break; }                        \
+        fprintf(stderr, "[INFO] - " msg "\n", ##__VA_ARGS__); \
+    } while(0)
+
 
 /* The VERSION_FORMAT symbols below should be just 1-byte long */
 enum {

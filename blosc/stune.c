@@ -106,7 +106,8 @@ void blosc_stune_next_blocksize(blosc2_context *context) {
   }
 
   /* Now the blocksize for splittable codecs */
-  if (clevel > 0 && split_block(context, typesize, blocksize)) {
+  int splitmode = split_block(context, typesize, blocksize);
+  if (clevel > 0 && splitmode) {
     // For performance reasons, do not exceed 256 KB (it must fit in L2 cache)
     switch (clevel) {
       case 1:
@@ -152,6 +153,8 @@ void blosc_stune_next_blocksize(blosc2_context *context) {
   }
 
   context->blocksize = blocksize;
+  BLOSC_INFO("compcode: %d, clevel: %d, blocksize: %d, splitmode: %d, typesize: %d",
+             context->compcode, context->clevel, blocksize, splitmode, typesize);
 }
 
 void blosc_stune_next_cparams(blosc2_context * context) {
