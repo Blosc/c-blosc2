@@ -12,7 +12,7 @@ Changes from 2.10.1 to 2.10.2
 
 * Several fixes for the CMake system.  Thanks to Axel Huebl. See PR #541 and #542.
 
-* Several fixes for mingw plaform.  Thanks to Biswapriyo Nath.  See PR #540 and #543.
+* Several fixes for mingw platform.  Thanks to Biswapriyo Nath.  See PR #540 and #543.
 
 
 Changes from 2.10.0 to 2.10.1
