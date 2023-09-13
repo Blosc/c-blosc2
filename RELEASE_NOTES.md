@@ -4,7 +4,15 @@ Release notes for C-Blosc2
 Changes from 2.10.2 to 2.10.3
 =============================
 
-#XXX version-specific blurb XXX#
+* Globally registered new codec `openhtj2k`. This will be loaded dynamically. See PR #557.
+
+* Added a `BLOSC_INFO` macro for details on compression params.
+
+* Added `get_blocksize.c` example on automatic blocksizes.
+
+* Warning fixes.
+
+* Fixes for mingw.
 
 
 Changes from 2.10.1 to 2.10.2

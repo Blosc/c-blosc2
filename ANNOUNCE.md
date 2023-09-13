@@ -3,9 +3,10 @@ A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release with also several improvements for helping
-integration of C-Blosc2 in other projects (thanks to Alex Huebl).  Also,
-some fixes for MinGW platform are in (thanks to Biswapriyo Nath).
+This is a maintenance release with also several improvements like the registration of
+the dynamically loaded codec blosc2_openhtj2k. See https://github.com/Blosc/blosc2_openhtj2k 
+for more info on how to use it. Also,
+the `BLOSC_INFO` macro has been added for details on compression params.
 
 For more info, please see the release notes in:
 
