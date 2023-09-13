@@ -1,4 +1,4 @@
-# Announcing C-Blosc2 2.10.2
+# Announcing C-Blosc2 2.10.3
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
