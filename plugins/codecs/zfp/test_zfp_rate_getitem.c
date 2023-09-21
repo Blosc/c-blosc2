@@ -334,7 +334,7 @@ int item_prices() {
 int main(void) {
 
   int result;
-  blosc2_init();   // this is mandatory for initiallizing the plugin mechanism
+  blosc2_init();   // this is mandatory for initializing the plugin mechanism
   printf("float_cyclic: ");
   result = float_cyclic();
   if (result < 0)

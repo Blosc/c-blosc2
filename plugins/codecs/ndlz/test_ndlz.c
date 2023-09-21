@@ -309,7 +309,7 @@ int some_matches() {
 int main(void) {
 
   int result;
-  blosc2_init();   // this is mandatory for initiallizing the plugin mechanism
+  blosc2_init();   // this is mandatory for initializing the plugin mechanism
   result = rand_();
   printf("rand: %d obtained \n \n", result);
   if (result < 0)
