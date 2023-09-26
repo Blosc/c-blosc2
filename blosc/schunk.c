@@ -134,26 +134,6 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
   // ...and update internal properties
   update_schunk_properties(schunk);
 
-  if (schunk->cctx->tuner_id < BLOSC_LAST_TUNER && schunk->cctx->tuner_id == BLOSC_STUNE) {
-    blosc_stune_init(schunk->storage->cparams->tuner_params, schunk->cctx, schunk->dctx);
-  } else {
-    for (int i = 0; i < g_ntuners; ++i) {
-      if (g_tuners[i].id == schunk->cctx->tuner_id) {
-        if (g_tuners[i].init == NULL) {
-          if (fill_tuner(&g_tuners[i]) < 0) {
-            BLOSC_TRACE_ERROR("Could not load tuner %d.", g_tuners[i].id);
-            return NULL;
-          }
-        }
-        g_tuners[i].init(schunk->storage->cparams->tuner_params, schunk->cctx, schunk->dctx);
-        goto urtunersuccess;
-      }
-    }
-    BLOSC_TRACE_ERROR("User-defined tuner %d not found\n", schunk->cctx->tuner_id);
-    return NULL;
-  }
-  urtunersuccess:;
-
   if (!storage->contiguous && storage->urlpath != NULL){
     char* urlpath;
     char last_char = storage->urlpath[strlen(storage->urlpath) - 1];
