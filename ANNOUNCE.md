@@ -1,12 +1,9 @@
-# Announcing C-Blosc2 2.10.3
+# Announcing C-Blosc2 2.10.4
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release with also several improvements like the registration of
-the dynamically loaded codec blosc2_openhtj2k. See https://github.com/Blosc/blosc2_openhtj2k 
-for more info on how to use it. Also,
-the `BLOSC_INFO` macro has been added for details on compression params.
+This is a maintenance release for removing duplicated tune initialization.
 
 For more info, please see the release notes in:
 

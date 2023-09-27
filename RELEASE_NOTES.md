@@ -4,7 +4,10 @@ Release notes for C-Blosc2
 Changes from 2.10.3 to 2.10.4
 =============================
 
-#XXX version-specific blurb XXX#
+* Remove duplicated tune initialization since it is already done in blosc2_create_cctx.
+  Thanks to Marta Iborra
+
+* Typos fixed.  Thanks to Dimitri Papadopoulos.
 
 
 Changes from 2.10.2 to 2.10.3
