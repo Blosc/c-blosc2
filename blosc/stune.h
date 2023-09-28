@@ -25,15 +25,15 @@
 
 #define BLOSC_STUNE 0
 
-void blosc_stune_init(void * config, blosc2_context* cctx, blosc2_context* dctx);
+int blosc_stune_init(void * config, blosc2_context* cctx, blosc2_context* dctx);
 
-void blosc_stune_next_blocksize(blosc2_context * context);
+int blosc_stune_next_blocksize(blosc2_context * context);
 
-void blosc_stune_next_cparams(blosc2_context * context);
+int blosc_stune_next_cparams(blosc2_context * context);
 
-void blosc_stune_update(blosc2_context * context, double ctime);
+int blosc_stune_update(blosc2_context * context, double ctime);
 
-void blosc_stune_free(blosc2_context * context);
+int blosc_stune_free(blosc2_context * context);
 
 /* Conditions for splitting a block before compressing with a codec. */
 int split_block(blosc2_context *context, int32_t typesize, int32_t blocksize);
