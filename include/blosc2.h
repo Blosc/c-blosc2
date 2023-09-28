@@ -469,6 +469,7 @@ enum {
   BLOSC2_ERROR_INVALID_INDEX = -33,   //!< Invalid index
   BLOSC2_ERROR_METALAYER_NOT_FOUND = -34,   //!< Metalayer has not been found
   BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED = -35,  //!< Max buffer size exceeded
+  BLOSC2_ERROR_TUNER = -36,           //!< Tuner failure
 };
 
 
@@ -1084,15 +1085,15 @@ BLOSC_EXPORT blosc2_io_cb *blosc2_get_io_cb(uint8_t id);
 typedef struct blosc2_context_s blosc2_context;   /* opaque type */
 
 typedef struct {
-  void (*init)(void * config, blosc2_context* cctx, blosc2_context* dctx);
+  int (*init)(void * config, blosc2_context* cctx, blosc2_context* dctx);
   //!< Initialize tuner. Keep in mind dctx may be NULL. This should memcpy the cctx->tuner_params.
-  void (*next_blocksize)(blosc2_context * context);
+  int (*next_blocksize)(blosc2_context * context);
   //!< Only compute the next blocksize. Only it is executed if tuner is not initialized.
-  void (*next_cparams)(blosc2_context * context);
+  int (*next_cparams)(blosc2_context * context);
   //!< Compute the next cparams. Only is executed if tuner is initialized.
-  void (*update)(blosc2_context * context, double ctime);
+  int (*update)(blosc2_context * context, double ctime);
   //!< Update the tuner parameters.
-  void (*free)(blosc2_context * context);
+  int (*free)(blosc2_context * context);
   //!< Free the tuner.
   int id;
   //!< The tuner id

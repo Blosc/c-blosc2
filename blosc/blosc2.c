@@ -2179,9 +2179,13 @@ static int initialize_context_compression(
   context->splitmode = splitmode;
   /* tuner some compression parameters */
   context->blocksize = (int32_t)blocksize;
+  int rc = 0;
   if (context->tuner_params != NULL) {
     if (context->tuner_id < BLOSC_LAST_TUNER && context->tuner_id == BLOSC_STUNE) {
-      blosc_stune_next_cparams(context);
+      if (blosc_stune_next_cparams(context) < 0) {
+        BLOSC_TRACE_ERROR("Error in stune next_cparams func\n");
+        return BLOSC2_ERROR_TUNER;
+      }
     } else {
       for (int i = 0; i < g_ntuners; ++i) {
         if (g_tuners[i].id == context->tuner_id) {
@@ -2191,10 +2195,16 @@ static int initialize_context_compression(
               return BLOSC2_ERROR_FAILURE;
             }
           }
-          g_tuners[i].next_cparams(context);
+          if (g_tuners[i].next_cparams(context) < 0) {
+            BLOSC_TRACE_ERROR("Error in tuner %d next_cparams func\n", context->tuner_id);
+            return BLOSC2_ERROR_TUNER;
+          }
           if (g_tuners[i].id == BLOSC_BTUNE && context->blocksize == 0) {
             // Call stune for initializing blocksize
-            blosc_stune_next_blocksize(context);
+            if (blosc_stune_next_blocksize(context) < 0) {
+              BLOSC_TRACE_ERROR("Error in stune next_blocksize func\n");
+              return BLOSC2_ERROR_TUNER;
+            }
           }
           goto urtunersuccess;
         }
@@ -2204,7 +2214,7 @@ static int initialize_context_compression(
     }
   } else {
     if (context->tuner_id < BLOSC_LAST_TUNER && context->tuner_id == BLOSC_STUNE) {
-      blosc_stune_next_blocksize(context);
+      rc = blosc_stune_next_blocksize(context);
     } else {
       for (int i = 0; i < g_ntuners; ++i) {
         if (g_tuners[i].id == context->tuner_id) {
@@ -2214,7 +2224,7 @@ static int initialize_context_compression(
               return BLOSC2_ERROR_FAILURE;
             }
           }
-          g_tuners[i].next_blocksize(context);
+          rc = g_tuners[i].next_blocksize(context);
           goto urtunersuccess;
         }
       }
@@ -2223,6 +2233,11 @@ static int initialize_context_compression(
     }
   }
   urtunersuccess:;
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Error in tuner next_blocksize func\n");
+    return BLOSC2_ERROR_TUNER;
+  }
+
 
   /* Check buffer size limits */
   if (srcsize > BLOSC2_MAX_BUFFERSIZE) {
@@ -2504,8 +2519,9 @@ static int blosc_compress_context(blosc2_context* context) {
   if (context->tuner_params != NULL) {
     blosc_set_timestamp(&current);
     double ctime = blosc_elapsed_secs(last, current);
+    int rc;
     if (context->tuner_id < BLOSC_LAST_TUNER && context->tuner_id == BLOSC_STUNE) {
-      blosc_stune_update(context, ctime);
+      rc = blosc_stune_update(context, ctime);
     } else {
       for (int i = 0; i < g_ntuners; ++i) {
         if (g_tuners[i].id == context->tuner_id) {
@@ -2515,13 +2531,17 @@ static int blosc_compress_context(blosc2_context* context) {
               return BLOSC2_ERROR_FAILURE;
             }
           }
-          g_tuners[i].update(context, ctime);
+          rc = g_tuners[i].update(context, ctime);
           goto urtunersuccess;
         }
       }
       BLOSC_TRACE_ERROR("User-defined tuner %d not found\n", context->tuner_id);
       return BLOSC2_ERROR_INVALID_PARAM;
       urtunersuccess:;
+    }
+    if (rc < 0) {
+      BLOSC_TRACE_ERROR("Error in tuner update func\n");
+      return BLOSC2_ERROR_TUNER;
     }
   }
 
@@ -4050,7 +4070,10 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
             return NULL;
           }
         }
-        g_tuners[i].init(cparams.tuner_params, context, NULL);
+        if (g_tuners[i].init(cparams.tuner_params, context, NULL) < 0) {
+          BLOSC_TRACE_ERROR("Error in user-defined tuner %d init function\n", cparams.tuner_id);
+          return NULL;
+        }
         goto urtunersuccess;
       }
     }
@@ -4118,8 +4141,9 @@ void blosc2_free_ctx(blosc2_context* context) {
 #endif
   }
   if (context->tuner_params != NULL) {
+    int rc;
     if (context->tuner_id < BLOSC_LAST_TUNER && context->tuner_id == BLOSC_STUNE) {
-      blosc_stune_free(context);
+      rc = blosc_stune_free(context);
     } else {
       for (int i = 0; i < g_ntuners; ++i) {
         if (g_tuners[i].id == context->tuner_id) {
@@ -4129,13 +4153,17 @@ void blosc2_free_ctx(blosc2_context* context) {
               return;
             }
           }
-          g_tuners[i].free(context);
+          rc = g_tuners[i].free(context);
           goto urtunersuccess;
         }
       }
       BLOSC_TRACE_ERROR("User-defined tuner %d not found\n", context->tuner_id);
       return;
       urtunersuccess:;
+    }
+    if (rc < 0) {
+      BLOSC_TRACE_ERROR("Error in user-defined tuner free function\n");
+      return;
     }
   }
   if (context->prefilter != NULL) {

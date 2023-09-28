@@ -34,14 +34,16 @@ static bool is_HCR(blosc2_context * context) {
   }
 }
 
-void blosc_stune_init(void * config, blosc2_context* cctx, blosc2_context* dctx) {
+int blosc_stune_init(void * config, blosc2_context* cctx, blosc2_context* dctx) {
   BLOSC_UNUSED_PARAM(config);
   BLOSC_UNUSED_PARAM(cctx);
   BLOSC_UNUSED_PARAM(dctx);
+
+  return BLOSC2_ERROR_SUCCESS;
 }
 
 // Set the automatic blocksize 0 to its real value
-void blosc_stune_next_blocksize(blosc2_context *context) {
+int blosc_stune_next_blocksize(blosc2_context *context) {
   int32_t clevel = context->clevel;
   int32_t typesize = context->typesize;
   int32_t nbytes = context->sourcesize;
@@ -51,7 +53,7 @@ void blosc_stune_next_blocksize(blosc2_context *context) {
   // Protection against very small buffers
   if (nbytes < typesize) {
     context->blocksize = 1;
-    return;
+    return BLOSC2_ERROR_SUCCESS;
   }
 
   if (user_blocksize) {
@@ -157,19 +159,27 @@ void blosc_stune_next_blocksize(blosc2_context *context) {
   context->blocksize = blocksize;
   BLOSC_INFO("compcode: %d, clevel: %d, blocksize: %d, splitmode: %d, typesize: %d",
              context->compcode, context->clevel, blocksize, splitmode, typesize);
+
+  return BLOSC2_ERROR_SUCCESS;
 }
 
-void blosc_stune_next_cparams(blosc2_context * context) {
-    BLOSC_UNUSED_PARAM(context);
+int blosc_stune_next_cparams(blosc2_context * context) {
+  BLOSC_UNUSED_PARAM(context);
+
+  return BLOSC2_ERROR_SUCCESS;
 }
 
-void blosc_stune_update(blosc2_context * context, double ctime) {
-    BLOSC_UNUSED_PARAM(context);
-    BLOSC_UNUSED_PARAM(ctime);
+int blosc_stune_update(blosc2_context * context, double ctime) {
+  BLOSC_UNUSED_PARAM(context);
+  BLOSC_UNUSED_PARAM(ctime);
+
+  return BLOSC2_ERROR_SUCCESS;
 }
 
-void blosc_stune_free(blosc2_context * context) {
-    BLOSC_UNUSED_PARAM(context);
+int blosc_stune_free(blosc2_context * context) {
+  BLOSC_UNUSED_PARAM(context);
+
+  return BLOSC2_ERROR_SUCCESS;
 }
 
 int split_block(blosc2_context *context, int32_t typesize, int32_t blocksize) {
