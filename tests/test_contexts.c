@@ -79,7 +79,7 @@ int main(void) {
   dctx = blosc2_create_dctx(dparams);
 
   blosc2_dparams dparams2 = {0};
-  blosc2_ctx_get_dparams(cctx, &dparams2);
+  blosc2_ctx_get_dparams(dctx, &dparams2);
 
   if (dparams2.nthreads != dparams.nthreads) {
     printf("Nthreads are not equal!");
