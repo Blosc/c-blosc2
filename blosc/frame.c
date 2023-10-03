@@ -961,6 +961,10 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     // Compress the chunk of offsets
     off_chunk = malloc(off_nbytes + BLOSC2_MAX_OVERHEAD);
     blosc2_context *cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
+    if (cctx == NULL) {
+      BLOSC_TRACE_ERROR("Error while creating the compression context");
+      return BLOSC2_ERROR_NULL_POINTER;
+    }
     cctx->typesize = sizeof(int64_t);
     off_cbytes = blosc2_compress_ctx(cctx, data_tmp, off_nbytes, off_chunk,
                                      off_nbytes + BLOSC2_MAX_OVERHEAD);
@@ -1191,6 +1195,10 @@ int64_t* blosc2_frame_get_offsets(blosc2_schunk *schunk) {
   // Decompress offsets
   blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_context *dctx = blosc2_create_dctx(off_dparams);
+  if (dctx == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the decompression context");
+    return NULL;
+  }
   int32_t prev_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes,
                                               offsets, off_nbytes);
   blosc2_free_ctx(dctx);
@@ -1746,9 +1754,17 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   blosc2_cparams *cparams;
   blosc2_schunk_get_cparams(schunk, &cparams);
   schunk->cctx = blosc2_create_cctx(*cparams);
+  if (schunk->cctx == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the compression context");
+    return NULL;
+  }
   blosc2_dparams *dparams;
   blosc2_schunk_get_dparams(schunk, &dparams);
   schunk->dctx = blosc2_create_dctx(*dparams);
+  if (schunk->dctx == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the decompression context");
+    return NULL;
+  }
   blosc2_storage storage = {.contiguous = copy ? false : true};
   schunk->storage = get_new_storage(&storage, cparams, dparams, udio);
   free(cparams);
@@ -1777,6 +1793,10 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   // Decompress offsets
   blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_context *dctx = blosc2_create_dctx(off_dparams);
+  if (dctx == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the decompression context");
+    return NULL;
+  }
   int64_t* offsets = (int64_t *) malloc((size_t)nchunks * sizeof(int64_t));
   int32_t off_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes,
                                              offsets, (int32_t)(nchunks * sizeof(int64_t)));
@@ -2624,6 +2644,10 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
     // Decompress offsets
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
+    if (dctx == NULL) {
+      BLOSC_TRACE_ERROR("Error while creating the decompression context");
+      return NULL;
+    }
     int32_t prev_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes, offsets,
                                                 off_nbytes);
     blosc2_free_ctx(dctx);
@@ -2680,6 +2704,10 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
   cparams.compcode = BLOSC_BLOSCLZ;
   blosc2_context* cctx = blosc2_create_cctx(cparams);
+  if (cctx == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the compression context");
+    return NULL;
+  }
   cctx->typesize = sizeof(int64_t);  // override a possible BLOSC_TYPESIZE env variable (or chaos may appear)
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
@@ -2828,6 +2856,10 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     // Decompress offsets
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
+    if (dctx == NULL) {
+      BLOSC_TRACE_ERROR("Error while creating the decompression context");
+      return NULL;
+    }
     int32_t prev_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes, offsets, off_nbytes);
     blosc2_free_ctx(dctx);
     if (prev_nbytes < 0) {
@@ -2889,6 +2921,10 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
   cparams.compcode = BLOSC_BLOSCLZ;
   blosc2_context* cctx = blosc2_create_cctx(cparams);
+  if (cctx == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the compression context");
+    return NULL;
+  }
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
                                                off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);
@@ -3043,6 +3079,10 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     // Decompress offsets
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
+    if (dctx == NULL) {
+      BLOSC_TRACE_ERROR("Error while creating the decompression context");
+      return NULL;
+    }
     int32_t prev_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes, offsets, off_nbytes);
     blosc2_free_ctx(dctx);
     if (prev_nbytes < 0) {
@@ -3139,6 +3179,10 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
   cparams.compcode = BLOSC_BLOSCLZ;
   blosc2_context* cctx = blosc2_create_cctx(cparams);
+  if (cctx == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the compression context");
+    return NULL;
+  }
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
                                                off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);
@@ -3278,6 +3322,10 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
     // Decompress offsets
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
+    if (dctx == NULL) {
+      BLOSC_TRACE_ERROR("Error while creating the decompression context");
+      return NULL;
+    }
     int32_t prev_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes, offsets, off_nbytes);
     blosc2_free_ctx(dctx);
     if (prev_nbytes < 0) {
@@ -3301,6 +3349,10 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
   cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
   cparams.compcode = BLOSC_BLOSCLZ;
   blosc2_context* cctx = blosc2_create_cctx(cparams);
+  if (cctx == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the compression context");
+    return NULL;
+  }
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes - (int32_t)sizeof(int64_t),
                                                off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);
@@ -3436,6 +3488,10 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
   // Decompress offsets
   blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_context *dctx = blosc2_create_dctx(off_dparams);
+  if (dctx == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the decompression context");
+    return BLOSC2_ERROR_NULL_POINTER;
+  }
   int32_t prev_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes,
                                               offsets, off_nbytes);
   blosc2_free_ctx(dctx);
@@ -3462,6 +3518,10 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
   cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
   cparams.compcode = BLOSC_BLOSCLZ;
   blosc2_context* cctx = blosc2_create_cctx(cparams);
+  if (cctx == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the compression context");
+    return BLOSC2_ERROR_NULL_POINTER;
+  }
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
                                                off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);

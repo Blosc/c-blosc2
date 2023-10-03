@@ -2820,6 +2820,10 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     cparams.nthreads = g_nthreads;
     cparams.splitmode = g_splitmode;
     cctx = blosc2_create_cctx(cparams);
+    if (cctx == NULL) {
+      BLOSC_TRACE_ERROR("Error while creating the compression context");
+      return BLOSC2_ERROR_NULL_POINTER;
+    }
     /* Do the actual compression */
     result = blosc2_compress_ctx(cctx, src, srcsize, dest, destsize);
     /* Release context resources */
@@ -2960,6 +2964,10 @@ int blosc2_decompress(const void* src, int32_t srcsize, void* dest, int32_t dest
   if (envvar != NULL) {
     dparams.nthreads = g_nthreads;
     dctx = blosc2_create_dctx(dparams);
+    if (dctx == NULL) {
+      BLOSC_TRACE_ERROR("Error while creating the decompression context");
+      return BLOSC2_ERROR_NULL_POINTER;
+    }
     result = blosc2_decompress_ctx(dctx, src, srcsize, dest, destsize);
     blosc2_free_ctx(dctx);
     return result;
@@ -4246,6 +4254,10 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const int32_t nbytes, void* dest,
 
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
+  if (context == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the compression context");
+    return BLOSC2_ERROR_NULL_POINTER;
+  }
 
   int error = initialize_context_compression(
           context, NULL, nbytes, dest, destsize,
@@ -4289,6 +4301,10 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const int32_t nbytes, void* dest
 
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
+  if (context == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the compression context");
+    return BLOSC2_ERROR_NULL_POINTER;
+  }
   int error = initialize_context_compression(
           context, NULL, nbytes, dest, destsize,
           context->clevel, context->filters, context->filters_meta,
@@ -4331,6 +4347,10 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const int32_t nbytes, void* dest, 
 
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
+  if (context == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the compression context");
+    return BLOSC2_ERROR_NULL_POINTER;
+  }
 
   int error = initialize_context_compression(
           context, NULL, nbytes, dest, destsize,
@@ -4376,6 +4396,10 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const int32_t nbytes,
 
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
+  if (context == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the compression context");
+    return BLOSC2_ERROR_NULL_POINTER;
+  }
 
   int error = initialize_context_compression(
           context, NULL, nbytes, dest, destsize,
