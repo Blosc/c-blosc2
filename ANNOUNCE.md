@@ -1,9 +1,11 @@
-# Announcing C-Blosc2 2.10.4
+# Announcing C-Blosc2 2.10.5
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release for removing duplicated tune initialization.
+This is a maintenance release for fixing a segfault in tests, better error
+checking when creating contexts and make tuner's functions signature to return
+always an error code.
 
 For more info, please see the release notes in:
 
