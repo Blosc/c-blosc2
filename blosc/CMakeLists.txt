@@ -354,10 +354,10 @@ if(COMPILER_SUPPORT_NEON)
         # Only armv7l needs special -mfpu=neon flag; aarch64 doesn't.
       set_source_files_properties(
             shuffle-neon.c bitshuffle-neon.c
-            PROPERTIES COMPILE_OPTIONS "-mfpu=neon -flax-vector-conversions")
+            PROPERTIES COMPILE_OPTIONS "-mfpu=neon;-flax-vector-conversions")
       set_property(
             SOURCE shuffle.c
-            APPEND PROPERTY COMPILE_OPTIONS "-mfpu=neon -flax-vector-conversions")
+            APPEND PROPERTY COMPILE_OPTIONS "-mfpu=neon;-flax-vector-conversions")
     endif()
     # Define a symbol for the shuffle-dispatch implementation
     # so it knows NEON is supported even though that file is
