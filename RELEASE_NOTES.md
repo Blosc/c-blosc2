@@ -1,10 +1,21 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.10.4 to 2.10.5
+Changes from 2.10.5 to 2.10.6
 =============================
 
 #XXX version-specific blurb XXX#
+
+
+Changes from 2.10.4 to 2.10.5
+=============================
+
+* Fix a variable name in a test that was causing a segfault in some platforms.
+
+* Change tuner's functions signature to return always an error code.  This allows
+  for better error checking when using plugable tuners in Blosc2.
+
+* Do checks when creating contexts.
 
 
 Changes from 2.10.3 to 2.10.4
