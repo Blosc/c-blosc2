@@ -2095,7 +2095,7 @@ void free_thread_context(struct thread_context* thread_context) {
 
 int check_nthreads(blosc2_context* context) {
   if (context->nthreads <= 0) {
-    BLOSC_TRACE_ERROR("nthreads must be a positive integer.");
+    BLOSC_TRACE_ERROR("nthreads must be >= 1 and <= %d", INT16_MAX);
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
@@ -2925,7 +2925,11 @@ int blosc2_decompress(const void* src, int32_t srcsize, void* dest, int32_t dest
   envvar = getenv("BLOSC_NTHREADS");
   if (envvar != NULL) {
     nthreads = strtol(envvar, NULL, 10);
-    if ((nthreads != EINVAL) && (nthreads > 0)) {
+    if ((nthreads != EINVAL)) {
+      if ((nthreads <= 0) || (nthreads > INT16_MAX)) {
+        BLOSC_TRACE_ERROR("nthreads must be >= 1 and <= %d", INT16_MAX);
+        return BLOSC2_ERROR_INVALID_PARAM;
+      }
       result = blosc2_set_nthreads((int16_t) nthreads);
       if (result < 0) {
         return result;
@@ -3495,7 +3499,10 @@ int16_t blosc2_set_nthreads(int16_t nthreads) {
  if (nthreads != ret) {
    g_nthreads = nthreads;
    g_global_context->new_nthreads = nthreads;
-   check_nthreads(g_global_context);
+   int16_t ret2 = check_nthreads(g_global_context);
+   if (ret2 < 0) {
+     return ret2;
+   }
  }
 
   return ret;

@@ -69,10 +69,57 @@ static char *test_compress_decompress(void) {
   return 0;
 }
 
+/* Check nthreads limits */
+static char *test_nthreads_limits(void) {
+  /* Get a compressed buffer */
+  cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
+                           dest, size + BLOSC2_MAX_OVERHEAD);
+  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
+
+  int16_t nthreads = blosc2_set_nthreads((int16_t) (INT16_MAX + 1));
+  mu_assert("ERROR: nthreads incorrect (1)", nthreads < 0);
+  /* Decompress the buffer */
+  nbytes = blosc1_decompress(dest, dest2, size);
+  mu_assert("ERROR: nbytes incorrect(>=0)", nbytes < 0);
+
+  nthreads = blosc2_set_nthreads(0);
+  mu_assert("ERROR: nthreads incorrect (2)", nthreads < 0);
+  /* Decompress the buffer */
+  nbytes = blosc1_decompress(dest, dest2, size);
+  mu_assert("ERROR: nbytes incorrect(>=0)", nbytes < 0);
+
+  return 0;
+}
+
+/* Check nthreads limits */
+static char *test_nthreads_limits_envvar(void) {
+  /* Get a compressed buffer */
+  cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
+                           dest, size + BLOSC2_MAX_OVERHEAD);
+  mu_assert("ERROR: cbytes is not correct", cbytes < (int)size);
+
+  char strval[10];
+  sprintf(strval, "%d", INT16_MAX + 1);
+  setenv("BLOSC_NTHREADS", strval, 1);
+  /* Decompress the buffer */
+  nbytes = blosc1_decompress(dest, dest2, size);
+  mu_assert("ERROR: nbytes incorrect (1)", nbytes < 0);
+
+  sprintf(strval, "%d", -1);
+  setenv("BLOSC_NTHREADS", strval, 1);
+  /* Decompress the buffer */
+  nbytes = blosc1_decompress(dest, dest2, size);
+  mu_assert("ERROR: nbytes incorrect (2)", nbytes < 0);
+
+  return 0;
+}
+
 
 static char *all_tests(void) {
   mu_run_test(test_compress);
   mu_run_test(test_compress_decompress);
+  mu_run_test(test_nthreads_limits);
+  mu_run_test(test_nthreads_limits_envvar);
 
   return 0;
 }
