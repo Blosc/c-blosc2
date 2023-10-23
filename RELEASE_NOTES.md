@@ -13,7 +13,7 @@ Changes from 2.10.4 to 2.10.5
 * Fix a variable name in a test that was causing a segfault in some platforms.
 
 * Change tuner's functions signature to return always an error code.  This allows
-  for better error checking when using plugable tuners in Blosc2.
+  for better error checking when using pluggable tuners in Blosc2.
 
 * Do checks when creating contexts.
 
