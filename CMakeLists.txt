@@ -29,6 +29,8 @@
 #       build a lite version (only with BloscLZ and LZ4/LZ4HC) of the blosc library
 #   DEACTIVATE_AVX2: default OFF
 #       do not attempt to build with AVX2 instructions
+#   DEACTIVATE_AVX512: default OFF
+#       do not attempt to build with AVX512 instructions
 #   DEACTIVATE_ZLIB: default OFF
 #       do not include support for the Zlib library
 #   DEACTIVATE_ZSTD: default OFF
@@ -115,6 +117,8 @@ option(BUILD_LITE
     "Build a lite version (only with BloscLZ and LZ4/LZ4HC) of the blosc library." OFF)
 option(DEACTIVATE_AVX2
     "Do not attempt to build with AVX2 instructions" OFF)
+option(DEACTIVATE_AVX512
+    "Do not attempt to build with AVX512 instructions" OFF)
 option(DEACTIVATE_ZLIB
     "Do not include support for the Zlib library." OFF)
 option(DEACTIVATE_ZSTD
@@ -355,6 +359,13 @@ endif()
 # disable AVX2 if specified
 if(DEACTIVATE_AVX2)
     set(COMPILER_SUPPORT_AVX2 FALSE)
+    # AVX512 functions in bitshuffle depend on AVX2 too
+    set(COMPILER_SUPPORT_AVX512 FALSE)
+endif()
+
+# disable AVX512 if specified
+if(DEACTIVATE_AVX512)
+    set(COMPILER_SUPPORT_AVX512 FALSE)
 endif()
 
 # flags
