@@ -256,10 +256,10 @@ void copy_ndim_fallback(const int8_t ndim,
 
 int b2nd_copy_buffer(int8_t ndim,
                      uint8_t itemsize,
-                     void *src, const int64_t *src_pad_shape,
-                     int64_t *src_start, const int64_t *src_stop,
+                     const void *src, const int64_t *src_pad_shape,
+                     const int64_t *src_start, const int64_t *src_stop,
                      void *dst, const int64_t *dst_pad_shape,
-                     int64_t *dst_start) {
+                     const int64_t *dst_start) {
   // Compute the shape of the copy
   int64_t copy_shape[B2ND_MAX_DIM] = {0};
   for (int i = 0; i < ndim; ++i) {
