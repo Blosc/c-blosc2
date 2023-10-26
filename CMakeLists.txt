@@ -456,6 +456,7 @@ if(BLOSC_INSTALL)
     # C++ files
     install(FILES ${PROJECT_SOURCE_DIR}/include/blosc2.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT DEV)
     install(FILES ${PROJECT_SOURCE_DIR}/include/b2nd.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT DEV)
+    install(FILES ${PROJECT_SOURCE_DIR}/include/b2nd_utils.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT DEV)
     install(FILES
             ${PROJECT_SOURCE_DIR}/include/blosc2/blosc2-export.h
             ${PROJECT_SOURCE_DIR}/include/blosc2/blosc2-common.h
