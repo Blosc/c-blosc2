@@ -198,10 +198,12 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
 
   /* Check for AVX-based features, if the processor supports extended features. */
   bool avx2_available = false;
+  bool avx512f_available = false;
   bool avx512bw_available = false;
   if (max_basic_function_id >= 7) {
     __cpuid(cpu_info, 7);
     avx2_available = (cpu_info[1] & (1 << 5)) != 0;
+    avx512f_available = (cpu_info[1] & (1 << 16)) != 0;
     avx512bw_available = (cpu_info[1] & (1 << 30)) != 0;
   }
 
@@ -211,13 +213,14 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
       extended control register XCR0 to see if the CPU features are enabled. */
   bool xmm_state_enabled = false;
   bool ymm_state_enabled = false;
-  bool zmm_state_enabled = false;
+  // Silence an unused variable compiler warning
+  // bool zmm_state_enabled = false;
 
 #if defined(_XCR_XFEATURE_ENABLED_MASK)
   if (xsave_available && xsave_enabled_by_os && (
       sse2_available || sse3_available || ssse3_available
       || sse41_available || sse42_available
-      || avx2_available || avx512bw_available)) {
+      || avx2_available || avx512f_available || avx512bw_available)) {
     /* Determine which register states can be restored by the OS. */
     uint64_t xcr0_contents = _xgetbv(_XCR_XFEATURE_ENABLED_MASK);
 
@@ -226,7 +229,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
 
     /*  Require support for both the upper 256-bits of zmm0-zmm15 to be
         restored as well as all of zmm16-zmm31 and the opmask registers. */
-    zmm_state_enabled = (xcr0_contents & 0x70) == 0x70;
+    // zmm_state_enabled = (xcr0_contents & 0x70) == 0x70;
   }
 #endif /* defined(_XCR_XFEATURE_ENABLED_MASK) */
 
@@ -238,12 +241,13 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   printf("SSE4.1 available: %s\n", sse41_available ? "True" : "False");
   printf("SSE4.2 available: %s\n", sse42_available ? "True" : "False");
   printf("AVX2 available: %s\n", avx2_available ? "True" : "False");
+  printf("AVX512F available: %s\n", avx512f_available ? "True" : "False");
   printf("AVX512BW available: %s\n", avx512bw_available ? "True" : "False");
   printf("XSAVE available: %s\n", xsave_available ? "True" : "False");
   printf("XSAVE enabled: %s\n", xsave_enabled_by_os ? "True" : "False");
   printf("XMM state enabled: %s\n", xmm_state_enabled ? "True" : "False");
   printf("YMM state enabled: %s\n", ymm_state_enabled ? "True" : "False");
-  printf("ZMM state enabled: %s\n", zmm_state_enabled ? "True" : "False");
+  // printf("ZMM state enabled: %s\n", zmm_state_enabled ? "True" : "False");
 #endif /* defined(BLOSC_DUMP_CPU_INFO) */
 
   /* Using the gathered CPU information, determine which implementation to use. */
@@ -255,7 +259,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   if (xmm_state_enabled && ymm_state_enabled && avx2_available) {
     result |= BLOSC_HAVE_AVX2;
   }
-  if (xmm_state_enabled && ymm_state_enabled && zmm_state_enabled && avx512bw_available) {
+  if (xmm_state_enabled && ymm_state_enabled && avx512f_available && avx512bw_available) {
     result |= BLOSC_HAVE_AVX512;
   }
   return result;
@@ -299,11 +303,11 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 #if defined(SHUFFLE_USE_AVX512)
   if (cpu_features & BLOSC_HAVE_AVX512) {
     shuffle_implementation_t impl_avx512;
-    impl_avx2.name = "avx512";
-    impl_avx2.shuffle = (shuffle_func)shuffle_avx2;
-    impl_avx2.unshuffle = (unshuffle_func)unshuffle_avx2;
-    impl_avx2.bitshuffle = (bitshuffle_func) bshuf_trans_bit_elem_AVX512;
-    impl_avx2.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_AVX512;
+    impl_avx512.name = "avx512";
+    impl_avx512.shuffle = (shuffle_func)shuffle_avx2;
+    impl_avx512.unshuffle = (unshuffle_func)unshuffle_avx2;
+    impl_avx512.bitshuffle = (bitshuffle_func) bshuf_trans_bit_elem_AVX512;
+    impl_avx512.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_AVX512;
     return impl_avx512;
   }
 #endif  /* defined(SHUFFLE_USE_AVX512) */

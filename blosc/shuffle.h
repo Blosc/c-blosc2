@@ -28,6 +28,7 @@
 */
 #if defined(SHUFFLE_AVX512_ENABLED) && defined(__AVX512F__) && defined (__AVX512BW__)
 #define SHUFFLE_USE_AVX512
+#define SHUFFLE_USE_AVX512
 #endif
 
 #if defined(SHUFFLE_AVX2_ENABLED) && defined(__AVX2__)
