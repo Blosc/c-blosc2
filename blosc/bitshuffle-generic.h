@@ -40,8 +40,9 @@
         do {                              \
           if ((count) < 0)                \
             return count;                 \
-         } while (0)  
+         } while (0)
 
+#define CHECK_ERR_FREE(count, buf) if (count < 0) { free(buf); return count; }
 
 /* ---- Worker code not requiring special instruction sets. ----
  *

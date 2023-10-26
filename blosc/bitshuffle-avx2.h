@@ -22,14 +22,14 @@
   AVX2-accelerated bitshuffle routine.
 */
 BLOSC_NO_EXPORT int64_t
-    bshuf_trans_bit_elem_avx2(void* in, void* out, const size_t size,
-                              const size_t elem_size, void* tmp_buf);
+    bshuf_trans_bit_elem_AVX(const void* in, void* out, const size_t size,
+                             const size_t elem_size);
 
 /**
   AVX2-accelerated bitunshuffle routine.
 */
 BLOSC_NO_EXPORT int64_t
-    bshuf_untrans_bit_elem_avx2(void* in, void* out, const size_t size,
-                                const size_t elem_size, void* tmp_buf);
+    bshuf_untrans_bit_elem_AVX(const void* in, void* out, const size_t size,
+                               const size_t elem_size);
 
 #endif /* BLOSC_BITSHUFFLE_AVX2_H */
