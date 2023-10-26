@@ -13,6 +13,10 @@
 /*  Include hardware-accelerated shuffle/unshuffle routines based on
     the target architecture. Note that a target architecture may support
     more than one type of acceleration!*/
+#if defined(SHUFFLE_USE_AVX512)
+  #include "bitshuffle-avx512.h"
+#endif  /* defined(SHUFFLE_USE_AVX512) */
+
 #if defined(SHUFFLE_USE_AVX2)
   #include "shuffle-avx2.h"
   #include "bitshuffle-avx2.h"
@@ -83,7 +87,8 @@ typedef enum {
   BLOSC_HAVE_SSE2 = 1,
   BLOSC_HAVE_AVX2 = 2,
   BLOSC_HAVE_NEON = 4,
-  BLOSC_HAVE_ALTIVEC = 8
+  BLOSC_HAVE_ALTIVEC = 8,
+  BLOSC_HAVE_AVX512 = 16,
 } blosc_cpu_features;
 
 /* Detect hardware and set function pointers to the best shuffle/unshuffle
@@ -206,7 +211,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
       extended control register XCR0 to see if the CPU features are enabled. */
   bool xmm_state_enabled = false;
   bool ymm_state_enabled = false;
-  //bool zmm_state_enabled = false;  // commented this out for avoiding an 'unused variable' warning
+  bool zmm_state_enabled = false;
 
 #if defined(_XCR_XFEATURE_ENABLED_MASK)
   if (xsave_available && xsave_enabled_by_os && (
@@ -221,7 +226,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
 
     /*  Require support for both the upper 256-bits of zmm0-zmm15 to be
         restored as well as all of zmm16-zmm31 and the opmask registers. */
-    //zmm_state_enabled = (xcr0_contents & 0x70) == 0x70;
+    zmm_state_enabled = (xcr0_contents & 0x70) == 0x70;
   }
 #endif /* defined(_XCR_XFEATURE_ENABLED_MASK) */
 
@@ -238,7 +243,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   printf("XSAVE enabled: %s\n", xsave_enabled_by_os ? "True" : "False");
   printf("XMM state enabled: %s\n", xmm_state_enabled ? "True" : "False");
   printf("YMM state enabled: %s\n", ymm_state_enabled ? "True" : "False");
-  //printf("ZMM state enabled: %s\n", zmm_state_enabled ? "True" : "False");
+  printf("ZMM state enabled: %s\n", zmm_state_enabled ? "True" : "False");
 #endif /* defined(BLOSC_DUMP_CPU_INFO) */
 
   /* Using the gathered CPU information, determine which implementation to use. */
@@ -249,6 +254,9 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   }
   if (xmm_state_enabled && ymm_state_enabled && avx2_available) {
     result |= BLOSC_HAVE_AVX2;
+  }
+  if (xmm_state_enabled && ymm_state_enabled && zmm_state_enabled && avx512bw_available) {
+    result |= BLOSC_HAVE_AVX512;
   }
   return result;
 }
@@ -288,6 +296,18 @@ return BLOSC_HAVE_NOTHING;
 
 static shuffle_implementation_t get_shuffle_implementation(void) {
   blosc_cpu_features cpu_features = blosc_get_cpu_features();
+#if defined(SHUFFLE_USE_AVX512)
+  if (cpu_features & BLOSC_HAVE_AVX512) {
+    shuffle_implementation_t impl_avx512;
+    impl_avx2.name = "avx512";
+    impl_avx2.shuffle = (shuffle_func)shuffle_avx2;
+    impl_avx2.unshuffle = (unshuffle_func)unshuffle_avx2;
+    impl_avx2.bitshuffle = (bitshuffle_func) bshuf_trans_bit_elem_AVX512;
+    impl_avx2.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_AVX512;
+    return impl_avx512;
+  }
+#endif  /* defined(SHUFFLE_USE_AVX512) */
+
 #if defined(SHUFFLE_USE_AVX2)
   if (cpu_features & BLOSC_HAVE_AVX2) {
     shuffle_implementation_t impl_avx2;
@@ -405,7 +425,7 @@ shuffle(const int32_t bytesoftype, const int32_t blocksize,
   init_shuffle_implementation();
 
   /* The implementation is initialized.
-     Dispatch to it's shuffle routine. */
+     Dispatch to its shuffle routine. */
   (host_implementation.shuffle)(bytesoftype, blocksize, _src, _dest);
 }
 

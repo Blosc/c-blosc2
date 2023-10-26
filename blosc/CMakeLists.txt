@@ -262,7 +262,7 @@ list(APPEND SOURCES
     blosc/directories.c
     blosc/blosc2-stdio.c
     blosc/b2nd.c
-    blosc/b2nd_utils.c    
+    blosc/b2nd_utils.c
 )
 if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
     if(COMPILER_SUPPORT_SSE2)
@@ -272,6 +272,10 @@ if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
     if(COMPILER_SUPPORT_AVX2)
         message(STATUS "Adding run-time support for AVX2")
         list(APPEND SOURCES blosc/shuffle-avx2.c blosc/bitshuffle-avx2.c)
+    endif()
+    if(COMPILER_SUPPORT_AVX512)
+        message(STATUS "Adding run-time support for AVX512")
+        list(APPEND SOURCES blosc/bitshuffle-avx512.c)
     endif()
 endif()
 if(COMPILER_SUPPORT_NEON)
@@ -342,6 +346,30 @@ if(COMPILER_SUPPORT_AVX2)
     set_property(
             SOURCE shuffle.c
             APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX2_ENABLED)
+endif()
+if(COMPILER_SUPPORT_AVX512)
+    if(MSVC)
+        set_source_files_properties(
+                bitshuffle-avx512.c
+                PROPERTIES COMPILE_OPTIONS "/arch:AVX512F")
+        set_property(
+                SOURCE shuffle.c
+                APPEND PROPERTY COMPILE_OPTIONS "/arch:AVX512F")
+    else()
+        set_source_files_properties(
+                bitshuffle-avx512.c
+                PROPERTIES COMPILE_OPTIONS -mavx512f)
+        set_property(
+                SOURCE shuffle.c
+                APPEND PROPERTY COMPILE_OPTIONS -mavx512f)
+    endif()
+
+    # Define a symbol for the shuffle-dispatch implementation
+    # so it knows AVX512 is supported even though that file is
+    # compiled without AVX512 support (for portability).
+    set_property(
+            SOURCE shuffle.c
+            APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX512_ENABLED)
 endif()
 if(COMPILER_SUPPORT_NEON)
     set_source_files_properties(

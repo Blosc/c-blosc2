@@ -26,6 +26,10 @@
 /* Toggle hardware-accelerated routines based on SHUFFLE_*_ENABLED macros
    and availability on the target architecture.
 */
+#if defined(SHUFFLE_AVX512_ENABLED) && defined(__AVX512F__) && defined (__AVX512BW__)
+#define SHUFFLE_USE_AVX512
+#endif
+
 #if defined(SHUFFLE_AVX2_ENABLED) && defined(__AVX2__)
 #define SHUFFLE_USE_AVX2
 #endif
