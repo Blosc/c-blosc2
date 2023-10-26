@@ -8,6 +8,18 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+/*********************************************************************
+  Bitshuffle - Filter for improving compression of typed binary data.
+
+  Author: Kiyoshi Masui <kiyo@physics.ubc.ca>
+  Website: https://github.com/kiyo-masui/bitshuffle
+
+  Note: Adapted for c-blosc2 by Francesc Alted.
+
+  See LICENSES/BITSHUFFLE.txt file for details about copyright and
+  rights to use.
+**********************************************************************/
+
 #include "bitshuffle-neon.h"
 #include "bitshuffle-generic.h"
 
@@ -16,7 +28,7 @@
 
 #include <arm_neon.h>
 
-#include <stdint.h>
+#include <stdlib.h>
 
 /* The next is useful for debugging purposes */
 #if 0
@@ -33,975 +45,461 @@ static void printmem(uint8_t* buf)
 }
 #endif
 
-/* Routine optimized for bit-shuffling a buffer for a type size of 1 byte. */
-static void
-bitshuffle1_neon(void* src, void* dest, const size_t size, const size_t elem_size) {
+/* Memory copy with bshuf call signature. For testing and profiling. */
+int64_t bshuf_copy(const void* in, void* out, const size_t size,
+                   const size_t elem_size) {
 
-  uint16x8_t x0;
-  size_t i, j, k;
-  uint8x8_t lo_x, hi_x, lo, hi;
+  const char* in_b = (const char*) in;
+  char* out_b = (char*) out;
 
-  const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-  uint8x8_t mask_and = vdup_n_u8(0x01);
-  int8x8_t mask_shift = vld1_s8(xr);
-
-  for (i = 0, k = 0; i < size * elem_size; i += 16, k++) {
-    /* Load 16-byte groups */
-    x0 = vld1q_u8(src + k * 16);
-    /* Split in 8-bytes grops */
-    lo_x = vget_low_u8(x0);
-    hi_x = vget_high_u8(x0);
-    for (j = 0; j < 8; j++) {
-      /* Create mask from the most significant bit of each 8-bit element */
-      lo = vand_u8(lo_x, mask_and);
-      lo = vshl_u8(lo, mask_shift);
-      hi = vand_u8(hi_x, mask_and);
-      hi = vshl_u8(hi, mask_shift);
-      lo = vpadd_u8(lo, lo);
-      lo = vpadd_u8(lo, lo);
-      lo = vpadd_u8(lo, lo);
-      hi = vpadd_u8(hi, hi);
-      hi = vpadd_u8(hi, hi);
-      hi = vpadd_u8(hi, hi);
-      /* Shift packed 8-bit */
-      lo_x = vshr_n_u8(lo_x, 1);
-      hi_x = vshr_n_u8(hi_x, 1);
-      /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + 2 * k + j * size * elem_size / (8 * elem_size), lo, 0);
-      vst1_lane_u8(dest + 2 * k + 1 + j * size * elem_size / (8 * elem_size), hi, 0);
-    }
-  }
+  memcpy(out_b, in_b, size * elem_size);
+  return size * elem_size;
 }
 
-/* Routine optimized for bit-shuffling a buffer for a type size of 2 bytes. */
-static void
-bitshuffle2_neon(void* src, void* dest, const size_t size, const size_t elem_size) {
 
-  uint8x16x2_t x0;
-  size_t i, j, k;
-  uint8x8_t lo_x[2], hi_x[2], lo[2], hi[2];
+/* ---- Worker code that uses Arm NEON ----
+ *
+ * The following code makes use of the Arm NEON instruction set.
+ * NEON technology is the implementation of the ARM Advanced Single
+ * Instruction Multiple Data (SIMD) extension.
+ * The NEON unit is the component of the processor that executes SIMD instructions.
+ * It is also called the NEON Media Processing Engine (MPE).
+ *
+ */
 
-  const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-  uint8x8_t mask_and = vdup_n_u8(0x01);
-  int8x8_t mask_shift = vld1_s8(xr);
+/* Transpose bytes within elements for 16 bit elements. */
+int64_t bshuf_trans_byte_elem_NEON_16(const void* in, void* out, const size_t size) {
 
-  for (i = 0, k = 0; i < size * elem_size; i += 32, k++) {
-    /* Load 32-byte groups */
-    x0 = vld2q_u8(src + i);
-    /* Split in 8-bytes grops */
-    lo_x[0] = vget_low_u8(x0.val[0]);
-    hi_x[0] = vget_high_u8(x0.val[0]);
-    lo_x[1] = vget_low_u8(x0.val[1]);
-    hi_x[1] = vget_high_u8(x0.val[1]);
-    for (j = 0; j < 8; j++) {
-      /* Create mask from the most significant bit of each 8-bit element */
-      lo[0] = vand_u8(lo_x[0], mask_and);
-      lo[0] = vshl_u8(lo[0], mask_shift);
-      lo[1] = vand_u8(lo_x[1], mask_and);
-      lo[1] = vshl_u8(lo[1], mask_shift);
+    size_t ii;
+    const char *in_b = (const char*) in;
+    char *out_b = (char*) out;
+    int8x16_t a0, b0, a1, b1;
 
-      hi[0] = vand_u8(hi_x[0], mask_and);
-      hi[0] = vshl_u8(hi[0], mask_shift);
-      hi[1] = vand_u8(hi_x[1], mask_and);
-      hi[1] = vshl_u8(hi[1], mask_shift);
+    for (ii=0; ii + 15 < size; ii += 16) {
+        a0 = vld1q_s8(in_b + 2*ii + 0*16);
+        b0 = vld1q_s8(in_b + 2*ii + 1*16);
 
-      lo[0] = vpadd_u8(lo[0], lo[0]);
-      lo[0] = vpadd_u8(lo[0], lo[0]);
-      lo[0] = vpadd_u8(lo[0], lo[0]);
-      lo[1] = vpadd_u8(lo[1], lo[1]);
-      lo[1] = vpadd_u8(lo[1], lo[1]);
-      lo[1] = vpadd_u8(lo[1], lo[1]);
+        a1 = vzip1q_s8(a0, b0);
+        b1 = vzip2q_s8(a0, b0);
 
-      hi[0] = vpadd_u8(hi[0], hi[0]);
-      hi[0] = vpadd_u8(hi[0], hi[0]);
-      hi[0] = vpadd_u8(hi[0], hi[0]);
-      hi[1] = vpadd_u8(hi[1], hi[1]);
-      hi[1] = vpadd_u8(hi[1], hi[1]);
-      hi[1] = vpadd_u8(hi[1], hi[1]);
-      /* Shift packed 8-bit */
-      lo_x[0] = vshr_n_u8(lo_x[0], 1);
-      hi_x[0] = vshr_n_u8(hi_x[0], 1);
-      lo_x[1] = vshr_n_u8(lo_x[1], 1);
-      hi_x[1] = vshr_n_u8(hi_x[1], 1);
-      /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + 2 * k + j * size * elem_size / (8 * elem_size), lo[0], 0);
-      vst1_lane_u8(dest + 2 * k + j * size * elem_size / (8 * elem_size) + size * elem_size / 2, lo[1], 0);
-      vst1_lane_u8(dest + 2 * k + 1 + j * size * elem_size / (8 * elem_size), hi[0], 0);
-      vst1_lane_u8(dest + 2 * k + 1 + j * size * elem_size / (8 * elem_size) + size * elem_size / 2, hi[1], 0);
+        a0 = vzip1q_s8(a1, b1);
+        b0 = vzip2q_s8(a1, b1);
+
+        a1 = vzip1q_s8(a0, b0);
+        b1 = vzip2q_s8(a0, b0);
+
+        a0 = vzip1q_s8(a1, b1);
+        b0 = vzip2q_s8(a1, b1);
+
+        vst1q_s8(out_b + 0*size + ii, a0);
+        vst1q_s8(out_b + 1*size + ii, b0);
     }
-  }
+
+    return bshuf_trans_byte_elem_remainder(in, out, size, 2,
+            size - size % 16);
 }
 
-/* Routine optimized for bit-shuffling a buffer for a type size of 4 bytes. */
-static void
-bitshuffle4_neon(void* src, void* dest, const size_t size, const size_t elem_size) {
-  uint8x16x4_t x0;
-  size_t i, j, k;
-  uint8x8_t lo_x[4], hi_x[4], lo[4], hi[4];
 
-  const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-  uint8x8_t mask_and = vdup_n_u8(0x01);
-  int8x8_t mask_shift = vld1_s8(xr);
+/* Transpose bytes within elements for 32 bit elements. */
+int64_t bshuf_trans_byte_elem_NEON_32(const void* in, void* out, const size_t size) {
 
-  for (i = 0, k = 0; i < size * elem_size; i += 64, k++) {
-    /* Load 64-byte groups */
-    x0 = vld4q_u8(src + i);
-    /* Split in 8-bytes grops */
-    lo_x[0] = vget_low_u8(x0.val[0]);
-    hi_x[0] = vget_high_u8(x0.val[0]);
-    lo_x[1] = vget_low_u8(x0.val[1]);
-    hi_x[1] = vget_high_u8(x0.val[1]);
-    lo_x[2] = vget_low_u8(x0.val[2]);
-    hi_x[2] = vget_high_u8(x0.val[2]);
-    lo_x[3] = vget_low_u8(x0.val[3]);
-    hi_x[3] = vget_high_u8(x0.val[3]);
-    for (j = 0; j < 8; j++) {
-      /* Create mask from the most significant bit of each 8-bit element */
-      lo[0] = vand_u8(lo_x[0], mask_and);
-      lo[0] = vshl_u8(lo[0], mask_shift);
-      lo[1] = vand_u8(lo_x[1], mask_and);
-      lo[1] = vshl_u8(lo[1], mask_shift);
-      lo[2] = vand_u8(lo_x[2], mask_and);
-      lo[2] = vshl_u8(lo[2], mask_shift);
-      lo[3] = vand_u8(lo_x[3], mask_and);
-      lo[3] = vshl_u8(lo[3], mask_shift);
+    size_t ii;
+    const char *in_b;
+    char *out_b;
+    in_b = (const char*) in;
+    out_b = (char*) out;
+    int8x16_t a0, b0, c0, d0, a1, b1, c1, d1;
+    int64x2_t a2, b2, c2, d2;
 
-      hi[0] = vand_u8(hi_x[0], mask_and);
-      hi[0] = vshl_u8(hi[0], mask_shift);
-      hi[1] = vand_u8(hi_x[1], mask_and);
-      hi[1] = vshl_u8(hi[1], mask_shift);
-      hi[2] = vand_u8(hi_x[2], mask_and);
-      hi[2] = vshl_u8(hi[2], mask_shift);
-      hi[3] = vand_u8(hi_x[3], mask_and);
-      hi[3] = vshl_u8(hi[3], mask_shift);
+    for (ii=0; ii + 15 < size; ii += 16) {
+        a0 = vld1q_s8(in_b + 4*ii + 0*16);
+        b0 = vld1q_s8(in_b + 4*ii + 1*16);
+        c0 = vld1q_s8(in_b + 4*ii + 2*16);
+        d0 = vld1q_s8(in_b + 4*ii + 3*16);
 
-      lo[0] = vpadd_u8(lo[0], lo[0]);
-      lo[0] = vpadd_u8(lo[0], lo[0]);
-      lo[0] = vpadd_u8(lo[0], lo[0]);
-      lo[1] = vpadd_u8(lo[1], lo[1]);
-      lo[1] = vpadd_u8(lo[1], lo[1]);
-      lo[1] = vpadd_u8(lo[1], lo[1]);
-      lo[2] = vpadd_u8(lo[2], lo[2]);
-      lo[2] = vpadd_u8(lo[2], lo[2]);
-      lo[2] = vpadd_u8(lo[2], lo[2]);
-      lo[3] = vpadd_u8(lo[3], lo[3]);
-      lo[3] = vpadd_u8(lo[3], lo[3]);
-      lo[3] = vpadd_u8(lo[3], lo[3]);
+        a1 = vzip1q_s8(a0, b0);
+        b1 = vzip2q_s8(a0, b0);
+        c1 = vzip1q_s8(c0, d0);
+        d1 = vzip2q_s8(c0, d0);
 
-      hi[0] = vpadd_u8(hi[0], hi[0]);
-      hi[0] = vpadd_u8(hi[0], hi[0]);
-      hi[0] = vpadd_u8(hi[0], hi[0]);
-      hi[1] = vpadd_u8(hi[1], hi[1]);
-      hi[1] = vpadd_u8(hi[1], hi[1]);
-      hi[1] = vpadd_u8(hi[1], hi[1]);
-      hi[2] = vpadd_u8(hi[2], hi[2]);
-      hi[2] = vpadd_u8(hi[2], hi[2]);
-      hi[2] = vpadd_u8(hi[2], hi[2]);
-      hi[3] = vpadd_u8(hi[3], hi[3]);
-      hi[3] = vpadd_u8(hi[3], hi[3]);
-      hi[3] = vpadd_u8(hi[3], hi[3]);
-      /* Shift packed 8-bit */
-      lo_x[0] = vshr_n_u8(lo_x[0], 1);
-      hi_x[0] = vshr_n_u8(hi_x[0], 1);
-      lo_x[1] = vshr_n_u8(lo_x[1], 1);
-      hi_x[1] = vshr_n_u8(hi_x[1], 1);
-      lo_x[2] = vshr_n_u8(lo_x[2], 1);
-      hi_x[2] = vshr_n_u8(hi_x[2], 1);
-      lo_x[3] = vshr_n_u8(lo_x[3], 1);
-      hi_x[3] = vshr_n_u8(hi_x[3], 1);
-      /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + 2 * k + j * size * elem_size / (8 * elem_size) + 0 * size * elem_size / 4, lo[0], 0);
-      vst1_lane_u8(dest + 2 * k + j * size * elem_size / (8 * elem_size) + 1 * size * elem_size / 4, lo[1], 0);
-      vst1_lane_u8(dest + 2 * k + j * size * elem_size / (8 * elem_size) + 2 * size * elem_size / 4, lo[2], 0);
-      vst1_lane_u8(dest + 2 * k + j * size * elem_size / (8 * elem_size) + 3 * size * elem_size / 4, lo[3], 0);
-      vst1_lane_u8(dest + 2 * k + 1 + j * size * elem_size / (8 * elem_size) + 0 * size * elem_size / 4, hi[0], 0);
-      vst1_lane_u8(dest + 2 * k + 1 + j * size * elem_size / (8 * elem_size) + 1 * size * elem_size / 4, hi[1], 0);
-      vst1_lane_u8(dest + 2 * k + 1 + j * size * elem_size / (8 * elem_size) + 2 * size * elem_size / 4, hi[2], 0);
-      vst1_lane_u8(dest + 2 * k + 1 + j * size * elem_size / (8 * elem_size) + 3 * size * elem_size / 4, hi[3], 0);
+        a0 = vzip1q_s8(a1, b1);
+        b0 = vzip2q_s8(a1, b1);
+        c0 = vzip1q_s8(c1, d1);
+        d0 = vzip2q_s8(c1, d1);
+
+        a1 = vzip1q_s8(a0, b0);
+        b1 = vzip2q_s8(a0, b0);
+        c1 = vzip1q_s8(c0, d0);
+        d1 = vzip2q_s8(c0, d0);
+
+        a2 = vzip1q_s64(vreinterpretq_s64_s8(a1), vreinterpretq_s64_s8(c1));
+        b2 = vzip2q_s64(vreinterpretq_s64_s8(a1), vreinterpretq_s64_s8(c1));
+        c2 = vzip1q_s64(vreinterpretq_s64_s8(b1), vreinterpretq_s64_s8(d1));
+        d2 = vzip2q_s64(vreinterpretq_s64_s8(b1), vreinterpretq_s64_s8(d1));
+
+        vst1q_s64((int64_t *) (out_b + 0*size + ii), a2);
+        vst1q_s64((int64_t *) (out_b + 1*size + ii), b2);
+        vst1q_s64((int64_t *) (out_b + 2*size + ii), c2);
+        vst1q_s64((int64_t *) (out_b + 3*size + ii), d2);
     }
-  }
+
+    return bshuf_trans_byte_elem_remainder(in, out, size, 4,
+            size - size % 16);
 }
 
-/* Routine optimized for bit-shuffling a buffer for a type size of 8 bytes. */
-static void
-bitshuffle8_neon(void* src, void* dest, const size_t size, const size_t elem_size) {
 
-  size_t i, j, k;
-  uint8x8x2_t r0[4];
-  uint16x4x2_t r1[4];
-  uint32x2x2_t r2[4];
+/* Transpose bytes within elements for 64 bit elements. */
+int64_t bshuf_trans_byte_elem_NEON_64(const void* in, void* out, const size_t size) {
 
-  const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-  uint8x8_t mask_and = vdup_n_u8(0x01);
-  int8x8_t mask_shift = vld1_s8(xr);
+    size_t ii;
+    const char* in_b = (const char*) in;
+    char* out_b = (char*) out;
+    int8x16_t a0, b0, c0, d0, e0, f0, g0, h0;
+    int8x16_t a1, b1, c1, d1, e1, f1, g1, h1;
 
-  for (i = 0, k = 0; i < size * elem_size; i += 64, k++) {
-    /* Load and interleave groups of 8 bytes (64 bytes) to the structure r0 */
-    r0[0] = vzip_u8(vld1_u8(src + i + 0 * 8), vld1_u8(src + i + 1 * 8));
-    r0[1] = vzip_u8(vld1_u8(src + i + 2 * 8), vld1_u8(src + i + 3 * 8));
-    r0[2] = vzip_u8(vld1_u8(src + i + 4 * 8), vld1_u8(src + i + 5 * 8));
-    r0[3] = vzip_u8(vld1_u8(src + i + 6 * 8), vld1_u8(src + i + 7 * 8));
-    /* Interleave 16 bytes */
-    r1[0] = vzip_u16(vreinterpret_u16_u8(r0[0].val[0]), vreinterpret_u16_u8(r0[1].val[0]));
-    r1[1] = vzip_u16(vreinterpret_u16_u8(r0[0].val[1]), vreinterpret_u16_u8(r0[1].val[1]));
-    r1[2] = vzip_u16(vreinterpret_u16_u8(r0[2].val[0]), vreinterpret_u16_u8(r0[3].val[0]));
-    r1[3] = vzip_u16(vreinterpret_u16_u8(r0[2].val[1]), vreinterpret_u16_u8(r0[3].val[1]));
-    /* Interleave 32 bytes */
-    r2[0] = vzip_u32(vreinterpret_u32_u16(r1[0].val[0]), vreinterpret_u32_u16(r1[2].val[0]));
-    r2[1] = vzip_u32(vreinterpret_u32_u16(r1[0].val[1]), vreinterpret_u32_u16(r1[2].val[1]));
-    r2[2] = vzip_u32(vreinterpret_u32_u16(r1[1].val[0]), vreinterpret_u32_u16(r1[3].val[0]));
-    r2[3] = vzip_u32(vreinterpret_u32_u16(r1[1].val[1]), vreinterpret_u32_u16(r1[3].val[1]));
-    for (j = 0; j < 8; j++) {
-      /* Create mask from the most significant bit of each 8-bit element */
-      r0[0].val[0] = vand_u8(vreinterpret_u8_u32(r2[0].val[0]), mask_and);
-      r0[0].val[0] = vshl_u8(r0[0].val[0], mask_shift);
-      r0[0].val[1] = vand_u8(vreinterpret_u8_u32(r2[0].val[1]), mask_and);
-      r0[0].val[1] = vshl_u8(r0[0].val[1], mask_shift);
-      r0[1].val[0] = vand_u8(vreinterpret_u8_u32(r2[1].val[0]), mask_and);
-      r0[1].val[0] = vshl_u8(r0[1].val[0], mask_shift);
-      r0[1].val[1] = vand_u8(vreinterpret_u8_u32(r2[1].val[1]), mask_and);
-      r0[1].val[1] = vshl_u8(r0[1].val[1], mask_shift);
-      r0[2].val[0] = vand_u8(vreinterpret_u8_u32(r2[2].val[0]), mask_and);
-      r0[2].val[0] = vshl_u8(r0[2].val[0], mask_shift);
-      r0[2].val[1] = vand_u8(vreinterpret_u8_u32(r2[2].val[1]), mask_and);
-      r0[2].val[1] = vshl_u8(r0[2].val[1], mask_shift);
-      r0[3].val[0] = vand_u8(vreinterpret_u8_u32(r2[3].val[0]), mask_and);
-      r0[3].val[0] = vshl_u8(r0[3].val[0], mask_shift);
-      r0[3].val[1] = vand_u8(vreinterpret_u8_u32(r2[3].val[1]), mask_and);
-      r0[3].val[1] = vshl_u8(r0[3].val[1], mask_shift);
+    for (ii=0; ii + 15 < size; ii += 16) {
+        a0 = vld1q_s8(in_b + 8*ii + 0*16);
+        b0 = vld1q_s8(in_b + 8*ii + 1*16);
+        c0 = vld1q_s8(in_b + 8*ii + 2*16);
+        d0 = vld1q_s8(in_b + 8*ii + 3*16);
+        e0 = vld1q_s8(in_b + 8*ii + 4*16);
+        f0 = vld1q_s8(in_b + 8*ii + 5*16);
+        g0 = vld1q_s8(in_b + 8*ii + 6*16);
+        h0 = vld1q_s8(in_b + 8*ii + 7*16);
 
-      r0[0].val[0] = vpadd_u8(r0[0].val[0], r0[0].val[0]);
-      r0[0].val[0] = vpadd_u8(r0[0].val[0], r0[0].val[0]);
-      r0[0].val[0] = vpadd_u8(r0[0].val[0], r0[0].val[0]);
-      r0[0].val[1] = vpadd_u8(r0[0].val[1], r0[0].val[1]);
-      r0[0].val[1] = vpadd_u8(r0[0].val[1], r0[0].val[1]);
-      r0[0].val[1] = vpadd_u8(r0[0].val[1], r0[0].val[1]);
-      r0[1].val[0] = vpadd_u8(r0[1].val[0], r0[1].val[0]);
-      r0[1].val[0] = vpadd_u8(r0[1].val[0], r0[1].val[0]);
-      r0[1].val[0] = vpadd_u8(r0[1].val[0], r0[1].val[0]);
-      r0[1].val[1] = vpadd_u8(r0[1].val[1], r0[1].val[1]);
-      r0[1].val[1] = vpadd_u8(r0[1].val[1], r0[1].val[1]);
-      r0[1].val[1] = vpadd_u8(r0[1].val[1], r0[1].val[1]);
-      r0[2].val[0] = vpadd_u8(r0[2].val[0], r0[2].val[0]);
-      r0[2].val[0] = vpadd_u8(r0[2].val[0], r0[2].val[0]);
-      r0[2].val[0] = vpadd_u8(r0[2].val[0], r0[2].val[0]);
-      r0[2].val[1] = vpadd_u8(r0[2].val[1], r0[2].val[1]);
-      r0[2].val[1] = vpadd_u8(r0[2].val[1], r0[2].val[1]);
-      r0[2].val[1] = vpadd_u8(r0[2].val[1], r0[2].val[1]);
-      r0[3].val[0] = vpadd_u8(r0[3].val[0], r0[3].val[0]);
-      r0[3].val[0] = vpadd_u8(r0[3].val[0], r0[3].val[0]);
-      r0[3].val[0] = vpadd_u8(r0[3].val[0], r0[3].val[0]);
-      r0[3].val[1] = vpadd_u8(r0[3].val[1], r0[3].val[1]);
-      r0[3].val[1] = vpadd_u8(r0[3].val[1], r0[3].val[1]);
-      r0[3].val[1] = vpadd_u8(r0[3].val[1], r0[3].val[1]);
-      /* Shift packed 8-bit */
-      r2[0].val[0] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[0].val[0]), 1));
-      r2[0].val[1] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[0].val[1]), 1));
-      r2[1].val[0] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[1].val[0]), 1));
-      r2[1].val[1] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[1].val[1]), 1));
-      r2[2].val[0] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[2].val[0]), 1));
-      r2[2].val[1] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[2].val[1]), 1));
-      r2[3].val[0] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[3].val[0]), 1));
-      r2[3].val[1] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[3].val[1]), 1));
-      /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 0 * size * elem_size / 8, r0[0].val[0], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 1 * size * elem_size / 8, r0[0].val[1], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 2 * size * elem_size / 8, r0[1].val[0], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 3 * size * elem_size / 8, r0[1].val[1], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 4 * size * elem_size / 8, r0[2].val[0], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 5 * size * elem_size / 8, r0[2].val[1], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 6 * size * elem_size / 8, r0[3].val[0], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 7 * size * elem_size / 8, r0[3].val[1], 0);
+        a1 = vzip1q_s8 (a0, b0);
+        b1 = vzip2q_s8 (a0, b0);
+        c1 = vzip1q_s8 (c0, d0);
+        d1 = vzip2q_s8 (c0, d0);
+        e1 = vzip1q_s8 (e0, f0);
+        f1 = vzip2q_s8 (e0, f0);
+        g1 = vzip1q_s8 (g0, h0);
+        h1 = vzip2q_s8 (g0, h0);
+
+        a0 = vzip1q_s8 (a1, b1);
+        b0 = vzip2q_s8 (a1, b1);
+        c0 = vzip1q_s8 (c1, d1);
+        d0 = vzip2q_s8 (c1, d1);
+        e0 = vzip1q_s8 (e1, f1);
+        f0 = vzip2q_s8 (e1, f1);
+        g0 = vzip1q_s8 (g1, h1);
+        h0 = vzip2q_s8 (g1, h1);
+
+        a1 = (int8x16_t) vzip1q_s32 (vreinterpretq_s32_s8 (a0), vreinterpretq_s32_s8 (c0));
+        b1 = (int8x16_t) vzip2q_s32 (vreinterpretq_s32_s8 (a0), vreinterpretq_s32_s8 (c0));
+        c1 = (int8x16_t) vzip1q_s32 (vreinterpretq_s32_s8 (b0), vreinterpretq_s32_s8 (d0));
+        d1 = (int8x16_t) vzip2q_s32 (vreinterpretq_s32_s8 (b0), vreinterpretq_s32_s8 (d0));
+        e1 = (int8x16_t) vzip1q_s32 (vreinterpretq_s32_s8 (e0), vreinterpretq_s32_s8 (g0));
+        f1 = (int8x16_t) vzip2q_s32 (vreinterpretq_s32_s8 (e0), vreinterpretq_s32_s8 (g0));
+        g1 = (int8x16_t) vzip1q_s32 (vreinterpretq_s32_s8 (f0), vreinterpretq_s32_s8 (h0));
+        h1 = (int8x16_t) vzip2q_s32 (vreinterpretq_s32_s8 (f0), vreinterpretq_s32_s8 (h0));
+
+        a0 = (int8x16_t) vzip1q_s64 (vreinterpretq_s64_s8 (a1), vreinterpretq_s64_s8 (e1));
+        b0 = (int8x16_t) vzip2q_s64 (vreinterpretq_s64_s8 (a1), vreinterpretq_s64_s8 (e1));
+        c0 = (int8x16_t) vzip1q_s64 (vreinterpretq_s64_s8 (b1), vreinterpretq_s64_s8 (f1));
+        d0 = (int8x16_t) vzip2q_s64 (vreinterpretq_s64_s8 (b1), vreinterpretq_s64_s8 (f1));
+        e0 = (int8x16_t) vzip1q_s64 (vreinterpretq_s64_s8 (c1), vreinterpretq_s64_s8 (g1));
+        f0 = (int8x16_t) vzip2q_s64 (vreinterpretq_s64_s8 (c1), vreinterpretq_s64_s8 (g1));
+        g0 = (int8x16_t) vzip1q_s64 (vreinterpretq_s64_s8 (d1), vreinterpretq_s64_s8 (h1));
+        h0 = (int8x16_t) vzip2q_s64 (vreinterpretq_s64_s8 (d1), vreinterpretq_s64_s8 (h1));
+
+        vst1q_s8(out_b + 0*size + ii, a0);
+        vst1q_s8(out_b + 1*size + ii, b0);
+        vst1q_s8(out_b + 2*size + ii, c0);
+        vst1q_s8(out_b + 3*size + ii, d0);
+        vst1q_s8(out_b + 4*size + ii, e0);
+        vst1q_s8(out_b + 5*size + ii, f0);
+        vst1q_s8(out_b + 6*size + ii, g0);
+        vst1q_s8(out_b + 7*size + ii, h0);
     }
-  }
+
+    return bshuf_trans_byte_elem_remainder(in, out, size, 8,
+            size - size % 16);
 }
 
-/* Routine optimized for bit-shuffling a buffer for a type size of 16 bytes. */
-static void
-bitshuffle16_neon(void* src, void* dest, const size_t size, const size_t elem_size) {
 
-  size_t i, j, k;
-  uint8x8x2_t r0[8];
-  uint16x4x2_t r1[8];
-  uint32x2x2_t r2[8];
+/* Transpose bytes within elements using best NEON algorithm available. */
+int64_t bshuf_trans_byte_elem_NEON(const void* in, void* out, const size_t size,
+         const size_t elem_size) {
 
-  const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-  uint8x8_t mask_and = vdup_n_u8(0x01);
-  int8x8_t mask_shift = vld1_s8(xr);
+    int64_t count;
 
-  for (i = 0, k = 0; i < size * elem_size; i += 128, k++) {
-    /* Load and interleave groups of 16 bytes (128 bytes) to the structure r0 */
-    r0[0] = vzip_u8(vld1_u8(src + i + 0 * 8), vld1_u8(src + i + 2 * 8));
-    r0[1] = vzip_u8(vld1_u8(src + i + 1 * 8), vld1_u8(src + i + 3 * 8));
-    r0[2] = vzip_u8(vld1_u8(src + i + 4 * 8), vld1_u8(src + i + 6 * 8));
-    r0[3] = vzip_u8(vld1_u8(src + i + 5 * 8), vld1_u8(src + i + 7 * 8));
-    r0[4] = vzip_u8(vld1_u8(src + i + 8 * 8), vld1_u8(src + i + 10 * 8));
-    r0[5] = vzip_u8(vld1_u8(src + i + 9 * 8), vld1_u8(src + i + 11 * 8));
-    r0[6] = vzip_u8(vld1_u8(src + i + 12 * 8), vld1_u8(src + i + 14 * 8));
-    r0[7] = vzip_u8(vld1_u8(src + i + 13 * 8), vld1_u8(src + i + 15 * 8));
-    /* Interleave 16 bytes */
-    r1[0] = vzip_u16(vreinterpret_u16_u8(r0[0].val[0]), vreinterpret_u16_u8(r0[2].val[0]));
-    r1[1] = vzip_u16(vreinterpret_u16_u8(r0[0].val[1]), vreinterpret_u16_u8(r0[2].val[1]));
-    r1[2] = vzip_u16(vreinterpret_u16_u8(r0[1].val[0]), vreinterpret_u16_u8(r0[3].val[0]));
-    r1[3] = vzip_u16(vreinterpret_u16_u8(r0[1].val[1]), vreinterpret_u16_u8(r0[3].val[1]));
-    r1[4] = vzip_u16(vreinterpret_u16_u8(r0[4].val[0]), vreinterpret_u16_u8(r0[6].val[0]));
-    r1[5] = vzip_u16(vreinterpret_u16_u8(r0[4].val[1]), vreinterpret_u16_u8(r0[6].val[1]));
-    r1[6] = vzip_u16(vreinterpret_u16_u8(r0[5].val[0]), vreinterpret_u16_u8(r0[7].val[0]));
-    r1[7] = vzip_u16(vreinterpret_u16_u8(r0[5].val[1]), vreinterpret_u16_u8(r0[7].val[1]));
-    /* Interleave 32 bytes */
-    r2[0] = vzip_u32(vreinterpret_u32_u16(r1[0].val[0]), vreinterpret_u32_u16(r1[4].val[0]));
-    r2[1] = vzip_u32(vreinterpret_u32_u16(r1[0].val[1]), vreinterpret_u32_u16(r1[4].val[1]));
-    r2[2] = vzip_u32(vreinterpret_u32_u16(r1[1].val[0]), vreinterpret_u32_u16(r1[5].val[0]));
-    r2[3] = vzip_u32(vreinterpret_u32_u16(r1[1].val[1]), vreinterpret_u32_u16(r1[5].val[1]));
-    r2[4] = vzip_u32(vreinterpret_u32_u16(r1[2].val[0]), vreinterpret_u32_u16(r1[6].val[0]));
-    r2[5] = vzip_u32(vreinterpret_u32_u16(r1[2].val[1]), vreinterpret_u32_u16(r1[6].val[1]));
-    r2[6] = vzip_u32(vreinterpret_u32_u16(r1[3].val[0]), vreinterpret_u32_u16(r1[7].val[0]));
-    r2[7] = vzip_u32(vreinterpret_u32_u16(r1[3].val[1]), vreinterpret_u32_u16(r1[7].val[1]));
-    for (j = 0; j < 8; j++) {
-      /* Create mask from the most significant bit of each 8-bit element */
-      r0[0].val[0] = vand_u8(vreinterpret_u8_u32(r2[0].val[0]), mask_and);
-      r0[0].val[0] = vshl_u8(r0[0].val[0], mask_shift);
-      r0[0].val[1] = vand_u8(vreinterpret_u8_u32(r2[0].val[1]), mask_and);
-      r0[0].val[1] = vshl_u8(r0[0].val[1], mask_shift);
-      r0[1].val[0] = vand_u8(vreinterpret_u8_u32(r2[1].val[0]), mask_and);
-      r0[1].val[0] = vshl_u8(r0[1].val[0], mask_shift);
-      r0[1].val[1] = vand_u8(vreinterpret_u8_u32(r2[1].val[1]), mask_and);
-      r0[1].val[1] = vshl_u8(r0[1].val[1], mask_shift);
-      r0[2].val[0] = vand_u8(vreinterpret_u8_u32(r2[2].val[0]), mask_and);
-      r0[2].val[0] = vshl_u8(r0[2].val[0], mask_shift);
-      r0[2].val[1] = vand_u8(vreinterpret_u8_u32(r2[2].val[1]), mask_and);
-      r0[2].val[1] = vshl_u8(r0[2].val[1], mask_shift);
-      r0[3].val[0] = vand_u8(vreinterpret_u8_u32(r2[3].val[0]), mask_and);
-      r0[3].val[0] = vshl_u8(r0[3].val[0], mask_shift);
-      r0[3].val[1] = vand_u8(vreinterpret_u8_u32(r2[3].val[1]), mask_and);
-      r0[3].val[1] = vshl_u8(r0[3].val[1], mask_shift);
-      r0[4].val[0] = vand_u8(vreinterpret_u8_u32(r2[4].val[0]), mask_and);
-      r0[4].val[0] = vshl_u8(r0[4].val[0], mask_shift);
-      r0[4].val[1] = vand_u8(vreinterpret_u8_u32(r2[4].val[1]), mask_and);
-      r0[4].val[1] = vshl_u8(r0[4].val[1], mask_shift);
-      r0[5].val[0] = vand_u8(vreinterpret_u8_u32(r2[5].val[0]), mask_and);
-      r0[5].val[0] = vshl_u8(r0[5].val[0], mask_shift);
-      r0[5].val[1] = vand_u8(vreinterpret_u8_u32(r2[5].val[1]), mask_and);
-      r0[5].val[1] = vshl_u8(r0[5].val[1], mask_shift);
-      r0[6].val[0] = vand_u8(vreinterpret_u8_u32(r2[6].val[0]), mask_and);
-      r0[6].val[0] = vshl_u8(r0[6].val[0], mask_shift);
-      r0[6].val[1] = vand_u8(vreinterpret_u8_u32(r2[6].val[1]), mask_and);
-      r0[6].val[1] = vshl_u8(r0[6].val[1], mask_shift);
-      r0[7].val[0] = vand_u8(vreinterpret_u8_u32(r2[7].val[0]), mask_and);
-      r0[7].val[0] = vshl_u8(r0[7].val[0], mask_shift);
-      r0[7].val[1] = vand_u8(vreinterpret_u8_u32(r2[7].val[1]), mask_and);
-      r0[7].val[1] = vshl_u8(r0[7].val[1], mask_shift);
-
-      r0[0].val[0] = vpadd_u8(r0[0].val[0], r0[0].val[0]);
-      r0[0].val[0] = vpadd_u8(r0[0].val[0], r0[0].val[0]);
-      r0[0].val[0] = vpadd_u8(r0[0].val[0], r0[0].val[0]);
-      r0[0].val[1] = vpadd_u8(r0[0].val[1], r0[0].val[1]);
-      r0[0].val[1] = vpadd_u8(r0[0].val[1], r0[0].val[1]);
-      r0[0].val[1] = vpadd_u8(r0[0].val[1], r0[0].val[1]);
-      r0[1].val[0] = vpadd_u8(r0[1].val[0], r0[1].val[0]);
-      r0[1].val[0] = vpadd_u8(r0[1].val[0], r0[1].val[0]);
-      r0[1].val[0] = vpadd_u8(r0[1].val[0], r0[1].val[0]);
-      r0[1].val[1] = vpadd_u8(r0[1].val[1], r0[1].val[1]);
-      r0[1].val[1] = vpadd_u8(r0[1].val[1], r0[1].val[1]);
-      r0[1].val[1] = vpadd_u8(r0[1].val[1], r0[1].val[1]);
-      r0[2].val[0] = vpadd_u8(r0[2].val[0], r0[2].val[0]);
-      r0[2].val[0] = vpadd_u8(r0[2].val[0], r0[2].val[0]);
-      r0[2].val[0] = vpadd_u8(r0[2].val[0], r0[2].val[0]);
-      r0[2].val[1] = vpadd_u8(r0[2].val[1], r0[2].val[1]);
-      r0[2].val[1] = vpadd_u8(r0[2].val[1], r0[2].val[1]);
-      r0[2].val[1] = vpadd_u8(r0[2].val[1], r0[2].val[1]);
-      r0[3].val[0] = vpadd_u8(r0[3].val[0], r0[3].val[0]);
-      r0[3].val[0] = vpadd_u8(r0[3].val[0], r0[3].val[0]);
-      r0[3].val[0] = vpadd_u8(r0[3].val[0], r0[3].val[0]);
-      r0[3].val[1] = vpadd_u8(r0[3].val[1], r0[3].val[1]);
-      r0[3].val[1] = vpadd_u8(r0[3].val[1], r0[3].val[1]);
-      r0[3].val[1] = vpadd_u8(r0[3].val[1], r0[3].val[1]);
-      r0[4].val[0] = vpadd_u8(r0[4].val[0], r0[4].val[0]);
-      r0[4].val[0] = vpadd_u8(r0[4].val[0], r0[4].val[0]);
-      r0[4].val[0] = vpadd_u8(r0[4].val[0], r0[4].val[0]);
-      r0[4].val[1] = vpadd_u8(r0[4].val[1], r0[4].val[1]);
-      r0[4].val[1] = vpadd_u8(r0[4].val[1], r0[4].val[1]);
-      r0[4].val[1] = vpadd_u8(r0[4].val[1], r0[4].val[1]);
-      r0[5].val[0] = vpadd_u8(r0[5].val[0], r0[5].val[0]);
-      r0[5].val[0] = vpadd_u8(r0[5].val[0], r0[5].val[0]);
-      r0[5].val[0] = vpadd_u8(r0[5].val[0], r0[5].val[0]);
-      r0[5].val[1] = vpadd_u8(r0[5].val[1], r0[5].val[1]);
-      r0[5].val[1] = vpadd_u8(r0[5].val[1], r0[5].val[1]);
-      r0[5].val[1] = vpadd_u8(r0[5].val[1], r0[5].val[1]);
-      r0[6].val[0] = vpadd_u8(r0[6].val[0], r0[6].val[0]);
-      r0[6].val[0] = vpadd_u8(r0[6].val[0], r0[6].val[0]);
-      r0[6].val[0] = vpadd_u8(r0[6].val[0], r0[6].val[0]);
-      r0[6].val[1] = vpadd_u8(r0[6].val[1], r0[6].val[1]);
-      r0[6].val[1] = vpadd_u8(r0[6].val[1], r0[6].val[1]);
-      r0[6].val[1] = vpadd_u8(r0[6].val[1], r0[6].val[1]);
-      r0[7].val[0] = vpadd_u8(r0[7].val[0], r0[7].val[0]);
-      r0[7].val[0] = vpadd_u8(r0[7].val[0], r0[7].val[0]);
-      r0[7].val[0] = vpadd_u8(r0[7].val[0], r0[7].val[0]);
-      r0[7].val[1] = vpadd_u8(r0[7].val[1], r0[7].val[1]);
-      r0[7].val[1] = vpadd_u8(r0[7].val[1], r0[7].val[1]);
-      r0[7].val[1] = vpadd_u8(r0[7].val[1], r0[7].val[1]);
-      /* Shift packed 8-bit */
-      r2[0].val[0] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[0].val[0]), 1));
-      r2[0].val[1] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[0].val[1]), 1));
-      r2[1].val[0] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[1].val[0]), 1));
-      r2[1].val[1] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[1].val[1]), 1));
-      r2[2].val[0] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[2].val[0]), 1));
-      r2[2].val[1] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[2].val[1]), 1));
-      r2[3].val[0] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[3].val[0]), 1));
-      r2[3].val[1] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[3].val[1]), 1));
-      r2[4].val[0] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[4].val[0]), 1));
-      r2[4].val[1] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[4].val[1]), 1));
-      r2[5].val[0] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[5].val[0]), 1));
-      r2[5].val[1] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[5].val[1]), 1));
-      r2[6].val[0] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[6].val[0]), 1));
-      r2[6].val[1] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[6].val[1]), 1));
-      r2[7].val[0] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[7].val[0]), 1));
-      r2[7].val[1] = vreinterpret_u8_u32(vshr_n_u8(vreinterpret_u8_u32(r2[7].val[1]), 1));
-      /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 0 * size * elem_size / 16, r0[0].val[0], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 1 * size * elem_size / 16, r0[0].val[1], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 2 * size * elem_size / 16, r0[1].val[0], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 3 * size * elem_size / 16, r0[1].val[1], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 4 * size * elem_size / 16, r0[2].val[0], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 5 * size * elem_size / 16, r0[2].val[1], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 6 * size * elem_size / 16, r0[3].val[0], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 7 * size * elem_size / 16, r0[3].val[1], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 8 * size * elem_size / 16, r0[4].val[0], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 9 * size * elem_size / 16, r0[4].val[1], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 10 * size * elem_size / 16, r0[5].val[0], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 11 * size * elem_size / 16, r0[5].val[1], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 12 * size * elem_size / 16, r0[6].val[0], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 13 * size * elem_size / 16, r0[6].val[1], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 14 * size * elem_size / 16, r0[7].val[0], 0);
-      vst1_lane_u8(dest + k + j * size * elem_size / (8 * elem_size) + 15 * size * elem_size / 16, r0[7].val[1], 0);
+    // Trivial cases: power of 2 bytes.
+    switch (elem_size) {
+        case 1:
+            count = bshuf_copy(in, out, size, elem_size);
+            return count;
+        case 2:
+            count = bshuf_trans_byte_elem_NEON_16(in, out, size);
+            return count;
+        case 4:
+            count = bshuf_trans_byte_elem_NEON_32(in, out, size);
+            return count;
+        case 8:
+            count = bshuf_trans_byte_elem_NEON_64(in, out, size);
+            return count;
     }
-  }
+
+    // Worst case: odd number of bytes. Turns out that this is faster for
+    // (odd * 2) byte elements as well (hence % 4).
+    if (elem_size % 4) {
+        count = bshuf_trans_byte_elem_scal(in, out, size, elem_size);
+        return count;
+    }
+
+    // Multiple of power of 2: transpose hierarchically.
+    {
+        size_t nchunk_elem;
+        void* tmp_buf = malloc(size * elem_size);
+        if (tmp_buf == NULL) return -1;
+
+        if ((elem_size % 8) == 0) {
+            nchunk_elem = elem_size / 8;
+            TRANS_ELEM_TYPE(in, out, size, nchunk_elem, int64_t);
+            count = bshuf_trans_byte_elem_NEON_64(out, tmp_buf,
+                    size * nchunk_elem);
+            bshuf_trans_elem(tmp_buf, out, 8, nchunk_elem, size);
+        } else if ((elem_size % 4) == 0) {
+            nchunk_elem = elem_size / 4;
+            TRANS_ELEM_TYPE(in, out, size, nchunk_elem, int32_t);
+            count = bshuf_trans_byte_elem_NEON_32(out, tmp_buf,
+                    size * nchunk_elem);
+            bshuf_trans_elem(tmp_buf, out, 4, nchunk_elem, size);
+        } else {
+            // Not used since scalar algorithm is faster.
+            nchunk_elem = elem_size / 2;
+            TRANS_ELEM_TYPE(in, out, size, nchunk_elem, int16_t);
+            count = bshuf_trans_byte_elem_NEON_16(out, tmp_buf,
+                    size * nchunk_elem);
+            bshuf_trans_elem(tmp_buf, out, 2, nchunk_elem, size);
+        }
+
+        free(tmp_buf);
+        return count;
+    }
 }
 
-/* Routine optimized for bit-unshuffling a buffer for a type size of 1 byte. */
-static void
-bitunshuffle1_neon(void* _src, void* dest, const size_t size, const size_t elem_size) {
 
-  uint8x8_t lo_x, hi_x, lo, hi;
-  size_t i, j, k;
-  uint8_t* src = _src;
+/* Creates a mask made up of the most significant
+ * bit of each byte of 'input'
+ */
+int32_t move_byte_mask_neon(uint8x16_t input) {
 
-  const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-  uint8x8_t mask_and = vdup_n_u8(0x01);
-  int8x8_t mask_shift = vld1_s8(xr);
-
-  for (i = 0, k = 0; i < size * elem_size; i += 16, k++) {
-    for (j = 0; j < 8; j++) {
-      /* Load lanes */
-      lo_x[j] = src[2 * k + 0 + j * size * elem_size / (8 * elem_size)];
-      hi_x[j] = src[2 * k + 1 + j * size * elem_size / (8 * elem_size)];
-    }
-    for (j = 0; j < 8; j++) {
-      /* Create mask from the most significant bit of each 8-bit element */
-      lo = vand_u8(lo_x, mask_and);
-      lo = vshl_u8(lo, mask_shift);
-      hi = vand_u8(hi_x, mask_and);
-      hi = vshl_u8(hi, mask_shift);
-      lo = vpadd_u8(lo, lo);
-      lo = vpadd_u8(lo, lo);
-      lo = vpadd_u8(lo, lo);
-      hi = vpadd_u8(hi, hi);
-      hi = vpadd_u8(hi, hi);
-      hi = vpadd_u8(hi, hi);
-      /* Shift packed 8-bit */
-      lo_x = vshr_n_u8(lo_x, 1);
-      hi_x = vshr_n_u8(hi_x, 1);
-      /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + j + i, lo, 0);
-      vst1_lane_u8(dest + j + i + 8, hi, 0);
-    }
-  }
+    return (  ((input[0] & 0x80) >> 7)          | (((input[1] & 0x80) >> 7) << 1)   | (((input[2] & 0x80) >> 7) << 2)   | (((input[3] & 0x80) >> 7) << 3)
+            | (((input[4] & 0x80) >> 7) << 4)   | (((input[5] & 0x80) >> 7) << 5)   | (((input[6] & 0x80) >> 7) << 6)   | (((input[7] & 0x80) >> 7) << 7)
+            | (((input[8] & 0x80) >> 7) << 8)   | (((input[9] & 0x80) >> 7) << 9)   | (((input[10] & 0x80) >> 7) << 10) | (((input[11] & 0x80) >> 7) << 11)
+            | (((input[12] & 0x80) >> 7) << 12) | (((input[13] & 0x80) >> 7) << 13) | (((input[14] & 0x80) >> 7) << 14) | (((input[15] & 0x80) >> 7) << 15)
+           );
 }
 
-/* Routine optimized for bit-unshuffling a buffer for a type size of 2 byte. */
-static void
-bitunshuffle2_neon(void* _src, void* dest, const size_t size, const size_t elem_size) {
+/* Transpose bits within bytes. */
+int64_t bshuf_trans_bit_byte_NEON(const void* in, void* out, const size_t size,
+         const size_t elem_size) {
 
-  size_t i, j, k;
-  uint8x8_t lo_x[2], hi_x[2], lo[2], hi[2];
-  uint8_t* src = _src;
+    size_t ii, kk;
+    const char* in_b = (const char*) in;
+    char* out_b = (char*) out;
+    uint16_t* out_ui16;
 
-  const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-  uint8x8_t mask_and = vdup_n_u8(0x01);
-  int8x8_t mask_shift = vld1_s8(xr);
+    int64_t count;
 
-  for (i = 0, k = 0; i < size * elem_size; i += 32, k++) {
-    for (j = 0; j < 8; j++) {
-      /* Load lanes */
-      lo_x[0][j] = src[2 * k + j * size * elem_size / (8 * elem_size)];
-      lo_x[1][j] = src[2 * k + j * size * elem_size / (8 * elem_size) + size * elem_size / 2];
-      hi_x[0][j] = src[2 * k + 1 + j * size * elem_size / (8 * elem_size)];
-      hi_x[1][j] = src[2 * k + 1 + j * size * elem_size / (8 * elem_size) + size * elem_size / 2];
+    size_t nbyte = elem_size * size;
+
+    CHECK_MULT_EIGHT(nbyte);
+
+    int16x8_t xmm;
+    int32_t bt;
+
+    for (ii = 0; ii + 15 < nbyte; ii += 16) {
+        xmm = vld1q_s16((int16_t *) (in_b + ii));
+        for (kk = 0; kk < 8; kk++) {
+            bt = move_byte_mask_neon((uint8x16_t) xmm);
+            xmm = vshlq_n_s16(xmm, 1);
+            out_ui16 = (uint16_t*) &out_b[((7 - kk) * nbyte + ii) / 8];
+            *out_ui16 = bt;
+        }
     }
-    for (j = 0; j < 8; j++) {
-      /* Create mask from the most significant bit of each 8-bit element */
-      lo[0] = vand_u8(lo_x[0], mask_and);
-      lo[0] = vshl_u8(lo[0], mask_shift);
-      lo[1] = vand_u8(lo_x[1], mask_and);
-      lo[1] = vshl_u8(lo[1], mask_shift);
-
-      hi[0] = vand_u8(hi_x[0], mask_and);
-      hi[0] = vshl_u8(hi[0], mask_shift);
-      hi[1] = vand_u8(hi_x[1], mask_and);
-      hi[1] = vshl_u8(hi[1], mask_shift);
-
-      lo[0] = vpadd_u8(lo[0], lo[0]);
-      lo[0] = vpadd_u8(lo[0], lo[0]);
-      lo[0] = vpadd_u8(lo[0], lo[0]);
-      lo[1] = vpadd_u8(lo[1], lo[1]);
-      lo[1] = vpadd_u8(lo[1], lo[1]);
-      lo[1] = vpadd_u8(lo[1], lo[1]);
-
-      hi[0] = vpadd_u8(hi[0], hi[0]);
-      hi[0] = vpadd_u8(hi[0], hi[0]);
-      hi[0] = vpadd_u8(hi[0], hi[0]);
-      hi[1] = vpadd_u8(hi[1], hi[1]);
-      hi[1] = vpadd_u8(hi[1], hi[1]);
-      hi[1] = vpadd_u8(hi[1], hi[1]);
-      /* Shift packed 8-bit */
-      lo_x[0] = vshr_n_u8(lo_x[0], 1);
-      hi_x[0] = vshr_n_u8(hi_x[0], 1);
-      lo_x[1] = vshr_n_u8(lo_x[1], 1);
-      hi_x[1] = vshr_n_u8(hi_x[1], 1);
-      /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + 2 * j + i, lo[0], 0);
-      vst1_lane_u8(dest + 2 * j + 1 + i, lo[1], 0);
-      vst1_lane_u8(dest + 2 * j + i + 16, hi[0], 0);
-      vst1_lane_u8(dest + 2 * j + 1 + i + 16, hi[1], 0);
-    }
-  }
-}
-
-/* Routine optimized for bit-unshuffling a buffer for a type size of 4 byte. */
-static void
-bitunshuffle4_neon(void* _src, void* dest, const size_t size, const size_t elem_size) {
-  size_t i, j, k;
-  uint8x8_t lo_x[4], hi_x[4], lo[4], hi[4];
-  uint8_t* src = _src;
-
-  const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-  uint8x8_t mask_and = vdup_n_u8(0x01);
-  int8x8_t mask_shift = vld1_s8(xr);
-
-  for (i = 0, k = 0; i < size * elem_size; i += 64, k++) {
-    for (j = 0; j < 8; j++) {
-      /* Load lanes */
-      lo_x[0][j] = src[2 * k + j * size * elem_size / (8 * elem_size) + 0 * size * elem_size / 4];
-      hi_x[0][j] = src[2 * k + 1 + j * size * elem_size / (8 * elem_size) + 0 * size * elem_size / 4];
-      lo_x[1][j] = src[2 * k + j * size * elem_size / (8 * elem_size) + 1 * size * elem_size / 4];
-      hi_x[1][j] = src[2 * k + 1 + j * size * elem_size / (8 * elem_size) + 1 * size * elem_size / 4];
-      lo_x[2][j] = src[2 * k + j * size * elem_size / (8 * elem_size) + 2 * size * elem_size / 4];
-      hi_x[2][j] = src[2 * k + 1 + j * size * elem_size / (8 * elem_size) + 2 * size * elem_size / 4];
-      lo_x[3][j] = src[2 * k + j * size * elem_size / (8 * elem_size) + 3 * size * elem_size / 4];
-      hi_x[3][j] = src[2 * k + 1 + j * size * elem_size / (8 * elem_size) + 3 * size * elem_size / 4];
-    }
-
-    for (j = 0; j < 8; j++) {
-      /* Create mask from the most significant bit of each 8-bit element */
-      lo[0] = vand_u8(lo_x[0], mask_and);
-      lo[0] = vshl_u8(lo[0], mask_shift);
-      lo[1] = vand_u8(lo_x[1], mask_and);
-      lo[1] = vshl_u8(lo[1], mask_shift);
-      lo[2] = vand_u8(lo_x[2], mask_and);
-      lo[2] = vshl_u8(lo[2], mask_shift);
-      lo[3] = vand_u8(lo_x[3], mask_and);
-      lo[3] = vshl_u8(lo[3], mask_shift);
-
-      hi[0] = vand_u8(hi_x[0], mask_and);
-      hi[0] = vshl_u8(hi[0], mask_shift);
-      hi[1] = vand_u8(hi_x[1], mask_and);
-      hi[1] = vshl_u8(hi[1], mask_shift);
-      hi[2] = vand_u8(hi_x[2], mask_and);
-      hi[2] = vshl_u8(hi[2], mask_shift);
-      hi[3] = vand_u8(hi_x[3], mask_and);
-      hi[3] = vshl_u8(hi[3], mask_shift);
-
-      lo[0] = vpadd_u8(lo[0], lo[0]);
-      lo[0] = vpadd_u8(lo[0], lo[0]);
-      lo[0] = vpadd_u8(lo[0], lo[0]);
-      lo[1] = vpadd_u8(lo[1], lo[1]);
-      lo[1] = vpadd_u8(lo[1], lo[1]);
-      lo[1] = vpadd_u8(lo[1], lo[1]);
-      lo[2] = vpadd_u8(lo[2], lo[2]);
-      lo[2] = vpadd_u8(lo[2], lo[2]);
-      lo[2] = vpadd_u8(lo[2], lo[2]);
-      lo[3] = vpadd_u8(lo[3], lo[3]);
-      lo[3] = vpadd_u8(lo[3], lo[3]);
-      lo[3] = vpadd_u8(lo[3], lo[3]);
-
-      hi[0] = vpadd_u8(hi[0], hi[0]);
-      hi[0] = vpadd_u8(hi[0], hi[0]);
-      hi[0] = vpadd_u8(hi[0], hi[0]);
-      hi[1] = vpadd_u8(hi[1], hi[1]);
-      hi[1] = vpadd_u8(hi[1], hi[1]);
-      hi[1] = vpadd_u8(hi[1], hi[1]);
-      hi[2] = vpadd_u8(hi[2], hi[2]);
-      hi[2] = vpadd_u8(hi[2], hi[2]);
-      hi[2] = vpadd_u8(hi[2], hi[2]);
-      hi[3] = vpadd_u8(hi[3], hi[3]);
-      hi[3] = vpadd_u8(hi[3], hi[3]);
-      hi[3] = vpadd_u8(hi[3], hi[3]);
-      /* Shift packed 8-bit */
-      lo_x[0] = vshr_n_u8(lo_x[0], 1);
-      hi_x[0] = vshr_n_u8(hi_x[0], 1);
-      lo_x[1] = vshr_n_u8(lo_x[1], 1);
-      hi_x[1] = vshr_n_u8(hi_x[1], 1);
-      lo_x[2] = vshr_n_u8(lo_x[2], 1);
-      hi_x[2] = vshr_n_u8(hi_x[2], 1);
-      lo_x[3] = vshr_n_u8(lo_x[3], 1);
-      hi_x[3] = vshr_n_u8(hi_x[3], 1);
-      /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + 4 * j + i, lo[0], 0);
-      vst1_lane_u8(dest + 4 * j + 1 + i, lo[1], 0);
-      vst1_lane_u8(dest + 4 * j + 2 + i, lo[2], 0);
-      vst1_lane_u8(dest + 4 * j + 3 + i, lo[3], 0);
-      vst1_lane_u8(dest + 4 * j + i + 32, hi[0], 0);
-      vst1_lane_u8(dest + 4 * j + 1 + i + 32, hi[1], 0);
-      vst1_lane_u8(dest + 4 * j + 2 + i + 32, hi[2], 0);
-      vst1_lane_u8(dest + 4 * j + 3 + i + 32, hi[3], 0);
-    }
-  }
-}
-
-/* Routine optimized for bit-unshuffling a buffer for a type size of 8 byte. */
-static void
-bitunshuffle8_neon(void* _src, void* dest, const size_t size, const size_t elem_size) {
-
-  size_t i, j, k;
-  uint8x8x2_t r0[4], r1[4];
-  uint8_t* src = _src;
-
-  const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-  uint8x8_t mask_and = vdup_n_u8(0x01);
-  int8x8_t mask_shift = vld1_s8(xr);
-
-  for (i = 0, k = 0; i < size * elem_size; i += 64, k++) {
-    for (j = 0; j < 8; j++) {
-      /* Load lanes */
-      r0[0].val[0][j] = src[k + j * size * elem_size / (8 * elem_size) + 0 * size * elem_size / 8];
-      r0[0].val[1][j] = src[k + j * size * elem_size / (8 * elem_size) + 1 * size * elem_size / 8];
-      r0[1].val[0][j] = src[k + j * size * elem_size / (8 * elem_size) + 2 * size * elem_size / 8];
-      r0[1].val[1][j] = src[k + j * size * elem_size / (8 * elem_size) + 3 * size * elem_size / 8];
-      r0[2].val[0][j] = src[k + j * size * elem_size / (8 * elem_size) + 4 * size * elem_size / 8];
-      r0[2].val[1][j] = src[k + j * size * elem_size / (8 * elem_size) + 5 * size * elem_size / 8];
-      r0[3].val[0][j] = src[k + j * size * elem_size / (8 * elem_size) + 6 * size * elem_size / 8];
-      r0[3].val[1][j] = src[k + j * size * elem_size / (8 * elem_size) + 7 * size * elem_size / 8];
-    }
-    for (j = 0; j < 8; j++) {
-      /* Create mask from the most significant bit of each 8-bit element */
-      r1[0].val[0] = vand_u8(r0[0].val[0], mask_and);
-      r1[0].val[0] = vshl_u8(r1[0].val[0], mask_shift);
-      r1[0].val[1] = vand_u8(r0[0].val[1], mask_and);
-      r1[0].val[1] = vshl_u8(r1[0].val[1], mask_shift);
-      r1[1].val[0] = vand_u8(r0[1].val[0], mask_and);
-      r1[1].val[0] = vshl_u8(r1[1].val[0], mask_shift);
-      r1[1].val[1] = vand_u8(r0[1].val[1], mask_and);
-      r1[1].val[1] = vshl_u8(r1[1].val[1], mask_shift);
-      r1[2].val[0] = vand_u8(r0[2].val[0], mask_and);
-      r1[2].val[0] = vshl_u8(r1[2].val[0], mask_shift);
-      r1[2].val[1] = vand_u8(r0[2].val[1], mask_and);
-      r1[2].val[1] = vshl_u8(r1[2].val[1], mask_shift);
-      r1[3].val[0] = vand_u8(r0[3].val[0], mask_and);
-      r1[3].val[0] = vshl_u8(r1[3].val[0], mask_shift);
-      r1[3].val[1] = vand_u8(r0[3].val[1], mask_and);
-      r1[3].val[1] = vshl_u8(r1[3].val[1], mask_shift);
-
-      r1[0].val[0] = vpadd_u8(r1[0].val[0], r1[0].val[0]);
-      r1[0].val[0] = vpadd_u8(r1[0].val[0], r1[0].val[0]);
-      r1[0].val[0] = vpadd_u8(r1[0].val[0], r1[0].val[0]);
-      r1[0].val[1] = vpadd_u8(r1[0].val[1], r1[0].val[1]);
-      r1[0].val[1] = vpadd_u8(r1[0].val[1], r1[0].val[1]);
-      r1[0].val[1] = vpadd_u8(r1[0].val[1], r1[0].val[1]);
-      r1[1].val[0] = vpadd_u8(r1[1].val[0], r1[1].val[0]);
-      r1[1].val[0] = vpadd_u8(r1[1].val[0], r1[1].val[0]);
-      r1[1].val[0] = vpadd_u8(r1[1].val[0], r1[1].val[0]);
-      r1[1].val[1] = vpadd_u8(r1[1].val[1], r1[1].val[1]);
-      r1[1].val[1] = vpadd_u8(r1[1].val[1], r1[1].val[1]);
-      r1[1].val[1] = vpadd_u8(r1[1].val[1], r1[1].val[1]);
-      r1[2].val[0] = vpadd_u8(r1[2].val[0], r1[2].val[0]);
-      r1[2].val[0] = vpadd_u8(r1[2].val[0], r1[2].val[0]);
-      r1[2].val[0] = vpadd_u8(r1[2].val[0], r1[2].val[0]);
-      r1[2].val[1] = vpadd_u8(r1[2].val[1], r1[2].val[1]);
-      r1[2].val[1] = vpadd_u8(r1[2].val[1], r1[2].val[1]);
-      r1[2].val[1] = vpadd_u8(r1[2].val[1], r1[2].val[1]);
-      r1[3].val[0] = vpadd_u8(r1[3].val[0], r1[3].val[0]);
-      r1[3].val[0] = vpadd_u8(r1[3].val[0], r1[3].val[0]);
-      r1[3].val[0] = vpadd_u8(r1[3].val[0], r1[3].val[0]);
-      r1[3].val[1] = vpadd_u8(r1[3].val[1], r1[3].val[1]);
-      r1[3].val[1] = vpadd_u8(r1[3].val[1], r1[3].val[1]);
-      r1[3].val[1] = vpadd_u8(r1[3].val[1], r1[3].val[1]);
-      /* Shift packed 8-bit */
-      r0[0].val[0] = vshr_n_u8(r0[0].val[0], 1);
-      r0[0].val[1] = vshr_n_u8(r0[0].val[1], 1);
-      r0[1].val[0] = vshr_n_u8(r0[1].val[0], 1);
-      r0[1].val[1] = vshr_n_u8(r0[1].val[1], 1);
-      r0[2].val[0] = vshr_n_u8(r0[2].val[0], 1);
-      r0[2].val[1] = vshr_n_u8(r0[2].val[1], 1);
-      r0[3].val[0] = vshr_n_u8(r0[3].val[0], 1);
-      r0[3].val[1] = vshr_n_u8(r0[3].val[1], 1);
-      /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + 8 * j + 0 + i, r1[0].val[0], 0);
-      vst1_lane_u8(dest + 8 * j + 1 + i, r1[0].val[1], 0);
-      vst1_lane_u8(dest + 8 * j + 2 + i, r1[1].val[0], 0);
-      vst1_lane_u8(dest + 8 * j + 3 + i, r1[1].val[1], 0);
-      vst1_lane_u8(dest + 8 * j + 4 + i, r1[2].val[0], 0);
-      vst1_lane_u8(dest + 8 * j + 5 + i, r1[2].val[1], 0);
-      vst1_lane_u8(dest + 8 * j + 6 + i, r1[3].val[0], 0);
-      vst1_lane_u8(dest + 8 * j + 7 + i, r1[3].val[1], 0);
-    }
-  }
-}
-
-/* Routine optimized for bit-unshuffling a buffer for a type size of 16 byte. */
-static void
-bitunshuffle16_neon(void* _src, void* dest, const size_t size, const size_t elem_size) {
-
-  size_t i, j, k;
-  uint8x8x2_t r0[8], r1[8];
-  uint8_t* src = _src;
-
-  const int8_t __attribute__ ((aligned (16))) xr[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-  uint8x8_t mask_and = vdup_n_u8(0x01);
-  int8x8_t mask_shift = vld1_s8(xr);
-
-  for (i = 0, k = 0; i < size * elem_size; i += 128, k++) {
-    for (j = 0; j < 8; j++) {
-      /* Load lanes */
-      r0[0].val[0][j] = src[k + j * size * elem_size / (8 * elem_size) + 0 * size * elem_size / 16];
-      r0[0].val[1][j] = src[k + j * size * elem_size / (8 * elem_size) + 1 * size * elem_size / 16];
-      r0[1].val[0][j] = src[k + j * size * elem_size / (8 * elem_size) + 2 * size * elem_size / 16];
-      r0[1].val[1][j] = src[k + j * size * elem_size / (8 * elem_size) + 3 * size * elem_size / 16];
-      r0[2].val[0][j] = src[k + j * size * elem_size / (8 * elem_size) + 4 * size * elem_size / 16];
-      r0[2].val[1][j] = src[k + j * size * elem_size / (8 * elem_size) + 5 * size * elem_size / 16];
-      r0[3].val[0][j] = src[k + j * size * elem_size / (8 * elem_size) + 6 * size * elem_size / 16];
-      r0[3].val[1][j] = src[k + j * size * elem_size / (8 * elem_size) + 7 * size * elem_size / 16];
-      r0[4].val[0][j] = src[k + j * size * elem_size / (8 * elem_size) + 8 * size * elem_size / 16];
-      r0[4].val[1][j] = src[k + j * size * elem_size / (8 * elem_size) + 9 * size * elem_size / 16];
-      r0[5].val[0][j] = src[k + j * size * elem_size / (8 * elem_size) + 10 * size * elem_size / 16];
-      r0[5].val[1][j] = src[k + j * size * elem_size / (8 * elem_size) + 11 * size * elem_size / 16];
-      r0[6].val[0][j] = src[k + j * size * elem_size / (8 * elem_size) + 12 * size * elem_size / 16];
-      r0[6].val[1][j] = src[k + j * size * elem_size / (8 * elem_size) + 13 * size * elem_size / 16];
-      r0[7].val[0][j] = src[k + j * size * elem_size / (8 * elem_size) + 14 * size * elem_size / 16];
-      r0[7].val[1][j] = src[k + j * size * elem_size / (8 * elem_size) + 15 * size * elem_size / 16];
-    }
-    for (j = 0; j < 8; j++) {
-      /* Create mask from the most significant bit of each 8-bit element */
-      r1[0].val[0] = vand_u8(r0[0].val[0], mask_and);
-      r1[0].val[0] = vshl_u8(r1[0].val[0], mask_shift);
-      r1[0].val[1] = vand_u8(r0[0].val[1], mask_and);
-      r1[0].val[1] = vshl_u8(r1[0].val[1], mask_shift);
-      r1[1].val[0] = vand_u8(r0[1].val[0], mask_and);
-      r1[1].val[0] = vshl_u8(r1[1].val[0], mask_shift);
-      r1[1].val[1] = vand_u8(r0[1].val[1], mask_and);
-      r1[1].val[1] = vshl_u8(r1[1].val[1], mask_shift);
-      r1[2].val[0] = vand_u8(r0[2].val[0], mask_and);
-      r1[2].val[0] = vshl_u8(r1[2].val[0], mask_shift);
-      r1[2].val[1] = vand_u8(r0[2].val[1], mask_and);
-      r1[2].val[1] = vshl_u8(r1[2].val[1], mask_shift);
-      r1[3].val[0] = vand_u8(r0[3].val[0], mask_and);
-      r1[3].val[0] = vshl_u8(r1[3].val[0], mask_shift);
-      r1[3].val[1] = vand_u8(r0[3].val[1], mask_and);
-      r1[3].val[1] = vshl_u8(r1[3].val[1], mask_shift);
-      r1[4].val[0] = vand_u8(r0[4].val[0], mask_and);
-      r1[4].val[0] = vshl_u8(r1[4].val[0], mask_shift);
-      r1[4].val[1] = vand_u8(r0[4].val[1], mask_and);
-      r1[4].val[1] = vshl_u8(r1[4].val[1], mask_shift);
-      r1[5].val[0] = vand_u8(r0[5].val[0], mask_and);
-      r1[5].val[0] = vshl_u8(r1[5].val[0], mask_shift);
-      r1[5].val[1] = vand_u8(r0[5].val[1], mask_and);
-      r1[5].val[1] = vshl_u8(r1[5].val[1], mask_shift);
-      r1[6].val[0] = vand_u8(r0[6].val[0], mask_and);
-      r1[6].val[0] = vshl_u8(r1[6].val[0], mask_shift);
-      r1[6].val[1] = vand_u8(r0[6].val[1], mask_and);
-      r1[6].val[1] = vshl_u8(r1[6].val[1], mask_shift);
-      r1[7].val[0] = vand_u8(r0[7].val[0], mask_and);
-      r1[7].val[0] = vshl_u8(r1[7].val[0], mask_shift);
-      r1[7].val[1] = vand_u8(r0[7].val[1], mask_and);
-      r1[7].val[1] = vshl_u8(r1[7].val[1], mask_shift);
-
-      r1[0].val[0] = vpadd_u8(r1[0].val[0], r1[0].val[0]);
-      r1[0].val[0] = vpadd_u8(r1[0].val[0], r1[0].val[0]);
-      r1[0].val[0] = vpadd_u8(r1[0].val[0], r1[0].val[0]);
-      r1[0].val[1] = vpadd_u8(r1[0].val[1], r1[0].val[1]);
-      r1[0].val[1] = vpadd_u8(r1[0].val[1], r1[0].val[1]);
-      r1[0].val[1] = vpadd_u8(r1[0].val[1], r1[0].val[1]);
-      r1[1].val[0] = vpadd_u8(r1[1].val[0], r1[1].val[0]);
-      r1[1].val[0] = vpadd_u8(r1[1].val[0], r1[1].val[0]);
-      r1[1].val[0] = vpadd_u8(r1[1].val[0], r1[1].val[0]);
-      r1[1].val[1] = vpadd_u8(r1[1].val[1], r1[1].val[1]);
-      r1[1].val[1] = vpadd_u8(r1[1].val[1], r1[1].val[1]);
-      r1[1].val[1] = vpadd_u8(r1[1].val[1], r1[1].val[1]);
-      r1[2].val[0] = vpadd_u8(r1[2].val[0], r1[2].val[0]);
-      r1[2].val[0] = vpadd_u8(r1[2].val[0], r1[2].val[0]);
-      r1[2].val[0] = vpadd_u8(r1[2].val[0], r1[2].val[0]);
-      r1[2].val[1] = vpadd_u8(r1[2].val[1], r1[2].val[1]);
-      r1[2].val[1] = vpadd_u8(r1[2].val[1], r1[2].val[1]);
-      r1[2].val[1] = vpadd_u8(r1[2].val[1], r1[2].val[1]);
-      r1[3].val[0] = vpadd_u8(r1[3].val[0], r1[3].val[0]);
-      r1[3].val[0] = vpadd_u8(r1[3].val[0], r1[3].val[0]);
-      r1[3].val[0] = vpadd_u8(r1[3].val[0], r1[3].val[0]);
-      r1[3].val[1] = vpadd_u8(r1[3].val[1], r1[3].val[1]);
-      r1[3].val[1] = vpadd_u8(r1[3].val[1], r1[3].val[1]);
-      r1[3].val[1] = vpadd_u8(r1[3].val[1], r1[3].val[1]);
-      r1[4].val[0] = vpadd_u8(r1[4].val[0], r1[4].val[0]);
-      r1[4].val[0] = vpadd_u8(r1[4].val[0], r1[4].val[0]);
-      r1[4].val[0] = vpadd_u8(r1[4].val[0], r1[4].val[0]);
-      r1[4].val[1] = vpadd_u8(r1[4].val[1], r1[4].val[1]);
-      r1[4].val[1] = vpadd_u8(r1[4].val[1], r1[4].val[1]);
-      r1[4].val[1] = vpadd_u8(r1[4].val[1], r1[4].val[1]);
-      r1[5].val[0] = vpadd_u8(r1[5].val[0], r1[5].val[0]);
-      r1[5].val[0] = vpadd_u8(r1[5].val[0], r1[5].val[0]);
-      r1[5].val[0] = vpadd_u8(r1[5].val[0], r1[5].val[0]);
-      r1[5].val[1] = vpadd_u8(r1[5].val[1], r1[5].val[1]);
-      r1[5].val[1] = vpadd_u8(r1[5].val[1], r1[5].val[1]);
-      r1[5].val[1] = vpadd_u8(r1[5].val[1], r1[5].val[1]);
-      r1[6].val[0] = vpadd_u8(r1[6].val[0], r1[6].val[0]);
-      r1[6].val[0] = vpadd_u8(r1[6].val[0], r1[6].val[0]);
-      r1[6].val[0] = vpadd_u8(r1[6].val[0], r1[6].val[0]);
-      r1[6].val[1] = vpadd_u8(r1[6].val[1], r1[6].val[1]);
-      r1[6].val[1] = vpadd_u8(r1[6].val[1], r1[6].val[1]);
-      r1[6].val[1] = vpadd_u8(r1[6].val[1], r1[6].val[1]);
-      r1[7].val[0] = vpadd_u8(r1[7].val[0], r1[7].val[0]);
-      r1[7].val[0] = vpadd_u8(r1[7].val[0], r1[7].val[0]);
-      r1[7].val[0] = vpadd_u8(r1[7].val[0], r1[7].val[0]);
-      r1[7].val[1] = vpadd_u8(r1[7].val[1], r1[7].val[1]);
-      r1[7].val[1] = vpadd_u8(r1[7].val[1], r1[7].val[1]);
-      r1[7].val[1] = vpadd_u8(r1[7].val[1], r1[7].val[1]);
-      /* Shift packed 8-bit */
-      r0[0].val[0] = vshr_n_u8(r0[0].val[0], 1);
-      r0[0].val[1] = vshr_n_u8(r0[0].val[1], 1);
-      r0[1].val[0] = vshr_n_u8(r0[1].val[0], 1);
-      r0[1].val[1] = vshr_n_u8(r0[1].val[1], 1);
-      r0[2].val[0] = vshr_n_u8(r0[2].val[0], 1);
-      r0[2].val[1] = vshr_n_u8(r0[2].val[1], 1);
-      r0[3].val[0] = vshr_n_u8(r0[3].val[0], 1);
-      r0[3].val[1] = vshr_n_u8(r0[3].val[1], 1);
-      r0[4].val[0] = vshr_n_u8(r0[4].val[0], 1);
-      r0[4].val[1] = vshr_n_u8(r0[4].val[1], 1);
-      r0[5].val[0] = vshr_n_u8(r0[5].val[0], 1);
-      r0[5].val[1] = vshr_n_u8(r0[5].val[1], 1);
-      r0[6].val[0] = vshr_n_u8(r0[6].val[0], 1);
-      r0[6].val[1] = vshr_n_u8(r0[6].val[1], 1);
-      r0[7].val[0] = vshr_n_u8(r0[7].val[0], 1);
-      r0[7].val[1] = vshr_n_u8(r0[7].val[1], 1);
-      /* Store the created mask to the destination vector */
-      vst1_lane_u8(dest + 16 * j + 0 + i, r1[0].val[0], 0);
-      vst1_lane_u8(dest + 16 * j + 1 + i, r1[0].val[1], 0);
-      vst1_lane_u8(dest + 16 * j + 2 + i, r1[1].val[0], 0);
-      vst1_lane_u8(dest + 16 * j + 3 + i, r1[1].val[1], 0);
-      vst1_lane_u8(dest + 16 * j + 4 + i, r1[2].val[0], 0);
-      vst1_lane_u8(dest + 16 * j + 5 + i, r1[2].val[1], 0);
-      vst1_lane_u8(dest + 16 * j + 6 + i, r1[3].val[0], 0);
-      vst1_lane_u8(dest + 16 * j + 7 + i, r1[3].val[1], 0);
-      vst1_lane_u8(dest + 16 * j + 8 + i, r1[4].val[0], 0);
-      vst1_lane_u8(dest + 16 * j + 9 + i, r1[4].val[1], 0);
-      vst1_lane_u8(dest + 16 * j + 10 + i, r1[5].val[0], 0);
-      vst1_lane_u8(dest + 16 * j + 11 + i, r1[5].val[1], 0);
-      vst1_lane_u8(dest + 16 * j + 12 + i, r1[6].val[0], 0);
-      vst1_lane_u8(dest + 16 * j + 13 + i, r1[6].val[1], 0);
-      vst1_lane_u8(dest + 16 * j + 14 + i, r1[7].val[0], 0);
-      vst1_lane_u8(dest + 16 * j + 15 + i, r1[7].val[1], 0);
-    }
-  }
-}
-
-/* Shuffle a block.  This can never fail. */
-int64_t
-bitshuffle_neon(void* _src, void* _dest, const size_t size,
-                const size_t elem_size, void* tmp_buf) {
-  size_t vectorized_chunk_size = 0;
-  int64_t count;
-  if (elem_size == 1 || elem_size == 2 || elem_size == 4) {
-    vectorized_chunk_size = elem_size * 16;
-  } else if (elem_size == 8 || elem_size == 16) {
-    vectorized_chunk_size = elem_size * 8;
-  }
-
-  /* If the block size is too small to be vectorized,
-     use the generic implementation. */
-  if (size * elem_size < vectorized_chunk_size) {
-    count = bshuf_trans_bit_elem_scal((void*)_src, (void*)_dest, size, elem_size, tmp_buf);
+    count = bshuf_trans_bit_byte_remainder(in, out, size, elem_size,
+            nbyte - nbyte % 16);
     return count;
-  }
-
-  /* Optimized bitshuffle implementations */
-  switch (elem_size) {
-    case 1:
-      bitshuffle1_neon(_src, _dest, size, elem_size);
-      break;
-    case 2:
-      bitshuffle2_neon(_src, _dest, size, elem_size);
-      break;
-    case 4:
-      bitshuffle4_neon(_src, _dest, size, elem_size);
-      break;
-    case 8:
-      bitshuffle8_neon(_src, _dest, size, elem_size);
-      break;
-    case 16:
-      bitshuffle16_neon(_src, _dest, size, elem_size);
-      break;
-    default:
-      /* Non-optimized bitshuffle */
-      count = bshuf_trans_bit_elem_scal((void*)_src, (void*)_dest, size, elem_size, tmp_buf);
-      /* The non-optimized function covers the whole buffer,
-         so we're done processing here. */
-      return count;
-  }
-
-  return (int64_t)size * (int64_t)elem_size;
 }
 
-/* Bitunshuffle a block.  This can never fail. */
-int64_t
-bitunshuffle_neon(void* _src, void* _dest, const size_t size,
-                  const size_t elem_size, void* tmp_buf) {
-  size_t vectorized_chunk_size = 0;
-  int64_t count;
-  if (size * elem_size == 1 || size * elem_size == 2 || size * elem_size == 4) {
-    vectorized_chunk_size = size * elem_size * 16;
-  } else if (size * elem_size == 8 || size * elem_size == 16) {
-    vectorized_chunk_size = size * elem_size * 8;
-  }
 
-  /* If the block size is too small to be vectorized,
-     use the generic implementation. */
-  if (size * elem_size < vectorized_chunk_size) {
-    count = bshuf_untrans_bit_elem_scal((void*)_src, (void*)_dest, size, elem_size, tmp_buf);
+/* Transpose bits within elements. */
+int64_t bshuf_trans_bit_elem_NEON(const void* in, void* out, const size_t size,
+         const size_t elem_size) {
+
+    int64_t count;
+
+    CHECK_MULT_EIGHT(size);
+
+    void* tmp_buf = malloc(size * elem_size);
+    if (tmp_buf == NULL) return -1;
+
+    count = bshuf_trans_byte_elem_NEON(in, out, size, elem_size);
+    CHECK_ERR_FREE(count, tmp_buf);
+    count = bshuf_trans_bit_byte_NEON(out, tmp_buf, size, elem_size);
+    CHECK_ERR_FREE(count, tmp_buf);
+    count = bshuf_trans_bitrow_eight(tmp_buf, out, size, elem_size);
+
+    free(tmp_buf);
+
     return count;
-  }
+}
 
-  /* Optimized bitunshuffle implementations */
-  switch (elem_size) {
-    case 1:
-      bitunshuffle1_neon(_src, _dest, size, elem_size);
-      break;
-    case 2:
-      bitunshuffle2_neon(_src, _dest, size, elem_size);
-      break;
-    case 4:
-      bitunshuffle4_neon(_src, _dest, size, elem_size);
-      break;
-    case 8:
-      bitunshuffle8_neon(_src, _dest, size, elem_size);
-      break;
-    case 16:
-      bitunshuffle16_neon(_src, _dest, size, elem_size);
-      break;
-    default:
-      /* Non-optimized bitunshuffle */
-      count = bshuf_untrans_bit_elem_scal((void*)_src, (void*)_dest, size, elem_size, tmp_buf);
-      /* The non-optimized function covers the whole buffer,
-         so we're done processing here. */
-      return count;
-  }
 
-  return (int64_t)size * (int64_t)elem_size;
+/* For data organized into a row for each bit (8 * elem_size rows), transpose
+ * the bytes. */
+int64_t bshuf_trans_byte_bitrow_NEON(const void* in, void* out, const size_t size,
+         const size_t elem_size) {
+
+    size_t ii, jj;
+    const char* in_b = (const char*) in;
+    char* out_b = (char*) out;
+
+    CHECK_MULT_EIGHT(size);
+
+    size_t nrows = 8 * elem_size;
+    size_t nbyte_row = size / 8;
+
+    int8x16_t a0, b0, c0, d0, e0, f0, g0, h0;
+    int8x16_t a1, b1, c1, d1, e1, f1, g1, h1;
+    int64x1_t *as, *bs, *cs, *ds, *es, *fs, *gs, *hs;
+
+    for (ii = 0; ii + 7 < nrows; ii += 8) {
+        for (jj = 0; jj + 15 < nbyte_row; jj += 16) {
+            a0 = vld1q_s8(in_b + (ii + 0)*nbyte_row + jj);
+            b0 = vld1q_s8(in_b + (ii + 1)*nbyte_row + jj);
+            c0 = vld1q_s8(in_b + (ii + 2)*nbyte_row + jj);
+            d0 = vld1q_s8(in_b + (ii + 3)*nbyte_row + jj);
+            e0 = vld1q_s8(in_b + (ii + 4)*nbyte_row + jj);
+            f0 = vld1q_s8(in_b + (ii + 5)*nbyte_row + jj);
+            g0 = vld1q_s8(in_b + (ii + 6)*nbyte_row + jj);
+            h0 = vld1q_s8(in_b + (ii + 7)*nbyte_row + jj);
+
+            a1 = vzip1q_s8(a0, b0);
+            b1 = vzip1q_s8(c0, d0);
+            c1 = vzip1q_s8(e0, f0);
+            d1 = vzip1q_s8(g0, h0);
+            e1 = vzip2q_s8(a0, b0);
+            f1 = vzip2q_s8(c0, d0);
+            g1 = vzip2q_s8(e0, f0);
+            h1 = vzip2q_s8(g0, h0);
+
+            a0 = (int8x16_t) vzip1q_s16 (vreinterpretq_s16_s8 (a1), vreinterpretq_s16_s8 (b1));
+            b0=  (int8x16_t) vzip1q_s16 (vreinterpretq_s16_s8 (c1), vreinterpretq_s16_s8 (d1));
+            c0 = (int8x16_t) vzip2q_s16 (vreinterpretq_s16_s8 (a1), vreinterpretq_s16_s8 (b1));
+            d0 = (int8x16_t) vzip2q_s16 (vreinterpretq_s16_s8 (c1), vreinterpretq_s16_s8 (d1));
+            e0 = (int8x16_t) vzip1q_s16 (vreinterpretq_s16_s8 (e1), vreinterpretq_s16_s8 (f1));
+            f0 = (int8x16_t) vzip1q_s16 (vreinterpretq_s16_s8 (g1), vreinterpretq_s16_s8 (h1));
+            g0 = (int8x16_t) vzip2q_s16 (vreinterpretq_s16_s8 (e1), vreinterpretq_s16_s8 (f1));
+            h0 = (int8x16_t) vzip2q_s16 (vreinterpretq_s16_s8 (g1), vreinterpretq_s16_s8 (h1));
+
+            a1 = (int8x16_t) vzip1q_s32 (vreinterpretq_s32_s8 (a0), vreinterpretq_s32_s8 (b0));
+            b1 = (int8x16_t) vzip2q_s32 (vreinterpretq_s32_s8 (a0), vreinterpretq_s32_s8 (b0));
+            c1 = (int8x16_t) vzip1q_s32 (vreinterpretq_s32_s8 (c0), vreinterpretq_s32_s8 (d0));
+            d1 = (int8x16_t) vzip2q_s32 (vreinterpretq_s32_s8 (c0), vreinterpretq_s32_s8 (d0));
+            e1 = (int8x16_t) vzip1q_s32 (vreinterpretq_s32_s8 (e0), vreinterpretq_s32_s8 (f0));
+            f1 = (int8x16_t) vzip2q_s32 (vreinterpretq_s32_s8 (e0), vreinterpretq_s32_s8 (f0));
+            g1 = (int8x16_t) vzip1q_s32 (vreinterpretq_s32_s8 (g0), vreinterpretq_s32_s8 (h0));
+            h1 = (int8x16_t) vzip2q_s32 (vreinterpretq_s32_s8 (g0), vreinterpretq_s32_s8 (h0));
+
+            as = (int64x1_t *) &a1;
+            bs = (int64x1_t *) &b1;
+            cs = (int64x1_t *) &c1;
+            ds = (int64x1_t *) &d1;
+            es = (int64x1_t *) &e1;
+            fs = (int64x1_t *) &f1;
+            gs = (int64x1_t *) &g1;
+            hs = (int64x1_t *) &h1;
+
+            vst1_s64((int64_t *)(out_b + (jj + 0) * nrows + ii), *as);
+            vst1_s64((int64_t *)(out_b + (jj + 1) * nrows + ii), *(as + 1));
+            vst1_s64((int64_t *)(out_b + (jj + 2) * nrows + ii), *bs);
+            vst1_s64((int64_t *)(out_b + (jj + 3) * nrows + ii), *(bs + 1));
+            vst1_s64((int64_t *)(out_b + (jj + 4) * nrows + ii), *cs);
+            vst1_s64((int64_t *)(out_b + (jj + 5) * nrows + ii), *(cs + 1));
+            vst1_s64((int64_t *)(out_b + (jj + 6) * nrows + ii), *ds);
+            vst1_s64((int64_t *)(out_b + (jj + 7) * nrows + ii), *(ds + 1));
+            vst1_s64((int64_t *)(out_b + (jj + 8) * nrows + ii), *es);
+            vst1_s64((int64_t *)(out_b + (jj + 9) * nrows + ii), *(es + 1));
+            vst1_s64((int64_t *)(out_b + (jj + 10) * nrows + ii), *fs);
+            vst1_s64((int64_t *)(out_b + (jj + 11) * nrows + ii), *(fs + 1));
+            vst1_s64((int64_t *)(out_b + (jj + 12) * nrows + ii), *gs);
+            vst1_s64((int64_t *)(out_b + (jj + 13) * nrows + ii), *(gs + 1));
+            vst1_s64((int64_t *)(out_b + (jj + 14) * nrows + ii), *hs);
+            vst1_s64((int64_t *)(out_b + (jj + 15) * nrows + ii), *(hs + 1));
+        }
+        for (jj = nbyte_row - nbyte_row % 16; jj < nbyte_row; jj ++) {
+            out_b[jj * nrows + ii + 0] = in_b[(ii + 0)*nbyte_row + jj];
+            out_b[jj * nrows + ii + 1] = in_b[(ii + 1)*nbyte_row + jj];
+            out_b[jj * nrows + ii + 2] = in_b[(ii + 2)*nbyte_row + jj];
+            out_b[jj * nrows + ii + 3] = in_b[(ii + 3)*nbyte_row + jj];
+            out_b[jj * nrows + ii + 4] = in_b[(ii + 4)*nbyte_row + jj];
+            out_b[jj * nrows + ii + 5] = in_b[(ii + 5)*nbyte_row + jj];
+            out_b[jj * nrows + ii + 6] = in_b[(ii + 6)*nbyte_row + jj];
+            out_b[jj * nrows + ii + 7] = in_b[(ii + 7)*nbyte_row + jj];
+        }
+    }
+    return size * elem_size;
+}
+
+
+/* Shuffle bits within the bytes of eight element blocks. */
+int64_t bshuf_shuffle_bit_eightelem_NEON(const void* in, void* out, const size_t size,
+         const size_t elem_size) {
+
+    CHECK_MULT_EIGHT(size);
+
+    // With a bit of care, this could be written such that such that it is
+    // in_buf = out_buf safe.
+    const char* in_b = (const char*) in;
+    uint16_t* out_ui16 = (uint16_t*) out;
+
+    size_t ii, jj, kk;
+    size_t nbyte = elem_size * size;
+
+    int16x8_t xmm;
+    int32_t bt;
+
+    if (elem_size % 2) {
+        bshuf_shuffle_bit_eightelem_scal(in, out, size, elem_size);
+    } else {
+        for (ii = 0; ii + 8 * elem_size - 1 < nbyte;
+                ii += 8 * elem_size) {
+            for (jj = 0; jj + 15 < 8 * elem_size; jj += 16) {
+                xmm = vld1q_s16((int16_t *) &in_b[ii + jj]);
+                for (kk = 0; kk < 8; kk++) {
+                    bt = move_byte_mask_neon((uint8x16_t) xmm);
+                    xmm = vshlq_n_s16(xmm, 1);
+                    size_t ind = (ii + jj / 8 + (7 - kk) * elem_size);
+                    out_ui16[ind / 2] = bt;
+                }
+            }
+        }
+    }
+    return size * elem_size;
+}
+
+
+/* Untranspose bits within elements. */
+int64_t bshuf_untrans_bit_elem_NEON(const void* in, void* out, const size_t size,
+         const size_t elem_size) {
+
+    int64_t count;
+
+    CHECK_MULT_EIGHT(size);
+
+    void* tmp_buf = malloc(size * elem_size);
+    if (tmp_buf == NULL) return -1;
+
+    count = bshuf_trans_byte_bitrow_NEON(in, tmp_buf, size, elem_size);
+    CHECK_ERR_FREE(count, tmp_buf);
+    count =  bshuf_shuffle_bit_eightelem_NEON(tmp_buf, out, size, elem_size);
+
+    free(tmp_buf);
+
+    return count;
 }
 
 #endif /* defined(__ARM_NEON) */

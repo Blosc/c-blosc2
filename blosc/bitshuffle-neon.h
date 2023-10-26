@@ -5,8 +5,6 @@
   https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 
-  Note: Adapted for NEON by Lucian Marc.
-
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
@@ -23,13 +21,13 @@
 /**
   NEON-accelerated bitshuffle routine.
 */
-BLOSC_NO_EXPORT int64_t bitshuffle_neon(void* _src, void* _dest, const size_t blocksize,
-                                        const size_t bytesoftype, void* tmp_buf);
+BLOSC_NO_EXPORT int64_t bshuf_trans_bit_elem_NEON(const void* in, void* out, const size_t size,
+                                                  const size_t elem_size);
 
 /**
   NEON-accelerated bitunshuffle routine.
 */
-BLOSC_NO_EXPORT int64_t bitunshuffle_neon(void* _src, void* _dest, const size_t blocksize,
-                                          const size_t bytesoftype, void* tmp_buf);
+BLOSC_NO_EXPORT int64_t bshuf_untrans_bit_elem_NEON(const void* in, void* out, const size_t size,
+                                                    const size_t elem_size);
 
 #endif /* BLOSC_BITSHUFFLE_NEON_H */
