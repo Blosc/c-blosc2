@@ -71,6 +71,11 @@ jobs:
             compiler: clang
             cmake-args: -D DEACTIVATE_AVX2=ON
 
+          - name: Ubuntu Clang No AVX512
+            os: ubuntu-latest
+            compiler: clang
+            cmake-args: -D DEACTIVATE_AVX512=ON
+
           - name: Ubuntu Clang No ZLIB
             os: ubuntu-latest
             compiler: clang
