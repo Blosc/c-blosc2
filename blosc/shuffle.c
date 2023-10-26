@@ -344,12 +344,11 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
     impl_neon.unshuffle = (unshuffle_func)unshuffle_neon;
     //impl_neon.shuffle = (shuffle_func)shuffle_generic;
     //impl_neon.unshuffle = (unshuffle_func)unshuffle_generic;
-    //impl_neon.bitshuffle = (bitshuffle_func)bitshuffle_neon;
-    //impl_neon.bitunshuffle = (bitunshuffle_func)bitunshuffle_neon;
+    //impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_NEON;
+    //impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_NEON;
     // The current bitshuffle optimized for NEON is not any faster
     // (in fact, it is pretty much slower) than the scalar implementation.
-    // Also, bitshuffle_neon (forward direction) is broken for 1, 2 and 4 bytes.
-    // So, let's use the the scalar one, which is pretty fast, at least on a M1 CPU.
+    // So, let's use the scalar one, which is pretty fast, at least on a M1 CPU.
     impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_scal;
     impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_scal;
     return impl_neon;
