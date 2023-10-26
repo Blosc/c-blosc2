@@ -351,17 +351,17 @@ if(COMPILER_SUPPORT_AVX512)
     if(MSVC)
         set_source_files_properties(
                 bitshuffle-avx512.c
-                PROPERTIES COMPILE_OPTIONS "/arch:AVX512F")
+		PROPERTIES COMPILE_OPTIONS "/arch:AVX512F;/arch:AVX512BW")
         set_property(
                 SOURCE shuffle.c
-                APPEND PROPERTY COMPILE_OPTIONS "/arch:AVX512F")
+		APPEND PROPERTY COMPILE_OPTIONS "/arch:AVX512F;/arch:AVX512BW")
     else()
         set_source_files_properties(
                 bitshuffle-avx512.c
-                PROPERTIES COMPILE_OPTIONS -mavx512f)
+                PROPERTIES COMPILE_OPTIONS "-mavx512f;-mavx512bw")
         set_property(
                 SOURCE shuffle.c
-                APPEND PROPERTY COMPILE_OPTIONS -mavx512f)
+                APPEND PROPERTY COMPILE_OPTIONS "-mavx512f;-mavx512bw")
     endif()
 
     # Define a symbol for the shuffle-dispatch implementation
