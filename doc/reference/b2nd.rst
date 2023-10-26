@@ -101,3 +101,10 @@ Destruction
 +++++++++++
 
 ..  doxygenfunction:: b2nd_free
+
+Utilities
+---------
+
+These functions may be used for working with plain C buffers representing multidimensional arrays.
+
+.. doxygenfunction:: b2nd_copy_buffer
