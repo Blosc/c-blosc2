@@ -10,7 +10,6 @@
 
 
 #include "test_common.h"
-#include "b2nd_utils.h"
 
 
 const int64_t result_length = 2 * 2 * 2;

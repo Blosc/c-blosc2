@@ -8,7 +8,6 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include "b2nd_utils.h"
 #include "b2nd.h"
 
 #include <stdint.h>
