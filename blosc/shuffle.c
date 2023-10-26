@@ -294,8 +294,8 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
     impl_avx2.name = "avx2";
     impl_avx2.shuffle = (shuffle_func)shuffle_avx2;
     impl_avx2.unshuffle = (unshuffle_func)unshuffle_avx2;
-    impl_avx2.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_avx2;
-    impl_avx2.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_avx2;
+    impl_avx2.bitshuffle = (bitshuffle_func) bshuf_trans_bit_elem_AVX;
+    impl_avx2.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_AVX;
     return impl_avx2;
   }
 #endif  /* defined(SHUFFLE_USE_AVX2) */
@@ -306,8 +306,8 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
     impl_sse2.name = "sse2";
     impl_sse2.shuffle = (shuffle_func)shuffle_sse2;
     impl_sse2.unshuffle = (unshuffle_func)unshuffle_sse2;
-    impl_sse2.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_sse2;
-    impl_sse2.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_sse2;
+    impl_sse2.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_SSE;
+    impl_sse2.bitunshuffle = (bitunshuffle_func) bshuf_untrans_bit_elem_SSE;
     return impl_sse2;
   }
 #endif  /* defined(SHUFFLE_USE_SSE2) */
