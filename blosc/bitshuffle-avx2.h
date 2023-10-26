@@ -19,17 +19,26 @@
 #include <stdint.h>
 
 /**
-  AVX2-accelerated bitshuffle routine.
+ * AVX2-accelerated bitshuffle routine.
 */
 BLOSC_NO_EXPORT int64_t
     bshuf_trans_bit_elem_AVX(const void* in, void* out, const size_t size,
                              const size_t elem_size);
 
 /**
-  AVX2-accelerated bitunshuffle routine.
+ * AVX2-accelerated bitunshuffle routine.
 */
 BLOSC_NO_EXPORT int64_t
     bshuf_untrans_bit_elem_AVX(const void* in, void* out, const size_t size,
                                const size_t elem_size);
+
+/**
+ * AVX2 utils used by AVX512 functions
+ */
+int64_t bshuf_shuffle_bit_eightelem_AVX(const void* in, void* out, const size_t size,
+                                        const size_t elem_size);
+
+int64_t bshuf_trans_byte_bitrow_AVX(const void* in, void* out, const size_t size,
+                                    const size_t elem_size);
 
 #endif /* BLOSC_BITSHUFFLE_AVX2_H */

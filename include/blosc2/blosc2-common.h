@@ -73,7 +73,7 @@
 #if defined(__SSE2__)
   #include <emmintrin.h>
 #endif
-#if defined(__AVX2__)
+#if defined(__AVX2__) || defined(__AVX512F__) || defined (__AVX512BW__)
   #include <immintrin.h>
 #endif
 
