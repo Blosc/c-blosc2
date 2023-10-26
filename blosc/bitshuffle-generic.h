@@ -94,6 +94,11 @@
     }
 
 
+
+/* Memory copy with bshuf call signature. For testing and profiling. */
+BLOSC_NO_EXPORT int64_t
+bshuf_copy(const void* in, void* out, const size_t size, const size_t elem_size);
+
 /* Private functions */
 BLOSC_NO_EXPORT int64_t
 bshuf_trans_byte_elem_remainder(const void* in, void* out, const size_t size,
@@ -143,7 +148,7 @@ bshuf_trans_byte_bitrow_scal(const void* in, void* out, const size_t size,
 
 BLOSC_NO_EXPORT int64_t
 bshuf_trans_bit_elem_scal(const void* in, void* out, const size_t size,
-                          const size_t elem_size, void* tmp_buf);
+                          const size_t elem_size);
 
 /* Unshuffle bitshuffled data.
  *
@@ -168,6 +173,6 @@ bshuf_trans_bit_elem_scal(const void* in, void* out, const size_t size,
 
 BLOSC_NO_EXPORT int64_t
 bshuf_untrans_bit_elem_scal(const void* in, void* out, const size_t size,
-                            const size_t elem_size, void* tmp_buf);
+                            const size_t elem_size);
 
 #endif /* BLOSC_BITSHUFFLE_GENERIC_H */

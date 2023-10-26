@@ -48,16 +48,6 @@ static void printxmm(__m128i xmm0)
 }
 #endif
 
-/* Memory copy with bshuf call signature. For testing and profiling. */
-int64_t bshuf_copy(const void* in, void* out, const size_t size,
-                   const size_t elem_size) {
-
-  const char* in_b = (const char*) in;
-  char* out_b = (char*) out;
-
-  memcpy(out_b, in_b, size * elem_size);
-  return size * elem_size;
-}
 
 /* ---- Worker code that requires SSE2. Intel Petium 4 (2000) and later. ---- */
 
