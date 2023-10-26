@@ -101,3 +101,11 @@ Destruction
 +++++++++++
 
 ..  doxygenfunction:: b2nd_free
+
+Utilities
+---------
+
+These are declared in the `b2nd_utils.h` header file, which contains
+utility functions for working with C buffers representing multidimensional arrays.
+
+.. doxygenfunction:: b2nd_copy_buffer
