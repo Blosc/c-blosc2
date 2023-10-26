@@ -351,10 +351,10 @@ if(COMPILER_SUPPORT_AVX512)
     if(MSVC)
         set_source_files_properties(
                 bitshuffle-avx512.c
-		PROPERTIES COMPILE_OPTIONS "/arch:AVX512F;/arch:AVX512BW")
+		PROPERTIES COMPILE_OPTIONS "/arch:AVX512")
         set_property(
                 SOURCE shuffle.c
-		APPEND PROPERTY COMPILE_OPTIONS "/arch:AVX512F;/arch:AVX512BW")
+		APPEND PROPERTY COMPILE_OPTIONS "/arch:AVX512")
     else()
         set_source_files_properties(
                 bitshuffle-avx512.c
