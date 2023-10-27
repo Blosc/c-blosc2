@@ -2688,7 +2688,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   if (envvar != NULL) {
     long value;
     value = strtol(envvar, NULL, 10);
-    if ((value != EINVAL) && (value >= 0)) {
+    if ((errno != EINVAL) && (value >= 0)) {
       clevel = (int)value;
     }
     else {
@@ -2731,7 +2731,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   if (envvar != NULL) {
     long value;
     value = strtol(envvar, NULL, 10);
-    if ((value != EINVAL) && (value > 0)) {
+    if ((errno != EINVAL) && (value > 0)) {
       typesize = (int32_t)value;
     }
     else {
@@ -2753,7 +2753,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   if (envvar != NULL) {
     long blocksize;
     blocksize = strtol(envvar, NULL, 10);
-    if ((blocksize != EINVAL) && (blocksize > 0)) {
+    if ((errno != EINVAL) && (blocksize > 0)) {
       blosc1_set_blocksize((size_t) blocksize);
     }
     else {
@@ -2766,7 +2766,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   if (envvar != NULL) {
     long nthreads;
     nthreads = strtol(envvar, NULL, 10);
-    if ((nthreads != EINVAL) && (nthreads > 0)) {
+    if ((errno != EINVAL) && (nthreads > 0)) {
       result = blosc2_set_nthreads((int16_t) nthreads);
       if (result < 0) {
         BLOSC_TRACE_WARNING("BLOSC_NTHREADS environment variable '%s' not recognized\n", envvar);
@@ -2949,7 +2949,7 @@ int blosc2_decompress(const void* src, int32_t srcsize, void* dest, int32_t dest
   envvar = getenv("BLOSC_NTHREADS");
   if (envvar != NULL) {
     nthreads = strtol(envvar, NULL, 10);
-    if ((nthreads != EINVAL)) {
+    if ((errno != EINVAL)) {
       if ((nthreads <= 0) || (nthreads > INT16_MAX)) {
         BLOSC_TRACE_ERROR("nthreads must be >= 1 and <= %d", INT16_MAX);
         return BLOSC2_ERROR_INVALID_PARAM;
@@ -3975,7 +3975,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   if (envvar != NULL) {
     int32_t value;
     value = (int32_t) strtol(envvar, NULL, 10);
-    if ((value != EINVAL) && (value > 0)) {
+    if ((errno != EINVAL) && (value > 0)) {
       context->typesize = value;
     }
     else {
@@ -3990,7 +3990,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   if (envvar != NULL) {
     int value;
     value = (int)strtol(envvar, NULL, 10);
-    if ((value != EINVAL) && (value >= 0)) {
+    if ((errno != EINVAL) && (value >= 0)) {
       context->clevel = value;
     }
     else {
@@ -4017,7 +4017,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   if (envvar != NULL) {
     int32_t blocksize;
     blocksize = (int32_t) strtol(envvar, NULL, 10);
-    if ((blocksize != EINVAL) && (blocksize > 0)) {
+    if ((errno != EINVAL) && (blocksize > 0)) {
       context->blocksize = blocksize;
     }
     else {
@@ -4030,7 +4030,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   envvar = getenv("BLOSC_NTHREADS");
   if (envvar != NULL) {
     int16_t nthreads = (int16_t) strtol(envvar, NULL, 10);
-    if ((nthreads != EINVAL) && (nthreads > 0)) {
+    if ((errno != EINVAL) && (nthreads > 0)) {
       context->nthreads = nthreads;
     }
     else {
@@ -4118,7 +4118,7 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   char* envvar = getenv("BLOSC_NTHREADS");
   if (envvar != NULL) {
     long nthreads = strtol(envvar, NULL, 10);
-    if ((nthreads != EINVAL) && (nthreads > 0)) {
+    if ((errno != EINVAL) && (nthreads > 0)) {
       context->nthreads = (int16_t) nthreads;
     }
   }
