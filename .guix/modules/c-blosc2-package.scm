@@ -49,6 +49,7 @@
      ;; Disable AVX2 by default as in Guix' c-blosc package.
      `(#:configure-flags '("-DBUILD_STATIC=OFF"
                            "-DDEACTIVATE_AVX2=ON"
+                           "-DDEACTIVATE_AVX512=ON"
                            "-DPREFER_EXTERNAL_LZ4=ON"
                            "-DPREFER_EXTERNAL_ZLIB=ON"
                            "-DPREFER_EXTERNAL_ZSTD=ON")))
@@ -87,5 +88,12 @@ supported).")
     (inherit (package-with-configure-flags c-blosc2
                                            #~(list "-DDEACTIVATE_AVX2=OFF")))
     (name "c-blosc2-with-avx2")))
+
+(define-public c-blosc2-with-avx512
+  (package
+    (inherit (package-with-configure-flags c-blosc2
+                                           #~(list "-DDEACTIVATE_AVX2=OFF"
+                                                   "-DDEACTIVATE_AVX512=OFF")))
+    (name "c-blosc2-with-avx512")))
 
 c-blosc2
