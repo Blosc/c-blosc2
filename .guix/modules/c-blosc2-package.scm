@@ -73,4 +73,19 @@ format-compatible with C-Blosc1 (i.e. forward compatibility is not
 supported).")
     (license license:bsd-3)))
 
+(define (package-with-configure-flags p flags)
+  "Return P with FLAGS as additional 'configure' flags."
+  (package/inherit p
+    (arguments (substitute-keyword-arguments (package-arguments p)
+                 ((#:configure-flags original-flags
+                   #~(list))
+                  #~(append #$original-flags
+                            #$flags))))))
+
+(define-public c-blosc2-with-avx2
+  (package
+    (inherit (package-with-configure-flags c-blosc2
+                                           #~(list "-DDEACTIVATE_AVX2=OFF")))
+    (name "c-blosc2-with-avx2")))
+
 c-blosc2
