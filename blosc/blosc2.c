@@ -921,7 +921,7 @@ void _cycle_buffers(uint8_t **src, uint8_t **dest, uint8_t **tmp) {
 
 uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t bsize,
                           const uint8_t* src, const int32_t offset,
-                          uint8_t* dest, uint8_t* tmp, uint8_t* tmp2) {
+                          uint8_t* dest, uint8_t* tmp) {
   blosc2_context* context = thread_context->parent_context;
   uint8_t* _src = (uint8_t*)src + offset;
   uint8_t* _tmp = tmp;
@@ -977,7 +977,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
           }
           break;
         case BLOSC_BITSHUFFLE:
-          if (bitshuffle(typesize, bsize, _src, _dest, tmp2) < 0) {
+          if (bitshuffle(typesize, bsize, _src, _dest) < 0) {
             return NULL;
           }
           break;
@@ -1081,7 +1081,6 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   int accel;
   const uint8_t* _src;
   uint8_t *_tmp = tmp, *_tmp2 = tmp2;
-  uint8_t *_tmp3 = thread_context->tmp4;
   int last_filter_index = last_filter(context->filters, 'c');
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
   bool instr_codec = context->blosc2_flags & BLOSC2_INSTR_CODEC;
@@ -1097,14 +1096,14 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     /* Apply the filter pipeline just for the prefilter */
     if (memcpyed && context->prefilter != NULL) {
       // We only need the prefilter output
-      _src = pipeline_forward(thread_context, bsize, src, offset, dest, _tmp2, _tmp3);
+      _src = pipeline_forward(thread_context, bsize, src, offset, dest, _tmp2);
       if (_src == NULL) {
         return BLOSC2_ERROR_FILTER_PIPELINE;
       }
       return bsize;
     }
     /* Apply regular filter pipeline */
-    _src = pipeline_forward(thread_context, bsize, src, offset, _tmp, _tmp2, _tmp3);
+    _src = pipeline_forward(thread_context, bsize, src, offset, _tmp, _tmp2);
     if (_src == NULL) {
       return BLOSC2_ERROR_FILTER_PIPELINE;
     }
@@ -1357,7 +1356,7 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
           }
           break;
         case BLOSC_BITSHUFFLE:
-          if (bitunshuffle(typesize, bsize, _src, _dest, _tmp, context->src[BLOSC2_CHUNK_VERSION]) < 0) {
+          if (bitunshuffle(typesize, bsize, _src, _dest, context->src[BLOSC2_CHUNK_VERSION]) < 0) {
             return BLOSC2_ERROR_FILTER_PIPELINE;
           }
           break;

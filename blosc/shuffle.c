@@ -45,12 +45,9 @@
 
 #include "shuffle-generic.h"
 #include "bitshuffle-generic.h"
-#include "blosc2/blosc2-common.h"
 #include "blosc2.h"
 
-#include <stdbool.h>
 #include <stdio.h>
-#include <stdint.h>
 #include <string.h>
 
 
@@ -65,8 +62,8 @@ typedef void(* shuffle_func)(const int32_t, const int32_t, const uint8_t*, const
 typedef void(* unshuffle_func)(const int32_t, const int32_t, const uint8_t*, const uint8_t*);
 // For bitshuffle, everything is done in terms of size_t and int64_t (return value)
 // and although this is not strictly necessary for Blosc, it does not hurt either
-typedef int64_t(* bitshuffle_func)(void*, void*, const size_t, const size_t, void*);
-typedef int64_t(* bitunshuffle_func)(void*, void*, const size_t, const size_t, void*);
+typedef int64_t(* bitshuffle_func)(const void*, void*, const size_t, const size_t);
+typedef int64_t(* bitunshuffle_func)(const void*, void*, const size_t, const size_t);
 
 /* An implementation of shuffle/unshuffle routines. */
 typedef struct shuffle_implementation {
@@ -449,15 +446,14 @@ unshuffle(const int32_t bytesoftype, const int32_t blocksize,
     hardware-accelerated routine at run-time. */
 int32_t
 bitshuffle(const int32_t bytesoftype, const int32_t blocksize,
-           const uint8_t *_src, const uint8_t *_dest,
-           const uint8_t *_tmp) {
+           const uint8_t *_src, const uint8_t *_dest) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
   size_t size = blocksize / bytesoftype;
   /* bitshuffle only supports a number of elements that is a multiple of 8. */
   size -= size % 8;
-  int ret = (int) (host_implementation.bitshuffle)((void *) _src, (void *) _dest,
-                                             size, bytesoftype, (void *) _tmp);
+  int ret = (int) (host_implementation.bitshuffle)
+      ((const void *) _src, (void *) _dest, size, bytesoftype);
   if (ret < 0) {
     // Some error in bitshuffle (should not happen)
     BLOSC_TRACE_ERROR("the impossible happened: the bitshuffle filter failed!");
@@ -475,7 +471,7 @@ bitshuffle(const int32_t bytesoftype, const int32_t blocksize,
     hardware-accelerated routine at run-time. */
 int32_t bitunshuffle(const int32_t bytesoftype, const int32_t blocksize,
                      const uint8_t *_src, const uint8_t *_dest,
-                     const uint8_t *_tmp, const uint8_t format_version) {
+                     const uint8_t format_version) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
   size_t size = blocksize / bytesoftype;
@@ -485,9 +481,8 @@ int32_t bitunshuffle(const int32_t bytesoftype, const int32_t blocksize,
     if ((size % 8) == 0) {
       /* The number of elems is a multiple of 8 which is supported by
          bitshuffle. */
-      int ret = (int) (host_implementation.bitunshuffle)((void *) _src, (void *) _dest,
-                                                   blocksize / bytesoftype,
-                                                   bytesoftype, (void *) _tmp);
+      int ret = (int) (host_implementation.bitunshuffle)
+          ((const void *) _src, (void *) _dest, blocksize / bytesoftype, bytesoftype);
       if (ret < 0) {
         // Some error in bitshuffle (should not happen)
         BLOSC_TRACE_ERROR("the impossible happened: the bitunshuffle filter failed!");
@@ -504,8 +499,8 @@ int32_t bitunshuffle(const int32_t bytesoftype, const int32_t blocksize,
   else {
     /* bitshuffle only supports a number of bytes that is a multiple of 8. */
     size -= size % 8;
-    int ret = (int) (host_implementation.bitunshuffle)((void *) _src, (void *) _dest,
-                                                 size, bytesoftype, (void *) _tmp);
+    int ret = (int) (host_implementation.bitunshuffle)
+        ((const void *) _src, (void *) _dest, size, bytesoftype);
     if (ret < 0) {
       BLOSC_TRACE_ERROR("the impossible happened: the bitunshuffle filter failed!");
       return ret;
