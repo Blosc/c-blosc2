@@ -50,9 +50,10 @@
 #include <stdio.h>
 #include <string.h>
 
-
-#if !defined(__clang__) && defined(__GNUC__) && defined(__GNUC_MINOR__) && \
-    __GNUC__ >= 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 8)
+// __builtin_cpu_supports() fixed in GCC 8: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85100
+// Also, clang added support for it in clang 10 at very least (and possibly since 3.8)
+#if (defined(__clang__) && (__clang_major__ >= 10)) || \
+    (defined(__GNUC__) && defined(__GNUC_MINOR__) && __GNUC__ >= 8)
 #define HAVE_CPU_FEAT_INTRIN
 #endif
 
@@ -92,13 +93,7 @@ typedef enum {
    implementations supported by the host processor. */
 #if defined(SHUFFLE_USE_AVX2) || defined(SHUFFLE_USE_SSE2)    /* Intel/i686 */
 
-/*  Disabled the __builtin_cpu_supports() call, as it has issues with
-    new versions of gcc (like 5.3.1 in forthcoming ubuntu/xenial:
-      "undefined symbol: __cpu_model"
-    For a similar report, see:
-    https://lists.fedoraproject.org/archives/list/devel@lists.fedoraproject.org/thread/ZM2L65WIZEEQHHLFERZYD5FAG7QY2OGB/
-*/
-#if defined(HAVE_CPU_FEAT_INTRIN) && 0
+#if defined(HAVE_CPU_FEAT_INTRIN)
 static blosc_cpu_features blosc_get_cpu_features(void) {
   blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
   if (__builtin_cpu_supports("sse2")) {
@@ -106,6 +101,9 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   }
   if (__builtin_cpu_supports("avx2")) {
     cpu_features |= BLOSC_HAVE_AVX2;
+  }
+  if (__builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw")) {
+    cpu_features |= BLOSC_HAVE_AVX512;
   }
   return cpu_features;
 }
