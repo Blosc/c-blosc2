@@ -18,6 +18,7 @@
 #include "ndlz4x4.h"
 #include "ndlz.h"
 #include "xxhash.h"
+#include "blosc-private.h"
 #include "../plugins/plugin_utils.h"
 
 #include <stdlib.h>
@@ -44,17 +45,23 @@
 #define MAX_COPY 32U
 #define MAX_DISTANCE 65535
 
-
-#ifdef BLOSC_STRICT_ALIGN
-#define NDLZ_READU16(p) ((p)[0] | (p)[1]<<8)
-#define NDLZ_READU32(p) ((p)[0] | (p)[1]<<8 | (p)[2]<<16 | (p)[3]<<24)
-#else
-#define NDLZ_READU16(p) *((const uint16_t*)(p))
-#define NDLZ_READU32(p) *((const uint32_t*)(p))
-#endif
-
 #define HASH_LOG (12)
 
+static inline uint16_t NDLZ_READU16(const unsigned char* src) {
+  uint16_t result;
+  memcpy(&result, src, 2);
+  if (!is_little_endian())
+    result = __builtin_bswap16(result);
+  return result;
+}
+
+static inline uint32_t NDLZ_READU32(const unsigned char* src) {
+  uint32_t result;
+  memcpy(&result, src, 4);
+  if (!is_little_endian())
+    result = __builtin_bswap32(result);
+  return result;
+}
 
 int ndlz4_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int32_t output_len,
                    uint8_t meta, blosc2_cparams *cparams) {

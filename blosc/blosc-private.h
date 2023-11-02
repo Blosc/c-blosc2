@@ -32,7 +32,14 @@
 
 
 // Return true if platform is little endian; else false
-static bool is_little_endian(void) {
+static inline bool is_little_endian(void) {
+  #if defined(__BYTE_ORDER__)
+  # if (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+      return false;
+  # else
+      return true;
+  # endif
+  #else
   static const int i = 1;
   char* p = (char*)&i;
 
@@ -42,6 +49,7 @@ static bool is_little_endian(void) {
   else {
     return false;
   }
+  #endif
 }
 
 
