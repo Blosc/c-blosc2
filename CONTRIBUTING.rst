@@ -36,5 +36,5 @@ Coding Style
 License
 -------
 By contributing to C-Blosc2, you agree that your contributions will be licensed
-under the `LICENSE <https://github.com/Blosc/c-blosc2/blob/main/LICENSES/BLOSC.txt>`_ 
+under the `LICENSE <https://github.com/Blosc/c-blosc2/blob/main/LICENSE.txt>`_ 
 file of the project.
