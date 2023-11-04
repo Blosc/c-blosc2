@@ -1,6 +1,12 @@
 Release notes for C-Blosc2
 ==========================
 
+Changes from 2.11.0 to 2.11.1
+=============================
+
+#XXX version-specific blurb XXX#
+
+
 Changes from 2.10.5 to 2.11.0
 =============================
 
