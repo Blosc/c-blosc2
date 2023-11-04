@@ -1,10 +1,24 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.10.5 to 2.10.6
+Changes from 2.10.5 to 2.11.0
 =============================
 
-#XXX version-specific blurb XXX#
+* New AVX512 support for the bitshuffle filter.  This is a backport of the upstream
+  bitshuffle project (https://github.com/kiyo-masui/bitshuffle).  Expect up to [20%
+  better compression speed](https://github.com/Blosc/c-blosc2/pull/567#issuecomment-1789239842)
+  on AMD Zen4 architecture (7950X3D CPU).
+
+* Add c-blosc2 package definition for Guix.  Thanks to Ivan Vilata.
+
+* Properly check calls to `strtol`.  Fixes #558.
+
+* Export the `b2nd_copy_buffer` function. This may be useful for other projects
+  dealing with multidimensional arrays in memory. Thanks to Ivan Vilata.
+
+* Better check that nthreads must be >= 1 and <= INT16_MAX.  Fixes #559.
+
+* Fix compile arguments for armv7l. Thanks to Ben Greiner.
 
 
 Changes from 2.10.4 to 2.10.5
