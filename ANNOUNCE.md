@@ -1,12 +1,10 @@
-# Announcing C-Blosc2 2.11.0
+# Announcing C-Blosc2 2.11.1
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a minor release where we have added support for AVX512 in the
-bitshuffle filter.  Expect up to 20% better speed when compressing
-in combination with fast codecs (LZ4, BloscLZ).  More info (with benchs):
-https://github.com/Blosc/c-blosc2/pull/567.
+This is a maintenance release for fixing the ALTIVEC header.
+Only affects to IBM POWER builds.
 
 Also, some other fixes and improvements are in.
 

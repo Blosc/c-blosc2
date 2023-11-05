@@ -4,7 +4,8 @@ Release notes for C-Blosc2
 Changes from 2.11.0 to 2.11.1
 =============================
 
-#XXX version-specific blurb XXX#
+* Fix ALTIVEC header.  Only affects to IBM POWER builds. Thanks to
+  Michael Kuhn for providing a patch.
 
 
 Changes from 2.10.5 to 2.11.0
