@@ -179,7 +179,7 @@ bitunshuffle1_altivec(void* _src, void* dest, const size_t size, const size_t el
 
 
 /* Transpose bytes within elements for 16 bit elements. */
-int64_t bshuf_trans_byte_elem_16(void* in, void* out, const size_t size) {
+int64_t bshuf_trans_byte_elem_16(const void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 2;
   __vector uint8_t xmm0[2];
 
@@ -199,7 +199,7 @@ int64_t bshuf_trans_byte_elem_16(void* in, void* out, const size_t size) {
 
 
 /* Transpose bytes within elements for 32 bit elements. */
-int64_t bshuf_trans_byte_elem_32(void* in, void* out, const size_t size) {
+int64_t bshuf_trans_byte_elem_32(const void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 4;
   __vector uint8_t xmm0[4];
 
@@ -219,7 +219,7 @@ int64_t bshuf_trans_byte_elem_32(void* in, void* out, const size_t size) {
 
 
 /* Transpose bytes within elements for 64 bit elements. */
-int64_t bshuf_trans_byte_elem_64(void* in, void* out, const size_t size) {
+int64_t bshuf_trans_byte_elem_64(const void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 8;
   __vector uint8_t xmm0[8];
 
@@ -239,7 +239,7 @@ int64_t bshuf_trans_byte_elem_64(void* in, void* out, const size_t size) {
 
 
 /* Transpose bytes within elements for 128 bit elements. */
-int64_t bshuf_trans_byte_elem_128(void* in, void* out, const size_t size) {
+int64_t bshuf_trans_byte_elem_128(const void* in, void* out, const size_t size) {
   static const uint8_t bytesoftype = 16;
   __vector uint8_t xmm0[16];
 
@@ -259,7 +259,7 @@ int64_t bshuf_trans_byte_elem_128(void* in, void* out, const size_t size) {
 
 
 /* Transpose bytes within elements using best SSE algorithm available. */
-int64_t bshuf_trans_byte_elem_altivec(void* in, void* out, const size_t size,
+int64_t bshuf_trans_byte_elem_altivec(const void* in, void* out, const size_t size,
                                       const size_t elem_size, void* tmp_buf) {
 
   int64_t count;
@@ -326,7 +326,7 @@ int64_t bshuf_trans_byte_elem_altivec(void* in, void* out, const size_t size,
 
 
 /* Transpose bits within bytes. */
-int64_t bshuf_trans_bit_byte_altivec(void* in, void* out, const size_t size,
+int64_t bshuf_trans_bit_byte_altivec(const void* in, void* out, const size_t size,
                                      const size_t elem_size) {
 
   const uint8_t* in_b = (const uint8_t*)in;
@@ -360,7 +360,7 @@ int64_t bshuf_trans_bit_byte_altivec(void* in, void* out, const size_t size,
 
 
 /* Transpose bits within elements. */
-int64_t bshuf_trans_bit_elem_altivec(void* in, void* out, const size_t size,
+int64_t bshuf_trans_bit_elem_altivec(const void* in, void* out, const size_t size,
                                      const size_t elem_size) {
 
   int64_t count;
@@ -384,7 +384,7 @@ int64_t bshuf_trans_bit_elem_altivec(void* in, void* out, const size_t size,
 
 /* For data organized into a row for each bit (8 * elem_size rows), transpose
  * the bytes. */
-int64_t bshuf_trans_byte_bitrow_altivec(void* in, void* out, const size_t size,
+int64_t bshuf_trans_byte_bitrow_altivec(const void* in, void* out, const size_t size,
                                         const size_t elem_size) {
   static const __vector uint8_t epi8_low = (const __vector uint8_t) {
     0x00, 0x10, 0x01, 0x11, 0x02, 0x12, 0x03, 0x13,
@@ -535,7 +535,7 @@ int64_t bshuf_trans_byte_bitrow_altivec(void* in, void* out, const size_t size,
 
 
 /* Shuffle bits within the bytes of eight element blocks. */
-int64_t bshuf_shuffle_bit_eightelem_altivec(void* in, void* out, const size_t size,
+int64_t bshuf_shuffle_bit_eightelem_altivec(const void* in, void* out, const size_t size,
                                             const size_t elem_size) {
   /*  With a bit of care, this could be written such that such that it is */
   /*  in_buf = out_buf safe. */
@@ -573,7 +573,7 @@ int64_t bshuf_shuffle_bit_eightelem_altivec(void* in, void* out, const size_t si
 
 
 /* Untranspose bits within elements. */
-int64_t bshuf_untrans_bit_elem_altivec(void* in, void* out, const size_t size,
+int64_t bshuf_untrans_bit_elem_altivec(const void* in, void* out, const size_t size,
                                        const size_t elem_size) {
 
   int64_t count;
