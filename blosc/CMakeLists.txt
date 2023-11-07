@@ -280,7 +280,9 @@ if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
 endif()
 if(COMPILER_SUPPORT_NEON)
     message(STATUS "Adding run-time support for NEON")
-    list(APPEND SOURCES blosc/shuffle-neon.c blosc/bitshuffle-neon.c)
+    # bitshuffle-neon.c does not offer better speed than generic on arm64 (Mac M1).
+    # Besides, it does not compile on raspberry pi (armv7l), so disable it.
+    list(APPEND SOURCES blosc/shuffle-neon.c)  # blosc/bitshuffle-neon.c)
 endif()
 if(COMPILER_SUPPORT_ALTIVEC)
     message(STATUS "Adding run-time support for ALTIVEC")
