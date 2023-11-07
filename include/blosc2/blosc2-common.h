@@ -61,7 +61,7 @@
 #undef BLOSC_STRICT_ALIGN
 /* Modern ARM systems (like ARM64) should support unaligned access
    quite efficiently. */
-#elif defined(__ARM_FEATURE_UNALIGNED)   /* ARM, GNU C */
+#elif defined(__ARM_FEATURE_UNALIGNED) && defined(__ARM64_ARCH_8__)
 #undef BLOSC_STRICT_ALIGN
 #elif defined(_ARCH_PPC) || defined(__PPC__)
 /* Modern PowerPC systems (like POWER8) should support unaligned access
