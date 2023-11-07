@@ -1,12 +1,10 @@
-# Announcing C-Blosc2 2.11.1
+# Announcing C-Blosc2 2.11.2
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release for fixing the ALTIVEC header.
-Only affects to IBM POWER builds.
-
-Also, some other fixes and improvements are in.
+This is a maintenance release for fixing compilation on Raspberry Pi (4).
+Only affects to ARM non-64bit builds.
 
 For more info, please see the release notes in:
 

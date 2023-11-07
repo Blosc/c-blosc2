@@ -4,7 +4,19 @@ Release notes for C-Blosc2
 Changes from 2.11.1 to 2.11.2
 =============================
 
-#XXX version-specific blurb XXX#
+* Added support for ARMv7l platforms (Raspberry Pi).  The NEON version
+  of the bitshuffle filter was not compiling there, and besides it offered
+  no performance advantage over the generic bitshuffle version (it is 2x to
+  3x slower actually). So bitshuffle-neon.c has been disabled by default in
+  all ARM platforms.
+
+* Also, unaligned access has been disabled in all ARM non-64bits platforms.
+  It turned out that, at least the armv7l CPU in Raspberry Pi 4, had issues
+  because `__ARM_FEATURE_UNALIGNED` C macro was asserted in the compiler
+  (both gcc and clang), but it actually made binaries to raise a "Bus error".
+
+* Thanks to Ben Nuttall for providing a Raspberry Pi for tracking down these
+  issues.
 
 
 Changes from 2.11.0 to 2.11.1
