@@ -285,7 +285,10 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL i386 OR
         else()
             set(COMPILER_SUPPORT_AVX2 FALSE)
         endif()
-        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.9 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 4.9)
+        # GCC 10.3.2 (the version in manylinux_2014) seems to have issues supporting dynamic dispatching
+        # of AVX512.  GCC 11.4 is the first minimal version that works well here.
+        # That means that Linux wheels will have AVX512 disabled, but that's life.
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 11.4 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 11.4)
             set(COMPILER_SUPPORT_AVX512 TRUE)
         else()
             set(COMPILER_SUPPORT_AVX512 FALSE)
@@ -297,7 +300,9 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL i386 OR
         else()
             set(COMPILER_SUPPORT_AVX2 FALSE)
         endif()
-        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 10.0 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 10.0)
+        # Clang 13 is the minimum version that we know that works with AVX512 dynamic dispatch.
+        # Perhaps lesser versions work too, better to err on the safe side.
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 13.0 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 13.0)
             set(COMPILER_SUPPORT_AVX512 TRUE)
         else()
             set(COMPILER_SUPPORT_AVX512 FALSE)
