@@ -2306,9 +2306,9 @@ BLOSC_EXPORT int blosc2_vlmeta_get_names(blosc2_schunk *schunk, char **names);
 
 /* The type of timestamp used on this system. */
 #if defined(_WIN32)
-#define blosc_timestamp_t LARGE_INTEGER
+typedef LARGE_INTEGER blosc_timestamp_t;
 #else
-#define blosc_timestamp_t struct timespec
+typedef struct timespec blosc_timestamp_t;
 #endif
 
 /*
