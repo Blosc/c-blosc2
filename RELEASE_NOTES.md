@@ -5,8 +5,8 @@ Changes from 2.11.2 to 2.11.3
 =============================
 
 * Frames accept now typesizes that are larger than 255 (and up to 2**31).
-  See https://github.com/PyTables/PyTables/issues/1081.  Thanks to @anttimc
-  for the report.
+  See https://github.com/PyTables/PyTables/issues/1086.  Thanks to
+  @chris-allan for the report.
 
 
 Changes from 2.11.1 to 2.11.2
