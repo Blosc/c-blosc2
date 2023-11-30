@@ -1,10 +1,10 @@
-# Announcing C-Blosc2 2.11.2
+# Announcing C-Blosc2 2.11.3
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release for fixing compilation on Raspberry Pi (4).
-Only affects to ARM non-64bit builds.
+This is a maintenance release for allowing typesizes > 255 in frames
+and other small fixes.
 
 For more info, please see the release notes in:
 

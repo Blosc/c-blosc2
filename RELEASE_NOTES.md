@@ -8,6 +8,11 @@ Changes from 2.11.2 to 2.11.3
   See https://github.com/PyTables/PyTables/issues/1086.  Thanks to
   @chris-allan for the report.
 
+* AVX512 runtime dispatching has been fixed (basically disabled) for GCC
+  versions <= 10.
+
+* Use typedef for blosc_timestamp_t.  Thanks to Magnus Ulimoen.
+
 
 Changes from 2.11.1 to 2.11.2
 =============================
