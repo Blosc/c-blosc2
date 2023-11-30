@@ -428,8 +428,8 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
   }
   if (typesize != NULL) {
     from_big(typesize, framep + FRAME_TYPESIZE, sizeof(*typesize));
-    if (*typesize <= 0 || *typesize > BLOSC_MAX_TYPESIZE) {
-      BLOSC_TRACE_ERROR("`typesize` is zero or greater than max allowed.");
+    if (*typesize <= 0) {
+      BLOSC_TRACE_ERROR("`typesize` cannot be zero or negative.");
       return BLOSC2_ERROR_INVALID_HEADER;
     }
   }

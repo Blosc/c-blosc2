@@ -4,7 +4,9 @@ Release notes for C-Blosc2
 Changes from 2.11.2 to 2.11.3
 =============================
 
-#XXX version-specific blurb XXX#
+* Frames accept now typesizes that are larger than 255 (and up to 2**31).
+  See https://github.com/PyTables/PyTables/issues/1081.  Thanks to @anttimc
+  for the report.
 
 
 Changes from 2.11.1 to 2.11.2
