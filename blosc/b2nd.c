@@ -926,6 +926,92 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t
 }
 
 
+int b2nd_get_slice_nchunks(b2nd_array_t *array, const int64_t *start, const int64_t *stop, int64_t **chunks_idx) {
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
+
+  int8_t ndim = array->ndim;
+
+  // 0-dim case
+  if (ndim == 0) {
+    *chunks_idx = malloc(1 * sizeof(int64_t));
+    *chunks_idx[0] = 0;
+    return 1;
+  }
+
+  int64_t chunks_in_array[B2ND_MAX_DIM] = {0};
+  for (int i = 0; i < ndim; ++i) {
+    chunks_in_array[i] = array->extshape[i] / array->chunkshape[i];
+  }
+
+  int64_t chunks_in_array_strides[B2ND_MAX_DIM];
+  chunks_in_array_strides[ndim - 1] = 1;
+  for (int i = ndim - 2; i >= 0; --i) {
+    chunks_in_array_strides[i] = chunks_in_array_strides[i + 1] * chunks_in_array[i + 1];
+  }
+
+  // Compute the number of chunks to update
+  int64_t update_start[B2ND_MAX_DIM];
+  int64_t update_shape[B2ND_MAX_DIM];
+
+  int64_t update_nchunks = 1;
+  for (int i = 0; i < ndim; ++i) {
+    int64_t pos = 0;
+    while (pos <= start[i]) {
+      pos += array->chunkshape[i];
+    }
+    update_start[i] = pos / array->chunkshape[i] - 1;
+    while (pos < stop[i]) {
+      pos += array->chunkshape[i];
+    }
+    update_shape[i] = pos / array->chunkshape[i] - update_start[i];
+    update_nchunks *= update_shape[i];
+  }
+
+  int nchunks = 0;
+  // Initially we do not know the number of chunks that will be affected
+  *chunks_idx = malloc(array->sc->nchunks * sizeof(int64_t));
+  int64_t *ptr = *chunks_idx;
+  for (int update_nchunk = 0; update_nchunk < update_nchunks; ++update_nchunk) {
+    int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
+    blosc2_unidim_to_multidim(ndim, update_shape, update_nchunk, nchunk_ndim);
+    for (int i = 0; i < ndim; ++i) {
+      nchunk_ndim[i] += update_start[i];
+    }
+    int64_t nchunk;
+    blosc2_multidim_to_unidim(nchunk_ndim, ndim, chunks_in_array_strides, &nchunk);
+
+    // Check if the chunk is inside the slice domain
+    int64_t chunk_start[B2ND_MAX_DIM] = {0};
+    int64_t chunk_stop[B2ND_MAX_DIM] = {0};
+    for (int i = 0; i < ndim; ++i) {
+      chunk_start[i] = nchunk_ndim[i] * array->chunkshape[i];
+      chunk_stop[i] = chunk_start[i] + array->chunkshape[i];
+      if (chunk_stop[i] > array->shape[i]) {
+        chunk_stop[i] = array->shape[i];
+      }
+    }
+    bool chunk_empty = false;
+    for (int i = 0; i < ndim; ++i) {
+      chunk_empty |= (chunk_stop[i] <= start[i] || chunk_start[i] >= stop[i]);
+    }
+    if (chunk_empty) {
+      continue;
+    }
+
+    ptr[nchunks] = nchunk;
+    nchunks++;
+  }
+
+  if (nchunks < array->sc->nchunks) {
+    *chunks_idx = reallocf(ptr, nchunks * sizeof(int64_t));
+  }
+
+  return nchunks;
+}
+
+
 int b2nd_squeeze(b2nd_array_t *array) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 

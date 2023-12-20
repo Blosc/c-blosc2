@@ -2486,6 +2486,21 @@ BLOSC_EXPORT void blosc2_unidim_to_multidim(uint8_t ndim, int64_t *shape, int64_
  */
 BLOSC_EXPORT void blosc2_multidim_to_unidim(const int64_t *index, int8_t ndim, const int64_t *strides, int64_t *i);
 
+/*
+ * @brief Get the unidimensional chunk indexes needed to get a slice of a schunk or a b2nd array
+ *
+ * @param schunk The super-chunk (of b2nd array or not).
+ * @param start Index (0-based if it is a schunk) where the slice begins.
+ * @param stop The first index (0-based if it is a schunk) that is not in the selected slice.
+ * @param chunks_idx The pointer to the buffer where the indexes will be written. It is the user responsibility
+ * to free the buffer.
+ *
+ *
+ * @return The number of chunks needed to get the slice. If some problem is
+ * detected, a negative code is returned instead.
+ */
+BLOSC_EXPORT int blosc2_get_slice_nchunks(blosc2_schunk* schunk, int64_t *start, int64_t *stop, int64_t **chunks_idx);
+
 #ifdef __cplusplus
 }
 #endif
