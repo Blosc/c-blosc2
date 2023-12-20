@@ -1379,6 +1379,27 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
 }
 
 
+int schunk_get_slice_nchunks(blosc2_schunk *schunk, int64_t start, int64_t stop, int64_t **chunks_idx) {
+  BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_NULL_POINTER);
+
+  int64_t byte_start = start * schunk->typesize;
+  int64_t byte_stop = stop * schunk->typesize;
+  int64_t nchunk_start = byte_start / schunk->chunksize;
+  int64_t nchunk_stop = byte_stop / schunk->chunksize;
+  if (byte_stop % schunk->chunksize != 0) {
+    nchunk_stop++;
+  }
+  int64_t nchunk = nchunk_start;
+  int nchunks = (int)(nchunk_stop - nchunk_start);
+  *chunks_idx = malloc(nchunks * sizeof(int64_t));
+  int64_t *ptr = *chunks_idx;
+  for (int64_t i = 0; i < nchunks; ++i) {
+    ptr[i] = nchunk;
+    nchunk++;
+  }
+  return nchunks;
+}
+
 /* Reorder the chunk offsets of an existing super-chunk. */
 int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int64_t *offsets_order) {
   // Check that the offsets order are correct
