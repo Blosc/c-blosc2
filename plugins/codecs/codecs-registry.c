@@ -56,4 +56,13 @@ void register_codecs(void) {
   openhtj2k.decoder = NULL;
   openhtj2k.compname = "openhtj2k";
   register_codec_private(&openhtj2k);
+
+  blosc2_codec grok;
+  openhtj2k.compcode = BLOSC_CODEC_GROK;
+  openhtj2k.version = 1;
+  openhtj2k.complib = BLOSC_CODEC_GROK;
+  openhtj2k.encoder = NULL;
+  openhtj2k.decoder = NULL;
+  openhtj2k.compname = "grok";
+  register_codec_private(&grok);
 }
