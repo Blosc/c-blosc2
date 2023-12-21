@@ -1005,7 +1005,7 @@ int b2nd_get_slice_nchunks(b2nd_array_t *array, const int64_t *start, const int6
   }
 
   if (nchunks < array->sc->nchunks) {
-    *chunks_idx = reallocf(ptr, nchunks * sizeof(int64_t));
+    *chunks_idx = realloc(ptr, nchunks * sizeof(int64_t));
   }
 
   return nchunks;
