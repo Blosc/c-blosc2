@@ -56,7 +56,7 @@ CUTEST_TEST_TEST(save) {
   blosc2_remove_urlpath(urlpath);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.nthreads = 1;
+  cparams.nthreads = 2;
   cparams.typesize = typesize;
   blosc2_storage b2_storage = {.cparams=&cparams};
   b2_storage.urlpath = NULL;
