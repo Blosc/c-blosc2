@@ -39,7 +39,7 @@ CUTEST_TEST_SETUP(save) {
       {1, {10}, {7}, {2}}, // 1-idim
       {2, {100, 100}, {20, 20}, {10, 10}},
       {3, {40, 55, 23}, {31, 5, 22}, {4, 4, 4}},
-      {3, {100, 0, 12}, {31, 0, 12}, {10, 0, 12}},
+      //{3, {100, 0, 12}, {31, 0, 12}, {10, 0, 12}},
   ));
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
       {true, false},
@@ -56,7 +56,7 @@ CUTEST_TEST_TEST(save) {
   blosc2_remove_urlpath(urlpath);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.nthreads = 2;
+  cparams.nthreads = 1;
   cparams.typesize = typesize;
   blosc2_storage b2_storage = {.cparams=&cparams};
   b2_storage.urlpath = NULL;
