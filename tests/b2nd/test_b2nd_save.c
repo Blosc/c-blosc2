@@ -41,7 +41,7 @@ CUTEST_TEST_SETUP(save) {
       {3, {40, 55, 23}, {31, 5, 22}, {4, 4, 4}},
       // The test below makes CI to crash.  I have not been able to reproduce this
       // manually on a Linux (Fedora) and ARM64 (M1), so anyways.
-      //{3, {100, 0, 12}, {31, 0, 12}, {10, 0, 12}},
+      // {3, {100, 0, 12}, {31, 0, 12}, {10, 0, 12}},
   ));
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
       {true, false},
