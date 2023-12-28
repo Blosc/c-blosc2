@@ -2312,18 +2312,31 @@ typedef struct timespec blosc_timestamp_t;
 #endif
 
 /*
- * Set a timestamp.
+ * @brief Set a timestamp.
+ *
+ * @param timestamp
+ *
  */
 BLOSC_EXPORT void blosc_set_timestamp(blosc_timestamp_t* timestamp);
 
 /*
- * Return the nanoseconds between 2 timestamps.
+ * @brief Get the nanoseconds between 2 timestamps.
+ *
+ * @param start_time
+ * @param end_time
+ *
+ * @return The nanoseconds between start_time and end_time.
  */
 BLOSC_EXPORT double blosc_elapsed_nsecs(blosc_timestamp_t start_time,
                                         blosc_timestamp_t end_time);
 
 /*
- * Return the seconds between 2 timestamps.
+ * @brief Get the seconds between 2 timestamps.
+ *
+ * @param start_time
+ * @param end_time
+ *
+ * @return The seconds between start_time and end_time.
  */
 BLOSC_EXPORT double blosc_elapsed_secs(blosc_timestamp_t start_time,
                                        blosc_timestamp_t end_time);
@@ -2458,16 +2471,29 @@ BLOSC_EXPORT int blosc2_register_filter(blosc2_filter *filter);
 
 /*
  * @brief Remove a directory and its files.
+ *
+ * @param path The directory to remove.
+ *
+ * @return 0 if succeeds. Else a negative code is returned.
  */
 BLOSC_EXPORT int blosc2_remove_dir(const char *path);
 
 /*
  * @brief Remove a file or a directory given by path.
+ *
+ * @param path The file or directory to remove.
+ *
+ * @return 0 if succeeds. Else a negative code is returned.
  */
 BLOSC_EXPORT int blosc2_remove_urlpath(const char *path);
 
 /*
  * @brief Rename a file or a directory given by old_urlpath to new_path.
+ *
+ * @param old_urlpath The original path to the directory or file.
+ * @param new_path The new path to the directory or file.
+ *
+ * @return 0 if succeeds. Else a negative code is returned.
  */
 BLOSC_EXPORT int blosc2_rename_urlpath(char* old_urlpath, char* new_path);
 
@@ -2494,7 +2520,6 @@ BLOSC_EXPORT void blosc2_multidim_to_unidim(const int64_t *index, int8_t ndim, c
  * @param stop The first index (0-based if it is a schunk) that is not in the selected slice.
  * @param chunks_idx The pointer to the buffer where the indexes will be written. It is the user responsibility
  * to free the buffer.
- *
  *
  * @return The number of chunks needed to get the slice. If some problem is
  * detected, a negative code is returned instead.
