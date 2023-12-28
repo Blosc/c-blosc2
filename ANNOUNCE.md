@@ -1,10 +1,12 @@
-# Announcing C-Blosc2 2.11.3
+# Announcing C-Blosc2 2.11.4
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release for allowing typesizes > 255 in frames
-and other small fixes.
+Now the `grok` codec is available globally and will be loaded dynamically. See more
+info about the codec in our blog post: https://www.blosc.org/posts/blosc2-grok-release/
+Furthermore, a new function has been added to get the unidimensional chunk indexes
+needed to get the slice of a Blosc2 container.
 
 For more info, please see the release notes in:
 
