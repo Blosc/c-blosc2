@@ -47,3 +47,11 @@ Dealing with chunks
 .. doxygenfunction:: blosc2_schunk_insert_chunk
 .. doxygenfunction:: blosc2_schunk_update_chunk
 .. doxygenfunction:: blosc2_schunk_delete_chunk
+
+Creating chunks
+---------------
+
+.. doxygenfunction:: blosc2_chunk_zeros
+.. doxygenfunction:: blosc2_chunk_nans
+.. doxygenfunction:: blosc2_chunk_repeatval
+.. doxygenfunction:: blosc2_chunk_uninit

@@ -29,3 +29,7 @@ Variable-length metalayers
 .. doxygenfunction:: blosc2_vlmeta_update
 
 .. doxygenfunction:: blosc2_vlmeta_get
+
+.. doxygenfunction:: blosc2_vlmeta_delete
+
+.. doxygenfunction:: blosc2_vlmeta_get_names

@@ -43,3 +43,5 @@ IO backends
    :members:
 
 .. doxygenfunction:: blosc2_register_io_cb
+
+.. doxygenfunction:: blosc2_get_io_cb

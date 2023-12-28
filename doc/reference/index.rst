@@ -17,7 +17,8 @@ metainfo to your datasets (metalayers).
    :maxdepth: 2
    :caption: Contents:
 
-   utility
+   utility_variables
+   utility_functions
    blosc1
    context
    plugins
