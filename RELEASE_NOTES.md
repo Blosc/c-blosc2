@@ -1,7 +1,7 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.11.3 to 2.11.4
+Changes from 2.11.3 to 2.12.0
 =============================
 
 * New `blosc2_get_slice_nchunks` function for getting the unidimensional chunk indexes of a Blosc2 container slice.
