@@ -55,3 +55,8 @@ Creating chunks
 .. doxygenfunction:: blosc2_chunk_nans
 .. doxygenfunction:: blosc2_chunk_repeatval
 .. doxygenfunction:: blosc2_chunk_uninit
+
+Frame specific functions
+------------------------
+
+.. doxygenfunction:: blosc2_frame_get_offsets

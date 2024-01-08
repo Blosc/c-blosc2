@@ -27,6 +27,7 @@ extern "C" {
 #endif
 
 #include "blosc2.h"
+#include "blosc-private.h"
 
 #include <stdio.h>
 #include <stdlib.h>

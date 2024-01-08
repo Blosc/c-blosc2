@@ -20,6 +20,10 @@ Main API
 
 .. doxygenfunction:: blosc2_set_nthreads
 
+.. doxygentypedef:: blosc_threads_callback
+
+.. doxygenfunction:: blosc2_set_threads_callback
+
 .. doxygenfunction:: blosc1_get_compressor
 
 .. doxygenfunction:: blosc1_set_compressor

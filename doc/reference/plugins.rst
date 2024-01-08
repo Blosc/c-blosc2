@@ -23,6 +23,14 @@ Codecs
 
 .. doxygenfunction:: blosc2_register_codec
 
+Tuners
+------
+
+.. doxygenstruct:: blosc2_tuner
+   :members:
+
+.. doxygenfunction:: blosc2_register_tuner
+
 
 IO backends
 -----------
