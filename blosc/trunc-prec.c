@@ -67,21 +67,25 @@ int truncate_precision64(int8_t prec_bits, int32_t nelems,
 }
 
 
+
 int truncate_int16(int8_t prec_bits, int32_t nelems,
-                   const int32_t* src, int32_t* dest) {
-  uint8_t max_prec_bits = (uint8_t)sizeof(int16_t) * 8;
+                   const uint16_t *src, uint16_t *dest) {
+  uint8_t max_prec_bits = (uint8_t) sizeof(uint16_t) * 8;
   if (prec_bits >= max_prec_bits) {
     BLOSC_TRACE_ERROR("The reduction in precision cannot be larger or equal than %d bits"
                       " (asking for %d bits)",  max_prec_bits, prec_bits);
     return -1;
   }
   uint8_t zeroed_bits = max_prec_bits - prec_bits;
-  int32_t mask = ~((1 << zeroed_bits) - 1);
+  // BLOSC_TRACE_INFO("zeroed_bits: %d\n", zeroed_bits);
+  uint16_t mask = ~((1 << zeroed_bits) - 1);
+  // BLOSC_TRACE_INFO("mask: %x\n", mask);
   for (int i = 0; i < nelems; i++) {
     dest[i] = src[i] & mask;
   }
   return 0;
 }
+
 
 /* Apply the truncate precision to src.  This can never fail. */
 int truncate_precision(int8_t prec_bits, int32_t typesize, int32_t nbytes,
