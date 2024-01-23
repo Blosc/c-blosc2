@@ -11,9 +11,7 @@
 #include "trunc-prec.h"
 #include "blosc2.h"
 
-#include <assert.h>
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
 
 #define BITS_MANTISSA_FLOAT 23
@@ -67,9 +65,8 @@ int truncate_precision64(int8_t prec_bits, int32_t nelems,
 }
 
 
-
-int truncate_int16(int8_t prec_bits, int32_t nelems,
-                   const uint16_t *src, uint16_t *dest) {
+int truncate_uint16(int8_t prec_bits, int32_t nelems,
+                    const uint16_t *src, uint16_t *dest) {
   uint8_t max_prec_bits = (uint8_t) sizeof(uint16_t) * 8;
   if (prec_bits >= max_prec_bits) {
     BLOSC_TRACE_ERROR("The reduction in precision cannot be larger or equal than %d bits"
@@ -77,9 +74,7 @@ int truncate_int16(int8_t prec_bits, int32_t nelems,
     return -1;
   }
   uint8_t zeroed_bits = max_prec_bits - prec_bits;
-  // BLOSC_TRACE_INFO("zeroed_bits: %d\n", zeroed_bits);
   uint16_t mask = ~((1 << zeroed_bits) - 1);
-  // BLOSC_TRACE_INFO("mask: %x\n", mask);
   for (int i = 0; i < nelems; i++) {
     dest[i] = src[i] & mask;
   }
@@ -94,8 +89,8 @@ int truncate_precision(int8_t prec_bits, int32_t typesize, int32_t nbytes,
   // values will reduce the precision bits (similar to Python slicing convention).
   switch (typesize) {
     case 2:
-      return truncate_int16(prec_bits, nbytes / typesize,
-                            (int32_t *)src, (int32_t *)dest);
+      return truncate_uint16(prec_bits, nbytes / typesize,
+                            (const uint16_t *)src, (uint16_t *)dest);
     case 4:
       return truncate_precision32(prec_bits, nbytes / typesize,
                                   (int32_t *)src, (int32_t *)dest);
