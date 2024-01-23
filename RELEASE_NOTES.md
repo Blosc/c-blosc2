@@ -1,10 +1,12 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.12.0 to 2.12.1
+Changes from 2.12.0 to 2.13.0
 =============================
 
-#XXX version-specific blurb XXX#
+* Added a new BLOSC_FILTER_INT_TRUNC filter for truncating integers to a
+  given number of bits.  This is useful for compressing integers that are
+  not using all the bits of the type.  See PR #577.
 
 
 Changes from 2.11.3 to 2.12.0
