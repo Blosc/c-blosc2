@@ -843,6 +843,11 @@ int fill_codec(blosc2_codec *codec) {
     dlclose(lib);
     return BLOSC2_ERROR_FAILURE;
   }
+  if (codec->compcode == BLOSC_CODEC_GROK) {
+    // Initialize grok lib
+    void (*init_func)(uint32_t, bool) = dlsym(lib, "blosc2_grok_init");
+    (*init_func)(0, false);
+  }
 
   return BLOSC2_ERROR_SUCCESS;
 }
