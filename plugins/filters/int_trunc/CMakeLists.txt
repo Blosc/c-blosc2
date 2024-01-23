@@ -7,20 +7,20 @@
 # See LICENSE.txt for details about copyright and rights to use.
 
 # sources
-set(SOURCES ${SOURCES} ${PROJECT_SOURCE_DIR}/plugins/filters/bytedelta/bytedelta.c PARENT_SCOPE)
+set(SOURCES ${SOURCES} ${PROJECT_SOURCE_DIR}/plugins/filters/int_trunc/int_trunc.c PARENT_SCOPE)
 
 if(BUILD_TESTS)
     # targets
-    add_executable(test_bytedelta test_bytedelta.c)
+    add_executable(test_int_trunc test_int_trunc.c)
     # Define the BLOSC_TESTING symbol so normally-hidden functions
     # are available to the test programs.
     set_property(
-            TARGET test_bytedelta
+            TARGET test_int_trunc
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
-    target_link_libraries(test_bytedelta blosc_testing)
+    target_link_libraries(test_int_trunc blosc_testing)
 
     # tests
-    add_test(NAME test_plugin_bytedelta
-        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_bytedelta>)
+    add_test(NAME test_plugin_int_trunc
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_int_trunc>)
 
 endif()
