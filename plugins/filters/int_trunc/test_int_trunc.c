@@ -17,17 +17,17 @@
 
 #define NCHUNKS 200
 #define CHUNKSIZE (500 * 1000)
-#define NTHREADS 4
+#define NTHREADS 8
 
 
-void fill_buffer(int64_t *buffer, int nchunk) {
-  for (int i = 0; i < CHUNKSIZE; i++) {
-    buffer[i] = i * nchunk + i;
+void fill_buffer64(int64_t *buffer, int nchunk, int precision_bits) {
+  for (int64_t i = 0; i < CHUNKSIZE; i++) {
+    buffer[i] = (i * nchunk + i) << (precision_bits - 20);
   }
 }
 
 
-int main(void) {
+int main64(void) {
   blosc2_schunk *schunk;
   int32_t isize = CHUNKSIZE * sizeof(int64_t);
   int dsize;
@@ -40,16 +40,11 @@ int main(void) {
   int64_t *data_buffer = malloc(CHUNKSIZE * sizeof(int64_t));
   int64_t *rec_buffer = malloc(CHUNKSIZE * sizeof(int64_t));
 
-  printf("Blosc version info: %s (%s)\n",
-         BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
-
-  /* Initialize the Blosc compressor */
-  blosc2_init();
-
   /* Create a super-chunk container */
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.filters[0] = BLOSC_FILTER_INT_TRUNC;
-  cparams.filters_meta[0] = -20;  // remove 20 bits of precision
+  int PRECISION_BITS = 50;
+  cparams.filters_meta[0] = -PRECISION_BITS;  // remove 50 bits of precision
   cparams.typesize = sizeof(int64_t);
   // Good codec params for this dataset
   cparams.compcode = BLOSC_BLOSCLZ;
@@ -61,7 +56,7 @@ int main(void) {
   /* Append the chunks */
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    fill_buffer(data_buffer, nchunk);
+    fill_buffer64(data_buffer, nchunk, PRECISION_BITS);
     nchunks = blosc2_schunk_append_buffer(schunk, data_buffer, isize);
   }
   blosc_set_timestamp(&current);
@@ -102,10 +97,10 @@ int main(void) {
       return dsize;
     }
     assert (dsize == (int)isize);
-    fill_buffer(data_buffer, nchunk);
+    fill_buffer64(data_buffer, nchunk, PRECISION_BITS);
     for (int i = 0; i < CHUNKSIZE; i++) {
-      // Check for precision (> 20 bits)
-      if ((data_buffer[i] - rec_buffer[i]) > 2 * 1024 * 1024) {
+      // Check for precision
+      if ((data_buffer[i] - rec_buffer[i]) > (1LL << PRECISION_BITS)) {
         printf("Value not in tolerance margin: ");
         printf("%lld - %lld: %lld, (nchunk: %d, nelem: %d)\n",
                data_buffer[i], rec_buffer[i],
@@ -121,8 +116,21 @@ int main(void) {
   free(rec_buffer);
   /* Destroy the super-chunk */
   blosc2_schunk_free(schunk);
-  /* Destroy the Blosc environment */
-  blosc2_destroy();
 
-  return 0;
+  return isize * NCHUNKS;
+}
+
+
+int main(void) {
+  int result;
+  blosc2_init();
+
+  result = main64();
+  printf("main64: roundtrip for %d bytes successful \n \n", result);
+  if (result < 0) {
+    return result;
+  }
+
+  blosc2_destroy();
+  return BLOSC2_ERROR_SUCCESS;
 }

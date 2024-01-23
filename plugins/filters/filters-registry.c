@@ -53,7 +53,7 @@ void register_filters(void) {
   int_trunc.name = "int_trunc";
   int_trunc.version = 1;
   int_trunc.forward = &int_trunc_forward;
-  int_trunc.backward = NULL;  // truncation is lossy and cannot be reversed
+  int_trunc.backward = &int_trunc_backward;
   register_filter_private(&int_trunc);
 
 }

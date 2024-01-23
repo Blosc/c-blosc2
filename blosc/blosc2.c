@@ -1403,10 +1403,6 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
         // Look for the filters_meta in user filters and run it
         for (uint64_t j = 0; j < g_nfilters; ++j) {
           if (g_filters[j].id == filters[i]) {
-            if (filters[i] == BLOSC_FILTER_INT_TRUNC) {
-              // BLOSC_FILTER_INT_TRUNC filter does not need to be undone
-              goto urfiltersuccess;
-            }
             if (g_filters[j].backward == NULL) {
               // Dynamically load filter
               if (fill_filter(&g_filters[j]) < 0) {
