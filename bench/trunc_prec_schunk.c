@@ -65,7 +65,7 @@ int main(void) {
   // DELTA makes compression ratio quite worse in this case
   //cparams.filters[1] = BLOSC_DELTA;
   // BLOSC_BITSHUFFLE is not compressing better and it quite slower here
-  //cparams.filters[BLOSC_LAST_FILTER - 1] = BLOSC_BITSHUFFLE;
+  //cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   // Good codec params for this dataset
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 9;

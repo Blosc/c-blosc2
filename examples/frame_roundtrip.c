@@ -36,7 +36,7 @@ int main(void) {
   // Create the original schunk
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = sizeof(int32_t);
-  cparams.filters[BLOSC_LAST_FILTER] = BLOSC_BITSHUFFLE;
+  cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
   cparams.clevel = 9;
   //  blosc2_remove_dir("/tmp/test.frame");
   //  blosc2_storage storage = {.cparams=&cparams, .contiguous=false, .urlpath="/tmp/test.frame"};

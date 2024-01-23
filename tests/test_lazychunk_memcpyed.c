@@ -58,7 +58,7 @@ static char* test_lazy_chunk_memcpyed_nofilter(void) {
   int cbytes, nbytes;
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.filters[BLOSC_LAST_FILTER] = BLOSC_NOFILTER;
+  cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_NOFILTER;
   cparams.blocksize = blocksize;
   cparams.typesize = sizeof(int32_t);
 
