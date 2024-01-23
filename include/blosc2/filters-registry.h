@@ -20,6 +20,7 @@ enum {
     BLOSC_FILTER_NDMEAN = 33,
     BLOSC_FILTER_BYTEDELTA_BUGGY = 34, // buggy version. See #524
     BLOSC_FILTER_BYTEDELTA = 35,  // fixed version
+    BLOSC_FILTER_INT_TRUNC = 36,  // truncate int precision; positive values in cparams.filters_meta will keep bits; negative values will reduce bits.
 };
 
 void register_filters(void);

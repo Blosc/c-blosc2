@@ -13,8 +13,6 @@
 // This requires Intel SSE4.1 and ARM64 NEON, which should be widely available by now.
 
 #include "bytedelta.h"
-#include "../plugins/plugin_utils.h"
-#include "blosc2/filters-registry.h"
 #include "blosc2.h"
 
 #include <stdint.h>

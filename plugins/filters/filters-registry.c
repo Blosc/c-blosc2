@@ -8,6 +8,7 @@
 #include "ndmean/ndmean.h"
 #include "ndcell/ndcell.h"
 #include "bytedelta/bytedelta.h"
+#include "int_trunc/int_trunc.h"
 #include "blosc-private.h"
 #include "blosc2.h"
 
@@ -46,4 +47,13 @@ void register_filters(void) {
   bytedelta.forward = &bytedelta_forward;
   bytedelta.backward = &bytedelta_backward;
   register_filter_private(&bytedelta);
+
+  blosc2_filter int_trunc;
+  int_trunc.id = BLOSC_FILTER_INT_TRUNC;
+  int_trunc.name = "int_trunc";
+  int_trunc.version = 1;
+  int_trunc.forward = &int_trunc_forward;
+  int_trunc.backward = NULL;  // truncation is lossy and cannot be reversed
+  register_filter_private(&int_trunc);
+
 }
