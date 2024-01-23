@@ -106,7 +106,8 @@ int int_trunc_forward(const uint8_t* input, uint8_t* output, int32_t length, uin
       return truncate_uint64(prec_bits, nelems,
                              (uint64_t *)input, (uint64_t *)output);
     default:
-      BLOSC_TRACE_ERROR("Error in int-trunc-prec filter: Precision for typesize %d not handled",
+      BLOSC_TRACE_ERROR("Error in BLOSC_FILTER_INT_TRUNC filter: "
+                        "Precision for typesize %d not handled",
                         (int)typesize);
       return -1;
   }
