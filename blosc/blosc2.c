@@ -1755,8 +1755,7 @@ static int blosc_d(
   }
 
   /* The number of compressed data streams for this block */
-  if (!dont_split && !leftoverblock && !context->use_dict) {
-    // We don't want to split when in a training dict state
+  if (!dont_split && !leftoverblock) {
     nstreams = (int32_t)typesize;
   }
   else {
@@ -2604,8 +2603,20 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
       dict_maxsize = srcsize / 20;
     }
     void* samples_buffer = context->dest + context->header_overhead;
-    unsigned nblocks = 8;  // the minimum that accepts zstd as of 1.4.0
-    unsigned sample_fraction = 1;  // 1 allows to use most of the chunk for training
+    unsigned nblocks = (unsigned)context->nblocks;
+    int dont_split = (context->header_flags & 0x10) >> 4;
+    if (!dont_split) {
+      nblocks = nblocks * context->typesize;
+    }
+    if (nblocks < 8) {
+      nblocks = 8;  // the minimum that accepts zstd as of 1.4.0
+    }
+
+    // 1 allows to use most of the chunk for training, but it is slower,
+    // and it does not always seem to improve compression ratio.
+    // Let's use 16, which is faster and still gives good results
+    // on test_dict_schunk.c, but this seems very dependent on the data.
+    unsigned sample_fraction = 16;
     size_t sample_size = context->sourcesize / nblocks / sample_fraction;
 
     // Populate the samples sizes for training the dictionary
@@ -2618,7 +2629,9 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     // Train from samples
     void* dict_buffer = malloc(dict_maxsize);
     BLOSC_ERROR_NULL(dict_buffer, BLOSC2_ERROR_MEMORY_ALLOC);
-    int32_t dict_actual_size = (int32_t)ZDICT_trainFromBuffer(dict_buffer, dict_maxsize, samples_buffer, samples_sizes, nblocks);
+    int32_t dict_actual_size = (int32_t)ZDICT_trainFromBuffer(
+        dict_buffer, dict_maxsize,
+        samples_buffer, samples_sizes, nblocks);
 
     // TODO: experiment with parameters of low-level fast cover algorithm
     // Note that this API is still unstable.  See: https://github.com/facebook/zstd/issues/1599
@@ -2627,7 +2640,9 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     // fast_cover_params.d = nblocks;
     // fast_cover_params.steps = 4;
     // fast_cover_params.zParams.compressionLevel = context->clevel;
-    //size_t dict_actual_size = ZDICT_optimizeTrainFromBuffer_fastCover(dict_buffer, dict_maxsize, samples_buffer, samples_sizes, nblocks, &fast_cover_params);
+    // size_t dict_actual_size = ZDICT_optimizeTrainFromBuffer_fastCover(
+    //   dict_buffer, dict_maxsize, samples_buffer, samples_sizes, nblocks,
+    //   &fast_cover_params);
 
     if (ZDICT_isError(dict_actual_size) != ZSTD_error_no_error) {
       BLOSC_TRACE_ERROR("Error in ZDICT_trainFromBuffer(): '%s'."

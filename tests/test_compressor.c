@@ -152,8 +152,8 @@ static char *test_bitshuffle(void) {
   int cbytes2;
 
   /* Get a compressed buffer */
-  if (blosc1_set_compressor("zstd") == -1) {
-    /* If zstd is not here, just skip the test */
+  if (blosc1_set_compressor("zlib") == -1) {
+    /* If zlib is not here, just skip the test */
     return 0;
   };
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,

@@ -39,6 +39,7 @@ static char* test_dict(void) {
   cparams.clevel = 5;
   cparams.nthreads = NTHREADS;
   cparams.blocksize = blocksize;
+  cparams.splitmode = BLOSC_FORWARD_COMPAT_SPLIT;
   dparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
   schunk = blosc2_schunk_new(&storage);
