@@ -198,8 +198,11 @@ int split_block(blosc2_context *context, int32_t typesize, int32_t blocksize) {
 
   int compcode = context->compcode;
   return (
-          // Fast codecs like blosclz and lz4 always prefer to always split
-          ((compcode == BLOSC_BLOSCLZ) || (compcode == BLOSC_LZ4)) &&
+          // Fast codecs like blosclz, lz4 seems to prefer to split
+          ((compcode == BLOSC_BLOSCLZ) || (compcode == BLOSC_LZ4)
+            // and low levels of zstd too
+            || ((compcode == BLOSC_ZSTD) && (context->clevel <= 5))
+            ) &&
           // ...but split seems to harm cratio too much when not using shuffle
           (context->filter_flags & BLOSC_DOSHUFFLE) &&
           (typesize <= MAX_STREAMS) &&
