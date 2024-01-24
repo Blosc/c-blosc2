@@ -1,12 +1,12 @@
-# Announcing C-Blosc2 2.12.0
+# Announcing C-Blosc2 2.13.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-Now the `grok` codec is available globally and will be loaded dynamically. See more
-info about the codec in our blog post: https://www.blosc.org/posts/blosc2-grok-release/
-Furthermore, a new function has been added to get the unidimensional chunk indexes
-needed to get the slice of a Blosc2 container.
+A new filter for truncating integers has been added. Furthermore, the zstd codec
+has been optimized specially when using dicts. And finally, the grok library
+will be initialized when loading the plugin. This evicts having to import it in 
+some use cases.
 
 For more info, please see the release notes in:
 
