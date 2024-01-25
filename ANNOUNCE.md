@@ -1,12 +1,9 @@
-# Announcing C-Blosc2 2.13.0
+# Announcing C-Blosc2 2.13.1
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-A new filter for truncating integers has been added. Furthermore, the zstd codec
-has been optimized specially when using dicts. And finally, the grok library
-will be initialized when loading the plugin. This evicts having to import it in 
-some use cases.
+This is a patch release for fixing a bug regarding the included files in `b2nd.h`.
 
 For more info, please see the release notes in:
 
