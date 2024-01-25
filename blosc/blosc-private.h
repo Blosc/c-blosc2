@@ -274,45 +274,5 @@ static inline void* load_lib(char *plugin_name, char *libpath) {
   return loaded_lib;
 }
 
-static inline void swap_store(void *dest, const void *pa, int size) {
-  uint8_t *pa_ = (uint8_t *) pa;
-  uint8_t *pa2_ = (uint8_t*)malloc((size_t) size);
-  int i = 1; /* for big/little endian detection */
-  char *p = (char *) &i;
-
-  if (p[0] == 1) {
-    /* little endian */
-    switch (size) {
-      case 8:
-        pa2_[0] = pa_[7];
-        pa2_[1] = pa_[6];
-        pa2_[2] = pa_[5];
-        pa2_[3] = pa_[4];
-        pa2_[4] = pa_[3];
-        pa2_[5] = pa_[2];
-        pa2_[6] = pa_[1];
-        pa2_[7] = pa_[0];
-        break;
-      case 4:
-        pa2_[0] = pa_[3];
-        pa2_[1] = pa_[2];
-        pa2_[2] = pa_[1];
-        pa2_[3] = pa_[0];
-        break;
-      case 2:
-        pa2_[0] = pa_[1];
-        pa2_[1] = pa_[0];
-        break;
-      case 1:
-        pa2_[0] = pa_[0];
-        break;
-      default:
-        fprintf(stderr, "Unhandled nitems: %d\n", size);
-    }
-  }
-  memcpy(dest, pa2_, size);
-  free(pa2_);
-}
-
 
 #endif /* BLOSC_BLOSC_PRIVATE_H */
