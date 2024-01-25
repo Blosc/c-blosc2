@@ -2505,6 +2505,11 @@ BLOSC_EXPORT void blosc2_multidim_to_unidim(const int64_t *index, int8_t ndim, c
 BLOSC_EXPORT int blosc2_get_slice_nchunks(blosc2_schunk* schunk, int64_t *start, int64_t *stop, int64_t **chunks_idx);
 
 
+/*********************************************************************
+  Private functions, these are here for convenience,
+  and are not meant to be included in public docs
+*********************************************************************/
+
 // Private function needed in b2nd.h for deserializing meta
 static inline void swap_store(void *dest, const void *pa, int size) {
   uint8_t *pa_ = (uint8_t *) pa;
