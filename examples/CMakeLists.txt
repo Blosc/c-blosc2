@@ -1,7 +1,7 @@
 # Examples with correspondingly named source files
 set(EXAMPLES contexts instrument_codec delta_schunk_ex multithread simple frame_metalayers
     noinit find_roots schunk_simple frame_simple schunk_postfilter urcodecs urfilters frame_vlmetalayers
-    sframe_simple frame_backed_schunk compress_file frame_offset frame_roundtrip get_set_slice get_blocksize)
+    sframe_simple frame_backed_schunk compress_file decompress_file frame_offset frame_roundtrip get_set_slice get_blocksize)
 
 add_subdirectory(b2nd)
 
