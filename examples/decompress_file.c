@@ -11,7 +11,7 @@
 
   Example usage for compression/decompression verification:
 
-  $ sha512sum compress_file 
+  $ sha512sum compress_file
   385c93c..feaf38dbec  compress_file
   $ ./compress_file compress_file compress_file.bl2
   Blosc version info: 2.13.2.dev ($Date:: 2023-01-25 #$)
@@ -26,7 +26,6 @@
 
  */
 
-#include <malloc.h>
 #include <stdio.h>
 #include <blosc2.h>
 
@@ -71,7 +70,7 @@ int main(int argc, char* argv[]) {
     fwrite(data, dsize, 1, foutput);
   }
   fclose(foutput);
-  
+
   /* Gather some info */
   nbytes = schunk->nbytes;
   cbytes = schunk->cbytes;

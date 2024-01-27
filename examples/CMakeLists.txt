@@ -44,8 +44,12 @@ if(BUILD_TESTS)
         foreach(example ${EXAMPLES})
             if(example STREQUAL compress_file)
                 add_test(NAME test_example_${example}
-                    COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:${example}>
-                        "${PROJECT_BINARY_DIR}/CMakeCache.txt" CMakeCache.b2frame)
+                         COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:${example}>
+                         "${PROJECT_BINARY_DIR}/CMakeCache.txt" CMakeCache.b2frame)
+            elseif(example STREQUAL decompress_file)
+                add_test(NAME test_example_${example}
+                         COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:${example}>
+                         CMakeCache.b2frame CMakeCache-2.txt)
             else()
                 add_test(NAME test_example_${example}
                     COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:${example}>)
