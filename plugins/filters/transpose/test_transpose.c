@@ -6,8 +6,8 @@
 */
 
 #include <stdio.h>
-#include <assert.h>
 #include "blosc2.h"
+#include "b2nd.h"
 #include "blosc2/filters-registry.h"
 
 
@@ -15,50 +15,62 @@
 #define MB  (1024*KB)
 #define GB  (1024*MB)
 
-#define NCHUNKS 20
-#define CHUNKSIZE (500 * 1000)
+#define NCHUNKS 1
+#define NDIM 3
+#define XSIZE (32 * NCHUNKS)
+#define YSIZE 100
+#define ZSIZE 32
+#define CHUNKSIZE (XSIZE * YSIZE * ZSIZE)
 #define NTHREADS 8
 
 
 // For 16-bit integers
 void fill_buffer16(int16_t *buffer) {
-  for (int32_t i = 0; i < CHUNKSIZE; i++) {
-    buffer[i] = (int16_t)i;
+  for (int32_t i = 0; i < XSIZE; i++) {
+    for (int32_t j = 0; j < YSIZE; j++) {
+      for (int32_t k = 0; k < ZSIZE; k++) {
+        buffer[i * YSIZE * ZSIZE + j * ZSIZE + k] = (int16_t) (i * YSIZE * ZSIZE + j * ZSIZE + k);
+      }
+    }
   }
 }
 
 int main16(void) {
-  blosc2_schunk *schunk;
-  int32_t isize = CHUNKSIZE * sizeof(int16_t);
-  int dsize;
+  int32_t isize = NCHUNKS * CHUNKSIZE * sizeof(int16_t);
   int64_t nbytes, cbytes;
-  int nchunk;
-  int64_t nchunks = 0;
   blosc_timestamp_t last, current;
   double totaltime;
-  float totalsize = (float)(isize * NCHUNKS);
-  int16_t *data_buffer = malloc(CHUNKSIZE * sizeof(int16_t));
-  int16_t *rec_buffer = malloc(CHUNKSIZE * sizeof(int16_t));
+  float totalsize = (float)isize;
+  int16_t *data_buffer = malloc(isize);
+  int16_t *rec_buffer = malloc(isize);
 
   /* Create a super-chunk container */
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.filters[0] = BLOSC_FILTER_INT_TRUNC;
-  int PRECISION_BITS = 10;  // remove 10 bits of precision
-  cparams.filters_meta[0] = -PRECISION_BITS;
+  cparams.filters[0] = BLOSC_FILTER_TRANSPOSE;
+  cparams.filters_meta[0] = 0;
   cparams.typesize = sizeof(int16_t);
   // Good codec params for this dataset
   cparams.compcode = BLOSC_BLOSCLZ;
   cparams.clevel = 9;
   cparams.nthreads = NTHREADS;
   blosc2_storage storage = {.cparams=&cparams, .contiguous=true};
-  schunk = blosc2_schunk_new(&storage);
 
-  /* Append the chunks */
+  int64_t shape[] = {XSIZE, YSIZE, ZSIZE};
+  int32_t chunkshape[] = {XSIZE / NCHUNKS , YSIZE, ZSIZE};
+  int32_t blockshape[] = {XSIZE / NCHUNKS / 2, YSIZE / 8, ZSIZE / 2};
+
+  b2nd_context_t *ctx = b2nd_create_ctx(
+      &storage, NDIM, shape, chunkshape, blockshape, NULL, 0,
+      NULL, 0);
+
+  // Fill the data buffer
+  fill_buffer16(data_buffer);
+
+  // Fill a b2nd array with data
   blosc_set_timestamp(&last);
-  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    fill_buffer16(data_buffer);
-    nchunks = blosc2_schunk_append_buffer(schunk, data_buffer, isize);
-  }
+  b2nd_array_t *arr;
+  BLOSC_ERROR(b2nd_from_cbuffer(ctx, &arr, data_buffer, isize));
+  blosc2_schunk *schunk = arr->sc;
   blosc_set_timestamp(&current);
   totaltime = blosc_elapsed_secs(last, current);
   printf("[Compr] Elapsed time:\t %6.3f s."
@@ -71,42 +83,24 @@ int main16(void) {
   printf("Compression super-chunk: %ld -> %ld (%.1fx)\n",
          (long)nbytes, (long)cbytes, (1. * (double)nbytes) / (double)cbytes);
 
-  /* Retrieve and decompress the chunks */
+  /* Retrieve and decompress the data */
   blosc_set_timestamp(&last);
-  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, rec_buffer, isize);
-    if (dsize < 0) {
-      printf("Decompression error.  Error code: %d\n", dsize);
-      return dsize;
-    }
-    assert (dsize == (int)isize);
-  }
+  BLOSC_ERROR(b2nd_to_cbuffer(arr, (void *)rec_buffer, isize) < 0);
   blosc_set_timestamp(&current);
   totaltime = blosc_elapsed_secs(last, current);
-  totalsize = (float)(isize * nchunks);
   printf("[Decompr] Elapsed time:\t %6.3f s."
          "  Processed data: %.3f GB (%.3f GB/s)\n",
          totaltime, totalsize / GB, totalsize / (GB * totaltime));
 
-  /* Check that all the values are in the precision range */
-  blosc_set_timestamp(&last);
-  for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) rec_buffer, isize);
-    if (dsize < 0) {
-      printf("Decompression error.  Error code: %d\n", dsize);
-      return dsize;
-    }
-    assert (dsize == (int)isize);
-    fill_buffer16(data_buffer);
-    for (int i = 0; i < CHUNKSIZE; i++) {
-      // Check for precision
-      if ((data_buffer[i] - rec_buffer[i]) > (1LL << PRECISION_BITS)) {
-        printf("Value not in tolerance margin: ");
-        printf("%d - %d: %d, (nchunk: %d, nelem: %d)\n",
-               data_buffer[i], rec_buffer[i],
-               (data_buffer[i] - rec_buffer[i]), nchunk, i);
-        return -1;
-      }
+  /* Check that all the values have had a good roundtrip */
+  for (int i = 0; i < isize; i++) {
+    // Check for precision
+    if ((data_buffer[i] != rec_buffer[i])) {
+      printf("Values are not equal: ");
+      printf("%d - %d: %d, (nelem: %d)\n",
+             data_buffer[i], rec_buffer[i],
+             (data_buffer[i] - rec_buffer[i]), i);
+      return -1;
     }
   }
   printf("All data did a good roundtrip!\n");
@@ -114,10 +108,10 @@ int main16(void) {
   /* Free resources */
   free(data_buffer);
   free(rec_buffer);
-  /* Destroy the super-chunk */
-  blosc2_schunk_free(schunk);
+  /* Destroy the b2nd array */
+  b2nd_free(arr);
 
-  return isize * NCHUNKS;
+  return isize;
 }
 
 
