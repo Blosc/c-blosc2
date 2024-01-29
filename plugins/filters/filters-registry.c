@@ -9,6 +9,7 @@
 #include "ndcell/ndcell.h"
 #include "bytedelta/bytedelta.h"
 #include "int_trunc/int_trunc.h"
+#include "transpose/transpose.h"
 #include "blosc-private.h"
 #include "blosc2.h"
 
@@ -55,5 +56,13 @@ void register_filters(void) {
   int_trunc.forward = &int_trunc_forward;
   int_trunc.backward = &int_trunc_backward;
   register_filter_private(&int_trunc);
+
+  blosc2_filter transpose;
+  transpose.id = BLOSC_FILTER_TRANSPOSE;
+  transpose.name = "transpose";
+  transpose.version = 1;
+  transpose.forward = &transpose_forward;
+  transpose.backward = &transpose_backward;
+  register_filter_private(&transpose);
 
 }
