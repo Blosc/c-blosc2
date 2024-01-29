@@ -1358,7 +1358,7 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
     schunk->metalayers[nmetalayer] = metalayer;
 
     // Populate the metalayer string
-    int8_t nslen = *idxp & (uint8_t)0x1F;
+    uint8_t nslen = *idxp & (uint8_t)0x1F;
     idxp += 1;
     header_pos += nslen;
     if (header_len < header_pos) {
@@ -1538,7 +1538,7 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
     schunk->vlmetalayers[nmetalayer] = metalayer;
 
     // Populate the metalayer string
-    int8_t nslen = *idxp & (uint8_t)0x1F;
+    uint8_t nslen = *idxp & (uint8_t)0x1F;
     idxp += 1;
     trailer_pos += nslen;
     if (trailer_len < trailer_pos) {
@@ -1885,6 +1885,11 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
       }
       if (chunk_cbytes > (int32_t)prev_alloc) {
         data_chunk = realloc(data_chunk, chunk_cbytes);
+        if (data_chunk == NULL) {
+          BLOSC_TRACE_ERROR("Cannot realloc space for the data_chunk.");
+          rc = BLOSC2_ERROR_MEMORY_ALLOC;
+          break;
+        }
         prev_alloc = chunk_cbytes;
       }
       if (!frame->sframe) {
