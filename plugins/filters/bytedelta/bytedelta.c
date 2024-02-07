@@ -18,7 +18,15 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#if defined __i386__ || defined _M_IX86 || defined __x86_64__ || defined _M_X64
+/* Define the __SSSE3__ symbol if compiling with Visual C++ and
+   targeting the minimum architecture level.
+*/
+#if !defined(__SSSE3__) && defined(_MSC_VER) && \
+    (defined(_M_X64) || (defined(_M_IX86) && _M_IX86_FP >= 2))
+  #define __SSSE3__
+#endif
+
+#if defined(__SSSE3__)
 // SSSE3 code path for x64/x64
 #define CPU_HAS_SIMD 1
 #include <emmintrin.h>
