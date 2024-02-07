@@ -19,11 +19,22 @@ extern "C" {
 
 enum {
     BLOSC_CODEC_NDLZ = 32,
+    //!< Simple Lempel-Ziv compressor for NDim data. Experimental, mainly for teaching purposes.
     BLOSC_CODEC_ZFP_FIXED_ACCURACY = 33,
+    //!< ZFP compressor for fixed accuracy mode. The desired accuracy is set in `compcode_meta`.
+    //!< See https://github.com/Blosc/c-blosc2/blob/main/plugins/codecs/zfp/README.md
     BLOSC_CODEC_ZFP_FIXED_PRECISION = 34,
+    //!< ZFP compressor for fixed precision. The desired precision is set in `compcode_meta`.
+    //!< See https://github.com/Blosc/c-blosc2/blob/main/plugins/codecs/zfp/README.md
     BLOSC_CODEC_ZFP_FIXED_RATE = 35,
+    //!< ZFP compressor for fixed precision. The desired rate is set in `compcode_meta`.
+    //!< See https://github.com/Blosc/c-blosc2/blob/main/plugins/codecs/zfp/README.md
     BLOSC_CODEC_OPENHTJ2K = 36,
+    //!< OpenHTJ2K compressor for JPEG 2000 HT.
+    //!< See https://github.com/Blosc/blosc2_openhtj2k
     BLOSC_CODEC_GROK = 37,
+    //!< Grok compressor for JPEG 2000.
+    //!< See https://github.com/Blosc/blosc2_grok
 };
 
 void register_codecs(void);

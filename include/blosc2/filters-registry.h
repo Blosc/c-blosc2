@@ -17,10 +17,20 @@ extern "C" {
 
 enum {
     BLOSC_FILTER_NDCELL = 32,
+    //!< Simple filter for grouping NDim cell data together.
+    //!< See https://github.com/Blosc/c-blosc2/blob/main/plugins/filters/ndcell/README.md
     BLOSC_FILTER_NDMEAN = 33,
-    BLOSC_FILTER_BYTEDELTA_BUGGY = 34, // buggy version. See #524
-    BLOSC_FILTER_BYTEDELTA = 35,  // fixed version
-    BLOSC_FILTER_INT_TRUNC = 36,  // truncate int precision; positive values in cparams.filters_meta will keep bits; negative values will reduce bits.
+    //!< Simple filter for replacing content of a NDim cell with its mean value.
+    //!< See https://github.com/Blosc/c-blosc2/blob/main/plugins/filters/ndmean/README.md
+    BLOSC_FILTER_BYTEDELTA_BUGGY = 34,
+    // buggy version. See #524
+    BLOSC_FILTER_BYTEDELTA = 35,
+    //!< Byteshuffle + delta.  Sometimes this can represent an advantage over
+    //!< @ref BLOSC_SHUFFLE or @ref BLOSC_BITSHUFFLE.
+    //!< See https://www.blosc.org/posts/bytedelta-enhance-compression-toolset/
+    BLOSC_FILTER_INT_TRUNC = 36,
+    //!< Truncate int precision; positive values in `filter_meta` will keep bits; negative values will zero bits.
+    //!< This is similar to @ref BLOSC_TRUNC_PREC, but for integers instead of floating point data.
 };
 
 void register_filters(void);

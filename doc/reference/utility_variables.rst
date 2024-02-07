@@ -33,6 +33,14 @@ Codes for filters
 
 .. doxygenenumvalue:: BLOSC_TRUNC_PREC
 
+.. doxygenenumvalue:: BLOSC_FILTER_NDCELL
+
+.. doxygenenumvalue:: BLOSC_FILTER_NDMEAN
+
+.. doxygenenumvalue:: BLOSC_FILTER_BYTEDELTA
+
+.. doxygenenumvalue:: BLOSC_FILTER_INT_TRUNC
+
 
 Compressor codecs
 -----------------
@@ -45,6 +53,18 @@ Compressor codecs
 .. doxygenenumvalue:: BLOSC_ZLIB
 
 .. doxygenenumvalue:: BLOSC_ZSTD
+
+.. doxygenenumvalue:: BLOSC_CODEC_NDLZ
+
+.. doxygenenumvalue:: BLOSC_CODEC_ZFP_FIXED_ACCURACY
+
+.. doxygenenumvalue:: BLOSC_CODEC_ZFP_FIXED_PRECISION
+
+.. doxygenenumvalue:: BLOSC_CODEC_ZFP_FIXED_RATE
+
+.. doxygenenumvalue:: BLOSC_CODEC_OPENHTJ2K
+
+.. doxygenenumvalue:: BLOSC_CODEC_GROK
 
 
 Compressor names
