@@ -4,7 +4,12 @@ Release notes for C-Blosc2
 Changes from 2.13.1 to 2.13.2
 =============================
 
-#XXX version-specific blurb XXX#
+* Better checking for `SSSE3` availability in Visual Studio.  Probably fixes #546 too.
+  Thanks to @t20100 (Thomas Vincent) for the PR (#586).
+
+* Documented the globally registered filters and codecs.  See:
+  https://www.blosc.org/c-blosc2/reference/utility_variables.html#codes-for-filters
+  https://www.blosc.org/c-blosc2/reference/utility_variables.html#compressor-codecs
 
 
 Changes from 2.13.0 to 2.13.1

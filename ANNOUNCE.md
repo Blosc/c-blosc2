@@ -1,9 +1,13 @@
-# Announcing C-Blosc2 2.13.1
+# Announcing C-Blosc2 2.13.2
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a patch release for fixing a bug regarding the included files in `b2nd.h`.
+This is a patch release for improving of SSSE3 detection on Visual Studio.
+Also, documentation for the globally registered filters and codecs has been
+added:
+https://www.blosc.org/c-blosc2/reference/utility_variables.html#codes-for-filters
+https://www.blosc.org/c-blosc2/reference/utility_variables.html#compressor-codecs
 
 For more info, please see the release notes in:
 
