@@ -1494,6 +1494,18 @@ static int32_t set_nans(int32_t typesize, uint8_t* dest, int32_t destsize) {
 
 
 static int32_t set_values(int32_t typesize, const uint8_t* src, uint8_t* dest, int32_t destsize) {
+#if defined(BLOSC_STRICT_ALIGN)
+  if (destsize % typesize != 0) {
+    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+  }
+  int32_t nitems = destsize / typesize;
+  if (nitems == 0) {
+    return 0;
+  }
+  for (int i = 0; i < nitems; i++) {
+    memcpy(dest + i * typesize, src + BLOSC_EXTENDED_HEADER_LENGTH, typesize);
+  }
+#else
   // destsize can only be a multiple of typesize
   int64_t val8;
   int64_t* dest8;
@@ -1546,6 +1558,7 @@ static int32_t set_values(int32_t typesize, const uint8_t* src, uint8_t* dest, i
         memcpy(dest + i * typesize, src + BLOSC_EXTENDED_HEADER_LENGTH, typesize);
       }
   }
+#endif
 
   return nitems;
 }
