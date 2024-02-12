@@ -60,12 +60,12 @@ The header contains information needed to decompress the Blosc chunks contained 
       +-- [msgpack] int32
 
 The filter pipeline is stored next in the header. It contains 6 slots, one for each filter that can be applied. For
-each slot there is a byte used to store the filter code in `filter_codes` and an associated byte used to store any
-possible filter meta-info in `filter_meta`::
+each slot there is a byte used to store the filter ID in `filters` and an associated byte used to store any
+possible filter meta-info in `filters_meta`::
 
 
     |-45|-46|-47|-48|-49|-4A|-4B|-4C|-4D|-4E|-4F|-50|-51|-52|-53|-54|-55|-56|
-    | d2| X | filter_codes          |_f4|_f5| filter_meta           |   |   |
+    | d2| X | filters               |_f4|_f5| filters_meta          |   |   |
     |---|---|-------------------------------|-------------------------------|
       ^   ^                           ^   ^                           ^   ^
       |   |                           |   |                           |   +-- reserved

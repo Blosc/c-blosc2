@@ -40,7 +40,7 @@ Starting in Blosc 2.0.0, there is an extension of the header above that allows
 for encoding blocks with a filter pipeline::
 
   1+|-0-|-1-|-2-|-3-|-4-|-5-|-6-|-7-|-8-|-9-|-A-|-B-|-C-|-D-|-E-|-F-|
-    |     filter codes      | ^ | ^ |     filter meta       | ^ | ^ |
+    |     filters           | ^ | ^ |     filters_meta      | ^ | ^ |
                               |   |                           |   |
                               |   +- compcode_meta            |   +-blosc2_flags
                               +- user-defined codec           +-reserved
@@ -105,8 +105,8 @@ for encoding blocks with a filter pipeline::
 :cbytes:
     (``int32``) Compressed size of the buffer (including this header).
 
-:filter_codes:
-    (``uint8``) Filter code.
+:filters:
+    (``uint8``) Filter ID.
 
     :``0``:
         No shuffle (for compatibility with Blosc1).
@@ -121,11 +121,12 @@ for encoding blocks with a filter pipeline::
     :``4``:
         Truncate precision filter.
     :``5``:
-        User-defined filter.
+        Sentinel. IDs larger than this are either global registered or user-defined filters.
 
-    The filter pipeline has 6 reserved slots for the filters. They are applied sequentially to the chunk according
-    to their index in increasing order. The type of filter applied is specified by the `filter_code`. Each
-    `filter_code` has an associated field in `filter_meta` that can contain metadata about the filter.
+    The filter pipeline has 6 reserved slots for the filters IDs. They are applied sequentially
+    to the chunk according to their index (in increasing order). The type of filter applied is
+    specified by the ID. Each ID has an associated field in `filters_meta` that can contain metadata
+    about the filter.
 
 :udcodec:
     (``uint8``) User-defined codec identifier.
@@ -135,10 +136,10 @@ for encoding blocks with a filter pipeline::
 
     Metadata associated with the compression codec.
 
-:filter_meta:
-    (``uint8``) Filter metadata.
+:filters_meta:
+    (``uint8``) Filter metadata associated to each filter ID.
 
-    Metadata associated with the filter code.
+    Metadata associated with the filter ID.
 
 :blosc2_flags:
     (``bitfield``) The flags for a Blosc2 buffer.

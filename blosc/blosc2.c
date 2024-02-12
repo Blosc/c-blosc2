@@ -660,10 +660,10 @@ typedef struct blosc_header_s {
   int32_t blocksize;
   int32_t cbytes;
   // Extended Blosc2 header
-  uint8_t filter_codes[BLOSC2_MAX_FILTERS];
+  uint8_t filters[BLOSC2_MAX_FILTERS];
   uint8_t udcompcode;
   uint8_t compcode_meta;
-  uint8_t filter_meta[BLOSC2_MAX_FILTERS];
+  uint8_t filters_meta[BLOSC2_MAX_FILTERS];
   uint8_t reserved2;
   uint8_t blosc2_flags;
 } blosc_header;
@@ -739,12 +739,12 @@ int read_chunk_header(const uint8_t* src, int32_t srcsize, bool extended_header,
     // The number of filters depends on the version of the header. Blosc2 alpha series
     // did not initialize filters to zero beyond the max supported.
     if (header->version == BLOSC2_VERSION_FORMAT_ALPHA) {
-      header->filter_codes[5] = 0;
-      header->filter_meta[5] = 0;
+      header->filters[5] = 0;
+      header->filters_meta[5] = 0;
     }
   }
   else {
-    flags_to_filters(header->flags, header->filter_codes);
+    flags_to_filters(header->flags, header->filters);
   }
   return 0;
 }
@@ -775,11 +775,11 @@ static int blosc2_initialize_context_from_header(blosc2_context* context, blosc_
     /* Extended header */
     context->header_overhead = BLOSC_EXTENDED_HEADER_LENGTH;
 
-    memcpy(context->filters, header->filter_codes, BLOSC2_MAX_FILTERS);
-    memcpy(context->filters_meta, header->filter_meta, BLOSC2_MAX_FILTERS);
+    memcpy(context->filters, header->filters, BLOSC2_MAX_FILTERS);
+    memcpy(context->filters_meta, header->filters_meta, BLOSC2_MAX_FILTERS);
     context->compcode_meta = header->compcode_meta;
 
-    context->filter_flags = filters_to_flags(header->filter_codes);
+    context->filter_flags = filters_to_flags(header->filters);
     context->special_type = (header->blosc2_flags >> 4) & BLOSC2_SPECIAL_MASK;
 
     is_lazy = (context->blosc2_flags & 0x08u);
@@ -894,8 +894,8 @@ static int blosc2_intialize_header_from_context(blosc2_context* context, blosc_h
   if (extended_header) {
     /* Store filter pipeline info at the end of the header */
     for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
-      header->filter_codes[i] = context->filters[i];
-      header->filter_meta[i] = context->filters_meta[i];
+      header->filters[i] = context->filters[i];
+      header->filters_meta[i] = context->filters_meta[i];
     }
     header->udcompcode = context->compcode;
     header->compcode_meta = context->compcode_meta;

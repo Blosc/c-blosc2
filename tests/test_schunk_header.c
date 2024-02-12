@@ -76,8 +76,8 @@ static char* test_schunk_header(void) {
   mu_assert("err clevel", schunk->clevel == 3);
   mu_assert("err typesize", schunk->typesize == 4);
   mu_assert("err blocksize", schunk->blocksize == 1024 * cparams.typesize);
-  mu_assert("err filter_meta 1", schunk->filters_meta[0] = 23);
-  mu_assert("err filter meta 2", schunk->filters_meta[1] = 24);
+  mu_assert("err  1", schunk->filters_meta[0] = 23);
+  mu_assert("err filters_meta 2", schunk->filters_meta[1] = 24);
   mu_assert("err filters 4", schunk->filters[4] = BLOSC_DELTA);
 
   // Check that the chunks have been decompressed correctly

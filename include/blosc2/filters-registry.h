@@ -25,11 +25,13 @@ enum {
     BLOSC_FILTER_BYTEDELTA_BUGGY = 34,
     // buggy version. See #524
     BLOSC_FILTER_BYTEDELTA = 35,
-    //!< Byteshuffle + delta.  Sometimes this can represent an advantage over
+    //!< Byteshuffle + delta.  The typesize should be specified in the `filters_meta` slot.
+    //!<  Sometimes this can represent an advantage over
     //!< @ref BLOSC_SHUFFLE or @ref BLOSC_BITSHUFFLE.
     //!< See https://www.blosc.org/posts/bytedelta-enhance-compression-toolset/
     BLOSC_FILTER_INT_TRUNC = 36,
-    //!< Truncate int precision; positive values in `filter_meta` will keep bits; negative values will zero bits.
+    //!< Truncate int precision; positive values in `filters_meta` slot will keep bits;
+    //!< negative values will remove (set to zero) bits.
     //!< This is similar to @ref BLOSC_TRUNC_PREC, but for integers instead of floating point data.
 };
 
