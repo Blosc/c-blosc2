@@ -245,14 +245,22 @@ enum {
  */
 enum {
 #ifndef BLOSC_H
-  BLOSC_NOSHUFFLE = 0,   //!< No shuffle (for compatibility with Blosc1).
-  BLOSC_NOFILTER = 0,    //!< No filter.
-  BLOSC_SHUFFLE = 1,     //!< Byte-wise shuffle.
-  BLOSC_BITSHUFFLE = 2,  //!< Bit-wise shuffle.
+  BLOSC_NOSHUFFLE = 0,
+  //!< No shuffle (for compatibility with Blosc1).
+  BLOSC_NOFILTER = 0,
+  //!< No filter.
+  BLOSC_SHUFFLE = 1,
+  //!< Byte-wise shuffle. `filters_meta` does not have any effect here.
+  BLOSC_BITSHUFFLE = 2,
+  //!< Bit-wise shuffle. `filters_meta` does not have any effect here.
 #endif // BLOSC_H
-  BLOSC_DELTA = 3,       //!< Delta filter.
-  BLOSC_TRUNC_PREC = 4,  //!< Truncate mantissa precision; positive values in `filters_meta` will keep bits; negative values will zero bits.
-  BLOSC_LAST_FILTER = 5, //!< sentinel
+  BLOSC_DELTA = 3,
+  //!< Delta filter. `filters_meta` does not have any effect here.
+  BLOSC_TRUNC_PREC = 4,
+  //!< Truncate mantissa precision.
+  //!< Positive values in `filters_meta` will keep bits; negative values will zero bits.
+  BLOSC_LAST_FILTER = 5,
+  //!< sentinel
   BLOSC_LAST_REGISTERED_FILTER = BLOSC2_GLOBAL_REGISTERED_FILTERS_START + BLOSC2_GLOBAL_REGISTERED_FILTERS - 1,
   //!< Determine the last registered filter. It is used to check if a filter is registered or not.
 };
