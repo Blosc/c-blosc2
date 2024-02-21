@@ -970,13 +970,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
     if (filters[i] <= BLOSC2_DEFINED_FILTERS_STOP) {
       switch (filters[i]) {
         case BLOSC_SHUFFLE:
-          for (int j = 0; j <= filters_meta[i]; j++) {
-            shuffle(typesize, bsize, _src, _dest);
-            // Cycle filters when required
-            if (j < filters_meta[i]) {
-              _cycle_buffers(&_src, &_dest, &_tmp);
-            }
-          }
+          shuffle(typesize, bsize, _src, _dest);
           break;
         case BLOSC_BITSHUFFLE:
           if (bitshuffle(typesize, bsize, _src, _dest) < 0) {
@@ -1345,17 +1339,7 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
     if (filters[i] <= BLOSC2_DEFINED_FILTERS_STOP) {
       switch (filters[i]) {
         case BLOSC_SHUFFLE:
-          for (int j = 0; j <= filters_meta[i]; j++) {
-            unshuffle(typesize, bsize, _src, _dest);
-            // Cycle filters when required
-            if (j < filters_meta[i]) {
-              _cycle_buffers(&_src, &_dest, &_tmp);
-            }
-            // Check whether we have to copy the intermediate _dest buffer to final destination
-            if (last_copy_filter && (filters_meta[i] % 2) == 1 && j == filters_meta[i]) {
-              memcpy(dest + offset, _dest, (unsigned int) bsize);
-            }
-          }
+          unshuffle(typesize, bsize, _src, _dest);
           break;
         case BLOSC_BITSHUFFLE:
           if (bitunshuffle(typesize, bsize, _src, _dest, context->src[BLOSC2_CHUNK_VERSION]) < 0) {
