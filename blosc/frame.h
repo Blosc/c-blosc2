@@ -124,13 +124,15 @@ int frame_free(blosc2_frame_s *frame);
 blosc2_frame_s* frame_from_file_offset(const char *urlpath, const blosc2_io *io_cb, int64_t offset);
 
 /**
- * @brief Initialize a frame out of a frame buffer.
+ * @brief Initialize a frame out of a contiguous frame buffer.
  *
- * @param buffer The buffer for the frame.
+ * @param cframe The buffer for the frame.
  * @param len The length of buffer for the frame.
  * @param copy Whether the frame buffer should be copied internally or not.
  *
- * @return The frame created from the frame buffer.
+ * @return The frame created from the contiguous frame buffer.
+ *
+ * @note The user is responsible to `free` the returned frame.
  */
 blosc2_frame_s* frame_from_cframe(uint8_t *cframe, int64_t len, bool copy);
 
