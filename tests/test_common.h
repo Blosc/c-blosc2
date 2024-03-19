@@ -3,7 +3,7 @@
 
   Unit tests for basic features in Blosc.
 
-  Copyright (c) 2010  The Blosc Development Team <blosc@blosc.org>
+  Copyright (c) 2010  Blosc Development Team <blosc@blosc.org>
   https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 
