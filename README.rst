@@ -6,7 +6,7 @@ A fast, compressed and persistent data store library for C
 ==========================================================
 
 
-:Author: The Blosc Development Team
+:Author: Blosc Development Team
 :Contact: blosc@blosc.org
 :URL: https://www.blosc.org
 :Gitter: |gitter|
@@ -250,4 +250,4 @@ See `THANKS document <https://github.com/Blosc/c-blosc2/blob/main/THANKS.rst>`_.
 
 ----
 
--- The Blosc Development Team.  **We make compression better.**
+-- Blosc Development Team.  **We make compression better.**

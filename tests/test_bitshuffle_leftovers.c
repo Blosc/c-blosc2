@@ -5,7 +5,7 @@
   See https://github.com/Blosc/python-blosc/issues/220
   Probably related: https://github.com/Blosc/c-blosc/issues/240
 
-  Copyright (c) 2021  The Blosc Development Team <blosc@blosc.org>
+  Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
   https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 
