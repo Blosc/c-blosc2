@@ -271,16 +271,12 @@ endif()
 # for newer hardware on older machines as well as cross-compilation.
 message(STATUS "Building for system processor ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "Building for compiler ID ${CMAKE_C_COMPILER_ID}")
-if(CMAKE_SYSTEM_PROCESSOR STREQUAL i386 OR
-    CMAKE_SYSTEM_PROCESSOR STREQUAL i686 OR
-    CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64 OR
-    CMAKE_SYSTEM_PROCESSOR STREQUAL amd64 OR
-    CMAKE_SYSTEM_PROCESSOR STREQUAL AMD64)
-    if(CMAKE_C_COMPILER_ID STREQUAL GNU)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES i386|i686|x86_64|amd64|AMD64)
+    if(CMAKE_C_COMPILER_ID MATCHES GNU)
         # We need C99 (GNU99 more exactly)
         SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
         set(COMPILER_SUPPORT_SSE2 TRUE)
-        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.7 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 4.7)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 4.7)
             set(COMPILER_SUPPORT_AVX2 TRUE)
         else()
             set(COMPILER_SUPPORT_AVX2 FALSE)
@@ -288,36 +284,36 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL i386 OR
         # GCC 10.3.2 (the version in manylinux_2014) seems to have issues supporting dynamic dispatching
         # of AVX512.  GCC 11.4 is the first minimal version that works well here.
         # That means that Linux wheels will have AVX512 disabled, but that's life.
-        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 11.4 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 11.4)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 11.4)
             set(COMPILER_SUPPORT_AVX512 TRUE)
         else()
             set(COMPILER_SUPPORT_AVX512 FALSE)
         endif()
-    elseif(CMAKE_C_COMPILER_ID STREQUAL Clang OR CMAKE_C_COMPILER_ID STREQUAL AppleClang)
+    elseif(CMAKE_C_COMPILER_ID MATCHES Clang|AppleClang)
         set(COMPILER_SUPPORT_SSE2 TRUE)
-        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 3.2 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 3.2)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 3.2)
             set(COMPILER_SUPPORT_AVX2 TRUE)
         else()
             set(COMPILER_SUPPORT_AVX2 FALSE)
         endif()
         # Clang 13 is the minimum version that we know that works with AVX512 dynamic dispatch.
         # Perhaps lesser versions work too, better to err on the safe side.
-        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 13.0 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 13.0)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
             set(COMPILER_SUPPORT_AVX512 TRUE)
         else()
             set(COMPILER_SUPPORT_AVX512 FALSE)
         endif()
-    elseif(CMAKE_C_COMPILER_ID STREQUAL Intel)
+    elseif(CMAKE_C_COMPILER_ID MATCHES Intel|IntelLLVM)
         # All Intel compilers since the introduction of AVX512 in 2016 should support it, so activate all SIMD flavors
         set(COMPILER_SUPPORT_SSE2 TRUE)
         set(COMPILER_SUPPORT_AVX2 TRUE)
         set(COMPILER_SUPPORT_AVX512 TRUE)
     elseif(MSVC)
         set(COMPILER_SUPPORT_SSE2 TRUE)
-        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 18.00.30501 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 18.00.30501)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 18.00.30501)
             set(COMPILER_SUPPORT_AVX2 TRUE)
         # AVX512 starts to be supported since Visual Studio 17 15.0
-        elseif(CMAKE_C_COMPILER_VERSION VERSION_GREATER 19.10.25017 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 19.10.25017)
+    elseif(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 19.10.25017)
                 set(COMPILER_SUPPORT_AVX512 TRUE)
         else()
             set(COMPILER_SUPPORT_AVX2 FALSE)
@@ -329,17 +325,15 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL i386 OR
         # Unrecognized compiler. Emit a warning message to let the user know hardware-acceleration won't be available.
         message(WARNING "Unable to determine which ${CMAKE_SYSTEM_PROCESSOR} hardware features are supported by the C compiler (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}).")
     endif()
-elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l OR
-        CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64 OR
-        CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
-    if(CMAKE_C_COMPILER_ID STREQUAL GNU)
-        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 5.2 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 5.2)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES armv7l|aarch64|arm64)
+    if(CMAKE_C_COMPILER_ID MATCHES GNU)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 5.2)
             set(COMPILER_SUPPORT_NEON TRUE)
         else()
             set(COMPILER_SUPPORT_NEON FALSE)
         endif()
-    elseif(CMAKE_C_COMPILER_ID STREQUAL Clang OR CMAKE_C_COMPILER_ID STREQUAL AppleClang)
-        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 3.3 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 3.3)
+    elseif(CMAKE_C_COMPILER_ID MATCHES Clang|AppleClang)
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 3.3)
             set(COMPILER_SUPPORT_NEON TRUE)
         else()
             set(COMPILER_SUPPORT_NEON FALSE)
@@ -350,9 +344,9 @@ elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l OR
         message(WARNING "Unable to determine which ${CMAKE_SYSTEM_PROCESSOR} hardware features are supported by the C compiler (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}).")
     endif()
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ppc64le|powerpc64le)")
-    if(CMAKE_C_COMPILER_ID STREQUAL GNU AND CMAKE_C_COMPILER_VERSION VERSION_GREATER 8)
+    if(CMAKE_C_COMPILER_ID MATCHES GNU AND CMAKE_C_COMPILER_VERSION VERSION_GREATER 8)
         set(COMPILER_SUPPORT_ALTIVEC TRUE)
-    elseif(CMAKE_C_COMPILER_ID STREQUAL Clang AND CMAKE_C_COMPILER_VERSION VERSION_GREATER 13)
+    elseif(CMAKE_C_COMPILER_ID MATCHES Clang AND CMAKE_C_COMPILER_VERSION VERSION_GREATER 13)
         set(COMPILER_SUPPORT_ALTIVEC TRUE)
     else()
         set(COMPILER_SUPPORT_ALTIVEC FALSE)
@@ -381,13 +375,13 @@ endif()
 
 # Set the "-msse2" build flag only if the CMAKE_C_FLAGS is not already set.
 # Probably "-msse2" should be appended to CMAKE_C_FLAGS_RELEASE.
-if(CMAKE_C_COMPILER_ID STREQUAL GNU OR CMAKE_C_COMPILER_ID STREQUAL Clang OR CMAKE_C_COMPILER_ID STREQUAL Intel)
+if(CMAKE_C_COMPILER_ID MATCHES GNU|Clang|Intel|IntelLLVM)
     if(NOT CMAKE_C_FLAGS AND COMPILER_SUPPORT_SSE2)
         set(CMAKE_C_FLAGS -msse2 CACHE STRING "C flags." FORCE)
     endif()
 endif()
 
-if(CMAKE_C_COMPILER_ID STREQUAL Intel OR CMAKE_C_COMPILER_ID STREQUAL Clang OR HAIKU)
+if(CMAKE_C_COMPILER_ID MATCHES Intel|IntelLLVM|Clang OR HAIKU)
     # We need to tell Intel and Clang compilers about what level of POSIX they support
     SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_XOPEN_SOURCE=600")
 endif()
