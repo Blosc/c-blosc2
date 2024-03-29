@@ -233,6 +233,9 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
     BLOSC_TRACE_ERROR("Pointer is NULL");
     return BLOSC2_ERROR_FAILURE;
   }
+  // Set the chunksize for the schunk, as it cannot be derived from storage
+  int32_t chunksize = (int32_t) (*array)->extchunknitems * sc->typesize;
+  sc->chunksize = chunksize;
 
   // Serialize the dimension info
   if (sc->nmetalayers >= BLOSC2_MAX_METALAYERS) {
@@ -274,7 +277,6 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
   }
   // Fill schunk with uninit values
   if ((*array)->nitems != 0) {
-    int32_t chunksize = (int32_t) (*array)->extchunknitems * sc->typesize;
     int64_t nchunks = (*array)->extnitems / (*array)->chunknitems;
     int64_t nitems = nchunks * (*array)->extchunknitems;
     // blosc2_schunk_fill_special(sc, nitems, BLOSC2_SPECIAL_ZERO, chunksize);
@@ -621,8 +623,6 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     }
 
     int32_t nblocks = (int32_t) array->extchunknitems / array->blocknitems;
-
-
     if (set_slice) {
       // Check if all the chunk is going to be updated and avoid the decompression
       bool decompress_chunk = false;
@@ -1223,8 +1223,8 @@ int extend_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
       BLOSC_TRACE_ERROR("The new shape must be greater than the old one");
       BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
     }
-    if (array->shape[i] == 0) {
-      BLOSC_TRACE_ERROR("Cannot extend array with shape[%d] = 0", i);
+    if (array->shape[i] == INT64_MAX) {
+      BLOSC_TRACE_ERROR("Cannot extend array with shape[%d] = %lld", i, INT64_MAX);
       BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
     }
   }

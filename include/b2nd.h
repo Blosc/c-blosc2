@@ -131,7 +131,7 @@ typedef struct {
  * @param chunkshape The chunk shape.
  * @param blockshape The block shape.
  * @param dtype The data type expressed as a string version.
- * @param dtype_format The data type format; default is DTYPE_NUMPY_FORMAT.
+ * @param dtype_format The data type format; DTYPE_NUMPY_FORMAT should be chosen for NumPy compatibility.
  * @param metalayers The memory pointer to the list of the metalayers desired.
  * @param nmetalayers The number of metalayers.
  *
@@ -364,10 +364,10 @@ BLOSC_EXPORT int b2nd_get_slice_cbuffer(const b2nd_array_t *array, const int64_t
  * @brief Set a slice in a b2nd array using a C buffer.
  *
  * @param buffer The buffer where the slice data is.
+ * @param buffershape The shape of the buffer.
  * @param buffersize The size (in bytes) of the buffer.
  * @param start The coordinates where the slice will begin.
  * @param stop The coordinates where the slice will end.
- * @param buffershape The shape of the buffer.
  * @param array The b2nd array where the slice will be set
  *
  * @return An error code.

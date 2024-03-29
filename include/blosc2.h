@@ -2091,7 +2091,7 @@ BLOSC_EXPORT int64_t blosc2_schunk_frame_len(blosc2_schunk* schunk);
  * If there is an error, a negative value is returned.
  */
 BLOSC_EXPORT int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems,
-                                            int special_value, int32_t chunksize);
+                                                int special_value, int32_t chunksize);
 
 
 /*********************************************************************
