@@ -121,7 +121,7 @@ int update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
                   chunkshape[i] + blockshape[i] - chunkshape[i] % blockshape[i];
         }
       } else {
-        array->extchunkshape[i] = 0;
+        array->extchunkshape[i] = chunkshape[i];
         array->extshape[i] = 0;
       }
     } else {
@@ -302,8 +302,7 @@ int b2nd_empty(b2nd_context_t *ctx, b2nd_array_t **array) {
   BLOSC_ERROR_NULL(ctx, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
-  // BLOSC_ERROR(array_new(ctx, BLOSC2_SPECIAL_UNINIT, array));
-  // Avoid variable cratios
+  // Fill with zeros to avoid variable cratios
   BLOSC_ERROR(array_new(ctx, BLOSC2_SPECIAL_ZERO, array));
 
   return BLOSC2_ERROR_SUCCESS;
@@ -1305,8 +1304,7 @@ int shrink_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
       BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
     }
     if (array->shape[i] == 0) {
-      BLOSC_TRACE_ERROR("Cannot shrink array with shape[%d] = 0", i);
-      BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+      continue;
     }
   }
   if (diffs_sum == 0) {
@@ -1451,7 +1449,34 @@ int b2nd_append(b2nd_array_t *array, const void *buffer, int64_t buffersize,
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
 
-  BLOSC_ERROR(b2nd_insert(array, buffer, buffersize, axis, array->shape[axis]));
+  int32_t chunksize = array->sc->chunksize;
+  int64_t nchunks_append = buffersize / chunksize;
+  // Check whether chunkshape and blockshape are equals
+  bool equal_chunks_blocks = true;
+  for (int i = 0; i < array->ndim; ++i) {
+    if (array->chunkshape[i] != array->blockshape[i]) {
+      equal_chunks_blocks = false;
+      break;
+    }
+  }
+  // General case where a buffer has a different size than the chunksize
+  if (!equal_chunks_blocks || buffersize % chunksize != 0 || nchunks_append != 1) {
+    BLOSC_ERROR(b2nd_insert(array, buffer, buffersize, axis, array->shape[axis]));
+    return BLOSC2_ERROR_SUCCESS;
+  }
+
+  // Accelerated path for buffers that are of the same size as the chunksize
+  // printf("accelerated path\n");
+
+  // Append the buffer to the underlying schunk. This is very fast, as
+  // it doesn't need to do internal partitioning.
+  BLOSC_ERROR(blosc2_schunk_append_buffer(array->sc, (void*)buffer, buffersize));
+
+  // Finally, resize the array
+  int64_t newshape[B2ND_MAX_DIM];
+  memcpy(newshape, array->shape, array->ndim * sizeof(int64_t));
+  newshape[axis] += nchunks_append * array->chunkshape[axis];
+  BLOSC_ERROR(b2nd_resize(array, newshape, NULL));
 
   return BLOSC2_ERROR_SUCCESS;
 }
