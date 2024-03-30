@@ -9,6 +9,10 @@
 **********************************************************************/
 
 // This is an example that saves a stack of images in a b2nd frame.
+// The images are generated randomly and saved in two different ways:
+// 1) Using the b2nd_set_slice_cbuffer method.
+// 2) Using the b2nd_append method.
+
 
 #include <blosc2.h>
 #include <b2nd.h>
@@ -24,9 +28,6 @@ int main() {
   uint16_t* image = malloc(buffersize);
   int64_t N_images = 10;
 
-  char *urlpath = "test_image_dataset.b2nd";
-  blosc2_remove_urlpath(urlpath);
-
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = sizeof(uint16_t);
   cparams.compcode = BLOSC_BLOSCLZ;
@@ -35,8 +36,10 @@ int main() {
 
   blosc2_storage storage = BLOSC2_STORAGE_DEFAULTS;
   storage.contiguous = true;  // for a single file in output
-  storage.cparams = &cparams;
+  char *urlpath = "example_stack_images_set_slice.b2nd";
+  blosc2_remove_urlpath(urlpath);
   storage.urlpath = urlpath;
+  storage.cparams = &cparams;
 
   // shape, chunkshape and blockshape of the ndarray
   int64_t shape[] = {N_images, height, width};
@@ -53,9 +56,9 @@ int main() {
     return -1;
   }
 
-  // loop through all images
+  // Loop through all images
+  printf("Saving images (set_slice version)...\n");
   for (int64_t i = 0; i < N_images; i++) {
-    printf("Saving image #: %lld\n", i);
     int64_t start[] = {i, 0, 0};
     int64_t stop[] = {i + 1, height, width};
     // Generate random image data
@@ -64,10 +67,71 @@ int main() {
     }
 
     if (b2nd_set_slice_cbuffer(image, buffershape, buffersize, start, stop, src) < 0) {
+      printf("Error in b2nd_set_slice_cbuffer\n");
+      return -1;
+    }
+  }
+  printf("Adding vlmetalayer data\n");
+  uint8_t msgpack[1024];
+  // Pack the message using the recommended msgpack format
+  // The Python wrapper can do this automatically
+  char *content = "Using b2nd_set_slice_cbuffer()";
+  msgpack[0] = 0xd9;
+  msgpack[1] = strlen(content);
+  memcpy(msgpack + 2, content, strlen(content) + 1);
+  int metalen = blosc2_vlmeta_add(src->sc, "method",
+                                 msgpack, strlen(content) + 2, NULL);
+  if (metalen < 0) {
+    printf("Cannot write vlmetalayer");
+    return metalen;
+  }
+  b2nd_free_ctx(ctx);
+  printf("Images saved successfully in %s\n", urlpath);
+
+  // Use the append method to add more images
+  urlpath = "example_stack_images_append.b2nd";
+  blosc2_remove_urlpath(urlpath);
+  storage.urlpath = urlpath;
+  // shape can start with 0 now
+  int64_t shape2[] = {0, height, width};
+
+  ctx = b2nd_create_ctx(&storage, 3,
+                         shape2, chunkshape, blockshape,
+                         "|u2", DTYPE_NUMPY_FORMAT,
+                         NULL, 0);
+  b2nd_free(src);
+  if (b2nd_empty(ctx, &src) < 0) {
+    printf("Error in b2nd_empty\n");
+    return -1;
+  }
+
+  // loop through all images
+  printf("Saving images (append version)...\n");
+  for (int64_t i = 0; i < N_images; i++) {
+    // Generate random image data
+    for (int j = 0; j < width * height; j++) {
+      image[j] = rand() % 65536; // generate random pixels (uncompressible data)
+    }
+
+    if (b2nd_append(src, image, buffersize, 0) < 0) {
       printf("Error in b2nd_append\n");
       return -1;
     }
   }
+  printf("Adding vlmetalayer data\n");
+  // Pack the message using the recommended msgpack format
+  // The Python wrapper can do this automatically
+  content = "Using b2nd_append()";
+  msgpack[0] = 0xd9;
+  msgpack[1] = strlen(content);
+  memcpy(msgpack + 2, content, strlen(content) + 1);
+  metalen = blosc2_vlmeta_add(src->sc, "method",
+                              msgpack, strlen(content) + 2, NULL);
+  if (metalen < 0) {
+    printf("Cannot write vlmetalayer");
+    return metalen;
+  }
+  printf("Images saved successfully in %s\n", urlpath);
 
   // Clean resources
   b2nd_free(src);
