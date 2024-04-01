@@ -20,22 +20,23 @@
 
 int main() {
   blosc2_init();
-  const int width = 4 * 512;
-  const int height = 4 * 272;
-  const int64_t buffershape[] = {1, height, width};
+  const int width = 512;
+  const int height = 256;
+  const int nimages_inbuf = 10;
+  const int64_t buffershape[] = {nimages_inbuf, height, width};
   int64_t N_images = 1000;
 
   // Shapes of the b2nd array
   int64_t shape[] = {N_images, height, width};
-  int32_t chunkshape[] = {1, height, width};
+  int32_t chunkshape[] = {nimages_inbuf, height, width};
   int32_t blockshape[] = {1, height, width};
 
   // Determine the buffer size of the image (in bytes)
-  const int64_t buffersize = height * width * (int64_t)sizeof(uint16_t);
+  const int64_t buffersize = nimages_inbuf * height * width * (int64_t)sizeof(uint16_t);
   uint16_t* image = malloc(buffersize);
 
   // Generate data
-  for (int j = 0; j < height * width; j++) {
+  for (int j = 0; j < nimages_inbuf * height * width; j++) {
     image[j] = j;
   }
 
@@ -69,9 +70,7 @@ int main() {
     // loop through all images
     blosc_timestamp_t t0, t1;
     blosc_set_timestamp(&t0);
-    for (int i = 0; i < N_images; i++) {
-      //printf("Saving image #: %d\n", i);
-
+    for (int i = 0; i < N_images / nimages_inbuf; i++) {
       if (accel) {
         if (b2nd_append(src, image, buffersize, 0) < 0) {
           printf("Error in b2nd_append\n");
@@ -79,7 +78,7 @@ int main() {
         }
       } else {
         int64_t start[] = {i, 0, 0};
-        int64_t stop[] = {i + 1, height, width};
+        int64_t stop[] = {i + nimages_inbuf, height, width};
         if (b2nd_set_slice_cbuffer(image, buffershape, buffersize, start, stop, src) < 0) {
           printf("Error in b2nd_append\n");
           return -1;
