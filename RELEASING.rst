@@ -83,7 +83,7 @@ Announcing
 - Send an announcement to the blosc and comp.compression mailing lists.
   Use the ``ANNOUNCE.md`` file as skeleton (likely as the definitive version).
 
-- Tweet about it from the @Blosc2 account.
+- Toot about it from the @Blosc2 account in https://fosstodon.org.
 
 
 Post-release actions
