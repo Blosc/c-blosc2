@@ -75,7 +75,10 @@ int main(void) {
       data2[i] = 2 * i * nchunk;
     }
     nchunks = blosc2_schunk_append_buffer(schunk0w, data, isize);
-    assert(nchunks == nchunk + 1);
+    if (nchunks != nchunk + 1) {
+      printf("Unexpected nchunks!");
+      return nchunks;
+    }
     blosc2_schunk_append_buffer(schunk1a, data2, isize);
   }
 
