@@ -77,6 +77,10 @@ static int test_shuffle_roundtrip_avx2(int32_t type_size, int32_t num_elements,
 
   return exit_code;
 #else
+  BLOSC_UNUSED_PARAM(type_size);
+  BLOSC_UNUSED_PARAM(num_elements);
+  BLOSC_UNUSED_PARAM(buffer_alignment);
+  BLOSC_UNUSED_PARAM(test_type);
   return EXIT_SUCCESS;
 #endif /* defined(SHUFFLE_USE_AVX2) */
 }

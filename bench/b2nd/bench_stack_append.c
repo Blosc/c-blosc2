@@ -13,6 +13,7 @@
 // when data to append is of the same size as the chunkshape.  This benchmark
 // compares the performance of the new accelerated path with the old one.
 
+#include <inttypes.h>
 #include "blosc2.h"
 #include "b2nd.h"
 
@@ -87,8 +88,9 @@ int main() {
     }
     blosc_set_timestamp(&t1);
     printf("Time to append (%s): %.4f s\n", accel_str, blosc_elapsed_secs(t0, t1));
-    printf("Number of chunks: %lld\n", src->sc->nchunks);
-    printf("Shape of array: (%lld, %lld, %lld)\n", src->shape[0], src->shape[1], src->shape[2]);
+    printf("Number of chunks: %" PRId64 "\n", src->sc->nchunks);
+    printf("Shape of array: (%" PRId64 ", %" PRId64 ", %" PRId64 ")\n",
+           src->shape[0], src->shape[1], src->shape[2]);
 
     b2nd_free(src);
     b2nd_free_ctx(ctx);

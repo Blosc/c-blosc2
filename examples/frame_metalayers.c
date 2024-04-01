@@ -71,11 +71,14 @@ int main(void) {
 
   blosc_set_timestamp(&last);
   for (nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-      for (i = 0; i < CHUNKSIZE; i++) {
-          data[i] = i * nchunk + i;
-      }
-      nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
-      assert(nchunks == nchunk + 1);
+    for (i = 0; i < CHUNKSIZE; i++) {
+      data[i] = i * nchunk + i;
+    }
+    nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
+    if (nchunks != nchunk + 1) {
+      printf("Unexpected nchunks!");
+      return nchunks;
+    }
   }
   /* Gather some info */
   nbytes = schunk->nbytes;

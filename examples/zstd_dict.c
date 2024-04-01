@@ -70,7 +70,10 @@ int main(void) {
       data[i] = i + (int64_t)nchunk * CHUNKSIZE;
     }
     nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
-    assert(nchunks == nchunk + 1);
+    if (nchunks != nchunk + 1) {
+      printf("Unexpected nchunks!");
+      return nchunks;
+    }
   }
   /* Gather some info */
   nbytes = schunk->nbytes;
