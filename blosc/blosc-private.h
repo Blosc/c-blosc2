@@ -248,7 +248,7 @@ static inline const char *dlerror (void) {
 
 static inline void* load_lib(char *plugin_name, char *libpath) {
   char python_cmd[PATH_MAX] = {0};
-  sprintf(python_cmd, "python -c \"import blosc2_%s; blosc2_%s.print_libpath()\"", plugin_name, plugin_name);
+  sprintf(python_cmd, "python3 -c \"import blosc2_%s; blosc2_%s.print_libpath()\"", plugin_name, plugin_name);
   FILE *fp = popen(python_cmd, "r");
   if (fp == NULL) {
     BLOSC_TRACE_ERROR("Could not run python");
