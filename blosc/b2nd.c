@@ -1451,16 +1451,22 @@ int b2nd_append(b2nd_array_t *array, const void *buffer, int64_t buffersize,
 
   int32_t chunksize = array->sc->chunksize;
   int64_t nchunks_append = buffersize / chunksize;
-  // Check whether chunkshape and blockshape are equals
-  bool equal_chunks_blocks = true;
-  for (int i = 0; i < array->ndim; ++i) {
+  // Check whether chunkshape and blockshape are compatible with accelerated path.
+  // Essentially, we are checking whether the buffer is a multiple of the chunksize
+  // and that the chunkshape and blockshape are the same, except for the first axis.
+  // Also, axis needs to be the first one.
+  bool compat_chunks_blocks = true;
+  for (int i = 1; i < array->ndim; ++i) {
     if (array->chunkshape[i] != array->blockshape[i]) {
-      equal_chunks_blocks = false;
+      compat_chunks_blocks = false;
       break;
     }
   }
+  if (axis > 0) {
+    compat_chunks_blocks = false;
+  }
   // General case where a buffer has a different size than the chunksize
-  if (!equal_chunks_blocks || buffersize % chunksize != 0 || nchunks_append != 1) {
+  if (!compat_chunks_blocks || buffersize % chunksize != 0 || nchunks_append != 1) {
     BLOSC_ERROR(b2nd_insert(array, buffer, buffersize, axis, array->shape[axis]));
     return BLOSC2_ERROR_SUCCESS;
   }

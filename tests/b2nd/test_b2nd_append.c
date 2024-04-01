@@ -50,7 +50,12 @@ CUTEST_TEST_SETUP(append) {
       {2, {0, 6}, {6, 6}, {3, 3}, {6, 6}, 0},
       // Accelerated path with chunkshape and blockshape equal to buffershape
       {2, {0, 6}, {6, 6}, {6, 6}, {6, 6}, 0},
-
+      // Accelerated path with chunkshape and blockshape equals except in the first dimension
+      {2, {0, 6}, {6, 6}, {3, 6}, {6, 6}, 0},
+      {2, {0, 6}, {6, 6}, {4, 6}, {6, 6}, 0},
+      {2, {0, 6}, {6, 6}, {3, 6}, {13, 6}, 0},
+      // The one below is not supported yet
+      // {2, {0, 6}, {6, 6}, {4, 6}, {13, 6}, 0},
   ));
 }
 
