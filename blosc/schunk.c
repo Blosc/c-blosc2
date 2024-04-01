@@ -874,7 +874,7 @@ int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
 
   if (schunk->chunksize != 0 && (chunk_nbytes > schunk->chunksize ||
       (chunk_nbytes < schunk->chunksize && nchunk != schunk->nchunks - 1))) {
-    BLOSC_TRACE_ERROR("Updating chunks that have different lengths in the same schunk "
+    BLOSC_TRACE_ERROR("Updating chunks having different lengths in the same schunk "
                       "is not supported yet (unless it's the last one and smaller):"
                       " %d > %d.", chunk_nbytes, schunk->chunksize);
     return BLOSC2_ERROR_CHUNK_UPDATE;
@@ -1038,7 +1038,7 @@ int64_t blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int64_t nchunk) {
 
 
 /* Append a data buffer to a super-chunk. */
-int64_t blosc2_schunk_append_buffer(blosc2_schunk *schunk, void *src, int32_t nbytes) {
+int64_t blosc2_schunk_append_buffer(blosc2_schunk *schunk, const void *src, int32_t nbytes) {
   uint8_t* chunk = malloc(nbytes + BLOSC2_MAX_OVERHEAD);
   schunk->current_nchunk = schunk->nchunks;
   /* Compress the src buffer using super-chunk context */
