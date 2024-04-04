@@ -1,10 +1,11 @@
-# Announcing C-Blosc2 2.14.0
+# Announcing C-Blosc2 2.14.1
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a minor release for adding an accelerated path in `b2nd_append()`.
-Also, many fixes and improvements have been added.
+This is a maintenance release. When loading plugins, first try with
+`python` and then `python3`. This is because many linux distros
+do not have `python` as a symlink to `python3` anymore.
 
 For more info, please see the release notes in:
 

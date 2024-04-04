@@ -4,7 +4,9 @@ Release notes for C-Blosc2
 Changes from 2.14.0 to 2.14.1
 =============================
 
-#XXX version-specific blurb XXX#
+* When loading plugins, first try with `python` and then `python3`.
+  This is because many linux distros do not have `python` as a
+  symlink to `python3` anymore.
 
 Changes from 2.13.2 to 2.14.0
 =============================
