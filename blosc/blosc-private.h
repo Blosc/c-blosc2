@@ -246,20 +246,32 @@ static inline const char *dlerror (void) {
 #endif
 
 
-static inline void* load_lib(char *plugin_name, char *libpath) {
+static inline int get_libpath(char *plugin_name, char *libpath, char *python_version) {
+  BLOSC_TRACE_INFO("Trying to get plugin path with python%s\n", python_version);
   char python_cmd[PATH_MAX] = {0};
-  sprintf(python_cmd, "python3 -c \"import blosc2_%s; blosc2_%s.print_libpath()\"", plugin_name, plugin_name);
+  sprintf(python_cmd, "python%s -c \"import blosc2_%s; blosc2_%s.print_libpath()\"", python_version, plugin_name, plugin_name);
   FILE *fp = popen(python_cmd, "r");
   if (fp == NULL) {
     BLOSC_TRACE_ERROR("Could not run python");
-    return NULL;
+    return BLOSC2_ERROR_FAILURE;
   }
   if (fgets(libpath, PATH_MAX, fp) == NULL) {
     BLOSC_TRACE_ERROR("Could not read python output");
     pclose(fp);
-    return NULL;
+    return BLOSC2_ERROR_FAILURE;
   }
   pclose(fp);
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+static inline void* load_lib(char *plugin_name, char *libpath) {
+  if (get_libpath(plugin_name, libpath, "") < 0 && get_libpath(plugin_name, libpath, "3") < 0) {
+    BLOSC_TRACE_ERROR("Problems when running python or python3 for getting plugin path");
+    return NULL;
+  }
+
   if (strlen(libpath) == 0) {
     BLOSC_TRACE_ERROR("Could not find plugin libpath");
     return NULL;
