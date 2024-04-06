@@ -3,8 +3,10 @@ A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release. We have fixed some additional security
-issues discovered by OSS-Fuzz.
+This is a hotfix release. We have fixed some additional security
+issues discovered by OSS-Fuzz, and reported as CVEs in
+CVE-2024-3203 and CVE-2024-3204. An upgrade for production
+(and specially, shared) environments is strongly recommended.
 
 For more info, please see the release notes in:
 

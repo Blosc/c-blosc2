@@ -1,10 +1,17 @@
 Release notes for C-Blosc2
 ==========================
 
+Changes from 2.14.3 to 2.14.4
+=============================
+
+#XXX version-specific blurb XXX#
+
+
 Changes from 2.14.2 to 2.14.3
 =============================
 
 * More fixes for internal fuzzer.
+
 
 Changes from 2.14.1 to 2.14.2
 =============================
@@ -18,6 +25,7 @@ Changes from 2.14.0 to 2.14.1
 * When loading plugins, first try with `python` and then `python3`.
   This is because many linux distros do not have `python` as a
   symlink to `python3` anymore.
+
 
 Changes from 2.13.2 to 2.14.0
 =============================
