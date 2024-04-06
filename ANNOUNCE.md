@@ -1,11 +1,10 @@
-# Announcing C-Blosc2 2.14.1
+# Announcing C-Blosc2 2.14.2
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release. When loading plugins, first try with
-`python` and then `python3`. This is because many linux distros
-do not have `python` as a symlink to `python3` anymore.
+This is a maintenance release. Security issue CVE-2024-3203 and
+CVE-2024-3204 have been fixed.
 
 For more info, please see the release notes in:
 

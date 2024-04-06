@@ -4,7 +4,8 @@ Release notes for C-Blosc2
 Changes from 2.14.1 to 2.14.2
 =============================
 
-#XXX version-specific blurb XXX#
+* Fixes for CVE-2024-3203 and CVE-2024-3204.
+
 
 Changes from 2.14.0 to 2.14.1
 =============================
