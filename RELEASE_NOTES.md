@@ -1,6 +1,11 @@
 Release notes for C-Blosc2
 ==========================
 
+Changes from 2.14.2 to 2.14.3
+=============================
+
+* More fixes for internal fuzzer.
+
 Changes from 2.14.1 to 2.14.2
 =============================
 

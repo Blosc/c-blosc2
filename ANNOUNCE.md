@@ -1,10 +1,10 @@
-# Announcing C-Blosc2 2.14.2
+# Announcing C-Blosc2 2.14.3
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release. Security issue CVE-2024-3203 and
-CVE-2024-3204 have been fixed.
+This is a maintenance release. We have fixed some additional security
+issues discovered by OSS-Fuzz.
 
 For more info, please see the release notes in:
 
