@@ -470,7 +470,7 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   eshape[0] = ((blockshape[0] + 7) / cell_shape) * cell_shape;
   eshape[1] = ((blockshape[1] + 7) / cell_shape) * cell_shape;
 
-  if (NDLZ_UNEXPECT_CONDITIONAL(output_len < blockshape[0] * blockshape[1])) {
+  if (NDLZ_UNEXPECT_CONDITIONAL((int64_t)output_len < (int64_t)blockshape[0] * (int64_t)blockshape[1])) {
     BLOSC_TRACE_ERROR("The blockshape is bigger than the output buffer");
     return 0;
   }
