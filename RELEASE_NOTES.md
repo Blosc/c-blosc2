@@ -4,7 +4,7 @@ Release notes for C-Blosc2
 Changes from 2.14.3 to 2.14.4
 =============================
 
-#XXX version-specific blurb XXX#
+* Bumped SONAME due to recent API changes. See https://github.com/Blosc/c-blosc2/issues/581.
 
 
 Changes from 2.14.2 to 2.14.3
