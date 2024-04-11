@@ -9,7 +9,8 @@ Preliminaries
 
 - Check that *VERSION* symbols in include/blosc2.h contains the correct info.
 
-- If API changes, please bump the SOVERSION in blosc/CMakeLists.txt.
+- If API/ABI changes, please increase the minor number (e.g. 2.15 -> 2.16) *and*
+  bump the SOVERSION in blosc/CMakeLists.txt.
 
 - Commit the changes with::
 
