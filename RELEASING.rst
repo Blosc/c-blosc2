@@ -9,6 +9,8 @@ Preliminaries
 
 - Check that *VERSION* symbols in include/blosc2.h contains the correct info.
 
+- If API changes, please bump the SOVERSION in blosc/CMakeLists.txt.
+
 - Commit the changes with::
 
     $ git commit -a -m "Getting ready for release X.Y.Z"
