@@ -784,6 +784,8 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       uint8_t *chunk = malloc(chunk_nbytes);
       BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
       int brc;
+      // Update current_chunk in case a prefilter is applied
+      array->sc->current_nchunk = nchunk;
       brc = blosc2_compress_ctx(array->sc->cctx, data, data_nbytes, chunk, chunk_nbytes);
       if (brc < 0) {
         BLOSC_TRACE_ERROR("Blosc can not compress the data");
