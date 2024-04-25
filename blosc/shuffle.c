@@ -96,6 +96,8 @@ typedef enum {
 #if defined(HAVE_CPU_FEAT_INTRIN)
 static blosc_cpu_features blosc_get_cpu_features(void) {
   blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
+
+  __builtin_cpu_init();
   if (__builtin_cpu_supports("sse2")) {
     cpu_features |= BLOSC_HAVE_SSE2;
   }
