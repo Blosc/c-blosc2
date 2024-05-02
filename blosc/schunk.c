@@ -521,6 +521,14 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
   }
 
   if (schunk->storage != NULL) {
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(schunk->storage->io->id);
+    if (io_cb != NULL && !io_cb->is_allocation_necessary) {
+      int rc = io_cb->free(schunk->storage->io->params);
+      if (rc < 0) {
+        BLOSC_TRACE_ERROR("Could not free the I/O ressources.");
+      }
+    }
+
     if (schunk->storage->urlpath != NULL) {
       free(schunk->storage->urlpath);
     }

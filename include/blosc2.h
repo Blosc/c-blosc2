@@ -1039,8 +1039,9 @@ typedef int     (*blosc2_close_cb)(void *stream);
 typedef int64_t (*blosc2_tell_cb)(void *stream);
 typedef int     (*blosc2_seek_cb)(void *stream, int64_t offset, int whence);
 typedef int64_t (*blosc2_write_cb)(const void *ptr, int64_t size, int64_t nitems, void *stream);
-typedef int64_t (*blosc2_read_cb)(void *ptr, int64_t size, int64_t nitems, void *stream);
+typedef int64_t (*blosc2_read_cb)(void **ptr, int64_t size, int64_t nitems, void *stream);
 typedef int     (*blosc2_truncate_cb)(void *stream, int64_t size);
+typedef int     (*blosc2_free_cb)(void *params);
 
 
 /*
@@ -1051,6 +1052,8 @@ typedef struct {
   //!< The IO identifier.
   char* name;
   //!< The IO name.
+  bool is_allocation_necessary;
+  //!< If true, the caller needs to allocate data for the read function (ptr argument). If false, the read function takes care of memory allocation and stores the address in the allocated_ptr argument.
   blosc2_open_cb open;
   //!< The IO open callback.
   blosc2_close_cb close;
@@ -1065,6 +1068,8 @@ typedef struct {
   //!< The IO read callback.
   blosc2_truncate_cb truncate;
   //!< The IO truncate callback.
+  blosc2_free_cb free;
+  //!< The IO free callback (called in the end when finished with the schunk).
 } blosc2_io_cb;
 
 
