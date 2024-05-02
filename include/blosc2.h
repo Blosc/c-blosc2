@@ -1024,7 +1024,8 @@ BLOSC_EXPORT const char* blosc2_cbuffer_complib(const void* cbuffer);
 
 enum {
   BLOSC2_IO_FILESYSTEM = 0,
-  BLOSC_IO_LAST_BLOSC_DEFINED = 1,  // sentinel
+  BLOSC2_IO_FILESYSTEM_MMAP = 1,
+  BLOSC_IO_LAST_BLOSC_DEFINED = 2,  // sentinel
   BLOSC_IO_LAST_REGISTERED = 32,  // sentinel
 };
 
@@ -1823,6 +1824,19 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open(const char* urlpath);
  * @return The new super-chunk.  NULL if not found or not in frame format.
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_offset(const char* urlpath, int64_t offset);
+
+/**
+ * @brief Open an existing super-chunk that is on-disk (frame) in memory-mapped mode. No in-memory copy is made.
+ *
+ * @param urlpath The file name.
+ *
+ * @param offset The frame offset.
+ * 
+ * @param mmap_mode The mode for the memmory mapping similar to Numpy's np.memmap (https://numpy.org/doc/stable/reference/generated/numpy.memmap.html). Set to r if the super-chunk should only be read.
+ *
+ * @return The new super-chunk.  NULL if not found or not in frame format.
+ */
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_offset_mmap(const char* urlpath, int64_t offset, const char* mmap_mode);
 
 /**
  * @brief Open an existing super-chunk (no copy is made) using a user-defined I/O interface.

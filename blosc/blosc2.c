@@ -3789,6 +3789,7 @@ void blosc_set_schunk(blosc2_schunk* schunk) {
 
 blosc2_io *blosc2_io_global = NULL;
 blosc2_io_cb BLOSC2_IO_CB_DEFAULTS;
+blosc2_io_cb BLOSC2_IO_CB_MMAP;
 
 void blosc2_init(void) {
   /* Return if Blosc is already initialized */
@@ -3804,7 +3805,19 @@ void blosc2_init(void) {
   BLOSC2_IO_CB_DEFAULTS.write = (blosc2_write_cb) blosc2_stdio_write;
   BLOSC2_IO_CB_DEFAULTS.read = (blosc2_read_cb) blosc2_stdio_read;
   BLOSC2_IO_CB_DEFAULTS.truncate = (blosc2_truncate_cb) blosc2_stdio_truncate;
-  BLOSC2_IO_CB_DEFAULTS.io_free = (blosc2_io_free_cb) blosc2_stdio_io_free;
+  BLOSC2_IO_CB_DEFAULTS.free = NULL;
+
+  BLOSC2_IO_CB_MMAP.id = BLOSC2_IO_FILESYSTEM_MMAP;
+  BLOSC2_IO_CB_MMAP.name = "filesystem_mmap";
+  BLOSC2_IO_CB_MMAP.is_allocation_necessary = false;
+  BLOSC2_IO_CB_MMAP.open = (blosc2_open_cb) blosc2_stdio_mmap_open;
+  BLOSC2_IO_CB_MMAP.close = (blosc2_close_cb) blosc2_stdio_mmap_close;
+  BLOSC2_IO_CB_MMAP.read = (blosc2_read_cb) blosc2_stdio_mmap_read;
+  BLOSC2_IO_CB_MMAP.tell = (blosc2_tell_cb) blosc2_stdio_mmap_tell;
+  BLOSC2_IO_CB_MMAP.seek = (blosc2_seek_cb) blosc2_stdio_mmap_seek;
+  BLOSC2_IO_CB_MMAP.write = (blosc2_write_cb) blosc2_stdio_mmap_write;
+  BLOSC2_IO_CB_MMAP.truncate = (blosc2_truncate_cb) blosc2_stdio_mmap_truncate;
+  BLOSC2_IO_CB_MMAP.free = (blosc2_free_cb) blosc2_stdio_mmap_free;
 
   g_ncodecs = 0;
   g_nfilters = 0;
@@ -4642,6 +4655,13 @@ blosc2_io_cb *blosc2_get_io_cb(uint8_t id) {
   if (id == BLOSC2_IO_FILESYSTEM) {
     if (_blosc2_register_io_cb(&BLOSC2_IO_CB_DEFAULTS) < 0) {
       BLOSC_TRACE_ERROR("Error registering the default IO API");
+      return NULL;
+    }
+    return blosc2_get_io_cb(id);
+  }
+  else if (id == BLOSC2_IO_FILESYSTEM_MMAP) {
+    if (_blosc2_register_io_cb(&BLOSC2_IO_CB_MMAP) < 0) {
+      BLOSC_TRACE_ERROR("Error registering the mmap IO API");
       return NULL;
     }
     return blosc2_get_io_cb(id);
