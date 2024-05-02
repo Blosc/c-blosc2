@@ -358,6 +358,45 @@ blosc2_schunk* blosc2_schunk_open_offset(const char* urlpath, int64_t offset) {
   return schunk;
 }
 
+blosc2_schunk* blosc2_schunk_open_offset_mmap(const char* urlpath, int64_t offset, const char* mmap_mode) {
+  if (urlpath == NULL) {
+    BLOSC_TRACE_ERROR("You need to supply a urlpath.");
+    return NULL;
+  }
+  if (mmap_mode == NULL) {
+    BLOSC_TRACE_ERROR("You need to supply the mode for the memory mapping.");
+    return NULL;
+  }
+
+  blosc2_stdio_mmap *mmap_file = malloc(sizeof(blosc2_stdio_mmap));
+  mmap_file->addr = NULL;
+  mmap_file->size = -1;
+  mmap_file->offset = 0;
+  mmap_file->file = NULL;
+  mmap_file->fd = -1;
+  mmap_file->mode = mmap_mode;
+  mmap_file->needs_free = true;
+
+  blosc2_io *io = malloc(sizeof(blosc2_io));
+  io->id = BLOSC2_IO_FILESYSTEM_MMAP;
+  io->name = "filesystem_mmap";
+  io->params = mmap_file;
+
+  blosc2_frame_s* frame = frame_from_file_offset(urlpath, io, offset);
+  if (frame == NULL) {
+    return NULL;
+  }
+  blosc2_schunk* schunk = frame_to_schunk(frame, false, io);
+
+  // Set the storage with proper defaults
+  size_t pathlen = strlen(urlpath);
+  schunk->storage->urlpath = malloc(pathlen + 1);
+  strcpy(schunk->storage->urlpath, urlpath);
+  schunk->storage->contiguous = !frame->sframe;
+
+  return schunk;
+}
+
 int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* needs_free) {
   blosc2_frame_s* frame;
   int64_t cframe_len;
