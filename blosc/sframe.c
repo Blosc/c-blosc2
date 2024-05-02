@@ -111,16 +111,22 @@ int32_t sframe_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t** chunk,
 
   io_cb->seek(fpc, 0L, SEEK_END);
   int64_t chunk_cbytes = io_cb->tell(fpc);
-  *chunk = malloc((size_t)chunk_cbytes);
+
+  if (io_cb->is_allocation_necessary) {
+    *chunk = malloc((size_t)chunk_cbytes);
+    *needs_free = true;
+  }
+  else {
+    *needs_free = false;
+  }
 
   io_cb->seek(fpc, 0L, SEEK_SET);
-  int64_t rbytes = io_cb->read(*chunk, 1, chunk_cbytes, fpc);
+  int64_t rbytes = io_cb->read((void**)chunk, 1, chunk_cbytes, fpc);
   io_cb->close(fpc);
   if (rbytes != chunk_cbytes) {
     BLOSC_TRACE_ERROR("Cannot read the chunk out of the chunkfile.");
     return BLOSC2_ERROR_FILE_READ;
   }
-  *needs_free = true;
 
   return (int32_t)chunk_cbytes;
 }

@@ -36,7 +36,7 @@ BLOSC_EXPORT int blosc2_stdio_close(void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_tell(void *stream);
 BLOSC_EXPORT int blosc2_stdio_seek(void *stream, int64_t offset, int whence);
 BLOSC_EXPORT int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, void *stream);
-BLOSC_EXPORT int64_t blosc2_stdio_read(void *ptr, int64_t size, int64_t nitems, void *stream);
+BLOSC_EXPORT int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, void *stream);
 BLOSC_EXPORT int blosc2_stdio_truncate(void *stream, int64_t size);
 
 #ifdef __cplusplus

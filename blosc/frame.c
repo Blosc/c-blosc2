@@ -53,7 +53,7 @@ int frame_free(blosc2_frame_s* frame) {
     free(frame->cframe);
   }
 
-  if (frame->coffsets != NULL) {
+  if (frame->coffsets != NULL && frame->coffsets_needs_free) {
     free(frame->coffsets);
   }
 
@@ -359,6 +359,7 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
                     uint8_t *compcode_meta, uint8_t *clevel, uint8_t *filters, uint8_t *filters_meta,
                     uint8_t *splitmode, const blosc2_io *io) {
   uint8_t* framep = frame->cframe;
+  uint8_t* header_ptr;
   uint8_t header[FRAME_HEADER_MINLEN];
 
   blosc2_io_cb *io_cb = blosc2_get_io_cb(io->id);
@@ -389,12 +390,14 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
       }
       io_cb->seek(fp, frame->file_offset, SEEK_SET);
     }
-    rbytes = io_cb->read(header, 1, FRAME_HEADER_MINLEN, fp);
+    if (io_cb->is_allocation_necessary)
+      header_ptr = header;
+    rbytes = io_cb->read((void**)&header_ptr, 1, FRAME_HEADER_MINLEN, fp);
     io_cb->close(fp);
     if (rbytes != FRAME_HEADER_MINLEN) {
       return BLOSC2_ERROR_FILE_READ;
     }
-    framep = header;
+    framep = header_ptr;
   }
 
   // Consistency check for frame type
@@ -783,7 +786,9 @@ static char* normalize_urlpath(const char* urlpath) {
 /* Initialize a frame out of a file */
 blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io, int64_t offset) {
     // Get the length of the frame
+    uint8_t* header_ptr;
     uint8_t header[FRAME_HEADER_MINLEN];
+    uint8_t* trailer_ptr;
     uint8_t trailer[FRAME_TRAILER_MINLEN];
 
     void* fp = NULL;
@@ -826,7 +831,9 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
       return NULL;
     }
     io_cb->seek(fp, offset, SEEK_SET);
-    int64_t rbytes = io_cb->read(header, 1, FRAME_HEADER_MINLEN, fp);
+    if (io_cb->is_allocation_necessary)
+      header_ptr = header;
+    int64_t rbytes = io_cb->read((void**)&header_ptr, 1, FRAME_HEADER_MINLEN, fp);
     if (rbytes != FRAME_HEADER_MINLEN) {
         BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
         io_cb->close(fp);
@@ -834,7 +841,7 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
         return NULL;
     }
     int64_t frame_len;
-    to_big(&frame_len, header + FRAME_LEN, sizeof(frame_len));
+    to_big(&frame_len, header_ptr + FRAME_LEN, sizeof(frame_len));
 
     blosc2_frame_s* frame = calloc(1, sizeof(blosc2_frame_s));
     frame->urlpath = urlpath_cpy;
@@ -844,7 +851,9 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
 
     // Now, the trailer length
     io_cb->seek(fp, offset + frame_len - FRAME_TRAILER_MINLEN, SEEK_SET);
-    rbytes = io_cb->read(trailer, 1, FRAME_TRAILER_MINLEN, fp);
+    if (io_cb->is_allocation_necessary)
+      trailer_ptr = trailer;
+    rbytes = io_cb->read((void**)&trailer_ptr, 1, FRAME_TRAILER_MINLEN, fp);
     io_cb->close(fp);
     if (rbytes != FRAME_TRAILER_MINLEN) {
         BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
@@ -853,13 +862,13 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
         return NULL;
     }
     int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
-    if (trailer[trailer_offset - 1] != 0xce) {
+    if (trailer_ptr[trailer_offset - 1] != 0xce) {
         free(urlpath_cpy);
         free(frame);
         return NULL;
     }
     uint32_t trailer_len;
-    to_big(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
+    to_big(&trailer_len, trailer_ptr + trailer_offset, sizeof(trailer_len));
     frame->trailer_len = trailer_len;
 
     return frame;
@@ -1132,7 +1141,15 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
   }
 
   void* fp = NULL;
-  uint8_t* coffsets = malloc((size_t)coffsets_cbytes);
+  uint8_t* coffsets;
+  if (io_cb->is_allocation_necessary) {
+    coffsets = malloc((size_t)coffsets_cbytes);
+    frame->coffsets_needs_free = true;
+  }
+  else {
+    frame->coffsets_needs_free = false;
+  }
+  
   if (frame->sframe) {
     fp = sframe_open_index(frame->urlpath, "rb",
                            frame->schunk->storage->io);
@@ -1150,11 +1167,12 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
     }
     io_cb->seek(fp, frame->file_offset + header_len + cbytes, SEEK_SET);
   }
-  int64_t rbytes = io_cb->read(coffsets, 1, coffsets_cbytes, fp);
+  int64_t rbytes = io_cb->read((void**)&coffsets, 1, coffsets_cbytes, fp);
   io_cb->close(fp);
   if (rbytes != coffsets_cbytes) {
     BLOSC_TRACE_ERROR("Cannot read the offsets out of the frame.");
-    free(coffsets);
+    if (frame->coffsets_needs_free)
+      free(coffsets);
     return NULL;
   }
   frame->coffsets = coffsets;
@@ -1213,6 +1231,7 @@ int64_t* blosc2_frame_get_offsets(blosc2_schunk *schunk) {
 
 int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) {
   uint8_t* framep = frame->cframe;
+  uint8_t* header_ptr;
   uint8_t header[FRAME_HEADER_MINLEN];
 
   if (frame->len <= 0) {
@@ -1251,14 +1270,16 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
       io_cb->seek(fp, frame->file_offset, SEEK_SET);
     }
     if (fp != NULL) {
-      rbytes = io_cb->read(header, 1, FRAME_HEADER_MINLEN, fp);
+      if (io_cb->is_allocation_necessary)
+        header_ptr = header;
+      rbytes = io_cb->read((void**)&header_ptr, 1, FRAME_HEADER_MINLEN, fp);
       io_cb->close(fp);
     }
     (void) rbytes;
     if (rbytes != FRAME_HEADER_MINLEN) {
       return BLOSC2_ERROR_FILE_WRITE;
     }
-    framep = header;
+    framep = header_ptr;
   }
   uint32_t prev_h2len;
   from_big(&prev_h2len, framep + FRAME_HEADER_LEN, sizeof(prev_h2len));
@@ -1439,15 +1460,23 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
 
   // Get the header
   uint8_t* header = NULL;
+  bool needs_free;
   if (frame->cframe != NULL) {
     header = frame->cframe;
   } else {
     int64_t rbytes = 0;
-    header = malloc(header_len);
     blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
     if (io_cb == NULL) {
       BLOSC_TRACE_ERROR("Error getting the input/output API");
       return BLOSC2_ERROR_PLUGIN_IO;
+    }
+
+    if (io_cb->is_allocation_necessary) {
+      header = malloc(header_len);
+      needs_free = true;
+    }
+    else {
+      needs_free = false;
     }
 
     void* fp = NULL;
@@ -1468,19 +1497,20 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       io_cb->seek(fp, frame->file_offset, SEEK_SET);
     }
     if (fp != NULL) {
-      rbytes = io_cb->read(header, 1, header_len, fp);
+      rbytes = io_cb->read((void**)&header, 1, header_len, fp);
       io_cb->close(fp);
     }
     if (rbytes != header_len) {
       BLOSC_TRACE_ERROR("Cannot access the header out of the frame.");
-      free(header);
+      if (needs_free)
+        free(header);
       return BLOSC2_ERROR_FILE_READ;
     }
   }
 
   ret = get_meta_from_header(frame, schunk, header, header_len);
 
-  if (frame->cframe == NULL) {
+  if (frame->cframe == NULL && needs_free) {
     free(header);
   }
 
@@ -1626,16 +1656,24 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
 
   // Get the trailer
   uint8_t* trailer = NULL;
+  bool needs_free;
   if (frame->cframe != NULL) {
     trailer = frame->cframe + trailer_offset;
   } else {
     int64_t rbytes = 0;
-    trailer = malloc(trailer_len);
 
     blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
     if (io_cb == NULL) {
       BLOSC_TRACE_ERROR("Error getting the input/output API");
       return BLOSC2_ERROR_PLUGIN_IO;
+    }
+
+    if (io_cb->is_allocation_necessary) {
+      trailer = malloc(trailer_len);
+      needs_free = true;
+    }
+    else {
+      needs_free = false;
     }
 
     void* fp = NULL;
@@ -1660,19 +1698,20 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       io_cb->seek(fp, frame->file_offset + trailer_offset, SEEK_SET);
     }
     if (fp != NULL) {
-      rbytes = io_cb->read(trailer, 1, trailer_len, fp);
+      rbytes = io_cb->read((void**)&trailer, 1, trailer_len, fp);
       io_cb->close(fp);
     }
     if (rbytes != trailer_len) {
       BLOSC_TRACE_ERROR("Cannot access the trailer out of the fileframe.");
-      free(trailer);
+      if (needs_free)
+        free(trailer);
       return BLOSC2_ERROR_FILE_READ;
     }
   }
 
   ret = get_vlmeta_from_trailer(frame, schunk, trailer, trailer_len);
 
-  if (frame->cframe == NULL) {
+  if (frame->cframe == NULL && needs_free) {
     free(trailer);
   }
 
@@ -1828,8 +1867,14 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
 
   void* fp = NULL;
   if (frame->cframe == NULL) {
-    data_chunk = malloc((size_t)prev_alloc);
-    needs_free = true;
+    if (io_cb->is_allocation_necessary) {
+      data_chunk = malloc((size_t)prev_alloc);
+      needs_free = true;
+    }
+    else {
+      needs_free = false;
+    }
+    
     if (!frame->sframe) {
       // If not the chunks won't be in the frame
       fp = io_cb->open(frame->urlpath, "rb", udio->params);
@@ -1873,7 +1918,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
       }
       else {
         io_cb->seek(fp, frame->file_offset + header_len + offsets[i], SEEK_SET);
-        rbytes = io_cb->read(data_chunk, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
+        rbytes = io_cb->read((void**)&data_chunk, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
       }
       if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
         rc = BLOSC2_ERROR_READ_BUFFER;
@@ -1884,7 +1929,8 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
         break;
       }
       if (chunk_cbytes > (int32_t)prev_alloc) {
-        data_chunk = realloc(data_chunk, chunk_cbytes);
+        if (io_cb->is_allocation_necessary)
+          data_chunk = realloc(data_chunk, chunk_cbytes);
         if (data_chunk == NULL) {
           BLOSC_TRACE_ERROR("Cannot realloc space for the data_chunk.");
           rc = BLOSC2_ERROR_MEMORY_ALLOC;
@@ -1894,7 +1940,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
       }
       if (!frame->sframe) {
         io_cb->seek(fp, frame->file_offset + header_len + offsets[i], SEEK_SET);
-        rbytes = io_cb->read(data_chunk, 1, chunk_cbytes, fp);
+        rbytes = io_cb->read((void**)&data_chunk, 1, chunk_cbytes, fp);
         if (rbytes != chunk_cbytes) {
           rc = BLOSC2_ERROR_READ_BUFFER;
           break;
@@ -2131,6 +2177,7 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
   }
 
   if (frame->cframe == NULL) {
+    uint8_t* header_ptr;
     uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
     void* fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
     if (fp == NULL) {
@@ -2138,27 +2185,36 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
       return BLOSC2_ERROR_FILE_OPEN;
     }
     io_cb->seek(fp, frame->file_offset + header_len + offset, SEEK_SET);
-    int64_t rbytes = io_cb->read(header, 1, sizeof(header), fp);
-    if (rbytes != sizeof(header)) {
+    if (io_cb->is_allocation_necessary)
+      header_ptr = header;
+    int64_t rbytes = io_cb->read((void**)&header_ptr, 1, sizeof(header), fp);
+    if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
       BLOSC_TRACE_ERROR("Cannot read the cbytes for chunk in the frame.");
       io_cb->close(fp);
       return BLOSC2_ERROR_FILE_READ;
     }
-    rc = blosc2_cbuffer_sizes(header, NULL, &chunk_cbytes, NULL);
+    rc = blosc2_cbuffer_sizes(header_ptr, NULL, &chunk_cbytes, NULL);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Cannot read the cbytes for chunk in the frame.");
       io_cb->close(fp);
       return rc;
     }
-    *chunk = malloc(chunk_cbytes);
+    if (io_cb->is_allocation_necessary) {
+      *chunk = malloc(chunk_cbytes);
+      *needs_free = true;
+    }
+    else {
+      *needs_free = false;
+    }
+    
     io_cb->seek(fp, frame->file_offset + header_len + offset, SEEK_SET);
-    rbytes = io_cb->read(*chunk, 1, chunk_cbytes, fp);
+    rbytes = io_cb->read((void**)chunk, 1, chunk_cbytes, fp);
     io_cb->close(fp);
     if (rbytes != chunk_cbytes) {
       BLOSC_TRACE_ERROR("Cannot read the chunk out of the frame.");
       return BLOSC2_ERROR_FILE_READ;
     }
-    *needs_free = true;
+
   } else {
     // The chunk is in memory and just one pointer away
     *chunk = frame->cframe + header_len + offset;
@@ -2246,6 +2302,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
     int32_t chunk_nbytes;
     int32_t chunk_cbytes;
     int32_t chunk_blocksize;
+    uint8_t* header_ptr;
     uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
     if (frame->sframe) {
       // The chunk is not in the frame
@@ -2264,13 +2321,15 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       }
       io_cb->seek(fp, frame->file_offset + header_len + offset, SEEK_SET);
     }
-    int64_t rbytes = io_cb->read(header, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
+    if (io_cb->is_allocation_necessary)
+      header_ptr = header;
+    int64_t rbytes = io_cb->read((void**)&header_ptr, 1, BLOSC_EXTENDED_HEADER_LENGTH, fp);
     if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
       BLOSC_TRACE_ERROR("Cannot read the header for chunk in the frame.");
       rc = BLOSC2_ERROR_FILE_READ;
       goto end;
     }
-    rc = blosc2_cbuffer_sizes(header, &chunk_nbytes, &chunk_cbytes, &chunk_blocksize);
+    rc = blosc2_cbuffer_sizes(header_ptr, &chunk_nbytes, &chunk_cbytes, &chunk_blocksize);
     if (rc < 0) {
       goto end;
     }
@@ -2279,8 +2338,8 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
     nblocks = leftover_block ? nblocks + 1 : nblocks;
     // Allocate space for the lazy chunk
     int32_t trailer_len;
-    int32_t special_type = (header[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
-    int memcpyed = header[BLOSC2_CHUNK_FLAGS] & (uint8_t) BLOSC_MEMCPYED;
+    int32_t special_type = (header_ptr[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
+    int memcpyed = header_ptr[BLOSC2_CHUNK_FLAGS] & (uint8_t) BLOSC_MEMCPYED;
 
     int32_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH;
     size_t streams_offset = BLOSC_EXTENDED_HEADER_LENGTH;
@@ -2305,8 +2364,6 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       rc = BLOSC2_ERROR_INVALID_HEADER;
       goto end;
     }
-    *chunk = malloc(lazychunk_cbytes);
-    *needs_free = true;
 
     // Read just the full header and bstarts section too (lazy partial length)
     if (frame->sframe) {
@@ -2316,7 +2373,21 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       io_cb->seek(fp, frame->file_offset + header_len + offset, SEEK_SET);
     }
 
-    rbytes = io_cb->read(*chunk, 1, (int64_t)streams_offset, fp);
+    // The case here is a bit special because more memory is allocated than read from the file
+    // and the chunk is modified after reading. Due to the modification, we cannot directly use
+    // the memory provided by the io
+    *chunk = malloc(lazychunk_cbytes);
+    *needs_free = true;
+
+    if (io_cb->is_allocation_necessary) {
+      rbytes = io_cb->read((void**)chunk, 1, (int64_t)streams_offset, fp);
+    }
+    else {
+      uint8_t* chunk_ptr;
+      rbytes = io_cb->read((void**)&chunk_ptr, 1, (int64_t)streams_offset, fp);
+      memcpy(*chunk, chunk_ptr, streams_offset);
+    }
+    
     if (rbytes != (int64_t)streams_offset) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) chunk out of the frame.");
       rc = BLOSC2_ERROR_FILE_READ;
@@ -2554,7 +2625,8 @@ int64_t frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_va
 
   // Invalidate the cache for chunk offsets
   if (frame->coffsets != NULL) {
-    free(frame->coffsets);
+    if (frame->coffsets_needs_free)
+      free(frame->coffsets);
     frame->coffsets = NULL;
   }
   free(off_chunk);
@@ -2800,7 +2872,8 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   }
   // Invalidate the cache for chunk offsets
   if (frame->coffsets != NULL) {
-    free(frame->coffsets);
+    if (frame->coffsets_needs_free)
+      free(frame->coffsets);
     frame->coffsets = NULL;
   }
   free(chunk);  // chunk has always to be a copy when reaching here...
@@ -3017,7 +3090,8 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     }
     // Invalidate the cache for chunk offsets
     if (frame->coffsets != NULL) {
-      free(frame->coffsets);
+      if (frame->coffsets_needs_free)
+        free(frame->coffsets);
       frame->coffsets = NULL;
     }
   }
@@ -3272,7 +3346,8 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     }
     // Invalidate the cache for chunk offsets
     if (frame->coffsets != NULL) {
-      free(frame->coffsets);
+      if (frame->coffsets_needs_free)
+        free(frame->coffsets);
       frame->coffsets = NULL;
     }
   }
@@ -3439,7 +3514,8 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
     }
     // Invalidate the cache for chunk offsets
     if (frame->coffsets != NULL) {
-      free(frame->coffsets);
+      if (frame->coffsets_needs_free)
+        free(frame->coffsets);
       frame->coffsets = NULL;
     }
   }
@@ -3596,7 +3672,8 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
 
   // Invalidate the cache for chunk offsets
   if (frame->coffsets != NULL) {
-    free(frame->coffsets);
+    if (frame->coffsets_needs_free)
+      free(frame->coffsets);
     frame->coffsets = NULL;
   }
   free(off_chunk);

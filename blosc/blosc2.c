@@ -1638,7 +1638,7 @@ static int blosc_d(
       io_cb->seek(fp, frame->file_offset + chunk_offset + src_offset, SEEK_SET);
     }
     // We can make use of tmp3 because it will be used after src is not needed anymore
-    int64_t rbytes = io_cb->read(tmp3, 1, block_csize, fp);
+    int64_t rbytes = io_cb->read((void**)&tmp3, 1, block_csize, fp);
     io_cb->close(fp);
     if ((int32_t)rbytes != block_csize) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");
@@ -3796,6 +3796,7 @@ void blosc2_init(void) {
 
   BLOSC2_IO_CB_DEFAULTS.id = BLOSC2_IO_FILESYSTEM;
   BLOSC2_IO_CB_DEFAULTS.name = "filesystem";
+  BLOSC2_IO_CB_DEFAULTS.is_allocation_necessary = true;
   BLOSC2_IO_CB_DEFAULTS.open = (blosc2_open_cb) blosc2_stdio_open;
   BLOSC2_IO_CB_DEFAULTS.close = (blosc2_close_cb) blosc2_stdio_close;
   BLOSC2_IO_CB_DEFAULTS.tell = (blosc2_tell_cb) blosc2_stdio_tell;
@@ -3803,6 +3804,7 @@ void blosc2_init(void) {
   BLOSC2_IO_CB_DEFAULTS.write = (blosc2_write_cb) blosc2_stdio_write;
   BLOSC2_IO_CB_DEFAULTS.read = (blosc2_read_cb) blosc2_stdio_read;
   BLOSC2_IO_CB_DEFAULTS.truncate = (blosc2_truncate_cb) blosc2_stdio_truncate;
+  BLOSC2_IO_CB_DEFAULTS.io_free = (blosc2_io_free_cb) blosc2_stdio_io_free;
 
   g_ncodecs = 0;
   g_nfilters = 0;

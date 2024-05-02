@@ -59,6 +59,7 @@ typedef struct {
   uint8_t* cframe;          //!< The in-memory, contiguous frame buffer
   bool avoid_cframe_free;   //!< Whether the cframe can be freed (false) or not (true).
   uint8_t* coffsets;        //!< Pointers to the (compressed, on-disk) chunk offsets
+  bool coffsets_needs_free; //!< Whether the coffsets memory need to be freed or not.
   int64_t len;              //!< The current length of the frame in (compressed) bytes
   int64_t maxlen;           //!< The maximum length of the frame; if 0, there is no maximum
   uint32_t trailer_len;     //!< The current length of the trailer in (compressed) bytes

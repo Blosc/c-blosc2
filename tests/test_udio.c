@@ -63,7 +63,7 @@ int64_t test_write(const void *ptr, int64_t size, int64_t nitems, void *stream) 
   return blosc2_stdio_write(ptr, size, nitems, my->bfile);
 }
 
-int64_t test_read(void *ptr, int64_t size, int64_t nitems, void *stream) {
+int64_t test_read(void **ptr, int64_t size, int64_t nitems, void *stream) {
   test_file *my = (test_file *) stream;
   my->params->read++;
   return blosc2_stdio_read(ptr, size, nitems, my->bfile);
@@ -91,6 +91,7 @@ CUTEST_TEST_SETUP(udio) {
   blosc2_io_cb io_cb;
 
   io_cb.id = 244;
+  io_cb.is_allocation_necessary = true;
   io_cb.open = (blosc2_open_cb) test_open;
   io_cb.close = (blosc2_close_cb) test_close;
   io_cb.read = (blosc2_read_cb) test_read;
