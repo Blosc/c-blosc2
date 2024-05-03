@@ -24,6 +24,10 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#if defined(_MSC_VER)
+#include <Windows.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -42,7 +46,7 @@ BLOSC_EXPORT int blosc2_stdio_truncate(void *stream, int64_t size);
 
 
 typedef struct {
-  void* addr;
+  char* addr;
   //!< The starting address of the mapping.
   int64_t size;
   //!< The size of the mapping.
@@ -53,9 +57,13 @@ typedef struct {
   int fd;
   //!< The underlying file descriptor.
   const char* mode;
-  //!< The opening mode of the memory mapped file (r, r+, w+ or c).
+  //!< The opening mode of the memory-mapped file (r, r+, w+ or c).
   bool needs_free;
   //!< Indicates whether this object should be freed in the blosc2_free_cb callback.
+#if defined(_MSC_VER)
+  HANDLE mmap_handle;
+  //!< The Windows handle to the memory mapping.
+#endif
 } blosc2_stdio_mmap;
 
 BLOSC_EXPORT void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params);
