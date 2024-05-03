@@ -1460,7 +1460,7 @@ int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
 
   // Get the header
   uint8_t* header = NULL;
-  bool needs_free;
+  bool needs_free = false;
   if (frame->cframe != NULL) {
     header = frame->cframe;
   } else {
@@ -1656,7 +1656,7 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
 
   // Get the trailer
   uint8_t* trailer = NULL;
-  bool needs_free;
+  bool needs_free = false;
   if (frame->cframe != NULL) {
     trailer = frame->cframe + trailer_offset;
   } else {
