@@ -78,7 +78,7 @@ CUTEST_TEST_TEST(mmap) {
   CUTEST_ASSERT("Could not write second chunk", cbytes > 0);
 
   /* New file using memory-mapped I/O */
-  blosc2_stdio_mmap mmap_file = {.addr=NULL, .size=-1, .offset=0, .file=NULL, .fd=-1, .mode="w+", .needs_free=false};
+  blosc2_stdio_mmap mmap_file = {.addr=NULL, .file_size=-1, .mapping_size=-1, .offset=0, .file=NULL, .fd=-1, .mode="w+", .needs_free=false};
   blosc2_io io = {.id = BLOSC2_IO_FILESYSTEM_MMAP, .name = "filesystem_mmap", .params = &mmap_file};
   blosc2_storage storage_mmap = {.cparams=&data->cparams, .contiguous=true, .urlpath = urlpath_mmap, .io=&io};
   blosc2_schunk *schunk_write_mmap = blosc2_schunk_new(&storage_mmap);

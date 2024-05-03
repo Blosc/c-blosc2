@@ -48,8 +48,10 @@ BLOSC_EXPORT int blosc2_stdio_truncate(void *stream, int64_t size);
 typedef struct {
   char* addr;
   //!< The starting address of the mapping.
-  int64_t size;
-  //!< The size of the mapping.
+  int64_t file_size;
+  //!< The size of the file.
+  int64_t mapping_size;
+  //!< The size of the mapping (mapping_size >= file_size).
   int64_t offset;
   //!< The current position inside the mapping.
   FILE* file;
