@@ -1832,7 +1832,7 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_offset(const char* urlpath, int64
  *
  * @param offset The frame offset.
  * 
- * @param mmap_mode The mode for the memmory mapping similar to Numpy's np.memmap (https://numpy.org/doc/stable/reference/generated/numpy.memmap.html). Set to r if the super-chunk should only be read.
+ * @param mmap_mode The mode for the memmory mapping similar to Numpy's np.memmap (https://numpy.org/doc/stable/reference/generated/numpy.memmap.html). Set to r if the super-chunk should only be read. Please also note that writing to a memory-mapped file is currently not optimized.
  *
  * @return The new super-chunk.  NULL if not found or not in frame format.
  */
