@@ -18,8 +18,8 @@ bool are_files_identical(const char* filename1, const char* filename2) {
   /* Compare file sizes */
   fseek(file1, 0, SEEK_END);
   fseek(file2, 0, SEEK_END);
-  long file_size1 = ftell(file1);
-  long file_size2 = ftell(file2);
+  size_t file_size1 = ftell(file1);
+  size_t file_size2 = ftell(file2);
   if (file_size1 != file_size2) {
     fclose(file1);
     fclose(file2);
@@ -31,8 +31,10 @@ bool are_files_identical(const char* filename1, const char* filename2) {
   fseek(file2, 0, SEEK_SET);
   char* buffer1 = (char*)malloc(file_size1);
   char* buffer2 = (char*)malloc(file_size2);
-  fread(buffer1, 1, file_size1, file1);
-  fread(buffer2, 1, file_size2, file2);
+  size_t count = fread(buffer1, 1, file_size1, file1);
+  CUTEST_ASSERT("Could not read file 1", count == file_size1);
+  count = fread(buffer2, 1, file_size2, file2);
+  CUTEST_ASSERT("Could not read file 2", count == file_size2);
   fclose(file1);
   fclose(file2);
 

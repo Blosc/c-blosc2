@@ -354,7 +354,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
   if (mmap_file->size < new_size) {
     int rc = ftruncate(mmap_file->fd, new_size);
     if (rc < 0) {
-      BLOSC_TRACE_ERROR("Cannot extend the file size to %lld bytes (error: %s).", new_size, strerror(errno));
+      BLOSC_TRACE_ERROR("Cannot extend the file size to %ld bytes (error: %s).", new_size, strerror(errno));
       return 0;
     }
 
