@@ -120,6 +120,7 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
     return mmap_file;
   }
 
+  /* mmap_file->mode mapping is similar to Numpy's memmap (https://github.com/numpy/numpy/blob/main/numpy/_core/memmap.py) and CPython (https://github.com/python/cpython/blob/main/Modules/mmapmodule.c) */
 #if defined(_MSC_VER)
   DWORD protect_flags;
   DWORD access_flags;
@@ -144,49 +145,7 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
     BLOSC_TRACE_ERROR("Mode %s not supported for memory-mapped files.", mmap_file->mode);
     return NULL;
   }
-
-  mmap_file->file = fopen(urlpath, open_mode);
-  if (mmap_file->file == NULL)
-    return NULL;
-
-  mmap_file->fd = _fileno(mmap_file->file);
-
-  /* Retrieve the size of the file */
-  fseek(mmap_file->file, 0, SEEK_END);
-  mmap_file->size = ftell(mmap_file->file);
-  fseek(mmap_file->file, 0, SEEK_SET);
-
-  if (mmap_file->size == 0) {
-    /* The length of the file mapping must be > 0 */
-    mmap_file->size = 1;
-  }
-
-  /* Similar to https://github.com/python/cpython/blob/main/Modules/mmapmodule.c */
-  DWORD size_hi = (DWORD)(mmap_file->size >> 32);
-  DWORD size_lo = (DWORD)(mmap_file->size & 0xFFFFFFFF);
-  HANDLE file_handle = (HANDLE) _get_osfhandle(mmap_file->fd);
-  mmap_file->mmap_handle = CreateFileMapping(file_handle, NULL, protect_flags, size_hi, size_lo, NULL);
-  if (mmap_file->mmap_handle == NULL) {
-    _print_last_error();
-    BLOSC_TRACE_ERROR("Memory mapping failed for the file %s.", urlpath);
-    return NULL;
-  }
-
-  DWORD offset = 0;
-  mmap_file->addr = (char*) MapViewOfFile(mmap_file->mmap_handle, access_flags, offset, offset, mmap_file->size);
-  if (mmap_file->addr == NULL) {
-    _print_last_error();
-    BLOSC_TRACE_ERROR("Memory mapping failed for the file %s.", urlpath);
-
-    if (!CloseHandle(mmap_file->mmap_handle)) {
-      _print_last_error();
-      BLOSC_TRACE_ERROR("Cannot close the handle to the memory-mapped file.");
-    }
-    
-    return NULL;
-  }
 #else
-  /* mmap_mode mapping is similar to Numpy's memmap (https://github.com/numpy/numpy/blob/main/numpy/_core/memmap.py) and CPython (https://github.com/python/cpython/blob/main/Modules/mmapmodule.c) */
   int prot;
   int flags;
   char* open_mode;
@@ -210,27 +169,55 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
     BLOSC_TRACE_ERROR("Mode %s not supported for memory-mapped files.", mmap_file->mode);
     return NULL;
   }
+#endif
 
   mmap_file->file = fopen(urlpath, open_mode);
   if (mmap_file->file == NULL)
     return NULL;
 
-  mmap_file->fd = fileno(mmap_file->file);
-
   /* Retrieve the size of the file */
   fseek(mmap_file->file, 0, SEEK_END);
-  mmap_file->size = ftell(mmap_file->file);
+  mmap_file->file_size = ftell(mmap_file->file);
   fseek(mmap_file->file, 0, SEEK_SET);
-  
-  if (mmap_file->size == 0) {
-    /* The length of the file mapping must be > 0 */
-    mmap_file->size = 1;
+
+  /* In read-only mode, we can simply restrict the mapping to the file size but for writing we need to use a large
+  enough buffer (which will be increased later if needed) */
+  const int64_t default_mapping_size = 1 << 30;
+  mmap_file->mapping_size = strstr(mmap_file->mode, "r") != NULL ? mmap_file->file_size : default_mapping_size;
+
+#if defined(_MSC_VER)
+  mmap_file->fd = _fileno(mmap_file->file);
+
+  /* Similar to https://github.com/python/cpython/blob/main/Modules/mmapmodule.c */
+  DWORD size_hi = (DWORD)(mmap_file->mapping_size >> 32);
+  DWORD size_lo = (DWORD)(mmap_file->mapping_size & 0xFFFFFFFF);
+  HANDLE file_handle = (HANDLE) _get_osfhandle(mmap_file->fd);
+  mmap_file->mmap_handle = CreateFileMapping(file_handle, NULL, protect_flags, size_hi, size_lo, NULL);
+  if (mmap_file->mmap_handle == NULL) {
+    _print_last_error();
+    BLOSC_TRACE_ERROR("Memory mapping failed for the file %s.", urlpath);
+    return NULL;
   }
+
+  DWORD offset = 0;
+  mmap_file->addr = (char*) MapViewOfFile(mmap_file->mmap_handle, access_flags, offset, offset, mmap_file->mapping_size);
+  if (mmap_file->addr == NULL) {
+    _print_last_error();
+    BLOSC_TRACE_ERROR("Memory mapping failed for the file %s.", urlpath);
+
+    if (!CloseHandle(mmap_file->mmap_handle)) {
+      _print_last_error();
+      BLOSC_TRACE_ERROR("Cannot close the handle to the memory-mapped file.");
+    }
+    
+    return NULL;
+  }
+#else
+  mmap_file->fd = fileno(mmap_file->file);
 
   /* Offset where the mapping should start (different to mmap_file->offset which denotes the current position and may change) */
   int64_t offset = 0;
-
-  mmap_file->addr = mmap(NULL, mmap_file->size, prot, flags, mmap_file->fd, offset);
+  mmap_file->addr = mmap(NULL, mmap_file->mapping_size, prot, flags, mmap_file->fd, offset);
   if (mmap_file->addr == MAP_FAILED) {
     BLOSC_TRACE_ERROR("Memory mapping failed for file %s.", urlpath);
     return NULL;
@@ -261,7 +248,7 @@ int blosc2_stdio_mmap_seek(void *stream, int64_t offset, int whence) {
       mmap_file->offset += offset;
       break;
     case SEEK_END:
-      mmap_file->offset = mmap_file->size + offset;
+      mmap_file->offset = mmap_file->file_size + offset;
       break;
     default:
       BLOSC_TRACE_ERROR("Invalid whence %d argument.", whence);
@@ -286,18 +273,19 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
 
   int64_t new_size = mmap_file->offset + n_bytes;
 
-  /* The writing routine is currently not optimized, neither for POSIX nor for Windows (even though probably worse
-   on Windows). In all cases, we remap everything on every write request (because the mapping is static) which may be slow or has unwanted side
-   effects. An improved solution could increment the memory mapping in larger chunks independent of the actual file size:
-   https://stackoverflow.com/a/6098864 */
-
 #if defined(_MSC_VER)
-  if (mmap_file->size < new_size) {
+  if (mmap_file->file_size < new_size) {
     int rc = _chsize_s(mmap_file->fd, size);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Cannot extend the file size to %lld bytes (error: %s).", new_size, strerror(errno));
       return 0;
     }
+
+    mmap_file->file_size = new_size;
+  }
+
+  if (mmap_file->mapping_size < mmap_file->file_size) {
+    mmap_file->mapping_size = mmap_file->file_size * 2;
 
     /* We need to remap the file completely and cannot pass the previous used address on Windows */
     if (!UnmapViewOfFile(mmap_file->addr)) {
@@ -313,8 +301,8 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
 
     DWORD protect_flags = strstr(mmap_file->mode, "c") ? PAGE_WRITECOPY : PAGE_READWRITE;
     HANDLE file_handle = (HANDLE) _get_osfhandle(mmap_file->fd);
-    DWORD size_hi = (DWORD)(new_size >> 32);
-    DWORD size_lo = (DWORD)(new_size & 0xFFFFFFFF);
+    DWORD size_hi = (DWORD)(mmap_file->mapping_size >> 32);
+    DWORD size_lo = (DWORD)(mmap_file->mapping_size & 0xFFFFFFFF);
     mmap_file->mmap_handle = CreateFileMapping(file_handle, NULL, protect_flags, size_hi, size_lo, NULL);
     if (mmap_file->mmap_handle == NULL) {
       _print_last_error();
@@ -324,7 +312,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
 
     int access_flags = strstr(mmap_file->mode, "c") ? FILE_MAP_COPY : FILE_MAP_WRITE;
     DWORD offset = 0;
-    char* new_address = (char*) MapViewOfFile(mmap_file->mmap_handle, access_flags, offset, offset, new_size);
+    char* new_address = (char*) MapViewOfFile(mmap_file->mmap_handle, access_flags, offset, offset, mmap_file->mapping_size);
     if (new_address == NULL) {
       _print_last_error();
       BLOSC_TRACE_ERROR("Cannot remapt the memory-mapped file");
@@ -338,33 +326,38 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
     }
 
     mmap_file->addr = new_address;
-    mmap_file->size = new_size;
   }
   
   memcpy(mmap_file->addr + mmap_file->offset, ptr, n_bytes);
 
   /* Ensure modified pages are written to disk */
-  if (!FlushViewOfFile(mmap_file->addr, mmap_file->size)) {
+  if (!FlushViewOfFile(mmap_file->addr, mmap_file->file_size)) {
     _print_last_error();
     BLOSC_TRACE_ERROR("Cannot flush the memory-mapped file to disk.");
     return 0;
   }
   mmap_file->offset += n_bytes;
 #else
-  if (mmap_file->size < new_size) {
+  if (mmap_file->file_size < new_size) {
     int rc = ftruncate(mmap_file->fd, new_size);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Cannot extend the file size to %ld bytes (error: %s).", new_size, strerror(errno));
       return 0;
     }
 
+    mmap_file->file_size = new_size;
+  }
+
+  if (mmap_file->mapping_size < mmap_file->file_size) {
+    mmap_file->mapping_size = mmap_file->file_size * 2;
+
     /* Extend the current mapping */
     int flags = strstr(mmap_file->mode, "c") ? MAP_PRIVATE : MAP_SHARED;
     int64_t offset = 0;
-    char* new_address = mmap(mmap_file->addr, new_size, PROT_READ | PROT_WRITE, flags | MAP_FIXED, mmap_file->fd, offset);
+    char* new_address = mmap(mmap_file->addr, mmap_file->mapping_size, PROT_READ | PROT_WRITE, flags | MAP_FIXED, mmap_file->fd, offset);
     if (new_address == MAP_FAILED) {
       BLOSC_TRACE_ERROR("Cannot remap the memory-mapped file (error: %s).", strerror(errno));
-      if (munmap(mmap_file->addr, mmap_file->size) < 0) {
+      if (munmap(mmap_file->addr, mmap_file->mapping_size) < 0) {
         BLOSC_TRACE_ERROR("Cannot unmap the memory-mapped file (error: %s).", strerror(errno));
       }
 
@@ -372,13 +365,12 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
     }
 
     mmap_file->addr = new_address;
-    mmap_file->size = new_size;
   }
   
   memcpy(mmap_file->addr + mmap_file->offset, ptr, n_bytes);
 
   /* Ensure modified pages are written to disk */
-  int rc = msync(mmap_file->addr, mmap_file->size, MS_SYNC);
+  int rc = msync(mmap_file->addr, mmap_file->file_size, MS_SYNC);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Cannot sync the memory-mapped file to disk (error: %s).", strerror(errno));
     return 0;
@@ -392,7 +384,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
 int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, void *stream) {
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) stream;
 
-  if (mmap_file->offset + size * nitems > mmap_file->size) {
+  if (mmap_file->offset + size * nitems > mmap_file->file_size) {
     BLOSC_TRACE_ERROR("Cannot read beyond the end of the memory-mapped file.");
     *ptr = NULL;
     return 0;
@@ -406,11 +398,11 @@ int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, void *s
 int blosc2_stdio_mmap_truncate(void *stream, int64_t size) {
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) stream;
 
-  if (mmap_file->size == size) {
+  if (mmap_file->file_size == size) {
     return 0;
   }
 
-  mmap_file->size = size;
+  mmap_file->file_size = size;
 
 #if defined(_MSC_VER)
   return _chsize_s(mmap_file->fd, size);
@@ -435,7 +427,7 @@ int blosc2_stdio_mmap_free(void* params) {
     err = -1;
   }
 #else
-  if (munmap(mmap_file->addr, mmap_file->size) < 0) {
+  if (munmap(mmap_file->addr, mmap_file->mapping_size) < 0) {
     BLOSC_TRACE_ERROR("Cannot unmap the memory-mapped file (error: %s).", strerror(errno));
     err = -1;
   }

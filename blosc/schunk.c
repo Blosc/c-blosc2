@@ -370,7 +370,8 @@ blosc2_schunk* blosc2_schunk_open_offset_mmap(const char* urlpath, int64_t offse
 
   blosc2_stdio_mmap *mmap_file = malloc(sizeof(blosc2_stdio_mmap));
   mmap_file->addr = NULL;
-  mmap_file->size = -1;
+  mmap_file->file_size = -1;
+  mmap_file->mapping_size = -1;
   mmap_file->offset = 0;
   mmap_file->file = NULL;
   mmap_file->fd = -1;
