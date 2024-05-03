@@ -390,9 +390,13 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
 }
 
 int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, void *stream) {
-  BLOSC_UNUSED_PARAM(size);
-  BLOSC_UNUSED_PARAM(nitems);
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) stream;
+
+  if (mmap_file->offset + size * nitems > mmap_file->size) {
+    BLOSC_TRACE_ERROR("Cannot read beyond the end of the memory-mapped file.");
+    *ptr = NULL;
+    return 0;
+  }
 
   *ptr = mmap_file->addr + mmap_file->offset;
 
