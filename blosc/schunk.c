@@ -369,7 +369,9 @@ blosc2_schunk* blosc2_schunk_open_offset_mmap(const char* urlpath, int64_t offse
   }
 
   blosc2_stdio_mmap *mmap_file = malloc(sizeof(blosc2_stdio_mmap));
-  *mmap_file = BLOSC2_STDIO_MMAP(.mode=mmap_mode, .needs_free=true);
+  *mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
+  mmap_file->mode = mmap_mode;
+  mmap_file->needs_free = true;
 
   blosc2_io *io = malloc(sizeof(blosc2_io));
   io->id = BLOSC2_IO_FILESYSTEM_MMAP;
