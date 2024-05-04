@@ -17,7 +17,7 @@
 #include <stdint.h>
 #include <errno.h>
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #include <memoryapi.h>
 #else
 #include <sys/mman.h>
@@ -88,7 +88,7 @@ int blosc2_stdio_truncate(void *stream, int64_t size) {
   return rc;
 }
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 void _print_last_error() {
     DWORD last_error = GetLastError();
     if(last_error == 0) {
@@ -121,7 +121,7 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
   }
 
   /* mmap_file->mode mapping is similar to Numpy's memmap (https://github.com/numpy/numpy/blob/main/numpy/_core/memmap.py) and CPython (https://github.com/python/cpython/blob/main/Modules/mmapmodule.c) */
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   char* open_mode;
   bool use_initial_mapping_size;
   if (strcmp(mmap_file->mode, "r") == 0) {
@@ -195,7 +195,7 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
   if (mmap_file->file_size > mmap_file->mapping_size)
     mmap_file->mapping_size = mmap_file->file_size;
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   mmap_file->fd = _fileno(mmap_file->file);
 
   if (mmap_file->file_size == 0) {
@@ -294,7 +294,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
 
   int64_t new_size = mmap_file->offset + n_bytes;
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   if (strcmp(mmap_file->mode, "c") != 0 && mmap_file->file_size < new_size) {
     int rc = _chsize_s(mmap_file->fd, new_size);
     if (rc != 0) {
@@ -424,7 +424,7 @@ int blosc2_stdio_mmap_truncate(void *stream, int64_t size) {
   if (strcmp(mmap_file->mode, "c") == 0)
     return 0;
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   return _chsize_s(mmap_file->fd, size);
 #else
   return ftruncate(mmap_file->fd, size);
@@ -435,7 +435,7 @@ int blosc2_stdio_mmap_free(void* params) {
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) params;
   int err = 0;
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   if (!UnmapViewOfFile(mmap_file->addr)) {
     _print_last_error();
     BLOSC_TRACE_ERROR("Cannot unmap the memory-mapped file.");
