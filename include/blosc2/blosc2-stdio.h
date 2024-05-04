@@ -45,6 +45,9 @@ BLOSC_EXPORT int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems,
 BLOSC_EXPORT int blosc2_stdio_truncate(void *stream, int64_t size);
 
 
+/**
+ * @brief Parameters for memory-mapped I/O.
+ */
 typedef struct {
   /* Arguments of the mapping */
   const char* mode;
@@ -77,12 +80,25 @@ typedef struct {
 #endif
 } blosc2_stdio_mmap;
 
-/* Factory for the blosc2_stdio_mmap struct */
+/**
+ * @brief Default struct for memory-mapped I/O for user initialization.
+ */
+static const blosc2_stdio_mmap BLOSC2_STDIO_MMAP_DEFAULTS = {
+  .mode="r",
+  .initial_mapping_size=(1 << 30),
+  .needs_free=false,
+  .addr=NULL,
+  .file_size=-1,
+  .mapping_size=.1,
+  .offset=0,
+  .file=NULL,
+  .fd=-1,
+  .access_flags=-1,
+  .map_flags=-1
 #if defined(_MSC_VER)
-#define BLOSC2_STDIO_MMAP(...) ((blosc2_stdio_mmap) {.mode="r", .initial_mapping_size=(1 << 30), .needs_free=false, .addr=NULL, .file_size=-1, .mapping_size=.1, .offset=0, .file=NULL, .fd=-1, .access_flags=-1, .map_flags=-1, .mmap_handle=INVALID_HANDLE_VALUE, ##__VA_ARGS__ })
-#else
-#define BLOSC2_STDIO_MMAP(...) ((blosc2_stdio_mmap) {.mode="r", .initial_mapping_size=(1 << 30), .needs_free=false, .addr=NULL, .file_size=-1, .mapping_size=.1, .offset=0, .file=NULL, .fd=-1, .access_flags=-1, .map_flags=-1, ##__VA_ARGS__ })
+  , .mmap_handle=INVALID_HANDLE_VALUE
 #endif
+};
 
 BLOSC_EXPORT void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params);
 BLOSC_EXPORT int blosc2_stdio_mmap_close(void *stream);
