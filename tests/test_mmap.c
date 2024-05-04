@@ -122,7 +122,7 @@ CUTEST_TEST_TEST(mmap) {
 
   blosc2_schunk_free(schunk_read);
 
-#if !defined(_MSC_VER)
+#if !defined(_WIN32)
   /* Append some data to the existing chunk in memory (does not work on Windows) */
   blosc2_schunk* schunk_memory = blosc2_schunk_open_offset_mmap(urlpath_mmap, 0, "c");
 

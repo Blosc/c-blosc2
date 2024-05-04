@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #include <Windows.h>
 #endif
 
@@ -74,7 +74,7 @@ typedef struct {
   //!< The access attributes for the memory pages.
   int64_t map_flags;
   //!< The attributes of the mapping.
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   HANDLE mmap_handle;
   //!< The Windows handle to the memory mapping.
 #endif
@@ -95,7 +95,7 @@ static const blosc2_stdio_mmap BLOSC2_STDIO_MMAP_DEFAULTS = {
   .fd=-1,
   .access_flags=-1,
   .map_flags=-1
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   , .mmap_handle=INVALID_HANDLE_VALUE
 #endif
 };
