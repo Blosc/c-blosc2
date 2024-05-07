@@ -1,14 +1,12 @@
 Some conventions used in C-Blosc2
 =================================
 
-* Use C99 designated initialization whenever possible (specially in examples).
+* Use C99 designated initialization only in examples. Libraries should use C89 initialization, which is more portable, specially with C++ (designated initialization in C++ is supported only since C++20).
 
 * Use _new and _free for memory allocating constructors and destructors and _init and _destroy for non-memory allocating constructors and destructors.
 
+* Lines must not exceed 120 characters. If a line is too long, it must be broken into several lines.
 
-Naming things
--------------
+* Conditional bodies must always use braces, even if they are one-liners.  The only exception that can be is when the conditional is a single line and the body is a single line:
 
-Naming is one of the most time-consuming tasks, but critical for communicating effectively.  Here it is a preliminary list of names that I am not comfortable with:
-
-* We are currently calling `filters` to a data transformation function that essentially produces the same amount of data, but with bytes shuffled or transformed in different ways.  Perhaps `transformers` would be a better name?
+  if (condition) whatever();
