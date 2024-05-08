@@ -73,7 +73,8 @@ void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int64_t nchunk,
     BLOSC_TRACE_ERROR("Error getting the input/output API");
     return NULL;
   }
-  int64_t wbytes = io_cb->write(chunk, 1, cbytes, fpc);
+  int64_t io_pos = 0;
+  int64_t wbytes = io_cb->write(chunk, 1, cbytes, io_pos, fpc);
   io_cb->close(fpc);
   if (wbytes != cbytes) {
     BLOSC_TRACE_ERROR("Cannot write the full chunk.");
@@ -120,8 +121,8 @@ int32_t sframe_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t** chunk,
     *needs_free = false;
   }
 
-  io_cb->seek(fpc, 0L, SEEK_SET);
-  int64_t rbytes = io_cb->read((void**)chunk, 1, chunk_cbytes, fpc);
+  int64_t io_pos = 0;
+  int64_t rbytes = io_cb->read((void**)chunk, 1, chunk_cbytes, io_pos, fpc);
   io_cb->close(fpc);
   if (rbytes != chunk_cbytes) {
     BLOSC_TRACE_ERROR("Cannot read the chunk out of the chunkfile.");

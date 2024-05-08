@@ -1620,6 +1620,7 @@ static int blosc_d(
       return BLOSC2_ERROR_PLUGIN_IO;
     }
 
+    int64_t io_pos = 0;
     if (frame->sframe) {
       // The chunk is not in the frame
       char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
@@ -1629,16 +1630,16 @@ static int blosc_d(
       BLOSC_ERROR_NULL(fp, BLOSC2_ERROR_FILE_OPEN);
       free(chunkpath);
       // The offset of the block is src_offset
-      io_cb->seek(fp, src_offset, SEEK_SET);
+      io_pos = src_offset;
     }
     else {
       fp = io_cb->open(urlpath, "rb", context->schunk->storage->io->params);
       BLOSC_ERROR_NULL(fp, BLOSC2_ERROR_FILE_OPEN);
       // The offset of the block is src_offset
-      io_cb->seek(fp, frame->file_offset + chunk_offset + src_offset, SEEK_SET);
+      io_pos = frame->file_offset + chunk_offset + src_offset;
     }
     // We can make use of tmp3 because it will be used after src is not needed anymore
-    int64_t rbytes = io_cb->read((void**)&tmp3, 1, block_csize, fp);
+    int64_t rbytes = io_cb->read((void**)&tmp3, 1, block_csize, io_pos, fp);
     io_cb->close(fp);
     if ((int32_t)rbytes != block_csize) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");

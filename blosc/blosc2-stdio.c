@@ -63,14 +63,17 @@ int blosc2_stdio_seek(void *stream, int64_t offset, int whence) {
   return rc;
 }
 
-int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, void *stream) {
-  blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
+int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
+  blosc2_stdio_seek(stream, position, SEEK_SET);
 
+  blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
   size_t nitems_ = fwrite(ptr, (size_t) size, (size_t) nitems, my_fp->file);
   return (int64_t) nitems_;
 }
 
-int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, void *stream) {
+int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
+  blosc2_stdio_seek(stream, position, SEEK_SET);
+
   void* data_ptr = *ptr;
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
   size_t nitems_ = fread(data_ptr, (size_t) size, (size_t) nitems, my_fp->file);
@@ -277,7 +280,7 @@ int blosc2_stdio_mmap_seek(void *stream, int64_t offset, int whence) {
   return 0;
 }
 
-int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, void *stream) {
+int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) stream;
 
   int64_t n_bytes = size * nitems;
@@ -285,7 +288,8 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
     return 0;
   }
 
-  int64_t new_size = mmap_file->offset + n_bytes;
+  int64_t position_end = position + n_bytes;
+  int64_t new_size = position_end > mmap_file->file_size ? position_end : mmap_file->file_size;
 
 #if defined(_WIN32)
   if (strcmp(mmap_file->mode, "c") != 0 && mmap_file->file_size < new_size) {
@@ -334,15 +338,14 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
     mmap_file->addr = new_address;
   }
 
-  memcpy(mmap_file->addr + mmap_file->offset, ptr, n_bytes);
+  memcpy(mmap_file->addr + position, ptr, n_bytes);
 
   /* Ensure modified pages are written to disk */
-  if (!FlushViewOfFile(mmap_file->addr + mmap_file->offset, n_bytes)) {
+  if (!FlushViewOfFile(mmap_file->addr + position, n_bytes)) {
     _print_last_error();
     BLOSC_TRACE_ERROR("Cannot flush the memory-mapped file to disk.");
     return 0;
   }
-  mmap_file->offset += n_bytes;
 #else
   if (strcmp(mmap_file->mode, "c") != 0 && mmap_file->file_size < new_size) {
     int rc = ftruncate(mmap_file->fd, new_size);
@@ -372,7 +375,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
     mmap_file->addr = new_address;
   }
   
-  memcpy(mmap_file->addr + mmap_file->offset, ptr, n_bytes);
+  memcpy(mmap_file->addr + position, ptr, n_bytes);
 
   /* Ensure modified pages are written to disk */
   int rc = msync(mmap_file->addr, mmap_file->file_size, MS_ASYNC);
@@ -380,22 +383,22 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
     BLOSC_TRACE_ERROR("Cannot sync the memory-mapped file to disk (error: %s).", strerror(errno));
     return 0;
   }
-  mmap_file->offset += n_bytes;
 #endif
 
+  mmap_file->offset = position_end;
   return nitems;
 }
 
-int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, void *stream) {
+int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) stream;
 
-  if (mmap_file->offset + size * nitems > mmap_file->file_size) {
+  if (position + size * nitems > mmap_file->file_size) {
     BLOSC_TRACE_ERROR("Cannot read beyond the end of the memory-mapped file.");
     *ptr = NULL;
     return 0;
   }
 
-  *ptr = mmap_file->addr + mmap_file->offset;
+  *ptr = mmap_file->addr + position;
 
   return nitems;
 }
