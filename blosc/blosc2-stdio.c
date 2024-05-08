@@ -117,6 +117,7 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) params;
   if (mmap_file->addr != NULL) {
     /* A memory-mapped file is only opened once */
+    mmap_file->offset = 0;
     return mmap_file;
   }
 
@@ -131,12 +132,12 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
     use_initial_mapping_size = false;
   } else if (strcmp(mmap_file->mode, "r+") == 0) {
     mmap_file->access_flags = PAGE_READWRITE;
-    mmap_file->map_flags = FILE_MAP_WRITE | FILE_MAP_RESERVE;
+    mmap_file->map_flags = FILE_MAP_WRITE;
     open_mode = "rb+";
     use_initial_mapping_size = true;
   } else if (strcmp(mmap_file->mode, "w+") == 0) {
     mmap_file->access_flags = PAGE_READWRITE;
-    mmap_file->map_flags = FILE_MAP_WRITE | FILE_MAP_RESERVE;
+    mmap_file->map_flags = FILE_MAP_WRITE;
     open_mode = "wb+";
     use_initial_mapping_size = true;
   } else if (strcmp(mmap_file->mode, "c") == 0) {
@@ -198,22 +199,14 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
 #if defined(_WIN32)
   mmap_file->fd = _fileno(mmap_file->file);
 
-  if (mmap_file->file_size == 0) {
-    /* Windows is a bit special here. CreateFileMapping is directly connected to the file size so we cannot pass the mapping_size
-    there. For the case of creating a new file, we need to use the (undocumented) FILE_MAP_RESERVE
-    flag (https://stackoverflow.com/a/41081832) and the initial file size must be > 0 */
-    mmap_file->file_size = 1;
-
-    int rc = _chsize_s(mmap_file->fd, mmap_file->file_size);
-    if (rc != 0) {
-      BLOSC_TRACE_ERROR("Cannot extend the file size to %lld bytes (error: %s).", mmap_file->file_size, strerror(errno));
-      return 0;
-    }
-  }
-
+  /* Windows automatically expands the file size to the memory mapped file
+  (https://learn.microsoft.com/en-us/windows/win32/memory/creating-a-file-mapping-object).
+  In general, the size of the file is directly connected to the size of the mapping and cannot change. We cut the
+  file size to the target size in the end after we close the mapping */
   HANDLE file_handle = (HANDLE) _get_osfhandle(mmap_file->fd);
-  DWORD size_auto = 0;
-  mmap_file->mmap_handle = CreateFileMapping(file_handle, NULL, mmap_file->access_flags, size_auto, size_auto, NULL);
+  DWORD size_hi = (DWORD)(mmap_file->mapping_size >> 32);
+  DWORD size_lo = (DWORD)(mmap_file->mapping_size & 0xFFFFFFFF);
+  mmap_file->mmap_handle = CreateFileMapping(file_handle, NULL, mmap_file->access_flags, size_hi, size_lo, NULL);
   if (mmap_file->mmap_handle == NULL) {
     _print_last_error();
     BLOSC_TRACE_ERROR("Creating the memory mapping failed for the file %s.", urlpath);
@@ -296,12 +289,6 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
 
 #if defined(_WIN32)
   if (strcmp(mmap_file->mode, "c") != 0 && mmap_file->file_size < new_size) {
-    int rc = _chsize_s(mmap_file->fd, new_size);
-    if (rc != 0) {
-      BLOSC_TRACE_ERROR("Cannot extend the file size to %lld bytes (error: %s).", new_size, strerror(errno));
-      return 0;
-    }
-
     mmap_file->file_size = new_size;
   }
 
@@ -321,8 +308,9 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
     }
 
     HANDLE file_handle = (HANDLE) _get_osfhandle(mmap_file->fd);
-    DWORD size_auto = 0;
-    mmap_file->mmap_handle = CreateFileMapping(file_handle, NULL, mmap_file->access_flags, size_auto, size_auto, NULL);
+    DWORD size_hi = (DWORD)(mmap_file->mapping_size >> 32);
+    DWORD size_lo = (DWORD)(mmap_file->mapping_size & 0xFFFFFFFF);
+    mmap_file->mmap_handle = CreateFileMapping(file_handle, NULL, mmap_file->access_flags, size_hi, size_lo, NULL);
     if (mmap_file->mmap_handle == NULL) {
       _print_last_error();
       BLOSC_TRACE_ERROR("Cannot remapt the memory-mapped file.");
@@ -349,7 +337,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
   memcpy(mmap_file->addr + mmap_file->offset, ptr, n_bytes);
 
   /* Ensure modified pages are written to disk */
-  if (!FlushViewOfFile(mmap_file->addr, mmap_file->file_size)) {
+  if (!FlushViewOfFile(mmap_file->addr + mmap_file->offset, n_bytes)) {
     _print_last_error();
     BLOSC_TRACE_ERROR("Cannot flush the memory-mapped file to disk.");
     return 0;
@@ -387,7 +375,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, v
   memcpy(mmap_file->addr + mmap_file->offset, ptr, n_bytes);
 
   /* Ensure modified pages are written to disk */
-  int rc = msync(mmap_file->addr, mmap_file->file_size, MS_SYNC);
+  int rc = msync(mmap_file->addr, mmap_file->file_size, MS_ASYNC);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Cannot sync the memory-mapped file to disk (error: %s).", strerror(errno));
     return 0;
@@ -424,8 +412,9 @@ int blosc2_stdio_mmap_truncate(void *stream, int64_t size) {
   if (strcmp(mmap_file->mode, "c") == 0)
     return 0;
 
-#if defined(_WIN32)
-  return _chsize_s(mmap_file->fd, size);
+#if defined(_MSC_VER)
+  /* On Windows, we can truncate the file only at the end after we released the mapping */
+  return 0;
 #else
   return ftruncate(mmap_file->fd, size);
 #endif
@@ -444,6 +433,11 @@ int blosc2_stdio_mmap_free(void* params) {
   if (!CloseHandle(mmap_file->mmap_handle)) {
     _print_last_error();
     BLOSC_TRACE_ERROR("Cannot close the handle to the memory-mapped file.");
+    err = -1;
+  }
+  int rc = _chsize_s(mmap_file->fd, mmap_file->file_size);
+  if (rc != 0) {
+    BLOSC_TRACE_ERROR("Cannot extend the file size to %lld bytes (error: %s).", mmap_file->file_size, strerror(errno));
     err = -1;
   }
 #else
