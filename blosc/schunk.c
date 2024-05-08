@@ -436,7 +436,8 @@ int64_t frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
     return BLOSC2_ERROR_PLUGIN_IO;
   }
   void* fp = io_cb->open(urlpath, "wb", frame->schunk->storage->io);
-  int64_t nitems = io_cb->write(frame->cframe, frame->len, 1, fp);
+  int64_t io_pos = 0;
+  int64_t nitems = io_cb->write(frame->cframe, frame->len, 1, io_pos, fp);
   io_cb->close(fp);
   return nitems * frame->len;
 }
@@ -459,7 +460,8 @@ int64_t append_frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
     offset = io_cb->tell(fp);
 # endif
 
-    io_cb->write(frame->cframe, frame->len, 1, fp);
+    int64_t io_pos = offset;
+    io_cb->write(frame->cframe, frame->len, 1, io_pos, fp);
     io_cb->close(fp);
     return offset;
 }
