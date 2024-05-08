@@ -40,6 +40,7 @@
 
 int nchunks = NCHUNKS;
 int iterations = 5;
+int io_type = BLOSC2_IO_FILESYSTEM;
 
 
 
@@ -249,7 +250,18 @@ void test_create_sframe_frame(char* operation) {
   blosc2_remove_urlpath(storage.urlpath);
   schunk_sframe = blosc2_schunk_new(&storage);
 
+  blosc2_stdio_mmap mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
+  mmap_file.mode = "w+";
+  blosc2_io io_mmap = {.id = BLOSC2_IO_FILESYSTEM_MMAP, .name = "filesystem_mmap", .params = &mmap_file};
+
   blosc2_storage storage2 = {.contiguous=true, .urlpath="test_cframe.b2frame", .cparams=&cparams, .dparams=&dparams};
+  if (io_type == BLOSC2_IO_FILESYSTEM) {
+    storage2.io = (blosc2_io*)&BLOSC2_IO_DEFAULTS;
+  }
+  else if (io_type == BLOSC2_IO_FILESYSTEM_MMAP) {
+    storage2.io = &io_mmap;
+  }
+
   blosc2_remove_urlpath(storage2.urlpath);
   schunk_cframe = blosc2_schunk_new(&storage2);
 
@@ -350,8 +362,8 @@ if (operation != NULL) {
 int main(int argc, char* argv[]) {
   char* operation = NULL;
 
-  if (argc >= 5) {
-    printf("Usage: ./sframe_bench [nchunks] [insert | update | reorder] [num operations]\n");
+  if (argc >= 6) {
+    printf("Usage: ./sframe_bench [nchunks] [insert | update | reorder] [num operations] [io_file | io_mmap]\n");
     exit(1);
   }
   else if (argc >= 2) {
@@ -360,8 +372,18 @@ int main(int argc, char* argv[]) {
   if (argc >= 3) {
     operation = argv[2];
   }
-  if (argc == 4) {
+  if (argc >= 4) {
     iterations = (int)strtol(argv[3], NULL, 10);
+  }
+  if (argc == 5) {
+    if (strcmp(argv[4], "io_file") == 0) {
+      io_type = BLOSC2_IO_FILESYSTEM;
+    } else if (strcmp(argv[4], "io_mmap") == 0) {
+      io_type = BLOSC2_IO_FILESYSTEM_MMAP;
+    } else {
+      printf("Invalid io type. Use io_file or io_mmap\n");
+      exit(1);
+    }
   }
 
   test_create_sframe_frame(operation);
