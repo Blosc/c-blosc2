@@ -105,8 +105,12 @@ CUTEST_TEST_TEST(mmap) {
   /* The compressed file content should not depend on the I/O which created it */
   CUTEST_ASSERT("Files are not identical", are_files_identical(urlpath_default, urlpath_mmap));
 
-  /* Read the chunk data back again (using mmap) */
-  blosc2_schunk* schunk_read = blosc2_schunk_open_offset_mmap(urlpath_mmap, 0, "r");
+  /* Read the schunk data back again (using mmap) */
+  mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
+  mmap_file.mode = "r";
+  mmap_file.initial_mapping_size = initial_mapping_size;
+  io.params = &mmap_file;
+  blosc2_schunk* schunk_read = blosc2_schunk_open_udio(urlpath_mmap, &io);
   CUTEST_ASSERT("Mismatch in number of chunks", schunk_read->nchunks == 2);
 
   float* chunk_data = (float*)malloc(schunk_read->chunksize);
@@ -122,9 +126,13 @@ CUTEST_TEST_TEST(mmap) {
 
   blosc2_schunk_free(schunk_read);
 
-#if !defined(_WIN32)
-  /* Append some data to the existing chunk in memory (does not work on Windows) */
-  blosc2_schunk* schunk_memory = blosc2_schunk_open_offset_mmap(urlpath_mmap, 0, "c");
+#if defined(__linux__)
+  /* Append some data to the existing schunk in memory (does not work on Windows) */
+  mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
+  mmap_file.mode = "c";
+  mmap_file.initial_mapping_size = initial_mapping_size;
+  io.params = &mmap_file;
+  blosc2_schunk* schunk_memory = blosc2_schunk_open_udio(urlpath_mmap, &io);
 
   float data_buffer_memory[2] = {0.5, 0.6};
   cbytes = blosc2_schunk_append_buffer(schunk_memory, data_buffer_memory, sizeof(data_buffer_memory));
@@ -136,7 +144,7 @@ CUTEST_TEST_TEST(mmap) {
   CUTEST_ASSERT("Value 2 of chunk 2 is wrong", fabs(chunk_data[1] - 0.4) < 1e-6);
 
   dsize = blosc2_schunk_decompress_chunk(schunk_memory, 2, chunk_data, schunk_memory->chunksize);
-  CUTEST_ASSERT("Size of decompressed chunk 1 does not match", dsize == sizeof(data_buffer2));
+  CUTEST_ASSERT("Size of decompressed chunk 1 does not match", dsize == sizeof(data_buffer_memory));
   CUTEST_ASSERT("Value 1 of chunk 2 is wrong", fabs(chunk_data[0] - 0.5) < 1e-6);
   CUTEST_ASSERT("Value 2 of chunk 2 is wrong", fabs(chunk_data[1] - 0.6) < 1e-6);
 
@@ -144,8 +152,12 @@ CUTEST_TEST_TEST(mmap) {
   CUTEST_ASSERT("Files are not identical", are_files_identical(urlpath_default, urlpath_mmap));
 #endif
 
-  /* Append some data to the existing chunk */
-  blosc2_schunk* schunk_append = blosc2_schunk_open_offset_mmap(urlpath_mmap, 0, "r+");
+  /* Append some data to the existing schunk */
+  mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
+  mmap_file.mode = "r+";
+  mmap_file.initial_mapping_size = initial_mapping_size;
+  io.params = &mmap_file;
+  blosc2_schunk* schunk_append = blosc2_schunk_open_udio(urlpath_mmap, &io);
 
   float data_buffer3[2] = {0.5, 0.6};
   cbytes = blosc2_schunk_append_buffer(schunk_append, data_buffer3, sizeof(data_buffer3));

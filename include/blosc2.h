@@ -1042,7 +1042,7 @@ typedef int     (*blosc2_seek_cb)(void *stream, int64_t offset, int whence);
 typedef int64_t (*blosc2_write_cb)(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
 typedef int64_t (*blosc2_read_cb)(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
 typedef int     (*blosc2_truncate_cb)(void *stream, int64_t size);
-typedef int     (*blosc2_free_cb)(void *params);
+typedef int     (*blosc2_destroy_cb)(void *params);
 
 
 /*
@@ -1054,7 +1054,8 @@ typedef struct {
   char* name;
   //!< The IO name.
   bool is_allocation_necessary;
-  //!< If true, the caller needs to allocate data for the read function (ptr argument). If false, the read function takes care of memory allocation and stores the address in the allocated_ptr argument.
+  //!< If true, the caller needs to allocate data for the read function (ptr argument). If false, the read function
+  //!< takes care of memory allocation and stores the address in the allocated_ptr argument.
   blosc2_open_cb open;
   //!< The IO open callback.
   blosc2_close_cb close;
@@ -1069,8 +1070,8 @@ typedef struct {
   //!< The IO read callback.
   blosc2_truncate_cb truncate;
   //!< The IO truncate callback.
-  blosc2_free_cb free;
-  //!< The IO free callback (called in the end when finished with the schunk).
+  blosc2_destroy_cb destroy;
+  //!< The IO destroy callback (called in the end when finished with the schunk).
 } blosc2_io_cb;
 
 
@@ -1846,19 +1847,6 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open(const char* urlpath);
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_offset(const char* urlpath, int64_t offset);
 
 /**
- * @brief Open an existing super-chunk that is on-disk (frame) in memory-mapped mode. No in-memory copy is made.
- *
- * @param urlpath The file name.
- *
- * @param offset The frame offset.
- * 
- * @param mmap_mode The mode for the memmory mapping similar to Numpy's np.memmap (https://numpy.org/doc/stable/reference/generated/numpy.memmap.html). Set to r if the super-chunk should only be read. See #blosc2_stdio_mmap struct for details.
- *
- * @return The new super-chunk.  NULL if not found or not in frame format.
- */
-BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_offset_mmap(const char* urlpath, int64_t offset, const char* mmap_mode);
-
-/**
  * @brief Open an existing super-chunk (no copy is made) using a user-defined I/O interface.
  *
  * @param urlpath The file name.
@@ -1868,6 +1856,19 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_offset_mmap(const char* urlpath, 
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_udio(const char* urlpath, const blosc2_io *udio);
+
+/**
+ * @brief Open an existing super-chunk (no copy is made) using a user-defined I/O interface.
+ *
+ * @param urlpath The file name.
+ *
+ * @param offset The frame offset.
+ * 
+ * @param udio The user-defined I/O interface.
+ *
+ * @return The new super-chunk.
+ */
+BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_offset_udio(const char* urlpath, int64_t offset, const blosc2_io *udio);
 
 /* @brief Convert a super-chunk into a contiguous frame buffer.
  *

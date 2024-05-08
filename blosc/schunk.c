@@ -313,12 +313,16 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
 
 /* Open an existing super-chunk that is on-disk (no copy is made). */
 blosc2_schunk* blosc2_schunk_open_udio(const char* urlpath, const blosc2_io *udio) {
+  return blosc2_schunk_open_offset_udio(urlpath, 0, udio);
+}
+
+blosc2_schunk* blosc2_schunk_open_offset_udio(const char* urlpath, int64_t offset, const blosc2_io *udio) {
   if (urlpath == NULL) {
     BLOSC_TRACE_ERROR("You need to supply a urlpath.");
     return NULL;
   }
 
-  blosc2_frame_s* frame = frame_from_file_offset(urlpath, udio, 0);
+  blosc2_frame_s* frame = frame_from_file_offset(urlpath, udio, offset);
   if (frame == NULL) {
     return NULL;
   }
@@ -338,59 +342,7 @@ blosc2_schunk* blosc2_schunk_open(const char* urlpath) {
 }
 
 blosc2_schunk* blosc2_schunk_open_offset(const char* urlpath, int64_t offset) {
-  if (urlpath == NULL) {
-    BLOSC_TRACE_ERROR("You need to supply a urlpath.");
-    return NULL;
-  }
-
-  blosc2_frame_s* frame = frame_from_file_offset(urlpath, &BLOSC2_IO_DEFAULTS, offset);
-  if (frame == NULL) {
-    return NULL;
-  }
-  blosc2_schunk* schunk = frame_to_schunk(frame, false, &BLOSC2_IO_DEFAULTS);
-
-  // Set the storage with proper defaults
-  size_t pathlen = strlen(urlpath);
-  schunk->storage->urlpath = malloc(pathlen + 1);
-  strcpy(schunk->storage->urlpath, urlpath);
-  schunk->storage->contiguous = !frame->sframe;
-
-  return schunk;
-}
-
-blosc2_schunk* blosc2_schunk_open_offset_mmap(const char* urlpath, int64_t offset, const char* mmap_mode) {
-  if (urlpath == NULL) {
-    BLOSC_TRACE_ERROR("You need to supply a urlpath.");
-    return NULL;
-  }
-  if (mmap_mode == NULL) {
-    BLOSC_TRACE_ERROR("You need to supply the mode for the memory mapping.");
-    return NULL;
-  }
-
-  blosc2_stdio_mmap *mmap_file = malloc(sizeof(blosc2_stdio_mmap));
-  *mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
-  mmap_file->mode = mmap_mode;
-  mmap_file->needs_free = true;
-
-  blosc2_io *io = malloc(sizeof(blosc2_io));
-  io->id = BLOSC2_IO_FILESYSTEM_MMAP;
-  io->name = "filesystem_mmap";
-  io->params = mmap_file;
-
-  blosc2_frame_s* frame = frame_from_file_offset(urlpath, io, offset);
-  if (frame == NULL) {
-    return NULL;
-  }
-  blosc2_schunk* schunk = frame_to_schunk(frame, false, io);
-
-  // Set the storage with proper defaults
-  size_t pathlen = strlen(urlpath);
-  schunk->storage->urlpath = malloc(pathlen + 1);
-  strcpy(schunk->storage->urlpath, urlpath);
-  schunk->storage->contiguous = !frame->sframe;
-
-  return schunk;
+  return blosc2_schunk_open_offset_udio(urlpath, offset, &BLOSC2_IO_DEFAULTS);
 }
 
 int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* needs_free) {
@@ -560,7 +512,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
   if (schunk->storage != NULL) {
     blosc2_io_cb *io_cb = blosc2_get_io_cb(schunk->storage->io->id);
     if (io_cb != NULL && !io_cb->is_allocation_necessary) {
-      int rc = io_cb->free(schunk->storage->io->params);
+      int rc = io_cb->destroy(schunk->storage->io->params);
       if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not free the I/O ressources.");
       }

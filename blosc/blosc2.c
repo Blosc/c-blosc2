@@ -3806,7 +3806,7 @@ void blosc2_init(void) {
   BLOSC2_IO_CB_DEFAULTS.write = (blosc2_write_cb) blosc2_stdio_write;
   BLOSC2_IO_CB_DEFAULTS.read = (blosc2_read_cb) blosc2_stdio_read;
   BLOSC2_IO_CB_DEFAULTS.truncate = (blosc2_truncate_cb) blosc2_stdio_truncate;
-  BLOSC2_IO_CB_DEFAULTS.free = NULL;
+  BLOSC2_IO_CB_DEFAULTS.destroy = NULL;
 
   BLOSC2_IO_CB_MMAP.id = BLOSC2_IO_FILESYSTEM_MMAP;
   BLOSC2_IO_CB_MMAP.name = "filesystem_mmap";
@@ -3818,7 +3818,7 @@ void blosc2_init(void) {
   BLOSC2_IO_CB_MMAP.seek = (blosc2_seek_cb) blosc2_stdio_mmap_seek;
   BLOSC2_IO_CB_MMAP.write = (blosc2_write_cb) blosc2_stdio_mmap_write;
   BLOSC2_IO_CB_MMAP.truncate = (blosc2_truncate_cb) blosc2_stdio_mmap_truncate;
-  BLOSC2_IO_CB_MMAP.free = (blosc2_free_cb) blosc2_stdio_mmap_free;
+  BLOSC2_IO_CB_MMAP.destroy = (blosc2_destroy_cb) blosc2_stdio_mmap_destroy;
 
   g_ncodecs = 0;
   g_nfilters = 0;

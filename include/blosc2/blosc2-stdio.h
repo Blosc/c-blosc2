@@ -51,11 +51,16 @@ BLOSC_EXPORT int blosc2_stdio_truncate(void *stream, int64_t size);
 typedef struct {
   /* Arguments of the mapping */
   const char* mode;
-  //!< The opening mode of the memory-mapped file (r, r+, w+ or c) similar to Numpy's np.memmap (https://numpy.org/doc/stable/reference/generated/numpy.memmap.html). Set to r if the file should only be read, r+ if you want to extend data to an existing file, w+ to create a new file and c to use an existing file as basis but keep all modifications in-memory. On Windows, the file size cannot change in the c mode.
+  //!< The opening mode of the memory-mapped file (r, r+, w+ or c) similar to Numpy's np.memmap
+  //!< (https://numpy.org/doc/stable/reference/generated/numpy.memmap.html). Set to r if the file should only be read,
+  //!< r+ if you want to extend data to an existing file, w+ to create a new file and c to use an existing file as basis
+  //!<  but keep all modifications in-memory. On Windows, the file size cannot change in the c mode.
   int64_t initial_mapping_size;
-  //!< The initial size of the memory mapping used as a large enough write buffer for the r+, w+ and c modes (for Windows, only the r+ and w+ modes).
+  //!< The initial size of the memory mapping used as a large enough write buffer for the r+, w+ and c modes (for
+  //!< Windows, only the r+ and w+ modes).
   bool needs_free;
-  //!< Indicates whether this object should be freed in the blosc2_free_cb callback (set to true if the blosc2_stdio_mmap struct was created on the heap).
+  //!< Indicates whether this object should be freed in the blosc2_destroy_cb callback (set to true if the
+  //!< blosc2_stdio_mmap struct was created on the heap).
 
   /* Internal attributes of the mapping */
   char* addr;
@@ -84,19 +89,9 @@ typedef struct {
  * @brief Default struct for memory-mapped I/O for user initialization.
  */
 static const blosc2_stdio_mmap BLOSC2_STDIO_MMAP_DEFAULTS = {
-  .mode="r",
-  .initial_mapping_size=(1 << 30),
-  .needs_free=false,
-  .addr=NULL,
-  .file_size=-1,
-  .mapping_size=.1,
-  .offset=0,
-  .file=NULL,
-  .fd=-1,
-  .access_flags=-1,
-  .map_flags=-1
+  "r", (1 << 30), false, NULL, -1, -1, 0, NULL, -1, -1, -1
 #if defined(_WIN32)
-  , .mmap_handle=INVALID_HANDLE_VALUE
+  , INVALID_HANDLE_VALUE
 #endif
 };
 
@@ -104,10 +99,11 @@ BLOSC_EXPORT void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode,
 BLOSC_EXPORT int blosc2_stdio_mmap_close(void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_mmap_tell(void *stream);
 BLOSC_EXPORT int blosc2_stdio_mmap_seek(void *stream, int64_t offset, int whence);
-BLOSC_EXPORT int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
+BLOSC_EXPORT int64_t blosc2_stdio_mmap_write(
+  const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
 BLOSC_EXPORT int blosc2_stdio_mmap_truncate(void *stream, int64_t size);
-BLOSC_EXPORT int blosc2_stdio_mmap_free(void* params);
+BLOSC_EXPORT int blosc2_stdio_mmap_destroy(void* params);
 
 #ifdef __cplusplus
 }
