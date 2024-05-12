@@ -1662,6 +1662,10 @@ typedef struct {
     //!< Input/output backend.
 } blosc2_storage;
 
+BLOSC_EXPORT blosc2_cparams blosc2_get_blosc2_cparams_defaults(void);
+BLOSC_EXPORT blosc2_dparams blosc2_get_blosc2_dparams_defaults(void);
+BLOSC_EXPORT blosc2_storage blosc2_get_blosc2_storage_defaults(void);
+
 /**
  * @brief Default struct for #blosc2_storage meant for user initialization.
  */
