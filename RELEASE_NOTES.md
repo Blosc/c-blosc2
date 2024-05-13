@@ -4,7 +4,7 @@ Release notes for C-Blosc2
 Changes from 2.14.4 to 2.14.5
 =============================
 
-#XXX version-specific blurb XXX#
+* Internal zstd sources updated to 1.5.6.
 
 
 Changes from 2.14.3 to 2.14.4
