@@ -1662,14 +1662,30 @@ typedef struct {
     //!< Input/output backend.
 } blosc2_storage;
 
-BLOSC_EXPORT blosc2_cparams blosc2_get_blosc2_cparams_defaults(void);
-BLOSC_EXPORT blosc2_dparams blosc2_get_blosc2_dparams_defaults(void);
-BLOSC_EXPORT blosc2_storage blosc2_get_blosc2_storage_defaults(void);
-
 /**
  * @brief Default struct for #blosc2_storage meant for user initialization.
  */
 static const blosc2_storage BLOSC2_STORAGE_DEFAULTS = {false, NULL, NULL, NULL, NULL};
+
+/**
+ * @brief Get default struct for compression params meant for user initialization.
+ */
+BLOSC_EXPORT blosc2_cparams blosc2_get_blosc2_cparams_defaults(void);
+
+/**
+ * @brief Get default struct for decompression params meant for user initialization.
+ */
+BLOSC_EXPORT blosc2_dparams blosc2_get_blosc2_dparams_defaults(void);
+
+/**
+ * @brief Get default struct for #blosc2_storage meant for user initialization.
+ */
+BLOSC_EXPORT blosc2_storage blosc2_get_blosc2_storage_defaults(void);
+
+/**
+ * @brief Get default struct for #blosc2_io meant for user initialization.
+ */
+BLOSC_EXPORT blosc2_io blosc2_get_blosc2_io_defaults(void);
 
 typedef struct blosc2_frame_s blosc2_frame;   /* opaque type */
 
