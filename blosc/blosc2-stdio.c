@@ -44,41 +44,29 @@ int blosc2_stdio_close(void *stream) {
   return err;
 }
 
-int64_t blosc2_stdio_tell(void *stream) {
+int64_t blosc2_stdio_size(void *stream) {
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
-  int64_t pos;
-#if defined(_MSC_VER)
-  pos = _ftelli64(my_fp->file);
-#else
-  pos = (int64_t)ftell(my_fp->file);
-#endif
-  return pos;
-}
 
-int blosc2_stdio_seek(void *stream, int64_t offset, int whence) {
-  blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
-  int rc;
-#if defined(_MSC_VER)
-  rc = _fseeki64(my_fp->file, offset, whence);
-#else
-  rc = fseek(my_fp->file, (long) offset, whence);
-#endif
-  return rc;
+  fseek(my_fp->file, 0, SEEK_END);
+  int64_t size = ftell(my_fp->file);
+  fseek(my_fp->file, 0, SEEK_SET);
+
+  return size;
 }
 
 int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
-  blosc2_stdio_seek(stream, position, SEEK_SET);
-
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
+  fseek(my_fp->file, position, SEEK_SET);
+
   size_t nitems_ = fwrite(ptr, (size_t) size, (size_t) nitems, my_fp->file);
   return (int64_t) nitems_;
 }
 
 int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
-  blosc2_stdio_seek(stream, position, SEEK_SET);
+  blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
+  fseek(my_fp->file, position, SEEK_SET);
 
   void* data_ptr = *ptr;
-  blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
   size_t nitems_ = fread(data_ptr, (size_t) size, (size_t) nitems, my_fp->file);
   return (int64_t) nitems_;
 }
@@ -123,7 +111,6 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) params;
   if (mmap_file->addr != NULL) {
     /* A memory-mapped file is only opened once */
-    mmap_file->offset = 0;
     return mmap_file;
   }
 
@@ -243,8 +230,7 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
 #else
   mmap_file->fd = fileno(mmap_file->file);
 
-  /* Offset where the mapping should start
-  (different to mmap_file->offset which denotes the current position and may change) */
+  /* Offset where the mapping should start */
   int64_t offset = 0;
   mmap_file->addr = mmap(
     NULL, mmap_file->mapping_size, mmap_file->access_flags, mmap_file->map_flags, mmap_file->fd, offset);
@@ -262,35 +248,9 @@ int blosc2_stdio_mmap_close(void *stream) {
   return 0;
 }
 
-int64_t blosc2_stdio_mmap_tell(void *stream) {
+int64_t blosc2_stdio_mmap_size(void *stream) {
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) stream;
-  return mmap_file->offset;
-}
-
-int blosc2_stdio_mmap_seek(void *stream, int64_t offset, int whence) {
-  blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) stream;
-
-  switch (whence) {
-    case SEEK_SET:
-      mmap_file->offset = offset;
-      break;
-    case SEEK_CUR:
-      mmap_file->offset += offset;
-      break;
-    case SEEK_END:
-      mmap_file->offset = mmap_file->file_size + offset;
-      break;
-    default:
-      BLOSC_TRACE_ERROR("Invalid whence %d argument.", whence);
-      return -1;
-  }
-
-  if (mmap_file->offset < 0) {
-    BLOSC_TRACE_ERROR("Cannot seek to a negative offset.");
-    return -1;
-  }
-  
-  return 0;
+  return mmap_file->file_size;
 }
 
 int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
@@ -421,7 +381,6 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
   }
 #endif
 
-  mmap_file->offset = position_end;
   return nitems;
 }
 

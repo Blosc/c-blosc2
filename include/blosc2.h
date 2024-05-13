@@ -1037,8 +1037,7 @@ enum {
 
 typedef void*   (*blosc2_open_cb)(const char *urlpath, const char *mode, void *params);
 typedef int     (*blosc2_close_cb)(void *stream);
-typedef int64_t (*blosc2_tell_cb)(void *stream);
-typedef int     (*blosc2_seek_cb)(void *stream, int64_t offset, int whence);
+typedef int64_t (*blosc2_size_cb)(void *stream);
 typedef int64_t (*blosc2_write_cb)(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
 typedef int64_t (*blosc2_read_cb)(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
 typedef int     (*blosc2_truncate_cb)(void *stream, int64_t size);
@@ -1060,10 +1059,8 @@ typedef struct {
   //!< The IO open callback.
   blosc2_close_cb close;
   //!< The IO close callback.
-  blosc2_tell_cb tell;
-  //!< The IO tell callback.
-  blosc2_seek_cb seek;
-  //!< The IO seek callback.
+  blosc2_size_cb size;
+  //!< The IO size callback.
   blosc2_write_cb write;
   //!< The IO write callback.
   blosc2_read_cb read;
