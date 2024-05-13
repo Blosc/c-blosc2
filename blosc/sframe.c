@@ -110,8 +110,7 @@ int32_t sframe_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t** chunk,
     return BLOSC2_ERROR_PLUGIN_IO;
   }
 
-  io_cb->seek(fpc, 0L, SEEK_END);
-  int64_t chunk_cbytes = io_cb->tell(fpc);
+  int64_t chunk_cbytes = io_cb->size(fpc);
 
   if (io_cb->is_allocation_necessary) {
     *chunk = malloc((size_t)chunk_cbytes);

@@ -44,10 +44,10 @@ int test_close(void *stream) {
   return err;
 }
 
-int64_t test_tell(void *stream) {
+int64_t test_size(void *stream) {
   test_file *my = (test_file *) stream;
   my->params->tell++;
-  return blosc2_stdio_tell(my->bfile);
+  return blosc2_stdio_size(my->bfile);
 }
 
 int64_t test_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
@@ -88,7 +88,7 @@ CUTEST_TEST_SETUP(udio) {
   io_cb.open = (blosc2_open_cb) test_open;
   io_cb.close = (blosc2_close_cb) test_close;
   io_cb.read = (blosc2_read_cb) test_read;
-  io_cb.tell = (blosc2_tell_cb) test_tell;
+  io_cb.size = (blosc2_size_cb) test_size;
   io_cb.write = (blosc2_write_cb) test_write;
   io_cb.truncate = (blosc2_truncate_cb) test_truncate;
 

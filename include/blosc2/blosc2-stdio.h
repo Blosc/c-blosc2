@@ -38,8 +38,7 @@ typedef struct {
 
 BLOSC_EXPORT void *blosc2_stdio_open(const char *urlpath, const char *mode, void* params);
 BLOSC_EXPORT int blosc2_stdio_close(void *stream);
-BLOSC_EXPORT int64_t blosc2_stdio_tell(void *stream);
-BLOSC_EXPORT int blosc2_stdio_seek(void *stream, int64_t offset, int whence);
+BLOSC_EXPORT int64_t blosc2_stdio_size(void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
 BLOSC_EXPORT int blosc2_stdio_truncate(void *stream, int64_t size);
@@ -69,8 +68,6 @@ typedef struct {
   //!< The size of the file.
   int64_t mapping_size;
   //!< The size of the mapping (mapping_size >= file_size).
-  int64_t offset;
-  //!< The current position inside the mapping.
   FILE* file;
   //!< The underlying file handle.
   int fd;
@@ -89,7 +86,7 @@ typedef struct {
  * @brief Default struct for memory-mapped I/O for user initialization.
  */
 static const blosc2_stdio_mmap BLOSC2_STDIO_MMAP_DEFAULTS = {
-  "r", (1 << 30), false, NULL, -1, -1, 0, NULL, -1, -1, -1
+  "r", (1 << 30), false, NULL, -1, -1, NULL, -1, -1, -1
 #if defined(_WIN32)
   , INVALID_HANDLE_VALUE
 #endif
@@ -97,8 +94,7 @@ static const blosc2_stdio_mmap BLOSC2_STDIO_MMAP_DEFAULTS = {
 
 BLOSC_EXPORT void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params);
 BLOSC_EXPORT int blosc2_stdio_mmap_close(void *stream);
-BLOSC_EXPORT int64_t blosc2_stdio_mmap_tell(void *stream);
-BLOSC_EXPORT int blosc2_stdio_mmap_seek(void *stream, int64_t offset, int whence);
+BLOSC_EXPORT int64_t blosc2_stdio_mmap_size(void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_mmap_write(
   const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
