@@ -1691,6 +1691,11 @@ BLOSC_EXPORT blosc2_storage blosc2_get_blosc2_storage_defaults(void);
  */
 BLOSC_EXPORT blosc2_io blosc2_get_blosc2_io_defaults(void);
 
+/**
+ * @brief Get default struct for #blosc2_stdio_mmap meant for user initialization.
+ */
+BLOSC_EXPORT blosc2_stdio_mmap blosc2_get_blosc2_stdio_mmap_defaults(void);
+
 typedef struct blosc2_frame_s blosc2_frame;   /* opaque type */
 
 /**
