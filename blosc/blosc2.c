@@ -4713,3 +4713,19 @@ int blosc2_get_slice_nchunks(blosc2_schunk* schunk, int64_t *start, int64_t *sto
 
   return rc;
 }
+
+blosc2_cparams blosc2_get_blosc2_cparams_defaults(void) {
+  return BLOSC2_CPARAMS_DEFAULTS;
+};
+
+blosc2_dparams blosc2_get_blosc2_dparams_defaults(void) {
+  return BLOSC2_DPARAMS_DEFAULTS;
+};
+
+blosc2_storage blosc2_get_blosc2_storage_defaults(void) {
+  return BLOSC2_STORAGE_DEFAULTS;
+};
+
+blosc2_io blosc2_get_blosc2_io_defaults(void) {
+  return BLOSC2_IO_DEFAULTS;
+};

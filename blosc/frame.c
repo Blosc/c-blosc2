@@ -555,7 +555,7 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   }
 
   // Create the trailer in msgpack (see the frame format document)
-  int64_t trailer_len = FRAME_TRAILER_MINLEN;
+  uint32_t trailer_len = FRAME_TRAILER_MINLEN;
   uint8_t* trailer = (uint8_t*)calloc((size_t)trailer_len, 1);
   uint8_t* ptrailer = trailer;
   *ptrailer = 0x90 + 4;  // fixarray with 4 elements

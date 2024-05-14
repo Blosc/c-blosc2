@@ -33,6 +33,7 @@
 #include <altivec.h>
 
 #include <stdint.h>
+#include <stdlib.h>
 
 /* The next is useful for debugging purposes */
 #if 0
