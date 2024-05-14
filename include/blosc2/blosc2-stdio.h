@@ -45,7 +45,9 @@ BLOSC_EXPORT int blosc2_stdio_truncate(void *stream, int64_t size);
 
 
 /**
- * @brief Parameters for memory-mapped I/O.
+ * @brief Parameters for memory-mapped I/O. Existing schunks can be opened memory-mapped with the *_udio functions and
+ * new schunks be created by setting the io member of the #blosc2_storage struct (see test_mmap for examples). Please
+ * note that only cframes and not sframes can be opened memory-mapped.
  */
 typedef struct {
   /* Arguments of the mapping */
@@ -56,7 +58,8 @@ typedef struct {
   //!<  but keep all modifications in-memory. On Windows, the file size cannot change in the c mode.
   int64_t initial_mapping_size;
   //!< The initial size of the memory mapping used as a large enough write buffer for the r+, w+ and c modes (for
-  //!< Windows, only the r+ and w+ modes).
+  //!< Windows, only the r+ and w+ modes). On Windows, this will also be the size of the file while the file is opened.
+  //!< It will be truncated to the target size when the file is closed (e.g., when the schunk is destroyed).
   bool needs_free;
   //!< Indicates whether this object should be freed in the blosc2_destroy_cb callback (set to true if the
   //!< blosc2_stdio_mmap struct was created on the heap).
@@ -64,6 +67,8 @@ typedef struct {
   /* Internal attributes of the mapping */
   char* addr;
   //!< The starting address of the mapping.
+  char* urlpath;
+  //!< The path to the file which is associated with this object.
   int64_t file_size;
   //!< The size of the file.
   int64_t mapping_size;
@@ -86,7 +91,7 @@ typedef struct {
  * @brief Default struct for memory-mapped I/O for user initialization.
  */
 static const blosc2_stdio_mmap BLOSC2_STDIO_MMAP_DEFAULTS = {
-  "r", (1 << 30), false, NULL, -1, -1, NULL, -1, -1, -1
+  "r", (1 << 30), false, NULL, NULL, -1, -1, NULL, -1, -1, -1
 #if defined(_WIN32)
   , INVALID_HANDLE_VALUE
 #endif

@@ -110,9 +110,24 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
 
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) params;
   if (mmap_file->addr != NULL) {
+    if (strcmp(mmap_file->urlpath, urlpath) != 0) {
+      BLOSC_TRACE_ERROR(
+        "The memory-mapped file is already opened with the path %s and hence cannot be reopened with the path %s. This "
+        "happens if you try to open a sframe (sparse frame) but please not that memory-mapped files are not supported "
+        "for sframes.",
+        mmap_file->urlpath,
+        urlpath
+      );
+      return NULL;
+    }
+
     /* A memory-mapped file is only opened once */
     return mmap_file;
   }
+
+  // Keep the original path to ensure that all future file openings are with the same path
+  mmap_file->urlpath = malloc(strlen(urlpath) + 1);
+  strcpy(mmap_file->urlpath, urlpath);
 
   /* mmap_file->mode mapping is similar to Numpy's memmap
   (https://github.com/numpy/numpy/blob/main/numpy/_core/memmap.py) and CPython
@@ -452,6 +467,7 @@ int blosc2_stdio_mmap_destroy(void* params) {
     err = -1;
   }
 
+  free(mmap_file->urlpath);
   if (mmap_file->needs_free) {
     free(mmap_file);
   }
