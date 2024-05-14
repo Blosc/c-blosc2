@@ -4729,3 +4729,7 @@ blosc2_storage blosc2_get_blosc2_storage_defaults(void) {
 blosc2_io blosc2_get_blosc2_io_defaults(void) {
   return BLOSC2_IO_DEFAULTS;
 };
+
+blosc2_stdio_mmap blosc2_get_blosc2_stdio_mmap_defaults(void) {
+  return BLOSC2_STDIO_MMAP_DEFAULTS;
+};
