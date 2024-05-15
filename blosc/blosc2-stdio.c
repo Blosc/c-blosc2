@@ -113,7 +113,7 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
     if (strcmp(mmap_file->urlpath, urlpath) != 0) {
       BLOSC_TRACE_ERROR(
         "The memory-mapped file is already opened with the path %s and hence cannot be reopened with the path %s. This "
-        "happens if you try to open a sframe (sparse frame) but please not that memory-mapped files are not supported "
+        "happens if you try to open a sframe (sparse frame); please note that memory-mapped files are not supported "
         "for sframes.",
         mmap_file->urlpath,
         urlpath
@@ -326,15 +326,6 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
 
     mmap_file->addr = new_address;
   }
-
-  memcpy(mmap_file->addr + position, ptr, n_bytes);
-
-  /* Ensure modified pages are written to disk */
-  if (!FlushViewOfFile(mmap_file->addr + position, n_bytes)) {
-    _print_last_error();
-    BLOSC_TRACE_ERROR("Cannot flush the memory-mapped file to disk.");
-    return 0;
-  }
 #else
   if (mmap_file->file_size < new_size) {
     mmap_file->file_size = new_size;
@@ -385,17 +376,9 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
 
     mmap_file->addr = new_address;
   }
-  
-  memcpy(mmap_file->addr + position, ptr, n_bytes);
-
-  /* Ensure modified pages are written to disk */
-  int rc = msync(mmap_file->addr, mmap_file->file_size, MS_ASYNC);
-  if (rc < 0) {
-    BLOSC_TRACE_ERROR("Cannot sync the memory-mapped file to disk (error: %s).", strerror(errno));
-    return 0;
-  }
 #endif
 
+  memcpy(mmap_file->addr + position, ptr, n_bytes);
   return nitems;
 }
 
@@ -440,6 +423,19 @@ int blosc2_stdio_mmap_destroy(void* params) {
   int err = 0;
 
 #if defined(_WIN32)
+  /* Ensure modified pages are written to disk */
+  if (!FlushViewOfFile(mmap_file->addr, mmap_file->file_size)) {
+    _print_last_error();
+    BLOSC_TRACE_ERROR("Cannot flush the memory-mapped view to disk.");
+    err = -1;
+  }
+  HANDLE file_handle = (HANDLE) _get_osfhandle(mmap_file->fd);
+  if (!FlushFileBuffers(file_handle)) {
+    _print_last_error();
+    BLOSC_TRACE_ERROR("Cannot flush the memory-mapped file to disk.");
+    err = -1;
+  }
+
   if (!UnmapViewOfFile(mmap_file->addr)) {
     _print_last_error();
     BLOSC_TRACE_ERROR("Cannot unmap the memory-mapped file.");
@@ -456,6 +452,15 @@ int blosc2_stdio_mmap_destroy(void* params) {
     err = -1;
   }
 #else
+  /* Ensure modified pages are written to disk */
+  /* This is important since not every munmap implementation flushes modified pages to disk
+  (e.g.: https://nfs.sourceforge.net/#faq_d8) */
+  int rc = msync(mmap_file->addr, mmap_file->file_size, MS_SYNC);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Cannot sync the memory-mapped file to disk (error: %s).", strerror(errno));
+    err = -1;
+  }
+
   if (munmap(mmap_file->addr, mmap_file->mapping_size) < 0) {
     BLOSC_TRACE_ERROR("Cannot unmap the memory-mapped file (error: %s).", strerror(errno));
     err = -1;

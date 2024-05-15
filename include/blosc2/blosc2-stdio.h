@@ -45,9 +45,10 @@ BLOSC_EXPORT int blosc2_stdio_truncate(void *stream, int64_t size);
 
 
 /**
- * @brief Parameters for memory-mapped I/O. Existing schunks can be opened memory-mapped with the *_udio functions and
- * new schunks be created by setting the io member of the #blosc2_storage struct (see test_mmap for examples). Please
- * note that only cframes and not sframes can be opened memory-mapped.
+ * @brief Parameters for memory-mapped I/O. You can use the blosc2_schunk_open*_udio functions to memory-map existing
+ * schunk files from disk. To create a new schunk which is backed up by a memory-mapped file on disk, set the io member
+ * of the #blosc2_storage struct (see test_mmap for examples). Please note that memory-mapped I/O is only available for
+ * cframes and not sframes.
  */
 typedef struct {
   /* Arguments of the mapping */
