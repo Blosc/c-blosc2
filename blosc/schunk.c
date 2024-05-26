@@ -324,6 +324,15 @@ blosc2_schunk* blosc2_schunk_open_offset_udio(const char* urlpath, int64_t offse
 
   blosc2_frame_s* frame = frame_from_file_offset(urlpath, udio, offset);
   if (frame == NULL) {
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(udio->id);
+    if (io_cb == NULL) {
+        BLOSC_TRACE_ERROR("Error getting the input/output API");
+        return NULL;
+    }
+    int rc = io_cb->destroy(udio->params);
+    if (rc < 0) {
+      BLOSC_TRACE_ERROR("Cannot destroy the input/output object.");
+    }
     return NULL;
   }
   blosc2_schunk* schunk = frame_to_schunk(frame, false, udio);
@@ -503,7 +512,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
 
   if (schunk->storage != NULL) {
     blosc2_io_cb *io_cb = blosc2_get_io_cb(schunk->storage->io->id);
-    if (io_cb != NULL && !io_cb->is_allocation_necessary) {
+    if (io_cb != NULL) {
       int rc = io_cb->destroy(schunk->storage->io->params);
       if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not free the I/O ressources.");

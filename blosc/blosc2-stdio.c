@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <errno.h>
+#include <inttypes.h>
 
 #if defined(_WIN32)
   #include <memoryapi.h>
@@ -80,6 +81,11 @@ int blosc2_stdio_truncate(void *stream, int64_t size) {
   rc = ftruncate(fileno(my_fp->file), size);
 #endif
   return rc;
+}
+
+int blosc2_stdio_destroy(void* params) {
+  BLOSC_UNUSED_PARAM(params);
+  return 0;
 }
 
 #if defined(_WIN32)
@@ -190,6 +196,7 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
 
   mmap_file->file = fopen(urlpath, open_mode);
   if (mmap_file->file == NULL) {
+    BLOSC_TRACE_ERROR("Cannot open the file %s with mode %s.", urlpath, open_mode);
     return NULL;
   }
 
@@ -255,6 +262,12 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
   }
 #endif
 
+  BLOSC_INFO(
+    "Opened memory-mapped file %s in mode %s with an mapping size of %" PRId64 " bytes.",
+    mmap_file->urlpath,
+    mmap_file->mode,
+    mmap_file->mapping_size
+  );
   return mmap_file;
 }
 
@@ -270,6 +283,11 @@ int64_t blosc2_stdio_mmap_size(void *stream) {
 
 int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) stream;
+
+  if (position < 0) {
+    BLOSC_TRACE_ERROR("Cannot write to a negative position.");
+    return 0;
+  }
 
   int64_t n_bytes = size * nitems;
   if (n_bytes == 0) {
@@ -333,7 +351,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
     if (strcmp(mmap_file->mode, "c") != 0) {
       int rc = ftruncate(mmap_file->fd, new_size);
       if (rc < 0) {
-        BLOSC_TRACE_ERROR("Cannot extend the file size to %ld bytes (error: %s).", new_size, strerror(errno));
+        BLOSC_TRACE_ERROR("Cannot extend the file size to %" PRId64 " bytes (error: %s).", new_size, strerror(errno));
         return 0;
       }
     }
@@ -384,6 +402,12 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
 
 int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) stream;
+
+  if (position < 0) {
+    BLOSC_TRACE_ERROR("Cannot read from a negative position.");
+    *ptr = NULL;
+    return 0;
+  }
 
   if (position + size * nitems > mmap_file->file_size) {
     BLOSC_TRACE_ERROR("Cannot read beyond the end of the memory-mapped file.");
@@ -448,7 +472,8 @@ int blosc2_stdio_mmap_destroy(void* params) {
   }
   int rc = _chsize_s(mmap_file->fd, mmap_file->file_size);
   if (rc != 0) {
-    BLOSC_TRACE_ERROR("Cannot extend the file size to %lld bytes (error: %s).", mmap_file->file_size, strerror(errno));
+    BLOSC_TRACE_ERROR(
+      "Cannot extend the file size to %" PRId64 " bytes (error: %s).", mmap_file->file_size, strerror(errno));
     err = -1;
   }
 #else

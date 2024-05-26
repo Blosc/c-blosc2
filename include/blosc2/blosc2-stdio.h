@@ -42,6 +42,7 @@ BLOSC_EXPORT int64_t blosc2_stdio_size(void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
 BLOSC_EXPORT int blosc2_stdio_truncate(void *stream, int64_t size);
+BLOSC_EXPORT int blosc2_stdio_destroy(void* params);
 
 
 /**
@@ -56,7 +57,7 @@ typedef struct {
   //!< The opening mode of the memory-mapped file (r, r+, w+ or c) similar to Numpy's np.memmap
   //!< (https://numpy.org/doc/stable/reference/generated/numpy.memmap.html). Set to r if the file should only be read,
   //!< r+ if you want to extend data to an existing file, w+ to create a new file and c to use an existing file as basis
-  //!<  but keep all modifications in-memory. On Windows, the file size cannot change in the c mode.
+  //!<  but keep all modifications in-memory. On Windows, the size of the mapping cannot change in the c mode.
   int64_t initial_mapping_size;
   //!< The initial size of the memory mapping used as a large enough write buffer for the r+, w+ and c modes (for
   //!< Windows, only the r+ and w+ modes). On Windows, this will also be the size of the file while the file is opened.

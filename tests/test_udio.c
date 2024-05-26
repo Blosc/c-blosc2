@@ -68,6 +68,11 @@ int test_truncate(void *stream, int64_t size) {
   return blosc2_stdio_truncate(my->bfile, size);
 }
 
+int test_destroy(void *params) {
+  BLOSC_UNUSED_PARAM(params);
+  return 0;
+}
+
 
 typedef struct {
   bool contiguous;
@@ -91,6 +96,7 @@ CUTEST_TEST_SETUP(udio) {
   io_cb.size = (blosc2_size_cb) test_size;
   io_cb.write = (blosc2_write_cb) test_write;
   io_cb.truncate = (blosc2_truncate_cb) test_truncate;
+  io_cb.destroy = (blosc2_destroy_cb) test_destroy;
 
   blosc2_register_io_cb(&io_cb);
 
