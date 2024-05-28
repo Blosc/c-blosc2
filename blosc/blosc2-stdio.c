@@ -8,6 +8,10 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#if defined(__linux__)
+  /* Must be defined before anything else is included */
+  #define _GNU_SOURCE
+#endif
 
 #include "blosc2/blosc2-stdio.h"
 #include "blosc2.h"
@@ -21,9 +25,6 @@
 #if defined(_WIN32)
   #include <memoryapi.h>
 #else
-  #if defined(__linux__)
-    #define __USE_GNU
-  #endif
   #include <sys/mman.h>
 #endif
 
