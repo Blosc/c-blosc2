@@ -75,6 +75,8 @@ typedef struct {
   //!< The size of the file.
   int64_t mapping_size;
   //!< The size of the mapping (mapping_size >= file_size).
+  bool is_memory_only;
+  //!< Whether the mapping is only in-memory and changes are not reflected to the file on disk (c mode).
   FILE* file;
   //!< The underlying file handle.
   int fd;
@@ -93,7 +95,7 @@ typedef struct {
  * @brief Default struct for memory-mapped I/O for user initialization.
  */
 static const blosc2_stdio_mmap BLOSC2_STDIO_MMAP_DEFAULTS = {
-  "r", (1 << 30), false, NULL, NULL, -1, -1, NULL, -1, -1, -1
+  "r", (1 << 30), false, NULL, NULL, -1, -1, false, NULL, -1, -1, -1
 #if defined(_WIN32)
   , INVALID_HANDLE_VALUE
 #endif
