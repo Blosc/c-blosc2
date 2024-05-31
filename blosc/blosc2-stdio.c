@@ -145,21 +145,25 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
   if (strcmp(mmap_file->mode, "r") == 0) {
     mmap_file->access_flags = PAGE_READONLY;
     mmap_file->map_flags = FILE_MAP_READ;
+    mmap_file->is_memory_only = false;
     open_mode = "rb";
     use_initial_mapping_size = false;
   } else if (strcmp(mmap_file->mode, "r+") == 0) {
     mmap_file->access_flags = PAGE_READWRITE;
     mmap_file->map_flags = FILE_MAP_WRITE;
+    mmap_file->is_memory_only = false;
     open_mode = "rb+";
     use_initial_mapping_size = true;
   } else if (strcmp(mmap_file->mode, "w+") == 0) {
     mmap_file->access_flags = PAGE_READWRITE;
     mmap_file->map_flags = FILE_MAP_WRITE;
+    mmap_file->is_memory_only = false;
     open_mode = "wb+";
     use_initial_mapping_size = true;
   } else if (strcmp(mmap_file->mode, "c") == 0) {
     mmap_file->access_flags = PAGE_WRITECOPY;
     mmap_file->map_flags = FILE_MAP_COPY;
+    mmap_file->is_memory_only = true;
     open_mode = "rb";
     use_initial_mapping_size = false;
   } else {
@@ -172,21 +176,25 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
   if (strcmp(mmap_file->mode, "r") == 0) {
     mmap_file->access_flags = PROT_READ;
     mmap_file->map_flags = MAP_SHARED;
+    mmap_file->is_memory_only = false;
     open_mode = "rb";
     use_initial_mapping_size = false;
   } else if (strcmp(mmap_file->mode, "r+") == 0) {
     mmap_file->access_flags = PROT_READ | PROT_WRITE;
     mmap_file->map_flags = MAP_SHARED;
+    mmap_file->is_memory_only = false;
     open_mode = "rb+";
     use_initial_mapping_size = true;
   } else if (strcmp(mmap_file->mode, "w+") == 0) {
     mmap_file->access_flags = PROT_READ | PROT_WRITE;
     mmap_file->map_flags = MAP_SHARED;
+    mmap_file->is_memory_only = false;
     open_mode = "wb+";
     use_initial_mapping_size = true;
   } else if (strcmp(mmap_file->mode, "c") == 0) {
     mmap_file->access_flags = PROT_READ | PROT_WRITE;
     mmap_file->map_flags = MAP_PRIVATE;
+    mmap_file->is_memory_only = true;
     open_mode = "rb";
     use_initial_mapping_size = true;
   } else {
@@ -258,7 +266,7 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
   mmap_file->addr = mmap(
     NULL, mmap_file->mapping_size, mmap_file->access_flags, mmap_file->map_flags, mmap_file->fd, offset);
   if (mmap_file->addr == MAP_FAILED) {
-    BLOSC_TRACE_ERROR("Memory mapping failed for file %s.", urlpath);
+    BLOSC_TRACE_ERROR("Memory mapping failed for file %s (error: %s).", urlpath, strerror(errno));
     return NULL;
   }
 #endif
@@ -269,6 +277,12 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
     mmap_file->mode,
     mmap_file->mapping_size
   );
+
+  /* The mmap_file->mode parameter is only available during the opening call and cannot be used in any of the other
+     I/O functions since this string is managed by the caller (e.g., from Python) and the memory of the string may not
+     be available anymore at a later point. */
+  mmap_file->mode = NULL;
+
   return mmap_file;
 }
 
@@ -349,7 +363,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
   if (mmap_file->file_size < new_size) {
     mmap_file->file_size = new_size;
 
-    if (strcmp(mmap_file->mode, "c") != 0) {
+    if (!mmap_file->is_memory_only) {
       int rc = ftruncate(mmap_file->fd, new_size);
       if (rc < 0) {
         BLOSC_TRACE_ERROR("Cannot extend the file size to %" PRId64 " bytes (error: %s).", new_size, strerror(errno));
@@ -367,7 +381,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
     is no POSIX standard and only available on Linux */
     char* new_address = mremap(mmap_file->addr, old_mapping_size, mmap_file->mapping_size, MREMAP_MAYMOVE);
 #else
-    if (strcmp(mmap_file->mode, "c") == 0) {
+    if (mmap_file->is_memory_only) {
       BLOSC_TRACE_ERROR("Remapping a memory-mapping in c mode is only possible on Linux."
       "Please specify either a different mode or set initial_mapping_size to a large enough number.");
       return 0;
@@ -431,7 +445,7 @@ int blosc2_stdio_mmap_truncate(void *stream, int64_t size) {
   mmap_file->file_size = size;
 
   /* No file operations in c mode */
-  if (strcmp(mmap_file->mode, "c") == 0) {
+  if (mmap_file->is_memory_only) {
     return 0;
   }
 
