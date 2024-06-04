@@ -601,6 +601,71 @@ int b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, cons
 }
 
 
+// Check whether the slice defined by start and stop is a single chunk and contiguous
+// in the C order. We also need blocks inside a chunk, and chunks inside an array,
+// are C contiguous. This is a fast path for the get_slice and set_slice functions.
+int64_t nchunk_fastpath(const b2nd_array_t *array, const int64_t *start,
+                        const int64_t *stop, const int64_t slice_size) {
+  if (slice_size != array->chunknitems) {
+    return -1;
+  }
+
+  int ndim = (int) array->ndim;
+  int inner_dim = ndim - 1;
+  int64_t partial_slice_size = 1;
+  int64_t partial_chunk_size = 1;
+  for (int i = ndim - 1; i >= 0; --i) {
+    // We need to check if the slice is contiguous in the C order
+    if (array->extshape[i] != array->shape[i]) {
+      return -1;
+    }
+    if (array->extchunkshape[i] != array->chunkshape[i]) {
+      return -1;
+    }
+
+    // blocks need to be C contiguous inside the chunk as well
+    if (array->chunkshape[i] > array->blockshape[i]) {
+      if (i < inner_dim) {
+        if (array->chunkshape[i] % array->blockshape[i] != 0) {
+          return -1;
+        }
+      }
+      else {
+        if (array->chunkshape[i] != array->blockshape[i]) {
+          return -1;
+        }
+      }
+      inner_dim = i;
+    }
+
+    // We need start and stop to be aligned with the chunkshape
+    // Do that by computing the slice size in reverse order and compare with the chunkshape
+    partial_slice_size *= stop[i] - start[i];
+    partial_chunk_size *= array->chunkshape[i];
+    if (partial_slice_size != partial_chunk_size) {
+      return -1;
+    }
+    // Ensure that the slice starts at the beginning of the chunk
+    if (start[i] % array->chunkshape[i] != 0) {
+      return -1;
+    }
+  }
+
+  // Compute the chunk number
+  int64_t *chunks_idx;
+  int nchunks = b2nd_get_slice_nchunks(array, start, stop, &chunks_idx);
+  if (nchunks != 1) {
+    free(chunks_idx);
+    BLOSC_TRACE_ERROR("The number of chunks to read is not 1; go fix the code");
+    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+  }
+  int64_t nchunk = chunks_idx[0];
+  free(chunks_idx);
+
+  return nchunk;
+}
+
+
 // Setting and getting slices
 int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const int64_t *stop,
                   const int64_t *shape, b2nd_array_t *array, bool set_slice) {
@@ -641,7 +706,61 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     return BLOSC2_ERROR_SUCCESS;
   }
 
+  if (array->nitems == 0) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+
+  int64_t nelems_slice = 1;
+  for (int i = 0; i < array->ndim; ++i) {
+    if (stop[i] - start[i] > shape[i]) {
+      BLOSC_TRACE_ERROR("The buffer shape can not be smaller than the slice shape");
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    nelems_slice *= stop[i] - start[i];
+  }
+  int64_t slice_nbytes = nelems_slice * array->sc->typesize;
   int32_t data_nbytes = (int32_t) array->extchunknitems * array->sc->typesize;
+
+  if (buffersize < slice_nbytes) {
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+
+  // Check for fast path for aligned slices with chunks and blocks (only 1 chunk is supported)
+  int64_t nchunk = nchunk_fastpath(array, start, stop, nelems_slice);
+  if (nchunk >= 0) {
+    if (set_slice) {
+      // Fast path for set. Let's set the chunk buffer straight into the array.
+      // Compress the chunk
+      int32_t chunk_nbytes = data_nbytes + BLOSC2_MAX_OVERHEAD;
+      uint8_t *chunk = malloc(chunk_nbytes);
+      BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
+      int brc;
+      // Update current_chunk in case a prefilter is applied
+      array->sc->current_nchunk = nchunk;
+      brc = blosc2_compress_ctx(array->sc->cctx, buffer, data_nbytes, chunk, chunk_nbytes);
+      if (brc < 0) {
+        BLOSC_TRACE_ERROR("Blosc can not compress the data");
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+      }
+      int64_t brc_ = blosc2_schunk_update_chunk(array->sc, nchunk, chunk, false);
+      if (brc_ < 0) {
+        BLOSC_TRACE_ERROR("Blosc can not update the chunk");
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+      }
+      // We are done
+      return BLOSC2_ERROR_SUCCESS;
+    }
+    else {
+      // Fast path for get. Let's read the chunk straight into the buffer.
+      if (blosc2_schunk_decompress_chunk(array->sc, nchunk, buffer, (int32_t) slice_nbytes) < 0) {
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+      }
+      return BLOSC2_ERROR_SUCCESS;
+    }
+  }
+
+  // Slow path for set and get
+
   uint8_t *data = malloc(data_nbytes);
   BLOSC_ERROR_NULL(data, BLOSC2_ERROR_MEMORY_ALLOC);
 
@@ -898,93 +1017,6 @@ int b2nd_get_slice_cbuffer(const b2nd_array_t *array, const int64_t *start, cons
   BLOSC_ERROR_NULL(buffershape, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
 
-  int64_t size = array->sc->typesize;
-  int64_t slice_size = 1;
-  for (int i = 0; i < array->ndim; ++i) {
-    if (stop[i] - start[i] > buffershape[i]) {
-      BLOSC_TRACE_ERROR("The buffer shape can not be smaller than the slice shape");
-      return BLOSC2_ERROR_INVALID_PARAM;
-    }
-    size *= buffershape[i];
-    slice_size *= stop[i] - start[i];
-  }
-
-  if (array->nitems == 0) {
-    return BLOSC2_ERROR_SUCCESS;
-  }
-
-  if (buffersize < size) {
-    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
-  }
-
-  // Check whether blocks inside a chunk, and chunks inside an array, are C contiguous (for fast path)
-  int ndim = (int) array->ndim;
-  int inner_dim = ndim - 1;
-  bool fast_path = true;
-  int64_t partial_slice_size = 1;
-  int64_t partial_chunk_size = 1;
-  for (int i = ndim - 1; i >= 0; --i) {
-    // We need to check if the slice is contiguous in the C order
-    if (array->extshape[i] != array->shape[i]) {
-      fast_path = false;
-      break;
-    }
-    if (array->extchunkshape[i] != array->chunkshape[i]) {
-      fast_path = false;
-      break;
-    }
-
-    // blocks need to be C contiguous inside the chunk as well
-    if (array->chunkshape[i] > array->blockshape[i]) {
-      if (i < inner_dim) {
-        if (array->chunkshape[i] % array->blockshape[i] != 0) {
-          fast_path = false;
-          break;
-        }
-      }
-      else {
-        if (array->chunkshape[i] != array->blockshape[i]) {
-          fast_path = false;
-          break;
-        }
-      }
-      inner_dim = i;
-    }
-
-    // We need start and stop to be aligned with the chunkshape
-    // Do that by computing the slice size in reverse order and compare with the chunkshape
-    partial_slice_size *= stop[i] - start[i];
-    partial_chunk_size *= array->chunkshape[i];
-    if (partial_slice_size != partial_chunk_size) {
-      fast_path = false;
-      break;
-    }
-    // Ensure that the slice starts at the beginning of the chunk
-    if (start[i] % array->chunkshape[i] != 0) {
-      fast_path = false;
-      break;
-    }
-  }
-
-  if (fast_path && slice_size == array->chunknitems) {
-    // Compute the chunk number
-    int64_t *chunks_idx;
-    int nchunks = b2nd_get_slice_nchunks(array, start, stop, &chunks_idx);
-    if (nchunks != 1) {
-      free(chunks_idx);
-      BLOSC_TRACE_ERROR("The number of chunks to read is not 1; go fix the code");
-      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
-    }
-    int64_t nchunk = chunks_idx[0];
-    // Let's read the chunk straight into the buffer
-    if (blosc2_schunk_decompress_chunk(array->sc, nchunk, buffer, (int32_t) size) < 0) {
-      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
-    }
-    free(chunks_idx);
-    // We are done!
-    return BLOSC2_ERROR_SUCCESS;
-  }
-
   BLOSC_ERROR(get_set_slice(buffer, buffersize, start, stop, buffershape, (b2nd_array_t *)array, false));
 
   return BLOSC2_ERROR_SUCCESS;
@@ -998,19 +1030,6 @@ int b2nd_set_slice_cbuffer(const void *buffer, const int64_t *buffershape, int64
   BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
-
-  int64_t size = array->sc->typesize;
-  for (int i = 0; i < array->ndim; ++i) {
-    size *= stop[i] - start[i];
-  }
-
-  if (buffersize < size) {
-    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
-  }
-
-  if (array->nitems == 0) {
-    return BLOSC2_ERROR_SUCCESS;
-  }
 
   BLOSC_ERROR(get_set_slice((void*)buffer, buffersize, start, stop, (int64_t *)buffershape, array, true));
 
