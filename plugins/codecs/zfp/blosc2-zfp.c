@@ -864,13 +864,14 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
       }
       break;
     default:
+      free(cell);
       BLOSC_TRACE_ERROR("ZFP is not available for ndims: %d", ndim);
       return BLOSC2_ERROR_FAILURE;
   }
   memcpy(dest, &cell[cell_ind * typesize], thread_ctx->zfp_cell_nitems * typesize);
+  free(cell);
   zfp_stream_close(zfp);
   stream_close(stream);
-  free(cell);
 
   if ((zfpsize == 0) || ((int32_t) zfpsize > (destsize * 8)) ||
       ((int32_t) zfpsize > (cell_nitems * typesize * 8)) ||
