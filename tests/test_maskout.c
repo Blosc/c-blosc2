@@ -65,7 +65,7 @@ static char *test_mask(void) {
 }
 
 
-// Check decompression with mask, and no mask aftewards
+// Check decompression with mask, and no mask afterwards
 static char *test_mask_nomask(void) {
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = nthreads;

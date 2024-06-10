@@ -515,7 +515,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     if (io_cb != NULL) {
       int rc = io_cb->destroy(schunk->storage->io->params);
       if (rc < 0) {
-        BLOSC_TRACE_ERROR("Could not free the I/O ressources.");
+        BLOSC_TRACE_ERROR("Could not free the I/O resources.");
       }
     }
 
