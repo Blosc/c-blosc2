@@ -108,12 +108,12 @@ extern "C" {
     do {                                            \
         if ((pointer) == NULL) {                    \
             BLOSC_TRACE_ERROR("Pointer is null");   \
-            return rc;                              \
+            return (rc);                            \
         }                                           \
     } while (0)
 #define BLOSC_ERROR(rc)                             \
     do {                                            \
-        int rc_ = rc;                               \
+        int rc_ = (rc);                             \
         if (rc_ < BLOSC2_ERROR_SUCCESS) {           \
             char *error_msg = print_error(rc_);     \
             BLOSC_TRACE_ERROR("%s", error_msg);     \
