@@ -11,8 +11,6 @@
 #ifndef BLOSC_BLOSC2_CODECS_REGISTRY_H
 #define BLOSC_BLOSC2_CODECS_REGISTRY_H
 
-#include "blosc2.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,9 +42,6 @@ typedef struct {
     char *encoder;
     char *decoder;
 } codec_info;
-
-// Silence unused codec_info typedef warning
-static codec_info codec_info_defaults BLOSC_ATTRIBUTE_UNUSED = {0};
 
 #ifdef __cplusplus
 }
