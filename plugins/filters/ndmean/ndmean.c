@@ -6,9 +6,8 @@
 
 
 #include "ndmean.h"
-#include "../plugins/plugin_utils.h"
-#include "../include/blosc2/filters-registry.h"
 #include "blosc2/blosc2-common.h"
+#include "b2nd.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -30,7 +29,7 @@ int ndmean_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_
     BLOSC_TRACE_ERROR("b2nd layer not found!");
     return BLOSC2_ERROR_FAILURE;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
   int typesize = cparams->typesize;
 
@@ -208,7 +207,7 @@ int ndmean_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8
     BLOSC_TRACE_ERROR("b2nd layer not found!");
     return BLOSC2_ERROR_FAILURE;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
 
   int8_t cellshape[8];

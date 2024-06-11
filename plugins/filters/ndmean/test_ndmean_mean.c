@@ -35,7 +35,6 @@
 
 #include "ndmean.h"
 #include "blosc2/filters-registry.h"
-#include "../plugins/plugin_utils.h"
 #include "b2nd.h"
 
 #include <inttypes.h>
@@ -74,7 +73,7 @@ static int test_ndmean(blosc2_schunk *schunk) {
     printf("Blosc error");
     return 0;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
 
   if (ndim != 1) {

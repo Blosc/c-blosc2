@@ -9,9 +9,8 @@
 **********************************************************************/
 
 #include "ndcell.h"
-#include "../plugins/plugin_utils.h"
-#include "blosc2/filters-registry.h"
 #include "blosc2.h"
+#include "b2nd.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -32,7 +31,7 @@ int ndcell_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_
   int64_t *shape = malloc(8 * sizeof(int64_t));
   int32_t *chunkshape = malloc(8 * sizeof(int32_t));
   int32_t *blockshape = malloc(8 * sizeof(int32_t));
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
   int typesize = cparams->typesize;
 
@@ -154,7 +153,7 @@ int ndcell_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8
     BLOSC_TRACE_ERROR("b2nd layer not found!");
     return BLOSC2_ERROR_FAILURE;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
 
   int8_t cell_shape = (int8_t) meta;

@@ -4,15 +4,12 @@
   License: BSD 3-Clause (see LICENSE.txt)
 */
 
-#include "blosc-private.h"
 #include "zfp.h"
 #include "blosc2-zfp.h"
 #include "../plugins/codecs/zfp/zfp-private.h"
-#include "../plugins/plugin_utils.h"
 #include "context.h"
-#include "frame.h"
-#include "blosc2/codecs-registry.h"
 #include "blosc2.h"
+#include "b2nd.h"
 
 #include <assert.h>
 #include <math.h>
@@ -42,7 +39,7 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     BLOSC_TRACE_ERROR("b2nd layer not found!");
     return BLOSC2_ERROR_FAILURE;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
 
   for(int i = 0; i < ndim; i++) {
@@ -167,7 +164,7 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(blockshape);
     return BLOSC2_ERROR_FAILURE;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
 
   zfp_type type;     /* array scalar type */
@@ -258,7 +255,7 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     BLOSC_TRACE_ERROR("b2nd layer not found!");
     return BLOSC2_ERROR_FAILURE;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
 
   for(int i = 0; i < ndim; i++) {
@@ -406,7 +403,7 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     free(blockshape);
     return BLOSC2_ERROR_FAILURE;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
 
   zfp_type type;     /* array scalar type */
@@ -524,7 +521,7 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     BLOSC_TRACE_ERROR("b2nd layer not found!");
     return BLOSC2_ERROR_FAILURE;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
 
   for(int i = 0; i < ndim; i++) {
@@ -660,7 +657,7 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     free(blockshape);
     return BLOSC2_ERROR_FAILURE;
   }
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
 
   zfp_type type;     /* array scalar type */

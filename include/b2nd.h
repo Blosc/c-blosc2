@@ -574,6 +574,9 @@ static inline int b2nd_deserialize_meta(
   }
 
   // dtype entry
+  if (dtype_format == NULL || dtype == NULL) {
+    return (int32_t)(pmeta - smeta);
+  }
   if (pmeta - smeta < smeta_len) {
     // dtype info is here
     *dtype_format = (int8_t) *(pmeta++);

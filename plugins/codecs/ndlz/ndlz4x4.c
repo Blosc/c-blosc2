@@ -16,9 +16,8 @@
 **********************************************************************/
 
 #include "ndlz4x4.h"
-#include "ndlz.h"
 #include "xxhash.h"
-#include "../plugins/plugin_utils.h"
+#include "b2nd.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -73,7 +72,7 @@ int ndlz4_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
   int64_t *shape = malloc(8 * sizeof(int64_t));
   int32_t *chunkshape = malloc(8 * sizeof(int32_t));
   int32_t *blockshape = malloc(8 * sizeof(int32_t));
-  deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape);
+  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
 
   if (ndim != 2) {
