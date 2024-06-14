@@ -12,7 +12,7 @@
 #include "shuffle-generic.h"
 
 /* Make sure ALTIVEC is available for the compilation target and compiler. */
-#if defined(__ALTIVEC__)
+#if defined(__ALTIVEC__) && defined(__VSX__) && defined(_ARCH_PWR8)
 
 #include "transpose-altivec.h"
 
