@@ -10,7 +10,7 @@ Changes from 2.14.4 to 2.15.0
   See https://github.com/Blosc/c-blosc2/blob/main/tests/test_mmap.c to see an example on
   how to use it.
 
-* Updated the `SOVERSION` due to the API change in `io_cb` read.
+* Updated the `SOVERSION` to 4 due to the API change in `io_cb` read.
 
 * Added functions to get cparams, dparams, storage and io defaults respectively.
 
