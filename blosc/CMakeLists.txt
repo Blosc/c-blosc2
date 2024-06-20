@@ -29,7 +29,7 @@ if(BUILD_SHARED)
     endif()
     set_target_properties(blosc2_shared PROPERTIES
         VERSION ${version_string}
-        SOVERSION 3  # Change this when an ABI change happens
+        SOVERSION 4  # Change this when an ABI change happens
     )
     target_compile_definitions(blosc2_shared PUBLIC BLOSC_SHARED_LIBRARY)
     target_include_directories(blosc2_shared PUBLIC

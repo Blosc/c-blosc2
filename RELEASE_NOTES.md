@@ -1,10 +1,22 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.14.4 to 2.14.5
+Changes from 2.14.4 to 2.15.0
 =============================
 
+* Removed some duplicated functions. See https://github.com/Blosc/c-blosc2/issues/503.
+
+* Added a new io mode to memory map files. This forced to change the `io_cb` read API.
+  See https://github.com/Blosc/c-blosc2/blob/main/tests/test_mmap.c to see an example on
+  how to use it.
+
+* Updated the `SOVERSION` due to the API change in `io_cb` read.
+
+* Added functions to get cparams, dparams, storage and io defaults respectively.
+
 * Internal zstd sources updated to 1.5.6.
+
+* Fixed a bug when setting a slice using prefilters.
 
 
 Changes from 2.14.3 to 2.14.4
