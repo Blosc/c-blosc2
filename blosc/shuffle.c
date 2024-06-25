@@ -308,7 +308,7 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 #endif  /* defined(SHUFFLE_AVX512_ENABLED) */
 
 #if defined(SHUFFLE_AVX2_ENABLED)
-  if (cpu_features & BLOSC_HAVE_AVX2) {
+  if (cpu_features & BLOSC_HAVE_AVX2 && is_shuffle_avx2 && is_bshuf_AVX) {
     shuffle_implementation_t impl_avx2;
     impl_avx2.name = "avx2";
     impl_avx2.shuffle = (shuffle_func)shuffle_avx2;

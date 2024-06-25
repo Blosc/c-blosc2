@@ -23,6 +23,7 @@
 #include "bitshuffle-avx2.h"
 #include "bitshuffle-sse2.h"
 #include "bitshuffle-generic.h"
+#include <stdlib.h>
 
 /* Make sure AVX2 is available for the compilation target and compiler. */
 #if defined(__AVX2__)
@@ -260,6 +261,24 @@ int64_t bshuf_untrans_bit_elem_AVX(const void* in, void* out, const size_t size,
 
   free(tmp_buf);
   return count;
+}
+
+const bool is_bshuf_AVX = true;
+
+#else /* defined(__AVX2__) */
+
+const bool is_bshuf_AVX = false;
+
+int64_t
+bshuf_trans_bit_elem_AVX(const void* in, void* out, const size_t size,
+                         const size_t elem_size) {
+  abort();
+}
+
+int64_t
+bshuf_untrans_bit_elem_AVX(const void* in, void* out, const size_t size,
+                           const size_t elem_size) {
+  abort();
 }
 
 #endif /* defined(__AVX2__) */

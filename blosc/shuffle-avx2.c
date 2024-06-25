@@ -10,13 +10,13 @@
 
 #include "shuffle-avx2.h"
 #include "shuffle-generic.h"
+#include <stdlib.h>
 
 /* Make sure AVX2 is available for the compilation target and compiler. */
 #if defined(__AVX2__)
 
 #include <immintrin.h>
 
-#include <stdlib.h>
 #include <stdint.h>
 
 /* The next is useful for debugging purposes */
@@ -744,6 +744,22 @@ unshuffle_avx2(const int32_t bytesoftype, const int32_t blocksize,
   if (vectorizable_bytes < blocksize) {
     unshuffle_generic_inline(bytesoftype, vectorizable_bytes, blocksize, _src, _dest);
   }
+}
+
+const bool is_shuffle_avx2 = true;
+
+#else
+
+const bool is_shuffle_avx2 = false;
+
+void shuffle_avx2(const int32_t bytesoftype, const int32_t blocksize,
+                  const uint8_t *_src, uint8_t *_dest) {
+  abort();
+}
+
+void unshuffle_avx2(const int32_t bytesoftype, const int32_t blocksize,
+                    const uint8_t *_src, uint8_t *_dest) {
+  abort();
 }
 
 #endif /* defined(__AVX2__) */
