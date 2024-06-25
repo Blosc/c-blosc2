@@ -17,6 +17,13 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
+
+/**
+ * AVX2-accelerated bit(un)shuffle routines availability.
+*/
+extern const bool is_bshuf_AVX;
+
 
 /**
  * AVX2-accelerated bitshuffle routine.
