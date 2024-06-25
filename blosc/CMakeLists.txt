@@ -300,17 +300,11 @@ if(COMPILER_SUPPORT_SSE2)
             set_source_files_properties(
                     shuffle-sse2.c bitshuffle-sse2.c blosclz.c fastcopy.c
                     PROPERTIES COMPILE_OPTIONS "/arch:SSE2")
-            set_property(
-                    SOURCE shuffle.c
-                    APPEND PROPERTY COMPILE_OPTIONS "/arch:SSE2")
         endif()
     else()
         set_source_files_properties(
                 shuffle-sse2.c bitshuffle-sse2.c blosclz.c fastcopy.c
                 PROPERTIES COMPILE_OPTIONS -msse2)
-        set_property(
-                SOURCE shuffle.c
-                APPEND PROPERTY COMPILE_OPTIONS -msse2)
         # Add SIMD flags for the bytedelta filter and Intel (it seems that ARM64 does not need these)
         set_source_files_properties(
                 ${PROJECT_SOURCE_DIR}/plugins/filters/bytedelta/bytedelta.c
@@ -330,16 +324,10 @@ if(COMPILER_SUPPORT_AVX2)
         set_source_files_properties(
                 shuffle-avx2.c bitshuffle-avx2.c
                 PROPERTIES COMPILE_OPTIONS "/arch:AVX2")
-        set_property(
-                SOURCE shuffle.c
-                APPEND PROPERTY COMPILE_OPTIONS "/arch:AVX2")
     else()
         set_source_files_properties(
                 shuffle-avx2.c bitshuffle-avx2.c
                 PROPERTIES COMPILE_OPTIONS -mavx2)
-        set_property(
-                SOURCE shuffle.c
-                APPEND PROPERTY COMPILE_OPTIONS -mavx2)
     endif()
 
     # Define a symbol for the shuffle-dispatch implementation
@@ -354,16 +342,10 @@ if(COMPILER_SUPPORT_AVX512)
         set_source_files_properties(
                 bitshuffle-avx512.c
 		PROPERTIES COMPILE_OPTIONS "/arch:AVX512")
-        set_property(
-                SOURCE shuffle.c
-		APPEND PROPERTY COMPILE_OPTIONS "/arch:AVX512")
     else()
         set_source_files_properties(
                 bitshuffle-avx512.c
                 PROPERTIES COMPILE_OPTIONS "-mavx512f;-mavx512bw")
-        set_property(
-                SOURCE shuffle.c
-                APPEND PROPERTY COMPILE_OPTIONS "-mavx512f;-mavx512bw")
     endif()
 
     # Define a symbol for the shuffle-dispatch implementation
@@ -377,17 +359,11 @@ if(COMPILER_SUPPORT_NEON)
     set_source_files_properties(
             shuffle-neon.c bitshuffle-neon.c
             PROPERTIES COMPILE_OPTIONS "-flax-vector-conversions")
-    set_property(
-            SOURCE shuffle.c
-            APPEND PROPERTY COMPILE_OPTIONS "-flax-vector-conversions")
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL armv7l)
         # Only armv7l needs special -mfpu=neon flag; aarch64 doesn't.
       set_source_files_properties(
             shuffle-neon.c bitshuffle-neon.c
             PROPERTIES COMPILE_OPTIONS "-mfpu=neon;-flax-vector-conversions")
-      set_property(
-            SOURCE shuffle.c
-            APPEND PROPERTY COMPILE_OPTIONS "-mfpu=neon;-flax-vector-conversions")
     endif()
     # Define a symbol for the shuffle-dispatch implementation
     # so it knows NEON is supported even though that file is
