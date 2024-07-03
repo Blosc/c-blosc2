@@ -17,6 +17,12 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
+
+/**
+ * NEON-accelerated bit(un)shuffle routines availability.
+*/
+extern const bool is_bshuf_NEON;
 
 /**
   NEON-accelerated bitshuffle routine.

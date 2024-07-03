@@ -11,6 +11,7 @@
 
 #include "shuffle-neon.h"
 #include "shuffle-generic.h"
+#include <stdlib.h>
 
 /* Make sure NEON is available for the compilation target and compiler. */
 #if defined(__ARM_NEON)
@@ -412,6 +413,22 @@ unshuffle_neon(const int32_t bytesoftype, const int32_t blocksize,
     if (vectorizable_bytes < blocksize) {
         unshuffle_generic_inline(bytesoftype, vectorizable_bytes, blocksize, _src, _dest);
     }
+}
+
+const bool is_shuffle_neon = true;
+
+#else /* defined(__ARM_NEON) */
+
+const bool is_shuffle_neon = false;
+
+void shuffle_neon(const int32_t bytesoftype, const int32_t blocksize,
+                  const uint8_t* const _src, uint8_t* const _dest) {
+  abort();
+}
+
+void unshuffle_neon(const int32_t bytesoftype, const int32_t blocksize,
+                    const uint8_t *_src, uint8_t *_dest) {
+  abort();
 }
 
 #endif /* defined(__ARM_NEON) */

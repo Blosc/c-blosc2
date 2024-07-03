@@ -18,6 +18,12 @@
 #include "blosc2/blosc2-common.h"
 
 #include <stdint.h>
+#include <stdbool.h>
+
+/**
+ * NEON-accelerated (un)shuffle routines availability.
+*/
+extern const bool is_shuffle_neon;
 
 /**
   NEON-accelerated shuffle routine.

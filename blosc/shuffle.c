@@ -332,7 +332,7 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
 #if defined(SHUFFLE_NEON_ENABLED)
-  if (cpu_features & BLOSC_HAVE_NEON) {
+  if (cpu_features & BLOSC_HAVE_NEON && is_shuffle_neon) { // && is_bshuf_NEON is using NEON bitshuffle
     shuffle_implementation_t impl_neon;
     impl_neon.name = "neon";
     impl_neon.shuffle = (shuffle_func)shuffle_neon;
