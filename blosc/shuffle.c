@@ -332,7 +332,7 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
 #if defined(SHUFFLE_NEON_ENABLED)
-  if (cpu_features & BLOSC_HAVE_NEON && is_shuffle_neon) { // && is_bshuf_NEON is using NEON bitshuffle
+  if (cpu_features & BLOSC_HAVE_NEON && is_shuffle_neon) { // && is_bshuf_NEON if using NEON bitshuffle
     shuffle_implementation_t impl_neon;
     impl_neon.name = "neon";
     impl_neon.shuffle = (shuffle_func)shuffle_neon;
@@ -351,7 +351,7 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 #endif  /* defined(SHUFFLE_NEON_ENABLED) */
 
 #if defined(SHUFFLE_ALTIVEC_ENABLED)
-  if (cpu_features & BLOSC_HAVE_ALTIVEC) {
+  if (cpu_features & BLOSC_HAVE_ALTIVEC && is_shuffle_altivec && is_bshuf_altivec) {
     shuffle_implementation_t impl_altivec;
     impl_altivec.name = "altivec";
     impl_altivec.shuffle = (shuffle_func)shuffle_altivec;

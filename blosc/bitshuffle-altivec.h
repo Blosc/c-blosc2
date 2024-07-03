@@ -17,6 +17,12 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
+
+/**
+ * ALTIVEC-accelerated bit(un)shuffle routines availability.
+*/
+extern const bool is_bshuf_altivec;
 
 BLOSC_NO_EXPORT int64_t
     bshuf_trans_byte_elem_altivec(const void* in, void* out, const size_t size,
