@@ -320,7 +320,7 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 #endif  /* defined(SHUFFLE_AVX2_ENABLED) */
 
 #if defined(SHUFFLE_SSE2_ENABLED)
-  if (cpu_features & BLOSC_HAVE_SSE2) {
+  if (cpu_features & BLOSC_HAVE_SSE2 && is_shuffle_sse2 && is_bshuf_SSE) {
     shuffle_implementation_t impl_sse2;
     impl_sse2.name = "sse2";
     impl_sse2.shuffle = (shuffle_func)shuffle_sse2;
