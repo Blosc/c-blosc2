@@ -91,7 +91,8 @@ typedef enum {
 
 /* Detect hardware and set function pointers to the best shuffle/unshuffle
    implementations supported by the host processor. */
-#if defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED)    /* Intel/i686 */
+#if (defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED)) && \
+    (defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64))  /* Intel/i686 */
 
 #if defined(HAVE_CPU_FEAT_INTRIN)
 static blosc_cpu_features blosc_get_cpu_features(void) {
