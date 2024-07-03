@@ -16,6 +16,12 @@
 #include "blosc2/blosc2-common.h"
 
 #include <stdint.h>
+#include <stdbool.h>
+
+/**
+ * AVX2-accelerated (un)shuffle routines availability.
+*/
+extern const bool is_shuffle_avx2;
 
 /**
   AVX2-accelerated shuffle routine.

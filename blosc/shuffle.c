@@ -91,7 +91,8 @@ typedef enum {
 
 /* Detect hardware and set function pointers to the best shuffle/unshuffle
    implementations supported by the host processor. */
-#if defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED)    /* Intel/i686 */
+#if (defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED)) && \
+    (defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64))  /* Intel/i686 */
 
 #if defined(HAVE_CPU_FEAT_INTRIN)
 static blosc_cpu_features blosc_get_cpu_features(void) {
@@ -296,7 +297,7 @@ return BLOSC_HAVE_NOTHING;
 static shuffle_implementation_t get_shuffle_implementation(void) {
   blosc_cpu_features cpu_features = blosc_get_cpu_features();
 #if defined(SHUFFLE_AVX512_ENABLED)
-  if (cpu_features & BLOSC_HAVE_AVX512) {
+  if (cpu_features & BLOSC_HAVE_AVX512 && is_shuffle_avx2 && is_bshuf_AVX512) {
     shuffle_implementation_t impl_avx512;
     impl_avx512.name = "avx512";
     impl_avx512.shuffle = (shuffle_func)shuffle_avx2;
@@ -308,7 +309,7 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 #endif  /* defined(SHUFFLE_AVX512_ENABLED) */
 
 #if defined(SHUFFLE_AVX2_ENABLED)
-  if (cpu_features & BLOSC_HAVE_AVX2) {
+  if (cpu_features & BLOSC_HAVE_AVX2 && is_shuffle_avx2 && is_bshuf_AVX) {
     shuffle_implementation_t impl_avx2;
     impl_avx2.name = "avx2";
     impl_avx2.shuffle = (shuffle_func)shuffle_avx2;
@@ -320,7 +321,7 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 #endif  /* defined(SHUFFLE_AVX2_ENABLED) */
 
 #if defined(SHUFFLE_SSE2_ENABLED)
-  if (cpu_features & BLOSC_HAVE_SSE2) {
+  if (cpu_features & BLOSC_HAVE_SSE2 && is_shuffle_sse2 && is_bshuf_SSE) {
     shuffle_implementation_t impl_sse2;
     impl_sse2.name = "sse2";
     impl_sse2.shuffle = (shuffle_func)shuffle_sse2;
@@ -332,7 +333,7 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
 #if defined(SHUFFLE_NEON_ENABLED)
-  if (cpu_features & BLOSC_HAVE_NEON) {
+  if (cpu_features & BLOSC_HAVE_NEON && is_shuffle_neon) { // && is_bshuf_NEON if using NEON bitshuffle
     shuffle_implementation_t impl_neon;
     impl_neon.name = "neon";
     impl_neon.shuffle = (shuffle_func)shuffle_neon;
@@ -351,7 +352,7 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 #endif  /* defined(SHUFFLE_NEON_ENABLED) */
 
 #if defined(SHUFFLE_ALTIVEC_ENABLED)
-  if (cpu_features & BLOSC_HAVE_ALTIVEC) {
+  if (cpu_features & BLOSC_HAVE_ALTIVEC && is_shuffle_altivec && is_bshuf_altivec) {
     shuffle_implementation_t impl_altivec;
     impl_altivec.name = "altivec";
     impl_altivec.shuffle = (shuffle_func)shuffle_altivec;

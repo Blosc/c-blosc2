@@ -17,6 +17,12 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
+
+/**
+ * AVX512-accelerated bit(un)shuffle routines availability.
+*/
+extern const bool is_bshuf_AVX512;
 
 BLOSC_NO_EXPORT int64_t
     bshuf_trans_bit_elem_AVX512(const void* in, void* out, const size_t size,

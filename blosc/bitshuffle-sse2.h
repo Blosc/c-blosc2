@@ -17,6 +17,12 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
+
+/**
+ * SSE2-accelerated bit(un)shuffle routines availability.
+*/
+extern const bool is_bshuf_SSE;
 
 BLOSC_NO_EXPORT int64_t
     bshuf_trans_byte_elem_SSE(const void* in, void* out, const size_t size,
