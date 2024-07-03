@@ -20,13 +20,15 @@
   rights to use.
 **********************************************************************/
 
-/* Make sure AVX512 is available for the compilation target and compiler. */
-#if defined(__AVX512F__) && defined (__AVX512BW__)
-#include <immintrin.h>
 #include "bitshuffle-avx512.h"
 #include "bitshuffle-avx2.h"
 #include "bitshuffle-sse2.h"
 #include "bitshuffle-generic.h"
+#include <stdlib.h>
+
+/* Make sure AVX512 is available for the compilation target and compiler. */
+#if defined(__AVX512F__) && defined (__AVX512BW__)
+#include <immintrin.h>
 
 
 /* Transpose bits within bytes. */
@@ -158,4 +160,22 @@ int64_t bshuf_untrans_bit_elem_AVX512(const void* in, void* out, const size_t si
   return count;
 }
 
-#endif
+const bool is_bshuf_AVX512 = true;
+
+#else /* defined(__AVX512F__) && defined (__AVX512BW__) */
+
+const bool is_bshuf_AVX512 = false;
+
+int64_t
+bshuf_trans_bit_elem_AVX512(const void* in, void* out, const size_t size,
+                            const size_t elem_size) {
+  abort();
+}
+
+int64_t
+bshuf_untrans_bit_elem_AVX512(const void* in, void* out, const size_t size,
+                              const size_t elem_size) {
+  abort();
+}
+
+#endif /* defined(__AVX512F__) && defined (__AVX512BW__) */

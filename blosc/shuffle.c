@@ -296,7 +296,7 @@ return BLOSC_HAVE_NOTHING;
 static shuffle_implementation_t get_shuffle_implementation(void) {
   blosc_cpu_features cpu_features = blosc_get_cpu_features();
 #if defined(SHUFFLE_AVX512_ENABLED)
-  if (cpu_features & BLOSC_HAVE_AVX512) {
+  if (cpu_features & BLOSC_HAVE_AVX512 && is_shuffle_avx2 && is_bshuf_AVX512) {
     shuffle_implementation_t impl_avx512;
     impl_avx512.name = "avx512";
     impl_avx512.shuffle = (shuffle_func)shuffle_avx2;
