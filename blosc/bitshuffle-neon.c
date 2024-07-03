@@ -22,13 +22,13 @@
 
 #include "bitshuffle-neon.h"
 #include "bitshuffle-generic.h"
+#include <stdlib.h>
 
 /* Make sure NEON is available for the compilation target and compiler. */
 #if defined(__ARM_NEON)
 
 #include <arm_neon.h>
 
-#include <stdlib.h>
 
 /* The next is useful for debugging purposes */
 #if 0
@@ -489,6 +489,22 @@ int64_t bshuf_untrans_bit_elem_NEON(const void* in, void* out, const size_t size
     free(tmp_buf);
 
     return count;
+}
+
+const bool is_bshuf_NEON = true;
+
+#else /* defined(__ARM_NEON) */
+
+const bool is_bshuf_NEON = false;
+
+int64_t bshuf_trans_bit_elem_NEON(const void* in, void* out, const size_t size,
+                                  const size_t elem_size) {
+  abort();
+}
+
+int64_t bshuf_untrans_bit_elem_NEON(const void* in, void* out, const size_t size,
+                                    const size_t elem_size) {
+  abort();
 }
 
 #endif /* defined(__ARM_NEON) */
