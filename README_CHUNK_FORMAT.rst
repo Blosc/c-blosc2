@@ -8,7 +8,7 @@ A regular chunk is composed of a header and a blocks section::
     +---------+--------+
 
 Also, there are the so-called lazy chunks that do not have the actual compressed data,
-but only metainformation about how to read it. Lazy chunks typically appear when reading
+but only meta-information about how to read it. Lazy chunks typically appear when reading
 data from persistent media.  A lazy chunk has header and bstarts sections in place and
 in addition, an additional trailer for allowing to read the data blocks::
 

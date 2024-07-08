@@ -1,5 +1,5 @@
 b2nd metalayer
-++++++++++++++
+==============
 
 b2nd format is specified as a metalayer on top of a Blosc2 container for storing
 multidimensional information.  Specifically, this metalayer is named 'b2nd'
