@@ -194,6 +194,19 @@ BLOSC_EXPORT int b2nd_zeros(b2nd_context_t *ctx, b2nd_array_t **array);
 
 
 /**
+ * Create an array, with NaN being used as the default value for
+ * uninitialized portions of the array. Should only be used with type sizes
+ * of either 4 or 8. Other sizes generate an error.
+ *
+ * @param ctx The b2nd context for the new array.
+ * @param array The memory pointer where the array will be created.
+ *
+ * @return An error code.
+ */
+BLOSC_EXPORT int b2nd_nans(b2nd_context_t *ctx, b2nd_array_t **array);
+
+
+/**
  * Create an array, with @p fill_value being used as the default value for
  * uninitialized portions of the array.
  *

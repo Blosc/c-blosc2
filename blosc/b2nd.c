@@ -395,6 +395,23 @@ int b2nd_zeros(b2nd_context_t *ctx, b2nd_array_t **array) {
 }
 
 
+int b2nd_nans(b2nd_context_t *ctx, b2nd_array_t **array) {
+  BLOSC_ERROR_NULL(ctx, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+
+  BLOSC_ERROR(array_new(ctx, BLOSC2_SPECIAL_NAN, array));
+
+  const int32_t typesize = (*array)->sc->typesize;
+  if (typesize != 4 && typesize != 8)
+  {
+    BLOSC_TRACE_ERROR("Unsupported typesize for NaN");
+    return BLOSC2_ERROR_DATA;
+  }
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, const void *fill_value) {
   BLOSC_ERROR_NULL(ctx, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
