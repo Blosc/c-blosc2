@@ -41,6 +41,7 @@ Constructors
 .. doxygenfunction:: b2nd_uninit
 .. doxygenfunction:: b2nd_empty
 .. doxygenfunction:: b2nd_zeros
+.. doxygenfunction:: b2nd_nans
 .. doxygenfunction:: b2nd_full
 
 From/To buffer
