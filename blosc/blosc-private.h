@@ -265,25 +265,46 @@ static inline int get_libpath(char *plugin_name, char *libpath, char *python_ver
   return BLOSC2_ERROR_SUCCESS;
 }
 
-
 static inline void* load_lib(char *plugin_name, char *libpath) {
-  if (get_libpath(plugin_name, libpath, "") < 0 && get_libpath(plugin_name, libpath, "3") < 0) {
-    BLOSC_TRACE_ERROR("Problems when running python or python3 for getting plugin path");
-    return NULL;
-  }
+    // Attempt to directly load the library by name
+#if defined(_WIN32)
+    // Windows dynamic library (DLL) format
+    snprintf(libpath, PATH_MAX, "blosc2_%s.dll", plugin_name);
+#else
+    // Unix/Linux/Mac OS dynamic library (.so) format
+    snprintf(libpath, PATH_MAX, "libblosc2_%s.so", plugin_name);
+#endif
+    void* loaded_lib = dlopen(libpath, RTLD_LAZY);
+    if (loaded_lib != NULL) {
+        BLOSC_TRACE_INFO("Successfully loaded %s directly\n", libpath);
+        return loaded_lib;
+    } else {
+#if defined(_WIN32)
+        BLOSC_TRACE_INFO("Failed to load %s directly, error: %s\n", libpath, GetLastError());
+#else
+        BLOSC_TRACE_INFO("Failed to load %s directly, error: %s\n", libpath, dlerror());
+#endif
+    }
+    // If direct loading fails, fallback to using Python to find the library path
+    if (get_libpath(plugin_name, libpath, "") < 0 && get_libpath(plugin_name, libpath, "3") < 0) {
+        BLOSC_TRACE_ERROR("Problems when running python or python3 for getting plugin path");
+        return NULL;
+    }
 
-  if (strlen(libpath) == 0) {
-    BLOSC_TRACE_ERROR("Could not find plugin libpath");
-    return NULL;
-  }
-  void* loaded_lib;
-  BLOSC_TRACE_INFO("libpath for plugin blosc2_%s: %s\n", plugin_name, libpath);
-  loaded_lib = dlopen(libpath, RTLD_LAZY);
-  if (loaded_lib == NULL) {
-    BLOSC_TRACE_ERROR("Attempt to load plugin in path '%s' failed with error: %s",
-                      libpath, dlerror());
-  }
-  return loaded_lib;
+    if (strlen(libpath) == 0) {
+        BLOSC_TRACE_ERROR("Could not find plugin libpath");
+        return NULL;
+    }
+
+    // Try to load the library again with the path from Python
+    loaded_lib = dlopen(libpath, RTLD_LAZY);
+    if (loaded_lib == NULL) {
+        BLOSC_TRACE_ERROR("Attempt to load plugin in path '%s' failed with error: %s", libpath, dlerror());
+    } else {
+        BLOSC_TRACE_INFO("Successfully loaded library with Python path: %s\n", libpath);
+    }
+
+    return loaded_lib;
 }
 
 
