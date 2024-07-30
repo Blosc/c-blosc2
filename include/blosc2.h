@@ -85,8 +85,8 @@ extern "C" {
 #define BLOSC2_VERSION_MINOR    15   /* for minor interface/format changes  */
 #define BLOSC2_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC2_VERSION_STRING   "2.15.1.dev"  /* string version.  Sync with above! */
-#define BLOSC2_VERSION_DATE     "$Date:: 2024-06-20 #$"    /* date version year-month-day */
+#define BLOSC2_VERSION_STRING   "2.15.1"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_DATE     "$Date:: 2024-07-30 #$"    /* date version year-month-day */
 
 
 /* The maximum number of dimensions for Blosc2 NDim arrays */
@@ -1865,7 +1865,7 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_udio(const char* urlpath, const b
  * @param urlpath The file name.
  *
  * @param offset The frame offset.
- * 
+ *
  * @param udio The user-defined I/O interface.
  *
  * @return The new super-chunk.
