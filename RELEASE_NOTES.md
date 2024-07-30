@@ -4,7 +4,17 @@ Release notes for C-Blosc2
 Changes from 2.15.0 to 2.15.1
 =============================
 
+* Do not pass `-m` flags when compiling `shuffle.c`. This prevents the
+  compiler from incidentally optimizing the code called independently
+  of the runtime CPU check to these instruction sets, effectively
+  causing `SIGILL` on other CPUs.  Fixes #621.  Thanks to @t20100 and @mgorny.
+
 * Internal LZ4 sources bumped to 1.10.0.
+
+* Allow direct loading of plugins by name, without relying on
+  the presence of python. Thanks to @boxerab.
+
+* Add `b2nd_nans` method (PR #624). Thanks to @waynegm.
 
 
 Changes from 2.14.4 to 2.15.0

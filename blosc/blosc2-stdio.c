@@ -255,7 +255,7 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
       _print_last_error();
       BLOSC_TRACE_ERROR("Cannot close the handle to the memory-mapped file.");
     }
-    
+
     return NULL;
   }
 #else
@@ -353,7 +353,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
         _print_last_error();
         BLOSC_TRACE_ERROR("Cannot close the handle to the memory-mapped file.");
       }
-      
+
       return 0;
     }
 
@@ -373,12 +373,12 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
   }
 
   if (mmap_file->mapping_size < mmap_file->file_size) {
-    int64_t old_mapping_size = mmap_file->mapping_size;
     mmap_file->mapping_size = mmap_file->file_size * 2;
 
 #if defined(__linux__)
     /* mremap is the best option as it also ensures that the old data is still available in c mode. Unfortunately, it
     is no POSIX standard and only available on Linux */
+    int64_t old_mapping_size = mmap_file->mapping_size;
     char* new_address = mremap(mmap_file->addr, old_mapping_size, mmap_file->mapping_size, MREMAP_MAYMOVE);
 #else
     if (mmap_file->is_memory_only) {

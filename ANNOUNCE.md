@@ -1,11 +1,12 @@
-# Announcing C-Blosc2 2.15.0
+# Announcing C-Blosc2 2.15.1
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a minor release in which a new io mode
-was added to memory-map files. Furthermore, the `io_cb` read API was changed, so the 
-`SOVERSION` was bumped. In addition, the internal zstd sources were updated to 1.5.6 and some
+This is a maintenance release in which we are fixing calling instructions
+more advanced than available in current CPU, causing a SIGKILL.
+Furthermore, a new `b2nd_nans` function has been added. In addition,
+the internal LZ4 sources were updated to 1.10.0 and some
 other improvements were made.
 
 For more info, please see the release notes in:
