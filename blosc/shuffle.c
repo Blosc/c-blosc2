@@ -268,7 +268,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
 #if defined(__aarch64__)
   /* aarch64 always has NEON */
   cpu_features |= BLOSC_HAVE_NEON;
-#else
+#elif defined(__linux__)
   if (getauxval(AT_HWCAP) & HWCAP_ARM_NEON) {
     cpu_features |= BLOSC_HAVE_NEON;
   }
