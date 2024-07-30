@@ -4,7 +4,7 @@ Release notes for C-Blosc2
 Changes from 2.15.0 to 2.15.1
 =============================
 
-#XXX version-specific blurb XXX#
+* Internal LZ4 sources bumped to 1.10.0.
 
 
 Changes from 2.14.4 to 2.15.0
