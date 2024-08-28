@@ -191,19 +191,20 @@ if(NOT DEACTIVATE_ZLIB)
     endif()
 
     if(NOT (ZLIB_NG_FOUND OR ZLIB_FOUND))
-        message(STATUS "Using ZLIB-NG internal sources for ZLIB support.")
-        set(HAVE_ZLIB_NG TRUE)
-        add_definitions(-DZLIB_COMPAT)
-        set(ZLIB_NG_DIR "zlib-ng-2.0.7")  # update to the actual included version
-        set(ZLIB_COMPAT TRUE)
-        set(SKIP_INSTALL_ALL TRUE)
-        set(BUILD_SHARED_LIBS FALSE)
-        set(ZLIB_ENABLE_TESTS OFF)
-        add_subdirectory("internal-complibs/${ZLIB_NG_DIR}")
-
-        file(COPY
-                ${CMAKE_CURRENT_BINARY_DIR}/internal-complibs/${ZLIB_NG_DIR}/zconf.h
-                DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/internal-complibs/${ZLIB_NG_DIR}/)
+        message(STATUS "Using ZLIB-NG external sources for ZLIB support.")
+        include(FetchContent)
+        FetchContent_Declare(z-ng
+            GIT_REPOSITORY  https://github.com/zlib-ng/zlib-ng
+            GIT_TAG         2.1.3
+            SOURCE_DIR      ${PROJECT_BINARY_DIR}/blosc2-internal-complibs/zlib-ng
+            BUILD_IN_SOURCE 0
+        )
+        set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+        option(BUILD_SHARED_LIBS "" OFF)
+        option(ZLIB_COMPAT "" ON)
+        option(ZLIB_ENABLE_TESTS "" OFF)
+        option(ZLIBNG_ENABLE_TESTS "" OFF)
+        FetchContent_MakeAvailable(z-ng)
     endif()
     set(HAVE_ZLIB TRUE)
 endif()
@@ -528,6 +529,18 @@ if(BLOSC_INSTALL)
     endif()
     if(BUILD_STATIC)
         list(APPEND Blosc2_INSTALL_TARGET_NAMES blosc2_static)
+    endif()
+    # internal zlib-ng aka superbuild
+    #   work-around: zlib-ng does not export its target to the build
+    #   tree yet
+    if(NOT DEACTIVATE_ZLIB)
+        if(NOT ZLIB_NG_FOUND AND NOT ZLIB_FOUND)
+            if(TARGET zlib)
+                list(APPEND Blosc2_INSTALL_TARGET_NAMES zlib)
+            elseif(TARGET zlibstatic)
+                list(APPEND Blosc2_INSTALL_TARGET_NAMES zlibstatic)
+            endif()
+        endif()
     endif()
     configure_file(
         ${PROJECT_SOURCE_DIR}/Blosc2Config.cmake.in
