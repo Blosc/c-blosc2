@@ -37,6 +37,7 @@ if(BUILD_SHARED)
         $<INSTALL_INTERFACE:include>)
 endif()
 if(BUILD_STATIC)
+    add_compile_definitions(BUILD_STATIC)
     add_library(blosc2_static STATIC)
     # ALIAS for superbuilds that use Blosc2 as sub-project
     # must be the same as the NAMESPACE in Blosc2Targets
