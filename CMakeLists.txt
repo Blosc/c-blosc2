@@ -35,6 +35,8 @@
 #       do not include support for the Zlib library
 #   DEACTIVATE_ZSTD: default OFF
 #       do not include support for the Zstd library
+#   WITH_ZLIB_OPTIM: default ON
+#       set WITH_OPTIM when building Zlib library, setting OFF is useful for wasm32 targets
 #   PREFER_EXTERNAL_LZ4: default OFF
 #       when found, use the installed LZ4 libs instead of included
 #       sources
@@ -131,6 +133,8 @@ option(PREFER_EXTERNAL_ZLIB
     "Find and use external ZLIB library instead of included sources." OFF)
 option(PREFER_EXTERNAL_ZSTD
     "Find and use external ZSTD library instead of included sources." OFF)
+option(WITH_ZLIB_OPTIM
+    "Set WITH_OPTIM for ZLIB, turning off is useful for compiling for wasm32 targets." ON)
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
@@ -191,6 +195,11 @@ if(NOT DEACTIVATE_ZLIB)
     endif()
 
     if(NOT (ZLIB_NG_FOUND OR ZLIB_FOUND))
+
+        if (NOT WITH_ZLIB_OPTIM)
+            set(WITH_OPTIM FALSE)
+            set(WITH_RUNTIME_CPU_DETECTION FALSE)
+        endif()
         message(STATUS "Using ZLIB-NG internal sources for ZLIB support.")
         set(HAVE_ZLIB_NG TRUE)
         add_definitions(-DZLIB_COMPAT)
