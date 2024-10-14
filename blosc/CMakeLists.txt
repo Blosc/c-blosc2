@@ -32,8 +32,9 @@ if(BUILD_SHARED)
         SOVERSION 4  # Change this when an ABI change happens
     )
     target_compile_definitions(blosc2_shared PUBLIC BLOSC_SHARED_LIBRARY)
+    target_include_directories(blosc2_shared PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_include_directories(blosc2_shared PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
         $<INSTALL_INTERFACE:include>)
 endif()
 if(BUILD_STATIC)
@@ -53,8 +54,9 @@ if(BUILD_STATIC)
     if(MSVC OR MINGW)
         set_target_properties(blosc2_static PROPERTIES PREFIX lib)
     endif()
+    target_include_directories(blosc2_static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_include_directories(blosc2_static PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
         $<INSTALL_INTERFACE:include>)
 endif()
 # When the option has been selected to compile the test suite,
