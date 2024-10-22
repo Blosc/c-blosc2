@@ -4646,6 +4646,11 @@ int blosc2_register_io_cb(const blosc2_io_cb *io) {
 }
 
 blosc2_io_cb *blosc2_get_io_cb(uint8_t id) {
+  // If g_initlib is not set by blosc2_init() this function will try to read
+  // uninitialized memory
+  if (!g_initlib) {
+    return NULL;
+  }
   for (uint64_t i = 0; i < g_nio; ++i) {
     if (g_ios[i].id == id) {
       return &g_ios[i];
