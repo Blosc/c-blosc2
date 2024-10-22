@@ -168,7 +168,7 @@ static char* test_schunk(void) {
 static char* test_schunk_no_init(void)
 {
   // Test that calling blosc2_schunk without a call to blosc2_init() is valid and works as intended
-  // as this is the recommended route for multithreaded 
+  // as this is the recommended route for multithreaded compression/decompression
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
   int32_t isize = CHUNKSIZE * sizeof(int32_t);

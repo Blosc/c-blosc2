@@ -4647,7 +4647,7 @@ int blosc2_register_io_cb(const blosc2_io_cb *io) {
 
 blosc2_io_cb *blosc2_get_io_cb(uint8_t id) {
   // If g_initlib is not set by blosc2_init() this function will try to read
-  // uninitialized memory
+  // uninitialized memory. We should therefore always return NULL in that case
   if (!g_initlib) {
     return NULL;
   }
