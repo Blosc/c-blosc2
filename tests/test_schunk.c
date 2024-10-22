@@ -165,7 +165,68 @@ static char* test_schunk(void) {
   return EXIT_SUCCESS;
 }
 
+static char* test_schunk_no_init(void)
+{
+  // Test that calling blosc2_schunk without a call to blosc2_init() is valid and works as intended
+  // as this is the recommended route for multithreaded 
+  static int32_t data[CHUNKSIZE];
+  static int32_t data_dest[CHUNKSIZE];
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
+  int dsize;
+  int64_t nbytes, cbytes;
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_schunk* schunk;
+
+  cparams.typesize = sizeof(int32_t);
+  cparams.clevel = 5;
+  cparams.nthreads = NTHREADS;
+  dparams.nthreads = NTHREADS;
+  blosc2_storage storage = { .cparams = &cparams, .dparams = &dparams };
+  schunk = blosc2_schunk_new(&storage);
+
+  // Feed it with data. This could be done in parallel but for testing we do it sequentially
+  for (int nchunk = 0; nchunk < nchunks; nchunk++) {
+    for (int i = 0; i < CHUNKSIZE; i++) {
+      data[i] = i + nchunk * CHUNKSIZE;
+    }
+
+    uint8_t* chunk = malloc(isize + BLOSC2_MAX_OVERHEAD);
+    blosc2_context* ctx = blosc2_create_cctx(cparams);
+
+    int csize = blosc2_compress_ctx(ctx, data, isize, chunk, isize + BLOSC2_MAX_OVERHEAD);
+    int64_t nchunks_ = blosc2_schunk_append_chunk(schunk, chunk, false);
+    mu_assert("ERROR: bad append in frame", nchunks_ > 0);
+    blosc2_free_ctx(ctx);
+  }
+
+  // Check the buffer
+  for (int nchunk = 0; nchunk < nchunks; nchunk++) {
+    blosc2_context* dctx = blosc2_create_dctx(dparams);
+    dsize = blosc2_decompress_ctx(dctx, schunk->data[nchunk], INT32_MAX, (void*)data_dest, isize);
+    mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
+    for (int i = 0; i < CHUNKSIZE; i++) {
+      mu_assert("ERROR: bad roundtrip", data_dest[i] == i + nchunk * CHUNKSIZE);
+    }
+  }
+
+  blosc2_schunk_free(schunk);
+}
+
+
 static char *all_tests(void) {
+
+  // We need to run the no-init example first as the other examples
+  // will initialize blosc2
+  nchunks = 0;
+  mu_run_test(test_schunk_no_init);
+
+  nchunks = 1;
+  mu_run_test(test_schunk_no_init);
+
+  nchunks = 10;
+  mu_run_test(test_schunk_no_init);
+
   nchunks = 0;
   mu_run_test(test_schunk);
 
@@ -183,7 +244,6 @@ int main(void) {
   char *result;
 
   install_blosc_callback_test(); /* optionally install callback test */
-  blosc2_init();
 
   /* Run all the suite */
   result = all_tests();
@@ -194,8 +254,6 @@ int main(void) {
     printf(" ALL TESTS PASSED");
   }
   printf("\tTests run: %d\n", tests_run);
-
-  blosc2_destroy();
 
   return result != EXIT_SUCCESS;
 }
