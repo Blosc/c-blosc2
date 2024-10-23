@@ -173,6 +173,7 @@ static char* test_schunk_no_init(void)
   static int32_t data_dest[CHUNKSIZE];
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int dsize;
+  int csize;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
@@ -193,7 +194,7 @@ static char* test_schunk_no_init(void)
     uint8_t* chunk = malloc(isize + BLOSC2_MAX_OVERHEAD);
     blosc2_context* ctx = blosc2_create_cctx(cparams);
 
-    blosc2_compress_ctx(ctx, data, isize, chunk, isize + BLOSC2_MAX_OVERHEAD);
+    csize = blosc2_compress_ctx(ctx, data, isize, chunk, isize + BLOSC2_MAX_OVERHEAD);
     int64_t nchunks_ = blosc2_schunk_append_chunk(schunk, chunk, false);
     mu_assert("ERROR: bad append in frame", nchunks_ > 0);
     blosc2_free_ctx(ctx);
