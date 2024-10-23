@@ -195,6 +195,7 @@ static char* test_schunk_no_init(void)
     blosc2_context* ctx = blosc2_create_cctx(cparams);
 
     csize = blosc2_compress_ctx(ctx, data, isize, chunk, isize + BLOSC2_MAX_OVERHEAD);
+    mu_assert("ERROR: chunk cannot be compressed correctly.", csize > 0);
     int64_t nchunks_ = blosc2_schunk_append_chunk(schunk, chunk, false);
     mu_assert("ERROR: bad append in frame", nchunks_ > 0);
     blosc2_free_ctx(ctx);
