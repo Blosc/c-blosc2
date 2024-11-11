@@ -39,8 +39,10 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(sframe_bench rt)
 endif()
 if(UNIX)
-    # Avoid a warning when using gcc without -fopenmp
-    target_compile_options(sum_openmp PRIVATE "-Wno-unknown-pragmas")
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+        # Avoid a warning when using gcc without -fopenmp
+        target_compile_options(sum_openmp PRIVATE "-Wno-unknown-pragmas")
+    endif()
 endif()
 target_link_libraries(b2bench blosc_testing)
 target_link_libraries(delta_schunk blosc_testing)
