@@ -1,27 +1,28 @@
-# Announcing C-Blosc2 2.15.1
+# Announcing C-Blosc2 2.15.2
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release in which we are fixing calling instructions
-more advanced than available in current CPU, causing a SIGKILL.
-Furthermore, a new `b2nd_nans` function has been added. In addition,
-the internal LZ4 sources were updated to 1.10.0 and some
-other improvements were made.
+This is a maintenance release in which we are fixing some issues
+that have been reported by the community. The most relevant changes are:
+
+* Support wasm32 by disabling ZLIB WITH_OPTIM option. Thanks to Miles Granger.
+
+* Added support for nvcc (NVidia Cuda Compiler) in CMake. Thanks to @dqwu.
+
+* Fix public include directories for blosc2 targets. Thanks to Dmitry Mikushin.
 
 For more info, please see the release notes in:
 
 https://github.com/Blosc/c-blosc2/blob/main/RELEASE_NOTES.md
 
-Also, there is blog post introducing the most relevant changes in Blosc2:
-
-https://www.blosc.org/posts/blosc2-ready-general-review/
-
 ## What is it?
 
 Blosc2 is a high performance data container optimized for binary data.
 It builds on the shoulders of Blosc, the high performance meta-compressor
-(https://github.com/Blosc/c-blosc).
+(https://github.com/Blosc/c-blosc).  Blosc2 is the next generation of Blosc,
+an `award-winning <https://www.blosc.org/posts/prize-push-Blosc2/>`_
+library that has been around for more than a decade.
 
 Blosc2 expands the capabilities of Blosc by providing a higher lever
 container that is able to store many chunks on it (hence the super-block name).
