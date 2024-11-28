@@ -21,8 +21,8 @@ https://github.com/Blosc/c-blosc2/blob/main/RELEASE_NOTES.md
 Blosc2 is a high performance data container optimized for binary data.
 It builds on the shoulders of Blosc, the high performance meta-compressor
 (https://github.com/Blosc/c-blosc).  Blosc2 is the next generation of Blosc,
-an `award-winning <https://www.blosc.org/posts/prize-push-Blosc2/>`_
-library that has been around for more than a decade.
+an award-winning (https://www.blosc.org/posts/prize-push-Blosc2)` library
+that has been around for more than a decade.
 
 Blosc2 expands the capabilities of Blosc by providing a higher lever
 container that is able to store many chunks on it (hence the super-block name).

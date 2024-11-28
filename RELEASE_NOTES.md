@@ -1,6 +1,11 @@
 Release notes for C-Blosc2
 ==========================
 
+Changes from 2.15.2 to 2.15.3
+=============================
+
+#XXX version-specific blurb XXX#
+
 
 Changes from 2.15.1 to 2.15.2
 =============================
@@ -14,7 +19,6 @@ Changes from 2.15.1 to 2.15.2
 * Fix public include directories for blosc2 targets. Thanks to Dmitry Mikushin.
 
 * Fix ub in shuffle and unshuffle by marking _dst non-const. Thanks to Emil Dohne.
-
 
 
 Changes from 2.15.0 to 2.15.1
