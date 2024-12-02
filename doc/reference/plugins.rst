@@ -37,8 +37,6 @@ IO backends
 
 .. doxygentypedef:: blosc2_open_cb
 .. doxygentypedef:: blosc2_close_cb
-.. doxygentypedef:: blosc2_tell_cb
-.. doxygentypedef:: blosc2_seek_cb
 .. doxygentypedef:: blosc2_write_cb
 .. doxygentypedef:: blosc2_read_cb
 .. doxygentypedef:: blosc2_truncate_cb
