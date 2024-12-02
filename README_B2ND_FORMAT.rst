@@ -1,4 +1,4 @@
-b2nd format
+b2nd Format
 ===========
 
 The b2nd format is just a `b2nd metalayer <https://github.com/Blosc/c-blosc2/blob/main/README_B2ND_METALAYER.rst>`_

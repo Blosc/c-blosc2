@@ -1,4 +1,4 @@
-Blosc2 format
+Blosc2 Format
 =============
 
 The Blosc2 format is a specification for storing compressed data in a way that is simple to read and parse,
@@ -13,3 +13,7 @@ Here there is a list of the different parts of the format, from the highest leve
 - `sframe format <https://github.com/Blosc/c-blosc2/blob/main/README_SFRAME_FORMAT.rst>`_
 - `cframe format <https://github.com/Blosc/c-blosc2/blob/main/README_CFRAME_FORMAT.rst>`_
 - `chunk format <https://github.com/Blosc/c-blosc2/blob/main/README_CHUNK_FORMAT.rst>`_
+
+And here the recommended extension file names for the different parts of the format:
+
+- `Blosc2 extension file names <https://github.com/Blosc/c-blosc2/blob/main/README_EXTENSION_FILENAMES.rst>`_

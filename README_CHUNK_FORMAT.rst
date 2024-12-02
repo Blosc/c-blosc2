@@ -1,5 +1,5 @@
-Blosc Chunk Format
-==================
+Blosc/Blosc2 Chunk Format
+=========================
 
 A regular chunk is composed of a header and a blocks section::
 

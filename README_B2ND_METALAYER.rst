@@ -1,5 +1,5 @@
-b2nd metalayer
-==============
+b2nd Metalayer Format
+=====================
 
 This is a `metalayer <https://www.blosc.org/posts/blosc-metalayers/>`_ on top of a Blosc2 container that is meant
 for storing multidimensional information.
