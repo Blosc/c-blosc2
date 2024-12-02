@@ -2,7 +2,8 @@ Blosc2 Contiguous Frame Format
 ==============================
 
 Blosc (as of version 2.0.0) has a contiguous frame format (cframe for short) that allows for the storage of
-different Blosc data chunks contiguously, either in-memory or on-disk.
+different `Blosc data chunks <https://github.com/Blosc/c-blosc2/blob/main/README_CHUNKS_FORMAT.rst>`_ contiguously,
+either in-memory or on-disk.
 
 The frame is composed of a header, a chunks section, and a trailer::
 
@@ -20,7 +21,7 @@ Header
 ------
 
 The header contains information needed to decompress the Blosc chunks contained in the frame. It is encoded using
-`msgpack <https://msgpack.org>`_ and the format is as follows::
+msgpack and the format is as follows::
 
     |-0-|-1-|-2-|-3-|-4-|-5-|-6-|-7-|-8-|-9-|-A-|-B-|-C-|-D-|-E-|-F-|-10|-11|-12|-13|-14|-15|-16|-17|
     | 9X| aX| "b2frame\0"                   | d2| header_size   | cf| frame_size                    |

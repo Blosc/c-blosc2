@@ -1,9 +1,10 @@
 b2nd metalayer
 ==============
 
-b2nd format is specified as a metalayer on top of a Blosc2 container for storing
-multidimensional information.  Specifically, this metalayer is named 'b2nd'
-and follows this format::
+This is a `metalayer <https://www.blosc.org/posts/blosc-metalayers/>`_ on top of a Blosc2 container that is meant
+for storing multidimensional information.
+
+Specifically, this metalayer is named 'b2nd' and follows this format::
 
     |-0-|-1-|-2-|-3-|~~~~~~~~~~~~~~~~|---|~~~~~~~~~~~~~~~~|---|~~~~~~~~~~~~~~~~|
     | 9X| v | nd| 9X| shape          | 9X| chunkshape     | 9X| blockshape     |
