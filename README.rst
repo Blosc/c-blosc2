@@ -41,7 +41,7 @@ See a 3 minutes  `introductory video to Blosc2 <https://www.youtube.com/watch?v=
 Blosc2 NDim: an N-Dimensional store
 ===================================
 
-One of the latest and more exciting additions in C-Blosc2 is the `Blosc2 NDim layer <https://www.blosc.org/c-blosc2/reference/b2nd.html>`_ (or b2nd for short), allowing to create *and* read n-dimensional datasets in an extremely efficient way thanks to a n-dim 2-level partitioning, that allows to slice and dice arbitrary large and compressed data in a more fine-grained way:
+One of the latest and more exciting additions in C-Blosc2 is the `Blosc2 NDim layer <https://www.blosc.org/c-blosc2/reference/b2nd.html>`_ (or B2ND for short), allowing to create *and* read n-dimensional datasets in an extremely efficient way thanks to a n-dim 2-level partitioning, that allows to slice and dice arbitrary large and compressed data in a more fine-grained way:
 
 .. image:: https://github.com/Blosc/c-blosc2/blob/main/images/b2nd-2level-parts.png?raw=true
   :width: 75%
@@ -67,7 +67,7 @@ New features in C-Blosc2
 
 * **64-bit containers:** the first-class container in C-Blosc2 is the `super-chunk` or, for brevity, `schunk`, that is made by smaller chunks which are essentially C-Blosc1 32-bit containers.  The super-chunk can be backed or not by another container which is called a `frame` (see later).
 
-* **NDim containers (b2nd):** allow to store n-dimensional data that can efficiently read datasets in slices that can be n-dimensional too. To achieve this, a n-dimensional 2-level partitioning has been implemented.  This capabilities were formerly part of `Caterva <https://github.com/Blosc/caterva>`_, and now it is included in C-Blosc2 for convenience.  Caterva is now deprecated.
+* **NDim containers (B2ND):** allow to store n-dimensional data that can efficiently read datasets in slices that can be n-dimensional too. To achieve this, a n-dimensional 2-level partitioning has been implemented.  This capabilities were formerly part of `Caterva <https://github.com/Blosc/caterva>`_, and now it is included in C-Blosc2 for convenience.  Caterva is now deprecated.
 
 * **More filters:** besides `shuffle` and `bitshuffle` already present in C-Blosc1, C-Blosc2 already implements:
 
@@ -123,14 +123,9 @@ C-Blosc2 API and format have been frozen, and that means that there is guarantee
 Open format
 ===========
 
-The Blosc2 format is open and documented in the next documents:
+The Blosc2 format is open and `fully documented <https://github.com/Blosc/c-blosc2/blob/main/README_FORMAT.rst>`_.
 
-* [The chunk; the basic building block](https://github.com/Blosc/c-blosc2/blob/main/README_CHUNK_FORMAT.rst)
-* [The cframe; this is made of different chunks in contiguous storage](https://github.com/Blosc/c-blosc2/blob/main/README_CFRAME_FORMAT.rst)
-* [The sframe; a variation of the cframe for sparse storage](https://github.com/Blosc/c-blosc2/blob/main/README_SFRAME_FORMAT.rst)
-* [The b2nd metalayer; info for the n-dimensional data container](https://github.com/Blosc/c-blosc2/blob/main/README_B2ND_METALAYER.rst)
-
-All these documents take less than 1000 lines of text, so they should be easy to read and understand.  In our opinion, this is very important for the long-term success of the library, as it allows for third-party implementations of the format, and also for the users to understand what is going on under the hood.
+The format specs are defined in less than 1000 lines of text, so they should be easy to read and understand.  In our opinion, this is very important for the long-term success of the library, as it allows for third-party implementations of the format, and also for the users to understand what is going on under the hood.
 
 
 Python wrapper

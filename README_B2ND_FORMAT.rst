@@ -1,7 +1,7 @@
-b2nd Format
+B2ND Format
 ===========
 
-The b2nd format is meant for storing multidimensional datasets defined by a shape and a data type.
+The B2ND format is meant for storing multidimensional datasets defined by a shape and a data type.
 Both the shape and the data type follow the NumPy conventions.
 
 It is just a `B2ND metalayer <https://github.com/Blosc/c-blosc2/blob/main/README_B2ND_METALAYER.rst>`_

@@ -1,4 +1,4 @@
-b2nd Metalayer Format
+B2ND Metalayer Format
 =====================
 
 This is a `metalayer <https://www.blosc.org/posts/blosc-metalayers/>`_ on top of a Blosc2 CFrame that is meant
