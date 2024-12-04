@@ -10,7 +10,6 @@ See a diagram of a Contiguous Frame (aka CFrame), the most important part of the
 
 .. image:: blosc2-cframe.png
    :alt: Blosc2 CFrame format diagram
-   :scale: 50 %
 
 And here, the list of the different parts of the format, from the highest level to the lowest:
 
