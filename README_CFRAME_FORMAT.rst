@@ -1,7 +1,7 @@
 Blosc2 Contiguous Frame Format
 ==============================
 
-Blosc (as of version 2.0.0) has a contiguous frame format (cframe for short) that allows for the storage of
+Blosc (as of version 2.0.0) has a Contiguous Frame format (CFrame for short) that allows for the storage of
 different `Blosc data chunks <https://github.com/Blosc/c-blosc2/blob/main/README_CHUNKS_FORMAT.rst>`_ contiguously,
 either in-memory or on-disk.
 
