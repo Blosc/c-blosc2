@@ -30,7 +30,7 @@ html_theme_options = {
         "alt_text": "Blosc",
     },
     "external_links": [
-        {"name": "Python-Blosc", "url": "/python-blosc/python-blosc.html"},
+        #{"name": "Python-Blosc", "url": "/python-blosc/python-blosc.html"},
         {"name": "Python-Blosc2", "url": "/python-blosc2/python-blosc2.html"},
         {"name": "Blosc In Depth", "url": "/pages/blosc-in-depth/"},
         {"name": "Donate to Blosc", "url": "/pages/donate/"},
