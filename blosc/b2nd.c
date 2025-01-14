@@ -706,6 +706,10 @@ int64_t nchunk_fastpath(const b2nd_array_t *array, const int64_t *start,
   int ndim = (int) array->ndim;
   int inner_dim = ndim - 1;
   int64_t partial_slice_size = 1;
+  int outer_dims = 0;
+  for (int j = 0; j < inner_dim; ++j) {
+    outer_dims += (array->blockshape[j] != 1);
+   }
   int64_t partial_chunk_size = 1;
   for (int i = ndim - 1; i >= 0; --i) {
     // We need to check if the slice is contiguous in the C order
@@ -724,11 +728,13 @@ int64_t nchunk_fastpath(const b2nd_array_t *array, const int64_t *start,
         }
       }
       else {
-        if (array->chunkshape[i] != array->blockshape[i]) {
+        // A block is still contiguous in the C order if the outer dimensions are 1 and the inner is
+        // a divisor of the chunkshape
+        if ( ! (array->chunkshape[i] == array->blockshape[i] ||
+                (outer_dims == 0 && array->chunkshape[i] % array->blockshape[i] == 0))) {
           return -1;
         }
       }
-      inner_dim = i;
     }
 
     // We need start and stop to be aligned with the chunkshape
@@ -743,7 +749,6 @@ int64_t nchunk_fastpath(const b2nd_array_t *array, const int64_t *start,
       return -1;
     }
   }
-
   // Compute the chunk number
   int64_t *chunks_idx;
   int nchunks = b2nd_get_slice_nchunks(array, start, stop, &chunks_idx);
