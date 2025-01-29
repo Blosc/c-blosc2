@@ -24,6 +24,7 @@
 
 #if defined(_WIN32)
   #include <memoryapi.h>
+  #define lseek _lseeki64
 #else
   #include <sys/mman.h>
 #endif
