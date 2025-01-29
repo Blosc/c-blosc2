@@ -24,7 +24,8 @@
 
 #if defined(_WIN32)
   #include <memoryapi.h>
-  #define lseek _lseeki64
+  #define fseek _fseeki64
+  #define ftell _ftelli64
 #else
   #include <sys/mman.h>
 #endif
