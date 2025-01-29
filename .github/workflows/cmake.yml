@@ -59,7 +59,7 @@ jobs:
 
           - name: Ubuntu GCC AARCH64
             os: ubuntu-latest
-            packages: qemu qemu-user gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc-dev-arm64-cross
+            packages: qemu-system-aarch64 qemu-user gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc-dev-arm64-cross
             cmake-args: -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64.cmake
 
           - name: Ubuntu Clang

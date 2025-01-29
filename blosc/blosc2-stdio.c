@@ -24,6 +24,7 @@
 
 #if defined(_WIN32)
   #include <memoryapi.h>
+  // See https://github.com/Blosc/python-blosc2/issues/359
   #define fseek _fseeki64
   #define ftell _ftelli64
 #else
