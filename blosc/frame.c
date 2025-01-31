@@ -14,12 +14,13 @@
 #include "blosc-private.h"
 #include "blosc2.h"
 
+#include <sys/stat.h>
 #if defined(_WIN32)
 #include <windows.h>
 #include <malloc.h>
+// See https://github.com/Blosc/python-blosc2/issues/359#issuecomment-2625380236
+#define stat _stat64
 #endif  /* _WIN32 */
-
-#include <sys/stat.h>
 
 #include <inttypes.h>
 #include <stdbool.h>
