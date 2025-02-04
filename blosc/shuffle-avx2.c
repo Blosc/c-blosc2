@@ -24,12 +24,22 @@
 #include <stdio.h>
 #include <string.h>
 
+static void printymm32(__m256i ymm0)
+{
+  uint32_t buf[8];
+
+  ((__m256i *)buf)[0] = ymm0;
+  fprintf(stderr, "%x,%x,%x,%x,%x,%x,%x,%x\n",
+          buf[0], buf[1], buf[2], buf[3],
+          buf[4], buf[5], buf[6], buf[7]);
+}
+
 static void printymm(__m256i ymm0)
 {
   uint8_t buf[32];
 
   ((__m256i *)buf)[0] = ymm0;
-  printf("%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x\n",
+  fprintf(stderr, "%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x\n",
           buf[0], buf[1], buf[2], buf[3],
           buf[4], buf[5], buf[6], buf[7],
           buf[8], buf[9], buf[10], buf[11],
@@ -516,6 +526,83 @@ unshuffle16_avx2(uint8_t* const dest, const uint8_t* const src,
   }
 }
 
+/* Routine optimized for unshuffling a buffer for a type size of 12 bytes.
+ * Based off 16-byte implementation*/
+static void
+unshuffle12_avx2(uint8_t* const dest, const uint8_t* const src,
+    const int32_t vectorizable_elements, const int32_t total_elements) {
+  static const int32_t bytesoftype = 12;
+  int32_t i;
+  int j;
+  __m256i ymm0[16], ymm1[16];
+
+  __m256i permute = _mm256_set_epi32(0,0,6,5,4,2,1,0);
+  __m256i store_mask = _mm256_set_epi32(0x0, 0x0, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF);
+  int32_t jump = 2*bytesoftype;
+  for (i = 0; i < vectorizable_elements; i += sizeof(__m256i)) {
+    /* Fetch 32 elements (512 bytes) into 16 YMM registers. */
+    const uint8_t* const src_for_ith_element = src + i;
+    for (j = 0; j < bytesoftype; j++) {
+      ymm0[j] = _mm256_loadu_si256((__m256i*)(src_for_ith_element + (j * total_elements)));
+    }
+
+    /* Shuffle bytes */
+    for (j = 0; j < 8; j++) {
+      /* Compute the low 32 bytes */
+      ymm1[j] = _mm256_unpacklo_epi8(ymm0[j * 2], ymm0[j * 2 + 1]);
+      /* Compute the hi 32 bytes */
+      ymm1[8 + j] = _mm256_unpackhi_epi8(ymm0[j * 2], ymm0[j * 2 + 1]);
+    }
+    /* Shuffle 2-byte words */
+    for (j = 0; j < 8; j++) {
+      /* Compute the low 32 bytes */
+      ymm0[j] = _mm256_unpacklo_epi16(ymm1[j * 2], ymm1[j * 2 + 1]);
+      /* Compute the hi 32 bytes */
+      ymm0[8 + j] = _mm256_unpackhi_epi16(ymm1[j * 2], ymm1[j * 2 + 1]);
+    }
+    /* Shuffle 4-byte dwords */
+    for (j = 0; j < 8; j++) {
+      /* Compute the low 32 bytes */
+      ymm1[j] = _mm256_unpacklo_epi32(ymm0[j * 2], ymm0[j * 2 + 1]);
+      /* Compute the hi 32 bytes */
+      ymm1[8 + j] = _mm256_unpackhi_epi32(ymm0[j * 2], ymm0[j * 2 + 1]);
+    }
+
+    /* Shuffle 8-byte qwords */
+    for (j = 0; j < 8; j++) {
+      /* Compute the low 32 bytes */
+      ymm0[j] = _mm256_unpacklo_epi64(ymm1[j * 2], ymm1[j * 2 + 1]);
+      /* Compute the hi 32 bytes */
+      ymm0[8 + j] = _mm256_unpackhi_epi64(ymm1[j * 2], ymm1[j * 2 + 1]);
+    }
+
+
+    for (j = 0; j < 8; j++) {
+      ymm1[j] = _mm256_permute2x128_si256(ymm0[j], ymm0[j + 8], 0x20);
+      ymm1[j + 8] = _mm256_permute2x128_si256(ymm0[j], ymm0[j + 8], 0x31);
+      ymm1[j] = _mm256_permutevar8x32_epi32(ymm1[j], permute);
+      ymm1[j+8] = _mm256_permutevar8x32_epi32(ymm1[j+8], permute);
+
+
+    }
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (0 * jump)), ymm1[0]);
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (1 * jump)), ymm1[4]);
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (2 * jump)), ymm1[2]);
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (3 * jump)), ymm1[6]);
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (4 * jump)), ymm1[1]);
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (5 * jump)), ymm1[5]);
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (6 * jump)), ymm1[3]);
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (7 * jump)), ymm1[7]);
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (8 * jump)), ymm1[8]);
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (9 * jump)), ymm1[12]);
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (10 * jump)), ymm1[10]);
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (11 * jump)), ymm1[14]);
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (12 * jump)), ymm1[9]);
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (13 * jump)), ymm1[13]);
+    _mm256_storeu_si256((__m256i*)(dest + (i * bytesoftype) + (14 * jump)), ymm1[11]);
+    _mm256_maskstore_epi32((int *)(dest + (i * bytesoftype) + (15 * jump)), store_mask, ymm1[15]);
+  }
+}
 /* Routine optimized for unshuffling a buffer for a type size larger than 16 bytes. */
 static void
 unshuffle16_tiled_avx2(const uint8_t *dest, const uint8_t* const src,
@@ -720,6 +807,9 @@ unshuffle_avx2(const int32_t bytesoftype, const int32_t blocksize,
       break;
     case 8:
       unshuffle8_avx2(_dest, _src, vectorizable_elements, total_elements);
+      break;
+    case 12:
+      unshuffle12_avx2(_dest, _src, vectorizable_elements, total_elements);
       break;
     case 16:
       unshuffle16_avx2(_dest, _src, vectorizable_elements, total_elements);
