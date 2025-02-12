@@ -1,6 +1,12 @@
 Release notes for C-Blosc2
 ==========================
 
+Changes from 2.16.0 to 2.16.1
+=============================
+
+#XXX version-specific blurb XXX#
+
+
 Changes from 2.15.2 to 2.16.0
 =============================
 
@@ -9,6 +15,7 @@ Changes from 2.15.2 to 2.16.0
 * Add 12-byte unshuffle for avx2. Thanks to Tom Birch (@froody).
 * Add 12-byte sse2 unshuffle implementation. Thanks to Tom Birch (@froody).
 * Better description of the Blosc2 format as a whole.
+
 
 Changes from 2.15.1 to 2.15.2
 =============================
