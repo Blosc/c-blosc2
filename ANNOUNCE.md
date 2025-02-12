@@ -1,16 +1,15 @@
-# Announcing C-Blosc2 2.15.2
+# Announcing C-Blosc2 2.16.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release in which we are fixing some issues
-that have been reported by the community. The most relevant changes are:
+This introduces some new features and improvements:
 
-* Support wasm32 by disabling ZLIB WITH_OPTIM option. Thanks to Miles Granger.
-
-* Added support for nvcc (NVidia Cuda Compiler) in CMake. Thanks to @dqwu.
-
-* Fix public include directories for blosc2 targets. Thanks to Dmitry Mikushin.
+* Use _fseeki64/_ftelli64/_stat64 on Windows for large file (>2 GB) support.
+  Thanks to Abhi Jaiantilal (@ajaiantilal) for the report and help.
+* Add 12-byte unshuffle for avx2. Thanks to Tom Birch (@froody).
+* Add 12-byte sse2 unshuffle implementation. Thanks to Tom Birch (@froody).
+* Better description of the Blosc2 format as a whole.
 
 For more info, please see the release notes in:
 
