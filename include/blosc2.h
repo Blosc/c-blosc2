@@ -429,7 +429,7 @@ enum {
   BLOSC2_NO_SPECIAL = 0x0,       //!< no special value
   BLOSC2_SPECIAL_ZERO = 0x1,     //!< zero special value
   BLOSC2_SPECIAL_NAN = 0x2,      //!< NaN special value
-  BLOSC2_SPECIAL_VALUE = 0x3,    //!< generic special value
+  BLOSC2_SPECIAL_VALUE = 0x3,    //!< repeated special value
   BLOSC2_SPECIAL_UNINIT = 0x4,   //!< non initialized values
   BLOSC2_SPECIAL_LASTID = 0x4,   //!< last valid ID for special value (update this adequately)
   BLOSC2_SPECIAL_MASK = 0x7      //!< special value mask (prev IDs cannot be larger than this)
