@@ -2160,7 +2160,7 @@ static int initialize_context_compression(
   context->output_bytes = 0;
   context->destsize = destsize;
   context->sourcesize = srcsize;
-  context->typesize = (int32_t)typesize;
+  context->typesize = typesize;
   context->filter_flags = filters_to_flags(filters);
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     context->filters[i] = filters[i];
@@ -4417,8 +4417,7 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const int32_t nbytes, void* dest, 
 /* Create a chunk made of repeated values */
 int blosc2_chunk_repeatval(blosc2_cparams cparams, const int32_t nbytes,
                            void* dest, int32_t destsize, const void* repeatval) {
-  uint8_t typesize = cparams.typesize;
-  if (destsize < BLOSC_EXTENDED_HEADER_LENGTH + typesize) {
+  if (destsize < BLOSC_EXTENDED_HEADER_LENGTH + cparams.typesize) {
     BLOSC_TRACE_ERROR("dest buffer is not long enough");
     return BLOSC2_ERROR_DATA;
   }
@@ -4450,17 +4449,17 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const int32_t nbytes,
   header.version = BLOSC2_VERSION_FORMAT;
   header.versionlz = BLOSC_BLOSCLZ_VERSION_FORMAT;
   header.flags = BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE;  // extended header
-  header.typesize = (uint8_t)typesize;
+  header.typesize = context->typesize;
   header.nbytes = (int32_t)nbytes;
   header.blocksize = context->blocksize;
-  header.cbytes = BLOSC_EXTENDED_HEADER_LENGTH + (int32_t)typesize;
+  header.cbytes = BLOSC_EXTENDED_HEADER_LENGTH + cparams.typesize;
   header.blosc2_flags = BLOSC2_SPECIAL_VALUE << 4;  // mark chunk as all repeated value
   memcpy((uint8_t *)dest, &header, sizeof(header));
-  memcpy((uint8_t *)dest + sizeof(header), repeatval, typesize);
+  memcpy((uint8_t *)dest + sizeof(header), repeatval, cparams.typesize);
 
   blosc2_free_ctx(context);
 
-  return BLOSC_EXTENDED_HEADER_LENGTH + (uint8_t)typesize;
+  return BLOSC_EXTENDED_HEADER_LENGTH + cparams.typesize;
 }
 
 

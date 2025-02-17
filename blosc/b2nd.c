@@ -355,7 +355,6 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
   if ((*array)->nitems != 0) {
     int64_t nchunks = (*array)->extnitems / (*array)->chunknitems;
     int64_t nitems = nchunks * (*array)->extchunknitems;
-    // blosc2_schunk_fill_special(sc, nitems, BLOSC2_SPECIAL_ZERO, chunksize);
     BLOSC_ERROR(blosc2_schunk_fill_special(sc, nitems, special_value, chunksize));
   }
   (*array)->sc = sc;
