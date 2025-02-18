@@ -725,14 +725,18 @@ int read_chunk_header(const uint8_t* src, int32_t srcsize, bool extended_header,
 
     int32_t special_type = (header->blosc2_flags >> 4) & BLOSC2_SPECIAL_MASK;
     if (special_type != 0) {
-      if (header->nbytes % header->typesize != 0) {
-        BLOSC_TRACE_ERROR("`nbytes` is not a multiple of typesize");
-        return BLOSC2_ERROR_INVALID_HEADER;
-      }
       if (special_type == BLOSC2_SPECIAL_VALUE) {
-        if (header->cbytes < BLOSC_EXTENDED_HEADER_LENGTH + header->typesize) {
-          BLOSC_TRACE_ERROR("`cbytes` is too small for run length encoding");
-          return BLOSC2_ERROR_READ_BUFFER;
+        // In this case, the actual type size must be derived from the cbytes
+        int32_t typesize = header->cbytes - BLOSC_EXTENDED_HEADER_LENGTH;
+        if (header->nbytes % typesize != 0) {
+          BLOSC_TRACE_ERROR("`nbytes` is not a multiple of typesize");
+          return BLOSC2_ERROR_INVALID_HEADER;
+        }
+      }
+      else {
+        if (header->nbytes % header->typesize != 0) {
+          BLOSC_TRACE_ERROR("`nbytes` is not a multiple of typesize");
+          return BLOSC2_ERROR_INVALID_HEADER;
         }
       }
     }
@@ -1581,6 +1585,10 @@ static int blosc_d(
   if (rc < 0) {
     return rc;
   }
+  if (context->special_type == BLOSC2_SPECIAL_VALUE) {
+    // We need the actual typesize in this case, but it cannot be encoded in the header, so derive it from cbytes
+    typesize = chunk_cbytes - context->header_overhead;
+  }
 
   // In some situations (lazychunks) the context can arrive uninitialized
   // (but BITSHUFFLE needs it for accessing the format of the chunk)
@@ -1674,7 +1682,7 @@ static int blosc_d(
     switch (context->special_type) {
       case BLOSC2_SPECIAL_VALUE:
         // All repeated values
-        rc = set_values(context->typesize, context->src, _dest, bsize_);
+        rc = set_values(typesize, context->src, _dest, bsize_);
         if (rc < 0) {
           BLOSC_TRACE_ERROR("set_values failed");
           return BLOSC2_ERROR_DATA;
@@ -1749,7 +1757,7 @@ static int blosc_d(
 
   /* The number of compressed data streams for this block */
   if (!dont_split && !leftoverblock) {
-    nstreams = (int32_t)typesize;
+    nstreams = context->typesize;
   }
   else {
     nstreams = 1;
