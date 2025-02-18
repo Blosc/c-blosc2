@@ -574,7 +574,8 @@ BLOSC_EXPORT int b2nd_copy_buffer(int8_t ndim,
                                   const void *src, const int64_t *src_pad_shape,
                                   const int64_t *src_start, const int64_t *src_stop,
                                   void *dst, const int64_t *dst_pad_shape,
-                                  const int64_t *dst_start);
+                                  const int64_t *dst_start)
+  __attribute__((deprecated("Use b2nd_copy_buffer2 instead")));
 
 
 /**
