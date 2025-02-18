@@ -17,34 +17,33 @@ CUTEST_TEST_SETUP(full) {
 
   // Add parametrizations
   CUTEST_PARAMETRIZE(typesize, int32_t, CUTEST_DATA(
-      //1, 2, 4, 8,
-      256, //257, 256 * 256,
-      // 256*256*256, 256*256*256*8,  // these should work for small shapes as well, but are too slow
+      1, 2, 4, 8, 16,
+      255, 256, 257,  // useful to testing typesizes equal or larger than 255
+      // 256 * 256, // this should work for all shapes as well, but is too slow
+      //  256*256*256, 256*256*256*8,  // this should for work small shapes, but is way sloooower
   ));
   CUTEST_PARAMETRIZE(shapes, _test_shapes, CUTEST_DATA(
-    // {0, {0}, {0}, {0}}, // 0-dim
-    // {1, {5}, {3}, {2}}, // 1-idim
-    // {2, {20, 0}, {7, 0}, {3, 0}}, // 0-shape
-    //{2, {20, 10}, {20, 10}, {10, 10}}, // funciona sempre
-    //{2, {20, 10}, {10, 5}, {10, 5}}, // falla
-    //{2, {4, 1}, {2, 1}, {2, 1}}, // falla
-    {2, {1, 3}, {1, 2}, {1, 2}}, // falla
-    //{1, {4}, {2}, {2}}, // funciona sempre
-    //{2, {20, 10}, {8, 6}, {7, 5}}, // falla
-    //{2, {20, 10}, {7, 5}, {3, 5}}, // falla
-    //{2, {14, 10}, {8, 5}, {2, 2}}, // general,
-    //{3, {12, 10, 14}, {3, 5, 9}, {3, 4, 4}}, // general
-    //{3, {10, 21, 20, 5}, {8, 7, 15, 3}, {5, 5, 10, 1}}, // general,
+    {0, {0}, {0}, {0}}, // 0-dim
+    {1, {5}, {3}, {2}}, // 1-idim
+    {2, {20, 0}, {7, 0}, {3, 0}}, // 0-shape
+    {2, {20, 10}, {20, 10}, {10, 10}}, // simple 2-dim
+    {2, {20, 10}, {10, 5}, {10, 5}}, // non-contiguous
+    {2, {4, 1}, {2, 1}, {2, 1}},
+    {2, {1, 3}, {1, 2}, {1, 2}},
+    {2, {20, 10}, {8, 6}, {7, 5}},
+    {2, {20, 10}, {7, 5}, {3, 5}},
+    {2, {14, 10}, {8, 5}, {2, 2}},
+    {3, {12, 10, 14}, {3, 5, 9}, {3, 4, 4}}, // 3-dim
+    {4, {10, 21, 20, 5}, {8, 7, 15, 3}, {5, 5, 10, 1}}, // 4-dim
   ));
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
       {false, false},
-      // {true, false},
-      // {true, true},
-      // {false, true},
+      {true, false},
+      {true, true},
+      {false, true},
   ));
   CUTEST_PARAMETRIZE(fill_value, int8_t, CUTEST_DATA(
-      //3, 113, 33, -5
-      3
+      3, 113, 33, -5
   ));
 }
 
@@ -131,9 +130,9 @@ CUTEST_TEST_TEST(full) {
         }
         // Compare buffer_fill with buffer_dest
         is_true = memcmp(buffer_fill, buffer_dest, typesize) == 0;
-        // print the 10 first bytes of buffer_fill and buffer_dest
+        // print the N first bytes of buffer_fill and buffer_dest
         // printf("buffer_fill: ");
-        // for (int j = 0; j < 10; ++j) {
+        // for (int j = 0; j < 3; ++j) {
         //   printf("%d vs %d ", buffer_fill[j], buffer_dest[j]);
         // }
         free(buffer_fill);

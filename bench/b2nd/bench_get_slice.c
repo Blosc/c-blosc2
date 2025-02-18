@@ -20,7 +20,7 @@ int main() {
   int nslices = 10;
 
   int8_t ndim = 3;
-  uint8_t itemsize = sizeof(DATA_TYPE);
+  int32_t itemsize = sizeof(DATA_TYPE);
 
   int64_t shape[] = {1250, 745, 400};
 
