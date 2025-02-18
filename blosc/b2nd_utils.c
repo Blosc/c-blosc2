@@ -332,7 +332,7 @@ int b2nd_copy_buffer(int8_t ndim,
                      const void *src, const int64_t *src_pad_shape,
                      const int64_t *src_start, const int64_t *src_stop,
                      void *dst, const int64_t *dst_pad_shape,
-                     const int64_t *dst_start) __attribute__((deprecated("Use b2nd_copy_buffer2 instead"))) {
+                     const int64_t *dst_start) {
   // Simply cast itemsize to int32_t and delegate
   return b2nd_copy_buffer2(ndim, (int32_t)itemsize, src, src_pad_shape,
                           src_start, src_stop, dst, dst_pad_shape, dst_start);

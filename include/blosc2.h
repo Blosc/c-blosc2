@@ -291,7 +291,8 @@ enum {
  */
 enum {
   BLOSC2_MAXDICTSIZE = 128 * 1024, //!< maximum size for compression dicts
-  BLOSC2_MAXBLOCKSIZE = 536866816  //!< maximum size for blocks
+  BLOSC2_MAXBLOCKSIZE = 536866816, //!< maximum size for blocks
+  BLOSC2_MAXTYPESIZE = BLOSC2_MAXBLOCKSIZE, //!< maximum size for types
 };
 
 

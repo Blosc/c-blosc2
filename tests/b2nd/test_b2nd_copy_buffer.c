@@ -26,7 +26,7 @@ CUTEST_TEST_SETUP(copy_buffer) {
 
 CUTEST_TEST_TEST(copy_buffer) {
   const int8_t ndim = 3;
-  const uint8_t itemsize = sizeof(uint8_t);
+  const int32_t itemsize = sizeof(uint8_t);
 
   const int64_t chunk_shape[] = {3, 3, 1};
 
@@ -51,24 +51,10 @@ CUTEST_TEST_TEST(copy_buffer) {
                     0, 0};
   const int64_t dest_shape[] = {2, 2, 2};
 
-  B2ND_TEST_ASSERT(b2nd_copy_buffer(ndim, itemsize,
-                                    chunk0x, chunk_shape, chunk0s_start, chunk0s_stop,
-                                    dest, dest_shape, chunk0s_dest));
-  B2ND_TEST_ASSERT(b2nd_copy_buffer(ndim, itemsize,
-                                    chunk1x, chunk_shape, chunk1s_start, chunk1s_stop,
-                                    dest, dest_shape, chunk1s_dest));
-
-  for (int i = 0; i < result_length; ++i) {
-    uint8_t a = dest[i];
-    uint8_t b = result[i];
-    CUTEST_ASSERT("Elements are not equal!", a == b);
-  }
-
-  int32_t itemsize2 = itemsize;
-  B2ND_TEST_ASSERT(b2nd_copy_buffer2(ndim, itemsize2,
+  B2ND_TEST_ASSERT(b2nd_copy_buffer2(ndim, itemsize,
                                      chunk0x, chunk_shape, chunk0s_start, chunk0s_stop,
                                      dest, dest_shape, chunk0s_dest));
-  B2ND_TEST_ASSERT(b2nd_copy_buffer2(ndim, itemsize2,
+  B2ND_TEST_ASSERT(b2nd_copy_buffer2(ndim, itemsize,
                                      chunk1x, chunk_shape, chunk1s_start, chunk1s_stop,
                                      dest, dest_shape, chunk1s_dest));
 
