@@ -728,6 +728,18 @@ int read_chunk_header(const uint8_t* src, int32_t srcsize, bool extended_header,
       if (special_type == BLOSC2_SPECIAL_VALUE) {
         // In this case, the actual type size must be derived from the cbytes
         int32_t typesize = header->cbytes - BLOSC_EXTENDED_HEADER_LENGTH;
+        if (typesize <= 0) {
+          BLOSC_TRACE_ERROR("`typesize` is zero or negative");
+          return BLOSC2_ERROR_INVALID_HEADER;
+        }
+        if (typesize > BLOSC2_MAXTYPESIZE) {
+          BLOSC_TRACE_ERROR("`typesize` is greater than maximum allowed");
+          return BLOSC2_ERROR_INVALID_HEADER;
+        }
+        if (typesize > header->nbytes) {
+          BLOSC_TRACE_ERROR("`typesize` is greater than `nbytes`");
+          return BLOSC2_ERROR_INVALID_HEADER;
+        }
         if (header->nbytes % typesize != 0) {
           BLOSC_TRACE_ERROR("`nbytes` is not a multiple of typesize");
           return BLOSC2_ERROR_INVALID_HEADER;
