@@ -18,18 +18,23 @@ CUTEST_TEST_SETUP(full) {
   // Add parametrizations
   CUTEST_PARAMETRIZE(typesize, int32_t, CUTEST_DATA(
       //1, 2, 4, 8,
-      256, // 256, 257, 256 * 256,
-      // 256*256*256, 256*256*256*8  # these should work for small shapes as well, but are too slow
+      256, //257, 256 * 256,
+      // 256*256*256, 256*256*256*8,  // these should work for small shapes as well, but are too slow
   ));
   CUTEST_PARAMETRIZE(shapes, _test_shapes, CUTEST_DATA(
-      {1, {3}, {3}, {3}}, // 1-idim
-      // {0, {0}, {0}, {0}}, // 0-dim
-      //{1, {5}, {3}, {2}}, // 1-idim
-      // {2, {20, 0}, {7, 0}, {3, 0}}, // 0-shape
-      // {2, {20, 10}, {7, 5}, {3, 5}}, // 0-shape
-      // {2, {14, 10}, {8, 5}, {2, 2}}, // general,
-      // {3, {12, 10, 14}, {3, 5, 9}, {3, 4, 4}}, // general
-      // {3, {10, 21, 20, 5}, {8, 7, 15, 3}, {5, 5, 10, 1}}, // general,
+    // {0, {0}, {0}, {0}}, // 0-dim
+    // {1, {5}, {3}, {2}}, // 1-idim
+    // {2, {20, 0}, {7, 0}, {3, 0}}, // 0-shape
+    //{2, {20, 10}, {20, 10}, {10, 10}}, // funciona sempre
+    //{2, {20, 10}, {10, 5}, {10, 5}}, // falla
+    //{2, {4, 1}, {2, 1}, {2, 1}}, // falla
+    {2, {1, 3}, {1, 2}, {1, 2}}, // falla
+    //{1, {4}, {2}, {2}}, // funciona sempre
+    //{2, {20, 10}, {8, 6}, {7, 5}}, // falla
+    //{2, {20, 10}, {7, 5}, {3, 5}}, // falla
+    //{2, {14, 10}, {8, 5}, {2, 2}}, // general,
+    //{3, {12, 10, 14}, {3, 5, 9}, {3, 4, 4}}, // general
+    //{3, {10, 21, 20, 5}, {8, 7, 15, 3}, {5, 5, 10, 1}}, // general,
   ));
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
       {false, false},
@@ -47,14 +52,14 @@ CUTEST_TEST_SETUP(full) {
 CUTEST_TEST_TEST(full) {
   CUTEST_GET_PARAMETER(backend, _test_backend);
   CUTEST_GET_PARAMETER(shapes, _test_shapes);
-  CUTEST_GET_PARAMETER(typesize, uint32_t);
+  CUTEST_GET_PARAMETER(typesize, int32_t);
   CUTEST_GET_PARAMETER(fill_value, int8_t);
 
   char *urlpath = "test_full.b2frame";
   blosc2_remove_urlpath(urlpath);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.nthreads = 2;
+  cparams.nthreads = 1;
   cparams.typesize = typesize;
   blosc2_storage b2_storage = {.cparams=&cparams};
 
@@ -121,16 +126,16 @@ CUTEST_TEST_TEST(full) {
         break;
       default:
         // Fill a buffer with fill_value and compare with buffer_dest
-        for (int j = 0; j < typesize; ++j) {
+        for (uint32_t j = 0; j < typesize; ++j) {
           buffer_fill[j] = fill_value;
         }
         // Compare buffer_fill with buffer_dest
         is_true = memcmp(buffer_fill, buffer_dest, typesize) == 0;
         // print the 10 first bytes of buffer_fill and buffer_dest
-        printf("buffer_fill: ");
-        for (int j = 0; j < 10; ++j) {
-          printf("%d vs %d ", buffer_fill[j], buffer_dest[j]);
-        }
+        // printf("buffer_fill: ");
+        // for (int j = 0; j < 10; ++j) {
+        //   printf("%d vs %d ", buffer_fill[j], buffer_dest[j]);
+        // }
         free(buffer_fill);
         break;
     }

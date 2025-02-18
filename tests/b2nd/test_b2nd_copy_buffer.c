@@ -64,6 +64,20 @@ CUTEST_TEST_TEST(copy_buffer) {
     CUTEST_ASSERT("Elements are not equal!", a == b);
   }
 
+  int32_t itemsize2 = itemsize;
+  B2ND_TEST_ASSERT(b2nd_copy_buffer2(ndim, itemsize2,
+                                     chunk0x, chunk_shape, chunk0s_start, chunk0s_stop,
+                                     dest, dest_shape, chunk0s_dest));
+  B2ND_TEST_ASSERT(b2nd_copy_buffer2(ndim, itemsize2,
+                                     chunk1x, chunk_shape, chunk1s_start, chunk1s_stop,
+                                     dest, dest_shape, chunk1s_dest));
+
+  for (int i = 0; i < result_length; ++i) {
+    uint8_t a = dest[i];
+    uint8_t b = result[i];
+    CUTEST_ASSERT("Elements are not equal!", a == b);
+  }
+
   return 0;
 }
 

@@ -1,10 +1,17 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.16.0 to 2.16.1
+Changes from 2.16.0 to 2.17.0
 =============================
 
-#XXX version-specific blurb XXX#
+* New b2nd_copy_buffer2() function for copying buffers with typesizes
+  larger than 255.  The previous b2nd_copy_buffer() function is now
+  deprecated and will be removed in a future release.
+
+### Deprecated Functions
+
+- `int b2nd_copy_buffer(...)` is deprecated and will be removed in
+  a future release. Please use `b2nd_copy_buffer2(...)` instead.
 
 
 Changes from 2.15.2 to 2.16.0

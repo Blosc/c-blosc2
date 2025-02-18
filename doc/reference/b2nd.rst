@@ -109,3 +109,4 @@ Utilities
 These functions may be used for working with plain C buffers representing multidimensional arrays.
 
 .. doxygenfunction:: b2nd_copy_buffer
+.. doxygenfunction:: b2nd_copy_buffer2

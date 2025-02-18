@@ -775,7 +775,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
-  uint8_t *buffer_b = (uint8_t *) buffer;
+  uint8_t *buffer_b = buffer;
   const int64_t *buffer_start = start;
   const int64_t *buffer_stop = stop;
   const int64_t *buffer_shape = shape;
@@ -1069,13 +1069,13 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       }
 
       if (set_slice) {
-        b2nd_copy_buffer(ndim, array->sc->typesize,
-                         src, src_pad_shape, src_start, src_stop,
-                         dst, dst_pad_shape, dst_start);
+        b2nd_copy_buffer2(ndim, array->sc->typesize,
+                          src, src_pad_shape, src_start, src_stop,
+                          dst, dst_pad_shape, dst_start);
       } else {
-        b2nd_copy_buffer(ndim, array->sc->typesize,
-                         dst, dst_pad_shape, dst_start, dst_stop,
-                         src, src_pad_shape, src_start);
+        b2nd_copy_buffer2(ndim, array->sc->typesize,
+                          dst, dst_pad_shape, dst_start, dst_stop,
+                          src, src_pad_shape, src_start);
       }
     }
 
@@ -2103,13 +2103,15 @@ b2nd_create_ctx(const blosc2_storage *b2_storage, int8_t ndim, const int64_t *sh
   }
 
   if (dtype == NULL) {
-    ctx->dtype = strdup(B2ND_DEFAULT_DTYPE);
-    ctx->dtype_format = 0;  // The default is NumPy format
+    // ctx->dtype = strdup(B2ND_DEFAULT_DTYPE);
+    char buf[16] = {0};
+    snprintf(buf, sizeof(buf), "|S%d", cparams->typesize);
+    ctx->dtype = strdup(buf);
   }
   else {
     ctx->dtype = strdup(dtype);
-    ctx->dtype_format = dtype_format;
   }
+  ctx->dtype_format = dtype_format;
 
   params_b2_storage->cparams = cparams;
   ctx->b2_storage = params_b2_storage;
