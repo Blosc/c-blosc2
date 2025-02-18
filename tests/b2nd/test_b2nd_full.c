@@ -58,7 +58,7 @@ CUTEST_TEST_TEST(full) {
   blosc2_remove_urlpath(urlpath);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.nthreads = 1;
+  cparams.nthreads = 2;
   cparams.typesize = typesize;
   blosc2_storage b2_storage = {.cparams=&cparams};
 
@@ -125,7 +125,7 @@ CUTEST_TEST_TEST(full) {
         break;
       default:
         // Fill a buffer with fill_value and compare with buffer_dest
-        for (uint32_t j = 0; j < typesize; ++j) {
+        for (int32_t j = 0; j < typesize; ++j) {
           buffer_fill[j] = fill_value;
         }
         // Compare buffer_fill with buffer_dest
