@@ -29,6 +29,10 @@
 #endif
 #endif
 
+#if defined(__APPLE__)
+#undef _XOPEN_SOURCE /* Needed for qsort_r on macOS */
+#endif
+
 #include <stdio.h>  /* fprintf */
 #include <stdlib.h> /* malloc, free, qsort_r */
 
