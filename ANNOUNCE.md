@@ -1,15 +1,22 @@
-# Announcing C-Blosc2 2.16.0
+# Announcing C-Blosc2 2.17.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
 This introduces some new features and improvements:
 
-* Use _fseeki64/_ftelli64/_stat64 on Windows for large file (>2 GB) support.
-  Thanks to Abhi Jaiantilal (@ajaiantilal) for the report and help.
-* Add 12-byte unshuffle for avx2. Thanks to Tom Birch (@froody).
-* Add 12-byte sse2 unshuffle implementation. Thanks to Tom Birch (@froody).
-* Better description of the Blosc2 format as a whole.
+* New b2nd_copy_buffer2() function for copying buffers with typesizes
+  larger than 255.  The previous b2nd_copy_buffer() function is now
+  deprecated and will be removed in a future release.
+
+* Support repeated values larger than 8-bit, also for n-dim arrays.
+  This is useful for compressing arrays with large runs of repeated
+  values, like in the case of images with large areas of the same color.
+
+* Fix a leak in the pthreads emulation for Windows.  Fixes #647.
+  Thanks to @jocbeh for the report and fix (#655).
+
+* Update zstd to 1.5.7.  Thanks to Tom Birch.
 
 For more info, please see the release notes in:
 

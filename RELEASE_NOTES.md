@@ -8,6 +8,17 @@ Changes from 2.16.0 to 2.17.0
   larger than 255.  The previous b2nd_copy_buffer() function is now
   deprecated and will be removed in a future release.
 
+* Support repeated values larger than 8-bit, also for n-dim arrays.
+  This is useful for compressing arrays with large runs of repeated
+  values, like in the case of images with large areas of the same color.
+
+* Fix a leak in the pthreads emulation for Windows.  Fixes #647.
+  Thanks to @jocbeh for the report and fix (#655).
+
+* Update zstd to 1.5.7.  Thanks to Tom Birch.
+
+* Add BLOSC2_MAXTYPESIZE constant.
+
 ### Deprecated Functions
 
 - `int b2nd_copy_buffer(...)` is deprecated and will be removed in
