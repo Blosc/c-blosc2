@@ -102,7 +102,12 @@ int blosc2_remove_dir(const char* dir_path) {
   char* fname;
   while ((de = readdir(dr)) != NULL) {
     fname = malloc(strlen(path) + strlen(de->d_name) + 1);
-    sprintf(fname, "%s%s", path, de->d_name);
+    if (path != NULL) {
+      sprintf(fname, "%s%s", path, de->d_name);
+    }
+    else {
+      sprintf(fname, "%s", de->d_name);
+    }
     if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")) {
       free(fname);
       continue;
