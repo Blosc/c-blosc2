@@ -280,7 +280,7 @@ static inline void* load_lib(char *plugin_name, char *libpath) {
         return loaded_lib;
     } else {
 #if defined(_WIN32)
-        BLOSC_TRACE_INFO("Failed to load %s directly, error: %s\n", libpath, GetLastError());
+        BLOSC_TRACE_INFO("Failed to load %s directly, error: %lu\n", libpath, GetLastError());
 #else
         BLOSC_TRACE_INFO("Failed to load %s directly, error: %s\n", libpath, dlerror());
 #endif
