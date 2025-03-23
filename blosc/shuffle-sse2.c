@@ -385,7 +385,7 @@ unshuffle12_sse2(uint8_t* const dest, const uint8_t* const src,
       xmm1[j] = _mm_loadu_si128((__m128i*)(src_for_ith_element + (j * total_elements)));
     }
     /* Initialize the last 4 registers (64 bytes) to null */
-    for (j = bytesoftype; j < 16 - bytesoftype; j++) {
+    for (j = bytesoftype; j < 16; j++) {
       xmm1[j] = _mm_setzero_si128();
     }
     /* Shuffle bytes */

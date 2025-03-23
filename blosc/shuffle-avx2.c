@@ -546,7 +546,7 @@ unshuffle12_avx2(uint8_t* const dest, const uint8_t* const src,
       ymm0[j] = _mm256_loadu_si256((__m256i*)(src_for_ith_element + (j * total_elements)));
     }
     /* Initialize the last 4 registers (128 bytes) to null */
-    for (j = bytesoftype; j < 16 - bytesoftype; j++) {
+    for (j = bytesoftype; j < 16; j++) {
       ymm0[j] = _mm256_setzero_si256();
     }
 
