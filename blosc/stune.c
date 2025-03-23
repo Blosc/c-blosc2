@@ -56,6 +56,7 @@ int blosc_stune_next_blocksize(blosc2_context *context) {
     return BLOSC2_ERROR_SUCCESS;
   }
 
+  int splitmode = split_block(context, typesize, blocksize);
   if (user_blocksize) {
     blocksize = user_blocksize;
     goto last;
@@ -108,7 +109,6 @@ int blosc_stune_next_blocksize(blosc2_context *context) {
   }
 
   /* Now the blocksize for splittable codecs */
-  int splitmode = split_block(context, typesize, blocksize);
   if (clevel > 0 && splitmode) {
     // For performance reasons, do not exceed 256 KB (it must fit in L2 cache)
     switch (clevel) {
