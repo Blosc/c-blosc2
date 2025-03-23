@@ -379,10 +379,14 @@ unshuffle12_sse2(uint8_t* const dest, const uint8_t* const src,
   __m128i mask = _mm_set_epi8( 0x0, 0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
 
   for (i = 0; i < vectorizable_elements; i += sizeof(__m128i)) {
-    /* Load 16 elements (256 bytes) into 16 XMM registers. */
+    /* Load 12 elements (192 bytes) into 12 XMM registers. */
     const uint8_t* const src_for_ith_element = src + i;
     for (j = 0; j < bytesoftype; j++) {
       xmm1[j] = _mm_loadu_si128((__m128i*)(src_for_ith_element + (j * total_elements)));
+    }
+    /* Initialize the last 4 registers (64 bytes) to null */
+    for (j = bytesoftype; j < 16 - bytesoftype; j++) {
+      xmm1[j] = _mm_setzero_si128();
     }
     /* Shuffle bytes */
     for (j = 0; j < 8; j++) {

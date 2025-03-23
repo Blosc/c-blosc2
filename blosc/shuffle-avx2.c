@@ -540,10 +540,14 @@ unshuffle12_avx2(uint8_t* const dest, const uint8_t* const src,
   __m256i store_mask = _mm256_set_epi32(0x0, 0x0, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF);
   int32_t jump = 2*bytesoftype;
   for (i = 0; i < vectorizable_elements; i += sizeof(__m256i)) {
-    /* Fetch 32 elements (512 bytes) into 16 YMM registers. */
+    /* Fetch 24 elements (384 bytes) into 12 YMM registers. */
     const uint8_t* const src_for_ith_element = src + i;
     for (j = 0; j < bytesoftype; j++) {
       ymm0[j] = _mm256_loadu_si256((__m256i*)(src_for_ith_element + (j * total_elements)));
+    }
+    /* Initialize the last 4 registers (128 bytes) to null */
+    for (j = bytesoftype; j < 16 - bytesoftype; j++) {
+      ymm0[j] = _mm256_setzero_si256();
     }
 
     /* Shuffle bytes */
