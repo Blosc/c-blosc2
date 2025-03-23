@@ -6,3 +6,4 @@ cmake-build-*
 /blosc/config.h
 /doc/doxygen/xml/
 /doc/xml
+.vs/
