@@ -91,7 +91,7 @@ static inline int32_t sw32_(const void* pa) {
 
   bool little_endian = is_little_endian();
   if (little_endian) {
-    idest = *(int32_t *)pa;
+    memcpy(&idest, pa, sizeof(idest));
   }
   else {
 #if defined (__GNUC__)
@@ -116,7 +116,7 @@ static inline void _sw32(void* dest, int32_t a) {
 
   bool little_endian = is_little_endian();
   if (little_endian) {
-    *(int32_t *)dest_ = a;
+    memcpy(dest_, &a, sizeof(a));;
   }
   else {
 #if defined (__GNUC__)
