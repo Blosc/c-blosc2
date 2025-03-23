@@ -3186,8 +3186,8 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       return NULL;
     }
   }
-  int32_t cbytes_old;
-  int64_t old_offset;
+  int32_t cbytes_old = 0;
+  int64_t old_offset = 0;
   if (!frame->sframe) {
     // See how big would be the space
     old_offset = offsets[nchunk];
