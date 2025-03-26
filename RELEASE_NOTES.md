@@ -4,7 +4,15 @@ Release notes for C-Blosc2
 Changes from 2.17.0 to 2.17.1
 =============================
 
-#XXX version-specific blurb XXX#
+Several fixes affecting uninitialized memory access and others:
+
+* Fix uninitialized memory access in newly added unshuffle12_sse2 and unshuffle12_avx2 functions
+* Fix unaligned access in _sw32 and sw32_
+* Fix DWORD being printed as %s in sprintf call
+* Fix warning on unused variable (since this variable was only being used in the linux branch)
+* `splitmode` variable was uninitialized if goto was triggered
+
+See PR #658.  Many thanks to @EmilDohne for this nice job.
 
 
 Changes from 2.16.0 to 2.17.0

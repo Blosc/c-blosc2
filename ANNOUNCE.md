@@ -1,24 +1,19 @@
-# Announcing C-Blosc2 2.17.0
+# Announcing C-Blosc2 2.17.1
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This introduces some new features and improvements:
+Several fixes affecting uninitialized memory access and others:
 
-* New b2nd_copy_buffer2() function for copying buffers with typesizes
-  larger than 255.  The previous b2nd_copy_buffer() function is now
-  deprecated and will be removed in a future release.
+* Fix uninitialized memory access in newly added unshuffle12_sse2 and unshuffle12_avx2 functions
+* Fix unaligned access in _sw32 and sw32_
+* Fix DWORD being printed as %s in sprintf call
+* Fix warning on unused variable (since this variable was only being used in the linux branch)
+* `splitmode` variable was uninitialized if goto was triggered
 
-* Support repeated values larger than 8-bit, also for n-dim arrays.
-  This is useful for compressing arrays with large runs of repeated
-  values, like in the case of images with large areas of the same color.
+See PR #658.  Many thanks to @EmilDohne for this nice job.
 
-* Fix a leak in the pthreads emulation for Windows.  Fixes #647.
-  Thanks to @jocbeh for the report and fix (#655).
-
-* Update zstd to 1.5.7.  Thanks to Tom Birch.
-
-For more info, please see the release notes in:
+For more info, see the release notes in:
 
 https://github.com/Blosc/c-blosc2/blob/main/RELEASE_NOTES.md
 
