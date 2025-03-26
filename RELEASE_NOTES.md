@@ -4,6 +4,11 @@ Release notes for C-Blosc2
 Changes from 2.17.0 to 2.17.1
 =============================
 
+#XXX version-specific blurb XXX#
+
+Changes from 2.17.0 to 2.17.1
+=============================
+
 Several fixes affecting uninitialized memory access and others:
 
 * Fix uninitialized memory access in newly added unshuffle12_sse2 and unshuffle12_avx2 functions
