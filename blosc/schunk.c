@@ -484,6 +484,8 @@ int64_t blosc2_schunk_append_file(blosc2_schunk* schunk, const char* urlpath) {
 
 /* Free all memory from a super-chunk. */
 int blosc2_schunk_free(blosc2_schunk *schunk) {
+  int err = 0;
+
   if (schunk->data != NULL) {
     for (int i = 0; i < schunk->nchunks; i++) {
       free(schunk->data[i]);
@@ -516,6 +518,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
       int rc = io_cb->destroy(schunk->storage->io->params);
       if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not free the I/O resources.");
+        err = 1;
       }
     }
 
@@ -546,7 +549,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
 
   free(schunk);
 
-  return 0;
+  return err;
 }
 
 
