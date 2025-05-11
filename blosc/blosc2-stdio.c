@@ -466,17 +466,19 @@ int blosc2_stdio_mmap_destroy(void* params) {
   int err = 0;
 
 #if defined(_WIN32)
-  /* Ensure modified pages are written to disk */
-  if (!FlushViewOfFile(mmap_file->addr, mmap_file->file_size)) {
-    _print_last_error();
-    BLOSC_TRACE_ERROR("Cannot flush the memory-mapped view to disk.");
-    err = -1;
-  }
-  HANDLE file_handle = (HANDLE) _get_osfhandle(mmap_file->fd);
-  if (!FlushFileBuffers(file_handle)) {
-    _print_last_error();
-    BLOSC_TRACE_ERROR("Cannot flush the memory-mapped file to disk.");
-    err = -1;
+  if (mmap_file->access_flags == PAGE_READWRITE) {
+    /* Ensure modified pages are written to disk */
+    if (!FlushViewOfFile(mmap_file->addr, mmap_file->file_size)) {
+      _print_last_error();
+      BLOSC_TRACE_ERROR("Cannot flush the memory-mapped view to disk.");
+      err = -1;
+    }
+    HANDLE file_handle = (HANDLE) _get_osfhandle(mmap_file->fd);
+    if (!FlushFileBuffers(file_handle)) {
+      _print_last_error();
+      BLOSC_TRACE_ERROR("Cannot flush the memory-mapped file to disk.");
+      err = -1;
+    }
   }
 
   if (!UnmapViewOfFile(mmap_file->addr)) {
@@ -496,13 +498,15 @@ int blosc2_stdio_mmap_destroy(void* params) {
     err = -1;
   }
 #else
-  /* Ensure modified pages are written to disk */
-  /* This is important since not every munmap implementation flushes modified pages to disk
-  (e.g.: https://nfs.sourceforge.net/#faq_d8) */
-  int rc = msync(mmap_file->addr, mmap_file->file_size, MS_SYNC);
-  if (rc < 0) {
-    BLOSC_TRACE_ERROR("Cannot sync the memory-mapped file to disk (error: %s).", strerror(errno));
-    err = -1;
+  if ((mmap_file->access_flags & PROT_WRITE) && !mmap_file->is_memory_only) {
+    /* Ensure modified pages are written to disk */
+    /* This is important since not every munmap implementation flushes modified pages to disk
+    (e.g.: https://nfs.sourceforge.net/#faq_d8) */
+    int rc = msync(mmap_file->addr, mmap_file->file_size, MS_SYNC);
+    if (rc < 0) {
+      BLOSC_TRACE_ERROR("Cannot sync the memory-mapped file to disk (error: %s).", strerror(errno));
+      err = -1;
+    }
   }
 
   if (munmap(mmap_file->addr, mmap_file->mapping_size) < 0) {

@@ -99,32 +99,37 @@ CUTEST_TEST_TEST(mmap) {
   cbytes = blosc2_schunk_append_buffer(schunk_write_mmap, data_buffer2, sizeof(data_buffer2));
   CUTEST_ASSERT("Could not write second chunk", cbytes > 0);
 
-  blosc2_schunk_free(schunk_write_default);
-  blosc2_schunk_free(schunk_write_mmap);
+  CUTEST_ASSERT("Could not free the schunk ressources", blosc2_schunk_free(schunk_write_default) == 0);
+  CUTEST_ASSERT("Could not free the schunk ressources", blosc2_schunk_free(schunk_write_mmap) == 0);
 
   /* The compressed file content should not depend on the I/O which created it */
   CUTEST_ASSERT("Files are not identical", are_files_identical(urlpath_default, urlpath_mmap));
 
   /* Read the schunk data back again (using mmap) */
-  mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
-  mmap_file.mode = "r";
-  mmap_file.initial_mapping_size = initial_mapping_size;
-  io.params = &mmap_file;
-  blosc2_schunk* schunk_read = blosc2_schunk_open_udio(urlpath_mmap, &io);
-  CUTEST_ASSERT("Mismatch in number of chunks", schunk_read->nchunks == 2);
+  int n_repeated_reads = 2;  // Make sure reading the same file again does not lead to any problems
+  int dsize;
+  float* chunk_data;
+  for (int i = 0; i < n_repeated_reads; i++) {
+    mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
+    mmap_file.mode = "r";
+    mmap_file.initial_mapping_size = initial_mapping_size;
+    io.params = &mmap_file;
+    blosc2_schunk* schunk_read = blosc2_schunk_open_udio(urlpath_mmap, &io);
+    CUTEST_ASSERT("Mismatch in number of chunks", schunk_read->nchunks == 2);
 
-  float* chunk_data = (float*)malloc(schunk_read->chunksize);
-  int dsize = blosc2_schunk_decompress_chunk(schunk_read, 0, chunk_data, schunk_read->chunksize);
-  CUTEST_ASSERT("Size of decompressed chunk 1 does not match", dsize == sizeof(data_buffer));
-  CUTEST_ASSERT("Value 1 of chunk 1 is wrong", fabs(chunk_data[0] - 0.1) < 1e-6);
-  CUTEST_ASSERT("Value 2 of chunk 1 is wrong", fabs(chunk_data[1] - 0.2) < 1e-6);
+    chunk_data = (float*)malloc(schunk_read->chunksize);
+    dsize = blosc2_schunk_decompress_chunk(schunk_read, 0, chunk_data, schunk_read->chunksize);
+    CUTEST_ASSERT("Size of decompressed chunk 1 does not match", dsize == sizeof(data_buffer));
+    CUTEST_ASSERT("Value 1 of chunk 1 is wrong", fabs(chunk_data[0] - 0.1) < 1e-6);
+    CUTEST_ASSERT("Value 2 of chunk 1 is wrong", fabs(chunk_data[1] - 0.2) < 1e-6);
 
-  dsize = blosc2_schunk_decompress_chunk(schunk_read, 1, chunk_data, schunk_read->chunksize);
-  CUTEST_ASSERT("Size of decompressed chunk 1 does not match", dsize == sizeof(data_buffer2));
-  CUTEST_ASSERT("Value 1 of chunk 2 is wrong", fabs(chunk_data[0] - 0.3) < 1e-6);
-  CUTEST_ASSERT("Value 2 of chunk 2 is wrong", fabs(chunk_data[1] - 0.4) < 1e-6);
+    dsize = blosc2_schunk_decompress_chunk(schunk_read, 1, chunk_data, schunk_read->chunksize);
+    CUTEST_ASSERT("Size of decompressed chunk 1 does not match", dsize == sizeof(data_buffer2));
+    CUTEST_ASSERT("Value 1 of chunk 2 is wrong", fabs(chunk_data[0] - 0.3) < 1e-6);
+    CUTEST_ASSERT("Value 2 of chunk 2 is wrong", fabs(chunk_data[1] - 0.4) < 1e-6);
 
-  blosc2_schunk_free(schunk_read);
+    CUTEST_ASSERT("Could not free the schunk ressources", blosc2_schunk_free(schunk_read) == 0);
+  }
 
 #if defined(__linux__)
   /* Append some data to the existing schunk in memory (does not work on Windows) */
@@ -148,7 +153,7 @@ CUTEST_TEST_TEST(mmap) {
   CUTEST_ASSERT("Value 1 of chunk 2 is wrong", fabs(chunk_data[0] - 0.5) < 1e-6);
   CUTEST_ASSERT("Value 2 of chunk 2 is wrong", fabs(chunk_data[1] - 0.6) < 1e-6);
 
-  blosc2_schunk_free(schunk_memory);
+  CUTEST_ASSERT("Could not free the schunk ressources", blosc2_schunk_free(schunk_memory) == 0);
   CUTEST_ASSERT("Files are not identical", are_files_identical(urlpath_default, urlpath_mmap));
 #endif
 
@@ -173,7 +178,7 @@ CUTEST_TEST_TEST(mmap) {
   CUTEST_ASSERT("Value 1 of chunk 2 is wrong", fabs(chunk_data[0] - 0.5) < 1e-6);
   CUTEST_ASSERT("Value 2 of chunk 2 is wrong", fabs(chunk_data[1] - 0.6) < 1e-6);
 
-  blosc2_schunk_free(schunk_append);
+  CUTEST_ASSERT("Could not free the schunk ressources", blosc2_schunk_free(schunk_append) == 0);
   CUTEST_ASSERT("Files are identical", !are_files_identical(urlpath_default, urlpath_mmap));
 
   free(chunk_data);
