@@ -99,8 +99,8 @@ CUTEST_TEST_TEST(mmap) {
   cbytes = blosc2_schunk_append_buffer(schunk_write_mmap, data_buffer2, sizeof(data_buffer2));
   CUTEST_ASSERT("Could not write second chunk", cbytes > 0);
 
-  CUTEST_ASSERT("Could not free the schunk ressources", blosc2_schunk_free(schunk_write_default) == 0);
-  CUTEST_ASSERT("Could not free the schunk ressources", blosc2_schunk_free(schunk_write_mmap) == 0);
+  CUTEST_ASSERT("Could not free the schunk resources", blosc2_schunk_free(schunk_write_default) == 0);
+  CUTEST_ASSERT("Could not free the schunk resources", blosc2_schunk_free(schunk_write_mmap) == 0);
 
   /* The compressed file content should not depend on the I/O which created it */
   CUTEST_ASSERT("Files are not identical", are_files_identical(urlpath_default, urlpath_mmap));
@@ -128,7 +128,7 @@ CUTEST_TEST_TEST(mmap) {
     CUTEST_ASSERT("Value 1 of chunk 2 is wrong", fabs(chunk_data[0] - 0.3) < 1e-6);
     CUTEST_ASSERT("Value 2 of chunk 2 is wrong", fabs(chunk_data[1] - 0.4) < 1e-6);
 
-    CUTEST_ASSERT("Could not free the schunk ressources", blosc2_schunk_free(schunk_read) == 0);
+    CUTEST_ASSERT("Could not free the schunk resources", blosc2_schunk_free(schunk_read) == 0);
   }
 
 #if defined(__linux__)
@@ -153,7 +153,7 @@ CUTEST_TEST_TEST(mmap) {
   CUTEST_ASSERT("Value 1 of chunk 2 is wrong", fabs(chunk_data[0] - 0.5) < 1e-6);
   CUTEST_ASSERT("Value 2 of chunk 2 is wrong", fabs(chunk_data[1] - 0.6) < 1e-6);
 
-  CUTEST_ASSERT("Could not free the schunk ressources", blosc2_schunk_free(schunk_memory) == 0);
+  CUTEST_ASSERT("Could not free the schunk resources", blosc2_schunk_free(schunk_memory) == 0);
   CUTEST_ASSERT("Files are not identical", are_files_identical(urlpath_default, urlpath_mmap));
 #endif
 
@@ -178,7 +178,7 @@ CUTEST_TEST_TEST(mmap) {
   CUTEST_ASSERT("Value 1 of chunk 2 is wrong", fabs(chunk_data[0] - 0.5) < 1e-6);
   CUTEST_ASSERT("Value 2 of chunk 2 is wrong", fabs(chunk_data[1] - 0.6) < 1e-6);
 
-  CUTEST_ASSERT("Could not free the schunk ressources", blosc2_schunk_free(schunk_append) == 0);
+  CUTEST_ASSERT("Could not free the schunk resources", blosc2_schunk_free(schunk_append) == 0);
   CUTEST_ASSERT("Files are identical", !are_files_identical(urlpath_default, urlpath_mmap));
 
   free(chunk_data);
