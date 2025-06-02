@@ -1330,6 +1330,101 @@ int b2nd_copy(b2nd_context_t *ctx, const b2nd_array_t *src, b2nd_array_t **array
 }
 
 
+int b2nd_concatenate(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t *src1,
+                     const b2nd_array_t *src2, int axis) {
+  BLOSC_ERROR_NULL(src1, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(src2, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+
+  ctx->ndim = src1->ndim;
+  // Compute the new shape while checking that the shapes are compatible with the other axes
+  for (int i = 0; i < src1->ndim; ++i) {
+    if (i == axis) {
+      ctx->shape[i] = src1->shape[i] + src2->shape[i];
+    } else {
+      if (src1->shape[i] != src2->shape[i]) {
+        BLOSC_TRACE_ERROR("The shapes of the arrays are not compatible in axis %d", i);
+        BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+      }
+      ctx->shape[i] = src1->shape[i];
+    }
+  }
+
+  // Use the same chunkshape and blockshape as src1
+  for (int i = 0; i < src1->ndim; ++i) {
+    ctx->chunkshape[i] = src1->chunkshape[i];
+    ctx->blockshape[i] = src1->blockshape[i];
+  }
+
+  // Create a container for the new array
+  BLOSC_ERROR(b2nd_empty(ctx, array));
+
+  // Copy the data from the first array
+  int64_t start[B2ND_MAX_DIM] = {0};
+  int64_t stop[B2ND_MAX_DIM];
+  for (int i = 0; i < src1->ndim; ++i) {
+    stop[i] = src1->shape[i];
+  }
+  // Copy src1 data chunk by chunk
+  void *buffer = malloc(src1->sc->typesize * src1->extchunknitems);
+  BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_MEMORY_ALLOC);
+  for (int64_t nchunk = 0; nchunk < src1->sc->nchunks; ++nchunk) {
+    BLOSC_ERROR(blosc2_schunk_decompress_chunk(src1->sc, nchunk, buffer,
+                                               src1->sc->typesize * src1->extchunknitems));
+    BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, src1->chunkshape, src1->sc->typesize * src1->extchunknitems,
+                                       start, stop, *array));
+  }
+  free(buffer);
+
+  // Copy the data from the second array
+  for (int i = 0; i < src2->ndim; ++i) {
+    if (i == axis) {
+      start[i] = src1->shape[i];
+      stop[i] = start[i] + src2->shape[i];
+    } else {
+      start[i] = 0;
+      stop[i] = src2->shape[i];
+    }
+  }
+  // Copy src2 data chunk by chunk
+  buffer = malloc(src2->sc->typesize * src2->extchunknitems);
+  BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_MEMORY_ALLOC);
+  for (int64_t nchunk = 0; nchunk < src2->sc->nchunks; ++nchunk) {
+    BLOSC_ERROR(blosc2_schunk_decompress_chunk(src2->sc, nchunk, buffer,
+                                               src2->sc->typesize * src2->extchunknitems));
+    BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, src2->chunkshape, src2->sc->typesize * src2->extchunknitems,
+                                       start, stop, *array));
+  }
+  free(buffer);
+
+  // Copy the metalayers from src1
+  blosc2_storage *b2_storage = ctx->b2_storage;
+  blosc2_schunk *schunk = src1->sc;
+  blosc2_schunk *new_schunk = (*array)->sc;
+  for (int nmeta = 0; nmeta < schunk->nmetalayers; ++nmeta) {
+    blosc2_metalayer *meta = schunk->metalayers[nmeta];
+    if (blosc2_meta_add(new_schunk, meta->name, meta->content, meta->content_len) < 0) {
+      BLOSC_TRACE_ERROR("Can not add %s `metalayer`.", meta->name);
+      return BLOSC2_ERROR_FAILURE;
+    }
+  }
+
+  // Copy the vlmetalayers from src1
+  for (int nvlmeta = 0; nvlmeta < schunk->nvlmetalayers; ++nvlmeta) {
+    uint8_t *content;
+    int32_t content_len;
+    if (blosc2_vlmeta_get(schunk, schunk->vlmetalayers[nvlmeta]->name, &content,
+                          &content_len) < 0) {
+      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+    }
+    BLOSC_ERROR(blosc2_vlmeta_add(new_schunk, schunk->vlmetalayers[nvlmeta]->name, content,
+                                  content_len, b2_storage->cparams));
+    free(content);
+  }
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
 int b2nd_save(const b2nd_array_t *array, char *urlpath) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(urlpath, BLOSC2_ERROR_NULL_POINTER);
