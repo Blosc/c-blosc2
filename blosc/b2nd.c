@@ -1376,7 +1376,11 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1,
     for (int8_t i = 0; i < src2->ndim; ++i) {
       chunkshape[i] = src2->chunkshape[i];
     }
-    blosc2_unidim_to_multidim(src2->ndim, chunkshape, nchunk, nchunk_ndim);
+    int64_t chunks_in_dim[B2ND_MAX_DIM] = {0};
+    for (int8_t i = 0; i < src2->ndim; ++i) {
+      chunks_in_dim[i] = (src2->extshape[i] + src2->chunkshape[i] - 1) / src2->chunkshape[i];
+    }
+    blosc2_unidim_to_multidim(src2->ndim, chunks_in_dim, nchunk, nchunk_ndim);
 
     // Set positions for each dimension
     for (int8_t i = 0; i < src2->ndim; ++i) {
