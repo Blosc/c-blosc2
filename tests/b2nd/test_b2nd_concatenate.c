@@ -21,6 +21,57 @@ typedef struct {
 } test_shapes_t;
 
 
+/**
+ * Helper function for recursive region filling
+ */
+static int fill_recursive_region(uint8_t *buffer,
+                                int64_t *strides,
+                                int8_t ndim,
+                                int64_t *start,
+                                int64_t *stop,
+                                const void *value,
+                                uint8_t typesize,
+                                int dim,
+                                int64_t current_offset) {
+  if (dim == ndim) {
+    // We've reached the innermost dimension, copy the value
+    memcpy(buffer + (current_offset * typesize), value, typesize);
+    return 0;
+  }
+
+  // Iterate through the current dimension within the region
+  for (int64_t i = start[dim]; i < stop[dim]; i++) {
+    int64_t offset = current_offset + i * strides[dim];
+    int err = fill_recursive_region(buffer, strides, ndim, start, stop,
+                                   value, typesize, dim + 1, offset);
+    if (err < 0) return err;
+  }
+  return 0;
+}
+
+/**
+ * Fill a region of a multidimensional buffer with a constant value.
+ */
+int fill_buffer_region(uint8_t *buffer,
+                       int64_t *buffer_shape,
+                       int8_t ndim,
+                       int64_t *start,
+                       int64_t *stop,
+                       const void *value,
+                       uint8_t typesize) {
+  // Calculate strides for the buffer
+  int64_t strides[B2ND_MAX_DIM];
+  strides[ndim - 1] = 1;
+  for (int i = ndim - 2; i >= 0; i--) {
+    strides[i] = strides[i + 1] * buffer_shape[i + 1];
+  }
+
+  // Start the recursive filling
+  return fill_recursive_region(buffer, strides, ndim, start, stop,
+                              value, typesize, 0, 0);
+}
+
+
 CUTEST_TEST_SETUP(concatenate) {
   blosc2_init();
 
@@ -88,12 +139,16 @@ CUTEST_TEST_TEST(concatenate) {
   size_t buffersize = typesize;
   for (int i = 0; i < shapes.ndim; ++i) {
     if (i == axis) {
+      helpershape[i] = shapes.shape1[i] + shapes.shape2[i];
       buffersize *= (size_t) (shapes.shape1[i] + shapes.shape2[i]);
     }
     else {
+      helpershape[i] = shapes.shape1[i];
       buffersize *= (size_t) shapes.shape1[i];
     }
   }
+  // Allocate a buffer for the concatenated array
+  uint8_t *helperbuffer = malloc(buffersize);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.nthreads = 2;
@@ -111,6 +166,9 @@ CUTEST_TEST_TEST(concatenate) {
   /* Create src1 with zeros */
   b2nd_array_t *src1;
   BLOSC_ERROR(b2nd_zeros(ctx1, &src1));
+
+  // Fill helperbuffer with zeros
+  memset(helperbuffer, 0, buffersize);
 
   /* Create src2 with a value */
   b2nd_array_t *src2;
@@ -157,6 +215,25 @@ CUTEST_TEST_TEST(concatenate) {
                                         NULL, 0, NULL, 0);
   B2ND_TEST_ASSERT(b2nd_concatenate(ctx, src1, src2, &array, axis));
 
+  // Fill the proper section of the helperbuffer with the value from src2
+  int64_t start_src2[B2ND_MAX_DIM] = {0};
+  int64_t stop_src2[B2ND_MAX_DIM];
+
+  // Set up the region to fill (corresponding to src2's position)
+  for (int i = 0; i < shapes.ndim; i++) {
+     if (i == axis) {
+         start_src2[i] = shapes.shape1[i];  // src2 starts after src1
+         stop_src2[i] = shapes.shape1[i] + shapes.shape2[i];
+     } else {
+         start_src2[i] = 0;
+         stop_src2[i] = shapes.shape2[i];
+     }
+  }
+
+ // Fill the region with the value
+ fill_buffer_region(helperbuffer, helpershape, shapes.ndim,
+                   start_src2, stop_src2, value, typesize);
+
   // Check the shape of the concatenated array
   for (int i = 0; i < ctx->ndim; ++i) {
     if (i == axis) {
@@ -175,6 +252,10 @@ CUTEST_TEST_TEST(concatenate) {
   }
 
   // Check the data in the concatenated array
+  printf("Array shapes: %ld x %ld\n", array->shape[0], array->shape[1]);
+  printf("Helperbuffer shapes: %ld x %ld\n", helpershape[0], helpershape[1]);
+  printf("Axis: %d\n", axis);
+
   int64_t start[B2ND_MAX_DIM] = {0};
   int64_t stop[B2ND_MAX_DIM] = {0};
   int64_t buffershape[B2ND_MAX_DIM] = {0};
@@ -186,33 +267,49 @@ CUTEST_TEST_TEST(concatenate) {
   }
   uint8_t *buffer = malloc(buffersize);
   B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(array, start, stop, buffer, buffershape, buffersize));
+  // Check if the data in the concatenated array matches the helperbuffer
+  uint8_t *buffer_fill = malloc(typesize);
   for (int64_t i = 0; i < buffersize / typesize; ++i) {
+    bool is_true = false;
     switch (typesize) {
-    case 8:
-      B2ND_TEST_ASSERT(((int64_t *) buffer)[i] == (i + 1));
-      break;
-    case 4:
-      B2ND_TEST_ASSERT(((int32_t *) buffer)[i] == (i + 1));
-      break;
-    case 2:
-      B2ND_TEST_ASSERT(((int16_t *) buffer)[i] == (i + 1));
-      break;
-    case 1:
-      printf("Checking value at index %lld: %d\n", i, ((int8_t *) buffer)[i]);
-        CUTEST_ASSERT("Value is not equal!", ((int8_t *) buffer)[i] == 0);
-      break;
-    default:
-      // Check the value in the buffer
-      for (int j = 0; j < typesize; ++j) {
-        B2ND_TEST_ASSERT(buffer[i * typesize + j] == value[j]);
-      }
-      break;
+      case 8:
+        is_true = ((int64_t *) buffer)[i] == ((int64_t *) helperbuffer)[i];
+        break;
+      case 4:
+        is_true = ((int32_t *) buffer)[i] == ((int32_t *) helperbuffer)[i];
+        break;
+      case 2:
+        is_true = ((int16_t *) buffer)[i] == ((int16_t *) helperbuffer)[i];
+        break;
+      case 1:
+        is_true = ((int8_t *) buffer)[i] == ((int8_t *) helperbuffer)[i];
+        break;
+      default:
+        // For default case, don't copy helperbuffer over buffer data
+        memcpy(buffer_fill, &buffer[i * typesize], typesize);
+        is_true = memcmp(buffer_fill, helperbuffer + i * typesize, typesize) == 0;
+        break;
     }
+    if (!is_true) {
+      // Print the raw byte values for better debugging
+      fprintf(stderr, "Data mismatch at index %ld: buffer bytes = ", i);
+      for (int b = 0; b < typesize + 10; b++) {
+        fprintf(stderr, "%02x ", buffer[i * typesize + b]);
+      }
+      fprintf(stderr, ", helperbuffer bytes = ");
+      for (int b = 0; b < typesize + 10; b++) {
+        fprintf(stderr, "%02x ", helperbuffer[i * typesize + b]);
+      }
+      fprintf(stderr, "\n");
+    }
+    CUTEST_ASSERT("Data in the concatenated array does not match the helperbuffer",
+                  is_true);
   }
+  free(buffer_fill);
 
   /* Free mallocs */
-  // free(buffer);
-  // free(destbuffer);
+  free(buffer);
+  free(helperbuffer);
   free(value);
   B2ND_TEST_ASSERT(b2nd_free(src1));
   B2ND_TEST_ASSERT(b2nd_free(src2));
