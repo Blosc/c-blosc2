@@ -1372,7 +1372,11 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1,
                                                src2->sc->typesize * src2->extchunknitems));
     // Get multidimensional chunk position
     int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
-    blosc2_unidim_to_multidim(src2->ndim, (int64_t*)(src2->chunkshape), nchunk, nchunk_ndim);
+    int64_t chunkshape[B2ND_MAX_DIM] = {0};
+    for (int8_t i = 0; i < src2->ndim; ++i) {
+      chunkshape[i] = src2->chunkshape[i];
+    }
+    blosc2_unidim_to_multidim(src2->ndim, chunkshape, nchunk, nchunk_ndim);
 
     // Set positions for each dimension
     for (int8_t i = 0; i < src2->ndim; ++i) {
@@ -1390,7 +1394,7 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1,
     }
 
     // Copy the chunk to the correct position
-    BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, (int64_t*)(src2->chunkshape),
+    BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, chunkshape,
                                        src2->sc->typesize * src2->extchunknitems,
                                        start, stop, *array));
   }
