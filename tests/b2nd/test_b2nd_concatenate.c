@@ -140,12 +140,11 @@ CUTEST_TEST_TEST(concatenate) {
   for (int i = 0; i < shapes.ndim; ++i) {
     if (i == axis) {
       helpershape[i] = shapes.shape1[i] + shapes.shape2[i];
-      buffersize *= (size_t) (shapes.shape1[i] + shapes.shape2[i]);
     }
     else {
       helpershape[i] = shapes.shape1[i];
-      buffersize *= (size_t) shapes.shape1[i];
     }
+    buffersize *= helpershape[i];  // Multiply by each dimension
   }
   // Allocate a buffer for the concatenated array
   uint8_t *helperbuffer = malloc(buffersize);
@@ -221,18 +220,20 @@ CUTEST_TEST_TEST(concatenate) {
 
   // Set up the region to fill (corresponding to src2's position)
   for (int i = 0; i < shapes.ndim; i++) {
-     if (i == axis) {
-         start_src2[i] = shapes.shape1[i];  // src2 starts after src1
-         stop_src2[i] = shapes.shape1[i] + shapes.shape2[i];
-     } else {
-         start_src2[i] = 0;
-         stop_src2[i] = shapes.shape2[i];
-     }
+    if (i == axis) {
+      start_src2[i] = shapes.shape1[i];  // src2 starts after src1
+      stop_src2[i] = shapes.shape1[i] + shapes.shape2[i];
+    } else {
+      start_src2[i] = 0;
+      // Use the minimum of shape1 and shape2 for non-axis dimensions
+      stop_src2[i] = (shapes.shape1[i] < shapes.shape2[i]) ?
+                      shapes.shape1[i] : shapes.shape2[i];
+    }
   }
 
- // Fill the region with the value
- fill_buffer_region(helperbuffer, helpershape, shapes.ndim,
-                   start_src2, stop_src2, value, typesize);
+  // Fill the region with the value
+  fill_buffer_region(helperbuffer, helpershape, shapes.ndim,
+                     start_src2, stop_src2, value, typesize);
 
   // Check the shape of the concatenated array
   for (int i = 0; i < ctx->ndim; ++i) {
@@ -259,13 +260,15 @@ CUTEST_TEST_TEST(concatenate) {
   int64_t start[B2ND_MAX_DIM] = {0};
   int64_t stop[B2ND_MAX_DIM] = {0};
   int64_t buffershape[B2ND_MAX_DIM] = {0};
+  size_t elementcount = 1;  // Count of elements
   for (int i = 0; i < ctx->ndim; ++i) {
     start[i] = 0;
     stop[i] = array->shape[i];
     buffershape[i] = stop[i] - start[i];
-    buffersize *= buffershape[i];
+    elementcount *= buffershape[i];
   }
-  uint8_t *buffer = malloc(buffersize);
+  size_t buffersize2 = elementcount * typesize;
+  uint8_t *buffer = malloc(buffersize2);
   B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(array, start, stop, buffer, buffershape, buffersize));
   // Check if the data in the concatenated array matches the helperbuffer
   uint8_t *buffer_fill = malloc(typesize);
@@ -293,11 +296,11 @@ CUTEST_TEST_TEST(concatenate) {
     if (!is_true) {
       // Print the raw byte values for better debugging
       fprintf(stderr, "Data mismatch at index %ld: buffer bytes = ", i);
-      for (int b = 0; b < typesize + 10; b++) {
+      for (int b = 0; b < typesize; b++) {
         fprintf(stderr, "%02x ", buffer[i * typesize + b]);
       }
       fprintf(stderr, ", helperbuffer bytes = ");
-      for (int b = 0; b < typesize + 10; b++) {
+      for (int b = 0; b < typesize; b++) {
         fprintf(stderr, "%02x ", helperbuffer[i * typesize + b]);
       }
       fprintf(stderr, "\n");
