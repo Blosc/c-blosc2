@@ -410,6 +410,23 @@ BLOSC_EXPORT int b2nd_set_slice_cbuffer(const void *buffer, const int64_t *buffe
 BLOSC_EXPORT int b2nd_copy(b2nd_context_t *ctx, const b2nd_array_t *src, b2nd_array_t **array);
 
 /**
+ * @brief Concatenate arrays. The result is stored in a new b2nd array.
+ *
+ * @param ctx The b2nd context for the new array.
+ * @param src1 The first array from which data is copied.
+ * @param src2 The second array from which data is copied.
+ * @param array The memory pointer where the array will be created.
+ * @param axis The axis along which the arrays will be concatenated.
+ *
+ * @return An error code
+ *
+ * @note The ndim and shape in ctx will be overwritten by the src1 ctx.
+ *
+ */
+BLOSC_EXPORT int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_array_t *src2,
+                                  b2nd_array_t **array, int8_t axis);
+
+/**
  * @brief Print metalayer parameters.
  *
  * @param array The array where the metalayer is stored.
