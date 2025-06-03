@@ -1330,8 +1330,8 @@ int b2nd_copy(b2nd_context_t *ctx, const b2nd_array_t *src, b2nd_array_t **array
 }
 
 
-int b2nd_concatenate(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t *src1,
-                     const b2nd_array_t *src2, int axis) {
+int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1,
+                     const b2nd_array_t *src2, b2nd_array_t **array, int8_t axis) {
   BLOSC_ERROR_NULL(src1, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(src2, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
@@ -1346,7 +1346,7 @@ int b2nd_concatenate(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array
   }
   // Compute the new shape
   int64_t newshape[B2ND_MAX_DIM];
-  for (int i = 0; i < src1->ndim; ++i) {
+  for (int8_t i = 0; i < src1->ndim; ++i) {
     if (i == axis) {
       newshape[i] = src1->shape[i] + src2->shape[i];
     } else {
@@ -1362,7 +1362,7 @@ int b2nd_concatenate(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array
   BLOSC_ERROR(b2nd_resize(*array, newshape, NULL));
 
   // Copy the data from the second array
-  int64_t start[B2ND_MAX_DIM] = {0};
+  int64_t start[B2ND_MAX_DIM];
   int64_t stop[B2ND_MAX_DIM];
   // Copy chunk by chunk
   void *buffer = malloc(src2->sc->typesize * src2->extchunknitems);
@@ -1372,10 +1372,10 @@ int b2nd_concatenate(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array
                                                src2->sc->typesize * src2->extchunknitems));
     // Get multidimensional chunk position
     int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
-    blosc2_unidim_to_multidim(src2->ndim, src2->chunkshape, nchunk, nchunk_ndim);
+    blosc2_unidim_to_multidim(src2->ndim, (int64_t*)(src2->chunkshape), nchunk, nchunk_ndim);
 
     // Set positions for each dimension
-    for (int i = 0; i < src2->ndim; ++i) {
+    for (int8_t i = 0; i < src2->ndim; ++i) {
       start[i] = nchunk_ndim[i] * src2->chunkshape[i];
       stop[i] = start[i] + src2->chunkshape[i];
       if (stop[i] > src2->shape[i]) {
@@ -1390,7 +1390,7 @@ int b2nd_concatenate(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array
     }
 
     // Copy the chunk to the correct position
-    BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, src2->chunkshape,
+    BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, (int64_t*)(src2->chunkshape),
                                        src2->sc->typesize * src2->extchunknitems,
                                        start, stop, *array));
   }
