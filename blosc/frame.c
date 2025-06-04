@@ -2146,7 +2146,7 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
     return rc;
   }
 
-  if (nchunk >= nchunks) {
+  if ((nchunks > 0) && (nchunk >= nchunks)) {
     BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') exceeds the number of chunks "
                     "('%" PRId64 "') in frame.", nchunk, nchunks);
     return BLOSC2_ERROR_INVALID_PARAM;

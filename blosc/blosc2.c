@@ -4307,7 +4307,7 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const int32_t nbytes, void* dest,
     return BLOSC2_ERROR_DATA;
   }
 
-  if (nbytes % cparams.typesize) {
+  if ((nbytes > 0) && (nbytes % cparams.typesize)) {
     BLOSC_TRACE_ERROR("nbytes must be a multiple of typesize");
     return BLOSC2_ERROR_DATA;
   }
