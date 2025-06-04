@@ -179,7 +179,6 @@ CUTEST_TEST_TEST(concatenate) {
                                         shapes.chunkshape1, shapes.blockshape1, NULL,
                                         0, NULL, 0);
 
-
   /* Create src1 with zeros */
   b2nd_array_t *src1;
   BLOSC_ERROR(b2nd_zeros(ctx1, &src1));
@@ -256,8 +255,10 @@ CUTEST_TEST_TEST(concatenate) {
 
   // Check the data in the concatenated array
   printf("Array ndim: %d\n", array->ndim);
-  printf("Array shapes: %d x %d x %d x %d\n", (int)array->shape[0], (int)array->shape[1], (int)array->shape[2], (int)array->shape[3]);
-  printf("Helperbuffer shapes: %d x %d x %d x %d\n", (int)helpershape[0], (int)helpershape[1], (int)helpershape[2],  (int)helpershape[3]);
+  printf("Array shapes: %d x %d x %d x %d\n", (int)array->shape[0], (int)array->shape[1],
+    (int)array->shape[2], (int)array->shape[3]);
+  printf("Helperbuffer shapes: %d x %d x %d x %d\n", (int)helpershape[0], (int)helpershape[1],
+    (int)helpershape[2],  (int)helpershape[3]);
   printf("Axis: %d\n", axis);
 
   int64_t start[B2ND_MAX_DIM] = {0};
