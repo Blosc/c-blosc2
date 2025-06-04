@@ -1330,14 +1330,24 @@ int b2nd_copy(b2nd_context_t *ctx, const b2nd_array_t *src, b2nd_array_t **array
 }
 
 
-int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1,
-                     const b2nd_array_t *src2, b2nd_array_t **array, int8_t axis) {
+int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_array_t *src2,
+                     int8_t axis, bool copy, b2nd_array_t **array) {
   BLOSC_ERROR_NULL(src1, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(src2, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
-  // For starters, create a copy of src1 array
-  BLOSC_ERROR(b2nd_copy(ctx, src1, array));
+  // Keep the src1 shape for later use
+  int64_t src1_shape[B2ND_MAX_DIM];
+  for (int i = 0; i < src1->ndim; ++i) {
+    src1_shape[i] = src1->shape[i];
+  }
+
+  if (copy) {
+    BLOSC_ERROR(b2nd_copy(ctx, src1, array));
+  } else
+  {
+    *array = src1;
+  }
 
   // Check that the shapes are compatible for concatenation
   if (src1->ndim != src2->ndim) {
@@ -1392,8 +1402,8 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1,
 
       // Apply offset only for concatenation axis
       if (i == axis) {
-        start[i] += src1->shape[i];
-        stop[i] += src1->shape[i];
+        start[i] += src1_shape[i];
+        stop[i] += src1_shape[i];
       }
     }
 
