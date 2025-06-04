@@ -418,7 +418,9 @@ BLOSC_EXPORT int b2nd_copy(b2nd_context_t *ctx, const b2nd_array_t *src, b2nd_ar
  * @param axis The axis along which the arrays will be concatenated.
  * @param copy Whether the data should be copied or not. If false, the @p src1 array
  *   will be expanded as needed to keep the result.
- * @param array The memory pointer where the array will be created.
+ * @param array The memory pointer where the array will be created.  It will have the same
+ *   metalayers of @p src1, except for the b2nd metalayer, which will be updated with the
+ *   new shape.
  *
  * @return An error code
  *
