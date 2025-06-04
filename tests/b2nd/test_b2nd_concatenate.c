@@ -190,25 +190,9 @@ CUTEST_TEST_TEST(concatenate) {
   /* Create src2 with a value */
   b2nd_array_t *src2;
   uint8_t *value = malloc(typesize);
-  switch (typesize) {
-  case 8:
-    ((int64_t *) value)[0] = (int64_t) fill_value;
-    break;
-  case 4:
-    ((int32_t *) value)[0] = (int32_t) fill_value;
-    break;
-  case 2:
-    ((int16_t *) value)[0] = (int16_t) fill_value;
-    break;
-  case 1:
-    ((int8_t *) value)[0] = fill_value;
-    break;
-  default:
-    // Fill a buffer with fill_value
-    for (int i = 0; i < typesize; ++i) {
-      value[i] = fill_value;
-    }
-    break;
+  // Fill a buffer with fill_value
+  for (int i = 0; i < typesize; ++i) {
+    value[i] = fill_value;
   }
   blosc2_storage b2_storage2 = {.cparams=&cparams};
   if (backend.persistent) {
@@ -290,29 +274,12 @@ CUTEST_TEST_TEST(concatenate) {
   uint8_t *buffer = malloc(buffersize2);
 
   B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(array, start, stop, buffer, buffershape, buffersize));
-  // Check if the data in the concatenated array matches the helperbuffer
+  // Data in the concatenated array matches the helperbuffer?
   uint8_t *buffer_fill = malloc(typesize);
   for (int64_t i = 0; i < buffersize / typesize; ++i) {
     bool is_true = false;
-    switch (typesize) {
-      case 8:
-        is_true = ((int64_t *) buffer)[i] == ((int64_t *) helperbuffer)[i];
-        break;
-      case 4:
-        is_true = ((int32_t *) buffer)[i] == ((int32_t *) helperbuffer)[i];
-        break;
-      case 2:
-        is_true = ((int16_t *) buffer)[i] == ((int16_t *) helperbuffer)[i];
-        break;
-      case 1:
-        is_true = ((int8_t *) buffer)[i] == ((int8_t *) helperbuffer)[i];
-        break;
-      default:
-        // For default case, don't copy helperbuffer over buffer data
-        memcpy(buffer_fill, &buffer[i * typesize], typesize);
-        is_true = memcmp(buffer_fill, helperbuffer + i * typesize, typesize) == 0;
-        break;
-    }
+    memcpy(buffer_fill, &buffer[i * typesize], typesize);
+    is_true = memcmp(buffer_fill, helperbuffer + i * typesize, typesize) == 0;
     if (!is_true) {
       // Print the raw byte values for better debugging
       fprintf(stderr, "Data mismatch at index %d: buffer bytes = ", (int)i);
@@ -325,8 +292,7 @@ CUTEST_TEST_TEST(concatenate) {
       }
       fprintf(stderr, "\n");
     }
-    CUTEST_ASSERT("Data in the concatenated array does not match the helperbuffer",
-                  is_true);
+    CUTEST_ASSERT("Data in the concatenated array does not match the helperbuffer", is_true);
   }
 
   /* Free mallocs */
