@@ -209,7 +209,7 @@ CUTEST_TEST_TEST(concatenate) {
   if (backend.persistent) {
     b2_storage.urlpath = urlpath;
   }
-  b2_storage2.contiguous = backend.contiguous;
+  b2_storage.contiguous = backend.contiguous;
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, shapes.ndim, shapes.shape1,
                                         shapes.chunkshape1, shapes.blockshape1,
                                         NULL, 0, NULL, 0);
@@ -274,7 +274,7 @@ CUTEST_TEST_TEST(concatenate) {
   size_t buffersize2 = elementcount * typesize;
   uint8_t *buffer = malloc(buffersize2);
 
-  B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(array, start, stop, buffer, buffershape, buffersize));
+  B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(array, start, stop, buffer, buffershape, buffersize2));
   // Data in the concatenated array matches the helperbuffer?
   uint8_t *buffer_fill = malloc(typesize);
   for (int64_t i = 0; i < buffersize / typesize; ++i) {
