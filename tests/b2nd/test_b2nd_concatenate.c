@@ -117,6 +117,10 @@ CUTEST_TEST_SETUP(concatenate) {
       0,
       1,
   ));
+  CUTEST_PARAMETRIZE(copy, bool, CUTEST_DATA(
+      true,
+      false,
+  ));
 
 }
 
@@ -126,6 +130,7 @@ CUTEST_TEST_TEST(concatenate) {
   CUTEST_GET_PARAMETER(typesize, uint8_t);
   CUTEST_GET_PARAMETER(fill_value, int8_t);
   CUTEST_GET_PARAMETER(axis, int8_t);
+  CUTEST_GET_PARAMETER(copy, bool);
 
   char *urlpath = "test_concatenate.b2frame";
   char *urlpath1 = "test_concatenate1.b2frame";
@@ -136,7 +141,7 @@ CUTEST_TEST_TEST(concatenate) {
 
   // Create a helper buffer for storing the final array for the concatenation in C
   int64_t helpershape[B2ND_MAX_DIM] = {0};
-  size_t buffersize = typesize;
+  int64_t buffersize = typesize;
   for (int i = 0; i < shapes.ndim; ++i) {
     if (i == axis) {
       helpershape[i] = shapes.shape1[i] + shapes.shape2[i];
@@ -212,7 +217,7 @@ CUTEST_TEST_TEST(concatenate) {
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, shapes.ndim, shapes.shape1,
                                         shapes.chunkshape1, shapes.blockshape1,
                                         NULL, 0, NULL, 0);
-  B2ND_TEST_ASSERT(b2nd_concatenate(ctx, src1, src2, &array, axis));
+  B2ND_TEST_ASSERT(b2nd_concatenate(ctx, src1, src2, axis, copy, &array));
 
   // Fill the proper section of the helperbuffer with the value from src2
   int64_t start_src2[B2ND_MAX_DIM] = {0};
@@ -253,8 +258,8 @@ CUTEST_TEST_TEST(concatenate) {
   }
 
   // Check the data in the concatenated array
-  printf("Array shapes: %ld x %ld\n", array->shape[0], array->shape[1]);
-  printf("Helperbuffer shapes: %ld x %ld\n", helpershape[0], helpershape[1]);
+  printf("Array shapes: %d x %d\n", (int)array->shape[0], (int)array->shape[1]);
+  printf("Helperbuffer shapes: %d x %d\n", (int)helpershape[0], (int)helpershape[1]);
   printf("Axis: %d\n", axis);
 
   int64_t start[B2ND_MAX_DIM] = {0};
@@ -269,6 +274,7 @@ CUTEST_TEST_TEST(concatenate) {
   }
   size_t buffersize2 = elementcount * typesize;
   uint8_t *buffer = malloc(buffersize2);
+
   B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(array, start, stop, buffer, buffershape, buffersize));
   // Check if the data in the concatenated array matches the helperbuffer
   uint8_t *buffer_fill = malloc(typesize);
@@ -295,7 +301,7 @@ CUTEST_TEST_TEST(concatenate) {
     }
     if (!is_true) {
       // Print the raw byte values for better debugging
-      fprintf(stderr, "Data mismatch at index %ld: buffer bytes = ", i);
+      fprintf(stderr, "Data mismatch at index %d: buffer bytes = ", (int)i);
       for (int b = 0; b < typesize; b++) {
         fprintf(stderr, "%02x ", buffer[i * typesize + b]);
       }
@@ -308,15 +314,18 @@ CUTEST_TEST_TEST(concatenate) {
     CUTEST_ASSERT("Data in the concatenated array does not match the helperbuffer",
                   is_true);
   }
-  free(buffer_fill);
 
   /* Free mallocs */
+  free(buffer_fill);
   free(buffer);
   free(helperbuffer);
   free(value);
   B2ND_TEST_ASSERT(b2nd_free(src1));
   B2ND_TEST_ASSERT(b2nd_free(src2));
-  B2ND_TEST_ASSERT(b2nd_free(array));
+  if (copy) {
+    // If copy is true, we need to free the concatenated array
+    B2ND_TEST_ASSERT(b2nd_free(array));
+  }
   B2ND_TEST_ASSERT(b2nd_free_ctx(ctx));
   B2ND_TEST_ASSERT(b2nd_free_ctx(ctx1));
   B2ND_TEST_ASSERT(b2nd_free_ctx(ctx2));
