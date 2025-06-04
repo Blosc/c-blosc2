@@ -1342,11 +1342,10 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
     src1_shape[i] = src1->shape[i];
   }
 
-  if (copy) {
-    BLOSC_ERROR(b2nd_copy(ctx, src1, array));
-  } else
-  {
-    *array = src1;
+  // Support for 0-dim arrays is not implemented
+  if (src1->ndim == 0 || src2->ndim == 0) {
+    BLOSC_TRACE_ERROR("Concatenation of 0-dim arrays is not supported");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
   // Check that the shapes are compatible for concatenation
@@ -1366,6 +1365,13 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
       }
       newshape[i] = src1->shape[i];
     }
+  }
+
+  if (copy) {
+    BLOSC_ERROR(b2nd_copy(ctx, src1, array));
+  }
+  else {
+    *array = (b2nd_array_t *)src1;
   }
 
   // Extend the array, we don't need to specify the start in resize, as we are extending the shape from the end

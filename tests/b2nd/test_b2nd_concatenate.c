@@ -12,12 +12,13 @@
 
 typedef struct {
   int8_t ndim;
-    int64_t shape1[B2ND_MAX_DIM];
-    int32_t chunkshape1[B2ND_MAX_DIM];
-    int32_t blockshape1[B2ND_MAX_DIM];
-    int64_t shape2[B2ND_MAX_DIM];
-    int32_t chunkshape2[B2ND_MAX_DIM];
-    int32_t blockshape2[B2ND_MAX_DIM];
+  int8_t axis;
+  int64_t shape1[B2ND_MAX_DIM];
+  int32_t chunkshape1[B2ND_MAX_DIM];
+  int32_t blockshape1[B2ND_MAX_DIM];
+  int64_t shape2[B2ND_MAX_DIM];
+  int32_t chunkshape2[B2ND_MAX_DIM];
+  int32_t blockshape2[B2ND_MAX_DIM];
 } test_shapes_t;
 
 
@@ -78,44 +79,56 @@ CUTEST_TEST_SETUP(concatenate) {
   // Add parametrization
   CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(
       1,
-//      2,
-//      4,
-//      8,
+      // 2,
+      // 4,
+      8,
+      13,
   ));
 
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
       {false, false},
-//      {true, false},
-//      {true, true},
-//      {false, true},
+      {true, false},
+      {true, true},
+      {false, true},
   ));
 
 
   CUTEST_PARAMETRIZE(shapes, test_shapes_t, CUTEST_DATA(
-      // {0, {0}, {0}, {0}, {0}, {0}}, // 0-dim
-      // {1, {5}, {3}, {2}, {2}, {5}}, // 1-idim
-      // {2, {20, 0}, {7, 0}, {3, 0}, {2, 0}, {8, 0}}, // 0-shape
-      // {2, {20, 10}, {7, 5}, {3, 5}, {2, 0}, {18, 0}}, // 0-shape
-      // {2, {14, 10}, {8, 5}, {2, 2}, {5, 3}, {9, 10}},
-      // {3, {12, 10, 14}, {3, 5, 9}, {3, 4, 4}, {3, 0, 3}, {6, 7, 10}},
-      // {4, {10, 21, 30, 5}, {8, 7, 15, 3}, {5, 5, 10, 1}, {5, 4, 3, 3}, {10, 8, 8, 4}},
-      {2, {50, 50}, {25, 13}, {5, 8}, {50, 50}, {25, 13}, {5, 8}},
-      // {2, {150, 45}, {15, 15}, {7, 7}, {4, 2}, {6, 5}},
-      // {2, {10, 10}, {5, 7}, {2, 2}, {0, 0}, {5, 5}},
-      // // Checks for fast path in setting a single chunk that is C contiguous
-      // {2, {20, 20}, {10, 10}, {5, 10}, {10, 10}, {20, 20}},
-      // {3, {3, 4, 5}, {1, 4, 5}, {1, 2, 5}, {1, 0, 0}, {2, 4, 5}},
-      // {3, {3, 8, 5}, {1, 4, 5}, {1, 2, 5}, {1, 4, 0}, {2, 8, 5}},
+      // 0-dim is not supported in concatenate
+      // {0, 0, {0}, {0}, {0}, {0}, {0}, {0}},
+      // 1-dim
+      {1, 0, {50}, {25}, {5}, {20}, {25}, {5}},
+      {1, 0, {2}, {25}, {5}, {49}, {25}, {5}},
+      // 2-dim
+      {2, 0, {50, 50}, {25, 13}, {5, 8}, {50, 50}, {25, 13}, {5, 8}},
+      {2, 1, {50, 50}, {25, 13}, {5, 8}, {50, 50}, {25, 13}, {5, 8}},
+      {2, 0, {25, 50}, {25, 25}, {5, 5}, {2, 50}, {25, 25}, {5, 5}},
+      {2, 1, {25, 50}, {25, 25}, {5, 5}, {25, 5}, {25, 25}, {5, 5}},
+      // 3-dim
+      {3, 0, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}},
+      {3, 1, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}},
+      {3, 2, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}},
+      {3, 0, {5, 5, 50}, {25, 13, 10}, {5, 8, 5}, {51, 5, 50}, {25, 13, 10}, {5, 8, 5}},
+      // Inner 0-dims are supported
+      {3, 1, {50, 1, 50}, {25, 13, 10}, {5, 8, 5}, {50, 0, 50}, {25, 13, 10}, {5, 8, 5}},
+      // TODO: the next is not working yet
+      // {3, 2, {50, 50, 0}, {25, 13, 10}, {5, 8, 5}, {50, 50, 49}, {25, 13, 10}, {5, 8, 5}},
+      // 4-dim
+      {4, 0, {5, 5, 5, 5}, {2, 5, 10, 5}, {5, 2, 5, 2}, {5, 5, 5, 5}, {5, 5, 10, 5}, {5, 2, 5, 2}},
+      {4, 1, {5, 5, 5, 5}, {2, 5, 10, 5}, {5, 2, 5, 2}, {5, 5, 5, 5}, {5, 5, 10, 5}, {5, 2, 5, 2}},
+      {4, 2, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 5}, {5, 13, 10, 5}, {5, 8, 5, 2}},
+      {4, 3, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 5}, {5, 13, 10, 5}, {5, 8, 5, 2}},
+      {4, 0, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {6, 5, 5, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
+      {4, 1, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 6, 5, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
+      {4, 2, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 6, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
+      {4, 3, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 6}, {15, 13, 10, 5}, {5, 8, 5, 2}},
+
   ));
   CUTEST_PARAMETRIZE(fill_value, int8_t, CUTEST_DATA(
       3,
+     -5,
 //    113,
 //    33,
-//    -5
-  ));
-  CUTEST_PARAMETRIZE(axis, int8_t, CUTEST_DATA(
-      0,
-      1,
   ));
   CUTEST_PARAMETRIZE(copy, bool, CUTEST_DATA(
       true,
@@ -129,9 +142,9 @@ CUTEST_TEST_TEST(concatenate) {
   CUTEST_GET_PARAMETER(shapes, test_shapes_t);
   CUTEST_GET_PARAMETER(typesize, uint8_t);
   CUTEST_GET_PARAMETER(fill_value, int8_t);
-  CUTEST_GET_PARAMETER(axis, int8_t);
   CUTEST_GET_PARAMETER(copy, bool);
 
+  int axis = shapes.axis;
   char *urlpath = "test_concatenate.b2frame";
   char *urlpath1 = "test_concatenate1.b2frame";
   char *urlpath2 = "test_concatenate2.b2frame";
@@ -258,8 +271,9 @@ CUTEST_TEST_TEST(concatenate) {
   }
 
   // Check the data in the concatenated array
-  printf("Array shapes: %d x %d\n", (int)array->shape[0], (int)array->shape[1]);
-  printf("Helperbuffer shapes: %d x %d\n", (int)helpershape[0], (int)helpershape[1]);
+  printf("Array ndim: %d\n", array->ndim);
+  printf("Array shapes: %d x %d x %d x %d\n", (int)array->shape[0], (int)array->shape[1], (int)array->shape[2], (int)array->shape[3]);
+  printf("Helperbuffer shapes: %d x %d x %d x %d\n", (int)helpershape[0], (int)helpershape[1], (int)helpershape[2],  (int)helpershape[3]);
   printf("Axis: %d\n", axis);
 
   int64_t start[B2ND_MAX_DIM] = {0};
