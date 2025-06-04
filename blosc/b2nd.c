@@ -1336,6 +1336,12 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
   BLOSC_ERROR_NULL(src2, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
+  // Validate the axis parameter
+  if (axis < 0 || axis >= src1->ndim) {
+    BLOSC_TRACE_ERROR("Axis parameter is out of bounds");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+
   // Keep the src1 shape for later use
   int64_t src1_shape[B2ND_MAX_DIM];
   for (int i = 0; i < src1->ndim; ++i) {
