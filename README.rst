@@ -259,4 +259,6 @@ See `THANKS document <https://github.com/Blosc/c-blosc2/blob/main/THANKS.rst>`_.
 
 ----
 
--- Blosc Development Team.  **We make compression better.**
+*Compress Better, Compute Bigger*
+
+-- Blosc Development Team
