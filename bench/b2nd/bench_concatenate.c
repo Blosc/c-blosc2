@@ -54,10 +54,10 @@ int main() {
     int32_t new_chunkshape[3] = {chunkshape[0], chunkshape[1], chunkshape[2]};
     if (!accel) {
       new_chunkshape[0] = chunkshape[0] + 1;  // to avoid the fast path
-      accel_str = "non-accel";
+      accel_str = "non-fast path";
     }
     else {
-      accel_str = "accel";
+      accel_str = "fast path";
     }
 
     blosc2_remove_urlpath(urlpath);
