@@ -1338,7 +1338,7 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
 
   // Validate the axis parameter
   if (axis < 0 || axis >= src1->ndim) {
-    BLOSC_TRACE_ERROR("Axis parameter is out of bounds");
+    BLOSC_TRACE_ERROR("axis parameter is out of bounds: axis=%d, expected range=[0, %d)", axis, src1->ndim - 1);
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
@@ -1390,8 +1390,11 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
   void *buffer = malloc(src2->sc->typesize * src2->extchunknitems);
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_MEMORY_ALLOC);
   for (int64_t nchunk = 0; nchunk < src2->sc->nchunks; ++nchunk) {
-    BLOSC_ERROR(blosc2_schunk_decompress_chunk(src2->sc, nchunk, buffer,
-                                               src2->sc->typesize * src2->extchunknitems));
+    if (blosc2_schunk_decompress_chunk(src2->sc, nchunk, buffer,
+                                      src2->sc->typesize * (int32_t)src2->extchunknitems) <= 0) {
+      BLOSC_TRACE_ERROR("Error decompressing chunk");
+      goto cleanup;
+                                   }
     // Get multidimensional chunk position
     int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
     int64_t chunkshape[B2ND_MAX_DIM] = {0};
@@ -1400,7 +1403,7 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
     }
     int64_t chunks_in_dim[B2ND_MAX_DIM] = {0};
     for (int8_t i = 0; i < src2->ndim; ++i) {
-      chunks_in_dim[i] = (src2->extshape[i] + src2->chunkshape[i] - 1) / src2->chunkshape[i];
+      chunks_in_dim[i] = src2->extshape[i] / src2->chunkshape[i];
     }
     blosc2_unidim_to_multidim(src2->ndim, chunks_in_dim, nchunk, nchunk_ndim);
 
@@ -1424,6 +1427,8 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
                                        src2->sc->typesize * src2->extchunknitems,
                                        start, stop, *array));
   }
+
+cleanup:
   free(buffer);
 
   return BLOSC2_ERROR_SUCCESS;
