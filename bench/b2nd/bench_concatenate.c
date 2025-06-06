@@ -8,7 +8,7 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-// Benchmark for concatenating b2nd arrays.  This is to check the accelerated path
+// Benchmark for concatenating b2nd arrays.  This is to check the fast path
 // that has been added to b2nd_concat() that allows for faster concatenation of
 // b2nd arrays when there are no partial (or zero-padded) chunks in the arrays being
 // concatenated.
@@ -20,12 +20,11 @@
 
 int main() {
   blosc2_init();
-  const int width = 512;
-  const int height = 256;
+  const int width = 1000;
+  const int height = 1000;
   const int nimages_inbuf = 10;
-  const int64_t buffershape[] = {nimages_inbuf, height, width};
   int64_t N_images = 1000;
-  bool copy = false;  // whether to copy the data or expand src1
+  bool copy = true;  // whether to copy the data or expand src1
 
   // Shapes of the b2nd array
   // int64_t shape[] = {N_images, height, width};
@@ -50,10 +49,11 @@ int main() {
   //storage.urlpath = urlpath;  // for storing in a file
   storage.cparams = &cparams;
 
-  char *accel_str = "non-accel";
-  for (int accel=1; accel >= 0; accel--) {
+  char *accel_str;
+  for (int accel=0; accel <= 1; accel++) {
+    int32_t new_chunkshape[3] = {chunkshape[0], chunkshape[1], chunkshape[2]};
     if (!accel) {
-      chunkshape[0] = chunkshape[0] + 1;  // to avoid the accelerated path
+      new_chunkshape[0] = chunkshape[0] + 1;  // to avoid the fast path
       accel_str = "non-accel";
     }
     else {
@@ -63,7 +63,7 @@ int main() {
     blosc2_remove_urlpath(urlpath);
 
     b2nd_context_t *ctx = b2nd_create_ctx(&storage, 3,
-                                          shape, chunkshape, blockshape,
+                                          shape, new_chunkshape, blockshape,
                                           "|u2", DTYPE_NUMPY_FORMAT,
                                           NULL, 0);
     // The first array
@@ -99,8 +99,8 @@ int main() {
     blosc_set_timestamp(&t1);
     printf("Time to append (%s): %.4f s\n", accel_str, blosc_elapsed_secs(t0, t1));
     printf("Number of chunks: %" PRId64 "\n", array->sc->nchunks);
-    printf("Shape of array: (%" PRId64 ", %" PRId64 ", %" PRId64 ")\n",
-           array->shape[0], array->shape[1], array->shape[2]);
+    // printf("Shape of array: (%" PRId64 ", %" PRId64 ", %" PRId64 ")\n",
+    //        array->shape[0], array->shape[1], array->shape[2]);
 
     b2nd_free(src2);
     if (copy) {
