@@ -179,7 +179,6 @@ CUTEST_TEST_TEST(concatenate) {
                                         shapes.chunkshape1, shapes.blockshape1, NULL,
                                         0, NULL, 0);
 
-
   /* Create src1 with zeros */
   b2nd_array_t *src1;
   BLOSC_ERROR(b2nd_zeros(ctx1, &src1));
@@ -210,7 +209,7 @@ CUTEST_TEST_TEST(concatenate) {
   if (backend.persistent) {
     b2_storage.urlpath = urlpath;
   }
-  b2_storage2.contiguous = backend.contiguous;
+  b2_storage.contiguous = backend.contiguous;
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, shapes.ndim, shapes.shape1,
                                         shapes.chunkshape1, shapes.blockshape1,
                                         NULL, 0, NULL, 0);
@@ -256,8 +255,10 @@ CUTEST_TEST_TEST(concatenate) {
 
   // Check the data in the concatenated array
   printf("Array ndim: %d\n", array->ndim);
-  printf("Array shapes: %d x %d x %d x %d\n", (int)array->shape[0], (int)array->shape[1], (int)array->shape[2], (int)array->shape[3]);
-  printf("Helperbuffer shapes: %d x %d x %d x %d\n", (int)helpershape[0], (int)helpershape[1], (int)helpershape[2],  (int)helpershape[3]);
+  printf("Array shapes: %d x %d x %d x %d\n", (int)array->shape[0], (int)array->shape[1],
+    (int)array->shape[2], (int)array->shape[3]);
+  printf("Helperbuffer shapes: %d x %d x %d x %d\n", (int)helpershape[0], (int)helpershape[1],
+    (int)helpershape[2],  (int)helpershape[3]);
   printf("Axis: %d\n", axis);
 
   int64_t start[B2ND_MAX_DIM] = {0};
@@ -273,7 +274,7 @@ CUTEST_TEST_TEST(concatenate) {
   size_t buffersize2 = elementcount * typesize;
   uint8_t *buffer = malloc(buffersize2);
 
-  B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(array, start, stop, buffer, buffershape, buffersize));
+  B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(array, start, stop, buffer, buffershape, buffersize2));
   // Data in the concatenated array matches the helperbuffer?
   uint8_t *buffer_fill = malloc(typesize);
   for (int64_t i = 0; i < buffersize / typesize; ++i) {

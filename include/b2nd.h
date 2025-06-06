@@ -263,7 +263,7 @@ BLOSC_EXPORT int b2nd_to_cframe(const b2nd_array_t *array, uint8_t **cframe,
  *
  * @param cframe The buffer of the in-memory array.
  * @param cframe_len The size (in bytes) of the in-memory array.
- * @param copy Whether b2nd should make a copy of the cframe data or not. The copy will be made to a sparse frame.
+ * @param copy Whether b2nd should make a copy of the cframe data or not. The copy will be made to an internal sparse frame.
  * @param array The memory pointer where the array will be created.
  *
  * @return An error code.
@@ -410,7 +410,7 @@ BLOSC_EXPORT int b2nd_set_slice_cbuffer(const void *buffer, const int64_t *buffe
 BLOSC_EXPORT int b2nd_copy(b2nd_context_t *ctx, const b2nd_array_t *src, b2nd_array_t **array);
 
 /**
- * @brief Concatenate arrays. The result is stored in a new b2nd array.
+ * @brief Concatenate arrays. The result is stored in a new b2nd array, or an enlarged one.
  *
  * @param ctx The b2nd context for the new array.
  * @param src1 The first array from which data is copied.
