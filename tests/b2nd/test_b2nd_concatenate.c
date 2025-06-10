@@ -124,7 +124,7 @@ CUTEST_TEST_SETUP(concatenate) {
   ));
 
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
-      // {false, false},
+      {false, false},
       // {true, false},
       // {true, true},
       {false, true},
@@ -150,7 +150,7 @@ CUTEST_TEST_SETUP(concatenate) {
       // // Inner 0-dims are supported
       // {3, 1, {50, 1, 50}, {25, 13, 10}, {5, 8, 5}, {50, 0, 50}, {25, 13, 10}, {5, 8, 5}},
       // // TODO: the next is not working yet
-      // {3, 2, {50, 50, 0}, {25, 13, 10}, {5, 8, 5}, {50, 50, 49}, {25, 13, 10}, {5, 8, 5}},
+      {3, 2, {50, 50, 0}, {25, 13, 10}, {5, 8, 5}, {50, 50, 49}, {25, 13, 10}, {5, 8, 5}},
       // // 4-dim
       // {4, 0, {5, 5, 5, 5}, {2, 5, 10, 5}, {5, 2, 5, 2}, {5, 5, 5, 5}, {5, 5, 10, 5}, {5, 2, 5, 2}},
       // {4, 1, {5, 5, 5, 5}, {2, 5, 10, 5}, {5, 2, 5, 2}, {5, 5, 5, 5}, {5, 5, 10, 5}, {5, 2, 5, 2}},
