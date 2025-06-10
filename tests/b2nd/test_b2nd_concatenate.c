@@ -81,7 +81,7 @@ static int fill_recursive_arange(uint8_t *buffer,
 }
 
 /**
- * Fill a region of a multidimensional buffer with a constant value.
+ * Fill a region of a multidimensional buffer with a constant value or linspace.
  */
 int fill_buffer_region(uint8_t *buffer,
                        int64_t *buffer_shape,
@@ -104,8 +104,10 @@ int fill_buffer_region(uint8_t *buffer,
     return fill_recursive_arange(buffer, strides, ndim, start, stop,
                                  0, typesize, 0, 0);
   }
-  return fill_recursive_region(buffer, strides, ndim, start, stop,
-                              value, typesize, 0, 0);
+  else{
+    return fill_recursive_region(buffer, strides, ndim, start, stop,
+                                value, typesize, 0, 0);
+  }
 }
 
 
@@ -122,10 +124,10 @@ CUTEST_TEST_SETUP(concatenate) {
   ));
 
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
-      {false, false},
+      // {false, false},
       // {true, false},
       // {true, true},
-      // {false, true},
+      {false, true},
   ));
 
 
@@ -136,9 +138,9 @@ CUTEST_TEST_SETUP(concatenate) {
       // {1, 0, {50}, {25}, {5}, {20}, {25}, {5}},
       // {1, 0, {2}, {25}, {5}, {49}, {25}, {5}},
       // // 2-dim
-      {2, 0, {10, 10}, {2, 2}, {1, 1}, {4, 4}, {2, 2}, {1, 1}},
-      // {2, 1, {50, 50}, {25, 13}, {5, 8}, {50, 50}, {25, 13}, {5, 8}},
-      // {2, 0, {25, 50}, {25, 25}, {5, 5}, {2, 50}, {25, 25}, {5, 5}},
+      // {2, 0, {10, 10}, {2, 2}, {1, 1}, {4, 10}, {2, 2}, {1, 1}},
+      // {2, 1, {10, 8}, {2, 2}, {1, 1}, {10, 8}, {2, 2}, {1, 1}},
+      // {2, 0, {4, 4}, {4, 4}, {2, 2}, {4, 4}, {4, 4}, {2, 2}}, //Fails
       // {2, 1, {25, 50}, {25, 25}, {5, 5}, {25, 5}, {25, 25}, {5, 5}},
       // // 3-dim
       // {3, 0, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}},
@@ -147,31 +149,31 @@ CUTEST_TEST_SETUP(concatenate) {
       // {3, 0, {5, 5, 50}, {25, 13, 10}, {5, 8, 5}, {51, 5, 50}, {25, 13, 10}, {5, 8, 5}},
       // // Inner 0-dims are supported
       // {3, 1, {50, 1, 50}, {25, 13, 10}, {5, 8, 5}, {50, 0, 50}, {25, 13, 10}, {5, 8, 5}},
-      // TODO: the next is not working yet
+      // // TODO: the next is not working yet
       // {3, 2, {50, 50, 0}, {25, 13, 10}, {5, 8, 5}, {50, 50, 49}, {25, 13, 10}, {5, 8, 5}},
-      // 4-dim
+      // // 4-dim
       // {4, 0, {5, 5, 5, 5}, {2, 5, 10, 5}, {5, 2, 5, 2}, {5, 5, 5, 5}, {5, 5, 10, 5}, {5, 2, 5, 2}},
-  //     {4, 1, {5, 5, 5, 5}, {2, 5, 10, 5}, {5, 2, 5, 2}, {5, 5, 5, 5}, {5, 5, 10, 5}, {5, 2, 5, 2}},
-  //     {4, 2, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 5}, {5, 13, 10, 5}, {5, 8, 5, 2}},
-  //     {4, 3, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 5}, {5, 13, 10, 5}, {5, 8, 5, 2}},
-  //     {4, 0, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {6, 5, 5, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
-  //     {4, 1, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 6, 5, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
-  //     {4, 2, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 6, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
-  //     {4, 3, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 6}, {15, 13, 10, 5}, {5, 8, 5, 2}},
+      // {4, 1, {5, 5, 5, 5}, {2, 5, 10, 5}, {5, 2, 5, 2}, {5, 5, 5, 5}, {5, 5, 10, 5}, {5, 2, 5, 2}},
+      // {4, 2, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 5}, {5, 13, 10, 5}, {5, 8, 5, 2}},
+      // {4, 3, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 5}, {5, 13, 10, 5}, {5, 8, 5, 2}},
+      // {4, 0, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {6, 5, 5, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
+      // {4, 1, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 6, 5, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
+      // {4, 2, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 6, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
+      // {4, 3, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 6}, {15, 13, 10, 5}, {5, 8, 5, 2}},
   //
   ));
   CUTEST_PARAMETRIZE(fill_value, int8_t, CUTEST_DATA(
       3,
-     // -5,
-//    113,
-//    33,
+     -5,
+   113,
+   33,
   ));
   CUTEST_PARAMETRIZE(copy, bool, CUTEST_DATA(
-      // true,
+      true,
       false,
   ));
   CUTEST_PARAMETRIZE(arange, bool, CUTEST_DATA(
-    // true,
+    true,
     false,
 ));
 
@@ -258,12 +260,6 @@ CUTEST_TEST_TEST(concatenate) {
                      start_, shapes.shape2, value, typesize, arange); // value is not used in this case
     B2ND_TEST_ASSERT(b2nd_from_cbuffer(ctx2, &src2, buff, buffsize));
 
-    for (int i = 0; i < buffsize; i++) {
-      if (i%(shapes.shape2[1]*typesize) == 0) {fprintf(stderr, "\n");}
-      if (i%typesize == 0) {
-        fprintf(stderr, "%02d ", buff[i]);
-      }
-      }
   }
 
   else {
@@ -300,7 +296,7 @@ CUTEST_TEST_TEST(concatenate) {
 
   // Fill the region with the value
   fill_buffer_region(helperbuffer, helpershape, shapes.ndim,
-                     start_src2, stop_src2, value, typesize, arange);
+                     start_src2, stop_src2, value, typesize, arange); // value is not used if arange is true
 
   // Check the shape of the concatenated array
   for (int i = 0; i < ctx->ndim; ++i) {
@@ -370,12 +366,6 @@ CUTEST_TEST_TEST(concatenate) {
   //   }
   // }
 
-  for (int i = 0; i < buffersize; i++) {
-    if (i%(helpershape[1]*typesize) == 0) {fprintf(stderr, "\n");}
-    if (i%typesize == 0) {
-      fprintf(stderr, "%02d ", buffer[i]);
-    }
-  }
 
   /* Free mallocs */
   free(buffer_fill);
