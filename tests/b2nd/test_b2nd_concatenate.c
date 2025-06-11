@@ -53,31 +53,39 @@ static int fill_recursive_region(uint8_t *buffer,
 /**
  * Helper function for recursive region filling with arange
  */
+void increment_large_value(uint8_t *value, uint8_t typesize) {
+  for (int i = typesize - 1; i >= 0; --i) {
+    if (++value[i] != 0) {
+      break;  // Si no hay desbordamiento, salimos
+    }
+  }
+}
 static int fill_recursive_arange(uint8_t *buffer,
                                 int64_t *strides,
                                 int8_t ndim,
                                 int64_t *start,
                                 int64_t *stop,
-                                int64_t value,
+                                uint8_t *value,
                                 uint8_t typesize,
                                 int dim,
                                 int64_t current_offset) {
   if (dim == ndim) {
     // We've reached the innermost dimension, copy the value
-    memcpy(buffer + (current_offset * typesize), &value, typesize);
+    memcpy(buffer + (current_offset * typesize), value, typesize);
     // Increment value for arange
-    return value + 1;
+    increment_large_value(value, typesize);
+    return 0;
   }
 
   // Iterate through the current dimension within the region
   int64_t val = value;
   for (int64_t i = start[dim]; i < stop[dim]; i++) {
     int64_t offset = current_offset + i * strides[dim];
-    val = fill_recursive_arange(buffer, strides, ndim, start, stop,
-                                    val, typesize, dim + 1, offset);
-    if (val < 0) return val;
+    int err = fill_recursive_arange(buffer, strides, ndim, start, stop,
+                                    value, typesize, dim + 1, offset);
+    if (err < 0) return err;
   }
-  return val;
+  return 0;
 }
 
 /**
@@ -88,7 +96,7 @@ int fill_buffer_region(uint8_t *buffer,
                        int8_t ndim,
                        int64_t *start,
                        int64_t *stop,
-                       const void *value,
+                       uint8_t *value,
                        uint8_t typesize,
                        bool arange) {
   // Calculate strides for the buffer
@@ -100,9 +108,12 @@ int fill_buffer_region(uint8_t *buffer,
 
   // Start the recursive filling
   if (arange) {
+    for (int i = 0; i < typesize; ++i) {
+      value[i] = 0;
+    }
     // If arange is true, fill with increasing values
     return fill_recursive_arange(buffer, strides, ndim, start, stop,
-                                 0, typesize, 0, 0);
+                                 value, typesize, 0, 0);
   }
   else{
     return fill_recursive_region(buffer, strides, ndim, start, stop,
@@ -135,31 +146,31 @@ CUTEST_TEST_SETUP(concatenate) {
       // 0-dim is not supported in concatenate
       // {0, 0, {0}, {0}, {0}, {0}, {0}, {0}},
       // 1-dim
-      {1, 0, {50}, {25}, {5}, {20}, {25}, {5}},
+      {1, 0, {10}, {5}, {1}, {5}, {5}, {1}},
       {1, 0, {2}, {25}, {5}, {49}, {25}, {5}},
-      // 2-dim
-      {2, 0, {10, 10}, {2, 2}, {1, 1}, {4, 10}, {2, 2}, {1, 1}},
-      {2, 1, {10, 8}, {2, 2}, {1, 1}, {10, 8}, {2, 2}, {1, 1}},
-      {2, 0, {4, 4}, {4, 4}, {2, 2}, {4, 4}, {4, 4}, {2, 2}}, //Fails
-      {2, 1, {25, 50}, {25, 25}, {5, 5}, {25, 5}, {25, 25}, {5, 5}},
-      // 3-dim
-      // {3, 0, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}},
-      // {3, 1, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}},
-      // {3, 2, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}},
-      // {3, 0, {5, 5, 50}, {25, 13, 10}, {5, 8, 5}, {51, 5, 50}, {25, 13, 10}, {5, 8, 5}},
-      // Inner 0-dims are supported
-      // {3, 1, {50, 1, 50}, {25, 13, 10}, {5, 8, 5}, {50, 0, 50}, {25, 13, 10}, {5, 8, 5}},
-      // // TODO: the next is not working yet
-      // {3, 2, {50, 50, 0}, {25, 13, 10}, {5, 8, 5}, {50, 50, 49}, {25, 13, 10}, {5, 8, 5}},
+  // 2-dim
+  {2, 0, {10, 10}, {2, 2}, {1, 1}, {4, 10}, {2, 2}, {1, 1}},
+  {2, 1, {10, 8}, {2, 2}, {1, 1}, {10, 8}, {2, 2}, {1, 1}},
+  {2, 0, {4, 4}, {4, 4}, {2, 2}, {4, 4}, {4, 4}, {2, 2}},
+  {2, 1, {25, 50}, {25, 25}, {5, 5}, {25, 5}, {25, 25}, {5, 5}},
+  // 3-dim
+  {3, 0, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}},
+  {3, 1, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}},
+  {3, 2, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}, {50, 5, 50}, {25, 13, 10}, {5, 8, 5}},
+  {3, 0, {5, 5, 50}, {25, 13, 10}, {5, 8, 5}, {51, 5, 50}, {25, 13, 10}, {5, 8, 5}},
+  // Inner 0-dims are supported
+  {3, 1, {50, 1, 50}, {25, 13, 10}, {5, 8, 5}, {50, 0, 50}, {25, 13, 10}, {5, 8, 5}},
+  //     // // TODO: the next is not working yet
+  //     // {3, 2, {50, 50, 0}, {25, 13, 10}, {5, 8, 5}, {50, 50, 49}, {25, 13, 10}, {5, 8, 5}},
       // // 4-dim
-  //     {4, 0, {5, 5, 5, 5}, {2, 5, 10, 5}, {5, 2, 5, 2}, {5, 5, 5, 5}, {5, 5, 10, 5}, {5, 2, 5, 2}},
-  //     {4, 1, {5, 5, 5, 5}, {2, 5, 10, 5}, {5, 2, 5, 2}, {5, 5, 5, 5}, {5, 5, 10, 5}, {5, 2, 5, 2}},
-  //     {4, 2, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 5}, {5, 13, 10, 5}, {5, 8, 5, 2}},
-  //     {4, 3, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 5}, {5, 13, 10, 5}, {5, 8, 5, 2}},
-  //     {4, 0, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {6, 5, 5, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
-  //     {4, 1, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 6, 5, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
-  //     {4, 2, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 6, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
-  //     {4, 3, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 6}, {15, 13, 10, 5}, {5, 8, 5, 2}},
+  {4, 0, {5, 5, 5, 5}, {2, 5, 10, 5}, {5, 2, 5, 2}, {5, 5, 5, 5}, {5, 5, 10, 5}, {5, 2, 5, 2}},
+  {4, 1, {5, 5, 5, 5}, {2, 5, 10, 5}, {5, 2, 5, 2}, {5, 5, 5, 5}, {5, 5, 10, 5}, {5, 2, 5, 2}},
+  {4, 2, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 5}, {5, 13, 10, 5}, {5, 8, 5, 2}},
+  {4, 3, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 5}, {5, 13, 10, 5}, {5, 8, 5, 2}},
+  {4, 0, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {6, 5, 5, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
+  {4, 1, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 6, 5, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
+  {4, 2, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 6, 5}, {15, 13, 10, 5}, {5, 8, 5, 2}},
+  {4, 3, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 6}, {15, 13, 10, 5}, {5, 8, 5, 2}},
   // //
   ));
   CUTEST_PARAMETRIZE(fill_value, int8_t, CUTEST_DATA(
@@ -194,7 +205,7 @@ CUTEST_TEST_TEST(concatenate) {
   blosc2_remove_urlpath(urlpath);
   blosc2_remove_urlpath(urlpath1);
   blosc2_remove_urlpath(urlpath2);
-  if (arange && typesize==13){return 0;} // arange is not supported for typesize 13
+  // if (arange && typesize==13){return 0;} // arange is not supported for typesize 13
 
   // Create a helper buffer for storing the final array for the concatenation in C
   int64_t helpershape[B2ND_MAX_DIM] = {0};
@@ -316,7 +327,7 @@ CUTEST_TEST_TEST(concatenate) {
     CUTEST_ASSERT("Chunkshape is not equal!", array->chunkshape[i] == shapes.chunkshape1[i]);
   }
 
-  // Check the data in the concatenated array
+  // // Check the data in the concatenated array
   // printf("Array ndim: %d\n", array->ndim);
   // printf("Array shapes: %d x %d x %d x %d\n", (int)array->shape[0], (int)array->shape[1],
   //   (int)array->shape[2], (int)array->shape[3]);
@@ -338,6 +349,21 @@ CUTEST_TEST_TEST(concatenate) {
   uint8_t *buffer = malloc(buffersize2);
 
   B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(array, start, stop, buffer, buffershape, buffersize2));
+
+  // fprintf(stderr, "----------------helperbuffer----------------\n");
+  // for (int i = 0; i < buffersize; i++) {
+  //   if (i%typesize == 0) {
+  //     fprintf(stderr, "\n");}
+  //     fprintf(stderr, "%d ", helperbuffer[i]);
+  // }
+  //
+  // fprintf(stderr, "----------------concatbuffer----------------\n");
+  // for (int i = 0; i < buffersize2; i++) {
+  //   if (i%typesize == 0) {
+  //     fprintf(stderr, "\n");}
+  //   fprintf(stderr, "%d ", buffer[i]);
+  // }
+
   // Data in the concatenated array matches the helperbuffer?
   uint8_t *buffer_fill = malloc(typesize);
   for (int64_t i = 0; i < buffersize / typesize; ++i) {
@@ -358,15 +384,6 @@ CUTEST_TEST_TEST(concatenate) {
     // }
     CUTEST_ASSERT("Data in the concatenated array does not match the helperbuffer", is_true);
   }
-
-  // for (int i = 0; i < buffersize; i++) {
-  //   if (i%typesize == 0) {
-  //     fprintf(stderr, "\n");
-  //     if (i%(typesize*shapes.shape1[0]) == 0) {fprintf(stderr, "--------------------------------\n");}
-  //     fprintf(stderr, "%d ", buffer[i]);
-  //   }
-  // }
-
 
   /* Free mallocs */
   free(buffer_fill);
