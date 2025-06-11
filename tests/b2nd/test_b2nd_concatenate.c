@@ -78,7 +78,6 @@ static int fill_recursive_arange(uint8_t *buffer,
   }
 
   // Iterate through the current dimension within the region
-  int64_t val = value;
   for (int64_t i = start[dim]; i < stop[dim]; i++) {
     int64_t offset = current_offset + i * strides[dim];
     int err = fill_recursive_arange(buffer, strides, ndim, start, stop,
