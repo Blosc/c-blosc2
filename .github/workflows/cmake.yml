@@ -36,14 +36,14 @@ jobs:
             packages: zlib1g-dev
             cmake-args: -D PREFER_EXTERNAL_ZLIB=ON
 
-            # Not too recent Zstd libs (< 1.4.4) in distros perform pretty bad on compression
-            # ratios when using dictionaries, making some tests not passing.
-            # Commenting this out for the time being.
-            # - name: Ubuntu GCC External ZSTD
-            #   os: ubuntu-latest
-            #   compiler: gcc
-            #   packages: zstd libzstd-dev
-            #   cmake-args: -D PREFER_EXTERNAL_ZSTD=ON
+          # Not too recent Zstd libs (< 1.4.4) in distros perform pretty bad on compression
+          # ratios when using dictionaries, making some tests not passing.
+          # Commenting this out for the time being.
+          # - name: Ubuntu GCC External ZSTD
+          #   os: ubuntu-latest
+          #   compiler: gcc
+          #   packages: zstd libzstd-dev
+          #   cmake-args: -D PREFER_EXTERNAL_ZSTD=ON
 
           # For some reason, some tests do not pass on ARM SF and HF.  Not sure what's going on,
           # but having ARM AARCH64 working is good enough for now, so commenting the former out.
@@ -57,10 +57,15 @@ jobs:
           #  packages: qemu qemu-user gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf libc-dev-armel-cross
           #  cmake-args: -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain-armhf.cmake
 
-          - name: Ubuntu GCC AARCH64
+          # - name: Ubuntu GCC AARCH64
+          #   os: ubuntu-latest
+          #   packages: qemu-system-aarch64 qemu-user gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc-dev-arm64-cross
+          #   cmake-args: -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64.cmake
+
+          - name: Ubuntu GCC AARCH64 (native)
             os: ubuntu-latest
-            packages: qemu-system-aarch64 qemu-user gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc-dev-arm64-cross
-            cmake-args: -D CMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64.cmake
+            arch: arm64
+            compiler: gcc
 
           - name: Ubuntu Clang
             os: ubuntu-latest
