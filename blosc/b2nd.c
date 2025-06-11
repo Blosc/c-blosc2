@@ -776,10 +776,6 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   }
 
   uint8_t *buffer_b = buffer;
-  const int64_t *buffer_start = start;
-  const int64_t *buffer_stop = stop;
-  const int64_t *buffer_shape = shape;
-
   int8_t ndim = array->ndim;
 
   // 0-dim case
@@ -884,11 +880,11 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   int64_t update_nchunks = 1;
   for (int i = 0; i < ndim; ++i) {
     int64_t pos = 0;
-    while (pos <= buffer_start[i]) {
+    while (pos <= start[i]) {
       pos += array->chunkshape[i];
     }
     update_start[i] = pos / array->chunkshape[i] - 1;
-    while (pos < buffer_stop[i]) {
+    while (pos < stop[i]) {
       pos += array->chunkshape[i];
     }
     update_shape[i] = pos / array->chunkshape[i] - update_start[i];
@@ -916,7 +912,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     }
     bool chunk_empty = false;
     for (int i = 0; i < ndim; ++i) {
-      chunk_empty |= (chunk_stop[i] <= buffer_start[i] || chunk_start[i] >= buffer_stop[i]);
+      chunk_empty |= (chunk_stop[i] <= start[i] || chunk_start[i] >= stop[i]);
     }
     if (chunk_empty) {
       continue;
@@ -927,7 +923,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       // Check if all the chunk is going to be updated and avoid the decompression
       bool decompress_chunk = false;
       for (int i = 0; i < ndim; ++i) {
-        decompress_chunk |= (chunk_start[i] < buffer_start[i] || chunk_stop[i] > buffer_stop[i]);
+        decompress_chunk |= (chunk_start[i] < start[i] || chunk_stop[i] > stop[i]);
       }
 
       if (decompress_chunk) {
@@ -1022,8 +1018,8 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       // compute the start of the slice inside the block
       int64_t slice_start[B2ND_MAX_DIM] = {0};
       for (int i = 0; i < ndim; ++i) {
-        if (block_start[i] < buffer_start[i]) {
-          slice_start[i] = buffer_start[i] - block_start[i];
+        if (block_start[i] < start[i]) {
+          slice_start[i] = start[i] - block_start[i];
         } else {
           slice_start[i] = 0;
         }
@@ -1032,8 +1028,8 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
 
       int64_t slice_stop[B2ND_MAX_DIM] = {0};
       for (int i = 0; i < ndim; ++i) {
-        if (block_stop[i] > buffer_stop[i]) {
-          slice_stop[i] = block_shape[i] - (block_stop[i] - buffer_stop[i]);
+        if (block_stop[i] > stop[i]) {
+          slice_stop[i] = block_shape[i] - (block_stop[i] - stop[i]);
         } else {
           slice_stop[i] = block_stop[i] - block_start[i];
         }
@@ -1046,13 +1042,12 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       }
 
       uint8_t *src = &buffer_b[0];
-      const int64_t *src_pad_shape = buffer_shape;
 
       int64_t src_start[B2ND_MAX_DIM] = {0};
       int64_t src_stop[B2ND_MAX_DIM] = {0};
       for (int i = 0; i < ndim; ++i) {
-        src_start[i] = slice_start[i] - buffer_start[i];
-        src_stop[i] = slice_stop[i] - buffer_start[i];
+        src_start[i] = slice_start[i] - start[i];
+        src_stop[i] = slice_stop[i] - start[i];
       }
 
       uint8_t *dst = &data[nblock * array->blocknitems * array->sc->typesize];
@@ -1070,12 +1065,12 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
 
       if (set_slice) {
         b2nd_copy_buffer2(ndim, array->sc->typesize,
-                          src, src_pad_shape, src_start, src_stop,
+                          src, shape, src_start, src_stop,
                           dst, dst_pad_shape, dst_start);
       } else {
         b2nd_copy_buffer2(ndim, array->sc->typesize,
                           dst, dst_pad_shape, dst_start, dst_stop,
-                          src, src_pad_shape, src_start);
+                          src, shape, src_start);
       }
     }
 
@@ -1390,11 +1385,6 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
   void *buffer = malloc(src2->sc->typesize * src2->extchunknitems);
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_MEMORY_ALLOC);
   for (int64_t nchunk = 0; nchunk < src2->sc->nchunks; ++nchunk) {
-    if (blosc2_schunk_decompress_chunk(src2->sc, nchunk, buffer,
-                                      src2->sc->typesize * (int32_t)src2->extchunknitems) <= 0) {
-      BLOSC_TRACE_ERROR("Error decompressing chunk");
-      goto cleanup;
-                                   }
     // Get multidimensional chunk position
     int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
     int64_t chunkshape[B2ND_MAX_DIM] = {0};
@@ -1414,13 +1404,13 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
       if (stop[i] > src2->shape[i]) {
         stop[i] = src2->shape[i];  // Handle boundary chunks
       }
-
-      // Apply offset only for concatenation axis
-      if (i == axis) {
-        start[i] += src1_shape[i];
-        stop[i] += src1_shape[i];
-      }
     }
+    // Load chunk into buffer
+    BLOSC_ERROR(b2nd_get_slice_cbuffer(src2, start, stop, buffer, chunkshape, src2->sc->chunksize));
+
+    // Apply chunk offset only for concatenation axis
+    start[axis] += src1_shape[axis];
+    stop[axis] += src1_shape[axis];
 
     // Copy the chunk to the correct position
     BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, chunkshape,
@@ -1428,7 +1418,6 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
                                        start, stop, *array));
   }
 
-cleanup:
   free(buffer);
 
   return BLOSC2_ERROR_SUCCESS;
