@@ -49,7 +49,6 @@ CUTEST_TEST_SETUP(copy) {
       {false, true},
       {true, true},
   ));
-
   CUTEST_PARAMETRIZE(backend2, _test_backend, CUTEST_DATA(
       {false, false},
       {false, false},
