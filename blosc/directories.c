@@ -54,12 +54,12 @@
       sprintf(fname, "%s\\%s", dir_path, cfile.name);
 
       ret = remove(fname);
-      free(fname);
       if (ret < 0) {
         BLOSC_TRACE_ERROR("Could not remove file %s", fname);
         _findclose(file);
         return BLOSC2_ERROR_FAILURE;
       }
+      free(fname);
     }
 
     rmdir(dir_path);
