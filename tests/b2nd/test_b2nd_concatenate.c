@@ -135,7 +135,7 @@ CUTEST_TEST_SETUP(concatenate) {
 
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
       {false, false},
-      {true, false},
+      {true, false}, // contiguous = True, persistent = False
       {true, true},
       {false, true},
   ));
@@ -145,8 +145,8 @@ CUTEST_TEST_SETUP(concatenate) {
       // 0-dim is not supported in concatenate
       // {0, 0, {0}, {0}, {0}, {0}, {0}, {0}},
       // 1-dim
-      {1, 0, {10}, {5}, {1}, {5}, {5}, {1}},
-      {1, 0, {2}, {25}, {5}, {49}, {25}, {5}},
+{1, 0, {10}, {5}, {1}, {5}, {5}, {1}},
+{1, 0, {2}, {25}, {5}, {49}, {25}, {5}},
   // 2-dim
   {2, 0, {10, 10}, {2, 2}, {1, 1}, {4, 10}, {2, 2}, {1, 1}},
   {2, 1, {10, 8}, {2, 2}, {1, 1}, {10, 8}, {2, 2}, {1, 1}},
@@ -159,9 +159,9 @@ CUTEST_TEST_SETUP(concatenate) {
   {3, 0, {5, 5, 50}, {25, 13, 10}, {5, 8, 5}, {51, 5, 50}, {25, 13, 10}, {5, 8, 5}},
   // Inner 0-dims are supported
   {3, 1, {50, 1, 50}, {25, 13, 10}, {5, 8, 5}, {50, 0, 50}, {25, 13, 10}, {5, 8, 5}},
-  //     // // TODO: the next is not working yet
-  //     // {3, 2, {50, 50, 0}, {25, 13, 10}, {5, 8, 5}, {50, 50, 49}, {25, 13, 10}, {5, 8, 5}},
-      // // 4-dim
+  {3, 2, {50, 50, 0}, {25, 13, 10}, {5, 8, 5}, {50, 50, 49}, {25, 13, 10}, {5, 8, 5}},
+{3, 2, {10, 10, 0}, {10, 10, 10}, {10, 10, 10}, {10, 10, 10},{10, 10, 10}, {10, 10, 10}},
+  // 4-dim
   {4, 0, {5, 5, 5, 5}, {2, 5, 10, 5}, {5, 2, 5, 2}, {5, 5, 5, 5}, {5, 5, 10, 5}, {5, 2, 5, 2}},
   {4, 1, {5, 5, 5, 5}, {2, 5, 10, 5}, {5, 2, 5, 2}, {5, 5, 5, 5}, {5, 5, 10, 5}, {5, 2, 5, 2}},
   {4, 2, {5, 5, 5, 5}, {2, 13, 10, 5}, {5, 8, 5, 2}, {5, 5, 5, 5}, {5, 13, 10, 5}, {5, 8, 5, 2}},
@@ -204,7 +204,6 @@ CUTEST_TEST_TEST(concatenate) {
   blosc2_remove_urlpath(urlpath);
   blosc2_remove_urlpath(urlpath1);
   blosc2_remove_urlpath(urlpath2);
-  // if (arange && typesize==13){return 0;} // arange is not supported for typesize 13
 
   // Create a helper buffer for storing the final array for the concatenation in C
   int64_t helpershape[B2ND_MAX_DIM] = {0};
