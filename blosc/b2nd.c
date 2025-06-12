@@ -1405,17 +1405,72 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
         stop[i] = src2->shape[i];  // Handle boundary chunks
       }
     }
-    // Load chunk into buffer
-    BLOSC_ERROR(b2nd_get_slice_cbuffer(src2, start, stop, buffer, chunkshape, src2->sc->chunksize));
 
-    // Apply chunk offset only for concatenation axis
-    start[axis] += src1_shape[axis];
-    stop[axis] += src1_shape[axis];
+    // Check if the chunk is aligned with dest chunks, and has the same blockshape
+    bool aligned = true;
+    // ...and get the chunk index in the dest array if aligned
+    int64_t nchunk_dest = 0;
+    int64_t chunks_in_array_strides[B2ND_MAX_DIM];
+    // Calculate strides for destination array
+    chunks_in_array_strides[(*array)->ndim - 1] = 1;
+    for (int i = (*array)->ndim - 2; i >= 0; --i) {
+        chunks_in_array_strides[i] = chunks_in_array_strides[i + 1] *
+                                    ((*array)->extshape[i + 1] / (*array)->chunkshape[i + 1]);
+    }
 
-    // Copy the chunk to the correct position
-    BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, chunkshape,
-                                       src2->sc->typesize * src2->extchunknitems,
-                                       start, stop, *array));
+    for (int8_t i = 0; i < src2->ndim; ++i) {
+      if ((i == axis && (start[i] + src1_shape[i]) % (*array)->chunkshape[i] != 0) ||
+          (i == axis && (stop[i] + src1_shape[i]) % (*array)->chunkshape[i] != 0) ||
+          (i != axis && start[i] % (*array)->chunkshape[i] != 0) ||
+          (i != axis && stop[i] % (*array)->chunkshape[i] != 0) ||
+          src2->blockshape[i] != (*array)->blockshape[i]) {
+        aligned = false;
+        break;
+      }
+      // Calculate the destination chunk coordinate for this dimension
+      int64_t nchunk_ndim_dest = start[i] / (*array)->chunkshape[i];
+      // For the concatenation axis, add the offset
+      if (i == axis) {
+        nchunk_ndim_dest += src1_shape[i] / (*array)->chunkshape[i];
+      }
+      nchunk_dest += nchunk_ndim_dest * chunks_in_array_strides[i];
+    }
+
+    if (aligned) {
+      // Get the uncompressed chunk buffer from the source array
+      bool needs_free = false;
+      uint8_t *chunk;
+      int32_t cbytes = blosc2_schunk_get_chunk(src2->sc, nchunk, &chunk, &needs_free);
+      if (cbytes < 0) {
+        BLOSC_TRACE_ERROR("Error getting chunk from source array");
+        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+      }
+      // Update the chunk in the destination array
+      // We need to free only if needs_free is true or copy is false
+      // bool needs_copy = !needs_free || copy;
+      // BLOSC_ERROR(blosc2_schunk_update_chunk((*array)->sc, nchunk_dest, chunk, needs_copy));
+      // if (needs_free && !copy) {
+      //   free(chunk);
+      // }
+      // TODO: the above makes some tests to crash, so always force a copy; try to optimize this later
+      BLOSC_ERROR(blosc2_schunk_update_chunk((*array)->sc, nchunk_dest, chunk, true));
+      if (needs_free) {
+        free(chunk);
+      }
+    }
+    else {
+      // Load chunk into buffer
+      BLOSC_ERROR(b2nd_get_slice_cbuffer(src2, start, stop, buffer, chunkshape, src2->sc->chunksize));
+
+      // Apply chunk offset only for concatenation axis
+      start[axis] += src1_shape[axis];
+      stop[axis] += src1_shape[axis];
+
+      // Copy the chunk to the correct position
+      BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, chunkshape,
+                                         src2->sc->typesize * src2->extchunknitems,
+                                         start, stop, *array));
+    }
   }
 
   free(buffer);
