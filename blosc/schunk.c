@@ -254,7 +254,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
     return NULL;
   }
   // Set the chunksize for the schunk, as it cannot be derived from storage
-  new_schunk->chunksize = schunk->chunksize ;
+  new_schunk->chunksize = schunk->chunksize;
 
   // Copy metalayers
   for (int nmeta = 0; nmeta < schunk->nmetalayers; ++nmeta) {

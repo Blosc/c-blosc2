@@ -324,14 +324,6 @@ CUTEST_TEST_TEST(concatenate) {
     CUTEST_ASSERT("Chunkshape is not equal!", array->chunkshape[i] == shapes.chunkshape1[i]);
   }
 
-  // // Check the data in the concatenated array
-  // printf("Array ndim: %d\n", array->ndim);
-  // printf("Array shapes: %d x %d x %d x %d\n", (int)array->shape[0], (int)array->shape[1],
-  //   (int)array->shape[2], (int)array->shape[3]);
-  // printf("Helperbuffer shapes: %d x %d x %d x %d\n", (int)helpershape[0], (int)helpershape[1],
-  //   (int)helpershape[2],  (int)helpershape[3]);
-  // printf("Axis: %d\n", axis);
-
   int64_t start[B2ND_MAX_DIM] = {0};
   int64_t stop[B2ND_MAX_DIM] = {0};
   int64_t buffershape[B2ND_MAX_DIM] = {0};
@@ -347,38 +339,12 @@ CUTEST_TEST_TEST(concatenate) {
 
   B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(array, start, stop, buffer, buffershape, buffersize2));
 
-  // fprintf(stderr, "----------------helperbuffer----------------\n");
-  // for (int i = 0; i < buffersize; i++) {
-  //   if (i%typesize == 0) {
-  //     fprintf(stderr, "\n");}
-  //     fprintf(stderr, "%d ", helperbuffer[i]);
-  // }
-  //
-  // fprintf(stderr, "----------------concatbuffer----------------\n");
-  // for (int i = 0; i < buffersize2; i++) {
-  //   if (i%typesize == 0) {
-  //     fprintf(stderr, "\n");}
-  //   fprintf(stderr, "%d ", buffer[i]);
-  // }
-
   // Data in the concatenated array matches the helperbuffer?
   uint8_t *buffer_fill = malloc(typesize);
   for (int64_t i = 0; i < buffersize / typesize; ++i) {
     bool is_true = false;
     memcpy(buffer_fill, &buffer[i * typesize], typesize);
     is_true = memcmp(buffer_fill, helperbuffer + i * typesize, typesize) == 0;
-    // if (!is_true) {
-    //   // Print the raw byte values for better debugging
-    //   fprintf(stderr, "Data mismatch at index %d: buffer bytes = ", (int)i);
-    //   for (int b = 0; b < typesize; b++) {
-    //     fprintf(stderr, "%02x ", buffer[i * typesize + b]);
-    //   }
-    //   fprintf(stderr, ", helperbuffer bytes = ");
-    //   for (int b = 0; b < typesize; b++) {
-    //     fprintf(stderr, "%02x ", helperbuffer[i * typesize + b]);
-    //   }
-    //   fprintf(stderr, "\n");
-    // }
     CUTEST_ASSERT("Data in the concatenated array does not match the helperbuffer", is_true);
   }
 
