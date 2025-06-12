@@ -24,7 +24,7 @@ int main() {
   const int height = 1000;
   const int nimages_inbuf = 10;
   int64_t N_images = 1000;
-  bool copy = true;  // whether to copy the data or expand src1
+  bool copy = false;  // whether to copy the data or expand src1
 
   // Shapes of the b2nd array
   // int64_t shape[] = {N_images, height, width};
@@ -50,6 +50,7 @@ int main() {
   storage.cparams = &cparams;
 
   char *accel_str;
+  double t, t_accel;
   for (int accel=0; accel <= 1; accel++) {
     int32_t new_chunkshape[3] = {chunkshape[0], chunkshape[1], chunkshape[2]};
     if (!accel) {
@@ -97,7 +98,14 @@ int main() {
       src1 = array;
     }
     blosc_set_timestamp(&t1);
-    printf("Time to append (%s): %.4f s\n", accel_str, blosc_elapsed_secs(t0, t1));
+    if (!accel) {
+      t = blosc_elapsed_secs(t0, t1);
+      printf("Time to append (%s): %.4f s\n", accel_str, t);
+    }
+    else {
+      t_accel = blosc_elapsed_secs(t0, t1);
+      printf("Time to append (%s): %.4f s\n", accel_str, t_accel);
+    }
     printf("Number of chunks: %" PRId64 "\n", array->sc->nchunks);
     // printf("Shape of array: (%" PRId64 ", %" PRId64 ", %" PRId64 ")\n",
     //        array->shape[0], array->shape[1], array->shape[2]);
@@ -109,6 +117,8 @@ int main() {
     b2nd_free_ctx(ctx);
   }
   free(image);
+  blosc2_remove_urlpath(urlpath);
+  printf("Spedup: %.2fx\n", t / t_accel);
 
   blosc2_destroy();
   return 0;
