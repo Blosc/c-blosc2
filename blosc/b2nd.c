@@ -1381,6 +1381,27 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
   // Copy the data from the second array
   int64_t start[B2ND_MAX_DIM];
   int64_t stop[B2ND_MAX_DIM];
+
+  // Check if the chunk is aligned with dest chunks, and has the same blockshape
+  bool aligned = true;
+  for (int8_t i = 0; i < src2->ndim; ++i) {
+    if (src1->chunkshape[i] != src2->chunkshape[i] ||
+        src2->blockshape[i] != (*array)->blockshape[i] ||
+        (i == axis && (src1_shape[i]) % (*array)->chunkshape[i] != 0)
+        ) {
+      aligned = false;
+      break;
+        }
+  }
+  // ...and get the chunk index in the dest array if aligned
+  int64_t chunks_in_array_strides[B2ND_MAX_DIM];
+  // Calculate strides for destination array
+  chunks_in_array_strides[(*array)->ndim - 1] = 1;
+  for (int i = (*array)->ndim - 2; i >= 0; --i) {
+    chunks_in_array_strides[i] = chunks_in_array_strides[i + 1] *
+                                ((*array)->extshape[i + 1] / (*array)->chunkshape[i + 1]);
+  }
+
   // Copy chunk by chunk
   void *buffer = malloc(src2->sc->typesize * src2->extchunknitems);
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_MEMORY_ALLOC);
@@ -1396,44 +1417,6 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
       chunks_in_dim[i] = src2->extshape[i] / src2->chunkshape[i];
     }
     blosc2_unidim_to_multidim(src2->ndim, chunks_in_dim, nchunk, nchunk_ndim);
-
-    // Set positions for each dimension
-    for (int8_t i = 0; i < src2->ndim; ++i) {
-      start[i] = nchunk_ndim[i] * src2->chunkshape[i];
-      stop[i] = start[i] + src2->chunkshape[i];
-      if (stop[i] > src2->shape[i]) {
-        stop[i] = src2->shape[i];  // Handle boundary chunks
-      }
-    }
-
-    // Check if the chunk is aligned with dest chunks, and has the same blockshape
-    bool aligned = true;
-    // ...and get the chunk index in the dest array if aligned
-    int64_t nchunk_dest = 0;
-    int64_t chunks_in_array_strides[B2ND_MAX_DIM];
-    // Calculate strides for destination array
-    chunks_in_array_strides[(*array)->ndim - 1] = 1;
-    for (int i = (*array)->ndim - 2; i >= 0; --i) {
-        chunks_in_array_strides[i] = chunks_in_array_strides[i + 1] *
-                                    ((*array)->extshape[i + 1] / (*array)->chunkshape[i + 1]);
-    }
-
-    for (int8_t i = 0; i < src2->ndim; ++i) {
-      if (src1->chunkshape[i] != src2->chunkshape[i] ||
-          src2->blockshape[i] != (*array)->blockshape[i] ||
-          (i == axis && (src1_shape[i]) % (*array)->chunkshape[i] != 0)
-          ) {
-        aligned = false;
-        break;
-      }
-      // Calculate the destination chunk coordinate for this dimension
-      int64_t nchunk_ndim_dest = start[i] / (*array)->chunkshape[i];
-      // For the concatenation axis, add the offset
-      if (i == axis) {
-        nchunk_ndim_dest += src1_shape[i] / (*array)->chunkshape[i];
-      }
-      nchunk_dest += nchunk_ndim_dest * chunks_in_array_strides[i];
-    }
 
     if (aligned) {
       // Get the uncompressed chunk buffer from the source array
@@ -1452,12 +1435,24 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
       //   free(chunk);
       // }
       // TODO: the above makes some tests to crash, so always force a copy; try to optimize this later
+      int64_t nchunk_dest = 0;
+      nchunk_ndim[axis] += src1_shape[axis] / (*array)->chunkshape[axis];
+      for ( int i =0; i< src2->ndim; i++){nchunk_dest += nchunk_ndim[i] * chunks_in_array_strides[i];}
       BLOSC_ERROR(blosc2_schunk_update_chunk((*array)->sc, nchunk_dest, chunk, true));
       if (needs_free) {
         free(chunk);
       }
     }
     else {
+
+      // Set positions for each dimension
+      for (int8_t i = 0; i < src2->ndim; ++i) {
+        start[i] = nchunk_ndim[i] * src2->chunkshape[i];
+        stop[i] = start[i] + src2->chunkshape[i];
+        if (stop[i] > src2->shape[i]) {
+          stop[i] = src2->shape[i];  // Handle boundary chunks
+        }
+      }
       // Load chunk into buffer
       BLOSC_ERROR(b2nd_get_slice_cbuffer(src2, start, stop, buffer, chunkshape, src2->sc->chunksize));
 
