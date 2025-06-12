@@ -1419,11 +1419,10 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
     }
 
     for (int8_t i = 0; i < src2->ndim; ++i) {
-      if ((i == axis && (start[i] + src1_shape[i]) % (*array)->chunkshape[i] != 0) ||
-          (i == axis && (stop[i] + src1_shape[i]) % (*array)->chunkshape[i] != 0) ||
-          (i != axis && start[i] % (*array)->chunkshape[i] != 0) ||
-          (i != axis && stop[i] % (*array)->chunkshape[i] != 0) ||
-          src2->blockshape[i] != (*array)->blockshape[i]) {
+      if (src1->chunkshape[i] != src2->chunkshape[i] ||
+          src2->blockshape[i] != (*array)->blockshape[i] ||
+          (i == axis && (src1_shape[i]) % (*array)->chunkshape[i] != 0)
+          ) {
         aligned = false;
         break;
       }
