@@ -1437,7 +1437,9 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
       // TODO: the above makes some tests to crash, so always force a copy; try to optimize this later
       int64_t nchunk_dest = 0;
       nchunk_ndim[axis] += src1_shape[axis] / (*array)->chunkshape[axis];
-      for ( int i =0; i< src2->ndim; i++){nchunk_dest += nchunk_ndim[i] * chunks_in_array_strides[i];}
+      for ( int i =0; i< src2->ndim; i++) {
+        nchunk_dest += nchunk_ndim[i] * chunks_in_array_strides[i];
+      }
       BLOSC_ERROR(blosc2_schunk_update_chunk((*array)->sc, nchunk_dest, chunk, true));
       if (needs_free) {
         free(chunk);
