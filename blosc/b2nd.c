@@ -170,7 +170,6 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
 }
 
 
-
 int update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
                  const int32_t *chunkshape, const int32_t *blockshape) {
   array->ndim = ndim;
@@ -1244,6 +1243,55 @@ int b2nd_squeeze_index(b2nd_array_t *array, const bool *index) {
   }
 
   BLOSC_ERROR(update_shape(array, nones, newshape, newchunkshape, newblockshape));
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+int b2nd_newaxis(b2nd_array_t *array, const int8_t axis) {
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+
+  // Contiguous or persistent arrays are not supported yet
+  if (array->sc->storage->contiguous || array->sc->storage->urlpath != NULL) {
+    BLOSC_TRACE_ERROR("Contiguous or persistent arrays do not allow a new axis");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+
+  int64_t newshape[B2ND_MAX_DIM];
+  int32_t newchunkshape[B2ND_MAX_DIM];
+  int32_t newblockshape[B2ND_MAX_DIM];
+
+  if (axis < 0 || axis > array->ndim) {
+    BLOSC_TRACE_ERROR("axis parameter is out of bounds: axis=%d, expected range=[0, %d]", axis, array->ndim);
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+
+  uint8_t new_ndim = array->ndim + 1;
+  if (new_ndim > B2ND_MAX_DIM) {
+    BLOSC_TRACE_ERROR("Maximum number of dimensions exceeded: %d", B2ND_MAX_DIM);
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+
+  for (int i = 0; i < new_ndim; ++i) {
+    if (i < axis) {
+      // Dimensions before the insertion point stay the same
+      newshape[i] = array->shape[i];
+      newchunkshape[i] = array->chunkshape[i];
+      newblockshape[i] = array->blockshape[i];
+    } else if (i == axis) {
+      // Insert the new dimension of size 1 at the axis position
+      newshape[i] = 1;
+      newchunkshape[i] = 1;
+      newblockshape[i] = 1;
+    } else {
+      // Shift remaining dimensions by 1
+      newshape[i] = array->shape[i - 1];
+      newchunkshape[i] = array->chunkshape[i - 1];
+      newblockshape[i] = array->blockshape[i - 1];
+    }
+  }
+
+  BLOSC_ERROR(update_shape(array, new_ndim, newshape, newchunkshape, newblockshape));
 
   return BLOSC2_ERROR_SUCCESS;
 }

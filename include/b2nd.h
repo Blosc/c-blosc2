@@ -342,6 +342,25 @@ BLOSC_EXPORT int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const
                                 const int64_t *start, const int64_t *stop);
 
 /**
+ * @brief Add a new 1-dim axis to a b2nd array
+ *
+ * This function adds a single-dimensional entry to the shape of a b2nd array.
+ * If the axis is ndim, the new axis will be added at the end of the shape.
+ *
+ * @param array The b2nd array.
+ * @param axis The axis where the new index will be added. It must be in the range [0, ndim].
+ *
+ * @note Persistent or contiguous arrays are not supported by this function and will error out.
+ * The reason is that the b2nd metalayer increases in size, and the new axis cannot be added to it
+ * without an expensive data/trailer copy.
+ * Also, the updated array will lose the newly added axis if it is saved to disk
+ * or serialized to a cframe. Use at your own risk.
+ *
+ * @return An error code
+ */
+BLOSC_EXPORT int b2nd_newaxis(b2nd_array_t *array, const int8_t axis);
+
+/**
  * @brief Squeeze a b2nd array
  *
  * This function remove selected single-dimensional entries from the shape of a
@@ -449,7 +468,6 @@ BLOSC_EXPORT int b2nd_print_meta(const b2nd_array_t *array);
  * @return An error code
  */
 BLOSC_EXPORT int b2nd_resize(b2nd_array_t *array, const int64_t *new_shape, const int64_t *start);
-
 
 /**
  * @brief Insert given buffer in an array extending the given axis.

@@ -1537,14 +1537,15 @@ int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content
 
   blosc2_metalayer *metalayer = schunk->metalayers[nmetalayer];
   if (content_len > metalayer->content_len) {
-    BLOSC_TRACE_ERROR("`content_len` cannot exceed the existing size of %d bytes.", metalayer->content_len);
+    BLOSC_TRACE_ERROR("`content_len` (%d) cannot exceed the existing size of %d bytes.",
+      content_len, metalayer->content_len);
     return nmetalayer;
   }
 
   // Update the contents of the metalayer
   memcpy(metalayer->content, content, content_len);
 
-  // Update the metalayers in frame (as size has not changed, we don't need to update the trailer)
+  // Update the metalayers in frame (as size has not increase, we don't need to update the trailer)
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (frame != NULL) {
     int rc = frame_update_header(frame, schunk, false);
