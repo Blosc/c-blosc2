@@ -98,9 +98,9 @@ CUTEST_TEST_TEST(squeeze) {
 
   blosc2_storage b2_storage2 = {.cparams=&cparams};
   if (backend2.persistent) {
-    b2_storage.urlpath = urlpath2;
+    b2_storage2.urlpath = urlpath2;
   }
-  b2_storage.contiguous = backend2.contiguous;
+  b2_storage2.contiguous = backend2.contiguous;
 
   // shape will then be overwritten
   b2nd_context_t *ctx2 = b2nd_create_ctx(&b2_storage2, shapes.ndim, shapes.shape,

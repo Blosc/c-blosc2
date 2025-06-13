@@ -121,7 +121,7 @@ CUTEST_TEST_TEST(get_slice) {
   if (backend2.persistent) {
     b2_storage2.urlpath = urlpath2;
   }
-  b2_storage.contiguous = backend2.contiguous;
+  b2_storage2.contiguous = backend2.contiguous;
 
   // shape param will then be ignored
   b2nd_context_t *ctx2 = b2nd_create_ctx(&b2_storage2, shapes.ndim, shapes.shape,
