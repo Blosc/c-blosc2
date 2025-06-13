@@ -80,7 +80,8 @@ foreach(source ${SOURCES})
         continue()
     endif()
 
-    add_executable(${target} ${source})
+    add_executable(${target} ${source}
+            b2nd/test_b2nd_expand_dims.c)
 
     # Define the BLOSC_TESTING symbol so normally-hidden functions
     # aren't hidden from the view of the test programs.

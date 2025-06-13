@@ -1194,6 +1194,33 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t
 }
 
 
+int b2nd_expand_dims(b2nd_array_t *array, const uint8_t axis) {
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+
+  uint8_t passed_axis = 0;
+  int64_t newshape[B2ND_MAX_DIM];
+  int32_t newchunkshape[B2ND_MAX_DIM];
+  int32_t newblockshape[B2ND_MAX_DIM];
+
+  for (int i = 0; i < array->ndim + 1; ++i) {
+    if (axis == i) {
+      newshape[i] = 1;
+      newchunkshape[i] = 1;
+      newblockshape[i] = 1;
+      passed_axis = 1;
+    } else {
+      newshape[i] = array->shape[i - passed_axis];
+      newchunkshape[i] = array->chunkshape[i - passed_axis];
+      newblockshape[i] = array->blockshape[i - passed_axis];
+    }
+  }
+
+  BLOSC_ERROR(update_shape(array, array->ndim + 1 , newshape, newchunkshape, newblockshape));
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 int b2nd_squeeze(b2nd_array_t *array) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
