@@ -366,6 +366,17 @@ BLOSC_EXPORT int b2nd_squeeze_index(b2nd_array_t *array, const bool *index);
 BLOSC_EXPORT int b2nd_squeeze(b2nd_array_t *array);
 
 /**
+ * @brief Add a new dimension at a given position in the array.
+ *
+ * @param array The b2nd array.
+ * @param axis Axis position at which to add new axis (dummy 1 in shape).
+ *
+ * @return An error code
+ *
+ */
+BLOSC_EXPORT int b2nd_expand_dims(b2nd_array_t *array, const uint8_t axis);
+
+/**
  * @brief Get a slice from an array and store it into a C buffer.
  *
  * @param array The array from which the slice will be extracted.
