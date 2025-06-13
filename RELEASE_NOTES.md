@@ -1,10 +1,13 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.17.0 to 2.17.1
+Changes from 2.17.1 to 2.18.0
 =============================
 
-#XXX version-specific blurb XXX#
+* New `b2nd_concatenate()` function for concatenating two b2nd arrays.
+  See PR #661 and #663.
+* Flush modified pages only in write mode for mmap files. Thanks to Jan Sellner.
+
 
 Changes from 2.17.0 to 2.17.1
 =============================

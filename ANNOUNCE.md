@@ -1,17 +1,12 @@
-# Announcing C-Blosc2 2.17.1
+# Announcing C-Blosc2 2.18.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-Several fixes affecting uninitialized memory access and others:
-
-* Fix uninitialized memory access in newly added unshuffle12_sse2 and unshuffle12_avx2 functions
-* Fix unaligned access in _sw32 and sw32_
-* Fix DWORD being printed as %s in sprintf call
-* Fix warning on unused variable (since this variable was only being used in the linux branch)
-* `splitmode` variable was uninitialized if goto was triggered
-
-See PR #658.  Many thanks to @EmilDohne for this nice job.
+* [FEATURE] New `b2nd_concatenate()` for concatenating two b2nd arrays.
+  See PR #661 and #663.
+* [FIX] Flush modified pages only in write mode for mmap files.
+  Thanks to Jan Sellner.
 
 For more info, see the release notes in:
 
