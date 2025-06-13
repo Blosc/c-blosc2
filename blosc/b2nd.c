@@ -1337,6 +1337,12 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
+  // typesize must be the same for both arrays
+  if (src1->sc->typesize != src2->sc->typesize) {
+    BLOSC_TRACE_ERROR("The two arrays must have the same typesize");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+
   // Keep the src1 shape for later use
   int64_t src1_shape[B2ND_MAX_DIM];
   for (int i = 0; i < src1->ndim; ++i) {

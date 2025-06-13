@@ -422,6 +422,9 @@ BLOSC_EXPORT int b2nd_copy(b2nd_context_t *ctx, const b2nd_array_t *src, b2nd_ar
  *   metalayers of @p src1, except for the b2nd metalayer, which will be updated with the
  *   new shape.
  *
+ * @ note The two arrays must have the same shape in all dimensions except the concatenation axis.
+ * Also, the typesize of the two arrays must be the same.
+ *
  * @return An error code
  *
  * @note The ndim and shape in ctx will be overwritten by the src1 ctx.
