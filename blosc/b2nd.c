@@ -1193,6 +1193,80 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t
   return BLOSC2_ERROR_SUCCESS;
 }
 
+/**
+ * @brief Return a view of a b2nd array.
+ *
+ * @param array The memory pointer of the array which will be viewed.
+ * @param view The memory pointer where the view will be created.
+ * @param ctx1 The b2nd context for the new array, containing new shape and other metadata.
+ *
+ * @ note This doesn't support slices of arrays and is only useful for adding (or removing) dimensions.
+ *
+ * * @return An error code
+ *
+ */
+int make_view(const b2nd_array_t *array, b2nd_array_t **view, b2nd_context_t *ctx1) {
+
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(view, BLOSC2_ERROR_NULL_POINTER);
+
+  // The view is not contiguous (points to the original contiguous cframe which has different shape)
+  // so we set contiguous to false, which forces a copy when calling to_cframe
+  ctx1->b2_storage->contiguous = false;
+
+
+  /* Fill view with zeros */
+  BLOSC_ERROR(b2nd_zeros(ctx1, view));
+  (*view)->sc->view = true;
+  (*view)->sc->data = array->sc->data; // point view to the same data
+  (*view)->sc->frame = array->sc->frame; // if original array is contiguous, point to frame
+  (*view)->sc->nvlmetalayers = array->sc->nvlmetalayers; //
+  for (int i = 0; i< array->sc->nvlmetalayers; i++) {
+    (*view)->sc->vlmetalayers[i] = array->sc->vlmetalayers[i]; // copy the vlmetalayers
+  }
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+int b2nd_expand_dims(const b2nd_array_t *array, b2nd_array_t **view, const int8_t axis) {
+  for (int i = 0; i < array->sc->nmetalayers; ++i) {
+    if (strcmp(array->sc->metalayers[i]->name, "b2nd") != 0) {
+      BLOSC_TRACE_ERROR("Cannot expand dimensions of an array with non-b2nd metalayers");
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+  }
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(view, BLOSC2_ERROR_NULL_POINTER);
+
+  uint8_t passed_axis = 0;
+  int64_t newshape[B2ND_MAX_DIM];
+  int32_t newchunkshape[B2ND_MAX_DIM];
+  int32_t newblockshape[B2ND_MAX_DIM];
+
+  for (int i = 0; i < array->ndim + 1; ++i) {
+    if (axis == i) {
+      newshape[i] = 1;
+      newchunkshape[i] = 1;
+      newblockshape[i] = 1;
+      passed_axis = 1;
+    } else {
+      newshape[i] = array->shape[i - passed_axis];
+      newchunkshape[i] = array->chunkshape[i - passed_axis];
+      newblockshape[i] = array->blockshape[i - passed_axis];
+    }
+  }
+
+  blosc2_cparams cparams = *(array->sc->storage->cparams);
+  blosc2_storage b2_storage1 = {.cparams=&cparams};
+  b2nd_context_t *ctx1 = b2nd_create_ctx(&b2_storage1, array->ndim + 1, newshape,
+                                        newchunkshape, newblockshape, array->dtype,
+                                        array->dtype_format, NULL, 0);
+
+  make_view(array, view, ctx1);
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
 
 int b2nd_squeeze(b2nd_array_t *array) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
