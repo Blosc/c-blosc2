@@ -41,9 +41,9 @@ There is an official Blosc mailing list at:
 blosc@googlegroups.com
 https://groups.google.com/g/blosc
 
-## Tweeter feed
+## Fosstodon feed
 
-Please follow @Blosc2 to get informed about the latest developments.
+Please follow https://fosstodon.org/@Blosc2 to get informed about the latest developments.
 
 
 Enjoy Data!
