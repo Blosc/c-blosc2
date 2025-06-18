@@ -110,5 +110,6 @@ These functions may be used for working with plain C buffers representing multid
 
 .. doxygenfunction:: b2nd_copy_buffer
 .. doxygenfunction:: b2nd_copy_buffer2
+.. doxygenfunction:: b2nd_expand_dims
 .. doxygenfunction:: b2nd_concatenate
 .. doxygenfunction:: b2nd_expand_dims
