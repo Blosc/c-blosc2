@@ -129,6 +129,7 @@ static bool file_exists (char *filename) {
 blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
   schunk->version = 0;     /* pre-first version */
+  schunk->view = false;  /* not a view by default */
 
   // Get the storage with proper defaults
   schunk->storage = get_new_storage(storage, &BLOSC2_CPARAMS_DEFAULTS, &BLOSC2_DPARAMS_DEFAULTS, &BLOSC2_IO_DEFAULTS);
@@ -488,7 +489,8 @@ int64_t blosc2_schunk_append_file(blosc2_schunk* schunk, const char* urlpath) {
 int blosc2_schunk_free(blosc2_schunk *schunk) {
   int err = 0;
 
-  if (schunk->data != NULL) {
+  // If it is a view, the data belongs to original array and should not be freed
+  if (schunk->data != NULL && !schunk->view) {
     for (int i = 0; i < schunk->nchunks; i++) {
       free(schunk->data[i]);
     }
@@ -533,7 +535,8 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     free(schunk->storage);
   }
 
-  if (schunk->frame != NULL) {
+  // If it is a view, the frame belongs to original array and should not be freed
+  if (schunk->frame != NULL && !schunk->view) {
     frame_free((blosc2_frame_s *) schunk->frame);
   }
 
