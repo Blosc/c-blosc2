@@ -135,10 +135,10 @@ CUTEST_TEST_TEST(full) {
         // for (int j = 0; j < 3; ++j) {
         //   printf("%d vs %d ", buffer_fill[j], buffer_dest[j]);
         // }
-        free(buffer_fill);
         break;
     }
     CUTEST_ASSERT("Elements are not equal", is_true);
+    free(buffer_fill);
   }
 
   /* Free mallocs */
