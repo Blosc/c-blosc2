@@ -1200,12 +1200,12 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t
  * @param view The memory pointer where the view will be created.
  * @param ctx1 The b2nd context for the new array, containing new shape and other metadata.
  *
- * @ note This doesn't support slices of arrays and is only useful for adding (or removing) dimensions.
+ * @return An error code.
  *
- * * @return An error code
+ * @note This doesn't support slices of arrays and is only useful for adding (or removing) dimensions.
  *
  */
-int make_view(const b2nd_array_t *array, b2nd_array_t **view, b2nd_context_t *ctx1) {
+int view_new(const b2nd_array_t *array, b2nd_array_t **view, b2nd_context_t *ctx1) {
 
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(view, BLOSC2_ERROR_NULL_POINTER);
@@ -1227,7 +1227,7 @@ int make_view(const b2nd_array_t *array, b2nd_array_t **view, b2nd_context_t *ct
   (*view)->sc->frame = array->sc->frame; // if original array is contiguous, point to frame
   (*view)->sc->nvlmetalayers = array->sc->nvlmetalayers; //
   for (int i = 0; i< array->sc->nvlmetalayers; i++) {
-    (*view)->sc->vlmetalayers[i] = array->sc->vlmetalayers[i]; // copy the vlmetalayers
+    (*view)->sc->vlmetalayers[i] = array->sc->vlmetalayers[i]; // add ptrs to vlmetalayers
   }
 
   return BLOSC2_ERROR_SUCCESS;
@@ -1261,13 +1261,16 @@ int b2nd_expand_dims(const b2nd_array_t *array, b2nd_array_t **view, const int8_
     }
   }
 
+  //views only deal with cparams/dparams; storage is always in-memory (ephemeral).
   blosc2_cparams cparams = *(array->sc->storage->cparams);
-  blosc2_storage b2_storage1 = {.cparams=&cparams};
+  blosc2_dparams dparams = *(array->sc->storage->dparams);
+  blosc2_storage b2_storage1 = {.cparams=&cparams, .dparams=&dparams};
+
   b2nd_context_t *ctx1 = b2nd_create_ctx(&b2_storage1, array->ndim + 1, newshape,
                                         newchunkshape, newblockshape, array->dtype,
                                         array->dtype_format, NULL, 0);
 
-  make_view(array, view, ctx1);
+  view_new(array, view, ctx1);
   b2nd_free_ctx(ctx1);
 
   return BLOSC2_ERROR_SUCCESS;
