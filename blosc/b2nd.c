@@ -1217,6 +1217,11 @@ int make_view(const b2nd_array_t *array, b2nd_array_t **view, b2nd_context_t *ct
 
   /* Fill view with zeros */
   BLOSC_ERROR(b2nd_zeros(ctx1, view));
+  // Free the chunks in base array
+  for (int i = 0; i < (*view)->sc->nchunks; i++) {
+    free((*view)->sc->data[i]);
+  }
+  free((*view)->sc->data);
   (*view)->sc->view = true;
   (*view)->sc->data = array->sc->data; // point view to the same data
   (*view)->sc->frame = array->sc->frame; // if original array is contiguous, point to frame
@@ -1263,6 +1268,7 @@ int b2nd_expand_dims(const b2nd_array_t *array, b2nd_array_t **view, const int8_
                                         array->dtype_format, NULL, 0);
 
   make_view(array, view, ctx1);
+  b2nd_free_ctx(ctx1);
 
   return BLOSC2_ERROR_SUCCESS;
 }
