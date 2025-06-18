@@ -137,6 +137,7 @@ static char* test_schunk(void) {
   int32_t content2_len;
   blosc2_vlmeta_get(schunk, "vlmetalayer1", &content2, &content2_len);
   mu_assert("ERROR: bad vlmetalayer content", strncmp((char*)content2, "testing the  vlmetalayers", content2_len) == 0);
+  free(content2);
 
   blosc2_vlmeta_get(schunk, "vlmetalayer2", &content2, &content2_len);
   mu_assert("ERROR: bad vlmetalayer content", strncmp((char*)content2, "vlmetalayers", content2_len) == 0);
