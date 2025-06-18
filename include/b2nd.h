@@ -386,7 +386,7 @@ BLOSC_EXPORT int b2nd_expand_dims(const b2nd_array_t *array, b2nd_array_t **view
  * @param buffer The buffer where the data will be stored.
  * @param buffersize The size (in bytes) of the buffer.
  *
- * @return An error code
+ * @return An error code.
  */
 BLOSC_EXPORT int b2nd_get_slice_cbuffer(const b2nd_array_t *array, const int64_t *start, const int64_t *stop,
                                         void *buffer, const int64_t *buffershape, int64_t buffersize);
