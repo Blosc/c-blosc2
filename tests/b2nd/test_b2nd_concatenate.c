@@ -278,7 +278,12 @@ CUTEST_TEST_TEST(concatenate) {
   b2nd_array_t *array = NULL;
   blosc2_storage b2_storage = {.cparams=&cparams};
   if (backend.persistent) {
-    b2_storage.urlpath = urlpath;
+    if (copy) {
+      b2_storage.urlpath = urlpath;
+    }
+    else { // If copy is false, we use the urlpath of src1
+      b2_storage.urlpath = urlpath1;
+    }
   }
   b2_storage.contiguous = backend.contiguous;
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, shapes.ndim, shapes.shape1,
