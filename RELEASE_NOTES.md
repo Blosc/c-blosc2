@@ -1,6 +1,11 @@
 Release notes for C-Blosc2
 ==========================
 
+Changes from 2.19.0 to 2.19.1
+=============================
+
+#XXX version-specific blurb XXX#
+
 Changes from 2.18.0 to 2.19.0
 =============================
 
