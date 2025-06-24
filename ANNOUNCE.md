@@ -1,12 +1,12 @@
-# Announcing C-Blosc2 2.18.0
+# Announcing C-Blosc2 2.19.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-* [FEATURE] New `b2nd_concatenate()` for concatenating two b2nd arrays.
-  See PR #661 and #663.
-* [FIX] Flush modified pages only in write mode for mmap files.
-  Thanks to Jan Sellner.
+* [FEATURE] New `b2nd_expand_dims()` function for expanding the dimensions
+  of a b2nd array. Useful for adding new dimensions to an existing b2nd array,
+  e.g., when you want to add a new dimension to a 2D array to make it 3D.
+  Thanks to @lshaw8317 for the PR (#666 and #667).
 
 For more info, see the release notes in:
 

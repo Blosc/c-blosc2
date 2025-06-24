@@ -1,11 +1,18 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.18.0 to 2.18.1
+Changes from 2.18.0 to 2.19.0
 =============================
 
-#XXX version-specific blurb XXX#
+* New `b2nd_expand_dims()` function for expanding the dimensions of a b2nd array.
+  This is useful for adding new dimensions to an existing b2nd array, e.g.,
+  when you want to add a new dimension to a 2D array to make it 3D.
+  Thanks to @lshaw8317 for the PR (#666 and #667).
 
+* New internal view object that allows accessing the data in a b2nd array
+  without copying it.  The new `b2nd_expand_dims()` function makes use of this.
+  In the future, it can also be useful for implementing e.g. a view on a slice
+  of a b2nd array.
 
 Changes from 2.17.1 to 2.18.0
 =============================
