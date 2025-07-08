@@ -4769,3 +4769,82 @@ blosc2_io blosc2_get_blosc2_io_defaults(void) {
 blosc2_stdio_mmap blosc2_get_blosc2_stdio_mmap_defaults(void) {
   return BLOSC2_STDIO_MMAP_DEFAULTS;
 };
+
+const char *blosc2_error_string(int error_code) {
+  switch (error_code) {
+    case BLOSC2_ERROR_FAILURE:
+      return "Generic failure";
+    case BLOSC2_ERROR_STREAM:
+      return "Bad stream";
+    case BLOSC2_ERROR_DATA:
+      return "Invalid data";
+    case BLOSC2_ERROR_MEMORY_ALLOC:
+      return "Memory alloc/realloc failure";
+    case BLOSC2_ERROR_READ_BUFFER:
+      return "Not enough space to read";
+    case BLOSC2_ERROR_WRITE_BUFFER:
+      return "Not enough space to write";
+    case BLOSC2_ERROR_CODEC_SUPPORT:
+      return "Codec not supported";
+    case BLOSC2_ERROR_CODEC_PARAM:
+      return "Invalid parameter supplied to codec";
+    case BLOSC2_ERROR_CODEC_DICT:
+      return "Codec dictionary error";
+    case BLOSC2_ERROR_VERSION_SUPPORT:
+      return "Version not supported";
+    case BLOSC2_ERROR_INVALID_HEADER:
+      return "Invalid value in header";
+    case BLOSC2_ERROR_INVALID_PARAM:
+      return "Invalid parameter supplied to function";
+    case BLOSC2_ERROR_FILE_READ:
+      return "File read failure";
+    case BLOSC2_ERROR_FILE_WRITE:
+      return "File write failure";
+    case BLOSC2_ERROR_FILE_OPEN:
+      return "File open failure";
+    case BLOSC2_ERROR_NOT_FOUND:
+      return "Not found";
+    case BLOSC2_ERROR_RUN_LENGTH:
+      return "Bad run length encoding";
+    case BLOSC2_ERROR_FILTER_PIPELINE:
+      return "Filter pipeline error";
+    case BLOSC2_ERROR_CHUNK_INSERT:
+      return "Chunk insert failure";
+    case BLOSC2_ERROR_CHUNK_APPEND:
+      return "Chunk append failure";
+    case BLOSC2_ERROR_CHUNK_UPDATE:
+      return "Chunk update failure";
+    case BLOSC2_ERROR_2GB_LIMIT:
+      return "Sizes larger than 2gb not supported";
+    case BLOSC2_ERROR_SCHUNK_COPY:
+      return "Super-chunk copy failure";
+    case BLOSC2_ERROR_FRAME_TYPE:
+      return "Wrong type for frame";
+    case BLOSC2_ERROR_FILE_TRUNCATE:
+      return "File truncate failure";
+    case BLOSC2_ERROR_THREAD_CREATE:
+      return "Thread or thread context creation failure";
+    case BLOSC2_ERROR_POSTFILTER:
+      return "Postfilter failure";
+    case BLOSC2_ERROR_FRAME_SPECIAL:
+      return "Special frame failure";
+    case BLOSC2_ERROR_SCHUNK_SPECIAL:
+      return "Special super-chunk failure";
+    case BLOSC2_ERROR_PLUGIN_IO:
+      return "IO plugin error";
+    case BLOSC2_ERROR_FILE_REMOVE:
+      return "Remove file failure";
+    case BLOSC2_ERROR_NULL_POINTER:
+      return "Pointer is null";
+    case BLOSC2_ERROR_INVALID_INDEX:
+      return "Invalid index";
+    case BLOSC2_ERROR_METALAYER_NOT_FOUND:
+      return "Metalayer has not been found";
+    case BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED:
+      return "Maximum buffersize exceeded";
+    case BLOSC2_ERROR_TUNER:
+      return "Tuner failure";
+    default:
+      return "Unknown error";
+  }
+}
