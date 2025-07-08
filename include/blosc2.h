@@ -488,84 +488,33 @@ enum {
 #define BLOSC_ATTRIBUTE_UNUSED
 #endif
 
+/**
+ * @brief Get the string representation of an error code.
+ *
+ * The returned string is a static string, so it should not be modified or freed.
+ * For unknown error codes, it returns "Unknown error".
+ *
+ * @param error_code The error code to get the string representation for.
+ * @return A pointer to a static string representing the error code.
+ */
+BLOSC_EXPORT const char *blosc2_error_string(int error_code);
+
+/**
+ * @brief Get the string representation of an error code.
+ *
+ * This function is identical to #blosc2_error_string, but with a legacy interface.
+ * The returned string is a static read only string, so it should not be modified or freed,
+ * although it is not const.
+ *
+ * Prefer using #blosc2_error_string instead.
+ *
+ * @param rc The error code to get the string representation for.
+ * @return A pointer to a static string representing the error code.
+ */
 static char *print_error(int rc) BLOSC_ATTRIBUTE_UNUSED;
 static char *print_error(int rc) {
-  switch (rc) {
-    case BLOSC2_ERROR_FAILURE:
-      return (char *) "Generic failure";
-    case BLOSC2_ERROR_STREAM:
-      return (char *) "Bad stream";
-    case BLOSC2_ERROR_DATA:
-      return (char *) "Invalid data";
-    case BLOSC2_ERROR_MEMORY_ALLOC:
-      return (char *) "Memory alloc/realloc failure";
-    case BLOSC2_ERROR_READ_BUFFER:
-      return (char *) "Not enough space to read";
-    case BLOSC2_ERROR_WRITE_BUFFER:
-      return (char *) "Not enough space to write";
-    case BLOSC2_ERROR_CODEC_SUPPORT:
-      return (char *) "Codec not supported";
-    case BLOSC2_ERROR_CODEC_PARAM:
-      return (char *) "Invalid parameter supplied to codec";
-    case BLOSC2_ERROR_CODEC_DICT:
-      return (char *) "Codec dictionary error";
-    case BLOSC2_ERROR_VERSION_SUPPORT:
-      return (char *) "Version not supported";
-    case BLOSC2_ERROR_INVALID_HEADER:
-      return (char *) "Invalid value in header";
-    case BLOSC2_ERROR_INVALID_PARAM:
-      return (char *) "Invalid parameter supplied to function";
-    case BLOSC2_ERROR_FILE_READ:
-      return (char *) "File read failure";
-    case BLOSC2_ERROR_FILE_WRITE:
-      return (char *) "File write failure";
-    case BLOSC2_ERROR_FILE_OPEN:
-      return (char *) "File open failure";
-    case BLOSC2_ERROR_NOT_FOUND:
-      return (char *) "Not found";
-    case BLOSC2_ERROR_RUN_LENGTH:
-      return (char *) "Bad run length encoding";
-    case BLOSC2_ERROR_FILTER_PIPELINE:
-      return (char *) "Filter pipeline error";
-    case BLOSC2_ERROR_CHUNK_INSERT:
-      return (char *) "Chunk insert failure";
-    case BLOSC2_ERROR_CHUNK_APPEND:
-      return (char *) "Chunk append failure";
-    case BLOSC2_ERROR_CHUNK_UPDATE:
-      return (char *) "Chunk update failure";
-    case BLOSC2_ERROR_2GB_LIMIT:
-      return (char *) "Sizes larger than 2gb not supported";
-    case BLOSC2_ERROR_SCHUNK_COPY:
-      return (char *) "Super-chunk copy failure";
-    case BLOSC2_ERROR_FRAME_TYPE:
-      return (char *) "Wrong type for frame";
-    case BLOSC2_ERROR_FILE_TRUNCATE:
-      return (char *) "File truncate failure";
-    case BLOSC2_ERROR_THREAD_CREATE:
-      return (char *) "Thread or thread context creation failure";
-    case BLOSC2_ERROR_POSTFILTER:
-      return (char *) "Postfilter failure";
-    case BLOSC2_ERROR_FRAME_SPECIAL:
-      return (char *) "Special frame failure";
-    case BLOSC2_ERROR_SCHUNK_SPECIAL:
-      return (char *) "Special super-chunk failure";
-    case BLOSC2_ERROR_PLUGIN_IO:
-      return (char *) "IO plugin error";
-    case BLOSC2_ERROR_FILE_REMOVE:
-      return (char *) "Remove file failure";
-    case BLOSC2_ERROR_NULL_POINTER:
-      return (char *) "Pointer is null";
-    case BLOSC2_ERROR_INVALID_INDEX:
-      return (char *) "Invalid index";
-    case BLOSC2_ERROR_METALAYER_NOT_FOUND:
-      return (char *) "Metalayer has not been found";
-    case BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED:
-      return (char *) "Maximum buffersize exceeded";
-    case BLOSC2_ERROR_TUNER:
-      return (char *) "Tuner failure";
-    default:
-      return (char *) "Unknown error";
-  }
+  // TODO: remove this function, use blosc2_error_string only
+  return (char *) blosc2_error_string(rc);
 }
 
 
