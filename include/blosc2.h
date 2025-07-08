@@ -561,6 +561,8 @@ static char *print_error(int rc) {
       return (char *) "Metalayer has not been found";
     case BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED:
       return (char *) "Maximum buffersize exceeded";
+    case BLOSC2_ERROR_TUNER:
+      return (char *) "Tuner failure";
     default:
       return (char *) "Unknown error";
   }
