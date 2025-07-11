@@ -31,7 +31,7 @@ A fast, compressed and persistent data store library for C
 What is it?
 ===========
 
-`Blosc <https://www.blosc.org/pages/blosc-in-depth/>`_ is a high performance compressor optimized for binary data (i.e. floating point numbers, integers and booleans, although it can handle string data too).  It has been designed to transmit data to the processor cache faster than the traditional, non-compressed, direct memory fetch approach via a memcpy() OS call.  Blosc main goal is not just to reduce the size of large datasets on-disk or in-memory, but also to accelerate memory-bound computations.
+`Blosc2 <https://www.blosc.org/pages/blosc-in-depth/>`_ is a high-performance compressor and data format optimized for binary data, including numerical arrays, tensors, and other structured formats. It provides a flexible framework of codecs and filters, enabling developers to balance compression speed and ratio for specific use cases, from high-throughput data pipelines to persistent storage. As the successor to the original Blosc library (released in 2010), Blosc2 is built on a mature foundation and is integrated into many popular scientific computing libraries, such as PyTables, h5py, and Zarr.
 
 C-Blosc2 is the new major version of `C-Blosc <https://github.com/Blosc/c-blosc>`_, and is backward compatible with both the C-Blosc1 API and its in-memory format.  However, the reverse thing is generally not true for the format; buffers generated with C-Blosc2 are not format-compatible with C-Blosc1 (i.e. forward compatibility is not supported).  In case you want to ensure full API compatibility with C-Blosc1 API, define the `BLOSC1_COMPAT` symbol.
 
@@ -41,7 +41,7 @@ See a 3 minutes  `introductory video to Blosc2 <https://www.youtube.com/watch?v=
 Blosc2 NDim: an N-Dimensional store
 ===================================
 
-One of the latest and more exciting additions in C-Blosc2 is the `Blosc2 NDim layer <https://www.blosc.org/c-blosc2/reference/b2nd.html>`_ (or B2ND for short), allowing to create *and* read n-dimensional datasets in an extremely efficient way thanks to a n-dim 2-level partitioning, that allows to slice and dice arbitrary large and compressed data in a more fine-grained way:
+One of more exciting additions in C-Blosc2 is the `Blosc2 NDim layer <https://www.blosc.org/c-blosc2/reference/b2nd.html>`_ (or B2ND for short), allowing to create *and* read n-dimensional datasets in an extremely efficient way thanks to a n-dim 2-level partitioning, that allows to slice and dice arbitrary large and compressed data in a more fine-grained way:
 
 .. image:: https://github.com/Blosc/c-blosc2/blob/main/images/b2nd-2level-parts.png?raw=true
   :width: 75%
@@ -67,7 +67,7 @@ New features in C-Blosc2
 
 * **64-bit containers:** the first-class container in C-Blosc2 is the `super-chunk` or, for brevity, `schunk`, that is made by smaller chunks which are essentially C-Blosc1 32-bit containers.  The super-chunk can be backed or not by another container which is called a `frame` (see later).
 
-* **NDim containers (B2ND):** allow to store n-dimensional data that can efficiently read datasets in slices that can be n-dimensional too. To achieve this, a n-dimensional 2-level partitioning has been implemented.  This capabilities were formerly part of `Caterva <https://github.com/Blosc/caterva>`_, and now it is included in C-Blosc2 for convenience.  Caterva is now deprecated.
+* **NDim containers (B2ND):** allow to store n-dimensional data (aka tensors) that can efficiently read datasets in slices that can be n-dimensional too. To achieve this, a n-dimensional 2-level partitioning has been implemented.
 
 * **More filters:** besides `shuffle` and `bitshuffle` already present in C-Blosc1, C-Blosc2 already implements:
 
