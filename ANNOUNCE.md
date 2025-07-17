@@ -1,12 +1,12 @@
-# Announcing C-Blosc2 2.19.0
+# Announcing C-Blosc2 2.19.1
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-* [FEATURE] New `b2nd_expand_dims()` function for expanding the dimensions
-  of a b2nd array. Useful for adding new dimensions to an existing b2nd array,
-  e.g., when you want to add a new dimension to a 2D array to make it 3D.
-  Thanks to @lshaw8317 for the PR (#666 and #667).
+* [FEATURE] New `blosc2_error_string()` public function for getting the error string
+  corresponding to a given error code.  This is useful for debugging purposes.
+  Thanks to Barak Ugav (@barakugav).
+* [FIX] Eagerly register io_cb's to avoid race. Thanks to Tom Birch (@tom-neara).
 
 For more info, see the release notes in:
 

@@ -4,7 +4,12 @@ Release notes for C-Blosc2
 Changes from 2.19.0 to 2.19.1
 =============================
 
-#XXX version-specific blurb XXX#
+* New `blosc2_error_string()` public function for getting the error string
+  corresponding to a given error code.  This is useful for debugging purposes.
+  Thanks to Barak Ugav (@barakugav).
+* Support BLOSC2_ERROR_TUNER in print_error. Thanks to Barak Ugav (@barakugav).
+* Eagerly register io_cb's to avoid race. Thanks to Tom Birch (@tom-neara).
+
 
 Changes from 2.18.0 to 2.19.0
 =============================
