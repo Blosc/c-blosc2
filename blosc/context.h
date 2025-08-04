@@ -22,11 +22,7 @@
 #include <ipps.h>
 #endif
 
-#if defined(_WIN32) && !defined(__GNUC__)
-#include "win32/pthread.h"
-#else
-#include <pthread.h>
-#endif
+#include <threading.h>
 
 #include <stddef.h>
 #include <stdint.h>
@@ -86,17 +82,17 @@ struct blosc2_context_s {
   int16_t new_nthreads;
   int16_t threads_started;
   int16_t end_threads;
-  pthread_t *threads;
+  blosc2_pthread_t *threads;
   struct thread_context *thread_contexts;  /* Only for user-managed threads */
-  pthread_mutex_t count_mutex;
-  pthread_mutex_t nchunk_mutex;
+  blosc2_pthread_mutex_t count_mutex;
+  blosc2_pthread_mutex_t nchunk_mutex;
 #ifdef BLOSC_POSIX_BARRIERS
   pthread_barrier_t barr_init;
   pthread_barrier_t barr_finish;
 #else
   int count_threads;
-  pthread_mutex_t count_threads_mutex;
-  pthread_cond_t count_threads_cv;
+  blosc2_pthread_mutex_t count_threads_mutex;
+  blosc2_pthread_cond_t count_threads_cv;
 #endif
 #if !defined(_WIN32)
   pthread_attr_t ct_attr;  /* creation time attrs for threads */
@@ -104,8 +100,8 @@ struct blosc2_context_s {
   int thread_giveup_code;  /* error code when give up */
   int thread_nblock;  /* block counter */
   int dref_not_init;  /* data ref in delta not initialized */
-  pthread_mutex_t delta_mutex;
-  pthread_cond_t delta_cv;
+  blosc2_pthread_mutex_t delta_mutex;
+  blosc2_pthread_cond_t delta_cv;
   // Add new fields here to avoid breaking the ABI.
 };
 
