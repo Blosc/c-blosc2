@@ -369,12 +369,14 @@ BLOSC_EXPORT int b2nd_squeeze(b2nd_array_t *array);
  * @brief Add a newaxis to a b2nd array at location @p axis.
  *
  * @param array The b2nd array to be expanded.
- * @param axis The axis where the new dimension will be added.
+ * @param axis The axes where the new dimensions will be added.
  * @param view The memory pointer where the new view will be created.
+ * @param final_dims The final number of dimensions. Should be same as the number of elements in @p axis.
  *
  * @return An error code.
  */
-BLOSC_EXPORT int b2nd_expand_dims(const b2nd_array_t *array, b2nd_array_t **view, const int8_t axis);
+BLOSC_EXPORT int b2nd_expand_dims(const b2nd_array_t *array, b2nd_array_t **view, const bool *axis,
+    const uint8_t final_dims);
 
 /**
  * @brief Get a slice from an array and store it into a C buffer.
