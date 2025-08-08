@@ -1233,7 +1233,7 @@ int view_new(const b2nd_array_t *array, b2nd_array_t **view, b2nd_context_t *ctx
   return BLOSC2_ERROR_SUCCESS;
 }
 
-int b2nd_expand_dims(const b2nd_array_t *array, b2nd_array_t **view, const int8_t axis) {
+int b2nd_expand_dims(const b2nd_array_t *array, b2nd_array_t **view, const bool *axis, const uint8_t final_dims) {
   for (int i = 0; i < array->sc->nmetalayers; ++i) {
     if (strcmp(array->sc->metalayers[i]->name, "b2nd") != 0) {
       BLOSC_TRACE_ERROR("Cannot expand dimensions of an array with non-b2nd metalayers");
@@ -1243,21 +1243,26 @@ int b2nd_expand_dims(const b2nd_array_t *array, b2nd_array_t **view, const int8_
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(view, BLOSC2_ERROR_NULL_POINTER);
 
-  uint8_t passed_axis = 0;
+  uint8_t old_idx = 0;
   int64_t newshape[B2ND_MAX_DIM];
   int32_t newchunkshape[B2ND_MAX_DIM];
   int32_t newblockshape[B2ND_MAX_DIM];
 
-  for (int i = 0; i < array->ndim + 1; ++i) {
-    if (axis == i) {
+  for (int i = 0; i < final_dims; ++i) {
+    if (axis[i] == true) {
       newshape[i] = 1;
       newchunkshape[i] = 1;
       newblockshape[i] = 1;
-      passed_axis = 1;
-    } else {
-      newshape[i] = array->shape[i - passed_axis];
-      newchunkshape[i] = array->chunkshape[i - passed_axis];
-      newblockshape[i] = array->blockshape[i - passed_axis];
+    }
+    else {
+      if (old_idx == array->ndim) {
+        BLOSC_TRACE_ERROR("Error in axis list: original array has fewer dimensions than the axis list implies!");
+        return BLOSC2_ERROR_INVALID_PARAM;
+      }
+      newshape[i] = array->shape[old_idx];
+      newchunkshape[i] = array->chunkshape[old_idx];
+      newblockshape[i] = array->blockshape[old_idx];
+      old_idx++;
     }
   }
 
@@ -1266,7 +1271,7 @@ int b2nd_expand_dims(const b2nd_array_t *array, b2nd_array_t **view, const int8_
   blosc2_dparams dparams = *(array->sc->storage->dparams);
   blosc2_storage b2_storage1 = {.cparams=&cparams, .dparams=&dparams};
 
-  b2nd_context_t *ctx1 = b2nd_create_ctx(&b2_storage1, array->ndim + 1, newshape,
+  b2nd_context_t *ctx1 = b2nd_create_ctx(&b2_storage1, final_dims, newshape,
                                         newchunkshape, newblockshape, array->dtype,
                                         array->dtype_format, NULL, 0);
 

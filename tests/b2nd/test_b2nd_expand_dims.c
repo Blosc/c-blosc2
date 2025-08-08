@@ -13,9 +13,10 @@ typedef struct {
   int64_t shape[B2ND_MAX_DIM];
   int32_t chunkshape[B2ND_MAX_DIM];
   int32_t blockshape[B2ND_MAX_DIM];
-  int8_t axis;
+  bool axis[B2ND_MAX_DIM];
   int64_t start[B2ND_MAX_DIM];
   int64_t stop[B2ND_MAX_DIM];
+  int8_t final_dims;
 } test_shapes_t;
 
 
@@ -36,14 +37,14 @@ CUTEST_TEST_SETUP(expand_dims) {
       {false, true},
   ));
   CUTEST_PARAMETRIZE(shapes, test_shapes_t, CUTEST_DATA(
-      {0, {0}, {0}, {0}, 0, {0, 0}, {1, 0}}, // 0-dim
-      {1, {10}, {7}, {2}, 0, {0, 2}, {1, 9}},
-      {1, {10}, {7}, {2}, 1, {2, 0}, {9, 1}},
-      {2, {14, 10}, {8, 5}, {2, 2}, 0, {0, 5, 3}, {1, 9, 10}},
-      {2, {14, 10}, {8, 5}, {2, 2}, 1, {2, 0, 0}, {8, 1, 0}},
-      {2, {14, 10}, {8, 5}, {2, 2}, 2, {2, 0, 0}, {8, 0, 0}},
-      {3, {10, 10, 10}, {3, 5, 9}, {3, 4, 4}, 0,{0, 3, 0, 3}, {1, 6, 7, 10}},
-      {3, {10, 10, 10}, {3, 5, 9}, {3, 4, 4}, 1,{3, 0, 0, 3}, {6, 1, 7, 10}},
+      {0, {0}, {0}, {0}, {1}, {0}, {1}, 1}, // 0-dim
+      {1, {10}, {7}, {2}, {1, 0, 1}, {0, 2, 0}, {1, 9, 1}, 3},
+      {1, {10}, {7}, {2}, {1, 0, 1, 1}, {0, 2, 0, 0}, {1, 9, 1, 1}, 4},
+      {2, {14, 10}, {8, 5}, {2, 2}, {1, 0, 0}, {0, 5, 3}, {1, 9, 10}, 3},
+      {2, {14, 10}, {8, 5}, {2, 2}, {0, 1, 0, 1}, {2, 0, 3, 0}, {8, 1, 5, 1}, 4},
+      {2, {14, 10}, {8, 5}, {2, 2}, {0, 1, 1, 0}, {2, 0, 0, 2}, {8, 1, 1, 7}, 4},
+      {3, {10, 10, 10}, {3, 5, 9}, {3, 4, 4}, {0, 1, 0, 1, 0},{3, 0, 3, 0, 3}, {6, 1, 7, 1, 5}, 5},
+      {3, {10, 10, 10}, {3, 5, 9}, {3, 4, 4}, {1, 0, 0, 0},{0, 3, 0, 3}, {1, 6, 7, 10}, 4},
   ));
 }
 
@@ -84,8 +85,19 @@ CUTEST_TEST_TEST(expand_dims) {
   B2ND_TEST_ASSERT(b2nd_from_cbuffer(ctx, &src, buffer, buffersize));
 
   b2nd_array_t *dest;
-  B2ND_TEST_ASSERT(b2nd_expand_dims(src, &dest, shapes.axis));
-  CUTEST_ASSERT("dims are equal", (dest)->ndim == src->ndim + 1);
+  B2ND_TEST_ASSERT(b2nd_expand_dims(src, &dest, shapes.axis, shapes.final_dims));
+  CUTEST_ASSERT("dims are equal", (dest)->ndim == shapes.final_dims);
+  int j = 0;
+  // check dimensions added correctly
+  for (int i = 0; i < dest->ndim; ++i) {
+    if (shapes.axis[i]) {
+      CUTEST_ASSERT("Shape of new axis is not 1", dest->shape[i] == 1);
+    }
+    else {
+      CUTEST_ASSERT("Shape of original axis is not equal", dest->shape[i] == src->shape[j]);
+      j++;
+    }
+  }
 
   if (backend.contiguous) {
     // Convert to a frame and restore from it
@@ -98,7 +110,7 @@ CUTEST_TEST_TEST(expand_dims) {
     if (needs_free) {
       free(destbuffer);
     }
-    CUTEST_ASSERT("dims are equal", dest2->ndim == src->ndim + 1);
+    CUTEST_ASSERT("dims are equal", dest2->ndim == shapes.final_dims);
     B2ND_TEST_ASSERT(b2nd_free(dest2));
   }
 
@@ -172,7 +184,7 @@ CUTEST_TEST_TEST(expand_dims) {
   for (int i = 0; i < destbuffersize / typesize; ++i) {
     uint8_t a = newbuffer_dest[i];
     uint8_t b = buffer_dest2[i];
-    CUTEST_ASSERT("Elements are not equals!", a == b);
+    CUTEST_ASSERT("Elements are not equal!", a == b);
   }
 
   free(buffer_dest);
