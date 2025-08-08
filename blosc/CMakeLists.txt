@@ -59,6 +59,8 @@ if(BUILD_STATIC)
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
         $<INSTALL_INTERFACE:include>)
 endif()
+# Add unified target
+add_library(Blosc2::blosc2 ALIAS ${UNIFIED_TARGET_ALIAS})
 # When the option has been selected to compile the test suite,
 # compile an additional version of blosc2_static which exports
 # some normally-hidden symbols (to facilitate unit testing).

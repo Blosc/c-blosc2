@@ -445,6 +445,28 @@ if(BUILD_PLUGINS)
     add_subdirectory(plugins)
 endif()
 
+# Determine which linkage the unified target will use
+if(BUILD_SHARED AND NOT BUILD_STATIC)
+    if(NOT BUILD_SHARED_LIBS)
+        message(WARNING "BUILD_SHARED_LIBS is OFF, but BUILD_SHARED is ON and BUILD_STATIC is OFF, which takes precedence, so Blosc2::blosc2 is a shared library")
+    endif()
+    set(UNIFIED_TARGET_ALIAS blosc2_shared)
+elseif(NOT BUILD_SHARED AND BUILD_STATIC)
+    if(BUILD_SHARED_LIBS)
+        message(WARNING "BUILD_SHARED_LIBS is ON, but BUILD_SHARED is OFF and BUILD_STATIC is ON, which takes precedence, so Blosc2::blosc2 is a static library")
+    endif()
+    set(UNIFIED_TARGET_ALIAS blosc2_static)
+else()
+    # If both BUILD_SHARED and BUILD_STATIC are set, which is the default,
+    # fallback to using BUILD_SHARED_LIBS to determine whether to set
+    # Blosc2::blosc2 to static or shared.
+    if(BUILD_SHARED_LIBS)
+        set(UNIFIED_TARGET_ALIAS blosc2_shared)
+    else()
+        set(UNIFIED_TARGET_ALIAS blosc2_static)
+    endif()
+endif()
+
 add_subdirectory(blosc)
 
 if(BUILD_TESTS)
@@ -538,6 +560,10 @@ if(BLOSC_INSTALL)
     if(BUILD_STATIC)
         list(APPEND Blosc2_INSTALL_TARGET_NAMES blosc2_static)
     endif()
+    # Add unified target
+    add_library(blosc2 INTERFACE)
+    list(APPEND Blosc2_INSTALL_TARGET_NAMES blosc2)
+    target_link_libraries(blosc2 INTERFACE ${UNIFIED_TARGET_ALIAS})
     configure_file(
         ${PROJECT_SOURCE_DIR}/Blosc2Config.cmake.in
         ${CMAKE_CURRENT_BINARY_DIR}/Blosc2Config.cmake
