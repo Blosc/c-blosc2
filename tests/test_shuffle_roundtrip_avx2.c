@@ -11,8 +11,6 @@
 **********************************************************************/
 
 #include "test_common.h"
-#include "../blosc/shuffle.h"
-#include "../blosc/shuffle-generic.h"
 
 /* Include accelerated shuffles if supported by this compiler.
    TODO: Need to also do run-time CPU feature support here. */

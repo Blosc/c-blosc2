@@ -8,7 +8,8 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include "shuffle.h" /* needs to be included first to define macros */
+#include "blosc2.h" /* needs to be included first to define macros */
+#include "shuffle.h"
 
 /*  Include hardware-accelerated shuffle/unshuffle routines based on
     the target architecture. Note that a target architecture may support
@@ -45,7 +46,6 @@
 
 #include "shuffle-generic.h"
 #include "bitshuffle-generic.h"
-#include "blosc2.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -417,42 +417,59 @@ void init_shuffle_implementation(void) {
 
 /* Shuffle a block by dynamically dispatching to the appropriate
    hardware-accelerated routine at run-time. */
-void
-shuffle(const int32_t bytesoftype, const int32_t blocksize,
-        const uint8_t* _src, uint8_t* _dest) {
+int
+blosc2_shuffle(const int32_t typesize, const int32_t blocksize,
+               const uint8_t* _src, uint8_t* _dest) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
+  if (typesize < 1 || typesize > 256 || blocksize < 0) {
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
   /* The implementation is initialized.
      Dispatch to its shuffle routine. */
-  (host_implementation.shuffle)(bytesoftype, blocksize, _src, _dest);
+  (host_implementation.shuffle)(typesize, blocksize, _src, _dest);
+
+  return blocksize;
 }
 
 /* Unshuffle a block by dynamically dispatching to the appropriate
    hardware-accelerated routine at run-time. */
-void
-unshuffle(const int32_t bytesoftype, const int32_t blocksize,
-          const uint8_t* _src, uint8_t* _dest) {
+int
+blosc2_unshuffle(const int32_t typesize, const int32_t blocksize,
+                 const uint8_t* _src, uint8_t* _dest) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
 
+  if (typesize < 1 || typesize > 256 || blocksize < 0) {
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
   /* The implementation is initialized.
      Dispatch to it's unshuffle routine. */
-  (host_implementation.unshuffle)(bytesoftype, blocksize, _src, _dest);
+  (host_implementation.unshuffle)(typesize, blocksize, _src, _dest);
+
+  return blocksize;
 }
 
 /*  Bit-shuffle a block by dynamically dispatching to the appropriate
     hardware-accelerated routine at run-time. */
 int32_t
-bitshuffle(const int32_t bytesoftype, const int32_t blocksize,
-           const uint8_t *_src, uint8_t *_dest) {
+blosc2_bitshuffle(const int32_t typesize, const int32_t blocksize,
+                  const uint8_t *src, uint8_t *dest) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
-  size_t size = blocksize / bytesoftype;
+  size_t size = blocksize / typesize;
+
+  if (typesize < 1 || typesize > 256 || blocksize < 0) {
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
   /* bitshuffle only supports a number of elements that is a multiple of 8. */
   size -= size % 8;
   int ret = (int) (host_implementation.bitshuffle)
-      ((const void *) _src, (void *) _dest, size, bytesoftype);
+  ((const void *) src, (void *) dest, size, typesize);
   if (ret < 0) {
     // Some error in bitshuffle (should not happen)
     BLOSC_TRACE_ERROR("the impossible happened: the bitshuffle filter failed!");
@@ -460,20 +477,20 @@ bitshuffle(const int32_t bytesoftype, const int32_t blocksize,
   }
 
   // Copy the leftovers
-  size_t offset = size * bytesoftype;
-  memcpy((void *) (_dest + offset), (void *) (_src + offset), blocksize - offset);
+  size_t offset = size * typesize;
+  memcpy((void *) (dest + offset), (void *) (src + offset), blocksize - offset);
 
   return blocksize;
 }
 
 /*  Bit-unshuffle a block by dynamically dispatching to the appropriate
     hardware-accelerated routine at run-time. */
-int32_t bitunshuffle(const int32_t bytesoftype, const int32_t blocksize,
-                     const uint8_t *_src, uint8_t *_dest,
+int32_t bitunshuffle(const int32_t typesize, const int32_t blocksize,
+                     const uint8_t *src, uint8_t *dest,
                      const uint8_t format_version) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
-  size_t size = blocksize / bytesoftype;
+  size_t size = blocksize / typesize;
 
   if (format_version == 2) {
     /* Starting from version 3, bitshuffle() works differently */
@@ -481,34 +498,41 @@ int32_t bitunshuffle(const int32_t bytesoftype, const int32_t blocksize,
       /* The number of elems is a multiple of 8 which is supported by
          bitshuffle. */
       int ret = (int) (host_implementation.bitunshuffle)
-          ((const void *) _src, (void *) _dest, blocksize / bytesoftype, bytesoftype);
+          ((const void *) src, (void *) dest, blocksize / typesize, typesize);
       if (ret < 0) {
         // Some error in bitshuffle (should not happen)
         BLOSC_TRACE_ERROR("the impossible happened: the bitunshuffle filter failed!");
         return ret;
       }
       /* Copy the leftovers (we do so starting from c-blosc 1.18 on) */
-      size_t offset = size * bytesoftype;
-      memcpy((void *) (_dest + offset), (void *) (_src + offset), blocksize - offset);
+      size_t offset = size * typesize;
+      memcpy((void *) (dest + offset), (void *) (src + offset), blocksize - offset);
     }
     else {
-      memcpy((void *) _dest, (void *) _src, blocksize);
+      memcpy((void *) dest, (void *) src, blocksize);
     }
   }
   else {
     /* bitshuffle only supports a number of bytes that is a multiple of 8. */
     size -= size % 8;
     int ret = (int) (host_implementation.bitunshuffle)
-        ((const void *) _src, (void *) _dest, size, bytesoftype);
+        ((const void *) src, (void *) dest, size, typesize);
     if (ret < 0) {
       BLOSC_TRACE_ERROR("the impossible happened: the bitunshuffle filter failed!");
       return ret;
     }
 
     /* Copy the leftovers */
-    size_t offset = size * bytesoftype;
-    memcpy((void *) (_dest + offset), (void *) (_src + offset), blocksize - offset);
+    size_t offset = size * typesize;
+    memcpy((void *) (dest + offset), (void *) (src + offset), blocksize - offset);
   }
 
   return blocksize;
+}
+
+/* Stub public API that redirects to internal implementation. */
+int32_t
+blosc2_bitunshuffle(const int32_t typesize, const int32_t blocksize,
+                  const uint8_t *src, uint8_t *dest) {
+  return bitunshuffle(typesize, blocksize, src, dest, BLOSC2_VERSION_FORMAT);
 }
