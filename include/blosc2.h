@@ -2510,6 +2510,81 @@ BLOSC_EXPORT int blosc2_get_slice_nchunks(blosc2_schunk* schunk, int64_t *start,
 
 
 /*********************************************************************
+  Raw shuffle functions.
+*********************************************************************/
+
+/**
+ * @brief Applies the shuffle operation to a block of data in @p src, and puts the result in @p dest.
+ *
+ * @warning The @p src buffer and the @p dest buffer can not overlap.
+ *
+ * @param typesize Is the number of bytes for the atomic type in binary @p src buffer. Only 1 < typesize
+ * < 256 is allowed.
+ * @param blocksize The size of the block.
+ * @param src The source buffer to be shuffled.
+ * @param dest The destination buffer where the shuffled data will be written.
+ *
+ * @return @p blocksize on success or a negative value if some error happens (mainly an invalid parameter).
+ */
+BLOSC_EXPORT int blosc2_shuffle(const int32_t typesize, const int32_t blocksize, const uint8_t* src,
+                                uint8_t* dest);
+
+/**
+ * @brief Applies the inverse shuffle operation to a block of data in @p src, and puts the result in @p dest.
+ *
+ * @warning The @p src buffer and the @p dest buffer can not overlap.
+ *
+ * @param typesize Is the number of bytes for the atomic type in binary @p src buffer. Only 1 < typesize
+ * < 256 is allowed.
+ * @param blocksize The size of the block.
+ * @param src The source buffer to be unshuffled.
+ * @param dest The destination buffer where the unshuffled data will be written.
+ *
+ * @return @p blocksize on success or a negative value if some error happens (mainly an invalid parameter).
+ */
+BLOSC_EXPORT int blosc2_unshuffle(const int32_t typesize, const int32_t blocksize, const uint8_t* src,
+                                  uint8_t* dest);
+
+/**
+ * @brief Applies the bitshuffle operation to a block of data in @p src, and puts the result in @p dest.
+ *
+ * @warning The @p src buffer and the @p dest buffer can not overlap.
+ *
+ * @remark The function will shuffle the maximum amount of elements that can be divided by 8, and copy the
+ * rest to the destination buffer unchanged. There are @p blocksize / @p typesize elements.
+ *
+ * @param typesize Is the number of bytes for the atomic type in binary @p src buffer. Only 1 < typesize
+ * < 256 is allowed.
+ * @param blocksize The size of the block.
+ * @param src The source buffer to be shuffled.
+ * @param dest The destination buffer where the shuffled data will be written.
+ *
+ * @return @p blocksize on success or a negative value if some error happens (mainly an invalid parameter).
+ */
+BLOSC_EXPORT int blosc2_bitshuffle(const int32_t typesize, const int32_t blocksize, const uint8_t* src,
+                                   uint8_t* dest);
+
+/**
+ * @brief Applies the inverse bitshuffle operation to a block of data in @p src, and puts the result in @p dest.
+ *
+ * @warning The @p src buffer and the @p dest buffer can not overlap.
+ *
+ * @remark The function will shuffle the maximum amount of elements that can be divided by 8, and copy the
+ * rest to the destination buffer unchanged. There are @p blocksize / @p typesize elements.
+ *
+ * @param typesize Is the number of bytes for the atomic type in binary @p src buffer. Only 1 < typesize
+ * < 256 is allowed.
+ * @param blocksize The size of the block.
+ * @param src The source buffer to be unshuffled.
+ * @param dest The destination buffer where the unshuffled data will be written.
+ *
+ * @return @p blocksize on success or a negative value if some error happens (mainly an invalid parameter).
+ */
+BLOSC_EXPORT int blosc2_bitunshuffle(const int32_t typesize, const int32_t blocksize, const uint8_t* src,
+                                     uint8_t* dest);
+
+
+/*********************************************************************
   Private functions, these are here for convenience,
   and are not meant to be included in public docs
 *********************************************************************/

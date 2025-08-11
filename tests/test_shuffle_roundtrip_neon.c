@@ -11,8 +11,6 @@
 **********************************************************************/
 
 #include "test_common.h"
-#include "../blosc/shuffle.h"
-#include "../blosc/shuffle-generic.h"
 
 
 /* Include NEON-accelerated shuffle implementation if supported by this compiler.

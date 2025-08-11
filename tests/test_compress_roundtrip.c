@@ -11,7 +11,6 @@
 **********************************************************************/
 
 #include "test_common.h"
-#include "../blosc/shuffle.h"
 
 
 /** Perform a compress + decompress round trip. */
