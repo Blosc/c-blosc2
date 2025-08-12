@@ -1,10 +1,23 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.19.1 to 2.19.2
+Changes from 2.19.1 to 2.20.0
 =============================
 
-#XXX version-specific blurb XXX#
+* Extended `b2nd_expand_dims()` to allow for list of axes like NumPy.
+  See PR #676. This represents a breaking change for the API, but as
+  it was introduced in 2.18.0, it is unlikely to be used in practice.
+  Thanks to Luke Shaw (@lshaw8317).
+
+* Fix detection of AVX512 in MSVC. See PR #678.
+  Thanks to Theodore Tsirpanis (@teo-tsirpanis).
+
+* Add unified Blosc2::blosc2 CMake target. See PR #677.
+  Thanks to Theodore Tsirpanis (@teo-tsirpanis).
+
+* Rename windows pthread functions and blosc_pthread_{xyz}. Fixes #673
+  (Duplicate symbols for pthread functions on Windows).
+  Thanks to Barak Ugav (@barakugav).
 
 
 Changes from 2.19.0 to 2.19.1
@@ -14,7 +27,7 @@ Changes from 2.19.0 to 2.19.1
   corresponding to a given error code.  This is useful for debugging purposes.
   Thanks to Barak Ugav (@barakugav).
 * Support BLOSC2_ERROR_TUNER in print_error. Thanks to Barak Ugav (@barakugav).
-* Eagerly register io_cb's to avoid race. Thanks to Tom Birch (@tom-neara).
+* Eagerly register io_cb's to avoid race. Thanks to Tom Birch (@froody).
 
 
 Changes from 2.18.0 to 2.19.0

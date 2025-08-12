@@ -1,12 +1,14 @@
-# Announcing C-Blosc2 2.19.1
+# Announcing C-Blosc2 2.20.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-* [FEATURE] New `blosc2_error_string()` public function for getting the error string
-  corresponding to a given error code.  This is useful for debugging purposes.
-  Thanks to Barak Ugav (@barakugav).
-* [FIX] Eagerly register io_cb's to avoid race. Thanks to Tom Birch (@tom-neara).
+Extended `b2nd_expand_dims()` to allow for list of axes like NumPy.
+See PR #676. This represents a breaking change for the API, but as
+it was introduced in 2.18.0, it is unlikely to be used in practice.
+Thanks to Luke Shaw (@lshaw8317).  Also, several fixes and improvements.
+
+This release will bump the SOVERSION to 5.
 
 For more info, see the release notes in:
 
