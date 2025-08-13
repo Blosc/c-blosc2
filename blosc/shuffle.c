@@ -504,9 +504,6 @@ int32_t bitunshuffle(const int32_t typesize, const int32_t blocksize,
         BLOSC_TRACE_ERROR("the impossible happened: the bitunshuffle filter failed!");
         return ret;
       }
-      /* Copy the leftovers (we do so starting from c-blosc 1.18 on) */
-      size_t offset = size * typesize;
-      memcpy((void *) (dest + offset), (void *) (src + offset), blocksize - offset);
     }
     else {
       memcpy((void *) dest, (void *) src, blocksize);
