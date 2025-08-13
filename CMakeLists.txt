@@ -249,7 +249,7 @@ endif()
 
 # create the config.h file
 configure_file("${PROJECT_SOURCE_DIR}/blosc/config.h.in"
-               "${PROJECT_SOURCE_DIR}/blosc/config.h")
+               "${PROJECT_BINARY_DIR}/blosc/config.h")
 
 # now make sure that you set the build directory on your "Include" path when compiling
 include_directories("${PROJECT_BINARY_DIR}/blosc/")
