@@ -417,7 +417,7 @@ void init_shuffle_implementation(void) {
 
 /* Shuffle a block by dynamically dispatching to the appropriate
    hardware-accelerated routine at run-time. */
-int
+int32_t
 blosc2_shuffle(const int32_t typesize, const int32_t blocksize,
                const uint8_t* _src, uint8_t* _dest) {
   /* Initialize the shuffle implementation if necessary. */
@@ -436,7 +436,7 @@ blosc2_shuffle(const int32_t typesize, const int32_t blocksize,
 
 /* Unshuffle a block by dynamically dispatching to the appropriate
    hardware-accelerated routine at run-time. */
-int
+int32_t
 blosc2_unshuffle(const int32_t typesize, const int32_t blocksize,
                  const uint8_t* _src, uint8_t* _dest) {
   /* Initialize the shuffle implementation if necessary. */
