@@ -2526,8 +2526,8 @@ BLOSC_EXPORT int blosc2_get_slice_nchunks(blosc2_schunk* schunk, int64_t *start,
  *
  * @return @p blocksize on success or a negative value if some error happens (mainly an invalid parameter).
  */
-BLOSC_EXPORT int blosc2_shuffle(const int32_t typesize, const int32_t blocksize, const uint8_t* src,
-                                uint8_t* dest);
+BLOSC_EXPORT int32_t blosc2_shuffle(const int32_t typesize, const int32_t blocksize, const uint8_t* src,
+                                    uint8_t* dest);
 
 /**
  * @brief Applies the inverse shuffle operation to a block of data in @p src, and puts the result in @p dest.
@@ -2542,8 +2542,8 @@ BLOSC_EXPORT int blosc2_shuffle(const int32_t typesize, const int32_t blocksize,
  *
  * @return @p blocksize on success or a negative value if some error happens (mainly an invalid parameter).
  */
-BLOSC_EXPORT int blosc2_unshuffle(const int32_t typesize, const int32_t blocksize, const uint8_t* src,
-                                  uint8_t* dest);
+BLOSC_EXPORT int32_t blosc2_unshuffle(const int32_t typesize, const int32_t blocksize, const uint8_t* src,
+                                      uint8_t* dest);
 
 /**
  * @brief Applies the bitshuffle operation to a block of data in @p src, and puts the result in @p dest.
@@ -2561,8 +2561,8 @@ BLOSC_EXPORT int blosc2_unshuffle(const int32_t typesize, const int32_t blocksiz
  *
  * @return @p blocksize on success or a negative value if some error happens (mainly an invalid parameter).
  */
-BLOSC_EXPORT int blosc2_bitshuffle(const int32_t typesize, const int32_t blocksize, const uint8_t* src,
-                                   uint8_t* dest);
+BLOSC_EXPORT int32_t blosc2_bitshuffle(const int32_t typesize, const int32_t blocksize, const uint8_t* src,
+                                       uint8_t* dest);
 
 /**
  * @brief Applies the inverse bitshuffle operation to a block of data in @p src, and puts the result in @p dest.
@@ -2580,8 +2580,8 @@ BLOSC_EXPORT int blosc2_bitshuffle(const int32_t typesize, const int32_t blocksi
  *
  * @return @p blocksize on success or a negative value if some error happens (mainly an invalid parameter).
  */
-BLOSC_EXPORT int blosc2_bitunshuffle(const int32_t typesize, const int32_t blocksize, const uint8_t* src,
-                                     uint8_t* dest);
+BLOSC_EXPORT int32_t blosc2_bitunshuffle(const int32_t typesize, const int32_t blocksize, const uint8_t* src,
+                                         uint8_t* dest);
 
 
 /*********************************************************************
