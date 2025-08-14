@@ -302,6 +302,17 @@ BLOSC_EXPORT int b2nd_open_offset(const char *urlpath, b2nd_array_t **array, int
 BLOSC_EXPORT int b2nd_save(const b2nd_array_t *array, char *urlpath);
 
 /**
+ * @brief Append a b2nd array into a file.
+ *
+ * @param array The array to write.
+ * @param urlpath The path for persistent storage.
+ *
+ * @return If successful, return the offset where @p array has been appended in @p urlpath.
+ * Else, a negative value.
+ */
+BLOSC_EXPORT int64_t b2nd_save_append(const b2nd_array_t *array, const char *urlpath);
+
+/**
  * @brief Create a b2nd array from a C buffer.
  *
  * @param ctx The b2nd context for the new array.

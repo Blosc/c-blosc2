@@ -1589,6 +1589,10 @@ int b2nd_save(const b2nd_array_t *array, char *urlpath) {
   return BLOSC2_ERROR_SUCCESS;
 }
 
+int64_t b2nd_save_append(const b2nd_array_t *array, const char *urlpath) {
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+  return blosc2_schunk_append_file(array->sc, urlpath);
+}
 
 int b2nd_print_meta(const b2nd_array_t *array) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
