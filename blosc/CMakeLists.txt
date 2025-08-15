@@ -31,7 +31,7 @@ if(BUILD_SHARED)
         VERSION ${version_string}
         SOVERSION 5  # Change this when an ABI change happens
     )
-    target_compile_definitions(blosc2_shared PUBLIC BLOSC_SHARED_LIBRARY)
+    target_compile_definitions(blosc2_shared PRIVATE BLOSC_SHARED_LIBRARY)
     target_include_directories(blosc2_shared PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_include_directories(blosc2_shared PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
