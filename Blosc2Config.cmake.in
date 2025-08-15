@@ -43,7 +43,7 @@ else()
 endif()
 
 if(PREFER_EXTERNAL_LZ4)
-    find_dependency(LZ4 CONFIG)
+    find_dependency(lz4 CONFIG)
 endif()
 set(Blosc2_LZ4_FOUND TRUE)
 
@@ -61,7 +61,7 @@ endif()
 if(DEACTIVATE_ZSTD)
     set(Blosc2_ZSTD_FOUND FALSE)
 elseif(NOT PREFER_EXTERNAL_ZSTD AND PREFER_EXTERNAL_ZSTD)
-    find_dependency(ZSTD CONFIG)
+    find_dependency(zstd CONFIG)
     set(Blosc2_ZSTD_FOUND TRUE)
 endif()
 
