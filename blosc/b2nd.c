@@ -2337,11 +2337,11 @@ b2nd_create_ctx(const blosc2_storage *b2_storage, int8_t ndim, const int64_t *sh
   blosc2_cparams *cparams = malloc(sizeof(blosc2_cparams));
   BLOSC_ERROR_NULL(cparams, NULL);
   // We need a copy of cparams mainly to be able to modify blocksize
-  if (b2_storage->cparams == NULL) {
+  if (params_b2_storage->cparams == NULL) {
     memcpy(cparams, &BLOSC2_CPARAMS_DEFAULTS, sizeof(blosc2_cparams));
   }
   else {
-    memcpy(cparams, b2_storage->cparams, sizeof(blosc2_cparams));
+    memcpy(cparams, params_b2_storage->cparams, sizeof(blosc2_cparams));
   }
 
   if (dtype == NULL) {
