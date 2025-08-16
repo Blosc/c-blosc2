@@ -43,18 +43,18 @@
 /*
  * Defines that adapt Windows API threads to pthreads API
  */
-#define blosc2_pthread_mutex_t CRITICAL_SECTION
+#define blosc2_pthread_mutex_t SRWLOCK
 
-#define blosc2_pthread_mutex_init(a,b) InitializeCriticalSection((a))
-#define blosc2_pthread_mutex_destroy(a) DeleteCriticalSection((a))
-#define blosc2_pthread_mutex_lock EnterCriticalSection
-#define blosc2_pthread_mutex_unlock LeaveCriticalSection
+#define blosc2_pthread_mutex_init(a,b) InitializeSRWLock((a))
+#define blosc2_pthread_mutex_destroy(a)
+#define blosc2_pthread_mutex_lock AcquireSRWLockExclusive
+#define blosc2_pthread_mutex_unlock ReleaseSRWLockExclusive
 
 #define blosc2_pthread_cond_t CONDITION_VARIABLE
 
 #define blosc2_pthread_cond_init(a,b) InitializeConditionVariable((a))
 #define blosc2_pthread_cond_destroy(a)
-#define blosc2_pthread_cond_wait(a, b) SleepConditionVariableCS((a), (b), INFINITE)
+#define blosc2_pthread_cond_wait(a, b) SleepConditionVariableSRW((a), (b), INFINITE, 0)
 #define blosc2_pthread_cond_signal(cond) WakeConditionVariable((cond))
 #define blosc2_pthread_cond_broadcast(cond) WakeAllConditionVariable((cond))
 
