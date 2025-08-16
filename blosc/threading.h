@@ -43,30 +43,20 @@
 /*
  * Defines that adapt Windows API threads to pthreads API
  */
-#define blosc2_pthread_mutex_t CRITICAL_SECTION
+#define blosc2_pthread_mutex_t SRWLOCK
 
-#define blosc2_pthread_mutex_init(a,b) InitializeCriticalSection((a))
-#define blosc2_pthread_mutex_destroy(a) DeleteCriticalSection((a))
-#define blosc2_pthread_mutex_lock EnterCriticalSection
-#define blosc2_pthread_mutex_unlock LeaveCriticalSection
+#define blosc2_pthread_mutex_init(a,b) InitializeSRWLock((a))
+#define blosc2_pthread_mutex_destroy(a)
+#define blosc2_pthread_mutex_lock AcquireSRWLockExclusive
+#define blosc2_pthread_mutex_unlock ReleaseSRWLockExclusive
 
-/*
- * Implement simple condition variable for Windows threads, based on ACE
- * implementation.
- */
-typedef struct {
-	LONG waiters;
-	int was_broadcast;
-	CRITICAL_SECTION waiters_lock;
-	HANDLE sema;
-	HANDLE continue_broadcast;
-} blosc2_pthread_cond_t;
+#define blosc2_pthread_cond_t CONDITION_VARIABLE
 
-int blosc2_pthread_cond_init(blosc2_pthread_cond_t *cond, const void *unused);
-int blosc2_pthread_cond_destroy(blosc2_pthread_cond_t *cond);
-int blosc2_pthread_cond_wait(blosc2_pthread_cond_t *cond, CRITICAL_SECTION *mutex);
-int blosc2_pthread_cond_signal(blosc2_pthread_cond_t *cond);
-int blosc2_pthread_cond_broadcast(blosc2_pthread_cond_t *cond);
+#define blosc2_pthread_cond_init(a,b) InitializeConditionVariable((a))
+#define blosc2_pthread_cond_destroy(a)
+#define blosc2_pthread_cond_wait(a, b) SleepConditionVariableSRW((a), (b), INFINITE, 0)
+#define blosc2_pthread_cond_signal(cond) WakeConditionVariable((cond))
+#define blosc2_pthread_cond_broadcast(cond) WakeAllConditionVariable((cond))
 
 /*
  * Simple thread creation implementation using pthread API
