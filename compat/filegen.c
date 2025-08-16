@@ -20,6 +20,87 @@
 
 #define SIZE (1000 * 1000)
 
+typedef enum {
+  OP_COMPRESS,
+  OP_SHUFFLE,
+  OP_BITSHUFFLE,
+  OP_DECOMPRESS,
+  OP_UNSHUFFLE,
+  OP_BITUNSHUFFLE,
+} op_t;
+
+static op_t parse_op(const char *op) {
+  if (strcmp(op, "compress") == 0) {
+    return OP_COMPRESS;
+  } else if (strcmp(op, "shuffle") == 0) {
+    return OP_SHUFFLE;
+  } else if (strcmp(op, "bitshuffle") == 0) {
+    return OP_BITSHUFFLE;
+  } else if (strcmp(op, "decompress") == 0) {
+    return OP_DECOMPRESS;
+  } else if (strcmp(op, "unshuffle") == 0) {
+    return OP_UNSHUFFLE;
+  } else if (strcmp(op, "bitunshuffle") == 0) {
+    return OP_BITUNSHUFFLE;
+  } else {
+    printf("Unknown operation: %s\n", op);
+    exit(-1);
+  }
+}
+
+static int32_t run(op_t op, const void * src, void * dest, const size_t size) {
+  int32_t result = -1;
+  if (op == OP_COMPRESS) {
+    /* Compress with clevel=9 and shuffle active  */
+    result = blosc1_compress(9, 1, sizeof(int32_t), size, src, dest, size);
+    if (result == 0) {
+      printf("Buffer is incompressible.  Giving up.\n");
+      exit(1);
+    }
+    if (result < 0) {
+      printf("Compression error. Error code: %d\n", result);
+      return result;
+    }
+    printf("Compression successful: %d bytes compressed.\n", result);
+  } else if (op == OP_SHUFFLE) {
+    result = blosc2_shuffle(sizeof(int32_t), size, src, dest);
+    if (result < 0) {
+      printf("Shuffle error. Error code: %d\n", result);
+      return result;
+    }
+    printf("Shuffle successful: %d bytes shuffled.\n", result);
+  } else if (op == OP_BITSHUFFLE) {
+    result = blosc2_bitshuffle(sizeof(int32_t), size, src, dest);
+    if (result < 0) {
+      printf("Bitshuffle error. Error code: %d\n", result);
+      return result;
+    }
+    printf("Bitshuffle successful: %d bytes shuffled.\n", result);
+  } else if (op == OP_DECOMPRESS) {
+    /* Compress with clevel=9 and shuffle active  */
+    result = blosc1_decompress(src, dest, size);
+    if (result < 0) {
+      printf("Decompression error.  Error code: %d\n", result);
+      return result;
+    }
+    printf("Decompression successful!\n");
+  } else if (op == OP_UNSHUFFLE) {
+    result = blosc2_unshuffle(sizeof(int32_t), size, src, dest);
+    if (result < 0) {
+      printf("Unshuffle error. Error code: %d\n", result);
+      return result;
+    }
+    printf("Unshuffle successful: %d bytes unshuffled.\n", result);
+  } else if (op == OP_BITUNSHUFFLE) {
+    result = blosc2_bitunshuffle(sizeof(int32_t), size, src, dest);
+    if (result < 0) {
+      printf("Bitunshuffle error. Error code: %d\n", result);
+      return result;
+    }
+    printf("Bitunshuffle successful: %d bytes bitunshuffled.\n", result);
+  }
+  return result;
+}
 
 int main(int argc, char *argv[]) {
   BLOSC_UNUSED_PARAM(argc);
@@ -36,6 +117,16 @@ int main(int argc, char *argv[]) {
 
   FILE *f;
 
+  if (argc != 3 && argc != 4) {
+    printf("Usage:\n");
+    printf("%s <compress|shuffle|bitshuffle> <compressor> <output_file>\n", argv[0]);
+    printf("%s <unshuffle|bitunshuffle> <output_file>\n", argv[0]);
+    return 1;
+  }
+
+  op_t operation = parse_op(argv[1]);
+  int is_encoding = operation == OP_COMPRESS || operation == OP_SHUFFLE || operation == OP_BITSHUFFLE;
+
   /* Register the filter with the library */
   printf("Blosc version info: %s\n", blosc2_get_version_string());
 
@@ -43,27 +134,25 @@ int main(int argc, char *argv[]) {
   blosc2_init();
   blosc2_set_nthreads(1);
 
-  /* Use the argv[2] compressor. The supported ones are "blosclz",
-  "lz4", "lz4hc", "zlib" and "zstd"*/
-  blosc1_set_compressor(argv[2]);
+  if (operation == OP_COMPRESS) {
+    /* Use the argv[2] compressor. The supported ones are "blosclz",
+    "lz4", "lz4hc", "zlib" and "zstd"*/
+    blosc1_set_compressor(argv[2]);
+  }
 
   for (i = 0; i < SIZE; i++) {
     data[i] = i;
   }
 
-  if (strcmp(argv[1], "compress") == 0) {
-
-    /* Compress with clevel=9 and shuffle active  */
-    csize = blosc1_compress(9, 1, sizeof(int32_t), isize, data, data_out, osize);
-    if (csize == 0) {
-      printf("Buffer is incompressible.  Giving up.\n");
-      return 1;
-    } else if (csize < 0) {
-      printf("Compression error.  Error code: %d\n", csize);
+  if (is_encoding) {
+    csize = run(operation, data, data_out, isize);
+    if (csize < 0) {
       return csize;
     }
 
-    printf("Compression: %d -> %d (%.1fx)\n", (int) isize, csize, (1. * (int)isize) / csize);
+    if (operation == OP_COMPRESS) {
+      printf("Compression: %d -> %d (%.1fx)\n", (int)isize, csize, (1. * (int)isize) / csize);
+    }
 
     /* Write data_out to argv[3] */
     f = fopen(argv[3], "wb+");
@@ -84,13 +173,10 @@ int main(int argc, char *argv[]) {
       printf("Read failed");
     }
 
-    /* Decompress */
-    dsize = blosc1_decompress(data_out, data_dest, (size_t) dsize);
+    dsize = run(operation, data_out, data_dest, (size_t) dsize);
     if (dsize < 0) {
-      printf("Decompression error.  Error code: %d\n", dsize);
       return dsize;
     }
-    printf("Decompression successful!\n");
 
     char *isbitshuf =  strstr(argv[2], "-bitshuffle");
     if ((isbitshuf != NULL) && (dsize % 8) != 0) {
