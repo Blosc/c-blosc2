@@ -1,11 +1,28 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.20.0 to 2.20.1
+Changes from 2.20.0 to 2.21.0
 =============================
 
-#XXX version-specific blurb XXX#
+* New public API `b2nd_save_append`. It is useful for appending a b2nd
+  array into a file. Thanks to Barak Ugav (@barakugav) for the PR (#683).
 
+* Added new public APIs for the shuffling filters:
+  * `blosc2_shuffle`
+  * `blosc2_unshuffle`
+  * `blosc2_bitshuffle`
+  * `blosc2_bitunshuffle`
+  Thanks to Theodore Tsirpanis (@teo-tsirpanis) for the PR (#681).
+
+* Fix a potential nullptr exception on `b2nd_create_ctx` with null storage.
+  Thanks to Barak Ugav (@barakugav) for the PR (#684).
+
+* The CMake dependency acquisition has been improved.
+  Thanks to Theodore Tsirpanis (@teo-tsirpanis) for the PR (#682).
+
+* Now, a blosc/config.h is generated in the binary directory. Fixes
+  failures when configuring from the same source directory in parallel.
+  Thanks to Theodore Tsirpanis (@teo-tsirpanis) for the PR (#679).
 
 Changes from 2.19.1 to 2.20.0
 =============================
