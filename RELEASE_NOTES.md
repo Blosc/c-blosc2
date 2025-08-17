@@ -1,6 +1,12 @@
 Release notes for C-Blosc2
 ==========================
 
+Changes from 2.21.0 to 2.21.1
+=============================
+
+#XXX version-specific blurb XXX#
+
+
 Changes from 2.20.0 to 2.21.0
 =============================
 
@@ -12,6 +18,7 @@ Changes from 2.20.0 to 2.21.0
   * `blosc2_unshuffle`
   * `blosc2_bitshuffle`
   * `blosc2_bitunshuffle`
+
   Thanks to Theodore Tsirpanis (@teo-tsirpanis) for the PR (#681).
 
 * Fix a potential nullptr exception on `b2nd_create_ctx` with null storage.
@@ -23,6 +30,7 @@ Changes from 2.20.0 to 2.21.0
 * Now, a blosc/config.h is generated in the binary directory. Fixes
   failures when configuring from the same source directory in parallel.
   Thanks to Theodore Tsirpanis (@teo-tsirpanis) for the PR (#679).
+
 
 Changes from 2.19.1 to 2.20.0
 =============================
