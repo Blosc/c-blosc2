@@ -35,7 +35,7 @@ double blosc_elapsed_nsecs(blosc_timestamp_t start_time,
 
 #include <time.h>
 
-#if defined(__MACH__) // OS X does not have clock_gettime, use clock_get_time
+#if defined(__MACH__) && defined(__APPLE__) // OS X does not have clock_gettime, use clock_get_time
 
 #include <mach/clock.h>
 
