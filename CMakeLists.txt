@@ -187,7 +187,7 @@ endif()
 
 if(NOT DEACTIVATE_ZLIB)
     if(PREFER_EXTERNAL_ZLIB)
-        find_package(ZLIB_NG CONFIG)
+        find_package(ZLIB_NG CONFIG NAMES zlib-ng)
         if(ZLIB_NG_FOUND)
             set(HAVE_ZLIB_NG TRUE)
             set(HAVE_ZLIB_NG_CONFIG TRUE)
