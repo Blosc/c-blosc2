@@ -4,8 +4,13 @@ Release notes for C-Blosc2
 Changes from 2.21.0 to 2.21.1
 =============================
 
-#XXX version-specific blurb XXX#
+* Fixed a regression introduced in PR #682 causing incompatibility
+  at least with Fedora and Gentoo.  Fixed in PR #690. Thanks to
+  Michał Górny (@mgorny) for reporting and Teodor Tsirpanis
+  (@teo-tsirpanis) for the actual fix.
 
+* Restrict overmatching MACH ifdef to only trigger on OSX and Mach.
+  Thanks to Maximilian Downey Twiss (@Zopolis4) for the PR (#688).
 
 Changes from 2.20.0 to 2.21.0
 =============================

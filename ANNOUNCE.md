@@ -1,19 +1,11 @@
-# Announcing C-Blosc2 2.20.0
+# Announcing C-Blosc2 2.21.1
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This release introduces several public APIs, including:
-* `blosc2_shuffle`
-* `blosc2_unshuffle`
-* `blosc2_bitshuffle`
-* `blosc2_bitunshuffle`
-
-Now, users can use these functions to shuffle and unshuffle data directly.
-It also adds a new `b2nd_save_append` API, useful for appending a b2nd
-array into a file.
-
-Finally, several improvements have been made to the build system.
+Fixed a regression in 2.21.0 causing incompatibility
+at least with Fedora and Gentoo. Thanks to Michał Górny (@mgorny) for
+reporting and Teodor Tsirpanis (@teo-tsirpanis) for the actual fix.
 
 For more info, see the release notes in:
 
