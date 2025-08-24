@@ -4706,7 +4706,9 @@ void blosc2_unidim_to_multidim(uint8_t ndim, int64_t *shape, int64_t i, int64_t 
   if (ndim == 0) {
     return;
   }
-  int64_t *strides = malloc(ndim * sizeof(int64_t));
+  assert(ndim < B2ND_MAX_DIM);
+  int64_t strides[B2ND_MAX_DIM];
+
   strides[ndim - 1] = 1;
   for (int j = ndim - 2; j >= 0; --j) {
       strides[j] = shape[j + 1] * strides[j + 1];
@@ -4716,7 +4718,6 @@ void blosc2_unidim_to_multidim(uint8_t ndim, int64_t *shape, int64_t i, int64_t 
   for (int j = 1; j < ndim; ++j) {
       index[j] = (i % strides[j - 1]) / strides[j];
   }
-  free(strides);
 }
 
 void blosc2_multidim_to_unidim(const int64_t *index, int8_t ndim, const int64_t *strides, int64_t *i) {

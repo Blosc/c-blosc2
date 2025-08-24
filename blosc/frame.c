@@ -866,6 +866,7 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     }
     int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
     if (trailer_ptr[trailer_offset - 1] != 0xce) {
+        BLOSC_TRACE_ERROR("Invalid trailer in file '%s'.", urlpath);
         free(urlpath_cpy);
         free(frame);
         return NULL;

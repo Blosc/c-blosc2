@@ -2486,6 +2486,8 @@ BLOSC_EXPORT int blosc2_rename_urlpath(char* old_urlpath, char* new_path);
 
 /*
  * @brief Convert a sequential index into a multidimensional index
+ *
+ * This function assume ndim <= B2ND_MAX_DIM.
  */
 BLOSC_EXPORT void blosc2_unidim_to_multidim(uint8_t ndim, int64_t *shape, int64_t i, int64_t *index);
 

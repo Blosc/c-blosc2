@@ -339,6 +339,11 @@ blosc2_schunk* blosc2_schunk_open_offset_udio(const char* urlpath, int64_t offse
     return NULL;
   }
   blosc2_schunk* schunk = frame_to_schunk(frame, false, udio);
+  if (schunk == NULL) {
+    frame_free(frame);
+    BLOSC_TRACE_ERROR("Error converting frame to super-chunk");
+    return NULL;
+  }
 
   // Set the storage with proper defaults
   size_t pathlen = strlen(urlpath);
