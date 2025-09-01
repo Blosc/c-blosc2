@@ -694,8 +694,7 @@ int b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, cons
 
 
 // Check whether the slice defined by start and stop is a single chunk and contiguous
-// in the C order. We also need blocks inside a chunk, and chunks inside an array,
-// are C contiguous. This is a fast path for the get_slice and set_slice functions.
+// in the C order. This is a fast path for the get_slice and set_slice functions.
 int64_t nchunk_fastpath(const b2nd_array_t *array, const int64_t *start,
                         const int64_t *stop, const int64_t slice_size) {
   if (slice_size != array->chunknitems) {
@@ -703,49 +702,29 @@ int64_t nchunk_fastpath(const b2nd_array_t *array, const int64_t *start,
   }
 
   int ndim = (int) array->ndim;
-  int inner_dim = ndim - 1;
-  int64_t partial_slice_size = 1;
-  int outer_dims = 0;
-  for (int j = 0; j < inner_dim; ++j) {
-    outer_dims += (array->blockshape[j] != 1);
-   }
-  int64_t partial_chunk_size = 1;
-  for (int i = ndim - 1; i >= 0; --i) {
-    // We need to check if the slice is contiguous in the C order
-    if (array->extshape[i] != array->shape[i]) {
-      return -1;
-    }
-    if (array->extchunkshape[i] != array->chunkshape[i]) {
-      return -1;
-    }
 
-    // blocks need to be C contiguous inside the chunk as well
-    if (array->chunkshape[i] > array->blockshape[i]) {
-      if (i < inner_dim) {
-        if (array->chunkshape[i] % array->blockshape[i] != 0) {
-          return -1;
-        }
-      }
-      else {
-        // A block is still contiguous in the C order if the outer dimensions are 1 and the inner is
-        // a divisor of the chunkshape
-        if ( ! (array->chunkshape[i] == array->blockshape[i] ||
-                (outer_dims == 0 && array->chunkshape[i] % array->blockshape[i] == 0))) {
-          return -1;
-        }
-      }
-    }
-
-    // We need start and stop to be aligned with the chunkshape
-    // Do that by computing the slice size in reverse order and compare with the chunkshape
-    partial_slice_size *= stop[i] - start[i];
-    partial_chunk_size *= array->chunkshape[i];
-    if (partial_slice_size != partial_chunk_size) {
-      return -1;
-    }
-    // Ensure that the slice starts at the beginning of the chunk
+  int k = 0;
+  for (int i = 0; i < ndim; ++i) {
+    // The slice needs to correspond to a whole chunk (without padding)
     if (start[i] % array->chunkshape[i] != 0) {
       return -1;
+    }
+    if (stop[i] - start[i] != array->chunkshape[i]) {
+      return -1;
+    }
+
+    // There needs to exist 0 <= k <= ndim such that:
+    // - for i < k, blockshape[i] == 1
+    // - for i == k, blockshape[i] divides chunkshape[i]
+    // - for i > k, blockshape[i] == chunkshape[i]
+    if (array->chunkshape[i] % array->blockshape[i] != 0) {
+      return -1;
+    }
+    if (i > k && array->chunkshape[i] != array->blockshape[i]) {
+      return -1;
+    }
+    if (i == k && array->blockshape[i] == 1) {
+      k++;
     }
   }
   // Compute the chunk number
