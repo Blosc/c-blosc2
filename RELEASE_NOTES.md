@@ -4,7 +4,10 @@ Release notes for C-Blosc2
 Changes from 2.21.1 to 2.21.2
 =============================
 
-#XXX version-specific blurb XXX#
+* Allocate strides array on stack if ndim <= B2ND_MAX_DIM in unidim_to_multidim.
+  Should allow to speed up code.  Thanks to Barak Ugav.
+* Handle frame_to_schunk failure in schunk_open. Thanks to Barak Ugav.
+* Fix fastpath decision logic for ndarray slicing. Thanks to Preeyan Parmar.
 
 Changes from 2.21.0 to 2.21.1
 =============================

@@ -1,11 +1,10 @@
-# Announcing C-Blosc2 2.21.1
+# Announcing C-Blosc2 2.21.2
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-Fixed a regression in 2.21.0 causing incompatibility
-at least with Fedora and Gentoo. Thanks to Michał Górny (@mgorny) for
-reporting and Teodor Tsirpanis (@teo-tsirpanis) for the actual fix.
+This is a maintenance release, with a few fixes and some optimizations.
+Thanks to Barak Ugav and Preeyan Parmar for their contributions.
 
 For more info, see the release notes in:
 
