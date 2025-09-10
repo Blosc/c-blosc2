@@ -4706,7 +4706,7 @@ void blosc2_unidim_to_multidim(uint8_t ndim, int64_t *shape, int64_t i, int64_t 
   if (ndim == 0) {
     return;
   }
-  assert(ndim < B2ND_MAX_DIM);
+  assert(ndim <= B2ND_MAX_DIM);
   int64_t strides[B2ND_MAX_DIM];
 
   strides[ndim - 1] = 1;
