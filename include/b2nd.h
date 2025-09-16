@@ -47,7 +47,7 @@ extern "C" {
 #define B2ND_METALAYER_VERSION 0
 
 /* The maximum number of dimensions for b2nd arrays */
-#define B2ND_MAX_DIM 8
+#define B2ND_MAX_DIM 16
 
 /* The maximum number of metalayers for b2nd arrays */
 #define B2ND_MAX_METALAYERS (BLOSC2_MAX_METALAYERS - 1)
