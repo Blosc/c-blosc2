@@ -2725,6 +2725,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   envvar = getenv("BLOSC_CLEVEL");
   if (envvar != NULL) {
     long value;
+    errno = 0; /* To distinguish success/failure after call */
     value = strtol(envvar, NULL, 10);
     if ((errno != EINVAL) && (value >= 0)) {
       clevel = (int)value;
@@ -2768,6 +2769,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   envvar = getenv("BLOSC_TYPESIZE");
   if (envvar != NULL) {
     long value;
+    errno = 0; /* To distinguish success/failure after call */
     value = strtol(envvar, NULL, 10);
     if ((errno != EINVAL) && (value > 0)) {
       typesize = (int32_t)value;
@@ -2790,6 +2792,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   envvar = getenv("BLOSC_BLOCKSIZE");
   if (envvar != NULL) {
     long blocksize;
+    errno = 0; /* To distinguish success/failure after call */
     blocksize = strtol(envvar, NULL, 10);
     if ((errno != EINVAL) && (blocksize > 0)) {
       blosc1_set_blocksize((size_t) blocksize);
@@ -2803,6 +2806,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   envvar = getenv("BLOSC_NTHREADS");
   if (envvar != NULL) {
     long nthreads;
+    errno = 0; /* To distinguish success/failure after call */
     nthreads = strtol(envvar, NULL, 10);
     if ((errno != EINVAL) && (nthreads > 0)) {
       result = blosc2_set_nthreads((int16_t) nthreads);
@@ -2986,6 +2990,7 @@ int blosc2_decompress(const void* src, int32_t srcsize, void* dest, int32_t dest
   /* Check for a BLOSC_NTHREADS environment variable */
   envvar = getenv("BLOSC_NTHREADS");
   if (envvar != NULL) {
+    errno = 0; /* To distinguish success/failure after call */
     nthreads = strtol(envvar, NULL, 10);
     if ((errno != EINVAL)) {
       if ((nthreads <= 0) || (nthreads > INT16_MAX)) {
@@ -4031,6 +4036,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   envvar = getenv("BLOSC_TYPESIZE");
   if (envvar != NULL) {
     int32_t value;
+    errno = 0; /* To distinguish success/failure after call */
     value = (int32_t) strtol(envvar, NULL, 10);
     if ((errno != EINVAL) && (value > 0)) {
       context->typesize = value;
@@ -4046,6 +4052,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   envvar = getenv("BLOSC_CLEVEL");
   if (envvar != NULL) {
     int value;
+    errno = 0; /* To distinguish success/failure after call */
     value = (int)strtol(envvar, NULL, 10);
     if ((errno != EINVAL) && (value >= 0)) {
       context->clevel = value;
@@ -4073,6 +4080,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   envvar = getenv("BLOSC_BLOCKSIZE");
   if (envvar != NULL) {
     int32_t blocksize;
+    errno = 0; /* To distinguish success/failure after call */
     blocksize = (int32_t) strtol(envvar, NULL, 10);
     if ((errno != EINVAL) && (blocksize > 0)) {
       context->blocksize = blocksize;
@@ -4086,6 +4094,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   /* Check for a BLOSC_NTHREADS environment variable */
   envvar = getenv("BLOSC_NTHREADS");
   if (envvar != NULL) {
+    errno = 0; /* To distinguish success/failure after call */
     int16_t nthreads = (int16_t) strtol(envvar, NULL, 10);
     if ((errno != EINVAL) && (nthreads > 0)) {
       context->nthreads = nthreads;
@@ -4174,6 +4183,7 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   context->nthreads = dparams.nthreads;
   char* envvar = getenv("BLOSC_NTHREADS");
   if (envvar != NULL) {
+    errno = 0; /* To distinguish success/failure after call */
     long nthreads = strtol(envvar, NULL, 10);
     if ((errno != EINVAL) && (nthreads > 0)) {
       context->nthreads = (int16_t) nthreads;
