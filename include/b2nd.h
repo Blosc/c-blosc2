@@ -385,6 +385,9 @@ BLOSC_EXPORT int b2nd_squeeze(b2nd_array_t *array);
  * @param final_dims The final number of dimensions. Should be same as the number of elements in @p axis.
  *
  * @return An error code.
+ *
+ * @note This returns a view, so if you free it, pointers to original @param array will be freed too.
+ *
  */
 BLOSC_EXPORT int b2nd_expand_dims(const b2nd_array_t *array, b2nd_array_t **view, const bool *axis,
     const uint8_t final_dims);

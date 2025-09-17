@@ -494,8 +494,7 @@ int64_t blosc2_schunk_append_file(blosc2_schunk* schunk, const char* urlpath) {
 int blosc2_schunk_free(blosc2_schunk *schunk) {
   int err = 0;
 
-  // If it is a view, the data belongs to original array and should not be freed
-  if (schunk->data != NULL && !schunk->view) {
+  if (schunk->data != NULL) {
     for (int i = 0; i < schunk->nchunks; i++) {
       free(schunk->data[i]);
     }
@@ -540,8 +539,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     free(schunk->storage);
   }
 
-  // If it is a view, the frame belongs to original array and should not be freed
-  if (schunk->frame != NULL && !schunk->view) {
+  if (schunk->frame != NULL) {
     frame_free((blosc2_frame_s *) schunk->frame);
   }
 

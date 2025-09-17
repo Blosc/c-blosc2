@@ -192,7 +192,6 @@ CUTEST_TEST_TEST(expand_dims) {
   free(newbuffer_dest);
   free(buffer);
   B2ND_TEST_ASSERT(b2nd_free(src));
-  B2ND_TEST_ASSERT(b2nd_free(dest));
   B2ND_TEST_ASSERT(b2nd_free(dest2));
   B2ND_TEST_ASSERT(b2nd_free(slice_dest));
   B2ND_TEST_ASSERT(b2nd_free(slice_dest2));
