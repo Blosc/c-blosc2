@@ -1726,8 +1726,8 @@ typedef struct blosc2_schunk {
   //<! The ndim (mainly for ZFP usage)
   int64_t *blockshape;
   //<! The blockshape (mainly for ZFP usage)
-  bool view;
-  //<! Whether the schunk is a view or not.
+  void *base;
+  //<! If a view then points to the base schunk (if not a view then NULL)
 } blosc2_schunk;
 
 

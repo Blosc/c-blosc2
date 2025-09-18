@@ -1201,7 +1201,7 @@ int view_new(const b2nd_array_t *array, b2nd_array_t **view, b2nd_context_t *ctx
     free((*view)->sc->data[i]);
   }
   free((*view)->sc->data);
-  (*view)->sc->view = true;
+  (*view)->sc->base = (blosc2_schunk*) array->sc; //pointer to original schunk
   (*view)->sc->data = array->sc->data; // point view to the same data
   (*view)->sc->frame = array->sc->frame; // if original array is contiguous, point to frame
   (*view)->sc->nvlmetalayers = array->sc->nvlmetalayers; //
