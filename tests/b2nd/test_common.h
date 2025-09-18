@@ -72,6 +72,10 @@ typedef struct {
 
 
 void b2nd_default_parameters() {
+    if (B2ND_MAX_DIM != 16) {
+      fprintf(stderr, "Error: B2ND_MAX_DIM must be equal to 16 or edit b2nd_default_parameters func!");
+      exit(1);
+    }
   CUTEST_PARAMETRIZE(typesize, uint8_t, CUTEST_DATA(1, 2, 4, 8));
   CUTEST_PARAMETRIZE(shapes, _test_shapes, CUTEST_DATA(
       {2, {40, 40}, {20, 20}, {10, 10}},
@@ -80,6 +84,9 @@ void b2nd_default_parameters() {
       {4, {50, 60, 31, 12}, {25, 20, 20, 10}, {5, 5, 5, 10}},
       {5, {1, 1, 1024, 1, 1}, {1, 1, 500, 1, 1}, {1, 1, 200, 1, 1}},
       {6, {5, 1, 50, 3, 1, 2}, {5, 1, 50, 2, 1, 2}, {2, 1, 20, 2, 1, 2}},
+      {B2ND_MAX_DIM,  {2, 3, 1, 1, 1, 1, 8, 1, 2, 2, 1, 1, 1, 1, 1, 2},
+        {1, 2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1},
+        {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}},
   ));
   CUTEST_PARAMETRIZE(backend, _test_backend, CUTEST_DATA(
       {false, false},
