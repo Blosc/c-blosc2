@@ -1,10 +1,17 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.21.2 to 2.21.3
+Changes from 2.21.3 to 2.21.4
 =============================
 
 #XXX version-specific blurb XXX#
+
+Changes from 2.21.2 to 2.21.3
+=============================
+
+* Increase MAX_DIMS from 8 to 16
+* Fix compatibility with glibc v2.42
+* Bug fix in ``unidim_to_multidim``
 
 Changes from 2.21.1 to 2.21.2
 =============================
@@ -522,7 +529,7 @@ Changes from 2.6.1 to 2.7.1
   Thanks to @bnavigator.
 
 * BloscLZ codec is now treated exactly the same as LZ4.  Before BloscLZ was considered less capable of reaching
- decent compression ratios, but this has changed quite a bit lately, so there is no point in treating both differently.
+  decent compression ratios, but this has changed quite a bit lately, so there is no point in treating both differently.
 
 * Fixed some leaks, mainly on the test suite.
 
@@ -569,7 +576,7 @@ Changes from 2.4.3 to 2.5.0
   * `out_size` -> `output_size`
   * `out_typesize` -> `output_typesize`
   * `out_offset` -> `output_offset`
-  This was needed to allow Cython to map the fields (`in` is a reserved word in Python).
+    This was needed to allow Cython to map the fields (`in` is a reserved word in Python).
 
 * Disabled maskout reads in `blosc2_schunk_get_slice_buffer()` as they are not faster than getitem there.
 
@@ -754,7 +761,7 @@ Changes from 2.0.1 to 2.0.2
 
 * Fixed a bug when a lazy_chunk was created from a small, memcpyed chunk.
   (see #329).
-  
+
 * Fixed many issues in documentation (see #333).
 
 
@@ -814,9 +821,9 @@ Changes from 2.0.0-beta.5 to 2.0.0.rc.1
 =======================================
 
 * [API change] `blosc2_decompress_ctx()` gets a new `srcsize`
- parameter to ensure that it does not read past the end
- of the provided buffer.  See #144.  Thanks to Nathan Moinvaziri
- (@nmoinvaz).
+  parameter to ensure that it does not read past the end
+  of the provided buffer.  See #144.  Thanks to Nathan Moinvaziri
+  (@nmoinvaz).
 
 * [BREAKING CHANGE] The format for frames has changed and
   BLOSC2_VERSION_FRAME_FORMAT is now set to 2.  There is no attempt to support
@@ -898,7 +905,7 @@ Changes from 2.0.0-beta.3 to 2.0.0-beta.4
 * The endianness of the platform that is writing the data in chunks is stored
   now in the headers of the chunks.  This info is not used yet, but this
   should allow a good hint for implementing format compatibility among
-  platforms with different endianness in other layers.  See PR #84. 
+  platforms with different endianness in other layers.  See PR #84.
 
 * Fixed a nasty bug that prevented frames to go more than 2 GB in size.
 
