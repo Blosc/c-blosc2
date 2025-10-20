@@ -61,15 +61,17 @@ is useful <https://www.youtube.com/watch?v=LvP9zxMGBng>`_:
   :alt: Slicing a dataset in pineapple-style
   :target: https://www.youtube.com/watch?v=LvP9zxMGBng
 
+.. include:: ../WHATS-NEW.rst
 
-.. include:: ./WHATS-NEW.rst
+More info about the `improved capabilities of C-Blosc2 can be found in this paper <https://www.blosc.org/docs/Exploring-MilkyWay-SciPy2023-paper.pdf>`_.  Please, cite it if you use C-Blosc2 in your research!
+
 
 Open format
 ===========
 
 The Blosc2 format is open and `fully documented <https://github.com/Blosc/c-blosc2/blob/main/README_FORMAT.rst>`_.
 
-The format specs are defined in less than 1000 lines of text, so they should be easy to read and understand.  In our opinion, this is very important for the long-term success of the library, as it allows for third-party implementations of the format, and also for the users to understand what is going on under the hood.
+The format specs are defined in less than 4000 words, so they should be easy to read and understand.  In our opinion, this is critical for the long-term success of the library, as it allows for third-party implementations of the format, and also for the users to understand what is going on under the hood.
 
 
 Python wrapper
