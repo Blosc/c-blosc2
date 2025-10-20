@@ -1,14 +1,5 @@
-Roadmap
-=======
-
-C-Blosc2 is the new iteration of C-Blosc 1.x series, adding more features and `better documentation <https://www.blosc.org/c-blosc2/c-blosc2.html>`_.
-This document lists the new features for the production release of C-Blosc2, as well as the plans for the future.
-
-Many of the features implemented so far have been possible with the funds of a `generous donation <https://www.blosc.org/posts/blosc-donation/>`_.  Thanks to HUAWEI, and specially to Zeeman Wang!
-
-
-New features
-------------
+New features in C-Blosc2
+========================
 
 Right now, the next features are already implemented (although they may require some refactoring or more tests):
 
@@ -62,42 +53,4 @@ Right now, the next features are already implemented (although they may require 
 
 * **Security:** we are actively using the `OSS-Fuzz <https://github.com/google/oss-fuzz>`_ and `ClusterFuzz <https://oss-fuzz.com>`_ for uncovering programming errors in C-Blosc2.  Thanks to Google for sponsoring us in doing this.
 
-
-Actions to be done
-------------------
-
-* **Improve the safety of the library:**  even if we have already made a long way in improving our safety, mainly thanks to the efforts of Nathan Moinvaziri, we take safety seriously, so this is always a work in progress.
-
-* **Checksums:** the frame can benefit from having a checksum per every chunk/index/metalayer.  This will provide more safety towards frames that are damaged for whatever reason.  Also, this would provide better feedback when trying to determine the parts of the frame that are corrupted.  Candidates for checksums can be the xxhash32 or xxhash64, depending on the goals (to be decided).
-
-* **Multiple index chunks in frames:** right now, only `one chunk <https://github.com/Blosc/c-blosc2/blob/main/README_CFRAME_FORMAT.rst#chunks>`_ is allowed for indexing other chunks.  Provided the 2GB limit for a chunksize, that means that 'only' 256 million of chunks can be stored in a frame.  Allowing for more than one index chunk would overcome this limitation.
-
-* **More robust detection of CPU capabilities:** although currently this detection is quite sophisticated, the code responsible for that has organically grow for more than 10 years and it is time to come with a more modern and robust way of doing this. https://github.com/google/cpu_features may be a good helper for doing this refactoring.
-
-* **Documentation:** utterly important for attracting new users and making the life easier for existing ones.  Important points to have in mind here:
-
-  - **Quality of API docstrings:** is the mission of the functions or data structures clearly and succinctly explained? Are all the parameters explained?  Is the return value explained?  What are the possible errors that can be returned?  (mostly completed by Alberto Sabater).
-
-  - **Tutorials/book:** besides the API docstrings, more documentation materials should be provided, like tutorials or a book about Blosc (or at least, the beginnings of it).  Due to its adoption in GitHub and Jupyter notebooks, one of the most extended and useful markup systems is Markdown, so this should also be the first candidate to use here.
-
-* **Wrappers for other languages:** Java, R or Julia are the most obvious candidates.  Still not sure if these should be produced and maintained by the Blosc development team, or leave them for third-party players that would be interested. The steering `council discussed this <https://github.com/Blosc/governance/blob/master/steering_council_minutes/2020-03-26.md>`_, and probably just the Python wrapper (python-blosc2, see above) should be maintained by Blosc maintainers themselves, while the other languages should be maintained by the community.
-
-* **Lock support for super-chunks:** when different processes are accessing concurrently to super-chunks, make them to sync properly by using locks, either on-disk (frame-backed super-chunks), or in-memory. Such a lock support would be configured in build time, so it could be disabled with a cmake flag.
-
-* **Hierarchical structure (aka Groups):** some libraries (like `xarray <https://xarray.dev>`_) need an easy way to tie different datasets together (groups).  This would also allow to create whole hierarchies so as to endow a structure to these datasets.  Besides the structural part (that will be part of the format specification), this will need an accompanying API that allows the user to create groups, add datasets to groups, (recursively) list datasets in groups, access a dataset inside a group, an so on.
-
-
-Outreaching
------------
-
-* **Improve the Blosc website:** create a nice, modern-looking and easy to navigate website so that new potential users can see at first glimpse what's Blosc all about and power-users can access the documentation part easily.  Ideally, a site-only search box would be great (sphinx-based docs would offer this for free).
-
-* **Attend to meetings and conferences:** it is very important to plan going to conferences for advertising C-Blosc2 and meeting people in-person.  We need to decide which meetings to attend.  When on the Python arena, the answer would be quite clear, but for general C libraries like C-Blosc2, it is not that straightforward which ones are the most suited.
-
-* Other outreaching activities would be to produce videos of the kind 'Blosc in 10 minutes', but not sure if this would be interesting for potential Blosc users (probably short tutorials in docs would be better suited).
-
-
-Increase diversity
-------------------
-
-* **We strive to make our team as diverse as possible:**  we are actively looking into more women and people from a variety of cultures to join our team.  Update: we are glad to have Marta Iborra, our first female among us; thanks to the Python Software Foundation and NumFOCUS for providing funds for allowing this.
+More info about the `improved capabilities of C-Blosc2 can be found in this talk <https://www.blosc.org/docs/Caterva-HDF5-Workshop.pdf>`_.
