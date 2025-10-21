@@ -1294,7 +1294,6 @@ int b2nd_squeeze_index(b2nd_array_t *array, b2nd_array_t **view, const bool *ind
   int64_t newshape[B2ND_MAX_DIM];
   int32_t newchunkshape[B2ND_MAX_DIM];
   int32_t newblockshape[B2ND_MAX_DIM];
-  uint8_t final_dims = array->ndim;
 
   for (int i = 0; i < array->ndim; ++i) {
     if (index[i] == true) {
@@ -1306,7 +1305,6 @@ int b2nd_squeeze_index(b2nd_array_t *array, b2nd_array_t **view, const bool *ind
       newchunkshape[nones] = array->chunkshape[i];
       newblockshape[nones] = array->blockshape[i];
       nones += 1;
-      final_dims -= 1;
     }
   }
 
@@ -1315,7 +1313,7 @@ int b2nd_squeeze_index(b2nd_array_t *array, b2nd_array_t **view, const bool *ind
   blosc2_dparams dparams = *(array->sc->storage->dparams);
   blosc2_storage b2_storage1 = {.cparams=&cparams, .dparams=&dparams};
 
-  b2nd_context_t *ctx1 = b2nd_create_ctx(&b2_storage1, final_dims, newshape,
+  b2nd_context_t *ctx1 = b2nd_create_ctx(&b2_storage1, nones, newshape,
                                         newchunkshape, newblockshape, array->dtype,
                                         array->dtype_format, NULL, 0);
 
