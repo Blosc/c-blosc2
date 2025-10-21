@@ -1285,7 +1285,7 @@ int b2nd_squeeze(b2nd_array_t *array, b2nd_array_t **view) {
 int b2nd_squeeze_index(b2nd_array_t *array, b2nd_array_t **view, const bool *index) {
   for (int i = 0; i < array->sc->nmetalayers; ++i) {
     if (strcmp(array->sc->metalayers[i]->name, "b2nd") != 0) {
-      BLOSC_TRACE_ERROR("Cannot expand dimensions of an array with non-b2nd metalayers");
+      BLOSC_TRACE_ERROR("Cannot squeeze dimensions of an array with non-b2nd metalayers");
       return BLOSC2_ERROR_INVALID_PARAM;
     }
   }
