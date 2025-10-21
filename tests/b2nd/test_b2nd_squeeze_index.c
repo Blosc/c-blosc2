@@ -115,7 +115,8 @@ CUTEST_TEST_TEST(squeeze_index) {
   b2nd_array_t *dest;
   B2ND_TEST_ASSERT(b2nd_get_slice(ctx2, &dest, src, shapes.start, shapes.stop));
 
-  B2ND_TEST_ASSERT(b2nd_squeeze_index(dest, shapes.squeeze_indexes));
+  b2nd_array_t *dest_view;
+  B2ND_TEST_ASSERT(b2nd_squeeze_index(dest, &dest_view, shapes.squeeze_indexes));
 
   int8_t nsq = 0;
   for (int i = 0; i < ctx->ndim; ++i) {
@@ -123,10 +124,11 @@ CUTEST_TEST_TEST(squeeze_index) {
       nsq++;
     }
   }
-  CUTEST_ASSERT("dims are not correct", src->ndim == dest->ndim + nsq);
+  CUTEST_ASSERT("dims are not correct", src->ndim == dest_view->ndim + nsq);
 
   free(buffer);
   B2ND_TEST_ASSERT(b2nd_free(src));
+  B2ND_TEST_ASSERT(b2nd_free(dest_view));
   B2ND_TEST_ASSERT(b2nd_free(dest));
   B2ND_TEST_ASSERT(b2nd_free_ctx(ctx));
   B2ND_TEST_ASSERT(b2nd_free_ctx(ctx2));

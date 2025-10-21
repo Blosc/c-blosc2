@@ -109,17 +109,19 @@ CUTEST_TEST_TEST(squeeze) {
   b2nd_array_t *dest;
   B2ND_TEST_ASSERT(b2nd_get_slice(ctx2, &dest, src, shapes.start, shapes.stop));
 
-  B2ND_TEST_ASSERT(b2nd_squeeze(dest));
+  b2nd_array_t *dest_view;
+  B2ND_TEST_ASSERT(b2nd_squeeze(dest, &dest_view));
 
   // check that the chunk cache hasn't been clobbered
   CUTEST_ASSERT("chunk_cache not invalid", dest->chunk_cache.nchunk == -1 || dest->chunk_cache.data != NULL);
 
   if (ctx->ndim != 0) {
-    CUTEST_ASSERT("dims are equal", src->ndim != dest->ndim);
+    CUTEST_ASSERT("dims are equal", src->ndim != dest_view->ndim);
   }
 
   free(buffer);
   B2ND_TEST_ASSERT(b2nd_free(src));
+  B2ND_TEST_ASSERT(b2nd_free(dest_view));
   B2ND_TEST_ASSERT(b2nd_free(dest));
   B2ND_TEST_ASSERT(b2nd_free_ctx(ctx));
   B2ND_TEST_ASSERT(b2nd_free_ctx(ctx2));
