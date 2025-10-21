@@ -1,10 +1,10 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.21.3 to 2.21.4
+Changes from 2.21.3 to 2.22.0
 =============================
 
-#XXX version-specific blurb XXX#
+* `b2nd_squeeze` and `b2nd_squeeze_index` now return views and their signatures have consequently changed.
 
 Changes from 2.21.2 to 2.21.3
 =============================
