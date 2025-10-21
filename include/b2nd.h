@@ -359,11 +359,12 @@ BLOSC_EXPORT int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const
  b2nd array.
  *
  * @param array The b2nd array.
+ * @param view The memory pointer where the new view will be created.
  * @param index Indexes of the single-dimensional entries to remove.
  *
  * @return An error code
  */
-BLOSC_EXPORT int b2nd_squeeze_index(b2nd_array_t *array, const bool *index);
+BLOSC_EXPORT int b2nd_squeeze_index(b2nd_array_t *array, b2nd_array_t **view, const bool *index);
 
 /**
  * @brief Squeeze a b2nd array
@@ -371,10 +372,11 @@ BLOSC_EXPORT int b2nd_squeeze_index(b2nd_array_t *array, const bool *index);
  * This function remove single-dimensional entries from the shape of a b2nd array.
  *
  * @param array The b2nd array.
+ *  @param view The memory pointer where the new view will be created.
  *
  * @return An error code
  */
-BLOSC_EXPORT int b2nd_squeeze(b2nd_array_t *array);
+BLOSC_EXPORT int b2nd_squeeze(b2nd_array_t *array, b2nd_array_t **view);
 
 /**
  * @brief Add a newaxis to a b2nd array at location @p axis.

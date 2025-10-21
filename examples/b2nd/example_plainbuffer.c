@@ -55,19 +55,21 @@ int main() {
   b2nd_array_t *slice;
   BLOSC_ERROR(b2nd_get_slice(slice_ctx, &slice, arr, slice_start, slice_stop));
 
-  BLOSC_ERROR(b2nd_squeeze(slice));
+  b2nd_array_t *slice_view;
+  BLOSC_ERROR(b2nd_squeeze(slice, &slice_view));
 
   uint8_t *buffer;
   uint64_t buffer_size = 1;
-  for (int i = 0; i < slice->ndim; ++i) {
-    buffer_size *= slice->shape[i];
+  for (int i = 0; i < slice_view->ndim; ++i) {
+    buffer_size *= slice_view->shape[i];
   }
-  buffer_size *= slice->sc->typesize;
+  buffer_size *= slice_view->sc->typesize;
   buffer = malloc(buffer_size);
 
-  BLOSC_ERROR(b2nd_to_cbuffer(slice, buffer, buffer_size));
+  BLOSC_ERROR(b2nd_to_cbuffer(slice_view, buffer, buffer_size));
 
   BLOSC_ERROR(b2nd_free(arr));
+  BLOSC_ERROR(b2nd_free(slice_view));
   BLOSC_ERROR(b2nd_free(slice));
   BLOSC_ERROR(b2nd_free_ctx(ctx));
   BLOSC_ERROR(b2nd_free_ctx(slice_ctx));
