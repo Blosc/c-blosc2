@@ -111,6 +111,9 @@ CUTEST_TEST_TEST(squeeze) {
 
   B2ND_TEST_ASSERT(b2nd_squeeze(dest));
 
+  // check that the chunk cache hasn't been clobbered
+  CUTEST_ASSERT("chunk_cache not invalid", dest->chunk_cache.nchunk == -1 || dest->chunk_cache.data != NULL);
+
   if (ctx->ndim != 0) {
     CUTEST_ASSERT("dims are equal", src->ndim != dest->ndim);
   }
