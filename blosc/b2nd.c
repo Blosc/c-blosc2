@@ -215,12 +215,14 @@ int update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
   }
 
   // Compute strides
-  array->item_array_strides[ndim - 1] = 1;
-  array->item_extchunk_strides[ndim - 1] = 1;
-  array->item_chunk_strides[ndim - 1] = 1;
-  array->item_block_strides[ndim - 1] = 1;
-  array->block_chunk_strides[ndim - 1] = 1;
-  array->chunk_array_strides[ndim - 1] = 1;
+  if (ndim > 0) {
+    array->item_array_strides[ndim - 1] = 1;
+    array->item_extchunk_strides[ndim - 1] = 1;
+    array->item_chunk_strides[ndim - 1] = 1;
+    array->item_block_strides[ndim - 1] = 1;
+    array->block_chunk_strides[ndim - 1] = 1;
+    array->chunk_array_strides[ndim - 1] = 1;
+  }
   for (int i = ndim - 2; i >= 0; --i) {
     if (shape[i + 1] != 0) {
       array->item_array_strides[i] = array->item_array_strides[i + 1] * array->shape[i + 1];
