@@ -5,6 +5,7 @@ Changes from 2.21.3 to 2.22.0
 =============================
 
 * `b2nd_squeeze` and `b2nd_squeeze_index` now return views and their signatures have consequently changed.
+* bug fix for indexing `[ndim - 1]` which caused an error when `ndim` is 0
 
 Changes from 2.21.2 to 2.21.3
 =============================

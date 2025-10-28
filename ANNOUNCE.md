@@ -1,12 +1,11 @@
-# Announcing C-Blosc2 2.21.3
+# Announcing C-Blosc2 2.22.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-The main change is an increase in the number of max dimensions for a 
-b2nd array from 8 to 16.
-Otherwise, this is a maintenance release, with a few fixes and some optimizations.
-Thanks to Barak Ugav and Antonio Valentino for their contributions.
+The main change is in the `b2nd_squeeze_index` and `b2nd_squeeze` APIs, which now accept and return views on the original array.
+Otherwise, this is a maintenance release, with a few fixes and some optimizations, as well as a new roadmap file.
+Thanks to @leyroycep for important bug fixes.
 
 For more info, see the release notes in:
 

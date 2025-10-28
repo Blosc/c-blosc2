@@ -29,7 +29,7 @@ if(BUILD_SHARED)
     endif()
     set_target_properties(blosc2_shared PROPERTIES
         VERSION ${version_string}
-        SOVERSION 5  # Change this when an ABI change happens
+        SOVERSION 6  # Change this when an ABI change happens
     )
     target_compile_definitions(blosc2_shared PRIVATE BLOSC_SHARED_LIBRARY)
     target_include_directories(blosc2_shared PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
