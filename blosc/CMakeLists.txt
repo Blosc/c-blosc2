@@ -182,10 +182,23 @@ if(NOT DEACTIVATE_OPENZL)
         # TODO: Fallback: build internal OpenZL 
         set(OPENZL_LOCAL_DIR ${INTERNAL_LIBS}/openzl-0.1.0)
 
-        # Add source files
-        file(GLOB_RECURSE OPENZL_SRC ${OPENZL_LOCAL_DIR}/src/*.c)
-        list(APPEND SOURCES ${OPENZL_SRC})
-        source_group("OpenZL" FILES ${OPENZL_SRC})        
+        # C sources
+        file(GLOB_RECURSE OPENZL_C_SRC
+            ${OPENZL_LOCAL_DIR}/src/*.c
+        )
+
+        # ASM sources (BMI2)
+        if((NOT MSVC) AND COMPILER_SUPPORT_BMI2)
+            file(GLOB_RECURSE OPENZL_ASM_SRC
+                ${OPENZL_LOCAL_DIR}/src/*.S
+            )
+        else()
+            add_compile_definitions(ZS_DISABLE_BMI2)
+            set(OPENZL_ASM_SRC "")
+        endif()
+
+        list(APPEND SOURCES ${OPENZL_C_SRC} ${OPENZL_ASM_SRC})
+        source_group("OpenZL" FILES ${OPENZL_C_SRC} ${OPENZL_ASM_SRC})
 
         list(APPEND BLOSC_INCLUDE_DIRS
             ${OPENZL_LOCAL_DIR}/src
