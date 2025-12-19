@@ -187,18 +187,17 @@ if(NOT DEACTIVATE_OPENZL)
             ${OPENZL_LOCAL_DIR}/src/*.c
         )
 
-        # ASM sources (BMI2)
-        if((NOT MSVC) AND COMPILER_SUPPORT_BMI2)
+        if(COMPILER_SUPPORT_AVX2 AND NOT MSVC)
+            enable_language(ASM)
             file(GLOB_RECURSE OPENZL_ASM_SRC
-                ${OPENZL_LOCAL_DIR}/src/*.S
+                ${OPENZL_LOCAL_DIR}/src/openzl/fse/decompress/*.S
             )
         else()
-            add_compile_definitions(ZS_DISABLE_BMI2)
+            add_compile_definitions(ZS_DISABLE_BMI2 ZS_DISABLE_ASM)
             set(OPENZL_ASM_SRC "")
         endif()
 
         list(APPEND SOURCES ${OPENZL_C_SRC} ${OPENZL_ASM_SRC})
-        source_group("OpenZL" FILES ${OPENZL_C_SRC} ${OPENZL_ASM_SRC})
 
         list(APPEND BLOSC_INCLUDE_DIRS
             ${OPENZL_LOCAL_DIR}/src
