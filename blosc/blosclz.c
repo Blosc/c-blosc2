@@ -23,6 +23,10 @@
 #include <stdint.h>
 #include <string.h>
 
+#if !defined(DISABLE_NEON_BLOSC) && (defined(__ARM_NEON) || defined(__aarch64__))
+#include <arm_neon.h>
+#endif
+
 /*
  * Give hints to the compiler for branch prediction optimization.
  * This is not necessary anymore with modern CPUs.
@@ -115,7 +119,38 @@ uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
 
 #endif
 
+#if !defined(DISABLE_NEON_BLOSC) && (defined(__ARM_NEON) || defined(__aarch64__))
+static uint8_t *get_run_neon(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+  uint8_t x = ip[-1];
 
+  while (ip < (ip_bound - sizeof(uint8x16_t))) {
+    uint8x16_t value, value2;
+    /* Broadcast the value for every byte in a 128-bit register */
+    value = vdupq_n_u8(x);
+    value2 = vld1q_u8(ref);
+    /* Compare all bytes */
+    uint8x16_t cmp = vceqq_u8(value, value2);
+    /* Use vminvq_u8 to check if all comparison results are 0xFF (all bytes match) */
+    uint8_t min_val = vminvq_u8(cmp);
+    
+    if (min_val != 0xFF) {
+      /* Return the byte that starts to differ */
+      while (*ref++ == x) ip++;
+      return ip;
+    }
+    else {
+      ip += sizeof(uint8x16_t);
+      ref += sizeof(uint8x16_t);
+    }
+  }
+  /* Look into the remainder */
+  while ((ip < ip_bound) && (*ref++ == x)) ip++;
+  return ip;
+}
+#endif
+
+
+#if defined(DISABLE_NEON_BLOSC) || (!defined(__ARM_NEON) && !defined(__aarch64__))
 static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
   int64_t value, value2;
@@ -142,9 +177,11 @@ static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref
   while ((ip < ip_bound) && (*ref++ == x)) ip++;
   return ip;
 }
+#endif
 
 
 /* Return the byte that starts to differ */
+#if defined(DISABLE_NEON_BLOSC) || (!defined(__ARM_NEON) && !defined(__aarch64__))
 uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
 #if !defined(BLOSC_STRICT_ALIGN)
   while (ip < (ip_bound - sizeof(int64_t))) {
@@ -163,6 +200,7 @@ uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   while ((ip < ip_bound) && (*ref++ == *ip++)) {}
   return ip;
 }
+#endif
 
 
 #if defined(__SSE2__)
@@ -214,10 +252,39 @@ static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
 }
 #endif
 
+#if !defined(DISABLE_NEON_BLOSC) && (defined(__ARM_NEON) || defined(__aarch64__))
+static uint8_t *get_match_neon(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+  while (ip < (ip_bound - sizeof(uint8x16_t))) {
+    uint8x16_t value, value2;
+    value = vld1q_u8(ip);
+    value2 = vld1q_u8(ref);
+    /* Compare all bytes */
+    uint8x16_t cmp = vceqq_u8(value, value2);
+    /* Use vminvq_u8 to check if all comparison results are 0xFF (all bytes match) */
+    uint8_t min_val = vminvq_u8(cmp);
+    
+    if (min_val != 0xFF) {
+      /* Return the byte that starts to differ */
+      while (*ref++ == *ip++) {}
+      return ip;
+    }
+    else {
+      ip += sizeof(uint8x16_t);
+      ref += sizeof(uint8x16_t);
+    }
+  }
+  /* Look into the remainder */
+  while ((ip < ip_bound) && (*ref++ == *ip++)) {}
+  return ip;
+}
+#endif
+
 
 static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* ref, bool run) {
   if (BLOSCLZ_UNLIKELY(run)) {
-#if defined(__AVX2__)
+#if !defined(DISABLE_NEON_BLOSC) && (defined(__ARM_NEON) || defined(__aarch64__))
+    ip = get_run_neon(ip, ip_bound, ref);
+#elif defined(__AVX2__)
     // Extensive experiments on AMD Ryzen3 say that regular get_run is faster
     // ip = get_run_32(ip, ip_bound, ref);
     ip = get_run(ip, ip_bound, ref);
@@ -230,7 +297,9 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 #endif
   }
   else {
-#if defined(__AVX2__)
+#if !defined(DISABLE_NEON_BLOSC) && (defined(__ARM_NEON) || defined(__aarch64__))
+    ip = get_match_neon(ip, ip_bound, ref);
+#elif defined(__AVX2__)
     // Extensive experiments on AMD Ryzen3 say that regular get_match_16 is faster
     // ip = get_match_32(ip, ip_bound, ref);
     ip = get_match_16(ip, ip_bound, ref);
@@ -673,6 +742,61 @@ static unsigned char* copy_match_16(unsigned char *op, const unsigned char *matc
 }
 #endif
 
+#if !defined(DISABLE_NEON_BLOSC) && (defined(__ARM_NEON) || defined(__aarch64__))
+#if defined(_MSC_VER)
+#define ALIGNED_(x) __declspec(align(x))
+#else
+#if defined(__GNUC__)
+#define ALIGNED_(x) __attribute__ ((aligned(x)))
+#endif
+#endif
+#define ALIGNED_TYPE_(t, x) t ALIGNED_(x)
+
+static unsigned char* copy_match_16_neon(unsigned char *op, const unsigned char *match, int32_t len)
+{
+  size_t offset = op - match;
+  while (len >= 16) {
+
+    static const ALIGNED_TYPE_(uint8_t, 16) masks[] =
+      {
+                0,  1,  2,  1,  4,  1,  4,  2,  8,  7,  6,  5,  4,  3,  2,  1, // offset = 0, not used as mask, but for shift
+                0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // offset = 1
+                0,  1,  0,  1,  0,  1,  0,  1,  0,  1,  0,  1,  0,  1,  0,  1,
+                0,  1,  2,  0,  1,  2,  0,  1,  2,  0,  1,  2,  0,  1,  2,  0,
+                0,  1,  2,  3,  0,  1,  2,  3,  0,  1,  2,  3,  0,  1,  2,  3,
+                0,  1,  2,  3,  4,  0,  1,  2,  3,  4,  0,  1,  2,  3,  4,  0,
+                0,  1,  2,  3,  4,  5,  0,  1,  2,  3,  4,  5,  0,  1,  2,  3,
+                0,  1,  2,  3,  4,  5,  6,  0,  1,  2,  3,  4,  5,  6,  0,  1,
+                0,  1,  2,  3,  4,  5,  6,  7,  0,  1,  2,  3,  4,  5,  6,  7,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  0,  1,  2,  3,  4,  5,  6,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  0,  1,  2,  3,  4,  5,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,  0,  1,  2,  3,  4,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11,  0,  1,  2,  3,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12,  0,  1,  2,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13,  0,  1,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,  0,
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,  15, // offset = 16
+      };
+
+    /* NEON equivalent of _mm_shuffle_epi8 using vtbl instructions */
+    uint8x16_t match_vec = vld1q_u8((const uint8_t *)match);
+    uint8x16_t mask_vec = vld1q_u8((const uint8_t *)(masks + offset * 16));
+    uint8x16_t result = vqtbl1q_u8(match_vec, mask_vec);
+    vst1q_u8((uint8_t *)op, result);
+
+    match += masks[offset];
+
+    op += 16;
+    len -= 16;
+  }
+  // Deal with remainders
+  for (; len > 0; len--) {
+    *op++ = *match++;
+  }
+  return op;
+}
+#endif
+
 // LZ4 wildCopy which can reach excellent copy bandwidth (even if insecure)
 static inline void wild_copy(uint8_t *out, const uint8_t* from, uint8_t* end) {
   uint8_t* d = out;
@@ -755,17 +879,24 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
       }
       else {
         // general copy with any overlap
-#if 0 && defined(__AVX2__)
+#if !defined(DISABLE_NEON_BLOSC) && (defined(__ARM_NEON) || defined(__aarch64__))
+        if (op - ref <= 16) {
+          op = copy_match_16_neon(op, ref, len);
+        }
+        else {
+          op = copy_match(op, ref, (unsigned) len);
+        }
+#elif 0 && defined(__AVX2__)
         if (op - ref <= 16) {
           // This is not faster on a combination of compilers (clang, gcc, icc) or machines, but
           // it is not too slower either.
           op = copy_match_16(op, ref, len);
         }
         else {
-#endif
           op = copy_match(op, ref, (unsigned) len);
-#if 0 && defined(__AVX2__)
         }
+#else
+        op = copy_match(op, ref, (unsigned) len);
 #endif
       }
     }

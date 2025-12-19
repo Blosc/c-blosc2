@@ -26,6 +26,10 @@
 #include <string.h>
 #endif
 
+#if !defined(DISABLE_NEON_BLOSC) && (defined(__ARM_NEON) || defined(__aarch64__))
+#include <arm_neon.h>
+#endif
+
 /*
  * Use inlined functions for supported systems.
  */
@@ -94,7 +98,12 @@ static inline unsigned char *copy_8_bytes(unsigned char *out, const unsigned cha
 
 
 static inline unsigned char *copy_16_bytes(unsigned char *out, const unsigned char *from) {
-#if defined(__SSE2__)
+#if !defined(DISABLE_NEON_BLOSC) && (defined(__ARM_NEON) || defined(__aarch64__))
+  uint8x16_t chunk;
+  chunk = vld1q_u8(from);
+  vst1q_u8(out, chunk);
+  out += 16;
+#elif defined(__SSE2__)
   __m128i chunk;
   chunk = _mm_loadu_si128((__m128i*)from);
   _mm_storeu_si128((__m128i*)out, chunk);
@@ -119,6 +128,14 @@ static inline unsigned char *copy_32_bytes(unsigned char *out, const unsigned ch
   chunk = _mm256_loadu_si256((__m256i*)from);
   _mm256_storeu_si256((__m256i*)out, chunk);
   out += 32;
+#elif !defined(DISABLE_NEON_BLOSC) && (defined(__ARM_NEON) || defined(__aarch64__))
+  uint8x16_t chunk;
+  chunk = vld1q_u8(from);
+  vst1q_u8(out, chunk);
+  from += 16; out += 16;
+  chunk = vld1q_u8(from);
+  vst1q_u8(out, chunk);
+  out += 16;
 #elif defined(__SSE2__)
   __m128i chunk;
   chunk = _mm_loadu_si128((__m128i*)from);
@@ -535,6 +552,8 @@ unsigned char *fastcopy(unsigned char *out, const unsigned char *from, unsigned 
 unsigned char* copy_match(unsigned char *out, const unsigned char *from, unsigned len) {
 #if defined(__AVX2__)
   unsigned sz = sizeof(__m256i);
+#elif !defined(DISABLE_NEON_BLOSC) && (defined(__ARM_NEON) || defined(__aarch64__))
+  unsigned sz = sizeof(uint8x16_t);
 #elif defined(__SSE2__)
   unsigned sz = sizeof(__m128i);
 #else
