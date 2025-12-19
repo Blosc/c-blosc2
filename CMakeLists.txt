@@ -131,7 +131,7 @@ option(DEACTIVATE_ZLIB
 option(DEACTIVATE_ZSTD
     "Do not include support for the Zstd library." OFF)
 option(DEACTIVATE_OPENZL
-    "Do not include support for the OpenZL library." OFF)
+    "Do not include support for the OpenZL library." DEACTIVATE_ZSTD)
 option(DEACTIVATE_IPP
     "Do not include support for the Intel IPP library." ON)
 option(PREFER_EXTERNAL_LZ4
