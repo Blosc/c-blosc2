@@ -59,7 +59,7 @@ static char *test_compress_decompress(void) {
 
   compressor = blosc1_get_compressor();
   mu_assert("ERROR: get_compressor incorrect",
-	    strcmp(compressor, "lz4") == 0);
+	    strcmp(compressor, "openzl") == 0);
 
   /* Get a compressed buffer */
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
