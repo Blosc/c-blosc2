@@ -193,7 +193,7 @@ if(NOT DEACTIVATE_OPENZL)
                 ${OPENZL_LOCAL_DIR}/src/openzl/fse/decompress/*.S
             )
         else()
-            add_compile_definitions(ZS_DISABLE_BMI2 ZS_DISABLE_ASM)
+            add_compile_definitions("ZSTD_DISABLE_ASM")
             set(OPENZL_ASM_SRC "")
         endif()
 
