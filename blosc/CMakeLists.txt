@@ -168,6 +168,32 @@ if(NOT DEACTIVATE_ZSTD)
     endif()
 endif()
 
+if(NOT DEACTIVATE_OPENZL)
+    if(OPENZL_FOUND)
+        # Preferred: imported target
+        if(TARGET OpenZL::openzl)
+            list(APPEND LIBS OpenZL::openzl)
+        else()
+            # Legacy FindOpenZL.cmake variables
+            list(APPEND LIBS ${OPENZL_LIBRARY})
+            list(APPEND BLOSC_INCLUDE_DIRS ${OPENZL_INCLUDE_DIR})
+        endif()
+    else()
+        # TODO: Fallback: build internal OpenZL 
+        set(OPENZL_LOCAL_DIR ${INTERNAL_LIBS}/openzl-0.1.0)
+
+        # Add source files
+        file(GLOB_RECURSE OPENZL_SRC ${OPENZL_LOCAL_DIR}/src/*.c)
+        list(APPEND SOURCES ${OPENZL_SRC})
+        source_group("OpenZL" FILES ${OPENZL_SRC})        
+
+        list(APPEND BLOSC_INCLUDE_DIRS
+            ${OPENZL_LOCAL_DIR}/src
+            ${OPENZL_LOCAL_DIR}/include
+        )
+    endif()
+endif()
+
 if(HAVE_IPP)
     set(LIBS ${LIBS} "${IPP_LIBRARIES}")
 endif()

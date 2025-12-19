@@ -320,8 +320,9 @@ enum {
   BLOSC_LZ4HC = 2,
   BLOSC_ZLIB = 4,
   BLOSC_ZSTD = 5,
+  BLOSC_OPENZL = 6,
 #endif // BLOSC_H
-  BLOSC_LAST_CODEC = 6,
+  BLOSC_LAST_CODEC = 7,
   //!< Determine the last codec defined by Blosc.
   BLOSC_LAST_REGISTERED_CODEC = BLOSC2_GLOBAL_REGISTERED_CODECS_START + BLOSC2_GLOBAL_REGISTERED_CODECS - 1,
   //!< Determine the last registered codec. It is used to check if a codec is registered or not.
@@ -336,6 +337,7 @@ enum {
 #define BLOSC_LZ4HC_COMPNAME     "lz4hc"
 #define BLOSC_ZLIB_COMPNAME      "zlib"
 #define BLOSC_ZSTD_COMPNAME      "zstd"
+#define BLOSC_OPENZL_COMPNAME    "openzl"
 #endif // BLOSC_H
 
 /**
@@ -347,6 +349,7 @@ enum {
   BLOSC_LZ4_LIB = 1,
   BLOSC_ZLIB_LIB = 3,
   BLOSC_ZSTD_LIB = 4,
+  BLOSC_OPENZL_LIB = 5,
 #endif // BLOSC_H
   BLOSC_UDCODEC_LIB = 6,
   BLOSC_SCHUNK_LIB = 7,   //!< compressor library in super-chunk header
@@ -360,6 +363,7 @@ enum {
 #define BLOSC_LZ4_LIBNAME       "LZ4"
 #define BLOSC_ZLIB_LIBNAME      "Zlib"
 #define BLOSC_ZSTD_LIBNAME      "Zstd"
+#define BLOSC_OPENZL_LIBNAME      "OpenZL"
 #endif // BLOSC_H
 
 /**
@@ -373,6 +377,7 @@ enum {
   BLOSC_LZ4HC_FORMAT = BLOSC_LZ4_LIB,
   BLOSC_ZLIB_FORMAT = BLOSC_ZLIB_LIB,
   BLOSC_ZSTD_FORMAT = BLOSC_ZSTD_LIB,
+  BLOSC_OPENZL_FORMAT = BLOSC_OPENZL_LIB,
 #endif // BLOSC_H
   BLOSC_UDCODEC_FORMAT = BLOSC_UDCODEC_LIB,
 };
@@ -388,6 +393,7 @@ enum {
   BLOSC_LZ4HC_VERSION_FORMAT = 1,  /* LZ4HC and LZ4 share the same format */
   BLOSC_ZLIB_VERSION_FORMAT = 1,
   BLOSC_ZSTD_VERSION_FORMAT = 1,
+  BLOSC_OPENZL_VERSION_FORMAT = 1,
 #endif // BLOSC_H
   BLOSC_UDCODEC_VERSION_FORMAT = 1,
 };

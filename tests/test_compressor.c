@@ -33,7 +33,7 @@ static char *test_compressor(void) {
 	    strcmp(compressor, "blosclz") == 0);
 
   /* Activate the BLOSC_COMPRESSOR variable */
-  setenv("BLOSC_COMPRESSOR", "lz4", 0);
+  setenv("BLOSC_COMPRESSOR", "openzl", 0);
 
   /* Get a compressed buffer */
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
@@ -42,7 +42,7 @@ static char *test_compressor(void) {
 
   compressor = blosc1_get_compressor();
   mu_assert("ERROR: get_compressor (compress, after) incorrect",
-	    strcmp(compressor, "lz4") == 0);
+	    strcmp(compressor, "openzl") == 0);
 
   /* Reset envvar */
   unsetenv("BLOSC_COMPRESSOR");

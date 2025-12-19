@@ -51,6 +51,9 @@
   // #include "cover.h"  // for experimenting with fast cover training for building dicts
   #include "zdict.h"
 #endif /*  HAVE_ZSTD */
+#if defined(HAVE_OPENZL)
+  #include "openzl/openzl.h"
+#endif /*  HAVE_OPENZL */
 
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <windows.h>
@@ -223,6 +226,8 @@ static int compname_to_clibcode(const char* compname) {
     return BLOSC_ZLIB_LIB;
   if (strcmp(compname, BLOSC_ZSTD_COMPNAME) == 0)
     return BLOSC_ZSTD_LIB;
+  if (strcmp(compname, BLOSC_OPENZL_COMPNAME) == 0)
+    return BLOSC_OPENZL_LIB;
   for (int i = 0; i < g_ncodecs; ++i) {
     if (strcmp(compname, g_codecs[i].compname) == 0)
       return g_codecs[i].complib;
@@ -236,6 +241,7 @@ static const char* clibcode_to_clibname(int clibcode) {
   if (clibcode == BLOSC_LZ4_LIB) return BLOSC_LZ4_LIBNAME;
   if (clibcode == BLOSC_ZLIB_LIB) return BLOSC_ZLIB_LIBNAME;
   if (clibcode == BLOSC_ZSTD_LIB) return BLOSC_ZSTD_LIBNAME;
+  if (clibcode == BLOSC_OPENZL_LIB) return BLOSC_OPENZL_LIBNAME;
   for (int i = 0; i < g_ncodecs; ++i) {
     if (clibcode == g_codecs[i].complib)
       return g_codecs[i].compname;
@@ -264,6 +270,8 @@ int blosc2_compcode_to_compname(int compcode, const char** compname) {
     name = BLOSC_ZLIB_COMPNAME;
   else if (compcode == BLOSC_ZSTD)
     name = BLOSC_ZSTD_COMPNAME;
+  else if (compcode == BLOSC_OPENZL)
+    name = BLOSC_OPENZL_COMPNAME;
   else {
     for (int i = 0; i < g_ncodecs; ++i) {
       if (compcode == g_codecs[i].compcode) {
@@ -289,7 +297,11 @@ int blosc2_compcode_to_compname(int compcode, const char** compname) {
 #if defined(HAVE_ZSTD)
   else if (compcode == BLOSC_ZSTD)
     code = BLOSC_ZSTD;
-#endif /* HAVE_ZSTD */
+#endif /* HAVE_OPENZL */
+#if defined(HAVE_OPENZL)
+  else if (compcode == BLOSC_OPENZL)
+    code = BLOSC_OPENZL;
+#endif /* HAVE_OPENZL */
   else if (compcode >= BLOSC_LAST_CODEC)
     code = compcode;
   return code;
@@ -318,6 +330,11 @@ int blosc2_compname_to_compcode(const char* compname) {
     code = BLOSC_ZSTD;
   }
 #endif /*  HAVE_ZSTD */
+#if defined(HAVE_OPENZL)
+  else if (strcmp(compname, BLOSC_OPENZL_COMPNAME) == 0) {
+    code = BLOSC_OPENZL;
+  }
+#endif /*  HAVE_OPENZL */
   else{
     for (int i = 0; i < g_ncodecs; ++i) {
       if (strcmp(compname, g_codecs[i].compname) == 0) {
@@ -345,6 +362,10 @@ static int compcode_to_compformat(int compcode) {
     case BLOSC_ZSTD:    return BLOSC_ZSTD_FORMAT;
       break;
 #endif /*  HAVE_ZSTD */
+#if defined(HAVE_OPENZL)
+    case BLOSC_OPENZL:    return BLOSC_OPENZL_FORMAT;
+      break;
+#endif /*  HAVE_OPENZL*/
     default:
       return BLOSC_UDCODEC_FORMAT;
   }
@@ -374,6 +395,13 @@ static int compcode_to_compversion(int compcode) {
       return BLOSC_ZSTD_VERSION_FORMAT;
       break;
 #endif /*  HAVE_ZSTD */
+
+#if defined(HAVE_OPENZL)
+    case BLOSC_OPENZL:
+      return BLOSC_OPENZL_VERSION_FORMAT;
+      break;
+#endif /*  HAVE_OPENZL */
+
     default:
       for (int i = 0; i < g_ncodecs; ++i) {
         if (compcode == g_codecs[i].compcode) {
@@ -546,6 +574,57 @@ static int zstd_wrap_decompress(struct thread_context* thread_context,
   return (int)code;
 }
 #endif /*  HAVE_ZSTD */
+
+#if defined(HAVE_OPENZL)
+static int openzl_wrap_compress(struct thread_context* thread_context,
+                              const char* input, size_t input_length,
+                              char* output, size_t maxout, int clevel) {
+  if (thread_context->openzl_cctx == NULL) {
+    thread_context->openzl_cctx = ZL_CCtx_create();
+  }
+  
+  ZL_Compressor* compressor = ZL_Compressor_create();
+  // For the moment just pick "serial" profile by default
+  ZL_GraphID graphId = ZL_Compressor_buildACEGraphWithDefault(compressor, ZL_GRAPH_ZSTD);
+
+  ZL_Report code = ZL_Compressor_selectStartingGraphID(compressor, graphId);
+  if (ZL_isError(code)) {
+    BLOSC_TRACE_ERROR("Error when setting graph for OpenZL compressor: '%s'.  Giving up.", ZL_errorCode(code));
+    return 0;
+  }
+
+  ZL_CParam gcparam = ZL_CParam_formatVersion;
+  ZL_CCtx_setParameter(thread_context->openzl_cctx,  gcparam, ZL_MAX_FORMAT_VERSION);
+  ZL_CCtx_refCompressor(thread_context->openzl_cctx, compressor);
+  ZL_TypedRef* input_ = ZL_TypedRef_createSerial(input, input_length);
+
+  code = ZL_CCtx_compressTypedRef(thread_context->openzl_cctx, output, maxout, input_);
+
+  if (ZL_isError(code)) {
+    return 0;
+  }
+
+  return ZL_validResult(code);
+}
+
+static int openzl_wrap_decompress(struct thread_context* thread_context,
+                                const char* input, size_t compressed_length,
+                                char* output, size_t maxout) {
+
+  if (thread_context->openzl_dctx == NULL) {
+    thread_context->openzl_dctx = ZL_DCtx_create();
+  }
+  
+  ZL_TypedBuffer* tbuffer = ZL_TypedBuffer_createWrapSerial((void*)output, maxout);
+  ZL_Report code = ZL_DCtx_decompressTBuffer(thread_context->openzl_dctx, tbuffer, (void*)input, compressed_length);
+
+  if (ZL_isError(code)) {
+    BLOSC_TRACE_ERROR("Error in OpenZL decompression: '%s'.  Giving up.", ZL_errorCode(code));
+    return 0;
+  }
+  return ZL_validResult(code);
+}
+#endif /*  HAVE_OPENZL */
 
 /* Compute acceleration for blosclz */
 static int get_accel(const blosc2_context* context) {
@@ -1242,6 +1321,13 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
                                   (char*)dest, (size_t)maxout, context->clevel);
     }
   #endif /* HAVE_ZSTD */
+  #if defined(HAVE_OPENZL)
+    else if (context->compcode == BLOSC_OPENZL) {
+      cbytes = openzl_wrap_compress(thread_context,
+                                    (char*)_src + j * neblock, (size_t)neblock,
+                                    (char*)dest, (size_t)maxout, context->clevel);
+    }
+  #endif /* HAVE_OPENZL */
     else if (context->compcode > BLOSC2_DEFINED_CODECS_STOP) {
       for (int i = 0; i < g_ncodecs; ++i) {
         if (g_codecs[i].compcode == context->compcode) {
@@ -1855,6 +1941,13 @@ static int blosc_d(
                                       (char*)_dest, (size_t)neblock);
       }
   #endif /*  HAVE_ZSTD */
+  #if defined(HAVE_OPENZL)
+    else if (compformat == BLOSC_OPENZL_FORMAT) {
+      nbytes = openzl_wrap_decompress(thread_context,
+                                    (char*)src, (size_t)cbytes,
+                                    (char*)_dest, (size_t)neblock);
+    }
+  #endif /*  HAVE_OPENZL */
       else if (compformat == BLOSC_UDCODEC_FORMAT) {
         bool getcell = false;
 
@@ -2053,6 +2146,10 @@ static int init_thread_context(struct thread_context* thread_context, blosc2_con
   thread_context->zstd_cctx = NULL;
   thread_context->zstd_dctx = NULL;
   #endif
+  #if defined(HAVE_OPENZL)
+  thread_context->openzl_cctx = NULL;
+  thread_context->openzl_dctx = NULL;
+  #endif
 
   /* Create the hash table for LZ4 in case we are using IPP */
 #ifdef HAVE_IPP
@@ -2094,6 +2191,14 @@ static void destroy_thread_context(struct thread_context* thread_context) {
   }
   if (thread_context->zstd_dctx != NULL) {
     ZSTD_freeDCtx(thread_context->zstd_dctx);
+  }
+#endif
+#if defined(HAVE_OPENZL)
+  if (thread_context->openzl_cctx != NULL) {
+    ZL_CCtx_free(thread_context->openzl_cctx);
+  }
+  if (thread_context->openzl_dctx != NULL) {
+    ZL_DCtx_free(thread_context->openzl_dctx);
   }
 #endif
 #ifdef HAVE_IPP
@@ -3630,6 +3735,10 @@ const char* blosc2_list_compressors(void) {
   strcat(ret, ",");
   strcat(ret, BLOSC_ZSTD_COMPNAME);
 #endif /* HAVE_ZSTD */
+#if defined(HAVE_OPENZL)
+  strcat(ret, ",");
+  strcat(ret, BLOSC_OPENZL_COMPNAME);
+#endif /* HAVE_OPENZL */
   compressors_list_done = 1;
   return ret;
 }

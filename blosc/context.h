@@ -18,6 +18,10 @@
 #include "zstd.h"
 #endif
 
+#if defined(HAVE_OPENZL)
+#include "openzl/openzl.h"
+#endif
+
 #ifdef HAVE_IPP
 #include <ipps.h>
 #endif
@@ -142,6 +146,11 @@ struct thread_context {
   ZSTD_CCtx* zstd_cctx;
   ZSTD_DCtx* zstd_dctx;
 #endif /* HAVE_ZSTD */
+#if defined(HAVE_OPENZL)
+  /* The contexts for OpenZL */
+  ZL_CCtx* openzl_cctx;
+  ZL_DCtx* openzl_dctx;
+#endif /* HAVE_OPENZL */
 #ifdef HAVE_IPP
   Ipp8u* lz4_hash_table;
 #endif

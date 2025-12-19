@@ -142,6 +142,11 @@ Or, you may want to use a codec in an external library already in the system:
 
   cmake -DPREFER_EXTERNAL_LZ4=ON ..
 
+For OpenZL, there are problems with the build seemingly, so, after building and installing into ``build-cmake`` in the ``openzl`` directory, one has to run:
+
+.. code-block:: console
+
+  cmake   -DPREFER_EXTERNAL_OPENZL=ON   -DOPENZL_LIBRARY=$HOME/openzl/build-cmake/install/lib/libopenzl.a   -DOPENZL_INCLUDE_DIR=$HOME/openzl/build-cmake/install/include   ..
 
 Supported platforms
 ~~~~~~~~~~~~~~~~~~~
