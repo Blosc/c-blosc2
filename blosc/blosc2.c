@@ -3059,7 +3059,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     return BLOSC2_ERROR_WRITE_BUFFER;
   }
 
-  context->bstarts = (int32_t*)(_src + context->header_overhead);
+  int32_t* bstarts = (int32_t*)(_src + context->header_overhead);
 
   /* Check region boundaries */
   if ((start < 0) || (start * header->typesize > header->nbytes)) {
@@ -3074,7 +3074,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
 
   int chunk_memcpy = header->flags & 0x1;
   if (!context->special_type && !chunk_memcpy &&
-      ((uint8_t *)(_src + srcsize) < (uint8_t *)(context->bstarts + context->nblocks))) {
+      ((uint8_t *)(_src + srcsize) < (uint8_t *)(bstarts + context->nblocks))) {
     BLOSC_TRACE_ERROR("`bstarts` out of bounds.");
     return BLOSC2_ERROR_READ_BUFFER;
   }
@@ -3178,7 +3178,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
 
     // If memcpyed we don't have a bstarts section (because it is not needed)
     int32_t src_offset = memcpyed ?
-      context->header_overhead + j * header->blocksize : sw32_(context->bstarts + j);
+      context->header_overhead + j * header->blocksize : sw32_(bstarts + j);
 
     int32_t cbytes = blosc_d(context->serial_context, bsize, leftoverblock, memcpyed,
                              src, srcsize, src_offset, j,
