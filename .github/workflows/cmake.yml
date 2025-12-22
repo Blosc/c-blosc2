@@ -91,10 +91,10 @@ jobs:
             compiler: clang
             cmake-args: -D DEACTIVATE_ZSTD=ON
 
-          - name: Windows MSVC Win64
+          - name: Windows Clang Win64
             os: windows-latest
-            compiler: cl
-            cmake-args: -A x64
+            compiler: clang-cl
+            cmake-args: -G Ninja
 
           - name: Windows GCC Ninja
             os: windows-latest
@@ -132,7 +132,7 @@ jobs:
       run: brew install ninja ${{ matrix.packages }}
 
     - name: Generate project files
-      run: cmake -S ${{ matrix.build-src-dir || '.' }} -B ${{ matrix.build-dir || '.' }} ${{ matrix.cmake-args }} -D CMAKE_BUILD_TYPE=${{ matrix.build-config || 'Release' }} -D BUILD_SHARED_LIBS=OFF
+      run: cmake -S ${{ matrix.build-src-dir || '.' }} -B ${{ matrix.build-dir || '.' }} ${{ matrix.cmake-args }} -D CMAKE_BUILD_TYPE=${{ matrix.build-config || 'Release' }} -D BUILD_SHARED_LIBS=OFF -D CMAKE_C_COMPILER=${{ matrix.compiler }} -D CMAKE_CXX_COMPILER=${{ matrix.compiler }}
       env:
         CC: ${{ matrix.compiler }}
         CFLAGS: ${{ matrix.cflags }}
