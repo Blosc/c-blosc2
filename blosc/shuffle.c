@@ -52,7 +52,9 @@
 
 // __builtin_cpu_supports() fixed in GCC 8: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85100
 // Also, clang added support for it in clang 10 at very least (and possibly since 3.8)
-#if (defined(__clang__) && (__clang_major__ >= 10)) && !(defined(__APPLE__) && defined(__x86_64__) && defined(BUILD_STATIC)) || \
+// Handle clang on windows without MSVC 
+#if (defined(__clang__) && (__clang_major__ >= 10)) && !(defined(__APPLE__) && defined(__x86_64__) && defined(BUILD_STATIC)) \
+      && !defined(_WIN32)|| \
     (defined(__GNUC__) && defined(__GNUC_MINOR__) && __GNUC__ >= 8)
 #define HAVE_CPU_FEAT_INTRIN
 #endif

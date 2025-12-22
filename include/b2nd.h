@@ -35,7 +35,7 @@ extern "C" {
 extern "C" {
 #endif
 
-#if (defined(_MSC_VER) && !defined(__clang__))
+#if defined(_MSC_VER)
 #define B2ND_DEPRECATED(msg) __declspec(deprecated(msg))
 #elif defined(__GNUC__) || defined(__clang__)
 #define B2ND_DEPRECATED(msg) __attribute__((deprecated(msg)))

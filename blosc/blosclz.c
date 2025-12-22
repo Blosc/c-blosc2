@@ -621,10 +621,10 @@ int blosclz_compress(const int clevel, const void* input, int length,
 // See https://habr.com/en/company/yandex/blog/457612/
 #if defined(__AVX2__)
 
-#if (defined(_MSC_VER) && !defined(__clang__))
+#if defined(_MSC_VER)
 #define ALIGNED_(x) __declspec(align(x))
 #else
-#if (defined(__GNUC__) || defined(__clang__))
+#if defined(__GNUC__)
 #define ALIGNED_(x) __attribute__ ((aligned(x)))
 #endif
 #endif
