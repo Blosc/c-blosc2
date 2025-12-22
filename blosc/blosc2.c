@@ -600,6 +600,10 @@ static int openzl_wrap_compress(struct thread_context* thread_context,
 
   code = ZL_CCtx_compressTypedRef(thread_context->openzl_cctx, output, maxout, input_);
 
+    // Cleanup
+    ZL_TypedRef_free(input_);
+    ZL_Compressor_free(compressor);
+
   if (ZL_isError(code)) {
     return 0;
   }
@@ -617,6 +621,9 @@ static int openzl_wrap_decompress(struct thread_context* thread_context,
   
   ZL_TypedBuffer* tbuffer = ZL_TypedBuffer_createWrapSerial((void*)output, maxout);
   ZL_Report code = ZL_DCtx_decompressTBuffer(thread_context->openzl_dctx, tbuffer, (void*)input, compressed_length);
+
+  // Cleanup
+  ZL_TypedBuffer_free(tbuffer);
 
   if (ZL_isError(code)) {
     BLOSC_TRACE_ERROR("Error in OpenZL decompression: '%s'.  Giving up.", ZL_errorCode(code));
