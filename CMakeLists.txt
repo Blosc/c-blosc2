@@ -85,6 +85,32 @@ if(NOT WIN32)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
 endif()
 
+# Copied from OpenZL CMakelists.txt
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND NOT DEACTIVATE_OPENZL)
+  # Check target architecture
+  if (NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+    message(FATAL_ERROR "OpenZL requires a 64bit target architecture.")
+  endif()
+
+  # Check compiler compatibility
+  if (CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+    # MSVC has limited C11 support - warn users about potential issues
+    if (MSVC_VERSION LESS 1910)
+      message(
+        FATAL_ERROR
+        "This build script only supports building OpenZL on 64-bit Windows with "
+        "at least Visual Studio 2017. "
+        "MSVC version '${MSVC_VERSION}' is not supported."
+      )
+    endif()
+
+    message(WARNING
+      "MSVC has limited C11 support and may produce C2099 errors. "
+      "For better C11 compatibility, consider using clang-cl instead. "
+      "To use clang-cl with Visual Studio generator, use: cmake -G \"Visual Studio 17 2022\" -T ClangCL")
+  endif()
+endif()
+
 cmake_minimum_required(VERSION 3.16.3)
 if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_GREATER 3.4)
   cmake_policy(SET CMP0063 NEW)
@@ -256,6 +282,8 @@ if(NOT DEACTIVATE_ZSTD)
     # HAVE_ZSTD will be set to true because even if the library is
     # not found, we will use the included sources for it
     set(HAVE_ZSTD TRUE)
+else()
+    set(DEACTIVATE_OPENZL ON) # Doesn't make sense to use openzl if don't want Zstd
 endif()
 
 if(NOT DEACTIVATE_OPENZL)
