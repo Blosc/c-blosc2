@@ -96,6 +96,12 @@ jobs:
             compiler: clang-cl
             cmake-args: -G Ninja
 
+          # OpenZL is quite fragile with MSVC
+          - name: Windows MSVC Win64
+            os: windows-latest
+            compiler: cl
+            cmake-args: -A x64 -D DEACTIVATE_OPENZL=ON
+
           - name: Windows GCC Ninja
             os: windows-latest
             compiler: gcc
