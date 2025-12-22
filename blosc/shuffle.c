@@ -112,7 +112,7 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
 }
 #else
 
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
   #include <immintrin.h>  /* Needed for _xgetbv */
   #include <intrin.h>     /* Needed for __cpuid */
 #else
