@@ -271,6 +271,17 @@ list(APPEND SOURCES blosc/shuffle.c)
 # by the C compiler, set hardware architecture optimization flags
 # for specific shuffle implementations.
 if(COMPILER_SUPPORT_SSE2)
+    include(CheckCCompilerFlag)
+    # Probe for SSSE3 flags for various compilers
+    check_c_compiler_flag("-mssse3" COMPILER_HAS_mssse3) 
+    check_c_compiler_flag("/arch:SSSE3" COMPILER_HAS_arch_SSSE3)
+    if(COMPILER_HAS_mssse3) 
+        set(SSSE3_FLAG "-mssse3") 
+    elseif(COMPILER_HAS_arch_SSSE3) 
+        set(SSSE3_FLAG "/arch:SSSE3") 
+    else() 
+        set(SSSE3_FLAG "") 
+    endif()
     if(MSVC)
         # MSVC targets SSE2 by default on 64-bit configurations, but not 32-bit configurations.
         if(${CMAKE_SIZEOF_VOID_P} EQUAL 4)
@@ -282,10 +293,9 @@ if(COMPILER_SUPPORT_SSE2)
         set_source_files_properties(
                 shuffle-sse2.c bitshuffle-sse2.c blosclz.c fastcopy.c
                 PROPERTIES COMPILE_OPTIONS -msse2)
-        # Add SIMD flags for the bytedelta filter and Intel (it seems that ARM64 does not need these)
-        set_source_files_properties(
-                ${PROJECT_SOURCE_DIR}/plugins/filters/bytedelta/bytedelta.c
-                PROPERTIES COMPILE_OPTIONS "-mssse3")
+    endif()
+    if(SSSE3_FLAG) 
+        set_source_files_properties( ${PROJECT_SOURCE_DIR}/plugins/filters/bytedelta/bytedelta.c PROPERTIES COMPILE_OPTIONS "${SSSE3_FLAG}" COMPILE_DEFINITIONS "HAVE_SSSE3=1" ) 
     endif()
 
     # Define a symbol for the shuffle-dispatch implementation
@@ -296,6 +306,7 @@ if(COMPILER_SUPPORT_SSE2)
             APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_SSE2_ENABLED)
 
 endif()
+
 if(COMPILER_SUPPORT_AVX2)
     if(MSVC)
         set_source_files_properties(

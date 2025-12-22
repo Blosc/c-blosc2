@@ -18,15 +18,11 @@
 #include <stdint.h>
 #include <stdio.h>
 
-/* Define the __SSSE3__ symbol if compiling with Visual C++ and
-   targeting the minimum architecture level.
-*/
-#if !defined(__SSSE3__) && defined(_MSC_VER) && \
-    (defined(_M_X64) || (defined(_M_IX86) && _M_IX86_FP >= 2))
-  #define __SSSE3__
-#endif
+/* Do NOT auto-define SSSE3 based on _MSC_VER (clang-cl defines _MSC_VER). 
+Require the build system to enable SSSE3 via the appropriate compiler 
+flag (/arch:SSSE3 or -mssse3). */
 
-#if defined(__SSSE3__)
+#if defined(HAVE_SSSE3)
 // SSSE3 code path for x64/x64
 #define CPU_HAS_SIMD 1
 #include <emmintrin.h>
