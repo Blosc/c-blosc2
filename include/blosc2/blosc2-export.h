@@ -18,7 +18,7 @@
    be exported by the blosc shared library.
 */
 #if defined(BLOSC_SHARED_LIBRARY)
-  #if defined(_MSC_VER)
+  #if (defined(_MSC_VER) && !defined(__clang__))
     #define BLOSC_EXPORT __declspec(dllexport)
   #elif (defined(__GNUC__) && __GNUC__ >= 4) || defined(__clang__)
     #if defined(_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)

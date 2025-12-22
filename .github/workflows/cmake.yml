@@ -94,13 +94,13 @@ jobs:
           - name: Windows Clang Win64
             os: windows-latest
             compiler: clang-cl
-            cmake-args: -G Ninja
+            cmake-args: -G Ninja -D BLOSC_DUMP_CPU_INFO=ON
 
           # OpenZL is quite fragile with MSVC
           - name: Windows MSVC Win64
             os: windows-latest
             compiler: cl
-            cmake-args: -A x64 -D DEACTIVATE_OPENZL=ON
+            cmake-args: -A x64 -D DEACTIVATE_OPENZL=ON -D BLOSC_DUMP_CPU_INFO=ON
 
           - name: Windows GCC Ninja
             os: windows-latest
