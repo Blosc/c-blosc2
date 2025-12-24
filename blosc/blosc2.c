@@ -607,7 +607,7 @@ static int openzl_wrap_compress(struct thread_context* thread_context,
   pytorch, csv, parquet, sddl require custom_parsers 
   */
   // le-(i/u)16/32/64
-  ZL_NodeID nodeid[2];
+  ZL_NodeID nodeid[3];
   ZL_TypedRef* input_;
   ZL_NodeID interpretAsLEnode;
   switch(profile){
@@ -653,14 +653,16 @@ static int openzl_wrap_compress(struct thread_context* thread_context,
     case(SH_BD_LZ4): // some difference between LZ4, COMPRESS_GENERIC and FIELD_LZ ??
       input_ = ZL_TypedRef_createStruct(input, typesize, input_length / typesize);
       nodeid[0] = ZL_NODE_TRANSPOSE_SPLIT; // shuffle
-      nodeid[1] = ZL_NODE_DELTA_INT; // delta
-      graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 2, ZL_GRAPH_LZ4);
+      nodeid[1] = ZL_NODE_CONVERT_STRUCT_TO_SERIAL; // convert to serial for (byte)delta
+      nodeid[2] = ZL_NODE_DELTA_INT; // delta on serial
+      graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 3, ZL_GRAPH_LZ4);
       break;
     case(SH_BD_ZSTD):
       input_ = ZL_TypedRef_createStruct(input, typesize, input_length / typesize);
       nodeid[0] = ZL_NODE_TRANSPOSE_SPLIT; // shuffle
-      nodeid[1] = ZL_NODE_DELTA_INT; // delta
-      graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 2, ZL_GRAPH_ZSTD);
+      nodeid[1] = ZL_NODE_CONVERT_STRUCT_TO_SERIAL; // convert to serial for (byte)delta
+      nodeid[2] = ZL_NODE_DELTA_INT; // delta on serial
+      graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 3, ZL_GRAPH_ZSTD);
       break;
     case(SH_LZ4): // some difference between LZ4, COMPRESS_GENERIC and FIELD_LZ ??
       input_ = ZL_TypedRef_createStruct(input, typesize, input_length / typesize);
