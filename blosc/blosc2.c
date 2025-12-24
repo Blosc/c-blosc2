@@ -607,42 +607,43 @@ static int openzl_wrap_compress(struct thread_context* thread_context,
   // le-(i/u)16/32/64
   ZL_NodeID nodeid[2];
   ZL_TypedRef* input_;
+  ZL_NodeID interpretAsLEnode;
   switch(profile){
     case(LE_U16):
       input_ = ZL_TypedRef_createSerial(input, input_length);
-      auto interpretAsLEnode = ZL_Node_interpretAsLE(16);
+      interpretAsLEnode = ZL_Node_interpretAsLE(16);
       nodeid[0] = interpretAsLEnode;
       graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 1, ZL_GRAPH_FIELD_LZ);
       break;
     case(LE_I16):
       input_ = ZL_TypedRef_createSerial(input, input_length);
-      auto interpretAsLEnode = ZL_Node_interpretAsLE(16);
+      interpretAsLEnode = ZL_Node_interpretAsLE(16);
       nodeid[0] = interpretAsLEnode;
       nodeid[1] = ZL_NODE_ZIGZAG; // only used for signed integers
       graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 2, ZL_GRAPH_FIELD_LZ);
       break;
     case(LE_U32):
       input_ = ZL_TypedRef_createSerial(input, input_length);
-      auto interpretAsLEnode = ZL_Node_interpretAsLE(32);
+      interpretAsLEnode = ZL_Node_interpretAsLE(32);
       nodeid[0] = interpretAsLEnode;
       graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 1, ZL_GRAPH_FIELD_LZ);
       break;
     case(LE_I32):
       input_ = ZL_TypedRef_createSerial(input, input_length);
-      auto interpretAsLEnode = ZL_Node_interpretAsLE(32);
+      interpretAsLEnode = ZL_Node_interpretAsLE(32);
       nodeid[0] = interpretAsLEnode;
       nodeid[1] = ZL_NODE_ZIGZAG; // only used for signed integers
       graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 2, ZL_GRAPH_FIELD_LZ);
       break;
     case(LE_U64):
       input_ = ZL_TypedRef_createSerial(input, input_length);
-      auto interpretAsLEnode = ZL_Node_interpretAsLE(64);
+      interpretAsLEnode = ZL_Node_interpretAsLE(64);
       nodeid[0] = interpretAsLEnode;
       graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 1, ZL_GRAPH_FIELD_LZ);
       break;
     case(LE_I64):
       input_ = ZL_TypedRef_createSerial(input, input_length);
-      auto interpretAsLEnode = ZL_Node_interpretAsLE(64);
+      interpretAsLEnode = ZL_Node_interpretAsLE(64);
       nodeid[0] = interpretAsLEnode;
       nodeid[1] = ZL_NODE_ZIGZAG; // only used for signed integers
       graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 2, ZL_GRAPH_FIELD_LZ);
