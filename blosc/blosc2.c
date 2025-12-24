@@ -587,6 +587,8 @@ enum {
   SH_BD_ZSTD = 7,
   SH_LZ4 = 8,
   SH_ZSTD = 9,
+  _LZ4 = 10,
+  _ZSTD = 11,
 };
 
 static int openzl_wrap_compress(struct thread_context* thread_context,
@@ -670,8 +672,12 @@ static int openzl_wrap_compress(struct thread_context* thread_context,
       nodeid[0] = ZL_NODE_TRANSPOSE_SPLIT; // shuffle
       graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 1, ZL_GRAPH_ZSTD);
       break;
+    case(_LZ4):
+      input_ = ZL_TypedRef_createSerial(input, input_length);
+      graphId = ZL_GRAPH_LZ4;
     default:
     // Default to serial (ZSTD)
+      input_ = ZL_TypedRef_createSerial(input, input_length);
       graphId = ZL_GRAPH_ZSTD;
   }
 
