@@ -179,7 +179,8 @@ if(NOT DEACTIVATE_OPENZL)
             list(APPEND BLOSC_INCLUDE_DIRS ${OPENZL_INCLUDE_DIR})
         endif()
     else()
-        # TODO: Fallback: build internal OpenZL 
+        # TODO: Fallback: build internal OpenZL     
+
         set(OPENZL_LOCAL_DIR ${INTERNAL_LIBS}/openzl-0.1.0)
 
         # C sources
@@ -187,6 +188,15 @@ if(NOT DEACTIVATE_OPENZL)
             ${OPENZL_LOCAL_DIR}/src/*.c
         )
 
+        # Defines a function needed for custom_parsers
+    
+        # if(MSVC)
+        #     include(${OPENZL_LOCAL_DIR}/cmake/OpenZLCompilerMSVC.cmake)
+        # else()
+        #     include(${OPENZL_LOCAL_DIR}/cmake/OpenZLCompilerUnix.cmake)
+        # endif()
+        # add_subdirectory(${OPENZL_LOCAL_DIR}/custom_parsers ${CMAKE_BINARY_DIR}/custom_parsers-build)
+        
         if(COMPILER_SUPPORT_AVX2 AND NOT MSVC)
             enable_language(ASM)
             file(GLOB_RECURSE OPENZL_ASM_SRC

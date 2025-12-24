@@ -576,33 +576,120 @@ static int zstd_wrap_decompress(struct thread_context* thread_context,
 #endif /*  HAVE_ZSTD */
 
 #if defined(HAVE_OPENZL)
+enum {
+  LE_U16 = 0,
+  LE_I16 = 1,
+  LE_U32 = 2,
+  LE_I32 = 3,
+  LE_U64 = 4,
+  LE_I64 = 5,
+  SH_BD_LZ4 = 6,
+  SH_BD_ZSTD = 7,
+  SH_LZ4 = 8,
+  SH_ZSTD = 9,
+};
+
 static int openzl_wrap_compress(struct thread_context* thread_context,
                               const char* input, size_t input_length,
                               char* output, size_t maxout, int clevel) {
   if (thread_context->openzl_cctx == NULL) {
     thread_context->openzl_cctx = ZL_CCtx_create();
   }
-  
-  ZL_Compressor* compressor = ZL_Compressor_create();
-  // For the moment just pick "serial" profile by default
-  ZL_GraphID graphId = ZL_Compressor_buildACEGraphWithDefault(compressor, ZL_GRAPH_ZSTD);
 
-  ZL_Report code = ZL_Compressor_selectStartingGraphID(compressor, graphId);
+  uint8_t profile = thread_context->parent_context->compcode_meta;
+  int32_t typesize = thread_context->parent_context->typesize;
+  ZL_GraphID graphId;
+  ZL_Compressor* compressor = ZL_Compressor_create();
+
+  /* 
+  pytorch, csv, parquet, sddl require custom_parsers 
+  */
+  // le-(i/u)16/32/64
+  ZL_NodeID nodeid[2];
+  ZL_TypedRef* input_;
+  switch(profile){
+    case(LE_U16):
+      input_ = ZL_TypedRef_createSerial(input, input_length);
+      auto interpretAsLEnode = ZL_Node_interpretAsLE(16);
+      nodeid[0] = interpretAsLEnode;
+      graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 1, ZL_GRAPH_FIELD_LZ);
+      break;
+    case(LE_I16):
+      input_ = ZL_TypedRef_createSerial(input, input_length);
+      auto interpretAsLEnode = ZL_Node_interpretAsLE(16);
+      nodeid[0] = interpretAsLEnode;
+      nodeid[1] = ZL_NODE_ZIGZAG; // only used for signed integers
+      graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 2, ZL_GRAPH_FIELD_LZ);
+      break;
+    case(LE_U32):
+      input_ = ZL_TypedRef_createSerial(input, input_length);
+      auto interpretAsLEnode = ZL_Node_interpretAsLE(32);
+      nodeid[0] = interpretAsLEnode;
+      graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 1, ZL_GRAPH_FIELD_LZ);
+      break;
+    case(LE_I32):
+      input_ = ZL_TypedRef_createSerial(input, input_length);
+      auto interpretAsLEnode = ZL_Node_interpretAsLE(32);
+      nodeid[0] = interpretAsLEnode;
+      nodeid[1] = ZL_NODE_ZIGZAG; // only used for signed integers
+      graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 2, ZL_GRAPH_FIELD_LZ);
+      break;
+    case(LE_U64):
+      input_ = ZL_TypedRef_createSerial(input, input_length);
+      auto interpretAsLEnode = ZL_Node_interpretAsLE(64);
+      nodeid[0] = interpretAsLEnode;
+      graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 1, ZL_GRAPH_FIELD_LZ);
+      break;
+    case(LE_I64):
+      input_ = ZL_TypedRef_createSerial(input, input_length);
+      auto interpretAsLEnode = ZL_Node_interpretAsLE(64);
+      nodeid[0] = interpretAsLEnode;
+      nodeid[1] = ZL_NODE_ZIGZAG; // only used for signed integers
+      graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 2, ZL_GRAPH_FIELD_LZ);
+      break;
+    case(SH_BD_LZ4): // some difference between LZ4, COMPRESS_GENERIC and FIELD_LZ ??
+      input_ = ZL_TypedRef_createStruct(input, typesize, input_length / typesize);
+      nodeid[0] = ZL_NODE_TRANSPOSE_SPLIT; // shuffle
+      nodeid[1] = ZL_NODE_DELTA_INT; // delta
+      graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 2, ZL_GRAPH_LZ4);
+      break;
+    case(SH_BD_ZSTD):
+      input_ = ZL_TypedRef_createStruct(input, typesize, input_length / typesize);
+      nodeid[0] = ZL_NODE_TRANSPOSE_SPLIT; // shuffle
+      nodeid[1] = ZL_NODE_DELTA_INT; // delta
+      graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 2, ZL_GRAPH_ZSTD);
+      break;
+    case(SH_LZ4): // some difference between LZ4, COMPRESS_GENERIC and FIELD_LZ ??
+      input_ = ZL_TypedRef_createStruct(input, typesize, input_length / typesize);
+      nodeid[0] = ZL_NODE_TRANSPOSE_SPLIT; // shuffle
+      graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 1, ZL_GRAPH_LZ4);
+      break;
+    case(SH_ZSTD):
+      input_ = ZL_TypedRef_createStruct(input, typesize, input_length / typesize);
+      nodeid[0] = ZL_NODE_TRANSPOSE_SPLIT; // shuffle
+      graphId = ZL_Compressor_registerStaticGraph_fromPipelineNodes1o(compressor, (ZL_NodeID*)nodeid, 1, ZL_GRAPH_ZSTD);
+      break;
+    default:
+    // Default to serial (ZSTD)
+      graphId = ZL_GRAPH_ZSTD;
+  }
+
+  ZL_GraphID graph = ZL_Compressor_buildACEGraphWithDefault(compressor, graphId);
+  ZL_Report code = ZL_Compressor_selectStartingGraphID(compressor, graph);
   if (ZL_isError(code)) {
     BLOSC_TRACE_ERROR("Error when setting graph for OpenZL compressor: '%s'.  Giving up.", ZL_errorCode(code));
     return 0;
   }
 
-  ZL_CParam gcparam = ZL_CParam_formatVersion;
-  ZL_CCtx_setParameter(thread_context->openzl_cctx,  gcparam, ZL_MAX_FORMAT_VERSION);
+  ZL_CCtx_setParameter(thread_context->openzl_cctx,  ZL_CParam_formatVersion, ZL_MAX_FORMAT_VERSION);
+  ZL_CCtx_setParameter(thread_context->openzl_cctx,  ZL_CParam_compressionLevel, clevel);
   ZL_CCtx_refCompressor(thread_context->openzl_cctx, compressor);
-  ZL_TypedRef* input_ = ZL_TypedRef_createSerial(input, input_length);
 
   code = ZL_CCtx_compressTypedRef(thread_context->openzl_cctx, output, maxout, input_);
 
-    // Cleanup
-    ZL_TypedRef_free(input_);
-    ZL_Compressor_free(compressor);
+  // Cleanup
+  ZL_TypedRef_free(input_);
+  ZL_Compressor_free(compressor);
 
   if (ZL_isError(code)) {
     return 0;
