@@ -6,7 +6,7 @@
 #
 # See LICENSE.txt for details about copyright and rights to use.
 
-file(GLOB SOURCES bench_*.c)
+file(GLOB SOURCES bench_*.c)  # Includes bench_stack_append_openzl.c
 
 foreach (source ${SOURCES})
     get_filename_component(target_name ${source} NAME_WE)

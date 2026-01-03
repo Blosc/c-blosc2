@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 #include <sys/stat.h>
 #include "blosc2.h"
 
@@ -101,7 +102,8 @@ void init_buffer(void* src, size_t size, int rshift) {
 }
 
 
-void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsize,
+void do_bench(char* compressor, const char* profile_name, int compcode_meta,
+              int nthreads, int size_, int elsize,
               int rshift, FILE* ofile) {
   size_t size = (size_t)size_;
   void* src, *srccpy;
@@ -111,7 +113,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
   unsigned char* orig, * round;
   blosc_timestamp_t last, current;
   double tmemcpy, tshuf, tunshuf;
-  int clevel, compcode_meta = BLOSC_NOFILTER;
+  int clevel;
   /* compcode_meta values
   SH_BD_LZ4 = 6,
   SH_BD_ZSTD = 7,
@@ -119,20 +121,12 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
   SH_ZSTD = 9,
   LZ4 = 10,
   ZSTD = 11,
+  BD_SH_LZ4 = 12,
+  BD_SH_ZSTD = 13,
   */
 
-  if (strcmp(shuffle, "shuffle") == 0) {
-    compcode_meta = strcmp(compressor, BLOSC_LZ4_COMPNAME) ? 8 : 9;
-  }
-  else if (strcmp(shuffle, "delta") == 0) {
-    compcode_meta = strcmp(compressor, BLOSC_LZ4_COMPNAME) ? 6 : 7;
-  }
-  else if (strcmp(shuffle, "noshuffle") == 0) {
-    compcode_meta = strcmp(compressor, BLOSC_LZ4_COMPNAME) ? 10 : 11; // default to just ZSTD
-  }
-
   blosc2_set_nthreads((int16_t) nthreads);
-  if (blosc1_set_compressor(BLOSC_OPENZL_COMPNAME) < 0) {
+  if (blosc2_compname_to_compcode(BLOSC_OPENZL_COMPNAME) < 0) {
     printf("Compiled w/o support for compressor: '%s', so sorry.\n",
            BLOSC_OPENZL_COMPNAME);
     exit(1);
@@ -161,7 +155,8 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
   }
   memset(dest2, 0, size);  // just to avoid some GCC compiler warnings
 
-  fprintf(ofile, "--> %d, %d, %d, %d, %s, %s\n", nthreads, (int)size, elsize, rshift, compressor, shuffle);
+  fprintf(ofile, "--> %d, %d, %d, %d, %s, %s\n",
+          nthreads, (int)size, elsize, rshift, compressor, profile_name);
   fprintf(ofile, "********************** Run info [OpenZL bench] ******************************\n");
   fprintf(ofile, "Blosc version: %s (%s)\n", BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
   fprintf(ofile, "Using synthetic data with %d significant bits (out of 32)\n", rshift);
@@ -193,7 +188,6 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
           tmemcpy, ((float)size * 1e6) / (tmemcpy * MB));
 
   for (clevel = 0; clevel < 10; clevel++) {
-
     fprintf(ofile, "Compression level: %d\n", clevel);
     /* Create a context for compression */
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -202,12 +196,14 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
     cparams.compcode = BLOSC_OPENZL;
     cparams.clevel = clevel;
     cparams.compcode_meta = compcode_meta;
+    cparams.typesize = elsize;
     cctx = blosc2_create_cctx(cparams);
+    dctx = blosc2_create_dctx(dparams);
 
     blosc_set_timestamp(&last);
     for (i = 0; i < niter_c; i++) {
       for (j = 0; j < nchunks; j++) {
-        cbytes = blosc2_compress_ctx(cctx, src, (size_t)elsize, dest[j], size + BLOSC2_MAX_OVERHEAD);
+        cbytes = blosc2_compress_ctx(cctx, src, (int32_t)size, dest[j], size + BLOSC2_MAX_OVERHEAD);
       }
     }
     blosc_set_timestamp(&current);
@@ -219,7 +215,6 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
       fprintf(ofile, "Ratio: %3.2f", (float)size / (float)cbytes);
     }
     fprintf(ofile, "\n");
-
     /* Compressor was unable to compress.  Copy the buffer manually. */
     if (cbytes == 0) {
       for (j = 0; j < nchunks; j++) {
@@ -235,7 +230,7 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
           nbytes = (int)size;
         }
         else {
-          nbytes = blosc1_decompress(dest[j], dest2, size);
+          nbytes = blosc2_decompress_ctx(dctx, dest[j], cbytes, dest2, (int32_t)size);
         }
       }
     }
@@ -268,6 +263,9 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
     }
 
     if (i == (int)size) fprintf(ofile, "OK\n");
+
+    blosc2_free_ctx(cctx);
+    blosc2_free_ctx(dctx);
 
   } /* End clevel loop */
 
@@ -322,13 +320,15 @@ void print_compress_info(void) {
 
 int main(int argc, char* argv[]) {
   char compressor[32];
-  char shuffle[32] = "shuffle";
+  char profile[32] = "SH_ZSTD";
   char bsuite[32];
   int single = 1;
   int suite = 0;
   int hard_suite = 0;
   int extreme_suite = 0;
   int debug_suite = 0;
+  int compcode_meta = BLOSC_NOFILTER;
+  int profile_backend = 0;
   int nthreads = 8;                     /* The number of threads */
   int size = 8 * MB;                    /* Buffer size */
   int elsize = 4;                       /* Datatype size */
@@ -342,8 +342,8 @@ int main(int argc, char* argv[]) {
 
   print_compress_info();
 
-  strncpy(usage, "Usage: bench [ lz4 | zstd] "
-      "[noshuffle | shuffle | delta] "
+  strncpy(usage, "Usage: bench "
+      "[BD_SH_LZ4 | BD_SH_ZSTD | SH_BD_LZ4 | SH_BD_ZSTD | SH_LZ4 | SH_ZSTD | LZ4 | ZSTD] "
       "[single | suite | hardsuite | extremesuite | debugsuite] "
       "[nthreads] [bufsize(bytes)] [typesize] [sbits]", 255);
 
@@ -353,34 +353,56 @@ int main(int argc, char* argv[]) {
   }
 
   if (argc >= 2) {
-    strcpy(compressor, argv[1]);
-  }
-  else {
-    strcpy(compressor, "zstd");
+    strcpy(profile, argv[1]);
   }
 
-  if (strcmp(compressor, "lz4") != 0 &&
-      strcmp(compressor, "zstd") != 0) {
-    printf("No such compressor for OpenZL: '%s'\n", compressor);
+  if (strcmp(profile, "BD_SH_LZ4") == 0) {
+    compcode_meta = 12;
+    profile_backend = 1;
+  }
+  else if (strcmp(profile, "BD_SH_ZSTD") == 0) {
+    compcode_meta = 13;
+    profile_backend = 2;
+  }
+  else if (strcmp(profile, "SH_BD_LZ4") == 0) {
+    compcode_meta = 6;
+    profile_backend = 1;
+  }
+  else if (strcmp(profile, "SH_BD_ZSTD") == 0) {
+    compcode_meta = 7;
+    profile_backend = 2;
+  }
+  else if (strcmp(profile, "SH_LZ4") == 0) {
+    compcode_meta = 8;
+    profile_backend = 1;
+  }
+  else if (strcmp(profile, "SH_ZSTD") == 0) {
+    compcode_meta = 9;
+    profile_backend = 2;
+  }
+  else if (strcmp(profile, "LZ4") == 0) {
+    compcode_meta = 10;
+    profile_backend = 1;
+  }
+  else if (strcmp(profile, "ZSTD") == 0) {
+    compcode_meta = 11;
+    profile_backend = 2;
+  }
+  else {
+    printf("No such profile for OpenZL: '%s'\n", profile);
     printf("%s\n", usage);
     exit(2);
   }
 
-  if (argc >= 3) {
-    strcpy(shuffle, argv[2]);
-    if (strcmp(shuffle, "shuffle") != 0 &&
-        strcmp(shuffle, "delta") != 0 &&
-        strcmp(shuffle, "noshuffle") != 0) {
-      printf("No such shuffler for OpenZL: '%s'\n", shuffle);
-      printf("%s\n", usage);
-      exit(2);
-    }
-  }
+  strcpy(compressor, profile_backend == 1 ? "lz4" : "zstd");
 
-  if (argc < 4)
+  int suite_arg = 2;
+  if (argc < suite_arg + 1) {
     strcpy(bsuite, "single");
-  else
-    strcpy(bsuite, argv[3]);
+  }
+  else {
+    strcpy(bsuite, argv[suite_arg]);
+  }
 
   if (strcmp(bsuite, "single") == 0) {
     single = 1;
@@ -428,23 +450,24 @@ int main(int argc, char* argv[]) {
   }
 
   printf("Using compressor: %s\n", compressor);
-  printf("Using shuffle type: %s\n", shuffle);
+  printf("Using OpenZL profile: %s\n", profile);
   printf("Running suite: %s\n", bsuite);
 
-  if (argc >= 5) {
-    nthreads = (int)strtol(argv[4], NULL, 10);
+  int opt_arg = suite_arg + 1;
+  if (argc >= opt_arg + 1) {
+    nthreads = (int)strtol(argv[opt_arg], NULL, 10);
   }
-  if (argc >= 6) {
-    size = (int)strtol(argv[5], NULL, 10);
+  if (argc >= opt_arg + 2) {
+    size = (int)strtol(argv[opt_arg + 1], NULL, 10);
   }
-  if (argc >= 7) {
-    elsize = (int)strtol(argv[6], NULL, 10);
+  if (argc >= opt_arg + 3) {
+    elsize = (int)strtol(argv[opt_arg + 2], NULL, 10);
   }
-  if (argc >= 8) {
-    rshift = (int)strtol(argv[7], NULL, 10);
+  if (argc >= opt_arg + 4) {
+    rshift = (int)strtol(argv[opt_arg + 3], NULL, 10);
   }
 
-  if ((argc >= 9) || !(single || suite || hard_suite || extreme_suite)) {
+  if ((argc >= opt_arg + 5) || !(single || suite || hard_suite || extreme_suite)) {
     printf("%s\n", usage);
     exit(1);
   }
@@ -456,7 +479,7 @@ int main(int argc, char* argv[]) {
 
   if (suite) {
     for (nthreads_ = 1; nthreads_ <= nthreads; nthreads_++) {
-      do_bench(compressor, shuffle, nthreads_, size, elsize, rshift, output_file);
+      do_bench(compressor, profile, compcode_meta, nthreads_, size, elsize, rshift, output_file);
     }
   }
   else if (hard_suite) {
@@ -471,7 +494,7 @@ int main(int argc, char* argv[]) {
             nchunks = get_nchunks(size_ + i, workingset);
             niter = 1;
             for (nthreads_ = 1; nthreads_ <= nthreads; nthreads_++) {
-              do_bench(compressor, shuffle, nthreads_, size_ + i, elsize_, rshift_, output_file);
+              do_bench(compressor, profile, compcode_meta, nthreads_, size_ + i, elsize_, rshift_, output_file);
               blosc_set_timestamp(&current);
               totaltime = blosc_elapsed_secs(last, current);
               printf("Elapsed time:\t %6.1f s.  Processed data: %.1f GB\n",
@@ -490,7 +513,7 @@ int main(int argc, char* argv[]) {
           for (size_ = 32 * KB; size_ <= size; size_ *= 2) {
             nchunks = get_nchunks(size_ + i, workingset);
             for (nthreads_ = 1; nthreads_ <= nthreads; nthreads_++) {
-              do_bench(compressor, shuffle, nthreads_, size_ + i, elsize_, rshift_, output_file);
+              do_bench(compressor, profile, compcode_meta, nthreads_, size_ + i, elsize_, rshift_, output_file);
               blosc_set_timestamp(&current);
               totaltime = blosc_elapsed_secs(last, current);
               printf("Elapsed time:\t %6.1f s.  Processed data: %.1f GB\n",
@@ -509,7 +532,7 @@ int main(int argc, char* argv[]) {
           for (size_ = size; size_ <= (int) (16 * MB); size_ *= 2) {
             nchunks = get_nchunks(size_ + i, workingset);
             for (nthreads_ = nthreads; nthreads_ <= 6; nthreads_++) {
-              do_bench(compressor, shuffle, nthreads_, size_ + i, elsize_, rshift_, output_file);
+              do_bench(compressor, profile, compcode_meta, nthreads_, size_ + i, elsize_, rshift_, output_file);
               blosc_set_timestamp(&current);
               totaltime = blosc_elapsed_secs(last, current);
               printf("Elapsed time:\t %6.1f s.  Processed data: %.1f GB\n",
@@ -522,7 +545,7 @@ int main(int argc, char* argv[]) {
   }
     /* Single mode */
   else {
-    do_bench(compressor, shuffle, nthreads, size, elsize, rshift, output_file);
+    do_bench(compressor, profile, compcode_meta, nthreads, size, elsize, rshift, output_file);
   }
 
   /* Print out some statistics */

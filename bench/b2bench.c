@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 #include <sys/stat.h>
 #include "blosc2.h"
 
@@ -185,7 +186,6 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
           tmemcpy, ((float)size * 1e6) / (tmemcpy * MB));
 
   for (clevel = 0; clevel < 10; clevel++) {
-
     fprintf(ofile, "Compression level: %d\n", clevel);
 
     blosc_set_timestamp(&last);
@@ -204,7 +204,6 @@ void do_bench(char* compressor, char* shuffle, int nthreads, int size_, int elsi
       fprintf(ofile, "Ratio: %3.2f", (float)size / (float)cbytes);
     }
     fprintf(ofile, "\n");
-
     /* Compressor was unable to compress.  Copy the buffer manually. */
     if (cbytes == 0) {
       for (j = 0; j < nchunks; j++) {

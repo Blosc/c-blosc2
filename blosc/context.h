@@ -106,6 +106,7 @@ struct blosc2_context_s {
   int dref_not_init;  /* data ref in delta not initialized */
   blosc2_pthread_mutex_t delta_mutex;
   blosc2_pthread_cond_t delta_cv;
+  int openzl_cache;  /* Enable OpenZL compressor caching (blosc2 API only) */
   // Add new fields here to avoid breaking the ABI.
 };
 
@@ -150,6 +151,11 @@ struct thread_context {
   /* The contexts for OpenZL */
   ZL_CCtx* openzl_cctx;
   ZL_DCtx* openzl_dctx;
+  ZL_Compressor* openzl_compressor;
+  ZL_GraphID openzl_graph;
+  int openzl_clevel;
+  uint8_t openzl_profile;
+  int32_t openzl_typesize;
 #endif /* HAVE_OPENZL */
 #ifdef HAVE_IPP
   Ipp8u* lz4_hash_table;
