@@ -115,14 +115,15 @@ void do_bench(char* compressor, const char* profile_name, int compcode_meta,
   double tmemcpy, tshuf, tunshuf;
   int clevel;
   /* compcode_meta values
-  SH_BD_LZ4 = 6,
-  SH_BD_ZSTD = 7,
-  SH_LZ4 = 8,
-  SH_ZSTD = 9,
-  LZ4 = 10,
-  ZSTD = 11,
-  BD_SH_LZ4 = 12,
-  BD_SH_ZSTD = 13,
+  ZSTD = 0,
+  LZ4 = 1,
+  SH_ZSTD = 2,
+  SH_LZ4 = 3,
+  SH_BD_ZSTD = 6,
+  SH_BD_LZ4 = 7,
+  SH_BD_SPLIT_ZSTD = 14,
+  SH_BD_SPLIT_LZ4 = 15,
+  For all these options, enable Checksum via +16
   */
 
   blosc2_set_nthreads((int16_t) nthreads);
@@ -341,9 +342,20 @@ int main(int argc, char* argv[]) {
   char usage[256];
 
   print_compress_info();
+  /* compcode_meta values
+  ZSTD = 0,
+  LZ4 = 1,
+  SH_ZSTD = 2,
+  SH_LZ4 = 3,
+  SH_BD_ZSTD = 6,
+  SH_BD_LZ4 = 7,
+  SH_BD_SPLIT_ZSTD = 14,
+  SH_BD_SPLIT_LZ4 = 15,
+  For all these options, enable Checksum via +16
+  */
 
   strncpy(usage, "Usage: bench "
-      "[BD_SH_LZ4 | BD_SH_ZSTD | SH_BD_LZ4 | SH_BD_ZSTD | SH_LZ4 | SH_ZSTD | LZ4 | ZSTD] "
+      "[SH_BD_SPLIT_LZ4 | SH_BD_SPLIT_ZSTD | SH_BD_LZ4 | SH_BD_ZSTD | SH_LZ4 | SH_ZSTD | LZ4 | ZSTD] "
       "[single | suite | hardsuite | extremesuite | debugsuite] "
       "[nthreads] [bufsize(bytes)] [typesize] [sbits]", 255);
 
@@ -356,36 +368,36 @@ int main(int argc, char* argv[]) {
     strcpy(profile, argv[1]);
   }
 
-  if (strcmp(profile, "BD_SH_LZ4") == 0) {
-    compcode_meta = 12;
+  if (strcmp(profile, "SH_BD_SPLIT_LZ4") == 0) {
+    compcode_meta = 15;
     profile_backend = 1;
   }
-  else if (strcmp(profile, "BD_SH_ZSTD") == 0) {
-    compcode_meta = 13;
+  else if (strcmp(profile, "SH_BD_SPLIT_ZSTD") == 0) {
+    compcode_meta = 14;
     profile_backend = 2;
   }
   else if (strcmp(profile, "SH_BD_LZ4") == 0) {
-    compcode_meta = 6;
+    compcode_meta = 7;
     profile_backend = 1;
   }
   else if (strcmp(profile, "SH_BD_ZSTD") == 0) {
-    compcode_meta = 7;
+    compcode_meta = 6;
     profile_backend = 2;
   }
   else if (strcmp(profile, "SH_LZ4") == 0) {
-    compcode_meta = 8;
+    compcode_meta = 3;
     profile_backend = 1;
   }
   else if (strcmp(profile, "SH_ZSTD") == 0) {
-    compcode_meta = 9;
+    compcode_meta = 2;
     profile_backend = 2;
   }
   else if (strcmp(profile, "LZ4") == 0) {
-    compcode_meta = 10;
+    compcode_meta = 1;
     profile_backend = 1;
   }
   else if (strcmp(profile, "ZSTD") == 0) {
-    compcode_meta = 11;
+    compcode_meta = 0;
     profile_backend = 2;
   }
   else {

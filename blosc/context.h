@@ -106,7 +106,6 @@ struct blosc2_context_s {
   int dref_not_init;  /* data ref in delta not initialized */
   blosc2_pthread_mutex_t delta_mutex;
   blosc2_pthread_cond_t delta_cv;
-  int openzl_cache;  /* Enable OpenZL compressor caching (blosc2 API only) */
   // Add new fields here to avoid breaking the ABI.
 };
 

@@ -19,38 +19,29 @@ Examples:
 
 ## Profiles
 
-Blosc2 maps OpenZL profiles via `compcode_meta` (used with `compcode=BLOSC_OPENZL`).
-Supported profile names in Blosc2 tools:
+OpenZL is selected via `compcode = BLOSC_OPENZL` and a profile via
+`compcode_meta`. The `compcode_meta` is an 8-bit integer corresponding to meta information relating to
+codecs, filters and other nodes for the compression graph. Starting from the Least-Significant-Bit (LSB),
+setting the bits tells OpenZL how to build the graph:
+  CODEC | SHUFFLE | DELTA | SPLIT | CRC | x | x | x |
 
-- `SH_BD_LZ4`
-- `SH_BD_ZSTD`
-- `SH_LZ4`
-- `SH_ZSTD`
-- `BD_SH_LZ4`
-- `BD_SH_ZSTD`
-- `LZ4`
-- `ZSTD`
+  - CODEC - If set, use LZ4. Else ZSTD.
+  - SHUFFLE - If set, use shuffle (outputs a stream for every byte of input data typesize)
+  - DELTA - If set, apply a bytedelta (to all streams if necessary)
+  - SPLIT - If set, do not recombine the bytestreams
+  - CRC - If set, store a checksum during compression and check it during decompression
+  
+The remaining bits may be used in the future.
 
-Notes:
-- `SH_*` profiles include a shuffle-like transpose stage.
-- `BD_SH_*` and `SH_BD_*` include delta + shuffle stages in different orders.
-- `LZ4`/`ZSTD` are backend-only profiles (no shuffle).
 
 ## Environment Variables
 
 OpenZL behavior can be tuned at runtime using these environment variables:
 
-- `BLOSC_OPENZL_CACHE=0`
-  - Disables caching of the OpenZL compressor/graph in Blosc2 contexts.
-  - Caching is enabled by default for OpenZL.
-  - This affects compression (OpenZL graph creation), not decompression.
 - `BLOSC_OPENZL_LOGLEVEL=<int>`
   - Sets OpenZL log level.
 - `BLOSC_OPENZL_REFLECT=1`
   - Prints a reflection summary of the last OpenZL frame (debug aid).
-- `BLOSC_OPENZL_ENABLE_CHECKSUM=1`
-  - Enables checksum verification during OpenZL decompression.
-  - By default, Blosc2 disables OpenZL checksum verification for speed.
 
 ## Notes and Caveats
 
