@@ -663,7 +663,6 @@ static ZL_Report openzl_shuffle_delta_concat_graph(
   const ZL_NodeIDList nodes = ZL_Graph_getCustomNodes(graph);
   const ZL_GraphIDList graphs = ZL_Graph_getCustomGraphs(graph);
   ZL_ERR_IF_NE(nodes.nbNodeIDs, 3, parameter_invalid);
-  ZL_ERR_IF_NE(graphs.nbGraphIDs, 2, parameter_invalid);
 
   // SHUFFLE: just converts to serial if node is not transpose (=shuffle)
   ZL_TRY_LET(ZL_EdgeList, fields, ZL_Edge_runNode(inputs[0], nodes.nodeids[0]));
@@ -734,15 +733,12 @@ static ZL_Report openzl_shuffle_delta_concat_graph(
 
 static ZL_GraphID openzl_register_blosc2_graph(
     ZL_Compressor* compressor, ZL_GraphID* successor_graphs, size_t nbCustomGraphs, bool shuffle, bool split, bool delta) {
-  if (split && nbCustomGraphs != 2){
-     BLOSC_TRACE_ERROR("When split is true, must have two output graphs!");
-  }
   if (split && !shuffle){
      BLOSC_TRACE_ERROR("When split is true, must also shuffle!");
   } 
   ZL_NodeID nodes[3] = {shuffle ? ZL_NODE_TRANSPOSE_SPLIT : ZL_NODE_CONVERT_STRUCT_TO_SERIAL, 
                         delta ? ZL_NODE_DELTA_INT : ZL_NODE_ILLEGAL, 
-                        split? ZL_NODE_ILLEGAL : ZL_NODE_CONCAT_SERIAL};
+                        split ? ZL_NODE_ILLEGAL : ZL_NODE_CONCAT_SERIAL};
 
   ZL_Type input_types[1] = {ZL_Type_struct};
   ZL_FunctionGraphDesc desc = {
@@ -771,8 +767,13 @@ static int openzl_wrap_compress(struct thread_context* thread_context,
   }
 
   blosc2_context* context = thread_context->parent_context;
+
   uint8_t profile = context->compcode_meta;
+  bool shuffle_ = is_bit_set(profile, 1);
+  bool delta_ = is_bit_set(profile, 2);
+  bool split_ = is_bit_set(profile, 3);
   bool checksum_ = is_bit_set(profile, 4);
+
   int32_t typesize = context->typesize;
   ZL_GraphID graphId;
   ZL_TypedRef* input_ = ZL_TypedRef_createStruct(input, typesize, input_length / typesize);
@@ -813,15 +814,13 @@ static int openzl_wrap_compress(struct thread_context* thread_context,
     lz4_graph_id = ZL_RES_value(lz4_result);
 
     ZL_GraphID codec_graph_id = is_bit_set(profile, 0) ? lz4_graph_id : zstd_graph_id;
-    bool shuffle_ = is_bit_set(profile, 1);
-    bool delta_ = is_bit_set(profile, 2);
-    bool split_ = is_bit_set(profile, 3);
 
     size_t nbCustomGraphs = split_ ? typesize : 2;
     ZL_GraphID successor_graphs[nbCustomGraphs];
-    for (size_t i = 0; i < nbCustomGraphs; i++){
-      successor_graphs[i] = (!split_ && i == 0) ? ZL_GRAPH_STORE : codec_graph_id;
-    }
+    successor_graphs[0] = split_ ? codec_graph_id : ZL_GRAPH_STORE; // store concat metadata when not splitting
+    for (size_t i = 1; i < nbCustomGraphs; i++) {
+        successor_graphs[i] = codec_graph_id;   // EVERY lane → codec → STORE
+      }
     graphId = openzl_register_blosc2_graph(compressor, successor_graphs, nbCustomGraphs, shuffle_, split_, delta_);
     graph = ZL_Compressor_buildACEGraphWithDefault(compressor, graphId);
 
@@ -856,12 +855,11 @@ static int openzl_wrap_compress(struct thread_context* thread_context,
 
   // Cleanup
   ZL_TypedRef_free(input_);
-
   if (ZL_isError(code)) {
     return 0;
   }
-
   size_t cbytes = ZL_validResult(code);
+
   openzl_maybe_reflect_frame(output, cbytes);
   return (int)cbytes;
 }
