@@ -840,7 +840,7 @@ static int openzl_wrap_compress(struct thread_context* thread_context,
     ZL_CCtx_setParameter(thread_context->openzl_cctx, ZL_CParam_compressedChecksum, ZL_TernaryParam_disable);
     ZL_CCtx_setParameter(thread_context->openzl_cctx, ZL_CParam_contentChecksum, ZL_TernaryParam_disable);
   }
-  ZL_CCtx_setParameter(thread_context->openzl_cctx, ZL_CParam_compressionLevel, clevel);
+
   ZL_Report code = ZL_Compressor_selectStartingGraphID(compressor, graph);
   if (ZL_isError(code)) {
     BLOSC_TRACE_ERROR("Error when setting graph for OpenZL compressor: '%s'.  Giving up.",
