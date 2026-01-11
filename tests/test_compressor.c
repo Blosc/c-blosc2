@@ -33,11 +33,7 @@ static char *test_compressor(void) {
 	    strcmp(compressor, "blosclz") == 0);
 
   /* Activate the BLOSC_COMPRESSOR variable */
-  #if defined(HAVE_OPENZL)
-    setenv("BLOSC_COMPRESSOR", "openzl", 0);
-  #else 
-    setenv("BLOSC_COMPRESSOR", "lz4", 0);
-  #endif
+  setenv("BLOSC_COMPRESSOR", "lz4", 0);
 
   /* Get a compressed buffer */
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
@@ -46,14 +42,8 @@ static char *test_compressor(void) {
 
   compressor = blosc1_get_compressor();
   /* Activate the BLOSC_COMPRESSOR variable */
-  #if defined(HAVE_OPENZL)
-      mu_assert("ERROR: get_compressor (compress, after) incorrect",
-	    strcmp(compressor, "openzl") == 0);
-  #else 
-      mu_assert("ERROR: get_compressor (compress, after) incorrect",
-	    strcmp(compressor, "lz4") == 0);
-  #endif
-
+  mu_assert("ERROR: get_compressor (compress, after) incorrect",
+  strcmp(compressor, "lz4") == 0);
 
   /* Reset envvar */
   unsetenv("BLOSC_COMPRESSOR");
@@ -70,13 +60,8 @@ static char *test_compress_decompress(void) {
 
   compressor = blosc1_get_compressor();
   /* Activate the BLOSC_COMPRESSOR variable */
-  #if defined(HAVE_OPENZL)
-      mu_assert("ERROR: get_compressor (compress, after) incorrect",
-	    strcmp(compressor, "openzl") == 0);
-  #else 
-      mu_assert("ERROR: get_compressor (compress, after) incorrect",
+  mu_assert("ERROR: get_compressor (compress, after) incorrect",
 	    strcmp(compressor, "lz4") == 0);
-  #endif
 
   /* Get a compressed buffer */
   cbytes = blosc1_compress(clevel, doshuffle, typesize, size, src,
