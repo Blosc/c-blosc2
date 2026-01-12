@@ -801,7 +801,12 @@ static int openzl_wrap_compress(struct thread_context* thread_context,
     }
     ZL_GraphID zstd_graph_id = ZL_GRAPH_ZSTD;
     ZL_GraphID lz4_graph_id = ZL_GRAPH_LZ4;
-
+    /*
+    int zstdclevel = (clevel < 9) ? clevel * 2 - 1 : ZSTD_maxCLevel();
+    // Make the level 8 close enough to maxCLevel
+    if (zstdclevel == 8) zstdclevel = ZSTD_maxCLevel() - 2;
+    zstd_graph_id = ZL_Compressor_registerZstdGraph_withLevel(compressor, zstdclevel);
+    */
     zstd_graph_id = ZL_Compressor_registerZstdGraph_withLevel(compressor, clevel);
     ZL_RESULT_OF(ZL_GraphID) lz4_result = ZL_Compressor_buildLZ4Graph(compressor, clevel);
     if (ZL_RES_isError(lz4_result)) {
