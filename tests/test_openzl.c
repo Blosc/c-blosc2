@@ -11,6 +11,8 @@
 **********************************************************************/
 
 #include "test_common.h"
+#include "config.h" // so have access to HAVE_OPENZL variable
+
 
 int tests_run = 0;
 
@@ -69,7 +71,7 @@ static char *test_checksum(void) {
   mu_assert("ERROR: cbytes is not correct", cbytes2 > cbytes);
 
   /* Decompress the buffer */
-  nbytes = blosc2_decompress_ctx(dctx, dest, cbytes, dest2, (int32_t)size);
+  nbytes = blosc2_decompress_ctx(dctx2, dest, cbytes2, dest2, (int32_t)size);
   mu_assert("ERROR: nbytes incorrect(1)", nbytes == size);
 
   blosc2_free_ctx(cctx);
@@ -150,8 +152,6 @@ int main(void) {
   blosc2_init();
   
   #if defined(HAVE_OPENZL)
-    blosc1_set_compressor("openzl");
-
     /* Initialize buffers */
     src = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
     srccpy = blosc_test_malloc(BUFFER_ALIGN_SIZE, size);
