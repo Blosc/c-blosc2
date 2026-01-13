@@ -164,6 +164,7 @@ CUTEST_TEST_TEST(urcodecs) {
   udcodec.compname = "arange";
   udcodec.version = 1;
   udcodec.encoder = codec_encoder;
+  udcodec.free = NULL;
   if (correct_backward) {
     udcodec.compcode = 250;
     udcodec.complib = 250;

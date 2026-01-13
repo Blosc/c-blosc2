@@ -586,72 +586,6 @@ bool is_bit_set(uint8_t byte, unsigned bit)
     return (byte & (1u << bit)) != 0;
 }
 
-static void openzl_maybe_set_log_level(void) {
-  static int initialized = 0;
-  if (initialized) {
-    return;
-  }
-  initialized = 1;
-
-  const char* env = getenv("BLOSC_OPENZL_LOGLEVEL");
-  if (env == NULL || env[0] == '\0') {
-    return;
-  }
-  char* endptr = NULL;
-  long level = strtol(env, &endptr, 10);
-  if (endptr == env) {
-    return;
-  }
-  ZL_g_logLevel = (int)level;
-}
-
-static void openzl_maybe_reflect_frame(const void* frame, size_t frame_size) {
-  static int reflected = 0;
-  const char* env = getenv("BLOSC_OPENZL_REFLECT");
-  if (env == NULL || env[0] == '\0') {
-    return;
-  }
-  if (reflected) {
-    return;
-  }
-  reflected = 1;
-
-  ZL_ReflectionCtx* rctx = ZL_ReflectionCtx_create();
-  if (rctx == NULL) {
-    BLOSC_TRACE_ERROR("OpenZL reflection context allocation failed.");
-    return;
-  }
-
-  ZL_Report rep = ZL_ReflectionCtx_setCompressedFrame(rctx, frame, frame_size);
-  if (ZL_isError(rep)) {
-    BLOSC_TRACE_ERROR("OpenZL reflection failed: '%s'.",
-                      ZL_ErrorCode_toString(ZL_errorCode(rep)));
-    ZL_ReflectionCtx_free(rctx);
-    return;
-  }
-
-  uint32_t fmt = ZL_ReflectionCtx_getFrameFormatVersion(rctx);
-  size_t nstreams = ZL_ReflectionCtx_getNumStreams_lastChunk(rctx);
-  size_t ncodecs = ZL_ReflectionCtx_getNumCodecs_lastChunk(rctx);
-  fprintf(stderr, "[openzl] frame format=%u streams=%zu codecs=%zu\n", fmt, nstreams, ncodecs);
-  for (size_t i = 0; i < ncodecs; ++i) {
-    ZL_CodecInfo const* ci = ZL_ReflectionCtx_getCodec_lastChunk(rctx, i);
-    if (ci == NULL) {
-      continue;
-    }
-    fprintf(stderr, "[openzl] codec[%zu] name=%s id=%u inputs=%zu outputs=%zu var_outputs=%zu\n",
-            i,
-            ZL_CodecInfo_getName(ci),
-            (unsigned)ZL_CodecInfo_getCodecID(ci),
-            ZL_CodecInfo_getNumInputs(ci),
-            ZL_CodecInfo_getNumOutputs(ci),
-            ZL_CodecInfo_getNumVariableOutputs(ci));
-  }
-
-  ZL_ReflectionCtx_free(rctx);
-}
-
-
 static ZL_Report openzl_shuffle_delta_concat_graph(
     ZL_Graph* graph, ZL_Edge** inputs, size_t numInputs) {
   ZL_RESULT_DECLARE_SCOPE_REPORT(graph);
@@ -761,7 +695,6 @@ static ZL_GraphID openzl_register_blosc2_graph(
 static int openzl_wrap_compress(struct thread_context* thread_context,
                               const char* input, size_t input_length,
                               char* output, size_t maxout, int clevel) {
-  openzl_maybe_set_log_level();
   if (thread_context->openzl_cctx == NULL) {
     thread_context->openzl_cctx = ZL_CCtx_create();
   }
@@ -864,8 +797,6 @@ static int openzl_wrap_compress(struct thread_context* thread_context,
     return 0;
   }
   size_t cbytes = ZL_validResult(code);
-
-  openzl_maybe_reflect_frame(output, cbytes);
   return (int)cbytes;
 }
 
@@ -873,7 +804,6 @@ static int openzl_wrap_decompress(struct thread_context* thread_context,
                                 const char* input, size_t compressed_length,
                                 char* output, size_t maxout) {
 
-  openzl_maybe_set_log_level();
   blosc2_context* context = thread_context->parent_context;
   uint8_t profile = context->compcode_meta;
   bool checksum_ = is_bit_set(profile, 4);
@@ -1230,13 +1160,23 @@ int fill_codec(blosc2_codec *codec) {
     dlclose(lib);
     return BLOSC2_ERROR_FAILURE;
   }
-
   codec->encoder = dlsym(lib, info->encoder);
   codec->decoder = dlsym(lib, info->decoder);
+
   if (codec->encoder == NULL || codec->decoder == NULL) {
     BLOSC_TRACE_ERROR("encoder or decoder cannot be loaded from plugin `%s`", codec->compname);
     dlclose(lib);
     return BLOSC2_ERROR_FAILURE;
+  }
+
+  codecparams_info *info2 = dlsym(lib, "info2");
+  if (info2 != NULL) {
+    // New plugin (e.g. openzl) with free function for codec_params defined
+    // will be used when destroying context in blosc2_free_ctx
+      codec->free = dlsym(lib, info2->free);
+  }
+  else{
+    codec->free = NULL;
   }
 
   return BLOSC2_ERROR_SUCCESS;
@@ -4687,6 +4627,35 @@ void blosc2_free_ctx(blosc2_context* context) {
     }
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Error in user-defined tuner free function\n");
+      return;
+    }
+  }
+  if (context->codec_params != NULL) {
+    int rc;
+    for (int i = 0; i < g_ncodecs; ++i) {
+      if (g_codecs[i].compcode == context->compcode) {
+        if (g_codecs[i].free == NULL) {
+          // Dynamically load codec plugin
+          if (fill_codec(&g_codecs[i]) < 0) {
+            BLOSC_TRACE_ERROR("Could not load codec %d.", g_codecs[i].compcode);
+            return BLOSC2_ERROR_CODEC_SUPPORT;
+          }
+        }
+        if (g_codecs[i].free == NULL){
+          // no free func, codec_params is simple
+          my_free(context->codec_params);
+        }
+        else{ // has free function for codec_params (e.g. openzl)
+        rc = g_codecs[i].free(context->codec_params);
+          goto urcodecsuccess;
+        }
+      }
+    }
+      BLOSC_TRACE_ERROR("User-defined compressor codec %d not found", context->compcode);
+      return BLOSC2_ERROR_CODEC_SUPPORT;
+    urcodecsuccess:;
+    if (rc < 0) {
+      BLOSC_TRACE_ERROR("Error in user-defined codec free function\n");
       return;
     }
   }

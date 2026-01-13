@@ -33,6 +33,9 @@ enum {
     BLOSC_CODEC_GROK = 37,
     //!< Grok compressor for JPEG 2000.
     //!< See https://github.com/Blosc/blosc2_grok
+    BLOSC_CODEC_OPENZL = 38,
+    //!< OpenZL metacompressor.
+    //!< See https://github.com/Blosc/blosc2_openzl
 };
 
 void register_codecs(void);
@@ -42,6 +45,10 @@ typedef struct {
     char *encoder;
     char *decoder;
 } codec_info;
+
+typedef struct {
+    char *free;
+} codecparams_info;
 
 #ifdef __cplusplus
 }

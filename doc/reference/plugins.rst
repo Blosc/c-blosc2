@@ -22,6 +22,7 @@ Codecs
    :members:
 
 .. doxygenfunction:: blosc2_register_codec
+.. doxygenfunction:: blosc2_codec_create
 
 Tuners
 ------

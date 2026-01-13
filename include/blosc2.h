@@ -363,7 +363,7 @@ enum {
 #define BLOSC_LZ4_LIBNAME       "LZ4"
 #define BLOSC_ZLIB_LIBNAME      "Zlib"
 #define BLOSC_ZSTD_LIBNAME      "Zstd"
-#define BLOSC_OPENZL_LIBNAME      "OpenZL"
+#define BLOSC_OPENZL_LIBNAME    "OpenZL"
 #endif // BLOSC_H
 
 /**
@@ -2408,6 +2408,8 @@ typedef struct {
   //!< The codec encoder that is used during compression.
   blosc2_codec_decoder_cb decoder;
   //!< The codec decoder that is used during decompression.
+  int (*free)(void* codec_params);
+  //!< Free the codec_params stored in blosc2_context.
 } blosc2_codec;
 
 /**
