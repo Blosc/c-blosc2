@@ -105,7 +105,6 @@ int main(void) {
   udcodec.compname = "udcodec";
   udcodec.encoder = codec_encoder;
   udcodec.decoder = codec_decoder;
-  udcodec.free = NULL;
 
   int rc = blosc2_register_codec(&udcodec);
   if (rc < 0) {

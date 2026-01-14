@@ -1169,6 +1169,7 @@ int fill_codec(blosc2_codec *codec) {
     return BLOSC2_ERROR_FAILURE;
   }
 
+  /* If ever add .free function in future for codec params
   codecparams_info *info2 = dlsym(lib, "info2");
   if (info2 != NULL) {
     // New plugin (e.g. openzl) with free function for codec_params defined
@@ -1178,7 +1179,8 @@ int fill_codec(blosc2_codec *codec) {
   else{
     codec->free = NULL;
   }
-
+  */
+ 
   return BLOSC2_ERROR_SUCCESS;
 }
 
@@ -4630,6 +4632,7 @@ void blosc2_free_ctx(blosc2_context* context) {
       return;
     }
   }
+  /* May be needed if codec_params ever contains nested objects
   if (context->codec_params != NULL) {
     int rc;
     for (int i = 0; i < g_ncodecs; ++i) {
@@ -4639,7 +4642,7 @@ void blosc2_free_ctx(blosc2_context* context) {
           if (fill_codec(&g_codecs[i]) < 0) {
             BLOSC_TRACE_ERROR("Could not load codec %d.", g_codecs[i].compcode);
             return BLOSC2_ERROR_CODEC_SUPPORT;
-          }
+          } 
         }
         if (g_codecs[i].free == NULL){
           // no free func, codec_params is simple
@@ -4659,6 +4662,7 @@ void blosc2_free_ctx(blosc2_context* context) {
       return;
     }
   }
+  */
   if (context->prefilter != NULL) {
     my_free(context->preparams);
   }
@@ -4702,6 +4706,7 @@ int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams) {
   dparams->schunk = ctx->schunk;
   dparams->postfilter = ctx->postfilter;
   dparams->postparams = ctx->postparams;
+  dparams->typesize = ctx->typesize;
 
   return BLOSC2_ERROR_SUCCESS;
 }
