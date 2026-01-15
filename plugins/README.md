@@ -43,7 +43,7 @@ everybody in the C-Blosc2 GitHub repository and users can install them anytime.
 
 **User registered plugins** are plugins that users register locally, and they can use them
 in the same way as in the examples `urcodecs.c` and `urfilters.c`. The codec must have .encoder and 
-.decoder functions, and optionally, a .free function which frees the codec_params.
+.decoder functions.
 
 If you only want to use a plugin on your own devices you can just register it as a user registered 
 plugin with an ID between *BLOSC2_USER_REGISTERED_FILTERS_START* and *BLOSC2_USER_REGISTERED_FILTERS_STOP*. 

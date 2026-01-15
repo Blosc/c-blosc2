@@ -35,8 +35,6 @@
 #       do not include support for the Zlib library
 #   DEACTIVATE_ZSTD: default OFF
 #       do not include support for the Zstd library
-#   DEACTIVATE_OPENZL: default OFF
-#       do not include support for the OpenZL library
 #   WITH_ZLIB_OPTIM: default ON
 #       set WITH_OPTIM when building Zlib library, setting OFF is useful for wasm32 targets
 #   PREFER_EXTERNAL_LZ4: default OFF
@@ -47,9 +45,6 @@
 #       MINIZ sources
 #   PREFER_EXTERNAL_ZSTD: default OFF
 #       when found, use the installed Zstd libs instead of included
-#       sources
-#   PREFER_EXTERNAL_OPENZL: default OFF
-#       when found, use the installed OpenZL libs instead of included
 #       sources
 #   TEST_INCLUDE_BENCH_SHUFFLE_1: default ON
 #       add a test that runs the benchmark program passing "shuffle" with 1
@@ -83,32 +78,6 @@
 
 if(NOT WIN32)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
-endif()
-
-# Copied from OpenZL CMakelists.txt
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND NOT DEACTIVATE_OPENZL)
-  # Check target architecture
-  if (NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
-    message(FATAL_ERROR "OpenZL requires a 64bit target architecture.")
-  endif()
-
-  # Check compiler compatibility
-  if (CMAKE_C_COMPILER_ID STREQUAL "MSVC")
-    # MSVC has limited C11 support - warn users about potential issues
-    if (MSVC_VERSION LESS 1910)
-      message(
-        FATAL_ERROR
-        "This build script only supports building OpenZL on 64-bit Windows with "
-        "at least Visual Studio 2017. "
-        "MSVC version '${MSVC_VERSION}' is not supported."
-      )
-    endif()
-
-    message(WARNING
-      "MSVC has limited C11 support and may produce C2099 errors. "
-      "For better C11 compatibility, consider using clang-cl instead. "
-      "To use clang-cl with Visual Studio generator, use: cmake -G \"Visual Studio 17 2022\" -T ClangCL")
-  endif()
 endif()
 
 cmake_minimum_required(VERSION 3.16.3)
@@ -156,8 +125,6 @@ option(DEACTIVATE_ZLIB
     "Do not include support for the Zlib library." OFF)
 option(DEACTIVATE_ZSTD
     "Do not include support for the Zstd library." OFF)
-option(DEACTIVATE_OPENZL
-    "Do not include support for the OpenZL library." DEACTIVATE_ZSTD)
 option(DEACTIVATE_IPP
     "Do not include support for the Intel IPP library." ON)
 option(PREFER_EXTERNAL_LZ4
@@ -166,8 +133,6 @@ option(PREFER_EXTERNAL_ZLIB
     "Find and use external ZLIB library instead of included sources." OFF)
 option(PREFER_EXTERNAL_ZSTD
     "Find and use external ZSTD library instead of included sources." OFF)
-option(PREFER_EXTERNAL_OPENZL
-    "Find and use external OpenZL library instead of included sources." OFF)
 option(WITH_ZLIB_OPTIM
     "Set WITH_OPTIM for ZLIB, turning off is useful for compiling for wasm32 targets." ON)
 
@@ -192,7 +157,6 @@ endif()
 if(BUILD_LITE)
     set(DEACTIVATE_ZLIB ON)
     set(DEACTIVATE_ZSTD ON)
-    set(DEACTIVATE_OPENZL ON)
 endif()
 
 # Threads
@@ -282,22 +246,6 @@ if(NOT DEACTIVATE_ZSTD)
     # HAVE_ZSTD will be set to true because even if the library is
     # not found, we will use the included sources for it
     set(HAVE_ZSTD TRUE)
-else()
-    set(DEACTIVATE_OPENZL ON) # Doesn't make sense to use openzl if don't want Zstd
-endif()
-
-if(NOT DEACTIVATE_OPENZL)
-    if(PREFER_EXTERNAL_OPENZL)
-        find_package(OPENZL MODULE)
-        if (NOT OPENZL_FOUND)
-            message(STATUS "No OpenZL library found.  Using internal sources.")
-        endif()
-    else()
-        message(STATUS "Using OpenZL internal sources.")
-    endif()
-    # HAVE_OPENZL will be set to true because even if the library is
-    # not found, we will use the included sources for it
-    set(HAVE_OPENZL TRUE)
 endif()
 
 if(NOT DEACTIVATE_IPP)

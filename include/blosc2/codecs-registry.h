@@ -46,9 +46,10 @@ typedef struct {
     char *decoder;
 } codec_info;
 
-typedef struct {
-    char *free;
-} codecparams_info;
+// If ever add .free func for codecs, may be needed
+// typedef struct {
+//     char *free;
+// } codecparams_info;
 
 #ifdef __cplusplus
 }

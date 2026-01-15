@@ -168,54 +168,6 @@ if(NOT DEACTIVATE_ZSTD)
     endif()
 endif()
 
-if(NOT DEACTIVATE_OPENZL)
-    if(OPENZL_FOUND)
-        # Preferred: imported target
-        if(TARGET OpenZL::openzl)
-            list(APPEND LIBS OpenZL::openzl)
-        else()
-            # Legacy FindOpenZL.cmake variables
-            list(APPEND LIBS ${OPENZL_LIBRARY})
-            list(APPEND BLOSC_INCLUDE_DIRS ${OPENZL_INCLUDE_DIR})
-        endif()
-    else()
-        # TODO: Fallback: build internal OpenZL     
-
-        set(OPENZL_LOCAL_DIR ${INTERNAL_LIBS}/openzl-0.1.0)
-
-        # C sources
-        file(GLOB_RECURSE OPENZL_C_SRC
-            ${OPENZL_LOCAL_DIR}/src/*.c
-        )
-
-        # Defines a function needed for custom_parsers
-    
-        # if(MSVC)
-        #     include(${OPENZL_LOCAL_DIR}/cmake/OpenZLCompilerMSVC.cmake)
-        # else()
-        #     include(${OPENZL_LOCAL_DIR}/cmake/OpenZLCompilerUnix.cmake)
-        # endif()
-        # add_subdirectory(${OPENZL_LOCAL_DIR}/custom_parsers ${CMAKE_BINARY_DIR}/custom_parsers-build)
-        
-        if(COMPILER_SUPPORT_AVX2 AND NOT MSVC)
-            enable_language(ASM)
-            file(GLOB_RECURSE OPENZL_ASM_SRC
-                ${OPENZL_LOCAL_DIR}/src/openzl/fse/decompress/*.S
-            )
-        else()
-            add_compile_definitions("ZSTD_DISABLE_ASM")
-            set(OPENZL_ASM_SRC "")
-        endif()
-
-        list(APPEND SOURCES ${OPENZL_C_SRC} ${OPENZL_ASM_SRC})
-
-        list(APPEND BLOSC_INCLUDE_DIRS
-            ${OPENZL_LOCAL_DIR}/src
-            ${OPENZL_LOCAL_DIR}/include
-        )
-    endif()
-endif()
-
 if(HAVE_IPP)
     set(LIBS ${LIBS} "${IPP_LIBRARIES}")
 endif()

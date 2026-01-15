@@ -51,13 +51,6 @@
   // #include "cover.h"  // for experimenting with fast cover training for building dicts
   #include "zdict.h"
 #endif /*  HAVE_ZSTD */
-#if defined(HAVE_OPENZL)
-  #include "openzl/common/logging.h"
-  #include "openzl/openzl.h"
-  #include "openzl/codecs/zl_concat.h"
-  #include "openzl/codecs/zl_store.h"
-  #include "openzl/codecs/zl_transpose.h"
-#endif /*  HAVE_OPENZL */
 
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <windows.h>
@@ -231,8 +224,6 @@ static int compname_to_clibcode(const char* compname) {
     return BLOSC_ZLIB_LIB;
   if (strcmp(compname, BLOSC_ZSTD_COMPNAME) == 0)
     return BLOSC_ZSTD_LIB;
-  if (strcmp(compname, BLOSC_OPENZL_COMPNAME) == 0)
-    return BLOSC_OPENZL_LIB;
   for (int i = 0; i < g_ncodecs; ++i) {
     if (strcmp(compname, g_codecs[i].compname) == 0)
       return g_codecs[i].complib;
@@ -246,7 +237,6 @@ static const char* clibcode_to_clibname(int clibcode) {
   if (clibcode == BLOSC_LZ4_LIB) return BLOSC_LZ4_LIBNAME;
   if (clibcode == BLOSC_ZLIB_LIB) return BLOSC_ZLIB_LIBNAME;
   if (clibcode == BLOSC_ZSTD_LIB) return BLOSC_ZSTD_LIBNAME;
-  if (clibcode == BLOSC_OPENZL_LIB) return BLOSC_OPENZL_LIBNAME;
   for (int i = 0; i < g_ncodecs; ++i) {
     if (clibcode == g_codecs[i].complib)
       return g_codecs[i].compname;
@@ -275,8 +265,6 @@ int blosc2_compcode_to_compname(int compcode, const char** compname) {
     name = BLOSC_ZLIB_COMPNAME;
   else if (compcode == BLOSC_ZSTD)
     name = BLOSC_ZSTD_COMPNAME;
-  else if (compcode == BLOSC_OPENZL)
-    name = BLOSC_OPENZL_COMPNAME;
   else {
     for (int i = 0; i < g_ncodecs; ++i) {
       if (compcode == g_codecs[i].compcode) {
@@ -302,11 +290,7 @@ int blosc2_compcode_to_compname(int compcode, const char** compname) {
 #if defined(HAVE_ZSTD)
   else if (compcode == BLOSC_ZSTD)
     code = BLOSC_ZSTD;
-#endif /* HAVE_OPENZL */
-#if defined(HAVE_OPENZL)
-  else if (compcode == BLOSC_OPENZL)
-    code = BLOSC_OPENZL;
-#endif /* HAVE_OPENZL */
+#endif /* HAVE_ZSTD */
   else if (compcode >= BLOSC_LAST_CODEC)
     code = compcode;
   return code;
@@ -335,11 +319,6 @@ int blosc2_compname_to_compcode(const char* compname) {
     code = BLOSC_ZSTD;
   }
 #endif /*  HAVE_ZSTD */
-#if defined(HAVE_OPENZL)
-  else if (strcmp(compname, BLOSC_OPENZL_COMPNAME) == 0) {
-    code = BLOSC_OPENZL;
-  }
-#endif /*  HAVE_OPENZL */
   else{
     for (int i = 0; i < g_ncodecs; ++i) {
       if (strcmp(compname, g_codecs[i].compname) == 0) {
@@ -367,10 +346,6 @@ static int compcode_to_compformat(int compcode) {
     case BLOSC_ZSTD:    return BLOSC_ZSTD_FORMAT;
       break;
 #endif /*  HAVE_ZSTD */
-#if defined(HAVE_OPENZL)
-    case BLOSC_OPENZL:    return BLOSC_OPENZL_FORMAT;
-      break;
-#endif /*  HAVE_OPENZL*/
     default:
       return BLOSC_UDCODEC_FORMAT;
   }
@@ -400,13 +375,6 @@ static int compcode_to_compversion(int compcode) {
       return BLOSC_ZSTD_VERSION_FORMAT;
       break;
 #endif /*  HAVE_ZSTD */
-
-#if defined(HAVE_OPENZL)
-    case BLOSC_OPENZL:
-      return BLOSC_OPENZL_VERSION_FORMAT;
-      break;
-#endif /*  HAVE_OPENZL */
-
     default:
       for (int i = 0; i < g_ncodecs; ++i) {
         if (compcode == g_codecs[i].compcode) {
@@ -579,284 +547,6 @@ static int zstd_wrap_decompress(struct thread_context* thread_context,
   return (int)code;
 }
 #endif /*  HAVE_ZSTD */
-
-#if defined(HAVE_OPENZL)
-bool is_bit_set(uint8_t byte, unsigned bit)
-{
-    return (byte & (1u << bit)) != 0;
-}
-
-static ZL_Report openzl_shuffle_delta_concat_graph(
-    ZL_Graph* graph, ZL_Edge** inputs, size_t numInputs) {
-  ZL_RESULT_DECLARE_SCOPE_REPORT(graph);
-
-  ZL_ERR_IF_NE(numInputs, 1, parameter_invalid);
-  ZL_ERR_IF_NULL(inputs, parameter_invalid);
-  ZL_ERR_IF_NULL(graph, parameter_invalid);
-
-  const ZL_NodeIDList nodes = ZL_Graph_getCustomNodes(graph);
-  const ZL_GraphIDList graphs = ZL_Graph_getCustomGraphs(graph);
-  ZL_ERR_IF_NE(nodes.nbNodeIDs, 3, parameter_invalid);
-
-  // SHUFFLE: just converts to serial if node is not transpose (=shuffle)
-  ZL_TRY_LET(ZL_EdgeList, fields, ZL_Edge_runNode(inputs[0], nodes.nodeids[0]));
-
-  if (fields.nbEdges == 0) {
-    return ZL_returnSuccess();
-  }
-
-  // DELTA: does nothing if node is not delta
-  ZL_Edge** delta_edges;
-  if (nodes.nodeids[1].nid == ZL_NODE_DELTA_INT.nid){
-    delta_edges = (ZL_Edge**)ZL_Graph_getScratchSpace(graph, fields.nbEdges * sizeof(ZL_Edge*));
-    ZL_ERR_IF_NULL(delta_edges, allocation);
-    for (size_t i = 0; i < fields.nbEdges; ++i) {
-      ZL_TRY_LET(ZL_EdgeList,
-                as_num,
-                ZL_Edge_runNode(fields.edges[i], ZL_NODE_CONVERT_SERIAL_TO_NUM_LE8));
-      ZL_ERR_IF_NE(as_num.nbEdges, 1, graph_invalid);
-
-      ZL_TRY_LET(ZL_EdgeList, delta, ZL_Edge_runNode(as_num.edges[0], nodes.nodeids[1]));
-      ZL_ERR_IF_NE(delta.nbEdges, 1, graph_invalid);
-
-      ZL_TRY_LET(ZL_EdgeList,
-                as_serial,
-                ZL_Edge_runNode(delta.edges[0], ZL_NODE_CONVERT_NUM_TO_SERIAL_LE));
-      ZL_ERR_IF_NE(as_serial.nbEdges, 1, graph_invalid);
-
-      delta_edges[i] = as_serial.edges[0];
-    }
-  }
-  else{
-    delta_edges = fields.edges;
-  }
-
-  if (fields.nbEdges == 1) {
-    ZL_RET_R_IF_ERR(ZL_Edge_setDestination(delta_edges[0], graphs.graphids[1]));
-    return ZL_returnSuccess();
-  }
-  
-  // CONCAT: just directs different streams to codec if node is not concat
-  if (nodes.nodeids[2].nid == ZL_NODE_CONCAT_SERIAL.nid){
-    ZL_TRY_LET(ZL_EdgeList,
-             concat_out,
-             ZL_Edge_runMultiInputNode(
-                 delta_edges, fields.nbEdges, nodes.nodeids[2])); 
-    if (concat_out.nbEdges == 2) {
-      ZL_RET_R_IF_ERR(
-          ZL_Edge_setDestination(concat_out.edges[0], graphs.graphids[0]));
-      ZL_RET_R_IF_ERR(
-          ZL_Edge_setDestination(concat_out.edges[1], graphs.graphids[1]));
-      return ZL_returnSuccess();
-    }
-    if (concat_out.nbEdges == 1) {
-      ZL_RET_R_IF_ERR(
-          ZL_Edge_setDestination(concat_out.edges[0], graphs.graphids[1]));
-      return ZL_returnSuccess();
-    }
-    ZL_RET_R_ERR(graph_invalid, "concat output has unexpected number of edges");
-  }
-  else{
-    for (size_t i = 0; i < fields.nbEdges; ++i) {
-      ZL_RET_R_IF_ERR(
-          ZL_Edge_setDestination(delta_edges[i], graphs.graphids[i]));
-    }
-    return ZL_returnSuccess();
-  }
-}
-
-static ZL_GraphID openzl_register_blosc2_graph(
-    ZL_Compressor* compressor, ZL_GraphID* successor_graphs, size_t nbCustomGraphs, bool shuffle, bool split, bool delta) {
-  if (split && !shuffle){
-     BLOSC_TRACE_ERROR("When split is true, must also shuffle!");
-  } 
-  ZL_NodeID nodes[3] = {shuffle ? ZL_NODE_TRANSPOSE_SPLIT : ZL_NODE_CONVERT_STRUCT_TO_SERIAL, 
-                        delta ? ZL_NODE_DELTA_INT : ZL_NODE_ILLEGAL, 
-                        split ? ZL_NODE_ILLEGAL : ZL_NODE_CONCAT_SERIAL};
-
-  ZL_Type input_types[1] = {ZL_Type_struct};
-  ZL_FunctionGraphDesc desc = {
-      .name = "blosc2.shuffle_delta_concat",
-      .graph_f = openzl_shuffle_delta_concat_graph,
-      .validate_f = NULL,
-      .inputTypeMasks = input_types,
-      .nbInputs = 1,
-      .lastInputIsVariable = 0,
-      .customGraphs = successor_graphs,
-      .nbCustomGraphs = nbCustomGraphs,
-      .customNodes = nodes,
-      .nbCustomNodes = 3,
-      .localParams = {0},
-      .opaque = {0},
-  };
-  return ZL_Compressor_registerFunctionGraph(compressor, &desc);
-}
-
-static int openzl_wrap_compress(struct thread_context* thread_context,
-                              const char* input, size_t input_length,
-                              char* output, size_t maxout, int clevel) {
-  if (thread_context->openzl_cctx == NULL) {
-    thread_context->openzl_cctx = ZL_CCtx_create();
-  }
-
-  blosc2_context* context = thread_context->parent_context;
-
-  uint8_t profile = context->compcode_meta;
-  bool shuffle_ = is_bit_set(profile, 1);
-  bool delta_ = is_bit_set(profile, 2);
-  bool split_ = is_bit_set(profile, 3);
-  bool checksum_ = is_bit_set(profile, 4);
-
-  int32_t typesize = context->typesize;
-  ZL_GraphID graphId;
-  ZL_TypedRef* input_ = ZL_TypedRef_createStruct(input, typesize, input_length / typesize);
-
-  ZL_Compressor* compressor = NULL;
-  ZL_GraphID graph = (ZL_GraphID){0};
-  // Try to reuse already-defined graph
-  if (thread_context->openzl_compressor != NULL &&
-      thread_context->openzl_profile == profile &&
-      thread_context->openzl_clevel == clevel &&
-      thread_context->openzl_typesize == typesize) {
-    compressor = thread_context->openzl_compressor;
-    graph = thread_context->openzl_graph;
-  }
-  else {
-    if (thread_context->openzl_compressor != NULL) {
-      ZL_Compressor_free(thread_context->openzl_compressor);
-      thread_context->openzl_compressor = NULL;
-    }
-    compressor = ZL_Compressor_create();
-    if (compressor == NULL) {
-      BLOSC_TRACE_ERROR("Error when creating OpenZL compressor.  Giving up.");
-      ZL_TypedRef_free(input_);
-      return 0;
-    }
-    ZL_GraphID zstd_graph_id = ZL_GRAPH_ZSTD;
-    ZL_GraphID lz4_graph_id = ZL_GRAPH_LZ4;
-    /*
-    int zstdclevel = (clevel < 9) ? clevel * 2 - 1 : ZSTD_maxCLevel();
-    // Make the level 8 close enough to maxCLevel
-    if (zstdclevel == 8) zstdclevel = ZSTD_maxCLevel() - 2;
-    zstd_graph_id = ZL_Compressor_registerZstdGraph_withLevel(compressor, zstdclevel);
-    */
-    zstd_graph_id = ZL_Compressor_registerZstdGraph_withLevel(compressor, clevel);
-    ZL_RESULT_OF(ZL_GraphID) lz4_result = ZL_Compressor_buildLZ4Graph(compressor, clevel);
-    if (ZL_RES_isError(lz4_result)) {
-      BLOSC_TRACE_ERROR("Error when building LZ4 graph for OpenZL: '%s'.  Giving up.",
-                        ZL_ErrorCode_toString(ZL_RES_code(lz4_result)));
-      ZL_Compressor_free(compressor);
-      ZL_TypedRef_free(input_);
-      return 0;
-    }
-    lz4_graph_id = ZL_RES_value(lz4_result);
-
-    ZL_GraphID codec_graph_id = is_bit_set(profile, 0) ? lz4_graph_id : zstd_graph_id;
-
-    size_t nbCustomGraphs = split_ ? typesize : 2;
-    ZL_GraphID successor_graphs[nbCustomGraphs];
-    successor_graphs[0] = split_ ? codec_graph_id : ZL_GRAPH_STORE; // store concat metadata when not splitting
-    for (size_t i = 1; i < nbCustomGraphs; i++) {
-        successor_graphs[i] = codec_graph_id;   // EVERY lane → codec → STORE
-      }
-    graphId = openzl_register_blosc2_graph(compressor, successor_graphs, nbCustomGraphs, shuffle_, split_, delta_);
-    graph = ZL_Compressor_buildACEGraphWithDefault(compressor, graphId);
-
-    // Cache generated graph
-    thread_context->openzl_compressor = compressor;
-    thread_context->openzl_graph = graph;
-    thread_context->openzl_profile = profile;
-    thread_context->openzl_clevel = clevel;
-    thread_context->openzl_typesize = typesize;
-  }
-
-  ZL_CCtx_setParameter(thread_context->openzl_cctx,  ZL_CParam_formatVersion, ZL_MAX_FORMAT_VERSION);
-  if (checksum_){
-    ZL_CCtx_setParameter(thread_context->openzl_cctx, ZL_CParam_compressedChecksum, ZL_TernaryParam_enable);
-    ZL_CCtx_setParameter(thread_context->openzl_cctx, ZL_CParam_contentChecksum, ZL_TernaryParam_enable);
-  } else {
-    ZL_CCtx_setParameter(thread_context->openzl_cctx, ZL_CParam_compressedChecksum, ZL_TernaryParam_disable);
-    ZL_CCtx_setParameter(thread_context->openzl_cctx, ZL_CParam_contentChecksum, ZL_TernaryParam_disable);
-  }
-
-  ZL_Report code = ZL_Compressor_selectStartingGraphID(compressor, graph);
-  if (ZL_isError(code)) {
-    BLOSC_TRACE_ERROR("Error when setting graph for OpenZL compressor: '%s'.  Giving up.",
-                      ZL_ErrorCode_toString(ZL_errorCode(code)));
-    ZL_TypedRef_free(input_);
-    ZL_Compressor_free(compressor);
-    return 0;
-  }
-  ZL_CCtx_refCompressor(thread_context->openzl_cctx, compressor);
-
-  code = ZL_CCtx_compressTypedRef(thread_context->openzl_cctx, output, maxout, input_);
-
-  // Cleanup
-  ZL_TypedRef_free(input_);
-  if (ZL_isError(code)) {
-    return 0;
-  }
-  size_t cbytes = ZL_validResult(code);
-  return (int)cbytes;
-}
-
-static int openzl_wrap_decompress(struct thread_context* thread_context,
-                                const char* input, size_t compressed_length,
-                                char* output, size_t maxout) {
-
-  blosc2_context* context = thread_context->parent_context;
-  uint8_t profile = context->compcode_meta;
-  bool checksum_ = is_bit_set(profile, 4);
-  if (thread_context->openzl_dctx == NULL) {
-    thread_context->openzl_dctx = ZL_DCtx_create();
-    /* Keep OpenZL params across sessions to avoid per-call resets. */
-    ZL_DCtx_setParameter(thread_context->openzl_dctx,
-                         ZL_DParam_stickyParameters, 1);
-    if (checksum_) {
-      ZL_DCtx_setParameter(thread_context->openzl_dctx,
-                           ZL_DParam_checkCompressedChecksum,
-                           ZL_TernaryParam_enable);
-      ZL_DCtx_setParameter(thread_context->openzl_dctx,
-                           ZL_DParam_checkContentChecksum,
-                           ZL_TernaryParam_enable);
-    } else {
-      ZL_DCtx_setParameter(thread_context->openzl_dctx,
-                           ZL_DParam_checkCompressedChecksum,
-                           ZL_TernaryParam_disable);
-      ZL_DCtx_setParameter(thread_context->openzl_dctx,
-                           ZL_DParam_checkContentChecksum,
-                           ZL_TernaryParam_disable);
-    }
-  }
- 
-  int32_t typesize = thread_context->parent_context->typesize;
-  ZL_Report code;
-  if ((typesize > 0) && (maxout % (size_t)typesize == 0)) {
-    size_t num_structs = maxout / (size_t)typesize;
-    ZL_TypedBuffer* tbuf = ZL_TypedBuffer_createWrapStruct(
-        output, (size_t)typesize, num_structs);
-    if (tbuf == NULL) {
-      BLOSC_TRACE_ERROR("Error in OpenZL decompression: failed to create TypedBuffer.");
-      return 0;
-    }
-    code = ZL_DCtx_decompressTBuffer(thread_context->openzl_dctx,
-                                     tbuf, (void*)input, compressed_length);
-    ZL_TypedBuffer_free(tbuf);
-  }
-  else {
-    code = ZL_DCtx_decompress(thread_context->openzl_dctx,
-                              (void*)output, maxout,
-                              (void*)input, compressed_length);
-  }
-
-  if (ZL_isError(code)) {
-    BLOSC_TRACE_ERROR("Error in OpenZL decompression: '%s'.  Giving up.",
-                      ZL_ErrorCode_toString(ZL_errorCode(code)));
-    return 0;
-  }
-  return ZL_validResult(code);
-}
-#endif /*  HAVE_OPENZL */
 
 /* Compute acceleration for blosclz */
 static int get_accel(const blosc2_context* context) {
@@ -1582,13 +1272,6 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
                                   (char*)dest, (size_t)maxout, context->clevel);
     }
   #endif /* HAVE_ZSTD */
-  #if defined(HAVE_OPENZL)
-    else if (context->compcode == BLOSC_OPENZL) {
-      cbytes = openzl_wrap_compress(thread_context,
-                                    (char*)_src + j * neblock, (size_t)neblock,
-                                    (char*)dest, (size_t)maxout, context->clevel);
-    }
-  #endif /* HAVE_OPENZL */
     else if (context->compcode > BLOSC2_DEFINED_CODECS_STOP) {
       for (int i = 0; i < g_ncodecs; ++i) {
         if (g_codecs[i].compcode == context->compcode) {
@@ -2202,13 +1885,6 @@ static int blosc_d(
                                       (char*)_dest, (size_t)neblock);
       }
   #endif /*  HAVE_ZSTD */
-  #if defined(HAVE_OPENZL)
-    else if (compformat == BLOSC_OPENZL_FORMAT) {
-      nbytes = openzl_wrap_decompress(thread_context,
-                                    (char*)src, (size_t)cbytes,
-                                    (char*)_dest, (size_t)neblock);
-    }
-  #endif /*  HAVE_OPENZL */
       else if (compformat == BLOSC_UDCODEC_FORMAT) {
         bool getcell = false;
 
@@ -2407,15 +2083,6 @@ static int init_thread_context(struct thread_context* thread_context, blosc2_con
   thread_context->zstd_cctx = NULL;
   thread_context->zstd_dctx = NULL;
   #endif
-  #if defined(HAVE_OPENZL)
-  thread_context->openzl_cctx = NULL;
-  thread_context->openzl_dctx = NULL;
-  thread_context->openzl_compressor = NULL;
-  thread_context->openzl_graph = (ZL_GraphID){0};
-  thread_context->openzl_clevel = -1;
-  thread_context->openzl_profile = 0xFF;
-  thread_context->openzl_typesize = -1;
-  #endif
 
   /* Create the hash table for LZ4 in case we are using IPP */
 #ifdef HAVE_IPP
@@ -2457,17 +2124,6 @@ static void destroy_thread_context(struct thread_context* thread_context) {
   }
   if (thread_context->zstd_dctx != NULL) {
     ZSTD_freeDCtx(thread_context->zstd_dctx);
-  }
-#endif
-#if defined(HAVE_OPENZL)
-  if (thread_context->openzl_cctx != NULL) {
-    ZL_CCtx_free(thread_context->openzl_cctx);
-  }
-  if (thread_context->openzl_dctx != NULL) {
-    ZL_DCtx_free(thread_context->openzl_dctx);
-  }
-  if (thread_context->openzl_compressor != NULL) {
-    ZL_Compressor_free(thread_context->openzl_compressor);
   }
 #endif
 #ifdef HAVE_IPP
@@ -3963,12 +3619,6 @@ const char* blosc1_get_compressor(void)
 }
 
 int blosc1_set_compressor(const char* compname) {
-#if defined(HAVE_OPENZL)
-  if (strcmp(compname, BLOSC_OPENZL_COMPNAME) == 0) {
-    BLOSC_TRACE_ERROR("OpenZL is only available via the Blosc2 API.");
-    BLOSC_ERROR(BLOSC2_ERROR_CODEC_SUPPORT);
-  }
-#endif
   int code = blosc2_compname_to_compcode(compname);
   if (code >= BLOSC_LAST_CODEC) {
     BLOSC_TRACE_ERROR("User defined codecs cannot be set here. Use Blosc2 mechanism instead.");
@@ -4010,10 +3660,6 @@ const char* blosc2_list_compressors(void) {
   strcat(ret, ",");
   strcat(ret, BLOSC_ZSTD_COMPNAME);
 #endif /* HAVE_ZSTD */
-#if defined(HAVE_OPENZL)
-  strcat(ret, ",");
-  strcat(ret, BLOSC_OPENZL_COMPNAME);
-#endif /* HAVE_OPENZL */
   compressors_list_done = 1;
   return ret;
 }

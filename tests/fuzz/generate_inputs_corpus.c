@@ -153,7 +153,6 @@ int main(void) {
   create_cframe("lz4hc");
   create_cframe("zlib");
   create_cframe("zstd");
-  create_cframe("openzl");
 
   blosc2_destroy();
 }
