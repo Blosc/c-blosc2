@@ -21,7 +21,6 @@
   #include <windows.h>
   #include <malloc.h>
   #include <io.h>
-  #include <direct.h>   /* <- add this for _rmdir */
 
   int blosc2_remove_dir(const char* dir_path) {
     char* path;
@@ -64,11 +63,7 @@
     }
 
     /* remove the directory */
-    if (_rmdir(dir_path) != 0) {
-      BLOSC_TRACE_ERROR("Could not remove directory %s (errno=%d)", dir_path, errno);
-      _findclose(file);
-      return BLOSC2_ERROR_FAILURE;
-    }
+    rmdir(dir_path);
     _findclose(file);
     return BLOSC2_ERROR_SUCCESS;
   }
