@@ -1111,6 +1111,7 @@ typedef struct {
   uint8_t *ttmp;  // a temporary that is able to hold several blocks for the output and is private for each thread
   size_t ttmp_nbytes;  // the size of the temporary in bytes
   blosc2_context *ctx;  // the compression context
+  bool output_is_disposable;  // whether the output buffer is disposable
 } blosc2_prefilter_params;
 
 /**

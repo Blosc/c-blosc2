@@ -959,11 +959,14 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
   uint8_t* filters = context->filters;
   uint8_t* filters_meta = context->filters_meta;
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
-
+  bool output_is_disposable = (context->preparams != NULL) ? context->preparams->output_is_disposable : false;
+  
   /* Prefilter function */
   if (context->prefilter != NULL) {
     /* Set unwritten values to zero */
-    memset(_dest, 0, bsize);
+    if (!output_is_disposable) {
+      memset(_dest, 0, bsize);
+    }
     // Create new prefilter parameters for this block (must be private for each thread)
     blosc2_prefilter_params preparams;
     memcpy(&preparams, context->preparams, sizeof(preparams));
@@ -978,8 +981,14 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
     preparams.ttmp = thread_context->tmp;
     preparams.ttmp_nbytes = thread_context->tmp_nbytes;
     preparams.ctx = context;
+    preparams.output_is_disposable = output_is_disposable;
 
     if (context->prefilter(&preparams) != 0) {
+      if (output_is_disposable) {
+        // Output is going to be discarded; no more filters are required
+        BLOSC_TRACE_INFO("Output is disposable");
+        return _dest;
+      }
       BLOSC_TRACE_ERROR("Execution of prefilter function failed");
       return NULL;
     }
@@ -1100,6 +1109,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   int32_t ctbytes = 0;              /* number of compressed bytes in block */
   int32_t maxout;
   int32_t typesize = context->typesize;
+  bool output_is_disposable = (context->preparams != NULL) ? context->preparams->output_is_disposable : false;
   const char* compname;
   int accel;
   const uint8_t* _src;
@@ -1161,6 +1171,13 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       dest += sizeof(int32_t);
       ntbytes += sizeof(int32_t);
       ctbytes += sizeof(int32_t);
+
+      if (context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH && output_is_disposable) {
+        // Simulate a run of 0s
+        BLOSC_TRACE_INFO("Output is disposable, simulating a run of 0s");
+        memset(dest - 4, 0, sizeof(int32_t));
+        continue;
+      }
 
       const uint8_t *ip = (uint8_t *) _src + j * neblock;
       const uint8_t *ipbound = (uint8_t *) _src + (j + 1) * neblock;
@@ -3072,7 +3089,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     return BLOSC2_ERROR_WRITE_BUFFER;
   }
 
-  context->bstarts = (int32_t*)(_src + context->header_overhead);
+  int32_t* bstarts = (int32_t*)(_src + context->header_overhead);
 
   /* Check region boundaries */
   if ((start < 0) || (start * header->typesize > header->nbytes)) {
@@ -3087,7 +3104,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
 
   int chunk_memcpy = header->flags & 0x1;
   if (!context->special_type && !chunk_memcpy &&
-      ((uint8_t *)(_src + srcsize) < (uint8_t *)(context->bstarts + context->nblocks))) {
+      ((uint8_t *)(_src + srcsize) < (uint8_t *)(bstarts + context->nblocks))) {
     BLOSC_TRACE_ERROR("`bstarts` out of bounds.");
     return BLOSC2_ERROR_READ_BUFFER;
   }
@@ -3191,7 +3208,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
 
     // If memcpyed we don't have a bstarts section (because it is not needed)
     int32_t src_offset = memcpyed ?
-      context->header_overhead + j * header->blocksize : sw32_(context->bstarts + j);
+      context->header_overhead + j * header->blocksize : sw32_(bstarts + j);
 
     int32_t cbytes = blosc_d(context->serial_context, bsize, leftoverblock, memcpyed,
                              src, srcsize, src_offset, j,
