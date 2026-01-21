@@ -1,8 +1,6 @@
-prefix=@CMAKE_INSTALL_PREFIX@
-exec_prefix=${prefix}
-libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
-sharedlibdir=${libdir}
-includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+prefix=${pcfiledir}/../.. # directory containing blosc2.pc
+libdir=${prefix}/lib
+includedir=${prefix}/include
 
 Name: blosc2
 Description: A blocking, shuffling and lossless compression library
@@ -10,5 +8,5 @@ URL: https://blosc.org/
 Version: @BLOSC2_VERSION_STRING@
 
 Requires:
-Libs: -L${libdir} -L${sharedlibdir} -lblosc2
+Libs: -L${libdir} -lblosc2
 Cflags: -I${includedir}

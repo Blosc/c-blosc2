@@ -86,3 +86,48 @@ foreach(comp ${Blosc2_FIND_COMPONENTS})
     endif()
 endforeach()
 
+# Defines imported targets for Blosc2 inside a Python wheel
+
+# ------------------------------
+# Shared library target
+# ------------------------------
+if(NOT TARGET Blosc2::blosc2_shared)
+  add_library(Blosc2::blosc2_shared SHARED IMPORTED GLOBAL)
+
+  if(WIN32)
+    # MSVC: import library (.lib) + runtime DLL (.dll)
+    set_target_properties(Blosc2::blosc2_shared PROPERTIES
+      IMPORTED_IMPLIB "${CMAKE_CURRENT_LIST_DIR}/../blosc2_shared.lib"
+      IMPORTED_LOCATION "${CMAKE_CURRENT_LIST_DIR}/../blosc2_shared.dll"
+      INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../../include"
+    )
+  else()
+    # Linux/macOS
+    set_target_properties(Blosc2::blosc2_shared PROPERTIES
+      IMPORTED_LOCATION "${CMAKE_CURRENT_LIST_DIR}/../blosc2_shared.so"
+      INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../../include"
+    )
+  endif()
+endif()
+
+# ------------------------------
+# Static library target
+# ------------------------------
+if(NOT TARGET Blosc2::blosc2_static)
+  add_library(Blosc2::blosc2_static STATIC IMPORTED GLOBAL)
+
+  if(MSVC)
+    # Windows static library uses .lib
+    set_target_properties(Blosc2::blosc2_static PROPERTIES
+      IMPORTED_LOCATION "${CMAKE_CURRENT_LIST_DIR}/../blosc2_static.lib"
+      INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../../include"
+    )
+  else()
+    # Linux/macOS static library uses .a
+    set_target_properties(Blosc2::blosc2_static PROPERTIES
+      IMPORTED_LOCATION "${CMAKE_CURRENT_LIST_DIR}/../blosc2_static.a"
+      INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../../include"
+    )
+  endif()
+endif()
+
