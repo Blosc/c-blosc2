@@ -214,7 +214,7 @@ if(NOT DEACTIVATE_ZLIB)
         message(STATUS "Using ZLIB-NG internal sources for ZLIB support.")
         set(HAVE_ZLIB_NG TRUE)
         add_definitions(-DZLIB_COMPAT)
-        set(ZLIB_NG_DIR "zlib-ng-2.0.7")  # update to the actual included version
+        set(ZLIB_NG_DIR "zlib-ng-2.1.0-beta1")  # update to the actual included version
         set(ZLIB_COMPAT TRUE)
         set(SKIP_INSTALL_ALL TRUE)
         set(BUILD_SHARED_LIBS FALSE)
