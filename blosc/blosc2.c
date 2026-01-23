@@ -963,17 +963,22 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
   
   /* Prefilter function */
   if (context->prefilter != NULL) {
-    /* Set unwritten values to zero */
-    if (!output_is_disposable) {
-      memset(_dest, 0, bsize);
-    }
     // Create new prefilter parameters for this block (must be private for each thread)
     blosc2_prefilter_params preparams;
     memcpy(&preparams, context->preparams, sizeof(preparams));
+    // Calculate output_size based on number of elements and output typesize
+    int32_t nelems = bsize / typesize;  // number of elements in the input block
+    // If output_typesize is not set (0), default to input typesize (no type conversion)
+    int32_t output_typesize_actual = (preparams.output_typesize > 0) ? preparams.output_typesize : typesize;
+    int32_t output_size = nelems * output_typesize_actual;  // output size in bytes
+    preparams.output_typesize = output_typesize_actual;  // ensure it's set
+    /* Set unwritten values to zero */
+    if (!output_is_disposable) {
+      memset(_dest, 0, output_size);
+    }
     preparams.input = _src;
     preparams.output = _dest;
-    preparams.output_size = bsize;
-    preparams.output_typesize = typesize;
+    preparams.output_size = output_size;
     preparams.output_offset = offset;
     preparams.nblock = offset / context->blocksize;
     preparams.nchunk = context->schunk != NULL ? context->schunk->current_nchunk : -1;
