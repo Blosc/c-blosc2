@@ -1,10 +1,12 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.22.0 to 2.22.1
+Changes from 2.22.0 to 2.23.0
 =============================
 
-#XXX version-specific blurb XXX#
+* Changes to allow use of miniexpr. This breaks the ABI as a public struct has an additional field.
+* Changes to enable blosc2-openzl plugin
+
 
 Changes from 2.21.3 to 2.22.0
 =============================

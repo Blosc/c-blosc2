@@ -1,11 +1,10 @@
-# Announcing C-Blosc2 2.22.0
+# Announcing C-Blosc2 2.23.0
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-The main change is in the `b2nd_squeeze_index` and `b2nd_squeeze` APIs, which now accept and return views on the original array.
-Otherwise, this is a maintenance release, with a few fixes and some optimizations, as well as a new roadmap file.
-Thanks to @leyroycep for important bug fixes.
+The main change is in ``blosc2_prefilter_params``, which has a new field. 
+There is also a new ``typesize`` field in ``blosc2_dparams`` and some other changes to support the blosc2-openzl plugin.
 
 For more info, see the release notes in:
 
