@@ -25,7 +25,7 @@ General improvements
 
 * **Multiple index chunks in frames:** right now, only `one chunk <https://github.com/Blosc/c-blosc2/blob/main/README_CFRAME_FORMAT.rst#chunks>`_ is allowed for indexing other chunks.  Provided the 2GB limit for a chunksize, that means that 'only' 256 million of chunks can be stored in a frame.  Allowing for more than one index chunk would overcome this limitation.
 
-* **More robust detection of CPU capabilities:** although currently this detection is quite sophisticated, the code responsible for that has organically grow for more than 10 years and it is time to come with a more modern and robust way of doing this. https://github.com/google/cpu_features may be a good helper for doing this refactoring.
+* **More robust detection of CPU capabilities:** although currently this detection is quite sophisticated, the code responsible for that has organically grown for more than 10 years and it is time to come with a more modern and robust way of doing this. https://github.com/google/cpu_features may be a good helper for doing this refactoring.
 
 * **Documentation:** utterly important for attracting new users and making the life easier for existing ones.  Important points to have in mind here:
 

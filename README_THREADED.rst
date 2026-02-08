@@ -3,7 +3,7 @@ Blosc supports threading
 
 Threads are the most efficient way to program parallel code for
 multi-core processors, but also the more difficult to program well.
-Also, they has a non-negligible start-up time that does not fit well
+Also, they have a non-negligible start-up time that does not fit well
 with a high-performance compressor as Blosc tries to be.
 
 In order to reduce the overhead of threads as much as possible, I've

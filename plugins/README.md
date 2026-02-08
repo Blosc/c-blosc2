@@ -18,7 +18,7 @@ A codec is a program that compresses and decompresses digital data streams with 
 
 A filter is a program that rearranges data without changing its size, so that the initial and final sizes remain equal. A filter consists of an encoder and decoder. The filter encoder is applied before using the codec compressor (or codec encoder) to make the data easier to compress, while the filter decoder is used after the codec decompressor (or codec decoder) to restore the original data arrangement. Some filters used by Blosc include SHUFFLE, which rearranges data based on the type size, and TRUNC, which zeroes the mantissa bits to reduce the precision of (floating point) data and increase the compression ratio.
 
-Here it is an example on how the compression process goes:
+Here is an example on how the compression process goes:
 
 
     --------------------   filter encoder  -------------------   codec encoder   -------
@@ -60,7 +60,7 @@ that their code must satisfy:
 - First, the plugin code must be **developed in C**, have a relatively small footprint
   and meet decent quality code standards.
 
-- Second, users must develop a test suite which prove that the plugin works correctly.
+- Second, users must develop a test suite that proves that the plugin works correctly.
 
 Finally, even if these requirements are completely satisfied, it is not
 guaranteed that the plugin will be useful or contribute something

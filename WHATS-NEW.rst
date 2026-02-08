@@ -13,9 +13,9 @@ Right now, the next features are already implemented (although they may require 
 
 * **A filter pipeline:** the different filters can be pipelined so that the output of one can be the input for the other.  A possible example is a `delta` followed by `shuffle`, or as described above, `trunc_prec` followed by `bitshuffle`.
 
-* **Prefilters:** allows to apply user-defined C callbacks **prior** the filter pipeline during compression.  See `test_prefilter.c <https://github.com/Blosc/c-blosc2/blob/main/tests/test_prefilter.c>`_ for an example of use.
+* **Prefilters:** allows applying user-defined C callbacks **prior to** the filter pipeline during compression.  See `test_prefilter.c <https://github.com/Blosc/c-blosc2/blob/main/tests/test_prefilter.c>`_ for an example of use.
 
-* **Postfilters:** allows to apply user-defined C callbacks **after** the filter pipeline during decompression. The combination of prefilters and postfilters could be interesting for supporting e.g. encryption (via prefilters) and decryption (via postfilters).  Also, a postfilter alone can be used to produce on-the-flight computation based on existing data (or other metadata, like e.g. coordinates). See `test_postfilter.c <https://github.com/Blosc/c-blosc2/blob/main/tests/test_postfilter.c>`_ for an example of use.
+* **Postfilters:** allows applying user-defined C callbacks **after** the filter pipeline during decompression. The combination of prefilters and postfilters could be interesting for supporting e.g. encryption (via prefilters) and decryption (via postfilters).  Also, a postfilter alone can be used to produce on-the-fly computation based on existing data (or other metadata, like e.g. coordinates). See `test_postfilter.c <https://github.com/Blosc/c-blosc2/blob/main/tests/test_postfilter.c>`_ for an example of use.
 
 * **SIMD support for ARM (NEON):** this allows for faster operation on ARM architectures.  Only `shuffle` is supported right now, but the idea is to implement `bitshuffle` for NEON too.  Thanks to Lucian Marc.
 

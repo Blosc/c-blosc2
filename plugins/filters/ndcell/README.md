@@ -43,7 +43,7 @@ dataset is traversed the elements of a cell are all in a row.
 Advantages and disadvantages
 ------------------------------
 
-The advantage of *NDCELL* is that it makes codecs finding duplicacies in
+The advantage of *NDCELL* is that it helps codecs find duplicacies in
 multidimensional datasets.
 
 The main disadvantage of *NDCELL* is that it only works for multidimensional

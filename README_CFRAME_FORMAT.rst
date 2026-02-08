@@ -78,7 +78,7 @@ possible filter meta-info in `filters_meta`::
 
 The last section of the header is for the *metalayers*, which contain meta-information about the data in the
 frame.  It is mandatory the use of the msgpack format for storing them, although the user may use another format
-(e.g. json) encoded as msgpack (in this case as a string). Here it is the format for the *metalayers*::
+(e.g. json) encoded as msgpack (in this case as a string). Here is the format for the *metalayers*::
 
     |-57|-58|-59|-5A|-5B|-5C|-5D|====================|---|---|---|================|
     | 93| cd| idx   | de| size  | meta keys/values   | dc|  idy  | meta content   |
@@ -213,7 +213,7 @@ Dumping info in metalayers
 
 **Note:** The method in this section only works for Unix.
 
-Here it is a trick for printing the content of metalayers using the nice set of
+Here is a trick for printing the content of metalayers using the nice set of
 `msgpack-tools <https://github.com/ludocode/msgpack-tools>`_ command line utilities.  After installing the package we
 can do e.g.::
 

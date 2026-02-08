@@ -35,18 +35,18 @@ What is it?
 
 C-Blosc2 is the new major version of `C-Blosc <https://github.com/Blosc/c-blosc>`_, and is backward compatible with both the C-Blosc1 API and its in-memory format.  However, the reverse thing is generally not true for the format; buffers generated with C-Blosc2 are not format-compatible with C-Blosc1 (i.e. forward compatibility is not supported).  In case you want to ensure full API compatibility with C-Blosc1 API, define the `BLOSC1_COMPAT` symbol.
 
-See a 3 minutes  `introductory video to Blosc2 <https://www.youtube.com/watch?v=ER12R7FXosk>`_.
+See a 3-minute `introductory video to Blosc2 <https://www.youtube.com/watch?v=ER12R7FXosk>`_.
 
 
 Blosc2 NDim: an N-Dimensional store
 ===================================
 
-One of more exciting additions in C-Blosc2 is the `Blosc2 NDim layer <https://www.blosc.org/c-blosc2/reference/b2nd.html>`_ (or B2ND for short), allowing to create *and* read n-dimensional datasets in an extremely efficient way thanks to a n-dim 2-level partitioning, that allows to slice and dice arbitrary large and compressed data in a more fine-grained way:
+One of more exciting additions in C-Blosc2 is the `Blosc2 NDim layer <https://www.blosc.org/c-blosc2/reference/b2nd.html>`_ (or B2ND for short), which allows creating *and* reading n-dimensional datasets in an extremely efficient way thanks to a n-dim 2-level partitioning, that allows slicing and dicing arbitrary large and compressed data in a more fine-grained way:
 
 .. image:: https://github.com/Blosc/c-blosc2/blob/main/images/b2nd-2level-parts.png?raw=true
   :width: 75%
 
-To wet you appetite, here it is how the `NDArray` object in the  `Python wrapper`_ performs on getting slices orthogonal to the different axis of a 4-dim dataset:
+To whet your appetite, here is how the `NDArray` object in the  `Python wrapper`_ performs on getting slices orthogonal to the different axis of a 4-dim dataset:
 
 .. image:: https://github.com/Blosc/c-blosc2/blob/main/images/Read-Partial-Slices-B2ND.png?raw=true
   :width: 75%
@@ -181,7 +181,7 @@ Contributing
 If you want to collaborate in this development you are welcome.  We need help in the different areas listed at the `ROADMAP <https://github.com/Blosc/c-blosc2/blob/main/ROADMAP-TO-3.0.rst>`_; also, be sure to read our `DEVELOPING-GUIDE <https://github.com/Blosc/c-blosc2/blob/main/DEVELOPING-GUIDE.rst>`_ and our `Code of Conduct <https://github.com/Blosc/community/blob/master/code_of_conduct.md>`_.  Blosc is distributed using the `BSD license <https://github.com/Blosc/c-blosc2/blob/main/LICENSE.txt>`_.
 
 
-Tweeter feed
+Twitter feed
 ============
 
 Follow `@Blosc2 <https://twitter.com/Blosc2>`_ so as to get informed about the latest developments.

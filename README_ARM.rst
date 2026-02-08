@@ -12,7 +12,7 @@ arm64 implementation.  Currently, you can compile C-Blosc2 with:
 
 The NEON extensions are used automatically in this case.
 
-Here it is a couple of benchmarks on BloscLZ and LZ4 codecs running on a MacBook Air
+Here are a couple of benchmarks on BloscLZ and LZ4 codecs running on a MacBook Air
 with a new M1 arm64 processor:
 
 .. code-block:: console

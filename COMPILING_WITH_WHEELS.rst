@@ -13,7 +13,7 @@ C-Blosc2 binary libraries (including plugins functionality) can easily be instal
         Installing collected packages: blosc2
         Successfully installed blosc2-0.1.8 
 
-As a result, one can easily update to the latest version of C-Blosc2 binaries without the need to manually compile the thing. Following are instructions on how to use the libraries in wheels for different platforms.
+As a result, one can easily update to the latest version of C-Blosc2 binaries without the need to manually compile it. Following are instructions on how to use the libraries in wheels for different platforms.
 
 Compiling C files with Blosc2 wheels on Windows
 ----------------------------------------------
@@ -31,7 +31,7 @@ Compiling C files with Blosc2 wheels on Windows
     usage: cl [ option... ] filename... [ /link linkoption... ]
 
 
-- Make the compiler available. Its typical installation location uses to be `C:\\Program files (x86)\\Microsoft Visual Studio`, so change your current directory there. Then, to set up the build architecture environment you can open a command prompt window in the `VC\\Auxiliary\\Build` subdirectory and execute `vcvarsall.bat x64` if your architecture is 64 bits or `vcvarsall.bat x86` if it is 32 bits.
+- Make the compiler available. Its typical installation location is `C:\\Program files (x86)\\Microsoft Visual Studio`, so change your current directory there. Then, to set up the build architecture environment you can open a command prompt window in the `VC\\Auxiliary\\Build` subdirectory and execute `vcvarsall.bat x64` if your architecture is 64 bits or `vcvarsall.bat x86` if it is 32 bits.
 
 - You will need to know the path where the Blosc2 wheel has installed its files.  For this we will use the `dir /s` command (but you can use your preferred location method):
 
