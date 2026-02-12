@@ -1011,7 +1011,8 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
     if (filters[i] <= BLOSC2_DEFINED_FILTERS_STOP) {
       switch (filters[i]) {
         case BLOSC_SHUFFLE:
-          blosc2_shuffle(typesize, bsize, _src, _dest);
+          // if filters_meta is different to 0, interpret it as grouped bytes to shuffle
+          blosc2_shuffle(filters_meta[i] == 0 ? typesize : filters_meta[i], bsize, _src, _dest);
           break;
         case BLOSC_BITSHUFFLE:
           if (blosc2_bitshuffle(typesize, bsize, _src, _dest) < 0) {
@@ -1388,7 +1389,8 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
     if (filters[i] <= BLOSC2_DEFINED_FILTERS_STOP) {
       switch (filters[i]) {
         case BLOSC_SHUFFLE:
-          blosc2_unshuffle(typesize, bsize, _src, _dest);
+        // if filters_meta is not 0, interpret as number of bytes to be grouped together for shuffle
+          blosc2_unshuffle(filters_meta[i] == 0 ? typesize : filters_meta[i], bsize, _src, _dest);
           break;
         case BLOSC_BITSHUFFLE:
           if (bitunshuffle(typesize, bsize, _src, _dest, context->src[BLOSC2_CHUNK_VERSION]) < 0) {
