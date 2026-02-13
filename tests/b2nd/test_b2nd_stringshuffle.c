@@ -64,9 +64,12 @@ CUTEST_TEST_TEST(stringshuffle) {
   B2ND_TEST_ASSERT(cbytes);
 
   uint8_t *dest2 = malloc(dest_buffersize);
-  cctx->filters_meta[-1] = 0; // now will use typesize by default for shuffle
+  cctx->filters_meta[5] = 0; // now will use typesize by default for shuffle
   int cbytes2 = blosc2_compress_ctx(cctx, buffer, buffersize, dest2, dest_buffersize);
   B2ND_TEST_ASSERT(cbytes2);
+  float cratio = (float)buffersize / (float) cbytes; 
+  float cratio2 = (float)buffersize / (float) cbytes2; 
+  printf("\n cratio for charwise shuffle: %.2f. \n cratio for stringwise shuffle: %.2f", cratio, cratio2);
   if (cbytes2 < cbytes){
     printf("Shuffle works better using stringsize not charsize!");
     return BLOSC2_ERROR_FAILURE;
