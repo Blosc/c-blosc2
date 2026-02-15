@@ -1,6 +1,5 @@
-prefix=${pcfiledir}/../.. # directory containing blosc2.pc
-libdir=${prefix}/lib
-includedir=${prefix}/include
+libdir=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@
+includedir=@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_INCLUDEDIR@
 
 Name: blosc2
 Description: A blocking, shuffling and lossless compression library
