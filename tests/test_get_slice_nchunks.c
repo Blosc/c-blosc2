@@ -46,6 +46,7 @@ test_ndata tndata[] = {
         {5, 0, CHUNKSIZE * 5 + 200 * 100 + 300, true, 0, 6}, // last chunk shorter
         {2, 10, CHUNKSIZE * 2 + 400, true, 0, 3}, // start != 0, last chunk shorter
         {12,  CHUNKSIZE * 1 + 300, CHUNKSIZE * 4 + 100, false, 1, 5}, // start not in first chunk
+        {0,  0, 100, false, 0, 0}, // shape 0 array
 };
 
 typedef struct {
@@ -83,6 +84,8 @@ static char* test_get_slice_nchunks(void) {
   blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams,
                             .urlpath=tdata.urlpath, .contiguous=tdata.contiguous};
   schunk = blosc2_schunk_new(&storage);
+
+  if (tdata.nchunks == 0){schunk->chunksize = 0;}
 
   // Feed it with data
   if (!tdata.shorter_last_chunk) {
