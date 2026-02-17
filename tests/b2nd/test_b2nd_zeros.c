@@ -21,6 +21,7 @@ CUTEST_TEST_SETUP(zeros) {
   CUTEST_PARAMETRIZE(shapes, _test_shapes, CUTEST_DATA(
       {0, {0}, {0}, {0}}, // 0-dim
       {1, {5}, {3}, {2}}, // 1-idim
+      {1, {1}, {3}, {2}}, // chunks larger than shape
       {2, {20, 0}, {7, 0}, {3, 0}}, // 0-shape
       {2, {20, 10}, {7, 5}, {3, 5}}, // 0-shape
       {2, {14, 10}, {8, 5}, {2, 2}}, // general,

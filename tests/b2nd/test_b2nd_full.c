@@ -25,6 +25,8 @@ CUTEST_TEST_SETUP(full) {
   CUTEST_PARAMETRIZE(shapes, _test_shapes, CUTEST_DATA(
     {0, {0}, {0}, {0}}, // 0-dim
     {1, {5}, {3}, {2}}, // 1-idim
+    {1, {1}, {3}, {2}}, // chunks larger than shape
+    {2, {1, 2}, {3, 3}, {2, 3}}, // chunks larger than shape
     {2, {20, 0}, {7, 0}, {3, 0}}, // 0-shape
     {2, {20, 10}, {20, 10}, {10, 10}}, // simple 2-dim
     {2, {20, 10}, {10, 5}, {10, 5}}, // non-contiguous

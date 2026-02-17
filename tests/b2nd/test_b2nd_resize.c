@@ -41,7 +41,12 @@ CUTEST_TEST_SETUP(resize_shape) {
 
 
   CUTEST_PARAMETRIZE(shapes, test_shapes_t, CUTEST_DATA(
+      {0, {}, {}, {}, {1}, false, {0}}, // extend 0-D array
       {1, {5}, {3}, {2}, {10}, false, {5}}, // extend only
+      {1, {0}, {1}, {2}, {1}, false, {0}}, // extend empty array
+      {1, {0}, {100}, {7}, {2}, false, {0}}, // extend empty array with chunks/blocks set
+      {2, {0, 0}, {100, 10}, {7, 3}, {2, 2}, false, {0, 0}}, // extend empty array with chunks/blocks larger than newshape
+      {2, {0, 0}, {100, 10}, {7, 3}, {150, 160}, false, {0, 0}}, // extend empty array with chunks/blocks smaller than newshape
       {2, {20, 5}, {7, 5}, {3, 3}, {27, 10}, true, {14, 5}}, // extend only - start
       {2, {20, 10}, {7, 5}, {3, 5}, {10, 10}, false, {10, 10}}, // shrink only
       {2, {30, 20}, {8, 5}, {2, 2}, {22, 10}, true, {8, 5}}, // shrink only - start
@@ -52,7 +57,6 @@ CUTEST_TEST_SETUP(resize_shape) {
       {2, {50, 50}, {25, 13}, {8, 8}, {49, 51}, false, {49, 50}}, // shrink and extend
       {2, {143, 41}, {18, 13}, {7, 7}, {50, 50}, false, {50, 41}}, // shrink and extend
       {4, {10, 10, 5, 5}, {5, 7, 3, 3}, {2, 2, 1, 1}, {11, 20, 2, 2}, false, {10, 10, 2, 2}}, // shrink and extend
-
   ));
 }
 
@@ -77,7 +81,7 @@ CUTEST_TEST_TEST(resize_shape) {
                                         shapes.chunkshape, shapes.blockshape, NULL, 0, NULL, 0);
 
   int64_t buffersize = typesize;
-  bool only_shrink = true;
+  bool only_shrink = ctx->ndim == 0 ? false : true;
   for (int i = 0; i < ctx->ndim; ++i) {
     if (shapes.newshape[i] > shapes.shape[i]) {
       only_shrink = false;

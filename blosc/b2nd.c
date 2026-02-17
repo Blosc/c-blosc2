@@ -184,7 +184,7 @@ int update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
       array->shape[i] = shape[i];
       array->chunkshape[i] = chunkshape[i];
       array->blockshape[i] = blockshape[i];
-      if (shape[i] != 0) {
+      if (array->chunkshape[i] != 0) {
         if (shape[i] % array->chunkshape[i] == 0) {
           array->extshape[i] = shape[i];
         } else {
