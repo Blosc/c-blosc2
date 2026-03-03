@@ -1,10 +1,9 @@
-# Announcing C-Blosc2 2.23.0
+# Announcing C-Blosc2 2.23.1
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-The main change is in ``blosc2_prefilter_params``, which has a new field. 
-There is also a new ``typesize`` field in ``blosc2_dparams`` and some other changes to support the blosc2-openzl plugin.
+This is a patch level release which fixes some memory leaks/undefined behaviour, as well as allowing resizing of empty arrays and the use of meta (interpreted as number of bytestreams) for the byteshuffle filter.
 
 For more info, see the release notes in:
 

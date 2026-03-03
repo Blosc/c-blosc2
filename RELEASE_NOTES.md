@@ -4,7 +4,10 @@ Release notes for C-Blosc2
 Changes from 2.23.0 to 2.23.1
 =============================
 
-#XXX version-specific blurb XXX#
+* Fix some memory leaks/undefined behaviour
+* Allow resizing of empty arrays
+* `filters_meta` (interpreted as number of bytestreams) for the byteshuffle filter
+
 
 Changes from 2.22.0 to 2.23.0
 =============================
