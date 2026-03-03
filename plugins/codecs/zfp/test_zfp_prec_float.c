@@ -242,6 +242,7 @@ int float_cyclic() {
   int result = test_zfp_prec_float(schunk);
   BLOSC_ERROR(b2nd_free_ctx(ctx));
   BLOSC_ERROR(b2nd_free(arr));
+  free(data);
   return result;
 }
 
@@ -281,6 +282,7 @@ int double_same_cells() {
   int result = test_zfp_prec_double(schunk);
   BLOSC_ERROR(b2nd_free_ctx(ctx));
   BLOSC_ERROR(b2nd_free(arr));
+  free(data);
   return result;
 }
 

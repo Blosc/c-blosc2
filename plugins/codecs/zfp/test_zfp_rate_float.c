@@ -240,6 +240,7 @@ int float_cyclic() {
   int result = test_zfp_rate_float(schunk, tolerance);
   BLOSC_ERROR(b2nd_free_ctx(ctx));
   BLOSC_ERROR(b2nd_free(arr));
+  free(data);
   return result;
 }
 
@@ -280,6 +281,7 @@ int double_same_cells() {
   int result = test_zfp_rate_double(schunk, tolerance);
   BLOSC_ERROR(b2nd_free_ctx(ctx));
   BLOSC_ERROR(b2nd_free(arr));
+  free(data);
   return result;
 }
 

@@ -168,7 +168,7 @@ int same_cells() {
     nelem *= (int) (shape[i]);
   }
   int64_t size = typesize * nelem;
-  double *data = malloc(size);
+  double *data = calloc((size_t) nelem, sizeof(double));
   for (int64_t i = 0; i < (nelem / 4); i++) {
     data[i * 4] = (double) 11111111;
     data[i * 4 + 1] = (double) 99999999;
