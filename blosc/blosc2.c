@@ -177,6 +177,10 @@ void blosc2_set_threads_callback(blosc_threads_callback callback, void *callback
 static uint8_t* my_malloc(size_t size) {
   void* block = NULL;
   int res = 0;
+  /* Keep aligned allocations valid under Valgrind and POSIX wrappers. */
+  if (size == 0) {
+    size = 1;
+  }
 
 /* Do an alignment to 32 bytes because AVX2 is supported */
 #if defined(_WIN32)
