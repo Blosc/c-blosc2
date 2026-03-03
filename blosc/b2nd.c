@@ -763,6 +763,11 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
 
   uint8_t *buffer_b = buffer;
   int8_t ndim = array->ndim;
+  if (!set_slice) {
+    // get_slice paths may touch only a subset of the destination buffer.
+    // Pre-initialize so unread regions are defined and deterministic.
+    memset(buffer_b, 0, (size_t)buffersize);
+  }
 
   // 0-dim case
   if (ndim == 0) {

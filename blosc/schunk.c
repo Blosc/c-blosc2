@@ -1741,7 +1741,10 @@ int blosc2_vlmeta_delete(blosc2_schunk *schunk, const char *name) {
   for (int i = nvlmetalayer; i < (schunk->nvlmetalayers - 1); i++) {
     schunk->vlmetalayers[i] = schunk->vlmetalayers[i + 1];
   }
+  schunk->vlmetalayers[schunk->nvlmetalayers - 1] = NULL;
+  free(vlmetalayer->name);
   free(vlmetalayer->content);
+  free(vlmetalayer);
   schunk->nvlmetalayers--;
 
   // Propagate to frames
