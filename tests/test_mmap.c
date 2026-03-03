@@ -117,6 +117,9 @@ CUTEST_TEST_TEST(mmap) {
     blosc2_schunk* schunk_read = blosc2_schunk_open_udio(urlpath_mmap, &io);
     CUTEST_ASSERT("Mismatch in number of chunks", schunk_read->nchunks == 2);
 
+    if (i > 0) {
+      free(chunk_data);
+    }
     chunk_data = (float*)malloc(schunk_read->chunksize);
     dsize = blosc2_schunk_decompress_chunk(schunk_read, 0, chunk_data, schunk_read->chunksize);
     CUTEST_ASSERT("Size of decompressed chunk 1 does not match", dsize == sizeof(data_buffer));

@@ -47,6 +47,7 @@ static char* test_lazy_chunk_memcpyed(void) {
   nbytes = blosc2_schunk_decompress_chunk(sc, 0, buffer_b, sc->typesize);
   mu_assert("ERROR: nbytes are incorrect", nbytes == 1);
 
+  blosc2_schunk_free(sc);
   blosc2_remove_dir(storage.urlpath);
 
   return 0;
@@ -100,6 +101,8 @@ static char* test_lazy_chunk_memcpyed_nofilter(void) {
   blosc2_schunk_get_slice_buffer(sc, chunk_nitems - 1, chunk_nitems, &last_item);
   mu_assert("ERROR: last value is incorrect", last_item == chunk_nitems - 1);
 
+  free(buffer_b);
+  blosc2_schunk_free(sc);
   blosc2_remove_dir(storage.urlpath);
 
   return 0;

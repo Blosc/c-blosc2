@@ -45,6 +45,8 @@ int main(void) {
   printf("Successful roundtrip data <-> schunk !\n");
 
   blosc2_schunk_free(schunk);
+  free(ref_data);
+  free(data_dest);
   blosc2_destroy();
   return 0;
 }

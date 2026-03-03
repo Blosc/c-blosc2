@@ -123,6 +123,9 @@ CUTEST_TEST_TEST(udio) {
   int32_t nbytes = CHUNKSIZE * sizeof(int32_t);
   int32_t *data_buffer = malloc(nbytes);
   int32_t *rec_buffer = malloc(nbytes);
+  for (int32_t i = 0; i < CHUNKSIZE; ++i) {
+    data_buffer[i] = i;
+  }
 
   /* Create a super-chunk container */
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;

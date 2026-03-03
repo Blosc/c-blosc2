@@ -54,8 +54,17 @@ CUTEST_TEST_TEST(open_offset) {
   BLOSC_ERROR(b2nd_empty(b2nd_params, &arr_write_offset));
   schunk_write_start = arr_write_start->sc;
   schunk_write_append = arr_write_offset->sc;
-  schunk_write_start->nchunks = 0;
-  schunk_write_append->nchunks = 0;
+  // b2nd_empty() pre-fills chunks with zeros; remove them properly before appending test data.
+  for (int64_t i = schunk_write_start->nchunks; i > 0; --i) {
+    if (blosc2_schunk_delete_chunk(schunk_write_start, i - 1) < 0) {
+      return -1;
+    }
+  }
+  for (int64_t i = schunk_write_append->nchunks; i > 0; --i) {
+    if (blosc2_schunk_delete_chunk(schunk_write_append, i - 1) < 0) {
+      return -1;
+    }
+  }
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int i, nchunk;
   int64_t nchunks;
@@ -137,10 +146,14 @@ CUTEST_TEST_TEST(open_offset) {
 
   uint8_t* cframe_read_start, *cframe_read_offset;
   bool cframe_needs_free2, cframe_needs_free3;
-  int64_t frame_len2 = b2nd_to_cframe(arr_read_start, &cframe_read_start, &frame_len,
-                                      &cframe_needs_free2);
+  int64_t frame_len2;
+  int rc = b2nd_to_cframe(arr_read_start, &cframe_read_start, &frame_len2,
+                          &cframe_needs_free2);
+  if (rc < 0) {
+    return rc;
+  }
   if (frame_len2 != frame_len) {
-    return (int)frame_len2;
+    return -1;
   }
   for (int j = 0; j < frame_len; ++j) {
     if (cframe_write_start[j] != cframe_read_start[j]) {
@@ -148,10 +161,14 @@ CUTEST_TEST_TEST(open_offset) {
       return -1;
     }
   }
-  int64_t frame_len3 = b2nd_to_cframe(arr_read_offset, &cframe_read_offset, &frame_len1,
-                                      &cframe_needs_free3);
+  int64_t frame_len3;
+  rc = b2nd_to_cframe(arr_read_offset, &cframe_read_offset, &frame_len3,
+                      &cframe_needs_free3);
+  if (rc < 0) {
+    return rc;
+  }
   if (frame_len3 != frame_len1) {
-    return (int)frame_len3;
+    return -1;
   }
   for (int j = 0; j < frame_len1; ++j) {
     if (cframe_write_append[j] != cframe_read_offset[j]) {
@@ -166,10 +183,11 @@ CUTEST_TEST_TEST(open_offset) {
 
 /* Free resources */
 
-  blosc2_schunk_free(schunk_write_start);
-  blosc2_schunk_free(schunk_write_append);
+  b2nd_free(arr_write_start);
+  b2nd_free(arr_write_offset);
   b2nd_free(arr_read_start);
   b2nd_free(arr_read_offset);
+  b2nd_free_ctx(b2nd_params);
   if (cframe_needs_free) {
     free(cframe_write_start);
   }

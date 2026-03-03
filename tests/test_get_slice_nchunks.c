@@ -64,7 +64,7 @@ test_storage tstorage[] = {
 
 static char* test_get_slice_nchunks(void) {
   static int32_t data[CHUNKSIZE];
-  int32_t *data_;
+  int32_t *data_ = NULL;
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int rc;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
@@ -124,6 +124,7 @@ static char* test_get_slice_nchunks(void) {
 
 
   /* Free resources */
+  free(data_);
   free(chunks_indexes);
   blosc2_schunk_free(schunk);
   blosc2_remove_urlpath(tdata.urlpath);

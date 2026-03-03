@@ -268,7 +268,7 @@ CUTEST_TEST_TEST(concatenate) {
     fill_buffer_region(buff, shapes.shape2, shapes.ndim,
                      start_, shapes.shape2, value, typesize, arange); // value is not used in this case
     B2ND_TEST_ASSERT(b2nd_from_cbuffer(ctx2, &src2, buff, buffsize));
-
+    free(buff);
   }
 
   else {

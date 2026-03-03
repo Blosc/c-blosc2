@@ -10,12 +10,13 @@
 
 #include "test_common.h"
 
-bool fill_buf_string(void *buf, uint8_t str_len, size_t buf_size) {
-    for (size_t i = 0; i < buf_size; ++i) {
-        for (size_t j = 0; j < str_len; ++j) {
-        ((uint32_t *) buf)[i + j] = (uint32_t) i + 1;
-        }
+bool fill_buf_string(void *buf, uint8_t str_len, size_t nitems) {
+  uint32_t *u32buf = (uint32_t *)buf;
+  for (size_t i = 0; i < nitems; ++i) {
+    for (size_t j = 0; j < str_len; ++j) {
+      u32buf[i * str_len + j] = (uint32_t)(i * str_len + j + 1);
     }
+  }
   return true;
 }
 
