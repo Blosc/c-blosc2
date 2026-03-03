@@ -45,12 +45,14 @@ int rand_() {
     nelem *= (int) (shape[i]);
   }
   int64_t size = typesize * nelem;
-  float *data = malloc(size);
+  float *data = calloc((size_t) nelem, sizeof(float));
   for (int64_t i = 0; i < nelem; i++) {
     data[i] = (float) (rand() % 220);
   }
   char *urlpath = "rand.b2nd";
-  BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  int rc = frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath);
+  free(data);
+  BLOSC_ERROR(rc);
 
   return 0;
 }
@@ -67,12 +69,14 @@ int all_eq() {
   }
   int64_t size = nelem * typesize;
 
-  int8_t *data = malloc(size);
+  int8_t *data = calloc((size_t) size, sizeof(int8_t));
   for (int i = 0; i < nelem; i++) {
     data[i] = (int8_t) 22;
   }
   char *urlpath = "all_eq.b2nd";
-  BLOSC_ERROR(frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  int rc = frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath);
+  free(data);
+  BLOSC_ERROR(rc);
 
   return 0;
 }
@@ -89,12 +93,14 @@ int cyclic() {
   }
   int64_t size = nelem * typesize;
 
-  int8_t *data = malloc(size);
+  int8_t *data = calloc((size_t) size, sizeof(int8_t));
   for (int i = 0; i < nelem; i++) {
     data[i] = (int8_t) i;
   }
   char *urlpath = "cyclic.b2nd";
-  BLOSC_ERROR(frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  int rc = frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath);
+  free(data);
+  BLOSC_ERROR(rc);
 
   return 0;
 }
@@ -110,13 +116,15 @@ int same_cells() {
     nelem *= (int) (shape[i]);
   }
   int64_t size = typesize * nelem;
-  double *data = malloc(size);
+  double *data = calloc((size_t) nelem, sizeof(double));
   for (int64_t i = 0; i < (nelem / 4); i++) {
     data[i * 4] = (double) 11111111;
     data[i * 4 + 1] = (double) 99999999;
   }
   char *urlpath = "same_cells.b2nd";
-  BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  int rc = frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath);
+  free(data);
+  BLOSC_ERROR(rc);
 
   return 0;
 }
@@ -132,7 +140,7 @@ int some_matches() {
     nelem *= (int) (shape[i]);
   }
   int64_t size = typesize * nelem;
-  double *data = malloc(size);
+  double *data = calloc((size_t) nelem, sizeof(double));
   for (int64_t i = 0; i < (nelem / 2); i++) {
     data[i] = (double) i;
   }
@@ -140,7 +148,9 @@ int some_matches() {
     data[i] = (double) 1;
   }
   char *urlpath = "some_matches.b2nd";
-  BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  int rc = frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath);
+  free(data);
+  BLOSC_ERROR(rc);
 
   return 0;
 }
@@ -157,13 +167,15 @@ int many_matches() {
   }
   int64_t size = nelem * typesize;
 
-  int8_t *data = malloc(size);
+  int8_t *data = calloc((size_t) size, sizeof(int8_t));
   for (int i = 0; i < nelem; i += 2) {
     data[i] = (int8_t) i;
     data[i + 1] = (int8_t) 2;
   }
   char *urlpath = "many_matches.b2nd";
-  BLOSC_ERROR(frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  int rc = frame_generator(data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath);
+  free(data);
+  BLOSC_ERROR(rc);
 
   return 0;
 }
@@ -180,14 +192,16 @@ int float_cyclic() {
   }
   int64_t size = nelem * typesize;
 
-  float *data = malloc(size);
+  float *data = calloc((size_t) nelem, sizeof(float));
   for (int i = 0; i < nelem; i += 2) {
     float j = (float) i;
     data[i] = (j + j / 10 + j / 100);
     data[i + 1] = (2 + j / 10 + j / 1000);
   }
   char *urlpath = "example_float_cyclic.b2nd";
-  BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  int rc = frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath);
+  free(data);
+  BLOSC_ERROR(rc);
 
   return 0;
 }
@@ -204,7 +218,7 @@ int double_same_cells() {
   }
   int64_t size = nelem * typesize;
 
-  double *data = malloc(size);
+  double *data = calloc((size_t) nelem, sizeof(double));
   for (int i = 0; i < nelem; i += 4) {
     data[i] = 1.5;
     data[i + 1] = 14.7;
@@ -212,7 +226,9 @@ int double_same_cells() {
     data[i + 3] = 3.2;
   }
   char *urlpath = "example_double_same_cells.b2nd";
-  BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  int rc = frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath);
+  free(data);
+  BLOSC_ERROR(rc);
 
   return 0;
 }
@@ -229,7 +245,7 @@ int big_float_frame() {
   }
   int64_t size = nelem * typesize;
 
-  float *data = malloc(size);
+  float *data = calloc((size_t) nelem, sizeof(float));
   for (int i = 0; i < nelem; i += 4) {
     float j = (float) i;
     data[i] = (float) 2.73;
@@ -238,7 +254,9 @@ int big_float_frame() {
     data[i + 3] = (11 + j / 100 - j / 1000);
   }
   char *urlpath = "example_big_float_frame.b2nd";
-  BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  int rc = frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath);
+  free(data);
+  BLOSC_ERROR(rc);
 
   return 0;
 }
@@ -258,15 +276,16 @@ int day_month_temp() {
   float temp_min = -20;
   float temp_max = 40;
   srand(time(NULL));
-  float *data = malloc(size);
-  for (int i = 0; i < nelem / 3; i++) {
+  float *data = calloc((size_t) nelem, sizeof(float));
+  for (int64_t i = 0; i + 2 < nelem; i += 3) {
     data[i] = (float) (rand() % 31);
     data[i + 1] = (float) (rand() % 12);
     data[i + 2] = ((float) (rand() % 10000) / 10000 * (temp_max - temp_min) + temp_min);
-    i += 3;
   }
   char *urlpath = "example_day_month_temp.b2nd";
-  BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  int rc = frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath);
+  free(data);
+  BLOSC_ERROR(rc);
 
   return 0;
 }
@@ -285,7 +304,7 @@ int item_prices() {
 
   float price_min = (float) 1;        // if I choose 0.99 results are less aproppiate
   float price_max = (float) 251;
-  float *data = malloc(size);
+  float *data = calloc((size_t) nelem, sizeof(float));
   int index = 0;
   for (int month = 1; month <= shape[0]; month++) {               // month (1 to 12)
     for (int store = 1; store <= shape[1]; store++) {           // store ID (less to more expensive)
@@ -298,7 +317,9 @@ int item_prices() {
     }
   }
   char *urlpath = "example_item_prices.b2nd";
-  BLOSC_ERROR(frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath));
+  int rc = frame_generator((int8_t *) data, ndim, shape, chunkshape, blockshape, typesize, size, urlpath);
+  free(data);
+  BLOSC_ERROR(rc);
 
   return 0;
 }

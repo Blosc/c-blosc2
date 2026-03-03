@@ -30,7 +30,7 @@ int main() {
     nelem *= shape[i];
   }
   int64_t size = nelem * typesize;
-  int8_t *data = malloc(size);
+  int8_t *data = calloc((size_t) size, sizeof(int8_t));
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = typesize;
