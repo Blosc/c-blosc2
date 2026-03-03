@@ -191,6 +191,7 @@ int same_cells() {
   int result = test_ndmean(schunk);
   BLOSC_ERROR(b2nd_free_ctx(ctx));
   BLOSC_ERROR(b2nd_free(arr));
+  free(data);
   return result;
 }
 
@@ -229,6 +230,7 @@ int some_matches() {
   int result = test_ndmean(schunk);
   BLOSC_ERROR(b2nd_free_ctx(ctx));
   BLOSC_ERROR(b2nd_free(arr));
+  free(data);
   return result;
 }
 
