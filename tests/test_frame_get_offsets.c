@@ -115,6 +115,7 @@ CUTEST_TEST_TEST(fill_special) {
 
   /* Free resources */
   blosc2_schunk_free(schunk);
+  free(data_);
   free(offsets);
 
   return 0;

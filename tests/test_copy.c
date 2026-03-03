@@ -146,7 +146,7 @@ CUTEST_TEST_TEST(copy) {
   CUTEST_ASSERT("Error copying a schunk", schunk_copy != NULL);
 
   if (metalayers) {
-    int64_t *content = malloc(meta_content_len);
+    int64_t *content = NULL;
     int32_t content_len;
     blosc2_meta_get(schunk_copy, meta_name, (uint8_t **) &content, &content_len);
     CUTEST_ASSERT("Metalayers are not equals.", *content == meta_content);

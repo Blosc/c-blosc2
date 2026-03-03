@@ -207,6 +207,7 @@ static char* test_schunk_no_init(void)
     blosc2_context* dctx = blosc2_create_dctx(dparams);
     dsize = blosc2_decompress_ctx(dctx, schunk->data[nchunk], INT32_MAX, (void*)data_dest, isize);
     mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
+    blosc2_free_ctx(dctx);
     for (int i = 0; i < CHUNKSIZE; i++) {
       mu_assert("ERROR: bad roundtrip", data_dest[i] == i + nchunk * CHUNKSIZE);
     }
