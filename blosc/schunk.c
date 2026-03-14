@@ -685,6 +685,25 @@ int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int sp
   return schunk->nchunks;
 }
 
+static int schunk_get_chunk_nbytes(blosc2_schunk *schunk, int64_t nchunk, int32_t *chunk_nbytes) {
+  int rc;
+  if (schunk->frame == NULL) {
+    return blosc2_cbuffer_sizes(schunk->data[nchunk], chunk_nbytes, NULL, NULL);
+  }
+
+  bool needs_free;
+  uint8_t *chunk;
+  rc = frame_get_lazychunk((blosc2_frame_s *)schunk->frame, nchunk, &chunk, &needs_free);
+  if (rc < 0) {
+    return rc;
+  }
+  rc = blosc2_cbuffer_sizes(chunk, chunk_nbytes, NULL, NULL);
+  if (needs_free) {
+    free(chunk);
+  }
+  return rc;
+}
+
 /* Append an existing chunk into a super-chunk. */
 int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy) {
   int32_t chunk_nbytes;
@@ -696,12 +715,26 @@ int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool c
     return rc;
   }
 
-  if (schunk->chunksize == -1) {
+  int32_t chunksize = schunk->chunksize;
+  bool variable_chunksize = (chunksize == 0);
+  if (chunksize == -1) {
     schunk->chunksize = chunk_nbytes;  // The super-chunk is initialized now
+    chunksize = schunk->chunksize;
   }
-  if (chunk_nbytes > schunk->chunksize) {
+  if (!variable_chunksize && nchunks > 0) {
+    int32_t last_nbytes;
+    rc = schunk_get_chunk_nbytes(schunk, nchunks - 1, &last_nbytes);
+    if (rc < 0) {
+      return rc;
+    }
+    if (last_nbytes < chunksize || chunk_nbytes > chunksize) {
+      variable_chunksize = true;
+      schunk->chunksize = 0;
+    }
+  }
+  if (!variable_chunksize && chunksize > 0 && chunk_nbytes > chunksize) {
     BLOSC_TRACE_ERROR("Appending chunks that have different lengths in the same schunk "
-                      "is not supported yet: %d > %d.", chunk_nbytes, schunk->chunksize);
+                      "is not supported yet: %d > %d.", chunk_nbytes, chunksize);
     return BLOSC2_ERROR_CHUNK_APPEND;
   }
 
@@ -735,22 +768,6 @@ int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool c
   // Update super-chunk or frame
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (frame == NULL) {
-    // Check that we are not appending a small chunk after another small chunk
-    if ((schunk->nchunks > 1) && (chunk_nbytes < schunk->chunksize)) {
-      uint8_t* last_chunk = schunk->data[nchunks - 1];
-      int32_t last_nbytes;
-      rc = blosc2_cbuffer_sizes(last_chunk, &last_nbytes, NULL, NULL);
-      if (rc < 0) {
-        return rc;
-      }
-      if ((last_nbytes < schunk->chunksize) && (chunk_nbytes < schunk->chunksize)) {
-        BLOSC_TRACE_ERROR(
-                "Appending two consecutive chunks with a chunksize smaller than the schunk chunksize "
-                "is not allowed yet: %d != %d.", chunk_nbytes, schunk->chunksize);
-        return BLOSC2_ERROR_CHUNK_APPEND;
-      }
-    }
-
     if (!copy && (chunk_cbytes < chunk_nbytes)) {
       // We still want to do a shrink of the chunk
       chunk = realloc(chunk, chunk_cbytes);
@@ -785,13 +802,28 @@ int64_t blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
     return rc;
   }
 
-  if (schunk->chunksize == -1) {
+  int32_t chunksize = schunk->chunksize;
+  bool variable_chunksize = (chunksize == 0);
+  if (chunksize == -1) {
     schunk->chunksize = chunk_nbytes;  // The super-chunk is initialized now
+    chunksize = schunk->chunksize;
   }
 
-  if (chunk_nbytes > schunk->chunksize) {
+  if (!variable_chunksize && nchunks > 0) {
+    int32_t last_nbytes;
+    rc = schunk_get_chunk_nbytes(schunk, nchunks - 1, &last_nbytes);
+    if (rc < 0) {
+      return rc;
+    }
+    if (last_nbytes < chunksize || chunk_nbytes > chunksize ||
+        (nchunk != nchunks && chunk_nbytes != chunksize)) {
+      variable_chunksize = true;
+      schunk->chunksize = 0;
+    }
+  }
+  if (!variable_chunksize && chunksize > 0 && chunk_nbytes > chunksize) {
     BLOSC_TRACE_ERROR("Inserting chunks that have different lengths in the same schunk "
-                      "is not supported yet: %d > %d.", chunk_nbytes, schunk->chunksize);
+                      "is not supported yet: %d > %d.", chunk_nbytes, chunksize);
     return BLOSC2_ERROR_CHUNK_INSERT;
   }
 
@@ -825,22 +857,6 @@ int64_t blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
   // Update super-chunk or frame
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (frame == NULL) {
-    // Check that we are not appending a small chunk after another small chunk
-    if ((schunk->nchunks > 0) && (chunk_nbytes < schunk->chunksize)) {
-      uint8_t* last_chunk = schunk->data[nchunks - 1];
-      int32_t last_nbytes;
-      rc = blosc2_cbuffer_sizes(last_chunk, &last_nbytes, NULL, NULL);
-      if (rc < 0) {
-        return rc;
-      }
-      if ((last_nbytes < schunk->chunksize) && (chunk_nbytes < schunk->chunksize)) {
-        BLOSC_TRACE_ERROR("Appending two consecutive chunks with a chunksize smaller "
-                          "than the schunk chunksize is not allowed yet:  %d != %d",
-                          chunk_nbytes, schunk->chunksize);
-        return BLOSC2_ERROR_CHUNK_APPEND;
-      }
-    }
-
     if (!copy && (chunk_cbytes < chunk_nbytes)) {
       // We still want to do a shrink of the chunk
       chunk = realloc(chunk, chunk_cbytes);
@@ -879,15 +895,21 @@ int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
     return rc;
   }
 
-  if (schunk->chunksize == -1) {
+  int32_t chunksize = schunk->chunksize;
+  bool variable_chunksize = (chunksize == 0);
+  if (chunksize == -1) {
     schunk->chunksize = chunk_nbytes;  // The super-chunk is initialized now
+    chunksize = schunk->chunksize;
   }
 
-  if (schunk->chunksize != 0 && (chunk_nbytes > schunk->chunksize ||
-      (chunk_nbytes < schunk->chunksize && nchunk != schunk->nchunks - 1))) {
+  if (!variable_chunksize && (chunk_nbytes > chunksize ||
+      (nchunk != schunk->nchunks - 1 && chunk_nbytes != chunksize))) {
+    variable_chunksize = true;
+    schunk->chunksize = 0;
+  }
+  if (!variable_chunksize && chunksize > 0 && chunk_nbytes > chunksize) {
     BLOSC_TRACE_ERROR("Updating chunks having different lengths in the same schunk "
-                      "is not supported yet (unless it's the last one and smaller):"
-                      " %d > %d.", chunk_nbytes, schunk->chunksize);
+                      "is not supported yet: %d > %d.", chunk_nbytes, chunksize);
     return BLOSC2_ERROR_CHUNK_UPDATE;
   }
 
