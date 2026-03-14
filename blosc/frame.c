@@ -355,6 +355,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
 }
 
 
+static int get_coffsets_nbytes(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
+                               int32_t *coffsets_nbytes, const blosc2_io *io);
+
 int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_len, int64_t *nbytes, int64_t *cbytes,
                     int32_t *blocksize, int32_t *chunksize, int64_t *nchunks, int32_t *typesize, uint8_t *compcode,
                     uint8_t *compcode_meta, uint8_t *clevel, uint8_t *filters, uint8_t *filters_meta,
@@ -478,20 +481,38 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
     }
   }
 
-  if (*nbytes > 0 && *chunksize > 0) {
-    // We can compute the number of chunks only when the frame has actual data
-    *nchunks = *nbytes / *chunksize;
-    if (*nbytes % *chunksize > 0) {
-      if (*nchunks == INT32_MAX) {
-        BLOSC_TRACE_ERROR("Number of chunks exceeds maximum allowed.");
+  if (*nbytes > 0) {
+    if (*chunksize > 0) {
+      // We can compute the number of chunks directly when there is a fixed chunk size.
+      *nchunks = *nbytes / *chunksize;
+      if (*nbytes % *chunksize > 0) {
+        if (*nchunks == INT32_MAX) {
+          BLOSC_TRACE_ERROR("Number of chunks exceeds maximum allowed.");
+          return BLOSC2_ERROR_INVALID_HEADER;
+        }
+        *nchunks += 1;
+      }
+
+      // Sanity check for compressed sizes
+      if ((*cbytes < 0) || ((int64_t)*nchunks * *chunksize < *nbytes)) {
+        BLOSC_TRACE_ERROR("Invalid compressed size in frame header.");
         return BLOSC2_ERROR_INVALID_HEADER;
       }
-      *nchunks += 1;
     }
-
-    // Sanity check for compressed sizes
-    if ((*cbytes < 0) || ((int64_t)*nchunks * *chunksize < *nbytes)) {
-      BLOSC_TRACE_ERROR("Invalid compressed size in frame header.");
+    else if (*chunksize == 0) {
+      int32_t coffsets_nbytes;
+      int rc2 = get_coffsets_nbytes(frame, *header_len, *cbytes, &coffsets_nbytes, io);
+      if (rc2 < 0) {
+        return rc2;
+      }
+      if (coffsets_nbytes < 0 || coffsets_nbytes % (int32_t)sizeof(int64_t) != 0) {
+        BLOSC_TRACE_ERROR("Invalid offsets chunk in frame header.");
+        return BLOSC2_ERROR_INVALID_HEADER;
+      }
+      *nchunks = coffsets_nbytes / (int32_t)sizeof(int64_t);
+    }
+    else {
+      BLOSC_TRACE_ERROR("Invalid chunk size in frame header.");
       return BLOSC2_ERROR_INVALID_HEADER;
     }
   } else {
@@ -508,6 +529,88 @@ int64_t get_trailer_offset(blosc2_frame_s *frame, int32_t header_len, bool has_c
     return header_len;
   }
   return frame->len - frame->trailer_len;
+}
+
+static int get_coffsets_nbytes(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
+                               int32_t *coffsets_nbytes, const blosc2_io *io) {
+  int32_t chunk_cbytes;
+  int rc;
+  int64_t off_pos = header_len;
+  if (!frame->sframe) {
+    if (cbytes < INT64_MAX - header_len) {
+      off_pos += cbytes;
+    }
+  }
+
+  if (off_pos < 0 || off_pos > INT64_MAX - BLOSC_EXTENDED_HEADER_LENGTH ||
+      off_pos + BLOSC_EXTENDED_HEADER_LENGTH > frame->len) {
+    BLOSC_TRACE_ERROR("Cannot read the offsets outside of frame boundary.");
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
+
+  if (frame->cframe != NULL) {
+    uint8_t *off_start = frame->cframe + off_pos;
+    rc = blosc2_cbuffer_sizes(off_start, coffsets_nbytes, &chunk_cbytes, NULL);
+    if (rc < 0) {
+      return rc;
+    }
+    if (chunk_cbytes < 0 || off_pos + chunk_cbytes > frame->len) {
+      BLOSC_TRACE_ERROR("Cannot read the cbytes outside of frame boundary.");
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
+    return 0;
+  }
+
+  int64_t trailer_offset = get_trailer_offset(frame, header_len, true);
+  if (trailer_offset < BLOSC_EXTENDED_HEADER_LENGTH || trailer_offset + FRAME_TRAILER_MINLEN > frame->len) {
+    BLOSC_TRACE_ERROR("Cannot read the trailer out of the frame.");
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
+
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(io->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return BLOSC2_ERROR_PLUGIN_IO;
+  }
+
+  uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
+  uint8_t *header_ptr = header;
+  void *fp = NULL;
+  int64_t io_pos = 0;
+  if (frame->sframe) {
+    fp = sframe_open_index(frame->urlpath, "rb", io);
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+      return BLOSC2_ERROR_FILE_OPEN;
+    }
+    io_pos = off_pos;
+  }
+  else {
+    fp = io_cb->open(frame->urlpath, "rb", io->params);
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+      return BLOSC2_ERROR_FILE_OPEN;
+    }
+    io_pos = frame->file_offset + off_pos;
+  }
+  int64_t rbytes = io_cb->read((void**)&header_ptr, 1, BLOSC_EXTENDED_HEADER_LENGTH, io_pos, fp);
+  io_cb->close(fp);
+  if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
+    BLOSC_TRACE_ERROR("Cannot read the offsets header out of the frame.");
+    return BLOSC2_ERROR_FILE_READ;
+  }
+
+  rc = blosc2_cbuffer_sizes(header_ptr, coffsets_nbytes, &chunk_cbytes, NULL);
+  if (rc < 0) {
+    return rc;
+  }
+
+  if (chunk_cbytes < 0 || off_pos + chunk_cbytes > trailer_offset) {
+    BLOSC_TRACE_ERROR("Cannot read the offsets outside of frame boundary.");
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
+
+  return 0;
 }
 
 
@@ -2685,7 +2788,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
     return NULL;
   }
 
-  if ((nchunks > 0) && (chunk_nbytes > chunksize)) {
+  if ((nchunks > 0) && (chunksize > 0) && (schunk->chunksize != 0) && (chunk_nbytes > chunksize)) {
     BLOSC_TRACE_ERROR("Appending chunks with a larger chunksize than frame is "
                       "not allowed yet %d != %d.", chunk_nbytes, chunksize);
     return NULL;
@@ -2693,7 +2796,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
 
   // Check that we are not appending a small chunk after another small chunk
   int32_t chunk_nbytes_last;
-  if (chunksize == 0 && (nchunks > 0) && (chunk_nbytes < chunksize)) {
+  if ((chunksize > 0) && (nchunks > 0) && (chunk_nbytes < chunksize)) {
     uint8_t* last_chunk;
     bool needs_free;
     rc = frame_get_lazychunk(frame, nchunks - 1, &last_chunk, &needs_free);
