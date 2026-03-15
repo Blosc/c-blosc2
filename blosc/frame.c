@@ -115,6 +115,9 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   // General flags
   *h2p = BLOSC2_VERSION_FRAME_FORMAT;  // version
   *h2p += 0x10;  // 64-bit offsets.  We only support this for now.
+  if (schunk->chunksize == 0) {
+    *h2p |= FRAME_VARIABLE_CHUNKS;
+  }
   h2p += 1;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
     return NULL;
@@ -1098,6 +1101,12 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
 
   // Now that we know them, fill the chunksize and frame length in header
   to_big(h2 + FRAME_CHUNKSIZE, &chunksize, sizeof(chunksize));
+  if (chunksize == 0) {
+    h2[FRAME_FLAGS] |= FRAME_VARIABLE_CHUNKS;
+  }
+  else {
+    h2[FRAME_FLAGS] &= (uint8_t)~FRAME_VARIABLE_CHUNKS;
+  }
   frame->len = h2len + cbytes + off_cbytes + FRAME_TRAILER_MINLEN;
   if (frame->sframe) {
     frame->len = h2len + off_cbytes + FRAME_TRAILER_MINLEN;

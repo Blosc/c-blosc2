@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "frame.h"
 #include "test_common.h"
 
 int tests_run = 0;
@@ -34,6 +35,12 @@ static const char *updated_values[] = {
     "alpha",
     "bravo bravo bravo bravo",
     "tiny",
+};
+
+static const char *fixed_values[] = {
+    "one",
+    "two",
+    "six",
 };
 
 static int append_string_chunk(blosc2_schunk *schunk, const char *value) {
@@ -72,6 +79,21 @@ static int assert_values(blosc2_schunk *schunk, const char *expected[], int nite
   return 0;
 }
 
+static int assert_variable_chunk_flag(blosc2_schunk *schunk, bool expected) {
+  uint8_t *cframe = NULL;
+  bool needs_free = false;
+  int64_t cframe_len = blosc2_schunk_to_buffer(schunk, &cframe, &needs_free);
+  if (cframe_len < FRAME_HEADER_MINLEN || cframe == NULL) {
+    return -1;
+  }
+
+  bool actual = (cframe[FRAME_FLAGS] & FRAME_VARIABLE_CHUNKS) != 0;
+  if (needs_free) {
+    free(cframe);
+  }
+  return actual == expected ? 0 : -2;
+}
+
 static char *test_variable_chunks(void) {
   blosc2_remove_urlpath(tdata.urlpath);
 
@@ -94,6 +116,8 @@ static char *test_variable_chunks(void) {
   }
 
   mu_assert("ERROR: schunk should switch to variable chunksize mode", schunk->chunksize == 0);
+  mu_assert("ERROR: frame should signal variable chunk sizes",
+            assert_variable_chunk_flag(schunk, true) == 0);
   mu_assert("ERROR: chunk cannot be decompressed", assert_values(schunk, values, 3) == 0);
 
   for (int i = 1; i < 3; ++i) {
@@ -102,6 +126,8 @@ static char *test_variable_chunks(void) {
   }
 
   mu_assert("ERROR: schunk should keep variable chunksize mode", schunk->chunksize == 0);
+  mu_assert("ERROR: updated frame should still signal variable chunk sizes",
+            assert_variable_chunk_flag(schunk, true) == 0);
   mu_assert("ERROR: updated chunk cannot be decompressed", assert_values(schunk, updated_values, 3) == 0);
 
   blosc2_schunk_free(schunk);
@@ -111,7 +137,51 @@ static char *test_variable_chunks(void) {
     mu_assert("ERROR: reopened schunk is NULL", reopened != NULL);
     mu_assert("ERROR: reopened schunk should keep variable chunksize mode", reopened->chunksize == 0);
     mu_assert("ERROR: reopened schunk nchunks mismatch", reopened->nchunks == 3);
+    mu_assert("ERROR: reopened frame should signal variable chunk sizes",
+              assert_variable_chunk_flag(reopened, true) == 0);
     mu_assert("ERROR: reopened chunk cannot be decompressed", assert_values(reopened, updated_values, 3) == 0);
+    blosc2_schunk_free(reopened);
+  }
+
+  blosc2_remove_urlpath(tdata.urlpath);
+  return EXIT_SUCCESS;
+}
+
+static char *test_fixed_chunks_flag(void) {
+  blosc2_remove_urlpath(tdata.urlpath);
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_storage storage = {
+      .contiguous = tdata.contiguous,
+      .urlpath = (char *)tdata.urlpath,
+      .cparams = &cparams,
+      .dparams = &dparams,
+  };
+
+  blosc2_schunk *schunk = blosc2_schunk_new(&storage);
+  mu_assert("ERROR: cannot create schunk", schunk != NULL);
+
+  for (int i = 0; i < 3; ++i) {
+    int nchunks = append_string_chunk(schunk, fixed_values[i]);
+    mu_assert("ERROR: fixed chunk cannot be appended", nchunks == i + 1);
+  }
+
+  mu_assert("ERROR: schunk should keep a fixed chunksize", schunk->chunksize == 4);
+  mu_assert("ERROR: frame should not signal variable chunk sizes",
+            assert_variable_chunk_flag(schunk, false) == 0);
+  mu_assert("ERROR: fixed chunk cannot be decompressed", assert_values(schunk, fixed_values, 3) == 0);
+
+  blosc2_schunk_free(schunk);
+
+  if (tdata.urlpath != NULL) {
+    blosc2_schunk *reopened = blosc2_schunk_open(tdata.urlpath);
+    mu_assert("ERROR: reopened schunk is NULL", reopened != NULL);
+    mu_assert("ERROR: reopened schunk should keep a fixed chunksize", reopened->chunksize == 4);
+    mu_assert("ERROR: reopened frame should not signal variable chunk sizes",
+              assert_variable_chunk_flag(reopened, false) == 0);
+    mu_assert("ERROR: reopened fixed chunk cannot be decompressed", assert_values(reopened, fixed_values, 3) == 0);
     blosc2_schunk_free(reopened);
   }
 
@@ -123,6 +193,7 @@ static char *all_tests(void) {
   for (int i = 0; i < (int)ARRAY_SIZE(backends); ++i) {
     tdata = backends[i];
     mu_run_test(test_variable_chunks);
+    mu_run_test(test_fixed_chunks_flag);
   }
   return EXIT_SUCCESS;
 }

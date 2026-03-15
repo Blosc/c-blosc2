@@ -22,6 +22,8 @@
 
 
 // Constants for metadata placement in header
+#define FRAME_VARIABLE_CHUNKS (1U << 6)
+
 #define FRAME_HEADER_MAGIC 2
 #define FRAME_HEADER_LEN (FRAME_HEADER_MAGIC + 8 + 1)  // 11
 #define FRAME_LEN (FRAME_HEADER_LEN + 4 + 1)  // 16
