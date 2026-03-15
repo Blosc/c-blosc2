@@ -57,6 +57,32 @@ Then, test the file created with the new version with::
 Repeat this for every codec shipped with Blosc (blosclz, lz4, lz4hc, zlib and
 zstd).
 
+For VL-block cframe compatibility checks, use ``compat/filegen-vl``.
+This utility can generate two kinds of persistent cframes:
+
+* a cframe with VL-block chunks and fixed chunk sizes
+* a cframe with VL-block chunks and variable chunk sizes
+
+Generate them with the current version::
+
+  $ cd ../compat
+  $ export LD_LIBRARY_PATH=../build/blosc
+  $ gcc -o filegen-vl filegen-vl.c -L$LD_LIBRARY_PATH -lblosc2 -I../include
+  $ ./filegen-vl compress lz4 vlblocks-lz4-fixed-2.y.z.b2frame
+  $ ./filegen-vl compress lz4 vlblocks-lz4-variable-2.y.z.b2frame --variable-chunks
+
+Then, build ``compat/filegen-vl`` against the target Blosc library and check
+the fixtures with::
+
+  $ ./filegen-vl decompress vlblocks-lz4-fixed-2.y.z.b2frame
+  $ ./filegen-vl decompress vlblocks-lz4-variable-2.y.z.b2frame
+
+Expected results:
+
+* These VL-block fixtures are only expected to work with releases that support
+  the VL-block cframe format.
+* Pre-vlblocks releases are expected to reject them.
+
 Tagging
 -------
 
