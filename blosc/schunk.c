@@ -34,6 +34,8 @@
   #include <stdalign.h>
 #endif
 
+static int schunk_get_chunk_flags2(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk_flags2);
+
 
 /* Get the cparams associated with a super-chunk */
 int blosc2_schunk_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
@@ -88,6 +90,7 @@ int update_schunk_properties(struct blosc2_schunk* schunk) {
   schunk->typesize = cparams->typesize;
   schunk->blocksize = cparams->blocksize;
   schunk->chunksize = -1;
+  schunk->flags2 = 0;
   schunk->tuner_params = cparams->tuner_params;
   schunk->tuner_id = cparams->tuner_id;
   if (cparams->tuner_id == BLOSC_BTUNE) {
@@ -256,6 +259,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
   }
   // Set the chunksize for the schunk, as it cannot be derived from storage
   new_schunk->chunksize = schunk->chunksize;
+  new_schunk->flags2 = schunk->flags2;
 
   // Copy metalayers
   for (int nmeta = 0; nmeta < schunk->nmetalayers; ++nmeta) {
@@ -267,15 +271,19 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
   }
 
   // Copy chunks
-  if (cparams_equal) {
+  bool uses_vlblocks = (schunk->flags2 & BLOSC2_VL_BLOCKS) != 0;
+
+  if (cparams_equal || uses_vlblocks) {
     for (int nchunk = 0; nchunk < schunk->nchunks; ++nchunk) {
       uint8_t *chunk;
       bool needs_free;
-      if (blosc2_schunk_get_chunk(schunk, nchunk, &chunk, &needs_free) < 0) {
+      int rc = blosc2_schunk_get_chunk(schunk, nchunk, &chunk, &needs_free);
+      if (rc < 0) {
         BLOSC_TRACE_ERROR("Can not get the `chunk` %d.", nchunk);
         return NULL;
       }
-      if (blosc2_schunk_append_chunk(new_schunk, chunk, !needs_free) < 0) {
+      rc = blosc2_schunk_append_chunk(new_schunk, chunk, !needs_free);
+      if (rc < 0) {
         BLOSC_TRACE_ERROR("Can not append the `chunk` into super-chunk.");
         return NULL;
       }
@@ -704,15 +712,49 @@ static int schunk_get_chunk_nbytes(blosc2_schunk *schunk, int64_t nchunk, int32_
   return rc;
 }
 
+static int schunk_get_chunk_flags2(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk_flags2) {
+  if (schunk->frame == NULL) {
+    *chunk_flags2 = schunk->data[nchunk][BLOSC2_CHUNK_BLOSC2_FLAGS2];
+    return 0;
+  }
+
+  bool needs_free;
+  uint8_t *chunk;
+  int rc = frame_get_chunk((blosc2_frame_s *)schunk->frame, nchunk, &chunk, &needs_free);
+  if (rc < 0) {
+    return rc;
+  }
+  *chunk_flags2 = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
+  if (needs_free) {
+    free(chunk);
+  }
+  return 0;
+}
+
 /* Append an existing chunk into a super-chunk. */
 int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool copy) {
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
   int64_t nchunks = schunk->nchunks;
+  bool chunk_vlblocks = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2] & BLOSC2_VL_BLOCKS) != 0;
 
   int rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {
     return rc;
+  }
+  if (nchunks > 0) {
+    uint8_t first_flags2;
+    rc = schunk_get_chunk_flags2(schunk, 0, &first_flags2);
+    if (rc < 0) {
+      return rc;
+    }
+    if (((first_flags2 & BLOSC2_VL_BLOCKS) != 0) != chunk_vlblocks) {
+      BLOSC_TRACE_ERROR("schunks cannot mix regular chunks and VL-block chunks.");
+      return BLOSC2_ERROR_CHUNK_APPEND;
+    }
+  }
+  else {
+    schunk->flags2 = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
   }
 
   int32_t chunksize = schunk->chunksize;
@@ -796,10 +838,25 @@ int64_t blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
   int64_t nchunks = schunk->nchunks;
+  bool chunk_vlblocks = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2] & BLOSC2_VL_BLOCKS) != 0;
 
   int rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {
     return rc;
+  }
+  if (nchunks > 0) {
+    uint8_t first_flags2;
+    rc = schunk_get_chunk_flags2(schunk, 0, &first_flags2);
+    if (rc < 0) {
+      return rc;
+    }
+    if (((first_flags2 & BLOSC2_VL_BLOCKS) != 0) != chunk_vlblocks) {
+      BLOSC_TRACE_ERROR("schunks cannot mix regular chunks and VL-block chunks.");
+      return BLOSC2_ERROR_CHUNK_INSERT;
+    }
+  }
+  else {
+    schunk->flags2 = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
   }
 
   int32_t chunksize = schunk->chunksize;
@@ -889,10 +946,26 @@ int64_t blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
 int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk, bool copy) {
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
+  bool chunk_vlblocks = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2] & BLOSC2_VL_BLOCKS) != 0;
 
   int rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {
     return rc;
+  }
+  if (schunk->nchunks > 1 || (schunk->nchunks == 1 && nchunk != 0)) {
+    int64_t ref_nchunk = (nchunk == 0) ? 1 : 0;
+    uint8_t ref_flags2;
+    rc = schunk_get_chunk_flags2(schunk, ref_nchunk, &ref_flags2);
+    if (rc < 0) {
+      return rc;
+    }
+    if (((ref_flags2 & BLOSC2_VL_BLOCKS) != 0) != chunk_vlblocks) {
+      BLOSC_TRACE_ERROR("schunks cannot mix regular chunks and VL-block chunks.");
+      return BLOSC2_ERROR_CHUNK_UPDATE;
+    }
+  }
+  else {
+    schunk->flags2 = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
   }
 
   int32_t chunksize = schunk->chunksize;
@@ -1035,6 +1108,9 @@ int64_t blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int64_t nchunk) {
 
   blosc2_frame_s* frame = (blosc2_frame_s*)(schunk->frame);
   schunk->nchunks -= 1;
+  if (schunk->nchunks == 0) {
+    schunk->flags2 = 0;
+  }
   if (schunk->frame == NULL) {
     /* Update counters */
     schunk->nbytes -= chunk_nbytes_old;
