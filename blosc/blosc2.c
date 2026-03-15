@@ -773,6 +773,10 @@ int read_chunk_header(const uint8_t* src, int32_t srcsize, bool extended_header,
   else {
     flags_to_filters(header->flags, header->filters);
   }
+  if ((header->blosc2_flags2 & BLOSC2_VL_BLOCKS) == 0 &&
+      header->nbytes > 0 && header->blocksize > header->nbytes) {
+    header->blocksize = header->nbytes;
+  }
   return 0;
 }
 
@@ -923,6 +927,11 @@ int fill_tuner(blosc2_tuner *tuner) {
 
 
 static int blosc2_intialize_header_from_context(blosc2_context* context, blosc_header* header, bool extended_header) {
+  int32_t header_blocksize = (int32_t)(context->header_blocksize > 0 ? context->header_blocksize : context->blocksize);
+  if ((context->blosc2_flags2 & BLOSC2_VL_BLOCKS) == 0 &&
+      context->sourcesize > 0 && header_blocksize > context->sourcesize) {
+    header_blocksize = (int32_t)context->sourcesize;
+  }
   memset(header, 0, sizeof(blosc_header));
 
   header->version = BLOSC2_VERSION_FORMAT;
@@ -930,7 +939,7 @@ static int blosc2_intialize_header_from_context(blosc2_context* context, blosc_h
   header->flags = context->header_flags;
   header->typesize = (uint8_t)context->typesize;
   header->nbytes = (int32_t)context->sourcesize;
-  header->blocksize = (int32_t)(context->header_blocksize > 0 ? context->header_blocksize : context->blocksize);
+  header->blocksize = header_blocksize;
 
   int little_endian = is_little_endian();
   if (!little_endian) {
