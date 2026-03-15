@@ -691,10 +691,6 @@ int read_chunk_header(const uint8_t* src, int32_t srcsize, bool extended_header,
     header->cbytes = bswap32_(header->cbytes);
   }
 
-  if (header->version > BLOSC2_VERSION_FORMAT) {
-    /* Version from future */
-    return BLOSC2_ERROR_VERSION_SUPPORT;
-  }
   if (header->cbytes < BLOSC_MIN_HEADER_LENGTH) {
     BLOSC_TRACE_ERROR("`cbytes` is too small to read min header.");
     return BLOSC2_ERROR_INVALID_HEADER;
@@ -772,6 +768,11 @@ int read_chunk_header(const uint8_t* src, int32_t srcsize, bool extended_header,
   }
   else {
     flags_to_filters(header->flags, header->filters);
+  }
+  if (header->version > BLOSC2_VERSION_FORMAT &&
+      (header->blosc2_flags2 & (uint8_t)~BLOSC2_VL_BLOCKS) != 0) {
+    /* Version from future with unsupported chunk features. */
+    return BLOSC2_ERROR_VERSION_SUPPORT;
   }
   if ((header->blosc2_flags2 & BLOSC2_VL_BLOCKS) == 0 &&
       header->nbytes > 0 && header->blocksize > header->nbytes) {
@@ -934,7 +935,9 @@ static int blosc2_intialize_header_from_context(blosc2_context* context, blosc_h
   }
   memset(header, 0, sizeof(blosc_header));
 
-  header->version = BLOSC2_VERSION_FORMAT;
+  header->version = (context->blosc2_flags2 & BLOSC2_VL_BLOCKS) ?
+                    BLOSC2_VERSION_FORMAT_VL_BLOCKS :
+                    BLOSC2_VERSION_FORMAT_STABLE;
   header->versionlz = compcode_to_compversion(context->compcode);
   header->flags = context->header_flags;
   header->typesize = (uint8_t)context->typesize;
@@ -4703,7 +4706,7 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const int32_t nbytes, void* dest,
   }
 
   memset(&header, 0, sizeof(header));
-  header.version = BLOSC2_VERSION_FORMAT;
+  header.version = BLOSC2_VERSION_FORMAT_STABLE;
   header.versionlz = BLOSC_BLOSCLZ_VERSION_FORMAT;
   header.flags = BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE;  // extended header
   header.typesize = context->typesize;
@@ -4749,7 +4752,7 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const int32_t nbytes, void* dest
   }
 
   memset(&header, 0, sizeof(header));
-  header.version = BLOSC2_VERSION_FORMAT;
+  header.version = BLOSC2_VERSION_FORMAT_STABLE;
   header.versionlz = BLOSC_BLOSCLZ_VERSION_FORMAT;
   header.flags = BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE;  // extended header
   header.typesize = context->typesize;
@@ -4796,7 +4799,7 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const int32_t nbytes, void* dest, 
   }
 
   memset(&header, 0, sizeof(header));
-  header.version = BLOSC2_VERSION_FORMAT;
+  header.version = BLOSC2_VERSION_FORMAT_STABLE;
   header.versionlz = BLOSC_BLOSCLZ_VERSION_FORMAT;
   header.flags = BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE;  // extended header
   header.typesize = context->typesize;
@@ -4844,7 +4847,7 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const int32_t nbytes,
   }
 
   memset(&header, 0, sizeof(header));
-  header.version = BLOSC2_VERSION_FORMAT;
+  header.version = BLOSC2_VERSION_FORMAT_STABLE;
   header.versionlz = BLOSC_BLOSCLZ_VERSION_FORMAT;
   header.flags = BLOSC_DOSHUFFLE | BLOSC_DOBITSHUFFLE;  // extended header
   header.typesize = context->typesize;

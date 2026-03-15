@@ -144,6 +144,7 @@ enum {
   BLOSC2_VERSION_FORMAT_BETA1 = 4,
   BLOSC2_VERSION_FORMAT_STABLE = 5,
   BLOSC2_VERSION_FORMAT_VL_BLOCKS = 6,
+  /* Highest chunk format version supported by this library. */
   BLOSC2_VERSION_FORMAT = BLOSC2_VERSION_FORMAT_VL_BLOCKS,
 };
 
@@ -158,6 +159,7 @@ enum {
   BLOSC2_VERSION_FRAME_FORMAT_BETA2 = 1,  // for 2.0.0-beta2 and after
   BLOSC2_VERSION_FRAME_FORMAT_RC1 = 2,    // for 2.0.0-rc1 and after
   BLOSC2_VERSION_FRAME_FORMAT_VL_BLOCKS = 3,
+  /* Highest cframe format version supported by this library. */
   BLOSC2_VERSION_FRAME_FORMAT = BLOSC2_VERSION_FRAME_FORMAT_VL_BLOCKS,
 };
 
