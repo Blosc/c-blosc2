@@ -94,6 +94,52 @@ static int assert_variable_chunk_flag(blosc2_schunk *schunk, bool expected) {
   return actual == expected ? 0 : -2;
 }
 
+static int assert_frame_version(blosc2_schunk *schunk, uint8_t expected) {
+  uint8_t *cframe = NULL;
+  bool needs_free = false;
+  int64_t cframe_len = blosc2_schunk_to_buffer(schunk, &cframe, &needs_free);
+  if (cframe_len < FRAME_HEADER_MINLEN || cframe == NULL) {
+    return -1;
+  }
+
+  uint8_t actual = cframe[FRAME_FLAGS] & 0x0fu;
+  if (needs_free) {
+    free(cframe);
+  }
+  return actual == expected ? 0 : -2;
+}
+
+static int assert_future_frame_version_rejected(blosc2_schunk *schunk) {
+  uint8_t *cframe = NULL;
+  bool needs_free = false;
+  int64_t cframe_len = blosc2_schunk_to_buffer(schunk, &cframe, &needs_free);
+  if (cframe_len < FRAME_HEADER_MINLEN || cframe == NULL) {
+    return -1;
+  }
+
+  uint8_t *mutated = malloc((size_t)cframe_len);
+  if (mutated == NULL) {
+    if (needs_free) {
+      free(cframe);
+    }
+    return -2;
+  }
+  memcpy(mutated, cframe, (size_t)cframe_len);
+  mutated[FRAME_FLAGS] = (uint8_t)((mutated[FRAME_FLAGS] & (uint8_t)~0x0fu) |
+                                   (BLOSC2_VERSION_FRAME_FORMAT + 1));
+
+  blosc2_schunk *reopened = blosc2_schunk_from_buffer(mutated, cframe_len, true);
+  free(mutated);
+  if (needs_free) {
+    free(cframe);
+  }
+  if (reopened != NULL) {
+    blosc2_schunk_free(reopened);
+    return -3;
+  }
+  return 0;
+}
+
 static char *test_variable_chunks(void) {
   blosc2_remove_urlpath(tdata.urlpath);
 
@@ -116,6 +162,10 @@ static char *test_variable_chunks(void) {
   }
 
   mu_assert("ERROR: schunk should switch to variable chunksize mode", schunk->chunksize == 0);
+  mu_assert("ERROR: variable-chunk frame should use cframe version 3",
+            assert_frame_version(schunk, BLOSC2_VERSION_FRAME_FORMAT_VL_BLOCKS) == 0);
+  mu_assert("ERROR: future cframe versions should be rejected",
+            assert_future_frame_version_rejected(schunk) == 0);
   mu_assert("ERROR: frame should signal variable chunk sizes",
             assert_variable_chunk_flag(schunk, true) == 0);
   mu_assert("ERROR: chunk cannot be decompressed", assert_values(schunk, values, 3) == 0);
@@ -137,6 +187,8 @@ static char *test_variable_chunks(void) {
     mu_assert("ERROR: reopened schunk is NULL", reopened != NULL);
     mu_assert("ERROR: reopened schunk should keep variable chunksize mode", reopened->chunksize == 0);
     mu_assert("ERROR: reopened schunk nchunks mismatch", reopened->nchunks == 3);
+    mu_assert("ERROR: reopened variable-chunk frame should use cframe version 3",
+              assert_frame_version(reopened, BLOSC2_VERSION_FRAME_FORMAT_VL_BLOCKS) == 0);
     mu_assert("ERROR: reopened frame should signal variable chunk sizes",
               assert_variable_chunk_flag(reopened, true) == 0);
     mu_assert("ERROR: reopened chunk cannot be decompressed", assert_values(reopened, updated_values, 3) == 0);
@@ -169,6 +221,8 @@ static char *test_fixed_chunks_flag(void) {
   }
 
   mu_assert("ERROR: schunk should keep a fixed chunksize", schunk->chunksize == 4);
+  mu_assert("ERROR: fixed-size regular frame should keep cframe version 2",
+            assert_frame_version(schunk, BLOSC2_VERSION_FRAME_FORMAT_RC1) == 0);
   mu_assert("ERROR: frame should not signal variable chunk sizes",
             assert_variable_chunk_flag(schunk, false) == 0);
   mu_assert("ERROR: fixed chunk cannot be decompressed", assert_values(schunk, fixed_values, 3) == 0);
@@ -179,6 +233,8 @@ static char *test_fixed_chunks_flag(void) {
     blosc2_schunk *reopened = blosc2_schunk_open(tdata.urlpath);
     mu_assert("ERROR: reopened schunk is NULL", reopened != NULL);
     mu_assert("ERROR: reopened schunk should keep a fixed chunksize", reopened->chunksize == 4);
+    mu_assert("ERROR: reopened fixed-size regular frame should keep cframe version 2",
+              assert_frame_version(reopened, BLOSC2_VERSION_FRAME_FORMAT_RC1) == 0);
     mu_assert("ERROR: reopened frame should not signal variable chunk sizes",
               assert_variable_chunk_flag(reopened, false) == 0);
     mu_assert("ERROR: reopened fixed chunk cannot be decompressed", assert_values(reopened, fixed_values, 3) == 0);

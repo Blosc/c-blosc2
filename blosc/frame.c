@@ -113,10 +113,18 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     return NULL;
   }
   // General flags
-  *h2p = BLOSC2_VERSION_FRAME_FORMAT;  // version
+  if (schunk->chunksize == 0 || (schunk->flags2 & BLOSC2_VL_BLOCKS)) {
+    *h2p = BLOSC2_VERSION_FRAME_FORMAT_VL_BLOCKS;  // version
+  }
+  else {
+    *h2p = BLOSC2_VERSION_FRAME_FORMAT_RC1;  // version
+  }
   *h2p += 0x10;  // 64-bit offsets.  We only support this for now.
   if (schunk->chunksize == 0) {
     *h2p |= FRAME_VARIABLE_CHUNKS;
+  }
+  if (schunk->flags2 & BLOSC2_VL_BLOCKS) {
+    *h2p |= FRAME_VL_BLOCKS;
   }
   h2p += 1;
   if (h2p - h2 >= FRAME_HEADER_MINLEN) {
@@ -410,6 +418,11 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
 
   // Consistency check for frame type
   uint8_t frame_type = framep[FRAME_TYPE];
+  uint8_t frame_version = framep[FRAME_FLAGS] & 0x0fu;
+  if (frame_version > BLOSC2_VERSION_FRAME_FORMAT) {
+    BLOSC_TRACE_ERROR("Unsupported cframe version: %u", frame_version);
+    return BLOSC2_ERROR_VERSION_SUPPORT;
+  }
   if (frame->sframe) {
     if (frame_type != FRAME_DIRECTORY_TYPE) {
       return BLOSC2_ERROR_FRAME_TYPE;
@@ -1106,6 +1119,14 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   }
   else {
     h2[FRAME_FLAGS] &= (uint8_t)~FRAME_VARIABLE_CHUNKS;
+  }
+  if (schunk->chunksize == 0 || (schunk->flags2 & BLOSC2_VL_BLOCKS)) {
+    h2[FRAME_FLAGS] = (uint8_t)((h2[FRAME_FLAGS] & (uint8_t)~0x0fu) | BLOSC2_VERSION_FRAME_FORMAT_VL_BLOCKS);
+    h2[FRAME_FLAGS] |= FRAME_VL_BLOCKS;
+  }
+  else {
+    h2[FRAME_FLAGS] = (uint8_t)((h2[FRAME_FLAGS] & (uint8_t)~0x0fu) | BLOSC2_VERSION_FRAME_FORMAT_RC1);
+    h2[FRAME_FLAGS] &= (uint8_t)~FRAME_VL_BLOCKS;
   }
   frame->len = h2len + cbytes + off_cbytes + FRAME_TRAILER_MINLEN;
   if (frame->sframe) {
@@ -1931,6 +1952,20 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   schunk->storage = get_new_storage(&storage, cparams, dparams, udio);
   free(cparams);
   free(dparams);
+  if (nchunks > 0) {
+    uint8_t *chunk;
+    bool needs_free;
+    rc = frame_get_chunk(frame, 0, &chunk, &needs_free);
+    if (rc < 0) {
+      BLOSC_TRACE_ERROR("Cannot inspect the first chunk in frame.");
+      blosc2_schunk_free(schunk);
+      return NULL;
+    }
+    schunk->flags2 = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
+    if (needs_free) {
+      free(chunk);
+    }
+  }
   if (!copy) {
     goto out;
   }
@@ -2457,9 +2492,12 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
     if (rc < 0) {
       goto end;
     }
-    size_t nblocks = chunk_nbytes / chunk_blocksize;
-    size_t leftover_block = chunk_nbytes % chunk_blocksize;
-    nblocks = leftover_block ? nblocks + 1 : nblocks;
+    bool vlblocks = (header_ptr[BLOSC2_CHUNK_BLOSC2_FLAGS2] & BLOSC2_VL_BLOCKS) != 0;
+    size_t nblocks = vlblocks ? (size_t)chunk_blocksize : (size_t)chunk_nbytes / chunk_blocksize;
+    size_t leftover_block = vlblocks ? 0 : (size_t)chunk_nbytes % chunk_blocksize;
+    if (!vlblocks) {
+      nblocks = leftover_block ? nblocks + 1 : nblocks;
+    }
     // Allocate space for the lazy chunk
     int32_t trailer_len;
     int32_t special_type = (header_ptr[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
@@ -3825,7 +3863,6 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
   return 0;
 }
 
-
 /* Decompress and return a chunk that is part of a frame. */
 int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int64_t nchunk, void *dest, int32_t nbytes) {
   uint8_t* src;
@@ -3834,8 +3871,7 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int64_t 
   int32_t chunk_cbytes;
   int rc;
 
-  // Use a lazychunk here in order to do a potential parallel read.
-  rc = frame_get_lazychunk(frame, nchunk, &src, &needs_free);
+  rc = frame_get_chunk(frame, nchunk, &src, &needs_free);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Cannot get the chunk in position %" PRId64 ".", nchunk);
     goto end;
