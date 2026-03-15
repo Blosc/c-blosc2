@@ -94,6 +94,21 @@ static int assert_frame_vlblocks_flag(blosc2_schunk *schunk, bool expected) {
   return actual == expected ? 0 : -2;
 }
 
+static int assert_frame_version(blosc2_schunk *schunk, uint8_t expected) {
+  uint8_t *cframe = NULL;
+  bool needs_free = false;
+  int64_t cframe_len = blosc2_schunk_to_buffer(schunk, &cframe, &needs_free);
+  if (cframe_len < FRAME_HEADER_MINLEN || cframe == NULL) {
+    return -1;
+  }
+
+  uint8_t actual = cframe[FRAME_FLAGS] & 0x0fu;
+  if (needs_free) {
+    free(cframe);
+  }
+  return actual == expected ? 0 : -2;
+}
+
 static char *test_vlblocks_roundtrip(void) {
   blosc2_remove_urlpath(tdata.urlpath);
 
@@ -108,6 +123,8 @@ static char *test_vlblocks_roundtrip(void) {
 
   int32_t cbytes = blosc2_vlcompress_ctx(cctx, (const void * const *)srcs, srcsizes, 3, chunk, destsize);
   mu_assert("ERROR: cannot create VL-block chunk", cbytes > 0);
+  mu_assert("ERROR: VL-block chunk should use format version 6",
+            chunk[BLOSC2_CHUNK_VERSION] == BLOSC2_VERSION_FORMAT_VL_BLOCKS);
   mu_assert("ERROR: VL-block flag missing in chunk", (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2] & BLOSC2_VL_BLOCKS) != 0);
 
   int32_t header_blocksize;
@@ -142,6 +159,8 @@ static char *test_vlblocks_roundtrip(void) {
   blosc2_schunk *schunk = blosc2_schunk_new(&storage);
   mu_assert("ERROR: cannot create schunk", schunk != NULL);
   mu_assert("ERROR: cannot append VL-block chunk", blosc2_schunk_append_chunk(schunk, chunk, true) == 1);
+  mu_assert("ERROR: VL-block frame should use cframe version 3",
+            assert_frame_version(schunk, BLOSC2_VERSION_FRAME_FORMAT_VL_BLOCKS) == 0);
   mu_assert("ERROR: frame should signal VL-block chunks", assert_frame_vlblocks_flag(schunk, true) == 0);
 
   memset(buffer, 0, (size_t)total_nbytes());
@@ -153,6 +172,8 @@ static char *test_vlblocks_roundtrip(void) {
   if (tdata.urlpath != NULL) {
     schunk = blosc2_schunk_open(tdata.urlpath);
     mu_assert("ERROR: cannot reopen VL-block schunk", schunk != NULL);
+    mu_assert("ERROR: reopened VL-block frame should use cframe version 3",
+              assert_frame_version(schunk, BLOSC2_VERSION_FRAME_FORMAT_VL_BLOCKS) == 0);
     mu_assert("ERROR: reopened frame should signal VL-block chunks", assert_frame_vlblocks_flag(schunk, true) == 0);
     memset(buffer, 0, (size_t)total_nbytes());
     nbytes = blosc2_schunk_decompress_chunk(schunk, 0, buffer, total_nbytes());

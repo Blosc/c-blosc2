@@ -113,7 +113,12 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     return NULL;
   }
   // General flags
-  *h2p = BLOSC2_VERSION_FRAME_FORMAT;  // version
+  if (schunk->flags2 & BLOSC2_VL_BLOCKS) {
+    *h2p = BLOSC2_VERSION_FRAME_FORMAT_VL_BLOCKS;  // version
+  }
+  else {
+    *h2p = BLOSC2_VERSION_FRAME_FORMAT_RC1;  // version
+  }
   *h2p += 0x10;  // 64-bit offsets.  We only support this for now.
   if (schunk->chunksize == 0) {
     *h2p |= FRAME_VARIABLE_CHUNKS;
@@ -1111,9 +1116,11 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     h2[FRAME_FLAGS] &= (uint8_t)~FRAME_VARIABLE_CHUNKS;
   }
   if (schunk->flags2 & BLOSC2_VL_BLOCKS) {
+    h2[FRAME_FLAGS] = (uint8_t)((h2[FRAME_FLAGS] & (uint8_t)~0x0fu) | BLOSC2_VERSION_FRAME_FORMAT_VL_BLOCKS);
     h2[FRAME_FLAGS] |= FRAME_VL_BLOCKS;
   }
   else {
+    h2[FRAME_FLAGS] = (uint8_t)((h2[FRAME_FLAGS] & (uint8_t)~0x0fu) | BLOSC2_VERSION_FRAME_FORMAT_RC1);
     h2[FRAME_FLAGS] &= (uint8_t)~FRAME_VL_BLOCKS;
   }
   frame->len = h2len + cbytes + off_cbytes + FRAME_TRAILER_MINLEN;

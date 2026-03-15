@@ -110,11 +110,56 @@ int main(void) {
     }
   }
 
+  uint8_t* future_chunk = malloc((size_t)csize);
+  uint8_t* future_chunk_unknown = malloc((size_t)csize);
+  if (future_chunk == NULL || future_chunk_unknown == NULL) {
+    printf("Cannot allocate future-version test buffers.\n");
+    blosc2_free_ctx(dctx);
+    free(future_chunk);
+    free(future_chunk_unknown);
+    free(data);
+    free(data_out);
+    free(data_dest);
+    return EXIT_FAILURE;
+  }
+  memcpy(future_chunk, data_out, (size_t)csize);
+  memcpy(future_chunk_unknown, data_out, (size_t)csize);
+  future_chunk[BLOSC2_CHUNK_VERSION] = BLOSC2_VERSION_FORMAT + 1;
+  future_chunk_unknown[BLOSC2_CHUNK_VERSION] = BLOSC2_VERSION_FORMAT + 1;
+  future_chunk_unknown[BLOSC2_CHUNK_BLOSC2_FLAGS2] = 0x2;
+
+  ret = blosc2_getitem_ctx(dctx, future_chunk, csize, 5, 5, data_subset, sizeof(data_subset));
+  if (ret < 0) {
+    printf("Error in forward-compatible blosc2_getitem_ctx().  Giving up.\n");
+    blosc2_free_ctx(dctx);
+    free(future_chunk);
+    free(future_chunk_unknown);
+    free(data);
+    free(data_out);
+    free(data_dest);
+    return EXIT_FAILURE;
+  }
+
+  for (i = 0; i < 5; i++) {
+    if (data_subset[i] != data_subset_ref[i]) {
+      printf("Forward-compatible blosc2_getitem_ctx() differs from original!\n");
+      blosc2_free_ctx(dctx);
+      free(future_chunk);
+      free(future_chunk_unknown);
+      free(data);
+      free(data_out);
+      free(data_dest);
+      return EXIT_FAILURE;
+    }
+  }
+
   /* Decompress  */
   dsize = blosc2_decompress_ctx(dctx, data_out, csize, data_dest, dsize);
-  blosc2_free_ctx(dctx);
   if (dsize < 0) {
     printf("Decompression error.  Error code: %d\n", dsize);
+    blosc2_free_ctx(dctx);
+    free(future_chunk);
+    free(future_chunk_unknown);
     free(data);
     free(data_out);
     free(data_dest);
@@ -131,6 +176,46 @@ int main(void) {
     }
   }
 
+  dsize = blosc2_decompress_ctx(dctx, future_chunk, csize, data_dest, dsize);
+  if (dsize < 0) {
+    printf("Forward-compatible decompression error.  Error code: %d\n", dsize);
+    blosc2_free_ctx(dctx);
+    free(future_chunk);
+    free(future_chunk_unknown);
+    free(data);
+    free(data_out);
+    free(data_dest);
+    return EXIT_FAILURE;
+  }
+
+  for (i = 0; i < SIZE; i++) {
+    if (data[i] != data_dest[i]) {
+      printf("Forward-compatible decompressed data differs from original!\n");
+      blosc2_free_ctx(dctx);
+      free(future_chunk);
+      free(future_chunk_unknown);
+      free(data);
+      free(data_out);
+      free(data_dest);
+      return EXIT_FAILURE;
+    }
+  }
+
+  dsize = blosc2_decompress_ctx(dctx, future_chunk_unknown, csize, data_dest, dsize);
+  if (dsize != BLOSC2_ERROR_VERSION_SUPPORT) {
+    printf("Unknown future chunk features should be rejected.  Error code: %d\n", dsize);
+    blosc2_free_ctx(dctx);
+    free(future_chunk);
+    free(future_chunk_unknown);
+    free(data);
+    free(data_out);
+    free(data_dest);
+    return EXIT_FAILURE;
+  }
+
+  blosc2_free_ctx(dctx);
+  free(future_chunk);
+  free(future_chunk_unknown);
   free(data);
   free(data_out);
   free(data_dest);
