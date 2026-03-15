@@ -43,7 +43,7 @@ for encoding blocks with a filter pipeline::
     |     filters           | ^ | ^ |     filters_meta      | ^ | ^ |
                               |   |                           |   |
                               |   +- compcode_meta            |   +-blosc2_flags
-                              +- user-defined codec           +-reserved
+                              +- user-defined codec           +-blosc2_flags2
 
 :version:
     (``uint8``) Blosc format version.
@@ -100,7 +100,9 @@ for encoding blocks with a filter pipeline::
     (``int32``) Uncompressed size of the buffer (this header is not included).
 
 :blocksize:
-    (``int32``) Size of internal blocks.
+    (``int32``) Size of internal blocks for regular chunks.
+
+    When `blosc2_flags2` bit 0 is set, this field stores the number of blocks in the chunk instead.
 
 :cbytes:
     (``int32``) Compressed size of the buffer (including this header).
@@ -174,6 +176,14 @@ for encoding blocks with a filter pipeline::
     :bit 7 (``0x80``):
         Indicate whether codec has been instrumented or not.
 
+:blosc2_flags2:
+    (``bitfield``) Secondary flags for a Blosc2 buffer.
+
+    :bit 0 (``0x01``):
+        Whether the chunk uses variable-length blocks or not.
+    :bits 1 to 7:
+        Reserved.
+
 
 Blocks
 ------
@@ -185,8 +195,14 @@ compression, and finally a list of compressed data streams::
     | bstarts | dict | streams |
     +=========+======+=========+
 
-Each block is equal-sized as specified by the `blocksize` header field. The size of the last block can be shorter
-or equal to the rest.
+For regular chunks, each block is equal-sized as specified by the `blocksize` header field. The size of the last
+block can be shorter or equal to the rest.
+
+When `blosc2_flags2` bit 0 is set, the chunk uses variable-length blocks instead:
+
+- `blocksize` in the header stores the number of blocks
+- each block still has one entry in `bstarts`
+- each block is stored in a single compressed stream
 
 **Block starts**
 
@@ -211,8 +227,9 @@ The dictionary section contains the size of the dictionary `int32_t dsize` follo
 
 **Compressed Data Streams**
 
-Compressed data streams are the compressed set of bytes that are passed to codecs for decompression. Each compressed
-data stream (`uint8_t* cdata`) is stored with the size of the stream (`int32_t csize`) preceding it::
+Compressed data streams are the compressed set of bytes that are passed to codecs for decompression. For regular
+chunks, each compressed data stream (`uint8_t* cdata`) is stored with the size of the stream (`int32_t csize`)
+preceding it::
 
     +=======+=======+
     | csize | cdata |
@@ -254,6 +271,20 @@ If bit 4 of the `flags` header is *not* set, each block can be stored using mult
 
 The uncompressed size for each block is equivalent to the `blocksize` field in the header, with the exception
 of the last block which may be equal to or less than the `blocksize`.
+
+For variable-length-block chunks (`blosc2_flags2` bit 0 set), each block is always stored in a single stream::
+
+    +=========+
+    | stream0 |
+    +=========+
+    | block0  |
+    +=========+
+
+In this variant:
+
+- `csize` stores the uncompressed size of the block
+- the compressed size is derived from adjacent entries in `bstarts` and the end of the chunk
+- the special `csize == 0` and `csize < 0` encodings are not used
 
 Trailer
 -------

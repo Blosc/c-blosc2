@@ -143,7 +143,8 @@ enum {
   BLOSC2_VERSION_FORMAT_ALPHA = 3,
   BLOSC2_VERSION_FORMAT_BETA1 = 4,
   BLOSC2_VERSION_FORMAT_STABLE = 5,
-  BLOSC2_VERSION_FORMAT = BLOSC2_VERSION_FORMAT_STABLE,
+  BLOSC2_VERSION_FORMAT_VL_BLOCKS = 6,
+  BLOSC2_VERSION_FORMAT = BLOSC2_VERSION_FORMAT_VL_BLOCKS,
 };
 
 
@@ -152,11 +153,12 @@ enum {
   /* Blosc format version
    *  1 -> First version (introduced in beta.2)
    *  2 -> Second version (introduced in rc.1)
-   *
+  *
    */
   BLOSC2_VERSION_FRAME_FORMAT_BETA2 = 1,  // for 2.0.0-beta2 and after
   BLOSC2_VERSION_FRAME_FORMAT_RC1 = 2,    // for 2.0.0-rc1 and after
-  BLOSC2_VERSION_FRAME_FORMAT = BLOSC2_VERSION_FRAME_FORMAT_RC1,
+  BLOSC2_VERSION_FRAME_FORMAT_VL_BLOCKS = 3,
+  BLOSC2_VERSION_FRAME_FORMAT = BLOSC2_VERSION_FRAME_FORMAT_VL_BLOCKS,
 };
 
 
@@ -284,6 +286,13 @@ enum {
   BLOSC2_USEDICT = 0x1,          //!< use dictionaries with codec
   BLOSC2_BIGENDIAN = 0x2,        //!< data is in big-endian ordering
   BLOSC2_INSTR_CODEC = 0x80,     //!< codec is instrumented (mainly for development)
+};
+
+/**
+ * @brief Codes for flags in the secondary Blosc2 header byte.
+ */
+enum {
+  BLOSC2_VL_BLOCKS = 0x1,        //!< chunk uses variable-length blocks
 };
 
 /**
@@ -420,6 +429,7 @@ enum {
   BLOSC2_CHUNK_CBYTES = 0xc,        //!< (int32) compressed size of the buffer (including this header)
   BLOSC2_CHUNK_FILTER_CODES = 0x10, //!< the codecs for the filter pipeline (1 byte per code)
   BLOSC2_CHUNK_FILTER_META = 0x18,  //!< meta info for the filter pipeline (1 byte per code)
+  BLOSC2_CHUNK_BLOSC2_FLAGS2 = 0x1e,//!< second flags byte specific for Blosc2 functionality
   BLOSC2_CHUNK_BLOSC2_FLAGS = 0x1F, //!< flags specific for Blosc2 functionality
 };
 
@@ -1465,6 +1475,22 @@ BLOSC_EXPORT int blosc2_compress_ctx(
         blosc2_context* context, const void* src, int32_t srcsize, void* dest,
         int32_t destsize);
 
+/**
+ * @brief Context interface to Blosc compression for chunks with variable-length blocks.
+ *
+ * @param context A blosc2_context struct with the different compression params.
+ * @param srcs A list of pointers, one per block.
+ * @param srcsizes A list of uncompressed sizes, one per block.
+ * @param nblocks The number of blocks in the chunk.
+ * @param dest The buffer where the compressed chunk will be put.
+ * @param destsize The size in bytes of the @p dest buffer.
+ *
+ * @return The number of bytes compressed, or a negative error code.
+ */
+BLOSC_EXPORT int blosc2_vlcompress_ctx(
+        blosc2_context* context, const void* const* srcs, const int32_t* srcsizes,
+        int32_t nblocks, void* dest, int32_t destsize);
+
 
 /**
  * @brief Context interface to Blosc decompression. This does not require a
@@ -1500,6 +1526,22 @@ BLOSC_EXPORT int blosc2_compress_ctx(
  */
 BLOSC_EXPORT int blosc2_decompress_ctx(blosc2_context* context, const void* src,
                                        int32_t srcsize, void* dest, int32_t destsize);
+
+/**
+ * @brief Context interface to Blosc decompression for chunks with variable-length blocks.
+ *
+ * @param context The blosc2_context struct with the different decompression params.
+ * @param src The buffer of compressed data.
+ * @param srcsize The length of buffer of compressed data.
+ * @param dests On output, one newly allocated buffer per block.
+ * @param destsizes On output, the uncompressed sizes of the blocks.
+ * @param maxblocks The number of entries available in @p dests and @p destsizes.
+ *
+ * @return The number of blocks decompressed, or a negative error code.
+ */
+BLOSC_EXPORT int blosc2_vldecompress_ctx(blosc2_context* context, const void* src,
+                                         int32_t srcsize, void** dests,
+                                         int32_t* destsizes, int32_t maxblocks);
 
 /**
  * @brief Create a chunk made of zeros.
@@ -1688,6 +1730,8 @@ typedef struct blosc2_schunk {
   //!< The requested size of the compressed blocks (0; meaning automatic).
   int32_t chunksize;
   //!< Size of each chunk. 0 if not a fixed chunksize.
+  uint8_t flags2;
+  //!< Secondary chunk-format flags shared by all chunks in the schunk. 0 when empty.
   uint8_t filters[BLOSC2_MAX_FILTERS];
   //!< The (sequence of) filters.  8-bit per filter.
   uint8_t filters_meta[BLOSC2_MAX_FILTERS];

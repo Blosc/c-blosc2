@@ -38,17 +38,24 @@ struct blosc2_context_s {
   uint8_t* dest;  /* The destination buffer */
   uint8_t header_flags;  /* Flags for header */
   uint8_t blosc2_flags;  /* Flags specific for blosc2 */
+  uint8_t blosc2_flags2;  /* Secondary flags specific for blosc2 */
   int32_t sourcesize;  /* Number of bytes in source buffer */
   int32_t header_overhead;  /* The number of bytes in chunk header */
   int32_t nblocks;  /* Number of total blocks in buffer */
   int32_t leftover;  /* Extra bytes at end of buffer */
   int32_t blocksize;  /* Length of the block in bytes */
+  int32_t header_blocksize;  /* Raw blocksize field as stored in the chunk header */
   int32_t splitmode;  /* Whether the blocks should be split or not */
   int32_t output_bytes;  /* Counter for the number of input bytes */
   int32_t srcsize;  /* Counter for the number of output bytes */
   int32_t destsize;  /* Maximum size for destination buffer */
   int32_t typesize;  /* Type size */
   int32_t* bstarts;  /* Starts for every block inside the compressed buffer */
+  int32_t* blocknbytes;  /* Uncompressed sizes for blocks in VL-block chunks */
+  int32_t* blockoffsets;  /* Uncompressed offsets for blocks in VL-block chunks */
+  int32_t* blockcbytes;  /* Compressed byte spans for blocks in VL-block chunks */
+  const uint8_t** vlblock_sources;  /* Per-block sources when compressing VL-block chunks */
+  uint8_t** vlblock_dests;  /* Per-block destinations when decompressing VL-block chunks */
   int32_t special_type;  /* Special type for chunk.  0 if not special. */
   int compcode;  /* Compressor code to use */
   uint8_t compcode_meta;  /* The metainfo for the compressor code */

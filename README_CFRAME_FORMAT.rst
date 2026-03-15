@@ -119,7 +119,9 @@ frame.  It is mandatory the use of the msgpack format for storing them, although
     :``6``:
         Chunks of fixed length (0) or variable length (1)
     :``7``:
-        Reserved
+        All chunks in the frame use variable-length blocks (1) or regular blocks (0)
+
+    Frames must not mix regular chunks and variable-length-block chunks.
 
 :frame_type:
     (``uint8``) The type of frame.
