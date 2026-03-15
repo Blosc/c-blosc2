@@ -4,6 +4,10 @@ add_executable(filegen filegen.c)
 target_link_libraries(filegen blosc_testing)
 add_dependencies(filegen blosc_testing)
 
+add_executable(filegen-vl filegen-vl.c)
+target_link_libraries(filegen-vl blosc_testing)
+add_dependencies(filegen-vl blosc_testing)
+
 # tests
 if(BUILD_TESTS)
     option(TEST_INCLUDE_COMPAT "Include compat checks in the tests" ON)

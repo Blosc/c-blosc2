@@ -113,7 +113,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     return NULL;
   }
   // General flags
-  if (schunk->flags2 & BLOSC2_VL_BLOCKS) {
+  if (schunk->chunksize == 0 || (schunk->flags2 & BLOSC2_VL_BLOCKS)) {
     *h2p = BLOSC2_VERSION_FRAME_FORMAT_VL_BLOCKS;  // version
   }
   else {
@@ -418,6 +418,11 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
 
   // Consistency check for frame type
   uint8_t frame_type = framep[FRAME_TYPE];
+  uint8_t frame_version = framep[FRAME_FLAGS] & 0x0fu;
+  if (frame_version > BLOSC2_VERSION_FRAME_FORMAT) {
+    BLOSC_TRACE_ERROR("Unsupported cframe version: %u", frame_version);
+    return BLOSC2_ERROR_VERSION_SUPPORT;
+  }
   if (frame->sframe) {
     if (frame_type != FRAME_DIRECTORY_TYPE) {
       return BLOSC2_ERROR_FRAME_TYPE;
@@ -1115,7 +1120,7 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   else {
     h2[FRAME_FLAGS] &= (uint8_t)~FRAME_VARIABLE_CHUNKS;
   }
-  if (schunk->flags2 & BLOSC2_VL_BLOCKS) {
+  if (schunk->chunksize == 0 || (schunk->flags2 & BLOSC2_VL_BLOCKS)) {
     h2[FRAME_FLAGS] = (uint8_t)((h2[FRAME_FLAGS] & (uint8_t)~0x0fu) | BLOSC2_VERSION_FRAME_FORMAT_VL_BLOCKS);
     h2[FRAME_FLAGS] |= FRAME_VL_BLOCKS;
   }
