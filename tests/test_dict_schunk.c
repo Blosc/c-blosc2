@@ -5,6 +5,7 @@
 */
 
 #include <stdio.h>
+#include <stdbool.h>
 #include "test_common.h"
 
 #define CHUNKSIZE (200 * 1000)
@@ -127,10 +128,23 @@ static char* test_dict(void) {
     }
   }
 
+  /* When use_dict=1, verify that BLOSC2_USEDICT is set in each raw chunk */
+  if (use_dict) {
+    for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+      uint8_t *chunk_ptr = NULL;
+      bool needs_free = false;
+      int csize = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_ptr, &needs_free);
+      mu_assert("ERROR: cannot retrieve raw chunk for flag check", csize > 0 && chunk_ptr != NULL);
+      bool flag_set = (chunk_ptr[BLOSC2_CHUNK_BLOSC2_FLAGS] & BLOSC2_USEDICT) != 0;
+      if (needs_free) free(chunk_ptr);
+      mu_assert("ERROR: BLOSC2_USEDICT flag not set in chunk compressed with use_dict=1", flag_set);
+    }
+  }
+
   // Check that the chunks have been decompressed correctly
   for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
     dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
-    mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize >= 0);
+    mu_assert("ERROR: chunk cannot be decompressed correctly.", dsize == isize);
     for (int i = 0; i < CHUNKSIZE; i++) {
       mu_assert("ERROR: bad roundtrip",
                 data_dest[i] == i + nchunk * CHUNKSIZE);
