@@ -2828,7 +2828,7 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     size_t sample_size = context->sourcesize / nblocks / sample_fraction;
 
     // Populate the samples sizes for training the dictionary
-    size_t* samples_sizes = malloc(nblocks * sizeof(void*));
+    size_t* samples_sizes = malloc(nblocks * sizeof(size_t));
     BLOSC_ERROR_NULL(samples_sizes, BLOSC2_ERROR_MEMORY_ALLOC);
     for (size_t i = 0; i < nblocks; i++) {
       samples_sizes[i] = sample_size;
@@ -2836,7 +2836,10 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
 
     // Train from samples
     void* dict_buffer = malloc(dict_maxsize);
-    BLOSC_ERROR_NULL(dict_buffer, BLOSC2_ERROR_MEMORY_ALLOC);
+    if (dict_buffer == NULL) {
+      free(samples_sizes);
+      BLOSC_ERROR_NULL(dict_buffer, BLOSC2_ERROR_MEMORY_ALLOC);
+    }
     int32_t dict_actual_size = (int32_t)ZDICT_trainFromBuffer(
         dict_buffer, dict_maxsize,
         samples_buffer, samples_sizes, nblocks);
@@ -2852,13 +2855,14 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     //   dict_buffer, dict_maxsize, samples_buffer, samples_sizes, nblocks,
     //   &fast_cover_params);
 
+    free(samples_sizes);
     if (ZDICT_isError(dict_actual_size) != ZSTD_error_no_error) {
       BLOSC_TRACE_ERROR("Error in ZDICT_trainFromBuffer(): '%s'."
                         "  Giving up.", ZDICT_getErrorName(dict_actual_size));
+      free(dict_buffer);
       return BLOSC2_ERROR_CODEC_DICT;
     }
     assert(dict_actual_size > 0);
-    free(samples_sizes);
 
     // Update bytes counter and pointers to bstarts for the new compressed buffer
     context->bstarts = (int32_t*)(context->dest + context->header_overhead);
@@ -2910,7 +2914,6 @@ static int reorder_vl_blocks_output(blosc2_context *context) {
     return 0;
   }
 
-  int32_t bstarts_end = context->header_overhead + nblocks * (int32_t)sizeof(int32_t);
   int32_t output_bytes = context->output_bytes;
   int32_t *bstarts = context->bstarts;
   uint8_t *dest = context->dest;
@@ -2927,7 +2930,18 @@ static int reorder_vl_blocks_output(blosc2_context *context) {
     return 0;
   }
 
-  int32_t data_size = output_bytes - bstarts_end;
+  /* When a dict is embedded, block data starts after [bstarts | dict_size | dict_data].
+   * Use the minimum bstart to locate the actual start of the compressed block region;
+   * this avoids touching (and corrupting) the dict bytes. */
+  int32_t data_start = sw32_(bstarts);
+  for (int32_t i = 1; i < nblocks; i++) {
+    int32_t bs = sw32_(bstarts + i);
+    if (bs < data_start) {
+      data_start = bs;
+    }
+  }
+
+  int32_t data_size = output_bytes - data_start;
   vl_bstart_entry_t *entries = malloc((size_t)nblocks * sizeof(vl_bstart_entry_t));
   int32_t *block_cbytes = malloc((size_t)nblocks * sizeof(int32_t));
   uint8_t *temp = malloc((size_t)data_size);
@@ -2951,15 +2965,15 @@ static int reorder_vl_blocks_output(blosc2_context *context) {
     block_cbytes[entries[j].idx] = next - entries[j].bstart;
   }
 
-  /* Snapshot all compressed block data so we can safely overwrite dest */
-  memcpy(temp, dest + bstarts_end, (size_t)data_size);
+  /* Snapshot compressed block data (not the dict) so we can safely overwrite dest */
+  memcpy(temp, dest + data_start, (size_t)data_size);
 
   /* Write blocks to dest in logical index order and update bstarts */
-  int32_t cur_pos = bstarts_end;
+  int32_t cur_pos = data_start;
   for (int32_t i = 0; i < nblocks; i++) {
     int32_t old_pos = sw32_(bstarts + i);
     _sw32(bstarts + i, cur_pos);
-    memcpy(dest + cur_pos, temp + (old_pos - bstarts_end), (size_t)block_cbytes[i]);
+    memcpy(dest + cur_pos, temp + (old_pos - data_start), (size_t)block_cbytes[i]);
     cur_pos += block_cbytes[i];
   }
 
@@ -3026,10 +3040,91 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
   }
 
   cbytes = blosc_compress_context(context);
-  context->vlblock_sources = NULL;
   if (cbytes < 0) {
+    context->vlblock_sources = NULL;
     return cbytes;
   }
+
+#ifdef HAVE_ZSTD
+  if (context->use_dict && context->dict_cdict == NULL) {
+    // The first blosc_compress_context() above was a dict-training pass that stored
+    // raw (uncompressed) VL block data at dest+header_overhead as samples.  Now train
+    // the dictionary from those samples and do the real compression pass.
+    int32_t dict_maxsize = BLOSC2_MAXDICTSIZE;
+    // Do not make the dict more than 5% of the uncompressed size
+    if (dict_maxsize > (int32_t)srcsize / 20) {
+      dict_maxsize = (int32_t)srcsize / 20;
+    }
+    if (dict_maxsize <= 0 || nblocks < 8) {
+      // Data is too small or too few VL blocks to train a useful dictionary;
+      // fall back to plain compression without a dict.
+      context->use_dict = 0;
+      context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
+      context->bstarts = (int32_t*)(context->dest + context->header_overhead);
+      context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
+      context->vlblock_sources = (const uint8_t**)srcs;
+      cbytes = blosc_compress_context(context);
+      context->vlblock_sources = NULL;
+    }
+    else {
+      // The training pass left all VL blocks concatenated at dest+header_overhead.
+      // Use the actual per-block sizes as ZDICT sample sizes so that each VL block
+      // is treated as a complete, independent training example.
+      void* samples_buffer = context->dest + context->header_overhead;
+      size_t* samples_sizes = malloc((size_t)nblocks * sizeof(size_t));
+      if (samples_sizes == NULL) {
+        context->vlblock_sources = NULL;
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+      }
+      for (int32_t i = 0; i < nblocks; i++) {
+        samples_sizes[i] = (size_t)context->blocknbytes[i];
+      }
+      void* dict_buffer = malloc((size_t)dict_maxsize);
+      if (dict_buffer == NULL) {
+        free(samples_sizes);
+        context->vlblock_sources = NULL;
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+      }
+      int32_t dict_actual_size = (int32_t)ZDICT_trainFromBuffer(
+          dict_buffer, (size_t)dict_maxsize, samples_buffer, samples_sizes, (unsigned)nblocks);
+      free(samples_sizes);
+      if (ZDICT_isError(dict_actual_size) != ZSTD_error_no_error) {
+        BLOSC_TRACE_ERROR("Error in ZDICT_trainFromBuffer(): '%s'.  Giving up.",
+                          ZDICT_getErrorName(dict_actual_size));
+        free(dict_buffer);
+        context->vlblock_sources = NULL;
+        return BLOSC2_ERROR_CODEC_DICT;
+      }
+      // Set up bstarts and embed the trained dictionary in the output buffer.
+      // Layout after header: [bstarts | dict_size(int32) | dict_data | compressed blocks]
+      context->bstarts = (int32_t*)(context->dest + context->header_overhead);
+      context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
+      _sw32(context->dest + context->output_bytes, dict_actual_size);
+      context->output_bytes += (int32_t)sizeof(int32_t);
+      context->dict_buffer = context->dest + context->output_bytes;
+      memcpy(context->dict_buffer, dict_buffer, (size_t)dict_actual_size);
+      context->dict_cdict = ZSTD_createCDict(dict_buffer, (size_t)dict_actual_size, 1);
+      free(dict_buffer);
+      context->output_bytes += dict_actual_size;
+      context->dict_size = dict_actual_size;
+
+      /* Actual compression pass using the trained dictionary */
+      context->vlblock_sources = (const uint8_t**)srcs;
+      cbytes = blosc_compress_context(context);
+      context->vlblock_sources = NULL;
+
+      /* Invalidate the dictionary so the context can be reused for the next chunk */
+      context->dict_buffer = NULL;
+      ZSTD_freeCDict(context->dict_cdict);
+      context->dict_cdict = NULL;
+    }
+    if (cbytes < 0) {
+      return cbytes;
+    }
+  }
+#endif  // HAVE_ZSTD
+
+  context->vlblock_sources = NULL;
 
   /* Multi-threaded compression may have written blocks in non-index order.
    * Rearrange the output so that bstarts is monotonically increasing, as

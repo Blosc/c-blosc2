@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "config.h"
 #include "frame.h"
 #include "test_common.h"
 
@@ -282,6 +283,119 @@ static char *test_vlblocks_mt_roundtrip(void) {
   return EXIT_SUCCESS;
 }
 
+#ifdef HAVE_ZSTD
+/* Regression test for the VL-block dict bug: blosc2_vlcompress_ctx was
+ * missing the dict-training pass, so compressing with use_dict=1 produced a
+ * malformed chunk that caused an abort on decompression.
+ *
+ * Uses 64 JSON-like blocks (~350 B each, ~22 KB total) to give ZDICT enough
+ * training data.  Verifies that BLOSC2_USEDICT is set in the chunk header and
+ * that both split and concatenated decompression return the original data.
+ * The multi-threaded compression path is checked too. */
+static char *test_vlblocks_dict_roundtrip(void) {
+  enum { DICT_NBLOCKS = 64, DICT_BUF = 512 };
+
+  static char raw[DICT_NBLOCKS][DICT_BUF];
+  const void *vsrcs[DICT_NBLOCKS];
+  int32_t vsizes[DICT_NBLOCKS];
+  int32_t total = 0;
+  for (int i = 0; i < DICT_NBLOCKS; i++) {
+    vsizes[i] = (int32_t)snprintf(raw[i], DICT_BUF,
+        "{\"id\":\"en:ingredient-%03d\",\"vegan\":\"%s\","
+        "\"vegetarian\":\"%s\",\"percent_estimate\":%.2f,"
+        "\"is_in_taxonomy\":%d,\"text\":\"INGREDIENT NUMBER %03d\","
+        "\"from_palm_oil\":null,\"processing\":null,"
+        "\"labels\":null,\"origins\":null,\"quantity\":null,"
+        "\"quantity_g\":null,\"ciqual_food_code\":null,"
+        "\"additives_n\":null,\"nova_group\":null,"
+        "\"pnns_groups_1\":null,\"pnns_groups_2\":null,"
+        "\"carbon_footprint_percent_of_known_ingredients\":null}",
+        i,
+        (i % 3 == 0) ? "maybe" : "yes",
+        (i % 5 == 0) ? "no" : "yes",
+        (double)(i % 20) * 2.5 + 0.1,
+        i % 2,
+        i);
+    vsrcs[i] = raw[i];
+    total += vsizes[i];
+  }
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  cparams.compcode = BLOSC_ZSTD;
+  cparams.use_dict = 1;
+  cparams.nthreads = 1;
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  mu_assert("ERROR: cannot create dict cctx", cctx != NULL);
+
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
+  mu_assert("ERROR: cannot create dict dctx", dctx != NULL);
+
+  /* Extra headroom for the dict itself (up to BLOSC2_MAXDICTSIZE) */
+  int32_t destsize = total + BLOSC2_MAX_OVERHEAD + DICT_NBLOCKS * 64 + BLOSC2_MAXDICTSIZE;
+  uint8_t *chunk = malloc((size_t)destsize);
+  mu_assert("ERROR: cannot allocate dict chunk buffer", chunk != NULL);
+
+  int32_t cbytes = blosc2_vlcompress_ctx(cctx, vsrcs, vsizes, DICT_NBLOCKS, chunk, destsize);
+  mu_assert("ERROR: dict VL-block compression failed", cbytes > 0);
+  mu_assert("ERROR: BLOSC2_USEDICT flag not set",
+            (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & BLOSC2_USEDICT) != 0);
+
+  /* Verify split decompression */
+  void *buffers[DICT_NBLOCKS];
+  int32_t sizes[DICT_NBLOCKS];
+  memset(buffers, 0, sizeof(buffers));
+  int32_t nblocks = blosc2_vldecompress_ctx(dctx, chunk, cbytes, buffers, sizes, DICT_NBLOCKS);
+  mu_assert("ERROR: dict VL-block split decompression failed", nblocks == DICT_NBLOCKS);
+  for (int i = 0; i < DICT_NBLOCKS; i++) {
+    mu_assert("ERROR: dict split size mismatch", sizes[i] == vsizes[i]);
+    mu_assert("ERROR: dict split content mismatch",
+              memcmp(buffers[i], vsrcs[i], (size_t)vsizes[i]) == 0);
+    free(buffers[i]);
+  }
+
+  /* Verify concatenated decompression */
+  uint8_t *concat = malloc((size_t)total);
+  mu_assert("ERROR: cannot allocate concat buffer", concat != NULL);
+  int32_t nbytes = blosc2_decompress_ctx(dctx, chunk, cbytes, concat, total);
+  mu_assert("ERROR: dict VL-block concat decompression failed", nbytes == total);
+  int32_t off = 0;
+  for (int i = 0; i < DICT_NBLOCKS; i++) {
+    mu_assert("ERROR: dict concat content mismatch",
+              memcmp(concat + off, vsrcs[i], (size_t)vsizes[i]) == 0);
+    off += vsizes[i];
+  }
+  free(concat);
+
+  /* Verify the multi-threaded compression path */
+  blosc2_free_ctx(cctx);
+  cparams.nthreads = 4;
+  cctx = blosc2_create_cctx(cparams);
+  mu_assert("ERROR: cannot create MT dict cctx", cctx != NULL);
+
+  int32_t cbytes_mt = blosc2_vlcompress_ctx(cctx, vsrcs, vsizes, DICT_NBLOCKS, chunk, destsize);
+  mu_assert("ERROR: MT dict VL-block compression failed", cbytes_mt > 0);
+  mu_assert("ERROR: MT BLOSC2_USEDICT flag not set",
+            (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & BLOSC2_USEDICT) != 0);
+
+  memset(buffers, 0, sizeof(buffers));
+  nblocks = blosc2_vldecompress_ctx(dctx, chunk, cbytes_mt, buffers, sizes, DICT_NBLOCKS);
+  mu_assert("ERROR: MT dict VL-block decompression failed", nblocks == DICT_NBLOCKS);
+  for (int i = 0; i < DICT_NBLOCKS; i++) {
+    mu_assert("ERROR: MT dict size mismatch", sizes[i] == vsizes[i]);
+    mu_assert("ERROR: MT dict content mismatch",
+              memcmp(buffers[i], vsrcs[i], (size_t)vsizes[i]) == 0);
+    free(buffers[i]);
+  }
+
+  free(chunk);
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+  return EXIT_SUCCESS;
+}
+#endif  /* HAVE_ZSTD */
+
 static char *all_tests(void) {
   for (int i = 0; i < (int)ARRAY_SIZE(backends); ++i) {
     tdata = backends[i];
@@ -289,6 +403,9 @@ static char *all_tests(void) {
     mu_run_test(test_no_mix_regular_and_vlblocks);
   }
   mu_run_test(test_vlblocks_mt_roundtrip);
+#ifdef HAVE_ZSTD
+  mu_run_test(test_vlblocks_dict_roundtrip);
+#endif
   return EXIT_SUCCESS;
 }
 
