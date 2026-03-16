@@ -2827,6 +2827,18 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     unsigned sample_fraction = 16;
     size_t sample_size = context->sourcesize / nblocks / sample_fraction;
 
+    // When the data is too small to produce useful dict training samples,
+    // fall back to plain compression without a dict.
+    if (dict_maxsize <= 0 || sample_size == 0) {
+      BLOSC_TRACE_WARNING("Data too small for dict training (dict_maxsize=%d, sample_size=%zu)."
+                          "  Falling back to plain compression.", dict_maxsize, sample_size);
+      context->use_dict = 0;
+      context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
+      context->bstarts = (int32_t*)(context->dest + context->header_overhead);
+      context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * context->nblocks;
+      cbytes = blosc_compress_context(context);
+    }
+    else {
     // Populate the samples sizes for training the dictionary
     size_t* samples_sizes = malloc(nblocks * sizeof(size_t));
     BLOSC_ERROR_NULL(samples_sizes, BLOSC2_ERROR_MEMORY_ALLOC);
@@ -2857,11 +2869,17 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
 
     free(samples_sizes);
     if (ZDICT_isError(dict_actual_size) != ZSTD_error_no_error) {
-      BLOSC_TRACE_ERROR("Error in ZDICT_trainFromBuffer(): '%s'."
-                        "  Giving up.", ZDICT_getErrorName(dict_actual_size));
+      BLOSC_TRACE_WARNING("ZDICT_trainFromBuffer() failed: '%s'."
+                          "  Falling back to plain compression.",
+                          ZDICT_getErrorName(dict_actual_size));
       free(dict_buffer);
-      return BLOSC2_ERROR_CODEC_DICT;
+      context->use_dict = 0;
+      context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
+      context->bstarts = (int32_t*)(context->dest + context->header_overhead);
+      context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * context->nblocks;
+      cbytes = blosc_compress_context(context);
     }
+    else {
     assert(dict_actual_size > 0);
 
     // Update bytes counter and pointers to bstarts for the new compressed buffer
@@ -2885,6 +2903,8 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     context->dict_buffer = NULL;
     ZSTD_freeCDict(context->dict_cdict);
     context->dict_cdict = NULL;
+    }  // ZDICT_isError
+    }  // dict_maxsize > 0 && sample_size > 0
 #endif  // HAVE_ZSTD
   }
 

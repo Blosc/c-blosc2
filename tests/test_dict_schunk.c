@@ -17,6 +17,18 @@ int tests_run = 0;
 int blocksize;
 int use_dict;
 
+static const uint8_t small_payload[] = {
+    0x8b, 0xa6, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0xa1, 0x78, 0xa4, 0x72, 0x6f, 0x77, 0x73, 0x01,
+    0xae, 0x72, 0x65, 0x67, 0x75, 0x6c, 0x61, 0x72, 0x5f, 0x63, 0x68, 0x75, 0x6e, 0x6b, 0x73, 0x91,
+    0x01, 0xae, 0x72, 0x65, 0x67, 0x75, 0x6c, 0x61, 0x72, 0x5f, 0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x73,
+    0x91, 0x01, 0xa5, 0x63, 0x6f, 0x64, 0x65, 0x63, 0xa4, 0x5a, 0x53, 0x54, 0x44, 0xa6, 0x63, 0x6c,
+    0x65, 0x76, 0x65, 0x6c, 0x05, 0xac, 0x63, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x5f, 0x75, 0x6e,
+    0x69, 0x78, 0x00, 0xb1, 0x69, 0x6e, 0x76, 0x65, 0x6e, 0x74, 0x6f, 0x72, 0x79, 0x5f, 0x76, 0x65,
+    0x72, 0x73, 0x69, 0x6f, 0x6e, 0x01, 0xa5, 0x70, 0x68, 0x61, 0x73, 0x65, 0xa6, 0x64, 0x69, 0x72,
+    0x65, 0x63, 0x74, 0xab, 0x73, 0x69, 0x6d, 0x70, 0x6c, 0x65, 0x5f, 0x6d, 0x6f, 0x64, 0x65, 0xc3,
+    0xaa, 0x62, 0x61, 0x74, 0x63, 0x68, 0x5f, 0x6b, 0x69, 0x6e, 0x64, 0xc0,
+};
+
 static char* test_dict(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
@@ -159,6 +171,50 @@ static char* test_dict(void) {
   return EXIT_SUCCESS;
 }
 
+static char* test_small_dict_append(void) {
+  uint8_t recovered[sizeof(small_payload)];
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+
+  blosc2_init();
+
+  cparams.typesize = 1;
+  cparams.compcode = BLOSC_ZSTD;
+  cparams.use_dict = use_dict;
+  cparams.clevel = 5;
+  cparams.nthreads = 1;
+
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
+  blosc2_schunk* schunk = blosc2_schunk_new(&storage);
+  mu_assert("ERROR: cannot create schunk for small dict append", schunk != NULL);
+
+  int64_t nchunks = blosc2_schunk_append_buffer(schunk, small_payload, (int32_t)sizeof(small_payload));
+  mu_assert("ERROR: cannot append small buffer with current use_dict setting", nchunks == 1);
+
+  int dsize = blosc2_schunk_decompress_chunk(schunk, 0, recovered, (int32_t)sizeof(recovered));
+  mu_assert("ERROR: cannot decompress small buffer chunk", dsize == (int)sizeof(small_payload));
+  mu_assert("ERROR: bad roundtrip for small dict append",
+            memcmp(recovered, small_payload, sizeof(small_payload)) == 0);
+
+  if (use_dict) {
+    /* For very small payloads dict training falls back to plain compression,
+     * so BLOSC2_USEDICT may or may not be set depending on whether ZDICT
+     * succeeded.  Only verify that the chunk is self-consistent: if the flag
+     * is set the chunk must still decompress correctly (already checked above),
+     * and if it is not set that is the expected graceful-fallback behaviour. */
+    uint8_t *chunk_ptr = NULL;
+    bool needs_free = false;
+    int csize = blosc2_schunk_get_chunk(schunk, 0, &chunk_ptr, &needs_free);
+    mu_assert("ERROR: cannot retrieve small buffer raw chunk for flag check", csize > 0 && chunk_ptr != NULL);
+    if (needs_free) free(chunk_ptr);
+  }
+
+  blosc2_schunk_free(schunk);
+  blosc2_destroy();
+
+  return EXIT_SUCCESS;
+}
+
 
 static char *all_tests(void) {
   blocksize = 1 * KB;    // really tiny
@@ -190,6 +246,11 @@ static char *all_tests(void) {
   mu_run_test(test_dict);
   use_dict = 1;
   mu_run_test(test_dict);
+
+  use_dict = 0;
+  mu_run_test(test_small_dict_append);
+  use_dict = 1;
+  mu_run_test(test_small_dict_append);
 
   return EXIT_SUCCESS;
 }
