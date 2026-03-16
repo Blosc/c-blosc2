@@ -70,18 +70,22 @@ Generate them with the current version::
   $ gcc -o filegen-vl filegen-vl.c -L$LD_LIBRARY_PATH -lblosc2 -I../include
   $ ./filegen-vl compress lz4 vlblocks-lz4-fixed-2.y.z.b2frame
   $ ./filegen-vl compress lz4 vlblocks-lz4-variable-2.y.z.b2frame --variable-chunks
+  $ ./filegen-vl compress lz4 varchunks-lz4-2.y.z.b2frame --regular
 
 Then, build ``compat/filegen-vl`` against the target Blosc library and check
 the fixtures with::
 
   $ ./filegen-vl decompress vlblocks-lz4-fixed-2.y.z.b2frame
   $ ./filegen-vl decompress vlblocks-lz4-variable-2.y.z.b2frame
+  $ ./filegen-vl decompress varchunks-lz4-2.y.z.b2frame
 
 Expected results:
 
 * These VL-block fixtures are only expected to work with releases that support
   the VL-block cframe format.
 * Pre-vlblocks releases are expected to reject them.
+* The ``--regular`` fixture tests regular (non-VL-block) chunks of varying
+  sizes in the same cframe (frame format v3 ``FRAME_VARIABLE_CHUNKS`` flag).
 
 Tagging
 -------
