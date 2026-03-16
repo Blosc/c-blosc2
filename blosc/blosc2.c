@@ -2887,6 +2887,89 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
   return cbytes;
 }
 
+/* Helper for reorder_vl_blocks_output: sort (bstart, logical_index) pairs by bstart */
+typedef struct { int32_t bstart; int32_t idx; } vl_bstart_entry_t;
+static int cmp_vl_bstart(const void *a, const void *b) {
+  int32_t ba = ((const vl_bstart_entry_t *)a)->bstart;
+  int32_t bb = ((const vl_bstart_entry_t *)b)->bstart;
+  return (ba > bb) - (ba < bb);
+}
+
+/* Ensure that VL-block compressed data is stored in block-index order.
+ *
+ * The decompressor derives each block's compressed span as
+ * bstarts[i+1] - bstarts[i], which requires bstarts to be monotonically
+ * increasing.  Multi-threaded compression writes blocks in finish order
+ * (non-deterministic), so bstarts may be out of order.  This function
+ * rearranges the compressed block data in the output buffer and fixes
+ * bstarts so that block 0 comes first, block 1 second, and so on.
+ */
+static int reorder_vl_blocks_output(blosc2_context *context) {
+  int32_t nblocks = context->nblocks;
+  if (nblocks <= 1) {
+    return 0;
+  }
+
+  int32_t bstarts_end = context->header_overhead + nblocks * (int32_t)sizeof(int32_t);
+  int32_t output_bytes = context->output_bytes;
+  int32_t *bstarts = context->bstarts;
+  uint8_t *dest = context->dest;
+
+  /* Fast path: blocks are already in index order (serial or lucky MT) */
+  bool ordered = true;
+  for (int32_t i = 1; i < nblocks; i++) {
+    if (sw32_(bstarts + i) < sw32_(bstarts + i - 1)) {
+      ordered = false;
+      break;
+    }
+  }
+  if (ordered) {
+    return 0;
+  }
+
+  int32_t data_size = output_bytes - bstarts_end;
+  vl_bstart_entry_t *entries = malloc((size_t)nblocks * sizeof(vl_bstart_entry_t));
+  int32_t *block_cbytes = malloc((size_t)nblocks * sizeof(int32_t));
+  uint8_t *temp = malloc((size_t)data_size);
+  if (entries == NULL || block_cbytes == NULL || temp == NULL) {
+    free(entries);
+    free(block_cbytes);
+    free(temp);
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+
+  for (int32_t i = 0; i < nblocks; i++) {
+    entries[i].bstart = sw32_(bstarts + i);
+    entries[i].idx = i;
+  }
+
+  /* Sort entries by physical position to compute each block's compressed size */
+  qsort(entries, (size_t)nblocks, sizeof(vl_bstart_entry_t), cmp_vl_bstart);
+
+  for (int32_t j = 0; j < nblocks; j++) {
+    int32_t next = (j + 1 < nblocks) ? entries[j + 1].bstart : output_bytes;
+    block_cbytes[entries[j].idx] = next - entries[j].bstart;
+  }
+
+  /* Snapshot all compressed block data so we can safely overwrite dest */
+  memcpy(temp, dest + bstarts_end, (size_t)data_size);
+
+  /* Write blocks to dest in logical index order and update bstarts */
+  int32_t cur_pos = bstarts_end;
+  for (int32_t i = 0; i < nblocks; i++) {
+    int32_t old_pos = sw32_(bstarts + i);
+    _sw32(bstarts + i, cur_pos);
+    memcpy(dest + cur_pos, temp + (old_pos - bstarts_end), (size_t)block_cbytes[i]);
+    cur_pos += block_cbytes[i];
+  }
+
+  free(entries);
+  free(block_cbytes);
+  free(temp);
+  return 0;
+}
+
+
 int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, const int32_t* srcsizes,
                           int32_t nblocks, void* dest, int32_t destsize) {
   int error, cbytes;
@@ -2946,6 +3029,14 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
   context->vlblock_sources = NULL;
   if (cbytes < 0) {
     return cbytes;
+  }
+
+  /* Multi-threaded compression may have written blocks in non-index order.
+   * Rearrange the output so that bstarts is monotonically increasing, as
+   * required by the decompressor. */
+  error = reorder_vl_blocks_output(context);
+  if (error < 0) {
+    return error;
   }
 
   return cbytes;

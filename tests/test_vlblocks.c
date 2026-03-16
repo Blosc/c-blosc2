@@ -224,12 +224,71 @@ static char *test_no_mix_regular_and_vlblocks(void) {
   return EXIT_SUCCESS;
 }
 
+/* Verify that multi-threaded VL-block compression produces a chunk that can
+ * be decompressed correctly.  This is a regression test for the bug where
+ * parallel threads wrote compressed blocks in finish order, leaving bstarts[]
+ * non-monotonically increasing and causing decompression to fail with -11. */
+static char *test_vlblocks_mt_roundtrip(void) {
+  /* Use enough blocks so that multiple threads actually race */
+  enum { NBLOCKS = 16 };
+  static const char *data[NBLOCKS] = {
+    "alpha", "bravo", "charlie", "delta",
+    "echo",  "foxtrot", "golf", "hotel",
+    "india", "juliet", "kilo",  "lima",
+    "mike",  "november", "oscar", "papa",
+  };
+  const void *vsrcs[NBLOCKS];
+  int32_t vsizes[NBLOCKS];
+  int32_t total = 0;
+  for (int i = 0; i < NBLOCKS; i++) {
+    vsrcs[i] = data[i];
+    vsizes[i] = (int32_t)strlen(data[i]);
+    total += vsizes[i];
+  }
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  cparams.nthreads = 8;
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  mu_assert("ERROR: cannot create cctx", cctx != NULL);
+
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
+  mu_assert("ERROR: cannot create dctx", dctx != NULL);
+
+  int32_t destsize = total + BLOSC2_MAX_OVERHEAD + NBLOCKS * 64;
+  uint8_t *chunk = malloc((size_t)destsize);
+  mu_assert("ERROR: cannot allocate chunk buffer", chunk != NULL);
+
+  int32_t cbytes = blosc2_vlcompress_ctx(cctx, vsrcs, vsizes, NBLOCKS, chunk, destsize);
+  mu_assert("ERROR: MT VL-block compression failed", cbytes > 0);
+
+  void *buffers[NBLOCKS];
+  int32_t sizes[NBLOCKS];
+  memset(buffers, 0, sizeof(buffers));
+  int32_t nblocks = blosc2_vldecompress_ctx(dctx, chunk, cbytes, buffers, sizes, NBLOCKS);
+  mu_assert("ERROR: MT VL-block decompression failed", nblocks == NBLOCKS);
+
+  for (int i = 0; i < NBLOCKS; i++) {
+    mu_assert("ERROR: decompressed size mismatch", sizes[i] == vsizes[i]);
+    mu_assert("ERROR: decompressed content mismatch",
+              memcmp(buffers[i], vsrcs[i], (size_t)vsizes[i]) == 0);
+    free(buffers[i]);
+  }
+
+  free(chunk);
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+  return EXIT_SUCCESS;
+}
+
 static char *all_tests(void) {
   for (int i = 0; i < (int)ARRAY_SIZE(backends); ++i) {
     tdata = backends[i];
     mu_run_test(test_vlblocks_roundtrip);
     mu_run_test(test_no_mix_regular_and_vlblocks);
   }
+  mu_run_test(test_vlblocks_mt_roundtrip);
   return EXIT_SUCCESS;
 }
 

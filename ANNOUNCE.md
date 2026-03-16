@@ -3,7 +3,9 @@ A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a patch level release which fixes some memory leaks/undefined behaviour, as well as allowing resizing of empty arrays and the use of meta (interpreted as number of bytestreams) for the byteshuffle filter.
+This is a patch level release which fixes some memory leaks/undefined
+behaviour, as well as allowing resizing of empty arrays and the use of meta
+(interpreted as number of bytestreams) for the byteshuffle filter.
 
 For more info, see the release notes in:
 
