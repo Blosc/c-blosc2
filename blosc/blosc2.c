@@ -2899,7 +2899,7 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
 
     // When the data is too small to produce useful dict samples,
     // fall back to plain compression without a dict.
-    if (dict_maxsize <= 0 || sample_size == 0) {
+    if (dict_maxsize < BLOSC2_MINUSEFULDICT || sample_size == 0) {
       BLOSC_TRACE_WARNING("Data too small for dict training (dict_maxsize=%d, sample_size=%zu)."
                           "  Falling back to plain compression.", dict_maxsize, sample_size);
       context->use_dict = 0;
@@ -3193,7 +3193,10 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
     if (dict_maxsize > (int32_t)srcsize / 20) {
       dict_maxsize = (int32_t)srcsize / 20;
     }
-    if (dict_maxsize <= 0 || nblocks < 8) {
+    // Mirror the sample_size guard from blosc2_compress_ctx: if the average
+    // per-block sample is too small for useful dict training, fall back.
+    size_t vl_sample_size = (nblocks > 0) ? ((size_t)srcsize / (size_t)nblocks / 16) : 0;
+    if (dict_maxsize < BLOSC2_MINUSEFULDICT || nblocks < 8 || vl_sample_size == 0) {
       // Data is too small or too few VL blocks to build a useful dictionary;
       // fall back to plain compression without a dict.
       context->use_dict = 0;
@@ -3267,34 +3270,43 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
           dict_buffer, (size_t)dict_maxsize, samples_buffer, samples_sizes, (unsigned)nblocks);
       free(samples_sizes);
       if (ZDICT_isError(dict_actual_size) != ZSTD_error_no_error) {
-        BLOSC_TRACE_ERROR("Error in ZDICT_trainFromBuffer(): '%s'.  Giving up.",
-                          ZDICT_getErrorName(dict_actual_size));
+        // Training failed (e.g. data is too small for a useful ZSTD dict).
+        // Fall back to plain compression rather than returning an error.
+        BLOSC_TRACE_WARNING("ZDICT_trainFromBuffer() failed ('%s'); falling back to plain compression.",
+                            ZDICT_getErrorName(dict_actual_size));
         free(dict_buffer);
+        context->use_dict = 0;
+        context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
+        context->bstarts = (int32_t*)(context->dest + context->header_overhead);
+        context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
+        context->vlblock_sources = (const uint8_t**)srcs;
+        cbytes = blosc_compress_context(context);
         context->vlblock_sources = NULL;
-        return BLOSC2_ERROR_CODEC_DICT;
       }
-      // Set up bstarts and embed the trained dictionary in the output buffer.
-      // Layout after header: [bstarts | dict_size(int32) | dict_data | compressed blocks]
-      context->bstarts = (int32_t*)(context->dest + context->header_overhead);
-      context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
-      _sw32(context->dest + context->output_bytes, dict_actual_size);
-      context->output_bytes += (int32_t)sizeof(int32_t);
-      context->dict_buffer = context->dest + context->output_bytes;
-      memcpy(context->dict_buffer, dict_buffer, (size_t)dict_actual_size);
-      context->dict_cdict = ZSTD_createCDict(dict_buffer, (size_t)dict_actual_size, 1);
-      free(dict_buffer);
-      context->output_bytes += dict_actual_size;
-      context->dict_size = dict_actual_size;
+      else {
+        // Set up bstarts and embed the trained dictionary in the output buffer.
+        // Layout after header: [bstarts | dict_size(int32) | dict_data | compressed blocks]
+        context->bstarts = (int32_t*)(context->dest + context->header_overhead);
+        context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
+        _sw32(context->dest + context->output_bytes, dict_actual_size);
+        context->output_bytes += (int32_t)sizeof(int32_t);
+        context->dict_buffer = context->dest + context->output_bytes;
+        memcpy(context->dict_buffer, dict_buffer, (size_t)dict_actual_size);
+        context->dict_cdict = ZSTD_createCDict(dict_buffer, (size_t)dict_actual_size, 1);
+        free(dict_buffer);
+        context->output_bytes += dict_actual_size;
+        context->dict_size = dict_actual_size;
 
-      /* Actual compression pass using the trained dictionary */
-      context->vlblock_sources = (const uint8_t**)srcs;
-      cbytes = blosc_compress_context(context);
-      context->vlblock_sources = NULL;
+        /* Actual compression pass using the trained dictionary */
+        context->vlblock_sources = (const uint8_t**)srcs;
+        cbytes = blosc_compress_context(context);
+        context->vlblock_sources = NULL;
 
-      /* Invalidate the dictionary so the context can be reused for the next chunk */
-      context->dict_buffer = NULL;
-      ZSTD_freeCDict(context->dict_cdict);
-      context->dict_cdict = NULL;
+        /* Invalidate the dictionary so the context can be reused for the next chunk */
+        context->dict_buffer = NULL;
+        ZSTD_freeCDict(context->dict_cdict);
+        context->dict_cdict = NULL;
+      }
     }
     if (cbytes < 0) {
       return cbytes;
@@ -3307,7 +3319,8 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
     if (dict_maxsize > (int32_t)srcsize / 20) {
       dict_maxsize = (int32_t)srcsize / 20;
     }
-    if (!is_lz4 || dict_maxsize <= 0 || nblocks < 8) {
+    size_t vl_sample_size_lz4 = (nblocks > 0) ? ((size_t)srcsize / (size_t)nblocks / 16) : 0;
+    if (!is_lz4 || dict_maxsize < BLOSC2_MINUSEFULDICT || nblocks < 8 || vl_sample_size_lz4 == 0) {
       context->use_dict = 0;
       context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
       context->bstarts = (int32_t*)(context->dest + context->header_overhead);

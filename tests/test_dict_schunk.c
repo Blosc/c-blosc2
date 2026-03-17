@@ -329,6 +329,56 @@ static char* test_vlcompress_dict_small(void) {
 }
 
 
+static char* test_vlcompress_dict_20blocks(void) {
+  /* 20 one-byte blocks: dict_maxsize = 20/20 = 1, vl_sample_size = 20/20/16 = 0 →
+     falls back to plain compression rather than failing with BLOSC2_ERROR_CODEC_DICT */
+  static const uint8_t payload = 'x';
+  static const int NBLK = 20;
+  uint8_t chunk[512];
+  void *dests[20];
+  int32_t destsizes[20];
+  memset(dests, 0, sizeof(dests));
+  memset(destsizes, 0, sizeof(destsizes));
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  cparams.compcode = BLOSC_ZSTD;
+  cparams.clevel = 5;
+  cparams.use_dict = 1;
+  cparams.nthreads = 1;
+  dparams.nthreads = 1;
+
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
+  mu_assert("ERROR: cannot create contexts", cctx != NULL && dctx != NULL);
+
+  const void *srcs[20];
+  int32_t srcsizes[20];
+  for (int i = 0; i < NBLK; i++) {
+    srcs[i] = &payload;
+    srcsizes[i] = 1;
+  }
+
+  int32_t cbytes = blosc2_vlcompress_ctx(cctx, srcs, srcsizes, NBLK, chunk, (int32_t)sizeof(chunk));
+  mu_assert("ERROR: blosc2_vlcompress_ctx failed for 20-block 1-byte VL with use_dict=1", cbytes > 0);
+
+  int32_t nblocks = blosc2_vldecompress_ctx(dctx, chunk, cbytes, dests, destsizes, NBLK);
+  mu_assert("ERROR: blosc2_vldecompress_ctx failed", nblocks == NBLK);
+  for (int i = 0; i < NBLK; i++) {
+    mu_assert("ERROR: decompressed size mismatch", destsizes[i] == 1);
+    mu_assert("ERROR: roundtrip mismatch", *(uint8_t *)dests[i] == payload);
+    free(dests[i]);
+  }
+
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+
+  return EXIT_SUCCESS;
+}
+
+
+
 static char *all_tests(void) {
   blocksize = 1 * KB;    // really tiny
   use_dict = 0;
@@ -386,6 +436,10 @@ static char *all_tests(void) {
 
   /* Regression: VL-block + use_dict + tiny (1-byte) payload must not crash */
   mu_run_test(test_vlcompress_dict_small);
+  /* Regression: VL + use_dict + 20 one-byte blocks must not return BLOSC2_ERROR_CODEC_DICT.
+     At exactly 20 blocks, dict_maxsize = srcsize/20 = 1, which is too small for ZSTD training;
+     should fall back to plain compression. */
+  mu_run_test(test_vlcompress_dict_20blocks);
 
   return EXIT_SUCCESS;
 }
