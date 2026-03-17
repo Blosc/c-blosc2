@@ -2453,8 +2453,10 @@ static int initialize_context_compression(
     return BLOSC2_ERROR_CODEC_PARAM;
   }
 
-  /* Dictionary support is only available for ZSTD, LZ4, and LZ4HC */
-  if (context->use_dict && context->compcode != BLOSC_ZSTD &&
+  /* Dictionary support is only available for ZSTD, LZ4, and LZ4HC.
+   * Skip the check when src is NULL (special-value chunks): no compression
+   * will actually happen, so codec compatibility is irrelevant. */
+  if (src != NULL && context->use_dict && context->compcode != BLOSC_ZSTD &&
       context->compcode != BLOSC_LZ4 && context->compcode != BLOSC_LZ4HC) {
     BLOSC_TRACE_ERROR("`use_dict` is only supported for ZSTD, LZ4, and LZ4HC codecs.");
     return BLOSC2_ERROR_CODEC_PARAM;
@@ -5130,9 +5132,6 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const int32_t nbytes, void* dest,
     return BLOSC2_ERROR_DATA;
   }
 
-  // Special-value chunks don't compress data; use_dict is irrelevant and must
-  // not trigger the codec-support check in initialize_context_compression.
-  cparams.use_dict = 0;
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
   if (context == NULL) {
@@ -5180,9 +5179,6 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const int32_t nbytes, void* dest
     return BLOSC2_ERROR_DATA;
   }
 
-  // Special-value chunks don't compress data; use_dict is irrelevant and must
-  // not trigger the codec-support check in initialize_context_compression.
-  cparams.use_dict = 0;
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
   if (context == NULL) {
@@ -5229,9 +5225,6 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const int32_t nbytes, void* dest, 
     return BLOSC2_ERROR_DATA;
   }
 
-  // Special-value chunks don't compress data; use_dict is irrelevant and must
-  // not trigger the codec-support check in initialize_context_compression.
-  cparams.use_dict = 0;
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
   if (context == NULL) {
@@ -5280,9 +5273,6 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const int32_t nbytes,
     return BLOSC2_ERROR_DATA;
   }
 
-  // Special-value chunks don't compress data; use_dict is irrelevant and must
-  // not trigger the codec-support check in initialize_context_compression.
-  cparams.use_dict = 0;
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
   if (context == NULL) {
