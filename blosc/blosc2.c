@@ -5130,6 +5130,9 @@ int blosc2_chunk_zeros(blosc2_cparams cparams, const int32_t nbytes, void* dest,
     return BLOSC2_ERROR_DATA;
   }
 
+  // Special-value chunks don't compress data; use_dict is irrelevant and must
+  // not trigger the codec-support check in initialize_context_compression.
+  cparams.use_dict = 0;
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
   if (context == NULL) {
@@ -5177,6 +5180,9 @@ int blosc2_chunk_uninit(blosc2_cparams cparams, const int32_t nbytes, void* dest
     return BLOSC2_ERROR_DATA;
   }
 
+  // Special-value chunks don't compress data; use_dict is irrelevant and must
+  // not trigger the codec-support check in initialize_context_compression.
+  cparams.use_dict = 0;
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
   if (context == NULL) {
@@ -5223,6 +5229,9 @@ int blosc2_chunk_nans(blosc2_cparams cparams, const int32_t nbytes, void* dest, 
     return BLOSC2_ERROR_DATA;
   }
 
+  // Special-value chunks don't compress data; use_dict is irrelevant and must
+  // not trigger the codec-support check in initialize_context_compression.
+  cparams.use_dict = 0;
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
   if (context == NULL) {
@@ -5271,6 +5280,9 @@ int blosc2_chunk_repeatval(blosc2_cparams cparams, const int32_t nbytes,
     return BLOSC2_ERROR_DATA;
   }
 
+  // Special-value chunks don't compress data; use_dict is irrelevant and must
+  // not trigger the codec-support check in initialize_context_compression.
+  cparams.use_dict = 0;
   blosc_header header;
   blosc2_context* context = blosc2_create_cctx(cparams);
   if (context == NULL) {
