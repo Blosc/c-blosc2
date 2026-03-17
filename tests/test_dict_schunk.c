@@ -286,6 +286,49 @@ static char* test_dict_lz4(void) {
 }
 
 
+/* Regression test for the VL-block + use_dict + tiny payload segfault.
+ * blosc_compress_context() was overwriting context->destsize with the
+ * training-pass output size, making subsequent compression passes see a
+ * buffer too small to hold even the chunk header overhead, which caused a
+ * NULL-pointer memcpy (context->src is NULL for VL blocks). */
+static char* test_vlcompress_dict_small(void) {
+  static const uint8_t payload[] = {'a'};
+  uint8_t chunk[256];
+  void *dests[1] = {NULL};
+  int32_t destsizes[1] = {0};
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  cparams.compcode = BLOSC_ZSTD;
+  cparams.clevel = 5;
+  cparams.use_dict = 1;
+  cparams.nthreads = 1;
+  dparams.nthreads = 1;
+
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
+  mu_assert("ERROR: cannot create contexts", cctx != NULL && dctx != NULL);
+
+  const void *srcs[1] = {payload};
+  int32_t srcsizes[1] = {1};
+
+  int32_t cbytes = blosc2_vlcompress_ctx(cctx, srcs, srcsizes, 1, chunk, (int32_t)sizeof(chunk));
+  mu_assert("ERROR: blosc2_vlcompress_ctx failed for tiny payload with use_dict=1", cbytes > 0);
+
+  int32_t nblocks = blosc2_vldecompress_ctx(dctx, chunk, cbytes, dests, destsizes, 1);
+  mu_assert("ERROR: blosc2_vldecompress_ctx failed", nblocks == 1);
+  mu_assert("ERROR: decompressed size mismatch", destsizes[0] == 1);
+  mu_assert("ERROR: roundtrip mismatch", memcmp(dests[0], payload, 1) == 0);
+
+  free(dests[0]);
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+
+  return EXIT_SUCCESS;
+}
+
+
 static char *all_tests(void) {
   blocksize = 1 * KB;    // really tiny
   use_dict = 0;
@@ -340,6 +383,9 @@ static char *all_tests(void) {
   mu_run_test(test_dict_lz4);
   compcode = BLOSC_LZ4HC;
   mu_run_test(test_dict_lz4);
+
+  /* Regression: VL-block + use_dict + tiny (1-byte) payload must not crash */
+  mu_run_test(test_vlcompress_dict_small);
 
   return EXIT_SUCCESS;
 }
