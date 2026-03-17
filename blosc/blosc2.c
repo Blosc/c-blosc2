@@ -2777,8 +2777,9 @@ static int blosc_compress_context(blosc2_context* context) {
   }
   else {
     // Check whether we have a run for the whole chunk
+    int dict_training = context->use_dict && (context->dict_cdict == NULL);
     int start_csizes = context->header_overhead + 4 * context->nblocks;
-    if (ntbytes == (int)(start_csizes + nstreams * sizeof(int32_t))) {
+    if (!dict_training && ntbytes == (int)(start_csizes + nstreams * sizeof(int32_t))) {
       // The streams are all zero runs (by construction).  Encode it...
       context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] |= BLOSC2_SPECIAL_ZERO << 4;
       // ...and assign the new chunk length
