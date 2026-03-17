@@ -442,6 +442,48 @@ static char* test_vlcompress_dict_20blocks(void) {
 
 
 
+/* Regression: blosc2_chunk_zeros/uninit/nans/repeatval must succeed even when
+ * use_dict=1 is set with a codec that does not support dictionary compression.
+ * These functions never compress data — they only build a special-value header —
+ * so use_dict is irrelevant and must not trigger a codec-support error. */
+static char *test_special_value_use_dict(void) {
+  static const int codecs[] = {BLOSC_BLOSCLZ, BLOSC_LZ4, BLOSC_ZLIB};
+  int32_t isize = 1000 * (int32_t)sizeof(float);
+  float repeatval = 3.14f;
+
+  for (int ci = 0; ci < (int)(sizeof(codecs) / sizeof(codecs[0])); ci++) {
+    blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+    cparams.typesize = sizeof(float);
+    cparams.clevel = 5;
+    cparams.nthreads = 1;
+    cparams.compcode = codecs[ci];
+    cparams.use_dict = 1;
+
+    uint8_t chunk[BLOSC_EXTENDED_HEADER_LENGTH + sizeof(float)];
+    int ret;
+
+    ret = blosc2_chunk_zeros(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+    mu_assert("ERROR: blosc2_chunk_zeros failed with use_dict=1",
+              ret == BLOSC_EXTENDED_HEADER_LENGTH);
+
+    ret = blosc2_chunk_uninit(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+    mu_assert("ERROR: blosc2_chunk_uninit failed with use_dict=1",
+              ret == BLOSC_EXTENDED_HEADER_LENGTH);
+
+    ret = blosc2_chunk_nans(cparams, isize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
+    mu_assert("ERROR: blosc2_chunk_nans failed with use_dict=1",
+              ret == BLOSC_EXTENDED_HEADER_LENGTH);
+
+    ret = blosc2_chunk_repeatval(cparams, isize,
+                                  chunk, BLOSC_EXTENDED_HEADER_LENGTH + (int32_t)sizeof(float),
+                                  &repeatval);
+    mu_assert("ERROR: blosc2_chunk_repeatval failed with use_dict=1",
+              ret == BLOSC_EXTENDED_HEADER_LENGTH + (int32_t)sizeof(float));
+  }
+  return EXIT_SUCCESS;
+}
+
+
 static char *all_tests(void) {
   blocksize = 1 * KB;    // really tiny
   use_dict = 0;
@@ -509,6 +551,10 @@ static char *all_tests(void) {
      At exactly 20 blocks, dict_maxsize = srcsize/20 = 1, which is too small for ZSTD training;
      should fall back to plain compression. */
   mu_run_test(test_vlcompress_dict_20blocks);
+
+  /* Regression: special-value chunk functions must not fail when use_dict=1
+     is combined with a codec that does not support dict compression. */
+  mu_run_test(test_special_value_use_dict);
 
   return EXIT_SUCCESS;
 }
