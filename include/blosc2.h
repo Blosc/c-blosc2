@@ -1173,7 +1173,8 @@ typedef struct {
   uint8_t clevel;
   //!< The compression level (5).
   int use_dict;
-  //!< Use dicts or not when compressing (only for ZSTD).
+  //!< Use dicts or not when compressing. Only ZSTD and LZ4/LZ4HC support this;
+  //!< other codecs will return an error if this is set.
   int32_t typesize;
   //!< The type size (8).
   int16_t nthreads;
