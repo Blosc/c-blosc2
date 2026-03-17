@@ -51,6 +51,7 @@ int blosc2_schunk_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
   (*cparams)->typesize = schunk->typesize;
   (*cparams)->blocksize = schunk->blocksize;
   (*cparams)->splitmode = schunk->splitmode;
+  (*cparams)->use_dict = schunk->use_dict;
   if (schunk->cctx == NULL) {
     (*cparams)->nthreads = blosc2_get_nthreads();
   }
@@ -87,6 +88,7 @@ int update_schunk_properties(struct blosc2_schunk* schunk) {
   schunk->compcode_meta = cparams->compcode_meta;
   schunk->clevel = cparams->clevel;
   schunk->splitmode = cparams->splitmode;
+  schunk->use_dict = (uint8_t)cparams->use_dict;
   schunk->typesize = cparams->typesize;
   schunk->blocksize = cparams->blocksize;
   schunk->chunksize = -1;
