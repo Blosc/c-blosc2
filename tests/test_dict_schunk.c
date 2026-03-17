@@ -16,6 +16,7 @@
 int tests_run = 0;
 int blocksize;
 int use_dict;
+int compcode;
 
 static const uint8_t small_payload[] = {
     0x8b, 0xa6, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0xa1, 0x78, 0xa4, 0x72, 0x6f, 0x77, 0x73, 0x01,
@@ -216,6 +217,75 @@ static char* test_small_dict_append(void) {
 }
 
 
+static char* test_dict_lz4(void) {
+  static int32_t data[CHUNKSIZE];
+  static int32_t data_dest[CHUNKSIZE];
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
+  int dsize;
+  int64_t nbytes, cbytes;
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_schunk* schunk;
+  int64_t nchunks;
+
+  blosc2_init();
+
+  cparams.typesize = sizeof(int32_t);
+  cparams.compcode = compcode;
+  cparams.use_dict = 1;
+  cparams.clevel = 1;
+  cparams.nthreads = NTHREADS;
+  cparams.blocksize = blocksize;
+  cparams.splitmode = BLOSC_FORWARD_COMPAT_SPLIT;
+  dparams.nthreads = NTHREADS;
+  blosc2_storage storage = {.cparams=&cparams, .dparams=&dparams};
+  schunk = blosc2_schunk_new(&storage);
+
+  for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    for (int i = 0; i < CHUNKSIZE; i++) {
+      data[i] = i + nchunk * CHUNKSIZE;
+    }
+    nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
+    mu_assert("ERROR: incorrect nchunks value", nchunks == (nchunk + 1));
+  }
+
+  nbytes = schunk->nbytes;
+  cbytes = schunk->cbytes;
+  float cratio = (float)nbytes / (float)cbytes;
+  if (tests_run == 0) printf("\n");
+  printf("[%s blocksize: %s] cratio with dict: %.1fx\n",
+         compcode == BLOSC_LZ4 ? "LZ4" : "LZ4HC",
+         blocksize > 0 ? (blocksize <= 4*1024 ? "4 KB" : "32 KB") : "auto",
+         cratio);
+  mu_assert("ERROR: LZ4 dict does not improve compression ratio", cratio > 1.0f);
+
+  /* Verify BLOSC2_USEDICT is set in each raw chunk */
+  for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    uint8_t *chunk_ptr = NULL;
+    bool needs_free = false;
+    int csize = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_ptr, &needs_free);
+    mu_assert("ERROR: cannot retrieve raw chunk", csize > 0 && chunk_ptr != NULL);
+    bool flag_set = (chunk_ptr[BLOSC2_CHUNK_BLOSC2_FLAGS] & BLOSC2_USEDICT) != 0;
+    if (needs_free) free(chunk_ptr);
+    mu_assert("ERROR: BLOSC2_USEDICT flag not set in LZ4 dict chunk", flag_set);
+  }
+
+  /* Verify correct roundtrip */
+  for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, (void *) data_dest, isize);
+    mu_assert("ERROR: LZ4 dict chunk decompression failed", dsize == isize);
+    for (int i = 0; i < CHUNKSIZE; i++) {
+      mu_assert("ERROR: bad roundtrip in LZ4 dict test",
+                data_dest[i] == i + nchunk * CHUNKSIZE);
+    }
+  }
+
+  blosc2_schunk_free(schunk);
+  blosc2_destroy();
+  return EXIT_SUCCESS;
+}
+
+
 static char *all_tests(void) {
   blocksize = 1 * KB;    // really tiny
   use_dict = 0;
@@ -251,6 +321,25 @@ static char *all_tests(void) {
   mu_run_test(test_small_dict_append);
   use_dict = 1;
   mu_run_test(test_small_dict_append);
+
+  /* LZ4 and LZ4HC dict tests */
+  blocksize = 4 * KB;
+  compcode = BLOSC_LZ4;
+  mu_run_test(test_dict_lz4);
+  compcode = BLOSC_LZ4HC;
+  mu_run_test(test_dict_lz4);
+
+  blocksize = 32 * KB;
+  compcode = BLOSC_LZ4;
+  mu_run_test(test_dict_lz4);
+  compcode = BLOSC_LZ4HC;
+  mu_run_test(test_dict_lz4);
+
+  blocksize = 0;  // automatic
+  compcode = BLOSC_LZ4;
+  mu_run_test(test_dict_lz4);
+  compcode = BLOSC_LZ4HC;
+  mu_run_test(test_dict_lz4);
 
   return EXIT_SUCCESS;
 }

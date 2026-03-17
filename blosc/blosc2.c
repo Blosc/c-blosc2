@@ -31,6 +31,7 @@
 #include "blosc2/tuners-registry.h"
 
 #include "lz4.h"
+#define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"
 #ifdef HAVE_IPP
   #include <ipps.h>
@@ -391,10 +392,15 @@ static int compcode_to_compversion(int compcode) {
 
 
 static int lz4_wrap_compress(const char* input, size_t input_length,
-                             char* output, size_t maxout, int accel, void* hash_table) {
+                             char* output, size_t maxout, int accel, void* hash_table,
+                             struct thread_context* thread_context) {
   BLOSC_UNUSED_PARAM(accel);
   int cbytes;
+  blosc2_context* context = thread_context->parent_context;
 #ifdef HAVE_IPP
+  if (context->use_dict) {
+    BLOSC_TRACE_WARNING("LZ4 dict compression is not supported with IPP.  Ignoring dict.");
+  }
   if (hash_table == NULL) {
     return BLOSC2_ERROR_INVALID_PARAM;  // the hash table should always be initialized
   }
@@ -414,37 +420,71 @@ static int lz4_wrap_compress(const char* input, size_t input_length,
 #else
   BLOSC_UNUSED_PARAM(hash_table);
   accel = 1;  // deactivate acceleration to match IPP behaviour
-  cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
+  if (context->use_dict && context->dict_cdict != NULL) {
+    if (thread_context->lz4_cstream == NULL) {
+      thread_context->lz4_cstream = LZ4_createStream();
+    }
+    // Reset the thread stream to dict-only context before each block so that
+    // each compressed block references only the dictionary (not prior blocks).
+    // This ensures independent decompressibility with LZ4_decompress_safe_usingDict.
+    LZ4_loadDict((LZ4_stream_t*)thread_context->lz4_cstream,
+                 (const char*)context->dict_buffer, (int)context->dict_size);
+    cbytes = LZ4_compress_fast_continue((LZ4_stream_t*)thread_context->lz4_cstream,
+                                        input, output, (int)input_length, (int)maxout, accel);
+  } else {
+    cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
+  }
 #endif
   return cbytes;
 }
 
 
 static int lz4hc_wrap_compress(const char* input, size_t input_length,
-                               char* output, size_t maxout, int clevel) {
+                               char* output, size_t maxout, int clevel,
+                               struct thread_context* thread_context) {
   int cbytes;
   if (input_length > (size_t)(UINT32_C(2) << 30))
     return BLOSC2_ERROR_2GB_LIMIT;
+  blosc2_context* context = thread_context->parent_context;
   /* clevel for lz4hc goes up to 12, at least in LZ4 1.7.5
    * but levels larger than 9 do not buy much compression. */
-  cbytes = LZ4_compress_HC(input, output, (int)input_length, (int)maxout,
-                           clevel);
+  if (context->use_dict && context->dict_cdict != NULL) {
+    if (thread_context->lz4hc_cstream == NULL) {
+      thread_context->lz4hc_cstream = LZ4_createStreamHC();
+    }
+    // Reset to dict-only context (with correct clevel) before each block.
+    LZ4_resetStreamHC_fast((LZ4_streamHC_t*)thread_context->lz4hc_cstream, clevel);
+    LZ4_loadDictHC((LZ4_streamHC_t*)thread_context->lz4hc_cstream,
+                   (const char*)context->dict_buffer, (int)context->dict_size);
+    cbytes = LZ4_compress_HC_continue((LZ4_streamHC_t*)thread_context->lz4hc_cstream,
+                                      input, output, (int)input_length, (int)maxout);
+  } else {
+    cbytes = LZ4_compress_HC(input, output, (int)input_length, (int)maxout, clevel);
+  }
   return cbytes;
 }
 
 
 static int lz4_wrap_decompress(const char* input, size_t compressed_length,
-                               char* output, size_t maxout) {
+                               char* output, size_t maxout,
+                               struct thread_context* thread_context) {
   int nbytes;
+  blosc2_context* context = thread_context->parent_context;
 #ifdef HAVE_IPP
   int outlen = (int)maxout;
   int inlen = (int)compressed_length;
   IppStatus status;
   status = ippsDecodeLZ4_8u((const Ipp8u*)input, inlen, (Ipp8u*)output, &outlen);
-  //status = ippsDecodeLZ4Dict_8u((const Ipp8u*)input, &inlen, (Ipp8u*)output, 0, &outlen, NULL, 1 << 16);
   nbytes = (status == ippStsNoErr) ? outlen : -outlen;
 #else
-  nbytes = LZ4_decompress_safe(input, output, (int)compressed_length, (int)maxout);
+  if (context->use_dict && context->dict_buffer != NULL && context->dict_size > 0) {
+    nbytes = LZ4_decompress_safe_usingDict(input, output,
+                                           (int)compressed_length, (int)maxout,
+                                           (const char*)context->dict_buffer,
+                                           (int)context->dict_size);
+  } else {
+    nbytes = LZ4_decompress_safe(input, output, (int)compressed_length, (int)maxout);
+  }
 #endif
   if (nbytes != (int)maxout) {
     return 0;
@@ -1294,11 +1334,13 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       hash_table = (void*)thread_context->lz4_hash_table;
     #endif
       cbytes = lz4_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
-                                 (char*)dest, (size_t)maxout, accel, hash_table);
+                                 (char*)dest, (size_t)maxout, accel, hash_table,
+                                 thread_context);
     }
     else if (context->compcode == BLOSC_LZ4HC) {
       cbytes = lz4hc_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
-                                   (char*)dest, (size_t)maxout, context->clevel);
+                                   (char*)dest, (size_t)maxout, context->clevel,
+                                   thread_context);
     }
   #if defined(HAVE_ZLIB)
     else if (context->compcode == BLOSC_ZLIB) {
@@ -1945,7 +1987,8 @@ static int blosc_d(
       }
       else if (compformat == BLOSC_LZ4_FORMAT) {
         nbytes = lz4_wrap_decompress((char*)src, (size_t)cbytes,
-                                     (char*)_dest, (size_t)neblock);
+                                     (char*)_dest, (size_t)neblock,
+                                     thread_context);
       }
   #if defined(HAVE_ZLIB)
       else if (compformat == BLOSC_ZLIB_FORMAT) {
@@ -2164,6 +2207,8 @@ static int init_thread_context(struct thread_context* thread_context, blosc2_con
   thread_context->zstd_cctx = NULL;
   thread_context->zstd_dctx = NULL;
   #endif
+  thread_context->lz4_cstream = NULL;
+  thread_context->lz4hc_cstream = NULL;
 
   /* Create the hash table for LZ4 in case we are using IPP */
 #ifdef HAVE_IPP
@@ -2207,6 +2252,12 @@ static void destroy_thread_context(struct thread_context* thread_context) {
     ZSTD_freeDCtx(thread_context->zstd_dctx);
   }
 #endif
+  if (thread_context->lz4_cstream != NULL) {
+    LZ4_freeStream((LZ4_stream_t*)thread_context->lz4_cstream);
+  }
+  if (thread_context->lz4hc_cstream != NULL) {
+    LZ4_freeStreamHC((LZ4_streamHC_t*)thread_context->lz4hc_cstream);
+  }
 #ifdef HAVE_IPP
   if (thread_context->lz4_hash_table != NULL) {
     ippsFree(thread_context->lz4_hash_table);
@@ -2402,6 +2453,13 @@ static int initialize_context_compression(
     return BLOSC2_ERROR_CODEC_PARAM;
   }
 
+  /* Dictionary support is only available for ZSTD, LZ4, and LZ4HC */
+  if (context->use_dict && context->compcode != BLOSC_ZSTD &&
+      context->compcode != BLOSC_LZ4 && context->compcode != BLOSC_LZ4HC) {
+    BLOSC_TRACE_ERROR("`use_dict` is only supported for ZSTD, LZ4, and LZ4HC codecs.");
+    return BLOSC2_ERROR_CODEC_PARAM;
+  }
+
   /* Check typesize limits */
   if (context->typesize > BLOSC2_MAXTYPESIZE) {
     // If typesize is too large for Blosc2, return an error
@@ -2499,13 +2557,8 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
 
   /* Read optional dictionary if flag set */
   if (context->blosc2_flags & BLOSC2_USEDICT) {
-#if defined(HAVE_ZSTD)
     context->use_dict = 1;
-    if (context->dict_ddict != NULL) {
-      // Free the existing dictionary (probably from another chunk)
-      ZSTD_freeDDict(context->dict_ddict);
-    }
-    // The trained dictionary is after the bstarts block
+    // The dictionary section is after the bstarts block: [int32 size | raw bytes]
     if (srcsize < (signed)sizeof(int32_t)) {
       BLOSC_TRACE_ERROR("Not enough space to read size of dictionary.");
       return BLOSC2_ERROR_READ_BUFFER;
@@ -2522,10 +2575,20 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
       return BLOSC2_ERROR_READ_BUFFER;
     }
     srcsize -= context->dict_size;
-    // Read dictionary
+    // dict_buffer points directly into the source chunk — no copy needed
     context->dict_buffer = (void*)(context->src + bstarts_end + sizeof(int32_t));
-    context->dict_ddict = ZSTD_createDDict(context->dict_buffer, context->dict_size);
+#if defined(HAVE_ZSTD)
+    // context->compcode during decompression holds the format code (flags >> 5),
+    // so compare against BLOSC_ZSTD_FORMAT (not BLOSC_ZSTD).
+    if (context->compcode == BLOSC_ZSTD_FORMAT) {
+      if (context->dict_ddict != NULL) {
+        // Free the existing dictionary (probably from another chunk)
+        ZSTD_freeDDict(context->dict_ddict);
+      }
+      context->dict_ddict = ZSTD_createDDict(context->dict_buffer, context->dict_size);
+    }
 #endif   // HAVE_ZSTD
+    // For LZ4/LZ4HC: dict_buffer and dict_size are sufficient; no digested object needed.
   }
 
   if (vlblocks && !context->special_type && !memcpyed) {
@@ -2581,8 +2644,14 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
 static int write_compression_header(blosc2_context* context, bool extended_header) {
   blosc_header header;
   int dont_split;
-  int dict_training = context->use_dict && (context->dict_cdict == NULL);
   bool vlblocks = (context->blosc2_flags2 & BLOSC2_VL_BLOCKS) != 0;
+
+  if (context->clevel == 0) {
+    /* Compression level 0 means no compression — dicts serve no purpose here */
+    context->use_dict = 0;
+  }
+
+  int dict_training = context->use_dict && (context->dict_cdict == NULL);
 
   context->header_flags = 0;
 
@@ -2795,7 +2864,8 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
 
   if (context->use_dict && context->dict_cdict == NULL) {
 
-    if (context->compcode != BLOSC_ZSTD) {
+    bool is_lz4 = (context->compcode == BLOSC_LZ4 || context->compcode == BLOSC_LZ4HC);
+    if (!is_lz4 && context->compcode != BLOSC_ZSTD) {
       const char* compname;
       compname = clibcode_to_clibname(context->compcode);
       BLOSC_TRACE_ERROR("Codec %s does not support dicts.  Giving up.",
@@ -2803,8 +2873,9 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
       return BLOSC2_ERROR_CODEC_DICT;
     }
 
-#ifdef HAVE_ZSTD
-    // Build the dictionary out of the filters outcome and compress with it
+    // Build the dictionary out of the filters outcome and compress with it.
+    // For LZ4/LZ4HC the raw samples are used directly (no training algorithm).
+    // For ZSTD, ZDICT_trainFromBuffer() is used.
     int32_t dict_maxsize = BLOSC2_MAXDICTSIZE;
     // Do not make the dict more than 5% larger than uncompressed buffer
     if (dict_maxsize > srcsize / 20) {
@@ -2817,17 +2888,13 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
       nblocks = nblocks * context->typesize;
     }
     if (nblocks < 8) {
-      nblocks = 8;  // the minimum that accepts zstd as of 1.4.0
+      nblocks = 8;
     }
 
-    // 1 allows to use most of the chunk for training, but it is slower,
-    // and it does not always seem to improve compression ratio.
-    // Let's use 16, which is faster and still gives good results
-    // on test_dict_schunk.c, but this seems very dependent on the data.
     unsigned sample_fraction = 16;
     size_t sample_size = context->sourcesize / nblocks / sample_fraction;
 
-    // When the data is too small to produce useful dict training samples,
+    // When the data is too small to produce useful dict samples,
     // fall back to plain compression without a dict.
     if (dict_maxsize <= 0 || sample_size == 0) {
       BLOSC_TRACE_WARNING("Data too small for dict training (dict_maxsize=%d, sample_size=%zu)."
@@ -2838,6 +2905,48 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
       context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * context->nblocks;
       cbytes = blosc_compress_context(context);
     }
+    else if (is_lz4) {
+      // LZ4/LZ4HC: use raw sample data directly as the dictionary (no training step).
+      int32_t dict_actual_size = (int32_t)(nblocks * sample_size);
+      if (dict_actual_size > dict_maxsize) {
+        dict_actual_size = dict_maxsize;
+      }
+
+      // Reset bstarts and embed dict in the output buffer.
+      context->bstarts = (int32_t*)(context->dest + context->header_overhead);
+      context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * context->nblocks;
+      /* Write dict size */
+      _sw32(context->dest + context->output_bytes, dict_actual_size);
+      context->output_bytes += (int32_t)sizeof(int32_t);
+      /* Copy dict bytes */
+      context->dict_buffer = context->dest + context->output_bytes;
+      memcpy(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
+      /* Build the stream used as cdict (pre-loaded with the dict bytes) */
+      if (context->compcode == BLOSC_LZ4HC) {
+        LZ4_streamHC_t* lz4hc_cdict = LZ4_createStreamHC();
+        LZ4_loadDictHC(lz4hc_cdict, (const char*)context->dict_buffer, dict_actual_size);
+        context->dict_cdict = lz4hc_cdict;
+      } else {
+        LZ4_stream_t* lz4_cdict = LZ4_createStream();
+        LZ4_loadDict(lz4_cdict, (const char*)context->dict_buffer, dict_actual_size);
+        context->dict_cdict = lz4_cdict;
+      }
+      context->output_bytes += dict_actual_size;
+      context->dict_size = dict_actual_size;
+
+      /* Compress with dict */
+      cbytes = blosc_compress_context(context);
+
+      // Invalidate the dictionary so the context can be reused for the next chunk
+      context->dict_buffer = NULL;
+      if (context->compcode == BLOSC_LZ4HC) {
+        LZ4_freeStreamHC((LZ4_streamHC_t*)context->dict_cdict);
+      } else {
+        LZ4_freeStream((LZ4_stream_t*)context->dict_cdict);
+      }
+      context->dict_cdict = NULL;
+    }
+#ifdef HAVE_ZSTD
     else {
     // Populate the samples sizes for training the dictionary
     size_t* samples_sizes = malloc(nblocks * sizeof(size_t));
@@ -2904,7 +3013,7 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     ZSTD_freeCDict(context->dict_cdict);
     context->dict_cdict = NULL;
     }  // ZDICT_isError
-    }  // dict_maxsize > 0 && sample_size > 0
+    }  // ZSTD else branch
 #endif  // HAVE_ZSTD
   }
 
@@ -3067,8 +3176,9 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
 
 #ifdef HAVE_ZSTD
   if (context->use_dict && context->dict_cdict == NULL) {
+    bool is_lz4 = (context->compcode == BLOSC_LZ4 || context->compcode == BLOSC_LZ4HC);
     // The first blosc_compress_context() above was a dict-training pass that stored
-    // raw (uncompressed) VL block data at dest+header_overhead as samples.  Now train
+    // raw (uncompressed) VL block data at dest+header_overhead as samples.  Now build
     // the dictionary from those samples and do the real compression pass.
     int32_t dict_maxsize = BLOSC2_MAXDICTSIZE;
     // Do not make the dict more than 5% of the uncompressed size
@@ -3076,7 +3186,7 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
       dict_maxsize = (int32_t)srcsize / 20;
     }
     if (dict_maxsize <= 0 || nblocks < 8) {
-      // Data is too small or too few VL blocks to train a useful dictionary;
+      // Data is too small or too few VL blocks to build a useful dictionary;
       // fall back to plain compression without a dict.
       context->use_dict = 0;
       context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
@@ -3086,7 +3196,47 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
       cbytes = blosc_compress_context(context);
       context->vlblock_sources = NULL;
     }
+    else if (is_lz4) {
+      // LZ4/LZ4HC: use the concatenated raw VL block data directly as the dictionary.
+      void* samples_buffer = context->dest + context->header_overhead;
+      int32_t total_raw = 0;
+      for (int32_t i = 0; i < nblocks; i++) {
+        total_raw += context->blocknbytes[i];
+      }
+      int32_t dict_actual_size = total_raw < dict_maxsize ? total_raw : dict_maxsize;
+
+      context->bstarts = (int32_t*)(context->dest + context->header_overhead);
+      context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
+      _sw32(context->dest + context->output_bytes, dict_actual_size);
+      context->output_bytes += (int32_t)sizeof(int32_t);
+      context->dict_buffer = context->dest + context->output_bytes;
+      memcpy(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
+      if (context->compcode == BLOSC_LZ4HC) {
+        LZ4_streamHC_t* lz4hc_cdict = LZ4_createStreamHC();
+        LZ4_loadDictHC(lz4hc_cdict, (const char*)context->dict_buffer, dict_actual_size);
+        context->dict_cdict = lz4hc_cdict;
+      } else {
+        LZ4_stream_t* lz4_cdict = LZ4_createStream();
+        LZ4_loadDict(lz4_cdict, (const char*)context->dict_buffer, dict_actual_size);
+        context->dict_cdict = lz4_cdict;
+      }
+      context->output_bytes += dict_actual_size;
+      context->dict_size = dict_actual_size;
+
+      context->vlblock_sources = (const uint8_t**)srcs;
+      cbytes = blosc_compress_context(context);
+      context->vlblock_sources = NULL;
+
+      context->dict_buffer = NULL;
+      if (context->compcode == BLOSC_LZ4HC) {
+        LZ4_freeStreamHC((LZ4_streamHC_t*)context->dict_cdict);
+      } else {
+        LZ4_freeStream((LZ4_stream_t*)context->dict_cdict);
+      }
+      context->dict_cdict = NULL;
+    }
     else {
+      // ZSTD: use ZDICT_trainFromBuffer for dictionary training.
       // The training pass left all VL blocks concatenated at dest+header_overhead.
       // Use the actual per-block sizes as ZDICT sample sizes so that each VL block
       // is treated as a complete, independent training example.
@@ -3136,6 +3286,64 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
       /* Invalidate the dictionary so the context can be reused for the next chunk */
       context->dict_buffer = NULL;
       ZSTD_freeCDict(context->dict_cdict);
+      context->dict_cdict = NULL;
+    }
+    if (cbytes < 0) {
+      return cbytes;
+    }
+  }
+#else
+  if (context->use_dict && context->dict_cdict == NULL) {
+    bool is_lz4 = (context->compcode == BLOSC_LZ4 || context->compcode == BLOSC_LZ4HC);
+    int32_t dict_maxsize = BLOSC2_MAXDICTSIZE;
+    if (dict_maxsize > (int32_t)srcsize / 20) {
+      dict_maxsize = (int32_t)srcsize / 20;
+    }
+    if (!is_lz4 || dict_maxsize <= 0 || nblocks < 8) {
+      context->use_dict = 0;
+      context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
+      context->bstarts = (int32_t*)(context->dest + context->header_overhead);
+      context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
+      context->vlblock_sources = (const uint8_t**)srcs;
+      cbytes = blosc_compress_context(context);
+      context->vlblock_sources = NULL;
+    }
+    else {
+      void* samples_buffer = context->dest + context->header_overhead;
+      int32_t total_raw = 0;
+      for (int32_t i = 0; i < nblocks; i++) {
+        total_raw += context->blocknbytes[i];
+      }
+      int32_t dict_actual_size = total_raw < dict_maxsize ? total_raw : dict_maxsize;
+
+      context->bstarts = (int32_t*)(context->dest + context->header_overhead);
+      context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
+      _sw32(context->dest + context->output_bytes, dict_actual_size);
+      context->output_bytes += (int32_t)sizeof(int32_t);
+      context->dict_buffer = context->dest + context->output_bytes;
+      memcpy(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
+      if (context->compcode == BLOSC_LZ4HC) {
+        LZ4_streamHC_t* lz4hc_cdict = LZ4_createStreamHC();
+        LZ4_loadDictHC(lz4hc_cdict, (const char*)context->dict_buffer, dict_actual_size);
+        context->dict_cdict = lz4hc_cdict;
+      } else {
+        LZ4_stream_t* lz4_cdict = LZ4_createStream();
+        LZ4_loadDict(lz4_cdict, (const char*)context->dict_buffer, dict_actual_size);
+        context->dict_cdict = lz4_cdict;
+      }
+      context->output_bytes += dict_actual_size;
+      context->dict_size = dict_actual_size;
+
+      context->vlblock_sources = (const uint8_t**)srcs;
+      cbytes = blosc_compress_context(context);
+      context->vlblock_sources = NULL;
+
+      context->dict_buffer = NULL;
+      if (context->compcode == BLOSC_LZ4HC) {
+        LZ4_freeStreamHC((LZ4_streamHC_t*)context->dict_cdict);
+      } else {
+        LZ4_freeStream((LZ4_stream_t*)context->dict_cdict);
+      }
       context->dict_cdict = NULL;
     }
     if (cbytes < 0) {
@@ -4739,8 +4947,15 @@ void blosc2_free_ctx(blosc2_context* context) {
     free_thread_context(context->serial_context);
   }
   if (context->dict_cdict != NULL) {
+    if (context->compcode == BLOSC_LZ4) {
+      LZ4_freeStream((LZ4_stream_t*)context->dict_cdict);
+    } else if (context->compcode == BLOSC_LZ4HC) {
+      LZ4_freeStreamHC((LZ4_streamHC_t*)context->dict_cdict);
+    }
 #ifdef HAVE_ZSTD
-    ZSTD_freeCDict(context->dict_cdict);
+    else if (context->compcode == BLOSC_ZSTD) {
+      ZSTD_freeCDict(context->dict_cdict);
+    }
 #endif
   }
   if (context->dict_ddict != NULL) {
