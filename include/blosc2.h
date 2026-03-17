@@ -1736,6 +1736,8 @@ typedef struct blosc2_schunk {
   //!< Size of each chunk. 0 if not a fixed chunksize.
   uint8_t flags2;
   //!< Secondary chunk-format flags shared by all chunks in the schunk. 0 when empty.
+  uint8_t use_dict;
+  //!< Whether to use a dictionary for codec compression (1) or not (0).
   uint8_t filters[BLOSC2_MAX_FILTERS];
   //!< The (sequence of) filters.  8-bit per filter.
   uint8_t filters_meta[BLOSC2_MAX_FILTERS];

@@ -43,6 +43,8 @@
 #define FRAME_FILTER_PIPELINE (FRAME_HAS_VLMETALAYERS + 1 + 1) // 70
 #define FRAME_UDCODEC (FRAME_FILTER_PIPELINE + 1 + 6) // 77
 #define FRAME_CODEC_META (FRAME_FILTER_PIPELINE + 1 + 7) // 78
+#define FRAME_OTHER_FLAGS2 (FRAME_FILTER_PIPELINE + 1 + 14)  // 85
+#define FRAME_USE_DICT (1U << 0)   //!< bit 0 of other_flags2: use dictionary compression
 #define FRAME_HEADER_MINLEN (FRAME_FILTER_PIPELINE + 1 + 16)  // 87 <- minimum length
 #define FRAME_METALAYERS (FRAME_HEADER_MINLEN)  // 87
 #define FRAME_IDX_SIZE (FRAME_METALAYERS + 1 + 1)  // 89
