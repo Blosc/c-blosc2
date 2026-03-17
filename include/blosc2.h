@@ -301,7 +301,7 @@ enum {
  * @brief Values for different Blosc2 capabilities
  */
 enum {
-  BLOSC2_MAXDICTSIZE = 128 * 1024, //!< maximum size for compression dicts
+  BLOSC2_MAXDICTSIZE = 32 * 1024,  //!< maximum size for compression dicts
   BLOSC2_MINUSEFULDICT = 256,      //!< minimum dict size considered useful; smaller → fall back to plain compression
   BLOSC2_MAXBLOCKSIZE = 536866816, //!< maximum size for blocks
   BLOSC2_MAXTYPESIZE = BLOSC2_MAXBLOCKSIZE, //!< maximum size for types
