@@ -61,6 +61,7 @@ CUTEST_TEST_SETUP(fill_special) {
       {true, "test_fill_special.b2frame"}, // disk - cframe
       {false, "test_fill_special_s.b2frame"}, // disk - sframe
   ));
+  CUTEST_PARAMETRIZE(use_dict, int, CUTEST_DATA(0, 1));
 }
 
 
@@ -74,6 +75,8 @@ CUTEST_TEST_TEST(fill_special) {
   CUTEST_GET_PARAMETER(svalue, int);
   CUTEST_GET_PARAMETER(leftover_items, int);
   CUTEST_GET_PARAMETER(backend, test_fill_special_backend);
+  CUTEST_GET_PARAMETER(use_dict, int);
+  cparams->use_dict = use_dict;
 
   // Remove a possible stale sparse frame
   blosc2_remove_urlpath(backend.urlpath);
