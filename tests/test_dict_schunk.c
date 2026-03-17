@@ -217,6 +217,69 @@ static char* test_small_dict_append(void) {
 }
 
 
+/* Verify that use_dict is correctly round-tripped through the frame format.
+ * Write a schunk to disk, reopen it, and check that blosc2_schunk_get_cparams
+ * returns the same use_dict value that was used at creation time. */
+static char* test_dict_persist(void) {
+  static int32_t data[CHUNKSIZE];
+  static int32_t data_dest[CHUNKSIZE];
+  int32_t isize = CHUNKSIZE * sizeof(int32_t);
+  const char *urlpath = "test_dict_persist.b2frame";
+
+  blosc2_init();
+
+  for (int i = 0; i < CHUNKSIZE; i++) {
+    data[i] = i;
+  }
+
+  /* Write schunk with use_dict to file */
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  cparams.typesize = sizeof(int32_t);
+  cparams.compcode = BLOSC_ZSTD;
+  cparams.use_dict = use_dict;
+  cparams.clevel = 5;
+  cparams.nthreads = 1;
+
+  blosc2_storage storage = {.cparams = &cparams, .dparams = &dparams,
+                             .urlpath = (char *)urlpath, .contiguous = true};
+  blosc2_schunk *schunk = blosc2_schunk_new(&storage);
+  mu_assert("ERROR: cannot create persistent schunk for dict persist test", schunk != NULL);
+
+  for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    int64_t nchunks = blosc2_schunk_append_buffer(schunk, data, isize);
+    mu_assert("ERROR: bad append in dict persist test", nchunks == nchunk + 1);
+  }
+  blosc2_schunk_free(schunk);
+
+  /* Reopen and check that use_dict is preserved */
+  schunk = blosc2_schunk_open(urlpath);
+  mu_assert("ERROR: cannot reopen persistent schunk", schunk != NULL);
+
+  blosc2_cparams *recovered_cparams;
+  int rc = blosc2_schunk_get_cparams(schunk, &recovered_cparams);
+  mu_assert("ERROR: blosc2_schunk_get_cparams failed after reopen", rc == 0);
+  mu_assert("ERROR: use_dict not preserved after frame reopen",
+            recovered_cparams->use_dict == use_dict);
+  free(recovered_cparams);
+
+  /* Also verify data integrity */
+  for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
+    int dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, data_dest, isize);
+    mu_assert("ERROR: chunk cannot be decompressed after reopen", dsize == isize);
+    for (int i = 0; i < CHUNKSIZE; i++) {
+      mu_assert("ERROR: bad roundtrip after reopen", data_dest[i] == i);
+    }
+  }
+
+  blosc2_schunk_free(schunk);
+  blosc2_remove_urlpath(urlpath);
+  blosc2_destroy();
+
+  return EXIT_SUCCESS;
+}
+
+
 static char* test_dict_lz4(void) {
   static int32_t data[CHUNKSIZE];
   static int32_t data_dest[CHUNKSIZE];
@@ -414,6 +477,12 @@ static char *all_tests(void) {
   mu_run_test(test_small_dict_append);
   use_dict = 1;
   mu_run_test(test_small_dict_append);
+
+  /* Persistence: use_dict must survive write-to-file / reopen */
+  use_dict = 0;
+  mu_run_test(test_dict_persist);
+  use_dict = 1;
+  mu_run_test(test_dict_persist);
 
   /* LZ4 and LZ4HC dict tests */
   blocksize = 4 * KB;
