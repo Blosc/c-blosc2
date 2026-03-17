@@ -2863,6 +2863,9 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
   }
 
   if (context->use_dict && context->dict_cdict == NULL) {
+    /* blosc_compress_context() overwrites context->destsize with the training-pass output
+     * size.  Restore it so that the real compression pass has the correct output-buffer size. */
+    context->destsize = destsize;
 
     bool is_lz4 = (context->compcode == BLOSC_LZ4 || context->compcode == BLOSC_LZ4HC);
     if (!is_lz4 && context->compcode != BLOSC_ZSTD) {
@@ -3173,6 +3176,11 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
     context->vlblock_sources = NULL;
     return cbytes;
   }
+
+  /* blosc_compress_context() overwrites context->destsize with the training-pass output
+   * size (which is tiny — just the raw sample data).  Restore it so that the real
+   * compression pass below has the correct output-buffer size. */
+  context->destsize = destsize;
 
 #ifdef HAVE_ZSTD
   if (context->use_dict && context->dict_cdict == NULL) {
