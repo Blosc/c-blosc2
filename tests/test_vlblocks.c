@@ -396,15 +396,303 @@ static char *test_vlblocks_dict_roundtrip(void) {
 }
 #endif  /* HAVE_ZSTD */
 
+/* ---- blosc2_vlchunk_get_nblocks ------------------------------------------ */
+
+static char *test_vlchunk_get_nblocks(void) {
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  mu_assert("ERROR: cannot create cctx", cctx != NULL);
+
+  int32_t destsize = total_nbytes() + BLOSC2_MAX_OVERHEAD + 64;
+  uint8_t *chunk = malloc((size_t)destsize);
+  mu_assert("ERROR: cannot allocate chunk", chunk != NULL);
+
+  int32_t cbytes = blosc2_vlcompress_ctx(cctx, (const void * const *)srcs, srcsizes, 3, chunk, destsize);
+  mu_assert("ERROR: cannot create VL-block chunk", cbytes > 0);
+
+  /* Happy path: should report 3 blocks. */
+  int32_t nblocks = -1;
+  int rc = blosc2_vlchunk_get_nblocks(chunk, cbytes, &nblocks);
+  mu_assert("ERROR: blosc2_vlchunk_get_nblocks failed", rc == 0);
+  mu_assert("ERROR: wrong nblocks", nblocks == 3);
+
+  /* Reject NULL nblocks pointer. */
+  rc = blosc2_vlchunk_get_nblocks(chunk, cbytes, NULL);
+  mu_assert("ERROR: expected error for NULL nblocks", rc < 0);
+
+  /* Reject a regular (non-VL) chunk. */
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
+  mu_assert("ERROR: cannot create dctx", dctx != NULL);
+  int32_t regular_destsize = srcsizes[0] + BLOSC2_MAX_OVERHEAD;
+  uint8_t *regular_chunk = malloc((size_t)regular_destsize);
+  mu_assert("ERROR: cannot allocate regular chunk", regular_chunk != NULL);
+  int32_t regular_cbytes = blosc2_compress_ctx(cctx, srcs[0], srcsizes[0],
+                                               regular_chunk, regular_destsize);
+  mu_assert("ERROR: cannot create regular chunk", regular_cbytes > 0);
+  nblocks = -1;
+  rc = blosc2_vlchunk_get_nblocks(regular_chunk, regular_cbytes, &nblocks);
+  mu_assert("ERROR: expected error for non-VL chunk", rc < 0);
+
+  free(regular_chunk);
+  free(chunk);
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+  return EXIT_SUCCESS;
+}
+
+
+/* ---- blosc2_vldecompress_block_ctx --------------------------------------- */
+
+static char *test_vldecompress_block_ctx(void) {
+  blosc2_remove_urlpath(tdata.urlpath);
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  mu_assert("ERROR: cannot create cctx", cctx != NULL);
+
+  int32_t destsize = total_nbytes() + BLOSC2_MAX_OVERHEAD + 64;
+  uint8_t *chunk = malloc((size_t)destsize);
+  mu_assert("ERROR: cannot allocate chunk", chunk != NULL);
+
+  int32_t cbytes = blosc2_vlcompress_ctx(cctx, (const void * const *)srcs, srcsizes, 3, chunk, destsize);
+  mu_assert("ERROR: cannot create VL-block chunk", cbytes > 0);
+
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
+  mu_assert("ERROR: cannot create dctx", dctx != NULL);
+
+  /* Decompress block 0, middle (1), and last (2) one by one. */
+  for (int i = 0; i < 3; ++i) {
+    uint8_t *blk = NULL;
+    int32_t blksize = -1;
+    int rc = blosc2_vldecompress_block_ctx(dctx, chunk, cbytes, i, &blk, &blksize);
+    mu_assert("ERROR: blosc2_vldecompress_block_ctx failed", rc == srcsizes[i]);
+    mu_assert("ERROR: returned size mismatch", blksize == srcsizes[i]);
+    mu_assert("ERROR: content mismatch",
+              memcmp(blk, srcs[i], (size_t)srcsizes[i]) == 0);
+    free(blk);
+  }
+
+  free(chunk);
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+  blosc2_remove_urlpath(tdata.urlpath);
+  return EXIT_SUCCESS;
+}
+
+
+static char *test_vldecompress_block_ctx_errors(void) {
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  mu_assert("ERROR: cannot create cctx", cctx != NULL);
+
+  int32_t destsize = total_nbytes() + BLOSC2_MAX_OVERHEAD + 64;
+  uint8_t *chunk = malloc((size_t)destsize);
+  mu_assert("ERROR: cannot allocate chunk", chunk != NULL);
+
+  int32_t cbytes = blosc2_vlcompress_ctx(cctx, (const void * const *)srcs, srcsizes, 3, chunk, destsize);
+  mu_assert("ERROR: cannot create VL-block chunk", cbytes > 0);
+
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
+  mu_assert("ERROR: cannot create dctx", dctx != NULL);
+
+  uint8_t *blk = NULL;
+  int32_t blksize = -1;
+
+  /* Negative nblock. */
+  int rc = blosc2_vldecompress_block_ctx(dctx, chunk, cbytes, -1, &blk, &blksize);
+  mu_assert("ERROR: expected error for negative nblock", rc < 0);
+
+  /* Out-of-range nblock. */
+  rc = blosc2_vldecompress_block_ctx(dctx, chunk, cbytes, 3, &blk, &blksize);
+  mu_assert("ERROR: expected error for out-of-range nblock", rc < 0);
+
+  /* NULL dest. */
+  rc = blosc2_vldecompress_block_ctx(dctx, chunk, cbytes, 0, NULL, &blksize);
+  mu_assert("ERROR: expected error for NULL dest", rc < 0);
+
+  /* NULL destsize. */
+  rc = blosc2_vldecompress_block_ctx(dctx, chunk, cbytes, 0, &blk, NULL);
+  mu_assert("ERROR: expected error for NULL destsize", rc < 0);
+
+  /* Regular (non-VL) chunk must be rejected. */
+  int32_t regular_destsize = srcsizes[0] + BLOSC2_MAX_OVERHEAD;
+  uint8_t *regular_chunk = malloc((size_t)regular_destsize);
+  mu_assert("ERROR: cannot allocate regular chunk", regular_chunk != NULL);
+  int32_t regular_cbytes = blosc2_compress_ctx(cctx, srcs[0], srcsizes[0],
+                                               regular_chunk, regular_destsize);
+  mu_assert("ERROR: cannot create regular chunk", regular_cbytes > 0);
+  rc = blosc2_vldecompress_block_ctx(dctx, regular_chunk, regular_cbytes, 0, &blk, &blksize);
+  mu_assert("ERROR: expected error for non-VL chunk in block_ctx", rc < 0);
+
+  free(regular_chunk);
+  free(chunk);
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+  return EXIT_SUCCESS;
+}
+
+
+/* ---- blosc2_schunk_get_vlblock ------------------------------------------- */
+
+static char *test_schunk_get_vlblock(void) {
+  blosc2_remove_urlpath(tdata.urlpath);
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_storage storage = {
+      .contiguous = tdata.contiguous,
+      .urlpath = (char *)tdata.urlpath,
+      .cparams = &cparams,
+      .dparams = &dparams,
+  };
+
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  mu_assert("ERROR: cannot create cctx", cctx != NULL);
+
+  int32_t destsize = total_nbytes() + BLOSC2_MAX_OVERHEAD + 64;
+  uint8_t *chunk = malloc((size_t)destsize);
+  mu_assert("ERROR: cannot allocate chunk", chunk != NULL);
+  int32_t cbytes = blosc2_vlcompress_ctx(cctx, (const void * const *)srcs, srcsizes, 3, chunk, destsize);
+  mu_assert("ERROR: cannot create VL-block chunk", cbytes > 0);
+
+  blosc2_schunk *schunk = blosc2_schunk_new(&storage);
+  mu_assert("ERROR: cannot create schunk", schunk != NULL);
+  mu_assert("ERROR: cannot append chunk", blosc2_schunk_append_chunk(schunk, chunk, true) == 1);
+  free(chunk);
+  blosc2_free_ctx(cctx);
+
+  /* Read each block individually and verify. */
+  for (int i = 0; i < 3; ++i) {
+    uint8_t *blk = NULL;
+    int32_t blksize = -1;
+    int rc = blosc2_schunk_get_vlblock(schunk, 0, i, &blk, &blksize);
+    mu_assert("ERROR: blosc2_schunk_get_vlblock failed", rc == srcsizes[i]);
+    mu_assert("ERROR: returned size mismatch (schunk)", blksize == srcsizes[i]);
+    mu_assert("ERROR: content mismatch (schunk)",
+              memcmp(blk, srcs[i], (size_t)srcsizes[i]) == 0);
+    free(blk);
+  }
+
+  blosc2_schunk_free(schunk);
+
+  /* Reopen persistent schunks and verify again. */
+  if (tdata.urlpath != NULL) {
+    schunk = blosc2_schunk_open(tdata.urlpath);
+    mu_assert("ERROR: cannot reopen schunk", schunk != NULL);
+    for (int i = 0; i < 3; ++i) {
+      uint8_t *blk = NULL;
+      int32_t blksize = -1;
+      int rc = blosc2_schunk_get_vlblock(schunk, 0, i, &blk, &blksize);
+      mu_assert("ERROR: reopened blosc2_schunk_get_vlblock failed", rc == srcsizes[i]);
+      mu_assert("ERROR: reopened size mismatch", blksize == srcsizes[i]);
+      mu_assert("ERROR: reopened content mismatch",
+                memcmp(blk, srcs[i], (size_t)srcsizes[i]) == 0);
+      free(blk);
+    }
+    blosc2_schunk_free(schunk);
+  }
+
+  blosc2_remove_urlpath(tdata.urlpath);
+  return EXIT_SUCCESS;
+}
+
+
+#ifdef HAVE_ZSTD
+/* Selective single-block decompression should work on dict-enabled VL chunks.
+ * Uses the same block count and data shape as test_vlblocks_dict_roundtrip
+ * (64 JSON-like blocks, ~350 B each) to ensure ZSTD dict training fires. */
+static char *test_vldecompress_block_ctx_dict(void) {
+  enum { DICT_NBLOCKS = 64, DICT_BUF = 512 };
+
+  static char raw[DICT_NBLOCKS][DICT_BUF];
+  const void *vsrcs[DICT_NBLOCKS];
+  int32_t vsizes[DICT_NBLOCKS];
+  int32_t total = 0;
+  for (int i = 0; i < DICT_NBLOCKS; i++) {
+    vsizes[i] = (int32_t)snprintf(raw[i], DICT_BUF,
+        "{\"id\":\"en:ingredient-%03d\",\"vegan\":\"%s\","
+        "\"vegetarian\":\"%s\",\"percent_estimate\":%.2f,"
+        "\"is_in_taxonomy\":%d,\"text\":\"INGREDIENT NUMBER %03d\","
+        "\"from_palm_oil\":null,\"processing\":null,"
+        "\"labels\":null,\"origins\":null,\"quantity\":null,"
+        "\"quantity_g\":null,\"ciqual_food_code\":null,"
+        "\"additives_n\":null,\"nova_group\":null,"
+        "\"pnns_groups_1\":null,\"pnns_groups_2\":null,"
+        "\"carbon_footprint_percent_of_known_ingredients\":null}",
+        i,
+        (i % 3 == 0) ? "maybe" : "yes",
+        (i % 5 == 0) ? "no" : "yes",
+        (double)(i % 20) * 2.5 + 0.1,
+        i % 2,
+        i);
+    vsrcs[i] = raw[i];
+    total += vsizes[i];
+  }
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  cparams.compcode = BLOSC_ZSTD;
+  cparams.use_dict = 1;
+  cparams.nthreads = 1;
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  mu_assert("ERROR: cannot create dict cctx", cctx != NULL);
+
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
+  mu_assert("ERROR: cannot create dict dctx", dctx != NULL);
+
+  int32_t destsize = total + BLOSC2_MAX_OVERHEAD + DICT_NBLOCKS * 64 + BLOSC2_MAXDICTSIZE;
+  uint8_t *chunk = malloc((size_t)destsize);
+  mu_assert("ERROR: cannot allocate dict chunk", chunk != NULL);
+
+  int32_t cbytes = blosc2_vlcompress_ctx(cctx, vsrcs, vsizes, DICT_NBLOCKS, chunk, destsize);
+  mu_assert("ERROR: dict VL-block compression failed", cbytes > 0);
+  mu_assert("ERROR: BLOSC2_USEDICT flag not set",
+            (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & BLOSC2_USEDICT) != 0);
+
+  /* Read first, middle, and last block selectively. */
+  int targets[] = {0, DICT_NBLOCKS / 2, DICT_NBLOCKS - 1};
+  for (int t = 0; t < 3; ++t) {
+    int i = targets[t];
+    uint8_t *blk = NULL;
+    int32_t blksize = -1;
+    int rc = blosc2_vldecompress_block_ctx(dctx, chunk, cbytes, i, &blk, &blksize);
+    mu_assert("ERROR: dict blosc2_vldecompress_block_ctx failed", rc == vsizes[i]);
+    mu_assert("ERROR: dict returned size mismatch", blksize == vsizes[i]);
+    mu_assert("ERROR: dict content mismatch",
+              memcmp(blk, vsrcs[i], (size_t)vsizes[i]) == 0);
+    free(blk);
+  }
+
+  free(chunk);
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+  return EXIT_SUCCESS;
+}
+#endif  /* HAVE_ZSTD */
+
+
 static char *all_tests(void) {
   for (int i = 0; i < (int)ARRAY_SIZE(backends); ++i) {
     tdata = backends[i];
     mu_run_test(test_vlblocks_roundtrip);
     mu_run_test(test_no_mix_regular_and_vlblocks);
+    mu_run_test(test_vlchunk_get_nblocks);
+    mu_run_test(test_vldecompress_block_ctx);
+    mu_run_test(test_vldecompress_block_ctx_errors);
+    mu_run_test(test_schunk_get_vlblock);
   }
   mu_run_test(test_vlblocks_mt_roundtrip);
 #ifdef HAVE_ZSTD
   mu_run_test(test_vlblocks_dict_roundtrip);
+  mu_run_test(test_vldecompress_block_ctx_dict);
 #endif
   return EXIT_SUCCESS;
 }

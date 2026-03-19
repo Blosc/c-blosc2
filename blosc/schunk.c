@@ -1311,6 +1311,33 @@ int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *
 }
 
 
+int blosc2_schunk_get_vlblock(blosc2_schunk *schunk, int64_t nchunk, int32_t nblock,
+                              uint8_t **dest, int32_t *destsize) {
+  if (schunk == NULL || dest == NULL || destsize == NULL) {
+    BLOSC_TRACE_ERROR("schunk, dest, and destsize must not be NULL.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  uint8_t *chunk = NULL;
+  bool needs_free = false;
+  int cbytes = blosc2_schunk_get_chunk(schunk, nchunk, &chunk, &needs_free);
+  if (cbytes < 0) {
+    return cbytes;
+  }
+  if (chunk == NULL || cbytes == 0) {
+    BLOSC_TRACE_ERROR("Chunk %" PRId64 " is not initialized.", nchunk);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  int result = blosc2_vldecompress_block_ctx(schunk->dctx, chunk, cbytes,
+                                             nblock, dest, destsize);
+  if (needs_free) {
+    free(chunk);
+  }
+  return result;
+}
+
+
 int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer) {
   int64_t byte_start = start * schunk->typesize;
   int64_t byte_stop = stop * schunk->typesize;
