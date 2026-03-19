@@ -3119,6 +3119,26 @@ static int reorder_vl_blocks_output(blosc2_context *context) {
 }
 
 
+int blosc2_vlchunk_get_nblocks(const void* src, int32_t srcsize, int32_t* nblocks) {
+  if (src == NULL || nblocks == NULL) {
+    BLOSC_TRACE_ERROR("src and nblocks must not be NULL.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  blosc_header header;
+  int result = read_chunk_header((const uint8_t*)src, srcsize, true, &header);
+  if (result < 0) {
+    return result;
+  }
+  if ((header.blosc2_flags2 & BLOSC2_VL_BLOCKS) == 0) {
+    BLOSC_TRACE_ERROR("Chunk does not use VL blocks.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  /* For VL-block chunks the blocksize field in the header stores nblocks. */
+  *nblocks = header.blocksize;
+  return 0;
+}
+
+
 int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, const int32_t* srcsizes,
                           int32_t nblocks, void* dest, int32_t destsize) {
   int error, cbytes;
@@ -3718,6 +3738,89 @@ int blosc2_vldecompress_ctx(blosc2_context* context, const void* src, int32_t sr
   }
 
   return context->nblocks;
+}
+
+
+/* Decompress a single VL block from an already-initialised decompression
+ * context.  The context must have been prepared by initialize_context_decompression()
+ * on a VL-block chunk so that blocknbytes[], blockoffsets[], blockcbytes[], and
+ * bstarts[] are all valid.
+ *
+ * On success, *dest points to a newly allocated buffer of *destsize bytes that
+ * the caller must free().  Returns *destsize, or a negative error code. */
+static int decompress_single_vlblock(blosc2_context* context, int32_t nblock,
+                                     uint8_t** dest, int32_t* destsize) {
+  if (nblock < 0 || nblock >= context->nblocks) {
+    BLOSC_TRACE_ERROR("nblock (%d) out of range [0, %d).", nblock, context->nblocks);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  int32_t bsize = context->blocknbytes[nblock];
+  uint8_t* buf = malloc((size_t)bsize);
+  if (buf == NULL) {
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+
+  /* Ensure we have a serial thread context sized for this blocksize. */
+  if (context->serial_context == NULL) {
+    context->serial_context = create_thread_context(context, 0);
+  }
+  else if (context->blocksize != context->serial_context->tmp_blocksize) {
+    free_thread_context(context->serial_context);
+    context->serial_context = create_thread_context(context, 0);
+  }
+  if (context->serial_context == NULL) {
+    free(buf);
+    return BLOSC2_ERROR_THREAD_CREATE;
+  }
+
+  bool memcpyed = (context->header_flags & (uint8_t)BLOSC_MEMCPYED) != 0;
+  int32_t src_offset = sw32_(context->bstarts + nblock);
+  int cbytes = blosc_d(context->serial_context, bsize, 0, memcpyed,
+                       context->src, context->srcsize, src_offset, nblock,
+                       buf, 0,
+                       context->serial_context->tmp, context->serial_context->tmp2);
+  if (cbytes < 0) {
+    free(buf);
+    return cbytes;
+  }
+
+  *dest = buf;
+  *destsize = bsize;
+  return bsize;
+}
+
+
+int blosc2_vldecompress_block_ctx(blosc2_context* context, const void* src, int32_t srcsize,
+                                  int32_t nblock, uint8_t** dest, int32_t* destsize) {
+  if (context->do_compress != 0) {
+    BLOSC_TRACE_ERROR("Context is not meant for decompression.  Giving up.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (dest == NULL || destsize == NULL) {
+    BLOSC_TRACE_ERROR("dest and destsize must not be NULL.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  blosc_header header;
+  int result = read_chunk_header((const uint8_t*)src, srcsize, true, &header);
+  if (result < 0) {
+    return result;
+  }
+  if ((header.blosc2_flags2 & BLOSC2_VL_BLOCKS) == 0) {
+    BLOSC_TRACE_ERROR("Chunk does not use VL blocks.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  /* Pass header.nbytes as destsize so the size-check inside
+   * initialize_context_decompression passes; context->dest is set to NULL and
+   * is never written by blosc_d (which uses its own dest argument). */
+  result = initialize_context_decompression(context, &header, src, srcsize, NULL, header.nbytes);
+  if (result < 0) {
+    return result;
+  }
+
+  return decompress_single_vlblock(context, nblock, dest, destsize);
 }
 
 

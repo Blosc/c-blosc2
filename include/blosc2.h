@@ -1548,6 +1548,49 @@ BLOSC_EXPORT int blosc2_vldecompress_ctx(blosc2_context* context, const void* sr
                                          int32_t* destsizes, int32_t maxblocks);
 
 /**
+ * @brief Return the number of variable-length blocks stored in a VL-block chunk.
+ *
+ * This is a header-only query: it reads only the chunk header and does not
+ * allocate or decompress anything.
+ *
+ * @param src The buffer of compressed data.  Must carry the #BLOSC2_VL_BLOCKS flag.
+ * @param srcsize The length of the compressed data buffer.
+ * @param nblocks On success, the number of VL blocks in the chunk.
+ *
+ * @return 0 on success, or a negative error code.
+ *   Returns #BLOSC2_ERROR_INVALID_PARAM if the chunk does not use VL blocks.
+ */
+BLOSC_EXPORT int blosc2_vlchunk_get_nblocks(const void* src, int32_t srcsize,
+                                            int32_t* nblocks);
+
+/**
+ * @brief Decompress a single variable-length block from a VL-block chunk.
+ *
+ * Only the requested block is decompressed and allocated; all other blocks
+ * in the chunk are untouched.
+ *
+ * @param context A decompression context (#blosc2_context created with
+ *   #blosc2_create_dctx).
+ * @param src The buffer of compressed data.  Must carry the #BLOSC2_VL_BLOCKS flag.
+ * @param srcsize The length of the compressed data buffer.
+ * @param nblock Zero-based index of the block to decompress.
+ * @param dest On success, points to a newly allocated buffer containing the
+ *   decompressed block.  The caller is responsible for freeing this buffer with
+ *   @c free().
+ * @param destsize On success, the uncompressed byte size of the block.
+ *
+ * @return The uncompressed byte size of the block on success, or a negative
+ *   error code.  Returns #BLOSC2_ERROR_INVALID_PARAM if the chunk does not use
+ *   VL blocks or if @p nblock is out of range.
+ */
+BLOSC_EXPORT int blosc2_vldecompress_block_ctx(blosc2_context* context,
+                                               const void* src,
+                                               int32_t srcsize,
+                                               int32_t nblock,
+                                               uint8_t** dest,
+                                               int32_t* destsize);
+
+/**
  * @brief Create a chunk made of zeros.
  *
  * @param cparams The compression parameters.
@@ -2055,6 +2098,29 @@ BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, 
  */
 BLOSC_EXPORT int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chunk,
                                              bool *needs_free);
+
+/**
+ * @brief Decompress a single variable-length block from a schunk chunk.
+ *
+ * Convenience wrapper around #blosc2_vldecompress_block_ctx that fetches the
+ * compressed chunk from @p schunk and decompresses only the requested VL block.
+ * Only the requested block is allocated and decompressed; all other blocks in
+ * the chunk are untouched.
+ *
+ * @param schunk The super-chunk from which to read.
+ * @param nchunk Zero-based index of the chunk inside the super-chunk.
+ * @param nblock Zero-based index of the VL block inside the chunk.
+ * @param dest On success, points to a newly allocated buffer containing the
+ *   decompressed block.  The caller is responsible for freeing it with @c free().
+ * @param destsize On success, the uncompressed byte size of the block.
+ *
+ * @return The uncompressed byte size of the block on success, or a negative
+ *   error code.  Returns #BLOSC2_ERROR_INVALID_PARAM if the chunk does not use
+ *   VL blocks or if @p nblock is out of range.
+ */
+BLOSC_EXPORT int blosc2_schunk_get_vlblock(blosc2_schunk *schunk, int64_t nchunk,
+                                           int32_t nblock,
+                                           uint8_t **dest, int32_t *destsize);
 
 /**
  * @brief Fill buffer with a schunk slice.
