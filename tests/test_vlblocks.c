@@ -679,6 +679,140 @@ static char *test_vldecompress_block_ctx_dict(void) {
 #endif  /* HAVE_ZSTD */
 
 
+/* ---- Lazy VL chunk tests ------------------------------------------------- */
+
+/* Helper: build a 2-chunk file-backed schunk with 3 VL blocks per chunk.
+ * Returns the schunk (caller must blosc2_schunk_free it), or NULL on error. */
+static blosc2_schunk* make_lazy_vl_schunk(const char* urlpath, bool contiguous) {
+  blosc2_remove_urlpath(urlpath);
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_storage storage = {
+      .contiguous = contiguous,
+      .urlpath = (char *)urlpath,
+      .cparams = &cparams,
+      .dparams = &dparams,
+  };
+
+  blosc2_schunk* schunk = blosc2_schunk_new(&storage);
+  if (schunk == NULL) return NULL;
+
+  blosc2_context* cctx = blosc2_create_cctx(cparams);
+  if (cctx == NULL) { blosc2_schunk_free(schunk); return NULL; }
+
+  int32_t destsize = total_nbytes() + BLOSC2_MAX_OVERHEAD + 64;
+  uint8_t* chunk = malloc((size_t)destsize);
+  if (chunk == NULL) { blosc2_free_ctx(cctx); blosc2_schunk_free(schunk); return NULL; }
+
+  int32_t cbytes = blosc2_vlcompress_ctx(cctx, (const void * const *)srcs, srcsizes, 3,
+                                         chunk, destsize);
+  if (cbytes <= 0 || blosc2_schunk_append_chunk(schunk, chunk, true) < 0) {
+    free(chunk); blosc2_free_ctx(cctx); blosc2_schunk_free(schunk); return NULL;
+  }
+  /* Append a second chunk (same data) so nchunks > 1. */
+  cbytes = blosc2_vlcompress_ctx(cctx, (const void * const *)srcs, srcsizes, 3,
+                                 chunk, destsize);
+  if (cbytes <= 0 || blosc2_schunk_append_chunk(schunk, chunk, true) < 0) {
+    free(chunk); blosc2_free_ctx(cctx); blosc2_schunk_free(schunk); return NULL;
+  }
+  free(chunk);
+  blosc2_free_ctx(cctx);
+  return schunk;
+}
+
+static char *test_lazy_vlchunk_get_nblocks(void) {
+  const char* urlpath = "test_lazy_vlnblocks.b2frame";
+  blosc2_schunk* schunk = make_lazy_vl_schunk(urlpath, true);
+  mu_assert("ERROR: cannot create lazy VL schunk", schunk != NULL);
+
+  for (int64_t nchunk = 0; nchunk < schunk->nchunks; ++nchunk) {
+    uint8_t* lazy_chunk = NULL;
+    bool needs_free = false;
+    int cbytes = blosc2_schunk_get_lazychunk(schunk, nchunk, &lazy_chunk, &needs_free);
+    mu_assert("ERROR: blosc2_schunk_get_lazychunk failed", cbytes > 0);
+
+    int32_t nblocks = -1;
+    int rc = blosc2_vlchunk_get_nblocks(lazy_chunk, cbytes, &nblocks);
+    mu_assert("ERROR: blosc2_vlchunk_get_nblocks failed on lazy chunk", rc == 0);
+    mu_assert("ERROR: wrong nblocks from lazy chunk", nblocks == 3);
+
+    if (needs_free) free(lazy_chunk);
+  }
+
+  blosc2_schunk_free(schunk);
+  blosc2_remove_urlpath(urlpath);
+  return EXIT_SUCCESS;
+}
+
+
+static char *test_lazy_vldecompress_block_ctx(void) {
+  const char* urlpath = "test_lazy_vldecomp.b2frame";
+  blosc2_schunk* schunk = make_lazy_vl_schunk(urlpath, true);
+  mu_assert("ERROR: cannot create lazy VL schunk", schunk != NULL);
+
+  /* Use the schunk's own dctx, which already has schunk->dctx->schunk set. */
+  blosc2_context* dctx = schunk->dctx;
+
+  for (int64_t nchunk = 0; nchunk < schunk->nchunks; ++nchunk) {
+    uint8_t* lazy_chunk = NULL;
+    bool needs_free = false;
+    int cbytes = blosc2_schunk_get_lazychunk(schunk, nchunk, &lazy_chunk, &needs_free);
+    mu_assert("ERROR: blosc2_schunk_get_lazychunk failed", cbytes > 0);
+
+    for (int i = 0; i < 3; ++i) {
+      uint8_t* blk = NULL;
+      int32_t blksize = -1;
+      int rc = blosc2_vldecompress_block_ctx(dctx, lazy_chunk, cbytes, i, &blk, &blksize);
+      mu_assert("ERROR: lazy blosc2_vldecompress_block_ctx failed", rc == srcsizes[i]);
+      mu_assert("ERROR: lazy returned size mismatch", blksize == srcsizes[i]);
+      mu_assert("ERROR: lazy content mismatch",
+                memcmp(blk, srcs[i], (size_t)srcsizes[i]) == 0);
+      free(blk);
+    }
+    if (needs_free) free(lazy_chunk);
+  }
+
+  blosc2_schunk_free(schunk);
+  blosc2_remove_urlpath(urlpath);
+  return EXIT_SUCCESS;
+}
+
+
+static char *test_lazy_vldecompress_block_ctx_sframe(void) {
+  const char* urlpath = "test_lazy_vldecomp_s.b2frame";
+  blosc2_schunk* schunk = make_lazy_vl_schunk(urlpath, false);
+  mu_assert("ERROR: cannot create lazy VL sframe schunk", schunk != NULL);
+
+  /* Use the schunk's own dctx. */
+  blosc2_context* dctx = schunk->dctx;
+
+  for (int64_t nchunk = 0; nchunk < schunk->nchunks; ++nchunk) {
+    uint8_t* lazy_chunk = NULL;
+    bool needs_free = false;
+    int cbytes = blosc2_schunk_get_lazychunk(schunk, nchunk, &lazy_chunk, &needs_free);
+    mu_assert("ERROR: sframe blosc2_schunk_get_lazychunk failed", cbytes > 0);
+
+    for (int i = 0; i < 3; ++i) {
+      uint8_t* blk = NULL;
+      int32_t blksize = -1;
+      int rc = blosc2_vldecompress_block_ctx(dctx, lazy_chunk, cbytes, i, &blk, &blksize);
+      mu_assert("ERROR: sframe lazy blosc2_vldecompress_block_ctx failed", rc == srcsizes[i]);
+      mu_assert("ERROR: sframe lazy returned size mismatch", blksize == srcsizes[i]);
+      mu_assert("ERROR: sframe lazy content mismatch",
+                memcmp(blk, srcs[i], (size_t)srcsizes[i]) == 0);
+      free(blk);
+    }
+    if (needs_free) free(lazy_chunk);
+  }
+
+  blosc2_schunk_free(schunk);
+  blosc2_remove_urlpath(urlpath);
+  return EXIT_SUCCESS;
+}
+
+
 static char *all_tests(void) {
   for (int i = 0; i < (int)ARRAY_SIZE(backends); ++i) {
     tdata = backends[i];
@@ -690,6 +824,9 @@ static char *all_tests(void) {
     mu_run_test(test_schunk_get_vlblock);
   }
   mu_run_test(test_vlblocks_mt_roundtrip);
+  mu_run_test(test_lazy_vlchunk_get_nblocks);
+  mu_run_test(test_lazy_vldecompress_block_ctx);
+  mu_run_test(test_lazy_vldecompress_block_ctx_sframe);
 #ifdef HAVE_ZSTD
   mu_run_test(test_vlblocks_dict_roundtrip);
   mu_run_test(test_vldecompress_block_ctx_dict);
