@@ -12,8 +12,11 @@
 #include "shuffle-generic.h"
 #include <stdlib.h>
 
-/* Make sure ALTIVEC is available for the compilation target and compiler. */
-#if defined(__ALTIVEC__) && defined(__VSX__) && defined(_ARCH_PWR8)
+/* Make sure ALTIVEC is available for the compilation target and compiler.
+   VSX (POWER7+) is required for vec_xl/vec_xst (unaligned loads/stores).
+   Exclude __APPLE__ because some GCC versions falsely define __VSX__ on
+   powerpc-apple-darwin targets (GCC Bug #121696, cf. Eigen's workaround). */
+#if defined(__ALTIVEC__) && defined(__VSX__) && !defined(__APPLE__)
 
 #include "transpose-altivec.h"
 
@@ -426,7 +429,7 @@ unshuffle_altivec(const int32_t bytesoftype, const int32_t blocksize,
 
 const bool is_shuffle_altivec = true;
 
-#else /* defined(__ALTIVEC__) && defined(__VSX__) && defined(_ARCH_PWR8) */
+#else /* defined(__ALTIVEC__) && defined(__VSX__) && !defined(__APPLE__) */
 
 const bool is_shuffle_altivec = false;
 
@@ -440,4 +443,4 @@ void unshuffle_altivec(const int32_t bytesoftype, const int32_t blocksize,
   abort();
 }
 
-#endif /* defined(__ALTIVEC__) && defined(__VSX__) && defined(_ARCH_PWR8) */
+#endif /* defined(__ALTIVEC__) && defined(__VSX__) && !defined(__APPLE__) */

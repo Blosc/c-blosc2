@@ -26,8 +26,20 @@
 #include "bitshuffle-generic.h"
 #include <stdlib.h>
 
-/* Make sure ALTIVEC is available for the compilation target and compiler. */
-#if defined(__ALTIVEC__) && defined(__VSX__) && defined(_ARCH_PWR8)
+/* Make sure ALTIVEC is available for the compilation target and compiler.
+   vec_bperm requires POWER8 (ISA 2.07).  VSX is needed for vec_xl/vec_xst.
+   Exclude __APPLE__ because some GCC versions falsely define __VSX__ on
+   powerpc-apple-darwin targets (GCC Bug #121696, cf. Eigen's workaround). */
+#if defined(__ALTIVEC__) && defined(__VSX__) && defined(_ARCH_PWR8) && !defined(__APPLE__)
+
+/* vec_bperm places its result in different elements depending on byte order.
+   On big-endian the result is in element 0; on little-endian it is in
+   element 4 (of a uint16_t vector). */
+#if defined(__BIG_ENDIAN__) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+  #define BLOSC_BPERM_RESULT_IDX 0
+#else
+  #define BLOSC_BPERM_RESULT_IDX 4
+#endif
 
 #include "transpose-altivec.h"
 
@@ -169,9 +181,9 @@ bitunshuffle1_altivec(void* _src, void* dest, const size_t size, const size_t el
         for (kk = 0; kk < 8; kk++) {
            __vector uint16_t tmp;
            tmp = (__vector uint16_t) vec_bperm(xmm, masks[kk]);
-           //printf("%d %d\n", vp, tmp[4]);
+           //printf("%d %d\n", vp, tmp[BLOSC_BPERM_RESULT_IDX]);
            //helper_print((__vector uint8_t)tmp, "tmp");
-           out_s[vp++] = tmp[4];
+           out_s[vp++] = tmp[BLOSC_BPERM_RESULT_IDX];
         }
       }
     }
@@ -351,7 +363,7 @@ int64_t bshuf_trans_bit_byte_altivec(const void* in, void* out, const size_t siz
       uint16_t* oui16;
       tmp = (__vector uint16_t) vec_bperm(data, masks[kk]);
       oui16 = (uint16_t*)&out_b[(ii + kk*nbyte) >> 3];
-      *oui16 = tmp[4];
+      *oui16 = tmp[BLOSC_BPERM_RESULT_IDX];
     }
   }
   count = bshuf_trans_bit_byte_remainder(in, out, size, elem_size,
@@ -564,7 +576,7 @@ int64_t bshuf_shuffle_bit_eightelem_altivec(const void* in, void* out, const siz
           uint16_t* oui16;
           tmp = (__vector uint16_t) vec_bperm(data, masks[kk]);
           oui16 = (uint16_t*)&out_b[ii + (jj>>3) + kk * elem_size];
-          *oui16 = tmp[4];
+          *oui16 = tmp[BLOSC_BPERM_RESULT_IDX];
         }
       }
     }
@@ -595,7 +607,7 @@ int64_t bshuf_untrans_bit_elem_altivec(const void* in, void* out, const size_t s
 
 const bool is_bshuf_altivec = true;
 
-#else /* defined(__ALTIVEC__) && defined(__VSX__) && defined(_ARCH_PWR8) */
+#else /* VSX + POWER8 path */
 
 const bool is_bshuf_altivec = false;
 
@@ -611,4 +623,4 @@ bshuf_untrans_bit_elem_altivec(const void* in, void* out, const size_t size,
   abort();
 }
 
-#endif /* defined(__ALTIVEC__) && defined(__VSX__) && defined(_ARCH_PWR8) */
+#endif /* defined(__ALTIVEC__) && defined(__VSX__) && defined(_ARCH_PWR8) && !defined(__APPLE__) */

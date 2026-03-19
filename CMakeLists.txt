@@ -371,7 +371,7 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES armv7l|aarch64|arm64)
         # Unrecognized compiler. Emit a warning message to let the user know hardware-acceleration won't be available.
         message(WARNING "Unable to determine which ${CMAKE_SYSTEM_PROCESSOR} hardware features are supported by the C compiler (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}).")
     endif()
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ppc64le|powerpc64le)")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(powerpc|ppc)")
     if(CMAKE_C_COMPILER_ID MATCHES GNU AND CMAKE_C_COMPILER_VERSION VERSION_GREATER 8)
         set(COMPILER_SUPPORT_ALTIVEC TRUE)
     elseif(CMAKE_C_COMPILER_ID MATCHES Clang AND CMAKE_C_COMPILER_VERSION VERSION_GREATER 13)
