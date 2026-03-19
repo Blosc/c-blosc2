@@ -1570,8 +1570,12 @@ BLOSC_EXPORT int blosc2_vlchunk_get_nblocks(const void* src, int32_t srcsize,
  * in the chunk are untouched.
  *
  * @param context A decompression context (#blosc2_context created with
- *   #blosc2_create_dctx).
+ *   #blosc2_create_dctx).  If @p src is a lazy chunk (obtained via
+ *   #blosc2_schunk_get_lazychunk), the caller must set @c context->schunk
+ *   to the owning super-chunk (which must have an associated frame) before
+ *   calling this function; the frame is used to read block data from disk.
  * @param src The buffer of compressed data.  Must carry the #BLOSC2_VL_BLOCKS flag.
+ *   May be a fully in-memory chunk or a lazy chunk proxy.
  * @param srcsize The length of the compressed data buffer.
  * @param nblock Zero-based index of the block to decompress.
  * @param dest On success, points to a newly allocated buffer containing the

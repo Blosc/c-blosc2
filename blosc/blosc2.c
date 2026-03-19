@@ -1724,10 +1724,6 @@ static int blosc_d(
   // Chunks with special values cannot be lazy
   bool is_lazy = ((context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH) &&
           (context->blosc2_flags & 0x08u) && !context->special_type);
-  if (is_lazy && vlblocks) {
-    BLOSC_TRACE_ERROR("VL-block lazy chunks are not supported yet.");
-    return BLOSC2_ERROR_INVALID_PARAM;
-  }
   if (is_lazy) {
     // The chunk is on disk, so just lazily load the block
     if (context->schunk == NULL) {
@@ -2512,6 +2508,8 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
     return rc;
   }
   vlblocks = (context->blosc2_flags2 & BLOSC2_VL_BLOCKS) != 0;
+  bool is_lazy = ((context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH) &&
+                  (context->blosc2_flags & 0x08u));
 
   /* Check that we have enough space to decompress */
   if (context->sourcesize > (int32_t)context->destsize) {
@@ -2558,7 +2556,7 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
   srcsize -= bstarts_end;
 
   /* Read optional dictionary if flag set */
-  if (context->blosc2_flags & BLOSC2_USEDICT) {
+  if ((context->blosc2_flags & BLOSC2_USEDICT) && !is_lazy) {
     context->use_dict = 1;
     // The dictionary section is after the bstarts block: [int32 size | raw bytes]
     if (srcsize < (signed)sizeof(int32_t)) {
@@ -2592,18 +2590,13 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
 #endif   // HAVE_ZSTD
     // For LZ4/LZ4HC: dict_buffer and dict_size are sufficient; no digested object needed.
   }
+  else if ((context->blosc2_flags & BLOSC2_USEDICT) && is_lazy) {
+    // Lazy chunks don't carry the dictionary in their buffer (only header+bstarts+trailer).
+    // Reuse dict_ddict from a previous full-chunk initialization of this context if available.
+    context->use_dict = (context->dict_ddict != NULL) ? 1 : 0;
+  }
 
   if (vlblocks && !context->special_type && !memcpyed) {
-    int32_t max_blocksize = 0;
-    int32_t total_nbytes = 0;
-    int32_t prev_bstart = 0;
-    bool is_lazy = ((context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH) &&
-                    (context->blosc2_flags & 0x08u));
-    if (is_lazy) {
-      BLOSC_TRACE_ERROR("VL-block lazy chunks are not supported yet.");
-      return BLOSC2_ERROR_INVALID_PARAM;
-    }
-
     context->blocknbytes = malloc((size_t)context->nblocks * sizeof(int32_t));
     BLOSC_ERROR_NULL(context->blocknbytes, BLOSC2_ERROR_MEMORY_ALLOC);
     context->blockoffsets = malloc((size_t)context->nblocks * sizeof(int32_t));
@@ -2611,33 +2604,63 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
     context->blockcbytes = malloc((size_t)context->nblocks * sizeof(int32_t));
     BLOSC_ERROR_NULL(context->blockcbytes, BLOSC2_ERROR_MEMORY_ALLOC);
 
-    for (int32_t i = 0; i < context->nblocks; ++i) {
-      int32_t bstart = sw32_(context->bstarts + i);
-      int32_t next_bstart = (i + 1 < context->nblocks) ? sw32_(context->bstarts + i + 1) : header->cbytes;
-      if (bstart < bstarts_end || bstart <= prev_bstart || next_bstart <= bstart ||
-          next_bstart > header->cbytes || bstart > context->srcsize - (int32_t)sizeof(int32_t)) {
-        BLOSC_TRACE_ERROR("Invalid VL-block offsets in chunk.");
+    if (is_lazy) {
+      // Lazy VL: block data is on disk, so blocknbytes is unknown at this point.
+      // Populate blockcbytes from bstarts differences; blocksize gets max(blockcbytes)
+      // as a safe upper bound so tmp buffers are large enough for the lazy block read.
+      int32_t max_csize = 0;
+      for (int32_t i = 0; i < context->nblocks; ++i) {
+        int32_t bstart = sw32_(context->bstarts + i);
+        int32_t next_bstart = (i + 1 < context->nblocks) ?
+            sw32_(context->bstarts + i + 1) : header->cbytes;
+        if (bstart < bstarts_end || next_bstart <= bstart ||
+            next_bstart > header->cbytes) {
+          BLOSC_TRACE_ERROR("Invalid VL-block offsets in lazy chunk.");
+          return BLOSC2_ERROR_INVALID_HEADER;
+        }
+        context->blocknbytes[i] = 0;   // unknown until block is read from disk
+        context->blockoffsets[i] = 0;  // unknown
+        context->blockcbytes[i] = next_bstart - bstart;
+        if (context->blockcbytes[i] > max_csize) {
+          max_csize = context->blockcbytes[i];
+        }
+      }
+      context->blocksize = max_csize;
+      context->leftover = 0;
+    }
+    else {
+      int32_t max_blocksize = 0;
+      int32_t total_nbytes = 0;
+      int32_t prev_bstart = 0;
+      for (int32_t i = 0; i < context->nblocks; ++i) {
+        int32_t bstart = sw32_(context->bstarts + i);
+        int32_t next_bstart = (i + 1 < context->nblocks) ?
+            sw32_(context->bstarts + i + 1) : header->cbytes;
+        if (bstart < bstarts_end || bstart <= prev_bstart || next_bstart <= bstart ||
+            next_bstart > header->cbytes || bstart > context->srcsize - (int32_t)sizeof(int32_t)) {
+          BLOSC_TRACE_ERROR("Invalid VL-block offsets in chunk.");
+          return BLOSC2_ERROR_INVALID_HEADER;
+        }
+        context->blockoffsets[i] = total_nbytes;
+        context->blocknbytes[i] = sw32_(context->src + bstart);
+        context->blockcbytes[i] = next_bstart - bstart;
+        if (context->blocknbytes[i] <= 0) {
+          BLOSC_TRACE_ERROR("Invalid VL-block uncompressed size in chunk.");
+          return BLOSC2_ERROR_INVALID_HEADER;
+        }
+        total_nbytes += context->blocknbytes[i];
+        if (context->blocknbytes[i] > max_blocksize) {
+          max_blocksize = context->blocknbytes[i];
+        }
+        prev_bstart = bstart;
+      }
+      if (total_nbytes != context->sourcesize) {
+        BLOSC_TRACE_ERROR("VL-block sizes do not add up to chunk nbytes.");
         return BLOSC2_ERROR_INVALID_HEADER;
       }
-      context->blockoffsets[i] = total_nbytes;
-      context->blocknbytes[i] = sw32_(context->src + bstart);
-      context->blockcbytes[i] = next_bstart - bstart;
-      if (context->blocknbytes[i] <= 0) {
-        BLOSC_TRACE_ERROR("Invalid VL-block uncompressed size in chunk.");
-        return BLOSC2_ERROR_INVALID_HEADER;
-      }
-      total_nbytes += context->blocknbytes[i];
-      if (context->blocknbytes[i] > max_blocksize) {
-        max_blocksize = context->blocknbytes[i];
-      }
-      prev_bstart = bstart;
+      context->blocksize = max_blocksize;
+      context->leftover = 0;
     }
-    if (total_nbytes != context->sourcesize) {
-      BLOSC_TRACE_ERROR("VL-block sizes do not add up to chunk nbytes.");
-      return BLOSC2_ERROR_INVALID_HEADER;
-    }
-    context->blocksize = max_blocksize;
-    context->leftover = 0;
   }
 
   return 0;
@@ -3753,6 +3776,74 @@ static int decompress_single_vlblock(blosc2_context* context, int32_t nblock,
   if (nblock < 0 || nblock >= context->nblocks) {
     BLOSC_TRACE_ERROR("nblock (%d) out of range [0, %d).", nblock, context->nblocks);
     return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  // For lazy VL chunks blocknbytes[nblock] == 0 because the uncompressed size is
+  // stored as the first 4 bytes of the block span on disk, not in the in-memory
+  // header.  Peek at the file to resolve it before we can allocate the output buffer.
+  if (context->blocknbytes[nblock] == 0) {
+    if (context->schunk == NULL || context->schunk->frame == NULL) {
+      BLOSC_TRACE_ERROR("Lazy VL block needs an associated super-chunk with a frame.");
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    blosc2_frame_s* frame = (blosc2_frame_s*)context->schunk->frame;
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(context->schunk->storage->io->id);
+    if (io_cb == NULL) {
+      BLOSC_TRACE_ERROR("Error getting the input/output API");
+      return BLOSC2_ERROR_PLUGIN_IO;
+    }
+
+    // Lazy chunk trailer: [nchunk int32 | chunk_offset int64 | block_csizes int32*N]
+    int32_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH +
+                             context->nblocks * (int32_t)sizeof(int32_t);
+    int32_t nchunk_lazy = *(const int32_t*)(context->src + trailer_offset);
+    int64_t chunk_offset = *(const int64_t*)(context->src + trailer_offset +
+                                             (int32_t)sizeof(int32_t));
+    int32_t bstart = sw32_(context->bstarts + nblock);
+
+    void* fp = NULL;
+    int64_t io_pos;
+    if (frame->sframe) {
+      char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+      BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
+      sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk_lazy);
+      fp = io_cb->open(chunkpath, "rb", context->schunk->storage->io->params);
+      free(chunkpath);
+      io_pos = bstart;
+    }
+    else {
+      fp = io_cb->open(frame->urlpath, "rb", context->schunk->storage->io->params);
+      io_pos = frame->file_offset + chunk_offset + bstart;
+    }
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Cannot open frame file for lazy VL block size peek.");
+      return BLOSC2_ERROR_FILE_OPEN;
+    }
+
+    // Read only the 4-byte uncompressed-size prefix of the block span.
+    uint8_t nbuf[sizeof(int32_t)];
+    uint8_t* nbufp = nbuf;
+    int64_t rbytes = io_cb->read((void**)&nbufp, 1, sizeof(int32_t), io_pos, fp);
+    io_cb->close(fp);
+    if (nbufp != nbuf) {
+      // io_cb allocated new memory; copy the result and free.
+      memcpy(nbuf, nbufp, sizeof(int32_t));
+      free(nbufp);
+    }
+    if (rbytes != (int64_t)sizeof(int32_t)) {
+      BLOSC_TRACE_ERROR("Cannot read VL-block uncompressed-size prefix from disk.");
+      return BLOSC2_ERROR_FILE_READ;
+    }
+    int32_t neblock = sw32_(nbuf);
+    if (neblock <= 0) {
+      BLOSC_TRACE_ERROR("Invalid VL-block uncompressed size read from disk.");
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
+    context->blocknbytes[nblock] = neblock;
+    // Keep blocksize as an upper bound for tmp buffer allocation.
+    if (neblock > context->blocksize) {
+      context->blocksize = neblock;
+    }
   }
 
   int32_t bsize = context->blocknbytes[nblock];
