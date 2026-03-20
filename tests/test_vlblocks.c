@@ -42,8 +42,42 @@ static const int32_t srcsizes[] = {
     (int32_t)sizeof(block2),
 };
 
+#define DICT_VL_NBLOCKS 64
+#define DICT_VL_BUF 512
+
 static int32_t total_nbytes(void) {
   return srcsizes[0] + srcsizes[1] + srcsizes[2];
+}
+
+static int build_dict_vl_inputs(char raw[DICT_VL_NBLOCKS][DICT_VL_BUF],
+                                const void* vsrcs[DICT_VL_NBLOCKS],
+                                int32_t vsizes[DICT_VL_NBLOCKS],
+                                int32_t* total) {
+  *total = 0;
+  for (int i = 0; i < DICT_VL_NBLOCKS; i++) {
+    vsizes[i] = (int32_t)snprintf(raw[i], DICT_VL_BUF,
+        "{\"id\":\"en:ingredient-%03d\",\"vegan\":\"%s\","
+        "\"vegetarian\":\"%s\",\"percent_estimate\":%.2f,"
+        "\"is_in_taxonomy\":%d,\"text\":\"INGREDIENT NUMBER %03d\","
+        "\"from_palm_oil\":null,\"processing\":null,"
+        "\"labels\":null,\"origins\":null,\"quantity\":null,"
+        "\"quantity_g\":null,\"ciqual_food_code\":null,"
+        "\"additives_n\":null,\"nova_group\":null,"
+        "\"pnns_groups_1\":null,\"pnns_groups_2\":null,"
+        "\"carbon_footprint_percent_of_known_ingredients\":null}",
+        i,
+        (i % 3 == 0) ? "maybe" : "yes",
+        (i % 5 == 0) ? "no" : "yes",
+        (double)(i % 20) * 2.5 + 0.1,
+        i % 2,
+        i);
+    if (vsizes[i] <= 0 || vsizes[i] >= DICT_VL_BUF) {
+      return -1;
+    }
+    vsrcs[i] = raw[i];
+    *total += vsizes[i];
+  }
+  return 0;
 }
 
 static int check_concatenated(const uint8_t *buffer, int32_t nbytes) {
@@ -679,6 +713,189 @@ static char *test_vldecompress_block_ctx_dict(void) {
 #endif  /* HAVE_ZSTD */
 
 
+static blosc2_schunk* make_lazy_dict_vl_schunk(const char* urlpath, bool contiguous, int compcode,
+                                               char raw[DICT_VL_NBLOCKS][DICT_VL_BUF],
+                                               const void* vsrcs[DICT_VL_NBLOCKS],
+                                               int32_t vsizes[DICT_VL_NBLOCKS],
+                                               int32_t* total) {
+  blosc2_remove_urlpath(urlpath);
+  if (build_dict_vl_inputs(raw, vsrcs, vsizes, total) != 0) {
+    return NULL;
+  }
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  cparams.compcode = compcode;
+  cparams.use_dict = 1;
+  cparams.nthreads = 1;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_storage storage = {
+      .contiguous = contiguous,
+      .urlpath = (char *)urlpath,
+      .cparams = &cparams,
+      .dparams = &dparams,
+  };
+
+  blosc2_schunk* schunk = blosc2_schunk_new(&storage);
+  if (schunk == NULL) {
+    return NULL;
+  }
+
+  blosc2_context* cctx = blosc2_create_cctx(cparams);
+  if (cctx == NULL) {
+    blosc2_schunk_free(schunk);
+    blosc2_remove_urlpath(urlpath);
+    return NULL;
+  }
+
+  int32_t destsize = *total + BLOSC2_MAX_OVERHEAD + DICT_VL_NBLOCKS * 64 + BLOSC2_MAXDICTSIZE;
+  uint8_t* chunk = malloc((size_t)destsize);
+  if (chunk == NULL) {
+    blosc2_free_ctx(cctx);
+    blosc2_schunk_free(schunk);
+    blosc2_remove_urlpath(urlpath);
+    return NULL;
+  }
+
+  int32_t cbytes = blosc2_vlcompress_ctx(cctx, vsrcs, vsizes, DICT_VL_NBLOCKS, chunk, destsize);
+  if (cbytes <= 0 || (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & BLOSC2_USEDICT) == 0 ||
+      blosc2_schunk_append_chunk(schunk, chunk, true) < 0) {
+    free(chunk);
+    blosc2_free_ctx(cctx);
+    blosc2_schunk_free(schunk);
+    blosc2_remove_urlpath(urlpath);
+    return NULL;
+  }
+
+  cbytes = blosc2_vlcompress_ctx(cctx, vsrcs, vsizes, DICT_VL_NBLOCKS, chunk, destsize);
+  if (cbytes <= 0 || (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & BLOSC2_USEDICT) == 0 ||
+      blosc2_schunk_append_chunk(schunk, chunk, true) < 0) {
+    free(chunk);
+    blosc2_free_ctx(cctx);
+    blosc2_schunk_free(schunk);
+    blosc2_remove_urlpath(urlpath);
+    return NULL;
+  }
+
+  free(chunk);
+  blosc2_free_ctx(cctx);
+  return schunk;
+}
+
+
+static char* run_lazy_vldecompress_block_ctx_dict_test(int compcode, const char* urlpath) {
+  static char raw[DICT_VL_NBLOCKS][DICT_VL_BUF];
+  const void* vsrcs[DICT_VL_NBLOCKS];
+  int32_t vsizes[DICT_VL_NBLOCKS];
+  int32_t total = 0;
+
+  blosc2_schunk* schunk = make_lazy_dict_vl_schunk(urlpath, true, compcode, raw, vsrcs, vsizes, &total);
+  mu_assert("ERROR: cannot create lazy dict VL schunk", schunk != NULL);
+
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  dparams.schunk = schunk;
+  blosc2_context* dctx = blosc2_create_dctx(dparams);
+  mu_assert("ERROR: cannot create fresh dctx for lazy dict test", dctx != NULL);
+
+  int targets[] = {0, DICT_VL_NBLOCKS / 2, DICT_VL_NBLOCKS - 1};
+  for (int64_t nchunk = 0; nchunk < schunk->nchunks; ++nchunk) {
+    uint8_t* lazy_chunk = NULL;
+    bool needs_free = false;
+    int cbytes = blosc2_schunk_get_lazychunk(schunk, nchunk, &lazy_chunk, &needs_free);
+    mu_assert("ERROR: cannot get lazy dict chunk", cbytes > 0);
+
+    for (int t = 0; t < 3; ++t) {
+      int i = targets[t];
+      uint8_t* blk = NULL;
+      int32_t blksize = -1;
+      int rc = blosc2_vldecompress_block_ctx(dctx, lazy_chunk, cbytes, i, &blk, &blksize);
+      mu_assert("ERROR: lazy dict blosc2_vldecompress_block_ctx failed", rc == vsizes[i]);
+      mu_assert("ERROR: lazy dict returned size mismatch", blksize == vsizes[i]);
+      mu_assert("ERROR: lazy dict content mismatch",
+                memcmp(blk, vsrcs[i], (size_t)vsizes[i]) == 0);
+      free(blk);
+    }
+
+    if (needs_free) {
+      free(lazy_chunk);
+    }
+  }
+
+  blosc2_free_ctx(dctx);
+  blosc2_schunk_free(schunk);
+  blosc2_remove_urlpath(urlpath);
+  return EXIT_SUCCESS;
+}
+
+
+static char* test_lazy_vldecompress_block_ctx_dict_lz4(void) {
+  return run_lazy_vldecompress_block_ctx_dict_test(BLOSC_LZ4, "test_lazy_vldecomp_dict_lz4.b2frame");
+}
+
+
+#ifdef HAVE_ZSTD
+static char* test_vlblocks_dict_fallback_is_per_chunk(void) {
+  static char raw[DICT_VL_NBLOCKS][DICT_VL_BUF];
+  const void* vsrcs[DICT_VL_NBLOCKS];
+  int32_t vsizes[DICT_VL_NBLOCKS];
+  int32_t total = 0;
+  uint8_t tiny = 'x';
+  const void* tiny_srcs[1] = {&tiny};
+  int32_t tiny_sizes[1] = {1};
+  uint8_t tiny_chunk[256];
+  uint8_t* chunk = NULL;
+
+  mu_assert("ERROR: cannot build dict VL inputs", build_dict_vl_inputs(raw, vsrcs, vsizes, &total) == 0);
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  cparams.compcode = BLOSC_ZSTD;
+  cparams.use_dict = 1;
+  cparams.nthreads = 1;
+  blosc2_context* cctx = blosc2_create_cctx(cparams);
+  mu_assert("ERROR: cannot create VL dict cctx", cctx != NULL);
+
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context* dctx = blosc2_create_dctx(dparams);
+  mu_assert("ERROR: cannot create VL dict dctx", dctx != NULL);
+
+  int32_t tiny_cbytes = blosc2_vlcompress_ctx(cctx, tiny_srcs, tiny_sizes, 1, tiny_chunk, (int32_t)sizeof(tiny_chunk));
+  mu_assert("ERROR: cannot create tiny fallback VL chunk", tiny_cbytes > 0);
+
+  int32_t destsize = total + BLOSC2_MAX_OVERHEAD + DICT_VL_NBLOCKS * 64 + BLOSC2_MAXDICTSIZE;
+  chunk = malloc((size_t)destsize);
+  mu_assert("ERROR: cannot allocate dict VL chunk", chunk != NULL);
+
+  int32_t cbytes = blosc2_vlcompress_ctx(cctx, vsrcs, vsizes, DICT_VL_NBLOCKS, chunk, destsize);
+  mu_assert("ERROR: cannot create dict VL chunk after fallback", cbytes > 0);
+  mu_assert("ERROR: later VL chunk lost BLOSC2_USEDICT after fallback",
+            (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & BLOSC2_USEDICT) != 0);
+
+  void* buffers[DICT_VL_NBLOCKS];
+  int32_t sizes[DICT_VL_NBLOCKS];
+  memset(buffers, 0, sizeof(buffers));
+  int32_t nblocks = blosc2_vldecompress_ctx(dctx, chunk, cbytes, buffers, sizes, DICT_VL_NBLOCKS);
+  mu_assert("ERROR: cannot decompress dict VL chunk after fallback", nblocks == DICT_VL_NBLOCKS);
+  for (int i = 0; i < DICT_VL_NBLOCKS; ++i) {
+    mu_assert("ERROR: dict VL size mismatch after fallback", sizes[i] == vsizes[i]);
+    mu_assert("ERROR: dict VL content mismatch after fallback",
+              memcmp(buffers[i], vsrcs[i], (size_t)vsizes[i]) == 0);
+    free(buffers[i]);
+  }
+
+  free(chunk);
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+  return EXIT_SUCCESS;
+}
+
+
+static char* test_lazy_vldecompress_block_ctx_dict_zstd(void) {
+  return run_lazy_vldecompress_block_ctx_dict_test(BLOSC_ZSTD, "test_lazy_vldecomp_dict_zstd.b2frame");
+}
+#endif
+
+
 /* ---- Lazy VL chunk tests ------------------------------------------------- */
 
 /* Helper: build a 2-chunk file-backed schunk with 3 VL blocks per chunk.
@@ -827,9 +1044,12 @@ static char *all_tests(void) {
   mu_run_test(test_lazy_vlchunk_get_nblocks);
   mu_run_test(test_lazy_vldecompress_block_ctx);
   mu_run_test(test_lazy_vldecompress_block_ctx_sframe);
+  mu_run_test(test_lazy_vldecompress_block_ctx_dict_lz4);
 #ifdef HAVE_ZSTD
   mu_run_test(test_vlblocks_dict_roundtrip);
+  mu_run_test(test_vlblocks_dict_fallback_is_per_chunk);
   mu_run_test(test_vldecompress_block_ctx_dict);
+  mu_run_test(test_lazy_vldecompress_block_ctx_dict_zstd);
 #endif
   return EXIT_SUCCESS;
 }

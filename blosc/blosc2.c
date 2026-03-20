@@ -2475,6 +2475,137 @@ static int initialize_context_compression(
   return 1;
 }
 
+static void release_context_dict_buffer(blosc2_context* context) {
+  if (context->dict_buffer_owned && context->dict_buffer != NULL) {
+    free(context->dict_buffer);
+  }
+  context->dict_buffer = NULL;
+  context->dict_buffer_owned = false;
+  context->dict_size = 0;
+}
+
+
+static void clear_context_decompression_dict(blosc2_context* context) {
+  context->use_dict = 0;
+  release_context_dict_buffer(context);
+#if defined(HAVE_ZSTD)
+  if (context->dict_ddict != NULL) {
+    ZSTD_freeDDict(context->dict_ddict);
+    context->dict_ddict = NULL;
+  }
+#else
+  context->dict_ddict = NULL;
+#endif
+}
+
+
+static int read_lazy_chunk_bytes(blosc2_context* context, int32_t offset, uint8_t* buffer, int32_t nbytes,
+                                 const char* open_error, const char* read_error) {
+  if (context->schunk == NULL || context->schunk->frame == NULL) {
+    BLOSC_TRACE_ERROR("Lazy chunk needs an associated super-chunk with a frame.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  blosc2_frame_s* frame = (blosc2_frame_s*)context->schunk->frame;
+  blosc2_io_cb* io_cb = blosc2_get_io_cb(context->schunk->storage->io->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return BLOSC2_ERROR_PLUGIN_IO;
+  }
+
+  int32_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH +
+                           context->nblocks * (int32_t)sizeof(int32_t);
+  int32_t nchunk_lazy = *(const int32_t*)(context->src + trailer_offset);
+  int64_t chunk_offset = *(const int64_t*)(context->src + trailer_offset +
+                                           (int32_t)sizeof(int32_t));
+
+  void* fp = NULL;
+  int64_t io_pos;
+  if (frame->sframe) {
+    char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
+    BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
+    sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk_lazy);
+    fp = io_cb->open(chunkpath, "rb", context->schunk->storage->io->params);
+    free(chunkpath);
+    io_pos = offset;
+  }
+  else {
+    fp = io_cb->open(frame->urlpath, "rb", context->schunk->storage->io->params);
+    io_pos = frame->file_offset + chunk_offset + offset;
+  }
+  if (fp == NULL) {
+    BLOSC_TRACE_ERROR("%s", open_error);
+    return BLOSC2_ERROR_FILE_OPEN;
+  }
+
+  uint8_t* read_buffer = buffer;
+  int64_t rbytes = io_cb->read((void**)&read_buffer, 1, nbytes, io_pos, fp);
+  io_cb->close(fp);
+  if (read_buffer != buffer) {
+    memcpy(buffer, read_buffer, (size_t)nbytes);
+    free(read_buffer);
+  }
+  if (rbytes != nbytes) {
+    BLOSC_TRACE_ERROR("%s", read_error);
+    return BLOSC2_ERROR_FILE_READ;
+  }
+
+  return 0;
+}
+
+
+static int load_lazy_chunk_dict(blosc2_context* context, blosc_header* header, int32_t bstarts_end) {
+  int32_t dict_offset = bstarts_end;
+  if (header->cbytes < dict_offset + (int32_t)sizeof(int32_t)) {
+    BLOSC_TRACE_ERROR("Lazy chunk dictionary header exceeds chunk length.");
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
+
+  uint8_t dict_size_buf[sizeof(int32_t)];
+  int rc = read_lazy_chunk_bytes(context, dict_offset, dict_size_buf, (int32_t)sizeof(dict_size_buf),
+                                 "Cannot open frame file for lazy chunk dictionary read.",
+                                 "Cannot read lazy chunk dictionary size from disk.");
+  if (rc < 0) {
+    return rc;
+  }
+
+  context->dict_size = sw32_(dict_size_buf);
+  if (context->dict_size <= 0 || context->dict_size > BLOSC2_MAXDICTSIZE) {
+    BLOSC_TRACE_ERROR("Dictionary size is smaller than minimum or larger than maximum allowed.");
+    return BLOSC2_ERROR_CODEC_DICT;
+  }
+  if (header->cbytes < dict_offset + (int32_t)sizeof(int32_t) + context->dict_size) {
+    BLOSC_TRACE_ERROR("Lazy chunk dictionary exceeds chunk length.");
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
+
+  context->dict_buffer = malloc((size_t)context->dict_size);
+  BLOSC_ERROR_NULL(context->dict_buffer, BLOSC2_ERROR_MEMORY_ALLOC);
+  context->dict_buffer_owned = true;
+  rc = read_lazy_chunk_bytes(context, dict_offset + (int32_t)sizeof(int32_t),
+                             context->dict_buffer, context->dict_size,
+                             "Cannot open frame file for lazy chunk dictionary read.",
+                             "Cannot read lazy chunk dictionary from disk.");
+  if (rc < 0) {
+    release_context_dict_buffer(context);
+    return rc;
+  }
+
+  context->use_dict = 1;
+#if defined(HAVE_ZSTD)
+  if (context->compcode == BLOSC_ZSTD_FORMAT) {
+    context->dict_ddict = ZSTD_createDDict(context->dict_buffer, context->dict_size);
+    if (context->dict_ddict == NULL) {
+      release_context_dict_buffer(context);
+      BLOSC_TRACE_ERROR("Cannot create ZSTD dictionary for lazy chunk.");
+      return BLOSC2_ERROR_CODEC_DICT;
+    }
+  }
+#endif
+
+  return 0;
+}
+
 
 static int initialize_context_decompression(blosc2_context* context, blosc_header* header, const void* src,
                                             int32_t srcsize, void* dest, int32_t destsize) {
@@ -2507,6 +2638,7 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
   if (rc < 0) {
     return rc;
   }
+  clear_context_decompression_dict(context);
   vlblocks = (context->blosc2_flags2 & BLOSC2_VL_BLOCKS) != 0;
   bool is_lazy = ((context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH) &&
                   (context->blosc2_flags & 0x08u));
@@ -2577,23 +2709,25 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
     srcsize -= context->dict_size;
     // dict_buffer points directly into the source chunk — no copy needed
     context->dict_buffer = (void*)(context->src + bstarts_end + sizeof(int32_t));
+    context->dict_buffer_owned = false;
 #if defined(HAVE_ZSTD)
     // context->compcode during decompression holds the format code (flags >> 5),
     // so compare against BLOSC_ZSTD_FORMAT (not BLOSC_ZSTD).
     if (context->compcode == BLOSC_ZSTD_FORMAT) {
-      if (context->dict_ddict != NULL) {
-        // Free the existing dictionary (probably from another chunk)
-        ZSTD_freeDDict(context->dict_ddict);
-      }
       context->dict_ddict = ZSTD_createDDict(context->dict_buffer, context->dict_size);
+      if (context->dict_ddict == NULL) {
+        BLOSC_TRACE_ERROR("Cannot create ZSTD dictionary for chunk.");
+        return BLOSC2_ERROR_CODEC_DICT;
+      }
     }
 #endif   // HAVE_ZSTD
     // For LZ4/LZ4HC: dict_buffer and dict_size are sufficient; no digested object needed.
   }
   else if ((context->blosc2_flags & BLOSC2_USEDICT) && is_lazy) {
-    // Lazy chunks don't carry the dictionary in their buffer (only header+bstarts+trailer).
-    // Reuse dict_ddict from a previous full-chunk initialization of this context if available.
-    context->use_dict = (context->dict_ddict != NULL) ? 1 : 0;
+    rc = load_lazy_chunk_dict(context, header, bstarts_end);
+    if (rc < 0) {
+      return rc;
+    }
   }
 
   if (vlblocks && !context->special_type && !memcpyed) {
@@ -2857,6 +2991,16 @@ static int blosc_compress_context(blosc2_context* context) {
 }
 
 
+static int blosc_compress_context_without_dict(blosc2_context* context) {
+  int saved_use_dict = context->use_dict;
+  context->use_dict = 0;
+  context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
+  int cbytes = blosc_compress_context(context);
+  context->use_dict = saved_use_dict;
+  return cbytes;
+}
+
+
 /* The public secure routine for compression with context. */
 int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsize,
                         void* dest, int32_t destsize) {
@@ -2928,11 +3072,9 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     if (dict_maxsize < BLOSC2_MINUSEFULDICT || sample_size == 0) {
       BLOSC_TRACE_WARNING("Data too small for dict training (dict_maxsize=%d, sample_size=%zu)."
                           "  Falling back to plain compression.", dict_maxsize, sample_size);
-      context->use_dict = 0;
-      context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
       context->bstarts = (int32_t*)(context->dest + context->header_overhead);
       context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * context->nblocks;
-      cbytes = blosc_compress_context(context);
+      cbytes = blosc_compress_context_without_dict(context);
     }
     else if (is_lz4) {
       // LZ4/LZ4HC: use raw sample data directly as the dictionary (no training step).
@@ -3011,11 +3153,9 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
                           "  Falling back to plain compression.",
                           ZDICT_getErrorName(dict_actual_size));
       free(dict_buffer);
-      context->use_dict = 0;
-      context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
       context->bstarts = (int32_t*)(context->dest + context->header_overhead);
       context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * context->nblocks;
-      cbytes = blosc_compress_context(context);
+      cbytes = blosc_compress_context_without_dict(context);
     }
     else {
     assert(dict_actual_size > 0);
@@ -3245,12 +3385,10 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
     if (dict_maxsize < BLOSC2_MINUSEFULDICT || nblocks < 8 || vl_sample_size == 0) {
       // Data is too small or too few VL blocks to build a useful dictionary;
       // fall back to plain compression without a dict.
-      context->use_dict = 0;
-      context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
       context->bstarts = (int32_t*)(context->dest + context->header_overhead);
       context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
       context->vlblock_sources = (const uint8_t**)srcs;
-      cbytes = blosc_compress_context(context);
+      cbytes = blosc_compress_context_without_dict(context);
       context->vlblock_sources = NULL;
     }
     else if (is_lz4) {
@@ -3321,12 +3459,10 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
         BLOSC_TRACE_WARNING("ZDICT_trainFromBuffer() failed ('%s'); falling back to plain compression.",
                             ZDICT_getErrorName(dict_actual_size));
         free(dict_buffer);
-        context->use_dict = 0;
-        context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
         context->bstarts = (int32_t*)(context->dest + context->header_overhead);
         context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
         context->vlblock_sources = (const uint8_t**)srcs;
-        cbytes = blosc_compress_context(context);
+        cbytes = blosc_compress_context_without_dict(context);
         context->vlblock_sources = NULL;
       }
       else {
@@ -3367,12 +3503,10 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
     }
     size_t vl_sample_size_lz4 = (nblocks > 0) ? ((size_t)srcsize / (size_t)nblocks / 16) : 0;
     if (!is_lz4 || dict_maxsize < BLOSC2_MINUSEFULDICT || nblocks < 8 || vl_sample_size_lz4 == 0) {
-      context->use_dict = 0;
-      context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
       context->bstarts = (int32_t*)(context->dest + context->header_overhead);
       context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
       context->vlblock_sources = (const uint8_t**)srcs;
-      cbytes = blosc_compress_context(context);
+      cbytes = blosc_compress_context_without_dict(context);
       context->vlblock_sources = NULL;
     }
     else {
@@ -5164,6 +5298,7 @@ void blosc2_free_ctx(blosc2_context* context) {
   if (context->serial_context != NULL) {
     free_thread_context(context->serial_context);
   }
+  release_context_dict_buffer(context);
   if (context->dict_cdict != NULL) {
     if (context->compcode == BLOSC_LZ4) {
       LZ4_freeStream((LZ4_stream_t*)context->dict_cdict);

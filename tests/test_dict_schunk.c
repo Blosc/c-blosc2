@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include "context.h"
 #include "test_common.h"
 
 #define CHUNKSIZE (200 * 1000)
@@ -29,6 +30,29 @@ static const uint8_t small_payload[] = {
     0x65, 0x63, 0x74, 0xab, 0x73, 0x69, 0x6d, 0x70, 0x6c, 0x65, 0x5f, 0x6d, 0x6f, 0x64, 0x65, 0xc3,
     0xaa, 0x62, 0x61, 0x74, 0x63, 0x68, 0x5f, 0x6b, 0x69, 0x6e, 0x64, 0xc0,
 };
+
+static int32_t build_dict_payload(char* payload, size_t payload_cap) {
+  int32_t payload_len = 0;
+  for (int i = 0; i < 64; ++i) {
+    int written = snprintf(
+        payload + payload_len, payload_cap - (size_t)payload_len,
+        "{\"id\":\"en:item-%03d\",\"vegan\":\"%s\",\"vegetarian\":\"%s\","
+        "\"percent_estimate\":%.2f,\"is_in_taxonomy\":%d,"
+        "\"text\":\"INGREDIENT NUMBER %03d\",\"from_palm_oil\":null,"
+        "\"processing\":null,\"labels\":null,\"origins\":null}\n",
+        i,
+        (i % 3 == 0) ? "maybe" : "yes",
+        (i % 5 == 0) ? "no" : "yes",
+        (double)(i % 20) * 2.5 + 0.1,
+        i % 2,
+        i);
+    if (written <= 0 || (size_t)written >= payload_cap - (size_t)payload_len) {
+      return -1;
+    }
+    payload_len += (int32_t)written;
+  }
+  return payload_len;
+}
 
 static char* test_dict(void) {
   static int32_t data[CHUNKSIZE];
@@ -440,6 +464,115 @@ static char* test_vlcompress_dict_20blocks(void) {
   return EXIT_SUCCESS;
 }
 
+static char* test_dctx_reuse_plain_after_dict(void) {
+  enum { PAYLOAD_CAP = 64 * 256 };
+  static char dict_payload[PAYLOAD_CAP];
+  uint8_t dict_chunk[PAYLOAD_CAP + BLOSC2_MAX_OVERHEAD + BLOSC2_MAXDICTSIZE];
+  uint8_t plain_chunk[sizeof(small_payload) + BLOSC2_MAX_OVERHEAD];
+  uint8_t* dict_dest = NULL;
+  uint8_t plain_dest[sizeof(small_payload)];
+  int32_t dict_payload_len;
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  cparams.compcode = BLOSC_ZSTD;
+  cparams.clevel = 5;
+  cparams.use_dict = 1;
+  cparams.nthreads = 1;
+  dparams.nthreads = 1;
+
+  dict_payload_len = build_dict_payload(dict_payload, sizeof(dict_payload));
+  mu_assert("ERROR: cannot build dict-friendly payload", dict_payload_len > 0);
+
+  blosc2_context* cctx = blosc2_create_cctx(cparams);
+  blosc2_context* dctx = blosc2_create_dctx(dparams);
+  mu_assert("ERROR: cannot create contexts", cctx != NULL && dctx != NULL);
+
+  int32_t dict_cbytes = blosc2_compress_ctx(cctx, dict_payload, dict_payload_len,
+                                            dict_chunk, (int32_t)sizeof(dict_chunk));
+  mu_assert("ERROR: cannot create dict chunk", dict_cbytes > 0);
+  mu_assert("ERROR: dict chunk should advertise BLOSC2_USEDICT",
+            (dict_chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & BLOSC2_USEDICT) != 0);
+
+  int32_t plain_cbytes = blosc2_compress_ctx(cctx, small_payload, (int32_t)sizeof(small_payload),
+                                             plain_chunk, (int32_t)sizeof(plain_chunk));
+  mu_assert("ERROR: cannot create plain fallback chunk", plain_cbytes > 0);
+  mu_assert("ERROR: fallback chunk should not advertise BLOSC2_USEDICT",
+            (plain_chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & BLOSC2_USEDICT) == 0);
+
+  dict_dest = malloc((size_t)dict_payload_len);
+  mu_assert("ERROR: cannot allocate dict destination", dict_dest != NULL);
+
+  int32_t dsize = blosc2_decompress_ctx(dctx, dict_chunk, dict_cbytes, dict_dest, dict_payload_len);
+  mu_assert("ERROR: cannot decompress dict chunk", dsize == dict_payload_len);
+  mu_assert("ERROR: dict chunk roundtrip mismatch",
+            memcmp(dict_dest, dict_payload, (size_t)dict_payload_len) == 0);
+  mu_assert("ERROR: dctx should keep dict state while decoding dict chunk", dctx->use_dict == 1);
+
+  dsize = blosc2_decompress_ctx(dctx, plain_chunk, plain_cbytes,
+                                plain_dest, (int32_t)sizeof(plain_dest));
+  mu_assert("ERROR: reused dctx failed on plain chunk after dict chunk",
+            dsize == (int32_t)sizeof(small_payload));
+  mu_assert("ERROR: plain chunk roundtrip mismatch after dict chunk",
+            memcmp(plain_dest, small_payload, sizeof(small_payload)) == 0);
+  mu_assert("ERROR: dctx kept stale dict state after decoding plain chunk", dctx->use_dict == 0);
+
+  free(dict_dest);
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+  return EXIT_SUCCESS;
+}
+
+
+static char* test_dict_fallback_is_per_chunk(void) {
+  enum { PAYLOAD_CAP = 64 * 256 };
+  static char dict_payload[PAYLOAD_CAP];
+  uint8_t small_chunk[sizeof(small_payload) + BLOSC2_MAX_OVERHEAD];
+  uint8_t dict_chunk[PAYLOAD_CAP + BLOSC2_MAX_OVERHEAD + BLOSC2_MAXDICTSIZE];
+  uint8_t* dict_dest = NULL;
+  int32_t dict_payload_len;
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  cparams.compcode = BLOSC_ZSTD;
+  cparams.clevel = 5;
+  cparams.use_dict = 1;
+  cparams.nthreads = 1;
+  dparams.nthreads = 1;
+
+  dict_payload_len = build_dict_payload(dict_payload, sizeof(dict_payload));
+  mu_assert("ERROR: cannot build dict-friendly payload", dict_payload_len > 0);
+
+  blosc2_context* cctx = blosc2_create_cctx(cparams);
+  blosc2_context* dctx = blosc2_create_dctx(dparams);
+  mu_assert("ERROR: cannot create contexts", cctx != NULL && dctx != NULL);
+
+  int32_t small_cbytes = blosc2_compress_ctx(cctx, small_payload, (int32_t)sizeof(small_payload),
+                                             small_chunk, (int32_t)sizeof(small_chunk));
+  mu_assert("ERROR: cannot create fallback chunk", small_cbytes > 0);
+
+  int32_t dict_cbytes = blosc2_compress_ctx(cctx, dict_payload, dict_payload_len,
+                                            dict_chunk, (int32_t)sizeof(dict_chunk));
+  mu_assert("ERROR: cannot create dict chunk after fallback", dict_cbytes > 0);
+  mu_assert("ERROR: later chunk lost BLOSC2_USEDICT after fallback",
+            (dict_chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] & BLOSC2_USEDICT) != 0);
+
+  dict_dest = malloc((size_t)dict_payload_len);
+  mu_assert("ERROR: cannot allocate dict destination", dict_dest != NULL);
+
+  int32_t dsize = blosc2_decompress_ctx(dctx, dict_chunk, dict_cbytes, dict_dest, dict_payload_len);
+  mu_assert("ERROR: cannot decompress dict chunk after fallback", dsize == dict_payload_len);
+  mu_assert("ERROR: dict chunk mismatch after fallback",
+            memcmp(dict_dest, dict_payload, (size_t)dict_payload_len) == 0);
+
+  free(dict_dest);
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+  return EXIT_SUCCESS;
+}
+
 
 
 /* Regression: blosc2_chunk_zeros/uninit/nans/repeatval must succeed even when
@@ -551,6 +684,8 @@ static char *all_tests(void) {
      At exactly 20 blocks, dict_maxsize = srcsize/20 = 1, which is too small for ZSTD training;
      should fall back to plain compression. */
   mu_run_test(test_vlcompress_dict_20blocks);
+  mu_run_test(test_dctx_reuse_plain_after_dict);
+  mu_run_test(test_dict_fallback_is_per_chunk);
 
   /* Regression: special-value chunk functions must not fail when use_dict=1
      is combined with a codec that does not support dict compression. */
