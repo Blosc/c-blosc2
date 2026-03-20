@@ -109,6 +109,7 @@ struct blosc2_context_s {
   int dref_not_init;  /* data ref in delta not initialized */
   blosc2_pthread_mutex_t delta_mutex;
   blosc2_pthread_cond_t delta_cv;
+  bool dict_buffer_owned;  /* Whether dict_buffer must be freed by the context */
   // Add new fields here to avoid breaking the ABI.
 };
 
