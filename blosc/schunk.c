@@ -1029,29 +1029,17 @@ int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
   } else {
     // A frame
     int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
+    schunk->nbytes += chunk_nbytes;
+    schunk->nbytes -= chunk_nbytes_old;
     switch (special_value) {
       case BLOSC2_SPECIAL_ZERO:
       case BLOSC2_SPECIAL_NAN:
       case BLOSC2_SPECIAL_UNINIT:
-        schunk->nbytes += chunk_nbytes;
-        schunk->nbytes -= chunk_nbytes_old;
-        if (frame->sframe) {
-          schunk->cbytes -= chunk_cbytes_old;
-        }
+        schunk->cbytes -= chunk_cbytes_old;
         break;
       default:
-        /* Update counters */
-        schunk->nbytes += chunk_nbytes;
-        schunk->nbytes -= chunk_nbytes_old;
         schunk->cbytes += chunk_cbytes;
-        if (frame->sframe) {
-          schunk->cbytes -= chunk_cbytes_old;
-        }
-        else {
-          if (chunk_cbytes_old >= chunk_cbytes) {
-            schunk->cbytes -= chunk_cbytes;
-          }
-        }
+        schunk->cbytes -= chunk_cbytes_old;
     }
   }
 

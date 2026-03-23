@@ -10,6 +10,8 @@
 
 #include "test_common.h"
 
+#include <sys/stat.h>
+
 typedef struct {
   int8_t ndim;
   int64_t shape[B2ND_MAX_DIM];
@@ -19,6 +21,115 @@ typedef struct {
   bool given_pos;
   int64_t start_resize[B2ND_MAX_DIM];
 } test_shapes_t;
+
+
+static int64_t get_file_size(const char *path) {
+  struct stat st;
+  if (stat(path, &st) != 0) {
+    return -1;
+  }
+  return (int64_t)st.st_size;
+}
+
+
+static int create_extended_array(const char *urlpath, int64_t nitems, int32_t batch_size,
+                                 const int32_t *chunkshape, const int32_t *blockshape) {
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  cparams.typesize = (int32_t)sizeof(int64_t);
+
+  blosc2_storage storage = {
+      .contiguous = true,
+      .urlpath = (char *)urlpath,
+      .cparams = &cparams,
+      .dparams = &dparams,
+  };
+
+  int8_t ndim = 1;
+  int64_t shape[] = {0};
+  b2nd_context_t *ctx = b2nd_create_ctx(&storage, ndim, shape, chunkshape, blockshape, NULL, 0, NULL, 0);
+  B2ND_TEST_ASSERT(ctx != NULL ? 0 : BLOSC2_ERROR_MEMORY_ALLOC);
+
+  b2nd_array_t *arr;
+  B2ND_TEST_ASSERT(b2nd_empty(ctx, &arr));
+
+  int64_t *buffer = malloc((size_t)batch_size * sizeof(int64_t));
+  B2ND_TEST_ASSERT(buffer != NULL ? 0 : BLOSC2_ERROR_MEMORY_ALLOC);
+
+  for (int64_t start = 0; start < nitems; start += batch_size) {
+    int64_t stop = start + batch_size;
+    if (stop > nitems) {
+      stop = nitems;
+    }
+    int64_t newshape[] = {stop};
+    B2ND_TEST_ASSERT(b2nd_resize(arr, newshape, NULL));
+
+    int64_t buffershape[] = {stop - start};
+    for (int64_t i = 0; i < stop - start; ++i) {
+      buffer[i] = start + i;
+    }
+    int64_t slice_start[] = {start};
+    int64_t slice_stop[] = {stop};
+    B2ND_TEST_ASSERT(b2nd_set_slice_cbuffer(buffer, buffershape, (stop - start) * (int64_t)sizeof(int64_t),
+                                            slice_start, slice_stop, arr));
+  }
+
+  free(buffer);
+  B2ND_TEST_ASSERT(b2nd_free(arr));
+  B2ND_TEST_ASSERT(b2nd_free_ctx(ctx));
+  return 0;
+}
+
+
+static int create_one_go_array(const char *urlpath, int64_t nitems,
+                               const int32_t *chunkshape, const int32_t *blockshape) {
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  cparams.typesize = (int32_t)sizeof(int64_t);
+
+  blosc2_storage storage = {
+      .contiguous = true,
+      .urlpath = (char *)urlpath,
+      .cparams = &cparams,
+      .dparams = &dparams,
+  };
+
+  int8_t ndim = 1;
+  int64_t shape[] = {nitems};
+  b2nd_context_t *ctx = b2nd_create_ctx(&storage, ndim, shape, chunkshape, blockshape, NULL, 0, NULL, 0);
+  B2ND_TEST_ASSERT(ctx != NULL ? 0 : BLOSC2_ERROR_MEMORY_ALLOC);
+
+  int64_t *buffer = malloc((size_t)nitems * sizeof(int64_t));
+  B2ND_TEST_ASSERT(buffer != NULL ? 0 : BLOSC2_ERROR_MEMORY_ALLOC);
+  for (int64_t i = 0; i < nitems; ++i) {
+    buffer[i] = i;
+  }
+
+  b2nd_array_t *arr;
+  B2ND_TEST_ASSERT(b2nd_from_cbuffer(ctx, &arr, buffer, nitems * (int64_t)sizeof(int64_t)));
+
+  free(buffer);
+  B2ND_TEST_ASSERT(b2nd_free(arr));
+  B2ND_TEST_ASSERT(b2nd_free_ctx(ctx));
+  return 0;
+}
+
+
+static int assert_sequential_contents(const char *urlpath, int64_t nitems) {
+  b2nd_array_t *arr;
+  B2ND_TEST_ASSERT(b2nd_open(urlpath, &arr));
+
+  int64_t *buffer = malloc((size_t)nitems * sizeof(int64_t));
+  B2ND_TEST_ASSERT(buffer != NULL ? 0 : BLOSC2_ERROR_MEMORY_ALLOC);
+  B2ND_TEST_ASSERT(b2nd_to_cbuffer(arr, buffer, nitems * (int64_t)sizeof(int64_t)));
+  for (int64_t i = 0; i < nitems; ++i) {
+    CUTEST_ASSERT("Unexpected value after incremental resize", buffer[i] == i);
+  }
+
+  free(buffer);
+  B2ND_TEST_ASSERT(b2nd_free(arr));
+  return 0;
+}
 
 
 CUTEST_TEST_SETUP(resize_shape) {
@@ -205,6 +316,61 @@ CUTEST_TEST_TEARDOWN(resize_shape) {
   blosc2_destroy();
 }
 
+
+CUTEST_TEST_SETUP(resize_growth_contiguous_frame) {
+  blosc2_init();
+}
+
+
+CUTEST_TEST_TEST(resize_growth_contiguous_frame) {
+  const char *extended_path = "test_resize_growth_extended.b2nd";
+  const char *one_go_path = "test_resize_growth_one_go.b2nd";
+  const int64_t nitems = 100000;
+  const int32_t batch_size = 1000;
+  const int32_t chunkshape[] = {16384};
+  const int32_t blockshape[] = {256};
+
+  blosc2_remove_urlpath(extended_path);
+  blosc2_remove_urlpath(one_go_path);
+
+  B2ND_TEST_ASSERT(create_extended_array(extended_path, nitems, batch_size, chunkshape, blockshape));
+  B2ND_TEST_ASSERT(create_one_go_array(one_go_path, nitems, chunkshape, blockshape));
+  B2ND_TEST_ASSERT(assert_sequential_contents(extended_path, nitems));
+  B2ND_TEST_ASSERT(assert_sequential_contents(one_go_path, nitems));
+
+  int64_t extended_size = get_file_size(extended_path);
+  int64_t one_go_size = get_file_size(one_go_path);
+  CUTEST_ASSERT("Could not stat the incrementally grown frame", extended_size >= 0);
+  CUTEST_ASSERT("Could not stat the one-shot frame", one_go_size >= 0);
+  CUTEST_ASSERT("Incremental contiguous resize still leaves too much dead data behind",
+                extended_size <= one_go_size + 4096);
+
+  blosc2_remove_urlpath(extended_path);
+  blosc2_remove_urlpath(one_go_path);
+  return 0;
+}
+
+
+CUTEST_TEST_TEARDOWN(resize_growth_contiguous_frame) {
+  blosc2_destroy();
+}
+
 int main() {
-  CUTEST_TEST_RUN(resize_shape);
+  int rc;
+
+  _cutest_setup();
+  resize_shape_setup();
+  rc = _cutest_run((int (*)(void))resize_shape_test, "resize_shape");
+  resize_shape_teardown();
+  _cutest_teardown();
+  if (rc != 0) {
+    return rc;
+  }
+
+  _cutest_setup();
+  resize_growth_contiguous_frame_setup();
+  rc = _cutest_run((int (*)(void))resize_growth_contiguous_frame_test, "resize_growth_contiguous_frame");
+  resize_growth_contiguous_frame_teardown();
+  _cutest_teardown();
+  return rc;
 }
