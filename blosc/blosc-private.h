@@ -99,6 +99,7 @@ static inline int32_t sw32_(const void* pa) {
 #elif defined (_MSC_VER) /* Visual Studio */
     return _byteswap_ulong(*(unsigned int *)pa);
 #else
+    const uint8_t *pa_ = (const uint8_t *)pa;
     uint8_t *dest = (uint8_t *)&idest;
     dest[0] = pa_[3];
     dest[1] = pa_[2];
