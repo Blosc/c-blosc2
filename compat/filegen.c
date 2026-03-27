@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <errno.h>
 
 #if defined(_WIN32) && !defined(__MINGW32__)
 #include <windows.h>
@@ -28,6 +30,24 @@ typedef enum {
   OP_UNSHUFFLE,
   OP_BITUNSHUFFLE,
 } op_t;
+
+static const char *op_name(op_t op) {
+  switch (op) {
+    case OP_COMPRESS:
+      return "compress";
+    case OP_SHUFFLE:
+      return "shuffle";
+    case OP_BITSHUFFLE:
+      return "bitshuffle";
+    case OP_DECOMPRESS:
+      return "decompress";
+    case OP_UNSHUFFLE:
+      return "unshuffle";
+    case OP_BITUNSHUFFLE:
+      return "bitunshuffle";
+  }
+  return "unknown";
+}
 
 static op_t parse_op(const char *op) {
   if (strcmp(op, "compress") == 0) {
@@ -46,6 +66,22 @@ static op_t parse_op(const char *op) {
     printf("Unknown operation: %s\n", op);
     exit(-1);
   }
+}
+
+static const char *fixture_basename(const char *path) {
+  const char *slash = strrchr(path, '/');
+  return slash == NULL ? path : slash + 1;
+}
+
+static op_t expected_decode_op(const char *path) {
+  const char *name = fixture_basename(path);
+  if (strncmp(name, "bitshuffle", strlen("bitshuffle")) == 0) {
+    return OP_BITUNSHUFFLE;
+  }
+  if (strncmp(name, "shuffle", strlen("shuffle")) == 0) {
+    return OP_UNSHUFFLE;
+  }
+  return OP_DECOMPRESS;
 }
 
 static int32_t run(op_t op, const void * src, void * dest, const size_t size) {
@@ -120,7 +156,7 @@ int main(int argc, char *argv[]) {
   if (argc != 3 && argc != 4) {
     printf("Usage:\n");
     printf("%s <compress|shuffle|bitshuffle> <compressor> <output_file>\n", argv[0]);
-    printf("%s <unshuffle|bitunshuffle> <output_file>\n", argv[0]);
+    printf("%s <decompress|unshuffle|bitunshuffle> <output_file>\n", argv[0]);
     return 1;
   }
 
@@ -156,14 +192,41 @@ int main(int argc, char *argv[]) {
 
     /* Write data_out to argv[3] */
     f = fopen(argv[3], "wb+");
+    if (f == NULL) {
+      printf("Cannot open %s for writing: %s\n", argv[3], strerror(errno));
+      blosc2_destroy();
+      return EXIT_FAILURE;
+    }
     if (fwrite(data_out, 1, (size_t) csize, f) == (uint32_t) csize) {
       printf("Wrote %s\n", argv[3]);
     } else {
       printf("Write failed");
     }
+    fclose(f);
   } else {
+    const char *name = fixture_basename(argv[2]);
+    size_t name_len = strlen(name);
+    if (name_len >= strlen(".b2frame") &&
+        strcmp(name + name_len - strlen(".b2frame"), ".b2frame") == 0) {
+      printf("Frame fixture detected: %s\n", argv[2]);
+      printf("Use './filegen-vl decompress %s' for .b2frame inputs.\n", argv[2]);
+      return EXIT_FAILURE;
+    }
+
+    op_t expected_op = expected_decode_op(argv[2]);
+    if (operation != expected_op) {
+      printf("Operation/file mismatch for %s\n", argv[2]);
+      printf("Use '%s' for this fixture, not '%s'.\n", op_name(expected_op), op_name(operation));
+      return EXIT_FAILURE;
+    }
+
     /* Read from argv[2] into data_out. */
     f = fopen(argv[2], "rb");
+    if (f == NULL) {
+      printf("Cannot open %s for reading: %s\n", argv[2], strerror(errno));
+      blosc2_destroy();
+      return EXIT_FAILURE;
+    }
     fseek(f, 0, SEEK_END);
     fsize = ftell(f);
     fseek(f, 0, SEEK_SET);
@@ -172,6 +235,7 @@ int main(int argc, char *argv[]) {
     } else {
       printf("Read failed");
     }
+    fclose(f);
 
     dsize = run(operation, data_out, data_dest, (size_t) dsize);
     if (dsize < 0) {
