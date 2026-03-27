@@ -28,11 +28,24 @@ int ndcell_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_
     return BLOSC2_ERROR_FAILURE;
   }
   int8_t ndim;
-  int64_t *shape = malloc(8 * sizeof(int64_t));
-  int32_t *chunkshape = malloc(8 * sizeof(int32_t));
-  int32_t *blockshape = malloc(8 * sizeof(int32_t));
-  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
+  int64_t *shape = malloc(B2ND_MAX_DIM * sizeof(int64_t));
+  int32_t *chunkshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
+  int32_t *blockshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
+  if (b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL) < 0) {
+    free(smeta);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    return BLOSC2_ERROR_FAILURE;
+  }
   free(smeta);
+  if (ndim <= 0 || ndim > NDCELL_MAX_DIM) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    BLOSC_TRACE_ERROR("ndim %d is out of range", ndim);
+    return BLOSC2_ERROR_FAILURE;
+  }
   int typesize = cparams->typesize;
 
   int8_t cell_shape = (int8_t) meta;
@@ -141,9 +154,9 @@ int ndcell_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8
   BLOSC_UNUSED_PARAM(id);
   blosc2_schunk *schunk = dparams->schunk;
   int8_t ndim;
-  int64_t *shape = malloc(8 * sizeof(int64_t));
-  int32_t *chunkshape = malloc(8 * sizeof(int32_t));
-  int32_t *blockshape = malloc(8 * sizeof(int32_t));
+  int64_t *shape = malloc(B2ND_MAX_DIM * sizeof(int64_t));
+  int32_t *chunkshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
+  int32_t *blockshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(schunk, "b2nd", &smeta, &smeta_len) < 0) {
@@ -153,8 +166,21 @@ int ndcell_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8
     BLOSC_TRACE_ERROR("b2nd layer not found!");
     return BLOSC2_ERROR_FAILURE;
   }
-  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
+  if (b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL) < 0) {
+    free(smeta);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    return BLOSC2_ERROR_FAILURE;
+  }
   free(smeta);
+  if (ndim <= 0 || ndim > NDCELL_MAX_DIM) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    BLOSC_TRACE_ERROR("ndim %d is out of range", ndim);
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   int8_t cell_shape = (int8_t) meta;
   int cell_size = (int) pow(cell_shape, ndim);
