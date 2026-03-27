@@ -2848,6 +2848,14 @@ static int write_compression_header(blosc2_context* context, bool extended_heade
     }
   }
 
+  /* If the header + block starts don't fit in destsize, fall back to memcpy */
+  if (!memcpyed && context->output_bytes > context->destsize) {
+    context->header_flags |= (uint8_t)BLOSC_MEMCPYED;
+    memcpyed = true;
+    context->bstarts = NULL;
+    context->output_bytes = context->header_overhead;
+  }
+
   // when memcpyed bit is set, there is no point in dealing with others
   if (!memcpyed) {
     if (context->filter_flags & BLOSC_DOSHUFFLE) {
