@@ -4,8 +4,52 @@ Release notes for C-Blosc2
 Changes from 2.23.1 to 3.0.0-rc.1
 =================================
 
-* Fixed several safety issues in the core library, as well as in ndcell/ndlz plugins.
-  Thanks to Trail of Bits (in collaboration with Anthropic).
+* This release introduces support for variable-length chunks and variable-length
+  blocks, which is the main reason for the major version bump.
+
+  Until now, a schunk/frame generally assumed that all chunks shared the same
+  logical chunk size, and regular Blosc2 chunks assumed fixed-size internal blocks
+  (except for the last remainder block).  In 3.0.0-rc.1, schunks can switch to
+  variable chunk sizes when needed, and there is also a new chunk layout for
+  variable-length blocks (VL-blocks), where each block can carry a different
+  uncompressed size inside the same chunk.
+
+  This is especially useful for workloads made of naturally variable-size pieces
+  of data, like strings, records, JSON fragments, or other irregular payloads
+  that previously had to be padded, split awkwardly, or stored as independent
+  chunks.  The new layout keeps these pieces grouped together while still making
+  them individually recoverable.
+
+  Together with this, there are new public APIs for VL-block chunks:
+  `blosc2_vlcompress_ctx()`, `blosc2_vldecompress_ctx()`,
+  `blosc2_vlchunk_get_nblocks()`, `blosc2_vldecompress_block_ctx()`, and
+  `blosc2_schunk_get_vlblock()`.  Lazy loading also works with VL-block chunks,
+  so individual blocks can be fetched on demand without materializing the whole
+  chunk first.
+
+* The chunk and cframe formats have been extended to represent variable chunk
+  sizes, VL-block chunks, and dictionary usage more explicitly.  Forward
+  compatibility checks were tightened as part of this work, and regular chunks
+  keep their previous stable format version while VL-block chunks use a new one.
+
+* Dictionary compression has been expanded and improved:
+  `use_dict` now works with LZ4 and LZ4HC in addition to ZSTD, the dictionary
+  state is preserved correctly across chunk compression/decompression, and the
+  frame metadata now round-trips the dictionary setting.  There is also a new
+  minimum useful dictionary threshold to avoid training or using dictionaries
+  that are too small to help.
+
+* The necessary changes for accommodating all these improvements have been fully
+  documented in README_CHUNK_FORMAT.md and README_CFRAME_FORMAT.md.  Again,
+  care has been taken to ensure that the chunk and frame formats are backward
+  compatible with previous versions of C-Blosc2.
+
+* Fixed several safety issues in the core library, as well as in ndcell/ndlz
+  plugins.  Thanks to Trail of Bits (in collaboration with Anthropic).
+
+* Additional compatibility and portability fixes include better protection
+  against unsupported future chunk/frame versions and proper VSX shuffle support
+  detection on big-endian ppc64.  Thanks to @AutoJanitor for these.
 
 
 Changes from 2.23.0 to 2.23.1

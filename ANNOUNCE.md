@@ -1,11 +1,11 @@
-# Announcing C-Blosc2 2.23.1
+# Announcing C-Blosc2 3.0.0 RC1
 A fast, compressed and persistent binary data store library for C.
 
 ## What is new?
 
-This is a patch level release which fixes some memory leaks/undefined
-behaviour, as well as allowing resizing of empty arrays and the use of meta
-(interpreted as number of bytestreams) for the byteshuffle filter.
+We've bumped the major version to introduce variable-length chunks & blocks
+(VL-blocks), perfect for irregular data like strings & JSON! Plus, improved
+dictionary compression (now with LZ4/LZ4HC!) and key safety fixes.
 
 For more info, see the release notes in:
 
