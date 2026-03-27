@@ -1,10 +1,11 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 2.23.1 to 2.23.2
-=============================
+Changes from 2.23.1 to 3.0.0-rc.1
+=================================
 
-  #XXX version-specific blurb XXX#
+* Fixed several safety issues in the core library, as well as in ndcell/ndlz plugins.
+  Thanks to Trail of Bits (in collaboration with Anthropic).
 
 
 Changes from 2.23.0 to 2.23.1
