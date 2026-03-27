@@ -109,6 +109,10 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
   // ndim entry
   *ndim = (int8_t) pmeta[0];
   int8_t ndim_aux = *ndim;  // positive fixnum (7-bit positive integer)
+  if (ndim_aux < 0 || ndim_aux > B2ND_MAX_DIM) {
+    BLOSC_TRACE_ERROR("ndim %d is out of range", ndim_aux);
+    return BLOSC2_ERROR_FAILURE;
+  }
   pmeta += 1;
 
   // shape entry
