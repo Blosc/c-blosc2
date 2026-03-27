@@ -520,6 +520,12 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
       } else if (match_type == 21) {    // triple match
         buffercpy = local_buffer;
         int row = (int) (token & 7);
+        if (row + 2 >= cell_shape) {
+          free(local_buffer);
+          free(cell_aux);
+          BLOSC_TRACE_ERROR("Triple match row out of bounds");
+          return BLOSC2_ERROR_FAILURE;
+        }
         uint16_t offset = *((uint16_t *) ip);
         ip += 2;
         for (int l = 0; l < 3; l++) {
@@ -535,6 +541,12 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
       } else if (match_type == 17) {    // pair match
         buffercpy = local_buffer;
         int row = (int) (token & 7);
+        if (row + 1 >= cell_shape) {
+          free(local_buffer);
+          free(cell_aux);
+          BLOSC_TRACE_ERROR("Pair match row out of bounds");
+          return BLOSC2_ERROR_FAILURE;
+        }
         uint16_t offset = *((uint16_t *) ip);
         ip += 2;
         for (int l = 0; l < 2; l++) {
