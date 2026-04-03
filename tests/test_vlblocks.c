@@ -939,6 +939,13 @@ static blosc2_schunk* make_lazy_vl_schunk(const char* urlpath, bool contiguous) 
   return schunk;
 }
 
+static void put_le32(uint8_t* p, uint32_t v) {
+  p[0] = (uint8_t)(v & 0xffu);
+  p[1] = (uint8_t)((v >> 8) & 0xffu);
+  p[2] = (uint8_t)((v >> 16) & 0xffu);
+  p[3] = (uint8_t)((v >> 24) & 0xffu);
+}
+
 static char *test_lazy_vlchunk_get_nblocks(void) {
   const char* urlpath = "test_lazy_vlnblocks.b2frame";
   blosc2_schunk* schunk = make_lazy_vl_schunk(urlpath, true);
@@ -956,6 +963,43 @@ static char *test_lazy_vlchunk_get_nblocks(void) {
     mu_assert("ERROR: wrong nblocks from lazy chunk", nblocks == 3);
 
     if (needs_free) free(lazy_chunk);
+  }
+
+  blosc2_schunk_free(schunk);
+  blosc2_remove_urlpath(urlpath);
+  return EXIT_SUCCESS;
+}
+
+static char *test_lazy_vlchunk_rejects_huge_nblocks(void) {
+  const char* urlpath = "test_lazy_vlnblocks_corrupt.b2frame";
+  blosc2_schunk* schunk = make_lazy_vl_schunk(urlpath, false);
+  mu_assert("ERROR: cannot create lazy VL schunk", schunk != NULL);
+
+  char chunk_path[256];
+  int chunk_path_len = snprintf(chunk_path, sizeof(chunk_path), "%s/%08X.chunk", urlpath, 0U);
+  mu_assert("ERROR: cannot build chunk path", chunk_path_len > 0 && chunk_path_len < (int)sizeof(chunk_path));
+
+  FILE* fp = fopen(chunk_path, "rb+");
+  mu_assert("ERROR: cannot open first chunk file", fp != NULL);
+
+  uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
+  size_t rbytes = fread(header, 1, sizeof(header), fp);
+  mu_assert("ERROR: cannot read first chunk header", rbytes == sizeof(header));
+
+  header[BLOSC2_CHUNK_BLOSC2_FLAGS2] |= BLOSC2_VL_BLOCKS;
+  put_le32(header + BLOSC2_CHUNK_BLOCKSIZE, UINT32_MAX);
+
+  mu_assert("ERROR: cannot rewind chunk file", fseek(fp, 0, SEEK_SET) == 0);
+  size_t wbytes = fwrite(header, 1, sizeof(header), fp);
+  mu_assert("ERROR: cannot write corrupted chunk header", wbytes == sizeof(header));
+  fclose(fp);
+
+  uint8_t* lazy_chunk = NULL;
+  bool needs_free = false;
+  int cbytes = blosc2_schunk_get_lazychunk(schunk, 0, &lazy_chunk, &needs_free);
+  mu_assert("ERROR: malformed lazy VL chunk should be rejected", cbytes < 0);
+  if (needs_free) {
+    free(lazy_chunk);
   }
 
   blosc2_schunk_free(schunk);
@@ -1042,6 +1086,7 @@ static char *all_tests(void) {
   }
   mu_run_test(test_vlblocks_mt_roundtrip);
   mu_run_test(test_lazy_vlchunk_get_nblocks);
+  mu_run_test(test_lazy_vlchunk_rejects_huge_nblocks);
   mu_run_test(test_lazy_vldecompress_block_ctx);
   mu_run_test(test_lazy_vldecompress_block_ctx_sframe);
   mu_run_test(test_lazy_vldecompress_block_ctx_dict_lz4);

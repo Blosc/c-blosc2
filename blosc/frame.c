@@ -23,6 +23,7 @@
 #endif  /* _WIN32 */
 
 #include <inttypes.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -1295,7 +1296,7 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
   else {
     frame->coffsets_needs_free = false;
   }
-  
+
   int64_t io_pos = 0;
   if (frame->sframe) {
     fp = sframe_open_index(frame->urlpath, "rb",
@@ -2038,7 +2039,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
     else {
       needs_free = false;
     }
-    
+
     if (!frame->sframe) {
       // If not the chunks won't be in the frame
       fp = io_cb->open(frame->urlpath, "rb", udio->params);
@@ -2370,7 +2371,7 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
     else {
       *needs_free = false;
     }
-    
+
     io_pos = frame->file_offset + header_len + offset;
     rbytes = io_cb->read((void**)chunk, 1, chunk_cbytes, io_pos, fp);
     io_cb->close(fp);
@@ -2415,6 +2416,8 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
   int32_t lazychunk_cbytes;
   int64_t offset;
   void* fp = NULL;
+  int32_t* block_csizes = NULL;
+  struct csize_idx *csize_idx = NULL;
 
   *chunk = NULL;
   *needs_free = false;
@@ -2498,40 +2501,113 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
     if (rc < 0) {
       goto end;
     }
+    if (chunk_nbytes < 0 || chunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH || chunk_blocksize <= 0) {
+      rc = BLOSC2_ERROR_INVALID_HEADER;
+      goto end;
+    }
     bool vlblocks = (header_ptr[BLOSC2_CHUNK_BLOSC2_FLAGS2] & BLOSC2_VL_BLOCKS) != 0;
-    size_t nblocks = vlblocks ? (size_t)chunk_blocksize : (size_t)chunk_nbytes / chunk_blocksize;
-    size_t leftover_block = vlblocks ? 0 : (size_t)chunk_nbytes % chunk_blocksize;
-    if (!vlblocks) {
-      nblocks = leftover_block ? nblocks + 1 : nblocks;
+    size_t nblocks;
+    size_t leftover_block = 0;
+    if (vlblocks) {
+      nblocks = (size_t)chunk_blocksize;
+    }
+    else {
+      nblocks = (size_t)chunk_nbytes / (size_t)chunk_blocksize;
+      leftover_block = (size_t)chunk_nbytes % (size_t)chunk_blocksize;
+      if (leftover_block) {
+        if (nblocks == SIZE_MAX) {
+          rc = BLOSC2_ERROR_INVALID_HEADER;
+          goto end;
+        }
+        nblocks += 1;
+      }
+    }
+    if (nblocks == 0 || nblocks > (size_t)INT_MAX) {
+      rc = BLOSC2_ERROR_INVALID_HEADER;
+      goto end;
     }
     // Allocate space for the lazy chunk
     int32_t trailer_len;
     int32_t special_type = (header_ptr[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
     int memcpyed = header_ptr[BLOSC2_CHUNK_FLAGS] & (uint8_t) BLOSC_MEMCPYED;
 
-    int32_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH;
+    int32_t trailer_offset;
     size_t streams_offset = BLOSC_EXTENDED_HEADER_LENGTH;
+    size_t trailer_offset_sz = BLOSC_EXTENDED_HEADER_LENGTH;
+    size_t trailer_len_sz = 0;
+    size_t lazychunk_cbytes_sz = 0;
+    size_t bstarts_nbytes = 0;
     if (special_type == 0) {
-      // Regular values have offsets for blocks
-      trailer_offset += (int32_t) (nblocks * sizeof(int32_t));
-      if (memcpyed) {
-        streams_offset += 0;
-      } else {
-        streams_offset += nblocks * sizeof(int32_t);
+      if (nblocks > SIZE_MAX / sizeof(int32_t)) {
+        rc = BLOSC2_ERROR_INVALID_HEADER;
+        goto end;
       }
-      trailer_len = (int32_t) (sizeof(int32_t) + sizeof(int64_t) + nblocks * sizeof(int32_t));
-      lazychunk_cbytes = trailer_offset + trailer_len;
+      bstarts_nbytes = nblocks * sizeof(int32_t);
+
+      if (!memcpyed) {
+        if ((size_t)chunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH ||
+            bstarts_nbytes > (size_t)chunk_cbytes - BLOSC_EXTENDED_HEADER_LENGTH) {
+          rc = BLOSC2_ERROR_INVALID_HEADER;
+          goto end;
+        }
+      }
+
+      if (bstarts_nbytes > SIZE_MAX - trailer_offset_sz) {
+        rc = BLOSC2_ERROR_INVALID_HEADER;
+        goto end;
+      }
+      trailer_offset_sz += bstarts_nbytes;
+      // Regular values have offsets for blocks
+      if (!memcpyed) {
+        if (bstarts_nbytes > SIZE_MAX - streams_offset) {
+          rc = BLOSC2_ERROR_INVALID_HEADER;
+          goto end;
+        }
+        streams_offset += bstarts_nbytes;
+      }
+
+      if (bstarts_nbytes > SIZE_MAX - (sizeof(int32_t) + sizeof(int64_t))) {
+        rc = BLOSC2_ERROR_INVALID_HEADER;
+        goto end;
+      }
+      trailer_len_sz = sizeof(int32_t) + sizeof(int64_t) + bstarts_nbytes;
+      if (trailer_len_sz > SIZE_MAX - trailer_offset_sz) {
+        rc = BLOSC2_ERROR_INVALID_HEADER;
+        goto end;
+      }
+      lazychunk_cbytes_sz = trailer_offset_sz + trailer_len_sz;
     }
     else if (special_type == BLOSC2_SPECIAL_VALUE) {
-      trailer_offset += typesize;
-      streams_offset += typesize;
+      if (typesize <= 0) {
+        rc = BLOSC2_ERROR_INVALID_HEADER;
+        goto end;
+      }
+      if ((size_t)typesize > SIZE_MAX - trailer_offset_sz ||
+          (size_t)typesize > SIZE_MAX - streams_offset) {
+        rc = BLOSC2_ERROR_INVALID_HEADER;
+        goto end;
+      }
+      trailer_offset_sz += (size_t)typesize;
+      streams_offset += (size_t)typesize;
       trailer_len = 0;
-      lazychunk_cbytes = trailer_offset + trailer_len;
+      lazychunk_cbytes_sz = trailer_offset_sz;
     }
     else {
       rc = BLOSC2_ERROR_INVALID_HEADER;
       goto end;
     }
+
+    if (streams_offset > (size_t)chunk_cbytes ||
+        trailer_offset_sz > INT32_MAX ||
+        trailer_len_sz > INT32_MAX ||
+        lazychunk_cbytes_sz > INT32_MAX) {
+      rc = BLOSC2_ERROR_INVALID_HEADER;
+      goto end;
+    }
+
+    trailer_offset = (int32_t)trailer_offset_sz;
+    trailer_len = (int32_t)trailer_len_sz;
+    lazychunk_cbytes = (int32_t)lazychunk_cbytes_sz;
 
     // Read just the full header and bstarts section too (lazy partial length)
     if (frame->sframe) {
@@ -2544,7 +2620,11 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
     // The case here is a bit special because more memory is allocated than read from the file
     // and the chunk is modified after reading. Due to the modification, we cannot directly use
     // the memory provided by the io
-    *chunk = malloc(lazychunk_cbytes);
+    *chunk = malloc((size_t)lazychunk_cbytes);
+    if (*chunk == NULL) {
+      rc = BLOSC2_ERROR_MEMORY_ALLOC;
+      goto end;
+    }
     *needs_free = true;
 
     if (io_cb->is_allocation_necessary) {
@@ -2555,7 +2635,7 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       rbytes = io_cb->read((void**)&chunk_ptr, 1, (int64_t)streams_offset, io_pos, fp);
       memcpy(*chunk, chunk_ptr, streams_offset);
     }
-    
+
     if (rbytes != (int64_t)streams_offset) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) chunk out of the frame.");
       rc = BLOSC2_ERROR_FILE_READ;
@@ -2580,11 +2660,15 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       *(int64_t*)(*chunk + trailer_offset + sizeof(int32_t)) = header_len + offset;
     }
 
-    int32_t* block_csizes = malloc(nblocks * sizeof(int32_t));
+    block_csizes = malloc(nblocks * sizeof(int32_t));
+    if (block_csizes == NULL) {
+      rc = BLOSC2_ERROR_MEMORY_ALLOC;
+      goto end;
+    }
 
     if (memcpyed) {
       // When memcpyed the blocksizes are trivial to compute
-      for (int i = 0; i < (int)nblocks - 1; i++) {
+      for (size_t i = 0; i + 1 < nblocks; i++) {
         block_csizes[i] = (int)chunk_blocksize;
       }
       // The last block could be incomplete, mainly due to the fact that the block size is not divisible
@@ -2596,26 +2680,32 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       // of order because of multi-threading), and get a reverse index too.
       memcpy(block_csizes, *chunk + BLOSC_EXTENDED_HEADER_LENGTH, nblocks * sizeof(int32_t));
       // Helper structure to keep track of original indexes
-      struct csize_idx *csize_idx = malloc(nblocks * sizeof(struct csize_idx));
-      for (int n = 0; n < (int)nblocks; n++) {
+      csize_idx = malloc(nblocks * sizeof(struct csize_idx));
+      if (csize_idx == NULL) {
+        rc = BLOSC2_ERROR_MEMORY_ALLOC;
+        goto end;
+      }
+      for (size_t n = 0; n < nblocks; n++) {
         csize_idx[n].val = block_csizes[n];
-        csize_idx[n].idx = n;
+        csize_idx[n].idx = (int)n;
       }
       qsort(csize_idx, nblocks, sizeof(struct csize_idx), &sort_offset);
       // Compute the actual csizes
       int idx;
-      for (int n = 0; n < (int)nblocks - 1; n++) {
+      for (size_t n = 0; n + 1 < nblocks; n++) {
         idx = csize_idx[n].idx;
         block_csizes[idx] = csize_idx[n + 1].val - csize_idx[n].val;
       }
       idx = csize_idx[nblocks - 1].idx;
-      block_csizes[idx] = (int)chunk_cbytes - csize_idx[nblocks - 1].val;
+      block_csizes[idx] = chunk_cbytes - csize_idx[nblocks - 1].val;
       free(csize_idx);
+      csize_idx = NULL;
     }
     // Copy the csizes at the end of the trailer
     void *trailer_csizes = *chunk + lazychunk_cbytes - nblocks * sizeof(int32_t);
     memcpy(trailer_csizes, block_csizes, nblocks * sizeof(int32_t));
     free(block_csizes);
+    block_csizes = NULL;
   } else {
     // The chunk is in memory and just one pointer away
     int64_t chunk_header_offset = header_len + offset;
@@ -2636,6 +2726,12 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
   }
 
   end:
+  if (csize_idx != NULL) {
+    free(csize_idx);
+  }
+  if (block_csizes != NULL) {
+    free(block_csizes);
+  }
   if (fp != NULL) {
     io_cb->close(fp);
   }
