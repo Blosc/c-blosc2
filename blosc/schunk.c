@@ -610,10 +610,9 @@ int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int sp
   }
 
   int32_t typesize = schunk->typesize;
-
-  if ((nitems * typesize / chunksize) > INT_MAX) {
-    BLOSC_TRACE_ERROR("nitems is too large.  Try increasing the chunksize.");
-    return BLOSC2_ERROR_SCHUNK_SPECIAL;
+  if (nitems < 0 || chunksize <= 0 || typesize <= 0) {
+    BLOSC_TRACE_ERROR("Invalid special fill parameters.");
+    return BLOSC2_ERROR_INVALID_PARAM;
   }
 
   if ((schunk->nbytes > 0) || (schunk->cbytes > 0)) {
@@ -623,7 +622,19 @@ int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int sp
 
   // Compute the number of chunks and the length of the offsets chunk
   int32_t chunkitems = chunksize / typesize;
+  if (chunkitems <= 0) {
+    BLOSC_TRACE_ERROR("chunksize must be >= typesize for special fill.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
   int64_t nchunks = nitems / chunkitems;
+  if (nchunks > INT_MAX) {
+    BLOSC_TRACE_ERROR("nitems is too large.  Try increasing the chunksize.");
+    return BLOSC2_ERROR_SCHUNK_SPECIAL;
+  }
+  if (nitems > INT64_MAX / typesize) {
+    BLOSC_TRACE_ERROR("nitems is too large for nbytes accounting.");
+    return BLOSC2_ERROR_SCHUNK_SPECIAL;
+  }
   int32_t leftover_items = (int32_t)(nitems % chunkitems);
 
   if (schunk->frame == NULL) {
@@ -678,6 +689,16 @@ int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int sp
   else {
     /* Fill an empty frame with special values (fast path). */
     blosc2_frame_s *frame = (blosc2_frame_s *) schunk->frame;
+    int64_t total_chunks = nchunks + (leftover_items ? 1 : 0);
+    if (!blosc2_nchunks_to_offsets_nbytes(total_chunks, NULL)) {
+      BLOSC_TRACE_ERROR("Too many chunks for frame offsets representation.");
+      return BLOSC2_ERROR_FRAME_SPECIAL;
+    }
+
+    int64_t old_nchunks = schunk->nchunks;
+    int64_t old_nbytes = schunk->nbytes;
+    int32_t old_chunksize = schunk->chunksize;
+
     /* Update counters (necessary for the frame_fill_special() logic) */
     if (leftover_items) {
       nchunks += 1;
@@ -687,6 +708,9 @@ int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int sp
     schunk->nbytes = nitems * typesize;
     int64_t frame_len = frame_fill_special(frame, nitems, special_value, chunksize, schunk);
     if (frame_len < 0) {
+      schunk->chunksize = old_chunksize;
+      schunk->nchunks = old_nchunks;
+      schunk->nbytes = old_nbytes;
       BLOSC_TRACE_ERROR("Error creating special frame.");
       return frame_len;
     }
