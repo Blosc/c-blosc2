@@ -284,20 +284,13 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   return cpu_features;
 }
 #else   /* No hardware acceleration supported for the target architecture. */
-  #if defined(_MSC_VER)
-    #pragma message("Hardware-acceleration detection not implemented for the target architecture. Only the generic shuffle/unshuffle routines will be available.")
-  #else
-    #warning Hardware-acceleration detection not implemented for the target architecture. Only the generic shuffle/unshuffle routines will be available.
-  #endif
-
-static blosc_cpu_features blosc_get_cpu_features(void) {
-return BLOSC_HAVE_NOTHING;
-}
 
 #endif /* defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED) */
 
 static shuffle_implementation_t get_shuffle_implementation(void) {
+#if defined(SHUFFLE_AVX512_ENABLED) || defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED) || defined(SHUFFLE_NEON_ENABLED) || defined(SHUFFLE_ALTIVEC_ENABLED)
   blosc_cpu_features cpu_features = blosc_get_cpu_features();
+#endif
 #if defined(SHUFFLE_AVX512_ENABLED)
   if (cpu_features & BLOSC_HAVE_AVX512 && is_shuffle_avx2 && is_bshuf_AVX512) {
     shuffle_implementation_t impl_avx512;
