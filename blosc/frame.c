@@ -813,7 +813,8 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
   ptrailer += 16;
 
   // Sanity check
-  if (ptrailer - trailer != trailer_len) {
+  ptrdiff_t actual_trailer_len = ptrailer - trailer;
+  if (actual_trailer_len < 0 || (uint64_t)actual_trailer_len != (uint64_t)trailer_len) {
     return BLOSC2_ERROR_DATA;
   }
 
@@ -1251,7 +1252,7 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
         BLOSC_TRACE_ERROR("Cannot read the cbytes outside of frame boundary.");
         return NULL;
       }
-      if ((uint64_t)chunk_nbytes != nchunks * sizeof(int64_t)) {
+      if (nchunks < 0 || (uint64_t)chunk_nbytes != (uint64_t)nchunks * (uint64_t)sizeof(int64_t)) {
         BLOSC_TRACE_ERROR("The number of chunks in offset idx "
                           "does not match the ones in the header frame.");
         return NULL;
