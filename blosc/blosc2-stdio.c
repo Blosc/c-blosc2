@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <limits.h>
 
 #if defined(_WIN32)
   #include <memoryapi.h>
@@ -30,6 +31,33 @@
 #else
   #include <sys/mman.h>
 #endif
+
+
+static bool checked_mul_int64_nonneg(int64_t a, int64_t b, int64_t* out) {
+  if (a < 0 || b < 0) {
+    return false;
+  }
+  if (a == 0 || b == 0) {
+    *out = 0;
+    return true;
+  }
+  if (a > INT64_MAX / b) {
+    return false;
+  }
+  *out = a * b;
+  return true;
+}
+
+static bool checked_add_int64_nonneg(int64_t a, int64_t b, int64_t* out) {
+  if (a < 0 || b < 0) {
+    return false;
+  }
+  if (a > INT64_MAX - b) {
+    return false;
+  }
+  *out = a + b;
+  return true;
+}
 
 
 void *blosc2_stdio_open(const char *urlpath, const char *mode, void *params) {
@@ -302,17 +330,29 @@ int64_t blosc2_stdio_mmap_size(void *stream) {
 int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) stream;
 
-  if (position < 0) {
-    BLOSC_TRACE_ERROR("Cannot write to a negative position.");
+  if (ptr == NULL || size < 0 || nitems < 0 || position < 0) {
+    BLOSC_TRACE_ERROR("Invalid arguments for mmap write.");
     return 0;
   }
 
-  int64_t n_bytes = size * nitems;
+  int64_t n_bytes;
+  if (!checked_mul_int64_nonneg(size, nitems, &n_bytes)) {
+    BLOSC_TRACE_ERROR("mmap write size overflow (size=%" PRId64 ", nitems=%" PRId64 ").", size, nitems);
+    return 0;
+  }
   if (n_bytes == 0) {
     return 0;
   }
+  if ((uint64_t)n_bytes > SIZE_MAX) {
+    BLOSC_TRACE_ERROR("mmap write size does not fit in size_t (%" PRId64 ").", n_bytes);
+    return 0;
+  }
 
-  int64_t position_end = position + n_bytes;
+  int64_t position_end;
+  if (!checked_add_int64_nonneg(position, n_bytes, &position_end)) {
+    BLOSC_TRACE_ERROR("mmap write position overflow (position=%" PRId64 ", nbytes=%" PRId64 ").", position, n_bytes);
+    return 0;
+  }
   int64_t new_size = position_end > mmap_file->file_size ? position_end : mmap_file->file_size;
 
 #if defined(_WIN32)
@@ -321,7 +361,12 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
   }
 
   if (mmap_file->mapping_size < mmap_file->file_size) {
-    mmap_file->mapping_size = mmap_file->file_size * 2;
+    if (mmap_file->file_size > INT64_MAX / 2) {
+      mmap_file->mapping_size = mmap_file->file_size;
+    }
+    else {
+      mmap_file->mapping_size = mmap_file->file_size * 2;
+    }
 
     /* We need to remap the file completely and cannot pass the previous used address on Windows */
     if (!UnmapViewOfFile(mmap_file->addr)) {
@@ -376,11 +421,15 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
   }
 
   if (mmap_file->mapping_size < mmap_file->file_size) {
-    mmap_file->mapping_size = mmap_file->file_size * 2;
+    int64_t old_mapping_size = mmap_file->mapping_size;
+    if (mmap_file->file_size > INT64_MAX / 2) {
+      mmap_file->mapping_size = mmap_file->file_size;
+    }
+    else {
+      mmap_file->mapping_size = mmap_file->file_size * 2;
+    }
 
 #if defined(__linux__)
-    int64_t old_mapping_size = mmap_file->mapping_size;
-
     /* mremap is the best option as it also ensures that the old data is still available in c mode. Unfortunately, it
     is no POSIX standard and only available on Linux */
     char* new_address = mremap(mmap_file->addr, old_mapping_size, mmap_file->mapping_size, MREMAP_MAYMOVE);
@@ -422,13 +471,26 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
 int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) stream;
 
-  if (position < 0) {
-    BLOSC_TRACE_ERROR("Cannot read from a negative position.");
+  if (ptr == NULL || size < 0 || nitems < 0 || position < 0) {
+    BLOSC_TRACE_ERROR("Invalid arguments for mmap read.");
     *ptr = NULL;
     return 0;
   }
 
-  if (position + size * nitems > mmap_file->file_size) {
+  int64_t n_bytes;
+  if (!checked_mul_int64_nonneg(size, nitems, &n_bytes)) {
+    BLOSC_TRACE_ERROR("mmap read size overflow (size=%" PRId64 ", nitems=%" PRId64 ").", size, nitems);
+    *ptr = NULL;
+    return 0;
+  }
+  int64_t position_end;
+  if (!checked_add_int64_nonneg(position, n_bytes, &position_end)) {
+    BLOSC_TRACE_ERROR("mmap read position overflow (position=%" PRId64 ", nbytes=%" PRId64 ").", position, n_bytes);
+    *ptr = NULL;
+    return 0;
+  }
+
+  if (position_end > mmap_file->file_size) {
     BLOSC_TRACE_ERROR("Cannot read beyond the end of the memory-mapped file.");
     *ptr = NULL;
     return 0;
