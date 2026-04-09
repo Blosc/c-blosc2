@@ -34,11 +34,6 @@
 #endif
 
 
-static inline unsigned char *copy_1_bytes(unsigned char *out, const unsigned char *from) {
-  *out++ = *from;
-  return out;
-}
-
 static inline unsigned char *copy_2_bytes(unsigned char *out, const unsigned char *from) {
 #if defined(BLOSC_STRICT_ALIGN)
   uint16_t chunk;
@@ -50,11 +45,6 @@ static inline unsigned char *copy_2_bytes(unsigned char *out, const unsigned cha
   return out + 2;
 }
 
-static inline unsigned char *copy_3_bytes(unsigned char *out, const unsigned char *from) {
-  out = copy_1_bytes(out, from);
-  return copy_2_bytes(out, from + 1);
-}
-
 static inline unsigned char *copy_4_bytes(unsigned char *out, const unsigned char *from) {
 #if defined(BLOSC_STRICT_ALIGN)
   uint32_t chunk;
@@ -64,6 +54,17 @@ static inline unsigned char *copy_4_bytes(unsigned char *out, const unsigned cha
   *(uint32_t *) out = *(uint32_t *) from;
 #endif
   return out + 4;
+}
+
+#if !defined(BLOSC_STRICT_ALIGN)
+static inline unsigned char *copy_1_bytes(unsigned char *out, const unsigned char *from) {
+  *out++ = *from;
+  return out;
+}
+
+static inline unsigned char *copy_3_bytes(unsigned char *out, const unsigned char *from) {
+  out = copy_1_bytes(out, from);
+  return copy_2_bytes(out, from + 1);
 }
 
 static inline unsigned char *copy_5_bytes(unsigned char *out, const unsigned char *from) {
@@ -80,6 +81,7 @@ static inline unsigned char *copy_7_bytes(unsigned char *out, const unsigned cha
   out = copy_3_bytes(out, from);
   return copy_4_bytes(out, from + 3);
 }
+#endif
 
 static inline unsigned char *copy_8_bytes(unsigned char *out, const unsigned char *from) {
 #if defined(BLOSC_STRICT_ALIGN)

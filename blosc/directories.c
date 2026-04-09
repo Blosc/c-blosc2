@@ -26,7 +26,7 @@
   int blosc2_remove_dir(const char* dir_path) {
     char* path;
     char last_char = dir_path[strlen(dir_path) - 1];
-    if (last_char != '\\' || last_char != '/') {
+    if (last_char != '\\' && last_char != '/') {
       path = malloc(strlen(dir_path) + 2 + 1);
       sprintf(path, "%s\\*", dir_path);
     }
@@ -81,7 +81,7 @@
 char* blosc2_normalize_dirpath(const char* dir_path) {
   char last_char = dir_path[strlen(dir_path) - 1];
   char* path;
-  if (last_char != '\\' || last_char != '/'){
+  if (last_char != '\\' && last_char != '/') {
     path = malloc(strlen(dir_path) + 1 + 1);
     sprintf(path, "%s/", dir_path);
   }
