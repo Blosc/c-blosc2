@@ -2109,7 +2109,8 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
         }
       }
       else {
-       data_chunk = frame->cframe + header_len + offsets[i];
+        data_chunk = frame->cframe + header_len + offsets[i];
+        needs_free = false;
       }
       rc = blosc2_cbuffer_sizes(data_chunk, NULL, &chunk_cbytes, NULL);
       if (rc < 0) {
