@@ -1085,7 +1085,7 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     return BLOSC2_ERROR_MEMORY_ALLOC;
   }
   bool needs_free = false;
-  for (int i = 0; i < nchunks; i++) {
+  for (int64_t i = 0; i < nchunks; i++) {
     uint8_t* data_chunk;
     data_chunk = schunk->data[i];
     rc = blosc2_cbuffer_sizes(data_chunk, &chunk_nbytes, &chunk_cbytes, NULL);
@@ -1189,7 +1189,7 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   // Fill the frame with the actual data chunks
   if (!frame->sframe) {
     coffset = 0;
-    for (int i = 0; i < nchunks; i++) {
+    for (int64_t i = 0; i < nchunks; i++) {
       uint8_t* data_chunk = schunk->data[i];
       rc = blosc2_cbuffer_sizes(data_chunk, NULL, &chunk_cbytes, NULL);
       if (rc < 0) {
@@ -2097,7 +2097,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
     }
   }
   schunk->data = malloc(nchunks * sizeof(void*));
-  for (int i = 0; i < nchunks; i++) {
+  for (int64_t i = 0; i < nchunks; i++) {
     if (frame->cframe != NULL) {
       if (needs_free) {
         free(data_chunk);
@@ -2574,7 +2574,6 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       goto end;
     }
     // Allocate space for the lazy chunk
-    int32_t trailer_len;
     int32_t special_type = (header_ptr[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
     int memcpyed = header_ptr[BLOSC2_CHUNK_FLAGS] & (uint8_t) BLOSC_MEMCPYED;
 
@@ -2636,7 +2635,6 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       }
       trailer_offset_sz += (size_t)typesize;
       streams_offset += (size_t)typesize;
-      trailer_len = 0;
       lazychunk_cbytes_sz = trailer_offset_sz;
     }
     else {
@@ -2653,7 +2651,6 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
     }
 
     trailer_offset = (int32_t)trailer_offset_sz;
-    trailer_len = (int32_t)trailer_len_sz;
     lazychunk_cbytes = (int32_t)lazychunk_cbytes_sz;
 
     // Read just the full header and bstarts section too (lazy partial length)
@@ -3050,10 +3047,6 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
       free(offsets);
       return NULL;
     }
-    if (coffsets_cbytes == 0) {
-      coffsets_cbytes = (int32_t)cbytes;
-    }
-
     // Decompress offsets
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
@@ -3097,7 +3090,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
     default:
       if (frame->sframe) {
         // Compute the sframe_chunk_id value
-        for (int i = 0; i < nchunks; ++i) {
+        for (int64_t i = 0; i < nchunks; ++i) {
           if (offsets[i] > sframe_chunk_id) {
             sframe_chunk_id = offsets[i];
           }
@@ -3265,10 +3258,6 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
       return NULL;
     }
-    if (coffsets_cbytes == 0) {
-      coffsets_cbytes = (int32_t)cbytes;
-    }
-
     // Decompress offsets
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
@@ -3316,7 +3305,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       break;
     default:
       if (frame->sframe) {
-        for (int i = 0; i <= nchunks; ++i) {
+        for (int64_t i = 0; i <= nchunks; ++i) {
           // offsets[nchunk] is still uninitialized here
           if (i != nchunk && offsets[i] > sframe_chunk_id) {
             sframe_chunk_id = offsets[i];
@@ -3499,10 +3488,6 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
       return NULL;
     }
-    if (coffsets_cbytes == 0) {
-      coffsets_cbytes = (int32_t)cbytes;
-    }
-
     // Decompress offsets
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
@@ -3585,7 +3570,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     default:
       if (frame->sframe) {
         if (sframe_chunk_id < 0) {
-          for (int i = 0; i < nchunks; ++i) {
+          for (int64_t i = 0; i < nchunks; ++i) {
             if (offsets[i] > sframe_chunk_id) {
               sframe_chunk_id = offsets[i];
             }
@@ -3607,7 +3592,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   if (!frame->sframe) {
     if (old_chunk_is_regular) {
       delta_cbytes = (int64_t)chunk_cbytes - cbytes_old;
-      for (int i = 0; i < nchunks; ++i) {
+      for (int64_t i = 0; i < nchunks; ++i) {
         if (i == nchunk || offsets[i] < 0) {
           continue;
         }
@@ -3828,10 +3813,6 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
       BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
       return NULL;
     }
-    if (coffsets_cbytes == 0) {
-      coffsets_cbytes = (int32_t)cbytes;
-    }
-
     // Decompress offsets
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
@@ -4028,7 +4009,7 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
   int64_t *offsets_copy = malloc(prev_nbytes);
   memcpy(offsets_copy, offsets, prev_nbytes);
 
-  for (int i = 0; i < nchunks; ++i) {
+  for (int64_t i = 0; i < nchunks; ++i) {
     offsets[i] = offsets_copy[offsets_order[i]];
   }
   free(offsets_copy);
