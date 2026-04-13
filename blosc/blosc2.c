@@ -152,6 +152,22 @@ static int init_threadpool(blosc2_context *context);
 #endif
 static int parallel_blosc(blosc2_context* context);
 
+static inline bool checked_mul_size(size_t a, size_t b, size_t* out) {
+  if (a != 0 && b > SIZE_MAX / a) {
+    return false;
+  }
+  *out = a * b;
+  return true;
+}
+
+static inline bool checked_add_size(size_t a, size_t b, size_t* out) {
+  if (a > SIZE_MAX - b) {
+    return false;
+  }
+  *out = a + b;
+  return true;
+}
+
 /* global variable to change threading backend from Blosc-managed to caller-managed */
 static blosc_threads_callback threads_callback = 0;
 static void *threads_callback_data = 0;
@@ -934,7 +950,7 @@ int fill_codec(blosc2_codec *codec) {
     codec->free = NULL;
   }
   */
- 
+
   return BLOSC2_ERROR_SUCCESS;
 }
 
@@ -1032,7 +1048,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
   uint8_t* filters_meta = context->filters_meta;
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
   bool output_is_disposable = (context->preparams != NULL) ? context->preparams->output_is_disposable : false;
-  
+
   /* Prefilter function */
   if (context->prefilter != NULL) {
     // Create new prefilter parameters for this block (must be private for each thread)
@@ -1738,7 +1754,21 @@ static int blosc_d(
     }
     blosc2_frame_s* frame = (blosc2_frame_s*)context->schunk->frame;
     char* urlpath = frame->urlpath;
-    size_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH + context->nblocks * sizeof(int32_t);
+    size_t bstarts_nbytes;
+    size_t trailer_offset;
+    size_t block_csizes_nbytes;
+    size_t trailer_meta_nbytes;
+    size_t lazy_trailer_end;
+    if (srcsize < 0 || context->nblocks < 0 ||
+        !checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &bstarts_nbytes) ||
+        !checked_add_size((size_t)BLOSC_EXTENDED_HEADER_LENGTH, bstarts_nbytes, &trailer_offset) ||
+        !checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &block_csizes_nbytes) ||
+        !checked_add_size(sizeof(int32_t) + sizeof(int64_t), block_csizes_nbytes, &trailer_meta_nbytes) ||
+        !checked_add_size(trailer_offset, trailer_meta_nbytes, &lazy_trailer_end) ||
+        (size_t)srcsize < lazy_trailer_end) {
+      BLOSC_TRACE_ERROR("Lazy VL trailer exceeds source buffer.");
+      return BLOSC2_ERROR_READ_BUFFER;
+    }
     int32_t nchunk;
     int64_t chunk_offset;
     // The nchunk and the offset of the current chunk are in the trailer
@@ -2674,13 +2704,36 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
   context->bstarts = (int32_t *) (context->src + context->header_overhead);
   bstarts_end = context->header_overhead;
   if (!context->special_type && !memcpyed) {
+    size_t bstarts_end_tmp;
+    size_t bstarts_nbytes;
+    if (context->nblocks < 0 ||
+        !checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &bstarts_nbytes) ||
+        !checked_add_size((size_t)context->header_overhead, bstarts_nbytes, &bstarts_end_tmp) ||
+        bstarts_end_tmp > (size_t)INT32_MAX) {
+      BLOSC_TRACE_ERROR("Invalid bstarts size in chunk header.");
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
     /* If chunk is not special or a memcpyed, we do have a bstarts section */
-    bstarts_end = (int32_t)(context->header_overhead + (context->nblocks * sizeof(int32_t)));
+    bstarts_end = (int32_t)bstarts_end_tmp;
   }
 
   if (srcsize < bstarts_end) {
     BLOSC_TRACE_ERROR("`bstarts` exceeds length of source buffer.");
     return BLOSC2_ERROR_READ_BUFFER;
+  }
+
+  if (vlblocks && is_lazy && !context->special_type && !memcpyed) {
+    size_t block_csizes_nbytes;
+    size_t trailer_meta_nbytes;
+    size_t lazy_trailer_end;
+    if (context->srcsize < 0 || context->nblocks < 0 ||
+        !checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &block_csizes_nbytes) ||
+        !checked_add_size(sizeof(int32_t) + sizeof(int64_t), block_csizes_nbytes, &trailer_meta_nbytes) ||
+        !checked_add_size((size_t)bstarts_end, trailer_meta_nbytes, &lazy_trailer_end) ||
+        (size_t)context->srcsize < lazy_trailer_end) {
+      BLOSC_TRACE_ERROR("Lazy VL trailer exceeds source buffer.");
+      return BLOSC2_ERROR_READ_BUFFER;
+    }
   }
   srcsize -= bstarts_end;
 
@@ -5889,7 +5942,7 @@ void blosc2_free_ctx(blosc2_context* context) {
           if (fill_codec(&g_codecs[i]) < 0) {
             BLOSC_TRACE_ERROR("Could not load codec %d.", g_codecs[i].compcode);
             return BLOSC2_ERROR_CODEC_SUPPORT;
-          } 
+          }
         }
         if (g_codecs[i].free == NULL){
           // no free func, codec_params is simple

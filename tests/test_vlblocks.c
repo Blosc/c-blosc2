@@ -1008,6 +1008,48 @@ static char *test_lazy_vlchunk_rejects_huge_nblocks(void) {
 }
 
 
+static char *test_lazy_vlchunk_rejects_truncated_trailer(void) {
+  const char* urlpath = "test_lazy_vl_truncated_trailer.b2frame";
+  blosc2_schunk* schunk = make_lazy_vl_schunk(urlpath, true);
+  mu_assert("ERROR: cannot create lazy VL schunk", schunk != NULL);
+
+  uint8_t* dest = malloc((size_t)total_nbytes());
+  mu_assert("ERROR: cannot allocate destination buffer", dest != NULL);
+
+  for (int64_t nchunk = 0; nchunk < schunk->nchunks; ++nchunk) {
+    uint8_t* lazy_chunk = NULL;
+    bool needs_free = false;
+    int cbytes = blosc2_schunk_get_lazychunk(schunk, nchunk, &lazy_chunk, &needs_free);
+    mu_assert("ERROR: blosc2_schunk_get_lazychunk failed", cbytes > 0);
+
+    int32_t nblocks = -1;
+    int rc = blosc2_vlchunk_get_nblocks(lazy_chunk, cbytes, &nblocks);
+    mu_assert("ERROR: cannot inspect lazy VL nblocks", rc == 0 && nblocks > 0);
+
+    int64_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH + (int64_t)nblocks * (int64_t)sizeof(int32_t);
+    int64_t trailer_nbytes = (int64_t)sizeof(int32_t) + (int64_t)sizeof(int64_t) +
+                             (int64_t)nblocks * (int64_t)sizeof(int32_t);
+    int64_t truncated_srcsize = trailer_offset + trailer_nbytes - 1;
+    mu_assert("ERROR: malformed srcsize should be positive", truncated_srcsize > 0);
+    mu_assert("ERROR: malformed srcsize should be smaller than cbytes", truncated_srcsize < cbytes);
+
+    memset(dest, 0, (size_t)total_nbytes());
+    rc = blosc2_decompress_ctx(schunk->dctx, lazy_chunk, (int32_t)truncated_srcsize,
+                               dest, total_nbytes());
+    mu_assert("ERROR: truncated lazy VL trailer must be rejected", rc < 0);
+
+    if (needs_free) {
+      free(lazy_chunk);
+    }
+  }
+
+  free(dest);
+  blosc2_schunk_free(schunk);
+  blosc2_remove_urlpath(urlpath);
+  return EXIT_SUCCESS;
+}
+
+
 static char *test_lazy_vldecompress_block_ctx(void) {
   const char* urlpath = "test_lazy_vldecomp.b2frame";
   blosc2_schunk* schunk = make_lazy_vl_schunk(urlpath, true);
@@ -1087,6 +1129,7 @@ static char *all_tests(void) {
   mu_run_test(test_vlblocks_mt_roundtrip);
   mu_run_test(test_lazy_vlchunk_get_nblocks);
   mu_run_test(test_lazy_vlchunk_rejects_huge_nblocks);
+  mu_run_test(test_lazy_vlchunk_rejects_truncated_trailer);
   mu_run_test(test_lazy_vldecompress_block_ctx);
   mu_run_test(test_lazy_vldecompress_block_ctx_sframe);
   mu_run_test(test_lazy_vldecompress_block_ctx_dict_lz4);
