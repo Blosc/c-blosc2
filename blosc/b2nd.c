@@ -102,6 +102,12 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
   BLOSC_ERROR_NULL(shape, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(chunkshape, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(blockshape, BLOSC2_ERROR_NULL_POINTER);
+  if (dtype != NULL) {
+    *dtype = NULL;
+  }
+  if (dtype_format != NULL) {
+    *dtype_format = 0;
+  }
   if (smeta_len <= 0) {
     BLOSC_TRACE_ERROR("Malformed b2nd metalayer: empty metadata");
     return BLOSC2_ERROR_FAILURE;
@@ -178,7 +184,6 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
   if (dtype_format == NULL || dtype == NULL) {
     return (int32_t)(pmeta - smeta);
   }
-  *dtype = NULL;
   if (pmeta - smeta < smeta_len) {
     // dtype info is here
     B2ND_REQUIRE_META_NBYTES(1 + 1 + sizeof(int32_t));
