@@ -108,11 +108,12 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
   }
 
   const uint8_t *pmeta = smeta;
-  const uint8_t *smeta_end = smeta + smeta_len;
 
 #define B2ND_REQUIRE_META_NBYTES(nbytes)                                             \
   do {                                                                                \
-    if ((size_t)(smeta_end - pmeta) < (size_t)(nbytes)) {                            \
+    size_t consumed = (size_t)(pmeta - smeta);                                        \
+    size_t total = (size_t)smeta_len;                                                 \
+    if (consumed > total || (total - consumed) < (size_t)(nbytes)) {                 \
       BLOSC_TRACE_ERROR("Malformed b2nd metalayer: truncated metadata");            \
       return BLOSC2_ERROR_FAILURE;                                                    \
     }                                                                                 \
@@ -183,7 +184,7 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
     B2ND_REQUIRE_META_NBYTES(1 + 1 + sizeof(int32_t));
     *dtype_format = (int8_t) *(pmeta++);
     pmeta += 1;
-    int dtype_len;
+    int32_t dtype_len;
     swap_store(&dtype_len, pmeta, sizeof(int32_t));
     pmeta += sizeof(int32_t);
     if (dtype_len < 0) {
