@@ -1530,7 +1530,7 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
 }
 
 
-int schunk_get_slice_nchunks(blosc2_schunk *schunk, int64_t start, int64_t stop, int64_t **chunks_idx) {
+int64_t schunk_get_slice_nchunks(blosc2_schunk *schunk, int64_t start, int64_t stop, int64_t **chunks_idx) {
   BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_NULL_POINTER);
   if (schunk->nchunks == 0){  
     *chunks_idx = NULL;
@@ -1544,7 +1544,7 @@ int schunk_get_slice_nchunks(blosc2_schunk *schunk, int64_t start, int64_t stop,
     nchunk_stop++;
   }
   int64_t nchunk = nchunk_start;
-  int nchunks = (int)(nchunk_stop - nchunk_start);
+  int64_t nchunks = nchunk_stop - nchunk_start;
   *chunks_idx = malloc(nchunks * sizeof(int64_t));
   int64_t *ptr = *chunks_idx;
   for (int64_t i = 0; i < nchunks; ++i) {

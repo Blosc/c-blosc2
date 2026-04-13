@@ -4,7 +4,11 @@ Release notes for C-Blosc2
 Changes from 3.0.0-rc.1 to 3.0.0
 ================================
 
-#XXX version-specific blurb XXX#
+* `blosc2_get_slice_nchunks()`, `schunk_get_slice_nchunks()`, and
+  `b2nd_get_slice_nchunks()` now return `int64_t` instead of `int`.
+  This removes an artificial `INT_MAX` limit on the number of chunks
+  reported for large slices.  As these function signatures changed,
+  this is an API/ABI break and callers should be rebuilt against 3.0.0.
 
 
 Changes from 2.23.1 to 3.0.0-rc.1

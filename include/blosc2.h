@@ -2634,7 +2634,7 @@ BLOSC_EXPORT void blosc2_multidim_to_unidim(const int64_t *index, int8_t ndim, c
  * @return The number of chunks needed to get the slice. If some problem is
  * detected, a negative code is returned instead.
  */
-BLOSC_EXPORT int blosc2_get_slice_nchunks(blosc2_schunk* schunk, int64_t *start, int64_t *stop, int64_t **chunks_idx);
+BLOSC_EXPORT int64_t blosc2_get_slice_nchunks(blosc2_schunk* schunk, int64_t *start, int64_t *stop, int64_t **chunks_idx);
 
 
 /*********************************************************************

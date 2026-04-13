@@ -438,7 +438,7 @@ int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, const void *fill_value)
   }
   free(cparams);
 
-  for (int i = 0; i < (*array)->sc->nchunks; ++i) {
+  for (int64_t i = 0; i < (*array)->sc->nchunks; ++i) {
     if (blosc2_schunk_update_chunk((*array)->sc, i, chunk, true) < 0) {
       BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
     }
@@ -613,7 +613,7 @@ int b2nd_to_cbuffer(const b2nd_array_t *array, void *buffer,
   return BLOSC2_ERROR_SUCCESS;
 }
 
-int b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, const int64_t *stop, int64_t **chunks_idx) {
+int64_t b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, const int64_t *stop, int64_t **chunks_idx) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
@@ -661,11 +661,11 @@ int b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, cons
     update_nchunks *= update_shape[i];
   }
 
-  int nchunks = 0;
+  int64_t nchunks = 0;
   // Initially we do not know the number of chunks that will be affected
   *chunks_idx = malloc(array->sc->nchunks * sizeof(int64_t));
   int64_t *ptr = *chunks_idx;
-  for (int update_nchunk = 0; update_nchunk < update_nchunks; ++update_nchunk) {
+  for (int64_t update_nchunk = 0; update_nchunk < update_nchunks; ++update_nchunk) {
     int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
     blosc2_unidim_to_multidim(ndim, update_shape, update_nchunk, nchunk_ndim);
     for (int i = 0; i < ndim; ++i) {
@@ -740,7 +740,7 @@ int64_t nchunk_fastpath(const b2nd_array_t *array, const int64_t *start,
   }
   // Compute the chunk number
   int64_t *chunks_idx;
-  int nchunks = b2nd_get_slice_nchunks(array, start, stop, &chunks_idx);
+  int64_t nchunks = b2nd_get_slice_nchunks(array, start, stop, &chunks_idx);
   if (nchunks != 1) {
     free(chunks_idx);
     BLOSC_TRACE_ERROR("The number of chunks to read is not 1; go fix the code");
@@ -886,7 +886,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     update_nchunks *= update_shape[i];
   }
 
-  for (int update_nchunk = 0; update_nchunk < update_nchunks; ++update_nchunk) {
+  for (int64_t update_nchunk = 0; update_nchunk < update_nchunks; ++update_nchunk) {
     int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
     blosc2_unidim_to_multidim(ndim, update_shape, update_nchunk, nchunk_ndim);
     for (int i = 0; i < ndim; ++i) {
@@ -1149,7 +1149,7 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t
     chunks_in_array[i] = (*array)->extshape[i] / (*array)->chunkshape[i];
   }
   int64_t nchunks = (*array)->sc->nchunks;
-  for (int nchunk = 0; nchunk < nchunks; ++nchunk) {
+  for (int64_t nchunk = 0; nchunk < nchunks; ++nchunk) {
     int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
     blosc2_unidim_to_multidim(ndim, chunks_in_array, nchunk, nchunk_ndim);
 
@@ -1689,7 +1689,7 @@ int extend_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
     for (int i = 0; i < ndim; ++i) {
       chunks_in_array[i] = array->extshape[i] / array->chunkshape[i];
     }
-    for (int i = 0; i < nchunks; ++i) {
+    for (int64_t i = 0; i < nchunks; ++i) {
       blosc2_unidim_to_multidim(ndim, chunks_in_array, i, nchunk_ndim);
       for (int j = 0; j < ndim; ++j) {
         if (start[j] <= (array->chunkshape[j] * nchunk_ndim[j])
