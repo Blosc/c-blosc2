@@ -87,30 +87,28 @@ int64_t blosc2_stdio_size(void *stream) {
   return size;
 }
 
-int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
+int64_t blosc2_stdio_write(const void *ptr, size_t size, size_t nitems, size_t position, void *stream) {
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
-  fseek(my_fp->file, position, SEEK_SET);
-
-  size_t nitems_ = fwrite(ptr, (size_t) size, (size_t) nitems, my_fp->file);
+  fseek(my_fp->file, (long)position, SEEK_SET);
+  size_t nitems_ = fwrite(ptr, size, nitems, my_fp->file);
   return (int64_t) nitems_;
 }
 
-int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
+int64_t blosc2_stdio_read(void **ptr, size_t size, size_t nitems, size_t position, void *stream) {
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
-  fseek(my_fp->file, position, SEEK_SET);
-
+  fseek(my_fp->file, (long)position, SEEK_SET);
   void* data_ptr = *ptr;
-  size_t nitems_ = fread(data_ptr, (size_t) size, (size_t) nitems, my_fp->file);
+  size_t nitems_ = fread(data_ptr, size, nitems, my_fp->file);
   return (int64_t) nitems_;
 }
 
-int blosc2_stdio_truncate(void *stream, int64_t size) {
+int blosc2_stdio_truncate(void *stream, size_t size) {
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
   int rc;
 #if defined(_MSC_VER)
-  rc = _chsize_s(_fileno(my_fp->file), size);
+  rc = _chsize_s(_fileno(my_fp->file), (__int64)size);
 #else
-  rc = ftruncate(fileno(my_fp->file), size);
+  rc = ftruncate(fileno(my_fp->file), (off_t)size);
 #endif
   return rc;
 }
@@ -258,6 +256,11 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
     mmap_file->mapping_size = mmap_file->file_size;
   }
 
+  if (mmap_file->mapping_size < 0 || (uint64_t)mmap_file->mapping_size > SIZE_MAX) {
+    BLOSC_TRACE_ERROR("mmap mapping size does not fit in size_t (%" PRId64 ").", mmap_file->mapping_size);
+    return NULL;
+  }
+
 #if defined(_WIN32)
   mmap_file->fd = _fileno(mmap_file->file);
 
@@ -327,33 +330,29 @@ int64_t blosc2_stdio_mmap_size(void *stream) {
   return mmap_file->file_size;
 }
 
-int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
+int64_t blosc2_stdio_mmap_write(const void *ptr, size_t size, size_t nitems, size_t position, void *stream) {
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) stream;
 
-  if (ptr == NULL || size < 0 || nitems < 0 || position < 0) {
-    BLOSC_TRACE_ERROR("Invalid arguments for mmap write.");
+  if (ptr == NULL) {
+    BLOSC_TRACE_ERROR("Invalid arguments for mmap write: ptr is NULL.");
     return 0;
   }
 
-  int64_t n_bytes;
-  if (!checked_mul_int64_nonneg(size, nitems, &n_bytes)) {
-    BLOSC_TRACE_ERROR("mmap write size overflow (size=%" PRId64 ", nitems=%" PRId64 ").", size, nitems);
+  size_t n_bytes;
+  if (size > 0 && nitems > 0 && size > SIZE_MAX / nitems) {
+    BLOSC_TRACE_ERROR("mmap write size overflow (size=%zu, nitems=%zu).", size, nitems);
     return 0;
   }
+  n_bytes = size * nitems;
   if (n_bytes == 0) {
     return 0;
   }
-  if ((uint64_t)n_bytes > SIZE_MAX) {
-    BLOSC_TRACE_ERROR("mmap write size does not fit in size_t (%" PRId64 ").", n_bytes);
+  if (position > SIZE_MAX - n_bytes) {
+    BLOSC_TRACE_ERROR("mmap write position overflow (position=%zu, nbytes=%zu).", position, n_bytes);
     return 0;
   }
-
-  int64_t position_end;
-  if (!checked_add_int64_nonneg(position, n_bytes, &position_end)) {
-    BLOSC_TRACE_ERROR("mmap write position overflow (position=%" PRId64 ", nbytes=%" PRId64 ").", position, n_bytes);
-    return 0;
-  }
-  int64_t new_size = position_end > mmap_file->file_size ? position_end : mmap_file->file_size;
+  size_t position_end = position + n_bytes;
+  size_t new_size = position_end > mmap_file->file_size ? position_end : mmap_file->file_size;
 
 #if defined(_WIN32)
   if (mmap_file->file_size < new_size) {
@@ -361,12 +360,24 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
   }
 
   if (mmap_file->mapping_size < mmap_file->file_size) {
-    if (mmap_file->file_size > INT64_MAX / 2) {
-      mmap_file->mapping_size = mmap_file->file_size;
+    size_t remap_size;
+    if (mmap_file->file_size > SIZE_MAX / 2) {
+      BLOSC_TRACE_WARNING(
+        "mmap remap growth capped at file size (%" PRId64 " bytes) to avoid int64 overflow.",
+        mmap_file->file_size
+      );
+      remap_size = mmap_file->file_size;
     }
     else {
-      mmap_file->mapping_size = mmap_file->file_size * 2;
+      remap_size = mmap_file->file_size * 2;
     }
+
+    if (remap_size < 0 || (uint64_t)remap_size > SIZE_MAX) {
+      BLOSC_TRACE_ERROR("mmap mapping size does not fit in size_t (%" PRId64 ").", remap_size);
+      return 0;
+    }
+
+    mmap_file->mapping_size = remap_size;
 
     /* We need to remap the file completely and cannot pass the previous used address on Windows */
     if (!UnmapViewOfFile(mmap_file->addr)) {
@@ -421,13 +432,25 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
   }
 
   if (mmap_file->mapping_size < mmap_file->file_size) {
-    int64_t old_mapping_size = mmap_file->mapping_size;
+    size_t old_mapping_size = mmap_file->mapping_size;
+    size_t remap_size;
     if (mmap_file->file_size > INT64_MAX / 2) {
-      mmap_file->mapping_size = mmap_file->file_size;
+      BLOSC_TRACE_WARNING(
+        "mmap remap growth capped at file size (%" PRId64 " bytes) to avoid int64 overflow.",
+        mmap_file->file_size
+      );
+      remap_size = mmap_file->file_size;
     }
     else {
-      mmap_file->mapping_size = mmap_file->file_size * 2;
+      remap_size = mmap_file->file_size * 2;
     }
+
+    if (remap_size < 0 || (uint64_t)remap_size > SIZE_MAX) {
+      BLOSC_TRACE_ERROR("mmap mapping size does not fit in size_t (%" PRId64 ").", remap_size);
+      return 0;
+    }
+
+    mmap_file->mapping_size = remap_size;
 
 #if defined(__linux__)
     /* mremap is the best option as it also ensures that the old data is still available in c mode. Unfortunately, it
@@ -471,33 +494,36 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
 int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) stream;
 
-  if (ptr == NULL || size < 0 || nitems < 0 || position < 0) {
+  if (ptr == NULL) {
+    BLOSC_TRACE_ERROR("Invalid arguments for mmap read: output pointer is NULL.");
+    return 0;
+  }
+
+  if (size < 0 || nitems < 0 || position < 0) {
     BLOSC_TRACE_ERROR("Invalid arguments for mmap read.");
     *ptr = NULL;
     return 0;
   }
 
-  int64_t n_bytes;
-  if (!checked_mul_int64_nonneg(size, nitems, &n_bytes)) {
-    BLOSC_TRACE_ERROR("mmap read size overflow (size=%" PRId64 ", nitems=%" PRId64 ").", size, nitems);
+  size_t n_bytes;
+  if (size > 0 && nitems > 0 && size > SIZE_MAX / nitems) {
+    BLOSC_TRACE_ERROR("mmap read size overflow (size=%zu, nitems=%zu).", size, nitems);
     *ptr = NULL;
     return 0;
   }
-  int64_t position_end;
-  if (!checked_add_int64_nonneg(position, n_bytes, &position_end)) {
-    BLOSC_TRACE_ERROR("mmap read position overflow (position=%" PRId64 ", nbytes=%" PRId64 ").", position, n_bytes);
+  n_bytes = size * nitems;
+  if (position > SIZE_MAX - n_bytes) {
+    BLOSC_TRACE_ERROR("mmap read position overflow (position=%zu, nbytes=%zu).", position, n_bytes);
     *ptr = NULL;
     return 0;
   }
-
+  size_t position_end = position + n_bytes;
   if (position_end > mmap_file->file_size) {
     BLOSC_TRACE_ERROR("Cannot read beyond the end of the memory-mapped file.");
     *ptr = NULL;
     return 0;
   }
-
   *ptr = mmap_file->addr + position;
-
   return nitems;
 }
 

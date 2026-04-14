@@ -39,9 +39,9 @@ typedef struct {
 BLOSC_EXPORT void *blosc2_stdio_open(const char *urlpath, const char *mode, void* params);
 BLOSC_EXPORT int blosc2_stdio_close(void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_size(void *stream);
-BLOSC_EXPORT int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
-BLOSC_EXPORT int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
-BLOSC_EXPORT int blosc2_stdio_truncate(void *stream, int64_t size);
+BLOSC_EXPORT int64_t blosc2_stdio_write(const void *ptr, size_t size, size_t nitems, size_t position, void *stream);
+BLOSC_EXPORT int64_t blosc2_stdio_read(void **ptr, size_t size, size_t nitems, size_t position, void *stream);
+BLOSC_EXPORT int blosc2_stdio_truncate(void *stream, size_t size);
 BLOSC_EXPORT int blosc2_stdio_destroy(void* params);
 
 
@@ -71,10 +71,10 @@ typedef struct {
   //!< The starting address of the mapping.
   char* urlpath;
   //!< The path to the file which is associated with this object.
-  int64_t file_size;
-  //!< The size of the file.
-  int64_t mapping_size;
-  //!< The size of the mapping (mapping_size >= file_size).
+    size_t file_size;
+    //!< The size of the file.
+    size_t mapping_size;
+    //!< The size of the mapping (mapping_size >= file_size).
   bool is_memory_only;
   //!< Whether the mapping is only in-memory and changes are not reflected to the file on disk (c mode).
   FILE* file;
@@ -105,9 +105,9 @@ BLOSC_EXPORT void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode,
 BLOSC_EXPORT int blosc2_stdio_mmap_close(void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_mmap_size(void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_mmap_write(
-  const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
-BLOSC_EXPORT int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
-BLOSC_EXPORT int blosc2_stdio_mmap_truncate(void *stream, int64_t size);
+  const void *ptr, size_t size, size_t nitems, size_t position, void *stream);
+BLOSC_EXPORT int64_t blosc2_stdio_mmap_read(void **ptr, size_t size, size_t nitems, size_t position, void *stream);
+BLOSC_EXPORT int blosc2_stdio_mmap_truncate(void *stream, size_t size);
 BLOSC_EXPORT int blosc2_stdio_mmap_destroy(void* params);
 
 #ifdef __cplusplus
