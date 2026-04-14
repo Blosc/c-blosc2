@@ -21,8 +21,8 @@
 #include <stdint.h>
 #include <errno.h>
 #include <inttypes.h>
-#include <limits.h>
 #include <string.h>
+
 #if defined(_WIN32)
   #include <memoryapi.h>
   // See https://github.com/Blosc/python-blosc2/issues/359
@@ -105,7 +105,7 @@ int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_
 
 int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
-    int rc = fseek(my_fp->file, position, SEEK_SET);
+  int rc = fseek(my_fp->file, position, SEEK_SET);
   if (rc != 0) {
     BLOSC_TRACE_ERROR("fseek failed at position %" PRId64 " (error: %s).", position, strerror(errno));
     return 0;
