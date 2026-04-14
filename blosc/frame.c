@@ -509,10 +509,6 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
       // We can compute the number of chunks directly when there is a fixed chunk size.
       *nchunks = *nbytes / *chunksize;
       if (*nbytes % *chunksize > 0) {
-        if (*nchunks == INT32_MAX) {
-          BLOSC_TRACE_ERROR("Number of chunks exceeds maximum allowed.");
-          return BLOSC2_ERROR_INVALID_HEADER;
-        }
         *nchunks += 1;
       }
 
@@ -540,6 +536,14 @@ int get_header_info(blosc2_frame_s *frame, int32_t *header_len, int64_t *frame_l
     }
   } else {
     *nchunks = 0;
+  }
+
+  if (*nchunks > 0) {
+    int32_t off_nbytes;
+    if (!blosc2_nchunks_to_offsets_nbytes(*nchunks, &off_nbytes)) {
+      BLOSC_TRACE_ERROR("Invalid number of chunks in frame header.");
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
   }
 
   return 0;
@@ -1068,10 +1072,20 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   int32_t chunksize = -1;
   int32_t off_cbytes = 0;
   uint64_t coffset = 0;
-  int32_t off_nbytes = (int32_t) (nchunks * sizeof(int64_t));
-  uint64_t* data_tmp = malloc(off_nbytes);
+  int32_t off_nbytes;
+  if (!blosc2_nchunks_to_offsets_nbytes(nchunks, &off_nbytes)) {
+    BLOSC_TRACE_ERROR("Too many chunks for offsets representation.");
+    free(h2);
+    return BLOSC2_ERROR_DATA;
+  }
+  uint64_t* data_tmp = malloc((size_t)off_nbytes);
+  if (data_tmp == NULL) {
+    BLOSC_TRACE_ERROR("Cannot allocate memory for offset data.");
+    free(h2);
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
   bool needs_free = false;
-  for (int i = 0; i < nchunks; i++) {
+  for (int64_t i = 0; i < nchunks; i++) {
     uint8_t* data_chunk;
     data_chunk = schunk->data[i];
     rc = blosc2_cbuffer_sizes(data_chunk, &chunk_nbytes, &chunk_cbytes, NULL);
@@ -1175,7 +1189,7 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   // Fill the frame with the actual data chunks
   if (!frame->sframe) {
     coffset = 0;
-    for (int i = 0; i < nchunks; i++) {
+    for (int64_t i = 0; i < nchunks; i++) {
       uint8_t* data_chunk = schunk->data[i];
       rc = blosc2_cbuffer_sizes(data_chunk, NULL, &chunk_cbytes, NULL);
       if (rc < 0) {
@@ -1253,7 +1267,12 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
         BLOSC_TRACE_ERROR("Cannot read the cbytes outside of frame boundary.");
         return NULL;
       }
-      if (nchunks < 0 || (uint64_t)chunk_nbytes != (uint64_t)nchunks * (uint64_t)sizeof(int64_t)) {
+      int32_t expected_off_nbytes;
+      if (!blosc2_nchunks_to_offsets_nbytes(nchunks, &expected_off_nbytes)) {
+        BLOSC_TRACE_ERROR("Too many chunks for offsets representation.");
+        return NULL;
+      }
+      if (chunk_nbytes != expected_off_nbytes) {
         BLOSC_TRACE_ERROR("The number of chunks in offset idx "
                           "does not match the ones in the header frame.");
         return NULL;
@@ -1270,13 +1289,18 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
     return NULL;
   }
 
-  int32_t coffsets_cbytes;
+  int64_t coffsets_cbytes64;
   if (frame->sframe) {
-    coffsets_cbytes = (int32_t)(trailer_offset - (header_len + 0));
+    coffsets_cbytes64 = trailer_offset - header_len;
   }
   else {
-    coffsets_cbytes = (int32_t)(trailer_offset - (header_len + cbytes));
+    coffsets_cbytes64 = trailer_offset - (header_len + cbytes);
   }
+  if (coffsets_cbytes64 <= 0 || coffsets_cbytes64 > INT32_MAX) {
+    BLOSC_TRACE_ERROR("Offsets chunk size is out of bounds.");
+    return NULL;
+  }
+  int32_t coffsets_cbytes = (int32_t)coffsets_cbytes64;
 
   if (off_cbytes != NULL) {
     *off_cbytes = coffsets_cbytes;
@@ -1354,8 +1378,16 @@ int64_t* blosc2_frame_get_offsets(blosc2_schunk *schunk) {
     return NULL;
   }
 
-  int32_t off_nbytes = (int32_t) (nchunks * sizeof(int64_t));
+  int32_t off_nbytes;
+  if (!blosc2_nchunks_to_offsets_nbytes(nchunks, &off_nbytes)) {
+    BLOSC_TRACE_ERROR("Too many chunks for offsets representation.");
+    return NULL;
+  }
   int64_t* offsets = (int64_t *) malloc((size_t)off_nbytes);
+  if (offsets == NULL) {
+    BLOSC_TRACE_ERROR("Cannot allocate memory for offsets.");
+    return NULL;
+  }
 
   int32_t coffsets_cbytes = 0;
   uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, nchunks, &coffsets_cbytes);
@@ -2002,9 +2034,22 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
     BLOSC_TRACE_ERROR("Error while creating the decompression context");
     return NULL;
   }
-  int64_t* offsets = (int64_t *) malloc((size_t)nchunks * sizeof(int64_t));
+  int32_t offsets_nbytes;
+  if (!blosc2_nchunks_to_offsets_nbytes(nchunks, &offsets_nbytes)) {
+    blosc2_free_ctx(dctx);
+    blosc2_schunk_free(schunk);
+    BLOSC_TRACE_ERROR("Too many chunks for offsets representation.");
+    return NULL;
+  }
+  int64_t* offsets = (int64_t *) malloc((size_t)offsets_nbytes);
+  if (offsets == NULL) {
+    blosc2_free_ctx(dctx);
+    blosc2_schunk_free(schunk);
+    BLOSC_TRACE_ERROR("Cannot allocate memory for offsets.");
+    return NULL;
+  }
   int32_t off_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes,
-                                             offsets, (int32_t)(nchunks * sizeof(int64_t)));
+                                             offsets, offsets_nbytes);
   blosc2_free_ctx(dctx);
   if (off_nbytes < 0) {
     free(offsets);
@@ -2052,7 +2097,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
     }
   }
   schunk->data = malloc(nchunks * sizeof(void*));
-  for (int i = 0; i < nchunks; i++) {
+  for (int64_t i = 0; i < nchunks; i++) {
     if (frame->cframe != NULL) {
       if (needs_free) {
         free(data_chunk);
@@ -2064,7 +2109,8 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
         }
       }
       else {
-       data_chunk = frame->cframe + header_len + offsets[i];
+        data_chunk = frame->cframe + header_len + offsets[i];
+        needs_free = false;
       }
       rc = blosc2_cbuffer_sizes(data_chunk, NULL, &chunk_cbytes, NULL);
       if (rc < 0) {
@@ -2528,7 +2574,6 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       goto end;
     }
     // Allocate space for the lazy chunk
-    int32_t trailer_len;
     int32_t special_type = (header_ptr[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
     int memcpyed = header_ptr[BLOSC2_CHUNK_FLAGS] & (uint8_t) BLOSC_MEMCPYED;
 
@@ -2590,7 +2635,6 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       }
       trailer_offset_sz += (size_t)typesize;
       streams_offset += (size_t)typesize;
-      trailer_len = 0;
       lazychunk_cbytes_sz = trailer_offset_sz;
     }
     else {
@@ -2607,7 +2651,6 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
     }
 
     trailer_offset = (int32_t)trailer_offset_sz;
-    trailer_len = (int32_t)trailer_len_sz;
     lazychunk_cbytes = (int32_t)lazychunk_cbytes_sz;
 
     // Read just the full header and bstarts section too (lazy partial length)
@@ -2784,6 +2827,10 @@ int64_t frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_va
 
   // Compute the number of chunks and the length of the offsets chunk
   int32_t chunkitems = chunksize / typesize;
+  if (chunkitems <= 0) {
+    BLOSC_TRACE_ERROR("chunksize must be >= typesize for frame special fill.");
+    return BLOSC2_ERROR_FRAME_SPECIAL;
+  }
   nchunks = nitems / chunkitems;
   int32_t leftover_items = (int32_t)(nitems % chunkitems);
   if (leftover_items) {
@@ -2798,6 +2845,13 @@ int64_t frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_va
   uint8_t* off_chunk = malloc(new_off_cbytes);
   uint64_t offset_value = ((uint64_t)1 << 63);
   uint8_t* sample_chunk = malloc(BLOSC_EXTENDED_HEADER_LENGTH);
+  if (off_chunk == NULL || sample_chunk == NULL) {
+    free(off_chunk);
+    free(sample_chunk);
+    free(cparams);
+    BLOSC_TRACE_ERROR("Cannot allocate memory for special fill chunks.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
   int csize;
   switch (special_value) {
     case BLOSC2_SPECIAL_ZERO:
@@ -2813,10 +2867,16 @@ int64_t frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_va
       csize = blosc2_chunk_nans(*cparams, chunksize, sample_chunk, BLOSC_EXTENDED_HEADER_LENGTH);
       break;
     default:
+      free(off_chunk);
+      free(sample_chunk);
+      free(cparams);
       BLOSC_TRACE_ERROR("Only zeros, NaNs or non-initialized values are supported.");
       return BLOSC2_ERROR_FRAME_SPECIAL;
   }
   if (csize < 0) {
+    free(off_chunk);
+    free(sample_chunk);
+    free(cparams);
     BLOSC_TRACE_ERROR("Error creating sample chunk");
     return BLOSC2_ERROR_FRAME_SPECIAL;
   }
@@ -2825,7 +2885,14 @@ int64_t frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_va
   cparams->blocksize = 8 * 2 * 1024;  // based on experiments with create_frame.c bench
   cparams->clevel = 5;
   cparams->compcode = BLOSC_BLOSCLZ;
-  int32_t special_nbytes = (int32_t) (nchunks * sizeof(int64_t));
+  int32_t special_nbytes;
+  if (!blosc2_nchunks_to_offsets_nbytes(nchunks, &special_nbytes)) {
+    free(off_chunk);
+    free(sample_chunk);
+    free(cparams);
+    BLOSC_TRACE_ERROR("Too many chunks for offsets representation.");
+    return BLOSC2_ERROR_FRAME_SPECIAL;
+  }
   rc = blosc2_chunk_repeatval(*cparams, special_nbytes, off_chunk, new_off_cbytes, &offset_value);
   free(cparams);
   if (rc < 0) {
@@ -2980,10 +3047,6 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
       free(offsets);
       return NULL;
     }
-    if (coffsets_cbytes == 0) {
-      coffsets_cbytes = (int32_t)cbytes;
-    }
-
     // Decompress offsets
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
@@ -3027,7 +3090,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
     default:
       if (frame->sframe) {
         // Compute the sframe_chunk_id value
-        for (int i = 0; i < nchunks; ++i) {
+        for (int64_t i = 0; i < nchunks; ++i) {
           if (offsets[i] > sframe_chunk_id) {
             sframe_chunk_id = offsets[i];
           }
@@ -3126,7 +3189,9 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
       wbytes = io_cb->write(chunk, 1, chunk_cbytes, io_pos, fp);  // the new chunk
       io_pos += chunk_cbytes;
       if (wbytes != chunk_cbytes) {
-        BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
+        BLOSC_TRACE_ERROR("Cannot write the full chunk to frame (wrote %" PRId64 " of %" PRId64
+                          " bytes at position %" PRId64 ", nchunk=%" PRId64 ").",
+                          wbytes, chunk_cbytes, io_pos - chunk_cbytes, nchunks);
         io_cb->close(fp);
         return NULL;
       }
@@ -3195,10 +3260,6 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
       return NULL;
     }
-    if (coffsets_cbytes == 0) {
-      coffsets_cbytes = (int32_t)cbytes;
-    }
-
     // Decompress offsets
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
@@ -3246,7 +3307,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       break;
     default:
       if (frame->sframe) {
-        for (int i = 0; i <= nchunks; ++i) {
+        for (int64_t i = 0; i <= nchunks; ++i) {
           // offsets[nchunk] is still uninitialized here
           if (i != nchunk && offsets[i] > sframe_chunk_id) {
             sframe_chunk_id = offsets[i];
@@ -3347,7 +3408,9 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       wbytes = io_cb->write(chunk, 1, chunk_cbytes, io_pos, fp);  // the new chunk
       io_pos += chunk_cbytes;
       if (wbytes != chunk_cbytes) {
-        BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
+        BLOSC_TRACE_ERROR("Cannot write the full chunk to frame (wrote %" PRId64 " of %" PRId64
+                          " bytes at position %" PRId64 ", nchunk=%" PRId64 ").",
+                          wbytes, chunk_cbytes, io_pos - chunk_cbytes, nchunk);
         io_cb->close(fp);
         return NULL;
       }
@@ -3412,8 +3475,16 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   }
 
   // Get the current offsets
-  int32_t off_nbytes = (int32_t) (nchunks * sizeof(int64_t));
+  int32_t off_nbytes;
+  if (!blosc2_nchunks_to_offsets_nbytes(nchunks, &off_nbytes)) {
+    BLOSC_TRACE_ERROR("Too many chunks for offsets representation.");
+    return NULL;
+  }
   int64_t* offsets = (int64_t *) malloc((size_t)off_nbytes);
+  if (offsets == NULL) {
+    BLOSC_TRACE_ERROR("Cannot allocate memory for offsets.");
+    return NULL;
+  }
   if (nchunks > 0) {
     int32_t coffsets_cbytes = 0;
     uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, nchunks, &coffsets_cbytes);
@@ -3421,10 +3492,6 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
       return NULL;
     }
-    if (coffsets_cbytes == 0) {
-      coffsets_cbytes = (int32_t)cbytes;
-    }
-
     // Decompress offsets
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
@@ -3507,7 +3574,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     default:
       if (frame->sframe) {
         if (sframe_chunk_id < 0) {
-          for (int i = 0; i < nchunks; ++i) {
+          for (int64_t i = 0; i < nchunks; ++i) {
             if (offsets[i] > sframe_chunk_id) {
               sframe_chunk_id = offsets[i];
             }
@@ -3529,7 +3596,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   if (!frame->sframe) {
     if (old_chunk_is_regular) {
       delta_cbytes = (int64_t)chunk_cbytes - cbytes_old;
-      for (int i = 0; i < nchunks; ++i) {
+      for (int64_t i = 0; i < nchunks; ++i) {
         if (i == nchunk || offsets[i] < 0) {
           continue;
         }
@@ -3678,7 +3745,9 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
         io_pos = frame->file_offset + header_len + new_chunk_offset;
         wbytes = io_cb->write(chunk, 1, chunk_cbytes, io_pos, fp);  // the new chunk
         if (wbytes != chunk_cbytes) {
-          BLOSC_TRACE_ERROR("Cannot write the full chunk to frame.");
+          BLOSC_TRACE_ERROR("Cannot write the full chunk to frame (wrote %" PRId64 " of %" PRId64
+                            " bytes at position %" PRId64 ", nchunk=%" PRId64 ").",
+                            wbytes, chunk_cbytes, io_pos, nchunk);
           io_cb->close(fp);
           return NULL;
         }
@@ -3733,8 +3802,16 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
   }
 
   // Get the current offsets
-  int32_t off_nbytes = (int32_t) (nchunks * sizeof(int64_t));
+  int32_t off_nbytes;
+  if (!blosc2_nchunks_to_offsets_nbytes(nchunks, &off_nbytes)) {
+    BLOSC_TRACE_ERROR("Too many chunks for offsets representation.");
+    return NULL;
+  }
   int64_t* offsets = (int64_t *) malloc((size_t)off_nbytes);
+  if (offsets == NULL) {
+    BLOSC_TRACE_ERROR("Cannot allocate memory for offsets.");
+    return NULL;
+  }
   if (nchunks > 0) {
     int32_t coffsets_cbytes = 0;
     uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, nchunks, &coffsets_cbytes);
@@ -3742,10 +3819,6 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
       BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
       return NULL;
     }
-    if (coffsets_cbytes == 0) {
-      coffsets_cbytes = (int32_t)cbytes;
-    }
-
     // Decompress offsets
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
@@ -3903,8 +3976,16 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
   }
 
   // Get the current offsets and add one more
-  int32_t off_nbytes = (int32_t) (nchunks * sizeof(int64_t));
+  int32_t off_nbytes;
+  if (!blosc2_nchunks_to_offsets_nbytes(nchunks, &off_nbytes)) {
+    BLOSC_TRACE_ERROR("Too many chunks for offsets representation.");
+    return BLOSC2_ERROR_DATA;
+  }
   int64_t* offsets = (int64_t *) malloc((size_t)off_nbytes);
+  if (offsets == NULL) {
+    BLOSC_TRACE_ERROR("Cannot allocate memory for offsets.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
 
   int32_t coffsets_cbytes = 0;
   uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, nchunks, &coffsets_cbytes);
@@ -3934,7 +4015,7 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
   int64_t *offsets_copy = malloc(prev_nbytes);
   memcpy(offsets_copy, offsets, prev_nbytes);
 
-  for (int i = 0; i < nchunks; ++i) {
+  for (int64_t i = 0; i < nchunks; ++i) {
     offsets[i] = offsets_copy[offsets_order[i]];
   }
   free(offsets_copy);

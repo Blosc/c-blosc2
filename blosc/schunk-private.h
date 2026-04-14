@@ -36,5 +36,5 @@
  * @return The number of chunks needed to get the slice. If some problem is
  * detected, a negative code is returned instead.
  */
-int schunk_get_slice_nchunks(blosc2_schunk *schunk, int64_t start, int64_t stop, int64_t **chunks_idx);
+int64_t schunk_get_slice_nchunks(blosc2_schunk *schunk, int64_t start, int64_t stop, int64_t **chunks_idx);
 #endif /* BLOSC_SCHUNK_PRIVATE_H */

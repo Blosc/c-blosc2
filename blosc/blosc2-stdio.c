@@ -21,7 +21,11 @@
 #include <stdint.h>
 #include <errno.h>
 #include <inttypes.h>
+<<<<<<< mmap-arithmetic-overflow-hardening
 #include <limits.h>
+=======
+#include <string.h>
+>>>>>>> main
 
 #if defined(_WIN32)
   #include <memoryapi.h>
@@ -89,18 +93,34 @@ int64_t blosc2_stdio_size(void *stream) {
 
 int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
-  fseek(my_fp->file, position, SEEK_SET);
+  int rc = fseek(my_fp->file, position, SEEK_SET);
+  if (rc != 0) {
+    BLOSC_TRACE_ERROR("fseek failed at position %" PRId64 " (error: %s).", position, strerror(errno));
+    return 0;
+  }
 
   size_t nitems_ = fwrite(ptr, (size_t) size, (size_t) nitems, my_fp->file);
+  if ((int64_t)nitems_ != nitems) {
+    BLOSC_TRACE_ERROR("Short write at position %" PRId64 ": requested %" PRId64 " items of size %" PRId64
+                      ", wrote %zu (error: %s).", position, nitems, size, nitems_, strerror(errno));
+  }
   return (int64_t) nitems_;
 }
 
 int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
-  fseek(my_fp->file, position, SEEK_SET);
+  int rc = fseek(my_fp->file, position, SEEK_SET);
+  if (rc != 0) {
+    BLOSC_TRACE_ERROR("fseek failed at position %" PRId64 " (error: %s).", position, strerror(errno));
+    return 0;
+  }
 
   void* data_ptr = *ptr;
   size_t nitems_ = fread(data_ptr, (size_t) size, (size_t) nitems, my_fp->file);
+  if ((int64_t)nitems_ != nitems) {
+    BLOSC_TRACE_ERROR("Short read at position %" PRId64 ": requested %" PRId64 " items of size %" PRId64
+                      ", read %zu (error: %s).", position, nitems, size, nitems_, strerror(errno));
+  }
   return (int64_t) nitems_;
 }
 

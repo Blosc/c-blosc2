@@ -35,6 +35,6 @@
  * @return The number of chunks needed to get the slice. If some problem is
  * detected, a negative code is returned instead.
  */
-int b2nd_get_slice_nchunks(b2nd_array_t *array, const int64_t *start, const int64_t *stop, int64_t **chunks_idx);
+int64_t b2nd_get_slice_nchunks(b2nd_array_t *array, const int64_t *start, const int64_t *stop, int64_t **chunks_idx);
 
 #endif /* BLOSC_B2ND_PRIVATE_H */

@@ -66,7 +66,7 @@ static char* test_get_slice_nchunks(void) {
   static int32_t data[CHUNKSIZE];
   int32_t *data_ = NULL;
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
-  int rc;
+  int64_t rc;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_schunk* schunk;
@@ -117,7 +117,7 @@ static char* test_get_slice_nchunks(void) {
   mu_assert("ERROR: cannot get slice correctly.", rc >= 0);
   mu_assert("ERROR: wrong number of chunks.", rc == (tdata.nchunk_stop - tdata.nchunk_start));
   int nchunk = tdata.nchunk_start;
-  for (int i = 0; i < rc; ++i) {
+  for (int64_t i = 0; i < rc; ++i) {
     mu_assert("ERROR: wrong nchunk index retrieved.", chunks_indexes[i] == nchunk);
     nchunk++;
   }

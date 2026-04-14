@@ -85,6 +85,25 @@ static inline void endian_handler(bool little, void *dest, const void *pa, int s
   }
 }
 
+/*
+ * Convert a chunk count to the serialized offsets payload size.
+ *
+ * Security rationale: frame metadata can be attacker-controlled, and the offsets payload
+ * eventually flows into APIs that accept int32 byte lengths. This helper enforces a
+ * single overflow-checked conversion so callers cannot accidentally truncate
+ * nchunks * sizeof(int64_t) into a smaller signed length.
+ */
+static inline bool blosc2_nchunks_to_offsets_nbytes(int64_t nchunks, int32_t *off_nbytes) {
+  const int64_t max_nchunks = INT32_MAX / (int64_t)sizeof(int64_t);
+  if (nchunks < 0 || nchunks > max_nchunks) {
+    return false;
+  }
+  if (off_nbytes != NULL) {
+    *off_nbytes = (int32_t)(nchunks * (int64_t)sizeof(int64_t));
+  }
+  return true;
+}
+
 /* Copy 4 bytes from @p *pa to int32_t, changing endianness if necessary. */
 static inline int32_t sw32_(const void* pa) {
   int32_t idest;
