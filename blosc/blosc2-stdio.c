@@ -90,7 +90,7 @@ int64_t blosc2_stdio_size(void *stream) {
 int64_t blosc2_stdio_write(const void *ptr, size_t size, size_t nitems, size_t position, void *stream) {
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
   fseek(my_fp->file, (long)position, SEEK_SET);
-  size_t nitems_ = fwrite(ptr, size, nitems, my_fp->file);
+  size_t nitems_ = fwrite(ptr, (size_t)size, (size_t)nitems, my_fp->file);
   return (int64_t) nitems_;
 }
 
@@ -98,7 +98,7 @@ int64_t blosc2_stdio_read(void **ptr, size_t size, size_t nitems, size_t positio
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
   fseek(my_fp->file, (long)position, SEEK_SET);
   void* data_ptr = *ptr;
-  size_t nitems_ = fread(data_ptr, size, nitems, my_fp->file);
+  size_t nitems_ = fread(data_ptr, (size_t)size, (size_t)nitems, my_fp->file);
   return (int64_t) nitems_;
 }
 
@@ -106,7 +106,7 @@ int blosc2_stdio_truncate(void *stream, size_t size) {
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
   int rc;
 #if defined(_MSC_VER)
-  rc = _chsize_s(_fileno(my_fp->file), (__int64)size);
+  rc = _chsize_s(_fileno(my_fp->file), size);
 #else
   rc = ftruncate(fileno(my_fp->file), (off_t)size);
 #endif

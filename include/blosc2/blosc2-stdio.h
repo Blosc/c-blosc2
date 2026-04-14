@@ -71,9 +71,9 @@ typedef struct {
   //!< The starting address of the mapping.
   char* urlpath;
   //!< The path to the file which is associated with this object.
-    size_t file_size;
+    int64_t file_size;
     //!< The size of the file.
-    size_t mapping_size;
+    int64_t mapping_size;
     //!< The size of the mapping (mapping_size >= file_size).
   bool is_memory_only;
   //!< Whether the mapping is only in-memory and changes are not reflected to the file on disk (c mode).
@@ -92,8 +92,9 @@ typedef struct {
 } blosc2_stdio_mmap;
 
 /**
- * @brief Default struct for memory-mapped I/O for user initialization.
- */
+  BLOSC_EXPORT int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
+  BLOSC_EXPORT int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
+  BLOSC_EXPORT int blosc2_stdio_truncate(void *stream, int64_t size);
 static const blosc2_stdio_mmap BLOSC2_STDIO_MMAP_DEFAULTS = {
   "r", (1 << 30), false, NULL, NULL, -1, -1, false, NULL, -1, -1, -1
 #if defined(_WIN32)
@@ -105,9 +106,10 @@ BLOSC_EXPORT void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode,
 BLOSC_EXPORT int blosc2_stdio_mmap_close(void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_mmap_size(void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_mmap_write(
-  const void *ptr, size_t size, size_t nitems, size_t position, void *stream);
-BLOSC_EXPORT int64_t blosc2_stdio_mmap_read(void **ptr, size_t size, size_t nitems, size_t position, void *stream);
-BLOSC_EXPORT int blosc2_stdio_mmap_truncate(void *stream, size_t size);
+BLOSC_EXPORT int64_t blosc2_stdio_mmap_write(
+  const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
+BLOSC_EXPORT int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
+BLOSC_EXPORT int blosc2_stdio_mmap_truncate(void *stream, int64_t size);
 BLOSC_EXPORT int blosc2_stdio_mmap_destroy(void* params);
 
 #ifdef __cplusplus

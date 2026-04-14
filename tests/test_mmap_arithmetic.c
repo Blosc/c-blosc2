@@ -26,8 +26,8 @@ CUTEST_TEST_TEST(mmap_arithmetic) {
 
   blosc2_stdio_mmap mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
   mmap_file.addr = (char*)backing;
-  mmap_file.file_size = (size_t)sizeof(backing);
-  mmap_file.mapping_size = (size_t)sizeof(backing);
+  mmap_file.file_size = (int64_t)sizeof(backing);
+  mmap_file.mapping_size = (int64_t)sizeof(backing);
 
   uint8_t src_ok[4] = {1, 2, 3, 4};
   int64_t nwritten = blosc2_stdio_mmap_write(src_ok, 1, 4, 8, &mmap_file);
@@ -35,13 +35,13 @@ CUTEST_TEST_TEST(mmap_arithmetic) {
   CUTEST_ASSERT("Valid mmap write should copy bytes", memcmp(backing + 8, src_ok, 4) == 0);
 
   uint8_t src_guard[4] = {7, 7, 7, 7};
-  nwritten = blosc2_stdio_mmap_write(src_guard, SIZE_MAX, 2, 0, &mmap_file);
+  nwritten = blosc2_stdio_mmap_write(src_guard, (int64_t)SIZE_MAX, 2, 0, &mmap_file);
   CUTEST_ASSERT("mmap write must reject multiplication overflow", nwritten == 0);
 
-  nwritten = blosc2_stdio_mmap_write(src_guard, 1, 1, SIZE_MAX, &mmap_file);
+  nwritten = blosc2_stdio_mmap_write(src_guard, 1, 1, (int64_t)SIZE_MAX, &mmap_file);
   CUTEST_ASSERT("mmap write must reject addition overflow", nwritten == 0);
 
-  nwritten = blosc2_stdio_mmap_write(src_guard, (size_t)-1, 1, 0, &mmap_file);
+  nwritten = blosc2_stdio_mmap_write(src_guard, (int64_t)-1, 1, 0, &mmap_file);
   CUTEST_ASSERT("mmap write must reject negative size (now wraps)", nwritten == 0);
 
   void* read_ptr = NULL;
@@ -58,17 +58,17 @@ CUTEST_TEST_TEST(mmap_arithmetic) {
   CUTEST_ASSERT("mmap read must null pointer on out-of-range read", read_ptr == NULL);
 
   read_ptr = (void*)0x1;
-  nread = blosc2_stdio_mmap_read(&read_ptr, SIZE_MAX, 2, 0, &mmap_file);
+  nread = blosc2_stdio_mmap_read(&read_ptr, (int64_t)SIZE_MAX, 2, 0, &mmap_file);
   CUTEST_ASSERT("mmap read must reject multiplication overflow", nread == 0);
   CUTEST_ASSERT("mmap read must null pointer on invalid args", read_ptr == NULL);
 
   read_ptr = (void*)0x1;
-  nread = blosc2_stdio_mmap_read(&read_ptr, 1, 1, SIZE_MAX, &mmap_file);
+  nread = blosc2_stdio_mmap_read(&read_ptr, 1, 1, (int64_t)SIZE_MAX, &mmap_file);
   CUTEST_ASSERT("mmap read must reject addition overflow", nread == 0);
   CUTEST_ASSERT("mmap read must null pointer on overflow", read_ptr == NULL);
 
   read_ptr = (void*)0x1;
-  nread = blosc2_stdio_mmap_read(&read_ptr, (size_t)-1, 1, 0, &mmap_file);
+  nread = blosc2_stdio_mmap_read(&read_ptr, (int64_t)-1, 1, 0, &mmap_file);
   CUTEST_ASSERT("mmap read must reject negative size (now wraps)", nread == 0);
   CUTEST_ASSERT("mmap read must null pointer on negative args", read_ptr == NULL);
 
