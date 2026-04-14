@@ -378,12 +378,19 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
   }
 
   if (mmap_file->mapping_size < mmap_file->file_size) {
+    int64_t remap_size;
     if (mmap_file->file_size > INT64_MAX / 2) {
-      mmap_file->mapping_size = mmap_file->file_size;
+      BLOSC_TRACE_WARNING("mmap remap growth fallback: cannot double mapping_size near INT64_MAX; using file_size (%" PRId64 ").", mmap_file->file_size);
+      remap_size = mmap_file->file_size;
     }
     else {
-      mmap_file->mapping_size = mmap_file->file_size * 2;
+      remap_size = mmap_file->file_size * 2;
     }
+    if (remap_size < 0 || (uint64_t)remap_size > SIZE_MAX) {
+      BLOSC_TRACE_ERROR("mmap mapping size does not fit in SIZE_T (%" PRId64 ").", remap_size);
+      return 0;
+    }
+    mmap_file->mapping_size = remap_size;
 
     /* We need to remap the file completely and cannot pass the previous used address on Windows */
     if (!UnmapViewOfFile(mmap_file->addr)) {
@@ -440,6 +447,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
   if (mmap_file->mapping_size < mmap_file->file_size) {
     int64_t old_mapping_size = mmap_file->mapping_size;
     if (mmap_file->file_size > INT64_MAX / 2) {
+      BLOSC_TRACE_WARNING("mmap remap growth fallback: cannot double mapping_size near INT64_MAX; using file_size (%" PRId64 ").", mmap_file->file_size);
       mmap_file->mapping_size = mmap_file->file_size;
     }
     else {
@@ -488,7 +496,12 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
 int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) stream;
 
-  if (ptr == NULL || size < 0 || nitems < 0 || position < 0) {
+  if (ptr == NULL) {
+    BLOSC_TRACE_ERROR("Invalid pointer argument for mmap read.");
+    return 0;
+  }
+
+  if (size < 0 || nitems < 0 || position < 0) {
     BLOSC_TRACE_ERROR("Invalid arguments for mmap read.");
     *ptr = NULL;
     return 0;
