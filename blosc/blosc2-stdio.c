@@ -21,11 +21,8 @@
 #include <stdint.h>
 #include <errno.h>
 #include <inttypes.h>
-<<<<<<< mmap-arithmetic-overflow-hardening
 #include <limits.h>
-=======
 #include <string.h>
->>>>>>> main
 
 #if defined(_WIN32)
   #include <memoryapi.h>
