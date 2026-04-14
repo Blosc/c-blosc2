@@ -105,7 +105,7 @@ BLOSC_EXPORT void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode,
 BLOSC_EXPORT int blosc2_stdio_mmap_close(void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_mmap_size(void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_mmap_write(
-const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
+  const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream);
 BLOSC_EXPORT int blosc2_stdio_mmap_truncate(void *stream, int64_t size);
 BLOSC_EXPORT int blosc2_stdio_mmap_destroy(void* params);
