@@ -256,8 +256,8 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
     mmap_file->mapping_size = mmap_file->file_size;
   }
 
-  if (mmap_file->mapping_size < 0 || (uint64_t)mmap_file->mapping_size > SIZE_MAX) {
-    BLOSC_TRACE_ERROR("mmap mapping size does not fit in size_t (%" PRId64 ").", mmap_file->mapping_size);
+  if ((uint64_t)mmap_file->mapping_size > SIZE_MAX) {
+    BLOSC_TRACE_ERROR("mmap mapping size does not fit in size_t (%zu).", (size_t)mmap_file->mapping_size);
     return NULL;
   }
 
@@ -306,10 +306,10 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
 #endif
 
   BLOSC_INFO(
-    "Opened memory-mapped file %s in mode %s with an mapping size of %" PRId64 " bytes.",
+    "Opened memory-mapped file %s in mode %s with a mapping size of %zu bytes.",
     mmap_file->urlpath,
     mmap_file->mode,
-    mmap_file->mapping_size
+    (size_t)mmap_file->mapping_size
   );
 
   /* The mmap_file->mode parameter is only available during the opening call and cannot be used in any of the other
@@ -363,8 +363,8 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, size_t size, size_t nitems, siz
     size_t remap_size;
     if (mmap_file->file_size > SIZE_MAX / 2) {
       BLOSC_TRACE_WARNING(
-        "mmap remap growth capped at file size (%" PRId64 " bytes) to avoid int64 overflow.",
-        mmap_file->file_size
+        "mmap remap growth capped at file size (%zu bytes) to avoid overflow.",
+        (size_t)mmap_file->file_size
       );
       remap_size = mmap_file->file_size;
     }
@@ -372,8 +372,8 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, size_t size, size_t nitems, siz
       remap_size = mmap_file->file_size * 2;
     }
 
-    if (remap_size < 0 || (uint64_t)remap_size > SIZE_MAX) {
-      BLOSC_TRACE_ERROR("mmap mapping size does not fit in size_t (%" PRId64 ").", remap_size);
+    if ((uint64_t)remap_size > SIZE_MAX) {
+      BLOSC_TRACE_ERROR("mmap mapping size does not fit in size_t (%zu).", (size_t)remap_size);
       return 0;
     }
 
