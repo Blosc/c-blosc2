@@ -828,6 +828,11 @@ int read_chunk_header(const uint8_t* src, int32_t srcsize, bool extended_header,
     /* Version from future with unsupported chunk features. */
     return BLOSC2_ERROR_VERSION_SUPPORT;
   }
+  if ((header->blosc2_flags2 & BLOSC2_VL_BLOCKS) != 0 &&
+      (header->flags & (uint8_t)BLOSC_MEMCPYED) != 0) {
+    BLOSC_TRACE_ERROR("VL-block chunks cannot be memcpyed.");
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
   if ((header->blosc2_flags2 & BLOSC2_VL_BLOCKS) == 0 &&
       header->nbytes > 0 && header->blocksize > header->nbytes) {
     header->blocksize = header->nbytes;
@@ -1766,7 +1771,7 @@ static int blosc_d(
         !checked_add_size(sizeof(int32_t) + sizeof(int64_t), block_csizes_nbytes, &trailer_meta_nbytes) ||
         !checked_add_size(trailer_offset, trailer_meta_nbytes, &lazy_trailer_end) ||
         (size_t)srcsize < lazy_trailer_end) {
-      BLOSC_TRACE_ERROR("Lazy VL trailer exceeds source buffer.");
+      BLOSC_TRACE_ERROR("Lazy trailer exceeds source buffer.");
       return BLOSC2_ERROR_READ_BUFFER;
     }
     int32_t nchunk;
@@ -2731,7 +2736,7 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
         !checked_add_size(sizeof(int32_t) + sizeof(int64_t), block_csizes_nbytes, &trailer_meta_nbytes) ||
         !checked_add_size((size_t)bstarts_end, trailer_meta_nbytes, &lazy_trailer_end) ||
         (size_t)context->srcsize < lazy_trailer_end) {
-      BLOSC_TRACE_ERROR("Lazy VL trailer exceeds source buffer.");
+      BLOSC_TRACE_ERROR("Lazy trailer exceeds source buffer.");
       return BLOSC2_ERROR_READ_BUFFER;
     }
   }
