@@ -125,13 +125,37 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
     }                                                                                 \
   } while (0)
 
+#define B2ND_REQUIRE_META_MARKER(expected, what)                                      \
+  do {                                                                                \
+    B2ND_REQUIRE_META_NBYTES(1);                                                      \
+    if (*pmeta != (uint8_t)(expected)) {                                              \
+      BLOSC_TRACE_ERROR("Malformed b2nd metalayer: invalid " what " marker");      \
+      return BLOSC2_ERROR_FAILURE;                                                    \
+    }                                                                                 \
+    pmeta += 1;                                                                       \
+  } while (0)
+
   // Check that we have an array with 7 entries (version, ndim, shape, chunkshape, blockshape, dtype_format, dtype)
   B2ND_REQUIRE_META_NBYTES(1);
-  pmeta += 1;
+  uint8_t top_array_marker = *pmeta++;
+  if ((top_array_marker & 0xf0u) != 0x90u) {
+    BLOSC_TRACE_ERROR("Malformed b2nd metalayer: invalid top-level array marker");
+    return BLOSC2_ERROR_FAILURE;
+  }
+  // Legacy caterva metadata can have fewer entries than current b2nd metadata.
+  uint8_t top_array_entries = (uint8_t)(top_array_marker & 0x0fu);
+  if (top_array_entries != 5 && top_array_entries != 7) {
+    BLOSC_TRACE_ERROR("Malformed b2nd metalayer: unsupported top-level array size (%u)", top_array_entries);
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   // version entry
-  // int8_t version = (int8_t)pmeta[0];  // positive fixnum (7-bit positive integer) commented to avoid warning
   B2ND_REQUIRE_META_NBYTES(1);
+  int8_t version = (int8_t)pmeta[0];  // positive fixnum (7-bit positive integer)
+  if (version <= 0 || version > B2ND_METALAYER_VERSION) {
+    BLOSC_TRACE_ERROR("Malformed b2nd metalayer: unsupported version (%d)", version);
+    return BLOSC2_ERROR_FAILURE;
+  }
   pmeta += 1;
 
   // ndim entry
@@ -148,10 +172,14 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
   // Initialize to ones, as required by b2nd
   for (int i = 0; i < ndim_aux; i++) shape[i] = 1;
   B2ND_REQUIRE_META_NBYTES(1);
-  pmeta += 1;
+  uint8_t shape_array_marker = *pmeta++;
+  if ((shape_array_marker & 0xf0u) != 0x90u || (shape_array_marker & 0x0fu) != (uint8_t)ndim_aux) {
+    BLOSC_TRACE_ERROR("Malformed b2nd metalayer: invalid shape array marker");
+    return BLOSC2_ERROR_FAILURE;
+  }
   for (int8_t i = 0; i < ndim_aux; i++) {
     B2ND_REQUIRE_META_NBYTES(1 + sizeof(int64_t));
-    pmeta += 1;
+    B2ND_REQUIRE_META_MARKER(0xd3, "shape dtype");
     swap_store(shape + i, pmeta, sizeof(int64_t));
     pmeta += sizeof(int64_t);
   }
@@ -160,10 +188,14 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
   // Initialize to ones, as required by b2nd
   for (int i = 0; i < ndim_aux; i++) chunkshape[i] = 1;
   B2ND_REQUIRE_META_NBYTES(1);
-  pmeta += 1;
+  uint8_t chunkshape_array_marker = *pmeta++;
+  if ((chunkshape_array_marker & 0xf0u) != 0x90u || (chunkshape_array_marker & 0x0fu) != (uint8_t)ndim_aux) {
+    BLOSC_TRACE_ERROR("Malformed b2nd metalayer: invalid chunkshape array marker");
+    return BLOSC2_ERROR_FAILURE;
+  }
   for (int8_t i = 0; i < ndim_aux; i++) {
     B2ND_REQUIRE_META_NBYTES(1 + sizeof(int32_t));
-    pmeta += 1;
+    B2ND_REQUIRE_META_MARKER(0xd2, "chunkshape dtype");
     swap_store(chunkshape + i, pmeta, sizeof(int32_t));
     pmeta += sizeof(int32_t);
   }
@@ -172,10 +204,14 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
   // Initialize to ones, as required by b2nd
   for (int i = 0; i < ndim_aux; i++) blockshape[i] = 1;
   B2ND_REQUIRE_META_NBYTES(1);
-  pmeta += 1;
+  uint8_t blockshape_array_marker = *pmeta++;
+  if ((blockshape_array_marker & 0xf0u) != 0x90u || (blockshape_array_marker & 0x0fu) != (uint8_t)ndim_aux) {
+    BLOSC_TRACE_ERROR("Malformed b2nd metalayer: invalid blockshape array marker");
+    return BLOSC2_ERROR_FAILURE;
+  }
   for (int8_t i = 0; i < ndim_aux; i++) {
     B2ND_REQUIRE_META_NBYTES(1 + sizeof(int32_t));
-    pmeta += 1;
+    B2ND_REQUIRE_META_MARKER(0xd2, "blockshape dtype");
     swap_store(blockshape + i, pmeta, sizeof(int32_t));
     pmeta += sizeof(int32_t);
   }
@@ -188,7 +224,7 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
     // dtype info is here
     B2ND_REQUIRE_META_NBYTES(1 + 1 + sizeof(int32_t));
     *dtype_format = (int8_t) *(pmeta++);
-    pmeta += 1;
+    B2ND_REQUIRE_META_MARKER(0xdb, "dtype string");
     int32_t dtype_len;
     swap_store(&dtype_len, pmeta, sizeof(int32_t));
     pmeta += sizeof(int32_t);
@@ -212,6 +248,7 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
     *dtype_format = 0;
   }
 
+#undef B2ND_REQUIRE_META_MARKER
 #undef B2ND_REQUIRE_META_NBYTES
 
   int32_t slen = (int32_t) (pmeta - smeta);
@@ -665,7 +702,7 @@ int64_t b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, 
 
   int8_t ndim = array->ndim;
 
-  if (array->nitems == 0){
+  if (array->nitems == 0) {
     *chunks_idx = NULL;
     return 0;
   }
