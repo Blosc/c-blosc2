@@ -127,11 +127,21 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
 
   // Check that we have an array with 7 entries (version, ndim, shape, chunkshape, blockshape, dtype_format, dtype)
   B2ND_REQUIRE_META_NBYTES(1);
+  uint8_t array_marker = *pmeta;
+  if ((array_marker & 0xf0u) != 0x90u) {
+    BLOSC_TRACE_ERROR("Malformed b2nd metalayer: invalid top-level MsgPack marker");
+    return BLOSC2_ERROR_FAILURE;
+  }
+  // Be compatibility-friendly: validate fixarray type, but do not enforce exact entry count.
   pmeta += 1;
 
   // version entry
-  // int8_t version = (int8_t)pmeta[0];  // positive fixnum (7-bit positive integer) commented to avoid warning
   B2ND_REQUIRE_META_NBYTES(1);
+  int8_t version = (int8_t)pmeta[0];  // positive fixnum (7-bit positive integer)
+  if (version <= 0 || version > B2ND_METALAYER_VERSION) {
+    BLOSC_TRACE_ERROR("Malformed b2nd metalayer: unsupported version (%d)", version);
+    return BLOSC2_ERROR_FAILURE;
+  }
   pmeta += 1;
 
   // ndim entry
