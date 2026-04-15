@@ -188,6 +188,10 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
     // dtype info is here
     B2ND_REQUIRE_META_NBYTES(1 + 1 + sizeof(int32_t));
     *dtype_format = (int8_t) *(pmeta++);
+    if (*pmeta != 0xdb) {
+      BLOSC_TRACE_ERROR("Malformed b2nd metalayer: invalid dtype MsgPack marker");
+      return BLOSC2_ERROR_FAILURE;
+    }
     pmeta += 1;
     int32_t dtype_len;
     swap_store(&dtype_len, pmeta, sizeof(int32_t));
@@ -665,7 +669,7 @@ int b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, cons
 
   int8_t ndim = array->ndim;
 
-  if (array->nitems == 0){
+  if (array->nitems == 0) {
     *chunks_idx = NULL;
     return 0;
   }
