@@ -1050,6 +1050,38 @@ static char *test_lazy_vlchunk_rejects_truncated_trailer(void) {
 }
 
 
+static char *test_vlchunk_rejects_memcpyed_flag(void) {
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  mu_assert("ERROR: cannot create cctx", cctx != NULL);
+
+  int32_t destsize = total_nbytes() + BLOSC2_MAX_OVERHEAD + 64;
+  uint8_t *chunk = malloc((size_t)destsize);
+  mu_assert("ERROR: cannot allocate chunk buffer", chunk != NULL);
+
+  int32_t cbytes = blosc2_vlcompress_ctx(cctx, (const void * const *)srcs, srcsizes, 3,
+                                         chunk, destsize);
+  mu_assert("ERROR: cannot create VL-block chunk", cbytes > 0);
+  chunk[BLOSC2_CHUNK_FLAGS] |= (uint8_t)BLOSC_MEMCPYED;
+
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
+  mu_assert("ERROR: cannot create dctx", dctx != NULL);
+
+  uint8_t *buffer = malloc((size_t)total_nbytes());
+  mu_assert("ERROR: cannot allocate destination buffer", buffer != NULL);
+  int32_t nbytes = blosc2_decompress_ctx(dctx, chunk, cbytes, buffer, total_nbytes());
+  mu_assert("ERROR: VL-block chunks marked memcpyed must be rejected", nbytes < 0);
+
+  free(buffer);
+  blosc2_free_ctx(dctx);
+  blosc2_free_ctx(cctx);
+  free(chunk);
+  return EXIT_SUCCESS;
+}
+
+
 static char *test_lazy_vldecompress_block_ctx(void) {
   const char* urlpath = "test_lazy_vldecomp.b2frame";
   blosc2_schunk* schunk = make_lazy_vl_schunk(urlpath, true);
@@ -1130,6 +1162,7 @@ static char *all_tests(void) {
   mu_run_test(test_lazy_vlchunk_get_nblocks);
   mu_run_test(test_lazy_vlchunk_rejects_huge_nblocks);
   mu_run_test(test_lazy_vlchunk_rejects_truncated_trailer);
+  mu_run_test(test_vlchunk_rejects_memcpyed_flag);
   mu_run_test(test_lazy_vldecompress_block_ctx);
   mu_run_test(test_lazy_vldecompress_block_ctx_sframe);
   mu_run_test(test_lazy_vldecompress_block_ctx_dict_lz4);
