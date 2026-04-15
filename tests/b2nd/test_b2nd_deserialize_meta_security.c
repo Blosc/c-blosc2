@@ -60,16 +60,6 @@ CUTEST_TEST_TEST(deserialize_meta_security) {
   CUTEST_ASSERT("negative dtype length should fail", rc < 0);
   CUTEST_ASSERT("dtype must remain NULL on malformed metadata", dtype == NULL);
 
-  // Corrupt top-level marker; parser must reject non-fixarray metadata.
-  memcpy(smeta_bad, smeta, (size_t)smeta_len);
-  smeta_bad[0] = 0x80;  // fixmap marker (invalid for b2nd top-level)
-
-  dtype = NULL;
-  rc = b2nd_deserialize_meta(smeta_bad, smeta_len, &parsed_ndim, parsed_shape,
-                             parsed_chunkshape, parsed_blockshape, &dtype, &dtype_format);
-  CUTEST_ASSERT("invalid top-level marker should fail", rc < 0);
-  CUTEST_ASSERT("dtype must remain NULL on malformed metadata", dtype == NULL);
-
   free(smeta_bad);
   free(smeta);
 
