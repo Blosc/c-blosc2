@@ -61,13 +61,13 @@ CUTEST_TEST_SETUP(mmap) {
   blosc2_stdio_mmap mmap_file_default = BLOSC2_STDIO_MMAP_DEFAULTS;
 
   /* We also want to trigger the remapping */
-  CUTEST_PARAMETRIZE(initial_mapping_size, int64_t, CUTEST_DATA(
-      1, mmap_file_default.initial_mapping_size,
+  CUTEST_PARAMETRIZE(initial_mapping_size, size_t, CUTEST_DATA(
+      (size_t)1, mmap_file_default.initial_mapping_size,
   ));
 }
 
 CUTEST_TEST_TEST(mmap) {
-  CUTEST_GET_PARAMETER(initial_mapping_size, int64_t);
+  CUTEST_GET_PARAMETER(initial_mapping_size, size_t);
 
   char* urlpath_default = "test_mmap_default.b2frame";
   char* urlpath_mmap = "test_mmap_mmap.b2frame";
