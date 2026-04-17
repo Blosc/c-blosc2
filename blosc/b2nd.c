@@ -2400,10 +2400,18 @@ b2nd_create_ctx(const blosc2_storage *b2_storage, int8_t ndim, const int64_t *sh
     // ctx->dtype = strdup(B2ND_DEFAULT_DTYPE);
     char buf[16] = {0};
     snprintf(buf, sizeof(buf), "|S%d", cparams->typesize);
+#if defined(_MSC_VER)
+    ctx->dtype = _strdup(buf);
+#else
     ctx->dtype = strdup(buf);
+#endif
   }
   else {
+#if defined(_MSC_VER)
+    ctx->dtype = _strdup(dtype);
+#else
     ctx->dtype = strdup(dtype);
+#endif
   }
   ctx->dtype_format = dtype_format;
 

@@ -148,6 +148,9 @@ static int init_callback_threads(blosc2_context *context);
 static int release_thread_backend(blosc2_context *context);
 static int attach_shared_pool(blosc2_context *context);
 static int parallel_blosc(blosc2_context* context);
+#if defined(_WIN32)
+static int init_context_threads(blosc2_context *context);
+#endif
 
 /* Macros for synchronization */
 

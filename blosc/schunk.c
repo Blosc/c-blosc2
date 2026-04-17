@@ -1759,7 +1759,11 @@ int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name, uint8_t *content,
 
   // Add the vlmetalayer
   blosc2_metalayer *vlmetalayer = malloc(sizeof(blosc2_metalayer));
+#if defined(_MSC_VER)
+  vlmetalayer->name = _strdup(name);
+#else
   vlmetalayer->name = strdup(name);
+#endif
   uint8_t* content_buf = malloc((size_t) content_len + BLOSC2_MAX_OVERHEAD);
 
   blosc2_context *cctx;
