@@ -101,9 +101,52 @@ int g_ntuners = 0;
 
 static int g_tuner = BLOSC_STUNE;
 
+struct blosc_job_group {
+  blosc2_context *context;
+  int32_t next_block;
+  int32_t next_output_block;
+  int32_t blocks_completed;
+  int32_t active_workers;
+  int32_t output_bytes;
+  int giveup_code;
+  int dref_not_init;
+  bool static_schedule;
+  bool completed;
+  blosc2_pthread_mutex_t mutex;
+  blosc2_pthread_mutex_t delta_mutex;
+  blosc2_pthread_cond_t delta_cv;
+  blosc2_pthread_cond_t completion_cv;
+};
+
+struct blosc_job_queue_entry {
+  struct blosc_job_group *job;
+  int32_t logical_tid;
+  struct blosc_job_queue_entry *next;
+};
+
+struct blosc_shared_pool {
+  int16_t nthreads;
+  int16_t shutdown;
+  int32_t context_refs;
+  int32_t active_jobs;
+  blosc2_pthread_t *threads;
+  struct thread_context *thread_contexts;
+  blosc2_pthread_mutex_t mutex;
+  blosc2_pthread_cond_t work_cv;
+  blosc2_pthread_cond_t idle_cv;
+  struct blosc_job_queue_entry *job_queue_head;
+  struct blosc_job_queue_entry *job_queue_tail;
+  struct blosc_shared_pool *next;
+#if !defined(_WIN32)
+  pthread_attr_t ct_attr;
+#endif
+};
+
 // Forward declarations
-int init_threadpool(blosc2_context *context);
-int release_threadpool(blosc2_context *context);
+static int init_callback_threads(blosc2_context *context);
+static int release_thread_backend(blosc2_context *context);
+static int attach_shared_pool(blosc2_context *context);
+static int parallel_blosc(blosc2_context* context);
 
 /* Macros for synchronization */
 
@@ -163,6 +206,9 @@ int release_threadpool(blosc2_context *context);
 /* global variable to change threading backend from Blosc-managed to caller-managed */
 static blosc_threads_callback threads_callback = 0;
 static void *threads_callback_data = 0;
+static blosc2_pthread_mutex_t pool_registry_mutex;
+static int pool_registry_initialized = 0;
+static struct blosc_shared_pool *shared_pools = NULL;
 
 
 /* non-threadsafe function should be called before any other Blosc function in
@@ -1479,18 +1525,22 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
             /* Serial mode */
             delta_decoder(dest, offset, bsize, typesize, _dest);
           } else {
+            struct blosc_job_group *job = context->job;
+            blosc2_pthread_mutex_t *delta_mutex = job != NULL ? &job->delta_mutex : &context->delta_mutex;
+            blosc2_pthread_cond_t *delta_cv = job != NULL ? &job->delta_cv : &context->delta_cv;
+            int *dref_not_init = job != NULL ? &job->dref_not_init : &context->dref_not_init;
             /* Force the thread in charge of the block 0 to go first */
-            blosc2_pthread_mutex_lock(&context->delta_mutex);
-            if (context->dref_not_init) {
+            blosc2_pthread_mutex_lock(delta_mutex);
+            if (*dref_not_init) {
               if (offset != 0) {
-                blosc2_pthread_cond_wait(&context->delta_cv, &context->delta_mutex);
+                blosc2_pthread_cond_wait(delta_cv, delta_mutex);
               } else {
                 delta_decoder(dest, offset, bsize, typesize, _dest);
-                context->dref_not_init = 0;
-                blosc2_pthread_cond_broadcast(&context->delta_cv);
+                *dref_not_init = 0;
+                blosc2_pthread_cond_broadcast(delta_cv);
               }
             }
-            blosc2_pthread_mutex_unlock(&context->delta_mutex);
+            blosc2_pthread_mutex_unlock(delta_mutex);
             if (offset != 0) {
               delta_decoder(dest, offset, bsize, typesize, _dest);
             }
@@ -2151,52 +2201,25 @@ static int serial_blosc(struct thread_context* thread_context) {
 
 static void t_blosc_do_job(void *ctxt);
 
-/* Threaded version for compression/decompression */
-static int parallel_blosc(blosc2_context* context) {
-#ifdef BLOSC_POSIX_BARRIERS
-  int rc;
-#endif
-  /* Set sentinels */
-  context->thread_giveup_code = 1;
-  context->thread_nblock = -1;
-
-  if (threads_callback) {
-    threads_callback(threads_callback_data, t_blosc_do_job,
-                     context->nthreads, sizeof(struct thread_context), (void*) context->thread_contexts);
-  }
-  else {
-    /* Synchronization point for all threads (wait for initialization) */
-    WAIT_INIT(-1, context);
-
-    /* Synchronization point for all threads (wait for finalization) */
-    WAIT_FINISH(-1, context);
-  }
-
-  if (context->thread_giveup_code <= 0) {
-    /* Compression/decompression gave up.  Return error code. */
-    return context->thread_giveup_code;
-  }
-
-  /* Return the total bytes (de-)compressed in threads */
-  return (int)context->output_bytes;
-}
-
 /* initialize a thread_context that has already been allocated */
 static int init_thread_context(struct thread_context* thread_context, blosc2_context* context, int32_t tid)
 {
   int32_t ebsize;
 
   thread_context->parent_context = context;
+  thread_context->owner_pool = NULL;
   thread_context->tid = tid;
 
-  ebsize = context->blocksize + context->typesize * (signed)sizeof(int32_t);
+  int32_t blocksize = context != NULL ? context->blocksize : 0;
+  int32_t typesize = context != NULL ? context->typesize : 0;
+  ebsize = blocksize + typesize * (signed)sizeof(int32_t);
   thread_context->tmp_nbytes = (size_t)4 * ebsize;
   thread_context->tmp = my_malloc(thread_context->tmp_nbytes);
   BLOSC_ERROR_NULL(thread_context->tmp, BLOSC2_ERROR_MEMORY_ALLOC);
   thread_context->tmp2 = thread_context->tmp + ebsize;
   thread_context->tmp3 = thread_context->tmp2 + ebsize;
   thread_context->tmp4 = thread_context->tmp3 + ebsize;
-  thread_context->tmp_blocksize = context->blocksize;
+  thread_context->tmp_blocksize = blocksize;
   thread_context->zfp_cell_nitems = 0;
   thread_context->zfp_cell_start = 0;
   #if defined(HAVE_ZSTD)
@@ -2274,13 +2297,23 @@ int check_nthreads(blosc2_context* context) {
   }
 
   if (context->new_nthreads != context->nthreads) {
-    if (context->nthreads > 1) {
-      release_threadpool(context);
-    }
+    release_thread_backend(context);
     context->nthreads = context->new_nthreads;
   }
-  if (context->new_nthreads > 1 && context->threads_started == 0) {
-    init_threadpool(context);
+  if (context->nthreads > 1 && context->threads_started == 0) {
+    int rc;
+    if (threads_callback) {
+      rc = init_callback_threads(context);
+    }
+    else {
+      rc = attach_shared_pool(context);
+    }
+    if (rc < 0) {
+      return rc;
+    }
+  }
+  if (context->nthreads <= 1) {
+    context->thread_backend = BLOSC_BACKEND_SERIAL;
   }
 
   return context->nthreads;
@@ -4348,19 +4381,45 @@ int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize
   return result;
 }
 
+static int ensure_thread_context_capacity(struct thread_context* thread_context, blosc2_context* context) {
+  int32_t blocksize = context->blocksize;
+  int32_t ebsize = blocksize + context->typesize * (int32_t)sizeof(int32_t);
+
+  if (blocksize <= thread_context->tmp_blocksize) {
+    return 0;
+  }
+
+  my_free(thread_context->tmp);
+  thread_context->tmp_nbytes = (size_t)4 * ebsize;
+  thread_context->tmp = my_malloc(thread_context->tmp_nbytes);
+  BLOSC_ERROR_NULL(thread_context->tmp, BLOSC2_ERROR_MEMORY_ALLOC);
+  thread_context->tmp2 = thread_context->tmp + ebsize;
+  thread_context->tmp3 = thread_context->tmp2 + ebsize;
+  thread_context->tmp4 = thread_context->tmp3 + ebsize;
+  thread_context->tmp_blocksize = blocksize;
+  return 0;
+}
+
+static int32_t claim_job_block(struct blosc_job_group *job) {
+  int32_t nblock_;
+  blosc2_pthread_mutex_lock(&job->mutex);
+  nblock_ = ++job->next_block;
+  blosc2_pthread_mutex_unlock(&job->mutex);
+  return nblock_;
+}
+
 /* execute single compression/decompression job for a single thread_context */
-static void t_blosc_do_job(void *ctxt)
-{
+static void t_blosc_do_job(void *ctxt) {
   struct thread_context* thcontext = (struct thread_context*)ctxt;
   blosc2_context* context = thcontext->parent_context;
+  struct blosc_job_group* job = context->job;
   int32_t cbytes;
   int32_t ntdest;
-  int32_t tblocks;               /* number of blocks per thread */
-  int32_t tblock;                /* limit block on a thread */
-  int32_t nblock_;              /* private copy of nblock */
+  int32_t tblocks;
+  int32_t tblock;
+  int32_t nblock_;
   int32_t bsize;
   int32_t leftoverblock;
-  /* Parameters for threads */
   int32_t blocksize;
   int32_t ebsize;
   int32_t srcsize;
@@ -4376,7 +4435,6 @@ static void t_blosc_do_job(void *ctxt)
   uint8_t* tmp2;
   uint8_t* tmp3;
 
-  /* Get parameters for this thread before entering the main loop */
   blocksize = context->blocksize;
   ebsize = blocksize + context->typesize * (int32_t)sizeof(int32_t);
   maxbytes = context->destsize;
@@ -4387,54 +4445,49 @@ static void t_blosc_do_job(void *ctxt)
   srcsize = context->srcsize;
   dest = context->dest;
 
-  /* Resize the temporaries if needed */
-  if (blocksize > thcontext->tmp_blocksize) {
-    my_free(thcontext->tmp);
-    thcontext->tmp_nbytes = (size_t) 4 * ebsize;
-    thcontext->tmp = my_malloc(thcontext->tmp_nbytes);
-    thcontext->tmp2 = thcontext->tmp + ebsize;
-    thcontext->tmp3 = thcontext->tmp2 + ebsize;
-    thcontext->tmp4 = thcontext->tmp3 + ebsize;
-    thcontext->tmp_blocksize = blocksize;
+  if (ensure_thread_context_capacity(thcontext, context) < 0) {
+    blosc2_pthread_mutex_lock(&job->mutex);
+    job->giveup_code = BLOSC2_ERROR_MEMORY_ALLOC;
+    blosc2_pthread_mutex_unlock(&job->mutex);
+    return;
   }
 
   tmp = thcontext->tmp;
   tmp2 = thcontext->tmp2;
   tmp3 = thcontext->tmp3;
 
-  // Determine whether we can do a static distribution of workload among different threads
   bool vlblocks = (context->blosc2_flags2 & BLOSC2_VL_BLOCKS) != 0;
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
   if (!context->do_compress && context->special_type) {
-    // Fake a runlen as if its a memcpyed chunk
     memcpyed = true;
   }
 
-  bool static_schedule = (!compress || memcpyed) && context->block_maskout == NULL;
-  if (static_schedule) {
-      /* Blocks per thread */
-      tblocks = nblocks / context->nthreads;
-      leftover2 = nblocks % context->nthreads;
-      tblocks = (leftover2 > 0) ? tblocks + 1 : tblocks;
-      nblock_ = thcontext->tid * tblocks;
-      tblock = nblock_ + tblocks;
-      if (tblock > nblocks) {
-          tblock = nblocks;
-      }
+  if (job->static_schedule) {
+    tblocks = nblocks / context->nthreads;
+    leftover2 = nblocks % context->nthreads;
+    tblocks = (leftover2 > 0) ? tblocks + 1 : tblocks;
+    nblock_ = thcontext->tid * tblocks;
+    tblock = nblock_ + tblocks;
+    if (tblock > nblocks) {
+      tblock = nblocks;
+    }
   }
   else {
-    // Use dynamic schedule via a queue.  Get the next block.
-    blosc2_pthread_mutex_lock(&context->count_mutex);
-    context->thread_nblock++;
-    nblock_ = context->thread_nblock;
-    blosc2_pthread_mutex_unlock(&context->count_mutex);
+    nblock_ = claim_job_block(job);
     tblock = nblocks;
   }
 
-  /* Loop over blocks */
   leftoverblock = 0;
-  while ((nblock_ < tblock) && (context->thread_giveup_code > 0)) {
+  while (nblock_ < tblock) {
+    blosc2_pthread_mutex_lock(&job->mutex);
+    if (job->giveup_code <= 0) {
+      blosc2_pthread_mutex_unlock(&job->mutex);
+      break;
+    }
+    blosc2_pthread_mutex_unlock(&job->mutex);
+
     bsize = vlblocks ? context->blocknbytes[nblock_] : blocksize;
+    leftoverblock = 0;
     if (!vlblocks && nblock_ == (nblocks - 1) && (leftover > 0)) {
       bsize = leftover;
       leftoverblock = 1;
@@ -4442,15 +4495,11 @@ static void t_blosc_do_job(void *ctxt)
     if (compress) {
       if (memcpyed) {
         if (!context->prefilter) {
-          /* We want to memcpy only */
           memcpy(dest + context->header_overhead + nblock_ * blocksize,
                  src + nblock_ * blocksize, (unsigned int) bsize);
-          cbytes = (int32_t) bsize;
+          cbytes = (int32_t)bsize;
         }
         else {
-          /* Only the prefilter has to be executed, and this is done in blosc_c().
-           * However, no further actions are needed, so we can put the result
-           * directly in dest. */
           cbytes = blosc_c(thcontext, bsize, leftoverblock, 0,
                            ebsize,
                            vlblocks ? context->vlblock_sources[nblock_] : src,
@@ -4460,194 +4509,417 @@ static void t_blosc_do_job(void *ctxt)
         }
       }
       else {
-        /* Regular compression */
         cbytes = blosc_c(thcontext, bsize, leftoverblock, 0,
-                          ebsize,
-                          vlblocks ? context->vlblock_sources[nblock_] : src,
-                          vlblocks ? 0 : nblock_ * blocksize,
-                          tmp2, tmp, tmp3);
+                         ebsize,
+                         vlblocks ? context->vlblock_sources[nblock_] : src,
+                         vlblocks ? 0 : nblock_ * blocksize,
+                         tmp2, tmp, tmp3);
       }
     }
     else {
-      /* Regular decompression */
       if (context->special_type == BLOSC2_NO_SPECIAL && !memcpyed &&
           (srcsize < (int32_t)(context->header_overhead + (sizeof(int32_t) * nblocks)))) {
-        /* Not enough input to read all `bstarts` */
         cbytes = -1;
       }
       else {
-        // If memcpyed we don't have a bstarts section (because it is not needed)
         int32_t src_offset = memcpyed ?
             context->header_overhead + nblock_ * blocksize : sw32_(bstarts + nblock_);
         uint8_t *dest_block = (vlblocks && context->vlblock_dests != NULL) ? context->vlblock_dests[nblock_] : dest;
         int32_t dest_offset = (vlblocks && context->vlblock_dests != NULL) ? 0 :
                               (vlblocks ? context->blockoffsets[nblock_] : nblock_ * blocksize);
         cbytes = blosc_d(thcontext, bsize, leftoverblock, memcpyed,
-                          src, srcsize, src_offset, nblock_,
-                          dest_block, dest_offset, tmp, tmp2);
+                         src, srcsize, src_offset, nblock_,
+                         dest_block, dest_offset, tmp, tmp2);
       }
     }
 
-    /* Check whether current thread has to giveup */
-    if (context->thread_giveup_code <= 0) {
+    if (cbytes < 0) {
+      blosc2_pthread_mutex_lock(&job->mutex);
+      if (job->giveup_code > 0) {
+        job->giveup_code = cbytes;
+      }
+      blosc2_pthread_mutex_unlock(&job->mutex);
       break;
     }
 
-    /* Check results for the compressed/decompressed block */
-    if (cbytes < 0) {            /* compr/decompr failure */
-      /* Set giveup_code error */
-      blosc2_pthread_mutex_lock(&context->count_mutex);
-      context->thread_giveup_code = cbytes;
-      blosc2_pthread_mutex_unlock(&context->count_mutex);
-      break;
-    }
-
+    blosc2_pthread_mutex_lock(&job->mutex);
     if (compress && !memcpyed) {
-      /* Start critical section */
-      blosc2_pthread_mutex_lock(&context->count_mutex);
-      ntdest = context->output_bytes;
-      // Note: do not use a typical local dict_training variable here
-      // because it is probably cached from previous calls if the number of
-      // threads does not change (the usual thing).
+      ntdest = job->output_bytes;
       if (!(context->use_dict && context->dict_cdict == NULL)) {
-        _sw32(bstarts + nblock_, (int32_t) ntdest);
+        _sw32(bstarts + nblock_, (int32_t)ntdest);
       }
-
       if ((cbytes == 0) || (ntdest + cbytes > maxbytes)) {
-        context->thread_giveup_code = 0;  /* incompressible buf */
-        blosc2_pthread_mutex_unlock(&context->count_mutex);
+        job->giveup_code = 0;
+        blosc2_pthread_mutex_unlock(&job->mutex);
         break;
       }
-      context->thread_nblock++;
-      nblock_ = context->thread_nblock;
-      context->output_bytes += cbytes;
-      blosc2_pthread_mutex_unlock(&context->count_mutex);
-      /* End of critical section */
-
-      /* Copy the compressed buffer to destination */
-      memcpy(dest + ntdest, tmp2, (unsigned int) cbytes);
+      job->output_bytes += cbytes;
+      blosc2_pthread_mutex_unlock(&job->mutex);
+      memcpy(dest + ntdest, tmp2, (unsigned int)cbytes);
     }
-    else if (static_schedule) {
+    else {
+      job->output_bytes += cbytes;
+      blosc2_pthread_mutex_unlock(&job->mutex);
+    }
+
+    if (job->static_schedule) {
       nblock_++;
     }
     else {
-      blosc2_pthread_mutex_lock(&context->count_mutex);
-      context->thread_nblock++;
-      nblock_ = context->thread_nblock;
-      context->output_bytes += cbytes;
-      blosc2_pthread_mutex_unlock(&context->count_mutex);
+      nblock_ = claim_job_block(job);
     }
-
-  } /* closes while (nblock_) */
-
-  if (static_schedule) {
-    blosc2_pthread_mutex_lock(&context->count_mutex);
-    context->output_bytes = context->sourcesize;
-    if (compress) {
-      context->output_bytes += context->header_overhead;
-    }
-    blosc2_pthread_mutex_unlock(&context->count_mutex);
   }
 
-}
-
-/* Decompress & unshuffle several blocks in a single thread */
-static void* t_blosc(void* ctxt) {
-  struct thread_context* thcontext = (struct thread_context*)ctxt;
-  blosc2_context* context = thcontext->parent_context;
-#ifdef BLOSC_POSIX_BARRIERS
-  int rc;
-#endif
-
-  while (1) {
-    /* Synchronization point for all threads (wait for initialization) */
-    WAIT_INIT(NULL, context);
-
-    if (context->end_threads) {
-      break;
-    }
-
-    t_blosc_do_job(ctxt);
-
-    /* Meeting point for all threads (wait for finalization) */
-    WAIT_FINISH(NULL, context);
-  }
-
-  /* Cleanup our working space and context */
-  free_thread_context(thcontext);
-
-  return (NULL);
-}
-
-
-int init_threadpool(blosc2_context *context) {
-  int32_t tid;
-  int rc2;
-
-  /* Initialize mutex and condition variable objects */
-  blosc2_pthread_mutex_init(&context->count_mutex, NULL);
-  blosc2_pthread_mutex_init(&context->delta_mutex, NULL);
-  blosc2_pthread_mutex_init(&context->nchunk_mutex, NULL);
-  blosc2_pthread_cond_init(&context->delta_cv, NULL);
-
-  /* Set context thread sentinels */
-  context->thread_giveup_code = 1;
-  context->thread_nblock = -1;
-
-  /* Barrier initialization */
-#ifdef BLOSC_POSIX_BARRIERS
-  pthread_barrier_init(&context->barr_init, NULL, context->nthreads + 1);
-  pthread_barrier_init(&context->barr_finish, NULL, context->nthreads + 1);
-#else
-  blosc2_pthread_mutex_init(&context->count_threads_mutex, NULL);
-  blosc2_pthread_cond_init(&context->count_threads_cv, NULL);
-  context->count_threads = 0;      /* Reset threads counter */
-#endif
-
-  if (threads_callback) {
-      /* Create thread contexts to store data for callback threads */
-    context->thread_contexts = (struct thread_context *)my_malloc(
-            context->nthreads * sizeof(struct thread_context));
-    BLOSC_ERROR_NULL(context->thread_contexts, BLOSC2_ERROR_MEMORY_ALLOC);
-    for (tid = 0; tid < context->nthreads; tid++)
-      init_thread_context(context->thread_contexts + tid, context, tid);
-  }
-  else {
-    #if !defined(_WIN32)
-      /* Initialize and set thread detached attribute */
-      pthread_attr_init(&context->ct_attr);
-      pthread_attr_setdetachstate(&context->ct_attr, PTHREAD_CREATE_JOINABLE);
-    #endif
-
-    /* Make space for thread handlers */
-    context->threads = (blosc2_pthread_t*)my_malloc(
-            context->nthreads * sizeof(blosc2_pthread_t));
-    BLOSC_ERROR_NULL(context->threads, BLOSC2_ERROR_MEMORY_ALLOC);
-    /* Finally, create the threads */
-    for (tid = 0; tid < context->nthreads; tid++) {
-      /* Create a thread context (will destroy when finished) */
-      struct thread_context *thread_context = create_thread_context(context, tid);
-      BLOSC_ERROR_NULL(thread_context, BLOSC2_ERROR_THREAD_CREATE);
-      #if !defined(_WIN32)
-        rc2 = blosc2_pthread_create(&context->threads[tid], &context->ct_attr, t_blosc,
-                            (void*)thread_context);
-      #else
-        rc2 = blosc2_pthread_create(&context->threads[tid], NULL, t_blosc,
-                            (void *)thread_context);
-      #endif
-      if (rc2) {
-        BLOSC_TRACE_ERROR("Return code from blosc2_pthread_create() is %d.\n"
-                          "\tError detail: %s\n", rc2, strerror(rc2));
-        return BLOSC2_ERROR_THREAD_CREATE;
+  blosc2_pthread_mutex_lock(&job->mutex);
+  job->blocks_completed++;
+  if (--job->active_workers == 0) {
+    if (job->static_schedule && job->giveup_code > 0) {
+      job->output_bytes = context->sourcesize;
+      if (compress) {
+        job->output_bytes += context->header_overhead;
       }
     }
+    job->completed = true;
+    blosc2_pthread_cond_broadcast(&job->completion_cv);
+  }
+  blosc2_pthread_mutex_unlock(&job->mutex);
+}
+
+static void job_group_init(struct blosc_job_group *job, blosc2_context *context) {
+  memset(job, 0, sizeof(*job));
+  job->context = context;
+  job->next_block = -1;
+  job->output_bytes = context->output_bytes;
+  job->giveup_code = 1;
+  job->dref_not_init = 1;
+  job->static_schedule = false;
+  blosc2_pthread_mutex_init(&job->mutex, NULL);
+  blosc2_pthread_mutex_init(&job->delta_mutex, NULL);
+  blosc2_pthread_cond_init(&job->delta_cv, NULL);
+  blosc2_pthread_cond_init(&job->completion_cv, NULL);
+}
+
+static void job_group_destroy(struct blosc_job_group *job) {
+  blosc2_pthread_mutex_destroy(&job->mutex);
+  blosc2_pthread_mutex_destroy(&job->delta_mutex);
+  blosc2_pthread_cond_destroy(&job->delta_cv);
+  blosc2_pthread_cond_destroy(&job->completion_cv);
+}
+
+static void* shared_pool_worker(void* arg) {
+  struct thread_context* thcontext = (struct thread_context*)arg;
+  struct blosc_shared_pool* pool = thcontext->owner_pool;
+
+  while (1) {
+    struct blosc_job_group* job = NULL;
+    struct blosc_job_queue_entry* entry = NULL;
+    blosc2_pthread_mutex_lock(&pool->mutex);
+    while (!pool->shutdown && pool->job_queue_head == NULL) {
+      blosc2_pthread_cond_wait(&pool->work_cv, &pool->mutex);
+    }
+    if (pool->shutdown) {
+      blosc2_pthread_mutex_unlock(&pool->mutex);
+      break;
+    }
+    entry = pool->job_queue_head;
+    job = entry->job;
+    pool->job_queue_head = entry->next;
+    if (pool->job_queue_head == NULL) {
+      pool->job_queue_tail = NULL;
+    }
+    blosc2_pthread_mutex_unlock(&pool->mutex);
+    int32_t logical_tid = entry->logical_tid;
+    free(entry);
+
+    thcontext->parent_context = job->context;
+    thcontext->tid = logical_tid;
+    t_blosc_do_job(thcontext);
+    thcontext->parent_context = NULL;
+
+    blosc2_pthread_mutex_lock(&pool->mutex);
+    pool->active_jobs--;
+    if (pool->active_jobs == 0 && pool->context_refs == 0 && pool->job_queue_head == NULL) {
+      blosc2_pthread_cond_broadcast(&pool->idle_cv);
+    }
+    blosc2_pthread_mutex_unlock(&pool->mutex);
   }
 
-  /* We have now started/initialized the threads */
-  context->threads_started = context->nthreads;
-  context->new_nthreads = context->nthreads;
+  destroy_thread_context(thcontext);
+  return NULL;
+}
 
+static struct blosc_shared_pool* find_shared_pool_locked(int16_t nthreads) {
+  struct blosc_shared_pool *pool = shared_pools;
+  while (pool != NULL) {
+    if (pool->nthreads == nthreads) {
+      return pool;
+    }
+    pool = pool->next;
+  }
+  return NULL;
+}
+
+static int create_shared_pool(int16_t nthreads, struct blosc_shared_pool **pool_out) {
+  int rc2;
+  int32_t started_threads = 0;
+  int32_t initialized_contexts = 0;
+  struct blosc_shared_pool *pool = calloc(1, sizeof(*pool));
+  BLOSC_ERROR_NULL(pool, BLOSC2_ERROR_MEMORY_ALLOC);
+  pool->nthreads = nthreads;
+  blosc2_pthread_mutex_init(&pool->mutex, NULL);
+  blosc2_pthread_cond_init(&pool->work_cv, NULL);
+  blosc2_pthread_cond_init(&pool->idle_cv, NULL);
+  pool->threads = (blosc2_pthread_t*)my_malloc(nthreads * sizeof(blosc2_pthread_t));
+  BLOSC_ERROR_NULL(pool->threads, BLOSC2_ERROR_MEMORY_ALLOC);
+  pool->thread_contexts = (struct thread_context*)calloc((size_t)nthreads, sizeof(struct thread_context));
+  BLOSC_ERROR_NULL(pool->thread_contexts, BLOSC2_ERROR_MEMORY_ALLOC);
+#if !defined(_WIN32)
+  pthread_attr_init(&pool->ct_attr);
+  pthread_attr_setdetachstate(&pool->ct_attr, PTHREAD_CREATE_JOINABLE);
+#endif
+  for (int32_t tid = 0; tid < nthreads; ++tid) {
+    int rc = init_thread_context(pool->thread_contexts + tid, NULL, tid);
+    if (rc < 0) {
+      goto fail_pool_create;
+    }
+    initialized_contexts++;
+    pool->thread_contexts[tid].owner_pool = pool;
+#if !defined(_WIN32)
+    rc2 = blosc2_pthread_create(&pool->threads[tid], &pool->ct_attr, shared_pool_worker,
+                                (void*)(pool->thread_contexts + tid));
+#else
+    rc2 = blosc2_pthread_create(&pool->threads[tid], NULL, shared_pool_worker,
+                                (void*)(pool->thread_contexts + tid));
+#endif
+    if (rc2) {
+      BLOSC_TRACE_ERROR("Return code from blosc2_pthread_create() is %d.\n\tError detail: %s\n", rc2, strerror(rc2));
+      goto fail_pool_create;
+    }
+    started_threads++;
+  }
+  *pool_out = pool;
   return 0;
+
+fail_pool_create:
+  if (started_threads > 0) {
+    void *status;
+    blosc2_pthread_mutex_lock(&pool->mutex);
+    pool->shutdown = 1;
+    blosc2_pthread_cond_broadcast(&pool->work_cv);
+    blosc2_pthread_mutex_unlock(&pool->mutex);
+    for (int32_t t = 0; t < started_threads; ++t) {
+      blosc2_pthread_join(pool->threads[t], &status);
+    }
+  }
+  for (int32_t tid = started_threads; tid < initialized_contexts; ++tid) {
+    destroy_thread_context(pool->thread_contexts + tid);
+  }
+#if !defined(_WIN32)
+  pthread_attr_destroy(&pool->ct_attr);
+#endif
+  my_free(pool->threads);
+  free(pool->thread_contexts);
+  blosc2_pthread_cond_destroy(&pool->idle_cv);
+  blosc2_pthread_cond_destroy(&pool->work_cv);
+  blosc2_pthread_mutex_destroy(&pool->mutex);
+  free(pool);
+  return BLOSC2_ERROR_THREAD_CREATE;
+}
+
+static void destroy_shared_pool(struct blosc_shared_pool *pool) {
+  void *status;
+
+  blosc2_pthread_mutex_lock(&pool->mutex);
+  pool->shutdown = 1;
+  blosc2_pthread_cond_broadcast(&pool->work_cv);
+  blosc2_pthread_mutex_unlock(&pool->mutex);
+
+  for (int32_t t = 0; t < pool->nthreads; ++t) {
+    blosc2_pthread_join(pool->threads[t], &status);
+  }
+#if !defined(_WIN32)
+  pthread_attr_destroy(&pool->ct_attr);
+#endif
+  my_free(pool->threads);
+  free(pool->thread_contexts);
+  blosc2_pthread_cond_destroy(&pool->idle_cv);
+  blosc2_pthread_cond_destroy(&pool->work_cv);
+  blosc2_pthread_mutex_destroy(&pool->mutex);
+  free(pool);
+}
+
+static int attach_shared_pool(blosc2_context *context) {
+  struct blosc_shared_pool *pool;
+
+  if (!g_initlib) {
+    blosc2_init();
+  }
+  blosc2_pthread_mutex_lock(&pool_registry_mutex);
+  pool = find_shared_pool_locked(context->nthreads);
+  if (pool == NULL) {
+    int rc = create_shared_pool(context->nthreads, &pool);
+    if (rc < 0) {
+      blosc2_pthread_mutex_unlock(&pool_registry_mutex);
+      return rc;
+    }
+    pool->next = shared_pools;
+    shared_pools = pool;
+  }
+  pool->context_refs++;
+  blosc2_pthread_mutex_unlock(&pool_registry_mutex);
+
+  context->thread_pool = pool;
+  context->thread_backend = BLOSC_BACKEND_SHARED_POOL;
+  context->threads_started = context->nthreads;
+  return 0;
+}
+
+static int init_callback_threads(blosc2_context *context) {
+  int32_t tid;
+
+  blosc2_pthread_mutex_init(&context->count_mutex, NULL);
+  blosc2_pthread_mutex_init(&context->delta_mutex, NULL);
+  blosc2_pthread_cond_init(&context->delta_cv, NULL);
+  context->thread_contexts = (struct thread_context *)my_malloc(
+      context->nthreads * sizeof(struct thread_context));
+  BLOSC_ERROR_NULL(context->thread_contexts, BLOSC2_ERROR_MEMORY_ALLOC);
+  for (tid = 0; tid < context->nthreads; tid++) {
+    int rc = init_thread_context(context->thread_contexts + tid, context, tid);
+    if (rc < 0) {
+      for (int32_t t = 0; t < tid; ++t) {
+        destroy_thread_context(context->thread_contexts + t);
+      }
+      my_free(context->thread_contexts);
+      context->thread_contexts = NULL;
+      blosc2_pthread_mutex_destroy(&context->count_mutex);
+      blosc2_pthread_mutex_destroy(&context->delta_mutex);
+      blosc2_pthread_cond_destroy(&context->delta_cv);
+      return rc;
+    }
+  }
+  context->thread_backend = BLOSC_BACKEND_CALLBACK;
+  context->threads_started = context->nthreads;
+  return 0;
+}
+
+static int release_thread_backend(blosc2_context *context) {
+  if (context->thread_backend == BLOSC_BACKEND_CALLBACK && context->threads_started > 0) {
+    for (int32_t t = 0; t < context->threads_started; t++) {
+      destroy_thread_context(context->thread_contexts + t);
+    }
+    my_free(context->thread_contexts);
+    context->thread_contexts = NULL;
+    blosc2_pthread_mutex_destroy(&context->count_mutex);
+    blosc2_pthread_mutex_destroy(&context->delta_mutex);
+    blosc2_pthread_cond_destroy(&context->delta_cv);
+  }
+  else if (context->thread_backend == BLOSC_BACKEND_SHARED_POOL && context->thread_pool != NULL) {
+    struct blosc_shared_pool *pool = context->thread_pool;
+    struct blosc_shared_pool **prev;
+    bool destroy_pool = false;
+
+    blosc2_pthread_mutex_lock(&pool_registry_mutex);
+    pool->context_refs--;
+    if (pool->context_refs == 0) {
+      bool idle;
+      blosc2_pthread_mutex_lock(&pool->mutex);
+      idle = (pool->active_jobs == 0 && pool->job_queue_head == NULL);
+      blosc2_pthread_mutex_unlock(&pool->mutex);
+      if (idle) {
+        prev = &shared_pools;
+        while (*prev != NULL && *prev != pool) {
+          prev = &(*prev)->next;
+        }
+        if (*prev == pool) {
+          *prev = pool->next;
+        }
+        destroy_pool = true;
+      }
+    }
+    blosc2_pthread_mutex_unlock(&pool_registry_mutex);
+    if (destroy_pool) {
+      destroy_shared_pool(pool);
+    }
+    context->thread_pool = NULL;
+  }
+
+  context->threads_started = 0;
+  context->thread_backend = BLOSC_BACKEND_SERIAL;
+  return 0;
+}
+
+static int parallel_blosc(blosc2_context* context) {
+  struct blosc_job_group job;
+
+  job_group_init(&job, context);
+  context->job = &job;
+
+  if (context->thread_backend == BLOSC_BACKEND_CALLBACK) {
+    blosc2_pthread_mutex_lock(&job.mutex);
+    job.active_workers = context->nthreads;
+    blosc2_pthread_mutex_unlock(&job.mutex);
+    threads_callback(threads_callback_data, t_blosc_do_job,
+                     context->nthreads, sizeof(struct thread_context), (void*) context->thread_contexts);
+  }
+  else {
+    struct blosc_shared_pool *pool = context->thread_pool;
+    int32_t enqueued = 0;
+    blosc2_pthread_mutex_lock(&pool->mutex);
+    for (int32_t tid = 0; tid < context->nthreads; ++tid) {
+      struct blosc_job_queue_entry *entry = calloc(1, sizeof(*entry));
+      if (entry == NULL) {
+        struct blosc_job_queue_entry **current = &pool->job_queue_head;
+        pool->job_queue_tail = NULL;
+        while (*current != NULL) {
+          if ((*current)->job == &job) {
+            struct blosc_job_queue_entry *victim = *current;
+            *current = victim->next;
+            free(victim);
+            pool->active_jobs--;
+            continue;
+          }
+          pool->job_queue_tail = *current;
+          current = &(*current)->next;
+        }
+        blosc2_pthread_mutex_unlock(&pool->mutex);
+        context->job = NULL;
+        job_group_destroy(&job);
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+      }
+      entry->job = &job;
+      entry->logical_tid = tid;
+      if (pool->job_queue_tail != NULL) {
+        pool->job_queue_tail->next = entry;
+      }
+      else {
+        pool->job_queue_head = entry;
+      }
+      pool->job_queue_tail = entry;
+      pool->active_jobs++;
+      enqueued++;
+    }
+    blosc2_pthread_mutex_lock(&job.mutex);
+    job.active_workers = enqueued;
+    blosc2_pthread_mutex_unlock(&job.mutex);
+    blosc2_pthread_cond_broadcast(&pool->work_cv);
+    blosc2_pthread_mutex_unlock(&pool->mutex);
+
+    blosc2_pthread_mutex_lock(&job.mutex);
+    while (!job.completed) {
+      blosc2_pthread_cond_wait(&job.completion_cv, &job.mutex);
+    }
+    blosc2_pthread_mutex_unlock(&job.mutex);
+  }
+
+  context->job = NULL;
+  context->output_bytes = job.output_bytes;
+  context->thread_giveup_code = job.giveup_code;
+  job_group_destroy(&job);
+
+  if (context->thread_giveup_code <= 0) {
+    return context->thread_giveup_code;
+  }
+  return (int)context->output_bytes;
 }
 
 int16_t blosc2_get_nthreads(void)
@@ -4959,11 +5231,16 @@ void blosc2_init(void) {
   register_tuners();
 #endif
   blosc2_pthread_mutex_init(&global_comp_mutex, NULL);
+  if (!pool_registry_initialized) {
+    blosc2_pthread_mutex_init(&pool_registry_mutex, NULL);
+    pool_registry_initialized = 1;
+  }
   /* Create a global context */
   g_global_context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
   memset(g_global_context, 0, sizeof(blosc2_context));
   g_global_context->nthreads = g_nthreads;
   g_global_context->new_nthreads = g_nthreads;
+  blosc2_pthread_mutex_init(&g_global_context->nchunk_mutex, NULL);
   g_initlib = 1;
 }
 
@@ -4972,7 +5249,7 @@ int blosc2_free_resources(void) {
   /* Return if Blosc is not initialized */
   if (!g_initlib) return BLOSC2_ERROR_FAILURE;
 
-  return release_threadpool(g_global_context);
+  return release_thread_backend(g_global_context);
 }
 
 
@@ -4984,69 +5261,11 @@ void blosc2_destroy(void) {
   g_initlib = 0;
   blosc2_free_ctx(g_global_context);
 
-  blosc2_pthread_mutex_destroy(&global_comp_mutex);
-
-}
-
-
-int release_threadpool(blosc2_context *context) {
-  int32_t t;
-  void* status;
-  int rc;
-
-  if (context->threads_started > 0) {
-    if (threads_callback) {
-      /* free context data for user-managed threads */
-      for (t=0; t<context->threads_started; t++)
-        destroy_thread_context(context->thread_contexts + t);
-      my_free(context->thread_contexts);
-    }
-    else {
-      /* Tell all existing threads to finish */
-      context->end_threads = 1;
-      WAIT_INIT(-1, context);
-
-      /* Join exiting threads */
-      for (t = 0; t < context->threads_started; t++) {
-        rc = blosc2_pthread_join(context->threads[t], &status);
-        if (rc) {
-          BLOSC_TRACE_ERROR("Return code from blosc2_pthread_join() is %d\n"
-                            "\tError detail: %s.", rc, strerror(rc));
-        }
-      }
-
-      /* Thread attributes */
-      #if !defined(_WIN32)
-        pthread_attr_destroy(&context->ct_attr);
-      #endif
-
-      /* Release thread handlers */
-      my_free(context->threads);
-    }
-
-    /* Release mutex and condition variable objects */
-    blosc2_pthread_mutex_destroy(&context->count_mutex);
-    blosc2_pthread_mutex_destroy(&context->delta_mutex);
-    blosc2_pthread_mutex_destroy(&context->nchunk_mutex);
-    blosc2_pthread_cond_destroy(&context->delta_cv);
-
-    /* Barriers */
-  #ifdef BLOSC_POSIX_BARRIERS
-    pthread_barrier_destroy(&context->barr_init);
-    pthread_barrier_destroy(&context->barr_finish);
-  #else
-    blosc2_pthread_mutex_destroy(&context->count_threads_mutex);
-    blosc2_pthread_cond_destroy(&context->count_threads_cv);
-    context->count_threads = 0;      /* Reset threads counter */
-  #endif
-
-    /* Reset flags and counters */
-    context->end_threads = 0;
-    context->threads_started = 0;
+  if (pool_registry_initialized && shared_pools == NULL) {
+    blosc2_pthread_mutex_destroy(&pool_registry_mutex);
+    pool_registry_initialized = 0;
   }
-
-
-  return 0;
+  blosc2_pthread_mutex_destroy(&global_comp_mutex);
 }
 
 
@@ -5225,6 +5444,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   }
 
   context->threads_started = 0;
+  blosc2_pthread_mutex_init(&context->nchunk_mutex, NULL);
   context->schunk = cparams.schunk;
 
   if (cparams.prefilter != NULL) {
@@ -5288,6 +5508,7 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   context->threads_started = 0;
   context->block_maskout = NULL;
   context->block_maskout_nitems = 0;
+  blosc2_pthread_mutex_init(&context->nchunk_mutex, NULL);
   context->schunk = dparams.schunk;
 
   if (dparams.postfilter != NULL) {
@@ -5302,10 +5523,11 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
 
 
 void blosc2_free_ctx(blosc2_context* context) {
-  release_threadpool(context);
+  release_thread_backend(context);
   if (context->serial_context != NULL) {
     free_thread_context(context->serial_context);
   }
+  blosc2_pthread_mutex_destroy(&context->nchunk_mutex);
   release_context_dict_buffer(context);
   if (context->dict_cdict != NULL) {
     if (context->compcode == BLOSC_LZ4) {

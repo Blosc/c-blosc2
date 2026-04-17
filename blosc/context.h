@@ -33,6 +33,10 @@
 #define BLOSC_POSIX_BARRIERS
 #endif
 
+#define BLOSC_BACKEND_SERIAL 0
+#define BLOSC_BACKEND_SHARED_POOL 1
+#define BLOSC_BACKEND_CALLBACK 2
+
 struct blosc2_context_s {
   const uint8_t* src;  /* The source buffer */
   uint8_t* dest;  /* The destination buffer */
@@ -87,10 +91,13 @@ struct blosc2_context_s {
   /* Threading */
   int16_t nthreads;
   int16_t new_nthreads;
+  int16_t thread_backend;
   int16_t threads_started;
   int16_t end_threads;
   blosc2_pthread_t *threads;
-  struct thread_context *thread_contexts;  /* Only for user-managed threads */
+  struct thread_context *thread_contexts;  /* Only for callback-managed threads */
+  struct blosc_shared_pool *thread_pool;
+  struct blosc_job_group *job;
   blosc2_pthread_mutex_t count_mutex;
   blosc2_pthread_mutex_t nchunk_mutex;
 #ifdef BLOSC_POSIX_BARRIERS
@@ -136,6 +143,7 @@ struct b2nd_context_s {
 
 struct thread_context {
   blosc2_context* parent_context;
+  struct blosc_shared_pool* owner_pool;
   int tid;
   uint8_t* tmp;
   uint8_t* tmp2;
@@ -157,5 +165,9 @@ struct thread_context {
   Ipp8u* lz4_hash_table;
 #endif
 };
+
+static inline bool ctx_uses_parallel_backend(const blosc2_context *context) {
+  return context != NULL && context->thread_backend != BLOSC_BACKEND_SERIAL && context->nthreads > 1;
+}
 
 #endif  /* BLOSC_CONTEXT_H */
