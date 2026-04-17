@@ -2311,9 +2311,9 @@ int check_nthreads(blosc2_context* context) {
     }
 #if defined(_WIN32)
     else {
-      /* Windows CI still crashes with the shared-pool backend, so keep using
-       * dedicated per-context worker threads there until the pool lifetime
-       * issues are understood and fixed. */
+      /* Windows CI still hangs or crashes with the shared-pool backend, so
+       * keep using dedicated per-context worker threads there until the pool
+       * lifetime issues are understood and fixed. */
       rc = init_context_threads(context);
     }
 #else
@@ -4622,12 +4622,12 @@ static void job_group_destroy(struct blosc_job_group *job) {
 }
 
 #if defined(_WIN32)
-static void* context_worker(void* ctxt) {
+static void* t_blosc(void* ctxt) {
   struct thread_context* thcontext = (struct thread_context*)ctxt;
   blosc2_context* context = thcontext->parent_context;
 
   while (1) {
-    /* Wait until the main thread publishes a new job. */
+    /* Synchronization point for all threads (wait for initialization). */
     WAIT_INIT(NULL, context);
 
     if (context->end_threads) {
@@ -4636,7 +4636,7 @@ static void* context_worker(void* ctxt) {
 
     t_blosc_do_job(ctxt);
 
-    /* Rejoin the main thread after the current job finishes. */
+    /* Meeting point for all threads (wait for finalization). */
     WAIT_FINISH(NULL, context);
   }
 
@@ -4645,8 +4645,10 @@ static void* context_worker(void* ctxt) {
 }
 
 static int init_context_threads(blosc2_context *context) {
-  int rc2;
+  int32_t tid;
   int32_t started_threads = 0;
+  int16_t saved_nthreads = context->nthreads;
+  int rc2;
 
   blosc2_pthread_mutex_init(&context->count_mutex, NULL);
   blosc2_pthread_mutex_init(&context->delta_mutex, NULL);
@@ -4659,34 +4661,52 @@ static int init_context_threads(blosc2_context *context) {
   context->end_threads = 0;
 
   context->threads = (blosc2_pthread_t*)my_malloc(context->nthreads * sizeof(blosc2_pthread_t));
-  BLOSC_ERROR_NULL(context->threads, BLOSC2_ERROR_MEMORY_ALLOC);
+  if (context->threads == NULL) {
+    blosc2_pthread_mutex_destroy(&context->count_mutex);
+    blosc2_pthread_mutex_destroy(&context->delta_mutex);
+    blosc2_pthread_cond_destroy(&context->delta_cv);
+    blosc2_pthread_mutex_destroy(&context->count_threads_mutex);
+    blosc2_pthread_cond_destroy(&context->count_threads_cv);
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
 
-  for (int32_t tid = 0; tid < context->nthreads; ++tid) {
+  for (tid = 0; tid < context->nthreads; tid++) {
     struct thread_context *thread_context = create_thread_context(context, tid);
-    BLOSC_ERROR_NULL(thread_context, BLOSC2_ERROR_THREAD_CREATE);
-    rc2 = blosc2_pthread_create(&context->threads[tid], NULL, context_worker, (void *)thread_context);
+    if (thread_context == NULL) {
+      break;
+    }
+    rc2 = blosc2_pthread_create(&context->threads[tid], NULL, t_blosc, (void *)thread_context);
     if (rc2) {
       BLOSC_TRACE_ERROR("Return code from blosc2_pthread_create() is %d.\n\tError detail: %s\n", rc2, strerror(rc2));
       free_thread_context(thread_context);
-      context->end_threads = 1;
-      if (started_threads > 0) {
-        void *status;
-        context->nthreads = (int16_t)started_threads;
-        WAIT_INIT(BLOSC2_ERROR_THREAD_CREATE, context);
-        for (int32_t t = 0; t < started_threads; ++t) {
-          blosc2_pthread_join(context->threads[t], &status);
-        }
-      }
-      my_free(context->threads);
-      context->threads = NULL;
-      blosc2_pthread_cond_destroy(&context->count_threads_cv);
-      blosc2_pthread_mutex_destroy(&context->count_threads_mutex);
-      blosc2_pthread_cond_destroy(&context->delta_cv);
-      blosc2_pthread_mutex_destroy(&context->delta_mutex);
-      blosc2_pthread_mutex_destroy(&context->count_mutex);
-      return BLOSC2_ERROR_THREAD_CREATE;
+      break;
     }
     started_threads++;
+  }
+
+  if (started_threads != context->nthreads) {
+    context->end_threads = 1;
+    context->nthreads = (int16_t)started_threads;
+    context->threads_started = (int16_t)started_threads;
+    if (started_threads > 0) {
+      void *status;
+      WAIT_INIT(BLOSC2_ERROR_THREAD_CREATE, context);
+      for (int32_t t = 0; t < started_threads; ++t) {
+        blosc2_pthread_join(context->threads[t], &status);
+      }
+    }
+    context->nthreads = saved_nthreads;
+    context->threads_started = 0;
+    my_free(context->threads);
+    context->threads = NULL;
+    blosc2_pthread_mutex_destroy(&context->count_mutex);
+    blosc2_pthread_mutex_destroy(&context->delta_mutex);
+    blosc2_pthread_cond_destroy(&context->delta_cv);
+    blosc2_pthread_mutex_destroy(&context->count_threads_mutex);
+    blosc2_pthread_cond_destroy(&context->count_threads_cv);
+    context->count_threads = 0;
+    context->end_threads = 0;
+    return BLOSC2_ERROR_THREAD_CREATE;
   }
 
   context->thread_backend = BLOSC_BACKEND_CONTEXT_THREADS;
