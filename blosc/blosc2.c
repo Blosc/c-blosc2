@@ -154,6 +154,10 @@ static blosc_threads_callback threads_callback = 0;
 static void *threads_callback_data = 0;
 static blosc2_pthread_mutex_t pool_registry_mutex;
 static struct blosc_shared_pool *shared_pools = NULL;
+/* Incremented each time blosc2_destroy() tears down the pool registry.
+ * Contexts store the epoch at attach time; a mismatch means the pool they
+ * hold a pointer to has already been freed. */
+static volatile int32_t g_destroy_count = 0;
 
 
 /* non-threadsafe function should be called before any other Blosc function in
@@ -2239,6 +2243,16 @@ int check_nthreads(blosc2_context* context) {
   if (context->nthreads <= 0) {
     BLOSC_TRACE_ERROR("nthreads must be >= 1 and <= %d", INT16_MAX);
     return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  /* Detect a pool that was torn down by blosc2_destroy() while this context
+   * was still alive.  The epoch mismatch tells us the pool pointer is dangling;
+   * clear it so the re-attach logic below creates a fresh one. */
+  if (context->thread_backend == BLOSC_BACKEND_SHARED_POOL &&
+      context->pool_epoch != g_destroy_count) {
+    context->thread_pool = NULL;
+    context->threads_started = 0;
+    context->thread_backend = BLOSC_BACKEND_SERIAL;
   }
 
   if (context->new_nthreads != context->nthreads) {
@@ -4587,19 +4601,26 @@ static void* shared_pool_worker(void* arg) {
     t_blosc_do_job(thcontext);
     thcontext->parent_context = NULL;
 
-    blosc2_pthread_mutex_lock(&pool->mutex);
-    pool->active_jobs--;
-    if (pool->active_jobs == 0 && pool->context_refs == 0 && pool->job_queue_head == NULL) {
-      blosc2_pthread_cond_broadcast(&pool->idle_cv);
-    }
-    blosc2_pthread_mutex_unlock(&pool->mutex);
-
+    /* Signal job completion BEFORE touching pool accounting.
+     * The job struct is stack-allocated in parallel_blosc; the main thread
+     * is allowed to destroy it as soon as completed==true is visible.
+     * Decrementing pending_workers here (under job->mutex) guarantees that
+     * every worker has finished with the job before the last decrement can
+     * reach 0 and wake the main thread.  Doing the pool accounting afterwards
+     * is safe because it no longer references the job. */
     blosc2_pthread_mutex_lock(&job->mutex);
     if (--job->pending_workers == 0) {
       job->completed = true;
       blosc2_pthread_cond_broadcast(&job->completion_cv);
     }
     blosc2_pthread_mutex_unlock(&job->mutex);
+
+    blosc2_pthread_mutex_lock(&pool->mutex);
+    pool->active_jobs--;
+    if (pool->active_jobs == 0 && pool->context_refs == 0 && pool->job_queue_head == NULL) {
+      blosc2_pthread_cond_broadcast(&pool->idle_cv);
+    }
+    blosc2_pthread_mutex_unlock(&pool->mutex);
   }
 
   destroy_thread_context(thcontext);
@@ -4700,6 +4721,7 @@ static int attach_shared_pool(blosc2_context *context) {
   context->thread_pool = pool;
   context->thread_backend = BLOSC_BACKEND_SHARED_POOL;
   context->threads_started = context->nthreads;
+  context->pool_epoch = g_destroy_count;
   return 0;
 }
 
@@ -4735,6 +4757,15 @@ static int release_thread_backend(blosc2_context *context) {
     struct blosc_shared_pool *pool = context->thread_pool;
     struct blosc_shared_pool **prev;
     bool destroy_pool = false;
+
+    if (context->pool_epoch != g_destroy_count) {
+      /* blosc2_destroy() already freed this pool and tore down pool_registry_mutex.
+       * Just clear the dangling pointer; nothing else to do. */
+      context->thread_pool = NULL;
+      context->threads_started = 0;
+      context->thread_backend = BLOSC_BACKEND_SERIAL;
+      return 0;
+    }
 
     blosc2_pthread_mutex_lock(&pool_registry_mutex);
     pool->context_refs--;
@@ -5184,6 +5215,12 @@ void blosc2_destroy(void) {
   blosc2_free_resources();
   g_initlib = 0;
   blosc2_free_ctx(g_global_context);
+
+  /* Bump the epoch so any live context can detect its pool is now stale.
+   * Do this before freeing the pools so that release_thread_backend callers
+   * that race with us will take the "skip" path rather than locking the
+   * soon-to-be-destroyed pool_registry_mutex. */
+  g_destroy_count++;
 
   /* Tear down any remaining shared pools */
   struct blosc_shared_pool *pool = shared_pools;
