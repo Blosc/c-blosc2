@@ -493,7 +493,6 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
   }
 
   if (mmap_file->mapping_size < mmap_file->file_size) {
-    size_t old_mapping_size = mmap_file->mapping_size;
     size_t new_mapping_size;
     if (mmap_file->file_size > SIZE_MAX / 2) {
       BLOSC_TRACE_WARNING("mmap remap growth fallback: cannot double mapping_size near SIZE_MAX; using file_size (%zu).", mmap_file->file_size);
@@ -506,6 +505,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
 #if defined(__linux__)
     /* mremap is the best option as it also ensures that the old data is still available in c mode. Unfortunately, it
     is no POSIX standard and only available on Linux */
+  size_t old_mapping_size = mmap_file->mapping_size;
     char* new_address = mremap(mmap_file->addr, old_mapping_size, new_mapping_size, MREMAP_MAYMOVE);
 #else
     if (mmap_file->is_memory_only) {
