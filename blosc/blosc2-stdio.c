@@ -262,6 +262,8 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
   mmap_file->file = fopen(urlpath, open_mode);
   if (mmap_file->file == NULL) {
     BLOSC_TRACE_ERROR("Cannot open the file %s with mode %s.", urlpath, open_mode);
+    free(mmap_file->urlpath);
+    mmap_file->urlpath = NULL;
     return NULL;
   }
 
@@ -270,6 +272,18 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
   int64_t file_size_i64 = ftell(mmap_file->file);
   if (file_size_i64 < 0) {
     BLOSC_TRACE_ERROR("Cannot retrieve file size for %s.", urlpath);
+    fclose(mmap_file->file);
+    mmap_file->file = NULL;
+    free(mmap_file->urlpath);
+    mmap_file->urlpath = NULL;
+    return NULL;
+  }
+  if ((uint64_t)file_size_i64 > SIZE_MAX) {
+    BLOSC_TRACE_ERROR("File size for %s exceeds size_t range.", urlpath);
+    fclose(mmap_file->file);
+    mmap_file->file = NULL;
+    free(mmap_file->urlpath);
+    mmap_file->urlpath = NULL;
     return NULL;
   }
   mmap_file->file_size = (size_t)file_size_i64;
@@ -480,18 +494,19 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
 
   if (mmap_file->mapping_size < mmap_file->file_size) {
     size_t old_mapping_size = mmap_file->mapping_size;
+    size_t new_mapping_size;
     if (mmap_file->file_size > SIZE_MAX / 2) {
       BLOSC_TRACE_WARNING("mmap remap growth fallback: cannot double mapping_size near SIZE_MAX; using file_size (%zu).", mmap_file->file_size);
-      mmap_file->mapping_size = mmap_file->file_size;
+      new_mapping_size = mmap_file->file_size;
     }
     else {
-      mmap_file->mapping_size = mmap_file->file_size * 2;
+      new_mapping_size = mmap_file->file_size * 2;
     }
 
 #if defined(__linux__)
     /* mremap is the best option as it also ensures that the old data is still available in c mode. Unfortunately, it
     is no POSIX standard and only available on Linux */
-    char* new_address = mremap(mmap_file->addr, old_mapping_size, mmap_file->mapping_size, MREMAP_MAYMOVE);
+    char* new_address = mremap(mmap_file->addr, old_mapping_size, new_mapping_size, MREMAP_MAYMOVE);
 #else
     if (mmap_file->is_memory_only) {
       BLOSC_TRACE_ERROR("Remapping a memory-mapping in c mode is only possible on Linux."
@@ -502,7 +517,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
     int64_t offset = 0;
     char* new_address = mmap(
       mmap_file->addr,
-      mmap_file->mapping_size,
+      new_mapping_size,
       mmap_file->access_flags,
       mmap_file->map_flags | MAP_FIXED,
       mmap_file->fd,
@@ -512,13 +527,10 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
 
     if (new_address == MAP_FAILED) {
       BLOSC_TRACE_ERROR("Cannot remap the memory-mapped file (error: %s).", strerror(errno));
-      if (munmap(mmap_file->addr, mmap_file->mapping_size) < 0) {
-        BLOSC_TRACE_ERROR("Cannot unmap the memory-mapped file (error: %s).", strerror(errno));
-      }
-
       return 0;
     }
 
+    mmap_file->mapping_size = new_mapping_size;
     mmap_file->addr = new_address;
   }
 #endif
@@ -577,6 +589,11 @@ int blosc2_stdio_mmap_truncate(void *stream, int64_t size) {
 
   if (size < 0) {
     BLOSC_TRACE_ERROR("Cannot truncate mmap file to negative size (%" PRId64 ").", size);
+    return -1;
+  }
+
+  if ((uint64_t)size > SIZE_MAX) {
+    BLOSC_TRACE_ERROR("Cannot truncate mmap file to size beyond size_t range (%" PRId64 ").", size);
     return -1;
   }
 
