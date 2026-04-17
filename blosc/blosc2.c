@@ -1780,8 +1780,17 @@ static int blosc_d(
     nchunk = *(int32_t*)(src + trailer_offset);
     chunk_offset = *(int64_t*)(src + trailer_offset + sizeof(int32_t));
     // Get the csize of the nblock
+    if (nblock < 0 || nblock >= context->nblocks) {
+      BLOSC_TRACE_ERROR("Invalid block index in lazy trailer.");
+      return BLOSC2_ERROR_DATA;
+    }
     int32_t *block_csizes = (int32_t *)(src + trailer_offset + sizeof(int32_t) + sizeof(int64_t));
     int32_t block_csize = block_csizes[nblock];
+    int32_t max_lazy_block_csize = context->blocksize + context->typesize * (signed)sizeof(int32_t);
+    if (block_csize <= 0 || block_csize > max_lazy_block_csize) {
+      BLOSC_TRACE_ERROR("Invalid lazy block size in trailer.");
+      return BLOSC2_ERROR_DATA;
+    }
     // Read the lazy block on disk
     void* fp = NULL;
     blosc2_io_cb *io_cb = blosc2_get_io_cb(context->schunk->storage->io->id);
