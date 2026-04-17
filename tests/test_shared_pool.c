@@ -325,15 +325,21 @@ static char *all_tests(void)
          BLOSC2_VERSION_STRING, BLOSC2_VERSION_DATE);
 
   mu_run_test(test_nthreads1_no_pool);
+#ifndef _WIN32
   mu_run_test(test_same_nthreads_share_pool);
   mu_run_test(test_different_nthreads_different_pools);
   mu_run_test(test_dynamic_nthreads_rebind);
+#endif
   mu_run_test(test_roundtrip_shuffle_multithreaded);
   mu_run_test(test_roundtrip_delta_multithreaded);
   mu_run_test(test_roundtrip_bitshuffle_multithreaded);
+#ifndef _WIN32
   mu_run_test(test_pool_refcount_and_destroy);
+#endif
   mu_run_test(test_roundtrip_delta_serial);
+#ifndef _WIN32
   mu_run_test(test_many_contexts_share_pool);
+#endif
 
   return EXIT_SUCCESS;
 }

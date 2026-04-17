@@ -107,10 +107,11 @@ struct blosc2_context_s {
   bool dict_buffer_owned;  /* Whether dict_buffer must be freed by the context */
   /* Per-context worker threads (Windows only; BLOSC_BACKEND_PER_CONTEXT) */
   int16_t end_threads;                   /* set to 1 to signal workers to exit */
-  uint32_t job_seq;                      /* incremented each time a new job is dispatched */
+  int32_t thread_nblock;                 /* next block for dynamic scheduling */
   blosc2_pthread_t *threads;             /* per-context thread handles */
-  blosc2_pthread_mutex_t count_threads_mutex;  /* guards job_seq/end_threads/job during dispatch */
-  blosc2_pthread_cond_t count_threads_cv;      /* workers sleep here between jobs */
+  int count_threads;                     /* barrier counter for WAIT_INIT/WAIT_FINISH */
+  blosc2_pthread_mutex_t count_threads_mutex;  /* guards count_threads */
+  blosc2_pthread_cond_t count_threads_cv;      /* sync condvar for WAIT_INIT/WAIT_FINISH */
   // Add new fields here to avoid breaking the ABI.
 };
 
@@ -158,7 +159,6 @@ struct thread_context {
 #ifdef HAVE_IPP
   Ipp8u* lz4_hash_table;
 #endif
-  uint32_t my_job_seq;  /* last job_seq processed; used by BLOSC_BACKEND_PER_CONTEXT */
 };
 
 static inline bool ctx_uses_parallel_backend(const blosc2_context *context) {
