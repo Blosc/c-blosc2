@@ -36,6 +36,7 @@
 #define BLOSC_BACKEND_SERIAL 0
 #define BLOSC_BACKEND_SHARED_POOL 1
 #define BLOSC_BACKEND_CALLBACK 2
+#define BLOSC_BACKEND_CONTEXT_THREADS 3
 
 struct blosc2_context_s {
   const uint8_t* src;  /* The source buffer */

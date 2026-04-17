@@ -254,6 +254,11 @@ static char *test_many_contexts_share_pool(void) {
 }
 
 static char *all_tests(void) {
+#if defined(_WIN32)
+  printf("Windows uses per-context worker threads instead of the shared-pool backend.\n");
+  return EXIT_SUCCESS;
+#endif
+
   mu_run_test(test_nthreads1_no_shared_pool);
   mu_run_test(test_same_nthreads_share_pool);
   mu_run_test(test_different_nthreads_different_pools);
