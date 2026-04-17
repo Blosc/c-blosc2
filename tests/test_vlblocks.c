@@ -1114,6 +1114,44 @@ static char *test_lazy_vldecompress_block_ctx(void) {
   return EXIT_SUCCESS;
 }
 
+static char *test_lazy_vldecompress_block_ctx_rejects_tiny_block_csize(void) {
+  const char* urlpath = "test_lazy_vldecomp_corrupt_csize.b2frame";
+  blosc2_schunk* schunk = make_lazy_vl_schunk(urlpath, true);
+  mu_assert("ERROR: cannot create lazy VL schunk", schunk != NULL);
+
+  blosc2_context* dctx = schunk->dctx;
+
+  uint8_t* lazy_chunk = NULL;
+  bool needs_free = false;
+  int cbytes = blosc2_schunk_get_lazychunk(schunk, 0, &lazy_chunk, &needs_free);
+  mu_assert("ERROR: blosc2_schunk_get_lazychunk failed", cbytes > 0);
+
+  int32_t nblocks = -1;
+  int rc = blosc2_vlchunk_get_nblocks(lazy_chunk, cbytes, &nblocks);
+  mu_assert("ERROR: cannot read lazy chunk nblocks", rc == 0);
+  mu_assert("ERROR: expected positive number of VL blocks", nblocks > 0);
+
+  int32_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH + nblocks * (int32_t)sizeof(int32_t);
+  int32_t block_csize0_offset = trailer_offset + (int32_t)sizeof(int32_t) + (int32_t)sizeof(int64_t);
+  mu_assert("ERROR: malformed test chunk offsets", block_csize0_offset + (int32_t)sizeof(int32_t) <= cbytes);
+
+  /* Corrupt first lazy block csize to 1 byte, which cannot hold VL block metadata. */
+  put_le32(lazy_chunk + block_csize0_offset, 1U);
+
+  uint8_t* blk = NULL;
+  int32_t blksize = -1;
+  rc = blosc2_vldecompress_block_ctx(dctx, lazy_chunk, cbytes, 0, &blk, &blksize);
+  mu_assert("ERROR: malformed lazy VL trailer must be rejected",
+            rc == BLOSC2_ERROR_INVALID_HEADER);
+
+  if (needs_free) {
+    free(lazy_chunk);
+  }
+  blosc2_schunk_free(schunk);
+  blosc2_remove_urlpath(urlpath);
+  return EXIT_SUCCESS;
+}
+
 
 static char *test_lazy_vldecompress_block_ctx_sframe(void) {
   const char* urlpath = "test_lazy_vldecomp_s.b2frame";
@@ -1164,6 +1202,7 @@ static char *all_tests(void) {
   mu_run_test(test_lazy_vlchunk_rejects_truncated_trailer);
   mu_run_test(test_vlchunk_rejects_memcpyed_flag);
   mu_run_test(test_lazy_vldecompress_block_ctx);
+  mu_run_test(test_lazy_vldecompress_block_ctx_rejects_tiny_block_csize);
   mu_run_test(test_lazy_vldecompress_block_ctx_sframe);
   mu_run_test(test_lazy_vldecompress_block_ctx_dict_lz4);
 #ifdef HAVE_ZSTD
