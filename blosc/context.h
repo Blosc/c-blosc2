@@ -33,6 +33,11 @@
 #define BLOSC_POSIX_BARRIERS
 #endif
 
+#define BLOSC_BACKEND_SERIAL 0
+#define BLOSC_BACKEND_SHARED_POOL 1
+#define BLOSC_BACKEND_CALLBACK 2
+#define BLOSC_BACKEND_PER_CONTEXT 3   /* per-context threads; used on Windows */
+
 struct blosc2_context_s {
   const uint8_t* src;  /* The source buffer */
   uint8_t* dest;  /* The destination buffer */
@@ -87,29 +92,28 @@ struct blosc2_context_s {
   /* Threading */
   int16_t nthreads;
   int16_t new_nthreads;
+  int16_t thread_backend;
   int16_t threads_started;
-  int16_t end_threads;
-  blosc2_pthread_t *threads;
-  struct thread_context *thread_contexts;  /* Only for user-managed threads */
+  struct thread_context *thread_contexts;  /* Only for callback-managed threads */
+  struct blosc_shared_pool *thread_pool;
+  int32_t pool_epoch;  /* value of g_destroy_count when pool was attached */
+  struct blosc_job_group *job;
   blosc2_pthread_mutex_t count_mutex;
   blosc2_pthread_mutex_t nchunk_mutex;
-#ifdef BLOSC_POSIX_BARRIERS
-  pthread_barrier_t barr_init;
-  pthread_barrier_t barr_finish;
-#else
-  int count_threads;
-  blosc2_pthread_mutex_t count_threads_mutex;
-  blosc2_pthread_cond_t count_threads_cv;
-#endif
-#if !defined(_WIN32)
-  pthread_attr_t ct_attr;  /* creation time attrs for threads */
-#endif
   int thread_giveup_code;  /* error code when give up */
-  int thread_nblock;  /* block counter */
   int dref_not_init;  /* data ref in delta not initialized */
   blosc2_pthread_mutex_t delta_mutex;
   blosc2_pthread_cond_t delta_cv;
   bool dict_buffer_owned;  /* Whether dict_buffer must be freed by the context */
+  /* Per-context worker threads (Windows only; BLOSC_BACKEND_PER_CONTEXT) */
+  int16_t end_threads;                   /* set to 1 to signal workers to exit */
+  uint32_t job_seq;                      /* incremented each new job dispatch */
+  int16_t active_workers;               /* workers still processing current job */
+  int32_t thread_nblock;               /* next block index for dynamic scheduling */
+  blosc2_pthread_t *threads;            /* per-context thread handles */
+  blosc2_pthread_mutex_t jobs_mutex;    /* guards job_seq, end_threads, active_workers */
+  blosc2_pthread_cond_t jobs_ready;     /* workers sleep here between jobs */
+  blosc2_pthread_cond_t jobs_done;      /* main sleeps here until job completes */
   // Add new fields here to avoid breaking the ABI.
 };
 
@@ -136,6 +140,7 @@ struct b2nd_context_s {
 
 struct thread_context {
   blosc2_context* parent_context;
+  struct blosc_shared_pool* owner_pool;
   int tid;
   uint8_t* tmp;
   uint8_t* tmp2;
@@ -156,6 +161,11 @@ struct thread_context {
 #ifdef HAVE_IPP
   Ipp8u* lz4_hash_table;
 #endif
+  uint32_t my_job_seq;  /* last job_seq processed; used by BLOSC_BACKEND_PER_CONTEXT on Windows */
 };
+
+static inline bool ctx_uses_parallel_backend(const blosc2_context *context) {
+  return context != NULL && context->thread_backend != BLOSC_BACKEND_SERIAL && context->nthreads > 1;
+}
 
 #endif  /* BLOSC_CONTEXT_H */
