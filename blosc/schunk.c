@@ -1242,7 +1242,7 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int64_t nchunk,
  * is returned instead.
 */
 int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chunk, bool *needs_free) {
-  if (schunk->dctx->threads_started > 1) {
+  if (ctx_uses_parallel_backend(schunk->dctx)) {
     blosc2_pthread_mutex_lock(&schunk->dctx->nchunk_mutex);
     schunk->current_nchunk = nchunk;
     blosc2_pthread_mutex_unlock(&schunk->dctx->nchunk_mutex);
@@ -1288,7 +1288,7 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chu
  * is returned instead.
 */
 int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chunk, bool *needs_free) {
-  if (schunk->dctx->threads_started > 1) {
+  if (ctx_uses_parallel_backend(schunk->dctx)) {
     blosc2_pthread_mutex_lock(&schunk->dctx->nchunk_mutex);
     schunk->current_nchunk = nchunk;
     blosc2_pthread_mutex_unlock(&schunk->dctx->nchunk_mutex);
