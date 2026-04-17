@@ -95,6 +95,7 @@ struct blosc2_context_s {
   int16_t threads_started;
   struct thread_context *thread_contexts;  /* Only for callback-managed threads */
   struct blosc_shared_pool *thread_pool;
+  int32_t pool_epoch;  /* value of g_destroy_count when pool was attached */
   struct blosc_job_group *job;
   blosc2_pthread_mutex_t count_mutex;
   blosc2_pthread_mutex_t nchunk_mutex;
