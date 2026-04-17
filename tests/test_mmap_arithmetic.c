@@ -17,13 +17,11 @@ CUTEST_TEST_DATA(mmap_arithmetic) {
 };
 
 CUTEST_TEST_SETUP(mmap_arithmetic) {
-CUTEST_TEST_SETUP(mmap_arithmetic) {
   BLOSC_UNUSED_PARAM(data);
   blosc2_init();
 }
 
 CUTEST_TEST_TEST(mmap_arithmetic) {
-  BLOSC_UNUSED_PARAM(data);
   BLOSC_UNUSED_PARAM(data);
   uint8_t backing[32];
   memset(backing, 0, sizeof(backing));
