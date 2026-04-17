@@ -152,37 +152,6 @@ static int init_threadpool(blosc2_context *context);
 #endif
 static int parallel_blosc(blosc2_context* context);
 
-/* Synchronization barriers for Windows per-context threads (no POSIX barriers on Windows) */
-#if defined(_WIN32)
-#define WAIT_INIT(RET_VAL, CONTEXT_PTR)                                        \
-  do {                                                                         \
-    blosc2_pthread_mutex_lock(&(CONTEXT_PTR)->count_threads_mutex);            \
-    if ((CONTEXT_PTR)->count_threads < (CONTEXT_PTR)->nthreads) {              \
-      (CONTEXT_PTR)->count_threads++;                                          \
-      blosc2_pthread_cond_wait(&(CONTEXT_PTR)->count_threads_cv,               \
-                               &(CONTEXT_PTR)->count_threads_mutex);           \
-    }                                                                          \
-    else {                                                                     \
-      blosc2_pthread_cond_broadcast(&(CONTEXT_PTR)->count_threads_cv);         \
-    }                                                                          \
-    blosc2_pthread_mutex_unlock(&(CONTEXT_PTR)->count_threads_mutex);          \
-  } while (0)
-
-#define WAIT_FINISH(RET_VAL, CONTEXT_PTR)                                      \
-  do {                                                                         \
-    blosc2_pthread_mutex_lock(&(CONTEXT_PTR)->count_threads_mutex);            \
-    if ((CONTEXT_PTR)->count_threads > 0) {                                    \
-      (CONTEXT_PTR)->count_threads--;                                          \
-      blosc2_pthread_cond_wait(&(CONTEXT_PTR)->count_threads_cv,               \
-                               &(CONTEXT_PTR)->count_threads_mutex);           \
-    }                                                                          \
-    else {                                                                     \
-      blosc2_pthread_cond_broadcast(&(CONTEXT_PTR)->count_threads_cv);         \
-    }                                                                          \
-    blosc2_pthread_mutex_unlock(&(CONTEXT_PTR)->count_threads_mutex);          \
-  } while (0)
-#endif  /* _WIN32 */
-
 /* global variable to change threading backend from Blosc-managed to caller-managed */
 static blosc_threads_callback threads_callback = 0;
 static void *threads_callback_data = 0;
@@ -4948,24 +4917,33 @@ static int attach_shared_pool(blosc2_context *context) {
 
 #if defined(_WIN32)
 /* Per-context worker thread for Windows (BLOSC_BACKEND_PER_CONTEXT).
- * Loops on WAIT_INIT (sleep until main wakes all workers), runs the job,
- * then WAIT_FINISH (signals main that all workers are done). */
-static void* t_blosc(void* arg) {
+ * Sleeps between jobs using a job_seq counter; wakes when main increments
+ * job_seq and broadcasts jobs_ready.  The last worker to finish signals
+ * jobs_done so main can return from parallel_blosc. */
+static void* t_blosc_win(void* arg) {
   struct thread_context* thcontext = (struct thread_context*)arg;
   blosc2_context* context = thcontext->parent_context;
 
+  blosc2_pthread_mutex_lock(&context->jobs_mutex);
   while (1) {
-    WAIT_INIT(NULL, context);
-
+    /* Sleep until main posts a new job or signals shutdown. */
+    while (!context->end_threads && thcontext->my_job_seq == context->job_seq) {
+      blosc2_pthread_cond_wait(&context->jobs_ready, &context->jobs_mutex);
+    }
     if (context->end_threads) {
       break;
     }
+    thcontext->my_job_seq = context->job_seq;
+    blosc2_pthread_mutex_unlock(&context->jobs_mutex);
 
     t_blosc_do_job(thcontext);
 
-    WAIT_FINISH(NULL, context);
+    blosc2_pthread_mutex_lock(&context->jobs_mutex);
+    if (--context->active_workers == 0) {
+      blosc2_pthread_cond_signal(&context->jobs_done);
+    }
   }
-
+  blosc2_pthread_mutex_unlock(&context->jobs_mutex);
   free_thread_context(thcontext);
   return NULL;
 }
@@ -4976,10 +4954,12 @@ static int init_threadpool(blosc2_context *context) {
   blosc2_pthread_mutex_init(&context->count_mutex, NULL);
   blosc2_pthread_mutex_init(&context->delta_mutex, NULL);
   blosc2_pthread_cond_init(&context->delta_cv, NULL);
-  blosc2_pthread_mutex_init(&context->count_threads_mutex, NULL);
-  blosc2_pthread_cond_init(&context->count_threads_cv, NULL);
-  context->count_threads = 0;
+  blosc2_pthread_mutex_init(&context->jobs_mutex, NULL);
+  blosc2_pthread_cond_init(&context->jobs_ready, NULL);
+  blosc2_pthread_cond_init(&context->jobs_done, NULL);
   context->end_threads = 0;
+  context->job_seq = 0;
+  context->active_workers = 0;
   context->thread_giveup_code = 1;
   context->thread_nblock = -1;
 
@@ -4994,7 +4974,8 @@ static int init_threadpool(blosc2_context *context) {
     if (thread_context == NULL) {
       goto create_error;
     }
-    int rc = blosc2_pthread_create(&context->threads[tid], NULL, t_blosc, thread_context);
+    thread_context->my_job_seq = 0;
+    int rc = blosc2_pthread_create(&context->threads[tid], NULL, t_blosc_win, thread_context);
     if (rc != 0) {
       BLOSC_TRACE_ERROR("blosc2_pthread_create() failed: %d\n", rc);
       free_thread_context(thread_context);
@@ -5008,20 +4989,19 @@ static int init_threadpool(blosc2_context *context) {
   return 0;
 
 create_error:
-  /* Signal any started threads to exit. */
-  blosc2_pthread_mutex_lock(&context->count_threads_mutex);
+  blosc2_pthread_mutex_lock(&context->jobs_mutex);
   context->end_threads = 1;
-  context->count_threads = created;
-  blosc2_pthread_cond_broadcast(&context->count_threads_cv);
-  blosc2_pthread_mutex_unlock(&context->count_threads_mutex);
+  blosc2_pthread_cond_broadcast(&context->jobs_ready);
+  blosc2_pthread_mutex_unlock(&context->jobs_mutex);
   for (int16_t t = 0; t < created; t++) {
     blosc2_pthread_join(context->threads[t], NULL);
   }
   my_free(context->threads);
   context->threads = NULL;
 oom_threads:
-  blosc2_pthread_cond_destroy(&context->count_threads_cv);
-  blosc2_pthread_mutex_destroy(&context->count_threads_mutex);
+  blosc2_pthread_cond_destroy(&context->jobs_done);
+  blosc2_pthread_cond_destroy(&context->jobs_ready);
+  blosc2_pthread_mutex_destroy(&context->jobs_mutex);
   blosc2_pthread_cond_destroy(&context->delta_cv);
   blosc2_pthread_mutex_destroy(&context->delta_mutex);
   blosc2_pthread_mutex_destroy(&context->count_mutex);
@@ -5060,22 +5040,23 @@ static int release_thread_backend(blosc2_context *context) {
   }
 #if defined(_WIN32)
   else if (context->thread_backend == BLOSC_BACKEND_PER_CONTEXT && context->threads_started > 0) {
-    /* Signal all workers to exit via WAIT_INIT with end_threads=1. */
+    /* Signal all workers to exit. */
+    blosc2_pthread_mutex_lock(&context->jobs_mutex);
     context->end_threads = 1;
-    WAIT_INIT(-1, context);
+    blosc2_pthread_cond_broadcast(&context->jobs_ready);
+    blosc2_pthread_mutex_unlock(&context->jobs_mutex);
 
     for (int32_t t = 0; t < context->threads_started; t++) {
       blosc2_pthread_join(context->threads[t], NULL);
     }
     my_free(context->threads);
     context->threads = NULL;
-    blosc2_pthread_cond_destroy(&context->count_threads_cv);
-    blosc2_pthread_mutex_destroy(&context->count_threads_mutex);
+    blosc2_pthread_cond_destroy(&context->jobs_done);
+    blosc2_pthread_cond_destroy(&context->jobs_ready);
+    blosc2_pthread_mutex_destroy(&context->jobs_mutex);
     blosc2_pthread_cond_destroy(&context->delta_cv);
     blosc2_pthread_mutex_destroy(&context->delta_mutex);
     blosc2_pthread_mutex_destroy(&context->count_mutex);
-    context->end_threads = 0;
-    context->count_threads = 0;
   }
 #endif  /* _WIN32 */
   else if (context->thread_backend == BLOSC_BACKEND_SHARED_POOL && context->thread_pool != NULL) {
@@ -5135,10 +5116,15 @@ static int parallel_blosc(blosc2_context* context) {
                      context->nthreads, sizeof(struct thread_context), (void*) context->thread_contexts);
   }
   else {
-    /* BLOSC_BACKEND_PER_CONTEXT: wake workers via WAIT_INIT, then wait for
-     * all workers to complete via WAIT_FINISH. */
-    WAIT_INIT(-1, context);
-    WAIT_FINISH(-1, context);
+    /* BLOSC_BACKEND_PER_CONTEXT: post job to sleeping workers and wait. */
+    blosc2_pthread_mutex_lock(&context->jobs_mutex);
+    context->active_workers = context->nthreads;
+    context->job_seq++;
+    blosc2_pthread_cond_broadcast(&context->jobs_ready);
+    while (context->active_workers > 0) {
+      blosc2_pthread_cond_wait(&context->jobs_done, &context->jobs_mutex);
+    }
+    blosc2_pthread_mutex_unlock(&context->jobs_mutex);
   }
 
   if (context->thread_giveup_code <= 0) {
