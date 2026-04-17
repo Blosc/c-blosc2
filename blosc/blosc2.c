@@ -107,6 +107,7 @@ struct blosc_job_group {
   int32_t next_output_block;
   int32_t blocks_completed;
   int32_t active_workers;
+  int32_t pending_workers;
   int32_t output_bytes;
   int giveup_code;
   int dref_not_init;
@@ -4579,8 +4580,10 @@ static void t_blosc_do_job(void *ctxt) {
         job->output_bytes += context->header_overhead;
       }
     }
-    job->completed = true;
-    blosc2_pthread_cond_broadcast(&job->completion_cv);
+    if (context->thread_backend == BLOSC_BACKEND_CALLBACK) {
+      job->completed = true;
+      blosc2_pthread_cond_broadcast(&job->completion_cv);
+    }
   }
   blosc2_pthread_mutex_unlock(&job->mutex);
 }
@@ -4642,6 +4645,13 @@ static void* shared_pool_worker(void* arg) {
       blosc2_pthread_cond_broadcast(&pool->idle_cv);
     }
     blosc2_pthread_mutex_unlock(&pool->mutex);
+
+    blosc2_pthread_mutex_lock(&job->mutex);
+    if (--job->pending_workers == 0) {
+      job->completed = true;
+      blosc2_pthread_cond_broadcast(&job->completion_cv);
+    }
+    blosc2_pthread_mutex_unlock(&job->mutex);
   }
 
   destroy_thread_context(thcontext);
@@ -4857,6 +4867,7 @@ static int parallel_blosc(blosc2_context* context) {
   if (context->thread_backend == BLOSC_BACKEND_CALLBACK) {
     blosc2_pthread_mutex_lock(&job.mutex);
     job.active_workers = context->nthreads;
+    job.pending_workers = 0;
     blosc2_pthread_mutex_unlock(&job.mutex);
     threads_callback(threads_callback_data, t_blosc_do_job,
                      context->nthreads, sizeof(struct thread_context), (void*) context->thread_contexts);
@@ -4900,6 +4911,7 @@ static int parallel_blosc(blosc2_context* context) {
     }
     blosc2_pthread_mutex_lock(&job.mutex);
     job.active_workers = enqueued;
+    job.pending_workers = enqueued;
     blosc2_pthread_mutex_unlock(&job.mutex);
     blosc2_pthread_cond_broadcast(&pool->work_cv);
     blosc2_pthread_mutex_unlock(&pool->mutex);
