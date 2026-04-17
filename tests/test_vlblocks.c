@@ -1136,8 +1136,7 @@ static char *test_lazy_vldecompress_block_ctx_rejects_tiny_block_csize(void) {
   mu_assert("ERROR: malformed test chunk offsets", block_csize0_offset + (int32_t)sizeof(int32_t) <= cbytes);
 
   /* Corrupt first lazy block csize to 1 byte, which cannot hold VL block metadata. */
-  int32_t corrupt_block_csize = 1;
-  memcpy(lazy_chunk + block_csize0_offset, &corrupt_block_csize, sizeof(corrupt_block_csize));
+  put_le32(lazy_chunk + block_csize0_offset, 1U);
 
   uint8_t* blk = NULL;
   int32_t blksize = -1;
