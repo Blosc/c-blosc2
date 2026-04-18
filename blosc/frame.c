@@ -2109,6 +2109,12 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
         }
       }
       else {
+        if (offsets[i] > INT64_MAX - header_len ||
+            header_len + offsets[i] > frame->len - BLOSC_EXTENDED_HEADER_LENGTH ||
+            offsets[i] > cbytes - BLOSC_EXTENDED_HEADER_LENGTH) {
+          rc = BLOSC2_ERROR_INVALID_HEADER;
+          break;
+        }
         data_chunk = frame->cframe + header_len + offsets[i];
         needs_free = false;
       }
@@ -2116,10 +2122,17 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
       if (rc < 0) {
         break;
       }
+      if (offsets[i] >= 0 &&
+          (chunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH ||
+           offsets[i] > INT64_MAX - chunk_cbytes ||
+           offsets[i] + chunk_cbytes > cbytes)) {
+        rc = BLOSC2_ERROR_INVALID_HEADER;
+        break;
+      }
     }
     else {
       int64_t rbytes;
-      if (frame->sframe) {
+      if (offsets[i] < 0 || frame->sframe) {
         if (needs_free) {
           free(data_chunk);
         }
@@ -2129,6 +2142,12 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
         }
       }
       else {
+        if (offsets[i] > INT64_MAX - header_len ||
+            header_len + offsets[i] > frame->len - BLOSC_EXTENDED_HEADER_LENGTH ||
+            offsets[i] > cbytes - BLOSC_EXTENDED_HEADER_LENGTH) {
+          rc = BLOSC2_ERROR_INVALID_HEADER;
+          break;
+        }
         int64_t io_pos = frame->file_offset + header_len + offsets[i];
         rbytes = io_cb->read((void**)&data_chunk, 1, BLOSC_EXTENDED_HEADER_LENGTH, io_pos, fp);
       }
@@ -2138,6 +2157,13 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
       }
       rc = blosc2_cbuffer_sizes(data_chunk, NULL, &chunk_cbytes, NULL);
       if (rc < 0) {
+        break;
+      }
+      if (offsets[i] >= 0 &&
+          (chunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH ||
+           offsets[i] > INT64_MAX - chunk_cbytes ||
+           offsets[i] + chunk_cbytes > cbytes)) {
+        rc = BLOSC2_ERROR_INVALID_HEADER;
         break;
       }
       if (chunk_cbytes > (int32_t)prev_alloc) {
@@ -2257,9 +2283,23 @@ int get_coffset(blosc2_frame_s* frame, int32_t header_len, int64_t cbytes,
   int rc = blosc2_getitem(coffsets, off_cbytes, (int32_t)nchunk, 1, offset, (int32_t)sizeof(int64_t));
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Problems retrieving a chunk offset.");
-  } else if (!frame->sframe && *offset > frame->len) {
-    BLOSC_TRACE_ERROR("Cannot read chunk %" PRId64 " outside of frame boundary.", nchunk);
-    rc = BLOSC2_ERROR_READ_BUFFER;
+  } else if (!frame->sframe && *offset >= 0) {
+    if (cbytes < 0 || cbytes > INT64_MAX - header_len) {
+      BLOSC_TRACE_ERROR("Invalid compressed size in frame header.");
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
+    if (*offset > INT64_MAX - header_len) {
+      BLOSC_TRACE_ERROR("Offset for chunk %" PRId64 " overflows frame position.", nchunk);
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
+    int64_t chunk_pos = header_len + *offset;
+    int64_t data_limit = header_len + cbytes;
+    if (chunk_pos < header_len ||
+        chunk_pos > data_limit - BLOSC_EXTENDED_HEADER_LENGTH ||
+        chunk_pos > frame->len - BLOSC_EXTENDED_HEADER_LENGTH) {
+      BLOSC_TRACE_ERROR("Cannot read chunk %" PRId64 " outside of frame boundary.", nchunk);
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
   }
 
   return rc;
@@ -2411,6 +2451,13 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
       io_cb->close(fp);
       return rc;
     }
+    if (chunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH ||
+        offset > INT64_MAX - chunk_cbytes ||
+        offset + chunk_cbytes > cbytes) {
+      BLOSC_TRACE_ERROR("Invalid chunk size in frame for chunk %" PRId64 ".", nchunk);
+      io_cb->close(fp);
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
     if (io_cb->is_allocation_necessary) {
       *chunk = malloc(chunk_cbytes);
       *needs_free = true;
@@ -2433,6 +2480,12 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
     rc = blosc2_cbuffer_sizes(*chunk, NULL, &chunk_cbytes, NULL);
     if (rc < 0) {
       return rc;
+    }
+    if (chunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH ||
+        offset > INT64_MAX - chunk_cbytes ||
+        offset + chunk_cbytes > cbytes) {
+      BLOSC_TRACE_ERROR("Invalid chunk size in frame for chunk %" PRId64 ".", nchunk);
+      return BLOSC2_ERROR_INVALID_HEADER;
     }
   }
 
