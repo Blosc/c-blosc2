@@ -1792,7 +1792,7 @@ static int blosc_d(
       BLOSC_TRACE_ERROR("Invalid lazy block size in trailer.");
       return BLOSC2_ERROR_INVALID_HEADER;
     }
-    if (vlblocks && block_csize < (int32_t)sizeof(int32_t)) {
+    if (vlblocks && block_csize <= (int32_t)sizeof(int32_t)) {
       BLOSC_TRACE_ERROR("Lazy VL block compressed size is too small.");
       return BLOSC2_ERROR_INVALID_HEADER;
     }
@@ -4057,7 +4057,7 @@ static int decompress_single_vlblock(blosc2_context* context, int32_t nblock,
     memcpy(&nchunk_lazy, context->src + trailer_offset, sizeof(nchunk_lazy));
     memcpy(&chunk_offset, context->src + trailer_offset + (int32_t)sizeof(int32_t), sizeof(chunk_offset));
     int32_t block_csize = *(const int32_t*)(context->src + block_csize_pos);
-  if (block_csize < (int32_t)sizeof(int32_t)) {
+    if (block_csize < (int32_t)sizeof(int32_t)) {
       BLOSC_TRACE_ERROR("Lazy VL block compressed size is too small.");
       return BLOSC2_ERROR_INVALID_HEADER;
     }
