@@ -1778,8 +1778,8 @@ static int blosc_d(
     int32_t nchunk;
     int64_t chunk_offset;
     // The nchunk and the offset of the current chunk are in the trailer
-    nchunk = *(int32_t*)(src + trailer_offset);
-    chunk_offset = *(int64_t*)(src + trailer_offset + sizeof(int32_t));
+    memcpy(&nchunk, src + trailer_offset, sizeof(nchunk));
+    memcpy(&chunk_offset, src + trailer_offset + sizeof(int32_t), sizeof(chunk_offset));
     // Get the csize of the nblock
     if (nblock < 0 || nblock >= context->nblocks) {
       BLOSC_TRACE_ERROR("Invalid block index in lazy trailer.");
@@ -1792,7 +1792,7 @@ static int blosc_d(
       BLOSC_TRACE_ERROR("Invalid lazy block size in trailer.");
       return BLOSC2_ERROR_INVALID_HEADER;
     }
-    if (vlblocks && block_csize < (int32_t)sizeof(int32_t)) {
+    if (vlblocks && block_csize <= (int32_t)sizeof(int32_t)) {
       BLOSC_TRACE_ERROR("Lazy VL block compressed size is too small.");
       return BLOSC2_ERROR_INVALID_HEADER;
     }
@@ -1824,6 +1824,11 @@ static int blosc_d(
       if (src_offset < 0) {
         io_cb->close(fp);
         BLOSC_TRACE_ERROR("Lazy block offset cannot be negative.");
+        return BLOSC2_ERROR_INVALID_HEADER;
+      }
+      if (chunk_offset < 0) {
+        io_cb->close(fp);
+        BLOSC_TRACE_ERROR("Lazy chunk offset cannot be negative.");
         return BLOSC2_ERROR_INVALID_HEADER;
       }
       if (frame->file_offset > INT64_MAX - chunk_offset) {
@@ -2579,9 +2584,10 @@ static int read_lazy_chunk_bytes(blosc2_context* context, int32_t offset, uint8_
 
   int32_t trailer_offset = BLOSC_EXTENDED_HEADER_LENGTH +
                            context->nblocks * (int32_t)sizeof(int32_t);
-  int32_t nchunk_lazy = *(const int32_t*)(context->src + trailer_offset);
-  int64_t chunk_offset = *(const int64_t*)(context->src + trailer_offset +
-                                           (int32_t)sizeof(int32_t));
+  int32_t nchunk_lazy;
+  int64_t chunk_offset;
+  memcpy(&nchunk_lazy, context->src + trailer_offset, sizeof(nchunk_lazy));
+  memcpy(&chunk_offset, context->src + trailer_offset + (int32_t)sizeof(int32_t), sizeof(chunk_offset));
 
   void* fp = NULL;
   int64_t io_pos;
@@ -2590,8 +2596,27 @@ static int read_lazy_chunk_bytes(blosc2_context* context, int32_t offset, uint8_
     io_pos = offset;
   }
   else {
+    if (chunk_offset < 0 || offset < 0) {
+      BLOSC_TRACE_ERROR("Lazy chunk offset cannot be negative.");
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
     fp = io_cb->open(frame->urlpath, "rb", context->schunk->storage->io->params);
-    io_pos = frame->file_offset + chunk_offset + offset;
+    if (frame->file_offset > INT64_MAX - chunk_offset) {
+      BLOSC_TRACE_ERROR("Lazy chunk offset overflows file position.");
+      if (fp != NULL) {
+        io_cb->close(fp);
+      }
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
+    io_pos = frame->file_offset + chunk_offset;
+    if (io_pos > INT64_MAX - offset) {
+      BLOSC_TRACE_ERROR("Lazy block offset overflows file position.");
+      if (fp != NULL) {
+        io_cb->close(fp);
+      }
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
+    io_pos += offset;
   }
   if (fp == NULL) {
     BLOSC_TRACE_ERROR("%s", open_error);
@@ -4027,11 +4052,12 @@ static int decompress_single_vlblock(blosc2_context* context, int32_t nblock,
       BLOSC_TRACE_ERROR("Malformed lazy trailer exceeds chunk bounds.");
       return BLOSC2_ERROR_INVALID_HEADER;
     }
-    int32_t nchunk_lazy = *(const int32_t*)(context->src + trailer_offset);
-    int64_t chunk_offset = *(const int64_t*)(context->src + trailer_offset +
-                                             (int32_t)sizeof(int32_t));
+    int32_t nchunk_lazy;
+    int64_t chunk_offset;
+    memcpy(&nchunk_lazy, context->src + trailer_offset, sizeof(nchunk_lazy));
+    memcpy(&chunk_offset, context->src + trailer_offset + (int32_t)sizeof(int32_t), sizeof(chunk_offset));
     int32_t block_csize = *(const int32_t*)(context->src + block_csize_pos);
-    if (block_csize < (int32_t)sizeof(int32_t)) {
+    if (block_csize <= (int32_t)sizeof(int32_t)) {
       BLOSC_TRACE_ERROR("Lazy VL block compressed size is too small.");
       return BLOSC2_ERROR_INVALID_HEADER;
     }
@@ -4052,6 +4078,11 @@ static int decompress_single_vlblock(blosc2_context* context, int32_t nblock,
       if (fp == NULL) {
         BLOSC_TRACE_ERROR("Cannot open frame file for lazy VL block size peek.");
         return BLOSC2_ERROR_FILE_OPEN;
+      }
+      if (chunk_offset < 0) {
+        BLOSC_TRACE_ERROR("Lazy chunk offset cannot be negative.");
+        io_cb->close(fp);
+        return BLOSC2_ERROR_INVALID_HEADER;
       }
       if (frame->file_offset > INT64_MAX - chunk_offset) {
         BLOSC_TRACE_ERROR("Lazy chunk offset overflows file position.");
