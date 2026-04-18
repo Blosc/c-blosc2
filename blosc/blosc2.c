@@ -13,6 +13,7 @@
 #include "blosc-private.h"
 #include "../plugins/codecs/zfp/blosc2-zfp.h"
 #include "frame.h"
+#include "sframe.h"
 #include "b2nd-private.h"
 #include "schunk-private.h"
 
@@ -1802,12 +1803,8 @@ static int blosc_d(
     int64_t io_pos = 0;
     if (frame->sframe) {
       // The chunk is not in the frame
-      char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-      BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
-      sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk);
-      fp = io_cb->open(chunkpath, "rb", context->schunk->storage->io->params);
+      fp = sframe_open_chunk(frame->urlpath, nchunk, "rb", context->schunk->storage->io);
       BLOSC_ERROR_NULL(fp, BLOSC2_ERROR_FILE_OPEN);
-      free(chunkpath);
       // The offset of the block is src_offset
       io_pos = src_offset;
     }
@@ -2564,11 +2561,7 @@ static int read_lazy_chunk_bytes(blosc2_context* context, int32_t offset, uint8_
   void* fp = NULL;
   int64_t io_pos;
   if (frame->sframe) {
-    char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-    BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
-    sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk_lazy);
-    fp = io_cb->open(chunkpath, "rb", context->schunk->storage->io->params);
-    free(chunkpath);
+    fp = sframe_open_chunk(frame->urlpath, nchunk_lazy, "rb", context->schunk->storage->io);
     io_pos = offset;
   }
   else {
@@ -4010,11 +4003,7 @@ static int decompress_single_vlblock(blosc2_context* context, int32_t nblock,
     void* fp = NULL;
     int64_t io_pos;
     if (frame->sframe) {
-      char* chunkpath = malloc(strlen(frame->urlpath) + 1 + 8 + strlen(".chunk") + 1);
-      BLOSC_ERROR_NULL(chunkpath, BLOSC2_ERROR_MEMORY_ALLOC);
-      sprintf(chunkpath, "%s/%08X.chunk", frame->urlpath, nchunk_lazy);
-      fp = io_cb->open(chunkpath, "rb", context->schunk->storage->io->params);
-      free(chunkpath);
+      fp = sframe_open_chunk(frame->urlpath, nchunk_lazy, "rb", context->schunk->storage->io);
       io_pos = bstart;
     }
     else {
