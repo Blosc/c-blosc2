@@ -238,6 +238,11 @@ int update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
       array->chunkshape[i] = chunkshape[i];
       array->blockshape[i] = blockshape[i];
       if (array->chunkshape[i] != 0) {
+        if (array->blockshape[i] == 0) {
+          BLOSC_TRACE_ERROR("blockshape[%d] cannot be zero when chunkshape[%d] is non-zero", i, i);
+          return BLOSC2_ERROR_INVALID_PARAM;
+        }
+
         if (shape[i] % array->chunkshape[i] == 0) {
           array->extshape[i] = shape[i];
         } else {
