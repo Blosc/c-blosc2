@@ -48,6 +48,7 @@
 #define FRAME_HEADER_MINLEN (FRAME_FILTER_PIPELINE + 1 + 16)  // 87 <- minimum length
 #define FRAME_METALAYERS (FRAME_HEADER_MINLEN)  // 87
 #define FRAME_IDX_SIZE (FRAME_METALAYERS + 1 + 1)  // 89
+#define FRAME_META_HDR_SIZE 5  // bin32 MessagePack marker (1) + size (4)
 
 #define FRAME_FILTER_PIPELINE_MAX (8)  // the maximum number of filters that can be stored in header
 
