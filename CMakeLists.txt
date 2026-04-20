@@ -136,6 +136,11 @@ option(PREFER_EXTERNAL_ZSTD
 option(WITH_ZLIB_OPTIM
     "Set WITH_OPTIM for ZLIB, turning off is useful for compiling for wasm32 targets." ON)
 
+set(BLOSC_ZLIBNG_VERSION "2.3.3" CACHE STRING
+    "zlib-ng version to use when fetching internal sources.")
+set(BLOSC_ZLIBNG_SOURCE_DIR "" CACHE PATH
+    "Optional local zlib-ng checkout to use instead of downloading sources.")
+
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 if(MINGW)
@@ -199,31 +204,42 @@ if(NOT DEACTIVATE_ZLIB)
                 find_package(ZLIB)
             endif()
         endif()
-
-        if(NOT (ZLIB_NG_FOUND OR ZLIB_FOUND))
-            message(STATUS "No ZLIB found.  Using ZLIB-NG internal sources.")
-        endif()
     endif()
 
     if(NOT (ZLIB_NG_FOUND OR ZLIB_FOUND))
-
+        include(FetchContent)
         if (NOT WITH_ZLIB_OPTIM)
             set(WITH_OPTIM FALSE)
             set(WITH_RUNTIME_CPU_DETECTION FALSE)
         endif()
-        message(STATUS "Using ZLIB-NG internal sources for ZLIB support.")
-        set(HAVE_ZLIB_NG TRUE)
-        add_definitions(-DZLIB_COMPAT)
-        set(ZLIB_NG_DIR "zlib-ng-2.0.7")  # update to the actual included version
-        set(ZLIB_COMPAT TRUE)
         set(SKIP_INSTALL_ALL TRUE)
-        set(BUILD_SHARED_LIBS FALSE)
-        set(ZLIB_ENABLE_TESTS OFF)
-        add_subdirectory("internal-complibs/${ZLIB_NG_DIR}")
+        set(BUILD_TESTING OFF)
+        set(WITH_GTEST OFF)
+        set(WITH_FUZZERS OFF)
+        set(WITH_BENCHMARKS OFF)
+        set(WITH_BENCHMARK_APPS OFF)
 
-        file(COPY
-                ${CMAKE_CURRENT_BINARY_DIR}/internal-complibs/${ZLIB_NG_DIR}/zconf.h
-                DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/internal-complibs/${ZLIB_NG_DIR}/)
+        if(BLOSC_ZLIBNG_SOURCE_DIR)
+            message(STATUS "Using zlib-ng via FetchContent from local checkout: ${BLOSC_ZLIBNG_SOURCE_DIR}")
+            FetchContent_Declare(
+                zlib_ng
+                SOURCE_DIR "${BLOSC_ZLIBNG_SOURCE_DIR}")
+        else()
+            message(STATUS "Using zlib-ng ${BLOSC_ZLIBNG_VERSION} via FetchContent download")
+            FetchContent_Declare(
+                zlib_ng
+                URL "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/${BLOSC_ZLIBNG_VERSION}.tar.gz"
+                DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+        endif()
+        FetchContent_MakeAvailable(zlib_ng)
+
+        set(HAVE_ZLIB_NG TRUE)
+        set(ZLIB_NG_FETCHED TRUE)
+        set(ZLIB_NG_FOUND TRUE)
+        set(ZLIB_NG_BUILD_DIR "${zlib_ng_BINARY_DIR}")
+        if(TARGET zlib-ng-static)
+            set_target_properties(zlib-ng-static PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        endif()
     endif()
     set(HAVE_ZLIB TRUE)
 endif()
@@ -550,6 +566,15 @@ if(BLOSC_INSTALL)
     if(BUILD_STATIC)
         install(TARGETS blosc2_static COMPONENT DEV)
     endif()
+    if(ZLIB_NG_FETCHED AND TARGET zlib-ng-static)
+        install(FILES
+                ${ZLIB_NG_BUILD_DIR}/zlib-ng.h
+                ${ZLIB_NG_BUILD_DIR}/zconf-ng.h
+                ${ZLIB_NG_BUILD_DIR}/zlib_name_mangling-ng.h
+                ${ZLIB_NG_BUILD_DIR}/gzread_mangle.h
+                DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+                COMPONENT DEV)
+    endif()
 
     # config files
     include(CMakePackageConfigHelpers)
@@ -578,6 +603,9 @@ if(BLOSC_INSTALL)
     endif()
     if(BUILD_STATIC)
         list(APPEND Blosc2_INSTALL_TARGET_NAMES blosc2_static)
+    endif()
+    if(ZLIB_NG_FETCHED AND TARGET zlib-ng-static)
+        list(APPEND Blosc2_INSTALL_TARGET_NAMES zlib-ng-static)
     endif()
     # Add unified target
     add_library(blosc2 INTERFACE)
