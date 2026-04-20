@@ -934,7 +934,7 @@ int fill_codec(blosc2_codec *codec) {
     codec->free = NULL;
   }
   */
- 
+
   return BLOSC2_ERROR_SUCCESS;
 }
 
@@ -1032,7 +1032,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
   uint8_t* filters_meta = context->filters_meta;
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
   bool output_is_disposable = (context->preparams != NULL) ? context->preparams->output_is_disposable : false;
-  
+
   /* Prefilter function */
   if (context->prefilter != NULL) {
     // Create new prefilter parameters for this block (must be private for each thread)
@@ -4125,27 +4125,51 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
   int32_t ntbytes = 0;              /* the number of uncompressed bytes */
   int32_t bsize, bsize2, ebsize, leftoverblock;
   int32_t startb, stopb;
-  int32_t stop = start + nitems;
+  int32_t stop;
+  int32_t nitems_bytes;
+  int64_t start64 = (int64_t)start;
+  int64_t nitems64 = (int64_t)nitems;
+  int64_t typesize64 = (int64_t)header->typesize;
+  int64_t stop64;
+  int64_t nitems_bytes64;
+  int64_t start_bytes64;
+  int64_t stop_bytes64;
   int j, rc;
 
   if (nitems == 0) {
     // We have nothing to do
     return 0;
   }
-  if (nitems * header->typesize > destsize) {
+  if (nitems < 0) {
+    BLOSC_TRACE_ERROR("`nitems` out of bounds.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  nitems_bytes64 = nitems64 * typesize64;
+  if (nitems_bytes64 < 0 || nitems_bytes64 > INT32_MAX || nitems_bytes64 > destsize) {
     BLOSC_TRACE_ERROR("`nitems`*`typesize` out of dest bounds.");
     return BLOSC2_ERROR_WRITE_BUFFER;
   }
+  nitems_bytes = (int32_t)nitems_bytes64;
 
   int32_t* bstarts = (int32_t*)(_src + context->header_overhead);
 
   /* Check region boundaries */
-  if ((start < 0) || (start * header->typesize > header->nbytes)) {
+  start_bytes64 = start64 * typesize64;
+  if ((start < 0) || (start_bytes64 < 0) || (start_bytes64 > header->nbytes)) {
     BLOSC_TRACE_ERROR("`start` out of bounds.");
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
-  if ((stop < 0) || (stop * header->typesize > header->nbytes)) {
+  stop64 = start64 + nitems64;
+  if ((stop64 < 0) || (stop64 > INT32_MAX)) {
+    BLOSC_TRACE_ERROR("`start`+`nitems` out of bounds.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  stop = (int32_t)stop64;
+
+  stop_bytes64 = stop64 * typesize64;
+  if ((stop_bytes64 < 0) || (stop_bytes64 > header->nbytes)) {
     BLOSC_TRACE_ERROR("`start`+`nitems` out of bounds.");
     return BLOSC2_ERROR_INVALID_PARAM;
   }
@@ -4167,7 +4191,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
                   (context->blosc2_flags & 0x08u) && !context->special_type);
   if (memcpyed && !is_lazy && !context->postfilter) {
     // Short-circuit for (non-lazy) memcpyed or special values
-    ntbytes = nitems * header->typesize;
+    ntbytes = nitems_bytes;
     switch (context->special_type) {
       case BLOSC2_SPECIAL_VALUE:
         // All repeated values
@@ -4191,7 +4215,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
         // We do nothing here
         break;
       case BLOSC2_NO_SPECIAL:
-        _src += context->header_overhead + start * context->typesize;
+        _src += context->header_overhead + (int32_t)start_bytes64;
         memcpy(_dest, _src, ntbytes);
         break;
       default:
@@ -4251,7 +4275,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     /* Do the actual data copy */
     // Regular decompression.  Put results in tmp2.
     // If the block is aligned and the worst case fits in destination, let's avoid a copy
-    bool get_single_block = ((startb == 0) && (bsize == nitems * header->typesize));
+    bool get_single_block = ((startb == 0) && (bsize == nitems_bytes));
     uint8_t* tmp2 = get_single_block ? dest : scontext->tmp2;
 
     // If memcpyed we don't have a bstarts section (because it is not needed)
@@ -5889,7 +5913,7 @@ void blosc2_free_ctx(blosc2_context* context) {
           if (fill_codec(&g_codecs[i]) < 0) {
             BLOSC_TRACE_ERROR("Could not load codec %d.", g_codecs[i].compcode);
             return BLOSC2_ERROR_CODEC_SUPPORT;
-          } 
+          }
         }
         if (g_codecs[i].free == NULL){
           // no free func, codec_params is simple
