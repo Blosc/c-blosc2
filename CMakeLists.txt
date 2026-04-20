@@ -140,6 +140,10 @@ set(BLOSC_ZLIBNG_VERSION "2.3.3" CACHE STRING
     "zlib-ng version to use when fetching internal sources.")
 set(BLOSC_ZLIBNG_SOURCE_DIR "" CACHE PATH
     "Optional local zlib-ng checkout to use instead of downloading sources.")
+set(BLOSC_ZSTD_VERSION "1.5.7" CACHE STRING
+    "zstd version to use when fetching internal sources.")
+set(BLOSC_ZSTD_SOURCE_DIR "" CACHE PATH
+    "Optional local zstd checkout to use instead of downloading sources.")
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
@@ -252,16 +256,45 @@ if(NOT DEACTIVATE_ZSTD)
             set(HAVE_ZSTD_CONFIG TRUE)
         else()
             find_package(ZSTD MODULE)
-            if (NOT ZSTD_FOUND)
-                message(STATUS "No ZSTD library found.  Using internal sources.")
-            endif()
+        endif()
+    endif()
+
+    if(NOT ZSTD_FOUND)
+        include(FetchContent)
+        set(ZSTD_BUILD_PROGRAMS OFF)
+        set(ZSTD_BUILD_SHARED OFF)
+        set(ZSTD_BUILD_STATIC ON)
+        set(ZSTD_BUILD_TESTS OFF)
+        set(ZSTD_BUILD_CONTRIB OFF)
+        set(ZSTD_MULTITHREAD_SUPPORT OFF)
+
+        if(BLOSC_ZSTD_SOURCE_DIR)
+            message(STATUS "Using zstd via FetchContent from local checkout: ${BLOSC_ZSTD_SOURCE_DIR}")
+            FetchContent_Declare(
+                zstd
+                SOURCE_DIR "${BLOSC_ZSTD_SOURCE_DIR}"
+                SOURCE_SUBDIR build/cmake)
+        else()
+            message(STATUS "Using zstd ${BLOSC_ZSTD_VERSION} via FetchContent download")
+            FetchContent_Declare(
+                zstd
+                URL "https://github.com/facebook/zstd/archive/refs/tags/v${BLOSC_ZSTD_VERSION}.tar.gz"
+                DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+                SOURCE_SUBDIR build/cmake)
+        endif()
+        FetchContent_MakeAvailable(zstd)
+
+        set(HAVE_ZSTD TRUE)
+        set(ZSTD_FETCHED TRUE)
+        set(ZSTD_FOUND TRUE)
+        set(ZSTD_BUILD_DIR "${zstd_BINARY_DIR}")
+        set(ZSTD_SOURCE_DIR "${zstd_SOURCE_DIR}")
+        if(TARGET libzstd_static)
+            set_target_properties(libzstd_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
         endif()
     else()
-        message(STATUS "Using ZSTD internal sources.")
+        set(HAVE_ZSTD TRUE)
     endif()
-    # HAVE_ZSTD will be set to true because even if the library is
-    # not found, we will use the included sources for it
-    set(HAVE_ZSTD TRUE)
 endif()
 
 if(NOT DEACTIVATE_IPP)
@@ -575,6 +608,14 @@ if(BLOSC_INSTALL)
                 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
                 COMPONENT DEV)
     endif()
+    if(ZSTD_FETCHED AND TARGET libzstd_static)
+        install(FILES
+                ${ZSTD_SOURCE_DIR}/lib/zstd.h
+                ${ZSTD_SOURCE_DIR}/lib/zdict.h
+                ${ZSTD_SOURCE_DIR}/lib/zstd_errors.h
+                DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+                COMPONENT DEV)
+    endif()
 
     # config files
     include(CMakePackageConfigHelpers)
@@ -606,6 +647,9 @@ if(BLOSC_INSTALL)
     endif()
     if(ZLIB_NG_FETCHED AND TARGET zlib-ng-static)
         list(APPEND Blosc2_INSTALL_TARGET_NAMES zlib-ng-static)
+    endif()
+    if(ZSTD_FETCHED AND TARGET libzstd_static)
+        list(APPEND Blosc2_INSTALL_TARGET_NAMES libzstd_static)
     endif()
     # Add unified target
     add_library(blosc2 INTERFACE)
@@ -654,12 +698,14 @@ if(BLOSC_INSTALL)
             DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig" COMPONENT DEV)
 
     # uninstaller
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
-        @ONLY)
-    add_custom_target(uninstall
-        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+    if(NOT TARGET uninstall)
+        configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+            @ONLY)
+        add_custom_target(uninstall
+            COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+    endif()
 endif()
 
 
