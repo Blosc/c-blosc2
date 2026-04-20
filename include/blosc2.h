@@ -903,13 +903,20 @@ BLOSC_EXPORT void blosc1_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
  *
  * @param cbuffer The buffer of compressed data.
  * @param nbytes The pointer where the number of uncompressed bytes will be put.
- * @param cbytes The pointer where the number of compressed bytes will be put.
+ * @param cbytes The pointer where the number of compressed bytes stored in the
+ * chunk header will be put.
  * @param blocksize The pointer where the block size will be put.
  *
  * @note: if any of the nbytes, cbytes or blocksize is NULL, it will not be returned.
  *
  * You only need to pass the first BLOSC_MIN_HEADER_LENGTH bytes of a
  * compressed buffer for this call to work.
+ *
+ * @note For lazy chunks returned by #blosc2_schunk_get_lazychunk, the returned
+ * @p cbytes value is still the compressed size encoded in the chunk header,
+ * not the full size of the lazy proxy buffer.  When passing a lazy chunk to
+ * #blosc2_decompress_ctx or #blosc2_getitem_ctx, use the size returned by
+ * #blosc2_schunk_get_lazychunk as @p srcsize.
  *
  * @return On failure, returns negative value.
  */
@@ -1504,7 +1511,10 @@ BLOSC_EXPORT int blosc2_vlcompress_ctx(
  *
  * @param context The blosc2_context struct with the different compression params.
  * @param src The buffer of compressed data.
- * @param srcsize The length of buffer of compressed data.
+ * @param srcsize The length of buffer of compressed data.  If @p src is a lazy
+ * chunk returned by #blosc2_schunk_get_lazychunk, pass the size returned by
+ * #blosc2_schunk_get_lazychunk here rather than the @p cbytes value reported by
+ * #blosc2_cbuffer_sizes.
  * @param dest The buffer where the decompressed data will be put.
  * @param destsize The size in bytes of the @p dest buffer.
  *
@@ -1667,7 +1677,10 @@ BLOSC_EXPORT int blosc2_chunk_uninit(blosc2_cparams cparams, int32_t nbytes,
  *
  * @param context Context pointer.
  * @param src The compressed buffer from data will be decompressed.
- * @param srcsize Compressed buffer length.
+ * @param srcsize Compressed buffer length.  If @p src is a lazy chunk returned by
+ * #blosc2_schunk_get_lazychunk, pass the size returned by
+ * #blosc2_schunk_get_lazychunk here rather than the @p cbytes value reported by
+ * #blosc2_cbuffer_sizes.
  * @param start The position of the first item (of @p typesize size) from where data
  * will be retrieved.
  * @param nitems The number of items (of @p typesize size) that will be retrieved.
@@ -2089,6 +2102,12 @@ BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, 
  *
  * @warning Currently, a lazy chunk can only be used by #blosc2_decompress_ctx and #blosc2_getitem_ctx.
  *
+ * @note The return value is the effective size of the returned buffer.  For lazy
+ * chunks, use this return value as @p srcsize when calling
+ * #blosc2_decompress_ctx or #blosc2_getitem_ctx.  This value can be larger than
+ * the @p cbytes reported by #blosc2_cbuffer_sizes because lazy chunks carry
+ * extra trailer metadata.
+ *
  * @warning If the super-chunk is backed by a frame that is disk-based, a buffer is allocated for the
  * (compressed) chunk, and hence a free is needed.
  * You can check whether requires a free with the @p needs_free parameter.
@@ -2096,9 +2115,11 @@ BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, 
  * (or the backing in-memory frame) is returned in the @p chunk parameter.  In this case the returned
  * chunk is not lazy.
  *
- * @return The size of the (compressed) chunk or 0 if it is non-initialized. If some problem is
- * detected, a negative code is returned instead.  Note that a lazy chunk is somewhat larger than
- * a regular chunk because of the trailer section (for details see `README_CHUNK_FORMAT.rst`).
+ * @return The size of the returned chunk buffer, or 0 if it is non-initialized.
+ * If some problem is detected, a negative code is returned instead.  For regular
+ * chunks this matches the compressed chunk size.  Note that a lazy chunk is
+ * somewhat larger than a regular chunk because of the trailer section (for
+ * details see `README_CHUNK_FORMAT.rst`).
  */
 BLOSC_EXPORT int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chunk,
                                              bool *needs_free);
