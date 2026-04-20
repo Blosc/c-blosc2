@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include "test_common.h"
 
-#define CHUNKSIZE 256
+#define CHUNK_ELEMS 256
 
 int tests_run = 0;
 
@@ -25,8 +25,8 @@ static test_storage tstorage[] = {
 static test_storage tdata;
 
 static char *test_negative_chunk_index_rejected(void) {
-  int32_t src[CHUNKSIZE];
-  int32_t dst[CHUNKSIZE];
+  int32_t src[CHUNK_ELEMS];
+  int32_t dst[CHUNK_ELEMS];
   int32_t isize = (int32_t)(sizeof(src));
 
   blosc2_remove_urlpath(tdata.urlpath);
@@ -48,7 +48,7 @@ static char *test_negative_chunk_index_rejected(void) {
   blosc2_schunk *schunk = blosc2_schunk_new(&storage);
   mu_assert("ERROR: cannot create schunk", schunk != NULL);
 
-  for (int i = 0; i < CHUNKSIZE; ++i) {
+  for (int i = 0; i < CHUNK_ELEMS; ++i) {
     src[i] = i;
   }
   mu_assert("ERROR: cannot append initial chunk", blosc2_schunk_append_buffer(schunk, src, isize) == 1);
@@ -80,6 +80,53 @@ static char *test_negative_chunk_index_rejected(void) {
 
   rc = (int)blosc2_schunk_delete_chunk(schunk, -1);
   mu_assert("ERROR: negative index should fail in delete_chunk", rc == BLOSC2_ERROR_INVALID_PARAM);
+  mu_assert("ERROR: delete_chunk changed nchunks on failure", schunk->nchunks == 1);
+
+  rc = blosc2_schunk_get_chunk(schunk, schunk->nchunks, &chunk, &needs_free);
+  mu_assert("ERROR: nchunks index should fail in get_chunk", rc == BLOSC2_ERROR_INVALID_PARAM);
+
+  rc = blosc2_schunk_get_lazychunk(schunk, schunk->nchunks, &chunk, &needs_free);
+  mu_assert("ERROR: nchunks index should fail in get_lazychunk", rc == BLOSC2_ERROR_INVALID_PARAM);
+
+  rc = blosc2_schunk_decompress_chunk(schunk, schunk->nchunks, dst, isize);
+  mu_assert("ERROR: nchunks index should fail in decompress_chunk", rc == BLOSC2_ERROR_INVALID_PARAM);
+
+  rc = (int)blosc2_schunk_update_chunk(schunk, schunk->nchunks, new_chunk, true);
+  mu_assert("ERROR: nchunks index should fail in update_chunk", rc == BLOSC2_ERROR_INVALID_PARAM);
+  mu_assert("ERROR: update_chunk changed nchunks on failure", schunk->nchunks == 1);
+
+  rc = (int)blosc2_schunk_insert_chunk(schunk, schunk->nchunks, new_chunk, true);
+  mu_assert("ERROR: nchunks index should succeed in insert_chunk", rc == 2);
+  mu_assert("ERROR: insert_chunk did not increase nchunks", schunk->nchunks == 2);
+
+  rc = (int)blosc2_schunk_delete_chunk(schunk, schunk->nchunks);
+  mu_assert("ERROR: nchunks index should fail in delete_chunk", rc == BLOSC2_ERROR_INVALID_PARAM);
+
+  rc = (int)blosc2_schunk_delete_chunk(schunk, 1);
+  mu_assert("ERROR: cannot delete inserted chunk", rc == 1);
+  mu_assert("ERROR: delete_chunk changed nchunks unexpectedly", schunk->nchunks == 1);
+
+  int64_t out_of_bounds = schunk->nchunks + 1;
+
+  rc = blosc2_schunk_get_chunk(schunk, out_of_bounds, &chunk, &needs_free);
+  mu_assert("ERROR: nchunks + 1 index should fail in get_chunk", rc == BLOSC2_ERROR_INVALID_PARAM);
+
+  rc = blosc2_schunk_get_lazychunk(schunk, out_of_bounds, &chunk, &needs_free);
+  mu_assert("ERROR: nchunks + 1 index should fail in get_lazychunk", rc == BLOSC2_ERROR_INVALID_PARAM);
+
+  rc = blosc2_schunk_decompress_chunk(schunk, out_of_bounds, dst, isize);
+  mu_assert("ERROR: nchunks + 1 index should fail in decompress_chunk", rc == BLOSC2_ERROR_INVALID_PARAM);
+
+  rc = (int)blosc2_schunk_update_chunk(schunk, out_of_bounds, new_chunk, true);
+  mu_assert("ERROR: nchunks + 1 index should fail in update_chunk", rc == BLOSC2_ERROR_INVALID_PARAM);
+  mu_assert("ERROR: update_chunk changed nchunks on failure", schunk->nchunks == 1);
+
+  rc = (int)blosc2_schunk_insert_chunk(schunk, out_of_bounds, new_chunk, true);
+  mu_assert("ERROR: nchunks + 1 index should fail in insert_chunk", rc == BLOSC2_ERROR_INVALID_PARAM);
+  mu_assert("ERROR: insert_chunk changed nchunks on failure", schunk->nchunks == 1);
+
+  rc = (int)blosc2_schunk_delete_chunk(schunk, out_of_bounds);
+  mu_assert("ERROR: nchunks + 1 index should fail in delete_chunk", rc == BLOSC2_ERROR_INVALID_PARAM);
   mu_assert("ERROR: delete_chunk changed nchunks on failure", schunk->nchunks == 1);
 
   free(new_chunk);
