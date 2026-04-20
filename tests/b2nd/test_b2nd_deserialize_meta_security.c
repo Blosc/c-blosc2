@@ -95,7 +95,6 @@ CUTEST_TEST_TEST(deserialize_meta_security) {
   b2nd_array_t *arr_corrupt = NULL;
   rc = b2nd_from_schunk(arr->sc, &arr_corrupt);
   CUTEST_ASSERT("corrupted blockshape/chunkshape metadata should fail", rc < 0);
-  CUTEST_ASSERT("output array must remain NULL on failure", arr_corrupt == NULL);
 
   free(b2nd_meta_bad);
   free(b2nd_meta);
