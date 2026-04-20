@@ -2,7 +2,7 @@
 # the project is compiled.
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-   exec_program(cat ARGS "/proc/cpuinfo" OUTPUT_VARIABLE CPUINFO)
+   execute_process(COMMAND cat /proc/cpuinfo OUTPUT_VARIABLE CPUINFO)
 
    string(REGEX REPLACE "^.*(sse2).*$" "\\1" SSE_THERE "${CPUINFO}")
    string(COMPARE EQUAL "sse2" "${SSE_THERE}" SSE2_TRUE)
@@ -21,7 +21,8 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
    endif()
 
 elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-   exec_program("/usr/sbin/sysctl -a | grep machdep.cpu.features" OUTPUT_VARIABLE CPUINFO)
+   execute_process(COMMAND /usr/sbin/sysctl -a OUTPUT_VARIABLE CPUINFO_ALL)
+   string(REGEX MATCH ".*machdep.cpu.features.*" CPUINFO "${CPUINFO_ALL}")
    string(REGEX REPLACE "^.*[^S](SSE2).*$" "\\1" SSE_THERE "${CPUINFO}")
    string(COMPARE EQUAL "SSE2" "${SSE_THERE}" SSE2_TRUE)
    if(SSE2_TRUE)
@@ -30,7 +31,7 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
       set(SSE2_FOUND false CACHE BOOL "SSE2 available on host")
    endif()
 
-   exec_program("/usr/sbin/sysctl -a | grep machdep.cpu.leaf7_features" OUTPUT_VARIABLE CPUINFO)
+   string(REGEX MATCH ".*machdep.cpu.leaf7_features.*" CPUINFO "${CPUINFO_ALL}")
    string(REGEX REPLACE "^.*(AVX2).*$" "\\1" SSE_THERE "${CPUINFO}")
    string(COMPARE EQUAL "AVX2" "${SSE_THERE}" AVX2_TRUE)
    if(AVX2_TRUE)
@@ -39,6 +40,7 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
       set(AVX2_FOUND false CACHE BOOL "AVX2 available on host")
    endif()
 
+   unset(CPUINFO_ALL)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
    # TODO.  For now supposing SSE2 is safe enough
    set(SSE2_FOUND true  CACHE BOOL "SSE2 available on host")
