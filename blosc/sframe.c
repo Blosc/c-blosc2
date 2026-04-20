@@ -69,7 +69,7 @@ static char* sframe_make_chunk_path(const char* urlpath, int64_t nchunk) {
     return NULL;
   }
 
-  int written = snprintf(chunk_path, total_len, "%s/%08X.chunk", urlpath, (uint32_t)nchunk);
+  int written = snprintf(chunk_path, total_len, "%s/%08" PRIX32 ".chunk", urlpath, (uint32_t)nchunk);
   if (written < 0 || (size_t)written >= total_len) {
     BLOSC_TRACE_ERROR("Error building chunk path for chunk index (%" PRId64 ")", nchunk);
     free(chunk_path);
