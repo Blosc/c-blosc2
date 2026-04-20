@@ -136,6 +136,10 @@ option(PREFER_EXTERNAL_ZSTD
 option(WITH_ZLIB_OPTIM
     "Set WITH_OPTIM for ZLIB, turning off is useful for compiling for wasm32 targets." ON)
 
+set(BLOSC_LZ4_VERSION "1.10.0" CACHE STRING
+    "lz4 version to use when fetching internal sources.")
+set(BLOSC_LZ4_SOURCE_DIR "" CACHE PATH
+    "Optional local lz4 checkout to use instead of downloading sources.")
 set(BLOSC_ZLIBNG_VERSION "2.3.3" CACHE STRING
     "zlib-ng version to use when fetching internal sources.")
 set(BLOSC_ZLIBNG_SOURCE_DIR "" CACHE PATH
@@ -190,8 +194,37 @@ if(PREFER_EXTERNAL_LZ4)
     else()
         find_package(LZ4 MODULE)
     endif()
-else()
-    message(STATUS "Using LZ4 internal sources.")
+endif()
+
+if(NOT LZ4_FOUND)
+    include(FetchContent)
+    set(LZ4_BUILD_CLI OFF CACHE BOOL "" FORCE)
+    set(LZ4_BUILD_LEGACY_LZ4C OFF CACHE BOOL "" FORCE)
+    set(LZ4_BUNDLED_MODE ON CACHE BOOL "" FORCE)
+    set(LZ4_POSITION_INDEPENDENT_LIB ON CACHE BOOL "" FORCE)
+
+    if(BLOSC_LZ4_SOURCE_DIR)
+        message(STATUS "Using lz4 via FetchContent from local checkout: ${BLOSC_LZ4_SOURCE_DIR}")
+        FetchContent_Declare(
+            lz4
+            SOURCE_DIR "${BLOSC_LZ4_SOURCE_DIR}"
+            SOURCE_SUBDIR build/cmake)
+    else()
+        message(STATUS "Using lz4 ${BLOSC_LZ4_VERSION} via FetchContent download")
+        FetchContent_Declare(
+            lz4
+            URL "https://github.com/lz4/lz4/archive/refs/tags/v${BLOSC_LZ4_VERSION}.tar.gz"
+            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+            SOURCE_SUBDIR build/cmake)
+    endif()
+    FetchContent_MakeAvailable(lz4)
+
+    set(LZ4_FETCHED TRUE)
+    set(LZ4_FOUND TRUE)
+    set(LZ4_SOURCE_DIR "${lz4_SOURCE_DIR}")
+    if(TARGET lz4_static)
+        set_target_properties(lz4_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    endif()
 endif()
 
 if(NOT DEACTIVATE_ZLIB)
@@ -599,6 +632,17 @@ if(BLOSC_INSTALL)
     if(BUILD_STATIC)
         install(TARGETS blosc2_static COMPONENT DEV)
     endif()
+    if(LZ4_FETCHED AND TARGET lz4_static)
+        install(FILES
+                ${LZ4_SOURCE_DIR}/lib/lz4.h
+                ${LZ4_SOURCE_DIR}/lib/lz4hc.h
+                ${LZ4_SOURCE_DIR}/lib/lz4frame.h
+                ${LZ4_SOURCE_DIR}/lib/lz4frame_static.h
+                ${LZ4_SOURCE_DIR}/lib/lz4file.h
+                ${LZ4_SOURCE_DIR}/lib/xxhash.h
+                DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+                COMPONENT DEV)
+    endif()
     if(ZLIB_NG_FETCHED AND TARGET zlib-ng-static)
         install(FILES
                 ${ZLIB_NG_BUILD_DIR}/zlib-ng.h
@@ -644,6 +688,9 @@ if(BLOSC_INSTALL)
     endif()
     if(BUILD_STATIC)
         list(APPEND Blosc2_INSTALL_TARGET_NAMES blosc2_static)
+    endif()
+    if(LZ4_FETCHED AND TARGET lz4_static)
+        list(APPEND Blosc2_INSTALL_TARGET_NAMES lz4_static)
     endif()
     if(ZLIB_NG_FETCHED AND TARGET zlib-ng-static)
         list(APPEND Blosc2_INSTALL_TARGET_NAMES zlib-ng-static)
