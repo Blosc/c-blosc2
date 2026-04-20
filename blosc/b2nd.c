@@ -223,9 +223,42 @@ int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim,
 }
 
 
+static int validate_shape_chunkshape_blockshape(int8_t ndim, const int64_t *shape,
+                                                const int32_t *chunkshape, const int32_t *blockshape) {
+  for (int i = 0; i < ndim; ++i) {
+    if (shape[i] < 0) {
+      BLOSC_TRACE_ERROR("shape[%d] cannot be negative", i);
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    if (chunkshape[i] < 0 || blockshape[i] < 0) {
+      BLOSC_TRACE_ERROR("chunkshape[%d] and blockshape[%d] cannot be negative", i, i);
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+
+    bool shape_is_zero = (shape[i] == 0);
+    bool chunkshape_is_zero = (chunkshape[i] == 0);
+    bool blockshape_is_zero = (blockshape[i] == 0);
+
+    if (shape_is_zero && (!chunkshape_is_zero || !blockshape_is_zero)) {
+      BLOSC_TRACE_ERROR("chunkshape[%d] and blockshape[%d] must be zero when shape[%d] is zero", i, i, i);
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+
+    if (!shape_is_zero && (chunkshape_is_zero || blockshape_is_zero)) {
+      BLOSC_TRACE_ERROR("chunkshape[%d] and blockshape[%d] cannot be zero when shape[%d] is non-zero", i, i, i);
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+  }
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 
 int update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
                  const int32_t *chunkshape, const int32_t *blockshape) {
+  BLOSC_ERROR(validate_shape_chunkshape_blockshape(ndim, shape, chunkshape, blockshape));
+
   array->ndim = ndim;
   array->nitems = 1;
   array->extnitems = 1;
@@ -238,11 +271,6 @@ int update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
       array->chunkshape[i] = chunkshape[i];
       array->blockshape[i] = blockshape[i];
       if (array->chunkshape[i] != 0) {
-        if (array->blockshape[i] == 0) {
-          BLOSC_TRACE_ERROR("blockshape[%d] cannot be zero when chunkshape[%d] is non-zero", i, i);
-          return BLOSC2_ERROR_INVALID_PARAM;
-        }
-
         if (shape[i] % array->chunkshape[i] == 0) {
           array->extshape[i] = shape[i];
         } else {
@@ -2381,6 +2409,21 @@ b2nd_context_t *
 b2nd_create_ctx(const blosc2_storage *b2_storage, int8_t ndim, const int64_t *shape, const int32_t *chunkshape,
                 const int32_t *blockshape, const char *dtype, int8_t dtype_format, const blosc2_metalayer *metalayers,
                 int32_t nmetalayers) {
+  if (ndim < 0 || ndim > B2ND_MAX_DIM) {
+    BLOSC_TRACE_ERROR("ndim must be in [0, %d]", B2ND_MAX_DIM);
+    return NULL;
+  }
+
+  if (ndim > 0) {
+    if (shape == NULL || chunkshape == NULL || blockshape == NULL) {
+      BLOSC_TRACE_ERROR("shape, chunkshape and blockshape cannot be NULL when ndim > 0");
+      return NULL;
+    }
+    if (validate_shape_chunkshape_blockshape(ndim, shape, chunkshape, blockshape) < 0) {
+      return NULL;
+    }
+  }
+
   b2nd_context_t *ctx = malloc(sizeof(b2nd_context_t));
   BLOSC_ERROR_NULL(ctx, NULL);
   blosc2_storage *params_b2_storage = malloc(sizeof(blosc2_storage));
