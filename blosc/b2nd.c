@@ -235,17 +235,13 @@ static int validate_shape_chunkshape_blockshape(int8_t ndim, const int64_t *shap
       return BLOSC2_ERROR_INVALID_PARAM;
     }
 
-    bool shape_is_zero = (shape[i] == 0);
     bool chunkshape_is_zero = (chunkshape[i] == 0);
     bool blockshape_is_zero = (blockshape[i] == 0);
 
-    if (shape_is_zero && (!chunkshape_is_zero || !blockshape_is_zero)) {
-      BLOSC_TRACE_ERROR("chunkshape[%d] and blockshape[%d] must be zero when shape[%d] is zero", i, i, i);
-      return BLOSC2_ERROR_INVALID_PARAM;
-    }
-
-    if (!shape_is_zero && (chunkshape_is_zero || blockshape_is_zero)) {
-      BLOSC_TRACE_ERROR("chunkshape[%d] and blockshape[%d] cannot be zero when shape[%d] is non-zero", i, i, i);
+    // Keep compatibility with contexts that use chunkshape=0 (e.g. empty slices).
+    // Reject only invalid tuples that can produce divide-by-zero when chunkshape is non-zero.
+    if (blockshape_is_zero && !chunkshape_is_zero) {
+      BLOSC_TRACE_ERROR("blockshape[%d] cannot be zero when chunkshape[%d] is non-zero", i, i);
       return BLOSC2_ERROR_INVALID_PARAM;
     }
   }
