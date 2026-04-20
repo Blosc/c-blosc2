@@ -10,6 +10,25 @@ Changes from 3.0.0-rc.1 to 3.0.0
   reported for large slices.  As these function signatures changed,
   this is an API/ABI break and callers should be rebuilt against 3.0.0.
 
+* Modernized codec dependency handling in CMake.  `lz4`, `zlib-ng`, and
+  `zstd` are now resolved either from external packages (when preferred and
+  available) or via `FetchContent` using pinned upstream versions, instead of
+  being built from vendored in-tree copies.
+
+* Added explicit CMake cache variables for the pinned codec versions and local
+  source overrides:
+  `BLOSC_LZ4_VERSION`, `BLOSC_ZLIBNG_VERSION`, `BLOSC_ZSTD_VERSION`, and the
+  matching `BLOSC_*_SOURCE_DIR` variables.
+
+* `blosclz` is now the only codec still vendored in-tree.
+
+* Improved CMake install/export support for static builds so downstream
+  `find_package(Blosc2)` consumers keep working when fetched codec libraries
+  are embedded into the Blosc package.
+
+* Replaced deprecated `exec_program()` usage in `cmake/FindSIMD.cmake` with
+  `execute_process()`.  This avoids warnings with newer CMake versions.
+
 
 Changes from 2.23.1 to 3.0.0-rc.1
 =================================
