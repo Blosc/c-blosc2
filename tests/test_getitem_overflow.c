@@ -14,6 +14,14 @@
 #include <stdint.h>
 #include <string.h>
 
+static void put_i32_le(uint8_t* dst, int32_t value) {
+  uint32_t uvalue = (uint32_t)value;
+  dst[0] = (uint8_t)(uvalue & 0xffu);
+  dst[1] = (uint8_t)((uvalue >> 8) & 0xffu);
+  dst[2] = (uint8_t)((uvalue >> 16) & 0xffu);
+  dst[3] = (uint8_t)((uvalue >> 24) & 0xffu);
+}
+
 int main(void) {
   blosc2_init();
 
@@ -28,9 +36,9 @@ int main(void) {
   int32_t nbytes = INT32_MAX;
   int32_t blocksize = 16;
   int32_t cbytes = BLOSC_MIN_HEADER_LENGTH;
-  memcpy(chunk + 4, &nbytes, sizeof(nbytes));
-  memcpy(chunk + 8, &blocksize, sizeof(blocksize));
-  memcpy(chunk + 12, &cbytes, sizeof(cbytes));
+  put_i32_le(chunk + BLOSC2_CHUNK_NBYTES, nbytes);
+  put_i32_le(chunk + BLOSC2_CHUNK_BLOCKSIZE, blocksize);
+  put_i32_le(chunk + BLOSC2_CHUNK_CBYTES, cbytes);
 
   int start = 0;
   int nitems = 1073741824;
