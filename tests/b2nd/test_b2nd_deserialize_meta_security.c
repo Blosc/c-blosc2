@@ -60,6 +60,50 @@ CUTEST_TEST_TEST(deserialize_meta_security) {
   CUTEST_ASSERT("negative dtype length should fail", rc < 0);
   CUTEST_ASSERT("dtype must remain NULL on malformed metadata", dtype == NULL);
 
+  // Corrupt blockshape[0] to 0 while chunkshape[0] stays non-zero; opening must fail cleanly.
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  blosc2_storage storage = {.cparams=&cparams};
+  int64_t arr_shape[2] = {20, 10};
+  int32_t arr_chunkshape[2] = {7, 5};
+  int32_t arr_blockshape[2] = {3, 5};
+  b2nd_context_t *ctx = b2nd_create_ctx(&storage, 2, arr_shape, arr_chunkshape, arr_blockshape,
+                                        NULL, 0, NULL, 0);
+  CUTEST_ASSERT("context creation should succeed", ctx != NULL);
+
+  b2nd_array_t *arr;
+  B2ND_TEST_ASSERT(b2nd_zeros(ctx, &arr));
+
+  uint8_t *b2nd_meta;
+  int32_t b2nd_meta_len;
+  B2ND_TEST_ASSERT(blosc2_meta_get(arr->sc, "b2nd", &b2nd_meta, &b2nd_meta_len));
+  uint8_t *b2nd_meta_bad = malloc((size_t)b2nd_meta_len);
+  CUTEST_ASSERT("cannot allocate b2nd metadata buffer", b2nd_meta_bad != NULL);
+  memcpy(b2nd_meta_bad, b2nd_meta, (size_t)b2nd_meta_len);
+
+  size_t blockshape_offset = 3;
+  blockshape_offset += 1 + (size_t)2 * (1 + sizeof(int64_t));
+  blockshape_offset += 1 + (size_t)2 * (1 + sizeof(int32_t));
+  size_t blockshape0_value_offset = blockshape_offset + 2;
+  CUTEST_ASSERT("blockshape field out of bounds",
+                blockshape0_value_offset + sizeof(int32_t) <= (size_t)b2nd_meta_len);
+
+  int32_t zero = 0;
+  swap_store(&b2nd_meta_bad[blockshape0_value_offset], &zero, sizeof(int32_t));
+  B2ND_TEST_ASSERT(blosc2_meta_update(arr->sc, "b2nd", b2nd_meta_bad, b2nd_meta_len));
+
+  b2nd_array_t *arr_corrupt = NULL;
+  rc = b2nd_from_schunk(arr->sc, &arr_corrupt);
+  CUTEST_ASSERT("corrupted blockshape/chunkshape metadata should fail", rc < 0);
+  if (arr_corrupt != NULL) {
+    B2ND_TEST_ASSERT(b2nd_free(arr_corrupt));
+  }
+
+  free(b2nd_meta_bad);
+  free(b2nd_meta);
+  B2ND_TEST_ASSERT(b2nd_free(arr));
+  B2ND_TEST_ASSERT(b2nd_free_ctx(ctx));
+
   free(smeta_bad);
   free(smeta);
 
