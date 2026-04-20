@@ -4317,8 +4317,8 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
-  int chunk_memcpy = header->flags & 0x1;
-  if (!context->special_type && !chunk_memcpy &&
+  bool chunk_memcpyed = (header->flags & (uint8_t)BLOSC_MEMCPYED) != 0;
+  if (!context->special_type && !chunk_memcpyed &&
       ((uint8_t *)(_src + srcsize) < (uint8_t *)(bstarts + context->nblocks))) {
     BLOSC_TRACE_ERROR("`bstarts` out of bounds.");
     return BLOSC2_ERROR_READ_BUFFER;
@@ -4358,7 +4358,15 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
         // We do nothing here
         break;
       case BLOSC2_NO_SPECIAL:
-        _src += context->header_overhead + (int32_t)start_bytes64;
+        {
+          int64_t src_offset64 = (int64_t)context->header_overhead + start_bytes64;
+          int64_t src_stop64 = src_offset64 + nitems_bytes64;
+          if ((src_offset64 < 0) || (src_stop64 < src_offset64) || (src_stop64 > srcsize)) {
+            BLOSC_TRACE_ERROR("getitem memcpy source out of bounds.");
+            return BLOSC2_ERROR_READ_BUFFER;
+          }
+          _src += (int32_t)src_offset64;
+        }
         memcpy(_dest, _src, ntbytes);
         break;
       default:
