@@ -2,7 +2,7 @@
 # the project is compiled.
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-   execute_process(COMMAND cat /proc/cpuinfo OUTPUT_VARIABLE CPUINFO)
+   file(READ /proc/cpuinfo CPUINFO)
 
    string(REGEX REPLACE "^.*(sse2).*$" "\\1" SSE_THERE "${CPUINFO}")
    string(COMPARE EQUAL "sse2" "${SSE_THERE}" SSE2_TRUE)
