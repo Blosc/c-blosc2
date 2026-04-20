@@ -26,6 +26,10 @@ Changes from 3.0.0-rc.1 to 3.0.0
   `find_package(Blosc2)` consumers keep working when fetched codec libraries
   are embedded into the Blosc package.
 
+* Embedded third-party headers installed by the CMake package are now placed
+  under a Blosc-owned include subtree (`blosc2/thirdparty/...`) instead of the
+  top-level include directory, reducing the risk of header name collisions.
+
 * Replaced deprecated `exec_program()` usage in `cmake/FindSIMD.cmake` with
   `execute_process()`.  This avoids warnings with newer CMake versions.
 

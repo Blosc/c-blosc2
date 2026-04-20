@@ -222,8 +222,12 @@ if(NOT LZ4_FOUND)
     set(LZ4_FETCHED TRUE)
     set(LZ4_FOUND TRUE)
     set(LZ4_SOURCE_DIR "${lz4_SOURCE_DIR}")
+    set(LZ4_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/blosc2/thirdparty/lz4")
     if(TARGET lz4_static)
         set_target_properties(lz4_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        set_property(TARGET lz4_static PROPERTY INTERFACE_INCLUDE_DIRECTORIES
+            "$<BUILD_INTERFACE:${LZ4_SOURCE_DIR}/lib>"
+            "$<INSTALL_INTERFACE:${LZ4_INSTALL_INCLUDEDIR}>")
     endif()
 endif()
 
@@ -274,6 +278,7 @@ if(NOT DEACTIVATE_ZLIB)
         set(ZLIB_NG_FETCHED TRUE)
         set(ZLIB_NG_FOUND TRUE)
         set(ZLIB_NG_BUILD_DIR "${zlib_ng_BINARY_DIR}")
+        set(ZLIB_NG_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/blosc2/thirdparty/zlib-ng")
         set(ZLIB_NG_INSTALL_TARGET "")
         if(TARGET zlib-ng-static)
             get_target_property(ZLIB_NG_INSTALL_TARGET zlib-ng-static ALIASED_TARGET)
@@ -281,6 +286,10 @@ if(NOT DEACTIVATE_ZLIB)
                 set(ZLIB_NG_INSTALL_TARGET zlib-ng-static)
             endif()
             set_target_properties(${ZLIB_NG_INSTALL_TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+            set_property(TARGET ${ZLIB_NG_INSTALL_TARGET} PROPERTY INTERFACE_INCLUDE_DIRECTORIES
+                "$<BUILD_INTERFACE:${zlib_ng_SOURCE_DIR}>"
+                "$<BUILD_INTERFACE:${ZLIB_NG_BUILD_DIR}>"
+                "$<INSTALL_INTERFACE:${ZLIB_NG_INSTALL_INCLUDEDIR}>")
         endif()
     endif()
     set(HAVE_ZLIB TRUE)
@@ -327,8 +336,12 @@ if(NOT DEACTIVATE_ZSTD)
         set(ZSTD_FOUND TRUE)
         set(ZSTD_BUILD_DIR "${zstd_BINARY_DIR}")
         set(ZSTD_SOURCE_DIR "${zstd_SOURCE_DIR}")
+        set(ZSTD_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/blosc2/thirdparty/zstd")
         if(TARGET libzstd_static)
             set_target_properties(libzstd_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
+            set_property(TARGET libzstd_static PROPERTY INTERFACE_INCLUDE_DIRECTORIES
+                "$<BUILD_INTERFACE:${ZSTD_SOURCE_DIR}/lib>"
+                "$<INSTALL_INTERFACE:${ZSTD_INSTALL_INCLUDEDIR}>")
         endif()
     else()
         set(HAVE_ZSTD TRUE)
@@ -645,7 +658,7 @@ if(BLOSC_INSTALL)
                 ${LZ4_SOURCE_DIR}/lib/lz4frame_static.h
                 ${LZ4_SOURCE_DIR}/lib/lz4file.h
                 ${LZ4_SOURCE_DIR}/lib/xxhash.h
-                DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+                DESTINATION ${LZ4_INSTALL_INCLUDEDIR}
                 COMPONENT DEV)
     endif()
     if(ZLIB_NG_FETCHED AND ZLIB_NG_INSTALL_TARGET)
@@ -654,7 +667,7 @@ if(BLOSC_INSTALL)
                 ${ZLIB_NG_BUILD_DIR}/zconf-ng.h
                 ${ZLIB_NG_BUILD_DIR}/zlib_name_mangling-ng.h
                 ${ZLIB_NG_BUILD_DIR}/gzread_mangle.h
-                DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+                DESTINATION ${ZLIB_NG_INSTALL_INCLUDEDIR}
                 COMPONENT DEV)
     endif()
     if(ZSTD_FETCHED AND TARGET libzstd_static)
@@ -662,7 +675,7 @@ if(BLOSC_INSTALL)
                 ${ZSTD_SOURCE_DIR}/lib/zstd.h
                 ${ZSTD_SOURCE_DIR}/lib/zdict.h
                 ${ZSTD_SOURCE_DIR}/lib/zstd_errors.h
-                DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+                DESTINATION ${ZSTD_INSTALL_INCLUDEDIR}
                 COMPONENT DEV)
     endif()
 
@@ -688,6 +701,7 @@ if(BLOSC_INSTALL)
     # This stores our targets and find and populates the targets we depend on,
     # including third party interface libraries that we added.
     set(Blosc2_INSTALL_TARGET_NAMES)
+    set(Blosc2_INSTALL_THIRDPARTY_TARGET_NAMES)
     if(BUILD_SHARED)
         list(APPEND Blosc2_INSTALL_TARGET_NAMES blosc2_shared)
     endif()
@@ -695,13 +709,13 @@ if(BLOSC_INSTALL)
         list(APPEND Blosc2_INSTALL_TARGET_NAMES blosc2_static)
     endif()
     if(LZ4_FETCHED AND TARGET lz4_static)
-        list(APPEND Blosc2_INSTALL_TARGET_NAMES lz4_static)
+        list(APPEND Blosc2_INSTALL_THIRDPARTY_TARGET_NAMES lz4_static)
     endif()
     if(ZLIB_NG_FETCHED AND ZLIB_NG_INSTALL_TARGET)
-        list(APPEND Blosc2_INSTALL_TARGET_NAMES ${ZLIB_NG_INSTALL_TARGET})
+        list(APPEND Blosc2_INSTALL_THIRDPARTY_TARGET_NAMES ${ZLIB_NG_INSTALL_TARGET})
     endif()
     if(ZSTD_FETCHED AND TARGET libzstd_static)
-        list(APPEND Blosc2_INSTALL_TARGET_NAMES libzstd_static)
+        list(APPEND Blosc2_INSTALL_THIRDPARTY_TARGET_NAMES libzstd_static)
     endif()
     # Add unified target
     add_library(blosc2 INTERFACE)
@@ -719,6 +733,14 @@ if(BLOSC_INSTALL)
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
+    if(Blosc2_INSTALL_THIRDPARTY_TARGET_NAMES)
+        install(TARGETS ${Blosc2_INSTALL_THIRDPARTY_TARGET_NAMES}
+            EXPORT Blosc2Targets
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        )
+    endif()
     install(EXPORT Blosc2Targets
         FILE Blosc2Targets.cmake
         NAMESPACE Blosc2::
