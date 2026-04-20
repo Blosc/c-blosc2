@@ -38,10 +38,8 @@ static int schunk_get_chunk_flags2(blosc2_schunk *schunk, int64_t nchunk, uint8_
 
 
 static int validate_nchunk(blosc2_schunk *schunk, int64_t nchunk, bool allow_end, const char *func_name) {
-  BLOSC_UNUSED_PARAM(func_name);
-
   if (nchunk < 0) {
-    BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') is negative.", nchunk);
+    BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') is negative in %s.", nchunk, func_name);
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
