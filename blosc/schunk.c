@@ -37,6 +37,33 @@
 static int schunk_get_chunk_flags2(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk_flags2);
 
 
+static int validate_nchunk(blosc2_schunk *schunk, int64_t nchunk, bool allow_end, const char *func_name) {
+  BLOSC_UNUSED_PARAM(func_name);
+
+  if (nchunk < 0) {
+    BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') is negative.", nchunk);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  if (allow_end) {
+    if (nchunk > schunk->nchunks) {
+      BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') is out of range [0, %" PRId64 "] in %s.",
+                        nchunk, schunk->nchunks, func_name);
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+  }
+  else {
+    if (nchunk >= schunk->nchunks) {
+      BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') exceeds the number of chunks "
+                        "('%" PRId64 "') in %s.", nchunk, schunk->nchunks, func_name);
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+  }
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 /* Get the cparams associated with a super-chunk */
 int blosc2_schunk_get_cparams(blosc2_schunk *schunk, blosc2_cparams **cparams) {
   *cparams = calloc(1, sizeof(blosc2_cparams));
@@ -861,12 +888,17 @@ int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool c
 
 /* Insert an existing @p chunk in a specified position on a super-chunk */
 int64_t blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk, bool copy) {
+  int rc = validate_nchunk(schunk, nchunk, true, "blosc2_schunk_insert_chunk");
+  if (rc < 0) {
+    return rc;
+  }
+
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
   int64_t nchunks = schunk->nchunks;
   bool chunk_vlblocks = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2] & BLOSC2_VL_BLOCKS) != 0;
 
-  int rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
+  rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {
     return rc;
   }
@@ -970,11 +1002,16 @@ int64_t blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
 
 
 int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk, bool copy) {
+  int rc = validate_nchunk(schunk, nchunk, false, "blosc2_schunk_update_chunk");
+  if (rc < 0) {
+    return rc;
+  }
+
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
   bool chunk_vlblocks = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2] & BLOSC2_VL_BLOCKS) != 0;
 
-  int rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
+  rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {
     return rc;
   }
@@ -1091,9 +1128,9 @@ int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
 }
 
 int64_t blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int64_t nchunk) {
-  int rc;
-  if (schunk->nchunks < nchunk) {
-    BLOSC_TRACE_ERROR("The schunk has not enough chunks (%" PRId64 ")!", schunk->nchunks);
+  int rc = validate_nchunk(schunk, nchunk, false, "blosc2_schunk_delete_chunk");
+  if (rc < 0) {
+    return rc;
   }
 
   bool needs_free;
@@ -1185,19 +1222,18 @@ int64_t blosc2_schunk_append_buffer(blosc2_schunk *schunk, const void *src, int3
 /* Decompress and return a chunk that is part of a super-chunk. */
 int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int64_t nchunk,
                                    void *dest, int32_t nbytes) {
+  int rc = validate_nchunk(schunk, nchunk, false, "blosc2_schunk_decompress_chunk");
+  if (rc < 0) {
+    return rc;
+  }
+
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
   int chunksize;
-  int rc;
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
 
   schunk->current_nchunk = nchunk;
   if (frame == NULL) {
-    if (nchunk >= schunk->nchunks) {
-      BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') exceeds the number of chunks "
-                        "('%" PRId64 "') in super-chunk.", nchunk, schunk->nchunks);
-      return BLOSC2_ERROR_INVALID_PARAM;
-    }
     uint8_t* src = schunk->data[nchunk];
     if (src == 0) {
       return 0;
@@ -1242,6 +1278,11 @@ int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int64_t nchunk,
  * is returned instead.
 */
 int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chunk, bool *needs_free) {
+  int rc = validate_nchunk(schunk, nchunk, false, "blosc2_schunk_get_chunk");
+  if (rc < 0) {
+    return rc;
+  }
+
   if (ctx_uses_parallel_backend(schunk->dctx)) {
     blosc2_pthread_mutex_lock(&schunk->dctx->nchunk_mutex);
     schunk->current_nchunk = nchunk;
@@ -1255,12 +1296,6 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chu
     return frame_get_chunk(frame, nchunk, chunk, needs_free);
   }
 
-  if (nchunk >= schunk->nchunks) {
-    BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') exceeds the number of chunks "
-                      "('%" PRId64 "') in schunk.", nchunk, schunk->nchunks);
-    return BLOSC2_ERROR_INVALID_PARAM;
-  }
-
   *chunk = schunk->data[nchunk];
   if (*chunk == 0) {
     *needs_free = 0;
@@ -1269,7 +1304,7 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chu
 
   *needs_free = false;
   int32_t chunk_cbytes;
-  int rc = blosc2_cbuffer_sizes(*chunk, NULL, &chunk_cbytes, NULL);
+  rc = blosc2_cbuffer_sizes(*chunk, NULL, &chunk_cbytes, NULL);
   if (rc < 0) {
     return rc;
   }
@@ -1288,6 +1323,11 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chu
  * is returned instead.
 */
 int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chunk, bool *needs_free) {
+  int rc = validate_nchunk(schunk, nchunk, false, "blosc2_schunk_get_lazychunk");
+  if (rc < 0) {
+    return rc;
+  }
+
   if (ctx_uses_parallel_backend(schunk->dctx)) {
     blosc2_pthread_mutex_lock(&schunk->dctx->nchunk_mutex);
     schunk->current_nchunk = nchunk;
@@ -1301,12 +1341,6 @@ int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *
     return frame_get_lazychunk(frame, nchunk, chunk, needs_free);
   }
 
-  if (nchunk >= schunk->nchunks) {
-    BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') exceeds the number of chunks "
-                      "('%" PRId64 "') in schunk.", nchunk, schunk->nchunks);
-    return BLOSC2_ERROR_INVALID_PARAM;
-  }
-
   *chunk = schunk->data[nchunk];
   if (*chunk == 0) {
     *needs_free = 0;
@@ -1315,7 +1349,7 @@ int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *
 
   *needs_free = false;
   int32_t chunk_cbytes;
-  int rc = blosc2_cbuffer_sizes(*chunk, NULL, &chunk_cbytes, NULL);
+  rc = blosc2_cbuffer_sizes(*chunk, NULL, &chunk_cbytes, NULL);
   if (rc < 0) {
     return rc;
   }
@@ -1532,7 +1566,7 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
 
 int64_t schunk_get_slice_nchunks(blosc2_schunk *schunk, int64_t start, int64_t stop, int64_t **chunks_idx) {
   BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_NULL_POINTER);
-  if (schunk->nchunks == 0){  
+  if (schunk->nchunks == 0){
     *chunks_idx = NULL;
     return 0;
   }
