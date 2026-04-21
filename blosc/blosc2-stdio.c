@@ -324,11 +324,17 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
     return 0;
   }
 
+  if (size < 0 || nitems < 0 || (size != 0 && nitems > INT64_MAX / size)) {
+    return 0;
+  }
   int64_t n_bytes = size * nitems;
   if (n_bytes == 0) {
     return 0;
   }
 
+  if (position < 0 || n_bytes < 0 || position > INT64_MAX - n_bytes) {
+    return 0;
+  }
   int64_t position_end = position + n_bytes;
   int64_t new_size = position_end > mmap_file->file_size ? position_end : mmap_file->file_size;
 
@@ -445,7 +451,19 @@ int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, int64_t
     return 0;
   }
 
-  if (position + size * nitems > mmap_file->file_size) {
+  if (size < 0 || nitems < 0 || (size != 0 && nitems > INT64_MAX / size)) {
+    *ptr = NULL;
+    return 0;
+  }
+  int64_t n_bytes = size * nitems;
+
+  if (position < 0 || n_bytes < 0 || position > INT64_MAX - n_bytes) {
+    *ptr = NULL;
+    return 0;
+  }
+  int64_t position_end = position + n_bytes;
+
+  if (position_end > mmap_file->file_size) {
     BLOSC_TRACE_ERROR("Cannot read beyond the end of the memory-mapped file.");
     *ptr = NULL;
     return 0;
