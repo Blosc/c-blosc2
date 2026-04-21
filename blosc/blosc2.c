@@ -274,20 +274,29 @@ int blosc2_compcode_to_compname(int compcode, const char** compname) {
   int code = -1;    /* -1 means non-existent compressor code */
   const char* name = NULL;
 
-  /* Map the compressor code */
-  if (compcode == BLOSC_BLOSCLZ)
+  if (compcode == BLOSC_BLOSCLZ) {
+    code = BLOSC_BLOSCLZ;
     name = BLOSC_BLOSCLZ_COMPNAME;
-  else if (compcode == BLOSC_LZ4)
+  } else if (compcode == BLOSC_LZ4) {
+    code = BLOSC_LZ4;
     name = BLOSC_LZ4_COMPNAME;
-  else if (compcode == BLOSC_LZ4HC)
+  } else if (compcode == BLOSC_LZ4HC) {
+    code = BLOSC_LZ4HC;
     name = BLOSC_LZ4HC_COMPNAME;
-  else if (compcode == BLOSC_ZLIB)
+  } else if (compcode == BLOSC_ZLIB) {
+#if defined(HAVE_ZLIB)
+    code = BLOSC_ZLIB;
+#endif /* HAVE_ZLIB */
     name = BLOSC_ZLIB_COMPNAME;
-  else if (compcode == BLOSC_ZSTD)
+  } else if (compcode == BLOSC_ZSTD) {
+#if defined(HAVE_ZSTD)
+    code = BLOSC_ZSTD;
+#endif /* HAVE_ZSTD */
     name = BLOSC_ZSTD_COMPNAME;
-  else {
+  } else {
     for (int i = 0; i < g_ncodecs; ++i) {
       if (compcode == g_codecs[i].compcode) {
+        code = compcode;
         name = g_codecs[i].compname;
         break;
       }
@@ -295,24 +304,6 @@ int blosc2_compcode_to_compname(int compcode, const char** compname) {
   }
 
   *compname = name;
-
-  /* Guess if there is support for this code */
-  if (compcode == BLOSC_BLOSCLZ)
-    code = BLOSC_BLOSCLZ;
-  else if (compcode == BLOSC_LZ4)
-    code = BLOSC_LZ4;
-  else if (compcode == BLOSC_LZ4HC)
-    code = BLOSC_LZ4HC;
-#if defined(HAVE_ZLIB)
-  else if (compcode == BLOSC_ZLIB)
-    code = BLOSC_ZLIB;
-#endif /* HAVE_ZLIB */
-#if defined(HAVE_ZSTD)
-  else if (compcode == BLOSC_ZSTD)
-    code = BLOSC_ZSTD;
-#endif /* HAVE_ZSTD */
-  else if (compcode >= BLOSC_LAST_CODEC)
-    code = compcode;
   return code;
 }
 
