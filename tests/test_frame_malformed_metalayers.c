@@ -8,7 +8,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <limits.h>
 #include "blosc2.h"
+#include "blosc-private.h"
 #include "frame.h"
 
 /* 
@@ -20,7 +22,7 @@ int main() {
     blosc2_init();
 
     /* 1. Create a minimal valid schunk and frame */
-    int32_t data[100];
+    int32_t data[100] = {0};
     blosc2_storage storage = {.contiguous = true};
     blosc2_schunk* schunk = blosc2_schunk_new(&storage);
     blosc2_schunk_append_buffer(schunk, data, sizeof(data));
@@ -40,31 +42,71 @@ int main() {
     }
 
     /* 4. Malfunction the buffer: Inject malicious metalayer metadata */
-    /* We need to find the metalayer index and overwrite it.
-       In a real attack, the entire frame would be crafted. 
-       Here we just demonstrate the logic bypass. */
-       
     int32_t header_len;
-    blosc2_from_big(&header_len, buffer + FRAME_HEADER_LEN, sizeof(header_len));
+    from_big(&header_len, buffer + FRAME_HEADER_LEN, sizeof(header_len));
     
     printf("Original Header Len: %d\n", header_len);
 
-    /* Search for the metalayer content marker (0xc6) and its size */
-    /* This is a simplification for the PoC demonstration. */
-    for (int i = FRAME_IDX_SIZE; i < header_len - 10; i++) {
-        if (buffer[i] == 0xc6) {
-            printf("Found metalayer content marker at offset %d\n", i);
+    /* Parse the metalayer index (map) to find "testmeta" */
+    uint8_t *idx_ptr = buffer + FRAME_IDX_SIZE + 2; // Skip idx_size
+    if (*idx_ptr != 0xde) {
+        printf("Error: Could not find metalayer index marker\n");
+        return 1;
+    }
+    idx_ptr++;
+    
+    uint16_t nmetalayers;
+    from_big(&nmetalayers, idx_ptr, sizeof(nmetalayers));
+    idx_ptr += 2;
+    
+    int found = 0;
+    for (int i = 0; i < nmetalayers; i++) {
+        if ((*idx_ptr & 0xe0u) != 0xa0u) break;
+        uint8_t nslen = *idx_ptr & 0x1fu;
+        idx_ptr++;
+        
+        if (nslen == strlen("testmeta") && memcmp(idx_ptr, "testmeta", nslen) == 0) {
+            printf("Found 'testmeta' in index at offset %td\n", idx_ptr - buffer);
+            idx_ptr += nslen;
             
-            /* Overwrite the content_len with a huge value (INT32_MAX) */
-            int32_t malicious_len = 2147483647; 
-            blosc2_to_big(buffer + i + 1, &malicious_len, sizeof(malicious_len));
+            if (*idx_ptr != 0xd2) {
+                printf("Error: Unexpected offset marker 0x%02x\n", *idx_ptr);
+                return 1;
+            }
+            idx_ptr++;
             
-            /* Overwrite the offset in the index to be very large */
-            /* This requires more complex parsing to find the exact index entry, 
-               but the principle is that 'offset + content_len' would overflow. */
-               
+            /* Get the original offset to the content marker */
+            int32_t original_offset;
+            from_big(&original_offset, idx_ptr, sizeof(original_offset));
+            
+            /* Overwrite the content_len at the destination with a huge value */
+            uint8_t *content_marker = buffer + original_offset;
+            if (*content_marker == 0xc6) {
+                int32_t malicious_len = INT32_MAX;
+                to_big(content_marker + 1, &malicious_len, sizeof(malicious_len));
+                printf("Overwrote content_len at offset %d with INT32_MAX\n", original_offset + 1);
+            }
+
+            /* Overwrite the offset in the index to be very large to trigger bypass */
+            /* We use a value that + 5 will overflow in 32-bit signed arithmetic */
+            int32_t malicious_offset = INT32_MAX - 2; 
+            to_big(idx_ptr, &malicious_offset, sizeof(malicious_offset));
+            printf("Overwrote index offset with %d to trigger overflow\n", malicious_offset);
+            
+            /* We also need header_len to be large so (offset < header_len) passes */
+            int32_t malicious_header_len = INT32_MAX;
+            to_big(buffer + FRAME_HEADER_LEN, &malicious_header_len, sizeof(malicious_header_len));
+            printf("Overwrote header_len with INT32_MAX\n");
+
+            found = 1;
             break;
         }
+        idx_ptr += nslen + 1 + 4; // Skip name + 0xd2 + offset
+    }
+
+    if (!found) {
+        printf("Error: Could not locate 'testmeta' metalayer in buffer\n");
+        return 1;
     }
 
     /* 5. Attempt to open the malformed frame */
@@ -76,12 +118,12 @@ int main() {
     } else {
         printf("FAILURE: Malformed frame was ACCEPTED! (Potential Vulnerability)\n");
         blosc2_schunk_free(malicious_schunk);
-        return 1; /* Return failure code */
+        return 1; 
     }
 
     blosc2_schunk_free(schunk);
     if (needs_free) free(buffer);
     blosc2_destroy();
 
-    return 0; /* Return success code */
+    return 0; 
 }
