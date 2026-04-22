@@ -121,6 +121,11 @@ static char* test_schunk_avoid_cframe_free_without_frame(void) {
   blosc2_schunk_avoid_cframe_free(schunk, false);
 
   blosc2_schunk_free(schunk);
+  blosc2_destroy();
+
+  return EXIT_SUCCESS;
+}
+
 static char* test_schunk_from_buffer_bad_magic(void) {
   blosc2_schunk* schunk;
   uint8_t* cframe;
