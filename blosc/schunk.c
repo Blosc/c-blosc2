@@ -600,15 +600,16 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
 
 /* Create a super-chunk out of a contiguous frame buffer */
 blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy) {
-  blosc2_frame_s* frame = frame_from_cframe(cframe, len, false);
-  if (frame == NULL) {
+  // Check that the buffer actually comes from a cframe
+  if (cframe == NULL || len < FRAME_HEADER_MINLEN) {
     return NULL;
   }
-  // Check that the buffer actually comes from a cframe
-  char *magic_number = (char *)cframe;
-  magic_number += FRAME_HEADER_MAGIC;
-  if (strcmp(magic_number, "b2frame\0") != 0) {
-    frame_free(frame);
+  char *magic_number = (char *)cframe + FRAME_HEADER_MAGIC;
+  if (memcmp(magic_number, "b2frame", sizeof("b2frame")) != 0) {
+    return NULL;
+  }
+  blosc2_frame_s* frame = frame_from_cframe(cframe, len, false);
+  if (frame == NULL) {
     return NULL;
   }
   blosc2_schunk* schunk = frame_to_schunk(frame, copy, &BLOSC2_IO_DEFAULTS);
