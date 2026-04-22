@@ -1987,6 +1987,8 @@ static int validate_offsets_chunk(blosc2_frame_s* frame, int32_t header_len, int
     return BLOSC2_ERROR_DATA;
   }
 
+  int64_t prev_non_negative_offset = 0;
+  bool have_prev_non_negative_offset = false;
   for (int64_t i = 0; i < nchunks; ++i) {
     int64_t offset = offsets[i];
     if (offset < 0) {
@@ -1997,11 +1999,13 @@ static int validate_offsets_chunk(blosc2_frame_s* frame, int32_t header_len, int
       BLOSC_TRACE_ERROR("Offset for chunk %" PRId64 " is out of bounds.", i);
       return BLOSC2_ERROR_INVALID_HEADER;
     }
-    if (i > 0 && offsets[i - 1] >= 0 && offset < offsets[i - 1]) {
+    if (have_prev_non_negative_offset && offset < prev_non_negative_offset) {
       free(offsets);
       BLOSC_TRACE_ERROR("Offsets are not monotonic at chunk %" PRId64 ".", i);
       return BLOSC2_ERROR_INVALID_HEADER;
     }
+    prev_non_negative_offset = offset;
+    have_prev_non_negative_offset = true;
   }
 
   free(offsets);
