@@ -36,16 +36,13 @@
 #   DEACTIVATE_ZSTD: default OFF
 #       do not include support for the Zstd library
 #   WITH_ZLIB_OPTIM: default ON
-#       set WITH_OPTIM when building Zlib library, setting OFF is useful for wasm32 targets
+#       set WITH_OPTIM when building the fetched zlib-ng library; setting OFF is useful for wasm32 targets
 #   PREFER_EXTERNAL_LZ4: default OFF
-#       when found, use the installed LZ4 libs instead of included
-#       sources
+#       when found, use the installed LZ4 libs instead of fetching upstream sources
 #   PREFER_EXTERNAL_ZLIB: default OFF
-#       when found, use the installed Zlib libs instead of included
-#       MINIZ sources
+#       when found, use the installed Zlib/Zlib-ng libs instead of fetching upstream sources
 #   PREFER_EXTERNAL_ZSTD: default OFF
-#       when found, use the installed Zstd libs instead of included
-#       sources
+#       when found, use the installed Zstd libs instead of fetching upstream sources
 #   TEST_INCLUDE_BENCH_SHUFFLE_1: default ON
 #       add a test that runs the benchmark program passing "shuffle" with 1
 #       thread as second parameter
@@ -128,11 +125,11 @@ option(DEACTIVATE_ZSTD
 option(DEACTIVATE_IPP
     "Do not include support for the Intel IPP library." ON)
 option(PREFER_EXTERNAL_LZ4
-    "Find and use external LZ4 library instead of included sources." OFF)
+    "Find and use external LZ4 library instead of fetching sources." OFF)
 option(PREFER_EXTERNAL_ZLIB
-    "Find and use external ZLIB library instead of included sources." OFF)
+    "Find and use external ZLIB library instead of fetching sources." OFF)
 option(PREFER_EXTERNAL_ZSTD
-    "Find and use external ZSTD library instead of included sources." OFF)
+    "Find and use external ZSTD library instead of fetching sources." OFF)
 option(WITH_ZLIB_OPTIM
     "Set WITH_OPTIM for ZLIB, turning off is useful for compiling for wasm32 targets." ON)
 
