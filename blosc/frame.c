@@ -3356,7 +3356,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
       if (wbytes != chunk_cbytes) {
         BLOSC_TRACE_ERROR("Cannot write the full chunk to frame (wrote %" PRId64 " of %" PRId64
                           " bytes at position %" PRId64 ", nchunk=%" PRId64 ").",
-                          wbytes, chunk_cbytes, io_pos - chunk_cbytes, nchunks);
+                          wbytes, (int64_t)chunk_cbytes, io_pos - (int64_t)chunk_cbytes, nchunks);
         io_cb->close(fp);
         return NULL;
       }
@@ -3575,7 +3575,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       if (wbytes != chunk_cbytes) {
         BLOSC_TRACE_ERROR("Cannot write the full chunk to frame (wrote %" PRId64 " of %" PRId64
                           " bytes at position %" PRId64 ", nchunk=%" PRId64 ").",
-                          wbytes, chunk_cbytes, io_pos - chunk_cbytes, nchunk);
+                          wbytes, (int64_t)chunk_cbytes, io_pos - (int64_t)chunk_cbytes, nchunk);
         io_cb->close(fp);
         return NULL;
       }
@@ -3912,7 +3912,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
         if (wbytes != chunk_cbytes) {
           BLOSC_TRACE_ERROR("Cannot write the full chunk to frame (wrote %" PRId64 " of %" PRId64
                             " bytes at position %" PRId64 ", nchunk=%" PRId64 ").",
-                            wbytes, chunk_cbytes, io_pos, nchunk);
+                            wbytes, (int64_t)chunk_cbytes, io_pos, nchunk);
           io_cb->close(fp);
           return NULL;
         }

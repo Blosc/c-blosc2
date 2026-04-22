@@ -1734,7 +1734,7 @@ int extend_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
       BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
     }
     if (array->shape[i] == INT64_MAX) {
-      BLOSC_TRACE_ERROR("Cannot extend array with shape[%d] = %" PRId64 "d", i, INT64_MAX);
+      BLOSC_TRACE_ERROR("Cannot extend array with shape[%d] = %" PRId64, i, (int64_t)INT64_MAX);
       BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
     }
   }
