@@ -106,6 +106,25 @@ static char* test_schunk_cframe(void) {
   return EXIT_SUCCESS;
 }
 
+static char* test_schunk_avoid_cframe_free_without_frame(void) {
+  blosc2_schunk* schunk;
+
+  blosc2_init();
+
+  blosc2_storage storage = {.contiguous = false};
+  schunk = blosc2_schunk_new(&storage);
+  mu_assert("blosc2_schunk_new() failed", schunk != NULL);
+  mu_assert("Expected in-memory non-contiguous schunk to have no frame", schunk->frame == NULL);
+
+  blosc2_schunk_avoid_cframe_free(schunk, true);
+  blosc2_schunk_avoid_cframe_free(schunk, false);
+
+  blosc2_schunk_free(schunk);
+  blosc2_destroy();
+
+  return EXIT_SUCCESS;
+}
+
 static char *all_tests(void) {
   nchunks = 0;
   contiguous = true;
@@ -147,6 +166,8 @@ static char *all_tests(void) {
   copy = false;
   special_chunks = true;
   mu_run_test(test_schunk_cframe);
+
+  mu_run_test(test_schunk_avoid_cframe_free_without_frame);
 
   return EXIT_SUCCESS;
 }
