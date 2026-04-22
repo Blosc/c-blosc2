@@ -20,8 +20,6 @@
 #else
   #if defined(_MSC_VER)
     #pragma message("NEON shuffle tests not enabled.")
-  #else
-    #warning NEON shuffle tests not enabled.
   #endif
 #endif  /* defined(SHUFFLE_USE_NEON) */
 
@@ -74,6 +72,10 @@ static int test_shuffle_roundtrip_neon(size_t type_size, size_t num_elements,
 
   return exit_code;
 #else
+  BLOSC_UNUSED_PARAM(type_size);
+  BLOSC_UNUSED_PARAM(num_elements);
+  BLOSC_UNUSED_PARAM(buffer_alignment);
+  BLOSC_UNUSED_PARAM(test_type);
   return EXIT_SUCCESS;
 #endif /* defined(SHUFFLE_USE_NEON) */
 }

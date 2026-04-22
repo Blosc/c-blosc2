@@ -144,7 +144,6 @@ int main(int argc, char *argv[]) {
   static int32_t data_out[SIZE];
   static int32_t data_dest[SIZE];
   size_t isize = SIZE * sizeof(int32_t);
-  size_t osize = SIZE * sizeof(int32_t);
   int dsize = SIZE * sizeof(int32_t);
   int csize;
   long fsize;
