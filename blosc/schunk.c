@@ -621,10 +621,12 @@ blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t len, bool copy
 }
 
 
-/* Create a super-chunk out of a contiguous frame buffer */
+/* Set whether freeing this super-chunk should avoid freeing its contiguous frame buffer */
 void blosc2_schunk_avoid_cframe_free(blosc2_schunk *schunk, bool avoid_cframe_free) {
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
-  frame_avoid_cframe_free(frame, avoid_cframe_free);
+  if (frame) {
+    frame_avoid_cframe_free(frame, avoid_cframe_free);
+  }
 }
 
 
