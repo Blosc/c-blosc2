@@ -33,6 +33,10 @@ Changes from 3.0.0-rc.1 to 3.0.0
 * Replaced deprecated `exec_program()` usage in `cmake/FindSIMD.cmake` with
   `execute_process()`.  This avoids warnings with newer CMake versions.
 
+* Removed the unmaintained Intel IPP integration.  C-Blosc2 no longer exposes
+  a CMake option to enable/disable IPP, does not probe for IPP at configure
+  time, and always uses the maintained native codec paths instead.
+
 
 Changes from 2.23.1 to 3.0.0-rc.1
 =================================

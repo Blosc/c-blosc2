@@ -34,10 +34,6 @@
 #include "lz4.h"
 #define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"
-#ifdef HAVE_IPP
-  #include <ipps.h>
-  #include <ippdc.h>
-#endif
 #if defined(HAVE_ZLIB_NG)
 #ifdef ZLIB_COMPAT
   #include "zlib.h"
@@ -398,34 +394,10 @@ static int compcode_to_compversion(int compcode) {
 
 
 static int lz4_wrap_compress(const char* input, size_t input_length,
-                             char* output, size_t maxout, int accel, void* hash_table,
+                             char* output, size_t maxout, int accel,
                              struct thread_context* thread_context) {
-  BLOSC_UNUSED_PARAM(accel);
   int cbytes;
   blosc2_context* context = thread_context->parent_context;
-#ifdef HAVE_IPP
-  if (context->use_dict) {
-    BLOSC_TRACE_WARNING("LZ4 dict compression is not supported with IPP.  Ignoring dict.");
-  }
-  if (hash_table == NULL) {
-    return BLOSC2_ERROR_INVALID_PARAM;  // the hash table should always be initialized
-  }
-  int outlen = (int)maxout;
-  int inlen = (int)input_length;
-  // I have not found any function that uses `accel` like in `LZ4_compress_fast`, but
-  // the IPP LZ4Safe call does a pretty good job on compressing well, so let's use it
-  IppStatus status = ippsEncodeLZ4Safe_8u((const Ipp8u*)input, &inlen,
-                                          (Ipp8u*)output, &outlen, (Ipp8u*)hash_table);
-  if (status == ippStsDstSizeLessExpected) {
-    return 0;  // we cannot compress in required outlen
-  }
-  else if (status != ippStsNoErr) {
-    return BLOSC2_ERROR_FAILURE;  // an unexpected error happened
-  }
-  cbytes = outlen;
-#else
-  BLOSC_UNUSED_PARAM(hash_table);
-  accel = 1;  // deactivate acceleration to match IPP behaviour
   if (context->use_dict && context->dict_cdict != NULL) {
     if (thread_context->lz4_cstream == NULL) {
       thread_context->lz4_cstream = LZ4_createStream();
@@ -440,7 +412,6 @@ static int lz4_wrap_compress(const char* input, size_t input_length,
   } else {
     cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
   }
-#endif
   return cbytes;
 }
 
@@ -476,13 +447,6 @@ static int lz4_wrap_decompress(const char* input, size_t compressed_length,
                                struct thread_context* thread_context) {
   int nbytes;
   blosc2_context* context = thread_context->parent_context;
-#ifdef HAVE_IPP
-  int outlen = (int)maxout;
-  int inlen = (int)compressed_length;
-  IppStatus status;
-  status = ippsDecodeLZ4_8u((const Ipp8u*)input, inlen, (Ipp8u*)output, &outlen);
-  nbytes = (status == ippStsNoErr) ? outlen : -outlen;
-#else
   if (context->use_dict && context->dict_buffer != NULL && context->dict_size > 0) {
     nbytes = LZ4_decompress_safe_usingDict(input, output,
                                            (int)compressed_length, (int)maxout,
@@ -491,7 +455,6 @@ static int lz4_wrap_decompress(const char* input, size_t compressed_length,
   } else {
     nbytes = LZ4_decompress_safe(input, output, (int)compressed_length, (int)maxout);
   }
-#endif
   if (nbytes != (int)maxout) {
     return 0;
   }
@@ -1340,12 +1303,8 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
                                 (int)neblock, dest, maxout, context);
     }
     else if (context->compcode == BLOSC_LZ4) {
-      void *hash_table = NULL;
-    #ifdef HAVE_IPP
-      hash_table = (void*)thread_context->lz4_hash_table;
-    #endif
       cbytes = lz4_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
-                                 (char*)dest, (size_t)maxout, accel, hash_table,
+                                 (char*)dest, (size_t)maxout, accel,
                                  thread_context);
     }
     else if (context->compcode == BLOSC_LZ4HC) {
@@ -2243,22 +2202,6 @@ static int init_thread_context(struct thread_context* thread_context, blosc2_con
   thread_context->lz4_cstream = NULL;
   thread_context->lz4hc_cstream = NULL;
 
-  /* Create the hash table for LZ4 in case we are using IPP */
-#ifdef HAVE_IPP
-  IppStatus status;
-  int inlen = thread_context->tmp_blocksize > 0 ? thread_context->tmp_blocksize : 1 << 16;
-  int hash_size = 0;
-  status = ippsEncodeLZ4HashTableGetSize_8u(&hash_size);
-  if (status != ippStsNoErr) {
-      BLOSC_TRACE_ERROR("Error in ippsEncodeLZ4HashTableGetSize_8u.");
-  }
-  Ipp8u *hash_table = ippsMalloc_8u(hash_size);
-  status = ippsEncodeLZ4HashTableInit_8u(hash_table, inlen);
-  if (status != ippStsNoErr) {
-    BLOSC_TRACE_ERROR("Error in ippsEncodeLZ4HashTableInit_8u.");
-  }
-  thread_context->lz4_hash_table = hash_table;
-#endif
   return 0;
 }
 
@@ -2291,11 +2234,6 @@ static void destroy_thread_context(struct thread_context* thread_context) {
   if (thread_context->lz4hc_cstream != NULL) {
     LZ4_freeStreamHC((LZ4_streamHC_t*)thread_context->lz4hc_cstream);
   }
-#ifdef HAVE_IPP
-  if (thread_context->lz4_hash_table != NULL) {
-    ippsFree(thread_context->lz4_hash_table);
-  }
-#endif
 }
 
 void free_thread_context(struct thread_context* thread_context) {

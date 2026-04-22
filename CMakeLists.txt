@@ -122,8 +122,6 @@ option(DEACTIVATE_ZLIB
     "Do not include support for the Zlib library." OFF)
 option(DEACTIVATE_ZSTD
     "Do not include support for the Zstd library." OFF)
-option(DEACTIVATE_IPP
-    "Do not include support for the Intel IPP library." ON)
 option(PREFER_EXTERNAL_LZ4
     "Find and use external LZ4 library instead of fetching sources." OFF)
 option(PREFER_EXTERNAL_ZLIB
@@ -342,17 +340,6 @@ if(NOT DEACTIVATE_ZSTD)
         endif()
     else()
         set(HAVE_ZSTD TRUE)
-    endif()
-endif()
-
-if(NOT DEACTIVATE_IPP)
-    find_package(IPP)
-    if(IPP_FOUND)
-        message(STATUS "Using IPP accelerated compression.")
-        set(HAVE_IPP TRUE)
-    else()
-        message(STATUS "Not using IPP accelerated compression.")
-        set(HAVE_IPP FALSE)
     endif()
 endif()
 

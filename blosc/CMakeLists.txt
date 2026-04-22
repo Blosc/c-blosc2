@@ -156,10 +156,6 @@ if(NOT DEACTIVATE_ZSTD)
     endif()
 endif()
 
-if(HAVE_IPP)
-    set(LIBS ${LIBS} "${IPP_LIBRARIES}")
-endif()
-
 if(UNIX AND NOT APPLE)
     set(LIBS ${LIBS} "rt")
     set(LIBS ${LIBS} "m")
