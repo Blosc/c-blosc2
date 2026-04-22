@@ -58,7 +58,7 @@ test_storage tstorage[] = {
 
 static char* test_get_slice_buffer(void) {
   static int32_t data[CHUNKSIZE];
-  int32_t *data_;
+  int32_t *data_ = NULL;
   int32_t isize = CHUNKSIZE * sizeof(int32_t);
   int rc;
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;

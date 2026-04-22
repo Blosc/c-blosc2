@@ -20,8 +20,6 @@
 #else
   #if defined(_MSC_VER)
     #pragma message("SSE2 shuffle tests not enabled.")
-  #else
-    #warning SSE2 shuffle tests not enabled.
   #endif
 #endif  /* defined(SHUFFLE_USE_SSE2) */
 
@@ -74,6 +72,10 @@ static int test_shuffle_roundtrip_sse2(int32_t type_size, int32_t num_elements,
 
   return exit_code;
 #else
+  BLOSC_UNUSED_PARAM(type_size);
+  BLOSC_UNUSED_PARAM(num_elements);
+  BLOSC_UNUSED_PARAM(buffer_alignment);
+  BLOSC_UNUSED_PARAM(test_type);
   return EXIT_SUCCESS;
 #endif /* defined(SHUFFLE_USE_SSE2) */
 }

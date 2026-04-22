@@ -348,6 +348,9 @@ if(NOT DEACTIVATE_ZSTD)
             set_property(TARGET libzstd_static PROPERTY INTERFACE_INCLUDE_DIRECTORIES
                 "$<BUILD_INTERFACE:${ZSTD_SOURCE_DIR}/lib>"
                 "$<INSTALL_INTERFACE:${ZSTD_INSTALL_INCLUDEDIR}>")
+            # Silence GCC false positives in fetched legacy zstd sources on some Linux/amd64 builds.
+            target_compile_options(libzstd_static PRIVATE
+                $<$<COMPILE_LANG_AND_ID:C,GNU>:-Wno-maybe-uninitialized>)
         endif()
     else()
         set(HAVE_ZSTD TRUE)

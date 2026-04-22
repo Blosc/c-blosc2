@@ -92,14 +92,18 @@ static char* test_sframe(void) {
   }
 
   if (metalayers) {
-    uint8_t* _content;
-    int32_t _content_len;
-    blosc2_meta_get(schunk, "metalayer1", &_content, &_content_len);
+    uint8_t* _content = NULL;
+    int32_t _content_len = 0;
+    int rc = blosc2_meta_get(schunk, "metalayer1", &_content, &_content_len);
+    mu_assert("ERROR: cannot get metalayer1", rc >= 0);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
     if (_content != NULL) {
       free(_content);
     }
-    blosc2_meta_get(schunk, "metalayer2", &_content, &_content_len);
+    _content = NULL;
+    _content_len = 0;
+    rc = blosc2_meta_get(schunk, "metalayer2", &_content, &_content_len);
+    mu_assert("ERROR: cannot get metalayer2", rc >= 0);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
     if (_content != NULL) {
       free(_content);
@@ -127,14 +131,18 @@ static char* test_sframe(void) {
   mu_assert("ERROR: wrong number of append chunks", _nchunks == nchunks);
 
   if (metalayers) {
-    uint8_t* _content;
-    int32_t _content_len;
-    blosc2_meta_get(schunk, "metalayer1", &_content, &_content_len);
+    uint8_t* _content = NULL;
+    int32_t _content_len = 0;
+    int rc = blosc2_meta_get(schunk, "metalayer1", &_content, &_content_len);
+    mu_assert("ERROR: cannot get metalayer1", rc >= 0);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
     if (_content != NULL) {
       free(_content);
     }
-    blosc2_meta_get(schunk, "metalayer2", &_content, &_content_len);
+    _content = NULL;
+    _content_len = 0;
+    rc = blosc2_meta_get(schunk, "metalayer2", &_content, &_content_len);
+    mu_assert("ERROR: cannot get metalayer2", rc >= 0);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
     if (_content != NULL) {
       free(_content);
@@ -174,14 +182,18 @@ static char* test_sframe(void) {
   }
 
   if (metalayers) {
-    uint8_t* _content;
-    int32_t _content_len;
-    blosc2_meta_get(schunk, "metalayer1", &_content, &_content_len);
+    uint8_t* _content = NULL;
+    int32_t _content_len = 0;
+    int rc = blosc2_meta_get(schunk, "metalayer1", &_content, &_content_len);
+    mu_assert("ERROR: cannot get metalayer1", rc >= 0);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer1", _content_len) == 0);
     if (_content != NULL) {
       free(_content);
     }
-    blosc2_meta_get(schunk, "metalayer2", &_content, &_content_len);
+    _content = NULL;
+    _content_len = 0;
+    rc = blosc2_meta_get(schunk, "metalayer2", &_content, &_content_len);
+    mu_assert("ERROR: cannot get metalayer2", rc >= 0);
     mu_assert("ERROR: bad metalayer content", strncmp((char*)_content, "my metalayer2", _content_len) == 0);
     if (_content != NULL) {
       free(_content);
