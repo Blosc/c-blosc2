@@ -105,7 +105,7 @@ directory (e.g. '/usr' or '/usr/local'):
 
   cmake -DCMAKE_INSTALL_PREFIX=your_install_prefix_directory ..
 
-CMake allows to configure Blosc in many different ways, like preferring internal or external sources for compressors or enabling/disabling them.  Please note that configuration can also be performed using UI tools provided by CMake (`ccmake`  or `cmake-gui`):
+CMake allows configuring Blosc in many different ways, including selecting external codec libraries, fetching pinned upstream codec sources during configuration, or disabling selected codecs altogether.  Please note that configuration can also be performed using UI tools provided by CMake (`ccmake`  or `cmake-gui`):
 
 .. code-block:: console
 
@@ -128,15 +128,30 @@ Once you have compiled your Blosc library, you can easily link your apps with it
 Handling support for codecs (LZ4, LZ4HC, Zstd, Zlib)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-C-Blosc2 comes with full sources for LZ4, LZ4HC, Zstd, and Zlib and in general, you should not worry about not having (or CMake not finding) the libraries in your system because by default the included sources will be automatically compiled and included in the C-Blosc2 library. This means that you can be confident in having a complete support for all these codecs in all the official Blosc deployments.  Of course, if you consider this is too bloated, you can exclude support for some of them.
+C-Blosc2 no longer vendors in-tree copies of LZ4, zlib, or Zstd.  Instead, CMake resolves these codecs in one of the following ways:
 
-For example, let's suppose that you want to disable support for Zstd:
+* use an already installed external library when requested (for example via ``-DPREFER_EXTERNAL_LZ4=ON``), or
+* fetch a pinned upstream release at configure time via ``FetchContent``.
+
+This means that, by default, you still get support for these codecs without having to vendor them inside the C-Blosc2 source tree, but your build may need access to the network during CMake configuration when an external library is not found or not requested.
+
+If you prefer fully local builds, you can point CMake at local codec checkouts instead of downloading them:
+
+.. code-block:: console
+
+  cmake \
+    -DBLOSC_LZ4_SOURCE_DIR=/path/to/lz4 \
+    -DBLOSC_ZLIBNG_SOURCE_DIR=/path/to/zlib-ng \
+    -DBLOSC_ZSTD_SOURCE_DIR=/path/to/zstd \
+    ..
+
+Of course, you can also exclude support for selected codecs.  For example, to disable Zstd support:
 
 .. code-block:: console
 
   cmake -DDEACTIVATE_ZSTD=ON ..
 
-Or, you may want to use a codec in an external library already in the system:
+Or, to prefer a codec already installed in the system:
 
 .. code-block:: console
 
