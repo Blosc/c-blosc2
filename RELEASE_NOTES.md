@@ -1,30 +1,44 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 3.0.0-rc.1 to 3.0.0
-================================
+Changes from 3.0.0-rc1 to 3.0.0-rc2
+===================================
 
 * `blosc2_get_slice_nchunks()`, `schunk_get_slice_nchunks()`, and
   `b2nd_get_slice_nchunks()` now return `int64_t` instead of `int`.
   This removes an artificial `INT_MAX` limit on the number of chunks
-  reported for large slices.  As these function signatures changed,
+  reported for large slices.  Because these public signatures changed,
   this is an API/ABI break and callers should be rebuilt against 3.0.0.
+
+* The internal parallel execution model has been reworked around a shared
+  managed thread pool.  Instead of owning a private worker pool per
+  compression/decompression context, contexts now attach lazily to a pool
+  shared by other contexts with the same `nthreads` setting, while
+  caller-managed callback threading remains supported as before.  This greatly
+  reduces redundant thread creation and idle thread accumulation when many
+  contexts coexist, improves scalability and resource usage, and fixes
+  reliability problems in downstream workloads such as python-blosc2 that
+  create large numbers of arrays/contexts over time.  The new queue-based
+  scheduling model also supports true concurrent submissions to the same pool.
+
+* Landed a broad set of robustness and security hardening fixes in frame,
+  schunk, lazy-chunk, metadata, mmap, and getitem paths.  These changes tighten
+  bounds checking, reject malformed headers/offset tables/VL-block metadata more
+  aggressively, prevent integer overflows and out-of-bounds reads/writes, and
+  add regression tests for malformed inputs and edge cases.  Thanks to
+  @metsw24-max for many of these.
 
 * Modernized codec dependency handling in CMake.  `lz4`, `zlib-ng`, and
   `zstd` are now resolved either from external packages (when preferred and
   available) or via `FetchContent` using pinned upstream versions, instead of
-  being built from vendored in-tree copies.
+  being built from vendored in-tree copies.  The optional ZFP plugin is now
+  also obtained via `FetchContent` too.  As a result, `blosclz` is now the only
+  codec still vendored in-tree.
 
-* Added explicit CMake cache variables for the pinned codec versions and local
+* Added explicit CMake cache variables for pinned codec versions and local
   source overrides:
   `BLOSC_LZ4_VERSION`, `BLOSC_ZLIBNG_VERSION`, `BLOSC_ZSTD_VERSION`, and the
   matching `BLOSC_*_SOURCE_DIR` variables.
-
-* The optional ZFP plugin is now also obtained via `FetchContent` from the
-  pinned upstream `1.0.1` release (or an explicit local checkout via
-  `BLOSC_ZFP_SOURCE_DIR`) instead of using vendored plugin copies.
-
-* `blosclz` is now the only codec still vendored in-tree.
 
 * Improved CMake install/export support for static builds so downstream
   `find_package(Blosc2)` consumers keep working when fetched codec libraries
@@ -35,15 +49,15 @@ Changes from 3.0.0-rc.1 to 3.0.0
   top-level include directory, reducing the risk of header name collisions.
 
 * Replaced deprecated `exec_program()` usage in `cmake/FindSIMD.cmake` with
-  `execute_process()`.  This avoids warnings with newer CMake versions.
+  `execute_process()`, avoiding warnings with newer CMake versions.
 
 * Removed the unmaintained Intel IPP integration.  C-Blosc2 no longer exposes
   a CMake option to enable/disable IPP, does not probe for IPP at configure
   time, and always uses the maintained native codec paths instead.
 
 
-Changes from 2.23.1 to 3.0.0-rc.1
-=================================
+Changes from 2.23.1 to 3.0.0-rc1
+================================
 
 * This release introduces support for variable-length chunks and variable-length
   blocks, which is the main reason for the major version bump.
