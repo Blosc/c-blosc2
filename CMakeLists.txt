@@ -143,6 +143,10 @@ set(BLOSC_ZSTD_VERSION "1.5.7" CACHE STRING
     "zstd version to use when fetching internal sources.")
 set(BLOSC_ZSTD_SOURCE_DIR "" CACHE PATH
     "Optional local zstd checkout to use instead of downloading sources.")
+set(BLOSC_ZFP_VERSION "1.0.1" CACHE STRING
+    "zfp version to use when fetching plugin sources.")
+set(BLOSC_ZFP_SOURCE_DIR "" CACHE PATH
+    "Optional local zfp checkout to use instead of downloading plugin sources.")
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
@@ -280,6 +284,13 @@ if(NOT DEACTIVATE_ZLIB)
             if(NOT ZLIB_NG_INSTALL_TARGET)
                 set(ZLIB_NG_INSTALL_TARGET zlib-ng-static)
             endif()
+        elseif(TARGET zlib-ng)
+            get_target_property(ZLIB_NG_INSTALL_TARGET zlib-ng ALIASED_TARGET)
+            if(NOT ZLIB_NG_INSTALL_TARGET)
+                set(ZLIB_NG_INSTALL_TARGET zlib-ng)
+            endif()
+        endif()
+        if(ZLIB_NG_INSTALL_TARGET)
             set_target_properties(${ZLIB_NG_INSTALL_TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
             set_property(TARGET ${ZLIB_NG_INSTALL_TARGET} PROPERTY INTERFACE_INCLUDE_DIRECTORIES
                 "$<BUILD_INTERFACE:${zlib_ng_SOURCE_DIR}>"
@@ -536,9 +547,6 @@ endif()
 
 # include directories
 include_directories(include)
-if(BUILD_PLUGINS)
-    include_directories(plugins/codecs/zfp/include)
-endif()
 
 # subdirectories
 set(SOURCES)
@@ -546,6 +554,9 @@ set(SOURCES)
 if(BUILD_PLUGINS)
     enable_testing()
     add_subdirectory(plugins)
+    if(DEFINED ZFP_SOURCE_DIR)
+        include_directories(${ZFP_SOURCE_DIR}/include)
+    endif()
 endif()
 
 # Determine which linkage the unified target will use
@@ -662,6 +673,11 @@ if(BLOSC_INSTALL)
                 DESTINATION ${ZSTD_INSTALL_INCLUDEDIR}
                 COMPONENT DEV)
     endif()
+    if(ZFP_FETCHED AND TARGET zfp)
+        install(DIRECTORY ${ZFP_SOURCE_DIR}/include/
+                DESTINATION ${ZFP_INSTALL_INCLUDEDIR}
+                COMPONENT DEV)
+    endif()
 
     # config files
     include(CMakePackageConfigHelpers)
@@ -700,6 +716,9 @@ if(BLOSC_INSTALL)
     endif()
     if(ZSTD_FETCHED AND TARGET libzstd_static)
         list(APPEND Blosc2_INSTALL_THIRDPARTY_TARGET_NAMES libzstd_static)
+    endif()
+    if(ZFP_FETCHED AND TARGET zfp)
+        list(APPEND Blosc2_INSTALL_THIRDPARTY_TARGET_NAMES zfp)
     endif()
     # Add unified target
     add_library(blosc2 INTERFACE)

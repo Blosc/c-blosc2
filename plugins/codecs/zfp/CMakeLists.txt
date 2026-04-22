@@ -1,8 +1,8 @@
-get_filename_component(ZFP_LOCAL_DIR ./ ABSOLUTE)
-file(GLOB ZFP_SRC_FILES ${ZFP_LOCAL_DIR}/blosc2-zfp.* ${ZFP_LOCAL_DIR}/src/zfp.c
-     ${ZFP_LOCAL_DIR}/src/bitstream.c ${ZFP_LOCAL_DIR}/src/decode*.c ${ZFP_LOCAL_DIR}/src/encode*.c)
-#message(status "--------------!!!!zfp:" ${ZFP_SRC_FILES})
-set(SOURCES ${SOURCES} ${ZFP_SRC_FILES} PARENT_SCOPE)
+set(SOURCES ${SOURCES}
+    ${CMAKE_CURRENT_SOURCE_DIR}/blosc2-zfp.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/blosc2-zfp.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/zfp-private.h
+    PARENT_SCOPE)
 
 # targets
 if(BUILD_TESTS)

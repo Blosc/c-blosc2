@@ -156,6 +156,10 @@ if(NOT DEACTIVATE_ZSTD)
     endif()
 endif()
 
+if(BUILD_PLUGINS AND TARGET zfp)
+    list(APPEND LIBS zfp)
+endif()
+
 if(UNIX AND NOT APPLE)
     set(LIBS ${LIBS} "rt")
     set(LIBS ${LIBS} "m")

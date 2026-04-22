@@ -20,6 +20,10 @@ Changes from 3.0.0-rc.1 to 3.0.0
   `BLOSC_LZ4_VERSION`, `BLOSC_ZLIBNG_VERSION`, `BLOSC_ZSTD_VERSION`, and the
   matching `BLOSC_*_SOURCE_DIR` variables.
 
+* The optional ZFP plugin is now also obtained via `FetchContent` from the
+  pinned upstream `1.0.1` release (or an explicit local checkout via
+  `BLOSC_ZFP_SOURCE_DIR`) instead of using vendored plugin copies.
+
 * `blosclz` is now the only codec still vendored in-tree.
 
 * Improved CMake install/export support for static builds so downstream
