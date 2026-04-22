@@ -1949,6 +1949,66 @@ blosc2_storage* get_new_storage(const blosc2_storage* storage,
 }
 
 
+static int validate_offsets_chunk(blosc2_frame_s* frame, int32_t header_len, int64_t cbytes,
+                                  int64_t nchunks) {
+  int32_t coffsets_cbytes = 0;
+  uint8_t* coffsets = get_coffsets(frame, header_len, cbytes, nchunks, &coffsets_cbytes);
+  if (coffsets == NULL) {
+    BLOSC_TRACE_ERROR("Cannot get compressed offsets from frame.");
+    return BLOSC2_ERROR_DATA;
+  }
+
+  int32_t offsets_nbytes;
+  if (!blosc2_nchunks_to_offsets_nbytes(nchunks, &offsets_nbytes)) {
+    BLOSC_TRACE_ERROR("Too many chunks for offsets representation.");
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  int64_t* offsets = (int64_t*)malloc((size_t)offsets_nbytes);
+  if (offsets == NULL) {
+    BLOSC_TRACE_ERROR("Cannot allocate memory for offsets validation.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+
+  blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context* dctx = blosc2_create_dctx(off_dparams);
+  if (dctx == NULL) {
+    free(offsets);
+    BLOSC_TRACE_ERROR("Error while creating the decompression context.");
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  int32_t off_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes,
+                                             offsets, offsets_nbytes);
+  blosc2_free_ctx(dctx);
+  if (off_nbytes != offsets_nbytes) {
+    free(offsets);
+    BLOSC_TRACE_ERROR("Cannot decompress offsets chunk.");
+    return BLOSC2_ERROR_DATA;
+  }
+
+  for (int64_t i = 0; i < nchunks; ++i) {
+    int64_t offset = offsets[i];
+    if (offset < 0) {
+      continue;
+    }
+    if (offset > INT64_MAX - header_len || offset > cbytes - BLOSC_EXTENDED_HEADER_LENGTH) {
+      free(offsets);
+      BLOSC_TRACE_ERROR("Offset for chunk %" PRId64 " is out of bounds.", i);
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
+    if (i > 0 && offsets[i - 1] >= 0 && offset < offsets[i - 1]) {
+      free(offsets);
+      BLOSC_TRACE_ERROR("Offsets are not monotonic at chunk %" PRId64 ".", i);
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
+  }
+
+  free(offsets);
+  return 0;
+}
+
+
 /* Get a super-chunk out of a frame */
 blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io *udio) {
   int32_t header_len;
@@ -1992,6 +2052,14 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   schunk->storage = get_new_storage(&storage, cparams, dparams, udio);
   free(cparams);
   free(dparams);
+  if (nchunks > 0) {
+    rc = validate_offsets_chunk(frame, header_len, cbytes, nchunks);
+    if (rc < 0) {
+      blosc2_schunk_free(schunk);
+      BLOSC_TRACE_ERROR("Cannot validate frame offsets.");
+      return NULL;
+    }
+  }
   if (nchunks > 0) {
     uint8_t *chunk;
     bool needs_free;
