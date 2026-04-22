@@ -24,7 +24,7 @@ The header contains information needed to decompress the Blosc chunks contained 
 msgpack and the format is as follows::
 
     |-0-|-1-|-2-|-3-|-4-|-5-|-6-|-7-|-8-|-9-|-A-|-B-|-C-|-D-|-E-|-F-|-10|-11|-12|-13|-14|-15|-16|-17|
-    | 9X| aX| "b2frame\0"                   | d2| header_size   | cf| frame_size                    |
+    | 9X| aX| "b2frame\0"                   | d2| header_len    | cf| frame_len                     |
     |---|---|-------------------------------|---|---------------|---|-------------------------------|
       ^   ^       ^                           ^                   ^
       |   |       |                           |                   |
@@ -94,11 +94,11 @@ frame.  It is mandatory the use of the msgpack format for storing them, although
      |   +-- [msgpack] uint16
      +-- [msgpack] fixarray with 3 elements
 
-:header_size:
-    (``int32``) Size of the header of the frame (including metalayers).
+:header_len:
+    (``int32``) Length of the header of the frame (including metalayers).
 
-:frame_size:
-    (``uint64``) Size of the whole frame (including compressed data).
+:frame_len:
+    (``uint64``) Length of the whole frame (including compressed data).
 
 :general_flags:
     (``uint8``) General flags.
