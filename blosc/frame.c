@@ -930,6 +930,11 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
 
     urlpath = normalize_urlpath(urlpath);
 
+    if (offset < 0) {
+      BLOSC_TRACE_ERROR("Negative frame offset is not valid: %" PRId64 ".", offset);
+      return NULL;
+    }
+
     if(stat(urlpath, &path_stat) < 0) {
         BLOSC_TRACE_ERROR("Cannot get information about the path %s.", urlpath);
         return NULL;
@@ -976,6 +981,29 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     }
     int64_t frame_len;
     to_big(&frame_len, header_ptr + FRAME_LEN, sizeof(frame_len));
+    if (frame_len < FRAME_HEADER_MINLEN + FRAME_TRAILER_MINLEN) {
+      BLOSC_TRACE_ERROR("Invalid frame length (%" PRId64 ") in file '%s'.", frame_len, urlpath);
+      io_cb->close(fp);
+      free(urlpath_cpy);
+      return NULL;
+    }
+
+    if (!sframe) {
+      int64_t file_size = (int64_t) path_stat.st_size;
+      if (offset > file_size || frame_len > file_size - offset) {
+        BLOSC_TRACE_ERROR("Frame length exceeds file boundary in file '%s'.", urlpath);
+        io_cb->close(fp);
+        free(urlpath_cpy);
+        return NULL;
+      }
+    }
+
+    if (offset > INT64_MAX - (frame_len - FRAME_TRAILER_MINLEN)) {
+      BLOSC_TRACE_ERROR("Frame offset arithmetic overflows in file '%s'.", urlpath);
+      io_cb->close(fp);
+      free(urlpath_cpy);
+      return NULL;
+    }
 
     blosc2_frame_s* frame = calloc(1, sizeof(blosc2_frame_s));
     frame->urlpath = urlpath_cpy;
@@ -1004,6 +1032,12 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     }
     uint32_t trailer_len;
     to_big(&trailer_len, trailer_ptr + trailer_offset, sizeof(trailer_len));
+    if (trailer_len < FRAME_TRAILER_MINLEN || trailer_len > INT32_MAX || (int64_t)trailer_len > frame_len) {
+      BLOSC_TRACE_ERROR("Invalid trailer length (%" PRIu32 ") in file '%s'.", trailer_len, urlpath);
+      free(urlpath_cpy);
+      free(frame);
+      return NULL;
+    }
     frame->trailer_len = trailer_len;
 
     return frame;
@@ -1949,12 +1983,79 @@ blosc2_storage* get_new_storage(const blosc2_storage* storage,
 }
 
 
+static int validate_offsets_chunk(blosc2_frame_s* frame, int32_t header_len, int64_t cbytes,
+                                  int64_t nchunks) {
+  int32_t coffsets_cbytes = 0;
+  uint8_t* coffsets = get_coffsets(frame, header_len, cbytes, nchunks, &coffsets_cbytes);
+  if (coffsets == NULL) {
+    BLOSC_TRACE_ERROR("Cannot get compressed offsets from frame.");
+    return BLOSC2_ERROR_DATA;
+  }
+
+  int32_t offsets_nbytes;
+  if (!blosc2_nchunks_to_offsets_nbytes(nchunks, &offsets_nbytes)) {
+    BLOSC_TRACE_ERROR("Too many chunks for offsets representation.");
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  int64_t* offsets = (int64_t*)malloc((size_t)offsets_nbytes);
+  if (offsets == NULL) {
+    BLOSC_TRACE_ERROR("Cannot allocate memory for offsets validation.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+
+  blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context* dctx = blosc2_create_dctx(off_dparams);
+  if (dctx == NULL) {
+    free(offsets);
+    BLOSC_TRACE_ERROR("Error while creating the decompression context.");
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  int32_t off_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes,
+                                             offsets, offsets_nbytes);
+  blosc2_free_ctx(dctx);
+  if (off_nbytes != offsets_nbytes) {
+    free(offsets);
+    BLOSC_TRACE_ERROR("Cannot decompress offsets chunk.");
+    return BLOSC2_ERROR_DATA;
+  }
+
+  for (int64_t i = 0; i < nchunks; ++i) {
+    int64_t offset = offsets[i];
+    if (offset < 0) {
+      continue;
+    }
+    if (offset > INT64_MAX - header_len || offset > cbytes - BLOSC_EXTENDED_HEADER_LENGTH) {
+      free(offsets);
+      BLOSC_TRACE_ERROR("Offset for chunk %" PRId64 " is out of bounds.", i);
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
+    /* Offsets do not need to be monotonic.  Frame mutations like insert can append
+     * chunk payloads at the end of the cframe while updating the logical chunk order
+     * only in the offsets table, so a valid frame may legitimately contain
+     * non-monotonic non-negative offsets.
+     */
+  }
+
+  free(offsets);
+  return 0;
+}
+
+
 /* Get a super-chunk out of a frame */
 blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io *udio) {
   int32_t header_len;
   int64_t frame_len;
   int rc;
+  bool frame_attached = true;
   blosc2_schunk* schunk = calloc(1, sizeof(blosc2_schunk));
+  blosc2_cparams *cparams = NULL;
+  blosc2_dparams *dparams = NULL;
+  int64_t *offsets = NULL;
+  if (schunk == NULL) {
+    return NULL;
+  }
   schunk->frame = (blosc2_frame*)frame;
   frame->schunk = schunk;
 
@@ -1965,8 +2066,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
                        schunk->filters_meta, &schunk->splitmode, &schunk->use_dict, udio);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
-    blosc2_schunk_free(schunk);
-    return NULL;
+    goto error;
   }
   int64_t nchunks = schunk->nchunks;
   int64_t nbytes = schunk->nbytes;
@@ -1974,32 +2074,38 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   int64_t cbytes = schunk->cbytes;
 
   // Compression and decompression contexts
-  blosc2_cparams *cparams;
   blosc2_schunk_get_cparams(schunk, &cparams);
   schunk->cctx = blosc2_create_cctx(*cparams);
   if (schunk->cctx == NULL) {
     BLOSC_TRACE_ERROR("Error while creating the compression context");
-    return NULL;
+    goto error;
   }
-  blosc2_dparams *dparams;
   blosc2_schunk_get_dparams(schunk, &dparams);
   schunk->dctx = blosc2_create_dctx(*dparams);
   if (schunk->dctx == NULL) {
     BLOSC_TRACE_ERROR("Error while creating the decompression context");
-    return NULL;
+    goto error;
   }
   blosc2_storage storage = {.contiguous = copy ? false : true};
   schunk->storage = get_new_storage(&storage, cparams, dparams, udio);
   free(cparams);
+  cparams = NULL;
   free(dparams);
+  dparams = NULL;
+  if (nchunks > 0) {
+    rc = validate_offsets_chunk(frame, header_len, cbytes, nchunks);
+    if (rc < 0) {
+      BLOSC_TRACE_ERROR("Cannot validate frame offsets.");
+      goto error;
+    }
+  }
   if (nchunks > 0) {
     uint8_t *chunk;
     bool needs_free;
     rc = frame_get_chunk(frame, 0, &chunk, &needs_free);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Cannot inspect the first chunk in frame.");
-      blosc2_schunk_free(schunk);
-      return NULL;
+      goto error;
     }
     schunk->flags2 = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
     if (needs_free) {
@@ -2012,6 +2118,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
 
   // We are not attached to a frame anymore
   schunk->frame = NULL;
+  frame_attached = false;
 
   if (nchunks == 0) {
     frame->schunk = NULL;
@@ -2022,9 +2129,8 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   int32_t coffsets_cbytes = 0;
   uint8_t* coffsets = get_coffsets(frame, header_len, cbytes, nchunks, &coffsets_cbytes);
   if (coffsets == NULL) {
-    blosc2_schunk_free(schunk);
     BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
-    return NULL;
+    goto error;
   }
 
   // Decompress offsets
@@ -2032,30 +2138,26 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   blosc2_context *dctx = blosc2_create_dctx(off_dparams);
   if (dctx == NULL) {
     BLOSC_TRACE_ERROR("Error while creating the decompression context");
-    return NULL;
+    goto error;
   }
   int32_t offsets_nbytes;
   if (!blosc2_nchunks_to_offsets_nbytes(nchunks, &offsets_nbytes)) {
     blosc2_free_ctx(dctx);
-    blosc2_schunk_free(schunk);
     BLOSC_TRACE_ERROR("Too many chunks for offsets representation.");
-    return NULL;
+    goto error;
   }
-  int64_t* offsets = (int64_t *) malloc((size_t)offsets_nbytes);
+  offsets = (int64_t *) malloc((size_t)offsets_nbytes);
   if (offsets == NULL) {
     blosc2_free_ctx(dctx);
-    blosc2_schunk_free(schunk);
     BLOSC_TRACE_ERROR("Cannot allocate memory for offsets.");
-    return NULL;
+    goto error;
   }
   int32_t off_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes,
                                              offsets, offsets_nbytes);
   blosc2_free_ctx(dctx);
   if (off_nbytes < 0) {
-    free(offsets);
-    blosc2_schunk_free(schunk);
     BLOSC_TRACE_ERROR("Cannot decompress the offsets chunk.");
-    return NULL;
+    goto error;
   }
 
   // We want the contiguous schunk, so create the actual data chunks (and, while doing this,
@@ -2225,8 +2327,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   // In the future, maybe we could provide special meanings for .data[i] > 0x7FFFFFFF, but not there yet
   // if (rc < 0 || acc_nbytes != nbytes || acc_cbytes != cbytes) {
   if (rc < 0 || acc_nbytes != nbytes) {
-    blosc2_schunk_free(schunk);
-    return NULL;
+    goto error;
   }
   // Update counters
   schunk->cbytes = acc_cbytes;
@@ -2235,19 +2336,30 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   out:
   rc = frame_get_metalayers(frame, schunk);
   if (rc < 0) {
-    blosc2_schunk_free(schunk);
     BLOSC_TRACE_ERROR("Cannot access the metalayers.");
-    return NULL;
+    goto error;
   }
 
   rc = frame_get_vlmetalayers(frame, schunk);
   if (rc < 0) {
-    blosc2_schunk_free(schunk);
     BLOSC_TRACE_ERROR("Cannot access the vlmetalayers.");
-    return NULL;
+    goto error;
   }
 
   return schunk;
+
+error:
+  free(cparams);
+  free(dparams);
+  free(offsets);
+  if (schunk != NULL) {
+    blosc2_schunk_free(schunk);
+  }
+  if (!frame_attached) {
+    frame->schunk = NULL;
+    frame_free(frame);
+  }
+  return NULL;
 }
 
 

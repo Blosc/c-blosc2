@@ -18,10 +18,6 @@
 #include "zstd.h"
 #endif
 
-#ifdef HAVE_IPP
-#include <ipps.h>
-#endif
-
 #include <threading.h>
 
 #include <stddef.h>
@@ -158,9 +154,6 @@ struct thread_context {
   /* Working streams for LZ4/LZ4HC dictionary compression */
   void* lz4_cstream;   /* LZ4_stream_t* pre-loaded with dict; NULL when no dict active */
   void* lz4hc_cstream; /* LZ4_streamHC_t* pre-loaded with dict; NULL when no dict active */
-#ifdef HAVE_IPP
-  Ipp8u* lz4_hash_table;
-#endif
   uint32_t my_job_seq;  /* last job_seq processed; used by BLOSC_BACKEND_PER_CONTEXT on Windows */
 };
 

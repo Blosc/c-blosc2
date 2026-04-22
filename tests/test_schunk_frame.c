@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include "test_common.h"
+#include "frame.h"
 
 #define CHUNKSIZE (200 * 1000)
 #define NTHREADS (2)
@@ -106,6 +107,67 @@ static char* test_schunk_cframe(void) {
   return EXIT_SUCCESS;
 }
 
+static char* test_schunk_avoid_cframe_free_without_frame(void) {
+  blosc2_schunk* schunk;
+
+  blosc2_init();
+
+  blosc2_storage storage = {.contiguous = false};
+  schunk = blosc2_schunk_new(&storage);
+  mu_assert("blosc2_schunk_new() failed", schunk != NULL);
+  mu_assert("Expected in-memory non-contiguous schunk to have no frame", schunk->frame == NULL);
+
+  blosc2_schunk_avoid_cframe_free(schunk, true);
+  blosc2_schunk_avoid_cframe_free(schunk, false);
+
+  blosc2_schunk_free(schunk);
+  blosc2_destroy();
+
+  return EXIT_SUCCESS;
+}
+
+static char* test_schunk_from_buffer_bad_magic(void) {
+  blosc2_schunk* schunk;
+  uint8_t* cframe;
+  bool cframe_needs_free;
+
+  blosc2_init();
+
+  blosc2_storage storage = {.contiguous = true};
+  schunk = blosc2_schunk_new(&storage);
+  mu_assert("blosc2_schunk_new() failed", schunk != NULL);
+
+  int32_t data[16];
+  for (int i = 0; i < (int)ARRAY_SIZE(data); ++i) {
+    data[i] = i;
+  }
+  int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, sizeof(data));
+  mu_assert("ERROR: bad append in frame", nchunks_ > 0);
+
+  int64_t len = blosc2_schunk_to_buffer(schunk, &cframe, &cframe_needs_free);
+  mu_assert("Error in getting a frame buffer", len > FRAME_HEADER_MINLEN);
+
+  uint8_t* mutated = malloc((size_t)len);
+  mu_assert("Error allocating mutated frame buffer", mutated != NULL);
+  memcpy(mutated, cframe, (size_t)len);
+  mutated[FRAME_HEADER_MAGIC] ^= 0x1;
+
+  blosc2_schunk* reopened = blosc2_schunk_from_buffer(mutated, len, true);
+  mu_assert("blosc2_schunk_from_buffer() should reject invalid magic", reopened == NULL);
+
+  reopened = blosc2_schunk_from_buffer(mutated, FRAME_HEADER_MINLEN - 1, true);
+  mu_assert("blosc2_schunk_from_buffer() should reject too-small buffers safely", reopened == NULL);
+
+  free(mutated);
+  blosc2_schunk_free(schunk);
+  if (cframe_needs_free) {
+    free(cframe);
+  }
+  blosc2_destroy();
+
+  return EXIT_SUCCESS;
+}
+
 static char *all_tests(void) {
   nchunks = 0;
   contiguous = true;
@@ -147,6 +209,9 @@ static char *all_tests(void) {
   copy = false;
   special_chunks = true;
   mu_run_test(test_schunk_cframe);
+
+  mu_run_test(test_schunk_avoid_cframe_free_without_frame);
+  mu_run_test(test_schunk_from_buffer_bad_magic);
 
   return EXIT_SUCCESS;
 }

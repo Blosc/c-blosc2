@@ -58,7 +58,7 @@ typedef struct {
   //!< (https://numpy.org/doc/stable/reference/generated/numpy.memmap.html). Set to r if the file should only be read,
   //!< r+ if you want to extend data to an existing file, w+ to create a new file and c to use an existing file as basis
   //!<  but keep all modifications in-memory. On Windows, the size of the mapping cannot change in the c mode.
-  int64_t initial_mapping_size;
+  size_t initial_mapping_size;
   //!< The initial size of the memory mapping used as a large enough write buffer for the r+, w+ and c modes (for
   //!< Windows, only the r+ and w+ modes). On Windows, this will also be the size of the file while the file is opened.
   //!< It will be truncated to the target size when the file is closed (e.g., when the schunk is destroyed).
@@ -71,9 +71,9 @@ typedef struct {
   //!< The starting address of the mapping.
   char* urlpath;
   //!< The path to the file which is associated with this object.
-  int64_t file_size;
+  size_t file_size;
   //!< The size of the file.
-  int64_t mapping_size;
+  size_t mapping_size;
   //!< The size of the mapping (mapping_size >= file_size).
   bool is_memory_only;
   //!< Whether the mapping is only in-memory and changes are not reflected to the file on disk (c mode).
@@ -95,7 +95,7 @@ typedef struct {
  * @brief Default struct for memory-mapped I/O for user initialization.
  */
 static const blosc2_stdio_mmap BLOSC2_STDIO_MMAP_DEFAULTS = {
-  "r", (1 << 30), false, NULL, NULL, -1, -1, false, NULL, -1, -1, -1
+  "r", ((size_t)1 << 30), false, NULL, NULL, 0, 0, false, NULL, -1, -1, -1
 #if defined(_WIN32)
   , INVALID_HANDLE_VALUE
 #endif

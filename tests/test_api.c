@@ -86,6 +86,16 @@ static char *test_blocksize(void) {
   return 0;
 }
 
+static char *test_compcode_to_compname_unknown(void) {
+  const char *compname = "sentinel";
+  int compcode;
+
+  compcode = blosc2_compcode_to_compname(BLOSC_LAST_CODEC, &compname);
+  mu_assert("ERROR: unknown compcode should return -1", compcode == -1);
+  mu_assert("ERROR: compname should be NULL for unknown compcode", compname == NULL);
+  return 0;
+}
+
 
 static char* all_tests(void) {
   mu_run_test(test_cbuffer_sizes);
@@ -94,6 +104,7 @@ static char* all_tests(void) {
   mu_run_test(test_cbuffer_complib);
   mu_run_test(test_nthreads);
   mu_run_test(test_blocksize);
+  mu_run_test(test_compcode_to_compname_unknown);
   return 0;
 }
 

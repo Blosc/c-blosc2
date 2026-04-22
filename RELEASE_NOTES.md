@@ -10,6 +10,37 @@ Changes from 3.0.0-rc.1 to 3.0.0
   reported for large slices.  As these function signatures changed,
   this is an API/ABI break and callers should be rebuilt against 3.0.0.
 
+* Modernized codec dependency handling in CMake.  `lz4`, `zlib-ng`, and
+  `zstd` are now resolved either from external packages (when preferred and
+  available) or via `FetchContent` using pinned upstream versions, instead of
+  being built from vendored in-tree copies.
+
+* Added explicit CMake cache variables for the pinned codec versions and local
+  source overrides:
+  `BLOSC_LZ4_VERSION`, `BLOSC_ZLIBNG_VERSION`, `BLOSC_ZSTD_VERSION`, and the
+  matching `BLOSC_*_SOURCE_DIR` variables.
+
+* The optional ZFP plugin is now also obtained via `FetchContent` from the
+  pinned upstream `1.0.1` release (or an explicit local checkout via
+  `BLOSC_ZFP_SOURCE_DIR`) instead of using vendored plugin copies.
+
+* `blosclz` is now the only codec still vendored in-tree.
+
+* Improved CMake install/export support for static builds so downstream
+  `find_package(Blosc2)` consumers keep working when fetched codec libraries
+  are embedded into the Blosc package.
+
+* Embedded third-party headers installed by the CMake package are now placed
+  under a Blosc-owned include subtree (`blosc2/thirdparty/...`) instead of the
+  top-level include directory, reducing the risk of header name collisions.
+
+* Replaced deprecated `exec_program()` usage in `cmake/FindSIMD.cmake` with
+  `execute_process()`.  This avoids warnings with newer CMake versions.
+
+* Removed the unmaintained Intel IPP integration.  C-Blosc2 no longer exposes
+  a CMake option to enable/disable IPP, does not probe for IPP at configure
+  time, and always uses the maintained native codec paths instead.
+
 
 Changes from 2.23.1 to 3.0.0-rc.1
 =================================
