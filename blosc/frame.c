@@ -930,6 +930,11 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
 
     urlpath = normalize_urlpath(urlpath);
 
+    if (offset < 0) {
+      BLOSC_TRACE_ERROR("Negative frame offset is not valid: %" PRId64 ".", offset);
+      return NULL;
+    }
+
     if(stat(urlpath, &path_stat) < 0) {
         BLOSC_TRACE_ERROR("Cannot get information about the path %s.", urlpath);
         return NULL;
@@ -976,6 +981,29 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     }
     int64_t frame_len;
     to_big(&frame_len, header_ptr + FRAME_LEN, sizeof(frame_len));
+    if (frame_len < FRAME_HEADER_MINLEN + FRAME_TRAILER_MINLEN) {
+      BLOSC_TRACE_ERROR("Invalid frame length (%" PRId64 ") in file '%s'.", frame_len, urlpath);
+      io_cb->close(fp);
+      free(urlpath_cpy);
+      return NULL;
+    }
+
+    if (!sframe) {
+      int64_t file_size = (int64_t) path_stat.st_size;
+      if (offset > file_size || frame_len > file_size - offset) {
+        BLOSC_TRACE_ERROR("Frame length exceeds file boundary in file '%s'.", urlpath);
+        io_cb->close(fp);
+        free(urlpath_cpy);
+        return NULL;
+      }
+    }
+
+    if (offset > INT64_MAX - (frame_len - FRAME_TRAILER_MINLEN)) {
+      BLOSC_TRACE_ERROR("Frame offset arithmetic overflows in file '%s'.", urlpath);
+      io_cb->close(fp);
+      free(urlpath_cpy);
+      return NULL;
+    }
 
     blosc2_frame_s* frame = calloc(1, sizeof(blosc2_frame_s));
     frame->urlpath = urlpath_cpy;
@@ -1004,6 +1032,13 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     }
     uint32_t trailer_len;
     to_big(&trailer_len, trailer_ptr + trailer_offset, sizeof(trailer_len));
+    if (trailer_len < FRAME_TRAILER_MINLEN || trailer_len > INT32_MAX || trailer_len > (uint32_t) frame_len) {
+      BLOSC_TRACE_ERROR("Invalid trailer length (%" PRIu32 ") in file '%s'.", trailer_len, urlpath);
+      io_cb->close(fp);
+      free(urlpath_cpy);
+      free(frame);
+      return NULL;
+    }
     frame->trailer_len = trailer_len;
 
     return frame;
