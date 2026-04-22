@@ -7,6 +7,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "blosc-private.h"
 #include "frame.h"
@@ -113,9 +114,93 @@ static char* test_reject_malformed_frame_offsets(void) {
   return EXIT_SUCCESS;
 }
 
+static char* test_open_rejects_malformed_frame_offsets(void) {
+  int32_t data[CHUNKSIZE];
+  const char* path = "test_frame_malformed_offsets_open.b2frame";
+  blosc2_storage storage = {.contiguous = true};
+  blosc2_schunk *schunk = NULL;
+  FILE *fp = NULL;
+  uint8_t *filebuf = NULL;
+
+  blosc2_remove_urlpath(path);
+  blosc2_init();
+
+  schunk = blosc2_schunk_new(&storage);
+  mu_assert("Cannot create schunk", schunk != NULL);
+
+  for (int i = 0; i < CHUNKSIZE; ++i) {
+    data[i] = i;
+  }
+
+  for (int nchunk = 0; nchunk < NCHUNKS; ++nchunk) {
+    int64_t n = blosc2_schunk_append_buffer(schunk, data, (int32_t)sizeof(data));
+    mu_assert("Cannot append chunk", n >= 0);
+  }
+
+  int64_t written = blosc2_schunk_to_file(schunk, path);
+  mu_assert("Cannot write frame", written > 0);
+
+  fp = fopen(path, "rb+");
+  mu_assert("Cannot open malformed test file", fp != NULL);
+  mu_assert("Cannot seek to end", fseek(fp, 0, SEEK_END) == 0);
+  long flen = ftell(fp);
+  mu_assert("Cannot get file size", flen > 0);
+  rewind(fp);
+
+  filebuf = malloc((size_t)flen);
+  mu_assert("Cannot allocate file buffer", filebuf != NULL);
+  mu_assert("Cannot read frame file", fread(filebuf, 1, (size_t)flen, fp) == (size_t)flen);
+
+  int32_t header_len;
+  int64_t cbytes;
+  from_big(&header_len, filebuf + FRAME_HEADER_LEN, sizeof(header_len));
+  from_big(&cbytes, filebuf + FRAME_CBYTES, sizeof(cbytes));
+  mu_assert("Invalid header length", header_len >= FRAME_HEADER_MINLEN);
+  mu_assert("Invalid compressed bytes", cbytes > 0);
+
+  int64_t off_pos = header_len + cbytes;
+  mu_assert("Offset chunk position out of bounds",
+            off_pos >= 0 && off_pos + BLOSC_EXTENDED_HEADER_LENGTH <= flen);
+
+  int32_t off_nbytes;
+  int32_t off_cbytes;
+  int rc = blosc2_cbuffer_sizes(filebuf + off_pos, &off_nbytes, &off_cbytes, NULL);
+  mu_assert("Cannot parse on-disk offsets chunk", rc >= 0);
+  mu_assert("Invalid offsets cbytes",
+            off_cbytes >= BLOSC_EXTENDED_HEADER_LENGTH && off_pos + off_cbytes <= flen);
+  (void)off_nbytes;
+
+  /* Corrupt the offsets chunk payload so frame_to_schunk fails on open. */
+  memset(filebuf + off_pos + BLOSC_EXTENDED_HEADER_LENGTH, 0xFF,
+         (size_t)(off_cbytes - BLOSC_EXTENDED_HEADER_LENGTH));
+
+  rewind(fp);
+  mu_assert("Cannot write malformed frame", fwrite(filebuf, 1, (size_t)flen, fp) == (size_t)flen);
+  fclose(fp);
+  fp = NULL;
+
+  blosc2_schunk *decoded = blosc2_schunk_open(path);
+  mu_assert("Malformed frame must be rejected", decoded == NULL);
+
+  if (fp != NULL) {
+    fclose(fp);
+  }
+  if (filebuf != NULL) {
+    free(filebuf);
+  }
+  if (schunk != NULL) {
+    blosc2_schunk_free(schunk);
+  }
+  blosc2_remove_urlpath(path);
+  blosc2_destroy();
+
+  return EXIT_SUCCESS;
+}
+
 
 static char *all_tests(void) {
   mu_run_test(test_reject_malformed_frame_offsets);
+  mu_run_test(test_open_rejects_malformed_frame_offsets);
   return EXIT_SUCCESS;
 }
 
