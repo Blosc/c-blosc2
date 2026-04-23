@@ -65,7 +65,7 @@ def get_values(filename):
 
 
 def show_plot(plots, yaxis, legends, gtitle, xmax=None, ymax=None):
-    xlabel('Compresssion ratio')
+    xlabel('Compression ratio')
     ylabel('Speed (GB/s)')
     title(gtitle)
     xlim(0, xmax)
