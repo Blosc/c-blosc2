@@ -119,7 +119,7 @@ The implementation should mostly extend current code paths instead of introducin
 ### 2. Chunk header read/write
 
 - In `read_chunk_header()`, read `blosc2_flags2` and keep it available in the local header struct.
-- In `blosc2_intialize_header_from_context()`, explicitly populate `blosc2_flags2` from the context.
+- In `blosc2_initialize_header_from_context()`, explicitly populate `blosc2_flags2` from the context.
 - For the special chunk constructors (`zeros`, `uninit`, `nans`, `repeatval`), keep `blosc2_flags2 == 0`.
 
 ### 3. Context state

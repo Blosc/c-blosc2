@@ -941,7 +941,7 @@ int fill_tuner(blosc2_tuner *tuner) {
 }
 
 
-static int blosc2_intialize_header_from_context(blosc2_context* context, blosc_header* header, bool extended_header) {
+static int blosc2_initialize_header_from_context(blosc2_context* context, blosc_header* header, bool extended_header) {
   int32_t header_blocksize = (int32_t)(context->header_blocksize > 0 ? context->header_blocksize : context->blocksize);
   if ((context->blosc2_flags2 & BLOSC2_VL_BLOCKS) == 0 &&
       context->sourcesize > 0 && header_blocksize > context->sourcesize) {
@@ -2920,7 +2920,7 @@ static int write_compression_header(blosc2_context* context, bool extended_heade
   }
 
   // Create blosc header and store to dest
-  blosc2_intialize_header_from_context(context, &header, extended_header);
+  blosc2_initialize_header_from_context(context, &header, extended_header);
 
   memcpy(context->dest, &header, (extended_header) ?
     BLOSC_EXTENDED_HEADER_LENGTH : BLOSC_MIN_HEADER_LENGTH);

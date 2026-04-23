@@ -7,11 +7,11 @@
 
   To compile this program:
 
-  $ gcc frame_rountrip.c -o frame_roundtrip -lblosc2
+  $ gcc frame_roundtrip.c -o frame_roundtrip -lblosc2
 
   To run:
 
-  $ ./frame_rountrip
+  $ ./frame_roundtrip
 
 */
 

@@ -150,7 +150,7 @@ int main(void) {
   if (envvar != NULL) {
     codec = blosc2_compname_to_compcode(envvar);
     if (codec < 0) {
-      printf("Unknown compresssor: %s\n", envvar);
+      printf("Unknown compressor: %s\n", envvar);
       return 1;
     }
   }
