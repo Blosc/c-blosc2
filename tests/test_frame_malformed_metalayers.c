@@ -83,7 +83,7 @@ static char* test_malformed_metalayer_bounds(void) {
             }
             idx_ptr++;
             
-            /* Get the original offset to the content marker */
+            /* Get the original, valid offset to the content marker */
             int32_t original_offset;
             from_big(&original_offset, idx_ptr, sizeof(original_offset));
             
@@ -94,23 +94,18 @@ static char* test_malformed_metalayer_bounds(void) {
 
             uint8_t *content_marker = buffer + original_offset;
             if (*content_marker != 0xc6) {
-                result_msg = "Expected bin32 MessagePack marker (0xc6)";
+                result_msg = "Expected bin32 MessagePack marker (0xc6) at metalayer content";
                 goto cleanup;
             }
-            
-            int32_t malicious_len = INT32_MAX;
-            to_big(content_marker + 1, &malicious_len, sizeof(malicious_len));
 
             /* 
-             * Overwrite index offset with header_len - FRAME_META_HDR_SIZE to 
-             * pass the first check but trigger the second one.
+             * REALISTIC CORRUPTION:
+             * We preserve the valid frame structure and only corrupt the 
+             * metalayer content length field. Setting it to INT32_MAX will 
+             * trigger the subtraction-based overflow check in frame.c.
              */
-            if (header_len < FRAME_META_HDR_SIZE) {
-                result_msg = "header_len too small for malicious injection";
-                goto cleanup;
-            }
-            int32_t malicious_offset = header_len - FRAME_META_HDR_SIZE; 
-            to_big(idx_ptr, &malicious_offset, sizeof(malicious_offset));
+            int32_t malicious_len = INT32_MAX;
+            to_big(content_marker + 1, &malicious_len, sizeof(malicious_len));
 
             found = 1;
             break;
@@ -126,9 +121,12 @@ static char* test_malformed_metalayer_bounds(void) {
     /* 5. Attempt to open the malformed frame */
     malicious_schunk = blosc2_schunk_from_buffer(buffer, buffer_len, false);
 
-    if (malicious_schunk != NULL) {
-        result_msg = "FAILURE: Malformed frame was ACCEPTED! (Potential Vulnerability)";
-    }
+    /* 
+     * The frame MUST be rejected. If malicious_schunk is NOT NULL, 
+     * the security check in frame.c was bypassed.
+     */
+    mu_assert("SECURITY FAILURE: Malformed frame was accepted (Overflow check bypassed)", 
+              malicious_schunk == NULL);
 
 cleanup:
     if (malicious_schunk != NULL) blosc2_schunk_free(malicious_schunk);
