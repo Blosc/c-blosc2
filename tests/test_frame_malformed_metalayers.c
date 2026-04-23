@@ -29,13 +29,11 @@ static char* test_malformed_metalayer_bounds(void) {
     bool needs_free = false;
     char* result_msg = NULL;
 
-    blosc2_init();
-
     /* 1. Create a minimal valid schunk and frame */
     int32_t data[100] = {0};
     blosc2_storage storage = {.contiguous = true};
     schunk = blosc2_schunk_new(&storage);
-    mu_assert("Failed to create schunk", schunk != NULL);
+    if (schunk == NULL) return "Failed to create schunk";
     
     blosc2_schunk_append_buffer(schunk, data, sizeof(data));
 
@@ -45,15 +43,26 @@ static char* test_malformed_metalayer_bounds(void) {
 
     /* 3. Export to buffer */
     int64_t buffer_len = blosc2_schunk_to_buffer(schunk, &buffer, &needs_free);
-    mu_assert("Failed to create frame buffer", buffer_len > 0);
+    if (buffer_len <= 0) {
+        result_msg = "Failed to create frame buffer";
+        goto cleanup;
+    }
 
     /* 4. Malform the buffer: Inject malicious metalayer metadata */
     int32_t header_len;
     from_big(&header_len, buffer + FRAME_HEADER_LEN, sizeof(header_len));
     
+    if (header_len < FRAME_IDX_SIZE + 2) {
+        result_msg = "Header too small for index";
+        goto cleanup;
+    }
+
     /* Parse the metalayer index (map) to find "testmeta" */
-    uint8_t *idx_ptr = buffer + FRAME_IDX_SIZE + 2; // Skip idx_size
-    mu_assert("Could not find metalayer index marker", *idx_ptr == 0xde);
+    uint8_t *idx_ptr = buffer + FRAME_IDX_SIZE + 2; 
+    if (*idx_ptr != 0xde) {
+        result_msg = "Could not find metalayer index marker";
+        goto cleanup;
+    }
     idx_ptr++;
     
     uint16_t nmetalayers;
@@ -67,41 +76,52 @@ static char* test_malformed_metalayer_bounds(void) {
         idx_ptr++;
         
         if (nslen == strlen("testmeta") && memcmp(idx_ptr, "testmeta", nslen) == 0) {
-            printf("Found 'testmeta' in index at offset %ld\n", (long)(idx_ptr - buffer));
             idx_ptr += nslen;
-            
-            mu_assert("Unexpected offset marker", *idx_ptr == 0xd2);
+            if (*idx_ptr != 0xd2) {
+                result_msg = "Unexpected offset marker";
+                goto cleanup;
+            }
             idx_ptr++;
             
             /* Get the original offset to the content marker */
             int32_t original_offset;
             from_big(&original_offset, idx_ptr, sizeof(original_offset));
             
-            /* 
-             * Corrupt the embedded metalayer content length to exercise 
-             * the overflow-resistant bounds checks.
-             */
+            if (original_offset < 0 || original_offset >= buffer_len) {
+                result_msg = "Invalid original offset";
+                goto cleanup;
+            }
+
             uint8_t *content_marker = buffer + original_offset;
-            mu_assert("Unexpected content marker", *content_marker == 0xc6);
+            if (*content_marker != 0xc6) {
+                result_msg = "Expected bin32 MessagePack marker (0xc6)";
+                goto cleanup;
+            }
             
             int32_t malicious_len = INT32_MAX;
             to_big(content_marker + 1, &malicious_len, sizeof(malicious_len));
 
             /* 
-             * Overwrite index offset with header_len - 1 to trigger 
-             * (header_len - offset < FRAME_META_HDR_SIZE) check.
+             * Overwrite index offset with header_len - FRAME_META_HDR_SIZE to 
+             * pass the first check but trigger the second one.
              */
-            int32_t malicious_offset = header_len - 1; 
+            if (header_len < FRAME_META_HDR_SIZE) {
+                result_msg = "header_len too small for malicious injection";
+                goto cleanup;
+            }
+            int32_t malicious_offset = header_len - FRAME_META_HDR_SIZE; 
             to_big(idx_ptr, &malicious_offset, sizeof(malicious_offset));
-            printf("Injected malicious offset %d and length %d\n", malicious_offset, malicious_len);
 
             found = 1;
             break;
         }
-        idx_ptr += nslen + 1 + 4; // Skip name + 0xd2 + offset
+        idx_ptr += nslen + 1 + 4; 
     }
 
-    mu_assert("Could not locate 'testmeta' metalayer in buffer", found);
+    if (!found) {
+        result_msg = "Could not locate 'testmeta' metalayer in buffer";
+        goto cleanup;
+    }
 
     /* 5. Attempt to open the malformed frame */
     malicious_schunk = blosc2_schunk_from_buffer(buffer, buffer_len, false);
@@ -114,7 +134,6 @@ cleanup:
     if (malicious_schunk != NULL) blosc2_schunk_free(malicious_schunk);
     if (schunk != NULL) blosc2_schunk_free(schunk);
     if (needs_free && buffer != NULL) free(buffer);
-    blosc2_destroy();
 
     return result_msg;
 }
