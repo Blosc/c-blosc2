@@ -2800,7 +2800,7 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
     }
     else {
       int32_t max_blocksize = 0;
-      int32_t total_nbytes = 0;
+      int64_t total_nbytes = 0;
       int32_t prev_bstart = 0;
       for (int32_t i = 0; i < context->nblocks; ++i) {
         int32_t bstart = sw32_(context->bstarts + i);
@@ -2811,14 +2811,22 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
           BLOSC_TRACE_ERROR("Invalid VL-block offsets in chunk.");
           return BLOSC2_ERROR_INVALID_HEADER;
         }
-        context->blockoffsets[i] = total_nbytes;
         context->blocknbytes[i] = sw32_(context->src + bstart);
         context->blockcbytes[i] = next_bstart - bstart;
         if (context->blocknbytes[i] <= 0) {
           BLOSC_TRACE_ERROR("Invalid VL-block uncompressed size in chunk.");
           return BLOSC2_ERROR_INVALID_HEADER;
         }
+        if (total_nbytes > INT32_MAX) {
+          BLOSC_TRACE_ERROR("Invalid VL-block cumulative size in chunk.");
+          return BLOSC2_ERROR_INVALID_HEADER;
+        }
+        context->blockoffsets[i] = (int32_t)total_nbytes;
         total_nbytes += context->blocknbytes[i];
+        if (total_nbytes > context->sourcesize) {
+          BLOSC_TRACE_ERROR("VL-block sizes exceed chunk nbytes.");
+          return BLOSC2_ERROR_INVALID_HEADER;
+        }
         if (context->blocknbytes[i] > max_blocksize) {
           max_blocksize = context->blocknbytes[i];
         }
