@@ -86,23 +86,19 @@ static char* test_malformed_metalayer_bounds(void) {
             /* Get the original, valid offset to the content marker */
             int32_t original_offset;
             from_big(&original_offset, idx_ptr, sizeof(original_offset));
-            
-            if (original_offset < 0 || original_offset >= buffer_len) {
-                result_msg = "Invalid original offset";
-                goto cleanup;
-            }
+
+            mu_assert("Invalid original offset", 
+                      original_offset >= 0 && original_offset < buffer_len);
 
             uint8_t *content_marker = buffer + original_offset;
-            if (*content_marker != 0xc6) {
-                result_msg = "Expected bin32 MessagePack marker (0xc6) at metalayer content";
-                goto cleanup;
-            }
+            mu_assert("Expected bin32 MessagePack marker (0xc6) at metalayer content", 
+                      *content_marker == 0xc6);
 
             /* 
-             * REALISTIC CORRUPTION:
+             * CORRUPTION:
              * We preserve the valid frame structure and only corrupt the 
              * metalayer content length field. Setting it to INT32_MAX will 
-             * trigger the subtraction-based overflow check in frame.c.
+             * trigger the bounds check in frame.c.
              */
             int32_t malicious_len = INT32_MAX;
             to_big(content_marker + 1, &malicious_len, sizeof(malicious_len));

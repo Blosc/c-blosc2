@@ -1596,7 +1596,7 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
     }
     // Go to offset and see if we have the correct marker
     uint8_t* content_marker = header + offset;
-    if (header_len - offset < FRAME_META_HDR_SIZE) {
+    if (offset + FRAME_META_HDR_SIZE > header_len) {
       return BLOSC2_ERROR_READ_BUFFER;
     }
     if (*content_marker != 0xc6) {
@@ -1786,7 +1786,7 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
     }
     // Go to offset and see if we have the correct marker
     uint8_t* content_marker = trailer + offset;
-    if (trailer_len - offset < FRAME_META_HDR_SIZE) {
+    if (offset + FRAME_META_HDR_SIZE > trailer_len) {
       return BLOSC2_ERROR_READ_BUFFER;
     }
     if (*content_marker != 0xc6) {
