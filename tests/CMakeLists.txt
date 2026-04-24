@@ -8,6 +8,8 @@
 
 # sources
 file(GLOB SOURCES test_*.c b2nd/test_*.c fuzz/generate_inputs_corpus.c)
+list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_vl_block_overflow.c)
+list(REMOVE_DUPLICATES SOURCES)
 
 # flags
 link_directories(${PROJECT_BINARY_DIR}/blosc)
