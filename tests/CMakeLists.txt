@@ -29,7 +29,8 @@ foreach(source ${SOURCES})
         if(target STREQUAL test_nolock OR
             target STREQUAL test_noinit OR
             target STREQUAL test_compressor OR
-            target STREQUAL test_blosc1_compat)
+            target STREQUAL test_blosc1_compat OR
+            target STREQUAL test_race)
             message("Skipping ${target} on Windows systems")
             continue()
         endif()
