@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "blosc2.h"
+#include "threading.h"
 
 void* set_compressor_thread(void* arg) {
     const char* comp = (const char*)arg;
