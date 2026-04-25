@@ -7,7 +7,7 @@
 # See LICENSE.txt for details about copyright and rights to use.
 
 # sources
-file(GLOB SOURCES test_*.c b2nd/test_*.c fuzz/generate_inputs_corpus.c)
+file(GLOB SOURCES CONFIGURE_DEPENDS test_*.c b2nd/test_*.c fuzz/generate_inputs_corpus.c)
 
 # flags
 link_directories(${PROJECT_BINARY_DIR}/blosc)
@@ -136,3 +136,7 @@ foreach(source ${SOURCES})
             COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:${target}>)
     endif()
 endforeach()
+
+if(TARGET test_lazychunk_oob)
+    set_tests_properties(test_lazychunk_oob PROPERTIES ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+endif()

@@ -2839,9 +2839,12 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
     if (io_cb->is_allocation_necessary) {
       uint8_t* chunk_ptr = NULL;
       rbytes = io_cb->read((void**)&chunk_ptr, 1, (int64_t)streams_offset, io_pos, fp);
-      if (rbytes == (int64_t)streams_offset && chunk_ptr != NULL) {
-        memcpy(*chunk, chunk_ptr, streams_offset);
+      if (rbytes != (int64_t)streams_offset || chunk_ptr == NULL) {
+        free(chunk_ptr);
+        rc = BLOSC2_ERROR_READ_BUFFER;
+        goto end;
       }
+      memcpy(*chunk, chunk_ptr, streams_offset);
       free(chunk_ptr);
     }
     else {
