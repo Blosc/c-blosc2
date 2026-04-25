@@ -5332,23 +5332,31 @@ static int parallel_blosc(blosc2_context* context) {
 
 int16_t blosc2_get_nthreads(void)
 {
-  return g_nthreads;
+  int16_t nthreads;
+  blosc2_pthread_mutex_lock(&global_comp_mutex);
+  nthreads = g_nthreads;
+  blosc2_pthread_mutex_unlock(&global_comp_mutex);
+  return nthreads;
 }
 
 int16_t blosc2_set_nthreads(int16_t nthreads) {
-  int16_t ret = g_nthreads;          /* the previous number of threads */
+  int16_t ret;          /* the previous number of threads */
 
   /* Check whether the library should be initialized */
   if (!g_initlib) blosc2_init();
 
- if (nthreads != ret) {
-   g_nthreads = nthreads;
-   g_global_context->new_nthreads = nthreads;
-   int16_t ret2 = check_nthreads(g_global_context);
-   if (ret2 < 0) {
-     return ret2;
-   }
- }
+  blosc2_pthread_mutex_lock(&global_comp_mutex);
+  ret = g_nthreads;
+  if (nthreads != ret) {
+    g_nthreads = nthreads;
+    g_global_context->new_nthreads = nthreads;
+    int16_t ret2 = check_nthreads(g_global_context);
+    if (ret2 < 0) {
+      blosc2_pthread_mutex_unlock(&global_comp_mutex);
+      return ret2;
+    }
+  }
+  blosc2_pthread_mutex_unlock(&global_comp_mutex);
 
   return ret;
 }
@@ -5357,7 +5365,9 @@ int16_t blosc2_set_nthreads(int16_t nthreads) {
 const char* blosc1_get_compressor(void)
 {
   const char* compname;
+  blosc2_pthread_mutex_lock(&global_comp_mutex);
   blosc2_compcode_to_compname(g_compressor, &compname);
+  blosc2_pthread_mutex_unlock(&global_comp_mutex);
 
   return compname;
 }
@@ -5368,7 +5378,9 @@ int blosc1_set_compressor(const char* compname) {
     BLOSC_TRACE_ERROR("User defined codecs cannot be set here. Use Blosc2 mechanism instead.");
     BLOSC_ERROR(BLOSC2_ERROR_CODEC_SUPPORT);
   }
+  blosc2_pthread_mutex_lock(&global_comp_mutex);
   g_compressor = code;
+  blosc2_pthread_mutex_unlock(&global_comp_mutex);
 
   /* Check whether the library should be initialized */
   if (!g_initlib) blosc2_init();
@@ -5377,8 +5389,9 @@ int blosc1_set_compressor(const char* compname) {
 }
 
 void blosc2_set_delta(int dodelta) {
-
+  blosc2_pthread_mutex_lock(&global_comp_mutex);
   g_delta = dodelta;
+  blosc2_pthread_mutex_unlock(&global_comp_mutex);
 
   /* Check whether the library should be initialized */
   if (!g_initlib) blosc2_init();
@@ -5566,29 +5579,39 @@ const char* blosc2_cbuffer_complib(const void* cbuffer) {
    that an automatic blocksize is computed internally. */
 int blosc1_get_blocksize(void)
 {
-  return (int)g_force_blocksize;
+  int blocksize;
+  blosc2_pthread_mutex_lock(&global_comp_mutex);
+  blocksize = (int)g_force_blocksize;
+  blosc2_pthread_mutex_unlock(&global_comp_mutex);
+  return blocksize;
 }
 
 
 /* Force the use of a specific blocksize.  If 0, an automatic
    blocksize will be used (the default). */
 void blosc1_set_blocksize(size_t blocksize) {
+  blosc2_pthread_mutex_lock(&global_comp_mutex);
   g_force_blocksize = (int32_t)blocksize;
+  blosc2_pthread_mutex_unlock(&global_comp_mutex);
 }
 
 
 /* Force the use of a specific split mode. */
 void blosc1_set_splitmode(int mode)
 {
+  blosc2_pthread_mutex_lock(&global_comp_mutex);
   g_splitmode = mode;
+  blosc2_pthread_mutex_unlock(&global_comp_mutex);
 }
 
 
 /* Set pointer to super-chunk.  If NULL, no super-chunk will be
    reachable (the default). */
 void blosc_set_schunk(blosc2_schunk* schunk) {
+  blosc2_pthread_mutex_lock(&global_comp_mutex);
   g_schunk = schunk;
   g_global_context->schunk = schunk;
+  blosc2_pthread_mutex_unlock(&global_comp_mutex);
 }
 
 blosc2_io *blosc2_io_global = NULL;
