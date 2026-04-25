@@ -13,13 +13,19 @@
 #include <stdint.h>
 
 static int32_t read_i32(const uint8_t* src) {
-  int32_t value;
-  memcpy(&value, src, sizeof(value));
-  return value;
+  uint32_t value = ((uint32_t)src[0]) |
+                   ((uint32_t)src[1] << 8) |
+                   ((uint32_t)src[2] << 16) |
+                   ((uint32_t)src[3] << 24);
+  return (int32_t)value;
 }
 
 static void write_i32(uint8_t* dst, int32_t value) {
-  memcpy(dst, &value, sizeof(value));
+  uint32_t uvalue = (uint32_t)value;
+  dst[0] = (uint8_t)(uvalue & 0xffu);
+  dst[1] = (uint8_t)((uvalue >> 8) & 0xffu);
+  dst[2] = (uint8_t)((uvalue >> 16) & 0xffu);
+  dst[3] = (uint8_t)((uvalue >> 24) & 0xffu);
 }
 
 int main(void) {
