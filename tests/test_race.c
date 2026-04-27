@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,7 +13,7 @@ static int is_expected_compressor(const char* comp) {
 void* set_compressor_thread(void* arg) {
     const char* comp = (const char*)arg;
     int rc = blosc1_set_compressor(comp);
-    return (void*)(size_t)rc;
+    return (void*)(intptr_t)rc;
 }
 
 int main() {
@@ -43,6 +44,16 @@ int main() {
             return 1;
         }
 
+        comp = blosc1_get_compressor();
+        if (comp != NULL && !is_expected_compressor(comp)) {
+            fprintf(stderr, "Unexpected compressor before join on iteration %d: %s\n",
+                    i, comp != NULL ? comp : "(null)");
+            blosc2_pthread_join(t1, NULL);
+            blosc2_pthread_join(t2, NULL);
+            blosc2_destroy();
+            return 1;
+        }
+
         rc = blosc2_pthread_join(t1, &t1_result);
         if (rc != 0) {
             fprintf(stderr, "blosc2_pthread_join for t1 failed on iteration %d: %d\n", i, rc);
@@ -58,16 +69,16 @@ int main() {
             return 1;
         }
 
-        if ((int)(size_t)t1_result < 0) {
+        if ((int)(intptr_t)t1_result < 0) {
             fprintf(stderr, "blosc1_set_compressor(\"blosclz\") failed on iteration %d: %d\n",
-                    i, (int)(size_t)t1_result);
+                    i, (int)(intptr_t)t1_result);
             blosc2_destroy();
             return 1;
         }
 
-        if ((int)(size_t)t2_result < 0) {
+        if ((int)(intptr_t)t2_result < 0) {
             fprintf(stderr, "blosc1_set_compressor(\"lz4\") failed on iteration %d: %d\n",
-                    i, (int)(size_t)t2_result);
+                    i, (int)(intptr_t)t2_result);
             blosc2_destroy();
             return 1;
         }
