@@ -84,9 +84,9 @@ Generate them with the current version::
 Then, build ``compat/filegen-vl`` against the target Blosc library and check
 the fixtures with::
 
-  $ ./filegen-vl decompress vlblocks-lz4-fixed-2.y.z.b2frame
-  $ ./filegen-vl decompress vlblocks-lz4-variable-2.y.z.b2frame
-  $ ./filegen-vl decompress varchunks-lz4-2.y.z.b2frame
+  $ ./filegen-vl decompress vlblocks-lz4-fixed-3.0.0.b2frame
+  $ ./filegen-vl decompress vlblocks-lz4-variable-3.0.0.b2frame
+  $ ./filegen-vl decompress varchunks-lz4-3.0.0.b2frame
 
 Expected results:
 
