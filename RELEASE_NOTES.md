@@ -4,8 +4,13 @@ Release notes for C-Blosc2
 Changes from 3.0.0-rc2 to 3.0.0
 ===============================
 
-#XXX version-specific blurb XXX#
+* Fixes an integer overflow in VL-block decompression where cumulative
+  blocknbytes was tracked in a 32-bit integer. PR #753. Thanks to @metsw24-max.
 
+* Fix data races in global configuration APIs using mutex protection. PR #753.
+  Thanks to @metsw24-max.
+
+* Different typos fixed.  Thanks to @DimitriPapadopoulos.
 
 Changes from 3.0.0-rc1 to 3.0.0-rc2
 ===================================

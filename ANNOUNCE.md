@@ -1,21 +1,49 @@
-# Announcing C-Blosc2 3.0.0 RC2
-A fast, compressed and persistent binary data store library for C.
+# Announcing C-Blosc2 3.0.0
+A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This release builds on the big 3.x features introduced in RC1—like
-variable-length chunks & blocks (VL-blocks) and improved dictionary
-compression —and adds an important round of polish before
-the final 3.0.0 release.
+This release is officially announcing the production-ready release of
+C-Blosc2 3.0.0. This is the culmination of a streamlined development
+process leading to variable-length chunks and blocks (VL-blocks),
+a new threading execution model, and improved dictionary compression.
+As usual, it also includes a number of bug fixes, cleanups, and
+improvements in security, robustness, and build system modernization.
 
-In short, RC2 makes Blosc2 more scalable, more robust, and easier to integrate
-in modern build environments.
+In short, the 3.0.0 release makes Blosc2 more scalable, flexible, and secure.
 
-Highlights include:
+Highlights:
 
-* `blosc2_get_slice_nchunks()`, `schunk_get_slice_nchunks()`, and
-  `b2nd_get_slice_nchunks()` now return `int64_t` instead of `int`, removing
-  an artificial `INT_MAX` limit for large slices.
+* Support for variable-length chunks and variable-length blocks.  This is
+  especially useful for workloads made of naturally variable-size pieces
+  of data, like strings, records, JSON fragments, or other irregular payloads
+  that previously had to be padded, split awkwardly, or stored as independent
+  chunks.  The new layout keeps these pieces grouped together while still
+  making them individually recoverable.
+
+  With this, there are new public APIs for VL-block chunks:
+  `blosc2_vlcompress_ctx()`, `blosc2_vldecompress_ctx()`,
+  `blosc2_vlchunk_get_nblocks()`, `blosc2_vldecompress_block_ctx()`, and
+  `blosc2_schunk_get_vlblock()`.  Lazy loading also works with VL-block chunks,
+  so individual blocks can be fetched on demand without materializing the whole
+  chunk first.
+
+* The chunk and cframe formats have been extended to represent variable chunk
+  sizes, VL-block chunks, and dictionary usage more explicitly.  Forward
+  compatibility checks were tightened as part of this work, and regular chunks
+  keep their previous stable format version while VL-block chunks use a new one.
+
+* Dictionary compression has been expanded and improved:
+  `use_dict` now works with LZ4 and LZ4HC in addition to ZSTD, the dictionary
+  state is preserved correctly across chunk compression/decompression, and the
+  frame metadata now round-trips the dictionary setting.  There is also a new
+  minimum useful dictionary threshold to avoid training or using dictionaries
+  that are too small to help.
+
+* The necessary changes for accommodating all these improvements have been fully
+  documented in README_CHUNK_FORMAT.md and README_CFRAME_FORMAT.md.  Again,
+  care has been taken to ensure that the chunk and frame formats are backward
+  compatible with previous versions of C-Blosc2.
 
 * The internal parallel execution model now uses a shared managed thread pool
   instead of private worker pools per context.  This reduces redundant thread
@@ -26,8 +54,8 @@ Highlights include:
 * A broad set of robustness and security hardening fixes landed across frame,
   schunk, lazy-chunk, metadata, mmap, and getitem paths, including tighter
   bounds checking, malformed-input rejection, integer-overflow prevention, and
-  many new regression tests.  RC2 is a much stronger candidate for production
-  testing as a result.
+  many new regression tests.  As a result, version 3.0.0 is much stronger
+  for production usage.
 
 * CMake dependency handling was modernized: `lz4`, `zlib-ng`, `zstd`, and the
   optional ZFP plugin are now obtained from external packages or via

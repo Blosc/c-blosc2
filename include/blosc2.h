@@ -85,12 +85,8 @@ extern "C" {
 #define BLOSC2_VERSION_MINOR    0   /* for minor interface/format changes  */
 #define BLOSC2_VERSION_RELEASE  0  /* for tweaks, bug-fixes, or development */
 
-#define BLOSC2_VERSION_STRING   "3.0.0.dev"  /* string version.  Sync with above! */
-#define BLOSC2_VERSION_DATE     "$Date:: 2026-04-22 #$"    /* date version year-month-day */
-
-
-/* The maximum number of dimensions for Blosc2 NDim arrays */
-#define BLOSC2_MAX_DIM 8
+#define BLOSC2_VERSION_STRING   "3.0.0"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_DATE     "$Date:: 2026-04-28 #$"    /* date version year-month-day */
 
 
 /* Tracing macros */
