@@ -9,10 +9,15 @@ static int is_expected_compressor(const char* comp) {
            (strcmp(comp, "blosclz") == 0 || strcmp(comp, "lz4") == 0);
 }
 
+struct set_compressor_arg {
+    const char* comp;
+    int rc;
+};
+
 void* set_compressor_thread(void* arg) {
-    const char* comp = (const char*)arg;
-    int rc = blosc1_set_compressor(comp);
-    return (void*)(size_t)rc;
+    struct set_compressor_arg* state = (struct set_compressor_arg*)arg;
+    state->rc = blosc1_set_compressor(state->comp);
+    return NULL;
 }
 
 int main() {
@@ -23,19 +28,20 @@ int main() {
 
     for (i = 0; i < iterations; ++i) {
         blosc2_pthread_t t1, t2;
-        void* t1_result;
-        void* t2_result;
         int rc;
         const char* comp;
 
-        rc = blosc2_pthread_create(&t1, NULL, set_compressor_thread, "blosclz");
+        struct set_compressor_arg arg1 = {"blosclz", 0};
+        struct set_compressor_arg arg2 = {"lz4", 0};
+
+        rc = blosc2_pthread_create(&t1, NULL, set_compressor_thread, &arg1);
         if (rc != 0) {
             fprintf(stderr, "blosc2_pthread_create for t1 failed on iteration %d: %d\n", i, rc);
             blosc2_destroy();
             return 1;
         }
 
-        rc = blosc2_pthread_create(&t2, NULL, set_compressor_thread, "lz4");
+        rc = blosc2_pthread_create(&t2, NULL, set_compressor_thread, &arg2);
         if (rc != 0) {
             fprintf(stderr, "blosc2_pthread_create for t2 failed on iteration %d: %d\n", i, rc);
             blosc2_pthread_join(t1, NULL);
@@ -43,7 +49,7 @@ int main() {
             return 1;
         }
 
-        rc = blosc2_pthread_join(t1, &t1_result);
+        rc = blosc2_pthread_join(t1, NULL);
         if (rc != 0) {
             fprintf(stderr, "blosc2_pthread_join for t1 failed on iteration %d: %d\n", i, rc);
             blosc2_pthread_join(t2, NULL);
@@ -51,23 +57,23 @@ int main() {
             return 1;
         }
 
-        rc = blosc2_pthread_join(t2, &t2_result);
+        rc = blosc2_pthread_join(t2, NULL);
         if (rc != 0) {
             fprintf(stderr, "blosc2_pthread_join for t2 failed on iteration %d: %d\n", i, rc);
             blosc2_destroy();
             return 1;
         }
 
-        if ((int)(size_t)t1_result < 0) {
+        if (arg1.rc < 0) {
             fprintf(stderr, "blosc1_set_compressor(\"blosclz\") failed on iteration %d: %d\n",
-                    i, (int)(size_t)t1_result);
+                    i, arg1.rc);
             blosc2_destroy();
             return 1;
         }
 
-        if ((int)(size_t)t2_result < 0) {
+        if (arg2.rc < 0) {
             fprintf(stderr, "blosc1_set_compressor(\"lz4\") failed on iteration %d: %d\n",
-                    i, (int)(size_t)t2_result);
+                    i, arg2.rc);
             blosc2_destroy();
             return 1;
         }
