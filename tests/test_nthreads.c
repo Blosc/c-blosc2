@@ -78,15 +78,15 @@ static char *test_nthreads_limits(void) {
 
   int16_t nthreads = blosc2_set_nthreads((int16_t) (INT16_MAX + 1));
   mu_assert("ERROR: nthreads incorrect (1)", nthreads < 0);
-  /* Decompress the buffer */
+  /* The invalid call should not leave the library in an inconsistent state. */
   nbytes = blosc1_decompress(dest, dest2, size);
-  mu_assert("ERROR: nbytes incorrect(>=0)", nbytes < 0);
+  mu_assert("ERROR: nbytes incorrect(1)", nbytes == (int)size);
 
   nthreads = blosc2_set_nthreads(0);
   mu_assert("ERROR: nthreads incorrect (2)", nthreads < 0);
-  /* Decompress the buffer */
+  /* The invalid call should not leave the library in an inconsistent state. */
   nbytes = blosc1_decompress(dest, dest2, size);
-  mu_assert("ERROR: nbytes incorrect(>=0)", nbytes < 0);
+  mu_assert("ERROR: nbytes incorrect(2)", nbytes == (int)size);
 
   return 0;
 }
