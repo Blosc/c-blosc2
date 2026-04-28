@@ -2243,6 +2243,10 @@ void free_thread_context(struct thread_context* thread_context) {
 
 
 int check_nthreads(blosc2_context* context) {
+  if (context->new_nthreads != context->nthreads && context->new_nthreads <= 0) {
+    BLOSC_TRACE_ERROR("nthreads must be >= 1 and <= %d", INT16_MAX);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
   if (context->nthreads <= 0) {
     BLOSC_TRACE_ERROR("nthreads must be >= 1 and <= %d", INT16_MAX);
     return BLOSC2_ERROR_INVALID_PARAM;
@@ -5352,12 +5356,15 @@ int16_t blosc2_set_nthreads(int16_t nthreads) {
   ret = g_nthreads;
   if (nthreads != ret) {
     int16_t old_new_nthreads = g_global_context->new_nthreads;
+    int16_t old_nthreads = g_global_context->nthreads;
     g_nthreads = nthreads;
     g_global_context->new_nthreads = nthreads;
     int16_t ret2 = check_nthreads(g_global_context);
     if (ret2 < 0) {
       g_nthreads = ret;
       g_global_context->new_nthreads = old_new_nthreads;
+      g_global_context->nthreads = old_nthreads;
+      check_nthreads(g_global_context);
       blosc2_pthread_mutex_unlock(&global_comp_mutex);
       return ret2;
     }
