@@ -5343,10 +5343,13 @@ int16_t blosc2_set_nthreads(int16_t nthreads) {
   blosc2_pthread_mutex_lock(&global_comp_mutex);
   ret = g_nthreads;
   if (nthreads != ret) {
+    int16_t old_new_nthreads = g_global_context->new_nthreads;
     g_nthreads = nthreads;
     g_global_context->new_nthreads = nthreads;
     int16_t ret2 = check_nthreads(g_global_context);
     if (ret2 < 0) {
+      g_nthreads = ret;
+      g_global_context->new_nthreads = old_new_nthreads;
       blosc2_pthread_mutex_unlock(&global_comp_mutex);
       return ret2;
     }
