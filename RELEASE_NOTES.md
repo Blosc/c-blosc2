@@ -4,7 +4,19 @@ Release notes for C-Blosc2
 Changes from 3.0.0 to 3.0.1
 ===========================
 
-#XXX version-specific blurb XXX#
+* Add BLOSC_DEPENDENCY_MODE to choose BUNDLED, EXTERNAL, or AUTO
+  dependency resolution, defaulting to BUNDLED for compatibility.
+
+* Add BLOSC_ENABLE_ZFP to make ZFP optional in external builds while
+  still allowing users to require or disable it explicitly.
+
+* Add external ZFP discovery and improve LZ4/Zstd find modules so
+  external builds provide proper imported targets and include dirs.
+
+* Avoid dependency CMake variables polluting the Blosc2 package install
+  dir, and install Blosc2 config files under the expected Blosc2 path.
+
+* Document the new options for distro packagers.
 
 Changes from 3.0.0-rc2 to 3.0.0
 ===============================
