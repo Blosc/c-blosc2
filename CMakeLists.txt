@@ -131,6 +131,13 @@ option(PREFER_EXTERNAL_ZSTD
 option(WITH_ZLIB_OPTIM
     "Set WITH_OPTIM for ZLIB, turning off is useful for compiling for wasm32 targets." ON)
 
+set(BLOSC_DEPENDENCY_MODE "BUNDLED" CACHE STRING
+    "Dependency resolution mode: BUNDLED uses fetched dependencies, EXTERNAL requires system dependencies, AUTO tries system dependencies before fetching.")
+set_property(CACHE BLOSC_DEPENDENCY_MODE PROPERTY STRINGS BUNDLED EXTERNAL AUTO)
+set(BLOSC_ENABLE_ZFP "AUTO" CACHE STRING
+    "ZFP codec support: AUTO enables it when available, ON requires it, OFF disables it.")
+set_property(CACHE BLOSC_ENABLE_ZFP PROPERTY STRINGS AUTO ON OFF)
+
 set(BLOSC_LZ4_VERSION "1.10.0" CACHE STRING
     "lz4 version to use when fetching internal sources.")
 set(BLOSC_LZ4_SOURCE_DIR "" CACHE PATH
@@ -149,6 +156,7 @@ set(BLOSC_ZFP_SOURCE_DIR "" CACHE PATH
     "Optional local zfp checkout to use instead of downloading plugin sources.")
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+include(GNUInstallDirs)
 
 if(MINGW)
     # This gets us DLL resource information when compiling on MinGW.
@@ -171,6 +179,24 @@ if(BUILD_LITE)
     set(DEACTIVATE_ZSTD ON)
 endif()
 
+string(TOUPPER "${BLOSC_DEPENDENCY_MODE}" BLOSC_DEPENDENCY_MODE)
+set(BLOSC_DEPENDENCY_MODE "${BLOSC_DEPENDENCY_MODE}" CACHE STRING
+    "Dependency resolution mode: BUNDLED uses fetched dependencies, EXTERNAL requires system dependencies, AUTO tries system dependencies before fetching." FORCE)
+if(NOT BLOSC_DEPENDENCY_MODE STREQUAL "BUNDLED" AND
+   NOT BLOSC_DEPENDENCY_MODE STREQUAL "EXTERNAL" AND
+   NOT BLOSC_DEPENDENCY_MODE STREQUAL "AUTO")
+    message(FATAL_ERROR "BLOSC_DEPENDENCY_MODE must be one of BUNDLED, EXTERNAL, or AUTO")
+endif()
+
+string(TOUPPER "${BLOSC_ENABLE_ZFP}" BLOSC_ENABLE_ZFP)
+set(BLOSC_ENABLE_ZFP "${BLOSC_ENABLE_ZFP}" CACHE STRING
+    "ZFP codec support: AUTO enables it when available, ON requires it, OFF disables it." FORCE)
+if(NOT BLOSC_ENABLE_ZFP STREQUAL "AUTO" AND
+   NOT BLOSC_ENABLE_ZFP STREQUAL "ON" AND
+   NOT BLOSC_ENABLE_ZFP STREQUAL "OFF")
+    message(FATAL_ERROR "BLOSC_ENABLE_ZFP must be one of AUTO, ON, or OFF")
+endif()
+
 # Threads
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE) # pre 3.1
 set(THREADS_PREFER_PTHREAD_FLAG TRUE) # CMake 3.1+
@@ -186,13 +212,26 @@ else()
     set(HAVE_THREADS OFF)
 endif()
 
-if(PREFER_EXTERNAL_LZ4)
+set(BLOSC_FIND_EXTERNAL_LZ4 FALSE)
+set(BLOSC_REQUIRE_EXTERNAL_LZ4 FALSE)
+if(BLOSC_DEPENDENCY_MODE STREQUAL "EXTERNAL")
+    set(BLOSC_FIND_EXTERNAL_LZ4 TRUE)
+    set(BLOSC_REQUIRE_EXTERNAL_LZ4 TRUE)
+elseif(BLOSC_DEPENDENCY_MODE STREQUAL "AUTO" OR PREFER_EXTERNAL_LZ4)
+    set(BLOSC_FIND_EXTERNAL_LZ4 TRUE)
+endif()
+
+if(BLOSC_FIND_EXTERNAL_LZ4)
     find_package(LZ4 CONFIG NAMES lz4)
     if(LZ4_FOUND)
         set(HAVE_LZ4_CONFIG TRUE)
     else()
         find_package(LZ4 MODULE)
     endif()
+endif()
+
+if(NOT LZ4_FOUND AND BLOSC_REQUIRE_EXTERNAL_LZ4)
+    message(FATAL_ERROR "BLOSC_DEPENDENCY_MODE=EXTERNAL requires an external LZ4 package. Install LZ4 or use BLOSC_DEPENDENCY_MODE=BUNDLED/AUTO.")
 endif()
 
 if(NOT LZ4_FOUND)
@@ -216,7 +255,18 @@ if(NOT LZ4_FOUND)
             DOWNLOAD_EXTRACT_TIMESTAMP TRUE
             SOURCE_SUBDIR build/cmake)
     endif()
-    FetchContent_MakeAvailable(lz4)
+    FetchContent_GetProperties(lz4)
+    if(NOT lz4_POPULATED)
+        if(POLICY CMP0169)
+            cmake_policy(PUSH)
+            cmake_policy(SET CMP0169 OLD)
+        endif()
+        FetchContent_Populate(lz4)
+        if(POLICY CMP0169)
+            cmake_policy(POP)
+        endif()
+        add_subdirectory("${lz4_SOURCE_DIR}/build/cmake" "${lz4_BINARY_DIR}" EXCLUDE_FROM_ALL)
+    endif()
 
     set(LZ4_FETCHED TRUE)
     set(LZ4_FOUND TRUE)
@@ -231,7 +281,16 @@ if(NOT LZ4_FOUND)
 endif()
 
 if(NOT DEACTIVATE_ZLIB)
-    if(PREFER_EXTERNAL_ZLIB)
+    set(BLOSC_FIND_EXTERNAL_ZLIB FALSE)
+    set(BLOSC_REQUIRE_EXTERNAL_ZLIB FALSE)
+    if(BLOSC_DEPENDENCY_MODE STREQUAL "EXTERNAL")
+        set(BLOSC_FIND_EXTERNAL_ZLIB TRUE)
+        set(BLOSC_REQUIRE_EXTERNAL_ZLIB TRUE)
+    elseif(BLOSC_DEPENDENCY_MODE STREQUAL "AUTO" OR PREFER_EXTERNAL_ZLIB)
+        set(BLOSC_FIND_EXTERNAL_ZLIB TRUE)
+    endif()
+
+    if(BLOSC_FIND_EXTERNAL_ZLIB)
         find_package(ZLIB_NG CONFIG NAMES zlib-ng)
         if(ZLIB_NG_FOUND)
             set(HAVE_ZLIB_NG TRUE)
@@ -244,6 +303,10 @@ if(NOT DEACTIVATE_ZLIB)
                 find_package(ZLIB)
             endif()
         endif()
+    endif()
+
+    if(NOT (ZLIB_NG_FOUND OR ZLIB_FOUND) AND BLOSC_REQUIRE_EXTERNAL_ZLIB)
+        message(FATAL_ERROR "BLOSC_DEPENDENCY_MODE=EXTERNAL requires an external zlib-ng or zlib package. Install one or use BLOSC_DEPENDENCY_MODE=BUNDLED/AUTO.")
     endif()
 
     if(NOT (ZLIB_NG_FOUND OR ZLIB_FOUND))
@@ -303,13 +366,26 @@ endif()
 
 
 if(NOT DEACTIVATE_ZSTD)
-    if(PREFER_EXTERNAL_ZSTD)
+    set(BLOSC_FIND_EXTERNAL_ZSTD FALSE)
+    set(BLOSC_REQUIRE_EXTERNAL_ZSTD FALSE)
+    if(BLOSC_DEPENDENCY_MODE STREQUAL "EXTERNAL")
+        set(BLOSC_FIND_EXTERNAL_ZSTD TRUE)
+        set(BLOSC_REQUIRE_EXTERNAL_ZSTD TRUE)
+    elseif(BLOSC_DEPENDENCY_MODE STREQUAL "AUTO" OR PREFER_EXTERNAL_ZSTD)
+        set(BLOSC_FIND_EXTERNAL_ZSTD TRUE)
+    endif()
+
+    if(BLOSC_FIND_EXTERNAL_ZSTD)
         find_package(ZSTD CONFIG NAMES zstd)
         if(ZSTD_FOUND)
             set(HAVE_ZSTD_CONFIG TRUE)
         else()
             find_package(ZSTD MODULE)
         endif()
+    endif()
+
+    if(NOT ZSTD_FOUND AND BLOSC_REQUIRE_EXTERNAL_ZSTD)
+        message(FATAL_ERROR "BLOSC_DEPENDENCY_MODE=EXTERNAL requires an external Zstd package. Install Zstd or use BLOSC_DEPENDENCY_MODE=BUNDLED/AUTO.")
     endif()
 
     if(NOT ZSTD_FOUND)
@@ -335,7 +411,18 @@ if(NOT DEACTIVATE_ZSTD)
                 DOWNLOAD_EXTRACT_TIMESTAMP TRUE
                 SOURCE_SUBDIR build/cmake)
         endif()
-        FetchContent_MakeAvailable(zstd)
+        FetchContent_GetProperties(zstd)
+        if(NOT zstd_POPULATED)
+            if(POLICY CMP0169)
+                cmake_policy(PUSH)
+                cmake_policy(SET CMP0169 OLD)
+            endif()
+            FetchContent_Populate(zstd)
+            if(POLICY CMP0169)
+                cmake_policy(POP)
+            endif()
+            add_subdirectory("${zstd_SOURCE_DIR}/build/cmake" "${zstd_BINARY_DIR}" EXCLUDE_FROM_ALL)
+        endif()
 
         set(HAVE_ZSTD TRUE)
         set(ZSTD_FETCHED TRUE)
@@ -354,6 +441,65 @@ if(NOT DEACTIVATE_ZSTD)
         endif()
     else()
         set(HAVE_ZSTD TRUE)
+    endif()
+endif()
+
+set(HAVE_ZFP FALSE)
+set(BLOSC_ZFP_PROVIDER "NONE")
+set(BLOSC_ZFP_TARGET "")
+set(ZFP_FOUND FALSE)
+if(BUILD_PLUGINS AND NOT BLOSC_ENABLE_ZFP STREQUAL "OFF")
+    set(BLOSC_FIND_EXTERNAL_ZFP FALSE)
+    set(BLOSC_ALLOW_BUNDLED_ZFP FALSE)
+    if(BLOSC_DEPENDENCY_MODE STREQUAL "EXTERNAL")
+        set(BLOSC_FIND_EXTERNAL_ZFP TRUE)
+    elseif(BLOSC_DEPENDENCY_MODE STREQUAL "AUTO")
+        set(BLOSC_FIND_EXTERNAL_ZFP TRUE)
+        set(BLOSC_ALLOW_BUNDLED_ZFP TRUE)
+    else()
+        set(BLOSC_ALLOW_BUNDLED_ZFP TRUE)
+    endif()
+
+    if(BLOSC_ENABLE_ZFP STREQUAL "ON" AND NOT BLOSC_DEPENDENCY_MODE STREQUAL "EXTERNAL")
+        set(BLOSC_ALLOW_BUNDLED_ZFP TRUE)
+    endif()
+
+    if(BLOSC_FIND_EXTERNAL_ZFP)
+        find_package(zfp CONFIG QUIET)
+        if(NOT zfp_FOUND)
+            find_package(ZFP CONFIG QUIET)
+        endif()
+        if(NOT zfp_FOUND AND NOT ZFP_FOUND)
+            find_package(ZFP MODULE QUIET)
+        endif()
+        if(zfp_FOUND OR ZFP_FOUND)
+            set(ZFP_FOUND TRUE)
+            set(BLOSC_ZFP_PROVIDER "EXTERNAL")
+            foreach(BLOSC_ZFP_CANDIDATE zfp ZFP::zfp zfp::zfp ZFP::ZFP)
+                if(TARGET ${BLOSC_ZFP_CANDIDATE} AND NOT BLOSC_ZFP_TARGET)
+                    set(BLOSC_ZFP_TARGET ${BLOSC_ZFP_CANDIDATE})
+                endif()
+            endforeach()
+            if(BLOSC_ZFP_TARGET AND NOT TARGET zfp)
+                add_library(zfp INTERFACE IMPORTED)
+                target_link_libraries(zfp INTERFACE ${BLOSC_ZFP_TARGET})
+            endif()
+        endif()
+    endif()
+
+    if(NOT ZFP_FOUND AND BLOSC_ALLOW_BUNDLED_ZFP)
+        set(BLOSC_ZFP_PROVIDER "BUNDLED")
+    endif()
+
+    if(BLOSC_ZFP_PROVIDER STREQUAL "NONE")
+        if(BLOSC_ENABLE_ZFP STREQUAL "ON")
+            message(FATAL_ERROR "BLOSC_ENABLE_ZFP=ON requires ZFP support, but no external ZFP package was found and bundled ZFP is disabled by BLOSC_DEPENDENCY_MODE=EXTERNAL.")
+        else()
+            message(STATUS "ZFP codec support disabled: no external ZFP package found in BLOSC_DEPENDENCY_MODE=EXTERNAL")
+        endif()
+    else()
+        set(HAVE_ZFP TRUE)
+        message(STATUS "ZFP codec support enabled (${BLOSC_ZFP_PROVIDER})")
     endif()
 endif()
 
@@ -689,14 +835,10 @@ if(BLOSC_INSTALL)
     # Blosc2Config.cmake files to. This is defined in CMake:
     # https://cmake.org/cmake/help/latest/command/find_package.html#config-mode-search-procedure
     if(NOT Blosc2_INSTALL_CMAKEDIR)
-        if(CMAKE_INSTALL_CMAKEDIR)
-            set(Blosc2_INSTALL_CMAKEDIR "${CMAKE_INSTALL_CMAKEDIR}/Blosc2")
+        if(WIN32 AND NOT MINGW)
+            set(Blosc2_INSTALL_CMAKEDIR "cmake")
         else()
-            if(WIN32 AND NOT MINGW)
-                set(Blosc2_INSTALL_CMAKEDIR "cmake")
-            else()
-                set(Blosc2_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/Blosc2")
-            endif()
+            set(Blosc2_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/Blosc2")
         endif()
     endif()
 
@@ -742,8 +884,8 @@ if(BLOSC_INSTALL)
     if(Blosc2_INSTALL_THIRDPARTY_TARGET_NAMES)
         install(TARGETS ${Blosc2_INSTALL_THIRDPARTY_TARGET_NAMES}
             EXPORT Blosc2Targets
-            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/blosc2
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/blosc2
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         )
     endif()

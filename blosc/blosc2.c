@@ -2025,7 +2025,7 @@ static int blosc_d(
       else if (compformat == BLOSC_UDCODEC_FORMAT) {
         bool getcell = false;
 
-#if defined(HAVE_PLUGINS)
+#if defined(HAVE_ZFP)
         if ((context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) &&
             (thread_context->zfp_cell_nitems > 0)) {
           nbytes = zfp_getcell(thread_context, src, cbytes, _dest, neblock);
@@ -2036,7 +2036,7 @@ static int blosc_d(
             getcell = true;
           }
         }
-#endif /* HAVE_PLUGINS */
+#endif /* HAVE_ZFP */
         if (!getcell) {
           thread_context->zfp_cell_nitems = 0;
           for (int i = 0; i < g_ncodecs; ++i) {
@@ -4357,12 +4357,12 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     }
     bsize2 = stopb - startb;
 
-#if defined(HAVE_PLUGINS)
+#if defined(HAVE_ZFP)
     if (context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) {
       scontext->zfp_cell_start = startb / context->typesize;
       scontext->zfp_cell_nitems = nitems;
     }
-#endif /* HAVE_PLUGINS */
+#endif /* HAVE_ZFP */
 
     /* Do the actual data copy */
     // Regular decompression.  Put results in tmp2.
@@ -5771,7 +5771,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     }
   }
 
-#if defined(HAVE_PLUGINS)
+#if defined(HAVE_ZFP)
 #include "blosc2/codecs-registry.h"
   if ((context->compcode >= BLOSC_CODEC_ZFP_FIXED_ACCURACY) && (context->compcode <= BLOSC_CODEC_ZFP_FIXED_RATE)) {
     for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
@@ -5781,7 +5781,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
       }
     }
   }
-#endif /* HAVE_PLUGINS */
+#endif /* HAVE_ZFP */
 
   /* Check for a BLOSC_SHUFFLE environment variable */
   int doshuffle = -1;
