@@ -131,7 +131,7 @@ Handling support for codecs (LZ4, LZ4HC, Zstd, Zlib, ZFP)
 C-Blosc2 can either fetch pinned upstream codec releases via CMake ``FetchContent`` or use codec libraries already installed on the system.  The top-level switch is ``BLOSC_DEPENDENCY_MODE``:
 
 ``BUNDLED``
-  Default.  Fetch and build the bundled dependency versions.  This preserves the traditional self-contained C-Blosc2 build behavior.
+  Default.  Fetch and build the bundled dependency versions.  This preserves the traditional self-contained C-Blosc2 build behavior.  Bundled dependencies are private: their headers and libraries are not installed separately, and static builds fold them into ``libblosc2.a``.
 
 ``EXTERNAL``
   Require system packages for mandatory dependencies and fail with a clear error if they are missing.  This is the recommended mode for distro packagers that must avoid bundled third-party code::

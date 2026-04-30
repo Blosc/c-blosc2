@@ -342,5 +342,70 @@ if(BUILD_TESTS)
     target_include_directories(blosc_testing PRIVATE ${BLOSC_INCLUDE_DIRS})
 endif()
 
+# When using fetched dependencies, make the installed static library self-contained
+# by folding the private bundled dependency archives into libblosc2.a.  This keeps
+# bundled dependencies out of the public install layout and lets consumers link the
+# wheel-provided static library without chasing private dependency archives.
+set(BLOSC_BUNDLED_STATIC_TARGETS)
+if(BUILD_STATIC)
+    if(LZ4_FETCHED AND TARGET lz4_static)
+        list(APPEND BLOSC_BUNDLED_STATIC_TARGETS lz4_static)
+    endif()
+    if(ZLIB_NG_FETCHED AND ZLIB_NG_INSTALL_TARGET AND TARGET ${ZLIB_NG_INSTALL_TARGET})
+        list(APPEND BLOSC_BUNDLED_STATIC_TARGETS ${ZLIB_NG_INSTALL_TARGET})
+    endif()
+    if(ZSTD_FETCHED AND TARGET libzstd_static)
+        list(APPEND BLOSC_BUNDLED_STATIC_TARGETS libzstd_static)
+    endif()
+    if(ZFP_FETCHED AND TARGET zfp)
+        list(APPEND BLOSC_BUNDLED_STATIC_TARGETS zfp)
+    endif()
+endif()
+
+if(BLOSC_BUNDLED_STATIC_TARGETS)
+    set(BLOSC_STATIC_MERGE_INPUTS "$<TARGET_FILE:blosc2_static>")
+    foreach(BLOSC_BUNDLED_STATIC_TARGET IN LISTS BLOSC_BUNDLED_STATIC_TARGETS)
+        list(APPEND BLOSC_STATIC_MERGE_INPUTS "$<TARGET_FILE:${BLOSC_BUNDLED_STATIC_TARGET}>")
+    endforeach()
+    string(JOIN "|" BLOSC_STATIC_MERGE_INPUTS_ARG ${BLOSC_STATIC_MERGE_INPUTS})
+    add_custom_command(TARGET blosc2_static POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+            -DOUTPUT="$<TARGET_FILE:blosc2_static>"
+            -DINPUTS="${BLOSC_STATIC_MERGE_INPUTS_ARG}"
+            -DAR="${CMAKE_AR}"
+            -DRANLIB="${CMAKE_RANLIB}"
+            -DSYSTEM_NAME="${CMAKE_SYSTEM_NAME}"
+            -DMSVC=$<BOOL:${MSVC}>
+            -P "${PROJECT_SOURCE_DIR}/cmake/merge_static_libs.cmake"
+        COMMENT "Merging bundled dependency archives into libblosc2.a")
+
+    # The bundled dependency objects are now inside libblosc2.a, so do not make
+    # installed CMake consumers depend on the private dependency targets.
+    get_target_property(BLOSC_STATIC_INTERFACE_LINK_LIBRARIES blosc2_static INTERFACE_LINK_LIBRARIES)
+    if(BLOSC_STATIC_INTERFACE_LINK_LIBRARIES)
+        set(BLOSC_BUNDLED_STATIC_INTERFACE_TARGETS ${BLOSC_BUNDLED_STATIC_TARGETS})
+        if(LZ4_FETCHED)
+            list(APPEND BLOSC_BUNDLED_STATIC_INTERFACE_TARGETS lz4_static LZ4::lz4)
+        endif()
+        if(ZLIB_NG_FETCHED)
+            list(APPEND BLOSC_BUNDLED_STATIC_INTERFACE_TARGETS
+                zlib-ng-static zlib-ng zlib zlibstatic zlib-ng::zlibstatic zlib-ng::zlib)
+        endif()
+        if(ZSTD_FETCHED)
+            list(APPEND BLOSC_BUNDLED_STATIC_INTERFACE_TARGETS
+                libzstd_static libzstd_shared zstd::libzstd_static zstd::libzstd_shared zstd::libzstd)
+        endif()
+        if(ZFP_FETCHED)
+            list(APPEND BLOSC_BUNDLED_STATIC_INTERFACE_TARGETS zfp ZFP::zfp zfp::zfp ZFP::ZFP)
+        endif()
+        list(REMOVE_DUPLICATES BLOSC_BUNDLED_STATIC_INTERFACE_TARGETS)
+        foreach(BLOSC_BUNDLED_STATIC_TARGET IN LISTS BLOSC_BUNDLED_STATIC_INTERFACE_TARGETS)
+            list(REMOVE_ITEM BLOSC_STATIC_INTERFACE_LINK_LIBRARIES "$<LINK_ONLY:${BLOSC_BUNDLED_STATIC_TARGET}>")
+        endforeach()
+        set_target_properties(blosc2_static PROPERTIES
+            INTERFACE_LINK_LIBRARIES "${BLOSC_STATIC_INTERFACE_LINK_LIBRARIES}")
+    endif()
+endif()
+
 # we use this variable in the CMake file one directory above ours
 set(SOURCES ${SOURCES} PARENT_SCOPE)

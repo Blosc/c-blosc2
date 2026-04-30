@@ -794,39 +794,9 @@ if(BLOSC_INSTALL)
     if(BUILD_STATIC)
         install(TARGETS blosc2_static COMPONENT DEV)
     endif()
-    if(LZ4_FETCHED AND TARGET lz4_static)
-        install(FILES
-                ${LZ4_SOURCE_DIR}/lib/lz4.h
-                ${LZ4_SOURCE_DIR}/lib/lz4hc.h
-                ${LZ4_SOURCE_DIR}/lib/lz4frame.h
-                ${LZ4_SOURCE_DIR}/lib/lz4frame_static.h
-                ${LZ4_SOURCE_DIR}/lib/lz4file.h
-                ${LZ4_SOURCE_DIR}/lib/xxhash.h
-                DESTINATION ${LZ4_INSTALL_INCLUDEDIR}
-                COMPONENT DEV)
-    endif()
-    if(ZLIB_NG_FETCHED AND ZLIB_NG_INSTALL_TARGET)
-        install(FILES
-                ${ZLIB_NG_BUILD_DIR}/zlib-ng.h
-                ${ZLIB_NG_BUILD_DIR}/zconf-ng.h
-                ${ZLIB_NG_BUILD_DIR}/zlib_name_mangling-ng.h
-                ${ZLIB_NG_BUILD_DIR}/gzread_mangle.h
-                DESTINATION ${ZLIB_NG_INSTALL_INCLUDEDIR}
-                COMPONENT DEV)
-    endif()
-    if(ZSTD_FETCHED AND TARGET libzstd_static)
-        install(FILES
-                ${ZSTD_SOURCE_DIR}/lib/zstd.h
-                ${ZSTD_SOURCE_DIR}/lib/zdict.h
-                ${ZSTD_SOURCE_DIR}/lib/zstd_errors.h
-                DESTINATION ${ZSTD_INSTALL_INCLUDEDIR}
-                COMPONENT DEV)
-    endif()
-    if(ZFP_FETCHED AND TARGET zfp)
-        install(DIRECTORY ${ZFP_SOURCE_DIR}/include/
-                DESTINATION ${ZFP_INSTALL_INCLUDEDIR}
-                COMPONENT DEV)
-    endif()
+    # Bundled dependency headers are private implementation details and are not
+    # installed.  Bundled dependency objects are folded into libblosc2.a for
+    # static builds and into libblosc2 shared libraries by the regular linker.
 
     # config files
     include(CMakePackageConfigHelpers)
@@ -852,18 +822,6 @@ if(BLOSC_INSTALL)
     endif()
     if(BUILD_STATIC)
         list(APPEND Blosc2_INSTALL_TARGET_NAMES blosc2_static)
-    endif()
-    if(LZ4_FETCHED AND TARGET lz4_static)
-        list(APPEND Blosc2_INSTALL_THIRDPARTY_TARGET_NAMES lz4_static)
-    endif()
-    if(ZLIB_NG_FETCHED AND ZLIB_NG_INSTALL_TARGET)
-        list(APPEND Blosc2_INSTALL_THIRDPARTY_TARGET_NAMES ${ZLIB_NG_INSTALL_TARGET})
-    endif()
-    if(ZSTD_FETCHED AND TARGET libzstd_static)
-        list(APPEND Blosc2_INSTALL_THIRDPARTY_TARGET_NAMES libzstd_static)
-    endif()
-    if(ZFP_FETCHED AND TARGET zfp)
-        list(APPEND Blosc2_INSTALL_THIRDPARTY_TARGET_NAMES zfp)
     endif()
     # Add unified target
     add_library(blosc2 INTERFACE)
