@@ -24,8 +24,11 @@ foreach(_input IN LISTS _inputs)
 endforeach()
 
 get_filename_component(_out_dir "${OUTPUT}" DIRECTORY)
-get_filename_component(_out_name "${OUTPUT}" NAME)
-set(_tmp "${_out_dir}/${_out_name}.merged")
+get_filename_component(_out_name_we "${OUTPUT}" NAME_WE)
+get_filename_component(_out_ext "${OUTPUT}" EXT)
+# Some Windows archivers, including llvm-lib, reject output archive names that
+# do not use the conventional .lib suffix.  Keep the original extension last.
+set(_tmp "${_out_dir}/${_out_name_we}.merged${_out_ext}")
 file(REMOVE "${_tmp}")
 
 if(MSVC)
@@ -33,7 +36,7 @@ if(MSVC)
         message(FATAL_ERROR "MSVC static library merging requires AR/lib.exe")
     endif()
     execute_process(
-        COMMAND "${AR}" /NOLOGO /OUT:"${_tmp}" ${_inputs}
+        COMMAND "${AR}" /NOLOGO "/OUT:${_tmp}" ${_inputs}
         RESULT_VARIABLE _result)
 elseif(SYSTEM_NAME STREQUAL "Darwin")
     find_program(_libtool NAMES libtool xcrun-libtool)
@@ -54,7 +57,7 @@ else()
     if(NOT AR)
         message(FATAL_ERROR "Static library merging requires AR")
     endif()
-    set(_mri "${_out_dir}/${_out_name}.mri")
+    set(_mri "${_out_dir}/${_out_name_we}.mri")
     file(WRITE "${_mri}" "CREATE ${_tmp}\n")
     foreach(_input IN LISTS _inputs)
         file(APPEND "${_mri}" "ADDLIB ${_input}\n")
