@@ -368,15 +368,24 @@ if(BLOSC_BUNDLED_STATIC_TARGETS)
         list(APPEND BLOSC_STATIC_MERGE_INPUTS "$<TARGET_FILE:${BLOSC_BUNDLED_STATIC_TARGET}>")
     endforeach()
     string(JOIN "|" BLOSC_STATIC_MERGE_INPUTS_ARG ${BLOSC_STATIC_MERGE_INPUTS})
+    set(BLOSC_STATIC_MERGE_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/merge_blosc2_static_$<CONFIG>.cmake")
+    file(GENERATE OUTPUT "${BLOSC_STATIC_MERGE_SCRIPT}" CONTENT
+"set(OUTPUT [=[$<TARGET_FILE:blosc2_static>]=])
+set(INPUTS [=[${BLOSC_STATIC_MERGE_INPUTS_ARG}]=])
+set(AR [=[${CMAKE_AR}]=])
+set(RANLIB [=[${CMAKE_RANLIB}]=])
+set(SYSTEM_NAME [=[${CMAKE_SYSTEM_NAME}]=])
+set(MSVC [=[$<BOOL:${MSVC}>]=])
+include([=[${PROJECT_SOURCE_DIR}/cmake/merge_static_libs.cmake]=])
+")
+    set(BLOSC_CMAKE_COMMAND "${CMAKE_COMMAND}")
+    if(WIN32)
+        # Avoid nested cmd.exe quoting problems with full paths such as
+        # "C:\Program Files\CMake\bin\cmake.exe" in Ninja post-build rules.
+        set(BLOSC_CMAKE_COMMAND cmake)
+    endif()
     add_custom_command(TARGET blosc2_static POST_BUILD
-        COMMAND "${CMAKE_COMMAND}"
-            "-DOUTPUT=$<TARGET_FILE:blosc2_static>"
-            "-DINPUTS=${BLOSC_STATIC_MERGE_INPUTS_ARG}"
-            "-DAR=${CMAKE_AR}"
-            "-DRANLIB=${CMAKE_RANLIB}"
-            "-DSYSTEM_NAME=${CMAKE_SYSTEM_NAME}"
-            "-DMSVC=$<BOOL:${MSVC}>"
-            -P "${PROJECT_SOURCE_DIR}/cmake/merge_static_libs.cmake"
+        COMMAND "${BLOSC_CMAKE_COMMAND}" -P "${BLOSC_STATIC_MERGE_SCRIPT}"
         COMMENT "Merging bundled dependency archives into libblosc2.a"
         VERBATIM)
 
