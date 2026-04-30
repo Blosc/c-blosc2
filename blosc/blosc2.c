@@ -2432,16 +2432,28 @@ static int initialize_context_compression(
 
 
   /* Check buffer size limits */
+  if (srcsize < 0) {
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
   if (srcsize > BLOSC2_MAX_BUFFERSIZE) {
     BLOSC_TRACE_ERROR("Input buffer size cannot exceed %d bytes.",
                       BLOSC2_MAX_BUFFERSIZE);
     return BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
   }
+  if (src == NULL && srcsize > 0) {
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
 
+  if (destsize < 0) {
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
   if (destsize < BLOSC2_MAX_OVERHEAD) {
     BLOSC_TRACE_ERROR("Output buffer size should be larger than %d bytes.",
                       BLOSC2_MAX_OVERHEAD);
     return BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
+  }
+  if (dest == NULL && destsize > 0) {
+    return BLOSC2_ERROR_INVALID_PARAM;
   }
 
   /* Compression level */
