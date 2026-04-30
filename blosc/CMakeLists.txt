@@ -369,15 +369,16 @@ if(BLOSC_BUNDLED_STATIC_TARGETS)
     endforeach()
     string(JOIN "|" BLOSC_STATIC_MERGE_INPUTS_ARG ${BLOSC_STATIC_MERGE_INPUTS})
     add_custom_command(TARGET blosc2_static POST_BUILD
-        COMMAND ${CMAKE_COMMAND}
-            -DOUTPUT="$<TARGET_FILE:blosc2_static>"
-            -DINPUTS="${BLOSC_STATIC_MERGE_INPUTS_ARG}"
-            -DAR="${CMAKE_AR}"
-            -DRANLIB="${CMAKE_RANLIB}"
-            -DSYSTEM_NAME="${CMAKE_SYSTEM_NAME}"
-            -DMSVC=$<BOOL:${MSVC}>
+        COMMAND "${CMAKE_COMMAND}"
+            "-DOUTPUT=$<TARGET_FILE:blosc2_static>"
+            "-DINPUTS=${BLOSC_STATIC_MERGE_INPUTS_ARG}"
+            "-DAR=${CMAKE_AR}"
+            "-DRANLIB=${CMAKE_RANLIB}"
+            "-DSYSTEM_NAME=${CMAKE_SYSTEM_NAME}"
+            "-DMSVC=$<BOOL:${MSVC}>"
             -P "${PROJECT_SOURCE_DIR}/cmake/merge_static_libs.cmake"
-        COMMENT "Merging bundled dependency archives into libblosc2.a")
+        COMMENT "Merging bundled dependency archives into libblosc2.a"
+        VERBATIM)
 
     # The bundled dependency objects are now inside libblosc2.a, so do not make
     # installed CMake consumers depend on the private dependency targets.
