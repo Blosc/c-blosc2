@@ -96,6 +96,23 @@ CUTEST_TEST_TEST(deserialize_meta_security) {
   rc = b2nd_from_schunk(arr->sc, &arr_corrupt);
   CUTEST_ASSERT("corrupted blockshape/chunkshape metadata should fail", rc < 0);
 
+  // Corrupt fixed-length metalayer content length to negative; get must fail safely.
+  blosc2_metalayer *b2nd_meta_layer = arr->sc->metalayers[0];
+  int32_t saved_b2nd_meta_len = b2nd_meta_layer->content_len;
+  b2nd_meta_layer->content_len = -1;
+  uint8_t *bad_meta_content = NULL;
+  int32_t bad_meta_content_len = 0;
+  rc = blosc2_meta_get(arr->sc, "b2nd", &bad_meta_content, &bad_meta_content_len);
+  CUTEST_ASSERT("negative fixed-length metalayer length should fail", rc < 0);
+  CUTEST_ASSERT("fixed-length metalayer get must not allocate on corrupted size", bad_meta_content == NULL);
+  CUTEST_ASSERT("fixed-length metalayer length output must remain zero on failure", bad_meta_content_len == 0);
+  b2nd_meta_layer->content_len = saved_b2nd_meta_len;
+
+  rc = blosc2_meta_add(arr->sc, "bad_metalayer", NULL, -1);
+  CUTEST_ASSERT("negative fixed-length metalayer content length must be rejected", rc < 0);
+  rc = blosc2_vlmeta_add(arr->sc, "bad_vlmetalayer", NULL, -1, NULL);
+  CUTEST_ASSERT("negative variable-length metalayer content length must be rejected", rc < 0);
+
   free(b2nd_meta_bad);
   free(b2nd_meta);
   B2ND_TEST_ASSERT(b2nd_free(arr));

@@ -2313,9 +2313,26 @@ static inline int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8
     BLOSC_TRACE_WARNING("Metalayer \"%s\" not found.", name);
     return nmetalayer;
   }
-  *content_len = schunk->metalayers[nmetalayer]->content_len;
-  *content = (uint8_t*)malloc((size_t)*content_len);
-  memcpy(*content, schunk->metalayers[nmetalayer]->content, (size_t)*content_len);
+  if (content == NULL || content_len == NULL) {
+    BLOSC_TRACE_ERROR("Output pointers must not be NULL.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  int32_t len = schunk->metalayers[nmetalayer]->content_len;
+  if (len < 0) {
+    BLOSC_TRACE_ERROR("Metalayer \"%s\" has corrupted content length %d.", name, len);
+    return BLOSC2_ERROR_DATA;
+  }
+  *content_len = len;
+  if (len == 0) {
+    *content = NULL;
+    return nmetalayer;
+  }
+  *content = (uint8_t*)malloc((size_t)len);
+  if (*content == NULL) {
+    BLOSC_TRACE_ERROR("Unable to allocate metalayer content buffer.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+  memcpy(*content, schunk->metalayers[nmetalayer]->content, (size_t)len);
   return nmetalayer;
 }
 
