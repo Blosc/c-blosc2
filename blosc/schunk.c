@@ -1686,14 +1686,38 @@ int blosc2_meta_add(blosc2_schunk *schunk, const char *name, uint8_t *content, i
     BLOSC_TRACE_ERROR("Metalayer \"%s\" already exists.", name);
     return BLOSC2_ERROR_INVALID_PARAM;
   }
+  if (content_len < 0) {
+    BLOSC_TRACE_ERROR("Metalayer content length must not be negative.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (content_len > 0 && content == NULL) {
+    BLOSC_TRACE_ERROR("Metalayer content pointer must not be NULL when content length is positive.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
 
   // Add the metalayer
   blosc2_metalayer *metalayer = malloc(sizeof(blosc2_metalayer));
+  BLOSC_ERROR_NULL(metalayer, BLOSC2_ERROR_MEMORY_ALLOC);
+
   char* name_ = malloc(strlen(name) + 1);
+  if (name_ == NULL) {
+    free(metalayer);
+    BLOSC_TRACE_ERROR("Unable to allocate metalayer name buffer.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
   strcpy(name_, name);
   metalayer->name = name_;
+
   uint8_t* content_buf = malloc((size_t)content_len);
-  memcpy(content_buf, content, content_len);
+  if (content_buf == NULL && content_len > 0) {
+    free(name_);
+    free(metalayer);
+    BLOSC_TRACE_ERROR("Unable to allocate metalayer content buffer.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+  if (content_len > 0) {
+    memcpy(content_buf, content, content_len);
+  }
   metalayer->content = content_buf;
   metalayer->content_len = content_len;
   schunk->metalayers[schunk->nmetalayers] = metalayer;
@@ -1718,6 +1742,14 @@ int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content
     BLOSC_TRACE_ERROR("Metalayer \"%s\" not found.", name);
     return nmetalayer;
   }
+  if (content_len < 0) {
+    BLOSC_TRACE_ERROR("Metalayer content length must not be negative.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (content_len > 0 && content == NULL) {
+    BLOSC_TRACE_ERROR("Metalayer content pointer must not be NULL when content length is positive.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
 
   blosc2_metalayer *metalayer = schunk->metalayers[nmetalayer];
   if (content_len > metalayer->content_len) {
@@ -1726,7 +1758,9 @@ int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content
   }
 
   // Update the contents of the metalayer
-  memcpy(metalayer->content, content, content_len);
+  if (content_len > 0) {
+    memcpy(metalayer->content, content, content_len);
+  }
 
   // Update the metalayers in frame (as size has not changed, we don't need to update the trailer)
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
@@ -1790,11 +1824,32 @@ int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name, uint8_t *content,
     BLOSC_TRACE_ERROR("Variable-length metalayer \"%s\" already exists.", name);
     return BLOSC2_ERROR_INVALID_PARAM;
   }
+  if (content_len < 0) {
+    BLOSC_TRACE_ERROR("Variable-length metalayer content length must not be negative.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (content_len > 0 && content == NULL) {
+    BLOSC_TRACE_ERROR("Variable-length metalayer content pointer must not be NULL when content length is positive.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
 
   // Add the vlmetalayer
   blosc2_metalayer *vlmetalayer = malloc(sizeof(blosc2_metalayer));
+  BLOSC_ERROR_NULL(vlmetalayer, BLOSC2_ERROR_MEMORY_ALLOC);
   vlmetalayer->name = strdup(name);
+  if (vlmetalayer->name == NULL) {
+    free(vlmetalayer);
+    BLOSC_TRACE_ERROR("Unable to allocate variable-length metalayer name buffer.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+
   uint8_t* content_buf = malloc((size_t) content_len + BLOSC2_MAX_OVERHEAD);
+  if (content_buf == NULL && content_len > 0) {
+    free(vlmetalayer->name);
+    free(vlmetalayer);
+    BLOSC_TRACE_ERROR("Unable to allocate variable-length metalayer buffer.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
 
   blosc2_context *cctx;
   if (cparams != NULL) {
@@ -1832,6 +1887,10 @@ int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name, uint8_t *content,
 
 int blosc2_vlmeta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
                       int32_t *content_len) {
+  if (content == NULL || content_len == NULL) {
+    BLOSC_TRACE_ERROR("Output pointers must not be NULL.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
   int nvlmetalayer = blosc2_vlmeta_exists(schunk, name);
   if (nvlmetalayer < 0) {
     BLOSC_TRACE_ERROR("User metalayer \"%s\" not found.", name);
@@ -1844,8 +1903,20 @@ int blosc2_vlmeta_get(blosc2_schunk *schunk, const char *name, uint8_t **content
     BLOSC_TRACE_ERROR("User metalayer \"%s\" is corrupted.", meta->name);
     return BLOSC2_ERROR_DATA;
   }
+  if (nbytes < 0) {
+    BLOSC_TRACE_ERROR("User metalayer \"%s\" has corrupted decompressed size %d.", meta->name, nbytes);
+    return BLOSC2_ERROR_DATA;
+  }
   *content_len = nbytes;
-  *content = malloc((size_t) nbytes);
+  if (nbytes == 0) {
+    *content = NULL;
+  } else {
+    *content = malloc((size_t) nbytes);
+    if (*content == NULL) {
+      BLOSC_TRACE_ERROR("Unable to allocate variable-length metalayer content buffer.");
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+  }
   blosc2_context *dctx = blosc2_create_dctx(*schunk->storage->dparams);
   if (dctx == NULL) {
     BLOSC_TRACE_ERROR("Error while creating the decompression context");
@@ -1867,10 +1938,22 @@ int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name, uint8_t *conte
     BLOSC_TRACE_ERROR("User vlmetalayer \"%s\" not found.", name);
     return nvlmetalayer;
   }
+  if (content_len < 0) {
+    BLOSC_TRACE_ERROR("Variable-length metalayer content length must not be negative.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (content_len > 0 && content == NULL) {
+    BLOSC_TRACE_ERROR("Variable-length metalayer content pointer must not be NULL when content length is positive.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
 
   blosc2_metalayer *vlmetalayer = schunk->vlmetalayers[nvlmetalayer];
   free(vlmetalayer->content);
   uint8_t* content_buf = malloc((size_t) content_len + BLOSC2_MAX_OVERHEAD);
+  if (content_buf == NULL && content_len > 0) {
+    BLOSC_TRACE_ERROR("Unable to allocate variable-length metalayer buffer.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
 
   blosc2_context *cctx;
   if (cparams != NULL) {
