@@ -2332,6 +2332,12 @@ static inline int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8
     BLOSC_TRACE_ERROR("Unable to allocate metalayer content buffer.");
     return BLOSC2_ERROR_MEMORY_ALLOC;
   }
+  if (len > 0 && schunk->metalayers[nmetalayer]->content == NULL) {
+    free(*content);
+    *content = NULL;
+    BLOSC_TRACE_ERROR("Metalayer \"%s\" has corrupted content pointer.", name);
+    return BLOSC2_ERROR_DATA;
+  }
   memcpy(*content, schunk->metalayers[nmetalayer]->content, (size_t)len);
   return nmetalayer;
 }

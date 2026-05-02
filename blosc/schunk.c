@@ -1844,7 +1844,7 @@ int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name, uint8_t *content,
   }
 
   uint8_t* content_buf = malloc((size_t) content_len + BLOSC2_MAX_OVERHEAD);
-  if (content_buf == NULL && content_len > 0) {
+  if (content_buf == NULL) {
     free(vlmetalayer->name);
     free(vlmetalayer);
     BLOSC_TRACE_ERROR("Unable to allocate variable-length metalayer buffer.");
