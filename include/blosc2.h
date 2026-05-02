@@ -2308,14 +2308,15 @@ BLOSC_EXPORT int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uin
  */
 static inline int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
                                   int32_t *content_len) {
+  if (schunk == NULL || name == NULL || content == NULL || content_len == NULL) {
+    BLOSC_TRACE_ERROR("Invalid parameters.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
   int nmetalayer = blosc2_meta_exists(schunk, name);
   if (nmetalayer < 0) {
     BLOSC_TRACE_WARNING("Metalayer \"%s\" not found.", name);
     return nmetalayer;
-  }
-  if (content == NULL || content_len == NULL) {
-    BLOSC_TRACE_ERROR("Output pointers must not be NULL.");
-    return BLOSC2_ERROR_INVALID_PARAM;
   }
   int32_t len = schunk->metalayers[nmetalayer]->content_len;
   if (len < 0) {
@@ -2330,11 +2331,13 @@ static inline int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8
   *content = (uint8_t*)malloc((size_t)len);
   if (*content == NULL) {
     BLOSC_TRACE_ERROR("Unable to allocate metalayer content buffer.");
+    *content_len = 0;
     return BLOSC2_ERROR_MEMORY_ALLOC;
   }
   if (len > 0 && schunk->metalayers[nmetalayer]->content == NULL) {
     free(*content);
     *content = NULL;
+    *content_len = 0;
     BLOSC_TRACE_ERROR("Metalayer \"%s\" has corrupted content pointer.", name);
     return BLOSC2_ERROR_DATA;
   }
