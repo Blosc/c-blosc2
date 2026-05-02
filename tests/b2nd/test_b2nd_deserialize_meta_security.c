@@ -97,7 +97,9 @@ CUTEST_TEST_TEST(deserialize_meta_security) {
   CUTEST_ASSERT("corrupted blockshape/chunkshape metadata should fail", rc < 0);
 
   // Corrupt fixed-length metalayer content length to negative; get must fail safely.
-  blosc2_metalayer *b2nd_meta_layer = arr->sc->metalayers[0];
+  int nmetalayer = blosc2_meta_exists(arr->sc, "b2nd");
+  CUTEST_ASSERT("b2nd metalayer should exist", nmetalayer >= 0);
+  blosc2_metalayer *b2nd_meta_layer = arr->sc->metalayers[nmetalayer];
   int32_t saved_b2nd_meta_len = b2nd_meta_layer->content_len;
   b2nd_meta_layer->content_len = -1;
   uint8_t *bad_meta_content = NULL;
