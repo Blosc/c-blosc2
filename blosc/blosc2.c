@@ -1068,7 +1068,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
           }
           break;
         case BLOSC_DELTA:
-          delta_encoder(src, offset, bsize, typesize, _src, _dest);
+          delta_encoder(offset == 0 ? _src : src, offset, bsize, typesize, _src, _dest);
           break;
         case BLOSC_TRUNC_PREC:
           if (truncate_precision(filters_meta[i], typesize, bsize, _src, _dest) < 0) {
@@ -1428,8 +1428,10 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
 
   for (int i = BLOSC2_MAX_FILTERS - 1; i >= 0; i--) {
     // Delta filter requires the whole chunk ready
-    int last_copy_filter = (last_filter_index == i) || (next_filter(filters, i, 'd') == BLOSC_DELTA);
-    if (last_copy_filter && context->postfilter == NULL) {
+    int last_copy_filter = (last_filter_index == i) || (filters[i] == BLOSC_DELTA) ||
+                           (next_filter(filters, i, 'd') == BLOSC_DELTA);
+    if (last_copy_filter && context->postfilter == NULL &&
+        (filters[i] == BLOSC_DELTA || _src != dest + offset)) {
       _dest = dest + offset;
     }
     int rc = BLOSC2_ERROR_SUCCESS;
@@ -1518,6 +1520,10 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
     if (last_filter_index == i) {
       break;
     }
+  }
+
+  if (context->postfilter == NULL && _src != dest + offset) {
+    memcpy(dest + offset, _src, (unsigned int)bsize);
   }
 
   /* Postfilter function */
