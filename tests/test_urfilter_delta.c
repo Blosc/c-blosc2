@@ -59,6 +59,10 @@ CUTEST_TEST_SETUP(urfilter_delta) {
 }
 
 CUTEST_TEST_TEST(urfilter_delta) {
+  if (blosc2_compname_to_compcode(BLOSC_ZSTD_COMPNAME) < 0) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+
   for (int32_t i = 0; i < CHUNKSIZE; ++i) {
     data->src[i] = (uint8_t)((i * 31 + 17) & 0xff);
   }
