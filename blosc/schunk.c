@@ -2036,9 +2036,10 @@ int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name, uint8_t *conte
   if (compressed_buf == NULL && csize > 0) {
     compressed_buf = content_buf;
   }
-  free(vlmetalayer->content);
+  uint8_t* old_content = vlmetalayer->content;
   vlmetalayer->content = compressed_buf;
   vlmetalayer->content_len = csize;
+  free(old_content);
 
   // Propagate to frames
   int rc = vlmetalayer_flush(schunk);
