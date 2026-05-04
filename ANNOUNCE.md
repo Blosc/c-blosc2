@@ -1,12 +1,17 @@
-# Announcing C-Blosc2 3.0.1
+# Announcing C-Blosc2 3.0.2
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This release is a bugfix release meant mainly to distro package maintainers.
-It introduces a new BLOSC_DEPENDENCY_MODE to choose BUNDLED, EXTERNAL, or AUTO
-dependency resolution, defaulting to BUNDLED for compatibility.  It also avoids
-dependency CMake variables polluting the Blosc2 package install dir.
+This release is a bugfix release:
+
+* Fix for windows when using ctx API from multiple threads.  Closes #763.
+  Thanks to Christoph Gohlke (@cgohlke).
+
+* Harden metalayer APIs against invalid lengths and unsafe memory usage.
+  PR #758.  Thanks to @metsw24-max.
+
+* Fix DELTA pipelines after byte-transforming filters (e.g. shuffle).
 
 For more info, see the release notes in:
 

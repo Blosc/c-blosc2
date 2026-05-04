@@ -4,7 +4,13 @@ Release notes for C-Blosc2
 Changes from 3.0.1 to 3.0.2
 ===========================
 
-#XXX version-specific blurb XXX#
+* Fix for windows when using ctx API from multiple threads.  Closes #763.
+  Thanks to Christoph Golke.
+
+* Harden metalayer APIs against invalid lengths and unsafe memory usage.
+  PR #758.  Thanks to @metsw24-max.
+
+* Fix DELTA pipelines after byte-transforming filters (e.g. shuffle).
 
 Changes from 3.0.0 to 3.0.1
 ===========================
