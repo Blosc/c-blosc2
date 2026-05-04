@@ -1,11 +1,16 @@
 Release notes for C-Blosc2
 ==========================
 
+Changes from 3.0.2 to 3.0.3
+===========================
+
+#XXX version-specific blurb XXX#
+
 Changes from 3.0.1 to 3.0.2
 ===========================
 
 * Fix for windows when using ctx API from multiple threads.  Closes #763.
-  Thanks to Christoph Golke.
+  Thanks to Christoph Gohlke (@cgohlke).
 
 * Harden metalayer APIs against invalid lengths and unsafe memory usage.
   PR #758.  Thanks to @metsw24-max.
