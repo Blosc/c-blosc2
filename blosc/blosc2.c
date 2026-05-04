@@ -5998,7 +5998,9 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
 
 
 void blosc2_free_ctx(blosc2_context* context) {
-  if (g_initlib) {
+  if (g_initlib ||
+      context->thread_backend == BLOSC_BACKEND_PER_CONTEXT ||
+      context->thread_backend == BLOSC_BACKEND_CALLBACK) {
     release_thread_backend(context);
   }
   if (context->serial_context != NULL) {
