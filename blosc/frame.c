@@ -1546,8 +1546,7 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
   if (nmetalayers > BLOSC2_MAX_METALAYERS) {
     return BLOSC2_ERROR_DATA;
   }
-  schunk->nmetalayers = nmetalayers;
-
+  int nmetalayers_added = 0;
   // Populate the metalayers and its serialized values
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
     header_pos += 1;
@@ -1557,8 +1556,6 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
     if ((*idxp & 0xe0u) != 0xa0u) {   // sanity check
       return BLOSC2_ERROR_DATA;
     }
-    blosc2_metalayer* metalayer = calloc(1, sizeof(blosc2_metalayer));
-    schunk->metalayers[nmetalayer] = metalayer;
 
     // Populate the metalayer string
     uint8_t nslen = *idxp & (uint8_t)0x1F;
@@ -1571,54 +1568,69 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
     memcpy(ns, idxp, nslen);
     ns[nslen] = '\0';
     idxp += nslen;
-    metalayer->name = ns;
 
     // Populate the serialized value for this metalayer
     // Get the offset
     header_pos += 1;
     if (header_len < header_pos) {
+      free(ns);
       return BLOSC2_ERROR_READ_BUFFER;
     }
     if ((*idxp & 0xffu) != 0xd2u) {   // sanity check
+      free(ns);
       return BLOSC2_ERROR_DATA;
     }
     idxp += 1;
     int32_t offset;
     header_pos += sizeof(offset);
     if (header_len < header_pos) {
+      free(ns);
       return BLOSC2_ERROR_READ_BUFFER;
     }
     from_big(&offset, idxp, sizeof(offset));
     idxp += 4;
     if (offset < 0 || offset >= header_len) {
       // Offset is less than zero or exceeds header length
+      free(ns);
       return BLOSC2_ERROR_DATA;
     }
     // Go to offset and see if we have the correct marker
     uint8_t* content_marker = header + offset;
-    if (offset > header_len - FRAME_META_HDR_SIZE) {
-      return BLOSC2_ERROR_READ_BUFFER;
+    if (offset > (int64_t)header_len - FRAME_META_HDR_SIZE) {
+      BLOSC_TRACE_ERROR("Malformed metalayer offset. Skipping.");
+      free(ns);
+      continue;
     }
     if (*content_marker != 0xc6) {
-      return BLOSC2_ERROR_DATA;
+      BLOSC_TRACE_ERROR("Malformed metalayer marker. Skipping.");
+      free(ns);
+      continue;
     }
 
     // Read the size of the content
     int32_t content_len;
     from_big(&content_len, content_marker + 1, sizeof(content_len));
     if (content_len < 0) {
+      free(ns);
       return BLOSC2_ERROR_DATA;
     }
-    metalayer->content_len = content_len;
 
     // Finally, read the content
-    if (content_len > header_len - offset - FRAME_META_HDR_SIZE) {
-      return BLOSC2_ERROR_READ_BUFFER;
+    if (content_len > (int64_t)header_len - offset - FRAME_META_HDR_SIZE) {
+      BLOSC_TRACE_ERROR("Malformed metalayer content length. Skipping.");
+      free(ns);
+      continue;
     }
+
+    blosc2_metalayer* metalayer = calloc(1, sizeof(blosc2_metalayer));
+    schunk->metalayers[nmetalayers_added++] = metalayer;
+    metalayer->name = ns;
+    metalayer->content_len = content_len;
     char* content = malloc((size_t)content_len);
     memcpy(content, content_marker + 1 + 4, (size_t)content_len);
     metalayer->content = (uint8_t*)content;
   }
+  schunk->nmetalayers = nmetalayers_added;
 
   return 1;
 }
@@ -1736,8 +1748,7 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
   if (nmetalayers > BLOSC2_MAX_VLMETALAYERS) {
     return BLOSC2_ERROR_DATA;
   }
-  schunk->nvlmetalayers = nmetalayers;
-
+  int nvlmetalayers_added = 0;
   // Populate the metalayers and its serialized values
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
     trailer_pos += 1;
@@ -1747,8 +1758,6 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
     if ((*idxp & 0xe0u) != 0xa0u) {   // sanity check
       return BLOSC2_ERROR_DATA;
     }
-    blosc2_metalayer* metalayer = calloc(1, sizeof(blosc2_metalayer));
-    schunk->vlmetalayers[nmetalayer] = metalayer;
 
     // Populate the metalayer string
     uint8_t nslen = *idxp & (uint8_t)0x1F;
@@ -1761,54 +1770,69 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
     memcpy(ns, idxp, nslen);
     ns[nslen] = '\0';
     idxp += nslen;
-    metalayer->name = ns;
 
     // Populate the serialized value for this metalayer
     // Get the offset
     trailer_pos += 1;
     if (trailer_len < trailer_pos) {
+      free(ns);
       return BLOSC2_ERROR_READ_BUFFER;
     }
     if ((*idxp & 0xffu) != 0xd2u) {   // sanity check
+      free(ns);
       return BLOSC2_ERROR_DATA;
     }
     idxp += 1;
     int32_t offset;
     trailer_pos += sizeof(offset);
     if (trailer_len < trailer_pos) {
+      free(ns);
       return BLOSC2_ERROR_READ_BUFFER;
     }
     from_big(&offset, idxp, sizeof(offset));
     idxp += 4;
     if (offset < 0 || offset >= trailer_len) {
       // Offset is less than zero or exceeds trailer length
+      free(ns);
       return BLOSC2_ERROR_DATA;
     }
     // Go to offset and see if we have the correct marker
     uint8_t* content_marker = trailer + offset;
-    if (offset > trailer_len - FRAME_META_HDR_SIZE) {
-      return BLOSC2_ERROR_READ_BUFFER;
+    if (offset > (int64_t)trailer_len - FRAME_META_HDR_SIZE) {
+      BLOSC_TRACE_ERROR("Malformed vlmetalayer offset. Skipping.");
+      free(ns);
+      continue;
     }
     if (*content_marker != 0xc6) {
-      return BLOSC2_ERROR_DATA;
+      BLOSC_TRACE_ERROR("Malformed vlmetalayer marker. Skipping.");
+      free(ns);
+      continue;
     }
 
     // Read the size of the content
     int32_t content_len;
     from_big(&content_len, content_marker + 1, sizeof(content_len));
     if (content_len < 0) {
+      free(ns);
       return BLOSC2_ERROR_DATA;
     }
-    metalayer->content_len = content_len;
 
     // Finally, read the content
-    if (content_len > trailer_len - offset - FRAME_META_HDR_SIZE) {
-      return BLOSC2_ERROR_READ_BUFFER;
+    if (content_len > (int64_t)trailer_len - offset - FRAME_META_HDR_SIZE) {
+      BLOSC_TRACE_ERROR("Malformed vlmetalayer content length. Skipping.");
+      free(ns);
+      continue;
     }
+
+    blosc2_metalayer* metalayer = calloc(1, sizeof(blosc2_metalayer));
+    schunk->vlmetalayers[nvlmetalayers_added++] = metalayer;
+    metalayer->name = ns;
+    metalayer->content_len = content_len;
     char* content = malloc((size_t)content_len);
     memcpy(content, content_marker + 1 + 4, (size_t)content_len);
     metalayer->content = (uint8_t*)content;
   }
+  schunk->nvlmetalayers = (int16_t)nvlmetalayers_added;
   return 1;
 }
 

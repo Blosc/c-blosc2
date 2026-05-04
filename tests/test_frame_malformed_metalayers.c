@@ -117,12 +117,16 @@ static char* test_malformed_metalayer_bounds(void) {
     /* 5. Attempt to open the malformed frame */
     malicious_schunk = blosc2_schunk_from_buffer(buffer, buffer_len, false);
 
-    /* 
-     * The frame MUST be rejected. If malicious_schunk is NOT NULL, 
-     * the security check in frame.c was bypassed.
+    /*
+     * The frame should be accepted (tolerant approach), but the malformed
+     * metalayer should be missing/rejected.
      */
-    mu_assert("SECURITY FAILURE: Malformed frame was accepted (Overflow check bypassed)", 
-              malicious_schunk == NULL);
+    mu_assert("Frame should be loaded safely", malicious_schunk != NULL);
+
+    uint8_t *content;
+    int32_t content_len;
+    mu_assert("Malformed metalayer 'testmeta' should be rejected/missing",
+              blosc2_meta_get(malicious_schunk, "testmeta", &content, &content_len) < 0);
 
 cleanup:
     if (malicious_schunk != NULL) blosc2_schunk_free(malicious_schunk);
