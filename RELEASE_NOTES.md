@@ -1,11 +1,49 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 3.0.0-rc2 to 3.0.0
-===============================
+Changes from 3.0.2 to 3.0.3
+===========================
 
 #XXX version-specific blurb XXX#
 
+Changes from 3.0.1 to 3.0.2
+===========================
+
+* Fix for windows when using ctx API from multiple threads.  Closes #763.
+  Thanks to Christoph Gohlke (@cgohlke).
+
+* Harden metalayer APIs against invalid lengths and unsafe memory usage.
+  PR #758.  Thanks to @metsw24-max.
+
+* Fix DELTA pipelines after byte-transforming filters (e.g. shuffle).
+
+Changes from 3.0.0 to 3.0.1
+===========================
+
+* Add BLOSC_DEPENDENCY_MODE to choose BUNDLED, EXTERNAL, or AUTO
+  dependency resolution, defaulting to BUNDLED for compatibility.
+
+* Add BLOSC_ENABLE_ZFP to make ZFP optional in external builds while
+  still allowing users to require or disable it explicitly.
+
+* Add external ZFP discovery and improve LZ4/Zstd find modules so
+  external builds provide proper imported targets and include dirs.
+
+* Avoid dependency CMake variables polluting the Blosc2 package install
+  dir, and install Blosc2 config files under the expected Blosc2 path.
+
+* Document the new options for distro packagers.
+
+Changes from 3.0.0-rc2 to 3.0.0
+===============================
+
+* Fixes an integer overflow in VL-block decompression where cumulative
+  blocknbytes was tracked in a 32-bit integer. PR #753. Thanks to @metsw24-max.
+
+* Fix data races in global configuration APIs using mutex protection. PR #753.
+  Thanks to @metsw24-max.
+
+* Different typos fixed.  Thanks to @DimitriPapadopoulos.
 
 Changes from 3.0.0-rc1 to 3.0.0-rc2
 ===================================

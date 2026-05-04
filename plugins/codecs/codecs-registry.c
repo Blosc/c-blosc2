@@ -6,7 +6,12 @@
 
 #include "blosc2/codecs-registry.h"
 #include "ndlz/ndlz.h"
-#include "zfp/blosc2-zfp.h"
+#if defined(USING_CMAKE)
+  #include "config.h"
+#endif
+#if defined(HAVE_ZFP)
+  #include "zfp/blosc2-zfp.h"
+#endif
 #include "blosc-private.h"
 #include "blosc2.h"
 
@@ -23,6 +28,7 @@ void register_codecs(void) {
   // ndlz.free = NULL; 
   register_codec_private(&ndlz);
 
+#if defined(HAVE_ZFP)
   blosc2_codec zfp_acc;
   zfp_acc.compcode = BLOSC_CODEC_ZFP_FIXED_ACCURACY;
   zfp_acc.version = 1;
@@ -52,6 +58,7 @@ void register_codecs(void) {
   zfp_rate.compname = "zfp_rate";
   // zfp_rate.free = NULL;
   register_codec_private(&zfp_rate);
+#endif
 
   blosc2_codec openhtj2k;
   openhtj2k.compcode = BLOSC_CODEC_OPENHTJ2K;

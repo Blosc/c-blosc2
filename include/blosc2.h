@@ -83,14 +83,10 @@ extern "C" {
 /* Version numbers */
 #define BLOSC2_VERSION_MAJOR    3    /* for major interface/format changes  */
 #define BLOSC2_VERSION_MINOR    0   /* for minor interface/format changes  */
-#define BLOSC2_VERSION_RELEASE  0  /* for tweaks, bug-fixes, or development */
+#define BLOSC2_VERSION_RELEASE  3  /* for tweaks, bug-fixes, or development */
 
-#define BLOSC2_VERSION_STRING   "3.0.0.dev"  /* string version.  Sync with above! */
-#define BLOSC2_VERSION_DATE     "$Date:: 2026-04-22 #$"    /* date version year-month-day */
-
-
-/* The maximum number of dimensions for Blosc2 NDim arrays */
-#define BLOSC2_MAX_DIM 8
+#define BLOSC2_VERSION_STRING   "3.0.3.dev"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_DATE     "$Date:: 2026-05-04 #$"    /* date version year-month-day */
 
 
 /* Tracing macros */
@@ -2312,14 +2308,40 @@ BLOSC_EXPORT int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uin
  */
 static inline int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
                                   int32_t *content_len) {
+  if (schunk == NULL || name == NULL || content == NULL || content_len == NULL) {
+    BLOSC_TRACE_ERROR("Invalid parameters.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
   int nmetalayer = blosc2_meta_exists(schunk, name);
   if (nmetalayer < 0) {
     BLOSC_TRACE_WARNING("Metalayer \"%s\" not found.", name);
     return nmetalayer;
   }
-  *content_len = schunk->metalayers[nmetalayer]->content_len;
-  *content = (uint8_t*)malloc((size_t)*content_len);
-  memcpy(*content, schunk->metalayers[nmetalayer]->content, (size_t)*content_len);
+  int32_t len = schunk->metalayers[nmetalayer]->content_len;
+  if (len < 0) {
+    BLOSC_TRACE_ERROR("Metalayer \"%s\" has corrupted content length %d.", name, len);
+    return BLOSC2_ERROR_DATA;
+  }
+  *content_len = len;
+  if (len == 0) {
+    *content = NULL;
+    return nmetalayer;
+  }
+  *content = (uint8_t*)malloc((size_t)len);
+  if (*content == NULL) {
+    BLOSC_TRACE_ERROR("Unable to allocate metalayer content buffer.");
+    *content_len = 0;
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+  if (len > 0 && schunk->metalayers[nmetalayer]->content == NULL) {
+    free(*content);
+    *content = NULL;
+    *content_len = 0;
+    BLOSC_TRACE_ERROR("Metalayer \"%s\" has corrupted content pointer.", name);
+    return BLOSC2_ERROR_DATA;
+  }
+  memcpy(*content, schunk->metalayers[nmetalayer]->content, (size_t)len);
   return nmetalayer;
 }
 

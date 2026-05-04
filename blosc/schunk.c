@@ -1681,19 +1681,47 @@ int metalayer_flush(blosc2_schunk* schunk) {
  * If successful, return the index of the new metalayer.  Else, return a negative value.
  */
 int blosc2_meta_add(blosc2_schunk *schunk, const char *name, uint8_t *content, int32_t content_len) {
+  if (schunk == NULL || name == NULL) {
+    BLOSC_TRACE_ERROR("Invalid parameters.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
   int nmetalayer = blosc2_meta_exists(schunk, name);
   if (nmetalayer >= 0) {
     BLOSC_TRACE_ERROR("Metalayer \"%s\" already exists.", name);
     return BLOSC2_ERROR_INVALID_PARAM;
   }
+  if (content_len < 0) {
+    BLOSC_TRACE_ERROR("Metalayer content length must not be negative.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (content_len > 0 && content == NULL) {
+    BLOSC_TRACE_ERROR("Metalayer content pointer must not be NULL when content length is positive.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
 
   // Add the metalayer
   blosc2_metalayer *metalayer = malloc(sizeof(blosc2_metalayer));
+  BLOSC_ERROR_NULL(metalayer, BLOSC2_ERROR_MEMORY_ALLOC);
+
   char* name_ = malloc(strlen(name) + 1);
+  if (name_ == NULL) {
+    free(metalayer);
+    BLOSC_TRACE_ERROR("Unable to allocate metalayer name buffer.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
   strcpy(name_, name);
   metalayer->name = name_;
+
   uint8_t* content_buf = malloc((size_t)content_len);
-  memcpy(content_buf, content, content_len);
+  if (content_buf == NULL && content_len > 0) {
+    free(name_);
+    free(metalayer);
+    BLOSC_TRACE_ERROR("Unable to allocate metalayer content buffer.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+  if (content_len > 0) {
+    memcpy(content_buf, content, content_len);
+  }
   metalayer->content = content_buf;
   metalayer->content_len = content_len;
   schunk->metalayers[schunk->nmetalayers] = metalayer;
@@ -1713,10 +1741,22 @@ int blosc2_meta_add(blosc2_schunk *schunk, const char *name, uint8_t *content, i
  * If successful, return the index of the new metalayer.  Else, return a negative value.
  */
 int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content, int32_t content_len) {
+  if (schunk == NULL || name == NULL) {
+    BLOSC_TRACE_ERROR("Invalid parameters.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
   int nmetalayer = blosc2_meta_exists(schunk, name);
   if (nmetalayer < 0) {
     BLOSC_TRACE_ERROR("Metalayer \"%s\" not found.", name);
     return nmetalayer;
+  }
+  if (content_len < 0) {
+    BLOSC_TRACE_ERROR("Metalayer content length must not be negative.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (content_len > 0 && content == NULL) {
+    BLOSC_TRACE_ERROR("Metalayer content pointer must not be NULL when content length is positive.");
+    return BLOSC2_ERROR_INVALID_PARAM;
   }
 
   blosc2_metalayer *metalayer = schunk->metalayers[nmetalayer];
@@ -1726,7 +1766,9 @@ int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content
   }
 
   // Update the contents of the metalayer
-  memcpy(metalayer->content, content, content_len);
+  if (content_len > 0) {
+    memcpy(metalayer->content, content, content_len);
+  }
 
   // Update the metalayers in frame (as size has not changed, we don't need to update the trailer)
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
@@ -1785,16 +1827,49 @@ int vlmetalayer_flush(blosc2_schunk* schunk) {
  */
 int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name, uint8_t *content, int32_t content_len,
                       blosc2_cparams *cparams) {
+  if (schunk == NULL || name == NULL) {
+    BLOSC_TRACE_ERROR("Invalid parameters.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
   int nvlmetalayer = blosc2_vlmeta_exists(schunk, name);
   if (nvlmetalayer >= 0) {
     BLOSC_TRACE_ERROR("Variable-length metalayer \"%s\" already exists.", name);
     return BLOSC2_ERROR_INVALID_PARAM;
   }
+  if (content_len < 0) {
+    BLOSC_TRACE_ERROR("Variable-length metalayer content length must not be negative.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (content_len > 0 && content == NULL) {
+    BLOSC_TRACE_ERROR("Variable-length metalayer content pointer must not be NULL when content length is positive.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
 
   // Add the vlmetalayer
   blosc2_metalayer *vlmetalayer = malloc(sizeof(blosc2_metalayer));
+  BLOSC_ERROR_NULL(vlmetalayer, BLOSC2_ERROR_MEMORY_ALLOC);
   vlmetalayer->name = strdup(name);
-  uint8_t* content_buf = malloc((size_t) content_len + BLOSC2_MAX_OVERHEAD);
+  if (vlmetalayer->name == NULL) {
+    free(vlmetalayer);
+    BLOSC_TRACE_ERROR("Unable to allocate variable-length metalayer name buffer.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+
+  int64_t destsize = (int64_t)content_len + BLOSC2_MAX_OVERHEAD;
+  if (destsize > INT32_MAX) {
+    free(vlmetalayer->name);
+    free(vlmetalayer);
+    BLOSC_TRACE_ERROR("Variable-length metalayer size is too large.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  size_t destsize_sz = (size_t)destsize;
+  uint8_t* content_buf = malloc(destsize_sz);
+  if (content_buf == NULL) {
+    free(vlmetalayer->name);
+    free(vlmetalayer);
+    BLOSC_TRACE_ERROR("Unable to allocate variable-length metalayer buffer.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
 
   blosc2_context *cctx;
   if (cparams != NULL) {
@@ -1803,18 +1878,29 @@ int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name, uint8_t *content,
     cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
   }
   if (cctx == NULL) {
+    free(content_buf);
+    free(vlmetalayer->name);
+    free(vlmetalayer);
     BLOSC_TRACE_ERROR("Error while creating the compression context");
     return BLOSC2_ERROR_NULL_POINTER;
   }
 
-  int csize = blosc2_compress_ctx(cctx, content, content_len, content_buf, content_len + BLOSC2_MAX_OVERHEAD);
+  int csize = blosc2_compress_ctx(cctx, content, content_len, content_buf, (int32_t)destsize);
   if (csize < 0) {
+    blosc2_free_ctx(cctx);
+    free(content_buf);
+    free(vlmetalayer->name);
+    free(vlmetalayer);
     BLOSC_TRACE_ERROR("Can not compress the `%s` variable-length metalayer.", name);
     return csize;
   }
   blosc2_free_ctx(cctx);
 
-  vlmetalayer->content = realloc(content_buf, csize);
+  uint8_t *compressed_buf = realloc(content_buf, csize);
+  if (compressed_buf == NULL && csize > 0) {
+    compressed_buf = content_buf;
+  }
+  vlmetalayer->content = compressed_buf;
   vlmetalayer->content_len = csize;
   schunk->vlmetalayers[schunk->nvlmetalayers] = vlmetalayer;
   schunk->nvlmetalayers += 1;
@@ -1822,6 +1908,11 @@ int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name, uint8_t *content,
   // Propagate to frames
   int rc = vlmetalayer_flush(schunk);
   if (rc < 0) {
+    schunk->nvlmetalayers -= 1;
+    schunk->vlmetalayers[schunk->nvlmetalayers] = NULL;
+    free(vlmetalayer->content);
+    free(vlmetalayer->name);
+    free(vlmetalayer);
     BLOSC_TRACE_ERROR("Can not propagate de `%s` variable-length metalayer to a frame.", name);
     return rc;
   }
@@ -1832,6 +1923,10 @@ int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name, uint8_t *content,
 
 int blosc2_vlmeta_get(blosc2_schunk *schunk, const char *name, uint8_t **content,
                       int32_t *content_len) {
+  if (schunk == NULL || name == NULL || content == NULL || content_len == NULL) {
+    BLOSC_TRACE_ERROR("Invalid parameters.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
   int nvlmetalayer = blosc2_vlmeta_exists(schunk, name);
   if (nvlmetalayer < 0) {
     BLOSC_TRACE_ERROR("User metalayer \"%s\" not found.", name);
@@ -1844,16 +1939,39 @@ int blosc2_vlmeta_get(blosc2_schunk *schunk, const char *name, uint8_t **content
     BLOSC_TRACE_ERROR("User metalayer \"%s\" is corrupted.", meta->name);
     return BLOSC2_ERROR_DATA;
   }
+  if (nbytes < 0) {
+    BLOSC_TRACE_ERROR("User metalayer \"%s\" has corrupted decompressed size %d.", meta->name, nbytes);
+    return BLOSC2_ERROR_DATA;
+  }
   *content_len = nbytes;
-  *content = malloc((size_t) nbytes);
+  if (nbytes == 0) {
+    *content = NULL;
+  } else {
+    *content = malloc((size_t) nbytes);
+    if (*content == NULL) {
+      BLOSC_TRACE_ERROR("Unable to allocate variable-length metalayer content buffer.");
+      *content_len = 0;
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+  }
   blosc2_context *dctx = blosc2_create_dctx(*schunk->storage->dparams);
   if (dctx == NULL) {
+    if (*content != NULL) {
+      free(*content);
+      *content = NULL;
+    }
+    *content_len = 0;
     BLOSC_TRACE_ERROR("Error while creating the decompression context");
     return BLOSC2_ERROR_NULL_POINTER;
   }
   int nbytes_ = blosc2_decompress_ctx(dctx, meta->content, meta->content_len, *content, nbytes);
   blosc2_free_ctx(dctx);
   if (nbytes_ != nbytes) {
+    if (*content != NULL) {
+      free(*content);
+      *content = NULL;
+    }
+    *content_len = 0;
     BLOSC_TRACE_ERROR("User metalayer \"%s\" is corrupted.", meta->name);
     return BLOSC2_ERROR_READ_BUFFER;
   }
@@ -1862,15 +1980,36 @@ int blosc2_vlmeta_get(blosc2_schunk *schunk, const char *name, uint8_t **content
 
 int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name, uint8_t *content, int32_t content_len,
                          blosc2_cparams *cparams) {
+  if (schunk == NULL || name == NULL) {
+    BLOSC_TRACE_ERROR("Invalid parameters.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
   int nvlmetalayer = blosc2_vlmeta_exists(schunk, name);
   if (nvlmetalayer < 0) {
     BLOSC_TRACE_ERROR("User vlmetalayer \"%s\" not found.", name);
     return nvlmetalayer;
   }
+  if (content_len < 0) {
+    BLOSC_TRACE_ERROR("Variable-length metalayer content length must not be negative.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (content_len > 0 && content == NULL) {
+    BLOSC_TRACE_ERROR("Variable-length metalayer content pointer must not be NULL when content length is positive.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
 
   blosc2_metalayer *vlmetalayer = schunk->vlmetalayers[nvlmetalayer];
-  free(vlmetalayer->content);
-  uint8_t* content_buf = malloc((size_t) content_len + BLOSC2_MAX_OVERHEAD);
+  int64_t destsize = (int64_t)content_len + BLOSC2_MAX_OVERHEAD;
+  if (destsize > INT32_MAX) {
+    BLOSC_TRACE_ERROR("Variable-length metalayer size is too large.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  size_t destsize_sz = (size_t)destsize;
+  uint8_t* content_buf = malloc(destsize_sz);
+  if (content_buf == NULL && content_len > 0) {
+    BLOSC_TRACE_ERROR("Unable to allocate variable-length metalayer buffer.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
 
   blosc2_context *cctx;
   if (cparams != NULL) {
@@ -1879,19 +2018,28 @@ int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name, uint8_t *conte
     cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
   }
   if (cctx == NULL) {
+    free(content_buf);
     BLOSC_TRACE_ERROR("Error while creating the compression context");
     return BLOSC2_ERROR_NULL_POINTER;
   }
 
-  int csize = blosc2_compress_ctx(cctx, content, content_len, content_buf, content_len + BLOSC2_MAX_OVERHEAD);
+  int csize = blosc2_compress_ctx(cctx, content, content_len, content_buf, (int32_t)destsize);
   if (csize < 0) {
+    blosc2_free_ctx(cctx);
+    free(content_buf);
     BLOSC_TRACE_ERROR("Can not compress the `%s` variable-length metalayer.", name);
     return csize;
   }
   blosc2_free_ctx(cctx);
 
-  vlmetalayer->content = realloc(content_buf, csize);
+  uint8_t* compressed_buf = realloc(content_buf, csize);
+  if (compressed_buf == NULL && csize > 0) {
+    compressed_buf = content_buf;
+  }
+  uint8_t* old_content = vlmetalayer->content;
+  vlmetalayer->content = compressed_buf;
   vlmetalayer->content_len = csize;
+  free(old_content);
 
   // Propagate to frames
   int rc = vlmetalayer_flush(schunk);

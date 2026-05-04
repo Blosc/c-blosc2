@@ -125,17 +125,36 @@ The static and dynamic version of the Blosc library, together with header files,
 Once you have compiled your Blosc library, you can easily link your apps with it as shown in the `examples/ directory <https://github.com/Blosc/c-blosc2/blob/main/examples>`_.
 
 
-Handling support for codecs (LZ4, LZ4HC, Zstd, Zlib)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Handling support for codecs (LZ4, LZ4HC, Zstd, Zlib, ZFP)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-C-Blosc2 no longer vendors in-tree copies of LZ4, zlib, or Zstd.  Instead, CMake resolves these codecs in one of the following ways:
+C-Blosc2 can either fetch pinned upstream codec releases via CMake ``FetchContent`` or use codec libraries already installed on the system.  The top-level switch is ``BLOSC_DEPENDENCY_MODE``:
 
-* use an already installed external library when requested (for example via ``-DPREFER_EXTERNAL_LZ4=ON``), or
-* fetch a pinned upstream release at configure time via ``FetchContent``.
+``BUNDLED``
+  Default.  Fetch and build the bundled dependency versions.  This preserves the traditional self-contained C-Blosc2 build behavior.  Bundled dependencies are private: their headers and libraries are not installed separately, and static builds fold them into ``libblosc2.a``.
 
-This means that, by default, you still get support for these codecs without having to vendor them inside the C-Blosc2 source tree, but your build may need access to the network during CMake configuration when an external library is not found or not requested.
+``EXTERNAL``
+  Require system packages for mandatory dependencies and fail with a clear error if they are missing.  This is the recommended mode for distro packagers that must avoid bundled third-party code::
 
-If you prefer fully local builds, you can point CMake at local codec checkouts instead of downloading them:
+    cmake -DBLOSC_DEPENDENCY_MODE=EXTERNAL ..
+
+``AUTO``
+  Try system packages first and fall back to bundled dependencies.  This is convenient for local development, but less reproducible for distro packaging.
+
+The older ``PREFER_EXTERNAL_LZ4``, ``PREFER_EXTERNAL_ZLIB`` and ``PREFER_EXTERNAL_ZSTD`` options are still accepted as per-dependency compatibility options; when enabled they try the system package first for that dependency.
+
+ZFP support is controlled separately because ZFP packages are not available in all distributions:
+
+``BLOSC_ENABLE_ZFP=AUTO``
+  Default.  In ``BUNDLED`` mode, build bundled ZFP.  In ``EXTERNAL`` mode, enable ZFP only when a system ZFP package is found; otherwise build C-Blosc2 without ZFP support.  In ``AUTO`` dependency mode, try system ZFP first and fall back to bundled ZFP.
+
+``BLOSC_ENABLE_ZFP=ON``
+  Require ZFP support.  In ``EXTERNAL`` mode this fails if no system ZFP package is found.
+
+``BLOSC_ENABLE_ZFP=OFF``
+  Disable the ZFP codec.
+
+For fully local bundled builds without network access, point CMake at local codec checkouts instead of downloading them:
 
 .. code-block:: console
 
@@ -143,19 +162,14 @@ If you prefer fully local builds, you can point CMake at local codec checkouts i
     -DBLOSC_LZ4_SOURCE_DIR=/path/to/lz4 \
     -DBLOSC_ZLIBNG_SOURCE_DIR=/path/to/zlib-ng \
     -DBLOSC_ZSTD_SOURCE_DIR=/path/to/zstd \
+    -DBLOSC_ZFP_SOURCE_DIR=/path/to/zfp \
     ..
 
-Of course, you can also exclude support for selected codecs.  For example, to disable Zstd support:
+You can also exclude support for selected codecs.  For example, to disable Zstd support:
 
 .. code-block:: console
 
   cmake -DDEACTIVATE_ZSTD=ON ..
-
-Or, to prefer a codec already installed in the system:
-
-.. code-block:: console
-
-  cmake -DPREFER_EXTERNAL_LZ4=ON ..
 
 Supported platforms
 ~~~~~~~~~~~~~~~~~~~

@@ -7,7 +7,9 @@
 # See LICENSE.txt for details about copyright and rights to use.
 
 # sources
-file(GLOB SOURCES CONFIGURE_DEPENDS test_*.c b2nd/test_*.c fuzz/generate_inputs_corpus.c)
+file(GLOB SOURCES test_*.c b2nd/test_*.c fuzz/generate_inputs_corpus.c)
+list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_vl_block_overflow.c)
+list(REMOVE_DUPLICATES SOURCES)
 
 # flags
 link_directories(${PROJECT_BINARY_DIR}/blosc)
@@ -27,7 +29,8 @@ foreach(source ${SOURCES})
         if(target STREQUAL test_nolock OR
             target STREQUAL test_noinit OR
             target STREQUAL test_compressor OR
-            target STREQUAL test_blosc1_compat)
+            target STREQUAL test_blosc1_compat OR
+            target STREQUAL test_race)
             message("Skipping ${target} on Windows systems")
             continue()
         endif()

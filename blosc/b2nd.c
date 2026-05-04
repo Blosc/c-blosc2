@@ -2468,7 +2468,7 @@ b2nd_create_ctx(const blosc2_storage *b2_storage, int8_t ndim, const int64_t *sh
     ctx->metalayers[i] = metalayers[i];
   }
 
-#if defined(HAVE_PLUGINS)
+#if defined(HAVE_ZFP)
   #include "blosc2/codecs-registry.h"
   if ((ctx->b2_storage->cparams->compcode >= BLOSC_CODEC_ZFP_FIXED_ACCURACY) &&
       (ctx->b2_storage->cparams->compcode <= BLOSC_CODEC_ZFP_FIXED_RATE)) {
@@ -2480,7 +2480,7 @@ b2nd_create_ctx(const blosc2_storage *b2_storage, int8_t ndim, const int64_t *sh
       }
     }
   }
-#endif /* HAVE_PLUGINS */
+#endif /* HAVE_ZFP */
 
   return ctx;
 }
