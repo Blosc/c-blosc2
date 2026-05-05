@@ -168,6 +168,54 @@ static char* test_schunk_from_buffer_bad_magic(void) {
   return EXIT_SUCCESS;
 }
 
+static void write_u32_be(uint8_t* dst, uint32_t value) {
+  dst[0] = (uint8_t)((value >> 24) & 0xffu);
+  dst[1] = (uint8_t)((value >> 16) & 0xffu);
+  dst[2] = (uint8_t)((value >> 8) & 0xffu);
+  dst[3] = (uint8_t)(value & 0xffu);
+}
+
+static char* test_schunk_from_buffer_bad_trailer_len(void) {
+  blosc2_schunk* schunk;
+  uint8_t* cframe;
+  bool cframe_needs_free;
+
+  blosc2_init();
+
+  blosc2_storage storage = {.contiguous = true};
+  schunk = blosc2_schunk_new(&storage);
+  mu_assert("blosc2_schunk_new() failed", schunk != NULL);
+
+  int32_t data[16];
+  for (int i = 0; i < (int)ARRAY_SIZE(data); ++i) {
+    data[i] = i;
+  }
+  int64_t nchunks_ = blosc2_schunk_append_buffer(schunk, data, sizeof(data));
+  mu_assert("ERROR: bad append in frame", nchunks_ > 0);
+
+  int64_t len = blosc2_schunk_to_buffer(schunk, &cframe, &cframe_needs_free);
+  mu_assert("Error in getting a frame buffer", len > FRAME_HEADER_MINLEN + FRAME_TRAILER_MINLEN);
+
+  uint8_t* mutated = malloc((size_t)len);
+  mu_assert("Error allocating mutated frame buffer", mutated != NULL);
+  memcpy(mutated, cframe, (size_t)len);
+
+  uint32_t bad_trailer_len = (uint32_t)(len - FRAME_HEADER_MINLEN + 1);
+  write_u32_be(mutated + (size_t)len - FRAME_TRAILER_LEN_OFFSET, bad_trailer_len);
+
+  blosc2_schunk* reopened = blosc2_schunk_from_buffer(mutated, len, true);
+  mu_assert("blosc2_schunk_from_buffer() should reject malformed trailer length", reopened == NULL);
+
+  free(mutated);
+  blosc2_schunk_free(schunk);
+  if (cframe_needs_free) {
+    free(cframe);
+  }
+  blosc2_destroy();
+
+  return EXIT_SUCCESS;
+}
+
 static char *all_tests(void) {
   nchunks = 0;
   contiguous = true;
@@ -212,6 +260,7 @@ static char *all_tests(void) {
 
   mu_run_test(test_schunk_avoid_cframe_free_without_frame);
   mu_run_test(test_schunk_from_buffer_bad_magic);
+  mu_run_test(test_schunk_from_buffer_bad_trailer_len);
 
   return EXIT_SUCCESS;
 }
