@@ -1032,7 +1032,9 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     }
     uint32_t trailer_len;
     to_big(&trailer_len, trailer_ptr + trailer_offset, sizeof(trailer_len));
-    if (trailer_len < FRAME_TRAILER_MINLEN || trailer_len > INT32_MAX || (int64_t)trailer_len > frame_len) {
+    if (trailer_len < FRAME_TRAILER_MINLEN || trailer_len > INT32_MAX ||
+        (int64_t)trailer_len > frame_len ||
+        (int64_t)trailer_len > frame_len - FRAME_HEADER_MINLEN) {
       BLOSC_TRACE_ERROR("Invalid trailer length (%" PRIu32 ") in file '%s'.", trailer_len, urlpath);
       free(urlpath_cpy);
       free(frame);
@@ -1071,6 +1073,12 @@ blosc2_frame_s* frame_from_cframe(uint8_t *cframe, int64_t len, bool copy) {
   }
   uint32_t trailer_len;
   from_big(&trailer_len, trailer + trailer_offset, sizeof(trailer_len));
+  if (trailer_len < FRAME_TRAILER_MINLEN || trailer_len > INT32_MAX ||
+      (int64_t)trailer_len > frame_len ||
+      (int64_t)trailer_len > frame_len - FRAME_HEADER_MINLEN) {
+    free(frame);
+    return NULL;
+  }
   frame->trailer_len = trailer_len;
 
   if (copy) {
