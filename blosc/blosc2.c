@@ -5484,9 +5484,11 @@ int blosc2_get_complib_info(const char* compname, char** complib, char** version
     clibversion = BLOSCLZ_VERSION_STRING;
   }
   else if (clibcode == BLOSC_LZ4_LIB) {
-        snprintf(sbuffer, sizeof(sbuffer), "%d.%d.%d",
-           LZ4_VERSION_MAJOR, LZ4_VERSION_MINOR, LZ4_VERSION_RELEASE);
-    clibversion = sbuffer;
+    int _sn = snprintf(sbuffer, sizeof(sbuffer), "%d.%d.%d",
+                       LZ4_VERSION_MAJOR, LZ4_VERSION_MINOR, LZ4_VERSION_RELEASE);
+    if (_sn >= 0 && (size_t)_sn < sizeof(sbuffer)) {
+      clibversion = sbuffer;
+    }
   }
 #if defined(HAVE_ZLIB)
   else if (clibcode == BLOSC_ZLIB_LIB) {
