@@ -5425,19 +5425,41 @@ const char* blosc2_list_compressors(void) {
 
   if (compressors_list_done) return ret;
   ret[0] = '\0';
-  strcat(ret, BLOSC_BLOSCLZ_COMPNAME);
-  strcat(ret, ",");
-  strcat(ret, BLOSC_LZ4_COMPNAME);
-  strcat(ret, ",");
-  strcat(ret, BLOSC_LZ4HC_COMPNAME);
+  size_t _avail = sizeof(ret);
+  char *_p = ret;
+  /* Start with the first compressor name. */
+  int _w = snprintf(_p, _avail, "%s", BLOSC_BLOSCLZ_COMPNAME);
+  if (_w < 0) {
+    ret[0] = '\0';
+    compressors_list_done = 1;
+    return ret;
+  }
+  if ((size_t)_w >= _avail) {
+    /* Truncated; ensure terminated and return */
+    ret[sizeof(ret)-1] = '\0';
+    compressors_list_done = 1;
+    return ret;
+  }
+  _p += _w; _avail -= (size_t)_w;
+
+#define APPEND_COMP(NAME) do { \
+    if (_avail > 1) { \
+      int __w = snprintf(_p, _avail, ",%s", (NAME)); \
+      if (__w < 0) { break; } \
+      if ((size_t)__w >= _avail) { _p += _avail - 1; _avail = 1; *_p = '\0'; break; } \
+      _p += __w; _avail -= (size_t)__w; \
+    } \
+  } while(0)
+
+  APPEND_COMP(BLOSC_LZ4_COMPNAME);
+  APPEND_COMP(BLOSC_LZ4HC_COMPNAME);
 #if defined(HAVE_ZLIB)
-  strcat(ret, ",");
-  strcat(ret, BLOSC_ZLIB_COMPNAME);
+  APPEND_COMP(BLOSC_ZLIB_COMPNAME);
 #endif /* HAVE_ZLIB */
 #if defined(HAVE_ZSTD)
-  strcat(ret, ",");
-  strcat(ret, BLOSC_ZSTD_COMPNAME);
+  APPEND_COMP(BLOSC_ZSTD_COMPNAME);
 #endif /* HAVE_ZSTD */
+#undef APPEND_COMP
   compressors_list_done = 1;
   return ret;
 }
@@ -5462,8 +5484,8 @@ int blosc2_get_complib_info(const char* compname, char** complib, char** version
     clibversion = BLOSCLZ_VERSION_STRING;
   }
   else if (clibcode == BLOSC_LZ4_LIB) {
-    sprintf(sbuffer, "%d.%d.%d",
-            LZ4_VERSION_MAJOR, LZ4_VERSION_MINOR, LZ4_VERSION_RELEASE);
+        snprintf(sbuffer, sizeof(sbuffer), "%d.%d.%d",
+           LZ4_VERSION_MAJOR, LZ4_VERSION_MINOR, LZ4_VERSION_RELEASE);
     clibversion = sbuffer;
   }
 #if defined(HAVE_ZLIB)
