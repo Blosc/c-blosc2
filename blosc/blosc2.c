@@ -5429,7 +5429,7 @@ const char* blosc2_list_compressors(void) {
   char *_p = ret;
   /* Start with the first compressor name. */
   int _sw = snprintf(_p, _avail, "%s", BLOSC_BLOSCLZ_COMPNAME);
-  if (_ssw < 0) {
+  if (_sw < 0) {
     ret[0] = '\0';
     compressors_list_done = 1;
     return ret;
