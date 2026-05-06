@@ -1904,8 +1904,18 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     void* fp = NULL;
     int64_t io_pos = 0;
     if (frame->sframe) {
-      char* eframe_name = malloc(strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1);
-      sprintf(eframe_name, "%s/chunks.b2frame", frame->urlpath);
+      size_t _len = strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1;
+      char* eframe_name = malloc(_len);
+      if (eframe_name == NULL) {
+        BLOSC_TRACE_ERROR("Unable to allocate memory for frame filename.");
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+      }
+      int _w = snprintf(eframe_name, _len, "%s/chunks.b2frame", frame->urlpath);
+      if (_w < 0 || (size_t)_w >= _len) {
+        BLOSC_TRACE_ERROR("Error building frame filename");
+        free(eframe_name);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
       fp = io_cb->open(eframe_name, "rb", frame->schunk->storage->io->params);
       if (fp == NULL) {
         BLOSC_TRACE_ERROR("Error opening file in: %s", eframe_name);
