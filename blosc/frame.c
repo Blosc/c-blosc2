@@ -1914,7 +1914,7 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       if (_w < 0 || (size_t)_w >= _len) {
         BLOSC_TRACE_ERROR("Error building frame filename");
         free(eframe_name);
-        return BLOSC2_ERROR_FILE_OPEN;
+        return BLOSC2_ERROR_INVALID_PARAM;
       }
       fp = io_cb->open(eframe_name, "rb", frame->schunk->storage->io->params);
       if (fp == NULL) {
