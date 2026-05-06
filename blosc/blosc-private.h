@@ -18,6 +18,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <ctype.h>
 
 /*********************************************************************
 
@@ -255,7 +256,7 @@ static inline int dlclose(void *handle) {
 static inline const char *dlerror (void) {
   static char errstr [88];
   if (var.lasterror) {
-      sprintf (errstr, "%s error #%ld", var.err_rutin, var.lasterror);
+      snprintf(errstr, sizeof(errstr), "%s error #%ld", var.err_rutin, var.lasterror);
       return errstr;
   } else {
       return NULL;
@@ -265,11 +266,33 @@ static inline const char *dlerror (void) {
 #include <dlfcn.h>
 #endif
 
+static inline bool blosc2_valid_plugin_name(const char *plugin_name) {
+  if (plugin_name == NULL || plugin_name[0] == '\0') {
+    return false;
+  }
+  for (const unsigned char *p = (const unsigned char *)plugin_name; *p != '\0'; ++p) {
+    if (!isalnum(*p) && *p != '_') {
+      return false;
+    }
+  }
+  return true;
+}
+
 
 static inline int get_libpath(char *plugin_name, char *libpath, char *python_version) {
   BLOSC_TRACE_INFO("Trying to get plugin path with python%s\n", python_version);
   char python_cmd[PATH_MAX] = {0};
-  sprintf(python_cmd, "python%s -c \"import blosc2_%s; blosc2_%s.print_libpath()\"", python_version, plugin_name, plugin_name);
+  if (!blosc2_valid_plugin_name(plugin_name)) {
+    BLOSC_TRACE_ERROR("Invalid plugin name");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  int written = snprintf(python_cmd, sizeof(python_cmd),
+                         "python%s -c \"import blosc2_%s; blosc2_%s.print_libpath()\"",
+                         python_version, plugin_name, plugin_name);
+  if (written < 0 || (size_t)written >= sizeof(python_cmd)) {
+    BLOSC_TRACE_ERROR("Python command is too long");
+    return BLOSC2_ERROR_FAILURE;
+  }
   FILE *fp = popen(python_cmd, "r");
   if (fp == NULL) {
     BLOSC_TRACE_ERROR("Could not run python");

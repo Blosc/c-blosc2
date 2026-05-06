@@ -14,9 +14,20 @@
 #include "blosc2.h"
 
 #include <inttypes.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+
+static bool b2nd_mul_overflow_size_t(size_t a, size_t b, size_t *out) {
+  if (a != 0 && b > SIZE_MAX / a) {
+    return true;
+  }
+  if (out != NULL) {
+    *out = a * b;
+  }
+  return false;
+}
 
 
 int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const int32_t *chunkshape,
@@ -394,7 +405,20 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
     return BLOSC2_ERROR_FAILURE;
   }
   // Set the chunksize for the schunk, as it cannot be derived from storage
-  int32_t chunksize = (int32_t) (*array)->extchunknitems * sc->typesize;
+  if (sc->typesize <= 0 || (*array)->extchunknitems < 0) {
+    BLOSC_TRACE_ERROR("Invalid chunk parameters");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  size_t chunkbytes_size = 0;
+  if (b2nd_mul_overflow_size_t((size_t)(*array)->extchunknitems, (size_t)sc->typesize, &chunkbytes_size)) {
+    BLOSC_TRACE_ERROR("Chunksize overflows size limits");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (chunkbytes_size > BLOSC2_MAX_BUFFERSIZE || chunkbytes_size > INT32_MAX) {
+    BLOSC_TRACE_ERROR("Chunksize exceeds maximum of %d", BLOSC2_MAX_BUFFERSIZE);
+    return BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
+  }
+  int32_t chunksize = (int32_t)chunkbytes_size;
   sc->chunksize = chunksize;
 
   // Serialize the dimension info
@@ -431,10 +455,6 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
     }
   }
 
-  if ((*array)->extchunknitems * sc->typesize > BLOSC2_MAX_BUFFERSIZE){
-    BLOSC_TRACE_ERROR("Chunksize exceeds maximum of %d", BLOSC2_MAX_BUFFERSIZE);
-    return BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
-  }
   // Fill schunk with uninit values
   if ((*array)->nitems != 0) {
     int64_t nchunks = (*array)->extnitems / (*array)->chunknitems;
@@ -501,7 +521,20 @@ int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, const void *fill_value)
 
   BLOSC_ERROR(b2nd_empty(ctx, array));
 
-  int32_t chunkbytes = (int32_t) (*array)->extchunknitems * (*array)->sc->typesize;
+  if ((*array)->sc->typesize <= 0 || (*array)->extchunknitems < 0) {
+    BLOSC_TRACE_ERROR("Invalid chunk parameters");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  size_t chunkbytes_size = 0;
+  if (b2nd_mul_overflow_size_t((size_t)(*array)->extchunknitems, (size_t)(*array)->sc->typesize, &chunkbytes_size)) {
+    BLOSC_TRACE_ERROR("Chunk bytes overflows size limits");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (chunkbytes_size > BLOSC2_MAX_BUFFERSIZE || chunkbytes_size > INT32_MAX) {
+    BLOSC_TRACE_ERROR("Chunk bytes exceeds maximum of %d", BLOSC2_MAX_BUFFERSIZE);
+    return BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
+  }
+  int32_t chunkbytes = (int32_t)chunkbytes_size;
 
   blosc2_cparams *cparams;
   if (blosc2_schunk_get_cparams((*array)->sc, &cparams) != 0) {
@@ -1250,15 +1283,32 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t
       src_start[i] = chunk_start[i] + start[i];
       src_stop[i] = chunk_stop[i] + start[i];
     }
-    int64_t buffersize = ctx->b2_storage->cparams->typesize;
+    if (ctx->b2_storage->cparams->typesize <= 0) {
+      BLOSC_TRACE_ERROR("Invalid typesize");
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    size_t buffersize = (size_t)ctx->b2_storage->cparams->typesize;
     for (int i = 0; i < ndim; ++i) {
-      buffersize *= chunk_shape[i];
+      if (chunk_shape[i] < 0) {
+        BLOSC_TRACE_ERROR("Invalid chunk shape");
+        return BLOSC2_ERROR_INVALID_PARAM;
+      }
+      if (b2nd_mul_overflow_size_t(buffersize, (size_t)chunk_shape[i], &buffersize)) {
+        BLOSC_TRACE_ERROR("Buffer size overflows size limits");
+        return BLOSC2_ERROR_INVALID_PARAM;
+      }
+    }
+    if (buffersize == 0 || buffersize > (size_t)INT64_MAX) {
+      BLOSC_TRACE_ERROR("Buffer size is out of range");
+      return BLOSC2_ERROR_INVALID_PARAM;
     }
     uint8_t *buffer = malloc(buffersize);
-    BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_MEMORY_ALLOC);
+    if (buffer == NULL) {
+      BLOSC_ERROR(BLOSC2_ERROR_MEMORY_ALLOC);
+    }
     BLOSC_ERROR(b2nd_get_slice_cbuffer(src, src_start, src_stop, buffer, chunk_shape,
-                                       buffersize));
-    BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, chunk_shape, buffersize, chunk_start,
+                                       (int64_t)buffersize));
+    BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, chunk_shape, (int64_t)buffersize, chunk_start,
                                        chunk_stop, *array));
     free(buffer);
   }
