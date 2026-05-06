@@ -1904,16 +1904,24 @@ int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     void* fp = NULL;
     int64_t io_pos = 0;
     if (frame->sframe) {
+      // Check for overflow before calculating length
+      if (strlen(frame->urlpath) > SIZE_MAX - strlen("/chunks.b2frame") - 1) {
+        BLOSC_TRACE_ERROR("Path too long for frame filename.");
+        if (needs_free) free(trailer);
+        return BLOSC2_ERROR_INVALID_PARAM;
+      }
       size_t _len = strlen(frame->urlpath) + strlen("/chunks.b2frame") + 1;
       char* eframe_name = malloc(_len);
       if (eframe_name == NULL) {
         BLOSC_TRACE_ERROR("Unable to allocate memory for frame filename.");
+        if (needs_free) free(trailer);
         return BLOSC2_ERROR_MEMORY_ALLOC;
       }
       int _w = snprintf(eframe_name, _len, "%s/chunks.b2frame", frame->urlpath);
       if (_w < 0 || (size_t)_w >= _len) {
         BLOSC_TRACE_ERROR("Error building frame filename");
         free(eframe_name);
+        if (needs_free) free(trailer);
         return BLOSC2_ERROR_INVALID_PARAM;
       }
       fp = io_cb->open(eframe_name, "rb", frame->schunk->storage->io->params);

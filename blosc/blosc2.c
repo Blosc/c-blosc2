@@ -5428,19 +5428,19 @@ const char* blosc2_list_compressors(void) {
   size_t _avail = sizeof(ret);
   char *_p = ret;
   /* Start with the first compressor name. */
-  int _w = snprintf(_p, _avail, "%s", BLOSC_BLOSCLZ_COMPNAME);
-  if (_w < 0) {
+  int _sw = snprintf(_p, _avail, "%s", BLOSC_BLOSCLZ_COMPNAME);
+  if (_ssw < 0) {
     ret[0] = '\0';
     compressors_list_done = 1;
     return ret;
   }
-  if ((size_t)_w >= _avail) {
+  if ((size_t)_sw >= _avail) {
     /* Truncated; ensure terminated and return */
     ret[sizeof(ret)-1] = '\0';
     compressors_list_done = 1;
     return ret;
   }
-  _p += _w; _avail -= (size_t)_w;
+  _p += _sw; _avail -= (size_t)_sw;
 
 #define APPEND_COMP(NAME) do { \
     if (_avail > 1) { \
@@ -5503,9 +5503,11 @@ int blosc2_get_complib_info(const char* compname, char** complib, char** version
 #endif /* HAVE_ZLIB */
 #if defined(HAVE_ZSTD)
   else if (clibcode == BLOSC_ZSTD_LIB) {
-    sprintf(sbuffer, "%d.%d.%d",
-            ZSTD_VERSION_MAJOR, ZSTD_VERSION_MINOR, ZSTD_VERSION_RELEASE);
-    clibversion = sbuffer;
+    int _sn_zstd = snprintf(sbuffer, sizeof(sbuffer), "%d.%d.%d",
+                            ZSTD_VERSION_MAJOR, ZSTD_VERSION_MINOR, ZSTD_VERSION_RELEASE);
+    if (_sn_zstd >= 0 && (size_t)_sn_zstd < sizeof(sbuffer)) {
+      clibversion = sbuffer;
+    }
   }
 #endif /* HAVE_ZSTD */
 
