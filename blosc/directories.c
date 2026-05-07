@@ -26,6 +26,10 @@
 
   int blosc2_remove_dir(const char* dir_path) {
     char* path;
+    if (dir_path == NULL || dir_path[0] == '\0') {
+      BLOSC_TRACE_ERROR("Invalid directory path");
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
     size_t dir_len = strlen(dir_path);
     char last_char = dir_path[dir_len - 1];
     size_t path_len = 0;
@@ -108,7 +112,15 @@
 
 /* Return the directory path with the '/' at the end */
 char* blosc2_normalize_dirpath(const char* dir_path) {
+  if (dir_path == NULL || dir_path[0] == '\0') {
+    errno = EINVAL;
+    return NULL;
+  }
   size_t dir_len = strlen(dir_path);
+  if (dir_len == 0) {
+    errno = EINVAL;
+    return NULL;
+  }
   char last_char = dir_path[dir_len - 1];
   char* path;
   if (last_char != '\\' && last_char != '/') {
@@ -140,7 +152,10 @@ char* blosc2_normalize_dirpath(const char* dir_path) {
 int blosc2_remove_dir(const char* dir_path) {
   char* path = blosc2_normalize_dirpath(dir_path);
   if (path == NULL) {
-    return BLOSC2_ERROR_MEMORY_ALLOC;
+    if (errno == ENOMEM) {
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+    return BLOSC2_ERROR_INVALID_PARAM;
   }
 
   DIR* dr = opendir(path);

@@ -309,6 +309,10 @@ static inline int get_libpath(char *plugin_name, char *libpath, char *python_ver
 }
 
 static inline void* load_lib(char *plugin_name, char *libpath) {
+  if (!blosc2_valid_plugin_name(plugin_name)) {
+    BLOSC_TRACE_ERROR("Invalid plugin name");
+    return NULL;
+  }
     // Attempt to directly load the library by name
 #if defined(_WIN32)
     // Windows dynamic library (DLL) format

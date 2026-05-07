@@ -405,17 +405,45 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
     return BLOSC2_ERROR_FAILURE;
   }
   // Set the chunksize for the schunk, as it cannot be derived from storage
-  if (sc->typesize <= 0 || (*array)->extchunknitems < 0) {
+  if (sc->typesize <= 0) {
     BLOSC_TRACE_ERROR("Invalid chunk parameters");
+    blosc2_schunk_free(sc);
+    free((*array)->dtype);
+    free(*array);
+    *array = NULL;
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if ((*array)->extchunknitems < 0) {
+    BLOSC_TRACE_ERROR("Invalid chunk parameters");
+    blosc2_schunk_free(sc);
+    free((*array)->dtype);
+    free(*array);
+    *array = NULL;
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if ((uint64_t)(*array)->extchunknitems > (uint64_t)SIZE_MAX) {
+    BLOSC_TRACE_ERROR("extchunknitems too large");
+    blosc2_schunk_free(sc);
+    free((*array)->dtype);
+    free(*array);
+    *array = NULL;
     return BLOSC2_ERROR_INVALID_PARAM;
   }
   size_t chunkbytes_size = 0;
   if (b2nd_mul_overflow_size_t((size_t)(*array)->extchunknitems, (size_t)sc->typesize, &chunkbytes_size)) {
     BLOSC_TRACE_ERROR("Chunksize overflows size limits");
+    blosc2_schunk_free(sc);
+    free((*array)->dtype);
+    free(*array);
+    *array = NULL;
     return BLOSC2_ERROR_INVALID_PARAM;
   }
   if (chunkbytes_size > BLOSC2_MAX_BUFFERSIZE || chunkbytes_size > INT32_MAX) {
     BLOSC_TRACE_ERROR("Chunksize exceeds maximum of %d", BLOSC2_MAX_BUFFERSIZE);
+    blosc2_schunk_free(sc);
+    free((*array)->dtype);
+    free(*array);
+    *array = NULL;
     return BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
   }
   int32_t chunksize = (int32_t)chunkbytes_size;
@@ -424,6 +452,10 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
   // Serialize the dimension info
   if (sc->nmetalayers >= BLOSC2_MAX_METALAYERS) {
     BLOSC_TRACE_ERROR("the number of metalayers for this schunk has been exceeded");
+    blosc2_schunk_free(sc);
+    free((*array)->dtype);
+    free(*array);
+    *array = NULL;
     return BLOSC2_ERROR_FAILURE;
   }
   uint8_t *smeta = NULL;
@@ -436,11 +468,20 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
                                           &smeta);
   if (smeta_len < 0) {
     BLOSC_TRACE_ERROR("error during serializing dims info for Blosc2 NDim");
+    blosc2_schunk_free(sc);
+    free((*array)->dtype);
+    free(*array);
+    *array = NULL;
     return BLOSC2_ERROR_FAILURE;
   }
 
   // And store it in b2nd metalayer
   if (blosc2_meta_add(sc, "b2nd", smeta, smeta_len) < 0) {
+    free(smeta);
+    blosc2_schunk_free(sc);
+    free((*array)->dtype);
+    free(*array);
+    *array = NULL;
     return BLOSC2_ERROR_FAILURE;
   }
 
@@ -451,7 +492,11 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
     uint8_t *data = ctx->metalayers[i].content;
     int32_t size = ctx->metalayers[i].content_len;
     if (blosc2_meta_add(sc, name, data, size) < 0) {
-      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+      blosc2_schunk_free(sc);
+      free((*array)->dtype);
+      free(*array);
+      *array = NULL;
+      return BLOSC2_ERROR_FAILURE;
     }
   }
 
@@ -459,7 +504,13 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
   if ((*array)->nitems != 0) {
     int64_t nchunks = (*array)->extnitems / (*array)->chunknitems;
     int64_t nitems = nchunks * (*array)->extchunknitems;
-    BLOSC_ERROR(blosc2_schunk_fill_special(sc, nitems, special_value, chunksize));
+    if (blosc2_schunk_fill_special(sc, nitems, special_value, chunksize) < 0) {
+      blosc2_schunk_free(sc);
+      free((*array)->dtype);
+      free(*array);
+      *array = NULL;
+      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+    }
   }
   (*array)->sc = sc;
 
@@ -521,8 +572,16 @@ int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, const void *fill_value)
 
   BLOSC_ERROR(b2nd_empty(ctx, array));
 
-  if ((*array)->sc->typesize <= 0 || (*array)->extchunknitems < 0) {
+  if ((*array)->sc->typesize <= 0) {
     BLOSC_TRACE_ERROR("Invalid chunk parameters");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if ((*array)->extchunknitems < 0) {
+    BLOSC_TRACE_ERROR("Invalid chunk parameters");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if ((uint64_t)(*array)->extchunknitems > (uint64_t)SIZE_MAX) {
+    BLOSC_TRACE_ERROR("extchunknitems too large");
     return BLOSC2_ERROR_INVALID_PARAM;
   }
   size_t chunkbytes_size = 0;
