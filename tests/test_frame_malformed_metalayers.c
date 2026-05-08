@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "blosc2.h"
+#include "blosc-private.h"
 #include "test_common.h"
 
 static void* my_memmem(const void* haystack, size_t haystacklen, const void* needle, size_t needlelen) {
@@ -46,31 +47,24 @@ static char* test_malformed_metalayer_header(void) {
     uint8_t* name_pos = (uint8_t*)my_memmem(cframe, (size_t)len, name, strlen(name));
     mu_assert("Could not find metalayer name in frame", name_pos != NULL);
 
-    // The metalayer entry is [name_len (1B) | name (N B) | content_offset (4B)]
+    // The metalayer entry is [name_len (1B) | name (N B) | 0xd2 (1B) | content_offset (4B)]
     // The content_offset points to a bin32 [0xc6 | content_len (4B) | content (M B)]
-    
+
     // Let's tamper with the content_len of the metalayer to be huge.
-    // The content_offset is 4 bytes after the name.
+    // The content_offset is 1 byte after the name (skipping the 0xd2 marker).
     uint32_t content_offset;
-    memcpy(&content_offset, name_pos + strlen(name), 4);
-    // On little-endian, we need to swap this because it's stored in big-endian in frame
-    uint32_t content_offset_be = content_offset;
-    if (is_little_endian()) {
-        content_offset = swap4(content_offset_be);
-    }
-    
+    from_big(&content_offset, name_pos + strlen(name) + 1, sizeof(content_offset));
+
     // Tamper with the bin32 header at content_offset
     // header_len is at cframe[11..14]
-    uint32_t header_len = (cframe[11] << 24) | (cframe[12] << 16) | (cframe[13] << 8) | cframe[14];
+    uint32_t header_len;
+    from_big(&header_len, cframe + FRAME_HEADER_LEN, sizeof(header_len));
     
     uint8_t* content_header = cframe + content_offset;
     // content_header[0] is 0xc6. content_header[1..4] is content_len.
     // Set content_len to something that would overflow header_len if added to content_offset
     uint32_t huge_len = 0x7FFFFFFF;
-    content_header[1] = (huge_len >> 24) & 0xFF;
-    content_header[2] = (huge_len >> 16) & 0xFF;
-    content_header[3] = (huge_len >> 8) & 0xFF;
-    content_header[4] = huge_len & 0xFF;
+    to_big(content_header + 1, &huge_len, sizeof(huge_len));
 
     printf("Attempting to parse frame with malformed metalayer content_len...\n");
     blosc2_schunk* schunk2 = blosc2_schunk_from_buffer(cframe, len, true);
