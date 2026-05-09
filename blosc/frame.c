@@ -2948,12 +2948,20 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
 
     *chunk = frame->cframe + chunk_header_offset;
 
-    if (chunk_cbytes_offset > frame->len) {
+    if (chunk_header_offset < 0 ||
+        chunk_cbytes_offset < chunk_header_offset ||
+        chunk_cbytes_offset > frame->len) {
       BLOSC_TRACE_ERROR("Cannot read the header for chunk in the (contiguous) frame.");
       rc = BLOSC2_ERROR_READ_BUFFER;
     } else {
       rc = blosc2_cbuffer_sizes(*chunk, NULL, &lazychunk_cbytes, NULL);
-      if (rc && chunk_cbytes_offset + lazychunk_cbytes > frame_len) {
+      if (rc < 0) {
+        BLOSC_TRACE_ERROR("Cannot read the chunk header.");
+        rc = BLOSC2_ERROR_READ_BUFFER;
+      }
+      else if (lazychunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH ||
+               chunk_header_offset > INT64_MAX - lazychunk_cbytes ||
+               chunk_header_offset + lazychunk_cbytes > frame_len) {
         BLOSC_TRACE_ERROR("Compressed bytes exceed beyond frame length.");
         rc = BLOSC2_ERROR_READ_BUFFER;
       }
