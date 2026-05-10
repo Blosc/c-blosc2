@@ -1638,7 +1638,7 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
     }
     // Go to offset and see if we have the correct marker
     uint8_t* content_marker = header + offset;
-    if (header_len < offset + 1 + 4) {
+    if ((int64_t)header_len < (int64_t)offset + 1 + 4) {
       return BLOSC2_ERROR_READ_BUFFER;
     }
     if (*content_marker != 0xc6) {
@@ -1653,11 +1653,16 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
     }
     metalayer->content_len = content_len;
 
-    // Finally, read the content
-    if (header_len < offset + 1 + 4 + content_len) {
+    // Finally, read the content. Use 64-bit arithmetic so a malicious
+    // (offset, content_len) pair near INT32_MAX cannot wrap and bypass the
+    // bounds check, which would let memcpy below read past the header buffer.
+    if ((int64_t)header_len < (int64_t)offset + 1 + 4 + (int64_t)content_len) {
       return BLOSC2_ERROR_READ_BUFFER;
     }
     char* content = malloc((size_t)content_len);
+    if (content == NULL) {
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
     memcpy(content, content_marker + 1 + 4, (size_t)content_len);
     metalayer->content = (uint8_t*)content;
   }
@@ -1828,7 +1833,7 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
     }
     // Go to offset and see if we have the correct marker
     uint8_t* content_marker = trailer + offset;
-    if (trailer_len < offset + 1 + 4) {
+    if ((int64_t)trailer_len < (int64_t)offset + 1 + 4) {
       return BLOSC2_ERROR_READ_BUFFER;
     }
     if (*content_marker != 0xc6) {
@@ -1843,11 +1848,16 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
     }
     metalayer->content_len = content_len;
 
-    // Finally, read the content
-    if (trailer_len < offset + 1 + 4 + content_len) {
+    // Finally, read the content. Use 64-bit arithmetic so a malicious
+    // (offset, content_len) pair near INT32_MAX cannot wrap and bypass the
+    // bounds check, which would let memcpy below read past the trailer buffer.
+    if ((int64_t)trailer_len < (int64_t)offset + 1 + 4 + (int64_t)content_len) {
       return BLOSC2_ERROR_READ_BUFFER;
     }
     char* content = malloc((size_t)content_len);
+    if (content == NULL) {
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
     memcpy(content, content_marker + 1 + 4, (size_t)content_len);
     metalayer->content = (uint8_t*)content;
   }
@@ -2344,6 +2354,10 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
     }
   }
   free(offsets);
+  // Avoid a double-free in the `error:` cleanup below, which is reached
+  // when frame_get_metalayers / frame_get_vlmetalayers reject a malformed
+  // metalayer index after we've already freed `offsets` here.
+  offsets = NULL;
 
   // cframes and sframes have different ways to store chunks with special values:
   // 1) cframes represent special chunks as negative offsets
