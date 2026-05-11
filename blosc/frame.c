@@ -1660,10 +1660,15 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
       return BLOSC2_ERROR_READ_BUFFER;
     }
     char* content = malloc((size_t)content_len);
-    if (content == NULL) {
+    // malloc(0) is allowed to return NULL, and blosc2_meta_add accepts
+    // content_len == 0, so only treat NULL as an allocation failure when
+    // a non-zero allocation was requested.
+    if (content_len > 0 && content == NULL) {
       return BLOSC2_ERROR_MEMORY_ALLOC;
     }
-    memcpy(content, content_marker + 1 + 4, (size_t)content_len);
+    if (content_len > 0) {
+      memcpy(content, content_marker + 1 + 4, (size_t)content_len);
+    }
     metalayer->content = (uint8_t*)content;
   }
 
@@ -1855,10 +1860,15 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
       return BLOSC2_ERROR_READ_BUFFER;
     }
     char* content = malloc((size_t)content_len);
-    if (content == NULL) {
+    // Same zero-length carve-out as in get_meta_from_header: malloc(0) may
+    // return NULL on some platforms, and the public API allows
+    // content_len == 0, so don't reject a valid empty vlmetalayer.
+    if (content_len > 0 && content == NULL) {
       return BLOSC2_ERROR_MEMORY_ALLOC;
     }
-    memcpy(content, content_marker + 1 + 4, (size_t)content_len);
+    if (content_len > 0) {
+      memcpy(content, content_marker + 1 + 4, (size_t)content_len);
+    }
     metalayer->content = (uint8_t*)content;
   }
   return 1;
