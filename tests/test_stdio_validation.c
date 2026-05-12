@@ -51,6 +51,13 @@ CUTEST_TEST_TEST(stdio_validation) {
   CUTEST_ASSERT("valid stdio read must not change *ptr",
                 read_ptr == (void*)dst_buf);
 
+  /* Write: reject NULL stream and NULL underlying FILE*. */
+  nw = blosc2_stdio_write(src_ok, 1, 1, 0, NULL);
+  CUTEST_ASSERT("stdio write must reject NULL stream", nw == 0);
+  blosc2_stdio_file bad_fp = { NULL };
+  nw = blosc2_stdio_write(src_ok, 1, 1, 0, &bad_fp);
+  CUTEST_ASSERT("stdio write must reject NULL my_fp->file", nw == 0);
+
   /* Write: reject NULL data pointer. */
   nw = blosc2_stdio_write(NULL, 1, 1, 0, &fp);
   CUTEST_ASSERT("stdio write must reject NULL ptr", nw == 0);
@@ -67,9 +74,23 @@ CUTEST_TEST_TEST(stdio_validation) {
   nw = blosc2_stdio_write(src_ok, INT64_MAX, 2, 0, &fp);
   CUTEST_ASSERT("stdio write must reject size*nitems overflow", nw == 0);
 
+  /* Read: reject NULL stream and NULL underlying FILE*. */
+  read_ptr = dst_buf;
+  nr = blosc2_stdio_read(&read_ptr, 1, 1, 0, NULL);
+  CUTEST_ASSERT("stdio read must reject NULL stream", nr == 0);
+  nr = blosc2_stdio_read(&read_ptr, 1, 1, 0, &bad_fp);
+  CUTEST_ASSERT("stdio read must reject NULL my_fp->file", nr == 0);
+
   /* Read: reject NULL out-parameter. */
   nr = blosc2_stdio_read(NULL, 1, 1, 0, &fp);
   CUTEST_ASSERT("stdio read must reject NULL ptr argument", nr == 0);
+
+  /* Read: reject NULL buffer (*ptr) when non-zero bytes requested. */
+  void* null_buf = NULL;
+  nr = blosc2_stdio_read(&null_buf, 1, 1, 0, &fp);
+  CUTEST_ASSERT("stdio read must reject NULL *ptr with non-zero size", nr == 0);
+  CUTEST_ASSERT("stdio read must NOT touch *ptr on NULL-buffer rejection",
+                null_buf == NULL);
 
   /* Read: on every failure path, *ptr (caller-owned buffer) must be untouched.
      This is the is_allocation_necessary=true contract: nulling it would leak

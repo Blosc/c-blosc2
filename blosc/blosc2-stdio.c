@@ -97,8 +97,12 @@ int64_t blosc2_stdio_size(void *stream) {
 }
 
 int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
+  if (stream == NULL || ptr == NULL || size < 0 || nitems < 0 || position < 0) {
+    BLOSC_TRACE_ERROR("Invalid arguments for stdio write.");
+    return 0;
+  }
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
-  if (ptr == NULL || size < 0 || nitems < 0 || position < 0) {
+  if (my_fp->file == NULL) {
     BLOSC_TRACE_ERROR("Invalid arguments for stdio write.");
     return 0;
   }
@@ -136,8 +140,12 @@ int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_
 }
 
 int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
+  if (stream == NULL || ptr == NULL || size < 0 || nitems < 0 || position < 0) {
+    BLOSC_TRACE_ERROR("Invalid arguments for stdio read.");
+    return 0;
+  }
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
-  if (ptr == NULL || size < 0 || nitems < 0 || position < 0) {
+  if (my_fp->file == NULL) {
     BLOSC_TRACE_ERROR("Invalid arguments for stdio read.");
     return 0;
   }
@@ -149,6 +157,12 @@ int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t posi
   }
   if ((uint64_t)n_bytes_i64 > SIZE_MAX) {
     BLOSC_TRACE_ERROR("stdio read size does not fit in size_t (%" PRId64 ").", n_bytes_i64);
+    return 0;
+  }
+  /* For allocation-necessary backends, *ptr must point at a real buffer
+     when the caller asked for any bytes. Leave *ptr untouched on failure. */
+  if (n_bytes_i64 > 0 && *ptr == NULL) {
+    BLOSC_TRACE_ERROR("stdio read called with NULL buffer for %" PRId64 " bytes.", n_bytes_i64);
     return 0;
   }
 
