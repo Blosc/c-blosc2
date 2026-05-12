@@ -295,10 +295,6 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
   }
 
   blosc2_stdio_mmap *mmap_file = (blosc2_stdio_mmap *) params;
-  if (mmap_file->mode == NULL) {
-    BLOSC_TRACE_ERROR("Memory-mapped mode is NULL.");
-    return NULL;
-  }
   if (mmap_file->addr != NULL) {
     if (mmap_file->urlpath == NULL) {
       BLOSC_TRACE_ERROR("Memory-mapped file has invalid state: urlpath is NULL.");
@@ -317,6 +313,11 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
 
     /* A memory-mapped file is only opened once */
     return mmap_file;
+  }
+
+  if (mmap_file->mode == NULL) {
+    BLOSC_TRACE_ERROR("Memory-mapped mode is NULL.");
+    return NULL;
   }
 
   // Keep the original path to ensure that all future file openings are with the same path

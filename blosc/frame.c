@@ -39,8 +39,15 @@
 /* Create a new (empty) frame */
 blosc2_frame_s* frame_new(const char* urlpath) {
   blosc2_frame_s* new_frame = calloc(1, sizeof(blosc2_frame_s));
+  if (new_frame == NULL) {
+    return NULL;
+  }
   if (urlpath != NULL) {
     char* new_urlpath = malloc(strlen(urlpath) + 1);  // + 1 for the trailing NULL
+    if (new_urlpath == NULL) {
+      free(new_frame);
+      return NULL;
+    }
     new_frame->urlpath = strcpy(new_urlpath, urlpath);
     new_frame->file_offset = 0;
   }
@@ -949,6 +956,10 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     char* urlpath_cpy;
     if (path_stat.st_mode & S_IFDIR) {
         urlpath_cpy = malloc(strlen(urlpath) + 1);
+      if (urlpath_cpy == NULL) {
+        BLOSC_TRACE_ERROR("Cannot allocate memory for path copy of '%s'.", urlpath);
+        return NULL;
+      }
         strcpy(urlpath_cpy, urlpath);
         char last_char = urlpath[strlen(urlpath) - 1];
         if (last_char == '\\' || last_char == '/') {
@@ -961,6 +972,10 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     }
     else {
         urlpath_cpy = malloc(strlen(urlpath) + 1);
+      if (urlpath_cpy == NULL) {
+        BLOSC_TRACE_ERROR("Cannot allocate memory for path copy of '%s'.", urlpath);
+        return NULL;
+      }
         strcpy(urlpath_cpy, urlpath);
         fp = io_cb->open(urlpath, "rb", io->params);
     }
@@ -1006,6 +1021,12 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     }
 
     blosc2_frame_s* frame = calloc(1, sizeof(blosc2_frame_s));
+    if (frame == NULL) {
+      BLOSC_TRACE_ERROR("Cannot allocate memory for frame metadata.");
+      io_cb->close(fp);
+      free(urlpath_cpy);
+      return NULL;
+    }
     frame->urlpath = urlpath_cpy;
     frame->len = frame_len;
     frame->sframe = sframe;

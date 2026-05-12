@@ -93,6 +93,7 @@ CUTEST_TEST_TEST(mmap) {
   blosc2_io io = {.id = BLOSC2_IO_FILESYSTEM_MMAP, .name = "filesystem_mmap", .params = &mmap_file};
   blosc2_storage storage_mmap = {.cparams=&data->cparams, .contiguous=true, .urlpath = urlpath_mmap, .io=&io};
   blosc2_schunk *schunk_write_mmap = blosc2_schunk_new(&storage_mmap);
+  CUTEST_ASSERT("Could not create mmap-backed schunk", schunk_write_mmap != NULL);
 
   cbytes = blosc2_schunk_append_buffer(schunk_write_mmap, data_buffer, sizeof(data_buffer));
   CUTEST_ASSERT("Could not write first chunk", cbytes > 0);
