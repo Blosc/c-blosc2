@@ -113,6 +113,14 @@ int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_
     return 0;
   }
 
+#if !defined(_WIN32)
+  /* POSIX fseek takes long; reject offsets that would silently truncate (e.g. on 32-bit). */
+  if (position > (int64_t)LONG_MAX) {
+    BLOSC_TRACE_ERROR("stdio write position %" PRId64 " exceeds LONG_MAX for fseek.", position);
+    return 0;
+  }
+#endif
+
   int rc = fseek(my_fp->file, position, SEEK_SET);
   if (rc != 0) {
     BLOSC_TRACE_ERROR("fseek failed at position %" PRId64 " (error: %s).", position, strerror(errno));
@@ -137,19 +145,24 @@ int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t posi
   int64_t n_bytes_i64;
   if (!checked_mul_int64_nonneg(size, nitems, &n_bytes_i64)) {
     BLOSC_TRACE_ERROR("stdio read size overflow (size=%" PRId64 ", nitems=%" PRId64 ").", size, nitems);
-    *ptr = NULL;
     return 0;
   }
   if ((uint64_t)n_bytes_i64 > SIZE_MAX) {
     BLOSC_TRACE_ERROR("stdio read size does not fit in size_t (%" PRId64 ").", n_bytes_i64);
-    *ptr = NULL;
     return 0;
   }
+
+#if !defined(_WIN32)
+  /* POSIX fseek takes long; reject offsets that would silently truncate (e.g. on 32-bit). */
+  if (position > (int64_t)LONG_MAX) {
+    BLOSC_TRACE_ERROR("stdio read position %" PRId64 " exceeds LONG_MAX for fseek.", position);
+    return 0;
+  }
+#endif
 
   int rc = fseek(my_fp->file, position, SEEK_SET);
   if (rc != 0) {
     BLOSC_TRACE_ERROR("fseek failed at position %" PRId64 " (error: %s).", position, strerror(errno));
-    *ptr = NULL;
     return 0;
   }
 
