@@ -33,6 +33,22 @@ CUTEST_TEST_SETUP(stdio_validation) {
 CUTEST_TEST_TEST(stdio_validation) {
   BLOSC_UNUSED_PARAM(data);
 
+  /* Open/close hardening: invalid arguments must be rejected safely. */
+  CUTEST_ASSERT("stdio open must reject NULL path",
+                blosc2_stdio_open(NULL, "rb", NULL) == NULL);
+  CUTEST_ASSERT("stdio open must reject NULL mode",
+                blosc2_stdio_open("test_stdio_validation.tmp", NULL, NULL) == NULL);
+  CUTEST_ASSERT("stdio close must reject NULL stream", blosc2_stdio_close(NULL) == -1);
+
+  /* Size/truncate hardening: invalid stream/state must be rejected safely. */
+  CUTEST_ASSERT("stdio size must reject NULL stream", blosc2_stdio_size(NULL) == -1);
+  CUTEST_ASSERT("stdio truncate must reject NULL stream", blosc2_stdio_truncate(NULL, 0) == -1);
+  CUTEST_ASSERT("stdio truncate must reject negative size", blosc2_stdio_truncate(NULL, -1) == -1);
+
+  blosc2_stdio_file invalid_fp = { NULL };
+  CUTEST_ASSERT("stdio size must reject NULL FILE*", blosc2_stdio_size(&invalid_fp) == -1);
+  CUTEST_ASSERT("stdio truncate must reject NULL FILE*", blosc2_stdio_truncate(&invalid_fp, 0) == -1);
+
   blosc2_stdio_file fp;
   fp.file = tmpfile();
   CUTEST_ASSERT("tmpfile() must succeed", fp.file != NULL);
@@ -50,6 +66,14 @@ CUTEST_TEST_TEST(stdio_validation) {
                 memcmp(dst_buf, src_ok, 8) == 0);
   CUTEST_ASSERT("valid stdio read must not change *ptr",
                 read_ptr == (void*)dst_buf);
+
+  /* size() should not alter stream position. */
+  int seek_rc = fseek(fp.file, 3, SEEK_SET);
+  CUTEST_ASSERT("fseek for size-position test should succeed", seek_rc == 0);
+  int64_t size_before = blosc2_stdio_size(&fp);
+  CUTEST_ASSERT("stdio size should return current file size", size_before == 8);
+  int64_t pos_after = ftell(fp.file);
+  CUTEST_ASSERT("stdio size must preserve current file position", pos_after == 3);
 
   /* Write: reject NULL stream and NULL underlying FILE*. */
   nw = blosc2_stdio_write(src_ok, 1, 1, 0, NULL);
@@ -135,6 +159,23 @@ CUTEST_TEST_TEST(stdio_validation) {
   CUTEST_ASSERT("stdio write must reject position > LONG_MAX on POSIX",
                 nw == 0);
 #endif
+
+  /* mmap API hardening: reject invalid argument/state transitions safely. */
+  blosc2_stdio_mmap mmap_null_path = BLOSC2_STDIO_MMAP_DEFAULTS;
+  CUTEST_ASSERT("mmap open must reject NULL path",
+                blosc2_stdio_mmap_open(NULL, "rb", &mmap_null_path) == NULL);
+  CUTEST_ASSERT("mmap open must reject NULL params",
+                blosc2_stdio_mmap_open("test_stdio_validation.mmap", "rb", NULL) == NULL);
+
+  blosc2_stdio_mmap mmap_params = BLOSC2_STDIO_MMAP_DEFAULTS;
+  mmap_params.mode = NULL;
+  CUTEST_ASSERT("mmap open must reject NULL mmap mode",
+                blosc2_stdio_mmap_open("test_stdio_validation.mmap", "rb", &mmap_params) == NULL);
+  CUTEST_ASSERT("mmap destroy must reject NULL params", blosc2_stdio_mmap_destroy(NULL) == -1);
+
+  blosc2_stdio_mmap invalid_mmap = BLOSC2_STDIO_MMAP_DEFAULTS;
+  CUTEST_ASSERT("mmap destroy must reject invalid uninitialized mapping state",
+                blosc2_stdio_mmap_destroy(&invalid_mmap) == -1);
 
   fclose(fp.file);
   return 0;
