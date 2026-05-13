@@ -98,7 +98,6 @@ int blosc2_stdio_close(void *stream) {
   blosc2_stdio_file *my_fp = (blosc2_stdio_file *) stream;
   if (my_fp->file == NULL) {
     BLOSC_TRACE_ERROR("Invalid stream for stdio close.");
-    free(my_fp);
     return -1;
   }
   int err = fclose(my_fp->file);

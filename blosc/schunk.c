@@ -194,6 +194,10 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
     // We want a sparse (directory) frame as storage
     blosc2_frame_s* frame = frame_new(urlpath);
     free(urlpath);
+    if (frame == NULL) {
+      BLOSC_TRACE_ERROR("Error creating sparse frame.");
+      return NULL;
+    }
     frame->sframe = true;
     // Initialize frame (basically, encode the header)
     frame->schunk = schunk;
@@ -213,6 +217,10 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
       }
     }
     blosc2_frame_s* frame = frame_new(storage->urlpath);
+    if (frame == NULL) {
+      BLOSC_TRACE_ERROR("Error creating contiguous frame.");
+      return NULL;
+    }
     frame->sframe = false;
     // Initialize frame (basically, encode the header)
     frame->schunk = schunk;
