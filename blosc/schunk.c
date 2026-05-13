@@ -1595,7 +1595,7 @@ int blosc2_schunk_reorder_offsets(blosc2_schunk *schunk, int64_t *offsets_order)
   for (int i = 0; i < schunk->nchunks; ++i) {
     int64_t index = offsets_order[i];
     if (index < 0 || index >= schunk->nchunks) {
-      BLOSC_TRACE_ERROR("Index is bigger than the number of chunks or negative.");
+      BLOSC_TRACE_ERROR("Index is out of range (negative or >= number of chunks).");
       free(index_check);
       return BLOSC2_ERROR_DATA;
     }
