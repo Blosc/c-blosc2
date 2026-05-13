@@ -125,11 +125,13 @@ int64_t blosc2_stdio_size(void *stream) {
 
   if (fseek(my_fp->file, 0, SEEK_END) != 0) {
     BLOSC_TRACE_ERROR("fseek to file end failed while getting size (error: %s).", strerror(errno));
+    fseek(my_fp->file, current, SEEK_SET);
     return -1;
   }
   int64_t size = ftell(my_fp->file);
   if (size < 0) {
     BLOSC_TRACE_ERROR("ftell failed while getting file size (error: %s).", strerror(errno));
+    fseek(my_fp->file, current, SEEK_SET);
     return -1;
   }
 

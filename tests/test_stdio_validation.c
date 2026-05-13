@@ -43,7 +43,8 @@ CUTEST_TEST_TEST(stdio_validation) {
   /* Size/truncate hardening: invalid stream/state must be rejected safely. */
   CUTEST_ASSERT("stdio size must reject NULL stream", blosc2_stdio_size(NULL) == -1);
   CUTEST_ASSERT("stdio truncate must reject NULL stream", blosc2_stdio_truncate(NULL, 0) == -1);
-  CUTEST_ASSERT("stdio truncate must reject negative size", blosc2_stdio_truncate(NULL, -1) == -1);
+  blosc2_stdio_file invalid_fp_neg = { NULL };
+  CUTEST_ASSERT("stdio truncate must reject negative size", blosc2_stdio_truncate(&invalid_fp_neg, -1) == -1);
 
   blosc2_stdio_file invalid_fp = { NULL };
   CUTEST_ASSERT("stdio size must reject NULL FILE*", blosc2_stdio_size(&invalid_fp) == -1);

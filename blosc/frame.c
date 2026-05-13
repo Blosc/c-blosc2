@@ -981,6 +981,7 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     }
     if (fp == NULL) {
       BLOSC_TRACE_ERROR("Error opening file in: %s", urlpath);
+      free(urlpath_cpy);
       return NULL;
     }
 
