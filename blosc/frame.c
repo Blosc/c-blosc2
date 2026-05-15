@@ -1632,6 +1632,9 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
       return BLOSC2_ERROR_READ_BUFFER;
     }
     char* ns = malloc((size_t)nslen + 1);
+    if (ns == NULL) {
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
     memcpy(ns, idxp, nslen);
     ns[nslen] = '\0';
     idxp += nslen;
@@ -1800,7 +1803,13 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
   }
   idxp += 1;
 
-  int16_t nmetalayers;
+  // The on-wire encoding is unsigned (uint16 follows the msgpack `0xde`
+  // map16 marker), but `schunk->nvlmetalayers` is int16_t. Decoding into a
+  // signed local would let raw bytes like 0xff 0xff slip past the
+  // `> BLOSC2_MAX_VLMETALAYERS` ceiling as a negative count, after which
+  // a later `blosc2_vlmeta_add` would write through `vlmetalayers[-1]`
+  // and corrupt adjacent schunk fields. Decode unsigned, then narrow.
+  uint16_t nmetalayers;
   trailer_pos += sizeof(nmetalayers);
   if (trailer_len < trailer_pos) {
     return BLOSC2_ERROR_READ_BUFFER;
@@ -1810,7 +1819,7 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
   if (nmetalayers > BLOSC2_MAX_VLMETALAYERS) {
     return BLOSC2_ERROR_DATA;
   }
-  schunk->nvlmetalayers = nmetalayers;
+  schunk->nvlmetalayers = (int16_t)nmetalayers;
 
   // Populate the metalayers and its serialized values
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
@@ -1832,6 +1841,9 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
       return BLOSC2_ERROR_READ_BUFFER;
     }
     char* ns = malloc((size_t)nslen + 1);
+    if (ns == NULL) {
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
     memcpy(ns, idxp, nslen);
     ns[nslen] = '\0';
     idxp += nslen;
