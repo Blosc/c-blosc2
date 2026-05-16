@@ -1622,6 +1622,9 @@ static int get_meta_from_header(blosc2_frame_s* frame, blosc2_schunk* schunk, ui
       return BLOSC2_ERROR_DATA;
     }
     blosc2_metalayer* metalayer = calloc(1, sizeof(blosc2_metalayer));
+    if (metalayer == NULL) {
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
     schunk->metalayers[nmetalayer] = metalayer;
 
     // Populate the metalayer string
@@ -1831,6 +1834,9 @@ static int get_vlmeta_from_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk,
       return BLOSC2_ERROR_DATA;
     }
     blosc2_metalayer* metalayer = calloc(1, sizeof(blosc2_metalayer));
+    if (metalayer == NULL) {
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
     schunk->vlmetalayers[nmetalayer] = metalayer;
 
     // Populate the metalayer string
