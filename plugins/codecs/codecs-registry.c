@@ -89,4 +89,24 @@ void register_codecs(void) {
   // openzl.free = NULL;
   openzl.compname = "openzl";
   register_codec_private(&openzl);
+
+  blosc2_codec j2k;
+  j2k.compcode = BLOSC_CODEC_J2K;
+  j2k.version = 1;
+  j2k.complib = BLOSC_CODEC_J2K;
+  j2k.encoder = NULL;
+  j2k.decoder = NULL;
+  // j2k.free = NULL;
+  j2k.compname = "j2k";
+  register_codec_private(&j2k);
+
+  blosc2_codec htj2k;
+  htj2k.compcode = BLOSC_CODEC_HTJ2K;
+  htj2k.version = 1;
+  htj2k.complib = BLOSC_CODEC_HTJ2K;
+  htj2k.encoder = NULL;
+  htj2k.decoder = NULL;
+  // htj2k.free = NULL;
+  htj2k.compname = "htj2k";
+  register_codec_private(&htj2k);
 }
