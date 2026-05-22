@@ -11,6 +11,7 @@
 #include "frame.h"
 #include "stune.h"
 #include "blosc-private.h"
+#include "context.h"
 #include "blosc2/tuners-registry.h"
 #include "blosc2.h"
 
@@ -24,6 +25,7 @@
 #include <sys/stat.h>
 
 #include <inttypes.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -1496,6 +1498,363 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
   }
 
   return BLOSC2_ERROR_SUCCESS;
+}
+
+
+typedef struct {
+  int64_t coord;
+  int64_t out_index;
+} sparse_coord_entry;
+
+typedef struct {
+  int64_t nchunk;
+  uint8_t *chunk;
+  int cbytes;
+  bool needs_free;
+} sparse_chunk_entry;
+
+typedef struct {
+  int64_t first;
+  int64_t count;
+  int64_t chunk_index;
+  int32_t nblock;
+} sparse_block_task;
+
+typedef struct {
+  const sparse_coord_entry *entries;
+  const sparse_block_task *tasks;
+  const sparse_chunk_entry *chunks;
+  int64_t ntasks;
+  uint8_t *buffer;
+  int32_t typesize;
+  int32_t blocksize;
+  int64_t chunk_nitems;
+  int64_t next_task;
+  int error;
+  blosc2_pthread_mutex_t mutex;
+} sparse_work;
+
+typedef struct {
+  sparse_work *work;
+  blosc2_context *dctx;
+  uint8_t *block;
+} sparse_worker;
+
+static int sparse_coord_entry_cmp(const void *a, const void *b) {
+  const sparse_coord_entry *ea = (const sparse_coord_entry *)a;
+  const sparse_coord_entry *eb = (const sparse_coord_entry *)b;
+  if (ea->coord < eb->coord) return -1;
+  if (ea->coord > eb->coord) return 1;
+  if (ea->out_index < eb->out_index) return -1;
+  if (ea->out_index > eb->out_index) return 1;
+  return 0;
+}
+
+static void sparse_work_set_error(sparse_work *work, int error) {
+  blosc2_pthread_mutex_lock(&work->mutex);
+  if (work->error == 0) {
+    work->error = error;
+  }
+  blosc2_pthread_mutex_unlock(&work->mutex);
+}
+
+static void sparse_worker_func(void *arg) {
+  sparse_worker *worker = (sparse_worker *)arg;
+  sparse_work *work = worker->work;
+
+  while (true) {
+    blosc2_pthread_mutex_lock(&work->mutex);
+    if (work->error < 0 || work->next_task >= work->ntasks) {
+      blosc2_pthread_mutex_unlock(&work->mutex);
+      break;
+    }
+    int64_t task_index = work->next_task++;
+    blosc2_pthread_mutex_unlock(&work->mutex);
+
+    const sparse_block_task *task = &work->tasks[task_index];
+    const sparse_chunk_entry *chunk_entry = &work->chunks[task->chunk_index];
+    int nbytes = blosc2_decompress_block_ctx(worker->dctx, chunk_entry->chunk, chunk_entry->cbytes,
+                                             task->nblock, worker->block, work->blocksize);
+    if (nbytes < 0) {
+      sparse_work_set_error(work, nbytes);
+      break;
+    }
+
+    for (int64_t i = task->first; i < task->first + task->count; ++i) {
+      const sparse_coord_entry *entry = &work->entries[i];
+      int64_t item_in_chunk = entry->coord % work->chunk_nitems;
+      int64_t byte_in_chunk = item_in_chunk * work->typesize;
+      int32_t block_offset = (int32_t)(byte_in_chunk % work->blocksize);
+      if (block_offset < 0 || block_offset > nbytes - work->typesize) {
+        sparse_work_set_error(work, BLOSC2_ERROR_DATA);
+        return;
+      }
+      memcpy(work->buffer + entry->out_index * work->typesize,
+             worker->block + block_offset,
+             (size_t)work->typesize);
+    }
+  }
+
+  return;
+}
+
+static int schunk_get_sparse_getitem(blosc2_schunk *schunk, int64_t ncoords, const int64_t* coords, void *buffer) {
+  int64_t nitems = schunk->nbytes / schunk->typesize;
+  int64_t chunk_nitems = schunk->chunksize / schunk->typesize;
+  uint8_t *dst_ptr = (uint8_t *)buffer;
+
+  for (int64_t i = 0; i < ncoords; ++i) {
+    int64_t coord = coords[i];
+    if (coord < 0 || coord >= nitems) {
+      BLOSC_TRACE_ERROR("Coordinate out of bounds.");
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+
+    int64_t nchunk = coord / chunk_nitems;
+    int start = (int)(coord % chunk_nitems);
+    uint8_t *chunk = NULL;
+    bool needs_free = false;
+    int cbytes = blosc2_schunk_get_lazychunk(schunk, nchunk, &chunk, &needs_free);
+    if (cbytes <= 0) {
+      BLOSC_TRACE_ERROR("Cannot get lazychunk ('%" PRId64 "').", nchunk);
+      return BLOSC2_ERROR_FAILURE;
+    }
+
+    int nbytes = blosc2_getitem_ctx(schunk->dctx, chunk, cbytes, start, 1, dst_ptr, schunk->typesize);
+    if (needs_free) {
+      free(chunk);
+    }
+    if (nbytes != schunk->typesize) {
+      BLOSC_TRACE_ERROR("Cannot get item from ('%" PRId64 "') chunk.", nchunk);
+      return BLOSC2_ERROR_FAILURE;
+    }
+    dst_ptr += schunk->typesize;
+  }
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+int blosc2_schunk_get_sparse(blosc2_schunk *schunk, int64_t ncoords, const int64_t* coords, void *buffer) {
+  if (schunk == NULL) {
+    BLOSC_TRACE_ERROR("schunk must not be NULL.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (ncoords < 0) {
+    BLOSC_TRACE_ERROR("ncoords must be non-negative.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (ncoords == 0) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  if (coords == NULL || buffer == NULL) {
+    BLOSC_TRACE_ERROR("coords and buffer must not be NULL when ncoords > 0.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (schunk->typesize <= 0) {
+    BLOSC_TRACE_ERROR("schunk must have a positive typesize.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (schunk->chunksize <= 0) {
+    BLOSC_TRACE_ERROR("blosc2_schunk_get_sparse does not support variable-length chunks yet.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (schunk->blocksize <= 0 || (schunk->flags2 & BLOSC2_VL_BLOCKS)) {
+    BLOSC_TRACE_ERROR("blosc2_schunk_get_sparse does not support variable-length blocks yet.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if ((schunk->chunksize % schunk->typesize) != 0 || (schunk->blocksize % schunk->typesize) != 0) {
+    BLOSC_TRACE_ERROR("chunksize and blocksize must be multiples of typesize.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+    if (schunk->filters[i] == BLOSC_DELTA) {
+      return schunk_get_sparse_getitem(schunk, ncoords, coords, buffer);
+    }
+  }
+  if (schunk->dctx != NULL && schunk->dctx->postfilter != NULL) {
+    return schunk_get_sparse_getitem(schunk, ncoords, coords, buffer);
+  }
+  if (ncoords <= 1) {
+    return schunk_get_sparse_getitem(schunk, ncoords, coords, buffer);
+  }
+
+  int rc = BLOSC2_ERROR_SUCCESS;
+  int64_t nitems = schunk->nbytes / schunk->typesize;
+  int64_t chunk_nitems = schunk->chunksize / schunk->typesize;
+  sparse_coord_entry *entries = NULL;
+  sparse_block_task *tasks = NULL;
+  sparse_chunk_entry *chunks = NULL;
+  sparse_worker *workers = NULL;
+  int16_t nthreads = 1;
+  int64_t ntasks = 0;
+  int64_t nchunks = 0;
+  sparse_work work;
+  memset(&work, 0, sizeof(work));
+
+  if (chunk_nitems <= 0 || chunk_nitems > INT32_MAX) {
+    BLOSC_TRACE_ERROR("Invalid chunk item count.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  entries = calloc((size_t)ncoords, sizeof(sparse_coord_entry));
+  if (entries == NULL) {
+    rc = BLOSC2_ERROR_MEMORY_ALLOC;
+    goto cleanup;
+  }
+
+  for (int64_t i = 0; i < ncoords; ++i) {
+    int64_t coord = coords[i];
+    if (coord < 0 || coord >= nitems) {
+      BLOSC_TRACE_ERROR("Coordinate out of bounds.");
+      rc = BLOSC2_ERROR_INVALID_PARAM;
+      goto cleanup;
+    }
+    entries[i].coord = coord;
+    entries[i].out_index = i;
+  }
+
+  qsort(entries, (size_t)ncoords, sizeof(sparse_coord_entry), sparse_coord_entry_cmp);
+
+  /* First pass over sorted entries: count touched chunks and selected block tasks. */
+  for (int64_t i = 0; i < ncoords;) {
+    int64_t nchunk = entries[i].coord / chunk_nitems;
+    ++nchunks;
+    while (i < ncoords && entries[i].coord / chunk_nitems == nchunk) {
+      int64_t item_in_chunk = entries[i].coord % chunk_nitems;
+      int64_t byte_in_chunk = item_in_chunk * schunk->typesize;
+      int32_t nblock = (int32_t)(byte_in_chunk / schunk->blocksize);
+      while (i < ncoords &&
+             entries[i].coord / chunk_nitems == nchunk &&
+             (int32_t)(((entries[i].coord % chunk_nitems) * schunk->typesize) / schunk->blocksize) == nblock) {
+        ++i;
+      }
+      ++ntasks;
+    }
+  }
+
+  tasks = calloc((size_t)ntasks, sizeof(sparse_block_task));
+  chunks = calloc((size_t)nchunks, sizeof(sparse_chunk_entry));
+  if (tasks == NULL || chunks == NULL) {
+    rc = BLOSC2_ERROR_MEMORY_ALLOC;
+    goto cleanup;
+  }
+
+  /* Second pass: fetch touched chunks and build one task per selected block. */
+  int64_t chunk_index = 0;
+  int64_t task_index = 0;
+  for (int64_t i = 0; i < ncoords;) {
+    int64_t nchunk = entries[i].coord / chunk_nitems;
+    uint8_t *chunk = NULL;
+    bool needs_free = false;
+    int cbytes = blosc2_schunk_get_lazychunk(schunk, nchunk, &chunk, &needs_free);
+    if (cbytes <= 0) {
+      BLOSC_TRACE_ERROR("Cannot get lazychunk ('%" PRId64 "').", nchunk);
+      rc = BLOSC2_ERROR_FAILURE;
+      goto cleanup;
+    }
+    chunks[chunk_index].nchunk = nchunk;
+    chunks[chunk_index].chunk = chunk;
+    chunks[chunk_index].cbytes = cbytes;
+    chunks[chunk_index].needs_free = needs_free;
+
+    while (i < ncoords && entries[i].coord / chunk_nitems == nchunk) {
+      int64_t item_in_chunk = entries[i].coord % chunk_nitems;
+      int64_t byte_in_chunk = item_in_chunk * schunk->typesize;
+      int32_t nblock = (int32_t)(byte_in_chunk / schunk->blocksize);
+      int64_t first = i;
+      while (i < ncoords &&
+             entries[i].coord / chunk_nitems == nchunk &&
+             (int32_t)(((entries[i].coord % chunk_nitems) * schunk->typesize) / schunk->blocksize) == nblock) {
+        ++i;
+      }
+      tasks[task_index].first = first;
+      tasks[task_index].count = i - first;
+      tasks[task_index].chunk_index = chunk_index;
+      tasks[task_index].nblock = nblock;
+      ++task_index;
+    }
+    ++chunk_index;
+  }
+
+  nthreads = schunk->dctx != NULL ? schunk->dctx->nthreads : blosc2_get_nthreads();
+  if (nthreads < 1) {
+    nthreads = 1;
+  }
+  if ((int64_t)nthreads > ntasks) {
+    nthreads = (int16_t)ntasks;
+  }
+
+  workers = calloc((size_t)nthreads, sizeof(sparse_worker));
+  if (workers == NULL) {
+    rc = BLOSC2_ERROR_MEMORY_ALLOC;
+    goto cleanup;
+  }
+
+  work.entries = entries;
+  work.tasks = tasks;
+  work.chunks = chunks;
+  work.ntasks = ntasks;
+  work.buffer = (uint8_t *)buffer;
+  work.typesize = schunk->typesize;
+  work.blocksize = schunk->blocksize;
+  work.chunk_nitems = chunk_nitems;
+  work.next_task = 0;
+  work.error = 0;
+  blosc2_pthread_mutex_init(&work.mutex, NULL);
+
+  for (int16_t i = 0; i < nthreads; ++i) {
+    blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+    dparams.nthreads = 1;
+    dparams.schunk = schunk;
+    workers[i].work = &work;
+    workers[i].dctx = blosc2_create_dctx(dparams);
+    workers[i].block = malloc((size_t)schunk->blocksize);
+    if (workers[i].dctx == NULL || workers[i].block == NULL) {
+      rc = BLOSC2_ERROR_MEMORY_ALLOC;
+      goto cleanup_work_mutex;
+    }
+  }
+
+  if (nthreads == 1) {
+    sparse_worker_func(&workers[0]);
+  }
+  else {
+    int err = blosc2_run_parallel(nthreads, sparse_worker_func, sizeof(sparse_worker), workers);
+    if (err < 0) {
+      sparse_work_set_error(&work, err);
+    }
+  }
+
+  if (work.error < 0) {
+    rc = work.error;
+  }
+
+cleanup_work_mutex:
+  blosc2_pthread_mutex_destroy(&work.mutex);
+cleanup:
+  if (workers != NULL) {
+    int16_t nworkers = nthreads > 0 ? nthreads : 1;
+    for (int16_t i = 0; i < nworkers; ++i) {
+      if (workers[i].dctx != NULL) {
+        blosc2_free_ctx(workers[i].dctx);
+      }
+      free(workers[i].block);
+    }
+  }
+  if (chunks != NULL) {
+    for (int64_t i = 0; i < nchunks; ++i) {
+      if (chunks[i].needs_free) {
+        free(chunks[i].chunk);
+      }
+    }
+  }
+  free(workers);
+  free(chunks);
+  free(tasks);
+  free(entries);
+
+  return rc;
 }
 
 

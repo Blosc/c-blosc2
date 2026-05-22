@@ -2159,6 +2159,21 @@ BLOSC_EXPORT int blosc2_schunk_get_vlblock(blosc2_schunk *schunk, int64_t nchunk
 BLOSC_EXPORT int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer);
 
 /**
+ * @brief Fill buffer with elements from coords in schunk.
+ *
+ * @param schunk The super-chunk from where to extract elements.
+ * @param ncoords The number of coordinates.
+ * @param coords The coordinates of the elements to be extracted.
+ * @param buffer The buffer where the data will be stored.
+ *
+ * @warning You must make sure that you have enough space in buffer to store the
+ * uncompressed data.
+ *
+ * @return An error code.
+ */
+BLOSC_EXPORT int blosc2_schunk_get_sparse(blosc2_schunk *schunk, int64_t ncoords, const int64_t* coords, void *buffer);
+
+/**
  * @brief Update a schunk slice from buffer.
  *
  * @param schunk The super-chunk where to set the slice.
