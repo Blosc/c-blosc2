@@ -184,6 +184,60 @@ void blosc2_set_threads_callback(blosc_threads_callback callback, void *callback
   threads_callback_data = callback_data;
 }
 
+typedef struct {
+  void (*dojob)(void *);
+  void *jobdata;
+} blosc2_parallel_job_data;
+
+static void *blosc2_parallel_pthread_entry(void *arg) {
+  blosc2_parallel_job_data *job = (blosc2_parallel_job_data *)arg;
+  job->dojob(job->jobdata);
+  return NULL;
+}
+
+int blosc2_run_parallel(int16_t nthreads, void (*dojob)(void *),
+                        size_t jobdata_elsize, void *jobdata) {
+  if (nthreads <= 0 || dojob == NULL || jobdata == NULL || jobdata_elsize == 0) {
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  if (nthreads == 1) {
+    dojob(jobdata);
+    return BLOSC2_ERROR_SUCCESS;
+  }
+
+  if (threads_callback != NULL) {
+    threads_callback(threads_callback_data, dojob, nthreads, jobdata_elsize, jobdata);
+    return BLOSC2_ERROR_SUCCESS;
+  }
+
+  blosc2_pthread_t *threads = malloc((size_t)nthreads * sizeof(blosc2_pthread_t));
+  blosc2_parallel_job_data *jobs = malloc((size_t)nthreads * sizeof(blosc2_parallel_job_data));
+  if (threads == NULL || jobs == NULL) {
+    free(threads);
+    free(jobs);
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+
+  int16_t started = 0;
+  for (int16_t i = 0; i < nthreads; ++i) {
+    jobs[i].dojob = dojob;
+    jobs[i].jobdata = (uint8_t *)jobdata + (size_t)i * jobdata_elsize;
+    int err = blosc2_pthread_create(&threads[i], NULL, blosc2_parallel_pthread_entry, &jobs[i]);
+    if (err != 0) {
+      break;
+    }
+    ++started;
+  }
+  for (int16_t i = 0; i < started; ++i) {
+    blosc2_pthread_join(threads[i], NULL);
+  }
+  free(threads);
+  free(jobs);
+
+  return started == nthreads ? BLOSC2_ERROR_SUCCESS : BLOSC2_ERROR_THREAD_CREATE;
+}
+
 
 /* A function for aligned malloc that is portable */
 static uint8_t* my_malloc(size_t size) {
@@ -4465,6 +4519,115 @@ int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize
   result = _blosc_getitem(context, &header, src, srcsize, start, nitems, dest, destsize);
 
   return result;
+}
+
+int blosc2_decompress_block_ctx(blosc2_context* context, const void* src,
+                                int32_t srcsize, int32_t nblock, void* dest,
+                                int32_t destsize) {
+  blosc_header header;
+  int result = read_chunk_header((uint8_t *)src, srcsize, true, &header);
+  if (result < 0) {
+    return result;
+  }
+  if (header.blosc2_flags2 & BLOSC2_VL_BLOCKS) {
+    BLOSC_TRACE_ERROR("block decompression is not supported for VL-block chunks.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  context->do_compress = 0;
+  context->src = src;
+  context->srcsize = srcsize;
+  context->dest = dest;
+  context->destsize = destsize;
+  context->output_bytes = 0;
+  context->vlblock_sources = NULL;
+  context->vlblock_dests = NULL;
+  if (context->blocknbytes != NULL) {
+    free(context->blocknbytes);
+    context->blocknbytes = NULL;
+  }
+  if (context->blockoffsets != NULL) {
+    free(context->blockoffsets);
+    context->blockoffsets = NULL;
+  }
+  if (context->blockcbytes != NULL) {
+    free(context->blockcbytes);
+    context->blockcbytes = NULL;
+  }
+
+  result = blosc2_initialize_context_from_header(context, &header);
+  if (result < 0) {
+    return result;
+  }
+  clear_context_decompression_dict(context);
+
+  context->special_type = (header.blosc2_flags >> 4) & BLOSC2_SPECIAL_MASK;
+  if (context->special_type > BLOSC2_SPECIAL_LASTID) {
+    BLOSC_TRACE_ERROR("Unknown special values ID (%d) ", context->special_type);
+    return BLOSC2_ERROR_DATA;
+  }
+  if (nblock < 0 || nblock >= context->nblocks) {
+    BLOSC_TRACE_ERROR("`nblock` out of bounds.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  bool memcpyed = (header.flags & (uint8_t)BLOSC_MEMCPYED) != 0;
+  if (context->special_type) {
+    memcpyed = true;
+  }
+  if (!context->special_type && !memcpyed) {
+    size_t bstarts_nbytes;
+    size_t bstarts_end;
+    if (context->nblocks < 0 ||
+        !checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &bstarts_nbytes) ||
+        !checked_add_size((size_t)context->header_overhead, bstarts_nbytes, &bstarts_end) ||
+        bstarts_end > (size_t)srcsize) {
+      BLOSC_TRACE_ERROR("`bstarts` out of bounds.");
+      return BLOSC2_ERROR_READ_BUFFER;
+    }
+  }
+
+  int32_t bsize = context->blocksize;
+  int32_t leftoverblock = 0;
+  if ((nblock == context->nblocks - 1) && (context->leftover > 0)) {
+    bsize = context->leftover;
+    leftoverblock = 1;
+  }
+  if (destsize < bsize) {
+    BLOSC_TRACE_ERROR("Destination is too small for block.");
+    return BLOSC2_ERROR_WRITE_BUFFER;
+  }
+
+  if (context->serial_context == NULL) {
+    context->serial_context = create_thread_context(context, 0);
+  }
+  BLOSC_ERROR_NULL(context->serial_context, BLOSC2_ERROR_THREAD_CREATE);
+  context->serial_context->parent_context = context;
+
+  int32_t ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
+  if (context->blocksize > context->serial_context->tmp_blocksize) {
+    my_free(context->serial_context->tmp);
+    context->serial_context->tmp_nbytes = (size_t)4 * ebsize;
+    context->serial_context->tmp = my_malloc(context->serial_context->tmp_nbytes);
+    BLOSC_ERROR_NULL(context->serial_context->tmp, BLOSC2_ERROR_MEMORY_ALLOC);
+    context->serial_context->tmp2 = context->serial_context->tmp + ebsize;
+    context->serial_context->tmp3 = context->serial_context->tmp2 + ebsize;
+    context->serial_context->tmp4 = context->serial_context->tmp3 + ebsize;
+    context->serial_context->tmp_blocksize = context->blocksize;
+  }
+
+  int32_t* bstarts = (int32_t*)((uint8_t*)src + context->header_overhead);
+  int32_t src_offset = memcpyed ?
+      context->header_overhead + nblock * context->blocksize : sw32_(bstarts + nblock);
+  int nbytes = blosc_d(context->serial_context, bsize, leftoverblock, memcpyed,
+                       src, srcsize, src_offset, nblock,
+                       (uint8_t*)dest, 0,
+                       context->serial_context->tmp,
+                       context->serial_context->tmp3);
+  if (nbytes < 0) {
+    return nbytes;
+  }
+  return bsize;
 }
 
 /* execute single compression/decompression job for a single thread_context */
