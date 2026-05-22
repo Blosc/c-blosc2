@@ -336,6 +336,48 @@ BLOSC_EXPORT int b2nd_from_cbuffer(b2nd_context_t *ctx, b2nd_array_t **array, co
 BLOSC_EXPORT int b2nd_to_cbuffer(const b2nd_array_t *array, void *buffer, int64_t buffersize);
 
 /**
+ * @brief Gather items from a b2nd array by flat logical coordinates.
+ *
+ * Coordinates are expressed in the logical, C-order flattened b2nd array domain
+ * (that is, in the range ``[0, array->nitems)``), not in the padded SChunk
+ * storage domain.  The function translates logical coordinates to the padded
+ * storage coordinates used internally by b2nd and then gathers the requested
+ * items into ``buffer`` in the same order as ``coords``.  Repeated and unsorted
+ * coordinates are allowed.
+ *
+ * This is a low-level sparse gather primitive.  It is most useful for 1-D fancy
+ * indexing and as a building block for higher-level ``take`` operations.
+ *
+ * @param array The source b2nd array.
+ * @param ncoords Number of coordinates to gather.  May be zero.
+ * @param coords Flat logical coordinates.  Must not be NULL when ``ncoords > 0``.
+ * @param buffer Destination buffer.  Must have room for at least
+ *               ``ncoords * array->sc->typesize`` bytes and must not be NULL
+ *               when ``ncoords > 0``.
+ * @param buffersize Destination buffer size in bytes.
+ *
+ * @return A non-negative value on success, a negative error code otherwise.
+ */
+BLOSC_EXPORT int b2nd_get_sparse_cbuffer(const b2nd_array_t *array, int64_t ncoords,
+                                         const int64_t *coords, void *buffer, int64_t buffersize);
+
+/**
+ * @brief Gather items from a b2nd array by flat logical coordinates.
+ *
+ * Convenience wrapper around #b2nd_get_sparse_cbuffer for callers that already
+ * know ``buffer`` has room for at least ``ncoords * array->sc->typesize`` bytes.
+ *
+ * @param array The source b2nd array.
+ * @param ncoords Number of coordinates to gather.  May be zero.
+ * @param coords Flat logical coordinates.  Must not be NULL when ``ncoords > 0``.
+ * @param buffer Destination buffer.  Must not be NULL when ``ncoords > 0``.
+ *
+ * @return A non-negative value on success, a negative error code otherwise.
+ */
+BLOSC_EXPORT int b2nd_get_sparse(const b2nd_array_t *array, int64_t ncoords,
+                                 const int64_t *coords, void *buffer);
+
+/**
  * @brief Get a slice from an array and store it into a new array.
  *
  * @param ctx The b2nd context for the new array.

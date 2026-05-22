@@ -783,6 +783,86 @@ int b2nd_to_cbuffer(const b2nd_array_t *array, void *buffer,
   return BLOSC2_ERROR_SUCCESS;
 }
 
+int b2nd_get_sparse_cbuffer(const b2nd_array_t *array, int64_t ncoords,
+                            const int64_t *coords, void *buffer, int64_t buffersize) {
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+  if (ncoords < 0) {
+    BLOSC_TRACE_ERROR("ncoords must be non-negative");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+  if (ncoords == 0) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  BLOSC_ERROR_NULL(coords, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
+  if (buffersize < ncoords * array->sc->typesize) {
+    BLOSC_TRACE_ERROR("Buffer is smaller than expected");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+  if (array->ndim == 0) {
+    BLOSC_TRACE_ERROR("Sparse indexing is not supported for 0-dimensional arrays");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+
+  int64_t chunks_in_array[B2ND_MAX_DIM] = {0};
+  int64_t chunks_in_array_strides[B2ND_MAX_DIM] = {0};
+  chunks_in_array_strides[array->ndim - 1] = 1;
+  for (int j = 0; j < array->ndim; ++j) {
+    chunks_in_array[j] = array->chunkshape[j] == 0 ? 0 : array->extshape[j] / array->chunkshape[j];
+  }
+  for (int j = array->ndim - 2; j >= 0; --j) {
+    chunks_in_array_strides[j] = chunks_in_array_strides[j + 1] * chunks_in_array[j + 1];
+  }
+
+  int64_t *storage_coords = malloc((size_t)ncoords * sizeof(int64_t));
+  BLOSC_ERROR_NULL(storage_coords, BLOSC2_ERROR_MEMORY_ALLOC);
+
+  int rc = BLOSC2_ERROR_SUCCESS;
+  for (int64_t i = 0; i < ncoords; ++i) {
+    int64_t coord = coords[i];
+    if (coord < 0 || coord >= array->nitems) {
+      BLOSC_TRACE_ERROR("Coordinate out of bounds");
+      rc = BLOSC2_ERROR_INVALID_PARAM;
+      goto cleanup;
+    }
+
+    int64_t logical_index[B2ND_MAX_DIM] = {0};
+    int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
+    int64_t item_in_chunk[B2ND_MAX_DIM] = {0};
+    int64_t nblock_ndim[B2ND_MAX_DIM] = {0};
+    int64_t item_in_block[B2ND_MAX_DIM] = {0};
+    blosc2_unidim_to_multidim(array->ndim, (int64_t *)array->shape, coord, logical_index);
+    for (int j = 0; j < array->ndim; ++j) {
+      nchunk_ndim[j] = logical_index[j] / array->chunkshape[j];
+      item_in_chunk[j] = logical_index[j] % array->chunkshape[j];
+      nblock_ndim[j] = item_in_chunk[j] / array->blockshape[j];
+      item_in_block[j] = item_in_chunk[j] % array->blockshape[j];
+    }
+
+    int64_t nchunk;
+    blosc2_multidim_to_unidim(nchunk_ndim, array->ndim, chunks_in_array_strides, &nchunk);
+
+    int64_t nblock;
+    blosc2_multidim_to_unidim(nblock_ndim, array->ndim, array->block_chunk_strides, &nblock);
+    int64_t storage_item_in_block;
+    blosc2_multidim_to_unidim(item_in_block, array->ndim, array->item_block_strides, &storage_item_in_block);
+    storage_coords[i] = nchunk * array->extchunknitems + nblock * array->blocknitems + storage_item_in_block;
+  }
+
+  rc = blosc2_schunk_get_sparse(array->sc, ncoords, storage_coords, buffer);
+
+cleanup:
+  free(storage_coords);
+  BLOSC_ERROR(rc);
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+int b2nd_get_sparse(const b2nd_array_t *array, int64_t ncoords,
+                    const int64_t *coords, void *buffer) {
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+  return b2nd_get_sparse_cbuffer(array, ncoords, coords, buffer, ncoords * array->sc->typesize);
+}
+
 int64_t b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, const int64_t *stop, int64_t **chunks_idx) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
