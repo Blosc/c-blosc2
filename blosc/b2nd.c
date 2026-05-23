@@ -317,7 +317,18 @@ int update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
     array->chunk_array_strides[ndim - 1] = 1;
   }
   for (int i = ndim - 2; i >= 0; --i) {
-    if (shape[i + 1] != 0) {
+    // Treat (chunkshape[i+1] == 0) the same as (shape[i+1] == 0):  the
+    // dimension carries no actual chunking and any stride into it is moot.
+    // validate_shape_chunkshape_blockshape allows the chunkshape==0
+    // combination (paired with blockshape==0) as a placeholder for empty
+    // contexts (see example_empty_shape.c).  Without this guard a crafted
+    // b2nd metalayer with shape[i+1]>0 but chunkshape[i+1]==blockshape[i+1]==0
+    // -- accepted by the validator -- reaches the (extchunkshape / blockshape)
+    // division below as 0/0, which is undefined behaviour and aborts the
+    // process with SIGFPE on x86.  Crafted cframes loaded via b2nd_from_schunk
+    // / b2nd_open / b2nd_from_cframe would otherwise crash any consumer.
+    if (shape[i + 1] != 0 && array->chunkshape[i + 1] != 0 &&
+        array->blockshape[i + 1] != 0) {
       array->item_array_strides[i] = array->item_array_strides[i + 1] * array->shape[i + 1];
       array->item_extchunk_strides[i] =
               array->item_extchunk_strides[i + 1] * array->extchunkshape[i + 1];
