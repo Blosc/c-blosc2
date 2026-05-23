@@ -28,10 +28,20 @@
 
   Tightening the validator turned out to break legitimate placeholder
   uses (examples/b2nd/example_empty_shape.c passes chunkshape=0 to
-  b2nd_create_ctx, which is then overridden by b2nd_get_slice), so the
-  fix lives in update_shape's stride loop: when chunkshape[i+1] or
-  blockshape[i+1] is 0 the dimension is degenerate and the strides
-  through it are set to 0 instead of triggering the 0/0 division.
+  b2nd_create_ctx, but the slice it ultimately writes has shape=0 in
+  the matching axis so no divide-by-zero materializes).  The fix is
+  therefore in two places:
+
+    * update_shape's stride loop skips the inner-stride update when
+      chunkshape[i+1] or blockshape[i+1] is 0, so the immediate
+      0/0 division can never fire (defense in depth for any internal
+      caller of update_shape).
+    * b2nd_from_schunk rejects the combination outright on the
+      deserialization path -- many other downstream code paths
+      (b2nd_get_slice, b2nd_set_slice, set/get_orthogonal_selection,
+      squeeze, resize) also divide/mod by chunkshape[i] / blockshape[i]
+      without zero checks, so a parsed-but-degenerate array would still
+      crash on the first real use.
 */
 
 #include "test_common.h"
@@ -103,28 +113,39 @@ CUTEST_TEST_TEST(zero_chunkshape_nonzero_shape) {
 
   B2ND_TEST_ASSERT(blosc2_meta_update(arr->sc, "b2nd", b2nd_meta_bad, b2nd_meta_len));
 
-  // The critical call:  pre-fix this divides by zero and kills the process.
-  // Post-fix it returns cleanly; the resulting array is degenerate (strides
-  // through the chunkshape==0 dimension are 0) but the parser does not crash.
+  // Re-open the mutated container as a separate schunk before parsing it
+  // into a second b2nd_array_t.  b2nd_from_schunk() transfers ownership of
+  // the passed schunk to the returned array, so using arr->sc directly here
+  // would make arr and arr_corrupt share ownership and double-free during
+  // cleanup.
+  uint8_t *cframe = NULL;
+  bool cframe_needs_free = false;
+  int64_t cframe_len = blosc2_schunk_to_buffer(arr->sc, &cframe, &cframe_needs_free);
+  CUTEST_ASSERT("blosc2_schunk_to_buffer should serialize the mutated schunk",
+                cframe_len > 0);
+
+  blosc2_schunk *arr_corrupt_sc = blosc2_schunk_from_buffer(cframe, cframe_len, false);
+  CUTEST_ASSERT("blosc2_schunk_from_buffer should reopen the mutated schunk",
+                arr_corrupt_sc != NULL);
+
+  // The critical call: pre-fix this divides by zero and kills the process.
+  // Post-fix b2nd_from_schunk rejects the crafted metalayer cleanly, leaving
+  // arr_corrupt as NULL and returning a negative error code -- if the patch
+  // is reverted the test runner crashes here and CTest reports the test as
+  // failed via an abnormal exit code rather than a clean assertion failure.
   b2nd_array_t *arr_corrupt = NULL;
-  int rc = b2nd_from_schunk(arr->sc, &arr_corrupt);
-  CUTEST_ASSERT("b2nd_from_schunk must not crash on chunkshape=blockshape=0", rc >= 0);
-  CUTEST_ASSERT("b2nd_from_schunk should produce an array on success", arr_corrupt != NULL);
+  int rc = b2nd_from_schunk(arr_corrupt_sc, &arr_corrupt);
+  CUTEST_ASSERT("b2nd_from_schunk must reject chunkshape=blockshape=0 with shape>0",
+                rc < 0);
+  CUTEST_ASSERT("b2nd_from_schunk must not produce an array on rejection",
+                arr_corrupt == NULL);
 
-  // Sanity-check that the degenerate strides we wrote did not leave the
-  // process in a state that traps on the next basic read of the metadata.
-  CUTEST_ASSERT("parsed ndim should round-trip", arr_corrupt->ndim == 2);
-  CUTEST_ASSERT("parsed chunkshape[1] should reflect the mutation",
-                arr_corrupt->chunkshape[1] == 0);
-  CUTEST_ASSERT("parsed blockshape[1] should reflect the mutation",
-                arr_corrupt->blockshape[1] == 0);
-
-  // The block_chunk_strides slot that would have hit 0/0 in the old code
-  // must now be the zeroed-out degenerate value.
-  CUTEST_ASSERT("degenerate block_chunk_strides[0] should be zero",
-                arr_corrupt->block_chunk_strides[0] == 0);
-
-  b2nd_free(arr_corrupt);
+  // b2nd_from_schunk only takes ownership of the schunk on success, so we
+  // still own arr_corrupt_sc and have to free it ourselves.
+  blosc2_schunk_free(arr_corrupt_sc);
+  if (cframe_needs_free) {
+    free(cframe);
+  }
   free(b2nd_meta_bad);
   free(b2nd_meta);
   B2ND_TEST_ASSERT(b2nd_free(arr));

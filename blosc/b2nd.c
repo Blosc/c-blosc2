@@ -663,6 +663,26 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
                                     &params.dtype_format));
   free(smeta);
 
+  // Reject crafted metalayers that pair shape[i]>0 with chunkshape[i]==0 or
+  // blockshape[i]==0.  validate_shape_chunkshape_blockshape is intentionally
+  // lenient about chunkshape==0/blockshape==0 to support the placeholder
+  // pattern in b2nd_create_ctx (see example_empty_shape.c), where the
+  // companion shape entry is also 0 so no divide-by-zero ever materializes.
+  // Crafted on-wire metadata can violate that pairing, and many code paths
+  // downstream (b2nd_get_slice, b2nd_set_slice, set/get_orthogonal_selection,
+  // squeeze, resize) divide or mod by chunkshape[i] / blockshape[i] without
+  // re-checking.  Enforce the pairing here so the deserialization path is
+  // strict even when the create-ctx path remains permissive.
+  for (int i = 0; i < params.ndim; ++i) {
+    if (params.shape[i] != 0 &&
+        (params.chunkshape[i] == 0 || params.blockshape[i] == 0)) {
+      BLOSC_TRACE_ERROR("b2nd metalayer: shape[%d] is non-zero but "
+                        "chunkshape[%d] or blockshape[%d] is zero", i, i, i);
+      free(params.dtype);
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+  }
+
   BLOSC_ERROR(array_without_schunk(&params, array));
   free(params.dtype);
 
