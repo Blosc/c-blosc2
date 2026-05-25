@@ -767,8 +767,8 @@ static inline int b2nd_deserialize_meta_inline(const uint8_t *smeta, int32_t sme
  * @brief Read the metainfo in the b2nd metalayer (ABI entry point).
  *
  * This is a wrapper around @ref b2nd_deserialize_meta_inline for ABI compatibility.
- * New code that only includes headers should use b2nd_deserialize_meta_inline() directly
- * to avoid the need to link against libblosc2.
+ * New code that only includes headers should use b2nd_deserialize_meta_inline()
+ * directly to avoid the need to link against libblosc2.
  *
  * @see b2nd_deserialize_meta_inline
  */
