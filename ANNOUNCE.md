@@ -1,26 +1,25 @@
-# Announcing C-Blosc2 3.0.3
+# Announcing C-Blosc2 3.1.0
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This release is a bugfix and hardening release:
+This release brings a new sparse coords getter API, header-only metalayer
+access for plugins, and new registered codec IDs:
 
-* Harden frame parsing against malformed trailer lengths, invalid metalayer
-  offsets and lengths, and lazy-chunk compressed sizes that extend past the
-  end of a frame.
+* **Sparse getitem**: ``blosc2_schunk_get_sparse_buffer()`` and
+  ``b2nd_get_sparse_cbuffer()`` extract arbitrary sets of coordinates in a
+  single call, batching by chunk internally to minimize decompression
+  overhead.  Much faster than repeated individual ``getitem`` calls.
 
-* Fix integer-overflow paths in b2nd chunk-size and slice-buffer
-  calculations.
+* **Header-only metalayer access for plugins**: ``b2nd_deserialize_meta_inline()``
+  lets external plugins read b2nd metadata without linking against
+  ``libblosc2``, avoiding symbol conflicts with other libraries.
 
-* Improve stdio and mmap I/O safety by validating streams, file sizes,
-  offsets, integer conversions, and cleanup paths.
+* **New codec IDs**: J2K (124) and HTJ2K (125) are now globally registered
+  for upcoming JPEG 2000 / High-Throughput JPEG 2000 plugins.
 
-* Replace unsafe string formatting/concatenation in several helper paths with
-  bounded operations and allocation checks.
-
-* Validate negative indices in offset reordering.
-
-Thanks to @metsw24-max and @uwezkhan for contributions to this release.
+* Several bug fixes: ``swap_store()`` on big-endian, divide-by-zero in
+  ``b2nd_update_shape``, and trailer vlmetalayer parsing.
 
 For more info, see the release notes in:
 

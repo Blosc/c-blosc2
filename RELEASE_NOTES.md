@@ -1,10 +1,52 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 3.0.3 to 3.0.4
+Changes from 3.0.3 to 3.1.0
 ===========================
 
-#XXX version-specific blurb XXX#
+New features
+------------
+
+* New sparse coords getter API for extracting arbitrary sets of
+  coordinates in a single call, much faster than repeated individual
+  `getitem` operations:
+
+  - ``blosc2_schunk_get_sparse_buffer()`` extracts a set of flat
+    (1-dimensional) coordinates from a schunk into a caller-provided
+    buffer.  It batches coordinates by chunk internally to minimize
+    decompression overhead.
+
+  - ``b2nd_get_sparse_cbuffer()`` does the same for multidimensional
+    (b2nd) arrays, accepting an array of *n*-dimensional coordinates and
+    returning the corresponding values into a C buffer.
+
+  Both APIs support regular and special-value (zero/NaN/run-length)
+  schunks, as well as frame-backed and callback-threaded schunks.
+
+* ``b2nd_deserialize_meta_inline()`` — a new static-inline version of
+  ``b2nd_deserialize_meta()`` available from the header ``b2nd.h`` without
+  linking against ``libblosc2``.  Together with the already-inline
+  ``blosc2_meta_get()``, this lets external codec/filter plugins (like
+  ``blosc2_grok``) use the b2nd metadata API without pulling all of
+  ``libblosc2``'s internal symbols (ZFP, Zstd, …) into the global
+  namespace, which could otherwise shadow symbols from other libraries
+  that need differently-configured builds of the same dependencies.
+  The existing ``b2nd_deserialize_meta()`` ABI entry point is preserved
+  as a thin wrapper for backward compatibility.
+
+* Globally registered codec IDs **J2K** (124) and **HTJ2K** (125) for
+  upcoming JPEG 2000 / High-Throughput JPEG 2000 plugins.
+  Thanks to @alemirone.
+
+Fixes
+-----
+
+* Fix ``swap_store()`` for big-endian machines.
+* Fix divide-by-zero in ``b2nd_update_shape``.  Thanks to @metsw24-max.
+* Fix trailer vlmetalayer-parsing and a NULL-check on a missing allocation.
+* Rename ``blosc2_schunk_get_sparse`` → ``blosc2_schunk_get_sparse_buffer``
+  in the test file and error messages for consistency with the public header.
+  Thanks to @metsw24-max.
 
 Changes from 3.0.2 to 3.0.3
 ===========================
