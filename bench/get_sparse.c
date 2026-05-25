@@ -164,7 +164,7 @@ int main(int argc, char **argv) {
 
   if (new_first || new_only) {
     blosc_set_timestamp(&t0);
-    int rc = blosc2_schunk_get_sparse_coords(array->sc, ncoords, coords, data_new);
+    int rc = blosc2_schunk_get_sparse_buffer(array->sc, ncoords, coords, data_new);
     blosc_set_timestamp(&t1);
     new_time = blosc_elapsed_secs(t0, t1);
     if (rc < 0) {
@@ -192,7 +192,7 @@ int main(int argc, char **argv) {
   }
   if (!new_first && !getitem_only && !new_only) {
     blosc_set_timestamp(&t0);
-    int rc = blosc2_schunk_get_sparse_coords(array->sc, ncoords, coords, data_new);
+    int rc = blosc2_schunk_get_sparse_buffer(array->sc, ncoords, coords, data_new);
     blosc_set_timestamp(&t1);
     new_time = blosc_elapsed_secs(t0, t1);
     if (rc < 0) {

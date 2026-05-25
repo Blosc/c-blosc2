@@ -1634,7 +1634,7 @@ static int schunk_get_sparse_getitem(blosc2_schunk *schunk, int64_t ncoords, con
   return BLOSC2_ERROR_SUCCESS;
 }
 
-int blosc2_schunk_get_sparse_coords(blosc2_schunk *schunk, int64_t ncoords, const int64_t* coords, void *buffer) {
+int blosc2_schunk_get_sparse_buffer(blosc2_schunk *schunk, int64_t ncoords, const int64_t* coords, void *buffer) {
   if (schunk == NULL) {
     BLOSC_TRACE_ERROR("schunk must not be NULL.");
     return BLOSC2_ERROR_INVALID_PARAM;
