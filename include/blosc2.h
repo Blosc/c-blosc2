@@ -2318,7 +2318,12 @@ BLOSC_EXPORT int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uin
  * @warning The @p **content receives a malloc'ed copy of the content.
  * The user is responsible of freeing it.
  *
- * @note This function is inlined and available even when not linking with libblosc2.
+ * @note This function is inlined so that external codec/filter plugins (like
+ * blosc2_grok) can use it without linking against libblosc2.  This avoids
+ * pulling all of libblosc2's symbols (e.g. internal ZFP, Zstd) into the
+ * global namespace at load time, which would otherwise shadow symbols from
+ * other libraries that need differently-configured builds of the same
+ * dependencies.
  *
  * @return If successful, the index of the new metalayer. Else, return a negative value.
  */

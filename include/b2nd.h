@@ -616,7 +616,7 @@ BLOSC_EXPORT int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const in
                                      int8_t dtype_format, uint8_t **smeta);
 
 /**
- * @brief Read the metainfo in the b2nd metalayer.
+ * @brief Read the metainfo in the b2nd metalayer (inline version).
  *
  * @param smeta The msgpack buffer (input).
  * @param smeta_len The length of the smeta buffer (input).
@@ -627,9 +627,150 @@ BLOSC_EXPORT int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const in
  * @param dtype A string representation of the data type of the array (output).
  * @param dtype_format The format of the dtype representation (output). 0 means NumPy (the default).
  *
- * @note This function is inlined and available even when not linking with libblosc2.
+ * @note This function is inlined so that external codec/filter plugins (like
+ * blosc2_grok) can use it without linking against libblosc2.  This avoids
+ * pulling all of libblosc2's symbols (e.g. internal ZFP, Zstd) into the
+ * global namespace at load time, which would otherwise shadow symbols from
+ * other libraries that need differently-configured builds of the same
+ * dependencies.
  *
  * @return An error code.
+ */
+static inline int b2nd_deserialize_meta_inline(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
+                                                int32_t *chunkshape, int32_t *blockshape, char **dtype, int8_t *dtype_format) {
+  BLOSC_ERROR_NULL(smeta, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(ndim, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(shape, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(chunkshape, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(blockshape, BLOSC2_ERROR_NULL_POINTER);
+  if (dtype != NULL) {
+    *dtype = NULL;
+  }
+  if (dtype_format != NULL) {
+    *dtype_format = 0;
+  }
+  if (smeta_len <= 0) {
+    BLOSC_TRACE_ERROR("Malformed b2nd metalayer: empty metadata");
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  const uint8_t *pmeta = smeta;
+
+#define B2ND_REQUIRE_META_NBYTES(nbytes)                                             \
+  do {                                                                                \
+    size_t consumed = (size_t)(pmeta - smeta);                                        \
+    size_t total = (size_t)smeta_len;                                                 \
+    if (consumed > total || (total - consumed) < (size_t)(nbytes)) {                 \
+      BLOSC_TRACE_ERROR("Malformed b2nd metalayer: truncated metadata");            \
+      return BLOSC2_ERROR_FAILURE;                                                    \
+    }                                                                                 \
+  } while (0)
+
+  // Check that we have an array with 7 entries (version, ndim, shape, chunkshape, blockshape, dtype_format, dtype)
+  B2ND_REQUIRE_META_NBYTES(1);
+  pmeta += 1;
+
+  // version entry
+  // int8_t version = (int8_t)pmeta[0];  // positive fixnum (7-bit positive integer) commented to avoid warning
+  B2ND_REQUIRE_META_NBYTES(1);
+  pmeta += 1;
+
+  // ndim entry
+  B2ND_REQUIRE_META_NBYTES(1);
+  *ndim = (int8_t) pmeta[0];
+  int8_t ndim_aux = *ndim;  // positive fixnum (7-bit positive integer)
+  if (ndim_aux < 0 || ndim_aux > B2ND_MAX_DIM) {
+    BLOSC_TRACE_ERROR("ndim %d is out of range", ndim_aux);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  pmeta += 1;
+
+  // shape entry
+  // Initialize to ones, as required by b2nd
+  for (int i = 0; i < ndim_aux; i++) shape[i] = 1;
+  B2ND_REQUIRE_META_NBYTES(1);
+  pmeta += 1;
+  for (int8_t i = 0; i < ndim_aux; i++) {
+    B2ND_REQUIRE_META_NBYTES(1 + sizeof(int64_t));
+    pmeta += 1;
+    swap_store(shape + i, pmeta, sizeof(int64_t));
+    pmeta += sizeof(int64_t);
+  }
+
+  // chunkshape entry
+  // Initialize to ones, as required by b2nd
+  for (int i = 0; i < ndim_aux; i++) chunkshape[i] = 1;
+  B2ND_REQUIRE_META_NBYTES(1);
+  pmeta += 1;
+  for (int8_t i = 0; i < ndim_aux; i++) {
+    B2ND_REQUIRE_META_NBYTES(1 + sizeof(int32_t));
+    pmeta += 1;
+    swap_store(chunkshape + i, pmeta, sizeof(int32_t));
+    pmeta += sizeof(int32_t);
+  }
+
+  // blockshape entry
+  // Initialize to ones, as required by b2nd
+  for (int i = 0; i < ndim_aux; i++) blockshape[i] = 1;
+  B2ND_REQUIRE_META_NBYTES(1);
+  pmeta += 1;
+  for (int8_t i = 0; i < ndim_aux; i++) {
+    B2ND_REQUIRE_META_NBYTES(1 + sizeof(int32_t));
+    pmeta += 1;
+    swap_store(blockshape + i, pmeta, sizeof(int32_t));
+    pmeta += sizeof(int32_t);
+  }
+
+  // dtype entry
+  if (dtype_format == NULL || dtype == NULL) {
+    return (int32_t)(pmeta - smeta);
+  }
+  if (pmeta - smeta < smeta_len) {
+    // dtype info is here
+    B2ND_REQUIRE_META_NBYTES(1 + 1 + sizeof(int32_t));
+    *dtype_format = (int8_t) *(pmeta++);
+    if (*pmeta != 0xdb) {
+      BLOSC_TRACE_ERROR("Malformed b2nd metalayer: invalid dtype MsgPack marker");
+      return BLOSC2_ERROR_FAILURE;
+    }
+    pmeta += 1;
+    int32_t dtype_len;
+    swap_store(&dtype_len, pmeta, sizeof(int32_t));
+    pmeta += sizeof(int32_t);
+    if (dtype_len < 0) {
+      BLOSC_TRACE_ERROR("Malformed b2nd metalayer: negative dtype length");
+      return BLOSC2_ERROR_FAILURE;
+    }
+    B2ND_REQUIRE_META_NBYTES(dtype_len);
+    size_t dtype_len_ = (size_t)dtype_len;
+    *dtype = (char*)malloc(dtype_len_ + 1);
+    BLOSC_ERROR_NULL(*dtype, BLOSC2_ERROR_MEMORY_ALLOC);
+    char* dtype_ = *dtype;
+    memcpy(dtype_, (char*)pmeta, dtype_len_);
+    dtype_[dtype_len_] = '\0';
+    pmeta += dtype_len_;
+  }
+  else {
+    // dtype is mandatory in b2nd metalayer, but this is mainly meant as
+    // a fall-back for deprecated caterva headers
+    *dtype = NULL;
+    *dtype_format = 0;
+  }
+
+#undef B2ND_REQUIRE_META_NBYTES
+
+  int32_t slen = (int32_t) (pmeta - smeta);
+  return (int)slen;
+}
+
+/**
+ * @brief Read the metainfo in the b2nd metalayer (ABI entry point).
+ *
+ * This is a wrapper around @ref b2nd_deserialize_meta_inline for ABI compatibility.
+ * New code that only includes headers should use b2nd_deserialize_meta_inline() directly
+ * to avoid the need to link against libblosc2.
+ *
+ * @see b2nd_deserialize_meta_inline
  */
 BLOSC_EXPORT int b2nd_deserialize_meta(const uint8_t *smeta, int32_t smeta_len, int8_t *ndim, int64_t *shape,
                                        int32_t *chunkshape, int32_t *blockshape, char **dtype, int8_t *dtype_format);
