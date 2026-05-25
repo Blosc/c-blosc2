@@ -2171,7 +2171,8 @@ BLOSC_EXPORT int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t s
  *
  * @return An error code.
  */
-BLOSC_EXPORT int blosc2_schunk_get_sparse(blosc2_schunk *schunk, int64_t ncoords, const int64_t* coords, void *buffer);
+BLOSC_EXPORT int blosc2_schunk_get_sparse_coords(blosc2_schunk *schunk, int64_t ncoords,
+                                                 const int64_t* coords, void *buffer);
 
 /**
  * @brief Update a schunk slice from buffer.
