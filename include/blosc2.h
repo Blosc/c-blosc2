@@ -2159,7 +2159,7 @@ BLOSC_EXPORT int blosc2_schunk_get_vlblock(blosc2_schunk *schunk, int64_t nchunk
 BLOSC_EXPORT int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer);
 
 /**
- * @brief Fill buffer with elements from coords in schunk.
+ * @brief Fill buffer with elements at the given coordinates from a schunk.
  *
  * @param schunk The super-chunk from where to extract elements.
  * @param ncoords The number of coordinates.
@@ -2171,7 +2171,7 @@ BLOSC_EXPORT int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t s
  *
  * @return An error code.
  */
-BLOSC_EXPORT int blosc2_schunk_get_sparse_coords(blosc2_schunk *schunk, int64_t ncoords,
+BLOSC_EXPORT int blosc2_schunk_get_sparse_buffer(blosc2_schunk *schunk, int64_t ncoords,
                                                  const int64_t* coords, void *buffer);
 
 /**
