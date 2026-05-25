@@ -849,7 +849,7 @@ int b2nd_get_sparse_cbuffer(const b2nd_array_t *array, int64_t ncoords,
     storage_coords[i] = nchunk * array->extchunknitems + nblock * array->blocknitems + storage_item_in_block;
   }
 
-  rc = blosc2_schunk_get_sparse(array->sc, ncoords, storage_coords, buffer);
+  rc = blosc2_schunk_get_sparse_coords(array->sc, ncoords, storage_coords, buffer);
 
 cleanup:
   free(storage_coords);
@@ -857,7 +857,7 @@ cleanup:
   return BLOSC2_ERROR_SUCCESS;
 }
 
-int b2nd_get_sparse(const b2nd_array_t *array, int64_t ncoords,
+int b2nd_get_sparse_coords(const b2nd_array_t *array, int64_t ncoords,
                     const int64_t *coords, void *buffer) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   return b2nd_get_sparse_cbuffer(array, ncoords, coords, buffer, ncoords * array->sc->typesize);

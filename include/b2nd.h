@@ -374,8 +374,8 @@ BLOSC_EXPORT int b2nd_get_sparse_cbuffer(const b2nd_array_t *array, int64_t ncoo
  *
  * @return A non-negative value on success, a negative error code otherwise.
  */
-BLOSC_EXPORT int b2nd_get_sparse(const b2nd_array_t *array, int64_t ncoords,
-                                 const int64_t *coords, void *buffer);
+BLOSC_EXPORT int b2nd_get_sparse_coords(const b2nd_array_t *array, int64_t ncoords,
+                                        const int64_t *coords, void *buffer);
 
 /**
  * @brief Get a slice from an array and store it into a new array.
