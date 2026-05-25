@@ -1655,11 +1655,11 @@ int blosc2_schunk_get_sparse_buffer(blosc2_schunk *schunk, int64_t ncoords, cons
     return BLOSC2_ERROR_INVALID_PARAM;
   }
   if (schunk->chunksize <= 0) {
-    BLOSC_TRACE_ERROR("blosc2_schunk_get_sparse does not support variable-length chunks yet.");
+    BLOSC_TRACE_ERROR("blosc2_schunk_get_sparse_buffer does not support variable-length chunks yet.");
     return BLOSC2_ERROR_INVALID_PARAM;
   }
   if (schunk->blocksize <= 0 || (schunk->flags2 & BLOSC2_VL_BLOCKS)) {
-    BLOSC_TRACE_ERROR("blosc2_schunk_get_sparse does not support variable-length blocks yet.");
+    BLOSC_TRACE_ERROR("blosc2_schunk_get_sparse_buffer does not support variable-length blocks yet.");
     return BLOSC2_ERROR_INVALID_PARAM;
   }
   if ((schunk->chunksize % schunk->typesize) != 0 || (schunk->blocksize % schunk->typesize) != 0) {
