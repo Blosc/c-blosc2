@@ -56,6 +56,7 @@ From/To file
 .. doxygenfunction:: b2nd_open
 .. doxygenfunction:: b2nd_open_offset
 .. doxygenfunction:: b2nd_save
+.. doxygenfunction:: b2nd_save_append
 
 From Blosc object
 ~~~~~~~~~~~~~~~~~
@@ -82,6 +83,7 @@ Slicing
 
 .. doxygenfunction:: b2nd_get_slice
 .. doxygenfunction:: b2nd_get_slice_cbuffer
+.. doxygenfunction:: b2nd_get_sparse_cbuffer
 .. doxygenfunction:: b2nd_set_slice_cbuffer
 .. doxygenfunction:: b2nd_get_orthogonal_selection
 .. doxygenfunction:: b2nd_set_orthogonal_selection
@@ -95,6 +97,7 @@ Utils
 .. doxygenfunction:: b2nd_print_meta
 .. doxygenfunction:: b2nd_serialize_meta
 .. doxygenfunction:: b2nd_deserialize_meta
+.. doxygenfunction:: b2nd_deserialize_meta_inline
 .. doxygenfunction:: b2nd_resize
 
 

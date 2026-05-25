@@ -17,6 +17,7 @@ short).
 .. doxygenfunction:: blosc2_schunk_open
 .. doxygenfunction:: blosc2_schunk_open_offset
 .. doxygenfunction:: blosc2_schunk_open_udio
+.. doxygenfunction:: blosc2_schunk_open_offset_udio
 .. doxygenfunction:: blosc2_schunk_copy
 .. doxygenfunction:: blosc2_schunk_from_buffer
 .. doxygenfunction:: blosc2_schunk_to_buffer
@@ -32,9 +33,14 @@ short).
 .. doxygenfunction:: blosc2_schunk_append_buffer
 
 .. doxygenfunction:: blosc2_schunk_get_slice_buffer
+.. doxygenfunction:: blosc2_schunk_get_sparse_buffer
 .. doxygenfunction:: blosc2_schunk_set_slice_buffer
 
 .. doxygenfunction:: blosc2_schunk_avoid_cframe_free
+
+.. doxygenfunction:: blosc2_get_blosc2_storage_defaults
+.. doxygenfunction:: blosc2_get_blosc2_io_defaults
+.. doxygenfunction:: blosc2_get_blosc2_stdio_mmap_defaults
 
 
 Dealing with chunks
@@ -42,6 +48,7 @@ Dealing with chunks
 
 .. doxygenfunction:: blosc2_schunk_get_chunk
 .. doxygenfunction:: blosc2_schunk_get_lazychunk
+.. doxygenfunction:: blosc2_schunk_get_vlblock
 .. doxygenfunction:: blosc2_schunk_decompress_chunk
 .. doxygenfunction:: blosc2_schunk_append_chunk
 .. doxygenfunction:: blosc2_schunk_insert_chunk

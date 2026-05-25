@@ -9,6 +9,14 @@ Preliminaries
 
 - Check that *VERSION* symbols in include/blosc2.h contains the correct info.
 
+- Check that all public functions are covered in the reference docs::
+
+    $ python3 doc/check_missing_docs.py
+
+  If any are missing, add them to the appropriate ``.rst`` file under
+  ``doc/reference/``.  If a function is intentionally left undocumented,
+  add it to ``INTENTIONAL_SKIP`` in ``doc/check_missing_docs.py``.
+
 - If API/ABI changes, please increase the minor number (e.g. 2.15 -> 2.16) *and*
   bump the SOVERSION in blosc/CMakeLists.txt.
   When in doubt on when SOVERSION should change, see these nice guidelines:

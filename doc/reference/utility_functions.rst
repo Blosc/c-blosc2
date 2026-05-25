@@ -29,3 +29,12 @@ Slice utilities
 .. doxygenfunction:: blosc2_unidim_to_multidim
 
 .. doxygenfunction:: blosc2_multidim_to_unidim
+
+
+Shuffle and bitshuffle
+----------------------
+
+.. doxygenfunction:: blosc2_shuffle
+.. doxygenfunction:: blosc2_unshuffle
+.. doxygenfunction:: blosc2_bitshuffle
+.. doxygenfunction:: blosc2_bitunshuffle

@@ -27,6 +27,11 @@ using the global lock.
 
 .. doxygenfunction:: blosc2_decompress_ctx
 
+.. doxygenfunction:: blosc2_vlcompress_ctx
+.. doxygenfunction:: blosc2_vldecompress_ctx
+.. doxygenfunction:: blosc2_vldecompress_block_ctx
+.. doxygenfunction:: blosc2_vlchunk_get_nblocks
+
 .. doxygenfunction:: blosc2_set_maskout
 
 .. doxygenfunction:: blosc2_getitem_ctx
@@ -34,3 +39,8 @@ using the global lock.
 .. doxygenfunction:: blosc2_ctx_get_cparams
 
 .. doxygenfunction:: blosc2_ctx_get_dparams
+
+.. doxygenfunction:: blosc2_get_blosc2_cparams_defaults
+.. doxygenfunction:: blosc2_get_blosc2_dparams_defaults
+
+.. doxygenfunction:: blosc2_error_string
