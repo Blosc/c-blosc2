@@ -2796,6 +2796,9 @@ static inline void swap_store(void *dest, const void *pa, int size) {
       default:
         fprintf(stderr, "Unhandled nitems: %d\n", size);
     }
+  } else {
+    /* big endian: native byte order is already big-endian, just copy */
+    memcpy(pa2_, pa_, size);
   }
   memcpy(dest, pa2_, size);
   free(pa2_);
