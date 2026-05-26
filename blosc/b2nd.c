@@ -2151,32 +2151,70 @@ int copy_block_buffer_data(b2nd_array_t *array,
   p_block_selection_1[ndim] = chunk_selection[ndim];
   while (p_block_selection_1[ndim] - p_block_selection_0[ndim] < block_selection_size[ndim]) {
     if (ndim == array->ndim - 1) {
+      // --- leaf: batch consecutive innermost-dimension elements ---------
 
+      // Compute start position of the first element in the batch.
       int64_t index_in_block_n[B2ND_MAX_DIM];
       for (int i = 0; i < array->ndim; ++i) {
         index_in_block_n[i] = p_block_selection_1[i]->value % array->chunkshape[i] % array->blockshape[i];
       }
-      int64_t index_in_block = 0;
+      int64_t start_block = 0;
       for (int i = 0; i < array->ndim; ++i) {
-        index_in_block += index_in_block_n[i] * array->item_block_strides[i];
+        start_block += index_in_block_n[i] * array->item_block_strides[i];
       }
 
       int64_t index_in_buffer_n[B2ND_MAX_DIM];
       for (int i = 0; i < array->ndim; ++i) {
         index_in_buffer_n[i] = p_block_selection_1[i]->index;
       }
-      int64_t index_in_buffer = 0;
+      int64_t start_buffer = 0;
       for (int i = 0; i < array->ndim; ++i) {
-        index_in_buffer += index_in_buffer_n[i] * bufferstrides[i];
+        start_buffer += index_in_buffer_n[i] * bufferstrides[i];
       }
+
+      int64_t count = 1;
+      int32_t typesize = array->sc->typesize;
+      p_block_selection_1[ndim]++;
+
+      while (p_block_selection_1[ndim] - p_block_selection_0[ndim] < block_selection_size[ndim]) {
+        b2nd_selection_t *prev = p_block_selection_1[ndim] - 1;
+        b2nd_selection_t *curr = p_block_selection_1[ndim];
+
+        // Check if this element is adjacent to the previous one in both
+        // the block buffer (value) and the output buffer (index).
+        if (curr->value == prev->value + 1 && curr->index == prev->index + 1) {
+          count++;
+        } else {
+          // Flush the current batch.
+          if (get) {
+            memcpy(&buffer[start_buffer * typesize], &block[start_block * typesize], (size_t)(count * typesize));
+          } else {
+            memcpy(&block[start_block * typesize], &buffer[start_buffer * typesize], (size_t)(count * typesize));
+          }
+
+          // Recompute start position for the new batch.
+          for (int i = 0; i < array->ndim; ++i) {
+            index_in_block_n[i] = curr->value % array->chunkshape[i] % array->blockshape[i];
+            index_in_buffer_n[i] = curr->index;
+          }
+          start_block = 0;
+          for (int i = 0; i < array->ndim; ++i) {
+            start_block += index_in_block_n[i] * array->item_block_strides[i];
+          }
+          start_buffer = 0;
+          for (int i = 0; i < array->ndim; ++i) {
+            start_buffer += index_in_buffer_n[i] * bufferstrides[i];
+          }
+          count = 1;
+        }
+        p_block_selection_1[ndim]++;
+      }
+
+      // Flush the last batch.
       if (get) {
-        memcpy(&buffer[index_in_buffer * array->sc->typesize],
-               &block[index_in_block * array->sc->typesize],
-               array->sc->typesize);
+        memcpy(&buffer[start_buffer * typesize], &block[start_block * typesize], (size_t)(count * typesize));
       } else {
-        memcpy(&block[index_in_block * array->sc->typesize],
-               &buffer[index_in_buffer * array->sc->typesize],
-               array->sc->typesize);
+        memcpy(&block[start_block * typesize], &buffer[start_buffer * typesize], (size_t)(count * typesize));
       }
     } else {
       BLOSC_ERROR(copy_block_buffer_data(array, (int8_t) (ndim + 1), block_selection_size,
@@ -2184,8 +2222,8 @@ int copy_block_buffer_data(b2nd_array_t *array,
                                          p_block_selection_0, p_block_selection_1, block,
                                          buffer, buffershape, bufferstrides, get)
       );
+      p_block_selection_1[ndim]++;
     }
-    p_block_selection_1[ndim]++;
   }
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -2313,7 +2351,9 @@ int iter_chunk(b2nd_array_t *array, int8_t ndim,
                uint8_t *buffer,
                int64_t *buffershape,
                int64_t *bufferstrides,
-               bool get) {
+               bool get,
+               uint8_t *chunk_data,
+               int32_t chunk_data_nbytes) {
   p_ordered_selection_0[ndim] = ordered_selection[ndim];
   p_ordered_selection_1[ndim] = ordered_selection[ndim];
   while (p_ordered_selection_1[ndim] - ordered_selection[ndim] < selection_size[ndim]) {
@@ -2369,10 +2409,8 @@ int iter_chunk(b2nd_array_t *array, int8_t ndim,
         }
         free(maskout);
       }
-      int data_nitems = (int) array->extchunknitems;
-      int data_nbytes = data_nitems * array->sc->typesize;
-      uint8_t *data = malloc(data_nitems * array->sc->typesize);
-      BLOSC_ERROR_NULL(data, BLOSC2_ERROR_MEMORY_ALLOC);
+      int data_nbytes = chunk_data_nbytes;
+      uint8_t *data = chunk_data;
       int err = blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes);
       if (err < 0) {
         BLOSC_TRACE_ERROR("Error decompressing chunk");
@@ -2397,14 +2435,13 @@ int iter_chunk(b2nd_array_t *array, int8_t ndim,
           BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
         }
       }
-      free(data);
       free(chunk_selection_size);
       free(p_chunk_selection_0);
       free(p_chunk_selection_1);
     } else {
       BLOSC_ERROR(iter_chunk(array, (int8_t) (ndim + 1), selection_size,
                              ordered_selection, p_ordered_selection_0, p_ordered_selection_1,
-                             buffer, buffershape, bufferstrides, get));
+                             buffer, buffershape, bufferstrides, get, chunk_data, chunk_data_nbytes));
     }
 
     p_ordered_selection_0[ndim] = p_ordered_selection_1[ndim];
@@ -2465,11 +2502,20 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
     bufferstrides[i] = bufferstrides[i + 1] * buffershape[i + 1];
   }
 
+  // Pre-allocate a single chunk decompression buffer, reused for every
+  // chunk visited by iter_chunk, instead of malloc/free per chunk.
+  int32_t chunk_data_nbytes = (int32_t)(array->extchunknitems * array->sc->typesize);
+  uint8_t *chunk_data = malloc(chunk_data_nbytes);
+  BLOSC_ERROR_NULL(chunk_data, BLOSC2_ERROR_MEMORY_ALLOC);
+
   BLOSC_ERROR(iter_chunk(array, 0,
                          selection_size, ordered_selection,
                          p_ordered_selection_0,
                          p_ordered_selection_1,
-                         buffer, buffershape, bufferstrides, get));
+                         buffer, buffershape, bufferstrides, get,
+                         chunk_data, chunk_data_nbytes));
+
+  free(chunk_data);
 
   // Free allocated memory
   free(p_ordered_selection_0);
