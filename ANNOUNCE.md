@@ -1,25 +1,11 @@
-# Announcing C-Blosc2 3.1.1
+# Announcing C-Blosc2 3.1.2
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release focused on performance and documentation
-polish:
-
-* **Faster orthogonal selections**: ``b2nd_get_orthogonal_selection()`` is
-  now significantly faster for axis-based row/column selections thanks to
-  internal buffer reuse and batched element copies.  In internal benchmarks,
-  this yields around a **2.6x speedup** on the ``blosc2.take()`` ndim=2
-  benchmark.
-
-* **More complete API documentation**: static-inline functions are now
-  included in the generated user-facing docs, and recently added public APIs
-  that were missing from the reference manual are now documented too.
-
-* **Doc coverage checks**: a new ``doc/check_missing_docs.py`` helper makes
-  it easier to catch undocumented public functions before a release.
-
-* **No API/ABI changes**: 3.1.1 is a drop-in maintenance update over 3.1.0.
+This is a hotfix release for a regression in ``b2nd_get_orthogonal_selection()``
+and ``b2nd_set_orthogonal_selection()`` introduced by the 3.1.1 batching
+optimization.
 
 For more info, see the release notes in:
 

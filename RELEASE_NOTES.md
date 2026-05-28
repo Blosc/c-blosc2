@@ -4,7 +4,20 @@ Release notes for C-Blosc2
 Changes from 3.1.1 to 3.1.2
 ===========================
 
-#XXX version-specific blurb XXX#
+Hotfixes
+--------
+
+* Fix a regression in ``b2nd_get_orthogonal_selection()`` and
+  ``b2nd_set_orthogonal_selection()`` introduced by the 3.1.1 batching
+  optimization.
+
+* Add a regression test covering orthogonal get/set selections across outer
+  dimensions.
+
+Notes
+-----
+
+* This is a hot-fix release with no API/ABI changes.
 
 Changes from 3.1.0 to 3.1.1
 ===========================
