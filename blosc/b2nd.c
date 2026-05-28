@@ -2193,9 +2193,16 @@ int copy_block_buffer_data(b2nd_array_t *array,
           }
 
           // Recompute start position for the new batch.
+          // Only the innermost dimension advances here; outer dimensions
+          // must keep using their current recursive selection pointers.
           for (int i = 0; i < array->ndim; ++i) {
-            index_in_block_n[i] = curr->value % array->chunkshape[i] % array->blockshape[i];
-            index_in_buffer_n[i] = curr->index;
+            if (i == ndim) {
+              index_in_block_n[i] = curr->value % array->chunkshape[i] % array->blockshape[i];
+              index_in_buffer_n[i] = curr->index;
+            } else {
+              index_in_block_n[i] = p_block_selection_1[i]->value % array->chunkshape[i] % array->blockshape[i];
+              index_in_buffer_n[i] = p_block_selection_1[i]->index;
+            }
           }
           start_block = 0;
           for (int i = 0; i < array->ndim; ++i) {
