@@ -4,7 +4,35 @@ Release notes for C-Blosc2
 Changes from 3.1.0 to 3.1.1
 ===========================
 
-#XXX version-specific blurb XXX#
+Performance improvements
+------------------------
+
+* Optimize ``b2nd_get_orthogonal_selection()`` for axis-based row/column
+  selections by reusing the chunk decompression buffer across visited chunks
+  and batching consecutive innermost-dimension element copies.
+
+  In internal benchmarks, this makes orthogonal selections up to about
+  2.6x faster (for example, on the ``blosc2.take()`` ndim=2 benchmark with
+  100M elements, 6388 indices, and ``axis=0``).
+
+Documentation improvements
+--------------------------
+
+* Include static-inline functions in the user-facing API docs, so header-only
+  entry points such as ``b2nd_deserialize_meta_inline()`` show up correctly in
+  the generated reference manual.
+
+* Add the public functions that were missing from the reference docs,
+  including recently added sparse getters, VL-block/context helpers,
+  defaults accessors, and utility functions.
+
+* Add ``doc/check_missing_docs.py`` to help ensure that public APIs are not
+  accidentally left undocumented in future releases.
+
+Notes
+-----
+
+* This is a maintenance release with no API/ABI changes.
 
 Changes from 3.0.3 to 3.1.0
 ===========================

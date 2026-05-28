@@ -1,25 +1,25 @@
-# Announcing C-Blosc2 3.1.0
+# Announcing C-Blosc2 3.1.1
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This release brings a new sparse coords getter API, header-only metalayer
-access for plugins, and new registered codec IDs:
+This is a maintenance release focused on performance and documentation
+polish:
 
-* **Sparse getitem**: ``blosc2_schunk_get_sparse_buffer()`` and
-  ``b2nd_get_sparse_cbuffer()`` extract arbitrary sets of coordinates in a
-  single call, batching by chunk internally to minimize decompression
-  overhead.  Much faster than repeated individual ``getitem`` calls.
+* **Faster orthogonal selections**: ``b2nd_get_orthogonal_selection()`` is
+  now significantly faster for axis-based row/column selections thanks to
+  internal buffer reuse and batched element copies.  In internal benchmarks,
+  this yields around a **2.6x speedup** on the ``blosc2.take()`` ndim=2
+  benchmark.
 
-* **Header-only metalayer access for plugins**: ``b2nd_deserialize_meta_inline()``
-  lets external plugins read b2nd metadata without linking against
-  ``libblosc2``, avoiding symbol conflicts with other libraries.
+* **More complete API documentation**: static-inline functions are now
+  included in the generated user-facing docs, and recently added public APIs
+  that were missing from the reference manual are now documented too.
 
-* **New codec IDs**: J2K (124) and HTJ2K (125) are now globally registered
-  for upcoming JPEG 2000 / High-Throughput JPEG 2000 plugins.
+* **Doc coverage checks**: a new ``doc/check_missing_docs.py`` helper makes
+  it easier to catch undocumented public functions before a release.
 
-* Several bug fixes: ``swap_store()`` on big-endian, divide-by-zero in
-  ``b2nd_update_shape``, and trailer vlmetalayer parsing.
+* **No API/ABI changes**: 3.1.1 is a drop-in maintenance update over 3.1.0.
 
 For more info, see the release notes in:
 
@@ -28,9 +28,9 @@ https://github.com/Blosc/c-blosc2/blob/main/RELEASE_NOTES.md
 ## What is it?
 
 Blosc2 is a high-performance data container optimized for binary data.
-Blosc2 is the next generation of Blosc, an [award-winning]
-(https://www.blosc.org/posts/prize-push-Blosc2) library that has been
-around for more than a decade.
+Blosc2 is the next generation of Blosc, an
+[award-winning library](https://www.blosc.org/posts/prize-push-Blosc2)
+that has been around for more than a decade.
 
 Blosc2 expands the capabilities of Blosc by providing a higher level
 container that is able to store many chunks on it (hence the super-block name).
