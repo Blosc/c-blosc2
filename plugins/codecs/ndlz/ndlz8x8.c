@@ -487,18 +487,20 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   uint8_t *local_buffer = malloc(cell_size);
   uint8_t *cell_aux = malloc(cell_size);
 
-  // Reject any read whose range [p, p + n) falls outside the compressed input
-  // buffer [input, ip_limit).  A crafted token `offset` otherwise makes the
-  // back-reference `buffercpy` (and the `ip - ... - offset` reads below) point
-  // before `input`, and the cell-fill memcpy then leaks out-of-bounds heap
-  // memory into the (attacker-visible) output -- CWE-125.  The per-cell
-  // `ip > ip_limit` check is not enough because each cell reads a 2-byte offset
-  // and literal bytes past that point.  Mirrors blosclz's `ref - 1 < output`.
-#define NDLZ8_CHECK_RANGE(p, n)                                                  \
+  // Validate that a read of `len` bytes starting at byte offset `pos` (measured
+  // from the start of `input`) lies fully within the compressed buffer.  A
+  // crafted token `offset` otherwise makes a back-reference point before
+  // `input`, and the cell-fill memcpy then leaks out-of-bounds heap memory into
+  // the (attacker-visible) output -- CWE-125.  The per-cell `ip > ip_limit`
+  // check is not enough because each cell reads a 2-byte offset and literal
+  // bytes past that point.  All arithmetic is done on integer offsets so we
+  // never form an out-of-bounds pointer (undefined behaviour in C, even when the
+  // pointer is only compared and not dereferenced).
+#define NDLZ8_CHECK_RANGE(pos, len)                                              \
   do {                                                                           \
-    const uint8_t *_p = (const uint8_t *) (p);                                   \
-    int64_t _n = (int64_t) (n);                                                  \
-    if (_n < 0 || _p < (const uint8_t *) input || _p > ip_limit - _n) {          \
+    int64_t _pos = (int64_t) (pos);                                              \
+    int64_t _len = (int64_t) (len);                                              \
+    if (_pos < 0 || _len < 0 || _pos > (int64_t) input_len - _len) {             \
       free(local_buffer);                                                        \
       free(cell_aux);                                                            \
       BLOSC_TRACE_ERROR("ndlz8: out-of-bounds reference in compressed stream");  \
@@ -524,21 +526,24 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
       } else {
         padding[1] = cell_shape;
       }
-      NDLZ8_CHECK_RANGE(ip, 1);
+      int64_t cur = ip - (const uint8_t *) input;   // in-range: ip is within [input, ip_limit]
+      NDLZ8_CHECK_RANGE(cur, 1);
       token = *ip++;
       uint8_t match_type = (token >> 3U);
       if (token == 0) {    // no match
+        NDLZ8_CHECK_RANGE(cur + 1, (int64_t) padding[0] * padding[1]);
         buffercpy = ip;
         ip += padding[0] * padding[1];
-        NDLZ8_CHECK_RANGE(buffercpy, (int64_t) padding[0] * padding[1]);
       } else if (token == (uint8_t) ((1U << 7U) | (1U << 6U))) {  // cell match
-        NDLZ8_CHECK_RANGE(ip, 2);
-        uint16_t offset = *((uint16_t *) ip);
-        buffercpy = ip - offset - 1;
+        NDLZ8_CHECK_RANGE(cur + 1, 2);
+        uint16_t offset;
+        memcpy(&offset, ip, sizeof(offset));
+        int64_t bpos = (cur + 1) - (int64_t) offset - 1;
+        NDLZ8_CHECK_RANGE(bpos, (int64_t) padding[0] * padding[1]);
+        buffercpy = (uint8_t *) input + bpos;
         ip += 2;
-        NDLZ8_CHECK_RANGE(buffercpy, (int64_t) padding[0] * padding[1]);
       } else if (token == (uint8_t) (1U << 6U)) { // whole cell of same element
-        NDLZ8_CHECK_RANGE(ip, 1);
+        NDLZ8_CHECK_RANGE(cur + 1, 1);
         buffercpy = cell_aux;
         memset(buffercpy, *ip, cell_size);
         ip++;
@@ -551,17 +556,21 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
           BLOSC_TRACE_ERROR("Triple match row out of bounds");
           return BLOSC2_ERROR_FAILURE;
         }
-        NDLZ8_CHECK_RANGE(ip, 2);
-        uint16_t offset = *((uint16_t *) ip);
+        NDLZ8_CHECK_RANGE(cur + 1, 2);
+        uint16_t offset;
+        memcpy(&offset, ip, sizeof(offset));
         ip += 2;
-        NDLZ8_CHECK_RANGE(ip - sizeof(token) - sizeof(offset) - offset, 3 * cell_shape);
+        // back-reference base == ip - sizeof(token) - sizeof(offset) - offset,
+        // i.e. (cur + 3) - 3 - offset == cur - offset, expressed as an offset.
+        int64_t bpos = cur - (int64_t) offset;
+        NDLZ8_CHECK_RANGE(bpos, 3 * cell_shape);
+        const uint8_t *ref = (const uint8_t *) input + bpos;
         for (int l = 0; l < 3; l++) {
-          memcpy(&buffercpy[(row + l) * cell_shape],
-                 ip - sizeof(token) - sizeof(offset) - offset + l * cell_shape, cell_shape);
+          memcpy(&buffercpy[(row + l) * cell_shape], ref + l * cell_shape, cell_shape);
         }
         for (int l = 0; l < cell_shape; l++) {
           if ((l < row) || (l > row + 2)) {
-            NDLZ8_CHECK_RANGE(ip, cell_shape);
+            NDLZ8_CHECK_RANGE(ip - (const uint8_t *) input, cell_shape);
             memcpy(&buffercpy[l * cell_shape], ip, cell_shape);
             ip += cell_shape;
           }
@@ -575,17 +584,20 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
           BLOSC_TRACE_ERROR("Pair match row out of bounds");
           return BLOSC2_ERROR_FAILURE;
         }
-        NDLZ8_CHECK_RANGE(ip, 2);
-        uint16_t offset = *((uint16_t *) ip);
+        NDLZ8_CHECK_RANGE(cur + 1, 2);
+        uint16_t offset;
+        memcpy(&offset, ip, sizeof(offset));
         ip += 2;
-        NDLZ8_CHECK_RANGE(ip - sizeof(token) - sizeof(offset) - offset, 2 * cell_shape);
+        // back-reference base == cur - offset (see triple-match note above).
+        int64_t bpos = cur - (int64_t) offset;
+        NDLZ8_CHECK_RANGE(bpos, 2 * cell_shape);
+        const uint8_t *ref = (const uint8_t *) input + bpos;
         for (int l = 0; l < 2; l++) {
-          memcpy(&buffercpy[(row + l) * cell_shape],
-                 ip - sizeof(token) - sizeof(offset) - offset + l * cell_shape, cell_shape);
+          memcpy(&buffercpy[(row + l) * cell_shape], ref + l * cell_shape, cell_shape);
         }
         for (int l = 0; l < cell_shape; l++) {
           if ((l < row) || (l > row + 1)) {
-            NDLZ8_CHECK_RANGE(ip, cell_shape);
+            NDLZ8_CHECK_RANGE(ip - (const uint8_t *) input, cell_shape);
             memcpy(&buffercpy[l * cell_shape], ip, cell_shape);
             ip += cell_shape;
           }
