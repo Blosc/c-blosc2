@@ -518,7 +518,6 @@ int ndlz4_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   BLOSC_ERROR_NULL(output, BLOSC2_ERROR_NULL_POINTER);
 
   uint8_t *ip = (uint8_t *) input;
-  uint8_t *ip_limit = ip + input_len;
   uint8_t *op = (uint8_t *) output;
   uint8_t ndim;
   int32_t blockshape[2];
@@ -526,9 +525,15 @@ int ndlz4_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
   uint8_t *buffercpy;
   uint8_t local_buffer[16];
   uint8_t token;
-  if (NDLZ_UNEXPECT_CONDITIONAL(input_len < 8)) {
+  // The fixed header is 1 (ndim) + 2 * int32 (blockshape) = 9 bytes.  Reject any
+  // input too short to hold it -- the previous `< 8` check let an 8-byte input
+  // through and the header parse below then read a 9th byte.  The cast keeps the
+  // comparison signed so a negative `input_len` is rejected here, before the
+  // `ip + input_len` pointer arithmetic (which would otherwise be UB) is reached.
+  if (NDLZ_UNEXPECT_CONDITIONAL(input_len < (int32_t) (1 + 2 * sizeof(int32_t)))) {
     return 0;
   }
+  uint8_t *ip_limit = ip + input_len;
 
   // Validate that a read of `len` bytes starting at byte offset `pos` (measured
   // from the start of `input`) lies fully within the compressed buffer.  A
