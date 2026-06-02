@@ -619,8 +619,13 @@ int ndlz8_decompress(const uint8_t *input, int32_t input_len, uint8_t *output, i
         if (i < padding[0]) {
           ind = orig + i * blockshape[1];
           memcpy(&op[ind], buffercpy, padding[1]);
+          // Only advance over rows we actually consume.  For a literal cell
+          // (token == 0) buffercpy points into the input and only holds
+          // padding[0] * padding[1] bytes; advancing unconditionally for the
+          // trailing padding rows would form an out-of-bounds pointer (UB)
+          // for the block's last cell.  The skipped rows are never read.
+          buffercpy += padding[1];
         }
-        buffercpy += padding[1];
       }
       if (ind > output_len) {
         free(local_buffer);
