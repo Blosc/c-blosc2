@@ -43,19 +43,36 @@ static int zfp_check_output_size(int deserialize_rc, int8_t ndim,
     BLOSC_TRACE_ERROR("ndim %d is out of range for ZFP", ndim);
     return BLOSC2_ERROR_FAILURE;
   }
+  if (typesize <= 0) {
+    BLOSC_TRACE_ERROR("Invalid typesize %d", typesize);
+    return BLOSC2_ERROR_FAILURE;
+  }
   if (output_len < 0) {
     BLOSC_TRACE_ERROR("Negative output length");
     return BLOSC2_ERROR_FAILURE;
   }
-  int64_t nbytes = typesize;
+  /* Compute prod(blockshape) * typesize and compare against output_len without
+   * ever overflowing int64_t: keep nbytes bounded by `cap` at every step, so a
+   * crafted (large) blockshape cannot wrap the product past the guard. */
+  const int64_t cap = (int64_t) output_len;
+  int64_t nbytes = (int64_t) typesize;
   for (int i = 0; i < ndim; i++) {
-    if (blockshape[i] < 0) {
+    int32_t dim = blockshape[i];
+    if (dim < 0) {
       BLOSC_TRACE_ERROR("Negative blockshape");
       return BLOSC2_ERROR_FAILURE;
     }
-    nbytes *= blockshape[i];
+    if (dim == 0) {
+      nbytes = 0;
+      break;
+    }
+    if (nbytes > cap / dim) {
+      BLOSC_TRACE_ERROR("Decompressed block size exceeds the output buffer (%d bytes)", output_len);
+      return BLOSC2_ERROR_FAILURE;
+    }
+    nbytes *= dim;
   }
-  if (nbytes > (int64_t) output_len) {
+  if (nbytes > cap) {
     BLOSC_TRACE_ERROR("Decompressed size (%lld bytes) is bigger than the output buffer (%d bytes)",
                       (long long) nbytes, output_len);
     return BLOSC2_ERROR_FAILURE;
@@ -74,9 +91,9 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
 
   double tol = (int8_t) meta;
   int8_t ndim;
-  int64_t *shape = malloc(8 * sizeof(int64_t));
-  int32_t *chunkshape = malloc(8 * sizeof(int32_t));
-  int32_t *blockshape = malloc(8 * sizeof(int32_t));
+  int64_t *shape = malloc(B2ND_MAX_DIM * sizeof(int64_t));
+  int32_t *chunkshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
+  int32_t *blockshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
@@ -86,11 +103,21 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     BLOSC_TRACE_ERROR("b2nd layer not found!");
     return BLOSC2_ERROR_FAILURE;
   }
-  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
+  int deserialize_rc = b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
+  if (deserialize_rc < 0 || ndim <= 0 || ndim > ZFP_MAX_DIM) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    BLOSC_TRACE_ERROR("Invalid b2nd meta info (ndim %d)", ndim);
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   for(int i = 0; i < ndim; i++) {
     if (blockshape[i] < 4) {
+      free(shape);
+      free(chunkshape);
+      free(blockshape);
       BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4");
       return BLOSC2_ERROR_FAILURE;
     }
@@ -297,9 +324,9 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   ZFP_ERROR_NULL(cparams->schunk);
 
   int8_t ndim;
-  int64_t *shape = malloc(8 * sizeof(int64_t));
-  int32_t *chunkshape = malloc(8 * sizeof(int32_t));
-  int32_t *blockshape = malloc(8 * sizeof(int32_t));
+  int64_t *shape = malloc(B2ND_MAX_DIM * sizeof(int64_t));
+  int32_t *chunkshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
+  int32_t *blockshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
@@ -309,11 +336,21 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     BLOSC_TRACE_ERROR("b2nd layer not found!");
     return BLOSC2_ERROR_FAILURE;
   }
-  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
+  int deserialize_rc = b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
+  if (deserialize_rc < 0 || ndim <= 0 || ndim > ZFP_MAX_DIM) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    BLOSC_TRACE_ERROR("Invalid b2nd meta info (ndim %d)", ndim);
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   for(int i = 0; i < ndim; i++) {
     if (blockshape[i] < 4) {
+      free(shape);
+      free(chunkshape);
+      free(blockshape);
       BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4");
       return BLOSC2_ERROR_FAILURE;
     }
@@ -570,9 +607,9 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
 
   double ratio = (double) meta / 100.0;
   int8_t ndim;
-  int64_t *shape = malloc(8 * sizeof(int64_t));
-  int32_t *chunkshape = malloc(8 * sizeof(int32_t));
-  int32_t *blockshape = malloc(8 * sizeof(int32_t));
+  int64_t *shape = malloc(B2ND_MAX_DIM * sizeof(int64_t));
+  int32_t *chunkshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
+  int32_t *blockshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
@@ -582,11 +619,21 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     BLOSC_TRACE_ERROR("b2nd layer not found!");
     return BLOSC2_ERROR_FAILURE;
   }
-  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
+  int deserialize_rc = b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
+  if (deserialize_rc < 0 || ndim <= 0 || ndim > ZFP_MAX_DIM) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    BLOSC_TRACE_ERROR("Invalid b2nd meta info (ndim %d)", ndim);
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   for(int i = 0; i < ndim; i++) {
     if (blockshape[i] < 4) {
+      free(shape);
+      free(chunkshape);
+      free(blockshape);
       BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4");
       return BLOSC2_ERROR_FAILURE;
     }
