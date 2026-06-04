@@ -118,7 +118,7 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
       free(shape);
       free(chunkshape);
       free(blockshape);
-      BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4");
+      BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4)");
       return BLOSC2_ERROR_FAILURE;
     }
   }
@@ -351,7 +351,7 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
       free(shape);
       free(chunkshape);
       free(blockshape);
-      BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4");
+      BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4)");
       return BLOSC2_ERROR_FAILURE;
     }
   }
@@ -634,7 +634,7 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
       free(shape);
       free(chunkshape);
       free(blockshape);
-      BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4");
+      BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4)");
       return BLOSC2_ERROR_FAILURE;
     }
   }
