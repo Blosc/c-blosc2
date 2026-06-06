@@ -58,13 +58,11 @@ static int zfp_check_output_size(int deserialize_rc, int8_t ndim,
   int64_t nbytes = (int64_t) typesize;
   for (int i = 0; i < ndim; i++) {
     int32_t dim = blockshape[i];
-    if (dim < 0) {
-      BLOSC_TRACE_ERROR("Negative blockshape");
+    if (dim <= 0) {
+      /* A zero or negative block dimension is malformed input; reject it rather
+       * than letting a 0 dim slip past the size guard and into zfp_field_*. */
+      BLOSC_TRACE_ERROR("Invalid blockshape dimension %d", dim);
       return BLOSC2_ERROR_FAILURE;
-    }
-    if (dim == 0) {
-      nbytes = 0;
-      break;
     }
     if (nbytes > cap / dim) {
       BLOSC_TRACE_ERROR("Decompressed block size exceeds the output buffer (%d bytes)", output_len);
