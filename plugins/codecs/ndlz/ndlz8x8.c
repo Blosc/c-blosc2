@@ -71,9 +71,9 @@ int ndlz8_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
   const int cell_shape = 8;
   const int cell_size = 64;
   int8_t ndim;
-  int64_t *shape = malloc(8 * sizeof(int64_t));
-  int32_t *chunkshape = malloc(8 * sizeof(int32_t));
-  int32_t *blockshape = malloc(8 * sizeof(int32_t));
+  int64_t *shape = malloc(B2ND_MAX_DIM * sizeof(int64_t));
+  int32_t *chunkshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
+  int32_t *blockshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
   b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
 
