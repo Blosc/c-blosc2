@@ -17,9 +17,13 @@ int ndmean_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_
                    uint8_t id) {
   BLOSC_UNUSED_PARAM(id);
   int8_t ndim;
-  int64_t *shape = malloc(8 * sizeof(int64_t));
-  int32_t *chunkshape = malloc(8 * sizeof(int32_t));
-  int32_t *blockshape = malloc(8 * sizeof(int32_t));
+  // b2nd_deserialize_meta() writes up to B2ND_MAX_DIM entries (it only validates
+  // ndim <= B2ND_MAX_DIM), so the destination buffers must be sized accordingly,
+  // not for NDMEAN_MAX_DIM.  Otherwise a crafted b2nd metalayer with
+  // NDMEAN_MAX_DIM < ndim <= B2ND_MAX_DIM overflows these allocations.
+  int64_t *shape = malloc(B2ND_MAX_DIM * sizeof(int64_t));
+  int32_t *chunkshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
+  int32_t *blockshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(cparams->schunk, "b2nd", &smeta, &smeta_len) < 0) {
@@ -29,8 +33,23 @@ int ndmean_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_
     BLOSC_TRACE_ERROR("b2nd layer not found!");
     return BLOSC2_ERROR_FAILURE;
   }
-  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
+  if (b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL) < 0) {
+    free(smeta);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    BLOSC_TRACE_ERROR("Cannot deserialize b2nd metalayer");
+    return BLOSC2_ERROR_FAILURE;
+  }
   free(smeta);
+  // Guard the fixed-size (NDMEAN_MAX_DIM) stack arrays used below.
+  if (ndim <= 0 || ndim > NDMEAN_MAX_DIM) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    BLOSC_TRACE_ERROR("ndim %d is out of range", ndim);
+    return BLOSC2_ERROR_FAILURE;
+  }
   int typesize = cparams->typesize;
 
   if ((typesize != 4) && (typesize != 8)) {
@@ -195,9 +214,13 @@ int ndmean_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8
   BLOSC_UNUSED_PARAM(id);
   blosc2_schunk *schunk = dparams->schunk;
   int8_t ndim;
-  int64_t *shape = malloc(8 * sizeof(int64_t));
-  int32_t *chunkshape = malloc(8 * sizeof(int32_t));
-  int32_t *blockshape = malloc(8 * sizeof(int32_t));
+  // b2nd_deserialize_meta() writes up to B2ND_MAX_DIM entries (it only validates
+  // ndim <= B2ND_MAX_DIM), so the destination buffers must be sized accordingly,
+  // not for NDMEAN_MAX_DIM.  Otherwise a crafted b2nd metalayer with
+  // NDMEAN_MAX_DIM < ndim <= B2ND_MAX_DIM overflows these allocations.
+  int64_t *shape = malloc(B2ND_MAX_DIM * sizeof(int64_t));
+  int32_t *chunkshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
+  int32_t *blockshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
   uint8_t *smeta;
   int32_t smeta_len;
   if (blosc2_meta_get(schunk, "b2nd", &smeta, &smeta_len) < 0) {
@@ -207,8 +230,23 @@ int ndmean_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8
     BLOSC_TRACE_ERROR("b2nd layer not found!");
     return BLOSC2_ERROR_FAILURE;
   }
-  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
+  if (b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL) < 0) {
+    free(smeta);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    BLOSC_TRACE_ERROR("Cannot deserialize b2nd metalayer");
+    return BLOSC2_ERROR_FAILURE;
+  }
   free(smeta);
+  // Guard the fixed-size (NDMEAN_MAX_DIM) stack arrays used below.
+  if (ndim <= 0 || ndim > NDMEAN_MAX_DIM) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    BLOSC_TRACE_ERROR("ndim %d is out of range", ndim);
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   int8_t cellshape[8];
   int cell_size = 1;

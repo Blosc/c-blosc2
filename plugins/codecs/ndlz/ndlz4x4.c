@@ -69,23 +69,32 @@ int ndlz4_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
   }
 
   int8_t ndim;
-  int64_t *shape = malloc(8 * sizeof(int64_t));
-  int32_t *chunkshape = malloc(8 * sizeof(int32_t));
-  int32_t *blockshape = malloc(8 * sizeof(int32_t));
-  b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
+  int64_t *shape = malloc(B2ND_MAX_DIM * sizeof(int64_t));
+  int32_t *chunkshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
+  int32_t *blockshape = malloc(B2ND_MAX_DIM * sizeof(int32_t));
+  int deserialize_rc = b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape, NULL, NULL);
   free(smeta);
 
-  if (ndim != 2) {
+  if (deserialize_rc < 0 || ndim != 2) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
     BLOSC_TRACE_ERROR("This codec only works for ndim = 2");
     return BLOSC2_ERROR_FAILURE;
   }
 
   if (input_len != (blockshape[0] * blockshape[1])) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
     BLOSC_TRACE_ERROR("Length not equal to blocksize");
     return BLOSC2_ERROR_FAILURE;
   }
 
   if (NDLZ_UNEXPECT_CONDITIONAL(output_len < (int) (1 + ndim * sizeof(int32_t)))) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
     BLOSC_TRACE_ERROR("Output too small");
     return BLOSC2_ERROR_FAILURE;
   }
@@ -120,6 +129,9 @@ int ndlz4_compress(const uint8_t *input, int32_t input_len, uint8_t *output, int
   /* input and output buffer cannot be less than 16 and 66 bytes or we can get into trouble */
   int overhead = 17 + (blockshape[0] * blockshape[1] / 16 - 1) * 2;
   if (input_len < 16 || output_len < overhead) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
     BLOSC_TRACE_ERROR("Incorrect length or maxout");
     return 0;
   }
