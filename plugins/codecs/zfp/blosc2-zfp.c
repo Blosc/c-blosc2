@@ -121,6 +121,24 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     }
   }
 
+  /* The b2nd blockshape determines the dataset fed to ZFP, so the input must be
+   * a complete block.  With split streams (e.g. SplitMode.ALWAYS_SPLIT) or any
+   * partial buffer, input_len is smaller than the block: compressing would
+   * overread the input, and the result would decompress to more bytes than the
+   * stream slot it came from.  Store uncompressed in that case. */
+  {
+    int64_t block_nbytes = cparams->typesize;
+    for (int i = 0; i < ndim; i++) {
+      block_nbytes *= blockshape[i];
+    }
+    if ((int64_t) input_len != block_nbytes) {
+      free(shape);
+      free(chunkshape);
+      free(blockshape);
+      return 0;
+    }
+  }
+
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
   zfp_stream *zfp;   /* stream containing the real output buffer */
@@ -351,6 +369,24 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
       free(blockshape);
       BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4)");
       return BLOSC2_ERROR_FAILURE;
+    }
+  }
+
+  /* The b2nd blockshape determines the dataset fed to ZFP, so the input must be
+   * a complete block.  With split streams (e.g. SplitMode.ALWAYS_SPLIT) or any
+   * partial buffer, input_len is smaller than the block: compressing would
+   * overread the input, and the result would decompress to more bytes than the
+   * stream slot it came from.  Store uncompressed in that case. */
+  {
+    int64_t block_nbytes = cparams->typesize;
+    for (int i = 0; i < ndim; i++) {
+      block_nbytes *= blockshape[i];
+    }
+    if ((int64_t) input_len != block_nbytes) {
+      free(shape);
+      free(chunkshape);
+      free(blockshape);
+      return 0;
     }
   }
 
@@ -634,6 +670,24 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
       free(blockshape);
       BLOSC_TRACE_ERROR("ZFP does not support blocks smaller than cells (4x...x4)");
       return BLOSC2_ERROR_FAILURE;
+    }
+  }
+
+  /* The b2nd blockshape determines the dataset fed to ZFP, so the input must be
+   * a complete block.  With split streams (e.g. SplitMode.ALWAYS_SPLIT) or any
+   * partial buffer, input_len is smaller than the block: compressing would
+   * overread the input, and the result would decompress to more bytes than the
+   * stream slot it came from.  Store uncompressed in that case. */
+  {
+    int64_t block_nbytes = cparams->typesize;
+    for (int i = 0; i < ndim; i++) {
+      block_nbytes *= blockshape[i];
+    }
+    if ((int64_t) input_len != block_nbytes) {
+      free(shape);
+      free(chunkshape);
+      free(blockshape);
+      return 0;
     }
   }
 
