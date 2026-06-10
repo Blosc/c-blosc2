@@ -2188,7 +2188,8 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
   if (nchunks > 0) {
     uint8_t *chunk;
     bool needs_free;
-    rc = frame_get_chunk(frame, 0, &chunk, &needs_free);
+    // A lazy chunk is enough here: only the header is needed for the flags2 byte
+    rc = frame_get_lazychunk(frame, 0, &chunk, &needs_free);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Cannot inspect the first chunk in frame.");
       goto error;
