@@ -1,11 +1,11 @@
-# Announcing C-Blosc2 3.1.2
+# Announcing C-Blosc2 3.1.3
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This is a hotfix release for a regression in ``b2nd_get_orthogonal_selection()``
-and ``b2nd_set_orthogonal_selection()`` introduced by the 3.1.1 batching
-optimization.
+This is a maintenance release for hardening ndlz, zfp, and ndmean plugin codecs/filters.
+We are also using lazy chunks more aggressively in the superblock.  This avoids
+unnecessary I/O and decompression when only part of a chunk is needed.
 
 For more info, see the release notes in:
 

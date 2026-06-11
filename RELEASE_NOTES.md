@@ -1,10 +1,62 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 3.1.2 to 3.1.3
+Changes from 3.1.3 to 3.1.4
 ===========================
 
 #XXX version-specific blurb XXX#
+
+Changes from 3.1.2 to 3.1.3
+===========================
+
+Security hardening
+------------------
+
+* Harden ndlz, zfp, and ndmean plugin codecs/filters against malformed or
+  attacker-crafted ``b2nd`` metalayers.  The block geometry for these
+  multidimensional plugins is read from the ``b2nd`` metalayer, which is
+  under user/remote control.  Without validation, a crafted metalayer could
+  trigger heap buffer overflows or out-of-bounds writes during decompression.
+
+* **zfp**: Added ``zfp_check_output_size()`` that validates the b2nd
+  metadata return value, ndim range, typesize, and performs an
+  overflow-safe computation of ``prod(blockshape) * typesize`` against the
+  output buffer size.  Non-positive block dimensions are rejected.
+  Compressors now also check deserialize returns and free buffers on every
+  early-return path.  A regression test covering oversized, zero-dimension,
+  and int64-overflow blockshapes has been added.
+
+* **ndlz**: Both ``ndlz4x4`` and ``ndlz8x8`` decoders now validate the
+  ``b2nd_deserialize_meta`` return value and properly free
+  shape/chunkshape/blockshape buffers (and ``bufarea``) on early-return
+  paths.
+
+* **ndmean**: Validates the deserialize return and ndim range, and sizes
+  the shape/chunkshape/blockshape buffers for ``B2ND_MAX_DIM``.
+
+* Validate NDLZ decompression input references, preventing potential issues
+  with untrusted or malformed inputs reaching the ndlz4x4 and ndlz8x8
+  decompressors.
+
+Thanks to @metsw24-max for all these improvements.
+
+Performance improvements
+------------------------
+
+* Use a lazy chunk instead of eagerly reading the whole chunk in the frame
+  code path.  This avoids unnecessary I/O and decompression when only part
+  of a chunk is needed.
+
+Fixes
+-----
+
+* Better handling of the ZFP codec workflow when ``input_len`` is smaller than
+  the block size in the zfp plugin.
+
+Notes
+-----
+
+* This is a maintenance release with no API/ABI changes.
 
 Changes from 3.1.1 to 3.1.2
 ===========================
