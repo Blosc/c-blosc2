@@ -73,16 +73,33 @@ int ndmean_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_
       cellshape[i] = 1;
     }
   }
-  int32_t blocksize = (int32_t) typesize;
+  // See ndmean_backward(): validate the b2nd block geometry in 64-bit so a
+  // crafted blockshape cannot wrap a 32-bit product back onto `length` and make
+  // the index arithmetic below stray outside the `length`-sized buffers.
+  int64_t blocksize = (int64_t) typesize;
   for (int i = 0; i < ndim; i++) {
+    if (blockshape[i] <= 0) {
+      free(shape);
+      free(chunkshape);
+      free(blockshape);
+      BLOSC_TRACE_ERROR("Invalid blockshape[%d] = %d", i, blockshape[i]);
+      return BLOSC2_ERROR_FAILURE;
+    }
     blocksize *= blockshape[i];
+    if (blocksize > (int64_t) length) {
+      free(shape);
+      free(chunkshape);
+      free(blockshape);
+      BLOSC_TRACE_ERROR("blockshape too large for block of %d bytes", length);
+      return BLOSC2_ERROR_FAILURE;
+    }
   }
 
-  if (length != blocksize) {
+  if ((int64_t) length != blocksize) {
     free(shape);
     free(chunkshape);
     free(blockshape);
-    BLOSC_TRACE_ERROR("Length not equal to blocksize %d %d \n", length, blocksize);
+    BLOSC_TRACE_ERROR("Length not equal to blocksize %d %lld \n", length, (long long) blocksize);
     return BLOSC2_ERROR_FAILURE;
   }
 
@@ -266,12 +283,41 @@ int ndmean_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8
   uint8_t *ip = (uint8_t *) input;
   uint8_t *ip_limit = ip + length;
   uint8_t *op = (uint8_t *) output;
-  int32_t blocksize = (int32_t) typesize;
+  if (typesize <= 0) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    BLOSC_TRACE_ERROR("Invalid typesize %d", typesize);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  // The block geometry (blockshape) comes from the attacker-controlled "b2nd"
+  // metalayer and is NOT validated by b2nd_deserialize_meta().  Compute the
+  // block size in 64-bit and reject non-positive dimensions.  Otherwise a
+  // crafted blockshape whose 32-bit product wraps back onto `length` would pass
+  // the check below, while the scatter-write index arithmetic further down uses
+  // the true (huge) dimensions, writing past the `length`-sized output buffer
+  // (heap overflow).  Bailing as soon as the running product exceeds `length`
+  // also keeps the 64-bit multiply from overflowing.
+  int64_t blocksize = (int64_t) typesize;
   for (int i = 0; i < ndim; i++) {
+    if (blockshape[i] <= 0) {
+      free(shape);
+      free(chunkshape);
+      free(blockshape);
+      BLOSC_TRACE_ERROR("Invalid blockshape[%d] = %d", i, blockshape[i]);
+      return BLOSC2_ERROR_FAILURE;
+    }
     blocksize *= blockshape[i];
+    if (blocksize > (int64_t) length) {
+      free(shape);
+      free(chunkshape);
+      free(blockshape);
+      BLOSC_TRACE_ERROR("blockshape too large for block of %d bytes", length);
+      return BLOSC2_ERROR_FAILURE;
+    }
   }
 
-  if (length != blocksize) {
+  if ((int64_t) length != blocksize) {
     free(shape);
     free(chunkshape);
     free(blockshape);
@@ -350,8 +396,8 @@ int ndmean_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8
   free(blockshape);
 
   if (ind != (int32_t) (blocksize / typesize)) {
-    BLOSC_TRACE_ERROR("Output size is not compatible with embedded blockshape ind %d %d \n",
-                      ind, (blocksize / typesize));
+    BLOSC_TRACE_ERROR("Output size is not compatible with embedded blockshape ind %d %lld \n",
+                      ind, (long long) (blocksize / typesize));
     return BLOSC2_ERROR_FAILURE;
   }
 
