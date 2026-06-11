@@ -15,7 +15,7 @@ if(BUILD_TESTS)
             TARGET test_ndmean_repart
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
     set_property(
-            TARGET test_ndmean_oversized_blockshape
+            TARGET test_ndmean_oversized
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
 
     target_link_libraries(test_ndmean_repart blosc_testing)
@@ -27,7 +27,7 @@ if(BUILD_TESTS)
         COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_ndmean_repart>)
     add_test(NAME test_plugin_ndmean_mean
         COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_ndmean_mean>)
-    add_test(NAME test_plugin_ndmean_oversized_blockshape
-        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_ndmean_oversized_blockshape>)
+    add_test(NAME test_plugin_ndmean_oversized
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_ndmean_oversized>)
 
 endif()
