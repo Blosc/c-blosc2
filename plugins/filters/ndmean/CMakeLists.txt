@@ -20,7 +20,7 @@ if(BUILD_TESTS)
 
     target_link_libraries(test_ndmean_repart blosc_testing)
     target_link_libraries(test_ndmean_mean blosc_testing)
-    target_link_libraries(test_ndmean_oversized_blockshape blosc_testing)
+    target_link_libraries(test_ndmean_oversized blosc_testing)
 
     # tests
     add_test(NAME test_plugin_ndmean_repart
