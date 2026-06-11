@@ -5,7 +5,7 @@ if(BUILD_TESTS)
     # targets
     add_executable(test_ndmean_repart test_ndmean_repart.c)
     add_executable(test_ndmean_mean test_ndmean_mean.c)
-    add_executable(test_ndmean_oversized_blockshape test_ndmean_oversized_blockshape.c)
+    add_executable(test_ndmean_oversized test_ndmean_oversized.c)
     # Define the BLOSC_TESTING symbol so normally-hidden functions
     # aren't hidden from the view of the test programs.
     set_property(
