@@ -5114,7 +5114,13 @@ static struct blosc_shared_pool* find_shared_pool_locked(int16_t nthreads) {
 }
 
 static int create_shared_pool(int16_t nthreads, struct blosc_shared_pool **pool_out) {
+  int rc = 0;
   int rc2;
+  int32_t contexts_init = 0;    // per-thread contexts successfully initialized
+  int32_t threads_started = 0;  // worker threads successfully created
+#if !defined(_WIN32)
+  bool attr_inited = false;
+#endif
   struct blosc_shared_pool *pool = (struct blosc_shared_pool *)my_malloc(sizeof(*pool));
   BLOSC_ERROR_NULL(pool, BLOSC2_ERROR_MEMORY_ALLOC);
   memset(pool, 0, sizeof(*pool));
@@ -5123,19 +5129,21 @@ static int create_shared_pool(int16_t nthreads, struct blosc_shared_pool **pool_
   blosc2_pthread_cond_init(&pool->work_cv, NULL);
   blosc2_pthread_cond_init(&pool->idle_cv, NULL);
   pool->threads = (blosc2_pthread_t*)my_malloc(nthreads * sizeof(blosc2_pthread_t));
-  BLOSC_ERROR_NULL(pool->threads, BLOSC2_ERROR_MEMORY_ALLOC);
+  if (pool->threads == NULL) { rc = BLOSC2_ERROR_MEMORY_ALLOC; goto error; }
   pool->thread_contexts = (struct thread_context*)my_malloc((size_t)nthreads * sizeof(struct thread_context));
-  BLOSC_ERROR_NULL(pool->thread_contexts, BLOSC2_ERROR_MEMORY_ALLOC);
+  if (pool->thread_contexts == NULL) { rc = BLOSC2_ERROR_MEMORY_ALLOC; goto error; }
   memset(pool->thread_contexts, 0, (size_t)nthreads * sizeof(struct thread_context));
 #if !defined(_WIN32)
   pthread_attr_init(&pool->ct_attr);
   pthread_attr_setdetachstate(&pool->ct_attr, PTHREAD_CREATE_JOINABLE);
+  attr_inited = true;
 #endif
   for (int32_t tid = 0; tid < nthreads; ++tid) {
-    int rc = init_thread_context(pool->thread_contexts + tid, NULL, tid);
+    rc = init_thread_context(pool->thread_contexts + tid, NULL, tid);
     if (rc < 0) {
-      return rc;
+      goto error;
     }
+    contexts_init++;
     pool->thread_contexts[tid].owner_pool = pool;
 #if !defined(_WIN32)
     rc2 = blosc2_pthread_create(&pool->threads[tid], &pool->ct_attr, shared_pool_worker,
@@ -5146,11 +5154,48 @@ static int create_shared_pool(int16_t nthreads, struct blosc_shared_pool **pool_
 #endif
     if (rc2) {
       BLOSC_TRACE_ERROR("Return code from blosc2_pthread_create() is %d.\n\tError detail: %s\n", rc2, strerror(rc2));
-      return BLOSC2_ERROR_THREAD_CREATE;
+      rc = BLOSC2_ERROR_THREAD_CREATE;
+      goto error;
     }
+    threads_started++;
   }
   *pool_out = pool;
   return 0;
+
+error:
+  // A worker frees its own thread context when it exits (see shared_pool_worker),
+  // so signal shutdown and join the ones already started before freeing anything.
+  if (threads_started > 0) {
+    blosc2_pthread_mutex_lock(&pool->mutex);
+    pool->shutdown = 1;
+    blosc2_pthread_cond_broadcast(&pool->work_cv);
+    blosc2_pthread_mutex_unlock(&pool->mutex);
+    for (int32_t t = 0; t < threads_started; ++t) {
+      void *status;
+      blosc2_pthread_join(pool->threads[t], &status);
+    }
+  }
+  // Contexts that were initialized but never got a running worker have no owner
+  // to free them; tear those down here (the started ones did it themselves).
+  for (int32_t t = threads_started; t < contexts_init; ++t) {
+    destroy_thread_context(pool->thread_contexts + t);
+  }
+#if !defined(_WIN32)
+  if (attr_inited) {
+    pthread_attr_destroy(&pool->ct_attr);
+  }
+#endif
+  if (pool->thread_contexts != NULL) {
+    my_free(pool->thread_contexts);
+  }
+  if (pool->threads != NULL) {
+    my_free(pool->threads);
+  }
+  blosc2_pthread_cond_destroy(&pool->idle_cv);
+  blosc2_pthread_cond_destroy(&pool->work_cv);
+  blosc2_pthread_mutex_destroy(&pool->mutex);
+  my_free(pool);
+  return rc;
 }
 
 static void destroy_shared_pool(struct blosc_shared_pool *pool) {
