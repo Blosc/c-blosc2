@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
 int ndcell_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta,
                     blosc2_dparams *dparams, uint8_t id);
@@ -78,15 +79,35 @@ static int expect_rejected(const char *name, int32_t b0, int32_t b1,
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.schunk = schunk;
 
-  uint8_t *input  = calloc(1, (size_t) (length > 0 ? length : 1));
-  uint8_t *output = malloc((size_t) (length > 0 ? length : 1));
+  size_t out_len = (size_t) (length > 0 ? length : 1);
+  /* Place a canary region immediately after the output buffer.  A rejection
+     must happen *before* any scatter-write, so even a partial overflow that
+     precedes the error return is caught here -- not just by the return code. */
+  const size_t canary_len = 64;
+  const uint8_t canary_byte = 0xAC;
+  uint8_t *input       = calloc(1, out_len);
+  uint8_t *output_full = malloc(out_len + canary_len);
+  uint8_t *output      = output_full;
+  memset(output_full + out_len, canary_byte, canary_len);
 
   int rc = ndcell_backward(input, output, length, cell_shape, &dparams, 0);
 
+  int canary_ok = 1;
+  for (size_t i = 0; i < canary_len; i++) {
+    if (output_full[out_len + i] != canary_byte) {
+      canary_ok = 0;
+      break;
+    }
+  }
+
   free(input);
-  free(output);
+  free(output_full);
   blosc2_schunk_free(schunk);
 
+  if (!canary_ok) {
+    printf("  %-30s: wrote past output buffer (canary clobbered) -- FAIL\n", name);
+    return -1;
+  }
   if (rc >= 0) {
     printf("  %-30s: NOT rejected (rc=%d) -- FAIL\n", name, rc);
     return -1;
