@@ -48,7 +48,18 @@ int ndcell_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_
   }
   int typesize = cparams->typesize;
 
-  int8_t cell_shape = (int8_t) meta;
+  // `meta` is the cell side length and comes from the chunk header (uint8_t,
+  // 0..255).  Interpret it as unsigned and reject 0: an (int8_t) cast would turn
+  // 128..255 into negative values and 0 would later divide by zero in
+  // `(blockshape[i] + cell_shape - 1) / cell_shape`.
+  int cell_shape = (int) meta;
+  if (cell_shape <= 0) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    BLOSC_TRACE_ERROR("Invalid cell_shape %d", cell_shape);
+    return BLOSC2_ERROR_FAILURE;
+  }
   const int cell_size = (int) pow(cell_shape, ndim);
 
   if (typesize <= 0) {
@@ -206,7 +217,17 @@ int ndcell_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8
     return BLOSC2_ERROR_FAILURE;
   }
 
-  int8_t cell_shape = (int8_t) meta;
+  // `meta` is attacker-controlled in a crafted frame.  Interpret it as unsigned
+  // and reject 0: an (int8_t) cast would turn 128..255 into negative values and
+  // 0 would later divide by zero in `(blockshape[i] + cell_shape - 1) / cell_shape`.
+  int cell_shape = (int) meta;
+  if (cell_shape <= 0) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    BLOSC_TRACE_ERROR("Invalid cell_shape %d", cell_shape);
+    return BLOSC2_ERROR_FAILURE;
+  }
   int cell_size = (int) pow(cell_shape, ndim);
   int32_t typesize = schunk->typesize;
   uint8_t *ip = (uint8_t *) input;
@@ -251,7 +272,7 @@ int ndcell_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8
     free(shape);
     free(chunkshape);
     free(blockshape);
-    BLOSC_TRACE_ERROR("Length not equal to blocksize");
+    BLOSC_TRACE_ERROR("Length not equal to blocksize %d %lld", length, (long long) blocksize);
     return BLOSC2_ERROR_FAILURE;
   }
 
