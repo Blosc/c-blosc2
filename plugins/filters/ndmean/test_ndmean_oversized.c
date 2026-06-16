@@ -103,6 +103,10 @@ int main(void) {
   result |= expect_rejected("zero block dimension", 0, 64, 1024, 4, 2);
   /* a negative block dimension must be invalid input */
   result |= expect_rejected("negative block dimension", -1, 64, 1024, 4, 2);
+  /* cell shape (meta) of 0 would divide by zero when building i_shape[] */
+  result |= expect_rejected("zero cell shape (meta=0)", 4, 4, 64, 4, 0);
+  /* cell shape (meta) > INT8_MAX becomes negative after the int8_t cast */
+  result |= expect_rejected("negative cell shape (meta=200)", 4, 4, 64, 4, 200);
 
   if (result == 0) {
     printf("All NDMEAN hardening checks passed.\n");
