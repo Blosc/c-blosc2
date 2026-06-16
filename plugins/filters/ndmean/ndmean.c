@@ -74,7 +74,7 @@ int ndmean_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_
   }
 
   int8_t cellshape[8];
-  int cell_size = 1;
+  int64_t cell_size = 1;  // 64-bit: prod(cellshape) can reach 127^ndim, which overflows int
   for (int i = 0; i < 8; ++i) {
     if (i < ndim) {
       cellshape[i] = (int8_t) meta;
@@ -293,7 +293,7 @@ int ndmean_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8
   }
 
   int8_t cellshape[8];
-  int cell_size = 1;
+  int64_t cell_size = 1;  // 64-bit: prod(cellshape) can reach 127^ndim, which overflows int
   for (int i = 0; i < 8; ++i) {
     if (i < ndim) {
       cellshape[i] = (int8_t) meta;
