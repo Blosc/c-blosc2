@@ -2357,12 +2357,17 @@ static int do_job(blosc2_context* context) {
   /* Set sentinels */
   context->dref_not_init = 1;
 
-  /* Check whether we need to restart threads */
-  check_nthreads(context);
+  /* Check whether we need to restart threads.  If the thread backend could
+     not be set up (e.g. shared-pool creation failed under thread/resource
+     exhaustion), rc < 0 and context->thread_pool stays NULL; fall back to the
+     serial path below instead of dereferencing a NULL pool in parallel_blosc.
+     The failed pool creation already emitted a TRACE_ERROR, and the next
+     do_job() re-attempts the attach, so the fallback is self-healing. */
+  int rc = check_nthreads(context);
 
-  /* Run the serial version when nthreads is 1 or when the buffers are
-     not larger than blocksize */
-  if (context->nthreads == 1 || (context->sourcesize / context->blocksize) <= 1) {
+  /* Run the serial version when nthreads is 1, when the buffers are not larger
+     than blocksize, or when the parallel backend failed to start */
+  if (context->nthreads == 1 || (context->sourcesize / context->blocksize) <= 1 || rc < 0) {
     /* The context for this 'thread' has no been initialized yet */
     if (context->serial_context == NULL) {
       context->serial_context = create_thread_context(context, 0);
