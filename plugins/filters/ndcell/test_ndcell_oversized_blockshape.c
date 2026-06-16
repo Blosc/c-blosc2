@@ -33,8 +33,7 @@
 #include <stdint.h>
 #include <string.h>
 
-int ndcell_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta,
-                    blosc2_dparams *dparams, uint8_t id);
+/* ndcell_backward() is declared in ndcell.h (included above). */
 
 static blosc2_schunk *make_schunk(int8_t ndim, const int64_t *shape, const int32_t *chunkshape,
                                   const int32_t *blockshape, int32_t typesize) {
