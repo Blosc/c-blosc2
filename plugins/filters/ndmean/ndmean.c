@@ -60,6 +60,19 @@ int ndmean_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_
     return BLOSC2_ERROR_FAILURE;
   }
 
+  // `meta` carries the NDMEAN cell shape and is attacker-controlled (it is the
+  // chunk-header filters_meta byte).  It is cast to int8_t and used as the
+  // divisor when building i_shape[] below, so a value of 0 (divide-by-zero) or
+  // one that becomes negative after the cast (meta > INT8_MAX) would crash or
+  // produce bogus, out-of-range geometry.  Require a positive cell shape.
+  if ((int8_t) meta <= 0) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    BLOSC_TRACE_ERROR("Invalid cell shape (meta) %d", (int) meta);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
   int8_t cellshape[8];
   int cell_size = 1;
   for (int i = 0; i < 8; ++i) {
@@ -262,6 +275,20 @@ int ndmean_backward(const uint8_t *input, uint8_t *output, int32_t length, uint8
     free(chunkshape);
     free(blockshape);
     BLOSC_TRACE_ERROR("ndim %d is out of range", ndim);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  // `meta` carries the NDMEAN cell shape and is attacker-controlled (it is the
+  // chunk-header filters_meta byte).  It is cast to int8_t and used as the
+  // divisor when building i_shape[] below, so a value of 0 (divide-by-zero) or
+  // one that becomes negative after the cast (meta > INT8_MAX) would crash or
+  // produce bogus, out-of-range geometry (e.g. a negative pad_shape feeding a
+  // huge memcpy).  Require a positive cell shape.
+  if ((int8_t) meta <= 0) {
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    BLOSC_TRACE_ERROR("Invalid cell shape (meta) %d", (int) meta);
     return BLOSC2_ERROR_FAILURE;
   }
 
