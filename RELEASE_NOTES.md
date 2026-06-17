@@ -4,7 +4,62 @@ Release notes for C-Blosc2
 Changes from 3.1.3 to 3.1.4
 ===========================
 
-#XXX version-specific blurb XXX#
+Security hardening
+------------------
+
+This release extends the block-geometry validation introduced in 3.1.3 to
+two more multidimensional plugin filters: **ndcell** and **ndmean**.
+
+* **ndcell**: ``ndcell_forward()`` and ``ndcell_backward()`` now validate
+the ``b2nd`` metalayer geometry in 64-bit arithmetic, rejecting non-positive
+block dimensions and blockshapes whose product exceeds the buffer size.
+This prevents a heap buffer overflow in the decompression path that could
+be triggered by a crafted blockshape whose 32-bit product wraps back onto
+``length``, passing the old validity check while the scatter-write index
+arithmetic used the true (huge) dimensions.
+
+* **ndmean**: Same class of fix applied to ``ndmean_forward()`` and
+``ndmean_backward()``.  Both now use 64-bit block-size computation with
+overflow-rejection and non-positive dimension checks at the earliest
+possible point.
+
+Both fixes ship with dedicated regression tests that explicitly craft the
+overflowing/wrapping geometries to prevent silent regressions.
+
+Thanks to @metsw24-max and @saddamr3e for all these improvements.
+
+Build / portability
+-------------------
+
+* Recognize **riscv64** (and riscv32) targets in CMake.  RISC-V builds now
+correctly disable SSE/AVX/NEON/ALTIVEC acceleration and fall back to the
+generic shuffle path, avoiding miscompilation or silent build failures on
+this emerging architecture.  Thanks to @carlosqwqqwq.
+
+Fixes
+-----
+
+* Fix a **memory leak** in ``create_shared_pool()`` when thread creation
+fails partway through building a shared thread pool.  Previously, a failed
+``pthread_create`` leaked the pool struct, thread and context arrays,
+synchronization primitives, and all per-thread scratch buffers initialized
+so far.  This was most visible under Emscripten/WASM (e.g., Pyodide),
+where every compress/decompress with ``nthreads > 1`` leaked the
+partially-built pool.  The fix adds a single error-unwind path that
+properly signals shutdown to already-started workers, joins them, tears
+down orphaned contexts, and releases all resources.
+
+* Fix a potential **NULL thread-pool SEGV** when shared-pool creation fails
+in ``do_job()``.  ``do_job()`` previously ignored ``check_nthreads()``'s
+return code, so a failed parallel backend (``context->thread_pool == NULL``)
+would still reach ``parallel_blosc()`` and crash on multi-block data.
+It now falls back to the serial path when ``rc < 0``.  The fallback is
+self-healing: the next ``do_job()`` call re-attempts the attach.
+
+Notes
+-----
+
+* This is a maintenance release with no API/ABI changes.
 
 Changes from 3.1.2 to 3.1.3
 ===========================

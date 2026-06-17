@@ -1,11 +1,21 @@
-# Announcing C-Blosc2 3.1.3
+# Announcing C-Blosc2 3.1.4
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release for hardening ndlz, zfp, and ndmean plugin codecs/filters.
-We are also using lazy chunks more aggressively in the superblock.  This avoids
-unnecessary I/O and decompression when only part of a chunk is needed.
+This is a maintenance release extending the security hardening from 3.1.3
+to the **ndcell** and **ndmean** plugin filters.  Malformed or
+attacker-crafted ``b2nd`` metalayers could previously trigger heap buffer
+overflows in these filters by exploiting 32-bit block-size arithmetic.
+Both plugins now validate block geometry in 64-bit to prevent overflows.
+
+Additionally, this release fixes a thread-pool memory leak that was
+especially visible under WebAssembly/Pyodide, and a potential SEGV on
+demand when the parallel backend fails to initialize.  RISC-V targets
+are now also properly recognized in the CMake build system.
+
+Thanks to @metsw24-max, @saddamr3e and @carlosqwqqwq for their contributions
+to this release!
 
 For more info, see the release notes in:
 
