@@ -816,7 +816,9 @@ int read_chunk_header(const uint8_t* src, int32_t srcsize, bool extended_header,
         }
       }
       else {
-        if (header->nbytes % header->typesize != 0) {
+        // All-zero chunks fill with memset, which works regardless of element alignment.
+        if (special_type != BLOSC2_SPECIAL_ZERO
+            && header->nbytes % header->typesize != 0) {
           BLOSC_TRACE_ERROR("`nbytes` is not a multiple of typesize");
           return BLOSC2_ERROR_INVALID_HEADER;
         }
@@ -1652,16 +1654,6 @@ static int32_t set_values(int32_t typesize, const uint8_t* src, uint8_t* dest, i
     memcpy(dest + i * typesize, src + BLOSC_EXTENDED_HEADER_LENGTH, typesize);
   }
 #else
-  // destsize can only be a multiple of typesize
-  int64_t val8;
-  int64_t* dest8;
-  int32_t val4;
-  int32_t* dest4;
-  int16_t val2;
-  int16_t* dest2;
-  int8_t val1;
-  int8_t* dest1;
-
   if (destsize % typesize != 0) {
     BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
   }
@@ -1671,34 +1663,38 @@ static int32_t set_values(int32_t typesize, const uint8_t* src, uint8_t* dest, i
   }
 
   switch (typesize) {
-    case 8:
-      val8 = ((int64_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
-      dest8 = (int64_t*)dest;
+    case 8: {
+      int64_t val8 = ((int64_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
+      int64_t* dest8 = (int64_t*)dest;
       for (int i = 0; i < nitems; i++) {
         dest8[i] = val8;
       }
       break;
-    case 4:
-      val4 = ((int32_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
-      dest4 = (int32_t*)dest;
+    }
+    case 4: {
+      int32_t val4 = ((int32_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
+      int32_t* dest4 = (int32_t*)dest;
       for (int i = 0; i < nitems; i++) {
         dest4[i] = val4;
       }
       break;
-    case 2:
-      val2 = ((int16_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
-      dest2 = (int16_t*)dest;
+    }
+    case 2: {
+      int16_t val2 = ((int16_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
+      int16_t* dest2 = (int16_t*)dest;
       for (int i = 0; i < nitems; i++) {
         dest2[i] = val2;
       }
       break;
-    case 1:
-      val1 = ((int8_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
-      dest1 = (int8_t*)dest;
+    }
+    case 1: {
+      int8_t val1 = ((int8_t*)(src + BLOSC_EXTENDED_HEADER_LENGTH))[0];
+      int8_t* dest1 = (int8_t*)dest;
       for (int i = 0; i < nitems; i++) {
         dest1[i] = val1;
       }
       break;
+    }
     default:
       for (int i = 0; i < nitems; i++) {
         memcpy(dest + i * typesize, src + BLOSC_EXTENDED_HEADER_LENGTH, typesize);
