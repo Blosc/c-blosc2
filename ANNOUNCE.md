@@ -1,21 +1,16 @@
-# Announcing C-Blosc2 3.1.4
+# Announcing C-Blosc2 3.1.5
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release extending the security hardening from 3.1.3
-to the **ndcell** and **ndmean** plugin filters.  Malformed or
-attacker-crafted ``b2nd`` metalayers could previously trigger heap buffer
-overflows in these filters by exploiting 32-bit block-size arithmetic.
-Both plugins now validate block geometry in 64-bit to prevent overflows.
+This is a maintenance release that fixes the decompression of all-zeros
+buffers whose length is not a multiple of ``typesize``.  Such chunks were
+previously rejected even though all-zeros decompression is just a ``memset``
+and works regardless of element alignment.  This affected, for example,
+python-blosc2's ``compress2`` → ``decompress2`` round-trip for all-zeros
+payloads with a length not divisible by the type size.
 
-Additionally, this release fixes a thread-pool memory leak that was
-especially visible under WebAssembly/Pyodide, and a potential SEGV on
-demand when the parallel backend fails to initialize.  RISC-V targets
-are now also properly recognized in the CMake build system.
-
-Thanks to @metsw24-max, @saddamr3e and @carlosqwqqwq for their contributions
-to this release!
+This release introduces no API/ABI changes.
 
 For more info, see the release notes in:
 

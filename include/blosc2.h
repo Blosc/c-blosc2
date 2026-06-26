@@ -85,8 +85,8 @@ extern "C" {
 #define BLOSC2_VERSION_MINOR    1   /* for minor interface/format changes  */
 #define BLOSC2_VERSION_RELEASE  5  /* for tweaks, bug-fixes, or development */
 
-#define BLOSC2_VERSION_STRING   "3.1.5.dev"  /* string version.  Sync with above! */
-#define BLOSC2_VERSION_DATE     "$Date:: 2026-06-17 #$"    /* date version year-month-day */
+#define BLOSC2_VERSION_STRING   "3.1.5"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_DATE     "$Date:: 2026-06-26 #$"    /* date version year-month-day */
 
 
 /* Tracing macros */

@@ -4,7 +4,25 @@ Release notes for C-Blosc2
 Changes from 3.1.4 to 3.1.5
 ===========================
 
-#XXX version-specific blurb XXX#
+Fixes
+-----
+
+* Fix decompression of **all-zeros buffers** whose length is not a multiple
+  of ``typesize``.  ``read_chunk_header()`` previously rejected
+  ``BLOSC2_SPECIAL_ZERO`` chunks whose ``nbytes`` was not a multiple of
+  ``typesize``.  However, all-zeros decompression is just a ``memset`` and
+  works regardless of element alignment, so the check was overly strict for
+  this case (it remains valid for ``SPECIAL_NAN``, ``SPECIAL_VALUE``, and
+  ``UNINIT``, whose callers do enforce alignment).  This affected, for
+  example, python-blosc2's ``compress2`` → ``decompress2`` round-trip for
+  all-zeros payloads such as ``bytes(707658)`` with ``typesize=8``
+  (``707658 % 8 == 2``).  A regression test with 9 parametrized cases has
+  been added.  Closes Blosc/python-blosc2#665.
+
+Notes
+-----
+
+* This is a maintenance release with no API/ABI changes.
 
 Changes from 3.1.3 to 3.1.4
 ===========================
