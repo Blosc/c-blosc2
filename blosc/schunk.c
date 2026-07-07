@@ -2309,6 +2309,16 @@ int blosc2_vlmeta_exists(blosc2_schunk *schunk, const char *name) {
     BLOSC_TRACE_ERROR("Variable-length metalayer names cannot be larger than %d chars.", BLOSC2_METALAYER_NAME_MAXLEN);
     return BLOSC2_ERROR_INVALID_PARAM;
   }
+  // Re-sync the cached vlmetalayers if another handle rewrote the frame, so
+  // that a vlmetalayer added or deleted elsewhere is (not) found.  The other
+  // vlmeta entry points (add/get/update/delete) all pass through here, so
+  // this is the single sync point for the vlmetalayers.
+  if (schunk->frame != NULL) {
+    int rc = frame_check_stale((blosc2_frame_s*)schunk->frame);
+    if (rc < 0) {
+      return rc;
+    }
+  }
 
   for (int nvlmetalayer = 0; nvlmetalayer < schunk->nvlmetalayers; nvlmetalayer++) {
     if (strcmp(name, schunk->vlmetalayers[nvlmetalayer]->name) == 0) {
@@ -2451,13 +2461,8 @@ int blosc2_vlmeta_get(blosc2_schunk *schunk, const char *name, uint8_t **content
     BLOSC_TRACE_ERROR("Invalid parameters.");
     return BLOSC2_ERROR_INVALID_PARAM;
   }
-  // Re-sync the cached vlmetalayers if another handle rewrote the frame
-  if (schunk->frame != NULL) {
-    int rc = frame_check_stale((blosc2_frame_s*)schunk->frame);
-    if (rc < 0) {
-      return rc;
-    }
-  }
+  // blosc2_vlmeta_exists() re-syncs the cached vlmetalayers if another handle
+  // rewrote the frame
   int nvlmetalayer = blosc2_vlmeta_exists(schunk, name);
   if (nvlmetalayer < 0) {
     BLOSC_TRACE_ERROR("User metalayer \"%s\" not found.", name);

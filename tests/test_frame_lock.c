@@ -148,6 +148,37 @@ static char* test_two_handles(void) {
 }
 
 
+/* blosc2_vlmeta_exists() must poll staleness: a vlmetalayer added or deleted
+   through another locked handle is reflected without any data access. */
+static char* test_vlmeta_exists_stale(void) {
+  mu_assert("ERROR: cannot create the frame", fill_frame(true, true) == NCHUNKS);
+  blosc2_schunk* h1 = blosc2_schunk_open_udio(URLPATH, locking_io());
+  blosc2_schunk* h2 = blosc2_schunk_open_udio(URLPATH, locking_io());
+  mu_assert("ERROR: cannot open the schunk twice", h1 != NULL && h2 != NULL);
+
+  mu_assert("ERROR: vlmetalayer must not exist yet",
+            blosc2_vlmeta_exists(h2, "foo") == BLOSC2_ERROR_NOT_FOUND);
+
+  uint8_t content[4] = {1, 2, 3, 4};
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  mu_assert("ERROR: cannot add the vlmetalayer",
+            blosc2_vlmeta_add(h1, "foo", content, sizeof(content), &cparams) >= 0);
+  mu_assert("ERROR: the added vlmetalayer is not seen by the other handle",
+            blosc2_vlmeta_exists(h2, "foo") >= 0);
+
+  mu_assert("ERROR: cannot delete the vlmetalayer",
+            blosc2_vlmeta_delete(h1, "foo") >= 0);
+  mu_assert("ERROR: the deleted vlmetalayer is still seen by the other handle",
+            blosc2_vlmeta_exists(h2, "foo") == BLOSC2_ERROR_NOT_FOUND);
+
+  blosc2_schunk_free(h1);
+  blosc2_schunk_free(h2);
+  blosc2_remove_urlpath(URLPATH);
+  return EXIT_SUCCESS;
+}
+
+
 static void set_env(const char* name, const char* value) {
 #if defined(_WIN32)
   _putenv_s(name, value);
@@ -410,6 +441,7 @@ static char *all_tests(void) {
   mu_run_test(test_two_handles);
   mu_run_test(test_env_locking);
   mu_run_test(test_sidecar_cleanup);
+  mu_run_test(test_vlmeta_exists_stale);
   mu_run_test(test_lock_bracket);
 #if !defined(_WIN32)
   mu_run_test(test_bracket_atomic);

@@ -2425,6 +2425,10 @@ static inline int blosc2_meta_get(blosc2_schunk *schunk, const char *name, uint8
 /**
  * @brief Find whether the schunk has a variable-length metalayer or not.
  *
+ * For on-disk super-chunks this also re-syncs the cached variable-length
+ * metalayers when another handle (or process) rewrote the frame, so a
+ * metalayer added or deleted elsewhere is reflected in the answer.
+ *
  * @param schunk The super-chunk from which the variable-length metalayer will be checked.
  * @param name The name of the variable-length metalayer to be checked.
  *
