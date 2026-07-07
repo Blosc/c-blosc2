@@ -126,6 +126,8 @@ typedef struct {
   //!< Data type. Different formats can be supported (see dtype_format).
   int8_t dtype_format;
   //!< The format of the data type.  Default is DTYPE_NUMPY_FORMAT.
+  int64_t last_tick;
+  //!< The schunk change_tick this struct was last synced with (see blosc2_schunk).
 } b2nd_array_t;
 
 

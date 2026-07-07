@@ -856,7 +856,65 @@ static int frame_refresh_if_stale(blosc2_frame_s *frame, int64_t frame_len_on_di
   }
   frame->trailer_len = trailer_len;
 
+  // The header metalayers and trailer vlmetalayers were cached at open time;
+  // reload them so metadata changes made by another handle (e.g. a b2nd shape
+  // update) become visible too.  The guard protects against re-entering from
+  // the reload path itself (get_header_info does not refresh, but cheap
+  // insurance against future changes there).
+  if (!frame->refreshing) {
+    frame->refreshing = true;
+    schunk_free_metalayers(frame->schunk);
+    int rc = frame_get_metalayers(frame, frame->schunk);
+    if (rc >= 0) {
+      schunk_free_vlmetalayers(frame->schunk);
+      rc = frame_get_vlmetalayers(frame, frame->schunk);
+    }
+    frame->refreshing = false;
+    if (rc < 0) {
+      BLOSC_TRACE_ERROR("Cannot reload the metalayers from the refreshed frame.");
+      return rc;
+    }
+  }
+  frame->schunk->change_tick++;
+
   return 1;
+}
+
+
+/* Poll the on-disk frame for staleness; see frame.h.  Mirrors the
+ * get_header_info + frame_refresh_if_stale + counter re-sync sequence that
+ * read paths like frame_get_chunk perform, but standalone, so upper layers
+ * (b2nd geometry checks, vlmeta reads) can sync before trusting cached
+ * metadata.  The shared lock makes the sidecar generation counter flag
+ * same-length mutations via force_refresh. */
+int frame_check_stale(blosc2_frame_s *frame) {
+  if (frame == NULL || frame->cframe != NULL || frame->schunk == NULL) {
+    return 0;
+  }
+  if (frame_lock(frame, false) < 0) {
+    return BLOSC2_ERROR_LOCK;
+  }
+  int32_t header_len;
+  int64_t frame_len;
+  int64_t nbytes;
+  int64_t cbytes;
+  int32_t blocksize;
+  int32_t chunksize;
+  int64_t nchunks;
+  int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes,
+                           &blocksize, &chunksize, &nchunks,
+                           NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+                           frame->schunk->storage->io);
+  if (rc >= 0) {
+    rc = frame_refresh_if_stale(frame, frame_len);
+    if (rc > 0) {
+      frame->schunk->nbytes = nbytes;
+      frame->schunk->cbytes = cbytes;
+      frame->schunk->nchunks = nchunks;
+    }
+  }
+  frame_unlock(frame);
+  return rc;
 }
 
 static int get_coffsets_nbytes(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,

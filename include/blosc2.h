@@ -1839,6 +1839,11 @@ typedef struct blosc2_schunk {
   //<! The blockshape (mainly for ZFP usage)
   bool view;
   //<! Whether the schunk is a view or not.
+  int64_t change_tick;
+  //!< Bumped whenever the (vl)metalayers change: by local mutations and by the
+  //!< refresh that follows a mutation made through another handle on the same
+  //!< on-disk frame.  Upper layers compare it against a cached value to know
+  //!< whether their deserialized view of the metalayers is still current.
 } blosc2_schunk;
 
 
@@ -2434,6 +2439,10 @@ BLOSC_EXPORT int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name,
  *
  * @warning The @p **content receives a malloc'ed copy of the content.
  * The user is responsible of freeing it.
+ *
+ * @note For disk-based super-chunks, this checks whether another handle has
+ * rewritten the frame and, if so, re-reads the cached metalayers first, so
+ * updates made through other handles (or processes) become visible.
  *
  * @return If successful, the index of the new variable-length metalayer. Else, return a negative value.
  */

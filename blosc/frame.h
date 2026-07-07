@@ -76,6 +76,7 @@ typedef struct {
   int32_t lock_depth;       //!< Lock re-entrancy depth; only depth 0 acquires/releases
   uint64_t lock_seq;        //!< Last seen value of the sidecar's generation counter
   bool force_refresh;       //!< Force a refresh of the cached frame state on the next access
+  bool refreshing;          //!< Re-entrancy guard for the metalayer reload during a refresh
 } blosc2_frame_s;
 
 
@@ -176,6 +177,24 @@ int frame_decompress_chunk(blosc2_context* dctx, blosc2_frame_s* frame, int64_t 
 
 int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new);
 int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk);
+
+int frame_get_metalayers(blosc2_frame_s* frame, blosc2_schunk* schunk);
+int frame_get_vlmetalayers(blosc2_frame_s* frame, blosc2_schunk* schunk);
+
+/**
+ * @brief Poll the on-disk frame for staleness and refresh the cached state
+ * (offsets index, counters, metalayers and vlmetalayers) when another handle
+ * mutated it.  Takes the shared lock when locking is enabled, so the sidecar
+ * generation counter is consulted too.  A no-op for in-memory frames.
+ *
+ * @return 1 if a refresh took place, 0 if none was needed, negative on error.
+ */
+int frame_check_stale(blosc2_frame_s* frame);
+
+/* Free the cached (vl)metalayers of a schunk (defined in schunk.c); used to
+ * reset the cache before reloading it from a refreshed frame. */
+void schunk_free_metalayers(blosc2_schunk* schunk);
+void schunk_free_vlmetalayers(blosc2_schunk* schunk);
 
 /**
  * @brief Acquire the frame's cross-process advisory lock (shared for reads,

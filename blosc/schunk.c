@@ -545,6 +545,32 @@ int64_t blosc2_schunk_append_file(blosc2_schunk* schunk, const char* urlpath) {
 
 
 /* Free all memory from a super-chunk. */
+void schunk_free_metalayers(blosc2_schunk *schunk) {
+  for (int i = 0; i < schunk->nmetalayers; i++) {
+    if (schunk->metalayers[i] != NULL) {
+      free(schunk->metalayers[i]->name);
+      free(schunk->metalayers[i]->content);
+      free(schunk->metalayers[i]);
+      schunk->metalayers[i] = NULL;
+    }
+  }
+  schunk->nmetalayers = 0;
+}
+
+
+void schunk_free_vlmetalayers(blosc2_schunk *schunk) {
+  for (int i = 0; i < schunk->nvlmetalayers; i++) {
+    if (schunk->vlmetalayers[i] != NULL) {
+      free(schunk->vlmetalayers[i]->name);
+      free(schunk->vlmetalayers[i]->content);
+      free(schunk->vlmetalayers[i]);
+      schunk->vlmetalayers[i] = NULL;
+    }
+  }
+  schunk->nvlmetalayers = 0;
+}
+
+
 int blosc2_schunk_free(blosc2_schunk *schunk) {
   int err = 0;
 
@@ -562,18 +588,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
   if (schunk->blockshape != NULL)
     free(schunk->blockshape);
 
-  if (schunk->nmetalayers > 0) {
-    for (int i = 0; i < schunk->nmetalayers; i++) {
-      if (schunk->metalayers[i] != NULL) {
-        if (schunk->metalayers[i]->name != NULL)
-          free(schunk->metalayers[i]->name);
-        if (schunk->metalayers[i]->content != NULL)
-          free(schunk->metalayers[i]->content);
-        free(schunk->metalayers[i]);
-      }
-    }
-    schunk->nmetalayers = 0;
-  }
+  schunk_free_metalayers(schunk);
 
   if (schunk->storage != NULL) {
     blosc2_io_cb *io_cb = blosc2_get_io_cb(schunk->storage->io->id);
@@ -599,17 +614,7 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
     frame_free((blosc2_frame_s *) schunk->frame);
   }
 
-  if (schunk->nvlmetalayers > 0) {
-    for (int i = 0; i < schunk->nvlmetalayers; ++i) {
-      if (schunk->vlmetalayers[i] != NULL) {
-        if (schunk->vlmetalayers[i]->name != NULL)
-          free(schunk->vlmetalayers[i]->name);
-        if (schunk->vlmetalayers[i]->content != NULL)
-          free(schunk->vlmetalayers[i]->content);
-        free(schunk->vlmetalayers[i]);
-      }
-    }
-  }
+  schunk_free_vlmetalayers(schunk);
 
   free(schunk);
 
@@ -2198,6 +2203,7 @@ int blosc2_meta_add(blosc2_schunk *schunk, const char *name, uint8_t *content, i
   if (rc < 0) {
     return rc;
   }
+  schunk->change_tick++;
 
   return schunk->nmetalayers - 1;
 }
@@ -2246,6 +2252,7 @@ int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content
       return rc;
     }
   }
+  schunk->change_tick++;
 
   return nmetalayer;
 }
@@ -2390,6 +2397,7 @@ int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name, uint8_t *content,
     BLOSC_TRACE_ERROR("Can not propagate de `%s` variable-length metalayer to a frame.", name);
     return rc;
   }
+  schunk->change_tick++;
 
   return schunk->nvlmetalayers - 1;
 }
@@ -2400,6 +2408,13 @@ int blosc2_vlmeta_get(blosc2_schunk *schunk, const char *name, uint8_t **content
   if (schunk == NULL || name == NULL || content == NULL || content_len == NULL) {
     BLOSC_TRACE_ERROR("Invalid parameters.");
     return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  // Re-sync the cached vlmetalayers if another handle rewrote the frame
+  if (schunk->frame != NULL) {
+    int rc = frame_check_stale((blosc2_frame_s*)schunk->frame);
+    if (rc < 0) {
+      return rc;
+    }
   }
   int nvlmetalayer = blosc2_vlmeta_exists(schunk, name);
   if (nvlmetalayer < 0) {
@@ -2521,6 +2536,7 @@ int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name, uint8_t *conte
     BLOSC_TRACE_ERROR("Can not propagate de `%s` variable-length metalayer to a frame.", name);
     return rc;
   }
+  schunk->change_tick++;
 
   return nvlmetalayer;
 }
@@ -2548,6 +2564,7 @@ int blosc2_vlmeta_delete(blosc2_schunk *schunk, const char *name) {
     BLOSC_TRACE_ERROR("Can not propagate de `%s` variable-length metalayer to a frame.", name);
     return rc;
   }
+  schunk->change_tick++;
 
   return schunk->nvlmetalayers;
 }
