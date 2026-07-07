@@ -277,7 +277,9 @@ int update_shape(b2nd_array_t *array, int8_t ndim, const int64_t *shape,
 
 /* Re-sync the cached geometry when another handle changed the b2nd metalayer
  * behind our back (the growth-SWMR case: a writer resizes, readers follow).
- * A no-op for arrays not backed by an on-disk frame. */
+ * A no-op for arrays not backed by an on-disk frame.
+ * Returns 1 if the geometry was re-synced, 0 if it was already current, or
+ * a negative error code. */
 static int refresh_if_stale(b2nd_array_t *array) {
   blosc2_schunk *sc = array->sc;
   if (sc == NULL || sc->frame == NULL) {
@@ -321,7 +323,13 @@ static int refresh_if_stale(b2nd_array_t *array) {
   BLOSC_ERROR(update_shape_struct(array, ndim, shape, chunkshape, blockshape));
   array->last_tick = sc->change_tick;
 
-  return BLOSC2_ERROR_SUCCESS;
+  return 1;
+}
+
+
+int b2nd_refresh(b2nd_array_t *array) {
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+  return refresh_if_stale(array);
 }
 
 

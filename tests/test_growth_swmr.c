@@ -184,18 +184,57 @@ static char* test_vlmeta(void) {
 }
 
 
+/* b2nd_refresh() must make a shape change visible without reading data
+   (the deterministic sync point pollers use, e.g. python-blosc2). */
+static char* test_explicit_refresh(void) {
+  b2nd_array_t *creator = create_array();
+  mu_assert("ERROR: cannot create the array", creator != NULL);
+  b2nd_free(creator);
+
+  b2nd_array_t *w = NULL;
+  b2nd_array_t *r = NULL;
+  mu_assert("ERROR: cannot open the writer handle", b2nd_open(urlpath, &w) >= 0);
+  mu_assert("ERROR: cannot open the reader handle", b2nd_open(urlpath, &r) >= 0);
+
+  // A fresh handle is already current
+  mu_assert("ERROR: refresh on a current handle should return 0",
+            b2nd_refresh(r) == 0);
+
+  // Writer grows the array behind the reader's back
+  int64_t new_shape[] = {2 * NROWS, NCOLS};
+  mu_assert("ERROR: cannot resize the array", b2nd_resize(w, new_shape, NULL) >= 0);
+  mu_assert("ERROR: the reader shape should still be stale before the refresh",
+            r->shape[0] == NROWS);
+
+  // An explicit refresh must re-sync the shape, with no data access involved
+  mu_assert("ERROR: refresh on a stale handle should return 1",
+            b2nd_refresh(r) == 1);
+  mu_assert("ERROR: the reader shape did not follow the resize",
+            r->shape[0] == 2 * NROWS && r->shape[1] == NCOLS);
+  mu_assert("ERROR: a second refresh should return 0",
+            b2nd_refresh(r) == 0);
+
+  b2nd_free(w);
+  b2nd_free(r);
+  blosc2_remove_urlpath(urlpath);
+  return EXIT_SUCCESS;
+}
+
+
 static char *all_tests(void) {
   urlpath = "test_growth_swmr.b2nd";
   contiguous = true;
   mu_run_test(test_grow);
   mu_run_test(test_shrink);
   mu_run_test(test_vlmeta);
+  mu_run_test(test_explicit_refresh);
 
   urlpath = "test_growth_swmr_s.b2nd";
   contiguous = false;
   mu_run_test(test_grow);
   mu_run_test(test_shrink);
   mu_run_test(test_vlmeta);
+  mu_run_test(test_explicit_refresh);
 
   return EXIT_SUCCESS;
 }

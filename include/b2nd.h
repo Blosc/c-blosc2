@@ -518,6 +518,29 @@ BLOSC_EXPORT int b2nd_resize(b2nd_array_t *array, const int64_t *new_shape, cons
 
 
 /**
+ * @brief Re-sync the cached geometry (shape, strides, metalayers) of a
+ * disk-based array when another handle — possibly in another process — has
+ * changed it (e.g. via @ref b2nd_resize).
+ *
+ * This gives a deterministic sync point for readers in a single-writer,
+ * multiple-readers (SWMR) workflow: after calling it, the shape in @p array
+ * reflects the current on-disk state.  Data-access functions (get/set slice
+ * and friends) already do this implicitly, so calling it is only needed to
+ * observe shape changes without reading data (e.g. when polling).
+ *
+ * A no-op for arrays not backed by an on-disk frame.  Only shape changes are
+ * followed: if ndim, chunkshape or blockshape changed behind this handle,
+ * BLOSC2_ERROR_DATA is returned.
+ *
+ * @param array The array to refresh.
+ *
+ * @return 1 if the geometry was re-synced, 0 if it was already current, or a
+ * negative error code.
+ */
+BLOSC_EXPORT int b2nd_refresh(b2nd_array_t *array);
+
+
+/**
  * @brief Insert given buffer in an array extending the given axis.
  *
  * @param array The array to insert the data in.
