@@ -565,6 +565,77 @@ int64_t get_trailer_offset(blosc2_frame_s *frame, int32_t header_len, bool has_c
   return frame->len - frame->trailer_len;
 }
 
+
+/* If the on-disk frame length (as just re-read by get_header_info) differs from the
+ * cached one, another handle (or process) has rewritten the frame behind our back.
+ * Drop the cached offsets index and refresh len/trailer_len so that subsequent
+ * accesses re-read the current on-disk state.  In-memory frames cannot go stale
+ * this way, and single-handle flows always match, so this is a no-op for them.
+ * Returns 1 if a refresh took place, 0 if none was needed, or a negative error. */
+static int frame_refresh_if_stale(blosc2_frame_s *frame, int64_t frame_len_on_disk) {
+  if (frame->cframe != NULL || frame->schunk == NULL || frame_len_on_disk == frame->len) {
+    return 0;
+  }
+
+  if (frame_len_on_disk < FRAME_HEADER_MINLEN + FRAME_TRAILER_MINLEN) {
+    BLOSC_TRACE_ERROR("Invalid on-disk frame length (%" PRId64 ").", frame_len_on_disk);
+    return BLOSC2_ERROR_FILE_READ;
+  }
+
+  // Invalidate the cached offsets index
+  if (frame->coffsets != NULL) {
+    if (frame->coffsets_needs_free) {
+      free(frame->coffsets);
+    }
+    frame->coffsets = NULL;
+  }
+  frame->len = frame_len_on_disk;
+
+  // Refresh the trailer length from the trailer tail (same logic as at open time)
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    return BLOSC2_ERROR_PLUGIN_IO;
+  }
+  void* fp;
+  if (frame->sframe) {
+    fp = sframe_open_index(frame->urlpath, "rb", frame->schunk->storage->io);
+  }
+  else {
+    fp = io_cb->open(frame->urlpath, "rb", frame->schunk->storage->io->params);
+  }
+  if (fp == NULL) {
+    BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+    return BLOSC2_ERROR_FILE_OPEN;
+  }
+  uint8_t trailer[FRAME_TRAILER_MINLEN];
+  uint8_t* trailer_ptr = trailer;
+  int64_t io_pos = frame->file_offset + frame_len_on_disk - FRAME_TRAILER_MINLEN;
+  int64_t rbytes = io_cb->read((void**)&trailer_ptr, 1, FRAME_TRAILER_MINLEN, io_pos, fp);
+  io_cb->close(fp);
+  if (rbytes != FRAME_TRAILER_MINLEN) {
+    BLOSC_TRACE_ERROR("Cannot read the trailer out of the frame.");
+    return BLOSC2_ERROR_FILE_READ;
+  }
+  int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
+  if (trailer_ptr[trailer_offset - 1] != 0xce) {
+    // Not a valid trailer; most likely we are reading a frame in the middle of
+    // being rewritten by another handle (writers need external serialization).
+    BLOSC_TRACE_ERROR("Invalid trailer in frame.");
+    return BLOSC2_ERROR_FILE_READ;
+  }
+  uint32_t trailer_len;
+  from_big(&trailer_len, trailer_ptr + trailer_offset, sizeof(trailer_len));
+  if (trailer_len < FRAME_TRAILER_MINLEN || trailer_len > INT32_MAX ||
+      (int64_t)trailer_len > frame_len_on_disk - FRAME_HEADER_MINLEN) {
+    BLOSC_TRACE_ERROR("Invalid trailer length (%" PRIu32 ") in frame.", trailer_len);
+    return BLOSC2_ERROR_FILE_READ;
+  }
+  frame->trailer_len = trailer_len;
+
+  return 1;
+}
+
 static int get_coffsets_nbytes(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
                                int32_t *coffsets_nbytes, const blosc2_io *io) {
   int32_t chunk_cbytes;
@@ -2590,6 +2661,19 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return rc;
   }
+  rc = frame_refresh_if_stale(frame, frame_len);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Unable to refresh the frame state from disk.");
+    return rc;
+  }
+  if (rc > 0) {
+    // Keep the schunk-level counters in sync with the refreshed on-disk state.
+    // Mutating ops (update/delete) read a chunk before adjusting the counters,
+    // so this also gives them a fresh base to apply their deltas on.
+    frame->schunk->nbytes = nbytes;
+    frame->schunk->cbytes = cbytes;
+    frame->schunk->nchunks = nchunks;
+  }
 
   if ((nchunks > 0) && (nchunk >= nchunks)) {
     BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') exceeds the number of chunks "
@@ -2731,6 +2815,18 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return rc;
+  }
+  rc = frame_refresh_if_stale(frame, frame_len);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Unable to refresh the frame state from disk.");
+    return rc;
+  }
+  if (rc > 0) {
+    // Keep the schunk-level counters in sync with the refreshed on-disk state
+    // (see frame_get_chunk).
+    frame->schunk->nbytes = nbytes;
+    frame->schunk->cbytes = cbytes;
+    frame->schunk->nchunks = nchunks;
   }
 
   if (nchunk >= nchunks) {
@@ -3260,6 +3356,11 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return NULL;
   }
+  rc = frame_refresh_if_stale(frame, frame_len);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Unable to refresh the frame state from disk.");
+    return NULL;
+  }
 
   /* The uncompressed and compressed sizes start at byte 4 and 12 */
   int32_t chunk_nbytes;
@@ -3508,6 +3609,11 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return NULL;
   }
+  rc = frame_refresh_if_stale(frame, frame_len);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Unable to refresh the frame state from disk.");
+    return NULL;
+  }
   int32_t chunk_cbytes;
   rc = blosc2_cbuffer_sizes(chunk_, NULL, &chunk_cbytes, NULL);
   if (rc < 0) {
@@ -3725,6 +3831,11 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
                            frame->schunk->storage->io);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
+    return NULL;
+  }
+  rc = frame_refresh_if_stale(frame, frame_len);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Unable to refresh the frame state from disk.");
     return NULL;
   }
   if (nchunk >= nchunks) {
@@ -4064,6 +4175,11 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
     BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
     return NULL;
   }
+  rc = frame_refresh_if_stale(frame, frame_len);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Unable to refresh the frame state from disk.");
+    return NULL;
+  }
 
   // Get the current offsets
   int32_t off_nbytes;
@@ -4237,6 +4353,11 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
   if (ret < 0) {
       BLOSC_TRACE_ERROR("Cannot get the header info for the frame.");
       return ret;
+  }
+  ret = frame_refresh_if_stale(frame, frame_len);
+  if (ret < 0) {
+    BLOSC_TRACE_ERROR("Unable to refresh the frame state from disk.");
+    return ret;
   }
 
   // Get the current offsets and add one more

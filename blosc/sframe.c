@@ -167,6 +167,14 @@ int32_t sframe_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t** chunk,
   }
 
   int64_t chunk_cbytes = io_cb->size(fpc);
+  if (chunk_cbytes < BLOSC_MIN_HEADER_LENGTH) {
+    // A valid chunk file always starts with a Blosc header; a smaller (e.g. empty)
+    // file means the on-disk state changed under us (another handle replaced this
+    // chunk) or the file is corrupted.  Fail the same way as frame_get_lazychunk().
+    BLOSC_TRACE_ERROR("Chunkfile is too small to contain a valid chunk.");
+    io_cb->close(fpc);
+    return BLOSC2_ERROR_FILE_READ;
+  }
 
   if (io_cb->is_allocation_necessary) {
     *chunk = malloc((size_t)chunk_cbytes);

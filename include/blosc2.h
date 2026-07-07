@@ -2079,6 +2079,11 @@ BLOSC_EXPORT int blosc2_schunk_decompress_chunk(blosc2_schunk *schunk, int64_t n
  * If the chunk does not need a free, it means that a pointer to the location in the super-chunk
  * (or the backing in-memory frame) is returned in the @p chunk parameter.
  *
+ * @note If the frame on disk has been modified through another handle (or process),
+ * the handle re-syncs its view automatically on the next access.  A concurrent
+ * (non-serialized) write can still surface as #BLOSC2_ERROR_FILE_READ; retry or
+ * reopen the super-chunk in that case.  Writers must be serialized externally.
+ *
  * @return The size of the (compressed) chunk or 0 if it is non-initialized. If some problem is
  * detected, a negative code is returned instead.
  */
@@ -2110,6 +2115,11 @@ BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, 
  * If the chunk does not need a free, it means that a pointer to the location in the super-chunk
  * (or the backing in-memory frame) is returned in the @p chunk parameter.  In this case the returned
  * chunk is not lazy.
+ *
+ * @note If the frame on disk has been modified through another handle (or process),
+ * the handle re-syncs its view automatically on the next access.  A concurrent
+ * (non-serialized) write can still surface as #BLOSC2_ERROR_FILE_READ; retry or
+ * reopen the super-chunk in that case.  Writers must be serialized externally.
  *
  * @return The size of the returned chunk buffer, or 0 if it is non-initialized.
  * If some problem is detected, a negative code is returned instead.  For regular
