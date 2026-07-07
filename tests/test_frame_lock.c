@@ -200,7 +200,121 @@ static char* test_sidecar_cleanup(void) {
 }
 
 
+/* blosc2_schunk_lock()/unlock() bracket: operations inside nest on the held
+   lock, everything keeps working after the unlock, and both calls are no-ops
+   on a handle without locking. */
+static char* test_lock_bracket(void) {
+  mu_assert("ERROR: cannot create the frame", fill_frame(true, true) == NCHUNKS);
+  blosc2_schunk* sc = blosc2_schunk_open_udio(URLPATH, locking_io());
+  mu_assert("ERROR: cannot open the schunk", sc != NULL);
+
+  mu_assert("ERROR: cannot take the lock bracket", blosc2_schunk_lock(sc) == 0);
+  // Mutations and reads inside the bracket nest instead of deadlocking
+  mu_assert("ERROR: cannot evict inside the bracket", evict_chunk(sc, 0) == 0);
+  uint8_t* chunk;
+  bool needs_free;
+  int csize = blosc2_schunk_get_chunk(sc, 0, &chunk, &needs_free);
+  mu_assert("ERROR: cannot read inside the bracket",
+            csize == BLOSC_EXTENDED_HEADER_LENGTH);
+  if (needs_free) {
+    free(chunk);
+  }
+  mu_assert("ERROR: cannot release the lock bracket", blosc2_schunk_unlock(sc) == 0);
+
+  // The lock is really released: operations after the bracket work normally
+  mu_assert("ERROR: cannot evict after the bracket", evict_chunk(sc, 1) == 0);
+  blosc2_schunk_free(sc);
+  blosc2_remove_urlpath(URLPATH);
+
+  // No-op on a handle without locking (and on in-memory schunks)
+  mu_assert("ERROR: cannot create the frame", fill_frame(true, false) == NCHUNKS);
+  sc = blosc2_schunk_open(URLPATH);
+  mu_assert("ERROR: cannot open the schunk", sc != NULL);
+  mu_assert("ERROR: lock bracket not a no-op without locking",
+            blosc2_schunk_lock(sc) == 0 && blosc2_schunk_unlock(sc) == 0);
+  mu_assert("ERROR: no sidecar must appear without locking",
+            !path_exists(URLPATH ".b2lock"));
+  blosc2_schunk_free(sc);
+  blosc2_remove_urlpath(URLPATH);
+  return EXIT_SUCCESS;
+}
+
+
 #if !defined(_WIN32)
+/* A bracketed multi-operation mutation must be atomic for other processes: a
+   child that reads while the parent holds the bracket blocks until the unlock
+   and then sees both mutations, never just the first one. */
+static char* test_bracket_atomic(void) {
+  mu_assert("ERROR: cannot create the frame", fill_frame(false, true) == NCHUNKS);
+
+  int pipefd[2];
+  mu_assert("ERROR: cannot create a pipe", pipe(pipefd) == 0);
+  pid_t pid = fork();
+  mu_assert("ERROR: cannot fork", pid >= 0);
+
+  if (pid == 0) {
+    /* Child: wait until the parent holds the bracket, then read both mutated
+       chunks; the shared lock is only granted after the parent's unlock, so
+       both must already be evicted (32-byte special chunks). */
+    close(pipefd[1]);
+    char byte;
+    if (read(pipefd[0], &byte, 1) != 1) {
+      _exit(1);
+    }
+    blosc2_schunk* sc = blosc2_schunk_open_udio(URLPATH, locking_io());
+    if (sc == NULL) {
+      _exit(2);
+    }
+    // Chunk 1 is mutated *last* by the parent: seeing it evicted while
+    // chunk 0 is not would mean the bracket leaked intermediate state
+    uint8_t* chunk;
+    bool needs_free;
+    int csize1 = blosc2_schunk_get_chunk(sc, 1, &chunk, &needs_free);
+    if (needs_free) {
+      free(chunk);
+    }
+    int csize0 = blosc2_schunk_get_chunk(sc, 0, &chunk, &needs_free);
+    if (needs_free) {
+      free(chunk);
+    }
+    blosc2_schunk_free(sc);
+    if (csize1 != BLOSC_EXTENDED_HEADER_LENGTH || csize0 != BLOSC_EXTENDED_HEADER_LENGTH) {
+      fprintf(stderr, "[child] csize1=%d csize0=%d (expected %d)\n",
+              csize1, csize0, BLOSC_EXTENDED_HEADER_LENGTH);
+      _exit(3);
+    }
+    _exit(0);
+  }
+
+  /* Parent: bracket around two evictions, with a pause in between that would
+     let the child slip in if each operation released the lock. */
+  close(pipefd[0]);
+  blosc2_schunk* sc = blosc2_schunk_open_udio(URLPATH, locking_io());
+  mu_assert("ERROR: cannot open the schunk in the parent", sc != NULL);
+  mu_assert("ERROR: cannot take the lock bracket", blosc2_schunk_lock(sc) == 0);
+  mu_assert("ERROR: cannot signal the child", write(pipefd[1], "x", 1) == 1);
+  mu_assert("ERROR: cannot evict chunk 0", evict_chunk(sc, 0) == 0);
+  usleep(200 * 1000);  // give the child time to block on the lock
+  mu_assert("ERROR: cannot evict chunk 1", evict_chunk(sc, 1) == 0);
+  mu_assert("ERROR: cannot release the lock bracket", blosc2_schunk_unlock(sc) == 0);
+  close(pipefd[1]);
+
+  int status = 0;
+  mu_assert("ERROR: cannot wait for the child", waitpid(pid, &status, 0) == pid);
+  if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+    fprintf(stderr, "[parent] child status: exited=%d code=%d signaled=%d sig=%d\n",
+            WIFEXITED(status), WIFEXITED(status) ? WEXITSTATUS(status) : -1,
+            WIFSIGNALED(status), WIFSIGNALED(status) ? WTERMSIG(status) : -1);
+  }
+  mu_assert("ERROR: the child observed intermediate bracket state",
+            WIFEXITED(status) && WEXITSTATUS(status) == 0);
+
+  blosc2_schunk_free(sc);
+  blosc2_remove_urlpath(URLPATH);
+  return EXIT_SUCCESS;
+}
+
+
 /* The real test: a child process keeps rewriting chunks while the parent
    reads all of them; with locking on, no read may ever fail (without it,
    torn reads intermittently yield BLOSC2_ERROR_FILE_READ). */
@@ -296,7 +410,9 @@ static char *all_tests(void) {
   mu_run_test(test_two_handles);
   mu_run_test(test_env_locking);
   mu_run_test(test_sidecar_cleanup);
+  mu_run_test(test_lock_bracket);
 #if !defined(_WIN32)
+  mu_run_test(test_bracket_atomic);
   mu_run_test(test_fork_hammer);
 #endif
   return EXIT_SUCCESS;

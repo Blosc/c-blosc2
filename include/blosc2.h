@@ -1899,6 +1899,41 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_from_buffer(uint8_t *cframe, int64_t l
 BLOSC_EXPORT void blosc2_schunk_avoid_cframe_free(blosc2_schunk *schunk, bool avoid_cframe_free);
 
 /**
+ * @brief Take the exclusive frame lock of a super-chunk and hold it across
+ * several operations.
+ *
+ * When the (opt-in) file locking is enabled on the handle (see the `locking`
+ * member of #blosc2_stdio_params, or the BLOSC_LOCKING environment variable),
+ * every schunk operation locks and unlocks the on-disk frame individually, so
+ * a sequence of operations is not atomic as a whole.  Bracketing the sequence
+ * between blosc2_schunk_lock() and blosc2_schunk_unlock() makes it atomic
+ * against other handles and processes: the operations inside nest on the
+ * already-held lock instead of re-acquiring it.
+ *
+ * Everything inside the bracket is serialized exclusively — including plain
+ * reads through other locked handles — so keep brackets short.  The bracket
+ * is re-entrant on the same handle.  When locking is not enabled on the
+ * handle (or the super-chunk is not disk-based), this is a no-op returning
+ * success, so callers do not need to check whether locking is active.
+ *
+ * @param schunk The super-chunk.
+ *
+ * @return 0 on success; a negative error code (e.g. BLOSC2_ERROR_LOCK)
+ * otherwise.
+ */
+BLOSC_EXPORT int blosc2_schunk_lock(blosc2_schunk *schunk);
+
+/**
+ * @brief Release the frame lock taken with blosc2_schunk_lock().
+ *
+ * @param schunk The super-chunk.
+ *
+ * @return 0 on success; a negative error code otherwise.  Like
+ * blosc2_schunk_lock(), a no-op when locking is not enabled.
+ */
+BLOSC_EXPORT int blosc2_schunk_unlock(blosc2_schunk *schunk);
+
+/**
  * @brief Open an existing super-chunk that is on-disk (frame). No in-memory copy is made.
  *
  * @param urlpath The file name.

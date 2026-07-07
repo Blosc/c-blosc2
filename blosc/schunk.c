@@ -394,6 +394,29 @@ blosc2_schunk* blosc2_schunk_open_offset_udio(const char* urlpath, int64_t offse
     frame_free(frame);
     return NULL;
   }
+  if (frame->force_refresh) {
+    // The bootstrap read in frame_from_file_offset() happened before the lock
+    // acquisition above, so a writer may have mutated the frame in between
+    // (the generation counter cannot tell a first acquisition from a raced
+    // one, so this also triggers on every open of a previously-mutated frame;
+    // one extra header read at open time is a fair price).  Re-read the frame
+    // now, taking the fresh handle's own shared lock *before* releasing the
+    // current one so that no writer can interleave.
+    blosc2_frame_s* fresh = frame_from_file_offset(urlpath, udio, offset);
+    int lock_rc = (fresh == NULL) ? BLOSC2_ERROR_FILE_READ : frame_lock(fresh, false);
+    frame_free(frame);  // closing its lock fd releases the old shared lock
+    if (fresh == NULL) {
+      return NULL;
+    }
+    if (lock_rc < 0) {
+      frame_free(fresh);
+      return NULL;
+    }
+    // The re-read ran under a continuously-held shared lock, so it is
+    // current: the seq mismatch of a first acquisition is not a mutation
+    fresh->force_refresh = false;
+    frame = fresh;
+  }
   blosc2_schunk* schunk = frame_to_schunk(frame, false, udio);
   if (schunk == NULL) {
     BLOSC_TRACE_ERROR("Error converting frame to super-chunk");
@@ -655,6 +678,21 @@ void blosc2_schunk_avoid_cframe_free(blosc2_schunk *schunk, bool avoid_cframe_fr
   if (frame) {
     frame_avoid_cframe_free(frame, avoid_cframe_free);
   }
+}
+
+
+/* Hold the exclusive frame lock across several operations: the operations
+   between blosc2_schunk_lock() and blosc2_schunk_unlock() nest on the
+   already-held lock (via the frame's lock depth counter) instead of
+   re-acquiring it, so the whole bracket is atomic against other handles.
+   No-ops (success) when locking is not enabled on the handle. */
+int blosc2_schunk_lock(blosc2_schunk *schunk) {
+  return frame_lock((blosc2_frame_s*)schunk->frame, true);
+}
+
+
+int blosc2_schunk_unlock(blosc2_schunk *schunk) {
+  return frame_unlock((blosc2_frame_s*)schunk->frame);
 }
 
 
