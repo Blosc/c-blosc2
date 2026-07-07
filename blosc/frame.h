@@ -71,6 +71,11 @@ typedef struct {
   bool sframe;              //!< Whether the frame is sparse (true) or not
   blosc2_schunk *schunk;    //!< The schunk associated
   int64_t file_offset;      //!< The offset where the frame starts inside the file
+  bool locking;             //!< Whether accesses are serialized via a sidecar lock file
+  intptr_t lock_fd;         //!< The fd (POSIX) or HANDLE (Windows) of the sidecar; -1 if not open
+  int32_t lock_depth;       //!< Lock re-entrancy depth; only depth 0 acquires/releases
+  uint64_t lock_seq;        //!< Last seen value of the sidecar's generation counter
+  bool force_refresh;       //!< Force a refresh of the cached frame state on the next access
 } blosc2_frame_s;
 
 
@@ -171,6 +176,32 @@ int frame_decompress_chunk(blosc2_context* dctx, blosc2_frame_s* frame, int64_t 
 
 int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new);
 int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk);
+
+/**
+ * @brief Acquire the frame's cross-process advisory lock (shared for reads,
+ * exclusive for mutations), blocking until available.  A no-op unless locking
+ * was requested at open/creation time (or when @p frame is NULL, for non-frame
+ * schunks).  Re-entrant on the same frame handle via a depth counter, so an
+ * exclusive section can nest shared ones.
+ *
+ * @return 0 if succeeds; BLOSC2_ERROR_LOCK otherwise.
+ */
+int frame_lock(blosc2_frame_s* frame, bool exclusive);
+
+/**
+ * @brief Release one level of the frame's advisory lock (the OS lock is
+ * released when the depth reaches zero).  A no-op when locking is off.
+ *
+ * @return 0 if succeeds; BLOSC2_ERROR_LOCK otherwise.
+ */
+int frame_unlock(blosc2_frame_s* frame);
+
+/**
+ * @brief Enable sidecar locking on @p frame when @p io requests it (default
+ * filesystem backend with blosc2_stdio_params.locking set).  Only meaningful
+ * for disk-based frames.
+ */
+void frame_set_locking(blosc2_frame_s* frame, const blosc2_io* io);
 
 int64_t frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
                        int32_t chunksize, blosc2_schunk* schunk);

@@ -16,6 +16,7 @@ set(SOURCES_ZERO_RUNLEN zero_runlen.c)
 set(SOURCES_CFRAME create_frame.c)
 set(SOURCES_SFRAME sframe_bench.c)
 set(SOURCES_GET_SPARSE get_sparse.c)
+set(SOURCES_FRAME_LOCK frame_lock_bench.c)
 
 add_subdirectory(b2nd)
 
@@ -28,6 +29,7 @@ add_executable(zero_runlen ${SOURCES_ZERO_RUNLEN})
 add_executable(create_frame ${SOURCES_CFRAME})
 add_executable(sframe_bench ${SOURCES_SFRAME})
 add_executable(get_sparse ${SOURCES_GET_SPARSE})
+add_executable(frame_lock_bench ${SOURCES_FRAME_LOCK})
 if(UNIX AND NOT APPLE)
     # cmake is complaining about LINK_PRIVATE in original PR
     # and removing it does not seem to hurt, so be it.
@@ -40,6 +42,7 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(create_frame rt)
     target_link_libraries(sframe_bench rt)
     target_link_libraries(get_sparse rt)
+    target_link_libraries(frame_lock_bench rt)
 endif()
 if(UNIX)
     if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
@@ -55,6 +58,7 @@ target_link_libraries(zero_runlen blosc_testing)
 target_link_libraries(create_frame blosc_testing)
 target_link_libraries(sframe_bench blosc_testing)
 target_link_libraries(get_sparse blosc_testing)
+target_link_libraries(frame_lock_bench blosc_testing)
 
 # tests
 if(BUILD_TESTS)

@@ -18,6 +18,13 @@ Each chunk follows the format described in the `chunk format <https://github.com
 
 *Note:* The real order of the chunks is in the index chunk and may not follow the order of the names. This can occur when doing an insertion or a reorder. For more information see the **Examples** section below.
 
+Sidecar lock file
+-----------------
+
+When the optional file locking is enabled (via the `locking` member of `blosc2_stdio_params`, passed in the `params` member of the `blosc2_io` struct), a small sidecar file named `.b2lock` appears inside the sframe directory. It is used to serialize accesses from several handles (typically in different processes) to the same sframe: readers share the lock, mutating operations take it exclusively, and it also carries a change counter so that open handles detect mutations made through other handles. See the `file-locking.c example <https://github.com/Blosc/c-blosc2/blob/main/examples/file-locking.c>`_ for usage.
+
+The sidecar is *not* part of the sframe format: it carries no frame data, it is safe to delete whenever no process has the sframe open, and it is removed together with the sframe directory. Note that the locking is advisory (it only protects the sframe if every handle enables it) and that it is not supported on network filesystems (NFS).
+
 Examples
 --------
 
