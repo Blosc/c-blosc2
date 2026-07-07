@@ -69,7 +69,7 @@ CUTEST_TEST_TEST(set_slice_buffer) {
   CUTEST_GET_PARAMETER(shapes, test_shapes_t);
   CUTEST_GET_PARAMETER(typesize, uint8_t);
 
-  char *urlpath = "test_set_slice_buffer.b2frame";
+  char *urlpath = "test_b2nd_set_slice_buffer.b2frame";
   blosc2_remove_urlpath(urlpath);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;

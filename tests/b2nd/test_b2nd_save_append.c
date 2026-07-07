@@ -53,7 +53,7 @@ CUTEST_TEST_TEST(save) {
   CUTEST_GET_PARAMETER(typesize, uint8_t);
   CUTEST_GET_PARAMETER(padding, uint32_t);
 
-  char *urlpath = "test_save.b2frame";
+  char *urlpath = "test_save_append.b2frame";
   blosc2_remove_urlpath(urlpath);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;

@@ -46,8 +46,8 @@ CUTEST_TEST_SETUP(fill_special) {
   ));
   CUTEST_PARAMETRIZE(backend, test_fill_special_backend, CUTEST_DATA(
       {true, NULL},  // memory - cframe
-      {true, "test_fill_special.b2frame"}, // disk - cframe
-      {false, "test_fill_special_s.b2frame"}, // disk - sframe
+      {true, "test_frame_get_offsets.b2frame"}, // disk - cframe
+      {false, "test_frame_get_offsets_s.b2frame"}, // disk - sframe
   ));
 }
 

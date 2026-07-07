@@ -64,8 +64,8 @@ CUTEST_TEST_TEST(copy) {
   CUTEST_GET_PARAMETER(backend2, _test_backend);
   CUTEST_GET_PARAMETER(typesize, uint8_t);
 
-  char *urlpath = "test_copy.b2frame";
-  char *urlpath2 = "test_copy2.b2frame";
+  char *urlpath = "test_b2nd_copy.b2frame";
+  char *urlpath2 = "test_b2nd_copy2.b2frame";
   blosc2_remove_urlpath(urlpath);
   blosc2_remove_urlpath(urlpath2);
 

@@ -20,9 +20,9 @@
   Time for schunk -> frame: 0.266 s, 286.7 MB/s
   Frame length in memory: 1212483 bytes
   Frame length on disk: 1212483 bytes
-  Time for frame -> fileframe (frame_simple.b2frame): 6.2 s, 0.0 GB/s
-  Time for fileframe (file:///frame_simple.b2frame) -> frame2 : 0.00177 s, 42.2 GB/s
-  Time for fileframe (file:///frame_simple.b2frame) + offset 1212483 -> frame3 : 0.00176 s, 42.3 GB/s
+  Time for frame -> fileframe (frame_offset.b2frame): 6.2 s, 0.0 GB/s
+  Time for fileframe (file:///frame_offset.b2frame) -> frame2 : 0.00177 s, 42.2 GB/s
+  Time for fileframe (file:///frame_offset.b2frame) + offset 1212483 -> frame3 : 0.00176 s, 42.3 GB/s
   Successful roundtrip schunk <-> frame <-> fileframe
                        schunk1 <-> frame1 <-> fileframe + offset
 
@@ -97,31 +97,31 @@ int main(void) {
   }
 
   // super-chunk -> fileframe (contiguous frame, on-disk)
-  remove("frame_simple.b2frame");
+  remove("frame_offset.b2frame");
   blosc_set_timestamp(&last);
-  frame_len = blosc2_schunk_to_file(schunk0w, "frame_simple.b2frame");
+  frame_len = blosc2_schunk_to_file(schunk0w, "frame_offset.b2frame");
   if (frame_len < 0) {
     return (int)frame_len;
   }
   printf("Frame length on disk: %ld bytes\n", (long)frame_len);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Time for frame -> fileframe (frame_simple.b2frame): %.3g s, %.1f GB/s\n",
+  printf("Time for frame -> fileframe (frame_offset.b2frame): %.3g s, %.1f GB/s\n",
          ttotal, (double)schunk0w->nbytes / (ttotal * GB));
 
   blosc_set_timestamp(&last);
-  int64_t offset = blosc2_schunk_append_file(schunk1a, "frame_simple.b2frame");
+  int64_t offset = blosc2_schunk_append_file(schunk1a, "frame_offset.b2frame");
   if (offset < 0) {
     return (int)offset;
   }
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Time for frame1 -> fileframe (frame_simple.b2frame) + offset: %.3g s, %.1f GB/s\n",
+  printf("Time for frame1 -> fileframe (frame_offset.b2frame) + offset: %.3g s, %.1f GB/s\n",
          ttotal, (double)schunk1a->nbytes / (ttotal * GB));
 
   // fileframe (file) -> schunk2 (on-disk contiguous, super-chunk)
   blosc_set_timestamp(&last);
-  blosc2_schunk* schunk2r = blosc2_schunk_open("file:///frame_simple.b2frame");
+  blosc2_schunk* schunk2r = blosc2_schunk_open("file:///frame_offset.b2frame");
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for fileframe (%s) -> frame2 : %.3g s, %.1f GB/s\n",
@@ -129,7 +129,7 @@ int main(void) {
 
   // fileframe (file) -> schunk3 (on-disk contiguous, super-chunk)
   blosc_set_timestamp(&last);
-  blosc2_schunk* schunk3o = blosc2_schunk_open_offset("file:///frame_simple.b2frame", offset);
+  blosc2_schunk* schunk3o = blosc2_schunk_open_offset("file:///frame_offset.b2frame", offset);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for fileframe (%s) + offset -> frame3 : %.3g s, %.1f GB/s\n",

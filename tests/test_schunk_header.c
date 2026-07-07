@@ -61,7 +61,7 @@ static char* test_schunk_header(void) {
   blosc2_schunk* schunk2 = blosc2_schunk_from_buffer(cframe, len, false);
 
   // Now store frame in a file
-  len = blosc2_schunk_to_file(schunk2, "test_file.b2frame");
+  len = blosc2_schunk_to_file(schunk2, "test_schunk_header.b2frame");
   mu_assert("Error in storing a frame buffer", len > 0);
 
   // Free completely all the schunks
@@ -69,7 +69,7 @@ static char* test_schunk_header(void) {
   blosc2_schunk_free(schunk2);
 
   // ...and open a new one back
-  schunk = blosc2_schunk_open("test_file.b2frame");
+  schunk = blosc2_schunk_open("test_schunk_header.b2frame");
 
   mu_assert("err compcode", schunk->compcode == BLOSC_BLOSCLZ);
   mu_assert("err comcode_meta", schunk->compcode_meta == 34);

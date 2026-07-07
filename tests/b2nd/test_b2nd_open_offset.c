@@ -103,33 +103,33 @@ CUTEST_TEST_TEST(open_offset) {
   }
 
   // super-chunk -> fileframe (contiguous frame, on-disk)
-  remove("frame_simple.b2frame");
+  remove("frame_simple_b2nd.b2frame");
   blosc_set_timestamp(&last);
-  frame_len = blosc2_schunk_to_file(schunk_write_start, "frame_simple.b2frame");
+  frame_len = blosc2_schunk_to_file(schunk_write_start, "frame_simple_b2nd.b2frame");
   if (frame_len < 0) {
     return (int)frame_len;
   }
   printf("Frame length on disk: %ld bytes\n", (long)frame_len);
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Time for frame_start -> fileframe (frame_simple.b2frame): %.3g s, %.1f GB/s\n",
+  printf("Time for frame_start -> fileframe (frame_simple_b2nd.b2frame): %.3g s, %.1f GB/s\n",
          ttotal, (double)schunk_write_start->nbytes / (ttotal * GB));
 
   // super-chunk -> fileframe (contiguous frame, on-disk) + offset
   blosc_set_timestamp(&last);
-  int64_t offset = blosc2_schunk_append_file(schunk_write_append, "frame_simple.b2frame");
+  int64_t offset = blosc2_schunk_append_file(schunk_write_append, "frame_simple_b2nd.b2frame");
   if (offset < 0) {
     return (int)offset;
   }
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
-  printf("Time for frame_append -> fileframe (frame_simple.b2frame) + offset: %.3g s, %.1f GB/s\n",
+  printf("Time for frame_append -> fileframe (frame_simple_b2nd.b2frame) + offset: %.3g s, %.1f GB/s\n",
          ttotal, (double)schunk_write_append->nbytes / (ttotal * GB));
 
   // fileframe (file) -> schunk (on-disk contiguous, super-chunk)
   blosc_set_timestamp(&last);
   b2nd_array_t* arr_read_start;
-  BLOSC_ERROR(b2nd_open("file:///frame_simple.b2frame", &arr_read_start));
+  BLOSC_ERROR(b2nd_open("file:///frame_simple_b2nd.b2frame", &arr_read_start));
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for fileframe (%s) -> frame_start : %.3g s, %.1f GB/s\n",
@@ -138,7 +138,7 @@ CUTEST_TEST_TEST(open_offset) {
   // fileframe (file) + offset -> schunk (on-disk contiguous, super-chunk)
   blosc_set_timestamp(&last);
   b2nd_array_t* arr_read_offset;
-  BLOSC_ERROR(b2nd_open_offset("file:///frame_simple.b2frame", &arr_read_offset, offset));
+  BLOSC_ERROR(b2nd_open_offset("file:///frame_simple_b2nd.b2frame", &arr_read_offset, offset));
   blosc_set_timestamp(&current);
   ttotal = blosc_elapsed_secs(last, current);
   printf("Time for fileframe (%s) + offset %ld -> open_offset : %.3g s, %.1f GB/s\n",
