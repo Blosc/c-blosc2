@@ -345,14 +345,18 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
 
   // Copy vlmetalayers
   for (int nmeta = 0; nmeta < schunk->nvlmetalayers; ++nmeta) {
-    uint8_t *content;
+    uint8_t *content = NULL;
     int32_t content_len;
     char* name = schunk->vlmetalayers[nmeta]->name;
     if (blosc2_vlmeta_get(schunk, name, &content, &content_len) < 0) {
+      // Passing the (previously uninitialized) content pointer forward ended
+      // in a bogus free that aborted the process; bail out instead.
       BLOSC_TRACE_ERROR("Can not get %s `vlmetalayer`.", name);
+      return NULL;
     }
     if (blosc2_vlmeta_add(new_schunk, name, content, content_len, NULL) < 0) {
       BLOSC_TRACE_ERROR("Can not add %s `vlmetalayer`.", name);
+      free(content);
       return NULL;
     }
     free(content);

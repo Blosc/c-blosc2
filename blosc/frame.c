@@ -905,13 +905,20 @@ int frame_check_stale(blosc2_frame_s *frame) {
                            &blocksize, &chunksize, &nchunks,
                            NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
                            frame->schunk->storage->io);
-  if (rc >= 0) {
-    rc = frame_refresh_if_stale(frame, frame_len);
-    if (rc > 0) {
-      frame->schunk->nbytes = nbytes;
-      frame->schunk->cbytes = cbytes;
-      frame->schunk->nchunks = nchunks;
-    }
+  if (rc < 0) {
+    // The on-disk header cannot be read right now (e.g. a freshly created
+    // frame not yet flushed to disk, or another process mid-write).  The
+    // poll is opportunistic: keep the cached view, exactly as before polling
+    // existed.  A genuinely torn frame still errors out in the data-access
+    // paths that need it.
+    frame_unlock(frame);
+    return 0;
+  }
+  rc = frame_refresh_if_stale(frame, frame_len);
+  if (rc > 0) {
+    frame->schunk->nbytes = nbytes;
+    frame->schunk->cbytes = cbytes;
+    frame->schunk->nchunks = nchunks;
   }
   frame_unlock(frame);
   return rc;
