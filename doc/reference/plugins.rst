@@ -48,6 +48,9 @@ IO backends
 .. doxygenstruct:: blosc2_io
    :members:
 
+.. doxygenstruct:: blosc2_stdio_params
+   :members:
+
 .. doxygenfunction:: blosc2_register_io_cb
 
 .. doxygenfunction:: blosc2_get_io_cb

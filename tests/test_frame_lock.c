@@ -148,6 +148,39 @@ static char* test_two_handles(void) {
 }
 
 
+static void set_env(const char* name, const char* value) {
+#if defined(_WIN32)
+  _putenv_s(name, value);
+#else
+  setenv(name, value, 1);
+#endif
+}
+
+
+/* The BLOSC_LOCKING env var must enable locking globally, with no locking
+   set in the io params; "0" must leave it off. */
+static char* test_env_locking(void) {
+  set_env("BLOSC_LOCKING", "1");
+  int64_t nchunks_on = fill_frame(true, false);
+  bool sidecar_on = path_exists(URLPATH ".b2lock");
+
+  set_env("BLOSC_LOCKING", "0");
+  int64_t nchunks_off = fill_frame(true, false);
+  bool sidecar_off = path_exists(URLPATH ".b2lock");
+
+  // Clear the env var before asserting, so a failure cannot leak it into
+  // the remaining tests ("" means off, like unset)
+  set_env("BLOSC_LOCKING", "");
+  blosc2_remove_urlpath(URLPATH);
+
+  mu_assert("ERROR: cannot create the frames",
+            nchunks_on == NCHUNKS && nchunks_off == NCHUNKS);
+  mu_assert("ERROR: BLOSC_LOCKING=1 did not enable locking", sidecar_on);
+  mu_assert("ERROR: BLOSC_LOCKING=0 did not disable locking", !sidecar_off);
+  return EXIT_SUCCESS;
+}
+
+
 /* The sidecar of a cframe must be removed along with the frame. */
 static char* test_sidecar_cleanup(void) {
   mu_assert("ERROR: cannot create the frame", fill_frame(true, true) == NCHUNKS);
@@ -261,6 +294,7 @@ static char* test_fork_hammer(void) {
 static char *all_tests(void) {
   mu_run_test(test_locking_off);
   mu_run_test(test_two_handles);
+  mu_run_test(test_env_locking);
   mu_run_test(test_sidecar_cleanup);
 #if !defined(_WIN32)
   mu_run_test(test_fork_hammer);

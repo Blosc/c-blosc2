@@ -19,6 +19,9 @@
     enables it.  Handles opened without `locking` bypass the lock entirely.
   - It is off by default, and only supported for the default filesystem I/O
     (BLOSC2_IO_FILESYSTEM); not on network filesystems (NFS).
+  - The BLOSC_LOCKING environment variable enables it globally, without
+    touching the sources ("0" or an empty value leave it off); handy to
+    make a whole deployment opt in at once.
   - The lock is held per operation, and it is crash-safe: the OS releases it
     when a process dies.
   - Lock failures surface as BLOSC2_ERROR_LOCK.

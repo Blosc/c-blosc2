@@ -49,6 +49,10 @@ typedef struct {
   //!< it only protects the frame if every handle on it enables this too).
   //!< Readers share the lock; mutating operations take it exclusively. Not
   //!< supported on network filesystems (NFS), nor by other I/O backends.
+  //!< The **BLOSC_LOCKING** environment variable turns this on globally
+  //!< (for every frame subsequently opened or created with the default
+  //!< filesystem I/O) without touching the sources; set it to "0" or the
+  //!< empty string to leave it off.
 } blosc2_stdio_params;
 
 /**

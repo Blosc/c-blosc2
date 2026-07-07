@@ -72,8 +72,18 @@ blosc2_frame_s* frame_new(const char* urlpath) {
 
 
 void frame_set_locking(blosc2_frame_s* frame, const blosc2_io* io) {
-  if (io != NULL && io->id == BLOSC2_IO_FILESYSTEM && io->params != NULL &&
-      ((blosc2_stdio_params*)io->params)->locking && frame->urlpath != NULL) {
+  if (frame->urlpath == NULL || io == NULL || io->id != BLOSC2_IO_FILESYSTEM) {
+    return;
+  }
+  bool locking = io->params != NULL && ((blosc2_stdio_params*)io->params)->locking;
+  if (!locking) {
+    // The BLOSC_LOCKING environment variable turns locking on globally, with
+    // the same effect as setting `locking` in blosc2_stdio_params on every
+    // handle ("0" or an empty value leave it off)
+    char* envvar = getenv("BLOSC_LOCKING");
+    locking = envvar != NULL && envvar[0] != '\0' && strcmp(envvar, "0") != 0;
+  }
+  if (locking) {
     frame->locking = true;
     frame->lock_fd = -1;
   }

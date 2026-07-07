@@ -1,4 +1,4 @@
-iname: RTD
+name: RTD
 channels:
   - conda-forge
   - defaults
