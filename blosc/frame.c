@@ -8,6 +8,14 @@
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
+#if !defined(_WIN32)
+// Make flock() and O_CLOEXEC visible despite -D_XOPEN_SOURCE=600 (as in blosc2-stdio.c)
+#if !defined(_GNU_SOURCE)
+#define _GNU_SOURCE
+#endif
+#define _DARWIN_C_SOURCE
+#endif
+
 #include "frame.h"
 #include "sframe.h"
 #include "context.h"
@@ -20,6 +28,14 @@
 #include <malloc.h>
 // See https://github.com/Blosc/python-blosc2/issues/359#issuecomment-2625380236
 #define stat _stat64
+#else
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
+#if !defined(O_CLOEXEC)
+#define O_CLOEXEC 0
+#endif
 #endif  /* _WIN32 */
 
 #include <inttypes.h>
@@ -55,8 +71,211 @@ blosc2_frame_s* frame_new(const char* urlpath) {
 }
 
 
+void frame_set_locking(blosc2_frame_s* frame, const blosc2_io* io) {
+  if (io != NULL && io->id == BLOSC2_IO_FILESYSTEM && io->params != NULL &&
+      ((blosc2_stdio_params*)io->params)->locking && frame->urlpath != NULL) {
+    frame->locking = true;
+    frame->lock_fd = -1;
+  }
+}
+
+
+/* Path of the sidecar lock file: inside the directory for sframes (removed for
+   free by blosc2_remove_dir), alongside the file for cframes. */
+static char* frame_lock_path(blosc2_frame_s* frame) {
+  const char* suffix = frame->sframe ? "/.b2lock" : ".b2lock";
+  char* path = malloc(strlen(frame->urlpath) + strlen(suffix) + 1);
+  if (path == NULL) {
+    return NULL;
+  }
+  strcpy(path, frame->urlpath);
+  strcat(path, suffix);
+  return path;
+}
+
+
+// Where the generation counter lives in the sidecar (past the byte range
+// locked by LockFileEx on Windows)
+#define FRAME_LOCK_SEQ_OFFSET 8
+
+
+static int frame_os_lock(blosc2_frame_s* frame, bool exclusive) {
+#if defined(_WIN32)
+  OVERLAPPED ov;
+  memset(&ov, 0, sizeof(ov));
+  if (!LockFileEx((HANDLE)frame->lock_fd, exclusive ? LOCKFILE_EXCLUSIVE_LOCK : 0,
+                  0, 1, 0, &ov)) {
+    return BLOSC2_ERROR_LOCK;
+  }
+#else
+  int rc;
+  do {
+    rc = flock((int)frame->lock_fd, exclusive ? LOCK_EX : LOCK_SH);
+  } while (rc != 0 && errno == EINTR);
+  if (rc != 0) {
+    return BLOSC2_ERROR_LOCK;
+  }
+#endif
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+static int frame_os_unlock(blosc2_frame_s* frame) {
+#if defined(_WIN32)
+  OVERLAPPED ov;
+  memset(&ov, 0, sizeof(ov));
+  if (!UnlockFileEx((HANDLE)frame->lock_fd, 0, 1, 0, &ov)) {
+    return BLOSC2_ERROR_LOCK;
+  }
+#else
+  if (flock((int)frame->lock_fd, LOCK_UN) != 0) {
+    return BLOSC2_ERROR_LOCK;
+  }
+#endif
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+/* Read the sidecar's generation counter (must be called with the lock held).
+   A fresh (short) sidecar reads as 0. */
+static int frame_lock_read_seq(blosc2_frame_s* frame, uint64_t* seq) {
+  *seq = 0;
+#if defined(_WIN32)
+  OVERLAPPED ov;
+  memset(&ov, 0, sizeof(ov));
+  ov.Offset = FRAME_LOCK_SEQ_OFFSET;
+  DWORD nread = 0;
+  if (!ReadFile((HANDLE)frame->lock_fd, seq, sizeof(*seq), &nread, &ov)) {
+    if (GetLastError() != ERROR_HANDLE_EOF) {
+      return BLOSC2_ERROR_LOCK;
+    }
+  }
+  if (nread != sizeof(*seq)) {
+    *seq = 0;
+  }
+#else
+  int64_t nread = pread((int)frame->lock_fd, seq, sizeof(*seq), FRAME_LOCK_SEQ_OFFSET);
+  if (nread < 0) {
+    return BLOSC2_ERROR_LOCK;
+  }
+  if (nread != (int64_t)sizeof(*seq)) {
+    *seq = 0;
+  }
+#endif
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+/* Write the sidecar's generation counter (must be called with the exclusive
+   lock held). */
+static int frame_lock_write_seq(blosc2_frame_s* frame, uint64_t seq) {
+#if defined(_WIN32)
+  OVERLAPPED ov;
+  memset(&ov, 0, sizeof(ov));
+  ov.Offset = FRAME_LOCK_SEQ_OFFSET;
+  DWORD nwritten = 0;
+  if (!WriteFile((HANDLE)frame->lock_fd, &seq, sizeof(seq), &nwritten, &ov) ||
+      nwritten != sizeof(seq)) {
+    return BLOSC2_ERROR_LOCK;
+  }
+#else
+  if (pwrite((int)frame->lock_fd, &seq, sizeof(seq), FRAME_LOCK_SEQ_OFFSET) !=
+      (int64_t)sizeof(seq)) {
+    return BLOSC2_ERROR_LOCK;
+  }
+#endif
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+int frame_lock(blosc2_frame_s* frame, bool exclusive) {
+  if (frame == NULL || !frame->locking) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  if (frame->lock_depth > 0) {
+    // Already held by this handle (a nested call); the outer lock covers us
+    frame->lock_depth++;
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  if (frame->lock_fd == -1) {
+    // Lazily open the sidecar, kept for the frame's lifetime
+    char* path = frame_lock_path(frame);
+    if (path == NULL) {
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+#if defined(_WIN32)
+    HANDLE h = CreateFileA(path, GENERIC_READ | GENERIC_WRITE,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                           NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) {
+      BLOSC_TRACE_ERROR("Cannot open the lock file in: %s", path);
+      free(path);
+      return BLOSC2_ERROR_LOCK;
+    }
+    frame->lock_fd = (intptr_t)h;
+#else
+    int fd = open(path, O_CREAT | O_RDWR | O_CLOEXEC, 0666);
+    if (fd < 0) {
+      BLOSC_TRACE_ERROR("Cannot open the lock file in: %s", path);
+      free(path);
+      return BLOSC2_ERROR_LOCK;
+    }
+    frame->lock_fd = fd;
+#endif
+    free(path);
+  }
+  if (frame_os_lock(frame, exclusive) < 0) {
+    BLOSC_TRACE_ERROR("Cannot lock the frame.");
+    return BLOSC2_ERROR_LOCK;
+  }
+  // Generation counter: writers bump it, everyone compares it with the last
+  // value it saw.  This detects mutations by other handles exactly, even when
+  // the frame length on disk ends up unchanged (which the length-based
+  // staleness check in frame_refresh_if_stale() cannot see).
+  uint64_t seq;
+  if (frame_lock_read_seq(frame, &seq) < 0 ||
+      (exclusive && frame_lock_write_seq(frame, seq + 1) < 0)) {
+    BLOSC_TRACE_ERROR("Cannot access the frame lock generation counter.");
+    frame_os_unlock(frame);
+    return BLOSC2_ERROR_LOCK;
+  }
+  if (seq != frame->lock_seq) {
+    frame->force_refresh = true;
+  }
+  if (exclusive) {
+    seq++;
+  }
+  frame->lock_seq = seq;
+  frame->lock_depth = 1;
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+int frame_unlock(blosc2_frame_s* frame) {
+  if (frame == NULL || !frame->locking || frame->lock_depth == 0) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  if (--frame->lock_depth > 0) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  if (frame_os_unlock(frame) < 0) {
+    BLOSC_TRACE_ERROR("Cannot unlock the frame.");
+    return BLOSC2_ERROR_LOCK;
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 /* Free memory from a frame. */
 int frame_free(blosc2_frame_s* frame) {
+
+  if (frame->locking && frame->lock_fd != -1) {
+#if defined(_WIN32)
+    CloseHandle((HANDLE)frame->lock_fd);
+#else
+    close((int)frame->lock_fd);
+#endif
+  }
 
   if (frame->cframe != NULL && !frame->avoid_cframe_free) {
     free(frame->cframe);
@@ -573,9 +792,13 @@ int64_t get_trailer_offset(blosc2_frame_s *frame, int32_t header_len, bool has_c
  * this way, and single-handle flows always match, so this is a no-op for them.
  * Returns 1 if a refresh took place, 0 if none was needed, or a negative error. */
 static int frame_refresh_if_stale(blosc2_frame_s *frame, int64_t frame_len_on_disk) {
-  if (frame->cframe != NULL || frame->schunk == NULL || frame_len_on_disk == frame->len) {
+  if (frame->cframe != NULL || frame->schunk == NULL ||
+      (!frame->force_refresh && frame_len_on_disk == frame->len)) {
     return 0;
   }
+  // The lock generation counter (see frame_lock) may have flagged a mutation
+  // that left the frame length unchanged; the refresh below covers it
+  frame->force_refresh = false;
 
   if (frame_len_on_disk < FRAME_HEADER_MINLEN + FRAME_TRAILER_MINLEN) {
     BLOSC_TRACE_ERROR("Invalid on-disk frame length (%" PRId64 ").", frame_len_on_disk);
@@ -1134,6 +1357,7 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
       return NULL;
     }
     frame->trailer_len = trailer_len;
+    frame_set_locking(frame, io);
 
     return frame;
 }

@@ -488,6 +488,7 @@ enum {
   BLOSC2_ERROR_METALAYER_NOT_FOUND = -34,   //!< Metalayer has not been found
   BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED = -35,  //!< Max buffer size exceeded
   BLOSC2_ERROR_TUNER = -36,           //!< Tuner failure
+  BLOSC2_ERROR_LOCK = -37,            //!< Frame lock failure
 };
 
 

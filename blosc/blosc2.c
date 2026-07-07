@@ -6910,6 +6910,8 @@ const char *blosc2_error_string(int error_code) {
       return "Wrong type for frame";
     case BLOSC2_ERROR_FILE_TRUNCATE:
       return "File truncate failure";
+    case BLOSC2_ERROR_LOCK:
+      return "Frame lock failure";
     case BLOSC2_ERROR_THREAD_CREATE:
       return "Thread or thread context creation failure";
     case BLOSC2_ERROR_POSTFILTER:

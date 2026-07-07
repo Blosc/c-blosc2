@@ -342,3 +342,11 @@ However, the *vlmetalayers* follows the same format as the ones stored in the he
 
 :fingerprint:
     (``uint128``) Fix storage space for the fingerprint (16 bytes), padded to the left.
+
+
+Sidecar lock file
+-----------------
+
+When the optional file locking is enabled for an on-disk cframe (via the `locking` member of `blosc2_stdio_params`, passed in the `params` member of the `blosc2_io` struct), a small sidecar file appears next to the frame file, with the same name plus a `.b2lock` suffix. It is used to serialize accesses from several handles (typically in different processes) to the same cframe: readers share the lock, mutating operations take it exclusively, and it also carries a change counter so that open handles detect mutations made through other handles. See the `file-locking.c example <https://github.com/Blosc/c-blosc2/blob/main/examples/file-locking.c>`_ for usage.
+
+The sidecar is *not* part of the cframe format: it carries no frame data, it is safe to delete whenever no process has the cframe open, and `blosc2_remove_urlpath()` removes it together with the frame file. Note that the locking is advisory (it only protects the cframe if every handle enables it) and that it is not supported on network filesystems (NFS).

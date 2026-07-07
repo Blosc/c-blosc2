@@ -226,6 +226,14 @@ int blosc2_remove_urlpath(const char* urlpath){
       BLOSC_TRACE_ERROR("Could not remove %s", urlpath);
       return BLOSC2_ERROR_FILE_REMOVE;
     }
+    // Also remove the sidecar lock file of a cframe, if any
+    char* lockpath = malloc(strlen(urlpath) + strlen(".b2lock") + 1);
+    if (lockpath != NULL) {
+      strcpy(lockpath, urlpath);
+      strcat(lockpath, ".b2lock");
+      remove(lockpath);  // best-effort; may not exist
+      free(lockpath);
+    }
   }
   return BLOSC2_ERROR_SUCCESS;
 }

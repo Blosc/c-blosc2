@@ -36,6 +36,26 @@ typedef struct {
   FILE *file;
 } blosc2_stdio_file;
 
+/**
+ * @brief Parameters for the default filesystem I/O (#BLOSC2_IO_FILESYSTEM).
+ * Pass a pointer to this struct in the params member of the #blosc2_io struct;
+ * a NULL params keeps all the defaults. The struct must outlive the super-chunks
+ * opened with it.
+ */
+typedef struct {
+  bool locking;
+  //!< Serialize accesses to a disk-based frame against other handles and other
+  //!< processes, via a sidecar lock file next to the frame (advisory locking:
+  //!< it only protects the frame if every handle on it enables this too).
+  //!< Readers share the lock; mutating operations take it exclusively. Not
+  //!< supported on network filesystems (NFS), nor by other I/O backends.
+} blosc2_stdio_params;
+
+/**
+ * @brief Default filesystem I/O parameters for user initialization.
+ */
+static const blosc2_stdio_params BLOSC2_STDIO_PARAMS_DEFAULTS = {false};
+
 BLOSC_EXPORT void *blosc2_stdio_open(const char *urlpath, const char *mode, void* params);
 BLOSC_EXPORT int blosc2_stdio_close(void *stream);
 BLOSC_EXPORT int64_t blosc2_stdio_size(void *stream);
