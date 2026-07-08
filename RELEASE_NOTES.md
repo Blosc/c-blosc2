@@ -4,7 +4,46 @@ Release notes for C-Blosc2
 Changes from 3.1.5 to 3.1.6
 ===========================
 
-#XXX version-specific blurb XXX#
+New features
+------------
+
+* **Opt-in cross-process locking** for disk-based frames, via a sidecar
+  lock file (``.b2lock``, ``flock``/``LockFileEx``) plus a generation
+  counter that detects mutations other handles made even when the on-disk
+  length is unchanged.  Enable it per-handle (``blosc2_stdio_params.locking``,
+  or the equivalent for other I/O backends) or fleet-wide with the
+  ``BLOSC_LOCKING`` environment variable.  Advisory: every handle touching
+  the container must opt in.  Not supported over NFS.
+* **`blosc2_schunk_lock()` / `blosc2_schunk_unlock()`**: a bracket API to
+  hold the exclusive frame lock across several operations, making a
+  multi-step mutation atomic to other locked handles instead of only each
+  individual call.  No-ops on a handle without locking enabled.
+* **Growth-SWMR** (single writer, multiple readers): a reader handle
+  opened on a disk-based frame or b2nd array now follows shape/length
+  growth made through another handle (typically another process) on its
+  next access, without reopening.  New public `b2nd_refresh()` reader-side
+  API, and `examples/b2nd/example_growth_swmr.c` demonstrating the
+  contract.  Works with or without locking; only the on-disk length is
+  polled without it, so growth is virtually always noticed but a
+  same-length mutation may not be until the next one that changes it.
+* **Stale-handle coherence fixes**: a handle whose cached view of an
+  on-disk frame goes stale (another handle rewrote it) now re-syncs before
+  trusting cached state, closing gaps in `blosc2_vlmeta_exists()` and in
+  the counters (`nbytes`/`cbytes`/`nchunks`) that
+  `blosc2_schunk_append_chunk()`/`blosc2_schunk_insert_chunk()` apply their
+  deltas to.  Also fixed a race between opening a frame and a concurrent
+  writer, and a leak on an unreadable-frame staleness poll.
+
+Notes
+-----
+
+* Advisory locking is not a replacement for a real lock manager: it only
+  protects a container if every handle on it (across every process)
+  enables it.  It does not work on network filesystems (NFS), and is
+  incompatible with memory-mapped I/O.
+* See ``plans/high-level-formats-locking.md`` and
+  ``plans/todo-locking-swmr.md`` in the source tree for the full design
+  rationale and known follow-ups.
 
 Changes from 3.1.4 to 3.1.5
 ===========================

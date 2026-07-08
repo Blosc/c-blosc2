@@ -968,6 +968,14 @@ int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool c
   if (rc < 0) {
     return rc;
   }
+  // Sync the cached counters before the delta below is applied to them, so a
+  // handle whose lock acquisition just flagged staleness does not persist
+  // wrong nbytes/cbytes/nchunks (see plans/todo-locking-swmr.md item 1).
+  rc = frame_check_stale(frame);
+  if (rc < 0) {
+    frame_unlock(frame);
+    return rc;
+  }
   int64_t nchunks = schunk_append_chunk_unlocked(schunk, chunk, copy);
   frame_unlock(frame);
   return nchunks;
@@ -1094,6 +1102,13 @@ int64_t blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   int rc = frame_lock(frame, true);
   if (rc < 0) {
+    return rc;
+  }
+  // See blosc2_schunk_append_chunk() for why this must happen before the
+  // counter deltas below are applied.
+  rc = frame_check_stale(frame);
+  if (rc < 0) {
+    frame_unlock(frame);
     return rc;
   }
   int64_t nchunks = schunk_insert_chunk_unlocked(schunk, nchunk, chunk, copy);

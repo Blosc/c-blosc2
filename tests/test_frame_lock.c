@@ -148,6 +148,63 @@ static char* test_two_handles(void) {
 }
 
 
+/* A handle whose lock acquisition flags staleness must resync its cached
+   nbytes/cbytes/nchunks *before* applying an append/insert delta to them, or
+   it persists wrong header counters (plans/todo-locking-swmr.md item 1).
+   h1 appends, then h2 (stale at that point) appends; the on-disk counters,
+   re-read from a fresh open, must equal the sum of both appends. */
+static char* test_stale_append_resync(void) {
+  mu_assert("ERROR: cannot create the frame", fill_frame(true, true) == NCHUNKS);
+
+  blosc2_schunk* h1 = blosc2_schunk_open_udio(URLPATH, locking_io());
+  blosc2_schunk* h2 = blosc2_schunk_open_udio(URLPATH, locking_io());
+  mu_assert("ERROR: cannot open the schunk twice", h1 != NULL && h2 != NULL);
+
+  static int32_t data[CHUNKSIZE];
+  for (int i = 0; i < CHUNKSIZE; i++) {
+    data[i] = i;
+  }
+
+  // h1 appends first, bumping the lock generation counter that h2 has not seen yet
+  int64_t nchunks1 = blosc2_schunk_append_buffer(h1, data, CHUNKSIZE * sizeof(int32_t));
+  mu_assert("ERROR: h1 append failed", nchunks1 == NCHUNKS + 1);
+
+  // h2's handle is stale now; its append must resync counters before applying its delta
+  int64_t nchunks2 = blosc2_schunk_append_buffer(h2, data, CHUNKSIZE * sizeof(int32_t));
+  mu_assert("ERROR: h2 append failed", nchunks2 == NCHUNKS + 2);
+
+  // h1 inserts; then h2 (stale again) inserts too -- insert must resync as well
+  uint8_t* chunk1 = malloc(CHUNKSIZE * sizeof(int32_t) + BLOSC2_MAX_OVERHEAD);
+  int csize1 = blosc2_compress_ctx(h1->cctx, data, CHUNKSIZE * sizeof(int32_t),
+                                   chunk1, CHUNKSIZE * sizeof(int32_t) + BLOSC2_MAX_OVERHEAD);
+  mu_assert("ERROR: cannot compress chunk for h1 insert", csize1 > 0);
+  int64_t nchunks3 = blosc2_schunk_insert_chunk(h1, 0, chunk1, false);
+  mu_assert("ERROR: h1 insert failed", nchunks3 == NCHUNKS + 3);
+
+  uint8_t* chunk2 = malloc(CHUNKSIZE * sizeof(int32_t) + BLOSC2_MAX_OVERHEAD);
+  int csize2 = blosc2_compress_ctx(h2->cctx, data, CHUNKSIZE * sizeof(int32_t),
+                                   chunk2, CHUNKSIZE * sizeof(int32_t) + BLOSC2_MAX_OVERHEAD);
+  mu_assert("ERROR: cannot compress chunk for h2 insert", csize2 > 0);
+  int64_t nchunks4 = blosc2_schunk_insert_chunk(h2, 0, chunk2, false);
+  mu_assert("ERROR: h2 insert failed", nchunks4 == NCHUNKS + 4);
+
+  blosc2_schunk_free(h1);
+  blosc2_schunk_free(h2);
+
+  // Reopen fresh and check the on-disk header counters agree with reality
+  blosc2_schunk* sc = blosc2_schunk_open(URLPATH);
+  mu_assert("ERROR: cannot reopen the schunk", sc != NULL);
+  mu_assert("ERROR: nchunks mismatch after stale-handle append/insert",
+            sc->nchunks == NCHUNKS + 4);
+  int64_t expected_nbytes = (int64_t)(NCHUNKS + 4) * CHUNKSIZE * sizeof(int32_t);
+  mu_assert("ERROR: nbytes mismatch after stale-handle append/insert",
+            sc->nbytes == expected_nbytes);
+  blosc2_schunk_free(sc);
+  blosc2_remove_urlpath(URLPATH);
+  return EXIT_SUCCESS;
+}
+
+
 /* blosc2_vlmeta_exists() must poll staleness: a vlmetalayer added or deleted
    through another locked handle is reflected without any data access. */
 static char* test_vlmeta_exists_stale(void) {
@@ -439,6 +496,7 @@ static char* test_fork_hammer(void) {
 static char *all_tests(void) {
   mu_run_test(test_locking_off);
   mu_run_test(test_two_handles);
+  mu_run_test(test_stale_append_resync);
   mu_run_test(test_env_locking);
   mu_run_test(test_sidecar_cleanup);
   mu_run_test(test_vlmeta_exists_stale);

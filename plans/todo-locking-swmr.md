@@ -65,14 +65,33 @@ shipped.  Per the parked plan `caterva2/plans/peercache-locking.md`:
 
 ## 3. Release coordination (both repos) — MEDIUM, blocks next release
 
-- python-blosc2 now hard-requires a c-blosc2 with `blosc2_schunk_lock` (new
-  export): before releasing python-blosc2, point the bundled pin at a
-  *released* c-blosc2 (3.1.6) and bump any system-blosc2 minimum-version
-  check (`BLOSC2_MIN_VERSION` or CMake equivalent).
-- Release notes for both repos should present the feature set together:
-  `locking=` / `BLOSC_LOCKING`, `holding_lock()`, cross-process
-  EmbedStore/DictStore, atomic `to_b2z()`, and the caveats (advisory, every
-  handle must opt in, no NFS, no mmap).
+Done (2026-07-08):
+
+- Filled in the pending "Changes from 3.1.5 to 3.1.6" section of c-blosc2's
+  `RELEASE_NOTES.md` and the "Changes from 4.7.0 to 4.7.1" section of
+  python-blosc2's, presenting the whole feature set together (`locking=` /
+  `BLOSC_LOCKING`, `holding_lock()`, cross-process EmbedStore/DictStore,
+  atomic `to_b2z()`, growth-SWMR, and the caveats).
+- Bumped python-blosc2's `BLOSC2_MIN_VERSION` (CMakeLists.txt) from `3.0.0`
+  to `3.1.6`: the system-blosc2 path (`USE_SYSTEM_BLOSC2`) was accepting any
+  c-blosc2 >= 3.0.0 via pkg-config, but `blosc2_ext.pyx` calls
+  `blosc2_schunk_lock()`, which no released c-blosc2 has yet — that combo
+  would fail at link time with a confusing undefined-symbol error instead of
+  a clear version check. This is a real fix, done now regardless of when the
+  actual release happens (no released c-blosc2 satisfies the floor yet,
+  which is the correct state until 3.1.6 ships).
+
+Still open, and blocked on an actual release decision (not done autonomously
+— cutting a tag/release is a user call):
+
+- c-blosc2 has no `v3.1.6` tag yet (current `HEAD` is still `3.1.6.dev`).
+  python-blosc2's `BLOSC2_BUNDLED_VERSION` (CMakeLists.txt) is pinned to
+  commit `488c33ec`, which *already* includes `blosc2_schunk_lock` (added
+  earlier, in `fab03bda`) — so the bundled build works today. But it
+  predates item 1's stale-writer append/insert counter fix (commit not yet
+  made/pushed as of this writing). Before releasing python-blosc2: cut the
+  c-blosc2 3.1.6 release (or at least push the item-1 fix), then move both
+  `BLOSC2_BUNDLED_VERSION` and (once tagged) the min-version floor to match.
 
 ## 4. Growth-SWMR tests in python-blosc2 — MEDIUM
 
@@ -120,6 +139,23 @@ inline versions as deprecated aliases if ABI fuss matters, though a major-ish
 release can just move them) and add the same poll as `blosc2_vlmeta_exists()`.
 Test mirrors `test_vlmeta_exists_stale`.  Low urgency: fixed metalayers
 rarely change after creation, and their size cannot change by design.
+
+**Blocked (2026-07-08): conflicts with an existing design decision.** These
+two are `static inline` in blosc2.h *on purpose* — the doc comment on
+`blosc2_meta_get()` explains external codec/filter plugins (e.g.
+`blosc2_grok`) rely on that to use them without linking against libblosc2, so
+the plugin doesn't pull in libblosc2's global symbols (internal ZFP, Zstd,
+etc.) and clash with a differently-configured build of the same deps
+elsewhere in the process. The staleness poll needs `frame_check_stale()`,
+which is internal (`blosc/frame.h`, not exported) and unreachable from inline
+code without linking. Converting to real exported functions, even with
+deprecated inline aliases kept around, would still leave callers who want the
+staleness fix needing to link — defeating the reason they're inline today.
+Decided (2026-07-08) not to force that tradeoff silently; revisit only with a
+deliberate call on whether the plugin no-link guarantee still matters, or
+whether some form of staleness check can be made reachable from inline code
+(e.g. exporting a narrow poll primitive that doesn't pull in the rest of
+libblosc2's symbol surface).
 
 ## 7. Parked / explicit non-goals (record, do not do)
 
