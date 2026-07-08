@@ -328,6 +328,45 @@ static char* test_lock_bracket(void) {
 }
 
 
+#if defined(BLOSC_TESTING)
+/* Deterministic version of the open-race bug: rather than racing real
+   concurrent writers/openers and hoping to land in a microseconds-wide
+   window (see test_fork_open_race_update() below, which tries exactly that
+   and mostly fails to land it even with a confirmed several-KB frame_len
+   swing on every write), directly simulate the transient state a race
+   would produce via the frame.c-internal blosc2_test_arm_open_race() fault
+   injection hook (BLOSC_TESTING-only, see blosc/frame.c). Fork-free, so
+   (unlike most of this file) it also runs on Windows.
+
+   fill_frame() performs many locked appends, which bump the sidecar lock's
+   generation counter; a freshly-opened handle's default lock_seq is behind
+   that counter, so its very first open already takes the force_refresh
+   path (frame.c: "this also triggers on every open of a previously-mutated
+   frame") -- no extra setup mutation is needed. That open makes exactly two
+   calls to frame_from_file_offset(): the bootstrap read (call #1) and the
+   force_refresh re-read (call #2). Arming the hook for call #2 forces that
+   specific call to see a transient "frame length exceeds file boundary"
+   the same way a real race would, then self-restores before the retry's
+   next attempt -- exercising precisely the code path this bug lived in. */
+extern void blosc2_test_arm_open_race(int arm_at);
+
+static char* test_open_race_deterministic(void) {
+  mu_assert("ERROR: cannot create the frame", fill_frame(true, true) == NCHUNKS);
+
+  blosc2_test_arm_open_race(2);
+  blosc2_schunk* sc = blosc2_schunk_open_udio(URLPATH, locking_io());
+  blosc2_test_arm_open_race(0);  // belt-and-suspenders; the hook also self-disarms
+  mu_assert("ERROR: open failed on a simulated transient race in the "
+            "force_refresh re-read -- the retry should have absorbed it",
+            sc != NULL);
+
+  blosc2_schunk_free(sc);
+  blosc2_remove_urlpath(URLPATH);
+  return EXIT_SUCCESS;
+}
+#endif  /* BLOSC_TESTING */
+
+
 #if !defined(_WIN32)
 /* A bracketed multi-operation mutation must be atomic for other processes: a
    child that reads while the parent holds the bracket blocks until the unlock
@@ -708,44 +747,6 @@ static char* test_fork_hammer(void) {
   blosc2_remove_urlpath(URLPATH);
   return EXIT_SUCCESS;
 }
-
-
-#if defined(BLOSC_TESTING)
-/* Deterministic version of the open-race bug: rather than racing real
-   concurrent writers/openers and hoping to land in a microseconds-wide
-   window (see test_fork_open_race_update() below, which tries exactly that
-   and mostly fails to land it even with a confirmed several-KB frame_len
-   swing on every write), directly simulate the transient state a race
-   would produce via the frame.c-internal blosc2_test_arm_open_race() fault
-   injection hook (BLOSC_TESTING-only, see blosc/frame.c).
-
-   fill_frame() performs many locked appends, which bump the sidecar lock's
-   generation counter; a freshly-opened handle's default lock_seq is behind
-   that counter, so its very first open already takes the force_refresh
-   path (frame.c: "this also triggers on every open of a previously-mutated
-   frame") -- no extra setup mutation is needed. That open makes exactly two
-   calls to frame_from_file_offset(): the bootstrap read (call #1) and the
-   force_refresh re-read (call #2). Arming the hook for call #2 forces that
-   specific call to see a transient "frame length exceeds file boundary"
-   the same way a real race would, then self-restores before the retry's
-   next attempt -- exercising precisely the code path this bug lived in. */
-extern void blosc2_test_arm_open_race(int arm_at);
-
-static char* test_open_race_deterministic(void) {
-  mu_assert("ERROR: cannot create the frame", fill_frame(true, true) == NCHUNKS);
-
-  blosc2_test_arm_open_race(2);
-  blosc2_schunk* sc = blosc2_schunk_open_udio(URLPATH, locking_io());
-  blosc2_test_arm_open_race(0);  // belt-and-suspenders; the hook also self-disarms
-  mu_assert("ERROR: open failed on a simulated transient race in the "
-            "force_refresh re-read -- the retry should have absorbed it",
-            sc != NULL);
-
-  blosc2_schunk_free(sc);
-  blosc2_remove_urlpath(URLPATH);
-  return EXIT_SUCCESS;
-}
-#endif  /* BLOSC_TESTING */
 
 
 /* A concurrent opener must not see spurious failures while a writer grows the
