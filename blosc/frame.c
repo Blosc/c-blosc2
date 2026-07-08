@@ -1302,6 +1302,67 @@ static char* normalize_urlpath(const char* urlpath) {
 }
 
 
+#if defined(BLOSC_TESTING)
+/* Deterministic fault injection for the stat()-vs-header transient race
+   handled by frame_from_file_offset_retrying() (schunk.c): rather than
+   relying on process-scheduling luck to land a real writer's header write
+   inside a reader's stat()-to-read window (see tests/test_frame_lock.c,
+   test_fork_open_race_update, which tries exactly that and mostly fails to
+   land it), simulate the race directly by tampering with the on-disk
+   frame_len field between this function's own stat() (already sampled) and
+   its header read.  Armed via blosc2_test_arm_open_race(): on the arm_at'th
+   call since arming, frame_len is overwritten with a value that exceeds the
+   already-sampled file size, forcing the same "frame length exceeds file
+   boundary" error a real race produces; the following call restores the
+   correct value before its own read, simulating the writer completing its
+   extend.  One-shot: disarms itself after firing once.  A no-op when not
+   armed (arm_at == 0, the default), so it costs one integer compare on
+   builds that don't use it. */
+static int g_open_race_arm_at = 0;
+static int g_open_race_calls = 0;
+static bool g_open_race_pending_restore = false;
+static uint8_t g_open_race_saved_len_be[8];
+
+void blosc2_test_arm_open_race(int arm_at) {
+  g_open_race_arm_at = arm_at;
+  g_open_race_calls = 0;
+  g_open_race_pending_restore = false;
+}
+
+static void open_race_test_hook(const char* urlpath, int64_t offset) {
+  if (g_open_race_arm_at == 0) {
+    return;
+  }
+  g_open_race_calls++;
+  FILE* fp = fopen(urlpath, "rb+");
+  if (fp == NULL) {
+    return;
+  }
+  if (g_open_race_pending_restore) {
+    fseek(fp, offset + FRAME_LEN, SEEK_SET);
+    fwrite(g_open_race_saved_len_be, 1, sizeof(g_open_race_saved_len_be), fp);
+    g_open_race_pending_restore = false;
+    g_open_race_arm_at = 0;
+  }
+  else if (g_open_race_calls == g_open_race_arm_at) {
+    fseek(fp, offset + FRAME_LEN, SEEK_SET);
+    if (fread(g_open_race_saved_len_be, 1, sizeof(g_open_race_saved_len_be), fp) ==
+        sizeof(g_open_race_saved_len_be)) {
+      int64_t real_len;
+      to_big(&real_len, g_open_race_saved_len_be, sizeof(real_len));
+      int64_t bogus_len = real_len + 10 * 1024 * 1024;
+      uint8_t bogus_be[8];
+      to_big(bogus_be, &bogus_len, sizeof(bogus_len));
+      fseek(fp, offset + FRAME_LEN, SEEK_SET);
+      fwrite(bogus_be, 1, sizeof(bogus_be), fp);
+      g_open_race_pending_restore = true;
+    }
+  }
+  fclose(fp);
+}
+#endif  /* BLOSC_TESTING */
+
+
 /* Initialize a frame out of a file */
 blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io, int64_t offset) {
     // Get the length of the frame
@@ -1325,6 +1386,10 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
         BLOSC_TRACE_ERROR("Cannot get information about the path %s.", urlpath);
         return NULL;
     }
+
+#if defined(BLOSC_TESTING)
+    open_race_test_hook(urlpath, offset);
+#endif
 
     blosc2_io_cb *io_cb = blosc2_get_io_cb(io->id);
     if (io_cb == NULL) {

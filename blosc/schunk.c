@@ -372,24 +372,21 @@ blosc2_schunk* blosc2_schunk_open_udio(const char* urlpath, const blosc2_io *udi
   return blosc2_schunk_open_offset_udio(urlpath, 0, udio);
 }
 
-blosc2_schunk* blosc2_schunk_open_offset_udio(const char* urlpath, int64_t offset, const blosc2_io *udio) {
-  if (urlpath == NULL) {
-    BLOSC_TRACE_ERROR("You need to supply a urlpath.");
-    return NULL;
-  }
-
-  // frame_from_file_offset()'s bootstrap read (path stat + header + trailer)
-  // happens before any lock is taken, so it can race a concurrent writer
-  // growing or rewriting the frame (e.g. a stat() size snapshot made stale by
-  // a header already advertising the writer's new, larger frame length) and
-  // fail outright instead of returning a frame to refresh under lock.  Under
-  // the locking contract such a failure is expected to be transient, so
-  // retry a bounded number of times with a short backoff before giving up;
-  // without locking requested this is the pre-existing single-attempt
-  // behavior (a concurrent writer without locking is already out of the SWMR
-  // contract).
-  bool retry_on_race = frame_locking_requested(udio);
-  const int max_attempts = retry_on_race ? 50 : 1;
+// frame_from_file_offset()'s bootstrap read (path stat + header + trailer)
+// happens before any lock is taken, so it can race a concurrent writer
+// growing or rewriting the frame (e.g. a stat() size snapshot made stale by
+// a header already advertising the writer's new, larger frame length) and
+// fail outright instead of returning a frame to refresh under lock.  Under
+// the locking contract such a failure is expected to be transient, so
+// retry a bounded number of times with a short backoff before giving up;
+// without locking requested this is the pre-existing single-attempt
+// behavior (a concurrent writer without locking is already out of the SWMR
+// contract).  Used for every bootstrap/re-read of the frame header in
+// blosc2_schunk_open_offset_udio() below -- a compressed-size change on an
+// in-place update can rewrite the frame layout just like growth does, so
+// this race is not limited to append/resize.
+static blosc2_frame_s* frame_from_file_offset_retrying(
+    const char* urlpath, const blosc2_io *udio, int64_t offset, int max_attempts) {
   blosc2_frame_s* frame = NULL;
   for (int attempt = 0; attempt < max_attempts; attempt++) {
     frame = frame_from_file_offset(urlpath, udio, offset);
@@ -402,6 +399,18 @@ blosc2_schunk* blosc2_schunk_open_offset_udio(const char* urlpath, int64_t offse
     usleep(1000);
 #endif
   }
+  return frame;
+}
+
+blosc2_schunk* blosc2_schunk_open_offset_udio(const char* urlpath, int64_t offset, const blosc2_io *udio) {
+  if (urlpath == NULL) {
+    BLOSC_TRACE_ERROR("You need to supply a urlpath.");
+    return NULL;
+  }
+
+  bool retry_on_race = frame_locking_requested(udio);
+  const int max_attempts = retry_on_race ? 50 : 1;
+  blosc2_frame_s* frame = frame_from_file_offset_retrying(urlpath, udio, offset, max_attempts);
   if (frame == NULL) {
     blosc2_io_cb *io_cb = blosc2_get_io_cb(udio->id);
     if (io_cb == NULL) {
@@ -426,8 +435,9 @@ blosc2_schunk* blosc2_schunk_open_offset_udio(const char* urlpath, int64_t offse
     // one, so this also triggers on every open of a previously-mutated frame;
     // one extra header read at open time is a fair price).  Re-read the frame
     // now, taking the fresh handle's own shared lock *before* releasing the
-    // current one so that no writer can interleave.
-    blosc2_frame_s* fresh = frame_from_file_offset(urlpath, udio, offset);
+    // current one so that no writer can interleave.  Same transient race as
+    // the bootstrap read above, so the same bounded retry applies.
+    blosc2_frame_s* fresh = frame_from_file_offset_retrying(urlpath, udio, offset, max_attempts);
     int lock_rc = (fresh == NULL) ? BLOSC2_ERROR_FILE_READ : frame_lock(fresh, false);
     frame_free(frame);  // closing its lock fd releases the old shared lock
     if (fresh == NULL) {

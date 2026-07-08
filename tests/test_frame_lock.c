@@ -580,6 +580,44 @@ static char* test_fork_hammer(void) {
 }
 
 
+#if defined(BLOSC_TESTING)
+/* Deterministic version of the open-race bug: rather than racing real
+   concurrent writers/openers and hoping to land in a microseconds-wide
+   window (see test_fork_open_race_update() below, which tries exactly that
+   and mostly fails to land it even with a confirmed several-KB frame_len
+   swing on every write), directly simulate the transient state a race
+   would produce via the frame.c-internal blosc2_test_arm_open_race() fault
+   injection hook (BLOSC_TESTING-only, see blosc/frame.c).
+
+   fill_frame() performs many locked appends, which bump the sidecar lock's
+   generation counter; a freshly-opened handle's default lock_seq is behind
+   that counter, so its very first open already takes the force_refresh
+   path (frame.c: "this also triggers on every open of a previously-mutated
+   frame") -- no extra setup mutation is needed. That open makes exactly two
+   calls to frame_from_file_offset(): the bootstrap read (call #1) and the
+   force_refresh re-read (call #2). Arming the hook for call #2 forces that
+   specific call to see a transient "frame length exceeds file boundary"
+   the same way a real race would, then self-restores before the retry's
+   next attempt -- exercising precisely the code path this bug lived in. */
+extern void blosc2_test_arm_open_race(int arm_at);
+
+static char* test_open_race_deterministic(void) {
+  mu_assert("ERROR: cannot create the frame", fill_frame(true, true) == NCHUNKS);
+
+  blosc2_test_arm_open_race(2);
+  blosc2_schunk* sc = blosc2_schunk_open_udio(URLPATH, locking_io());
+  blosc2_test_arm_open_race(0);  // belt-and-suspenders; the hook also self-disarms
+  mu_assert("ERROR: open failed on a simulated transient race in the "
+            "force_refresh re-read -- the retry should have absorbed it",
+            sc != NULL);
+
+  blosc2_schunk_free(sc);
+  blosc2_remove_urlpath(URLPATH);
+  return EXIT_SUCCESS;
+}
+#endif  /* BLOSC_TESTING */
+
+
 /* A concurrent opener must not see spurious failures while a writer grows the
    frame. frame_from_file_offset()'s bootstrap read (stat() for the file size,
    then the header/trailer) happens before any lock is taken; a writer that
@@ -660,6 +698,119 @@ static char* test_fork_open_race(void) {
   blosc2_remove_urlpath(URLPATH);
   return EXIT_SUCCESS;
 }
+
+
+/* Same race as test_fork_open_race() above, but the frame never grows in
+   the sense of gaining chunks: chunk count is fixed throughout, only
+   in-place updates happen. An update whose new compressed size does not fit
+   in the space the old chunk occupied still forces c-blosc2 to relocate the
+   chunk to the end of the frame and rewrite the trailer, changing frame_len
+   exactly like an append does -- so the opener can still catch the frame
+   mid-rewrite. To make that relocation happen on (almost) every single
+   update -- and not just the first one per chunk -- each cycle evicts the
+   chunk down to a near-zero UNINIT special before refilling it with
+   incompressible random data at full size, so the chunk's footprint swings
+   from ~0 back to ~full on every refill.
+
+   This specifically targets the second, force_refresh re-read inside
+   blosc2_schunk_open_offset_udio() (the one done under the freshly-acquired
+   shared lock, after the bootstrap read already succeeded): that re-read
+   used to run without the bounded retry the bootstrap read has, so it
+   propagated the same transient "frame length exceeds file boundary" race
+   as a hard failure on nearly every open (force_refresh is set on
+   essentially every open of a previously-mutated frame).
+
+   Unlike test_fork_open_race() above, this one is *not* a reliable trip
+   wire: a stat+header probe confirms the on-disk frame length really does
+   swing by several KB on every single evict/refill cycle here, so the
+   transient window this test is trying to land in genuinely exists, but on
+   fast local storage that window is apparently narrow enough that this
+   fork-based harness did not manage to land in it in dozens of manual
+   trials, with or without the fix. Kept as stress coverage for the
+   concurrent open+update path in general (and it may well catch this race
+   reliably on slower/loaded machines or filesystems), not as a guaranteed
+   regression test for this specific bug -- the bug itself was confirmed via
+   direct reproduction through python-blosc2's multiprocessing-based hammer
+   test instead (see python-blosc2 tests/test_locking.py,
+   test_cross_process_open_race_under_update, similarly best-effort). */
+#define OPEN_RACE_NUPDATERS (4)
+#define OPEN_RACE_NOPENERS2 (4)
+static char* test_fork_open_race_update(void) {
+  const int updater_iters = 150;
+  const int opener_iters = updater_iters * 4;
+
+  mu_assert("ERROR: cannot create the frame", fill_frame(true, true) == NCHUNKS);
+
+  pid_t pids[OPEN_RACE_NUPDATERS + OPEN_RACE_NOPENERS2];
+  int nchildren = 0;
+
+  for (int u = 0; u < OPEN_RACE_NUPDATERS; u++) {
+    pid_t pid = fork();
+    mu_assert("ERROR: cannot fork an updater", pid >= 0);
+    if (pid == 0) {
+      static int32_t data[CHUNKSIZE];
+      unsigned int seed = (unsigned int)(getpid() + u);
+      blosc2_schunk* sc = blosc2_schunk_open_udio(URLPATH, locking_io());
+      if (sc == NULL) {
+        _exit(1);
+      }
+      int64_t nchunk = u % sc->nchunks;
+      for (int i = 0; i < updater_iters; i++) {
+        if (evict_chunk(sc, nchunk) != 0) {
+          _exit(2);
+        }
+        for (int j = 0; j < CHUNKSIZE; j++) {
+          data[j] = (int32_t)rand_r(&seed);
+        }
+        uint8_t* chunk = malloc(CHUNKSIZE * sizeof(int32_t) + BLOSC2_MAX_OVERHEAD);
+        int csize = blosc2_compress_ctx(sc->cctx, data, CHUNKSIZE * sizeof(int32_t),
+                                        chunk, CHUNKSIZE * sizeof(int32_t) + BLOSC2_MAX_OVERHEAD);
+        if (csize < 0) {
+          free(chunk);
+          _exit(3);
+        }
+        if (blosc2_schunk_update_chunk(sc, nchunk, chunk, false) < 0) {
+          _exit(4);
+        }
+      }
+      blosc2_schunk_free(sc);
+      _exit(0);
+    }
+    pids[nchildren++] = pid;
+  }
+
+  for (int o = 0; o < OPEN_RACE_NOPENERS2; o++) {
+    pid_t pid = fork();
+    mu_assert("ERROR: cannot fork an opener", pid >= 0);
+    if (pid == 0) {
+      /* Opens a *fresh* handle repeatedly, exercising both the bootstrap
+         read and the force_refresh re-read racing the updaters; every
+         single open must succeed. */
+      for (int i = 0; i < opener_iters; i++) {
+        blosc2_schunk* sc = blosc2_schunk_open_udio(URLPATH, locking_io());
+        if (sc == NULL) {
+          _exit(5);
+        }
+        blosc2_schunk_free(sc);
+      }
+      _exit(0);
+    }
+    pids[nchildren++] = pid;
+  }
+
+  bool all_ok = true;
+  for (int k = 0; k < nchildren; k++) {
+    int status = 0;
+    pid_t w = waitpid(pids[k], &status, 0);
+    if (w < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+      all_ok = false;
+    }
+  }
+  mu_assert("ERROR: an updater or opener child failed under concurrent in-place updates", all_ok);
+
+  blosc2_remove_urlpath(URLPATH);
+  return EXIT_SUCCESS;
+}
 #endif  /* !_WIN32 */
 
 
@@ -671,11 +822,15 @@ static char *all_tests(void) {
   mu_run_test(test_sidecar_cleanup);
   mu_run_test(test_vlmeta_exists_stale);
   mu_run_test(test_lock_bracket);
+#if defined(BLOSC_TESTING)
+  mu_run_test(test_open_race_deterministic);
+#endif
 #if !defined(_WIN32)
   mu_run_test(test_bracket_atomic);
   mu_run_test(test_fork_hammer);
   mu_run_test(test_fork_two_appenders);
   mu_run_test(test_fork_open_race);
+  mu_run_test(test_fork_open_race_update);
 #endif
   return EXIT_SUCCESS;
 }
