@@ -71,19 +71,29 @@ blosc2_frame_s* frame_new(const char* urlpath) {
 }
 
 
-void frame_set_locking(blosc2_frame_s* frame, const blosc2_io* io) {
-  if (frame->urlpath == NULL || io == NULL || io->id != BLOSC2_IO_FILESYSTEM) {
-    return;
+/* Whether `io` requests locking, either explicitly (blosc2_stdio_params.locking)
+   or via the fleet-wide BLOSC_LOCKING environment variable.  Factored out of
+   frame_set_locking() so callers without a frame object yet (e.g. the open
+   path's pre-frame bootstrap read) can also ask the question. */
+bool frame_locking_requested(const blosc2_io* io) {
+  if (io == NULL || io->id != BLOSC2_IO_FILESYSTEM) {
+    return false;
   }
   bool locking = io->params != NULL && ((blosc2_stdio_params*)io->params)->locking;
   if (!locking) {
-    // The BLOSC_LOCKING environment variable turns locking on globally, with
-    // the same effect as setting `locking` in blosc2_stdio_params on every
-    // handle ("0" or an empty value leave it off)
+    // "0" or an empty value leave it off
     char* envvar = getenv("BLOSC_LOCKING");
     locking = envvar != NULL && envvar[0] != '\0' && strcmp(envvar, "0") != 0;
   }
-  if (locking) {
+  return locking;
+}
+
+
+void frame_set_locking(blosc2_frame_s* frame, const blosc2_io* io) {
+  if (frame->urlpath == NULL) {
+    return;
+  }
+  if (frame_locking_requested(io)) {
     frame->locking = true;
     frame->lock_fd = -1;
   }

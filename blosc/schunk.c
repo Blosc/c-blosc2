@@ -20,6 +20,8 @@
 #include <direct.h>
 #include <malloc.h>
 #define mkdir(D, M) _mkdir(D)
+#else
+#include <unistd.h>
 #endif  /* _WIN32 */
 
 #include <sys/stat.h>
@@ -376,7 +378,30 @@ blosc2_schunk* blosc2_schunk_open_offset_udio(const char* urlpath, int64_t offse
     return NULL;
   }
 
-  blosc2_frame_s* frame = frame_from_file_offset(urlpath, udio, offset);
+  // frame_from_file_offset()'s bootstrap read (path stat + header + trailer)
+  // happens before any lock is taken, so it can race a concurrent writer
+  // growing or rewriting the frame (e.g. a stat() size snapshot made stale by
+  // a header already advertising the writer's new, larger frame length) and
+  // fail outright instead of returning a frame to refresh under lock.  Under
+  // the locking contract such a failure is expected to be transient, so
+  // retry a bounded number of times with a short backoff before giving up;
+  // without locking requested this is the pre-existing single-attempt
+  // behavior (a concurrent writer without locking is already out of the SWMR
+  // contract).
+  bool retry_on_race = frame_locking_requested(udio);
+  const int max_attempts = retry_on_race ? 50 : 1;
+  blosc2_frame_s* frame = NULL;
+  for (int attempt = 0; attempt < max_attempts; attempt++) {
+    frame = frame_from_file_offset(urlpath, udio, offset);
+    if (frame != NULL || attempt + 1 == max_attempts) {
+      break;
+    }
+#if defined(_WIN32)
+    Sleep(1);
+#else
+    usleep(1000);
+#endif
+  }
   if (frame == NULL) {
     blosc2_io_cb *io_cb = blosc2_get_io_cb(udio->id);
     if (io_cb == NULL) {

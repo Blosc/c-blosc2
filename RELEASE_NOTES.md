@@ -1,7 +1,7 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 3.1.5 to 3.1.6
+Changes from 3.1.5 to 3.2.0
 ===========================
 
 New features

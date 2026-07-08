@@ -222,6 +222,13 @@ int frame_unlock(blosc2_frame_s* frame);
  */
 void frame_set_locking(blosc2_frame_s* frame, const blosc2_io* io);
 
+/**
+ * @brief Whether @p io requests locking, either explicitly
+ * (blosc2_stdio_params.locking) or via the BLOSC_LOCKING environment
+ * variable. Usable before a frame object exists (e.g. in the open path).
+ */
+bool frame_locking_requested(const blosc2_io* io);
+
 int64_t frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
                        int32_t chunksize, blosc2_schunk* schunk);
 

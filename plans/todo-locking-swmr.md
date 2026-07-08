@@ -21,7 +21,7 @@ details: `plans/locking-sidecar-flock.md` (mechanism, rejected alternatives),
 
 ---
 
-## 1. Stale-writer append/insert re-sync (c-blosc2) — HIGH
+## 1. Stale-writer append/insert re-sync (c-blosc2) — DONE
 
 The one known correctness gap left at the frame level (deliberate, from the
 original coherence work).  `blosc2_schunk_append_chunk()` and
@@ -51,6 +51,43 @@ Fix shape:
   fresh open) must equal the sum of both appends.  Verify it fails before the
   fix.  A fork-based two-appender variant would pin the cross-process case.
 
+Landed in `3cd3bfe5`. The fork-based cross-process pin landed 2026-07-08 as
+`test_fork_two_appenders` in `tests/test_frame_lock.c` (two child processes
+append through their own handle; header counters and per-chunk parity
+re-read from a fresh open confirm the union of both, with no lost or
+corrupted chunk).
+
+### 1b. Open-vs-growth race in `blosc2_schunk_open_offset_udio()` — DONE (2026-07-08)
+
+Found while writing python-blosc2's cross-process NDArray multi-writer
+hammer test (`todo/locking-mwmr.md` item 1): several writers `resize()`ing
+concurrently while several fresh opens race in made `blosc2_schunk_open_offset_udio()`
+return `NULL` intermittently. Distinct from (and downstream of) the "the
+open-vs-writer race fix" in the Context bullet above, which handles a stale
+handle re-reading *after* a frame object already exists — this bug is in the
+bootstrap read *before* any frame object or lock exists.
+
+Root cause: `frame_from_file_offset()` (`blosc/frame.c`) calls `stat()` for
+the file size, then separately reads the header/trailer, with no lock held
+in between. A writer growing the frame in that window leaves the header
+advertising a `frame_len` bigger than the now-stale `file_size` snapshot,
+which was treated as a hard "frame length exceeds file boundary" error
+instead of the transient race it is — and `blosc2_schunk_open_offset_udio()`
+propagated that `NULL` straight to the caller with no retry.
+
+Fix: `frame_locking_requested()` (new helper, `frame.c`/`frame.h`, factored
+out of `frame_set_locking()`) lets `blosc2_schunk_open_offset_udio()` know
+locking is in play before a frame object exists; when it is, the bootstrap
+`frame_from_file_offset()` call is retried up to 50 times with a 1ms backoff
+before giving up. Without locking requested, behavior is unchanged
+(single attempt).
+
+A single appender vs. a single serial opener rarely reproduces this — it took
+several concurrent appenders racing several concurrent fresh opens from time
+zero to land in the window reliably. Regression test: `test_fork_open_race`
+in `tests/test_frame_lock.c` (4 appenders vs. 4 openers); reproduces the
+`NULL` return in 4/5 trials without the fix, clean across 20+ trials with it.
+
 ## 2. Caterva2 integration — HIGH (different repo)
 
 The original motivation for the whole effort; everything it needs is now
@@ -65,33 +102,44 @@ shipped.  Per the parked plan `caterva2/plans/peercache-locking.md`:
 
 ## 3. Release coordination (both repos) — MEDIUM, blocks next release
 
+**Version renumbering (2026-07-08): the next releases will be c-blosc2
+3.2.0 and python-blosc2 4.8.0** (minor bumps rather than 3.1.6/4.7.1,
+reflecting the significant API additions of this feature set). All the
+artifacts below have been renamed/bumped accordingly.
+
 Done (2026-07-08):
 
-- Filled in the pending "Changes from 3.1.5 to 3.1.6" section of c-blosc2's
-  `RELEASE_NOTES.md` and the "Changes from 4.7.0 to 4.7.1" section of
+- Filled in the pending "Changes from 3.1.5 to 3.2.0" section of c-blosc2's
+  `RELEASE_NOTES.md` and the "Changes from 4.7.0 to 4.8.0" section of
   python-blosc2's, presenting the whole feature set together (`locking=` /
   `BLOSC_LOCKING`, `holding_lock()`, cross-process EmbedStore/DictStore,
   atomic `to_b2z()`, growth-SWMR, and the caveats).
 - Bumped python-blosc2's `BLOSC2_MIN_VERSION` (CMakeLists.txt) from `3.0.0`
-  to `3.1.6`: the system-blosc2 path (`USE_SYSTEM_BLOSC2`) was accepting any
+  to `3.2.0`: the system-blosc2 path (`USE_SYSTEM_BLOSC2`) was accepting any
   c-blosc2 >= 3.0.0 via pkg-config, but `blosc2_ext.pyx` calls
   `blosc2_schunk_lock()`, which no released c-blosc2 has yet — that combo
   would fail at link time with a confusing undefined-symbol error instead of
   a clear version check. This is a real fix, done now regardless of when the
   actual release happens (no released c-blosc2 satisfies the floor yet,
-  which is the correct state until 3.1.6 ships).
+  which is the correct state until 3.2.0 ships).
+- Moved python-blosc2's `BLOSC2_BUNDLED_VERSION` to `3cd3bfe5`, which
+  includes both `blosc2_schunk_lock` (`fab03bda`) and item 1's stale-writer
+  append/insert counter fix — so the bundled build carries the full feature
+  set today.
+- Bumped the dev version identifiers to match the renumbering: c-blosc2
+  `blosc2.h` to `3.2.0.dev`, python-blosc2 `version.py`/`pyproject.toml` to
+  `4.8.0.dev0`.
 
 Still open, and blocked on an actual release decision (not done autonomously
 — cutting a tag/release is a user call):
 
-- c-blosc2 has no `v3.1.6` tag yet (current `HEAD` is still `3.1.6.dev`).
-  python-blosc2's `BLOSC2_BUNDLED_VERSION` (CMakeLists.txt) is pinned to
-  commit `488c33ec`, which *already* includes `blosc2_schunk_lock` (added
-  earlier, in `fab03bda`) — so the bundled build works today. But it
-  predates item 1's stale-writer append/insert counter fix (commit not yet
-  made/pushed as of this writing). Before releasing python-blosc2: cut the
-  c-blosc2 3.1.6 release (or at least push the item-1 fix), then move both
-  `BLOSC2_BUNDLED_VERSION` and (once tagged) the min-version floor to match.
+- Cut the c-blosc2 3.2.0 tag; then move python-blosc2's
+  `BLOSC2_BUNDLED_VERSION` from the `3cd3bfe5` pin to the `v3.2.0` tag
+  (the `BLOSC2_MIN_VERSION 3.2.0` floor is already correct). Then release
+  python-blosc2 4.8.0. See also python-blosc2 `todo/locking-mwmr.md`:
+  its items 1–3 (multi-writer hammer tests, set_slice bracketing, mutating-
+  path audit) should ideally land before the tags so 3.2.0/4.8.0 ship a
+  tested multi-writer story.
 
 ## 4. Growth-SWMR tests in python-blosc2 — MEDIUM
 
@@ -176,6 +224,12 @@ libblosc2's symbol surface).
 
 ## Suggested order
 
-1 (append/insert fix) and 2 (Caterva2) carry real user impact; 3–5 are small
-hygiene items that should land before/with the next release pair; 6 rides
-along whenever schunk.c is next touched.
+1 (append/insert fix, done) and 2 (Caterva2) carry real user impact; 3–5 are
+small hygiene items that should land before/with the next release pair; 6
+rides along whenever schunk.c is next touched.
+
+Note for item 3 (release coordination): the 1b open-race fix above is not
+yet in the `3cd3bfe5` commit python-blosc2's `BLOSC2_BUNDLED_VERSION` pins
+to — it needs its own commit, and the bundled pin (and the eventual v3.2.0
+tag) must move past it before python-blosc2's NDArray multi-writer hammer
+test (`todo/locking-mwmr.md` item 1) is green against a non-local c-blosc2.

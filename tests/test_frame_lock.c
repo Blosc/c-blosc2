@@ -403,6 +403,94 @@ static char* test_bracket_atomic(void) {
 }
 
 
+/* Two children append through their own handle concurrently under locking.
+   This is the cross-process pin for test_stale_append_resync's counter fix
+   (plans/todo-locking-swmr.md item 1; python-blosc2's todo/locking-mwmr.md
+   item 1): each child's append re-syncs the cached nbytes/cbytes/nchunks
+   before applying its delta, so interleaved appends from two processes must
+   not lose or corrupt either side's chunks. Chunk values are tagged by
+   parity (child 0 -> even, child 1 -> odd) so ownership and any torn/mixed
+   content are both checkable from a fresh open. */
+static char* test_fork_two_appenders(void) {
+  static int32_t data[CHUNKSIZE];
+  const int child_iters = 200;
+
+  mu_assert("ERROR: cannot create the frame", fill_frame(false, true) == NCHUNKS);
+
+  for (int child = 0; child < 2; child++) {
+    pid_t pid = fork();
+    mu_assert("ERROR: cannot fork", pid >= 0);
+    if (pid == 0) {
+      blosc2_schunk* sc = blosc2_schunk_open_udio(URLPATH, locking_io());
+      if (sc == NULL) {
+        _exit(1);
+      }
+      for (int i = 0; i < child_iters; i++) {
+        for (int j = 0; j < CHUNKSIZE; j++) {
+          data[j] = (i * CHUNKSIZE + j) * 2 + child;
+        }
+        int64_t nchunks_ = blosc2_schunk_append_buffer(sc, data, CHUNKSIZE * sizeof(int32_t));
+        if (nchunks_ < 0) {
+          _exit(2);
+        }
+      }
+      blosc2_schunk_free(sc);
+      _exit(0);
+    }
+  }
+
+  bool children_ok = true;
+  for (int child = 0; child < 2; child++) {
+    int status = 0;
+    pid_t w = wait(&status);
+    if (w < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+      children_ok = false;
+    }
+  }
+  mu_assert("ERROR: a child appender failed", children_ok);
+
+  blosc2_schunk* sc = blosc2_schunk_open(URLPATH);
+  mu_assert("ERROR: cannot reopen the schunk", sc != NULL);
+  int64_t expected_nchunks = NCHUNKS + 2 * (int64_t)child_iters;
+  mu_assert("ERROR: nchunks mismatch after concurrent appenders",
+            sc->nchunks == expected_nchunks);
+  int64_t expected_nbytes = expected_nchunks * CHUNKSIZE * (int64_t)sizeof(int32_t);
+  mu_assert("ERROR: nbytes mismatch after concurrent appenders",
+            sc->nbytes == expected_nbytes);
+
+  // Every appended chunk must be internally consistent (single parity, i.e.
+  // not a mix of both children's writes), and both children's chunks present
+  static int32_t dest[CHUNKSIZE];
+  bool content_ok = true, seen_even = false, seen_odd = false;
+  for (int64_t nchunk = NCHUNKS; nchunk < sc->nchunks; nchunk++) {
+    int dsize = blosc2_schunk_decompress_chunk(sc, nchunk, dest, sizeof(dest));
+    if (dsize < 0) {
+      content_ok = false;
+      break;
+    }
+    int parity = ((dest[0] % 2) + 2) % 2;
+    for (int j = 1; j < CHUNKSIZE; j++) {
+      if ((((dest[j] % 2) + 2) % 2) != parity) {
+        content_ok = false;
+        break;
+      }
+    }
+    if (parity == 0) {
+      seen_even = true;
+    }
+    else {
+      seen_odd = true;
+    }
+  }
+  mu_assert("ERROR: a chunk mixed values from both appenders", content_ok);
+  mu_assert("ERROR: did not see appended chunks from both children", seen_even && seen_odd);
+
+  blosc2_schunk_free(sc);
+  blosc2_remove_urlpath(URLPATH);
+  return EXIT_SUCCESS;
+}
+
+
 /* The real test: a child process keeps rewriting chunks while the parent
    reads all of them; with locking on, no read may ever fail (without it,
    torn reads intermittently yield BLOSC2_ERROR_FILE_READ). */
@@ -490,6 +578,88 @@ static char* test_fork_hammer(void) {
   blosc2_remove_urlpath(URLPATH);
   return EXIT_SUCCESS;
 }
+
+
+/* A concurrent opener must not see spurious failures while a writer grows the
+   frame. frame_from_file_offset()'s bootstrap read (stat() for the file size,
+   then the header/trailer) happens before any lock is taken; a writer that
+   grows the frame between the stat() and the header read can leave the
+   opener with a header advertising a frame_len larger than the now-stale
+   file_size snapshot, which frame_from_file_offset() treated as a hard
+   "frame length exceeds file boundary" error. Under locking this is a
+   transient race, not a real error -- blosc2_schunk_open_offset_udio() should
+   retry rather than propagate it.
+
+   A single appender vs. a single serial opener rarely lands in the window;
+   several concurrent appenders racing several concurrent openers from the
+   very first append reproduces it reliably (this is how it was originally
+   found, via python-blosc2's cross-process NDArray multi-writer hammer
+   test). */
+#define OPEN_RACE_NAPPENDERS (4)
+#define OPEN_RACE_NOPENERS (4)
+static char* test_fork_open_race(void) {
+  const int appender_iters = 100;
+  const int opener_iters = appender_iters * 4;
+
+  mu_assert("ERROR: cannot create the frame", fill_frame(true, true) == NCHUNKS);
+
+  pid_t pids[OPEN_RACE_NAPPENDERS + OPEN_RACE_NOPENERS];
+  int nchildren = 0;
+
+  for (int a = 0; a < OPEN_RACE_NAPPENDERS; a++) {
+    pid_t pid = fork();
+    mu_assert("ERROR: cannot fork an appender", pid >= 0);
+    if (pid == 0) {
+      static int32_t data[CHUNKSIZE];
+      blosc2_schunk* sc = blosc2_schunk_open_udio(URLPATH, locking_io());
+      if (sc == NULL) {
+        _exit(1);
+      }
+      for (int i = 0; i < appender_iters; i++) {
+        for (int j = 0; j < CHUNKSIZE; j++) {
+          data[j] = i * CHUNKSIZE + j;
+        }
+        if (blosc2_schunk_append_buffer(sc, data, CHUNKSIZE * sizeof(int32_t)) < 0) {
+          _exit(2);
+        }
+      }
+      blosc2_schunk_free(sc);
+      _exit(0);
+    }
+    pids[nchildren++] = pid;
+  }
+
+  for (int o = 0; o < OPEN_RACE_NOPENERS; o++) {
+    pid_t pid = fork();
+    mu_assert("ERROR: cannot fork an opener", pid >= 0);
+    if (pid == 0) {
+      /* Opens a *fresh* handle repeatedly, exercising the bootstrap read
+         racing the appenders' growth; every single open must succeed. */
+      for (int i = 0; i < opener_iters; i++) {
+        blosc2_schunk* sc = blosc2_schunk_open_udio(URLPATH, locking_io());
+        if (sc == NULL) {
+          _exit(3);
+        }
+        blosc2_schunk_free(sc);
+      }
+      _exit(0);
+    }
+    pids[nchildren++] = pid;
+  }
+
+  bool all_ok = true;
+  for (int k = 0; k < nchildren; k++) {
+    int status = 0;
+    pid_t w = waitpid(pids[k], &status, 0);
+    if (w < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+      all_ok = false;
+    }
+  }
+  mu_assert("ERROR: an appender or opener child failed under concurrent frame growth", all_ok);
+
+  blosc2_remove_urlpath(URLPATH);
+  return EXIT_SUCCESS;
+}
 #endif  /* !_WIN32 */
 
 
@@ -504,6 +674,8 @@ static char *all_tests(void) {
 #if !defined(_WIN32)
   mu_run_test(test_bracket_atomic);
   mu_run_test(test_fork_hammer);
+  mu_run_test(test_fork_two_appenders);
+  mu_run_test(test_fork_open_race);
 #endif
   return EXIT_SUCCESS;
 }
