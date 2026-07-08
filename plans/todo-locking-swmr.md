@@ -115,6 +115,37 @@ unchanged — also verified to reproduce the mix without the c-blosc2 fix).
 
 Not yet committed as of this writing (still local on top of `fa742207`).
 
+### 1d. Second open-vs-mutation race + `b2nd_insert`/`b2nd_append` external-lock requirement — DONE (2026-07-08)
+
+python-blosc2's `todo/locking-mwmr.md` items 0 and its C-side follow-up have
+the full narrative; summary here:
+
+- `blosc2_schunk_open_offset_udio()`'s `force_refresh` re-read (the second
+  `frame_from_file_offset()` call, done after the bootstrap read succeeds)
+  had no retry, unlike the first read `fa742207` protects — an in-place
+  update (not just growth) could still crash a fresh open. Fixed via a
+  shared `frame_from_file_offset_retrying()` helper in `blosc/schunk.c`.
+  Deterministic regression test: `tests/test_frame_lock.c::test_open_race_deterministic`,
+  using a new `BLOSC_TESTING`-only fault-injection hook in `blosc/frame.c`
+  (`blosc2_test_arm_open_race()`) that simulates the race directly instead
+  of racing real processes (the natural race window turned out to be
+  single-digit-microsecond, unreproducible on demand — see the fuller
+  writeup in python-blosc2's todo doc for the Fable-5-assisted root cause).
+- `b2nd_insert()`/`b2nd_append()`, called bare (no external lock), have a
+  real race: their own `refresh_if_stale()` and the `b2nd_resize()` they
+  call afterward are two separate lock cycles with a gap between them, so a
+  concurrent writer growing the array in that gap makes the already-computed
+  `newshape` stale, hitting the same shrink-and-delete-data bug as
+  python-blosc2's `NDArray.append()` bug (item 3 above), just narrower.
+  **Not a library bug** — same caller-discipline requirement as Python's
+  `holding_lock()`: bracket the whole call in `blosc2_schunk_lock()`/`unlock()`.
+  `blosc2_schunk_insert_chunk()` (raw SChunk, not b2nd) is safe bare by
+  contrast — one continuous lock hold covers everything.
+  Tests: `tests/test_b2nd_multiwriter_lock.c` (new file, 3 tests) and
+  `tests/test_frame_lock.c::test_fork_multiwriter_insert_chunk`.
+
+Not yet committed as of this writing.
+
 ## 2. Caterva2 integration — HIGH (different repo)
 
 The original motivation for the whole effort; everything it needs is now

@@ -491,6 +491,136 @@ static char* test_fork_two_appenders(void) {
 }
 
 
+/* C-side follow-up to python-blosc2's todo/locking-mwmr.md "creative test
+   pass" (2026-07-08): append/update multi-writer concurrency is pinned by
+   test_fork_two_appenders() and test_fork_hammer() above, but raw SChunk
+   insert (not append -- shifting existing chunk indices, not just adding at
+   the end) had no multi-writer coverage anywhere. Unlike b2nd_insert()
+   (blosc/b2nd.c), which does its own refresh_if_stale() and then separately
+   calls b2nd_resize() -- two independent lock cycles with a real gap in
+   between, which needs external blosc2_schunk_lock()/unlock() bracketing to
+   be safe under concurrent writers (see tests/test_b2nd_multiwriter_lock.c)
+   -- blosc2_schunk_insert_chunk() takes its lock once and holds it across
+   the stale check and the insert itself, so it should already be safe bare,
+   with no external bracket needed. This test checks that empirically. */
+#define SCHUNK_INSERT_NWRITERS (4)
+#define SCHUNK_INSERT_PER_WRITER (30)
+static char* test_fork_multiwriter_insert_chunk(void) {
+  static int32_t data[CHUNKSIZE];
+
+  mu_assert("ERROR: cannot create the frame", fill_frame(true, true) == NCHUNKS);
+  int64_t base_nchunks = NCHUNKS;
+
+  pid_t pids[SCHUNK_INSERT_NWRITERS];
+  for (int w = 0; w < SCHUNK_INSERT_NWRITERS; w++) {
+    pid_t pid = fork();
+    mu_assert("ERROR: cannot fork a writer", pid >= 0);
+    if (pid == 0) {
+      blosc2_schunk* sc = blosc2_schunk_open_udio(URLPATH, locking_io());
+      if (sc == NULL) {
+        _exit(1);
+      }
+      for (int i = 0; i < SCHUNK_INSERT_PER_WRITER; i++) {
+        int32_t tag = w * 1000000 + i;
+        for (int j = 0; j < CHUNKSIZE; j++) {
+          data[j] = tag;
+        }
+        uint8_t* chunk = malloc(CHUNKSIZE * sizeof(int32_t) + BLOSC2_MAX_OVERHEAD);
+        int csize = blosc2_compress_ctx(sc->cctx, data, CHUNKSIZE * sizeof(int32_t),
+                                        chunk, CHUNKSIZE * sizeof(int32_t) + BLOSC2_MAX_OVERHEAD);
+        if (csize < 0) {
+          free(chunk);
+          _exit(2);
+        }
+        // Always insert at index 0 (not bracketed in an external lock: this
+        // is testing whether blosc2_schunk_insert_chunk() is safe bare).
+        int64_t nchunks_ = blosc2_schunk_insert_chunk(sc, 0, chunk, false);
+        if (nchunks_ < 0) {
+          _exit(3);
+        }
+      }
+      blosc2_schunk_free(sc);
+      _exit(0);
+    }
+    pids[w] = pid;
+  }
+
+  bool all_ok = true;
+  for (int w = 0; w < SCHUNK_INSERT_NWRITERS; w++) {
+    int status = 0;
+    pid_t r = waitpid(pids[w], &status, 0);
+    if (r < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+      all_ok = false;
+    }
+  }
+  mu_assert("ERROR: an insert-chunk writer child failed", all_ok);
+
+  blosc2_schunk* sc = blosc2_schunk_open(URLPATH);
+  mu_assert("ERROR: cannot reopen the schunk", sc != NULL);
+  int64_t expected_nchunks = base_nchunks + (int64_t) SCHUNK_INSERT_NWRITERS * SCHUNK_INSERT_PER_WRITER;
+  mu_assert("ERROR: nchunks mismatch -- lost or duplicated an inserted chunk",
+            sc->nchunks == expected_nchunks);
+
+  // Every inserted chunk is uniform (a single tag repeated CHUNKSIZE times);
+  // the original fill_frame() chunks are a ramp, not uniform, so they are
+  // trivially distinguishable and skipped by construction (they always end
+  // up after all the newly-inserted ones, since insertion at 0 keeps
+  // shifting them later).
+  static int32_t dest[CHUNKSIZE];
+  int64_t expected_ntags = (int64_t) SCHUNK_INSERT_NWRITERS * SCHUNK_INSERT_PER_WRITER;
+  int32_t* seen_tags = malloc((size_t) expected_ntags * sizeof(int32_t));
+  mu_assert("ERROR: cannot allocate tag buffer", seen_tags != NULL);
+  int64_t ntags = 0;
+  bool corrupted = false;
+  for (int64_t nchunk = 0; nchunk < expected_ntags; nchunk++) {
+    int dsize = blosc2_schunk_decompress_chunk(sc, nchunk, dest, sizeof(dest));
+    if (dsize < 0) {
+      corrupted = true;
+      break;
+    }
+    int32_t tag = dest[0];
+    for (int j = 1; j < CHUNKSIZE; j++) {
+      if (dest[j] != tag) {
+        corrupted = true;
+        break;
+      }
+    }
+    if (corrupted) {
+      break;
+    }
+    seen_tags[ntags++] = tag;
+  }
+  mu_assert("ERROR: an inserted chunk is not uniform (torn) or unreadable", !corrupted);
+
+  for (int64_t i = 1; i < ntags; i++) {
+    int32_t key = seen_tags[i];
+    int64_t j = i - 1;
+    while (j >= 0 && seen_tags[j] > key) {
+      seen_tags[j + 1] = seen_tags[j];
+      j--;
+    }
+    seen_tags[j + 1] = key;
+  }
+  bool tags_ok = (ntags == expected_ntags);
+  int64_t k = 0;
+  for (int w = 0; w < SCHUNK_INSERT_NWRITERS && tags_ok; w++) {
+    for (int i = 0; i < SCHUNK_INSERT_PER_WRITER; i++) {
+      int32_t expected = w * 1000000 + i;
+      if (seen_tags[k++] != expected) {
+        tags_ok = false;
+        break;
+      }
+    }
+  }
+  mu_assert("ERROR: insert-chunk tags don't match: a chunk was lost, duplicated, or corrupted", tags_ok);
+
+  free(seen_tags);
+  blosc2_schunk_free(sc);
+  blosc2_remove_urlpath(URLPATH);
+  return EXIT_SUCCESS;
+}
+
+
 /* The real test: a child process keeps rewriting chunks while the parent
    reads all of them; with locking on, no read may ever fail (without it,
    torn reads intermittently yield BLOSC2_ERROR_FILE_READ). */
@@ -829,6 +959,7 @@ static char *all_tests(void) {
   mu_run_test(test_bracket_atomic);
   mu_run_test(test_fork_hammer);
   mu_run_test(test_fork_two_appenders);
+  mu_run_test(test_fork_multiwriter_insert_chunk);
   mu_run_test(test_fork_open_race);
   mu_run_test(test_fork_open_race_update);
 #endif
