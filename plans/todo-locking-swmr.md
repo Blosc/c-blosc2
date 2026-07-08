@@ -88,6 +88,33 @@ zero to land in the window reliably. Regression test: `test_fork_open_race`
 in `tests/test_frame_lock.c` (4 appenders vs. 4 openers); reproduces the
 `NULL` return in 4/5 trials without the fix, clean across 20+ trials with it.
 
+Committed as `fa742207`; python-blosc2's `BLOSC2_BUNDLED_VERSION` pins to it.
+
+### 1c. `b2nd_set_slice_cbuffer()` atomicity bracket — DONE (2026-07-08)
+
+python-blosc2's `todo/locking-mwmr.md` item 2. A slice write spanning
+multiple chunks was N independently-locked `blosc2_schunk_update_chunk()`
+calls; two writers on overlapping slices interleaved at chunk granularity —
+no corruption, but a locked reader could observe a half-applied write (a
+mixed, chunk-wise-last-writer-wins result). `b2nd_resize()` already held the
+exclusive frame lock across its whole metalayer+chunks sequence;
+`b2nd_set_slice_cbuffer()` (the real exported name behind "set_slice") now
+does the same around its call to `get_set_slice()` — a 5-line change in
+`blosc/b2nd.c`, nesting on `lock_depth` like every other bracket, a no-op for
+unlocked handles. python-blosc2 inherits the atomicity through `__setitem__`
+with zero code changes on that side.
+
+Regression tests: `tests/test_b2nd_set_slice_lock.c` (new file, two writer
+processes overwrite the whole multi-chunk array with their own constant
+value; a `blosc2_schunk_lock()`/`unlock()`-bracketed reader must never see a
+mix — reproduces the mix in 10/10 trials without the fix, clean across 15+
+with it) and python-blosc2's
+`tests/test_locking.py::test_cross_process_overlapping_slice_atomic` (same
+scenario through `arr[:, :] = value`, confirming the fix reaches Python
+unchanged — also verified to reproduce the mix without the c-blosc2 fix).
+
+Not yet committed as of this writing (still local on top of `fa742207`).
+
 ## 2. Caterva2 integration — HIGH (different repo)
 
 The original motivation for the whole effort; everything it needs is now
@@ -228,8 +255,9 @@ libblosc2's symbol surface).
 small hygiene items that should land before/with the next release pair; 6
 rides along whenever schunk.c is next touched.
 
-Note for item 3 (release coordination): the 1b open-race fix above is not
-yet in the `3cd3bfe5` commit python-blosc2's `BLOSC2_BUNDLED_VERSION` pins
-to — it needs its own commit, and the bundled pin (and the eventual v3.2.0
-tag) must move past it before python-blosc2's NDArray multi-writer hammer
-test (`todo/locking-mwmr.md` item 1) is green against a non-local c-blosc2.
+Note for item 3 (release coordination): 1b (open-race fix) is committed as
+`fa742207` and python-blosc2's `BLOSC2_BUNDLED_VERSION` already pins to it.
+1c (set_slice bracket) is not committed yet — it needs its own commit, and
+the bundled pin (and the eventual v3.2.0 tag) must move past it before
+python-blosc2's `test_cross_process_overlapping_slice_atomic`
+(`todo/locking-mwmr.md` item 2) is green against a non-local c-blosc2.
