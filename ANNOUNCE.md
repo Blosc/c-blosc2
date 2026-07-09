@@ -25,7 +25,9 @@ Locking is advisory (every handle on a container must opt in) and not
 supported over NFS. See the release notes for the full rundown, including
 a couple of additive struct fields and a new error code.
 
-This release introduces no breaking API/ABI changes.
+This release introduces no breaking API, but this alters the ABI as two
+public structs have an additional field; the shared library's `SOVERSION`
+is bumped accordingly (8 to 9).
 
 For more info, see the release notes in:
 

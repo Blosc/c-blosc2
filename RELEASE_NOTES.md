@@ -1,6 +1,11 @@
 Release notes for C-Blosc2
 ==========================
 
+Changes from 3.2.0 to 3.2.1
+===========================
+
+#XXX version-specific blurb XXX#
+
 Changes from 3.1.5 to 3.2.0
 ===========================
 
@@ -55,7 +60,7 @@ API/ABI notes
 * Appends `change_tick` to `blosc2_schunk` struct and `last_tick` to
   `b2nd_array_t`, and adds `locking` to `blosc2_stdio_params` and the new
   `BLOSC2_ERROR_LOCK` error code.  No existing field or function signature
-  was altered, but this breaks the ABI as two public structs have an
+  was altered, but this alters the ABI as two public structs have an
   additional field; the shared library's `SOVERSION` is bumped accordingly
   (8 to 9).
 
