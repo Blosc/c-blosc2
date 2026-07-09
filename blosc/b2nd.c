@@ -294,7 +294,21 @@ static int refresh_if_stale(b2nd_array_t *array) {
   int32_t smeta_len;
   if (blosc2_meta_get(sc, "b2nd", &smeta, &smeta_len) < 0) {
     if (blosc2_meta_get(sc, "caterva", &smeta, &smeta_len) < 0) {
-      BLOSC_ERROR(BLOSC2_ERROR_METALAYER_NOT_FOUND);
+      // blosc2_meta_get() itself is a pure in-memory lookup on
+      // schunk->metalayers[], but that array was just repopulated by
+      // frame_check_stale() -> frame_refresh_if_stale() -> frame_get_metalayers(),
+      // which does its *own*, fully independent disk read (its own fresh
+      // get_header_info() + header re-read, frame.c) -- separate from both
+      // frame_check_stale()'s header read and the trailer read a few lines
+      // up in this same call chain. Without locking, nothing holds these
+      // reads together atomically, so this one can catch the header mid
+      // rewrite just as easily as the other two; a b2nd array always has
+      // one of these two metalayers from creation, so a miss here reflects
+      // that specific read landing in a torn window, not a genuine
+      // absence. Same opportunistic treatment as those reads: keep the
+      // cached view and let the next poll (its own fresh, independent read)
+      // resolve it, instead of hard-erroring on what is normally transient.
+      return BLOSC2_ERROR_SUCCESS;
     }
   }
   int8_t ndim;

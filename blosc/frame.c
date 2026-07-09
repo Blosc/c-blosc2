@@ -816,25 +816,27 @@ static int frame_refresh_if_stale(blosc2_frame_s *frame, int64_t frame_len_on_di
       (!frame->force_refresh && frame_len_on_disk == frame->len)) {
     return 0;
   }
-  // The lock generation counter (see frame_lock) may have flagged a mutation
-  // that left the frame length unchanged; the refresh below covers it
-  frame->force_refresh = false;
+  // Saved so the metalayer-reload retry loop below can roll back to a fully
+  // consistent state on exhaustion, rather than leaving frame->len/trailer_len
+  // committed to the new value with no metalayers to match it.
+  int64_t old_len = frame->len;
+  uint32_t old_trailer_len = frame->trailer_len;
 
   if (frame_len_on_disk < FRAME_HEADER_MINLEN + FRAME_TRAILER_MINLEN) {
     BLOSC_TRACE_ERROR("Invalid on-disk frame length (%" PRId64 ").", frame_len_on_disk);
     return BLOSC2_ERROR_FILE_READ;
   }
 
-  // Invalidate the cached offsets index
-  if (frame->coffsets != NULL) {
-    if (frame->coffsets_needs_free) {
-      free(frame->coffsets);
-    }
-    frame->coffsets = NULL;
-  }
-  frame->len = frame_len_on_disk;
-
-  // Refresh the trailer length from the trailer tail (same logic as at open time)
+  // Read and validate the trailer *before* mutating any frame state below,
+  // so a transient torn read (a writer without locking has no coordination
+  // preventing a reader from landing mid-rewrite here -- the documented
+  // SWMR-without-locking tradeoff) can be handled opportunistically: keep
+  // the old cached view and let the next access retry, the same way
+  // frame_check_stale()'s header read already does a few lines up in the
+  // caller. Once frame->len/coffsets are overwritten below, a failure
+  // partway through would leave the frame in a self-inconsistent state
+  // (new length, stale trailer/offsets), so those mutations only happen
+  // after the trailer is confirmed good.
   blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
   if (io_cb == NULL) {
     BLOSC_TRACE_ERROR("Error getting the input/output API");
@@ -858,22 +860,37 @@ static int frame_refresh_if_stale(blosc2_frame_s *frame, int64_t frame_len_on_di
   io_cb->close(fp);
   if (rbytes != FRAME_TRAILER_MINLEN) {
     BLOSC_TRACE_ERROR("Cannot read the trailer out of the frame.");
-    return BLOSC2_ERROR_FILE_READ;
+    return 0;  // opportunistic: transient, keep the cached view, retry later
   }
   int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
   if (trailer_ptr[trailer_offset - 1] != 0xce) {
     // Not a valid trailer; most likely we are reading a frame in the middle of
-    // being rewritten by another handle (writers need external serialization).
+    // being rewritten by another handle without locking (locked handles
+    // fully serialize, so this only happens under the no-locking contract).
     BLOSC_TRACE_ERROR("Invalid trailer in frame.");
-    return BLOSC2_ERROR_FILE_READ;
+    return 0;  // opportunistic, same reasoning as above
   }
   uint32_t trailer_len;
   from_big(&trailer_len, trailer_ptr + trailer_offset, sizeof(trailer_len));
   if (trailer_len < FRAME_TRAILER_MINLEN || trailer_len > INT32_MAX ||
       (int64_t)trailer_len > frame_len_on_disk - FRAME_HEADER_MINLEN) {
     BLOSC_TRACE_ERROR("Invalid trailer length (%" PRIu32 ") in frame.", trailer_len);
-    return BLOSC2_ERROR_FILE_READ;
+    return 0;  // opportunistic, same reasoning as above
   }
+
+  // Trailer confirmed good: now safe to commit the new length. The lock
+  // generation counter (see frame_lock) may have flagged a mutation that
+  // left the frame length unchanged; only clear that flag here, once a
+  // refresh has actually happened -- clearing it earlier and then bailing
+  // out opportunistically above would permanently lose a same-length
+  // mutation notification on a torn-read retry. The cached offsets index is
+  // dropped further down, only once the metalayer/vlmetalayer reload below
+  // has actually succeeded -- neither of those touches frame->coffsets, so
+  // deferring this keeps the old view of it fully intact for the
+  // opportunistic rollback path below, exactly as strong as the trailer
+  // read's own bail-outs above.
+  frame->force_refresh = false;
+  frame->len = frame_len_on_disk;
   frame->trailer_len = trailer_len;
 
   // The header metalayers and trailer vlmetalayers were cached at open time;
@@ -881,21 +898,79 @@ static int frame_refresh_if_stale(blosc2_frame_s *frame, int64_t frame_len_on_di
   // update) become visible too.  The guard protects against re-entering from
   // the reload path itself (get_header_info does not refresh, but cheap
   // insurance against future changes there).
+  //
+  // frame_get_metalayers()/frame_get_vlmetalayers() each do their own fully
+  // independent header/trailer re-read (separate from the trailer read
+  // above), so without locking they can hit the same transient torn-read
+  // window. Unlike that trailer read, there's no way to validate first and
+  // commit after: schunk_free_metalayers()/schunk_free_vlmetalayers() must
+  // run before a reload attempt (the parsers write straight into
+  // schunk->metalayers[]/vlmetalayers[] as they go), so a single failed
+  // attempt already discards the old cached set. Retry a bounded number of
+  // times -- both free helpers are NULL-safe and re-run cleanly against a
+  // partial prior attempt, and each attempt is a fresh independent read, so
+  // this self-heals once the writer's rewrite stabilizes.
+  //
+  // This reasoning only holds without locking, though: frame_check_stale()
+  // (the only caller) holds the shared frame lock across this entire call
+  // when frame->locking is set, which fully excludes writers for its
+  // duration -- so under locking a reload failure here cannot be a torn
+  // read, it is a genuine problem (corruption or a real I/O error), and
+  // retrying 50 times would just waste ~50ms holding that shared lock
+  // before silently masking it. Retry once (i.e. don't retry) and propagate
+  // the error under locking; keep the opportunistic bounded retry + silent
+  // rollback for the no-locking case only.
+  //
+  // On exhaustion in the no-locking case, roll back frame->len/trailer_len
+  // to what they were before this call and force a full retry on the next
+  // poll (frame->force_refresh = true) -- otherwise frame_len_on_disk ==
+  // frame->len would short-circuit every subsequent call at the top of this
+  // function, permanently stranding this handle with an empty metalayer set.
   if (!frame->refreshing) {
     frame->refreshing = true;
-    schunk_free_metalayers(frame->schunk);
-    int rc = frame_get_metalayers(frame, frame->schunk);
-    if (rc >= 0) {
-      schunk_free_vlmetalayers(frame->schunk);
-      rc = frame_get_vlmetalayers(frame, frame->schunk);
+    int rc = -1;
+    const int max_attempts = frame->locking ? 1 : 50;
+    for (int attempt = 0; attempt < max_attempts; attempt++) {
+      schunk_free_metalayers(frame->schunk);
+      rc = frame_get_metalayers(frame, frame->schunk);
+      if (rc >= 0) {
+        schunk_free_vlmetalayers(frame->schunk);
+        rc = frame_get_vlmetalayers(frame, frame->schunk);
+      }
+      if (rc >= 0 || attempt + 1 == max_attempts) {
+        break;
+      }
+#if defined(_WIN32)
+      Sleep(1);
+#else
+      usleep(1000);
+#endif
     }
     frame->refreshing = false;
     if (rc < 0) {
-      BLOSC_TRACE_ERROR("Cannot reload the metalayers from the refreshed frame.");
-      return rc;
+      if (frame->locking) {
+        BLOSC_TRACE_ERROR("Cannot reload the metalayers from the refreshed frame "
+                          "(locked handle: this is not a transient race).");
+        return rc;
+      }
+      BLOSC_TRACE_ERROR("Cannot reload the metalayers from the refreshed frame "
+                        "after retries; rolling back to the previous cached view.");
+      frame->len = old_len;
+      frame->trailer_len = old_trailer_len;
+      frame->force_refresh = true;
+      return 0;
     }
   }
   frame->schunk->change_tick++;
+
+  // Cached offsets index invalidated only now, after a fully successful
+  // refresh: recomputed lazily from the fresh trailer on demand.
+  if (frame->coffsets != NULL) {
+    if (frame->coffsets_needs_free) {
+      free(frame->coffsets);
+    }
+    frame->coffsets = NULL;
+  }
 
   return 1;
 }
