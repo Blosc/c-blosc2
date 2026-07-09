@@ -73,3 +73,4 @@ Locking
 
 .. doxygenfunction:: blosc2_schunk_lock
 .. doxygenfunction:: blosc2_schunk_unlock
+.. doxygenfunction:: blosc2_schunk_refresh

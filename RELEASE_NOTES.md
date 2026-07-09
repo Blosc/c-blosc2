@@ -4,7 +4,10 @@ Release notes for C-Blosc2
 Changes from 3.2.0 to 3.2.1
 ===========================
 
-#XXX version-specific blurb XXX#
+* New `blosc2_schunk_refresh()` API: an explicit, data-free re-sync point
+  for a plain `blosc2_schunk` reader handle in a Growth-SWMR setup, mirroring
+  `b2nd_refresh()` for b2nd arrays. Useful for polling for another handle's
+  changes without touching data.
 
 Changes from 3.1.5 to 3.2.0
 ===========================
