@@ -99,6 +99,7 @@ Utils
 .. doxygenfunction:: b2nd_deserialize_meta
 .. doxygenfunction:: b2nd_deserialize_meta_inline
 .. doxygenfunction:: b2nd_resize
+.. doxygenfunction:: b2nd_refresh
 
 
 Destruction

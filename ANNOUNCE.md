@@ -1,16 +1,31 @@
-# Announcing C-Blosc2 3.1.5
+# Announcing C-Blosc2 3.2.0
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release that fixes the decompression of all-zeros
-buffers whose length is not a multiple of ``typesize``.  Such chunks were
-previously rejected even though all-zeros decompression is just a ``memset``
-and works regardless of element alignment.  This affected, for example,
-python-blosc2's ``compress2`` → ``decompress2`` round-trip for all-zeros
-payloads with a length not divisible by the type size.
+This release adds opt-in cross-process coordination for disk-based
+containers shared by several handles (typically several processes), such
+as a cache evictor running alongside concurrent readers:
 
-This release introduces no API/ABI changes.
+* **Cross-process locking**: an advisory, per-frame lock (a sidecar
+  ``.b2lock`` file plus a generation counter) that every participating
+  handle can enable via `blosc2_stdio_params.locking` or fleet-wide with
+  the `BLOSC_LOCKING` environment variable. A new bracket API,
+  `blosc2_schunk_lock()` / `blosc2_schunk_unlock()`, holds the lock across
+  several operations so a multi-step mutation is atomic to other locked
+  handles; `b2nd_resize()` and `b2nd_set_slice_cbuffer()` now use it
+  internally too.
+* **Growth-SWMR** (single writer, multiple readers): a reader handle on a
+  disk-based frame or b2nd array now follows shape/length growth made by
+  another handle on its next access, without reopening — via a new
+  `b2nd_refresh()` API and stale-handle coherence fixes that also closed
+  gaps in `blosc2_vlmeta_exists()` and the append/insert counters.
+
+Locking is advisory (every handle on a container must opt in) and not
+supported over NFS. See the release notes for the full rundown, including
+a couple of additive struct fields and a new error code.
+
+This release introduces no breaking API/ABI changes.
 
 For more info, see the release notes in:
 

@@ -18,6 +18,10 @@ New features
   hold the exclusive frame lock across several operations, making a
   multi-step mutation atomic to other locked handles instead of only each
   individual call.  No-ops on a handle without locking enabled.
+  `b2nd_resize()` and `b2nd_set_slice_cbuffer()` now bracket their own
+  multi-chunk sequences this way too, so a locked reader never observes a
+  half-applied resize or slice write, and two overlapping slice writers no
+  longer interleave at chunk granularity.
 * **Growth-SWMR** (single writer, multiple readers): a reader handle
   opened on a disk-based frame or b2nd array now follows shape/length
   growth made through another handle (typically another process) on its
@@ -31,8 +35,29 @@ New features
   trusting cached state, closing gaps in `blosc2_vlmeta_exists()` and in
   the counters (`nbytes`/`cbytes`/`nchunks`) that
   `blosc2_schunk_append_chunk()`/`blosc2_schunk_insert_chunk()` apply their
-  deltas to.  Also fixed a race between opening a frame and a concurrent
-  writer, and a leak on an unreadable-frame staleness poll.
+  deltas to.  Also fixed:
+
+  - A race between opening a frame and a concurrent writer growing or
+    otherwise mutating it (`blosc2_schunk_open_offset_udio()` could
+    return ``NULL`` on a transient "frame length exceeds file boundary"
+    read instead of retrying it).
+  - A torn read during the (unlocked) staleness poll used to hard-error
+    instead of keeping the cached view and retrying on the next poll, as
+    intended.
+  - A leak, and a free of an uninitialized pointer in
+    `blosc2_schunk_copy()`, on an unreadable-frame staleness poll (hit
+    legitimately by a freshly created, not-yet-flushed file-backed
+    schunk).
+
+API/ABI notes
+-------------
+
+* Appends `change_tick` to `blosc2_schunk` struct and `last_tick` to
+  `b2nd_array_t`, and adds `locking` to `blosc2_stdio_params` and the new
+  `BLOSC2_ERROR_LOCK` error code.  No existing field or function signature
+  was altered, but this breaks the ABI as two public structs have an
+  additional field; the shared library's `SOVERSION` is bumped accordingly
+  (8 to 9).
 
 Notes
 -----
