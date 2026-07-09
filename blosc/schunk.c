@@ -731,6 +731,20 @@ int blosc2_schunk_unlock(blosc2_schunk *schunk) {
 }
 
 
+/* Re-sync the cached counters (nchunks, nbytes, cbytes) and metalayers of a
+   disk-based super-chunk when another handle changed it behind our back.
+   A no-op for in-memory super-chunks. */
+int blosc2_schunk_refresh(blosc2_schunk *schunk) {
+  if (schunk == NULL) {
+    return BLOSC2_ERROR_NULL_POINTER;
+  }
+  if (schunk->frame == NULL) {
+    return 0;
+  }
+  return frame_check_stale((blosc2_frame_s *) schunk->frame);
+}
+
+
 /* Fill an empty frame with special values (fast path). */
 int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int special_value,
                                int32_t chunksize) {

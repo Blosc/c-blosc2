@@ -1934,6 +1934,26 @@ BLOSC_EXPORT int blosc2_schunk_lock(blosc2_schunk *schunk);
 BLOSC_EXPORT int blosc2_schunk_unlock(blosc2_schunk *schunk);
 
 /**
+ * @brief Re-sync the cached counters (nchunks, nbytes, cbytes) and
+ * metalayers of a disk-based super-chunk when another handle — possibly in
+ * another process — has changed it.
+ *
+ * This gives a deterministic sync point for readers in a single-writer,
+ * multiple-readers (SWMR) workflow: after calling it, the counters in
+ * @p schunk reflect the current on-disk state.  Data-access functions
+ * already do this implicitly, so calling it is only needed to observe
+ * changes without touching data (e.g. when polling).
+ *
+ * A no-op for super-chunks not backed by an on-disk frame.
+ *
+ * @param schunk The super-chunk to refresh.
+ *
+ * @return 1 if the counters were re-synced, 0 if they were already current,
+ * or a negative error code.
+ */
+BLOSC_EXPORT int blosc2_schunk_refresh(blosc2_schunk *schunk);
+
+/**
  * @brief Open an existing super-chunk that is on-disk (frame). No in-memory copy is made.
  *
  * @param urlpath The file name.

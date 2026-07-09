@@ -221,6 +221,50 @@ static char* test_explicit_refresh(void) {
 }
 
 
+/* Same explicit-refresh contract, but at the plain blosc2_schunk level
+   (no b2nd layer), exercising blosc2_schunk_refresh() directly. */
+static char* test_schunk_explicit_refresh(void) {
+  blosc2_remove_urlpath(urlpath);
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = sizeof(int32_t);
+  blosc2_storage storage = {.contiguous=contiguous, .urlpath=urlpath, .cparams=&cparams};
+  blosc2_schunk *creator = blosc2_schunk_new(&storage);
+  mu_assert("ERROR: cannot create the schunk", creator != NULL);
+  int32_t buffer[NCOLS] = {0};
+  mu_assert("ERROR: cannot append the first chunk",
+            blosc2_schunk_append_buffer(creator, buffer, sizeof(buffer)) >= 0);
+  blosc2_schunk_free(creator);
+
+  blosc2_schunk *w = blosc2_schunk_open(urlpath);
+  blosc2_schunk *r = blosc2_schunk_open(urlpath);
+  mu_assert("ERROR: cannot open the writer handle", w != NULL);
+  mu_assert("ERROR: cannot open the reader handle", r != NULL);
+
+  // A fresh handle is already current
+  mu_assert("ERROR: refresh on a current handle should return 0",
+            blosc2_schunk_refresh(r) == 0);
+
+  // Writer appends a chunk behind the reader's back
+  mu_assert("ERROR: cannot append a chunk via the writer",
+            blosc2_schunk_append_buffer(w, buffer, sizeof(buffer)) >= 0);
+  mu_assert("ERROR: the reader nchunks should still be stale before the refresh",
+            r->nchunks == 1);
+
+  // An explicit refresh must re-sync the counters, with no data access involved
+  mu_assert("ERROR: refresh on a stale handle should return 1",
+            blosc2_schunk_refresh(r) == 1);
+  mu_assert("ERROR: the reader nchunks did not follow the append",
+            r->nchunks == 2);
+  mu_assert("ERROR: a second refresh should return 0",
+            blosc2_schunk_refresh(r) == 0);
+
+  blosc2_schunk_free(w);
+  blosc2_schunk_free(r);
+  blosc2_remove_urlpath(urlpath);
+  return EXIT_SUCCESS;
+}
+
+
 static char *all_tests(void) {
   urlpath = "test_growth_swmr.b2nd";
   contiguous = true;
@@ -228,6 +272,7 @@ static char *all_tests(void) {
   mu_run_test(test_shrink);
   mu_run_test(test_vlmeta);
   mu_run_test(test_explicit_refresh);
+  mu_run_test(test_schunk_explicit_refresh);
 
   urlpath = "test_growth_swmr_s.b2nd";
   contiguous = false;
@@ -235,6 +280,7 @@ static char *all_tests(void) {
   mu_run_test(test_shrink);
   mu_run_test(test_vlmeta);
   mu_run_test(test_explicit_refresh);
+  mu_run_test(test_schunk_explicit_refresh);
 
   return EXIT_SUCCESS;
 }
