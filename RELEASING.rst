@@ -107,7 +107,7 @@ Expected results:
 Tagging
 -------
 
-- Create a tag ``X.Y.Z`` from ``master``.  Use the next message::
+- Create a tag ``X.Y.Z`` from ``main``.  Use the next message::
 
     $ git tag -a vX.Y.Z -m "Tagging version X.Y.Z"
 
@@ -141,8 +141,8 @@ Announcing
 Post-release actions
 --------------------
 
-- Edit *VERSION* symbols in blosc/blosc2.h in master to increment the
-  version to the next minor one (i.e. X.Y.Z --> X.Y.(Z+1).dev).
+- Edit *VERSION* symbols in include/blosc2.h in main to increment the
+  version to the next patch one (i.e. X.Y.Z --> X.Y.(Z+1).dev).
 
 - Create new headers for adding new features in ``RELEASE_NOTES.md``
   and add this place-holder instead:

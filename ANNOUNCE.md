@@ -23,7 +23,7 @@ Blosc2 is the next generation of Blosc, an
 that has been around for more than a decade.
 
 Blosc2 expands the capabilities of Blosc by providing a higher level
-container that is able to store many chunks on it (hence the super-block name).
+container that is able to store many chunks on it (hence the super-chunk name).
 It supports storing data on both memory and disk using the same API.
 Also, it adds more compressors and filters.
 

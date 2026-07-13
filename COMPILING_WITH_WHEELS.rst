@@ -2,21 +2,16 @@
 C-Blosc2 libraries come with Python-Blosc2 wheels
 =============================================================================
 
-C-Blosc2 binary libraries (including plugins functionality) can easily be installed from Python-Blosc2 (>= 0.1.8) wheels:
+C-Blosc2 binary libraries (including plugins functionality) can easily be installed from Python-Blosc2 wheels:
 
 .. code-block:: console
 
         $ pip install blosc2
-	Collecting blosc2
-          Downloading blosc2-0.1.8-cp37-cp37m-manylinux2010_x86_64.whl (3.3 MB)
-             |████████████████████████████████| 3.3 MB 4.7 MB/s
-        Installing collected packages: blosc2
-        Successfully installed blosc2-0.1.8 
 
 As a result, one can easily update to the latest version of C-Blosc2 binaries without the need to manually compile it. Following are instructions on how to use the libraries in wheels for different platforms.
 
 Compiling C files with Blosc2 wheels on Windows
-----------------------------------------------
+-----------------------------------------------
 
 - The wheels for Windows have been produced with the Microsoft MSVC compiler, so we recommend that you use it too.  You can get it for free at: https://visualstudio.microsoft.com/es/downloads/.
 

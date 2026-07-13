@@ -3,7 +3,7 @@ Blosc2 Sparse Frame Format
 
 Blosc (as of version 2.0.0) has a Sparse Frame (SFrame for short) format that allows for non-contiguous storage of `Blosc2 data chunks <https://github.com/Blosc/c-blosc2/blob/main/README_CHUNK_FORMAT.rst>`_ on disk.
 
-When creating an sparse frame one must denote the `contiguous` flag in `storage` struct as false and provide a name (which represents a directory, but in the future it could be an arbitrary URL) in `storage.urlpath` for the sframe to be stored. It is recommended to name the directory with the `.b2frame` (or `.b2f` for short) extension.
+When creating a sparse frame one must denote the `contiguous` flag in `storage` struct as false and provide a name (which represents a directory, but in the future it could be an arbitrary URL) in `storage.urlpath` for the sframe to be stored. It is recommended to name the directory with the `.b2frame` (or `.b2f` for short) extension.
 
 A SFrame is made up of a frame index file and the chunks stored in the same directory on-disk.  The frame index file follows the format described in the `contiguous frame format <https://github.com/Blosc/c-blosc2/blob/main/README_CFRAME_FORMAT.rst>`_ document, with the difference that the frame's chunks section is made up of multiple files (one per chunk). The frame index file name is always `chunks.b2frame`, and it also contains the metadata for the sframe.
 
@@ -47,7 +47,7 @@ As shown below, an sframe of 4 chunks will be composed of a directory with each 
 
 Insertion example
 ^^^^^^^^^^^^^^^^^
-When doing an insertion in the nth position, in the same position of the index chunk will be the real chunk index which will be the numbers of chunks that there were before inserting the new one. Following the previous example, it its shown the content of the directory and the index chunk before and after an insertion in the 2nd position::
+When doing an insertion in the nth position, in the same position of the index chunk will be the real chunk index which will be the numbers of chunks that there were before inserting the new one. Following the previous example, the content of the directory and the index chunk is shown before and after an insertion in the 2nd position::
 
  Before                                 After
 

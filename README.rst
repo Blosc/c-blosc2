@@ -33,7 +33,7 @@ What is it?
 
 `Blosc2 <https://www.blosc.org/pages/blosc-in-depth/>`_ is a high-performance compressor and data format optimized for binary data, including numerical arrays, tensors, and other structured formats. It provides a flexible framework of codecs and filters, enabling developers to balance compression speed and ratio for specific use cases, from high-throughput data pipelines to persistent storage. As the successor to the original Blosc library (released in 2010), Blosc2 is built on a mature foundation and is integrated into many popular scientific computing libraries, such as PyTables, h5py, and Zarr.
 
-C-Blosc2 is the new major version of `C-Blosc <https://github.com/Blosc/c-blosc>`_, and is backward compatible with both the C-Blosc1 API and its in-memory format.  However, the reverse thing is generally not true for the format; buffers generated with C-Blosc2 are not format-compatible with C-Blosc1 (i.e. forward compatibility is not supported).  In case you want to ensure full API compatibility with C-Blosc1 API, define the `BLOSC1_COMPAT` symbol.
+C-Blosc2 is the latest major version of `C-Blosc <https://github.com/Blosc/c-blosc>`_, and is backward compatible with both the C-Blosc1 API and its in-memory format.  However, the reverse thing is generally not true for the format; buffers generated with C-Blosc2 are not format-compatible with C-Blosc1 (i.e. forward compatibility is not supported).  In case you want to ensure full API compatibility with C-Blosc1 API, define the `BLOSC1_COMPAT` symbol.
 
 See a 3-minute `introductory video to Blosc2 <https://www.youtube.com/watch?v=ER12R7FXosk>`_.
 
@@ -41,7 +41,7 @@ See a 3-minute `introductory video to Blosc2 <https://www.youtube.com/watch?v=ER
 Blosc2 NDim: an N-Dimensional store
 ===================================
 
-One of more exciting additions in C-Blosc2 is the `Blosc2 NDim layer <https://www.blosc.org/c-blosc2/reference/b2nd.html>`_ (or B2ND for short), which allows creating *and* reading n-dimensional datasets in an extremely efficient way thanks to a n-dim 2-level partitioning, that allows slicing and dicing arbitrary large and compressed data in a more fine-grained way:
+One of the more exciting additions in C-Blosc2 is the `Blosc2 NDim layer <https://www.blosc.org/c-blosc2/reference/b2nd.html>`_ (or B2ND for short), which allows creating *and* reading n-dimensional datasets in an extremely efficient way thanks to a n-dim 2-level partitioning, that allows slicing and dicing arbitrary large and compressed data in a more fine-grained way:
 
 .. image:: https://github.com/Blosc/c-blosc2/blob/main/images/b2nd-2level-parts.png?raw=true
   :width: 75%
@@ -201,13 +201,13 @@ the ``BLOSC_TRACE`` environment variable.
 Contributing
 ============
 
-If you want to collaborate in this development you are welcome.  We need help in the different areas listed at the `ROADMAP <https://github.com/Blosc/c-blosc2/blob/main/ROADMAP-TO-3.0.rst>`_; also, be sure to read our `DEVELOPING-GUIDE <https://github.com/Blosc/c-blosc2/blob/main/DEVELOPING-GUIDE.rst>`_ and our `Code of Conduct <https://github.com/Blosc/community/blob/master/code_of_conduct.md>`_.  Blosc is distributed using the `BSD license <https://github.com/Blosc/c-blosc2/blob/main/LICENSE.txt>`_.
+If you want to collaborate in this development you are welcome.  We need help in the different areas listed at the `ROADMAP <https://github.com/Blosc/c-blosc2/blob/main/ROADMAP-TO-4.0.rst>`_; also, be sure to read our `DEVELOPING-GUIDE <https://github.com/Blosc/c-blosc2/blob/main/DEVELOPING-GUIDE.rst>`_ and our `Code of Conduct <https://github.com/Blosc/community/blob/master/code_of_conduct.md>`_.  Blosc is distributed using the `BSD license <https://github.com/Blosc/c-blosc2/blob/main/LICENSE.txt>`_.
 
 
-Twitter feed
+Social feeds
 ============
 
-Follow `@Blosc2 <https://twitter.com/Blosc2>`_ so as to get informed about the latest developments.
+Follow `@Blosc2 <https://fosstodon.org/@Blosc2>`_ on Mastodon to get informed about the latest developments.
 
 
 Citing Blosc
@@ -220,7 +220,7 @@ You can cite our work on the different libraries under the Blosc umbrella as:
   @ONLINE{blosc,
     author = {{Blosc Development Team}},
     title = "{A fast, compressed and persistent data store library}",
-    year = {2009-2025},
+    year = {2009-2026},
     note = {https://blosc.org}
   }
 
