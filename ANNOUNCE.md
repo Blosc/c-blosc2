@@ -1,21 +1,17 @@
-# Announcing C-Blosc2 3.2.2
+# Announcing C-Blosc2 3.2.3
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This is a performance-focused follow-up to 3.2.1, with two main
-improvements for b2nd get_slice operations:
+This is a hot-fix release for 3.2.2.  The new fast path for small b2nd
+``get_slice`` reads returned truncated (corrupted) data for arrays with
+typesize > 255, because such chunks are compressed with an internal
+typesize of 1 and the block reads were requested in array-typesize
+units.  This is now fixed (with a new regression test), and the fast
+path remains as fast for large typesizes too.
 
-* **Small slice reads from large chunks are now up to 3x faster.**
-  Previously, every ``get_slice`` call allocated a full chunk-sized
-  scratch buffer, even when only one block was needed.  Now small requests
-  decompress individual blocks on the fly into a
-  reusable block-sized buffer, so cost scales with the request instead of
-  the chunk size.  Large requests still use the parallel path unchanged.
-
-Plus a documentation refresh (updated roadmap, stale references fixed).
-
-This release introduces no breaking API or ABI changes.
+Users of 3.2.2 reading slices from b2nd arrays with typesize > 255
+should upgrade.  This release introduces no API or ABI changes.
 
 For more info, see the release notes in:
 

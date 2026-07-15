@@ -4,7 +4,24 @@ Release notes for C-Blosc2
 Changes from 3.2.2 to 3.2.3
 ===========================
 
-#XXX version-specific blurb XXX#
+Bug fixes
+---------
+
+* **Fixed data corruption in b2nd get_slice for typesize > 255.**  The
+  compact get path introduced in 3.2.2 passed item counts to
+  ``blosc2_getitem_ctx()`` in array-typesize units, but chunks whose
+  typesize exceeds ``BLOSC_MAX_TYPESIZE`` (255) are compressed with an
+  internal typesize of 1, so small slice reads returned truncated blocks
+  (only the first ``blocknitems`` bytes were correct).  Item counts are
+  now expressed in the chunk's actual item unit, keeping the fast path
+  both correct and O(request) for large typesizes.  Added a regression
+  test covering typesize > 255 on the get_slice path.
+
+Notes
+-----
+
+* This is a hot-fix release with no API/ABI changes.  Users of 3.2.2
+  reading slices from b2nd arrays with typesize > 255 should upgrade.
 
 
 Changes from 3.2.1 to 3.2.2
