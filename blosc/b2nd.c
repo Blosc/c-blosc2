@@ -1100,8 +1100,14 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
 
   // Slow path for set and get
 
-  uint8_t *data = malloc(data_nbytes);
-  BLOSC_ERROR_NULL(data, BLOSC2_ERROR_MEMORY_ALLOC);
+  // Chunk-sized scratch, allocated lazily: the compact get path below never
+  // needs it, and for large chunks just the malloc/free pair costs
+  // O(chunksize) in page-table work (it is way above the malloc mmap
+  // threshold), which would dominate small reads.
+  uint8_t *data = NULL;
+  // Block-sized scratch for the compact get path (lazily allocated too).
+  uint8_t *block_data = NULL;
+  int32_t block_nbytes = (int32_t) (array->blocknitems * array->sc->typesize);
 
   int64_t chunks_in_array[B2ND_MAX_DIM] = {0};
   for (int i = 0; i < ndim; ++i) {
@@ -1165,7 +1171,16 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     }
 
     int32_t nblocks = (int32_t) array->extchunknitems / array->blocknitems;
+    // Compact get path state for this chunk (see below).
+    bool use_compact = false;
+    uint8_t *lazychunk = NULL;
+    bool lazychunk_needs_free = false;
+    int32_t lazychunk_cbytes = 0;
     if (set_slice) {
+      if (data == NULL) {
+        data = malloc(data_nbytes);
+        BLOSC_ERROR_NULL(data, BLOSC2_ERROR_MEMORY_ALLOC);
+      }
       // Check if all the chunk is going to be updated and avoid the decompression
       bool decompress_chunk = false;
       for (int i = 0; i < ndim; ++i) {
@@ -1185,6 +1200,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     } else {
       bool *block_maskout = malloc(nblocks);
       BLOSC_ERROR_NULL(block_maskout, BLOSC2_ERROR_MEMORY_ALLOC);
+      int32_t nblocks_needed = 0;
       for (int nblock = 0; nblock < nblocks; ++nblock) {
         int64_t nblock_ndim[B2ND_MAX_DIM] = {0};
         blosc2_unidim_to_multidim(ndim, blocks_in_chunk, nblock, nblock_ndim);
@@ -1211,17 +1227,55 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
           block_empty |= (block_stop[i] <= start[i] || block_start[i] >= stop[i]);
         }
         block_maskout[nblock] = block_empty ? true : false;
+        if (!block_empty) {
+          nblocks_needed++;
+        }
       }
 
-      if (blosc2_set_maskout(array->sc->dctx, block_maskout, nblocks) != BLOSC2_ERROR_SUCCESS) {
-        BLOSC_TRACE_ERROR("Error setting the maskout");
-        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
-      }
+      // Compact get path: when only a small fraction of the chunk's blocks
+      // is needed, decompress just those blocks -- one at a time, straight
+      // from the (lazy)chunk -- instead of decompressing into a chunk-sized
+      // scratch.  This keeps the working buffer at one block, so small reads
+      // from arrays with large chunks stay O(request), not O(chunksize).
+      // Larger requests keep the maskout path, which decompresses the needed
+      // blocks in parallel.
+      use_compact = ((int64_t) nblocks_needed * block_nbytes) * 16 <= (int64_t) data_nbytes;
+      if (use_compact) {
+        lazychunk_cbytes = blosc2_schunk_get_lazychunk(array->sc, nchunk, &lazychunk,
+                                                       &lazychunk_needs_free);
+        if (lazychunk_cbytes < 0) {
+          BLOSC_TRACE_ERROR("Error getting the lazy chunk");
+          free(block_maskout);
+          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+        }
+        if (block_data == NULL) {
+          block_data = malloc(block_nbytes);
+          if (block_data == NULL) {
+            if (lazychunk_needs_free) {
+              free(lazychunk);
+            }
+            free(block_maskout);
+            BLOSC_ERROR(BLOSC2_ERROR_MEMORY_ALLOC);
+          }
+        }
+      } else {
+        if (data == NULL) {
+          data = malloc(data_nbytes);
+          if (data == NULL) {
+            free(block_maskout);
+            BLOSC_ERROR(BLOSC2_ERROR_MEMORY_ALLOC);
+          }
+        }
+        if (blosc2_set_maskout(array->sc->dctx, block_maskout, nblocks) != BLOSC2_ERROR_SUCCESS) {
+          BLOSC_TRACE_ERROR("Error setting the maskout");
+          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+        }
 
-      int err = blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes);
-      if (err < 0) {
-        BLOSC_TRACE_ERROR("Error decompressing chunk");
-        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+        int err = blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes);
+        if (err < 0) {
+          BLOSC_TRACE_ERROR("Error decompressing chunk");
+          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+        }
       }
 
       free(block_maskout);
@@ -1296,7 +1350,23 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
         src_stop[i] = slice_stop[i] - start[i];
       }
 
-      uint8_t *dst = &data[nblock * array->blocknitems * array->sc->typesize];
+      uint8_t *dst;
+      if (use_compact) {
+        // Decompress just this block from the (lazy)chunk.
+        int grc = blosc2_getitem_ctx(array->sc->dctx, lazychunk, lazychunk_cbytes,
+                                     (int) (nblock * array->blocknitems), (int) array->blocknitems,
+                                     block_data, block_nbytes);
+        if (grc < 0) {
+          BLOSC_TRACE_ERROR("Error decompressing block");
+          if (lazychunk_needs_free) {
+            free(lazychunk);
+          }
+          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+        }
+        dst = block_data;
+      } else {
+        dst = &data[nblock * array->blocknitems * array->sc->typesize];
+      }
       int64_t dst_pad_shape[B2ND_MAX_DIM];
       for (int i = 0; i < ndim; ++i) {
         dst_pad_shape[i] = array->blockshape[i];
@@ -1318,6 +1388,10 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
                           dst, dst_pad_shape, dst_start, dst_stop,
                           src, shape, src_start);
       }
+    }
+
+    if (use_compact && lazychunk_needs_free) {
+      free(lazychunk);
     }
 
     if (set_slice) {
@@ -1342,6 +1416,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   }
 
   free(data);
+  free(block_data);
 
   return BLOSC2_ERROR_SUCCESS;
 }
