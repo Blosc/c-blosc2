@@ -1,13 +1,19 @@
-# Announcing C-Blosc2 3.2.1
+# Announcing C-Blosc2 3.2.2
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This is a small follow-up to 3.2.0's Growth-SWMR (single writer, multiple
-readers) support: a new `blosc2_schunk_refresh()` API gives plain
-`blosc2_schunk` readers the same explicit, data-free re-sync point that
-`b2nd_refresh()` already gave b2nd arrays, for polling another handle's
-changes without touching data.
+This is a performance-focused follow-up to 3.2.1, with two main
+improvements for b2nd get_slice operations:
+
+* **Small slice reads from large chunks are now up to 3x faster.**
+  Previously, every ``get_slice`` call allocated a full chunk-sized
+  scratch buffer, even when only one block was needed.  Now small requests
+  decompress individual blocks on the fly into a
+  reusable block-sized buffer, so cost scales with the request instead of
+  the chunk size.  Large requests still use the parallel path unchanged.
+
+Plus a documentation refresh (updated roadmap, stale references fixed).
 
 This release introduces no breaking API or ABI changes.
 

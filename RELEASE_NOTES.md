@@ -4,7 +4,39 @@ Release notes for C-Blosc2
 Changes from 3.2.1 to 3.2.2
 ===========================
 
-#XXX version-specific blurb XXX#
+Performance improvements
+------------------------
+
+* **Avoid chunk-sized scratch allocation for small b2nd get_slice
+  requests.**  ``get_set_slice()`` in the b2nd path previously malloc'd a
+  full extended-chunk-sized scratch buffer on every call, even when the
+  block maskout meant only one block was decompressed into it.  For large
+  chunks the mmap/munmap page-table work alone is O(chunksize), so reading
+  a single 1.6 MB block from a 128 MB chunk could cost up to 3x more than
+  the same read from a small chunk.  Now the get path counts the needed
+  blocks after building the maskout, and when they are a small part of the
+  chunk, decompresses just those blocks one at a time via
+  ``blosc2_getitem_ctx()`` into a reusable block-sized buffer — small
+  reads stay O(request) instead of O(chunksize), and on-disk frames only
+  read the touched blocks.  Larger requests keep the existing parallel
+  block-decompression path unchanged, and the chunk-sized scratch is now
+  allocated lazily only when that path (or a set operation) actually runs.
+  Single-block reads from large chunks are now flat ~0.33 ms regardless
+  of chunk size.
+
+Documentation
+-------------
+
+* Broad refresh: annotated every ROADMAP-TO-3.0 item as Done/Ongoing/
+  Deferred now that 3.0 is out, and added a new ROADMAP-TO-4.0 with the
+  deferred items as current goals.  Fixed several stale references
+  (python-blosc2 status, NEON bitshuffle, citation year, Twitter→Mastodon,
+  master→main, header paths), and assorted grammar/markup fixes.
+
+Notes
+-----
+
+* This is a maintenance release with no API/ABI changes.
 
 Changes from 3.2.0 to 3.2.1
 ===========================
