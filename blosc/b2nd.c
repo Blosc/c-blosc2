@@ -1232,14 +1232,26 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
         }
       }
 
-      // Compact get path: when only a small fraction of the chunk's blocks
-      // is needed, decompress just those blocks -- one at a time, straight
+      // Compact get path: when only a fraction of the chunk's blocks is
+      // needed, decompress just those blocks -- one at a time, straight
       // from the (lazy)chunk -- instead of decompressing into a chunk-sized
       // scratch.  This keeps the working buffer at one block, so small reads
       // from arrays with large chunks stay O(request), not O(chunksize).
       // Larger requests keep the maskout path, which decompresses the needed
       // blocks in parallel.
-      use_compact = ((int64_t) nblocks_needed * block_nbytes) * 16 <= (int64_t) data_nbytes;
+      //
+      // The threshold depends on the storage backend.  On disk, the maskout
+      // path reads the *whole* compressed chunk per call while the compact
+      // path only reads the touched blocks, so compact wins by 10-100x well
+      // past needed == nblocks/4 for typical data.  In memory there is no
+      // I/O to save: for poorly-compressible data the maskout path's
+      // parallel decompression overtakes the compact path's serial one at
+      // around 2-4 needed blocks, so stay conservative there (1/16 keeps
+      // the possible loss window narrow while still capturing the common
+      // 1-2 block reads, where compact always wins or ties).
+      bool on_disk = array->sc->storage != NULL && array->sc->storage->urlpath != NULL;
+      int64_t frac = on_disk ? 4 : 16;
+      use_compact = ((int64_t) nblocks_needed * block_nbytes) * frac <= (int64_t) data_nbytes;
       if (use_compact) {
         lazychunk_cbytes = blosc2_schunk_get_lazychunk(array->sc, nchunk, &lazychunk,
                                                        &lazychunk_needs_free);
