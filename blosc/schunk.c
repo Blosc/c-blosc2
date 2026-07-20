@@ -889,9 +889,24 @@ static int schunk_get_chunk_nbytes(blosc2_schunk *schunk, int64_t nchunk, int32_
   return rc;
 }
 
+/* The flags2 byte lives in the extended header, at offset 0x1e.  A Blosc1-style
+   chunk is only BLOSC_MIN_HEADER_LENGTH (16) bytes long and carries no flags2,
+   so report it as unset instead of reading past the end of the buffer. */
+static uint8_t get_chunk_flags2(const uint8_t *chunk, int32_t chunk_cbytes) {
+  if (chunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH) {
+    return 0;
+  }
+  return chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
+}
+
 static int schunk_get_chunk_flags2(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk_flags2) {
   if (schunk->frame == NULL) {
-    *chunk_flags2 = schunk->data[nchunk][BLOSC2_CHUNK_BLOSC2_FLAGS2];
+    int32_t chunk_cbytes;
+    int rc = blosc2_cbuffer_sizes(schunk->data[nchunk], NULL, &chunk_cbytes, NULL);
+    if (rc < 0) {
+      return rc;
+    }
+    *chunk_flags2 = get_chunk_flags2(schunk->data[nchunk], chunk_cbytes);
     return 0;
   }
 
@@ -901,7 +916,7 @@ static int schunk_get_chunk_flags2(blosc2_schunk *schunk, int64_t nchunk, uint8_
   if (rc < 0) {
     return rc;
   }
-  *chunk_flags2 = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
+  *chunk_flags2 = get_chunk_flags2(chunk, rc);
   if (needs_free) {
     free(chunk);
   }
@@ -913,12 +928,13 @@ static int64_t schunk_append_chunk_unlocked(blosc2_schunk *schunk, uint8_t *chun
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
   int64_t nchunks = schunk->nchunks;
-  bool chunk_vlblocks = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2] & BLOSC2_VL_BLOCKS) != 0;
 
   int rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {
     return rc;
   }
+  uint8_t flags2 = get_chunk_flags2(chunk, chunk_cbytes);
+  bool chunk_vlblocks = (flags2 & BLOSC2_VL_BLOCKS) != 0;
   if (nchunks > 0) {
     uint8_t first_flags2;
     rc = schunk_get_chunk_flags2(schunk, 0, &first_flags2);
@@ -931,7 +947,7 @@ static int64_t schunk_append_chunk_unlocked(blosc2_schunk *schunk, uint8_t *chun
     }
   }
   else {
-    schunk->flags2 = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
+    schunk->flags2 = flags2;
   }
 
   int32_t chunksize = schunk->chunksize;
@@ -1041,12 +1057,13 @@ static int64_t schunk_insert_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
   int64_t nchunks = schunk->nchunks;
-  bool chunk_vlblocks = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2] & BLOSC2_VL_BLOCKS) != 0;
 
   rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {
     return rc;
   }
+  uint8_t flags2 = get_chunk_flags2(chunk, chunk_cbytes);
+  bool chunk_vlblocks = (flags2 & BLOSC2_VL_BLOCKS) != 0;
   if (nchunks > 0) {
     uint8_t first_flags2;
     rc = schunk_get_chunk_flags2(schunk, 0, &first_flags2);
@@ -1059,7 +1076,7 @@ static int64_t schunk_insert_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
     }
   }
   else {
-    schunk->flags2 = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
+    schunk->flags2 = flags2;
   }
 
   int32_t chunksize = schunk->chunksize;
@@ -1174,12 +1191,13 @@ static int64_t schunk_update_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
 
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
-  bool chunk_vlblocks = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2] & BLOSC2_VL_BLOCKS) != 0;
 
   rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {
     return rc;
   }
+  uint8_t flags2 = get_chunk_flags2(chunk, chunk_cbytes);
+  bool chunk_vlblocks = (flags2 & BLOSC2_VL_BLOCKS) != 0;
   if (schunk->nchunks > 1 || (schunk->nchunks == 1 && nchunk != 0)) {
     int64_t ref_nchunk = (nchunk == 0) ? 1 : 0;
     uint8_t ref_flags2;
@@ -1193,7 +1211,7 @@ static int64_t schunk_update_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
     }
   }
   else {
-    schunk->flags2 = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
+    schunk->flags2 = flags2;
   }
 
   int32_t chunksize = schunk->chunksize;
