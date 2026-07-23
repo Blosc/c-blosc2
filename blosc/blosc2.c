@@ -4338,14 +4338,19 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     // Short-circuit for (non-lazy) memcpyed or special values
     ntbytes = nitems_bytes;
     switch (context->special_type) {
-      case BLOSC2_SPECIAL_VALUE:
-        // All repeated values
-        rc = set_values(context->typesize, _src, _dest, ntbytes);
+      case BLOSC2_SPECIAL_VALUE: {
+        // The repeated value's width is cbytes minus the header, not the header
+        // typesize byte (which is left unconstrained for special-value chunks).
+        // Derive it the same way blosc_d() does so a crafted typesize cannot make
+        // set_values() read past the end of the chunk.
+        int32_t value_typesize = header->cbytes - context->header_overhead;
+        rc = set_values(value_typesize, _src, _dest, ntbytes);
         if (rc < 0) {
           BLOSC_TRACE_ERROR("set_values failed");
           return BLOSC2_ERROR_DATA;
         }
         break;
+      }
       case BLOSC2_SPECIAL_NAN:
         rc = set_nans(context->typesize, _dest, ntbytes);
         if (rc < 0) {
