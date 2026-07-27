@@ -36,6 +36,23 @@ Security fixes
 
   Reported by Akhil Koul.
 
+* **Fixed an out-of-bounds read of the flags2 byte in the schunk append, insert
+  and update paths** (#792).  That byte lives at offset 0x1e, inside the
+  extended header, but a Blosc1-style chunk is only
+  ``BLOSC_MIN_HEADER_LENGTH`` (16) bytes long and carries no flags2 at all, so
+  handing such a chunk to ``blosc2_schunk_append_chunk()`` read 15 bytes past
+  the end of the caller's buffer.  All the sites now go through one helper that
+  looks the size up first.
+
+  The helper also decides whether a chunk has a flags2 byte from the flags, the
+  way ``read_chunk_header()`` does, rather than from the chunk size: a
+  Blosc1-style chunk with 16 or more bytes of payload is long enough to reach
+  offset 0x1e, where it holds compressed data.  Reading that as flags2 could
+  mark a schunk as using variable-length blocks out of thin air, and the flag
+  is persisted into the frame.
+
+  Reported and largely fixed by Farkhalit Rida.
+
 Bug fixes
 ---------
 

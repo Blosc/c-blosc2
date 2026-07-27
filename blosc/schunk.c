@@ -889,11 +889,17 @@ static int schunk_get_chunk_nbytes(blosc2_schunk *schunk, int64_t nchunk, int32_
   return rc;
 }
 
-/* The flags2 byte lives in the extended header, at offset 0x1e.  A Blosc1-style
-   chunk is only BLOSC_MIN_HEADER_LENGTH (16) bytes long and carries no flags2,
-   so report it as unset instead of reading past the end of the buffer. */
+/* The flags2 byte lives in the extended header, at offset 0x1e, so it only
+   exists when the chunk actually carries one.  Whether it does is recorded in
+   the flags byte, the same way read_chunk_header() decides it -- not in the
+   chunk size: a Blosc1-style chunk with 16 or more bytes of payload is 32 bytes
+   or longer, yet offset 0x1e is compressed data there, and reading it as flags2
+   can mark a schunk as using variable-length blocks out of thin air.  The size
+   check stays as the bound that keeps a short chunk from being over-read. */
 static uint8_t get_chunk_flags2(const uint8_t *chunk, int32_t chunk_cbytes) {
-  if (chunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH) {
+  uint8_t flags = chunk[BLOSC2_CHUNK_FLAGS];
+  bool extended_header = (flags & BLOSC_DOSHUFFLE) && (flags & BLOSC_DOBITSHUFFLE);
+  if (!extended_header || chunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH) {
     return 0;
   }
   return chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
