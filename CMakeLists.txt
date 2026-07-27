@@ -661,7 +661,11 @@ if(CMAKE_C_COMPILER_ID MATCHES GNU|Clang|Intel|IntelLLVM)
 endif()
 
 if(CMAKE_C_COMPILER_ID MATCHES Intel|IntelLLVM|Clang OR HAIKU)
-    # We need to tell Intel and Clang compilers about what level of POSIX they support
+    # We need to tell Intel and Clang compilers about what level of POSIX they support.
+    # Note this cannot be dropped on the BSDs even though it hides their BSD extensions
+    # (see the _XOPEN_SOURCE handling at the top of frame.c): my_malloc() in blosc2.c
+    # keys the posix_memalign() path off it, and there is nothing else defining
+    # _POSIX_C_SOURCE there, so dropping it would silently fall back to plain malloc().
     SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_XOPEN_SOURCE=600")
 endif()
 

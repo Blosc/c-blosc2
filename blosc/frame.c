@@ -14,6 +14,19 @@
 #define _GNU_SOURCE
 #endif
 #define _DARWIN_C_SOURCE
+// The BSDs honour neither of the above.  There, <sys/cdefs.h> derives
+// _POSIX_C_SOURCE from _XOPEN_SOURCE and then leaves __BSD_VISIBLE undefined,
+// which reads as 0 in the `#if __BSD_VISIBLE` that guards both flock() and the
+// LOCK_* constants in <sys/fcntl.h> --- so they stay hidden even though
+// <sys/file.h> is included below (see #794).  Dropping _XOPEN_SOURCE for this
+// file restores their default environment, which is a superset of what it asks
+// for: POSIX 200809 and XSI 700, plus the BSD extensions.  It has to be done per
+// file rather than in CMakeLists.txt, because my_malloc() in blosc2.c keys its
+// posix_memalign() path off _XOPEN_SOURCE and would fall back to malloc().
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
+    defined(__DragonFly__)
+#undef _XOPEN_SOURCE
+#endif
 #endif
 
 #include "frame.h"
