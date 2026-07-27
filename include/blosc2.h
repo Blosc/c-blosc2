@@ -1684,12 +1684,57 @@ BLOSC_EXPORT int blosc2_chunk_uninit(blosc2_cparams cparams, int32_t nbytes,
  * @param dest The buffer where the decompressed data retrieved will be put.
  * @param destsize Output buffer length.
  *
+ * @warning @p start and @p nitems are counted in the typesize that the *chunk*
+ * records, which is not the typesize the data was created with when the latter
+ * exceeds #BLOSC_MAX_TYPESIZE.  Such buffers are compressed as a plain stream of
+ * bytes with a stored typesize of 1, so for them one "item" here is one byte.
+ * Code that does not control the typesize (a library reading whatever its caller
+ * supplied) should use #blosc2_getitem_bytes_ctx instead, which is unambiguous
+ * at any typesize.
+ *
  * @return The number of bytes copied to @p dest or a negative value if
  * some error happens.
  */
 BLOSC_EXPORT int blosc2_getitem_ctx(blosc2_context* context, const void* src,
                                     int32_t srcsize, int start, int nitems, void* dest,
                                     int32_t destsize);
+
+
+/**
+ * @brief Retrieve a byte range out of a compressed buffer.
+ *
+ * This is the counterpart of #blosc2_getitem_ctx that counts in bytes rather
+ * than in items.  Because a buffer whose typesize exceeds #BLOSC_MAX_TYPESIZE is
+ * stored with a typesize of 1, the unit of #blosc2_getitem_ctx silently changes
+ * with the typesize; bytes do not.  Prefer this entry point in generic code that
+ * does not pick the typesize itself, and #blosc2_getitem_ctx where the typesize
+ * is known and at most #BLOSC_MAX_TYPESIZE, as counting in items reads better
+ * there.
+ *
+ * @param context Context pointer.
+ * @param src The compressed buffer from data will be decompressed.
+ * @param srcsize Compressed buffer length.  If @p src is a lazy chunk returned by
+ * #blosc2_schunk_get_lazychunk, pass the size returned by
+ * #blosc2_schunk_get_lazychunk here rather than the @p cbytes value reported by
+ * #blosc2_cbuffer_sizes.
+ * @param start The position, counted in bytes into the *uncompressed* buffer, of
+ * the first byte from where data will be retrieved.
+ * @param nbytes The number of bytes that will be retrieved.
+ * @param dest The buffer where the decompressed data retrieved will be put.
+ * @param destsize Output buffer length.
+ *
+ * @remark @p start and @p nbytes must both be multiples of the typesize stored
+ * in the chunk, or #BLOSC2_ERROR_INVALID_PARAM is returned.  This constraint is
+ * vacuous for typesizes above #BLOSC_MAX_TYPESIZE (the stored typesize is 1), and
+ * is met automatically by any caller deriving byte offsets from the real
+ * typesize, so it costs nothing in the cases this function exists for.
+ *
+ * @return The number of bytes copied to @p dest or a negative value if
+ * some error happens.
+ */
+BLOSC_EXPORT int blosc2_getitem_bytes_ctx(blosc2_context* context, const void* src,
+                                          int32_t srcsize, int32_t start, int32_t nbytes,
+                                          void* dest, int32_t destsize);
 
 
 /*********************************************************************

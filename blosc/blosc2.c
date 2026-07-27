@@ -4500,27 +4500,33 @@ int blosc1_getitem(const void* src, int start, int nitems, void* dest) {
   return blosc2_getitem(src, INT32_MAX, start, nitems, dest, INT32_MAX);
 }
 
-int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize,
-    int start, int nitems, void* dest, int32_t destsize) {
-  blosc_header header;
-  int result;
-
-  /* Minimally populate the context */
-  result = read_chunk_header((uint8_t *) src, srcsize, true, &header);
+/* Read and validate the chunk header for the getitem entry points below.
+   read_chunk_header() already rejects a zero typesize, so on success
+   header->typesize is in [1, BLOSC_MAX_TYPESIZE]. */
+static int getitem_read_header(const void* src, int32_t srcsize, blosc_header* header) {
+  int result = read_chunk_header((uint8_t *) src, srcsize, true, header);
   if (result < 0) {
     return result;
   }
-  if (header.blosc2_flags2 & BLOSC2_VL_BLOCKS) {
+  if (header->blosc2_flags2 & BLOSC2_VL_BLOCKS) {
     BLOSC_TRACE_ERROR("getitem is not supported for VL-block chunks.");
     return BLOSC2_ERROR_INVALID_PARAM;
   }
+  return 0;
+}
 
+/* Shared body of the getitem entry points.  `start` and `nitems` are counted in
+   the typesize that `header` records. */
+static int getitem_with_header(blosc2_context* context, blosc_header* header,
+                               const void* src, int32_t srcsize,
+                               int start, int nitems, void* dest, int32_t destsize) {
+  /* Minimally populate the context */
   context->src = src;
   context->srcsize = srcsize;
   context->dest = dest;
   context->destsize = destsize;
 
-  result = blosc2_initialize_context_from_header(context, &header);
+  int result = blosc2_initialize_context_from_header(context, header);
   if (result < 0) {
     return result;
   }
@@ -4530,9 +4536,46 @@ int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize
   }
   BLOSC_ERROR_NULL(context->serial_context, BLOSC2_ERROR_THREAD_CREATE);
   /* Call the actual getitem function */
-  result = _blosc_getitem(context, &header, src, srcsize, start, nitems, dest, destsize);
+  return _blosc_getitem(context, header, src, srcsize, start, nitems, dest, destsize);
+}
 
-  return result;
+int blosc2_getitem_ctx(blosc2_context* context, const void* src, int32_t srcsize,
+    int start, int nitems, void* dest, int32_t destsize) {
+  blosc_header header;
+  int result = getitem_read_header(src, srcsize, &header);
+  if (result < 0) {
+    return result;
+  }
+
+  return getitem_with_header(context, &header, src, srcsize, start, nitems, dest, destsize);
+}
+
+int blosc2_getitem_bytes_ctx(blosc2_context* context, const void* src, int32_t srcsize,
+    int32_t start, int32_t nbytes, void* dest, int32_t destsize) {
+  blosc_header header;
+  int result = getitem_read_header(src, srcsize, &header);
+  if (result < 0) {
+    return result;
+  }
+
+  if (start < 0 || nbytes < 0) {
+    BLOSC_TRACE_ERROR("`start` and `nbytes` must not be negative.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  /* The typesize a chunk records is 1 whenever the original one exceeded
+     BLOSC_MAX_TYPESIZE, so for wide types this conversion is a no-op and the
+     alignment check below is vacuous.  That is the whole point of this entry
+     point: the caller never has to know whether the cap kicked in. */
+  int32_t typesize = header.typesize;
+  if ((start % typesize != 0) || (nbytes % typesize != 0)) {
+    BLOSC_TRACE_ERROR("`start` (%d) and `nbytes` (%d) must both be multiples of "
+                      "the typesize stored in the chunk (%d).", start, nbytes, typesize);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  return getitem_with_header(context, &header, src, srcsize, start / typesize,
+                             nbytes / typesize, dest, destsize);
 }
 
 int blosc2_decompress_block_ctx(blosc2_context* context, const void* src,

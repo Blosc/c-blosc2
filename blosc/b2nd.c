@@ -1108,12 +1108,6 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   // Block-sized scratch for the compact get path (lazily allocated too).
   uint8_t *block_data = NULL;
   int32_t block_nbytes = (int32_t) (array->blocknitems * array->sc->typesize);
-  // Chunks are compressed with an internal typesize of 1 when the array
-  // typesize exceeds BLOSC_MAX_TYPESIZE, so blosc2_getitem_ctx() items are
-  // bytes in that case.
-  int32_t chunk_typesize = array->sc->typesize <= BLOSC_MAX_TYPESIZE ?
-                           (int32_t) array->sc->typesize : 1;
-  int32_t block_chunkitems = block_nbytes / chunk_typesize;
 
   int64_t chunks_in_array[B2ND_MAX_DIM] = {0};
   for (int i = 0; i < ndim; ++i) {
@@ -1371,9 +1365,9 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       uint8_t *dst;
       if (use_compact) {
         // Decompress just this block from the (lazy)chunk.
-        int grc = blosc2_getitem_ctx(array->sc->dctx, lazychunk, lazychunk_cbytes,
-                                     (int) ((int64_t) nblock * block_chunkitems), (int) block_chunkitems,
-                                     block_data, block_nbytes);
+        int grc = blosc2_getitem_bytes_ctx(array->sc->dctx, lazychunk, lazychunk_cbytes,
+                                           (int32_t) ((int64_t) nblock * block_nbytes), block_nbytes,
+                                           block_data, block_nbytes);
         if (grc < 0) {
           BLOSC_TRACE_ERROR("Error decompressing block");
           if (lazychunk_needs_free) {

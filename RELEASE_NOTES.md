@@ -6,6 +6,25 @@ Changes from 3.2.3 to 3.2.4
 
 #XXX version-specific blurb XXX#
 
+New features
+------------
+
+* **New ``blosc2_getitem_bytes_ctx()``**, a byte-counting counterpart to
+  ``blosc2_getitem_ctx()``.  The unit of the latter is the typesize the
+  *chunk* records, which is 1 for typesizes above ``BLOSC_MAX_TYPESIZE``
+  (255), so its meaning silently changes with the typesize; bytes do not.
+  Prefer it in generic code that does not choose the typesize itself, and
+  ``blosc2_getitem_ctx()`` where the typesize is known and at most 255, as
+  counting in items reads better there.  ``start`` and ``nbytes`` must be
+  multiples of the typesize stored in the chunk, which is vacuous above the
+  cap and automatic for callers deriving offsets from the real typesize.
+
+  ``blosc2_getitem_ctx()`` is unchanged and is not deprecated; its docs now
+  spell out the unit and point at the new entry point.  The three in-tree
+  call sites (``blosc2_schunk_get_slice_buffer()``,
+  ``blosc2_schunk_get_sparse_buffer()`` and the b2nd compact get path) now
+  use it, so the typesize-cap rule lives in exactly one place again.
+
 Bug fixes
 ---------
 
