@@ -99,6 +99,13 @@ Bug fixes
   decode no longer looks like a success to callers that only test for a
   negative return.
 
+* Fixed the build on FreeBSD and the other BSDs (#794).  ``-D_XOPEN_SOURCE=600``
+  leaves ``__BSD_VISIBLE`` undefined there, which hides ``flock()`` and the
+  ``LOCK_*`` constants behind the guard in ``<sys/fcntl.h>``, so ``frame.c``
+  failed to compile.  It now drops ``_XOPEN_SOURCE`` for that one file; it
+  cannot be dropped build-wide, because ``my_malloc()`` keys its
+  ``posix_memalign()`` path off it.  Reported by Erik Schnetter.
+
 
 Changes from 3.2.2 to 3.2.3
 ===========================

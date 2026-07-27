@@ -35,6 +35,7 @@ using the global lock.
 .. doxygenfunction:: blosc2_set_maskout
 
 .. doxygenfunction:: blosc2_getitem_ctx
+.. doxygenfunction:: blosc2_getitem_bytes_ctx
 
 .. doxygenfunction:: blosc2_ctx_get_cparams
 
