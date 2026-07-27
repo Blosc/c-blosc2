@@ -6,6 +6,25 @@ Changes from 3.2.3 to 3.2.4
 
 #XXX version-specific blurb XXX#
 
+Bug fixes
+---------
+
+* **Fixed wrong results in schunk slice and sparse reads for typesize > 255.**
+  ``blosc2_schunk_get_slice_buffer()`` derived its ``blosc2_getitem_ctx()``
+  item counts by dividing byte offsets by ``schunk->typesize``, but chunks
+  whose typesize exceeds ``BLOSC_MAX_TYPESIZE`` (255) are compressed with an
+  internal typesize of 1, so getitem counts bytes for them.  Slices that did
+  not cover a chunk exactly mostly failed with ``BLOSC2_ERROR_FAILURE``, and
+  single-element slices returned the wrong bytes with a success return code.
+  The single-coordinate path of ``blosc2_schunk_get_sparse_buffer()`` had the
+  same confusion.  Both now convert through the chunk's actual item unit.
+  See #796.
+
+* ``blosc2_getitem_ctx()`` now returns ``BLOSC2_ERROR_DATA`` instead of a
+  short byte count when it cannot decode every requested item, so a partial
+  decode no longer looks like a success to callers that only test for a
+  negative return.
+
 
 Changes from 3.2.2 to 3.2.3
 ===========================

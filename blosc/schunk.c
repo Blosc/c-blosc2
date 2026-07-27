@@ -1592,6 +1592,15 @@ int blosc2_schunk_get_vlblock(blosc2_schunk *schunk, int64_t nchunk, int32_t nbl
 }
 
 
+/* The typesize that chunks of this schunk actually carry in their header.
+   create_context() caps typesizes above BLOSC_MAX_TYPESIZE to 1 (the buffer is
+   then treated as a plain byte stream), so for such schunks the `start` and
+   `nitems` of blosc2_getitem_ctx() count bytes, not schunk items. */
+static int32_t schunk_chunk_typesize(const blosc2_schunk *schunk) {
+  return schunk->typesize <= BLOSC_MAX_TYPESIZE ? schunk->typesize : 1;
+}
+
+
 int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer) {
   int64_t byte_start = start * schunk->typesize;
   int64_t byte_stop = stop * schunk->typesize;
@@ -1637,6 +1646,9 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       nbytes = blosc2_decompress_ctx(schunk->dctx, chunk, cbytes, dst_ptr, chunksize);
       if (nbytes < 0) {
         BLOSC_TRACE_ERROR("Cannot decompress chunk ('%" PRId64 "').", nchunk);
+        if (needs_free) {
+          free(chunk);
+        }
         return BLOSC2_ERROR_FAILURE;
       }
     }
@@ -1669,11 +1681,26 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
         free(data);
       }
       else {
-        /* Less than 1 block to read; use a getitem call */
-        nbytes = blosc2_getitem_ctx(schunk->dctx, chunk, cbytes, (int32_t) (chunk_start / schunk->typesize),
-                                    (chunk_stop - chunk_start) / schunk->typesize, dst_ptr, chunksize);
+        /* Less than 1 block to read; use a getitem call.  Note that getitem
+           items are counted in the *chunk* typesize, which is not the schunk
+           typesize when the latter exceeds BLOSC_MAX_TYPESIZE. */
+        int32_t item_typesize = schunk_chunk_typesize(schunk);
+        int32_t nbytes_wanted = chunk_stop - chunk_start;
+        nbytes = blosc2_getitem_ctx(schunk->dctx, chunk, cbytes, (int32_t) (chunk_start / item_typesize),
+                                    nbytes_wanted / item_typesize, dst_ptr, nbytes_wanted);
         if (nbytes < 0) {
           BLOSC_TRACE_ERROR("Cannot get item from ('%" PRId64 "') chunk.", nchunk);
+          if (needs_free) {
+            free(chunk);
+          }
+          return BLOSC2_ERROR_FAILURE;
+        }
+        if (nbytes != nbytes_wanted) {
+          BLOSC_TRACE_ERROR("Short read (%d out of %d bytes) in ('%" PRId64 "') chunk.",
+                            nbytes, nbytes_wanted, nchunk);
+          if (needs_free) {
+            free(chunk);
+          }
           return BLOSC2_ERROR_FAILURE;
         }
       }
@@ -1799,6 +1826,10 @@ static void sparse_worker_func(void *arg) {
 static int schunk_get_sparse_getitem(blosc2_schunk *schunk, int64_t ncoords, const int64_t* coords, void *buffer) {
   int64_t nitems = schunk->nbytes / schunk->typesize;
   int64_t chunk_nitems = schunk->chunksize / schunk->typesize;
+  // getitem items are counted in the chunk typesize, which is 1 (i.e. bytes)
+  // whenever the schunk typesize exceeds BLOSC_MAX_TYPESIZE
+  int32_t item_typesize = schunk_chunk_typesize(schunk);
+  int getitem_nitems = schunk->typesize / item_typesize;
   uint8_t *dst_ptr = (uint8_t *)buffer;
 
   for (int64_t i = 0; i < ncoords; ++i) {
@@ -1809,7 +1840,7 @@ static int schunk_get_sparse_getitem(blosc2_schunk *schunk, int64_t ncoords, con
     }
 
     int64_t nchunk = coord / chunk_nitems;
-    int start = (int)(coord % chunk_nitems);
+    int start = (int)((coord % chunk_nitems) * getitem_nitems);
     uint8_t *chunk = NULL;
     bool needs_free = false;
     int cbytes = blosc2_schunk_get_lazychunk(schunk, nchunk, &chunk, &needs_free);
@@ -1818,7 +1849,8 @@ static int schunk_get_sparse_getitem(blosc2_schunk *schunk, int64_t ncoords, con
       return BLOSC2_ERROR_FAILURE;
     }
 
-    int nbytes = blosc2_getitem_ctx(schunk->dctx, chunk, cbytes, start, 1, dst_ptr, schunk->typesize);
+    int nbytes = blosc2_getitem_ctx(schunk->dctx, chunk, cbytes, start, getitem_nitems,
+                                    dst_ptr, schunk->typesize);
     if (needs_free) {
       free(chunk);
     }

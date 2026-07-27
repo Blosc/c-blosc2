@@ -4463,6 +4463,14 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
 
   scontext->zfp_cell_nitems = 0;
 
+  if (ntbytes >= 0 && ntbytes != nitems_bytes) {
+    // A partial decode must not look like a success: callers that only test for
+    // a negative return would silently keep hold of an incompletely filled dest.
+    BLOSC_TRACE_ERROR("Only %d bytes out of the %d requested could be decoded.",
+                      ntbytes, nitems_bytes);
+    return BLOSC2_ERROR_DATA;
+  }
+
   return ntbytes;
 }
 
