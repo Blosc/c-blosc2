@@ -19,6 +19,16 @@
 
 int tests_run = 0;
 
+/* Write a 32-bit int to the chunk header in little-endian order.
+ * Chunk headers are always little-endian, regardless of host endianness. */
+static void put_i32_le(uint8_t* dst, int32_t value) {
+  uint32_t uvalue = (uint32_t)value;
+  dst[0] = (uint8_t)(uvalue & 0xffu);
+  dst[1] = (uint8_t)((uvalue >> 8) & 0xffu);
+  dst[2] = (uint8_t)((uvalue >> 16) & 0xffu);
+  dst[3] = (uint8_t)((uvalue >> 24) & 0xffu);
+}
+
 /* Build a minimal but valid Blosc1-style chunk of exactly
    BLOSC_MIN_HEADER_LENGTH bytes. read_chunk_header() accepts
    cbytes == BLOSC_MIN_HEADER_LENGTH, so this is a well-formed chunk. */
@@ -36,9 +46,9 @@ static uint8_t *make_min_header_chunk(void) {
   int32_t nbytes = 0;
   int32_t blocksize = 1;
   int32_t cbytes = BLOSC_MIN_HEADER_LENGTH;
-  memcpy(chunk + 4, &nbytes, sizeof(nbytes));
-  memcpy(chunk + 8, &blocksize, sizeof(blocksize));
-  memcpy(chunk + 12, &cbytes, sizeof(cbytes));
+  put_i32_le(chunk + BLOSC2_CHUNK_NBYTES, nbytes);
+  put_i32_le(chunk + BLOSC2_CHUNK_BLOCKSIZE, blocksize);
+  put_i32_le(chunk + BLOSC2_CHUNK_CBYTES, cbytes);
   return chunk;
 }
 
