@@ -6,6 +6,44 @@ Changes from 3.2.3 to 3.2.4
 
 #XXX version-specific blurb XXX#
 
+Security fixes
+--------------
+
+* **Fixed integer overflows in b2nd shape handling reachable from a crafted
+  ``.b2nd`` file** (#795).  ``update_shape_struct()`` accumulated the shape,
+  chunkshape and blockshape products into ``int32_t`` (``chunknitems``,
+  ``blocknitems``) and ``int64_t`` (``nitems``, ``extnitems``,
+  ``extchunknitems``) fields without any overflow check.  Signed overflow is
+  undefined behaviour, and a wrapped product reached both divisors and
+  allocation sizes: a metalayer declaring ``blockshape={65536, 65536}`` was
+  accepted by ``b2nd_open()`` with ``blocknitems == 0``, and the first data
+  access then divided by zero (SIGFPE on x86-64; on aarch64 the division
+  silently yields 0 instead).  Products that wrapped to a small positive value
+  could instead drive out-of-bounds offsets.
+
+  All the products are now computed with checked multiplications and rejected
+  with ``BLOSC2_ERROR_INVALID_PARAM``.  The same guard covers the creation path,
+  which shared the overflow, plus a third site in ``b2nd_create_ctx()`` that
+  wrapped ``cparams->blocksize``.
+
+* **Fixed int64 to int32 truncation of chunk buffer sizes** (#795).
+  ``b2nd_get_slice_cbuffer()``/``b2nd_set_slice_cbuffer()`` and
+  ``orthogonal_selection()`` sized a chunk buffer with a truncating cast of
+  ``extchunknitems * typesize`` while the copy offsets kept using the full
+  extent, so a shape whose product fits in ``int32_t`` but whose byte count does
+  not produced a heap buffer overflow.  Both sites now compute in 64 bits and
+  refuse anything above ``INT32_MAX``.
+
+  Reported by Akhil Koul.
+
+Bug fixes
+---------
+
+* Fixed a memory leak and a dangling non-NULL output pointer in
+  ``array_without_schunk()`` when the shape could not be validated, and a leak
+  of the deserialized dtype in ``b2nd_from_schunk()`` on the same path.  These
+  were only reachable once the shape checks above made that path possible.
+
 New features
 ------------
 

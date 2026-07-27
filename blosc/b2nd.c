@@ -30,6 +30,31 @@ static bool b2nd_mul_overflow_size_t(size_t a, size_t b, size_t *out) {
   return false;
 }
 
+/* Signed counterparts of the above.  Shape products are accumulated with these
+ * so that crafted metadata cannot wrap them: signed overflow is UB, and a
+ * wrapped product reaches divisors (see the nblocks computations) and
+ * allocation sizes.  Negative operands are reported as overflow too, so callers
+ * get one error path rather than two. */
+static bool b2nd_mul_overflow_int32(int32_t a, int32_t b, int32_t *out) {
+  if (a < 0 || b < 0 || (a != 0 && b > INT32_MAX / a)) {
+    return true;
+  }
+  if (out != NULL) {
+    *out = a * b;
+  }
+  return false;
+}
+
+static bool b2nd_mul_overflow_int64(int64_t a, int64_t b, int64_t *out) {
+  if (a < 0 || b < 0 || (a != 0 && b > INT64_MAX / a)) {
+    return true;
+  }
+  if (out != NULL) {
+    *out = a * b;
+  }
+  return false;
+}
+
 
 int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const int32_t *chunkshape,
                         const int32_t *blockshape, const char *dtype, int8_t dtype_format,
@@ -163,13 +188,20 @@ static int update_shape_struct(b2nd_array_t *array, int8_t ndim, const int64_t *
         if (shape[i] % array->chunkshape[i] == 0) {
           array->extshape[i] = shape[i];
         } else {
+          // Rounding shape up to the next chunk must not wrap int64
+          if (shape[i] > INT64_MAX - chunkshape[i]) {
+            BLOSC_TRACE_ERROR("shape[%d] is too large to round up to chunkshape[%d]", i, i);
+            return BLOSC2_ERROR_INVALID_PARAM;
+          }
           array->extshape[i] = shape[i] + chunkshape[i] - shape[i] % chunkshape[i];
         }
         if (chunkshape[i] % blockshape[i] == 0) {
           array->extchunkshape[i] = chunkshape[i];
         } else {
+          // Done in 64 bits: the sum of two int32 values does not fit in int32,
+          // and extchunkshape is int64 anyway
           array->extchunkshape[i] =
-                  chunkshape[i] + blockshape[i] - chunkshape[i] % blockshape[i];
+                  (int64_t) chunkshape[i] + blockshape[i] - chunkshape[i] % blockshape[i];
         }
       } else {
         array->extchunkshape[i] = chunkshape[i];
@@ -182,11 +214,17 @@ static int update_shape_struct(b2nd_array_t *array, int8_t ndim, const int64_t *
       array->extchunkshape[i] = 1;
       array->shape[i] = 1;
     }
-    array->nitems *= array->shape[i];
-    array->extnitems *= array->extshape[i];
-    array->extchunknitems *= array->extchunkshape[i];
-    array->chunknitems *= array->chunkshape[i];
-    array->blocknitems *= array->blockshape[i];
+    // Crafted metadata can make any of these products wrap, which is UB and
+    // lands in divisors and allocation sizes downstream (see #795)
+    if (b2nd_mul_overflow_int64(array->nitems, array->shape[i], &array->nitems) ||
+        b2nd_mul_overflow_int64(array->extnitems, array->extshape[i], &array->extnitems) ||
+        b2nd_mul_overflow_int64(array->extchunknitems, array->extchunkshape[i],
+                                &array->extchunknitems) ||
+        b2nd_mul_overflow_int32(array->chunknitems, array->chunkshape[i], &array->chunknitems) ||
+        b2nd_mul_overflow_int32(array->blocknitems, array->blockshape[i], &array->blocknitems)) {
+      BLOSC_TRACE_ERROR("shape, chunkshape or blockshape product overflows at dimension %d", i);
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
   }
 
   // Compute strides
@@ -359,7 +397,15 @@ int array_without_schunk(b2nd_context_t *ctx, b2nd_array_t **array) {
   int64_t *shape = ctx->shape;
   int32_t *chunkshape = ctx->chunkshape;
   int32_t *blockshape = ctx->blockshape;
-  BLOSC_ERROR(update_shape(*array, ctx->ndim, shape, chunkshape, blockshape));
+  // update_shape() rejects shapes whose products overflow, so this can fail on
+  // crafted metadata.  Hand back NULL rather than the half-built array, which
+  // would otherwise leak and leave callers with a non-NULL pointer on error.
+  int rc = update_shape(*array, ctx->ndim, shape, chunkshape, blockshape);
+  if (rc < 0) {
+    free(*array);
+    *array = NULL;
+    BLOSC_ERROR(rc);
+  }
 
   if (ctx->dtype != NULL) {
     (*array)->dtype = malloc(strlen(ctx->dtype) + 1);
@@ -654,8 +700,11 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
     }
   }
 
-  BLOSC_ERROR(array_without_schunk(&params, array));
+  // Free the deserialized dtype whether or not the array could be built; the
+  // rejection path is now reachable for crafted shapes (see #795)
+  int rc = array_without_schunk(&params, array);
   free(params.dtype);
+  BLOSC_ERROR(rc);
 
   (*array)->sc = schunk;
   (*array)->last_tick = schunk->change_tick;
@@ -1058,7 +1107,16 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     nelems_slice *= stop[i] - start[i];
   }
   int64_t slice_nbytes = nelems_slice * array->sc->typesize;
-  int32_t data_nbytes = (int32_t) array->extchunknitems * array->sc->typesize;
+  // Compute in 64 bits and range-check: the cast used to bind to extchunknitems
+  // alone, truncating it before the multiply and sizing buffers from the
+  // wrapped value while offsets kept using the full extent (see #795)
+  int64_t data_nbytes_64 = 0;
+  if (b2nd_mul_overflow_int64(array->extchunknitems, array->sc->typesize, &data_nbytes_64) ||
+      data_nbytes_64 > INT32_MAX) {
+    BLOSC_TRACE_ERROR("Chunk buffer size overflows the maximum of %d bytes", INT32_MAX);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  int32_t data_nbytes = (int32_t) data_nbytes_64;
 
   if (buffersize < slice_nbytes) {
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
@@ -2708,6 +2766,17 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
+  // Size of the reusable chunk buffer allocated further down.  Computed here,
+  // before any allocation, so the error path has nothing to unwind: the cast
+  // used to truncate an int64 product into the malloc size while the copy
+  // offsets kept using the full extent (see #795).
+  int64_t chunk_data_nbytes_64 = 0;
+  if (b2nd_mul_overflow_int64(array->extchunknitems, array->sc->typesize, &chunk_data_nbytes_64) ||
+      chunk_data_nbytes_64 > INT32_MAX) {
+    BLOSC_TRACE_ERROR("Chunk buffer size overflows the maximum of %d bytes", INT32_MAX);
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+
   // Sort selections
   b2nd_selection_t **ordered_selection = malloc(ndim * sizeof(b2nd_selection_t *));
   BLOSC_ERROR_NULL(ordered_selection, BLOSC2_ERROR_MEMORY_ALLOC);
@@ -2734,7 +2803,7 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
 
   // Pre-allocate a single chunk decompression buffer, reused for every
   // chunk visited by iter_chunk, instead of malloc/free per chunk.
-  int32_t chunk_data_nbytes = (int32_t)(array->extchunknitems * array->sc->typesize);
+  int32_t chunk_data_nbytes = (int32_t) chunk_data_nbytes_64;
   uint8_t *chunk_data = malloc(chunk_data_nbytes);
   BLOSC_ERROR_NULL(chunk_data, BLOSC2_ERROR_MEMORY_ALLOC);
 
@@ -2825,13 +2894,27 @@ b2nd_create_ctx(const blosc2_storage *b2_storage, int8_t ndim, const int64_t *sh
   ctx->b2_storage = params_b2_storage;
   ctx->ndim = ndim;
   int32_t blocknitems = 1;
+  bool blocksize_overflow = false;
   for (int i = 0; i < ndim; i++) {
     ctx->shape[i] = shape[i];
     ctx->chunkshape[i] = chunkshape[i];
     ctx->blockshape[i] = blockshape[i];
-    blocknitems *= ctx->blockshape[i];
+    if (b2nd_mul_overflow_int32(blocknitems, ctx->blockshape[i], &blocknitems)) {
+      blocksize_overflow = true;
+      break;
+    }
   }
-  cparams->blocksize = blocknitems * cparams->typesize;
+  // update_shape_struct() rejects this too, but only once an array is built out
+  // of the context; catching it here keeps cparams->blocksize from wrapping
+  if (blocksize_overflow ||
+      b2nd_mul_overflow_int32(blocknitems, cparams->typesize, &cparams->blocksize)) {
+    BLOSC_TRACE_ERROR("blockshape product overflows the maximum blocksize");
+    free(ctx->dtype);
+    free(cparams);
+    free(params_b2_storage);
+    free(ctx);
+    return NULL;
+  }
 
   ctx->nmetalayers = nmetalayers;
   for (int i = 0; i < nmetalayers; ++i) {
