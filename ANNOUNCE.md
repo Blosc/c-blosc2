@@ -1,17 +1,24 @@
-# Announcing C-Blosc2 3.2.3
+# Announcing C-Blosc2 3.3.0
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This is a hot-fix release for 3.2.2.  The new fast path for small b2nd
-``get_slice`` reads returned truncated (corrupted) data for arrays with
-typesize > 255, because such chunks are compressed with an internal
-typesize of 1 and the block reads were requested in array-typesize
-units.  This is now fixed (with a new regression test), and the fast
-path remains as fast for large typesizes too.
+This release hardens the paths that read data described by untrusted
+metadata.  A crafted ``.b2nd`` file could overflow the b2nd shape
+arithmetic and reach a division by zero or an undersized allocation, and
+a crafted chunk carrying no extended header could be read past its end.
+Anyone opening b2nd files or chunks they did not produce themselves
+should upgrade.
 
-Users of 3.2.2 reading slices from b2nd arrays with typesize > 255
-should upgrade.  This release introduces no API or ABI changes.
+It also adds ``blosc2_getitem_bytes_ctx()``, a byte-counting counterpart
+to ``blosc2_getitem_ctx()``.  The unit of the latter is the typesize the
+chunk records, which is one byte for typesizes above 255, so its meaning
+silently changes with the data; bytes do not.  Prefer the new entry point
+in code that does not choose the typesize itself.  Two schunk read paths
+that got this wrong, returning errors or the wrong bytes for typesizes
+above 255, are fixed as well.
+
+Finally, the build on FreeBSD and the other BSDs is fixed.
 
 For more info, see the release notes in:
 

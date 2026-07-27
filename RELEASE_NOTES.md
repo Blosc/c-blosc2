@@ -1,10 +1,25 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 3.2.3 to 3.2.4
+Changes from 3.2.3 to 3.3.0
 ===========================
 
-#XXX version-specific blurb XXX#
+This release hardens the paths that read data described by untrusted metadata,
+and adds a small API for reading a byte range out of a chunk.
+
+Crafted `.b2nd` files could overflow the b2nd shape arithmetic and reach a
+division by zero or an undersized allocation, and crafted chunks without an
+extended header could be read past their end.  Both are fixed.  Users opening
+b2nd files or chunks they did not produce themselves should upgrade.
+
+Separately, `blosc2_getitem_ctx()` turned out to be easy to misuse for typesizes
+above `BLOSC_MAX_TYPESIZE`, where its unit silently becomes the byte rather than
+the element; `blosc2_getitem_bytes_ctx()` is the unambiguous counterpart, and
+two schunk read paths that got this wrong are fixed.
+
+This is a minor release: `blosc2_getitem_bytes_ctx()` is new, but nothing was
+removed or changed incompatibly, so the SOVERSION is unchanged and existing
+binaries keep working.
 
 Security fixes
 --------------
@@ -53,14 +68,6 @@ Security fixes
 
   Reported and largely fixed by Farkhalit Rida.
 
-Bug fixes
----------
-
-* Fixed a memory leak and a dangling non-NULL output pointer in
-  ``array_without_schunk()`` when the shape could not be validated, and a leak
-  of the deserialized dtype in ``b2nd_from_schunk()`` on the same path.  These
-  were only reachable once the shape checks above made that path possible.
-
 New features
 ------------
 
@@ -98,6 +105,11 @@ Bug fixes
   short byte count when it cannot decode every requested item, so a partial
   decode no longer looks like a success to callers that only test for a
   negative return.
+
+* Fixed a memory leak and a dangling non-NULL output pointer in
+  ``array_without_schunk()`` when the shape could not be validated, and a leak
+  of the deserialized dtype in ``b2nd_from_schunk()`` on the same path.  These
+  were only reachable once the shape checks above made that path possible.
 
 * Fixed the build on FreeBSD and the other BSDs (#794).  ``-D_XOPEN_SOURCE=600``
   leaves ``__BSD_VISIBLE`` undefined there, which hides ``flock()`` and the
