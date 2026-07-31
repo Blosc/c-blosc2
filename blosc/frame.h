@@ -12,6 +12,7 @@
 #define BLOSC_FRAME_H
 
 #include "blosc2.h"
+#include "threading.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -77,6 +78,8 @@ typedef struct {
   uint64_t lock_seq;        //!< Last seen value of the sidecar's generation counter
   bool force_refresh;       //!< Force a refresh of the cached frame state on the next access
   bool refreshing;          //!< Re-entrancy guard for the metalayer reload during a refresh
+  void* read_fp;            //!< Cached "rb" handle for the frame file; NULL if none open
+  blosc2_pthread_mutex_t read_fp_mutex;  //!< Guards opening/closing read_fp
 } blosc2_frame_s;
 
 
@@ -169,6 +172,49 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
 void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk);
 void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* schunk);
 int frame_reorder_offsets(blosc2_frame_s *frame, const int64_t *offsets_order, blosc2_schunk* schunk);
+
+/**
+ * @brief Get an open "rb" handle for the frame file (regular frames only; sframe
+ * chunk/index files keep their own opens).  With the default filesystem backend
+ * on POSIX the handle is opened once and cached in the frame, so scattered
+ * reads -- including the decompressor's worker threads -- do not pay an
+ * open/close each: reads there are positional (pread), hence safe to share.
+ *
+ * Caching is skipped, and a private per-call handle returned instead, when:
+ * the backend is not #BLOSC2_IO_FILESYSTEM (other backends keep their per-call
+ * open/close contract); the platform is Windows (the CRT gives no
+ * FILE_SHARE_DELETE, so a cached handle would block unlink/rename of the frame
+ * file); or the process-wide cache is full, which bounds descriptor use at
+ * min(96, RLIMIT_NOFILE/16), overridable with BLOSC_MAX_CACHED_READERS.
+ *
+ * Either way the handle must be given back with frame_reader_release().
+ *
+ * @return The handle, or NULL if it could not be opened.
+ */
+void* frame_reader_acquire(blosc2_frame_s* frame, const blosc2_io* io);
+
+/**
+ * @brief Counterpart of frame_reader_acquire(): closes @p fp unless it is the
+ * frame's cached handle.  Also the right call for handles obtained elsewhere
+ * (e.g. sframe_open_index), which are never the cached one.
+ */
+void frame_reader_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void* fp);
+
+/**
+ * @brief Close the frame's cached read handle, if any.  Call before the frame
+ * file is replaced (rather than rewritten in place) so the next read reopens it.
+ */
+void frame_reader_invalidate(blosc2_frame_s* frame);
+
+/**
+ * @brief Drop the cached read handle if it no longer refers to the file at the
+ * frame's urlpath, i.e. the frame file was unlinked and recreated, or renamed
+ * over.  Also sets @p frame->force_refresh so the cached metadata is reloaded
+ * even when the replacement happens to have the same length.  Call before any
+ * read that the frame's cached state is derived from.  No-op where no handle is
+ * cached (Windows, non-filesystem backends, cframes).
+ */
+void frame_reader_revalidate(blosc2_frame_s* frame);
 
 int frame_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
 int frame_get_lazychunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);

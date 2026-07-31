@@ -520,10 +520,18 @@ int64_t frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
     BLOSC_TRACE_ERROR("Error getting the input/output API");
     return BLOSC2_ERROR_PLUGIN_IO;
   }
-  void* fp = io_cb->open(urlpath, "wb", frame->schunk->storage->io);
+  void* fp = io_cb->open(urlpath, "wb", frame->schunk->storage->io->params);
+  if (fp == NULL) {
+    BLOSC_TRACE_ERROR("Cannot open %s for writing.", urlpath);
+    return BLOSC2_ERROR_FILE_OPEN;
+  }
   int64_t io_pos = 0;
   int64_t nitems = io_cb->write(frame->cframe, frame->len, 1, io_pos, fp);
   io_cb->close(fp);
+  if (nitems != 1) {
+    BLOSC_TRACE_ERROR("Cannot write the frame to %s.", urlpath);
+    return BLOSC2_ERROR_FILE_WRITE;
+  }
   return nitems * frame->len;
 }
 
@@ -535,11 +543,32 @@ int64_t append_frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
         BLOSC_TRACE_ERROR("Error getting the input/output API");
         return BLOSC2_ERROR_PLUGIN_IO;
     }
-    void* fp = io_cb->open(urlpath, "ab", frame->schunk->storage->io);
+    /* "rb+" rather than "ab": the write below passes an explicit position, and
+       POSIX ignores it on an O_APPEND descriptor (every write lands at EOF)
+       while Windows honours it.  Without O_APPEND the position means the same
+       thing on both.  "rb+" will not create, so fall back to "wb+" when the
+       file is not there yet -- which is what "ab" used to cover. */
+    void* fp = io_cb->open(urlpath, "rb+", frame->schunk->storage->io->params);
+    if (fp == NULL) {
+        fp = io_cb->open(urlpath, "wb+", frame->schunk->storage->io->params);
+    }
+    if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Cannot open %s for appending.", urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+    }
 
     int64_t io_pos = io_cb->size(fp);
-    io_cb->write(frame->cframe, frame->len, 1, io_pos, fp);
+    if (io_pos < 0) {
+        io_cb->close(fp);
+        BLOSC_TRACE_ERROR("Cannot determine the size of %s.", urlpath);
+        return BLOSC2_ERROR_FILE_READ;
+    }
+    int64_t nitems = io_cb->write(frame->cframe, frame->len, 1, io_pos, fp);
     io_cb->close(fp);
+    if (nitems != 1) {
+        BLOSC_TRACE_ERROR("Cannot append the frame to %s.", urlpath);
+        return BLOSC2_ERROR_FILE_WRITE;
+    }
     return io_pos;
 }
 

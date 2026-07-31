@@ -6,6 +6,25 @@ Changes from 3.3.0 to 3.3.1
 
 #XXX version-specific blurb XXX#
 
+Reads from on-disk frames got noticeably faster.  The default filesystem I/O
+backend now uses positioned reads and writes (`pread`/`pwrite`, `ReadFile`/
+`WriteFile` with an explicit offset on Windows) instead of seek + stdio, and a
+frame keeps a single read handle open instead of opening and closing the file
+several times per chunk fetch.  Scattered small reads out of a cframe are about
+3x faster in our microbenchmarks; the gain grows with how many small reads a
+workload does.  User-registered I/O backends are unaffected: they keep their
+one-handle-per-reader contract.
+
+Note that an open on-disk schunk now holds one file descriptor for as long as it
+stays open, where before descriptors were only taken for the duration of each
+read.  To keep that from exhausting the process's descriptor budget, the number
+of cached handles is capped at min(96, RLIMIT_NOFILE/16) -- schunks past the cap
+fall back to the previous open-per-read behaviour.  Set the
+**BLOSC_MAX_CACHED_READERS** environment variable to choose a different cap, or
+to 0 to switch the cache off entirely.  Handle caching is currently POSIX-only:
+on Windows the C runtime opens files without FILE_SHARE_DELETE, so a cached
+handle would make unlinking or renaming an open frame file fail.
+
 
 Changes from 3.2.3 to 3.3.0
 ===========================
