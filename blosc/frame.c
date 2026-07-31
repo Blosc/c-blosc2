@@ -217,19 +217,26 @@ void frame_reader_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void
 }
 
 
+/* Drop the cached handle; caller must hold read_fp_mutex */
+static void frame_reader_close_locked(blosc2_frame_s* frame) {
+  if (frame->read_fp == NULL) {
+    return;
+  }
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(BLOSC2_IO_FILESYSTEM);
+  if (io_cb != NULL) {
+    io_cb->close(frame->read_fp);
+  }
+  frame->read_fp = NULL;
+#if !defined(_WIN32)
+  reader_cache_return();
+#endif
+}
+
+
 /* See frame.h */
 void frame_reader_invalidate(blosc2_frame_s* frame) {
   blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
-  if (frame->read_fp != NULL) {
-    blosc2_io_cb *io_cb = blosc2_get_io_cb(BLOSC2_IO_FILESYSTEM);
-    if (io_cb != NULL) {
-      io_cb->close(frame->read_fp);
-    }
-    frame->read_fp = NULL;
-#if !defined(_WIN32)
-    reader_cache_return();
-#endif
-  }
+  frame_reader_close_locked(frame);
   blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
 }
 
@@ -243,38 +250,45 @@ void frame_reader_revalidate(blosc2_frame_s* frame) {
   if (frame->urlpath == NULL) {
     return;
   }
-  /* Only the filesystem backend ever populates read_fp, so this cast is safe.
-     Taken under the mutex like every other read of it; the handle itself cannot
-     go away while we look at it, as only the owning thread drops it. */
+  /* The whole inspection runs under read_fp_mutex: reading the pointer and then
+     dereferencing it outside the lock would let a concurrent invalidate close
+     the handle in between.  Two stat() calls under the lock cost nothing here,
+     as this runs once per header read rather than per block. */
   blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
+  /* Only the filesystem backend ever populates read_fp, so this cast is safe */
   blosc2_stdio_file* my_fp = (blosc2_stdio_file*)frame->read_fp;
-  blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
   if (my_fp == NULL) {
+    blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
     return;
   }
+  bool stale;
   int fd = my_fp->file != NULL ? fileno(my_fp->file) : -1;
   struct stat fd_st;
+  struct stat path_st;
   if (fd < 0 || fstat(fd, &fd_st) != 0) {
     /* Cannot vouch for the handle; drop it and let the next acquire reopen */
-    frame_reader_invalidate(frame);
-    frame->force_refresh = true;
-    return;
+    stale = true;
   }
-  struct stat path_st;
-  if (stat(frame->urlpath, &path_st) != 0) {
+  else if (stat(frame->urlpath, &path_st) != 0) {
     /* The path is gone but the inode we hold open is still perfectly valid, so
        keep reading it -- exactly what an already-open fd does on POSIX. */
-    return;
+    stale = false;
   }
-  if (fd_st.st_dev == path_st.st_dev && fd_st.st_ino == path_st.st_ino) {
-    return;
+  else {
+    /* A different file at urlpath means unlink-then-recreate (mode="w") or a
+       rename over it (os.replace) */
+    stale = fd_st.st_dev != path_st.st_dev || fd_st.st_ino != path_st.st_ino;
   }
-  /* A different file lives at urlpath now: unlink-then-recreate (mode="w") or a
-     rename over it (os.replace).  Drop the handle *and* force the metadata
-     refresh -- the replacement is often the same length as the old frame, and
-     then the trailer poll in frame_refresh_if_stale() never fires by itself. */
-  frame_reader_invalidate(frame);
-  frame->force_refresh = true;
+  if (stale) {
+    frame_reader_close_locked(frame);
+  }
+  blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
+  if (stale) {
+    /* Force the metadata refresh too: the replacement is often the same length
+       as the old frame, and then the trailer poll in frame_refresh_if_stale()
+       never fires by itself. */
+    frame->force_refresh = true;
+  }
 #endif
 }
 
