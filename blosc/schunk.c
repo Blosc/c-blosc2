@@ -546,11 +546,18 @@ int64_t append_frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
     /* "rb+" rather than "ab": the write below passes an explicit position, and
        POSIX ignores it on an O_APPEND descriptor (every write lands at EOF)
        while Windows honours it.  Without O_APPEND the position means the same
-       thing on both.  "rb+" will not create, so fall back to "wb+" when the
-       file is not there yet -- which is what "ab" used to cover. */
+       thing on both.  "rb+" will not create, so create the file first when it
+       is not there yet -- which is what "ab" used to cover.  Creating with "ab"
+       rather than "wb+": should the "rb+" below have failed for some reason
+       other than a missing file, "ab" leaves its contents alone where "wb+"
+       would truncate them away. */
     void* fp = io_cb->open(urlpath, "rb+", frame->schunk->storage->io->params);
     if (fp == NULL) {
-        fp = io_cb->open(urlpath, "wb+", frame->schunk->storage->io->params);
+        fp = io_cb->open(urlpath, "ab", frame->schunk->storage->io->params);
+        if (fp != NULL) {
+            io_cb->close(fp);
+            fp = io_cb->open(urlpath, "rb+", frame->schunk->storage->io->params);
+        }
     }
     if (fp == NULL) {
         BLOSC_TRACE_ERROR("Cannot open %s for appending.", urlpath);
