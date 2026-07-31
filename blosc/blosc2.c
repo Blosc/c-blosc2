@@ -1765,7 +1765,6 @@ static int blosc_d(
       return BLOSC2_ERROR_INVALID_PARAM;
     }
     blosc2_frame_s* frame = (blosc2_frame_s*)context->schunk->frame;
-    char* urlpath = frame->urlpath;
     size_t bstarts_nbytes;
     size_t trailer_offset;
     size_t block_csizes_nbytes;
@@ -1817,34 +1816,34 @@ static int blosc_d(
       BLOSC_ERROR_NULL(fp, BLOSC2_ERROR_FILE_OPEN);
       // The offset of the block is src_offset
       if (src_offset < 0) {
-        io_cb->close(fp);
+        frame_reader_release(frame, io_cb, fp);
         BLOSC_TRACE_ERROR("Lazy block offset cannot be negative.");
         return BLOSC2_ERROR_INVALID_HEADER;
       }
       io_pos = src_offset;
     }
     else {
-      fp = io_cb->open(urlpath, "rb", context->schunk->storage->io->params);
+      fp = frame_reader_acquire(frame, context->schunk->storage->io);
       BLOSC_ERROR_NULL(fp, BLOSC2_ERROR_FILE_OPEN);
       // The offset of the block is src_offset
       if (src_offset < 0) {
-        io_cb->close(fp);
+        frame_reader_release(frame, io_cb, fp);
         BLOSC_TRACE_ERROR("Lazy block offset cannot be negative.");
         return BLOSC2_ERROR_INVALID_HEADER;
       }
       if (chunk_offset < 0) {
-        io_cb->close(fp);
+        frame_reader_release(frame, io_cb, fp);
         BLOSC_TRACE_ERROR("Lazy chunk offset cannot be negative.");
         return BLOSC2_ERROR_INVALID_HEADER;
       }
       if (frame->file_offset > INT64_MAX - chunk_offset) {
-        io_cb->close(fp);
+        frame_reader_release(frame, io_cb, fp);
         BLOSC_TRACE_ERROR("Lazy chunk offset overflows file position.");
         return BLOSC2_ERROR_INVALID_HEADER;
       }
       io_pos = frame->file_offset + chunk_offset;
       if (io_pos > INT64_MAX - src_offset) {
-        io_cb->close(fp);
+        frame_reader_release(frame, io_cb, fp);
         BLOSC_TRACE_ERROR("Lazy block offset overflows file position.");
         return BLOSC2_ERROR_INVALID_HEADER;
       }
@@ -1852,7 +1851,7 @@ static int blosc_d(
     }
     // We can make use of tmp3 because it will be used after src is not needed anymore
     int64_t rbytes = io_cb->read((void**)&tmp3, 1, block_csize, io_pos, fp);
-    io_cb->close(fp);
+    frame_reader_release(frame, io_cb, fp);
     if ((int32_t)rbytes != block_csize) {
       BLOSC_TRACE_ERROR("Cannot read the (lazy) block out of the fileframe.");
       return BLOSC2_ERROR_READ_BUFFER;
@@ -2594,11 +2593,11 @@ static int read_lazy_chunk_bytes(blosc2_context* context, int32_t offset, uint8_
       BLOSC_TRACE_ERROR("Lazy chunk offset cannot be negative.");
       return BLOSC2_ERROR_INVALID_HEADER;
     }
-    fp = io_cb->open(frame->urlpath, "rb", context->schunk->storage->io->params);
+    fp = frame_reader_acquire(frame, context->schunk->storage->io);
     if (frame->file_offset > INT64_MAX - chunk_offset) {
       BLOSC_TRACE_ERROR("Lazy chunk offset overflows file position.");
       if (fp != NULL) {
-        io_cb->close(fp);
+        frame_reader_release(frame, io_cb, fp);
       }
       return BLOSC2_ERROR_INVALID_HEADER;
     }
@@ -2606,7 +2605,7 @@ static int read_lazy_chunk_bytes(blosc2_context* context, int32_t offset, uint8_
     if (io_pos > INT64_MAX - offset) {
       BLOSC_TRACE_ERROR("Lazy block offset overflows file position.");
       if (fp != NULL) {
-        io_cb->close(fp);
+        frame_reader_release(frame, io_cb, fp);
       }
       return BLOSC2_ERROR_INVALID_HEADER;
     }
@@ -2619,7 +2618,7 @@ static int read_lazy_chunk_bytes(blosc2_context* context, int32_t offset, uint8_
 
   uint8_t* read_buffer = buffer;
   int64_t rbytes = io_cb->read((void**)&read_buffer, 1, nbytes, io_pos, fp);
-  io_cb->close(fp);
+  frame_reader_release(frame, io_cb, fp);
   if (read_buffer != buffer) {
     memcpy(buffer, read_buffer, (size_t)nbytes);
     free(read_buffer);
@@ -4076,25 +4075,25 @@ static int decompress_single_vlblock(blosc2_context* context, int32_t nblock,
       io_pos = bstart;
     }
     else {
-      fp = io_cb->open(frame->urlpath, "rb", context->schunk->storage->io->params);
+      fp = frame_reader_acquire(frame, context->schunk->storage->io);
       if (fp == NULL) {
         BLOSC_TRACE_ERROR("Cannot open frame file for lazy VL block size peek.");
         return BLOSC2_ERROR_FILE_OPEN;
       }
       if (chunk_offset < 0) {
         BLOSC_TRACE_ERROR("Lazy chunk offset cannot be negative.");
-        io_cb->close(fp);
+        frame_reader_release(frame, io_cb, fp);
         return BLOSC2_ERROR_INVALID_HEADER;
       }
       if (frame->file_offset > INT64_MAX - chunk_offset) {
         BLOSC_TRACE_ERROR("Lazy chunk offset overflows file position.");
-        io_cb->close(fp);
+        frame_reader_release(frame, io_cb, fp);
         return BLOSC2_ERROR_INVALID_HEADER;
       }
       io_pos = frame->file_offset + chunk_offset;
       if (io_pos > INT64_MAX - bstart) {
         BLOSC_TRACE_ERROR("Lazy block offset overflows file position.");
-        io_cb->close(fp);
+        frame_reader_release(frame, io_cb, fp);
         return BLOSC2_ERROR_INVALID_HEADER;
       }
       io_pos += bstart;
@@ -4108,7 +4107,7 @@ static int decompress_single_vlblock(blosc2_context* context, int32_t nblock,
     uint8_t nbuf[sizeof(int32_t)];
     uint8_t* nbufp = nbuf;
     int64_t rbytes = io_cb->read((void**)&nbufp, 1, sizeof(int32_t), io_pos, fp);
-    io_cb->close(fp);
+    frame_reader_release(frame, io_cb, fp);
     if (nbufp != nbuf) {
       // io_cb allocated new memory; copy the result and free.
       memcpy(nbuf, nbufp, sizeof(int32_t));

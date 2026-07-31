@@ -26,11 +26,13 @@
 
 #if defined(_WIN32)
   #include <memoryapi.h>
+  #include <io.h>
   // See https://github.com/Blosc/python-blosc2/issues/359
   #define fseek _fseeki64
   #define ftell _ftelli64
 #else
   #include <sys/mman.h>
+  #include <unistd.h>
 #endif
 
 
@@ -66,6 +68,59 @@ static bool checked_size_t_to_int64(size_t value, int64_t* out) {
   }
   *out = (int64_t)value;
   return true;
+}
+
+
+/* Positioned I/O on the raw descriptor behind the FILE*: no seek state and no
+   stdio buffer, so a single handle can serve concurrent readers and can never
+   hand out bytes staled by a write through another handle.  Returns the number
+   of bytes transferred; a short count means EOF or error (errno is set). */
+static int64_t stdio_pio(FILE *file, const void *buf, size_t n_bytes, int64_t position, bool is_write) {
+  uint8_t *p = (uint8_t *)(uintptr_t) buf;  /* const only matters for the write side */
+  size_t done = 0;
+#if defined(_WIN32)
+  HANDLE h = (HANDLE) _get_osfhandle(_fileno(file));
+  if (h == INVALID_HANDLE_VALUE) {
+    return 0;
+  }
+  while (done < n_bytes) {
+    size_t left = n_bytes - done;
+    DWORD to_do = (DWORD)(left > 0x40000000u ? 0x40000000u : left);  /* 1 GB per call */
+    uint64_t off = (uint64_t) position + done;
+    OVERLAPPED ov;
+    memset(&ov, 0, sizeof(ov));
+    ov.Offset = (DWORD)(off & 0xFFFFFFFFu);
+    ov.OffsetHigh = (DWORD)(off >> 32);
+    DWORD n = 0;
+    BOOL ok = is_write ? WriteFile(h, p + done, to_do, &n, &ov)
+                       : ReadFile(h, p + done, to_do, &n, &ov);
+    if (!ok || n == 0) {
+      break;  /* error or EOF (ERROR_HANDLE_EOF) */
+    }
+    done += n;
+  }
+#else
+  int fd = fileno(file);
+  if (fd < 0) {
+    return 0;
+  }
+  while (done < n_bytes) {
+    off_t off = (off_t)(position + (int64_t) done);
+    ssize_t n = is_write ? pwrite(fd, p + done, n_bytes - done, off)
+                         : pread(fd, p + done, n_bytes - done, off);
+    if (n < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      break;
+    }
+    if (n == 0) {
+      break;  /* EOF */
+    }
+    done += (size_t) n;
+  }
+#endif
+  return (int64_t) done;
 }
 
 
@@ -163,26 +218,13 @@ int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_
     return 0;
   }
 
-#if !defined(_WIN32)
-  /* POSIX fseek takes long; reject offsets that would silently truncate (e.g. on 32-bit). */
-  if (position > (int64_t)LONG_MAX) {
-    BLOSC_TRACE_ERROR("stdio write position %" PRId64 " exceeds LONG_MAX for fseek.", position);
-    return 0;
-  }
-#endif
-
-  int rc = fseek(my_fp->file, position, SEEK_SET);
-  if (rc != 0) {
-    BLOSC_TRACE_ERROR("fseek failed at position %" PRId64 " (error: %s).", position, strerror(errno));
-    return 0;
-  }
-
-  size_t nitems_ = fwrite(ptr, (size_t) size, (size_t) nitems, my_fp->file);
-  if ((int64_t)nitems_ != nitems) {
+  int64_t nbytes_ = stdio_pio(my_fp->file, ptr, (size_t) n_bytes_i64, position, true);
+  int64_t nitems_ = size > 0 ? nbytes_ / size : nitems;
+  if (nitems_ != nitems) {
     BLOSC_TRACE_ERROR("Short write at position %" PRId64 ": requested %" PRId64 " items of size %" PRId64
-                      ", wrote %zu (error: %s).", position, nitems, size, nitems_, strerror(errno));
+                      ", wrote %" PRId64 " (error: %s).", position, nitems, size, nitems_, strerror(errno));
   }
-  return (int64_t) nitems_;
+  return nitems_;
 }
 
 int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
@@ -212,27 +254,13 @@ int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t posi
     return 0;
   }
 
-#if !defined(_WIN32)
-  /* POSIX fseek takes long; reject offsets that would silently truncate (e.g. on 32-bit). */
-  if (position > (int64_t)LONG_MAX) {
-    BLOSC_TRACE_ERROR("stdio read position %" PRId64 " exceeds LONG_MAX for fseek.", position);
-    return 0;
-  }
-#endif
-
-  int rc = fseek(my_fp->file, position, SEEK_SET);
-  if (rc != 0) {
-    BLOSC_TRACE_ERROR("fseek failed at position %" PRId64 " (error: %s).", position, strerror(errno));
-    return 0;
-  }
-
-  void* data_ptr = *ptr;
-  size_t nitems_ = fread(data_ptr, (size_t) size, (size_t) nitems, my_fp->file);
-  if ((int64_t)nitems_ != nitems) {
+  int64_t nbytes_ = stdio_pio(my_fp->file, *ptr, (size_t) n_bytes_i64, position, false);
+  int64_t nitems_ = size > 0 ? nbytes_ / size : nitems;
+  if (nitems_ != nitems) {
     BLOSC_TRACE_ERROR("Short read at position %" PRId64 ": requested %" PRId64 " items of size %" PRId64
-                      ", read %zu (error: %s).", position, nitems, size, nitems_, strerror(errno));
+                      ", read %" PRId64 " (error: %s).", position, nitems, size, nitems_, strerror(errno));
   }
-  return (int64_t) nitems_;
+  return nitems_;
 }
 
 int blosc2_stdio_truncate(void *stream, int64_t size) {
