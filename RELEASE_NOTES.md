@@ -15,6 +15,14 @@ several times per chunk fetch.  Scattered small reads out of a cframe are about
 workload does.  User-registered I/O backends are unaffected: they keep their
 one-handle-per-reader contract.
 
+Concurrent readers gain the most, since the per-access open/close this removes
+was paid by every process and contended in the kernel.  Eight processes each
+doing 300 random slice reads over the same 269 MB frame went from 0.52 s to
+0.36 s of wall time, and from 3.85 s to 2.58 s of CPU (Apple M4 Pro): about
+1.4x, against 13% for a single reader.  The advantage of opening such files with
+`mmap_mode="r"` narrows accordingly -- not because memory mapping got slower,
+but because the regular path caught up.
+
 Note that an open on-disk schunk now holds one file descriptor for as long as it
 stays open, where before descriptors were only taken for the duration of each
 read.  To keep that from exhausting the process's descriptor budget, the number
