@@ -550,7 +550,14 @@ int64_t append_frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
        is not there yet -- which is what "ab" used to cover.  Creating with "ab"
        rather than "wb+": should the "rb+" below have failed for some reason
        other than a missing file, "ab" leaves its contents alone where "wb+"
-       would truncate them away. */
+       would truncate them away.
+
+       Note this gives up O_APPEND's atomic land-at-EOF: two processes appending
+       to the same file concurrently can now write at the same offset.  They
+       could not use the result before either -- the offset returned here comes
+       from a size() that the other process invalidates just the same -- and
+       Windows never had the atomicity to begin with, since it honours the
+       explicit position even on an append handle. */
     void* fp = io_cb->open(urlpath, "rb+", frame->schunk->storage->io->params);
     if (fp == NULL) {
         fp = io_cb->open(urlpath, "ab", frame->schunk->storage->io->params);

@@ -79,7 +79,9 @@ typedef struct {
   bool force_refresh;       //!< Force a refresh of the cached frame state on the next access
   bool refreshing;          //!< Re-entrancy guard for the metalayer reload during a refresh
   void* read_fp;            //!< Cached "rb" handle for the frame file; NULL if none open
-  blosc2_pthread_mutex_t read_fp_mutex;  //!< Guards opening/closing read_fp
+  int32_t read_fp_refs;     //!< Outstanding frame_reader_acquire() calls on read_fp
+  bool read_fp_nocache;     //!< The handle cache was full for this frame; do not ask again
+  blosc2_pthread_mutex_t read_fp_mutex;  //!< Guards read_fp and its bookkeeping
 } blosc2_frame_s;
 
 
@@ -196,13 +198,17 @@ void* frame_reader_acquire(blosc2_frame_s* frame, const blosc2_io* io);
 /**
  * @brief Counterpart of frame_reader_acquire(): closes @p fp unless it is the
  * frame's cached handle.  Also the right call for handles obtained elsewhere
- * (e.g. sframe_open_index), which are never the cached one.
+ * (e.g. sframe_open_index), which are never the cached one.  Every acquire must
+ * be paired with exactly one release: the cached handle is only ever dropped
+ * while no acquire is outstanding.
  */
 void frame_reader_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void* fp);
 
 /**
  * @brief Close the frame's cached read handle, if any.  Call before the frame
  * file is replaced (rather than rewritten in place) so the next read reopens it.
+ * Unconditional: only for teardown and for write paths that recreate the file,
+ * where no read can be in flight.
  */
 void frame_reader_invalidate(blosc2_frame_s* frame);
 

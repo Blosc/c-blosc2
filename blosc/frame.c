@@ -88,8 +88,9 @@
 
 /* Plain pthread type so it can be statically initialised; this block is
    POSIX-only anyway, and there the blosc2_pthread_* macros are pthread_*.
-   No atomics needed: the counter only moves when a handle is actually opened
-   or closed, i.e. once per frame, never per read. */
+   No atomics needed: the counter is only touched when a handle is actually
+   opened or closed, or once more when a frame is first refused one (see
+   read_fp_nocache) -- never per read. */
 static pthread_mutex_t reader_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int reader_cache_count = 0;
 
@@ -183,13 +184,25 @@ void* frame_reader_acquire(blosc2_frame_s* frame, const blosc2_io* io) {
   // store below (C11 data race, and TSan says so).  An uncontended lock is a
   // handful of ns against the ~600 ns pread this hands a handle to.
   blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
-  if (frame->read_fp == NULL && reader_cache_claim()) {
-    frame->read_fp = io_cb->open(frame->urlpath, "rb", io->params);
-    if (frame->read_fp == NULL) {
-      reader_cache_return();
+  if (frame->read_fp == NULL && !frame->read_fp_nocache) {
+    if (reader_cache_claim()) {
+      frame->read_fp = io_cb->open(frame->urlpath, "rb", io->params);
+      if (frame->read_fp == NULL) {
+        reader_cache_return();
+      }
+    }
+    else {
+      // Remember that this frame goes uncached, so the process-wide cache mutex
+      // is asked once rather than on every read for the rest of its life
+      frame->read_fp_nocache = true;
     }
   }
   void* fp = frame->read_fp;
+  if (fp != NULL) {
+    // Held until the matching release, so nothing can close it underneath a
+    // caller that keeps it across several reads (frame_to_schunk does)
+    frame->read_fp_refs++;
+  }
   blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
   if (fp == NULL) {
     // Cache full (or the cached open failed): hand out a private handle, which
@@ -210,6 +223,9 @@ void frame_reader_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void
   // under the mutex, so a concurrent first open cannot race this comparison.
   blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
   bool is_cached = (fp == frame->read_fp);
+  if (is_cached) {
+    frame->read_fp_refs--;
+  }
   blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
   if (!is_cached) {
     io_cb->close(fp);
@@ -217,26 +233,38 @@ void frame_reader_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void
 }
 
 
-/* Drop the cached handle; caller must hold read_fp_mutex */
-static void frame_reader_close_locked(blosc2_frame_s* frame) {
+/* Drop the cached handle; caller must hold read_fp_mutex.  Returns false when
+   the handle is checked out and @p force is not set, i.e. nothing was closed. */
+static bool frame_reader_close_locked(blosc2_frame_s* frame, bool force) {
   if (frame->read_fp == NULL) {
-    return;
+    return true;
   }
-  blosc2_io_cb *io_cb = blosc2_get_io_cb(BLOSC2_IO_FILESYSTEM);
-  if (io_cb != NULL) {
-    io_cb->close(frame->read_fp);
+  if (frame->read_fp_refs > 0 && !force) {
+    /* A caller up the stack is reading through it (frame_to_schunk holds it
+       across its whole chunk loop, and that loop re-enters get_header_info).
+       Closing it here would hand that caller a dangling handle, and its own
+       release would then close it a second time.  Leave it: the operation in
+       flight finishes on the file it started on, and the next revalidate --
+       past that release -- drops it. */
+    return false;
   }
+  /* read_fp only ever comes from the filesystem backend, so close it directly:
+     blosc2_get_io_cb() would return NULL after a blosc2_destroy(), and then the
+     descriptor would leak while its cache slot got handed back anyway. */
+  blosc2_stdio_close(frame->read_fp);
   frame->read_fp = NULL;
+  frame->read_fp_refs = 0;
 #if !defined(_WIN32)
   reader_cache_return();
 #endif
+  return true;
 }
 
 
 /* See frame.h */
 void frame_reader_invalidate(blosc2_frame_s* frame) {
   blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
-  frame_reader_close_locked(frame);
+  frame_reader_close_locked(frame, true);
   blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
 }
 
@@ -280,7 +308,7 @@ void frame_reader_revalidate(blosc2_frame_s* frame) {
     stale = fd_st.st_dev != path_st.st_dev || fd_st.st_ino != path_st.st_ino;
   }
   if (stale) {
-    frame_reader_close_locked(frame);
+    frame_reader_close_locked(frame, false);
   }
   blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
   if (stale) {
