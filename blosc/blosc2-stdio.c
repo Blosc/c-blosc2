@@ -105,9 +105,19 @@ static int64_t stdio_pio(FILE *file, const void *buf, size_t n_bytes, int64_t po
     return 0;
   }
   while (done < n_bytes) {
-    off_t off = (off_t)(position + (int64_t) done);
-    ssize_t n = is_write ? pwrite(fd, p + done, n_bytes - done, off)
-                         : pread(fd, p + done, n_bytes - done, off);
+    int64_t position_i64 = position + (int64_t) done;
+    off_t off = (off_t) position_i64;
+    if ((int64_t) off != position_i64) {
+      /* 32-bit off_t build without large-file support: refuse rather than
+         silently transfer at a truncated position. */
+      BLOSC_TRACE_ERROR("Position %" PRId64 " does not fit in off_t.", position_i64);
+      break;
+    }
+    size_t left = n_bytes - done;
+    /* Keep each call under SSIZE_MAX/2GB; short transfers are looped anyway */
+    size_t to_do = left > 0x40000000u ? 0x40000000u : left;
+    ssize_t n = is_write ? pwrite(fd, p + done, to_do, off)
+                         : pread(fd, p + done, to_do, off);
     if (n < 0) {
       if (errno == EINTR) {
         continue;
@@ -219,7 +229,8 @@ int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_
   }
 
   int64_t nbytes_ = stdio_pio(my_fp->file, ptr, (size_t) n_bytes_i64, position, true);
-  int64_t nitems_ = size > 0 ? nbytes_ / size : nitems;
+  /* A zero item size transfers nothing, so report nothing (as fwrite does) */
+  int64_t nitems_ = size > 0 ? nbytes_ / size : 0;
   if (nitems_ != nitems) {
     BLOSC_TRACE_ERROR("Short write at position %" PRId64 ": requested %" PRId64 " items of size %" PRId64
                       ", wrote %" PRId64 " (error: %s).", position, nitems, size, nitems_, strerror(errno));
@@ -255,7 +266,8 @@ int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t posi
   }
 
   int64_t nbytes_ = stdio_pio(my_fp->file, *ptr, (size_t) n_bytes_i64, position, false);
-  int64_t nitems_ = size > 0 ? nbytes_ / size : nitems;
+  /* A zero item size transfers nothing, so report nothing (as fread does) */
+  int64_t nitems_ = size > 0 ? nbytes_ / size : 0;
   if (nitems_ != nitems) {
     BLOSC_TRACE_ERROR("Short read at position %" PRId64 ": requested %" PRId64 " items of size %" PRId64
                       ", read %" PRId64 " (error: %s).", position, nitems, size, nitems_, strerror(errno));
