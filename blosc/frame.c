@@ -114,9 +114,9 @@ static int reader_cache_max(void) {
       cached_max = (int)share;
     }
   }
-  if (cached_max < 1) {
-    cached_max = 1;
-  }
+  /* A budget below FRAME_READER_CACHE_SHARE lands on 0, i.e. no caching at all;
+     that is the right answer there -- a descriptor held for a frame's lifetime
+     is exactly what such a process cannot spare. */
   return cached_max;
 }
 
@@ -165,7 +165,7 @@ void* frame_reader_acquire(blosc2_frame_s* frame, const blosc2_io* io) {
     return io_cb->open(frame->urlpath, "rb", io->params);
   }
 #if defined(_WIN32)
-  // ponytail: no handle caching on Windows.  The CRT opens files without
+  // No handle caching on Windows.  The CRT opens files without
   // FILE_SHARE_DELETE, so a cached handle turns every unlink or rename of the
   // frame file into a sharing violation.  Callers that replace a frame rather
   // than rewrite it in place -- python-blosc2 does, both via os.replace and via
@@ -203,7 +203,15 @@ void* frame_reader_acquire(blosc2_frame_s* frame, const blosc2_io* io) {
 
 /* See frame.h */
 void frame_reader_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void* fp) {
-  if (fp != NULL && fp != frame->read_fp) {
+  if (fp == NULL) {
+    return;
+  }
+  // Same reasoning as in frame_reader_acquire(): read_fp is only ever read
+  // under the mutex, so a concurrent first open cannot race this comparison.
+  blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
+  bool is_cached = (fp == frame->read_fp);
+  blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
+  if (!is_cached) {
     io_cb->close(fp);
   }
 }
@@ -232,11 +240,18 @@ void frame_reader_revalidate(blosc2_frame_s* frame) {
   /* No handle is ever cached here, so none can go stale */
   BLOSC_UNUSED_PARAM(frame);
 #else
-  if (frame->read_fp == NULL || frame->urlpath == NULL) {
+  if (frame->urlpath == NULL) {
     return;
   }
-  /* Only the filesystem backend ever populates read_fp, so this cast is safe */
+  /* Only the filesystem backend ever populates read_fp, so this cast is safe.
+     Taken under the mutex like every other read of it; the handle itself cannot
+     go away while we look at it, as only the owning thread drops it. */
+  blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
   blosc2_stdio_file* my_fp = (blosc2_stdio_file*)frame->read_fp;
+  blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
+  if (my_fp == NULL) {
+    return;
+  }
   int fd = my_fp->file != NULL ? fileno(my_fp->file) : -1;
   struct stat fd_st;
   if (fd < 0 || fstat(fd, &fd_st) != 0) {
@@ -1827,6 +1842,9 @@ blosc2_frame_s* frame_from_cframe(uint8_t *cframe, int64_t len, bool copy) {
   }
 
   blosc2_frame_s* frame = frame_alloc();
+  if (frame == NULL) {
+    return NULL;
+  }
   frame->len = frame_len;
   frame->file_offset = 0;
 
