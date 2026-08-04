@@ -4,7 +4,7 @@ Release notes for C-Blosc2
 Changes from 3.3.0 to 3.3.1
 ===========================
 
-#XXX version-specific blurb XXX#
+This release is about making reads from on-disk frames faster.
 
 Reads from on-disk frames got noticeably faster.  The default filesystem I/O
 backend now uses positioned reads and writes (`pread`/`pwrite`, `ReadFile`/
@@ -32,6 +32,11 @@ fall back to the previous open-per-read behaviour.  Set the
 to 0 to switch the cache off entirely.  Handle caching is currently POSIX-only:
 on Windows the C runtime opens files without FILE_SHARE_DELETE, so a cached
 handle would make unlinking or renaming an open frame file fail.
+
+As a side effect of dropping `fseek()`, reads and writes past 2 GB no longer
+fail on 32-bit builds whose `off_t` is 64-bit wide.
+
+There are no API or format changes in this release.
 
 
 Changes from 3.2.3 to 3.3.0

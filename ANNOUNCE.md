@@ -1,24 +1,22 @@
-# Announcing C-Blosc2 3.3.0
+# Announcing C-Blosc2 3.3.1
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This release hardens the paths that read data described by untrusted
-metadata.  A crafted ``.b2nd`` file could overflow the b2nd shape
-arithmetic and reach a division by zero or an undersized allocation, and
-a crafted chunk carrying no extended header could be read past its end.
-Anyone opening b2nd files or chunks they did not produce themselves
-should upgrade.
+Reads from on-disk frames got noticeably faster.  The default filesystem
+I/O backend now uses positioned reads and writes (``pread``/``pwrite``,
+``ReadFile``/``WriteFile`` with an explicit offset on Windows) instead of
+seek + stdio, and a frame keeps a single read handle open instead of
+opening and closing the file several times per chunk fetch.  Scattered
+small reads out of a cframe are about 3x faster in our microbenchmarks.
 
-It also adds ``blosc2_getitem_bytes_ctx()``, a byte-counting counterpart
-to ``blosc2_getitem_ctx()``.  The unit of the latter is the typesize the
-chunk records, which is one byte for typesizes above 255, so its meaning
-silently changes with the data; bytes do not.  Prefer the new entry point
-in code that does not choose the typesize itself.  Two schunk read paths
-that got this wrong, returning errors or the wrong bytes for typesizes
-above 255, are fixed as well.
+Concurrent readers gain the most, since the per-access open/close this
+removes was paid by every process and contended in the kernel.  Eight
+processes each doing 300 random slice reads over the same 269 MB frame
+went from 0.52 s to 0.36 s of wall time (Apple M4 Pro): about 1.4x,
+against 13% for a single reader.
 
-Finally, the build on FreeBSD and the other BSDs is fixed.
+There are no API or format changes in this release.
 
 For more info, see the release notes in:
 
