@@ -17,6 +17,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 /* Do NOT auto-define SSSE3 based on _MSC_VER (clang-cl defines _MSC_VER). 
 Require the build system to enable SSSE3 via the appropriate compiler 
@@ -125,6 +126,11 @@ int bytedelta_forward(const uint8_t *input, uint8_t *output, int32_t length, uin
     }
   }
 
+  // When length is not a multiple of typesize, the trailing length % typesize
+  // bytes do not belong to any channel (shuffle leaves them in place too).
+  // Pass them through verbatim, or they would be left uninitialized in output.
+  memcpy(output, input, (size_t)(length - stream_len * typesize));
+
   return BLOSC2_ERROR_SUCCESS;
 }
 
@@ -171,6 +177,9 @@ int bytedelta_backward(const uint8_t *input, uint8_t *output, int32_t length, ui
       _v2 = v;
     }
   }
+
+  // Mirror of the forward pass: restore the trailing bytes verbatim.
+  memcpy(output, input, (size_t)(length - stream_len * typesize));
 
   return BLOSC2_ERROR_SUCCESS;
 }

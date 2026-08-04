@@ -48,6 +48,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 /* The original implementation of the bytedelta filter had incorrect
  * roundtrip behavior between SIMD and non-SIMD binaries. This filter provides
@@ -338,9 +339,73 @@ int arange_like() {
 }
 
 
+/* Buffers whose length is not a multiple of typesize end in a partial element.
+ * Those trailing length % typesize bytes belong to no channel, so bytedelta
+ * must pass them through untouched in both directions.  Before the fix they
+ * were left uninitialized, silently corrupting the tail of the buffer.
+ * See https://github.com/Blosc/python-blosc2/issues/357 */
+int partial_element_tail(void) {
+  const int32_t maxbytes = 4096;
+  uint8_t *src = malloc(maxbytes);
+  uint8_t *dst = malloc(maxbytes + BLOSC2_MAX_OVERHEAD);
+  uint8_t *back = malloc(maxbytes);
+  int failures = 0;
+
+  for (int32_t i = 0; i < maxbytes; i++) {
+    src[i] = (uint8_t) (i * 7 + 3);
+  }
+
+  for (int32_t typesize = 2; typesize <= 8; typesize++) {
+    for (int32_t nbytes = 32; nbytes < maxbytes; nbytes++) {
+      if (nbytes % typesize == 0) {
+        continue;  // only partial tails are of interest here
+      }
+      blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+      cparams.typesize = typesize;
+      cparams.filters[BLOSC2_MAX_FILTERS - 2] = BLOSC_SHUFFLE;
+      cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_FILTER_BYTEDELTA;
+      cparams.filters_meta[BLOSC2_MAX_FILTERS - 1] = (uint8_t) typesize;
+      blosc2_context *cctx = blosc2_create_cctx(cparams);
+      int csize = blosc2_compress_ctx(cctx, src, nbytes, dst, nbytes + BLOSC2_MAX_OVERHEAD);
+      blosc2_free_ctx(cctx);
+      if (csize < 0) {
+        printf("compression failed for nbytes=%d typesize=%d\n", nbytes, typesize);
+        failures++;
+        continue;
+      }
+
+      blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+      blosc2_context *dctx = blosc2_create_dctx(dparams);
+      memset(back, 0, nbytes);
+      int dsize = blosc2_decompress_ctx(dctx, dst, csize, back, nbytes);
+      blosc2_free_ctx(dctx);
+      if (dsize != nbytes) {
+        printf("decompression failed for nbytes=%d typesize=%d\n", nbytes, typesize);
+        failures++;
+        continue;
+      }
+
+      if (memcmp(src, back, nbytes) != 0) {
+        printf("roundtrip mismatch for nbytes=%d typesize=%d\n", nbytes, typesize);
+        failures++;
+      }
+    }
+  }
+
+  free(src);
+  free(dst);
+  free(back);
+  return failures == 0 ? BLOSC2_ERROR_SUCCESS : BLOSC2_ERROR_FAILURE;
+}
+
 int main(void) {
   int result;
   blosc2_init();
+
+  result = partial_element_tail();
+  printf("partial_element_tail: %s \n \n", result == 0 ? "OK" : "FAILED");
+  if (result < 0)
+    return result;
 
   result = rand_();
   printf("rand: saved %d bytes \n \n", result);
