@@ -35,7 +35,7 @@ if(BUILD_SHARED)
     target_include_directories(blosc2_shared PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_include_directories(blosc2_shared PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
-        $<INSTALL_INTERFACE:include>)
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 endif()
 if(BUILD_STATIC)
     add_compile_definitions(BUILD_STATIC)
@@ -57,7 +57,7 @@ if(BUILD_STATIC)
     target_include_directories(blosc2_static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_include_directories(blosc2_static PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
-        $<INSTALL_INTERFACE:include>)
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 endif()
 # Add unified target
 add_library(Blosc2::blosc2 ALIAS ${UNIFIED_TARGET_ALIAS})
@@ -76,7 +76,7 @@ if(BUILD_TESTS)
     )
     target_include_directories(blosc_testing PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-        $<INSTALL_INTERFACE:include>)
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 endif()
 
 set(INTERNAL_LIBS ${PROJECT_SOURCE_DIR}/internal-complibs)
