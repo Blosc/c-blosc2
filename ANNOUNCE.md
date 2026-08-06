@@ -1,20 +1,24 @@
-# Announcing C-Blosc2 3.3.1
+# Announcing C-Blosc2 3.3.2
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-Reads from on-disk frames got noticeably faster.  The default filesystem
-I/O backend now uses positioned reads and writes (``pread``/``pwrite``,
-``ReadFile``/``WriteFile`` with an explicit offset on Windows) instead of
-seek + stdio, and a frame keeps a single read handle open instead of
-opening and closing the file several times per chunk fetch.  Scattered
-small reads out of a cframe are about 3x faster in our microbenchmarks.
+This is a bugfix release, mainly about BYTEDELTA.
 
-Concurrent readers gain the most, since the per-access open/close this
-removes was paid by every process and contended in the kernel.  Eight
-processes each doing 300 random slice reads over the same 269 MB frame
-went from 0.52 s to 0.36 s of wall time (Apple M4 Pro): about 1.4x,
-against 13% for a single reader.
+The BYTEDELTA filter silently corrupted the tail of any block whose
+length is not a multiple of the typesize.  The last ``length % typesize``
+bytes belong to no byte stream, and were never written to the output in
+either direction, leaving whatever the destination buffer happened to
+hold.  They are now passed through verbatim, as SHUFFLE already does with
+the same remainder.
+
+Blocks whose length is a multiple of the typesize are unaffected, so
+existing data still decodes bit for bit.  Data written by the old encoder
+at a non-multiple length cannot be recovered: those tail bytes were never
+encoded in the first place.
+
+Also, the installed CMake package now exports the configured
+``CMAKE_INSTALL_INCLUDEDIR`` instead of a hardcoded ``include``.
 
 There are no API or format changes in this release.
 

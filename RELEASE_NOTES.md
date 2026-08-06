@@ -4,7 +4,27 @@ Release notes for C-Blosc2
 Changes from 3.3.1 to 3.3.2
 ===========================
 
-#XXX version-specific blurb XXX#
+This is a bugfix release, mainly about BYTEDELTA.
+
+The BYTEDELTA filter silently corrupted the tail of any block whose length is
+not a multiple of the typesize.  It splits a block into `typesize` byte streams
+of `length / typesize` bytes each, and the last `length % typesize` bytes fell
+outside every stream, so they were never written to the output -- in both the
+forward and the backward pass, leaving whatever the destination buffer happened
+to hold.  Those trailing bytes are now passed through verbatim in both
+directions, which is what SHUFFLE already does with the same remainder (and why
+SHUFFLE alone roundtrips fine while any pipeline containing BYTEDELTA did not).
+
+Blocks whose length is a multiple of the typesize are unaffected, so existing
+data still decodes bit for bit.  Data written by the old encoder at a
+non-multiple length cannot be recovered: those tail bytes were never encoded in
+the first place.
+
+Also, the installed CMake package now exports the configured
+`CMAKE_INSTALL_INCLUDEDIR` instead of a hardcoded `include`, so consumers of
+installs that use a different include directory get the right path.
+
+There are no API or format changes in this release.
 
 
 Changes from 3.3.0 to 3.3.1
