@@ -4,7 +4,31 @@ Release notes for C-Blosc2
 Changes from 3.3.2 to 3.3.3
 ===========================
 
-#XXX version-specific blurb XXX#
+This is a bugfix and security release fixing bounds checking issues in BloscLZ.
+
+* **Fixed integer and pointer overflow in BloscLZ decompression bounds checks.**
+  In `blosclz_decompress`, match length accumulation in the length-extension
+  loop (`while (code == 255)`) was unbounded, allowing crafted chunks to grow
+  `len` arbitrarily large.
+
+  On 32-bit platforms (and WebAssembly `wasm32`), pointer arithmetic `op + len`
+  wrapped modulo 2^32 when destination buffers were allocated high in the
+  virtual address space, bypassing the `op + len > op_limit` guard and leading
+  to out-of-bounds heap writes. On 64-bit platforms, an excessively large input
+  could similarly trigger signed `int32_t` overflow.
+
+  This has been resolved by:
+  - Capping match length accumulation inside the extension loop early with
+    `if (len > maxout) return 0;`.
+  - Converting all pointer-addition bounds checks (`op + len > op_limit`, literal
+    copy checks, and compressor macros) into safe subtraction form
+    (`len > op_limit - op`).
+  - Adding a regression test in `tests/test_blosclz_bounds.c`.
+
+  Thanks to Lylan from QI-ANXIN Technology Research Institute for discovering
+  and responsibly reporting this vulnerability.
+
+There are no API or format changes in this release.
 
 
 Changes from 3.3.1 to 3.3.2

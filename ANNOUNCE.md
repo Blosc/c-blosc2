@@ -1,24 +1,20 @@
-# Announcing C-Blosc2 3.3.2
+# Announcing C-Blosc2 3.3.3
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This is a bugfix release, mainly about BYTEDELTA.
+This is a bugfix and security release fixing bounds checking issues in BloscLZ.
 
-The BYTEDELTA filter silently corrupted the tail of any block whose
-length is not a multiple of the typesize.  The last ``length % typesize``
-bytes belong to no byte stream, and were never written to the output in
-either direction, leaving whatever the destination buffer happened to
-hold.  They are now passed through verbatim, as SHUFFLE already does with
-the same remainder.
+Match length accumulation in the length-extension loop was unbounded, allowing
+crafted chunks to trigger integer or pointer overflow. On 32-bit platforms
+(and WebAssembly `wasm32`), pointer arithmetic wrapped around when destination
+buffers landed high in memory, bypassing bounds guards and causing heap
+out-of-bounds writes. On 64-bit platforms, excessively large inputs could trigger
+signed `int32_t` overflow.
 
-Blocks whose length is a multiple of the typesize are unaffected, so
-existing data still decodes bit for bit.  Data written by the old encoder
-at a non-multiple length cannot be recovered: those tail bytes were never
-encoded in the first place.
-
-Also, the installed CMake package now exports the configured
-``CMAKE_INSTALL_INCLUDEDIR`` instead of a hardcoded ``include``.
+This is resolved by capping length accumulation early (`len > maxout`),
+rewriting all pointer-addition bounds checks in safe subtraction form
+(`len > op_limit - op`), and adding regression testing.
 
 There are no API or format changes in this release.
 
