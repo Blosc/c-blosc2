@@ -39,6 +39,56 @@ CUTEST_TEST_TEST(deserialize_meta_security) {
   CUTEST_ASSERT("truncated metadata should fail", rc < 0);
   CUTEST_ASSERT("dtype must remain NULL on failure", dtype == NULL);
 
+  // Structural markers and the format version are part of the wire format,
+  // not padding that a reader may silently skip.
+  uint8_t saved_byte = smeta[0];
+  smeta[0] = 0x94;
+  rc = b2nd_deserialize_meta(smeta, smeta_len, &parsed_ndim, parsed_shape,
+                             parsed_chunkshape, parsed_blockshape, &dtype, &dtype_format);
+  CUTEST_ASSERT("invalid outer array marker should fail", rc < 0);
+  smeta[0] = saved_byte;
+
+  saved_byte = smeta[1];
+  smeta[1] = B2ND_METALAYER_VERSION + 1;
+  rc = b2nd_deserialize_meta(smeta, smeta_len, &parsed_ndim, parsed_shape,
+                             parsed_chunkshape, parsed_blockshape, &dtype, &dtype_format);
+  CUTEST_ASSERT("unknown metadata version should fail", rc < 0);
+  smeta[1] = saved_byte;
+
+  saved_byte = smeta[3];
+  smeta[3] = 0x91;
+  rc = b2nd_deserialize_meta(smeta, smeta_len, &parsed_ndim, parsed_shape,
+                             parsed_chunkshape, parsed_blockshape, &dtype, &dtype_format);
+  CUTEST_ASSERT("incorrect shape array length should fail", rc < 0);
+  smeta[3] = saved_byte;
+
+  saved_byte = smeta[4];
+  smeta[4] = 0xd2;
+  rc = b2nd_deserialize_meta(smeta, smeta_len, &parsed_ndim, parsed_shape,
+                             parsed_chunkshape, parsed_blockshape, &dtype, &dtype_format);
+  CUTEST_ASSERT("incorrect shape element marker should fail", rc < 0);
+  smeta[4] = saved_byte;
+
+  uint8_t *smeta_trailing = malloc((size_t)smeta_len + 1);
+  CUTEST_ASSERT("cannot allocate metadata with trailing byte", smeta_trailing != NULL);
+  memcpy(smeta_trailing, smeta, (size_t)smeta_len);
+  smeta_trailing[smeta_len] = 0;
+  rc = b2nd_deserialize_meta(smeta_trailing, smeta_len + 1, &parsed_ndim, parsed_shape,
+                             parsed_chunkshape, parsed_blockshape, NULL, NULL);
+  CUTEST_ASSERT("trailing metadata should fail even when dtype output is ignored", rc < 0);
+  free(smeta_trailing);
+
+  // The 2023 writer declared six entries while actually writing seven.
+  // Readers retain this narrow compatibility exception.
+  smeta[0] = 0x96;
+  rc = b2nd_deserialize_meta(smeta, smeta_len, &parsed_ndim, parsed_shape,
+                             parsed_chunkshape, parsed_blockshape, &dtype, &dtype_format);
+  CUTEST_ASSERT("legacy six-entry declaration should remain readable", rc == smeta_len);
+  CUTEST_ASSERT("legacy dtype should be returned", dtype != NULL && strcmp(dtype, "|u1") == 0);
+  free(dtype);
+  dtype = NULL;
+  smeta[0] = 0x97;
+
   // Corrupt dtype length to negative; parser must fail before allocating/copying.
   uint8_t *smeta_bad = malloc((size_t)smeta_len);
   CUTEST_ASSERT("cannot allocate test buffer", smeta_bad != NULL);
@@ -51,6 +101,17 @@ CUTEST_TEST_TEST(deserialize_meta_security) {
   size_t dtype_len_offset = dtype_offset + 2;
   CUTEST_ASSERT("dtype length field out of bounds", dtype_len_offset + sizeof(int32_t) <= (size_t)smeta_len);
 
+  // Older Caterva metadata ended after blockshape and declared five entries.
+  uint8_t *caterva_meta = malloc(dtype_offset);
+  CUTEST_ASSERT("cannot allocate legacy Caterva metadata", caterva_meta != NULL);
+  memcpy(caterva_meta, smeta, dtype_offset);
+  caterva_meta[0] = 0x95;
+  rc = b2nd_deserialize_meta(caterva_meta, (int32_t)dtype_offset, &parsed_ndim, parsed_shape,
+                             parsed_chunkshape, parsed_blockshape, &dtype, &dtype_format);
+  CUTEST_ASSERT("legacy metadata without dtype should remain readable", rc == (int32_t)dtype_offset);
+  CUTEST_ASSERT("legacy metadata without dtype should return NULL", dtype == NULL);
+  free(caterva_meta);
+
   int32_t negative_dtype_len = -1;
   swap_store(&smeta_bad[dtype_len_offset], &negative_dtype_len, sizeof(int32_t));
 
@@ -59,6 +120,32 @@ CUTEST_TEST_TEST(deserialize_meta_security) {
                              parsed_chunkshape, parsed_blockshape, &dtype, &dtype_format);
   CUTEST_ASSERT("negative dtype length should fail", rc < 0);
   CUTEST_ASSERT("dtype must remain NULL on malformed metadata", dtype == NULL);
+
+  // Version 0 assigns B2ND-specific meaning to 0xa0 for 16-element vectors,
+  // even though MessagePack defines that byte as fixstr(0).
+  int64_t shape16[B2ND_MAX_DIM];
+  int32_t chunkshape16[B2ND_MAX_DIM];
+  int32_t blockshape16[B2ND_MAX_DIM];
+  for (int i = 0; i < B2ND_MAX_DIM; ++i) {
+    shape16[i] = i + 1;
+    chunkshape16[i] = 1;
+    blockshape16[i] = 1;
+  }
+  uint8_t *smeta16 = NULL;
+  int32_t smeta16_len = b2nd_serialize_meta(B2ND_MAX_DIM, shape16, chunkshape16, blockshape16,
+                                             "|u1", DTYPE_NUMPY_FORMAT, &smeta16);
+  CUTEST_ASSERT("version 0 should serialize 16-D metadata", smeta16_len > 0);
+  CUTEST_ASSERT("16-D shape marker should be 0xa0", smeta16[3] == 0xa0);
+  size_t chunkshape16_offset = 4 + B2ND_MAX_DIM * (1 + sizeof(int64_t));
+  size_t blockshape16_offset = chunkshape16_offset + 1 + B2ND_MAX_DIM * (1 + sizeof(int32_t));
+  CUTEST_ASSERT("16-D chunkshape marker should be 0xa0", smeta16[chunkshape16_offset] == 0xa0);
+  CUTEST_ASSERT("16-D blockshape marker should be 0xa0", smeta16[blockshape16_offset] == 0xa0);
+  rc = b2nd_deserialize_meta(smeta16, smeta16_len, &parsed_ndim, parsed_shape,
+                             parsed_chunkshape, parsed_blockshape, NULL, NULL);
+  CUTEST_ASSERT("version 0 16-D metadata should be readable", rc == smeta16_len);
+  CUTEST_ASSERT("version 0 16-D metadata values should round-trip",
+                parsed_ndim == B2ND_MAX_DIM && parsed_shape[B2ND_MAX_DIM - 1] == B2ND_MAX_DIM);
+  free(smeta16);
 
   // Corrupt blockshape[0] to 0 while chunkshape[0] stays non-zero; opening must fail cleanly.
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;

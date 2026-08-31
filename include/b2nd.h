@@ -691,14 +691,26 @@ static inline int b2nd_deserialize_meta_inline(const uint8_t *smeta, int32_t sme
     }                                                                                 \
   } while (0)
 
-  // Check that we have an array with 7 entries (version, ndim, shape, chunkshape, blockshape, dtype_format, dtype)
+  // Canonical b2nd metadata has 7 entries.  Accept the two historical
+  // declarations for backward compatibility: 0x96 declared 6 while writing
+  // all 7 entries, and 0x95 omitted dtype_format and dtype.
   B2ND_REQUIRE_META_NBYTES(1);
-  pmeta += 1;
+  uint8_t outer_marker = *pmeta++;
+  bool legacy_without_dtype = false;
+  if (outer_marker == 0x95) {
+    legacy_without_dtype = true;
+  }
+  else if (outer_marker != 0x96 && outer_marker != 0x97) {
+    BLOSC_TRACE_ERROR("Malformed b2nd metalayer: expected a 7-entry MsgPack array");
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   // version entry
-  // int8_t version = (int8_t)pmeta[0];  // positive fixnum (7-bit positive integer) commented to avoid warning
   B2ND_REQUIRE_META_NBYTES(1);
-  pmeta += 1;
+  if (*pmeta++ != B2ND_METALAYER_VERSION) {
+    BLOSC_TRACE_ERROR("Unsupported b2nd metalayer version");
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   // ndim entry
   B2ND_REQUIRE_META_NBYTES(1);
@@ -710,14 +722,26 @@ static inline int b2nd_deserialize_meta_inline(const uint8_t *smeta, int32_t sme
   }
   pmeta += 1;
 
+#define B2ND_READ_DIM_ARRAY_HEADER()                                                \
+  do {                                                                              \
+    B2ND_REQUIRE_META_NBYTES(1);                                                    \
+    /* For ndim == 16, version 0 assigns B2ND-specific meaning to 0xa0. */           \
+    if (*pmeta++ != (uint8_t)(0x90 + ndim_aux)) {                                  \
+      BLOSC_TRACE_ERROR("Malformed b2nd metalayer: invalid dimension vector");   \
+      return BLOSC2_ERROR_FAILURE;                                                  \
+    }                                                                               \
+  } while (0)
+
   // shape entry
   // Initialize to ones, as required by b2nd
   for (int i = 0; i < ndim_aux; i++) shape[i] = 1;
-  B2ND_REQUIRE_META_NBYTES(1);
-  pmeta += 1;
+  B2ND_READ_DIM_ARRAY_HEADER();
   for (int8_t i = 0; i < ndim_aux; i++) {
     B2ND_REQUIRE_META_NBYTES(1 + sizeof(int64_t));
-    pmeta += 1;
+    if (*pmeta++ != 0xd3) {
+      BLOSC_TRACE_ERROR("Malformed b2nd metalayer: shape element is not int64");
+      return BLOSC2_ERROR_FAILURE;
+    }
     swap_store(shape + i, pmeta, sizeof(int64_t));
     pmeta += sizeof(int64_t);
   }
@@ -725,11 +749,13 @@ static inline int b2nd_deserialize_meta_inline(const uint8_t *smeta, int32_t sme
   // chunkshape entry
   // Initialize to ones, as required by b2nd
   for (int i = 0; i < ndim_aux; i++) chunkshape[i] = 1;
-  B2ND_REQUIRE_META_NBYTES(1);
-  pmeta += 1;
+  B2ND_READ_DIM_ARRAY_HEADER();
   for (int8_t i = 0; i < ndim_aux; i++) {
     B2ND_REQUIRE_META_NBYTES(1 + sizeof(int32_t));
-    pmeta += 1;
+    if (*pmeta++ != 0xd2) {
+      BLOSC_TRACE_ERROR("Malformed b2nd metalayer: chunkshape element is not int32");
+      return BLOSC2_ERROR_FAILURE;
+    }
     swap_store(chunkshape + i, pmeta, sizeof(int32_t));
     pmeta += sizeof(int32_t);
   }
@@ -737,51 +763,58 @@ static inline int b2nd_deserialize_meta_inline(const uint8_t *smeta, int32_t sme
   // blockshape entry
   // Initialize to ones, as required by b2nd
   for (int i = 0; i < ndim_aux; i++) blockshape[i] = 1;
-  B2ND_REQUIRE_META_NBYTES(1);
-  pmeta += 1;
+  B2ND_READ_DIM_ARRAY_HEADER();
   for (int8_t i = 0; i < ndim_aux; i++) {
     B2ND_REQUIRE_META_NBYTES(1 + sizeof(int32_t));
-    pmeta += 1;
+    if (*pmeta++ != 0xd2) {
+      BLOSC_TRACE_ERROR("Malformed b2nd metalayer: blockshape element is not int32");
+      return BLOSC2_ERROR_FAILURE;
+    }
     swap_store(blockshape + i, pmeta, sizeof(int32_t));
     pmeta += sizeof(int32_t);
   }
 
   // dtype entry
-  if (dtype_format == NULL || dtype == NULL) {
-    return (int32_t)(pmeta - smeta);
+  if (legacy_without_dtype) {
+    if (pmeta != smeta + smeta_len) {
+      BLOSC_TRACE_ERROR("Malformed legacy b2nd metalayer: trailing data");
+      return BLOSC2_ERROR_FAILURE;
+    }
   }
-  if (pmeta - smeta < smeta_len) {
-    // dtype info is here
-    B2ND_REQUIRE_META_NBYTES(1 + 1 + sizeof(int32_t));
-    *dtype_format = (int8_t) *(pmeta++);
-    if (*pmeta != 0xdb) {
+  else {
+    B2ND_REQUIRE_META_NBYTES(1 + 1 + sizeof(uint32_t));
+    uint8_t dtype_format_aux = *pmeta++;
+    if (dtype_format_aux > 0x7f) {
+      BLOSC_TRACE_ERROR("Malformed b2nd metalayer: dtype_format is not a positive fixint");
+      return BLOSC2_ERROR_FAILURE;
+    }
+    if (*pmeta++ != 0xdb) {
       BLOSC_TRACE_ERROR("Malformed b2nd metalayer: invalid dtype MsgPack marker");
       return BLOSC2_ERROR_FAILURE;
     }
-    pmeta += 1;
-    int32_t dtype_len;
-    swap_store(&dtype_len, pmeta, sizeof(int32_t));
-    pmeta += sizeof(int32_t);
-    if (dtype_len < 0) {
-      BLOSC_TRACE_ERROR("Malformed b2nd metalayer: negative dtype length");
+    uint32_t dtype_len;
+    swap_store(&dtype_len, pmeta, sizeof(dtype_len));
+    pmeta += sizeof(dtype_len);
+    B2ND_REQUIRE_META_NBYTES(dtype_len);
+    if ((size_t)(smeta + smeta_len - pmeta) != (size_t)dtype_len) {
+      BLOSC_TRACE_ERROR("Malformed b2nd metalayer: trailing data after dtype");
       return BLOSC2_ERROR_FAILURE;
     }
-    B2ND_REQUIRE_META_NBYTES(dtype_len);
-    size_t dtype_len_ = (size_t)dtype_len;
-    *dtype = (char*)malloc(dtype_len_ + 1);
-    BLOSC_ERROR_NULL(*dtype, BLOSC2_ERROR_MEMORY_ALLOC);
-    char* dtype_ = *dtype;
-    memcpy(dtype_, (char*)pmeta, dtype_len_);
-    dtype_[dtype_len_] = '\0';
-    pmeta += dtype_len_;
-  }
-  else {
-    // dtype is mandatory in b2nd metalayer, but this is mainly meant as
-    // a fall-back for deprecated caterva headers
-    *dtype = NULL;
-    *dtype_format = 0;
+    if (dtype_format != NULL) {
+      *dtype_format = (int8_t)dtype_format_aux;
+    }
+    if (dtype != NULL) {
+      size_t dtype_len_ = (size_t)dtype_len;
+      *dtype = (char*)malloc(dtype_len_ + 1);
+      BLOSC_ERROR_NULL(*dtype, BLOSC2_ERROR_MEMORY_ALLOC);
+      char* dtype_ = *dtype;
+      memcpy(dtype_, (char*)pmeta, dtype_len_);
+      dtype_[dtype_len_] = '\0';
+    }
+    pmeta += dtype_len;
   }
 
+#undef B2ND_READ_DIM_ARRAY_HEADER
 #undef B2ND_REQUIRE_META_NBYTES
 
   int32_t slen = (int32_t) (pmeta - smeta);

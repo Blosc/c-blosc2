@@ -59,6 +59,16 @@ static bool b2nd_mul_overflow_int64(int64_t a, int64_t b, int64_t *out) {
 int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const int32_t *chunkshape,
                         const int32_t *blockshape, const char *dtype, int8_t dtype_format,
                         uint8_t **smeta) {
+  BLOSC_ERROR_NULL(smeta, BLOSC2_ERROR_NULL_POINTER);
+  *smeta = NULL;
+  if (ndim < 0 || ndim > B2ND_MAX_DIM) {
+    BLOSC_TRACE_ERROR("b2nd supports ndim in [0, %d]", B2ND_MAX_DIM);
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+  if (ndim > 0 && (shape == NULL || chunkshape == NULL || blockshape == NULL)) {
+    BLOSC_TRACE_ERROR("shape, chunkshape and blockshape cannot be NULL when ndim > 0");
+    BLOSC_ERROR(BLOSC2_ERROR_NULL_POINTER);
+  }
   if (dtype == NULL) {
     dtype = B2ND_DEFAULT_DTYPE;
   }
@@ -74,10 +84,17 @@ int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const int32_t *chunks
   }
   const int32_t dtype_len = (int32_t) dtype_len0;
   // Allocate space for b2nd metalayer
-  int32_t max_smeta_len = (int32_t) (1 + 1 + 1 + (1 + ndim * (1 + sizeof(int64_t))) +
-                                     (1 + ndim * (1 + sizeof(int32_t))) + (1 + ndim * (1 + sizeof(int32_t))) +
-                                     1 + 1 + sizeof(int32_t) + dtype_len);
-  *smeta = malloc((size_t) max_smeta_len);
+  size_t max_smeta_len_ = 1 + 1 + 1 +
+                          1 + (size_t)ndim * (1 + sizeof(int64_t)) +
+                          1 + (size_t)ndim * (1 + sizeof(int32_t)) +
+                          1 + (size_t)ndim * (1 + sizeof(int32_t)) +
+                          1 + 1 + sizeof(int32_t) + (size_t)dtype_len;
+  if (max_smeta_len_ > INT32_MAX) {
+    BLOSC_TRACE_ERROR("b2nd metadata is too large");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+  int32_t max_smeta_len = (int32_t)max_smeta_len_;
+  *smeta = malloc(max_smeta_len_);
   BLOSC_ERROR_NULL(*smeta, BLOSC2_ERROR_MEMORY_ALLOC);
   uint8_t *pmeta = *smeta;
 
@@ -91,7 +108,7 @@ int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const int32_t *chunks
   *pmeta++ = (uint8_t) ndim;  // positive fixnum (7-bit positive integer)
 
   // shape entry
-  *pmeta++ = (uint8_t) (0x90) + ndim;  // fix array with ndim elements
+  *pmeta++ = (uint8_t)(0x90 + ndim);  // dimension-vector marker; 0xa0 means 16 in version 0
   for (uint8_t i = 0; i < ndim; i++) {
     *pmeta++ = 0xd3;  // int64
     swap_store(pmeta, shape + i, sizeof(int64_t));
@@ -99,7 +116,7 @@ int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const int32_t *chunks
   }
 
   // chunkshape entry
-  *pmeta++ = (uint8_t) (0x90) + ndim;  // fix array with ndim elements
+  *pmeta++ = (uint8_t)(0x90 + ndim);  // dimension-vector marker; 0xa0 means 16 in version 0
   for (uint8_t i = 0; i < ndim; i++) {
     *pmeta++ = 0xd2;  // int32
     swap_store(pmeta, chunkshape + i, sizeof(int32_t));
@@ -107,7 +124,7 @@ int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const int32_t *chunks
   }
 
   // blockshape entry
-  *pmeta++ = (uint8_t) (0x90) + ndim;  // fix array with ndim elements
+  *pmeta++ = (uint8_t)(0x90 + ndim);  // dimension-vector marker; 0xa0 means 16 in version 0
   for (uint8_t i = 0; i < ndim; i++) {
     *pmeta++ = 0xd2;  // int32
     swap_store(pmeta, blockshape + i, sizeof(int32_t));
@@ -125,6 +142,8 @@ int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const int32_t *chunks
   int32_t slen = (int32_t) (pmeta - *smeta);
   if (max_smeta_len != slen) {
     BLOSC_TRACE_ERROR("meta length is inconsistent!");
+    free(*smeta);
+    *smeta = NULL;
     return BLOSC2_ERROR_FAILURE;
   }
 
