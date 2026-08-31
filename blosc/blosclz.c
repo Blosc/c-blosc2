@@ -246,7 +246,7 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 
 
 #define LITERAL(ip, op, op_limit, anchor, copy) {       \
-  if (BLOSCLZ_UNLIKELY((op) + 2 > (op_limit)))          \
+  if (BLOSCLZ_UNLIKELY((op_limit) - (op) < 2))          \
     goto out;                                           \
   *(op)++ = *(anchor)++;                                \
   (ip) = (anchor);                                      \
@@ -268,29 +268,29 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 }
 
 #define MATCH_SHORT(op, op_limit, len, distance) {        \
-  if (BLOSCLZ_UNLIKELY((op) + 2 > (op_limit)))            \
+  if (BLOSCLZ_UNLIKELY((op_limit) - (op) < 2))            \
     goto out;                                             \
   *(op)++ = (uint8_t)(((len) << 5U) + ((distance) >> 8U));\
   *(op)++ = (uint8_t)(((distance) & 255U));               \
 }
 
 #define MATCH_LONG(op, op_limit, len, distance) {       \
-  if (BLOSCLZ_UNLIKELY((op) + 1 > (op_limit)))          \
+  if (BLOSCLZ_UNLIKELY((op_limit) - (op) < 1))          \
     goto out;                                           \
   *(op)++ = (uint8_t)((7U << 5U) + ((distance) >> 8U)); \
   for ((len) -= 7; (len) >= 255; (len) -= 255) {        \
-    if (BLOSCLZ_UNLIKELY((op) + 1 > (op_limit)))        \
+    if (BLOSCLZ_UNLIKELY((op_limit) - (op) < 1))        \
       goto out;                                         \
     *(op)++ = 255;                                      \
   }                                                     \
-  if (BLOSCLZ_UNLIKELY((op) + 2 > (op_limit)))          \
+  if (BLOSCLZ_UNLIKELY((op_limit) - (op) < 2))          \
     goto out;                                           \
   *(op)++ = (uint8_t)(len);                             \
   *(op)++ = (uint8_t)(((distance) & 255U));             \
 }
 
 #define MATCH_SHORT_FAR(op, op_limit, len, distance) {      \
-  if (BLOSCLZ_UNLIKELY((op) + 4 > (op_limit)))              \
+  if (BLOSCLZ_UNLIKELY((op_limit) - (op) < 4))              \
     goto out;                                               \
   *(op)++ = (uint8_t)(((len) << 5U) + 31);                  \
   *(op)++ = 255;                                            \
@@ -299,15 +299,15 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 }
 
 #define MATCH_LONG_FAR(op, op_limit, len, distance) {       \
-  if (BLOSCLZ_UNLIKELY((op) + 1 > (op_limit)))              \
+  if (BLOSCLZ_UNLIKELY((op_limit) - (op) < 1))              \
     goto out;                                               \
   *(op)++ = (7U << 5U) + 31;                                \
   for ((len) -= 7; (len) >= 255; (len) -= 255) {            \
-    if (BLOSCLZ_UNLIKELY((op) + 1 > (op_limit)))            \
+    if (BLOSCLZ_UNLIKELY((op_limit) - (op) < 1))            \
       goto out;                                             \
     *(op)++ = 255;                                          \
   }                                                         \
-  if (BLOSCLZ_UNLIKELY((op) + 4 > (op_limit)))              \
+  if (BLOSCLZ_UNLIKELY((op_limit) - (op) < 4))              \
     goto out;                                               \
   *(op)++ = (uint8_t)(len);                                 \
   *(op)++ = 255;                                            \
@@ -585,7 +585,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
       ip++;
     }
 
-    if (BLOSCLZ_UNLIKELY(op + 1 > op_limit))
+    if (BLOSCLZ_UNLIKELY(op_limit - op < 1))
       goto out;
 
     /* assuming literal copy */
@@ -594,7 +594,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
   /* left-over as literal copy */
   while (BLOSCLZ_UNLIKELY(ip <= ip_bound)) {
-    if (BLOSCLZ_UNLIKELY(op + 2 > op_limit)) goto out;
+    if (BLOSCLZ_UNLIKELY(op_limit - op < 2)) goto out;
     *op++ = *ip++;
     copy++;
     if (BLOSCLZ_UNLIKELY(copy == MAX_COPY)) {
@@ -708,6 +708,9 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
           }
           code = *ip++;
           len += code;
+          if (BLOSCLZ_UNLIKELY(len > maxout)) {
+            return 0;
+          }
         } while (code == 255);
       }
       else {
@@ -731,11 +734,11 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         }
       }
 
-      if (BLOSCLZ_UNLIKELY(op + len > op_limit)) {
+      if (BLOSCLZ_UNLIKELY(len > op_limit - op)) {
         return 0;
       }
 
-      if (BLOSCLZ_UNLIKELY(ref - 1 < (uint8_t*)output)) {
+      if (BLOSCLZ_UNLIKELY(ref <= (uint8_t*)output)) {
         return 0;
       }
 
@@ -772,10 +775,10 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
     else {
       // literal
       ctrl++;
-      if (BLOSCLZ_UNLIKELY(op + ctrl > op_limit)) {
+      if (BLOSCLZ_UNLIKELY(ctrl > op_limit - op)) {
         return 0;
       }
-      if (BLOSCLZ_UNLIKELY(ip + ctrl > ip_limit)) {
+      if (BLOSCLZ_UNLIKELY(ctrl > ip_limit - ip)) {
         return 0;
       }
 
