@@ -60,6 +60,12 @@ target_link_libraries(sframe_bench blosc_testing)
 target_link_libraries(get_sparse blosc_testing)
 target_link_libraries(frame_lock_bench blosc_testing)
 
+add_executable(bench_compact_tail bench_compact_tail.c)
+target_link_libraries(bench_compact_tail blosc_testing)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(bench_compact_tail rt)
+endif()
+
 # tests
 if(BUILD_TESTS)
 

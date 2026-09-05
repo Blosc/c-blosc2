@@ -175,6 +175,22 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
 void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* schunk);
 int frame_reorder_offsets(blosc2_frame_s *frame, const int64_t *offsets_order, blosc2_schunk* schunk);
 
+#define FRAME_TAIL_COPY_BUFFER_CAP (1024 * 1024)
+
+/**
+ * @brief Move a byte range within a frame using a bounded scratch buffer.
+ *
+ * @param io_cb The I/O callbacks to use.
+ * @param fp The open file stream.
+ * @param src_pos Physical file source position.
+ * @param dst_pos Physical file destination position.
+ * @param length Number of bytes to move.
+ * @param cap Scratch allocation cap in bytes (if <= 0, defaults to FRAME_TAIL_COPY_BUFFER_CAP).
+ *
+ * @return BLOSC2_ERROR_SUCCESS on success, or a negative error code on failure.
+ */
+int frame_move_range(blosc2_io_cb *io_cb, void *fp, int64_t src_pos, int64_t dst_pos, int64_t length, int64_t cap);
+
 /**
  * @brief Get an open "rb" handle for the frame file (regular frames only; sframe
  * chunk/index files keep their own opens).  With the default filesystem backend

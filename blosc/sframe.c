@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 
 /* If C11 is supported, use it's built-in aligned allocation. */
@@ -141,13 +142,18 @@ void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int64_t nchunk,
   return frame;
 }
 
-/* Append an existing chunk into a sparse frame. */
+/* Delete a chunk from a sparse frame. */
 int sframe_delete_chunk(const char *urlpath, int64_t nchunk) {
   char* chunk_path = sframe_make_chunk_path(urlpath, nchunk);
   if (chunk_path) {
     int rc = remove(chunk_path);
+    if (rc != 0) {
+      BLOSC_TRACE_ERROR("Cannot remove chunk file %s (error: %s)", chunk_path, strerror(errno));
+      free(chunk_path);
+      return BLOSC2_ERROR_FILE_REMOVE;
+    }
     free(chunk_path);
-    return rc;
+    return BLOSC2_ERROR_SUCCESS;
   }
   return BLOSC2_ERROR_FILE_REMOVE;
 }

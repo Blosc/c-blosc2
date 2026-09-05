@@ -1597,6 +1597,7 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     frame->cframe = realloc(frame->cframe, (size_t)(trailer_offset + trailer_len));
     if (frame->cframe == NULL) {
       BLOSC_TRACE_ERROR("Cannot realloc space for the frame.");
+      free(trailer);
       return BLOSC2_ERROR_MEMORY_ALLOC;
     }
     memcpy(frame->cframe + trailer_offset, trailer, trailer_len);
@@ -1612,16 +1613,22 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     }
     if (fp == NULL) {
       BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+      free(trailer);
       return BLOSC2_ERROR_FILE_OPEN;
     }
     int64_t io_pos = frame->file_offset + trailer_offset;
     int64_t wbytes = io_cb->write(trailer, 1, trailer_len, io_pos, fp);
     if (wbytes != trailer_len) {
       BLOSC_TRACE_ERROR("Cannot write the trailer length in trailer.");
+      io_cb->close(fp);
+      free(trailer);
       return BLOSC2_ERROR_FILE_WRITE;
     }
-    if (io_cb->truncate(fp, trailer_offset + trailer_len) != 0) {
+    int64_t trunc_pos = frame->file_offset + trailer_offset + trailer_len;
+    if (io_cb->truncate(fp, trunc_pos) != 0) {
       BLOSC_TRACE_ERROR("Cannot truncate the frame.");
+      io_cb->close(fp);
+      free(trailer);
       return BLOSC2_ERROR_FILE_TRUNCATE;
     }
     io_cb->close(fp);
@@ -4553,6 +4560,114 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
 }
 
 
+int frame_move_range(blosc2_io_cb *io_cb, void *fp, int64_t src_pos, int64_t dst_pos, int64_t length, int64_t cap) {
+  if (io_cb == NULL || fp == NULL) {
+    BLOSC_TRACE_ERROR("Invalid arguments for frame_move_range.");
+    return BLOSC2_ERROR_NULL_POINTER;
+  }
+  if (length < 0 || src_pos < 0 || dst_pos < 0) {
+    BLOSC_TRACE_ERROR("Negative arguments for frame_move_range: src_pos=%" PRId64
+                      ", dst_pos=%" PRId64 ", length=%" PRId64 ".",
+                      src_pos, dst_pos, length);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (length == 0 || src_pos == dst_pos) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  if (src_pos > INT64_MAX - length || dst_pos > INT64_MAX - length) {
+    BLOSC_TRACE_ERROR("Position overflow in frame_move_range: src_pos=%" PRId64
+                      ", dst_pos=%" PRId64 ", length=%" PRId64 ".",
+                      src_pos, dst_pos, length);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  int64_t effective_cap = (cap > 0) ? cap : (int64_t)FRAME_TAIL_COPY_BUFFER_CAP;
+  int64_t buf_size = length < effective_cap ? length : effective_cap;
+  if ((uint64_t)buf_size > SIZE_MAX) {
+    BLOSC_TRACE_ERROR("Buffer size exceeds SIZE_MAX in frame_move_range.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+
+  uint8_t *scratch = malloc((size_t)buf_size);
+  if (scratch == NULL) {
+    BLOSC_TRACE_ERROR("Cannot allocate scratch memory (%" PRId64 " bytes) for frame tail movement.", buf_size);
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+
+  if (dst_pos < src_pos) {
+    // Shrink: move forward starting from the beginning of the range
+    int64_t offset = 0;
+    while (offset < length) {
+      int64_t seg_len = length - offset;
+      if (seg_len > buf_size) {
+        seg_len = buf_size;
+      }
+      int64_t cur_src = src_pos + offset;
+      int64_t cur_dst = dst_pos + offset;
+
+      void *read_ptr = scratch;
+      if (!io_cb->is_allocation_necessary) {
+        read_ptr = NULL;
+      }
+      int64_t rbytes = io_cb->read(&read_ptr, 1, seg_len, cur_src, fp);
+      if (rbytes != seg_len || (!io_cb->is_allocation_necessary && read_ptr == NULL)) {
+        free(scratch);
+        BLOSC_TRACE_ERROR("Cannot read payload segment from frame (read %" PRId64 " of %" PRId64 " bytes at %" PRId64 ").",
+                          rbytes, seg_len, cur_src);
+        return BLOSC2_ERROR_FILE_READ;
+      }
+      if (!io_cb->is_allocation_necessary) {
+        memcpy(scratch, read_ptr, (size_t)seg_len);
+      }
+
+      int64_t wbytes = io_cb->write(scratch, 1, seg_len, cur_dst, fp);
+      if (wbytes != seg_len) {
+        free(scratch);
+        BLOSC_TRACE_ERROR("Cannot write payload segment to frame (wrote %" PRId64 " of %" PRId64 " bytes at %" PRId64 ").",
+                          wbytes, seg_len, cur_dst);
+        return BLOSC2_ERROR_FILE_WRITE;
+      }
+      offset += seg_len;
+    }
+  } else {
+    // Growth: move backward starting from the end of the range
+    int64_t offset = length;
+    while (offset > 0) {
+      int64_t seg_len = offset < buf_size ? offset : buf_size;
+      offset -= seg_len;
+      int64_t cur_src = src_pos + offset;
+      int64_t cur_dst = dst_pos + offset;
+
+      void *read_ptr = scratch;
+      if (!io_cb->is_allocation_necessary) {
+        read_ptr = NULL;
+      }
+      int64_t rbytes = io_cb->read(&read_ptr, 1, seg_len, cur_src, fp);
+      if (rbytes != seg_len || (!io_cb->is_allocation_necessary && read_ptr == NULL)) {
+        free(scratch);
+        BLOSC_TRACE_ERROR("Cannot read payload segment from frame (read %" PRId64 " of %" PRId64 " bytes at %" PRId64 ").",
+                          rbytes, seg_len, cur_src);
+        return BLOSC2_ERROR_FILE_READ;
+      }
+      if (!io_cb->is_allocation_necessary) {
+        memcpy(scratch, read_ptr, (size_t)seg_len);
+      }
+
+      int64_t wbytes = io_cb->write(scratch, 1, seg_len, cur_dst, fp);
+      if (wbytes != seg_len) {
+        free(scratch);
+        BLOSC_TRACE_ERROR("Cannot write payload segment to frame (wrote %" PRId64 " of %" PRId64 " bytes at %" PRId64 ").",
+                          wbytes, seg_len, cur_dst);
+        return BLOSC2_ERROR_FILE_WRITE;
+      }
+    }
+  }
+
+  free(scratch);
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk) {
   uint8_t *chunk_ = (uint8_t *) chunk;
   int32_t header_len;
@@ -4601,6 +4716,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     int32_t coffsets_cbytes = 0;
     uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, nchunks, &coffsets_cbytes);
     if (coffsets == NULL) {
+      free(offsets);
       BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
       return NULL;
     }
@@ -4608,6 +4724,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
     if (dctx == NULL) {
+      free(offsets);
       BLOSC_TRACE_ERROR("Error while creating the decompression context");
       return NULL;
     }
@@ -4628,6 +4745,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     uint8_t *chunk_old;
     int err = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_old, &needs_free);
     if (err < 0) {
+      free(offsets);
       BLOSC_TRACE_ERROR("%" PRId64 " chunk can not be obtained from schunk.", nchunk);
       return NULL;
     }
@@ -4648,6 +4766,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
 
   // Add the new offset
   int64_t sframe_chunk_id = -1;
+  int64_t old_sframe_chunk_id = -1;
   int64_t delta_cbytes = 0;
   bool old_chunk_is_regular = (!frame->sframe && old_offset >= 0);
   bool new_chunk_is_regular = true;
@@ -4659,6 +4778,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     else {
       // In case there was a reorder in a sframe
       sframe_chunk_id = offsets[nchunk];
+      old_sframe_chunk_id = offsets[nchunk];
     }
   }
   int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
@@ -4730,10 +4850,17 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   cparams.compcode = BLOSC_BLOSCLZ;
   blosc2_context* cctx = blosc2_create_cctx(cparams);
   if (cctx == NULL) {
+    free(offsets);
     BLOSC_TRACE_ERROR("Error while creating the compression context");
     return NULL;
   }
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
+  if (off_chunk == NULL) {
+    free(offsets);
+    blosc2_free_ctx(cctx);
+    BLOSC_TRACE_ERROR("Cannot allocate memory for off_chunk.");
+    return NULL;
+  }
   int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
                                                off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);
   blosc2_free_ctx(cctx);
@@ -4766,6 +4893,8 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     if (new_frame_len > frame->len) {
       frame->cframe = framep = realloc(framep, (size_t)new_frame_len);
       if (framep == NULL) {
+        free(chunk);
+        free(off_chunk);
         BLOSC_TRACE_ERROR("Cannot realloc space for the frame.");
         return NULL;
       }
@@ -4790,14 +4919,18 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
     if (io_cb == NULL) {
       BLOSC_TRACE_ERROR("Error getting the input/output API");
+      free(chunk);
+      free(off_chunk);
       return NULL;
     }
 
     if (frame->sframe) {
-      // Create the chunks file, if it's a special value this will delete its old content
-      if (sframe_chunk_id >= 0) {
+      // Create or update chunk file only for chunks with stored payload (regular or VALUE)
+      if (!is_special_chunk && sframe_chunk_id >= 0) {
         if (sframe_create_chunk(frame, chunk, sframe_chunk_id, chunk_cbytes) == NULL) {
           BLOSC_TRACE_ERROR("Cannot write the full chunk.");
+          free(chunk);
+          free(off_chunk);
           return NULL;
         }
       }
@@ -4806,6 +4939,8 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
                              frame->schunk->storage->io);
       if (fp == NULL) {
         BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        free(chunk);
+        free(off_chunk);
         return NULL;
       }
       io_pos = frame->file_offset + header_len + 0;
@@ -4815,39 +4950,30 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       fp = io_cb->open(frame->urlpath, "rb+", frame->schunk->storage->io->params);
       if (fp == NULL) {
         BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        free(chunk);
+        free(off_chunk);
         return NULL;
       }
       if (old_chunk_is_regular) {
         int64_t tail_src_offset = old_offset + cbytes_old;
         int64_t tail_dst_offset = old_offset + chunk_cbytes;
         int64_t tail_nbytes = cbytes - tail_src_offset;
+        if (tail_nbytes < 0) {
+          io_cb->close(fp);
+          free(chunk);
+          free(off_chunk);
+          BLOSC_TRACE_ERROR("Invalid tail length for frame payload compaction.");
+          return NULL;
+        }
         if (tail_nbytes > 0 && tail_src_offset != tail_dst_offset) {
-          uint8_t *tail = malloc((size_t)tail_nbytes);
-          if (tail == NULL) {
+          int rc_move = frame_move_range(io_cb, fp,
+                                         frame->file_offset + header_len + tail_src_offset,
+                                         frame->file_offset + header_len + tail_dst_offset,
+                                         tail_nbytes, 0);
+          if (rc_move < 0) {
             io_cb->close(fp);
-            BLOSC_TRACE_ERROR("Cannot allocate memory for frame payload compaction.");
-            return NULL;
-          }
-          void *tail_src = tail;
-          if (!io_cb->is_allocation_necessary) {
-            tail_src = NULL;
-          }
-          int64_t rbytes = io_cb->read(&tail_src, 1, tail_nbytes,
-                                       frame->file_offset + header_len + tail_src_offset, fp);
-          if (rbytes != tail_nbytes) {
-            free(tail);
-            io_cb->close(fp);
-            BLOSC_TRACE_ERROR("Cannot read the payload tail from frame.");
-            return NULL;
-          }
-          if (!io_cb->is_allocation_necessary) {
-            memcpy(tail, tail_src, (size_t)tail_nbytes);
-          }
-          wbytes = io_cb->write(tail, 1, tail_nbytes,
-                                frame->file_offset + header_len + tail_dst_offset, fp);
-          free(tail);
-          if (wbytes != tail_nbytes) {
-            io_cb->close(fp);
+            free(chunk);
+            free(off_chunk);
             BLOSC_TRACE_ERROR("Cannot compact the payload tail in frame.");
             return NULL;
           }
@@ -4861,6 +4987,8 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
                             " bytes at position %" PRId64 ", nchunk=%" PRId64 ").",
                             wbytes, (int64_t)chunk_cbytes, io_pos, nchunk);
           io_cb->close(fp);
+          free(chunk);
+          free(off_chunk);
           return NULL;
         }
       }
@@ -4870,6 +4998,8 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     io_cb->close(fp);
     if (wbytes != new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
+      free(chunk);
+      free(off_chunk);
       return NULL;
     }
     // Invalidate the cache for chunk offsets
@@ -4891,6 +5021,14 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   rc = frame_update_trailer(frame, schunk);
   if (rc < 0) {
     return NULL;
+  }
+
+  if (frame->sframe && is_special_chunk && old_sframe_chunk_id >= 0) {
+    int err = sframe_delete_chunk(frame->urlpath, old_sframe_chunk_id);
+    if (err != 0) {
+      BLOSC_TRACE_ERROR("Unable to delete chunk %" PRId64 " from sframe.", old_sframe_chunk_id);
+      return NULL;
+    }
   }
 
   return frame;
