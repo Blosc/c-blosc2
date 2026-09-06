@@ -812,6 +812,74 @@ static char *test_contiguous_mmap_update(void) {
   return EXIT_SUCCESS;
 }
 
+static char *test_mmap_destroy_external_growth(void) {
+  const char *test_file = "test_mmap_ext_growth.bin";
+  blosc2_remove_urlpath(test_file);
+
+  /* Case 1: Handle never writes; another handle appends */
+  FILE *f0 = fopen(test_file, "wb");
+  mu_assert("ERROR: fopen failed", f0 != NULL);
+  mu_assert("ERROR: fwrite failed", fwrite("1234", 1, 4, f0) == 4);
+  fclose(f0);
+
+  blosc2_stdio_mmap mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
+  mmap_file.mode = "r+";
+  void *stream = blosc2_stdio_mmap_open(test_file, "r+", &mmap_file);
+  mu_assert("ERROR: blosc2_stdio_mmap_open failed", stream != NULL);
+
+  FILE *fext = fopen(test_file, "ab");
+  mu_assert("ERROR: fopen append failed", fext != NULL);
+  mu_assert("ERROR: fwrite append failed", fwrite("5678", 1, 4, fext) == 4);
+  fclose(fext);
+
+  int rc = blosc2_stdio_mmap_destroy(&mmap_file);
+  mu_assert("ERROR: blosc2_stdio_mmap_destroy failed", rc == 0);
+
+  FILE *fcheck = fopen(test_file, "rb");
+  mu_assert("ERROR: fopen check failed", fcheck != NULL);
+  fseek(fcheck, 0, SEEK_END);
+  long sz = ftell(fcheck);
+  mu_assert("ERROR: file size shrunk after mmap destroy (case 1: no writes)", sz == 8);
+  char buf[9] = {0};
+  fseek(fcheck, 0, SEEK_SET);
+  mu_assert("ERROR: fread check failed", fread(buf, 1, 8, fcheck) == 8);
+  fclose(fcheck);
+  mu_assert("ERROR: file content corrupted after mmap destroy", strcmp(buf, "12345678") == 0);
+
+  /* Case 2: Handle writes data, and another handle appends */
+  mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
+  mmap_file.mode = "r+";
+  stream = blosc2_stdio_mmap_open(test_file, "r+", &mmap_file);
+  mu_assert("ERROR: blosc2_stdio_mmap_open failed", stream != NULL);
+
+  /* Write 4 bytes over the first 4 bytes */
+  int64_t wbytes = blosc2_stdio_mmap_write("ABCD", 1, 4, 0, stream);
+  mu_assert("ERROR: mmap write failed", wbytes == 4);
+
+  /* External append 4 more bytes */
+  fext = fopen(test_file, "ab");
+  mu_assert("ERROR: fopen append failed", fext != NULL);
+  mu_assert("ERROR: fwrite append failed", fwrite("9012", 1, 4, fext) == 4);
+  fclose(fext);
+
+  rc = blosc2_stdio_mmap_destroy(&mmap_file);
+  mu_assert("ERROR: blosc2_stdio_mmap_destroy failed", rc == 0);
+
+  fcheck = fopen(test_file, "rb");
+  mu_assert("ERROR: fopen check failed", fcheck != NULL);
+  fseek(fcheck, 0, SEEK_END);
+  sz = ftell(fcheck);
+  mu_assert("ERROR: file size shrunk after mmap destroy (case 2: writes + append)", sz == 12);
+  char buf2[13] = {0};
+  fseek(fcheck, 0, SEEK_SET);
+  mu_assert("ERROR: fread check failed", fread(buf2, 1, 12, fcheck) == 12);
+  fclose(fcheck);
+  mu_assert("ERROR: file content corrupted after mmap destroy", strcmp(buf2, "ABCD56789012") == 0);
+
+  blosc2_remove_urlpath(test_file);
+  return EXIT_SUCCESS;
+}
+
 static char *all_tests(void) {
   mu_run_test(test_move_range_invalid_and_noop);
   mu_run_test(test_move_range_shrink_direction_and_cap);
@@ -822,6 +890,7 @@ static char *all_tests(void) {
   mu_run_test(test_contiguous_special_transitions);
   mu_run_test(test_contiguous_reordered_tail_update);
   mu_run_test(test_contiguous_mmap_update);
+  mu_run_test(test_mmap_destroy_external_growth);
   return EXIT_SUCCESS;
 }
 

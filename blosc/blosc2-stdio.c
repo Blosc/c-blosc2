@@ -24,6 +24,8 @@
 #include <inttypes.h>
 #include <string.h>
 
+#include <sys/stat.h>
+
 #if defined(_WIN32)
   #include <memoryapi.h>
   #include <io.h>
@@ -724,40 +726,17 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
       "Please specify either a different mode or set initial_mapping_size to a large enough number.");
       return 0;
     }
-    if (!mmap_file->is_memory_only) {
-      int64_t ftruncate_map_size;
-      if (!checked_size_t_to_int64(new_mapping_size, &ftruncate_map_size)) {
-        BLOSC_TRACE_ERROR("Cannot extend the file size to %zu bytes for mapping: value exceeds int64_t.", new_mapping_size);
-        return 0;
-      }
-      if (ftruncate(mmap_file->fd, ftruncate_map_size) < 0) {
-        BLOSC_TRACE_ERROR("Cannot extend the file size to %zu bytes for mapping (error: %s).", new_mapping_size, strerror(errno));
-        return 0;
-      }
-    }
-    /* Extend the current mapping with the help of MAP_FIXED */
     int64_t offset = 0;
     char* new_address = mmap(
-      mmap_file->addr,
+      NULL,
       new_mapping_size,
       mmap_file->access_flags,
-      mmap_file->map_flags | MAP_FIXED,
+      mmap_file->map_flags,
       mmap_file->fd,
       offset
     );
-    if (new_address == MAP_FAILED) {
-      /* If MAP_FIXED fails, fallback to allocating a new mapping and unmapping the old */
-      new_address = mmap(
-        NULL,
-        new_mapping_size,
-        mmap_file->access_flags,
-        mmap_file->map_flags,
-        mmap_file->fd,
-        offset
-      );
-      if (new_address != MAP_FAILED) {
-        munmap(mmap_file->addr, mmap_file->mapping_size);
-      }
+    if (new_address != MAP_FAILED) {
+      munmap(mmap_file->addr, mmap_file->mapping_size);
     }
 #endif
 
@@ -900,7 +879,16 @@ int blosc2_stdio_mmap_destroy(void* params) {
     err = -1;
   }
   else {
-    int rc = _chsize_s(mmap_file->fd, (long long)file_size_i64);
+    int64_t target_size = file_size_i64;
+    struct _stat64 st;
+    if (_fstat64(mmap_file->fd, &st) == 0) {
+      int64_t disk_size = (int64_t)st.st_size;
+      if (disk_size > (int64_t)mmap_file->mapping_size) {
+        int64_t extra = disk_size - (int64_t)mmap_file->mapping_size;
+        target_size += extra;
+      }
+    }
+    int rc = _chsize_s(mmap_file->fd, (long long)target_size);
     if (rc != 0) {
       BLOSC_TRACE_ERROR(
         "Cannot extend the file size to %zu bytes (error: %s).", mmap_file->file_size, strerror(errno));
@@ -931,11 +919,20 @@ int blosc2_stdio_mmap_destroy(void* params) {
   }
 
   if ((mmap_file->access_flags & PROT_WRITE) && !mmap_file->is_memory_only) {
-    int64_t file_size_i64;
-    if (checked_size_t_to_int64(mmap_file->file_size, &file_size_i64)) {
-      if (ftruncate(mmap_file->fd, file_size_i64) < 0) {
-        BLOSC_TRACE_ERROR("Cannot truncate the memory-mapped file to file_size (error: %s).", strerror(errno));
-        err = -1;
+    struct stat st;
+    if (fstat(mmap_file->fd, &st) == 0) {
+      int64_t disk_size = (int64_t)st.st_size;
+      /* Only trim if the physical file on disk was padded to at least mapping_size
+         and is larger than this handle's logical file_size. Preserve any external growth. */
+      if (disk_size > (int64_t)mmap_file->file_size && disk_size >= (int64_t)mmap_file->mapping_size) {
+        int64_t extra = disk_size - (int64_t)mmap_file->mapping_size;
+        int64_t target_size = (int64_t)mmap_file->file_size + extra;
+        if (target_size < disk_size) {
+          if (ftruncate(mmap_file->fd, target_size) < 0) {
+            BLOSC_TRACE_ERROR("Cannot truncate the memory-mapped file (error: %s).", strerror(errno));
+            err = -1;
+          }
+        }
       }
     }
   }
