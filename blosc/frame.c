@@ -5024,10 +5024,13 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   }
 
   if (frame->sframe && is_special_chunk && old_sframe_chunk_id >= 0) {
-    int err = sframe_delete_chunk(frame->urlpath, old_sframe_chunk_id);
-    if (err != 0) {
-      BLOSC_TRACE_ERROR("Unable to delete chunk %" PRId64 " from sframe.", old_sframe_chunk_id);
-      return NULL;
+    const blosc2_io *io = (frame->schunk && frame->schunk->storage) ? frame->schunk->storage->io : NULL;
+    int err = sframe_delete_chunk(frame->urlpath, old_sframe_chunk_id, io);
+    if (err != BLOSC2_ERROR_SUCCESS) {
+      BLOSC_TRACE_WARNING("Unable to evict old chunk %" PRId64 " from sframe (error %d).",
+                          old_sframe_chunk_id, err);
+      // Do not return NULL: the update was already committed to the index and trailer.
+      // Distinguish orphan cleanup failure from failure to commit the update.
     }
   }
 
@@ -5159,10 +5162,10 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
       }
       if (offset >= 0){
         // Remove the chunk file only if it is not a special value chunk
-        int err = sframe_delete_chunk(frame->urlpath, offset);
-        if (err != 0) {
-          BLOSC_TRACE_ERROR("Unable to delete chunk!");
-          return NULL;
+        const blosc2_io *io = (frame->schunk && frame->schunk->storage) ? frame->schunk->storage->io : NULL;
+        int err = sframe_delete_chunk(frame->urlpath, offset, io);
+        if (err != BLOSC2_ERROR_SUCCESS) {
+          BLOSC_TRACE_WARNING("Unable to delete chunk file %" PRId64 " from sframe (error %d).", offset, err);
         }
       }
       // Update the offsets chunk in the chunks frame

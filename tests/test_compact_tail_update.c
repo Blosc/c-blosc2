@@ -654,16 +654,21 @@ static char *test_contiguous_reordered_tail_update(void) {
 
 #include "blosc2/blosc2-stdio.h"
 
+#define MMAP_CHUNK_ITEMS (75000) /* 300 KB of int32 per chunk */
+#define MMAP_NUM_CHUNKS (6)       /* 4 random chunks in tail = ~1.2 MB > 1 MiB cap */
+
 static char *test_contiguous_mmap_update(void) {
   blosc2_remove_urlpath(TEST_FRAME);
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-  cparams.typesize = sizeof(int64_t);
+  cparams.typesize = sizeof(int32_t);
   cparams.compcode = BLOSC_BLOSCLZ;
+  cparams.clevel = 1;
 
   blosc2_stdio_mmap mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
   mmap_file.mode = "w+";
+  mmap_file.initial_mapping_size = 128 * 1024; /* 128 KB to force remapping on writes */
   blosc2_io io = {.id = BLOSC2_IO_FILESYSTEM_MMAP, .name = "filesystem_mmap", .params = &mmap_file};
 
   blosc2_storage storage = {
@@ -677,42 +682,93 @@ static char *test_contiguous_mmap_update(void) {
   blosc2_schunk *schunk = blosc2_schunk_new(&storage);
   mu_assert("ERROR: blosc2_schunk_new failed for mmap", schunk != NULL);
 
-  int64_t chunk_data[CHUNK_NITEMS];
-  int32_t buf_bytes = CHUNK_NITEMS * sizeof(int64_t);
-
-  for (int i = 0; i < 4; ++i) {
-    fill_chunk_data(chunk_data, i, 0);
-    blosc2_schunk_append_buffer(schunk, chunk_data, buf_bytes);
+  int32_t chunk_bytes = MMAP_CHUNK_ITEMS * (int32_t)sizeof(int32_t);
+  int32_t *chunks_data[MMAP_NUM_CHUNKS];
+  for (int i = 0; i < MMAP_NUM_CHUNKS; ++i) {
+    chunks_data[i] = malloc(chunk_bytes);
   }
 
-  /* Update chunk 1 with shrink under mmap */
-  for (int i = 0; i < CHUNK_NITEMS; ++i) {
-    chunk_data[i] = 12345;
-  }
-  uint8_t *chunk = malloc(buf_bytes + BLOSC2_MAX_OVERHEAD);
-  int csize = blosc2_compress_ctx(schunk->cctx, chunk_data, buf_bytes, chunk, buf_bytes + BLOSC2_MAX_OVERHEAD);
-  mu_assert("ERROR: compress failed", csize > 0);
+  /* Chunk 0: compressible sequential values */
+  for (int j = 0; j < MMAP_CHUNK_ITEMS; ++j) chunks_data[0][j] = j * 3;
+  /* Chunk 1: initially compressible zeros */
+  for (int j = 0; j < MMAP_CHUNK_ITEMS; ++j) chunks_data[1][j] = 0;
 
-  int64_t nch = blosc2_schunk_update_chunk(schunk, 1, chunk, true);
-  free(chunk);
-  mu_assert("ERROR: mmap update_chunk failed", nch == 4);
-
-  int64_t decomp[CHUNK_NITEMS];
-  int dsize = blosc2_schunk_decompress_chunk(schunk, 1, decomp, buf_bytes);
-  mu_assert("ERROR: mmap decompress failed", dsize == buf_bytes);
-  mu_assert("ERROR: mmap decompressed data mismatch", memcmp(decomp, chunk_data, buf_bytes) == 0);
-
-  /* Verify chunk 0, 2, 3 */
-  for (int i = 0; i < 4; ++i) {
-    if (i == 1) continue;
-    int64_t exp[CHUNK_NITEMS];
-    fill_chunk_data(exp, i, 0);
-    dsize = blosc2_schunk_decompress_chunk(schunk, i, decomp, buf_bytes);
-    mu_assert("ERROR: decompress failed", dsize == buf_bytes);
-    mu_assert("ERROR: mmap unaffected chunk mismatch", memcmp(decomp, exp, buf_bytes) == 0);
+  /* Chunks 2..5: pseudo-random data that do not compress much (~300 KB each) */
+  uint32_t lcg = 0x12345678;
+  for (int i = 2; i < MMAP_NUM_CHUNKS; ++i) {
+    for (int j = 0; j < MMAP_CHUNK_ITEMS; ++j) {
+      lcg = lcg * 1664525u + 1013904223u;
+      chunks_data[i][j] = (int32_t)lcg;
+    }
   }
 
+  for (int i = 0; i < MMAP_NUM_CHUNKS; ++i) {
+    int64_t nchunks = blosc2_schunk_append_buffer(schunk, chunks_data[i], chunk_bytes);
+    mu_assert("ERROR: append_buffer failed", nchunks == i + 1);
+  }
+
+  /* 1. Mmap shrink: update chunk 0 with highly compressible constant */
+  for (int j = 0; j < MMAP_CHUNK_ITEMS; ++j) chunks_data[0][j] = 42;
+  uint8_t *c0_chunk = malloc(chunk_bytes + BLOSC2_MAX_OVERHEAD);
+  int csize0 = blosc2_compress_ctx(schunk->cctx, chunks_data[0], chunk_bytes, c0_chunk, chunk_bytes + BLOSC2_MAX_OVERHEAD);
+  mu_assert("ERROR: c0 compress failed", csize0 > 0);
+  int64_t nch = blosc2_schunk_update_chunk(schunk, 0, c0_chunk, true);
+  free(c0_chunk);
+  mu_assert("ERROR: mmap shrink update chunk 0 failed", nch == MMAP_NUM_CHUNKS);
+
+  /* 2. Mmap growth: update chunk 1 from ~100 bytes to ~300 KB.
+     The tail following chunk 1 consists of 4 chunks of ~300 KB each + trailer,
+     totalling ~1.2 MB, which is > 1 MiB (FRAME_TAIL_COPY_BUFFER_CAP).
+     This forces backward movement with multiple segments AND forces mmap remapping. */
+  for (int j = 0; j < MMAP_CHUNK_ITEMS; ++j) {
+    lcg = lcg * 1664525u + 1013904223u;
+    chunks_data[1][j] = (int32_t)lcg;
+  }
+  uint8_t *c1_chunk = malloc(chunk_bytes + BLOSC2_MAX_OVERHEAD);
+  int csize1 = blosc2_compress_ctx(schunk->cctx, chunks_data[1], chunk_bytes, c1_chunk, chunk_bytes + BLOSC2_MAX_OVERHEAD);
+  mu_assert("ERROR: c1 compress failed", csize1 > 0);
+  nch = blosc2_schunk_update_chunk(schunk, 1, c1_chunk, true);
+  free(c1_chunk);
+  mu_assert("ERROR: mmap growth update chunk 1 failed", nch == MMAP_NUM_CHUNKS);
+
+  /* Verify all chunks in active schunk */
+  int32_t *decomp = malloc(chunk_bytes);
+  for (int i = 0; i < MMAP_NUM_CHUNKS; ++i) {
+    int dsize = blosc2_schunk_decompress_chunk(schunk, i, decomp, chunk_bytes);
+    mu_assert("ERROR: active decompress failed", dsize == chunk_bytes);
+    mu_assert("ERROR: active chunk data mismatch", memcmp(decomp, chunks_data[i], chunk_bytes) == 0);
+  }
   blosc2_schunk_free(schunk);
+
+  /* 3. Reopen from disk with standard I/O and verify every chunk */
+  blosc2_schunk *schunk_reopen = blosc2_schunk_open(TEST_FRAME);
+  mu_assert("ERROR: reopen from disk failed", schunk_reopen != NULL);
+  mu_assert("ERROR: reopen nchunks mismatch", schunk_reopen->nchunks == MMAP_NUM_CHUNKS);
+  for (int i = 0; i < MMAP_NUM_CHUNKS; ++i) {
+    int dsize = blosc2_schunk_decompress_chunk(schunk_reopen, i, decomp, chunk_bytes);
+    mu_assert("ERROR: reopen decompress failed", dsize == chunk_bytes);
+    mu_assert("ERROR: reopen chunk data mismatch", memcmp(decomp, chunks_data[i], chunk_bytes) == 0);
+  }
+  blosc2_schunk_free(schunk_reopen);
+
+  /* 4. Reopen from disk with mmap I/O and verify every chunk */
+  blosc2_stdio_mmap mmap_read = BLOSC2_STDIO_MMAP_DEFAULTS;
+  mmap_read.mode = "r";
+  blosc2_io io_read = {.id = BLOSC2_IO_FILESYSTEM_MMAP, .name = "filesystem_mmap", .params = &mmap_read};
+  blosc2_schunk *schunk_mmap = blosc2_schunk_open_udio(TEST_FRAME, &io_read);
+  mu_assert("ERROR: reopen with mmap failed", schunk_mmap != NULL);
+  mu_assert("ERROR: mmap reopen nchunks mismatch", schunk_mmap->nchunks == MMAP_NUM_CHUNKS);
+  for (int i = 0; i < MMAP_NUM_CHUNKS; ++i) {
+    int dsize = blosc2_schunk_decompress_chunk(schunk_mmap, i, decomp, chunk_bytes);
+    mu_assert("ERROR: mmap reopen decompress failed", dsize == chunk_bytes);
+    mu_assert("ERROR: mmap reopen chunk data mismatch", memcmp(decomp, chunks_data[i], chunk_bytes) == 0);
+  }
+  blosc2_schunk_free(schunk_mmap);
+
+  free(decomp);
+  for (int i = 0; i < MMAP_NUM_CHUNKS; ++i) {
+    free(chunks_data[i]);
+  }
   blosc2_remove_urlpath(TEST_FRAME);
   return EXIT_SUCCESS;
 }

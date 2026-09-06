@@ -142,12 +142,23 @@ void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int64_t nchunk,
   return frame;
 }
 
-/* Delete a chunk from a sparse frame. */
-int sframe_delete_chunk(const char *urlpath, int64_t nchunk) {
+/* Delete or evict a chunk from a sparse frame. */
+int sframe_delete_chunk(const char *urlpath, int64_t nchunk, const blosc2_io *io) {
   char* chunk_path = sframe_make_chunk_path(urlpath, nchunk);
-  if (chunk_path) {
+  if (chunk_path == NULL) {
+    return BLOSC2_ERROR_FILE_REMOVE;
+  }
+
+  uint8_t io_id = (io != NULL) ? io->id : BLOSC2_IO_FILESYSTEM;
+
+  if (io_id == BLOSC2_IO_FILESYSTEM || io_id == BLOSC2_IO_FILESYSTEM_MMAP) {
     int rc = remove(chunk_path);
     if (rc != 0) {
+      if (errno == ENOENT) {
+        /* Chunk file does not exist on disk; already evicted or absent */
+        free(chunk_path);
+        return BLOSC2_ERROR_SUCCESS;
+      }
       BLOSC_TRACE_ERROR("Cannot remove chunk file %s (error: %s)", chunk_path, strerror(errno));
       free(chunk_path);
       return BLOSC2_ERROR_FILE_REMOVE;
@@ -155,6 +166,42 @@ int sframe_delete_chunk(const char *urlpath, int64_t nchunk) {
     free(chunk_path);
     return BLOSC2_ERROR_SUCCESS;
   }
+
+  /* Non-standard / custom I/O backend */
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(io_id);
+  if (io_cb == NULL) {
+    BLOSC_TRACE_ERROR("Error getting the input/output API");
+    free(chunk_path);
+    return BLOSC2_ERROR_FILE_REMOVE;
+  }
+
+  /* If the custom backend supports direct removal on the filesystem, try it first. */
+  if (remove(chunk_path) == 0) {
+    free(chunk_path);
+    return BLOSC2_ERROR_SUCCESS;
+  }
+
+  /* Otherwise, the backend may map chunk paths or manage virtual storage.
+     Evict payload by opening with "wb" to truncate the chunk via custom I/O. */
+  void *params = (io != NULL) ? io->params : NULL;
+  void *fp = io_cb->open(chunk_path, "wb", params);
+  if (fp != NULL) {
+    if (io_cb->truncate != NULL) {
+      io_cb->truncate(fp, 0);
+    }
+    io_cb->close(fp);
+    free(chunk_path);
+    return BLOSC2_ERROR_SUCCESS;
+  }
+
+  /* If open failed because chunk file does not exist, consider it evicted. */
+  if (errno == ENOENT) {
+    free(chunk_path);
+    return BLOSC2_ERROR_SUCCESS;
+  }
+
+  BLOSC_TRACE_ERROR("Cannot evict chunk %" PRId64 " via custom I/O backend (id %d)", nchunk, (int)io_id);
+  free(chunk_path);
   return BLOSC2_ERROR_FILE_REMOVE;
 }
 

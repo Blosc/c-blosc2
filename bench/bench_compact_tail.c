@@ -10,19 +10,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
-#include <time.h>
 #include "blosc2.h"
 #include "frame.h"
 
 #define BENCH_FRAME "bench_compact_tail.b2frame"
 #define CHUNK_ITEMS (250 * 1000) /* 1 MB of int32 per chunk */
 #define NUM_CHUNKS (20)           /* 20 MB total uncompressed */
-
-static double get_time_sec(void) {
-  struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
-}
 
 static void bench_move_range_caps(void) {
   printf("=== Microbenchmark: frame_move_range throughput across buffer caps ===\n");
@@ -49,17 +42,18 @@ static void bench_move_range_caps(void) {
     int64_t cap = caps[i];
 
     /* Test shrink (forward) */
-    double t0 = get_time_sec();
+    blosc_timestamp_t t0, t1;
+    blosc_set_timestamp(&t0);
     int rc = frame_move_range(io_cb, fp, 15 * 1024 * 1024, 10 * 1024 * 1024, move_len, cap);
-    double t1 = get_time_sec();
-    double dt_shrink = t1 - t0;
+    blosc_set_timestamp(&t1);
+    double dt_shrink = blosc_elapsed_secs(t0, t1);
     double speed_shrink = ((double)move_len / (1024.0 * 1024.0)) / dt_shrink;
 
     /* Test growth (backward) */
-    t0 = get_time_sec();
+    blosc_set_timestamp(&t0);
     rc = frame_move_range(io_cb, fp, 10 * 1024 * 1024, 15 * 1024 * 1024, move_len, cap);
-    t1 = get_time_sec();
-    double dt_growth = t1 - t0;
+    blosc_set_timestamp(&t1);
+    double dt_growth = blosc_elapsed_secs(t0, t1);
     double speed_growth = ((double)move_len / (1024.0 * 1024.0)) / dt_growth;
 
     printf("  Cap: %6" PRId64 " KB | Shrink (fwd): %6.2f MB/s (%6.4f s) | Growth (bwd): %6.2f MB/s (%6.4f s) [rc=%d]\n",
@@ -111,9 +105,11 @@ static void bench_frame_update_positions(void) {
     uint8_t *chunk_grow = malloc(buf_bytes + BLOSC2_MAX_OVERHEAD);
     int csize_grow = blosc2_compress_ctx(schunk->cctx, data, buf_bytes, chunk_grow, buf_bytes + BLOSC2_MAX_OVERHEAD);
 
-    double t0 = get_time_sec();
+    blosc_timestamp_t t0, t1;
+    blosc_set_timestamp(&t0);
     blosc2_schunk_update_chunk(schunk, pos, chunk_grow, true);
-    double dt_grow = get_time_sec() - t0;
+    blosc_set_timestamp(&t1);
+    double dt_grow = blosc_elapsed_secs(t0, t1);
     free(chunk_grow);
 
     /* Shrink update: highly compressible data */
@@ -123,9 +119,10 @@ static void bench_frame_update_positions(void) {
     uint8_t *chunk_shrink = malloc(buf_bytes + BLOSC2_MAX_OVERHEAD);
     int csize_shrink = blosc2_compress_ctx(schunk->cctx, data, buf_bytes, chunk_shrink, buf_bytes + BLOSC2_MAX_OVERHEAD);
 
-    t0 = get_time_sec();
+    blosc_set_timestamp(&t0);
     blosc2_schunk_update_chunk(schunk, pos, chunk_shrink, true);
-    double dt_shrink = get_time_sec() - t0;
+    blosc_set_timestamp(&t1);
+    double dt_shrink = blosc_elapsed_secs(t0, t1);
     free(chunk_shrink);
 
     printf("  Position: %-20s | Growth delta (%d -> %d): %6.4f s | Shrink delta (%d -> %d): %6.4f s\n",

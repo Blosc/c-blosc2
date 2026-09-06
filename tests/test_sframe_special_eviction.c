@@ -328,10 +328,154 @@ static char *test_sframe_reordered_physical_id_eviction(void) {
   return EXIT_SUCCESS;
 }
 
+#include "blosc2/blosc2-stdio.h"
+
+#define MAPPED_IO_ID 246
+
+static char* map_test_path(const char *urlpath) {
+  if (strstr(urlpath, ".chunk") != NULL) {
+    size_t len = strlen(urlpath) + 16;
+    char *mapped = malloc(len);
+    snprintf(mapped, len, "%s.mapped", urlpath);
+    return mapped;
+  }
+  size_t len = strlen(urlpath) + 1;
+  char *res = malloc(len);
+  memcpy(res, urlpath, len);
+  return res;
+}
+
+static void* mapped_io_open(const char *urlpath, const char *mode, void *params) {
+  char *mapped = map_test_path(urlpath);
+  void *fp = blosc2_stdio_open(mapped, mode, params);
+  free(mapped);
+  return fp;
+}
+
+static int mapped_io_close(void *stream) {
+  return blosc2_stdio_close(stream);
+}
+
+static int64_t mapped_io_size(void *stream) {
+  return blosc2_stdio_size(stream);
+}
+
+static int64_t mapped_io_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
+  return blosc2_stdio_write(ptr, size, nitems, position, stream);
+}
+
+static int64_t mapped_io_read(void **ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
+  return blosc2_stdio_read(ptr, size, nitems, position, stream);
+}
+
+static int mapped_io_truncate(void *stream, int64_t size) {
+  return blosc2_stdio_truncate(stream, size);
+}
+
+static int mapped_io_destroy(void *params) {
+  BLOSC_UNUSED_PARAM(params);
+  return 0;
+}
+
+static char *test_sframe_custom_io_mapped_filenames_eviction(void) {
+  blosc2_remove_dir(SFRAME_DIR);
+
+  blosc2_io_cb io_cb;
+  memset(&io_cb, 0, sizeof(io_cb));
+  io_cb.id = MAPPED_IO_ID;
+  io_cb.name = "mapped_test_io";
+  io_cb.is_allocation_necessary = true;
+  io_cb.open = (blosc2_open_cb) mapped_io_open;
+  io_cb.close = (blosc2_close_cb) mapped_io_close;
+  io_cb.read = (blosc2_read_cb) mapped_io_read;
+  io_cb.size = (blosc2_size_cb) mapped_io_size;
+  io_cb.write = (blosc2_write_cb) mapped_io_write;
+  io_cb.truncate = (blosc2_truncate_cb) mapped_io_truncate;
+  io_cb.destroy = (blosc2_destroy_cb) mapped_io_destroy;
+
+  int rc = blosc2_register_io_cb(&io_cb);
+  mu_assert("ERROR: register custom io failed", rc >= 0);
+
+  blosc2_io io = {.id = MAPPED_IO_ID, .name = "mapped_test_io", .params = NULL};
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  cparams.typesize = sizeof(int32_t);
+  cparams.compcode = BLOSC_BLOSCLZ;
+
+  blosc2_storage storage = {
+      .cparams = &cparams,
+      .dparams = &dparams,
+      .io = &io,
+      .urlpath = SFRAME_DIR,
+      .contiguous = false,
+  };
+
+  blosc2_schunk *schunk = blosc2_schunk_new(&storage);
+  mu_assert("ERROR: blosc2_schunk_new failed for custom mapped io", schunk != NULL);
+
+  int32_t chunk_data[CHUNK_NITEMS];
+  int32_t buf_bytes = CHUNK_NITEMS * sizeof(int32_t);
+
+  for (int i = 0; i < 3; ++i) {
+    fill_data(chunk_data, i, 1);
+    int64_t nchunks = blosc2_schunk_append_buffer(schunk, chunk_data, buf_bytes);
+    mu_assert("ERROR: append_buffer failed", nchunks == i + 1);
+  }
+
+  /* Update chunk 1 to ZERO: old chunk was stored at 00000001.chunk.mapped.
+     Standard remove("SFRAME_DIR/00000001.chunk") would fail with ENOENT because of filename mapping.
+     The eviction must succeed through custom I/O, commit must not be reported as failure (-21),
+     and reading the chunk must return zeros. */
+  uint8_t special_buf[BLOSC_EXTENDED_HEADER_LENGTH];
+  int ret = blosc2_chunk_zeros(cparams, buf_bytes, special_buf, sizeof(special_buf));
+  mu_assert("ERROR: chunk_zeros failed", ret == BLOSC_EXTENDED_HEADER_LENGTH);
+
+  int64_t nch = blosc2_schunk_update_chunk(schunk, 1, special_buf, true);
+  mu_assert("ERROR: update chunk 1 to zero on custom I/O must succeed (not -21)", nch == 3);
+
+  /* Verify reading chunk 1 returns zeros */
+  int32_t decomp[CHUNK_NITEMS];
+  int dsize = blosc2_schunk_decompress_chunk(schunk, 1, decomp, buf_bytes);
+  mu_assert("ERROR: decompress ZERO chunk failed", dsize == buf_bytes);
+  for (int i = 0; i < CHUNK_NITEMS; ++i) {
+    mu_assert("ERROR: chunk 1 data should be zero", decomp[i] == 0);
+  }
+
+  /* Verify unaffected chunk 0 and chunk 2 */
+  int32_t exp[CHUNK_NITEMS];
+  fill_data(exp, 0, 1);
+  dsize = blosc2_schunk_decompress_chunk(schunk, 0, decomp, buf_bytes);
+  mu_assert("ERROR: decompress chunk 0 failed", dsize == buf_bytes);
+  mu_assert("ERROR: chunk 0 mismatch", memcmp(decomp, exp, buf_bytes) == 0);
+
+  fill_data(exp, 2, 1);
+  dsize = blosc2_schunk_decompress_chunk(schunk, 2, decomp, buf_bytes);
+  mu_assert("ERROR: decompress chunk 2 failed", dsize == buf_bytes);
+  mu_assert("ERROR: chunk 2 mismatch", memcmp(decomp, exp, buf_bytes) == 0);
+
+  /* Reopen sframe using custom I/O */
+  blosc2_schunk_free(schunk);
+  schunk = blosc2_schunk_open_udio(SFRAME_DIR, &io);
+  mu_assert("ERROR: reopen with custom I/O failed", schunk != NULL);
+  mu_assert("ERROR: nchunks changed on reopen", schunk->nchunks == 3);
+
+  dsize = blosc2_schunk_decompress_chunk(schunk, 1, decomp, buf_bytes);
+  mu_assert("ERROR: decompress ZERO chunk on reopen failed", dsize == buf_bytes);
+  for (int i = 0; i < CHUNK_NITEMS; ++i) {
+    mu_assert("ERROR: chunk 1 data on reopen should be zero", decomp[i] == 0);
+  }
+
+  blosc2_schunk_free(schunk);
+  blosc2_remove_dir(SFRAME_DIR);
+  return EXIT_SUCCESS;
+}
+
 static char *all_tests(void) {
   mu_run_test(test_sframe_eviction_and_refill);
   mu_run_test(test_sframe_churn_no_orphan_growth);
   mu_run_test(test_sframe_reordered_physical_id_eviction);
+  mu_run_test(test_sframe_custom_io_mapped_filenames_eviction);
   return EXIT_SUCCESS;
 }
 
