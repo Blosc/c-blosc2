@@ -85,7 +85,8 @@ typedef struct {
   size_t initial_mapping_size;
   //!< The initial size of the memory mapping used as a large enough write buffer for the r+, w+ and c modes (for
   //!< Windows, only the r+ and w+ modes). On Windows, this will also be the size of the file while the file is opened.
-  //!< It will be truncated to the target size when the file is closed (e.g., when the schunk is destroyed).
+  //!< It will be truncated to the target size when the file is closed (e.g., when the schunk is destroyed),
+  //!< unless the physical file size has changed externally, in which case the file is preserved.
   bool needs_free;
   //!< Indicates whether this object should be freed in the blosc2_destroy_cb callback (set to true if the
   //!< blosc2_stdio_mmap struct was created on the heap).

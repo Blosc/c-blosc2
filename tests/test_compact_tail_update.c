@@ -812,11 +812,10 @@ static char *test_contiguous_mmap_update(void) {
   return EXIT_SUCCESS;
 }
 
-static char *test_mmap_destroy_external_growth(void) {
+static char *check_mmap_destroy_external_growth(size_t mapping_size, int append_size, bool write_first) {
   const char *test_file = "test_mmap_ext_growth.bin";
   blosc2_remove_urlpath(test_file);
 
-  /* Case 1: Handle never writes; another handle appends */
   FILE *f0 = fopen(test_file, "wb");
   mu_assert("ERROR: fopen failed", f0 != NULL);
   mu_assert("ERROR: fwrite failed", fwrite("1234", 1, 4, f0) == 4);
@@ -824,12 +823,26 @@ static char *test_mmap_destroy_external_growth(void) {
 
   blosc2_stdio_mmap mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
   mmap_file.mode = "r+";
+  mmap_file.initial_mapping_size = mapping_size;
   void *stream = blosc2_stdio_mmap_open(test_file, "r+", &mmap_file);
   mu_assert("ERROR: blosc2_stdio_mmap_open failed", stream != NULL);
 
+  if (write_first) {
+    int64_t wbytes = blosc2_stdio_mmap_write("ABCD", 1, 4, 0, stream);
+    mu_assert("ERROR: mmap write failed", wbytes == 4);
+  }
+
+  /* POSIX keeps the physical file at 4 bytes; Windows pads it to mapping_size.
+     Check the appended bytes at their original offsets, including on Windows. */
+  const char *appended = "abcdefghijklmnop";
+#if defined(_WIN32)
+  long append_offset = (long)mapping_size;
+#else
+  long append_offset = 4;
+#endif
   FILE *fext = fopen(test_file, "ab");
   mu_assert("ERROR: fopen append failed", fext != NULL);
-  mu_assert("ERROR: fwrite append failed", fwrite("5678", 1, 4, fext) == 4);
+  mu_assert("ERROR: fwrite append failed", fwrite(appended, 1, append_size, fext) == (size_t)append_size);
   fclose(fext);
 
   int rc = blosc2_stdio_mmap_destroy(&mmap_file);
@@ -839,44 +852,40 @@ static char *test_mmap_destroy_external_growth(void) {
   mu_assert("ERROR: fopen check failed", fcheck != NULL);
   fseek(fcheck, 0, SEEK_END);
   long sz = ftell(fcheck);
-  mu_assert("ERROR: file size shrunk after mmap destroy (case 1: no writes)", sz == 8);
-  char buf[9] = {0};
+  long expected_size = append_offset + append_size;
+#if defined(_WIN32)
+  /* With no external append, Windows should still remove its mapping padding. */
+  if (append_size == 0) expected_size = 4;
+#endif
+  mu_assert("ERROR: file size changed after mmap destroy", sz == expected_size);
+  char buf[16];
   fseek(fcheck, 0, SEEK_SET);
-  mu_assert("ERROR: fread check failed", fread(buf, 1, 8, fcheck) == 8);
+  mu_assert("ERROR: fread prefix failed", fread(buf, 1, 4, fcheck) == 4);
+  mu_assert("ERROR: original data corrupted", memcmp(buf, write_first ? "ABCD" : "1234", 4) == 0);
+  if (append_size > 0) {
+    fseek(fcheck, append_offset, SEEK_SET);
+    mu_assert("ERROR: fread appended data failed", fread(buf, 1, append_size, fcheck) == (size_t)append_size);
+    mu_assert("ERROR: appended data corrupted", memcmp(buf, appended, append_size) == 0);
+  }
   fclose(fcheck);
-  mu_assert("ERROR: file content corrupted after mmap destroy", strcmp(buf, "12345678") == 0);
-
-  /* Case 2: Handle writes data, and another handle appends */
-  mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
-  mmap_file.mode = "r+";
-  stream = blosc2_stdio_mmap_open(test_file, "r+", &mmap_file);
-  mu_assert("ERROR: blosc2_stdio_mmap_open failed", stream != NULL);
-
-  /* Write 4 bytes over the first 4 bytes */
-  int64_t wbytes = blosc2_stdio_mmap_write("ABCD", 1, 4, 0, stream);
-  mu_assert("ERROR: mmap write failed", wbytes == 4);
-
-  /* External append 4 more bytes */
-  fext = fopen(test_file, "ab");
-  mu_assert("ERROR: fopen append failed", fext != NULL);
-  mu_assert("ERROR: fwrite append failed", fwrite("9012", 1, 4, fext) == 4);
-  fclose(fext);
-
-  rc = blosc2_stdio_mmap_destroy(&mmap_file);
-  mu_assert("ERROR: blosc2_stdio_mmap_destroy failed", rc == 0);
-
-  fcheck = fopen(test_file, "rb");
-  mu_assert("ERROR: fopen check failed", fcheck != NULL);
-  fseek(fcheck, 0, SEEK_END);
-  sz = ftell(fcheck);
-  mu_assert("ERROR: file size shrunk after mmap destroy (case 2: writes + append)", sz == 12);
-  char buf2[13] = {0};
-  fseek(fcheck, 0, SEEK_SET);
-  mu_assert("ERROR: fread check failed", fread(buf2, 1, 12, fcheck) == 12);
-  fclose(fcheck);
-  mu_assert("ERROR: file content corrupted after mmap destroy", strcmp(buf2, "ABCD56789012") == 0);
 
   blosc2_remove_urlpath(test_file);
+  return EXIT_SUCCESS;
+}
+
+static char *test_mmap_destroy_external_growth(void) {
+  /* On POSIX, final sizes below, equal to, and above the mapping boundary.
+     Include no-append controls and both untouched and modified mappings. */
+  const size_t mapping_sizes[] = {4, 8, 16};
+  const int append_sizes[] = {0, 4, 8, 16};
+  for (size_t i = 0; i < sizeof(mapping_sizes) / sizeof(mapping_sizes[0]); ++i) {
+    for (size_t j = 0; j < sizeof(append_sizes) / sizeof(append_sizes[0]); ++j) {
+      for (int write_first = 0; write_first <= 1; ++write_first) {
+        char *result = check_mmap_destroy_external_growth(mapping_sizes[i], append_sizes[j], write_first != 0);
+        if (result != NULL) return result;
+      }
+    }
+  }
   return EXIT_SUCCESS;
 }
 

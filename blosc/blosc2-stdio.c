@@ -873,26 +873,26 @@ int blosc2_stdio_mmap_destroy(void* params) {
     BLOSC_TRACE_ERROR("Cannot close the handle to the memory-mapped file.");
     err = -1;
   }
-  int64_t file_size_i64;
-  if (!checked_size_t_to_int64(mmap_file->file_size, &file_size_i64)) {
-    BLOSC_TRACE_ERROR("Cannot extend the file size to %zu bytes: value exceeds int64_t.", mmap_file->file_size);
-    err = -1;
-  }
-  else {
-    int64_t target_size = file_size_i64;
+  if (mmap_file->access_flags == PAGE_READWRITE && err == 0) {
     struct _stat64 st;
-    if (_fstat64(mmap_file->fd, &st) == 0) {
-      int64_t disk_size = (int64_t)st.st_size;
-      if (disk_size > (int64_t)mmap_file->mapping_size) {
-        int64_t extra = disk_size - (int64_t)mmap_file->mapping_size;
-        target_size += extra;
-      }
-    }
-    int rc = _chsize_s(mmap_file->fd, (long long)target_size);
-    if (rc != 0) {
-      BLOSC_TRACE_ERROR(
-        "Cannot extend the file size to %zu bytes (error: %s).", mmap_file->file_size, strerror(errno));
+    if (_fstat64(mmap_file->fd, &st) != 0) {
+      BLOSC_TRACE_ERROR("Cannot determine the memory-mapped file size (error: %s).", strerror(errno));
       err = -1;
+    }
+    else if (st.st_size >= 0 && (uint64_t)st.st_size == mmap_file->mapping_size) {
+      /* Windows extends the file to mapping_size. Trim that padding only if
+         the physical size has not changed. External appends must stay at their
+         original offsets, so preserve the entire file when it has grown. */
+      int64_t file_size_i64;
+      if (!checked_size_t_to_int64(mmap_file->file_size, &file_size_i64)) {
+        BLOSC_TRACE_ERROR("Cannot truncate the memory-mapped file to %zu bytes: value exceeds int64_t.",
+                          mmap_file->file_size);
+        err = -1;
+      }
+      else if (_chsize_s(mmap_file->fd, (long long)file_size_i64) != 0) {
+        BLOSC_TRACE_ERROR("Cannot truncate the memory-mapped file (error: %s).", strerror(errno));
+        err = -1;
+      }
     }
   }
 #else
@@ -918,24 +918,8 @@ int blosc2_stdio_mmap_destroy(void* params) {
     err = -1;
   }
 
-  if ((mmap_file->access_flags & PROT_WRITE) && !mmap_file->is_memory_only) {
-    struct stat st;
-    if (fstat(mmap_file->fd, &st) == 0) {
-      int64_t disk_size = (int64_t)st.st_size;
-      /* Only trim if the physical file on disk was padded to at least mapping_size
-         and is larger than this handle's logical file_size. Preserve any external growth. */
-      if (disk_size > (int64_t)mmap_file->file_size && disk_size >= (int64_t)mmap_file->mapping_size) {
-        int64_t extra = disk_size - (int64_t)mmap_file->mapping_size;
-        int64_t target_size = (int64_t)mmap_file->file_size + extra;
-        if (target_size < disk_size) {
-          if (ftruncate(mmap_file->fd, target_size) < 0) {
-            BLOSC_TRACE_ERROR("Cannot truncate the memory-mapped file (error: %s).", strerror(errno));
-            err = -1;
-          }
-        }
-      }
-    }
-  }
+  /* POSIX mappings do not pad the file. Writes and explicit truncation already
+     set its physical size; the cached file_size may be stale after external writes. */
 #endif
 cleanup:
   /* Also closes the HANDLE on Windows */
