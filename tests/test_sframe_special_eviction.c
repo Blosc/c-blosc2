@@ -423,16 +423,42 @@ static char *test_sframe_custom_io_mapped_filenames_eviction(void) {
     mu_assert("ERROR: append_buffer failed", nchunks == i + 1);
   }
 
+  /* Create an unrelated decoy file at the unmapped path (SFRAME_DIR/00000001.chunk).
+     Eviction in custom I/O backend must use backend callbacks exclusively and NOT delete this file. */
+  char decoy_path[512];
+  snprintf(decoy_path, sizeof(decoy_path), "%s/%08" PRIX32 ".chunk", SFRAME_DIR, (uint32_t)1);
+  FILE *fdecoy = fopen(decoy_path, "wb");
+  mu_assert("ERROR: cannot create decoy file", fdecoy != NULL);
+  fputs("unrelated", fdecoy);
+  fclose(fdecoy);
+
   /* Update chunk 1 to ZERO: old chunk was stored at 00000001.chunk.mapped.
-     Standard remove("SFRAME_DIR/00000001.chunk") would fail with ENOENT because of filename mapping.
-     The eviction must succeed through custom I/O, commit must not be reported as failure (-21),
-     and reading the chunk must return zeros. */
+     Custom I/O backend callbacks must be used exclusively.
+     The decoy file at SFRAME_DIR/00000001.chunk must not be deleted.
+     The mapped chunk file at SFRAME_DIR/00000001.chunk.mapped must be truncated to 0 bytes. */
   uint8_t special_buf[BLOSC_EXTENDED_HEADER_LENGTH];
   int ret = blosc2_chunk_zeros(cparams, buf_bytes, special_buf, sizeof(special_buf));
   mu_assert("ERROR: chunk_zeros failed", ret == BLOSC_EXTENDED_HEADER_LENGTH);
 
   int64_t nch = blosc2_schunk_update_chunk(schunk, 1, special_buf, true);
   mu_assert("ERROR: update chunk 1 to zero on custom I/O must succeed (not -21)", nch == 3);
+
+  /* Assert the unrelated decoy file at the unmapped path was NOT deleted */
+  FILE *fcheck = fopen(decoy_path, "rb");
+  mu_assert("ERROR: custom I/O eviction must NOT delete unrelated file at unmapped path", fcheck != NULL);
+  if (fcheck != NULL) fclose(fcheck);
+
+  /* Assert the mapped chunk file was truncated to 0 bytes */
+  char mapped_path[512];
+  snprintf(mapped_path, sizeof(mapped_path), "%s/%08" PRIX32 ".chunk.mapped", SFRAME_DIR, (uint32_t)1);
+  FILE *fmap = fopen(mapped_path, "rb");
+  mu_assert("ERROR: mapped chunk file should exist", fmap != NULL);
+  if (fmap != NULL) {
+    fseek(fmap, 0, SEEK_END);
+    long map_sz = ftell(fmap);
+    fclose(fmap);
+    mu_assert("ERROR: mapped chunk file must be truncated to 0 bytes upon eviction", map_sz == 0);
+  }
 
   /* Verify reading chunk 1 returns zeros */
   int32_t decomp[CHUNK_NITEMS];

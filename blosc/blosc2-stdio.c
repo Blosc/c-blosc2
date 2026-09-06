@@ -724,6 +724,17 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
       "Please specify either a different mode or set initial_mapping_size to a large enough number.");
       return 0;
     }
+    if (!mmap_file->is_memory_only) {
+      int64_t ftruncate_map_size;
+      if (!checked_size_t_to_int64(new_mapping_size, &ftruncate_map_size)) {
+        BLOSC_TRACE_ERROR("Cannot extend the file size to %zu bytes for mapping: value exceeds int64_t.", new_mapping_size);
+        return 0;
+      }
+      if (ftruncate(mmap_file->fd, ftruncate_map_size) < 0) {
+        BLOSC_TRACE_ERROR("Cannot extend the file size to %zu bytes for mapping (error: %s).", new_mapping_size, strerror(errno));
+        return 0;
+      }
+    }
     /* Extend the current mapping with the help of MAP_FIXED */
     int64_t offset = 0;
     char* new_address = mmap(
@@ -734,6 +745,20 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
       mmap_file->fd,
       offset
     );
+    if (new_address == MAP_FAILED) {
+      /* If MAP_FIXED fails, fallback to allocating a new mapping and unmapping the old */
+      new_address = mmap(
+        NULL,
+        new_mapping_size,
+        mmap_file->access_flags,
+        mmap_file->map_flags,
+        mmap_file->fd,
+        offset
+      );
+      if (new_address != MAP_FAILED) {
+        munmap(mmap_file->addr, mmap_file->mapping_size);
+      }
+    }
 #endif
 
     if (new_address == MAP_FAILED) {
@@ -903,6 +928,16 @@ int blosc2_stdio_mmap_destroy(void* params) {
   if (munmap(mmap_file->addr, mmap_file->mapping_size) < 0) {
     BLOSC_TRACE_ERROR("Cannot unmap the memory-mapped file (error: %s).", strerror(errno));
     err = -1;
+  }
+
+  if ((mmap_file->access_flags & PROT_WRITE) && !mmap_file->is_memory_only) {
+    int64_t file_size_i64;
+    if (checked_size_t_to_int64(mmap_file->file_size, &file_size_i64)) {
+      if (ftruncate(mmap_file->fd, file_size_i64) < 0) {
+        BLOSC_TRACE_ERROR("Cannot truncate the memory-mapped file to file_size (error: %s).", strerror(errno));
+        err = -1;
+      }
+    }
   }
 #endif
 cleanup:

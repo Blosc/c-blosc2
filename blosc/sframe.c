@@ -167,7 +167,7 @@ int sframe_delete_chunk(const char *urlpath, int64_t nchunk, const blosc2_io *io
     return BLOSC2_ERROR_SUCCESS;
   }
 
-  /* Non-standard / custom I/O backend */
+  /* Non-standard / custom I/O backend: use its callbacks exclusively. */
   blosc2_io_cb *io_cb = blosc2_get_io_cb(io_id);
   if (io_cb == NULL) {
     BLOSC_TRACE_ERROR("Error getting the input/output API");
@@ -175,34 +175,41 @@ int sframe_delete_chunk(const char *urlpath, int64_t nchunk, const blosc2_io *io
     return BLOSC2_ERROR_FILE_REMOVE;
   }
 
-  /* If the custom backend supports direct removal on the filesystem, try it first. */
-  if (remove(chunk_path) == 0) {
-    free(chunk_path);
-    return BLOSC2_ERROR_SUCCESS;
-  }
-
-  /* Otherwise, the backend may map chunk paths or manage virtual storage.
-     Evict payload by opening with "wb" to truncate the chunk via custom I/O. */
   void *params = (io != NULL) ? io->params : NULL;
   void *fp = io_cb->open(chunk_path, "wb", params);
-  if (fp != NULL) {
-    if (io_cb->truncate != NULL) {
-      io_cb->truncate(fp, 0);
+  if (fp == NULL) {
+    /* If open failed because chunk file does not exist, consider it already evicted. */
+    if (errno == ENOENT) {
+      free(chunk_path);
+      return BLOSC2_ERROR_SUCCESS;
     }
-    io_cb->close(fp);
+    BLOSC_TRACE_ERROR("Cannot open chunk %" PRId64 " for eviction via custom I/O backend (id %d)",
+                      nchunk, (int)io_id);
     free(chunk_path);
-    return BLOSC2_ERROR_SUCCESS;
+    return BLOSC2_ERROR_FILE_OPEN;
   }
 
-  /* If open failed because chunk file does not exist, consider it evicted. */
-  if (errno == ENOENT) {
-    free(chunk_path);
-    return BLOSC2_ERROR_SUCCESS;
+  if (io_cb->truncate != NULL) {
+    int rc_trunc = io_cb->truncate(fp, 0);
+    if (rc_trunc != 0) {
+      BLOSC_TRACE_ERROR("Cannot truncate chunk %" PRId64 " in custom I/O backend (id %d, error %d)",
+                        nchunk, (int)io_id, rc_trunc);
+      io_cb->close(fp);
+      free(chunk_path);
+      return BLOSC2_ERROR_FILE_TRUNCATE;
+    }
   }
 
-  BLOSC_TRACE_ERROR("Cannot evict chunk %" PRId64 " via custom I/O backend (id %d)", nchunk, (int)io_id);
+  int rc_close = io_cb->close(fp);
+  if (rc_close != 0) {
+    BLOSC_TRACE_ERROR("Cannot close chunk %" PRId64 " after eviction in custom I/O backend (id %d, error %d)",
+                      nchunk, (int)io_id, rc_close);
+    free(chunk_path);
+    return BLOSC2_ERROR_FILE_REMOVE;
+  }
+
   free(chunk_path);
-  return BLOSC2_ERROR_FILE_REMOVE;
+  return BLOSC2_ERROR_SUCCESS;
 }
 
 /* Get chunk from sparse frame. */

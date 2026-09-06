@@ -655,7 +655,7 @@ static char *test_contiguous_reordered_tail_update(void) {
 #include "blosc2/blosc2-stdio.h"
 
 #define MMAP_CHUNK_ITEMS (75000) /* 300 KB of int32 per chunk */
-#define MMAP_NUM_CHUNKS (6)       /* 4 random chunks in tail = ~1.2 MB > 1 MiB cap */
+#define MMAP_NUM_CHUNKS (8)       /* 6 random chunks in tail = ~1.8 MB > 1 MiB cap */
 
 static char *test_contiguous_mmap_update(void) {
   blosc2_remove_urlpath(TEST_FRAME);
@@ -690,10 +690,13 @@ static char *test_contiguous_mmap_update(void) {
 
   /* Chunk 0: compressible sequential values */
   for (int j = 0; j < MMAP_CHUNK_ITEMS; ++j) chunks_data[0][j] = j * 3;
-  /* Chunk 1: initially compressible zeros */
-  for (int j = 0; j < MMAP_CHUNK_ITEMS; ++j) chunks_data[1][j] = 0;
 
-  /* Chunks 2..5: pseudo-random data that do not compress much (~300 KB each) */
+  /* Chunk 1: compressible, non-special data (repeating pattern 0..4).
+     Must NOT be all zeros so it does not become a payload-free special chunk. */
+  for (int j = 0; j < MMAP_CHUNK_ITEMS; ++j) chunks_data[1][j] = (int32_t)(j % 5);
+
+  /* Chunks 2..7: pseudo-random data that do not compress much (~300 KB each).
+     6 chunks * ~300 KB = ~1.8 MB > 1 MiB cap. */
   uint32_t lcg = 0x12345678;
   for (int i = 2; i < MMAP_NUM_CHUNKS; ++i) {
     for (int j = 0; j < MMAP_CHUNK_ITEMS; ++j) {
@@ -716,9 +719,39 @@ static char *test_contiguous_mmap_update(void) {
   free(c0_chunk);
   mu_assert("ERROR: mmap shrink update chunk 0 failed", nch == MMAP_NUM_CHUNKS);
 
-  /* 2. Mmap growth: update chunk 1 from ~100 bytes to ~300 KB.
-     The tail following chunk 1 consists of 4 chunks of ~300 KB each + trailer,
-     totalling ~1.2 MB, which is > 1 MiB (FRAME_TAIL_COPY_BUFFER_CAP).
+  /* Verify chunk 1 is non-special and has real payload before growth */
+  uint8_t *ch1_raw;
+  bool needs_free1;
+  int lz1_old = blosc2_schunk_get_lazychunk(schunk, 1, &ch1_raw, &needs_free1);
+  mu_assert("ERROR: get chunk 1 failed", lz1_old > 0);
+  int special_val1 = (ch1_raw[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
+  mu_assert("ERROR: chunk 1 must not be a special value chunk", special_val1 == 0);
+  int32_t cbytes1_old = 0;
+  int rc_sz1 = blosc2_cbuffer_sizes(ch1_raw, NULL, &cbytes1_old, NULL);
+  mu_assert("ERROR: cbuffer sizes for chunk 1 failed", rc_sz1 == 0);
+  if (needs_free1) free(ch1_raw);
+
+  /* Calculate tail payload size following chunk 1 (chunks 2..7) */
+  int64_t tail_payload_bytes = 0;
+  for (int i = 2; i < MMAP_NUM_CHUNKS; ++i) {
+    uint8_t *ch_i;
+    bool needs_free_i;
+    int cb_i = blosc2_schunk_get_lazychunk(schunk, i, &ch_i, &needs_free_i);
+    mu_assert("ERROR: get tail chunk failed", cb_i > 0);
+    int32_t cbytes_i = 0;
+    int rc_sz = blosc2_cbuffer_sizes(ch_i, NULL, &cbytes_i, NULL);
+    mu_assert("ERROR: get cbuffer sizes failed", rc_sz == 0);
+    tail_payload_bytes += cbytes_i;
+    if (needs_free_i) free(ch_i);
+  }
+  /* Assert that the tail to be moved exceeds the 1 MiB cap */
+  mu_assert("ERROR: tail payload to move must exceed 1 MiB cap", tail_payload_bytes > 1024 * 1024);
+
+  size_t mapping_before = mmap_file.mapping_size;
+
+  /* 2. Mmap growth: update chunk 1 from ~300 bytes to ~300 KB.
+     The tail following chunk 1 consists of 6 chunks of ~300 KB each + trailer,
+     totalling ~1.8 MB, which is > 1 MiB (FRAME_TAIL_COPY_BUFFER_CAP).
      This forces backward movement with multiple segments AND forces mmap remapping. */
   for (int j = 0; j < MMAP_CHUNK_ITEMS; ++j) {
     lcg = lcg * 1664525u + 1013904223u;
@@ -727,9 +760,15 @@ static char *test_contiguous_mmap_update(void) {
   uint8_t *c1_chunk = malloc(chunk_bytes + BLOSC2_MAX_OVERHEAD);
   int csize1 = blosc2_compress_ctx(schunk->cctx, chunks_data[1], chunk_bytes, c1_chunk, chunk_bytes + BLOSC2_MAX_OVERHEAD);
   mu_assert("ERROR: c1 compress failed", csize1 > 0);
+  mu_assert("ERROR: c1 must grow significantly", csize1 > cbytes1_old + 100000);
+
   nch = blosc2_schunk_update_chunk(schunk, 1, c1_chunk, true);
   free(c1_chunk);
   mu_assert("ERROR: mmap growth update chunk 1 failed", nch == MMAP_NUM_CHUNKS);
+
+  size_t mapping_after = mmap_file.mapping_size;
+  /* Assert that the update actually grew the memory mapping */
+  mu_assert("ERROR: update must grow the memory mapping", mapping_after > mapping_before);
 
   /* Verify all chunks in active schunk */
   int32_t *decomp = malloc(chunk_bytes);
