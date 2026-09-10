@@ -1,20 +1,27 @@
-# Announcing C-Blosc2 3.3.3
+# Announcing C-Blosc2 3.3.4
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This is a bugfix and security release fixing bounds checking issues in BloscLZ.
+This release introduces bounded-memory tail compaction for contiguous on-disk
+frames and clean file eviction for payload-free chunks in sparse frames.
 
-Match length accumulation in the length-extension loop was unbounded, allowing
-crafted chunks to trigger integer or pointer overflow. On 32-bit platforms
-(and WebAssembly `wasm32`), pointer arithmetic wrapped around when destination
-buffers landed high in memory, bypassing bounds guards and causing heap
-out-of-bounds writes. On 64-bit platforms, excessively large inputs could trigger
-signed `int32_t` overflow.
+Updating chunks in place within an on-disk contiguous frame previously allocated
+memory for the entire remaining payload tail in RAM. For large frames (tens or
+hundreds of gigabytes), this caused large memory spikes or out-of-memory aborts.
+Tail compaction now moves payload data using a bounded scratch buffer capped at
+1 MiB, shifting data forward on shrink and backward on expansion for overlap
+safety, ensuring RAM usage stays minimal regardless of dataset size.
 
-This is resolved by capping length accumulation early (`len > maxout`),
-rewriting all pointer-addition bounds checks in safe subtraction form
-(`len > op_limit - op`), and adding regression testing.
+In sparse frames, updating chunks to payload-free special values (ZERO, UNINIT,
+NAN) now unlinks and deletes the old physical chunk files instead of leaving
+0-byte files on disk, preventing directory clutter and inode exhaustion during
+cache churn. Deletion is coordinated safely after committing index updates and
+is fully integrated with custom I/O backends.
+
+Additionally, memory mapping (`mmap`) stability has been improved on POSIX and
+Windows, avoiding `MAP_FIXED` pitfalls on BSD/macOS and preserving external file
+growth during cleanup.
 
 There are no API or format changes in this release.
 

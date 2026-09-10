@@ -4,7 +4,70 @@ Release notes for C-Blosc2
 Changes from 3.3.3 to 3.3.4
 ===========================
 
-#XXX version-specific blurb XXX#
+This release introduces bounded-memory tail compaction for contiguous on-disk
+frames and clean file eviction for payload-free chunks in sparse frames.
+
+* **Bounded-buffer tail compaction in contiguous frames**:
+  When updating a chunk in place within an on-disk contiguous frame (`cframe`),
+  a change in compressed size requires shifting all subsequent chunks in the
+  payload tail.  Previously, Blosc2 allocated a single heap buffer sized to the
+  entire remaining tail (`malloc(tail_nbytes)`).  For multi-gigabyte or terabyte
+  frames, updating an early chunk could require gigabytes of RAM, risking
+  out-of-memory aborts.
+
+  Tail compaction now uses an internal bounded-buffer movement helper
+  (`frame_move_range`) capped at 1 MiB (`FRAME_TAIL_COPY_BUFFER_CAP`), decoupling
+  RAM consumption from frame size:
+  - Shifts forward when shrinking (`dst < src`) and backward when expanding
+    (`dst > src`) to guarantee overlap safety across any displacement.
+  - Reads each segment fully into owned scratch memory before writing, avoiding
+    pointer invalidation when memory-mapped files are remapped during expansion.
+  - Adds checked arithmetic to prevent integer overflow and negative buffer
+    allocations.
+  - Consolidates error cleanup paths in `frame_update_chunk()` and
+    `frame_update_trailer()`, and accounts for `frame->file_offset` on truncation.
+
+* **Sparse frame special chunk file removal**:
+  Updating a chunk to a payload-free special value (such as ZERO, UNINIT, or NAN)
+  in a sparse frame (`sframe`) previously truncated the chunk file to 0 bytes
+  rather than deleting it.  Repeated cache eviction and refill cycles could leave
+  thousands of empty chunk files (`0000000X.chunk`), cluttering directories and
+  exhausting filesystem inodes.
+
+  Updating to a payload-free special value now unlinks and deletes the old
+  physical chunk file (`sframe_delete_chunk()`), matching the representation of
+  never-materialized special chunks:
+  - `BLOSC2_SPECIAL_VALUE` chunks (which store repeated payload data) retain
+    their physical chunk file.
+  - Adopts recoverable-orphan ordering: the chunk file is deleted only after
+    publishing the updated offsets index and trailer to disk.
+  - Properly tracks the preceding physical chunk ID when logical chunks have been
+    reordered.
+  - Custom I/O backends that map file paths are handled cleanly: standard backends
+    use `remove()` (treating `ENOENT` as idempotent success), while custom backends
+    use their registered callbacks (`open`, `truncate` to 0, `close`), preventing
+    unintended file operations on host paths.
+  - Eviction failures occurring after the metadata update has been committed are
+    logged as warnings rather than returning an error, preventing committed
+    updates from being reported as failures.
+
+* **Memory mapping (`mmap`) fixes and external file growth preservation**:
+  - Memory remapping on non-Linux POSIX systems (macOS, BSD) in
+    `blosc2_stdio_mmap_write()` now maps cleanly to a new address before
+    unmapping the old one, avoiding `MAP_FIXED` pitfalls.
+  - In `blosc2_stdio_mmap_destroy()`, file size truncation respects external
+    growth.  On Windows, file padding to `mapping_size` is only trimmed if the
+    file has not grown externally, avoiding truncating appends made by other
+    handles.  On POSIX, avoids truncating away external writes or appends.
+
+* **New benchmarks and tests**:
+  - Added `bench/bench_compact_tail.c` to benchmark tail updates across
+    different buffer caps and chunk positions (with portable timing support
+    across POSIX and Windows).
+  - Added comprehensive test suites in `tests/test_compact_tail_update.c` and
+    `tests/test_sframe_special_eviction.c`.
+
+There are no API or format changes in this release.
 
 Changes from 3.3.2 to 3.3.3
 ===========================
