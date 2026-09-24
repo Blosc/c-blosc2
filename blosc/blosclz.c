@@ -707,10 +707,13 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
             return 0;
           }
           code = *ip++;
-          len += code;
-          if (BLOSCLZ_UNLIKELY(len > maxout)) {
+          /* Guard before the addition so that `len` can never wrap past
+             INT32_MAX.  The subsequent `len += 3` adds at most 3 more,
+             so capping at maxout here is safe and sufficient. */
+          if (BLOSCLZ_UNLIKELY(len > maxout - code)) {
             return 0;
           }
+          len += code;
         } while (code == 255);
       }
       else {
