@@ -12,7 +12,9 @@
 #include "b2nd.h"
 
 #include <assert.h>
+#include <limits.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -313,10 +315,14 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
       return BLOSC2_ERROR_FAILURE;
   }
 
-  size_t zfp_maxin = zfp_stream_maximum_size(zfp, field);
-  if (zfp_maxin == 0 || input_len < (int32_t) zfp_maxin) {
+  size_t blocks = zfp_field_blocks(field);
+  size_t min_bytes = (blocks + CHAR_BIT - 1) / CHAR_BIT;
+  if (min_bytes < sizeof(uint64_t)) {
+    min_bytes = sizeof(uint64_t);
+  }
+  if (input_len < (int32_t) min_bytes) {
     BLOSC_TRACE_ERROR("ZFP acc: input too small (%d bytes) for the required "
-                      "bitstream size (%zu bytes)", input_len, zfp_maxin);
+                      "bitstream size (%zu bytes)", input_len, min_bytes);
     zfp_field_free(field);
     zfp_stream_close(zfp);
     stream_close(stream);
@@ -626,10 +632,14 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
       return BLOSC2_ERROR_FAILURE;
   }
 
-  size_t zfp_maxin = zfp_stream_maximum_size(zfp, field);
-  if (zfp_maxin == 0 || input_len < (int32_t) zfp_maxin) {
+  size_t blocks = zfp_field_blocks(field);
+  size_t min_bytes = (blocks + CHAR_BIT - 1) / CHAR_BIT;
+  if (min_bytes < sizeof(uint64_t)) {
+    min_bytes = sizeof(uint64_t);
+  }
+  if (input_len < (int32_t) min_bytes) {
     BLOSC_TRACE_ERROR("ZFP prec: input too small (%d bytes) for the required "
-                      "bitstream size (%zu bytes)", input_len, zfp_maxin);
+                      "bitstream size (%zu bytes)", input_len, min_bytes);
     zfp_field_free(field);
     zfp_stream_close(zfp);
     stream_close(stream);
@@ -903,10 +913,41 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
       return BLOSC2_ERROR_FAILURE;
   }
 
-  size_t zfp_maxin = zfp_stream_maximum_size(zfp, field);
-  if (zfp_maxin == 0 || input_len < (int32_t) zfp_maxin) {
+  size_t blocks = zfp_field_blocks(field);
+  uint n = 1u << (2 * ndim);
+  uint bits = (uint) floor(n * rate + 0.5);
+  switch (type) {
+    case zfp_type_float:
+      if (bits < 1 + 8u) {
+        bits = 1 + 8u;
+      }
+      break;
+    case zfp_type_double:
+      if (bits < 1 + 11u) {
+        bits = 1 + 11u;
+      }
+      break;
+    default:
+      break;
+  }
+  if (bits > 0 && blocks > SIZE_MAX / bits) {
+    BLOSC_TRACE_ERROR("ZFP rate: required bits overflow size_t");
+    zfp_field_free(field);
+    zfp_stream_close(zfp);
+    stream_close(stream);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  size_t required_bits = blocks * (size_t) bits;
+  size_t required_bytes = (required_bits + CHAR_BIT - 1) / CHAR_BIT;
+  if (required_bytes < sizeof(uint64_t)) {
+    required_bytes = sizeof(uint64_t);
+  }
+  if (input_len < (int32_t) required_bytes) {
     BLOSC_TRACE_ERROR("ZFP rate: input too small (%d bytes) for the required "
-                      "bitstream size (%zu bytes)", input_len, zfp_maxin);
+                      "bitstream size (%zu bytes)", input_len, required_bytes);
     zfp_field_free(field);
     zfp_stream_close(zfp);
     stream_close(stream);
