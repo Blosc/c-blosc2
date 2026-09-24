@@ -4,7 +4,37 @@ Release notes for C-Blosc2
 Changes from 3.3.4 to 3.3.5
 ===========================
 
-#XXX version-specific blurb XXX#
+This is a bugfix and maintenance release addressing several robustness and
+security issues reported via OSS-Fuzz in BloscLZ, ZFP codec plugins, and frame
+handling.
+
+* **Fixed integer overflow in BloscLZ match-length accumulation (heap-buffer-overflow)**:
+  In `blosclz_decompress`, the `MATCH_LONG` decoding loop (`ctrl >> 5 == 7`)
+  accumulated continuation bytes (`0xFF`) into a signed 32-bit integer (`len`)
+  without overflow protection. After ~8 MB of `0xFF` bytes, `len` could wrap
+  past `INT32_MAX` into negative values, bypassing the `len > maxout` check and
+  causing a severe out-of-bounds heap write in `copy_match`. This is resolved
+  by checking `len > maxout - code` before the addition, rejecting invalid matches
+  before any overflow can occur. Reported via OSS-Fuzz (`decompress_chunk_fuzzer`).
+
+* **Fixed heap-buffer-overflow in ZFP decompression paths**:
+  In `zfp_acc_decompress`, `zfp_prec_decompress`, and `zfp_rate_decompress`,
+  a ZFP bitstream was opened on the compressed input without checking whether the
+  buffer was sufficiently sized for the stream reads dictated by codec parameters
+  and field dimensions. A crafted frame with a large `compcode_meta` and a small
+  payload could trigger an out-of-bounds read in ZFP's `stream_read_word`. Added
+  validation of the required bitstream size before decompression to ensure the
+  input buffer is large enough, returning `BLOSC2_ERROR_FAILURE` otherwise.
+  Reported via OSS-Fuzz (`decompress_frame_fuzzer`).
+
+* **Fixed division by zero (FPE) in `frame_get_chunk` and `frame_get_lazychunk`**:
+  When processing special-value chunks, a crafted frame with `chunksize <= 0`
+  caused a floating-point exception (division by zero) in the `nbytes % chunksize`
+  calculation for the last chunk. Added validation to ensure `chunksize > 0` before
+  evaluating the modulo expression, returning `BLOSC2_ERROR_INVALID_HEADER` on
+  invalid chunk sizes. Reported via OSS-Fuzz (`decompress_frame_fuzzer`).
+
+There are no API or format changes in this release.
 
 Changes from 3.3.3 to 3.3.4
 ===========================
