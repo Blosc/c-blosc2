@@ -3434,6 +3434,10 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
 
   if (offset < 0) {
     // Special value
+    if (chunksize <= 0) {
+      BLOSC_TRACE_ERROR("Cannot synthesize special chunk with chunksize <= 0.");
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
     chunk_cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
     int32_t chunksize_ = chunksize;
     if ((nchunk == nchunks - 1) && (nbytes % chunksize)) {
@@ -3588,6 +3592,10 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
 
   if (offset < 0) {
     // Special value
+    if (chunksize <= 0) {
+      BLOSC_TRACE_ERROR("Cannot synthesize special chunk with chunksize <= 0.");
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
     lazychunk_cbytes = BLOSC_EXTENDED_HEADER_LENGTH;
     int32_t chunksize_ = chunksize;
     if ((nchunk == nchunks - 1) && (nbytes % chunksize)) {
