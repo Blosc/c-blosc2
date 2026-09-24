@@ -313,6 +313,19 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
       return BLOSC2_ERROR_FAILURE;
   }
 
+  size_t zfp_maxin = zfp_stream_maximum_size(zfp, field);
+  if (zfp_maxin == 0 || input_len < (int32_t) zfp_maxin) {
+    BLOSC_TRACE_ERROR("ZFP acc: input too small (%d bytes) for the required "
+                      "bitstream size (%zu bytes)", input_len, zfp_maxin);
+    zfp_field_free(field);
+    zfp_stream_close(zfp);
+    stream_close(stream);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
   zfpsize = zfp_decompress(zfp, field);
 
   /* clean up */
@@ -613,6 +626,19 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
       return BLOSC2_ERROR_FAILURE;
   }
 
+  size_t zfp_maxin = zfp_stream_maximum_size(zfp, field);
+  if (zfp_maxin == 0 || input_len < (int32_t) zfp_maxin) {
+    BLOSC_TRACE_ERROR("ZFP prec: input too small (%d bytes) for the required "
+                      "bitstream size (%zu bytes)", input_len, zfp_maxin);
+    zfp_field_free(field);
+    zfp_stream_close(zfp);
+    stream_close(stream);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
   zfpsize = zfp_decompress(zfp, field);
 
   /* clean up */
@@ -875,6 +901,19 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
       free(blockshape);
       BLOSC_TRACE_ERROR("ZFP is not available for ndims: %d", ndim);
       return BLOSC2_ERROR_FAILURE;
+  }
+
+  size_t zfp_maxin = zfp_stream_maximum_size(zfp, field);
+  if (zfp_maxin == 0 || input_len < (int32_t) zfp_maxin) {
+    BLOSC_TRACE_ERROR("ZFP rate: input too small (%d bytes) for the required "
+                      "bitstream size (%zu bytes)", input_len, zfp_maxin);
+    zfp_field_free(field);
+    zfp_stream_close(zfp);
+    stream_close(stream);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    return BLOSC2_ERROR_FAILURE;
   }
 
   zfpsize = zfp_decompress(zfp, field);
