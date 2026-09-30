@@ -2297,7 +2297,7 @@ void free_thread_context(struct thread_context* thread_context) {
 }
 
 
-int check_nthreads(blosc2_context* context) {
+static int check_nthreads(blosc2_context* context, bool start_backend) {
   if (context->new_nthreads != context->nthreads && context->new_nthreads <= 0) {
     BLOSC_TRACE_ERROR("nthreads must be >= 1 and <= %d", INT16_MAX);
     return BLOSC2_ERROR_INVALID_PARAM;
@@ -2321,7 +2321,7 @@ int check_nthreads(blosc2_context* context) {
     release_thread_backend(context);
     context->nthreads = context->new_nthreads;
   }
-  if (context->nthreads > 1 && context->threads_started == 0) {
+  if (start_backend && context->nthreads > 1 && context->threads_started == 0) {
     int rc;
     if (threads_callback) {
       rc = init_callback_threads(context);
@@ -2344,6 +2344,17 @@ int check_nthreads(blosc2_context* context) {
   return context->nthreads;
 }
 
+static int ensure_serial_context(blosc2_context* context) {
+  if (context->serial_context == NULL) {
+    context->serial_context = create_thread_context(context, 0);
+  }
+  else if (context->blocksize != context->serial_context->tmp_blocksize) {
+    free_thread_context(context->serial_context);
+    context->serial_context = create_thread_context(context, 0);
+  }
+  return context->serial_context != NULL ? 0 : BLOSC2_ERROR_THREAD_CREATE;
+}
+
 /* Do the compression or decompression of the buffer depending on the
    global params. */
 static int do_job(blosc2_context* context) {
@@ -2352,30 +2363,30 @@ static int do_job(blosc2_context* context) {
   /* Set sentinels */
   context->dref_not_init = 1;
 
-  /* Check whether we need to restart threads.  If the thread backend could
-     not be set up (e.g. shared-pool creation failed under thread/resource
-     exhaustion), rc < 0 and context->thread_pool stays NULL; fall back to the
-     serial path below instead of dereferencing a NULL pool in parallel_blosc.
-     The failed pool creation already emitted a TRACE_ERROR, and the next
-     do_job() re-attempts the attach, so the fallback is self-healing. */
-  int rc = check_nthreads(context);
+  /* Apply thread-count changes before deciding whether this operation actually
+     needs a parallel backend.  Small single-block operations stay serial and
+     avoid creating worker threads they will not use. */
+  int rc = check_nthreads(context, false);
 
   /* Run the serial version when nthreads is 1, when the buffers are not larger
      than blocksize, or when the parallel backend failed to start */
   if (context->nthreads == 1 || (context->sourcesize / context->blocksize) <= 1 || rc < 0) {
-    /* The context for this 'thread' has no been initialized yet */
-    if (context->serial_context == NULL) {
-      context->serial_context = create_thread_context(context, 0);
+    if (ensure_serial_context(context) < 0) {
+      return BLOSC2_ERROR_THREAD_CREATE;
     }
-    else if (context->blocksize != context->serial_context->tmp_blocksize) {
-      free_thread_context(context->serial_context);
-      context->serial_context = create_thread_context(context, 0);
-    }
-    BLOSC_ERROR_NULL(context->serial_context, BLOSC2_ERROR_THREAD_CREATE);
     ntbytes = serial_blosc(context->serial_context);
   }
   else {
-    ntbytes = parallel_blosc(context);
+    rc = check_nthreads(context, true);
+    if (rc < 0) {
+      if (ensure_serial_context(context) < 0) {
+        return BLOSC2_ERROR_THREAD_CREATE;
+      }
+      ntbytes = serial_blosc(context->serial_context);
+    }
+    else {
+      ntbytes = parallel_blosc(context);
+    }
   }
 
   return ntbytes;
@@ -5537,7 +5548,9 @@ static int parallel_blosc(blosc2_context* context) {
     struct blosc_shared_pool *pool = context->thread_pool;
     blosc2_pthread_mutex_lock(&pool->mutex);
     int32_t enqueued = 0;
-    for (int32_t tid = 0; tid < context->nthreads; ++tid) {
+    /* More workers than blocks cannot add useful parallel work. */
+    int32_t workers = context->nthreads < context->nblocks ? context->nthreads : context->nblocks;
+    for (int32_t tid = 0; tid < workers; ++tid) {
       struct blosc_job_queue_entry *entry = (struct blosc_job_queue_entry *)my_malloc(sizeof(*entry));
       if (entry == NULL) {
         /* Drain already-enqueued entries so they don't reference the
@@ -5581,7 +5594,15 @@ static int parallel_blosc(blosc2_context* context) {
     job.active_workers = enqueued;
     job.pending_workers = enqueued;
     blosc2_pthread_mutex_unlock(&job.mutex);
-    blosc2_pthread_cond_broadcast(&pool->work_cv);
+    /* Avoid waking idle pool workers that have no queue entry for this job. */
+    if (enqueued < pool->nthreads) {
+      for (int32_t i = 0; i < enqueued; ++i) {
+        blosc2_pthread_cond_signal(&pool->work_cv);
+      }
+    }
+    else {
+      blosc2_pthread_cond_broadcast(&pool->work_cv);
+    }
     blosc2_pthread_mutex_unlock(&pool->mutex);
 
     blosc2_pthread_mutex_lock(&job.mutex);
@@ -5629,12 +5650,12 @@ int16_t blosc2_set_nthreads(int16_t nthreads) {
     int16_t old_nthreads = g_global_context->nthreads;
     g_nthreads = nthreads;
     g_global_context->new_nthreads = nthreads;
-    int16_t ret2 = check_nthreads(g_global_context);
+    int16_t ret2 = check_nthreads(g_global_context, true);
     if (ret2 < 0) {
       g_nthreads = ret;
       g_global_context->new_nthreads = old_new_nthreads;
       g_global_context->nthreads = old_nthreads;
-      check_nthreads(g_global_context);
+      check_nthreads(g_global_context, true);
       blosc2_pthread_mutex_unlock(&global_comp_mutex);
       return ret2;
     }
