@@ -2364,9 +2364,14 @@ static int do_job(blosc2_context* context) {
   context->dref_not_init = 1;
 
   /* Apply thread-count changes before deciding whether this operation actually
-     needs a parallel backend.  Small single-block operations stay serial and
-     avoid creating worker threads they will not use. */
+     needs a parallel backend.  POSIX can defer shared-pool startup for small
+     single-block operations.  Windows keeps its existing per-context thread
+     lifecycle and starts/rebinds the backend eagerly. */
+#if defined(_WIN32)
+  int rc = check_nthreads(context, true);
+#else
   int rc = check_nthreads(context, false);
+#endif
 
   /* Run the serial version when nthreads is 1, when the buffers are not larger
      than blocksize, or when the parallel backend failed to start */
