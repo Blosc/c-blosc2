@@ -130,7 +130,51 @@ static char *test_single_block_multithread_request_no_pool(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 3: contexts with the same nthreads share one pool             */
+/* Test 3: configured threads may exceed available blocks             */
+/* ------------------------------------------------------------------ */
+static char *test_more_threads_than_blocks(void)
+{
+#define FEW_BLOCKS 3
+#define MANY_THREADS 16
+  static int64_t data[(FEW_BLOCKS * BLOCKSIZE) / TYPESIZE];
+  static int64_t dest[(FEW_BLOCKS * BLOCKSIZE) / TYPESIZE];
+  static uint8_t cbuf[FEW_BLOCKS * BLOCKSIZE * 2];
+  const int32_t isize = (int32_t)sizeof(data);
+
+  for (int i = 0; i < (int)(sizeof(data) / sizeof(data[0])); i++) data[i] = i;
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.nthreads = MANY_THREADS;
+  cparams.blocksize = BLOCKSIZE;
+  cparams.typesize = TYPESIZE;
+
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  mu_assert("create_cctx failed", cctx != NULL);
+  int cbytes = blosc2_compress_ctx(cctx, data, isize, cbuf, (int32_t)sizeof(cbuf));
+  mu_assert("compress failed", cbytes > 0);
+  mu_assert("expected exactly three blocks", cctx->nblocks == FEW_BLOCKS);
+  mu_assert("configured thread count should remain 16", cctx->nthreads == MANY_THREADS);
+  mu_assert("16-thread pool should exist", cctx->thread_pool != NULL);
+  blosc2_free_ctx(cctx);
+
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  dparams.nthreads = MANY_THREADS;
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
+  mu_assert("create_dctx failed", dctx != NULL);
+  int dbytes = blosc2_decompress_ctx(dctx, cbuf, cbytes, dest, isize);
+  mu_assert("decompress failed", dbytes == isize);
+  blosc2_free_ctx(dctx);
+
+  mu_assert("data mismatch", memcmp(data, dest, isize) == 0);
+
+#undef MANY_THREADS
+#undef FEW_BLOCKS
+  return EXIT_SUCCESS;
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Test 4: contexts with the same nthreads share one pool             */
 /* ------------------------------------------------------------------ */
 static char *test_same_nthreads_share_pool(void)
 {
@@ -360,6 +404,7 @@ static char *all_tests(void)
   mu_run_test(test_nthreads1_no_pool);
 #ifndef _WIN32
   mu_run_test(test_single_block_multithread_request_no_pool);
+  mu_run_test(test_more_threads_than_blocks);
   mu_run_test(test_same_nthreads_share_pool);
   mu_run_test(test_different_nthreads_different_pools);
   mu_run_test(test_dynamic_nthreads_rebind);
