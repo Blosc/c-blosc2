@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "context.h"
 #include "config.h"
 #include "frame.h"
 #include "test_common.h"
@@ -41,6 +42,31 @@ static const int32_t srcsizes[] = {
     (int32_t)sizeof(block1),
     (int32_t)sizeof(block2),
 };
+
+/* Exercise caller ownership, exact/oversized/undersized buffers, and context
+ * reuse for every storage/codec variant also covered by the allocating API. */
+static int check_into(blosc2_context* dctx, const uint8_t* chunk, int32_t cbytes,
+                      int32_t block, const uint8_t* expected, int32_t size) {
+  int32_t queried = -1;
+  if (blosc2_vlblock_get_nbytes_ctx(dctx, chunk, cbytes, block, &queried) != 0 || queried != size)
+    return -1;
+  uint8_t* buffer = malloc((size_t)size + 16);
+  if (buffer == NULL) return -1;
+  memset(buffer, 0xa5, (size_t)size + 16);
+  int rc = blosc2_vldecompress_block_into_ctx(dctx, chunk, cbytes, block, buffer + 8, size - 1);
+  if (rc != BLOSC2_ERROR_WRITE_BUFFER) { free(buffer); return -1; }
+  for (int32_t i = 0; i < size + 16; i++) {
+    if (buffer[i] != 0xa5) { free(buffer); return -1; }
+  }
+  rc = blosc2_vldecompress_block_into_ctx(dctx, chunk, cbytes, block, buffer + 8, size);
+  if (rc != size || memcmp(buffer + 8, expected, (size_t)size) != 0) { free(buffer); return -1; }
+  for (int i = 0; i < 8; i++) {
+    if (buffer[i] != 0xa5 || buffer[size + 8 + i] != 0xa5) { free(buffer); return -1; }
+  }
+  rc = blosc2_vldecompress_block_into_ctx(dctx, chunk, cbytes, block, buffer + 8, size + 8);
+  free(buffer);
+  return rc == size ? 0 : -1;
+}
 
 #define DICT_VL_NBLOCKS 64
 #define DICT_VL_BUF 512
@@ -503,6 +529,7 @@ static char *test_vldecompress_block_ctx(void) {
     uint8_t *blk = NULL;
     int32_t blksize = -1;
     int rc = blosc2_vldecompress_block_ctx(dctx, chunk, cbytes, i, &blk, &blksize);
+    mu_assert("ERROR: caller-buffer VL decompression", check_into(dctx, chunk, cbytes, i, blk, blksize) == 0);
     mu_assert("ERROR: blosc2_vldecompress_block_ctx failed", rc == srcsizes[i]);
     mu_assert("ERROR: returned size mismatch", blksize == srcsizes[i]);
     mu_assert("ERROR: content mismatch",
@@ -700,6 +727,7 @@ static char *test_vldecompress_block_ctx_dict(void) {
     int rc = blosc2_vldecompress_block_ctx(dctx, chunk, cbytes, i, &blk, &blksize);
     mu_assert("ERROR: dict blosc2_vldecompress_block_ctx failed", rc == vsizes[i]);
     mu_assert("ERROR: dict returned size mismatch", blksize == vsizes[i]);
+    mu_assert("ERROR: dict caller-buffer decompression", check_into(dctx, chunk, cbytes, i, blk, blksize) == 0);
     mu_assert("ERROR: dict content mismatch",
               memcmp(blk, vsrcs[i], (size_t)vsizes[i]) == 0);
     free(blk);
@@ -809,6 +837,8 @@ static char* run_lazy_vldecompress_block_ctx_dict_test(int compcode, const char*
       uint8_t* blk = NULL;
       int32_t blksize = -1;
       int rc = blosc2_vldecompress_block_ctx(dctx, lazy_chunk, cbytes, i, &blk, &blksize);
+      mu_assert("ERROR: lazy caller-buffer VL decompression", rc > 0 &&
+                check_into(dctx, lazy_chunk, cbytes, i, blk, blksize) == 0);
       mu_assert("ERROR: lazy dict blosc2_vldecompress_block_ctx failed", rc == vsizes[i]);
       mu_assert("ERROR: lazy dict returned size mismatch", blksize == vsizes[i]);
       mu_assert("ERROR: lazy dict content mismatch",
@@ -1187,7 +1217,156 @@ static char *test_lazy_vldecompress_block_ctx_sframe(void) {
 }
 
 
+static char *test_bounded_vl_apis(void) {
+  for (int backend = 0; backend < 2; backend++) {
+    const char* path = backend ? "test_bounded_sparse.b2frame" : "test_bounded.b2frame";
+    blosc2_schunk* sc = make_lazy_vl_schunk(path, backend == 0);
+    mu_assert("cannot create bounded API fixture", sc != NULL);
+    uint8_t* lazy = NULL;
+    bool owned = false;
+    int size = blosc2_schunk_get_lazychunk(sc, 0, &lazy, &owned);
+    mu_assert("cannot get lazy fixture", size > 0);
+    for (int block = 2; block >= 0; block--) {
+      mu_assert("lazy bounded roundtrip", check_into(sc->dctx, lazy, size, block,
+                srcs[block], srcsizes[block]) == 0);
+    }
+    int32_t result = -42;
+    uint8_t output[128];
+    mu_assert("null context", blosc2_vlblock_get_nbytes_ctx(NULL, lazy, size, 0, &result) < 0);
+    mu_assert("null source", blosc2_vlblock_get_nbytes_ctx(sc->dctx, NULL, size, 0, &result) < 0);
+    mu_assert("null size pointer", blosc2_vlblock_get_nbytes_ctx(sc->dctx, lazy, size, 0, NULL) < 0);
+    mu_assert("invalid block", blosc2_vlblock_get_nbytes_ctx(sc->dctx, lazy, size, -1, &result) < 0 && result == -42);
+    mu_assert("truncated lazy source", blosc2_vlblock_get_nbytes_ctx(sc->dctx, lazy, size - 1, 0, &result) < 0);
+    mu_assert("null destination", blosc2_vldecompress_block_into_ctx(sc->dctx, lazy, size, 0, NULL, 10) < 0);
+    mu_assert("negative capacity", blosc2_vldecompress_block_into_ctx(sc->dctx, lazy, size, 0, output, -1) < 0);
+    mu_assert("zero capacity", blosc2_vldecompress_block_into_ctx(sc->dctx, lazy, size, 0, output, 0) == BLOSC2_ERROR_WRITE_BUFFER);
+    int64_t trailer = 32 + 3 * 4;
+    int64_t saved_offset;
+    memcpy(&saved_offset, lazy + trailer + 4, 8);
+    int64_t invalid_offset = INT64_MAX;
+    memcpy(lazy + trailer + 4, &invalid_offset, 8);
+    if (!backend) {
+      mu_assert("out-of-frame lazy offset", blosc2_vlblock_get_nbytes_ctx(sc->dctx, lazy, size, 0, &result) < 0);
+    }
+    memcpy(lazy + trailer + 4, &saved_offset, 8);
+    int32_t saved_span;
+    memcpy(&saved_span, lazy + trailer + 12, 4);
+    int32_t invalid_span = INT32_MAX;
+    memcpy(lazy + trailer + 12, &invalid_span, 4);
+    mu_assert("malformed compressed span", blosc2_vldecompress_block_into_ctx(sc->dctx, lazy, size, 0, output, 128) < 0);
+    memcpy(lazy + trailer + 12, &saved_span, 4);
+    if (owned) free(lazy);
+
+    uint8_t* chunk = NULL;
+    size = blosc2_schunk_get_chunk(sc, 0, &chunk, &owned);
+    mu_assert("get full fixture", size > 0);
+    uint8_t* changed = malloc((size_t)size);
+    memcpy(changed, chunk, (size_t)size);
+    uint32_t start = (uint32_t)changed[32] | ((uint32_t)changed[33] << 8) |
+                     ((uint32_t)changed[34] << 16) | ((uint32_t)changed[35] << 24);
+    changed[start] = 255; changed[start + 1] = 255;
+    changed[start + 2] = 255; changed[start + 3] = 127;
+    mu_assert("oversized size prefix", blosc2_vldecompress_block_into_ctx(sc->dctx, changed, size, 0, output, 128) < 0);
+    free(changed);
+    if (owned) free(chunk);
+    blosc2_schunk_free(sc);
+    blosc2_remove_urlpath(path);
+  }
+  return EXIT_SUCCESS;
+}
+
+static int64_t bounded_read_bytes;
+static int64_t bounded_read(void** ptr, int64_t size, int64_t nitems, int64_t position, void* stream) {
+  bounded_read_bytes += size * nitems;
+  return blosc2_stdio_read(ptr, size, nitems, position, stream);
+}
+
+static char *test_bounded_vl_selective_io(void) {
+  blosc2_io_cb callback = *blosc2_get_io_cb(BLOSC2_IO_FILESYSTEM);
+  callback.id = 245;
+  callback.read = bounded_read;
+  mu_assert("register counting I/O", blosc2_register_io_cb(&callback) == 0);
+  for (int backend = 0; backend < 2; backend++) {
+    const char* path = backend ? "test_bounded_io_sparse.b2frame" : "test_bounded_io.b2frame";
+    blosc2_schunk* sc = make_lazy_vl_schunk(path, backend == 0);
+    mu_assert("create counting fixture", sc != NULL);
+    blosc2_schunk_free(sc);
+    blosc2_io io = {.id = 245};
+    sc = blosc2_schunk_open_udio(path, &io);
+    mu_assert("open counting fixture", sc != NULL);
+    uint8_t* lazy = NULL;
+    bool owned = false;
+    int size = blosc2_schunk_get_lazychunk(sc, 0, &lazy, &owned);
+    mu_assert("get counting lazy source", size > 0);
+    bounded_read_bytes = 0;
+    int32_t queried = -1;
+    mu_assert("size query", blosc2_vlblock_get_nbytes_ctx(sc->dctx, lazy, size, 1, &queried) == 0);
+    mu_assert("query reads only prefix", bounded_read_bytes == 4 && queried == srcsizes[1]);
+    uint8_t output[128];
+    bounded_read_bytes = 0;
+    mu_assert("undersized buffer admission", blosc2_vldecompress_block_into_ctx(sc->dctx, lazy, size, 1,
+              output, queried - 1) == BLOSC2_ERROR_WRITE_BUFFER);
+    mu_assert("undersized buffer reads only prefix", bounded_read_bytes == 4);
+    bounded_read_bytes = 0;
+    int rc = blosc2_vldecompress_block_into_ctx(sc->dctx, lazy, size, 1, output, sizeof(output));
+    int32_t selected_span;
+    memcpy(&selected_span, lazy + 32 + 3 * 4 + 12 + 4, 4);
+    mu_assert("selected output", rc == queried && memcmp(output, srcs[1], (size_t)queried) == 0);
+    mu_assert("only selected span is read", bounded_read_bytes == 4 + selected_span);
+    if (!backend) {
+      /* A prior query is not an authorization to trust a subsequently changed
+       * prefix. Revalidate on every decompression call before scratch setup. */
+      int64_t chunk_offset;
+      memcpy(&chunk_offset, lazy + 32 + 3 * 4 + 4, 8);
+      uint32_t block_start = (uint32_t)lazy[36] | ((uint32_t)lazy[37] << 8) |
+          ((uint32_t)lazy[38] << 16) | ((uint32_t)lazy[39] << 24);
+      FILE* fp = fopen(path, "r+b");
+      mu_assert("open mutable fixture", fp != NULL);
+      mu_assert("seek prefix", fseek(fp, (long)(chunk_offset + block_start), SEEK_SET) == 0);
+      uint8_t prefix[4] = {(uint8_t)(queried + 1), 0, 0, 0};
+      mu_assert("write changed prefix", fwrite(prefix, 1, 4, fp) == 4);
+      fclose(fp);
+      bounded_read_bytes = 0;
+      mu_assert("changed prefix admission", blosc2_vldecompress_block_into_ctx(sc->dctx, lazy, size, 1,
+                output, queried) == BLOSC2_ERROR_WRITE_BUFFER);
+      mu_assert("changed prefix reads only prefix", bounded_read_bytes == 4);
+    }
+    if (owned) free(lazy);
+    blosc2_schunk_free(sc);
+    blosc2_remove_urlpath(path);
+  }
+  return EXIT_SUCCESS;
+}
+
+static char *test_bounded_vl_selected_scratch(void) {
+  blosc2_cparams cp = BLOSC2_CPARAMS_DEFAULTS;
+  cp.typesize = 1;
+  cp.nthreads = 1;
+  blosc2_context* cctx = blosc2_create_cctx(cp);
+  blosc2_dparams dp = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context* dctx = blosc2_create_dctx(dp);
+  uint8_t large[65536] = {0};
+  const void* blocks[] = {block0, large};
+  int32_t sizes[] = {sizeof(block0), sizeof(large)};
+  uint8_t compressed[66000];
+  int size = blosc2_vlcompress_ctx(cctx, blocks, sizes, 2, compressed, sizeof(compressed));
+  mu_assert("mixed-size compression", size > 0);
+  int32_t queried;
+  mu_assert("allocation-free query", blosc2_vlblock_get_nbytes_ctx(dctx, compressed, size, 0, &queried) == 0
+            && dctx->serial_context == NULL && dctx->blocknbytes == NULL);
+  uint8_t output[sizeof(block0)];
+  mu_assert("small selected output", blosc2_vldecompress_block_into_ctx(dctx, compressed, size, 0,
+            output, sizeof(output)) == sizeof(output));
+  mu_assert("scratch size follows selected block", dctx->blocksize == sizeof(output));
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+  return EXIT_SUCCESS;
+}
+
 static char *all_tests(void) {
+  mu_run_test(test_bounded_vl_apis);
+  mu_run_test(test_bounded_vl_selective_io);
+  mu_run_test(test_bounded_vl_selected_scratch);
   for (int i = 0; i < (int)ARRAY_SIZE(backends); ++i) {
     tdata = backends[i];
     mu_run_test(test_vlblocks_roundtrip);

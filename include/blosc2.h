@@ -1595,11 +1595,52 @@ BLOSC_EXPORT int blosc2_vlchunk_get_nblocks(const void* src, int32_t srcsize,
  *   VL blocks or if @p nblock is out of range.
  */
 BLOSC_EXPORT int blosc2_vldecompress_block_ctx(blosc2_context* context,
-                                               const void* src,
-                                               int32_t srcsize,
-                                               int32_t nblock,
-                                               uint8_t** dest,
-                                               int32_t* destsize);
+                                             const void* src, int32_t srcsize,
+                                             int32_t nblock, uint8_t** dest,
+                                             int32_t* destsize);
+
+/**
+ * @brief Query the uncompressed size of one VL block, without allocating
+ * payload, dictionary, or decompression scratch buffers.
+ *
+ * @param context A decompression context. For lazy chunks it must be associated
+ * with the owning SChunk through blosc2_dparams.schunk.
+ * @param src A compressed VL chunk, or a lazy chunk.
+ * @param srcsize Actual source buffer length (the size returned by
+ * #blosc2_schunk_get_lazychunk for lazy chunks, not header cbytes).
+ * @param nblock Zero-based block index.
+ * @param nbytes Receives the selected block size on success; unchanged on error.
+ * @return 0 on success, a negative error code on failure.
+ *
+ * Lazy queries read only the selected four-byte size prefix. This is an
+ * admission query, not full payload validation; decompression revalidates the
+ * size. Source buffers, contexts and backing storage must not be modified
+ * concurrently. The context is not reinitialized by this query.
+ */
+BLOSC_EXPORT int blosc2_vlblock_get_nbytes_ctx(blosc2_context* context,
+                                            const void* src, int32_t srcsize,
+                                            int32_t nblock, int32_t* nbytes);
+
+/**
+ * @brief Decompress one VL block into a caller-owned buffer.
+ *
+ * Parameters have the same meaning as #blosc2_vlblock_get_nbytes_ctx.
+ * @param dest Caller-provided output buffer, which must not overlap src.
+ * @param destsize Capacity of dest in bytes.
+ * @return Bytes decompressed, or a negative error code. An insufficient
+ * destination returns BLOSC2_ERROR_WRITE_BUFFER before dictionary or scratch
+ * allocation. The output buffer may be partially modified on other errors.
+ *
+ * Never writes beyond destsize. Decompression scratch is sized from the
+ * selected admitted block, not other blocks. Lazy spans are checked against
+ * their chunk and owning frame before reading. This is not a total-memory
+ * budget: block tables, compressed input, dictionaries, and codec internals
+ * have separate allocations. No output buffer is allocated by this function.
+ */
+BLOSC_EXPORT int blosc2_vldecompress_block_into_ctx(blosc2_context* context,
+                                                 const void* src, int32_t srcsize,
+                                                 int32_t nblock, void* dest,
+                                                 int32_t destsize);
 
 /**
  * @brief Create a chunk made of zeros.

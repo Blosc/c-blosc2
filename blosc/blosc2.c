@@ -2563,6 +2563,16 @@ static void clear_context_decompression_dict(blosc2_context* context) {
 
 static int read_lazy_chunk_bytes(blosc2_context* context, int32_t offset, uint8_t* buffer, int32_t nbytes,
                                  const char* open_error, const char* read_error) {
+  int32_t chunk_cbytes;
+  if (context->src == NULL || context->srcsize < BLOSC_EXTENDED_HEADER_LENGTH ||
+      offset < 0 || nbytes < 0 || context->nblocks <= 0 ||
+      blosc2_cbuffer_sizes(context->src, NULL, &chunk_cbytes, NULL) < 0 ||
+      offset > chunk_cbytes || nbytes > chunk_cbytes - offset) {
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
+  int64_t trailer_end = BLOSC_EXTENDED_HEADER_LENGTH +
+      (int64_t)context->nblocks * sizeof(int32_t) + sizeof(int32_t) + sizeof(int64_t);
+  if (trailer_end > context->srcsize) return BLOSC2_ERROR_READ_BUFFER;
   if (context->schunk == NULL || context->schunk->frame == NULL) {
     BLOSC_TRACE_ERROR("Lazy chunk needs an associated super-chunk with a frame.");
     return BLOSC2_ERROR_INVALID_PARAM;
@@ -2581,6 +2591,11 @@ static int read_lazy_chunk_bytes(blosc2_context* context, int32_t offset, uint8_
   int64_t chunk_offset;
   memcpy(&nchunk_lazy, context->src + trailer_offset, sizeof(nchunk_lazy));
   memcpy(&chunk_offset, context->src + trailer_offset + (int32_t)sizeof(int32_t), sizeof(chunk_offset));
+  if (nchunk_lazy < 0 || chunk_offset < 0 || frame->file_offset < 0 ||
+      (!frame->sframe && (chunk_offset < FRAME_HEADER_MINLEN ||
+       chunk_offset > frame->len || chunk_cbytes > frame->len - chunk_offset))) {
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
 
   void* fp = NULL;
   int64_t io_pos;
@@ -2615,15 +2630,19 @@ static int read_lazy_chunk_bytes(blosc2_context* context, int32_t offset, uint8_
     BLOSC_TRACE_ERROR("%s", open_error);
     return BLOSC2_ERROR_FILE_OPEN;
   }
+  if (io_pos > INT64_MAX - nbytes) {
+    frame_reader_release(frame, io_cb, fp);
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
 
   uint8_t* read_buffer = buffer;
   int64_t rbytes = io_cb->read((void**)&read_buffer, 1, nbytes, io_pos, fp);
   frame_reader_release(frame, io_cb, fp);
   if (read_buffer != buffer) {
-    memcpy(buffer, read_buffer, (size_t)nbytes);
+    if (rbytes == nbytes && read_buffer != NULL) memcpy(buffer, read_buffer, (size_t)nbytes);
     free(read_buffer);
   }
-  if (rbytes != nbytes) {
+  if (rbytes != nbytes || read_buffer == NULL) {
     BLOSC_TRACE_ERROR("%s", read_error);
     return BLOSC2_ERROR_FILE_READ;
   }
@@ -4164,6 +4183,87 @@ static int decompress_single_vlblock(blosc2_context* context, int32_t nblock,
   return bsize;
 }
 
+
+/* Admission preflight: no payload, dictionary, or thread-buffer allocation.
+ * Lazy sources read just the selected size prefix through the owning frame. */
+int blosc2_vlblock_get_nbytes_ctx(blosc2_context* context, const void* src, int32_t srcsize,
+                                int32_t nblock, int32_t* nbytes) {
+  if (context == NULL || context->do_compress != 0 || src == NULL || nbytes == NULL)
+    return BLOSC2_ERROR_INVALID_PARAM;
+  blosc_header header;
+  int rc = read_chunk_header(src, srcsize, true, &header);
+  if (rc < 0) return rc;
+  if (!(header.blosc2_flags2 & BLOSC2_VL_BLOCKS) ||
+      (header.flags & BLOSC_MEMCPYED) || (header.blosc2_flags >> 4) != 0)
+    return BLOSC2_ERROR_INVALID_PARAM;
+  int32_t count = header.blocksize;
+  if (nblock < 0 || nblock >= count) return BLOSC2_ERROR_INVALID_PARAM;
+  int64_t table_end = BLOSC_EXTENDED_HEADER_LENGTH + (int64_t)count * sizeof(int32_t);
+  bool lazy = header.blosc2_flags & 0x08u;
+  int64_t required = table_end + (lazy ? sizeof(int32_t) + sizeof(int64_t) +
+      (int64_t)count * sizeof(int32_t) : 0);
+  if (required > srcsize || header.nbytes <= 0 || (!lazy && header.cbytes > srcsize))
+    return BLOSC2_ERROR_READ_BUFFER;
+  const uint8_t* bytes = src;
+  int32_t start = sw32_(bytes + BLOSC_EXTENDED_HEADER_LENGTH + (int64_t)nblock * 4);
+  int32_t end = nblock + 1 < count ?
+      sw32_(bytes + BLOSC_EXTENDED_HEADER_LENGTH + (int64_t)(nblock + 1) * 4) : header.cbytes;
+  if (start < table_end || end > header.cbytes || end <= start || end - start <= 4)
+    return BLOSC2_ERROR_INVALID_HEADER;
+  uint8_t prefix[4];
+  if (lazy) {
+    int32_t span;
+    memcpy(&span, bytes + table_end + sizeof(int32_t) + sizeof(int64_t) + (int64_t)nblock * 4, 4);
+    if (span != end - start) return BLOSC2_ERROR_INVALID_HEADER;
+    blosc2_context probe = {0};
+    probe.schunk = context->schunk;
+    probe.src = src;
+    probe.srcsize = srcsize;
+    probe.nblocks = count;
+    rc = read_lazy_chunk_bytes(&probe, start, prefix, 4,
+        "Cannot open frame for VL size query.", "Cannot read VL size prefix.");
+    if (rc < 0) return rc;
+  }
+  else {
+    memcpy(prefix, bytes + start, 4);
+  }
+  int32_t size = sw32_(prefix);
+  if (size <= 0 || size > header.nbytes || size > BLOSC2_MAXBLOCKSIZE)
+    return BLOSC2_ERROR_INVALID_HEADER;
+  *nbytes = size;
+  return 0;
+}
+
+int blosc2_vldecompress_block_into_ctx(blosc2_context* context, const void* src, int32_t srcsize,
+                                     int32_t nblock, void* dest, int32_t destsize) {
+  if (dest == NULL || destsize < 0) return BLOSC2_ERROR_INVALID_PARAM;
+  int32_t size;
+  int rc = blosc2_vlblock_get_nbytes_ctx(context, src, srcsize, nblock, &size);
+  if (rc < 0) return rc;
+  if (size > destsize) return BLOSC2_ERROR_WRITE_BUFFER;
+  blosc_header header;
+  rc = read_chunk_header(src, srcsize, true, &header);
+  if (rc < 0) return rc;
+  rc = initialize_context_decompression(context, &header, src, srcsize, NULL, header.nbytes);
+  if (rc < 0) return rc;
+  if (context->use_dict && sw32_(context->bstarts + nblock) <
+      BLOSC_EXTENDED_HEADER_LENGTH + (int64_t)context->nblocks * 4 + 4 + context->dict_size)
+    return BLOSC2_ERROR_INVALID_HEADER;
+  /* Never size scratch from a different block (or max compressed lazy span). */
+  context->blocksize = size;
+  context->blocknbytes[nblock] = size;
+  if (context->serial_context != NULL && context->serial_context->tmp_blocksize != size) {
+    free_thread_context(context->serial_context);
+    context->serial_context = NULL;
+  }
+  if (context->serial_context == NULL) context->serial_context = create_thread_context(context, 0);
+  if (context->serial_context == NULL) return BLOSC2_ERROR_MEMORY_ALLOC;
+  rc = blosc_d(context->serial_context, size, 0, false, context->src, context->srcsize,
+               sw32_(context->bstarts + nblock), nblock, dest, 0,
+               context->serial_context->tmp, context->serial_context->tmp2);
+  if (rc < 0) return rc;
+  return rc == size ? rc : BLOSC2_ERROR_DATA;
+}
 
 int blosc2_vldecompress_block_ctx(blosc2_context* context, const void* src, int32_t srcsize,
                                   int32_t nblock, uint8_t** dest, int32_t* destsize) {

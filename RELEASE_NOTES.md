@@ -6,6 +6,14 @@ Changes from 3.3.5 to 3.3.6
 
 #XXX version-specific blurb XXX#
 
+* Added `blosc2_vlblock_get_nbytes_ctx()` to query one block's uncompressed size
+  without payload, dictionary, or scratch allocation. Lazy queries read only
+  the selected four-byte prefix.
+* Added `blosc2_vldecompress_block_into_ctx()` for single-block decompression
+  into a caller-owned buffer. Capacity is checked before dictionary/scratch
+  allocation, and scratch is sized from the admitted block. Both APIs support
+  ordinary and lazy VL chunks. The existing allocating API is unchanged.
+
 Changes from 3.3.4 to 3.3.5
 ===========================
 
