@@ -75,7 +75,7 @@ static void make_filters(uint8_t *filters, uint8_t *filters_meta, uint8_t filter
 
 
 /* ------------------------------------------------------------------ */
-/* Test 1: nthreads=1 never allocates a pool                          */
+/* nthreads=1 never allocates a pool                                 */
 /* ------------------------------------------------------------------ */
 static char *test_nthreads1_no_pool(void)
 {
@@ -104,7 +104,7 @@ static char *test_nthreads1_no_pool(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* Test 2: single-block jobs stay serial even when nthreads > 1       */
+/* single-block jobs stay serial even when nthreads > 1              */
 /* ------------------------------------------------------------------ */
 static char *test_single_block_multithread_request_no_pool(void)
 {
@@ -130,7 +130,7 @@ static char *test_single_block_multithread_request_no_pool(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 3: configured threads may exceed available blocks             */
+/* configured threads may exceed available blocks                    */
 /* ------------------------------------------------------------------ */
 static char *test_more_threads_than_blocks(void)
 {
@@ -174,7 +174,7 @@ static char *test_more_threads_than_blocks(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 4: contexts with the same nthreads share one pool             */
+/* contexts with the same nthreads share one pool                    */
 /* ------------------------------------------------------------------ */
 static char *test_same_nthreads_share_pool(void)
 {
@@ -209,7 +209,7 @@ static char *test_same_nthreads_share_pool(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 3: different nthreads → different pools                        */
+/* different nthreads → different pools                              */
 /* ------------------------------------------------------------------ */
 static char *test_different_nthreads_different_pools(void)
 {
@@ -241,7 +241,7 @@ static char *test_different_nthreads_different_pools(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 4: dynamic nthreads change triggers pool rebind               */
+/* dynamic nthreads change triggers pool rebind                      */
 /* ------------------------------------------------------------------ */
 static char *test_dynamic_nthreads_rebind(void)
 {
@@ -286,7 +286,7 @@ static char *test_dynamic_nthreads_rebind(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 5: round-trip with shuffle filter, multi-threaded             */
+/* round-trip with shuffle filter, multi-threaded                    */
 /* ------------------------------------------------------------------ */
 static char *test_roundtrip_shuffle_multithreaded(void)
 {
@@ -297,7 +297,7 @@ static char *test_roundtrip_shuffle_multithreaded(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 6: round-trip with delta filter, multi-threaded               */
+/* round-trip with delta filter, multi-threaded                      */
 /* ------------------------------------------------------------------ */
 static char *test_roundtrip_delta_multithreaded(void)
 {
@@ -308,7 +308,7 @@ static char *test_roundtrip_delta_multithreaded(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 7: round-trip with bitshuffle filter, multi-threaded          */
+/* round-trip with bitshuffle filter, multi-threaded                 */
 /* ------------------------------------------------------------------ */
 static char *test_roundtrip_bitshuffle_multithreaded(void)
 {
@@ -319,7 +319,7 @@ static char *test_roundtrip_bitshuffle_multithreaded(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 8: pool ref-count drops to 0 on last free (no crash)          */
+/* pool ref-count drops to 0 on last free (no crash)                 */
 /* ------------------------------------------------------------------ */
 static char *test_pool_refcount_and_destroy(void)
 {
@@ -344,7 +344,7 @@ static char *test_pool_refcount_and_destroy(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 9: compression + decompression with delta, nthreads=1         */
+/* compression + decompression with delta, nthreads=1                */
 /* ------------------------------------------------------------------ */
 static char *test_roundtrip_delta_serial(void)
 {
@@ -355,7 +355,7 @@ static char *test_roundtrip_delta_serial(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 10: many contexts share one pool                              */
+/* many contexts share one pool                                      */
 /* ------------------------------------------------------------------ */
 static char *test_many_contexts_share_pool(void)
 {

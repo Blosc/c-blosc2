@@ -2364,17 +2364,17 @@ static int do_job(blosc2_context* context) {
   context->dref_not_init = 1;
 
   /* Apply thread-count changes before deciding whether this operation actually
-     needs a parallel backend.  POSIX can defer shared-pool startup for small
-     single-block operations.  Windows keeps its existing per-context thread
-     lifecycle and starts/rebinds the backend eagerly. */
+     needs a parallel backend.  POSIX defers backend startup for serial jobs.
+     Windows keeps its existing per-context thread lifecycle and starts/rebinds
+     the backend eagerly. */
 #if defined(_WIN32)
   int rc = check_nthreads(context, true);
 #else
   int rc = check_nthreads(context, false);
 #endif
 
-  /* Run the serial version when nthreads is 1, when the buffers are not larger
-     than blocksize, or when the parallel backend failed to start */
+  /* Run serially with one thread, with fewer than two full blocks of source
+     data, or if thread configuration/backend setup fails. */
   if (context->nthreads == 1 || (context->sourcesize / context->blocksize) <= 1 || rc < 0) {
     if (ensure_serial_context(context) < 0) {
       return BLOSC2_ERROR_THREAD_CREATE;
@@ -2384,6 +2384,7 @@ static int do_job(blosc2_context* context) {
   else {
     rc = check_nthreads(context, true);
     if (rc < 0) {
+      /* Backend startup failed; run serially and retry on the next parallel job. */
       if (ensure_serial_context(context) < 0) {
         return BLOSC2_ERROR_THREAD_CREATE;
       }
