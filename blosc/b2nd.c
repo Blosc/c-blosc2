@@ -928,7 +928,8 @@ int64_t b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, 
   // 0-dim case
   if (ndim == 0) {
     *chunks_idx = malloc(1 * sizeof(int64_t));
-    *chunks_idx[0] = 0;
+    BLOSC_ERROR_NULL(*chunks_idx, BLOSC2_ERROR_MEMORY_ALLOC);
+    (*chunks_idx)[0] = 0;
     return 1;
   }
 
@@ -958,12 +959,19 @@ int64_t b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, 
       pos += array->chunkshape[i];
     }
     update_shape[i] = pos / array->chunkshape[i] - update_start[i];
-    update_nchunks *= update_shape[i];
+    if (b2nd_mul_overflow_int64(update_nchunks, update_shape[i], &update_nchunks)) {
+      BLOSC_TRACE_ERROR("The number of chunks spanned by the slice overflows");
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
   }
 
   int64_t nchunks = 0;
-  // Initially we do not know the number of chunks that will be affected
-  *chunks_idx = malloc(array->sc->nchunks * sizeof(int64_t));
+  // The loop below writes at most one index per iteration, so size the buffer
+  // from update_nchunks.  sc->nchunks only equals that bound when the shape and
+  // chunkshape in the b2nd metalayer agree with the chunks actually stored,
+  // which is not true for a crafted container.
+  *chunks_idx = malloc((size_t)update_nchunks * sizeof(int64_t));
+  BLOSC_ERROR_NULL(*chunks_idx, BLOSC2_ERROR_MEMORY_ALLOC);
   int64_t *ptr = *chunks_idx;
   for (int64_t update_nchunk = 0; update_nchunk < update_nchunks; ++update_nchunk) {
     int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
@@ -996,8 +1004,8 @@ int64_t b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, 
     nchunks++;
   }
 
-  if (nchunks < array->sc->nchunks) {
-    *chunks_idx = realloc(ptr, nchunks * sizeof(int64_t));
+  if (nchunks < update_nchunks) {
+    *chunks_idx = realloc(ptr, (size_t)nchunks * sizeof(int64_t));
   }
 
   return nchunks;
