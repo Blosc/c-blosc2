@@ -11,6 +11,7 @@ if(BUILD_TESTS)
     add_executable(test_zfp_rate_float test_zfp_rate_float.c)
     add_executable(test_zfp_rate_getitem test_zfp_rate_getitem.c)
     add_executable(test_zfp_oversized_blockshape test_zfp_oversized_blockshape.c)
+    add_executable(test_zfp_getcell_oversized_ndim test_zfp_getcell_oversized_ndim.c)
     # Define the BLOSC_TESTING symbol so normally-hidden functions
     # aren't hidden from the view of the test programs.
     set_property(
@@ -28,12 +29,16 @@ if(BUILD_TESTS)
     set_property(
             TARGET test_zfp_oversized_blockshape
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
+    set_property(
+            TARGET test_zfp_getcell_oversized_ndim
+            APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
 
     target_link_libraries(test_zfp_acc_float blosc_testing)
     target_link_libraries(test_zfp_prec_float blosc_testing)
     target_link_libraries(test_zfp_rate_float blosc_testing)
     target_link_libraries(test_zfp_rate_getitem blosc_testing)
     target_link_libraries(test_zfp_oversized_blockshape blosc_testing)
+    target_link_libraries(test_zfp_getcell_oversized_ndim blosc_testing)
 
     # tests
     add_test(NAME test_plugin_test_zfp_acc_float
@@ -46,6 +51,8 @@ if(BUILD_TESTS)
         COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_zfp_rate_getitem>)
     add_test(NAME test_plugin_test_zfp_oversized_blockshape
         COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_zfp_oversized_blockshape>)
+    add_test(NAME test_plugin_test_zfp_getcell_oversized_ndim
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_zfp_getcell_oversized_ndim>)
 
     # Copy test files
     file(GLOB TESTS_DATA ../../test_data/example_day_month_temp.b2nd ../../test_data/example_item_prices.b2nd)
