@@ -988,7 +988,15 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
         meta = true;
         uint8_t *pmeta = context->schunk->metalayers[nmetalayer]->content;
         ndim = (int8_t) pmeta[2];
-        assert(ndim <= ZFP_MAX_DIM);
+        // ndim comes straight from the (attacker-controlled) b2nd metalayer and
+        // is only an assert away from driving the blockmeta[ZFP_MAX_DIM] writes
+        // below; asserts are compiled out in release builds, so a crafted ndim
+        // past ZFP_MAX_DIM walks off both pmeta and the stack array.  Reject it
+        // the same way the other ZFP decoders do.
+        if (ndim <= 0 || ndim > ZFP_MAX_DIM) {
+          BLOSC_TRACE_ERROR("ndim %d is out of range for ZFP", ndim);
+          return BLOSC2_ERROR_DATA;
+        }
         pmeta += (6 + ndim * 9 + ndim * 5);
         for (int8_t i = 0; (uint8_t) i < ndim; i++) {
           pmeta += 1;
