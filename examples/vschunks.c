@@ -12,17 +12,26 @@
   maintains chunk order internally across mutation. Unlike a
   flat fixed-width layout, such as typical C arrays, the schunk
   does not need every chunk to expand to the same byte size.
+
+  examples/vlblocks.c showcases similar behavior at a different
+  abstraction layer. That example focuses on variable-length 
+  blocks within a chunk, and this example focuses on 
+  variable-sized chunks within a schunk. They differ as well in
+  that chunks do not expose append or replace operations for
+  the blocks within, whereas schunks do support append and
+  replace operations for the chunks within.
 */
 
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "blosc2.h"
 
 static const char short_string[] = "short";
 static const char longer_string[] = "a bit longer string";
+static const char update_string[] = "an update to the bit longer string";
 static const char longest_string[] = "this is the longest string stored in the chunk";
 
 static int compress_string_to_chunk(const char* string, uint8_t** chunk, blosc2_schunk* schunk) {
@@ -42,17 +51,33 @@ static int compress_string_to_chunk(const char* string, uint8_t** chunk, blosc2_
   return cbytes;
 }
 
-static int decompress_and_validate_chunk(blosc2_schunk* schunk, int current_chunk, const char* expected_string) {
+static int print_and_validate_chunk(blosc2_schunk* schunk, int current_chunk, const char* expected_string) {
   char buffer[64] = {0};
   int32_t dsize = blosc2_schunk_decompress_chunk(schunk, current_chunk, buffer, (int32_t)sizeof(buffer));
 
   if (dsize != (int32_t)strlen(expected_string) + 1) {
-    fprintf(stderr, "unexpected decompression size %d for string %s.\n", dsize, expected_string);
+    fprintf(stderr, "unexpected decompression size %d for string: %s.\n", dsize, expected_string);
     return -1;
   }
   if (strcmp(buffer, expected_string) != 0) {
-    fprintf(stderr, "unexpected decompressed string %s for string %s.\n", buffer, expected_string);
+    fprintf(stderr, "unexpected decompressed result: %s. expected result: %s.\n", buffer, expected_string);
     return -2;
+  }
+
+  printf("Verified content of chunk %d (%d bytes): %s\n", current_chunk, dsize, buffer);
+
+  return 0;
+}
+
+static int print_and_validate_chunks(blosc2_schunk* schunk, size_t nchunks, const int chunk_indexes[], const char* expected_results[]) {
+  int rc = 0;
+  for (size_t i = 0; i < nchunks; i++) {
+    int current_chunk = chunk_indexes[i];
+    const char* expected_string = expected_results[i];
+    rc = print_and_validate_chunk(schunk, current_chunk, expected_string);
+    if (rc < 0) {
+      return rc;
+    }
   }
 
   return 0;
@@ -65,6 +90,7 @@ int main(void) {
   blosc2_schunk *schunk = NULL;
   uint8_t *short_chunk = NULL;
   uint8_t *longer_chunk = NULL;
+  uint8_t *update_chunk = NULL;
   uint8_t *longest_chunk = NULL;
 
   blosc2_init();
@@ -116,19 +142,30 @@ int main(void) {
     goto cleanup;
   }
 
-  printf("checkpoint. TODO make this better\n");
+  printf("Verifying content of schunk after appends...\n");
+  int chunk_indexes[] = {0, 1, 2};
+  const char *expected_results[] = {short_string, longer_string, longest_string};
+  int nchunks = sizeof(chunk_indexes) / sizeof(chunk_indexes[0]);
+  int print_rc = print_and_validate_chunks(schunk, nchunks, chunk_indexes, expected_results);
+  if (print_rc < 0) {
+    goto cleanup;
+  }
 
-  int d_retval = 0;
-  d_retval = decompress_and_validate_chunk(schunk, 0, short_string);
-  if (d_retval < 0) {
+  int update_cbytes = compress_string_to_chunk(update_string, &update_chunk, schunk);
+  if (update_cbytes <= 0) {
     goto cleanup;
   }
-  d_retval = decompress_and_validate_chunk(schunk, 1, longer_string);
-  if (d_retval < 0) {
+
+  num_chunks = blosc2_schunk_update_chunk(schunk, 1, update_chunk, true);
+  if (num_chunks != 3) {
+    fprintf(stderr, "failed to update chunk, got unexpected number of chunks: %d\n", num_chunks);
     goto cleanup;
   }
-  d_retval = decompress_and_validate_chunk(schunk, 2, longest_string);
-  if (d_retval < 0) {
+
+  printf("Verifying content of schunk after update...\n");
+  expected_results[1] = update_string;
+  print_rc = print_and_validate_chunks(schunk, nchunks, chunk_indexes, expected_results);
+  if (print_rc < 0) {
     goto cleanup;
   }
 
@@ -141,6 +178,7 @@ cleanup:
 
   free(short_chunk);
   free(longer_chunk);
+  free(update_chunk);
   free(longest_chunk);
 
   blosc2_remove_urlpath(urlpath);
