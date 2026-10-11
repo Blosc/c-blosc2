@@ -3,25 +3,26 @@
   https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 
-  Example program demonstrating how to store chunks of different
-  lengths inside a single variable-sized-chunk schunk.
+  Example program showing how to store variable-sized-chunk
+  (chunks of different lengths) inside one schunk (super-chunk).
 
   Appends, updates, and indexed retrieval of variable-sized
   chunks within a schunk are possible because each chunk header
-  contains the chunk's uncompressed byte count, and the schunk 
+  contains the chunk's uncompressed byte count, and the schunk
   maintains chunk order internally across mutation. Unlike a
-  flat fixed-width layout, such as typical C arrays, the schunk
+  fixed-width layout, such as in typical C arrays, the schunk
   does not need every chunk to expand to the same byte size.
 
   examples/vlblocks.c showcases similar behavior at a different
-  abstraction layer. That example focuses on variable-length 
-  blocks within a chunk, and this example focuses on 
+  abstraction layer. That example focuses on variable-length
+  blocks within a chunk, and this example focuses on
   variable-sized chunks within a schunk. They differ as well in
   that chunks do not expose append or replace operations for
   the blocks within, whereas schunks do support append and
   replace operations for the chunks within.
 */
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,9 +52,9 @@ static int compress_string_to_chunk(const char* string, uint8_t** chunk, blosc2_
   return cbytes;
 }
 
-static int print_and_validate_chunk(blosc2_schunk* schunk, int current_chunk, const char* expected_string) {
+static int print_and_validate_chunk(blosc2_schunk* schunk, int nchunk, const char* expected_string) {
   char buffer[64] = {0};
-  int32_t dsize = blosc2_schunk_decompress_chunk(schunk, current_chunk, buffer, (int32_t)sizeof(buffer));
+  int32_t dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, buffer, (int32_t)sizeof(buffer));
 
   if (dsize != (int32_t)strlen(expected_string) + 1) {
     fprintf(stderr, "unexpected decompression size %d for string: %s.\n", dsize, expected_string);
@@ -64,7 +65,7 @@ static int print_and_validate_chunk(blosc2_schunk* schunk, int current_chunk, co
     return -2;
   }
 
-  printf("Verified content of chunk %d (%d bytes): %s\n", current_chunk, dsize, buffer);
+  printf("Verified content of chunk %d (%d bytes): %s\n", nchunk, dsize, buffer);
 
   return 0;
 }
@@ -105,7 +106,7 @@ int main(void) {
     .cparams = &cparams,
     .dparams = &dparams,
   };
-  
+
   schunk = blosc2_schunk_new(&storage);
   if (schunk == NULL) {
     fprintf(stderr, "failed to create schunk\n");
@@ -125,12 +126,22 @@ int main(void) {
     goto cleanup;
   }
 
+  /*
+    There is also a blosc2_schunk_append_buffer() function that would allow us to
+    directly append the strings as raw buffers. We use blosc2_schunk_append_chunk()
+    for this example instead to demonstrate management with variable-sized chunks.
+
+    In addition, note that blosc2_schunk_append_chunk() has a copy argument that
+    specifies whether the schunk copies the compressed chunk buffer internally or
+    takes ownership of the chunk on success. The blosc2_schunk_update_chunk(),
+    which is used later, also has a copy argument with analogous behavior.
+  */
   int num_chunks = 0;
   num_chunks = blosc2_schunk_append_chunk(schunk, short_chunk, true);
   if (num_chunks != 1) {
     fprintf(stderr, "failed to append chunk for short string\n");
     goto cleanup;
-  } 
+  }
   num_chunks = blosc2_schunk_append_chunk(schunk, longer_chunk, true);
   if (num_chunks != 2) {
     fprintf(stderr, "failed to append chunk for longer string\n");
@@ -145,7 +156,7 @@ int main(void) {
   printf("Verifying content of schunk after appends...\n");
   int chunk_indexes[] = {0, 1, 2};
   const char *expected_results[] = {short_string, longer_string, longest_string};
-  int nchunks = sizeof(chunk_indexes) / sizeof(chunk_indexes[0]);
+  size_t nchunks = sizeof(chunk_indexes) / sizeof(chunk_indexes[0]);
   int print_rc = print_and_validate_chunks(schunk, nchunks, chunk_indexes, expected_results);
   if (print_rc < 0) {
     goto cleanup;
@@ -156,14 +167,29 @@ int main(void) {
     goto cleanup;
   }
 
-  num_chunks = blosc2_schunk_update_chunk(schunk, 1, update_chunk, true);
+  int nchunk_to_update = 1;
+  num_chunks = blosc2_schunk_update_chunk(schunk, nchunk_to_update, update_chunk, true);
   if (num_chunks != 3) {
     fprintf(stderr, "failed to update chunk, got unexpected number of chunks: %d\n", num_chunks);
     goto cleanup;
   }
 
   printf("Verifying content of schunk after update...\n");
-  expected_results[1] = update_string;
+  expected_results[nchunk_to_update] = update_string;
+  print_rc = print_and_validate_chunks(schunk, nchunks, chunk_indexes, expected_results);
+  if (print_rc < 0) {
+    goto cleanup;
+  }
+
+  blosc2_schunk_free(schunk);
+
+  schunk = blosc2_schunk_open(urlpath);
+  if (schunk == NULL) {
+    fprintf(stderr, "failed to reopen schunk\n");
+    goto cleanup;
+  }
+
+  printf("Verifying content of schunk after closing and reopening...\n");
   print_rc = print_and_validate_chunks(schunk, nchunks, chunk_indexes, expected_results);
   if (print_rc < 0) {
     goto cleanup;
