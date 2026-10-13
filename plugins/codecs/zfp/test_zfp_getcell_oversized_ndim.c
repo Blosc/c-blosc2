@@ -113,6 +113,42 @@ int main(void) {
   }
   printf("getitem rejected out-of-range ndim as expected (rc %d)\n", rc);
 
+  /* Test truncated metalayer length (e.g. content_len < 3) */
+  int32_t orig_content_len = 0;
+  for (int i = 0; i < schunk->nmetalayers; i++) {
+    if (strcmp("b2nd", schunk->metalayers[i]->name) == 0) {
+      schunk->metalayers[i]->content[2] = ndim;  /* restore valid ndim */
+      orig_content_len = schunk->metalayers[i]->content_len;
+      schunk->metalayers[i]->content_len = 2;  /* truncated */
+    }
+  }
+  rc = blosc2_getitem_ctx(dctx, chunk_zfp, zfp_cbytes, 0, 1, &item, sizeof(item));
+  if (rc >= 0) {
+    printf("getitem accepted truncated metalayer (rc %d)\n", rc);
+    return -1;
+  }
+  printf("getitem rejected truncated metalayer as expected (rc %d)\n", rc);
+
+  /* Test partially truncated metalayer (truncated before blockshape) */
+  for (int i = 0; i < schunk->nmetalayers; i++) {
+    if (strcmp("b2nd", schunk->metalayers[i]->name) == 0) {
+      schunk->metalayers[i]->content_len = 10;
+    }
+  }
+  rc = blosc2_getitem_ctx(dctx, chunk_zfp, zfp_cbytes, 0, 1, &item, sizeof(item));
+  if (rc >= 0) {
+    printf("getitem accepted partially truncated metalayer (rc %d)\n", rc);
+    return -1;
+  }
+  printf("getitem rejected partially truncated metalayer as expected (rc %d)\n", rc);
+
+  /* Restore original content_len for clean teardown */
+  for (int i = 0; i < schunk->nmetalayers; i++) {
+    if (strcmp("b2nd", schunk->metalayers[i]->name) == 0) {
+      schunk->metalayers[i]->content_len = orig_content_len;
+    }
+  }
+
   blosc2_free_ctx(cctx);
   blosc2_free_ctx(dctx);
   free(data_in);
