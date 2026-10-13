@@ -986,35 +986,43 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
     for (int nmetalayer = 0; nmetalayer < context->schunk->nmetalayers; nmetalayer++) {
       if (strcmp("b2nd", context->schunk->metalayers[nmetalayer]->name) == 0) {
         meta = true;
-        uint8_t *pmeta = context->schunk->metalayers[nmetalayer]->content;
-        ndim = (int8_t) pmeta[2];
-        // ndim comes straight from the (attacker-controlled) b2nd metalayer and
-        // is only an assert away from driving the blockmeta[ZFP_MAX_DIM] writes
-        // below; asserts are compiled out in release builds, so a crafted ndim
-        // past ZFP_MAX_DIM walks off both pmeta and the stack array.  Reject it
-        // the same way the other ZFP decoders do.
-        if (ndim <= 0 || ndim > ZFP_MAX_DIM) {
-          BLOSC_TRACE_ERROR("ndim %d is out of range for ZFP", ndim);
+        int64_t shape[B2ND_MAX_DIM];
+        int32_t chunkshape[B2ND_MAX_DIM];
+        int32_t blockmeta_aux[B2ND_MAX_DIM];
+        int deserialize_rc = b2nd_deserialize_meta_inline(
+            context->schunk->metalayers[nmetalayer]->content,
+            context->schunk->metalayers[nmetalayer]->content_len,
+            &ndim, shape, chunkshape, blockmeta_aux, NULL, NULL);
+        if (deserialize_rc < 0 || ndim <= 0 || ndim > ZFP_MAX_DIM) {
+          BLOSC_TRACE_ERROR("Invalid b2nd meta info (ndim %d)", ndim);
           return BLOSC2_ERROR_DATA;
         }
-        pmeta += (6 + ndim * 9 + ndim * 5);
-        for (int8_t i = 0; (uint8_t) i < ndim; i++) {
-          pmeta += 1;
-          swap_store(blockmeta + i, pmeta, sizeof(int32_t));
-          pmeta += sizeof(int32_t);
+        for (int8_t i = 0; i < ndim; i++) {
+          if (blockmeta_aux[i] <= 0) {
+            BLOSC_TRACE_ERROR("Invalid blockshape[%d] = %d", i, blockmeta_aux[i]);
+            return BLOSC2_ERROR_DATA;
+          }
+          blockmeta[i] = blockmeta_aux[i];
         }
+        context->schunk->ndim = ndim;
+        context->schunk->blockshape = malloc(sizeof(int64_t) * ndim);
+        BLOSC_ERROR_NULL(context->schunk->blockshape, BLOSC2_ERROR_MEMORY_ALLOC);
+        for (int i = 0; i < ndim; ++i) {
+          context->schunk->blockshape[i] = (int64_t) blockmeta[i];
+        }
+        break;
       }
     }
     if (!meta) {
-      return -1;
-    }
-    context->schunk->ndim = ndim;
-    context->schunk->blockshape = malloc(sizeof(int64_t) * ndim);
-    for (int i = 0; i < ndim; ++i) {
-      context->schunk->blockshape[i] = (int64_t) blockmeta[i];
+      BLOSC_TRACE_ERROR("b2nd metalayer not found");
+      return BLOSC2_ERROR_DATA;
     }
   }
   ndim = context->schunk->ndim;
+  if (ndim <= 0 || ndim > ZFP_MAX_DIM) {
+    BLOSC_TRACE_ERROR("ndim %d is out of range for ZFP", ndim);
+    return BLOSC2_ERROR_DATA;
+  }
   int64_t *blockshape = context->schunk->blockshape;
 
   // Compute the coordinates of the cell
