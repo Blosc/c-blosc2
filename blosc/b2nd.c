@@ -944,18 +944,31 @@ int64_t b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, 
     chunks_in_array_strides[i] = chunks_in_array_strides[i + 1] * chunks_in_array[i + 1];
   }
 
+  // Check slice bounds
+  for (int i = 0; i < ndim; ++i) {
+    if (start[i] < 0 || stop[i] < 0) {
+      BLOSC_TRACE_ERROR("Slice bounds must be non-negative");
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    if (start[i] >= stop[i] || start[i] >= array->shape[i]) {
+      *chunks_idx = NULL;
+      return 0;
+    }
+  }
+
   // Compute the number of chunks to update
   int64_t update_start[B2ND_MAX_DIM];
   int64_t update_shape[B2ND_MAX_DIM];
 
   int64_t update_nchunks = 1;
   for (int i = 0; i < ndim; ++i) {
+    int64_t slice_stop = stop[i] > array->extshape[i] ? array->extshape[i] : stop[i];
     int64_t pos = 0;
     while (pos <= start[i]) {
       pos += array->chunkshape[i];
     }
     update_start[i] = pos / array->chunkshape[i] - 1;
-    while (pos < stop[i]) {
+    while (pos < slice_stop) {
       pos += array->chunkshape[i];
     }
     update_shape[i] = pos / array->chunkshape[i] - update_start[i];
@@ -963,6 +976,15 @@ int64_t b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, 
       BLOSC_TRACE_ERROR("The number of chunks spanned by the slice overflows");
       return BLOSC2_ERROR_INVALID_PARAM;
     }
+  }
+
+  if (update_nchunks == 0) {
+    *chunks_idx = NULL;
+    return 0;
+  }
+  if ((uint64_t)update_nchunks > SIZE_MAX / sizeof(int64_t)) {
+    BLOSC_TRACE_ERROR("The number of chunks to allocate exceeds addressable memory");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
   }
 
   int64_t nchunks = 0;
