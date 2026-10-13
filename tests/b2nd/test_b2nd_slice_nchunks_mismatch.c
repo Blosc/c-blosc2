@@ -91,6 +91,41 @@ CUTEST_TEST_TEST(slice_nchunks_mismatch) {
                 b2nd_to_cbuffer(array, &out, 1) < 0);
   B2ND_TEST_ASSERT(b2nd_free(array));
 
+  /* Test slice bounds handling: negative indices must fail */
+  int64_t neg_start = -1;
+  int64_t neg_stop = 10;
+  int64_t *dummy_idx = NULL;
+  blosc2_schunk *schunk_bounds = crafted_schunk(10, 10);
+  CUTEST_ASSERT("cannot build schunk_bounds", schunk_bounds != NULL);
+  CUTEST_ASSERT("negative start must fail",
+                blosc2_get_slice_nchunks(schunk_bounds, &neg_start, &neg_stop, &dummy_idx) == BLOSC2_ERROR_INVALID_PARAM);
+
+  /* Empty slice: start >= stop or start >= shape must return 0 chunks and NULL buffer */
+  int64_t empty_start = 5;
+  int64_t empty_stop = 5;
+  int64_t nchunks_empty = blosc2_get_slice_nchunks(schunk_bounds, &empty_start, &empty_stop, &dummy_idx);
+  CUTEST_ASSERT("start == stop must return 0 chunks", nchunks_empty == 0);
+  CUTEST_ASSERT("start == stop must leave chunks_idx NULL", dummy_idx == NULL);
+
+  empty_start = 10;
+  empty_stop = 15;
+  nchunks_empty = blosc2_get_slice_nchunks(schunk_bounds, &empty_start, &empty_stop, &dummy_idx);
+  CUTEST_ASSERT("start >= shape must return 0 chunks", nchunks_empty == 0);
+  CUTEST_ASSERT("start >= shape must leave chunks_idx NULL", dummy_idx == NULL);
+
+  /* Out-of-bounds stop clamping: stop well beyond shape must not cause oversized allocation */
+  int64_t large_start = 0;
+  int64_t large_stop = INT64_MAX / 2;
+  int64_t nchunks_clamped = blosc2_get_slice_nchunks(schunk_bounds, &large_start, &large_stop, &dummy_idx);
+  CUTEST_ASSERT("stop beyond shape must be clamped to array extent", nchunks_clamped == 10);
+  CUTEST_ASSERT("chunks_idx must not be NULL", dummy_idx != NULL);
+  CUTEST_ASSERT("chunks_idx[0] should be 0", dummy_idx[0] == 0);
+  CUTEST_ASSERT("chunks_idx[9] should be 9", dummy_idx[9] == 9);
+  free(dummy_idx);
+  dummy_idx = NULL;
+
+  blosc2_schunk_free(schunk_bounds);
+
   return 0;
 }
 
