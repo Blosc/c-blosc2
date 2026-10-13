@@ -1026,8 +1026,14 @@ int64_t b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, 
     nchunks++;
   }
 
-  if (nchunks < update_nchunks) {
-    *chunks_idx = realloc(ptr, (size_t)nchunks * sizeof(int64_t));
+  if (nchunks == 0) {
+    free(ptr);
+    *chunks_idx = NULL;
+  } else if (nchunks < update_nchunks) {
+    int64_t *new_ptr = realloc(ptr, (size_t)nchunks * sizeof(int64_t));
+    if (new_ptr != NULL) {
+      *chunks_idx = new_ptr;
+    }
   }
 
   return nchunks;
