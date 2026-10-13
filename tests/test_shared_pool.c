@@ -17,6 +17,7 @@
 
 #define CHUNKSIZE  (64 * 1024)   /* 64 KiB – large enough for multi-block */
 #define TYPESIZE   8
+#define BLOCKSIZE  (16 * 1024)
 
 /* Global vars */
 int tests_run = 0;
@@ -37,6 +38,7 @@ static char *roundtrip(int16_t nthreads, uint8_t *filters, uint8_t *filters_meta
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.nthreads  = nthreads;
+  cparams.blocksize = BLOCKSIZE;
   cparams.typesize  = typesize;
   cparams.clevel    = clevel;
   memcpy(cparams.filters,      filters,      BLOSC2_MAX_FILTERS);
@@ -73,7 +75,7 @@ static void make_filters(uint8_t *filters, uint8_t *filters_meta, uint8_t filter
 
 
 /* ------------------------------------------------------------------ */
-/* Test 1: nthreads=1 never allocates a pool                          */
+/* nthreads=1 never allocates a pool                                 */
 /* ------------------------------------------------------------------ */
 static char *test_nthreads1_no_pool(void)
 {
@@ -82,6 +84,7 @@ static char *test_nthreads1_no_pool(void)
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.nthreads = 1;
+  cparams.blocksize = BLOCKSIZE;
   cparams.typesize = TYPESIZE;
   memcpy(cparams.filters,      f,  BLOSC2_MAX_FILTERS);
   memcpy(cparams.filters_meta, fm, BLOSC2_MAX_FILTERS);
@@ -100,14 +103,84 @@ static char *test_nthreads1_no_pool(void)
   return EXIT_SUCCESS;
 }
 
+/* ------------------------------------------------------------------ */
+/* single-block jobs stay serial even when nthreads > 1              */
+/* ------------------------------------------------------------------ */
+static char *test_single_block_multithread_request_no_pool(void)
+{
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.nthreads = 4;
+  cparams.blocksize = CHUNKSIZE;
+  cparams.typesize = TYPESIZE;
+
+  static int64_t data[CHUNKSIZE / TYPESIZE];
+  static uint8_t cbuf[CHUNKSIZE * 2];
+  for (int i = 0; i < (int)(sizeof(data)/sizeof(data[0])); i++) data[i] = i;
+
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  mu_assert("create_cctx failed", cctx != NULL);
+  int r = blosc2_compress_ctx(cctx, data, (int32_t)sizeof(data), cbuf, (int32_t)sizeof(cbuf));
+  mu_assert("compress failed", r > 0);
+  mu_assert("single-block job should not acquire a pool", cctx->thread_pool == NULL);
+  mu_assert("single-block job should remain serial", cctx->thread_backend == BLOSC_BACKEND_SERIAL);
+  blosc2_free_ctx(cctx);
+
+  return EXIT_SUCCESS;
+}
+
 
 /* ------------------------------------------------------------------ */
-/* Test 2: contexts with the same nthreads share one pool             */
+/* configured threads may exceed available blocks                    */
+/* ------------------------------------------------------------------ */
+static char *test_more_threads_than_blocks(void)
+{
+#define FEW_BLOCKS 3
+#define MANY_THREADS 16
+  static int64_t data[(FEW_BLOCKS * BLOCKSIZE) / TYPESIZE];
+  static int64_t dest[(FEW_BLOCKS * BLOCKSIZE) / TYPESIZE];
+  static uint8_t cbuf[FEW_BLOCKS * BLOCKSIZE * 2];
+  const int32_t isize = (int32_t)sizeof(data);
+
+  for (int i = 0; i < (int)(sizeof(data) / sizeof(data[0])); i++) data[i] = i;
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.nthreads = MANY_THREADS;
+  cparams.blocksize = BLOCKSIZE;
+  cparams.typesize = TYPESIZE;
+
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  mu_assert("create_cctx failed", cctx != NULL);
+  int cbytes = blosc2_compress_ctx(cctx, data, isize, cbuf, (int32_t)sizeof(cbuf));
+  mu_assert("compress failed", cbytes > 0);
+  mu_assert("expected exactly three blocks", cctx->nblocks == FEW_BLOCKS);
+  mu_assert("configured thread count should remain 16", cctx->nthreads == MANY_THREADS);
+  mu_assert("16-thread pool should exist", cctx->thread_pool != NULL);
+  blosc2_free_ctx(cctx);
+
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  dparams.nthreads = MANY_THREADS;
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
+  mu_assert("create_dctx failed", dctx != NULL);
+  int dbytes = blosc2_decompress_ctx(dctx, cbuf, cbytes, dest, isize);
+  mu_assert("decompress failed", dbytes == isize);
+  blosc2_free_ctx(dctx);
+
+  mu_assert("data mismatch", memcmp(data, dest, isize) == 0);
+
+#undef MANY_THREADS
+#undef FEW_BLOCKS
+  return EXIT_SUCCESS;
+}
+
+
+/* ------------------------------------------------------------------ */
+/* contexts with the same nthreads share one pool                    */
 /* ------------------------------------------------------------------ */
 static char *test_same_nthreads_share_pool(void)
 {
   blosc2_cparams cp = BLOSC2_CPARAMS_DEFAULTS;
   cp.nthreads = 4;
+  cp.blocksize = BLOCKSIZE;
 
   static int64_t data[CHUNKSIZE / TYPESIZE];
   static uint8_t cbuf1[CHUNKSIZE * 2], cbuf2[CHUNKSIZE * 2];
@@ -136,7 +209,7 @@ static char *test_same_nthreads_share_pool(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 3: different nthreads → different pools                        */
+/* different nthreads → different pools                              */
 /* ------------------------------------------------------------------ */
 static char *test_different_nthreads_different_pools(void)
 {
@@ -144,8 +217,8 @@ static char *test_different_nthreads_different_pools(void)
   static uint8_t cb2[CHUNKSIZE * 2], cb4[CHUNKSIZE * 2];
   for (int i = 0; i < (int)(sizeof(data)/sizeof(data[0])); i++) data[i] = i;
 
-  blosc2_cparams cp2 = BLOSC2_CPARAMS_DEFAULTS; cp2.nthreads = 2;
-  blosc2_cparams cp4 = BLOSC2_CPARAMS_DEFAULTS; cp4.nthreads = 4;
+  blosc2_cparams cp2 = BLOSC2_CPARAMS_DEFAULTS; cp2.nthreads = 2; cp2.blocksize = BLOCKSIZE;
+  blosc2_cparams cp4 = BLOSC2_CPARAMS_DEFAULTS; cp4.nthreads = 4; cp4.blocksize = BLOCKSIZE;
 
   blosc2_context *ctx2 = blosc2_create_cctx(cp2);
   blosc2_context *ctx4 = blosc2_create_cctx(cp4);
@@ -168,7 +241,7 @@ static char *test_different_nthreads_different_pools(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 4: dynamic nthreads change triggers pool rebind               */
+/* dynamic nthreads change triggers pool rebind                      */
 /* ------------------------------------------------------------------ */
 static char *test_dynamic_nthreads_rebind(void)
 {
@@ -179,6 +252,7 @@ static char *test_dynamic_nthreads_rebind(void)
   /* Create a 2-thread context to anchor the 2-thread pool */
   blosc2_cparams cp2 = BLOSC2_CPARAMS_DEFAULTS;
   cp2.nthreads = 2;
+  cp2.blocksize = BLOCKSIZE;
   blosc2_context *anchor = blosc2_create_cctx(cp2);
   int r = blosc2_compress_ctx(anchor, data, (int32_t)sizeof(data), cbuf, (int32_t)sizeof(cbuf));
   mu_assert("anchor compress failed", r > 0);
@@ -188,6 +262,7 @@ static char *test_dynamic_nthreads_rebind(void)
   /* Create a 4-thread context and verify it uses a different pool */
   blosc2_cparams cp4 = BLOSC2_CPARAMS_DEFAULTS;
   cp4.nthreads = 4;
+  cp4.blocksize = BLOCKSIZE;
   blosc2_context *ctx = blosc2_create_cctx(cp4);
   r = blosc2_compress_ctx(ctx, data, (int32_t)sizeof(data), cbuf, (int32_t)sizeof(cbuf));
   mu_assert("initial 4-thread compress failed", r > 0);
@@ -211,7 +286,7 @@ static char *test_dynamic_nthreads_rebind(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 5: round-trip with shuffle filter, multi-threaded             */
+/* round-trip with shuffle filter, multi-threaded                    */
 /* ------------------------------------------------------------------ */
 static char *test_roundtrip_shuffle_multithreaded(void)
 {
@@ -222,7 +297,7 @@ static char *test_roundtrip_shuffle_multithreaded(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 6: round-trip with delta filter, multi-threaded               */
+/* round-trip with delta filter, multi-threaded                      */
 /* ------------------------------------------------------------------ */
 static char *test_roundtrip_delta_multithreaded(void)
 {
@@ -233,7 +308,7 @@ static char *test_roundtrip_delta_multithreaded(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 7: round-trip with bitshuffle filter, multi-threaded          */
+/* round-trip with bitshuffle filter, multi-threaded                 */
 /* ------------------------------------------------------------------ */
 static char *test_roundtrip_bitshuffle_multithreaded(void)
 {
@@ -244,7 +319,7 @@ static char *test_roundtrip_bitshuffle_multithreaded(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 8: pool ref-count drops to 0 on last free (no crash)          */
+/* pool ref-count drops to 0 on last free (no crash)                 */
 /* ------------------------------------------------------------------ */
 static char *test_pool_refcount_and_destroy(void)
 {
@@ -254,6 +329,7 @@ static char *test_pool_refcount_and_destroy(void)
 
   blosc2_cparams cp = BLOSC2_CPARAMS_DEFAULTS;
   cp.nthreads = 3;
+  cp.blocksize = BLOCKSIZE;
 
   blosc2_context *ctx = blosc2_create_cctx(cp);
   int r = blosc2_compress_ctx(ctx, data, (int32_t)sizeof(data), cbuf, (int32_t)sizeof(cbuf));
@@ -268,7 +344,7 @@ static char *test_pool_refcount_and_destroy(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 9: compression + decompression with delta, nthreads=1         */
+/* compression + decompression with delta, nthreads=1                */
 /* ------------------------------------------------------------------ */
 static char *test_roundtrip_delta_serial(void)
 {
@@ -279,7 +355,7 @@ static char *test_roundtrip_delta_serial(void)
 
 
 /* ------------------------------------------------------------------ */
-/* Test 10: many contexts share one pool                              */
+/* many contexts share one pool                                      */
 /* ------------------------------------------------------------------ */
 static char *test_many_contexts_share_pool(void)
 {
@@ -290,6 +366,7 @@ static char *test_many_contexts_share_pool(void)
 
   blosc2_cparams cp = BLOSC2_CPARAMS_DEFAULTS;
   cp.nthreads = 4;
+  cp.blocksize = BLOCKSIZE;
 
   blosc2_context *ctxs[N_CTX];
   for (int i = 0; i < N_CTX; i++) {
@@ -326,6 +403,8 @@ static char *all_tests(void)
 
   mu_run_test(test_nthreads1_no_pool);
 #ifndef _WIN32
+  mu_run_test(test_single_block_multithread_request_no_pool);
+  mu_run_test(test_more_threads_than_blocks);
   mu_run_test(test_same_nthreads_share_pool);
   mu_run_test(test_different_nthreads_different_pools);
   mu_run_test(test_dynamic_nthreads_rebind);
