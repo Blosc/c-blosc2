@@ -1125,12 +1125,16 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
     return 0;
   }
 
+  if (cbytes <= 0) {
+    BLOSC_TRACE_ERROR("ZFP getcell: invalid cbytes %d", cbytes);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
   // Get the ZFP stream
   zfp_type type;     /* array scalar type */
   zfp_stream *zfp;   /* compressed stream */
   bitstream *stream; /* bit stream to write to or read from */
   int32_t typesize = context->typesize;
-  zfp = zfp_stream_open(NULL);
 
   switch (typesize) {
     case sizeof(float):
@@ -1143,21 +1147,51 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
       BLOSC_TRACE_ERROR("ZFP is not available for typesize: %d", typesize);
       return BLOSC2_ERROR_FAILURE;
   }
+  zfp = zfp_stream_open(NULL);
   uint8_t compmeta = context->compcode_meta;   // access to compressed chunk header
   double rate = (double) (compmeta * typesize * 8) /
                 100.0;     // convert from output size / input size to output bits per input value
   zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
 
-  stream = stream_open((void *) block, cbytes);
-  zfp_stream_set_bit_stream(zfp, stream);
-  zfp_stream_rewind(zfp);
+  if (zfp->maxbits == 0) {
+    BLOSC_TRACE_ERROR("ZFP getcell: maxbits is 0");
+    zfp_stream_close(zfp);
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   // Check that ncell is a valid index
-  int ncells = (int) ((cbytes * 8) / zfp->maxbits);
+  int ncells = (int) (((size_t) cbytes * 8) / zfp->maxbits);
   if (ncell >= ncells) {
     BLOSC_TRACE_ERROR("Invalid cell index");
+    zfp_stream_close(zfp);
     return -1;
   }
+
+  /* Allocate a word-aligned, zero-padded buffer to protect against
+   * unbounded 64-bit word reads past cbytes. */
+  size_t padded_len = (size_t) cbytes;
+  if (padded_len < sizeof(uint64_t)) {
+    padded_len = sizeof(uint64_t);
+  }
+  padded_len = (padded_len + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
+  uint8_t *padded_block = malloc(padded_len);
+  if (padded_block == NULL) {
+    BLOSC_TRACE_ERROR("ZFP: cannot allocate padded buffer (%zu bytes)", padded_len);
+    zfp_stream_close(zfp);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  memcpy(padded_block, block, (size_t) cbytes);
+  memset(padded_block + cbytes, 0, padded_len - (size_t) cbytes);
+
+  stream = stream_open(padded_block, padded_len);
+  if (stream == NULL) {
+    BLOSC_TRACE_ERROR("ZFP: cannot open padded bitstream");
+    free(padded_block);
+    zfp_stream_close(zfp);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  zfp_stream_set_bit_stream(zfp, stream);
+  zfp_stream_rewind(zfp);
 
   // Position the stream at the ncell bit offset for reading
   stream_rseek(zfp->stream, (size_t) (ncell * zfp->maxbits));
@@ -1165,6 +1199,12 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
   // Get the cell
   size_t zfpsize;
   uint8_t *cell = malloc(cell_nitems * typesize);
+  if (cell == NULL) {
+    BLOSC_TRACE_ERROR("ZFP: cannot allocate cell buffer");
+    zfp_close_padded_stream(stream, padded_block);
+    zfp_stream_close(zfp);
+    return BLOSC2_ERROR_FAILURE;
+  }
   switch (ndim) {
     case 1:
       if (type == zfp_type_float) {
@@ -1200,13 +1240,15 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
       break;
     default:
       free(cell);
+      zfp_close_padded_stream(stream, padded_block);
+      zfp_stream_close(zfp);
       BLOSC_TRACE_ERROR("ZFP is not available for ndims: %d", ndim);
       return BLOSC2_ERROR_FAILURE;
   }
   memcpy(dest, &cell[cell_ind * typesize], thread_ctx->zfp_cell_nitems * typesize);
   free(cell);
+  zfp_close_padded_stream(stream, padded_block);
   zfp_stream_close(zfp);
-  stream_close(stream);
 
   if ((zfpsize == 0) || ((int32_t) zfpsize > (destsize * 8)) ||
       ((int32_t) zfpsize > (cell_nitems * typesize * 8)) ||
