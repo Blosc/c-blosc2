@@ -269,7 +269,7 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
   zfp_stream *zfp;   /* compressed stream */
-  bitstream *stream; /* bit stream to write to or read from */
+  bitstream *stream = NULL; /* bit stream to write to or read from */
   size_t zfpsize;    /* byte size of compressed stream */
   double tolerance = pow(10, tol);
 
@@ -290,9 +290,6 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
 
   zfp = zfp_stream_open(NULL);
   zfp_stream_set_accuracy(zfp, tolerance);
-  stream = stream_open((void *) input, input_len);
-  zfp_stream_set_bit_stream(zfp, stream);
-  zfp_stream_rewind(zfp);
 
   switch (ndim) {
     case 1:
@@ -325,7 +322,6 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
                       "bitstream size (%zu bytes)", input_len, min_bytes);
     zfp_field_free(field);
     zfp_stream_close(zfp);
-    stream_close(stream);
     free(shape);
     free(chunkshape);
     free(blockshape);
@@ -347,7 +343,6 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
     BLOSC_TRACE_ERROR("ZFP: cannot determine maximum bitstream size");
     zfp_field_free(field);
     zfp_stream_close(zfp);
-    stream_close(stream);
     free(shape);
     free(chunkshape);
     free(blockshape);
@@ -365,14 +360,12 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
     BLOSC_TRACE_ERROR("ZFP: cannot allocate padded input buffer (%zu bytes)", padded_len);
     zfp_field_free(field);
     zfp_stream_close(zfp);
-    stream_close(stream);
     free(shape);
     free(chunkshape);
     free(blockshape);
     return BLOSC2_ERROR_FAILURE;
   }
   memcpy(padded_input, input, (size_t) input_len);
-  stream_close(stream);
   stream = stream_open(padded_input, padded_len);
   if (stream == NULL) {
     BLOSC_TRACE_ERROR("ZFP: cannot open padded bitstream");
@@ -616,7 +609,7 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
   zfp_stream *zfp;   /* compressed stream */
-  bitstream *stream; /* bit stream to write to or read from */
+  bitstream *stream = NULL; /* bit stream to write to or read from */
   size_t zfpsize;    /* byte size of compressed stream */
 
   uint prec;
@@ -663,9 +656,6 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
 
   zfp = zfp_stream_open(NULL);
   zfp_stream_set_precision(zfp, prec);
-  stream = stream_open((void *) input, input_len);
-  zfp_stream_set_bit_stream(zfp, stream);
-  zfp_stream_rewind(zfp);
 
   switch (ndim) {
     case 1:
@@ -698,7 +688,6 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
                       "bitstream size (%zu bytes)", input_len, min_bytes);
     zfp_field_free(field);
     zfp_stream_close(zfp);
-    stream_close(stream);
     free(shape);
     free(chunkshape);
     free(blockshape);
@@ -720,7 +709,6 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     BLOSC_TRACE_ERROR("ZFP: cannot determine maximum bitstream size");
     zfp_field_free(field);
     zfp_stream_close(zfp);
-    stream_close(stream);
     free(shape);
     free(chunkshape);
     free(blockshape);
@@ -738,14 +726,12 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     BLOSC_TRACE_ERROR("ZFP: cannot allocate padded input buffer (%zu bytes)", padded_len);
     zfp_field_free(field);
     zfp_stream_close(zfp);
-    stream_close(stream);
     free(shape);
     free(chunkshape);
     free(blockshape);
     return BLOSC2_ERROR_FAILURE;
   }
   memcpy(padded_input, input, (size_t) input_len);
-  stream_close(stream);
   stream = stream_open(padded_input, padded_len);
   if (stream == NULL) {
     BLOSC_TRACE_ERROR("ZFP: cannot open padded bitstream");
@@ -978,7 +964,7 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
   zfp_stream *zfp;   /* compressed stream */
-  bitstream *stream; /* bit stream to write to or read from */
+  bitstream *stream = NULL; /* bit stream to write to or read from */
   size_t zfpsize;    /* byte size of compressed stream */
 
   switch (typesize) {
@@ -999,10 +985,6 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
       ratio * (double) typesize * 8;     // convert from output size / input size to output bits per input value
   zfp = zfp_stream_open(NULL);
   zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
-
-  stream = stream_open((void *) input, input_len);
-  zfp_stream_set_bit_stream(zfp, stream);
-  zfp_stream_rewind(zfp);
 
   switch (ndim) {
     case 1:
@@ -1046,7 +1028,6 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     BLOSC_TRACE_ERROR("ZFP rate: required bits overflow size_t");
     zfp_field_free(field);
     zfp_stream_close(zfp);
-    stream_close(stream);
     free(shape);
     free(chunkshape);
     free(blockshape);
@@ -1062,7 +1043,6 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
                       "bitstream size (%zu bytes)", input_len, required_bytes);
     zfp_field_free(field);
     zfp_stream_close(zfp);
-    stream_close(stream);
     free(shape);
     free(chunkshape);
     free(blockshape);
@@ -1084,7 +1064,6 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     BLOSC_TRACE_ERROR("ZFP: cannot determine maximum bitstream size");
     zfp_field_free(field);
     zfp_stream_close(zfp);
-    stream_close(stream);
     free(shape);
     free(chunkshape);
     free(blockshape);
@@ -1102,14 +1081,12 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     BLOSC_TRACE_ERROR("ZFP: cannot allocate padded input buffer (%zu bytes)", padded_len);
     zfp_field_free(field);
     zfp_stream_close(zfp);
-    stream_close(stream);
     free(shape);
     free(chunkshape);
     free(blockshape);
     return BLOSC2_ERROR_FAILURE;
   }
   memcpy(padded_input, input, (size_t) input_len);
-  stream_close(stream);
   stream = stream_open(padded_input, padded_len);
   if (stream == NULL) {
     BLOSC_TRACE_ERROR("ZFP: cannot open padded bitstream");
