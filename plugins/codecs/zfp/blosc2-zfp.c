@@ -355,7 +355,7 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
   /* round up to whole words; input_len >= 8 past the check above, so the
    * addition cannot overflow */
   padded_len = (padded_len + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
-  uint8_t *padded_input = calloc(1, padded_len);
+  uint8_t *padded_input = malloc(padded_len);
   if (padded_input == NULL) {
     BLOSC_TRACE_ERROR("ZFP: cannot allocate padded input buffer (%zu bytes)", padded_len);
     zfp_field_free(field);
@@ -366,6 +366,7 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
     return BLOSC2_ERROR_FAILURE;
   }
   memcpy(padded_input, input, (size_t) input_len);
+  memset(padded_input + input_len, 0, padded_len - (size_t) input_len);
   stream = stream_open(padded_input, padded_len);
   if (stream == NULL) {
     BLOSC_TRACE_ERROR("ZFP: cannot open padded bitstream");
@@ -721,7 +722,7 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   /* round up to whole words; input_len >= 8 past the check above, so the
    * addition cannot overflow */
   padded_len = (padded_len + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
-  uint8_t *padded_input = calloc(1, padded_len);
+  uint8_t *padded_input = malloc(padded_len);
   if (padded_input == NULL) {
     BLOSC_TRACE_ERROR("ZFP: cannot allocate padded input buffer (%zu bytes)", padded_len);
     zfp_field_free(field);
@@ -732,6 +733,7 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     return BLOSC2_ERROR_FAILURE;
   }
   memcpy(padded_input, input, (size_t) input_len);
+  memset(padded_input + input_len, 0, padded_len - (size_t) input_len);
   stream = stream_open(padded_input, padded_len);
   if (stream == NULL) {
     BLOSC_TRACE_ERROR("ZFP: cannot open padded bitstream");
@@ -1076,7 +1078,7 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   /* round up to whole words; input_len >= 8 past the check above, so the
    * addition cannot overflow */
   padded_len = (padded_len + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
-  uint8_t *padded_input = calloc(1, padded_len);
+  uint8_t *padded_input = malloc(padded_len);
   if (padded_input == NULL) {
     BLOSC_TRACE_ERROR("ZFP: cannot allocate padded input buffer (%zu bytes)", padded_len);
     zfp_field_free(field);
@@ -1087,6 +1089,7 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     return BLOSC2_ERROR_FAILURE;
   }
   memcpy(padded_input, input, (size_t) input_len);
+  memset(padded_input + input_len, 0, padded_len - (size_t) input_len);
   stream = stream_open(padded_input, padded_len);
   if (stream == NULL) {
     BLOSC_TRACE_ERROR("ZFP: cannot open padded bitstream");
