@@ -80,6 +80,65 @@ static int zfp_check_output_size(int deserialize_rc, int8_t ndim,
   return BLOSC2_ERROR_SUCCESS;
 }
 
+/* Allocate a word-aligned, zero-padded input buffer sized to zfp_stream_maximum_size()
+ * and open a bitstream on it to guard against zfp's unbounded 64-bit word reads. */
+static int zfp_open_padded_stream(const uint8_t *input, int32_t input_len,
+                                  zfp_stream *zfp, const zfp_field *field,
+                                  bitstream **stream_out, uint8_t **padded_buf_out) {
+  *stream_out = NULL;
+  *padded_buf_out = NULL;
+
+  /* zfp's bitstream reader fetches whole 64-bit words with no bounds
+   * checking (see stream_read_word() in zfp's bitstream.inl: "buffer
+   * overruns are not caught"), so the decoder can touch bytes past the
+   * validated input_len whenever the consumed bit count is not a whole
+   * number of words (fixed-rate), or is data-dependent (fixed-accuracy /
+   * fixed-precision).  Decompress from a zero-padded copy sized to
+   * zfp_stream_maximum_size() -- zfp's own word-rounded upper bound for
+   * this stream configuration -- so those reads stay inside the
+   * allocation.  This cannot reject legitimate streams: it only widens
+   * the buffer the decoder sees. */
+  size_t zfp_maxin = zfp_stream_maximum_size(zfp, field);
+  if (zfp_maxin == 0) {
+    BLOSC_TRACE_ERROR("ZFP: cannot determine maximum bitstream size");
+    return BLOSC2_ERROR_FAILURE;
+  }
+  size_t padded_len = zfp_maxin;
+  if (padded_len < (size_t) input_len) {
+    padded_len = (size_t) input_len;
+  }
+  /* round up to whole words; input_len >= 8 past the check above, so the
+   * addition cannot overflow */
+  padded_len = (padded_len + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
+  uint8_t *padded_input = malloc(padded_len);
+  if (padded_input == NULL) {
+    BLOSC_TRACE_ERROR("ZFP: cannot allocate padded input buffer (%zu bytes)", padded_len);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  memcpy(padded_input, input, (size_t) input_len);
+  memset(padded_input + input_len, 0, padded_len - (size_t) input_len);
+  bitstream *stream = stream_open(padded_input, padded_len);
+  if (stream == NULL) {
+    BLOSC_TRACE_ERROR("ZFP: cannot open padded bitstream");
+    free(padded_input);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  zfp_stream_set_bit_stream(zfp, stream);
+  zfp_stream_rewind(zfp);
+
+  *stream_out = stream;
+  *padded_buf_out = padded_input;
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+static void zfp_close_padded_stream(bitstream *stream, uint8_t *padded_buf) {
+  if (stream != NULL) {
+    stream_close(stream);
+  }
+  free(padded_buf);
+}
+
+
 
 int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
                      int32_t output_len, uint8_t meta, blosc2_cparams *cparams, const void *chunk) {
@@ -270,6 +329,7 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
   zfp_field *field;  /* array meta data */
   zfp_stream *zfp;   /* compressed stream */
   bitstream *stream = NULL; /* bit stream to write to or read from */
+  uint8_t *padded_input = NULL;
   size_t zfpsize;    /* byte size of compressed stream */
   double tolerance = pow(10, tol);
 
@@ -328,19 +388,7 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
     return BLOSC2_ERROR_FAILURE;
   }
 
-  /* zfp's bitstream reader fetches whole 64-bit words with no bounds
-   * checking (see stream_read_word() in zfp's bitstream.inl: "buffer
-   * overruns are not caught"), so the decoder can touch bytes past the
-   * validated input_len whenever the consumed bit count is not a whole
-   * number of words (fixed-rate), or is data-dependent (fixed-accuracy /
-   * fixed-precision).  Decompress from a zero-padded copy sized to
-   * zfp_stream_maximum_size() -- zfp's own word-rounded upper bound for
-   * this stream configuration -- so those reads stay inside the
-   * allocation.  This cannot reject legitimate streams: it only widens
-   * the buffer the decoder sees. */
-  size_t zfp_maxin = zfp_stream_maximum_size(zfp, field);
-  if (zfp_maxin == 0) {
-    BLOSC_TRACE_ERROR("ZFP: cannot determine maximum bitstream size");
+  if (zfp_open_padded_stream(input, input_len, zfp, field, &stream, &padded_input) != BLOSC2_ERROR_SUCCESS) {
     zfp_field_free(field);
     zfp_stream_close(zfp);
     free(shape);
@@ -348,46 +396,13 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(blockshape);
     return BLOSC2_ERROR_FAILURE;
   }
-  size_t padded_len = zfp_maxin;
-  if (padded_len < (size_t) input_len) {
-    padded_len = (size_t) input_len;
-  }
-  /* round up to whole words; input_len >= 8 past the check above, so the
-   * addition cannot overflow */
-  padded_len = (padded_len + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
-  uint8_t *padded_input = malloc(padded_len);
-  if (padded_input == NULL) {
-    BLOSC_TRACE_ERROR("ZFP: cannot allocate padded input buffer (%zu bytes)", padded_len);
-    zfp_field_free(field);
-    zfp_stream_close(zfp);
-    free(shape);
-    free(chunkshape);
-    free(blockshape);
-    return BLOSC2_ERROR_FAILURE;
-  }
-  memcpy(padded_input, input, (size_t) input_len);
-  memset(padded_input + input_len, 0, padded_len - (size_t) input_len);
-  stream = stream_open(padded_input, padded_len);
-  if (stream == NULL) {
-    BLOSC_TRACE_ERROR("ZFP: cannot open padded bitstream");
-    free(padded_input);
-    zfp_field_free(field);
-    zfp_stream_close(zfp);
-    free(shape);
-    free(chunkshape);
-    free(blockshape);
-    return BLOSC2_ERROR_FAILURE;
-  }
-  zfp_stream_set_bit_stream(zfp, stream);
-  zfp_stream_rewind(zfp);
 
   zfpsize = zfp_decompress(zfp, field);
 
   /* clean up */
   zfp_field_free(field);
   zfp_stream_close(zfp);
-  stream_close(stream);
-  free(padded_input);
+  zfp_close_padded_stream(stream, padded_input);
   free(shape);
   free(chunkshape);
   free(blockshape);
@@ -611,6 +626,7 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   zfp_field *field;  /* array meta data */
   zfp_stream *zfp;   /* compressed stream */
   bitstream *stream = NULL; /* bit stream to write to or read from */
+  uint8_t *padded_input = NULL;
   size_t zfpsize;    /* byte size of compressed stream */
 
   uint prec;
@@ -695,19 +711,7 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     return BLOSC2_ERROR_FAILURE;
   }
 
-  /* zfp's bitstream reader fetches whole 64-bit words with no bounds
-   * checking (see stream_read_word() in zfp's bitstream.inl: "buffer
-   * overruns are not caught"), so the decoder can touch bytes past the
-   * validated input_len whenever the consumed bit count is not a whole
-   * number of words (fixed-rate), or is data-dependent (fixed-accuracy /
-   * fixed-precision).  Decompress from a zero-padded copy sized to
-   * zfp_stream_maximum_size() -- zfp's own word-rounded upper bound for
-   * this stream configuration -- so those reads stay inside the
-   * allocation.  This cannot reject legitimate streams: it only widens
-   * the buffer the decoder sees. */
-  size_t zfp_maxin = zfp_stream_maximum_size(zfp, field);
-  if (zfp_maxin == 0) {
-    BLOSC_TRACE_ERROR("ZFP: cannot determine maximum bitstream size");
+  if (zfp_open_padded_stream(input, input_len, zfp, field, &stream, &padded_input) != BLOSC2_ERROR_SUCCESS) {
     zfp_field_free(field);
     zfp_stream_close(zfp);
     free(shape);
@@ -715,46 +719,13 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     free(blockshape);
     return BLOSC2_ERROR_FAILURE;
   }
-  size_t padded_len = zfp_maxin;
-  if (padded_len < (size_t) input_len) {
-    padded_len = (size_t) input_len;
-  }
-  /* round up to whole words; input_len >= 8 past the check above, so the
-   * addition cannot overflow */
-  padded_len = (padded_len + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
-  uint8_t *padded_input = malloc(padded_len);
-  if (padded_input == NULL) {
-    BLOSC_TRACE_ERROR("ZFP: cannot allocate padded input buffer (%zu bytes)", padded_len);
-    zfp_field_free(field);
-    zfp_stream_close(zfp);
-    free(shape);
-    free(chunkshape);
-    free(blockshape);
-    return BLOSC2_ERROR_FAILURE;
-  }
-  memcpy(padded_input, input, (size_t) input_len);
-  memset(padded_input + input_len, 0, padded_len - (size_t) input_len);
-  stream = stream_open(padded_input, padded_len);
-  if (stream == NULL) {
-    BLOSC_TRACE_ERROR("ZFP: cannot open padded bitstream");
-    free(padded_input);
-    zfp_field_free(field);
-    zfp_stream_close(zfp);
-    free(shape);
-    free(chunkshape);
-    free(blockshape);
-    return BLOSC2_ERROR_FAILURE;
-  }
-  zfp_stream_set_bit_stream(zfp, stream);
-  zfp_stream_rewind(zfp);
 
   zfpsize = zfp_decompress(zfp, field);
 
   /* clean up */
   zfp_field_free(field);
   zfp_stream_close(zfp);
-  stream_close(stream);
-  free(padded_input);
+  zfp_close_padded_stream(stream, padded_input);
   free(shape);
   free(chunkshape);
   free(blockshape);
@@ -967,6 +938,7 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   zfp_field *field;  /* array meta data */
   zfp_stream *zfp;   /* compressed stream */
   bitstream *stream = NULL; /* bit stream to write to or read from */
+  uint8_t *padded_input = NULL;
   size_t zfpsize;    /* byte size of compressed stream */
 
   switch (typesize) {
@@ -1051,19 +1023,7 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     return BLOSC2_ERROR_FAILURE;
   }
 
-  /* zfp's bitstream reader fetches whole 64-bit words with no bounds
-   * checking (see stream_read_word() in zfp's bitstream.inl: "buffer
-   * overruns are not caught"), so the decoder can touch bytes past the
-   * validated input_len whenever the consumed bit count is not a whole
-   * number of words (fixed-rate), or is data-dependent (fixed-accuracy /
-   * fixed-precision).  Decompress from a zero-padded copy sized to
-   * zfp_stream_maximum_size() -- zfp's own word-rounded upper bound for
-   * this stream configuration -- so those reads stay inside the
-   * allocation.  This cannot reject legitimate streams: it only widens
-   * the buffer the decoder sees. */
-  size_t zfp_maxin = zfp_stream_maximum_size(zfp, field);
-  if (zfp_maxin == 0) {
-    BLOSC_TRACE_ERROR("ZFP: cannot determine maximum bitstream size");
+  if (zfp_open_padded_stream(input, input_len, zfp, field, &stream, &padded_input) != BLOSC2_ERROR_SUCCESS) {
     zfp_field_free(field);
     zfp_stream_close(zfp);
     free(shape);
@@ -1071,46 +1031,13 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     free(blockshape);
     return BLOSC2_ERROR_FAILURE;
   }
-  size_t padded_len = zfp_maxin;
-  if (padded_len < (size_t) input_len) {
-    padded_len = (size_t) input_len;
-  }
-  /* round up to whole words; input_len >= 8 past the check above, so the
-   * addition cannot overflow */
-  padded_len = (padded_len + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
-  uint8_t *padded_input = malloc(padded_len);
-  if (padded_input == NULL) {
-    BLOSC_TRACE_ERROR("ZFP: cannot allocate padded input buffer (%zu bytes)", padded_len);
-    zfp_field_free(field);
-    zfp_stream_close(zfp);
-    free(shape);
-    free(chunkshape);
-    free(blockshape);
-    return BLOSC2_ERROR_FAILURE;
-  }
-  memcpy(padded_input, input, (size_t) input_len);
-  memset(padded_input + input_len, 0, padded_len - (size_t) input_len);
-  stream = stream_open(padded_input, padded_len);
-  if (stream == NULL) {
-    BLOSC_TRACE_ERROR("ZFP: cannot open padded bitstream");
-    free(padded_input);
-    zfp_field_free(field);
-    zfp_stream_close(zfp);
-    free(shape);
-    free(chunkshape);
-    free(blockshape);
-    return BLOSC2_ERROR_FAILURE;
-  }
-  zfp_stream_set_bit_stream(zfp, stream);
-  zfp_stream_rewind(zfp);
 
   zfpsize = zfp_decompress(zfp, field);
 
   /* clean up */
   zfp_field_free(field);
   zfp_stream_close(zfp);
-  stream_close(stream);
-  free(padded_input);
+  zfp_close_padded_stream(stream, padded_input);
   free(shape);
   free(chunkshape);
   free(blockshape);
