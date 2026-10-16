@@ -3,10 +3,10 @@
   https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
 
-  Example program showing how to store variable-sized-chunk
+  Example program showing how to store variable-length chunks
   (chunks of different lengths) inside one schunk (super-chunk).
 
-  Appends, updates, and indexed retrieval of variable-sized
+  Appends, updates, and indexed retrieval of variable-length
   chunks within a schunk are possible because each chunk header
   contains the chunk's uncompressed byte count, and the schunk
   maintains chunk order internally across mutation. Unlike a
@@ -16,7 +16,7 @@
   examples/vlblocks.c showcases similar behavior at a different
   abstraction layer. That example focuses on variable-length
   blocks within a chunk, and this example focuses on
-  variable-sized chunks within a schunk. They differ as well in
+  variable-length chunks within a schunk. They differ as well in
   that chunks do not expose append or replace operations for
   the blocks within, whereas schunks do support append and
   replace operations for the chunks within.
@@ -87,7 +87,7 @@ static int print_and_validate_chunks(blosc2_schunk* schunk, size_t nchunks, cons
 int main(void) {
   int rc = 1;
 
-  const char *urlpath = "vschunks_example.b2frame";
+  const char *urlpath = "vlchunks_example.b2frame";
   blosc2_schunk *schunk = NULL;
   uint8_t *short_chunk = NULL;
   uint8_t *longer_chunk = NULL;
@@ -129,7 +129,7 @@ int main(void) {
   /*
     There is also a blosc2_schunk_append_buffer() function that would allow us to
     directly append the strings as raw buffers. We use blosc2_schunk_append_chunk()
-    for this example instead to demonstrate management with variable-sized chunks.
+    for this example instead to demonstrate management with variable-length chunks.
 
     In addition, note that blosc2_schunk_append_chunk() has a copy argument that
     specifies whether the schunk copies the compressed chunk buffer internally or
