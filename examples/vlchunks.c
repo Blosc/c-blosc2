@@ -22,6 +22,7 @@
   replace operations for the chunks within.
 */
 
+#include <inttypes.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -65,12 +66,24 @@ static int print_and_validate_chunk(blosc2_schunk* schunk, int nchunk, const cha
     return -2;
   }
 
-  printf("Verified content of chunk %d (%d bytes): %s\n", nchunk, dsize, buffer);
+  printf("  chunk %d:    %-2d bytes  content: %s\n", nchunk, dsize, buffer);
 
   return 0;
 }
 
-static int print_and_validate_chunks(blosc2_schunk* schunk, size_t nchunks, const int chunk_indexes[], const char* expected_results[]) {
+/*
+  Alongside chunk-level info, this function prints two 
+  similar but different fields of an schunk.
+
+  chunksize: The size of each chunk, or if variable-length
+  chunks are used, 0. In this program, we only ever print 0.
+
+  nbytes: The total, uncompressed data size of the chunks.
+*/
+static int print_and_validate_schunk(blosc2_schunk* schunk, size_t nchunks, const int chunk_indexes[], const char* expected_results[]) {
+  printf("  chunksize:  %-8d  (variable-length mode)\n", schunk->chunksize);
+  printf("  nbytes:     %-8" PRIi64 "  (total uncompressed bytes)\n", schunk->nbytes);
+
   int rc = 0;
   for (size_t i = 0; i < nchunks; i++) {
     int current_chunk = chunk_indexes[i];
@@ -153,11 +166,11 @@ int main(void) {
     goto cleanup;
   }
 
-  printf("Verifying content of schunk after appends...\n");
+  printf("After appending 3 chunks to the schunk...\n");
   int chunk_indexes[] = {0, 1, 2};
   const char *expected_results[] = {short_string, longer_string, longest_string};
   size_t nchunks = sizeof(chunk_indexes) / sizeof(chunk_indexes[0]);
-  int print_rc = print_and_validate_chunks(schunk, nchunks, chunk_indexes, expected_results);
+  int print_rc = print_and_validate_schunk(schunk, nchunks, chunk_indexes, expected_results);
   if (print_rc < 0) {
     goto cleanup;
   }
@@ -174,9 +187,9 @@ int main(void) {
     goto cleanup;
   }
 
-  printf("Verifying content of schunk after update...\n");
+  printf("\nAfter updating chunk 1 of the schunk...\n");
   expected_results[nchunk_to_update] = update_string;
-  print_rc = print_and_validate_chunks(schunk, nchunks, chunk_indexes, expected_results);
+  print_rc = print_and_validate_schunk(schunk, nchunks, chunk_indexes, expected_results);
   if (print_rc < 0) {
     goto cleanup;
   }
@@ -189,8 +202,8 @@ int main(void) {
     goto cleanup;
   }
 
-  printf("Verifying content of schunk after closing and reopening...\n");
-  print_rc = print_and_validate_chunks(schunk, nchunks, chunk_indexes, expected_results);
+  printf("\nAfter closing and reopening the schunk...\n");
+  print_rc = print_and_validate_schunk(schunk, nchunks, chunk_indexes, expected_results);
   if (print_rc < 0) {
     goto cleanup;
   }
