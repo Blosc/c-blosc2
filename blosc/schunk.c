@@ -11,6 +11,7 @@
 #include "frame.h"
 #include "stune.h"
 #include "blosc-private.h"
+#include "blosc-checked.h"
 #include "context.h"
 #include "blosc2/tuners-registry.h"
 #include "blosc2.h"
@@ -817,7 +818,7 @@ int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int sp
     BLOSC_TRACE_ERROR("nitems is too large.  Try increasing the chunksize.");
     return BLOSC2_ERROR_SCHUNK_SPECIAL;
   }
-  if (nitems > INT64_MAX / typesize) {
+  if (!blosc2_checked_mul_i64_nonneg(nitems, typesize, NULL)) {
     BLOSC_TRACE_ERROR("nitems is too large for nbytes accounting.");
     return BLOSC2_ERROR_SCHUNK_SPECIAL;
   }

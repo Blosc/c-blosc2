@@ -9,6 +9,7 @@
 **********************************************************************/
 
 #include "blosc2.h"
+#include "blosc-checked.h"
 
 #include <sys/stat.h>
 #include <errno.h>
@@ -34,11 +35,10 @@
     char last_char = dir_path[dir_len - 1];
     size_t path_len = 0;
     if (last_char != '\\' && last_char != '/') {
-      if (dir_len > SIZE_MAX - 3) {
+      if (!blosc2_checked_add_size(dir_len, 3, &path_len)) {
         BLOSC_TRACE_ERROR("Directory path is too long");
         return BLOSC2_ERROR_INVALID_PARAM;
       }
-      path_len = dir_len + 3;
       path = malloc(path_len);
       if (path == NULL) {
         return BLOSC2_ERROR_MEMORY_ALLOC;
@@ -46,11 +46,10 @@
       snprintf(path, path_len, "%s\\*", dir_path);
     }
     else {
-      if (dir_len > SIZE_MAX - 2) {
+      if (!blosc2_checked_add_size(dir_len, 2, &path_len)) {
         BLOSC_TRACE_ERROR("Directory path is too long");
         return BLOSC2_ERROR_INVALID_PARAM;
       }
-      path_len = dir_len + 2;
       path = malloc(path_len);
       if (path == NULL) {
         return BLOSC2_ERROR_MEMORY_ALLOC;
@@ -74,17 +73,18 @@
         continue;
       }
       size_t name_len = strlen(cfile.name);
-      if (dir_len > SIZE_MAX - name_len - 2) {
+      size_t fname_len;
+      if (!blosc2_checked_add_size(dir_len, name_len + 2, &fname_len)) {
         BLOSC_TRACE_ERROR("File path is too long");
         _findclose(file);
         return BLOSC2_ERROR_INVALID_PARAM;
       }
-      fname = malloc(dir_len + name_len + 2);
+      fname = malloc(fname_len);
       if (fname == NULL) {
         _findclose(file);
         return BLOSC2_ERROR_MEMORY_ALLOC;
       }
-      snprintf(fname, dir_len + name_len + 2, "%s\\%s", dir_path, cfile.name);
+      snprintf(fname, fname_len, "%s\\%s", dir_path, cfile.name);
 
       ret = remove(fname);
       if (ret < 0) {
@@ -123,27 +123,28 @@ char* blosc2_normalize_dirpath(const char* dir_path) {
   }
   char last_char = dir_path[dir_len - 1];
   char* path;
+  size_t path_len;
   if (last_char != '\\' && last_char != '/') {
-    if (dir_len > SIZE_MAX - 2) {
+    if (!blosc2_checked_add_size(dir_len, 2, &path_len)) {
       BLOSC_TRACE_ERROR("Directory path is too long");
       return NULL;
     }
-    path = malloc(dir_len + 2);
+    path = malloc(path_len);
     if (path == NULL) {
       return NULL;
     }
-    snprintf(path, dir_len + 2, "%s/", dir_path);
+    snprintf(path, path_len, "%s/", dir_path);
   }
   else {
-    if (dir_len > SIZE_MAX - 1) {
+    if (!blosc2_checked_add_size(dir_len, 1, &path_len)) {
       BLOSC_TRACE_ERROR("Directory path is too long");
       return NULL;
     }
-    path = malloc(dir_len + 1);
+    path = malloc(path_len);
     if (path == NULL) {
       return NULL;
     }
-    snprintf(path, dir_len + 1, "%s", dir_path);
+    snprintf(path, path_len, "%s", dir_path);
   }
   return path;
 }
@@ -171,19 +172,20 @@ int blosc2_remove_dir(const char* dir_path) {
   while ((de = readdir(dr)) != NULL) {
     size_t path_len = strlen(path);
     size_t name_len = strlen(de->d_name);
-    if (path_len > SIZE_MAX - name_len - 1) {
+    size_t fname_len;
+    if (!blosc2_checked_add_size(path_len, name_len + 1, &fname_len)) {
       BLOSC_TRACE_ERROR("File path is too long");
       closedir(dr);
       free(path);
       return BLOSC2_ERROR_INVALID_PARAM;
     }
-    fname = malloc(path_len + name_len + 1);
+    fname = malloc(fname_len);
     if (fname == NULL) {
       closedir(dr);
       free(path);
       return BLOSC2_ERROR_MEMORY_ALLOC;
     }
-    snprintf(fname, path_len + name_len + 1, "%s%s", path, de->d_name);
+    snprintf(fname, fname_len, "%s%s", path, de->d_name);
     if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")) {
       free(fname);
       continue;
