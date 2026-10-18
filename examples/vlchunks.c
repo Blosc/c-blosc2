@@ -6,20 +6,31 @@
   Example program showing how to store variable-length chunks
   (chunks of different lengths) inside one schunk (super-chunk).
 
-  Appends, updates, and indexed retrieval of variable-length
-  chunks within a schunk are possible because each chunk header
-  contains the chunk's uncompressed byte count, and the schunk
-  maintains chunk order internally across mutation. Unlike a
-  fixed-width layout, such as in typical C arrays, the schunk
-  does not need every chunk to expand to the same byte size.
+  There are two levels of variable-length storage in C-Blosc2:
 
-  examples/vlblocks.c showcases similar behavior at a different
-  abstraction layer. That example focuses on variable-length
-  blocks within a chunk, and this example focuses on
-  variable-length chunks within a schunk. They differ as well in
-  that chunks do not expose append or replace operations for
-  the blocks within, whereas schunks do support append and
-  replace operations for the chunks within.
+  1. Variable-Length Chunks (this example: vlchunks.c)
+    Operates inside ONE schunk. After the update in this example:
+      schunk
+        ├── Chunk 0  (uncompressed:  6 bytes, compressed: 38 bytes)
+        ├── Chunk 1  (uncompressed: 35 bytes, compressed: 67 bytes)
+        └── Chunk 2  (uncompressed: 47 bytes, compressed: 79 bytes)
+
+      * Each chunk's header contains its independent uncompressed
+      and compressed byte counts, and the schunk maintains chunk
+      order internally across mutations.
+      * Chunks can be appended, updated (shrunk/grown), and
+      decompressed individually.
+
+  2. Variable-Length Blocks (examples/vlblocks.c)
+    Operates inside ONE Chunk. Example:
+      chunk
+        ├── Block 0 (payload: 10 bytes)
+        ├── Block 1 (payload: 50 bytes)
+        └── Block 2 (payload: 20 bytes)
+
+      * Blocks are stored together in one chunk.
+      * Blocks can be decompressed individually, but appending or
+      updating requires rebuilding and replacing the entire chunk.
 */
 
 #include <inttypes.h>
@@ -53,7 +64,13 @@ static int compress_string_to_chunk(const char* string, uint8_t** chunk, blosc2_
   return cbytes;
 }
 
-static int schunk_get_chunk_buffer_size(blosc2_schunk* schunk, int nchunk, int32_t* chunk_nbytes) {
+/* 
+  Grabs the uncompressed and compressed sizes for a chunk by
+  reading from the chunk's header. The uncompressed size is
+  used here to allocate memory before decompressing the chunk,
+  whereas compressed size is used for printing.
+*/
+static int schunk_get_chunk_buffer_size(blosc2_schunk* schunk, int nchunk, int32_t* chunk_nbytes, int32_t* chunk_cbytes) {
   int rc;
 
   bool needs_free;
@@ -63,7 +80,7 @@ static int schunk_get_chunk_buffer_size(blosc2_schunk* schunk, int nchunk, int32
     return -1;
   }
 
-  rc = blosc2_cbuffer_sizes(cchunk, chunk_nbytes, NULL, NULL);
+  rc = blosc2_cbuffer_sizes(cchunk, chunk_nbytes, chunk_cbytes, NULL);
   if (needs_free) {
     free(cchunk);
   }
@@ -72,8 +89,8 @@ static int schunk_get_chunk_buffer_size(blosc2_schunk* schunk, int nchunk, int32
 }
 
 static int print_and_validate_chunk(blosc2_schunk* schunk, int nchunk, const char* expected_string) {
-  int32_t chunk_nbytes = 0;
-  int rc = schunk_get_chunk_buffer_size(schunk, nchunk, &chunk_nbytes);
+  int32_t chunk_nbytes, chunk_cbytes;
+  int rc = schunk_get_chunk_buffer_size(schunk, nchunk, &chunk_nbytes, &chunk_cbytes);
   if (rc < 0) {
     return rc;
   }
@@ -97,9 +114,10 @@ static int print_and_validate_chunk(blosc2_schunk* schunk, int nchunk, const cha
     return -2;
   }
 
-  printf("  chunk %d:    %-2d bytes  content: %s\n", nchunk, dsize, buffer);
-  free(buffer);
+  printf("  chunk %d  (uncompressed: %2d bytes, compressed: %2d bytes, content: \"%s\")\n",
+    nchunk, chunk_nbytes, chunk_cbytes, buffer);
 
+  free(buffer);
   return 0;
 }
 
@@ -113,8 +131,8 @@ static int print_and_validate_chunk(blosc2_schunk* schunk, int nchunk, const cha
   nbytes: The total, uncompressed data size of the chunks.
 */
 static int print_and_validate_schunk(blosc2_schunk* schunk, size_t nchunks, const int chunk_indexes[], const char* expected_results[]) {
-  printf("  chunksize:  %-8d  (variable-length mode)\n", schunk->chunksize);
-  printf("  nbytes:     %-8" PRIi64 "  (total uncompressed bytes)\n", schunk->nbytes);
+  printf("  chunksize: %2d (<- indicates variable-length mode)\n", schunk->chunksize);
+  printf("  nbytes:    %2" PRIi64 " (<- sum of each chunk's uncompressed bytes)\n", schunk->nbytes);
 
   int rc = 0;
   for (size_t i = 0; i < nchunks; i++) {
@@ -180,8 +198,13 @@ int main(void) {
     specifies whether the schunk copies the compressed chunk buffer internally or
     takes ownership of the chunk on success. The blosc2_schunk_update_chunk(),
     which is used later, also has a copy argument with analogous behavior.
+
+    Finally, note that schunk maintains a chunksize field which is set to 0 to
+    indicate variable-length chunks are used. After the first append, chunksize
+    will be set to the first chunk's size. After the second append and onward,
+    because the second chunk has a different size, the chunksize will be 0.
   */
-  int num_chunks = 0;
+  int64_t num_chunks = 0;
   num_chunks = blosc2_schunk_append_chunk(schunk, short_chunk, true);
   if (num_chunks != 1) {
     fprintf(stderr, "failed to append chunk for short string\n");
@@ -219,7 +242,7 @@ int main(void) {
     goto cleanup;
   }
 
-  printf("\nAfter updating chunk 1 of the schunk...\n");
+  printf("\nAfter updating chunk 1 of the schunk, nbytes should update...\n");
   expected_results[nchunk_to_update] = update_string;
   print_rc = print_and_validate_schunk(schunk, nchunks, chunk_indexes, expected_results);
   if (print_rc < 0) {
@@ -234,7 +257,7 @@ int main(void) {
     goto cleanup;
   }
 
-  printf("\nAfter closing and reopening the schunk...\n");
+  printf("\nAfter closing and reopening the schunk, our values should persist...\n");
   print_rc = print_and_validate_schunk(schunk, nchunks, chunk_indexes, expected_results);
   if (print_rc < 0) {
     goto cleanup;
