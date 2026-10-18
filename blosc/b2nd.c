@@ -13,47 +13,13 @@
 #include "frame.h"
 #include "blosc2/blosc2-common.h"
 #include "blosc2.h"
+#include "blosc-checked.h"
 
 #include <inttypes.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-
-static bool b2nd_mul_overflow_size_t(size_t a, size_t b, size_t *out) {
-  if (a != 0 && b > SIZE_MAX / a) {
-    return true;
-  }
-  if (out != NULL) {
-    *out = a * b;
-  }
-  return false;
-}
-
-/* Signed counterparts of the above.  Shape products are accumulated with these
- * so that crafted metadata cannot wrap them: signed overflow is UB, and a
- * wrapped product reaches divisors (see the nblocks computations) and
- * allocation sizes.  Negative operands are reported as overflow too, so callers
- * get one error path rather than two. */
-static bool b2nd_mul_overflow_int32(int32_t a, int32_t b, int32_t *out) {
-  if (a < 0 || b < 0 || (a != 0 && b > INT32_MAX / a)) {
-    return true;
-  }
-  if (out != NULL) {
-    *out = a * b;
-  }
-  return false;
-}
-
-static bool b2nd_mul_overflow_int64(int64_t a, int64_t b, int64_t *out) {
-  if (a < 0 || b < 0 || (a != 0 && b > INT64_MAX / a)) {
-    return true;
-  }
-  if (out != NULL) {
-    *out = a * b;
-  }
-  return false;
-}
 
 
 int b2nd_serialize_meta(int8_t ndim, const int64_t *shape, const int32_t *chunkshape,
@@ -216,12 +182,12 @@ static int update_shape_struct(b2nd_array_t *array, int8_t ndim, const int64_t *
     }
     // Crafted metadata can make any of these products wrap, which is UB and
     // lands in divisors and allocation sizes downstream (see #795)
-    if (b2nd_mul_overflow_int64(array->nitems, array->shape[i], &array->nitems) ||
-        b2nd_mul_overflow_int64(array->extnitems, array->extshape[i], &array->extnitems) ||
-        b2nd_mul_overflow_int64(array->extchunknitems, array->extchunkshape[i],
-                                &array->extchunknitems) ||
-        b2nd_mul_overflow_int32(array->chunknitems, array->chunkshape[i], &array->chunknitems) ||
-        b2nd_mul_overflow_int32(array->blocknitems, array->blockshape[i], &array->blocknitems)) {
+    if (!blosc2_checked_mul_i64_nonneg(array->nitems, array->shape[i], &array->nitems) ||
+        !blosc2_checked_mul_i64_nonneg(array->extnitems, array->extshape[i], &array->extnitems) ||
+        !blosc2_checked_mul_i64_nonneg(array->extchunknitems, array->extchunkshape[i],
+                                       &array->extchunknitems) ||
+        !blosc2_checked_mul_i32_nonneg(array->chunknitems, array->chunkshape[i], &array->chunknitems) ||
+        !blosc2_checked_mul_i32_nonneg(array->blocknitems, array->blockshape[i], &array->blocknitems)) {
       BLOSC_TRACE_ERROR("shape, chunkshape or blockshape product overflows at dimension %d", i);
       return BLOSC2_ERROR_INVALID_PARAM;
     }
@@ -458,7 +424,7 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
     return BLOSC2_ERROR_INVALID_PARAM;
   }
   size_t chunkbytes_size = 0;
-  if (b2nd_mul_overflow_size_t((size_t)(*array)->extchunknitems, (size_t)sc->typesize, &chunkbytes_size)) {
+  if (!blosc2_checked_mul_size((size_t)(*array)->extchunknitems, (size_t)sc->typesize, &chunkbytes_size)) {
     BLOSC_TRACE_ERROR("Chunksize overflows size limits");
     blosc2_schunk_free(sc);
     free((*array)->dtype);
@@ -613,7 +579,7 @@ int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, const void *fill_value)
     return BLOSC2_ERROR_INVALID_PARAM;
   }
   size_t chunkbytes_size = 0;
-  if (b2nd_mul_overflow_size_t((size_t)(*array)->extchunknitems, (size_t)(*array)->sc->typesize, &chunkbytes_size)) {
+  if (!blosc2_checked_mul_size((size_t)(*array)->extchunknitems, (size_t)(*array)->sc->typesize, &chunkbytes_size)) {
     BLOSC_TRACE_ERROR("Chunk bytes overflows size limits");
     return BLOSC2_ERROR_INVALID_PARAM;
   }
@@ -972,7 +938,7 @@ int64_t b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, 
       pos += array->chunkshape[i];
     }
     update_shape[i] = pos / array->chunkshape[i] - update_start[i];
-    if (b2nd_mul_overflow_int64(update_nchunks, update_shape[i], &update_nchunks)) {
+    if (!blosc2_checked_mul_i64_nonneg(update_nchunks, update_shape[i], &update_nchunks)) {
       BLOSC_TRACE_ERROR("The number of chunks spanned by the slice overflows");
       return BLOSC2_ERROR_INVALID_PARAM;
     }
@@ -1147,7 +1113,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   // alone, truncating it before the multiply and sizing buffers from the
   // wrapped value while offsets kept using the full extent (see #795)
   int64_t data_nbytes_64 = 0;
-  if (b2nd_mul_overflow_int64(array->extchunknitems, array->sc->typesize, &data_nbytes_64) ||
+  if (!blosc2_checked_mul_i64_nonneg(array->extchunknitems, array->sc->typesize, &data_nbytes_64) ||
       data_nbytes_64 > INT32_MAX) {
     BLOSC_TRACE_ERROR("Chunk buffer size overflows the maximum of %d bytes", INT32_MAX);
     return BLOSC2_ERROR_INVALID_PARAM;
@@ -1628,7 +1594,7 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t
         BLOSC_TRACE_ERROR("Invalid chunk shape");
         return BLOSC2_ERROR_INVALID_PARAM;
       }
-      if (b2nd_mul_overflow_size_t(buffersize, (size_t)chunk_shape[i], &buffersize)) {
+      if (!blosc2_checked_mul_size(buffersize, (size_t)chunk_shape[i], &buffersize)) {
         BLOSC_TRACE_ERROR("Buffer size overflows size limits");
         return BLOSC2_ERROR_INVALID_PARAM;
       }
@@ -2807,7 +2773,7 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
   // used to truncate an int64 product into the malloc size while the copy
   // offsets kept using the full extent (see #795).
   int64_t chunk_data_nbytes_64 = 0;
-  if (b2nd_mul_overflow_int64(array->extchunknitems, array->sc->typesize, &chunk_data_nbytes_64) ||
+  if (!blosc2_checked_mul_i64_nonneg(array->extchunknitems, array->sc->typesize, &chunk_data_nbytes_64) ||
       chunk_data_nbytes_64 > INT32_MAX) {
     BLOSC_TRACE_ERROR("Chunk buffer size overflows the maximum of %d bytes", INT32_MAX);
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
@@ -2935,7 +2901,7 @@ b2nd_create_ctx(const blosc2_storage *b2_storage, int8_t ndim, const int64_t *sh
     ctx->shape[i] = shape[i];
     ctx->chunkshape[i] = chunkshape[i];
     ctx->blockshape[i] = blockshape[i];
-    if (b2nd_mul_overflow_int32(blocknitems, ctx->blockshape[i], &blocknitems)) {
+    if (!blosc2_checked_mul_i32_nonneg(blocknitems, ctx->blockshape[i], &blocknitems)) {
       blocksize_overflow = true;
       break;
     }
@@ -2943,7 +2909,7 @@ b2nd_create_ctx(const blosc2_storage *b2_storage, int8_t ndim, const int64_t *sh
   // update_shape_struct() rejects this too, but only once an array is built out
   // of the context; catching it here keeps cparams->blocksize from wrapping
   if (blocksize_overflow ||
-      b2nd_mul_overflow_int32(blocknitems, cparams->typesize, &cparams->blocksize)) {
+      !blosc2_checked_mul_i32_nonneg(blocknitems, cparams->typesize, &cparams->blocksize)) {
     BLOSC_TRACE_ERROR("blockshape product overflows the maximum blocksize");
     free(ctx->dtype);
     free(cparams);

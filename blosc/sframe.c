@@ -10,6 +10,7 @@
 
 #include "frame.h"
 #include "blosc2.h"
+#include "blosc-checked.h"
 
 #include <inttypes.h>
 #include <limits.h>
@@ -29,18 +30,19 @@
 static char* sframe_make_index_path(const char* urlpath) {
   size_t path_len = strlen(urlpath);
   size_t suffix_len = strlen("/chunks.b2frame");
-  if (path_len > SIZE_MAX - suffix_len - 1) {
+  size_t total_len;
+  if (!blosc2_checked_add_size(path_len, suffix_len + 1, &total_len)) {
     BLOSC_TRACE_ERROR("Index path length overflows size limits");
     return NULL;
   }
 
-  char* index_path = malloc(path_len + suffix_len + 1);
+  char* index_path = malloc(total_len);
   if (index_path == NULL) {
     return NULL;
   }
 
-  int written = snprintf(index_path, path_len + suffix_len + 1, "%s/chunks.b2frame", urlpath);
-  if (written < 0 || (size_t)written >= path_len + suffix_len + 1) {
+  int written = snprintf(index_path, total_len, "%s/chunks.b2frame", urlpath);
+  if (written < 0 || (size_t)written >= total_len) {
     BLOSC_TRACE_ERROR("Error building index path");
     free(index_path);
     return NULL;
@@ -59,12 +61,12 @@ static char* sframe_make_chunk_path(const char* urlpath, int64_t nchunk) {
   size_t path_len = strlen(urlpath);
   size_t suffix_len = strlen("/.chunk");
   size_t chunk_hex_len = 8;
-  if (path_len > SIZE_MAX - suffix_len - chunk_hex_len - 1) {
+  size_t total_len;
+  if (!blosc2_checked_add_size(path_len, suffix_len + chunk_hex_len + 1, &total_len)) {
     BLOSC_TRACE_ERROR("Chunk path length overflows size limits");
     return NULL;
   }
 
-  size_t total_len = path_len + suffix_len + chunk_hex_len + 1;
   char* chunk_path = malloc(total_len);
   if (chunk_path == NULL) {
     return NULL;
