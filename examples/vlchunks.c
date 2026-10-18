@@ -53,20 +53,52 @@ static int compress_string_to_chunk(const char* string, uint8_t** chunk, blosc2_
   return cbytes;
 }
 
+static int schunk_get_chunk_buffer_size(blosc2_schunk* schunk, int nchunk, int32_t* chunk_nbytes) {
+  int rc;
+
+  bool needs_free;
+  uint8_t* cchunk;
+  rc = blosc2_schunk_get_lazychunk(schunk, nchunk, &cchunk, &needs_free);
+  if (rc <= 0) {
+    return -1;
+  }
+
+  rc = blosc2_cbuffer_sizes(cchunk, chunk_nbytes, NULL, NULL);
+  if (needs_free) {
+    free(cchunk);
+  }
+
+  return rc;
+}
+
 static int print_and_validate_chunk(blosc2_schunk* schunk, int nchunk, const char* expected_string) {
-  char buffer[64] = {0};
-  int32_t dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, buffer, (int32_t)sizeof(buffer));
+  int32_t chunk_nbytes = 0;
+  int rc = schunk_get_chunk_buffer_size(schunk, nchunk, &chunk_nbytes);
+  if (rc < 0) {
+    return rc;
+  }
+
+  char *buffer = malloc((size_t)chunk_nbytes);
+  if (buffer == NULL) {
+    fprintf(stderr, "failed to allocate decompression buffer\n");
+    return -1;
+  }
+
+  int32_t dsize = blosc2_schunk_decompress_chunk(schunk, nchunk, buffer, chunk_nbytes);
 
   if (dsize != (int32_t)strlen(expected_string) + 1) {
     fprintf(stderr, "unexpected decompression size %d for string: %s.\n", dsize, expected_string);
+    free(buffer);
     return -1;
   }
   if (strcmp(buffer, expected_string) != 0) {
     fprintf(stderr, "unexpected decompressed result: %s. expected result: %s.\n", buffer, expected_string);
+    free(buffer);
     return -2;
   }
 
   printf("  chunk %d:    %-2d bytes  content: %s\n", nchunk, dsize, buffer);
+  free(buffer);
 
   return 0;
 }
