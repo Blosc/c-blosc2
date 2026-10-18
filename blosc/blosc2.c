@@ -11,6 +11,7 @@
 
 #include "blosc2.h"
 #include "blosc-private.h"
+#include "blosc-checked.h"
 #include "../plugins/codecs/zfp/blosc2-zfp.h"
 #include "frame.h"
 #include "sframe.h"
@@ -148,22 +149,6 @@ static int attach_shared_pool(blosc2_context *context);
 static int init_threadpool(blosc2_context *context);
 #endif
 static int parallel_blosc(blosc2_context* context);
-
-static inline bool checked_mul_size(size_t a, size_t b, size_t* out) {
-  if (a != 0 && b > SIZE_MAX / a) {
-    return false;
-  }
-  *out = a * b;
-  return true;
-}
-
-static inline bool checked_add_size(size_t a, size_t b, size_t* out) {
-  if (a > SIZE_MAX - b) {
-    return false;
-  }
-  *out = a + b;
-  return true;
-}
 
 /* global variable to change threading backend from Blosc-managed to caller-managed */
 static blosc_threads_callback threads_callback = 0;
@@ -1806,11 +1791,11 @@ static int blosc_d(
     size_t trailer_meta_nbytes;
     size_t lazy_trailer_end;
     if (srcsize < 0 || context->nblocks < 0 ||
-        !checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &bstarts_nbytes) ||
-        !checked_add_size((size_t)BLOSC_EXTENDED_HEADER_LENGTH, bstarts_nbytes, &trailer_offset) ||
-        !checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &block_csizes_nbytes) ||
-        !checked_add_size(sizeof(int32_t) + sizeof(int64_t), block_csizes_nbytes, &trailer_meta_nbytes) ||
-        !checked_add_size(trailer_offset, trailer_meta_nbytes, &lazy_trailer_end) ||
+        !blosc2_checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &bstarts_nbytes) ||
+        !blosc2_checked_add_size((size_t)BLOSC_EXTENDED_HEADER_LENGTH, bstarts_nbytes, &trailer_offset) ||
+        !blosc2_checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &block_csizes_nbytes) ||
+        !blosc2_checked_add_size(sizeof(int32_t) + sizeof(int64_t), block_csizes_nbytes, &trailer_meta_nbytes) ||
+        !blosc2_checked_add_size(trailer_offset, trailer_meta_nbytes, &lazy_trailer_end) ||
         (size_t)srcsize < lazy_trailer_end) {
       BLOSC_TRACE_ERROR("Lazy trailer exceeds source buffer.");
       return BLOSC2_ERROR_READ_BUFFER;
@@ -1871,18 +1856,16 @@ static int blosc_d(
         BLOSC_TRACE_ERROR("Lazy chunk offset cannot be negative.");
         return BLOSC2_ERROR_INVALID_HEADER;
       }
-      if (frame->file_offset > INT64_MAX - chunk_offset) {
+      if (!blosc2_checked_add_i64(frame->file_offset, chunk_offset, &io_pos)) {
         frame_reader_release(frame, io_cb, fp);
         BLOSC_TRACE_ERROR("Lazy chunk offset overflows file position.");
         return BLOSC2_ERROR_INVALID_HEADER;
       }
-      io_pos = frame->file_offset + chunk_offset;
-      if (io_pos > INT64_MAX - src_offset) {
+      if (!blosc2_checked_add_i64(io_pos, src_offset, &io_pos)) {
         frame_reader_release(frame, io_cb, fp);
         BLOSC_TRACE_ERROR("Lazy block offset overflows file position.");
         return BLOSC2_ERROR_INVALID_HEADER;
       }
-      io_pos += src_offset;
     }
     // We can make use of tmp3 because it will be used after src is not needed anymore
     int64_t rbytes = io_cb->read((void**)&tmp3, 1, block_csize, io_pos, fp);
@@ -2677,28 +2660,26 @@ static int read_lazy_chunk_bytes(blosc2_context* context, int32_t offset, uint8_
       return BLOSC2_ERROR_INVALID_HEADER;
     }
     fp = frame_reader_acquire(frame, context->schunk->storage->io);
-    if (frame->file_offset > INT64_MAX - chunk_offset) {
+    if (!blosc2_checked_add_i64(frame->file_offset, chunk_offset, &io_pos)) {
       BLOSC_TRACE_ERROR("Lazy chunk offset overflows file position.");
       if (fp != NULL) {
         frame_reader_release(frame, io_cb, fp);
       }
       return BLOSC2_ERROR_INVALID_HEADER;
     }
-    io_pos = frame->file_offset + chunk_offset;
-    if (io_pos > INT64_MAX - offset) {
+    if (!blosc2_checked_add_i64(io_pos, offset, &io_pos)) {
       BLOSC_TRACE_ERROR("Lazy block offset overflows file position.");
       if (fp != NULL) {
         frame_reader_release(frame, io_cb, fp);
       }
       return BLOSC2_ERROR_INVALID_HEADER;
     }
-    io_pos += offset;
   }
   if (fp == NULL) {
     BLOSC_TRACE_ERROR("%s", open_error);
     return BLOSC2_ERROR_FILE_OPEN;
   }
-  if (io_pos > INT64_MAX - nbytes) {
+  if (!blosc2_checked_add_i64(io_pos, nbytes, NULL)) {
     frame_reader_release(frame, io_cb, fp);
     return BLOSC2_ERROR_INVALID_HEADER;
   }
@@ -2866,8 +2847,8 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
     size_t bstarts_end_tmp;
     size_t bstarts_nbytes;
     if (context->nblocks < 0 ||
-        !checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &bstarts_nbytes) ||
-        !checked_add_size((size_t)context->header_overhead, bstarts_nbytes, &bstarts_end_tmp) ||
+        !blosc2_checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &bstarts_nbytes) ||
+        !blosc2_checked_add_size((size_t)context->header_overhead, bstarts_nbytes, &bstarts_end_tmp) ||
         bstarts_end_tmp > (size_t)INT32_MAX) {
       BLOSC_TRACE_ERROR("Invalid bstarts size in chunk header.");
       return BLOSC2_ERROR_INVALID_HEADER;
@@ -2886,9 +2867,9 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
     size_t trailer_meta_nbytes;
     size_t lazy_trailer_end;
     if (context->srcsize < 0 || context->nblocks < 0 ||
-        !checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &block_csizes_nbytes) ||
-        !checked_add_size(sizeof(int32_t) + sizeof(int64_t), block_csizes_nbytes, &trailer_meta_nbytes) ||
-        !checked_add_size((size_t)bstarts_end, trailer_meta_nbytes, &lazy_trailer_end) ||
+        !blosc2_checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &block_csizes_nbytes) ||
+        !blosc2_checked_add_size(sizeof(int32_t) + sizeof(int64_t), block_csizes_nbytes, &trailer_meta_nbytes) ||
+        !blosc2_checked_add_size((size_t)bstarts_end, trailer_meta_nbytes, &lazy_trailer_end) ||
         (size_t)context->srcsize < lazy_trailer_end) {
       BLOSC_TRACE_ERROR("Lazy trailer exceeds source buffer.");
       return BLOSC2_ERROR_READ_BUFFER;
@@ -4259,18 +4240,16 @@ static int decompress_single_vlblock(blosc2_context* context, int32_t nblock,
         frame_reader_release(frame, io_cb, fp);
         return BLOSC2_ERROR_INVALID_HEADER;
       }
-      if (frame->file_offset > INT64_MAX - chunk_offset) {
+      if (!blosc2_checked_add_i64(frame->file_offset, chunk_offset, &io_pos)) {
         BLOSC_TRACE_ERROR("Lazy chunk offset overflows file position.");
         frame_reader_release(frame, io_cb, fp);
         return BLOSC2_ERROR_INVALID_HEADER;
       }
-      io_pos = frame->file_offset + chunk_offset;
-      if (io_pos > INT64_MAX - bstart) {
+      if (!blosc2_checked_add_i64(io_pos, bstart, &io_pos)) {
         BLOSC_TRACE_ERROR("Lazy block offset overflows file position.");
         frame_reader_release(frame, io_cb, fp);
         return BLOSC2_ERROR_INVALID_HEADER;
       }
-      io_pos += bstart;
     }
     if (fp == NULL) {
       BLOSC_TRACE_ERROR("Cannot open frame file for lazy VL block size peek.");
@@ -4910,8 +4889,8 @@ int blosc2_decompress_block_ctx(blosc2_context* context, const void* src,
     size_t bstarts_nbytes;
     size_t bstarts_end;
     if (context->nblocks < 0 ||
-        !checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &bstarts_nbytes) ||
-        !checked_add_size((size_t)context->header_overhead, bstarts_nbytes, &bstarts_end) ||
+        !blosc2_checked_mul_size((size_t)context->nblocks, sizeof(int32_t), &bstarts_nbytes) ||
+        !blosc2_checked_add_size((size_t)context->header_overhead, bstarts_nbytes, &bstarts_end) ||
         bstarts_end > (size_t)srcsize) {
       BLOSC_TRACE_ERROR("`bstarts` out of bounds.");
       return BLOSC2_ERROR_READ_BUFFER;
