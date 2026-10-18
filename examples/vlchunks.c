@@ -238,11 +238,11 @@ int main(void) {
   int nchunk_to_update = 1;
   num_chunks = blosc2_schunk_update_chunk(schunk, nchunk_to_update, update_chunk, true);
   if (num_chunks != 3) {
-    fprintf(stderr, "failed to update chunk, got unexpected number of chunks: %d\n", num_chunks);
+    fprintf(stderr, "failed to update chunk, got unexpected number of chunks: %" PRIi64 "\n", num_chunks);
     goto cleanup;
   }
 
-  printf("\nAfter updating chunk 1 of the schunk, nbytes should update...\n");
+  printf("\nAfter updating chunk 1 of the schunk, values and sizes should update...\n");
   expected_results[nchunk_to_update] = update_string;
   print_rc = print_and_validate_schunk(schunk, nchunks, chunk_indexes, expected_results);
   if (print_rc < 0) {
@@ -257,7 +257,7 @@ int main(void) {
     goto cleanup;
   }
 
-  printf("\nAfter closing and reopening the schunk, our values should persist...\n");
+  printf("\nAfter closing and reopening the schunk, our chunks should persist...\n");
   print_rc = print_and_validate_schunk(schunk, nchunks, chunk_indexes, expected_results);
   if (print_rc < 0) {
     goto cleanup;
