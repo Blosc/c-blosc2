@@ -13,6 +13,12 @@ Changes from 3.3.5 to 3.3.6
   into a caller-owned buffer. Capacity is checked before dictionary/scratch
   allocation, and scratch is sized from the admitted block. Both APIs support
   ordinary and lazy VL chunks. The existing allocating API is unchanged.
+* **Fixed bit-shuffled Blosc1 chunks with leftover bytes being decoded incorrectly**:
+  When reading a chunk with format version 2 whose bit-shuffled blocks have a
+  number of elements that is a multiple of 8, the bytes left over after the last
+  whole element were not copied to the output, so the end of the buffer was
+  garbage while the call reported success. They are now copied, as C-Blosc 1.x
+  does. See #812.
 
 Changes from 3.3.4 to 3.3.5
 ===========================
