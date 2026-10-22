@@ -1326,6 +1326,19 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
         }
       }
 
+      bool has_delta = false;
+      for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+        if (array->sc->filters[i] == BLOSC_DELTA) {
+          has_delta = true;
+          break;
+        }
+      }
+      if (has_delta && nblocks_needed > 0) {
+        // Delta filter encodes subsequent blocks relative to the reference block (block 0).
+        // If any block in the chunk is needed, block 0 must be decompressed as reference.
+        block_maskout[0] = false;
+      }
+
       // Compact get path: when only a fraction of the chunk's blocks is
       // needed, decompress just those blocks -- one at a time, straight
       // from the (lazy)chunk -- instead of decompressing into a chunk-sized
@@ -1343,9 +1356,12 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       // around 2-4 needed blocks, so stay conservative there (1/16 keeps
       // the possible loss window narrow while still capturing the common
       // 1-2 block reads, where compact always wins or ties).
+      //
+      // If DELTA is used, blocks cannot be decompressed independently; keep maskout path.
       bool on_disk = array->sc->storage != NULL && array->sc->storage->urlpath != NULL;
       int64_t frac = on_disk ? 4 : 16;
-      use_compact = ((int64_t) nblocks_needed * block_nbytes) * frac <= (int64_t) data_nbytes;
+      use_compact = !has_delta &&
+                    (((int64_t) nblocks_needed * block_nbytes) * frac <= (int64_t) data_nbytes);
       if (use_compact) {
         lazychunk_cbytes = blosc2_schunk_get_lazychunk(array->sc, nchunk, &lazychunk,
                                                        &lazychunk_needs_free);
