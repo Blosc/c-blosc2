@@ -2730,16 +2730,32 @@ BLOSC_EXPORT void blosc1_set_splitmode(int splitmode);
  * decoded by C-Blosc 1.x.  They are not byte-identical to what C-Blosc 1.x would write.
  * Contexts do not write Blosc1 chunks by default.
  *
- * Only a plain shuffle or bitshuffle filter (or none) and the blosclz, lz4, lz4hc, zlib
- * and zstd codecs can be used, without dictionaries or variable-length blocks.  A compression call on a context set up otherwise fails
- * with an error.
+ * The chunk format has room for a plain shuffle or bitshuffle filter, in whichever slot of
+ * the filter pipeline it is, and for the blosclz, lz4, lz4hc, zlib and zstd codecs.  A
+ * compression call on a context that has any other filter or more than one filter, another
+ * codec, a dictionary or variable-length blocks fails with an error.  A prefilter is applied
+ * as usual: the chunk records nothing about it, so a reader gets the prefiltered data.
  *
  * @param context A compression context.
  * @param enable Whether to write Blosc1 chunks.
  *
  * @return 0 on success, a negative error code otherwise.
+ *
+ * @sa #blosc2_ctx_get_blosc1_format
  */
 BLOSC_EXPORT int blosc2_ctx_set_blosc1_format(blosc2_context* context, bool enable);
+
+/**
+ * @brief Query whether a compression context writes Blosc1 chunks.
+ *
+ * @param context A compression context.
+ *
+ * @return true if the context is set to write Blosc1 chunks, false if it is not or if
+ * @p context is NULL.
+ *
+ * @sa #blosc2_ctx_set_blosc1_format
+ */
+BLOSC_EXPORT bool blosc2_ctx_get_blosc1_format(const blosc2_context* context);
 
 
 /**

@@ -47,7 +47,7 @@ static bool codec_available(int codec) {
 /* Compress with a Blosc1-format context and check the chunk can be read back.
  * Returns the compressed size, or a negative error code. */
 static int roundtrip(int codec, int filter, int32_t typesize, int32_t nbytes,
-                     int32_t blocksize, uint8_t* chunk, uint8_t* out) {
+                     int32_t blocksize, int16_t nthreads, uint8_t* chunk, uint8_t* out) {
   uint8_t src[MAX_NBYTES];
   fill(src, nbytes);
 
@@ -56,7 +56,7 @@ static int roundtrip(int codec, int filter, int32_t typesize, int32_t nbytes,
   cparams.clevel = 5;
   cparams.typesize = typesize;
   cparams.blocksize = blocksize;
-  cparams.nthreads = 1;
+  cparams.nthreads = nthreads;
   cparams.filters[BLOSC2_MAX_FILTERS - 1] = (uint8_t)filter;
   blosc2_context* cctx = blosc2_create_cctx(cparams);
   if (cctx == NULL) {
@@ -74,7 +74,7 @@ static int roundtrip(int codec, int filter, int32_t typesize, int32_t nbytes,
   }
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
-  dparams.nthreads = 1;
+  dparams.nthreads = nthreads;
   blosc2_context* dctx = blosc2_create_dctx(dparams);
   int dbytes = blosc2_decompress_ctx(dctx, chunk, cbytes, out, nbytes);
   blosc2_free_ctx(dctx);
@@ -97,12 +97,15 @@ static char* test_header(void) {
   mu_assert("ERROR: default compression failed", cbytes > 0);
   mu_assert("ERROR: default chunks changed version", chunk[0] != BLOSC1_VERSION_FORMAT);
 
+  mu_assert("ERROR: default context is Blosc1", !blosc2_ctx_get_blosc1_format(cctx));
   mu_assert("ERROR: cannot set the flag", blosc2_ctx_set_blosc1_format(cctx, true) == 0);
+  mu_assert("ERROR: the flag is not reported", blosc2_ctx_get_blosc1_format(cctx));
   cbytes = blosc2_compress_ctx(cctx, src, sizeof(src), chunk, sizeof(chunk));
   mu_assert("ERROR: blosc1 compression failed", cbytes > 0);
   mu_assert("ERROR: not format version 2", chunk[0] == BLOSC1_VERSION_FORMAT);
 
   mu_assert("ERROR: cannot clear the flag", blosc2_ctx_set_blosc1_format(cctx, false) == 0);
+  mu_assert("ERROR: the cleared flag is reported", !blosc2_ctx_get_blosc1_format(cctx));
   cbytes = blosc2_compress_ctx(cctx, src, sizeof(src), chunk, sizeof(chunk));
   mu_assert("ERROR: compression failed after clearing the flag", cbytes > 0);
   mu_assert("ERROR: version not restored", chunk[0] != BLOSC1_VERSION_FORMAT);
@@ -123,6 +126,7 @@ static char* test_header(void) {
 /* The flag can only be set on compression contexts */
 static char* test_set_flag_errors(void) {
   mu_assert("ERROR: NULL context accepted", blosc2_ctx_set_blosc1_format(NULL, true) < 0);
+  mu_assert("ERROR: NULL context is Blosc1", !blosc2_ctx_get_blosc1_format(NULL));
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   blosc2_context* dctx = blosc2_create_dctx(dparams);
   mu_assert("ERROR: decompression context accepted", blosc2_ctx_set_blosc1_format(dctx, true) < 0);
@@ -158,7 +162,7 @@ static char* test_unsupported(void) {
   uint8_t src[4096], chunk[4096 + BLOSC2_MAX_OVERHEAD];
   fill(src, sizeof(src));
 
-  for (int k = 0; k < 6; k++) {
+  for (int k = 0; k < 7; k++) {
     blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
     cparams.typesize = 4;
     switch (k) {
@@ -167,7 +171,8 @@ static char* test_unsupported(void) {
       case 2: cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_TRUNC_PREC; break;
       case 3: cparams.filters_meta[BLOSC2_MAX_FILTERS - 1] = 2; break;  /* custom shuffle typesize */
       case 4: cparams.compcode = BLOSC_CODEC_NDLZ; break;
-      default: cparams.use_dict = true; cparams.compcode = BLOSC_ZSTD; break;
+      case 5: cparams.use_dict = true; cparams.compcode = BLOSC_ZSTD; break;
+      default: cparams.compcode = 3; break;  /* snappy's code, which c-blosc2 does not have */
     }
     blosc2_context* cctx = blosc2_create_cctx(cparams);
     mu_assert("ERROR: cannot create the context", cctx != NULL);
@@ -194,13 +199,77 @@ static char* test_roundtrip(void) {
     for (size_t f = 0; f < sizeof(filters) / sizeof(filters[0]); f++) {
       for (size_t t = 0; t < sizeof(typesizes) / sizeof(typesizes[0]); t++) {
         for (size_t s = 0; s < sizeof(sizes) / sizeof(sizes[0]); s++) {
-          int cbytes = roundtrip(codecs[c], filters[f], typesizes[t], sizes[s], 0, chunk, out);
+          int cbytes = roundtrip(codecs[c], filters[f], typesizes[t], sizes[s], 0, 1, chunk, out);
           if (cbytes < 0) {
             printf("codec %d filter %d typesize %d nbytes %d: error %d\n",
                    codecs[c], filters[f], typesizes[t], sizes[s], cbytes);
           }
           mu_assert("ERROR: Blosc1 format roundtrip failed", cbytes > 0);
           mu_assert("ERROR: not format version 2", chunk[0] == BLOSC1_VERSION_FORMAT);
+        }
+      }
+    }
+  }
+  return 0;
+}
+
+
+/* The Blosc1 header has flags for the filter, so it can be in any slot of the pipeline */
+static char* test_filter_slots(void) {
+  static uint8_t src[4096], chunk[4096 + BLOSC2_MAX_OVERHEAD], out[4096];
+  fill(src, sizeof(src));
+
+  for (int slot = 0; slot < BLOSC2_MAX_FILTERS; slot++) {
+    for (int filter = BLOSC_SHUFFLE; filter <= BLOSC_BITSHUFFLE; filter++) {
+      blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+      cparams.typesize = 4;
+      cparams.nthreads = 1;
+      memset(cparams.filters, 0, sizeof(cparams.filters));
+      cparams.filters[slot] = (uint8_t)filter;
+      blosc2_context* cctx = blosc2_create_cctx(cparams);
+      blosc2_ctx_set_blosc1_format(cctx, true);
+      int cbytes = blosc2_compress_ctx(cctx, src, sizeof(src), chunk, sizeof(chunk));
+      blosc2_free_ctx(cctx);
+      mu_assert("ERROR: a filter in this slot was refused", cbytes > 0);
+      mu_assert("ERROR: not format version 2", chunk[0] == BLOSC1_VERSION_FORMAT);
+      mu_assert("ERROR: bad decompression", blosc1_decompress(chunk, out, sizeof(out)) == (int)sizeof(out));
+      mu_assert("ERROR: bad roundtrip", memcmp(src, out, sizeof(src)) == 0);
+    }
+  }
+  return 0;
+}
+
+
+/* Several threads, and enough blocks for them to share */
+static char* test_threads(void) {
+  static uint8_t chunk[MAX_NBYTES + BLOSC2_MAX_OVERHEAD], out[MAX_NBYTES];
+  static const int32_t typesizes[] = {1, 4, 8, 16, 17};
+  static const int32_t blocksizes[] = {0, 1024, 4096};
+  static const int16_t threads[] = {2, 4};
+
+  for (size_t c = 0; c < sizeof(codecs) / sizeof(codecs[0]); c++) {
+    if (!codec_available(codecs[c])) {
+      continue;
+    }
+    for (size_t f = 0; f < sizeof(filters) / sizeof(filters[0]); f++) {
+      for (size_t t = 0; t < sizeof(typesizes) / sizeof(typesizes[0]); t++) {
+        for (size_t b = 0; b < sizeof(blocksizes) / sizeof(blocksizes[0]); b++) {
+          /* a block size must be a multiple of the typesize, as C-Blosc 1.x enforces itself;
+             c-blosc2 does not, and writes chunks that it cannot read back otherwise */
+          int32_t blocksize = blocksizes[b];
+          if (blocksize > typesizes[t]) {
+            blocksize -= blocksize % typesizes[t];
+          }
+          for (size_t n = 0; n < sizeof(threads) / sizeof(threads[0]); n++) {
+            int cbytes = roundtrip(codecs[c], filters[f], typesizes[t], 40001, blocksize,
+                                   threads[n], chunk, out);
+            if (cbytes < 0) {
+              printf("codec %d filter %d typesize %d blocksize %d threads %d: error %d\n",
+                     codecs[c], filters[f], typesizes[t], blocksize, threads[n], cbytes);
+            }
+            mu_assert("ERROR: multi-threaded Blosc1 format roundtrip failed", cbytes > 0);
+            mu_assert("ERROR: not format version 2", chunk[0] == BLOSC1_VERSION_FORMAT);
+          }
         }
       }
     }
@@ -287,6 +356,8 @@ static char* all_tests(void) {
   mu_run_test(test_invalid_typesize);
   mu_run_test(test_unsupported);
   mu_run_test(test_roundtrip);
+  mu_run_test(test_filter_slots);
+  mu_run_test(test_threads);
   mu_run_test(test_split_flag);
 #ifndef _WIN32
   mu_run_test(test_envvar);

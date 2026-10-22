@@ -32,6 +32,10 @@ Changes from 3.3.5 to 3.3.6
   `BLOSC_BLOSC1_COMPAT` environment variable now enables the same mode for
   `blosc1_compress()` (it previously only dropped the extended header, still
   writing a format version 5 chunk), so delta there is now an error.
+  `blosc2_ctx_get_blosc1_format()` reports whether a context is in this mode. The
+  filter may be in any slot of the pipeline; a prefilter is applied as usual.
+* `blosc2_compress_ctx()` with a typesize of 0 stopped with SIGFPE (a division by
+  zero when choosing the block size). It now returns `BLOSC2_ERROR_INVALID_PARAM`.
 
 Changes from 3.3.4 to 3.3.5
 ===========================
