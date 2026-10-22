@@ -36,6 +36,18 @@ Changes from 3.3.5 to 3.3.6
   filter may be in any slot of the pipeline; a prefilter is applied as usual.
 * `blosc2_compress_ctx()` with a typesize of 0 stopped with SIGFPE (a division by
   zero when choosing the block size). It now returns `BLOSC2_ERROR_INVALID_PARAM`.
+* **Fixed chunks that could not be read back when the requested block size was not a
+  multiple of the typesize**: the tuner rounds a requested block size down to a multiple
+  of the typesize, but the chunk header recorded the size that had been asked for, so a
+  reader cut the chunk into blocks of a different size and failed (error -3, or wrong
+  data) with every filter and codec. The header now records the block size that is used.
+* **Fixed the block size of buffers with a typesize above `BLOSC_MAX_TYPESIZE`**: such
+  buffers are stored as a stream of bytes with a typesize of 1, but the tuner chose the
+  block size with the large typesize and only then was it capped. A buffer shorter than
+  the typesize was split into blocks of one byte (200 bytes of typesize 300 took 1831
+  bytes) and a longer one got a block size that was a multiple of the large typesize.
+  The typesize is now capped before the tuner runs, so that it is blocked exactly like a
+  typesize of 1.
 
 Changes from 3.3.4 to 3.3.5
 ===========================

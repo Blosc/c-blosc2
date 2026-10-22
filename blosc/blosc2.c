@@ -2422,6 +2422,20 @@ static int initialize_context_compression(
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
+  /* Check typesize limits */
+  if (typesize > BLOSC2_MAXTYPESIZE) {
+    // If typesize is too large for Blosc2, return an error
+    BLOSC_TRACE_ERROR("Typesize cannot exceed %d bytes.", BLOSC2_MAXTYPESIZE);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  /* Now, cap typesize so that blosc2 split machinery can continue to work.  This has to be
+     done before the tuner chooses the block size, which depends on the typesize: a buffer
+     with a larger typesize is a plain stream of bytes and is blocked as one. */
+  if (typesize > BLOSC_MAX_TYPESIZE) {
+    /* If typesize is too large, treat buffer as an 1-byte stream. */
+    typesize = 1;
+  }
+
   /* Set parameters */
   context->do_compress = 1;
   context->src = (const uint8_t*)src;
@@ -2520,6 +2534,11 @@ static int initialize_context_compression(
     BLOSC_TRACE_ERROR("Error in tuner next_blocksize func\n");
     return BLOSC2_ERROR_TUNER;
   }
+  /* The header must record the block size that the tuner settled on (it rounds a requested
+     one to a multiple of the typesize, for instance), not the one that was asked for: a reader
+     splits the chunk into blocks of the size in the header.  Variable-length block chunks
+     store something else there and set it themselves. */
+  context->header_blocksize = context->blocksize;
 
 
   /* Check buffer size limits */
@@ -2549,18 +2568,6 @@ static int initialize_context_compression(
       context->compcode != BLOSC_LZ4 && context->compcode != BLOSC_LZ4HC) {
     BLOSC_TRACE_ERROR("`use_dict` is only supported for ZSTD, LZ4, and LZ4HC codecs.");
     return BLOSC2_ERROR_CODEC_PARAM;
-  }
-
-  /* Check typesize limits */
-  if (context->typesize > BLOSC2_MAXTYPESIZE) {
-    // If typesize is too large for Blosc2, return an error
-    BLOSC_TRACE_ERROR("Typesize cannot exceed %d bytes.", BLOSC2_MAXTYPESIZE);
-    return BLOSC2_ERROR_INVALID_PARAM;
-  }
-  /* Now, cap typesize so that blosc2 split machinery can continue to work */
-  if (context->typesize > BLOSC_MAX_TYPESIZE) {
-    /* If typesize is too large, treat buffer as an 1-byte stream. */
-    context->typesize = 1;
   }
 
   blosc2_calculate_blocks(context);
