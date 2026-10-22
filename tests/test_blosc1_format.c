@@ -254,12 +254,8 @@ static char* test_threads(void) {
     for (size_t f = 0; f < sizeof(filters) / sizeof(filters[0]); f++) {
       for (size_t t = 0; t < sizeof(typesizes) / sizeof(typesizes[0]); t++) {
         for (size_t b = 0; b < sizeof(blocksizes) / sizeof(blocksizes[0]); b++) {
-          /* a block size must be a multiple of the typesize, as C-Blosc 1.x enforces itself;
-             c-blosc2 does not, and writes chunks that it cannot read back otherwise */
+          /* not a multiple of the typesize in general: it is rounded */
           int32_t blocksize = blocksizes[b];
-          if (blocksize > typesizes[t]) {
-            blocksize -= blocksize % typesizes[t];
-          }
           for (size_t n = 0; n < sizeof(threads) / sizeof(threads[0]); n++) {
             int cbytes = roundtrip(codecs[c], filters[f], typesizes[t], 40001, blocksize,
                                    threads[n], chunk, out);
