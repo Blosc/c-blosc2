@@ -29,6 +29,19 @@ static void fill(uint8_t* buf, int32_t nbytes) {
 }
 
 
+/* Whether this build has the codec (zlib and zstd can be deactivated) */
+static bool codec_available(int codec) {
+  uint8_t src[64] = {0}, chunk[64 + BLOSC2_MAX_OVERHEAD];
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.compcode = (uint8_t)codec;
+  cparams.nthreads = 1;
+  blosc2_context* cctx = blosc2_create_cctx(cparams);
+  int cbytes = blosc2_compress_ctx(cctx, src, sizeof(src), chunk, sizeof(chunk));
+  blosc2_free_ctx(cctx);
+  return cbytes >= 0;
+}
+
+
 /* Compress with a Blosc1-format context and check the chunk can be read back.
  * Returns the compressed size, or a negative error code. */
 static int roundtrip(int codec, int filter, int32_t typesize, int32_t nbytes,
@@ -151,6 +164,9 @@ static char* test_roundtrip(void) {
   static const int32_t sizes[] = {1, 31, 32, 33, 1000, 4097, 40001, MAX_NBYTES};
 
   for (size_t c = 0; c < sizeof(codecs) / sizeof(codecs[0]); c++) {
+    if (!codec_available(codecs[c])) {
+      continue;
+    }
     for (size_t f = 0; f < sizeof(filters) / sizeof(filters[0]); f++) {
       for (size_t t = 0; t < sizeof(typesizes) / sizeof(typesizes[0]); t++) {
         for (size_t s = 0; s < sizeof(sizes) / sizeof(sizes[0]); s++) {
