@@ -131,6 +131,28 @@ static char* test_set_flag_errors(void) {
 }
 
 
+/* A typesize that is not positive is an error, not a division by zero */
+static char* test_invalid_typesize(void) {
+  uint8_t src[4096], chunk[4096 + BLOSC2_MAX_OVERHEAD];
+  fill(src, sizeof(src));
+
+  for (int blosc1_format = 0; blosc1_format < 2; blosc1_format++) {
+    for (int32_t typesize = -1; typesize <= 0; typesize++) {
+      blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+      cparams.typesize = typesize;
+      cparams.nthreads = 1;
+      cparams.filters[BLOSC2_MAX_FILTERS - 1] = BLOSC_BITSHUFFLE;
+      blosc2_context* cctx = blosc2_create_cctx(cparams);
+      blosc2_ctx_set_blosc1_format(cctx, blosc1_format);
+      int cbytes = blosc2_compress_ctx(cctx, src, sizeof(src), chunk, sizeof(chunk));
+      blosc2_free_ctx(cctx);
+      mu_assert("ERROR: a typesize that is not positive was accepted", cbytes < 0);
+    }
+  }
+  return 0;
+}
+
+
 /* What the Blosc1 format cannot express is refused rather than written wrongly */
 static char* test_unsupported(void) {
   uint8_t src[4096], chunk[4096 + BLOSC2_MAX_OVERHEAD];
@@ -262,6 +284,7 @@ static char* test_envvar(void) {
 static char* all_tests(void) {
   mu_run_test(test_header);
   mu_run_test(test_set_flag_errors);
+  mu_run_test(test_invalid_typesize);
   mu_run_test(test_unsupported);
   mu_run_test(test_roundtrip);
   mu_run_test(test_split_flag);

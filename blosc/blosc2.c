@@ -2416,6 +2416,12 @@ static int initialize_context_compression(
         int tuner_id, void *tuner_params,
         blosc2_schunk* schunk) {
 
+  /* The block size and the filters divide by the typesize */
+  if (typesize <= 0) {
+    BLOSC_TRACE_ERROR("The typesize must be positive, not %d.", typesize);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
   /* Set parameters */
   context->do_compress = 1;
   context->src = (const uint8_t*)src;
