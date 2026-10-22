@@ -183,7 +183,16 @@ int blosc_stune_free(blosc2_context * context) {
   return BLOSC2_ERROR_SUCCESS;
 }
 
+/* C-Blosc 1.x readers do not look only at the "dont split" flag: they also treat a block
+ * as unsplit unless typesize <= 16 and it has at least this many elements. */
+#define BLOSC1_MIN_SPLIT_ELEMENTS 128
+
 int split_block(blosc2_context *context, int32_t typesize, int32_t blocksize) {
+  if (context->blosc1_format &&
+      (typesize > MAX_STREAMS || (blocksize / typesize) < BLOSC1_MIN_SPLIT_ELEMENTS)) {
+    // A C-Blosc 1.x reader would not split this block whatever the flag says
+    return 0;
+  }
   switch (context->splitmode) {
     case BLOSC_ALWAYS_SPLIT:
       return 1;

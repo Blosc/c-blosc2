@@ -33,7 +33,7 @@ What is it?
 
 `Blosc2 <https://www.blosc.org/pages/blosc-in-depth/>`_ is a high-performance compressor and data format optimized for binary data, including numerical arrays, tensors, and other structured formats. It provides a flexible framework of codecs and filters, enabling developers to balance compression speed and ratio for specific use cases, from high-throughput data pipelines to persistent storage. As the successor to the original Blosc library (released in 2010), Blosc2 is built on a mature foundation and is integrated into many popular scientific computing libraries, such as PyTables, h5py, and Zarr.
 
-C-Blosc2 is the latest major version of `C-Blosc <https://github.com/Blosc/c-blosc>`_, and is backward compatible with both the C-Blosc1 API and its in-memory format.  However, the reverse thing is generally not true for the format; buffers generated with C-Blosc2 are not format-compatible with C-Blosc1 (i.e. forward compatibility is not supported).  In case you want to ensure full API compatibility with C-Blosc1 API, define the `BLOSC1_COMPAT` symbol.
+C-Blosc2 is the latest major version of `C-Blosc <https://github.com/Blosc/c-blosc>`_, and is backward compatible with both the C-Blosc1 API and its in-memory format.  However, the reverse thing is generally not true for the format; buffers generated with C-Blosc2 are not format-compatible with C-Blosc1 (i.e. forward compatibility is not supported by default, but see `blosc2_ctx_set_blosc1_format()` to write chunks that C-Blosc1 can read).  In case you want to ensure full API compatibility with C-Blosc1 API, define the `BLOSC1_COMPAT` symbol.
 
 See a 3-minute `introductory video to Blosc2 <https://www.youtube.com/watch?v=ER12R7FXosk>`_.
 

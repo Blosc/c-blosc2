@@ -19,6 +19,19 @@ Changes from 3.3.5 to 3.3.6
   whole element were not copied to the output, so the end of the buffer was
   garbage while the call reported success. They are now copied, as C-Blosc 1.x
   does. See #812.
+* **New opt-in writer for Blosc1 (C-Blosc 1.x compatible) chunks**:
+  `blosc2_ctx_set_blosc1_format()` makes a compression context write chunks in
+  format version 2 with the 16-byte header, which C-Blosc 1.x can decode (stock
+  C-Blosc2 chunks, even with `BLOSC_BLOSC1_COMPAT`, cannot be). Besides the
+  header, such chunks follow the version 2 bitshuffle rule (a block is
+  bit-shuffled only if its number of elements is a multiple of 8) and only split
+  blocks that a C-Blosc 1.x reader also splits. Only plain shuffle/bitshuffle with
+  the blosclz, lz4, lz4hc, zlib and zstd codecs are supported; anything else
+  (other filters including delta, other codecs, dictionaries, variable-length
+  blocks) fails with an error. Off by default, no ABI change. The
+  `BLOSC_BLOSC1_COMPAT` environment variable now enables the same mode for
+  `blosc1_compress()` (it previously only dropped the extended header, still
+  writing a format version 5 chunk), so delta there is now an error.
 
 Changes from 3.3.4 to 3.3.5
 ===========================
