@@ -631,6 +631,10 @@ BLOSC_EXPORT void blosc2_destroy(void);
  * #blosc2_set_nthreads. *BLOSC_CLEVEL*, *BLOSC_SHUFFLE*, *BLOSC_DELTA* and
  * *BLOSC_TYPESIZE* environment vars will also be honored.
  *
+ * * **BLOSC_BLOSC1_COMPAT=(ANY VALUE)**: The chunk is written in the Blosc1 format,
+ * as if #blosc2_ctx_set_blosc1_format() had been called, so that C-Blosc 1.x can
+ * decode it.  Also honored together with *BLOSC_NOLOCK*.
+ *
  * @endparblock
  *
  * @sa #blosc1_decompress
@@ -2718,6 +2722,24 @@ BLOSC_EXPORT void blosc1_set_blocksize(size_t blocksize);
   * This function should always succeed.
  */
 BLOSC_EXPORT void blosc1_set_splitmode(int splitmode);
+
+/**
+ * @brief Make a compression context write Blosc1 chunks.
+ *
+ * The chunks use format version 2 and the 16-byte header, so that they can also be
+ * decoded by C-Blosc 1.x.  They are not byte-identical to what C-Blosc 1.x would write.
+ * Contexts do not write Blosc1 chunks by default.
+ *
+ * Only a plain shuffle or bitshuffle filter (or none) and the blosclz, lz4, lz4hc, zlib
+ * and zstd codecs can be used, without dictionaries or variable-length blocks.  A compression call on a context set up otherwise fails
+ * with an error.
+ *
+ * @param context A compression context.
+ * @param enable Whether to write Blosc1 chunks.
+ *
+ * @return 0 on success, a negative error code otherwise.
+ */
+BLOSC_EXPORT int blosc2_ctx_set_blosc1_format(blosc2_context* context, bool enable);
 
 
 /**

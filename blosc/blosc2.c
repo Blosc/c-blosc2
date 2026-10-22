@@ -1008,6 +1008,9 @@ static int blosc2_initialize_header_from_context(blosc2_context* context, blosc_
   header->version = (context->blosc2_flags2 & BLOSC2_VL_BLOCKS) ?
                     BLOSC2_VERSION_FORMAT_VL_BLOCKS :
                     BLOSC2_VERSION_FORMAT_STABLE;
+  if (context->blosc1_format) {
+    header->version = BLOSC1_VERSION_FORMAT;
+  }
   header->versionlz = compcode_to_compversion(context->compcode);
   header->flags = context->header_flags;
   header->typesize = (uint8_t)context->typesize;
@@ -1119,7 +1122,12 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
           blosc2_shuffle(filters_meta[i] == 0 ? typesize : filters_meta[i], bsize, _src, _dest);
           break;
         case BLOSC_BITSHUFFLE:
-          if (blosc2_bitshuffle(typesize, bsize, _src, _dest) < 0) {
+          if (context->blosc1_format && ((bsize / typesize) % 8) != 0) {
+            // Format version 2 (Blosc1) only bit-shuffles blocks whose number of
+            // elements is a multiple of 8; other blocks are stored unshuffled.
+            memcpy(_dest, _src, (size_t)bsize);
+          }
+          else if (blosc2_bitshuffle(typesize, bsize, _src, _dest) < 0) {
             return NULL;
           }
           break;
@@ -3153,6 +3161,42 @@ static int blosc_compress_context_without_dict(blosc2_context* context) {
 }
 
 
+int blosc2_ctx_set_blosc1_format(blosc2_context* context, bool enable) {
+  if (context == NULL || context->do_compress != 1) {
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  context->blosc1_format = enable;
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+/* Check that a context set to write Blosc1 chunks only uses what the format can express */
+static int blosc1_format_check(const blosc2_context* context) {
+  if (!context->blosc1_format) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  if (context->compcode > BLOSC_ZSTD) {
+    BLOSC_TRACE_ERROR("Codec %d cannot be used when writing Blosc1 chunks.", context->compcode);
+    return BLOSC2_ERROR_CODEC_SUPPORT;
+  }
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
+    uint8_t filter = context->filters[i];
+    bool supported = (filter == BLOSC_NOFILTER) ||
+                     (i == BLOSC2_MAX_FILTERS - 1 && context->filters_meta[i] == 0 &&
+                      (filter == BLOSC_SHUFFLE || filter == BLOSC_BITSHUFFLE));
+    if (!supported) {
+      BLOSC_TRACE_ERROR("Filter %d in slot %d cannot be used when writing Blosc1 chunks.", filter, i);
+      return BLOSC2_ERROR_FILTER_PIPELINE;
+    }
+  }
+  if (context->use_dict || (context->blosc2_flags2 & BLOSC2_VL_BLOCKS)) {
+    BLOSC_TRACE_ERROR("Dictionaries and variable-length blocks cannot be used when writing Blosc1 chunks.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 /* The public secure routine for compression with context. */
 int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsize,
                         void* dest, int32_t destsize) {
@@ -3173,8 +3217,13 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     return error;
   }
 
-  /* Write the extended header */
-  error = write_compression_header(context, true);
+  error = blosc1_format_check(context);
+  if (error < 0) {
+    return error;
+  }
+
+  /* Write the extended header, or the Blosc1 header if requested */
+  error = write_compression_header(context, !context->blosc1_format);
   if (error < 0) {
     return error;
   }
@@ -3888,6 +3937,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
       BLOSC_TRACE_ERROR("Error while creating the compression context");
       return BLOSC2_ERROR_NULL_POINTER;
     }
+    cctx->blosc1_format = (getenv("BLOSC_BLOSC1_COMPAT") != NULL);
     /* Do the actual compression */
     result = blosc2_compress_ctx(cctx, src, srcsize, dest, destsize);
     /* Release context resources */
@@ -3896,6 +3946,9 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   }
 
   blosc2_pthread_mutex_lock(&global_comp_mutex);
+
+  /* Blosc1 format is read before anything depends on it (e.g. block splitting) */
+  g_global_context->blosc1_format = (getenv("BLOSC_BLOSC1_COMPAT") != NULL);
 
   /* Initialize a context compression */
   uint8_t* filters = calloc(1, BLOSC2_MAX_FILTERS);
@@ -3914,14 +3967,14 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     return error;
   }
 
-  envvar = getenv("BLOSC_BLOSC1_COMPAT");
-  if (envvar != NULL) {
-    /* Write chunk header without extended header (Blosc1 compatibility mode) */
-    error = write_compression_header(g_global_context, false);
+  error = blosc1_format_check(g_global_context);
+  if (error < 0) {
+    blosc2_pthread_mutex_unlock(&global_comp_mutex);
+    return error;
   }
-  else {
-    error = write_compression_header(g_global_context, true);
-  }
+
+  /* Blosc1 format: chunk header without extended header */
+  error = write_compression_header(g_global_context, !g_global_context->blosc1_format);
   if (error < 0) {
     blosc2_pthread_mutex_unlock(&global_comp_mutex);
     return error;
