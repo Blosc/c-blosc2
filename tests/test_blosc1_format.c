@@ -29,16 +29,18 @@ static void fill(uint8_t* buf, int32_t nbytes) {
 }
 
 
-/* Whether this build has the codec (zlib and zstd can be deactivated) */
+/* Whether this build has the codec (zlib and zstd can be deactivated).  The data must not
+ * be a run of zeros, which is stored without calling the codec. */
 static bool codec_available(int codec) {
-  uint8_t src[64] = {0}, chunk[64 + BLOSC2_MAX_OVERHEAD];
+  uint8_t src[4096], chunk[4096 + BLOSC2_MAX_OVERHEAD];
+  fill(src, sizeof(src));
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.compcode = (uint8_t)codec;
   cparams.nthreads = 1;
   blosc2_context* cctx = blosc2_create_cctx(cparams);
   int cbytes = blosc2_compress_ctx(cctx, src, sizeof(src), chunk, sizeof(chunk));
   blosc2_free_ctx(cctx);
-  return cbytes >= 0;
+  return cbytes != BLOSC2_ERROR_CODEC_SUPPORT;
 }
 
 
