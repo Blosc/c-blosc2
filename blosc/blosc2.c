@@ -2775,11 +2775,33 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
     return BLOSC2_ERROR_WRITE_BUFFER;
   }
 
-  if (context->block_maskout != NULL && context->block_maskout_nitems != context->nblocks) {
-    BLOSC_TRACE_ERROR("The number of items in block_maskout (%d) must match the number"
-                      " of blocks in chunk (%d).",
-                      context->block_maskout_nitems, context->nblocks);
-    return BLOSC2_ERROR_DATA;
+  if (context->block_maskout != NULL) {
+    if (context->block_maskout_nitems != context->nblocks) {
+      BLOSC_TRACE_ERROR("The number of items in block_maskout (%d) must match the number"
+                        " of blocks in chunk (%d).",
+                        context->block_maskout_nitems, context->nblocks);
+      return BLOSC2_ERROR_DATA;
+    }
+    bool has_delta = false;
+    for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+      if (context->filters[i] == BLOSC_DELTA) {
+        has_delta = true;
+        break;
+      }
+    }
+    if (has_delta) {
+      bool any_needed = false;
+      for (int i = 0; i < context->block_maskout_nitems; ++i) {
+        if (!context->block_maskout[i]) {
+          any_needed = true;
+          break;
+        }
+      }
+      if (any_needed) {
+        // Delta filter encodes subsequent blocks relative to block 0; block 0 must be unmasked.
+        context->block_maskout[0] = false;
+      }
+    }
   }
 
   context->special_type = (header->blosc2_flags >> 4) & BLOSC2_SPECIAL_MASK;
@@ -4575,6 +4597,28 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     return ntbytes;
   }
 
+  bool has_delta = false;
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+    if (context->filters[i] == BLOSC_DELTA) {
+      has_delta = true;
+      break;
+    }
+  }
+  if (has_delta) {
+    uint8_t* full_chunk = malloc((size_t)header->nbytes);
+    if (full_chunk == NULL) {
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+    int dbytes = blosc2_decompress_ctx(context, src, srcsize, full_chunk, header->nbytes);
+    if (dbytes < 0) {
+      free(full_chunk);
+      return dbytes;
+    }
+    memcpy(dest, full_chunk + start_bytes64, (size_t)nitems_bytes);
+    free(full_chunk);
+    return nitems_bytes;
+  }
+
   ebsize = header->blocksize + header->typesize * (signed)sizeof(int32_t);
   struct thread_context* scontext = context->serial_context;
   /* Resize the temporaries in serial context if needed */
@@ -4845,6 +4889,28 @@ int blosc2_decompress_block_ctx(blosc2_context* context, const void* src,
   if (destsize < bsize) {
     BLOSC_TRACE_ERROR("Destination is too small for block.");
     return BLOSC2_ERROR_WRITE_BUFFER;
+  }
+
+  bool has_delta = false;
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+    if (context->filters[i] == BLOSC_DELTA) {
+      has_delta = true;
+      break;
+    }
+  }
+  if (has_delta) {
+    uint8_t* full_chunk = malloc((size_t)header.nbytes);
+    if (full_chunk == NULL) {
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+    int dbytes = blosc2_decompress_ctx(context, src, srcsize, full_chunk, header.nbytes);
+    if (dbytes < 0) {
+      free(full_chunk);
+      return dbytes;
+    }
+    memcpy(dest, full_chunk + (int64_t)nblock * context->blocksize, (size_t)bsize);
+    free(full_chunk);
+    return bsize;
   }
 
   if (context->serial_context == NULL) {
