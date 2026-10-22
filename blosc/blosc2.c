@@ -3176,21 +3176,38 @@ int blosc2_ctx_set_blosc1_format(blosc2_context* context, bool enable) {
 }
 
 
+bool blosc2_ctx_get_blosc1_format(const blosc2_context* context) {
+  return context != NULL && context->blosc1_format;
+}
+
+
 /* Check that a context set to write Blosc1 chunks only uses what the format can express */
 static int blosc1_format_check(const blosc2_context* context) {
   if (!context->blosc1_format) {
     return BLOSC2_ERROR_SUCCESS;
   }
-  if (context->compcode > BLOSC_ZSTD) {
-    BLOSC_TRACE_ERROR("Codec %d cannot be used when writing Blosc1 chunks.", context->compcode);
-    return BLOSC2_ERROR_CODEC_SUPPORT;
+  switch (context->compcode) {
+    case BLOSC_BLOSCLZ:
+    case BLOSC_LZ4:
+    case BLOSC_LZ4HC:
+    case BLOSC_ZLIB:
+    case BLOSC_ZSTD:
+      break;
+    default:
+      BLOSC_TRACE_ERROR("Codec %d cannot be used when writing Blosc1 chunks.", context->compcode);
+      return BLOSC2_ERROR_CODEC_SUPPORT;
   }
+  /* The Blosc1 header only has flags for a shuffle or a bitshuffle, so the pipeline can have
+     one of those and nothing else, in any of its slots. */
+  int nfilters = 0;
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     uint8_t filter = context->filters[i];
-    bool supported = (filter == BLOSC_NOFILTER) ||
-                     (i == BLOSC2_MAX_FILTERS - 1 && context->filters_meta[i] == 0 &&
-                      (filter == BLOSC_SHUFFLE || filter == BLOSC_BITSHUFFLE));
-    if (!supported) {
+    if (filter == BLOSC_NOFILTER) {
+      continue;
+    }
+    bool plain_shuffle = (filter == BLOSC_SHUFFLE || filter == BLOSC_BITSHUFFLE) &&
+                         context->filters_meta[i] == 0;
+    if (!plain_shuffle || ++nfilters > 1) {
       BLOSC_TRACE_ERROR("Filter %d in slot %d cannot be used when writing Blosc1 chunks.", filter, i);
       return BLOSC2_ERROR_FILTER_PIPELINE;
     }
@@ -3943,7 +3960,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
       BLOSC_TRACE_ERROR("Error while creating the compression context");
       return BLOSC2_ERROR_NULL_POINTER;
     }
-    cctx->blosc1_format = (getenv("BLOSC_BLOSC1_COMPAT") != NULL);
+    blosc2_ctx_set_blosc1_format(cctx, getenv("BLOSC_BLOSC1_COMPAT") != NULL);
     /* Do the actual compression */
     result = blosc2_compress_ctx(cctx, src, srcsize, dest, destsize);
     /* Release context resources */
