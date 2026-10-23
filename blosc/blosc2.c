@@ -4610,9 +4610,11 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
       return BLOSC2_ERROR_MEMORY_ALLOC;
     }
     int dbytes = blosc2_decompress_ctx(context, src, srcsize, full_chunk, header->nbytes);
-    if (dbytes < 0) {
+    context->dest = NULL;
+    context->destsize = 0;
+    if (dbytes < 0 || dbytes != header->nbytes) {
       free(full_chunk);
-      return dbytes;
+      return dbytes < 0 ? dbytes : BLOSC2_ERROR_DATA;
     }
     memcpy(dest, full_chunk + start_bytes64, (size_t)nitems_bytes);
     free(full_chunk);
@@ -4904,9 +4906,11 @@ int blosc2_decompress_block_ctx(blosc2_context* context, const void* src,
       return BLOSC2_ERROR_MEMORY_ALLOC;
     }
     int dbytes = blosc2_decompress_ctx(context, src, srcsize, full_chunk, header.nbytes);
-    if (dbytes < 0) {
+    context->dest = dest;
+    context->destsize = destsize;
+    if (dbytes < 0 || dbytes != header.nbytes) {
       free(full_chunk);
-      return dbytes;
+      return dbytes < 0 ? dbytes : BLOSC2_ERROR_DATA;
     }
     memcpy(dest, full_chunk + (int64_t)nblock * context->blocksize, (size_t)bsize);
     free(full_chunk);
