@@ -13,6 +13,7 @@
 #include <assert.h>
 
 #include "test_common.h"
+#include "blosc-private.h"
 
 int tests_run = 0;
 
@@ -102,6 +103,17 @@ static char* test_getitem_multi_blocks(void) {
   int rc2 = blosc2_getitem_ctx(dctx, chunk, cbytes, 200, 50, b2, sizeof(b2));
   mu_assert("ERROR: getitem block 2 failed", rc2 == sizeof(b2));
   mu_assert("ERROR: getitem block 2 data mismatch", memcmp(src + 200, b2, sizeof(b2)) == 0);
+
+  /* Check decompress block 1 and 2 directly via blosc2_decompress_block_ctx */
+  int32_t blk1[100];
+  int rcb1 = blosc2_decompress_block_ctx(dctx, chunk, cbytes, 1, blk1, sizeof(blk1));
+  mu_assert("ERROR: decompress block 1 failed", rcb1 == sizeof(blk1));
+  mu_assert("ERROR: decompress block 1 data mismatch", memcmp(src + 100, blk1, sizeof(blk1)) == 0);
+
+  int32_t blk2[100];
+  int rcb2 = blosc2_decompress_block_ctx(dctx, chunk, cbytes, 2, blk2, sizeof(blk2));
+  mu_assert("ERROR: decompress block 2 failed", rcb2 == sizeof(blk2));
+  mu_assert("ERROR: decompress block 2 data mismatch", memcmp(src + 200, blk2, sizeof(blk2)) == 0);
 
   free(chunk);
   blosc2_free_ctx(cctx);

@@ -71,7 +71,10 @@ static int test_partial_edge_chunk(int32_t typesize, bool persistent) {
   return 0;
 }
 
-static int test_subslice_non_zero_block(void) {
+static int test_subslice_non_zero_block(bool persistent) {
+  char *urlpath = "test_b2nd_delta_subslice.b2frame";
+  blosc2_remove_urlpath(urlpath);
+
   int8_t ndim = 1;
   int64_t shape[1] = {1000};
   int32_t chunkshape[1] = {1000};
@@ -82,6 +85,9 @@ static int test_subslice_non_zero_block(void) {
   cparams.filters[0] = BLOSC_DELTA;
 
   blosc2_storage b2_storage = {.cparams = &cparams};
+  if (persistent) {
+    b2_storage.urlpath = urlpath;
+  }
   b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape, NULL, 0, NULL, 0);
   CUTEST_ASSERT("ctx creation failed", ctx != NULL);
 
@@ -94,6 +100,12 @@ static int test_subslice_non_zero_block(void) {
   CUTEST_ASSERT("b2nd_from_cbuffer failed", rc >= 0);
   b2nd_free_ctx(ctx);
 
+  if (persistent) {
+    b2nd_free(arr);
+    rc = b2nd_open(urlpath, &arr);
+    CUTEST_ASSERT("b2nd_open failed", rc >= 0);
+  }
+
   int64_t start[1] = {200};
   int64_t stop[1] = {300};
   int32_t dst[100] = {0};
@@ -104,6 +116,9 @@ static int test_subslice_non_zero_block(void) {
   CUTEST_ASSERT("subslice mismatch with DELTA filter", memcmp(dst, &src[200], sizeof(dst)) == 0);
 
   b2nd_free(arr);
+  if (persistent) {
+    blosc2_remove_urlpath(urlpath);
+  }
   return 0;
 }
 
@@ -114,7 +129,8 @@ CUTEST_TEST_TEST(b2nd_delta) {
   CUTEST_ASSERT("test_partial_edge_chunk int16 persistent failed", test_partial_edge_chunk(2, true) == 0);
   CUTEST_ASSERT("test_partial_edge_chunk float32 in-memory failed", test_partial_edge_chunk(4, false) == 0);
   CUTEST_ASSERT("test_partial_edge_chunk float32 persistent failed", test_partial_edge_chunk(4, true) == 0);
-  CUTEST_ASSERT("test_subslice_non_zero_block failed", test_subslice_non_zero_block() == 0);
+  CUTEST_ASSERT("test_subslice_non_zero_block in-memory failed", test_subslice_non_zero_block(false) == 0);
+  CUTEST_ASSERT("test_subslice_non_zero_block persistent failed", test_subslice_non_zero_block(true) == 0);
   return BLOSC2_ERROR_SUCCESS;
 }
 
