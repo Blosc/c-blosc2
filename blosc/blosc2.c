@@ -2458,7 +2458,6 @@ static int initialize_context_compression(
   context->tuner_params = tuner_params;
   context->tuner_id = tuner_id;
   context->splitmode = splitmode;
-  context->header_blocksize = (int32_t)blocksize;
   context->blosc2_flags2 = 0;
   if (context->blocknbytes != NULL) {
     free(context->blocknbytes);
