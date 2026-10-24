@@ -4,24 +4,24 @@
   License: BSD 3-Clause (see LICENSE.txt)
 */
 
+#include <inttypes.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #include "blosc2.h"
 
 #define CHUNK_ITEMS 10
 #define BLOCK_ITEMS 5
 #define NUM_CHUNKS 10
-#define NUM_COORDS 3
+#define NUM_COORDS 4
 #define NUM_ITEMS (CHUNK_ITEMS * NUM_CHUNKS)
 
 static const size_t typesize = sizeof(int32_t);
 static const int64_t coords[NUM_COORDS] = {
-    4, 28, 99
+    4, 27, 28, 59
 };
 
 int main(void) {
@@ -31,6 +31,7 @@ int main(void) {
   uint8_t *dataset = NULL;
   blosc2_schunk *schunk = NULL;
   uint8_t *chunk = NULL;
+  uint8_t *output = NULL;
 
   blosc2_init();
   blosc2_remove_urlpath(urlpath);
@@ -86,15 +87,51 @@ int main(void) {
     }
   }
 
-  // blosc2_schunk_get_sparse_buffer() does not take a specific buffer size argument, so we must
+  // blosc2_schunk_get_sparse_buffer() does not take an explicit buffer size argument, so we must
   // allocate enough space for the buffer ourselves. We will request NUM_COORDS values, and each
   // value has size typesize (set to sizeof(int32_t)), so we allocate NUM_COORDS * typesize bytes.
-  uint8_t *ouput_buffer = malloc((size_t)NUM_COORDS * typesize);
+  output = malloc((size_t)NUM_COORDS * typesize);
+  if (output == NULL) {
+    fprintf(stderr, "failed to malloc output\n");
+    goto cleanup;
+  }
+
+  // In our example, we have 100 integers spread across 10 chunks, with each chunk containing 10
+  // integers each. We could retrieve each value in coords individually with a full-chunk
+  // decompression per value. With the sparse-access API, we can instead have Blosc batch the
+  // coordinates by chunk internally, minimizing decompression overhead. In our case, Blosc will
+  // batch the retrievals for coordinates 27 and 28 together because they share a chunk: 
+  // chunks                |---------|---------|---------|---------|---------|---------|
+  // indices               0         10        20        30        40        50        60
+  // requested                 ^                      ^^                              ^
+  //                           4                     27,28                            59
+  //
+  // full chunk requests:  chunk 0 (4)     chunk 2 (27), chunk 2 (28)         chunk 5 (59)
+  // sparse requests:      chunk 0 (4)           chunk 2 (27, 28)             chunk 5 (59)
   
-  rc = blosc2_schunk_get_sparse_buffer(schunk, NUM_COORDS, coords, ouput_buffer);
-  if (rc < 0) {
+  int retrieve_rc = blosc2_schunk_get_sparse_buffer(schunk, NUM_COORDS, coords, output);
+  if (retrieve_rc < 0) {
     fprintf(stderr, "failed to retrieve sparse coordinates\n");
     goto cleanup;
+  }
+
+  printf("Comparing sparse retrieval results to expected values...\n");
+  for (int i = 0; i < NUM_COORDS; ++i) {
+    int32_t output_result, dataset_result;
+
+    size_t output_offset = i * typesize;
+    memcpy(&output_result, output + output_offset, typesize);
+
+    size_t dataset_offset = coords[i] * typesize;
+    memcpy(&dataset_result, dataset + dataset_offset, typesize);
+
+    printf("  coords[%d] = %2" PRId64 ": sparse retrieval value: %2d, actual dataset value: %2d\n", i, coords[i], output_result, dataset_result);
+
+    int compare_result = memcmp(output + output_offset, dataset + dataset_offset, typesize);
+    if (compare_result != 0) {
+      fprintf(stderr, "Bad sparse value at index %d: coord=%" PRId64 "\n", i, coords[i]);
+      goto cleanup;
+    }
   }
 
   rc = 0;
@@ -102,6 +139,7 @@ int main(void) {
 cleanup:
   free(dataset);
   free(chunk);
+  free(output);
 
   if (schunk != NULL) {
     blosc2_schunk_free(schunk);
