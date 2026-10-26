@@ -1992,6 +1992,10 @@ static int blosc_d(
     /* Not enough space to output bytes */
     BLOSC_ERROR(BLOSC2_ERROR_WRITE_BUFFER);
   }
+  /* The splits must cover the whole block, or part of tmp is left unwritten */
+  if (neblock * nstreams != bsize) {
+    BLOSC_ERROR(BLOSC2_ERROR_DATA);
+  }
   for (int j = 0; j < nstreams; j++) {
     if (vlblocks) {
       if (srcsize < (signed)sizeof(int32_t)) {
