@@ -1,24 +1,14 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 3.3.5 to 3.3.6
+Changes from 3.3.5 to 3.4.0
 ===========================
 
-#XXX version-specific blurb XXX#
+This is a minor release introducing an opt-in Blosc1-compatible chunk writer,
+bounded-memory APIs for variable-length block decompression, as well as
+important bug fixes and robustness improvements in DELTA filter decoding, blocksize
+tuning, ZFP codec handling, b2nd slicing, and thread management.
 
-* Added `blosc2_vlblock_get_nbytes_ctx()` to query one block's uncompressed size
-  without payload, dictionary, or scratch allocation. Lazy queries read only
-  the selected four-byte prefix.
-* Added `blosc2_vldecompress_block_into_ctx()` for single-block decompression
-  into a caller-owned buffer. Capacity is checked before dictionary/scratch
-  allocation, and scratch is sized from the admitted block. Both APIs support
-  ordinary and lazy VL chunks. The existing allocating API is unchanged.
-* **Fixed bit-shuffled Blosc1 chunks with leftover bytes being decoded incorrectly**:
-  When reading a chunk with format version 2 whose bit-shuffled blocks have a
-  number of elements that is a multiple of 8, the bytes left over after the last
-  whole element were not copied to the output, so the end of the buffer was
-  garbage while the call reported success. They are now copied, as C-Blosc 1.x
-  does. See #812.
 * **New opt-in writer for Blosc1 (C-Blosc 1.x compatible) chunks**:
   `blosc2_ctx_set_blosc1_format()` makes a compression context write chunks in
   format version 2 with the 16-byte header, which C-Blosc 1.x can decode (stock
@@ -34,20 +24,74 @@ Changes from 3.3.5 to 3.3.6
   writing a format version 5 chunk), so delta there is now an error.
   `blosc2_ctx_get_blosc1_format()` reports whether a context is in this mode. The
   filter may be in any slot of the pipeline; a prefilter is applied as usual.
-* `blosc2_compress_ctx()` with a typesize of 0 stopped with SIGFPE (a division by
-  zero when choosing the block size). It now returns `BLOSC2_ERROR_INVALID_PARAM`.
+  Thanks to Mark Kittisopikul (@mkitti).
+* Added `blosc2_vlblock_get_nbytes_ctx()` to query one block's uncompressed size
+  without payload, dictionary, or scratch allocation. Lazy queries read only
+  the selected four-byte prefix.
+* Added `blosc2_vldecompress_block_into_ctx()` for single-block decompression
+  into a caller-owned buffer. Capacity is checked before dictionary/scratch
+  allocation, and scratch is sized from the admitted block. Both APIs support
+  ordinary and lazy VL chunks. The existing allocating API is unchanged.
+* **Fixed DELTA filter decoding on partial chunks, maskout, and getitem**:
+  When an array compressed with the DELTA filter was sliced or read partially,
+  non-zero blocks could be corrupted because DELTA encodes blocks > 0 relative
+  to block 0. If block 0 was masked out or omitted (such as in `b2nd`'s compact
+  read path for small block fractions, or in block-level getitem), subsequent
+  blocks decoded against uninitialized memory. b2nd now disables the compact
+  path for DELTA and always unmasks block 0, and `_blosc_getitem` and
+  `blosc2_decompress_block_ctx` fall back to full chunk decompression when DELTA
+  is active. Destination pointers and sizes are reset after fallback decompression
+  to avoid leaving dangling references on reused contexts. Fixes Blosc/python-blosc2#740.
+  Thanks to Karol Gotkowski (@Karol-G) for reporting this issue.
+* **Fixed bit-shuffled Blosc1 chunks with leftover bytes being decoded incorrectly**:
+  When reading a chunk with format version 2 whose bit-shuffled blocks have a
+  number of elements that is a multiple of 8, the bytes left over after the last
+  whole element were not copied to the output, so the end of the buffer was
+  garbage while the call reported success. They are now copied, as C-Blosc 1.x
+  does. See #812. Thanks to Mark Kittisopikul (@mkitti).
 * **Fixed chunks that could not be read back when the requested block size was not a
   multiple of the typesize**: the tuner rounds a requested block size down to a multiple
   of the typesize, but the chunk header recorded the size that had been asked for, so a
   reader cut the chunk into blocks of a different size and failed (error -3, or wrong
   data) with every filter and codec. The header now records the block size that is used.
+  Thanks to Mark Kittisopikul (@mkitti).
 * **Fixed the block size of buffers with a typesize above `BLOSC_MAX_TYPESIZE`**: such
   buffers are stored as a stream of bytes with a typesize of 1, but the tuner chose the
   block size with the large typesize and only then was it capped. A buffer shorter than
   the typesize was split into blocks of one byte (200 bytes of typesize 300 took 1831
   bytes) and a longer one got a block size that was a multiple of the large typesize.
   The typesize is now capped before the tuner runs, so that it is blocked exactly like a
-  typesize of 1.
+  typesize of 1. Thanks to Mark Kittisopikul (@mkitti).
+* `blosc2_compress_ctx()` with a typesize of 0 stopped with SIGFPE (a division by
+  zero when choosing the block size). It now returns `BLOSC2_ERROR_INVALID_PARAM`.
+  Thanks to Mark Kittisopikul (@mkitti).
+* **Hardened ZFP codec against bitstream over-read and invalid metadata**:
+  ZFP bitstream decompression now operates from a zero-padded buffer sized to
+  `zfp_stream_maximum_size()`, preventing out-of-bounds heap reads when 64-bit
+  word reads extend past unaligned payloads (`blocks * bits` not a multiple of 64).
+  Also guarded against word-alignment over-read in `zfp_getcell()`, removed
+  redundant stream opens, validated metalayer bounds via `b2nd_deserialize_meta_inline`,
+  and rejected non-positive blockshapes and invalid `ndim`.
+  Thanks to @kalt2212 and Farkhalit Rida (@fr-manvi).
+* **Hardened `b2nd_get_slice_nchunks` bounds handling and allocation**:
+  Clamped slice bounds against negative values and `extshape`, sized `chunks_idx`
+  from slice bounding boxes to prevent mismatch overflows, protected against
+  multiplication overflow on 32-bit platforms, and handled empty slices and
+  shrinking reallocations without memory leaks.
+  Thanks to Farkhalit Rida (@fr-manvi).
+* **Rejected split blocks where streams do not cover blocksize**:
+  In `blosc_d`, decompression verifies that `neblock * nstreams == bsize` and returns
+  `BLOSC2_ERROR_DATA` if split streams fail to cover the full block, avoiding leaving
+  bytes unwritten in destination buffers (backported from C-Blosc #407).
+  Thanks to @suraiya-ctrl.
+* **Avoided unused parallel work for small block counts**:
+  Single-block compression and decompression jobs remain serial when `nthreads > 1`,
+  avoiding worker thread pool startup and overhead when threads cannot be used.
+  Parallel dispatch also caps worker entries to `min(nthreads, nblocks)`.
+  Fixed thread backend initialization on Windows. Thanks to
+  Johnny Kao (@johnny-kao).
+* Added `examples/vlchunks.c` illustrating variable-length chunk usage, updates,
+  compression, and verification. Thanks to Lance Uymatiao (@lanceu0128).
 
 Changes from 3.3.4 to 3.3.5
 ===========================
