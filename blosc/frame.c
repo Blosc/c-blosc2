@@ -5601,6 +5601,7 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
 int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int64_t nchunk, void *dest, int32_t nbytes) {
   uint8_t* src;
   bool needs_free;
+  int32_t srcsize;
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
   int rc;
@@ -5610,14 +5611,21 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int64_t 
     BLOSC_TRACE_ERROR("Cannot get the chunk in position %" PRId64 ".", nchunk);
     goto end;
   }
-  chunk_cbytes = rc;
-  if (chunk_cbytes < (signed)sizeof(int32_t)) {
-    /* Not enough input to read `nbytes` */
+  srcsize = rc;
+  if (srcsize < BLOSC_MIN_HEADER_LENGTH) {
+    BLOSC_TRACE_ERROR("Not enough input to read the header of chunk %" PRId64 ".", nchunk);
     rc = BLOSC2_ERROR_READ_BUFFER;
+    goto end;
   }
 
   rc = blosc2_cbuffer_sizes(src, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {
+    goto end;
+  }
+  /* The header cbytes is used as srcsize below, so it must fit in what was read */
+  if (chunk_cbytes > srcsize) {
+    BLOSC_TRACE_ERROR("Invalid chunk size in frame for chunk %" PRId64 ".", nchunk);
+    rc = BLOSC2_ERROR_INVALID_HEADER;
     goto end;
   }
 
