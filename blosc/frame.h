@@ -75,6 +75,7 @@ typedef struct {
   bool locking;             //!< Whether accesses are serialized via a sidecar lock file
   intptr_t lock_fd;         //!< The fd (POSIX) or HANDLE (Windows) of the sidecar; -1 if not open
   int32_t lock_depth;       //!< Lock re-entrancy depth; only depth 0 acquires/releases
+  bool lock_exclusive;      //!< Whether the outermost lock held is the exclusive one
   uint64_t lock_seq;        //!< Last seen value of the sidecar's generation counter
   bool force_refresh;       //!< Force a refresh of the cached frame state on the next access
   bool refreshing;          //!< Re-entrancy guard for the metalayer reload during a refresh
@@ -82,6 +83,10 @@ typedef struct {
   int32_t read_fp_refs;     //!< Outstanding frame_reader_acquire() calls on read_fp
   bool read_fp_nocache;     //!< The handle cache was full for this frame; do not ask again
   blosc2_pthread_mutex_t read_fp_mutex;  //!< Guards read_fp and its bookkeeping
+  void* write_fp;           //!< Cached "rb+" handle for the frame file; NULL if none open
+  bool write_fp_nocache;    //!< The handle budget was exhausted for this frame; do not ask again
+  bool write_fp_stale;      //!< The file was replaced; the writer reopens it on its next acquire
+  int64_t file_end;         //!< Size of the frame file as we last left it; 0 if unknown
 } blosc2_frame_s;
 
 
@@ -237,6 +242,27 @@ void frame_reader_invalidate(blosc2_frame_s* frame);
  * cached (Windows, non-filesystem backends, cframes).
  */
 void frame_reader_revalidate(blosc2_frame_s* frame);
+
+/**
+ * @brief Get a writable ("rb+") handle on the frame file.  For the filesystem
+ * backend on POSIX the handle is opened once and kept until the frame is freed
+ * or its file replaced: every close() of a written file is a synchronous flush
+ * on NFS, and a frame update used to open and close the file four times.
+ * Other backends and Windows get a private per-call handle, as before.
+ * Give it back with frame_writer_release().
+ */
+void* frame_writer_acquire(blosc2_frame_s* frame, blosc2_io_cb* io_cb);
+
+/**
+ * @brief Counterpart of frame_writer_acquire(): closes @p fp unless it is the
+ * frame's cached writable handle.  Also fine for sframe index handles.
+ */
+void frame_writer_release(blosc2_frame_s* frame, blosc2_io_cb* io_cb, void* fp);
+
+/**
+ * @brief Close the frame's cached writable handle, if any (flushing it).
+ */
+void frame_writer_close(blosc2_frame_s* frame);
 
 int frame_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
 int frame_get_lazychunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
