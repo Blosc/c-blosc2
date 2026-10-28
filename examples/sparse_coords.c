@@ -2,6 +2,13 @@
   Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
   https://blosc.org
   License: BSD 3-Clause (see LICENSE.txt)
+
+  Example program showing how to fetch flat (1-dimensional)
+  coordinate values from an schunk using the sparse-access API,
+  which reduces decompression overhead.
+
+  A similar sparse-access API is available for b2nd arrays,
+  allowing users to fetch coordinates from N-dimensional data.
 */
 
 #include <inttypes.h>
@@ -27,10 +34,10 @@ static const int64_t coords[NUM_COORDS] = {
 int main(void) {
   int rc = 1;
 
-  const char *urlpath = "sparse_coords.b2frame";
+  const char *urlpath = "sparse_coords_example.b2frame";
   uint8_t *dataset = NULL;
   blosc2_schunk *schunk = NULL;
-  uint8_t *chunk = NULL;
+  uint8_t *chunk_buf = NULL;
   uint8_t *output = NULL;
 
   blosc2_init();
@@ -57,9 +64,9 @@ int main(void) {
     memcpy(dataset + i * typesize, &i, (size_t)typesize);
   }
 
-  chunk = malloc((size_t)CHUNK_ITEMS * typesize);
-  if (chunk == NULL) {
-    fprintf(stderr, "failed to malloc chunk\n");
+  chunk_buf = malloc((size_t)CHUNK_ITEMS * typesize);
+  if (chunk_buf == NULL) {
+    fprintf(stderr, "failed to malloc chunk buffer\n");
     goto cleanup;
   }
 
@@ -78,9 +85,9 @@ int main(void) {
     int64_t curr_chunk_items = stop - start;
     uint8_t *dataset_offset = dataset + (start * typesize);
     size_t chunk_size = (size_t)curr_chunk_items * typesize;
-    memcpy(chunk, dataset_offset, chunk_size);
+    memcpy(chunk_buf, dataset_offset, chunk_size);
     
-    int64_t nchunks = blosc2_schunk_append_buffer(schunk, chunk, (int32_t) chunk_size);
+    int64_t nchunks = blosc2_schunk_append_buffer(schunk, chunk_buf, (int32_t) chunk_size);
     if (nchunks < 0) {
       fprintf(stderr, "failed to append dataset at index: %d\n", start);
       goto cleanup;
@@ -97,7 +104,7 @@ int main(void) {
   }
 
   // In our example, we have 100 integers spread across 10 chunks, with each chunk containing 10
-  // integers each. We could retrieve each value in coords individually with a full-chunk
+  // integers. We could retrieve each value in coords individually with a full-chunk
   // decompression per value. With the sparse-access API, we can instead have Blosc batch the
   // coordinates by chunk internally, minimizing decompression overhead. In our case, Blosc will
   // batch the retrievals for coordinates 27 and 28 together because they share a chunk: 
@@ -138,7 +145,7 @@ int main(void) {
 
 cleanup:
   free(dataset);
-  free(chunk);
+  free(chunk_buf);
   free(output);
 
   if (schunk != NULL) {
