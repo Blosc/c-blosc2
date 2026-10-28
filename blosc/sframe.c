@@ -252,5 +252,18 @@ int32_t sframe_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t** chunk,
     return BLOSC2_ERROR_FILE_READ;
   }
 
+  // The chunk header must not claim more bytes than the chunkfile holds
+  int32_t header_cbytes;
+  int rc = blosc2_cbuffer_sizes(*chunk, NULL, &header_cbytes, NULL);
+  if (rc < 0 || header_cbytes > chunk_cbytes) {
+    BLOSC_TRACE_ERROR("Invalid chunk size in chunkfile for chunk %" PRId64 ".", nchunk);
+    if (*needs_free) {
+      free(*chunk);
+      *chunk = NULL;
+      *needs_free = false;
+    }
+    return rc < 0 ? rc : BLOSC2_ERROR_INVALID_HEADER;
+  }
+
   return (int32_t)chunk_cbytes;
 }
