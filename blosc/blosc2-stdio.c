@@ -33,6 +33,7 @@
   #define fseek _fseeki64
   #define ftell _ftelli64
 #else
+  #include <fcntl.h>
   #include <sys/mman.h>
   #include <unistd.h>
 #endif
@@ -147,6 +148,14 @@ void *blosc2_stdio_open(const char *urlpath, const char *mode, void *params) {
     BLOSC_TRACE_ERROR("Cannot open the file %s with mode %s.", urlpath, mode);
     return NULL;
   }
+#if !defined(_WIN32)
+  /* Frames keep their handles open between calls, so do not let exec'd child
+     processes inherit them */
+  int fd_flags = fcntl(fileno(file), F_GETFD);
+  if (fd_flags >= 0) {
+    fcntl(fileno(file), F_SETFD, fd_flags | FD_CLOEXEC);
+  }
+#endif
   blosc2_stdio_file *my_fp = malloc(sizeof(blosc2_stdio_file));
   if (my_fp == NULL) {
     BLOSC_TRACE_ERROR("Cannot allocate memory for stdio file wrapper.");
