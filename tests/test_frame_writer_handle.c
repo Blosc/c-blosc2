@@ -330,9 +330,8 @@ static char* test_removed_file(void) {
 
 /* With locking on, each lock holder must see the writes of the one before, so
    no write may stay behind in a cached writer once the lock is let go: the
-   unlock closes the writer, and a write outside the lock (blosc2_meta_update
-   takes none) must not cache one in the first place.  POSIX only, as handles
-   are never cached on Windows. */
+   unlock closes the writer, and any write outside a lock must not cache one in
+   the first place.  POSIX only, as handles are never cached on Windows. */
 static char* test_locking(void) {
 #if !defined(_WIN32)
   blosc2_stdio_params ioparams = {.locking = true};
@@ -354,7 +353,7 @@ static char* test_locking(void) {
   mu_assert("The unlock must close the writer", count_open_fds() == nfds);
   meta[0] = 42;
   mu_assert("Cannot update the metalayer", blosc2_meta_update(schunk, "writer", meta, sizeof(meta)) >= 0);
-  mu_assert("A write outside the lock must not keep a writer open", count_open_fds() == nfds);
+  mu_assert("blosc2_meta_update must close the writer at unlock", count_open_fds() == nfds);
   blosc2_schunk_free(schunk);
 
   schunk = blosc2_schunk_open(URLPATH);

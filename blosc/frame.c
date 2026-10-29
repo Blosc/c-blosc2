@@ -143,6 +143,53 @@ static void reader_cache_return(void) {
   }
   blosc2_pthread_mutex_unlock(&reader_cache_mutex);
 }
+
+/* Device and inode of the open @p fd, or of @p path when it is not NULL.  Only
+   identity is wanted, so on Linux ask statx() for exactly that: a plain (f)stat
+   requests mtime too, and an NFS client answers that by first flushing the
+   file's dirty pages to the server -- a synchronous round trip on every header
+   read while the frame is being written through its cached writer. */
+static int file_identity(int fd, const char* path, uint64_t* dev, uint64_t* ino) {
+#if defined(__linux__) && defined(STATX_INO)
+  struct statx stx;
+  int rc = path == NULL ? statx(fd, "", AT_EMPTY_PATH, STATX_INO, &stx)
+                        : statx(AT_FDCWD, path, 0, STATX_INO, &stx);
+  if (rc == 0) {
+    /* Same encoding as st_dev, so a statx() and a (f)stat() result compare fine */
+    *dev = (uint64_t)makedev(stx.stx_dev_major, stx.stx_dev_minor);
+    *ino = stx.stx_ino;
+    return 0;
+  }
+  if (path != NULL && (errno == ENOENT || errno == ENOTDIR)) {
+    *dev = 0;
+    *ino = 0;
+    return -1;
+  }
+  /* Anything else (ENOSYS before Linux 4.11, EPERM from a seccomp filter that
+     does not know statx, ...): ask (f)stat instead */
+#endif
+  struct stat st;
+  if ((path == NULL ? fstat(fd, &st) : stat(path, &st)) != 0) {
+    *dev = 0;
+    *ino = 0;
+    return -1;
+  }
+  *dev = (uint64_t)st.st_dev;
+  *ino = (uint64_t)st.st_ino;
+  return 0;
+}
+
+static void record_handle_identity(void* fp, uint64_t* dev, uint64_t* ino) {
+  *dev = 0;
+  *ino = 0;
+  if (fp != NULL) {
+    blosc2_stdio_file* sfp = (blosc2_stdio_file*)fp;
+    int fd = sfp->file != NULL ? fileno(sfp->file) : -1;
+    if (fd >= 0) {
+      file_identity(fd, NULL, dev, ino);
+    }
+  }
+}
 #endif  /* !_WIN32 */
 
 
@@ -189,22 +236,12 @@ void* frame_reader_acquire(blosc2_frame_s* frame, const blosc2_io* io) {
   blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
   if (frame->read_fp == NULL && !frame->read_fp_nocache) {
     if (reader_cache_claim()) {
-      blosc2_stdio_file* sfp = io_cb->open(frame->urlpath, "rb", io->params);
-      frame->read_fp = sfp;
+      frame->read_fp = io_cb->open(frame->urlpath, "rb", io->params);
       if (frame->read_fp == NULL) {
         reader_cache_return();
       }
       else {
-        int fd = sfp->file != NULL ? fileno(sfp->file) : -1;
-        struct stat st;
-        if (fd >= 0 && fstat(fd, &st) == 0) {
-          frame->read_fp_dev = (uint64_t)st.st_dev;
-          frame->read_fp_ino = (uint64_t)st.st_ino;
-        }
-        else {
-          frame->read_fp_dev = 0;
-          frame->read_fp_ino = 0;
-        }
+        record_handle_identity(frame->read_fp, &frame->read_fp_dev, &frame->read_fp_ino);
       }
     }
     else {
@@ -304,38 +341,6 @@ void frame_reader_invalidate(blosc2_frame_s* frame) {
 
 
 #if !defined(_WIN32)
-/* Device and inode of the open @p fd, or of @p path when it is not NULL.  Only
-   identity is wanted, so on Linux ask statx() for exactly that: a plain (f)stat
-   requests mtime too, and an NFS client answers that by first flushing the
-   file's dirty pages to the server -- a synchronous round trip on every header
-   read while the frame is being written through its cached writer. */
-static int file_identity(int fd, const char* path, uint64_t* dev, uint64_t* ino) {
-#if defined(__linux__) && defined(STATX_INO)
-  struct statx stx;
-  int rc = path == NULL ? statx(fd, "", AT_EMPTY_PATH, STATX_INO, &stx)
-                        : statx(AT_FDCWD, path, 0, STATX_INO, &stx);
-  if (rc == 0) {
-    /* Same encoding as st_dev, so a statx() and a (f)stat() result compare fine */
-    *dev = (uint64_t)makedev(stx.stx_dev_major, stx.stx_dev_minor);
-    *ino = stx.stx_ino;
-    return 0;
-  }
-  if (path != NULL && (errno == ENOENT || errno == ENOTDIR)) {
-    return -1;
-  }
-  /* Anything else (ENOSYS before Linux 4.11, EPERM from a seccomp filter that
-     does not know statx, ...): ask (f)stat instead */
-#endif
-  struct stat st;
-  if ((path == NULL ? fstat(fd, &st) : stat(path, &st)) != 0) {
-    return -1;
-  }
-  *dev = (uint64_t)st.st_dev;
-  *ino = (uint64_t)st.st_ino;
-  return 0;
-}
-
-
 /* Whether the cached handle with recorded identity (@p fd_dev, @p fd_ino) no
    longer refers to the file at the frame's urlpath, whose identity is
    (@p path_dev, @p path_ino), or unknown when @p path_found is false. */
@@ -424,8 +429,8 @@ void* frame_writer_acquire(blosc2_frame_s* frame, const blosc2_io_cb* io_cb) {
   if (frame->locking && frame->lock_depth == 0) {
     // With locking on, the writer is only cached while the lock is held, as
     // the unlock is what closes it and so publishes the writes to the next lock
-    // holder.  A write outside the lock (blosc2_meta_update takes none) would
-    // have nothing to close it, so it keeps the per-call handle it always had.
+    // holder.  Any write outside a lock would have nothing to close it, so it
+    // keeps the per-call handle it always had.
     return io_cb->open(frame->urlpath, "rb+", io->params);
   }
   // Writes to one frame are serialized by its callers; the mutex only guards
@@ -437,22 +442,12 @@ void* frame_writer_acquire(blosc2_frame_s* frame, const blosc2_io_cb* io_cb) {
   if (frame->write_fp == NULL && !frame->write_fp_nocache) {
     // Cached writers draw on the same descriptor budget as cached readers
     if (reader_cache_claim()) {
-      blosc2_stdio_file* sfp = io_cb->open(frame->urlpath, "rb+", io->params);
-      frame->write_fp = sfp;
+      frame->write_fp = io_cb->open(frame->urlpath, "rb+", io->params);
       if (frame->write_fp == NULL) {
         reader_cache_return();
       }
       else {
-        int fd = sfp->file != NULL ? fileno(sfp->file) : -1;
-        struct stat st;
-        if (fd >= 0 && fstat(fd, &st) == 0) {
-          frame->write_fp_dev = (uint64_t)st.st_dev;
-          frame->write_fp_ino = (uint64_t)st.st_ino;
-        }
-        else {
-          frame->write_fp_dev = 0;
-          frame->write_fp_ino = 0;
-        }
+        record_handle_identity(frame->write_fp, &frame->write_fp_dev, &frame->write_fp_ino);
       }
     }
     else {
