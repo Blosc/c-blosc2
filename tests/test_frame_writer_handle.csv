@@ -1,3 +1,4 @@
-mode
+"Handle budget (cached: default, nocache: 0, budget1: 1)"
 cached
 nocache
+budget1

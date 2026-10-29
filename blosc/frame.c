@@ -264,10 +264,27 @@ static bool frame_reader_close_locked(blosc2_frame_s* frame, bool force) {
 }
 
 
+/* Drop the cached writable handle (which flushes it on NFS) and forget the file
+   size; caller must hold read_fp_mutex.  Writes to a frame are serialized by
+   its callers, so no write can be using the handle meanwhile. */
+static void frame_writer_close_locked(blosc2_frame_s* frame) {
+  if (frame->write_fp != NULL) {
+    /* Only the filesystem backend ever populates write_fp */
+    blosc2_stdio_close(frame->write_fp);
+    frame->write_fp = NULL;
+#if !defined(_WIN32)
+    reader_cache_return();
+#endif
+  }
+  frame->write_fp_stale = false;
+  frame->file_end = 0;
+}
+
+
 /* See frame.h */
 void frame_reader_invalidate(blosc2_frame_s* frame) {
-  frame_writer_close(frame);  // takes and releases read_fp_mutex itself
   blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
+  frame_writer_close_locked(frame);
   frame_reader_close_locked(frame, true);
   blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
 }
@@ -304,6 +321,28 @@ static int file_identity(int fd, const char* path, uint64_t* dev, uint64_t* ino)
   *ino = (uint64_t)st.st_ino;
   return 0;
 }
+
+
+/* Whether the cached handle @p fp no longer refers to the file at the frame's
+   urlpath, whose identity is (@p path_dev, @p path_ino), or unknown when
+   @p path_found is false. */
+static bool cached_handle_is_stale(blosc2_stdio_file* fp, bool path_found,
+                                   uint64_t path_dev, uint64_t path_ino) {
+  int fd = fp->file != NULL ? fileno(fp->file) : -1;
+  uint64_t fd_dev, fd_ino;
+  if (fd < 0 || file_identity(fd, NULL, &fd_dev, &fd_ino) != 0) {
+    /* Cannot vouch for the handle; drop it and let the next acquire reopen */
+    return true;
+  }
+  if (!path_found) {
+    /* The path is gone but the inode we hold open is still perfectly valid, so
+       keep using it -- exactly what an already-open fd does on POSIX. */
+    return false;
+  }
+  /* A different file at urlpath means unlink-then-recreate (mode="w") or a
+     rename over it (os.replace) */
+  return fd_dev != path_dev || fd_ino != path_ino;
+}
 #endif
 
 
@@ -318,42 +357,38 @@ void frame_reader_revalidate(blosc2_frame_s* frame) {
   }
   /* The whole inspection runs under read_fp_mutex: reading the pointer and then
      dereferencing it outside the lock would let a concurrent invalidate close
-     the handle in between.  Two stat() calls under the lock cost nothing here,
-     as this runs once per header read rather than per block. */
+     the handle in between.  The few statx() calls under the lock (one for the
+     path, one per cached handle) cost nothing here, as this runs once per
+     header read rather than per block. */
   blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
-  /* Only the filesystem backend ever populates read_fp, so this cast is safe */
+  /* Only the filesystem backend ever populates read_fp and write_fp, so these
+     casts are safe */
   blosc2_stdio_file* my_fp = (blosc2_stdio_file*)frame->read_fp;
-  if (my_fp == NULL) {
+  blosc2_stdio_file* my_wfp = (blosc2_stdio_file*)frame->write_fp;
+  if (my_fp == NULL && my_wfp == NULL) {
     blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
     return;
   }
-  bool stale;
-  int fd = my_fp->file != NULL ? fileno(my_fp->file) : -1;
-  uint64_t fd_dev, fd_ino, path_dev, path_ino;
-  if (fd < 0 || file_identity(fd, NULL, &fd_dev, &fd_ino) != 0) {
-    /* Cannot vouch for the handle; drop it and let the next acquire reopen */
-    stale = true;
-  }
-  else if (file_identity(-1, frame->urlpath, &path_dev, &path_ino) != 0) {
-    /* The path is gone but the inode we hold open is still perfectly valid, so
-       keep reading it -- exactly what an already-open fd does on POSIX. */
-    stale = false;
-  }
-  else {
-    /* A different file at urlpath means unlink-then-recreate (mode="w") or a
-       rename over it (os.replace) */
-    stale = fd_dev != path_dev || fd_ino != path_ino;
-  }
-  if (stale) {
+  /* Check each cached handle on its own: one of them may have been opened
+     after the file was replaced, and a frame can hold a cached writer but no
+     cached reader when the handle budget ran out in between. */
+  uint64_t path_dev = 0, path_ino = 0;
+  bool path_found = file_identity(-1, frame->urlpath, &path_dev, &path_ino) == 0;
+  bool read_stale = my_fp != NULL && cached_handle_is_stale(my_fp, path_found, path_dev, path_ino);
+  /* Unlike a reader, a writer must not outlive its path: writes to an unlinked
+     inode would vanish silently, where the per-call open used to fail. */
+  bool write_stale = my_wfp != NULL &&
+                     (!path_found || cached_handle_is_stale(my_wfp, path_found, path_dev, path_ino));
+  if (read_stale) {
     frame_reader_close_locked(frame, false);
   }
+  if (write_stale) {
+    /* Only flag the writer: a write in flight on another thread may be using it
+       right now.  It reopens the path on its next acquire. */
+    frame->write_fp_stale = true;
+  }
   blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
-  if (stale) {
-    /* The cached writer, if any, points at the replaced inode as well.  Only flag
-       it: a write in flight on another thread may be using it right now. */
-    blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
-    frame->write_fp_stale = frame->write_fp != NULL;
-    blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
+  if (read_stale || write_stale) {
     /* Force the metadata refresh too: the replacement is often the same length
        as the old frame, and then the trailer poll in frame_refresh_if_stale()
        never fires by itself. */
@@ -364,7 +399,7 @@ void frame_reader_revalidate(blosc2_frame_s* frame) {
 
 
 /* See frame.h */
-void* frame_writer_acquire(blosc2_frame_s* frame, blosc2_io_cb* io_cb) {
+void* frame_writer_acquire(blosc2_frame_s* frame, const blosc2_io_cb* io_cb) {
   const blosc2_io* io = frame->schunk->storage->io;
 #if defined(_WIN32)
   // Same reason as for readers: a cached handle would block unlink/rename
@@ -373,16 +408,19 @@ void* frame_writer_acquire(blosc2_frame_s* frame, blosc2_io_cb* io_cb) {
   if (io->id != BLOSC2_IO_FILESYSTEM) {
     return io_cb->open(frame->urlpath, "rb+", io->params);
   }
+  if (frame->locking && frame->lock_depth == 0) {
+    // With locking on, the writer is only cached while the lock is held, as
+    // the unlock is what closes it and so publishes the writes to the next lock
+    // holder.  A write outside the lock (blosc2_meta_update takes none) would
+    // have nothing to close it, so it keeps the per-call handle it always had.
+    return io_cb->open(frame->urlpath, "rb+", io->params);
+  }
   // Writes to one frame are serialized by its callers; the mutex only guards
   // against readers flagging the handle stale (and teardown) meanwhile
   blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
-  if (frame->write_fp != NULL && frame->write_fp_stale) {
-    blosc2_stdio_close(frame->write_fp);
-    frame->write_fp = NULL;
-    frame->file_end = 0;
-    reader_cache_return();
+  if (frame->write_fp_stale) {
+    frame_writer_close_locked(frame);
   }
-  frame->write_fp_stale = false;
   if (frame->write_fp == NULL && !frame->write_fp_nocache) {
     // Cached writers draw on the same descriptor budget as cached readers
     if (reader_cache_claim()) {
@@ -408,8 +446,15 @@ void* frame_writer_acquire(blosc2_frame_s* frame, blosc2_io_cb* io_cb) {
 
 
 /* See frame.h */
-void frame_writer_release(blosc2_frame_s* frame, blosc2_io_cb* io_cb, void* fp) {
-  if (fp != NULL && fp != frame->write_fp) {
+void frame_writer_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void* fp) {
+  if (fp == NULL) {
+    return;
+  }
+  // write_fp is only ever read under the mutex, as read_fp is
+  blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
+  bool is_cached = (fp == frame->write_fp);
+  blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
+  if (!is_cached) {
     io_cb->close(fp);
   }
 }
@@ -418,16 +463,7 @@ void frame_writer_release(blosc2_frame_s* frame, blosc2_io_cb* io_cb, void* fp) 
 /* See frame.h */
 void frame_writer_close(blosc2_frame_s* frame) {
   blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
-  if (frame->write_fp != NULL) {
-    // Only the filesystem backend ever populates write_fp
-    blosc2_stdio_close(frame->write_fp);
-    frame->write_fp = NULL;
-#if !defined(_WIN32)
-    reader_cache_return();
-#endif
-  }
-  frame->write_fp_stale = false;
-  frame->file_end = 0;
+  frame_writer_close_locked(frame);
   blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
 }
 
@@ -648,7 +684,6 @@ int frame_lock(blosc2_frame_s* frame, bool exclusive) {
   }
   frame->lock_seq = seq;
   frame->lock_depth = 1;
-  frame->lock_exclusive = exclusive;
   return BLOSC2_ERROR_SUCCESS;
 }
 
@@ -661,10 +696,9 @@ int frame_unlock(blosc2_frame_s* frame) {
     return BLOSC2_ERROR_SUCCESS;
   }
   // Hand our writes over before the next lock holder looks: closing the cached
-  // writer is what pushes them to the server on NFS (close-to-open consistency)
-  if (frame->lock_exclusive) {
-    frame_writer_close(frame);
-  }
+  // writer is what pushes them to the server on NFS (close-to-open consistency).
+  // A no-op unless this handle wrote since it last let go of the lock.
+  frame_writer_close(frame);
   if (frame_os_unlock(frame) < 0) {
     BLOSC_TRACE_ERROR("Cannot unlock the frame.");
     return BLOSC2_ERROR_LOCK;
@@ -676,7 +710,7 @@ int frame_unlock(blosc2_frame_s* frame) {
 /* Free memory from a frame. */
 int frame_free(blosc2_frame_s* frame) {
 
-  frame_reader_invalidate(frame);  // also closes the cached writer
+  frame_reader_invalidate(frame);
   blosc2_pthread_mutex_destroy(&frame->read_fp_mutex);
 
   if (frame->locking && frame->lock_fd != -1) {
@@ -1738,6 +1772,7 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     int64_t wbytes = io_cb->write(trailer, 1, trailer_len, io_pos, fp);
     if (wbytes != trailer_len) {
       BLOSC_TRACE_ERROR("Cannot write the trailer length in trailer.");
+      frame->file_end = 0;  // a partial write may have moved the end of the file
       frame_writer_release(frame, io_cb, fp);
       free(trailer);
       return BLOSC2_ERROR_FILE_WRITE;
@@ -1748,6 +1783,11 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
     // free: on NFS it is a synchronous flush plus a SETATTR round trip, and XFS
     // flushes the file on the next close after any truncate that does not grow
     // it.  Other backends keep truncating unconditionally.
+    //
+    // file_end is the size we last left the file at.  A write that failed
+    // halfway through an earlier update can have left bytes past it, which are
+    // then only cut by the next update that shrinks the frame.  That is
+    // harmless: the frame length is read from the header, not the file size.
     bool must_truncate = true;
     if (!frame->sframe && frame->schunk->storage->io->id == BLOSC2_IO_FILESYSTEM) {
       if (frame->file_end <= 0) {
@@ -1755,13 +1795,14 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       }
       must_truncate = frame->file_end <= 0 || trunc_pos < frame->file_end;
     }
-    frame->file_end = trunc_pos;
     if (must_truncate && io_cb->truncate(fp, trunc_pos) != 0) {
       BLOSC_TRACE_ERROR("Cannot truncate the frame.");
+      frame->file_end = 0;
       frame_writer_release(frame, io_cb, fp);
       free(trailer);
       return BLOSC2_ERROR_FILE_TRUNCATE;
     }
+    frame->file_end = trunc_pos;
     frame_writer_release(frame, io_cb, fp);
 
   }
