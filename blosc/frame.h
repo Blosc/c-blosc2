@@ -81,10 +81,14 @@ typedef struct {
   void* read_fp;            //!< Cached "rb" handle for the frame file; NULL if none open
   int32_t read_fp_refs;     //!< Outstanding frame_reader_acquire() calls on read_fp
   bool read_fp_nocache;     //!< The handle cache was full for this frame; do not ask again
+  uint64_t read_fp_dev;     //!< Device of cached read_fp (POSIX)
+  uint64_t read_fp_ino;     //!< Inode of cached read_fp (POSIX)
   blosc2_pthread_mutex_t read_fp_mutex;  //!< Guards read_fp, write_fp and their bookkeeping
   void* write_fp;           //!< Cached "rb+" handle for the frame file; NULL if none open
   bool write_fp_nocache;    //!< The handle budget was exhausted for this frame; do not ask again
   bool write_fp_stale;      //!< The file was replaced; the writer reopens it on its next acquire
+  uint64_t write_fp_dev;    //!< Device of cached write_fp (POSIX)
+  uint64_t write_fp_ino;    //!< Inode of cached write_fp (POSIX)
   int64_t file_end;         //!< Size of the frame file as we last left it; <= 0 if unknown
 } blosc2_frame_s;
 
