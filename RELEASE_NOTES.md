@@ -6,6 +6,22 @@ Changes from 3.4.0 to 3.4.1
 
 #XXX version-specific blurb XXX#
 
+* **Faster in-place writes to on-disk contiguous frames, especially on NFS**:
+  appending, inserting, updating or deleting a chunk (and so b2nd
+  `set_slice`) opened and closed the frame file four times and truncated it on
+  every trailer update.  On NFS each close is a synchronous flush to the
+  server, which made such writes cost about 20 ms per chunk whatever its size.
+  With the default filesystem backend on POSIX, a frame now keeps one writable
+  handle open, truncates the file only when the frame got shorter, and checks
+  for a replaced file with `statx(STATX_INO)` on Linux, which does not flush
+  pending writes.  A chunk write on NFS now costs about 1 ms of I/O; local
+  disks gain about 1.4x.  Other NFS clients now see the data when the kernel
+  writes it back, or at the latest when the frame is freed, rather than after
+  every update; with `BLOSC_LOCKING` it is still flushed when the lock is
+  released.  The writable handle comes out of the same budget as the cached
+  read handle (`BLOSC_MAX_CACHED_READERS`), so a schunk that has been written
+  to can hold two file descriptors.
+
 Changes from 3.3.5 to 3.4.0
 ===========================
 
