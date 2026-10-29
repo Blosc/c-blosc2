@@ -2439,7 +2439,12 @@ int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content
   // Update the metalayers in frame (as size has not changed, we don't need to update the trailer)
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (frame != NULL) {
-    int rc = frame_update_header(frame, schunk, false);
+    int rc = frame_lock(frame, true);
+    if (rc < 0) {
+      return rc;
+    }
+    rc = frame_update_header(frame, schunk, false);
+    frame_unlock(frame);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Unable to update meta info from frame.");
       return rc;
