@@ -7,7 +7,7 @@
 # See LICENSE.txt for details about copyright and rights to use.
 
 # sources
-file(GLOB SOURCES test_*.c b2nd/test_*.c fuzz/generate_inputs_corpus.c fuzz/gen_b2nd_corpus.c fuzz/gen_plugins_corpus.c)
+file(GLOB SOURCES test_*.c b2nd/test_*.c fuzz/generate_inputs_corpus.c fuzz/gen_b2nd_corpus.c fuzz/gen_plugins_corpus.c fuzz/gen_schunk_corpus.c)
 list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_vl_block_overflow.c)
 list(REMOVE_DUPLICATES SOURCES)
 

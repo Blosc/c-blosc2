@@ -5139,7 +5139,6 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     if (new_frame_len > frame->len) {
       frame->cframe = framep = realloc(framep, (size_t)new_frame_len);
       if (framep == NULL) {
-        free(chunk);
         free(off_chunk);
         BLOSC_TRACE_ERROR("Cannot realloc space for the frame.");
         return NULL;
@@ -5165,7 +5164,6 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
     if (io_cb == NULL) {
       BLOSC_TRACE_ERROR("Error getting the input/output API");
-      free(chunk);
       free(off_chunk);
       return NULL;
     }
@@ -5175,7 +5173,6 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       if (!is_special_chunk && sframe_chunk_id >= 0) {
         if (sframe_create_chunk(frame, chunk, sframe_chunk_id, chunk_cbytes) == NULL) {
           BLOSC_TRACE_ERROR("Cannot write the full chunk.");
-          free(chunk);
           free(off_chunk);
           return NULL;
         }
@@ -5185,7 +5182,6 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
                              frame->schunk->storage->io);
       if (fp == NULL) {
         BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
-        free(chunk);
         free(off_chunk);
         return NULL;
       }
@@ -5196,7 +5192,6 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       fp = frame_writer_acquire(frame, io_cb);
       if (fp == NULL) {
         BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
-        free(chunk);
         free(off_chunk);
         return NULL;
       }
@@ -5206,7 +5201,6 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
         int64_t tail_nbytes = cbytes - tail_src_offset;
         if (tail_nbytes < 0) {
           frame_writer_release(frame, io_cb, fp);
-          free(chunk);
           free(off_chunk);
           BLOSC_TRACE_ERROR("Invalid tail length for frame payload compaction.");
           return NULL;
@@ -5219,7 +5213,6 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
           if (rc_move < 0) {
             frame->file_end = 0;
             frame_writer_release(frame, io_cb, fp);
-            free(chunk);
             free(off_chunk);
             BLOSC_TRACE_ERROR("Cannot compact the payload tail in frame.");
             return NULL;
@@ -5235,7 +5228,6 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
                             wbytes, (int64_t)chunk_cbytes, io_pos, nchunk);
           frame->file_end = 0;
           frame_writer_release(frame, io_cb, fp);
-          free(chunk);
           free(off_chunk);
           return NULL;
         }
@@ -5247,7 +5239,6 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     if (wbytes != new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       frame->file_end = 0;
-      free(chunk);
       free(off_chunk);
       return NULL;
     }
@@ -5258,11 +5249,24 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       frame->coffsets = NULL;
     }
   }
-  free(chunk);  // chunk has always to be a copy when reaching here...
   free(off_chunk);
 
   frame->len = new_frame_len;
   rc = frame_update_header(frame, schunk, false);
+  if (rc < 0) {
+    frame->len = frame_len;
+    return NULL;
+  }
+
+  rc = frame_update_trailer(frame, schunk);
+  if (rc < 0) {
+    frame->len = frame_len;
+    return NULL;
+  }
+
+  // The chunk is consumed only on success; on errors, the caller still owns it
+  free(chunk);
+  return frame;
   if (rc < 0) {
     frame->len = frame_len;
     return NULL;

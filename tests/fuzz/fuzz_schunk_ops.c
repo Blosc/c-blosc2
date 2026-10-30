@@ -161,20 +161,25 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       }
       case 7: {
         /* Slice read; bounded by the scratch cap. */
-        if (schunk->chunksize <= 0 ||
-            schunk->chunksize > FUZZ_BUF_CAP / 8 ||
+        if (schunk->typesize <= 0 ||
+            schunk->chunksize <= 0 ||
+            schunk->nbytes <= 0 ||
             schunk->nbytes > FUZZ_BUF_CAP) {
           break;
         }
-        int64_t start = clamp_index(arg, schunk->nchunks + 1);
+        int64_t nitems = schunk->nbytes / schunk->typesize;
+        if (nitems <= 0) {
+          break;
+        }
+        int64_t start = clamp_index(arg, nitems);
         int64_t stop = start + 1 + (tail_u8(&r) % 8);
-        if (stop > schunk->nchunks) {
-          stop = schunk->nchunks;
+        if (stop > nitems) {
+          stop = nitems;
         }
         if (stop <= start) {
           break;
         }
-        size_t slice_len = (size_t)(stop - start) * (size_t)schunk->chunksize;
+        size_t slice_len = (size_t)(stop - start) * (size_t)schunk->typesize;
         uint8_t *slice_buf = (uint8_t *)malloc(slice_len);
         if (slice_buf != NULL) {
           blosc2_schunk_get_slice_buffer(schunk, start, stop, slice_buf);
@@ -193,7 +198,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         if (blosc2_meta_exists(schunk, name) >= 0) {
           uint8_t *content = NULL;
           int32_t content_len = 0;
-          blosc2_meta_get(schunk, name, &content, &content_len);
+          if (blosc2_meta_get(schunk, name, &content, &content_len) >= 0 && content != NULL) {
+            free(content);
+          }
           if (mlen > 0) {
             blosc2_meta_update(schunk, name, (uint8_t *)payload + cursor,
                                (int32_t)mlen);
