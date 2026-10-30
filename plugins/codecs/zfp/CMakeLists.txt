@@ -10,6 +10,7 @@ if(BUILD_TESTS)
     add_executable(test_zfp_prec_float test_zfp_prec_float.c)
     add_executable(test_zfp_rate_float test_zfp_rate_float.c)
     add_executable(test_zfp_rate_getitem test_zfp_rate_getitem.c)
+    add_executable(test_zfp_rate_getitem_cells test_zfp_rate_getitem_cells.c)
     add_executable(test_zfp_oversized_blockshape test_zfp_oversized_blockshape.c)
     add_executable(test_zfp_getcell_oversized_ndim test_zfp_getcell_oversized_ndim.c)
     add_executable(test_zfp_word_alignment test_zfp_word_alignment.c)
@@ -28,6 +29,9 @@ if(BUILD_TESTS)
             TARGET test_zfp_rate_getitem
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
     set_property(
+            TARGET test_zfp_rate_getitem_cells
+            APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
+    set_property(
             TARGET test_zfp_oversized_blockshape
             APPEND PROPERTY COMPILE_DEFINITIONS BLOSC_TESTING)
     set_property(
@@ -41,6 +45,7 @@ if(BUILD_TESTS)
     target_link_libraries(test_zfp_prec_float blosc_testing)
     target_link_libraries(test_zfp_rate_float blosc_testing)
     target_link_libraries(test_zfp_rate_getitem blosc_testing)
+    target_link_libraries(test_zfp_rate_getitem_cells blosc_testing)
     target_link_libraries(test_zfp_oversized_blockshape blosc_testing)
     target_link_libraries(test_zfp_getcell_oversized_ndim blosc_testing)
     target_link_libraries(test_zfp_word_alignment blosc_testing)
@@ -54,6 +59,8 @@ if(BUILD_TESTS)
         COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_zfp_rate_float>)
     add_test(NAME test_plugin_test_zfp_rate_getitem
         COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_zfp_rate_getitem>)
+    add_test(NAME test_plugin_test_zfp_rate_getitem_cells
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_zfp_rate_getitem_cells>)
     add_test(NAME test_plugin_test_zfp_oversized_blockshape
         COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:test_zfp_oversized_blockshape>)
     add_test(NAME test_plugin_test_zfp_getcell_oversized_ndim
