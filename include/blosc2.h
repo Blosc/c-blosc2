@@ -2136,8 +2136,9 @@ BLOSC_EXPORT int blosc2_schunk_free(blosc2_schunk *schunk);
  * @brief Append an existing @p chunk to a super-chunk.
  *
  * @param schunk The super-chunk where the chunk will be appended.
- * @param chunk The @p chunk to append.  An internal copy is made, so @p chunk can be reused or
- * freed if desired.
+ * @param chunk The @p chunk to append. If @p copy is true, an internal copy is made, so
+ * @p chunk can be reused or freed if desired. If @p copy is false, ownership is transferred
+ * to the super-chunk on success; on error, the caller retains ownership.
  * @param copy Whether the chunk should be copied internally or can be used as-is.
  *
  * @return The number of chunks in super-chunk. If some problem is
@@ -2150,8 +2151,8 @@ BLOSC_EXPORT int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *
   *
   * @param schunk The super-chunk where the chunk will be updated.
   * @param nchunk The position where the chunk will be updated.
-  * @param chunk The new @p chunk. If an internal copy is made, the @p chunk can be reused or
-  * freed if desired.
+  * @param chunk The new @p chunk. If @p copy is true, an internal copy is made, so
+  * @p chunk can be reused or freed if desired. If @p copy is false, the chunk is used as-is.
   * @param copy Whether the chunk should be copied internally or can be used as-is.
   *
   * @return The number of chunks in super-chunk. If some problem is
@@ -2162,10 +2163,11 @@ BLOSC_EXPORT int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t n
 /**
  * @brief Insert a chunk at a specific position in a super-chunk.
  *
- * @param schunk The super-chunk where the chunk will be appended.
+ * @param schunk The super-chunk where the chunk will be inserted.
  * @param nchunk The position where the chunk will be inserted.
- * @param chunk The @p chunk to insert. If an internal copy is made, the @p chunk can be reused or
- * freed if desired.
+ * @param chunk The @p chunk to insert. If @p copy is true, an internal copy is made, so
+ * @p chunk can be reused or freed if desired. If @p copy is false, ownership is transferred
+ * to the super-chunk on success; on error, the caller retains ownership.
  * @param copy Whether the chunk should be copied internally or can be used as-is.
  *
  * @return The number of chunks in super-chunk. If some problem is
