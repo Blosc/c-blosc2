@@ -1202,6 +1202,12 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   // Block-sized scratch for the compact get path (lazily allocated too).
   uint8_t *block_data = NULL;
   int32_t block_nbytes = (int32_t) (array->blocknitems * array->sc->typesize);
+  int rc = BLOSC2_ERROR_SUCCESS;
+  bool use_compact = false;
+  uint8_t *lazychunk = NULL;
+  bool lazychunk_needs_free = false;
+  bool *block_maskout = NULL;
+  uint8_t *chunk = NULL;
 
   int64_t chunks_in_array[B2ND_MAX_DIM] = {0};
   for (int i = 0; i < ndim; ++i) {
@@ -1266,14 +1272,17 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
 
     int32_t nblocks = (int32_t) array->extchunknitems / array->blocknitems;
     // Compact get path state for this chunk (see below).
-    bool use_compact = false;
-    uint8_t *lazychunk = NULL;
-    bool lazychunk_needs_free = false;
+    use_compact = false;
+    lazychunk = NULL;
+    lazychunk_needs_free = false;
     int32_t lazychunk_cbytes = 0;
     if (set_slice) {
       if (data == NULL) {
         data = malloc(data_nbytes);
-        BLOSC_ERROR_NULL(data, BLOSC2_ERROR_MEMORY_ALLOC);
+        if (data == NULL) {
+          rc = BLOSC2_ERROR_MEMORY_ALLOC;
+          goto cleanup;
+        }
       }
       // Check if all the chunk is going to be updated and avoid the decompression
       bool decompress_chunk = false;
@@ -1285,15 +1294,19 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
         int err = blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes);
         if (err < 0) {
           BLOSC_TRACE_ERROR("Error decompressing chunk");
-          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+          rc = BLOSC2_ERROR_FAILURE;
+          goto cleanup;
         }
       } else {
         // Avoid writing non zero padding from previous chunk
         memset(data, 0, data_nbytes);
       }
     } else {
-      bool *block_maskout = malloc(nblocks);
-      BLOSC_ERROR_NULL(block_maskout, BLOSC2_ERROR_MEMORY_ALLOC);
+      block_maskout = malloc(nblocks);
+      if (block_maskout == NULL) {
+        rc = BLOSC2_ERROR_MEMORY_ALLOC;
+        goto cleanup;
+      }
       int32_t nblocks_needed = 0;
       for (int nblock = 0; nblock < nblocks; ++nblock) {
         int64_t nblock_ndim[B2ND_MAX_DIM] = {0};
@@ -1367,40 +1380,40 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
                                                        &lazychunk_needs_free);
         if (lazychunk_cbytes < 0) {
           BLOSC_TRACE_ERROR("Error getting the lazy chunk");
-          free(block_maskout);
-          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+          rc = BLOSC2_ERROR_FAILURE;
+          goto cleanup;
         }
         if (block_data == NULL) {
           block_data = malloc(block_nbytes);
           if (block_data == NULL) {
-            if (lazychunk_needs_free) {
-              free(lazychunk);
-            }
-            free(block_maskout);
-            BLOSC_ERROR(BLOSC2_ERROR_MEMORY_ALLOC);
+            rc = BLOSC2_ERROR_MEMORY_ALLOC;
+            goto cleanup;
           }
         }
       } else {
         if (data == NULL) {
           data = malloc(data_nbytes);
           if (data == NULL) {
-            free(block_maskout);
-            BLOSC_ERROR(BLOSC2_ERROR_MEMORY_ALLOC);
+            rc = BLOSC2_ERROR_MEMORY_ALLOC;
+            goto cleanup;
           }
         }
         if (blosc2_set_maskout(array->sc->dctx, block_maskout, nblocks) != BLOSC2_ERROR_SUCCESS) {
           BLOSC_TRACE_ERROR("Error setting the maskout");
-          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+          rc = BLOSC2_ERROR_FAILURE;
+          goto cleanup;
         }
 
         int err = blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes);
         if (err < 0) {
           BLOSC_TRACE_ERROR("Error decompressing chunk");
-          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+          rc = BLOSC2_ERROR_FAILURE;
+          goto cleanup;
         }
       }
 
       free(block_maskout);
+      block_maskout = NULL;
     }
 
     // Iterate over blocks
@@ -1480,10 +1493,8 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
                                            block_data, block_nbytes);
         if (grc < 0) {
           BLOSC_TRACE_ERROR("Error decompressing block");
-          if (lazychunk_needs_free) {
-            free(lazychunk);
-          }
-          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+          rc = BLOSC2_ERROR_FAILURE;
+          goto cleanup;
         }
         dst = block_data;
       } else {
@@ -1514,33 +1525,47 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
 
     if (use_compact && lazychunk_needs_free) {
       free(lazychunk);
+      lazychunk = NULL;
+      lazychunk_needs_free = false;
     }
 
     if (set_slice) {
       // Recompress the data
       int32_t chunk_nbytes = data_nbytes + BLOSC2_MAX_OVERHEAD;
-      uint8_t *chunk = malloc(chunk_nbytes);
-      BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
+      chunk = malloc(chunk_nbytes);
+      if (chunk == NULL) {
+        rc = BLOSC2_ERROR_MEMORY_ALLOC;
+        goto cleanup;
+      }
       int brc;
       // Update current_chunk in case a prefilter is applied
       array->sc->current_nchunk = nchunk;
       brc = blosc2_compress_ctx(array->sc->cctx, data, data_nbytes, chunk, chunk_nbytes);
       if (brc < 0) {
         BLOSC_TRACE_ERROR("Blosc can not compress the data");
-        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+        rc = BLOSC2_ERROR_FAILURE;
+        goto cleanup;
       }
       int64_t brc_ = blosc2_schunk_update_chunk(array->sc, nchunk, chunk, false);
+      chunk = NULL; // ownership transferred to blosc2_schunk_update_chunk (copy=false)
       if (brc_ < 0) {
         BLOSC_TRACE_ERROR("Blosc can not update the chunk");
-        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+        rc = BLOSC2_ERROR_FAILURE;
+        goto cleanup;
       }
     }
   }
 
+cleanup:
+  if (use_compact && lazychunk_needs_free) {
+    free(lazychunk);
+  }
+  free(block_maskout);
+  free(chunk);
   free(data);
   free(block_data);
 
-  return BLOSC2_ERROR_SUCCESS;
+  return rc;
 }
 
 
@@ -1655,13 +1680,26 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t
     }
     uint8_t *buffer = malloc(buffersize);
     if (buffer == NULL) {
+      b2nd_free(*array);
+      *array = NULL;
       BLOSC_ERROR(BLOSC2_ERROR_MEMORY_ALLOC);
     }
-    BLOSC_ERROR(b2nd_get_slice_cbuffer(src, src_start, src_stop, buffer, chunk_shape,
-                                       (int64_t)buffersize));
-    BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, chunk_shape, (int64_t)buffersize, chunk_start,
-                                       chunk_stop, *array));
+    int g_rc = b2nd_get_slice_cbuffer(src, src_start, src_stop, buffer, chunk_shape,
+                                      (int64_t)buffersize);
+    if (g_rc < 0) {
+      free(buffer);
+      b2nd_free(*array);
+      *array = NULL;
+      return g_rc;
+    }
+    int s_rc = b2nd_set_slice_cbuffer(buffer, chunk_shape, (int64_t)buffersize, chunk_start,
+                                      chunk_stop, *array);
     free(buffer);
+    if (s_rc < 0) {
+      b2nd_free(*array);
+      *array = NULL;
+      return s_rc;
+    }
   }
 
   return BLOSC2_ERROR_SUCCESS;
