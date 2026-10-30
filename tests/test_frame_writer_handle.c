@@ -318,12 +318,31 @@ static char* test_removed_file(void) {
   mu_assert("Cannot create the schunk", schunk != NULL);
   fill(0, true);
   mu_assert("Cannot append", blosc2_schunk_append_buffer(schunk, data, CHUNKSIZE * sizeof(int32_t)) > 0);
+  int64_t old_cbytes = schunk->cbytes;
 
   blosc2_remove_urlpath(URLPATH);
   mu_assert("An append to a removed file must fail",
             blosc2_schunk_append_buffer(schunk, data, CHUNKSIZE * sizeof(int32_t)) < 0);
   mu_assert("The failed append must not be counted",
-            schunk->nchunks == 1 && schunk->nbytes == CHUNKSIZE * (int64_t)sizeof(int32_t));
+            schunk->nchunks == 1 && schunk->nbytes == CHUNKSIZE * (int64_t)sizeof(int32_t) &&
+            schunk->cbytes == old_cbytes);
+
+  uint8_t chunk[CHUNKSIZE * sizeof(int32_t) + BLOSC2_MAX_OVERHEAD];
+  mu_assert("Cannot compress", compress_data(schunk, chunk) > 0);
+  mu_assert("An insert to a removed file must fail",
+            blosc2_schunk_insert_chunk(schunk, 0, chunk, true) < 0);
+  mu_assert("The failed insert must not be counted",
+            schunk->nchunks == 1 && schunk->nbytes == CHUNKSIZE * (int64_t)sizeof(int32_t) &&
+            schunk->cbytes == old_cbytes);
+
+  uint8_t* chunk_copy_false = malloc(CHUNKSIZE * sizeof(int32_t) + BLOSC2_MAX_OVERHEAD);
+  mu_assert("Cannot compress", compress_data(schunk, chunk_copy_false) > 0);
+  mu_assert("An insert (copy=false) to a removed file must fail",
+            blosc2_schunk_insert_chunk(schunk, 0, chunk_copy_false, false) < 0);
+  mu_assert("The failed insert (copy=false) must not be counted",
+            schunk->nchunks == 1 && schunk->nbytes == CHUNKSIZE * (int64_t)sizeof(int32_t) &&
+            schunk->cbytes == old_cbytes);
+  free(chunk_copy_false);
   mu_assert("The failed append must not recreate the file", file_size(URLPATH) < 0);
   blosc2_schunk_free(schunk);
   return EXIT_SUCCESS;
