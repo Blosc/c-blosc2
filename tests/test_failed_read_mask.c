@@ -5,11 +5,12 @@
 
   See LICENSE.txt for details about copyright and rights to use.
 
-  A slice read that decompresses only some blocks of a chunk sets a block mask
-  on the decompression context of the array.  When reading the chunk fails
-  before it is decompressed (here: the file lost its end), the mask must not
-  stay on the context, or the next decompression with it skips the blocks the
-  failed read did not want.
+  A slice read (or an orthogonal selection) that decompresses only some
+  blocks of a chunk sets a block mask on the decompression context of the
+  array.  When reading the chunk fails before it is decompressed (here: the
+  file lost its end), the mask must not stay on the context, or the next
+  decompression with it skips the blocks the failed read did not want; and
+  the failed read must free what it allocated (checked by LeakSanitizer).
 */
 
 #include <stdio.h>
@@ -31,7 +32,9 @@ static int32_t result[NROWS * NCOLS];
 
 
 #if !defined(_WIN32)
-static char* test_failed_partial_read(void) {
+/* An on-disk array of two chunks whose file is cut in the middle of the second
+   one, opened before the cut (the first chunk read once) */
+static char* open_cut_array(b2nd_array_t **array) {
   for (int i = 0; i < NROWS * NCOLS; i++) {
     data[i] = i * 7 + (i % 13);
   }
@@ -47,14 +50,13 @@ static char* test_failed_partial_read(void) {
   b2nd_context_t *ctx = b2nd_create_ctx(&storage, 2, shape, chunkshape, blockshape, NULL, 0, NULL, 0);
   mu_assert("Cannot create the context", ctx != NULL);
   blosc2_remove_urlpath(URLPATH);
-  b2nd_array_t *array;
   mu_assert("Cannot create the array",
-            b2nd_from_cbuffer(ctx, &array, data, sizeof(data)) == BLOSC2_ERROR_SUCCESS);
+            b2nd_from_cbuffer(ctx, array, data, sizeof(data)) == BLOSC2_ERROR_SUCCESS);
   b2nd_free_ctx(ctx);
-  b2nd_free(array);
+  b2nd_free(*array);
 
-  mu_assert("Cannot open the array", b2nd_open(URLPATH, &array) == BLOSC2_ERROR_SUCCESS);
-  blosc2_schunk *sc = array->sc;
+  mu_assert("Cannot open the array", b2nd_open(URLPATH, array) == BLOSC2_ERROR_SUCCESS);
+  blosc2_schunk *sc = (*array)->sc;
   int32_t chunk_nbytes = (int32_t) sizeof(data) / 2;
   // Read the first chunk once, which also caches the chunk offsets
   mu_assert("Cannot read the first chunk",
@@ -73,7 +75,27 @@ static char* test_failed_partial_read(void) {
   off_t cut = (off_t) (header_len + offsets[1] + BLOSC_EXTENDED_HEADER_LENGTH + 8);
   free(offsets);
   mu_assert("Cannot truncate the file", truncate(URLPATH, cut) == 0);
+  return EXIT_SUCCESS;
+}
 
+
+/* The first chunk is all still there, and must decompress whole */
+static char* check_first_chunk(b2nd_array_t *array) {
+  int32_t chunk_nbytes = (int32_t) sizeof(data) / 2;
+  memset(result, 0, sizeof(result));
+  mu_assert("Cannot read the first chunk again",
+            blosc2_schunk_decompress_chunk(array->sc, 0, result, chunk_nbytes) == chunk_nbytes);
+  mu_assert("The failed read left its block mask behind", memcmp(result, data, chunk_nbytes) == 0);
+  return EXIT_SUCCESS;
+}
+
+
+static char* test_failed_partial_read(void) {
+  b2nd_array_t *array;
+  char *msg = open_cut_array(&array);
+  if (msg != EXIT_SUCCESS) {
+    return msg;
+  }
   // One row of the second chunk: one of its blocks
   int64_t start[] = {NROWS / 2 + 1, 0};
   int64_t stop[] = {NROWS / 2 + 2, NCOLS};
@@ -81,16 +103,33 @@ static char* test_failed_partial_read(void) {
   int32_t row[NCOLS];
   mu_assert("Reading the cut chunk must fail",
             b2nd_get_slice_cbuffer(array, start, stop, row, buffershape, sizeof(row)) < 0);
-
-  // The first chunk is all still there, and must decompress whole
-  memset(result, 0, sizeof(result));
-  mu_assert("Cannot read the first chunk again",
-            blosc2_schunk_decompress_chunk(sc, 0, result, chunk_nbytes) == chunk_nbytes);
-  mu_assert("The failed read left its block mask behind", memcmp(result, data, chunk_nbytes) == 0);
-
+  msg = check_first_chunk(array);
   b2nd_free(array);
   blosc2_remove_urlpath(URLPATH);
-  return EXIT_SUCCESS;
+  return msg;
+}
+
+
+static char* test_failed_orthogonal_read(void) {
+  b2nd_array_t *array;
+  char *msg = open_cut_array(&array);
+  if (msg != EXIT_SUCCESS) {
+    return msg;
+  }
+  // Two items of one row of the second chunk
+  int64_t rows[] = {NROWS / 2 + 1};
+  int64_t cols[] = {3, 40};
+  int64_t *selection[] = {rows, cols};
+  int64_t selection_size[] = {1, 2};
+  int64_t buffershape[] = {1, 2};
+  int32_t items[2];
+  mu_assert("Reading the cut chunk must fail",
+            b2nd_get_orthogonal_selection(array, selection, selection_size, items, buffershape,
+                                          sizeof(items)) < 0);
+  msg = check_first_chunk(array);
+  b2nd_free(array);
+  blosc2_remove_urlpath(URLPATH);
+  return msg;
 }
 #endif
 
@@ -98,6 +137,7 @@ static char* test_failed_partial_read(void) {
 static char* all_tests(void) {
 #if !defined(_WIN32)
   mu_run_test(test_failed_partial_read);
+  mu_run_test(test_failed_orthogonal_read);
 #endif
   return EXIT_SUCCESS;
 }

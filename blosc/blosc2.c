@@ -6851,11 +6851,8 @@ int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams) {
 
 /* Set a maskout in decompression context */
 int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks) {
-
-  if (ctx->block_maskout != NULL) {
-    // Get rid of a possible mask here
-    free(ctx->block_maskout);
-  }
+  // Get rid of a possible mask here (also if the allocation below fails)
+  ctx_clear_maskout(ctx);
 
   bool *maskout_ = malloc(nblocks);
   BLOSC_ERROR_NULL(maskout_, BLOSC2_ERROR_MEMORY_ALLOC);

@@ -179,6 +179,10 @@ static inline bool chunksize_after_adding(int32_t *chunksize, int64_t nchunks, i
   return true;
 }
 
+/* Copy the variable-length metalayers of `schunk` into `new_schunk`, compressed
+   with `cparams` (NULL for the defaults of blosc2_vlmeta_add()). */
+int schunk_copy_vlmetalayers(blosc2_schunk *schunk, blosc2_schunk *new_schunk, blosc2_cparams *cparams);
+
 /* blosc2_schunk_update_chunk(schunk, nchunk, chunk, true) for a chunk in private memory of the
    caller, which keeps it: unlike a chunk that may point anywhere, a frame writes it out without
    copying it first.  It must not point into the storage of any frame (in memory or mapped). */

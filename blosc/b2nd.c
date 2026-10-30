@@ -407,52 +407,40 @@ int array_without_schunk(b2nd_context_t *ctx, b2nd_array_t **array) {
 int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
   BLOSC_ERROR(array_without_schunk(ctx, array));
 
+  int rc = BLOSC2_ERROR_FAILURE;
   blosc2_schunk *sc = blosc2_schunk_new(ctx->b2_storage);
   if (sc == NULL) {
     BLOSC_TRACE_ERROR("Pointer is NULL");
-    return BLOSC2_ERROR_FAILURE;
+    goto failed;
   }
+  // Freed with the array on failure
+  (*array)->sc = sc;
   // Set the chunksize for the schunk, as it cannot be derived from storage
   if (sc->typesize <= 0) {
     BLOSC_TRACE_ERROR("Invalid chunk parameters");
-    blosc2_schunk_free(sc);
-    free((*array)->dtype);
-    free(*array);
-    *array = NULL;
-    return BLOSC2_ERROR_INVALID_PARAM;
+    rc = BLOSC2_ERROR_INVALID_PARAM;
+    goto failed;
   }
   if ((*array)->extchunknitems < 0) {
     BLOSC_TRACE_ERROR("Invalid chunk parameters");
-    blosc2_schunk_free(sc);
-    free((*array)->dtype);
-    free(*array);
-    *array = NULL;
-    return BLOSC2_ERROR_INVALID_PARAM;
+    rc = BLOSC2_ERROR_INVALID_PARAM;
+    goto failed;
   }
   if ((uint64_t)(*array)->extchunknitems > (uint64_t)SIZE_MAX) {
     BLOSC_TRACE_ERROR("extchunknitems too large");
-    blosc2_schunk_free(sc);
-    free((*array)->dtype);
-    free(*array);
-    *array = NULL;
-    return BLOSC2_ERROR_INVALID_PARAM;
+    rc = BLOSC2_ERROR_INVALID_PARAM;
+    goto failed;
   }
   size_t chunkbytes_size = 0;
   if (!blosc2_checked_mul_size((size_t)(*array)->extchunknitems, (size_t)sc->typesize, &chunkbytes_size)) {
     BLOSC_TRACE_ERROR("Chunksize overflows size limits");
-    blosc2_schunk_free(sc);
-    free((*array)->dtype);
-    free(*array);
-    *array = NULL;
-    return BLOSC2_ERROR_INVALID_PARAM;
+    rc = BLOSC2_ERROR_INVALID_PARAM;
+    goto failed;
   }
   if (chunkbytes_size > BLOSC2_MAX_BUFFERSIZE || chunkbytes_size > INT32_MAX) {
     BLOSC_TRACE_ERROR("Chunksize exceeds maximum of %d", BLOSC2_MAX_BUFFERSIZE);
-    blosc2_schunk_free(sc);
-    free((*array)->dtype);
-    free(*array);
-    *array = NULL;
-    return BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
+    rc = BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
+    goto failed;
   }
   int32_t chunksize = (int32_t)chunkbytes_size;
   sc->chunksize = chunksize;
@@ -460,11 +448,7 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
   // Serialize the dimension info
   if (sc->nmetalayers >= BLOSC2_MAX_METALAYERS) {
     BLOSC_TRACE_ERROR("the number of metalayers for this schunk has been exceeded");
-    blosc2_schunk_free(sc);
-    free((*array)->dtype);
-    free(*array);
-    *array = NULL;
-    return BLOSC2_ERROR_FAILURE;
+    goto failed;
   }
   uint8_t *smeta = NULL;
   int32_t smeta_len = b2nd_serialize_meta(ctx->ndim,
@@ -476,35 +460,22 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
                                           &smeta);
   if (smeta_len < 0) {
     BLOSC_TRACE_ERROR("error during serializing dims info for Blosc2 NDim");
-    blosc2_schunk_free(sc);
-    free((*array)->dtype);
-    free(*array);
-    *array = NULL;
-    return BLOSC2_ERROR_FAILURE;
+    goto failed;
   }
 
   // And store it in b2nd metalayer
-  if (blosc2_meta_add(sc, "b2nd", smeta, smeta_len) < 0) {
-    free(smeta);
-    blosc2_schunk_free(sc);
-    free((*array)->dtype);
-    free(*array);
-    *array = NULL;
-    return BLOSC2_ERROR_FAILURE;
-  }
-
+  int meta_rc = blosc2_meta_add(sc, "b2nd", smeta, smeta_len);
   free(smeta);
+  if (meta_rc < 0) {
+    goto failed;
+  }
 
   for (int i = 0; i < ctx->nmetalayers; ++i) {
     char *name = ctx->metalayers[i].name;
     uint8_t *data = ctx->metalayers[i].content;
     int32_t size = ctx->metalayers[i].content_len;
     if (blosc2_meta_add(sc, name, data, size) < 0) {
-      blosc2_schunk_free(sc);
-      free((*array)->dtype);
-      free(*array);
-      *array = NULL;
-      return BLOSC2_ERROR_FAILURE;
+      goto failed;
     }
   }
 
@@ -513,16 +484,17 @@ int array_new(b2nd_context_t *ctx, int special_value, b2nd_array_t **array) {
     int64_t nchunks = (*array)->extnitems / (*array)->chunknitems;
     int64_t nitems = nchunks * (*array)->extchunknitems;
     if (blosc2_schunk_fill_special(sc, nitems, special_value, chunksize) < 0) {
-      blosc2_schunk_free(sc);
-      free((*array)->dtype);
-      free(*array);
-      *array = NULL;
-      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+      BLOSC_TRACE_ERROR("Error filling the super-chunk");
+      goto failed;
     }
   }
-  (*array)->sc = sc;
 
   return BLOSC2_ERROR_SUCCESS;
+
+  failed:
+  b2nd_free(*array);
+  *array = NULL;
+  return rc;
 }
 
 
@@ -611,17 +583,17 @@ int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, const void *fill_value)
   int32_t chunksize = BLOSC_EXTENDED_HEADER_LENGTH + (*array)->sc->typesize;
   uint8_t *chunk = malloc(chunksize);
   BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
-  if (blosc2_chunk_repeatval(*cparams, chunkbytes, chunk, chunksize, fill_value) < 0) {
-    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
-  }
+  int rc = blosc2_chunk_repeatval(*cparams, chunkbytes, chunk, chunksize, fill_value);
   free(cparams);
-
-  for (int64_t i = 0; i < (*array)->sc->nchunks; ++i) {
+  for (int64_t i = 0; rc >= 0 && i < (*array)->sc->nchunks; ++i) {
     if (blosc2_schunk_update_chunk((*array)->sc, i, chunk, true) < 0) {
-      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+      rc = BLOSC2_ERROR_FAILURE;
     }
   }
   free(chunk);
+  if (rc < 0) {
+    BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+  }
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -1426,11 +1398,9 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       int32_t chunk_size = array->sc->typesize + BLOSC2_MAX_OVERHEAD;
       uint8_t *chunk = malloc(chunk_size);
       BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
-      if (blosc2_compress_ctx(array->sc->cctx, buffer_b, array->sc->typesize, chunk, chunk_size) < 0) {
-        free(chunk);
-        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
-      }
-      if (blosc2_schunk_update_chunk(array->sc, 0, chunk, false) < 0) {
+      if (blosc2_compress_ctx(array->sc->cctx, buffer_b, array->sc->typesize, chunk, chunk_size) < 0 ||
+          blosc2_schunk_update_chunk(array->sc, 0, chunk, false) < 0) {
+        // Neither a failed compression nor a failed update took the chunk
         free(chunk);
         BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
@@ -2227,6 +2197,8 @@ int b2nd_copy(b2nd_context_t *ctx, const b2nd_array_t *src, b2nd_array_t **array
     blosc2_schunk *new_sc = blosc2_schunk_copy(src->sc, ctx->b2_storage);
 
     if (new_sc == NULL) {
+      b2nd_free(*array);
+      *array = NULL;
       return BLOSC2_ERROR_FAILURE;
     }
     (*array)->sc = new_sc;
@@ -2259,16 +2231,10 @@ int b2nd_copy(b2nd_context_t *ctx, const b2nd_array_t *src, b2nd_array_t **array
     BLOSC_ERROR(b2nd_get_slice(&params_meta, array, src, start, stop));
 
     // Copy vlmetayers
-    for (int i = 0; i < src->sc->nvlmetalayers; ++i) {
-      uint8_t *content;
-      int32_t content_len;
-      if (blosc2_vlmeta_get(src->sc, src->sc->vlmetalayers[i]->name, &content,
-                            &content_len) < 0) {
-        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
-      }
-      BLOSC_ERROR(blosc2_vlmeta_add((*array)->sc, src->sc->vlmetalayers[i]->name, content, content_len,
-                                      (*array)->sc->storage->cparams));
-      free(content);
+    if (schunk_copy_vlmetalayers(src->sc, (*array)->sc, (*array)->sc->storage->cparams) < 0) {
+      b2nd_free(*array);
+      *array = NULL;
+      BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
     }
   }
   return BLOSC2_ERROR_SUCCESS;
@@ -2398,10 +2364,11 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
       for ( int i =0; i< src2->ndim; i++) {
         nchunk_dest += nchunk_ndim[i] * chunks_in_array_strides[i];
       }
-      BLOSC_ERROR(blosc2_schunk_update_chunk((*array)->sc, nchunk_dest, chunk, true));
+      int64_t urc = blosc2_schunk_update_chunk((*array)->sc, nchunk_dest, chunk, true);
       if (needs_free) {
         free(chunk);
       }
+      BLOSC_ERROR(urc);
     }
     else {
 
@@ -2570,6 +2537,8 @@ int extend_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
           }
           nchunks_ = blosc2_schunk_insert_chunk(array->sc, i, chunk, false);
           if (nchunks_ < 0) {
+            // A failed insert leaves the chunk to us
+            free(chunk);
             free(aux);
             free(cparams);
             BLOSC_TRACE_ERROR("Blosc error when inserting a chunk");
@@ -3126,77 +3095,90 @@ int iter_chunk(b2nd_array_t *array, int8_t ndim,
 
       int64_t nblocks = array->extchunknitems / array->blocknitems;
       b2nd_selection_t **p_chunk_selection_0 = malloc(array->ndim * sizeof(b2nd_selection_t *));
-      BLOSC_ERROR_NULL(p_chunk_selection_0, BLOSC2_ERROR_MEMORY_ALLOC);
       b2nd_selection_t **p_chunk_selection_1 = malloc(array->ndim * sizeof(b2nd_selection_t *));
-      BLOSC_ERROR_NULL(p_chunk_selection_1, BLOSC2_ERROR_MEMORY_ALLOC);
       int64_t *chunk_selection_size = malloc(array->ndim * sizeof(int64_t));
-      BLOSC_ERROR_NULL(chunk_selection_size, BLOSC2_ERROR_MEMORY_ALLOC);
+      bool *maskout = NULL;
+      uint8_t *chunk = NULL;
+      int data_nbytes = chunk_data_nbytes;
+      uint8_t *data = chunk_data;
+      int rc = BLOSC2_ERROR_SUCCESS;
+      if (p_chunk_selection_0 == NULL || p_chunk_selection_1 == NULL || chunk_selection_size == NULL) {
+        rc = BLOSC2_ERROR_MEMORY_ALLOC;
+        goto chunk_done;
+      }
       for (int i = 0; i < array->ndim; ++i) {
         chunk_selection_size[i] = p_ordered_selection_1[i] - p_ordered_selection_0[i];
       }
 
       if (get) {
-        bool *maskout = calloc(nblocks, sizeof(bool));
+        maskout = malloc(nblocks);
+        if (maskout == NULL) {
+          rc = BLOSC2_ERROR_MEMORY_ALLOC;
+          goto chunk_done;
+        }
         for (int i = 0; i < nblocks; ++i) {
           maskout[i] = true;
         }
 
-        BLOSC_ERROR(iter_block_maskout(array, (int8_t) 0,
-                                       chunk_selection_size,
-                                       p_ordered_selection_0,
-                                       p_chunk_selection_0,
-                                       p_chunk_selection_1,
-                                       maskout));
+        rc = iter_block_maskout(array, (int8_t) 0,
+                                chunk_selection_size,
+                                p_ordered_selection_0,
+                                p_chunk_selection_0,
+                                p_chunk_selection_1,
+                                maskout);
+        if (rc < 0) {
+          goto chunk_done;
+        }
 
         if (blosc2_set_maskout(array->sc->dctx, maskout, (int) nblocks) !=
             BLOSC2_ERROR_SUCCESS) {
           BLOSC_TRACE_ERROR("Error setting the maskout");
-          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+          rc = BLOSC2_ERROR_FAILURE;
+          goto chunk_done;
         }
-        free(maskout);
       }
-      int data_nbytes = chunk_data_nbytes;
-      uint8_t *data = chunk_data;
-      int err = blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes);
-      if (err < 0) {
+      if (blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes) < 0) {
         BLOSC_TRACE_ERROR("Error decompressing chunk");
-        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+        // A read that failed before decompressing leaves the mask on the context
+        ctx_clear_maskout(array->sc->dctx);
+        rc = BLOSC2_ERROR_FAILURE;
+        goto chunk_done;
       }
-      BLOSC_ERROR(iter_block_copy(array, 0, chunk_selection_size,
-                                  p_ordered_selection_0, p_chunk_selection_0, p_chunk_selection_1,
-                                  data, buffer, buffershape, bufferstrides, get));
+      rc = iter_block_copy(array, 0, chunk_selection_size,
+                           p_ordered_selection_0, p_chunk_selection_0, p_chunk_selection_1,
+                           data, buffer, buffershape, bufferstrides, get);
+      if (rc < 0) {
+        goto chunk_done;
+      }
 
       if (!get) {
         int32_t chunk_size = data_nbytes + BLOSC_EXTENDED_HEADER_LENGTH;
-        uint8_t *chunk = malloc(chunk_size);
+        chunk = malloc(chunk_size);
         if (chunk == NULL) {
-          free(chunk_selection_size);
-          free(p_chunk_selection_0);
-          free(p_chunk_selection_1);
-          return BLOSC2_ERROR_MEMORY_ALLOC;
+          rc = BLOSC2_ERROR_MEMORY_ALLOC;
+          goto chunk_done;
         }
-        err = blosc2_compress_ctx(array->sc->cctx, data, data_nbytes, chunk, chunk_size);
-        if (err < 0) {
+        if (blosc2_compress_ctx(array->sc->cctx, data, data_nbytes, chunk, chunk_size) < 0) {
           BLOSC_TRACE_ERROR("Error compressing data");
-          free(chunk);
-          free(chunk_selection_size);
-          free(p_chunk_selection_0);
-          free(p_chunk_selection_1);
-          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+          rc = BLOSC2_ERROR_FAILURE;
+          goto chunk_done;
         }
-        err = (int) blosc2_schunk_update_chunk(array->sc, nchunk, chunk, false);
-        if (err < 0) {
+        if (blosc2_schunk_update_chunk(array->sc, nchunk, chunk, false) < 0) {
+          // A failed update leaves the chunk to us
           BLOSC_TRACE_ERROR("Error updating chunk");
-          free(chunk);
-          free(chunk_selection_size);
-          free(p_chunk_selection_0);
-          free(p_chunk_selection_1);
-          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+          rc = BLOSC2_ERROR_FAILURE;
+          goto chunk_done;
         }
+        chunk = NULL;
       }
+
+      chunk_done:
+      free(chunk);
+      free(maskout);
       free(chunk_selection_size);
       free(p_chunk_selection_0);
       free(p_chunk_selection_1);
+      BLOSC_ERROR(rc);
     } else {
       BLOSC_ERROR(iter_chunk(array, (int8_t) (ndim + 1), selection_size,
                              ordered_selection, p_ordered_selection_0, p_ordered_selection_1,
@@ -3250,10 +3232,26 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
   }
 
   // Sort selections
-  b2nd_selection_t **ordered_selection = malloc(ndim * sizeof(b2nd_selection_t *));
-  BLOSC_ERROR_NULL(ordered_selection, BLOSC2_ERROR_MEMORY_ALLOC);
+  int rc = BLOSC2_ERROR_SUCCESS;
+  b2nd_selection_t **ordered_selection = calloc(ndim, sizeof(b2nd_selection_t *));
+  // Pointers to iterate over ordered_selection data
+  b2nd_selection_t **p_ordered_selection_0 = malloc(ndim * sizeof(b2nd_selection_t *));
+  b2nd_selection_t **p_ordered_selection_1 = malloc(ndim * sizeof(b2nd_selection_t *));
+  // A single chunk decompression buffer, reused for every chunk visited by
+  // iter_chunk, instead of malloc/free per chunk.
+  int32_t chunk_data_nbytes = (int32_t) chunk_data_nbytes_64;
+  uint8_t *chunk_data = malloc(chunk_data_nbytes);
+  if (ordered_selection == NULL || p_ordered_selection_0 == NULL || p_ordered_selection_1 == NULL ||
+      chunk_data == NULL) {
+    rc = BLOSC2_ERROR_MEMORY_ALLOC;
+    goto out;
+  }
   for (int i = 0; i < ndim; ++i) {
     ordered_selection[i] = malloc(selection_size[i] * sizeof(b2nd_selection_t));
+    if (ordered_selection[i] == NULL && selection_size[i] > 0) {
+      rc = BLOSC2_ERROR_MEMORY_ALLOC;
+      goto out;
+    }
     for (int j = 0; j < selection_size[i]; ++j) {
       ordered_selection[i][j].index = j;
       ordered_selection[i][j].value = selection[i][j];
@@ -3261,40 +3259,30 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
     qsort(ordered_selection[i], selection_size[i], sizeof(b2nd_selection_t), compare_selection);
   }
 
-  // Define pointers to iterate over ordered_selection data
-  b2nd_selection_t **p_ordered_selection_0 = malloc(ndim * sizeof(b2nd_selection_t *));
-  BLOSC_ERROR_NULL(p_ordered_selection_0, BLOSC2_ERROR_MEMORY_ALLOC);
-  b2nd_selection_t **p_ordered_selection_1 = malloc(ndim * sizeof(b2nd_selection_t *));
-  BLOSC_ERROR_NULL(p_ordered_selection_1, BLOSC2_ERROR_MEMORY_ALLOC);
-
   int64_t bufferstrides[B2ND_MAX_DIM];
   bufferstrides[array->ndim - 1] = 1;
   for (int i = array->ndim - 2; i >= 0; --i) {
     bufferstrides[i] = bufferstrides[i + 1] * buffershape[i + 1];
   }
 
-  // Pre-allocate a single chunk decompression buffer, reused for every
-  // chunk visited by iter_chunk, instead of malloc/free per chunk.
-  int32_t chunk_data_nbytes = (int32_t) chunk_data_nbytes_64;
-  uint8_t *chunk_data = malloc(chunk_data_nbytes);
-  BLOSC_ERROR_NULL(chunk_data, BLOSC2_ERROR_MEMORY_ALLOC);
+  rc = iter_chunk(array, 0,
+                  selection_size, ordered_selection,
+                  p_ordered_selection_0,
+                  p_ordered_selection_1,
+                  buffer, buffershape, bufferstrides, get,
+                  chunk_data, chunk_data_nbytes);
 
-  BLOSC_ERROR(iter_chunk(array, 0,
-                         selection_size, ordered_selection,
-                         p_ordered_selection_0,
-                         p_ordered_selection_1,
-                         buffer, buffershape, bufferstrides, get,
-                         chunk_data, chunk_data_nbytes));
-
+  out:
   free(chunk_data);
-
-  // Free allocated memory
   free(p_ordered_selection_0);
   free(p_ordered_selection_1);
-  for (int i = 0; i < ndim; ++i) {
-    free(ordered_selection[i]);
+  if (ordered_selection != NULL) {
+    for (int i = 0; i < ndim; ++i) {
+      free(ordered_selection[i]);
+    }
   }
   free(ordered_selection);
+  BLOSC_ERROR(rc);
 
   return BLOSC2_ERROR_SUCCESS;
 }

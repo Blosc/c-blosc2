@@ -2173,7 +2173,8 @@ BLOSC_EXPORT int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *
   * @param schunk The super-chunk where the chunk will be updated.
   * @param nchunk The position where the chunk will be updated.
   * @param chunk The new @p chunk. If @p copy is true, an internal copy is made, so
-  * @p chunk can be reused or freed if desired. If @p copy is false, the chunk is used as-is.
+  * @p chunk can be reused or freed if desired. If @p copy is false, ownership is transferred
+  * to the super-chunk on success; on error, the caller retains ownership.
   * @param copy Whether the chunk should be copied internally or can be used as-is.
   *
   * @return The number of chunks in super-chunk. If some problem is
