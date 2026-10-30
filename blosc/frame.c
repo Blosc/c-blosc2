@@ -3692,6 +3692,11 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
     }
     if (io_cb->is_allocation_necessary) {
       *chunk = malloc(chunk_cbytes);
+      if (*chunk == NULL) {
+        BLOSC_TRACE_ERROR("Cannot allocate memory for chunk.");
+        frame_reader_release(frame, io_cb, fp);
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+      }
       *needs_free = true;
     }
     else {
@@ -3703,6 +3708,11 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
     frame_reader_release(frame, io_cb, fp);
     if (rbytes != chunk_cbytes) {
       BLOSC_TRACE_ERROR("Cannot read the chunk out of the frame.");
+      if (*needs_free) {
+        free(*chunk);
+        *chunk = NULL;
+        *needs_free = false;
+      }
       return BLOSC2_ERROR_FILE_READ;
     }
 
@@ -5599,8 +5609,8 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
 
 /* Decompress and return a chunk that is part of a frame. */
 int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int64_t nchunk, void *dest, int32_t nbytes) {
-  uint8_t* src;
-  bool needs_free;
+  uint8_t* src = NULL;
+  bool needs_free = false;
   int32_t srcsize;
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
