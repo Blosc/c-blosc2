@@ -33,6 +33,7 @@
 #include "sframe.h"
 #include "context.h"
 #include "blosc-private.h"
+#include "blosc-checked.h"
 #include "blosc2.h"
 
 #include <sys/stat.h>
@@ -3549,12 +3550,11 @@ int get_coffset(blosc2_frame_s* frame, int32_t header_len, int64_t cbytes,
 }
 
 
-// Detect and return a chunk with special values in offsets (only zeros, NaNs and non initialized)
-int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize, int32_t blocksize,
-                        uint8_t** chunk, int32_t cbytes, bool *needs_free) {
+// Write the chunk with special values (only zeros, NaNs and non initialized) that an
+// offset codes into `dest`, which holds `cbytes` bytes
+static int special_chunk_into(int64_t special_value, int32_t nbytes, int32_t typesize, int32_t blocksize,
+                              uint8_t* dest, int32_t cbytes) {
   int rc = 0;
-  *chunk = malloc(cbytes);
-  *needs_free = true;
 
   // Detect the kind of special value
   uint64_t zeros_mask = (uint64_t) BLOSC2_SPECIAL_ZERO << (8 * 7);  // chunk of zeros
@@ -3565,19 +3565,19 @@ int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize,
   cparams.typesize = typesize;
   cparams.blocksize = blocksize;
   if (special_value & zeros_mask) {
-    rc = blosc2_chunk_zeros(cparams, nbytes, *chunk, cbytes);
+    rc = blosc2_chunk_zeros(cparams, nbytes, dest, cbytes);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Error creating a zero chunk");
     }
   }
   else if (special_value & uninit_mask) {
-    rc = blosc2_chunk_uninit(cparams, nbytes, *chunk, cbytes);
+    rc = blosc2_chunk_uninit(cparams, nbytes, dest, cbytes);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Error creating a non initialized chunk");
     }
   }
   else if (special_value & nans_mask) {
-    rc = blosc2_chunk_nans(cparams, nbytes, *chunk, cbytes);
+    rc = blosc2_chunk_nans(cparams, nbytes, dest, cbytes);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Error creating a nan chunk");
     }
@@ -3586,7 +3586,17 @@ int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize,
     BLOSC_TRACE_ERROR("Special value not recognized: %" PRId64 "", special_value);
     rc = BLOSC2_ERROR_DATA;
   }
+  return rc;
+}
 
+
+// Detect and return a chunk with special values in offsets (only zeros, NaNs and non initialized)
+int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize, int32_t blocksize,
+                        uint8_t** chunk, int32_t cbytes, bool *needs_free) {
+  *chunk = malloc(cbytes);
+  *needs_free = true;
+  int rc = *chunk == NULL ? BLOSC2_ERROR_MEMORY_ALLOC
+                          : special_chunk_into(special_value, nbytes, typesize, blocksize, *chunk, cbytes);
   if (rc < 0) {
     free(*chunk);
     *needs_free = false;
@@ -4139,6 +4149,141 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
 }
 
 
+/* The fields of a frame header needed to find, and synthesize, its chunks */
+typedef struct {
+  int32_t header_len;
+  int64_t nbytes;
+  int64_t cbytes;
+  int32_t blocksize;
+  int32_t chunksize;
+  int64_t nchunks;
+  int32_t typesize;
+} frame_fields;
+
+
+/* Read the fields of the header of `frame`, refreshing its cached state when the
+   frame changed on disk (and the counters of its super-chunk, as get_chunk() does). */
+static int get_frame_fields(blosc2_frame_s* frame, frame_fields* f) {
+  int64_t frame_len;
+  int rc = get_header_info(frame, &f->header_len, &frame_len, &f->nbytes, &f->cbytes, &f->blocksize,
+                           &f->chunksize, &f->nchunks, &f->typesize, NULL, NULL, NULL, NULL, NULL, NULL,
+                           NULL, frame->schunk->storage->io);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Unable to get meta info from frame.");
+    return rc;
+  }
+  rc = frame_refresh_if_stale(frame, frame_len);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Unable to refresh the frame state from disk.");
+    return rc;
+  }
+  if (rc > 0) {
+    frame->schunk->nbytes = f->nbytes;
+    frame->schunk->cbytes = f->cbytes;
+    frame->schunk->nchunks = f->nchunks;
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+/* Copy the header of chunk `nchunk` of `frame`, whose header fields are `f`, into
+   `header` (BLOSC_EXTENDED_HEADER_LENGTH bytes); a chunk coded in its offset gets
+   the header of the special chunk that it stands for.  A contiguous file frame is
+   read through `fp` if not NULL.  The offset of the chunk goes to *offset.
+   Returns the cbytes of the chunk, or a negative value on error. */
+static int read_frame_chunk_header(blosc2_frame_s* frame, const frame_fields* f, int64_t nchunk, void* fp,
+                                   uint8_t* header, int64_t* offset) {
+  if (nchunk < 0 || nchunk >= f->nchunks) {
+    BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') exceeds the number of chunks "
+                      "('%" PRId64 "') in frame.", nchunk, f->nchunks);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  int rc = get_coffset(frame, f->header_len, f->cbytes, nchunk, f->nchunks, offset);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Unable to get offset to chunk %" PRId64 ".", nchunk);
+    return rc;
+  }
+  if (*offset < 0) {
+    if (f->chunksize <= 0) {
+      BLOSC_TRACE_ERROR("Cannot synthesize special chunk with chunksize <= 0.");
+      return BLOSC2_ERROR_INVALID_HEADER;
+    }
+    int32_t chunksize = f->chunksize;
+    if ((nchunk == f->nchunks - 1) && (f->nbytes % f->chunksize)) {
+      // Last chunk is incomplete.  Compute its actual size.
+      chunksize = (int32_t) (f->nbytes % f->chunksize);
+    }
+    return special_chunk_into(*offset, chunksize, f->typesize, f->blocksize, header,
+                              BLOSC_EXTENDED_HEADER_LENGTH);
+  }
+
+  if (frame->cframe != NULL) {
+    // get_coffset() checked that the header is inside the frame
+    memcpy(header, frame->cframe + f->header_len + *offset, BLOSC_EXTENDED_HEADER_LENGTH);
+  }
+  else {
+    blosc2_io_cb* io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+    if (io_cb == NULL) {
+      BLOSC_TRACE_ERROR("Error getting the input/output API");
+      return BLOSC2_ERROR_PLUGIN_IO;
+    }
+    void* chunk_fp = fp;
+    int64_t io_pos = frame->file_offset + f->header_len + *offset;
+    if (frame->sframe) {
+      chunk_fp = sframe_open_chunk(frame->urlpath, *offset, "rb", frame->schunk->storage->io);
+      io_pos = 0;
+    }
+    else if (fp == NULL) {
+      chunk_fp = frame_reader_acquire(frame, frame->schunk->storage->io);
+    }
+    if (chunk_fp == NULL) {
+      BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+      return BLOSC2_ERROR_FILE_OPEN;
+    }
+    uint8_t* header_ptr = header;
+    int64_t rbytes = io_cb->read((void**)&header_ptr, 1, BLOSC_EXTENDED_HEADER_LENGTH, io_pos, chunk_fp);
+    if (rbytes == BLOSC_EXTENDED_HEADER_LENGTH && header_ptr != header) {
+      memcpy(header, header_ptr, BLOSC_EXTENDED_HEADER_LENGTH);
+    }
+    if (frame->sframe) {
+      io_cb->close(chunk_fp);
+    }
+    else if (fp == NULL) {
+      frame_reader_release(frame, io_cb, chunk_fp);
+    }
+    if (rbytes != BLOSC_EXTENDED_HEADER_LENGTH) {
+      BLOSC_TRACE_ERROR("Cannot read the header for chunk in the frame.");
+      return BLOSC2_ERROR_FILE_READ;
+    }
+  }
+  int32_t chunk_cbytes;
+  rc = blosc2_cbuffer_sizes(header, NULL, &chunk_cbytes, NULL);
+  if (rc < 0) {
+    return rc;
+  }
+  int64_t chunk_end;
+  if (chunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH ||
+      (!frame->sframe && (!blosc2_checked_add_i64_nonneg(*offset, chunk_cbytes, &chunk_end) ||
+                          chunk_end > f->cbytes))) {
+    BLOSC_TRACE_ERROR("Invalid chunk size in frame for chunk %" PRId64 ".", nchunk);
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
+  return chunk_cbytes;
+}
+
+
+/* See frame.h */
+int frame_get_chunk_header(blosc2_frame_s* frame, int64_t nchunk, uint8_t* header) {
+  frame_fields f;
+  int rc = get_frame_fields(frame, &f);
+  if (rc < 0) {
+    return rc;
+  }
+  int64_t offset;
+  return read_frame_chunk_header(frame, &f, nchunk, NULL, header, &offset);
+}
+
+
 /* Fill an empty frame with special values (fast path). */
 int64_t frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_value,
                        int32_t chunksize, blosc2_schunk* schunk) {
@@ -4366,16 +4511,12 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   // Check that we are not appending a small chunk after another small chunk
   int32_t chunk_nbytes_last;
   if ((chunksize > 0) && (nchunks > 0) && (chunk_nbytes < chunksize)) {
-    uint8_t* last_chunk;
-    bool needs_free;
-    rc = frame_get_lazychunk(frame, nchunks - 1, &last_chunk, &needs_free);
+    uint8_t last_header[BLOSC_EXTENDED_HEADER_LENGTH];
+    rc = frame_get_chunk_header(frame, nchunks - 1, last_header);
     if (rc < 0) {
       BLOSC_TRACE_ERROR("Cannot get the last chunk (in position %" PRId64 ").", nchunks - 1);
     } else {
-      rc = blosc2_cbuffer_sizes(last_chunk, &chunk_nbytes_last, NULL, NULL);
-    }
-    if (needs_free) {
-      free(last_chunk);
+      rc = blosc2_cbuffer_sizes(last_header, &chunk_nbytes_last, NULL, NULL);
     }
     if (rc < 0) {
       return NULL;
@@ -4944,7 +5085,8 @@ int frame_move_range(blosc2_io_cb *io_cb, void *fp, int64_t src_pos, int64_t dst
 }
 
 
-void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk) {
+void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk,
+                         int32_t cbytes_old) {
   uint8_t *chunk_ = (uint8_t *) chunk;
   int32_t header_len;
   int64_t frame_len;
@@ -5012,32 +5154,9 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       return NULL;
     }
   }
-  int32_t cbytes_old = 0;
   int64_t old_offset = 0;
   if (!frame->sframe) {
-    // See how big would be the space
     old_offset = offsets[nchunk];
-    bool needs_free;
-    uint8_t *chunk_old;
-    int err = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_old, &needs_free);
-    if (err < 0) {
-      free(offsets);
-      BLOSC_TRACE_ERROR("%" PRId64 " chunk can not be obtained from schunk.", nchunk);
-      return NULL;
-    }
-
-    if (chunk_old == NULL) {
-      cbytes_old = 0;
-    }
-    else {
-      cbytes_old = sw32_(chunk_old + BLOSC2_CHUNK_CBYTES);
-      if (cbytes_old == BLOSC2_MAX_OVERHEAD) {
-        cbytes_old = 0;
-      }
-    }
-    if (needs_free) {
-      free(chunk_old);
-    }
   }
 
   // Add the new offset

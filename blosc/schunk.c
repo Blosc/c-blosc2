@@ -926,23 +926,36 @@ int64_t blosc2_schunk_fill_special(blosc2_schunk* schunk, int64_t nitems, int sp
   return schunk->nchunks;
 }
 
-static int schunk_get_chunk_nbytes(blosc2_schunk *schunk, int64_t nchunk, int32_t *chunk_nbytes) {
-  int rc;
-  if (schunk->frame == NULL) {
-    return blosc2_cbuffer_sizes(schunk->data[nchunk], chunk_nbytes, NULL, NULL);
+/* The header of chunk `nchunk` of `schunk` in *chunk: the chunk itself, NULL for a
+   missing one, or for a frame a copy in `header` (BLOSC_EXTENDED_HEADER_LENGTH
+   bytes), so an on-disk frame does not read the whole chunk.  Returns the cbytes
+   of the chunk (0 for a missing one), or a negative value on error. */
+static int schunk_get_chunk_header(blosc2_schunk *schunk, int64_t nchunk, uint8_t *header,
+                                   const uint8_t **chunk) {
+  if (schunk->frame != NULL) {
+    *chunk = header;
+    return frame_get_chunk_header((blosc2_frame_s *)schunk->frame, nchunk, header);
   }
+  *chunk = schunk->data[nchunk];
+  if (*chunk == NULL) {
+    return 0;
+  }
+  int32_t chunk_cbytes;
+  int rc = blosc2_cbuffer_sizes(*chunk, NULL, &chunk_cbytes, NULL);
+  return rc < 0 ? rc : chunk_cbytes;
+}
 
-  bool needs_free;
-  uint8_t *chunk;
-  rc = frame_get_lazychunk((blosc2_frame_s *)schunk->frame, nchunk, &chunk, &needs_free);
+static int schunk_get_chunk_nbytes(blosc2_schunk *schunk, int64_t nchunk, int32_t *chunk_nbytes) {
+  uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
+  const uint8_t *chunk;
+  int rc = schunk_get_chunk_header(schunk, nchunk, header, &chunk);
   if (rc < 0) {
     return rc;
   }
-  rc = blosc2_cbuffer_sizes(chunk, chunk_nbytes, NULL, NULL);
-  if (needs_free) {
-    free(chunk);
+  if (chunk == NULL) {
+    return BLOSC2_ERROR_DATA;
   }
-  return rc;
+  return blosc2_cbuffer_sizes(chunk, chunk_nbytes, NULL, NULL);
 }
 
 /* The flags2 byte lives in the extended header, at offset 0x1e, so it only
@@ -962,28 +975,41 @@ static uint8_t get_chunk_flags2(const uint8_t *chunk, int32_t chunk_cbytes) {
 }
 
 static int schunk_get_chunk_flags2(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk_flags2) {
-  if (schunk->frame == NULL) {
-    int32_t chunk_cbytes;
-    int rc = blosc2_cbuffer_sizes(schunk->data[nchunk], NULL, &chunk_cbytes, NULL);
-    if (rc < 0) {
-      return rc;
-    }
-    *chunk_flags2 = get_chunk_flags2(schunk->data[nchunk], chunk_cbytes);
-    return 0;
-  }
-
-  bool needs_free;
-  uint8_t *chunk;
-  int rc = frame_get_chunk((blosc2_frame_s *)schunk->frame, nchunk, &chunk, &needs_free);
+  uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
+  const uint8_t *chunk;
+  int rc = schunk_get_chunk_header(schunk, nchunk, header, &chunk);
   if (rc < 0) {
     return rc;
   }
-  *chunk_flags2 = get_chunk_flags2(chunk, rc);
-  if (needs_free) {
-    free(chunk);
+  if (chunk == NULL) {
+    return BLOSC2_ERROR_DATA;
   }
+  *chunk_flags2 = get_chunk_flags2(chunk, rc);
   return 0;
 }
+
+/* The nbytes and cbytes of chunk `nchunk` that the counters of `schunk` hold:
+   none for a missing chunk, no cbytes for a chunk made of its header only. */
+static int schunk_get_counted_sizes(blosc2_schunk *schunk, int64_t nchunk, int32_t *chunk_nbytes,
+                                    int32_t *chunk_cbytes) {
+  *chunk_nbytes = 0;
+  *chunk_cbytes = 0;
+  uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
+  const uint8_t *chunk;
+  int rc = schunk_get_chunk_header(schunk, nchunk, header, &chunk);
+  if (rc < 0 || chunk == NULL) {
+    return rc;
+  }
+  rc = blosc2_cbuffer_sizes(chunk, chunk_nbytes, chunk_cbytes, NULL);
+  if (rc < 0) {
+    return rc;
+  }
+  if (*chunk_cbytes == BLOSC2_MAX_OVERHEAD) {
+    *chunk_cbytes = 0;
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
 
 /* Append an existing chunk into a super-chunk. */
 static int64_t schunk_append_chunk_unlocked(blosc2_schunk *schunk, uint8_t *chunk, bool copy) {
@@ -1333,29 +1359,15 @@ static int64_t schunk_update_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
     return BLOSC2_ERROR_CHUNK_UPDATE;
   }
 
-  bool needs_free;
-  uint8_t *chunk_old;
-  int err = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_old, &needs_free);
-  if (err < 0) {
+  // Only the sizes of the old chunk are needed, so do not read all of it from disk
+  int32_t chunk_nbytes_old;
+  int32_t chunk_cbytes_old;
+  rc = schunk_get_counted_sizes(schunk, nchunk, &chunk_nbytes_old, &chunk_cbytes_old);
+  if (rc < 0) {
     BLOSC_TRACE_ERROR("%" PRId64 " chunk can not be obtained from schunk.", nchunk);
-    return -1;
+    return rc;
   }
-  int32_t chunk_nbytes_old = 0;
-  int32_t chunk_cbytes_old = 0;
   schunk->current_nchunk = nchunk;
-
-  if (chunk_old != 0) {
-    rc = blosc2_cbuffer_sizes(chunk_old, &chunk_nbytes_old, &chunk_cbytes_old, NULL);
-    if (rc < 0) {
-      return rc;
-    }
-    if (chunk_cbytes_old == BLOSC2_MAX_OVERHEAD) {
-        chunk_cbytes_old = 0;
-    }
-  }
-  if (needs_free) {
-    free(chunk_old);
-  }
 
   if (copy) {
     // Make a copy of the chunk
@@ -1403,7 +1415,7 @@ static int64_t schunk_update_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
     schunk->data[nchunk] = chunk;
   }
   else {
-    if (frame_update_chunk(frame, nchunk, chunk, schunk) == NULL) {
+    if (frame_update_chunk(frame, nchunk, chunk, schunk, chunk_cbytes_old) == NULL) {
         BLOSC_TRACE_ERROR("Problems updating a chunk in a frame.");
         if (copy) {
           free(chunk);
@@ -1439,29 +1451,15 @@ static int64_t schunk_delete_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
     return rc;
   }
 
-  bool needs_free;
-  uint8_t *chunk_old;
-  int err = blosc2_schunk_get_chunk(schunk, nchunk, &chunk_old, &needs_free);
-  if (err < 0) {
+  // Only the sizes of the old chunk are needed (see schunk_update_chunk_unlocked)
+  int32_t chunk_nbytes_old;
+  int32_t chunk_cbytes_old;
+  rc = schunk_get_counted_sizes(schunk, nchunk, &chunk_nbytes_old, &chunk_cbytes_old);
+  if (rc < 0) {
     BLOSC_TRACE_ERROR("%" PRId64 "chunk can not be obtained from schunk.", nchunk);
-    return -1;
+    return rc;
   }
-  int32_t chunk_nbytes_old = 0;
-  int32_t chunk_cbytes_old = 0;
   schunk->current_nchunk = nchunk;
-
-  if (chunk_old != 0) {
-    rc = blosc2_cbuffer_sizes(chunk_old, &chunk_nbytes_old, &chunk_cbytes_old, NULL);
-    if (rc < 0) {
-      return rc;
-    }
-    if (chunk_cbytes_old == BLOSC2_MAX_OVERHEAD) {
-      chunk_cbytes_old = 0;
-    }
-  }
-  if (needs_free) {
-    free(chunk_old);
-  }
 
   blosc2_frame_s* frame = (blosc2_frame_s*)(schunk->frame);
   schunk->nchunks -= 1;
