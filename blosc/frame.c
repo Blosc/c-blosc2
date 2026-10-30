@@ -3815,7 +3815,14 @@ int frame_special_chunk(int64_t special_value, int32_t nbytes, int32_t typesize,
  * The size of the (compressed) chunk is returned.  If some problem is detected, a negative code
  * is returned instead.
 */
-int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool *needs_free) {
+// With `capacity`, a chunk read from a file goes into a buffer from
+// blosc2_tmp_malloc() (release it with blosc2_tmp_free(*chunk, *capacity));
+// otherwise into a plain malloc'ed one.
+static int get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool *needs_free,
+                     size_t *capacity) {
+  if (capacity != NULL) {
+    *capacity = 0;
+  }
   int32_t header_len;
   int64_t frame_len;
   int64_t nbytes;
@@ -3927,7 +3934,7 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
       return BLOSC2_ERROR_INVALID_HEADER;
     }
     if (io_cb->is_allocation_necessary) {
-      *chunk = malloc(chunk_cbytes);
+      *chunk = capacity != NULL ? blosc2_tmp_malloc(chunk_cbytes, capacity) : malloc(chunk_cbytes);
       if (*chunk == NULL) {
         BLOSC_TRACE_ERROR("Cannot allocate memory for chunk.");
         frame_reader_release(frame, io_cb, fp);
@@ -3969,6 +3976,11 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
 
   end:
   return (int32_t)chunk_cbytes;
+}
+
+
+int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool *needs_free) {
+  return get_chunk(frame, nchunk, chunk, needs_free, NULL);
 }
 
 
@@ -4951,8 +4963,6 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
     return NULL;
   }
 
-  // The chunk is consumed only on success; on errors, the caller still owns it
-  free(chunk);
   return frame;
 
   failed:
@@ -5300,14 +5310,13 @@ static int fill_from_schunk_unlocked(blosc2_frame_s* frame, blosc2_schunk* schun
     }
     else {
       if ((size_t)stored > buffer_capacity) {
-        free(buffer);
-        buffer = malloc((size_t)stored);
+        blosc2_tmp_free(buffer, buffer_capacity);
+        buffer = blosc2_tmp_malloc((size_t)stored, &buffer_capacity);
         if (buffer == NULL) {
           buffer_capacity = 0;
           rc = BLOSC2_ERROR_MEMORY_ALLOC;
           break;
         }
-        buffer_capacity = (size_t)stored;
       }
       rc = source_read_chunk(src, nchunk, stored, buffer);
       if (rc >= 0) {
@@ -5315,7 +5324,7 @@ static int fill_from_schunk_unlocked(blosc2_frame_s* frame, blosc2_schunk* schun
       }
     }
   }
-  free(buffer);
+  blosc2_tmp_free(buffer, buffer_capacity);
 
   uint8_t* off_chunk = NULL;
   int32_t off_cbytes = 0;
@@ -5693,8 +5702,6 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     return NULL;
   }
 
-  // The chunk is consumed only on success; on errors, the caller still owns it
-  free(chunk);
   return frame;
 
   failed:
@@ -6104,8 +6111,6 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     }
   }
 
-  // The chunk is consumed only on success; on errors, the caller still owns it
-  free(chunk);
   return frame;
 
   failed:
@@ -6451,7 +6456,8 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int64_t 
   int32_t chunk_cbytes;
   int rc;
 
-  rc = frame_get_chunk(frame, nchunk, &src, &needs_free);
+  size_t capacity = 0;
+  rc = get_chunk(frame, nchunk, &src, &needs_free, &capacity);
   if (rc < 0) {
     BLOSC_TRACE_ERROR("Cannot get the chunk in position %" PRId64 ".", nchunk);
     goto end;
@@ -6490,7 +6496,7 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int64_t 
   }
   end:
   if (needs_free) {
-    free(src);
+    blosc2_tmp_free(src, capacity);
   }
   return rc;
 }
