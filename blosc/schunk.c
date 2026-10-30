@@ -1130,6 +1130,12 @@ static int64_t schunk_insert_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
   if (rc < 0) {
     return rc;
   }
+  // Saved, so that the super-chunk is left unchanged if inserting into the frame fails
+  uint8_t old_flags2 = schunk->flags2;
+  int32_t old_chunksize = schunk->chunksize;
+  int64_t old_current_nchunk = schunk->current_nchunk;
+  int64_t old_nbytes = schunk->nbytes;
+  int64_t old_cbytes = schunk->cbytes;
   uint8_t flags2 = get_chunk_flags2(chunk, chunk_cbytes);
   bool chunk_vlblocks = (flags2 & BLOSC2_VL_BLOCKS) != 0;
   if (nchunks > 0) {
@@ -1224,6 +1230,15 @@ static int64_t schunk_insert_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
   else {
     if (frame_insert_chunk(frame, nchunk, chunk, schunk) == NULL) {
       BLOSC_TRACE_ERROR("Problems inserting a chunk in a frame.");
+      if (copy) {
+        free(chunk);
+      }
+      schunk->flags2 = old_flags2;
+      schunk->chunksize = old_chunksize;
+      schunk->current_nchunk = old_current_nchunk;
+      schunk->nchunks = nchunks;
+      schunk->nbytes = old_nbytes;
+      schunk->cbytes = old_cbytes;
       return BLOSC2_ERROR_CHUNK_INSERT;
     }
   }
