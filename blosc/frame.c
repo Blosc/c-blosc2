@@ -5264,20 +5264,6 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     return NULL;
   }
 
-  // The chunk is consumed only on success; on errors, the caller still owns it
-  free(chunk);
-  return frame;
-  if (rc < 0) {
-    frame->len = frame_len;
-    return NULL;
-  }
-
-  rc = frame_update_trailer(frame, schunk);
-  if (rc < 0) {
-    frame->len = frame_len;
-    return NULL;
-  }
-
   if (frame->sframe && is_special_chunk && old_sframe_chunk_id >= 0) {
     const blosc2_io *io = (frame->schunk && frame->schunk->storage) ? frame->schunk->storage->io : NULL;
     int err = sframe_delete_chunk(frame->urlpath, old_sframe_chunk_id, io);
@@ -5289,6 +5275,8 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     }
   }
 
+  // The chunk is consumed only on success; on errors, the caller still owns it
+  free(chunk);
   return frame;
 }
 
