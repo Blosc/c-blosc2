@@ -4112,11 +4112,7 @@ int blosc2_decompress_ctx(blosc2_context* context, const void* src, int32_t srcs
   result = blosc_run_decompression_with_context(context, src, srcsize, dest, destsize);
 
   // Reset a possible block_maskout
-  if (context->block_maskout != NULL) {
-    free(context->block_maskout);
-    context->block_maskout = NULL;
-  }
-  context->block_maskout_nitems = 0;
+  ctx_clear_maskout(context);
 
   return result;
 }
@@ -6734,11 +6730,8 @@ int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams) {
 
 /* Set a maskout in decompression context */
 int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks) {
-
-  if (ctx->block_maskout != NULL) {
-    // Get rid of a possible mask here
-    free(ctx->block_maskout);
-  }
+  // Get rid of a possible mask here (also if the allocation below fails)
+  ctx_clear_maskout(ctx);
 
   bool *maskout_ = malloc(nblocks);
   BLOSC_ERROR_NULL(maskout_, BLOSC2_ERROR_MEMORY_ALLOC);
