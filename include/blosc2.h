@@ -2099,6 +2099,27 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_offset_udio(const char* urlpath, 
  */
 BLOSC_EXPORT int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** cframe, bool* needs_free);
 
+/**
+ * @brief Convert a super-chunk into a contiguous frame in a buffer provided by the caller.
+ *
+ * The frame is the same that blosc2_schunk_to_buffer() returns, but it goes into
+ * memory that the caller owns, e.g. the final destination of the serialized
+ * super-chunk, which saves copying it there afterwards.  Unless the super-chunk
+ * already is a frame in memory, the frame is moreover written in place instead
+ * of being built first.
+ *
+ * @param schunk The super-chunk to convert.
+ * @param alloc Called once with the exact length of the frame; it returns a buffer
+ * of (at least) that many bytes, or NULL to give up.
+ * @param user_data Passed on to @p alloc.
+ *
+ * @return If successful, return the size of the frame written into the buffer.
+ * Else (also when @p alloc returns NULL), a negative value.
+ */
+BLOSC_EXPORT int64_t blosc2_schunk_to_buffer_alloc(blosc2_schunk* schunk,
+                                                   uint8_t* (*alloc)(int64_t len, void* user_data),
+                                                   void* user_data);
+
 /* @brief Store a super-chunk into a file.
  *
  * @param schunk The super-chunk to write.

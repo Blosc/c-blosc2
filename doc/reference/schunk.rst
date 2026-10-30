@@ -21,6 +21,7 @@ short).
 .. doxygenfunction:: blosc2_schunk_copy
 .. doxygenfunction:: blosc2_schunk_from_buffer
 .. doxygenfunction:: blosc2_schunk_to_buffer
+.. doxygenfunction:: blosc2_schunk_to_buffer_alloc
 .. doxygenfunction:: blosc2_schunk_to_file
 .. doxygenfunction:: blosc2_schunk_append_file
 
