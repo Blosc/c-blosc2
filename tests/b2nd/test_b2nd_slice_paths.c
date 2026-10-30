@@ -224,7 +224,8 @@ CUTEST_TEST_TEARDOWN(slice_paths) {
 
 
 /* Uninitialized chunks read as zeros on the paths that decompress whole
-   chunks; a user postfilter keeps being applied on every path. */
+   chunks or scatter them; a user postfilter keeps being applied on every
+   path. */
 
 static int add_one_postfilter(blosc2_postfilter_params *params) {
   const uint32_t *in = (const uint32_t *) params->input;
@@ -309,6 +310,112 @@ CUTEST_TEST_TEARDOWN(slice_special) {
 }
 
 
+/* Uninitialized chunks read as zeros on every path, also where they decode
+   into scratch memory that is reused: each slice operation first runs on an
+   initialized array, which leaves its items in the per-thread scratch.  A
+   partial write must also store zeros around the slice. */
+
+typedef struct {
+  bool delta;
+  bool set;
+  int64_t start[3];
+  int64_t stop[3];
+} uninit_case_t;
+
+CUTEST_TEST_SETUP(slice_uninit) {
+  blosc2_init();
+  CUTEST_PARAMETRIZE(nthreads, int16_t, CUTEST_DATA(1, 4));
+  CUTEST_PARAMETRIZE(op, uninit_case_t, CUTEST_DATA(
+      {false, false, {1, 2, 3}, {5, 6, 7}},      // compact get (one block)
+      {false, false, {1, 2, 3}, {40, 40, 40}},   // scatter get
+      {true, false, {1, 2, 3}, {40, 40, 40}},    // scratch get (DELTA)
+      {false, true, {0, 0, 0}, {40, 64, 64}},    // gather set
+      {true, true, {1, 2, 3}, {9, 10, 11}},      // scratch set (DELTA)
+  ));
+}
+
+CUTEST_TEST_TEST(slice_uninit) {
+  CUTEST_GET_PARAMETER(nthreads, int16_t);
+  CUTEST_GET_PARAMETER(op, uninit_case_t);
+  int8_t ndim = 3;
+  int64_t shape[] = {64, 64, 64};
+  // 64 KB blocks, 1 MB chunks: both kinds of scratch come from the cache
+  int32_t chunkshape[] = {64, 64, 64};
+  int32_t blockshape[] = {16, 32, 32};
+  int32_t typesize = sizeof(uint32_t);
+  int64_t nitems = nitems_of(ndim, shape);
+  int64_t zeros[B2ND_MAX_DIM] = {0};
+  int64_t sliceshape[3];
+  for (int i = 0; i < ndim; ++i) {
+    sliceshape[i] = op.stop[i] - op.start[i];
+  }
+  int64_t n = nitems_of(ndim, sliceshape);
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.nthreads = nthreads;
+  cparams.typesize = typesize;
+  if (op.delta) {
+    cparams.filters[BLOSC2_MAX_FILTERS - 2] = BLOSC_DELTA;
+  }
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  dparams.nthreads = nthreads;
+  blosc2_storage b2_storage = {.cparams=&cparams, .dparams=&dparams, .contiguous=true};
+  b2nd_context_t *ctx = b2nd_create_ctx(&b2_storage, ndim, shape, chunkshape, blockshape,
+                                        NULL, 0, NULL, 0);
+  uint32_t *ref = malloc(nitems * typesize);
+  for (int64_t i = 0; i < nitems; ++i) {
+    ref[i] = (uint32_t) (i * 7 + 1);
+  }
+  b2nd_array_t *dirty;
+  B2ND_TEST_ASSERT(b2nd_from_cbuffer(ctx, &dirty, ref, nitems * typesize));
+  b2nd_array_t *array;
+  B2ND_TEST_ASSERT(b2nd_uninit(ctx, &array));
+
+  uint32_t *out = malloc(n * typesize);
+  if (op.set) {
+    for (int64_t k = 0; k < n; ++k) {
+      out[k] = (uint32_t) (k * 13 + 5);
+    }
+    B2ND_TEST_ASSERT(b2nd_set_slice_cbuffer(out, sliceshape, n * typesize, op.start, op.stop, dirty));
+    B2ND_TEST_ASSERT(b2nd_set_slice_cbuffer(out, sliceshape, n * typesize, op.start, op.stop, array));
+    // Expect the written items, and zeros everywhere else
+    memset(ref, 0, nitems * typesize);
+    for (int64_t k = 0; k < n; ++k) {
+      int64_t pos[3];
+      int64_t rem = k;
+      for (int i = ndim - 1; i >= 0; --i) {
+        pos[i] = rem % sliceshape[i] + op.start[i];
+        rem /= sliceshape[i];
+      }
+      ref[c_index(ndim, shape, pos)] = out[k];
+    }
+    uint32_t *all = malloc(nitems * typesize);
+    B2ND_TEST_ASSERT(b2nd_to_cbuffer(array, all, nitems * typesize));
+    CUTEST_ASSERT("a partial write into an uninitialized chunk stored stale items",
+                  check_slice(ndim, shape, ref, zeros, shape, shape, all));
+    free(all);
+  }
+  else {
+    B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(dirty, op.start, op.stop, out, sliceshape, n * typesize));
+    memset(out, 0xa5, n * typesize);
+    B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(array, op.start, op.stop, out, sliceshape, n * typesize));
+    for (int64_t k = 0; k < n; ++k) {
+      CUTEST_ASSERT("uninitialized chunks must read as zeros", out[k] == 0);
+    }
+  }
+  free(out);
+  free(ref);
+  B2ND_TEST_ASSERT(b2nd_free(array));
+  B2ND_TEST_ASSERT(b2nd_free(dirty));
+  B2ND_TEST_ASSERT(b2nd_free_ctx(ctx));
+  return 0;
+}
+
+CUTEST_TEST_TEARDOWN(slice_uninit) {
+  blosc2_destroy();
+}
+
+
 // CUTEST_TEST_RUN() returns from the function it is in
 static int run_slice_paths(void) {
   CUTEST_TEST_RUN(slice_paths);
@@ -318,9 +425,14 @@ static int run_slice_special(void) {
   CUTEST_TEST_RUN(slice_special);
 }
 
+static int run_slice_uninit(void) {
+  CUTEST_TEST_RUN(slice_uninit);
+}
+
 
 int main(void) {
   int rc = run_slice_paths();
   rc |= run_slice_special();
+  rc |= run_slice_uninit();
   return rc;
 }
