@@ -180,6 +180,26 @@ static int file_identity(int fd, const char* path, uint64_t* dev, uint64_t* ino)
   return 0;
 }
 
+/* A read-only stdio handle on a duplicate of @p fp's descriptor, or NULL.  It
+   shares the open file description, so it costs no open on the server. */
+static void* stdio_dup_reader(void* fp) {
+  blosc2_stdio_file* sfp = (blosc2_stdio_file*)fp;
+  int fd = sfp->file != NULL ? fileno(sfp->file) : -1;
+  int dupfd = fd >= 0 ? fcntl(fd, F_DUPFD_CLOEXEC, 0) : -1;
+  if (dupfd < 0) {
+    return NULL;
+  }
+  blosc2_stdio_file* dup_fp = malloc(sizeof(blosc2_stdio_file));
+  FILE* file = dup_fp != NULL ? fdopen(dupfd, "rb") : NULL;
+  if (file == NULL) {
+    free(dup_fp);
+    close(dupfd);
+    return NULL;
+  }
+  dup_fp->file = file;
+  return dup_fp;
+}
+
 static void record_handle_identity(void* fp, uint64_t* dev, uint64_t* ino) {
   *dev = 0;
   *ino = 0;
@@ -191,7 +211,52 @@ static void record_handle_identity(void* fp, uint64_t* dev, uint64_t* ino) {
     }
   }
 }
+
+/* Whether the handle cache may take one more handle for the empty slot of a
+   frame whose `nocache` flag is clear; caller must hold read_fp_mutex.  When the
+   process-wide budget is spent, the frame is flagged, so the budget is asked
+   once rather than on every access for the rest of its life. */
+static bool cache_slot_claim(const void* slot, bool* nocache) {
+  if (slot != NULL || *nocache) {
+    return false;
+  }
+  if (!reader_cache_claim()) {
+    *nocache = true;
+    return false;
+  }
+  return true;
+}
+
+/* Put @p fp in a slot claimed with cache_slot_claim(), with the identity of its
+   file; a NULL @p fp (a failed open) gives the claim back instead. */
+static void cache_install(void** slot, uint64_t* dev, uint64_t* ino, void* fp) {
+  *slot = fp;
+  if (fp == NULL) {
+    reader_cache_return();
+  }
+  else {
+    record_handle_identity(fp, dev, ino);
+  }
+}
 #endif  /* !_WIN32 */
+
+
+/* Whether the readers of a frame opened through @p io may be cached.  Third-party
+   backends keep the documented one-handle-per-reader contract (and the mmap one
+   already makes open() a cheap pointer return). */
+static bool reader_cacheable(const blosc2_io* io) {
+  return io->id == BLOSC2_IO_FILESYSTEM;
+}
+
+#if !defined(_WIN32)
+/* Whether the writer of @p frame may be cached now.  With locking on, the
+   writer is only cached while the lock is held, as the unlock is what closes it
+   and so publishes the writes to the next lock holder.  Any write outside a lock
+   would have nothing to close it, so it keeps a per-call handle. */
+static bool writer_cacheable(const blosc2_frame_s* frame, const blosc2_io* io) {
+  return reader_cacheable(io) && !(frame->locking && frame->lock_depth == 0);
+}
+#endif
 
 
 /* Allocate a zeroed frame with its internal mutex ready */
@@ -211,9 +276,7 @@ void* frame_reader_acquire(blosc2_frame_s* frame, const blosc2_io* io) {
     BLOSC_TRACE_ERROR("Error getting the input/output API");
     return NULL;
   }
-  if (io->id != BLOSC2_IO_FILESYSTEM) {
-    // Third-party backends keep the documented one-handle-per-reader contract
-    // (and the mmap one already makes open() a cheap pointer return).
+  if (!reader_cacheable(io)) {
     return io_cb->open(frame->urlpath, "rb", io->params);
   }
 #if defined(_WIN32)
@@ -235,21 +298,9 @@ void* frame_reader_acquire(blosc2_frame_s* frame, const blosc2_io* io) {
   // store below (C11 data race, and TSan says so).  An uncontended lock is a
   // handful of ns against the ~600 ns pread this hands a handle to.
   blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
-  if (frame->read_fp == NULL && !frame->read_fp_nocache) {
-    if (reader_cache_claim()) {
-      frame->read_fp = io_cb->open(frame->urlpath, "rb", io->params);
-      if (frame->read_fp == NULL) {
-        reader_cache_return();
-      }
-      else {
-        record_handle_identity(frame->read_fp, &frame->read_fp_dev, &frame->read_fp_ino);
-      }
-    }
-    else {
-      // Remember that this frame goes uncached, so the process-wide cache mutex
-      // is asked once rather than on every read for the rest of its life
-      frame->read_fp_nocache = true;
-    }
+  if (cache_slot_claim(frame->read_fp, &frame->read_fp_nocache)) {
+    cache_install(&frame->read_fp, &frame->read_fp_dev, &frame->read_fp_ino,
+                  io_cb->open(frame->urlpath, "rb", io->params));
   }
   void* fp = frame->read_fp;
   if (fp != NULL) {
@@ -284,6 +335,33 @@ void frame_reader_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void
   if (!is_cached) {
     io_cb->close(fp);
   }
+}
+
+
+/* Keep @p fp, a "rb" handle on the frame's file that the caller opened and no
+   longer needs, as the frame's cached reader instead of closing it, so that the
+   first read does not open the file again: on NFS each open and close is a
+   synchronous round trip to the server.  The frame must not be shared yet. */
+static void frame_reader_adopt(blosc2_frame_s* frame, const blosc2_io* io,
+                               const blosc2_io_cb* io_cb, void* fp) {
+#if !defined(_WIN32)
+  bool adopted = false;
+  if (reader_cacheable(io) && !frame->sframe) {
+    blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
+    adopted = cache_slot_claim(frame->read_fp, &frame->read_fp_nocache);
+    if (adopted) {
+      cache_install(&frame->read_fp, &frame->read_fp_dev, &frame->read_fp_ino, fp);
+    }
+    blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
+  }
+  if (adopted) {
+    return;
+  }
+#else
+  BLOSC_UNUSED_PARAM(frame);
+  BLOSC_UNUSED_PARAM(io);
+#endif
+  io_cb->close(fp);
 }
 
 
@@ -424,14 +502,7 @@ void* frame_writer_acquire(blosc2_frame_s* frame, const blosc2_io_cb* io_cb) {
   // Same reason as for readers: a cached handle would block unlink/rename
   return io_cb->open(frame->urlpath, "rb+", io->params);
 #else
-  if (io->id != BLOSC2_IO_FILESYSTEM) {
-    return io_cb->open(frame->urlpath, "rb+", io->params);
-  }
-  if (frame->locking && frame->lock_depth == 0) {
-    // With locking on, the writer is only cached while the lock is held, as
-    // the unlock is what closes it and so publishes the writes to the next lock
-    // holder.  Any write outside a lock would have nothing to close it, so it
-    // keeps the per-call handle it always had.
+  if (!writer_cacheable(frame, io)) {
     return io_cb->open(frame->urlpath, "rb+", io->params);
   }
   // Writes to one frame are serialized by its callers; the mutex only guards
@@ -440,20 +511,10 @@ void* frame_writer_acquire(blosc2_frame_s* frame, const blosc2_io_cb* io_cb) {
   if (frame->write_fp_stale) {
     frame_writer_close_locked(frame);
   }
-  if (frame->write_fp == NULL && !frame->write_fp_nocache) {
-    // Cached writers draw on the same descriptor budget as cached readers
-    if (reader_cache_claim()) {
-      frame->write_fp = io_cb->open(frame->urlpath, "rb+", io->params);
-      if (frame->write_fp == NULL) {
-        reader_cache_return();
-      }
-      else {
-        record_handle_identity(frame->write_fp, &frame->write_fp_dev, &frame->write_fp_ino);
-      }
-    }
-    else {
-      frame->write_fp_nocache = true;
-    }
+  // Cached writers draw on the same descriptor budget as cached readers
+  if (cache_slot_claim(frame->write_fp, &frame->write_fp_nocache)) {
+    cache_install(&frame->write_fp, &frame->write_fp_dev, &frame->write_fp_ino,
+                  io_cb->open(frame->urlpath, "rb+", io->params));
   }
   void* fp = frame->write_fp;
   blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
@@ -463,6 +524,45 @@ void* frame_writer_acquire(blosc2_frame_s* frame, const blosc2_io_cb* io_cb) {
   // Budget exhausted (or the cached open failed): a private per-call handle,
   // which frame_writer_release() closes
   return io_cb->open(frame->urlpath, "rb+", io->params);
+#endif
+}
+
+
+/* Keep @p fp, a writable handle the caller just created the frame's file with,
+   as the frame's cached writer instead of closing it: closing flushes the data
+   synchronously on NFS, and the next write would open the file again anyway.
+   Returns false (and leaves @p fp to the caller) when it cannot be cached. */
+static bool frame_writer_adopt(blosc2_frame_s* frame, const blosc2_io* io, void* fp) {
+#if defined(_WIN32)
+  BLOSC_UNUSED_PARAM(frame);
+  BLOSC_UNUSED_PARAM(io);
+  BLOSC_UNUSED_PARAM(fp);
+  return false;
+#else
+  if (!writer_cacheable(frame, io) || frame->sframe) {
+    return false;
+  }
+  blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
+  bool adopted = cache_slot_claim(frame->write_fp, &frame->write_fp_nocache);
+  if (adopted) {
+    cache_install(&frame->write_fp, &frame->write_fp_dev, &frame->write_fp_ino, fp);
+    frame->write_fp_stale = false;
+    /* Each update reads the header first, and the first read would open the
+       file once more for the cached reader (another OPEN, and a CLOSE at the
+       end, on NFS).  A duplicate of the writer's descriptor serves as well. */
+    if (cache_slot_claim(frame->read_fp, &frame->read_fp_nocache)) {
+      frame->read_fp = stdio_dup_reader(fp);
+      if (frame->read_fp == NULL) {
+        reader_cache_return();
+      }
+      else {
+        frame->read_fp_dev = frame->write_fp_dev;
+        frame->read_fp_ino = frame->write_fp_ino;
+      }
+    }
+  }
+  blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
+  return adopted;
 #endif
 }
 
@@ -1940,6 +2040,8 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     uint8_t trailer[FRAME_TRAILER_MINLEN];
 
     void* fp = NULL;
+    char* urlpath_cpy = NULL;
+    blosc2_frame_s* frame = NULL;
     bool sframe = false;
     struct stat path_stat;
 
@@ -1965,7 +2067,6 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
         return NULL;
     }
 
-    char* urlpath_cpy;
     if (path_stat.st_mode & S_IFDIR) {
         urlpath_cpy = malloc(strlen(urlpath) + 1);
       if (urlpath_cpy == NULL) {
@@ -1993,8 +2094,7 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     }
     if (fp == NULL) {
       BLOSC_TRACE_ERROR("Error opening file in: %s", urlpath);
-      free(urlpath_cpy);
-      return NULL;
+      goto failed;
     }
 
     if (io_cb->is_allocation_necessary)
@@ -2003,42 +2103,32 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     int64_t rbytes = io_cb->read((void**)&header_ptr, 1, FRAME_HEADER_MINLEN, io_pos, fp);
     if (rbytes != FRAME_HEADER_MINLEN) {
         BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
-        io_cb->close(fp);
-        free(urlpath_cpy);
-        return NULL;
+        goto failed;
     }
     int64_t frame_len;
     to_big(&frame_len, header_ptr + FRAME_LEN, sizeof(frame_len));
     if (frame_len < FRAME_HEADER_MINLEN + FRAME_TRAILER_MINLEN) {
       BLOSC_TRACE_ERROR("Invalid frame length (%" PRId64 ") in file '%s'.", frame_len, urlpath);
-      io_cb->close(fp);
-      free(urlpath_cpy);
-      return NULL;
+      goto failed;
     }
 
     if (!sframe) {
       int64_t file_size = (int64_t) path_stat.st_size;
       if (offset > file_size || frame_len > file_size - offset) {
         BLOSC_TRACE_ERROR("Frame length exceeds file boundary in file '%s'.", urlpath);
-        io_cb->close(fp);
-        free(urlpath_cpy);
-        return NULL;
+        goto failed;
       }
     }
 
     if (offset > INT64_MAX - (frame_len - FRAME_TRAILER_MINLEN)) {
       BLOSC_TRACE_ERROR("Frame offset arithmetic overflows in file '%s'.", urlpath);
-      io_cb->close(fp);
-      free(urlpath_cpy);
-      return NULL;
+      goto failed;
     }
 
-    blosc2_frame_s* frame = frame_alloc();
+    frame = frame_alloc();
     if (frame == NULL) {
       BLOSC_TRACE_ERROR("Cannot allocate memory for frame metadata.");
-      io_cb->close(fp);
-      free(urlpath_cpy);
-      return NULL;
+      goto failed;
     }
     frame->urlpath = urlpath_cpy;
     frame->len = frame_len;
@@ -2051,21 +2141,14 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
       trailer_ptr = trailer;
     io_pos = offset + frame_len - FRAME_TRAILER_MINLEN;
     rbytes = io_cb->read((void**)&trailer_ptr, 1, FRAME_TRAILER_MINLEN, io_pos, fp);
-    io_cb->close(fp);
     if (rbytes != FRAME_TRAILER_MINLEN) {
         BLOSC_TRACE_ERROR("Cannot read from file '%s'.", urlpath);
-        free(urlpath_cpy);
-        blosc2_pthread_mutex_destroy(&frame->read_fp_mutex);
-        free(frame);
-        return NULL;
+        goto failed;
     }
     int trailer_offset = FRAME_TRAILER_MINLEN - FRAME_TRAILER_LEN_OFFSET;
     if (trailer_ptr[trailer_offset - 1] != 0xce) {
         BLOSC_TRACE_ERROR("Invalid trailer in file '%s'.", urlpath);
-        free(urlpath_cpy);
-        blosc2_pthread_mutex_destroy(&frame->read_fp_mutex);
-        free(frame);
-        return NULL;
+        goto failed;
     }
     uint32_t trailer_len;
     to_big(&trailer_len, trailer_ptr + trailer_offset, sizeof(trailer_len));
@@ -2073,15 +2156,24 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
         (int64_t)trailer_len > frame_len ||
         (int64_t)trailer_len > frame_len - FRAME_HEADER_MINLEN) {
       BLOSC_TRACE_ERROR("Invalid trailer length (%" PRIu32 ") in file '%s'.", trailer_len, urlpath);
-      free(urlpath_cpy);
-      blosc2_pthread_mutex_destroy(&frame->read_fp_mutex);
-      free(frame);
-      return NULL;
+      goto failed;
     }
     frame->trailer_len = trailer_len;
     frame_set_locking(frame, io);
+    frame_reader_adopt(frame, io, io_cb, fp);
 
     return frame;
+
+  failed:
+    if (fp != NULL) {
+      io_cb->close(fp);
+    }
+    free(urlpath_cpy);
+    if (frame != NULL) {
+      blosc2_pthread_mutex_destroy(&frame->read_fp_mutex);
+      free(frame);
+    }
+    return NULL;
 }
 
 
@@ -2243,7 +2335,8 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   int64_t tbytes = frame->len;
   to_big(h2 + FRAME_LEN, &tbytes, sizeof(tbytes));
 
-  blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+  const blosc2_io* io = frame->schunk->storage->io;
+  blosc2_io_cb *io_cb = blosc2_get_io_cb(io->id);
   if (io_cb == NULL) {
     BLOSC_TRACE_ERROR("Error getting the input/output API");
     return BLOSC2_ERROR_PLUGIN_IO;
@@ -2257,13 +2350,14 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   }
   else {
     if (frame->sframe) {
-      fp = sframe_open_index(frame->urlpath, "wb",
-                             frame->schunk->storage->io);
+      fp = sframe_open_index(frame->urlpath, "wb", io);
     }
     else {
       // The file is about to be recreated from scratch; drop any cached reader
       frame_reader_invalidate(frame);
-      fp = io_cb->open(frame->urlpath, "wb", frame->schunk->storage->io->params);
+      // Where the handle can stay open as the cached writer (which is "rb+"
+      // everywhere else), open it readable too
+      fp = io_cb->open(frame->urlpath, reader_cacheable(io) ? "wb+" : "wb", io->params);
     }
     if (fp == NULL) {
       BLOSC_TRACE_ERROR("Error creating file in: %s", frame->urlpath);
@@ -2306,7 +2400,10 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     if (off_cbytes > 0) {
       io_cb->write(off_chunk, off_cbytes, 1, io_pos, fp);
     }
-    io_cb->close(fp);
+    // Only a handle opened readable above can be adopted
+    if (!frame_writer_adopt(frame, io, fp)) {
+      io_cb->close(fp);
+    }
     // The file was created from scratch, so its size is exactly what we wrote
     frame->file_end = frame->sframe ? 0 : io_pos + off_cbytes;
   }
