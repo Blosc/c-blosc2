@@ -675,10 +675,11 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
       BLOSC_ERROR(BLOSC2_ERROR_METALAYER_NOT_FOUND);
     }
   }
-  BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &params.ndim, params.shape,
-                                    params.chunkshape, params.blockshape, &params.dtype,
-                                    &params.dtype_format));
+  int rc_meta = b2nd_deserialize_meta(smeta, smeta_len, &params.ndim, params.shape,
+                                      params.chunkshape, params.blockshape, &params.dtype,
+                                      &params.dtype_format);
   free(smeta);
+  BLOSC_ERROR(rc_meta);
 
   // Reject crafted metalayers that pair shape[i]>0 with chunkshape[i]==0 or
   // blockshape[i]==0.  validate_shape_chunkshape_blockshape is intentionally
@@ -744,7 +745,11 @@ int b2nd_from_cframe(uint8_t *cframe, int64_t cframe_len, bool copy, b2nd_array_
     return BLOSC2_ERROR_FAILURE;
   }
   // ...and create a b2nd array out of it
-  BLOSC_ERROR(b2nd_from_schunk(sc, array));
+  int rc = b2nd_from_schunk(sc, array);
+  if (rc < 0) {
+    blosc2_schunk_free(sc);
+    return rc;
+  }
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -755,9 +760,16 @@ int b2nd_open(const char *urlpath, b2nd_array_t **array) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
   blosc2_schunk *sc = blosc2_schunk_open(urlpath);
+  if (sc == NULL) {
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   // ...and create a b2nd array out of it
-  BLOSC_ERROR(b2nd_from_schunk(sc, array));
+  int rc = b2nd_from_schunk(sc, array);
+  if (rc < 0) {
+    blosc2_schunk_free(sc);
+    return rc;
+  }
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -768,9 +780,16 @@ int b2nd_open_offset(const char *urlpath, b2nd_array_t **array, int64_t offset) 
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
   blosc2_schunk *sc = blosc2_schunk_open_offset(urlpath, offset);
+  if (sc == NULL) {
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   // ...and create a b2nd array out of it
-  BLOSC_ERROR(b2nd_from_schunk(sc, array));
+  int rc = b2nd_from_schunk(sc, array);
+  if (rc < 0) {
+    blosc2_schunk_free(sc);
+    return rc;
+  }
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -1116,9 +1135,11 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       uint8_t *chunk = malloc(chunk_size);
       BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
       if (blosc2_compress_ctx(array->sc->cctx, buffer_b, array->sc->typesize, chunk, chunk_size) < 0) {
+        free(chunk);
         BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
       if (blosc2_schunk_update_chunk(array->sc, 0, chunk, false) < 0) {
+        free(chunk);
         BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
 
@@ -1173,11 +1194,13 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       brc = blosc2_compress_ctx(array->sc->cctx, buffer, data_nbytes, chunk, chunk_nbytes);
       if (brc < 0) {
         BLOSC_TRACE_ERROR("Blosc can not compress the data");
+        free(chunk);
         BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
       int64_t brc_ = blosc2_schunk_update_chunk(array->sc, nchunk, chunk, false);
       if (brc_ < 0) {
         BLOSC_TRACE_ERROR("Blosc can not update the chunk");
+        free(chunk);
         BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
       // We are done
@@ -1547,12 +1570,12 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
         goto cleanup;
       }
       int64_t brc_ = blosc2_schunk_update_chunk(array->sc, nchunk, chunk, false);
-      chunk = NULL; // ownership transferred to blosc2_schunk_update_chunk (copy=false)
       if (brc_ < 0) {
         BLOSC_TRACE_ERROR("Blosc can not update the chunk");
         rc = BLOSC2_ERROR_FAILURE;
         goto cleanup;
       }
+      chunk = NULL; // ownership transferred to blosc2_schunk_update_chunk (copy=false) only on success
     }
   }
 
@@ -2135,9 +2158,10 @@ int b2nd_print_meta(const b2nd_array_t *array) {
       BLOSC_ERROR(BLOSC2_ERROR_METALAYER_NOT_FOUND);
     }
   }
-  BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape,
-                                    &dtype, &dtype_format));
+  int rc = b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape,
+                                 &dtype, &dtype_format);
   free(smeta);
+  BLOSC_ERROR(rc);
 
   printf("b2nd metalayer parameters:\n Ndim:       %d", ndim);
   printf("\n shape:      %" PRId64 "", shape[0]);
@@ -2829,15 +2853,28 @@ int iter_chunk(b2nd_array_t *array, int8_t ndim,
       if (!get) {
         int32_t chunk_size = data_nbytes + BLOSC_EXTENDED_HEADER_LENGTH;
         uint8_t *chunk = malloc(chunk_size);
-        BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
+        if (chunk == NULL) {
+          free(chunk_selection_size);
+          free(p_chunk_selection_0);
+          free(p_chunk_selection_1);
+          return BLOSC2_ERROR_MEMORY_ALLOC;
+        }
         err = blosc2_compress_ctx(array->sc->cctx, data, data_nbytes, chunk, chunk_size);
         if (err < 0) {
           BLOSC_TRACE_ERROR("Error compressing data");
+          free(chunk);
+          free(chunk_selection_size);
+          free(p_chunk_selection_0);
+          free(p_chunk_selection_1);
           BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
         }
         err = (int) blosc2_schunk_update_chunk(array->sc, nchunk, chunk, false);
         if (err < 0) {
           BLOSC_TRACE_ERROR("Error updating chunk");
+          free(chunk);
+          free(chunk_selection_size);
+          free(p_chunk_selection_0);
+          free(p_chunk_selection_1);
           BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
         }
       }
