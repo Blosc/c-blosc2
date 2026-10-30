@@ -3369,12 +3369,13 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
       // Reset bstarts and embed dict in the output buffer.
       context->bstarts = (int32_t*)(context->dest + context->header_overhead);
       context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * context->nblocks;
+      /* Move dict bytes; samples_buffer overlaps the dict (and its size) in dest,
+         so this has to be a memmove, done before writing the size */
+      context->dict_buffer = context->dest + context->output_bytes + sizeof(int32_t);
+      memmove(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
       /* Write dict size */
       _sw32(context->dest + context->output_bytes, dict_actual_size);
       context->output_bytes += (int32_t)sizeof(int32_t);
-      /* Copy dict bytes */
-      context->dict_buffer = context->dest + context->output_bytes;
-      memcpy(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
       /* Build the stream used as cdict (pre-loaded with the dict bytes) */
       if (context->compcode == BLOSC_LZ4HC) {
         LZ4_streamHC_t* lz4hc_cdict = LZ4_createStreamHC();
@@ -3685,10 +3686,11 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
 
       context->bstarts = (int32_t*)(context->dest + context->header_overhead);
       context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
+      // samples_buffer overlaps the dict (and its size) in dest: memmove before writing the size
+      context->dict_buffer = context->dest + context->output_bytes + sizeof(int32_t);
+      memmove(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
       _sw32(context->dest + context->output_bytes, dict_actual_size);
       context->output_bytes += (int32_t)sizeof(int32_t);
-      context->dict_buffer = context->dest + context->output_bytes;
-      memcpy(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
       if (context->compcode == BLOSC_LZ4HC) {
         LZ4_streamHC_t* lz4hc_cdict = LZ4_createStreamHC();
         LZ4_loadDictHC(lz4hc_cdict, (const char*)context->dict_buffer, dict_actual_size);
@@ -3802,10 +3804,11 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
 
       context->bstarts = (int32_t*)(context->dest + context->header_overhead);
       context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
+      // samples_buffer overlaps the dict (and its size) in dest: memmove before writing the size
+      context->dict_buffer = context->dest + context->output_bytes + sizeof(int32_t);
+      memmove(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
       _sw32(context->dest + context->output_bytes, dict_actual_size);
       context->output_bytes += (int32_t)sizeof(int32_t);
-      context->dict_buffer = context->dest + context->output_bytes;
-      memcpy(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
       if (context->compcode == BLOSC_LZ4HC) {
         LZ4_streamHC_t* lz4hc_cdict = LZ4_createStreamHC();
         LZ4_loadDictHC(lz4hc_cdict, (const char*)context->dict_buffer, dict_actual_size);
