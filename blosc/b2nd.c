@@ -1308,6 +1308,15 @@ static bool scatter_unsupported(const blosc2_context *dctx) {
 }
 
 
+// Whether a decompression by dctx that returned `rc` left its destination as
+// it was: a missing chunk, or an uninitialized one (unless a postfilter
+// computes its items).  A scratch destination then holds stale bytes, of
+// another array even (see scratch_malloc()), so it must be zeroed.
+static bool decoded_nothing(const blosc2_context *dctx, int rc) {
+  return rc == 0 || (dctx->special_type == BLOSC2_SPECIAL_UNINIT && dctx->postfilter == NULL);
+}
+
+
 // Prefilter assembling each block of a chunk from the slice buffer right in
 // the compression thread that consumes it, instead of first copying the slice
 // into a chunk-sized scratch on the calling thread.
@@ -1621,8 +1630,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
           BLOSC_TRACE_ERROR("Error decompressing chunk");
           goto out;
         }
-        // Uninitialized chunks decode to nothing (unless a postfilter computes them)
-        if (rc == 0 || (dctx->special_type == BLOSC2_SPECIAL_UNINIT && dctx->postfilter == NULL)) {
+        if (decoded_nothing(dctx, rc)) {
           memset(run, 0, (size_t)data_nbytes);
         }
         rc = BLOSC2_ERROR_SUCCESS;
@@ -1680,6 +1688,9 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
             rc = BLOSC2_ERROR_FAILURE;
             goto out;
           }
+          if (decoded_nothing(dctx, err)) {
+            memset(data, 0, data_nbytes);
+          }
         }
         slice_chunk.keep_old = decompress_chunk;
         rc = compress_update_chunk(array, nchunk, data, data_nbytes, &slice_chunk);
@@ -1695,6 +1706,9 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
           BLOSC_TRACE_ERROR("Error decompressing chunk");
           rc = BLOSC2_ERROR_FAILURE;
           goto out;
+        }
+        if (decoded_nothing(dctx, err)) {
+          memset(data, 0, data_nbytes);
         }
       } else {
         // Avoid writing non zero padding from previous chunk
@@ -1815,6 +1829,9 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
           rc = BLOSC2_ERROR_FAILURE;
           goto out;
         }
+        if (decoded_nothing(dctx, err)) {
+          memset(data, 0, data_nbytes);
+        }
       }
     }
 
@@ -1839,6 +1856,9 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
           }
           rc = BLOSC2_ERROR_FAILURE;
           goto out;
+        }
+        if (decoded_nothing(dctx, grc)) {
+          memset(block_data, 0, block_nbytes);
         }
         dst = block_data;
       } else {
