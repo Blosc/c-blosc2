@@ -1120,8 +1120,12 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
   blosc2_multidim_to_unidim(cell_ind_ndim, (int8_t) ndim, ind_strides, &cell_ind);
   blosc2_multidim_to_unidim(ncell_ndim, (int8_t) ndim, cell_strides, &ncell);
   int cell_nitems = (int) (1u << (2 * ndim));
-  if ((thread_ctx->zfp_cell_nitems > cell_nitems) ||
-      ((cell_ind + thread_ctx->zfp_cell_nitems) > cell_nitems)) {
+  // The items are consecutive in the block, so they can only be taken from a single
+  // cell when they lie in one row of it, and in one row of the block (which may be
+  // shorter than a cell row).  Else, let the caller decode the whole block.
+  if ((cell_ind_ndim[ndim - 1] + thread_ctx->zfp_cell_nitems > ZFP_MAX_DIM) ||
+      (cell_start_ndim[ndim - 1] + thread_ctx->zfp_cell_nitems > blockshape[ndim - 1]) ||
+      (thread_ctx->zfp_cell_nitems * context->typesize > destsize)) {
     return 0;
   }
 
@@ -1245,15 +1249,17 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
       BLOSC_TRACE_ERROR("ZFP is not available for ndims: %d", ndim);
       return BLOSC2_ERROR_FAILURE;
   }
-  memcpy(dest, &cell[cell_ind * typesize], thread_ctx->zfp_cell_nitems * typesize);
+  // In fixed-rate mode, a cell takes maxbits bits (zfpsize counts the bits read)
+  bool decoded = (zfpsize > 0) && (zfpsize <= zfp->maxbits);
+  if (decoded) {
+    memcpy(dest, &cell[cell_ind * typesize], thread_ctx->zfp_cell_nitems * typesize);
+  }
   free(cell);
   zfp_close_padded_stream(stream, padded_block);
   zfp_stream_close(zfp);
 
-  if ((zfpsize == 0) || ((int32_t) zfpsize > (destsize * 8)) ||
-      ((int32_t) zfpsize > (cell_nitems * typesize * 8)) ||
-      ((thread_ctx->zfp_cell_nitems * typesize * 8) > (int32_t) zfpsize)) {
-    BLOSC_TRACE_ERROR("ZFP error or small destsize");
+  if (!decoded) {
+    BLOSC_TRACE_ERROR("ZFP: cannot decode the cell");
     return -1;
   }
 

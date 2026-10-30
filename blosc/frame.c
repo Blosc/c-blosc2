@@ -3692,6 +3692,11 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
     }
     if (io_cb->is_allocation_necessary) {
       *chunk = malloc(chunk_cbytes);
+      if (*chunk == NULL) {
+        BLOSC_TRACE_ERROR("Cannot allocate memory for chunk.");
+        frame_reader_release(frame, io_cb, fp);
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+      }
       *needs_free = true;
     }
     else {
@@ -3703,6 +3708,11 @@ int frame_get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, bool
     frame_reader_release(frame, io_cb, fp);
     if (rbytes != chunk_cbytes) {
       BLOSC_TRACE_ERROR("Cannot read the chunk out of the frame.");
+      if (*needs_free) {
+        free(*chunk);
+        *chunk = NULL;
+        *needs_free = false;
+      }
       return BLOSC2_ERROR_FILE_READ;
     }
 
@@ -4366,6 +4376,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
     if (dctx == NULL) {
       BLOSC_TRACE_ERROR("Error while creating the decompression context");
+      free(offsets);
       return NULL;
     }
     int32_t prev_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes, offsets,
@@ -4426,6 +4437,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   blosc2_context* cctx = blosc2_create_cctx(cparams);
   if (cctx == NULL) {
     BLOSC_TRACE_ERROR("Error while creating the compression context");
+    free(offsets);
     return NULL;
   }
   cctx->typesize = sizeof(int64_t);  // override a possible BLOSC_TYPESIZE env variable (or chaos may appear)
@@ -4451,13 +4463,14 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
 
   void* fp = NULL;
   if (frame->cframe != NULL) {
-    uint8_t* framep = frame->cframe;
     /* Make space for the new chunk and copy it */
-    frame->cframe = framep = realloc(framep, (size_t)new_frame_len);
+    uint8_t* framep = realloc(frame->cframe, (size_t)new_frame_len);
     if (framep == NULL) {
       BLOSC_TRACE_ERROR("Cannot realloc space for the frame.");
+      free(off_chunk);
       return NULL;
     }
+    frame->cframe = framep;
     /* Copy the chunk */
     memcpy(framep + header_len + cbytes, chunk, (size_t)chunk_cbytes);
     /* Copy the offsets */
@@ -4469,6 +4482,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
     blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
     if (io_cb == NULL) {
       BLOSC_TRACE_ERROR("Error getting the input/output API");
+      free(off_chunk);
       return NULL;
     }
 
@@ -4477,10 +4491,12 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
       if (chunk_cbytes != 0) {
         if (sframe_chunk_id < 0) {
           BLOSC_TRACE_ERROR("The chunk id (%" PRId64 ") is not correct", sframe_chunk_id);
+          free(off_chunk);
           return NULL;
         }
         if (sframe_create_chunk(frame, chunk, sframe_chunk_id, chunk_cbytes) == NULL) {
           BLOSC_TRACE_ERROR("Cannot write the full chunk.");
+          free(off_chunk);
           return NULL;
         }
       }
@@ -4488,6 +4504,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
                              frame->schunk->storage->io);
       if (fp == NULL) {
         BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        free(off_chunk);
         return NULL;
       }
       io_pos = frame->file_offset + header_len;
@@ -4497,6 +4514,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
       fp = frame_writer_acquire(frame, io_cb);
       if (fp == NULL) {
         BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        free(off_chunk);
         return NULL;
       }
       io_pos = frame->file_offset + header_len + cbytes;
@@ -4508,6 +4526,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
                           wbytes, (int64_t)chunk_cbytes, io_pos - (int64_t)chunk_cbytes, nchunks);
         frame->file_end = 0;
         frame_writer_release(frame, io_cb, fp);
+        free(off_chunk);
         return NULL;
       }
     }
@@ -4516,6 +4535,7 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
     if (wbytes != new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       frame->file_end = 0;
+      free(off_chunk);
       return NULL;
     }
   }
@@ -4525,20 +4545,23 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
       free(frame->coffsets);
     frame->coffsets = NULL;
   }
-  free(chunk);  // chunk has always to be a copy when reaching here...
   free(off_chunk);
 
   frame->len = new_frame_len;
   rc = frame_update_header(frame, schunk, false);
   if (rc < 0) {
+    frame->len = frame_len;
     return NULL;
   }
 
   rc = frame_update_trailer(frame, schunk);
   if (rc < 0) {
+    frame->len = frame_len;
     return NULL;
   }
 
+  // The chunk is consumed only on success; on errors, the caller still owns it
+  free(chunk);
   return frame;
 }
 
@@ -4579,6 +4602,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, nchunks, &coffsets_cbytes);
     if (coffsets == NULL) {
       BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
+      free(offsets);
       return NULL;
     }
     // Decompress offsets
@@ -4586,6 +4610,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
     if (dctx == NULL) {
       BLOSC_TRACE_ERROR("Error while creating the decompression context");
+      free(offsets);
       return NULL;
     }
     int32_t prev_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes, offsets, off_nbytes);
@@ -4651,6 +4676,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   blosc2_context* cctx = blosc2_create_cctx(cparams);
   if (cctx == NULL) {
     BLOSC_TRACE_ERROR("Error while creating the compression context");
+    free(offsets);
     return NULL;
   }
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
@@ -4677,13 +4703,14 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   // Add the chunk and update meta
   void* fp = NULL;
   if (frame->cframe != NULL) {
-    uint8_t* framep = frame->cframe;
     /* Make space for the new chunk and copy it */
-    frame->cframe = framep = realloc(framep, (size_t)new_frame_len);
+    uint8_t* framep = realloc(frame->cframe, (size_t)new_frame_len);
     if (framep == NULL) {
       BLOSC_TRACE_ERROR("Cannot realloc space for the frame.");
+      free(off_chunk);
       return NULL;
     }
+    frame->cframe = framep;
     /* Copy the chunk */
     memcpy(framep + header_len + cbytes, chunk, (size_t)chunk_cbytes);
     /* Copy the offsets */
@@ -4695,6 +4722,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     blosc2_io_cb *io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
     if (io_cb == NULL) {
       BLOSC_TRACE_ERROR("Error getting the input/output API");
+      free(off_chunk);
       return NULL;
     }
 
@@ -4702,10 +4730,12 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       if (chunk_cbytes != 0) {
         if (sframe_chunk_id < 0) {
           BLOSC_TRACE_ERROR("The chunk id (%" PRId64 ") is not correct", sframe_chunk_id);
+          free(off_chunk);
           return NULL;
         }
         if (sframe_create_chunk(frame, chunk, sframe_chunk_id, chunk_cbytes) == NULL) {
           BLOSC_TRACE_ERROR("Cannot write the full chunk.");
+          free(off_chunk);
           return NULL;
         }
       }
@@ -4714,6 +4744,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
                              frame->schunk->storage->io);
       if (fp == NULL) {
         BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        free(off_chunk);
         return NULL;
       }
       io_pos = frame->file_offset + header_len + 0;
@@ -4723,6 +4754,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       fp = frame_writer_acquire(frame, io_cb);
       if (fp == NULL) {
         BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+        free(off_chunk);
         return NULL;
       }
       io_pos = frame->file_offset + header_len + cbytes;
@@ -4734,6 +4766,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
                           wbytes, (int64_t)chunk_cbytes, io_pos - (int64_t)chunk_cbytes, nchunk);
         frame->file_end = 0;
         frame_writer_release(frame, io_cb, fp);
+        free(off_chunk);
         return NULL;
       }
     }
@@ -4742,6 +4775,7 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     if (wbytes != new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       frame->file_end = 0;
+      free(off_chunk);
       return NULL;
     }
     // Invalidate the cache for chunk offsets
@@ -4751,20 +4785,23 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       frame->coffsets = NULL;
     }
   }
-  free(chunk);  // chunk has always to be a copy when reaching here...
   free(off_chunk);
 
   frame->len = new_frame_len;
   rc = frame_update_header(frame, schunk, false);
   if (rc < 0) {
+    frame->len = frame_len;
     return NULL;
   }
 
   rc = frame_update_trailer(frame, schunk);
   if (rc < 0) {
+    frame->len = frame_len;
     return NULL;
   }
 
+  // The chunk is consumed only on success; on errors, the caller still owns it
+  free(chunk);
   return frame;
 }
 
@@ -5227,11 +5264,13 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   frame->len = new_frame_len;
   rc = frame_update_header(frame, schunk, false);
   if (rc < 0) {
+    frame->len = frame_len;
     return NULL;
   }
 
   rc = frame_update_trailer(frame, schunk);
   if (rc < 0) {
+    frame->len = frame_len;
     return NULL;
   }
 
@@ -5287,6 +5326,7 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
     uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, nchunks, &coffsets_cbytes);
     if (coffsets == NULL) {
       BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
+      free(offsets);
       return NULL;
     }
     // Decompress offsets
@@ -5294,6 +5334,7 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
     blosc2_context *dctx = blosc2_create_dctx(off_dparams);
     if (dctx == NULL) {
       BLOSC_TRACE_ERROR("Error while creating the decompression context");
+      free(offsets);
       return NULL;
     }
     int32_t prev_nbytes = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes, offsets, off_nbytes);
@@ -5321,6 +5362,7 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
   blosc2_context* cctx = blosc2_create_cctx(cparams);
   if (cctx == NULL) {
     BLOSC_TRACE_ERROR("Error while creating the compression context");
+    free(offsets);
     return NULL;
   }
   void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
@@ -5415,11 +5457,13 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
   frame->len = new_frame_len;
   rc = frame_update_header(frame, schunk, false);
   if (rc < 0) {
+    frame->len = frame_len;
     return NULL;
   }
 
   rc = frame_update_trailer(frame, schunk);
   if (rc < 0) {
+    frame->len = frame_len;
     return NULL;
   }
 
@@ -5599,8 +5643,9 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
 
 /* Decompress and return a chunk that is part of a frame. */
 int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int64_t nchunk, void *dest, int32_t nbytes) {
-  uint8_t* src;
-  bool needs_free;
+  uint8_t* src = NULL;
+  bool needs_free = false;
+  int32_t srcsize;
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
   int rc;
@@ -5610,14 +5655,21 @@ int frame_decompress_chunk(blosc2_context *dctx, blosc2_frame_s* frame, int64_t 
     BLOSC_TRACE_ERROR("Cannot get the chunk in position %" PRId64 ".", nchunk);
     goto end;
   }
-  chunk_cbytes = rc;
-  if (chunk_cbytes < (signed)sizeof(int32_t)) {
-    /* Not enough input to read `nbytes` */
+  srcsize = rc;
+  if (srcsize < BLOSC_MIN_HEADER_LENGTH) {
+    BLOSC_TRACE_ERROR("Not enough input to read the header of chunk %" PRId64 ".", nchunk);
     rc = BLOSC2_ERROR_READ_BUFFER;
+    goto end;
   }
 
   rc = blosc2_cbuffer_sizes(src, &chunk_nbytes, &chunk_cbytes, NULL);
   if (rc < 0) {
+    goto end;
+  }
+  /* The header cbytes is used as srcsize below, so it must fit in what was read */
+  if (chunk_cbytes > srcsize) {
+    BLOSC_TRACE_ERROR("Invalid chunk size in frame for chunk %" PRId64 ".", nchunk);
+    rc = BLOSC2_ERROR_INVALID_HEADER;
     goto end;
   }
 

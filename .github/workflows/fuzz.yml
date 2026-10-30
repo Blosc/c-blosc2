@@ -1,5 +1,25 @@
 name: CI Fuzz
-on: [push, pull_request]
+on:
+  push:
+    paths-ignore:
+      - 'doc/**'
+      - 'bench/**'
+      - 'examples/**'
+      - '**.md'
+      - '**.rst'
+      - 'RELEASE_NOTES.*'
+      - 'ANNOUNCE.*'
+      - 'THANKS.*'
+  pull_request:
+    paths-ignore:
+      - 'doc/**'
+      - 'bench/**'
+      - 'examples/**'
+      - '**.md'
+      - '**.rst'
+      - 'RELEASE_NOTES.*'
+      - 'ANNOUNCE.*'
+      - 'THANKS.*'
 jobs:
   Fuzzing:
     runs-on: ubuntu-latest
@@ -14,7 +34,7 @@ jobs:
       uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
       with:
         oss-fuzz-project-name: 'c-blosc2'
-        fuzz-seconds: 600
+        fuzz-seconds: 120
         dry-run: false
 
     - name: Upload Crash

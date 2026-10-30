@@ -1,48 +1,39 @@
-# Announcing C-Blosc2 3.4.0
+# Announcing C-Blosc2 3.4.1
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This minor release introduces an opt-in writer for C-Blosc 1.x compatible chunks,
-bounded-memory APIs for variable-length block decompression, alongside critical
-bug fixes and robustness enhancements in DELTA filter decoding, blocksize tuning,
-ZFP codec decompression, and threading.
+This bugfix release brings substantial performance improvements for in-place
+writes to on-disk contiguous frames (especially on NFS), security hardening for
+sparse frames, critical fixes for filter pipelines chaining 3 or more filters
+alongside multithreaded DELTA decoding, and a new example for sparse coordinate
+handling.
 
-First, an opt-in writer for Blosc1 (C-Blosc 1.x compatible) format chunks is
-now available via `blosc2_ctx_set_blosc1_format()` and queryable with
-`blosc2_ctx_get_blosc1_format()`. In this mode, chunks are written in format
-version 2 with the 16-byte header and adhere to C-Blosc 1.x bitshuffle and
-block-splitting rules, allowing them to be decompressed seamlessly by legacy
-C-Blosc 1.x decoders. The `BLOSC_BLOSC1_COMPAT` environment variable also activates
-this mode for `blosc1_compress()`.
+First, in-place writes to on-disk contiguous frames on POSIX systems are now
+substantially faster.  Operations like appending, inserting, updating, or deleting
+chunks (as well as `b2nd_set_slice`) previously reopened and closed the frame file
+multiple times and truncated on every trailer update, incurring synchronous flush
+penalties on NFS (around ~20 ms per chunk).  Frames now cache a writable file
+descriptor and avoid unnecessary truncations and flushes, reducing chunk writes
+on NFS to ~1 ms and improving local disk writes by ~1.4x.
 
-Second, two new APIs were added for variable-length (VL) blocks:
-`blosc2_vlblock_get_nbytes_ctx()` inspects a single block's uncompressed size
-without allocating buffers or dictionaries, and `blosc2_vldecompress_block_into_ctx()`
-decompresses a single variable-length block directly into a caller-owned buffer.
-Both work with standard and lazy VL chunks.
+Second, sparse (directory) frames have been hardened against out-of-bounds heap
+reads: `sframe_get_chunk()` and `frame_decompress_chunk()` now verify that the
+chunk's compressed size (`cbytes`) recorded in the chunk header does not exceed
+the actual size of the chunk file on disk before allocating or decompressing
+(#822).  Thanks to Mar Dominguez (@mardgez).
 
-Third, multiple critical bug fixes have landed:
-- Fixed DELTA filter decoding corrupted data during partial reads, slicing, or
-  maskout (Blosc/python-blosc2#740) by disabling the b2nd compact read path for
-  DELTA, always unmasking reference block 0, and falling back to full chunk
-  decompression in `_blosc_getitem` and `blosc2_decompress_block_ctx`.
-- Fixed a bug where chunk headers stored requested rather than tuner-adjusted
-  block sizes when not divisible by the typesize, causing decompression errors (#815).
-- Fixed block size selection when typesize exceeds `BLOSC_MAX_TYPESIZE`.
-- Fixed reading format version 2 bit-shuffled Blosc1 chunks that have leftover trailing
-  bytes (#812).
-- Validated that split blocks fully cover blocksize on decompression, rejecting
-  incompletely covered blocks with `BLOSC2_ERROR_DATA` (backported from C-Blosc #407).
+Third, the filter pipeline has been fixed when chaining 3 or more filters:
+- `pipeline_forward()` now ping-pongs strictly between thread-local scratch
+  buffers, ensuring that caller input data is never overwritten and preserving
+  block 0 integrity as the reference block for DELTA encoding (#820).
+- `pipeline_backward()` now prevents buffer aliasing across chained backward
+  filters and coordinates multithreaded DELTA decoding so worker threads wait
+  until block 0 has finished its entire backward filter pipeline before decoding
+  subsequent blocks.
 
-Fourth, robustness and performance were strengthened:
-- Hardened the ZFP codec plugin against heap-buffer-overflow over-reads during
-  unaligned 64-bit word reads by decompressing from a zero-padded buffer, and
-  validated metalayer shapes and bounds in `zfp_getcell()`.
-- Hardened `b2nd_get_slice_nchunks` bounds clamping and allocation arithmetic.
-- Single-block operations remain serial when `nthreads > 1`, deferring worker thread
-  backend initialization and avoiding unused thread overhead. Worker queues also cap
-  active worker entries to the block count.
+Fourth, a new example (`examples/sparse_coords.c`) was added to demonstrate
+sparse coordinate handling and selective retrieval.
 
 There are no breaking API or format changes in this release.
 

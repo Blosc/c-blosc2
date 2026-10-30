@@ -326,6 +326,9 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
       rc = blosc2_schunk_append_chunk(new_schunk, chunk, !needs_free);
       if (rc < 0) {
         BLOSC_TRACE_ERROR("Can not append the `chunk` into super-chunk.");
+        if (needs_free) {
+          free(chunk);
+        }
         return NULL;
       }
     }
@@ -982,6 +985,13 @@ static int64_t schunk_append_chunk_unlocked(blosc2_schunk *schunk, uint8_t *chun
   if (rc < 0) {
     return rc;
   }
+  // Saved, so that the super-chunk is left unchanged if appending to the frame fails
+  uint8_t old_flags2 = schunk->flags2;
+  int32_t old_chunksize = schunk->chunksize;
+  int64_t old_current_nchunk = schunk->current_nchunk;
+  int64_t old_nbytes = schunk->nbytes;
+  int64_t old_cbytes = schunk->cbytes;
+
   uint8_t flags2 = get_chunk_flags2(chunk, chunk_cbytes);
   bool chunk_vlblocks = (flags2 & BLOSC2_VL_BLOCKS) != 0;
   if (nchunks > 0) {
@@ -1068,6 +1078,15 @@ static int64_t schunk_append_chunk_unlocked(blosc2_schunk *schunk, uint8_t *chun
   else {
     if (frame_append_chunk(frame, chunk, schunk) == NULL) {
       BLOSC_TRACE_ERROR("Problems appending a chunk.");
+      if (copy) {
+        free(chunk);
+      }
+      schunk->flags2 = old_flags2;
+      schunk->chunksize = old_chunksize;
+      schunk->current_nchunk = old_current_nchunk;
+      schunk->nchunks = nchunks;
+      schunk->nbytes = old_nbytes;
+      schunk->cbytes = old_cbytes;
       return BLOSC2_ERROR_CHUNK_APPEND;
     }
   }
@@ -1111,6 +1130,12 @@ static int64_t schunk_insert_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
   if (rc < 0) {
     return rc;
   }
+  // Saved, so that the super-chunk is left unchanged if inserting into the frame fails
+  uint8_t old_flags2 = schunk->flags2;
+  int32_t old_chunksize = schunk->chunksize;
+  int64_t old_current_nchunk = schunk->current_nchunk;
+  int64_t old_nbytes = schunk->nbytes;
+  int64_t old_cbytes = schunk->cbytes;
   uint8_t flags2 = get_chunk_flags2(chunk, chunk_cbytes);
   bool chunk_vlblocks = (flags2 & BLOSC2_VL_BLOCKS) != 0;
   if (nchunks > 0) {
@@ -1205,6 +1230,15 @@ static int64_t schunk_insert_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
   else {
     if (frame_insert_chunk(frame, nchunk, chunk, schunk) == NULL) {
       BLOSC_TRACE_ERROR("Problems inserting a chunk in a frame.");
+      if (copy) {
+        free(chunk);
+      }
+      schunk->flags2 = old_flags2;
+      schunk->chunksize = old_chunksize;
+      schunk->current_nchunk = old_current_nchunk;
+      schunk->nchunks = nchunks;
+      schunk->nbytes = old_nbytes;
+      schunk->cbytes = old_cbytes;
       return BLOSC2_ERROR_CHUNK_INSERT;
     }
   }
@@ -1470,6 +1504,7 @@ int64_t blosc2_schunk_append_buffer(blosc2_schunk *schunk, const void *src, int3
   int64_t nchunks = blosc2_schunk_append_chunk(schunk, chunk, false);
   if (nchunks < 0) {
     BLOSC_TRACE_ERROR("Error appending a buffer in super-chunk");
+    free(chunk);
     return nchunks;
   }
 
@@ -2433,7 +2468,7 @@ int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content
 
   // Update the contents of the metalayer
   if (content_len > 0) {
-    memcpy(metalayer->content, content, content_len);
+    memmove(metalayer->content, content, content_len);
   }
 
   // Update the metalayers in frame (as size has not changed, we don't need to update the trailer)
