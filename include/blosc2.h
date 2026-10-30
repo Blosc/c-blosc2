@@ -82,11 +82,11 @@ extern "C" {
 
 /* Version numbers */
 #define BLOSC2_VERSION_MAJOR    3  /* for major interface/format changes  */
-#define BLOSC2_VERSION_MINOR    3  /* for minor interface/format changes  */
-#define BLOSC2_VERSION_RELEASE  6  /* for tweaks, bug-fixes, or development */
+#define BLOSC2_VERSION_MINOR    4  /* for minor interface/format changes  */
+#define BLOSC2_VERSION_RELEASE  2  /* for tweaks, bug-fixes, or development */
 
-#define BLOSC2_VERSION_STRING   "3.3.6.dev"  /* string version.  Sync with above! */
-#define BLOSC2_VERSION_DATE     "$Date:: 2026-09-24 #$"    /* date version year-month-day */
+#define BLOSC2_VERSION_STRING   "3.4.2.dev"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_DATE     "$Date:: 2026-10-30 #$"    /* date version year-month-day */
 
 
 /* Tracing macros */
@@ -630,6 +630,10 @@ BLOSC_EXPORT void blosc2_destroy(void);
  * #blosc1_set_compressor, #blosc1_set_blocksize and
  * #blosc2_set_nthreads. *BLOSC_CLEVEL*, *BLOSC_SHUFFLE*, *BLOSC_DELTA* and
  * *BLOSC_TYPESIZE* environment vars will also be honored.
+ *
+ * * **BLOSC_BLOSC1_COMPAT=(ANY VALUE)**: The chunk is written in the Blosc1 format,
+ * as if #blosc2_ctx_set_blosc1_format() had been called, so that C-Blosc 1.x can
+ * decode it.  Also honored together with *BLOSC_NOLOCK*.
  *
  * @endparblock
  *
@@ -2132,8 +2136,9 @@ BLOSC_EXPORT int blosc2_schunk_free(blosc2_schunk *schunk);
  * @brief Append an existing @p chunk to a super-chunk.
  *
  * @param schunk The super-chunk where the chunk will be appended.
- * @param chunk The @p chunk to append.  An internal copy is made, so @p chunk can be reused or
- * freed if desired.
+ * @param chunk The @p chunk to append. If @p copy is true, an internal copy is made, so
+ * @p chunk can be reused or freed if desired. If @p copy is false, ownership is transferred
+ * to the super-chunk on success; on error, the caller retains ownership.
  * @param copy Whether the chunk should be copied internally or can be used as-is.
  *
  * @return The number of chunks in super-chunk. If some problem is
@@ -2146,8 +2151,8 @@ BLOSC_EXPORT int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *
   *
   * @param schunk The super-chunk where the chunk will be updated.
   * @param nchunk The position where the chunk will be updated.
-  * @param chunk The new @p chunk. If an internal copy is made, the @p chunk can be reused or
-  * freed if desired.
+  * @param chunk The new @p chunk. If @p copy is true, an internal copy is made, so
+  * @p chunk can be reused or freed if desired. If @p copy is false, the chunk is used as-is.
   * @param copy Whether the chunk should be copied internally or can be used as-is.
   *
   * @return The number of chunks in super-chunk. If some problem is
@@ -2158,10 +2163,11 @@ BLOSC_EXPORT int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t n
 /**
  * @brief Insert a chunk at a specific position in a super-chunk.
  *
- * @param schunk The super-chunk where the chunk will be appended.
+ * @param schunk The super-chunk where the chunk will be inserted.
  * @param nchunk The position where the chunk will be inserted.
- * @param chunk The @p chunk to insert. If an internal copy is made, the @p chunk can be reused or
- * freed if desired.
+ * @param chunk The @p chunk to insert. If @p copy is true, an internal copy is made, so
+ * @p chunk can be reused or freed if desired. If @p copy is false, ownership is transferred
+ * to the super-chunk on success; on error, the caller retains ownership.
  * @param copy Whether the chunk should be copied internally or can be used as-is.
  *
  * @return The number of chunks in super-chunk. If some problem is
@@ -2718,6 +2724,40 @@ BLOSC_EXPORT void blosc1_set_blocksize(size_t blocksize);
   * This function should always succeed.
  */
 BLOSC_EXPORT void blosc1_set_splitmode(int splitmode);
+
+/**
+ * @brief Make a compression context write Blosc1 chunks.
+ *
+ * The chunks use format version 2 and the 16-byte header, so that they can also be
+ * decoded by C-Blosc 1.x.  They are not byte-identical to what C-Blosc 1.x would write.
+ * Contexts do not write Blosc1 chunks by default.
+ *
+ * The chunk format has room for a plain shuffle or bitshuffle filter, in whichever slot of
+ * the filter pipeline it is, and for the blosclz, lz4, lz4hc, zlib and zstd codecs.  A
+ * compression call on a context that has any other filter or more than one filter, another
+ * codec, a dictionary or variable-length blocks fails with an error.  A prefilter is applied
+ * as usual: the chunk records nothing about it, so a reader gets the prefiltered data.
+ *
+ * @param context A compression context.
+ * @param enable Whether to write Blosc1 chunks.
+ *
+ * @return 0 on success, a negative error code otherwise.
+ *
+ * @sa #blosc2_ctx_get_blosc1_format
+ */
+BLOSC_EXPORT int blosc2_ctx_set_blosc1_format(blosc2_context* context, bool enable);
+
+/**
+ * @brief Query whether a compression context writes Blosc1 chunks.
+ *
+ * @param context A compression context.
+ *
+ * @return true if the context is set to write Blosc1 chunks, false if it is not or if
+ * @p context is NULL.
+ *
+ * @sa #blosc2_ctx_set_blosc1_format
+ */
+BLOSC_EXPORT bool blosc2_ctx_get_blosc1_format(const blosc2_context* context);
 
 
 /**

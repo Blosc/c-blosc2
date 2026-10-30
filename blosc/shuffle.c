@@ -498,6 +498,10 @@ int32_t bitunshuffle(const int32_t typesize, const int32_t blocksize,
         BLOSC_TRACE_ERROR("the impossible happened: the bitunshuffle filter failed!");
         return ret;
       }
+      /* Copy the leftovers (the bytes that do not make up a whole element), as
+         Blosc1 does when it writes them after the shuffled part. */
+      size_t offset = size * typesize;
+      memcpy((uint8_t *) dest + offset, (const uint8_t *) src + offset, blocksize - offset);
     }
     else {
       memcpy(dest, src, blocksize);

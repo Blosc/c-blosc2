@@ -641,10 +641,11 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
       BLOSC_ERROR(BLOSC2_ERROR_METALAYER_NOT_FOUND);
     }
   }
-  BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &params.ndim, params.shape,
-                                    params.chunkshape, params.blockshape, &params.dtype,
-                                    &params.dtype_format));
+  int rc_meta = b2nd_deserialize_meta(smeta, smeta_len, &params.ndim, params.shape,
+                                      params.chunkshape, params.blockshape, &params.dtype,
+                                      &params.dtype_format);
   free(smeta);
+  BLOSC_ERROR(rc_meta);
 
   // Reject crafted metalayers that pair shape[i]>0 with chunkshape[i]==0 or
   // blockshape[i]==0.  validate_shape_chunkshape_blockshape is intentionally
@@ -710,7 +711,11 @@ int b2nd_from_cframe(uint8_t *cframe, int64_t cframe_len, bool copy, b2nd_array_
     return BLOSC2_ERROR_FAILURE;
   }
   // ...and create a b2nd array out of it
-  BLOSC_ERROR(b2nd_from_schunk(sc, array));
+  int rc = b2nd_from_schunk(sc, array);
+  if (rc < 0) {
+    blosc2_schunk_free(sc);
+    return rc;
+  }
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -721,9 +726,16 @@ int b2nd_open(const char *urlpath, b2nd_array_t **array) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
   blosc2_schunk *sc = blosc2_schunk_open(urlpath);
+  if (sc == NULL) {
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   // ...and create a b2nd array out of it
-  BLOSC_ERROR(b2nd_from_schunk(sc, array));
+  int rc = b2nd_from_schunk(sc, array);
+  if (rc < 0) {
+    blosc2_schunk_free(sc);
+    return rc;
+  }
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -734,9 +746,16 @@ int b2nd_open_offset(const char *urlpath, b2nd_array_t **array, int64_t offset) 
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
   blosc2_schunk *sc = blosc2_schunk_open_offset(urlpath, offset);
+  if (sc == NULL) {
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   // ...and create a b2nd array out of it
-  BLOSC_ERROR(b2nd_from_schunk(sc, array));
+  int rc = b2nd_from_schunk(sc, array);
+  if (rc < 0) {
+    blosc2_schunk_free(sc);
+    return rc;
+  }
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -1082,9 +1101,11 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       uint8_t *chunk = malloc(chunk_size);
       BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
       if (blosc2_compress_ctx(array->sc->cctx, buffer_b, array->sc->typesize, chunk, chunk_size) < 0) {
+        free(chunk);
         BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
       if (blosc2_schunk_update_chunk(array->sc, 0, chunk, false) < 0) {
+        free(chunk);
         BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
 
@@ -1139,11 +1160,13 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       brc = blosc2_compress_ctx(array->sc->cctx, buffer, data_nbytes, chunk, chunk_nbytes);
       if (brc < 0) {
         BLOSC_TRACE_ERROR("Blosc can not compress the data");
+        free(chunk);
         BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
       int64_t brc_ = blosc2_schunk_update_chunk(array->sc, nchunk, chunk, false);
       if (brc_ < 0) {
         BLOSC_TRACE_ERROR("Blosc can not update the chunk");
+        free(chunk);
         BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
       // We are done
@@ -1168,6 +1191,12 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   // Block-sized scratch for the compact get path (lazily allocated too).
   uint8_t *block_data = NULL;
   int32_t block_nbytes = (int32_t) (array->blocknitems * array->sc->typesize);
+  int rc = BLOSC2_ERROR_SUCCESS;
+  bool use_compact = false;
+  uint8_t *lazychunk = NULL;
+  bool lazychunk_needs_free = false;
+  bool *block_maskout = NULL;
+  uint8_t *chunk = NULL;
 
   int64_t chunks_in_array[B2ND_MAX_DIM] = {0};
   for (int i = 0; i < ndim; ++i) {
@@ -1232,14 +1261,17 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
 
     int32_t nblocks = (int32_t) array->extchunknitems / array->blocknitems;
     // Compact get path state for this chunk (see below).
-    bool use_compact = false;
-    uint8_t *lazychunk = NULL;
-    bool lazychunk_needs_free = false;
+    use_compact = false;
+    lazychunk = NULL;
+    lazychunk_needs_free = false;
     int32_t lazychunk_cbytes = 0;
     if (set_slice) {
       if (data == NULL) {
         data = malloc(data_nbytes);
-        BLOSC_ERROR_NULL(data, BLOSC2_ERROR_MEMORY_ALLOC);
+        if (data == NULL) {
+          rc = BLOSC2_ERROR_MEMORY_ALLOC;
+          goto cleanup;
+        }
       }
       // Check if all the chunk is going to be updated and avoid the decompression
       bool decompress_chunk = false;
@@ -1251,15 +1283,19 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
         int err = blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes);
         if (err < 0) {
           BLOSC_TRACE_ERROR("Error decompressing chunk");
-          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+          rc = BLOSC2_ERROR_FAILURE;
+          goto cleanup;
         }
       } else {
         // Avoid writing non zero padding from previous chunk
         memset(data, 0, data_nbytes);
       }
     } else {
-      bool *block_maskout = malloc(nblocks);
-      BLOSC_ERROR_NULL(block_maskout, BLOSC2_ERROR_MEMORY_ALLOC);
+      block_maskout = malloc(nblocks);
+      if (block_maskout == NULL) {
+        rc = BLOSC2_ERROR_MEMORY_ALLOC;
+        goto cleanup;
+      }
       int32_t nblocks_needed = 0;
       for (int nblock = 0; nblock < nblocks; ++nblock) {
         int64_t nblock_ndim[B2ND_MAX_DIM] = {0};
@@ -1292,6 +1328,19 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
         }
       }
 
+      bool has_delta = false;
+      for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+        if (array->sc->filters[i] == BLOSC_DELTA) {
+          has_delta = true;
+          break;
+        }
+      }
+      if (has_delta && nblocks_needed > 0) {
+        // Delta filter encodes subsequent blocks relative to the reference block (block 0).
+        // If any block in the chunk is needed, block 0 must be decompressed as reference.
+        block_maskout[0] = false;
+      }
+
       // Compact get path: when only a fraction of the chunk's blocks is
       // needed, decompress just those blocks -- one at a time, straight
       // from the (lazy)chunk -- instead of decompressing into a chunk-sized
@@ -1309,48 +1358,51 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       // around 2-4 needed blocks, so stay conservative there (1/16 keeps
       // the possible loss window narrow while still capturing the common
       // 1-2 block reads, where compact always wins or ties).
+      //
+      // If DELTA is used, blocks cannot be decompressed independently; keep maskout path.
       bool on_disk = array->sc->storage != NULL && array->sc->storage->urlpath != NULL;
       int64_t frac = on_disk ? 4 : 16;
-      use_compact = ((int64_t) nblocks_needed * block_nbytes) * frac <= (int64_t) data_nbytes;
+      use_compact = !has_delta &&
+                    (((int64_t) nblocks_needed * block_nbytes) * frac <= (int64_t) data_nbytes);
       if (use_compact) {
         lazychunk_cbytes = blosc2_schunk_get_lazychunk(array->sc, nchunk, &lazychunk,
                                                        &lazychunk_needs_free);
         if (lazychunk_cbytes < 0) {
           BLOSC_TRACE_ERROR("Error getting the lazy chunk");
-          free(block_maskout);
-          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+          rc = BLOSC2_ERROR_FAILURE;
+          goto cleanup;
         }
         if (block_data == NULL) {
           block_data = malloc(block_nbytes);
           if (block_data == NULL) {
-            if (lazychunk_needs_free) {
-              free(lazychunk);
-            }
-            free(block_maskout);
-            BLOSC_ERROR(BLOSC2_ERROR_MEMORY_ALLOC);
+            rc = BLOSC2_ERROR_MEMORY_ALLOC;
+            goto cleanup;
           }
         }
       } else {
         if (data == NULL) {
           data = malloc(data_nbytes);
           if (data == NULL) {
-            free(block_maskout);
-            BLOSC_ERROR(BLOSC2_ERROR_MEMORY_ALLOC);
+            rc = BLOSC2_ERROR_MEMORY_ALLOC;
+            goto cleanup;
           }
         }
         if (blosc2_set_maskout(array->sc->dctx, block_maskout, nblocks) != BLOSC2_ERROR_SUCCESS) {
           BLOSC_TRACE_ERROR("Error setting the maskout");
-          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+          rc = BLOSC2_ERROR_FAILURE;
+          goto cleanup;
         }
 
         int err = blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes);
         if (err < 0) {
           BLOSC_TRACE_ERROR("Error decompressing chunk");
-          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+          rc = BLOSC2_ERROR_FAILURE;
+          goto cleanup;
         }
       }
 
       free(block_maskout);
+      block_maskout = NULL;
     }
 
     // Iterate over blocks
@@ -1430,10 +1482,8 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
                                            block_data, block_nbytes);
         if (grc < 0) {
           BLOSC_TRACE_ERROR("Error decompressing block");
-          if (lazychunk_needs_free) {
-            free(lazychunk);
-          }
-          BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+          rc = BLOSC2_ERROR_FAILURE;
+          goto cleanup;
         }
         dst = block_data;
       } else {
@@ -1464,33 +1514,47 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
 
     if (use_compact && lazychunk_needs_free) {
       free(lazychunk);
+      lazychunk = NULL;
+      lazychunk_needs_free = false;
     }
 
     if (set_slice) {
       // Recompress the data
       int32_t chunk_nbytes = data_nbytes + BLOSC2_MAX_OVERHEAD;
-      uint8_t *chunk = malloc(chunk_nbytes);
-      BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
+      chunk = malloc(chunk_nbytes);
+      if (chunk == NULL) {
+        rc = BLOSC2_ERROR_MEMORY_ALLOC;
+        goto cleanup;
+      }
       int brc;
       // Update current_chunk in case a prefilter is applied
       array->sc->current_nchunk = nchunk;
       brc = blosc2_compress_ctx(array->sc->cctx, data, data_nbytes, chunk, chunk_nbytes);
       if (brc < 0) {
         BLOSC_TRACE_ERROR("Blosc can not compress the data");
-        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+        rc = BLOSC2_ERROR_FAILURE;
+        goto cleanup;
       }
       int64_t brc_ = blosc2_schunk_update_chunk(array->sc, nchunk, chunk, false);
       if (brc_ < 0) {
         BLOSC_TRACE_ERROR("Blosc can not update the chunk");
-        BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
+        rc = BLOSC2_ERROR_FAILURE;
+        goto cleanup;
       }
+      chunk = NULL; // ownership transferred to blosc2_schunk_update_chunk (copy=false) only on success
     }
   }
 
+cleanup:
+  if (use_compact && lazychunk_needs_free) {
+    free(lazychunk);
+  }
+  free(block_maskout);
+  free(chunk);
   free(data);
   free(block_data);
 
-  return BLOSC2_ERROR_SUCCESS;
+  return rc;
 }
 
 
@@ -1605,13 +1669,26 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t
     }
     uint8_t *buffer = malloc(buffersize);
     if (buffer == NULL) {
+      b2nd_free(*array);
+      *array = NULL;
       BLOSC_ERROR(BLOSC2_ERROR_MEMORY_ALLOC);
     }
-    BLOSC_ERROR(b2nd_get_slice_cbuffer(src, src_start, src_stop, buffer, chunk_shape,
-                                       (int64_t)buffersize));
-    BLOSC_ERROR(b2nd_set_slice_cbuffer(buffer, chunk_shape, (int64_t)buffersize, chunk_start,
-                                       chunk_stop, *array));
+    int g_rc = b2nd_get_slice_cbuffer(src, src_start, src_stop, buffer, chunk_shape,
+                                      (int64_t)buffersize);
+    if (g_rc < 0) {
+      free(buffer);
+      b2nd_free(*array);
+      *array = NULL;
+      return g_rc;
+    }
+    int s_rc = b2nd_set_slice_cbuffer(buffer, chunk_shape, (int64_t)buffersize, chunk_start,
+                                      chunk_stop, *array);
     free(buffer);
+    if (s_rc < 0) {
+      b2nd_free(*array);
+      *array = NULL;
+      return s_rc;
+    }
   }
 
   return BLOSC2_ERROR_SUCCESS;
@@ -2047,9 +2124,10 @@ int b2nd_print_meta(const b2nd_array_t *array) {
       BLOSC_ERROR(BLOSC2_ERROR_METALAYER_NOT_FOUND);
     }
   }
-  BLOSC_ERROR(b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape,
-                                    &dtype, &dtype_format));
+  int rc = b2nd_deserialize_meta(smeta, smeta_len, &ndim, shape, chunkshape, blockshape,
+                                 &dtype, &dtype_format);
   free(smeta);
+  BLOSC_ERROR(rc);
 
   printf("b2nd metalayer parameters:\n Ndim:       %d", ndim);
   printf("\n shape:      %" PRId64 "", shape[0]);
@@ -2135,6 +2213,7 @@ int extend_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
           BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
           csize = blosc2_chunk_zeros(*cparams, array->sc->chunksize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
           if (csize < 0) {
+            free(chunk);
             free(aux);
             free(cparams);
             BLOSC_TRACE_ERROR("Blosc error when creating a chunk");
@@ -2142,6 +2221,7 @@ int extend_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
           }
           nchunks_ = blosc2_schunk_insert_chunk(array->sc, i, chunk, false);
           if (nchunks_ < 0) {
+            free(chunk);
             free(aux);
             free(cparams);
             BLOSC_TRACE_ERROR("Blosc error when inserting a chunk");
@@ -2232,17 +2312,28 @@ int b2nd_resize(b2nd_array_t *array, const int64_t *new_shape,
   BLOSC_ERROR_NULL(new_shape, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR(refresh_if_stale(array));
 
+  for (int i = 0; i < array->ndim; ++i) {
+    if (new_shape[i] < 0) {
+      BLOSC_TRACE_ERROR("`new_shape` cannot have negative entries");
+      BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+    }
+    if (new_shape[i] != array->shape[i] && (array->chunkshape[i] <= 0 || array->chunknitems <= 0)) {
+      BLOSC_TRACE_ERROR("Cannot resize array with zero chunkshape");
+      BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+    }
+  }
+
   if (start != NULL) {
     for (int i = 0; i < array->ndim; ++i) {
-      if (start[i] > array->shape[i]) {
-        BLOSC_TRACE_ERROR("`start` must be lower or equal than old array shape in all dims");
+      if (start[i] < 0 || start[i] > array->shape[i]) {
+        BLOSC_TRACE_ERROR("`start` must be in [0, shape] in all dims");
         BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
       }
       if ((new_shape[i] > array->shape[i] && start[i] != array->shape[i])
           || (new_shape[i] < array->shape[i]
               && (start[i] + array->shape[i] - new_shape[i]) != array->shape[i])) {
         // Chunks cannot be cut unless they are in the last position
-        if (start[i] % array->chunkshape[i] != 0) {
+        if (array->chunkshape[i] <= 0 || start[i] % array->chunkshape[i] != 0) {
           BLOSC_TRACE_ERROR("If array end is not being modified "
                               "`start` must be a multiple of chunkshape in all dims");
           BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
@@ -2290,8 +2381,12 @@ int b2nd_insert(b2nd_array_t *array, const void *buffer, int64_t buffersize,
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR(refresh_if_stale(array));
 
-  if (axis >= array->ndim) {
-    BLOSC_TRACE_ERROR("`axis` cannot be greater than the number of dimensions");
+  if (axis < 0 || axis >= array->ndim) {
+    BLOSC_TRACE_ERROR("`axis` must be in [0, ndim)");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+  if (insert_start < 0 || insert_start > array->shape[axis] || buffersize < 0) {
+    BLOSC_TRACE_ERROR("`insert_start` must be in [0, shape[axis]] and `buffersize` non-negative");
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
@@ -2303,8 +2398,8 @@ int b2nd_insert(b2nd_array_t *array, const void *buffer, int64_t buffersize,
       buffershape[i] = array->shape[i];
     }
   }
-  if (buffersize % axis_size != 0) {
-    BLOSC_TRACE_ERROR("`buffersize` must be multiple of the array");
+  if (axis_size <= 0 || buffersize % axis_size != 0) {
+    BLOSC_TRACE_ERROR("`buffersize` must be multiple of the array cross-section");
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
   int64_t newshape[B2ND_MAX_DIM];
@@ -2335,7 +2430,16 @@ int b2nd_append(b2nd_array_t *array, const void *buffer, int64_t buffersize,
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR(refresh_if_stale(array));
 
+  if (axis < 0 || axis >= array->ndim || buffersize < 0) {
+    BLOSC_TRACE_ERROR("`axis` must be in [0, ndim) and `buffersize` non-negative");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+
   int32_t chunksize = array->sc->chunksize;
+  if (chunksize <= 0) {
+    BLOSC_TRACE_ERROR("Cannot append to array with non-positive chunksize");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
   int64_t nchunks_append = buffersize / chunksize;
   // Check whether chunkshape and blockshape are compatible with accelerated path.
   // Essentially, we are checking whether the buffer is a multiple of the chunksize
@@ -2379,8 +2483,13 @@ int b2nd_delete(b2nd_array_t *array, const int8_t axis,
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR(refresh_if_stale(array));
 
-  if (axis >= array->ndim) {
-    BLOSC_TRACE_ERROR("axis cannot be greater than the number of dimensions");
+  if (axis < 0 || axis >= array->ndim) {
+    BLOSC_TRACE_ERROR("axis must be in [0, ndim)");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+  if (delete_start < 0 || delete_len < 0 || delete_len > array->shape[axis] ||
+      delete_start > array->shape[axis] - delete_len) {
+    BLOSC_TRACE_ERROR("Invalid delete range");
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
@@ -2712,15 +2821,28 @@ int iter_chunk(b2nd_array_t *array, int8_t ndim,
       if (!get) {
         int32_t chunk_size = data_nbytes + BLOSC_EXTENDED_HEADER_LENGTH;
         uint8_t *chunk = malloc(chunk_size);
-        BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
+        if (chunk == NULL) {
+          free(chunk_selection_size);
+          free(p_chunk_selection_0);
+          free(p_chunk_selection_1);
+          return BLOSC2_ERROR_MEMORY_ALLOC;
+        }
         err = blosc2_compress_ctx(array->sc->cctx, data, data_nbytes, chunk, chunk_size);
         if (err < 0) {
           BLOSC_TRACE_ERROR("Error compressing data");
+          free(chunk);
+          free(chunk_selection_size);
+          free(p_chunk_selection_0);
+          free(p_chunk_selection_1);
           BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
         }
         err = (int) blosc2_schunk_update_chunk(array->sc, nchunk, chunk, false);
         if (err < 0) {
           BLOSC_TRACE_ERROR("Error updating chunk");
+          free(chunk);
+          free(chunk_selection_size);
+          free(p_chunk_selection_0);
+          free(p_chunk_selection_1);
           BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
         }
       }

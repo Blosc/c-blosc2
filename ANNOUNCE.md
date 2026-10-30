@@ -1,28 +1,41 @@
-# Announcing C-Blosc2 3.3.5
+# Announcing C-Blosc2 3.4.1
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This is a bugfix and maintenance release fixing robustness and security issues
-discovered via OSS-Fuzz.
+This bugfix release brings substantial performance improvements for in-place
+writes to on-disk contiguous frames (especially on NFS), security hardening for
+sparse frames, critical fixes for filter pipelines chaining 3 or more filters
+alongside multithreaded DELTA decoding, and a new example for sparse coordinate
+handling.
 
-First, an integer overflow in the BloscLZ decompressor's long-match length
-accumulation loop was fixed. A crafted input with excessive continuation bytes
-could wrap a 32-bit length past `INT32_MAX` into negative values, bypassing bounds
-checks and leading to a heap buffer overflow. Length bounds are now verified
-prior to addition.
+First, in-place writes to on-disk contiguous frames on POSIX systems are now
+substantially faster.  Operations like appending, inserting, updating, or deleting
+chunks (as well as `b2nd_set_slice`) previously reopened and closed the frame file
+multiple times and truncated on every trailer update, incurring synchronous flush
+penalties on NFS (around ~20 ms per chunk).  Frames now cache a writable file
+descriptor and avoid unnecessary truncations and flushes, reducing chunk writes
+on NFS to ~1 ms and improving local disk writes by ~1.4x.
 
-Second, input buffer size validation was added to the ZFP codec decompressors
-(`zfp_acc_decompress`, `zfp_prec_decompress`, `zfp_rate_decompress`). Previously,
-crafted frames with high metadata values could cause ZFP's bitstream reader to
-read beyond buffer bounds. The required bitstream size is now validated against
-the input length prior to decompression.
+Second, sparse (directory) frames have been hardened against out-of-bounds heap
+reads: `sframe_get_chunk()` and `frame_decompress_chunk()` now verify that the
+chunk's compressed size (`cbytes`) recorded in the chunk header does not exceed
+the actual size of the chunk file on disk before allocating or decompressing
+(#822).  Thanks to Mar Dominguez (@mardgez).
 
-Third, a potential division-by-zero (floating-point exception) in
-`frame_get_chunk()` and `frame_get_lazychunk()` when encountering crafted frames
-with `chunksize <= 0` during special-value chunk retrieval was guarded.
+Third, the filter pipeline has been fixed when chaining 3 or more filters:
+- `pipeline_forward()` now ping-pongs strictly between thread-local scratch
+  buffers, ensuring that caller input data is never overwritten and preserving
+  block 0 integrity as the reference block for DELTA encoding (#820).
+- `pipeline_backward()` now prevents buffer aliasing across chained backward
+  filters and coordinates multithreaded DELTA decoding so worker threads wait
+  until block 0 has finished its entire backward filter pipeline before decoding
+  subsequent blocks.
 
-There are no API or format changes in this release.
+Fourth, a new example (`examples/sparse_coords.c`) was added to demonstrate
+sparse coordinate handling and selective retrieval.
+
+There are no breaking API or format changes in this release.
 
 For more info, see the release notes in:
 

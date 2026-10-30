@@ -43,6 +43,9 @@ using the global lock.
 
 .. doxygenfunction:: blosc2_ctx_get_dparams
 
+.. doxygenfunction:: blosc2_ctx_set_blosc1_format
+.. doxygenfunction:: blosc2_ctx_get_blosc1_format
+
 .. doxygenfunction:: blosc2_get_blosc2_cparams_defaults
 .. doxygenfunction:: blosc2_get_blosc2_dparams_defaults
 

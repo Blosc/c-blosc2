@@ -40,6 +40,7 @@ struct blosc2_context_s {
   uint8_t header_flags;  /* Flags for header */
   uint8_t blosc2_flags;  /* Flags specific for blosc2 */
   uint8_t blosc2_flags2;  /* Secondary flags specific for blosc2 */
+  bool blosc1_format;  /* Write Blosc1 (format version 2) chunks, readable by C-Blosc 1.x */
   int32_t sourcesize;  /* Number of bytes in source buffer */
   int32_t header_overhead;  /* The number of bytes in chunk header */
   int32_t nblocks;  /* Number of total blocks in buffer */

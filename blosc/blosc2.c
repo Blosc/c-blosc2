@@ -993,6 +993,9 @@ static int blosc2_initialize_header_from_context(blosc2_context* context, blosc_
   header->version = (context->blosc2_flags2 & BLOSC2_VL_BLOCKS) ?
                     BLOSC2_VERSION_FORMAT_VL_BLOCKS :
                     BLOSC2_VERSION_FORMAT_STABLE;
+  if (context->blosc1_format) {
+    header->version = BLOSC1_VERSION_FORMAT;
+  }
   header->versionlz = compcode_to_compversion(context->compcode);
   header->flags = context->header_flags;
   header->typesize = (uint8_t)context->typesize;
@@ -1030,11 +1033,14 @@ static int blosc2_initialize_header_from_context(blosc2_context* context, blosc_
   return 0;
 }
 
-void _cycle_buffers(uint8_t **src, uint8_t **dest, uint8_t **tmp) {
-  uint8_t *tmp2 = *src;
+/* Cycle buffers for the compression pipeline.  The input block is read-only
+   (and the DELTA filter needs it unmodified as a reference), so it must never
+   be recycled as a destination; ping-pong between the two scratch buffers. */
+static void _cycle_buffers_forward(uint8_t **src, uint8_t **dest, uint8_t **tmp,
+                                   const uint8_t *input) {
+  uint8_t *prev_src = *src;
   *src = *dest;
-  *dest = *tmp;
-  *tmp = tmp2;
+  *dest = (prev_src == input) ? *tmp : prev_src;
 }
 
 uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t bsize,
@@ -1091,7 +1097,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
       // No more filters are required
       return _dest;
     }
-    _cycle_buffers(&_src, &_dest, &_tmp);
+    _cycle_buffers_forward(&_src, &_dest, &_tmp, src + offset);
   }
 
   /* Process the filter pipeline */
@@ -1104,7 +1110,12 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
           blosc2_shuffle(filters_meta[i] == 0 ? typesize : filters_meta[i], bsize, _src, _dest);
           break;
         case BLOSC_BITSHUFFLE:
-          if (blosc2_bitshuffle(typesize, bsize, _src, _dest) < 0) {
+          if (context->blosc1_format && ((bsize / typesize) % 8) != 0) {
+            // Format version 2 (Blosc1) only bit-shuffles blocks whose number of
+            // elements is a multiple of 8; other blocks are stored unshuffled.
+            memcpy(_dest, _src, (size_t)bsize);
+          }
+          else if (blosc2_bitshuffle(typesize, bsize, _src, _dest) < 0) {
             return NULL;
           }
           break;
@@ -1158,7 +1169,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
 
     // Cycle buffers when required
     if (filters[i] != BLOSC_NOFILTER) {
-      _cycle_buffers(&_src, &_dest, &_tmp);
+      _cycle_buffers_forward(&_src, &_dest, &_tmp, src + offset);
     }
   }
   return _src;
@@ -1454,17 +1465,56 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
 }
 
 
+static void delta_dref_sync(blosc2_context* context, blosc2_pthread_mutex_t** delta_mutex,
+                            blosc2_pthread_cond_t** delta_cv, int** dref_not_init) {
+  struct blosc_job_group* job = context->job;
+  *delta_mutex = job != NULL ? &job->delta_mutex : &context->delta_mutex;
+  *delta_cv = job != NULL ? &job->delta_cv : &context->delta_cv;
+  *dref_not_init = job != NULL ? &job->dref_not_init : &context->dref_not_init;
+}
+
+
+static void delta_wait_dref(blosc2_context* context) {
+  blosc2_pthread_mutex_t* delta_mutex;
+  blosc2_pthread_cond_t* delta_cv;
+  int* dref_not_init;
+
+  delta_dref_sync(context, &delta_mutex, &delta_cv, &dref_not_init);
+  blosc2_pthread_mutex_lock(delta_mutex);
+  while (*dref_not_init) {
+    blosc2_pthread_cond_wait(delta_cv, delta_mutex);
+  }
+  blosc2_pthread_mutex_unlock(delta_mutex);
+}
+
+
+static void delta_release_dref(blosc2_context* context) {
+  blosc2_pthread_mutex_t* delta_mutex;
+  blosc2_pthread_cond_t* delta_cv;
+  int* dref_not_init;
+
+  delta_dref_sync(context, &delta_mutex, &delta_cv, &dref_not_init);
+  blosc2_pthread_mutex_lock(delta_mutex);
+  if (*dref_not_init) {
+    *dref_not_init = 0;
+    blosc2_pthread_cond_broadcast(delta_cv);
+  }
+  blosc2_pthread_mutex_unlock(delta_mutex);
+}
+
+
 /* Process the filter pipeline (decompression mode) */
 int pipeline_backward(struct thread_context* thread_context, const int32_t bsize, uint8_t* dest,
                       const int32_t offset, uint8_t* src, uint8_t* tmp,
                       uint8_t* tmp2, int last_filter_index, int32_t nblock) {
+  (void)tmp2;
   blosc2_context* context = thread_context->parent_context;
   int32_t typesize = context->typesize;
   uint8_t* filters = context->filters;
   uint8_t* filters_meta = context->filters_meta;
-  uint8_t* _src = src;
+  uint8_t* _src = (next_filter(filters, BLOSC2_MAX_FILTERS, 'd') == BLOSC_DELTA &&
+                   context->postfilter == NULL) ? (dest + offset) : src;
   uint8_t* _dest = tmp;
-  uint8_t* _tmp = tmp2;
   int errcode = 0;
 
   for (int i = BLOSC2_MAX_FILTERS - 1; i >= 0; i--) {
@@ -1474,6 +1524,8 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
     if (last_copy_filter && context->postfilter == NULL &&
         (filters[i] == BLOSC_DELTA || _src != dest + offset)) {
       _dest = dest + offset;
+    } else {
+      _dest = (_src == src) ? tmp : src;
     }
     int rc = BLOSC2_ERROR_SUCCESS;
     if (filters[i] <= BLOSC2_DEFINED_FILTERS_STOP) {
@@ -1488,30 +1540,13 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
           }
           break;
         case BLOSC_DELTA:
-          if (context->nthreads == 1) {
-            /* Serial mode */
-            delta_decoder(dest, offset, bsize, typesize, _dest);
-          } else {
-            struct blosc_job_group *job = context->job;
-            blosc2_pthread_mutex_t *delta_mutex = job != NULL ? &job->delta_mutex : &context->delta_mutex;
-            blosc2_pthread_cond_t *delta_cv = job != NULL ? &job->delta_cv : &context->delta_cv;
-            int *dref_not_init = job != NULL ? &job->dref_not_init : &context->dref_not_init;
-            /* Force the thread in charge of the block 0 to go first */
-            blosc2_pthread_mutex_lock(delta_mutex);
-            if (*dref_not_init) {
-              if (offset != 0) {
-                blosc2_pthread_cond_wait(delta_cv, delta_mutex);
-              } else {
-                delta_decoder(dest, offset, bsize, typesize, _dest);
-                *dref_not_init = 0;
-                blosc2_pthread_cond_broadcast(delta_cv);
-              }
-            }
-            blosc2_pthread_mutex_unlock(delta_mutex);
-            if (offset != 0) {
-              delta_decoder(dest, offset, bsize, typesize, _dest);
-            }
+          if (_src != _dest) {
+            memcpy(_dest, _src, (size_t)bsize);
           }
+          if (offset != 0 && thread_context != context->serial_context) {
+            delta_wait_dref(context);
+          }
+          delta_decoder(offset == 0 ? _dest : dest, offset, bsize, typesize, _dest);
           break;
         case BLOSC_TRUNC_PREC:
           // TRUNC_PREC filter does not need to be undone
@@ -1554,9 +1589,9 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
       urfiltersuccess:;
     }
 
-    // Cycle buffers when required
+    // Update input buffer for the next filter in the backward pipeline
     if ((filters[i] != BLOSC_NOFILTER) && (filters[i] != BLOSC_TRUNC_PREC)) {
-      _cycle_buffers(&_src, &_dest, &_tmp);
+      _src = _dest;
     }
     if (last_filter_index == i) {
       break;
@@ -1966,6 +2001,10 @@ static int blosc_d(
   if (neblock == 0) {
     /* Not enough space to output bytes */
     BLOSC_ERROR(BLOSC2_ERROR_WRITE_BUFFER);
+  }
+  /* The splits must cover the whole block, or part of tmp is left unwritten */
+  if (neblock * nstreams != bsize) {
+    BLOSC_ERROR(BLOSC2_ERROR_DATA);
   }
   for (int j = 0; j < nstreams; j++) {
     if (vlblocks) {
@@ -2391,6 +2430,26 @@ static int initialize_context_compression(
         int tuner_id, void *tuner_params,
         blosc2_schunk* schunk) {
 
+  /* The block size and the filters divide by the typesize */
+  if (typesize <= 0) {
+    BLOSC_TRACE_ERROR("The typesize must be positive, not %d.", typesize);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  /* Check typesize limits */
+  if (typesize > BLOSC2_MAXTYPESIZE) {
+    // If typesize is too large for Blosc2, return an error
+    BLOSC_TRACE_ERROR("Typesize cannot exceed %d bytes.", BLOSC2_MAXTYPESIZE);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  /* Now, cap typesize so that blosc2 split machinery can continue to work.  This has to be
+     done before the tuner chooses the block size, which depends on the typesize: a buffer
+     with a larger typesize is a plain stream of bytes and is blocked as one. */
+  if (typesize > BLOSC_MAX_TYPESIZE) {
+    /* If typesize is too large, treat buffer as an 1-byte stream. */
+    typesize = 1;
+  }
+
   /* Set parameters */
   context->do_compress = 1;
   context->src = (const uint8_t*)src;
@@ -2413,7 +2472,6 @@ static int initialize_context_compression(
   context->tuner_params = tuner_params;
   context->tuner_id = tuner_id;
   context->splitmode = splitmode;
-  context->header_blocksize = (int32_t)blocksize;
   context->blosc2_flags2 = 0;
   if (context->blocknbytes != NULL) {
     free(context->blocknbytes);
@@ -2489,6 +2547,11 @@ static int initialize_context_compression(
     BLOSC_TRACE_ERROR("Error in tuner next_blocksize func\n");
     return BLOSC2_ERROR_TUNER;
   }
+  /* The header must record the block size that the tuner settled on (it rounds a requested
+     one to a multiple of the typesize, for instance), not the one that was asked for: a reader
+     splits the chunk into blocks of the size in the header.  Variable-length block chunks
+     store something else there and set it themselves. */
+  context->header_blocksize = context->blocksize;
 
 
   /* Check buffer size limits */
@@ -2518,18 +2581,6 @@ static int initialize_context_compression(
       context->compcode != BLOSC_LZ4 && context->compcode != BLOSC_LZ4HC) {
     BLOSC_TRACE_ERROR("`use_dict` is only supported for ZSTD, LZ4, and LZ4HC codecs.");
     return BLOSC2_ERROR_CODEC_PARAM;
-  }
-
-  /* Check typesize limits */
-  if (context->typesize > BLOSC2_MAXTYPESIZE) {
-    // If typesize is too large for Blosc2, return an error
-    BLOSC_TRACE_ERROR("Typesize cannot exceed %d bytes.", BLOSC2_MAXTYPESIZE);
-    return BLOSC2_ERROR_INVALID_PARAM;
-  }
-  /* Now, cap typesize so that blosc2 split machinery can continue to work */
-  if (context->typesize > BLOSC_MAX_TYPESIZE) {
-    /* If typesize is too large, treat buffer as an 1-byte stream. */
-    context->typesize = 1;
   }
 
   blosc2_calculate_blocks(context);
@@ -2742,11 +2793,33 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
     return BLOSC2_ERROR_WRITE_BUFFER;
   }
 
-  if (context->block_maskout != NULL && context->block_maskout_nitems != context->nblocks) {
-    BLOSC_TRACE_ERROR("The number of items in block_maskout (%d) must match the number"
-                      " of blocks in chunk (%d).",
-                      context->block_maskout_nitems, context->nblocks);
-    return BLOSC2_ERROR_DATA;
+  if (context->block_maskout != NULL) {
+    if (context->block_maskout_nitems != context->nblocks) {
+      BLOSC_TRACE_ERROR("The number of items in block_maskout (%d) must match the number"
+                        " of blocks in chunk (%d).",
+                        context->block_maskout_nitems, context->nblocks);
+      return BLOSC2_ERROR_DATA;
+    }
+    bool has_delta = false;
+    for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+      if (context->filters[i] == BLOSC_DELTA) {
+        has_delta = true;
+        break;
+      }
+    }
+    if (has_delta) {
+      bool any_needed = false;
+      for (int i = 0; i < context->block_maskout_nitems; ++i) {
+        if (!context->block_maskout[i]) {
+          any_needed = true;
+          break;
+        }
+      }
+      if (any_needed) {
+        // Delta filter encodes subsequent blocks relative to block 0; block 0 must be unmasked.
+        context->block_maskout[0] = false;
+      }
+    }
   }
 
   context->special_type = (header->blosc2_flags >> 4) & BLOSC2_SPECIAL_MASK;
@@ -3134,6 +3207,59 @@ static int blosc_compress_context_without_dict(blosc2_context* context) {
 }
 
 
+int blosc2_ctx_set_blosc1_format(blosc2_context* context, bool enable) {
+  if (context == NULL || context->do_compress != 1) {
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  context->blosc1_format = enable;
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+bool blosc2_ctx_get_blosc1_format(const blosc2_context* context) {
+  return context != NULL && context->blosc1_format;
+}
+
+
+/* Check that a context set to write Blosc1 chunks only uses what the format can express */
+static int blosc1_format_check(const blosc2_context* context) {
+  if (!context->blosc1_format) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  switch (context->compcode) {
+    case BLOSC_BLOSCLZ:
+    case BLOSC_LZ4:
+    case BLOSC_LZ4HC:
+    case BLOSC_ZLIB:
+    case BLOSC_ZSTD:
+      break;
+    default:
+      BLOSC_TRACE_ERROR("Codec %d cannot be used when writing Blosc1 chunks.", context->compcode);
+      return BLOSC2_ERROR_CODEC_SUPPORT;
+  }
+  /* The Blosc1 header only has flags for a shuffle or a bitshuffle, so the pipeline can have
+     one of those and nothing else, in any of its slots. */
+  int nfilters = 0;
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
+    uint8_t filter = context->filters[i];
+    if (filter == BLOSC_NOFILTER) {
+      continue;
+    }
+    bool plain_shuffle = (filter == BLOSC_SHUFFLE || filter == BLOSC_BITSHUFFLE) &&
+                         context->filters_meta[i] == 0;
+    if (!plain_shuffle || ++nfilters > 1) {
+      BLOSC_TRACE_ERROR("Filter %d in slot %d cannot be used when writing Blosc1 chunks.", filter, i);
+      return BLOSC2_ERROR_FILTER_PIPELINE;
+    }
+  }
+  if (context->use_dict || (context->blosc2_flags2 & BLOSC2_VL_BLOCKS)) {
+    BLOSC_TRACE_ERROR("Dictionaries and variable-length blocks cannot be used when writing Blosc1 chunks.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 /* The public secure routine for compression with context. */
 int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsize,
                         void* dest, int32_t destsize) {
@@ -3154,8 +3280,13 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
     return error;
   }
 
-  /* Write the extended header */
-  error = write_compression_header(context, true);
+  error = blosc1_format_check(context);
+  if (error < 0) {
+    return error;
+  }
+
+  /* Write the extended header, or the Blosc1 header if requested */
+  error = write_compression_header(context, !context->blosc1_format);
   if (error < 0) {
     return error;
   }
@@ -3219,12 +3350,13 @@ int blosc2_compress_ctx(blosc2_context* context, const void* src, int32_t srcsiz
       // Reset bstarts and embed dict in the output buffer.
       context->bstarts = (int32_t*)(context->dest + context->header_overhead);
       context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * context->nblocks;
+      /* Move dict bytes; samples_buffer overlaps the dict (and its size) in dest,
+         so this has to be a memmove, done before writing the size */
+      context->dict_buffer = context->dest + context->output_bytes + sizeof(int32_t);
+      memmove(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
       /* Write dict size */
       _sw32(context->dest + context->output_bytes, dict_actual_size);
       context->output_bytes += (int32_t)sizeof(int32_t);
-      /* Copy dict bytes */
-      context->dict_buffer = context->dest + context->output_bytes;
-      memcpy(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
       /* Build the stream used as cdict (pre-loaded with the dict bytes) */
       if (context->compcode == BLOSC_LZ4HC) {
         LZ4_streamHC_t* lz4hc_cdict = LZ4_createStreamHC();
@@ -3535,10 +3667,11 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
 
       context->bstarts = (int32_t*)(context->dest + context->header_overhead);
       context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
+      // samples_buffer overlaps the dict (and its size) in dest: memmove before writing the size
+      context->dict_buffer = context->dest + context->output_bytes + sizeof(int32_t);
+      memmove(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
       _sw32(context->dest + context->output_bytes, dict_actual_size);
       context->output_bytes += (int32_t)sizeof(int32_t);
-      context->dict_buffer = context->dest + context->output_bytes;
-      memcpy(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
       if (context->compcode == BLOSC_LZ4HC) {
         LZ4_streamHC_t* lz4hc_cdict = LZ4_createStreamHC();
         LZ4_loadDictHC(lz4hc_cdict, (const char*)context->dict_buffer, dict_actual_size);
@@ -3652,10 +3785,11 @@ int blosc2_vlcompress_ctx(blosc2_context* context, const void* const* srcs, cons
 
       context->bstarts = (int32_t*)(context->dest + context->header_overhead);
       context->output_bytes = context->header_overhead + (int32_t)sizeof(int32_t) * nblocks;
+      // samples_buffer overlaps the dict (and its size) in dest: memmove before writing the size
+      context->dict_buffer = context->dest + context->output_bytes + sizeof(int32_t);
+      memmove(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
       _sw32(context->dest + context->output_bytes, dict_actual_size);
       context->output_bytes += (int32_t)sizeof(int32_t);
-      context->dict_buffer = context->dest + context->output_bytes;
-      memcpy(context->dict_buffer, samples_buffer, (size_t)dict_actual_size);
       if (context->compcode == BLOSC_LZ4HC) {
         LZ4_streamHC_t* lz4hc_cdict = LZ4_createStreamHC();
         LZ4_loadDictHC(lz4hc_cdict, (const char*)context->dict_buffer, dict_actual_size);
@@ -3869,6 +4003,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
       BLOSC_TRACE_ERROR("Error while creating the compression context");
       return BLOSC2_ERROR_NULL_POINTER;
     }
+    blosc2_ctx_set_blosc1_format(cctx, getenv("BLOSC_BLOSC1_COMPAT") != NULL);
     /* Do the actual compression */
     result = blosc2_compress_ctx(cctx, src, srcsize, dest, destsize);
     /* Release context resources */
@@ -3877,6 +4012,9 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   }
 
   blosc2_pthread_mutex_lock(&global_comp_mutex);
+
+  /* Blosc1 format is read before anything depends on it (e.g. block splitting) */
+  g_global_context->blosc1_format = (getenv("BLOSC_BLOSC1_COMPAT") != NULL);
 
   /* Initialize a context compression */
   uint8_t* filters = calloc(1, BLOSC2_MAX_FILTERS);
@@ -3895,14 +4033,14 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
     return error;
   }
 
-  envvar = getenv("BLOSC_BLOSC1_COMPAT");
-  if (envvar != NULL) {
-    /* Write chunk header without extended header (Blosc1 compatibility mode) */
-    error = write_compression_header(g_global_context, false);
+  error = blosc1_format_check(g_global_context);
+  if (error < 0) {
+    blosc2_pthread_mutex_unlock(&global_comp_mutex);
+    return error;
   }
-  else {
-    error = write_compression_header(g_global_context, true);
-  }
+
+  /* Blosc1 format: chunk header without extended header */
+  error = write_compression_header(g_global_context, !g_global_context->blosc1_format);
   if (error < 0) {
     blosc2_pthread_mutex_unlock(&global_comp_mutex);
     return error;
@@ -4478,6 +4616,30 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     return ntbytes;
   }
 
+  bool has_delta = false;
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+    if (context->filters[i] == BLOSC_DELTA) {
+      has_delta = true;
+      break;
+    }
+  }
+  if (has_delta) {
+    uint8_t* full_chunk = malloc((size_t)header->nbytes);
+    if (full_chunk == NULL) {
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+    int dbytes = blosc2_decompress_ctx(context, src, srcsize, full_chunk, header->nbytes);
+    context->dest = NULL;
+    context->destsize = 0;
+    if (dbytes < 0 || dbytes != header->nbytes) {
+      free(full_chunk);
+      return dbytes < 0 ? dbytes : BLOSC2_ERROR_DATA;
+    }
+    memcpy(dest, full_chunk + start_bytes64, (size_t)nitems_bytes);
+    free(full_chunk);
+    return nitems_bytes;
+  }
+
   ebsize = header->blocksize + header->typesize * (signed)sizeof(int32_t);
   struct thread_context* scontext = context->serial_context;
   /* Resize the temporaries in serial context if needed */
@@ -4520,15 +4682,16 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
 
 #if defined(HAVE_ZFP)
     if (context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) {
+      // The items in this block
       scontext->zfp_cell_start = startb / context->typesize;
-      scontext->zfp_cell_nitems = nitems;
+      scontext->zfp_cell_nitems = bsize2 / context->typesize;
     }
 #endif /* HAVE_ZFP */
 
     /* Do the actual data copy */
     // Regular decompression.  Put results in tmp2.
-    // If the block is aligned and the worst case fits in destination, let's avoid a copy
-    bool get_single_block = ((startb == 0) && (bsize == nitems_bytes));
+    // If the items are exactly this block, decompress it in destination and avoid a copy
+    bool get_single_block = ((ntbytes == 0) && (startb == 0) && (bsize == nitems_bytes));
     uint8_t* tmp2 = get_single_block ? dest : scontext->tmp2;
 
     // If memcpyed we don't have a bstarts section (because it is not needed)
@@ -4542,16 +4705,11 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
       ntbytes = cbytes;
       break;
     }
-    if (scontext->zfp_cell_nitems > 0) {
-      if (cbytes == bsize2) {
-        memcpy((uint8_t *) dest, tmp2, (unsigned int) bsize2);
-      } else if (cbytes == context->blocksize) {
-        memcpy((uint8_t *) dest, tmp2 + scontext->zfp_cell_start * context->typesize, (unsigned int) bsize2);
-        cbytes = bsize2;
-      }
-    } else if (!get_single_block) {
-      /* Copy to destination */
-      memcpy((uint8_t *) dest + ntbytes, tmp2 + startb, (unsigned int) bsize2);
+    if (!get_single_block) {
+      /* Copy to destination.  When ZFP decoded just the requested items (a single
+         cell), they are at the start of tmp2, else the whole block was decoded. */
+      bool zfp_cell = (scontext->zfp_cell_nitems > 0) && (cbytes == bsize2);
+      memcpy((uint8_t *) dest + ntbytes, tmp2 + (zfp_cell ? 0 : startb), (unsigned int) bsize2);
     }
     ntbytes += bsize2;
   }
@@ -4750,6 +4908,30 @@ int blosc2_decompress_block_ctx(blosc2_context* context, const void* src,
     return BLOSC2_ERROR_WRITE_BUFFER;
   }
 
+  bool has_delta = false;
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
+    if (context->filters[i] == BLOSC_DELTA) {
+      has_delta = true;
+      break;
+    }
+  }
+  if (has_delta) {
+    uint8_t* full_chunk = malloc((size_t)header.nbytes);
+    if (full_chunk == NULL) {
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+    int dbytes = blosc2_decompress_ctx(context, src, srcsize, full_chunk, header.nbytes);
+    context->dest = dest;
+    context->destsize = destsize;
+    if (dbytes < 0 || dbytes != header.nbytes) {
+      free(full_chunk);
+      return dbytes < 0 ? dbytes : BLOSC2_ERROR_DATA;
+    }
+    memcpy(dest, full_chunk + (int64_t)nblock * context->blocksize, (size_t)bsize);
+    free(full_chunk);
+    return bsize;
+  }
+
   if (context->serial_context == NULL) {
     context->serial_context = create_thread_context(context, 0);
   }
@@ -4909,6 +5091,9 @@ static void t_blosc_do_job(void *ctxt)
                          src, srcsize, src_offset, nblock_,
                          dest_block, dest_offset, tmp, tmp2);
       }
+      if (nblock_ == 0 || cbytes < 0) {
+        delta_release_dref(context);
+      }
     }
 
     if (context->thread_giveup_code <= 0) {
@@ -5031,6 +5216,9 @@ static void t_blosc_do_job(void *ctxt) {
     blosc2_pthread_mutex_lock(&job->mutex);
     job->giveup_code = BLOSC2_ERROR_MEMORY_ALLOC;
     blosc2_pthread_mutex_unlock(&job->mutex);
+    if (!compress) {
+      delta_release_dref(context);
+    }
     goto job_done;
   }
 
@@ -5112,6 +5300,9 @@ static void t_blosc_do_job(void *ctxt) {
         cbytes = blosc_d(thcontext, bsize, leftoverblock, memcpyed,
                          src, srcsize, src_offset, nblock_,
                          dest_block, dest_offset, tmp, tmp2);
+      }
+      if (nblock_ == 0 || cbytes < 0) {
+        delta_release_dref(context);
       }
     }
 

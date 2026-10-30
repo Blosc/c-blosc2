@@ -81,7 +81,15 @@ typedef struct {
   void* read_fp;            //!< Cached "rb" handle for the frame file; NULL if none open
   int32_t read_fp_refs;     //!< Outstanding frame_reader_acquire() calls on read_fp
   bool read_fp_nocache;     //!< The handle cache was full for this frame; do not ask again
-  blosc2_pthread_mutex_t read_fp_mutex;  //!< Guards read_fp and its bookkeeping
+  uint64_t read_fp_dev;     //!< Device of cached read_fp (POSIX)
+  uint64_t read_fp_ino;     //!< Inode of cached read_fp (POSIX)
+  blosc2_pthread_mutex_t read_fp_mutex;  //!< Guards read_fp, write_fp and their bookkeeping
+  void* write_fp;           //!< Cached "rb+" handle for the frame file; NULL if none open
+  bool write_fp_nocache;    //!< The handle budget was exhausted for this frame; do not ask again
+  bool write_fp_stale;      //!< The file was replaced; the writer reopens it on its next acquire
+  uint64_t write_fp_dev;    //!< Device of cached write_fp (POSIX)
+  uint64_t write_fp_ino;    //!< Inode of cached write_fp (POSIX)
+  int64_t file_end;         //!< Size of the frame file as we last left it; <= 0 if unknown
 } blosc2_frame_s;
 
 
@@ -221,8 +229,9 @@ void* frame_reader_acquire(blosc2_frame_s* frame, const blosc2_io* io);
 void frame_reader_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void* fp);
 
 /**
- * @brief Close the frame's cached read handle, if any.  Call before the frame
- * file is replaced (rather than rewritten in place) so the next read reopens it.
+ * @brief Close the frame's cached read and write handles, if any.  Call before
+ * the frame file is replaced (rather than rewritten in place) so the next
+ * access reopens it.
  * Unconditional: only for teardown and for write paths that recreate the file,
  * where no read can be in flight.
  */
@@ -231,12 +240,43 @@ void frame_reader_invalidate(blosc2_frame_s* frame);
 /**
  * @brief Drop the cached read handle if it no longer refers to the file at the
  * frame's urlpath, i.e. the frame file was unlinked and recreated, or renamed
- * over.  Also sets @p frame->force_refresh so the cached metadata is reloaded
- * even when the replacement happens to have the same length.  Call before any
- * read that the frame's cached state is derived from.  No-op where no handle is
- * cached (Windows, non-filesystem backends, cframes).
+ * over, and flag the cached write handle for reopening in that case.  Also sets
+ * @p frame->force_refresh so the cached metadata is reloaded even when the
+ * replacement happens to have the same length.  Call before any read that the
+ * frame's cached state is derived from.  No-op where no handle is cached
+ * (Windows, non-filesystem backends, cframes).
  */
 void frame_reader_revalidate(blosc2_frame_s* frame);
+
+/**
+ * @brief Get a writable ("rb+") handle on the frame file (regular frames only).
+ * For the filesystem backend on POSIX the handle is opened once and kept until
+ * the frame is freed, its file replaced, or a frame lock released (with
+ * locking on, it is only kept while the lock is held): every
+ * close() of a written file is a synchronous flush on NFS, and a frame update
+ * used to open and close the file four times.  It draws on the same descriptor
+ * budget as the cached read handle (see frame_reader_acquire()), and falls back
+ * to a private per-call handle when that is exhausted.  Other backends and
+ * Windows always get a private per-call handle, as before.
+ *
+ * Writes to one frame must be serialized by the caller.  Give the handle back
+ * with frame_writer_release().
+ *
+ * @return The handle, or NULL if it could not be opened.
+ */
+void* frame_writer_acquire(blosc2_frame_s* frame, const blosc2_io_cb* io_cb);
+
+/**
+ * @brief Counterpart of frame_writer_acquire(): closes @p fp unless it is the
+ * frame's cached writable handle.  Also fine for sframe index handles.
+ */
+void frame_writer_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void* fp);
+
+/**
+ * @brief Close the frame's cached writable handle, if any, which pushes its
+ * writes to the server on NFS (close-to-open consistency).
+ */
+void frame_writer_close(blosc2_frame_s* frame);
 
 int frame_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
 int frame_get_lazychunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);

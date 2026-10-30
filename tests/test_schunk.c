@@ -219,6 +219,41 @@ static char* test_schunk_no_init(void)
 }
 
 
+/* Update a metalayer from (part of) its own content: the source and the
+   destination of the copy overlap */
+static char* test_meta_update_overlap(void) {
+  blosc2_init();
+  for (int contiguous = 0; contiguous <= 1; contiguous++) {
+    blosc2_storage storage = {.contiguous = contiguous};
+    blosc2_schunk* schunk = blosc2_schunk_new(&storage);
+    mu_assert("ERROR: cannot create the schunk", schunk != NULL);
+    const char content[] = "0123456789";
+    int nmeta = blosc2_meta_add(schunk, "meta", (uint8_t *) content, sizeof(content));
+    mu_assert("ERROR: cannot add the metalayer", nmeta >= 0);
+    uint8_t *own_content = schunk->metalayers[nmeta]->content;
+
+    // The very same buffer
+    int rc = blosc2_meta_update(schunk, "meta", own_content, sizeof(content));
+    mu_assert("ERROR: cannot update the metalayer with itself", rc >= 0);
+    // Partly overlapping: shift the content 2 bytes to the left
+    rc = blosc2_meta_update(schunk, "meta", own_content + 2, sizeof(content) - 2);
+    mu_assert("ERROR: cannot update the metalayer with part of itself", rc >= 0);
+
+    uint8_t *content_;
+    int32_t content_len_;
+    rc = blosc2_meta_get(schunk, "meta", &content_, &content_len_);
+    mu_assert("ERROR: cannot get the metalayer", rc >= 0);
+    mu_assert("ERROR: bad metalayer length", content_len_ == sizeof(content));
+    mu_assert("ERROR: bad metalayer content", memcmp(content_, "23456789\0" "9", sizeof(content)) == 0);
+    free(content_);
+    blosc2_schunk_free(schunk);
+  }
+  blosc2_destroy();
+
+  return EXIT_SUCCESS;
+}
+
+
 static char *all_tests(void) {
 
   // We need to run the no-init example first as the other examples
@@ -240,6 +275,8 @@ static char *all_tests(void) {
 
   nchunks = 10;
   mu_run_test(test_schunk);
+
+  mu_run_test(test_meta_update_overlap);
 
   return EXIT_SUCCESS;
 }
