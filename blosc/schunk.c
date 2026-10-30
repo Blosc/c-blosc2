@@ -326,6 +326,9 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
       rc = blosc2_schunk_append_chunk(new_schunk, chunk, !needs_free);
       if (rc < 0) {
         BLOSC_TRACE_ERROR("Can not append the `chunk` into super-chunk.");
+        if (needs_free) {
+          free(chunk);
+        }
         return NULL;
       }
     }
@@ -1068,6 +1071,9 @@ static int64_t schunk_append_chunk_unlocked(blosc2_schunk *schunk, uint8_t *chun
   else {
     if (frame_append_chunk(frame, chunk, schunk) == NULL) {
       BLOSC_TRACE_ERROR("Problems appending a chunk.");
+      if (copy) {
+        free(chunk);
+      }
       return BLOSC2_ERROR_CHUNK_APPEND;
     }
   }
@@ -1470,6 +1476,7 @@ int64_t blosc2_schunk_append_buffer(blosc2_schunk *schunk, const void *src, int3
   int64_t nchunks = blosc2_schunk_append_chunk(schunk, chunk, false);
   if (nchunks < 0) {
     BLOSC_TRACE_ERROR("Error appending a buffer in super-chunk");
+    free(chunk);
     return nchunks;
   }
 
