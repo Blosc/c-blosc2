@@ -2873,8 +2873,9 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
   }
   srcsize -= bstarts_end;
 
-  /* Read optional dictionary if flag set */
-  if ((context->blosc2_flags & BLOSC2_USEDICT) && !is_lazy) {
+  /* Read optional dictionary if flag set.  A memcpyed chunk has none, even if the flag says so
+     (older versions left it on chunks with a dictionary that did not compress) */
+  if ((context->blosc2_flags & BLOSC2_USEDICT) && !memcpyed && !is_lazy) {
     context->use_dict = 1;
     // The dictionary section is after the bstarts block: [int32 size | raw bytes]
     if (srcsize < (signed)sizeof(int32_t)) {
@@ -2909,7 +2910,7 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
 #endif   // HAVE_ZSTD
     // For LZ4/LZ4HC: dict_buffer and dict_size are sufficient; no digested object needed.
   }
-  else if ((context->blosc2_flags & BLOSC2_USEDICT) && is_lazy) {
+  else if ((context->blosc2_flags & BLOSC2_USEDICT) && !memcpyed && is_lazy) {
     rc = load_lazy_chunk_dict(context, header, bstarts_end);
     if (rc < 0) {
       return rc;
@@ -3132,6 +3133,10 @@ static int blosc_compress_context(blosc2_context* context) {
       }
       // Success!  update the memcpy bit in header
       context->dest[BLOSC2_CHUNK_FLAGS] = context->header_flags;
+      if (context->dict_cdict != NULL) {
+        // The copy overwrote the dictionary that this pass was going to use
+        context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
+      }
       // and clear the memcpy bit in context (for next reuse)
       context->header_flags &= ~(uint8_t)BLOSC_MEMCPYED;
     }
