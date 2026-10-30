@@ -1273,6 +1273,12 @@ static int64_t schunk_update_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
     return rc;
   }
 
+  uint8_t old_flags2 = schunk->flags2;
+  int32_t old_chunksize = schunk->chunksize;
+  int64_t old_current_nchunk = schunk->current_nchunk;
+  int64_t old_nbytes = schunk->nbytes;
+  int64_t old_cbytes = schunk->cbytes;
+
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
 
@@ -1387,6 +1393,14 @@ static int64_t schunk_update_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
   else {
     if (frame_update_chunk(frame, nchunk, chunk, schunk) == NULL) {
         BLOSC_TRACE_ERROR("Problems updating a chunk in a frame.");
+        if (copy) {
+          free(chunk);
+        }
+        schunk->flags2 = old_flags2;
+        schunk->chunksize = old_chunksize;
+        schunk->current_nchunk = old_current_nchunk;
+        schunk->nbytes = old_nbytes;
+        schunk->cbytes = old_cbytes;
         return BLOSC2_ERROR_CHUNK_UPDATE;
     }
   }
@@ -1724,6 +1738,13 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       return BLOSC2_ERROR_FAILURE;
     }
     int32_t blocksize = sw32_(chunk + BLOSC2_CHUNK_BLOCKSIZE);
+    if (blocksize <= 0) {
+      BLOSC_TRACE_ERROR("Corrupted chunk blocksize %d.", blocksize);
+      if (needs_free) {
+        free(chunk);
+      }
+      return BLOSC2_ERROR_DATA;
+    }
 
     int32_t nblock_start = (int32_t) (chunk_start / blocksize);
     int32_t nblock_stop = (int32_t) ((chunk_stop - 1) / blocksize);

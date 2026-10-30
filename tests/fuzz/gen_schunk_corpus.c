@@ -58,12 +58,16 @@ static void emit(const char *dir, const char *name, bool contiguous,
                     (int32_t)strlen(meta_content));
   }
   int32_t bufsize = (int32_t)(chunk_items * typesize);
-  uint32_t *data = (uint32_t *)malloc((size_t)bufsize);
-  int64_t words = bufsize / 4;
+  uint8_t *data = (uint8_t *)calloc(1, bufsize > 0 ? (size_t)bufsize : 1);
+  if (data == NULL) {
+    blosc2_schunk_free(schunk);
+    return;
+  }
+  for (size_t k = 0; k < (size_t)bufsize; k++) {
+    uint32_t p = pattern((int64_t)(k / 4));
+    data[k] = (uint8_t)(p >> ((k % 4) * 8));
+  }
   for (int i = 0; i < nchunks; i++) {
-    for (int64_t k = 0; k < words; k++) {
-      data[k] = pattern((int64_t)i * words + k);
-    }
     blosc2_schunk_append_buffer(schunk, data, bufsize);
   }
   free(data);
@@ -81,11 +85,7 @@ static void emit(const char *dir, const char *name, bool contiguous,
 }
 
 int main(int argc, char **argv) {
-  if (argc < 2) {
-    fprintf(stderr, "usage: %s <output-dir>\n", argv[0]);
-    return 1;
-  }
-  const char *dir = argv[1];
+  const char *dir = (argc >= 2) ? argv[1] : ".";
 
   blosc2_init();
   emit(dir, "schunk_meta_blosclz.b2frame", true, BLOSC_BLOSCLZ, 5, 4,
