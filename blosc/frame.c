@@ -2230,6 +2230,9 @@ blosc2_frame_s* frame_from_cframe(uint8_t *cframe, int64_t len, bool copy) {
 }
 
 
+static int32_t compress_offsets(const int64_t* offsets, int32_t off_nbytes, int32_t dest_nbytes,
+                                uint8_t** off_chunk);
+
 /* Create a frame out of a super-chunk. */
 int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   frame->file_offset = 0;
@@ -2290,19 +2293,9 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   }
   uint8_t *off_chunk = NULL;
   if (nchunks > 0) {
-    // Compress the chunk of offsets
-    off_chunk = malloc(off_nbytes + BLOSC2_MAX_OVERHEAD);
-    blosc2_context *cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
-    if (cctx == NULL) {
-      BLOSC_TRACE_ERROR("Error while creating the compression context");
-      return BLOSC2_ERROR_NULL_POINTER;
-    }
-    cctx->typesize = sizeof(int64_t);
-    off_cbytes = blosc2_compress_ctx(cctx, data_tmp, off_nbytes, off_chunk,
-                                     off_nbytes + BLOSC2_MAX_OVERHEAD);
-    blosc2_free_ctx(cctx);
+    off_cbytes = compress_offsets((const int64_t*)data_tmp, off_nbytes, off_nbytes + BLOSC2_MAX_OVERHEAD,
+                                  &off_chunk);
     if (off_cbytes < 0) {
-      free(off_chunk);
       free(h2);
       return off_cbytes;
     }
@@ -5486,26 +5479,11 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   }
 
   // Re-compress the offsets again
-  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.splitmode = BLOSC_NEVER_SPLIT;
-  cparams.typesize = sizeof(int64_t);
-  cparams.blocksize = 16 * 1024;  // based on experiments with create_frame.c bench
-  cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
-  cparams.compcode = BLOSC_BLOSCLZ;
-  blosc2_context* cctx = blosc2_create_cctx(cparams);
-  if (cctx == NULL) {
-    BLOSC_TRACE_ERROR("Error while creating the compression context");
-    free(offsets);
-    return NULL;
-  }
-  void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
-  int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
-                                               off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);
-  blosc2_free_ctx(cctx);
-
+  uint8_t* off_chunk;
+  int32_t new_off_cbytes = compress_offsets(offsets, off_nbytes, off_nbytes + BLOSC2_MAX_OVERHEAD,
+                                            &off_chunk);
   free(offsets);
   if (new_off_cbytes < 0) {
-    free(off_chunk);
     return NULL;
   }
 
@@ -5864,32 +5842,11 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     }
   }
   // Re-compress the offsets again
-  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.splitmode = BLOSC_NEVER_SPLIT;
-  cparams.typesize = sizeof(int64_t);
-  cparams.blocksize = 16 * 1024;  // based on experiments with create_frame.c bench
-  cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
-  cparams.compcode = BLOSC_BLOSCLZ;
-  blosc2_context* cctx = blosc2_create_cctx(cparams);
-  if (cctx == NULL) {
-    free(offsets);
-    BLOSC_TRACE_ERROR("Error while creating the compression context");
-    return NULL;
-  }
-  void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
-  if (off_chunk == NULL) {
-    free(offsets);
-    blosc2_free_ctx(cctx);
-    BLOSC_TRACE_ERROR("Cannot allocate memory for off_chunk.");
-    return NULL;
-  }
-  int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
-                                               off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);
-  blosc2_free_ctx(cctx);
-
+  uint8_t* off_chunk;
+  int32_t new_off_cbytes = compress_offsets(offsets, off_nbytes, off_nbytes + BLOSC2_MAX_OVERHEAD,
+                                            &off_chunk);
   free(offsets);
   if (new_off_cbytes < 0) {
-    free(off_chunk);
     return NULL;
   }
 
@@ -6118,27 +6075,12 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
   }
   offsets[nchunks - 1] = 0;
 
-  // Re-compress the offsets again
-  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.splitmode = BLOSC_NEVER_SPLIT;
-  cparams.typesize = sizeof(int64_t);
-  cparams.blocksize = 16 * 1024;  // based on experiments with create_frame.c bench
-  cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
-  cparams.compcode = BLOSC_BLOSCLZ;
-  blosc2_context* cctx = blosc2_create_cctx(cparams);
-  if (cctx == NULL) {
-    BLOSC_TRACE_ERROR("Error while creating the compression context");
-    free(offsets);
-    return NULL;
-  }
-  void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
-  int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes - (int32_t)sizeof(int64_t),
-                                               off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);
-  blosc2_free_ctx(cctx);
-
+  // Re-compress the offsets again: one less, in the room of the old ones
+  uint8_t* off_chunk;
+  int32_t new_off_cbytes = compress_offsets(offsets, off_nbytes - (int32_t)sizeof(int64_t),
+                                            off_nbytes + BLOSC2_MAX_OVERHEAD, &off_chunk);
   free(offsets);
   if (new_off_cbytes < 0) {
-    free(off_chunk);
     return NULL;
   }
 
@@ -6306,28 +6248,13 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
   free(offsets_copy);
 
   // Re-compress the offsets again
-  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.splitmode = BLOSC_NEVER_SPLIT;
-  cparams.typesize = sizeof(int64_t);
-  cparams.blocksize = 16 * 1024;  // based on experiments with create_frame.c bench
-  cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
-  cparams.compcode = BLOSC_BLOSCLZ;
-  blosc2_context* cctx = blosc2_create_cctx(cparams);
-  if (cctx == NULL) {
-    BLOSC_TRACE_ERROR("Error while creating the compression context");
-    return BLOSC2_ERROR_NULL_POINTER;
-  }
-  void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
-  int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
-                                               off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);
-  blosc2_free_ctx(cctx);
-
+  uint8_t* off_chunk;
+  int32_t new_off_cbytes = compress_offsets(offsets, off_nbytes, off_nbytes + BLOSC2_MAX_OVERHEAD,
+                                            &off_chunk);
+  free(offsets);
   if (new_off_cbytes < 0) {
-    free(offsets);
-    free(off_chunk);
     return new_off_cbytes;
   }
-  free(offsets);
   int64_t new_frame_len;
   if (frame->sframe) {
     // The chunks are not in the frame
