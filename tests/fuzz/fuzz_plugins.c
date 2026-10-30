@@ -97,6 +97,17 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   uint8_t typesize = typesizes[typesize_sel];
 
   uint8_t compcode = compcodes[comp_sel];
+  bool is_zfp = (compcode == BLOSC_CODEC_ZFP_FIXED_ACCURACY ||
+                 compcode == BLOSC_CODEC_ZFP_FIXED_PRECISION ||
+                 compcode == BLOSC_CODEC_ZFP_FIXED_RATE);
+  if (is_zfp && typesize != 4 && typesize != 8) {
+    typesize = (typesize_sel % 2) ? 8 : 4;
+  }
+  if (compcode == BLOSC_CODEC_NDLZ) {
+    ndim = 2;
+    typesize = 1;
+  }
+
   uint8_t compcode_meta = raw_meta;
   if (compcode == BLOSC_CODEC_NDLZ) {
     compcode_meta = (uint8_t)((raw_meta % 2) ? 8 : 4);
@@ -114,26 +125,45 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   int64_t total = 1;
   for (int8_t d = 0; d < ndim; d++) {
     int64_t ext = (int64_t)(tail_u8(&r) % FUZZ_MAX_EXTENT + 1);
+    if (is_zfp && ext < 4) {
+      ext = 4;
+    }
     if (total * ext > FUZZ_MAX_ITEMS) {
-      ext = 1;
+      ext = is_zfp ? 4 : 1;
     }
     shape[d] = ext;
-    chunkshape[d] = (int32_t)(ext > 4 ? 4 : ext);
-    blockshape[d] = (int32_t)(ext > 2 ? 2 : ext);
-    total *= ext;
+    if (is_zfp) {
+      chunkshape[d] = (int32_t)(ext >= 4 ? 4 : ext);
+      blockshape[d] = 4;
+    } else if (compcode == BLOSC_CODEC_NDLZ) {
+      int32_t b = (compcode_meta == 8) ? 8 : 4;
+      chunkshape[d] = b;
+      blockshape[d] = b;
+      if (shape[d] < b) shape[d] = b;
+    } else {
+      chunkshape[d] = (int32_t)(ext > 4 ? 4 : ext);
+      blockshape[d] = (int32_t)(ext > 2 ? 2 : ext);
+    }
+    total *= shape[d];
   }
 
-  const uint8_t *payload = data;
-  size_t payload_len = r.size;
+  uint8_t filter = filters[filter_sel];
+  uint8_t f_meta = filter_meta;
+  if (filter == BLOSC_FILTER_NDCELL || filter == BLOSC_FILTER_NDMEAN) {
+    f_meta = (uint8_t)((filter_meta % 2) + 1);
+  } else if (filter == BLOSC_FILTER_BYTEDELTA || filter == BLOSC_FILTER_BYTEDELTA_BUGGY) {
+    f_meta = typesize;
+  } else if (filter == BLOSC_FILTER_INT_TRUNC) {
+    f_meta = (uint8_t)(filter_meta % (typesize * 8));
+  }
 
   blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
   cparams.typesize = typesize;
   cparams.clevel = clevel;
   cparams.compcode = compcode;
   cparams.compcode_meta = compcode_meta;
-  cparams.filters[BLOSC2_MAX_FILTERS - 1] = filters[filter_sel];
-  cparams.filters_meta[BLOSC2_MAX_FILTERS - 1] =
-      (filter_sel == 6 || filter_sel == 7) ? typesize : filter_meta;
+  cparams.filters[BLOSC2_MAX_FILTERS - 1] = filter;
+  cparams.filters_meta[BLOSC2_MAX_FILTERS - 1] = f_meta;
   cparams.nthreads = 1;
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
   dparams.nthreads = 1;
@@ -147,8 +177,27 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     return 0;
   }
 
+  int64_t required_bytes = total * typesize;
+  uint8_t *payload_buf = (uint8_t *)malloc((size_t)required_bytes);
+  if (payload_buf == NULL) {
+    b2nd_free_ctx(ctx);
+    blosc2_destroy();
+    return 0;
+  }
+  const uint8_t *payload = data;
+  size_t payload_len = r.size;
+  if (payload_len > 0) {
+    for (size_t i = 0; i < (size_t)required_bytes; i += payload_len) {
+      size_t chunk = ((size_t)required_bytes - i < payload_len) ? ((size_t)required_bytes - i) : payload_len;
+      memcpy(payload_buf + i, payload, chunk);
+    }
+  } else {
+    memset(payload_buf, 0, (size_t)required_bytes);
+  }
+
   b2nd_array_t *arr = NULL;
-  int rc = b2nd_from_cbuffer(ctx, &arr, payload, (int64_t)payload_len);
+  int rc = b2nd_from_cbuffer(ctx, &arr, payload_buf, required_bytes);
+  free(payload_buf);
   if (rc >= 0 && arr != NULL) {
     uint8_t *buf = (uint8_t *)malloc((size_t)FUZZ_MAX_ITEMS * 8);
     if (buf != NULL) {
