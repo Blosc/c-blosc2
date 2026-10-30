@@ -1889,7 +1889,7 @@ static int masked_slice_read(blosc2_schunk *schunk, uint8_t *chunk, int32_t cbyt
 }
 
 
-int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer) {
+static int schunk_get_slice_buffer_unlocked(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer) {
   int64_t byte_start = start * schunk->typesize;
   int64_t byte_stop = stop * schunk->typesize;
   int64_t nchunk_start = byte_start / schunk->chunksize;
@@ -1994,6 +1994,27 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
   }
 
   return BLOSC2_ERROR_SUCCESS;
+}
+
+
+int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer) {
+  // With locking on, hold the shared frame lock from the refresh to the last chunk read, as
+  // b2nd_get_slice_cbuffer() does: with a lock per chunk access, a writer could change the
+  // frame between two chunks of the slice, or between reading a lazy chunk and its blocks.
+  // Unlocked handles keep SWMR's transient errors, and skip the refresh.
+  blosc2_frame_s *frame = (blosc2_frame_s *) schunk->frame;
+  int rc = frame_lock(frame, false);
+  if (rc < 0) {
+    return rc;
+  }
+  if (frame != NULL && frame->locking) {
+    rc = frame_check_stale(frame);
+  }
+  if (rc >= 0) {
+    rc = schunk_get_slice_buffer_unlocked(schunk, start, stop, buffer);
+  }
+  frame_unlock(frame);
+  return rc;
 }
 
 

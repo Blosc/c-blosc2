@@ -1897,6 +1897,33 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
 }
 
 
+// get_set_slice() holding the frame lock (shared to read, exclusive to write)
+// from the refresh to the last chunk, so a locked handle works on the chunks
+// of the shape it just refreshed to: with a lock per chunk access, a writer
+// shrinking the array in between made a read fail ("nchunk exceeds the number
+// of chunks").  A write can span several chunks, each updated with its own
+// blosc2_schunk_update_chunk() call; under one lock (as b2nd_resize() already
+// does for its metalayer+chunks sequence) locked handles -- including plain
+// readers -- see the whole slice atomically instead of a chunk-wise interleave
+// with other writers (plans/todo-locking-swmr.md item 2 / python-blosc2's
+// todo/locking-mwmr.md item 2).  A no-op for unlocked handles, which keep
+// SWMR's transient errors.
+static int locked_get_set_slice(void *buffer, int64_t buffersize, const int64_t *start,
+                                const int64_t *stop, const int64_t *shape, b2nd_array_t *array,
+                                bool set_slice) {
+  blosc2_frame_s *frame = (blosc2_frame_s *) array->sc->frame;
+  BLOSC_ERROR(frame_lock(frame, set_slice));
+  int rc = refresh_if_stale(array);
+  if (rc >= 0) {
+    rc = get_set_slice(buffer, buffersize, start, stop, shape, array, set_slice);
+  }
+  frame_unlock(frame);
+  BLOSC_ERROR(rc);
+
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 int b2nd_get_slice_cbuffer(const b2nd_array_t *array, const int64_t *start, const int64_t *stop,
                            void *buffer, const int64_t *buffershape, int64_t buffersize) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
@@ -1904,11 +1931,9 @@ int b2nd_get_slice_cbuffer(const b2nd_array_t *array, const int64_t *start, cons
   BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(buffershape, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
-  BLOSC_ERROR(refresh_if_stale((b2nd_array_t *) array));
 
-  BLOSC_ERROR(get_set_slice(buffer, buffersize, start, stop, buffershape, (b2nd_array_t *)array, false));
-
-  return BLOSC2_ERROR_SUCCESS;
+  return locked_get_set_slice(buffer, buffersize, start, stop, buffershape, (b2nd_array_t *) array,
+                              false);
 }
 
 
@@ -1919,22 +1944,8 @@ int b2nd_set_slice_cbuffer(const void *buffer, const int64_t *buffershape, int64
   BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
-  BLOSC_ERROR(refresh_if_stale(array));
 
-  // A slice write can span several chunks, each updated with its own
-  // blosc2_schunk_update_chunk() call; hold the exclusive frame lock across
-  // all of them (as b2nd_resize() already does for its metalayer+chunks
-  // sequence) so locked handles -- including plain readers -- see the whole
-  // slice atomically instead of a chunk-wise interleave with other writers
-  // (plans/todo-locking-swmr.md item 2 / python-blosc2's
-  // todo/locking-mwmr.md item 2). A no-op for unlocked handles.
-  blosc2_frame_s *frame = (blosc2_frame_s *) array->sc->frame;
-  BLOSC_ERROR(frame_lock(frame, true));
-  int rc = get_set_slice((void*)buffer, buffersize, start, stop, (int64_t *)buffershape, array, true);
-  frame_unlock(frame);
-  BLOSC_ERROR(rc);
-
-  return BLOSC2_ERROR_SUCCESS;
+  return locked_get_set_slice((void *) buffer, buffersize, start, stop, buffershape, array, true);
 }
 
 
