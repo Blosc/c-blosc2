@@ -279,6 +279,14 @@ static char *test_no_mix_regular_and_vlblocks(void) {
   int vl_cbytes = blosc2_vlcompress_ctx(schunk->cctx, (const void * const *)srcs, srcsizes, 3, vlchunk, (int32_t)sizeof(vlchunk));
   mu_assert("ERROR: cannot create VL-block chunk", vl_cbytes > 0);
   mu_assert("ERROR: mixing regular and VL-block chunks should fail", blosc2_schunk_append_chunk(schunk, vlchunk, true) < 0);
+  /* Inserts and updates check against another chunk too (chunk 1 when updating chunk 0) */
+  mu_assert("ERROR: cannot append regular chunk", blosc2_schunk_append_chunk(schunk, regular, true) == 2);
+  mu_assert("ERROR: inserting a VL-block chunk should fail", blosc2_schunk_insert_chunk(schunk, 1, vlchunk, true) < 0);
+  mu_assert("ERROR: updating to a VL-block chunk should fail",
+            blosc2_schunk_update_chunk(schunk, 0, vlchunk, true) < 0);
+  mu_assert("ERROR: updating to a VL-block chunk should fail",
+            blosc2_schunk_update_chunk(schunk, 1, vlchunk, true) < 0);
+  mu_assert("ERROR: the rejected chunks must leave the schunk alone", schunk->nchunks == 2);
 
   blosc2_schunk_free(schunk);
   blosc2_remove_urlpath(tdata.urlpath);
