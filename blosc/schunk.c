@@ -308,7 +308,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
     blosc2_metalayer *meta = schunk->metalayers[nmeta];
     if (blosc2_meta_add(new_schunk, meta->name, meta->content, meta->content_len) < 0) {
       BLOSC_TRACE_ERROR("Can not add %s `metalayer`.", meta->name);
-      return NULL;
+      goto error;
     }
   }
 
@@ -322,7 +322,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
       int rc = blosc2_schunk_get_chunk(schunk, nchunk, &chunk, &needs_free);
       if (rc < 0) {
         BLOSC_TRACE_ERROR("Can not get the `chunk` %d.", nchunk);
-        return NULL;
+        goto error;
       }
       rc = blosc2_schunk_append_chunk(new_schunk, chunk, !needs_free);
       if (rc < 0) {
@@ -330,20 +330,25 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
         if (needs_free) {
           free(chunk);
         }
-        return NULL;
+        goto error;
       }
     }
   } else {
     int32_t chunksize = schunk->chunksize == -1 ? 0 : schunk->chunksize;
     uint8_t *buffer = malloc(chunksize);
+    if (buffer == NULL && chunksize > 0) {
+      goto error;
+    }
     for (int nchunk = 0; nchunk < schunk->nchunks; ++nchunk) {
       if (blosc2_schunk_decompress_chunk(schunk, nchunk, buffer, schunk->chunksize) < 0) {
         BLOSC_TRACE_ERROR("Can not decompress the `chunk` %d.", nchunk);
-        return NULL;
+        free(buffer);
+        goto error;
       }
       if (blosc2_schunk_append_buffer(new_schunk, buffer, schunk->chunksize) < 0) {
         BLOSC_TRACE_ERROR("Can not append the `buffer` into super-chunk.");
-        return NULL;
+        free(buffer);
+        goto error;
       }
     }
     free(buffer);
@@ -358,16 +363,20 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
       // Passing the (previously uninitialized) content pointer forward ended
       // in a bogus free that aborted the process; bail out instead.
       BLOSC_TRACE_ERROR("Can not get %s `vlmetalayer`.", name);
-      return NULL;
+      goto error;
     }
     if (blosc2_vlmeta_add(new_schunk, name, content, content_len, NULL) < 0) {
       BLOSC_TRACE_ERROR("Can not add %s `vlmetalayer`.", name);
       free(content);
-      return NULL;
+      goto error;
     }
     free(content);
   }
   return new_schunk;
+
+error:
+  blosc2_schunk_free(new_schunk);
+  return NULL;
 }
 
 
