@@ -4707,8 +4707,8 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
 
     /* Do the actual data copy */
     // Regular decompression.  Put results in tmp2.
-    // If the block is aligned and the worst case fits in destination, let's avoid a copy
-    bool get_single_block = ((startb == 0) && (bsize == nitems_bytes));
+    // If the items are exactly this block, decompress it in destination and avoid a copy
+    bool get_single_block = ((ntbytes == 0) && (startb == 0) && (bsize == nitems_bytes));
     uint8_t* tmp2 = get_single_block ? dest : scontext->tmp2;
 
     // If memcpyed we don't have a bstarts section (because it is not needed)
