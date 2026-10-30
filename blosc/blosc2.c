@@ -4703,8 +4703,9 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
 
 #if defined(HAVE_ZFP)
     if (context->compcode == BLOSC_CODEC_ZFP_FIXED_RATE) {
+      // The items in this block
       scontext->zfp_cell_start = startb / context->typesize;
-      scontext->zfp_cell_nitems = nitems;
+      scontext->zfp_cell_nitems = bsize2 / context->typesize;
     }
 #endif /* HAVE_ZFP */
 
@@ -4725,16 +4726,11 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
       ntbytes = cbytes;
       break;
     }
-    if (scontext->zfp_cell_nitems > 0) {
-      if (cbytes == bsize2) {
-        memcpy((uint8_t *) dest, tmp2, (unsigned int) bsize2);
-      } else if (cbytes == context->blocksize) {
-        memcpy((uint8_t *) dest, tmp2 + scontext->zfp_cell_start * context->typesize, (unsigned int) bsize2);
-        cbytes = bsize2;
-      }
-    } else if (!get_single_block) {
-      /* Copy to destination */
-      memcpy((uint8_t *) dest + ntbytes, tmp2 + startb, (unsigned int) bsize2);
+    if (!get_single_block) {
+      /* Copy to destination.  When ZFP decoded just the requested items (a single
+         cell), they are at the start of tmp2, else the whole block was decoded. */
+      bool zfp_cell = (scontext->zfp_cell_nitems > 0) && (cbytes == bsize2);
+      memcpy((uint8_t *) dest + ntbytes, tmp2 + (zfp_cell ? 0 : startb), (unsigned int) bsize2);
     }
     ntbytes += bsize2;
   }
