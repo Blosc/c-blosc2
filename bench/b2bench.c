@@ -71,13 +71,13 @@ double get_usec_chunk(blosc_timestamp_t last, blosc_timestamp_t current,
 
 
 int get_value(int i, int rshift) {
-  int v;
-
-  v = (i << 26) ^ (i << 18) ^ (i << 11) ^ (i << 3) ^ i;
+  // Shift unsigned values, as shifting bits out of a signed int is undefined
+  uint32_t u = (uint32_t)i;
+  uint32_t v = (u << 26) ^ (u << 18) ^ (u << 11) ^ (u << 3) ^ u;
   if (rshift < 32) {
-    v &= (1 << rshift) - 1;
+    v &= (1u << rshift) - 1;
   }
-  return v;
+  return (int)v;
 }
 
 
