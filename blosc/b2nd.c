@@ -1333,13 +1333,30 @@ static int slice_gather_prefilter(blosc2_prefilter_params *params) {
 }
 
 
+// A temporary of a slice read or write on `array`, released with
+// blosc2_tmp_free(ptr, *capacity).  Frames do not keep the buffers handed to
+// them, so their slice temporaries cycle through the per-thread cache.  Plain
+// in-memory super-chunks keep each new chunk, and caching their scratch
+// changes how glibc places those chunks (its mmap threshold follows the
+// buffers freed) for the worse; their buffers are plain malloc ones (of no
+// capacity, which blosc2_tmp_free() frees).
+static uint8_t *scratch_malloc(const b2nd_array_t *array, int32_t nbytes, size_t *capacity) {
+  if (array->sc->frame != NULL) {
+    return blosc2_tmp_malloc((size_t) nbytes, capacity);
+  }
+  *capacity = 0;
+  return malloc((size_t) nbytes);
+}
+
+
 // Compress `src` as chunk `nchunk` and store it.  With `gather`, the blocks
 // are assembled by slice_gather_prefilter() and `src` is only read for the
 // old contents of partly overwritten blocks.
 static int compress_update_chunk(b2nd_array_t *array, int64_t nchunk, const uint8_t *src,
                                  int32_t nbytes, slice_chunk_t *gather) {
   int32_t chunk_nbytes = nbytes + BLOSC2_MAX_OVERHEAD;
-  uint8_t *chunk = malloc(chunk_nbytes);
+  size_t chunk_capacity;
+  uint8_t *chunk = scratch_malloc(array, chunk_nbytes, &chunk_capacity);
   BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
   // Update current_chunk in case a prefilter is applied
   array->sc->current_nchunk = nchunk;
@@ -1358,15 +1375,21 @@ static int compress_update_chunk(b2nd_array_t *array, int64_t nchunk, const uint
     cctx->preparams = saved_preparams;
   }
   if (brc < 0) {
-    free(chunk);
+    blosc2_tmp_free(chunk, chunk_capacity);
     BLOSC_TRACE_ERROR("Blosc can not compress the data");
     return BLOSC2_ERROR_FAILURE;
   }
-  int64_t brc_ = blosc2_schunk_update_chunk(array->sc, nchunk, chunk, false);
+  // A frame stores its own copy of the chunk, so it is lent a reused buffer; an
+  // in-memory super-chunk keeps the buffer itself
+  bool in_frame = array->sc->frame != NULL;
+  int64_t brc_ = in_frame ? schunk_update_chunk_lent(array->sc, nchunk, chunk)
+                          : blosc2_schunk_update_chunk(array->sc, nchunk, chunk, false);
+  if (in_frame || brc_ < 0) {
+    // A failed update leaves the chunk to us
+    blosc2_tmp_free(chunk, chunk_capacity);
+  }
   if (brc_ < 0) {
     BLOSC_TRACE_ERROR("Blosc can not update the chunk");
-    // A failed update leaves the chunk to us
-    free(chunk);
     return BLOSC2_ERROR_FAILURE;
   }
   return BLOSC2_ERROR_SUCCESS;
@@ -1466,13 +1489,15 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     }
   }
 
-  // Chunk-sized scratch, allocated lazily: the compact get path below never
-  // needs it, and for large chunks just the malloc/free pair costs
-  // O(chunksize) in page-table work (it is way above the malloc mmap
-  // threshold), which would dominate small reads.
+  // Chunk-sized scratch (see scratch_malloc()), allocated lazily: the compact
+  // get path below never needs it, and for large chunks just the malloc/free
+  // pair costs O(chunksize) in page-table work (it is way above the malloc
+  // mmap threshold), which would dominate small reads.
   uint8_t *data = NULL;
+  size_t data_capacity = 0;
   // Block-sized scratch for the compact get path (lazily allocated too).
   uint8_t *block_data = NULL;
+  size_t block_data_capacity = 0;
   int32_t block_nbytes = (int32_t) (array->blocknitems * array->sc->typesize);
   bool *block_maskout = NULL;
   int rc = BLOSC2_ERROR_SUCCESS;
@@ -1612,7 +1637,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     int32_t lazychunk_cbytes = 0;
     if (set_slice) {
       if (data == NULL) {
-        data = malloc(data_nbytes);
+        data = scratch_malloc(array, data_nbytes, &data_capacity);
         if (data == NULL) {
           rc = BLOSC2_ERROR_MEMORY_ALLOC;
           goto out;
@@ -1730,7 +1755,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
           goto out;
         }
         if (block_data == NULL) {
-          block_data = malloc(block_nbytes);
+          block_data = scratch_malloc(array, block_nbytes, &block_data_capacity);
           if (block_data == NULL) {
             if (lazychunk_needs_free) {
               free(lazychunk);
@@ -1741,7 +1766,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
         }
       } else {
         if (data == NULL) {
-          data = malloc(data_nbytes);
+          data = scratch_malloc(array, data_nbytes, &data_capacity);
           if (data == NULL) {
             rc = BLOSC2_ERROR_MEMORY_ALLOC;
             goto out;
@@ -1844,8 +1869,8 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   }
 
   out:
-  free(data);
-  free(block_data);
+  blosc2_tmp_free(data, data_capacity);
+  blosc2_tmp_free(block_data, block_data_capacity);
   free(block_maskout);
 
   return rc;

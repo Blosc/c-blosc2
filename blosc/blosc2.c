@@ -6281,6 +6281,144 @@ int blosc2_free_resources(void) {
 }
 
 
+#define BLOSC2_TMP_CACHE_SLOTS 4
+#define BLOSC2_TMP_CACHE_MIN (64 * 1024)
+#define BLOSC2_TMP_CACHE_MAX (64 * 1024 * 1024)
+
+#if !defined(_WIN32)
+typedef struct {
+  void *ptr[BLOSC2_TMP_CACHE_SLOTS];
+  size_t size[BLOSC2_TMP_CACHE_SLOTS];
+} tmp_cache_t;
+
+static pthread_key_t tmp_cache_key;
+static pthread_once_t tmp_cache_once = PTHREAD_ONCE_INIT;
+static bool tmp_cache_ready = false;
+
+static void tmp_cache_release(void *arg) {
+  tmp_cache_t *cache = arg;
+  for (int i = 0; i < BLOSC2_TMP_CACHE_SLOTS; ++i) {
+    free(cache->ptr[i]);
+  }
+  free(cache);
+}
+
+static void tmp_cache_init(void) {
+  tmp_cache_ready = pthread_key_create(&tmp_cache_key, tmp_cache_release) == 0;
+}
+
+static tmp_cache_t *tmp_cache_get(bool create) {
+  pthread_once(&tmp_cache_once, tmp_cache_init);
+  if (!tmp_cache_ready) {
+    return NULL;
+  }
+  tmp_cache_t *cache = pthread_getspecific(tmp_cache_key);
+  if (cache == NULL && create) {
+    cache = calloc(1, sizeof(tmp_cache_t));
+    if (cache != NULL && pthread_setspecific(tmp_cache_key, cache) != 0) {
+      free(cache);
+      cache = NULL;
+    }
+  }
+  return cache;
+}
+#endif
+
+void *blosc2_tmp_malloc(size_t nbytes, size_t *capacity) {
+  *capacity = nbytes;
+#if !defined(_WIN32)
+  tmp_cache_t *cache = nbytes >= BLOSC2_TMP_CACHE_MIN ? tmp_cache_get(false) : NULL;
+  if (cache != NULL) {
+    // The smallest buffer that fits, and not one far larger than needed
+    int best = -1;
+    for (int i = 0; i < BLOSC2_TMP_CACHE_SLOTS; ++i) {
+      if (cache->ptr[i] != NULL && cache->size[i] >= nbytes && cache->size[i] / 2 <= nbytes &&
+          (best < 0 || cache->size[i] < cache->size[best])) {
+        best = i;
+      }
+    }
+    if (best >= 0) {
+      void *ptr = cache->ptr[best];
+      *capacity = cache->size[best];
+      cache->ptr[best] = NULL;
+      cache->size[best] = 0;
+      return ptr;
+    }
+  }
+#endif
+  return malloc(nbytes);
+}
+
+void blosc2_tmp_free(void *ptr, size_t capacity) {
+  if (ptr == NULL) {
+    return;
+  }
+#if !defined(_WIN32)
+  tmp_cache_t *cache = NULL;
+  if (capacity >= BLOSC2_TMP_CACHE_MIN && capacity <= BLOSC2_TMP_CACHE_MAX / 2) {
+    cache = tmp_cache_get(true);
+  }
+  if (cache != NULL) {
+    // Make room by dropping the smallest buffers (each one smaller than this)
+    for (;;) {
+      size_t total = capacity;
+      int empty = -1;
+      int smallest = -1;
+      for (int i = 0; i < BLOSC2_TMP_CACHE_SLOTS; ++i) {
+        if (cache->ptr[i] == NULL) {
+          empty = i;
+          continue;
+        }
+        total += cache->size[i];
+        if (smallest < 0 || cache->size[i] < cache->size[smallest]) {
+          smallest = i;
+        }
+      }
+      if (empty >= 0 && total <= BLOSC2_TMP_CACHE_MAX) {
+        cache->ptr[empty] = ptr;
+        cache->size[empty] = capacity;
+        return;
+      }
+      if (smallest < 0 || cache->size[smallest] >= capacity) {
+        break;
+      }
+      free(cache->ptr[smallest]);
+      cache->ptr[smallest] = NULL;
+      cache->size[smallest] = 0;
+    }
+  }
+#else
+  BLOSC_UNUSED_PARAM(capacity);
+#endif
+  free(ptr);
+}
+
+void blosc2_tmp_cache_clear(void) {
+#if !defined(_WIN32)
+  tmp_cache_t *cache = tmp_cache_get(false);
+  if (cache != NULL) {
+    for (int i = 0; i < BLOSC2_TMP_CACHE_SLOTS; ++i) {
+      free(cache->ptr[i]);
+      cache->ptr[i] = NULL;
+      cache->size[i] = 0;
+    }
+  }
+#endif
+}
+
+size_t blosc2_tmp_cache_nbytes(void) {
+  size_t nbytes = 0;
+#if !defined(_WIN32)
+  tmp_cache_t *cache = tmp_cache_get(false);
+  if (cache != NULL) {
+    for (int i = 0; i < BLOSC2_TMP_CACHE_SLOTS; ++i) {
+      nbytes += cache->size[i];
+    }
+  }
+#endif
+  return nbytes;
+}
+
 void blosc2_destroy(void) {
   /* Return if Blosc is not initialized */
   if (!g_initlib) return;
@@ -6288,6 +6426,7 @@ void blosc2_destroy(void) {
   blosc2_free_resources();
   g_initlib = 0;
   blosc2_free_ctx(g_global_context);
+  blosc2_tmp_cache_clear();
 
   /* Bump the epoch so any live context can detect its pool is now stale.
    * Do this before freeing the pools so that release_thread_backend callers

@@ -1077,8 +1077,36 @@ static int schunk_get_counted_sizes(blosc2_schunk *schunk, int64_t nchunk, int32
 }
 
 
+/* How a chunk write hands over its chunk */
+typedef enum {
+  CHUNK_GIVEN,   // copy=false: the super-chunk owns the chunk after a successful write
+  CHUNK_COPIED,  // copy=true: the caller keeps the chunk
+  CHUNK_LENT,    // the caller keeps the chunk, which is private memory (see schunk_update_chunk_lent())
+} chunk_handover;
+
+
+/* Whether a write of a chunk handed over as `how` into `frame` (NULL for a plain super-chunk)
+   needs a private copy of it.  A plain super-chunk keeps the chunk itself.  A frame stores its
+   own copy, but a chunk that the caller keeps may point into storage that the write moves
+   (realloc, mremap) or overwrites (the tail that an update shifts): of this frame, or of
+   another handle (or process) that maps the same file.  Only a lent chunk is known not to. */
+static bool chunk_needs_private_copy(const blosc2_frame_s *frame, chunk_handover how) {
+  return how == CHUNK_COPIED || (how == CHUNK_LENT && frame == NULL);
+}
+
+
+/* Free what a write of `chunk` (handed over as `how`, maybe a private copy) into a frame leaves
+   to the schunk layer: the frame stores its own copy of the chunk, so a private copy goes in any
+   case, and a given chunk once `written`; a failed write leaves any other chunk to the caller. */
+static void frame_write_done(uint8_t *chunk, chunk_handover how, bool private_copy, bool written) {
+  if (private_copy || (written && how == CHUNK_GIVEN)) {
+    free(chunk);
+  }
+}
+
+
 /* Append an existing chunk into a super-chunk. */
-static int64_t schunk_append_chunk_unlocked(blosc2_schunk *schunk, uint8_t *chunk, bool copy) {
+static int64_t schunk_append_chunk_unlocked(blosc2_schunk *schunk, uint8_t *chunk, chunk_handover how) {
   int32_t chunk_nbytes;
   int32_t chunk_cbytes;
   int64_t nchunks = schunk->nchunks;
@@ -1134,7 +1162,9 @@ static int64_t schunk_append_chunk_unlocked(blosc2_schunk *schunk, uint8_t *chun
     schunk->cbytes += chunk_cbytes;
   }
 
-  if (copy) {
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+  bool private_copy = chunk_needs_private_copy(frame, how);
+  if (private_copy) {
     // Make a copy of the chunk
     uint8_t *chunk_copy = malloc(chunk_cbytes);
     memcpy(chunk_copy, chunk, chunk_cbytes);
@@ -1142,9 +1172,8 @@ static int64_t schunk_append_chunk_unlocked(blosc2_schunk *schunk, uint8_t *chun
   }
 
   // Update super-chunk or frame
-  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (frame == NULL) {
-    if (!copy && (chunk_cbytes < chunk_nbytes)) {
+    if (how == CHUNK_GIVEN && (chunk_cbytes < chunk_nbytes)) {
       // We still want to do a shrink of the chunk
       chunk = realloc(chunk, chunk_cbytes);
     }
@@ -1158,11 +1187,10 @@ static int64_t schunk_append_chunk_unlocked(blosc2_schunk *schunk, uint8_t *chun
     schunk->data[nchunks] = chunk;
   }
   else {
-    if (frame_append_chunk(frame, chunk, schunk) == NULL) {
+    bool written = frame_append_chunk(frame, chunk, schunk) != NULL;
+    frame_write_done(chunk, how, private_copy, written);
+    if (!written) {
       BLOSC_TRACE_ERROR("Problems appending a chunk.");
-      if (copy) {
-        free(chunk);
-      }
       schunk->flags2 = old_flags2;
       schunk->chunksize = old_chunksize;
       schunk->current_nchunk = old_current_nchunk;
@@ -1191,14 +1219,15 @@ int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *chunk, bool c
     frame_unlock(frame);
     return rc;
   }
-  int64_t nchunks = schunk_append_chunk_unlocked(schunk, chunk, copy);
+  int64_t nchunks = schunk_append_chunk_unlocked(schunk, chunk, copy ? CHUNK_COPIED : CHUNK_GIVEN);
   frame_unlock(frame);
   return nchunks;
 }
 
 
 /* Insert an existing @p chunk in a specified position on a super-chunk */
-static int64_t schunk_insert_chunk_unlocked(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk, bool copy) {
+static int64_t schunk_insert_chunk_unlocked(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk,
+                                            chunk_handover how) {
   int rc = validate_nchunk(schunk, nchunk, true, "blosc2_schunk_insert_chunk");
   if (rc < 0) {
     return rc;
@@ -1259,7 +1288,9 @@ static int64_t schunk_insert_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
     schunk->cbytes += chunk_cbytes;
   }
 
-  if (copy) {
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+  bool private_copy = chunk_needs_private_copy(frame, how);
+  if (private_copy) {
     // Make a copy of the chunk
     uint8_t *chunk_copy = malloc(chunk_cbytes);
     memcpy(chunk_copy, chunk, chunk_cbytes);
@@ -1267,9 +1298,8 @@ static int64_t schunk_insert_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
   }
 
   // Update super-chunk or frame
-  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   if (frame == NULL) {
-    if (!copy && (chunk_cbytes < chunk_nbytes)) {
+    if (how == CHUNK_GIVEN && (chunk_cbytes < chunk_nbytes)) {
       // We still want to do a shrink of the chunk
       chunk = realloc(chunk, chunk_cbytes);
     }
@@ -1289,11 +1319,10 @@ static int64_t schunk_insert_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
   }
 
   else {
-    if (frame_insert_chunk(frame, nchunk, chunk, schunk) == NULL) {
+    bool written = frame_insert_chunk(frame, nchunk, chunk, schunk) != NULL;
+    frame_write_done(chunk, how, private_copy, written);
+    if (!written) {
       BLOSC_TRACE_ERROR("Problems inserting a chunk in a frame.");
-      if (copy) {
-        free(chunk);
-      }
       schunk->flags2 = old_flags2;
       schunk->chunksize = old_chunksize;
       schunk->current_nchunk = old_current_nchunk;
@@ -1321,13 +1350,14 @@ int64_t blosc2_schunk_insert_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_
     frame_unlock(frame);
     return rc;
   }
-  int64_t nchunks = schunk_insert_chunk_unlocked(schunk, nchunk, chunk, copy);
+  int64_t nchunks = schunk_insert_chunk_unlocked(schunk, nchunk, chunk, copy ? CHUNK_COPIED : CHUNK_GIVEN);
   frame_unlock(frame);
   return nchunks;
 }
 
 
-static int64_t schunk_update_chunk_unlocked(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk, bool copy) {
+static int64_t schunk_update_chunk_unlocked(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk,
+                                            chunk_handover how) {
   int rc = validate_nchunk(schunk, nchunk, false, "blosc2_schunk_update_chunk");
   if (rc < 0) {
     return rc;
@@ -1392,14 +1422,15 @@ static int64_t schunk_update_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
   }
   schunk->current_nchunk = nchunk;
 
-  if (copy) {
+  blosc2_frame_s* frame = (blosc2_frame_s*)(schunk->frame);
+  bool private_copy = chunk_needs_private_copy(frame, how);
+  if (private_copy) {
     // Make a copy of the chunk
     uint8_t *chunk_copy = malloc(chunk_cbytes);
     memcpy(chunk_copy, chunk, chunk_cbytes);
     chunk = chunk_copy;
   }
 
-  blosc2_frame_s* frame = (blosc2_frame_s*)(schunk->frame);
   if (schunk->frame == NULL) {
     /* Update counters */
     schunk->nbytes += chunk_nbytes;
@@ -1418,7 +1449,7 @@ static int64_t schunk_update_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
 
   // Update super-chunk or frame
   if (schunk->frame == NULL) {
-    if (!copy && (chunk_cbytes < chunk_nbytes)) {
+    if (how == CHUNK_GIVEN && (chunk_cbytes < chunk_nbytes)) {
       // We still want to do a shrink of the chunk
       chunk = realloc(chunk, chunk_cbytes);
     }
@@ -1430,33 +1461,42 @@ static int64_t schunk_update_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
     schunk->data[nchunk] = chunk;
   }
   else {
-    if (frame_update_chunk(frame, nchunk, chunk, schunk, chunk_cbytes_old) == NULL) {
-        BLOSC_TRACE_ERROR("Problems updating a chunk in a frame.");
-        if (copy) {
-          free(chunk);
-        }
-        schunk->flags2 = old_flags2;
-        schunk->chunksize = old_chunksize;
-        schunk->current_nchunk = old_current_nchunk;
-        schunk->nbytes = old_nbytes;
-        schunk->cbytes = old_cbytes;
-        return BLOSC2_ERROR_CHUNK_UPDATE;
+    bool written = frame_update_chunk(frame, nchunk, chunk, schunk, chunk_cbytes_old) != NULL;
+    frame_write_done(chunk, how, private_copy, written);
+    if (!written) {
+      BLOSC_TRACE_ERROR("Problems updating a chunk in a frame.");
+      schunk->flags2 = old_flags2;
+      schunk->chunksize = old_chunksize;
+      schunk->current_nchunk = old_current_nchunk;
+      schunk->nbytes = old_nbytes;
+      schunk->cbytes = old_cbytes;
+      return BLOSC2_ERROR_CHUNK_UPDATE;
     }
   }
 
   return schunk->nchunks;
 }
 
-/* Update the chunk at a specified position of a super-chunk. */
-int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk, bool copy) {
+static int64_t schunk_update_chunk_locked(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk,
+                                          chunk_handover how) {
   blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
   int rc = frame_lock(frame, true);
   if (rc < 0) {
     return rc;
   }
-  int64_t nchunks = schunk_update_chunk_unlocked(schunk, nchunk, chunk, copy);
+  int64_t nchunks = schunk_update_chunk_unlocked(schunk, nchunk, chunk, how);
   frame_unlock(frame);
   return nchunks;
+}
+
+/* Update the chunk at a specified position of a super-chunk. */
+int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk, bool copy) {
+  return schunk_update_chunk_locked(schunk, nchunk, chunk, copy ? CHUNK_COPIED : CHUNK_GIVEN);
+}
+
+/* See blosc-private.h */
+int64_t schunk_update_chunk_lent(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk) {
+  return schunk_update_chunk_locked(schunk, nchunk, chunk, CHUNK_LENT);
 }
 
 

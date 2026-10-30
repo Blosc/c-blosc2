@@ -179,6 +179,11 @@ static inline bool chunksize_after_adding(int32_t *chunksize, int64_t nchunks, i
   return true;
 }
 
+/* blosc2_schunk_update_chunk(schunk, nchunk, chunk, true) for a chunk in private memory of the
+   caller, which keeps it: unlike a chunk that may point anywhere, a frame writes it out without
+   copying it first.  It must not point into the storage of any frame (in memory or mapped). */
+int64_t schunk_update_chunk_lent(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk);
+
 /* Decompress chunk `nchunk` of `schunk`, or `chunk` (`cbytes` long) if it is not NULL,
    with the decompression context of `schunk`, decoding only the blocks that `maskout`
    (`nblocks` items) leaves in and, if `postfilter` is not NULL, running it (with
@@ -285,6 +290,21 @@ int fill_tuner(blosc2_tuner *tuner);
 
 extern blosc2_tuner g_tuners[256];
 extern int g_ntuners;
+
+/* Large short-lived buffers (chunk scratch, compressed chunks) cycle through a
+   small per-thread cache instead of malloc/free on every call: glibc trims
+   freed memory at the top of the heap back to the kernel, so a buffer of
+   several MB freed per call is page-faulted in again by the next one.
+   blosc2_tmp_malloc() returns memory for at least `nbytes` (malloc'ed, so it
+   may be released with plain free()) and its real size in *capacity;
+   blosc2_tmp_free() keeps it for reuse or frees it.  At most
+   BLOSC2_TMP_CACHE_MAX bytes stay cached per thread, released at thread exit
+   or by blosc2_destroy() for the calling thread. */
+void *blosc2_tmp_malloc(size_t nbytes, size_t *capacity);
+void blosc2_tmp_free(void *ptr, size_t capacity);
+void blosc2_tmp_cache_clear(void);
+/* Bytes currently held by the calling thread's cache (for tests). */
+size_t blosc2_tmp_cache_nbytes(void);
 
 
 #if defined(_WIN32)
