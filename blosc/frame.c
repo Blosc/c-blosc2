@@ -2295,12 +2295,16 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     }
   }
 
-  // Copy the offsets chunk at the end of the frame
+  // Copy the offsets chunk at the end of the frame (there is none without chunks)
   if (frame->urlpath == NULL) {
-    memcpy(frame->cframe + h2len + cbytes, off_chunk, off_cbytes);
+    if (off_cbytes > 0) {
+      memcpy(frame->cframe + h2len + cbytes, off_chunk, off_cbytes);
+    }
   }
   else {
-    io_cb->write(off_chunk, off_cbytes, 1, io_pos, fp);
+    if (off_cbytes > 0) {
+      io_cb->write(off_chunk, off_cbytes, 1, io_pos, fp);
+    }
     io_cb->close(fp);
     // The file was created from scratch, so its size is exactly what we wrote
     frame->file_end = frame->sframe ? 0 : io_pos + off_cbytes;
